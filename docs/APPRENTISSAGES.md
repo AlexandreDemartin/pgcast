@@ -45,6 +45,8 @@ Candidats à un contrôle, une règle ou une ligne de skill.
 - 1.6 — `git commit --no-edit` après un merge résolu garde les lignes `# Conflicts:` : écrire le message avec `-m` — `builder`
 - 1.6 — Un `paths` redéfini dans un tsconfig enfant efface celui du parent (`"*": ["src/typings/*"]`) : c'est ce qui laisse `zapatos/schema` au module ambiant généré — `builder`
 - 1.6 — `scripts/` n'a ni lint ni tests : un garde-fou de script se vérifie par essais rapportés, ou s'extrait en fonction testable — `builder`
+- 1.7 — Réécrire une section Markdown par une regex `re.S` a laissé `.*` courir jusqu'à la fin du fichier : remplacer une section exacte, ou vérifier `git diff --stat` avant de commiter — `builder`
+- 1.7 — Dans un tableau Markdown, un nom de test qui contient des backticks demande un code span à double backtick — `builder`
 
 ## Mineurs gardés
 
