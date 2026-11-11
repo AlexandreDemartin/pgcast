@@ -28,6 +28,11 @@ Candidats à un contrôle, une règle ou une ligne de skill.
 - 1.3 — Une surprise vue sur un cas s'essaie en changeant un paramètre avant d'être écrite en règle (niveau d'isolation : warning ou 25001) — `branch-reviewer`
 - 1.3 — `npx vitest run -u <fichier>` a parfois relancé toute la suite : vérifier `git status` après — `builder`
 - 1.3 — Un worktree dont `node_modules` est un lien vers le checkout écrit dans son cache (`node_modules/.cache/pgcast`) — `branch-reviewer`
+- 1.5 — Un test « rien n'a fui » placé en dernier ne prouve rien lancé seul ou mélangé : l'isolement se vérifie dans le test même, en relisant par une autre connexion — `branch-reviewer`, `test/integration/injection.test.ts`
+- 1.5 — Les points d'entrée d'injection se listent en cherchant `raw(` et les interpolations dans `src/`, pas en suivant la doc des options ; un paramètre public « used internally » (`aggregate`) reste un point d'entrée (candidat : skill `sql-safety`) — `branch-reviewer`
+- 1.5 — Vitest `-t` prend une regex JS : `a\|b` ne trouve rien — `builder`
+- 1.5 — `toMatchInlineSnapshot` écrit un octet nul brut dans la source : le remplacer par un marqueur visible avant de figer — `builder`
+- 1.5 — Dans une boucle de reprise, `git push … | tail` masque le code de sortie : tester la commande elle-même — `builder`
 
 ## Mineurs gardés
 
