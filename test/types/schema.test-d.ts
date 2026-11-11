@@ -75,7 +75,9 @@ describe('identity column', () => {
     type Int8 = number | db.Int8String | bigint;
     expectTypeOf<s.accounts.Insertable['id']>()
       .toEqualTypeOf<Int8 | db.Parameter<Int8> | db.DefaultType | db.SQLFragment | undefined>();
-    expectTypeOf<'id' & keyof s.accounts.Updatable>().toEqualTypeOf<'id'>();
+    expectTypeOf<s.accounts.Updatable['id']>()
+      .toEqualTypeOf<Int8 | db.Parameter<Int8> | db.DefaultType | db.SQLFragment
+        | db.SQLFragment<any, Int8 | db.Parameter<Int8> | db.DefaultType | db.SQLFragment> | undefined>();
   });
 });
 
@@ -161,6 +163,8 @@ describe('views', () => {
   test('characterization: a view (active_users) has an Insertable, every column optional and nullable', () => {
     // characterization: the codegen cannot tell an updatable view; NOT NULL of users.id is lost
     expectTypeOf<s.active_users.Selectable['id']>().toEqualTypeOf<number | null>();
+    expectTypeOf<s.active_users.Insertable['id']>()
+      .toEqualTypeOf<number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment | undefined>();
     expectTypeOf<s.active_users.Insertable['display_name']>()
       .toEqualTypeOf<string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment | undefined>();
   });
