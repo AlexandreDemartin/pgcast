@@ -12,10 +12,10 @@ Une règle écrite (`AGENTS.md`, un skill, une note acceptée) gagne toujours : 
 Dans cet ordre, s'arrêter dès que la réponse est écrite :
 
 1. `AGENTS.md` § Philosophie et § Points d'arrêt.
-2. `docs/decisions/` (notes acceptées), puis `docs/ROADMAP.md`.
+2. `docs/decisions/` (notes acceptées), puis l'Epic du chapitre (`gh issue view`).
 3. Le skill du sujet (`.agents/README.md` § Carte des skills).
 4. Le code de Zapatos qui résout déjà le même problème.
-5. L'usage réel dans Project A et Project B (skill `consumer-usage`).
+5. L'usage réel du corpus (skill `consumer-usage`).
 6. Le standard du marché : la doc Postgres, puis pgTyped, sqlc, Kysely, Slonik.
 
 - **Trouvé** : appliquer sans rediscuter ; une meilleure idée se propose, ne s'impose pas.

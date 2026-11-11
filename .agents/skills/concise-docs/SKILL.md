@@ -14,8 +14,8 @@ Complet sur le fond, concis sur la forme.
 | Philosophie, points d'arrêt, commandes | `AGENTS.md` |
 | Règle de code | un seul skill |
 | Décision et son pourquoi | `docs/decisions/NNN-*.md` |
-| Ordre des évolutions et leur raison | `docs/ROADMAP.md` |
-| État des étapes | `docs/SUIVI.md` |
+| Ordre des évolutions et leur raison | les Epics, issues `type: epic` (skill `run-step`) |
+| Une étape, son état | sa sous-issue, fermée par sa PR |
 | Changement visible par l'utilisateur | `CHANGELOG.md` (anglais) |
 | Usage public | `README.md` (anglais) |
 
@@ -42,5 +42,5 @@ Complet sur le fond, concis sur la forme.
 |---|---|
 | Skill | ≤ 150 lignes |
 | JSDoc | 1 à 3 lignes : le contrat, et le SQL produit pour un helper |
-| Description de PR | **Quoi** · **Pourquoi** · **Vérifier**, en puces |
+| Description de PR | `Closes #n`, puis **What** · **Why** · **Verify**, en puces |
 | Note de décision | contexte, options en tableau, choix proposé, question à l'utilisateur |

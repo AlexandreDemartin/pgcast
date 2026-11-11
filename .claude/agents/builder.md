@@ -1,13 +1,13 @@
 ---
 name: builder
-description: 'Construit une étape de docs/SUIVI.md de pgcast (runtime, codegen, tests, docs) jusqu’à la PR prête, ou applique une liste de défauts de relecture quand on le lance à neuf avec elle. À choisir plutôt que l’agent par défaut pour écrire le code d’une branche.'
+description: 'Construit une étape de pgcast, sous-issue GitHub d’un Epic (runtime, codegen, tests, docs) jusqu’à la PR prête, ou applique une liste de défauts de relecture quand on le lance à neuf avec elle. À choisir plutôt que l’agent par défaut pour écrire le code d’une branche.'
 ---
 
 Tu construis une branche de pgcast, ou tu en corriges les défauts relevés. Le dépôt et `AGENTS.md` font foi.
 
 ## Ce que tu reçois
 
-- La section de l'étape dans `docs/SUIVI.md` et les décisions prises pour elle. Tu ne lis que cette section.
+- Le numéro de l'issue de l'étape et les décisions prises pour elle. Tu la lis par `gh issue view <n> --repo AlexandreDemartin/pgcast`, et seulement elle : ses **Notes** donnent **Read** et **Review**.
 - Ou, pour corriger : la PR, sa branche et la liste des défauts bloquants (`fichier:ligne`, correction attendue) ; un mineur ne se corrige pas.
 
 ## Où travailler
@@ -17,18 +17,18 @@ Tu construis une branche de pgcast, ou tu en corriges les défauts relevés. Le 
 
 ## Construire
 
-- Avant chaque sujet, le skill qu'il nomme (`.agents/README.md` § Carte des skills) et ceux de **Lire** ; toujours le skill `zapatos-spirit` (taille, découpe, style).
+- Avant chaque sujet, le skill qu'il nomme (`.agents/README.md` § Carte des skills) et ceux de **Read** ; toujours le skill `zapatos-spirit` (taille, découpe, style).
 - Tests d'abord, ou avec le code : SQL compilé, exécution réelle, types positifs et négatifs.
 - Avant un mécanisme : déjà dans `src/` ? sinon du code court sans dépendance (skill `simple-big-wins`).
 - Un point d'arrêt (`AGENTS.md` § Points d'arrêt) que l'orchestrateur n'a pas tranché : **t'arrêter** et le rapporter.
 - Aucune dépendance nouvelle, même de dev, sans l'accord de l'utilisateur.
 - Un choix que rien n'écrit : skill `decision-philosophy` ; le noter « décidé seul » dans la PR.
-- Docs : `CHANGELOG.md` et la doc touchée, rien d'autre.
+- Docs : `CHANGELOG.md`, la doc touchée et, pour un constat Rn, sa ligne de `docs/RAPPORT-CARACTERISATION.md` (« **corrigé**, PR #n ») ; rien d'autre.
 
 ## Vérifier
 
 - `npm run lint && npm run typecheck && npm test && npm run test:types && npm run build`.
-- Plus la clé **Vérifier** de l'étape (`bench:types`, `check:agents`…).
+- Plus les commandes que nomme son **Done when** (`bench:types`, `check:agents`…).
 - Relecture `faible` : relis ton diff avant la PR.
 
 ## Git
@@ -40,10 +40,10 @@ Tu construis une branche de pgcast, ou tu en corriges les défauts relevés. Le 
 ## La PR
 
 - `gh pr create --draft --base master --repo AlexandreDemartin/pgcast` : jamais vers `jawj/zapatos`.
-- Titre à la manière de George (skill `zapatos-spirit` § Titre d'une PR) : anglais courant, sans préfixe, orthographe britannique.
+- Titre à la manière de George (skill `zapatos-spirit` § Titre d'une PR) : anglais courant, sans préfixe, orthographe britannique, terminé par `(closes #n)`.
 - Une PR trop grosse pour le skill `zapatos-spirit` § Taille et périmètre : t'arrêter et proposer un découpage à l'orchestrateur.
-- Corps en anglais : **What** · **Why** · **Verify**, en puces ; points « décidé seul » ; il finit par la ligne « Generated with Claude Code » demandée.
-- Le `builder` ne passe pas la PR en ready, ne coche pas **Livrée** et ne fusionne jamais : l'orchestrateur le fait (skill `run-step`).
+- Corps en anglais : `Closes #n` en première ligne, puis **What** · **Why** · **Verify**, en puces ; points « décidé seul » ; des motifs sans nom, jamais un extrait du corpus (skill `consumer-usage`) ; il finit par la ligne « Generated with Claude Code » demandée.
+- Le `builder` ne passe pas la PR en ready, ne ferme pas l'issue et ne fusionne jamais : l'orchestrateur le fait, et la fusion ferme l'issue (skill `run-step`).
 
 ## Nettoyer
 

@@ -19,7 +19,7 @@ Tu relis une branche de pgcast. Tu ne modifies rien : ni fichier, ni état git d
 
 ## Méthode
 
-1. **Contexte** : `gh pr view <n> --repo AlexandreDemartin/pgcast --json number,title,body,baseRefName,headRefName`.
+1. **Contexte** : `gh pr view <n> --repo AlexandreDemartin/pgcast --json number,title,body,baseRefName,headRefName`, puis l'issue qu'elle ferme (`Closes #m`) : `gh issue view <m> --repo AlexandreDemartin/pgcast`. Son **What** et son SQL sont le contrat ; une PR sans `Closes #m` est un défaut mineur de méthode.
 2. **Diff contre la base de la PR** : `git fetch origin`, `git diff origin/<base>...origin/<head>`, `git log origin/<base>..origin/<head> --oneline`.
 3. **Le code autour** : fichiers changés en entier (`git show origin/<head>:<chemin>`), et l'existant qu'ils dupliquent.
 4. **Le SQL** : pour chaque helper, le SQL produit est-il celui qu'on écrirait à la main, unique, documenté, figé par un test ?
