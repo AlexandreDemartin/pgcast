@@ -1,7 +1,7 @@
 # 003 — Correctifs cassants : corriger, ou déprécier
 
 - **Statut** : accepté (2026-11-12), par délégation de l'utilisateur : « la meilleure solution selon la philosophie, ne pas tout casser, du deprecated fonctionnel et signalé ».
-- **Portée** : les constats « cassant » de [RAPPORT-CARACTERISATION.md](../RAPPORT-CARACTERISATION.md), chapitre 2 de [SUIVI.md](../SUIVI.md).
+- **Portée** : les constats « cassant » de [RAPPORT-CARACTERISATION.md](../RAPPORT-CARACTERISATION.md), chapitre 2 (Epic [#18](https://github.com/AlexandreDemartin/pgcast/issues/18)).
 
 ## Contexte
 
