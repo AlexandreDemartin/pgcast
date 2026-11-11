@@ -57,7 +57,7 @@ Le code généré et le runtime parlent de `zapatos/schema`, `zapatos/db` et `za
 | `npm run build` | `tsc` (CJS, ES2019) + wrappers ESM |
 | `npm run lint` | ESLint 9 (flat config) sur `src/` |
 | `npm run typecheck` | `tsc --noEmit` sur la lib et sur `test/` |
-| `npm test` | Vitest (runtime) |
+| `npm test` | Vitest : unitaires et intégration (`TEST_DATABASE_URL` requis, `useTestDatabase()` dans `test/helpers/db.ts`) |
 | `npm run test:watch` | Vitest en watch |
 | `npm run test:types` | tests de types Vitest (`*.test-d.ts`, `expectTypeOf`) |
 | `npm run bench:types` | benchmark du temps de compilation (arrive à l'étape 1.5) |
