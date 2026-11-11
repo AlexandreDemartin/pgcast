@@ -43,9 +43,10 @@ describe('param, parent, self', () => {
   });
 
   test('characterization: parent() is not checked against the parent table', () => {
-    // characterization: Column is every table's column; owner_id is not a users column
-    db.select('accounts', db.all, { lateral: { u: db.selectOne('users', { id: db.parent('owner_id') }) } });
+    // characterization: Column is every table's column; owner_id is not a users column,
+    // sku (products) is a column of neither users nor accounts
     db.select('users', db.all, { lateral: { u: db.selectOne('accounts', { owner_id: db.parent('owner_id') }) } });
+    db.select('users', db.all, { lateral: { u: db.selectOne('accounts', { owner_id: db.parent('sku') }) } });
   });
 
   test('self is a unique symbol', () => {
@@ -88,16 +89,20 @@ describe('type surprises', () => {
     db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { display_name: 'x' } });
   });
 
-  test('characterization: add() refuses a Parameter, which the runtime accepts', () => {
+  test('characterization: add() and subtract() refuse a Parameter, which the runtime accepts', () => {
     // characterization: add<T extends number | Date>; conditionalParam() passes a Parameter through
-    // @ts-expect-error Parameter<number> is not number | Date
-    db.update('accounts', { balance: c.add(db.param(1)) }, { id: 1 });
+    // @ts-expect-error Parameter<number> is not number | Date (add)
+    c.add(db.param(1));
+    // @ts-expect-error Parameter<number> is not number | Date (subtract)
+    c.subtract(db.param(1));
   });
 
   test('characterization: array conditions are typed on the element, not on the column', () => {
-    // characterization: arrayContains<T>(a: T[]) gives Constraint T = number; scores wants number[]
+    // characterization: arrayContains<T>(a: T[] | ParentColumn) gives Constraint T = number; scores wants number[]
     // @ts-expect-error valid at run time ("scores" @> '{1}'), refused by the type
     db.select('accounts', { scores: c.arrayContains([1]) });
+    // @ts-expect-error same for arrayContainedIn
+    db.select('accounts', { scores: c.arrayContainedIn([1]) });
     // @ts-expect-error same for arrayOverlaps
     db.select('accounts', { scores: c.arrayOverlaps([1]) });
     // the workaround types the argument as an array of arrays
@@ -120,10 +125,12 @@ describe('type surprises', () => {
     expectTypeOf<Run<typeof q>>().toEqualTypeOf<never[]>();
   });
 
-  test('characterization: a passthru lateral is refused after columns', () => {
+  test('characterization: a passthru lateral is refused after columns or extras', () => {
     // characterization: LateralOption limits lateral to an object once columns or extras is set
     // @ts-expect-error at run time, columns is dropped
     db.select('accounts', db.all, { columns: ['id'], lateral: db.count('users', db.all) });
+    // @ts-expect-error at run time, extras is dropped
+    db.select('accounts', db.all, { extras: { b: 'balance' }, lateral: db.count('users', db.all) });
   });
 
   test('characterization: an untyped sql`` lateral is `any`', () => {
