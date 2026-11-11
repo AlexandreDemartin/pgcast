@@ -32,8 +32,9 @@ export function useTestDatabase(): TestDatabase {
 
   beforeAll(async () => {
     name = ctx.prefix + randomBytes(4).toString('hex');
+    const url = urlForDatabase(ctx.url, name);  // throws before anything is created
     await withAdminClient(ctx.url, c => createDatabase(c, name!, ctx.template));
-    pool = new pg.Pool({ connectionString: urlForDatabase(ctx.url, name) });
+    pool = new pg.Pool({ connectionString: url });
   });
 
   afterAll(async () => {

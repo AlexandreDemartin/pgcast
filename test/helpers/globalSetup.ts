@@ -22,13 +22,14 @@ export default async function setup(project: TestProject) {
 
   const prefix = runPrefix(process.pid);
   const template = `${prefix}template`;
+  const templateUrl = urlForDatabase(url, template);  // throws on a URL we cannot rewrite, before creating anything
   const fixture = readFileSync(new URL('../fixtures/schema.sql', import.meta.url), 'utf8');
 
   await withAdminClient(url, async client => {
     for (const name of orphanDatabases(await listTestDatabases(client), isProcessAlive)) await dropDatabase(client, name);
     await createDatabase(client, template, 'template0');
   });
-  await withAdminClient(urlForDatabase(url, template), client => client.query(fixture));
+  await withAdminClient(templateUrl, client => client.query(fixture));
 
   project.provide('pgcastDb', { url, template, prefix });
 
