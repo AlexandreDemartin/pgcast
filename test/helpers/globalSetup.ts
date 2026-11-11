@@ -26,7 +26,8 @@ export default async function setup(project: TestProject) {
   const fixture = readFileSync(new URL('../fixtures/schema.sql', import.meta.url), 'utf8');
 
   await withAdminClient(url, async client => {
-    for (const name of orphanDatabases(await listTestDatabases(client), isProcessAlive)) await dropDatabase(client, name);
+    const orphans = orphanDatabases(await listTestDatabases(client), isProcessAlive, process.pid);
+    for (const name of orphans) await dropDatabase(client, name);
     await createDatabase(client, template, 'template0');
   });
   await withAdminClient(templateUrl, client => client.query(fixture));
