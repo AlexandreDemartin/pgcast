@@ -5,12 +5,15 @@ on:
     branches: [master]
   pull_request:
     branches: [master]
+    types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
   contents: read
 
 jobs:
   build:
+    # Draft PRs run nothing: the CI starts with `gh pr ready` (skill ci-gate).
+    if: github.event_name == 'push' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -25,6 +28,7 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: npm
       - run: npm ci
+      - run: npm run check:agents
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test

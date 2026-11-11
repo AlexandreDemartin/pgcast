@@ -18,4 +18,5 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 - `prepack` builds before any `npm pack` / `npm publish`.
 - Vitest harness (`test`, `test:watch`, `test:types`) and a `typecheck` script.
 - `AGENTS.md` (+ `CLAUDE.md` symlink), roadmap and design decision notes under `docs/`.
-- CI matrix: Node 20, 22 and latest LTS.
+- CI matrix: Node 20, 22 and latest LTS; draft PRs run no job.
+- Agent workflow (adapted from Bienvenue): `.agents/skills/`, `.claude/agents/` (`builder`, `branch-reviewer`, `chores`), `.claude/hooks/guard.mjs`, `npm run check:agents`, `docs/SUIVI.md`, `docs/APPRENTISSAGES.md`.

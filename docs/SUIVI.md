@@ -34,7 +34,7 @@ Toujours les mêmes clés, dans cet ordre ; une clé absente ne s'applique pas.
 
 ### 0.1 `chore/fork-setup` — renommage, outillage, CI, notes 001 et 002
 
-- [ ] **Livrée** : PR #1
+- [ ] **Livrée** : PR #1 (relue, CI verte, en attente de fusion par l'utilisateur)
 - **But** : `pgcast` se construit à l'octet près comme Zapatos 6.6.1, avec TypeScript 5.9, ESLint 9, Vitest 4.
 
 ### 0.2 `chore/agent-workflow` — méthode de travail des agents
@@ -60,7 +60,7 @@ Toujours les mêmes clés, dans cet ordre ; une clé absente ne s'applique pas.
   - [ ] `globalSetup` : `TEST_DATABASE_URL` lu depuis `src/.env` ou l'environnement ; base modèle créée depuis la fixture.
   - [ ] Helper : base par fichier (`CREATE DATABASE … TEMPLATE`), supprimée à la fin ; client par test en `BEGIN` / `ROLLBACK`.
   - [ ] Tests unitaires sans base toujours lancés ; tests d'intégration en échec clair sans `TEST_DATABASE_URL`.
-  - [ ] CI : service Postgres 14, 16 et 18 × Node 20, 22 et LTS ; PR draft sans run (skill `ci-gate`).
+  - [ ] CI : service Postgres 14, 16 et 18 × Node 20, 22 et LTS.
 - **Vérifier** : `npm test` deux fois de suite (rien ne fuit entre runs).
 
 ### 1.2 `test/codegen-snapshots` — sortie du codegen figée
@@ -74,6 +74,7 @@ Toujours les mêmes clés, dans cet ordre ; une clé absente ne s'applique pas.
 
 - [ ] **Livrée**
 - **But** : `text` + `values` de chaque shortcut et de chaque condition figés, puis exécutés contre Postgres.
+- **À caractériser en priorité** (vus dans Belco et Bienvenue ou à la lecture) : `and()` / `or()` sans argument, `isIn([])`, clé `undefined` dans un `Whereable` ou un `Updatable`, `update` sans colonne, `min` / `max` sur une date ou un texte (`Number()` du résultat), conditions de tableau sur une colonne tableau, ordre des colonnes d'un `insert`.
 - **Relecture** : `normal`, lentille `sql`.
 - **Lire** : `zero-abstraction`, `sql-safety`.
 
@@ -102,24 +103,24 @@ Toujours les mêmes clés, dans cet ordre ; une clé absente ne s'applique pas.
 
 > Détaillé à partir du rapport 1.6 : une étape par bug, chacune avec un test qui échoue d'abord.
 
-## 3. Le schéma dit tout
+## 3. Le schéma et les conditions
 
-> Titres seulement ; l'ordre et le pourquoi : [ROADMAP.md](./ROADMAP.md).
+> Titres seulement, détaillés au début du chapitre ; l'ordre et le pourquoi : [ROADMAP.md](./ROADMAP.md) (v2).
 
-- 3.1 `--check` et `--watch`, avec un modèle intermédiaire de l'introspection
-- 3.2 Clés étrangères et `related` / `relatedMany` (note de décision d'abord)
-- 3.3 Validateurs Zod / Valibot et `jsonb` typé par `COMMENT ON` (note de décision d'abord)
-- 3.4 Fonctions Postgres typées
+- 3.1 ① `--check` et `--watch`, avec un modèle intermédiaire de l'introspection
+- 3.2 ② Conditions : `isInSelect`, `exists`, tableaux typés sur la colonne, `jsonbContains`, `jsonbPathExists`, full-text
+- 3.3 ③ Clés étrangères, `related` / `relatedMany`, référence typée au résultat d'un lateral (note de décision d'abord)
+- 3.4 ④ Domaines `CHECK` en unions littérales, validateurs Zod / Valibot, `jsonb` par `COMMENT ON` (note de décision d'abord)
+- 3.5 ⑤ Fonctions Postgres typées
+- 3.6 ⑥ Alias de table typés et `with`
 
 ## 4. Runtime
 
-- 4.1 Conditions `jsonb` et full-text
-- 4.2 Interface de driver (relecture `élevé`)
-- 4.3 Savepoints et transactions imbriquées
-- 4.4 Contexte RLS
-- 4.5 Streaming par curseur
-- 4.6 CTE typées
+- 4.1 ⑦ Interface de driver (relecture `élevé`)
+- 4.2 ⑧ Savepoints, `advisoryXactLock`, retry structuré
+- 4.3 ⑨ Contexte RLS
+- 4.4 ⑩ Streaming par curseur
 
 ## 5. Inférence du SQL brut
 
-- 5.1 Note de conception, puis implémentation si validée
+- 5.1 ⑪ Note de conception, puis implémentation si validée
