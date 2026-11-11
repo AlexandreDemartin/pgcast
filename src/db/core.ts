@@ -118,7 +118,9 @@ export const toBuffer = strict((ba: ByteArrayString) => Buffer.from(ba.slice(2),
  * at the appropriate position of the values array passed to `pg`.
  * @param x The value to be wrapped
  * @param cast Optional cast type. If a string, the parameter will be cast to
- * this type within the query e.g. `CAST($1 AS type)` instead of plain `$1`. If
+ * this type within the query e.g. `CAST($1 AS "type")` instead of plain `$1`.
+ * The type is quoted as one identifier, with any `"` doubled (as `quote_ident`
+ * does), so it cannot close its quotes and add to the SQL. If
  * `true`, the value will be JSON stringified and cast to `json` (irrespective
  * of the configuration parameters `castArrayParamsToJson` and
  * `castObjectParamsToJson`). If `false`, the value will **not** be JSON-
@@ -133,7 +135,9 @@ export class Parameter<T = any> { constructor(public value: T, public cast?: boo
  * the values array passed to `pg`.
  * @param x The value to be wrapped
  * @param cast Optional cast type. If a string, the parameter will be cast to
- * this type within the query e.g. `CAST($1 AS type)` instead of plain `$1`. If
+ * this type within the query e.g. `CAST($1 AS "type")` instead of plain `$1`.
+ * The type is quoted as one identifier, with any `"` doubled (as `quote_ident`
+ * does), so it cannot close its quotes and add to the SQL. If
  * `true`, the value will be JSON stringified and cast to `json` (irrespective
  * of the configuration parameters `castArrayParamsToJson` and
  * `castObjectParamsToJson`). If `false`, the value will **not** be JSON
@@ -363,7 +367,8 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
 
       } else if (typeof expression.cast === 'string') {
         result.values.push(expression.value);
-        result.text += `CAST(${placeholder} AS "${expression.cast}")`;
+        // the type is one quoted identifier: any `"` is doubled, as quote_ident does
+        result.text += `CAST(${placeholder} AS "${expression.cast.replace(/"/g, '""')}")`;
 
       } else {
         result.values.push(expression.value);

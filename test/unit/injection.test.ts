@@ -641,7 +641,8 @@ describe('shortcut options', () => {
 });
 
 describe('param cast', () => {
-  it('characterization: the cast type is quoted without doubling `"`', () => {
+  it('the cast type is one quoted identifier: `"` is doubled', () => {
+    // as quote_ident: `a"b` gives `"a""b"`; a pre-quoted type is quoted again, not written raw
     expect(matrix(v => sql`SELECT ${param(1, v)}`)).toMatchInlineSnapshot(`
       {
         "backslash": "SELECT CAST($1 AS "a\\b")",
@@ -649,14 +650,20 @@ describe('param cast', () => {
         "dashes": "SELECT CAST($1 AS "a--b")",
         "dollar": "SELECT CAST($1 AS "a$1b")",
         "dot": "SELECT CAST($1 AS "a.b")",
-        "dquote": "SELECT CAST($1 AS "a"b")",
-        "lone": "SELECT CAST($1 AS """)",
+        "dquote": "SELECT CAST($1 AS "a""b")",
+        "lone": "SELECT CAST($1 AS """")",
         "nul": "SELECT CAST($1 AS "a<NUL>b")",
-        "prequoted": "SELECT CAST($1 AS ""a"")",
+        "prequoted": "SELECT CAST($1 AS """a""")",
         "semicolon": "SELECT CAST($1 AS "a;b")",
         "squote": "SELECT CAST($1 AS "a'b")",
       }
     `);
+  });
+
+  it('a cast that closes its quotes compiles to one type name, and its values are untouched', () => {
+    const q = sql`SELECT ${param(1, 'int4") || (SELECT secret FROM t) || ("int4')}`.compile();
+    expect(q.text).toBe('SELECT CAST($1 AS "int4"") || (SELECT secret FROM t) || (""int4")');
+    expect(q.values).toEqual([1]);
   });
 });
 

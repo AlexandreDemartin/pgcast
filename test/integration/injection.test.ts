@@ -56,10 +56,17 @@ describe('with parameters (extended protocol)', () => {
     expect(await adaName()).toBe('Ada');
   });
 
-  it('characterization: a `"` in a param cast reads another expression', async () => {
-    // characterization: `CAST($1 AS "text") || (SELECT …) || CAST('' AS "text")`, one statement
+  it('a `"` in a param cast stays in one type name, which does not exist', async () => {
+    // `CAST($1 AS "text"") || (SELECT …) || CAST('' AS ""text")`: one quoted type name
     const cast = `text") || (SELECT display_name FROM users WHERE id = 1) || CAST('' AS "text`;
-    expect(await sql`SELECT ${param('x', cast)} AS v`.run(t.client)).toEqual([{ v: 'xAda' }]);
+    const q = sql`SELECT ${param('x', cast)} AS v`;
+    expect(q.compile().text).toBe(`SELECT CAST($1 AS "text"") || (SELECT display_name FROM users WHERE id = 1) || CAST('' AS ""text") AS v`);
+    expect(await pgError(t.client, () => q.run(t.client))).toMatchInlineSnapshot(`
+      {
+        "code": "42704",
+        "message": "type "text") || (SELECT display_name FROM users WHERE id = 1) || CAST" does not exist",
+      }
+    `);
   });
 });
 
