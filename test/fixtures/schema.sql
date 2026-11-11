@@ -245,6 +245,18 @@ $$;
 
 COMMENT ON FUNCTION public.reports_of(int) IS 'Direct reports of a manager';
 
+-- ---------------------------------------------------------------- codegen suspects
+
+-- column comments on relations that are not plain tables
+COMMENT ON COLUMN public.events.kind IS 'Partitioned table column comment';
+COMMENT ON COLUMN extra.imported_lines.line IS 'Foreign table column comment';
+COMMENT ON COLUMN public.active_users.display_name IS 'View column comment';
+COMMENT ON COLUMN public.account_totals.total_balance IS 'Materialized view column comment';
+
+-- one index name in two schemas: unique on extra.articles, not unique on public.transfers
+CREATE UNIQUE INDEX shared_name_idx ON extra.articles (body);
+CREATE INDEX shared_name_idx ON public.transfers (note);
+
 -- ---------------------------------------------------------------- edge: may break the generated file
 
 CREATE TYPE edge."traffic-light" AS ENUM ('red', 'amber''s', 'green light');
