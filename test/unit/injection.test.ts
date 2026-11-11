@@ -216,6 +216,12 @@ describe('shortcut arguments', () => {
     expect(numeric('count\n')).toBe('SELECT count\n("id") AS result FROM "users"');
   });
 
+  it('characterization: a null aggregate is written as null, as in 6.6.1', () => {
+    // characterization: RegExp.test(null) tests the string 'null', a valid name
+    expect(db.select('users', all, { columns: ['id'] }, db.SelectResultMode.Numeric, null as any).compile().text)
+      .toBe('SELECT null("id") AS result FROM "users"');
+  });
+
   it('the aggregate of select() is ignored, as before, outside Numeric mode', () => {
     expect(db.select('users', all, {}, db.SelectResultMode.Many, 'a;b').compile().text)
       .toBe(db.select('users', all).compile().text);
