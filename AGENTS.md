@@ -60,19 +60,29 @@ Le code généré et le runtime parlent de `zapatos/schema`, `zapatos/db` et `za
 | `npm test` | Vitest (runtime) |
 | `npm run test:watch` | Vitest en watch |
 | `npm run test:types` | tests de types Vitest (`*.test-d.ts`, `expectTypeOf`) |
-| `npm run bench:types` | benchmark du temps de compilation (arrive en phase 1) |
+| `npm run bench:types` | benchmark du temps de compilation (arrive à l'étape 1.5) |
+| `npm run check:agents` | cohérence des skills et agents, tests du hook `guard` |
 
 Une tâche n'est **terminée** que si `lint`, `typecheck`, `test` et `test:types` passent.
+
+## Méthode
+
+- Outillage IA et carte des skills : [.agents/README.md](.agents/README.md). Avant un sujet, lire le skill qu'il nomme.
+- Étapes : [docs/SUIVI.md](docs/SUIVI.md), une à la fois, orchestrées par le skill `run-step` (agents `builder`, `branch-reviewer`, `chores`).
+- CI : PR en draft pendant l'itération, `gh pr ready` une fois prête (skill `ci-gate`).
+- Relectures : agent `branch-reviewer`, qui s'appuie sur le skill utilisateur `branch-review`.
+- Trancher seul ou demander : skill `decision-philosophy`.
 
 ## Règles de travail
 
 - **Lire le code concerné avant de modifier**, et résumer ce qu'on a compris.
 - **Tests d'abord**, ou au minimum avec l'implémentation : runtime, SQL compilé (`text` et `values`) et types (cas positifs **et** négatifs avec `@ts-expect-error`).
 - **Une fonctionnalité = une branche = une PR** sur `AlexandreDemartin/pgcast`. Commits petits et atomiques au format Conventional Commits (`feat:`, `fix:`, `test:`, `chore:`, `docs:`, `ci:`…).
-- **Aucun changement cassant** sur l'API publique. Si c'est inévitable, on s'arrête et on demande.
-- **`core.ts` (échappement, paramétrisation, compilation des identifiants)** : ne jamais y toucher sans le signaler explicitement. Chaque changement ajoute des tests d'injection SQL.
-- **Types avancés** : surveiller le temps de compilation (`bench:types`, seuil +20 %). Un type qui compile n'est pas forcément correct.
-- Mettre à jour `CHANGELOG.md` et la doc à chaque fonctionnalité.
+- **Aucun changement cassant** sur l'API publique. Si c'est inévitable, on s'arrête et on demande (skill `backward-compat`).
+- **`core.ts` (échappement, paramétrisation, compilation des identifiants)** : ne jamais y toucher sans le signaler explicitement. Chaque changement ajoute des tests d'injection SQL (skill `sql-safety`).
+- **Types avancés** : surveiller le temps de compilation (`bench:types`, seuil +20 %). Un type qui compile n'est pas forcément correct (skill `type-tests`).
+- Un helper se conçoit avec le skill `zero-abstraction`, la sortie du codegen avec le skill `codegen-output`, un besoin se valide avec le skill `consumer-usage`.
+- Mettre à jour `CHANGELOG.md` et la doc à chaque fonctionnalité (skill `concise-docs`).
 - Garder les en-têtes de copyright existants (George MacKerron). Les nouveaux fichiers peuvent porter `Copyright (C) 2026 Alexandre Demartin`.
 - Décision de conception ambiguë : rédiger `docs/decisions/NNN-titre.md` (contexte, options, choix proposé) et **demander validation avant d'implémenter**.
 
