@@ -101,9 +101,9 @@ describe('without parameters (simple protocol)', () => {
   });
 
   it('an aggregate named as Postgres lexes it runs', async () => {
-    // each name is created as written, then called by select(); the ROLLBACK drops them
+    // each name is created as written, then called by select(); the ROLLBACK drops them; étendue in NFD
     await t.client.query('CREATE SCHEMA my_schema');
-    for (const aggregate of ['my$agg', 'a$1b', 'étendue', '"my agg"', '"a""b"', '"Stats-2024"', 'my_schema."MyAgg"']) {
+    for (const aggregate of ['my$agg', 'a$1b', 'e\u0301tendue', '"my agg"', '"a""b"', '"Stats-2024"', 'my_schema."MyAgg"']) {
       await t.client.query(`CREATE AGGREGATE ${aggregate} (int) (sfunc = int4pl, stype = int, initcond = '0')`);
       expect(await db.select('users', all, { columns: ['id'] }, db.SelectResultMode.Numeric, aggregate).run(t.client), aggregate).toBe(6);
     }
