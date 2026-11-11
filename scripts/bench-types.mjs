@@ -32,6 +32,20 @@ function tsc(...args) {
   return result.stdout;
 }
 
+function fail(...lines) {
+  for (const line of lines) console.error(line);
+  process.exit(1);
+}
+
+// every compared figure must be a finite integer: NaN would make every comparison false and the job pass
+function integer(value, what) {
+  const number = Number(value);
+  if (value === undefined || value === null || value === '' || !Number.isSafeInteger(number)) {
+    fail(`bench:types: ${what} is ${JSON.stringify(value)}, not an integer.`);
+  }
+  return number;
+}
+
 function diagnostics(project) {
   const output = tsc('-p', project, '--noEmit', '--extendedDiagnostics');
   return Object.fromEntries([...output.matchAll(/^([A-Za-z ]+):\s+(\S+)$/gm)].map(([, key, value]) => [key, value]));
@@ -42,7 +56,10 @@ tsc('--emitDeclarationOnly', '--outDir', 'node_modules/.cache/pgcast');
 
 const bench = diagnostics('bench');
 const floor = diagnostics('bench/tsconfig.floor.json');
-const current = Object.fromEntries(compared.map(key => [key, Number(bench[key]) - Number(floor[key])]));
+const current = Object.fromEntries(compared.map(key => [
+  key,
+  integer(bench[key], `${key} of tsc -p bench`) - integer(floor[key], `${key} of tsc -p bench/tsconfig.floor.json`),
+]));
 
 if (process.argv.includes('--update')) {
   writeFileSync(baselinePath, JSON.stringify({typescript: tsVersion, ...current}, null, 2) + '\n');
@@ -51,6 +68,9 @@ if (process.argv.includes('--update')) {
 }
 
 const baseline = JSON.parse(readFileSync(baselinePath, 'utf8'));
+for (const key of compared) {
+  if (integer(baseline[key], `${key} in ${baselineName}`) <= 0) fail(`bench:types: ${key} in ${baselineName} is not positive.`);
+}
 const rows = [['', 'current', 'baseline', 'change']];
 const failures = [];
 for (const key of compared) {
