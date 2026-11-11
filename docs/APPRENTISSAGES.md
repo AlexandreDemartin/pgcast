@@ -47,6 +47,10 @@ Candidats à un contrôle, une règle ou une ligne de skill.
 - 1.6 — `scripts/` n'a ni lint ni tests : un garde-fou de script se vérifie par essais rapportés, ou s'extrait en fonction testable — `builder`
 - 1.7 — Réécrire une section Markdown par une regex `re.S` a laissé `.*` courir jusqu'à la fin du fichier : remplacer une section exacte, ou vérifier `git diff --stat` avant de commiter — `builder`
 - 1.7 — Dans un tableau Markdown, un nom de test qui contient des backticks demande un code span à double backtick — `builder`
+- 2.1 — `git checkout <ref> --` sans chemin change la HEAD du checkout principal : lire une autre révision par `git show <ref>:<chemin>` ou un worktree — `branch-reviewer`
+- 2.1 — Une liste blanche sur un paramètre variadique refuse aussi `undefined` / `null`, que l'ancien code rendait vides : vérifier l'ancien SQL de ces cas (projets sans `strictNullChecks`) avant de figer un refus (candidat : skill `backward-compat`) — `branch-reviewer`
+- 2.1 — Pour prouver « avant toute requête » sur du code qui commite, `pool.connect` remplacé par `mockRejectedValue` : une régression ne peut rien écrire — `builder`
+- 2.1 — Un correctif rend obsolètes la ligne du rapport et la ligne « nothing is fixed yet » du CHANGELOG : le commit qui coche l'étape les met à jour — `builder`
 
 ## Mineurs gardés
 
