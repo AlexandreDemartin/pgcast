@@ -1,0 +1,141 @@
+// Copyright (C) 2026 Alexandre Demartin
+//
+// Characterization of the types of src/db/core.ts and src/db/conditions.ts on the
+// fixture schema: sql<> generics, param / parent / self, the column constraint of a
+// condition. Surprises (a type that accepts what the runtime refuses, or refuses
+// what it accepts) are frozen with a `characterization:` comment.
+
+import { describe, expectTypeOf, test } from 'vitest';
+import * as db from 'zapatos/db';
+import type * as s from 'zapatos/schema';
+
+const c = db.conditions;
+declare const pool: db.Queryable;
+type Run<Q> = Q extends db.SQLFragment<infer R, any> ? R : never;
+
+describe('sql<Interpolations, RunResult, Constraint>', () => {
+  test('RunResult is what run() resolves to; rows of any by default', () => {
+    const q = db.sql<db.SQL, { one: number }[]>`SELECT 1 AS one`;
+    expectTypeOf(q.run).returns.resolves.toEqualTypeOf<{ one: number }[]>();
+    expectTypeOf(db.sql`SELECT 1`.run(pool)).resolves.toEqualTypeOf<any[]>();
+  });
+
+  test('Interpolations limits what may be interpolated', () => {
+    const q = db.sql<s.users.SQL>`SELECT ${'display_name'} FROM ${'users'} WHERE ${{ id: 1 }}`;
+    expectTypeOf(q).toEqualTypeOf<db.SQLFragment<any[], never>>();
+    // @ts-expect-error 'nope' is not a column of users
+    db.sql<s.users.SQL>`SELECT ${'nope'} FROM ${'users'}`;
+    // @ts-expect-error 'accounts' is not the users table
+    db.sql<s.users.SQL>`SELECT * FROM ${'accounts'}`;
+  });
+});
+
+describe('param, parent, self', () => {
+  test('param carries its value type', () => {
+    expectTypeOf(db.param(1)).toEqualTypeOf<db.Parameter<number>>();
+    expectTypeOf(db.param('x', 'text')).toEqualTypeOf<db.Parameter<string>>();
+  });
+
+  test('parent carries its column; refuses a name that is no column at all', () => {
+    expectTypeOf(db.parent('id')).toEqualTypeOf<db.ParentColumn<'id'>>();
+    // @ts-expect-error 'nope' is no column of any table
+    db.parent('nope');
+  });
+
+  test('characterization: parent() is not checked against the parent table', () => {
+    // characterization: Column is every table's column; owner_id is not a users column,
+    // sku (products) is a column of neither users nor accounts
+    db.select('users', db.all, { lateral: { u: db.selectOne('accounts', { owner_id: db.parent('owner_id') }) } });
+    db.select('users', db.all, { lateral: { u: db.selectOne('accounts', { owner_id: db.parent('sku') }) } });
+  });
+
+  test('self is a unique symbol', () => {
+    expectTypeOf(db.self).toEqualTypeOf<db.SelfType>();
+  });
+});
+
+describe('conditions: the constraint on the column', () => {
+  test('a value of the column type is accepted', () => {
+    db.select('users', { id: c.eq(1), display_name: c.like('A%'), mood: c.isIn(['ok', 'happy']) });
+    db.select('users', { manager_id: c.isNull, id: c.or(c.eq(1), c.eq(2)) });
+    db.select('accounts', { opened_on: c.gt(new Date()), lifetime_ops: c.gte(BigInt(1)) });
+    db.update('accounts', { balance: c.add(1) }, { id: 1 });
+  });
+
+  test('a value of another type is refused', () => {
+    // @ts-expect-error '1' is not a number (users.id)
+    db.select('users', { id: c.eq('1') });
+    // @ts-expect-error like() on an int column
+    db.select('users', { id: c.like('A%') });
+    // @ts-expect-error isIn of strings on an int column
+    db.select('users', { id: c.isIn(['1']) });
+    // @ts-expect-error 'angry' is not a mood
+    db.select('users', { mood: c.eq('angry') });
+    // @ts-expect-error eq(null) would compile to `= NULL`: isNull is needed
+    db.select('users', { manager_id: c.eq(null) });
+  });
+});
+
+describe('type surprises', () => {
+  test('characterization: a Parameter in a Whereable is accepted, the runtime wraps it twice', () => {
+    // characterization: Whereable accepts db.Parameter<number>; compiled, it is sent as '{"value":1}'
+    // (test/integration/core.test.ts, "a Parameter value fails")
+    db.select('users', { id: db.param(1) });
+  });
+
+  test('characterization: updateValues with a plain value is accepted, the runtime refuses it', () => {
+    // characterization: UpdatableForTable accepts 'x'; compiled as the identifier "x"
+    // (test/integration/shortcuts.test.ts, "updateValues with a plain string fails")
+    db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { display_name: 'x' } });
+  });
+
+  test('characterization: add() and subtract() refuse a Parameter, which the runtime accepts', () => {
+    // characterization: add<T extends number | Date>; conditionalParam() passes a Parameter through
+    // @ts-expect-error Parameter<number> is not number | Date (add)
+    c.add(db.param(1));
+    // @ts-expect-error Parameter<number> is not number | Date (subtract)
+    c.subtract(db.param(1));
+  });
+
+  test('characterization: array conditions are typed on the element, not on the column', () => {
+    // characterization: arrayContains<T>(a: T[] | ParentColumn) gives Constraint T = number; scores wants number[]
+    // @ts-expect-error valid at run time ("scores" @> '{1}'), refused by the type
+    db.select('accounts', { scores: c.arrayContains([1]) });
+    // @ts-expect-error same for arrayContainedIn
+    db.select('accounts', { scores: c.arrayContainedIn([1]) });
+    // @ts-expect-error same for arrayOverlaps
+    db.select('accounts', { scores: c.arrayOverlaps([1]) });
+    // the workaround types the argument as an array of arrays
+    db.select('accounts', { scores: c.arrayContains<number[]>([[1]]) });
+  });
+
+  test('characterization: an inline sql`${self} …` in a Whereable is refused', () => {
+    // characterization: inferred from the context before T is fixed, Constraint takes the
+    // union of every table's `id` type; a fragment declared first, or sql<db.SQL>, passes
+    // @ts-expect-error valid at run time
+    db.select('users', { id: db.sql`${db.self} = 1` });
+    const frag = db.sql`${db.self} = 1`;
+    db.select('users', { id: frag });
+    db.select('users', { id: db.sql<db.SQL>`${db.self} = 1` });
+  });
+
+  test('characterization: columns as a readonly tuple gives never[]', () => {
+    // characterization: ReturningTypeForTable tests `C extends ColumnForTable<T>[]`, which a readonly array is not
+    const q = db.select('accounts', db.all, { columns: ['id'] as const });
+    expectTypeOf<Run<typeof q>>().toEqualTypeOf<never[]>();
+  });
+
+  test('characterization: a passthru lateral is refused after columns or extras', () => {
+    // characterization: LateralOption limits lateral to an object once columns or extras is set
+    // @ts-expect-error at run time, columns is dropped
+    db.select('accounts', db.all, { columns: ['id'], lateral: db.count('users', db.all) });
+    // @ts-expect-error at run time, extras is dropped
+    db.select('accounts', db.all, { extras: { b: 'balance' }, lateral: db.count('users', db.all) });
+  });
+
+  test('characterization: an untyped sql`` lateral is `any`', () => {
+    // characterization: without RunResult, the lateral key is `any` and no error is reported
+    const q = db.select('users', db.all, { lateral: { x: db.sql`SELECT 1 AS result` } });
+    expectTypeOf<Run<typeof q>[number]['x']>().toBeAny();
+  });
+});
