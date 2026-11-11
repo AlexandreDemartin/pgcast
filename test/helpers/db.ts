@@ -8,6 +8,7 @@
 // ROLLBACK does not undo everything: sequences stay advanced (serial, identity,
 // nextval, setval), and pooled connections keep their session state (PREPARE,
 // session advisory locks). Never hard-code a generated value: read it via RETURNING.
+// Code that must COMMIT (db.transaction()) uses `pool` instead, and cleans up what it writes.
 
 import { randomBytes } from 'node:crypto';
 import pg from 'pg';
@@ -19,6 +20,8 @@ export interface TestDatabase {
   readonly name: string;
   /** The current test's client, inside a transaction rolled back after the test. */
   readonly client: pg.PoolClient;
+  /** This file's pool, for code that commits (db.transaction()): no rollback, clean up by hand. */
+  readonly pool: pg.Pool;
 }
 
 export function useTestDatabase(): TestDatabase {
@@ -74,6 +77,10 @@ export function useTestDatabase(): TestDatabase {
       get client() {
         if (!client) throw new Error('useTestDatabase(): client used outside a test');
         return client;
+      },
+      get pool() {
+        if (!pool) throw new Error('useTestDatabase(): no pool before beforeAll');
+        return pool;
       },
     };
   }
