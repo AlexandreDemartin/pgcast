@@ -71,7 +71,9 @@ describe('with parameters (extended protocol)', () => {
   });
 
   it('no hostile cast reads anything: each is a missing type, a syntax error or a harmless name', async () => {
-    // compiled text: test/unit/injection.test.ts; a row would show what the cast let through
+    // compiled text: test/unit/injection.test.ts; a row would show what the cast let through.
+    // Rows: pg_catalog.int4, with whitespace around the dot as in 6.6.1; a comment between the parts
+    // (commentBetween, lineCommentBetween) returned 1 under 6.6.1 and is now one missing type
     const outcomes: Record<string, unknown> = {};
     for (const [name, cast] of Object.entries(hostileCasts)) {
       await t.client.query('SAVEPOINT pgcast_cast');
@@ -87,19 +89,30 @@ describe('with parameters (extended protocol)', () => {
       {
         "closes": "42704",
         "comment": "42704",
+        "commentBetween": "42704",
         "dquote": "42704",
         "empty": "42601",
         "emptyLast": "42704",
         "emptyPart": "42704",
         "escaped": "42704",
         "leadingDot": "42704",
+        "lineCommentBetween": "42704",
         "lone": "42704",
         "newlineInside": "42704",
-        "newlineOutside": "42704",
+        "newlineOutside": [
+          {
+            "v": 1,
+          },
+        ],
         "nul": "08P01",
         "nulQualified": "08P01",
         "oddQuotes": "42704",
         "operator": "42704",
+        "otherSpaces": [
+          {
+            "v": 1,
+          },
+        ],
         "prequoted": "42704",
         "qualified": [
           {
@@ -107,6 +120,16 @@ describe('with parameters (extended protocol)', () => {
           },
         ],
         "qualifiedCloses": "42704",
+        "spacesAroundDot": [
+          {
+            "v": 1,
+          },
+        ],
+        "tabsAroundDot": [
+          {
+            "v": 1,
+          },
+        ],
         "threeParts": "0A000",
         "trailingDot": "42704",
       }

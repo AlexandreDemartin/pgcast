@@ -1,7 +1,8 @@
 // Copyright (C) 2026 Alexandre Demartin
 //
 // Types for param(x, cast) aimed at the rule of core.ts that writes a cast as is
-// when `"${cast}"` is well-formed (one or more quoted identifiers joined by `.`).
+// when `"${cast}"` is well-formed (one or more quoted identifiers joined by `.`, with
+// whitespace around it, but no comment).
 // Each must compile to one quoted type name, or to a well-formed name that adds
 // nothing else to the SQL: test/unit/injection.test.ts compiles them,
 // test/integration/injection.test.ts runs them. The SELECT in a payload is harmless.
@@ -28,5 +29,10 @@ export const hostileCasts = {
   empty: '',
   newlineInside: 'in\nt4',
   newlineOutside: 'pg_catalog"\n."int4',
+  spacesAroundDot: 'pg_catalog" . "int4',
+  tabsAroundDot: 'pg_catalog"\t.\t"int4',
+  otherSpaces: 'pg_catalog"\r\n\f.\v"int4',
+  commentBetween: 'pg_catalog"/**/."int4',
+  lineCommentBetween: 'pg_catalog"--\n."int4',
   nulQualified: 'pg_catalog"."in\0t4',
 };
