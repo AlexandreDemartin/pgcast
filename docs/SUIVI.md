@@ -110,7 +110,7 @@ Toujours les mêmes clés, dans cet ordre ; une clé absente ne s'applique pas.
 
 > Une étape par constat à corriger du [rapport](./RAPPORT-CARACTERISATION.md), dans l'ordre : gravité, puis risque croissant. Chacune commence par un test qui échoue. Classe de chaque correctif (note [003](./decisions/003-correctifs-et-depreciation.md)) : **(opt-in)** = option de config + `DeprecationWarning` de l'ancien comportement ; sans mention = correctif direct. Relecture `élevé` pour `core.ts`.
 
-- 2.1 Check lock, truncate and isolation level keywords at run time (R5)
+- 2.1 Check lock, truncate and isolation level keywords at run time (R5) — livrée : PR #14
 - 2.2 Accept only a function name as the aggregate of select() (R6)
 - 2.3 Escape quotes in the type name of a param() cast (R3)
 - 2.4 Double embedded quotes in identifiers, so a name cannot close its quotes (R1)
