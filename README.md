@@ -8,14 +8,14 @@ Your TypeScript types are *cast* from your database: Postgres is the single sour
 
 ## Drop-in replacement for Zapatos
 
-The generated schema and the runtime still use the `zapatos/*` module names (`zapatos/db`, `zapatos/schema`). To switch an existing project **without touching a single import**, install pgcast under the `zapatos` alias:
+The generated schema and the runtime still use the `zapatos/*` module names (`zapatos/db`, `zapatos/schema`). To switch an existing project **without touching a single import**, install pgcast under the `zapatos` alias (once published: pgcast is not on npm yet):
 
 ```bash
 npm install zapatos@npm:pgcast
 npx zapatos        # or: npx pgcast
 ```
 
-Native `pgcast/*` module names are being discussed in [decision 002](docs/decisions/002-noms-de-modules.md).
+Installing it as plain `npm install pgcast` breaks every `zapatos/*` import, by design for now. Native `pgcast/*` module names will come later as an opt-in ([decision 002](docs/decisions/002-noms-de-modules.md)).
 
 ## Documentation
 

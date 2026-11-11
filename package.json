@@ -14,18 +14,16 @@
     "pgcast": "dist/generate/cli.js",
     "zapatos": "dist/generate/cli.js"
   },
-  "engines": {
-    "node": ">=20"
-  },
   "scripts": {
     "build": "tsc && gen-esm-wrapper db db.mjs && gen-esm-wrapper generate generate.mjs",
+    "prepack": "npm run build",
     "lint": "eslint src/db/*.ts src/generate/*.ts",
     "typecheck": "tsc --noEmit && tsc -p test",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:types": "vitest run --typecheck.only",
     "bench:types": "node -e \"console.error('bench:types arrive en phase 1 (cf. docs/ROADMAP.md)'); process.exit(1)\"",
-    "version": "npm run lint && npm run typecheck && npm test && npm run build",
+    "version": "npm run lint && npm run typecheck && npm test && npm run test:types && npm run build",
     "check:agents": "node scripts/check-agents.mjs"
   },
   "files": [
