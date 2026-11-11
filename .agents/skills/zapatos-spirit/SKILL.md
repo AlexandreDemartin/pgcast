@@ -61,7 +61,17 @@ Exemple pour l'étape ③ (clés étrangères) :
 - Noms d'API tels quels, sans backticks : « Allow db.all as value of noNullUpdateColumns ».
 - Issue liée en fin : `(closes #n)` ou `(addresses #n)`.
 - Exemples : « Fix not() so it parenthesises its condition », « Add related() and relatedMany() for lateral joins on foreign keys ».
-- Les commits gardent le format de `AGENTS.md`.
+
+## Commits
+
+Même voix que les titres de PR ; ses sujets récents donnent le modèle.
+
+- **Une ligne**, en anglais courant, une majuscule au début, sans préfixe ni point final : « Add conditions with array operators », « Stop generating .eslintrc.json (closes #184) ».
+- **Impératif**, comme ses commits récents : `Add`, `Allow`, `Fix`, `Make`, `Stop`, `Ensure`, `Export`, `Characterise`.
+- **Docs** : « Update docs for … » ; **dépendances** : « Update dependencies » ; **version** : le numéro seul (« 6.7.0 »).
+- **Cases cochées** : « Tick step 2.1 [skip ci] » ; **merge de master** : « Merge master into <branche> ».
+- Pas de corps, sauf une raison qui ne tient pas dans la ligne ; la ligne `Co-Authored-By` demandée reste toujours.
+- Ancien format (`test: …`, `fix: …`) : historique des PR #1 à #12, on ne le réécrit pas.
 
 ## Code dans `src/`
 
