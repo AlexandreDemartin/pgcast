@@ -4,6 +4,7 @@
 // compiled in test/unit/shortcuts.test.ts returns, surprises included.
 // Identity and serial values are never hard-coded: they are read back.
 
+import * as pg from 'pg';
 import { describe, expect, it } from 'vitest';
 import * as db from '../../src/db';
 import { sql, param, parent, Default, all } from '../../src/db';
@@ -338,6 +339,21 @@ describe('select', () => {
         ],
       }
     `);
+  });
+
+  it('characterization: with enableCustomJSONParsingForLargeNumbers, an int8 beyond 2^53 is a string', async () => {
+    // characterization: the option sets pg's global json / jsonb parsers; sum() reads no JSON and stays rounded
+    const { JSON: json, JSONB: jsonb } = pg.types.builtins;
+    const parsers = [json, jsonb].map(oid => [oid, pg.types.getTypeParser(oid)] as const);
+    const lifetimeOps = () => run(db.selectOne('accounts', { id: 1 }, { columns: ['lifetime_ops', 'balance'] }));
+    try {
+      db.enableCustomJSONParsingForLargeNumbers(pg);
+      expect(await lifetimeOps()).toEqual({ lifetime_ops: '9007199254740993', balance: 1500.5 });
+      expect(await run(db.sum('accounts', { id: 1 }, { columns: ['lifetime_ops'] }))).toBe(9007199254740992);
+    } finally {
+      for (const [oid, parser] of parsers) pg.types.setTypeParser(oid, parser);
+    }
+    expect(await lifetimeOps()).toEqual({ lifetime_ops: 9007199254740992, balance: 1500.5 });  // control: parsers restored
   });
 
   it('distinct', async () => {
