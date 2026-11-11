@@ -8,11 +8,8 @@ import { describe, expect, it } from 'vitest';
 import * as db from '../../src/db';
 import { sql, param, parent, conditions as dc } from '../../src/db';
 
-/** `text -- values` of `{ col: condition }`, nested under a parent table for parent(). */
-const show = (condition: db.SQL) => {
-  const { text, values } = sql`${{ col: condition }}`.copy({ parentTable: 'p' }).compile();
-  return values.length ? `${text} -- ${JSON.stringify(values)}` : text;
-};
+/** The compiled `{ text, values }` of `{ col: condition }`, nested under a parent table for parent(); values raw. */
+const show = (condition: db.SQL) => sql`${{ col: condition }}`.copy({ parentTable: 'p' }).compile();
 
 describe('conditions', () => {
   it('covers every export of db.conditions', () => {
@@ -74,14 +71,38 @@ describe('conditions', () => {
       isUnknown: show(dc.isUnknown), isNotUnknown: show(dc.isNotUnknown),
     }).toMatchInlineSnapshot(`
       {
-        "isFalse": "(("col" IS FALSE))",
-        "isNotFalse": "(("col" IS NOT FALSE))",
-        "isNotNull": "(("col" IS NOT NULL))",
-        "isNotTrue": "(("col" IS NOT TRUE))",
-        "isNotUnknown": "(("col" IS NOT UNKNOWN))",
-        "isNull": "(("col" IS NULL))",
-        "isTrue": "(("col" IS TRUE))",
-        "isUnknown": "(("col" IS UNKNOWN))",
+        "isFalse": {
+          "text": "(("col" IS FALSE))",
+          "values": [],
+        },
+        "isNotFalse": {
+          "text": "(("col" IS NOT FALSE))",
+          "values": [],
+        },
+        "isNotNull": {
+          "text": "(("col" IS NOT NULL))",
+          "values": [],
+        },
+        "isNotTrue": {
+          "text": "(("col" IS NOT TRUE))",
+          "values": [],
+        },
+        "isNotUnknown": {
+          "text": "(("col" IS NOT UNKNOWN))",
+          "values": [],
+        },
+        "isNull": {
+          "text": "(("col" IS NULL))",
+          "values": [],
+        },
+        "isTrue": {
+          "text": "(("col" IS TRUE))",
+          "values": [],
+        },
+        "isUnknown": {
+          "text": "(("col" IS UNKNOWN))",
+          "values": [],
+        },
       }
     `);
   });
@@ -89,21 +110,69 @@ describe('conditions', () => {
   it('comparisons: a value, a fragment, a Parameter or parent()', () => {
     expect({
       isDistinctFrom: show(dc.isDistinctFrom('a')), isNotDistinctFrom: show(dc.isNotDistinctFrom(null)),
-      eq: show(dc.eq(1)), ne: show(dc.ne(sql`lower(${'x'})`)), gt: show(dc.gt(param(1, 'int8'))),
+      eq: show(dc.eq(1)), eqUndefined: show(dc.eq(undefined)), ne: show(dc.ne(sql`lower(${'x'})`)), gt: show(dc.gt(param(1, 'int8'))),
       gte: show(dc.gte(parent('y'))), lt: show(dc.lt(new Date(0))), lte: show(dc.lte(parent())),
       after: show(dc.after(dc.now)), before: show(dc.before(dc.fromNow(-2, 'days'))),
     }).toMatchInlineSnapshot(`
       {
-        "after": "(("col" > now()))",
-        "before": "(("col" < now() + $1)) -- ["-2 days"]",
-        "eq": "(("col" = $1)) -- [1]",
-        "gt": "(("col" > CAST($1 AS "int8"))) -- [1]",
-        "gte": "(("col" >= "p"."y"))",
-        "isDistinctFrom": "(("col" IS DISTINCT FROM $1)) -- ["a"]",
-        "isNotDistinctFrom": "(("col" IS NOT DISTINCT FROM $1)) -- [null]",
-        "lt": "(("col" < $1)) -- ["1970-01-01T00:00:00.000Z"]",
-        "lte": "(("col" <= "p"."col"))",
-        "ne": "(("col" <> lower("x")))",
+        "after": {
+          "text": "(("col" > now()))",
+          "values": [],
+        },
+        "before": {
+          "text": "(("col" < now() + $1))",
+          "values": [
+            "-2 days",
+          ],
+        },
+        "eq": {
+          "text": "(("col" = $1))",
+          "values": [
+            1,
+          ],
+        },
+        "eqUndefined": {
+          "text": "(("col" = $1))",
+          "values": [
+            undefined,
+          ],
+        },
+        "gt": {
+          "text": "(("col" > CAST($1 AS "int8")))",
+          "values": [
+            1,
+          ],
+        },
+        "gte": {
+          "text": "(("col" >= "p"."y"))",
+          "values": [],
+        },
+        "isDistinctFrom": {
+          "text": "(("col" IS DISTINCT FROM $1))",
+          "values": [
+            "a",
+          ],
+        },
+        "isNotDistinctFrom": {
+          "text": "(("col" IS NOT DISTINCT FROM $1))",
+          "values": [
+            null,
+          ],
+        },
+        "lt": {
+          "text": "(("col" < $1))",
+          "values": [
+            1970-01-01T00:00:00.000Z,
+          ],
+        },
+        "lte": {
+          "text": "(("col" <= "p"."col"))",
+          "values": [],
+        },
+        "ne": {
+          "text": "(("col" <> lower("x")))",
+          "values": [],
+        },
       }
     `);
   });
@@ -114,10 +183,34 @@ describe('conditions', () => {
       notBetween: show(dc.notBetween(1, 2)), notBetweenSymmetric: show(dc.notBetweenSymmetric(2, 1)),
     }).toMatchInlineSnapshot(`
       {
-        "between": "(("col" BETWEEN ($1) AND ($2))) -- [1,2]",
-        "betweenSymmetric": "(("col" BETWEEN SYMMETRIC ($1) AND ($2))) -- [2,1]",
-        "notBetween": "(("col" NOT BETWEEN ($1) AND ($2))) -- [1,2]",
-        "notBetweenSymmetric": "(("col" NOT BETWEEN SYMMETRIC ($1) AND ($2))) -- [2,1]",
+        "between": {
+          "text": "(("col" BETWEEN ($1) AND ($2)))",
+          "values": [
+            1,
+            2,
+          ],
+        },
+        "betweenSymmetric": {
+          "text": "(("col" BETWEEN SYMMETRIC ($1) AND ($2)))",
+          "values": [
+            2,
+            1,
+          ],
+        },
+        "notBetween": {
+          "text": "(("col" NOT BETWEEN ($1) AND ($2)))",
+          "values": [
+            1,
+            2,
+          ],
+        },
+        "notBetweenSymmetric": {
+          "text": "(("col" NOT BETWEEN SYMMETRIC ($1) AND ($2)))",
+          "values": [
+            2,
+            1,
+          ],
+        },
       }
     `);
   });
@@ -130,16 +223,66 @@ describe('conditions', () => {
       notReMatch: show(dc.notReMatch('^A')), notReImatch: show(dc.notReImatch('^a')),
     }).toMatchInlineSnapshot(`
       {
-        "ilike": "(("col" ILIKE $1)) -- ["a%"]",
-        "like": "(("col" LIKE $1)) -- ["A%"]",
-        "notIlike": "(("col" NOT ILIKE $1)) -- ["a%"]",
-        "notLike": "(("col" NOT LIKE $1)) -- ["A%"]",
-        "notReImatch": "(("col" !~* $1)) -- ["^a"]",
-        "notReMatch": "(("col" !~ $1)) -- ["^A"]",
-        "notSimilarTo": "(("col" NOT SIMILAR TO $1)) -- ["(A|B)%"]",
-        "reImatch": "(("col" ~* $1)) -- ["^a"]",
-        "reMatch": "(("col" ~ $1)) -- ["^A"]",
-        "similarTo": "(("col" SIMILAR TO $1)) -- ["(A|B)%"]",
+        "ilike": {
+          "text": "(("col" ILIKE $1))",
+          "values": [
+            "a%",
+          ],
+        },
+        "like": {
+          "text": "(("col" LIKE $1))",
+          "values": [
+            "A%",
+          ],
+        },
+        "notIlike": {
+          "text": "(("col" NOT ILIKE $1))",
+          "values": [
+            "a%",
+          ],
+        },
+        "notLike": {
+          "text": "(("col" NOT LIKE $1))",
+          "values": [
+            "A%",
+          ],
+        },
+        "notReImatch": {
+          "text": "(("col" !~* $1))",
+          "values": [
+            "^a",
+          ],
+        },
+        "notReMatch": {
+          "text": "(("col" !~ $1))",
+          "values": [
+            "^A",
+          ],
+        },
+        "notSimilarTo": {
+          "text": "(("col" NOT SIMILAR TO $1))",
+          "values": [
+            "(A|B)%",
+          ],
+        },
+        "reImatch": {
+          "text": "(("col" ~* $1))",
+          "values": [
+            "^a",
+          ],
+        },
+        "reMatch": {
+          "text": "(("col" ~ $1))",
+          "values": [
+            "^A",
+          ],
+        },
+        "similarTo": {
+          "text": "(("col" SIMILAR TO $1))",
+          "values": [
+            "(A|B)%",
+          ],
+        },
       }
     `);
   });
@@ -150,10 +293,27 @@ describe('conditions', () => {
       isNotIn: show(dc.isNotIn(['a'])), isNotInEmpty: show(dc.isNotIn([])),
     }).toMatchInlineSnapshot(`
       {
-        "isIn": "(("col" IN ($1, $2, 3))) -- [1,2]",
-        "isInEmpty": "((false))",
-        "isNotIn": "(("col" NOT IN ($1))) -- ["a"]",
-        "isNotInEmpty": "((true))",
+        "isIn": {
+          "text": "(("col" IN ($1, $2, 3)))",
+          "values": [
+            1,
+            2,
+          ],
+        },
+        "isInEmpty": {
+          "text": "((false))",
+          "values": [],
+        },
+        "isNotIn": {
+          "text": "(("col" NOT IN ($1)))",
+          "values": [
+            "a",
+          ],
+        },
+        "isNotInEmpty": {
+          "text": "((true))",
+          "values": [],
+        },
       }
     `);
   });
@@ -166,21 +326,52 @@ describe('conditions', () => {
       notWhereable: show(dc.not({ other: 2, more: 3 })),
     }).toMatchInlineSnapshot(`
       {
-        "and": "((("col" > $1 AND ("other" = $2)))) -- [1,2]",
-        "not": "(((NOT "col" = $1))) -- [1]",
-        "notWhereable": "(((NOT ("more" = $1 AND "other" = $2)))) -- [3,2]",
-        "or": "((("col" = $1 OR "col" IS NULL))) -- [1]",
+        "and": {
+          "text": "((("col" > $1 AND ("other" = $2))))",
+          "values": [
+            1,
+            2,
+          ],
+        },
+        "not": {
+          "text": "(((NOT "col" = $1)))",
+          "values": [
+            1,
+          ],
+        },
+        "notWhereable": {
+          "text": "(((NOT ("more" = $1 AND "other" = $2))))",
+          "values": [
+            3,
+            2,
+          ],
+        },
+        "or": {
+          "text": "((("col" = $1 OR "col" IS NULL)))",
+          "values": [
+            1,
+          ],
+        },
       }
     `);
   });
 
   it('characterization: and() / or() without argument compile to ()', () => {
     // characterization: `()` is invalid SQL (see the integration test); `TRUE` / `FALSE` would be valid
-    expect({ and: show(dc.and()), or: show(dc.or()), topLevelAnd: dc.and().compile().text }).toMatchInlineSnapshot(`
+    expect({ and: show(dc.and()), or: show(dc.or()), topLevelAnd: dc.and().compile() }).toMatchInlineSnapshot(`
       {
-        "and": "((()))",
-        "or": "((()))",
-        "topLevelAnd": "()",
+        "and": {
+          "text": "((()))",
+          "values": [],
+        },
+        "or": {
+          "text": "((()))",
+          "values": [],
+        },
+        "topLevelAnd": {
+          "text": "()",
+          "values": [],
+        },
       }
     `);
   });
@@ -191,10 +382,33 @@ describe('conditions', () => {
       arrayOverlaps: show(dc.arrayOverlaps([])), arrayOverlapsParent: show(dc.arrayOverlaps(parent('tags'))),
     }).toMatchInlineSnapshot(`
       {
-        "arrayContainedIn": "(("col" <@ $1)) -- [["a"]]",
-        "arrayContains": "(("col" @> $1)) -- [[1,2]]",
-        "arrayOverlaps": "(("col" && $1)) -- [[]]",
-        "arrayOverlapsParent": "(("col" && "p"."tags"))",
+        "arrayContainedIn": {
+          "text": "(("col" <@ $1))",
+          "values": [
+            [
+              "a",
+            ],
+          ],
+        },
+        "arrayContains": {
+          "text": "(("col" @> $1))",
+          "values": [
+            [
+              1,
+              2,
+            ],
+          ],
+        },
+        "arrayOverlaps": {
+          "text": "(("col" && $1))",
+          "values": [
+            [],
+          ],
+        },
+        "arrayOverlapsParent": {
+          "text": "(("col" && "p"."tags"))",
+          "values": [],
+        },
       }
     `);
   });
@@ -205,7 +419,12 @@ describe('conditions', () => {
       add: show(dc.add(5)), subtract: show(dc.subtract(new Date(0))),
     }).toMatchInlineSnapshot(`
       {
-        "add": "(("col" + $1)) -- [5]",
+        "add": {
+          "text": "(("col" + $1))",
+          "values": [
+            5,
+          ],
+        },
         "fromNow": {
           "text": "now() + $1",
           "values": [
@@ -222,7 +441,12 @@ describe('conditions', () => {
           "text": "now()",
           "values": [],
         },
-        "subtract": "(("col" - $1)) -- ["1970-01-01T00:00:00.000Z"]",
+        "subtract": {
+          "text": "(("col" - $1))",
+          "values": [
+            1970-01-01T00:00:00.000Z,
+          ],
+        },
       }
     `);
   });
