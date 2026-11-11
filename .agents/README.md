@@ -1,76 +1,76 @@
-# Outillage IA
+# AI tooling
 
-Chaque élément existe une seule fois, à l'emplacement que les outils lisent nativement. Méthode reprise d'un projet applicatif, réduite à ce qu'une librairie demande.
+Each element exists once, where the tools read it natively. The method comes from an application project, cut down to what a library needs.
 
-| Élément | Emplacement | Lu par |
+| Element | Location | Read by |
 |---|---|---|
-| Instructions du projet | `AGENTS.md` | Cursor, Codex, Copilot ; Claude Code via `CLAUDE.md` (lien) |
-| Skills | `.agents/skills/` | Cursor, Codex, Copilot ; Claude Code via `.claude/skills` (lien) |
-| Agents (sous-agents) | `.claude/agents/*.md` | Claude Code, Cursor, Copilot |
-| Garde-fou | `.claude/hooks/guard.mjs` | Claude Code (`.claude/settings.json`) |
+| Project instructions | `AGENTS.md` | Cursor, Codex, Copilot; Claude Code via `CLAUDE.md` (link) |
+| Skills | `.agents/skills/` | Cursor, Codex, Copilot; Claude Code via `.claude/skills` (link) |
+| Agents (subagents) | `.claude/agents/*.md` | Claude Code, Cursor, Copilot |
+| Guard | `.claude/hooks/guard.mjs` | Claude Code (`.claude/settings.json`) |
 
-## Carte des skills
+## Skill map
 
-### Méthode
+### Method
 
-| Skill | Sujet |
+| Skill | Subject |
 |---|---|
-| `run-step` | Orchestrer une étape, sous-issue d'un Epic GitHub (`gh issue view`) : builder, relecture selon **Review**, tri, `verify`, fusion qui ferme l'issue, fin de chapitre |
-| `ci-gate` | PR draft pendant l'itération, `gh pr ready`, docs seules, check **CI passed**, `[skip ci]` exceptionnel, fusion |
-| `decision-philosophy` | Trancher seul ce que rien n'écrit, ou attendre l'utilisateur |
-| `simple-big-wins` | Gain mesuré rapporté à la complexité ajoutée ; rien de bancal |
-| `concise-docs` | Doc complète mais concise, une information à un endroit |
+| `run-step` | Orchestrate a step, sub-issue of a GitHub Epic (`gh issue view`): builder, review by **Review**, triage, `verify`, merge that closes the issue, end of chapter |
+| `ci-gate` | Draft PR while iterating, `gh pr ready`, docs only, **CI passed** check, exceptional `[skip ci]`, merge |
+| `decision-philosophy` | Decide alone what nothing writes down, or wait for the user |
+| `simple-big-wins` | Measured gain weighed against added complexity; nothing shaky |
+| `concise-docs` | Complete but concise docs, one piece of information in one place |
 
-### Librairie
+### Library
 
-| Skill | Sujet |
+| Skill | Subject |
 |---|---|
-| `zero-abstraction` | Concevoir un helper ou une option : SQL visible et unique, déduit de Postgres, surface minimale |
-| `backward-compat` | Rétrocompatibilité avec Zapatos 6.6.1 : API publique, `zapatos/*`, ce qui est cassant |
-| `sql-safety` | Zone sensible `core.ts` : échappement, paramètres, identifiants, tests d'injection |
-| `type-tests` | Tests de types positifs et négatifs, coût de compilation (`bench:types`) |
-| `codegen-output` | Sortie du codegen : snapshots, opt-in, canary, diff justifié |
-| `consumer-usage` | Valider un besoin et une API contre le corpus d'usages réels, sans rien en sortir |
-| `zapatos-spirit` | L'esprit de George MacKerron : découper, nommer, coder et documenter comme lui, en mieux |
+| `zero-abstraction` | Design a helper or an option: visible and unique SQL, derived from Postgres, minimal surface |
+| `backward-compat` | Backward compatibility with Zapatos 6.6.1: public API, `zapatos/*`, what breaks |
+| `sql-safety` | `core.ts` sensitive zone: escaping, parameters, identifiers, injection tests |
+| `type-tests` | Positive and negative type tests, compile cost (`bench:types`) |
+| `codegen-output` | Codegen output: snapshots, opt-in, canary, justified diff |
+| `consumer-usage` | Validate a need and an API against the corpus of real usage, without letting anything out |
+| `zapatos-spirit` | George MacKerron's spirit: split, name, code and document like him, only better |
 
-## Écrire un skill
+## Writing a skill
 
 ```text
-.agents/skills/<nom-en-kebab-case>/SKILL.md
+.agents/skills/<name-in-kebab-case>/SKILL.md
 ```
 
 ```markdown
 ---
-name: nom-en-kebab-case
-description: 'Ce que fait le skill. USE FOR: … DO NOT USE FOR: …'
+name: name-in-kebab-case
+description: 'What the skill does. USE FOR: … DO NOT USE FOR: …'
 ---
 ```
 
-- **Un sujet par skill**, lu en entier quand il se déclenche ; ≤ 150 lignes.
-- **Seulement ce que l'agent ne sait pas** : les choix propres à pgcast, jamais un cours sur Postgres ou TypeScript.
-- **Une règle, un skill** : ailleurs, on renvoie en le nommant (« skill `sql-safety` »).
-- **Une voie par défaut**, l'exception nommée ; le pourquoi en une ligne.
-- **Exemples réels** du dépôt, fichier nommé en commentaire.
-- `description` ≤ 350 caractères (`npm run check:agents`) : c'est elle seule qui déclenche le skill.
+- **One subject per skill**, read in full when it triggers; ≤ 150 lines.
+- **Only what the agent does not know**: pgcast's own choices, never a course on Postgres or TypeScript.
+- **One rule, one skill**: elsewhere, refer to it by name ("skill `sql-safety`").
+- **One default path**, the exception named; the why in one line.
+- **Real examples** from the repository, file named in a comment.
+- `description` ≤ 350 characters (`npm run check:agents`): it alone triggers the skill.
 
 ## Agents
 
 | Agent | Mission |
 |---|---|
-| `builder` | Construit une étape (une issue) jusqu'à la PR prête qui la ferme, ou corrige une liste de défauts, lancé à neuf |
-| `branch-reviewer` | Relecture senior en lecture seule (skill utilisateur `branch-review` + lentilles pgcast) ; mode `verify` |
-| `chores` | Mécanique sur sonnet : merge du dessous, relance CI, régénération ; s'arrête au premier choix |
+| `builder` | Builds a step (an issue) up to the ready PR that closes it, or fixes a list of defects, started afresh |
+| `branch-reviewer` | Senior read-only review (user skill `branch-review` + pgcast lenses); `verify` mode |
+| `chores` | Mechanical work on sonnet: merge from below, CI rerun, regeneration; stops at the first choice |
 
-Rituel d'une étape : skill `run-step`.
+Ritual of a step: skill `run-step`.
 
-## Contrôles de la méthode
+## Method checks
 
-- `guard.mjs` refuse avant exécution ce qui n'a aucune exception : `push --force`, `rebase`, `--amend`, publication npm ou release, écriture dans les fichiers générés (`db.mjs`, `generate.mjs`, `dist/`) ou dans un `.env`.
-- `npm run check:agents` (`scripts/check-agents.mjs`, en CI) : frontmatter des skills et agents, longueur des descriptions, skills cités qui existent, tests du hook.
+- `guard.mjs` refuses before execution what has no exception: `push --force`, `rebase`, `--amend`, npm publication or release, writes to generated files (`db.mjs`, `generate.mjs`, `dist/`) or to a `.env`.
+- `npm run check:agents` (`scripts/check-agents.mjs`, in CI): frontmatter of skills and agents, description length, cited skills that exist, the hook's tests.
 
-## Auto-amélioration
+## Self-improvement
 
-- **Invariants**, jamais remis en cause seul : les 5 principes de `AGENTS.md` § Philosophie, la rétrocompatibilité 6.6.1, les décisions acceptées de `docs/decisions/`.
-- **Critère** : une remarque de relecture entre dans un skill si elle évite un vrai bug qui revient ou a coûté cher, générale et vérifiable. Une préférence de forme n'y entre pas.
-- **Préférence** : un contrôle automatique (ESLint, test, `check:agents`) ; sinon une règle existante modifiée ; en dernier une ligne de skill.
-- **Groupée** : la méthode est gelée pendant un chapitre ; les agents rendent leurs « apprentissages » à part, l'orchestrateur les écrit dans [docs/APPRENTISSAGES.md](../docs/APPRENTISSAGES.md), jugés à la PR de méthode de fin de chapitre (skill `run-step`).
+- **Invariants**, never questioned alone: the 5 principles of `AGENTS.md` § Philosophy, 6.6.1 backward compatibility, the accepted decisions of `docs/decisions/`.
+- **Criterion**: a review remark enters a skill if it prevents a real bug that recurs or has cost dearly, and is general and verifiable. A preference of form does not.
+- **Preference**: an automatic check (ESLint, test, `check:agents`); otherwise an existing rule amended; last, a skill line.
+- **Batched**: the method is frozen during a chapter; agents return their "learnings" apart, the orchestrator writes them in [docs/APPRENTISSAGES.md](../docs/APPRENTISSAGES.md), judged at the end-of-chapter method PR (skill `run-step`).

@@ -57,7 +57,7 @@ const citingFiles = [
   ...readdirSync(agentsDirectory).filter(f => f.endsWith('.md')).map(f => join(agentsDirectory, f)),
 ].filter(existsSync);
 for (const path of citingFiles) {
-  for (const [, cited] of readFileSync(path, 'utf8').matchAll(/skills? (?:utilisateur )?`([a-z0-9-]+)`/g)) {
+  for (const [, cited] of readFileSync(path, 'utf8').matchAll(/skills? `([a-z0-9-]+)`/g)) {
     if (!skills.includes(cited) && !userLevelSkills.has(cited)) errors.push(`${path}: cites unknown skill '${cited}'`);
   }
 }

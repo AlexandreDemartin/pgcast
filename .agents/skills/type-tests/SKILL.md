@@ -1,30 +1,30 @@
 ---
 name: type-tests
-description: 'Tester un type public de pgcast : cas positifs et négatifs, expectTypeOf, @ts-expect-error, schéma généré de la fixture, coût de compilation (bench:types, seuil +20 %). USE FOR: écrire ou changer un type, un générique, une signature, un type généré. DO NOT USE FOR: tests runtime du SQL (zero-abstraction).'
+description: 'Testing a public type of pgcast: positive and negative cases, expectTypeOf, @ts-expect-error, the fixture’s generated schema, compile cost (bench:types, +20 % threshold). USE FOR: writing or changing a type, a generic, a signature, a generated type. DO NOT USE FOR: runtime tests of the SQL (zero-abstraction).'
 ---
 
-# Tests de types
+# Type tests
 
-Un type qui compile n'est pas forcément correct : il peut être `any`, trop large, ou accepter un appel faux.
+A type that compiles is not necessarily correct: it may be `any`, too wide, or accept a wrong call.
 
-## Règles
+## Rules
 
-- **Fichiers** : `test/**/*.test-d.ts`, lancés par `npm run test:types` (Vitest `--typecheck`).
-- **Positif** : `expectTypeOf(x).toEqualTypeOf<…>()`, jamais `toMatchTypeOf` quand l'égalité est possible : il laisse passer un type trop large.
-- **Négatif** : un appel faux par ligne sous `// @ts-expect-error <raison>` ; la raison dit ce qui doit être refusé.
-- **Pas de `any` qui passe** : `expectTypeOf(x).not.toBeAny()` sur chaque retour de shortcut testé.
-- **Schéma réel** : les types se testent contre le schéma généré depuis la fixture (`test/fixtures/schema.sql`), pas contre le schéma factice de `src/typings`.
-- **Cas limites** : colonne nullable, avec défaut, générée, identity ; `columns`, `extras`, `lateral` imbriqué ; table de vue (pas d'`Insertable`).
-- `exactOptionalPropertyTypes` est activé : un test couvre `{ col: undefined }` quand le type le concerne.
+- **Files**: `test/**/*.test-d.ts`, run by `npm run test:types` (Vitest `--typecheck`).
+- **Positive**: `expectTypeOf(x).toEqualTypeOf<…>()`, never `toMatchTypeOf` when equality is possible: it lets a too-wide type through.
+- **Negative**: one wrong call per line under `// @ts-expect-error <reason>`; the reason says what must be refused.
+- **No `any` slipping through**: `expectTypeOf(x).not.toBeAny()` on each tested shortcut's return.
+- **Real schema**: types are tested against the schema generated from the fixture (`test/fixtures/schema.sql`), not against the dummy schema of `src/typings`.
+- **Edge cases**: nullable column, with a default, generated, identity; `columns`, `extras`, nested `lateral`; a view's table (no `Insertable`).
+- `exactOptionalPropertyTypes` is on: a test covers `{ col: undefined }` when the type is concerned.
 
-## Coût de compilation
+## Compile cost
 
-- `npm run bench:types` compile un projet exemple et compare `Instantiations` (déterministe) à la référence stockée.
-- Au-delà de **+20 %** : point d'arrêt (`AGENTS.md`), avec le chiffre et sa cause.
-- Une hausse justifiée met la référence à jour dans la même PR, chiffre dans la description.
+- `npm run bench:types` compiles an example project and compares `Instantiations` (deterministic) with the stored baseline.
+- Above **+20 %**: a stop point (`AGENTS.md`), with the figure and its cause.
+- A justified rise updates the baseline in the same PR, figure in the description.
 
 ## Checklist
 
-- [ ] Au moins un positif et un négatif par type changé
-- [ ] `not.toBeAny()` sur les retours
-- [ ] `bench:types` sous le seuil, chiffre dans la PR
+- [ ] At least one positive and one negative per changed type
+- [ ] `not.toBeAny()` on the returns
+- [ ] `bench:types` under the threshold, figure in the PR

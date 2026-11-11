@@ -1,26 +1,26 @@
 ---
 name: codegen-output
-description: 'Changer la sortie du codegen (src/generate) : snapshots de la fixture, opt-in, canary de version, diff justifié, chaînes zapatos/*. USE FOR: introspection pg_catalog, nouveau type ou constante générée, option de config du codegen, --check, --watch. DO NOT USE FOR: types runtime de src/db (type-tests), compat de l’API (backward-compat).'
+description: 'Changing the codegen output (src/generate): fixture snapshots, opt-in, version canary, justified diff, zapatos/* strings. USE FOR: pg_catalog introspection, a new generated type or constant, a codegen config option, --check, --watch. DO NOT USE FOR: runtime types of src/db (type-tests), API compat (backward-compat).'
 ---
 
-# Sortie du codegen
+# Codegen output
 
-Le fichier généré (`zapatos/schema.d.ts`) est compilé par chaque projet utilisateur : son contenu fait partie de l'API (skill `backward-compat`).
+The generated file (`zapatos/schema.d.ts`) is compiled by every user project: its content is part of the API (skill `backward-compat`).
 
-## Règles
+## Rules
 
-- **Snapshot d'abord** : la sortie générée depuis `test/fixtures/schema.sql` est figée ; tout diff de snapshot est expliqué ligne à ligne dans la PR.
-- **Sortie par défaut inchangée** : une nouveauté (FK, fonctions, validateurs) est derrière une option de config, défaut = sortie 6.6.1. Sinon point d'arrêt.
-- **Déterministe** : ordre trié explicitement (`ORDER BY` + nom), jamais l'ordre de `pg_catalog`.
-- **Qualifier par schéma** : toute requête d'introspection filtre sur `pg_namespace`, jamais sur le seul nom d'objet.
-- **Le généré compile** : `npm run typecheck` compile la sortie de la fixture.
-- **Canary** : un changement incompatible du format incrémente `SchemaVersionCanary` (`src/db/canary.ts` et `src/generate/tsOutput.ts`) : point d'arrêt.
-- **Chaînes `zapatos/*`** inchangées (note 002).
-- **Commentaires** : un texte de `COMMENT ON` va dans un JSDoc ; `*/` doit y être neutralisé.
+- **Snapshot first**: the output generated from `test/fixtures/schema.sql` is frozen; every snapshot diff is explained line by line in the PR.
+- **Default output unchanged**: anything new (FKs, functions, validators) sits behind a config option, default = 6.6.1 output. Otherwise a stop point.
+- **Deterministic**: explicitly sorted order (`ORDER BY` + name), never `pg_catalog`'s order.
+- **Qualify by schema**: every introspection query filters on `pg_namespace`, never on the object name alone.
+- **The generated output compiles**: `npm run typecheck` compiles the fixture's output.
+- **Canary**: an incompatible change of format increments `SchemaVersionCanary` (`src/db/canary.ts` and `src/generate/tsOutput.ts`): a stop point.
+- **`zapatos/*` strings** unchanged (note 002).
+- **Comments**: a `COMMENT ON` text goes into a JSDoc; `*/` must be neutralised in it.
 
 ## Checklist
 
-- [ ] Diff de snapshot justifié, ou aucun
-- [ ] Option opt-in, défaut = sortie actuelle
-- [ ] Requêtes d'introspection qualifiées par schéma et triées
-- [ ] La sortie de la fixture compile
+- [ ] Snapshot diff justified, or none
+- [ ] Opt-in option, default = current output
+- [ ] Introspection queries qualified by schema and sorted
+- [ ] The fixture's output compiles

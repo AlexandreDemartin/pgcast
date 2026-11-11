@@ -1,9 +1,9 @@
 # Apprentissages du chapitre
 
-Ce que les agents ont rendu pendant le chapitre et qui attend sa fin. Écrit par l'orchestrateur, jugé et vidé par la PR de méthode (skill `run-step` § Fin de chapitre).
+Ce que les agents ont rendu pendant le chapitre et qui attend sa fin. Écrit par l'orchestrateur, jugé et vidé par la PR de méthode (skill `run-step` § End of chapter).
 
 - Une ligne par remarque : `<étape> — <remarque> — <source>` (agent, `fichier:ligne`, standard).
-- Rien ne s'applique avant la fin du chapitre : la méthode y est gelée (`.agents/README.md` § Auto-amélioration).
+- Rien ne s'applique avant la fin du chapitre : la méthode y est gelée (`.agents/README.md` § Self-improvement).
 
 ## Apprentissages
 

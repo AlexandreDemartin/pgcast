@@ -1,6 +1,6 @@
 # Notes de décision
 
-Une note par décision ambiguë : contexte, options, choix proposé, puis validation par l'utilisateur avant d'implémenter (`AGENTS.md` § Points d'arrêt). Une note remplacée n'est jamais supprimée : son statut pointe vers celle qui la remplace.
+Une note par décision ambiguë : contexte, options, choix proposé, puis validation par l'utilisateur avant d'implémenter (`AGENTS.md` § Stop points). Une note remplacée n'est jamais supprimée : son statut pointe vers celle qui la remplace.
 
 | # | Titre | Statut |
 |---|---|---|

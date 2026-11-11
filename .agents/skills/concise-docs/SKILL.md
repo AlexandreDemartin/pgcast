@@ -1,46 +1,46 @@
 ---
 name: concise-docs
-description: 'Toute la doc, complète mais concise : une information à un endroit, structure avant prose, phrases courtes. USE FOR: écrire ou condenser un Markdown (AGENTS, README, CHANGELOG, skill, note de décision), une description de PR, un JSDoc. DO NOT USE FOR: contenu d’une note de décision (decision-philosophy).'
+description: 'All docs, complete but concise: one piece of information in one place, structure before prose, short sentences. USE FOR: writing or condensing Markdown (AGENTS, README, CHANGELOG, skill, decision note), a PR description, a JSDoc. DO NOT USE FOR: the content of a decision note (decision-philosophy).'
 ---
 
-# Documentation concise
+# Concise documentation
 
-Complet sur le fond, concis sur la forme.
+Complete in substance, concise in form.
 
-## Une information, un endroit
+## One piece of information, one place
 
 | Information | Source |
 |---|---|
-| Philosophie, points d'arrêt, commandes | `AGENTS.md` |
-| Règle de code | un seul skill |
-| Décision et son pourquoi | `docs/decisions/NNN-*.md` |
-| Ordre des évolutions et leur raison | les Epics, issues `type: epic` (skill `run-step`) |
-| Une étape, son état | sa sous-issue, fermée par sa PR |
-| Changement visible par l'utilisateur | `CHANGELOG.md` (anglais) |
-| Usage public | `README.md` (anglais) |
+| Philosophy, stop points, commands | `AGENTS.md` |
+| A code rule | a single skill |
+| A decision and its why | `docs/decisions/NNN-*.md` |
+| Order of changes and their reason | the Epics, `type: epic` issues (skill `run-step`) |
+| A step, its state | its sub-issue, closed by its PR |
+| A change visible to the user | `CHANGELOG.md` |
+| Public usage | `README.md` |
 
-- Ailleurs, on renvoie : un lien, ou « skill `<nom>` ». Un résumé d'une ligne plus le lien est permis ; recopier, jamais.
+- Elsewhere, refer: a link, or "skill `<name>`". A one-line summary plus the link is allowed; copying, never.
 
-## Règles
+## Rules
 
-- **Structure avant prose** : titres, puces, tableaux ; un paragraphe de 3 phrases au plus.
-- **Une puce, une idée**, environ 20 mots.
-- **L'essentiel d'abord**, le pourquoi en une ligne s'il n'est pas évident.
-- **Termes exacts** en backticks : chemins, fonctions, commandes copiables.
-- **Un exemple par règle**, le plus court, extrait réel du dépôt.
-- **Complet** : condenser ne retire jamais une règle, une exception ou un piège.
-- Langue : docs de travail en français ; `README.md`, `CHANGELOG.md`, commits, JSDoc et code en anglais.
+- **Structure before prose**: headings, bullets, tables; a paragraph of 3 sentences at most.
+- **One bullet, one idea**, about 20 words.
+- **The essentials first**, the why in one line if it is not obvious.
+- **Exact terms** in backticks: paths, functions, copyable commands.
+- **One example per rule**, the shortest, a real extract from the repository.
+- **Complete**: condensing never removes a rule, an exception or a pitfall.
+- Language: everything written to the repository or to GitHub is in English, British spelling; chat with the maintainer may stay in French.
 
-## À couper
+## To cut
 
-- Introductions, transitions, conclusions ; « il est important de noter que ».
-- Historique (il est dans git) ; listes exhaustives qui se périment.
+- Introductions, transitions, conclusions; "it is important to note that".
+- History (it is in git); exhaustive lists that go stale.
 
-## Longueurs cibles
+## Target lengths
 
-| Document | Cible |
+| Document | Target |
 |---|---|
-| Skill | ≤ 150 lignes |
-| JSDoc | 1 à 3 lignes : le contrat, et le SQL produit pour un helper |
-| Description de PR | `Closes #n`, puis **What** · **Why** · **Verify**, en puces |
-| Note de décision | contexte, options en tableau, choix proposé, question à l'utilisateur |
+| Skill | ≤ 150 lines |
+| JSDoc | 1 to 3 lines: the contract, and the SQL produced for a helper |
+| PR description | `Closes #n`, then **What** · **Why** · **Verify**, as bullets |
+| Decision note | context, options in a table, proposed choice, question to the user |

@@ -1,34 +1,34 @@
 ---
 name: sql-safety
-description: 'Zone sensible core.ts : échappement des identifiants, paramétrisation, raw, cols/vals, parent/self, compilation. Point d’arrêt et tests d’injection obligatoires. USE FOR: toucher compileExpression, param, raw, un identifiant interpolé, une clé d’objet compilée en SQL. DO NOT USE FOR: forme d’un helper (zero-abstraction).'
+description: 'The core.ts sensitive zone: identifier escaping, parameterisation, raw, cols/vals, parent/self, compilation. Stop point and mandatory injection tests. USE FOR: touching compileExpression, param, raw, an interpolated identifier, an object key compiled into SQL. DO NOT USE FOR: the shape of a helper (zero-abstraction).'
 ---
 
-# Sécurité du SQL
+# SQL safety
 
-`src/db/core.ts` (`SQLFragment.compile`, `compileExpression`) transforme chaque interpolation en SQL. Une erreur ici est une injection chez tous les utilisateurs.
+`src/db/core.ts` (`SQLFragment.compile`, `compileExpression`) turns each interpolation into SQL. A mistake here is an injection for every user.
 
-## Point d'arrêt
+## Stop point
 
-- Toute modification de `compileExpression`, `Parameter`, `DangerousRawString`, `ColumnNames`, `ColumnValues`, `ParentColumn` ou de la mise entre guillemets : **le signaler à l'utilisateur avant d'écrire**, avec le SQL avant/après.
-- Niveau de relecture `élevé`, lentille `sql` (skill `run-step`).
+- Any change to `compileExpression`, `Parameter`, `DangerousRawString`, `ColumnNames`, `ColumnValues`, `ParentColumn` or to quoting: **tell the user before writing**, with the SQL before/after.
+- Review level `high`, lens `sql` (skill `run-step`).
 
-## Règles
+## Rules
 
-- **Une valeur est un paramètre** (`$n`), jamais concaténée ; `raw` n'est réservé qu'aux mots-clés fixes du code (`ASC`, `FOR UPDATE`), jamais à une entrée.
-- **Un identifiant vient du type** (`Table`, `Column`) ; à l'exécution il peut venir d'un objet non typé (`req.body` passé en `Whereable` ou en `Insertable`) : le compiler comme s'il était hostile.
-- **Les clés d'objet** (`Whereable`, `cols`, `vals`, `extras`, `lateral`) sont des identifiants : même règle.
-- `cast` de `param(x, 'type')` et le nom d'une clé de `lateral` sont interpolés : même règle.
+- **A value is a parameter** (`$n`), never concatenated; `raw` is reserved for fixed keywords in the code (`ASC`, `FOR UPDATE`), never for an input.
+- **An identifier comes from the type** (`Table`, `Column`); at run time it may come from an untyped object (`req.body` passed as a `Whereable` or an `Insertable`): compile it as if it were hostile.
+- **Object keys** (`Whereable`, `cols`, `vals`, `extras`, `lateral`) are identifiers: same rule.
+- The `cast` of `param(x, 'type')` and the name of a `lateral` key are interpolated: same rule.
 
-## Tests d'injection
+## Injection tests
 
-Chaque changement ajoute, dans `test/unit/injection.test.ts` :
+Each change adds, in `test/unit/injection.test.ts`:
 
-- l'entrée hostile (`"`, `'`, `;`, `--`, `/*`, `$1`, `\`, octet nul) sur chaque point d'entrée touché ;
-- le `text` compilé attendu, figé ;
-- l'exécution réelle contre Postgres qui prouve que la requête reste une seule instruction.
+- the hostile input (`"`, `'`, `;`, `--`, `/*`, `$1`, `\`, null byte) on each entry point touched;
+- the expected compiled `text`, frozen;
+- real execution against Postgres proving that the query stays a single statement.
 
 ## Checklist
 
-- [ ] Utilisateur prévenu avant d'écrire, SQL avant/après dans la PR
-- [ ] Entrées hostiles testées en compilation et en exécution
-- [ ] Aucune valeur concaténée ; `raw` seulement sur des constantes du code
+- [ ] User warned before writing, SQL before/after in the PR
+- [ ] Hostile inputs tested in compilation and in execution
+- [ ] No concatenated value; `raw` only on constants of the code

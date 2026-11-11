@@ -27,7 +27,7 @@ declare module 'vitest' {
 
 export const missingUrlMessage =
   'TEST_DATABASE_URL is not set: integration tests need a Postgres server. ' +
-  'Set it in src/.env or in the environment (AGENTS.md § Environnement local).';
+  'Set it in src/.env or in the environment (AGENTS.md § Local environment).';
 
 /** Reads TEST_DATABASE_URL: the environment wins; `src/.env` only fills it when unset (process.loadEnvFile never overrides). */
 export function testDatabaseUrl(): string | undefined {

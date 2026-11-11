@@ -1,48 +1,48 @@
 ---
 name: ci-gate
-description: 'Quand la CI tourne et quand l’attendre : PR draft pendant l’itération, `gh pr ready`, docs seules, check CI passed de master, `[skip ci]` exceptionnel, fusion, relance. USE FOR: ouvrir, finaliser ou fusionner une PR, relancer la CI, PR de docs seules. DO NOT USE FOR: checks locaux (**Done when** de l’issue), niveau de relecture (run-step).'
+description: 'When CI runs and when to wait for it: draft PR while iterating, `gh pr ready`, docs only, the CI passed check of master, exceptional `[skip ci]`, merge, rerun. USE FOR: opening, finalising or merging a PR, rerunning CI, docs-only PR. DO NOT USE FOR: local checks (**Done when** of the issue), review level (run-step).'
 ---
 
-# Lancer, attendre, ou avancer
+# Run, wait, or move on
 
-On valide en local pendant l'itération ; la CI se lance **une fois prêt**.
+We validate locally while iterating; CI runs **once ready**.
 
-## Quand la CI tourne
+## When CI runs
 
-| Situation | Ce qui se passe |
+| Situation | What happens |
 |---|---|
-| PR **draft** | aucun job lourd (`.github/workflows/ci.yml`, condition sur `draft`) |
-| PR prête, **docs seules** (`.md` hors de `.agents/` et `.claude/`) | `changes` puis **CI passed** ; `build` et `bench-types` sautés |
-| PR prête, autre chose | run complet : `build` (9 jobs), `bench-types`, puis **CI passed** |
-| Push sur `master` | run complet |
-| Couche d'une pile (base : la branche du dessous) | même règle qu'une PR vers `master` : la CI tourne sur chaque couche |
+| **Draft** PR | no heavy job (`.github/workflows/ci.yml`, condition on `draft`) |
+| Ready PR, **docs only** (`.md` outside `.agents/` and `.claude/`) | `changes` then **CI passed**; `build` and `bench-types` skipped |
+| Ready PR, anything else | full run: `build` (9 jobs), `bench-types`, then **CI passed** |
+| Push to `master` | full run |
+| Layer of a stack (base: the branch below) | same rule as a PR to `master`: CI runs on each layer |
 
-## Itérer puis lancer
+## Iterate, then run
 
-1. `gh pr create --draft --base master` : relectures possibles tout de suite.
-2. Vérifier en local (le **Done when** de l'issue).
-3. Prête : `gh pr ready`, puis `gh pr checks --watch`.
-4. Correctifs après ready : chaque push relance la CI ; les regrouper.
+1. `gh pr create --draft --base master`: reviews possible straight away.
+2. Check locally (the issue's **Done when**).
+3. Ready: `gh pr ready`, then `gh pr checks --watch`.
+4. Fixes after ready: each push reruns CI; group them.
 
-## Le check de `master`
+## The check of `master`
 
-- `master` est protégée : une PR ne fusionne qu'avec **CI passed** vert **sur son dernier commit**. Ce job échoue si un job a échoué ; un job sauté exprès (docs seules) compte comme réussi.
-- Une PR de docs seules ne coûte donc que deux petits jobs : pas besoin de `[skip ci]` pour économiser un run. Exemple : « Move the plan into GitHub issues ».
-- **`[skip ci]` exceptionnel** : sur un commit **intermédiaire** d'une PR prête, quand le suivant arrive aussitôt (il évite un run qui serait jeté). **Jamais sur le dernier commit** : sans run, pas de **CI passed**, la fusion reste bloquée.
+- `master` is protected: a PR merges only with **CI passed** green **on its last commit**. This job fails if a job failed; a job skipped on purpose (docs only) counts as passed.
+- A docs-only PR thus costs only two small jobs: no need for `[skip ci]` to save a run. Example: "Move the plan into GitHub issues".
+- **Exceptional `[skip ci]`**: on an **intermediate** commit of a ready PR, when the next one follows at once (it avoids a run that would be thrown away). **Never on the last commit**: without a run, no **CI passed**, the merge stays blocked.
 
-## Pièges
+## Pitfalls
 
-- **Draft oublié** : pas de checks ; `gh pr ready` avant d'attendre.
-- **`[skip ci]` sur le dernier commit** : aucun check, la fusion est bloquée ; pousser un commit sans.
-- **Un job ajouté dans `ci.yml`** : l'ajouter aux `needs` de **CI passed**, sinon son échec ne bloque pas la fusion.
+- **Forgotten draft**: no checks; `gh pr ready` before waiting.
+- **`[skip ci]` on the last commit**: no check, the merge is blocked; push a commit without it.
+- **A job added to `ci.yml`**: add it to the `needs` of **CI passed**, otherwise its failure does not block the merge.
 
-## Relancer
+## Rerun
 
-- PR draft : `gh pr ready` d'abord.
-- Puis `gh run rerun <id>`, ou `git commit --allow-empty -m "Rerun CI"`.
-- Suivre par `gh pr checks --watch` en arrière-plan, jamais en sondant à la main.
+- Draft PR: `gh pr ready` first.
+- Then `gh run rerun <id>`, or `git commit --allow-empty -m "Rerun CI"`.
+- Follow with `gh pr checks --watch` in the background, never by polling by hand.
 
-## Fusion
+## Merge
 
-- `gh pr merge --merge` ; le `Closes #n` du corps ferme l'issue de l'étape, l'Epic se met à jour seul : aucun commit après la CI verte.
-- Après fusion : `git branch -d <branche>`, `git fetch --prune`, `git switch master && git pull --ff-only`.
+- `gh pr merge --merge`; the body's `Closes #n` closes the step's issue, the Epic updates itself: no commit after the green CI.
+- After merge: `git branch -d <branch>`, `git fetch --prune`, `git switch master && git pull --ff-only`.

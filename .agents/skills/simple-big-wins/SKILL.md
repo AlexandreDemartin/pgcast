@@ -1,33 +1,33 @@
 ---
 name: simple-big-wins
-description: 'Gros gains simples, rien de bancal : gain mesuré rapporté à la complexité ajoutée, réutiliser avant d’écrire, quoi tester. USE FOR: avant d’écrire un mécanisme, choisir entre deux solutions, optimiser, ajouter une dépendance, règle sur l’existant. DO NOT USE FOR: forme d’un helper (zero-abstraction), consigner une décision (decision-philosophy).'
+description: 'Simple big wins, nothing shaky: measured gain weighed against added complexity, reuse before writing, what to test. USE FOR: before writing a mechanism, choosing between two solutions, optimising, adding a dependency, a rule on existing code. DO NOT USE FOR: the shape of a helper (zero-abstraction), recording a decision (decision-philosophy).'
 ---
 
-# Gros gains simples, pas de petits gains compliqués
+# Simple big wins, not complicated small wins
 
-- Le bon équilibre se juge au **gain mesuré** rapporté à la **complexité ajoutée** : lignes, cas particuliers, types conditionnels, hypothèses à garder en tête.
-- **Gros gain simple** : se prend tout de suite. **Petit gain coûteux** : se laisse, même juste et testé.
-- **Solution bancale** (contournement fragile, dépendance à un détail interne de `pg` ou de TS, comportement dû au hasard) : refusée, même si elle marche aujourd'hui.
-- Supprimer du code ou une dépendance sans perte de fonction est un gros gain.
+- The right balance is judged by the **measured gain** weighed against the **added complexity**: lines, special cases, conditional types, assumptions to keep in mind.
+- **Simple big win**: take it at once. **Costly small win**: leave it, even if correct and tested.
+- **Shaky solution** (fragile workaround, reliance on an internal detail of `pg` or TS, behaviour that works by chance): refused, even if it works today.
+- Removing code or a dependency with no loss of function is a big win.
 
-## Avant d'écrire du code
+## Before writing code
 
-1. Déjà dans `src/` ? Réutiliser (`mapWithSeparator`, `SQLFragment.copy`, `conditionalParam`…).
-2. Postgres le fait déjà ? Exposer le SQL, ne pas le réimplémenter en JS.
-3. Sinon du code maison court, sans dépendance runtime (`AGENTS.md` § Philosophie, point 4).
+1. Already in `src/`? Reuse it (`mapWithSeparator`, `SQLFragment.copy`, `conditionalParam`…).
+2. Postgres already does it? Expose the SQL, do not reimplement it in JS.
+3. Otherwise short home-made code, with no runtime dependency (`AGENTS.md` § Philosophy, point 4).
 
 ## Types
 
-- Un type conditionnel de plus se paie à chaque compilation chez chaque utilisateur : le mesurer (`npm run bench:types`).
-- Le type le plus simple qui refuse les cas faux ; pas de prouesse qui n'attrape rien de plus.
+- One more conditional type is paid for at every compilation by every user: measure it (`npm run bench:types`).
+- The simplest type that refuses the wrong cases; no feat of typing that catches nothing more.
 
 ## Tests
 
-- Chaque comportement observable : son SQL compilé (`text` + `values`) et son exécution réelle.
-- Chaque type public : un cas positif et un cas négatif (skill `type-tests`).
-- Hors de Pareto, couverts en entier : l'échappement et la paramétrisation (skill `sql-safety`).
+- Each observable behaviour: its compiled SQL (`text` + `values`) and its real execution.
+- Each public type: a positive and a negative case (skill `type-tests`).
+- Outside Pareto, covered in full: escaping and parameterisation (skill `sql-safety`).
 
-## Adopter une règle sur l'existant
+## Adopting a rule on existing code
 
-- Une règle nouvelle s'applique au code neuf ou touché ; pas de balayage de tout `src/` (sauf un bug ou une faille).
-- Le code d'origine de Zapatos garde son style ; on ne le reformate pas.
+- A new rule applies to new or touched code; no sweep of all of `src/` (except for a bug or a vulnerability).
+- Zapatos's original code keeps its style; we do not reformat it.

@@ -23,11 +23,11 @@ const commandRefusals = [
     refuses: command =>
       /^(npm|npx\s+npm(@\S+)?)\s+(publish|version|dist-tag|unpublish|deprecate)\b/.test(command) ||
       /^gh\s+release\s+(create|edit|upload)\b/.test(command),
-    reason: 'Publishing is a mandatory stop point: the user publishes (AGENTS.md § Points d’arrêt).',
+    reason: 'Publishing is a mandatory stop point: the user publishes (AGENTS.md § Stop points).',
   },
   {
     refuses: command => /^gh\s+pr\s+create\b/.test(command) && !new RegExp(`(--repo|-R)[ =]${fork}\\b`).test(command),
-    reason: `A PR targets the fork only: \`gh pr create --repo ${fork} --base master …\`, never jawj/zapatos (agent builder § La PR).`,
+    reason: `A PR targets the fork only: \`gh pr create --repo ${fork} --base master …\`, never jawj/zapatos (agent builder § The PR).`,
   },
 ];
 
@@ -39,7 +39,7 @@ function writeRefusalOf(path) {
     return 'Never edit build output (`dist/`, `db.mjs`, `generate.mjs`): change `src/`, then `npm run build`.';
   }
   if (/^\.env(\..+)?$/.test(basename(path))) {
-    return 'Never write a `.env`: it holds the user’s local secrets (AGENTS.md § Environnement local).';
+    return 'Never write a `.env`: it holds the user’s local secrets (AGENTS.md § Local environment).';
   }
   return undefined;
 }
