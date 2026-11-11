@@ -1,40 +1,40 @@
-# 002 — Noms de modules : `zapatos/*` ou `pgcast/*`
+# 002 — Module names: `zapatos/*` or `pgcast/*`
 
-- **Statut** : accepté (2026-11-11) : option A maintenant, option C comme cible
-- **Date** : 2026-11-11
+- **Status**: accepted (2026-11-11): option A now, option C as the target
+- **Date**: 2026-11-11
 
-## Contexte
+## Context
 
-Le paquet s'appelle désormais `pgcast`. Or le nom `zapatos` n'est pas seulement une marque, c'est un **nom de module** utilisé à trois endroits :
+The package is now called `pgcast`. But the name `zapatos` is not only a brand: it is a **module name**, used in three places:
 
-1. **Le code généré** (`zapatos/schema.d.ts`) contient :
+1. **The generated code** (`zapatos/schema.d.ts`) contains:
    ```ts
    declare module 'zapatos/schema' {
-     import type * as db from 'zapatos/db';          // ← résolution réelle dans node_modules
+     import type * as db from 'zapatos/db';          // ← real resolution in node_modules
      import type * as c from 'zapatos/custom';
      …
    }
    ```
-2. **Le runtime compilé** (`dist/db/*.d.ts`) importe `import type { … } from 'zapatos/schema'`. Ce module est *ambiant*, fourni par le fichier généré, donc il fonctionne quel que soit le nom du paquet.
-3. **Le code utilisateur** importe `zapatos/db` et `zapatos/schema`.
+2. **The compiled runtime** (`dist/db/*.d.ts`) imports `import type { … } from 'zapatos/schema'`. This module is *ambient*, provided by the generated file, so it works whatever the package's name.
+3. **User code** imports `zapatos/db` and `zapatos/schema`.
 
-Conséquence : si l'on installe `pgcast` sous son propre nom, `import 'zapatos/db'` ne résout plus rien et les types générés cassent.
+Consequence: if `pgcast` is installed under its own name, `import 'zapatos/db'` no longer resolves and the generated types break.
 
 ## Options
 
-| Option | Migration utilisateur | Sortie codegen | Risque |
+| Option | User migration | Codegen output | Risk |
 |---|---|---|---|
-| **A. Alias npm, statu quo des noms** : `npm i zapatos@npm:pgcast` | **Aucune** : on change une ligne du `package.json` et rien d'autre. | Inchangée | Nul. Inconvénient : le nom `pgcast` n'apparaît jamais dans les imports. |
-| B. Noms natifs `pgcast/*` | Changer les imports (`zapatos/db` → `pgcast/db`) et régénérer. | Change (`declare module 'pgcast/schema'`…) | Moyen : deux noms de module à faire coexister dans la doc et dans les issues. |
-| **C. A + B : double nom, opt-in** : `pgcast/db` est exporté par le paquet, et une option de config `moduleName: 'zapatos' \| 'pgcast'` (défaut `'zapatos'`) choisit les noms émis par le codegen. | Aucune par défaut. Les nouveaux projets peuvent écrire `pgcast/*`. | Inchangée par défaut, opt-in sinon | Faible, à une subtilité près : `src/db` importe `'zapatos/schema'`. En mode `pgcast`, le fichier généré devrait déclarer **les deux** modules ambiants (`pgcast/schema` qui réexporte, et `zapatos/schema`), ce qui reste à prototyper et à tester. |
+| **A. npm alias, names unchanged**: `npm i zapatos@npm:pgcast` | **None**: one line of `package.json` changes, nothing else. | Unchanged | None. Drawback: the name `pgcast` never appears in imports. |
+| B. Native `pgcast/*` names | Change the imports (`zapatos/db` → `pgcast/db`) and regenerate. | Changes (`declare module 'pgcast/schema'`…) | Medium: two module names to keep side by side in the docs and in the issues. |
+| **C. A + B: two names, opt-in**: the package exports `pgcast/db`, and a config option `moduleName: 'zapatos' \| 'pgcast'` (default `'zapatos'`) chooses the names the codegen emits. | None by default. New projects can write `pgcast/*`. | Unchanged by default, opt-in otherwise | Low, but for one subtlety: `src/db` imports `'zapatos/schema'`. In `pgcast` mode, the generated file would have to declare **both** ambient modules (`pgcast/schema`, which re-exports, and `zapatos/schema`); this remains to be prototyped and tested. |
 
-## Choix proposé
+## Proposed choice
 
-**A immédiatement, C plus tard.**
+**A at once, C later.**
 
-- Phase 0 : on ne touche à aucune chaîne `zapatos/*`. Le README documente l'installation `zapatos@npm:pgcast`, qui garantit la promesse « changer d'import sans réécrire son code ». Le CLI s'appelle `pgcast`, avec l'alias `zapatos`.
-- Après la phase 1 (snapshots du codegen en place) : prototyper C dans une PR dédiée, avec le snapshot du mode par défaut inchangé et un nouveau snapshot pour le mode `pgcast`.
+- Phase 0: no `zapatos/*` string is touched. The README documents installing `zapatos@npm:pgcast`, which keeps the promise "change the import without rewriting your code". The CLI is called `pgcast`, with the alias `zapatos`.
+- After phase 1 (codegen snapshots in place): prototype C in a dedicated PR, with the default mode's snapshot unchanged and a new snapshot for `pgcast` mode.
 
 ## Validation
 
-Validé par l'utilisateur le 2026-11-11 : A maintenant, C comme cible.
+Validated by the user on 2026-11-11: A now, C as the target.

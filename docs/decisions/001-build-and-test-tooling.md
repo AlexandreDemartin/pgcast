@@ -1,48 +1,48 @@
-# 001 — Outillage : build et tests
+# 001 — Tooling: build and tests
 
-- **Statut** : accepté (2026-11-11)
-- **Date** : 2026-11-11
-- **Portée** : phase 0 (build) et phase 1 (tests)
+- **Status**: accepted (2026-11-11)
+- **Date**: 2026-11-11
+- **Scope**: phase 0 (build) and phase 1 (tests)
 
-## Contexte
+## Context
 
-Zapatos 6.6.1 compile en **CommonJS** (`tsc`, `target ES2019`) puis génère des wrappers ESM (`db.mjs`, `generate.mjs`) avec `gen-esm-wrapper`. Le champ `exports` du `package.json` pointe `require` vers les `.js` et `import` vers les `.mjs`, qui réexportent le module CJS.
+Zapatos 6.6.1 compiles to **CommonJS** (`tsc`, `target ES2019`), then generates ESM wrappers (`db.mjs`, `generate.mjs`) with `gen-esm-wrapper`. The `exports` field of `package.json` points `require` at the `.js` files and `import` at the `.mjs` files, which re-export the CJS module.
 
-Le runtime expose des **valeurs identitaires** : les symboles `Default`, `self` et `all`, et les classes `Parameter`, `SQLFragment`, `ColumnNames`, `ParentColumn`… La compilation repose sur `instanceof` et `===` (`core.ts`, `compileExpression`). Si deux copies du runtime coexistaient dans un même process, l'une chargée via `require` et l'autre via `import`, `db.Default` de l'une ne serait pas reconnu par l'autre. Une partie des valeurs tomberait alors silencieusement dans la branche « Whereable ». C'est le *dual package hazard*.
+The runtime exposes **identity values**: the symbols `Default`, `self` and `all`, and the classes `Parameter`, `SQLFragment`, `ColumnNames`, `ParentColumn`… Compilation relies on `instanceof` and `===` (`core.ts`, `compileExpression`). If two copies of the runtime coexisted in one process, one loaded through `require` and the other through `import`, one copy's `db.Default` would not be recognised by the other. Some values would then fall silently into the "Whereable" branch. This is the *dual package hazard*.
 
-## Build : options
+## Build: options
 
-| Option | Pour | Contre |
+| Option | For | Against |
 |---|---|---|
-| **A. Garder CJS + wrapper ESM** (`tsc` + `gen-esm-wrapper`) | Une seule copie du runtime, donc aucun dual package hazard. Sortie **identique à l'octet** à 6.6.1 (vérifié). Zéro risque pour les consommateurs. | Pas de tree-shaking ESM (impact négligeable : ~3 kLoC). Wrapper `.mjs` à régénérer quand un export est ajouté (automatique au build). |
-| B. Dual build `tsup` (CJS + ESM natifs) | ESM natif, bundling. | **Deux copies du runtime**, donc hazard réel sur `Default`, `self`, `all` et `instanceof`. Il faudrait enregistrer les symboles via `Symbol.for` et remplacer `instanceof` par des marqueurs, ce qui toucherait `core.ts`, une zone sensible. Nouvelle dépendance de build. |
-| C. `tsc` ×2 (CJS + ESM) | Pas d'outil tiers. | Même hazard que B. Deux tsconfig à maintenir. |
-| D. ESM pur + `require(esm)` (Node ≥ 22.12 / 20.19) | Le plus moderne. | Rupture pour les consommateurs CJS sur d'anciens Node ou bundlers. Hors périmètre « aucun changement cassant ». |
+| **A. Keep CJS + ESM wrapper** (`tsc` + `gen-esm-wrapper`) | A single copy of the runtime, so no dual package hazard. Output **byte-identical** to 6.6.1 (checked). Zero risk for consumers. | No ESM tree-shaking (negligible impact: ~3 kLoC). The `.mjs` wrapper must be regenerated when an export is added (automatic at build). |
+| B. `tsup` dual build (native CJS + ESM) | Native ESM, bundling. | **Two copies of the runtime**, so a real hazard on `Default`, `self`, `all` and `instanceof`. The symbols would have to be registered with `Symbol.for` and `instanceof` replaced by markers, which would touch `core.ts`, a sensitive zone. A new build dependency. |
+| C. `tsc` ×2 (CJS + ESM) | No third-party tool. | Same hazard as B. Two tsconfigs to maintain. |
+| D. Pure ESM + `require(esm)` (Node ≥ 22.12 / 20.19) | The most modern. | Breaks CJS consumers on older Node versions or bundlers. Outside the "no breaking change" scope. |
 
-**Choix proposé : A.** Les seuls changements de la phase 0 sont TypeScript 5.9.3 et l'appel des binaires sans `npx`. La sortie `dist/`, `db.mjs` et `generate.mjs` est identique à l'octet à celle de 6.6.1, et `npm pack --dry-run` liste les mêmes 51 fichiers. Si l'on veut un ESM natif un jour, il faudra d'abord rendre le runtime robuste au hazard (`Symbol.for` et des *brands* à la place d'`instanceof`), ce qui fera l'objet d'une note à part puisque cela touche `core.ts`.
+**Proposed choice: A.** The only phase 0 changes are TypeScript 5.9.3 and calling the binaries without `npx`. The output in `dist/`, `db.mjs` and `generate.mjs` is byte-identical to 6.6.1's, and `npm pack --dry-run` lists the same 51 files. If native ESM is wanted one day, the runtime must first be made robust to the hazard (`Symbol.for` and *brands* instead of `instanceof`); that will get a note of its own, since it touches `core.ts`.
 
-### Versions retenues
+### Chosen versions
 
-| Outil | Version | Pourquoi pas plus récent |
+| Tool | Version | Why not newer |
 |---|---|---|
-| TypeScript | **5.9.3** | TS 6.0 et 7.0 (le portage en Go) existent, mais typescript-eslint 8 plafonne à `<6.1` et TS 7 n'expose pas encore l'API compilateur dont aura besoin l'inférence SQL (évolution n°1). À réévaluer avant l'inférence du SQL brut (⑪, [#62](https://github.com/AlexandreDemartin/pgcast/issues/62)). Les consommateurs restent libres (`peerDependency typescript >=4.1`, inchangée). |
-| ESLint | **9.39** (flat config natif) | `eslint-plugin-import` ne déclare pas encore ESLint 10. |
-| typescript-eslint | **8.72** | `member-delimiter-style` et `semi` ont migré vers `@stylistic/eslint-plugin` : mêmes règles, même configuration. |
-| Vitest | **4.1** | Vitest 5 exige Node ≥ 22.12 et ferait sortir Node 20 de la matrice. |
-| Node | dev : `^20.19` ou `>=22.12` ; paquet publié : **aucun `engines`** | Zapatos 6.6.1 n'en déclarait pas ; en ajouter un ferait échouer l'install sous Yarn 1 chez un utilisateur de Node 18 (relecture de la PR #1). Node 20 est EOL depuis avril 2026 mais reste dans la matrice CI tant que ça ne coûte rien. |
+| TypeScript | **5.9.3** | TS 6.0 and 7.0 (the Go port) exist, but typescript-eslint 8 caps at `<6.1`, and TS 7 does not yet expose the compiler API that SQL inference (evolution no. 1) will need. To be reassessed before raw SQL inference (⑪, [#62](https://github.com/AlexandreDemartin/pgcast/issues/62)). Consumers stay free (`peerDependency typescript >=4.1`, unchanged). |
+| ESLint | **9.39** (native flat config) | `eslint-plugin-import` does not yet declare ESLint 10. |
+| typescript-eslint | **8.72** | `member-delimiter-style` and `semi` have moved to `@stylistic/eslint-plugin`: same rules, same configuration. |
+| Vitest | **4.1** | Vitest 5 requires Node ≥ 22.12 and would drop Node 20 from the matrix. |
+| Node | dev: `^20.19` or `>=22.12`; published package: **no `engines`** | Zapatos 6.6.1 declared none; adding one would make installation fail under Yarn 1 for a Node 18 user (review of PR #1). Node 20 has been EOL since April 2026 but stays in the CI matrix while it costs nothing. |
 
-## Tests : options
+## Tests: options
 
-| Besoin | Choix proposé | Alternatives écartées |
+| Need | Proposed choice | Alternatives rejected |
 |---|---|---|
-| Runner | **Vitest 4** | Jest (ESM/TS plus lourd), `node:test` (pas de snapshots inline ni de typecheck intégré). |
-| Tests de types | **`expectTypeOf` + `vitest --typecheck`** (fichiers `*.test-d.ts`), plus `@ts-expect-error` pour les cas négatifs | `tsd` (runner séparé, moins bonne intégration). `expect-type` reste en devDep pour l'usage direct. |
-| Postgres | **Pas de Docker.** En local, une instance existante via `TEST_DATABASE_URL` (lue depuis `src/.env`, ignoré par git). En CI, des **service containers** GitHub Actions (14, 16 et dernière stable). | docker-compose (inutile ici), Testcontainers (lent, dépendance lourde), PGlite seul (ce n'est pas le vrai serveur, mais il servira de second driver avec l'interface de driver, ⑦, [#58](https://github.com/AlexandreDemartin/pgcast/issues/58)). |
-| Isolation | Une base éphémère par fichier de test (`CREATE DATABASE … TEMPLATE pgcast_fixture`), puis une transaction annulée par test. | Un schéma par test (incompatible avec la fixture multi-schémas). |
-| Snapshots | Snapshots fichier pour le codegen (`test/__snapshots__/schema.d.ts.snap`), snapshots inline pour le SQL compilé. | — |
-| Bench types | `tsc --noEmit --extendedDiagnostics -p bench/` sur un projet exemple. On compare le *Check time* et le nombre d'*Instantiations*, qui sont plus stables que le temps, à `bench/baseline.json`. Échec au-delà de +20 %. | Hyperfine (ne mesure que le temps, trop bruité en CI). |
+| Runner | **Vitest 4** | Jest (heavier ESM/TS), `node:test` (no inline snapshots nor built-in typecheck). |
+| Type tests | **`expectTypeOf` + `vitest --typecheck`** (`*.test-d.ts` files), plus `@ts-expect-error` for negative cases | `tsd` (separate runner, poorer integration). `expect-type` stays as a devDep for direct use. |
+| Postgres | **No Docker.** Locally, an existing instance through `TEST_DATABASE_URL` (read from `src/.env`, ignored by git). In CI, GitHub Actions **service containers** (14, 16 and latest stable). | docker-compose (pointless here), Testcontainers (slow, heavy dependency), PGlite alone (it is not the real server, but it will serve as a second driver with the driver interface, ⑦, [#58](https://github.com/AlexandreDemartin/pgcast/issues/58)). |
+| Isolation | One ephemeral database per test file (`CREATE DATABASE … TEMPLATE pgcast_fixture`), then one rolled-back transaction per test. | One schema per test (incompatible with the multi-schema fixture). |
+| Snapshots | File snapshots for the codegen (`test/__snapshots__/schema.d.ts.snap`), inline snapshots for compiled SQL. | — |
+| Type bench | `tsc --noEmit --extendedDiagnostics -p bench/` on a sample project. The *Check time* and the number of *Instantiations*, which are more stable than time, are compared with `bench/baseline.json`. Fails beyond +20 %. | Hyperfine (measures only time, too noisy in CI). |
 
-## Conséquences
+## Consequences
 
-- La phase 0 ne change aucun comportement : sortie de build identique à l'octet.
-- `vitest` et `expect-type` sont installés dès la phase 0, avec un smoke test, pour que `test` et `test:types` soient de vraies commandes. La phase 1 n'ajoute aucune nouvelle dépendance : `pg` est déjà là.
+- Phase 0 changes no behaviour: the build output is byte-identical.
+- `vitest` and `expect-type` are installed in phase 0, with a smoke test, so that `test` and `test:types` are real commands. Phase 1 adds no new dependency: `pg` is already there.
