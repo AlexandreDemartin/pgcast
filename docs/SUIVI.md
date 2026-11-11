@@ -101,7 +101,7 @@ Toujours les mêmes clés, dans cet ordre ; une clé absente ne s'applique pas.
 
 ### 1.7 `docs/characterization-report` — rapport des bugs et surprises
 
-- [ ] **Livrée**
+- [x] **Livrée** : PR #11
 - **But** : chaque comportement surprenant trouvé en 1.1–1.6, avec son test de caractérisation et une proposition ; rien n'est corrigé.
 - **Relecture** : `faible`.
 - **Lire** : `backward-compat`, `consumer-usage`.
