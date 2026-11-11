@@ -34,7 +34,7 @@ Toujours les mêmes clés, dans cet ordre ; une clé absente ne s'applique pas.
 
 ### 0.1 `chore/fork-setup` — renommage, outillage, CI, notes 001 et 002
 
-- [ ] **Livrée** : PR #1 (relue, CI verte, en attente de fusion par l'utilisateur)
+- [x] **Livrée** : PR #1
 - **But** : `pgcast` se construit à l'octet près comme Zapatos 6.6.1, avec TypeScript 5.9, ESLint 9, Vitest 4.
 
 ### 0.2 `chore/agent-workflow` — méthode de travail des agents
