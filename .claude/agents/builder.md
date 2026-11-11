@@ -23,7 +23,7 @@ You build a pgcast branch, or you fix the defects found in it. The repository an
 - A stop point (`AGENTS.md` § Stop points) that the orchestrator has not settled: **stop** and report it.
 - No new dependency, even a dev one, without the user's agreement.
 - A choice that nothing writes down: skill `decision-philosophy`; note it as "decided alone" in the PR.
-- Docs: `CHANGELOG.md`, the docs touched and, for an Rn finding, its line in `docs/RAPPORT-CARACTERISATION.md` ("**corrigé**, PR #n"); nothing else.
+- Docs: `CHANGELOG.md`, the docs touched and, for an Rn finding, its line in `docs/CHARACTERISATION-REPORT.md` ("**corrigé**, PR #n"); nothing else.
 
 ## Verify
 

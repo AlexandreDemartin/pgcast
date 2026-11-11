@@ -1,7 +1,7 @@
 # 003 — Breaking fixes: fix, or deprecate
 
 - **Status**: accepted (2026-11-12), by delegation from the user (paraphrased from French): "the best solution according to the philosophy; do not break everything; deprecation that keeps working and is flagged". Revised on 2026-11-12 after audit (R8, R14, R16).
-- **Scope**: the "breaking" findings of [RAPPORT-CARACTERISATION.md](../RAPPORT-CARACTERISATION.md), chapter 2 (Epic [#18](https://github.com/AlexandreDemartin/pgcast/issues/18)).
+- **Scope**: the "breaking" findings of [CHARACTERISATION-REPORT.md](../CHARACTERISATION-REPORT.md), chapter 2 (Epic [#18](https://github.com/AlexandreDemartin/pgcast/issues/18)).
 
 ## Context
 

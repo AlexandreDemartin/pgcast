@@ -51,9 +51,9 @@ In English, concise (skill `concise-docs`): **What** (the expected behaviour, th
 2. The level's reviews, in parallel, even on a draft PR.
 3. Each defect is classed:
    - **blocking** (bug, injection, breaking change, wrong or too wide type, SQL different from the one announced, missing test on a risk): a fresh `builder` fixes it in the step;
-   - **minor** (naming, JSDoc, form): added to `docs/APPRENTISSAGES.md` § Mineurs gardés, or dropped.
+   - **minor** (naming, JSDoc, form): added to `docs/LEARNINGS.md` § Mineurs gardés, or dropped.
 4. Level `high`: `branch-reviewer` in `verify` mode on the fix commits; `not fixed` or `regressed` goes back to 3.
-5. The agents' "learning" remarks: one line each in `docs/APPRENTISSAGES.md`, last commit of the branch ("Record what #22 taught").
+5. The agents' "learning" remarks: one line each in `docs/LEARNINGS.md`, last commit of the branch ("Record what #22 taught").
 6. `gh pr ready`, green CI on the last commit (skill `ci-gate`); `gh pr merge --merge`: the merge closes the issue, the Epic ticks itself. No "Tick step" commit. Clean up (`builder.md` § Clean up).
 
 ## Briefs
@@ -88,7 +88,7 @@ Sources: GitHub docs "Stack code changes in pull requests", Thoughtworks Radar (
 
 ## End of chapter
 
-1. A review of the whole merged range (`<master before the chapter>..master`) by `branch-reviewer`, with `docs/APPRENTISSAGES.md` § Mineurs gardés; its fixes in a follow-up PR.
+1. A review of the whole merged range (`<master before the chapter>..master`) by `branch-reviewer`, with `docs/LEARNINGS.md` § Mineurs gardés; its fixes in a follow-up PR.
 2. The method PR: each learning judged (`.agents/README.md` § Self-improvement), kept or dropped; the file is emptied in the same PR, which closes the Epic (`Closes #epic`).
 
 ## Checklist
@@ -96,5 +96,5 @@ Sources: GitHub docs "Stack code changes in pull requests", Thoughtworks Radar (
 - [ ] Only the step's issue read; stop points asked before the `builder`
 - [ ] Review of the level, brief without a fed conclusion
 - [ ] Each defect classed; blockers fixed by a fresh `builder`
-- [ ] Minors and learnings written in `docs/APPRENTISSAGES.md`
+- [ ] Minors and learnings written in `docs/LEARNINGS.md`
 - [ ] PR merged with `Closes #n`, issue closed, local clean
