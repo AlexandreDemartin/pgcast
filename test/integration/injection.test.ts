@@ -94,6 +94,15 @@ describe('without parameters (simple protocol)', () => {
   it('a schema-qualified aggregate runs', async () => {
     expect(await db.select('users', all, {}, db.SelectResultMode.Numeric, 'pg_catalog.count').run(t.client)).toBe(3);
   });
+
+  it('an aggregate named as Postgres lexes it runs', async () => {
+    // each name is created as written, then called by select(); the ROLLBACK drops them
+    await t.client.query('CREATE SCHEMA my_schema');
+    for (const aggregate of ['my$agg', 'a$1b', 'étendue', '"my agg"', '"a""b"', '"Stats-2024"', 'my_schema."MyAgg"']) {
+      await t.client.query(`CREATE AGGREGATE ${aggregate} (int) (sfunc = int4pl, stype = int, initcond = '0')`);
+      expect(await db.select('users', all, { columns: ['id'] }, db.SelectResultMode.Numeric, aggregate).run(t.client), aggregate).toBe(6);
+    }
+  });
 });
 
 describe('transaction', () => {

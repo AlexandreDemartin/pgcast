@@ -463,9 +463,6 @@ export interface SelectSignatures {
   ): SQLFragment<FullSelectReturnTypeForTable<T, C, L, E, M>>;
 }
 
-// the aggregate of select() is written raw: a plain or quoted identifier, optionally schema-qualified
-const functionName = /^(?:[\p{L}_][\p{L}\p{N}_]*|"[\p{L}\p{N}_]+")(?:\.(?:[\p{L}_][\p{L}\p{N}_]*|"[\p{L}\p{N}_]+"))?$/u;
-
 export class NotExactlyOneError extends Error {
   // see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error
   query: SQLFragment;
@@ -476,6 +473,13 @@ export class NotExactlyOneError extends Error {
     this.query = query;  // custom property
   }
 }
+
+// the aggregate of select() is written raw, so it must be an identifier as Postgres lexes one, optionally
+// schema-qualified: unquoted, any non-ASCII character is a letter and `$` may follow the first one; quoted,
+// anything but NUL, with `""` for `"` -- see https://github.com/postgres/postgres/blob/master/src/backend/parser/scan.l
+const
+  identifier = /[A-Za-z_\u0080-\u{10FFFF}][A-Za-z0-9_$\u0080-\u{10FFFF}]*|"(?:[^"\0]|"")+"/u.source,
+  functionName = new RegExp(`^(?:${identifier})(?:\\.(?:${identifier}))?$`, 'u');
 
 /**
  * Generate a `SELECT` query `SQLFragment`. This can be nested with other 

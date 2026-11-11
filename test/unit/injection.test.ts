@@ -180,13 +180,13 @@ describe('shortcut arguments', () => {
 
   it('the aggregate of select() in Numeric mode is checked at run time', () => {
     // count(), sum(), avg(), min() and max() pass a constant; select() itself is public;
-    // `a.b` and `"a"` are function names, written as before
+    // `a.b`, `"a"` and `a$1b` are function names, written as before
     expect(matrix(v => db.select('users', all, {}, db.SelectResultMode.Numeric, v))).toMatchInlineSnapshot(`
       {
         "backslash": "throws: Aggregate must be a function name (e.g. sum, or my_schema.my_agg), not 'a\\b'",
         "comment": "throws: Aggregate must be a function name (e.g. sum, or my_schema.my_agg), not 'a/*b'",
         "dashes": "throws: Aggregate must be a function name (e.g. sum, or my_schema.my_agg), not 'a--b'",
-        "dollar": "throws: Aggregate must be a function name (e.g. sum, or my_schema.my_agg), not 'a$1b'",
+        "dollar": "SELECT a$1b(*) AS result FROM "users"",
         "dot": "SELECT a.b(*) AS result FROM "users"",
         "dquote": "throws: Aggregate must be a function name (e.g. sum, or my_schema.my_agg), not 'a"b'",
         "lone": "throws: Aggregate must be a function name (e.g. sum, or my_schema.my_agg), not '"'",
@@ -198,7 +198,7 @@ describe('shortcut arguments', () => {
     `);
   });
 
-  it('a function name as the aggregate, plain, quoted or schema-qualified, is written as before', () => {
+  it('a function name as the aggregate, as Postgres lexes one, is written as before', () => {
     const numeric = (aggregate?: string) => db.select('users', all, { columns: ['id'] }, db.SelectResultMode.Numeric, aggregate).compile().text;
     expect(numeric(undefined)).toBe('SELECT count("id") AS result FROM "users"');  // the default, also without strictNullChecks
     expect(numeric('my_agg2')).toBe('SELECT my_agg2("id") AS result FROM "users"');
@@ -206,6 +206,12 @@ describe('shortcut arguments', () => {
     expect(numeric('"MyAgg"')).toBe('SELECT "MyAgg"("id") AS result FROM "users"');
     expect(numeric('pg_catalog.count')).toBe('SELECT pg_catalog.count("id") AS result FROM "users"');
     expect(numeric('"Stats"."MyAgg"')).toBe('SELECT "Stats"."MyAgg"("id") AS result FROM "users"');
+    expect(numeric('my$agg')).toBe('SELECT my$agg("id") AS result FROM "users"');
+    expect(numeric('a$1b')).toBe('SELECT a$1b("id") AS result FROM "users"');
+    expect(numeric('e\u0301tendue')).toBe('SELECT e\u0301tendue("id") AS result FROM "users"');  // NFD
+    expect(numeric('"my agg"')).toBe('SELECT "my agg"("id") AS result FROM "users"');
+    expect(numeric('"a""b"')).toBe('SELECT "a""b"("id") AS result FROM "users"');
+    expect(numeric('"Stats-2024"')).toBe('SELECT "Stats-2024"("id") AS result FROM "users"');
   });
 
   it('the aggregate of select() is ignored, as before, outside Numeric mode', () => {
@@ -215,7 +221,7 @@ describe('shortcut arguments', () => {
 
   it('an aggregate that is not a function name throws', () => {
     const numeric = (aggregate: any) => () => db.select('users', all, {}, db.SelectResultMode.Numeric, aggregate);
-    for (const aggregate of ['', '1count', 'a.b.c', 'a.', '.a', '"a""b"', '""', '"a', 'a"', 'count(*) FROM users; SELECT count', 'my$agg', 'a b', 'count\n'])
+    for (const aggregate of ['', '1count', '$a', 'a.b.c', 'a.', '.a', '""', '"a', 'a"', '"a"b"', '"a\0b"', 'count(*) FROM users; SELECT count', 'a b', 'a\nb', 'count\n;'])
       expect(numeric(aggregate), aggregate).toThrow(`Aggregate must be a function name (e.g. sum, or my_schema.my_agg), not '${aggregate}'`);
   });
 
