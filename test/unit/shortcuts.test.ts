@@ -386,6 +386,14 @@ describe('truncate', () => {
       }
     `);
   });
+
+  it('undefined or null options (allowed without strictNullChecks) give the SQL of 6.6.1, spaces and all', () => {
+    expect(db.truncate('users', undefined as any).compile().text).toBe('TRUNCATE "users" ');
+    expect(db.truncate('users', null as any).compile().text).toBe('TRUNCATE "users" ');
+    expect(db.truncate('users', undefined as any, 'CASCADE').compile().text).toBe('TRUNCATE "users"  CASCADE');
+    expect(db.truncate('users', 'RESTART IDENTITY', undefined as any).compile().text).toBe('TRUNCATE "users" RESTART IDENTITY ');
+    expect(() => db.truncate('users', '' as any)).toThrow(`Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not ''`);
+  });
 });
 
 describe('select', () => {

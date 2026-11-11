@@ -1,7 +1,8 @@
 // Copyright (C) 2026 Alexandre Demartin
 //
 // What a hostile identifier achieves today, run against the fixture (compiled text:
-// test/unit/injection.test.ts). Nothing is fixed here (chapter 2).
+// test/unit/injection.test.ts). A test named `characterization:` is not fixed yet
+// (chapter 2).
 // Payloads stay harmless and inside this file's database: a SELECT, or the UPDATE
 // below, undone by the ROLLBACK that ends each test (test/helpers/db.ts); each test
 // that runs it reads the row again through another connection, which still sees 'Ada'.
@@ -10,7 +11,7 @@
 // which runs them all.
 
 import type pg from 'pg';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import * as db from '../../src/db';
 import { sql, param, all } from '../../src/db';
 import { useTestDatabase } from '../helpers/db';
@@ -77,21 +78,32 @@ describe('without parameters (simple protocol)', () => {
     await expectInjectedHereOnly();
   });
 
-  it('characterization: lock.for is raw and runs a second statement', async () => {
-    // characterization: `… FOR UPDATE) AS x; UPDATE …; SELECT (1) AS "sq_users"`; pg returns one
-    // result per statement, so run() then throws, after the UPDATE has run
-    const q = db.select('users', all, { lock: { for: `UPDATE) AS x; ${update}; SELECT (1` } } as any);
-    expect(q.compile().values).toEqual([]);
-    await expect(q.run(t.client)).rejects.toThrow(TypeError);
-    await expectInjectedHereOnly();
+  it('lock.for is checked before any query', async () => {
+    expect(() => db.select('users', all, { lock: { for: `UPDATE) AS x; ${update}; SELECT (1` } } as any))
+      .toThrow(`Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not 'UPDATE) AS x; ${update}; SELECT (1'`);
+    expect(await adaName()).toBe('Ada');
   });
 
   it('characterization: the aggregate of select() is raw and runs a second statement', async () => {
     // characterization: `SELECT count(*) FROM users; UPDATE …; SELECT count(*) AS result FROM "users"`;
-    // run() then throws, as for lock.for
+    // pg returns one result per statement, so run() then throws, after the UPDATE has run
     const q = db.select('users', all, {}, db.SelectResultMode.Numeric, `count(*) FROM users; ${update}; SELECT count`);
     expect(q.compile().values).toEqual([]);
     await expect(q.run(t.client)).rejects.toThrow(TypeError);
     await expectInjectedHereOnly();
+  });
+});
+
+describe('transaction', () => {
+  it('the isolation level is checked before a client is checked out', async () => {
+    // the pool would commit: connect() is stubbed, so a regression runs nothing either
+    const connect = vi.spyOn(t.pool, 'connect').mockRejectedValue(new Error('connect() was called') as never);
+    try {
+      await expect(db.transaction(t.pool, `SERIALIZABLE; ${update}; SELECT 1` as any, async () => null))
+        .rejects.toThrow(`Isolation level must be an IsolationLevel value (e.g. IsolationLevel.Serializable), not 'SERIALIZABLE; ${update}; SELECT 1'`);
+      expect(connect).not.toHaveBeenCalled();
+    } finally {
+      connect.mockRestore();
+    }
   });
 });
