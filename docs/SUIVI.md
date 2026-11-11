@@ -78,30 +78,37 @@ Toujours les mêmes clés, dans cet ordre ; une clé absente ne s'applique pas.
 - **Relecture** : `normal`, lentille `sql`.
 - **Lire** : `zero-abstraction`, `sql-safety`.
 
-### 1.4 `test/types-and-injection` — tests de types et d'injection
+### 1.4 `test/types` — types publics sur un schéma réel
 
 - [ ] **Livrée**
-- **But** : types publics testés en positif et en négatif sur le schéma de la fixture ; entrées hostiles testées sur chaque point d'entrée de `core.ts`.
-- **Relecture** : `normal`, lentilles `types` et `sql`.
-- **Lire** : `type-tests`, `sql-safety`.
+- **But** : types publics testés en positif et en négatif sur le schéma généré de la fixture ; chaque variante du codegen compile.
+- **Relecture** : `normal`, lentille `types`.
+- **Lire** : `type-tests`, `zapatos-spirit`.
 
-### 1.5 `test/bench-types` — coût de compilation
+### 1.5 `test/injection` — entrées hostiles
+
+- [ ] **Livrée**
+- **But** : entrées hostiles testées sur chaque point d'entrée de `core.ts`, compilées et exécutées.
+- **Relecture** : `normal`, lentille `sql`.
+- **Lire** : `sql-safety`, `zapatos-spirit`.
+
+### 1.6 `test/bench-types` — coût de compilation
 
 - [ ] **Livrée**
 - **But** : `npm run bench:types` mesure `Instantiations` sur un projet exemple, compare à la référence, échoue au-delà de +20 % ; branché en CI.
 - **Relecture** : `normal`.
 - **Lire** : `type-tests`.
 
-### 1.6 `docs/characterization-report` — rapport des bugs et surprises
+### 1.7 `docs/characterization-report` — rapport des bugs et surprises
 
 - [ ] **Livrée**
-- **But** : chaque comportement surprenant trouvé en 1.1–1.5, avec son test de caractérisation et une proposition ; rien n'est corrigé.
+- **But** : chaque comportement surprenant trouvé en 1.1–1.6, avec son test de caractérisation et une proposition ; rien n'est corrigé.
 - **Relecture** : `faible`.
 - **Lire** : `backward-compat`, `consumer-usage`.
 
 ## 2. Correctifs
 
-> Détaillé à partir du rapport 1.6 : une étape par bug, chacune avec un test qui échoue d'abord.
+> Détaillé à partir du rapport 1.7 : une étape par bug, chacune avec un test qui échoue d'abord.
 
 ## 3. Le schéma et les conditions
 

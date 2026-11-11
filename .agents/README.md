@@ -31,6 +31,7 @@ Chaque élément existe une seule fois, à l'emplacement que les outils lisent n
 | `type-tests` | Tests de types positifs et négatifs, coût de compilation (`bench:types`) |
 | `codegen-output` | Sortie du codegen : snapshots, opt-in, canary, diff justifié |
 | `consumer-usage` | Valider un besoin et une API contre Project A et Project B, sans rien en sortir |
+| `zapatos-spirit` | L'esprit de George MacKerron : découper, nommer, coder et documenter comme lui, en mieux |
 
 ## Écrire un skill
 
