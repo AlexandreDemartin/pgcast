@@ -170,6 +170,10 @@ describe('param', () => {
     `);
   });
 
+  it('with a text cast that is well-formed once quoted: written as is, as in 6.6.1', () => {
+    expect(one(param('1', 'pg_catalog"."int4'))).toEqual({ text: 'CAST($1 AS "pg_catalog"."int4")', values: ['1'] });
+  });
+
   it('with true: arrays and plain objects are JSON-stringified and cast to json', () => {
     expect(sql`${param([1, 'a'], true)}, ${param({ a: [1] }, true)}`.compile()).toMatchInlineSnapshot(`
       {
