@@ -29,7 +29,7 @@ export const missingUrlMessage =
   'TEST_DATABASE_URL is not set: integration tests need a Postgres server. ' +
   'Set it in src/.env or in the environment (AGENTS.md § Environnement local).';
 
-/** Reads TEST_DATABASE_URL, from `src/.env` when it exists, else from the environment. */
+/** Reads TEST_DATABASE_URL: the environment wins; `src/.env` only fills it when unset (process.loadEnvFile never overrides). */
 export function testDatabaseUrl(): string | undefined {
   const envFile = fileURLToPath(new URL('../../src/.env', import.meta.url));
   if (existsSync(envFile)) process.loadEnvFile(envFile);
