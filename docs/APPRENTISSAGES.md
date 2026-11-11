@@ -39,6 +39,12 @@ Candidats à un contrôle, une règle ou une ligne de skill.
 - 1.4 — Des déclarations émises dans le dossier temporaire du système ne résolvent pas `pg` : les émettre sous `node_modules/.cache/` — `builder`
 - 1.4 — Un merge de `master` fait un conflit dans `AGENTS.md` dès qu'une branche a modifié le tableau des commandes : le prévoir dans le brief — `builder`
 - 1.4 — Découper une PR déjà poussée se fait par de nouvelles branches et `cherry-pick`, l'ancienne PR fermée avec un renvoi — `builder`
+- 1.6 — `Instantiations` d'un projet entier est dominé par `lib.dom` et `@types` (~82 %) : une mesure de coût soustrait un plancher — `builder`, `scripts/bench-types.mjs`
+- 1.6 — Un garde-fou `if (x > seuil) fail` laisse passer `NaN` : valider toute valeur lue d'un outil ou d'un fichier (`Number.isInteger`) avant de comparer (candidat : skill `type-tests`) — `branch-reviewer`
+- 1.6 — Une référence comparée sur une seule borne dérive vers le haut : une mesure déterministe a aussi une borne basse, ou une mise à jour obligatoire — `branch-reviewer`
+- 1.6 — `git commit --no-edit` après un merge résolu garde les lignes `# Conflicts:` : écrire le message avec `-m` — `builder`
+- 1.6 — Un `paths` redéfini dans un tsconfig enfant efface celui du parent (`"*": ["src/typings/*"]`) : c'est ce qui laisse `zapatos/schema` au module ambiant généré — `builder`
+- 1.6 — `scripts/` n'a ni lint ni tests : un garde-fou de script se vérifie par essais rapportés, ou s'extrait en fonction testable — `builder`
 
 ## Mineurs gardés
 

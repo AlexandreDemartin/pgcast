@@ -1,0 +1,7 @@
+{
+  // Type-checking cost of a schema-heavy consumer project, measured by `npm run bench:types`
+  // (scripts/bench-types.mjs): the fixture's generated schema, and 'zapatos/db' as the
+  // declarations of src/db, never its sources (../test/generated/tsconfig.json).
+  "extends": "../test/generated/tsconfig.json",
+  "include": ["./**/*.ts", "../test/generated/zapatos/**/*"]
+}
