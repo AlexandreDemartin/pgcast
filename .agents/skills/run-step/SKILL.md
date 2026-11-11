@@ -12,6 +12,7 @@ L'orchestrateur est la session principale : il lance les agents, trie, coche et 
 - La prochaine : la première dont **Livrée** n'est pas cochée (`docs/SUIVI.md` § Mode d'emploi).
 - Ne lire que sa section : `grep -n '^### ' docs/SUIVI.md`, puis sa plage de lignes ; jamais tout le fichier.
 - Une étape part de `master` à jour et se fusionne dès qu'elle est finie.
+- Une étape trop large pour une PR à la manière de George (skill `zapatos-spirit` § Découper comme George) : la découper en étapes avant de lancer le `builder`.
 - Un point d'arrêt de `AGENTS.md` dans l'étape (note de décision, `core.ts`, sortie du codegen, publication) : demander à l'utilisateur **avant** de lancer le `builder`.
 
 ## Niveau de relecture

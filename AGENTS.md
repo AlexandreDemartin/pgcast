@@ -60,7 +60,7 @@ Le code généré et le runtime parlent de `zapatos/schema`, `zapatos/db` et `za
 | `npm test` | Vitest : unitaires et intégration (`TEST_DATABASE_URL` requis, `useTestDatabase()` dans `test/helpers/db.ts`) |
 | `npm run test:watch` | Vitest en watch |
 | `npm run test:types` | émet les déclarations de `src/db`, puis les tests de types Vitest (`test/types/*.test-d.ts`, `expectTypeOf`) sur le schéma généré de la fixture |
-| `npm run bench:types` | benchmark du temps de compilation (arrive à l'étape 1.5) |
+| `npm run bench:types` | benchmark du temps de compilation (arrive à l'étape 1.6) |
 | `npm run check:agents` | cohérence des skills et agents, tests du hook `guard` |
 
 Une tâche n'est **terminée** que si `lint`, `typecheck`, `test` et `test:types` passent.
@@ -72,6 +72,7 @@ Une tâche n'est **terminée** que si `lint`, `typecheck`, `test` et `test:types
 - CI : PR en draft pendant l'itération, `gh pr ready` une fois prête (skill `ci-gate`).
 - Relectures : agent `branch-reviewer`, qui s'appuie sur le skill utilisateur `branch-review`.
 - Trancher seul ou demander : skill `decision-philosophy`.
+- Taille, découpe, titres et style de George MacKerron, à pousser plus loin sans les trahir : skill `zapatos-spirit`.
 
 ## Règles de travail
 

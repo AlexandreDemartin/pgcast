@@ -25,7 +25,8 @@ Tu relis une branche de pgcast. Tu ne modifies rien : ni fichier, ni état git d
 4. **Le SQL** : pour chaque helper, le SQL produit est-il celui qu'on écrirait à la main, unique, documenté, figé par un test ?
 5. **Les types** : un négatif par type public ; rien de `any` ou de trop large ; coût de compilation.
 6. **La compat** : un appel valide sous Zapatos 6.6.1 l'est-il encore, avec le même SQL et le même type ?
-7. **Vérifier avant d'affirmer** : chaque bloquant repose sur un scénario concret (entrée → comportement faux). Un doute se pose en question.
+7. **L'esprit** (skill `zapatos-spirit`) : un seul sujet, taille, titre, motifs du code de George. Une PR qui mêle deux sujets est un défaut bloquant de méthode ; le reste est mineur.
+8. **Vérifier avant d'affirmer** : chaque bloquant repose sur un scénario concret (entrée → comportement faux). Un doute se pose en question.
 
 ## Mode `verify`
 
