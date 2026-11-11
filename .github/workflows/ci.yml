@@ -11,9 +11,41 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  changes:
     # Draft PRs run nothing: the CI starts with `gh pr ready` (skill ci-gate).
     if: github.event_name == 'push' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: diff
+        name: Is there anything besides docs to check?
+        # Markdown outside .agents/ and .claude/ needs no build: those two hold the agent method, which check:agents checks.
+        # A push to master always runs everything.
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.base_ref }}
+        run: |
+          code=true
+          if [ "$EVENT" = pull_request ]; then
+            code=false
+            while IFS= read -r file; do
+              case "$file" in
+                '') ;;
+                .agents/*|.claude/*) code=true ;;
+                *.md) ;;
+                *) code=true ;;
+              esac
+            done <<< "$(git diff --name-only "origin/$BASE...HEAD")"
+          fi
+          echo "code=$code" | tee -a "$GITHUB_OUTPUT"
+
+  build:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -55,8 +87,9 @@ jobs:
         run: git diff --exit-code -- db.mjs generate.mjs
 
   bench-types:
-    # Same draft filter as build. No Postgres: bench/ compiles the committed test/generated/ schema.
-    if: github.event_name == 'push' || github.event.pull_request.draft == false
+    # No Postgres: bench/ compiles the committed test/generated/ schema.
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -66,3 +99,21 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run bench:types
+
+  ci-passed:
+    # The one check master requires: it stays stable when the matrix changes, and passes when docs-only skips the rest.
+    name: CI passed
+    needs: [changes, build, bench-types]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Every job passed, or was skipped on purpose
+        env:
+          RESULTS: ${{ needs.changes.result }} ${{ needs.build.result }} ${{ needs.bench-types.result }}
+        run: |
+          for result in $RESULTS; do
+            case "$result" in
+              success|skipped) ;;
+              *) echo "A job ended with: $result"; exit 1 ;;
+            esac
+          done
