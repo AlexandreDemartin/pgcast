@@ -16,6 +16,7 @@ Des projets réels qui utilisent Zapatos forment un **corpus d'exemples**, pas l
 
 - **Lecture seule**, jamais de modification ni de commit dans ces dépôts.
 - **Confidentialité** : le code du corpus ne sort pas du poste, et le nom de ses projets non plus. Rien n'en est cité dans le dépôt, une PR, une issue ou un service externe : on décrit le **motif**, jamais l'extrait, le projet ni un nom métier.
+- **Exemples inventés** : jamais un extrait du corpus, même modifié. Un exemple qui montre le même motif s'écrit avec d'autres noms de tables et de colonnes, ceux de la fixture (`users`, `accounts`, `transfers`, `products`…) ou d'un domaine neutre.
 - **Public** : les issues et les PR de pgcast sont publiques, comme le dépôt. On n'y écrit que des **motifs sans nom** : ni projet, ni extrait, ni nom métier, ni chemin ; « un corpus d'usages réels », avec des ordres de grandeur (« environ un millier de laterals écrits à la main »).
 - **Chercher le contournement**, pas seulement l'usage : `as unknown as`, `runResultTransform` réécrit, `db.raw` sur une valeur, `sql```  qui réimplémente un shortcut, helper maison autour de `db.conditions`.
 - **Un besoin vaut une API** s'il est **général à Postgres** (un motif que toute application rencontre) et s'il revient dans le corpus. Un choix propre à un projet (configuration `simple` + `unaccent`, nom de domaine métier) devient un paramètre, jamais un helper dédié. Un cas isolé reste un fragment `sql`.
@@ -24,5 +25,6 @@ Des projets réels qui utilisent Zapatos forment un **corpus d'exemples**, pas l
 ## Checklist
 
 - [ ] Motif cité avec son ordre de grandeur, sans nom ni extrait
+- [ ] Exemples inventés, sur d'autres tables et colonnes
 - [ ] SQL du contournement comparé au SQL du helper proposé
 - [ ] Migration de l'appelant décrite en une ligne
