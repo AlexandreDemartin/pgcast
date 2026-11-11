@@ -1,0 +1,11 @@
+{
+  // Type tests (`npm run test:types`), compiled as a consumer project compiles: against the
+  // fixture's generated schema (../generated/zapatos, ambient 'zapatos/schema' and 'zapatos/custom')
+  // and the declarations of src/db that `npm run test:types` emits first ('zapatos/db').
+  "extends": "../generated/tsconfig.json",
+  "include": ["../generated/zapatos/**/*", "./**/*"],
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "bundler"
+  }
+}
