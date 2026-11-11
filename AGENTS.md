@@ -59,7 +59,7 @@ Le code généré et le runtime parlent de `zapatos/schema`, `zapatos/db` et `za
 | `npm run typecheck` | `tsc` sur la lib (ses déclarations vont dans `node_modules/.cache/pgcast`), sur `test/`, et sur le généré de la fixture (`test/generated/`) contre ces déclarations |
 | `npm test` | Vitest : unitaires et intégration (`TEST_DATABASE_URL` requis, `useTestDatabase()` dans `test/helpers/db.ts`) |
 | `npm run test:watch` | Vitest en watch |
-| `npm run test:types` | tests de types Vitest (`*.test-d.ts`, `expectTypeOf`) |
+| `npm run test:types` | émet les déclarations de `src/db`, puis les tests de types Vitest (`test/types/*.test-d.ts`, `expectTypeOf`) sur le schéma généré de la fixture |
 | `npm run bench:types` | benchmark du temps de compilation (arrive à l'étape 1.5) |
 | `npm run check:agents` | cohérence des skills et agents, tests du hook `guard` |
 
