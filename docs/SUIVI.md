@@ -49,18 +49,18 @@ Toujours les mêmes clés, dans cet ordre ; une clé absente ne s'applique pas.
 
 ### 1.1 `test/harness` — base de test, fixture, CI Postgres
 
-- [ ] **Livrée**
+- [x] **Livrée** : PR #3
 - **But** : une base éphémère par fichier de test, une transaction annulée par test, sur un schéma de référence riche.
 - **Touche** : `test`, CI.
 - **Relecture** : `normal` ; bloquant : une base hors de celles créées par les tests touchée, un test qui dépend de l'ordre d'exécution.
 - **Lire** : `simple-big-wins`, `type-tests`.
 - **Compat** : aucun.
 - **Tâches** :
-  - [ ] `test/fixtures/schema.sql` : plusieurs schémas, enums, domaines, composites, `jsonb`, tableaux, ranges, `int8` / `numeric`, colonnes générées, `DEFAULT`, identity, vues, vues matérialisées, foreign table (`file_fdw`), table partitionnée, index uniques multi-colonnes, FK simples / composites / auto-référentes / multiples vers la même table, fonctions SQL et PL/pgSQL (scalaire, `SETOF`, `RETURNS TABLE`, `OUT`, `VARIADIC`, surcharge), `COMMENT ON`, identifiants à guillemets.
-  - [ ] `globalSetup` : `TEST_DATABASE_URL` lu depuis `src/.env` ou l'environnement ; base modèle créée depuis la fixture.
-  - [ ] Helper : base par fichier (`CREATE DATABASE … TEMPLATE`), supprimée à la fin ; client par test en `BEGIN` / `ROLLBACK`.
-  - [ ] Tests unitaires sans base toujours lancés ; tests d'intégration en échec clair sans `TEST_DATABASE_URL`.
-  - [ ] CI : service Postgres 14, 16 et 18 × Node 20, 22 et LTS.
+  - [x] `test/fixtures/schema.sql` : plusieurs schémas, enums, domaines, composites, `jsonb`, tableaux, ranges, `int8` / `numeric`, colonnes générées, `DEFAULT`, identity, vues, vues matérialisées, foreign table (`file_fdw`), table partitionnée, index uniques multi-colonnes, FK simples / composites / auto-référentes / multiples vers la même table, fonctions SQL et PL/pgSQL (scalaire, `SETOF`, `RETURNS TABLE`, `OUT`, `VARIADIC`, surcharge), `COMMENT ON`, identifiants à guillemets.
+  - [x] `globalSetup` : `TEST_DATABASE_URL` lu depuis `src/.env` ou l'environnement ; base modèle créée depuis la fixture.
+  - [x] Helper : base par fichier (`CREATE DATABASE … TEMPLATE`), supprimée à la fin ; client par test en `BEGIN` / `ROLLBACK`.
+  - [x] Tests unitaires sans base toujours lancés ; tests d'intégration en échec clair sans `TEST_DATABASE_URL`.
+  - [x] CI : service Postgres 14, 16 et 18 × Node 20, 22 et LTS.
 - **Vérifier** : `npm test` deux fois de suite (rien ne fuit entre runs).
 
 ### 1.2 `test/codegen-snapshots` — sortie du codegen figée
