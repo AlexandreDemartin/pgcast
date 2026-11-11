@@ -1,0 +1,12 @@
+{
+  // Test-only config: the library build (../tsconfig.json) stays CommonJS/node10.
+  "extends": "../tsconfig.json",
+  "include": ["../src/**/*", "./**/*"],
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "..",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "skipLibCheck": true
+  }
+}
