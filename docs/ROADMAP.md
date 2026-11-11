@@ -1,12 +1,24 @@
 # Roadmap pgcast
 
-> **Statut** : v2, proposée le 2026-11-11 après l'étude de l'usage réel de Zapatos dans Belco et Bienvenue. Elle attend la validation de l'utilisateur.
+> **Statut** : v2, proposée le 2026-11-11. Elle attend la validation de l'utilisateur.
 
-L'ordre est établi en fonction de trois critères : **la fréquence réelle du besoin**, **le rapport valeur/risque** et **les dépendances techniques**. Une ligne = une branche = une PR ; l'état est dans [SUIVI.md](./SUIVI.md).
+## Objectif
 
-## Ce que disent les usages réels
+**Un Zapatos augmenté qui fait le dernier kilomètre.** Tout ce qu'une application réelle écrit encore en dehors du chemin typé doit avoir une forme typée, avec le même SQL visible et sans abstraction de plus. Ce chemin non typé couvre :
+- `db.raw`,
+- `db.sql` sans type de résultat,
+- les types de lignes écrits à la main,
+- les `as unknown as`,
+- les helpers maison autour de `db.conditions`.
 
-Les motifs viennent de deux projets, sans extrait de code (skill `consumer-usage`). Les comptes sont approximatifs, relevés par grep.
+- **Boussole** : le nombre de sorties du chemin typé dans un code réel. Chaque étape doit en faire disparaître une famille entière.
+- **Corpus** : Belco et Bienvenue fournissent des exemples d'usage, ils ne sont pas la cible. Un besoin n'entre que s'il est général à Postgres (skill `consumer-usage`).
+
+L'ordre est établi en fonction de trois critères : **la part du dernier kilomètre couverte**, **le rapport valeur/risque** et **les dépendances techniques**. Une ligne = une branche = une PR ; l'état est dans [SUIVI.md](./SUIVI.md).
+
+## Où l'on sort du chemin typé aujourd'hui
+
+Les motifs sont relevés dans le corpus, sans extrait de code (skill `consumer-usage`). Les comptes sont approximatifs, relevés par grep, et ne servent qu'à mesurer la fréquence.
 
 | Motif | Belco | Bienvenue | Réponse pgcast |
 |---|---|---|---|
@@ -43,7 +55,7 @@ Les motifs viennent de deux projets, sans extrait de code (skill `consumer-usage
 | **⑧** | Savepoints, `advisoryXactLock`, retry structuré | Les deux projets prennent des verrous consultatifs dans des transactions rejouées. | moyen |
 | **⑨** | Contexte RLS `withContext` | `SET LOCAL` n'a de sens que dans une transaction, avec des savepoints bien définis. | faible |
 | **⑩** | Streaming par curseur | Dépend de l'API de curseur de chaque driver (⑦). | moyen |
-| **⑪** | Inférence de type du SQL brut | La plus risquée ; s'appuie sur ①, ⑥ et ⑦. **Note de conception validée avant toute ligne de code.** | **très élevé** |
+| **⑪** | Inférence de type du SQL brut | L'aboutissement du dernier kilomètre : même le SQL écrit à la main devient typé. C'est la plus risquée, et elle s'appuie sur ①, ⑥ et ⑦. **Note de conception validée avant toute ligne de code.** | **très élevé** |
 
 ## Écarté, contraire à la philosophie
 
