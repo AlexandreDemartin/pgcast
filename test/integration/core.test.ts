@@ -89,7 +89,7 @@ describe('Default, self, parent, cols, vals', () => {
   });
 
   it('characterization: vals of an array fails on a Parameter or Default element', async () => {
-    // characterization: the Parameter is sent JSON-stringified; the Symbol cannot be serialised by pg
+    // characterization: pg sends the Parameter JSON-stringified, '{"value":1}', and the Default Symbol as 'Symbol(DEFAULT)'
     const withParam = sql`SELECT ${'id'} FROM ${'users'} WHERE ${'id'} IN (${vals([param(1)])})`;
     expect(await pgError(t.client, () => withParam.run(t.client))).toMatchInlineSnapshot(`
       {
