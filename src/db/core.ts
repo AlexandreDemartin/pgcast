@@ -238,7 +238,8 @@ export function sql<
 let preparedNameSeq = 0;
 
 // one or more double-quoted identifiers joined by `.`, as Postgres lexes them: `"a"`, `"a"."b"`, `"a""b"`;
-// Postgres's ASCII spaces may surround a dot, as in the aggregate rule of shortcuts.ts, but a comment may not
+// whitespace may surround a dot, as in the aggregate rule of shortcuts.ts, but a comment may not
+// (`\v` is whitespace from Postgres 17; before, it is a syntax error)
 const quotedIdentifiers = /^"(?:[^"\0]|"")+"(?:[ \t\n\r\f\v]*\.[ \t\n\r\f\v]*"(?:[^"\0]|"")+")*$/;
 
 export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never> {
