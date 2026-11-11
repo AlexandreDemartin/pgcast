@@ -1,6 +1,6 @@
 ---
 name: ci-gate
-description: 'Quand la CI tourne, quand l’attendre, quand la sauter : PR draft pendant l’itération, `gh pr ready`, docs-only, `[skip ci]`, fusion, relance. USE FOR: ouvrir, finaliser ou fusionner une PR, relancer la CI, commit qui coche les cases. DO NOT USE FOR: checks locaux (clé **Vérifier**), niveau de relecture (run-step).'
+description: 'Quand la CI tourne et quand l’attendre : PR draft pendant l’itération, `gh pr ready`, checks obligatoires de master, fusion, relance. USE FOR: ouvrir, finaliser ou fusionner une PR, relancer la CI, commit qui coche les cases. DO NOT USE FOR: checks locaux (clé **Vérifier**), niveau de relecture (run-step).'
 ---
 
 # Lancer, attendre, ou avancer
@@ -14,7 +14,6 @@ On valide en local pendant l'itération ; la CI se lance **une fois prêt**.
 | PR **draft** | aucun job (`.github/workflows/ci.yml`, condition sur `draft`) |
 | `gh pr ready`, ou push ensuite | run complet |
 | Push sur `master` | run complet |
-| `[skip ci]` dans le message du commit | workflow non déclenché |
 
 ## Itérer puis lancer
 
@@ -25,15 +24,16 @@ On valide en local pendant l'itération ; la CI se lance **une fois prêt**.
 
 ## Docs-only
 
-- Seulement des `.md` au-dessus d'un commit vert : `[skip ci]` permis, fusion sans attendre.
-- Exemple : `Tick step 1.1 [skip ci]`.
+- `master` est protégée : une PR ne fusionne qu'avec les 10 checks verts **sur son dernier commit** (`bench-types` et les 9 `build (…)`), même pour des `.md` seuls.
+- Donc **jamais `[skip ci]`** : un commit sans run n'a pas de checks, et la fusion reste bloquée. Le run d'un docs-only dure environ une minute.
+- Exemple : `Tick step 2.2`.
 - Tout le reste (`src/`, `test/`, `package*.json`, `.github/`, configs) : attendre la CI verte.
 
 ## Pièges
 
 - **Draft oublié** : pas de checks ; `gh pr ready` avant d'attendre.
-- **`[skip ci]` sur un HEAD qui contient du code** : aucun verdict pour ce SHA.
-- **Cases cochées sans `[skip ci]`** : relance un run complet pour rien.
+- **`[skip ci]`** : le commit n'a aucun check, la fusion est bloquée ; pousser un nouveau commit sans.
+- **Un job renommé ou ajouté dans `ci.yml`** : mettre à jour la liste des checks obligatoires de `master` (`gh api repos/AlexandreDemartin/pgcast/branches/master/protection`) dans la même PR, sinon toutes les PR restent bloquées.
 
 ## Relancer
 
