@@ -34,7 +34,7 @@ Tu construis une branche de pgcast, ou tu en corriges les défauts relevés. Le 
 ## Git
 
 - Branche depuis `master` à jour : `git fetch && git switch -c <branche> origin/master`.
-- Commits petits et atomiques, en anglais, Conventional Commits (`feat:`, `fix:`, `test:`, `docs:`, `chore:`, `ci:`) ; chacun finit par la ligne `Co-Authored-By` demandée.
+- Commits petits et atomiques, à la manière de George (skill `zapatos-spirit` § Commits) : une ligne en anglais courant, sans préfixe ; chacun finit par la ligne `Co-Authored-By` demandée.
 - Push normal ; jamais `--amend`, `rebase` ni `--force` (`guard.mjs`).
 
 ## La PR
