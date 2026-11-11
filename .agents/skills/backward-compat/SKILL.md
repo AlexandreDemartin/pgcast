@@ -29,8 +29,11 @@ Promesse : un projet sous Zapatos 6.6.1 passe à `zapatos@npm:pgcast` sans chang
 
 ## Correction d'un bug existant
 
-- Si l'ancien comportement produisait un résultat valide mais faux : point d'arrêt ; décider avec l'utilisateur entre correctif (`Fixed`) et opt-in.
-- Le test de caractérisation de la phase 1 change dans la même PR, avec la raison.
+Règle de la note [003](../../../docs/decisions/003-correctifs-et-depreciation.md) :
+
+- **Corriger** directement si Postgres refusait déjà le SQL, si le type refusait déjà l'appel, si l'ancien résultat contredit le nom, le type ou la doc de la fonction, ou si c'est une faille.
+- **Sinon, opt-in** : une option de config, dont le défaut garde l'ancien comportement ; l'ancien chemin émet une fois `process.emitWarning(…, { type: 'DeprecationWarning', code: 'PGCAST_DEP00n' })` qui nomme l'option ; défaut en 7.0.
+- Le test de caractérisation de la phase 1 change dans la même PR, avec la raison ; un opt-in garde aussi le test de l'ancien comportement.
 
 ## Checklist
 
