@@ -4,11 +4,13 @@ import stylistic from "@stylistic/eslint-plugin";
 import importPlugin from "eslint-plugin-import";
 import prettier from "eslint-config-prettier";
 import globals from "globals";
+import { defineConfig } from "eslint/config";
 
 // Same rule set as upstream Zapatos 6.6.1, ported to native flat config.
 // `member-delimiter-style` and `semi` moved from typescript-eslint to @stylistic in v8.
+// `ecmaVersion: 5` is dropped: it had no effect with the TypeScript parser.
 
-export default tseslint.config(
+export default defineConfig(
   js.configs.recommended,
   prettier,
   {

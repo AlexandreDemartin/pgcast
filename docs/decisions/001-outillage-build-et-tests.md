@@ -25,11 +25,11 @@ Le runtime expose des **valeurs identitaires** : les symboles `Default`, `self` 
 
 | Outil | Version | Pourquoi pas plus récent |
 |---|---|---|
-| TypeScript | **5.9.3** | TS 6.0 et 7.0 (le portage en Go) existent, mais typescript-eslint 8 plafonne à `<6.1` et TS 7 n'expose pas encore l'API compilateur dont aura besoin l'inférence SQL (évolution n°1). À réévaluer à la phase 2.8. Les consommateurs restent libres (`peerDependency typescript >=4.1`, inchangée). |
+| TypeScript | **5.9.3** | TS 6.0 et 7.0 (le portage en Go) existent, mais typescript-eslint 8 plafonne à `<6.1` et TS 7 n'expose pas encore l'API compilateur dont aura besoin l'inférence SQL (évolution n°1). À réévaluer avant l'inférence du SQL brut (`docs/ROADMAP.md`, étape ⑪). Les consommateurs restent libres (`peerDependency typescript >=4.1`, inchangée). |
 | ESLint | **9.39** (flat config natif) | `eslint-plugin-import` ne déclare pas encore ESLint 10. |
 | typescript-eslint | **8.72** | `member-delimiter-style` et `semi` ont migré vers `@stylistic/eslint-plugin` : mêmes règles, même configuration. |
 | Vitest | **4.1** | Vitest 5 exige Node ≥ 22.12 et ferait sortir Node 20 de la matrice. |
-| Node | `engines >=20` | Node 20 est EOL depuis avril 2026, mais le brief le demande. Il reste dans la matrice CI tant que ça ne coûte rien. |
+| Node | dev : `^20.19` ou `>=22.12` ; paquet publié : **aucun `engines`** | Zapatos 6.6.1 n'en déclarait pas ; en ajouter un ferait échouer l'install sous Yarn 1 chez un utilisateur de Node 18 (relecture de la PR #1). Node 20 est EOL depuis avril 2026 mais reste dans la matrice CI tant que ça ne coûte rien. |
 
 ## Tests : options
 
@@ -37,7 +37,7 @@ Le runtime expose des **valeurs identitaires** : les symboles `Default`, `self` 
 |---|---|---|
 | Runner | **Vitest 4** | Jest (ESM/TS plus lourd), `node:test` (pas de snapshots inline ni de typecheck intégré). |
 | Tests de types | **`expectTypeOf` + `vitest --typecheck`** (fichiers `*.test-d.ts`), plus `@ts-expect-error` pour les cas négatifs | `tsd` (runner séparé, moins bonne intégration). `expect-type` reste en devDep pour l'usage direct. |
-| Postgres | **Pas de Docker.** En local, une instance existante via `TEST_DATABASE_URL` (lue depuis `src/.env`, ignoré par git). En CI, des **service containers** GitHub Actions (14, 16 et dernière stable). | docker-compose (inutile ici), Testcontainers (lent, dépendance lourde), PGlite seul (ce n'est pas le vrai serveur, mais il servira de second driver en 2.6). |
+| Postgres | **Pas de Docker.** En local, une instance existante via `TEST_DATABASE_URL` (lue depuis `src/.env`, ignoré par git). En CI, des **service containers** GitHub Actions (14, 16 et dernière stable). | docker-compose (inutile ici), Testcontainers (lent, dépendance lourde), PGlite seul (ce n'est pas le vrai serveur, mais il servira de second driver à l'étape ⑥ de `docs/ROADMAP.md`). |
 | Isolation | Une base éphémère par fichier de test (`CREATE DATABASE … TEMPLATE pgcast_fixture`), puis une transaction annulée par test. | Un schéma par test (incompatible avec la fixture multi-schémas). |
 | Snapshots | Snapshots fichier pour le codegen (`test/__snapshots__/schema.d.ts.snap`), snapshots inline pour le SQL compilé. | — |
 | Bench types | `tsc --noEmit --extendedDiagnostics -p bench/` sur un projet exemple. On compare le *Check time* et le nombre d'*Instantiations*, qui sont plus stables que le temps, à `bench/baseline.json`. Échec au-delà de +20 %. | Hyperfine (ne mesure que le temps, trop bruité en CI). |

@@ -35,6 +35,6 @@ Conséquence : si l'on installe `pgcast` sous son propre nom, `import 'zapatos/d
 - Phase 0 : on ne touche à aucune chaîne `zapatos/*`. Le README documente l'installation `zapatos@npm:pgcast`, qui garantit la promesse « changer d'import sans réécrire son code ». Le CLI s'appelle `pgcast`, avec l'alias `zapatos`.
 - Après la phase 1 (snapshots du codegen en place) : prototyper C dans une PR dédiée, avec le snapshot du mode par défaut inchangé et un nouveau snapshot pour le mode `pgcast`.
 
-## Question pour toi
+## Validation
 
-Valides-tu A maintenant et C comme cible ? Ou préfères-tu rester définitivement sur A, avec `zapatos/*` pour toujours et `pgcast` réduit au nom du paquet ?
+Validé par l'utilisateur le 2026-11-11 : A maintenant, C comme cible.
