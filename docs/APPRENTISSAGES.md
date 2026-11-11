@@ -22,6 +22,12 @@ Candidats à un contrôle, une règle ou une ligne de skill.
 - 1.2 — Un dossier `.d.ts` de snapshots sous `test/` doit être exclu de `test/tsconfig.json`, sinon `tsc -p test` le compile — `builder`
 - 1.2 — Un tsconfig qui `extends` et pose `files` garde l'`include` du parent : ajouter `"include": []` — `builder`
 - 1.2 — `toMatchFileSnapshot` et `-u` ne suppriment jamais de fichier : chaque dossier de snapshots fichiers a son contrôle des fichiers en trop ou orphelins (candidat : skill `codegen-output`) — `branch-reviewer`
+- 1.3 — Déstructurer `const { all, Default } = db` élargit les `unique symbol` en `symbol` : imports nommés — `builder`
+- 1.3 — Un helper d'affichage dans un test (`JSON.stringify`) efface ce qu'il doit attraper (Date / chaîne, `undefined` / `null`) : snapshotter l'objet compilé brut (candidat : skill `type-tests` ou un skill de tests) — `branch-reviewer`, `test/unit/conditions.test.ts:14`
+- 1.3 — `RETURNING` sans `ORDER BY` n'a pas d'ordre : un résultat multi-lignes se trie avant `toEqual` — `branch-reviewer`
+- 1.3 — Une surprise vue sur un cas s'essaie en changeant un paramètre avant d'être écrite en règle (niveau d'isolation : warning ou 25001) — `branch-reviewer`
+- 1.3 — `npx vitest run -u <fichier>` a parfois relancé toute la suite : vérifier `git status` après — `builder`
+- 1.3 — Un worktree dont `node_modules` est un lien vers le checkout écrit dans son cache (`node_modules/.cache/pgcast`) — `branch-reviewer`
 
 ## Mineurs gardés
 
