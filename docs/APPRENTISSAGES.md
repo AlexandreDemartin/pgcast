@@ -52,9 +52,15 @@ Candidats à un contrôle, une règle ou une ligne de skill.
 - 2.1 — Pour prouver « avant toute requête » sur du code qui commite, `pool.connect` remplacé par `mockRejectedValue` : une régression ne peut rien écrire — `builder`
 - 2.1 — Un correctif rend obsolètes la ligne du rapport et la ligne « nothing is fixed yet » du CHANGELOG : le commit qui coche l'étape les met à jour — `builder`
 - 2.2 — Une liste blanche d'identifiants Postgres se calque sur le lexer (`scan.l` : `ident_start`, `ident_cont`, `""`, `U&`), pas sur `\p{L}` ; chaque refus se teste contre Postgres avant d'être figé (candidat : skill `sql-safety`) — `branch-reviewer`
-- 2.2 — `\s*` collé à une classe qui contient des caractères non ASCII rend une regex polynomiale (2 000 espaces insécables : 3 s) : utiliser l'espace de Postgres `[ \t\n\r\f\v]` et chronométrer un long run — `builder`
+- 2.2 — `\s*` collé à une classe qui contient des caractères non ASCII rend une regex polynomiale (2 000 espaces insécables : 3 s) : utiliser l'espace de Postgres `[ \t\n\r\f\v]` (from Postgres 17; `[ \t\n\r\f]` before) et chronométrer un long run — `builder`
 - 2.2 — `RegExp.prototype.test` convertit son argument en chaîne : `null` passe comme `'null'` ; si le comportement sans `strictNullChecks` en dépend, un test le fige — `branch-reviewer`
 - 2.2 — Un `toMatchInlineSnapshot()` vide s'écrit avec la sortie actuelle : pour un test rouge de correctif, écrire le snapshot attendu à la main — `builder`
+- #22 — Before calling an input "never valid", replay it in its 6.6.1 form against Postgres: a quote break can be a workaround in use (`a"."b` gave a schema-qualified cast), so closing it is a break to name — `branch-reviewer`
+- #22 — A "written as is when well-formed" rule follows Postgres's grammar, whitespace around `.` included, or it refuses calls that ran (candidate: skill `sql-safety`) — `branch-reviewer`
+- #22 — Lexer behaviour pinned in an integration test must hold on every Postgres of the CI matrix: `\v` is whitespace only from 17 (`scan.l`, `REL_17_STABLE`); a local 17 and a draft PR hide it (candidate: skill `sql-safety`) — `branch-reviewer`, `test/helpers/hostileCasts.ts`
+- #22 — Vitest inline snapshots turn `\r\n` into `\n` and keep `\f` / `\v` raw: make control characters visible before snapshotting — `builder`
+- #22 — A NUL byte in the query text gives 08P01 and the client stays usable; Postgres cuts identifiers to 63 bytes, so a 42704 message shows only the start of a forged name — `builder`
+- #22 — In a worktree the sandbox refuses compound shell commands that run git (`for` retry loops, pipes): brief worktree builders to run plain `git -C` commands — `builder`
 
 ## Mineurs gardés
 
