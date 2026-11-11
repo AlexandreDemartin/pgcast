@@ -4,6 +4,6 @@ Une note par décision ambiguë : contexte, options, choix proposé, puis valida
 
 | # | Titre | Statut |
 |---|---|---|
-| [001](./001-outillage-build-et-tests.md) | Outillage : build et tests | accepté (2026-11-11) |
-| [002](./002-noms-de-modules.md) | Noms de modules `zapatos/*` ou `pgcast/*` | accepté (2026-11-11) |
-| [003](./003-correctifs-et-depreciation.md) | Correctifs cassants : corriger, ou déprécier | accepté (2026-11-12), révisée après audit |
+| [001](./001-build-and-test-tooling.md) | Outillage : build et tests | accepté (2026-11-11) |
+| [002](./002-module-names.md) | Noms de modules `zapatos/*` ou `pgcast/*` | accepté (2026-11-11) |
+| [003](./003-fixes-and-deprecation.md) | Correctifs cassants : corriger, ou déprécier | accepté (2026-11-12), révisée après audit |

@@ -29,7 +29,7 @@ Promise: a project on Zapatos 6.6.1 moves to `zapatos@npm:pgcast` without changi
 
 ## Fixing an existing bug
 
-Rule of note [003](../../../docs/decisions/003-correctifs-et-depreciation.md):
+Rule of note [003](../../../docs/decisions/003-fixes-and-deprecation.md):
 
 - **Fix** directly if Postgres already refused the SQL, if the type already refused the call, if the old result contradicts the function's name, type or docs, or if it is a vulnerability.
 - **Otherwise, opt-in**: a config option, whose default keeps the old behaviour; the old path emits once `process.emitWarning(…, { type: 'DeprecationWarning', code: 'PGCAST_DEP00n' })` naming the option; default in 7.0.
