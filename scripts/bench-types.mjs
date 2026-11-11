@@ -8,8 +8,12 @@
 import {spawnSync} from 'node:child_process';
 import {readFileSync, writeFileSync} from 'node:fs';
 import {createRequire} from 'node:module';
+import {join} from 'node:path';
+import {fileURLToPath} from 'node:url';
 
-const baselinePath = 'bench/baseline.json';
+const root = fileURLToPath(new URL('..', import.meta.url));
+const baselineName = 'bench/baseline.json';
+const baselinePath = join(root, baselineName);
 const threshold = 0.2;
 const compared = ['Instantiations', 'Types'];
 const shown = ['Check time', 'Memory used'];
@@ -19,7 +23,7 @@ const tscPath = require.resolve('typescript/bin/tsc');
 const tsVersion = require('typescript/package.json').version;
 
 function tsc(...args) {
-  const result = spawnSync(process.execPath, [tscPath, ...args], {encoding: 'utf8'});
+  const result = spawnSync(process.execPath, [tscPath, ...args], {cwd: root, encoding: 'utf8'});
   if (result.status !== 0) {
     process.stderr.write(result.stdout + result.stderr);
     console.error(`bench:types: tsc ${args.join(' ')} failed`);
@@ -42,7 +46,7 @@ const current = Object.fromEntries(compared.map(key => [key, Number(bench[key]) 
 
 if (process.argv.includes('--update')) {
   writeFileSync(baselinePath, JSON.stringify({typescript: tsVersion, ...current}, null, 2) + '\n');
-  console.log(`bench:types: ${baselinePath} updated`, current);
+  console.log(`bench:types: ${baselineName} updated`, current);
   process.exit(0);
 }
 
@@ -63,7 +67,7 @@ if (baseline.typescript !== tsVersion) {
   console.log(`\nnote: the baseline was measured with TypeScript ${baseline.typescript}, this is ${tsVersion}`);
 }
 if (failures.length) {
-  console.error(`\nbench:types: ${failures.join(' and ')} up by more than ${threshold * 100} % on ${baselinePath}.`);
+  console.error(`\nbench:types: ${failures.join(' and ')} up by more than ${threshold * 100} % on ${baselineName}.`);
   console.error('Find the type that costs more, or, if the rise is justified, run `npm run bench:types -- --update`');
   console.error('and give the figures in the PR (skill type-tests).');
   process.exit(1);
