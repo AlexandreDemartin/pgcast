@@ -53,3 +53,16 @@ jobs:
       - run: npm run build
       - name: Committed ESM wrappers match the build
         run: git diff --exit-code -- db.mjs generate.mjs
+
+  bench-types:
+    # Same draft filter as build. No Postgres: bench/ compiles the committed test/generated/ schema.
+    if: github.event_name == 'push' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - run: npm run bench:types

@@ -94,7 +94,7 @@ Toujours les mêmes clés, dans cet ordre ; une clé absente ne s'applique pas.
 
 ### 1.6 `test/bench-types` — coût de compilation
 
-- [ ] **Livrée**
+- [x] **Livrée** : PR #10
 - **But** : `npm run bench:types` mesure `Instantiations` sur un projet exemple, compare à la référence, échoue au-delà de +20 % ; branché en CI.
 - **Relecture** : `normal`.
 - **Lire** : `type-tests`.
