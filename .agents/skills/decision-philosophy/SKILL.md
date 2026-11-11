@@ -1,47 +1,47 @@
 ---
 name: decision-philosophy
-description: 'Trancher seul un choix que rien n’écrit : où chercher, quelles limites priment, ce qui attend l’utilisateur, où l’écrire. USE FOR: choisir sans règle écrite, principes en conflit, « puis-je décider seul », challenger un besoin. DO NOT USE FOR: mesurer un gain (simple-big-wins), concevoir un helper (zero-abstraction).'
+description: 'Deciding alone a choice that nothing writes down: where to look, which limits come first, what waits for the user, where to write it. USE FOR: choosing without a written rule, principles in conflict, "can I decide alone", challenging a need. DO NOT USE FOR: measuring a gain (simple-big-wins), designing a helper (zero-abstraction).'
 ---
 
-# Trancher seul
+# Deciding alone
 
-Une règle écrite (`AGENTS.md`, un skill, une note acceptée) gagne toujours : ce skill ne sert que là où rien n'est écrit.
+A written rule (`AGENTS.md`, a skill, an accepted note) always wins: this skill applies only where nothing is written.
 
-## 1. Chercher avant de décider
+## 1. Look before deciding
 
-Dans cet ordre, s'arrêter dès que la réponse est écrite :
+In this order, stopping as soon as the answer is written:
 
-1. `AGENTS.md` § Philosophie et § Points d'arrêt.
-2. `docs/decisions/` (notes acceptées), puis l'Epic du chapitre (`gh issue view`).
-3. Le skill du sujet (`.agents/README.md` § Carte des skills).
-4. Le code de Zapatos qui résout déjà le même problème.
-5. L'usage réel du corpus (skill `consumer-usage`).
-6. Le standard du marché : la doc Postgres, puis pgTyped, sqlc, Kysely, Slonik.
+1. `AGENTS.md` § Philosophy and § Stop points.
+2. `docs/decisions/` (accepted notes), then the chapter's Epic (`gh issue view`).
+3. The subject's skill (`.agents/README.md` § Skill map).
+4. Zapatos code that already solves the same problem.
+5. Real usage in the corpus (skill `consumer-usage`).
+6. The market standard: the Postgres docs, then pgTyped, sqlc, Kysely, Slonik.
 
-- **Trouvé** : appliquer sans rediscuter ; une meilleure idée se propose, ne s'impose pas.
-- **Besoin bancal** (contournement, cas tordu, magie) : on ne code pas autour, on le remonte.
+- **Found**: apply it without reopening the debate; a better idea is proposed, not imposed.
+- **Shaky need** (workaround, contorted case, magic): do not code around it; raise it.
 
-## 2. Les limites, dans cet ordre
+## 2. The limits, in this order
 
-1. **Sécurité** : pas d'injection, paramètre plutôt que littéral, l'option la plus sûre (skill `sql-safety`).
-2. **Rétrocompatibilité 6.6.1** (skill `backward-compat`).
-3. **Les 5 principes** de `AGENTS.md` § Philosophie.
+1. **Security**: no injection, a parameter rather than a literal, the safest option (skill `sql-safety`).
+2. **6.6.1 backward compatibility** (skill `backward-compat`).
+3. **The 5 principles** of `AGENTS.md` § Philosophy.
 
-## 3. Dans ces limites, à égalité
+## 3. Within these limits, all else equal
 
-- Le SQL le plus proche de ce qu'on écrirait à la main.
-- Le type déduit de la base plutôt qu'écrit à la main.
-- L'opt-in plutôt que le défaut ; le package séparé plutôt que le cœur.
-- Celle qu'un test ou le compilateur vérifie plutôt que la relecture.
-- Celle qui coûte le moins de temps de compilation (`bench:types`).
-- La plus réversible.
+- The SQL closest to what you would write by hand.
+- The type derived from the database rather than written by hand.
+- Opt-in rather than default; a separate package rather than the core.
+- The one a test or the compiler checks rather than review.
+- The one that costs the least compile time (`bench:types`).
+- The most reversible.
 
-## 4. Seul, ou avec l'utilisateur
+## 4. Alone, or with the user
 
-| Se décide seul, s'écrit dans la PR (« décidé seul »), et on continue | Attend l'utilisateur |
+| Decided alone, written in the PR ("decided alone"), and we carry on | Waits for the user |
 |---|---|
-| Forme du code, tests, outillage de dev, méthode | Toute dépendance nouvelle, même de dev |
-| Découpage d'une étape, ordre des tâches | Un changement de l'API publique ou de la sortie par défaut du codegen |
-| Un correctif circonscrit avec son test | `core.ts` : échappement ou compilation |
-| Nommage interne | Une note de décision (`docs/decisions/`) |
-| | Publication npm, release, tout ce qui est visible dehors |
+| Shape of the code, tests, dev tooling, method | Any new dependency, even a dev one |
+| Splitting a step, order of tasks | A change to the public API or to the default codegen output |
+| A contained fix with its test | `core.ts`: escaping or compilation |
+| Internal naming | A decision note (`docs/decisions/`) |
+| | npm publication, release, anything visible outside |

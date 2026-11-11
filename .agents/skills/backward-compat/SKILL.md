@@ -1,42 +1,42 @@
 ---
 name: backward-compat
-description: 'Rétrocompatibilité avec Zapatos 6.6.1 : ce qui est l’API publique, ce qui est cassant, comment ajouter sans casser, noms de modules zapatos/*. USE FOR: changer un export, une signature, un type public, un comportement runtime, la config. DO NOT USE FOR: sortie du codegen (codegen-output).'
+description: 'Backward compatibility with Zapatos 6.6.1: what the public API is, what breaks, how to add without breaking, zapatos/* module names. USE FOR: changing an export, a signature, a public type, a runtime behaviour, the config. DO NOT USE FOR: codegen output (codegen-output).'
 ---
 
-# Rester rétrocompatible
+# Staying backward compatible
 
-Promesse : un projet sous Zapatos 6.6.1 passe à `zapatos@npm:pgcast` sans changer une ligne (note 002).
+Promise: a project on Zapatos 6.6.1 moves to `zapatos@npm:pgcast` without changing a line (note 002).
 
-## L'API publique
+## The public API
 
-- Tout ce qu'exportent `zapatos/db` et `zapatos/generate` (`db.mjs` et `generate.mjs` en donnent la liste).
-- Les types générés et leur forme (`Selectable`, `Insertable`, `Whereable`, `Updatable`, `*ForTable<T>`).
-- Le SQL produit par chaque shortcut : un utilisateur peut le logger, le tester ou en dépendre.
-- La config (`zapatosconfig.json`, `setConfig`) et le CLI (`npx zapatos`).
+- Everything exported by `zapatos/db` and `zapatos/generate` (`db.mjs` and `generate.mjs` give the list).
+- The generated types and their shape (`Selectable`, `Insertable`, `Whereable`, `Updatable`, `*ForTable<T>`).
+- The SQL produced by each shortcut: a user may log it, test it or depend on it.
+- The config (`zapatosconfig.json`, `setConfig`) and the CLI (`npx zapatos`).
 
-## Cassant, donc point d'arrêt
+## Breaking, hence a stop point
 
-- Retirer ou renommer un export, un paramètre, une option.
-- Rétrécir un type accepté, élargir un type renvoyé.
-- Changer le SQL produit par défaut, même « équivalent ».
-- Renommer une chaîne `zapatos/*` (note 002).
+- Removing or renaming an export, a parameter, an option.
+- Narrowing an accepted type, widening a returned type.
+- Changing the SQL produced by default, even if "equivalent".
+- Renaming a `zapatos/*` string (note 002).
 
-## Non cassant
+## Not breaking
 
-- Ajouter un export, une option facultative, une condition.
-- Élargir un type accepté sans changer l'inférence des appels existants (le vérifier par un test de types).
-- Corriger un SQL **invalide** (Postgres le refusait) : c'est un correctif, avec son test et sa ligne de CHANGELOG.
+- Adding an export, an optional option, a condition.
+- Widening an accepted type without changing inference for existing calls (check it with a type test).
+- Fixing **invalid** SQL (Postgres refused it): it is a fix, with its test and its CHANGELOG line.
 
-## Correction d'un bug existant
+## Fixing an existing bug
 
-Règle de la note [003](../../../docs/decisions/003-correctifs-et-depreciation.md) :
+Rule of note [003](../../../docs/decisions/003-correctifs-et-depreciation.md):
 
-- **Corriger** directement si Postgres refusait déjà le SQL, si le type refusait déjà l'appel, si l'ancien résultat contredit le nom, le type ou la doc de la fonction, ou si c'est une faille.
-- **Sinon, opt-in** : une option de config, dont le défaut garde l'ancien comportement ; l'ancien chemin émet une fois `process.emitWarning(…, { type: 'DeprecationWarning', code: 'PGCAST_DEP00n' })` qui nomme l'option ; défaut en 7.0.
-- Le test de caractérisation de la phase 1 change dans la même PR, avec la raison ; un opt-in garde aussi le test de l'ancien comportement.
+- **Fix** directly if Postgres already refused the SQL, if the type already refused the call, if the old result contradicts the function's name, type or docs, or if it is a vulnerability.
+- **Otherwise, opt-in**: a config option, whose default keeps the old behaviour; the old path emits once `process.emitWarning(…, { type: 'DeprecationWarning', code: 'PGCAST_DEP00n' })` naming the option; default in 7.0.
+- The phase 1 characterisation test changes in the same PR, with the reason; an opt-in also keeps the test of the old behaviour.
 
 ## Checklist
 
-- [ ] Aucun export retiré : `git diff master -- db.mjs generate.mjs` après `npm run build`
-- [ ] Tests de caractérisation inchangés, ou diff justifié
-- [ ] Ligne de `CHANGELOG.md` (`Added`, `Changed`, `Fixed`)
+- [ ] No export removed: `git diff master -- db.mjs generate.mjs` after `npm run build`
+- [ ] Characterisation tests unchanged, or diff justified
+- [ ] `CHANGELOG.md` line (`Added`, `Changed`, `Fixed`)

@@ -1,30 +1,30 @@
 ---
 name: consumer-usage
-description: 'Valider un besoin et une API contre le corpus local d’usages réels de Zapatos : où chercher, quoi relever, ce qui ne sort jamais du poste. USE FOR: justifier une option ou un helper, choisir une API, trouver les contournements existants, préparer une note de décision. DO NOT USE FOR: forme du helper (zero-abstraction).'
+description: 'Validate a need and an API against the local corpus of real Zapatos usage: where to look, what to note, what never leaves the machine. USE FOR: justifying an option or a helper, choosing an API, finding existing workarounds, preparing a decision note. DO NOT USE FOR: the shape of a helper (zero-abstraction).'
 ---
 
-# Usage réel
+# Real usage
 
-Des projets réels qui utilisent Zapatos forment un **corpus d'exemples**, pas la cible : pgcast vise un Zapatos qui fait le dernier kilomètre pour toute application (`README.md` § Roadmap). Leurs contournements montrent où l'on sort du chemin typé.
+Real projects that use Zapatos form a **corpus of examples**, not the target: pgcast aims at a Zapatos that goes the last mile for any application (`README.md` § Roadmap). Their workarounds show where people leave the typed path.
 
-## Où
+## Where
 
-- Les projets, leurs chemins et leurs points d'entrée sont dans `.agents/local/corpus.md`, **ignoré par git** : il ne vit que sur le poste de l'utilisateur.
-- Fichier absent : demander à l'utilisateur ; ne jamais deviner un chemin.
+- The projects, their paths and their entry points are in `.agents/local/corpus.md`, **ignored by git**: it lives only on the user's machine.
+- File missing: ask the user; never guess a path.
 
-## Règles
+## Rules
 
-- **Lecture seule**, jamais de modification ni de commit dans ces dépôts.
-- **Confidentialité** : le code du corpus ne sort pas du poste, et le nom de ses projets non plus. Rien n'en est cité dans le dépôt, une PR, une issue ou un service externe : on décrit le **motif**, jamais l'extrait, le projet ni un nom métier.
-- **Exemples inventés** : jamais un extrait du corpus, même modifié. Un exemple qui montre le même motif s'écrit avec d'autres noms de tables et de colonnes : ceux de George (skill `zapatos-spirit` § Doc), ou ceux de la fixture dans un test.
-- **Public** : les issues et les PR de pgcast sont publiques, comme le dépôt. On n'y écrit que des **motifs sans nom** : ni projet, ni extrait, ni nom métier, ni chemin ; « un corpus d'usages réels », avec des ordres de grandeur (« environ un millier de laterals écrits à la main »).
-- **Chercher le contournement**, pas seulement l'usage : `as unknown as`, `runResultTransform` réécrit, `db.raw` sur une valeur, `sql```  qui réimplémente un shortcut, helper maison autour de `db.conditions`.
-- **Un besoin vaut une API** s'il est **général à Postgres** (un motif que toute application rencontre) et s'il revient dans le corpus. Un choix propre à un projet (configuration `simple` + `unaccent`, nom de domaine métier) devient un paramètre, jamais un helper dédié. Un cas isolé reste un fragment `sql`.
-- **L'API proposée** remplace le contournement sans changer le SQL produit, ou en le rendant valide (`and()` vide).
+- **Read only**, never a change nor a commit in these repositories.
+- **Confidentiality**: the corpus's code does not leave the machine, and neither do its project names. Nothing from it is quoted in the repository, a PR, an issue or an external service: describe the **pattern**, never the extract, the project nor a business name.
+- **Invented examples**: never an extract from the corpus, even modified. An example showing the same pattern is written with other table and column names: George's (skill `zapatos-spirit` § Doc), or the fixture's in a test.
+- **Public**: pgcast's issues and PRs are public, like the repository. Write only **unnamed patterns** there: no project, no extract, no business name, no path; "a corpus of real usage", with orders of magnitude ("about a thousand hand-written laterals").
+- **Look for the workaround**, not just the usage: `as unknown as`, a rewritten `runResultTransform`, `db.raw` on a value, `sql``` that reimplements a shortcut, a home-made helper around `db.conditions`.
+- **A need is worth an API** if it is **general to Postgres** (a pattern every application meets) and if it recurs in the corpus. A project-specific choice (`simple` + `unaccent` configuration, a business domain name) becomes a parameter, never a dedicated helper. An isolated case stays a `sql` fragment.
+- **The proposed API** replaces the workaround without changing the SQL produced, or by making it valid (empty `and()`).
 
 ## Checklist
 
-- [ ] Motif cité avec son ordre de grandeur, sans nom ni extrait
-- [ ] Exemples inventés, sur d'autres tables et colonnes
-- [ ] SQL du contournement comparé au SQL du helper proposé
-- [ ] Migration de l'appelant décrite en une ligne
+- [ ] Pattern cited with its order of magnitude, without name or extract
+- [ ] Invented examples, on other tables and columns
+- [ ] The workaround's SQL compared with the proposed helper's SQL
+- [ ] The caller's migration described in one line

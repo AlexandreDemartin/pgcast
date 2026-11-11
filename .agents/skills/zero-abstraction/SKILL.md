@@ -1,44 +1,44 @@
 ---
 name: zero-abstraction
-description: 'Concevoir un helper, une condition ou une option de pgcast : SQL visible et unique, types déduits de Postgres, surface minimale, opt-in. USE FOR: ajouter à db.conditions, un shortcut, une option de select, un helper (related, fn, with), nommer une API. DO NOT USE FOR: échappement (sql-safety), tests de types (type-tests).'
+description: 'Designing a helper, a condition or an option of pgcast: visible and unique SQL, types derived from Postgres, minimal surface, opt-in. USE FOR: adding to db.conditions, a shortcut, a select option, a helper (related, fn, with), naming an API. DO NOT USE FOR: escaping (sql-safety), type tests (type-tests).'
 ---
 
-# Zéro abstraction
+# Zero abstraction
 
-Un helper de pgcast est un raccourci d'écriture vers un SQL qu'on aurait écrit à la main ; rien de plus.
+A pgcast helper is a writing shortcut to SQL you would have written by hand; nothing more.
 
-## Règles
+## Rules
 
-- **Le SQL est le contrat** : chaque helper documente en JSDoc le SQL exact qu'il produit, et un test fige ce SQL (`text` + `values`).
-- **Un seul SQL par appel** : pas de branche cachée qui change la forme de la requête selon les valeurs, sauf le cas vide documenté (`isIn([])` → `false`).
-- **Toujours composable** : un helper renvoie un `SQLFragment` qu'on peut glisser dans `sql```, un `Whereable`, `extras` ou `lateral`.
-- **Paramètre, jamais littéral** : une valeur passe par `param()` ; un identifiant passe par le typage `Column`/`Table` (skill `sql-safety`).
-- **Déduit de la base** : un type vient du schéma généré (`ColumnForTable<T>`, `SelectableForTable<T>`), jamais d'une déclaration à la main.
-- **Pas d'état, pas de magie** : ni cache, ni registre global, ni lecture paresseuse, ni requête supplémentaire implicite.
-- **Surface minimale** : une option de plus seulement si un usage réel la demande (skill `consumer-usage`) ; sinon un fragment `sql` suffit.
-- **Opt-in** : tout ce qui change la sortie par défaut ou ajoute une dépendance est derrière une option (skill `backward-compat`).
-- **Cas vide valide** : un helper variadique ou à tableau produit un SQL valide sans argument (`and()` → `TRUE`, `or()` → `FALSE`), jamais `()`.
+- **The SQL is the contract**: each helper documents in JSDoc the exact SQL it produces, and a test freezes that SQL (`text` + `values`).
+- **One SQL per call**: no hidden branch that changes the shape of the query depending on the values, except the documented empty case (`isIn([])` → `false`).
+- **Always composable**: a helper returns a `SQLFragment` that can be slipped into `sql```, a `Whereable`, `extras` or `lateral`.
+- **Parameter, never literal**: a value goes through `param()`; an identifier goes through `Column`/`Table` typing (skill `sql-safety`).
+- **Derived from the database**: a type comes from the generated schema (`ColumnForTable<T>`, `SelectableForTable<T>`), never from a hand-written declaration.
+- **No state, no magic**: no cache, no global registry, no lazy read, no implicit extra query.
+- **Minimal surface**: one more option only if real usage asks for it (skill `consumer-usage`); otherwise a `sql` fragment is enough.
+- **Opt-in**: anything that changes the default output or adds a dependency sits behind an option (skill `backward-compat`).
+- **Valid empty case**: a variadic or array helper produces valid SQL with no argument (`and()` → `TRUE`, `or()` → `FALSE`), never `()`.
 
-## Forme d'une condition
+## Shape of a condition
 
 ```ts
 // src/db/conditions.ts
 export const like = <T extends string>(a: T) => sql<SQL, boolean | null, T>`${self} LIKE ${conditionalParam(a)}`;
 ```
 
-- `self` pour la colonne courante, `conditionalParam` pour accepter valeur, `SQLFragment`, `Parameter` ou `parent()`.
-- Le troisième paramètre de type (`T`) contraint la colonne ; le `RunResult` dit `boolean | null`.
+- `self` for the current column, `conditionalParam` to accept a value, `SQLFragment`, `Parameter` or `parent()`.
+- The third type parameter (`T`) constrains the column; the `RunResult` says `boolean | null`.
 
-## Nommage
+## Naming
 
-- Le nom de l'opérateur ou de la fonction Postgres quand il existe (`arrayOverlaps` pour `&&`, `websearchToTsquery`).
-- Pas de synonyme d'un helper existant ; pas d'alias « pratique ».
+- The name of the Postgres operator or function when there is one (`arrayOverlaps` for `&&`, `websearchToTsquery`).
+- No synonym of an existing helper; no "handy" alias.
 
 ## Checklist
 
-- [ ] SQL produit écrit en JSDoc et figé par un test
-- [ ] Composable dans `Whereable`, `extras`, `lateral`, `sql```
-- [ ] Valeurs en `param`, identifiants typés
-- [ ] Cas vide valide et testé
-- [ ] Type positif et négatif (skill `type-tests`), coût mesuré si type conditionnel
-- [ ] Besoin réel cité (skill `consumer-usage`)
+- [ ] SQL produced written in JSDoc and frozen by a test
+- [ ] Composable in `Whereable`, `extras`, `lateral`, `sql```
+- [ ] Values in `param`, identifiers typed
+- [ ] Valid and tested empty case
+- [ ] Positive and negative type (skill `type-tests`), cost measured for a conditional type
+- [ ] Real need cited (skill `consumer-usage`)

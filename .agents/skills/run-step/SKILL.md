@@ -1,100 +1,100 @@
 ---
 name: run-step
-description: 'Orchestrer une étape, sous-issue d’un Epic GitHub : builder, relecture selon **Review**, tri bloquant / mineur, verify, fusion qui ferme l’issue, fin de chapitre, apprentissages. USE FOR: lancer l’étape suivante, démarrer une feature, choisir la relecture, trier des défauts, fusionner. DO NOT USE FOR: écrire le code (agent builder), CI (ci-gate).'
+description: 'Orchestrate a step, sub-issue of a GitHub Epic: builder, review by **Review**, blocking / minor triage, verify, merge that closes the issue, end of chapter, learnings. USE FOR: starting the next step, starting a feature, choosing the review, triaging defects, merging. DO NOT USE FOR: writing the code (agent builder), CI (ci-gate).'
 ---
 
-# Orchestrer une étape
+# Orchestrating a step
 
-L'orchestrateur est la session principale : il lance les agents, trie et fusionne ; il n'écrit pas le code de l'étape.
+The orchestrator is the main session: it starts the agents, triages and merges; it does not write the step's code.
 
-## Le plan
+## The plan
 
-Il vit dans les issues de `AlexandreDemartin/pgcast` (`--repo AlexandreDemartin/pgcast` partout, jamais `jawj/zapatos`) :
+It lives in the issues of `AlexandreDemartin/pgcast` (`--repo AlexandreDemartin/pgcast` everywhere, never `jawj/zapatos`):
 
-| Issue | Rôle | Fermée par |
+| Issue | Role | Closed by |
 |---|---|---|
-| `type: epic` | un chapitre : résultat, pourquoi, ordre, écarté | la PR de méthode de fin de chapitre (`Closes #epic`) |
-| `type: feature` | une fonctionnalité ; ses **Planned PRs** en liste de titres | la dernière PR de ses tâches (`Closes #tâche`, `Closes #feature`) |
-| `type: task` | une étape = une branche = une PR | sa PR (`Closes #n`) |
+| `type: epic` | a chapter: outcome, why, order, ruled out | the end-of-chapter method PR (`Closes #epic`) |
+| `type: feature` | a feature; its **Planned PRs** as a list of titles | the last PR of its tasks (`Closes #task`, `Closes #feature`) |
+| `type: task` | a step = a branch = a PR | its PR (`Closes #n`) |
 
-- Sous-issues natives : leur ordre est l'ordre des étapes ; l'Epic compte les fermées tout seul.
-- Labels de sujet : `security`, `opt-in` (note 003), `needs decision`, `runtime`, `codegen`, `types`. Milestones : les versions.
+- Native sub-issues: their order is the order of the steps; the Epic counts the closed ones by itself.
+- Subject labels: `security`, `opt-in` (note 003), `needs decision`, `runtime`, `codegen`, `types`. Milestones: the versions.
 
-## Trouver l'étape
+## Finding the step
 
-- Epics ouverts : `gh issue list --repo AlexandreDemartin/pgcast --label 'type: epic' --state open`.
-- La prochaine : la première sous-issue ouverte du premier Epic ouvert :
+- Open Epics: `gh issue list --repo AlexandreDemartin/pgcast --label 'type: epic' --state open`.
+- The next one: the first open sub-issue of the first open Epic:
   `gh api 'repos/AlexandreDemartin/pgcast/issues/<epic>/sub_issues?per_page=100' -q '.[] | select(.state == "open") | "\(.number) \(.title)"' | head -1`.
-- La lire : `gh issue view <n> --repo AlexandreDemartin/pgcast` ; seulement elle, et son Epic si l'ordre le demande.
-- Une `type: feature` qui démarre : créer d'abord ses `type: task` depuis **Planned PRs**, dans l'ordre, chacune sous la feature :
-  `gh api repos/AlexandreDemartin/pgcast/issues/<feature>/sub_issues -F sub_issue_id=<id>`, où `<id>` est l'`id` de la tâche, pas son numéro (`gh api repos/AlexandreDemartin/pgcast/issues/<n> -q .id`).
-- Une étape trop large pour une PR à la manière de George (skill `zapatos-spirit` § Découper comme George) : la découper en sous-issues avant de lancer le `builder`.
-- `needs decision`, ou un point d'arrêt de `AGENTS.md` (`core.ts`, sortie du codegen, publication) : demander à l'utilisateur **avant** le `builder`.
-- Une idée nouvelle : une issue `type: feature` sous son Epic, à sa place dans l'ordre (`PATCH …/issues/<epic>/sub_issues/priority`, avec `sub_issue_id` et `after_id`).
-- Réseau instable : chaque appel `gh` se relance ; avant de recréer, lister ce qui existe (aucun doublon).
+- Read it: `gh issue view <n> --repo AlexandreDemartin/pgcast`; only it, and its Epic if the order requires.
+- A `type: feature` that starts: first create its `type: task` issues from **Planned PRs**, in order, each under the feature:
+  `gh api repos/AlexandreDemartin/pgcast/issues/<feature>/sub_issues -F sub_issue_id=<id>`, where `<id>` is the task's `id`, not its number (`gh api repos/AlexandreDemartin/pgcast/issues/<n> -q .id`).
+- A step too wide for one PR in George's manner (skill `zapatos-spirit` § Splitting like George): split it into sub-issues before starting the `builder`.
+- `needs decision`, or a stop point of `AGENTS.md` (`core.ts`, codegen output, publication): ask the user **before** the `builder`.
+- A new idea: a `type: feature` issue under its Epic, at its place in the order (`PATCH …/issues/<epic>/sub_issues/priority`, with `sub_issue_id` and `after_id`).
+- Unstable network: each `gh` call can be retried; before recreating, list what exists (no duplicates).
 
-## Corps d'une issue
+## Issue body
 
-En anglais, concis (skill `concise-docs`) : **What** (le comportement attendu, le SQL avant / après quand il compte) · **Why** · **Done when** · **Notes** : **Class** (note 003), **Review** (niveau, lentille, bloquants), **Read** (skills), **Frozen by** (tests). **Done when** nomme les commandes en plus de `lint`, `typecheck`, `test`, `test:types`, `build` (`bench:types`…). Public : des motifs sans nom (skill `consumer-usage`).
+In English, concise (skill `concise-docs`): **What** (the expected behaviour, the SQL before / after when it matters) · **Why** · **Done when** · **Notes**: **Class** (note 003), **Review** (level, lens, blockers), **Read** (skills), **Frozen by** (tests). **Done when** names the commands beyond `lint`, `typecheck`, `test`, `test:types`, `build` (`bench:types`…). Public: unnamed patterns (skill `consumer-usage`).
 
-## Niveau de relecture
+## Review level
 
-| Niveau | Pour | Relecture |
+| Level | For | Review |
 |---|---|---|
-| `faible` | docs, méthode, CI seule | la CI, et le `builder` relit son diff avant la PR ; aucun relecteur |
-| `normal` | tests, ajout opt-in (condition, option, émetteur du codegen) | `branch-reviewer` ; un `builder` neuf seulement pour des bloquants ; pas de `verify` |
-| `élevé` | `core.ts` (compilation, échappement), `transaction.ts`, interface de driver, types publics existants, sortie par défaut du codegen | `branch-reviewer` avec la lentille du sujet ; `builder` neuf ; `verify` |
+| `low` | docs, method, CI only | the CI, and the `builder` rereads its diff before the PR; no reviewer |
+| `normal` | tests, opt-in addition (condition, option, codegen emitter) | `branch-reviewer`; a fresh `builder` only for blockers; no `verify` |
+| `high` | `core.ts` (compilation, escaping), `transaction.ts`, driver interface, existing public types, default codegen output | `branch-reviewer` with the subject's lens; fresh `builder`; `verify` |
 
-## Déroulé
+## Sequence
 
-1. `builder` construit l'étape, vérifie en local, ouvre sa PR en **draft**, base `master` (skill `ci-gate`), avec `Closes #n` dans le corps et `(closes #n)` en fin de titre.
-2. Les relectures du niveau, en parallèle, même sur une PR draft.
-3. Chaque défaut est classé :
-   - **bloquant** (bug, injection, changement cassant, type faux ou trop large, SQL différent de celui annoncé, test manquant sur un risque) : un `builder` neuf le corrige dans l'étape ;
-   - **mineur** (nommage, JSDoc, forme) : ajouté à `docs/APPRENTISSAGES.md` § Mineurs gardés, ou abandonné.
-4. Niveau `élevé` : `branch-reviewer` en mode `verify` sur les commits de correction ; `not fixed` ou `regressed` repart en 3.
-5. Remarques « apprentissage » des agents : une ligne chacune dans `docs/APPRENTISSAGES.md`, dernier commit de la branche (« Record what #22 taught »).
-6. `gh pr ready`, CI verte sur le dernier commit (skill `ci-gate`) ; `gh pr merge --merge` : la fusion ferme l'issue, l'Epic se coche seul. Aucun commit « Tick step ». Nettoyer (`builder.md` § Nettoyer).
+1. `builder` builds the step, checks locally, opens its PR in **draft**, base `master` (skill `ci-gate`), with `Closes #n` in the body and `(closes #n)` at the end of the title.
+2. The level's reviews, in parallel, even on a draft PR.
+3. Each defect is classed:
+   - **blocking** (bug, injection, breaking change, wrong or too wide type, SQL different from the one announced, missing test on a risk): a fresh `builder` fixes it in the step;
+   - **minor** (naming, JSDoc, form): added to `docs/APPRENTISSAGES.md` § Mineurs gardés, or dropped.
+4. Level `high`: `branch-reviewer` in `verify` mode on the fix commits; `not fixed` or `regressed` goes back to 3.
+5. The agents' "learning" remarks: one line each in `docs/APPRENTISSAGES.md`, last commit of the branch ("Record what #22 taught").
+6. `gh pr ready`, green CI on the last commit (skill `ci-gate`); `gh pr merge --merge`: the merge closes the issue, the Epic ticks itself. No "Tick step" commit. Clean up (`builder.md` § Clean up).
 
 ## Briefs
 
-Un agent ne sait que ce que dit son brief.
+An agent knows only what its brief says.
 
-- **`builder`** : le numéro de l'issue, les décisions prises avec l'utilisateur ; pour corriger, la PR, sa branche et les bloquants (`fichier:ligne`, correction attendue).
-- **`branch-reviewer`** : la PR, le niveau, les bloquants de **Review**, la lentille (`sql`, `types`, `codegen`, `compat`) si l'issue en a une.
-- Jamais la conclusion attendue : un relecteur à qui l'on souffle l'hypothèse la confirme.
+- **`builder`**: the issue number, the decisions taken with the user; to fix, the PR, its branch and the blockers (`file:line`, expected fix).
+- **`branch-reviewer`**: the PR, the level, the blockers of **Review**, the lens (`sql`, `types`, `codegen`, `compat`) if the issue has one.
+- Never the expected conclusion: a reviewer fed the hypothesis confirms it.
 
-## Règles du rituel
+## Ritual rules
 
-- **Rapport d'un relecteur** : au plus 10 défauts, du plus grave au moins grave, chacun bloquant ou mineur.
-- **Pas de worktree par défaut** ; un seul pour deux travaux en parallèle, retiré après la fusion.
-- Une branche poussée n'est jamais rebasée ni forcée ; une correction du dessous monte par merge (`guard.mjs`).
+- **A reviewer's report**: at most 10 defects, from most to least serious, each blocking or minor.
+- **No worktree by default**; one only for two pieces of work in parallel, removed after the merge.
+- A pushed branch is never rebased nor forced; a fix from below goes up by merge (`guard.mjs`).
 
-## Empiler des PR (stacked PRs)
+## Stacking PRs
 
-Sources : doc GitHub « Stack code changes in pull requests », Thoughtworks Radar (anneau *Caution*), Graphite, cubic (2026).
+Sources: GitHub docs "Stack code changes in pull requests", Thoughtworks Radar (*Caution* ring), Graphite, cubic (2026).
 
-| Empiler | Ne pas empiler |
+| Stack | Do not stack |
 |---|---|
-| Les étapes d'une **même feature** dépendent l'une de l'autre (la PR 2 a besoin du code de la PR 1), et attendre la fusion du bas bloquerait la suite. Exemple : la série de #54, métadonnées des FK → `related()` → `relatedMany()`. | Des changements **indépendants**, comme la plupart des correctifs de l'Epic #18 : des PR séparées vers `master`. |
-| Chaque couche est une PR de George, lisible seule. | Une PR qui suffit seule ; une pile qui sert d'excuse à un gros changement (« an excuse to write one enormous change », Thoughtworks). |
-| **3 couches au plus**, chacune ≤ ~250 lignes et 25 fichiers (seuil d'alerte de Graphite). | Une couche qui n'a pas de sens sans celle du dessus : la redécouper. |
+| The steps of a **same feature** depend on each other (PR 2 needs PR 1's code), and waiting for the bottom to merge would block what follows. Example: the series of #54, FK metadata → `related()` → `relatedMany()`. | **Independent** changes, like most fixes of Epic #18: separate PRs to `master`. |
+| Each layer is a George PR, readable on its own. | A PR that stands on its own; a stack used as an excuse for a big change ("an excuse to write one enormous change", Thoughtworks). |
+| **3 layers at most**, each ≤ ~250 lines and 25 files (Graphite's warning threshold). | A layer that makes no sense without the one above: split it again. |
 
-- **Mécanique sans réécriture**, compatible avec `guard.mjs` : la couche N part de la branche N-1 et sa PR vise la branche N-1 (`--base <branche N-1>`). Une correction du bas monte par `git merge origin/<branche N-1>` dans chaque couche du dessus, du bas vers le haut (agent `chores`).
-- **Pas de `gh stack sync` ni de `gh stack push`** : ils rebasent et forcent chaque branche.
-- **Revue** : chaque couche est relue seule, dès qu'elle est ouverte, sans attendre le bas ; le relecteur reçoit le numéro de la couche et sa base.
-- **Fusion du bas vers le haut**, en merge commit (`gh pr merge --merge`) : la couche suivante n'a rien à refaire, et GitHub la recible sur `master` (`delete_branch_on_merge` est actif). Puis `git merge origin/master` dans la couche reciblée si `master` a bougé, CI verte, fusion.
-- Une couche du milieu ne se fusionne jamais avant celles du dessous.
+- **Mechanics without rewriting**, compatible with `guard.mjs`: layer N starts from branch N-1 and its PR targets branch N-1 (`--base <branch N-1>`). A fix from below goes up by `git merge origin/<branch N-1>` into each layer above, from bottom to top (agent `chores`).
+- **No `gh stack sync` nor `gh stack push`**: they rebase and force each branch.
+- **Review**: each layer is reviewed on its own, as soon as it is open, without waiting for the bottom; the reviewer gets the layer's number and its base.
+- **Merge from bottom to top**, as a merge commit (`gh pr merge --merge`): the next layer has nothing to redo, and GitHub retargets it to `master` (`delete_branch_on_merge` is on). Then `git merge origin/master` into the retargeted layer if `master` has moved, green CI, merge.
+- A middle layer is never merged before the ones below it.
 
-## Fin de chapitre
+## End of chapter
 
-1. Une relecture de toute la plage fusionnée (`<master avant le chapitre>..master`) par `branch-reviewer`, avec `docs/APPRENTISSAGES.md` § Mineurs gardés ; ses corrections dans une PR de suite.
-2. La PR de méthode : chaque apprentissage jugé (`.agents/README.md` § Auto-amélioration), retenu ou écarté ; le fichier est vidé dans la même PR, qui ferme l'Epic (`Closes #epic`).
+1. A review of the whole merged range (`<master before the chapter>..master`) by `branch-reviewer`, with `docs/APPRENTISSAGES.md` § Mineurs gardés; its fixes in a follow-up PR.
+2. The method PR: each learning judged (`.agents/README.md` § Self-improvement), kept or dropped; the file is emptied in the same PR, which closes the Epic (`Closes #epic`).
 
 ## Checklist
 
-- [ ] Seule l'issue de l'étape lue ; points d'arrêt demandés avant le `builder`
-- [ ] Relecture du niveau, brief sans conclusion soufflée
-- [ ] Chaque défaut classé ; bloquants corrigés par un `builder` neuf
-- [ ] Mineurs et apprentissages écrits dans `docs/APPRENTISSAGES.md`
-- [ ] PR fusionnée avec `Closes #n`, issue fermée, local nettoyé
+- [ ] Only the step's issue read; stop points asked before the `builder`
+- [ ] Review of the level, brief without a fed conclusion
+- [ ] Each defect classed; blockers fixed by a fresh `builder`
+- [ ] Minors and learnings written in `docs/APPRENTISSAGES.md`
+- [ ] PR merged with `Closes #n`, issue closed, local clean
