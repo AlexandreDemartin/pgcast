@@ -15,6 +15,7 @@ On valide en local pendant l'itération ; la CI se lance **une fois prêt**.
 | PR prête, **docs seules** (`.md` hors de `.agents/` et `.claude/`) | `changes` puis **CI passed** ; `build` et `bench-types` sautés |
 | PR prête, autre chose | run complet : `build` (9 jobs), `bench-types`, puis **CI passed** |
 | Push sur `master` | run complet |
+| Couche d'une pile (base : la branche du dessous) | même règle qu'une PR vers `master` : la CI tourne sur chaque couche |
 
 ## Itérer puis lancer
 

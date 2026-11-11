@@ -34,12 +34,13 @@ Tu construis une branche de pgcast, ou tu en corriges les défauts relevés. Le 
 ## Git
 
 - Branche depuis `master` à jour : `git fetch && git switch -c <branche> origin/master`.
+- Couche d'une pile, seulement si l'orchestrateur le demande (skill `run-step` § Empiler) : la branche part de la couche du dessous (`git switch -c <branche> origin/<branche du dessous>`), et une correction du dessous monte par `git merge`, jamais par rebase.
 - Commits petits et atomiques, à la manière de George (skill `zapatos-spirit` § Commits) : une ligne en anglais courant, sans préfixe ; chacun finit par la ligne `Co-Authored-By` demandée.
 - Push normal ; jamais `--amend`, `rebase` ni `--force` (`guard.mjs`).
 
 ## La PR
 
-- `gh pr create --draft --base master --repo AlexandreDemartin/pgcast` : jamais vers `jawj/zapatos`.
+- `gh pr create --draft --base master --repo AlexandreDemartin/pgcast` : jamais vers `jawj/zapatos`. Pour une couche de pile, `--base <branche du dessous>`, et la description commence par « Stacked on #n ».
 - Titre à la manière de George (skill `zapatos-spirit` § Titre d'une PR) : anglais courant, sans préfixe, orthographe britannique, terminé par `(closes #n)`.
 - Une PR trop grosse pour le skill `zapatos-spirit` § Taille et périmètre : t'arrêter et proposer un découpage à l'orchestrateur.
 - Corps en anglais : `Closes #n` en première ligne, puis **What** · **Why** · **Verify**, en puces ; points « décidé seul » ; des motifs sans nom, jamais un extrait du corpus (skill `consumer-usage`) ; il finit par la ligne « Generated with Claude Code » demandée.
