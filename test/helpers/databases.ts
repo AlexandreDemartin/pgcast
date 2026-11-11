@@ -54,12 +54,16 @@ export function urlForDatabase(url: string, database: string): string {
 
 const quoteIdent = (name: string) => '"' + name.replace(/"/g, '""') + '"';
 
-/** Databases left by runs whose process is gone (or with a name we do not recognise). */
-export function orphanDatabases(names: string[], isAlive: (pid: number) => boolean): string[] {
+/**
+ * Databases left by runs whose process is gone, by a dead run that had our pid
+ * (pid reuse), or with a name we do not recognise.
+ * Assumes a single host: every run against this server comes from this machine.
+ */
+export function orphanDatabases(names: string[], isAlive: (pid: number) => boolean, ownPid: number): string[] {
   return names.filter(name => {
     if (!name.startsWith(PREFIX)) return false;
     const pid = /^pgcast_test_(\d+)_/.exec(name)?.[1];
-    return pid === undefined || !isAlive(Number(pid));
+    return pid === undefined || Number(pid) === ownPid || !isAlive(Number(pid));
   });
 }
 

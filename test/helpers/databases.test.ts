@@ -17,9 +17,14 @@ describe('test database naming', () => {
       `${runPrefix(200)}template`, `${runPrefix(200)}0a1b2c3d`,
       'pgcast_test_leftover',
     ];
-    expect(orphanDatabases(names, pid => alive.has(pid))).toEqual([
+    expect(orphanDatabases(names, pid => alive.has(pid), 1)).toEqual([
       'pgcast_test_200_template', 'pgcast_test_200_0a1b2c3d', 'pgcast_test_leftover',
     ]);
+  });
+
+  it('treats databases with our own pid as orphans: a killed run whose pid we reused', () => {
+    const names = [`${runPrefix(100)}template`, `${runPrefix(100)}0a1b2c3d`, `${runPrefix(200)}template`];
+    expect(orphanDatabases(names, () => true, 100)).toEqual(['pgcast_test_100_template', 'pgcast_test_100_0a1b2c3d']);
   });
 
   it('points the server URL at another database, keeping credentials and options', () => {
