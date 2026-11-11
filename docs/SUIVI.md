@@ -108,41 +108,40 @@ Toujours les mêmes clés, dans cet ordre ; une clé absente ne s'applique pas.
 
 ## 2. Correctifs
 
-> Une étape par constat à corriger du [rapport](./RAPPORT-CARACTERISATION.md), dans l'ordre : gravité, puis risque croissant. Chacune commence par un test qui échoue. **(point d'arrêt)** : cassante, ou touche `core.ts` ou la sortie du codegen.
+> Une étape par constat à corriger du [rapport](./RAPPORT-CARACTERISATION.md), dans l'ordre : gravité, puis risque croissant. Chacune commence par un test qui échoue. Classe de chaque correctif (note [003](./decisions/003-correctifs-et-depreciation.md)) : **(opt-in)** = option de config + `DeprecationWarning` de l'ancien comportement ; sans mention = correctif direct. Relecture `élevé` pour `core.ts`.
 
 - 2.1 Check lock, truncate and isolation level keywords at run time (R5)
 - 2.2 Accept only a function name as the aggregate of select() (R6)
-- 2.3 Escape quotes in the type name of a param() cast (R3) **(point d'arrêt)**
-- 2.4 Double embedded quotes in identifiers, so a name cannot close its quotes (R1) **(point d'arrêt)**
+- 2.3 Escape quotes in the type name of a param() cast (R3)
+- 2.4 Double embedded quotes in identifiers, so a name cannot close its quotes (R1)
 - 2.5 Double embedded quotes in lateral keys and aliases too (R7)
-- 2.6 Pass a string through as already quoted only if it is a well-formed quoted identifier (R2) **(point d'arrêt)**
-- 2.7 Send plain updateValues in upsert as parameters, not identifiers (R4) **(point d'arrêt)**
-- 2.8 Make upsert throw on rows with different keys unless updateColumns is given (R8) **(point d'arrêt)**
+- 2.6 Pass a string through as already quoted only if it is a well-formed quoted identifier (R2)
+- 2.7 Send plain updateValues in upsert as parameters, not identifiers (R4)
+- 2.8 Add upsertUpdatesSharedColumnsOnly, so rows with different keys keep what they leave out (R8) **(opt-in)**
 - 2.9 Make update() with no columns throw a helpful error (R24, avant R9)
-- 2.10 Leave undefined values out of update(), rather than setting them to NULL (R9) **(point d'arrêt)**
-- 2.11 Fix not() so it parenthesises its condition (R12) **(point d'arrêt)**
-- 2.12 Insert DEFAULT for an undefined value, as for a missing key (R11) **(point d'arrêt)**
-- 2.13 Compile a Parameter in a Whereable or in vals() as a parameter, not as JSON (R13) **(point d'arrêt)**
-- 2.14 Make selectExactlyOne throw when there is a second row (R14) **(point d'arrêt)**
-- 2.15 Make and() and or() with no arguments compile to TRUE and FALSE (R23)
-- 2.16 Refuse aggregate options that cannot compile (R25)
-- 2.17 Treat a native pg client as a client, not a pool, in transaction() (R26)
-- 2.18 Let an explicit param() cast win over castArrayParamsToJson (R27) **(point d'arrêt)**
-- 2.19 Allow schema-qualified and array types in param() casts (R28) **(point d'arrêt)**
-- 2.20 Refuse a constraint of another table in upsert (R32)
-- 2.21 Allow a Parameter in add() and subtract(), for date arithmetic (R33)
-- 2.22 Type the array conditions on the array column, not on its element (R34)
-- 2.23 Accept a readonly array as the columns option (R35) **(point d'arrêt)**
-- 2.24 Warn when two custom types share a placeholder name (R42)
-- 2.25 Match unique indexes by table, not by name alone (R41) **(point d'arrêt)**
-- 2.26 Type enums of other schemas as enums, not as custom types (R40) **(point d'arrêt)**
-- 2.27 Warn about an include entry that matches no table (R51)
-- 2.28 Prefix every line of a multi-line column comment (R48) **(point d'arrêt)**
-- 2.29 Keep column comments on views, foreign tables and partitioned tables (R49) **(point d'arrêt)**
-- 2.30 Quote awkward names and escape comments so the generated schema always parses (R47) **(point d'arrêt)**
-- 2.31 Keep enum values in their declared order (R50) **(point d'arrêt)**
-- 2.32 Give a helpful error on interpolating null or a column-less parent() (R58) **(point d'arrêt)**
-- 2.33 Document the surprises the characterisation found (constats à documenter)
+- 2.10 Add undefinedMeansMissing, so undefined acts as a missing key in update() and insert() (R9, R11) **(opt-in)**
+- 2.11 Fix not() so it parenthesises its condition (R12)
+- 2.12 Compile a Parameter in a Whereable or in vals() as a parameter, not as JSON (R13)
+- 2.13 Add selectExactlyOneChecksForSecondRow (R14) **(opt-in)**
+- 2.14 Make and() and or() with no arguments compile to TRUE and FALSE (R23)
+- 2.15 Refuse aggregate options that cannot compile (R25)
+- 2.16 Treat a native pg client as a client, not a pool, in transaction() (R26)
+- 2.17 Let an explicit param() cast win over castArrayParamsToJson (R27)
+- 2.18 Allow schema-qualified and array types in param() casts (R28)
+- 2.19 Refuse a constraint of another table in upsert (R32)
+- 2.20 Allow a Parameter in add() and subtract(), for date arithmetic (R33)
+- 2.21 Type the array conditions on the array column, not on its element (R34)
+- 2.22 Accept a readonly array as the columns option (R35)
+- 2.23 Warn when two custom types share a placeholder name (R42)
+- 2.24 Match unique indexes by table, not by name alone (R41)
+- 2.25 Add typeEnumsAcrossSchemas to type enums of other schemas as enums (R40) **(opt-in)**
+- 2.26 Warn about an include entry that matches no table (R51)
+- 2.27 Prefix every line of a multi-line column comment (R48)
+- 2.28 Keep column comments on views, foreign tables and partitioned tables (R49)
+- 2.29 Quote awkward names and escape comments so the generated schema always parses (R47)
+- 2.30 Add enumOrder: 'declared' to keep enum values in their declared order (R50) **(opt-in)**
+- 2.31 Give a helpful error on interpolating null or a column-less parent() (R58)
+- 2.32 Document the surprises the characterisation found (constats à documenter)
 
 ## 3. Le schéma et les conditions
 
