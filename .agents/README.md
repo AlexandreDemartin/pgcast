@@ -16,7 +16,7 @@ Chaque élément existe une seule fois, à l'emplacement que les outils lisent n
 | Skill | Sujet |
 |---|---|
 | `run-step` | Orchestrer une étape de `docs/SUIVI.md` : builder, relecture selon **Relecture**, tri, `verify`, fusion, fin de chapitre |
-| `ci-gate` | PR draft pendant l'itération, `gh pr ready`, docs-only et `[skip ci]`, fusion |
+| `ci-gate` | PR draft pendant l'itération, `gh pr ready`, docs seules, check **CI passed**, `[skip ci]` exceptionnel, fusion |
 | `decision-philosophy` | Trancher seul ce que rien n'écrit, ou attendre l'utilisateur |
 | `simple-big-wins` | Gain mesuré rapporté à la complexité ajoutée ; rien de bancal |
 | `concise-docs` | Doc complète mais concise, une information à un endroit |
