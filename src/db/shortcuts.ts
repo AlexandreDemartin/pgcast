@@ -503,7 +503,10 @@ const
  * quantities can be included in the JSON result
  * @param mode (Used internally by `selectOne` and `count`)
  * @param aggregate (Used internally by `count`, `sum`, `avg`, `min` and `max`)
- * The name of the aggregate function, optionally quoted and schema-qualified
+ * The name of the aggregate function, plain or quoted, optionally
+ * schema-qualified (`sum`, `my_schema."MyAgg"`); anything else throws. With
+ * `columns: ['id']`, `'my_schema."MyAgg"'` gives
+ * `SELECT my_schema."MyAgg"("id") AS result FROM "users"`.
  */
 export const select: SelectSignatures = function (
   table: Table,
