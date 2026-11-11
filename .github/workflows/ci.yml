@@ -19,7 +19,24 @@ jobs:
       fail-fast: false
       matrix:
         node-version: [20.x, 22.x, lts/*]
-        # Postgres matrix (14, 16, latest) arrives with the integration suite in phase 1.
+        postgres: [14, 16, 18]
+
+    # Integration tests create and drop their own pgcast_test_* databases (test/helpers).
+    services:
+      postgres:
+        image: postgres:${{ matrix.postgres }}
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: pgcast
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/pgcast
 
     steps:
       - uses: actions/checkout@v4
