@@ -37,21 +37,34 @@ describe('values are data', () => {
 });
 
 describe('with parameters (extended protocol)', () => {
-  it('characterization: a `"` in a Whereable key widens the filter', async () => {
-    // characterization: `("id" IS NOT NULL OR "id" = $2)`: every row instead of none
+  it('a `"` in a Whereable key stays in one column name, which does not exist', async () => {
+    // 6.6.1: `("id" IS NOT NULL OR "id" = $2)`, every row instead of none
     const q = db.select('users', { ['id" IS NOT NULL OR "id']: 0 } as any, { columns: ['id'], order: { by: 'id', direction: 'ASC' } });
-    expect(q.compile().text).toContain(`WHERE ("id" IS NOT NULL OR "id" = $2)`);
-    expect(await q.run(t.client)).toEqual([{ id: 1 }, { id: 2 }, { id: 3 }]);
+    expect(q.compile().text).toContain(`WHERE ("id"" IS NOT NULL OR ""id" = $2)`);
+    expect(await pgError(t.client, () => q.run(t.client))).toMatchInlineSnapshot(`
+      {
+        "code": "42703",
+        "message": "column "id" IS NOT NULL OR "id" does not exist",
+      }
+    `);
   });
 
-  it('a second statement after a `"` in a string identifier is refused by pg', async () => {
-    // `SELECT "display_name" FROM users; UPDATE …; SELECT "display_name" FROM "users" WHERE ("id" = $1)`
+  it('a column whose name has a `"` is reached by its name, or hand-escaped as under 6.6.1', async () => {
+    await t.client.query(`CREATE TABLE "my""table" ("my""col" int); INSERT INTO "my""table" VALUES (1)`);
+    // not through select(), which still writes its table name raw into "sq_<table>"
+    expect(await sql`SELECT ${'my"col'} AS v FROM ${'my"table'} WHERE ${{ 'my"col': 1 }}`.run(t.client)).toEqual([{ v: 1 }]);
+    expect(await sql`SELECT ${'my""col'} AS v FROM ${'my""table'} WHERE ${{ 'my""col': 1 }}`.run(t.client)).toEqual([{ v: 1 }]);
+  });
+
+  it('a `"` in a string identifier stays in one column name with parameters too', async () => {
+    // 6.6.1: `SELECT "display_name" FROM users; UPDATE …; SELECT "display_name" FROM "users" WHERE ("id" = $1)`,
+    // refused by pg (42601, multiple commands in a prepared statement)
     const column = `display_name" FROM users; ${update}; SELECT "display_name`;
     const q = sql`SELECT ${column} FROM ${'users'} WHERE ${{ id: 1 }}`;
     expect(await pgError(t.client, () => q.run(t.client))).toMatchInlineSnapshot(`
       {
-        "code": "42601",
-        "message": "cannot insert multiple commands into a prepared statement",
+        "code": "42703",
+        "message": "column "display_name" FROM users; UPDATE users SET display_name = 'inje" does not exist",
       }
     `);
     expect(await adaName()).toBe('Ada');
@@ -142,11 +155,87 @@ describe('with parameters (extended protocol)', () => {
 });
 
 describe('without parameters (simple protocol)', () => {
-  it('characterization: a `"` in a string identifier runs a second statement', async () => {
-    // characterization: `SELECT "display_name" FROM users; UPDATE …; SELECT "display_name" FROM "users"`
+  it('a `"` in a string identifier stays in one column name, which does not exist', async () => {
+    // 6.6.1: `SELECT "display_name" FROM users; UPDATE …; SELECT "display_name" FROM "users"`, three statements
     const column = `display_name" FROM users; ${update}; SELECT "display_name`;
-    await sql`SELECT ${column} FROM ${'users'}`.run(t.client);
-    await expectInjectedHereOnly();
+    expect(await pgError(t.client, () => sql`SELECT ${column} FROM ${'users'}`.run(t.client))).toMatchInlineSnapshot(`
+      {
+        "code": "42703",
+        "message": "column "display_name" FROM users; UPDATE users SET display_name = 'inje" does not exist",
+      }
+    `);
+    expect(await adaName(t.pool)).toBe('Ada');
+  });
+
+  it('no hostile string identifier runs: each is one missing name, as a column, a table or a Whereable key', async () => {
+    // compiled text: test/unit/injection.test.ts; a pre-quoted string is still written raw (prequoted, lone)
+    const hostile = {
+      dquote: 'a"b', squote: "a'b", semicolon: 'a;b', dashes: 'a--b', comment: 'a/*b', dollar: 'a$1b',
+      backslash: 'a\\b', nul: 'a\0b', prequoted: '"a"', dot: 'a.b', lone: '"',
+      closes: `display_name" FROM users; ${update}; SELECT "display_name`,
+      qualifiedCloses: `users"."display_name" FROM users; ${update}; SELECT "display_name`,
+    };
+    const outcomes: Record<string, unknown> = {};
+    for (const [name, input] of Object.entries(hostile)) {
+      for (const [where, q] of Object.entries({
+        column: sql`SELECT ${input} FROM ${'users'}`,
+        table: sql`SELECT 1 FROM ${input}`,
+        key: sql`SELECT 1 FROM ${'users'} WHERE ${{ [input]: 1 }}`,
+      })) {
+        await t.client.query('SAVEPOINT pgcast_identifier');
+        try {
+          outcomes[`${name} ${where}`] = await q.run(t.client);
+          await t.client.query('RELEASE SAVEPOINT pgcast_identifier');
+        } catch (err) {
+          await t.client.query('ROLLBACK TO SAVEPOINT pgcast_identifier');
+          outcomes[`${name} ${where}`] = (err as { code?: string }).code;
+        }
+      }
+    }
+    expect(outcomes).toMatchInlineSnapshot(`
+      {
+        "backslash column": "42703",
+        "backslash key": "42703",
+        "backslash table": "42P01",
+        "closes column": "42703",
+        "closes key": "42703",
+        "closes table": "42P01",
+        "comment column": "42703",
+        "comment key": "42703",
+        "comment table": "42P01",
+        "dashes column": "42703",
+        "dashes key": "42703",
+        "dashes table": "42P01",
+        "dollar column": "42703",
+        "dollar key": "42703",
+        "dollar table": "42P01",
+        "dot column": "42P01",
+        "dot key": "42P01",
+        "dot table": "42P01",
+        "dquote column": "42703",
+        "dquote key": "42703",
+        "dquote table": "42P01",
+        "lone column": "42601",
+        "lone key": "42601",
+        "lone table": "42601",
+        "nul column": "08P01",
+        "nul key": "08P01",
+        "nul table": "08P01",
+        "prequoted column": "42703",
+        "prequoted key": "42703",
+        "prequoted table": "42P01",
+        "qualifiedCloses column": "42P01",
+        "qualifiedCloses key": "42P01",
+        "qualifiedCloses table": "42P01",
+        "semicolon column": "42703",
+        "semicolon key": "42703",
+        "semicolon table": "42P01",
+        "squote column": "42703",
+        "squote key": "42703",
+        "squote table": "42P01",
+      }
+    `);
+    expect(await adaName()).toBe('Ada');
   });
 
   it('characterization: a pre-quoted string identifier is raw and runs a second statement', async () => {

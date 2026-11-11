@@ -41,9 +41,9 @@ const matrix = (build: (input: any) => db.SQLFragment<any, any>, inputs: Record<
   }));
 
 describe('identifiers', () => {
-  it('characterization: a string (Table, Column): `"` is not doubled, a pre-quoted string is raw', () => {
-    // characterization: `a"b` gives `"a"b"`: the quote closes the identifier; `.` is the only
-    // character rewritten (`"a"."b"`); `"` alone starts and ends with `"`, so it is written raw
+  it('characterization: a string (Table, Column): `"` is doubled, a pre-quoted string is raw', () => {
+    // `a"b` gives `"a""b"`, one identifier, and `.` still splits (`"a"."b"`); characterization: `"`
+    // alone starts and ends with `"`, so it is written raw, here and in every matrix below
     expect(matrix(v => sql`SELECT ${v}`)).toMatchInlineSnapshot(`
       {
         "backslash": "SELECT "a\\b"",
@@ -51,7 +51,7 @@ describe('identifiers', () => {
         "dashes": "SELECT "a--b"",
         "dollar": "SELECT "a$1b"",
         "dot": "SELECT "a"."b"",
-        "dquote": "SELECT "a"b"",
+        "dquote": "SELECT "a""b"",
         "lone": "SELECT "",
         "nul": "SELECT "a<NUL>b"",
         "prequoted": "SELECT "a"",
@@ -59,6 +59,22 @@ describe('identifiers', () => {
         "squote": "SELECT "a'b"",
       }
     `);
+  });
+
+  it('a string that closes its quotes compiles to one identifier, and its values are untouched', () => {
+    // 6.6.1: `WHERE ("a" = "a" OR TRUE OR "a" = $1)`, every row
+    const where = sql`WHERE ${{ ['a" = "a" OR TRUE OR "a']: 1 }}`.compile();
+    expect(where).toEqual({ text: 'WHERE ("a"" = ""a"" OR TRUE OR ""a" = $1)', values: [1] });
+    // 6.6.1: `SELECT "a" FROM t; DROP TABLE t; SELECT "a" FROM "t"`, three statements
+    expect(sql`SELECT ${'a" FROM t; DROP TABLE t; SELECT "a'} FROM ${'t'}`.compile())
+      .toEqual({ text: 'SELECT "a"" FROM t; DROP TABLE t; SELECT ""a" FROM "t"', values: [] });
+    // the quotes are doubled before the split on `.`
+    expect(sql`${'s"."t" WHERE true; --.c'}`.compile().text).toBe('"s"""."""t"" WHERE true; --"."c"');
+  });
+
+  it('a string identifier check stays fast on a long run of doubled quotes', () => {
+    const name = `${'a"".'.repeat(100_000)}"`;
+    expect(sql`${name}`.compile().text).toBe(`"${name.replace(/"/g, '""').replace(/[.]/g, '"."')}"`);
   });
 
   it('characterization: Whereable keys', () => {
@@ -69,7 +85,7 @@ describe('identifiers', () => {
         "dashes": "WHERE ("a--b" = $1)",
         "dollar": "WHERE ("a$1b" = $1)",
         "dot": "WHERE ("a"."b" = $1)",
-        "dquote": "WHERE ("a"b" = $1)",
+        "dquote": "WHERE ("a""b" = $1)",
         "lone": "WHERE (" = $1)",
         "nul": "WHERE ("a<NUL>b" = $1)",
         "prequoted": "WHERE ("a" = $1)",
@@ -87,7 +103,7 @@ describe('identifiers', () => {
         "dashes": "("a--b") VALUES ($1)",
         "dollar": "("a$1b") VALUES ($1)",
         "dot": "("a"."b") VALUES ($1)",
-        "dquote": "("a"b") VALUES ($1)",
+        "dquote": "("a""b") VALUES ($1)",
         "lone": "(") VALUES ($1)",
         "nul": "("a<NUL>b") VALUES ($1)",
         "prequoted": "("a") VALUES ($1)",
@@ -105,7 +121,7 @@ describe('identifiers', () => {
         "dashes": "SELECT "a--b"",
         "dollar": "SELECT "a$1b"",
         "dot": "SELECT "a"."b"",
-        "dquote": "SELECT "a"b"",
+        "dquote": "SELECT "a""b"",
         "lone": "SELECT "",
         "nul": "SELECT "a<NUL>b"",
         "prequoted": "SELECT "a"",
@@ -122,7 +138,7 @@ describe('identifiers', () => {
         "dashes": "WHERE ("owner_id" = "users"."a--b")",
         "dollar": "WHERE ("owner_id" = "users"."a$1b")",
         "dot": "WHERE ("owner_id" = "users"."a"."b")",
-        "dquote": "WHERE ("owner_id" = "users"."a"b")",
+        "dquote": "WHERE ("owner_id" = "users"."a""b")",
         "lone": "WHERE ("owner_id" = "users".")",
         "nul": "WHERE ("owner_id" = "users"."a<NUL>b")",
         "prequoted": "WHERE ("owner_id" = "users"."a")",
@@ -154,7 +170,7 @@ describe('shortcut arguments', () => {
         "dashes": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("a--b".*) AS result FROM "a--b") AS "sq_a--b"",
         "dollar": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("a$1b".*) AS result FROM "a$1b") AS "sq_a$1b"",
         "dot": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("a"."b".*) AS result FROM "a"."b") AS "sq_a.b"",
-        "dquote": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("a"b".*) AS result FROM "a"b") AS "sq_a"b"",
+        "dquote": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("a""b".*) AS result FROM "a""b") AS "sq_a"b"",
         "lone": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb(".*) AS result FROM ") AS "sq_""",
         "nul": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("a<NUL>b".*) AS result FROM "a<NUL>b") AS "sq_a<NUL>b"",
         "prequoted": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("a".*) AS result FROM "a") AS "sq_"a""",
@@ -170,7 +186,7 @@ describe('shortcut arguments', () => {
         "dashes": "DELETE FROM "a--b" WHERE ("id" = $1) RETURNING to_jsonb("a--b".*) AS result",
         "dollar": "DELETE FROM "a$1b" WHERE ("id" = $1) RETURNING to_jsonb("a$1b".*) AS result",
         "dot": "DELETE FROM "a"."b" WHERE ("id" = $1) RETURNING to_jsonb("a"."b".*) AS result",
-        "dquote": "DELETE FROM "a"b" WHERE ("id" = $1) RETURNING to_jsonb("a"b".*) AS result",
+        "dquote": "DELETE FROM "a""b" WHERE ("id" = $1) RETURNING to_jsonb("a""b".*) AS result",
         "lone": "DELETE FROM " WHERE ("id" = $1) RETURNING to_jsonb(".*) AS result",
         "nul": "DELETE FROM "a<NUL>b" WHERE ("id" = $1) RETURNING to_jsonb("a<NUL>b".*) AS result",
         "prequoted": "DELETE FROM "a" WHERE ("id" = $1) RETURNING to_jsonb("a".*) AS result",
@@ -263,7 +279,7 @@ describe('shortcut arguments', () => {
         "dashes": "INSERT INTO "users" ("a--b") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a--b") = ROW(EXCLUDED."a--b") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "dollar": "INSERT INTO "users" ("a$1b") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a$1b") = ROW(EXCLUDED."a$1b") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "dot": "INSERT INTO "users" ("a"."b") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a"."b") = ROW(EXCLUDED."a"."b") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
-        "dquote": "INSERT INTO "users" ("a"b") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a"b") = ROW(EXCLUDED."a"b") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "dquote": "INSERT INTO "users" ("a""b") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a""b") = ROW(EXCLUDED."a""b") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "lone": "INSERT INTO "users" (") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET (") = ROW(EXCLUDED.") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "nul": "INSERT INTO "users" ("a<NUL>b") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a<NUL>b") = ROW(EXCLUDED."a<NUL>b") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "prequoted": "INSERT INTO "users" ("a") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a") = ROW(EXCLUDED."a") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
@@ -281,7 +297,7 @@ describe('shortcut arguments', () => {
         "dashes": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("a--b") DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "dollar": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("a$1b") DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "dot": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("a"."b") DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
-        "dquote": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("a"b") DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "dquote": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("a""b") DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "lone": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT (") DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "nul": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("a<NUL>b") DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "prequoted": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("a") DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
@@ -299,7 +315,7 @@ describe('shortcut arguments', () => {
         "dashes": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ON CONSTRAINT "a--b" DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "dollar": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ON CONSTRAINT "a$1b" DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "dot": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ON CONSTRAINT "a"."b" DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
-        "dquote": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ON CONSTRAINT "a"b" DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "dquote": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ON CONSTRAINT "a""b" DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "lone": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ON CONSTRAINT " DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "nul": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ON CONSTRAINT "a<NUL>b" DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "prequoted": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ON CONSTRAINT "a" DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
@@ -319,7 +335,7 @@ describe('shortcut options', () => {
         "dashes": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT jsonb_build_object($1::text, "a--b") AS result FROM "users") AS "sq_users"",
         "dollar": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT jsonb_build_object($1::text, "a$1b") AS result FROM "users") AS "sq_users"",
         "dot": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT jsonb_build_object($1::text, "a"."b") AS result FROM "users") AS "sq_users"",
-        "dquote": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT jsonb_build_object($1::text, "a"b") AS result FROM "users") AS "sq_users"",
+        "dquote": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT jsonb_build_object($1::text, "a""b") AS result FROM "users") AS "sq_users"",
         "lone": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT jsonb_build_object($1::text, ") AS result FROM "users") AS "sq_users"",
         "nul": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT jsonb_build_object($1::text, "a<NUL>b") AS result FROM "users") AS "sq_users"",
         "prequoted": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT jsonb_build_object($1::text, "a") AS result FROM "users") AS "sq_users"",
@@ -338,7 +354,7 @@ describe('shortcut options', () => {
         "dashes": "DELETE FROM "users" WHERE ("id" = $1) RETURNING jsonb_build_object($2::text, "a--b") AS result",
         "dollar": "DELETE FROM "users" WHERE ("id" = $1) RETURNING jsonb_build_object($2::text, "a$1b") AS result",
         "dot": "DELETE FROM "users" WHERE ("id" = $1) RETURNING jsonb_build_object($2::text, "a"."b") AS result",
-        "dquote": "DELETE FROM "users" WHERE ("id" = $1) RETURNING jsonb_build_object($2::text, "a"b") AS result",
+        "dquote": "DELETE FROM "users" WHERE ("id" = $1) RETURNING jsonb_build_object($2::text, "a""b") AS result",
         "lone": "DELETE FROM "users" WHERE ("id" = $1) RETURNING jsonb_build_object($2::text, ") AS result",
         "nul": "DELETE FROM "users" WHERE ("id" = $1) RETURNING jsonb_build_object($2::text, "a<NUL>b") AS result",
         "prequoted": "DELETE FROM "users" WHERE ("id" = $1) RETURNING jsonb_build_object($2::text, "a") AS result",
@@ -356,7 +372,7 @@ describe('shortcut options', () => {
         "dashes": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" ORDER BY "a--b" ASC) AS "sq_users"",
         "dollar": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" ORDER BY "a$1b" ASC) AS "sq_users"",
         "dot": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" ORDER BY "a"."b" ASC) AS "sq_users"",
-        "dquote": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" ORDER BY "a"b" ASC) AS "sq_users"",
+        "dquote": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" ORDER BY "a""b" ASC) AS "sq_users"",
         "lone": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" ORDER BY " ASC) AS "sq_users"",
         "nul": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" ORDER BY "a<NUL>b" ASC) AS "sq_users"",
         "prequoted": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" ORDER BY "a" ASC) AS "sq_users"",
@@ -374,7 +390,7 @@ describe('shortcut options', () => {
         "dashes": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a--b") = ROW(EXCLUDED."a--b") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "dollar": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a$1b") = ROW(EXCLUDED."a$1b") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "dot": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a"."b") = ROW(EXCLUDED."a"."b") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
-        "dquote": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a"b") = ROW(EXCLUDED."a"b") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "dquote": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a""b") = ROW(EXCLUDED."a""b") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "lone": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET (") = ROW(EXCLUDED.") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "nul": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a<NUL>b") = ROW(EXCLUDED."a<NUL>b") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "prequoted": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a") = ROW(EXCLUDED."a") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
@@ -391,7 +407,7 @@ describe('shortcut options', () => {
           "dashes": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a--b") = ROW(CASE WHEN EXCLUDED."a--b" IS NULL THEN "users"."a--b" ELSE EXCLUDED."a--b" END) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
           "dollar": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a$1b") = ROW(CASE WHEN EXCLUDED."a$1b" IS NULL THEN "users"."a$1b" ELSE EXCLUDED."a$1b" END) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
           "dot": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a"."b") = ROW(CASE WHEN EXCLUDED."a"."b" IS NULL THEN "users"."a"."b" ELSE EXCLUDED."a"."b" END) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
-          "dquote": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a"b") = ROW(CASE WHEN EXCLUDED."a"b" IS NULL THEN "users"."a"b" ELSE EXCLUDED."a"b" END) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+          "dquote": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a""b") = ROW(CASE WHEN EXCLUDED."a""b" IS NULL THEN "users"."a""b" ELSE EXCLUDED."a""b" END) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
           "lone": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET (") = ROW(CASE WHEN EXCLUDED." IS NULL THEN "users"." ELSE EXCLUDED." END) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
           "nul": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a<NUL>b") = ROW(CASE WHEN EXCLUDED."a<NUL>b" IS NULL THEN "users"."a<NUL>b" ELSE EXCLUDED."a<NUL>b" END) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
           "prequoted": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a") = ROW(CASE WHEN EXCLUDED."a" IS NULL THEN "users"."a" ELSE EXCLUDED."a" END) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
@@ -410,7 +426,7 @@ describe('shortcut options', () => {
           "dashes": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a--b") = ROW(1) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
           "dollar": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a$1b") = ROW(1) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
           "dot": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a"."b") = ROW(1) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
-          "dquote": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a"b") = ROW(1) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+          "dquote": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a""b") = ROW(1) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
           "lone": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET (") = ROW(1) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
           "nul": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a<NUL>b") = ROW(1) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
           "prequoted": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a") = ROW(1) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
@@ -426,7 +442,7 @@ describe('shortcut options', () => {
           "dashes": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("mood") = ROW("a--b") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
           "dollar": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("mood") = ROW("a$1b") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
           "dot": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("mood") = ROW("a"."b") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
-          "dquote": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("mood") = ROW("a"b") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+          "dquote": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("mood") = ROW("a""b") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
           "lone": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("mood") = ROW(") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
           "nul": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("mood") = ROW("a<NUL>b") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
           "prequoted": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("mood") = ROW("a") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
@@ -481,7 +497,7 @@ describe('shortcut options', () => {
         "dashes": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("a--b".*) AS result FROM "users" AS "a--b") AS "sq_a--b"",
         "dollar": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("a$1b".*) AS result FROM "users" AS "a$1b") AS "sq_a$1b"",
         "dot": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("a"."b".*) AS result FROM "users" AS "a"."b") AS "sq_a.b"",
-        "dquote": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("a"b".*) AS result FROM "users" AS "a"b") AS "sq_a"b"",
+        "dquote": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("a""b".*) AS result FROM "users" AS "a""b") AS "sq_a"b"",
         "lone": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb(".*) AS result FROM "users" AS ") AS "sq_""",
         "nul": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("a<NUL>b".*) AS result FROM "users" AS "a<NUL>b") AS "sq_a<NUL>b"",
         "prequoted": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("a".*) AS result FROM "users" AS "a") AS "sq_"a""",
@@ -565,7 +581,7 @@ describe('shortcut options', () => {
         "dashes": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" FOR UPDATE OF "a--b") AS "sq_users"",
         "dollar": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" FOR UPDATE OF "a$1b") AS "sq_users"",
         "dot": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" FOR UPDATE OF "a"."b") AS "sq_users"",
-        "dquote": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" FOR UPDATE OF "a"b") AS "sq_users"",
+        "dquote": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" FOR UPDATE OF "a""b") AS "sq_users"",
         "lone": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" FOR UPDATE OF ") AS "sq_users"",
         "nul": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" FOR UPDATE OF "a<NUL>b") AS "sq_users"",
         "prequoted": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" FOR UPDATE OF "a") AS "sq_users"",
@@ -616,7 +632,7 @@ describe('shortcut options', () => {
         "dashes": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("a--b") to_jsonb("users".*) AS result FROM "users") AS "sq_users"",
         "dollar": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("a$1b") to_jsonb("users".*) AS result FROM "users") AS "sq_users"",
         "dot": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("a"."b") to_jsonb("users".*) AS result FROM "users") AS "sq_users"",
-        "dquote": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("a"b") to_jsonb("users".*) AS result FROM "users") AS "sq_users"",
+        "dquote": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("a""b") to_jsonb("users".*) AS result FROM "users") AS "sq_users"",
         "lone": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT DISTINCT ON (") to_jsonb("users".*) AS result FROM "users") AS "sq_users"",
         "nul": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("a<NUL>b") to_jsonb("users".*) AS result FROM "users") AS "sq_users"",
         "prequoted": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("a") to_jsonb("users".*) AS result FROM "users") AS "sq_users"",
@@ -631,7 +647,7 @@ describe('shortcut options', () => {
         "dashes": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" GROUP BY "a--b") AS "sq_users"",
         "dollar": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" GROUP BY "a$1b") AS "sq_users"",
         "dot": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" GROUP BY "a"."b") AS "sq_users"",
-        "dquote": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" GROUP BY "a"b") AS "sq_users"",
+        "dquote": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" GROUP BY "a""b") AS "sq_users"",
         "lone": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" GROUP BY ") AS "sq_users"",
         "nul": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" GROUP BY "a<NUL>b") AS "sq_users"",
         "prequoted": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" GROUP BY "a") AS "sq_users"",
