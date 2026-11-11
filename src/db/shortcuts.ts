@@ -463,6 +463,9 @@ export interface SelectSignatures {
   ): SQLFragment<FullSelectReturnTypeForTable<T, C, L, E, M>>;
 }
 
+// the aggregate of select() is written raw: a plain or quoted identifier, optionally schema-qualified
+const functionName = /^(?:[\p{L}_][\p{L}\p{N}_]*|"[\p{L}\p{N}_]+")(?:\.(?:[\p{L}_][\p{L}\p{N}_]*|"[\p{L}\p{N}_]+"))?$/u;
+
 export class NotExactlyOneError extends Error {
   // see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error
   query: SQLFragment;
@@ -494,6 +497,8 @@ export class NotExactlyOneError extends Error {
  * * `extras` — an object mapping key(s) to `SQLFragment`s, so that derived 
  * quantities can be included in the JSON result
  * @param mode (Used internally by `selectOne` and `count`)
+ * @param aggregate (Used internally by `count`, `sum`, `avg`, `min` and `max`)
+ * The name of the aggregate function, optionally quoted and schema-qualified
  */
 export const select: SelectSignatures = function (
   table: Table,
@@ -502,6 +507,8 @@ export const select: SelectSignatures = function (
   mode: SelectResultMode = SelectResultMode.Many,
   aggregate: string = 'count',
 ) {
+
+  if (mode === SelectResultMode.Numeric && !functionName.test(aggregate)) throw new Error(`Aggregate must be a function name (e.g. sum, or my_schema.my_agg), not '${aggregate}'`);
 
   const
     limit1 = mode === SelectResultMode.One || mode === SelectResultMode.ExactlyOne,
