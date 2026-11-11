@@ -72,7 +72,7 @@ Toujours les mêmes clés, dans cet ordre ; une clé absente ne s'applique pas.
 
 ### 1.3 `test/compiled-sql` — SQL de chaque shortcut et condition
 
-- [ ] **Livrée**
+- [x] **Livrée** : PR #5
 - **But** : `text` + `values` de chaque shortcut et de chaque condition figés, puis exécutés contre Postgres.
 - **À caractériser en priorité** (vus dans Belco et Bienvenue ou à la lecture) : `and()` / `or()` sans argument, `isIn([])`, clé `undefined` dans un `Whereable` ou un `Updatable`, `update` sans colonne, `min` / `max` sur une date ou un texte (`Number()` du résultat), conditions de tableau sur une colonne tableau, ordre des colonnes d'un `insert`.
 - **Relecture** : `normal`, lentille `sql`.
