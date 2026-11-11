@@ -33,6 +33,12 @@ Candidats à un contrôle, une règle ou une ligne de skill.
 - 1.5 — Vitest `-t` prend une regex JS : `a\|b` ne trouve rien — `builder`
 - 1.5 — `toMatchInlineSnapshot` écrit un octet nul brut dans la source : le remplacer par un marqueur visible avant de figer — `builder`
 - 1.5 — Dans une boucle de reprise, `git push … | tail` masque le code de sortie : tester la commande elle-même — `builder`
+- 1.4 — Un négatif écrit à travers un helper typé (`constraint<'users'>(…)`) teste le helper, pas le shortcut : construire la valeur à part, puis la passer (candidat : skill `type-tests`) — `branch-reviewer`, `test/types/shortcuts.test-d.ts:155`
+- 1.4 — `X extends T ? true : false` ne vérifie qu'une inclusion, comme `toMatchTypeOf` : `toEqualTypeOf` dès que le type s'écrit — `branch-reviewer`
+- 1.4 — Un type faux seulement quand il est inféré dans l'appel d'un shortcut n'apparaît pas sur une variable annotée : tester l'appel lui-même — `builder`
+- 1.4 — Des déclarations émises dans le dossier temporaire du système ne résolvent pas `pg` : les émettre sous `node_modules/.cache/` — `builder`
+- 1.4 — Un merge de `master` fait un conflit dans `AGENTS.md` dès qu'une branche a modifié le tableau des commandes : le prévoir dans le brief — `builder`
+- 1.4 — Découper une PR déjà poussée se fait par de nouvelles branches et `cherry-pick`, l'ancienne PR fermée avec un renvoi — `builder`
 
 ## Mineurs gardés
 
