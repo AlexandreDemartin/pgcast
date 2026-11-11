@@ -1,0 +1,115 @@
+// Copyright (C) 2026 Alexandre Demartin
+//
+// Shared by the global setup and the per-file helper. The tests create and drop
+// only databases whose name starts with PREFIX; every DROP goes through
+// dropDatabase(), which refuses any other name.
+
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import pg from 'pg';
+
+export const PREFIX = 'pgcast_test_';
+
+export interface PgcastDbContext {
+  /** Server URL used for CREATE / DROP DATABASE. */
+  url: string;
+  /** Template database holding the fixture. */
+  template: string;
+  /** Name prefix of this run's databases. */
+  prefix: string;
+}
+
+declare module 'vitest' {
+  export interface ProvidedContext {
+    pgcastDb: PgcastDbContext | null;
+  }
+}
+
+export const missingUrlMessage =
+  'TEST_DATABASE_URL is not set: integration tests need a Postgres server. ' +
+  'Set it in src/.env or in the environment (AGENTS.md § Environnement local).';
+
+/** Reads TEST_DATABASE_URL: the environment wins; `src/.env` only fills it when unset (process.loadEnvFile never overrides). */
+export function testDatabaseUrl(): string | undefined {
+  const envFile = fileURLToPath(new URL('../../src/.env', import.meta.url));
+  if (existsSync(envFile)) process.loadEnvFile(envFile);
+  return process.env.TEST_DATABASE_URL || undefined;
+}
+
+/** Name prefix of every database created by the run of process `pid`. */
+export const runPrefix = (pid: number) => `${PREFIX}${pid}_`;
+
+/** Same server and credentials as `url`, other database. Its errors never contain `url` (password). */
+export function urlForDatabase(url: string, database: string): string {
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    // new URL()'s error carries the whole URL in `input`, which Vitest prints: throw one without it
+    throw new Error('TEST_DATABASE_URL must be a URL with a host, e.g. postgres://user:password@localhost:5432/db');
+  }
+  u.pathname = '/' + encodeURIComponent(database);
+  return u.toString();
+}
+
+const quoteIdent = (name: string) => '"' + name.replace(/"/g, '""') + '"';
+
+/**
+ * Databases left by runs whose process is gone, by a dead run that had our pid
+ * (pid reuse), or with a name we do not recognise.
+ * Assumes a single host: every run against this server comes from this machine.
+ */
+export function orphanDatabases(names: string[], isAlive: (pid: number) => boolean, ownPid: number): string[] {
+  return names.filter(name => {
+    if (!name.startsWith(PREFIX)) return false;
+    const pid = /^pgcast_test_(\d+)_/.exec(name)?.[1];
+    return pid === undefined || Number(pid) === ownPid || !isAlive(Number(pid));
+  });
+}
+
+export function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    return (err as NodeJS.ErrnoException).code === 'EPERM';  // exists, owned by someone else
+  }
+}
+
+/** Runs `fn` on a short-lived connection to the database of `url` (catalog reads, CREATE / DROP DATABASE). */
+export async function withAdminClient<T>(url: string, fn: (client: pg.Client) => Promise<T>): Promise<T> {
+  const client = new pg.Client({ connectionString: url });
+  await client.connect();
+  try {
+    return await fn(client);
+  } finally {
+    await client.end();
+  }
+}
+
+export async function listTestDatabases(client: pg.Client): Promise<string[]> {
+  const { rows } = await client.query<{ datname: string }>(
+    'SELECT datname FROM pg_database WHERE starts_with(datname, $1) ORDER BY datname', [PREFIX]);
+  return rows.map(r => r.datname);
+}
+
+const refuseOutsidePrefix = (verb: string, name: string) => {
+  if (!name.startsWith(PREFIX)) throw new Error(`refusing to ${verb} ${name}: not a ${PREFIX}* database`);
+};
+
+export async function createDatabase(client: pg.Client, name: string, template: string): Promise<void> {
+  refuseOutsidePrefix('create', name);
+  await client.query(`CREATE DATABASE ${quoteIdent(name)} TEMPLATE ${quoteIdent(template)}`);
+}
+
+/** The run's template database, empty, before the fixture is loaded. */
+export async function createTemplateDatabase(client: pg.Client, name: string): Promise<void> {
+  refuseOutsidePrefix('create', name);
+  // locale C: the same text sort order everywhere (macOS libc and glibc collations differ)
+  await client.query(`CREATE DATABASE ${quoteIdent(name)} TEMPLATE template0 ENCODING 'UTF8' LOCALE 'C'`);
+}
+
+export async function dropDatabase(client: pg.Client, name: string): Promise<void> {
+  refuseOutsidePrefix('drop', name);
+  await client.query(`DROP DATABASE IF EXISTS ${quoteIdent(name)} WITH (FORCE)`);
+}
