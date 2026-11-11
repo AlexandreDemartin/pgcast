@@ -88,4 +88,4 @@ Une tâche n'est **terminée** que si `lint`, `typecheck`, `test` et `test:types
 
 - Node ≥ 20 (le dev courant se fait en Node 22).
 - Avec npm 10, `npm install <pkg>` peut planter sur les peer deps de Vitest (`Cannot read properties of null (reading 'edgesOut')`). Dans ce cas, utiliser `npx npm@11 install …`. `npm ci` fonctionne normalement.
-- Postgres pour les tests : `docker compose` (phase 1) ou une instance locale via `TEST_DATABASE_URL`.
+- Postgres pour les tests : **pas de Docker**. On utilise une instance locale via `TEST_DATABASE_URL`, définie dans `src/.env` (ignoré par git, ne jamais le commiter). En CI, ce sont des service containers GitHub Actions.

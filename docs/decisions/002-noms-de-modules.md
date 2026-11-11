@@ -1,6 +1,6 @@
 # 002 — Noms de modules : `zapatos/*` ou `pgcast/*`
 
-- **Statut** : proposé (en attente de validation, **bloquant avant la première publication npm**)
+- **Statut** : accepté (2026-11-11) : option A maintenant, option C comme cible
 - **Date** : 2026-11-11
 
 ## Contexte

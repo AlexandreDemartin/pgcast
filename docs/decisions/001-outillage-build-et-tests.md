@@ -1,6 +1,6 @@
 # 001 — Outillage : build et tests
 
-- **Statut** : proposé (en attente de validation)
+- **Statut** : accepté (2026-11-11)
 - **Date** : 2026-11-11
 - **Portée** : phase 0 (build) et phase 1 (tests)
 
@@ -37,7 +37,7 @@ Le runtime expose des **valeurs identitaires** : les symboles `Default`, `self` 
 |---|---|---|
 | Runner | **Vitest 4** | Jest (ESM/TS plus lourd), `node:test` (pas de snapshots inline ni de typecheck intégré). |
 | Tests de types | **`expectTypeOf` + `vitest --typecheck`** (fichiers `*.test-d.ts`), plus `@ts-expect-error` pour les cas négatifs | `tsd` (runner séparé, moins bonne intégration). `expect-type` reste en devDep pour l'usage direct. |
-| Postgres | **`docker-compose.yml`** (images officielles 14, 16 et dernière stable) en local, **service containers** GitHub Actions en CI. Variable `TEST_DATABASE_URL` pour pointer vers une instance existante (ex. le PG 17 local). | Testcontainers (lent, dépendance lourde). PGlite seul (ce n'est pas le vrai serveur, mais il servira de second driver en 2.6). |
+| Postgres | **Pas de Docker.** En local, une instance existante via `TEST_DATABASE_URL` (lue depuis `src/.env`, ignoré par git). En CI, des **service containers** GitHub Actions (14, 16 et dernière stable). | docker-compose (inutile ici), Testcontainers (lent, dépendance lourde), PGlite seul (ce n'est pas le vrai serveur, mais il servira de second driver en 2.6). |
 | Isolation | Une base éphémère par fichier de test (`CREATE DATABASE … TEMPLATE pgcast_fixture`), puis une transaction annulée par test. | Un schéma par test (incompatible avec la fixture multi-schémas). |
 | Snapshots | Snapshots fichier pour le codegen (`test/__snapshots__/schema.d.ts.snap`), snapshots inline pour le SQL compilé. | — |
 | Bench types | `tsc --noEmit --extendedDiagnostics -p bench/` sur un projet exemple. On compare le *Check time* et le nombre d'*Instantiations*, qui sont plus stables que le temps, à `bench/baseline.json`. Échec au-delà de +20 %. | Hyperfine (ne mesure que le temps, trop bruité en CI). |
