@@ -15,6 +15,22 @@ Si George MacKerron ouvre pgcast, il doit retrouver son projet, en mieux. Source
   - **« Correct, consistent, comprehensible »** : corriger, harmoniser, rendre lisible ;
   - **« Small is beautiful »** : pas de complexité pour un cas de niche ni pour un gain de performance noyé dans la latence réseau.
 - Sa feuille de route (§ What's next) passe en premier : une vraie suite de tests, y compris sur les types inférés, puis des laterals typés grâce aux clés étrangères.
+- **Ses limites, écrites par lui** (§ lateral, Limitations) : les jointures ne sont pas vérifiées (« REFERENCES relationships are not exploited ») ; `selectExactlyOne` s'écrit à la main quand la FK est `NOT NULL`, alors que ça « might be inferred for us ». Aller plus loin, c'est d'abord lever ces limites-là.
+- « Zapatos is always explicit about what client or pool is running your query » : pas de client par défaut, « too easy to accidentally issue queries outside of transactions ».
+
+## Ce que George n'aurait pas fait
+
+Une PR qui fait l'un de ces gestes est refusée, quel que soit son gain :
+
+- Un modèle, une classe d'entité, une relation déclarée en TypeScript (« just (fully-typed) POJOs »).
+- Du chargement paresseux, une identity map, un suivi des modifications, un cache de requêtes.
+- Une chaîne de méthodes qui construit une requête et cache son SQL (`.where().join()`).
+- Un client implicite, par défaut ou global ; une transaction ouverte sans qu'on l'ait demandée.
+- Gérer le pool de connexions ou les migrations (« Zapatos doesn't handle schema migrations »).
+- Une abstraction pour changer de base demain au détriment de Postgres aujourd'hui (« a source of misery »).
+- Un type deviné que la base ne dit pas ; une valeur concaténée au lieu d'un paramètre.
+- Un SQL qui dépend de l'état ou qui change selon les valeurs sans être documenté.
+- Compliquer le cœur pour un cas de niche ou un gain noyé dans la latence réseau (« Small is beautiful ») : ça va dans un paquet séparé, ou en opt-in.
 
 ## Taille et périmètre
 
@@ -104,7 +120,7 @@ const
 
 - Première personne, chaleureuse et brève, un peu d'humour (« It is a truth universally acknowledged that ORMs aren't very good. »).
 - Chaque fonctionnalité montre trois choses côte à côte : le TypeScript qu'on écrit, le SQL produit, le type obtenu.
-- **Ses exemples, son monde** : `authors` (`"id"`, `"name"`, `"isLiving"`), `books` (`"authorId"`, `"title"`, `"createdAt"`), `tags` (`"tag"`, `"bookId"`) ; `employees` (`"managerId"`) pour une auto-référence ; `bankAccounts` pour une transaction. Colonnes en camelCase entre guillemets, comme dans sa doc. Un exemple neuf (JSDoc, doc, issue, PR) reprend ces tables ; jamais un extrait d'un projet réel.
+- **Ses exemples, son monde** : `authors` (`"id"`, `"name"`, `"isLiving"`), `books` (`"authorId"`, `"title"`, `"createdAt"`), `tags` (`"tag"`, `"bookId"`) ; `employees` (`"managerId"`, avec `alias`) pour une auto-référence ; `photos` / `subjects` / `subjectPhotos` pour un many-to-many (lateral passthrough) ; `stores` pour `extras` (PostGIS) ; `nameCounts` pour `updateValues` ; `bankAccounts` et `doctors` / `shifts` pour les transactions. Colonnes en camelCase entre guillemets, comme dans sa doc. Un exemple neuf (JSDoc, doc, issue, PR) reprend ces tables ; jamais un extrait d'un projet réel.
 
 ## Plus loin, sans trahir
 
