@@ -84,13 +84,35 @@ describe('without parameters (simple protocol)', () => {
     expect(await adaName()).toBe('Ada');
   });
 
-  it('characterization: the aggregate of select() is raw and runs a second statement', async () => {
-    // characterization: `SELECT count(*) FROM users; UPDATE …; SELECT count(*) AS result FROM "users"`;
-    // pg returns one result per statement, so run() then throws, after the UPDATE has run
-    const q = db.select('users', all, {}, db.SelectResultMode.Numeric, `count(*) FROM users; ${update}; SELECT count`);
-    expect(q.compile().values).toEqual([]);
-    await expect(q.run(t.client)).rejects.toThrow(TypeError);
-    await expectInjectedHereOnly();
+  it('the aggregate of select() is checked before any query', async () => {
+    const aggregate = `count(*) FROM users; ${update}; SELECT count`;
+    expect(() => db.select('users', all, {}, db.SelectResultMode.Numeric, aggregate))
+      .toThrow(`Aggregate must be a function name (e.g. sum, or my_schema.my_agg), not '${aggregate}'`);
+    expect(await adaName()).toBe('Ada');
+  });
+
+  it('a schema-qualified aggregate runs', async () => {
+    expect(await db.select('users', all, {}, db.SelectResultMode.Numeric, 'pg_catalog.count').run(t.client)).toBe(3);
+  });
+
+  it('an aggregate with spaces around it runs', async () => {
+    for (const aggregate of [' count', 'count ', '\tpg_catalog.count\n'])
+      expect(await db.select('users', all, {}, db.SelectResultMode.Numeric, aggregate).run(t.client), aggregate).toBe(3);
+  });
+
+  it('an aggregate in three parts, with spaces around the dot or U& quoted runs', async () => {
+    const name = (await t.client.query<{ name: string }>('SELECT quote_ident(current_database()) AS name')).rows[0]!.name;
+    for (const aggregate of [`${name}.pg_catalog.count`, 'pg_catalog . count', 'U&"c\\006Funt"'])
+      expect(await db.select('users', all, {}, db.SelectResultMode.Numeric, aggregate).run(t.client), aggregate).toBe(3);
+  });
+
+  it('an aggregate named as Postgres lexes it runs', async () => {
+    // each name is created as written, then called by select(); the ROLLBACK drops them; étendue in NFD
+    await t.client.query('CREATE SCHEMA my_schema');
+    for (const aggregate of ['my$agg', 'a$1b', 'e\u0301tendue', '"my agg"', '"a""b"', '"Stats-2024"', 'my_schema."MyAgg"']) {
+      await t.client.query(`CREATE AGGREGATE ${aggregate} (int) (sfunc = int4pl, stype = int, initcond = '0')`);
+      expect(await db.select('users', all, { columns: ['id'] }, db.SelectResultMode.Numeric, aggregate).run(t.client), aggregate).toBe(6);
+    }
   });
 });
 

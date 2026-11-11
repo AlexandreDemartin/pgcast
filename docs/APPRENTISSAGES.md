@@ -51,6 +51,10 @@ Candidats à un contrôle, une règle ou une ligne de skill.
 - 2.1 — Une liste blanche sur un paramètre variadique refuse aussi `undefined` / `null`, que l'ancien code rendait vides : vérifier l'ancien SQL de ces cas (projets sans `strictNullChecks`) avant de figer un refus (candidat : skill `backward-compat`) — `branch-reviewer`
 - 2.1 — Pour prouver « avant toute requête » sur du code qui commite, `pool.connect` remplacé par `mockRejectedValue` : une régression ne peut rien écrire — `builder`
 - 2.1 — Un correctif rend obsolètes la ligne du rapport et la ligne « nothing is fixed yet » du CHANGELOG : le commit qui coche l'étape les met à jour — `builder`
+- 2.2 — Une liste blanche d'identifiants Postgres se calque sur le lexer (`scan.l` : `ident_start`, `ident_cont`, `""`, `U&`), pas sur `\p{L}` ; chaque refus se teste contre Postgres avant d'être figé (candidat : skill `sql-safety`) — `branch-reviewer`
+- 2.2 — `\s*` collé à une classe qui contient des caractères non ASCII rend une regex polynomiale (2 000 espaces insécables : 3 s) : utiliser l'espace de Postgres `[ \t\n\r\f\v]` et chronométrer un long run — `builder`
+- 2.2 — `RegExp.prototype.test` convertit son argument en chaîne : `null` passe comme `'null'` ; si le comportement sans `strictNullChecks` en dépend, un test le fige — `branch-reviewer`
+- 2.2 — Un `toMatchInlineSnapshot()` vide s'écrit avec la sortie actuelle : pour un test rouge de correctif, écrire le snapshot attendu à la main — `builder`
 
 ## Mineurs gardés
 

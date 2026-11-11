@@ -474,6 +474,16 @@ export class NotExactlyOneError extends Error {
   }
 }
 
+// the aggregate of select() is written raw, so it must be a function name as Postgres lexes it, in up to
+// three dotted parts: unquoted, any non-ASCII character is a letter and `$` may follow the first one; quoted,
+// or `U&` quoted, anything but NUL, with `""` for `"` (a `UESCAPE` clause is refused); spaces around it and
+// around the dots are kept as they are, and are Postgres's ASCII ones: a non-ASCII space is a letter to it,
+// and `\s` would make this test backtrack for ever on a long run of them (see https://github.com/postgres/postgres/blob/master/src/backend/parser/scan.l)
+const
+  identifier = /[A-Za-z_\u0080-\u{10FFFF}][A-Za-z0-9_$\u0080-\u{10FFFF}]*|(?:[Uu]&)?"(?:[^"\0]|"")+"/u.source,
+  space = '[ \\t\\n\\r\\f\\v]*',
+  functionName = new RegExp(`^${space}(?:${identifier})(?:${space}\\.${space}(?:${identifier})){0,2}${space}$`, 'u');
+
 /**
  * Generate a `SELECT` query `SQLFragment`. This can be nested with other 
  * `select`/`selectOne`/`count` queries using the `lateral` option.
@@ -494,6 +504,12 @@ export class NotExactlyOneError extends Error {
  * * `extras` — an object mapping key(s) to `SQLFragment`s, so that derived 
  * quantities can be included in the JSON result
  * @param mode (Used internally by `selectOne` and `count`)
+ * @param aggregate (Used internally by `count`, `sum`, `avg`, `min` and `max`)
+ * The name of the aggregate function, plain, quoted or `U&` quoted, in up to
+ * three dotted parts (`sum`, `my_schema."MyAgg"`, `my_db.my_schema.my_agg`);
+ * anything else, a `UESCAPE` clause included, throws. With
+ * `columns: ['id']`, `'my_schema."MyAgg"'` gives
+ * `SELECT my_schema."MyAgg"("id") AS result FROM "users"`.
  */
 export const select: SelectSignatures = function (
   table: Table,
@@ -502,6 +518,8 @@ export const select: SelectSignatures = function (
   mode: SelectResultMode = SelectResultMode.Many,
   aggregate: string = 'count',
 ) {
+
+  if (mode === SelectResultMode.Numeric && !functionName.test(aggregate)) throw new Error(`Aggregate must be a function name (e.g. sum, or my_schema.my_agg), not '${aggregate}'`);
 
   const
     limit1 = mode === SelectResultMode.One || mode === SelectResultMode.ExactlyOne,
