@@ -1,21 +1,29 @@
 {
-  "name": "zapatos",
+  "name": "pgcast",
   "version": "6.6.1",
-  "description": "Zero-Abstraction Postgres for TypeScript",
-  "homepage": "https://jawj.github.io/zapatos/",
+  "description": "Zero-abstraction Postgres for TypeScript: types cast from your database schema. A maintained fork of Zapatos.",
+  "homepage": "https://github.com/AlexandreDemartin/pgcast#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/jawj/zapatos"
+    "url": "git+https://github.com/AlexandreDemartin/pgcast.git"
+  },
+  "bugs": {
+    "url": "https://github.com/AlexandreDemartin/pgcast/issues"
   },
   "bin": {
+    "pgcast": "dist/generate/cli.js",
     "zapatos": "dist/generate/cli.js"
   },
   "scripts": {
+    "build": "tsc && gen-esm-wrapper db db.mjs && gen-esm-wrapper generate generate.mjs",
+    "prepack": "npm run build",
     "lint": "eslint src/db/*.ts src/generate/*.ts",
-    "build": "npx tsc && npx gen-esm-wrapper db db.mjs && npx gen-esm-wrapper generate generate.mjs",
-    "version": "npm run lint && npm run build",
-    "postversion": "git push && git push --tags && npm publish",
-    "postinstall": "node -e \"console.warn('>>> \\u001b[1;33mZapatos was installed or upgraded. Please (re-)run \\u001b[1;32mnpx zapatos\\u001b[1;33m.\\u001b[0m <<<\\u000a')\""
+    "typecheck": "tsc --noEmit && tsc -p test",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:types": "vitest run --typecheck.only",
+    "bench:types": "node -e \"console.error('bench:types arrive en phase 1 (cf. docs/ROADMAP.md)'); process.exit(1)\"",
+    "version": "npm run lint && npm run typecheck && npm test && npm run test:types && npm run build"
   },
   "files": [
     "dist/db",
@@ -41,34 +49,37 @@
   },
   "keywords": [
     "postgres",
+    "postgresql",
     "typescript",
-    "orm",
-    "sql"
+    "sql",
+    "codegen",
+    "zapatos"
   ],
   "author": "George MacKerron",
+  "contributors": [
+    "Alexandre Demartin"
+  ],
   "license": "MIT",
   "peerDependencies": {
     "@types/pg": ">=7.14.3",
     "pg": ">=7.18.2",
     "typescript": ">=4.1"
   },
-  "overrides": {
-    "eslint": "^9.5.0"
-  },
   "devDependencies": {
-    "@eslint/compat": "^1.1.0",
-    "@eslint/eslintrc": "^3.1.0",
-    "@eslint/js": "^9.5.0",
-    "@types/pg": "^8.6.5",
-    "@typescript-eslint/eslint-plugin": "^7.13.1",
-    "@typescript-eslint/parser": "^7.13.1",
-    "eslint": "^9.5.0",
-    "eslint-config-prettier": "^9.0.0",
-    "eslint-plugin-import": "^2.26.0",
+    "@eslint/js": "^9.39.5",
+    "@stylistic/eslint-plugin": "^5.10.0",
+    "@types/node": "^20.19.43",
+    "@types/pg": "^8.23.1",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-import": "^2.32.0",
+    "expect-type": "^1.4.0",
     "gen-esm-wrapper": "^1.1.3",
-    "globals": "^15.6.0",
-    "pg": "^8.7.3",
-    "typescript": "^5.2.2"
+    "globals": "^17.14.0",
+    "pg": "^8.23.1",
+    "typescript": "5.9.3",
+    "typescript-eslint": "^8.72.2",
+    "vitest": "^4.1.12"
   },
   "dependencies": {
     "json-custom-numbers": "^3.1.1"
