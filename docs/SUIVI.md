@@ -87,7 +87,7 @@ Toujours les mêmes clés, dans cet ordre ; une clé absente ne s'applique pas.
 
 ### 1.5 `test/injection` — entrées hostiles
 
-- [ ] **Livrée**
+- [x] **Livrée** : PR #8
 - **But** : entrées hostiles testées sur chaque point d'entrée de `core.ts`, compilées et exécutées.
 - **Relecture** : `normal`, lentille `sql`.
 - **Lire** : `sql-safety`, `zapatos-spirit`.
