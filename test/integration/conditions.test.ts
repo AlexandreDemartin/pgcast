@@ -130,6 +130,38 @@ describe('on booleans (extra.type_zoo)', () => {
   });
 });
 
+describe('on Date values (extra.type_zoo)', () => {
+  // pg sends a Date as local time with its offset (2025-06-01T00:30:00.000+02:00): a timestamptz keeps the
+  // instant, a date keeps the local calendar day. Local constructors keep the tests independent of TZ.
+  let id: number;
+
+  beforeEach(async () => {
+    ({ id } = await db.insert('extra.type_zoo', { c_timestamptz: '2025-06-01T12:00:00Z', c_date: '2025-06-01' },
+      { returning: ['id'] }).run(t.client));
+  });
+
+  const matches = async (where: db.SQL) => (await ids('extra.type_zoo', where)).includes(id);
+  const diff = async (where: db.SQL) =>
+    (await sql`SELECT (${where})::text AS v FROM ${'extra.type_zoo'} WHERE ${{ id }}`.run(t.client))[0].v;
+
+  it('timestamptz: the instant, to the millisecond', async () => {
+    expect(await matches({ c_timestamptz: dc.lt(new Date('2025-06-01T12:00:00.001Z')) })).toBe(true);
+    expect(await matches({ c_timestamptz: dc.lt(new Date('2025-06-01T12:00:00.000Z')) })).toBe(false);
+    expect(await matches({ c_timestamptz: dc.eq(new Date('2025-06-01T12:00:00Z')) })).toBe(true);
+    expect(await diff({ c_timestamptz: dc.subtract(new Date('2025-06-01T10:30:00Z')) })).toBe('01:30:00');
+  });
+
+  it('characterization: date: the local day of the Date, its time dropped', async () => {
+    // characterization: `"c_date" < $1` types $1 as date, so 23:30 on June 1 is not after June 1
+    expect(await matches({ c_date: dc.eq(new Date(2025, 5, 1, 0, 30)) })).toBe(true);
+    expect(await matches({ c_date: dc.eq(new Date(2025, 5, 1, 23, 30)) })).toBe(true);
+    expect(await matches({ c_date: dc.lt(new Date(2025, 5, 1, 23, 30)) })).toBe(false);
+    expect(await matches({ c_date: dc.lt(new Date(2025, 5, 2, 0, 30)) })).toBe(true);
+    // `date - date` is a number of days
+    expect(await diff({ c_date: dc.subtract(new Date(2025, 4, 30, 23, 30)) })).toBe('2');
+  });
+});
+
 describe('on arrays (accounts)', () => {
   const cases: [string, db.SQL, number[]][] = [
     ['arrayContains', { scores: dc.arrayContains([1, 2]) }, [1]],
