@@ -104,6 +104,7 @@ const
 
 - Première personne, chaleureuse et brève, un peu d'humour (« It is a truth universally acknowledged that ORMs aren't very good. »).
 - Chaque fonctionnalité montre trois choses côte à côte : le TypeScript qu'on écrit, le SQL produit, le type obtenu.
+- **Ses exemples, son monde** : `authors` (`"id"`, `"name"`, `"isLiving"`), `books` (`"authorId"`, `"title"`, `"createdAt"`), `tags` (`"tag"`, `"bookId"`) ; `employees` (`"managerId"`) pour une auto-référence ; `bankAccounts` pour une transaction. Colonnes en camelCase entre guillemets, comme dans sa doc. Un exemple neuf (JSDoc, doc, issue, PR) reprend ces tables ; jamais un extrait d'un projet réel.
 
 ## Plus loin, sans trahir
 
