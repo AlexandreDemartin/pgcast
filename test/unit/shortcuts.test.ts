@@ -482,8 +482,15 @@ describe('select', () => {
         ],
       }
     `);
-    expect(db.select('accounts', all, { groupBy: ['owner_id', 'id'], having: { owner_id: 1 } }).compile().text)
-      .toMatchInlineSnapshot(`"SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("accounts".*) AS result FROM "accounts" GROUP BY "owner_id", "id" HAVING ("owner_id" = $1)) AS "sq_accounts""`);
+    expect(db.select('accounts', all, { groupBy: ['owner_id', 'id'], having: { owner_id: 1 } }).compile())
+      .toMatchInlineSnapshot(`
+        {
+          "text": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("accounts".*) AS result FROM "accounts" GROUP BY "owner_id", "id" HAVING ("owner_id" = $1)) AS "sq_accounts"",
+          "values": [
+            1,
+          ],
+        }
+      `);
     expect(db.select('accounts', all, { groupBy: sql`${'owner_id'}` }).compile().text).toMatchInlineSnapshot(`"SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("accounts".*) AS result FROM "accounts" GROUP BY "owner_id") AS "sq_accounts""`);
   });
 
@@ -582,7 +589,14 @@ describe('count, sum, avg, min, max', () => {
         "values": [],
       }
     `);
-    expect(db.sum('accounts', { owner_id: 1 }).compile().text).toMatchInlineSnapshot(`"SELECT sum(*) AS result FROM "accounts" WHERE ("owner_id" = $1)"`);
+    expect(db.sum('accounts', { owner_id: 1 }).compile()).toMatchInlineSnapshot(`
+      {
+        "text": "SELECT sum(*) AS result FROM "accounts" WHERE ("owner_id" = $1)",
+        "values": [
+          1,
+        ],
+      }
+    `);
   });
 
   it('with columns: aggregate("col"), extras ignored', () => {
