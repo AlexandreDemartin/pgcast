@@ -95,6 +95,11 @@ describe('without parameters (simple protocol)', () => {
     expect(await db.select('users', all, {}, db.SelectResultMode.Numeric, 'pg_catalog.count').run(t.client)).toBe(3);
   });
 
+  it('an aggregate with spaces around it runs', async () => {
+    for (const aggregate of [' count', 'count ', '\tpg_catalog.count\n'])
+      expect(await db.select('users', all, {}, db.SelectResultMode.Numeric, aggregate).run(t.client), aggregate).toBe(3);
+  });
+
   it('an aggregate named as Postgres lexes it runs', async () => {
     // each name is created as written, then called by select(); the ROLLBACK drops them
     await t.client.query('CREATE SCHEMA my_schema');

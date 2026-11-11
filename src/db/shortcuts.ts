@@ -474,12 +474,13 @@ export class NotExactlyOneError extends Error {
   }
 }
 
-// the aggregate of select() is written raw, so it must be an identifier as Postgres lexes one, optionally
+// the aggregate of select() is written raw, so it must be a function name as Postgres lexes it, optionally
 // schema-qualified: unquoted, any non-ASCII character is a letter and `$` may follow the first one; quoted,
-// anything but NUL, with `""` for `"` -- see https://github.com/postgres/postgres/blob/master/src/backend/parser/scan.l
+// anything but NUL, with `""` for `"`; spaces around it are kept as they are
+// (see https://github.com/postgres/postgres/blob/master/src/backend/parser/scan.l)
 const
   identifier = /[A-Za-z_\u0080-\u{10FFFF}][A-Za-z0-9_$\u0080-\u{10FFFF}]*|"(?:[^"\0]|"")+"/u.source,
-  functionName = new RegExp(`^(?:${identifier})(?:\\.(?:${identifier}))?$`, 'u');
+  functionName = new RegExp(`^\\s*(?:${identifier})(?:\\.(?:${identifier}))?\\s*$`, 'u');
 
 /**
  * Generate a `SELECT` query `SQLFragment`. This can be nested with other 

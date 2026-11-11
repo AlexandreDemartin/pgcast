@@ -212,6 +212,8 @@ describe('shortcut arguments', () => {
     expect(numeric('"my agg"')).toBe('SELECT "my agg"("id") AS result FROM "users"');
     expect(numeric('"a""b"')).toBe('SELECT "a""b"("id") AS result FROM "users"');
     expect(numeric('"Stats-2024"')).toBe('SELECT "Stats-2024"("id") AS result FROM "users"');
+    expect(numeric(' count')).toBe('SELECT  count("id") AS result FROM "users"');
+    expect(numeric('count\n')).toBe('SELECT count\n("id") AS result FROM "users"');
   });
 
   it('the aggregate of select() is ignored, as before, outside Numeric mode', () => {
