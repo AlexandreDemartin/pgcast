@@ -2,7 +2,9 @@
 import { inspect } from 'node:util';
 import { describe, expect, it } from 'vitest';
 import type pg from 'pg';
-import { createDatabase, dropDatabase, orphanDatabases, runPrefix, urlForDatabase } from './databases';
+import {
+  createDatabase, createTemplateDatabase, dropDatabase, orphanDatabases, runPrefix, urlForDatabase,
+} from './databases';
 
 const noQueryClient = {
   query: () => { throw new Error('must not reach the server'); },
@@ -49,5 +51,6 @@ describe('test database naming', () => {
     await expect(dropDatabase(noQueryClient, 'pgcast')).rejects.toThrow(/refusing to drop pgcast/);
     await expect(dropDatabase(noQueryClient, 'postgres')).rejects.toThrow(/refusing/);
     await expect(createDatabase(noQueryClient, 'pgcast_copy', 'template0')).rejects.toThrow(/refusing to create/);
+    await expect(createTemplateDatabase(noQueryClient, 'template1')).rejects.toThrow(/refusing to create/);
   });
 });

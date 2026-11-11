@@ -93,12 +93,23 @@ export async function listTestDatabases(client: pg.Client): Promise<string[]> {
   return rows.map(r => r.datname);
 }
 
+const refuseOutsidePrefix = (verb: string, name: string) => {
+  if (!name.startsWith(PREFIX)) throw new Error(`refusing to ${verb} ${name}: not a ${PREFIX}* database`);
+};
+
 export async function createDatabase(client: pg.Client, name: string, template: string): Promise<void> {
-  if (!name.startsWith(PREFIX)) throw new Error(`refusing to create ${name}: not a ${PREFIX}* database`);
+  refuseOutsidePrefix('create', name);
   await client.query(`CREATE DATABASE ${quoteIdent(name)} TEMPLATE ${quoteIdent(template)}`);
 }
 
+/** The run's template database, empty, before the fixture is loaded. */
+export async function createTemplateDatabase(client: pg.Client, name: string): Promise<void> {
+  refuseOutsidePrefix('create', name);
+  // locale C: the same text sort order everywhere (macOS libc and glibc collations differ)
+  await client.query(`CREATE DATABASE ${quoteIdent(name)} TEMPLATE template0 ENCODING 'UTF8' LOCALE 'C'`);
+}
+
 export async function dropDatabase(client: pg.Client, name: string): Promise<void> {
-  if (!name.startsWith(PREFIX)) throw new Error(`refusing to drop ${name}: not a ${PREFIX}* database`);
+  refuseOutsidePrefix('drop', name);
   await client.query(`DROP DATABASE IF EXISTS ${quoteIdent(name)} WITH (FORCE)`);
 }

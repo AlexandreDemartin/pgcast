@@ -9,7 +9,7 @@
 import { readFileSync } from 'node:fs';
 import type { TestProject } from 'vitest/node';
 import {
-  createDatabase, dropDatabase, isProcessAlive, listTestDatabases, orphanDatabases,
+  createTemplateDatabase, dropDatabase, isProcessAlive, listTestDatabases, orphanDatabases,
   runPrefix, testDatabaseUrl, urlForDatabase, withAdminClient,
 } from './databases';
 
@@ -28,7 +28,7 @@ export default async function setup(project: TestProject) {
   await withAdminClient(url, async client => {
     const orphans = orphanDatabases(await listTestDatabases(client), isProcessAlive, process.pid);
     for (const name of orphans) await dropDatabase(client, name);
-    await createDatabase(client, template, 'template0');
+    await createTemplateDatabase(client, template);
   });
   await withAdminClient(templateUrl, client => client.query(fixture));
 

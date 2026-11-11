@@ -17,6 +17,13 @@ describe('test database', () => {
     // inside BEGIN: now() is frozen at the start of the transaction
     expect(await one('SELECT now()::text AS v')).toBe(await one('SELECT now()::text AS v'));
   });
+
+  it('sorts text the same way on every OS: UTF8, locale C', async () => {
+    const { rows } = await t.client.query(`SELECT pg_encoding_to_char(encoding) AS encoding, datcollate, datctype,
+      (SELECT string_agg(x, ',' ORDER BY x) FROM (VALUES ('b'), ('B'), ('a'), ('é')) v(x)) AS sorted
+      FROM pg_database WHERE datname = current_database()`);
+    expect(rows[0]).toEqual({ encoding: 'UTF8', datcollate: 'C', datctype: 'C', sorted: 'B,a,b,é' });
+  });
 });
 
 describe('fixture', () => {
