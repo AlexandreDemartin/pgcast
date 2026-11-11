@@ -1,7 +1,6 @@
 // PreToolUse hook of Claude Code (`.claude/settings.json`): refuses the commands and writes that a rule forbids without
 // exception, before they run. Exit 2 blocks the tool call and hands stderr back to the agent, which then corrects itself.
 // Only rules with no legitimate exception belong here: a refusal the agent cannot route around is a dead end.
-// Adapted from Project B's guard.
 import {basename} from 'node:path';
 import {pathToFileURL} from 'node:url';
 

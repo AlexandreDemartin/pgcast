@@ -1,6 +1,6 @@
 # Outillage IA
 
-Chaque élément existe une seule fois, à l'emplacement que les outils lisent nativement. Méthode reprise de Project B, réduite à ce qu'une librairie demande.
+Chaque élément existe une seule fois, à l'emplacement que les outils lisent nativement. Méthode reprise d'un projet applicatif, réduite à ce qu'une librairie demande.
 
 | Élément | Emplacement | Lu par |
 |---|---|---|
