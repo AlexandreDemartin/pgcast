@@ -1,0 +1,521 @@
+// Copyright (C) 2026 Alexandre Demartin
+//
+// Characterization of src/db/core.ts, compilation only (no database): the
+// `text` + `values` of each branch of compileExpression, as Zapatos 6.6.1
+// produces them. Execution: test/integration/core.test.ts.
+// Hostile inputs are the subject of step 1.4 (test/unit/injection.test.ts).
+
+import { afterEach, describe, expect, it } from 'vitest';
+import * as db from '../../src/db';
+import { sql, param, raw, cols, vals, parent, self, Default } from '../../src/db';
+import { resetConfig } from '../helpers/config';
+
+/** Compiles one interpolated expression on its own. */
+const one = (expression: db.SQL) => sql`${expression}`.compile();
+
+afterEach(resetConfig);
+
+describe('identifiers (strings)', () => {
+  it('quotes a simple identifier', () => {
+    expect(one('users')).toMatchInlineSnapshot(`
+      {
+        "text": ""users"",
+        "values": [],
+      }
+    `);
+  });
+
+  it('passes an already quoted identifier through unchanged', () => {
+    expect(one('"OrderLines"')).toMatchInlineSnapshot(`
+      {
+        "text": ""OrderLines"",
+        "values": [],
+      }
+    `);
+  });
+
+  it('splits a dotted identifier on every dot', () => {
+    expect(one('public.users')).toMatchInlineSnapshot(`
+      {
+        "text": ""public"."users"",
+        "values": [],
+      }
+    `);
+    expect(one('a.b.c')).toMatchInlineSnapshot(`
+      {
+        "text": ""a"."b"."c"",
+        "values": [],
+      }
+    `);
+  });
+
+  it('characterization: does not double an embedded double quote', () => {
+    // characterization: `a"b` compiles to `"a"b"`, not `"a""b"` (injection matrix: step 1.4)
+    expect(one('a"b')).toMatchInlineSnapshot(`
+      {
+        "text": ""a"b"",
+        "values": [],
+      }
+    `);
+  });
+
+  it('characterization: anything that starts and ends with a double quote passes through raw', () => {
+    // characterization: the "already quoted" test only looks at the first and last characters
+    expect(one('"a" || "b"')).toMatchInlineSnapshot(`
+      {
+        "text": ""a" || "b"",
+        "values": [],
+      }
+    `);
+  });
+});
+
+describe('raw and arrays', () => {
+  it('inlines a raw string as is', () => {
+    expect(one(raw('now() - interval \'1 day\''))).toMatchInlineSnapshot(`
+      {
+        "text": "now() - interval '1 day'",
+        "values": [],
+      }
+    `);
+  });
+
+  it('compiles the elements of an array one after the other, with no separator', () => {
+    expect(one(['users', raw(' / '), param(1), sql` + ${param(2)}`])).toMatchInlineSnapshot(`
+      {
+        "text": ""users" / $1 + $2",
+        "values": [
+          1,
+          2,
+        ],
+      }
+    `);
+  });
+
+  it('compiles an empty array to nothing', () => {
+    expect(sql`SELECT 1${[]}`.compile()).toMatchInlineSnapshot(`
+      {
+        "text": "SELECT 1",
+        "values": [],
+      }
+    `);
+  });
+});
+
+describe('param', () => {
+  it('numbers the placeholders from $1, across nested fragments', () => {
+    expect(sql`${param('a')}, ${sql`${param('b')}, ${param('c')}`}, ${param('d')}`.compile()).toMatchInlineSnapshot(`
+      {
+        "text": "$1, $2, $3, $4",
+        "values": [
+          "a",
+          "b",
+          "c",
+          "d",
+        ],
+      }
+    `);
+  });
+
+  it('without a cast: a plain placeholder, the value untouched (arrays and objects included)', () => {
+    const date = new Date(0);
+    expect(sql`${param(1)}, ${param(null)}, ${param(undefined)}, ${param([1, 2])}, ${param({ a: 1 })}, ${param(date)}`.compile())
+      .toMatchInlineSnapshot(`
+        {
+          "text": "$1, $2, $3, $4, $5, $6",
+          "values": [
+            1,
+            null,
+            undefined,
+            [
+              1,
+              2,
+            ],
+            {
+              "a": 1,
+            },
+            1970-01-01T00:00:00.000Z,
+          ],
+        }
+      `);
+  });
+
+  it('with a text cast: CAST($n AS "type"), the type quoted as one identifier', () => {
+    expect(one(param('2026-01-01', 'date'))).toMatchInlineSnapshot(`
+      {
+        "text": "CAST($1 AS "date")",
+        "values": [
+          "2026-01-01",
+        ],
+      }
+    `);
+    // characterization: a schema-qualified or parameterised type is quoted whole (see the integration test)
+    expect(one(param('ok', 'public.mood'))).toMatchInlineSnapshot(`
+      {
+        "text": "CAST($1 AS "public.mood")",
+        "values": [
+          "ok",
+        ],
+      }
+    `);
+    expect(one(param([1], 'int[]'))).toMatchInlineSnapshot(`
+      {
+        "text": "CAST($1 AS "int[]")",
+        "values": [
+          [
+            1,
+          ],
+        ],
+      }
+    `);
+  });
+
+  it('with true: arrays and plain objects are JSON-stringified and cast to json', () => {
+    expect(sql`${param([1, 'a'], true)}, ${param({ a: [1] }, true)}`.compile()).toMatchInlineSnapshot(`
+      {
+        "text": "CAST($1 AS "json"), CAST($2 AS "json")",
+        "values": [
+          "[1,"a"]",
+          "{"a":[1]}",
+        ],
+      }
+    `);
+  });
+
+  it('characterization: with true, a scalar or a non-plain object is neither stringified nor cast', () => {
+    // characterization: cast `true` only acts on arrays and POJOs; anything else is a plain placeholder
+    expect(sql`${param('a', true)}, ${param(1, true)}, ${param(new Date(0), true)}, ${param(null, true)}`.compile())
+      .toMatchInlineSnapshot(`
+        {
+          "text": "$1, $2, $3, $4",
+          "values": [
+            "a",
+            1,
+            1970-01-01T00:00:00.000Z,
+            null,
+          ],
+        }
+      `);
+  });
+
+  it('with false: never JSON, whatever the config', () => {
+    db.setConfig({ castArrayParamsToJson: true, castObjectParamsToJson: true });
+    expect(sql`${param([1], false)}, ${param({ a: 1 }, false)}`.compile()).toMatchInlineSnapshot(`
+      {
+        "text": "$1, $2",
+        "values": [
+          [
+            1,
+          ],
+          {
+            "a": 1,
+          },
+        ],
+      }
+    `);
+  });
+
+  it('castArrayParamsToJson: arrays only', () => {
+    db.setConfig({ castArrayParamsToJson: true });
+    expect(sql`${param([1, 2])}, ${param({ a: 1 })}`.compile()).toMatchInlineSnapshot(`
+      {
+        "text": "CAST($1 AS "json"), $2",
+        "values": [
+          "[1,2]",
+          {
+            "a": 1,
+          },
+        ],
+      }
+    `);
+  });
+
+  it('castObjectParamsToJson: plain objects only', () => {
+    db.setConfig({ castObjectParamsToJson: true });
+    expect(sql`${param([1, 2])}, ${param({ a: 1 })}, ${param(new Date(0))}`.compile()).toMatchInlineSnapshot(`
+      {
+        "text": "$1, CAST($2 AS "json"), $3",
+        "values": [
+          [
+            1,
+            2,
+          ],
+          "{"a":1}",
+          1970-01-01T00:00:00.000Z,
+        ],
+      }
+    `);
+  });
+
+  it('characterization: a JSON cast wins over a text cast when the config asks for it', () => {
+    // characterization: with castArrayParamsToJson, param(array, 'int4[]') compiles to CAST($1 AS "json")
+    db.setConfig({ castArrayParamsToJson: true });
+    expect(one(param([1, 2], 'int4[]'))).toMatchInlineSnapshot(`
+      {
+        "text": "CAST($1 AS "json")",
+        "values": [
+          "[1,2]",
+        ],
+      }
+    `);
+  });
+});
+
+describe('Default, self, parent', () => {
+  it('Default compiles to DEFAULT', () => {
+    expect(one(Default)).toMatchInlineSnapshot(`
+      {
+        "text": "DEFAULT",
+        "values": [],
+      }
+    `);
+  });
+
+  it('self compiles to the current column of a Whereable', () => {
+    expect(one({ display_name: sql`lower(${self}) = ${param('ada')}` })).toMatchInlineSnapshot(`
+      {
+        "text": "((lower("display_name") = $1))",
+        "values": [
+          "ada",
+        ],
+      }
+    `);
+  });
+
+  it('parent(column) and parent() compile against the parent table of a nested query', () => {
+    const nested = sql`${{ owner_id: parent('id') }} AND ${{ id: parent() }}`.copy({ parentTable: 'users' });
+    expect(nested.compile()).toMatchInlineSnapshot(`
+      {
+        "text": "("owner_id" = "users"."id") AND ("id" = "users"."id")",
+        "values": [],
+      }
+    `);
+  });
+
+  it('parent() inside a fragment of a Whereable takes the current column', () => {
+    const nested = sql`${{ manager_id: sql`${self} = ${parent()}` }}`.copy({ parentTable: 'users' });
+    expect(nested.compile()).toMatchInlineSnapshot(`
+      {
+        "text": "(("manager_id" = "users"."manager_id"))",
+        "values": [],
+      }
+    `);
+  });
+});
+
+describe('cols and vals', () => {
+  it('cols of an array: quoted names, in array order', () => {
+    expect(one(cols(['email', 'display_name', 'public.users']))).toMatchInlineSnapshot(`
+      {
+        "text": ""email", "display_name", "public"."users"",
+        "values": [],
+      }
+    `);
+  });
+
+  it('cols of an object: its keys, sorted', () => {
+    expect(one(cols({ zeta: 1, alpha: 2, Mid: 3 }))).toMatchInlineSnapshot(`
+      {
+        "text": ""Mid", "alpha", "zeta"",
+        "values": [],
+      }
+    `);
+  });
+
+  it('vals of an object: values in the sorted key order; SQLFragment, Parameter and Default kept', () => {
+    const values = { zeta: 1, alpha: sql`now()`, mid: param('x', 'text'), beta: Default, gamma: sql`${self} + 1` };
+    expect(sql`(${cols(values)}) = (${vals(values)})`.compile()).toMatchInlineSnapshot(`
+      {
+        "text": "("alpha", "beta", "gamma", "mid", "zeta") = (now(), DEFAULT, "gamma" + 1, CAST($1 AS "text"), $2)",
+        "values": [
+          "x",
+          1,
+        ],
+      }
+    `);
+  });
+
+  it('vals of an array: plain values become parameters, SQLFragments are kept', () => {
+    expect(one(vals([1, 'a', sql`now()`, null]))).toMatchInlineSnapshot(`
+      {
+        "text": "$1, $2, now(), $3",
+        "values": [
+          1,
+          "a",
+          null,
+        ],
+      }
+    `);
+  });
+
+  it('characterization: vals of an array wraps a Parameter or Default in another parameter', () => {
+    // characterization: only SQLFragment is special-cased in the array branch; a Parameter is
+    // double-wrapped (pg then sends it JSON-stringified) and Default is sent as a Symbol value
+    expect(one(vals([param(1), Default]))).toMatchInlineSnapshot(`
+      {
+        "text": "$1, $2",
+        "values": [
+          Parameter {
+            "cast": undefined,
+            "value": 1,
+          },
+          Symbol(DEFAULT),
+        ],
+      }
+    `);
+  });
+});
+
+describe('Whereable', () => {
+  it('an empty Whereable compiles to TRUE', () => {
+    expect(one({})).toMatchInlineSnapshot(`
+      {
+        "text": "TRUE",
+        "values": [],
+      }
+    `);
+  });
+
+  it('keys sorted, joined by AND, values as parameters', () => {
+    expect(one({ mood: 'ok', display_name: 'Bob', id: 2 })).toMatchInlineSnapshot(`
+      {
+        "text": "("display_name" = $1 AND "id" = $2 AND "mood" = $3)",
+        "values": [
+          "Bob",
+          2,
+          "ok",
+        ],
+      }
+    `);
+  });
+
+  it('a fragment value is wrapped in parentheses, with self bound to the key', () => {
+    expect(one({ id: sql`${self} > ${param(1)}`, display_name: 'Bob' })).toMatchInlineSnapshot(`
+      {
+        "text": "("display_name" = $1 AND ("id" > $2))",
+        "values": [
+          "Bob",
+          1,
+        ],
+      }
+    `);
+  });
+
+  it('characterization: null and undefined values compile to `= $n`', () => {
+    // characterization: `{ col: null }` or `{ col: undefined }` gives `"col" = NULL`, which matches no row
+    expect(one({ manager_id: null, mood: undefined })).toMatchInlineSnapshot(`
+      {
+        "text": "("manager_id" = $1 AND "mood" = $2)",
+        "values": [
+          null,
+          undefined,
+        ],
+      }
+    `);
+  });
+
+  it('characterization: a Parameter, raw or Default value is wrapped in another parameter', () => {
+    // characterization: only SQLFragment and ParentColumn are special-cased in a Whereable
+    expect(one({ id: param(1), mood: raw("'ok'"), display_name: Default })).toMatchInlineSnapshot(`
+      {
+        "text": "("display_name" = $1 AND "id" = $2 AND "mood" = $3)",
+        "values": [
+          Symbol(DEFAULT),
+          Parameter {
+            "cast": undefined,
+            "value": 1,
+          },
+          DangerousRawString {
+            "value": "'ok'",
+          },
+        ],
+      }
+    `);
+  });
+});
+
+describe('errors', () => {
+  it('refuses the global object (`self` instead of `db.self`)', () => {
+    expect(() => one(globalThis as any)).toThrowErrorMatchingInlineSnapshot(`[Error: Did you use \`self\` (the global object) where you meant \`db.self\` (the Zapatos value)? The global object cannot be embedded in a query.]`);
+  });
+
+  it('refuses an alien value', () => {
+    expect(() => one(42 as any)).toThrowErrorMatchingInlineSnapshot(`[Error: Alien object while interpolating SQL: 42]`);
+    expect(() => one(true as any)).toThrowErrorMatchingInlineSnapshot(`[Error: Alien object while interpolating SQL: true]`);
+    expect(() => one(undefined as any)).toThrowErrorMatchingInlineSnapshot(`[Error: Alien object while interpolating SQL: undefined]`);
+  });
+
+  it('characterization: null reaches the Whereable branch and throws a TypeError', () => {
+    // characterization: typeof null === 'object', then Object.keys(null) throws, not the alien-object error
+    expect(() => one(null as any)).toThrowErrorMatchingInlineSnapshot(`[TypeError: Cannot convert undefined or null to object]`);
+  });
+
+  it('refuses self outside a Whereable', () => {
+    expect(() => one(self)).toThrowErrorMatchingInlineSnapshot(`[Error: The 'self' column alias has no meaning here]`);
+  });
+
+  it('refuses parent outside a nested query', () => {
+    expect(() => one(parent('id'))).toThrowErrorMatchingInlineSnapshot(`[Error: The 'parent' table alias has no meaning here]`);
+  });
+
+  it('characterization: parent() with no column and no current column', () => {
+    // characterization: the table and the dot are written before the alien `undefined` throws
+    const q = sql`${parent()}`.copy({ parentTable: 'users' });
+    expect(() => q.compile()).toThrowErrorMatchingInlineSnapshot(`[Error: Alien object while interpolating SQL: undefined]`);
+  });
+});
+
+describe('SQLFragment', () => {
+  it('prepared(): a generated name by default, or the given one; mutates and returns the fragment', () => {
+    const q = sql`SELECT 1`;
+    expect(q.prepared()).toBe(q);
+    expect(q.compile().name).toMatch(/^_zapatos_prepared_\d+$/);
+    expect(sql`SELECT 1`.prepared('mine').compile()).toMatchInlineSnapshot(`
+      {
+        "name": "mine",
+        "text": "SELECT 1",
+        "values": [],
+      }
+    `);
+  });
+
+  it('noop: a comment is prepended to the text', () => {
+    const q = sql`SELECT 1`;
+    q.noop = true;
+    expect(q.compile()).toMatchInlineSnapshot(`
+      {
+        "text": "/* marked no-op: won't hit DB unless forced -> */ SELECT 1",
+        "values": [],
+      }
+    `);
+  });
+
+  it('copy(): keeps literals, expressions and flags unless overridden', () => {
+    const q = sql`SELECT ${param(1)}`.prepared('p');
+    q.noop = true;
+    expect(q.copy().compile()).toEqual(q.compile());
+    expect(q.copy({ noop: false, preparedName: 'other' }).compile()).toMatchInlineSnapshot(`
+      {
+        "name": "other",
+        "text": "SELECT $1",
+        "values": [
+          1,
+        ],
+      }
+    `);
+  });
+
+  it('compile() appends to the result it is given', () => {
+    const result = { text: 'x = $1 AND ', values: ['before'] };
+    expect(sql`y = ${param('after')}`.compile(result)).toBe(result);
+    expect(result).toMatchInlineSnapshot(`
+      {
+        "text": "x = $1 AND y = $2",
+        "values": [
+          "before",
+          "after",
+        ],
+      }
+    `);
+  });
+});
