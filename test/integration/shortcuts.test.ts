@@ -16,6 +16,9 @@ const t = useTestDatabase();
 const run = (q: db.SQLFragment<any>): Promise<any> => q.run(t.client);
 const fails = (q: db.SQLFragment<any>) => pgError(t.client, () => q.run(t.client));
 const scalar = async (text: string) => (await t.client.query(text)).rows[0].v;
+/** RETURNING without ORDER BY gives no order: rows sorted by `key` before comparing. */
+const sortBy = <R extends Record<string, any>>(rows: R[], key: keyof R) =>
+  [...rows].sort((a, b) => (a[key] < b[key] ? -1 : a[key] > b[key] ? 1 : 0));
 
 describe('insert', () => {
   it('one row: the inserted row as JSON, defaults applied', async () => {
@@ -40,7 +43,7 @@ describe('insert', () => {
       { email: 'a@x.org', display_name: 'A', settings: { theme: 'light' } },
       { mood: 'ok', email: 'b@x.org', display_name: 'B', manager_id: 1 },
     ], { returning: ['email', 'mood', 'manager_id', 'settings'] }));
-    expect(rows).toMatchInlineSnapshot(`
+    expect(sortBy(rows, 'email')).toMatchInlineSnapshot(`
       [
         {
           "email": "a@x.org",
@@ -104,10 +107,10 @@ describe('insert', () => {
 
 describe('upsert', () => {
   it('a conflicting row is updated ($action UPDATE), a new one inserted ($action INSERT)', async () => {
-    const [updated, inserted] = await run(db.upsert('users', [
+    const [updated, inserted] = sortBy(await run(db.upsert('users', [
       { email: 'ADA@example.com', display_name: 'Ada L.' },
       { email: 'new@x.org', display_name: 'New' },
-    ], 'email', { returning: ['id', 'email', 'display_name'] }));
+    ], 'email', { returning: ['id', 'email', 'display_name'] })), 'email');
     expect(updated).toEqual({ id: 1, email: 'ADA@example.com', display_name: 'Ada L.', $action: 'UPDATE' });
     expect(inserted).toEqual({ id: expect.any(Number), email: 'new@x.org', display_name: 'New', $action: 'INSERT' });
   });
@@ -126,15 +129,8 @@ describe('upsert', () => {
       { sku: 'TEE', variant: 'S', price_cents: 1300, title: 'T-shirt S' },
       { sku: 'CAP', variant: '', price_cents: 900, title: 'Cap' },
     ], ['sku', 'variant'], { returning: ['sku', 'variant', 'price_cents', 'title'] }));
-    expect(rows).toMatchInlineSnapshot(`
+    expect(sortBy(rows, 'sku')).toMatchInlineSnapshot(`
       [
-        {
-          "$action": "UPDATE",
-          "price_cents": 1300,
-          "sku": "TEE",
-          "title": "T-shirt S",
-          "variant": "S",
-        },
         {
           "$action": "INSERT",
           "price_cents": 900,
@@ -142,17 +138,24 @@ describe('upsert', () => {
           "title": "Cap",
           "variant": "",
         },
+        {
+          "$action": "UPDATE",
+          "price_cents": 1300,
+          "sku": "TEE",
+          "title": "T-shirt S",
+          "variant": "S",
+        },
       ]
     `);
   });
 
   it('characterization: in several rows, a key missing from one row overwrites with DEFAULT on UPDATE', async () => {
     // characterization: the missing key is filled with DEFAULT, then `SET title = EXCLUDED.title` erases the title
-    const [tee] = await run(db.upsert('products', [
+    const [, tee] = sortBy(await run(db.upsert('products', [
       { sku: 'TEE', variant: 'S', price_cents: 1300 },
       { sku: 'CAP', variant: '', price_cents: 900, title: 'Cap' },
-    ], ['sku', 'variant'], { returning: ['title'] }));
-    expect(tee).toEqual({ title: null, $action: 'UPDATE' });
+    ], ['sku', 'variant'], { returning: ['sku', 'title'] })), 'sku');
+    expect(tee).toEqual({ sku: 'TEE', title: null, $action: 'UPDATE' });
   });
 
   it('constraint()', async () => {
@@ -223,7 +226,7 @@ describe('upsert', () => {
 
 describe('update', () => {
   it('one column, every matching row returned', async () => {
-    expect(await run(db.update('accounts', { balance: 10 }, { owner_id: 1 }, { returning: ['id', 'balance'] })))
+    expect(sortBy(await run(db.update('accounts', { balance: 10 }, { owner_id: 1 }, { returning: ['id', 'balance'] })), 'id'))
       .toEqual([{ id: 1, balance: 10 }, { id: 2, balance: 10 }]);
   });
 
