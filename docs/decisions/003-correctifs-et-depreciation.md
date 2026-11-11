@@ -1,6 +1,6 @@
 # 003 — Correctifs cassants : corriger, ou déprécier
 
-- **Statut** : accepté (2026-11-12), par délégation de l'utilisateur : « la meilleure solution selon la philosophie, ne pas tout casser, du deprecated fonctionnel et signalé ».
+- **Statut** : accepté (2026-11-12), par délégation de l'utilisateur : « la meilleure solution selon la philosophie, ne pas tout casser, du deprecated fonctionnel et signalé ». Révisée le 2026-11-12 après audit (R8, R14, R16).
 - **Portée** : les constats « cassant » de [RAPPORT-CARACTERISATION.md](../RAPPORT-CARACTERISATION.md), chapitre 2 (Epic [#18](https://github.com/AlexandreDemartin/pgcast/issues/18)).
 
 ## Contexte
@@ -29,19 +29,21 @@ Trois classes, de la plus directe à la plus prudente :
   - runtime : `process.emitWarning(message, { type: 'DeprecationWarning', code: 'PGCAST_DEP00n' })`, seulement quand le chemin déprécié est réellement emprunté ;
   - codegen : par `warningListener`, seulement si le schéma est concerné.
   - Le message dit l'option à activer et que ce sera le défaut en 7.0.
+- **Opt-in sans bascule** : quand l'ancien comportement reste une lecture que George utilise et documente, l'option reste opt-in pour de bon, sans avertissement ni bascule en 7.0 (R14). CHANGELOG : `Added` (l'option) + `Changed` (la doc).
 - **Nom des options** : clés plates, à la manière des options existantes (`castArrayParamsToJson`, `unprefixedSchema`).
 - **JSDoc** : `@deprecated` sur l'ancien comportement quand il a une forme propre (une valeur d'option, une signature).
 
-## Les 10 constats cassants
+## Les 11 constats cassants
 
 | # | Classe | Pourquoi | Option (défaut = 6.6.1) |
 |---|---|---|---|
 | R4 | Corriger (`Security`) | le type promet une valeur ; une chaîne compilée en identifiant est aussi une voie d'injection | — |
-| R8 | Opt-in | perte de données, mais du code peut compter sur la mise à jour de toutes les colonnes | `upsertUpdatesSharedColumnsOnly: true` : sans `updateColumns`, seules les colonnes présentes dans toutes les lignes sont mises à jour ; l'ancien chemin avertit dès que les lignes n'ont pas les mêmes clés |
+| R8 | Opt-in | perte de données, mais du code peut compter sur la mise à jour de toutes les colonnes | `upsertRequiresSameKeys: true` : sans `updateColumns`, des lignes aux clés différentes lèvent une erreur qui dit quoi faire (« rows have different keys: pass updateColumns, or give every row the same keys ») ; aucune colonne n'est ignorée en silence, Postgres ne distinguant pas un `DEFAULT` inséré ; l'ancien chemin avertit dès que les lignes n'ont pas les mêmes clés |
 | R9, R11 | Opt-in | `undefined` → `NULL` est observable et peut être voulu | `undefinedMeansMissing: true` : une valeur `undefined` se comporte comme une clé absente (`update` l'omet, `insert` envoie `DEFAULT`) ; l'ancien chemin avertit à la première valeur `undefined` |
 | R12 | Corriger | `not()` doit nier toute sa condition ; `(NOT a) OR b` contredit son nom | — |
 | R13 | Corriger | le type accepte un `Parameter`, le runtime l'enveloppe deux fois ; `Default` dans un filtre lève une erreur qui dit quoi faire | — |
-| R14 | Opt-in | des centaines d'appels dans le corpus ; un `LIMIT 2` qui lève peut casser du code en production | `selectExactlyOneChecksForSecondRow: true` ; sans l'option, un avertissement à la première utilisation |
+| R14 | Opt-in sans bascule | des centaines d'appels dans le corpus ; George imbrique `selectExactlyOne` dans un `lateral` (doc § lateral, JSDoc de `shortcuts.ts`), où un `LIMIT 2` dupliquerait la ligne parente | `selectExactlyOneChecksForSecondRow: true`, pour un `run` de premier niveau seulement ; jamais dans un `lateral`, qui garde `LIMIT 1` ; ni avertissement, ni bascule en 7.0 ; la doc dit « au moins une ligne, `LIMIT 1` » |
+| R16 | Opt-in | `0` sur un ensemble vide, une date en millisecondes : des résultats observables, que du code peut comparer ; le rapport proposait de documenter | `aggregatesTypedByColumn: true` (nom proposé, fixé dans sa PR) : `avg`, `sum`, `min` et `max` rendent `null` sur un ensemble vide, `min` et `max` sont typés par colonne au lieu de passer par `Number()` ; l'ancien chemin avertit quand son résultat diffère |
 | R35 | Corriger | `never[]` ne sert à personne ; le type correct ne refuse aucun appel qui marchait | — |
 | R40 | Opt-in (codegen) | `any` → union littérale peut refuser du code qui compile aujourd'hui | `typeEnumsAcrossSchemas: true` |
 | R50 | Opt-in (codegen) | l'ordre du tuple `every.<enum>` est observable | `enumOrder: 'declared'` (défaut `'alphabetical'`, déprécié) |
@@ -55,4 +57,4 @@ Trois classes, de la plus directe à la plus prudente :
 ## Conséquences
 
 - Aucun projet sous 6.6.1 ne change de comportement sans l'avoir demandé, sauf pour un bug de la classe « Corriger ».
-- La version 7.0 se résume à basculer les défauts des options listées ici ; elle est annoncée par les avertissements.
+- La version 7.0 se résume à basculer les défauts des options listées ici, sauf celle de R14 ; elle est annoncée par les avertissements.
