@@ -4,6 +4,8 @@
 
 Your TypeScript types are *cast* from your database: Postgres is the single source of truth, the types are generated from its catalog, and the SQL you write is the SQL that runs. No ORM, no models, no hidden state.
 
+The goal is Zapatos going the last mile. Foreign-key joins, the conditions Postgres offers, CTEs, functions and raw SQL each get a typed form, so that real code never has to fall back on `db.raw`, hand-written row types or casts.
+
 > **Status:** fork setup (phase 0). Behaviour is identical to Zapatos 6.6.1. See the [roadmap](docs/ROADMAP.md).
 
 ## Drop-in replacement for Zapatos
