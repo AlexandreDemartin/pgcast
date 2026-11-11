@@ -80,7 +80,7 @@ Toujours les mêmes clés, dans cet ordre ; une clé absente ne s'applique pas.
 
 ### 1.4 `test/types` — types publics sur un schéma réel
 
-- [ ] **Livrée**
+- [x] **Livrée** : PR #7
 - **But** : types publics testés en positif et en négatif sur le schéma généré de la fixture ; chaque variante du codegen compile.
 - **Relecture** : `normal`, lentille `types`.
 - **Lire** : `type-tests`, `zapatos-spirit`.

@@ -6,6 +6,7 @@
 //   * generate(): the files written to disk for the main configuration, frozen in
 //     test/generated/, which `npm run typecheck` compiles (test/generated/tsconfig.json).
 // Update after an intended change: `npx vitest run -u test/integration/codegen.test.ts`.
+// -u never deletes a file: a stale snapshot is removed by hand (the orphan test names it).
 // tsForConfig() calls process.exit(1) on any SQL error: no test here may cause one.
 
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -13,7 +14,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
-import { afterEach, beforeEach, describe, expect, inject, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, inject, it } from 'vitest';
 import { finaliseConfig, generate, tsForConfig, type Config } from '../../src/generate';
 import { urlForDatabase } from '../helpers/databases';
 import { useTestDatabase } from '../helpers/db';
@@ -98,6 +99,40 @@ describe('tsForConfig()', () => {
     const second = await codegen(main);
     expect(second.ts).toBe(first.ts);
     expect(customFiles(second.customTypeSourceFiles)).toBe(customFiles(first.customTypeSourceFiles));
+  });
+});
+
+describe('variant snapshots', () => {
+  const snapshotPath = fileURLToPath(new URL(snapshotDir, import.meta.url));
+  let declarationDir: string;
+
+  // the declarations of src/db, emitted afresh: a consumer compiles against them, not the sources;
+  // under node_modules, so that they resolve 'pg'
+  beforeAll(() => {
+    const root = fileURLToPath(new URL('../..', import.meta.url));
+    mkdirSync(join(root, 'node_modules/.cache'), { recursive: true });
+    declarationDir = mkdtempSync(join(root, 'node_modules/.cache/pgcast-declarations-'));
+    const { config } = ts.readConfigFile(join(root, 'tsconfig.json'), ts.sys.readFile);
+    const { options, fileNames } = ts.parseJsonConfigFileContent(config, ts.sys, root);
+    ts.createProgram(fileNames, { ...options, emitDeclarationOnly: true, outDir: declarationDir }).emit();
+  });
+  afterAll(() => { if (declarationDir) rmSync(declarationDir, { recursive: true, force: true }); });
+
+  it.each(variants.filter(([name]) => name !== 'edge'))('%s compiles with its custom types', name => {
+    const { config } = ts.readConfigFile(join(generatedDir, 'tsconfig.json'), ts.sys.readFile);
+    const { options } = ts.parseJsonConfigFileContent(config, ts.sys, generatedDir);
+    const custom = join(snapshotPath, `${name}.custom.d.ts`);
+    const rootNames = [join(snapshotPath, `${name}.d.ts`), ...(withoutCustomTypes.includes(name) ? [] : [custom])];
+    const program = ts.createProgram(rootNames, { ...options, paths: { 'zapatos/db': [join(declarationDir, 'db')] } });
+    const errors = ts.getPreEmitDiagnostics(program).map(d =>
+      `${d.file ? relative(snapshotPath, d.file.fileName) : ''} TS${d.code} ${ts.flattenDiagnosticMessageText(d.messageText, ' ')}`);
+    expect(errors).toEqual([]);
+  });
+
+  it('holds no orphan file', () => {
+    const expected = variants.flatMap(([name]) =>
+      withoutCustomTypes.includes(name) ? [`${name}.d.ts`] : [`${name}.custom.d.ts`, `${name}.d.ts`]);
+    expect(readdirSync(snapshotPath).sort()).toEqual(expected.sort());
   });
 });
 
