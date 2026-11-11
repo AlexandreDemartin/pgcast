@@ -31,7 +31,7 @@ L'orchestrateur est la session principale : il lance les agents, trie, coche et 
    - **bloquant** (bug, injection, changement cassant, type faux ou trop large, SQL différent de celui annoncé, test manquant sur un risque) : un `builder` neuf le corrige dans l'étape ;
    - **mineur** (nommage, JSDoc, forme) : ajouté à `docs/APPRENTISSAGES.md` § Mineurs gardés, ou abandonné.
 4. Niveau `élevé` : `branch-reviewer` en mode `verify` sur les commits de correction ; `not fixed` ou `regressed` repart en 3.
-5. `gh pr ready`, CI verte (skill `ci-gate`) ; dernier commit : cases cochées, **Livrée** avec le numéro, `[skip ci]` ; `gh pr merge --merge` ; nettoyer (`builder.md` § Nettoyer).
+5. `gh pr ready`, CI verte (skill `ci-gate`) ; dernier commit : cases cochées, **Livrée** avec le numéro, puis CI verte sur ce commit (`master` l'exige) ; `gh pr merge --merge` ; nettoyer (`builder.md` § Nettoyer).
 6. Remarques « apprentissage » des agents : une ligne chacune dans `docs/APPRENTISSAGES.md`, dans le commit qui coche les cases.
 
 ## Briefs
