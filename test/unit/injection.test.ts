@@ -671,7 +671,7 @@ describe('param cast', () => {
   it('a cast is written as is only if it is well-formed once quoted', () => {
     // `"${cast}"` passes as is only as quoted identifiers without NUL joined by `.`, with whitespace
     // around it but no comment (qualified, threeParts, escaped, leadingDot, newlineInside, newlineOutside,
-    // spacesAroundDot, tabsAroundDot, otherSpaces); any other cast is one identifier, `"` doubled
+    // spacesAroundDot, tabsAroundDot, otherSpaces, verticalTab); any other cast is one identifier, `"` doubled
     expect(matrix(v => sql`SELECT ${param(1, v)}`, hostileCasts)).toMatchInlineSnapshot(`
       {
         "closes": "SELECT CAST($1 AS "int4"") || (SELECT display_name FROM users WHERE id = 1) || (""int4")",
@@ -695,7 +695,7 @@ describe('param cast', () => {
         "oddQuotes": "SELECT CAST($1 AS "int4""""""")",
         "operator": "SELECT CAST($1 AS "int4"" || ""int4")",
         "otherSpaces": "SELECT CAST($1 AS "pg_catalog"<CR>
-      <FF>.<VT>"int4")",
+      <FF>."int4")",
         "prequoted": "SELECT CAST($1 AS """a""")",
         "qualified": "SELECT CAST($1 AS "pg_catalog"."int4")",
         "qualifiedCloses": "SELECT CAST($1 AS "pg_catalog"".""int4"") || (SELECT display_name FROM users WHERE id = 1) || (""int4")",
@@ -703,6 +703,7 @@ describe('param cast', () => {
         "tabsAroundDot": "SELECT CAST($1 AS "pg_catalog"	.	"int4")",
         "threeParts": "SELECT CAST($1 AS "x"."pg_catalog"."int4")",
         "trailingDot": "SELECT CAST($1 AS "pg_catalog"".")",
+        "verticalTab": "SELECT CAST($1 AS "pg_catalog"<VT>."int4")",
       }
     `);
   });

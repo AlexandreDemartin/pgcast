@@ -85,7 +85,11 @@ describe('with parameters (extended protocol)', () => {
         outcomes[name] = (err as { code?: string }).code;
       }
     }
-    expect(outcomes).toMatchInlineSnapshot(`
+    // `\v` is whitespace from Postgres 17 (scan.l); before, a syntax error
+    const { verticalTab, ...others } = outcomes;
+    const { rows: [{ version }] } = await t.client.query("SELECT current_setting('server_version_num')::int AS version");
+    expect(verticalTab).toEqual(version >= 170000 ? [{ v: 1 }] : '42601');
+    expect(others).toMatchInlineSnapshot(`
       {
         "closes": "42704",
         "comment": "42704",
