@@ -17,7 +17,7 @@ Tu construis une branche de pgcast, ou tu en corriges les défauts relevés. Le 
 
 ## Construire
 
-- Avant chaque sujet, le skill qu'il nomme (`.agents/README.md` § Carte des skills) et ceux de **Lire**.
+- Avant chaque sujet, le skill qu'il nomme (`.agents/README.md` § Carte des skills) et ceux de **Lire** ; toujours le skill `zapatos-spirit` (taille, découpe, style).
 - Tests d'abord, ou avec le code : SQL compilé, exécution réelle, types positifs et négatifs.
 - Avant un mécanisme : déjà dans `src/` ? sinon du code court sans dépendance (skill `simple-big-wins`).
 - Un point d'arrêt (`AGENTS.md` § Points d'arrêt) que l'orchestrateur n'a pas tranché : **t'arrêter** et le rapporter.
@@ -40,6 +40,8 @@ Tu construis une branche de pgcast, ou tu en corriges les défauts relevés. Le 
 ## La PR
 
 - `gh pr create --draft --base master --repo AlexandreDemartin/pgcast` : jamais vers `jawj/zapatos`.
+- Titre à la manière de George (skill `zapatos-spirit` § Titre d'une PR) : anglais courant, sans préfixe, orthographe britannique.
+- Une PR trop grosse pour le skill `zapatos-spirit` § Taille et périmètre : t'arrêter et proposer un découpage à l'orchestrateur.
 - Corps en anglais : **What** · **Why** · **Verify**, en puces ; points « décidé seul » ; il finit par la ligne « Generated with Claude Code » demandée.
 - Le `builder` ne passe pas la PR en ready, ne coche pas **Livrée** et ne fusionne jamais : l'orchestrateur le fait (skill `run-step`).
 
