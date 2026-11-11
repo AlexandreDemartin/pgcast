@@ -26,7 +26,7 @@ On valide en local pendant l'itération ; la CI se lance **une fois prêt**.
 ## Docs-only
 
 - Seulement des `.md` au-dessus d'un commit vert : `[skip ci]` permis, fusion sans attendre.
-- Exemple : `docs: tick step 1.1 [skip ci]`.
+- Exemple : `Tick step 1.1 [skip ci]`.
 - Tout le reste (`src/`, `test/`, `package*.json`, `.github/`, configs) : attendre la CI verte.
 
 ## Pièges
@@ -38,7 +38,7 @@ On valide en local pendant l'itération ; la CI se lance **une fois prêt**.
 ## Relancer
 
 - PR draft : `gh pr ready` d'abord.
-- Puis `gh run rerun <id>`, ou `git commit --allow-empty -m "chore: rerun CI"`.
+- Puis `gh run rerun <id>`, ou `git commit --allow-empty -m "Rerun CI"`.
 - Suivre par `gh pr checks --watch` en arrière-plan, jamais en sondant à la main.
 
 ## Branches

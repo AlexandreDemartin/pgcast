@@ -78,7 +78,7 @@ Une tâche n'est **terminée** que si `lint`, `typecheck`, `test` et `test:types
 
 - **Lire le code concerné avant de modifier**, et résumer ce qu'on a compris.
 - **Tests d'abord**, ou au minimum avec l'implémentation : runtime, SQL compilé (`text` et `values`) et types (cas positifs **et** négatifs avec `@ts-expect-error`).
-- **Une fonctionnalité = une branche = une PR** sur `AlexandreDemartin/pgcast`. Commits petits et atomiques au format Conventional Commits (`feat:`, `fix:`, `test:`, `chore:`, `docs:`, `ci:`…).
+- **Une fonctionnalité = une branche = une PR** sur `AlexandreDemartin/pgcast`, petite comme un commit de George. Commits, titres de PR et découpe à la manière de George MacKerron (skill `zapatos-spirit`).
 - **Aucun changement cassant** sur l'API publique. Si c'est inévitable, on s'arrête et on demande (skill `backward-compat`).
 - **`core.ts` (échappement, paramétrisation, compilation des identifiants)** : ne jamais y toucher sans le signaler explicitement. Chaque changement ajoute des tests d'injection SQL (skill `sql-safety`).
 - **Types avancés** : surveiller le temps de compilation (`bench:types`, seuil +20 %). Un type qui compile n'est pas forcément correct (skill `type-tests`).
