@@ -58,7 +58,8 @@ describe('select', () => {
     type First = Run<typeof q>[number]['first'];
     // a selectOne in a lateral can be null (LEFT JOIN): undefined becomes null
     expectTypeOf<NonNullable<First>['out']>().toEqualTypeOf<Pick<s.transfers.JSONSelectable, 'amount'>[]>();
-    expectTypeOf<null extends First ? true : false>().toEqualTypeOf<true>();
+    expectTypeOf<First>()
+      .toEqualTypeOf<(s.accounts.JSONSelectable & { out: Pick<s.transfers.JSONSelectable, 'amount'>[] }) | null>();
   });
 
   test('refuses an unknown column, table, order direction or lock', () => {
@@ -152,11 +153,19 @@ describe('upsert', () => {
     expectTypeOf(many.run(pool)).resolves.toEqualTypeOf<(s.users.JSONSelectable & db.UpsertAction)[]>();
   });
 
-  test('refuses an unknown conflict column or another table’s constraint', () => {
+  test('refuses an unknown conflict column; constraint<T>() refuses an index of another table', () => {
     // @ts-expect-error 'nope' is not a column of users
     db.upsert('users', row, 'nope');
-    // @ts-expect-error accounts_pkey is not a unique index of users
-    db.upsert('users', row, db.constraint<'users'>('accounts_pkey'));
+    // @ts-expect-error accounts_pkey is not a unique index of users (refused by constraint(), not by upsert)
+    db.constraint<'users'>('accounts_pkey');
+  });
+
+  test('characterization: upsert accepts the constraint of another table', () => {
+    // characterization: Constraint<'accounts'> passes as the conflict target of users;
+    // at run time, ON CONSTRAINT accounts_pkey fails on users
+    const k = db.constraint<'accounts'>('accounts_pkey');
+    db.upsert('users', row, k);
+    db.upsert('users', [row], k);
   });
 });
 
