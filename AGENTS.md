@@ -60,7 +60,7 @@ Le code généré et le runtime parlent de `zapatos/schema`, `zapatos/db` et `za
 | `npm test` | Vitest : unitaires et intégration (`TEST_DATABASE_URL` requis, `useTestDatabase()` dans `test/helpers/db.ts`) |
 | `npm run test:watch` | Vitest en watch |
 | `npm run test:types` | tests de types Vitest (`*.test-d.ts`, `expectTypeOf`) |
-| `npm run bench:types` | benchmark du temps de compilation (arrive à l'étape 1.6) |
+| `npm run bench:types` | coût de compilation de `bench/` (requêtes typées sur le schéma de la fixture) : `Instantiations` et `Types`, moins un plancher sans pgcast, comparés à `bench/baseline.json` ; échoue au-delà de +20 % ; `-- --update` réécrit la référence |
 | `npm run check:agents` | cohérence des skills et agents, tests du hook `guard` |
 
 Une tâche n'est **terminée** que si `lint`, `typecheck`, `test` et `test:types` passent.
