@@ -474,13 +474,13 @@ export class NotExactlyOneError extends Error {
   }
 }
 
-// the aggregate of select() is written raw, so it must be a function name as Postgres lexes it, optionally
-// schema-qualified: unquoted, any non-ASCII character is a letter and `$` may follow the first one; quoted,
-// anything but NUL, with `""` for `"`; spaces around it are kept as they are
-// (see https://github.com/postgres/postgres/blob/master/src/backend/parser/scan.l)
+// the aggregate of select() is written raw, so it must be a function name as Postgres lexes it, in up to
+// three dotted parts: unquoted, any non-ASCII character is a letter and `$` may follow the first one; quoted,
+// or `U&` quoted, anything but NUL, with `""` for `"` (a `UESCAPE` clause is refused); spaces around it and
+// around the dots are kept as they are (see https://github.com/postgres/postgres/blob/master/src/backend/parser/scan.l)
 const
-  identifier = /[A-Za-z_\u0080-\u{10FFFF}][A-Za-z0-9_$\u0080-\u{10FFFF}]*|"(?:[^"\0]|"")+"/u.source,
-  functionName = new RegExp(`^\\s*(?:${identifier})(?:\\.(?:${identifier}))?\\s*$`, 'u');
+  identifier = /[A-Za-z_\u0080-\u{10FFFF}][A-Za-z0-9_$\u0080-\u{10FFFF}]*|(?:[Uu]&)?"(?:[^"\0]|"")+"/u.source,
+  functionName = new RegExp(`^\\s*(?:${identifier})(?:\\s*\\.\\s*(?:${identifier})){0,2}\\s*$`, 'u');
 
 /**
  * Generate a `SELECT` query `SQLFragment`. This can be nested with other 
@@ -503,8 +503,9 @@ const
  * quantities can be included in the JSON result
  * @param mode (Used internally by `selectOne` and `count`)
  * @param aggregate (Used internally by `count`, `sum`, `avg`, `min` and `max`)
- * The name of the aggregate function, plain or quoted, optionally
- * schema-qualified (`sum`, `my_schema."MyAgg"`); anything else throws. With
+ * The name of the aggregate function, plain, quoted or `U&` quoted, in up to
+ * three dotted parts (`sum`, `my_schema."MyAgg"`, `my_db.my_schema.my_agg`);
+ * anything else, a `UESCAPE` clause included, throws. With
  * `columns: ['id']`, `'my_schema."MyAgg"'` gives
  * `SELECT my_schema."MyAgg"("id") AS result FROM "users"`.
  */

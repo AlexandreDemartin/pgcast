@@ -100,6 +100,12 @@ describe('without parameters (simple protocol)', () => {
       expect(await db.select('users', all, {}, db.SelectResultMode.Numeric, aggregate).run(t.client), aggregate).toBe(3);
   });
 
+  it('an aggregate in three parts, with spaces around the dot or U& quoted runs', async () => {
+    const name = (await t.client.query<{ name: string }>('SELECT quote_ident(current_database()) AS name')).rows[0]!.name;
+    for (const aggregate of [`${name}.pg_catalog.count`, 'pg_catalog . count', 'U&"c\\006Funt"'])
+      expect(await db.select('users', all, {}, db.SelectResultMode.Numeric, aggregate).run(t.client), aggregate).toBe(3);
+  });
+
   it('an aggregate named as Postgres lexes it runs', async () => {
     // each name is created as written, then called by select(); the ROLLBACK drops them; étendue in NFD
     await t.client.query('CREATE SCHEMA my_schema');

@@ -214,6 +214,10 @@ describe('shortcut arguments', () => {
     expect(numeric('"Stats-2024"')).toBe('SELECT "Stats-2024"("id") AS result FROM "users"');
     expect(numeric(' count')).toBe('SELECT  count("id") AS result FROM "users"');
     expect(numeric('count\n')).toBe('SELECT count\n("id") AS result FROM "users"');
+    expect(numeric('my_db.pg_catalog.count')).toBe('SELECT my_db.pg_catalog.count("id") AS result FROM "users"');
+    expect(numeric('pg_catalog . count')).toBe('SELECT pg_catalog . count("id") AS result FROM "users"');
+    expect(numeric('U&"c\\006Funt"')).toBe('SELECT U&"c\\006Funt"("id") AS result FROM "users"');
+    expect(numeric('u&"c\\006Funt"')).toBe('SELECT u&"c\\006Funt"("id") AS result FROM "users"');
   });
 
   it('a null aggregate is written as null, as in 6.6.1', () => {
@@ -229,8 +233,15 @@ describe('shortcut arguments', () => {
 
   it('an aggregate that is not a function name throws', () => {
     const numeric = (aggregate: any) => () => db.select('users', all, {}, db.SelectResultMode.Numeric, aggregate);
-    for (const aggregate of ['', '1count', '$a', 'a.b.c', 'a.', '.a', '""', '"a', 'a"', '"a"b"', '"a\0b"', 'count(*) FROM users; SELECT count', 'a b', 'a\nb', 'count\n;'])
+    for (const aggregate of ['', '1count', '$a', 'a.b.c.d', 'a.', '.a', 'a..b', 'a. .b', 'U&""', 'U& "a"', '&"a"', '""', '"a', 'a"', '"a"b"', '"a\0b"', 'count(*) FROM users; SELECT count', 'a b', 'a\nb', 'count\n;'])
       expect(numeric(aggregate), aggregate).toThrow(`Aggregate must be a function name (e.g. sum, or my_schema.my_agg), not '${aggregate}'`);
+  });
+
+  it('a U& quoted aggregate with a UESCAPE clause throws', () => {
+    // valid in 6.6.1, but not a name alone: `U&"c!006Funt" UESCAPE '!'`
+    for (const aggregate of [`U&"c!006Funt" UESCAPE '!'`, `U&"c!006Funt"UESCAPE'!'`])
+      expect(() => db.select('users', all, {}, db.SelectResultMode.Numeric, aggregate), aggregate)
+        .toThrow(`Aggregate must be a function name (e.g. sum, or my_schema.my_agg), not '${aggregate}'`);
   });
 
   it('characterization: upsert values keys, also written after EXCLUDED.', () => {
