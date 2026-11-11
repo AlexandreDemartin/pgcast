@@ -373,6 +373,7 @@ export const truncate: TruncateSignatures = function (
 ): SQLFragment<undefined> {
 
   if (!Array.isArray(table)) table = [table];
+  for (const opt of opts) if (!['CONTINUE IDENTITY', 'RESTART IDENTITY', 'RESTRICT', 'CASCADE'].includes(opt)) throw new Error(`Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not '${opt}'`);
   const
     tables = mapWithSeparator(table, sql`, `, t => t),
     query = sql<SQL, undefined>`TRUNCATE ${tables}${raw((opts.length ? ' ' : '') + opts.join(' '))}`;
@@ -535,6 +536,8 @@ export const select: SelectSignatures = function (
         sql` LIMIT ${param(allOptions.limit)}`,  // compatibility with pg pre-10.5; and fewer bytes!
     offsetSQL = allOptions.offset === undefined ? [] : sql` OFFSET ${param(allOptions.offset)}`,  // pg is lax about OFFSET following FETCH, and we exploit that
     lockSQL = lock === undefined ? [] : (lock as SelectLockingOptions<string>[]).map(lock => {  // `as` clause is required when TS not strict
+      if (!['UPDATE', 'NO KEY UPDATE', 'SHARE', 'KEY SHARE'].includes(lock.for)) throw new Error(`Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not '${lock.for}'`);
+      if (lock.wait && !['NOWAIT', 'SKIP LOCKED'].includes(lock.wait)) throw new Error(`Lock wait must be NOWAIT/SKIP LOCKED/undefined, not '${lock.wait}'`);
       const
         ofTables = lock.of === undefined || Array.isArray(lock.of) ? lock.of : [lock.of],
         ofClause = ofTables === undefined ? [] : sql` OF ${mapWithSeparator(ofTables as Table[], sql`, `, t => t)}`;  // `as` clause is required when TS not strict

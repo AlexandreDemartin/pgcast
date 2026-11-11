@@ -96,6 +96,8 @@ export async function transaction<T, M extends IsolationLevel>(
     return callback(txnClientOrQueryable as TxnClient<IsolationSatisfying<M>>);
   }
 
+  if (!Object.values(IsolationLevel).includes(isolationLevel)) throw new Error(`Isolation level must be an IsolationLevel value (e.g. IsolationLevel.Serializable), not '${isolationLevel}'`);
+
   if (txnSeq >= Number.MAX_SAFE_INTEGER - 1) txnSeq = 0;  // wrap around
 
   const
