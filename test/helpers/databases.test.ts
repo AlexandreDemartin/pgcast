@@ -1,4 +1,5 @@
 // Unit tests of the harness itself: no database needed.
+import { inspect } from 'node:util';
 import { describe, expect, it } from 'vitest';
 import type pg from 'pg';
 import { createDatabase, dropDatabase, orphanDatabases, runPrefix, urlForDatabase } from './databases';
@@ -24,6 +25,19 @@ describe('test database naming', () => {
   it('points the server URL at another database, keeping credentials and options', () => {
     expect(urlForDatabase('postgres://u:p%40ss@db.local:5433/pgcast?sslmode=disable', 'pgcast_test_1_ab'))
       .toBe('postgres://u:p%40ss@db.local:5433/pgcast_test_1_ab?sslmode=disable');
+  });
+
+  it('never puts the URL, hence the password, in its error', () => {
+    // accepted by pg (socket host), rejected by new URL()
+    let error: unknown;
+    try {
+      urlForDatabase('postgres://user:s3cret@/mydb', 'pgcast_test_1_ab');
+    } catch (err) {
+      error = err;
+    }
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toMatch(/TEST_DATABASE_URL must be a URL with a host/);
+    expect(inspect(error, { showHidden: true, depth: null })).not.toContain('s3cret');
   });
 
   it('refuses to create or drop a database outside the prefix', async () => {

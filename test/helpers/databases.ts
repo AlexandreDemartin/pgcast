@@ -39,9 +39,15 @@ export function testDatabaseUrl(): string | undefined {
 /** Name prefix of every database created by the run of process `pid`. */
 export const runPrefix = (pid: number) => `${PREFIX}${pid}_`;
 
-/** Same server and credentials as `url`, other database. */
+/** Same server and credentials as `url`, other database. Its errors never contain `url` (password). */
 export function urlForDatabase(url: string, database: string): string {
-  const u = new URL(url);
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    // new URL()'s error carries the whole URL in `input`, which Vitest prints: throw one without it
+    throw new Error('TEST_DATABASE_URL must be a URL with a host, e.g. postgres://user:password@localhost:5432/db');
+  }
   u.pathname = '/' + encodeURIComponent(database);
   return u.toString();
 }
