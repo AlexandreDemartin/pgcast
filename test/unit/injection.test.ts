@@ -11,6 +11,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as db from '../../src/db';
 import { sql, param, cols, vals, all } from '../../src/db';
+import { hostileCasts } from '../helpers/hostileCasts';
 
 const hostile = {
   dquote: 'a"b',
@@ -29,8 +30,8 @@ const hostile = {
 const visible = (text: string) => text.replace(/\0/g, '<NUL>');
 
 /** The compiled text for each hostile input, or the error thrown; a NUL byte is shown as <NUL>. */
-const matrix = (build: (input: any) => db.SQLFragment<any, any>) =>
-  Object.fromEntries(Object.entries(hostile).map(([name, input]) => {
+const matrix = (build: (input: any) => db.SQLFragment<any, any>, inputs: Record<string, string> = hostile) =>
+  Object.fromEntries(Object.entries(inputs).map(([name, input]) => {
     try {
       return [name, visible(build(input).compile().text)];
     } catch (err) {
@@ -664,6 +665,37 @@ describe('param cast', () => {
     const q = sql`SELECT ${param(1, 'int4") || (SELECT secret FROM t) || ("int4')}`.compile();
     expect(q.text).toBe('SELECT CAST($1 AS "int4"") || (SELECT secret FROM t) || (""int4")');
     expect(q.values).toEqual([1]);
+  });
+
+  it('a cast is written as is only if it is well-formed once quoted', () => {
+    // `"${cast}"` passes as is only as quoted identifiers joined by `.`, without NUL (qualified,
+    // threeParts, escaped, leadingDot, newlineInside); any other cast is one identifier, `"` doubled
+    expect(matrix(v => sql`SELECT ${param(1, v)}`, hostileCasts)).toMatchInlineSnapshot(`
+      {
+        "closes": "SELECT CAST($1 AS "int4"") || (SELECT display_name FROM users WHERE id = 1) || (""int4")",
+        "comment": "SELECT CAST($1 AS "int4""/*.""*/""int4")",
+        "dquote": "SELECT CAST($1 AS "a""b")",
+        "empty": "SELECT CAST($1 AS "")",
+        "emptyLast": "SELECT CAST($1 AS "pg_catalog"".""")",
+        "emptyPart": "SELECT CAST($1 AS "pg_catalog""..""int4")",
+        "escaped": "SELECT CAST($1 AS "int4""")",
+        "leadingDot": "SELECT CAST($1 AS ".int4")",
+        "lone": "SELECT CAST($1 AS """")",
+        "newlineInside": "SELECT CAST($1 AS "in
+      t4")",
+        "newlineOutside": "SELECT CAST($1 AS "pg_catalog""
+      .""int4")",
+        "nul": "SELECT CAST($1 AS "a<NUL>b")",
+        "nulQualified": "SELECT CAST($1 AS "pg_catalog"".""in<NUL>t4")",
+        "oddQuotes": "SELECT CAST($1 AS "int4""""""")",
+        "operator": "SELECT CAST($1 AS "int4"" || ""int4")",
+        "prequoted": "SELECT CAST($1 AS """a""")",
+        "qualified": "SELECT CAST($1 AS "pg_catalog"."int4")",
+        "qualifiedCloses": "SELECT CAST($1 AS "pg_catalog"".""int4"") || (SELECT display_name FROM users WHERE id = 1) || (""int4")",
+        "threeParts": "SELECT CAST($1 AS "x"."pg_catalog"."int4")",
+        "trailingDot": "SELECT CAST($1 AS "pg_catalog"".")",
+      }
+    `);
   });
 });
 

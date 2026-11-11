@@ -15,6 +15,7 @@ import { describe, expect, it, vi } from 'vitest';
 import * as db from '../../src/db';
 import { sql, param, all } from '../../src/db';
 import { useTestDatabase } from '../helpers/db';
+import { hostileCasts } from '../helpers/hostileCasts';
 import { pgError } from '../helpers/pgError';
 
 const t = useTestDatabase();
@@ -65,6 +66,49 @@ describe('with parameters (extended protocol)', () => {
       {
         "code": "42704",
         "message": "type "text") || (SELECT display_name FROM users WHERE id = 1) || CAST" does not exist",
+      }
+    `);
+  });
+
+  it('no hostile cast reads anything: each is a missing type, a syntax error or a harmless name', async () => {
+    // compiled text: test/unit/injection.test.ts; a row would show what the cast let through
+    const outcomes: Record<string, unknown> = {};
+    for (const [name, cast] of Object.entries(hostileCasts)) {
+      await t.client.query('SAVEPOINT pgcast_cast');
+      try {
+        outcomes[name] = await sql`SELECT ${param('1', cast)} AS v`.run(t.client);
+        await t.client.query('RELEASE SAVEPOINT pgcast_cast');
+      } catch (err) {
+        await t.client.query('ROLLBACK TO SAVEPOINT pgcast_cast');
+        outcomes[name] = (err as { code?: string }).code;
+      }
+    }
+    expect(outcomes).toMatchInlineSnapshot(`
+      {
+        "closes": "42704",
+        "comment": "42704",
+        "dquote": "42704",
+        "empty": "42601",
+        "emptyLast": "42704",
+        "emptyPart": "42704",
+        "escaped": "42704",
+        "leadingDot": "42704",
+        "lone": "42704",
+        "newlineInside": "42704",
+        "newlineOutside": "42704",
+        "nul": "08P01",
+        "nulQualified": "08P01",
+        "oddQuotes": "42704",
+        "operator": "42704",
+        "prequoted": "42704",
+        "qualified": [
+          {
+            "v": 1,
+          },
+        ],
+        "qualifiedCloses": "42704",
+        "threeParts": "0A000",
+        "trailingDot": "42704",
       }
     `);
   });
