@@ -34,6 +34,12 @@ describe('param', () => {
       .toEqual([{ d: new Date(2026, 1, 1) }]);
   });
 
+  it('a text cast that is well-formed once quoted reaches another schema, as in 6.6.1', async () => {
+    const q = sql`SELECT ${param('1', 'pg_catalog"."int4')} AS n`;
+    expect(q.compile().text).toBe('SELECT CAST($1 AS "pg_catalog"."int4") AS n');
+    expect(await q.run(t.client)).toEqual([{ n: 1 }]);
+  });
+
   it('characterization: a schema-qualified or array type cast fails', async () => {
     // characterization: "public.mood" and "int[]" are taken as single type names
     expect(await pgError(t.client, () => sql`SELECT ${param('ok', 'public.mood')}`.run(t.client)))

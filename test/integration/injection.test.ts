@@ -15,6 +15,7 @@ import { describe, expect, it, vi } from 'vitest';
 import * as db from '../../src/db';
 import { sql, param, all } from '../../src/db';
 import { useTestDatabase } from '../helpers/db';
+import { hostileCasts } from '../helpers/hostileCasts';
 import { pgError } from '../helpers/pgError';
 
 const t = useTestDatabase();
@@ -56,10 +57,87 @@ describe('with parameters (extended protocol)', () => {
     expect(await adaName()).toBe('Ada');
   });
 
-  it('characterization: a `"` in a param cast reads another expression', async () => {
-    // characterization: `CAST($1 AS "text") || (SELECT …) || CAST('' AS "text")`, one statement
+  it('a `"` in a param cast stays in one type name, which does not exist', async () => {
+    // `CAST($1 AS "text"") || (SELECT …) || CAST('' AS ""text")`: one quoted type name
     const cast = `text") || (SELECT display_name FROM users WHERE id = 1) || CAST('' AS "text`;
-    expect(await sql`SELECT ${param('x', cast)} AS v`.run(t.client)).toEqual([{ v: 'xAda' }]);
+    const q = sql`SELECT ${param('x', cast)} AS v`;
+    expect(q.compile().text).toBe(`SELECT CAST($1 AS "text"") || (SELECT display_name FROM users WHERE id = 1) || CAST('' AS ""text") AS v`);
+    expect(await pgError(t.client, () => q.run(t.client))).toMatchInlineSnapshot(`
+      {
+        "code": "42704",
+        "message": "type "text") || (SELECT display_name FROM users WHERE id = 1) || CAST" does not exist",
+      }
+    `);
+  });
+
+  it('no hostile cast reads anything: each is a missing type, a syntax error or a harmless name', async () => {
+    // compiled text: test/unit/injection.test.ts; a row would show what the cast let through.
+    // Rows: pg_catalog.int4, with whitespace around the dot as in 6.6.1; a comment between the parts
+    // (commentBetween, lineCommentBetween) returned 1 under 6.6.1 and is now one missing type
+    const outcomes: Record<string, unknown> = {};
+    for (const [name, cast] of Object.entries(hostileCasts)) {
+      await t.client.query('SAVEPOINT pgcast_cast');
+      try {
+        outcomes[name] = await sql`SELECT ${param('1', cast)} AS v`.run(t.client);
+        await t.client.query('RELEASE SAVEPOINT pgcast_cast');
+      } catch (err) {
+        await t.client.query('ROLLBACK TO SAVEPOINT pgcast_cast');
+        outcomes[name] = (err as { code?: string }).code;
+      }
+    }
+    // `\v` is whitespace from Postgres 17 (scan.l); before, a syntax error
+    const { verticalTab, ...others } = outcomes;
+    const { rows: [{ version }] } = await t.client.query("SELECT current_setting('server_version_num')::int AS version");
+    expect(verticalTab).toEqual(version >= 170000 ? [{ v: 1 }] : '42601');
+    expect(others).toMatchInlineSnapshot(`
+      {
+        "closes": "42704",
+        "comment": "42704",
+        "commentBetween": "42704",
+        "dquote": "42704",
+        "empty": "42601",
+        "emptyLast": "42704",
+        "emptyPart": "42704",
+        "escaped": "42704",
+        "leadingDot": "42704",
+        "lineCommentBetween": "42704",
+        "lone": "42704",
+        "newlineInside": "42704",
+        "newlineOutside": [
+          {
+            "v": 1,
+          },
+        ],
+        "nul": "08P01",
+        "nulQualified": "08P01",
+        "oddQuotes": "42704",
+        "operator": "42704",
+        "otherSpaces": [
+          {
+            "v": 1,
+          },
+        ],
+        "prequoted": "42704",
+        "qualified": [
+          {
+            "v": 1,
+          },
+        ],
+        "qualifiedCloses": "42704",
+        "spacesAroundDot": [
+          {
+            "v": 1,
+          },
+        ],
+        "tabsAroundDot": [
+          {
+            "v": 1,
+          },
+        ],
+        "threeParts": "0A000",
+        "trailingDot": "42704",
+      }
+    `);
   });
 });
 

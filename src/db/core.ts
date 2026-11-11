@@ -118,7 +118,13 @@ export const toBuffer = strict((ba: ByteArrayString) => Buffer.from(ba.slice(2),
  * at the appropriate position of the values array passed to `pg`.
  * @param x The value to be wrapped
  * @param cast Optional cast type. If a string, the parameter will be cast to
- * this type within the query e.g. `CAST($1 AS type)` instead of plain `$1`. If
+ * this type within the query e.g. `CAST($1 AS "type")` instead of plain `$1`.
+ * The type is written as is if `"type"` is well-formed: non-empty quoted parts
+ * without NUL, in which `""` stands for one `"`, joined by `.` with optional
+ * whitespace around it (so `public"."mood` gives `"public"."mood"`). Otherwise
+ * it is one quoted identifier, any `"` doubled (as `quote_ident` does), so it
+ * cannot close its quotes: `public.mood` and `int4[]` are not split, and an
+ * array type needs `sql` (`` sql`${param(x)}::int4[]` ``). If
  * `true`, the value will be JSON stringified and cast to `json` (irrespective
  * of the configuration parameters `castArrayParamsToJson` and
  * `castObjectParamsToJson`). If `false`, the value will **not** be JSON-
@@ -133,7 +139,13 @@ export class Parameter<T = any> { constructor(public value: T, public cast?: boo
  * the values array passed to `pg`.
  * @param x The value to be wrapped
  * @param cast Optional cast type. If a string, the parameter will be cast to
- * this type within the query e.g. `CAST($1 AS type)` instead of plain `$1`. If
+ * this type within the query e.g. `CAST($1 AS "type")` instead of plain `$1`.
+ * The type is written as is if `"type"` is well-formed: non-empty quoted parts
+ * without NUL, in which `""` stands for one `"`, joined by `.` with optional
+ * whitespace around it (so `public"."mood` gives `"public"."mood"`). Otherwise
+ * it is one quoted identifier, any `"` doubled (as `quote_ident` does), so it
+ * cannot close its quotes: `public.mood` and `int4[]` are not split, and an
+ * array type needs `sql` (`` sql`${param(x)}::int4[]` ``). If
  * `true`, the value will be JSON stringified and cast to `json` (irrespective
  * of the configuration parameters `castArrayParamsToJson` and
  * `castObjectParamsToJson`). If `false`, the value will **not** be JSON
@@ -224,6 +236,11 @@ export function sql<
 }
 
 let preparedNameSeq = 0;
+
+// one or more double-quoted identifiers joined by `.`, as Postgres lexes them: `"a"`, `"a"."b"`, `"a""b"`;
+// whitespace may surround a dot, as in the aggregate rule of shortcuts.ts, but a comment may not
+// (`\v` is whitespace from Postgres 17; before, it is a syntax error)
+const quotedIdentifiers = /^"(?:[^"\0]|"")+"(?:[ \t\n\r\f\v]*\.[ \t\n\r\f\v]*"(?:[^"\0]|"")+")*$/;
 
 export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never> {
   protected constraint?: Constraint;
@@ -362,8 +379,14 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
         result.text += `CAST(${placeholder} AS "json")`;
 
       } else if (typeof expression.cast === 'string') {
+        // `"${cast}"` passes as is if well-formed (`pg_catalog"."int4`, as before); otherwise
+        // it is one quoted identifier, any `"` doubled as quote_ident does, so it cannot close its quotes
+        const
+          quoted = `"${expression.cast}"`,
+          type = quotedIdentifiers.test(quoted) ? quoted : `"${expression.cast.replace(/"/g, '""')}"`;
+
         result.values.push(expression.value);
-        result.text += `CAST(${placeholder} AS "${expression.cast}")`;
+        result.text += `CAST(${placeholder} AS ${type})`;
 
       } else {
         result.values.push(expression.value);
