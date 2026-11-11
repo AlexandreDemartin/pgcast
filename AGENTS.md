@@ -1,104 +1,104 @@
 # AGENTS.md — pgcast
 
-> `CLAUDE.md` est un lien symbolique vers ce fichier. Lis-le en entier avant toute modification.
+> `CLAUDE.md` is a symbolic link to this file. Read it in full before any change.
 
-**pgcast** est un fork maintenu de [Zapatos](https://github.com/jawj/zapatos) 6.6.1 (MIT, George MacKerron).
-Le nom joue sur deux sens : en Postgres, un *cast* (`::type`) donne un type à une valeur ; en anglais, *cast* désigne aussi un moulage. Les types TypeScript sont **moulés sur le schéma de la base**, sans jamais être écrits à la main.
+**pgcast** is a maintained fork of [Zapatos](https://github.com/jawj/zapatos) 6.6.1 (MIT, George MacKerron).
+The name plays on two meanings: in Postgres, a *cast* (`::type`) gives a value a type; in English, a *cast* is also a mould. The TypeScript types are **cast from the database schema**, never written by hand.
 
-Objectifs : moderniser, tester, puis étendre, **sans trahir la philosophie** et en restant **rétrocompatible avec Zapatos 6.6.1**.
-La roadmap est dans les issues GitHub, un Epic par chapitre ([README](README.md#roadmap)), et les décisions dans [docs/decisions/](docs/decisions/).
+Goals: modernise, test, then extend, **without betraying the philosophy** and staying **backward compatible with Zapatos 6.6.1**.
+The roadmap lives in the GitHub issues, one Epic per chapter ([README](README.md#roadmap)), and the decisions in [docs/decisions/](docs/decisions/).
 
-## Philosophie (non négociable)
+## Philosophy (non-negotiable)
 
-1. **La base de données est la seule source de vérité.** Tout ce qui est typé ou validé est déduit de Postgres (`pg_catalog`, `information_schema`, `COMMENT ON`), jamais déclaré à la main côté TS.
-2. **Pas d'ORM.** Pas de modèles, pas de classes d'entités, pas de relations déclarées en code, pas d'état caché, pas de lazy loading.
-3. **Le SQL reste visible et prévisible.** Chaque helper produit un SQL lisible, unique et documenté. On peut toujours redescendre au template `sql`.
-4. **Surface minimale.** Ce qui peut vivre dans un package séparé ou rester opt-in doit l'être. Aucune nouvelle dépendance runtime obligatoire (Zod/Valibot en peer dependency optionnelle).
-5. **Le codegen reste un simple CLI** qui lit la base et écrit des fichiers `.d.ts` / `.ts`.
+1. **The database is the single source of truth.** Everything typed or validated is derived from Postgres (`pg_catalog`, `information_schema`, `COMMENT ON`), never declared by hand on the TS side.
+2. **No ORM.** No models, no entity classes, no relationships declared in code, no hidden state, no lazy loading.
+3. **SQL stays visible and predictable.** Each helper produces readable, unique, documented SQL. You can always drop down to the `sql` template.
+4. **Minimal surface.** Whatever can live in a separate package or stay opt-in must. No new mandatory runtime dependency (Zod/Valibot as an optional peer dependency).
+5. **The codegen stays a simple CLI** that reads the database and writes `.d.ts` / `.ts` files.
 
-Si une demande viole un de ces points : **s'arrêter et le signaler** au lieu de l'implémenter.
+If a request breaks one of these points: **stop and say so** instead of implementing it.
 
 ## Architecture
 
 ```
-Postgres ──(introspection SQL)──► src/generate/ ──(écrit)──► zapatos/schema.d.ts  (declare module 'zapatos/schema')
-                                                              zapatos/custom/*.d.ts (placeholders éditables)
-                                                                     │ types ambiants
+Postgres ──(SQL introspection)──► src/generate/ ──(writes)──► zapatos/schema.d.ts  (declare module 'zapatos/schema')
+                                                              zapatos/custom/*.d.ts (editable placeholders)
+                                                                     │ ambient types
                                                                      ▼
-code utilisateur ──► src/db/ (runtime : sql``, shortcuts, conditions, transactions) ──► pg (node-postgres)
+user code ──► src/db/ (runtime: sql``, shortcuts, conditions, transactions) ──► pg (node-postgres)
 ```
 
-- `src/generate/` : le codegen (CLI `pgcast`, alias `zapatos`).
-  - `cli.ts` lit `zapatosconfig.json` et/ou un argument JSON, et interpole `{{ENV_VAR}}`.
-  - `config.ts` contient la config et ses défauts.
-  - `write.ts` (`generate()`) écrit `zapatos/schema.d.ts` et les placeholders `zapatos/custom/`.
-  - `tsOutput.ts` assemble le module `zapatos/schema` (namespaces par schéma, types agrégés, lookups `*ForTable<T>`, version canary).
-  - `tables.ts` introspecte les relations, colonnes, index uniques et commentaires, puis produit `Selectable`, `JSONSelectable`, `Whereable`, `Insertable`, `Updatable` par table.
-  - `enums.ts` et `pgTypes.ts` font le mapping des types Postgres vers TS (selon le contexte Selectable, Insertable, etc.).
-  - `legacy.ts` affiche l'avertissement de migration depuis l'ancien « srcMode ».
-- `src/db/` : le runtime (import `zapatos/db`).
-  - `core.ts` : ⚠️ **zone sensible** : `sql`, `SQLFragment`, compilation et échappement (`param`, `raw`, `cols`, `vals`, `parent`, `self`, `Default`).
-  - `shortcuts.ts` : `insert`, `upsert`, `update`, `deletes`, `truncate`, `select*`, agrégats, `lateral`, verrous.
-  - `conditions.ts` : `eq`, `like`, `isIn`, `or`/`and`/`not`, opérateurs de tableaux…
-  - `transaction.ts` : niveaux d'isolation typés et retry sur erreur de sérialisation ou de deadlock.
+- `src/generate/`: the codegen (CLI `pgcast`, alias `zapatos`).
+  - `cli.ts` reads `zapatosconfig.json` and/or a JSON argument, and interpolates `{{ENV_VAR}}`.
+  - `config.ts` holds the config and its defaults.
+  - `write.ts` (`generate()`) writes `zapatos/schema.d.ts` and the `zapatos/custom/` placeholders.
+  - `tsOutput.ts` assembles the `zapatos/schema` module (namespaces per schema, aggregate types, `*ForTable<T>` lookups, version canary).
+  - `tables.ts` introspects relations, columns, unique indexes and comments, then produces `Selectable`, `JSONSelectable`, `Whereable`, `Insertable`, `Updatable` per table.
+  - `enums.ts` and `pgTypes.ts` map Postgres types to TS (by context: Selectable, Insertable, etc.).
+  - `legacy.ts` prints the migration warning for the old "srcMode".
+- `src/db/`: the runtime (import `zapatos/db`).
+  - `core.ts`: ⚠️ **sensitive zone**: `sql`, `SQLFragment`, compilation and escaping (`param`, `raw`, `cols`, `vals`, `parent`, `self`, `Default`).
+  - `shortcuts.ts`: `insert`, `upsert`, `update`, `deletes`, `truncate`, `select*`, aggregates, `lateral`, locks.
+  - `conditions.ts`: `eq`, `like`, `isIn`, `or`/`and`/`not`, array operators…
+  - `transaction.ts`: typed isolation levels and retry on serialisation failure or deadlock.
   - `date.ts`, `customJSON.ts`, `pgErrors.ts`, `config.ts`, `canary.ts`, `utils.ts`.
-- `src/typings/zapatos/schema.ts` : schéma factice qui ne sert qu'à compiler `src/db` (via `paths` dans tsconfig).
-- `db.{js,mjs,d.ts}` et `generate.{js,mjs,d.ts}` : shims racine. Les `.mjs` sont **générés** par `gen-esm-wrapper` au build.
+- `src/typings/zapatos/schema.ts`: a dummy schema used only to compile `src/db` (via `paths` in tsconfig).
+- `db.{js,mjs,d.ts}` and `generate.{js,mjs,d.ts}`: root shims. The `.mjs` files are **generated** by `gen-esm-wrapper` at build time.
 
-### Point d'attention : noms de modules
+### Watch out: module names
 
-Le code généré et le runtime parlent de `zapatos/schema`, `zapatos/db` et `zapatos/custom`. Ce sont des **noms de modules résolus à l'exécution et à la compilation**, pas une simple question de marque. Décision [002](docs/decisions/002-noms-de-modules.md) : ces chaînes restent `zapatos/*` ; un mode `pgcast/*` viendra plus tard, en opt-in. **Ne renomme aucune de ces chaînes.**
+The generated code and the runtime speak of `zapatos/schema`, `zapatos/db` and `zapatos/custom`. These are **module names resolved at run time and at compile time**, not a mere matter of branding. Decision [002](docs/decisions/002-noms-de-modules.md): these strings stay `zapatos/*`; a `pgcast/*` mode will come later, opt-in. **Do not rename any of these strings.**
 
-## Commandes
+## Commands
 
-| Commande | Rôle |
+| Command | Role |
 |---|---|
-| `npm ci` | installation (npm ≥ 10) |
-| `npm run build` | `tsc` (CJS, ES2019) + wrappers ESM |
-| `npm run lint` | ESLint 9 (flat config) sur `src/` |
-| `npm run typecheck` | `tsc` sur la lib (ses déclarations vont dans `node_modules/.cache/pgcast`), sur `test/`, et sur le généré de la fixture (`test/generated/`) contre ces déclarations |
-| `npm test` | Vitest : unitaires et intégration (`TEST_DATABASE_URL` requis, `useTestDatabase()` dans `test/helpers/db.ts`) |
-| `npm run test:watch` | Vitest en watch |
-| `npm run test:types` | émet les déclarations de `src/db`, puis les tests de types Vitest (`test/types/*.test-d.ts`, `expectTypeOf`) sur le schéma généré de la fixture |
-| `npm run bench:types` | coût de compilation de `bench/` (requêtes typées sur le schéma de la fixture) : `Instantiations` et `Types`, moins un plancher sans pgcast, comparés à `bench/baseline.json` ; échoue au-delà de +20 %, en deçà de −5 % ou si la version de TypeScript diffère ; `-- --update` réécrit la référence |
-| `npm run check:agents` | cohérence des skills et agents, tests du hook `guard` |
+| `npm ci` | install (npm ≥ 10) |
+| `npm run build` | `tsc` (CJS, ES2019) + ESM wrappers |
+| `npm run lint` | ESLint 9 (flat config) on `src/` |
+| `npm run typecheck` | `tsc` on the lib (its declarations go to `node_modules/.cache/pgcast`), on `test/`, and on the fixture's generated output (`test/generated/`) against those declarations |
+| `npm test` | Vitest: unit and integration (`TEST_DATABASE_URL` required, `useTestDatabase()` in `test/helpers/db.ts`) |
+| `npm run test:watch` | Vitest in watch mode |
+| `npm run test:types` | emits the declarations of `src/db`, then the Vitest type tests (`test/types/*.test-d.ts`, `expectTypeOf`) on the fixture's generated schema |
+| `npm run bench:types` | compile cost of `bench/` (typed queries on the fixture's schema): `Instantiations` and `Types`, minus a floor without pgcast, compared with `bench/baseline.json`; fails above +20 %, below −5 % or if the TypeScript version differs; `-- --update` rewrites the baseline |
+| `npm run check:agents` | consistency of skills and agents, tests of the `guard` hook |
 
-Une tâche n'est **terminée** que si `lint`, `typecheck`, `test` et `test:types` passent.
+A task is **done** only if `lint`, `typecheck`, `test` and `test:types` pass.
 
-## Méthode
+## Method
 
-- Outillage IA et carte des skills : [.agents/README.md](.agents/README.md). Avant un sujet, lire le skill qu'il nomme.
-- Étapes : les sous-issues des Epics, une à la fois, lues par `gh issue view <n> --repo AlexandreDemartin/pgcast`, orchestrées par le skill `run-step` (agents `builder`, `branch-reviewer`, `chores`). Chaque PR ferme son issue (`Closes #n`). Historique d'avant : [docs/SUIVI.md](docs/SUIVI.md).
-- CI : PR en draft pendant l'itération, `gh pr ready` une fois prête (skill `ci-gate`).
-- Relectures : agent `branch-reviewer`, qui s'appuie sur le skill utilisateur `branch-review`.
-- Trancher seul ou demander : skill `decision-philosophy`.
-- Taille, découpe, titres et style de George MacKerron, à pousser plus loin sans les trahir : skill `zapatos-spirit`.
+- AI tooling and skill map: [.agents/README.md](.agents/README.md). Before a subject, read the skill it names.
+- Steps: the sub-issues of the Epics, one at a time, read with `gh issue view <n> --repo AlexandreDemartin/pgcast`, orchestrated by the skill `run-step` (agents `builder`, `branch-reviewer`, `chores`). Each PR closes its issue (`Closes #n`). Earlier history: [docs/SUIVI.md](docs/SUIVI.md).
+- CI: PR in draft while iterating, `gh pr ready` once ready (skill `ci-gate`).
+- Reviews: agent `branch-reviewer`, which relies on the user skill `branch-review`.
+- Deciding alone or asking: skill `decision-philosophy`.
+- George MacKerron's size, splitting, titles and style, pushed further without betraying them: skill `zapatos-spirit`.
 
-## Règles de travail
+## Working rules
 
-- **Lire le code concerné avant de modifier**, et résumer ce qu'on a compris.
-- **Tests d'abord**, ou au minimum avec l'implémentation : runtime, SQL compilé (`text` et `values`) et types (cas positifs **et** négatifs avec `@ts-expect-error`).
-- **Une fonctionnalité = une branche = une PR** sur `AlexandreDemartin/pgcast`, petite comme un commit de George. Commits, titres de PR et découpe à la manière de George MacKerron (skill `zapatos-spirit`).
-- **Aucun changement cassant** sur l'API publique. Si c'est inévitable, on s'arrête et on demande (skill `backward-compat`).
-- **`core.ts` (échappement, paramétrisation, compilation des identifiants)** : ne jamais y toucher sans le signaler explicitement. Chaque changement ajoute des tests d'injection SQL (skill `sql-safety`).
-- **Types avancés** : surveiller le temps de compilation (`bench:types`, seuil +20 %). Un type qui compile n'est pas forcément correct (skill `type-tests`).
-- Un helper se conçoit avec le skill `zero-abstraction`, la sortie du codegen avec le skill `codegen-output`, un besoin se valide avec le skill `consumer-usage`.
-- Mettre à jour `CHANGELOG.md` et la doc à chaque fonctionnalité (skill `concise-docs`).
-- Garder les en-têtes de copyright existants (George MacKerron). Les nouveaux fichiers peuvent porter `Copyright (C) 2026 Alexandre Demartin`.
-- Décision de conception ambiguë : rédiger `docs/decisions/NNN-titre.md` (contexte, options, choix proposé) et **demander validation avant d'implémenter**.
+- **Read the code concerned before changing it**, and summarise what you understood.
+- **Tests first**, or at least with the implementation: runtime, compiled SQL (`text` and `values`) and types (positive **and** negative cases with `@ts-expect-error`).
+- **One feature = one branch = one PR** on `AlexandreDemartin/pgcast`, small like one of George's commits. Commits, PR titles and splitting in George MacKerron's manner (skill `zapatos-spirit`).
+- **No breaking change** to the public API. If it is unavoidable, stop and ask (skill `backward-compat`).
+- **`core.ts` (escaping, parameterisation, identifier compilation)**: never touch it without saying so explicitly. Each change adds SQL injection tests (skill `sql-safety`).
+- **Advanced types**: watch compile time (`bench:types`, +20 % threshold). A type that compiles is not necessarily correct (skill `type-tests`).
+- A helper is designed with the skill `zero-abstraction`, the codegen output with the skill `codegen-output`, and a need is validated with the skill `consumer-usage`.
+- Update `CHANGELOG.md` and the docs with each feature (skill `concise-docs`).
+- Keep the existing copyright headers (George MacKerron). New files may carry `Copyright (C) 2026 Alexandre Demartin`.
+- An ambiguous design decision: write `docs/decisions/NNN-title.md` (context, options, proposed choice) and **ask for validation before implementing**.
 
-## Points d'arrêt obligatoires (on s'arrête et on demande)
+## Stop points (mandatory: stop and ask)
 
-- Avant tout changement de l'API publique ou de la sortie du codegen (hors ajout opt-in).
-- Avant toute modification de l'échappement ou de la compilation SQL dans `core.ts`.
-- À chaque note de décision.
-- Si le benchmark de compilation dépasse le seuil.
-- Avant toute publication npm ou création de release. Le script `postversion` d'origine, qui publiait automatiquement, a été retiré ; `prepack` garantit un build avant tout `npm pack` ou `npm publish`.
-- Avant tout changement de `exports`, `bin`, `files`, `engines`, `peerDependencies` ou `dependencies` : ils font partie de l'API publique.
+- Before any change to the public API or to the codegen output (except an opt-in addition).
+- Before any change to escaping or SQL compilation in `core.ts`.
+- At each decision note.
+- If the compile benchmark exceeds its threshold.
+- Before any npm publication or release. The original `postversion` script, which published automatically, has been removed; `prepack` guarantees a build before any `npm pack` or `npm publish`.
+- Before any change to `exports`, `bin`, `files`, `engines`, `peerDependencies` or `dependencies`: they are part of the public API.
 
-## Environnement local
+## Local environment
 
-- Node `^20.19` ou `>=22.12` pour développer (Vite, via Vitest) ; le dev courant se fait en Node 22. Le paquet publié ne déclare pas d'`engines`, comme Zapatos 6.6.1.
-- La CI utilise npm 10 (Node 20 et 22) et npm 11 (`lts/*`) ; `npm ci` passe avec les deux. Avec npm 10, `npm install <pkg>` peut planter sur les peer deps de Vitest (`Cannot read properties of null (reading 'edgesOut')`). Dans ce cas, utiliser `npx npm@11 install …`.
-- Postgres pour les tests : **pas de Docker**. On utilise une instance locale via `TEST_DATABASE_URL`, définie dans `src/.env` (ignoré par git, ne jamais le commiter) ; une variable déjà dans l'environnement prime sur `src/.env`. En CI, ce sont des service containers GitHub Actions.
-- Droits du rôle de `TEST_DATABASE_URL` : `CREATEDB`, et superutilisateur pour `CREATE EXTENSION file_fdw` et l'option `filename` de la table étrangère de la fixture.
+- Node `^20.19` or `>=22.12` for development (Vite, via Vitest); day-to-day development is on Node 22. The published package declares no `engines`, like Zapatos 6.6.1.
+- CI uses npm 10 (Node 20 and 22) and npm 11 (`lts/*`); `npm ci` works with both. With npm 10, `npm install <pkg>` can crash on Vitest's peer deps (`Cannot read properties of null (reading 'edgesOut')`). If so, use `npx npm@11 install …`.
+- Postgres for tests: **no Docker**. We use a local instance via `TEST_DATABASE_URL`, set in `src/.env` (ignored by git, never commit it); a variable already in the environment takes precedence over `src/.env`. In CI, these are GitHub Actions service containers.
+- Rights of the `TEST_DATABASE_URL` role: `CREATEDB`, and superuser for `CREATE EXTENSION file_fdw` and the `filename` option of the fixture's foreign table.
