@@ -20,3 +20,5 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 - `AGENTS.md` (+ `CLAUDE.md` symlink), roadmap and design decision notes under `docs/`.
 - CI matrix: Node 20, 22 and latest LTS; draft PRs run no job.
 - Agent workflow (adapted from Bienvenue): `.agents/skills/`, `.claude/agents/` (`builder`, `branch-reviewer`, `chores`), `.claude/hooks/guard.mjs`, `npm run check:agents`, `docs/SUIVI.md`, `docs/APPRENTISSAGES.md`.
+- Integration test harness: reference fixture `test/fixtures/schema.sql` (Postgres 14+), a template database built once per run, a fresh database per test file and a `ROLLBACK` per test (`useTestDatabase()`, `test/helpers/db.ts`). Needs `TEST_DATABASE_URL` (`src/.env` or the environment); tests only create and drop `pgcast_test_*` databases.
+- CI matrix: Postgres 14, 16 and 18 service containers × Node 20, 22 and latest LTS.
