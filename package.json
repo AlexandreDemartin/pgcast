@@ -21,7 +21,7 @@
     "typecheck": "tsc --emitDeclarationOnly --outDir node_modules/.cache/pgcast && tsc -p test && tsc -p test/generated",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:types": "vitest run --typecheck.only",
+    "test:types": "tsc --emitDeclarationOnly --outDir node_modules/.cache/pgcast && vitest run --typecheck.only",
     "bench:types": "node -e \"console.error('bench:types arrive en phase 1 (cf. docs/ROADMAP.md)'); process.exit(1)\"",
     "version": "npm run lint && npm run typecheck && npm test && npm run test:types && npm run build",
     "check:agents": "node scripts/check-agents.mjs"
