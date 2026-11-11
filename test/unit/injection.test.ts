@@ -1,13 +1,14 @@
 // Copyright (C) 2026 Alexandre Demartin
 //
-// Characterization of every entry point of src/db/core.ts and src/db/shortcuts.ts
-// that writes a caller's string into the SQL text, under hostile inputs (skill
-// sql-safety). Compilation only: each snapshot maps an input to the `text` it gives,
-// or to the error it throws. What the text achieves once run:
-// test/integration/injection.test.ts. Nothing here is fixed (chapter 2).
+// Characterization of every entry point of src/db/core.ts, shortcuts.ts and
+// transaction.ts that writes a caller's string into the SQL text, under hostile
+// inputs (skill sql-safety). Compilation only: each snapshot maps an input to the
+// `text` it gives, or to the error it throws. What the text achieves once run:
+// test/integration/injection.test.ts. A test named `characterization:` is not
+// fixed yet (chapter 2).
 // Inputs are cast to `any`: at run time they may come from untyped data (req.body).
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import * as db from '../../src/db';
 import { sql, param, cols, vals, all } from '../../src/db';
 
@@ -465,35 +466,35 @@ describe('shortcut options', () => {
     `);
   });
 
-  it('characterization: lock.for and lock.wait are written raw', () => {
+  it('lock.for and lock.wait are checked at run time', () => {
     expect(matrix(v => db.select('users', all, { lock: { for: v } } as any))).toMatchInlineSnapshot(`
       {
-        "backslash": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" FOR a\\b) AS "sq_users"",
-        "comment": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" FOR a/*b) AS "sq_users"",
-        "dashes": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" FOR a--b) AS "sq_users"",
-        "dollar": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" FOR a$1b) AS "sq_users"",
-        "dot": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" FOR a.b) AS "sq_users"",
-        "dquote": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" FOR a"b) AS "sq_users"",
-        "lone": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" FOR ") AS "sq_users"",
-        "nul": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" FOR a<NUL>b) AS "sq_users"",
-        "prequoted": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" FOR "a") AS "sq_users"",
-        "semicolon": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" FOR a;b) AS "sq_users"",
-        "squote": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" FOR a'b) AS "sq_users"",
+        "backslash": "throws: Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not 'a\\b'",
+        "comment": "throws: Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not 'a/*b'",
+        "dashes": "throws: Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not 'a--b'",
+        "dollar": "throws: Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not 'a$1b'",
+        "dot": "throws: Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not 'a.b'",
+        "dquote": "throws: Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not 'a"b'",
+        "lone": "throws: Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not '"'",
+        "nul": "throws: Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not 'a<NUL>b'",
+        "prequoted": "throws: Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not '"a"'",
+        "semicolon": "throws: Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not 'a;b'",
+        "squote": "throws: Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not 'a'b'",
       }
     `);
     expect(matrix(v => db.select('users', all, { lock: { for: 'UPDATE', wait: v } } as any))).toMatchInlineSnapshot(`
       {
-        "backslash": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" FOR UPDATE a\\b) AS "sq_users"",
-        "comment": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" FOR UPDATE a/*b) AS "sq_users"",
-        "dashes": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" FOR UPDATE a--b) AS "sq_users"",
-        "dollar": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" FOR UPDATE a$1b) AS "sq_users"",
-        "dot": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" FOR UPDATE a.b) AS "sq_users"",
-        "dquote": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" FOR UPDATE a"b) AS "sq_users"",
-        "lone": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" FOR UPDATE ") AS "sq_users"",
-        "nul": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" FOR UPDATE a<NUL>b) AS "sq_users"",
-        "prequoted": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" FOR UPDATE "a") AS "sq_users"",
-        "semicolon": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" FOR UPDATE a;b) AS "sq_users"",
-        "squote": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" FOR UPDATE a'b) AS "sq_users"",
+        "backslash": "throws: Lock wait must be NOWAIT/SKIP LOCKED/undefined, not 'a\\b'",
+        "comment": "throws: Lock wait must be NOWAIT/SKIP LOCKED/undefined, not 'a/*b'",
+        "dashes": "throws: Lock wait must be NOWAIT/SKIP LOCKED/undefined, not 'a--b'",
+        "dollar": "throws: Lock wait must be NOWAIT/SKIP LOCKED/undefined, not 'a$1b'",
+        "dot": "throws: Lock wait must be NOWAIT/SKIP LOCKED/undefined, not 'a.b'",
+        "dquote": "throws: Lock wait must be NOWAIT/SKIP LOCKED/undefined, not 'a"b'",
+        "lone": "throws: Lock wait must be NOWAIT/SKIP LOCKED/undefined, not '"'",
+        "nul": "throws: Lock wait must be NOWAIT/SKIP LOCKED/undefined, not 'a<NUL>b'",
+        "prequoted": "throws: Lock wait must be NOWAIT/SKIP LOCKED/undefined, not '"a"'",
+        "semicolon": "throws: Lock wait must be NOWAIT/SKIP LOCKED/undefined, not 'a;b'",
+        "squote": "throws: Lock wait must be NOWAIT/SKIP LOCKED/undefined, not 'a'b'",
       }
     `);
   });
@@ -516,20 +517,35 @@ describe('shortcut options', () => {
     `);
   });
 
-  it('characterization: truncate options are written raw', () => {
+  it('truncate options are checked at run time', () => {
     expect(matrix(v => db.truncate('users', v))).toMatchInlineSnapshot(`
       {
-        "backslash": "TRUNCATE "users" a\\b",
-        "comment": "TRUNCATE "users" a/*b",
-        "dashes": "TRUNCATE "users" a--b",
-        "dollar": "TRUNCATE "users" a$1b",
-        "dot": "TRUNCATE "users" a.b",
-        "dquote": "TRUNCATE "users" a"b",
-        "lone": "TRUNCATE "users" "",
-        "nul": "TRUNCATE "users" a<NUL>b",
-        "prequoted": "TRUNCATE "users" "a"",
-        "semicolon": "TRUNCATE "users" a;b",
-        "squote": "TRUNCATE "users" a'b",
+        "backslash": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not 'a\\b'",
+        "comment": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not 'a/*b'",
+        "dashes": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not 'a--b'",
+        "dollar": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not 'a$1b'",
+        "dot": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not 'a.b'",
+        "dquote": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not 'a"b'",
+        "lone": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not '"'",
+        "nul": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not 'a<NUL>b'",
+        "prequoted": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not '"a"'",
+        "semicolon": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not 'a;b'",
+        "squote": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not 'a'b'",
+      }
+    `);
+    expect(matrix(v => db.truncate('users', 'RESTART IDENTITY', v))).toMatchInlineSnapshot(`
+      {
+        "backslash": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not 'a\\b'",
+        "comment": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not 'a/*b'",
+        "dashes": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not 'a--b'",
+        "dollar": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not 'a$1b'",
+        "dot": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not 'a.b'",
+        "dquote": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not 'a"b'",
+        "lone": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not '"'",
+        "nul": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not 'a<NUL>b'",
+        "prequoted": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not '"a"'",
+        "semicolon": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not 'a;b'",
+        "squote": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not 'a'b'",
       }
     `);
   });
@@ -585,5 +601,36 @@ describe('param cast', () => {
         "squote": "SELECT CAST($1 AS "a'b")",
       }
     `);
+  });
+});
+
+describe('transaction', () => {
+  it('the isolation level is checked before any query', async () => {
+    const queryable = { connect: vi.fn(), query: vi.fn() };
+    const results = await Promise.all(Object.entries(hostile).map(async ([name, input]) => {
+      try {
+        await db.transaction(queryable as any, input as any, async () => null);
+        return [name, 'resolves'];
+      } catch (err) {
+        return [name, visible(`throws: ${(err as Error).message}`)];
+      }
+    }));
+    expect(Object.fromEntries(results)).toMatchInlineSnapshot(`
+      {
+        "backslash": "throws: Isolation level must be an IsolationLevel value (e.g. IsolationLevel.Serializable), not 'a\\b'",
+        "comment": "throws: Isolation level must be an IsolationLevel value (e.g. IsolationLevel.Serializable), not 'a/*b'",
+        "dashes": "throws: Isolation level must be an IsolationLevel value (e.g. IsolationLevel.Serializable), not 'a--b'",
+        "dollar": "throws: Isolation level must be an IsolationLevel value (e.g. IsolationLevel.Serializable), not 'a$1b'",
+        "dot": "throws: Isolation level must be an IsolationLevel value (e.g. IsolationLevel.Serializable), not 'a.b'",
+        "dquote": "throws: Isolation level must be an IsolationLevel value (e.g. IsolationLevel.Serializable), not 'a"b'",
+        "lone": "throws: Isolation level must be an IsolationLevel value (e.g. IsolationLevel.Serializable), not '"'",
+        "nul": "throws: Isolation level must be an IsolationLevel value (e.g. IsolationLevel.Serializable), not 'a<NUL>b'",
+        "prequoted": "throws: Isolation level must be an IsolationLevel value (e.g. IsolationLevel.Serializable), not '"a"'",
+        "semicolon": "throws: Isolation level must be an IsolationLevel value (e.g. IsolationLevel.Serializable), not 'a;b'",
+        "squote": "throws: Isolation level must be an IsolationLevel value (e.g. IsolationLevel.Serializable), not 'a'b'",
+      }
+    `);
+    expect(queryable.connect).not.toHaveBeenCalled();
+    expect(queryable.query).not.toHaveBeenCalled();
   });
 });
