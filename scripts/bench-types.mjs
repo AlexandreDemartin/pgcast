@@ -6,6 +6,8 @@
 //
 // What is compared is the bench minus its floor (bench/tsconfig.floor.json: same options, no code),
 // so that TypeScript's libs and @types/node, which do not depend on pgcast, do not dilute the threshold.
+// A fixed part remains: checking the .d.ts of the generated schema and of src/db, whatever the queries,
+// is about 47 % of the net Types and 16 % of the net Instantiations.
 import {spawnSync} from 'node:child_process';
 import {readFileSync, writeFileSync} from 'node:fs';
 import {createRequire} from 'node:module';
