@@ -1,6 +1,8 @@
 // Integration smoke test of the harness: a fresh database per file, the fixture
 // loaded, and each test isolated by a ROLLBACK.
+import type pg from 'pg';
 import { describe, expect, inject, it } from 'vitest';
+import { urlForDatabase, withAdminClient } from '../helpers/databases';
 import { useTestDatabase } from '../helpers/db';
 
 const t = useTestDatabase();
@@ -94,4 +96,19 @@ describe('isolation between tests', () => {
 
   it('first writer sees only its own write', () => insertAndCount('first'));
   it('second writer sees only its own write', () => insertAndCount('second'));
+
+  it('leaves sequences advanced after a ROLLBACK: read generated values via RETURNING', async () => {
+    const insert = (c: pg.ClientBase) => c.query<{ id: number }>(
+      `INSERT INTO public.users (email, display_name) VALUES ('seq@probe.test', 'sequence probe') RETURNING id`);
+    // a second connection to this file's database, rolled back like the harness does after each test
+    const rolledBack = await withAdminClient(urlForDatabase(inject('pgcastDb')!.url, t.name), async c => {
+      await c.query('BEGIN');
+      const { rows } = await insert(c);
+      await c.query('ROLLBACK');
+      return rows[0].id;
+    });
+    const { rows } = await insert(t.client);
+    expect(rows[0].id).toBeGreaterThan(rolledBack);
+    expect(await one(`SELECT count(*)::int AS v FROM public.users WHERE id = ${rolledBack}`)).toBe(0);
+  });
 });

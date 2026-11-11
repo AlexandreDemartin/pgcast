@@ -5,6 +5,9 @@
 //   - each test: one client inside BEGIN, rolled back afterwards;
 //   - afterAll: the database is dropped.
 // A test must not COMMIT: its writes would leak into the next tests of the file.
+// ROLLBACK does not undo everything: sequences stay advanced (serial, identity,
+// nextval, setval), and pooled connections keep their session state (PREPARE,
+// session advisory locks). Never hard-code a generated value: read it via RETURNING.
 
 import { randomBytes } from 'node:crypto';
 import pg from 'pg';
