@@ -119,11 +119,12 @@ export const toBuffer = strict((ba: ByteArrayString) => Buffer.from(ba.slice(2),
  * @param x The value to be wrapped
  * @param cast Optional cast type. If a string, the parameter will be cast to
  * this type within the query e.g. `CAST($1 AS "type")` instead of plain `$1`.
- * The type is quoted as one identifier, any `"` doubled (as `quote_ident`
- * does), so it cannot close its quotes: `public.mood` and `int4[]` are not
- * split. A type that is well-formed once wrapped in `"`, such as `public"."mood`
- * (giving `"public"."mood"`), is written as is; an array type needs `sql`
- * (`` sql`${param(x)}::int4[]` ``). If
+ * The type is written as is if `"type"` is well-formed: non-empty quoted parts
+ * without NUL, in which `""` stands for one `"`, joined by `.` with optional
+ * whitespace around it (so `public"."mood` gives `"public"."mood"`). Otherwise
+ * it is one quoted identifier, any `"` doubled (as `quote_ident` does), so it
+ * cannot close its quotes: `public.mood` and `int4[]` are not split, and an
+ * array type needs `sql` (`` sql`${param(x)}::int4[]` ``). If
  * `true`, the value will be JSON stringified and cast to `json` (irrespective
  * of the configuration parameters `castArrayParamsToJson` and
  * `castObjectParamsToJson`). If `false`, the value will **not** be JSON-
@@ -139,11 +140,12 @@ export class Parameter<T = any> { constructor(public value: T, public cast?: boo
  * @param x The value to be wrapped
  * @param cast Optional cast type. If a string, the parameter will be cast to
  * this type within the query e.g. `CAST($1 AS "type")` instead of plain `$1`.
- * The type is quoted as one identifier, any `"` doubled (as `quote_ident`
- * does), so it cannot close its quotes: `public.mood` and `int4[]` are not
- * split. A type that is well-formed once wrapped in `"`, such as `public"."mood`
- * (giving `"public"."mood"`), is written as is; an array type needs `sql`
- * (`` sql`${param(x)}::int4[]` ``). If
+ * The type is written as is if `"type"` is well-formed: non-empty quoted parts
+ * without NUL, in which `""` stands for one `"`, joined by `.` with optional
+ * whitespace around it (so `public"."mood` gives `"public"."mood"`). Otherwise
+ * it is one quoted identifier, any `"` doubled (as `quote_ident` does), so it
+ * cannot close its quotes: `public.mood` and `int4[]` are not split, and an
+ * array type needs `sql` (`` sql`${param(x)}::int4[]` ``). If
  * `true`, the value will be JSON stringified and cast to `json` (irrespective
  * of the configuration parameters `castArrayParamsToJson` and
  * `castObjectParamsToJson`). If `false`, the value will **not** be JSON
