@@ -6,7 +6,7 @@
 Le nom joue sur deux sens : en Postgres, un *cast* (`::type`) donne un type à une valeur ; en anglais, *cast* désigne aussi un moulage. Les types TypeScript sont **moulés sur le schéma de la base**, sans jamais être écrits à la main.
 
 Objectifs : moderniser, tester, puis étendre, **sans trahir la philosophie** et en restant **rétrocompatible avec Zapatos 6.6.1**.
-La roadmap est dans [docs/ROADMAP.md](docs/ROADMAP.md) et les décisions dans [docs/decisions/](docs/decisions/).
+La roadmap est dans les issues GitHub, un Epic par chapitre ([README](README.md#roadmap)), et les décisions dans [docs/decisions/](docs/decisions/).
 
 ## Philosophie (non négociable)
 
@@ -68,7 +68,7 @@ Une tâche n'est **terminée** que si `lint`, `typecheck`, `test` et `test:types
 ## Méthode
 
 - Outillage IA et carte des skills : [.agents/README.md](.agents/README.md). Avant un sujet, lire le skill qu'il nomme.
-- Étapes : [docs/SUIVI.md](docs/SUIVI.md), une à la fois, orchestrées par le skill `run-step` (agents `builder`, `branch-reviewer`, `chores`).
+- Étapes : les sous-issues des Epics, une à la fois, lues par `gh issue view <n> --repo AlexandreDemartin/pgcast`, orchestrées par le skill `run-step` (agents `builder`, `branch-reviewer`, `chores`). Chaque PR ferme son issue (`Closes #n`). Historique d'avant : [docs/SUIVI.md](docs/SUIVI.md).
 - CI : PR en draft pendant l'itération, `gh pr ready` une fois prête (skill `ci-gate`).
 - Relectures : agent `branch-reviewer`, qui s'appuie sur le skill utilisateur `branch-review`.
 - Trancher seul ou demander : skill `decision-philosophy`.

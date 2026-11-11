@@ -15,7 +15,7 @@ Chaque élément existe une seule fois, à l'emplacement que les outils lisent n
 
 | Skill | Sujet |
 |---|---|
-| `run-step` | Orchestrer une étape de `docs/SUIVI.md` : builder, relecture selon **Relecture**, tri, `verify`, fusion, fin de chapitre |
+| `run-step` | Orchestrer une étape, sous-issue d'un Epic GitHub (`gh issue view`) : builder, relecture selon **Review**, tri, `verify`, fusion qui ferme l'issue, fin de chapitre |
 | `ci-gate` | PR draft pendant l'itération, `gh pr ready`, docs seules, check **CI passed**, `[skip ci]` exceptionnel, fusion |
 | `decision-philosophy` | Trancher seul ce que rien n'écrit, ou attendre l'utilisateur |
 | `simple-big-wins` | Gain mesuré rapporté à la complexité ajoutée ; rien de bancal |
@@ -30,7 +30,7 @@ Chaque élément existe une seule fois, à l'emplacement que les outils lisent n
 | `sql-safety` | Zone sensible `core.ts` : échappement, paramètres, identifiants, tests d'injection |
 | `type-tests` | Tests de types positifs et négatifs, coût de compilation (`bench:types`) |
 | `codegen-output` | Sortie du codegen : snapshots, opt-in, canary, diff justifié |
-| `consumer-usage` | Valider un besoin et une API contre Project A et Project B, sans rien en sortir |
+| `consumer-usage` | Valider un besoin et une API contre le corpus d'usages réels, sans rien en sortir |
 | `zapatos-spirit` | L'esprit de George MacKerron : découper, nommer, coder et documenter comme lui, en mieux |
 
 ## Écrire un skill
@@ -57,7 +57,7 @@ description: 'Ce que fait le skill. USE FOR: … DO NOT USE FOR: …'
 
 | Agent | Mission |
 |---|---|
-| `builder` | Construit une étape de `docs/SUIVI.md` jusqu'à la PR prête, ou corrige une liste de défauts, lancé à neuf |
+| `builder` | Construit une étape (une issue) jusqu'à la PR prête qui la ferme, ou corrige une liste de défauts, lancé à neuf |
 | `branch-reviewer` | Relecture senior en lecture seule (skill utilisateur `branch-review` + lentilles pgcast) ; mode `verify` |
 | `chores` | Mécanique sur sonnet : merge du dessous, relance CI, régénération ; s'arrête au premier choix |
 
