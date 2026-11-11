@@ -240,21 +240,25 @@ describe('transaction', () => {
 
   it('a plain client is used as is and not released', async () => {
     const client = await t.pool.connect();
+    const counts = () => ({ total: t.pool.totalCount, idle: t.pool.idleCount });
+    const before = counts();
     try {
       await db.readCommitted(client, c => {
         expect(c).toBe(client);
         return write(c, 'plain client');
       });
-      expect(await sql`SELECT 1 AS one`.run(client)).toEqual([{ one: 1 }]);  // still connected and ours
+      expect(counts()).toEqual(before);  // released, the client would be counted idle
     } finally {
       client.release();
     }
+    expect(counts()).toEqual({ ...before, idle: before.idle + 1 });  // control: release() makes it idle
     expect(await notes()).toEqual(['plain client']);
   });
 
-  it('characterization: on a client already in a raw BEGIN, it commits the outer transaction', async () => {
+  it('characterization: on a client already in a raw BEGIN, at the same level, it commits the outer transaction', async () => {
     // characterization: only a client from transaction() is passed through; START TRANSACTION inside BEGIN
-    // only warns, and its COMMIT ends the outer transaction, so the later ROLLBACK undoes nothing
+    // at the level already in force only warns, and its COMMIT ends the outer transaction,
+    // so the later ROLLBACK undoes nothing
     const client = await t.pool.connect();
     try {
       await client.query('BEGIN');
@@ -265,5 +269,25 @@ describe('transaction', () => {
       client.release();
     }
     expect(await notes()).toEqual(['inner', 'outer']);
+  });
+
+  it('characterization: on a client already in a raw BEGIN, at another level, it rolls back the outer transaction', async () => {
+    // characterization: once the outer transaction has run a query, its level can no longer change:
+    // START TRANSACTION fails with 25001, then transaction()'s ROLLBACK undoes the outer write
+    let called = false;
+    const client = await t.pool.connect();
+    try {
+      await client.query('BEGIN');
+      await write(client, 'outer');
+      const err = await db.serializable(client, async c => {
+        called = true;
+        await write(c, 'inner');
+      }).catch((e: unknown) => e);
+      expect(err).toMatchObject({ code: '25001', message: 'SET TRANSACTION ISOLATION LEVEL must be called before any query' });
+    } finally {
+      client.release();
+    }
+    expect(called).toBe(false);
+    expect(await notes()).toEqual([]);
   });
 });
