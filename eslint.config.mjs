@@ -1,42 +1,30 @@
-import { fixupConfigRules, fixupPluginRules } from "@eslint/compat";
-import { fileURLToPath } from "node:url";
-import { FlatCompat } from "@eslint/eslintrc";
-import typescriptEslint from "@typescript-eslint/eslint-plugin";
-import _import from "eslint-plugin-import";
-import globals from "globals";
-import tsParser from "@typescript-eslint/parser";
-import path from "node:path";
 import js from "@eslint/js";
+import tseslint from "typescript-eslint";
+import stylistic from "@stylistic/eslint-plugin";
+import importPlugin from "eslint-plugin-import";
+import prettier from "eslint-config-prettier";
+import globals from "globals";
 
-const
-  __filename = fileURLToPath(import.meta.url),
-  __dirname = path.dirname(__filename),
-  compat = new FlatCompat({
-    baseDirectory: __dirname,
-    recommendedConfig: js.configs.recommended,
-    allConfig: js.configs.all
-  });
+// Same rule set as upstream Zapatos 6.6.1, ported to native flat config.
+// `member-delimiter-style` and `semi` moved from typescript-eslint to @stylistic in v8.
 
-export default [
-  ...fixupConfigRules(
-    compat.extends(
-      "eslint:recommended",
-      "prettier",
-      "plugin:import/typescript"
-    ),
-  ), {
+export default tseslint.config(
+  js.configs.recommended,
+  prettier,
+  {
     files: ["src/**/*.ts"],
+    settings: importPlugin.flatConfigs.typescript.settings,
     plugins: {
-      "@typescript-eslint": typescriptEslint,
-      import: fixupPluginRules(_import),
+      "@typescript-eslint": tseslint.plugin,
+      "@stylistic": stylistic,
+      import: importPlugin,
     },
     languageOptions: {
       globals: {
         ...globals.node,
         globalThis: false,
       },
-      parser: tsParser,
-      ecmaVersion: 5,
+      parser: tseslint.parser,
       sourceType: "module",
       parserOptions: {
         project: "tsconfig.json",
@@ -59,7 +47,7 @@ export default [
       }],
       "@typescript-eslint/await-thenable": "error",
       "@typescript-eslint/no-floating-promises": "error",
-      "@typescript-eslint/member-delimiter-style": ["error", {
+      "@stylistic/member-delimiter-style": ["error", {
         "multiline": {
           "delimiter": "semi",
           "requireLast": true,
@@ -69,7 +57,7 @@ export default [
           "requireLast": false,
         },
       }],
-      "@typescript-eslint/semi": ["error", "always"],
+      "@stylistic/semi": ["error", "always"],
     },
-  }
-];
+  },
+);
