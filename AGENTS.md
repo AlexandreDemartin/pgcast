@@ -99,4 +99,5 @@ Une tâche n'est **terminée** que si `lint`, `typecheck`, `test` et `test:types
 
 - Node `^20.19` ou `>=22.12` pour développer (Vite, via Vitest) ; le dev courant se fait en Node 22. Le paquet publié ne déclare pas d'`engines`, comme Zapatos 6.6.1.
 - La CI utilise npm 10 (Node 20 et 22) et npm 11 (`lts/*`) ; `npm ci` passe avec les deux. Avec npm 10, `npm install <pkg>` peut planter sur les peer deps de Vitest (`Cannot read properties of null (reading 'edgesOut')`). Dans ce cas, utiliser `npx npm@11 install …`.
-- Postgres pour les tests : **pas de Docker**. On utilise une instance locale via `TEST_DATABASE_URL`, définie dans `src/.env` (ignoré par git, ne jamais le commiter). En CI, ce sont des service containers GitHub Actions.
+- Postgres pour les tests : **pas de Docker**. On utilise une instance locale via `TEST_DATABASE_URL`, définie dans `src/.env` (ignoré par git, ne jamais le commiter) ; une variable déjà dans l'environnement prime sur `src/.env`. En CI, ce sont des service containers GitHub Actions.
+- Droits du rôle de `TEST_DATABASE_URL` : `CREATEDB`, et superutilisateur pour `CREATE EXTENSION file_fdw` et l'option `filename` de la table étrangère de la fixture.
