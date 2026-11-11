@@ -94,7 +94,7 @@ Toujours les mêmes clés, dans cet ordre ; une clé absente ne s'applique pas.
 
 ### 1.6 `test/bench-types` — coût de compilation
 
-- [ ] **Livrée**
+- [x] **Livrée** : PR #10
 - **But** : `npm run bench:types` mesure `Instantiations` sur un projet exemple, compare à la référence, échoue au-delà de +20 % ; branché en CI.
 - **Relecture** : `normal`.
 - **Lire** : `type-tests`.
@@ -143,25 +143,25 @@ Toujours les mêmes clés, dans cet ordre ; une clé absente ne s'applique pas.
 - 2.31 Keep enum values in their declared order (R50) **(point d'arrêt)**
 - 2.32 Give a helpful error on interpolating null or a column-less parent() (R58) **(point d'arrêt)**
 - 2.33 Document the surprises the characterisation found (constats à documenter)
-- 2.34 
-- 2.35 ## 3. Le schéma et les conditions
-- 2.36 
-- 2.37 > Titres seulement, détaillés au début du chapitre ; l'ordre et le pourquoi : [ROADMAP.md](./ROADMAP.md) (v2).
-- 2.38 
-- 2.39 - 3.1 ① `--check` et `--watch`, avec un modèle intermédiaire de l'introspection
-- 2.40 - 3.2 ② Conditions : `isInSelect`, `exists`, tableaux typés sur la colonne, `jsonbContains`, `jsonbPathExists`, full-text
-- 2.41 - 3.3 ③ Clés étrangères, `related` / `relatedMany`, référence typée au résultat d'un lateral (note de décision d'abord)
-- 2.42 - 3.4 ④ Domaines `CHECK` en unions littérales, validateurs Zod / Valibot, `jsonb` par `COMMENT ON` (note de décision d'abord)
-- 2.43 - 3.5 ⑤ Fonctions Postgres typées
-- 2.44 - 3.6 ⑥ Alias de table typés et `with`
-- 2.45 
-- 2.46 ## 4. Runtime
-- 2.47 
-- 2.48 - 4.1 ⑦ Interface de driver (relecture `élevé`)
-- 2.49 - 4.2 ⑧ Savepoints, `advisoryXactLock`, retry structuré
-- 2.50 - 4.3 ⑨ Contexte RLS
-- 2.51 - 4.4 ⑩ Streaming par curseur
-- 2.52 
-- 2.53 ## 5. Inférence du SQL brut
-- 2.54 
-- 2.55 - 5.1 ⑪ Note de conception, puis implémentation si validée
+
+## 3. Le schéma et les conditions
+
+> Titres seulement, détaillés au début du chapitre ; l'ordre et le pourquoi : [ROADMAP.md](./ROADMAP.md) (v2).
+
+- 3.1 ① `--check` et `--watch`, avec un modèle intermédiaire de l'introspection
+- 3.2 ② Conditions : `isInSelect`, `exists`, tableaux typés sur la colonne, `jsonbContains`, `jsonbPathExists`, full-text
+- 3.3 ③ Clés étrangères, `related` / `relatedMany`, référence typée au résultat d'un lateral (note de décision d'abord)
+- 3.4 ④ Domaines `CHECK` en unions littérales, validateurs Zod / Valibot, `jsonb` par `COMMENT ON` (note de décision d'abord)
+- 3.5 ⑤ Fonctions Postgres typées
+- 3.6 ⑥ Alias de table typés et `with`
+
+## 4. Runtime
+
+- 4.1 ⑦ Interface de driver (relecture `élevé`)
+- 4.2 ⑧ Savepoints, `advisoryXactLock`, retry structuré
+- 4.3 ⑨ Contexte RLS
+- 4.4 ⑩ Streaming par curseur
+
+## 5. Inférence du SQL brut
+
+- 5.1 ⑪ Note de conception, puis implémentation si validée
