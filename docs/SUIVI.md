@@ -65,7 +65,7 @@ Toujours les mêmes clés, dans cet ordre ; une clé absente ne s'applique pas.
 
 ### 1.2 `test/codegen-snapshots` — sortie du codegen figée
 
-- [ ] **Livrée**
+- [x] **Livrée** : PR #4
 - **But** : le `schema.d.ts` généré depuis la fixture est figé par snapshot, et compile.
 - **Relecture** : `normal`, lentille `codegen`.
 - **Lire** : `codegen-output`.
