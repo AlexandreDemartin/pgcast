@@ -49,7 +49,7 @@ Mesuré sur ses 212 commits qui touchent `src/` :
 
 ## Découper comme George
 
-George committait directement sur `master` : **un commit de George correspond à une PR de pgcast**. Son historique montre comment il découpait :
+George committait directement sur `master` : **un commit de George correspond à une PR de pgcast**. Quand ses marches dépendent l'une de l'autre, la série devient une pile de PR (skill `run-step` § Empiler) ; sinon, des PR séparées. Son historique montre comment il découpait :
 
 | Son geste | Exemple tiré de `git log upstream/master` | Dans pgcast |
 |---|---|---|

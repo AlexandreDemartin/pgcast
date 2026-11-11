@@ -68,8 +68,23 @@ Un agent ne sait que ce que dit son brief.
 
 - **Rapport d'un relecteur** : au plus 10 défauts, du plus grave au moins grave, chacun bloquant ou mineur.
 - **Pas de worktree par défaut** ; un seul pour deux travaux en parallèle, retiré après la fusion.
-- **Pas de pile**, sauf une étape qui a besoin du code de la précédente avant sa fusion : un niveau, fusionné dans l'ordre.
 - Une branche poussée n'est jamais rebasée ni forcée ; une correction du dessous monte par merge (`guard.mjs`).
+
+## Empiler des PR (stacked PRs)
+
+Sources : doc GitHub « Stack code changes in pull requests », Thoughtworks Radar (anneau *Caution*), Graphite, cubic (2026).
+
+| Empiler | Ne pas empiler |
+|---|---|
+| Les étapes d'une **même feature** dépendent l'une de l'autre (la PR 2 a besoin du code de la PR 1), et attendre la fusion du bas bloquerait la suite. Exemple : la série de #54, métadonnées des FK → `related()` → `relatedMany()`. | Des changements **indépendants**, comme la plupart des correctifs de l'Epic #18 : des PR séparées vers `master`. |
+| Chaque couche est une PR de George, lisible seule. | Une PR qui suffit seule ; une pile qui sert d'excuse à un gros changement (« an excuse to write one enormous change », Thoughtworks). |
+| **3 couches au plus**, chacune ≤ ~250 lignes et 25 fichiers (seuil d'alerte de Graphite). | Une couche qui n'a pas de sens sans celle du dessus : la redécouper. |
+
+- **Mécanique sans réécriture**, compatible avec `guard.mjs` : la couche N part de la branche N-1 et sa PR vise la branche N-1 (`--base <branche N-1>`). Une correction du bas monte par `git merge origin/<branche N-1>` dans chaque couche du dessus, du bas vers le haut (agent `chores`).
+- **Pas de `gh stack sync` ni de `gh stack push`** : ils rebasent et forcent chaque branche.
+- **Revue** : chaque couche est relue seule, dès qu'elle est ouverte, sans attendre le bas ; le relecteur reçoit le numéro de la couche et sa base.
+- **Fusion du bas vers le haut**, en merge commit (`gh pr merge --merge`) : la couche suivante n'a rien à refaire, et GitHub la recible sur `master` (`delete_branch_on_merge` est actif). Puis `git merge origin/master` dans la couche reciblée si `master` a bougé, CI verte, fusion.
+- Une couche du milieu ne se fusionne jamais avant celles du dessous.
 
 ## Fin de chapitre
 
