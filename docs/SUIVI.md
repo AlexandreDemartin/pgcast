@@ -39,7 +39,7 @@ Toujours les mêmes clés, dans cet ordre ; une clé absente ne s'applique pas.
 
 ### 0.2 `chore/agent-workflow` — méthode de travail des agents
 
-- [ ] **Livrée** : PR à venir
+- [x] **Livrée** : PR #2
 - **But** : skills, agents `builder` / `branch-reviewer` / `chores`, hook `guard`, `check:agents`, ce suivi.
 - **Relecture** : `faible`.
 
