@@ -59,8 +59,8 @@ Exemple pour l'étape ③ (clés étrangères) :
 - **Anglais courant, une majuscule au début, sans préfixe** (`test:`, `feat:`), avec un verbe qui dit l'effet pour l'utilisateur : `Add …`, `Allow …`, `Fix …`, `Make …`, `Stop …`, `Characterise …`.
 - **Orthographe britannique**, comme George (`licence`, `characterise`, `parenthesise`, `favour`).
 - Noms d'API tels quels, sans backticks : « Allow db.all as value of noNullUpdateColumns ».
-- Issue liée en fin : `(closes #n)` ou `(addresses #n)`.
-- Exemples : « Fix not() so it parenthesises its condition », « Add related() and relatedMany() for lateral joins on foreign keys ».
+- **Issue de l'étape en fin, toujours** : `(closes #n)`, comme George (« Stop generating .eslintrc.json (closes #184) ») ; le corps porte aussi `Closes #n`, qui ferme l'issue à la fusion. `(addresses #n)` pour une PR qui n'en fait qu'une partie.
+- Exemples : « Fix not() so it parenthesises its condition (closes #30) », « Add related() and relatedMany() for lateral joins on foreign keys ».
 
 ## Commits
 
@@ -69,7 +69,8 @@ Même voix que les titres de PR ; ses sujets récents donnent le modèle.
 - **Une ligne**, en anglais courant, une majuscule au début, sans préfixe ni point final : « Add conditions with array operators », « Stop generating .eslintrc.json (closes #184) ».
 - **Impératif**, comme ses commits récents : `Add`, `Allow`, `Fix`, `Make`, `Stop`, `Ensure`, `Export`, `Characterise`.
 - **Docs** : « Update docs for … » ; **dépendances** : « Update dependencies » ; **version** : le numéro seul (« 6.7.0 »).
-- **Cases cochées** : « Tick step 2.1 » ; **merge de master** : « Merge master into <branche> ».
+- **Apprentissages** : « Record what #22 taught » ; **merge de master** : « Merge master into <branche> ».
+- Plus de commit qui coche une case : la fusion de la PR ferme son issue.
 - Pas de corps, sauf une raison qui ne tient pas dans la ligne ; la ligne `Co-Authored-By` demandée reste toujours.
 - Ancien format (`test: …`, `fix: …`) : historique des PR #1 à #12, on ne le réécrit pas.
 

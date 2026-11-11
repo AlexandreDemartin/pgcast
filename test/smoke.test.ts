@@ -1,5 +1,5 @@
 // Phase 0 smoke test: proves the harness runs against src/ without a database.
-// The real characterization suite lands in phase 1 (see docs/ROADMAP.md).
+// The real characterization suite lands in phase 1 (see README.md § Roadmap).
 import { describe, expect, it } from 'vitest';
 import * as db from '../src/db';
 

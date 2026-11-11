@@ -53,7 +53,6 @@ for (const file of readdirSync(agentsDirectory).filter(f => f.endsWith('.md'))) 
 const citingFiles = [
   'AGENTS.md',
   '.agents/README.md',
-  'docs/SUIVI.md',
   ...skills.map(s => join(skillsDirectory, s, 'SKILL.md')),
   ...readdirSync(agentsDirectory).filter(f => f.endsWith('.md')).map(f => join(agentsDirectory, f)),
 ].filter(existsSync);
