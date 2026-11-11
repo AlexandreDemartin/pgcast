@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // `npm run bench:types`: the type-checking cost of bench/, a schema-heavy project, against
-// bench/baseline.json. Fails when Instantiations or Types grow by more than 20 %.
-// `--update` rewrites the baseline. Times and memory are shown, never compared: they depend on the machine.
+// bench/baseline.json. Fails when Instantiations or Types grow by more than 20 %, or drop by more than 5 %
+// (the figures are deterministic, so a drop means the baseline is stale), or when the TypeScript version differs
+// from the baseline's. `--update` rewrites the baseline. Times and memory are shown, never compared: they depend on the machine.
 //
 // What is compared is the bench minus its floor (bench/tsconfig.floor.json: same options, no code),
 // so that TypeScript's libs and @types/node, which do not depend on pgcast, do not dilute the threshold.
@@ -15,6 +16,7 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 const baselineName = 'bench/baseline.json';
 const baselinePath = join(root, baselineName);
 const threshold = 0.2;
+const dropThreshold = 0.05;
 const compared = ['Instantiations', 'Types'];
 const shown = ['Check time', 'Memory used'];
 
@@ -72,11 +74,13 @@ for (const key of compared) {
   if (integer(baseline[key], `${key} in ${baselineName}`) <= 0) fail(`bench:types: ${key} in ${baselineName} is not positive.`);
 }
 const rows = [['', 'current', 'baseline', 'change']];
-const failures = [];
+const rises = [];
+const drops = [];
 for (const key of compared) {
   const change = current[key] / baseline[key] - 1;
   rows.push([key, current[key], baseline[key], `${change >= 0 ? '+' : ''}${(change * 100).toFixed(1)} %`]);
-  if (change > threshold) failures.push(key);
+  if (change > threshold) rises.push(key);
+  if (change < -dropThreshold) drops.push(key);
 }
 for (const key of shown) rows.push([key, bench[key], '', '']);
 
@@ -84,11 +88,22 @@ const widths = rows[0].map((_, i) => Math.max(...rows.map(row => String(row[i]).
 for (const row of rows) console.log(row.map((cell, i) => String(cell)[i ? 'padStart' : 'padEnd'](widths[i])).join('  '));
 
 if (baseline.typescript !== tsVersion) {
-  console.log(`\nnote: the baseline was measured with TypeScript ${baseline.typescript}, this is ${tsVersion}`);
+  fail(
+    `\nbench:types: ${baselineName} was measured with TypeScript ${baseline.typescript}, this is ${tsVersion}.`,
+    'Run `npm run bench:types -- --update` and commit the new baseline.',
+  );
 }
-if (failures.length) {
-  console.error(`\nbench:types: ${failures.join(' and ')} up by more than ${threshold * 100} % on ${baselineName}.`);
-  console.error('Find the type that costs more, or, if the rise is justified, run `npm run bench:types -- --update`');
-  console.error('and give the figures in the PR (skill type-tests).');
-  process.exit(1);
+if (rises.length) {
+  fail(
+    `\nbench:types: ${rises.join(' and ')} up by more than ${threshold * 100} % on ${baselineName}.`,
+    'Find the type that costs more, or, if the rise is justified, run `npm run bench:types -- --update`',
+    'and give the figures in the PR (skill type-tests).',
+  );
+}
+if (drops.length) {
+  fail(
+    `\nbench:types: ${drops.join(' and ')} down by more than ${dropThreshold * 100} % on ${baselineName}.`,
+    'The figures are deterministic: run `npm run bench:types -- --update` so that the baseline follows the drop,',
+    'and give the figures in the PR.',
+  );
 }
