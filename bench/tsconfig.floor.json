@@ -1,0 +1,6 @@
+{
+  // The bench's options without its code: see floor.ts.
+  "extends": "./tsconfig.json",
+  "include": [],
+  "files": ["./floor.ts"]
+}
