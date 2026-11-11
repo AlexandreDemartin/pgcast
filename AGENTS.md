@@ -47,7 +47,7 @@ code utilisateur ──► src/db/ (runtime : sql``, shortcuts, conditions, tran
 
 ### Point d'attention : noms de modules
 
-Le code généré et le runtime parlent de `zapatos/schema`, `zapatos/db` et `zapatos/custom`. Ce sont des **noms de modules résolus à l'exécution et à la compilation**, pas une simple question de marque. Tant que [docs/decisions/002-noms-de-modules.md](docs/decisions/002-noms-de-modules.md) n'est pas tranché, **ne renomme aucune de ces chaînes**.
+Le code généré et le runtime parlent de `zapatos/schema`, `zapatos/db` et `zapatos/custom`. Ce sont des **noms de modules résolus à l'exécution et à la compilation**, pas une simple question de marque. Décision [002](docs/decisions/002-noms-de-modules.md) : ces chaînes restent `zapatos/*` ; un mode `pgcast/*` viendra plus tard, en opt-in. **Ne renomme aucune de ces chaînes.**
 
 ## Commandes
 
@@ -82,10 +82,11 @@ Une tâche n'est **terminée** que si `lint`, `typecheck`, `test` et `test:types
 - Avant toute modification de l'échappement ou de la compilation SQL dans `core.ts`.
 - À chaque note de décision.
 - Si le benchmark de compilation dépasse le seuil.
-- Avant toute publication npm ou création de release. Le script `postversion` d'origine, qui publiait automatiquement, a été retiré.
+- Avant toute publication npm ou création de release. Le script `postversion` d'origine, qui publiait automatiquement, a été retiré ; `prepack` garantit un build avant tout `npm pack` ou `npm publish`.
+- Avant tout changement de `exports`, `bin`, `files`, `engines`, `peerDependencies` ou `dependencies` : ils font partie de l'API publique.
 
 ## Environnement local
 
-- Node ≥ 20 (le dev courant se fait en Node 22).
-- Avec npm 10, `npm install <pkg>` peut planter sur les peer deps de Vitest (`Cannot read properties of null (reading 'edgesOut')`). Dans ce cas, utiliser `npx npm@11 install …`. `npm ci` fonctionne normalement.
+- Node `^20.19` ou `>=22.12` pour développer (Vite, via Vitest) ; le dev courant se fait en Node 22. Le paquet publié ne déclare pas d'`engines`, comme Zapatos 6.6.1.
+- La CI utilise npm 10 (Node 20 et 22) et npm 11 (`lts/*`) ; `npm ci` passe avec les deux. Avec npm 10, `npm install <pkg>` peut planter sur les peer deps de Vitest (`Cannot read properties of null (reading 'edgesOut')`). Dans ce cas, utiliser `npx npm@11 install …`.
 - Postgres pour les tests : **pas de Docker**. On utilise une instance locale via `TEST_DATABASE_URL`, définie dans `src/.env` (ignoré par git, ne jamais le commiter). En CI, ce sont des service containers GitHub Actions.
