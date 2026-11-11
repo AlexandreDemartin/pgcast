@@ -2,6 +2,8 @@
   // Test-only config: the library build (../tsconfig.json) stays CommonJS/node10.
   "extends": "../tsconfig.json",
   "include": ["../src/**/*", "./**/*"],
+  // codegen output: compiled by ./generated/tsconfig.json, or not at all (edge snapshot)
+  "exclude": ["./generated", "./__snapshots__"],
   "compilerOptions": {
     "noEmit": true,
     "rootDir": "..",

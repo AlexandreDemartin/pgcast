@@ -18,6 +18,10 @@ Candidats à un contrôle, une règle ou une ligne de skill.
 - 1.1 — `process.loadEnvFile` ne remplace pas une variable déjà définie : l'environnement prime sur le fichier — `branch-reviewer`
 - 1.1 — Une base de test se crée en `ENCODING 'UTF8' LOCALE 'C'` : la collation libc diffère entre macOS et glibc — `branch-reviewer`, `test/helpers/globalSetup.ts`
 - 1.1 — `git stash` d'un seul fichier casse les fichiers qui en dépendent ; pour montrer un test rouge avant un correctif, un `node -e` direct est plus sûr — `builder`
+- 1.2 — Les sources de `src/db` ne compilent que contre le schéma factice ; un test de types importe les déclarations émises, comme un consommateur — `builder`, `test/generated/tsconfig.json`
+- 1.2 — Un dossier `.d.ts` de snapshots sous `test/` doit être exclu de `test/tsconfig.json`, sinon `tsc -p test` le compile — `builder`
+- 1.2 — Un tsconfig qui `extends` et pose `files` garde l'`include` du parent : ajouter `"include": []` — `builder`
+- 1.2 — `toMatchFileSnapshot` et `-u` ne suppriment jamais de fichier : chaque dossier de snapshots fichiers a son contrôle des fichiers en trop ou orphelins (candidat : skill `codegen-output`) — `branch-reviewer`
 
 ## Mineurs gardés
 
@@ -25,3 +29,6 @@ Défauts mineurs de relecture, repris par la relecture de fin de chapitre.
 
 - 1.1 — `test/helpers/db.ts:44` : un seul `client` par fichier ; `it.concurrent` écraserait la transaction d'un autre test — lever une erreur si `client` est déjà défini — `branch-reviewer`
 - 1.1 — `vitest.config.mts:7` : `globalSetup` tourne aussi sous `test:types` et crée une base modèle pour rien — `branch-reviewer`
+- 1.2 — `test/integration/codegen.test.ts:88` : seule la sortie principale est compilée ; les variantes (sauf `edge`) ne le sont pas — à reprendre en 1.4 — `branch-reviewer`
+- 1.2 — `test/integration/codegen.test.ts:8` : l'en-tête ne dit pas qu'après `-u` un fichier obsolète de `test/generated/zapatos/` se supprime à la main — `branch-reviewer`
+- 1.2 — `test/integration/codegen.test.ts:92` : rien ne repère un fichier orphelin dans `test/__snapshots__/codegen/` — `branch-reviewer`
