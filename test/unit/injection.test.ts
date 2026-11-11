@@ -178,23 +178,79 @@ describe('shortcut arguments', () => {
     `);
   });
 
-  it('characterization: the aggregate of select() in Numeric mode is written raw', () => {
-    // count(), sum(), avg(), min() and max() pass a constant; select() itself is public
+  it('the aggregate of select() in Numeric mode is checked at run time', () => {
+    // count(), sum(), avg(), min() and max() pass a constant; select() itself is public;
+    // `a.b`, `"a"` and `a$1b` are function names, written as before
     expect(matrix(v => db.select('users', all, {}, db.SelectResultMode.Numeric, v))).toMatchInlineSnapshot(`
       {
-        "backslash": "SELECT a\\b(*) AS result FROM "users"",
-        "comment": "SELECT a/*b(*) AS result FROM "users"",
-        "dashes": "SELECT a--b(*) AS result FROM "users"",
+        "backslash": "throws: Aggregate must be a function name (e.g. sum, or my_schema.my_agg), not 'a\\b'",
+        "comment": "throws: Aggregate must be a function name (e.g. sum, or my_schema.my_agg), not 'a/*b'",
+        "dashes": "throws: Aggregate must be a function name (e.g. sum, or my_schema.my_agg), not 'a--b'",
         "dollar": "SELECT a$1b(*) AS result FROM "users"",
         "dot": "SELECT a.b(*) AS result FROM "users"",
-        "dquote": "SELECT a"b(*) AS result FROM "users"",
-        "lone": "SELECT "(*) AS result FROM "users"",
-        "nul": "SELECT a<NUL>b(*) AS result FROM "users"",
+        "dquote": "throws: Aggregate must be a function name (e.g. sum, or my_schema.my_agg), not 'a"b'",
+        "lone": "throws: Aggregate must be a function name (e.g. sum, or my_schema.my_agg), not '"'",
+        "nul": "throws: Aggregate must be a function name (e.g. sum, or my_schema.my_agg), not 'a<NUL>b'",
         "prequoted": "SELECT "a"(*) AS result FROM "users"",
-        "semicolon": "SELECT a;b(*) AS result FROM "users"",
-        "squote": "SELECT a'b(*) AS result FROM "users"",
+        "semicolon": "throws: Aggregate must be a function name (e.g. sum, or my_schema.my_agg), not 'a;b'",
+        "squote": "throws: Aggregate must be a function name (e.g. sum, or my_schema.my_agg), not 'a'b'",
       }
     `);
+  });
+
+  it('a function name as the aggregate, as Postgres lexes one, is written as before', () => {
+    const numeric = (aggregate?: string) => db.select('users', all, { columns: ['id'] }, db.SelectResultMode.Numeric, aggregate).compile().text;
+    expect(numeric(undefined)).toBe('SELECT count("id") AS result FROM "users"');  // the default, also without strictNullChecks
+    expect(numeric('my_agg2')).toBe('SELECT my_agg2("id") AS result FROM "users"');
+    expect(numeric('_médiane')).toBe('SELECT _médiane("id") AS result FROM "users"');
+    expect(numeric('"MyAgg"')).toBe('SELECT "MyAgg"("id") AS result FROM "users"');
+    expect(numeric('pg_catalog.count')).toBe('SELECT pg_catalog.count("id") AS result FROM "users"');
+    expect(numeric('"Stats"."MyAgg"')).toBe('SELECT "Stats"."MyAgg"("id") AS result FROM "users"');
+    expect(numeric('my$agg')).toBe('SELECT my$agg("id") AS result FROM "users"');
+    expect(numeric('a$1b')).toBe('SELECT a$1b("id") AS result FROM "users"');
+    expect(numeric('e\u0301tendue')).toBe('SELECT e\u0301tendue("id") AS result FROM "users"');  // NFD
+    expect(numeric('"my agg"')).toBe('SELECT "my agg"("id") AS result FROM "users"');
+    expect(numeric('"a""b"')).toBe('SELECT "a""b"("id") AS result FROM "users"');
+    expect(numeric('"Stats-2024"')).toBe('SELECT "Stats-2024"("id") AS result FROM "users"');
+    expect(numeric(' count')).toBe('SELECT  count("id") AS result FROM "users"');
+    expect(numeric('count\n')).toBe('SELECT count\n("id") AS result FROM "users"');
+    expect(numeric('my_db.pg_catalog.count')).toBe('SELECT my_db.pg_catalog.count("id") AS result FROM "users"');
+    expect(numeric('pg_catalog . count')).toBe('SELECT pg_catalog . count("id") AS result FROM "users"');
+    expect(numeric('U&"c\\006Funt"')).toBe('SELECT U&"c\\006Funt"("id") AS result FROM "users"');
+    expect(numeric('u&"c\\006Funt"')).toBe('SELECT u&"c\\006Funt"("id") AS result FROM "users"');
+  });
+
+  it('a null aggregate is written as null, as in 6.6.1', () => {
+    // RegExp.test(null) tests the string 'null', a valid name; Postgres refuses the SQL, as before
+    expect(db.select('users', all, { columns: ['id'] }, db.SelectResultMode.Numeric, null as any).compile().text)
+      .toBe('SELECT null("id") AS result FROM "users"');
+  });
+
+  it('the aggregate of select() is ignored, as before, outside Numeric mode', () => {
+    expect(db.select('users', all, {}, db.SelectResultMode.Many, 'a;b').compile().text)
+      .toBe(db.select('users', all).compile().text);
+  });
+
+  it('an aggregate that is not a function name throws', () => {
+    const numeric = (aggregate: any) => () => db.select('users', all, {}, db.SelectResultMode.Numeric, aggregate);
+    for (const aggregate of ['', '1count', '$a', 'a.b.c.d', 'a.', '.a', 'a..b', 'a. .b', 'U&""', 'U& "a"', '&"a"', '""', '"a', 'a"', '"a"b"', '"a\0b"', 'count(*) FROM users; SELECT count', 'a b', 'a\nb', 'count\n;'])
+      expect(numeric(aggregate), aggregate).toThrow(`Aggregate must be a function name (e.g. sum, or my_schema.my_agg), not '${aggregate}'`);
+  });
+
+  it('an aggregate check stays fast on a long run of spaces', () => {
+    // a non-ASCII space is a letter to Postgres, so `\u00a0count` is one name and `\u00a0"a"` is two
+    const numeric = (aggregate: string) => () => db.select('users', all, {}, db.SelectResultMode.Numeric, aggregate);
+    expect(numeric('\u00a0count')).not.toThrow();
+    expect(numeric('\u00a0"a"')).toThrow();
+    for (const aggregate of ['\u00a0'.repeat(100_000) + ';', ' '.repeat(100_000) + ';', `a${' '.repeat(100_000)}.${' '.repeat(100_000)};`])
+      expect(numeric(aggregate)).toThrow('Aggregate must be a function name');
+  });
+
+  it('a U& quoted aggregate with a UESCAPE clause throws', () => {
+    // valid in 6.6.1, but not a name alone: `U&"c!006Funt" UESCAPE '!'`
+    for (const aggregate of [`U&"c!006Funt" UESCAPE '!'`, `U&"c!006Funt"UESCAPE'!'`])
+      expect(() => db.select('users', all, {}, db.SelectResultMode.Numeric, aggregate), aggregate)
+        .toThrow(`Aggregate must be a function name (e.g. sum, or my_schema.my_agg), not '${aggregate}'`);
   });
 
   it('characterization: upsert values keys, also written after EXCLUDED.', () => {
