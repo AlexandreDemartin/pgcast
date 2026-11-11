@@ -237,6 +237,15 @@ describe('shortcut arguments', () => {
       expect(numeric(aggregate), aggregate).toThrow(`Aggregate must be a function name (e.g. sum, or my_schema.my_agg), not '${aggregate}'`);
   });
 
+  it('an aggregate check stays fast on a long run of spaces', () => {
+    // a non-ASCII space is a letter to Postgres, so `\u00a0count` is one name and `\u00a0"a"` is two
+    const numeric = (aggregate: string) => () => db.select('users', all, {}, db.SelectResultMode.Numeric, aggregate);
+    expect(numeric('\u00a0count')).not.toThrow();
+    expect(numeric('\u00a0"a"')).toThrow();
+    for (const aggregate of ['\u00a0'.repeat(100_000) + ';', ' '.repeat(100_000) + ';', `a${' '.repeat(100_000)}.${' '.repeat(100_000)};`])
+      expect(numeric(aggregate)).toThrow('Aggregate must be a function name');
+  });
+
   it('a U& quoted aggregate with a UESCAPE clause throws', () => {
     // valid in 6.6.1, but not a name alone: `U&"c!006Funt" UESCAPE '!'`
     for (const aggregate of [`U&"c!006Funt" UESCAPE '!'`, `U&"c!006Funt"UESCAPE'!'`])
