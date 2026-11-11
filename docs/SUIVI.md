@@ -108,26 +108,60 @@ Toujours les mêmes clés, dans cet ordre ; une clé absente ne s'applique pas.
 
 ## 2. Correctifs
 
-> Détaillé à partir du rapport 1.7 : une étape par bug, chacune avec un test qui échoue d'abord.
+> Une étape par constat à corriger du [rapport](./RAPPORT-CARACTERISATION.md), dans l'ordre : gravité, puis risque croissant. Chacune commence par un test qui échoue. **(point d'arrêt)** : cassante, ou touche `core.ts` ou la sortie du codegen.
 
-## 3. Le schéma et les conditions
-
-> Titres seulement, détaillés au début du chapitre ; l'ordre et le pourquoi : [ROADMAP.md](./ROADMAP.md) (v2).
-
-- 3.1 ① `--check` et `--watch`, avec un modèle intermédiaire de l'introspection
-- 3.2 ② Conditions : `isInSelect`, `exists`, tableaux typés sur la colonne, `jsonbContains`, `jsonbPathExists`, full-text
-- 3.3 ③ Clés étrangères, `related` / `relatedMany`, référence typée au résultat d'un lateral (note de décision d'abord)
-- 3.4 ④ Domaines `CHECK` en unions littérales, validateurs Zod / Valibot, `jsonb` par `COMMENT ON` (note de décision d'abord)
-- 3.5 ⑤ Fonctions Postgres typées
-- 3.6 ⑥ Alias de table typés et `with`
-
-## 4. Runtime
-
-- 4.1 ⑦ Interface de driver (relecture `élevé`)
-- 4.2 ⑧ Savepoints, `advisoryXactLock`, retry structuré
-- 4.3 ⑨ Contexte RLS
-- 4.4 ⑩ Streaming par curseur
-
-## 5. Inférence du SQL brut
-
-- 5.1 ⑪ Note de conception, puis implémentation si validée
+- 2.1 Check lock, truncate and isolation level keywords at run time (R5)
+- 2.2 Accept only a function name as the aggregate of select() (R6)
+- 2.3 Escape quotes in the type name of a param() cast (R3) **(point d'arrêt)**
+- 2.4 Double embedded quotes in identifiers, so a name cannot close its quotes (R1) **(point d'arrêt)**
+- 2.5 Double embedded quotes in lateral keys and aliases too (R7)
+- 2.6 Pass a string through as already quoted only if it is a well-formed quoted identifier (R2) **(point d'arrêt)**
+- 2.7 Send plain updateValues in upsert as parameters, not identifiers (R4) **(point d'arrêt)**
+- 2.8 Make upsert throw on rows with different keys unless updateColumns is given (R8) **(point d'arrêt)**
+- 2.9 Make update() with no columns throw a helpful error (R24, avant R9)
+- 2.10 Leave undefined values out of update(), rather than setting them to NULL (R9) **(point d'arrêt)**
+- 2.11 Fix not() so it parenthesises its condition (R12) **(point d'arrêt)**
+- 2.12 Insert DEFAULT for an undefined value, as for a missing key (R11) **(point d'arrêt)**
+- 2.13 Compile a Parameter in a Whereable or in vals() as a parameter, not as JSON (R13) **(point d'arrêt)**
+- 2.14 Make selectExactlyOne throw when there is a second row (R14) **(point d'arrêt)**
+- 2.15 Make and() and or() with no arguments compile to TRUE and FALSE (R23)
+- 2.16 Refuse aggregate options that cannot compile (R25)
+- 2.17 Treat a native pg client as a client, not a pool, in transaction() (R26)
+- 2.18 Let an explicit param() cast win over castArrayParamsToJson (R27) **(point d'arrêt)**
+- 2.19 Allow schema-qualified and array types in param() casts (R28) **(point d'arrêt)**
+- 2.20 Refuse a constraint of another table in upsert (R32)
+- 2.21 Allow a Parameter in add() and subtract(), for date arithmetic (R33)
+- 2.22 Type the array conditions on the array column, not on its element (R34)
+- 2.23 Accept a readonly array as the columns option (R35) **(point d'arrêt)**
+- 2.24 Warn when two custom types share a placeholder name (R42)
+- 2.25 Match unique indexes by table, not by name alone (R41) **(point d'arrêt)**
+- 2.26 Type enums of other schemas as enums, not as custom types (R40) **(point d'arrêt)**
+- 2.27 Warn about an include entry that matches no table (R51)
+- 2.28 Prefix every line of a multi-line column comment (R48) **(point d'arrêt)**
+- 2.29 Keep column comments on views, foreign tables and partitioned tables (R49) **(point d'arrêt)**
+- 2.30 Quote awkward names and escape comments so the generated schema always parses (R47) **(point d'arrêt)**
+- 2.31 Keep enum values in their declared order (R50) **(point d'arrêt)**
+- 2.32 Give a helpful error on interpolating null or a column-less parent() (R58) **(point d'arrêt)**
+- 2.33 Document the surprises the characterisation found (constats à documenter)
+- 2.34 
+- 2.35 ## 3. Le schéma et les conditions
+- 2.36 
+- 2.37 > Titres seulement, détaillés au début du chapitre ; l'ordre et le pourquoi : [ROADMAP.md](./ROADMAP.md) (v2).
+- 2.38 
+- 2.39 - 3.1 ① `--check` et `--watch`, avec un modèle intermédiaire de l'introspection
+- 2.40 - 3.2 ② Conditions : `isInSelect`, `exists`, tableaux typés sur la colonne, `jsonbContains`, `jsonbPathExists`, full-text
+- 2.41 - 3.3 ③ Clés étrangères, `related` / `relatedMany`, référence typée au résultat d'un lateral (note de décision d'abord)
+- 2.42 - 3.4 ④ Domaines `CHECK` en unions littérales, validateurs Zod / Valibot, `jsonb` par `COMMENT ON` (note de décision d'abord)
+- 2.43 - 3.5 ⑤ Fonctions Postgres typées
+- 2.44 - 3.6 ⑥ Alias de table typés et `with`
+- 2.45 
+- 2.46 ## 4. Runtime
+- 2.47 
+- 2.48 - 4.1 ⑦ Interface de driver (relecture `élevé`)
+- 2.49 - 4.2 ⑧ Savepoints, `advisoryXactLock`, retry structuré
+- 2.50 - 4.3 ⑨ Contexte RLS
+- 2.51 - 4.4 ⑩ Streaming par curseur
+- 2.52 
+- 2.53 ## 5. Inférence du SQL brut
+- 2.54 
+- 2.55 - 5.1 ⑪ Note de conception, puis implémentation si validée
