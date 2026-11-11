@@ -373,7 +373,8 @@ export const truncate: TruncateSignatures = function (
 ): SQLFragment<undefined> {
 
   if (!Array.isArray(table)) table = [table];
-  for (const opt of opts) if (!['CONTINUE IDENTITY', 'RESTART IDENTITY', 'RESTRICT', 'CASCADE'].includes(opt)) throw new Error(`Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not '${opt}'`);
+  // without strictNullChecks, `undefined` or `null` gets past the type: join() makes it empty, as in 6.6.1
+  for (const opt of opts) if (opt != null && !['CONTINUE IDENTITY', 'RESTART IDENTITY', 'RESTRICT', 'CASCADE'].includes(opt)) throw new Error(`Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not '${opt}'`);
   const
     tables = mapWithSeparator(table, sql`, `, t => t),
     query = sql<SQL, undefined>`TRUNCATE ${tables}${raw((opts.length ? ' ' : '') + opts.join(' '))}`;
