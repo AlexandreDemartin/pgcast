@@ -18,6 +18,7 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 
 ### Changed
 - `README.md` rewritten for pgcast: what it fixes and adds, an example with its SQL and type, what differs from Zapatos 6.6.1, the versions policy, the relationship with Zapatos.
+- The docs site and the README take their examples from pgcast's own world, a film's cast, instead of Zapatos's `authors` and `books` ([decision 004](docs/decisions/004-documentation-site.md), amended): the docs schema (`website/schema.sql`) holds `studios`, `films`, `actors`, `roles`, `crew`, `cinemas`, `screenings`, `seat_bookings`, `ratings` and `tags`, snake_case, with invented seed rows from id 1000. The tests keep their fixture.
 - `package.json`: the `author` is the maintainer, Alexandre Demartin; George MacKerron, the original author of Zapatos, is listed under `contributors`. `.github/FUNDING.yml` lists both. The published files are unchanged.
 
 ### Deprecated
