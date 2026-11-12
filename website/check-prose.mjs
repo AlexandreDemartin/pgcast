@@ -101,7 +101,7 @@ function isMessage(quote) {
  * marks are blanked first: a probe may hold backticks, and VitePress reads a comment before any code span in it.
  */
 function codeSpans(line) {
-  const spans = [], text = line.replace(/<!--.*?-->/g, comment => ' '.repeat(comment.length));
+  const spans = [], text = line.replace(/<!--[\s\S]*?-->/g, comment => ' '.repeat(comment.length));
   for (let i = 0; i < text.length;) {
     const open = text.slice(i).match(/^`+/)?.[0];
     if (!open) { i += text[i] === '\\' ? 2 : 1; continue; }
