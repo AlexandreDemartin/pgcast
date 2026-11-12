@@ -11,6 +11,8 @@ import { castOf } from './cast.data.ts';
 import { outline } from './outline.ts';
 import { twoslashOptions } from './twoslash.ts';
 
+type Twoslasher = ReturnType<typeof createTwoslasher>;
+
 const host = 'https://alexandredemartin.github.io';  // GitHub Pages, under the config's `base`
 
 export async function writeLlmsFiles(config: SiteConfig) {
@@ -53,16 +55,19 @@ export async function writeLlmsFiles(config: SiteConfig) {
       casts[name!] = `Postgres runs:\n\n\`\`\`sql\n${sql}\n\`\`\`\n\nValues: \`${values}\`\n\n` +
         `TypeScript knows:\n\n\`\`\`ts\n${type}\n\`\`\``;
     }
-    full.push(plain(source, casts, config.srcDir, linksOf(link)).replace(/^# .*$/m, `$&\n\nSource: ${url(link)}`));
+    full.push(plain(source, casts, config.srcDir, linksOf(link), twoslasher).replace(/^# .*$/m, `$&\n\nSource: ${url(link)}`));
   }
   writeFileSync(join(config.outDir, 'llms-full.txt'), full.join('\n\n---\n\n') + '\n');
 }
 
 /**
  * A page's Markdown as plain Markdown: VitePress's containers as quotes (a code group unwrapped), each Twoslash block
- * as the page shows it, each cast panel as its example followed by `casts[example]`, HTML and attributes dropped.
+ * as the page shows it (`shown()`), each cast panel as its example followed by `casts[example]`, HTML and attributes
+ * dropped.
  */
-function plain(source: string, casts: Record<string, string>, srcDir: string, url: (link: string) => string) {
+function plain(
+  source: string, casts: Record<string, string>, srcDir: string, url: (link: string) => string, twoslasher: Twoslasher,
+) {
   const
     lines: string[] = [],
     quotes: string[] = [],  // for each open container: the prefix of its lines
@@ -95,7 +100,7 @@ function plain(source: string, casts: Record<string, string>, srcDir: string, ur
       }
       const
         twoslash = /\btwoslash\b/.test(fence.info),
-        code = twoslash ? shown(fence.code.join('\n')) : fence.code.join('\n'),
+        code = twoslash ? shown(fence.code.join('\n'), twoslasher) : fence.code.join('\n'),
         info = fence.info.replace(/\s*\btwoslash\b/, '').replace(/\{.*?\}/, '').trim();
       lines.push(...['```' + info, ...code.split('\n'), '```'].map(l => prefix + (l === '' ? '' : indent) + l));
       fence = undefined;
@@ -142,9 +147,23 @@ function checkCopy(file: string, page: string) {
   if (!blocks.includes(copy)) throw new Error(`llms.ts: the copy region of ${file} is no longer a block of its page`);
 }
 
-/** The code a Twoslash block shows: what follows `// ---cut---`, without Twoslash's own `// @` and `// ^` lines. */
-const shown = (code: string) => code.split('// ---cut---').pop()!.trim().split('\n')
-  .filter(line => !/^\s*\/\/\s*[@^]/.test(line)).join('\n');
+/**
+ * The code a Twoslash block shows: what follows `// ---cut---`, without Twoslash's own `// @` and `// ^` lines. A block
+ * meant to fail (`// @errors: 2741`) also marks each line the page underlines (`// error TS2741`): without its
+ * `// @errors`, it would read as code that compiles.
+ */
+function shown(code: string, twoslasher: Twoslasher) {
+  if (/^\s*\/\/\s*@errors\b/m.test(code)) {
+    const
+      { code: compiled, errors } = twoslasher(code, 'ts'),  // the code after its cut, as the page shows it
+      lines = compiled.split('\n');
+    for (const line of new Set(errors.map(error => error.line)))
+      lines[line] += '  // error ' + [...new Set(errors.filter(error => error.line === line).map(error => error.code))]
+        .map(code => `TS${code}`).join(', ');
+    code = lines.join('\n');
+  }
+  return code.split('// ---cut---').pop()!.trim().split('\n').filter(line => !/^\s*\/\/\s*[@^]/.test(line)).join('\n');
+}
 
 /**
  * One line of a page as plain Markdown: HTML and Markdown attributes dropped, links to the site and within the page
