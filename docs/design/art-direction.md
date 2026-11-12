@@ -95,7 +95,7 @@ Other tokens: `--radius: 10px` (the cast panel 14px, buttons 9px, chips and the 
 ## Voice
 
 - George MacKerron's: warm, brief, first person where natural; British spelling.
-- His world for every example: `authors`, `books`, `tags`, `employees`, `photos` and `subjects`, `stores`, `bankAccounts`, `doctors` and `shifts` (skill `zapatos-spirit`). Never an extract from a real project.
+- His world for every example: `authors`, `books`, `tags`, `employees`, `photos` and `subjects`, `stores`, `bankAccounts`, `doctors` and `shifts`. Never an extract from a real project.
 
 ## What to avoid
 

@@ -27,7 +27,7 @@ gh pr merge <pr> --repo AlexandreDemartin/pgcast --squash \
   --subject "<PR title> (#<pr>)" --body "Co-Authored-By: …"
 ```
 
-- One George commit per PR on `master`; the subject keeps the title's `(closes #n)`, and the body's `Closes #n` closes the issue; the Epic ticks itself.
+- One commit per PR on `master`, as in Zapatos; the subject keeps the title's `(closes #n)`, and the body's `Closes #n` closes the issue; the Epic ticks itself.
 - `--body`: the requested `Co-Authored-By` line only, not the list of the branch's commits.
 - Before merging, the label `decided-alone` matches the PR's **Decided alone** section (skill `plan-and-proofs`).
 - No commit after the green CI.

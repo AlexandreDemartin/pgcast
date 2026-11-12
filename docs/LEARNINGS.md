@@ -131,6 +131,10 @@ Candidates for a check, a rule or a skill line.
 - #107 — In a lateral whose subquery reads its parent's table, `parent('c')` compiles to the same name as the inner column: such tests alias the outer select or use another table — `builder`
 - #107 — A hostile-identifier matrix for a new entry point is derived from a pinned one by a mechanical rewrite (`= X` → `IN (X)`), so it pins "quoted exactly as the Whereable value" — `builder`
 - #107 — A patched copy of the runtime, replayed beside 6.6.1 and master before posting the plan, makes the plan's claims come from replay rather than reasoning — `builder`
+- #114 — `pg.Pool.end()` resolving does not mean the server sessions are gone: never follow it with `DROP DATABASE … WITH (FORCE)` from the same process; a plain `DROP` waits for closing sessions — `builder`
+- #114 — `generate()` never deletes a `custom/` placeholder it no longer needs, and a regenerate-and-diff check does not catch a stale committed one: code that reads `zapatos/custom/` copes with the folder being absent (candidate: skill `codegen-output`) — `builder`
+- #114 — A change to the codegen output in `src/generate` also needs `npm run docs:schema`, or the `docs` job fails on a stale `website/zapatos/` (#130 writes it into skill `codegen-output`) — `branch-reviewer`
+- #114 — A builder told not to mark its PR ready cannot prove a CI-only criterion (a matrix, a failing step): brief it to push temporary commits on a ready PR, or the orchestrator does that half — `builder`
 
 ## Minors kept
 
