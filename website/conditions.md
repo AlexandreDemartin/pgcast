@@ -378,7 +378,7 @@ Operations, not tests: for an [`update()`](/insert#update) value, where `self` i
 
 ## Values a condition refuses {#refused-values}
 
-`Default`, `self`, `raw()`, `cols()` and `vals()` have no meaning as the value of a condition. The type refuses them (TS2322); at run time, calling the condition does not throw, compiling it does, so `run()` rejects with a plain `Error` before any query. Zapatos 6.6.1 sent `Default` and `self` as the strings `'Symbol(DEFAULT)'` and `'Symbol(self)'`, and `raw()`, `cols()` and `vals()` as JSON, `'{"value":…}'`: no row on a text column, every row with `ne()` or `isNotIn()`, 22P02 on the others. Why a `raw()` value is not SQL: [The security model](/security).
+`Default`, `self`, `raw()`, `cols()` and `vals()` have no meaning as the value of a condition. The type refuses them (TS2322, or TS2345 where the condition bounds its argument: a pattern, a range's second bound, an array condition, `add()`, `subtract()`); at run time, calling the condition does not throw, compiling it does, so `run()` rejects with a plain `Error` before any query. Zapatos 6.6.1 sent `Default` and `self` as the strings `'Symbol(DEFAULT)'` and `'Symbol(self)'`, and `raw()`, `cols()` and `vals()` as JSON, `'{"value":…}'`: no row on a text column, every row with `ne()` or `isNotIn()`, 22P02 on the others. Why a `raw()` value is not SQL: [The security model](/security).
 
 | Message | When |
 |---|---|
