@@ -10,7 +10,9 @@ const bookSeats = (txnClientOrPool: pg.Pool | db.TxnClientForSerializable,
   });
 // ---cut---
 // a couple: both bookings, or neither
-const couple = await db.serializable(pool, async txnClient => [
-  await bookSeats(txnClient, 1000, ['G1'], 'Wren Abernathy'),
-  await bookSeats(txnClient, 1000, ['G2'], 'Barnaby Quill'),
-]);
+const couple = await db.serializable(pool, async txnClient => {
+  const wren = await bookSeats(txnClient, 1000, ['G1'], 'Wren Abernathy');
+  const barnaby = await bookSeats(txnClient, 1000, ['G2'], 'Barnaby Quill');
+  if (!wren || !barnaby) throw new Error('Both seats, or neither');  // rolls back the other one
+  return [...wren, ...barnaby];
+});

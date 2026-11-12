@@ -66,7 +66,7 @@ Given the `txnClient` of a transaction already open, `bookSeats()` joins it: `se
 
 <<< ./examples/plain/retries_larger.ts{ts twoslash}
 
-One transaction: `START TRANSACTION ISOLATION LEVEL SERIALIZABLE`, the two `count()`s and `insert()`s, `COMMIT`. On a 40001, it is the outer transaction that rolls back and runs its callback again, both bookings included.
+One transaction: `START TRANSACTION ISOLATION LEVEL SERIALIZABLE`, the two `count()`s and `insert()`s, `COMMIT`. If either `bookSeats()` resolves with `null`, the `throw` sends `ROLLBACK` in place of `COMMIT`, and the `await` rejects with that `Error`, not retried. On a 40001, it is the outer transaction that rolls back and runs its callback again, both bookings included.
 
 Typed `pg.Pool | db.TxnClientForSerializable`, the first parameter refuses the client of a transaction at a lower level, where the rule would no longer hold (2345, with `strict` on or off):
 
