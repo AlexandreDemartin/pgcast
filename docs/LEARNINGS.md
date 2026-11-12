@@ -191,6 +191,9 @@ Candidates for a check, a rule or a skill line.
 - #123 — « each / every X does Y » is searched for its exceptions before it is written (`grep runResultTransform` showed the aggregates' `Number()`) — `branch-reviewer`
 - #123 — The docs examples share one process: an example that changes module state is undone by value (nested objects included) and a self-check proves it — `branch-reviewer`, `builder`
 - #123 — A probe that leaks pool clients on purpose crashes Node once its database is dropped (57P01): run it last, in its own process — `builder`
+- #125 — A claim that rows are duplicated inside a lateral is probed under an outer `select()` and an outer `selectOne()`: the outer `LIMIT 1` hides it — `branch-reviewer`, `builder`
+- #125 — A cast panel types the module's first `const`: a helper above the query is written as a `function` declaration, or the query repeats it — `builder`, `branch-reviewer`
+- #125 — In type probes, mutual assignability (`[A] extends [B]` both ways) tests what a reader sees; strict identity fails on `JSONOnlyColsForTable & LateralResult` — `branch-reviewer`
 
 ## Minors kept
 
