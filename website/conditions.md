@@ -131,7 +131,7 @@ Each takes one value of the column's type, `<T>(a: T)`, and writes the column, i
 
 ## Ranges {#ranges}
 
-Each takes two values of the column's type, `<T>(a: T, b: T)`, each a parameter in its own parentheses. Both bounds are included.
+Each takes two values of the column's type, `<T>(a: T, b: T)`, each a parameter in its own parentheses. Both bounds belong to the range: `between()` matches them, `notBetween()` does not.
 
 <CastPanel example="conditions_between">
 
