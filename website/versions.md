@@ -28,7 +28,11 @@ One opt-in will stay off for good. [`selectExactlyOne()`](/select#selectExactlyO
 
 ## Why an opt-in, not a breaking change
 
-Take `db.update('films', { tagline: undefined }, { id: 1002 })`. Zapatos 6.6.1 sends `SET ("tagline") = ROW($1)` with `null`, and the film loses its tagline. That may be a bug, a key copied from a form field that was never filled in; it may also be how a project clears a column. pgcast can't tell which, and neither can your compiler: had 6.7 simply left the column out, that code would still compile, still run, and quietly stop clearing taglines.
+Take an `update()` with an `undefined` value:
+
+<<< ./examples/plain/versions_undefined.ts{ts twoslash}
+
+Zapatos 6.6.1 sends `SET ("tagline") = ROW($1)` with `null`, and the film loses its tagline. That may be a bug, a key copied from a form field that was never filled in; it may also be how a project clears a column. pgcast can't tell which, and neither can your compiler: had 6.7 simply left the column out, that code would still compile, still run, and quietly stop clearing taglines.
 
 So the new reading arrives as an option, off by default, and the old one warns when it runs. You switch when you're ready, one option at a time, with your tests to show what moved. The pattern is borrowed: Node's own deprecation cycle (documented, then a warning at run time, then removed in a major), React Router's future flags, and TypeScript's `--strict` family, one option per safer behaviour.
 
