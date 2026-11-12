@@ -65,7 +65,7 @@ One per group, in `templates/`, not published (`srcExclude` in `.vitepress/confi
 - A `ts twoslash` block is compiled against the built `zapatos/db` and the docs schema's `zapatos/schema`; hovers show the types TypeScript gives. An unexpected type error fails the build; a block meant to fail says so with `// @errors: <code>`.
 - Twoslash reports only a block's own errors, so `docs:build` first runs `tsc` (`tsconfig.json`) on the docs schema and `examples/`: a stale schema fails there.
 - **The cast panel** shows what you write, what Postgres runs and what TypeScript knows. It is for a query whose SQL and type the reader should see: a shortcut, an option that changes the SQL. Code that sends no query (a pool, a config, a type) is a plain `ts twoslash` block.
-- A cast panel's example is a module in `examples/`, its imports above `// ---cut---`, hidden on the page (`examples/install.ts` is the shortest):
+- A cast panel's example is a module in `examples/`, its imports above `// ---cut---`, hidden on the page (`examples/first-query.ts` is the shortest):
 
   ```md
   <CastPanel example="home">
