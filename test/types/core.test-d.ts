@@ -92,37 +92,72 @@ describe('type surprises', () => {
     db.select('users', { id: c.isIn([db.Default]) });
   });
 
-  test('characterization: raw(), cols(x) and vals(x) pass as a Parameter<T>, in a Whereable, isIn and eq', () => {
-    // characterization: Parameter<T> is structural ({ value: T, cast? }), so DangerousRawString ({ value: string })
-    // matches it on a text or jsonb column, and the generic ColumnNames<T> and ColumnValues<T> on any column, as
-    // does a plain { value } object; the runtime sends each as a parameter, as JSON
-    // (test/integration/core.test.ts, "raw(), cols(x) and vals(x) as a value are sent as JSON")
+  test('raw(), cols(x) and vals(x) are refused as a value where a Parameter<T> stands, filters and writes', () => {
+    // each throws in a filter (test/integration/core.test.ts, "raw(), cols(x) and vals(x) as a filter value reject
+    // run()"); as insert() and update() values 6.6.1 sent them as JSON too (#132)
+    // @ts-expect-error raw() is no Parameter<string>: in a Whereable
     db.select('users', { display_name: db.raw("'Ada'") });
+    // @ts-expect-error nor Parameter<JSONValue>, on jsonb
     db.select('users', { settings: db.raw(`'{"theme": "dark"}'`) });
+    // @ts-expect-error in isIn
     db.select('users', { display_name: c.isIn([db.raw("'Ada'")]) });
+    // @ts-expect-error in isNotIn
     db.select('users', { display_name: c.isNotIn([db.raw("'Ada'")]) });
+    // @ts-expect-error in eq
     db.select('users', { display_name: c.eq(db.raw("'Ada'")) });
+    // @ts-expect-error in the where of update
     db.update('users', { mood: 'ok' }, { display_name: db.raw("'Ada'") });
+    // @ts-expect-error in a Whereable written apart
+    const where: s.users.Whereable = { display_name: db.raw("'Ada'") };
+    // @ts-expect-error cols(x) is no Parameter<T>: on text
     db.select('users', { display_name: db.cols('Ada') });
+    // @ts-expect-error vals(x) neither
     db.select('users', { display_name: db.vals('Ada') });
+    // @ts-expect-error in isIn
     db.select('users', { display_name: c.isIn([db.cols('Ada'), db.vals('Ada')]) });
+    // @ts-expect-error in eq
     db.select('users', { display_name: c.eq(db.cols('Ada')) });
-    db.select('users', { tags: db.cols(['admin']) });
+    // @ts-expect-error on an array column
     db.select('users', { tags: db.vals(['admin']) });
+    // @ts-expect-error on an int column
     db.select('users', { id: db.vals(1) });
-    db.select('users', { id: db.cols(1) });
+    // @ts-expect-error in isIn, on an int column
     db.select('users', { id: c.isIn([db.vals(1)]) });
+    // @ts-expect-error in eq, on an int column
     db.select('users', { id: c.eq(db.vals(1)) });
-    db.select('users', { mood: db.cols('ok') });
+    // @ts-expect-error in isIn, on an enum column
     db.select('users', { mood: c.isIn([db.cols('ok')]) });
-    db.select('users', { mood: c.eq(db.vals('ok')) });
+    // @ts-expect-error as an insert() value
+    db.insert('users', { email: 'a@b', display_name: db.raw("'A'") });
+    // @ts-expect-error as an update() value
+    db.update('users', { display_name: db.raw('upper(display_name)') }, { id: 1 });
+    // @ts-expect-error as an upsert() value
+    db.upsert('users', { email: 'a@b', display_name: db.cols('A') }, 'email');
+    expectTypeOf(where).not.toBeAny();
+  });
+
+  test('a Parameter, a plain { value } and a sql fragment with raw() are still accepted as values', () => {
+    // a plain { value } object is a value, sent as JSON (test/unit/core.test.ts)
+    expectTypeOf(db.select('users', { display_name: db.param('Ada') }).run(pool)).not.toBeAny();
+    db.select('users', { display_name: db.param('Ada', 'text') });
+    db.select('users', { display_name: c.eq(db.param('Ada')) });
+    db.select('users', { display_name: c.isIn([db.param('Ada'), 'Bob']) });
     db.select('users', { display_name: { value: 'Ada' } });
-    // @ts-expect-error raw() is a Parameter<string>, not of an int column
-    db.select('users', { id: db.raw('1') });
-    // @ts-expect-error nor of an enum column
-    db.select('users', { mood: db.raw("'ok'") });
-    // @ts-expect-error nor in isIn on an int column
-    db.select('users', { id: c.isIn([db.raw('1')]) });
+    db.select('users', { settings: { value: 'Ada' } });
+    db.select('users', { display_name: db.sql`${db.self} = ${db.raw("'Ada'")}` });
+    db.insert('users', { email: 'a@b', display_name: db.param('A') });
+    db.insert('users', { email: 'a@b', display_name: db.sql`${db.raw("'A'")}` });
+    expectTypeOf(db.param('Ada')).toEqualTypeOf<db.Parameter<string>>();
+  });
+
+  test('updateValues takes raw(), cols(x) and vals(x) on any column, compiled as SQL', () => {
+    // as in 6.6.1, which took raw() only on a text or jsonb column (test/integration/core.test.ts, "raw() in a
+    // fragment value, or in the updateValues of upsert, is SQL")
+    db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { display_name: db.raw(`"users"."display_name" || '!'`) } });
+    db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { manager_id: db.raw('"users"."manager_id"'), tags: db.cols(['users.tags']) } });
+    db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { settings: db.vals({ a: 1 }) } });
+    // @ts-expect-error still the columns of the table
+    db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { nope: db.raw('1') } });
   });
 
   test('parent() is accepted in isIn and isNotIn', () => {
