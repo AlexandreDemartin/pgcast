@@ -18,6 +18,20 @@ The roadmap lives in the GitHub issues, one Epic per chapter ([README](README.md
 
 If a request breaks one of these points: **stop and say so** instead of implementing it.
 
+### What pgcast does not do
+
+A change that makes one of these moves is refused, whatever its gain. Sources: Zapatos's docs (`docs/index.html`).
+
+- A model, an entity class, a relationship declared in TypeScript (Zapatos returns "just (fully-typed) POJOs").
+- Lazy loading, an identity map, change tracking, a query cache.
+- A method chain that builds a query and hides its SQL (`.where().join()`).
+- An implicit, default or global client, or a transaction opened without being asked for: "Zapatos is always explicit about what client or pool is running your query", as it is "too easy to accidentally issue queries outside of transactions".
+- Managing the connection pool or migrations ("Zapatos doesn't handle schema migrations").
+- A layer to switch databases tomorrow at the expense of Postgres today ("a source of misery").
+- A guessed type that the database does not state; a concatenated value instead of a parameter.
+- SQL that depends on state, or changes with the values, without being documented.
+- Core complexity for a niche case or for a gain drowned in network latency ("Small is beautiful"): it goes to a separate package, or opt-in.
+
 ## Architecture
 
 ```
