@@ -109,7 +109,7 @@ jobs:
       - run: npm run bench:types
 
   docs:
-    # The docs site, a package of its own (decision 004): its build fails on a dead link. No deploy yet.
+    # The docs site, a package of its own (decision 004): its build fails on a dead link. docs.yml deploys it from master.
     needs: changes
     if: needs.changes.outputs.docs == 'true'
     runs-on: ubuntu-latest
