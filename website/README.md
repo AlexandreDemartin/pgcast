@@ -91,7 +91,7 @@ Every export of `zapatos/db` (a member of `conditions` as `conditions.eq`), ever
 At build, `.vitepress/llms.ts` writes two files to the site's root, from the outline and the pages, in its order ([llmstxt.org](https://llmstxt.org/)):
 
 - `llms.txt`: `# pgcast`, a summary (the site's description and the home's lede), then one section per group, each written page with its URL and lede. So a page needs a `# ` title and a `{.lede}` paragraph, or the build fails.
-- `llms-full.txt`: every written page as plain Markdown, each cast panel with the SQL, values and type `cast.data.ts` computes.
+- `llms-full.txt`: every written page as plain Markdown, each cast panel with the SQL, values and type `cast.data.ts` computes. A panel not written `<CastPanel example="<name>">` fails the build.
 
 A "Coming" page has no `.md` file, so it is in neither; nor are the templates and this README, which the outline does not list.
 
