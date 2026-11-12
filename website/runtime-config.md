@@ -65,7 +65,7 @@ The keys pgcast adds are optional, so a `Config` written for Zapatos 6.6.1 still
 | [`transactionRetryDelay`](#Config.transactionRetryDelay) | `{ minMs: 25, maxMs: 250 }` | the wait before each retry | at each `transaction()` |
 | [`castArrayParamsToJson`](#Config.castArrayParamsToJson) | `false` | an array parameter: `CAST($1 AS "json")` in place of `$1` | at each `compile()` |
 | [`castObjectParamsToJson`](#Config.castObjectParamsToJson) | `false` | a plain object parameter: `CAST($1 AS "json")` in place of `$1` | at each `compile()` |
-| [`upsertRequiresSameKeys`](#Config.upsertRequiresSameKeys) | `false` | rows with different keys in `upsert()`: throw, not warn | at each `upsert()` |
+| [`upsertRequiresSameKeys`](#Config.upsertRequiresSameKeys) | `false` | a multi-row `upsert()` with a key missing from some row, still set from `EXCLUDED`: throw, not warn | at each `upsert()` |
 | [`undefinedMeansMissing`](#Config.undefinedMeansMissing) | `false` | an `undefined` value in `insert()`, `update()` and `upsert()`: a missing key, not `NULL` | at each call of those |
 | [`queryListener`](#Config.queryListener) | none | called with each query `run()` sends | at each `run()` |
 | [`resultListener`](#Config.resultListener) | none | called with each result `run()` gives | at each `run()` |
@@ -137,7 +137,7 @@ With `true`, every plain object sent as a parameter is sent as `CAST($1 AS "json
 upsertRequiresSameKeys?: boolean  // default: false; the default in 7.0
 ```
 
-With `true`, a multi-row [`upsert()`](/insert#upsert) whose rows have different keys, without `updateColumns`, throws when called, before any query: "rows have different keys: pass updateColumns, or give every row the same keys". Off, it runs as in Zapatos 6.6.1 and warns once per process: `PGCAST_DEP001`. Which keys count, and the SQL: [Rows with different keys](/insert#upsert-different-keys).
+With `true`, a multi-row [`upsert()`](/insert#upsert) without `updateColumns`, where a key missing from some row is still set from `EXCLUDED`, throws when called, before any query: "rows have different keys: pass updateColumns, or give every row the same keys". Off, it runs as in Zapatos 6.6.1 and warns once per process: `PGCAST_DEP001`. Which keys count, and the SQL: [Rows with different keys](/insert#upsert-different-keys).
 
 ### `undefinedMeansMissing` {#Config.undefinedMeansMissing}
 
@@ -236,7 +236,7 @@ A behaviour of Zapatos 6.6.1 that code may rely on, but that pgcast would change
 
 | Option | Warning | It warns when | Default from |
 |---|---|---|---|
-| [`upsertRequiresSameKeys: true`](#Config.upsertRequiresSameKeys) | `PGCAST_DEP001` | a multi-row `upsert()` without `updateColumns` has rows with different keys ([Rows with different keys](/insert#upsert-different-keys)) | 7.0 |
+| [`upsertRequiresSameKeys: true`](#Config.upsertRequiresSameKeys) | `PGCAST_DEP001` | a multi-row `upsert()` without `updateColumns` has a key missing from some row that is still set from `EXCLUDED` ([Rows with different keys](/insert#upsert-different-keys)) | 7.0 |
 | [`undefinedMeansMissing: true`](#Config.undefinedMeansMissing) | `PGCAST_DEP002` | a value of `insert()`, `update()` or `upsert()` is `undefined` ([An `undefined` value](/insert#undefined-values)) | 7.0 |
 
 Each warning is a Node.js `DeprecationWarning`, emitted once per process for each code, when the shortcut is called, and only when the old behaviour is used. Its message names the option. Node prints it to `stderr`:
