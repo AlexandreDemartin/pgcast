@@ -58,10 +58,13 @@ If it got past the type (an `any`, a `@ts-ignore`), it would still be a name, an
 
 - A real column matches every row: `'title'` compiles to `"title" = "title"`, true wherever `title` is not null, and so do `'films.title'` and `'"title"'`. In a `DELETE`, that deletes them.
 - An unknown one fails: `'The Salt Orchard'` gives `"title" = "The Salt Orchard"`, a column that does not exist (42703).
+- It can be any column in scope, a system column such as `xmin` included, and, where a table goes, any relation the role can read, `'schema.table'` included: `` FROM ${'pg_catalog.pg_roles'} `` lists the database's roles.
 - Any `"` in it is doubled, so it can't close its quotes (in Zapatos 6.6.1 it could, [Identifiers](/sql-template#identifiers)), but that does not make it a value.
 
+The keys of an interpolated object are names too. The type refuses an unknown key only in an object literal (TS2353): an object built at run time (a `Record<string, string>`, `Object.fromEntries()`, a variable with extra keys) passes it with any key.
+
 ::: warning Security
-An interpolated object that is not a `param()`, a fragment or another of pgcast's values compiles as a Whereable, whatever it is. A `Date` has no keys of its own, so it gives `TRUE`: `` db.sql`DELETE FROM ${'ratings'} WHERE ${when}` ``, with `when` a `Date` typed `any`, compiles to `DELETE FROM "ratings" WHERE TRUE` and deletes every rating. The type refuses a `Date` (TS2345), not an `any`. Pass a date as `db.param(when)` ([#170](https://github.com/AlexandreDemartin/pgcast/issues/170)).
+An interpolated object that is not a `param()`, a fragment or another of pgcast's values compiles as a Whereable, whatever it is. A `Date` has no keys of its own, so it gives `TRUE`: `` db.sql`DELETE FROM ${'ratings'} WHERE ${when}` ``, with `when` a `Date` typed `any`, compiles to `DELETE FROM "ratings" WHERE TRUE` and deletes every rating. The type refuses a `Date` (TS2345), not an `any` or an `object`. Pass a date as `db.param(when)` ([#170](https://github.com/AlexandreDemartin/pgcast/issues/170)).
 
 Any object with no keys is `TRUE`, a typed Whereable included: `const where: s.ratings.Whereable = {}`, given a `film_id` only `if (filmId)`, compiles with no error to the same `DELETE`. Check for an empty filter before a `DELETE` or an `UPDATE` ([Whereable objects](/sql-template#whereable)).
 :::
@@ -96,7 +99,7 @@ Some choices are syntax, not values: a sort direction, the column to sort on. A 
 </CastPanel>
 
 - [`db.raw()`](/sql-template#raw) writes its string as it is. Here it only ever gets `'DESC'` or `'ASC'`, whatever the caller sent.
-- The column is a name: quoted, it can't close its quotes, but the caller's string could name any column of the query, or none (42703, or 42P01 for a table outside the query). `find()` keeps one of yours, typed as the template wants.
+- The column is a name: quoted, it can't close its quotes, but the caller's string could name any column in scope, a system column such as `xmin` included, or none (42703, or 42P01 for a table outside the query). `find()` keeps one of yours, typed as the template wants.
 
 ::: warning Security
 Whatever reaches `raw()` runs as SQL, and its type takes any string. Give it a caller's text, and the caller writes your query:
