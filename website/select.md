@@ -179,13 +179,23 @@ With `withTies` and `order`, it writes `FETCH FIRST $1 ROWS WITH TIES`, here and
 db.selectExactlyOne(table, where, options?)
 ```
 
-As [`selectOne()`](#selectOne), but its type has no `undefined`: when no row matches, `.run()` rejects with a [`NotExactlyOneError`](/transaction#NotExactlyOneError), whose `query` is this query: "One result expected but none returned (hint: check `.query.compile()` on this Error)". It does not check that only one row matches: with `LIMIT 1`, it takes the first. In a `lateral`, a missing row gives `null` and no error, though the type says otherwise; it fits a `NOT NULL` foreign key.
+As [`selectOne()`](#selectOne), but its type has no `undefined`: when no row matches, `.run()` rejects with a [`NotExactlyOneError`](#NotExactlyOneError). It does not check that only one row matches: with `LIMIT 1`, it takes the first. In a `lateral`, a missing row gives `null` and no error, though the type says otherwise; it fits a `NOT NULL` foreign key.
 
 <CastPanel example="selectExactlyOne">
 
 <<< ./examples/selectExactlyOne.ts{ts twoslash}
 
 </CastPanel>
+
+### `NotExactlyOneError` {#NotExactlyOneError}
+
+```ts
+class NotExactlyOneError extends Error {
+  query: SQLFragment;
+}
+```
+
+What `selectExactlyOne()`, the mode `ExactlyOne` of `select()`, rejects with when no row matches. Its `name` is `'NotExactlyOneError'`, its `message` "One result expected but none returned (hint: check `.query.compile()` on this Error)", and its `query` the [`SQLFragment`](/sql-template#SQLFragment) that ran: `err.query.compile()` gives its SQL and values. `err instanceof db.NotExactlyOneError` recognises it.
 
 ## `count()` {#count}
 

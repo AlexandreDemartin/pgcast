@@ -87,7 +87,6 @@
   ],
   "transaction.md": [
     "isDatabaseError",
-    "NotExactlyOneError",
     "transaction",
     "serializable",
     "repeatableRead",
