@@ -42,7 +42,7 @@ Closes #n
 - **`core.ts`**: the compiled SQL before / after (skill `sql-safety`).
 - **Compat at stake**: the 6.6.1 replay, what 6.6.1 did and what the branch does (skill `backward-compat`).
 - **Types**: the `bench:types` figure when a type changes (skill `type-tests`).
-- No screenshots: pgcast has no UI.
+- **Docs site**: screenshots go on a private artifact, linked from **Proofs** (`gh` cannot attach images).
 
 ## Decided alone
 
