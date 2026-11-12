@@ -1,0 +1,480 @@
+# The `sql` template
+
+`sql` is the tagged template every query in pgcast is built from, the shortcuts included. This page lists what it takes, what each interpolation compiles to, and the `SQLFragment` it returns.
+{.lede}
+
+## `sql` {#sql}
+
+```ts
+db.sql<
+  Interpolations = db.SQL,
+  RunResult = pg.QueryResult['rows'],
+  Constraint = never,
+>`…`: SQLFragment<RunResult, Constraint>
+```
+
+Returns a [`SQLFragment`](#SQLFragment): the literal parts as you wrote them, each interpolation compiled as below, every value a numbered parameter. Nothing is sent until [`run()`](#run).
+
+<CastPanel example="sql_template">
+
+<<< ./examples/sql_template.ts{ts twoslash}
+
+</CastPanel>
+
+### Type arguments
+
+| Argument | Default | What it sets |
+|---|---|---|
+| `Interpolations` | [`db.SQL`](#SQL): every table and column of the schema | what may be interpolated; `s.films.SQL` allows only the names of `films` |
+| `RunResult` | `pg.QueryResult['rows']` (`any[]`) | what `run()` resolves to, and the type of the fragment as a `lateral` or `extras` value |
+| `Constraint` | `never` | the value type a condition compares with; set by [`conditions`](/conditions#conditions), checked by a Whereable. You rarely give it. |
+
+`RunResult` is not checked against the SQL: it is your word for what comes back. The shortcuts set it for you.
+
+A name outside `Interpolations` does not compile:
+
+```ts twoslash
+// @errors: 2345
+import * as db from 'zapatos/db';
+import type * as s from 'zapatos/schema';
+// ---cut---
+db.sql<s.films.SQL>`SELECT ${'name'} FROM ${'films'}`;
+```
+
+### Interpolations
+
+Each value between `${…}` compiles by what it is. The SQL is the built library's `.compile()`.
+
+| Value | Compiles to | Entry |
+|---|---|---|
+| a string | a quoted name: `'films'` → `"films"`, `'public.films'` → `"public"."films"` | [Identifiers](#identifiers) |
+| `param(x, cast?)` | `$1`, or `CAST($1 AS "timestamptz")`; `x` in the values | [`param()`](#param) |
+| `raw(s)` | `s`, as it is | [`raw()`](#raw) |
+| `cols(o)` / `cols(a)` | the object's keys, sorted, or the array's items, quoted: `"film_id", "tag"` | [`cols()`](#cols) |
+| `vals(o)` / `vals(a)` | the values, in the order of `cols(o)`, or the array's: `$1, $2` | [`vals()`](#vals) |
+| a plain object | a Whereable: `("studio_id" = $1)`; `{}` → `TRUE` | [Whereable objects](#whereable) |
+| `self` | the current column, in a Whereable's fragment value | [`self`](#self) |
+| `parent(c?)` | the column of the parent query: `"studios"."id"` | [`parent()`](#parent) |
+| `Default` | `DEFAULT` | [`Default`](#Default) |
+| a `sql` fragment | its own SQL, its parameters numbered on | [Nested fragments](#nested-fragments) |
+| an array | each item in turn, nothing between; `[]` → nothing | [Arrays](#arrays) |
+
+Anything else throws while compiling, so `run()` rejects before any query, and the type refuses it: a number or a boolean (`Alien object while interpolating SQL: 42`), `null`, `undefined`, a symbol such as [`all`](#all). The global object, which the type lets through, throws too: "Did you use `self` (the global object) where you meant `db.self` (the Zapatos value)?…".
+
+## Identifiers {#identifiers}
+
+An interpolated string is a table or column name. It is double-quoted, so its case is kept and a keyword is a name, and split on `.`. It can never close its quotes:
+
+| String | Compiles to | |
+|---|---|---|
+| `'films'` | `"films"` | |
+| `'public.films'` | `"public"."films"` | split on `.` |
+| `'a"b'` | `"a""b"` | a `"` is doubled, as `quote_ident` does |
+| `'a""b'` | `"a""b"` | already escaped by hand: as it is |
+| `'"Films"."title"'` | `"Films"."title"` | already a well-formed quoted name: as it is |
+| `'"a" \|\| "b"'` | `"""a"" \|\| ""b"""` | not well-formed: one name |
+
+- Well-formed: a quoted identifier, then quoted, `U&` quoted or unquoted ones after each `.`, with or without spaces around it.
+- The cost: a real column named `a""b` compiles to `"a""b"`, the column `a"b`.
+- Zapatos 6.6.1 wrapped the string in `"` without escaping, and wrote as it is any string that started and ended with `"`: a name could splice SQL around it. The generated `Table` and `Column` types already refused such names; the why is in [The security model](/security).
+
+Interpolate names rather than writing them in the literal: they are type-checked, and they follow the schema when you regenerate it.
+
+## `param()` {#param}
+
+```ts
+db.param<T>(value: T, cast?: boolean | string): Parameter<T>
+```
+
+A numbered parameter: `$1`, `$2`…, numbered across the whole query, and `value` at that place in the values. The value never enters the SQL text.
+
+<CastPanel example="sql_param">
+
+<<< ./examples/sql_param.ts{ts twoslash}
+
+</CastPanel>
+
+| `cast` | Compiles to | Value sent |
+|---|---|---|
+| none | `$1` | `value`, as `pg` serialises it |
+| `'timestamptz'` | `CAST($1 AS "timestamptz")` | `value` |
+| `'pg_catalog"."text'` | `CAST($1 AS "pg_catalog"."text")` | `value` |
+| `'public.mood'`, `'int4[]'` | `CAST($1 AS "public.mood")`, `CAST($1 AS "int4[]")`: one name, not split | `value` |
+| `true` | `CAST($1 AS "json")` for an array or a plain object; `$1` otherwise | `JSON.stringify(value)`; otherwise `value` |
+| `false` | `$1` | `value`, never as JSON |
+
+- A string `cast` is written as `"cast"` if that is well-formed (quoted parts joined by `.`); otherwise it is one quoted name, any `"` doubled, so it cannot close its quotes: `'int4") || (SELECT 1) || ("int4'` gives `CAST($1 AS "int4"") || (SELECT 1) || (""int4")`, a type that does not exist. Zapatos 6.6.1 wrote any `cast` as it is between quotes.
+- An array type takes `sql`: `` db.sql`${db.param(ids)}::int4[]` ``.
+- Without a `cast`, an array or a plain object is sent as JSON with `CAST($1 AS "json")` when [`castArrayParamsToJson`](/runtime-config#Config.castArrayParamsToJson) or [`castObjectParamsToJson`](/runtime-config#Config.castObjectParamsToJson) is on (both off by default).
+- As a Whereable value or in `vals([…])` (so in [`isIn()`](/conditions#conditions.isIn)), a `Parameter` compiles as it is, with its cast: `{ title: db.param('x', 'text') }` gives `("title" = CAST($1 AS "text"))`. Zapatos 6.6.1 wrapped it in a second parameter, sent as JSON (`'{"value":"x","cast":"text"}'`).
+
+### `Parameter` {#Parameter}
+
+```ts
+class Parameter<T = any> { value: T; cast?: boolean | string }
+```
+
+What `param()` returns. The generated Whereable, Insertable and Updatable types take a `Parameter<T>` of the column's type wherever they take a `T`.
+
+## `raw()` {#raw}
+
+```ts
+db.raw(sql: string): DangerousRawString
+```
+
+The string, written into the SQL as it is: for syntax a parameter cannot stand for, such as a keyword.
+
+<CastPanel example="sql_raw">
+
+<<< ./examples/sql_raw.ts{ts twoslash}
+
+</CastPanel>
+
+::: warning Security
+Whatever reaches `raw()` runs as SQL. Never give it a caller's text; a value is a [`param()`](#param). How to keep hand-written SQL safe: [Write raw SQL safely](/raw-sql).
+:::
+
+As a filter value (a Whereable value, in `isIn()` / `isNotIn()`, or as the value of `eq()` and the other [conditions](/conditions)), `raw()` throws, and so do `cols()` and `vals()`:
+
+> `` `db.raw()`, `db.cols()` and `db.vals()` have no meaning as a value in a Whereable (a filter), nor in `isIn()`: to compare with SQL, use a `sql` fragment value, where `db.self` stands for the column; to compare with a value, give the value itself, or `db.param()`. ``
+
+The type refuses them there, and as an `insert()` or `update()` value:
+
+```ts twoslash
+// @errors: 2345
+import * as db from 'zapatos/db';
+import type * as s from 'zapatos/schema';
+// ---cut---
+db.sql<s.films.SQL>`SELECT * FROM ${'films'} WHERE ${{ title: db.raw("'x'") }}`;
+```
+
+- To compare with SQL: a fragment value, `` { title: db.sql`${db.self} = ${db.raw("'x'")}` } ``.
+- Zapatos 6.6.1 sent them there as one parameter, as JSON (`'{"value":…}'`): no row on a text or `jsonb` column, every row with `ne()` and `isNotIn()`, an error (22P02) on other types.
+- Outside a filter, `vals([db.raw(x)])` is still a parameter, `x` as JSON; in `upsert()`'s `updateValues`, `raw()` is SQL ([`upsert()`](/insert#upsert)).
+
+### `DangerousRawString` {#DangerousRawString}
+
+```ts
+class DangerousRawString { value: string }
+```
+
+What `raw()` returns. A type-only member keeps it from passing as a `Parameter`: `const r: db.DangerousRawString = { value: 'x' }` does not compile.
+
+## `cols()` {#cols}
+
+```ts
+db.cols<T>(namesOrObject: T): ColumnNames<T>
+```
+
+A comma-separated list of quoted names:
+
+- an object: its keys, sorted, `cols({ tag, film_id })` → `"film_id", "tag"`;
+- an array: its items in their order, each an [identifier](#identifiers), `cols(['id', 'title'])` → `"id", "title"`.
+
+With `vals()` of the same object, an `INSERT` in which keys and values line up:
+
+<CastPanel example="sql_cols_vals">
+
+<<< ./examples/sql_cols_vals.ts{ts twoslash}
+
+</CastPanel>
+
+With arrays, a `SELECT` of some columns and an `IN` list; `s.films.OnlyCols<…>` is the row type of those columns:
+
+<CastPanel example="sql_cols_vals_arrays">
+
+<<< ./examples/sql_cols_vals_arrays.ts{ts twoslash}
+
+</CastPanel>
+
+As a filter value, `cols()` throws, as [`raw()`](#raw) does.
+
+### `ColumnNames` {#ColumnNames}
+
+```ts
+class ColumnNames<T> { value: T }
+```
+
+What `cols()` returns. A type-only member keeps it from passing as a `Parameter`.
+
+## `vals()` {#vals}
+
+```ts
+db.vals<T>(valuesOrObject: T): ColumnValues<T>
+```
+
+A comma-separated list of values. Each value compiles as follows.
+
+| Value | In `vals({…})` | In `vals([…])` |
+|---|---|---|
+| a plain value | a parameter, `$1` | a parameter, `$1` |
+| a `Parameter` | as it is, with its cast | as it is, with its cast |
+| a `sql` fragment | its SQL, with its key as the current column (so [`self`](#self) works) | its SQL |
+| `Default` | `DEFAULT` | `DEFAULT`; throws in a filter |
+| `parent(c?)` | a parameter, as JSON | the [parent column](#parent) |
+| `self`, `raw()`, `cols()`, `vals()` | a parameter | throw in a filter; a parameter outside one |
+
+- An object's values come in the order of its sorted keys, as `cols()` lists them.
+- "In a filter" is wherever `vals([…])` has a current column: in `isIn()` and `isNotIn()`, and in a fragment value of a Whereable or of `vals({…})`. There `Default` throws "`` `db.Default` has no meaning in a Whereable (a filter)… ``", `self` "`` `db.self` has no meaning as a value in a Whereable (a filter), nor in `isIn()`… ``", and `raw()`, `cols()` and `vals()` as [`raw()`](#raw) says.
+- As a filter value itself, `vals()` throws, as [`raw()`](#raw) does.
+- Zapatos 6.6.1 wrapped a `Parameter`, `Default` and `parent()` in a second parameter in an array: `'{"value":…}'`, `'Symbol(DEFAULT)'`, `'{"value":"id"}'`.
+
+### `ColumnValues` {#ColumnValues}
+
+```ts
+class ColumnValues<T> { value: T }
+```
+
+What `vals()` returns. A type-only member keeps it from passing as a `Parameter`.
+
+## Whereable objects {#whereable}
+
+A plain object is a Whereable of the table: each key a column, each value what it must match. The keys are sorted, each pair compiled as below, joined by `AND`, the whole in parentheses; there is no `WHERE`, which you write. An empty object is `TRUE`.
+
+<CastPanel example="sql_whereable">
+
+<<< ./examples/sql_whereable.ts{ts twoslash}
+
+</CastPanel>
+
+| Value | Compiles to |
+|---|---|
+| a plain value, `null` and arrays included | `("title" = $1)` |
+| a `Parameter` | `("title" = CAST($1 AS "text"))`, as it is |
+| a `sql` fragment | `(…)`, compiled with the key as the current column: [`self`](#self) is the column |
+| a [condition](/conditions) | the same: a condition is a fragment, `like('The%')` |
+| `parent(c?)` | `("studio_id" = "studios"."id")`, in a `lateral` subquery |
+| `Default`, `self` | throws |
+| `raw()`, `cols()`, `vals()` | throws ([`raw()`](#raw)) |
+
+- `null` is a parameter too, and `= NULL` matches no row: use [`conditions.isNull`](/conditions#conditions.isNull).
+- `Default` throws "`` `db.Default` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. `DEFAULT` is for INSERT and UPDATE values. ``"; Zapatos 6.6.1 sent it as `'Symbol(DEFAULT)'`.
+- The shortcuts take the same object as their `where` ([`select()`](/select#select)).
+
+## `self` {#self}
+
+```ts
+db.self
+```
+
+The current column, in a Whereable's fragment value: `` { runtime_minutes: db.sql`${db.self} > ${db.param(100)}` } `` gives `(("runtime_minutes" > $1))`. In a fragment value of `vals({…})`, the current column is its key: `` vals({ tag: db.sql`upper(${db.self})` }) `` gives `upper("tag")`.
+
+- Where there is no current column, it throws: "The 'self' column alias has no meaning here".
+- As a Whereable value, in `isIn()`, or as the value of `eq()` and the other conditions, it throws: it is the column, not a value to compare with it ("`` `db.self` has no meaning as a value in a Whereable (a filter), nor in `isIn()`… ``"). Zapatos 6.6.1 sent it as the string `'Symbol(self)'`.
+
+### `SelfType` {#SelfType}
+
+```ts
+type SelfType = typeof self
+```
+
+## `parent()` {#parent}
+
+```ts
+db.parent<C extends Column | undefined = Column | undefined>(column?: C): ParentColumn<C>
+```
+
+A column of the parent query's table, in a subquery given to `lateral` ([Join through a lateral](/lateral)): `"<parent table or alias>"."<column>"`.
+
+<CastPanel example="sql_parent">
+
+<<< ./examples/sql_parent.ts{ts twoslash}
+
+</CastPanel>
+
+- Without a column, the column of the filter it sits in: `{ film_id: db.parent() }`, in a `lateral` of `roles`, gives `("film_id" = "roles"."film_id")`. With no filter, it throws.
+- It works as a Whereable value, in a `sql` fragment, in `eq()` and in `vals([…])`, so in `isIn()`: `{ film_id: isIn([db.parent()]) }` gives `("film_id" IN ("roles"."film_id"))`. In `vals([…])`, Zapatos 6.6.1 sent it as JSON: `isIn([parent('id')])` compared with `'{"value":"id"}'`.
+- Outside a nested query, it throws "The 'parent' table alias has no meaning here", so `run()` rejects before any query.
+
+### `ParentColumn` {#ParentColumn}
+
+```ts
+class ParentColumn<C extends Column | undefined = Column | undefined> { value?: C }
+```
+
+What `parent()` returns.
+
+## `Default` {#Default}
+
+```ts
+db.Default
+```
+
+The keyword `DEFAULT`: a column's default, in an `INSERT` or `UPDATE` value, alone or in `vals()`.
+
+<CastPanel example="sql_default">
+
+<<< ./examples/sql_default.ts{ts twoslash}
+
+</CastPanel>
+
+- In a filter it throws: as a Whereable value ([above](#whereable)), in `isIn()`, as the value of `eq()`, `add()` and the other conditions, and in `vals([…])` with a current column ([`vals()`](#vals)).
+- For `add()` and `subtract()`, set the column itself: `{ n: db.Default }`.
+- Zapatos 6.6.1 sent it as the string `'Symbol(DEFAULT)'` in all of these, and in `vals([…])`, where it is now `DEFAULT`.
+
+### `DefaultType` {#DefaultType}
+
+```ts
+type DefaultType = typeof Default
+```
+
+## Nested fragments {#nested-fragments}
+
+A `sql` fragment interpolated in another compiles in place. Its parameters are numbered on from the outer ones, and it inherits the outer parent table and current column. A fragment that compiles to nothing, or an empty array, lets a query grow by condition:
+
+<CastPanel example="sql_nested">
+
+<<< ./examples/sql_nested.ts{ts twoslash}
+
+</CastPanel>
+
+A nested fragment's `RunResult` and `runResultTransform` are not used: only the outer fragment's `run()` counts.
+
+## Arrays {#arrays}
+
+An array's items compile one after the other, each as if interpolated alone, with nothing between them: ``[db.sql`a`, ' ', 'b']`` gives `a" ""b"`, the string `' '` being a name. An empty array compiles to nothing. To put something between the items, [`mapWithSeparator()`](#mapWithSeparator).
+
+## `mapWithSeparator()` {#mapWithSeparator}
+
+```ts
+db.mapWithSeparator<TIn, TSep, TOut>(
+  items: readonly TIn[],
+  separator: TSep,
+  map: (item: TIn, index: number, items: readonly TIn[]) => TOut,
+): (TOut | TSep)[]
+```
+
+Maps `items` with `map`, `separator` between each two results; `[]` for no items. A plain array, so it compiles as [one](#arrays):
+
+<CastPanel example="sql_map_with_separator">
+
+<<< ./examples/sql_map_with_separator.ts{ts twoslash}
+
+</CastPanel>
+
+## `all` {#all}
+
+```ts
+db.all
+```
+
+The `where` of `select()`, `count()` and the other selects that matches every row: `db.select('films', db.all)` writes no `WHERE` ([`select()`](/select#select)). It is not an interpolation: in `sql`, the type refuses it, and it throws.
+
+### `AllType` {#AllType}
+
+```ts
+type AllType = typeof all
+```
+
+## `SQLFragment` {#SQLFragment}
+
+```ts
+class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
+```
+
+What `sql` and every shortcut return: a query, or part of one, not yet compiled. You never construct one with `new`.
+
+| Member | What it is |
+|---|---|
+| [`run(queryable, force?)`](#run) | compiles, runs, and resolves to `RunResult` |
+| [`compile()`](#compile) | `{ text, values }`, the query `run()` sends |
+| [`runResultTransform`](#runResultTransform) | turns `pg`'s result into `RunResult` |
+| [`prepared(name?)`](#prepared) | makes it a prepared statement |
+| `copy(override?)` | a shallow copy, some properties replaced |
+| `noop`, `noopResult` | set by `insert()` and `upsert()` given `[]`: `run()` sends nothing and resolves to `noopResult` |
+| `parentTable` | set on a `lateral` subquery by its parent, for [`parent()`](#parent) |
+| `preparedName` | set by `prepared()` |
+| `compileExpression()` | used by `compile()`, internal |
+
+### `run()` {#run}
+
+```ts
+fragment.run(queryable: Queryable, force = false): Promise<RunResult>
+```
+
+1. Compiles the fragment ([`compile()`](#compile)); an error there rejects, before any query.
+2. Calls [`queryListener`](/runtime-config#Config.queryListener) with the query and the transaction's id, if set.
+3. Sends the query to `queryable`, and passes `pg`'s result through [`runResultTransform`](#runResultTransform). A `noop` fragment sends nothing and gives `noopResult`, unless `force` is `true`.
+4. Calls [`resultListener`](/runtime-config#Config.resultListener) with the result, the transaction's id, the time taken and the query, if set.
+
+A `noop` fragment still compiles, its SQL behind a comment: `/* marked no-op: won't hit DB unless forced -> */ INSERT INTO "tags" SELECT null WHERE false`.
+
+### `compile()` {#compile}
+
+```ts
+fragment.compile(): SQLQuery
+```
+
+The query as `pg` takes it ([`SQLQuery`](/runtime-config#SQLQuery)): `text`, its parameters numbered from `$1`, and `values`, in their order; `name` too, once [prepared](#prepared). It sends nothing, and throws where an interpolation has no meaning. Its arguments are for its own recursion: call it with none.
+
+<CastPanel example="sql_compile">
+
+<<< ./examples/sql_compile.ts{ts twoslash}
+
+</CastPanel>
+
+### `runResultTransform` {#runResultTransform}
+
+```ts
+fragment.runResultTransform: (qr: pg.QueryResult) => any  // default: qr => qr.rows
+```
+
+Applied by `run()` to what `pg` returns. The shortcuts set their own (`selectOne()` takes the first row's `result`). Assign one to return something else; `RunResult` must then be the type it returns:
+
+<CastPanel example="sql_run_result_transform">
+
+<<< ./examples/sql_run_result_transform.ts{ts twoslash}
+
+</CastPanel>
+
+It applies only to `run()` on that fragment: not when it is nested in another, nor given to `lateral` or `extras`.
+
+### `prepared()` {#prepared}
+
+```ts
+fragment.prepared(name = `_zapatos_prepared_${n}`): this
+```
+
+Sets the `name` that `compile()` adds to the query, so that Postgres prepares the statement once per connection and runs it by name after ([node-postgres](https://node-postgres.com/features/queries#prepared-statements)). Without a name, `_zapatos_prepared_0`, `_1`… in the order of the calls.
+
+## `RunResultForSQLFragment` {#RunResultForSQLFragment}
+
+```ts
+type RunResultForSQLFragment<F extends SQLFragment<any, any>>
+```
+
+The `RunResult` of `F`, with `undefined` read as `null`: a fragment nested as a `lateral` or `extras` value comes back as JSON, where a missing row is `null`. So `selectOne()`'s `films.JSONSelectable | undefined` becomes `films.JSONSelectable | null` there.
+
+## `Queryable` {#Queryable}
+
+```ts
+type Queryable = pg.ClientBase | pg.Pool
+```
+
+What `run()` takes: a pool, a client, or the client a [`transaction()`](/transaction#transaction) gives its callback.
+
+## `SQL` {#SQL}
+
+```ts
+type SQL = SQLExpression | SQLExpression[]
+```
+
+The default `Interpolations` of `sql`: an expression, or an array of them. Each table of the generated schema has its own, `s.films.SQL`, which takes only the names, Whereable and `cols()` / `vals()` objects of that table.
+
+### `SQLExpression` {#SQLExpression}
+
+```ts
+type SQLExpression = Table | ColumnNames<Updatable | (keyof Updatable)[]> | ColumnValues<Updatable | any[]>
+  | Whereable | Column | ParentColumn | GenericSQLExpression
+```
+
+One interpolation: a table or column name of any table, a Whereable, `parent()`, `cols()` / `vals()` of an Updatable, or a [`GenericSQLExpression`](#GenericSQLExpression).
+
+### `GenericSQLExpression` {#GenericSQLExpression}
+
+```ts
+type GenericSQLExpression = SQLFragment<any, any> | Parameter | DefaultType | DangerousRawString
+  | SelfType | ColumnNames<any> | ColumnValues<any>
+```
+
+The interpolations that hold no name of the schema: they fit in any table's `SQL`.
