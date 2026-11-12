@@ -225,6 +225,10 @@ Candidates for a check, a rule or a skill line.
 - #149 — A rules file for assistants names the cases a reviewer would: a request body passed whole, an empty filter before a write, side effects in a callback that may run again, `@ts-ignore` — `branch-reviewer`
 - #149 — `RAISE EXCEPTION … USING ERRCODE = '40001'` in a `DO` block probes a retry in one line, with no concurrent transactions — `builder`
 - #149 — `git merge -m` takes a trailer only as a second `-m`: brief merges as `-m "<subject>" -m "Co-Authored-By: …"` — `builder`
+- #148 — « the catalog doesn't say X » (Postgres) and « the generator doesn't read X » (Zapatos 6.6.1) are different claims: name the catalog table that holds or lacks X (`pg_constraint` for foreign keys and `CHECK`s) — `branch-reviewer`, `builder`
+- #148 — `information_schema` reports a view's `NOT NULL` domain column as `NO`, while a materialised view's `attnotnull` is false even for it: probe both read paths with a `NOT NULL` domain — `branch-reviewer`, `builder`
+- #148 — An explanation that names open issues « as they are today » is tied back to them (a comment on each, rule of #130), or it outlives the behaviour — `branch-reviewer`
+- #148 — `<sup>` is stripped in `llms-full.txt` (2<sup>53</sup> became « 253 »): write the value another way — `builder`
 
 ## Minors kept
 
