@@ -6,8 +6,10 @@
 // `<<< ./examples/….ts{ts twoslash}` above it, up to the previous such line, adds its code below `// ---cut---` (all
 // of it if it has none), but a block that shows an error (`// @errors:`), which the reader does not keep: its code is
 // checked below the steps above it, in a `{ … }` of its own, and must give exactly the errors it lists, as Twoslash
-// checks it only against its own setup. The join is checked in memory, with the options of tsconfig.json but
-// `skipLibCheck`, against the built `zapatos/db` and the docs schema. Run by `npm run docs:build`.
+// checks it only against its own setup. If the first `ts twoslash` block under the line is titled with the file
+// (`ts twoslash [src/films.ts]`), it shows the whole file: it must be the join, imports in any order and blank lines
+// aside. The join is checked in memory, with the options of tsconfig.json but `skipLibCheck`, against the built
+// `zapatos/db` and the docs schema. Run by `npm run docs:build`.
 import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
@@ -24,24 +26,35 @@ const
 /** What the reader writes of a block: the lines below `// ---cut---`, the rest being its setup. */
 const belowCut = lines => lines.slice(lines.findIndex(({ text }) => text.trim() === '// ---cut---') + 1);
 
+/** The lines of code, to compare a whole file with its steps: blank lines left out, the imports first and sorted. */
+function comparable(lines) {
+  const
+    code = lines.filter(({ text }) => text.trim() !== '').map(({ text, at }) => ({ text: text.trimEnd(), at })),
+    isImport = ({ text }) => /^import\b/.test(text);
+  return [...code.filter(isImport).sort((a, b) => a.text < b.text ? -1 : a.text > b.text ? 1 : 0),
+    ...code.filter(line => !isImport(line))];
+}
+
 /**
- * The blocks of `page`, each `{ text, at }[]`, joined at each `<!-- joined: <file> -->` line, and those that show an
- * error, each with the codes it lists and the number of blocks above it.
+ * The blocks of `page`, each `{ text, at }[]`, joined at each `<!-- joined: <file> -->` line, those that show an
+ * error, each with the codes it lists and the number of blocks above it, and the whole file if the page shows it.
  */
 function joinsOf(page) {
   const joins = [], source = readFileSync(root + page, 'utf8');
-  let pieces = [], shown = [], fence, block;
-  const add = lines => {
+  let pieces = [], shown = [], fence, block, title, last;
+  const add = (lines, title) => {
     const listed = lines.map(({ text }) => text.match(/^\/\/ @errors:(.*)$/)?.[1]).find(codes => codes !== undefined);
-    if (listed === undefined) pieces.push(lines);
+    if (last && title === last.file) last.whole = lines;  // the first block under the marker, titled with the file
+    else if (listed === undefined) pieces.push(lines);
     else shown.push({ lines, codes: listed.split(/[\s,]+/).filter(Boolean).map(Number), above: pieces.length });
+    last = undefined;
   };
   if (!/<!--\s*joined/i.test(source)) return joins;
   source.split('\n').forEach((line, i) => {
     const at = `${page}:${i + 1}`, trimmed = line.trim();
     if (fence) {  // inside a fenced block, until a line of at least as many of its backticks or tildes
       if (trimmed.length >= fence.length && [...trimmed].every(char => char === fence[0])) {
-        if (block) add(block);
+        if (block) add(block, title);
         fence = block = undefined;
       } else block?.push({ text: line, at });
       return;
@@ -53,6 +66,7 @@ function joinsOf(page) {
     if (open) {
       fence = open[1];
       block = /^ts twoslash\b/.test(open[2].trim()) ? [] : undefined;
+      title = open[2].match(/\[(.+?)\]/)?.[1];
     } else if (include) {
       add(readFileSync(root + include, 'utf8').split('\n')
         .map((text, j) => ({ text, at: `${at}: ${include}:${j + 1}` })));
@@ -60,7 +74,7 @@ function joinsOf(page) {
       problems.push(`${at}: a joined page includes only \`<<< ./examples/<name>.ts{ts twoslash}\`, unindented: ${
         line}`);
     } else if (joined) {
-      joins.push({ file: joined, at, pieces, shown });
+      joins.push(last = { file: joined, at, pieces, shown });
       pieces = [];
       shown = [];
     } else if (/<!--\s*joined/i.test(line.replace(/`[^`]*`/g, ''))) {  // a marker the line above misses would pass
@@ -93,9 +107,9 @@ function errorsOf(name, lines) {
 
 /**
  * Type-check `pieces` joined as `file`, then the code of each block in `shown` below the pieces above it, which must
- * give exactly the errors it lists: each error names the line of the page it is on.
+ * give exactly the errors it lists, and compare the join with `whole`: each error names the line of the page it is on.
  */
-function check({ file, at, pieces, shown }) {
+function check({ file, at, pieces, shown, whole }) {
   const lines = pieces.flatMap(belowCut), name = root + file;
   if (lines.length === 0) return problems.push(`${at}: nothing above it to join as ${file}`);
   for (const { line, where, text } of errorsOf(name, lines)) {
@@ -112,7 +126,18 @@ function check({ file, at, pieces, shown }) {
       codes.join(', TS')}, but below the steps above it the code gives ${
       errors.map(({ line, text }) => `${probe[line].at}: ${text}`).join('; ') || 'no error'}`);
   }
-  checked.push(`${file} (${at.split(':')[0]}, ${pieces.length} blocks, ${shown.length} that show an error)`);
+  if (whole) {
+    const
+      steps = comparable(lines),
+      shows = comparable(belowCut(whole)),
+      i = Array.from({ length: Math.max(steps.length, shows.length) }, (_, j) => j)
+        .find(j => steps[j]?.text !== shows[j]?.text),
+      quoted = line => line ? `\`${line.text.trim()}\`` : 'nothing more';
+    if (i !== undefined) problems.push(`${shows[i]?.at ?? whole.at(-1)?.at ?? at} (the whole ${file}): it shows ${
+      quoted(shows[i])}, but the steps above give ${quoted(steps[i])}${steps[i] ? ` (${steps[i].at})` : ''}`);
+  }
+  checked.push(`${file} (${at.split(':')[0]}, ${pieces.length} blocks, ${shown.length} that show an error${
+    whole ? ', the whole file' : ''})`);
 }
 
 for (const page of readdirSync(root).filter(file => file.endsWith('.md'))) joinsOf(page).forEach(check);

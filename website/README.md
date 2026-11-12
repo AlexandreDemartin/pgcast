@@ -88,6 +88,7 @@ One per group, in `templates/`, not published (`srcExclude` in `.vitepress/confi
 - A page whose examples the reader keeps in one file, as the tutorial's `src/films.ts`, says so with a line `<!-- joined: src/films.ts -->` under its last step; any other line holding `<!-- joined` fails the build. `docs:build` checks the file (`check-joined.mjs`), and each error names the page and the line:
   - The code below `// ---cut---` of each `ts twoslash` block and `<<< ./examples/<name>.ts{ts twoslash}` (unindented) above it, up to the previous such line, is joined in page order and type-checked: a name declared twice or an import the page never gives fails.
   - A block that shows an error (`// @errors:`) stays out of the join, as the reader does not keep it. Its code is type-checked below the steps above it, in a `{ … }` of its own, and must give exactly the codes it lists: Twoslash checks it only against its own setup.
+  - If the first `ts twoslash` block under the line is titled with the file (`ts twoslash [src/films.ts]`), it shows the whole file: it must be the join, imports in any order and blank lines aside.
 - An optional caption goes under the panel: `<template #caption><span>…</span></template>` (`index.md`).
 
 ### The reference
