@@ -153,14 +153,7 @@ A query names its table with the schema, and its rows are `s.archive.screenings.
 const past = await db.select('archive.screenings', { film_id: 1000 }).run(pool);
 ```
 
-```sql
-SELECT coalesce(jsonb_agg(result), '[]') AS result
-FROM (
-  SELECT to_jsonb("archive"."screenings".*) AS result
-  FROM "archive"."screenings"
-  WHERE ("film_id" = $1)
-) AS "sq_archive.screenings"
-```
+Its SQL is [`select()`](/select#select)'s, with the name quoted part by part: `to_jsonb("archive"."screenings".*)`, `FROM "archive"."screenings"`, and the alias `"sq_archive.screenings"`.
 
 ### `unprefixedSchema` {#generate.unprefixedSchema}
 
