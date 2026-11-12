@@ -245,7 +245,12 @@ db.avg(table, where, options?)
 db.min(table, where, options?)
 ```
 
-`SELECT min("column") AS result`, through `Number()`: `0` over no rows, and `NaN` on a column that is not a number (text, a date), though the type says `number`. Otherwise as [`sum()`](#sum).
+`SELECT min("column") AS result`, through `Number()`, so `0` over no rows. The type says `number` whatever the column:
+
+- a date or time column (`date`, `timestamp`, `timestamptz`) gives its milliseconds since 1970, as node-postgres reads it as a `Date`;
+- text or an enum gives `NaN`, unless the text reads as a number: `'9'` gives `9`.
+
+Otherwise as [`sum()`](#sum).
 
 <CastPanel example="min">
 
@@ -259,7 +264,7 @@ db.min(table, where, options?)
 db.max(table, where, options?)
 ```
 
-`SELECT max("column") AS result`; as [`min()`](#min), `0` over no rows and `NaN` on a column that is not a number.
+`SELECT max("column") AS result`; as [`min()`](#min): `0` over no rows, a date's milliseconds, and `NaN` on text or an enum unless the text reads as a number.
 
 <CastPanel example="max">
 
