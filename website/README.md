@@ -54,7 +54,7 @@ One per group, in `templates/`, not published (`srcExclude` in `.vitepress/confi
 - **Options tables**: the columns read Option → SQL it adds → Effect on the type, the option and its SQL in code, "none" when the type does not change. The SQL is what the built library compiles (`.compile().text`), never written from memory.
 - **Links**: root-relative, without `.md`: `[Install](/install)`, an entry as `` [`select()`](/select#select) ``. A link to a page that does not exist fails the build.
   - The hash is the anchor exactly as written: an entry's name, case and dots kept (`` [`Config.castArrayParamsToJson`](/runtime-config#Config.castArrayParamsToJson) ``, `` [`SelectResultMode`](#SelectResultMode) `` on its own page); a heading without `{#…}` by its slug, in lower case with hyphens (`## Insert options` → `#insert-options`). No raw `<a href>`.
-  - A link to an anchor that its page does not define fails the build, with the page and the link (`.vitepress/anchors.ts`). A name still in `reference-pending.json` counts as an anchor of its page, so a page can link an entry of a "Coming" page.
+  - A raw `<a href>` to a page that does not exist fails it too, as does a link to an anchor that its page does not define or a root link outside the site's base, with the page and the link (`.vitepress/anchors.ts`). A name still in `reference-pending.json` counts as an anchor of its page, so a page can link an entry of a "Coming" page.
   - A tutorial ends on the three other groups.
   - A how-to links each option it uses to its entry.
   - A reference entry links its explanation for the why.

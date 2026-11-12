@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { transformerTwoslash } from '@shikijs/vitepress-twoslash';
 import { defineConfig } from 'vitepress';
-import { checkLinkAnchors, keepLinkHashes } from './anchors.ts';
+import { checkLinks, keepLinkHashes } from './anchors.ts';
 import { writeLlmsFiles } from './llms.ts';
 import { outline } from './outline.ts';
 import { sqlParameters, syntax } from './syntax.ts';
@@ -24,8 +24,8 @@ export default defineConfig({
   cleanUrls: true,
   srcExclude: ['README.md', 'templates/**'],  // for whoever writes the site, not pages of it
   buildEnd: async config => {
-    checkLinkAnchors(config);  // a link to an anchor no page defines fails the build
     await writeLlmsFiles(config);  // llms.txt and llms-full.txt, for assistants
+    checkLinks(config);  // a link to a page or an anchor that does not exist fails the build
   },
   head: [
     ['link', { rel: 'preconnect', href: 'https://fonts.googleapis.com' }],
