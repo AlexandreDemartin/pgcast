@@ -243,6 +243,12 @@ Zapatos 6.6.1 sent a `Parameter` and `parent()` there as one more parameter, as 
 
 `"col" NOT IN ($1, $2)`. An empty array gives `true`: every row. A `NULL` in the list, as Postgres reads `NOT IN`, makes it match no row; the type refuses `null` there with `strictNullChecks` on.
 
+<CastPanel example="conditions_isNotIn">
+
+<<< ./examples/conditions_isNotIn.ts{ts twoslash}
+
+</CastPanel>
+
 ## Arrays {#arrays}
 
 Each takes an array, sent as one parameter, or [`parent()`](/sql-template#parent): `<T>(a: T[] | ParentColumn)`. They compare the elements, whatever the dimensions: `{drama,romance}` overlaps `{{romance,thriller}}`.
@@ -347,6 +353,14 @@ db.conditions.fromNow(n: number, unit: IntervalUnit = 'millisecond')
 ```
 
 `now() + $1`, the value `` `${n} ${unit}` ``, which Postgres reads as an interval: `fromNow(-7, 'days')` sends `'-7 days'`, `fromNow(1.5, 'hours')` `'1.5 hours'`. `unit` is one of `microsecond`, `millisecond`, `second`, `minute`, `hour`, `day`, `week`, `month`, `year`, `decade`, each with or without an `s`, then `century`, `centuries`, `millennium`, `millennia`. A value, as [`now`](#conditions.now). An `n` whose string Postgres does not read (`NaN`, `1e21`, written `1e+21`) fails with 22007.
+
+The screenings of the next seven days, from `now()`, here the time of the query:
+
+<CastPanel example="conditions_now">
+
+<<< ./examples/conditions_now.ts{ts twoslash}
+
+</CastPanel>
 
 ## Arithmetic: `add()`, `subtract()` {#arithmetic}
 
