@@ -66,7 +66,7 @@ pgcast starts from Zapatos 6.6.1. Before changing it, the fork pinned what 6.6.1
 
 The security fixes came first, in 6.6.2: no name (a table, a column, a key, an alias) and no cast of `param()` can close its quotes, a plain value in `upsert()`'s `updateValues` is a parameter, and the keywords of a lock, `truncate()` or an isolation level, and the name of an aggregate, are checked before any query ([The security model](/security)). Today's two opt-ins become the defaults in 7.0, and their old paths go in 8.0; until then, 6.x is a drop-in for Zapatos 6.6.1 ([Versions, opt-ins and warnings](/versions)).
 
-Zapatos 6.6.1 had no test suite; its CI linted and built. Its roadmap called one "kind of indispensable", one that tests "not just returned values but also inferred types". pgcast's tests check the SQL each call compiles, run it on Postgres 14, 16 and 18, check the types, accepted and refused, and measure what they cost the compiler.
+Zapatos 6.6.1 shipped no test suite of its own (its first consumer's tests exercised "most of the code base at least a little"); its CI linted and built. Its roadmap called one "kind of indispensable", one that tests "not just returned values but also inferred types". pgcast's tests check the SQL each call compiles, run it on Postgres 14, 16 and 18, check the types, accepted and refused, and measure what they cost the compiler.
 
 These docs are the last addition. Every example compiles against the library at build: its SQL comes from its own `.compile()`, its type from TypeScript, and an example that no longer fits fails the build.
 
