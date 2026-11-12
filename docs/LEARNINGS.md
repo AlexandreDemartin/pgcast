@@ -225,6 +225,10 @@ Candidates for a check, a rule or a skill line.
 - #149 — A rules file for assistants names the cases a reviewer would: a request body passed whole, an empty filter before a write, side effects in a callback that may run again, `@ts-ignore` — `branch-reviewer`
 - #149 — `RAISE EXCEPTION … USING ERRCODE = '40001'` in a `DO` block probes a retry in one line, with no concurrent transactions — `builder`
 - #149 — `git merge -m` takes a trailer only as a second `-m`: brief merges as `-m "<subject>" -m "Co-Authored-By: …"` — `builder`
+- #127 — A guide's « same under both libraries » is probed in both directions: the fixes a project starts relying on are what going back undoes (`isNotIn([param(x)])` in `deletes()` hits every row again) — `branch-reviewer`
+- #127 — A migration guide names the changed `.compile()` text as well as the changed rows: SQL snapshots in tests change where rows do not — `branch-reviewer`
+- #127 — A `CHANGELOG.md` migration snippet is never compiled: run each through `tsc` on the fixture (#200) — `branch-reviewer`
+- #127 — A review's example is run on the real docs schema before it goes on the page (`deletes('films', …)` stops on foreign keys) — `builder`
 
 ## Minors kept
 
