@@ -230,9 +230,11 @@ export type Queryable = pg.ClientBase | pg.Pool;
  * An interpolated string is a table or column name: it is double-quoted and
  * split on `.` (`'s.t'` gives `"s"."t"`), and any `"` in it is doubled, as
  * `quote_ident` does (`'a"b'` gives `"a""b"`), so it cannot close its quotes.
- * As in Zapatos 6.6.1, a string that starts and ends with `"` is written as
- * is, and one that already compiled to quoted names only is written as before
- * (`'a""b'` gives `"a""b"`).
+ * A string that is already well-formed quoted names joined by `.` is written
+ * as is (`'"s"."t"'`, `'"a""b"'`), and one that already compiled to quoted
+ * names only is written as before (`'a""b'` gives `"a""b"`). Unlike Zapatos
+ * 6.6.1, any other string that starts and ends with `"` is quoted like any
+ * other name: `'"a" || "b"'` gives `"""a"" || ""b"""`, one identifier.
  */
 export function sql<
   Interpolations = SQL,
@@ -359,10 +361,11 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
 
     } else if (typeof expression === 'string') {
       // if it's a string, it should be a x.Table or x.Column type, so just needs quoting (split on `.`);
-      // a `"` is doubled as quote_ident does, so it cannot close its quotes, unless the name already
-      // compiled to quoted identifiers only (`a""b`, a hand-escaped `a"b`), which is written as before
+      // a well-formed quoted name (`"a"`, `"a"."b"`) is written as is; otherwise a `"` is doubled as
+      // quote_ident does, so it cannot close its quotes, unless the name already compiled to quoted
+      // identifiers only (`a""b`, a hand-escaped `a"b`), which is written as before
       const quoted = `"${expression.replace(/[.]/g, '"."')}"`;
-      result.text += expression.startsWith('"') && expression.endsWith('"') ? expression :
+      result.text += quotedIdentifiers.test(expression) ? expression :
         !expression.includes('"') || quotedIdentifiers.test(quoted) ? quoted :
           `"${expression.replace(/"/g, '""').replace(/[.]/g, '"."')}"`;
 
