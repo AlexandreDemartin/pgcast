@@ -13,6 +13,11 @@ import { resetConfig } from '../helpers/config';
 /** Compiles one interpolated expression on its own. */
 const one = (expression: db.SQL) => sql`${expression}`.compile();
 
+/** What calling `f` throws, or 'compiled'. */
+const thrown = (f: () => unknown) => {
+  try { f(); return 'compiled'; } catch (err) { return (err as Error).message; }
+};
+
 afterEach(resetConfig);
 
 describe('identifiers (strings)', () => {
@@ -391,19 +396,38 @@ describe('cols and vals', () => {
     expect(() => one({ id: db.conditions.isIn([1, Default]) })).toThrowErrorMatchingInlineSnapshot(`[Error: \`db.Default\` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. \`DEFAULT\` is for INSERT and UPDATE values.]`);
   });
 
-  it('characterization: vals of an array wraps raw and cols in a parameter', () => {
-    // characterization: only a SQLFragment, a Parameter, Default or parent() is compiled as it is; pg
-    // sends the others as JSON ('{"value":"x"}'), so isIn([cols('x')]) compares with a string (#101)
-    const nested = sql`${{ owner_id: db.conditions.isIn([raw('1'), cols('x')]) }}`.copy({ parentTable: 'users' });
-    expect(nested.compile()).toMatchInlineSnapshot(`
+  it('vals of an array throws on raw, cols and vals in a Whereable: they are no values', () => {
+    // 6.6.1 sent them as JSON ('{"value":"1"}'): no row on a text column, every row with isNotIn, 22P02 on the
+    // others; so does vals([…]) in a fragment value of vals of an object, as for Default
+    expect(new Set([raw('1'), cols('x'), vals('x')].flatMap(value => [
+      () => sql`${{ owner_id: db.conditions.isIn([1, value]) }}`.copy({ parentTable: 'users' }).compile(),
+      () => one({ owner_id: db.conditions.isNotIn([value]) }),
+      () => one(vals({ role: sql`${vals([value])}` })),
+    ].map(thrown)))).toMatchInlineSnapshot(`
+      Set {
+        "\`db.raw()\`, \`db.cols()\` and \`db.vals()\` have no meaning as a value in a Whereable (a filter), nor in \`isIn()\`: to compare with SQL, use a \`sql\` fragment value, where \`db.self\` stands for the column; to compare with a value, give the value itself, or \`db.param()\`.",
+      }
+    `);
+  });
+
+  it('characterization: outside a filter, raw, cols and vals in vals of an array are parameters', () => {
+    // characterization: pg sends them as JSON ('{"value":"now()"}'); left as they are by #108
+    expect(one(vals([raw('now()'), cols(['a']), vals([1])]))).toMatchInlineSnapshot(`
       {
-        "text": "(("owner_id" IN ($1, $2)))",
+        "text": "$1, $2, $3",
         "values": [
           DangerousRawString {
-            "value": "1",
+            "value": "now()",
           },
           ColumnNames {
-            "value": "x",
+            "value": [
+              "a",
+            ],
+          },
+          ColumnValues {
+            "value": [
+              1,
+            ],
           },
         ],
       }
@@ -569,36 +593,37 @@ describe('Whereable', () => {
     expect(() => one({ display_name: Default })).toThrowErrorMatchingInlineSnapshot(`[Error: \`db.Default\` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. \`DEFAULT\` is for INSERT and UPDATE values.]`);
   });
 
-  it('characterization: a raw value is wrapped in another parameter', () => {
-    // characterization: pg sends it as JSON, {"value":"'ok'"} (#101)
-    expect(one({ mood: raw("'ok'") })).toMatchInlineSnapshot(`
-      {
-        "text": "("mood" = $1)",
-        "values": [
-          DangerousRawString {
-            "value": "'ok'",
-          },
-        ],
+  it('a raw, cols or vals value throws: compare with a sql fragment value, or with a value', () => {
+    // 6.6.1 sent them as JSON ('{"value":"\'ok\'"}'): no row on a text or jsonb column, every row with isNotIn,
+    // 22P02 on the others; raw(x) is not compiled as SQL there, where it was a parameter, so raw(input) stays harmless
+    expect(new Set([raw("'ok'"), cols('Ada'), vals(['admin'])].flatMap(value => [
+      () => one({ mood: value }),
+      () => one({ id: 1, mood: value }),
+      () => one(db.conditions.and({ mood: value })),
+      () => one(db.conditions.not({ mood: value })),
+      () => sql`${{ owner_id: value }}`.copy({ parentTable: 'users' }).compile(),
+    ].map(thrown)))).toMatchInlineSnapshot(`
+      Set {
+        "\`db.raw()\`, \`db.cols()\` and \`db.vals()\` have no meaning as a value in a Whereable (a filter), nor in \`isIn()\`: to compare with SQL, use a \`sql\` fragment value, where \`db.self\` stands for the column; to compare with a value, give the value itself, or \`db.param()\`.",
       }
     `);
   });
 
-  it('characterization: cols and vals as a value are wrapped in a parameter too', () => {
-    // characterization: as raw(); pg sends '{"value":"Ada"}'. A parent() value is the one wrapper compiled
-    // as it is (#101)
-    expect(one({ display_name: cols('Ada'), tags: vals(['admin']) })).toMatchInlineSnapshot(`
+  it('raw in a fragment value is SQL, and a plain { value } object is a value', () => {
+    expect({ fragment: one({ mood: sql`${self} = ${raw("'ok'")}` }), plain: one({ settings: { value: 'Ada' } }) }).toMatchInlineSnapshot(`
       {
-        "text": "("display_name" = $1 AND "tags" = $2)",
-        "values": [
-          ColumnNames {
-            "value": "Ada",
-          },
-          ColumnValues {
-            "value": [
-              "admin",
-            ],
-          },
-        ],
+        "fragment": {
+          "text": "(("mood" = 'ok'))",
+          "values": [],
+        },
+        "plain": {
+          "text": "("settings" = $1)",
+          "values": [
+            {
+              "value": "Ada",
+            },
+          ],
+        },
       }
     `);
   });

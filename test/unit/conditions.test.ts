@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from 'vitest';
 import * as db from '../../src/db';
-import { sql, param, parent, raw, cols, self, Default, conditions as dc } from '../../src/db';
+import { sql, param, parent, raw, cols, vals, self, Default, conditions as dc } from '../../src/db';
 
 /** The compiled `{ text, values }` of `{ col: condition }`, nested under a parent table for parent(); values raw. */
 const show = (condition: db.SQL) => sql`${{ col: condition }}`.copy({ parentTable: 'p' }).compile();
@@ -172,31 +172,6 @@ describe('conditions', () => {
         "ne": {
           "text": "(("col" <> lower("x")))",
           "values": [],
-        },
-      }
-    `);
-  });
-
-  it('characterization: a comparison wraps raw and cols in a parameter', () => {
-    // characterization: conditionalParam() passes only a SQLFragment, a Parameter or parent() through; pg
-    // sends the rest as JSON ('{"value":"Ada"}') (#101)
-    expect({ raw: show(dc.eq(raw("'Ada'"))), cols: show(dc.eq(cols('Ada'))) }).toMatchInlineSnapshot(`
-      {
-        "cols": {
-          "text": "(("col" = $1))",
-          "values": [
-            ColumnNames {
-              "value": "Ada",
-            },
-          ],
-        },
-        "raw": {
-          "text": "(("col" = $1))",
-          "values": [
-            DangerousRawString {
-              "value": "'Ada'",
-            },
-          ],
         },
       }
     `);
@@ -498,7 +473,7 @@ describe('conditions', () => {
   });
 });
 
-describe('Default and self as the value of a condition', () => {
+describe('Default, self, raw, cols and vals as the value of a condition', () => {
   // each condition that takes a value, by arity; the others take none, or take conditions (and, or, not)
   const one: Record<string, (a: any) => db.SQLFragment<any, any>> = {
     isDistinctFrom: dc.isDistinctFrom, isNotDistinctFrom: dc.isNotDistinctFrom,
@@ -552,6 +527,32 @@ describe('Default and self as the value of a condition', () => {
         "isNotInSelf": "\`db.self\` has no meaning as a value in a Whereable (a filter), nor in \`isIn()\`: compare with a value, or use it in a \`sql\` fragment value, where it stands for the column.",
       }
     `);
+  });
+
+  it('a condition given raw, cols or vals throws when compiled, not when called', () => {
+    // 6.6.1 sent them as JSON ('{"value":"\'Ada\'"}'): no row on a text column, every row with ne(), 22P02 on the others
+    expect({ raw: messages(raw("'Ada'")), cols: messages(cols('Ada')), vals: messages(vals('Ada')) }).toMatchInlineSnapshot(`
+      {
+        "cols": Set {
+          "\`db.raw()\`, \`db.cols()\` and \`db.vals()\` have no meaning as the value of \`eq()\`, \`add()\` and the other conditions: for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition; for a value, give the value itself, or \`db.param()\`.",
+        },
+        "raw": Set {
+          "\`db.raw()\`, \`db.cols()\` and \`db.vals()\` have no meaning as the value of \`eq()\`, \`add()\` and the other conditions: for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition; for a value, give the value itself, or \`db.param()\`.",
+        },
+        "vals": Set {
+          "\`db.raw()\`, \`db.cols()\` and \`db.vals()\` have no meaning as the value of \`eq()\`, \`add()\` and the other conditions: for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition; for a value, give the value itself, or \`db.param()\`.",
+        },
+      }
+    `);
+  });
+
+  it('isIn and isNotIn given raw, cols or vals throw when compiled', () => {
+    expect(new Set(Object.values(lists).flatMap(f => [raw("'Ada'"), cols('Ada'), vals('Ada')].map(v => thrown(f(['Ada', v]))))))
+      .toMatchInlineSnapshot(`
+        Set {
+          "\`db.raw()\`, \`db.cols()\` and \`db.vals()\` have no meaning as a value in a Whereable (a filter), nor in \`isIn()\`: to compare with SQL, use a \`sql\` fragment value, where \`db.self\` stands for the column; to compare with a value, give the value itself, or \`db.param()\`.",
+        }
+      `);
   });
 
   it('self keeps its meaning in a fragment written by hand', () => {
