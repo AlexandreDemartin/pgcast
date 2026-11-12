@@ -13,12 +13,24 @@ import {
   SQL,
   self,
   vals,
+  Default,
 } from './core';
 
 import { mapWithSeparator } from './utils';
 import type { Whereable } from 'zapatos/schema';
 
-const conditionalParam = (a: any) => a instanceof SQLFragment || a instanceof ParentColumn || a instanceof Parameter ? a : param(a);
+const
+  defaultInCondition = '`db.Default` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. `DEFAULT` is for INSERT and UPDATE values.',
+  selfInCondition = '`db.self` has no meaning as the value of `eq()`, `add()` and the other conditions: it is already the column on the left. To compare the column with itself, write a `sql` fragment with `db.self` on both sides.';
+
+// a fragment that throws when compiled, so that `run()` rejects before any query, as for `Default` in a
+// Whereable, rather than the condition throwing while the query is built; 6.6.1 sent 'Symbol(DEFAULT)'
+const refused = (message: string) => Object.assign(sql``, { compile: () => { throw new Error(message); } });
+
+const conditionalParam = (a: any) =>
+  a === Default ? refused(defaultInCondition) :
+    a === self ? refused(selfInCondition) :
+      a instanceof SQLFragment || a instanceof ParentColumn || a instanceof Parameter ? a : param(a);
 
 export const isNull = sql<SQL, boolean>`${self} IS NULL`;
 export const isNotNull = sql<SQL, boolean>`${self} IS NOT NULL`;

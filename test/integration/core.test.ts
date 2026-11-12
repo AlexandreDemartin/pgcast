@@ -286,16 +286,16 @@ describe('Whereable', () => {
       {
         "deletesNeDefault": "\`db.Default\` has no meaning as the value of \`eq()\`, \`add()\` and the other conditions: compare with a value. \`DEFAULT\` is for INSERT and UPDATE values.",
         "eqDefault": "\`db.Default\` has no meaning as the value of \`eq()\`, \`add()\` and the other conditions: compare with a value. \`DEFAULT\` is for INSERT and UPDATE values.",
-        "eqSelf": "\`db.self\` has no meaning as the value of \`eq()\`, \`add()\` and the other conditions: it is already the column on the left. To compare the column with itself, write sql\`\${db.self} = \${db.self}\`.",
+        "eqSelf": "\`db.self\` has no meaning as the value of \`eq()\`, \`add()\` and the other conditions: it is already the column on the left. To compare the column with itself, write a \`sql\` fragment with \`db.self\` on both sides.",
         "idEqDefault": "\`db.Default\` has no meaning as the value of \`eq()\`, \`add()\` and the other conditions: compare with a value. \`DEFAULT\` is for INSERT and UPDATE values.",
-        "isInSelf": "\`db.self\` has no meaning as a value in a Whereable (a filter), nor in \`isIn()\`: compare with a value, or use it in a fragment, as in { n: sql\`\${db.self} > 0\` }.",
-        "isNotInSelf": "\`db.self\` has no meaning as a value in a Whereable (a filter), nor in \`isIn()\`: compare with a value, or use it in a fragment, as in { n: sql\`\${db.self} > 0\` }.",
+        "isInSelf": "\`db.self\` has no meaning as a value in a Whereable (a filter), nor in \`isIn()\`: compare with a value, or use it in a \`sql\` fragment value, where it stands for the column.",
+        "isNotInSelf": "\`db.self\` has no meaning as a value in a Whereable (a filter), nor in \`isIn()\`: compare with a value, or use it in a \`sql\` fragment value, where it stands for the column.",
         "lateralEqDefault": "\`db.Default\` has no meaning as the value of \`eq()\`, \`add()\` and the other conditions: compare with a value. \`DEFAULT\` is for INSERT and UPDATE values.",
-        "lateralSelf": "\`db.self\` has no meaning as a value in a Whereable (a filter), nor in \`isIn()\`: compare with a value, or use it in a fragment, as in { n: sql\`\${db.self} > 0\` }.",
+        "lateralSelf": "\`db.self\` has no meaning as a value in a Whereable (a filter), nor in \`isIn()\`: compare with a value, or use it in a \`sql\` fragment value, where it stands for the column.",
         "neDefault": "\`db.Default\` has no meaning as the value of \`eq()\`, \`add()\` and the other conditions: compare with a value. \`DEFAULT\` is for INSERT and UPDATE values.",
-        "selfValue": "\`db.self\` has no meaning as a value in a Whereable (a filter), nor in \`isIn()\`: compare with a value, or use it in a fragment, as in { n: sql\`\${db.self} > 0\` }.",
+        "selfValue": "\`db.self\` has no meaning as a value in a Whereable (a filter), nor in \`isIn()\`: compare with a value, or use it in a \`sql\` fragment value, where it stands for the column.",
         "updateAddDefault": "\`db.Default\` has no meaning as the value of \`eq()\`, \`add()\` and the other conditions: compare with a value. \`DEFAULT\` is for INSERT and UPDATE values.",
-        "updateWhereSelf": "\`db.self\` has no meaning as a value in a Whereable (a filter), nor in \`isIn()\`: compare with a value, or use it in a fragment, as in { n: sql\`\${db.self} > 0\` }.",
+        "updateWhereSelf": "\`db.self\` has no meaning as a value in a Whereable (a filter), nor in \`isIn()\`: compare with a value, or use it in a \`sql\` fragment value, where it stands for the column.",
       }
     `);
     expect(queries).toEqual([]);

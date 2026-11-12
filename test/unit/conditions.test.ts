@@ -536,7 +536,7 @@ describe('Default and self as the value of a condition', () => {
           "\`db.Default\` has no meaning as the value of \`eq()\`, \`add()\` and the other conditions: compare with a value. \`DEFAULT\` is for INSERT and UPDATE values.",
         },
         "self": Set {
-          "\`db.self\` has no meaning as the value of \`eq()\`, \`add()\` and the other conditions: it is already the column on the left. To compare the column with itself, write sql\`\${db.self} = \${db.self}\`.",
+          "\`db.self\` has no meaning as the value of \`eq()\`, \`add()\` and the other conditions: it is already the column on the left. To compare the column with itself, write a \`sql\` fragment with \`db.self\` on both sides.",
         },
       }
     `);
@@ -547,9 +547,9 @@ describe('Default and self as the value of a condition', () => {
       [[`${name}Default`, thrown(f(['Ada', Default]))], [`${name}Self`, thrown(f(['Ada', self]))]]))).toMatchInlineSnapshot(`
       {
         "isInDefault": "\`db.Default\` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. \`DEFAULT\` is for INSERT and UPDATE values.",
-        "isInSelf": "\`db.self\` has no meaning as a value in a Whereable (a filter), nor in \`isIn()\`: compare with a value, or use it in a fragment, as in { n: sql\`\${db.self} > 0\` }.",
+        "isInSelf": "\`db.self\` has no meaning as a value in a Whereable (a filter), nor in \`isIn()\`: compare with a value, or use it in a \`sql\` fragment value, where it stands for the column.",
         "isNotInDefault": "\`db.Default\` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. \`DEFAULT\` is for INSERT and UPDATE values.",
-        "isNotInSelf": "\`db.self\` has no meaning as a value in a Whereable (a filter), nor in \`isIn()\`: compare with a value, or use it in a fragment, as in { n: sql\`\${db.self} > 0\` }.",
+        "isNotInSelf": "\`db.self\` has no meaning as a value in a Whereable (a filter), nor in \`isIn()\`: compare with a value, or use it in a \`sql\` fragment value, where it stands for the column.",
       }
     `);
   });

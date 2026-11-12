@@ -416,8 +416,8 @@ describe('cols and vals', () => {
 
   it('vals of an array throws on self in a Whereable: self is the column, not a value', () => {
     // 6.6.1 sent 'Symbol(self)'; so does vals([self]) in a fragment value of vals of an object, as for Default
-    expect(() => one({ display_name: db.conditions.isIn(['Ada', self]) })).toThrowErrorMatchingInlineSnapshot(`[Error: \`db.self\` has no meaning as a value in a Whereable (a filter), nor in \`isIn()\`: compare with a value, or use it in a fragment, as in { n: sql\`\${db.self} > 0\` }.]`);
-    expect(() => one(vals({ role: sql`${vals([self])}` }))).toThrowErrorMatchingInlineSnapshot(`[Error: \`db.self\` has no meaning as a value in a Whereable (a filter), nor in \`isIn()\`: compare with a value, or use it in a fragment, as in { n: sql\`\${db.self} > 0\` }.]`);
+    expect(() => one({ display_name: db.conditions.isIn(['Ada', self]) })).toThrowErrorMatchingInlineSnapshot(`[Error: \`db.self\` has no meaning as a value in a Whereable (a filter), nor in \`isIn()\`: compare with a value, or use it in a \`sql\` fragment value, where it stands for the column.]`);
+    expect(() => one(vals({ role: sql`${vals([self])}` }))).toThrowErrorMatchingInlineSnapshot(`[Error: \`db.self\` has no meaning as a value in a Whereable (a filter), nor in \`isIn()\`: compare with a value, or use it in a \`sql\` fragment value, where it stands for the column.]`);
   });
 
   it('characterization: outside a filter, vals([self]), vals({ a: self }), param(self) and param(Default) are parameters', () => {
@@ -587,7 +587,7 @@ describe('Whereable', () => {
 
   it('a self value throws: self is the column, not a value to compare it with', () => {
     // 6.6.1 sent 'Symbol(self)': no row on a text column, 22P02 on the others
-    expect(() => one({ display_name: self })).toThrowErrorMatchingInlineSnapshot(`[Error: \`db.self\` has no meaning as a value in a Whereable (a filter), nor in \`isIn()\`: compare with a value, or use it in a fragment, as in { n: sql\`\${db.self} > 0\` }.]`);
+    expect(() => one({ display_name: self })).toThrowErrorMatchingInlineSnapshot(`[Error: \`db.self\` has no meaning as a value in a Whereable (a filter), nor in \`isIn()\`: compare with a value, or use it in a \`sql\` fragment value, where it stands for the column.]`);
   });
 
   it('self in a fragment value is the column, as before', () => {
