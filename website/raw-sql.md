@@ -27,6 +27,17 @@ import type * as s from 'zapatos/schema';
 db.sql<s.films.SQL>`SELECT * FROM ${'screenings'}`;
 ```
 
+A write is written the same way. This `INSERT … SELECT` copies one film's tags to another, and `RETURNING *` gives back the rows it added:
+
+<CastPanel example="raw_sql_insert_select">
+
+<<< ./examples/raw_sql_insert_select.ts{ts twoslash}
+
+</CastPanel>
+
+- [`db.cols()`](/sql-template#cols) writes the column list, `"film_id", "tag"`. `columns`, typed `s.tags.Column[]`, checks the names: `db.cols()` alone takes any, so `'tagz'` would compile, and Postgres refuse it (42703).
+- `ON CONFLICT DO NOTHING` skips a tag the film has already. Without it, Postgres refuses the whole `INSERT` with 23505, and adds none.
+
 ## Pass each value as a parameter
 
 A value from a caller (a form, a URL, a row you read elsewhere) goes in as [`db.param()`](/sql-template#param), or in a [Whereable object](/sql-template#whereable), which makes a parameter of each value:
@@ -66,7 +77,20 @@ The keys of an interpolated object are names too. The type refuses an unknown ke
 ::: warning Security
 An interpolated object that is not a `param()`, a fragment or another of pgcast's values compiles as a Whereable, whatever it is. A `Date` has no keys of its own, so it gives `TRUE`: `` db.sql`DELETE FROM ${'ratings'} WHERE ${when}` ``, with `when` a `Date` typed `any`, compiles to `DELETE FROM "ratings" WHERE TRUE` and deletes every rating. The type refuses a `Date` (TS2345), not an `any` or an `object`. Pass a date as `db.param(when)` ([#170](https://github.com/AlexandreDemartin/pgcast/issues/170)).
 
-Any object with no keys is `TRUE`, a typed Whereable included: `const where: s.ratings.Whereable = {}`, given a `film_id` only `if (filmId)`, compiles with no error to the same `DELETE`. Check for an empty filter before a `DELETE` or an `UPDATE` ([Whereable objects](/sql-template#whereable)).
+Any object with no keys is `TRUE`, a typed Whereable included: `const where: s.ratings.Whereable = {}`, given a `film_id` only `if (filmId)`, compiles with no error to the same `DELETE`. Check for an empty filter before a `DELETE` or an `UPDATE` ([Whereable objects](/sql-template#whereable)). The check below catches `{}`, not a key whose value compiles to `true`, such as `film_id: db.conditions.isNotIn([])`:
+
+```ts twoslash
+import * as db from 'zapatos/db';
+import type * as s from 'zapatos/schema';
+// ---cut---
+function removeRatings(filmId?: number) {
+  const where: s.ratings.Whereable = {};
+  if (filmId) where.film_id = filmId;
+  if (Object.keys(where).length === 0) throw new Error('No filter: that would delete every rating');
+  return db.deletes('ratings', where);
+}
+```
+
 :::
 
 ## Cast a parameter Postgres can't type
@@ -152,20 +176,13 @@ Joins through `lateral`, step by step: [Join through a lateral](/lateral).
 
 ## Check the SQL before you run it
 
-[`.compile()`](/sql-template#compile) gives the `text` and `values` that `run()` would send, and sends nothing. Each value from outside belongs in `values`, with a `$n` in its place in `text`:
+[`.compile()`](/sql-template#compile) gives the `text` and `values` that `run()` would send, and sends nothing. Each value from outside belongs in `values`, with a `$n` in its place in `text`. A test that compiles each query with hostile input, expects it in `values` and freezes `text` keeps it that way, here for `listings()` above:
 
-```ts twoslash
-import * as db from 'zapatos/db';
-import type * as s from 'zapatos/schema';
-type Listing = Pick<s.films.Selectable, 'title'> & Pick<s.screenings.Selectable, 'starts_at'>;
-declare function listings(cinema: string): db.SQLFragment<Listing[]>;
-// ---cut---
-const { text, values } = listings("x' OR TRUE --").compile();
-// text:   … WHERE "cinemas"."name" = $1 ORDER BY "screenings"."starts_at"
-// values: [ "x' OR TRUE --" ]
-```
+<<< ./examples/plain/raw_sql_test.ts{ts twoslash}
 
-A test that compiles each query with hostile input (`x' OR TRUE --`, `x" --`), expects it in `values` and freezes `text` keeps it that way. A search of `text` is not enough: a name compiled from `x" --` is there as `"x"" --"`, its `"` doubled, and a lone `'` matches the query's own literals.
+- Here with `test` from `node:test` and `assert` from `node:assert/strict`; any test runner does.
+- `text` keeps the line breaks of the template: the test collapses its whitespace, so that only a change to the SQL fails it.
+- A search of `text` is not enough: a name compiled from `x" --` is there as `"x"" --"`, its `"` doubled, and a lone `'` matches the query's own literals.
 
 ## See also
 

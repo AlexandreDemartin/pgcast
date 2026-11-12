@@ -45,15 +45,13 @@ Keep the edit within `declare module 'zapatos/custom'`: the file is the module's
 
 </CastPanel>
 
-And the object that Postgres refused no longer compiles:
+And the object that Postgres refused no longer compiles, here as a row typed `s.cinemas.Insertable`:
 
 ```ts twoslash
-// @errors: 2769
-import * as db from 'zapatos/db';
-import type pg from 'pg';
-declare const pool: pg.Pool;
+// @errors: 2353
+import type * as s from 'zapatos/schema';
 // ---cut---
-await db.insert('cinemas', { name: 'The Harbour Lights', location: { x: 1.5, y: 2.5 } }).run(pool);
+const cinema: s.cinemas.Insertable = { name: 'The Harbour Lights', location: { x: 1.5, y: 2.5 } };
 ```
 
 From two numbers, build the point in SQL, each number a [parameter](/sql-template#param): this sends `VALUES (point($1, $2), $3)`, as an `Insertable` value can be any [`sql`](/sql-template#sql) fragment.
@@ -70,8 +68,17 @@ await db.insert('cinemas', {
 }).run(pool);
 ```
 
-- Postgres also takes `'1.5,2.5'`, which the type refuses. The type checks the parentheses and the comma, and lets spaces through: `'(1.5, 2.5)'` compiles, and Postgres takes it.
-- One type serves all five interfaces. Your own query typed `s.cinemas.Selectable` gets rows from `pg`, which parses a point into `{ x: 1.5, y: 2.5 }`, whatever the type says: select `${'location'}::text` there, or type that query's result yourself ([`sql`](/sql-template#sql)).
+Postgres also takes `'1.5,2.5'`, which the type refuses. The type checks the parentheses and the comma, and lets spaces through: `'(1.5, 2.5)'` compiles, and Postgres takes it.
+
+One type serves all five interfaces. But your own query typed `s.cinemas.Selectable` gets its rows from `pg`, which parses a point into `{ x: 0.4, y: 1.2 }`, whatever the type says. Select the point as text there, and the rows fit the type:
+
+<CastPanel example="custom_types_text">
+
+<<< ./examples/custom_types_text.ts{ts twoslash}
+
+</CastPanel>
+
+The Lantern's `location` is then `"(0.4,1.2)"`, as the shortcuts give it. Or type that query's result yourself ([`sql`](/sql-template#sql)).
 
 ## Find the nearest cinema
 
@@ -86,7 +93,16 @@ await db.insert('cinemas', {
 - The Lantern comes back, its `location` the string `"(0.4,1.2)"`, typed `PgPoint`.
 - For the distance too, add the same fragment to [`extras`](/select#extras): `` km: db.sql<s.cinemas.SQL, number>`…` ``.
 - The GiST index on `location` serves this order: on 20,000 cinemas, `EXPLAIN` shows `Index Scan using cinemas_location_idx` and `Order By: (location <-> '(0.5,1)'::point)`, with no sort.
-- To find cinemas at a point, compare with `~=`, Postgres's "same as" for points: `` db.sql`${'location'} ~= ${db.param('(0.4,1.2)')}` `` as the `where`. A Whereable `{ location: '(0.4,1.2)' }` compiles but fails in Postgres with 42883, `operator does not exist: point = unknown`: a point has no `=`.
+
+To find cinemas at a point, compare with `~=`, Postgres's "same as" for points, in a fragment as the `where`:
+
+<CastPanel example="custom_types_same_as">
+
+<<< ./examples/custom_types_same_as.ts{ts twoslash}
+
+</CastPanel>
+
+It gives The Lantern. A Whereable `{ location: '(0.4,1.2)' }` compiles but fails in Postgres with 42883, `operator does not exist: point = unknown`: a point has no `=`.
 
 To name the type in your own code, import `zapatos/custom` as you import `zapatos/schema`:
 
@@ -121,11 +137,26 @@ declare module 'zapatos/custom' {
 }
 ```
 
+```ts [src/seats.ts]
+import * as db from 'zapatos/db';
+import type * as c from 'zapatos/custom';
+import type pg from 'pg';
+
+function isSeatLabel(seat: string): seat is c.PgSeat_label {
+  return /^[A-Z][0-9]{1,2}$/.test(seat);  // the domain's CHECK
+}
+
+export async function bookSeat(pool: pg.Pool, screening_id: number, seat: string, customer: string) {
+  if (!isSeatLabel(seat)) throw new Error(`There is no seat ${seat}`);
+  return db.insert('seat_bookings', { screening_id, seat, customer }).run(pool);
+}
+```
+
 :::
 
-- `seat: 'f7'` then fails to compile (TS2769); `'Z100'` still compiles, and Postgres still refuses it.
+- `seat: 'f7'` then fails to compile, TS2322 in a row typed `s.seat_bookings.Insertable`; `'Z100'` still compiles, and Postgres still refuses it.
 - Each type in `declare module 'zapatos/custom'` is exported, `PgSeat_labelRow` too: a helper named `Row` would clash with another placeholder's (TS2300).
-- A `string` from a form no longer fits: check it first, with the `CHECK`'s pattern, `/^[A-Z][0-9]{1,2}$/`, in a type guard.
+- A `string` from a form no longer fits (TS2322 in a typed row, TS2769 in the call): check it first, with the `CHECK`'s pattern, in a type guard, as `src/seats.ts` does.
 - These docs keep `PgSeat_label` as generated, `string`.
 
 ### A `jsonb` domain
@@ -152,7 +183,7 @@ declare module 'zapatos/custom' {
 
 :::
 
-`db.insert('cinemas', { …, screen: { format: 'VHS', seats: 120 } })` then fails to compile (TS2769), and a cinema's `screen.format` is typed `'35mm' | '70mm' | 'digital'`. Postgres checks none of it, and stores that value all the same: the type is your promise about what the column holds.
+A row typed `s.cinemas.Insertable` with `screen: { format: 'VHS', seats: 120 }` then fails to compile (TS2322), and a cinema's `screen.format` is typed `'35mm' | '70mm' | 'digital'`. Postgres checks none of it, and stores that value all the same: the type is your promise about what the column holds.
 
 ## Keep it across runs
 
@@ -178,7 +209,7 @@ A domain's placeholder holds its base type's TypeScript name, and imports `zapat
 | `db.Int8String`, for a domain over `bigint`; `numeric`, `time` and the ranges alike | TS2503, `Cannot find namespace 'db'.` | `import type * as db from 'zapatos/db';` |
 | `crew_job`, for `CREATE DOMAIN lead_job AS crew_job`, over an enum | TS2304, `Cannot find name 'crew_job'.` | `import type { crew_job } from 'zapatos/schema';` |
 
-For `CREATE DOMAIN ticket_no AS bigint`, the placeholder holds `db.Int8String`, the string `pg` returns for a `bigint`. But the shortcuts return a `bigint` as a JSON number: a `ticket_no` that [`select()`](/select#select) returns is a `number` typed `db.Int8String`, so `.padStart()` compiles, then throws; and [`insert()`](/insert#insert) refuses `1` (TS2769). With the import, type it as both:
+For `CREATE DOMAIN ticket_no AS bigint`, the placeholder holds `db.Int8String`, the string `pg` returns for a `bigint`. But the shortcuts return a `bigint` as a JSON number: a `ticket_no` that [`select()`](/select#select) returns is a `number` typed `db.Int8String`, so `.padStart()` compiles, then throws; and a row for [`insert()`](/insert#insert), typed `Insertable`, refuses `1` (TS2322). With the import, type it as both:
 
 ::: code-group
 

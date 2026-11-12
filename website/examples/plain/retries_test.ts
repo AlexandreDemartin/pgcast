@@ -2,7 +2,10 @@ import * as db from 'zapatos/db';
 import type pg from 'pg';
 declare const pool: pg.Pool;
 declare function test(name: string, fn: () => Promise<void>): void;
-declare const assert: { equal(actual: unknown, expected: unknown): void; deepEqual(actual: unknown, expected: unknown): void };
+declare const assert: {
+  equal(actual: unknown, expected: unknown): void; deepEqual(actual: unknown, expected: unknown): void;
+  rejects(promise: Promise<unknown>, expected: object): Promise<void>;
+};
 const bookSeats = (txnClientOrPool: pg.Pool | db.TxnClientForSerializable,
   screening_id: number, seats: string[], customer: string) =>
   db.serializable(txnClientOrPool, async txnClient => {
@@ -11,7 +14,7 @@ const bookSeats = (txnClientOrPool: pg.Pool | db.TxnClientForSerializable,
     return db.insert('seat_bookings', seats.map(seat => ({ screening_id, seat, customer }))).run(txnClient);
   });
 // ---cut---
-db.setConfig({ transactionRetryDelay: { minMs: 0, maxMs: 0 } });
+db.setConfig({ transactionAttemptsMax: 2, transactionRetryDelay: { minMs: 0, maxMs: 0 } });
 
 test('a booking runs again after a serialization failure', async () => {
   await db.deletes('seat_bookings', { screening_id: 1003 }).run(pool);  // so that it runs again on the same database
@@ -25,4 +28,13 @@ test('a booking runs again after a serialization failure', async () => {
   assert.equal(attempts, 2);
   assert.deepEqual(booked?.map(booking => booking.seat), ['H1', 'H2']);
   assert.equal(await db.count('seat_bookings', { screening_id: 1003, customer: 'Tamsin Rowe' }).run(pool), 2);
+});
+
+test('a booking gives up after its last attempt', async () => {
+  let attempts = 0;
+  await assert.rejects(db.serializable(pool, async () => {
+    attempts++;
+    throw Object.assign(new Error('A serialization failure, for the test'), { code: '40001' });
+  }), { code: '40001' });
+  assert.equal(attempts, 2);
 });
