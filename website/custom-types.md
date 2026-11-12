@@ -106,16 +106,17 @@ A template literal type can hold part of the `CHECK`, a capital letter then a nu
 
 ```ts [src/zapatos/custom/PgSeat_label.d.ts]
 declare module 'zapatos/custom' {
-  type Row = 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H' | 'I'
+  type PgSeat_labelRow = 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H' | 'I'
     | 'J' | 'K' | 'L' | 'M' | 'N' | 'O' | 'P' | 'Q' | 'R'
     | 'S' | 'T' | 'U' | 'V' | 'W' | 'X' | 'Y' | 'Z';
-  export type PgSeat_label = `${Row}${number}`;  // a row, then a number: F7
+  export type PgSeat_label = `${PgSeat_labelRow}${number}`;  // a row, then a number: F7
 }
 ```
 
 :::
 
 - `seat: 'f7'` then fails to compile (TS2769); `'Z100'` still compiles, and Postgres still refuses it.
+- Each type in `declare module 'zapatos/custom'` is exported, `PgSeat_labelRow` too: a helper named `Row` would clash with another placeholder's (TS2300).
 - A `string` from a form no longer fits: check it first, with the `CHECK`'s pattern, `/^[A-Z][0-9]{1,2}$/`, in a type guard.
 - These docs keep `PgSeat_label` as generated, `string`.
 
