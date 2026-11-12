@@ -29,7 +29,7 @@ Insert one row or several, and return them as Postgres stored them, defaults and
 
 </CastPanel>
 
-- One row gives one result; an array gives an array, in the same order.
+- One row gives one result; an array gives an array, in the order Postgres returns them, in practice the order given.
 - The columns are the keys of every row; a key missing from a row is `DEFAULT` in that row, as `tagline` above.
 - An empty array is a no-op: `.run(pool)` resolves with `[]` and sends nothing, unless forced with `.run(pool, true)`. Its SQL, `INSERT INTO "films" SELECT null WHERE false`, is marked as a no-op.
 - Postgres takes at most 65,535 parameters in a query: split a bigger insert ([Insert and upsert in batches](/batches)).
