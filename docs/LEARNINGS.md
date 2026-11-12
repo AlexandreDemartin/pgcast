@@ -198,6 +198,9 @@ Candidates for a check, a rule or a skill line.
 - #141 — Helpers that refuse by returning `null` are not « both or neither » inside one outer transaction: only a throw rolls it back — `branch-reviewer`
 - #141 — A docs example that writes cleans its own rows, or a second run fails — `branch-reviewer`, `builder`
 - #141 — `queryListener` logs a `COMMIT` before Postgres answers it: a log line is no proof of a commit (#190) — `builder`
+- #140 — A Postgres message that quotes a count is probed at more than one size (08P01 at 65,536 and at 200,000 differ): quote it as an example — `branch-reviewer`, `builder`
+- #140 — A guide that shortens a reference rule loses its condition (« an array or string conflict target » became « the conflict target »): copy the condition or link — `branch-reviewer`
+- #140 — 21000 comes with any `DO UPDATE` batch that names a key twice, not only with an existing row — `branch-reviewer`
 
 ## Minors kept
 
