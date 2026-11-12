@@ -216,6 +216,8 @@ Candidates for a check, a rule or a skill line.
 - #142 — Every type inside `declare module 'zapatos/custom'` is exported and the blocks merge: a helper type in a placeholder takes a prefixed name — `branch-reviewer`, `builder`
 - #142 — A placeholder in the shared docs schema is a cross-page dependency: `git grep` the open worktrees before narrowing it — `builder`
 - #142 — Bulk inserts into the docs schema without ids hit 23505 at the 1000th row (seeds from 1000, sequences from 1): probes set explicit ids from 2000 — `branch-reviewer`
+- #147 — A word-for-word quote check misses a changed subject or a dropped clause: read the 300 characters around each match, and keep the subject and any clause whose loss would be unfair to Zapatos — `branch-reviewer`, `builder`
+- #147 — A user-facing page does not copy a running count from a living report; a count closed by a release can be — `branch-reviewer`
 
 ## Minors kept
 
@@ -242,3 +244,4 @@ Minor review defects, taken up by the end-of-chapter review.
 - #31 — `src/db/conditions.ts:21`: `conditionalParam` still wraps `Default`, so `{ display_name: eq(Default) }` sends `'Symbol(DEFAULT)'` and matches nothing (both versions): a candidate finding, with #101 — `branch-reviewer` → R64, #106
 - #107 — `insert('books', { title: parent('name') })` (object branch) still stores `'{"value":"name"}'`: a candidate finding — `builder`
 - #137 — `website/check-reference.mjs`: a fence closed by a line with an info string (```` ```ts ````) is taken as closed, so a later entry is missed (fails loudly) — `branch-reviewer`
+- #147 — `website/why.md`: « all fixed in 6.6.2 » and, two paragraphs later, « The security fixes came first, in 6.6.2 » repeat each other; merge them in a later edit — `builder`
