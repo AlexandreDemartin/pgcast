@@ -138,6 +138,7 @@ With a second schema, `archive`, that holds a `screenings` table of its own:
 
 ```json [zapatosconfig.json]
 {
+  "db": { "connectionString": "{{DATABASE_URL}}" },
   "schemas": {
     "public": { "include": "*", "exclude": [] },
     "archive": { "include": "*", "exclude": [] }
