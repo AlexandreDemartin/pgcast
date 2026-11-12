@@ -6,6 +6,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 import { generate } from 'zapatos/generate';
+import { dropOrphanDocsDatabases } from './orphan-databases.mjs';
 
 const envFile = new URL('../src/.env', import.meta.url);
 if (!process.env.TEST_DATABASE_URL && existsSync(envFile)) process.loadEnvFile(envFile);
@@ -18,6 +19,7 @@ const
   admin = new pg.Client({ connectionString: server.toString() });
 
 await admin.connect();
+await dropOrphanDocsDatabases(admin);
 await admin.query(`CREATE DATABASE "${name}"`);
 try {
   const client = new pg.Client({ connectionString: url });

@@ -80,6 +80,11 @@ One per group, in `templates/`, not published (`srcExclude` in `.vitepress/confi
 
   At build, `.vitepress/cast.data.ts` runs it against a pool that only records the query `.run()` gets from `.compile()`: its SQL (laid out on lines, whitespace only) and values fill "Postgres runs". "TypeScript knows" is the type Twoslash gives the module's first `const`: its name, then one level down. Nothing in a panel is typed by hand; the loader checks itself before each build (a type error must fail, the layout must change whitespace only, a query whose result transform throws on no rows is still recorded, a configuration an example changes is put back whole). The examples share one `zapatos/db`: one may call `db.setConfig()`, or change `transactionRetryDelay` in place, and the loader puts the configuration back before the next.
 - An example that sends more than one query, such as a transaction, cannot be a panel: it goes in `examples/plain/`, which `tsc` checks and `cast.data.ts` does not run, as `<<< ./examples/plain/<name>.ts{ts twoslash}`; the SQL it sends, where the page shows it, in a `sql` block: only the lines pgcast sends itself, such as `START TRANSACTION`, with a comment and a link for each query's own.
+- Every example runs against Postgres in CI's `docs` job (`npm run docs:examples`, with `TEST_DATABASE_URL`), on the docs schema: a query that type-checks but that Postgres refuses fails, with the page and the line that include it. A panel's example runs between `BEGIN` and `ROLLBACK`; one in `examples/plain/`, which commits its own transactions, on its own copy of the database.
+  - An example that shows an error says which, above `// ---cut---`: `// rejects with 42703` (a SQLSTATE) or `// rejects with NotExactlyOneError` (an error's name). It fails if it rejects with anything else, or not at all.
+  - An example also fails if a promise it does not await rejects, or, in `examples/plain/`, if it leaves a client in use or a query waiting. One that does not settle within 10 s ends the run.
+  - A name an example only declares (`declare const tags: …`) runs with a stand-in from `run-examples.mjs`; a new one goes there.
+- Code a page shows in its own block and an example needs above its `// ---cut---`, such as a function it calls, goes between `// #region copy` and `// #endregion copy` (`examples/plain/paginate_handler.ts`). The build fails, in `.vitepress/llms.ts`, unless those lines are still a block of the page, blank lines aside.
 - An optional caption goes under the panel: `<template #caption><span>…</span></template>` (`index.md`).
 
 ### The reference
@@ -111,7 +116,7 @@ A PR that changes how a page looks shows it, in light and dark, at a phone's wid
 - [ ] Every example in the film world, as `ts twoslash`; a query's SQL in a cast panel, or a `sql` block for an example of several queries (`examples/plain/`)
 - [ ] Notes with a chip; options tables as Option → SQL it adds → Effect on the type
 - [ ] Links to the other groups; British spelling
-- [ ] `npm run docs:build` passes
+- [ ] `npm run docs:build` passes, and `npm run docs:examples` if an example changed
 - [ ] Screenshots of a new page, or of one that looks different
 
 ## The docs schema
@@ -123,4 +128,4 @@ npm run build                  # at the root
 cd website && npm run docs:schema
 ```
 
-`docs:schema` loads `schema.sql` into a temporary `pgcast_test_<pid>_docs` database on the server of `TEST_DATABASE_URL` (the environment, else `src/.env`), runs `generate()`, and drops the database.
+`docs:schema` loads `schema.sql` into a temporary `pgcast_test_<pid>_docs` database on the server of `TEST_DATABASE_URL` (the environment, else `src/.env`), runs `generate()`, and drops the database. It and `docs:examples` first drop the `pgcast_test_<pid>_docs` databases of a run whose process is gone (stopped by Ctrl-C, killed, or crashed).

@@ -6,7 +6,7 @@ By the end of this page, you'll have generated the types of a database, asked it
 ## Before you start
 
 - pgcast installed under the `zapatos` alias, with `pg` and `@types/pg`: [Install](/install).
-- TypeScript in your project: `npm install --save-dev typescript`.
+- TypeScript 5.7 or later in your project: `npm install --save-dev typescript`.
 - Node 22.18 or later, which runs a TypeScript file as it is, stripping its types.
 - An empty Postgres database you can connect to, its connection string in the `DATABASE_URL` environment variable, and `psql`, Postgres's command-line client.
 - The films of these docs in it: [`schema.sql`](https://github.com/AlexandreDemartin/pgcast/blob/master/website/schema.sql) holds `studios`, their `films`, the `actors` and the `roles` they play, and a few more tables, with some rows to query. Download it and load it:
