@@ -136,9 +136,13 @@ The string, written into the SQL as it is: for syntax a parameter cannot stand f
 Whatever reaches `raw()` runs as SQL. Never give it a caller's text; a value is a [`param()`](#param). How to keep hand-written SQL safe: [Write raw SQL safely](/raw-sql).
 :::
 
-As a filter value (a Whereable value, in `isIn()` / `isNotIn()`, or as the value of `eq()` and the other [conditions](/conditions)), `raw()` throws, and so do `cols()` and `vals()`:
+As a filter value, `raw()` throws while compiling, and so do `cols()` and `vals()`. As a Whereable value, in `isIn()` / `isNotIn()`, and in `vals([…])` within a filter:
 
 > `` `db.raw()`, `db.cols()` and `db.vals()` have no meaning as a value in a Whereable (a filter), nor in `isIn()`: to compare with SQL, use a `sql` fragment value, where `db.self` stands for the column; to compare with a value, give the value itself, or `db.param()`. ``
+
+As the value of `eq()`, `add()` and the other [conditions](/conditions):
+
+> `` `db.raw()`, `db.cols()` and `db.vals()` have no meaning as the value of `eq()`, `add()` and the other conditions: for SQL, write a `sql` fragment with `db.self` in place of the condition; for a value, give the value itself, or `db.param()`. ``
 
 The type refuses them there, and as an `insert()` or `update()` value:
 
@@ -266,7 +270,9 @@ db.self
 The current column, in a Whereable's fragment value: `` { runtime_minutes: db.sql`${db.self} > ${db.param(100)}` } `` gives `(("runtime_minutes" > $1))`. In a fragment value of `vals({…})`, the current column is its key: `` vals({ tag: db.sql`upper(${db.self})` }) `` gives `upper("tag")`.
 
 - Where there is no current column, it throws: "The 'self' column alias has no meaning here".
-- As a Whereable value, in `isIn()`, or as the value of `eq()` and the other conditions, it throws: it is the column, not a value to compare with it ("`` `db.self` has no meaning as a value in a Whereable (a filter), nor in `isIn()`… ``"). Zapatos 6.6.1 sent it as the string `'Symbol(self)'`.
+- As a filter value it throws: it is the column, not a value to compare with it. Zapatos 6.6.1 sent it as the string `'Symbol(self)'`.
+  - As a Whereable value, in `isIn()` / `isNotIn()` and in `vals([…])` within a filter: "`` `db.self` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: compare with a value, or use it in a `sql` fragment value, where it stands for the column. ``"
+  - As the value of `eq()`, `add()` and the other conditions: "`` `db.self` has no meaning as the value of `eq()`, `add()` and the other conditions: it is already the column on the left. To compare the column with itself, write a `sql` fragment with `db.self` on both sides. ``"
 
 ### `SelfType` {#SelfType}
 
@@ -314,7 +320,9 @@ The keyword `DEFAULT`: a column's default, in an `INSERT` or `UPDATE` value, alo
 
 </CastPanel>
 
-- In a filter it throws: as a Whereable value ([above](#whereable)), in `isIn()`, as the value of `eq()`, `add()` and the other conditions, and in `vals([…])` with a current column ([`vals()`](#vals)).
+- In a filter it throws while compiling.
+  - As a Whereable value ([above](#whereable)), in `isIn()` / `isNotIn()`, and in `vals([…])` with a current column ([`vals()`](#vals)): "`` `db.Default` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. `DEFAULT` is for INSERT and UPDATE values. ``"
+  - As the value of `eq()`, `add()` and the other conditions: "`` `db.Default` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To set a column to its default in an UPDATE, give `db.Default` as the value itself: `{ n: db.Default }`. ``"
 - For `add()` and `subtract()`, set the column itself: `{ n: db.Default }`.
 - Zapatos 6.6.1 sent it as the string `'Symbol(DEFAULT)'` in all of these, and in `vals([…])`, where it is now `DEFAULT`.
 
