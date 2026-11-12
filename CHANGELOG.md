@@ -17,6 +17,7 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 - An `undefined` value in `insert()`, `update()` or `upsert()` values, sent as `NULL`: a `NOT NULL DEFAULT` column fails, and `update()` erases the column instead of leaving it. It still runs, with the same SQL, and emits a `DeprecationWarning` (`PGCAST_DEP002`) once per process. `undefinedMeansMissing` will be the default in 7.0.
 
 ### Fixed
+- `not()` puts its condition in parentheses: `` not(sql`a OR b`) `` compiles to `(NOT (a OR b))`; it was `(NOT a OR b)`, which Postgres reads `(NOT a) OR b`. Only a condition with a bare `AND` or `OR` at its top level now matches other rows: a `sql` fragment such as `` sql`${self} = 1 OR ${self} = 2` `` (or an array of fragments), alone, inside `and()` / `or()` or under another `not()`. Any other condition (`eq`, `isNull`, `isIn`, `between`, `like`, `and()`, `or()`, a `Parameter`, a `Whereable`) gains one pair of parentheses in its text and matches the same rows.
 - `update()` with an `Updatable` that has no keys (`update('authors', {}, …)`) throws as it builds the query, before anything reaches Postgres: "nothing to update: an Updatable needs at least one column". It compiled to `SET () = ROW()`, which Postgres refused (42601), so no call that ran stops; the error now comes from `update()` itself, not from `.run()`. A key whose value is `undefined` still counts, and sets the column to `NULL` as before.
 
 ## [6.6.2] - 2026-11-12

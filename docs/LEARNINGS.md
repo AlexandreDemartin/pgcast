@@ -99,6 +99,9 @@ Candidates for a check, a rule or a skill line.
 - #29 — To prove an opt-in leaves the default path untouched, replay master's runtime beside the branch's on hostile shapes (a `null` row, a getter, a class instance, inherited, non-enumerable or symbol keys, nested `undefined`): they catch a stray `Object.values` that disagrees with `Object.keys` (candidate: skill `backward-compat`) — `branch-reviewer`
 - #29 — `test/integration/codegen.test.ts` freezes the TS error codes of `src/db` compiled against the generated schema: a new internal helper typed `T | T[] → T | T[]` added a TS2322 there while the lib's own `tsc` passed; check that snapshot when typing a helper — `builder`
 - #29 — With `exactOptionalPropertyTypes`, a test helper typed `typeof rows` refuses `{ ...row, title: undefined }`: type such helpers loosely — `builder`
+- #30 — A `Whereable` already wraps each `SQLFragment` value in parentheses: a bare `OR` is exposed only in fragments passed straight to `not()`, `and()` or `or()` (it scoped #96) — `branch-reviewer`
+- #30 — A 6.6.1 replay can transpile `core.ts` and `conditions.ts` from `git archive v6.6.1 src/db` with `tsc --noCheck --module commonjs`; run each case under a `SAVEPOINT` and `ROLLBACK TO` it on error, or one failure turns every later case into 25P02 — `branch-reviewer`
+- #30 — Vitest collects only files under `test/`: a throwaway replay sits there and moves out before `npm test`; a documented scratch spot for 6.6.1 replays would avoid it (candidate: skill `backward-compat`) — `builder`
 
 ## Minors kept
 

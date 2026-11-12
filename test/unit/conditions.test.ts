@@ -334,13 +334,13 @@ describe('conditions', () => {
           ],
         },
         "not": {
-          "text": "(((NOT "col" = $1)))",
+          "text": "(((NOT ("col" = $1))))",
           "values": [
             1,
           ],
         },
         "notWhereable": {
-          "text": "(((NOT ("more" = $1 AND "other" = $2))))",
+          "text": "(((NOT (("more" = $1 AND "other" = $2)))))",
           "values": [
             3,
             2,
@@ -351,6 +351,27 @@ describe('conditions', () => {
           "values": [
             1,
           ],
+        },
+      }
+    `);
+  });
+
+  it('not() parenthesises its condition', () => {
+    // 6.6.1 wrote `(NOT "col" = 1 OR "col" = 2)`, which reads `(NOT "col" = 1) OR "col" = 2`
+    expect({
+      notOr: show(dc.not(sql`${db.self} = 1 OR ${db.self} = 2`)),
+      notNot: show(dc.not(dc.not(dc.eq(1)))),
+    }).toMatchInlineSnapshot(`
+      {
+        "notNot": {
+          "text": "(((NOT ((NOT ("col" = $1))))))",
+          "values": [
+            1,
+          ],
+        },
+        "notOr": {
+          "text": "(((NOT ("col" = 1 OR "col" = 2))))",
+          "values": [],
         },
       }
     `);

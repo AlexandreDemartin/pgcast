@@ -60,7 +60,13 @@ export const isNotIn = <T>(a: readonly T[]) => a.length > 0 ? sql<SQL, boolean |
 
 export const or = <T>(...conditions: (SQLFragment<any, T> | Whereable)[]) => sql<SQL, boolean | null, T>`(${mapWithSeparator(conditions, sql` OR `, c => c)})`;
 export const and = <T>(...conditions: (SQLFragment<any, T> | Whereable)[]) => sql<SQL, boolean | null, T>`(${mapWithSeparator(conditions, sql` AND `, c => c)})`;
-export const not = <T>(condition: SQLFragment<any, T> | Whereable) => sql<SQL, boolean | null, T>`(NOT ${condition})`;
+/**
+ * Negate a condition, all of it: `` not(sql`a OR b`) `` compiles to `(NOT (a OR b))`, and
+ * `not({ id: 1 })` to `(NOT (("id" = $1)))`. Zapatos 6.6.1 wrote `(NOT a OR b)`, which reads
+ * `(NOT a) OR b`.
+ * @param condition A `SQLFragment` (another condition, or `sql` using `self`) or a `Whereable`
+ */
+export const not = <T>(condition: SQLFragment<any, T> | Whereable) => sql<SQL, boolean | null, T>`(NOT (${condition}))`;
 
 export const arrayContains = <T>(a: T[] | ParentColumn) => sql<SQL, boolean | null, T>`${self} @> ${conditionalParam(a)}`;
 export const arrayContainedIn = <T>(a: T[] | ParentColumn) => sql<SQL, boolean | null, T>`${self} <@ ${conditionalParam(a)}`;
