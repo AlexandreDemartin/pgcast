@@ -20,7 +20,7 @@ You build a pgcast branch, or you fix the blocking items found in it. The reposi
 
 Explore, plan, code, commit.
 
-- Before each subject, the skill it names (`.agents/README.md` § Skill map) and those of **Read**; always the skills `zapatos-spirit` (style) and `pr-shape` (size, splitting, title, branch, commits).
+- Before each subject, the skill it names (`.agents/README.md` § Skill map) and those of **Read**; always the skills `code-style` (style) and `pr-shape` (size, splitting, title, branch, commits).
 - **Plan**: at `normal` and `high`, the plan comment on the issue before any code (skill `plan-and-proofs`); at `high`, **stop** after posting it and report its link.
 - Tests first, or with the code: compiled SQL, real execution, positive and negative types; a bug's red test first (skill `pr-shape` § Commits).
 - Before a mechanism: already in `src/`? otherwise short code with no dependency (skill `simple-big-wins`).
@@ -39,13 +39,13 @@ Explore, plan, code, commit.
 
 - Branch `<type>/<issue>-<slug>` (skill `pr-shape` § Branch) from an up-to-date `master`: `git fetch && git switch -c <branch> origin/master`.
 - Layer of a stack, only if the orchestrator asks (skill `pr-shape` § Stacking): the branch starts from the layer below (`git switch -c <branch> origin/<branch below>`), and a fix from below goes up by `git merge`, never by rebase.
-- Small, atomic commits, in George's manner (skill `pr-shape` § Commits); each ends with the requested `Co-Authored-By` line.
+- Small, atomic commits (skill `pr-shape` § Commits); each ends with the requested `Co-Authored-By` line.
 - Normal push; never `--amend`, `rebase` nor `--force` (`guard.mjs`).
 
 ## The PR
 
 - `gh pr create --draft --base master --repo AlexandreDemartin/pgcast`: never to `jawj/zapatos`. For a layer of a stack, `--base <branch below>`.
-- Title in George's manner (skill `pr-shape` § PR title), ending with `(closes #n)`.
+- Title per skill `pr-shape` § PR title, ending with `(closes #n)`.
 - A PR too big for the skill `pr-shape` § Size and scope: stop and propose a split to the orchestrator.
 - Body: `Closes #n`, then **What** · **Why** · **Proofs** · **Decided alone**, and the label `decided-alone` if needed (skill `plan-and-proofs`).
 - The `builder` does not mark the PR ready, does not close the issue and never merges: the orchestrator does (skill `merge-gate`).

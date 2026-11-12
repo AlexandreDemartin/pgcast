@@ -28,7 +28,7 @@ It lives in the issues of `AlexandreDemartin/pgcast` (`--repo AlexandreDemartin/
 - Read it: `gh issue view <n> --repo AlexandreDemartin/pgcast`; only it, and its Epic if the order requires.
 - A `type: feature` that starts: first create its `type: task` issues from **Planned PRs**, in order, each under the feature:
   `gh api repos/AlexandreDemartin/pgcast/issues/<feature>/sub_issues -F sub_issue_id=<id>`, where `<id>` is the task's `id`, not its number (`gh api repos/AlexandreDemartin/pgcast/issues/<n> -q .id`).
-- A step too wide for one PR in George's manner (skill `pr-shape` § Splitting like George): split it into sub-issues before starting the `builder`.
+- A step too wide for one PR (skill `pr-shape` § Size and scope, § Splitting like Zapatos): split it into sub-issues before starting the `builder`.
 - `needs decision`, or a stop point of `AGENTS.md` (`core.ts`, codegen output, publication): ask the user **before** the `builder`.
 - A new idea: a `type: feature` issue under its Epic, at its place in the order (`PATCH …/issues/<epic>/sub_issues/priority`, with `sub_issue_id` and `after_id`).
 - Unstable network: each `gh` call can be retried; before recreating, list what exists (no duplicates).
@@ -58,7 +58,7 @@ The plan: skill `plan-and-proofs`; the comments: skill `review-comments`; the ga
 
 1. **Issue**: **Files** and **Risk** present; stop points asked.
 2. **Plan** (`normal`, `high`): the `builder` posts it on the issue. At `high` it stops; the orchestrator checks the plan against the issue, then resumes it.
-3. **Build**: tests first, George commits (skill `pr-shape`), checks; draft PR, base `master` (skill `ci-gate`), body with **Proofs** (skill `plan-and-proofs`).
+3. **Build**: tests first, one-line commits (skill `pr-shape`), checks; draft PR, base `master` (skill `ci-gate`), body with **Proofs** (skill `plan-and-proofs`).
 4. **Review** (`normal`, `high`): a fresh `branch-reviewer`, even on a draft PR; the orchestrator posts its comment (skill `review-comments`).
 5. **Fixes**: a fresh `builder`, blocking items only; the others go to `docs/LEARNINGS.md` § Minors kept.
 6. **Verify** (`high`): `branch-reviewer` in `verify` mode on the fix commits, posted as a second comment; `not fixed` or `regressed` goes back to 5.

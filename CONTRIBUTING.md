@@ -30,7 +30,7 @@ npm run lint && npm run typecheck && npm test && npm run test:types && npm run b
 
 ## Commits and pull requests
 
-- In George MacKerron's manner: one line, plain English, imperative, British spelling, no prefix: "Add conditions with array operators".
+- As in Zapatos: one line, plain English, imperative, British spelling, no prefix: "Add conditions with array operators".
 - A pull request title ends with the issue it closes: "Fix not() so it parenthesises its condition (closes #30)".
 - Size, splitting and naming: skill [`pr-shape`](.agents/skills/pr-shape/SKILL.md).
 

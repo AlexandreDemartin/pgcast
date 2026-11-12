@@ -20,7 +20,7 @@ Each element exists once, where the tools read it natively. The method comes fro
 | `review-comments` | Conventional Comments, one comment per round, verify comment, `→ fixed in <sha>` |
 | `merge-gate` | Ship / Show / Ask by risk, `needs-owner`, squash, stacks, clean-up |
 | `ci-gate` | Draft PR while iterating, `gh pr ready`, docs only, **CI passed** check, exceptional `[skip ci]`, rerun |
-| `pr-shape` | Size, splitting, stacking, title, branch and commits of a PR, after George's commits |
+| `pr-shape` | Size, splitting, stacking, title, branch and commits of a PR, after Zapatos's commits |
 | `decision-philosophy` | Decide alone what nothing writes down, or wait for the user |
 | `simple-big-wins` | Measured gain weighed against added complexity; nothing shaky |
 | `concise-docs` | Complete but concise docs, one piece of information in one place |
@@ -35,7 +35,7 @@ Each element exists once, where the tools read it natively. The method comes fro
 | `type-tests` | Positive and negative type tests, compile cost (`bench:types`) |
 | `codegen-output` | Codegen output: snapshots, opt-in, canary, justified diff |
 | `consumer-usage` | Validate a need and an API against the corpus of real usage, without letting anything out |
-| `zapatos-spirit` | George MacKerron's spirit: code and document like him, only better |
+| `code-style` | Code, JSDoc, errors and docs in Zapatos's patterns; docs examples in the film world |
 
 ## Writing a skill
 
