@@ -14,6 +14,7 @@ const bookSeats = (txnClientOrPool: pg.Pool | db.TxnClientForSerializable,
 db.setConfig({ transactionRetryDelay: { minMs: 0, maxMs: 0 } });
 
 test('a booking runs again after a serialization failure', async () => {
+  await db.deletes('seat_bookings', { screening_id: 1003 }).run(pool);  // so that it runs again on the same database
   let attempts = 0;
   const booked = await db.serializable(pool, async txnClient => {
     const seats = await bookSeats(txnClient, 1003, ['H1', 'H2'], 'Tamsin Rowe');
