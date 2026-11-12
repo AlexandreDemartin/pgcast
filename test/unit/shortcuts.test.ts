@@ -799,6 +799,21 @@ describe('undefinedMeansMissing', () => {
     expect(several(rows).text).toContain('VALUES ($1, $2, DEFAULT, $3), ($4, $5, $6, $7) ON CONFLICT');
   });
 
+  it('upsert: an undefined key named in updateColumns is left out of the insert, but still set from EXCLUDED', () => {
+    // as for a missing key, an existing row takes the column DEFAULT
+    db.setConfig({ undefinedMeansMissing: true });
+    expect(db.upsert('users', { email: 'a@x.org', display_name: 'A', mood: undefined }, 'email',
+      { updateColumns: ['mood'] }).compile()).toMatchInlineSnapshot(`
+        {
+          "text": "INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("mood") = ROW(EXCLUDED."mood") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+          "values": [
+            "A",
+            "a@x.org",
+          ],
+        }
+      `);
+  });
+
   it('upsert: an undefined key counts as missing for upsertRequiresSameKeys, and for PGCAST_DEP001', async () => {
     const rows = [
       { sku: 'TEE', variant: 'S', price_cents: 1300, title: undefined },
