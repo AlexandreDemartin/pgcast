@@ -193,7 +193,7 @@ export class DangerousRawString { declare readonly [wrapper]: 'raw'; constructor
  * `insert()` or `update()` value: write a `sql` fragment value instead,
  * `` { name: sql`${self} = ${raw("'Ada'")}` } ``. Zapatos 6.6.1 sent it there
  * as JSON (`'{"value":"…"}'`), not as SQL. In `upsert()`'s
- * `updateValues` it is SQL, on any column.
+ * `updateValues` it is SQL, on a column that takes a string (text, `jsonb`).
  */
 export function raw(x: string) { return new DangerousRawString(x); }
 
