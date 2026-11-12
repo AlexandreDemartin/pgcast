@@ -37,7 +37,7 @@ START TRANSACTION ISOLATION LEVEL READ COMMITTED
 COMMIT
 ```
 
-- If a chunk fails, [`readCommitted()`](/transaction#readCommitted) sends `ROLLBACK` and rejects with its error: no tag is left in.
+- If a chunk fails, [`readCommitted()`](/transaction#readCommitted) sends `ROLLBACK` and rejects with its error: no tag is left in. A deadlock (40P01) runs the chunks again first ([Retry a transaction](/retries)).
 - On the pool, without the transaction, each chunk commits as it goes: the chunks before the one that failed stay.
 - `upsert()` splits the same way.
 
