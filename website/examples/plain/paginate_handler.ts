@@ -2,7 +2,8 @@ import * as db from 'zapatos/db';
 import type * as s from 'zapatos/schema';
 import type pg from 'pg';
 declare const pool: pg.Pool;
-// The two functions of « Send the cursor to the client »
+// The two functions of « Send the cursor to the client », which the build checks against that block
+// #region copy
 type Cursor = { release_year: number; id: number };
 function encodeCursor({ release_year, id }: Cursor): string {
   return Buffer.from(JSON.stringify({ release_year, id })).toString('base64url');
@@ -15,6 +16,7 @@ function decodeCursor(cursor: string): Cursor | undefined {
   } catch {}  // not base64url JSON
   return undefined;
 }
+// #endregion copy
 // ---cut---
 const size = 2;
 
