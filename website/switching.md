@@ -140,10 +140,10 @@ Both will be the default in 7.0 ([Versions, opt-ins and warnings](/versions)). W
 npm install zapatos@6.6.1
 ```
 
-The generated files are the same, and each change of [Find the calls whose result changes](#find-the-calls-whose-result-changes) runs as it did. Remove the two options from `setConfig()` first: Zapatos 6.6.1's `Config` doesn't have them (2353).
+The generated files are the same, and each change of [Find the calls whose result changes](#find-the-calls-whose-result-changes) runs as it did, but the `jsonb` one, which finds nothing again. Remove the two options from `setConfig()` first: Zapatos 6.6.1's `Config` doesn't have them (2353).
 
 ::: warning Security
-Code written or left as it is against pgcast's fixes gets Zapatos 6.6.1's results back: each row whose What to do is "nothing", and the `not()` row. `db.deletes('roles', { character: db.conditions.isNotIn([db.param('The ferryman')]) })` deletes 11 roles under pgcast, and all 12 under Zapatos 6.6.1. The holes of the [changelog](https://github.com/AlexandreDemartin/pgcast/blob/master/CHANGELOG.md)'s § Security are open again: a name, a `lock`, an `aggregate`, a plain value in `updateValues` or a `param()` cast can splice SQL ([The security model](/security)).
+Code written or left as it is against pgcast's fixes gets Zapatos 6.6.1's results back: each row whose What to do is "nothing", the `not()` row and the `jsonb` row. `db.deletes('roles', { character: db.conditions.isNotIn([db.param('The ferryman')]) })` deletes 11 roles under pgcast, and all 12 under Zapatos 6.6.1. The holes of the [changelog](https://github.com/AlexandreDemartin/pgcast/blob/master/CHANGELOG.md)'s § Security are open again: a name, a `lock`, an `aggregate`, a plain value in `updateValues` or a `param()` cast can splice SQL ([The security model](/security)).
 :::
 
 ## See also
