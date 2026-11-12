@@ -24,14 +24,15 @@ One of `ines` and `barnaby` is `true`, the other `false`. When both read before 
 ```sql
 -- attempt 1
 START TRANSACTION ISOLATION LEVEL SERIALIZABLE
-SELECT to_jsonb("seat_bookings".*) AS result FROM "seat_bookings" WHERE ("screening_id" = $1 AND "seat" = $2) LIMIT $3
-INSERT INTO "seat_bookings" ("customer", "screening_id", "seat") VALUES ($1, $2, $3) RETURNING to_jsonb("seat_bookings".*) AS result
+-- the callback's selectOne(), then insert(), which Postgres refuses with 40001
 ROLLBACK
--- attempt 2, 25 to 250 ms later: the SELECT returns the other booking
+-- attempt 2, 25 to 250 ms later
 START TRANSACTION ISOLATION LEVEL SERIALIZABLE
-SELECT to_jsonb("seat_bookings".*) AS result FROM "seat_bookings" WHERE ("screening_id" = $1 AND "seat" = $2) LIMIT $3
+-- the callback's selectOne(), which returns the other booking
 COMMIT
 ```
+
+The SQL of the callback's queries: [`selectOne()`](/select#selectOne) and [`insert()`](/insert#insert).
 
 ### The SQL it sends
 
