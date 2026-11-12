@@ -153,7 +153,7 @@ Start from the first row you showed, and read the other way: flip the comparison
 - `>` with `ASC` gives the rows just before `first` in the page's order, the nearest first; [`reverse()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/reverse), in place, puts them newest first again.
 - Fewer rows than `limit`, `[]` included: you reached the start of the list, so show the first page instead. A film added since page 1 was shown can leave one row there, not `[]`.
 - The index on `(release_year, id)` serves both ways. On 300,000 films, before the first row (1960, 150000), `EXPLAIN (ANALYZE)` shows an `Index Scan`, forwards this time, with `Index Cond: (ROW(release_year, id) > ROW(1960, 150000))`: it reads the 2 rows it returns.
-- To let a client come back, send `encodeCursor(first)` as a second cursor, `before`, beside `after`.
+- To let a client come back, send `encodeCursor(first)` as a second cursor, `before`, beside `after`. To know whether a page comes before, fetch `size + 1` rows the other way, as the [handler](#a-handler-from-request-to-response) does for `after`, keep `size` of them and reverse.
 
 ## Count the total
 
