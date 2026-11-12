@@ -111,6 +111,23 @@ function SQLForExtras<T extends Table>(extras: ExtrasOption<T>) {
 }
 
 
+// an undefined value is sent as NULL, as in 6.6.1, but warns once; with undefinedMeansMissing (the default in 7.0)
+// it is a missing key instead, as JSON.stringify leaves it out: `toDefault` sends DEFAULT (insert), otherwise the
+// key goes (update, upsert, whose missing keys then take DEFAULT, and the rules of upsertRequiresSameKeys);
+// a null row, which an untyped caller may pass among others, is read as `{}`, as completeKeysWithDefaultValue reads it
+function undefinedAsMissing<V extends object>(values: V, toDefault: boolean): V {
+  const rows: object[] = (Array.isArray(values) ? values : [values]).map(row => row ?? {});
+  if (!rows.some(row => Object.values(row).includes(undefined))) return values;
+  if (!(getConfig().undefinedMeansMissing ?? false)) {
+    warnOnce('PGCAST_DEP002', 'An undefined value in insert(), update() or upsert() is sent as NULL. Set undefinedMeansMissing: true (db.setConfig) to treat it as a missing key instead (DEFAULT in insert(), left out of update() and upsert()); it will be the default in pgcast 7.0.');
+    return values;
+  }
+  const kept = rows.map(row => Object.fromEntries(Object.entries(row).flatMap(([k, v]) =>
+    v !== undefined ? [[k, v]] : toDefault ? [[k, Default]] : [])));
+  return (Array.isArray(values) ? kept : kept[0]) as V;
+}
+
+
 /* === insert === */
 
 interface InsertSignatures {
@@ -130,7 +147,11 @@ interface InsertSignatures {
 /**
  * Generate an `INSERT` query `SQLFragment`.
  * @param table The table into which to insert
- * @param values The `Insertable` values (or array thereof) to be inserted
+ * @param values The `Insertable` values (or array thereof) to be inserted.
+ * An `undefined` value is sent as `NULL`, and emits a `DeprecationWarning`
+ * (`PGCAST_DEP002`), once; with the `undefinedMeansMissing` config option (the
+ * default in 7.0), it sends `DEFAULT`, as a key missing from one of several
+ * rows does: `{ title: undefined }` gives `VALUES (DEFAULT)`.
  */
 export const insert: InsertSignatures = function (
   table: Table,
@@ -145,6 +166,7 @@ export const insert: InsertSignatures = function (
     query.noopResult = [];
 
   } else {
+    values = undefinedAsMissing(values, true);
     const
       completedValues = Array.isArray(values) ? completeKeysWithDefaultValue(values, Default) : values,
       colsSQL = cols(Array.isArray(completedValues) ? completedValues[0] : completedValues),
@@ -273,6 +295,13 @@ const updateValueSQL = (value: any) => compiledAsIs(value) ? value : param(value
  * it throws instead, before any query: pass `updateColumns`, or give every row
  * the same keys. So new rows without their serial `id`, upserted on `'id'`
  * among existing ones, neither warn nor throw.
+ *
+ * An `undefined` value in `values` is sent as `NULL`, then set from `EXCLUDED`,
+ * and emits a `DeprecationWarning` (`PGCAST_DEP002`), once. With the
+ * `undefinedMeansMissing` config option (the default in 7.0), its key is left
+ * out, as if it were missing: one row does not insert that column, nor update
+ * it unless `updateColumns` names it, in which case it is still set from
+ * `EXCLUDED` and an existing row takes the column `DEFAULT`.
  */
 export const upsert: UpsertSignatures = function (
   table: Table,
@@ -283,6 +312,7 @@ export const upsert: UpsertSignatures = function (
 
   if (Array.isArray(values) && values.length === 0) return insert(table, values);  // punt a no-op to plain insert
   if (typeof conflictTarget === 'string') conflictTarget = [conflictTarget];  // now either Column[] or Constraint
+  values = undefinedAsMissing(values, false);
 
   let noNullUpdateColumns = options?.noNullUpdateColumns ?? [];
   if (noNullUpdateColumns !== all && !Array.isArray(noNullUpdateColumns)) noNullUpdateColumns = [noNullUpdateColumns];
@@ -359,8 +389,11 @@ interface UpdateSignatures {
  * @param table The table to update
  * @param values An `Updatable` of the new values with which to update the table.
  * It needs at least one key: with none, there is nothing to set, and `update()`
- * throws before any query (a key whose value is `undefined` counts, and sets
- * the column to `NULL`).
+ * throws before any query. A key whose value is `undefined` counts, sets the
+ * column to `NULL`, and emits a `DeprecationWarning` (`PGCAST_DEP002`), once;
+ * with the `undefinedMeansMissing` config option (the default in 7.0), it is
+ * left out, as `JSON.stringify` leaves it out, and does not count:
+ * `{ name: 'A', isLiving: undefined }` gives `SET ("name") = ROW($1)`.
  * @param where A `Whereable` (or `SQLFragment`) defining which rows to update
  */
 export const update: UpdateSignatures = function (
@@ -370,6 +403,7 @@ export const update: UpdateSignatures = function (
   options?: ReturningOptionsForTable<Table, ColumnsOption<Table>, ExtrasOption<Table>>
 ): SQLFragment {
 
+  values = undefinedAsMissing(values, false);
   // `SET () = ROW()` is a syntax error in Postgres, so say so before any query
   if (Object.keys(values).length === 0) throw new Error('nothing to update: an Updatable needs at least one column');
 
