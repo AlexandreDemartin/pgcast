@@ -93,7 +93,7 @@ order.forEach((name, index) => {
   if (pageOf(name)) return;
   const pages = [...new Set([nearest(index, -1), nearest(index, 1)].filter(Boolean))].join(' or ');
   problems.push(`${name}: no entry; add a heading ending in {#${name}} to ${pages || 'a Reference page'}, ` +
-    `or list it under that page in ${pendingFile}`);
+    `or list it under ${pages ? 'that page' : 'the page you choose'} in ${pendingFile}`);
 });
 
 if (problems.length > 0) {
