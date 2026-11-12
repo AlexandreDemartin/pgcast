@@ -123,6 +123,10 @@ export function strict<FnIn, FnOut>(fn: (x: FnIn) => FnOut):
  */
 export const toBuffer = strict((ba: ByteArrayString) => Buffer.from(ba.slice(2), 'hex'));
 
+// a type-only tag (no JS is emitted): it keeps raw(), cols() and vals() from passing as a `Parameter<T>`, which
+// is structural ({ value: T }), so the generated Whereable, Insertable and Updatable types refuse them as values
+declare const wrapper: unique symbol;
+
 /**
  * Compiles to a numbered query parameter (`$1`, `$2`, etc) and adds the wrapped value
  * at the appropriate position of the values array passed to `pg`.
@@ -141,7 +145,7 @@ export const toBuffer = strict((ba: ByteArrayString) => Buffer.from(ba.slice(2),
  * stringified or cast to `json` (again irrespective of the configuration
  * parameters `castArrayParamsToJson` and `castObjectParamsToJson`).
  */
-export class Parameter<T = any> { constructor(public value: T, public cast?: boolean | string) { } }
+export class Parameter<T = any> { declare readonly [wrapper]?: never; constructor(public value: T, public cast?: boolean | string) { } }
 
 /**
  * Returns a `Parameter` instance, which compiles to a numbered query parameter
@@ -172,7 +176,7 @@ export function param<T = any>(x: T, cast?: boolean | string) { return new Param
  * Compiles to the wrapped string value, as is, which may enable SQL injection
  * attacks.
  */
-export class DangerousRawString { constructor(public value: string) { } }
+export class DangerousRawString { declare readonly [wrapper]: 'raw'; constructor(public value: string) { } }
 
 /**
  * 💥💥💣 **DANGEROUS** 💣💥💥
@@ -183,6 +187,13 @@ export class DangerousRawString { constructor(public value: string) { } }
  * Returns a `DangerousRawString` instance, wrapping a string.
  * `DangerousRawString` compiles to the wrapped string value, as-is, which may
  * enable SQL injection attacks.
+ *
+ * As a `Whereable` value, in `isIn()` or as the value of `eq()` and the other
+ * conditions, it throws, and the type refuses it there, as it does as an
+ * `insert()` or `update()` value: write a `sql` fragment value instead,
+ * `` { name: sql`${self} = ${raw("'Ada'")}` } ``. Zapatos 6.6.1 sent it there
+ * as JSON (`'{"value":"…"}'`), not as SQL. In `upsert()`'s
+ * `updateValues` it is SQL, on any column.
  */
 export function raw(x: string) { return new DangerousRawString(x); }
 
@@ -191,12 +202,13 @@ export function raw(x: string) { return new DangerousRawString(x); }
  * list of array values (for use in a `SELECT` query) or object keys (for use
  * in an `INSERT`, `UPDATE` or `UPSERT` query, alongside `ColumnValues`).
  */
-export class ColumnNames<T> { constructor(public value: T) { } }
+export class ColumnNames<T> { declare readonly [wrapper]: 'cols'; constructor(public value: T) { } }
 /**
  * Returns a `ColumnNames` instance, wrapping either an array or an object.
  * `ColumnNames` compiles to a quoted, comma-separated list of array values (for
  * use in a `SELECT` query) or object keys (for use in an `INSERT`, `UDPATE` or
- * `UPSERT` query alongside a `ColumnValues`).
+ * `UPSERT` query alongside a `ColumnValues`). As a filter value it throws, and
+ * as a value the type refuses it, as for `raw()`; Zapatos 6.6.1 sent it as JSON.
  */
 export function cols<T>(x: T) { return new ColumnNames<T>(x); }
 
@@ -204,7 +216,7 @@ export function cols<T>(x: T) { return new ColumnNames<T>(x); }
  * Compiles to a quoted, comma-separated list of object keys for use in an
  * `INSERT`, `UPDATE` or `UPSERT` query, alongside `ColumnNames`.
  */
-export class ColumnValues<T> { constructor(public value: T) { } }
+export class ColumnValues<T> { declare readonly [wrapper]: 'vals'; constructor(public value: T) { } }
 /**
  * Returns a ColumnValues instance, wrapping an object. ColumnValues compiles to
  * a quoted, comma-separated list of object keys for use in an INSERT, UPDATE
@@ -215,6 +227,9 @@ export class ColumnValues<T> { constructor(public value: T) { } }
  * (`` { role: sql`${vals([Default])}` } ``), compiled as a `Whereable` value is.
  * In an array, `parent()` compiles to the parent column (`"authors"."id"`), as
  * in a `sql` template; Zapatos 6.6.1 sent it as JSON (`'{"value":"id"}'`).
+ * `raw()`, `cols()` and `vals()` throw in an array in a filter, as `Default`
+ * does; outside one they are still sent as JSON. As a filter value `vals(x)`
+ * throws, and as a value the type refuses it, as for `raw()`.
  */
 export function vals<T>(x: T) { return new ColumnValues<T>(x); }
 
@@ -236,7 +251,8 @@ export class ParentColumn<T extends Column | undefined = Column | undefined> { c
 export function parent<T extends Column | undefined = Column | undefined>(x?: T) { return new ParentColumn<T>(x); }
 
 
-export type GenericSQLExpression = SQLFragment<any, any> | Parameter | DefaultType | DangerousRawString | SelfType;
+// ColumnNames and ColumnValues of any value: a `Parameter` accepted them in a `sql` template before the tag above
+export type GenericSQLExpression = SQLFragment<any, any> | Parameter | DefaultType | DangerousRawString | SelfType | ColumnNames<any> | ColumnValues<any>;
 export type SQLExpression = Table | ColumnNames<Updatable | (keyof Updatable)[]> | ColumnValues<Updatable | any[]> | Whereable | Column | ParentColumn | GenericSQLExpression;
 export type SQL = SQLExpression | SQLExpression[];
 
@@ -282,7 +298,12 @@ const quotedName = new RegExp(`^"(?:[^"\\0]|"")+"(?:${space}\\.${space}(?:${iden
 
 const
   defaultInWhereable = '`db.Default` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. `DEFAULT` is for INSERT and UPDATE values.',
-  selfInWhereable = '`db.self` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: compare with a value, or use it in a `sql` fragment value, where it stands for the column.';
+  selfInWhereable = '`db.self` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: compare with a value, or use it in a `sql` fragment value, where it stands for the column.',
+  wrapperInWhereable = '`db.raw()`, `db.cols()` and `db.vals()` have no meaning as a value in a Whereable (a filter), nor in `isIn()`: to compare with SQL, use a `sql` fragment value, where `db.self` stands for the column; to compare with a value, give the value itself, or `db.param()`.';
+
+// raw(), cols() and vals() as a filter value: Zapatos 6.6.1 sent them as JSON; compiling raw() there as SQL would
+// turn a caller's raw(input), a parameter until now, into an injection, so they throw
+const isWrapper = (x: unknown) => x instanceof DangerousRawString || x instanceof ColumnNames || x instanceof ColumnValues;
 
 export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never> {
   protected constraint?: Constraint;
@@ -479,6 +500,7 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
           // a set currentColumn means we are in a Whereable (`isIn`), where there is no default, and `self` is no value
           if (value === Default && currentColumn) throw new Error(defaultInWhereable);
           if (value === self && currentColumn) throw new Error(selfInWhereable);
+          if (isWrapper(value) && currentColumn) throw new Error(wrapperInWhereable);
           if (value instanceof SQLFragment ||
             value instanceof Parameter ||
             value === Default) this.compileExpression(value, result, parentTable);
@@ -526,6 +548,7 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
             // a Parameter is compiled as it is, with its cast; Zapatos 6.6.1 wrapped it in another one
             if (columnValue === Default) throw new Error(defaultInWhereable);
             if (columnValue === self) throw new Error(selfInWhereable);
+            if (isWrapper(columnValue)) throw new Error(wrapperInWhereable);
             this.compileExpression(columnName, result);
             result.text += ` = `;
             this.compileExpression(columnValue instanceof ParentColumn || columnValue instanceof Parameter ? columnValue :

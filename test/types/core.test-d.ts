@@ -150,6 +150,14 @@ describe('type surprises', () => {
     expectTypeOf(db.param('Ada')).toEqualTypeOf<db.Parameter<string>>();
   });
 
+  test('cols(x) and vals(x) of any value are still accepted in a sql template', () => {
+    // a Parameter<any> accepted them before the tag that refuses them as values
+    const ids: readonly number[] = [1, 2];
+    db.sql<s.users.SQL>`SELECT ${db.cols(['id', 'email'])} FROM ${'users'} WHERE ${'id'} IN (${db.vals([1, 2])})`;
+    db.sql`SELECT * FROM ${'users'} WHERE ${'id'} IN (${db.vals(ids)})`;
+    db.sql`INSERT INTO ${'users'} (${db.cols({ email: 'a@b' })}) VALUES (${db.vals({ email: 'a@b' })})`;
+  });
+
   test('updateValues takes raw(), cols(x) and vals(x) on any column, compiled as SQL', () => {
     // as in 6.6.1, which took raw() only on a text or jsonb column (test/integration/core.test.ts, "raw() in a
     // fragment value, or in the updateValues of upsert, is SQL")

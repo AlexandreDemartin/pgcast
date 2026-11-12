@@ -213,6 +213,10 @@ type UpsertReturnableForTable<
 
 type UpsertConflictTargetForTable<T extends Table> = Constraint<T> | ColumnForTable<T> | ColumnForTable<T>[];
 type UpdateColumns<T extends Table> = ColumnForTable<T> | ColumnForTable<T>[];
+// updateValues are compiled as in a `sql` template, so raw(), cols() and vals() are SQL there, on any column,
+// where an Updatable value refuses them (they are sent as JSON as insert() and update() values)
+type UpdateValuesForTable<T extends Table, U = UpdatableForTable<T>> =
+  { [K in keyof U]: U[K] | DangerousRawString | ColumnNames<any> | ColumnValues<any> };
 
 interface UpsertOptions<
   T extends Table,
@@ -221,7 +225,7 @@ interface UpsertOptions<
   UC extends UpdateColumns<T> | undefined,
   RA extends UpsertReportAction | undefined,
 > extends ReturningOptionsForTable<T, C, E> {
-  updateValues?: UpdatableForTable<T>;
+  updateValues?: UpdateValuesForTable<T>;
   updateColumns?: UC;
   noNullUpdateColumns?: ColumnForTable<T> | ColumnForTable<T>[] | typeof all;
   reportAction?: RA;
