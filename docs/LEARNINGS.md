@@ -237,6 +237,8 @@ Candidates for a check, a rule or a skill line.
 - #148 — `information_schema` reports a view's `NOT NULL` domain column as `NO`, while a materialised view's `attnotnull` is false even for it: probe both read paths with a `NOT NULL` domain — `branch-reviewer`, `builder`
 - #148 — An explanation that names open issues « as they are today » is tied back to them (a comment on each, rule of #130), or it outlives the behaviour — `branch-reviewer`
 - #148 — `<sup>` is stripped in `llms-full.txt` (2<sup>53</sup> became « 253 »): write the value another way — `builder`
+- #172 — pgcast's declarations need TypeScript 5.7 for a full check (`toBuffer()` returns `Buffer<ArrayBuffer>`, as in Zapatos 6.6.1), while the peer range says `>=4.1`: a version claim is checked with real installs per version, not read from `peerDependencies` — `builder`
+- #172 — `skipLibCheck` also skips the generated `.d.ts`, so the version canary goes quiet: say so wherever it is suggested — `builder`
 
 ## Minors kept
 
