@@ -538,7 +538,7 @@ Makes a string Postgres reads of a `Date`, typed by `stringTypeTz`; `null` gives
 import * as db from 'zapatos/db';
 // ---cut---
 const curtain = new Date('2030-03-01T19:30:00Z');
-const day: db.DateString = db.toString(curtain, 'date:UTC');                // '2030-03-01'
+const day: db.DateString = db.toString(curtain, 'date:UTC');              // '2030-03-01'
 const stamp: db.TimestampTzString = db.toString(curtain, 'timestamptz');  // '2030-03-01T19:30:00.000Z'
 ```
 
