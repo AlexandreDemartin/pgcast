@@ -15,7 +15,7 @@ pgcast hasn't had its first release. These commands will work once it has; until
 
 ### On an older TypeScript
 
-pgcast's own types go back to TypeScript 4.1, the first with template literal types. Below 5.7, tell TypeScript not to check the types in `node_modules`:
+pgcast's own types go back to TypeScript 4.1, the first with template literal types. Below 5.7, tell TypeScript not to check the types in `node_modules` (`toBuffer()` then returns `any`):
 
 ::: code-group
 
@@ -30,8 +30,11 @@ pgcast's own types go back to TypeScript 4.1, the first with template literal ty
 :::
 
 - From 5.0, that's all.
-- Below 5.0, TypeScript can't read today's `@types/node`. Install the one made for your version, by its tag, and pin it: `npm install --save-dev --save-exact @types/node@ts4.1` for 4.1, `@types/node@ts4.9` for 4.9.
-- `toBuffer()` then returns `any`.
+- Below 5.0, TypeScript can't read today's `@types/node`. Install the one made for your version, by its tag, and pin it: here for 4.1, `ts4.9` for 4.9.
+
+```sh
+npm install --save-dev --save-exact @types/node@ts4.1
+```
 
 ::: warning Stale schema
 `skipLibCheck` skips your generated `schema.d.ts` too. After an upgrade of pgcast, a schema you haven't regenerated no longer fails on `schemaVersionCanary` ([When the schema changes](/first-query#when-the-schema-changes)): run `npx pgcast` each time.
