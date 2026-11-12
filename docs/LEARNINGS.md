@@ -216,6 +216,10 @@ Candidates for a check, a rule or a skill line.
 - #142 — Every type inside `declare module 'zapatos/custom'` is exported and the blocks merge: a helper type in a placeholder takes a prefixed name — `branch-reviewer`, `builder`
 - #142 — A placeholder in the shared docs schema is a cross-page dependency: `git grep` the open worktrees before narrowing it — `builder`
 - #142 — Bulk inserts into the docs schema without ids hit 23505 at the 1000th row (seeds from 1000, sequences from 1): probes set explicit ids from 2000 — `branch-reviewer`
+- #127 — A guide's « same under both libraries » is probed in both directions: the fixes a project starts relying on are what going back undoes (`isNotIn([param(x)])` in `deletes()` hits every row again) — `branch-reviewer`
+- #127 — A migration guide names the changed `.compile()` text as well as the changed rows: SQL snapshots in tests change where rows do not — `branch-reviewer`
+- #127 — A `CHANGELOG.md` migration snippet is never compiled: run each through `tsc` on the fixture (#200) — `branch-reviewer`
+- #127 — A review's example is run on the real docs schema before it goes on the page (`deletes('films', …)` stops on foreign keys) — `builder`
 
 ## Minors kept
 
