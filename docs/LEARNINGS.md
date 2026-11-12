@@ -151,6 +151,10 @@ Candidates for a check, a rule or a skill line.
 - #136 — `vitepress preview` keeps the file list it read at start-up and 404s the new hashed CSS after a rebuild: restart it, cache off, before measuring — `builder`
 - #138 — `git worktree add -b <branch> origin/master` makes the branch track origin/master, so a bare `git push` aims at master: add `--no-track` in briefs — `builder`
 - #138 — Under zsh, an unquoted `===` separator fails (`=word` expansion): quote separators in shell commands — `builder`
+- #137 — VitePress fails on a duplicate custom id within a page, not across pages: a check that wants one entry per name enforces it across pages itself — `branch-reviewer`
+- #137 — Probe a Markdown-scanning check in the silent-pass direction first (an HTML comment, a duplicate): a missed entry fails loudly, a false entry stays green — `branch-reviewer`
+- #137 — A pending list that assigns names to pages is cross-read against the scopes of the issues that will write those pages — `branch-reviewer`
+- #137 — `check-reference.mjs` has no tests: a fixtures mode (pages and pending file as arguments) would let its probes run in CI — `builder`
 
 ## Minors kept
 
@@ -176,3 +180,4 @@ Minor review defects, taken up by the end-of-chapter review.
 - #29 — pre-existing: an `undefined` in `updateValues` still adds its column to `SET` as `EXCLUDED.col`, even when the column was not inserted, which writes its `DEFAULT` into the existing row: a candidate line for the characterisation report — `builder`
 - #31 — `src/db/conditions.ts:21`: `conditionalParam` still wraps `Default`, so `{ display_name: eq(Default) }` sends `'Symbol(DEFAULT)'` and matches nothing (both versions): a candidate finding, with #101 — `branch-reviewer` → R64, #106
 - #107 — `insert('books', { title: parent('name') })` (object branch) still stores `'{"value":"name"}'`: a candidate finding — `builder`
+- #137 — `website/check-reference.mjs`: a fence closed by a line with an info string (```` ```ts ````) is taken as closed, so a later entry is missed (fails loudly) — `branch-reviewer`

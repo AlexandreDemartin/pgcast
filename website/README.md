@@ -28,6 +28,10 @@ npm run docs:build             # or docs:dev, docs:preview
 
   At build, `.vitepress/cast.data.ts` runs it against a pool that only records the query `.run()` gets from `.compile()`: its SQL (laid out on lines, whitespace only) and values fill "Postgres runs". "TypeScript knows" is the type Twoslash gives the module's first `const`: its name, then one level down. Nothing in a panel is typed by hand; the loader checks itself before each build (a type error must fail, the layout must change whitespace only, a query whose result transform throws on no rows is still recorded).
 
+## The reference
+
+Every export of `zapatos/db` (a member of `conditions` as `conditions.eq`), every option of its `Config` (`Config.transactionAttemptsMax`) and of the generator's (`generate.outDir`) has an entry: a heading of a Reference page that ends in its name as an anchor, `` ## `insert()` {#insert} `` (other attributes may follow it: `{#upsert .since}`). Only the page's own ATX headings count, outside fenced code and HTML comments: not a partial's (`<!--@include: -->`), nor a Setext or indented heading. Until its page is written, a name waits in `reference-pending.json`, under that page. `docs:build` runs `check-reference.mjs` after `tsc`: it reads the names from the built library's declarations, and fails on a name with neither, on a name anchored on two Reference pages, on a pending name that already has its entry, and on a pending name the library no longer has; each line says which page to add it to. So the list only shrinks: a reference page's PR removes its names.
+
 ## For assistants
 
 At build, `.vitepress/llms.ts` writes two files to the site's root, from the outline and the pages, in its order ([llmstxt.org](https://llmstxt.org/)):
