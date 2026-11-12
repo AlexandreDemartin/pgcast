@@ -24,7 +24,7 @@ Then pick how the reader moves on:
 | Go to page *n* | yes | no: the next page, from the one before |
 | A deep page | Postgres computes every row it skips | Postgres starts at the last row, with an index that matches the `order` |
 | A film added or removed meanwhile | shifts every later page by one | the next page still starts after the last row shown |
-| It needs | an `order` | an `order` that never ties, its columns in `columns` |
+| It needs | an `order` that never ties | an `order` that never ties, and its columns in `columns` |
 
 ## Go to page n with offset
 
