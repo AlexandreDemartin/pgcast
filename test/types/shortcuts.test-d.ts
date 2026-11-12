@@ -187,6 +187,26 @@ describe('upsert', () => {
   });
 });
 
+describe('undefinedMeansMissing', () => {
+  test('an optional boolean of Config and setConfig', () => {
+    db.setConfig({ undefinedMeansMissing: true });
+    expectTypeOf(db.getConfig().undefinedMeansMissing).toEqualTypeOf<boolean | undefined>();
+    expectTypeOf<db.NewConfig['undefinedMeansMissing']>().toEqualTypeOf<boolean | undefined>();
+    // a Config written for 6.6.1, without the key, still compiles
+    const c: db.Config = {
+      transactionAttemptsMax: 5,
+      transactionRetryDelay: { minMs: 25, maxMs: 250 },
+      castArrayParamsToJson: false,
+      castObjectParamsToJson: false,
+    };
+    // @ts-expect-error a boolean, not a string
+    const d: db.Config = { ...c, undefinedMeansMissing: 'yes' };
+    void d;
+    // @ts-expect-error a boolean, not a string
+    db.setConfig({ undefinedMeansMissing: 'yes' });
+  });
+});
+
 describe('update, deletes', () => {
   test('update: JSONSelectable[]', () => {
     const q = db.update('users', { display_name: 'B' }, { id: 1 });

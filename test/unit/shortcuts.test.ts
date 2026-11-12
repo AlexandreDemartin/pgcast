@@ -9,6 +9,8 @@ import * as db from '../../src/db';
 import { sql, param, parent, Default, all, conditions as dc } from '../../src/db';
 import { resetConfig } from '../helpers/config';
 
+afterEach(resetConfig);
+
 describe('insert', () => {
   it('one row: columns in sorted key order, RETURNING to_jsonb', () => {
     // characterization: the column order is the sorted key order, not the object's
@@ -75,14 +77,26 @@ describe('insert', () => {
   });
 
   it('values: SQLFragment, Parameter with a cast, Default, undefined', () => {
-    // characterization: an undefined value is sent as a parameter (NULL), not replaced by DEFAULT
-    expect(db.insert('accounts', {
+    // without undefinedMeansMissing (deprecated, PGCAST_DEP002), an undefined value is sent as a parameter (NULL)
+    const q = () => db.insert('accounts', {
       owner_id: 1, balance: sql`1 + 1`, ratio: param('0.5', 'float8'), lifetime_ops: Default, overdraft_limit: undefined,
-    }).compile()).toMatchInlineSnapshot(`
+    }).compile();
+    expect(q()).toMatchInlineSnapshot(`
       {
         "text": "INSERT INTO "accounts" ("balance", "lifetime_ops", "overdraft_limit", "owner_id", "ratio") VALUES (1 + 1, DEFAULT, $1, $2, CAST($3 AS "float8")) RETURNING to_jsonb("accounts".*) AS result",
         "values": [
           undefined,
+          1,
+          "0.5",
+        ],
+      }
+    `);
+    // with it, DEFAULT, as for a key missing from one of several rows
+    db.setConfig({ undefinedMeansMissing: true });
+    expect(q()).toMatchInlineSnapshot(`
+      {
+        "text": "INSERT INTO "accounts" ("balance", "lifetime_ops", "overdraft_limit", "owner_id", "ratio") VALUES (1 + 1, DEFAULT, DEFAULT, $1, CAST($2 AS "float8")) RETURNING to_jsonb("accounts".*) AS result",
+        "values": [
           1,
           "0.5",
         ],
@@ -746,6 +760,121 @@ describe('upsert of rows with different keys: only a missing key still set from 
   });
 });
 
+describe('undefinedMeansMissing', () => {
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  it('insert of several rows: an undefined cell sends DEFAULT, the columns are the union of the keys', () => {
+    db.setConfig({ undefinedMeansMissing: true });
+    expect(db.insert('users', [
+      { email: 'a@x.org', display_name: 'A', mood: undefined },
+      { email: 'b@x.org', display_name: 'B', manager_id: 1 },
+    ]).compile()).toMatchInlineSnapshot(`
+      {
+        "text": "INSERT INTO "users" ("display_name", "email", "manager_id", "mood") VALUES ($1, $2, DEFAULT, DEFAULT), ($3, $4, $5, DEFAULT) RETURNING to_jsonb("users".*) AS result",
+        "values": [
+          "A",
+          "a@x.org",
+          "B",
+          "b@x.org",
+          1,
+        ],
+      }
+    `);
+  });
+
+  it('upsert: an undefined key compiles as a missing one', () => {
+    const
+      ada = { email: 'ada@example.com', display_name: 'Ada L.' },
+      rows = [
+        { sku: 'TEE', variant: 'S', price_cents: 1300 },
+        { sku: 'CAP', variant: '', price_cents: 900, title: 'Cap' },
+      ],
+      several = (r: typeof rows) => db.upsert('products', r, ['sku', 'variant'], { updateColumns: ['price_cents'] }).compile();
+    db.setConfig({ undefinedMeansMissing: true });
+    // one row: neither inserted nor updated
+    expect(db.upsert('users', { ...ada, mood: undefined }, 'email').compile())
+      .toEqual(db.upsert('users', ada, 'email').compile());
+    // several rows: DEFAULT in its cell
+    expect(several([{ ...rows[0], title: undefined }, rows[1]])).toEqual(several(rows));
+    expect(several(rows).text).toContain('VALUES ($1, $2, DEFAULT, $3), ($4, $5, $6, $7) ON CONFLICT');
+  });
+
+  it('upsert: an undefined key counts as missing for upsertRequiresSameKeys, and for PGCAST_DEP001', async () => {
+    const rows = [
+      { sku: 'TEE', variant: 'S', price_cents: 1300, title: undefined },
+      { sku: 'CAP', variant: '', price_cents: 900, title: 'Cap' },
+    ];
+    const { fdb, emitWarning } = await fresh();
+    fdb.setConfig({ undefinedMeansMissing: true });
+    fdb.upsert('products', rows, ['sku', 'variant']);
+    expect(emitWarning).toHaveBeenCalledTimes(1);
+    expect(emitWarning.mock.calls[0][1]).toEqual({ type: 'DeprecationWarning', code: 'PGCAST_DEP001' });
+    fdb.setConfig({ upsertRequiresSameKeys: true });
+    expect(() => fdb.upsert('products', rows, ['sku', 'variant']))
+      .toThrow('rows have different keys: pass updateColumns, or give every row the same keys');
+    // without undefinedMeansMissing, the key is there, and its NULL overwrites
+    fdb.setConfig({ undefinedMeansMissing: false });
+    expect(() => fdb.upsert('products', rows, ['sku', 'variant'])).not.toThrow();
+  });
+
+  it('without an undefined value, in a Whereable or in updateValues: the same SQL with it as without it', () => {
+    const queries = () => [
+      db.insert('users', { email: 'e@x.org', display_name: 'E' }),
+      db.insert('users', [{ email: 'a@x.org', display_name: 'A' }, { email: 'b@x.org', display_name: 'B', mood: 'ok' }]),
+      db.update('users', { mood: 'ok' }, { manager_id: undefined }),
+      db.upsert('users', { email: 'e@x.org', display_name: 'E' }, 'email', { updateValues: { mood: undefined } }),
+      db.deletes('users', { manager_id: undefined }),
+    ].map(q => q.compile());
+    const without = queries();
+    db.setConfig({ undefinedMeansMissing: true });
+    expect(queries()).toEqual(without);
+  });
+});
+
+describe('an undefined value, without undefinedMeansMissing', () => {
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  it('emits a DeprecationWarning once per process, PGCAST_DEP002, naming the option', async () => {
+    // the SQL is unchanged: see the snapshots of insert and update
+    const { fdb, emitWarning } = await fresh();
+    fdb.update('users', { mood: undefined }, { id: 1 });
+    fdb.insert('users', { email: 'e@x.org', display_name: 'E', mood: undefined });
+    expect(emitWarning).toHaveBeenCalledTimes(1);
+    const [message, options] = emitWarning.mock.calls[0];
+    expect(options).toEqual({ type: 'DeprecationWarning', code: 'PGCAST_DEP002' });
+    expect(message).toMatch(/undefinedMeansMissing: true/);
+    expect(message).toMatch(/default in pgcast 7\.0/);
+  });
+
+  it('emits it from insert, update and upsert, one row or several', async () => {
+    const calls: ((fdb: typeof db) => unknown)[] = [
+      fdb => fdb.insert('users', { email: 'e@x.org', display_name: 'E', mood: undefined }),
+      fdb => fdb.insert('users', [{ email: 'a@x.org', display_name: 'A' }, { email: 'b@x.org', display_name: 'B', mood: undefined }]),
+      fdb => fdb.update('users', { mood: undefined }, { id: 1 }),
+      fdb => fdb.upsert('users', { email: 'e@x.org', display_name: 'E', mood: undefined }, 'email'),
+      fdb => fdb.upsert('users', [{ email: 'a@x.org', display_name: 'A', mood: undefined }], 'email'),
+    ];
+    for (const call of calls) {
+      const { fdb, emitWarning } = await fresh();
+      call(fdb);
+      expect(emitWarning.mock.calls.map(c => c[1])).toEqual([{ type: 'DeprecationWarning', code: 'PGCAST_DEP002' }]);
+    }
+  });
+
+  it('emits none without an undefined value, for one in a Whereable or in updateValues, nor with the option', async () => {
+    const { fdb, emitWarning } = await fresh();
+    fdb.insert('users', { email: 'e@x.org', display_name: 'E', mood: null });
+    fdb.update('users', { mood: 'ok' }, { manager_id: undefined });
+    fdb.deletes('users', { manager_id: undefined });
+    fdb.upsert('users', { email: 'e@x.org', display_name: 'E' }, 'email', { updateValues: { mood: undefined } });
+    fdb.setConfig({ undefinedMeansMissing: true });
+    fdb.insert('users', { email: 'e@x.org', display_name: 'E', mood: undefined });
+    fdb.update('users', { mood: 'ok', manager_id: undefined }, { id: 1 });
+    fdb.upsert('users', { email: 'e@x.org', display_name: 'E', mood: undefined }, 'email');
+    expect(emitWarning).not.toHaveBeenCalled();
+  });
+});
+
 describe('update', () => {
   it('one column: SET (...) = ROW(...)', () => {
     expect(db.update('accounts', { balance: 10 }, { id: 1 }).compile()).toMatchInlineSnapshot(`
@@ -780,7 +909,7 @@ describe('update', () => {
     // `SET () = ROW()` is invalid SQL, so update() throws while it builds the query
     expect(() => db.update('accounts', {}, { id: 1 }))
       .toThrow('nothing to update: an Updatable needs at least one column');
-    // a key whose value is undefined is still a column (see below)
+    // without undefinedMeansMissing, a key whose value is undefined is still a column (see below)
     expect(db.update('accounts', { ratio: undefined }, { id: 1 }).compile()).toMatchInlineSnapshot(`
       {
         "text": "UPDATE "accounts" SET ("ratio") = ROW($1) WHERE ("id" = $2) RETURNING to_jsonb("accounts".*) AS result",
@@ -790,15 +919,30 @@ describe('update', () => {
         ],
       }
     `);
+    // with it, only the kept keys count
+    db.setConfig({ undefinedMeansMissing: true });
+    expect(() => db.update('accounts', { ratio: undefined, balance: undefined }, { id: 1 }))
+      .toThrow('nothing to update: an Updatable needs at least one column');
   });
 
-  it('characterization: an undefined value', () => {
-    // characterization: the key is kept and the column set to NULL, not left out
-    expect(db.update('users', { mood: 'ok', manager_id: undefined }, { id: 2 }).compile()).toMatchInlineSnapshot(`
+  it('an undefined value: set to NULL without undefinedMeansMissing, left out with it', () => {
+    // without it (deprecated, PGCAST_DEP002), the key is kept and the column set to NULL
+    const q = () => db.update('users', { mood: 'ok', manager_id: undefined }, { id: 2 }).compile();
+    expect(q()).toMatchInlineSnapshot(`
       {
         "text": "UPDATE "users" SET ("manager_id", "mood") = ROW($1, $2) WHERE ("id" = $3) RETURNING to_jsonb("users".*) AS result",
         "values": [
           undefined,
+          "ok",
+          2,
+        ],
+      }
+    `);
+    db.setConfig({ undefinedMeansMissing: true });
+    expect(q()).toMatchInlineSnapshot(`
+      {
+        "text": "UPDATE "users" SET ("mood") = ROW($1) WHERE ("id" = $2) RETURNING to_jsonb("users".*) AS result",
+        "values": [
           "ok",
           2,
         ],
