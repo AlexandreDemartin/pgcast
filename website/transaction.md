@@ -40,14 +40,14 @@ The SQL of the callback's queries: [`selectOne()`](/select#selectOne) and [`inse
 |---|---|
 | before the callback | `START TRANSACTION ISOLATION LEVEL SERIALIZABLE`: the level's value, written as it is |
 | the callback resolves | `COMMIT` |
-| the callback rejects, or `COMMIT` fails | `ROLLBACK`, then a retry or the rejection |
+| `START TRANSACTION`, the callback or `COMMIT` rejects | `ROLLBACK`, then a retry or the rejection |
 
 - These three run on the transaction's client, as the callback's queries do. Each reaches [`queryListener`](/runtime-config#Config.queryListener) and [`resultListener`](/runtime-config#Config.resultListener) with the transaction's id: a counter from 0, one per call, kept across retries.
 - No `SAVEPOINT`: a transaction inside another is the outer one ([Passing a transaction through](#passing-a-transaction-through)).
 
 ### Retries
 
-When the callback or `COMMIT` rejects with a `code` of 40001 (`serialization_failure`) or 40P01 (`deadlock_detected`), at any level, `transaction()` sends `ROLLBACK`, waits, then starts again: `START TRANSACTION`, the whole callback, `COMMIT`.
+When `START TRANSACTION`, the callback or `COMMIT` rejects with a `code` of 40001 (`serialization_failure`) or 40P01 (`deadlock_detected`), at any level, `transaction()` sends `ROLLBACK`, waits, then starts again: `START TRANSACTION`, the whole callback, `COMMIT`.
 
 | [`Config`](/runtime-config#Config) option | Default | What it sets |
 |---|---|---|
