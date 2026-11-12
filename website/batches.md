@@ -87,7 +87,6 @@ Then add each row's votes to those stored: set `votes` in [`updateValues`](/inse
 </CastPanel>
 
 - The first run inserts the three rows. The second updates them, to 4, 2 and 6 votes, each with `$action: 'UPDATE'`.
-- `updateValues` is one expression for every row: `EXCLUDED."votes"` is what makes it each row's own count.
 - An `undefined` in `updateValues` doesn't leave `votes` alone ([An `undefined` value](/insert#undefined-values), [#168](https://github.com/AlexandreDemartin/pgcast/issues/168)).
 
 ## Rows with different keys
