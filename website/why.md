@@ -54,7 +54,7 @@ There are no models. A query gives back plain objects, typed: "just (fully-typed
 
 Nor is there a default connection: each `.run()` takes the pool or client to run on, as "Zapatos is always explicit about what client or pool is running your query". A transaction starts only when you call [`transaction()`](/transaction#transaction). It sends `START TRANSACTION` at the isolation level you chose, then `COMMIT` or `ROLLBACK`, and runs your callback again after a serialisation failure or a deadlock ([Retry a transaction](/retries)).
 
-The same goes for your own functions. Zapatos's docs advise against giving a function's client argument the pool as its default: "I find that way it's too easy to accidentally issue queries outside of transactions."
+The same goes for your own functions. Zapatos's docs advise against giving a function's client argument the pool as its default: "I find that way it's too easy to accidentally issue queries outside of transactions." So a function of yours takes its client as a [`Queryable`](/sql-template#Queryable) with no default, and each caller passes the pool or its transaction's client.
 
 ## What pgcast adds
 

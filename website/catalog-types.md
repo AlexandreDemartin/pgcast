@@ -25,6 +25,22 @@ The generator reads names, types, nullability and defaults. Postgres also keeps 
 
 A view is typed as Postgres reports it, and Postgres reports every column of a view as nullable, whatever the tables underneath say, unless its type is a `NOT NULL` domain. A view of the `id` and `title` of `films` types both as `| null`, and gets an `Insertable` with every column optional, since Postgres can write through it; a view over a join, which it can't write through, gets an `Insertable` and an `Updatable` that take nothing (`[key: string]: never`). A materialised view keeps no `NOT NULL` at all, not even a domain's, so its columns are nullable too.
 
+```sql
+CREATE VIEW film_titles AS SELECT id, title FROM films;
+```
+
+```ts
+// zapatos/schema.d.ts, its JSDoc left out
+export namespace film_titles {
+  export type Table = 'film_titles';
+  export interface Selectable {
+    id: number | null;
+    title: string | null;
+  }
+  …
+}
+```
+
 For views, pgcast keeps to what Postgres states, as Zapatos did: a nullability the database doesn't state would be a guess, and a guess is the one thing a generated type mustn't be. Some gaps in what the generator reads are known, and described here as they are today:
 
 - Enum labels come out in alphabetical order: `crew_job` is `'cinematographer' | 'composer' | 'director' | 'editor' | 'writer'`, not the order of its `CREATE TYPE` ([#49](https://github.com/AlexandreDemartin/pgcast/issues/49)).
@@ -50,6 +66,14 @@ Here are two columns of `screenings`, from the generated schema:
 | `Updatable` | changes to a row: every key optional | `TimestampTzString \| Date` | `boolean`, `null` or `DEFAULT` |
 
 Wherever a value goes in, it may also be a [`param()`](/sql-template#param) or a [`sql`](/sql-template#sql) fragment, and in a filter a [`parent()`](/sql-template#parent) column. A `Whereable` refuses `null` because `"subtitled" = NULL` is never true in SQL: given one anyway (the type lets it through when `strictNullChecks` is off), the filter compiles to `"subtitled" = $1`, with `null` as `$1`, and finds nothing. [`conditions.isNull`](/conditions#conditions.isNull) writes the `IS NULL` you meant.
+
+```ts twoslash
+// @errors: 2322
+import * as db from 'zapatos/db';
+// ---cut---
+db.select('screenings', { subtitled: null });
+db.select('screenings', { subtitled: db.conditions.isNull });
+```
 
 A domain or custom type is the exception: its placeholder is one type, used in all five contexts. That suits `seat_label`, a string everywhere, but not a domain over `int8`, `numeric`, `bytea` or a date, whose JSON differs from what `pg` returns ([#194](https://github.com/AlexandreDemartin/pgcast/issues/194)).
 
