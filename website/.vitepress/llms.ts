@@ -26,9 +26,10 @@ export async function writeLlmsFiles(config: SiteConfig) {
       if (!existsSync(file)) return;
       const
         source = readFileSync(file, 'utf8').replace(/^---\n[\s\S]*?\n---\n/, ''),  // front matter
-        [, h1, html] = /^# (.+)$|<h1>(.*?)<\/h1>/m.exec(source) ?? [],
+        text = source.replace(/<!--[\s\S]*?-->/g, ''),  // a comment, such as a mark of check-prose.mjs, is not read
+        [, h1, html] = /^# (.+)$|<h1>(.*?)<\/h1>/m.exec(text) ?? [],
         title = (h1 ?? html)?.replace(/\s*<small.*?<\/small>/g, ''),
-        lede = /^(.+)\n\{\.lede\}$/m.exec(source)?.[1];
+        lede = /^(.+)\n\{\.lede\}$/m.exec(text)?.[1];
       if (!title || !lede)
         throw new Error(`llms.ts: ${file} needs a title (\`# \` or \`<h1>\`) and a \`{.lede}\` paragraph, for llms.txt`);
       return { link, source, title: inline(title, linksOf(link)), lede: inline(lede, linksOf(link)) };
