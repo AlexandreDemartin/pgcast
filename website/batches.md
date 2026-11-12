@@ -13,7 +13,7 @@ Give [`insert()`](/insert#insert) an array, and every row goes in one query:
 
 </CastPanel>
 
-Each cell is a parameter: three rows of two columns, `$1` to `$6`. An empty array sends nothing and resolves with `[]`.
+Each cell is a parameter: three rows of two columns, `$1`<!-- probe: examples/batches_insert.ts --> to `$6`<!-- probe: examples/batches_insert.ts -->. An empty array sends nothing and resolves with `[]`.
 
 ## Split under the parameter limit
 
@@ -31,13 +31,14 @@ Then send the rows in chunks of a fixed size, well under the limit. In one trans
 
 <<< ./examples/plain/batches_chunks.ts{ts twoslash}
 
+<!-- probe: db.readCommitted(pool, async () => {}) -->
 ```sql
 START TRANSACTION ISOLATION LEVEL READ COMMITTED
 -- the insert() of each chunk: 20 of them for 100,000 tags
 COMMIT
 ```
 
-- If a chunk fails, [`readCommitted()`](/transaction#readCommitted) sends `ROLLBACK` and rejects with its error: no tag is left in. A deadlock (40P01) runs the chunks again first ([Retry a transaction](/retries)).
+- If a chunk fails, [`readCommitted()`](/transaction#readCommitted) sends `ROLLBACK`<!-- probe: db.readCommitted(pool, async () => { throw new Error(); }) --> and rejects with its error: no tag is left in. A deadlock (40P01) runs the chunks again first ([Retry a transaction](/retries)).
 - On the pool, without the transaction, each chunk commits as it goes: the chunks before the one that failed stay.
 - `upsert()` splits the same way.
 
@@ -93,7 +94,7 @@ Then add each row's votes to those stored: set `votes` in [`updateValues`](/inse
 
 pgcast inserts a key that some rows lack as `DEFAULT` in those rows. Without `updateColumns`, an upsert then sets every column from `EXCLUDED`, that `DEFAULT` included. Say you correct the names on two bookings, and only one of them has its `booked_at`:
 
-- the second row is `(DEFAULT, $5, $6, $7)`, and `"booked_at"` is set from `EXCLUDED."booked_at"`: F8's booking time becomes the time of the upsert, `now()`, the column's default;
+- the second row is `(DEFAULT, $5, $6, $7)`<!-- probe: db.upsert('seat_bookings', [{ screening_id: 1000, seat: 'F7', customer: 'Ines Calloway', booked_at: '2030-02-20T09:15:00Z' }, { screening_id: 1000, seat: 'F8', customer: 'Barnaby Quill-Hart' }], ['screening_id', 'seat']) -->, and `"booked_at"` is set from `EXCLUDED."booked_at"`<!-- probe: db.upsert('seat_bookings', [{ screening_id: 1000, seat: 'F7', customer: 'Ines Calloway', booked_at: '2030-02-20T09:15:00Z' }, { screening_id: 1000, seat: 'F8', customer: 'Barnaby Quill-Hart' }], ['screening_id', 'seat']) -->: F8's booking time becomes the time of the upsert, `now()`, the column's default;
 - pgcast warns once per process, `PGCAST_DEP001`.
 
 Name the columns to update instead, with [`updateColumns`](/insert#upsert-options):
@@ -104,7 +105,7 @@ Name the columns to update instead, with [`updateColumns`](/insert#upsert-option
 
 </CastPanel>
 
-- The update is `DO UPDATE SET ("customer") = ROW(EXCLUDED."customer")`: F8 keeps its booking time. A new row still takes the `booked_at` given, or the default.
+- The update is `DO UPDATE SET ("customer") = ROW(EXCLUDED."customer")`<!-- probe: examples/batches_different_keys.ts -->: F8 keeps its booking time. A new row still takes the `booked_at` given, or the default.
 - Or give every row the same keys: upsert the rows with a `booked_at` and those without in two calls.
 - Not every key counts as missing ([Rows with different keys](/insert#upsert-different-keys)).
 
@@ -117,7 +118,7 @@ With `db.setConfig({ upsertRequiresSameKeys: true })` ([`Config.upsertRequiresSa
 Rows built from input often hold an `undefined`, such as a `booked_at` the form left empty. By default it's sent as `NULL`, as in Zapatos 6.6.1. `booked_at` is `NOT NULL`, so Postgres refuses the whole batch, 23502, `null value in column "booked_at" of relation "seat_bookings" violates not-null constraint`, and pgcast warns once, `PGCAST_DEP002`.
 
 ::: tip Opt-in
-With `db.setConfig({ undefinedMeansMissing: true })` ([`Config.undefinedMeansMissing`](/runtime-config#Config.undefinedMeansMissing)), an `undefined` is a missing key: F8 with `booked_at: undefined` is `(DEFAULT, $5, $6, $7)`, a row with different keys as above ([An `undefined` value](/insert#undefined-values)).
+With `db.setConfig({ undefinedMeansMissing: true })` ([`Config.undefinedMeansMissing`](/runtime-config#Config.undefinedMeansMissing)), an `undefined` is a missing key: F8 with `booked_at: undefined` is `(DEFAULT, $5, $6, $7)`<!-- probe: (db.setConfig({ undefinedMeansMissing: true }), db.upsert('seat_bookings', [{ screening_id: 1000, seat: 'F7', customer: 'Ines Calloway', booked_at: '2030-02-20T09:15:00Z' }, { screening_id: 1000, seat: 'F8', customer: 'Barnaby Quill-Hart', booked_at: undefined }], ['screening_id', 'seat'], { updateColumns: 'customer' })) -->, a row with different keys as above ([An `undefined` value](/insert#undefined-values)).
 :::
 
 ## Choose what comes back
@@ -130,7 +131,7 @@ Each row comes back whole by default, and from an upsert with its `$action`. For
 
 </CastPanel>
 
-- [`returning: ['seat']`](/insert#insert-options) sends `jsonb_build_object($8::text, "seat")` in place of `to_jsonb("seat_bookings".*)`.
+- [`returning: ['seat']`](/insert#insert-options) sends `jsonb_build_object($8::text, "seat")`<!-- probe: examples/batches_returning.ts --> in place of `to_jsonb("seat_bookings".*)`<!-- probe: examples/batches_different_keys.ts -->.
 - `$action` tells the new rows from the updated ones: `newSeats` is `['F8']` when F7 was already booked.
 - [`reportAction: 'suppress'`](/insert#upsert-options) leaves `$action` out of the SQL and of the type, for a batch that doesn't need it.
 - Both narrow the type only with `strictNullChecks` on ([Options](/insert#insert-options)).

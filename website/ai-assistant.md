@@ -159,7 +159,7 @@ Call [`.compile()`](/sql-template#compile) where the code calls `.run()`, and pr
 With `.compile()` in place of `.run(pool)`, `console.log()` prints the same SQL as `text`, on one line, and the same values as `values`:
 
 - Each value is a `$n` in `text` and an item of `values`: here `1000` and `3`. The column names among the values are the keys of the JSON object each row comes back as ([`select()`](/select#select)).
-- Each name is in double quotes: `"films"`, `"studio_id"`.
+- Each name is in double quotes: `"films"`<!-- probe: examples/ai_assistant_longest.ts -->, `"studio_id"`<!-- probe: examples/ai_assistant_longest.ts -->.
 - A value written into `text`, with no `$n` and no item in `values` for it, was pasted into the SQL: a `raw()` or a concatenation. Ask for a parameter instead.
 
 `.compile()` sends nothing, so it is safe on an `insert()` or a `deletes()` too.

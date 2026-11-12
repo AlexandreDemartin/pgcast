@@ -15,7 +15,7 @@ Ask for the first page of all the films ([`db.all`](/sql-template#all)): an `ord
 </CastPanel>
 
 - End the [`order`](/select#order-limit-offset-and-withties) on a unique column, `id` here. Two films of the same year can otherwise come back in either order, and from one request to the next a film can turn up on two pages or on none: Postgres promises no order among ties ([LIMIT and OFFSET](https://www.postgresql.org/docs/current/queries-limit.html)).
-- `limit` is sent as a parameter, `$4`.
+- `limit` is sent as a parameter, `$4`<!-- probe: examples/paginate.ts -->.
 - Name the [`columns`](/select#columns) the page shows, and keep the `order`'s among them if you'll fetch the next page from the last row (below).
 
 Then pick how the reader moves on:
@@ -84,7 +84,7 @@ Give the `where` as a [`sql`](/sql-template#sql) fragment that compares the `ord
 <template #caption><span>The same page 2 as with offset: A Lantern for Edith (1991, id 1001), then The Salt Orchard (1974, id 1000).</span></template>
 </CastPanel>
 
-- `("release_year", "id") < ($4, $5)` keeps the rows before 2008 and 1002 in the order: an earlier year, or 2008 and a smaller `id` ([row-wise comparison](https://www.postgresql.org/docs/current/functions-comparisons.html#ROW-WISE-COMPARISON)). `<` goes with `DESC`; for an `ASC` order, write `>`.
+- `("release_year", "id") < ($4, $5)`<!-- probe: examples/paginate_keyset.ts --> keeps the rows before 2008 and 1002 in the order: an earlier year, or 2008 and a smaller `id` ([row-wise comparison](https://www.postgresql.org/docs/current/functions-comparisons.html#ROW-WISE-COMPARISON)). `<` goes with `DESC`; for an `ASC` order, write `>`.
 - With an index on `(release_year, id)`, Postgres starts reading at the last row. On 300,000 films, after the last row (1960, 150000), `EXPLAIN (ANALYZE)` shows an `Index Scan Backward` with `Index Cond: (ROW(release_year, id) < ROW(1960, 150000))`: it reads the 2 rows it returns, and none to skip.
 - Keep the key columns `NOT NULL`, as these are: where the comparison reaches a `NULL`, it gives `NULL`, and that row never shows up.
 - `s.films.SQL` lets the fragment name only the columns of `films`.

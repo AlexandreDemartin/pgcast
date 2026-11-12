@@ -54,7 +54,7 @@ import type * as s from 'zapatos/schema';
 const cinema: s.cinemas.Insertable = { name: 'The Harbour Lights', location: { x: 1.5, y: 2.5 } };
 ```
 
-From two numbers, build the point in SQL, each number a [parameter](/sql-template#param): this sends `VALUES (point($1, $2), $3)`, as an `Insertable` value can be any [`sql`](/sql-template#sql) fragment.
+From two numbers, build the point in SQL, each number a [parameter](/sql-template#param): this sends `VALUES (point($1, $2), $3)`<!-- probe: db.insert('cinemas', { name: 'The Harbour Lights', location: db.sql`point(${db.param(1.5)}, ${db.param(2.5)})` }) -->, as an `Insertable` value can be any [`sql`](/sql-template#sql) fragment.
 
 ```ts twoslash
 import * as db from 'zapatos/db';
