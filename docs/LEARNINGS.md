@@ -251,6 +251,9 @@ Candidates for a check, a rule or a skill line.
 - #203 — `Number(s)` is not a parser for query-string ids (`Number('')` is 0, `Number('0x3e8')` is 1000): test the string first (`/^\d{1,9}$/`) — `branch-reviewer`
 - #203 — Re-encoding a decoded cursor and comparing it with the input is the simplest way to refuse a string the server did not make — `builder`
 - #203 — Parallel builders that name their probe databases alike see each other's rows: put the agent's own folder name in the database name, and check the row count before a proof run — orchestrator
+- #203 — A panel's caption matches the entry it sits under: on `pool`, `now()` is the query's time only because the query is its own transaction — `branch-reviewer`
+- #203 — A link's text does not repeat a section title of the page that holds it, or it reads as an in-page anchor — `branch-reviewer`
+- #203 — A snippet whose caption names variable values keeps them in scope after any `try` — `branch-reviewer`, `builder`
 
 ## Minors kept
 
