@@ -12,6 +12,10 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 - The `undefinedMeansMissing` config option (`db.setConfig({ undefinedMeansMissing: true })`, off by default, optional in `Config`): an `undefined` value acts as a missing key. `insert()` sends `DEFAULT` for it (`VALUES ($1, DEFAULT)`); `update()` leaves its column out (`SET ("name") = ROW($1)`), and throws "nothing to update…" if no key is left; `upsert()` leaves its key out, so one row does not insert that column, nor update it unless `updateColumns` names it (then it is still set from `EXCLUDED` and an existing row takes the column `DEFAULT`, as for a missing key), and in several rows its cell takes `DEFAULT` and counts as missing for `upsertRequiresSameKeys`. An `undefined` in a `Whereable` or in `updateValues` is unchanged.
 - Dependabot version updates (`.github/dependabot.yml`), weekly: dev dependencies, minor and patch, in one PR; GitHub Actions in another. A minor or patch never changes `dependencies` or `peerDependencies`.
 
+### Changed
+- `README.md` rewritten for pgcast: what it fixes and adds, an example with its SQL and type, what differs from Zapatos 6.6.1, the versions policy, the relationship with Zapatos.
+- `package.json`: the `author` is the maintainer, Alexandre Demartin; George MacKerron, the original author of Zapatos, is listed under `contributors`. `.github/FUNDING.yml` lists both. The published files are unchanged.
+
 ### Deprecated
 - A multi-row `upsert()` without `updateColumns`, where a key missing from some row is still set from `EXCLUDED`: it is inserted as `DEFAULT`, then overwrites the existing value on conflict. It still runs, with the same SQL, and emits a `DeprecationWarning` (`PGCAST_DEP001`) once per process. `upsertRequiresSameKeys` will be the default in 7.0.
 - An `undefined` value in `insert()`, `update()` or `upsert()` values, sent as `NULL`: a `NOT NULL DEFAULT` column fails, and `update()` erases the column instead of leaving it. It still runs, with the same SQL, and emits a `DeprecationWarning` (`PGCAST_DEP002`) once per process. `undefinedMeansMissing` will be the default in 7.0.
