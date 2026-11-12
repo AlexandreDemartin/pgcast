@@ -7,6 +7,7 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 ## [Unreleased]
 
 ### Added
+- Dependabot version updates (`.github/dependabot.yml`), weekly: dev dependencies, minor and patch, in one PR; GitHub Actions in another. A minor or patch never changes `dependencies` or `peerDependencies`.
 - The `upsertRequiresSameKeys` config option (`db.setConfig({ upsertRequiresSameKeys: true })`, off by default, optional in `Config`): a multi-row `upsert()` without `updateColumns`, where a key missing from some row is still set from `EXCLUDED`, throws before any query ("rows have different keys: pass updateColumns, or give every row the same keys"), instead of overwriting the existing value with its `DEFAULT`. A key of `updateValues` or a column of an array or string `conflictTarget` does not count (new rows without their serial `id`, upserted on `'id'`, pass); with `constraint()`, every key counts. Rows with the same keys, one row, and any `updateColumns` compile as before.
 
 ### Deprecated

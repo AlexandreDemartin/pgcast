@@ -1,0 +1,36 @@
+# Version updates, once a week, a few PRs at a time. Security updates are on in the repository settings; no `allow` narrows them.
+# No commit-message prefix: Dependabot copies the plain style of master's history ("Bump the dev-dependencies group with 4 updates"),
+# and the squash merge reads "Update dependencies" (skill pr-shape).
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    # A range moves only when the new version falls outside it: `dependencies` and `peerDependencies` (all `^` or `>=`) never change from a minor or patch.
+    versioning-strategy: increase-if-necessary
+    groups:
+      dev-dependencies:
+        dependency-type: development
+        update-types: [minor, patch]
+        # TypeScript comes on its own: bench:types needs its baseline rewritten for any new version.
+        exclude-patterns: [typescript]
+    ignore:
+      # A major of the runtime dependency is a change to `dependencies`, a stop point (AGENTS.md).
+      - dependency-name: json-custom-numbers
+        update-types: [version-update:semver-major]
+      # The types of the oldest Node supported, so that code cannot use a newer API by accident.
+      - dependency-name: "@types/node"
+        update-types: [version-update:semver-major]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 2
+    groups:
+      actions:
+        patterns: ["*"]
