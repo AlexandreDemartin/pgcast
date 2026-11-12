@@ -21,7 +21,15 @@ export function keepLinkHashes(md: MarkdownRenderer) {
 
 const
   entities: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'" },
-  unescape = (html: string) => html.replace(/&(amp|lt|gt|quot|#39);/g, (_, name: string) => entities[name]!);
+  unescape = (html: string) => html.replace(/&(amp|lt|gt|quot|#39);/g, (_, name: string) => entities[name]!),
+  anchorOf = (hash: string) => {  // `#name:~:text=…`: the name; null for a stray `%`, which a raw `<a href>` keeps
+    try {
+      return decodeURIComponent(hash.slice(1)).split(':~:')[0]!;
+    } catch (error) {
+      if (error instanceof URIError) return null;
+      throw error;
+    }
+  };
 
 /**
  * Fail the build on a link outside the site's base, to a page or a file that the build did not write, or to an anchor
@@ -52,10 +60,11 @@ export function checkLinks(config: SiteConfig) {
         path = url.pathname.slice(base.length),
         target = /\.(?!html$)[^./]+$/.test(path) ? path :  // a file, `llms.txt`
           `${path.replace(/\.html$/, '').replace(/(^|\/)$/, '$1index')}.html`,
-        anchor = decodeURIComponent(url.hash.slice(1)).split(':~:')[0],  // `#name:~:text=…`: the name
+        anchor = anchorOf(url.hash),
         problem =
           !inBase ? `not under the site's base, ${base}` :
           !files.has(target) ? 'no such page' :
+          anchor === null ? 'its hash is not valid percent-encoding' :
           anchor !== '' && !anchors.get(target)?.has(anchor) ? 'no such anchor on that page' :
           null;
       if (problem) problems.add(`${file.replace(/\.html$/, '.md')}: ${link}${url.hash}, ${problem}`);
