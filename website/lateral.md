@@ -104,7 +104,7 @@ Each cinema, and the nearest other one: a self-join again, with the distance as 
 
 - **`strictNullChecks`**: without it, or `strict`, the lateral keys are not in the type ([`select()`](/select#options)).
 - **An unchecked join**: `db.parent()` takes a column of any table, so a join on the wrong column compiles. Postgres refuses a column the parent doesn't have: `db.parent('billing')` under `films` fails with 42703, "column films.billing does not exist".
-- **`withTies` in a nested `selectOne()`**: it writes `FETCH FIRST $1 ROWS WITH TIES`, which keeps every tied row, so the parent row comes back once per tie. Under `select()`, the ties stay in the array. Unchanged from Zapatos 6.6.1, and open as [#164](https://github.com/AlexandreDemartin/pgcast/issues/164).
+- **`withTies` in a nested `selectOne()`**: it writes `FETCH FIRST $1 ROWS WITH TIES`, which keeps every tied row. Under an outer `select()`, the parent row comes back once per tie; under `selectOne()`, with one of them. In a nested `select()`, the ties stay in the array. Unchanged from Zapatos 6.6.1, and open as [#164](https://github.com/AlexandreDemartin/pgcast/issues/164).
 - **A `lock`**: without `of`, `FOR UPDATE` reaches the subqueries, and Postgres refuses the query (0A000): "FOR UPDATE is not allowed with aggregate functions" under `select()` or `count()`, "FOR UPDATE cannot be applied to the nullable side of an outer join" under `selectOne()`. Name the table: `lock: { for: 'UPDATE', of: 'films' }` ([`lock`](/select#lock)).
 
 ## See also
