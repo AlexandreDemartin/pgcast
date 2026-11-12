@@ -98,6 +98,27 @@ describe('with parameters (extended protocol)', () => {
     expect(await adaName()).toBe('Ada');
   });
 
+  it('a lateral key that opens a string across its two places is one alias, and reads no other table', async () => {
+    // 6.6.1, and master before this fix: the `'` of the first `"lateral_…"` closes in the second, and
+    // between them a lateral that reads every email; the key held
+    // `("Ada@Example.com,bob@example.com,cyd@example.com")) AS result FROM … || `
+    const key = `x" || ') AS result FROM "users" LEFT JOIN LATERAL (SELECT (SELECT string_agg(email::text, chr(44)) FROM users) AS result) AS "lateral_x`;
+    const q = db.selectOne('users', { id: 1 }, {
+      columns: ['id'], lateral: { [key]: db.count('accounts', { owner_id: db.parent('id') }) },
+    } as any);
+    expect(q.compile().values).toHaveLength(4);
+    expect(await q.run(t.client)).toEqual({ id: 1, [key]: 2 });
+  });
+
+  it('an alias that adds a GROUP BY to "sq_<alias>" is one alias, and every row comes back', async () => {
+    // 6.6.1, and master before this fix: `) AS "sq_x" ("result") GROUP BY "result"`, one row per
+    // distinct result, of which only the first came back: `[{ email: 'bob@example.com' }]`
+    const q = db.select('users', all, { columns: ['email'], alias: 'x" ("result") GROUP BY "result' } as any);
+    expect(q.compile().values).toHaveLength(1);
+    expect((await q.run(t.client)).map(u => u.email).sort())
+      .toEqual(['Ada@Example.com', 'bob@example.com', 'cyd@example.com']);
+  });
+
   it('a `"` in a string identifier stays in one column name with parameters too', async () => {
     // 6.6.1: `SELECT "display_name" FROM users; UPDATE …; SELECT "display_name" FROM "users" WHERE ("id" = $1)`,
     // refused by pg (42601, multiple commands in a prepared statement)
