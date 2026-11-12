@@ -29,18 +29,25 @@ const expectInjectedHereOnly = async () => {
   expect(await adaName(t.pool)).toBe('Ada');
 };
 
-/** What each input gives as a column, a table and a Whereable key: its rows, or its error code. */
-const identifierOutcomes = async (inputs: Record<string, string>) => {
+const identifierQueries = (input: string) => ({
+  column: sql`SELECT ${input} FROM ${'users'}`,
+  table: sql`SELECT 1 FROM ${input}`,
+  key: sql`SELECT 1 FROM ${'users'} WHERE ${{ [input]: 1 }}`,
+});
+
+/** What each input gives in each query (by default as a column, a table and a Whereable key): its rows, or its error code. */
+const identifierOutcomes = async (
+  inputs: Record<string, string>,
+  queries: (input: string) => Record<string, { run: (client: pg.ClientBase) => Promise<unknown> }> = identifierQueries,
+) => {
   const outcomes: Record<string, unknown> = {};
   for (const [name, input] of Object.entries(inputs)) {
-    for (const [where, q] of Object.entries({
-      column: sql`SELECT ${input} FROM ${'users'}`,
-      table: sql`SELECT 1 FROM ${input}`,
-      key: sql`SELECT 1 FROM ${'users'} WHERE ${{ [input]: 1 }}`,
-    })) {
+    for (const [where, q] of Object.entries(queries(input))) {
       await t.client.query('SAVEPOINT pgcast_identifier');
       try {
         outcomes[`${name} ${where}`] = await q.run(t.client);
+        // read before the savepoint goes: a second statement that ran shows here
+        if (await adaName() !== 'Ada') outcomes[`${name} ${where}`] = 'injected';
         await t.client.query('RELEASE SAVEPOINT pgcast_identifier');
       } catch (err) {
         await t.client.query('ROLLBACK TO SAVEPOINT pgcast_identifier');
@@ -73,9 +80,43 @@ describe('with parameters (extended protocol)', () => {
 
   it('a column whose name has a `"` is reached by its name, or hand-escaped as under 6.6.1', async () => {
     await t.client.query(`CREATE TABLE "my""table" ("my""col" int); INSERT INTO "my""table" VALUES (1)`);
-    // not through select(), which still writes its table name raw into "sq_<table>"
     expect(await sql`SELECT ${'my"col'} AS v FROM ${'my"table'} WHERE ${{ 'my"col': 1 }}`.run(t.client)).toEqual([{ v: 1 }]);
     expect(await sql`SELECT ${'my""col'} AS v FROM ${'my""table'} WHERE ${{ 'my""col': 1 }}`.run(t.client)).toEqual([{ v: 1 }]);
+    // select() too, now that "sq_<table>" doubles the `"` (6.6.1: `AS "sq_my"table"`, a syntax error)
+    expect(await db.select('my"table' as any, { 'my"col': 1 } as any).run(t.client)).toEqual([{ 'my"col': 1 }]);
+    expect(await db.select('my""table' as any, all).run(t.client)).toEqual([{ 'my"col': 1 }]);
+  });
+
+  it('a lateral key that closes its quotes stays one alias, and is still the key of the result', async () => {
+    // 6.6.1: `"lateral_x" ON true) AS "sq_users"; …; --".result` in the select list, a syntax error
+    const key = `x" ON true) AS "sq_users"; ${update}; --`;
+    const q = db.select('users', all, {
+      columns: ['id'], order: { by: 'id', direction: 'ASC' }, limit: 1,
+      lateral: { [key]: db.count('accounts', { owner_id: db.parent('id') }) },
+    } as any);
+    expect(await q.run(t.client)).toEqual([{ id: 1, [key]: 2 }]);
+    expect(await adaName()).toBe('Ada');
+  });
+
+  it('a lateral key that opens a string across its two places is one alias, and reads no other table', async () => {
+    // 6.6.1, and master before this fix: the `'` of the first `"lateral_…"` closes in the second, and
+    // between them a lateral that reads every email; the key held
+    // `("Ada@Example.com,bob@example.com,cyd@example.com")) AS result FROM … || `
+    const key = `x" || ') AS result FROM "users" LEFT JOIN LATERAL (SELECT (SELECT string_agg(email::text, chr(44)) FROM users) AS result) AS "lateral_x`;
+    const q = db.selectOne('users', { id: 1 }, {
+      columns: ['id'], lateral: { [key]: db.count('accounts', { owner_id: db.parent('id') }) },
+    } as any);
+    expect(q.compile().values).toHaveLength(4);
+    expect(await q.run(t.client)).toEqual({ id: 1, [key]: 2 });
+  });
+
+  it('an alias that adds a GROUP BY to "sq_<alias>" is one alias, and every row comes back', async () => {
+    // 6.6.1, and master before this fix: `) AS "sq_x" ("result") GROUP BY "result"`, one row per
+    // distinct result, of which only the first came back: `[{ email: 'bob@example.com' }]`
+    const q = db.select('users', all, { columns: ['email'], alias: 'x" ("result") GROUP BY "result' } as any);
+    expect(q.compile().values).toHaveLength(1);
+    expect((await q.run(t.client)).map(u => u.email).sort())
+      .toEqual(['Ada@Example.com', 'bob@example.com', 'cyd@example.com']);
   });
 
   it('a `"` in a string identifier stays in one column name with parameters too', async () => {
@@ -265,6 +306,78 @@ describe('without parameters (simple protocol)', () => {
         "semicolon table": "42P01",
         "squote column": "42703",
         "squote key": "42703",
+        "squote table": "42P01",
+      }
+    `);
+  });
+
+  it('an alias that closes its quotes stays one alias, in "sq_<alias>" too', async () => {
+    // `) AS "sq_u"; UPDATE …; --"`; 6.6.1: a syntax error; since #74: a second statement that ran
+    const q = db.select('users', all, { alias: `u"; ${update}; --`, order: { by: 'id', direction: 'ASC' } } as any);
+    const { text, values } = q.compile();
+    expect(text).toContain(`AS "sq_u""; ${update}; --"`);
+    expect(values).toEqual([]);
+    expect((await q.run(t.client)).map(u => u.id)).toEqual([1, 2, 3]);
+    expect(await adaName()).toBe('Ada');
+  });
+
+  it('no hostile table name, alias or lateral key of select() runs SQL of its own', async () => {
+    // compiled text: test/unit/injection.test.ts; rows are given as their number; a lateral key is
+    // also a parameter, so its query goes through the extended protocol
+    const rows = (q: db.SQLFragment<any[]>) => ({ run: async (client: pg.ClientBase) => `${(await q.run(client)).length} rows` });
+    expect(await identifierOutcomes({
+      dquote: 'a"b', squote: "a'b", semicolon: 'a;b', dashes: 'a--b', comment: 'a/*b', dollar: 'a$1b',
+      backslash: 'a\\b', nul: 'a\0b', dot: 'a.b',
+      closes: `a"; ${update}; --`,
+      escapedCloses: 'a"" OR TRUE OR ""b', qualifiedEscaped: 's.a"" OR TRUE OR ""b', escapedDot: 'a"."b',
+      escapedOdd: 'a"""b',
+    }, input => ({
+      table: rows(db.select(input as any, all)),
+      alias: rows(db.select('users', all, { alias: input } as any)),
+      key: rows(db.select('users', all, { lateral: { [input]: db.count('accounts', { owner_id: db.parent('id') }) } } as any)),
+    }))).toMatchInlineSnapshot(`
+      {
+        "backslash alias": "3 rows",
+        "backslash key": "3 rows",
+        "backslash table": "42P01",
+        "closes alias": "3 rows",
+        "closes key": "3 rows",
+        "closes table": "42P01",
+        "comment alias": "3 rows",
+        "comment key": "3 rows",
+        "comment table": "42P01",
+        "dashes alias": "3 rows",
+        "dashes key": "3 rows",
+        "dashes table": "42P01",
+        "dollar alias": "3 rows",
+        "dollar key": "3 rows",
+        "dollar table": "42P01",
+        "dot alias": "42601",
+        "dot key": "3 rows",
+        "dot table": "42P01",
+        "dquote alias": "3 rows",
+        "dquote key": "3 rows",
+        "dquote table": "42P01",
+        "escapedCloses alias": "3 rows",
+        "escapedCloses key": "3 rows",
+        "escapedCloses table": "42P01",
+        "escapedDot alias": "3 rows",
+        "escapedDot key": "3 rows",
+        "escapedDot table": "42P01",
+        "escapedOdd alias": "3 rows",
+        "escapedOdd key": "3 rows",
+        "escapedOdd table": "42P01",
+        "nul alias": "08P01",
+        "nul key": "08P01",
+        "nul table": "08P01",
+        "qualifiedEscaped alias": "42601",
+        "qualifiedEscaped key": "3 rows",
+        "qualifiedEscaped table": "42P01",
+        "semicolon alias": "3 rows",
+        "semicolon key": "3 rows",
+        "semicolon table": "42P01",
+        "squote alias": "3 rows",
+        "squote key": "3 rows",
         "squote table": "42P01",
       }
     `);

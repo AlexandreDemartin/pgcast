@@ -68,6 +68,11 @@ Candidates for a check, a rule or a skill line.
 - #23 — Replay each listed 6.6.1 form rather than reasoning about it: `users"/**/."id` ran as a bare alias, not as a qualified name — `builder`
 - #23 — `db.select()` cannot test a table name containing `"` until #24: its `"sq_<table>"` alias is still raw; use `sql` — `builder`
 - #23 — `console.log` from a test is swallowed by this Vitest setup: write throwaway replay output to a scratch file — `builder`
+- #24 — Fixing one of the places an input lands can make the intermediate state worse than 6.6.1: after #74, the alias `u"; …; --` ran its second statement, which 6.6.1 refused at parse time. Fix every place in one PR, or replay master as well as 6.6.1 — `builder`, `branch-reviewer`
+- #24 — "Every other input was already a syntax error" must be checked against splices that stay valid SQL: a string literal opened in one occurrence of a name and closed in the other (lateral key), or an alias list plus a clause after the last occurrence; each matrix input alone was rejected (candidate: skill `sql-safety`) — `branch-reviewer`
+- #24 — `columns:` in `select()` adds a parameter (`$1::text`): a test meant for the simple protocol asserts `compile().values` is empty — `branch-reviewer`
+- #24 — `pg` returns an array of results for a multi-statement simple query, so `runResultTransform` throws (`reading '0'`) after the second statement ran: a thrown error does not prove nothing ran — `builder`
+- #24 — Replay harness: `git archive v6.6.1 src/db` under `node_modules/.cache/`, a throwaway test importing both runtimes, output to a scratch file; delete before committing (candidate: skill `sql-safety`) — `builder`
 
 ## Minors kept
 
