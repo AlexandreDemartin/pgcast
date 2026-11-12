@@ -212,15 +212,17 @@ describe('upsert', () => {
     }
   });
 
+  /** The `SET` of an upsert whose updateValues are `{ mood: v }`, and its parameters; or what it throws. */
+  const set = (v: any) => {
+    try {
+      const q = db.upsert('users', ada, 'email', { updateColumns: [], updateValues: { mood: v } } as any).compile();
+      return [q.text.replace(/.* DO UPDATE SET (.*) RETURNING .*/, '$1'), q.values.slice(2)];
+    } catch (err) {
+      return `throws: ${(err as Error).message}`;
+    }
+  };
+
   it('updateValues: pgcast objects compile as under 6.6.1, and a Parameter is not wrapped twice', () => {
-    const set = (v: any) => {
-      try {
-        const q = db.upsert('users', ada, 'email', { updateColumns: [], updateValues: { mood: v } } as any).compile();
-        return [q.text.replace(/.* DO UPDATE SET (.*) RETURNING .*/, '$1'), q.values.slice(2)];
-      } catch (err) {
-        return `throws: ${(err as Error).message}`;
-      }
-    };
     expect({
       param: set(param('happy')), cast: set(param('happy', 'mood')), default: set(Default),
       raw: set(db.raw('now()')), cols: set(db.cols(['a', 'b'])), vals: set(db.vals({ a: 1 })),
@@ -262,6 +264,112 @@ describe('upsert', () => {
         ],
       }
     `);
+  });
+
+  it('updateValues: an array that holds a pgcast object, at any depth, compiles item by item as under 6.6.1', () => {
+    // as in a sql template: each item as if interpolated directly, so a string is an identifier and a number throws
+    expect({
+      sql: set([sql`upper(`, sql`EXCLUDED.mood`, sql`)`]), param: set([param('happy')]), raw: set([db.raw(`'happy'`)]),
+      mapWithSeparator: set(db.mapWithSeparator(['ha', 'ppy'], sql` || `, c => param(c))), nested: set([[sql`'happy'`]]),
+      default: set([Default]), string: set([sql`upper(`, 'excluded.mood', sql`)`]), number: set([sql`repeat('a', `, 3, sql`)`]),
+      object: set([sql`'happy' || `, {}]),
+    }).toMatchInlineSnapshot(`
+      {
+        "default": [
+          "("mood") = ROW(DEFAULT)",
+          [],
+        ],
+        "mapWithSeparator": [
+          "("mood") = ROW($3 || $4)",
+          [
+            "ha",
+            "ppy",
+          ],
+        ],
+        "nested": [
+          "("mood") = ROW('happy')",
+          [],
+        ],
+        "number": "throws: Alien object while interpolating SQL: 3",
+        "object": [
+          "("mood") = ROW('happy' || TRUE)",
+          [],
+        ],
+        "param": [
+          "("mood") = ROW($3)",
+          [
+            "happy",
+          ],
+        ],
+        "raw": [
+          "("mood") = ROW('happy')",
+          [],
+        ],
+        "sql": [
+          "("mood") = ROW(upper(EXCLUDED.mood))",
+          [],
+        ],
+        "string": [
+          "("mood") = ROW(upper("excluded"."mood"))",
+          [],
+        ],
+      }
+    `);
+    // an array of plain values only is one parameter, as update() sends it
+    expect({ strings: set(['a', 'b']), numbers: set([1, 2]), empty: set([]), objects: set([{}, { a: [1] }]) }).toMatchInlineSnapshot(`
+      {
+        "empty": [
+          "("mood") = ROW($3)",
+          [
+            [],
+          ],
+        ],
+        "numbers": [
+          "("mood") = ROW($3)",
+          [
+            [
+              1,
+              2,
+            ],
+          ],
+        ],
+        "objects": [
+          "("mood") = ROW($3)",
+          [
+            [
+              {},
+              {
+                "a": [
+                  1,
+                ],
+              },
+            ],
+          ],
+        ],
+        "strings": [
+          "("mood") = ROW($3)",
+          [
+            [
+              "a",
+              "b",
+            ],
+          ],
+        ],
+      }
+    `);
+  });
+
+  it('updateValues: a function or the global object throws, as under 6.6.1, alone or in an array', () => {
+    const fn = () => 'happy';
+    expect({ fn: set(fn), global: set(globalThis), inArray: set([fn]), globalInArray: set([globalThis]) })
+      .toMatchInlineSnapshot(`
+        {
+          "fn": "throws: Alien object while interpolating SQL: () => "happy"",
+          "global": "throws: Did you use \`self\` (the global object) where you meant \`db.self\` (the Zapatos value)? The global object cannot be embedded in a query.",
+          "globalInArray": "throws: Did you use \`self\` (the global object) where you meant \`db.self\` (the Zapatos value)? The global object cannot be embedded in a query.",
+          "inArray": "throws: Alien object while interpolating SQL: () => "happy"",
+        }
+      `);
   });
 
   it('noNullUpdateColumns: one column, a list, or all', () => {

@@ -673,6 +673,11 @@ describe('shortcut options', () => {
       expect(q.text, name).toBe(`INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("mood") = ROW($2) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result`);
       expect(q.values, name).toEqual(['x', v]);
     }
+    // in an array with a fragment, a string is an identifier, quoted as in a sql template
+    const upsertMood = (mood: any) => db.upsert('users', { email: 'x' }, 'email', { updateColumns: [], updateValues: { mood } } as any).compile();
+    for (const [name, v] of Object.entries(hostile)) {
+      expect(upsertMood([sql`lower(`, v, sql`)`]), name).toEqual(upsertMood(sql`lower(${v})`));
+    }
   });
 
   it('characterization: extras keys', () => {

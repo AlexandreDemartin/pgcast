@@ -220,6 +220,20 @@ describe('upsert', () => {
     expect(await scalar(`SELECT created_at = now() AS v FROM users WHERE email = 'bob@example.com'`)).toBe(true);
   });
 
+  it('updateValues: an array that holds a pgcast object runs item by item, as under 6.6.1', async () => {
+    const upsertBob = (displayName: any) => run(db.upsert('users', { email: 'bob@example.com', display_name: 'Robert' }, 'email', {
+      updateColumns: [], updateValues: { display_name: displayName }, returning: ['display_name'],
+    })).then(row => row.display_name);
+    expect({
+      sql: await upsertBob([sql`upper(`, sql`EXCLUDED.display_name`, sql`)`]),
+      param: await upsertBob([param('Bobby')]),
+      raw: await upsertBob([db.raw(`'Bobby'`)]),
+      mapWithSeparator: await upsertBob(db.mapWithSeparator(['Bo', 'bby'], sql` || `, c => param(c))),
+      // a string in such an array is an identifier, as in a sql template
+      mixed: await upsertBob([sql`upper(`, 'excluded.display_name', sql`)`]),
+    }).toEqual({ sql: 'ROBERT', param: 'Bobby', raw: 'Bobby', mapWithSeparator: 'Bobby', mixed: 'ROBERT' });
+  });
+
   it('noNullUpdateColumns: a NULL does not overwrite (one column, a list, all)', async () => {
     const values = { email: 'ada@example.com', display_name: 'Ada', mood: null, manager_id: null };
     const returning = ['mood', 'manager_id'] as const;
