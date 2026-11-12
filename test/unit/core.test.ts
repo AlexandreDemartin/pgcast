@@ -49,14 +49,22 @@ describe('identifiers (strings)', () => {
     `);
   });
 
-  it('characterization: does not double an embedded double quote', () => {
-    // characterization: `a"b` compiles to `"a"b"`, not `"a""b"` (injection matrix: step 1.4)
+  it('doubles an embedded double quote', () => {
+    // as quote_ident: `a"b` compiles to `"a""b"`, not `"a"b"` as in 6.6.1 (injection matrix: test/unit/injection.test.ts)
     expect(one('a"b')).toMatchInlineSnapshot(`
       {
-        "text": ""a"b"",
+        "text": ""a""b"",
         "values": [],
       }
     `);
+    expect(one('s.a"b')).toEqual({ text: '"s"."a""b"', values: [] });
+  });
+
+  it('writes a string as before if 6.6.1 compiled it to quoted identifiers only', () => {
+    // a hand-escaped `a""b` named the column `a"b` under 6.6.1, and still does
+    expect(one('a""b')).toEqual({ text: '"a""b"', values: [] });
+    expect(one('s.a""b')).toEqual({ text: '"s"."a""b"', values: [] });
+    expect(one('a"."b')).toEqual({ text: '"a"".""b"', values: [] });
   });
 
   it('characterization: anything that starts and ends with a double quote passes through raw', () => {

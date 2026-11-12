@@ -61,6 +61,13 @@ Candidates for a check, a rule or a skill line.
 - #22 — Vitest inline snapshots turn `\r\n` into `\n` and keep `\f` / `\v` raw: make control characters visible before snapshotting — `builder`
 - #22 — A NUL byte in the query text gives 08P01 and the client stays usable; Postgres cuts identifiers to 63 bytes, so a 42704 message shows only the start of a forged name — `builder`
 - #22 — In a worktree the sandbox refuses compound shell commands that run git (`for` retry loops, pipes): brief worktree builders to run plain `git -C` commands — `builder`
+- #23 — A well-formedness regex shared by several entry points (`param()` casts, string identifiers) needs hostile inputs that take its accept branch in each entry point's matrix, or loosening it for one silently reopens the other (candidate: skill `sql-safety`) — `branch-reviewer`
+- #23 — A "nothing leaked" read through another connection, or after a savepoint rollback, passes whatever happened: the proof is the error naming the whole payload as one identifier, or a read before the rollback — `branch-reviewer`, `test/integration/injection.test.ts`
+- #23 — A run matrix that records only SQLSTATE codes cannot tell "the first statement failed" from "the injected ones ran, then the last failed": it proves something only with the unit matrix that pins the compiled text — `branch-reviewer`
+- #23 — `parse_ident(text, true)` is a cheap oracle for "this compiled text is only a qualified name", good for fuzzing an identifier path — `branch-reviewer`
+- #23 — Replay each listed 6.6.1 form rather than reasoning about it: `users"/**/."id` ran as a bare alias, not as a qualified name — `builder`
+- #23 — `db.select()` cannot test a table name containing `"` until #24: its `"sq_<table>"` alias is still raw; use `sql` — `builder`
+- #23 — `console.log` from a test is swallowed by this Vitest setup: write throwaway replay output to a scratch file — `builder`
 
 ## Minors kept
 
@@ -71,3 +78,8 @@ Minor review defects, taken up by the end-of-chapter review.
 - 1.2 — `test/integration/codegen.test.ts:88`: only the main output is compiled; the variants (except `edge`) are not — to take up in 1.4 — `branch-reviewer`
 - 1.2 — `test/integration/codegen.test.ts:8`: the header does not say that after `-u` a stale file of `test/generated/zapatos/` is deleted by hand — `branch-reviewer`
 - 1.2 — `test/integration/codegen.test.ts:92`: nothing spots an orphan file in `test/__snapshots__/codegen/` — `branch-reviewer`
+- #23 — `docs/CHARACTERISATION-REPORT.md:42`: the R1 Compat cell names three of the seven 6.6.1 forms the CHANGELOG lists, and its tests cell leaves out `unit/core › writes a string as before if 6.6.1 compiled it to quoted identifiers only` — "non-breaking, except the 6.6.1 forms listed in the CHANGELOG" — `branch-reviewer`
+- #23 — `test/integration/injection.test.ts:218`: `escapedNul` in the run matrix cannot fail on an escaping bug (any NUL gives 08P01); its text is pinned in the unit matrix — drop it or say why it stays — `branch-reviewer`
+- #23 — `test/integration/injection.test.ts:210`: the comment still lists "a syntax error", but no 42601 is left in that snapshot since `lone` moved out — `branch-reviewer`
+- #23 — `test/integration/injection.test.ts:293,300`: `expect(await adaName()).toBe('Ada')` after a `toThrow` on a builder that never runs a query can never fail — `branch-reviewer`
+- #71 — `docs/CHARACTERISATION-REPORT.md`: the intro still says nothing is fixed, while R3, R5, R6 (and now R1) are — `builder`

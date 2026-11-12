@@ -226,6 +226,13 @@ export type Queryable = pg.ClientBase | pg.Pool;
  * argument defines what interpolated value types are allowed. The second
  * defines what type the `SQLFragment` produces, where relevant (i.e. when
  * calling `.run(...)` on it, or using it as the value of an `extras` object).
+ *
+ * An interpolated string is a table or column name: it is double-quoted and
+ * split on `.` (`'s.t'` gives `"s"."t"`), and any `"` in it is doubled, as
+ * `quote_ident` does (`'a"b'` gives `"a""b"`), so it cannot close its quotes.
+ * As in Zapatos 6.6.1, a string that starts and ends with `"` is written as
+ * is, and one that already compiled to quoted names only is written as before
+ * (`'a""b'` gives `"a""b"`).
  */
 export function sql<
   Interpolations = SQL,
@@ -351,9 +358,13 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
       expression.compile(result, parentTable, currentColumn);
 
     } else if (typeof expression === 'string') {
-      // if it's a string, it should be a x.Table or x.Column type, so just needs quoting
+      // if it's a string, it should be a x.Table or x.Column type, so just needs quoting (split on `.`);
+      // a `"` is doubled as quote_ident does, so it cannot close its quotes, unless the name already
+      // compiled to quoted identifiers only (`a""b`, a hand-escaped `a"b`), which is written as before
+      const quoted = `"${expression.replace(/[.]/g, '"."')}"`;
       result.text += expression.startsWith('"') && expression.endsWith('"') ? expression :
-        `"${expression.replace(/[.]/g, '"."')}"`;
+        !expression.includes('"') || quotedIdentifiers.test(quoted) ? quoted :
+          `"${expression.replace(/"/g, '""').replace(/[.]/g, '"."')}"`;
 
     } else if (expression instanceof DangerousRawString) {
       // Little Bobby Tables passes straight through ...
