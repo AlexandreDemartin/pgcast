@@ -102,7 +102,7 @@ The files in `custom/` are yours: the generator writes each one once and never o
 | `films.Selectable` | a row, as `pg` returns it | your own `sql` queries |
 | `films.JSONSelectable` | a row that came back as JSON: here the same, but a `timestamptz`, for one, arrives as a string, not a `Date` ([why](/catalog-types)) | the results of `select()`, `insert()` and the other shortcuts |
 | `films.Whereable` | a filter: any columns, each with a value | the `where` of `select()`, `update()`, `deletes()` |
-| `films.Insertable` | a new row: the columns with no default required, the rest optional | `insert()`, `upsert()` |
+| `films.Insertable` | a new row: the `NOT NULL` columns with no default required, the rest optional | `insert()`, `upsert()` |
 | `films.Updatable` | changes to a row: every column optional | `update()`, `upsert()` |
 
 ## Connect
@@ -243,7 +243,7 @@ It prints the new row:
 
 The columns you left out took their defaults: the new `id` from its sequence, `genres` as `[]`, `tagline` as `null`. On a freshly loaded docs schema, the first film you add gets the `id` 1, as the seeded films start at 1000; each run after that adds it again, with the next `id`.
 
-A column with no default can't be left out. Forget the running time, and TypeScript says so before Postgres can:
+A `NOT NULL` column with no default can't be left out. Forget the running time, and TypeScript says so before Postgres can:
 
 ```ts twoslash
 // @errors: 2769
