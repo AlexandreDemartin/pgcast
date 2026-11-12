@@ -478,15 +478,20 @@ A name stands for one text: on a connection that has prepared `'p'`, a fragment 
 type RunResultForSQLFragment<F extends SQLFragment<any, any>>
 ```
 
-The `RunResult` of `F`, with `undefined` read as `null`: a fragment nested as a `lateral` or `extras` value comes back as JSON, where a missing row is `null`. So `selectOne()`'s `studios.JSONSelectable | undefined` becomes `studios.JSONSelectable | null` there:
+The `RunResult` of `F`, with `undefined` read as `null`: a fragment nested as a `lateral` or `extras` value comes back as JSON, where a missing row is `null`. So `selectOne()`'s `crew.JSONSelectable | undefined` becomes `crew.JSONSelectable | null` there:
 
 ```ts twoslash
 import * as db from 'zapatos/db';
+import type pg from 'pg';
+declare const pool: pg.Pool;
 // ---cut---
-const studioOf = db.selectOne('studios', { id: db.parent('studio_id') });
+const mentor = db.selectOne('crew', { id: db.parent('mentor_id') }, { alias: 'mentor' });
 
-type Studio = db.RunResultForSQLFragment<typeof studioOf>;
-const nameOf = (studio: Studio) => studio?.name ?? 'no studio';
+type Mentor = db.RunResultForSQLFragment<typeof mentor>;
+const nameOf = (row: Mentor) => row?.name ?? 'no mentor';
+
+const crew = await db.select('crew', db.all, { lateral: { mentor } }).run(pool);
+const mentors = crew.map(member => nameOf(member.mentor));
 ```
 
 ## `Queryable` {#Queryable}
