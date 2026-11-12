@@ -96,7 +96,7 @@ Everything else: [CHANGELOG.md](CHANGELOG.md); what the characterisation of 6.6.
 
 ## Documentation
 
-pgcast's own site is coming ([Epic #85](https://github.com/AlexandreDemartin/pgcast/issues/85)). Until then, the [Zapatos documentation](https://jawj.github.io/zapatos/) applies wherever pgcast does not differ (above, and the changelog).
+pgcast's documentation: <https://alexandredemartin.github.io/pgcast/>, built from `master` ([Epic #85](https://github.com/AlexandreDemartin/pgcast/issues/85)). Its pages are still being written; until each is, the [Zapatos documentation](https://jawj.github.io/zapatos/) applies wherever pgcast does not differ (above, and the changelog).
 
 ## Roadmap
 
