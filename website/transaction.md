@@ -309,17 +309,17 @@ Handling them in an app: [Handle errors](/handle-errors).
 
 ## Errors pgcast throws before any query
 
-A plain `Error`, with no `code`, thrown as a shortcut builds its query or as `.compile()` compiles it; `.run()` then rejects before anything is sent. Each is listed with what throws it:
+A plain `Error`, with no `code`, before anything is sent. A shortcut throws its own synchronously, from the call itself: `.run()` is never reached, so a `.catch()` chained on it does not get them. The others are thrown as `.compile()` compiles the query, so `.run()` rejects with them; `transaction()` rejects with its own. Each is listed with what throws it:
 
-| Thrown by | Messages |
-|---|---|
-| `select()`, `selectOne()`, `selectExactlyOne()` and the aggregates, given a bad `order`, `lock` or `aggregate` | [`select()`, Errors](/select#errors) |
-| `upsert()` of rows with different keys, with `upsertRequiresSameKeys` | [Rows with different keys](/insert#upsert-different-keys) |
-| `update()` with no column to set | [`update()`](/insert#update) |
-| `truncate()` with another option | [`truncate()`](/insert#truncate) |
-| an interpolation that has no meaning in SQL: a number, `null`, `db.all`, the global object | [Interpolations](/sql-template#interpolations) |
-| `db.self` with no column, `db.parent()` with no parent table | [`self`](/sql-template#self), [`parent()`](/sql-template#parent) |
-| `db.Default`, `db.self`, `db.raw()`, `db.cols()` or `db.vals()` as a filter value | [Whereable objects](/sql-template#whereable), [Conditions](/conditions) |
-| `transaction()` with another isolation level | [`transaction()`, Errors](#errors) |
+| Thrown by | How | Messages |
+|---|---|---|
+| `select()`, `selectOne()`, `selectExactlyOne()` and the aggregates, given a bad `order`, `lock` or `aggregate` | the call throws | [`select()`, Errors](/select#errors) |
+| `upsert()` of rows with different keys, with `upsertRequiresSameKeys` | the call throws | [Rows with different keys](/insert#upsert-different-keys) |
+| `update()` with no column to set | the call throws | [`update()`](/insert#update) |
+| `truncate()` with another option | the call throws | [`truncate()`](/insert#truncate) |
+| an interpolation that has no meaning in SQL: a number, `null`, `db.all`, the global object | `.run()` rejects | [Interpolations](/sql-template#interpolations) |
+| `db.self` with no column, `db.parent()` with no parent table | `.run()` rejects | [`self`](/sql-template#self), [`parent()`](/sql-template#parent) |
+| `db.Default`, `db.self`, `db.raw()`, `db.cols()` or `db.vals()` as a filter value | `.run()` rejects | [Whereable objects](/sql-template#whereable), [Conditions](/conditions) |
+| `transaction()` with another isolation level | its promise rejects | [`transaction()`, Errors](#errors) |
 
 After a query, pgcast rejects in two cases of its own: `selectExactlyOne()` with no row, with a [`NotExactlyOneError`](/select#NotExactlyOneError); `count()` and the other aggregates with no row to read, with a `TypeError` ([`count()`](/select#count)).
