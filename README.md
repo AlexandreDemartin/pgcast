@@ -30,7 +30,9 @@ import pool from './pgPool';
 
 const films = await db.select('films', db.all, {
   lateral: {
-    cast: db.select('roles', { film_id: db.parent('id') }),
+    cast: db.select('roles', { film_id: db.parent('id') }, {
+      order: { by: 'billing', direction: 'ASC' },
+    }),
   },
 }).run(pool);
 ```
@@ -48,6 +50,7 @@ FROM (
       SELECT to_jsonb("roles".*) AS result
       FROM "roles"
       WHERE ("film_id" = "films"."id")
+      ORDER BY "billing" ASC
     ) AS "sq_roles"
   ) AS "lateral_cast" ON true
 ) AS "sq_films"

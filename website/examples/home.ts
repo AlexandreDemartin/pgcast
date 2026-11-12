@@ -6,6 +6,8 @@ const films = await db.select('films', db.all, {
   lateral: {
     cast: db.select('roles', {
       film_id: db.parent('id'),
+    }, {
+      order: { by: 'billing', direction: 'ASC' },
     }),
   },
 }).run(pool);
