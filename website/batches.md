@@ -25,7 +25,7 @@ A query's parameters, to count before you send it:
 - none for a cell that is `DEFAULT`, a key missing from its row or [`db.Default`](/sql-template#Default); a `sql` fragment sends its own;
 - one per column of `returning` and per key of [`extras`](/insert#insert-options), and the parameters of `updateValues`, once.
 
-Or ask the query itself: [`.compile()`](/sql-template#compile)`.values.length`.
+Or ask the query itself: [`.compile()`](/sql-template#compile)`.values.length` of a one-row insert, as below.
 
 Then send the rows in chunks of a fixed size, well under the limit. In one transaction, every chunk goes in or none does:
 
