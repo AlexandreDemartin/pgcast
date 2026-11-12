@@ -228,6 +228,8 @@ Empty one table, or several in one statement.
 | `'RESTRICT'` | `RESTRICT`: Postgres refuses if a table not in the list references one of them, as by default | none |
 | `'CASCADE'` | `CASCADE`: also empties the tables that reference them | none |
 
+- `.run()` resolves with `[]`, where the type says `undefined`.
+- The type takes the options in that order, one of each kind. pgcast writes them as given: in JavaScript, or past the type with `as any`, `truncate('tags', 'CASCADE', 'RESTART IDENTITY')` sends `TRUNCATE "tags" CASCADE RESTART IDENTITY`, and Postgres refuses it (42601).
 - Any other option throws: "Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not '…'". Zapatos 6.6.1 wrote it into the SQL as it was.
 
 ## An `undefined` value {#undefined-values}
