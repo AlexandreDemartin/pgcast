@@ -27,7 +27,7 @@ Each film has one studio: `studio_id` is `NOT NULL REFERENCES studios(id)`, so t
 
 </CastPanel>
 
-- The joins come in the alphabetical order of their keys, whatever order you write them in.
+- The joins come in the sorted order of their keys, whatever order you write them in.
 - On a nullable foreign key, nest [`selectOne()`](/select#selectOne): the key holds the row or `null`, as the mentor below.
 - In a lateral, `selectExactlyOne()` checks nothing: a missing row gives `null` and no error, though its type has no `null` ([`selectExactlyOne()`](/select#selectExactlyOne)). Keep it for a `NOT NULL` foreign key.
 
