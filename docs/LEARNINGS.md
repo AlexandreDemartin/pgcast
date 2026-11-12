@@ -233,6 +233,10 @@ Candidates for a check, a rule or a skill line.
 - #129 — A hostile payload in an example is run inlined into that query's exact compiled text: `--` breaks on a shortcut's trailing `)) AS "sq_…"` and gives 42601, not the attack described — `branch-reviewer`, `builder`
 - #129 — A caller's name reaches any relation the role can read as a table (`pg_catalog.pg_roles`) and any column in scope, system columns included — `branch-reviewer`
 - #129 — node-postgres uses the extended protocol when there are values or a statement name: « no values means plain text » names `.prepared()` — `branch-reviewer`
+- #148 — « the catalog doesn't say X » (Postgres) and « the generator doesn't read X » (Zapatos 6.6.1) are different claims: name the catalog table that holds or lacks X (`pg_constraint` for foreign keys and `CHECK`s) — `branch-reviewer`, `builder`
+- #148 — `information_schema` reports a view's `NOT NULL` domain column as `NO`, while a materialised view's `attnotnull` is false even for it: probe both read paths with a `NOT NULL` domain — `branch-reviewer`, `builder`
+- #148 — An explanation that names open issues « as they are today » is tied back to them (a comment on each, rule of #130), or it outlives the behaviour — `branch-reviewer`
+- #148 — `<sup>` is stripped in `llms-full.txt` (2<sup>53</sup> became « 253 »): write the value another way — `builder`
 
 ## Minors kept
 
