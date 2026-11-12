@@ -209,6 +209,9 @@ Candidates for a check, a rule or a skill line.
 - #145 — `.catch(err => { …; return undefined; throw err; })` is typed `any` without `strictNullChecks`: write `(err): undefined =>` to keep the row type in every mode — `branch-reviewer`, `builder`
 - #145 — `pg.DatabaseError` exists from pg 8.6 and `pg.native` rejects with plain `Error`s, while the peer range is `pg >=7.18.2`: a docs clause on pg versions is checked on the tarballs — `branch-reviewer`, `builder`
 - #145 — pgcast is stricter than SQL for options (`'desc'`, `'serializable'` run in Postgres): « cannot mean anything in SQL » is checked against Postgres itself — `branch-reviewer`
+- #140 — A Postgres message that quotes a count is probed at more than one size (08P01 at 65,536 and at 200,000 differ): quote it as an example — `branch-reviewer`, `builder`
+- #140 — A guide that shortens a reference rule loses its condition (« an array or string conflict target » became « the conflict target »): copy the condition or link — `branch-reviewer`
+- #140 — 21000 comes with any `DO UPDATE` batch that names a key twice, not only with an existing row — `branch-reviewer`
 
 ## Minors kept
 
