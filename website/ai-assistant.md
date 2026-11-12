@@ -89,17 +89,18 @@ Put it where your assistant reads its instructions:
 | As | File | Above the rules |
 |---|---|---|
 | `AGENTS.md`, which most assistants read | `AGENTS.md` at the root of the repository, or at the end of yours | nothing |
-| a Cursor rule | `.cursor/rules/pgcast.mdc` | front matter with a `description` and `globs`, such as `src/**/*.ts` |
+| a Cursor rule | `.cursor/rules/pgcast.mdc` | front matter with a `description` and `alwaysApply: false` |
 | a Claude skill | `.claude/skills/pgcast/SKILL.md` | front matter with a `description` |
 
-For the last two, the `description` says when the rules apply:
+- Claude Code reads `AGENTS.md` only when the project has no `CLAUDE.md`, `.claude/CLAUDE.md` or `CLAUDE.local.md`. With one, it reads `AGENTS.md` only if that file imports it, with a line `@AGENTS.md` ([Claude Code's docs](https://code.claude.com/docs/en/memory#agents-md)).
+- For the last two, the `description` says when the rules apply: the assistant reads it and pulls the rules in when a task needs them. A Cursor rule with `globs` would instead be attached whenever a matching file is in context, whatever its `description` ([Cursor's docs](https://cursor.com/docs/context/rules)).
 
 ::: code-group
 
 ```md [.cursor/rules/pgcast.mdc]
 ---
 description: Querying Postgres with pgcast (zapatos/db). Use when writing or changing a database query.
-globs: src/**/*.ts
+alwaysApply: false
 ---
 ```
 
