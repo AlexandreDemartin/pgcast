@@ -56,7 +56,7 @@ const bookingProblem = (err: pg.DatabaseError) =>
 
 - A class name, with no `_`, matches every code of its class: `'IntegrityConstraintViolation'` matches all three. Several names match if any does: `db.isDatabaseError(err, 'IntegrityConstraintViolation', 'DataException')`.
 - The names are Postgres's [error codes](https://www.postgresql.org/docs/current/errcodes-appendix.html) in PascalCase, and the type refuses any other: your editor completes them.
-- `DiskFull`, `OutOfMemory`, `TooManyConnections` and `ConfigurationLimitExceeded` match the whole class 53, as `InsufficientResources` does; `InsufficientResources_DiskFull` matches 53100 only. `isDatabaseError(null, …)` throws a `TypeError`, which narrowing first avoids. Both as in Zapatos 6.6.1 ([#178](https://github.com/AlexandreDemartin/pgcast/issues/178)).
+- `isDatabaseError(null, …)` throws a `TypeError`, which narrowing first avoids; the other cases, such as the names of class 53: [`isDatabaseError()`](/transaction#isDatabaseError).
 
 ## Catch outside a transaction
 
