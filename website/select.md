@@ -117,7 +117,7 @@ Steps, nesting and self-joins: [Join through a lateral](/lateral). Since pgcast 
 - `groupBy`: a column, an array of columns (`GROUP BY "film_id", "stars"`) or a `sql` fragment.
 - `having`: a `Whereable`, in parentheses as in `where`, or a `sql` fragment.
 
-They go with `columns` and `extras`, since a grouped query can only return the grouped columns and aggregates.
+Postgres returns only the grouped columns, those a grouped primary key determines, and aggregates, and refuses any other (42803): the whole row, without `columns`, runs when `groupBy` holds the primary key.
 
 <CastPanel example="selectGroupBy">
 
