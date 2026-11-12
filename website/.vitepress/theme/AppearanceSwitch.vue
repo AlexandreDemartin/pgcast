@@ -2,8 +2,9 @@
 // Copyright (C) 2026 Alexandre Demartin
 // Stands in for VitePress's VPSwitchAppearance (config.ts): one button that cycles system → light → dark
 // (docs/design/art-direction.md). The choice goes under VitePress's own key, which its pre-paint script reads, and
-// a `storage` event tells VitePress's `isDark` (VueUse's useStorage) to follow, as VueUse itself does.
-import { onMounted, ref } from 'vue';
+// a `storage` event tells VitePress's `isDark` (VueUse's useStorage) to follow, as VueUse itself does. The same event,
+// from another tab, moves the icon here.
+import { onMounted, onUnmounted, ref } from 'vue';
 import { useData } from 'vitepress';
 
 const
@@ -14,14 +15,24 @@ const
 </script>
 
 <script setup lang="ts">
+// VitePress passes `aria-labelledby` in the `⋯` menu and the mobile screen: it would hide the mode in `aria-label`
+defineOptions({ inheritAttrs: false });
+
 const { isDark } = useData();
 
+function show(stored: string | null) {
+  mode.value = stored && modes.includes(stored) ? stored : 'auto';
+}
+
+function onStorage(e: StorageEvent) {
+  if (e.key === key || e.key === null) show(e.newValue);  // `null`: the storage was cleared
+}
+
 onMounted(() => {
-  try {
-    const stored = localStorage.getItem(key);
-    if (stored && modes.includes(stored)) mode.value = stored;
-  } catch { /* no storage: the system decides */ }
+  try { show(localStorage.getItem(key)); } catch { /* no storage: the system decides */ }
+  window.addEventListener('storage', onStorage);
 });
+onUnmounted(() => window.removeEventListener('storage', onStorage));
 
 function cycle() {
   const next = modes[(modes.indexOf(mode.value) + 1) % modes.length];
