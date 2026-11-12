@@ -30,7 +30,7 @@ npm run docs:build             # or docs:dev, docs:preview
 
 ## The docs schema
 
-`schema.sql`, in George MacKerron's world. `zapatos/schema.d.ts` is generated from it by pgcast's own generator and committed, so a build needs no database. After a change to `schema.sql` or to the generator, regenerate it:
+`schema.sql`, in George MacKerron's world. `zapatos/` is generated from it by pgcast's own generator and committed, so a build needs no database; CI regenerates it and fails if anything differs. After a change to `schema.sql` or to the generator, regenerate it:
 
 ```sh
 npm run build                  # at the root

@@ -29,6 +29,8 @@ try {
   }
   await generate({ db: { connectionString: url }, outDir: fileURLToPath(new URL('.', import.meta.url)) });
 } finally {
-  await admin.query(`DROP DATABASE IF EXISTS "${name}" WITH (FORCE)`);
+  // No FORCE: it would terminate a connection of generate()'s pool still closing (pool.end() does not wait for the
+  // sockets), and the pool has no 'error' handler. A plain DROP waits up to 5 s for those sessions to go.
+  await admin.query(`DROP DATABASE IF EXISTS "${name}"`);
   await admin.end();
 }
