@@ -50,7 +50,8 @@ Insert one row or several, and return them as Postgres stored them, defaults and
 | `extras: { name: 'title' }` | `\|\| jsonb_build_object($6::text, "title")` | adds `name`, of the column's type |
 | `extras: { shouted: … }`, the fragment above | `\|\| jsonb_build_object($7::text, upper("title"))` | adds `shouted`, of the fragment's `RunResult`: `string`, from `db.sql<s.films.SQL, string>` |
 
-- Several `extras` keys go in one `jsonb_build_object()`, as in the panel; `returning` takes a `readonly` array too.
+- Several `extras` keys go in one `jsonb_build_object()`, as in the panel.
+- A `readonly` array in `returning` (`['id'] as const`) sends the same SQL, but the result type is `never` for now ([#41](https://github.com/AlexandreDemartin/pgcast/issues/41)): write the array without `as const`.
 - Both need `strictNullChecks` for their types.
 
 ## `upsert()` {#upsert}
