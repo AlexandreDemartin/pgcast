@@ -114,10 +114,6 @@ jobs:
     needs: changes
     if: needs.changes.outputs.docs == 'true'
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        postgres: [14, 16, 18]
     defaults:
       run:
         working-directory: website
@@ -125,7 +121,7 @@ jobs:
     # docs:schema loads schema.sql into its own pgcast_test_<pid>_docs database.
     services:
       postgres:
-        image: postgres:${{ matrix.postgres }}
+        image: postgres:18
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: pgcast
