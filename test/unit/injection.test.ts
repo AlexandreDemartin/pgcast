@@ -246,6 +246,32 @@ describe('values stay parameters', () => {
   });
 });
 
+describe('a Parameter in a Whereable or in vals of an array', () => {
+  it('its cast compiles as in sql`${param(x, cast)}`, in a Whereable, isIn and vals', () => {
+    for (const cast of [...Object.values(hostile), ...Object.values(hostileCasts)]) {
+      const alone = sql`${param(1, cast)}`.compile().text;
+      expect(sql`${{ display_name: param(1, cast) }}`.compile()).toEqual({ text: `("display_name" = ${alone})`, values: [1] });
+      expect(sql`${{ display_name: db.conditions.isIn([param(1, cast)]) }}`.compile())
+        .toEqual({ text: `(("display_name" IN (${alone})))`, values: [1] });
+      expect(sql`${vals([param(1, cast), 2])}`.compile()).toEqual({ text: `${alone}, $2`, values: [1, 2] });
+    }
+  });
+
+  it('a cast that closes its quotes stays one type name in a Whereable', () => {
+    const q = sql`${{ display_name: param('Ada', 'text") OR TRUE OR ("text') }}`.compile();
+    expect(q.text).toBe('("display_name" = CAST($1 AS "text"") OR TRUE OR (""text"))');
+    expect(q.values).toEqual(['Ada']);
+  });
+
+  it('a hostile value stays a value, and a hostile key is quoted as with a plain value', () => {
+    for (const input of Object.values(hostile)) {
+      expect(sql`${{ a: param(input) }}`.compile()).toEqual({ text: '("a" = $1)', values: [input] });
+      expect(sql`${vals([param(input)])}`.compile()).toEqual({ text: '$1', values: [input] });
+      expect(sql`${{ [input]: param(1) }}`.compile()).toEqual(sql`${{ [input]: 1 }}`.compile());
+    }
+  });
+});
+
 describe('shortcut arguments', () => {
   it('the table name is one identifier in "sq_<table>" too: `"` is doubled, `.` does not split', () => {
     // 6.6.1: `AS "sq_my"table"`, a syntax error; a table name 6.6.1 already wrote as one quoted

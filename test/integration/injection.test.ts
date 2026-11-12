@@ -239,6 +239,37 @@ describe('with parameters (extended protocol)', () => {
   });
 });
 
+describe('a Parameter in a Whereable or in isIn', () => {
+  it('a hostile cast does what it does in sql`${param(x, cast)}`, and reads nothing', async () => {
+    // compiled text: test/unit/injection.test.ts; outcomes of the cast alone: "no hostile cast reads anything"
+    const outcome = async (q: db.SQLFragment<any[]>) => {
+      await t.client.query('SAVEPOINT pgcast_cast');
+      try {
+        const rows = await q.run(t.client);
+        // read before the savepoint goes: a second statement that ran shows here
+        return rows.length === 1 && await adaName() === 'Ada' ? 'one row' : rows;
+      } catch (err) {
+        return (err as { code?: string }).code;
+      } finally {
+        await t.client.query('ROLLBACK TO SAVEPOINT pgcast_cast');
+      }
+    };
+    for (const [name, cast] of Object.entries(hostileCasts)) {
+      const alone = await outcome(sql`SELECT ${param('1', cast)} AS v`);
+      expect({
+        name,
+        whereable: await outcome(sql`SELECT ${'id'} FROM ${'users'} WHERE ${{ id: param('1', cast) }}`),
+        isIn: await outcome(sql`SELECT ${'id'} FROM ${'users'} WHERE ${{ id: db.conditions.isIn([param('1', cast)]) }}`),
+      }).toEqual({ name, whereable: alone, isIn: alone });
+    }
+  });
+
+  it('a hostile value is sent as a parameter', async () => {
+    expect(await db.select('users', { display_name: param(`Ada' OR '1' = '1`) }).run(t.client)).toEqual([]);
+    expect(await db.select('users', { display_name: db.conditions.isIn([param(`Ada' OR '1' = '1`)]) }).run(t.client)).toEqual([]);
+  });
+});
+
 describe('without parameters (simple protocol)', () => {
   it('a `"` in a string identifier stays in one column name, which does not exist', async () => {
     // 6.6.1: `SELECT "display_name" FROM users; UPDATE …; SELECT "display_name" FROM "users"`, three statements

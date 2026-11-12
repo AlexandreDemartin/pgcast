@@ -11,6 +11,7 @@ import { useTestDatabase } from '../helpers/db';
 import { pgError } from '../helpers/pgError';
 
 const t = useTestDatabase();
+const c = db.conditions;
 
 afterEach(resetConfig);
 
@@ -94,22 +95,22 @@ describe('Default, self, parent, cols, vals', () => {
     ]);
   });
 
-  it('characterization: vals of an array fails on a Parameter or Default element', async () => {
-    // characterization: pg sends the Parameter JSON-stringified, '{"value":1}', and the Default Symbol as 'Symbol(DEFAULT)'
-    const withParam = sql`SELECT ${'id'} FROM ${'users'} WHERE ${'id'} IN (${vals([param(1)])})`;
-    expect(await pgError(t.client, () => withParam.run(t.client))).toMatchInlineSnapshot(`
-      {
-        "code": "22P02",
-        "message": "invalid input syntax for type integer: "{"value":1}"",
-      }
-    `);
-    const withDefault = sql`SELECT ${'id'} FROM ${'users'} WHERE ${'id'} IN (${vals([Default])})`;
-    expect(await pgError(t.client, () => withDefault.run(t.client))).toMatchInlineSnapshot(`
-      {
-        "code": "22P02",
-        "message": "invalid input syntax for type integer: "Symbol(DEFAULT)"",
-      }
-    `);
+  it('vals of an array: a Parameter is a parameter, with its cast', async () => {
+    // 6.6.1 sent '{"value":1}' (22P02)
+    const q = sql`SELECT ${'id'} FROM ${'users'} WHERE ${'id'} IN (${vals([param(1), param('3', 'int4')])}) ORDER BY ${'id'}`;
+    expect(await q.run(t.client)).toEqual([{ id: 1 }, { id: 3 }]);
+  });
+
+  it('vals of an array in an INSERT stores a Parameter value, and the column default for Default', async () => {
+    // 6.6.1 stored '{"value":"guest"}' and 'Symbol(DEFAULT)' in the text column, and refused 'Symbol(DEFAULT)' as numeric (22P02)
+    const memberships = await sql`INSERT INTO ${'memberships'} (${'user_id'}, ${'org_country'}, ${'org_code'}, ${'role'})
+      VALUES (${vals([3, 'FR', 'acme', param('guest')])}), (${vals([3, 'FR', 'acme-lyon', Default])})
+      RETURNING ${'org_code'}, ${'role'}`.run(t.client);
+    expect(memberships.sort((a, b) => a.org_code.localeCompare(b.org_code))).toEqual([
+      { org_code: 'acme', role: 'guest' }, { org_code: 'acme-lyon', role: 'member' },
+    ]);
+    const accounts = await sql`INSERT INTO ${'accounts'} (${'owner_id'}, ${'balance'}) VALUES (${vals([3, Default])}) RETURNING ${'balance'}`.run(t.client);
+    expect(accounts).toEqual([{ balance: '0.00' }]);
   });
 });
 
@@ -130,14 +131,51 @@ describe('Whereable', () => {
     expect(await ids({ manager_id: undefined })).toEqual([]);
   });
 
-  it('characterization: a Parameter value fails', async () => {
-    // characterization: param(1) is wrapped in a second Parameter and sent as '{"value":1}'
-    expect(await pgError(t.client, () => ids({ id: param(1) }))).toMatchInlineSnapshot(`
+  it('a Parameter value is a parameter, with its cast', async () => {
+    // 6.6.1 sent '{"value":…}': no row on a text or jsonb column, 22P02 on the others
+    expect(await ids({ display_name: param('Ada') })).toEqual([{ id: 1 }]);
+    expect(await ids({ display_name: param('Ada', 'text') })).toEqual([{ id: 1 }]);
+    expect(await ids({ id: param(2) })).toEqual([{ id: 2 }]);
+    expect(await ids({ id: param('2', 'int4') })).toEqual([{ id: 2 }]);
+    expect(await ids({ mood: param('ok') })).toEqual([{ id: 2 }]);
+    expect(await ids({ settings: param({ theme: 'dark' }) })).toEqual([{ id: 1 }]);
+    expect(await ids({ tags: param(['admin']) })).toEqual([{ id: 1 }]);
+  });
+
+  it('a Parameter cast to json is compared as json, which jsonb refuses', async () => {
+    // as `` sql`${self} = ${param(x, true)}` `` is; 6.6.1 found no row
+    expect(await pgError(t.client, () => ids({ settings: param({ theme: 'dark' }, true) }))).toMatchInlineSnapshot(`
       {
-        "code": "22P02",
-        "message": "invalid input syntax for type integer: "{"value":1}"",
+        "code": "42883",
+        "message": "operator does not exist: jsonb = json",
       }
     `);
+  });
+
+  it('isIn, isNotIn and not() take a Parameter as a value', async () => {
+    // 6.6.1: isIn found Bob only, isNotIn and not() matched every row
+    expect(await ids({ display_name: c.isIn([param('Ada'), 'Bob']) })).toEqual([{ id: 1 }, { id: 2 }]);
+    expect(await ids({ id: c.isIn([param(1)]) })).toEqual([{ id: 1 }]);
+    expect(await ids({ display_name: c.isNotIn([param('Ada')]) })).toEqual([{ id: 2 }, { id: 3 }]);
+    expect(await ids(c.not({ display_name: param('Ada') }))).toEqual([{ id: 2 }, { id: 3 }]);
+  });
+
+  it('deletes, update and count reach the rows a Parameter value names', async () => {
+    // 6.6.1 deleted every membership with isNotIn([param('owner')]), and found nothing with { display_name: param('Cyd') }
+    expect(await db.deletes('memberships', { role: c.isNotIn([param('owner')]) }, { returning: ['user_id'] }).run(t.client))
+      .toEqual([{ user_id: 2 }]);
+    expect(await db.count('users', { display_name: param('Cyd') }).run(t.client)).toBe(1);
+    expect(await db.update('users', { mood: 'ok' }, { display_name: param('Cyd') }, { returning: ['id', 'mood'] }).run(t.client))
+      .toEqual([{ id: 3, mood: 'ok' }]);
+    expect(await db.deletes('memberships', { user_id: param(1) }, { returning: ['user_id'] }).run(t.client))
+      .toEqual([{ user_id: 1 }]);
+  });
+
+  it('a Default value rejects run() with an Error that says what to do', async () => {
+    // 6.6.1 sent 'Symbol(DEFAULT)': no row on a text column, 22P02 on the others; this Error has no code
+    await expect(ids({ display_name: Default })).rejects.toThrowErrorMatchingInlineSnapshot(`[Error: \`db.Default\` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. \`DEFAULT\` is for INSERT and UPDATE values.]`);
+    await expect(ids({ id: c.isIn([Default]) })).rejects.toThrowErrorMatchingInlineSnapshot(`[Error: \`db.Default\` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. \`DEFAULT\` is for INSERT and UPDATE values.]`);
+    await expect(ids({ id: Default })).rejects.not.toHaveProperty('code');
   });
 });
 
