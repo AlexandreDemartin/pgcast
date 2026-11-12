@@ -11,5 +11,5 @@
     "skipLibCheck": false,
     "types": []
   },
-  "include": ["zapatos/schema.d.ts", "examples"]
+  "include": ["zapatos", "examples"]
 }
