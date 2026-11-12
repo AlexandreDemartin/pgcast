@@ -37,7 +37,9 @@ Reading more of the catalog, each as an opt-in: foreign keys, for laterals that 
 
 ## One column, five types
 
-A value isn't the same thing everywhere it goes. A `timestamptz` read by a plain `SELECT` reaches you as a `Date`, because `pg` parses it; read through JSON, it's a string; in a filter it may be either, or some SQL; in a new row, it may be required, or left to its default. So the generator writes each table five times, once per context, each column typed for that context. Here are two columns of `screenings`, from the generated schema:
+A value isn't the same thing everywhere it goes. A `timestamptz` read by a plain `SELECT` reaches you as a `Date`, because `pg` parses it; read through JSON, it's a string; in a filter it may be either, or some SQL; in a new row, it may be required, or left to its default. So the generator writes each table five times, once per context, each column typed for that context.
+
+Here are two columns of `screenings`, from the generated schema:
 
 | Type | What it describes | `starts_at`, `timestamptz NOT NULL` | `subtitled`, a nullable `boolean` |
 |---|---|---|---|
@@ -71,7 +73,9 @@ Zapatos returned JSON from every shortcut that returns rows, even those that cou
 
 ## How a result type follows the query
 
-A shortcut's result type is never declared: TypeScript works it out from the call. The table gives its `JSONSelectable`; `columns` keeps only those keys, as `returning` does for [`insert()` and the other writes](/insert#insert-options); each `extras` key adds the type of its column, or of its `sql` fragment; each `lateral` key adds the result type of its subquery, worked out the same way, one level down, and a `lateral` given as [one subquery](/lateral#keep-only-the-far-side) replaces the row with its result. Then the shortcut sets the shape: an array for `select()`, the row or `undefined` for `selectOne()`, the row for `selectExactlyOne()`, a number for `count()`. Hover `films` to see what came of this one:
+A shortcut's result type is never declared: TypeScript works it out from the call. The table gives its `JSONSelectable`; `columns` keeps only those keys, as `returning` does for [`insert()` and the other writes](/insert#insert-options); each `extras` key adds the type of its column, or of its `sql` fragment; each `lateral` key adds the result type of its subquery, worked out the same way, one level down. A `lateral` given as [one subquery](/lateral#keep-only-the-far-side) replaces the row with its result instead.
+
+Then the shortcut sets the shape: an array for `select()`, the row or `undefined` for `selectOne()`, the row for `selectExactlyOne()`, a number for `count()`. Hover `films` to see what came of this one:
 
 <CastPanel example="catalog_types_result">
 
@@ -81,7 +85,7 @@ A shortcut's result type is never declared: TypeScript works it out from the cal
 
 Three things in that type are worth a closer look:
 
-- **`studio` may be `null`, not `undefined`.** `selectOne()` can find nothing, and in a nested query nothing is JSON's `null`, so the type turns the `undefined` into `null`. Here it can't find nothing, as `films.studio_id` is `NOT NULL REFERENCES studios`; but the generator doesn't read foreign keys, so say so yourself with `selectExactlyOne()`, and `studio` loses its `| null`. Zapatos's docs list this among their limitations; [#54](https://github.com/AlexandreDemartin/pgcast/issues/54) plans to read it from the catalog.
+- **`studio` may be `null`, not `undefined`.** `selectOne()` can find nothing, and in a nested query nothing is JSON's `null`, so the type turns the `undefined` into `null`. Here it can't find nothing, as `films.studio_id` is `NOT NULL REFERENCES studios`; but the generator doesn't read foreign keys, so say so yourself with `selectExactlyOne()`, and `studio` loses its `| null` (Zapatos's docs list this among their limitations, and [#54](https://github.com/AlexandreDemartin/pgcast/issues/54) plans to read it from the catalog).
 - **`hours` is a `number` because you said so.** A `sql` fragment's type is its second type argument, here `number`, and pgcast doesn't parse your SQL to check it ([Type arguments](/sql-template#type-arguments)). `year`, a column, takes its type from the schema.
 - **`roles` is a `number`**, the type of `count()`, though Postgres counts in `int8`: like Zapatos, pgcast assumes no count comes near `Number.MAX_SAFE_INTEGER`.
 
