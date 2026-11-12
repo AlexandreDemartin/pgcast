@@ -67,6 +67,8 @@ Here are two columns of `screenings`, from the generated schema:
 
 Wherever a value goes in, it may also be a [`param()`](/sql-template#param) or a [`sql`](/sql-template#sql) fragment, and in a filter a [`parent()`](/sql-template#parent) column. A `Whereable` refuses `null` because `"subtitled" = NULL` is never true in SQL: given one anyway (the type lets it through when `strictNullChecks` is off), the filter compiles to `"subtitled" = $1`, with `null` as `$1`, and finds nothing. [`conditions.isNull`](/conditions#conditions.isNull) writes the `IS NULL` you meant.
 
+The first does not compile (TS2322, with `strict` on); the second is the filter you meant:
+
 ```ts twoslash
 // @errors: 2322
 import * as db from 'zapatos/db';
