@@ -146,6 +146,9 @@ Candidates for a check, a rule or a skill line.
 - #134 — A mapped type that wraps a generated field as `Wrapper<U[K]>` wraps the whole union (`T | Parameter<T> | null | DefaultType | SQLFragment`), not the value type: pull `T` out first (`ParameterValue<U[K]>`), or the wrapper takes `vals(null)`, `vals(Default)` and `vals(fragment)` — `branch-reviewer`
 - #134 — A compat grid diffs the accepted sets both ways: a union member added beside a generic call can make a new call type-check (`` sql`x` `` on a NOT NULL column), not only refuse an old one — `branch-reviewer`
 - #134 — Two review items gave a wrong "Expected" type; the builder found the right one with the grid. An "Expected" for a type is a hypothesis until a grid proves it — orchestrator
+- #136 — Headless Chrome cannot go below ~500 px with `--window-size`; a phone layout needs CDP `Emulation.setDeviceMetricsOverride` with `mobile: true` — `branch-reviewer`
+- #136 — VitePress 2.0's nav has no fixed breakpoints: it measures what fits and moves the rest into `⋯`, so any change to the nav text is checked at every width from 768 to 1280 px, not only 960 and 1280 — `branch-reviewer`
+- #136 — `vitepress preview` keeps the file list it read at start-up and 404s the new hashed CSS after a rebuild: restart it, cache off, before measuring — `builder`
 
 ## Minors kept
 
