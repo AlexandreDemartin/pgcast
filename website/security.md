@@ -29,7 +29,7 @@ Then the quoting, because the type is gone at run time and names can arrive with
 
 </CastPanel>
 
-The key stays one name, a column that does not exist (42703). Zapatos 6.6.1 trusted the type here (its docs warned never to override it), and wrote that key as `("title" = "title" OR TRUE OR "title" = $1)`, which returns every film; without parameters, such a name could run a second statement. The type refuses the key (TS2353), so this only hits a value typed `any`, or plain JavaScript. Every rule of the quoting, a name already quoted by hand included: [Identifiers](/sql-template#identifiers).
+The key stays one name, a column that does not exist (42703). Zapatos 6.6.1 trusted the type here (its docs warned never to override it), and wrote that key as `("title" = "title" OR TRUE OR "title" = $1)`, which returns every film; without parameters, such a name could run a second statement. The type refuses such a key in an object literal (TS2353). An object built at run time (a `Record<string, string>`, `Object.fromEntries()`, a variable with extra keys) passes the type, as `any` and plain JavaScript do. Every rule of the quoting, a name already quoted by hand included: [Identifiers](/sql-template#identifiers).
 
 ## Keywords are checked before any query
 
@@ -88,7 +88,7 @@ In `deletes()` or `update()`, an empty filter is every row: `removeRatings()` de
 
 ### An object that is not a filter
 
-An interpolated object that is not one of pgcast's values compiles as a filter of its own enumerable keys. A class instance gives its fields; a `Date` or a `Map`, which have none, gives `TRUE`, so `` db.sql`DELETE FROM ${'ratings'} WHERE ${when}` ``, with `when` a `Date`, compiles to `DELETE FROM "ratings" WHERE TRUE`. The type refuses a `Date` (TS2345), so this hits a value typed `any`; pass a date as `db.param(when)`. Unchanged from Zapatos 6.6.1, and planned: [#170](https://github.com/AlexandreDemartin/pgcast/issues/170).
+An interpolated object that is not one of pgcast's values compiles as a filter of its own enumerable keys. A class instance gives its fields; a `Date` or a `Map`, which have none, gives `TRUE`, so `` db.sql`DELETE FROM ${'ratings'} WHERE ${when}` ``, with `when` a `Date`, compiles to `DELETE FROM "ratings" WHERE TRUE`. The type refuses a `Date` (TS2345), so this hits a value typed `any`, or a wider type such as `object`; pass a date as `db.param(when)`. Unchanged from Zapatos 6.6.1, and planned: [#170](https://github.com/AlexandreDemartin/pgcast/issues/170).
 
 ## Report a flaw
 
