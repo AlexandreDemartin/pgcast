@@ -17,10 +17,10 @@ Characterising Zapatos 6.6.1 turned up 64 surprises ([the report](https://github
 
 | Class | When | What changes for you | Example |
 |---|---|---|---|
-| Fix | Postgres already refused the SQL, the type already refused the call, or the result contradicts the function's name, type or docs; and every security hole | the behaviour, at once; the changelog lists each call whose result changes, under Fixed or Security | [`not()`](/conditions#conditions.not) negates its whole condition: `` not(sql`a OR b`) `` gave `(NOT a OR b)`, which Postgres reads `(NOT a) OR b` |
-| Opt-in | the result is valid, and code may rely on it | nothing, until you turn its option on; the old behaviour warns | an `undefined` value sent as `NULL`, until [`undefinedMeansMissing`](/runtime-config#Config.undefinedMeansMissing) makes it a missing key |
+| Fix | Postgres or the type already refused it, or it contradicts the function's name; every security hole | at once; the changelog lists each result that changes | [`not()`](/conditions#conditions.not) negates its whole condition: `` not(sql`a OR b`) `` gave `(NOT a OR b)`, which Postgres reads `(NOT a) OR b` |
+| Opt-in | the result is valid, and code may rely on it | nothing until you opt in; the old behaviour warns | an `undefined` value sent as `NULL`, until [`undefinedMeansMissing`](/runtime-config#Config.undefinedMeansMissing) makes it a missing key |
 | Document | Postgres does it, or it is meant | nothing; the docs say so | [`isNotIn()`](/conditions#conditions.isNotIn) with a `NULL` in its list matches no row: that is how Postgres reads `NOT IN` |
-| Leave | the type already protects, the case is rare, or a change would need a guess the database doesn't state | nothing | an `int[][]` column is typed `number[]`: Postgres doesn't enforce the dimensions, and stores one, two or three in it alike |
+| Leave | the type protects, the case is rare, or a fix would need a guess | nothing | an `int[][]` column is typed `number[]`: Postgres doesn't enforce the dimensions, and stores one, two or three in it alike |
 
 A fix can still stop a call that only worked through the bug. 6.6.2's escaping fixes are an example: a column name such as `id" AS "x` used to close its quotes and add an alias, and now names a column that doesn't exist. The changelog lists every such call, with what to write instead.
 
