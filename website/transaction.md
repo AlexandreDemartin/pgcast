@@ -267,7 +267,7 @@ db.isDatabaseError(err, ...types)
 `true` when the `code` of `err`, five characters, starts with the code of one of `types`; otherwise `false`, and always with no `types`.
 
 - `err`: an object with an optional `code` string. The type accepts `any`, `pg.DatabaseError` and `{ code?: string }`, and refuses `unknown` and the global `Error` (below); `err instanceof pg.DatabaseError` narrows a `catch` variable to one it accepts. On an error from Postgres, `.run()` rejects with node-postgres's `DatabaseError`, whose `code` is the SQLSTATE; it also has `constraint`, `detail`, `table` and the other fields Postgres sends. `null` or `undefined` throws a `TypeError`.
-- `types`: one or more names, of two kinds:
+- `types`: names, any number; with none, `false`. Two kinds:
 
 | Name | Code | Matches |
 |---|---|---|
