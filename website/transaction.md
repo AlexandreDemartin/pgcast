@@ -34,6 +34,12 @@ COMMIT
 
 The SQL of the callback's queries: [`selectOne()`](/select#selectOne) and [`insert()`](/insert#insert).
 
+Given a client you checked out, `transaction()` runs on it and leaves it connected; releasing it is yours:
+
+<<< ./examples/plain/checked_out_client.ts{ts twoslash}
+
+The two `count()`s run on `client`, outside the transaction: `before` is 0, `after` 1.
+
 ### The SQL it sends
 
 | When | SQL |
@@ -154,6 +160,20 @@ db.serializableRODeferrable(txnClientOrQueryable, callback)
 ```
 
 [`transaction()`](#transaction) at `IsolationLevel.SerializableRODeferrable`: `START TRANSACTION ISOLATION LEVEL SERIALIZABLE, READ ONLY, DEFERRABLE`. Its callback gets a [`TxnClientForSerializableRODeferrable`](#TxnClientForSerializableRODeferrable). Postgres refuses a write in it (25006).
+
+A report whose two counts read the same snapshot:
+
+<<< ./examples/plain/read_only_report.ts{ts twoslash}
+
+`report` is `{ films: 4, bookings: 0 }` on the docs schema. The transaction sends:
+
+```sql
+START TRANSACTION ISOLATION LEVEL SERIALIZABLE, READ ONLY, DEFERRABLE
+-- the callback's two count() queries
+COMMIT
+```
+
+The SQL of each query: [`count()`](/select#count). The other read-only shortcuts send the same, with their level; in [`readCommittedRO()`](#readCommittedRO), each query reads its own snapshot, so a booking committed between the two counts is in the second.
 
 ## Types
 
