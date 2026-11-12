@@ -62,9 +62,10 @@ Same module names, same SQL, same types. Safer behaviours wait behind opt-ins un
 
 <div class="readnext">
 
-[**Install**<small>Add the package and run your first query.</small>](/install)
-[**select()**<small>Read rows, with lateral joins and typed results.</small>](/select)
-[**Opt-ins**<small>The safer behaviours, and their warnings.</small>](/opt-ins)
+[**Tutorial**<small>Install pgcast and run your first typed query.</small>](/tutorial)
+[**How-to guides**<small>Laterals, pages, batches, retries: one task each.</small>](/guides)
+[**Reference**<small>Every export and option, and the SQL it writes.</small>](/reference)
+[**Explanation**<small>Why pgcast works as it does.</small>](/explanation)
 
 </div>
 
