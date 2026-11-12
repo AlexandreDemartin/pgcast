@@ -83,10 +83,13 @@ describe('type surprises', () => {
     db.select('users', { id: db.param(1) });
   });
 
-  test('characterization: updateValues with a plain value is accepted, the runtime refuses it', () => {
-    // characterization: UpdatableForTable accepts 'x'; compiled as the identifier "x"
-    // (test/integration/shortcuts.test.ts, "updateValues with a plain string fails")
-    db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { display_name: 'x' } });
+  test('updateValues takes a plain value of the column, sent as a parameter', () => {
+    // (test/integration/shortcuts.test.ts, "updateValues: a plain value is stored as it is")
+    db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { display_name: 'x', mood: 'happy', manager_id: null } });
+    // @ts-expect-error a number is not text (display_name)
+    db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { display_name: 1 } });
+    // @ts-expect-error 'glad' is not a mood
+    db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { mood: 'glad' } });
   });
 
   test('characterization: add() and subtract() refuse a Parameter, which the runtime accepts', () => {

@@ -79,6 +79,13 @@ Candidates for a check, a rule or a skill line.
 - #25 — A replay that runs several runtimes in one transaction rolls back to its savepoint after an injected write, or every later case looks injected — `builder`
 - #25 — A long input built with `repeat` can turn out well-formed by accident and test the accept branch silently: assert which branch a speed-test input takes — `builder`
 - #25 — Substituting values into SQL text with `.replace('$1', …)` hits a `$1` inside a name (`"a".x$1$."b"`): use real parameters in an oracle — `branch-reviewer`
+- #26 — An issue's claim about what a 6.6.1 form did can be wrong ("copies that column"): inside `ON CONFLICT DO UPDATE SET` a bare column name is ambiguous with `EXCLUDED` (42702); replay the SQL before writing the break — `builder`
+- #26 — A predicate that sorts values into "compile as SQL" and "send as a parameter" follows every branch of `compileExpression`: those that recurse (fragments, arrays, plain objects as Whereables, `cols`/`vals`, `parent`) and those that throw (functions, `globalThis`, symbols). Three review rounds each found one more container (candidate: skill `sql-safety`) — `branch-reviewer`
+- #26 — Wrapping an unknown value in `param()` can turn an error into a silent write: `pg` serialises objects with `JSON.stringify`, arrays as array literals, anything else with `toString()`, functions included. A replay checks what is stored, not only whether it throws — `branch-reviewer`
+- #26 — A replay of two copies of the runtime builds each case with that copy's own `sql` / `param` / `Default` (`instanceof` and symbols do not cross copies), and rolls back a savepoint after every run, even a successful one (candidate: skill `backward-compat`) — `branch-reviewer`, `builder`
+- #26 — A corpus of real usage wraps plain `updateValues` in `param()` as a workaround: the fix must never wrap a `Parameter` twice — `builder`
+- #26 — In zsh `${PIPESTATUS[0]}` is empty (it is `pipestatus`): a retry loop built on it cannot tell success from failure; check `$?` of a bare `git push` — `builder`
+- #26 — `to_jsonb` of a `timestamptz` follows the session time zone: compare in SQL rather than matching the JSON string — `builder`
 
 ## Minors kept
 
@@ -96,3 +103,5 @@ Minor review defects, taken up by the end-of-chapter review.
 - #71 — `docs/CHARACTERISATION-REPORT.md`: the intro still says nothing is fixed, while R3, R5, R6 (and now R1) are — `builder`
 - #25 — `src/db/core.ts:257`: an accepted chain of about a million parts makes `quotedName.test` throw `RangeError` (fails closed, before any query) — a comment or a length guard — `branch-reviewer`
 - #25 — `docs/CHARACTERISATION-REPORT.md:43`: the R2 cell's short list leaves out a statement and a table alias — point to the CHANGELOG only — `branch-reviewer`
+- #26 — `CHANGELOG.md:39`: the R4 line is one bullet of about 400 words; split it into a short statement and a list of the changed forms (skill `concise-docs`) — orchestrator
+- #26 — `test/integration/shortcuts.test.ts:182`: a `Buffer` written to a `bytea` column is checked only in the unit test; one round trip on the same connection — `branch-reviewer`

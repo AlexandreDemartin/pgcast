@@ -7,6 +7,7 @@
 import { describe, expect, it } from 'vitest';
 import * as db from '../../src/db';
 import { sql, param, parent, Default, all, conditions as dc } from '../../src/db';
+import { resetConfig } from '../helpers/config';
 
 describe('insert', () => {
   it('one row: columns in sorted key order, RETURNING to_jsonb', () => {
@@ -176,19 +177,348 @@ describe('upsert', () => {
     `);
   });
 
-  it('characterization: updateValues with a plain value', () => {
-    // characterization: a string is compiled as an identifier (`"x"`), a number throws: neither is a parameter
+  it('updateValues: a plain value is a parameter, sent as update() sends it', () => {
     expect(db.upsert('users', ada, 'email', { updateValues: { mood: 'happy' } }).compile()).toMatchInlineSnapshot(`
       {
-        "text": "INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("email", "display_name", "mood") = ROW(EXCLUDED."email", EXCLUDED."display_name", "happy") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "text": "INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("email", "display_name", "mood") = ROW(EXCLUDED."email", EXCLUDED."display_name", $3) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "values": [
           "Ada L.",
           "ada@example.com",
+          "happy",
         ],
       }
     `);
-    expect(() => db.upsert('accounts', { id: 1, owner_id: 1 }, 'id', { updateValues: { balance: 5 } }).compile())
-      .toThrowErrorMatchingInlineSnapshot(`[Error: Alien object while interpolating SQL: 5]`);
+    const plain = {
+      string: 'x', number: 5, bigint: BigInt(5), boolean: true, null: null, date: new Date(0),
+      array: [1, 2], object: { a: 1 }, emptyObject: {}, buffer: Buffer.from('ab'),
+    };
+    const compare = () => Object.entries(plain).forEach(([kind, v]) => {
+      const
+        upserted = db.upsert('accounts', { id: 1, owner_id: 1 }, 'id', { updateColumns: [], updateValues: { balance: v } } as any).compile(),
+        updated = db.update('accounts', { balance: v } as any, { id: 1 }).compile();
+      expect(upserted.text.replace(/.* DO UPDATE SET (.*) RETURNING .*/, '$1'), kind)
+        .toBe(updated.text.replace(/.* SET (.*) WHERE .*/, '$1').replace('$1', '$3'));
+      expect(upserted.values[2], kind).toBe(updated.values[0]);
+    });
+    compare();
+    // with the JSON casts on, an array or an object is cast as update() casts it
+    db.setConfig({ castArrayParamsToJson: true, castObjectParamsToJson: true });
+    try {
+      compare();
+      expect(db.upsert('users', ada, 'email', { updateColumns: [], updateValues: { settings: { a: 1 } } }).compile().text)
+        .toContain(`DO UPDATE SET ("settings") = ROW(CAST($3 AS "json")) RETURNING`);
+    } finally {
+      resetConfig();
+    }
+  });
+
+  /** The `SET` of an upsert whose updateValues are `{ mood: v }`, and its parameters; or what it throws. */
+  const set = (v: any) => {
+    try {
+      const q = db.upsert('users', ada, 'email', { updateColumns: [], updateValues: { mood: v } } as any).compile();
+      return [q.text.replace(/.* DO UPDATE SET (.*) RETURNING .*/, '$1'), q.values.slice(2)];
+    } catch (err) {
+      return `throws: ${(err as Error).message}`;
+    }
+  };
+
+  it('updateValues: pgcast objects compile as under 6.6.1, and a Parameter is not wrapped twice', () => {
+    expect({
+      param: set(param('happy')), cast: set(param('happy', 'mood')), default: set(Default),
+      raw: set(db.raw('now()')), cols: set(db.cols(['a', 'b'])), vals: set(db.vals({ a: 1 })),
+      parent: set(parent('id')), self: set(db.self), all: set(all),
+    }).toMatchInlineSnapshot(`
+      {
+        "all": "throws: Cannot convert a Symbol value to a string",
+        "cast": [
+          "("mood") = ROW(CAST($3 AS "mood"))",
+          [
+            "happy",
+          ],
+        ],
+        "cols": [
+          "("mood") = ROW("a", "b")",
+          [],
+        ],
+        "default": [
+          "("mood") = ROW(DEFAULT)",
+          [],
+        ],
+        "param": [
+          "("mood") = ROW($3)",
+          [
+            "happy",
+          ],
+        ],
+        "parent": "throws: The 'parent' table alias has no meaning here",
+        "raw": [
+          "("mood") = ROW(now())",
+          [],
+        ],
+        "self": "throws: The 'self' column alias has no meaning here",
+        "vals": [
+          "("mood") = ROW($3)",
+          [
+            1,
+          ],
+        ],
+      }
+    `);
+  });
+
+  it('updateValues: an array that holds a pgcast object, at any depth, compiles item by item as under 6.6.1', () => {
+    // as in a sql template: each item as if interpolated directly, so a string is an identifier and a number throws
+    expect({
+      sql: set([sql`upper(`, sql`EXCLUDED.mood`, sql`)`]), param: set([param('happy')]), raw: set([db.raw(`'happy'`)]),
+      mapWithSeparator: set(db.mapWithSeparator(['ha', 'ppy'], sql` || `, c => param(c))), nested: set([[sql`'happy'`]]),
+      default: set([Default]), string: set([sql`upper(`, 'excluded.mood', sql`)`]), number: set([sql`repeat('a', `, 3, sql`)`]),
+      object: set([sql`'happy' || `, {}]),
+    }).toMatchInlineSnapshot(`
+      {
+        "default": [
+          "("mood") = ROW(DEFAULT)",
+          [],
+        ],
+        "mapWithSeparator": [
+          "("mood") = ROW($3 || $4)",
+          [
+            "ha",
+            "ppy",
+          ],
+        ],
+        "nested": [
+          "("mood") = ROW('happy')",
+          [],
+        ],
+        "number": "throws: Alien object while interpolating SQL: 3",
+        "object": [
+          "("mood") = ROW('happy' || TRUE)",
+          [],
+        ],
+        "param": [
+          "("mood") = ROW($3)",
+          [
+            "happy",
+          ],
+        ],
+        "raw": [
+          "("mood") = ROW('happy')",
+          [],
+        ],
+        "sql": [
+          "("mood") = ROW(upper(EXCLUDED.mood))",
+          [],
+        ],
+        "string": [
+          "("mood") = ROW(upper("excluded"."mood"))",
+          [],
+        ],
+      }
+    `);
+    // an array of plain values only is one parameter, as update() sends it; so is what mapWithSeparator()
+    // returns for one string or none, with no separator in it
+    expect({
+      strings: set(['a', 'b']), numbers: set([1, 2]), empty: set([]), objects: set([{}, { a: [1] }]),
+      oneItem: set(db.mapWithSeparator(['users.mood'], sql` || `, c => c)),
+      noItem: set(db.mapWithSeparator([], sql` || `, c => c)),
+    }).toMatchInlineSnapshot(`
+      {
+        "empty": [
+          "("mood") = ROW($3)",
+          [
+            [],
+          ],
+        ],
+        "noItem": [
+          "("mood") = ROW($3)",
+          [
+            [],
+          ],
+        ],
+        "numbers": [
+          "("mood") = ROW($3)",
+          [
+            [
+              1,
+              2,
+            ],
+          ],
+        ],
+        "objects": [
+          "("mood") = ROW($3)",
+          [
+            [
+              {},
+              {
+                "a": [
+                  1,
+                ],
+              },
+            ],
+          ],
+        ],
+        "oneItem": [
+          "("mood") = ROW($3)",
+          [
+            [
+              "users.mood",
+            ],
+          ],
+        ],
+        "strings": [
+          "("mood") = ROW($3)",
+          [
+            [
+              "a",
+              "b",
+            ],
+          ],
+        ],
+      }
+    `);
+  });
+
+  it('updateValues: a plain object that holds a pgcast object, at any depth, compiles as under 6.6.1', () => {
+    // as in a sql template: a WHERE-style condition of its keys, each value a fragment or a parameter
+    expect({
+      like: set({ 'users.mood': dc.like('h%') }), sql: set({ x: sql`'happy'` }), inArray: set([{ x: sql`'happy'` }]),
+      nullPrototype: set(Object.assign(Object.create(null), { x: sql`'happy'` })),
+      param: set({ 'users.mood': param('happy') }), deep: set({ a: { b: [db.raw(`'happy'`)] } }),
+      default: set({ a: Default }), parent: set({ a: parent('id') }),
+    }).toMatchInlineSnapshot(`
+      {
+        "deep": [
+          "("mood") = ROW(("a" = $3))",
+          [
+            {
+              "b": [
+                DangerousRawString {
+                  "value": "'happy'",
+                },
+              ],
+            },
+          ],
+        ],
+        "default": [
+          "("mood") = ROW(("a" = $3))",
+          [
+            Symbol(DEFAULT),
+          ],
+        ],
+        "inArray": [
+          "("mood") = ROW((('happy')))",
+          [],
+        ],
+        "like": [
+          "("mood") = ROW((("users"."mood" LIKE $3)))",
+          [
+            "h%",
+          ],
+        ],
+        "nullPrototype": [
+          "("mood") = ROW((('happy')))",
+          [],
+        ],
+        "param": [
+          "("mood") = ROW(("users"."mood" = $3))",
+          [
+            Parameter {
+              "cast": undefined,
+              "value": "happy",
+            },
+          ],
+        ],
+        "parent": "throws: The 'parent' table alias has no meaning here",
+        "sql": [
+          "("mood") = ROW((('happy')))",
+          [],
+        ],
+      }
+    `);
+    // an object or a class instance of plain values only is one parameter, as update() sends it; a function
+    // in an object is data there too (a toPostgres() method), as under 6.6.1
+    class Holder { x = sql`'happy'`; }
+    expect({
+      empty: set({}), nullPrototype: set(Object.create(null)), where: set({ 'users.mood': 'happy' }),
+      date: set(new Date(0)), buffer: set(Buffer.alloc(0)), map: set(new Map()),
+      toPostgres: set({ toPostgres: () => 'happy' }), inArray: set([{ toPostgres: () => 'happy' }]),
+    }).toMatchInlineSnapshot(`
+      {
+        "buffer": [
+          "("mood") = ROW($3)",
+          [
+            {
+              "data": [],
+              "type": "Buffer",
+            },
+          ],
+        ],
+        "date": [
+          "("mood") = ROW($3)",
+          [
+            1970-01-01T00:00:00.000Z,
+          ],
+        ],
+        "empty": [
+          "("mood") = ROW($3)",
+          [
+            {},
+          ],
+        ],
+        "inArray": [
+          "("mood") = ROW($3)",
+          [
+            [
+              {
+                "toPostgres": [Function],
+              },
+            ],
+          ],
+        ],
+        "map": [
+          "("mood") = ROW($3)",
+          [
+            Map {},
+          ],
+        ],
+        "nullPrototype": [
+          "("mood") = ROW($3)",
+          [
+            {},
+          ],
+        ],
+        "toPostgres": [
+          "("mood") = ROW($3)",
+          [
+            {
+              "toPostgres": [Function],
+            },
+          ],
+        ],
+        "where": [
+          "("mood") = ROW($3)",
+          [
+            {
+              "users.mood": "happy",
+            },
+          ],
+        ],
+      }
+    `);
+    expect(set(new Holder())[0]).toBe(`("mood") = ROW($3)`);
+  });
+
+  it('updateValues: a function or the global object throws, as under 6.6.1, alone or in an array', () => {
+    const fn = () => 'happy';
+    expect({ fn: set(fn), global: set(globalThis), inArray: set([fn]), globalInArray: set([globalThis]) })
+      .toMatchInlineSnapshot(`
+        {
+          "fn": "throws: Alien object while interpolating SQL: () => "happy"",
+          "global": "throws: Did you use \`self\` (the global object) where you meant \`db.self\` (the Zapatos value)? The global object cannot be embedded in a query.",
+          "globalInArray": "throws: Did you use \`self\` (the global object) where you meant \`db.self\` (the Zapatos value)? The global object cannot be embedded in a query.",
+          "inArray": "throws: Alien object while interpolating SQL: () => "happy"",
+        }
+      `);
   });
 
   it('noNullUpdateColumns: one column, a list, or all', () => {

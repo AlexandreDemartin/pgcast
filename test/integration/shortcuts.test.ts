@@ -179,16 +179,79 @@ describe('upsert', () => {
     }))).toEqual({ display_name: 'Bob!', $action: 'UPDATE' });
   });
 
-  it('characterization: updateValues with a plain string fails', async () => {
-    // characterization: 'happy' is compiled as the identifier "happy"
-    expect(await fails(db.upsert('users', { email: 'bob@example.com', display_name: 'Bob' }, 'email', {
-      updateValues: { mood: 'happy' },
+  it('updateValues: a plain value is stored as it is', async () => {
+    const createdAt = new Date('2020-01-02T03:04:05.000Z');
+    expect(await run(db.upsert('users', { email: 'bob@example.com', display_name: 'Bob' }, 'email', {
+      updateColumns: [],
+      updateValues: { display_name: 'Bobby', mood: 'happy', manager_id: null, settings: { theme: 'light' }, tags: ['a', 'b'], created_at: createdAt },
+      returning: ['display_name', 'mood', 'manager_id', 'settings', 'tags'],
+    }))).toEqual({ display_name: 'Bobby', mood: 'happy', manager_id: null, settings: { theme: 'light' }, tags: ['a', 'b'], $action: 'UPDATE' });
+    expect(await scalar(`SELECT created_at = '2020-01-02T03:04:05Z' AS v FROM users WHERE email = 'bob@example.com'`)).toBe(true);
+    const id = await scalar(`SELECT min(id) AS v FROM accounts WHERE owner_id = 2`);
+    expect(await run(db.upsert('accounts', { id, owner_id: 2 }, 'id', {
+      updateColumns: [], updateValues: { balance: 5, lifetime_ops: BigInt(42) }, returning: ['balance', 'lifetime_ops'],
+    }))).toEqual({ balance: 5, lifetime_ops: 42, $action: 'UPDATE' });
+  });
+
+  it('updateValues: a string that named a column is now stored as text; in sql it reads the column, as before', async () => {
+    const upsertBob = (displayName: any) => run(db.upsert('users', { email: 'bob@example.com', display_name: 'Robert' }, 'email', {
+      updateColumns: [], updateValues: { display_name: displayName }, returning: ['display_name'],
+    }));
+    expect(await upsertBob('users.display_name')).toEqual({ display_name: 'users.display_name', $action: 'UPDATE' });
+    // the same string in a fragment compiles to the same identifier as under 6.6.1
+    expect(await upsertBob(sql`${'users.display_name'}`)).toEqual({ display_name: 'users.display_name', $action: 'UPDATE' });
+    expect(await upsertBob(sql`${'excluded.display_name'}`)).toEqual({ display_name: 'Robert', $action: 'UPDATE' });
+    // a bare column name is ambiguous here, between the existing row and EXCLUDED: it never ran
+    expect(await fails(db.upsert('users', { email: 'bob@example.com', display_name: 'Robert' }, 'email', {
+      updateColumns: [], updateValues: { display_name: sql`${'email'}` },
     }))).toMatchInlineSnapshot(`
       {
-        "code": "42703",
-        "message": "column "happy" does not exist",
+        "code": "42702",
+        "message": "column reference "email" is ambiguous",
       }
     `);
+  });
+
+  it('updateValues: raw, param and Default compile as under 6.6.1', async () => {
+    expect(await run(db.upsert('users', { email: 'bob@example.com', display_name: 'Bob' }, 'email', {
+      updateColumns: [], updateValues: { created_at: db.raw('now()'), mood: Default, display_name: param('Bobby') },
+      returning: ['mood', 'display_name'],
+    }))).toEqual({ mood: null, display_name: 'Bobby', $action: 'UPDATE' });
+    expect(await scalar(`SELECT created_at = now() AS v FROM users WHERE email = 'bob@example.com'`)).toBe(true);
+  });
+
+  it('updateValues: an array that holds a pgcast object runs item by item, as under 6.6.1', async () => {
+    const upsertBob = (displayName: any) => run(db.upsert('users', { email: 'bob@example.com', display_name: 'Robert' }, 'email', {
+      updateColumns: [], updateValues: { display_name: displayName }, returning: ['display_name'],
+    })).then(row => row.display_name);
+    expect({
+      sql: await upsertBob([sql`upper(`, sql`EXCLUDED.display_name`, sql`)`]),
+      param: await upsertBob([param('Bobby')]),
+      raw: await upsertBob([db.raw(`'Bobby'`)]),
+      mapWithSeparator: await upsertBob(db.mapWithSeparator(['Bo', 'bby'], sql` || `, c => param(c))),
+      // a string in such an array is an identifier, as in a sql template
+      mixed: await upsertBob([sql`upper(`, 'excluded.display_name', sql`)`]),
+    }).toEqual({ sql: 'ROBERT', param: 'Bobby', raw: 'Bobby', mapWithSeparator: 'Bobby', mixed: 'ROBERT' });
+  });
+
+  it('updateValues: a plain object that holds a pgcast object runs as under 6.6.1; one of plain values is stored', async () => {
+    const upsertBob = (displayName: any) => run(db.upsert('users', { email: 'bob@example.com', display_name: 'Robert' }, 'email', {
+      updateColumns: [], updateValues: { display_name: displayName }, returning: ['display_name'],
+    })).then(row => row.display_name);
+    expect({
+      like: await upsertBob({ 'users.display_name': db.conditions.like('B%') }),
+      sql: await upsertBob({ x: sql`'Robert'` }),
+      inArray: await upsertBob([{ x: sql`'Bobby'` }]),
+      // under 6.6.1, these gave TRUE or a comparison, stored as true; in sql, they still do
+      empty: await upsertBob({}),
+      emptyBuffer: await upsertBob(Buffer.alloc(0)),
+      where: await upsertBob({ 'users.email': 'bob@example.com' }),
+      emptyInSql: await upsertBob(sql`${{}}`),
+      whereInSql: await upsertBob(sql`${{ 'users.email': 'bob@example.com' }}`),
+    }).toEqual({
+      like: 'true', sql: 'Robert', inArray: 'Bobby',
+      empty: '{}', emptyBuffer: '', where: '{"users.email":"bob@example.com"}', emptyInSql: 'true', whereInSql: 'true',
+    });
   });
 
   it('noNullUpdateColumns: a NULL does not overwrite (one column, a list, all)', async () => {
