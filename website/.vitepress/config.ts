@@ -46,12 +46,18 @@ export default defineConfig({
   themeConfig: {
     siteTitle: 'pg<b>::</b>cast',
     nav: [
-      { text: 'Docs', link: '/install', activeMatch: '^/(?!$)' },
+      // a group with a `nav` text is current on its landing page and on each of its pages; Explanation has none, so
+      // that the theme button stays in the bar from 960px (VitePress moves what does not fit into its ⋯ menu)
+      ...outline.flatMap(({ nav, link, items }) => nav === undefined ? [] : [{
+        text: nav,
+        link,
+        activeMatch: `^(${[link, ...items.map(item => item.link)].join('|')})$`,
+      }]),
       // no ↗ after the external links, as the prototype
       { text: 'Changelog', link: `${repo}/blob/master/CHANGELOG.md`, noIcon: true },
       { text: 'GitHub', link: repo, noIcon: true },
     ],
-    sidebar: outline,
+    sidebar: outline,  // each group's heading links its landing page
     search: {
       provider: 'local',
       options: { translations: { button: { buttonText: 'Search the docs', buttonAriaLabel: 'Search the docs' } } },
