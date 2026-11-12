@@ -108,6 +108,11 @@ Candidates for a check, a rule or a skill line.
 - #31 — A type can accept a class it never names: `Parameter<T>` is structural, so `DangerousRawString { value: string }` passes wherever `Parameter<string>` does; probe every wrapper class against a slot typed `Parameter<T>` (led to #101) — `builder`
 - #31 — VitePress default-theme overrides with one class lose to its scoped `[data-v-…]` rules without any error: check an override in the built CSS or the computed style (#103) — `branch-reviewer`
 - #31 — Agents running at the same time share one session scratchpad: name review worktrees uniquely (PR number and PID), never `scratchpad/wt` — `branch-reviewer`
+- #98 — To restyle a VitePress component, a rule needs more specificity than its scoped rules (`[data-v-…]` counts as one class, so `.X.active[data-v]` weighs three): read the component's `<style scoped>` or the computed style first; a `nav` item's `noIcon` beats overriding `::after` — `builder`, `branch-reviewer`
+- #98 — VitePress's pre-paint script reads only `vitepress-theme-appearance`: a theme switch keeps that key, or the page flashes the wrong theme on load — `builder`
+- #98 — Pinning only the direct dependencies leaves the tree free to resolve recent versions: `npm install --before=<date>` enforces the two-week rule for the whole lock file, and Dependabot's `cooldown: { default-days: 14 }` keeps it after — `builder`, `branch-reviewer`
+- #98 — Skill `plan-and-proofs` says "No screenshots: pgcast has no UI", and skill `ci-gate` that a Markdown-only PR runs two small jobs: both stop being true with `website/` (screenshots go to a private artifact, since `gh` cannot attach images; Markdown under `website/` runs the `docs` job) (candidate: both skills) — `builder`
+- #98 — `vitepress preview` keeps its file list from start-up: restart it after each rebuild, or new assets return 404; headless Chrome cannot go below ~500px, so phone-width shots go through the DevTools protocol — `builder`
 
 ## Minors kept
 
