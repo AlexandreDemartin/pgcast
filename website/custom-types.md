@@ -167,7 +167,7 @@ A domain's placeholder holds its base type's TypeScript name, and imports `zapat
 | Placeholder type | `tsc` says | Add, inside `declare module` |
 |---|---|---|
 | `db.Int8String`, for a domain over `bigint`; `numeric`, `time` and the ranges alike | TS2503, `Cannot find namespace 'db'.` | `import type * as db from 'zapatos/db';` |
-| `genre`, for a domain over the enum `genre` | TS2304, `Cannot find name 'genre'.` | `import type { genre } from 'zapatos/schema';` |
+| `crew_job`, for `CREATE DOMAIN lead_job AS crew_job`, over an enum | TS2304, `Cannot find name 'crew_job'.` | `import type { crew_job } from 'zapatos/schema';` |
 
 For `CREATE DOMAIN ticket_no AS bigint`, the placeholder holds `db.Int8String`, the string `pg` returns for a `bigint`. But the shortcuts return a `bigint` as a JSON number: a `ticket_no` that [`select()`](/select#select) returns is a `number` typed `db.Int8String`, so `.padStart()` compiles, then throws; and [`insert()`](/insert#insert) refuses `1` (TS2769). With the import, type it as both:
 
