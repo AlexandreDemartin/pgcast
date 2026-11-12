@@ -61,7 +61,8 @@ One per group, in `templates/`, not published (`srcExclude` in `.vitepress/confi
   - Any comment that starts as a mark is one: a mark the script cannot read fails. In a table, a probe holds no `|` (write `'\x7c'`). Postgres's own messages and the SQL the reader writes are not marked.
 - **Links**: root-relative, without `.md`: `[Install](/install)`, an entry as `` [`select()`](/select#select) ``. A link to a page that does not exist fails the build.
   - The hash is the anchor exactly as written: an entry's name, case and dots kept (`` [`Config.castArrayParamsToJson`](/runtime-config#Config.castArrayParamsToJson) ``, `` [`SelectResultMode`](#SelectResultMode) `` on its own page); a heading without `{#…}` by its slug, in lower case with hyphens (`## Insert options` → `#insert-options`). No raw `<a href>`.
-  - The build also fails on a raw `<a href>` to a page that does not exist, on a link to an anchor that its page does not define (the part before a text fragment's `:~:`, if any), and on a root link outside the site's base, with the page and the link (`.vitepress/anchors.ts`). A name still in `reference-pending.json` counts as an anchor of its page, so a page can link an entry of a "Coming" page.
+  - The build also fails on a raw `<a href>` to a page that does not exist, on a link to an anchor that its page does not define (the part before a text fragment's `:~:`, if any), and on a root link outside the site's base, with the page and the link (`.vitepress/anchors.ts`). A link written with the site's host (`https://alexandredemartin.github.io/pgcast/…`) is checked the same way. A name still in `reference-pending.json` counts as an anchor of its page, so a page can link an entry of a "Coming" page.
+  - A URL of the site in a fenced block (`https://alexandredemartin.github.io/pgcast/…`), such as the rules file of `ai-assistant.md` that readers copy into their projects, is checked the same way, page and anchor, and reported with its line. The home may be written without its slash, as GitHub Pages redirects it.
   - A tutorial ends on the three other groups.
   - A how-to links each option it uses to its entry.
   - A reference entry links its explanation for the why.
@@ -91,6 +92,10 @@ One per group, in `templates/`, not published (`srcExclude` in `.vitepress/confi
   - An example also fails if a promise it does not await rejects, or, in `examples/plain/`, if it leaves a client in use or a query waiting. One that does not settle within 10 s ends the run.
   - A name an example only declares (`declare const tags: …`) runs with a stand-in from `run-examples.mjs`; a new one goes there.
 - Code a page shows in its own block and an example needs above its `// ---cut---`, such as a function it calls, goes between `// #region copy` and `// #endregion copy` (`examples/plain/paginate_handler.ts`). The build fails, in `.vitepress/llms.ts`, unless those lines are still a block of the page, blank lines aside.
+- A page whose examples the reader keeps in one file, as the tutorial's `src/films.ts`, says so with a line `<!-- joined: src/films.ts -->` under its last step; any other line holding `<!-- joined` fails the build. `docs:build` checks the file (`check-joined.mjs`), and each error names the page and the line:
+  - The code below `// ---cut---` of each `ts twoslash` block and `<<< ./examples/<name>.ts{ts twoslash}` (unindented) above it, up to the previous such line, is joined in page order and type-checked: a name declared twice or an import the page never gives fails.
+  - A block that shows an error (`// @errors:`) stays out of the join, as the reader does not keep it. Its code is type-checked below the steps above it, in a `{ … }` of its own, and must give exactly the codes it lists: Twoslash checks it only against its own setup.
+  - If the first `ts twoslash` block under the line is titled with the file (`ts twoslash [src/films.ts]`), it shows the whole file: it must be the join, imports in any order and blank lines aside.
 - An optional caption goes under the panel: `<template #caption><span>…</span></template>` (`index.md`).
 
 ### The reference
