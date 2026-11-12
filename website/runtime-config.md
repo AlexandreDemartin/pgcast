@@ -59,7 +59,7 @@ interface Config {
 }
 ```
 
-The keys pgcast adds are optional, so a `Config` written for Zapatos 6.6.1 still compiles; `getConfig()` types them `boolean | undefined`, though it always gives a value. No option changes a type.
+The keys pgcast adds are optional, so a `Config` written for Zapatos 6.6.1 still compiles; `getConfig()` types them `boolean | undefined`, though it always gives a value unless set to `undefined`. No option changes a type.
 
 | Option | Default | What it changes | Read |
 |---|---|---|---|
