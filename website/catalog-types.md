@@ -19,13 +19,13 @@ A Postgres database knows its own shape, and keeps it in its catalog: the system
 
 To watch the queries themselves, set [`debugListener`](/generator#generate.debugListener). A domain, such as `seat_label`, and a type the generator has no mapping for, such as `point`, each get a placeholder in `zapatos/custom/`, yours to fill in ([Use custom types and domains](/custom-types)). And what the catalog can't see, such as a column a trigger fills in, you say in the config: [`columnOptions`](/generator#generate.columnOptions) leaves it out of `Insertable`, or makes it optional there.
 
-### What the catalog doesn't say
+### What the generator doesn't read
 
-The generator reads names, types, nullability and defaults. It doesn't read foreign keys, `CHECK` constraints, or the SQL inside views and functions. So `ratings.stars`, `CHECK (stars BETWEEN 1 AND 5)`, is a `number`; a `seat_label` matching `'^[A-Z][0-9]{1,2}$'` is a `string`; and nothing tells TypeScript that `films.studio_id` points at a studio.
+The generator reads names, types, nullability and defaults. Postgres also keeps each foreign key and `CHECK` constraint, in `pg_constraint`, but Zapatos 6.6.1 never read that table, nor the SQL inside views and functions; pgcast doesn't yet either. So `ratings.stars`, `CHECK (stars BETWEEN 1 AND 5)`, is a `number`; a `seat_label` matching `'^[A-Z][0-9]{1,2}$'` is a `string`; and nothing tells TypeScript that `films.studio_id` points at a studio.
 
 A view is typed as Postgres reports it, and Postgres reports every column of a view as nullable, whatever the tables underneath say. A view of the `id` and `title` of `films` types both as `| null`, and gets an `Insertable` with every column optional, since Postgres can write through it; a view over a join, which it can't write through, gets an `Insertable` and an `Updatable` that take nothing (`[key: string]: never`). A materialised view keeps no `NOT NULL` at all, so its columns are nullable too.
 
-That's how Zapatos works, and pgcast keeps it: a type the database doesn't state would be a guess, and a guess is the one thing a generated type mustn't be. Some gaps in what it reads are known, and described here as they are today:
+For views, pgcast keeps to what Postgres states, as Zapatos did: a nullability the database doesn't state would be a guess, and a guess is the one thing a generated type mustn't be. Some gaps in what the generator reads are known, and described here as they are today:
 
 - Enum labels come out in alphabetical order: `crew_job` is `'cinematographer' | 'composer' | 'director' | 'editor' | 'writer'`, not the order of its `CREATE TYPE` ([#49](https://github.com/AlexandreDemartin/pgcast/issues/49)).
 - Comments are read on the columns of tables and materialised views only, not of views, foreign tables or partitioned tables ([#47](https://github.com/AlexandreDemartin/pgcast/issues/47)).
