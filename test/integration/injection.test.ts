@@ -4,8 +4,8 @@
 // test/unit/injection.test.ts). A test named `characterization:` is not fixed yet
 // (chapter 2).
 // Payloads stay harmless and inside this file's database: a SELECT, or the UPDATE
-// below, undone by the ROLLBACK that ends each test (test/helpers/db.ts); each test
-// that runs it reads the row again through another connection, which still sees 'Ada'.
+// below, undone by the ROLLBACK that ends each test (test/helpers/db.ts); a test reads
+// the row on its own connection before that ROLLBACK, where an UPDATE that ran would show.
 // pg sends a query with parameters through the extended protocol, which refuses
 // several statements; a query without parameters goes through the simple protocol,
 // which runs them all.
@@ -23,11 +23,6 @@ const t = useTestDatabase();
 const update = `UPDATE users SET display_name = 'injected' WHERE id = 1`;
 const adaName = async (queryable: pg.ClientBase | pg.Pool = t.client) =>
   (await queryable.query<{ display_name: string }>('SELECT display_name FROM users WHERE id = 1')).rows[0]!.display_name;
-/** The UPDATE ran in this test's transaction, which another connection does not see. */
-const expectInjectedHereOnly = async () => {
-  expect(await adaName()).toBe('injected');
-  expect(await adaName(t.pool)).toBe('Ada');
-};
 
 const identifierQueries = (input: string) => ({
   column: sql`SELECT ${input} FROM ${'users'}`,
@@ -257,6 +252,8 @@ describe('without parameters (simple protocol)', () => {
       qualifiedCloses: `users"."display_name" FROM users; ${update}; SELECT "display_name`,
       escapedCloses: 'a"" OR TRUE OR ""b', qualifiedEscaped: 's.a"" OR TRUE OR ""b', escapedDot: 'a"."b',
       escapedNul: 'a""\0""b', escapedOdd: 'a"""b',
+      prequotedEscaped: '"a"" OR TRUE OR ""b"', prequotedEmpty: '""', lone: '"',
+      prequotedCloses: `"display_name" FROM users; ${update}; SELECT "display_name"`,
     })).toMatchInlineSnapshot(`
       {
         "backslash column": "42703",
@@ -292,9 +289,21 @@ describe('without parameters (simple protocol)', () => {
         "escapedOdd column": "42703",
         "escapedOdd key": "42703",
         "escapedOdd table": "42P01",
+        "lone column": "42703",
+        "lone key": "42703",
+        "lone table": "42P01",
         "nul column": "08P01",
         "nul key": "08P01",
         "nul table": "08P01",
+        "prequotedCloses column": "42703",
+        "prequotedCloses key": "42703",
+        "prequotedCloses table": "42P01",
+        "prequotedEmpty column": "42703",
+        "prequotedEmpty key": "42703",
+        "prequotedEmpty table": "42P01",
+        "prequotedEscaped column": "42703",
+        "prequotedEscaped key": "42703",
+        "prequotedEscaped table": "42P01",
         "qualifiedCloses column": "42P01",
         "qualifiedCloses key": "42P01",
         "qualifiedCloses table": "42P01",
@@ -331,6 +340,8 @@ describe('without parameters (simple protocol)', () => {
       closes: `a"; ${update}; --`,
       escapedCloses: 'a"" OR TRUE OR ""b', qualifiedEscaped: 's.a"" OR TRUE OR ""b', escapedDot: 'a"."b',
       escapedOdd: 'a"""b',
+      prequoted: '"a"', prequotedEscaped: '"a"" OR TRUE OR ""b"', prequotedEmpty: '""', lone: '"',
+      prequotedCloses: `"a"; ${update}; --"`,
     }, input => ({
       table: rows(db.select(input as any, all)),
       alias: rows(db.select('users', all, { alias: input } as any)),
@@ -367,9 +378,24 @@ describe('without parameters (simple protocol)', () => {
         "escapedOdd alias": "3 rows",
         "escapedOdd key": "3 rows",
         "escapedOdd table": "42P01",
+        "lone alias": "3 rows",
+        "lone key": "3 rows",
+        "lone table": "42P01",
         "nul alias": "08P01",
         "nul key": "08P01",
         "nul table": "08P01",
+        "prequoted alias": "3 rows",
+        "prequoted key": "3 rows",
+        "prequoted table": "42P01",
+        "prequotedCloses alias": "3 rows",
+        "prequotedCloses key": "3 rows",
+        "prequotedCloses table": "42P01",
+        "prequotedEmpty alias": "3 rows",
+        "prequotedEmpty key": "3 rows",
+        "prequotedEmpty table": "42P01",
+        "prequotedEscaped alias": "3 rows",
+        "prequotedEscaped key": "3 rows",
+        "prequotedEscaped table": "42P01",
         "qualifiedEscaped alias": "42601",
         "qualifiedEscaped key": "3 rows",
         "qualifiedEscaped table": "42P01",
@@ -383,21 +409,68 @@ describe('without parameters (simple protocol)', () => {
     `);
   });
 
-  it('characterization: a pre-quoted string identifier is raw and runs a second statement', async () => {
-    // characterization: it starts and ends with `"`, so it is written as is, even a lone `"`
-    expect(await identifierOutcomes({ prequoted: '"a"', lone: '"' })).toMatchInlineSnapshot(`
+  it('a pre-quoted string that closes its quotes stays one column name, which does not exist', async () => {
+    // 6.6.1: written as is, as anything that starts and ends with `"`, so a second statement ran
+    const column = `"display_name" FROM users; ${update}; SELECT "display_name"`;
+    const q = sql`SELECT ${column} FROM ${'users'}`;
+    expect(q.compile().values).toEqual([]);
+    expect(await pgError(t.client, () => q.run(t.client))).toMatchInlineSnapshot(`
       {
-        "lone column": "42601",
-        "lone key": "42601",
-        "lone table": "42601",
-        "prequoted column": "42703",
-        "prequoted key": "42703",
-        "prequoted table": "42P01",
+        "code": "42703",
+        "message": "column ""display_name" FROM users; UPDATE users SET display_name = 'inj" does not exist",
       }
     `);
-    const column = `"display_name" FROM users; ${update}; SELECT "display_name"`;
-    await sql`SELECT ${column} FROM ${'users'}`.run(t.client);
-    await expectInjectedHereOnly();
+    expect(await adaName()).toBe('Ada');
+  });
+
+  it('a well-formed quoted name runs as before, as a column, a table or a Whereable key', async () => {
+    const run = (column: string, table: string) =>
+      sql`SELECT ${column} AS v FROM ${table} WHERE ${{ [column]: 'Ada' }}`.run(t.client);
+    for (const [column, table] of [
+      ['"display_name"', '"users"'], ['"users"."display_name"', '"public"."users"'],
+      ['"users" . "display_name"', '"public" . "users"'], ['"users"\n.\n"display_name"', '"public"\t.\t"users"'],
+    ]) expect(await run(column!, table!), column).toEqual([{ v: 'Ada' }]);
+  });
+
+  it('a pre-quoted string that ran under 6.6.1 by closing its quotes now names something that does not exist', async () => {
+    // 6.6.1 ran each of these: an alias, a cast, an expression, a collation, a comment between the parts
+    expect(await identifierOutcomes({
+      alias: '"display_name" AS "x"', cast: '"display_name"::"text"', concat: '"display_name" || "email"',
+      collate: '"display_name" COLLATE "C"', comment: '"users"/**/."display_name"',
+    }, input => ({ column: sql`SELECT ${input} FROM ${'users'}`, key: sql`SELECT 1 FROM ${'users'} WHERE ${{ [input]: 'Ada' }}` })))
+      .toMatchInlineSnapshot(`
+        {
+          "alias column": "42703",
+          "alias key": "42703",
+          "cast column": "42703",
+          "cast key": "42703",
+          "collate column": "42703",
+          "collate key": "42703",
+          "comment column": "42P01",
+          "comment key": "42P01",
+          "concat column": "42703",
+          "concat key": "42703",
+        }
+      `);
+    expect(await identifierOutcomes({ alias: '"users" "u"', comment: '"public"/**/."users"' }, input => ({ table: sql`SELECT 1 FROM ${input}` })))
+      .toMatchInlineSnapshot(`
+        {
+          "alias table": "42P01",
+          "comment table": "42P01",
+        }
+      `);
+  });
+
+  it('a pre-quoted alias that closes its quotes stays one alias, in FROM and to_jsonb() alike', async () => {
+    // 6.6.1, and master before this fix: written as is in `to_jsonb(<alias>.*)` and `FROM "users" AS <alias>`
+    const alias = `"u"; ${update}; --"`;
+    const q = db.select('users', all, { alias, order: { by: 'id', direction: 'ASC' } } as any);
+    const { text, values } = q.compile();
+    expect(text).toContain(`to_jsonb("""u""; ${update}; --""".*)`);
+    expect(text).toContain(`FROM "users" AS """u""; ${update}; --"""`);
+    expect(values).toEqual([]);
+    expect((await q.run(t.client)).map(u => u.id)).toEqual([1, 2, 3]);
+    expect(await adaName()).toBe('Ada');
   });
 
   it('lock.for is checked before any query', async () => {

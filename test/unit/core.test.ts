@@ -67,14 +67,20 @@ describe('identifiers (strings)', () => {
     expect(one('a"."b')).toEqual({ text: '"a"".""b"', values: [] });
   });
 
-  it('characterization: anything that starts and ends with a double quote passes through raw', () => {
-    // characterization: the "already quoted" test only looks at the first and last characters
-    expect(one('"a" || "b"')).toMatchInlineSnapshot(`
-      {
-        "text": ""a" || "b"",
-        "values": [],
-      }
-    `);
+  it('writes a string that is already a well-formed quoted name as is', () => {
+    // `"; DROP TABLE t; --"` is one quoted name too, the column `; DROP TABLE t; --`, as under 6.6.1
+    for (const name of ['"a"', '"a"."b"', '"a""b"', '"a.b"', '"a" . "b"', '"a"\n.\n"b"', '"s"."t"."c"', '"; DROP TABLE t; --"'])
+      expect(one(name), name).toEqual({ text: name, values: [] });
+  });
+
+  it('quotes any other string that starts and ends with a double quote like any other name', () => {
+    // 6.6.1 wrote each of these as is, as it did anything that started and ended with `"`
+    expect(one('"a" FROM t; DROP TABLE t; SELECT "a"')).toEqual({ text: '"""a"" FROM t; DROP TABLE t; SELECT ""a"""', values: [] });
+    expect(one('"a" || "b"')).toEqual({ text: '"""a"" || ""b"""', values: [] });
+    expect(one('"a"/**/."b"')).toEqual({ text: '"""a""/**/"."""b"""', values: [] });
+    expect(one('"')).toEqual({ text: '""""', values: [] });
+    // as for `a""b`, a name that compiles to quoted names only is written so: `""` gives the column `"`
+    expect(one('""')).toEqual({ text: '""""', values: [] });
   });
 });
 
