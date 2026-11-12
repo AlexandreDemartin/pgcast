@@ -66,7 +66,7 @@ npx pgcast   # or: npx zapatos
 
 ::: code-group
 
-```ts [src/books.ts]
+```ts twoslash [src/books.ts]
 import * as db from 'zapatos/db';
 import pg from 'pg';
 

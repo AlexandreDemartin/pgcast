@@ -28,6 +28,8 @@ export default defineConfig({
   ],
   markdown: {
     theme: syntax,
+    // a hover's JSDoc can hold these (`process.env`, from @types/node), and Shiki loads only the languages a page names
+    languages: ['js', 'bash'],
     // an unexpected type error in a `ts twoslash` block fails the build; a block meant to fail says so with `// @errors`
     codeTransformers: [transformerTwoslash({ twoslashOptions }), focusableHovers, sqlParameters],
   },
