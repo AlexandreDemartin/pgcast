@@ -200,6 +200,14 @@ describe('type surprises', () => {
     db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { settings: db.vals({ a: 1 }) } });
     // @ts-expect-error vals(x) of another type, refused by 6.6.1 too
     db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { manager_id: db.vals('nonsense') } });
+    // @ts-expect-error vals(null), refused by 6.6.1 too: it throws while compiling
+    db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { manager_id: db.vals(null) } });
+    // @ts-expect-error vals() of a fragment, refused by 6.6.1 too: the fragment's fields become parameters
+    db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { created_at: db.vals(db.sql`now()`) } });
+    // @ts-expect-error vals() of a Parameter, refused by 6.6.1 too: its fields become parameters
+    db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { manager_id: db.vals(db.param(1)) } });
+    // @ts-expect-error vals(Default), refused by 6.6.1 too: it compiles to `ROW(…, )`
+    db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { created_at: db.vals(db.Default) } });
     // @ts-expect-error raw() on an int column, refused by 6.6.1 too
     db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { manager_id: db.raw('"users"."manager_id"') } });
     // @ts-expect-error cols(x) of another type
