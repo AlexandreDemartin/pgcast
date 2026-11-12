@@ -31,7 +31,11 @@ The file's name, `PgPoint`, comes from [`customTypesTransform`](/generator#gener
 
 The shortcuts return each row as JSON, which writes a point as Postgres prints it: `"(0.4,1.2)"`. Postgres takes that string back as a value too. So in `src/zapatos/custom/PgPoint.d.ts`, replace `any` with that form, a template literal type:
 
-<<< ./zapatos/custom/PgPoint.d.ts{ts}
+::: code-group
+
+<<< ./zapatos/custom/PgPoint.d.ts#module{ts} [src/zapatos/custom/PgPoint.d.ts]
+
+:::
 
 Keep the edit within `declare module 'zapatos/custom'`: the file is the module's declaration. Now a cinema's location is checked as you write it:
 
@@ -96,7 +100,11 @@ const here: c.PgPoint = '(0.5,1)';
 
 A domain gets a placeholder too, which holds its base type's `Selectable` type instead of `any`: the type `pg` returns. That one type serves all five interfaces, `JSONSelectable` included. `seat_label` is a `TEXT` with a `CHECK`, so `src/zapatos/custom/PgSeat_label.d.ts` holds `string`, right in each:
 
-<<< ./zapatos/custom/PgSeat_label.d.ts{ts}
+::: code-group
+
+<<< ./zapatos/custom/PgSeat_label.d.ts#module{ts} [src/zapatos/custom/PgSeat_label.d.ts]
+
+:::
 
 And `seat_bookings.seat` is `c.PgSeat_label`. The `CHECK` stays in Postgres: TypeScript lets `seat: 'f7'` through, and Postgres refuses it with 23514, `value for domain seat_label violates check constraint "seat_label_check"`. Catch it with [`isDatabaseError()`](/transaction#isDatabaseError).
 
