@@ -188,6 +188,9 @@ Candidates for a check, a rule or a skill line.
 - #146 — VitePress interpolates `{{…}}` in inline code: use `<code v-pre>`; fenced blocks are safe — `builder`
 - #146 — To test the CLI as a user runs it, `npm pack` and install the tarball in a scratch project (`website/node_modules/.bin` has no `pgcast`) — `builder`
 - #146 — A builder's worktree can miss a master that moved: check `git fetch` then `git merge-base` before saying no merge is needed — orchestrator
+- #123 — « each / every X does Y » is searched for its exceptions before it is written (`grep runResultTransform` showed the aggregates' `Number()`) — `branch-reviewer`
+- #123 — The docs examples share one process: an example that changes module state is undone by value (nested objects included) and a self-check proves it — `branch-reviewer`, `builder`
+- #123 — A probe that leaks pool clients on purpose crashes Node once its database is dropped (57P01): run it last, in its own process — `builder`
 
 ## Minors kept
 
