@@ -1,25 +1,4 @@
 {
-  "transaction.md": [
-    "isDatabaseError",
-    "transaction",
-    "serializable",
-    "repeatableRead",
-    "readCommitted",
-    "serializableRO",
-    "repeatableReadRO",
-    "readCommittedRO",
-    "serializableRODeferrable",
-    "IsolationLevel",
-    "IsolationSatisfying",
-    "TxnClient",
-    "TxnClientForSerializable",
-    "TxnClientForRepeatableRead",
-    "TxnClientForReadCommitted",
-    "TxnClientForSerializableRO",
-    "TxnClientForRepeatableReadRO",
-    "TxnClientForReadCommittedRO",
-    "TxnClientForSerializableRODeferrable"
-  ],
   "runtime-config.md": [
     "SchemaVersionCanary",
     "SQLQuery",
