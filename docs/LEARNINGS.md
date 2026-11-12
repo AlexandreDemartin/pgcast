@@ -202,6 +202,10 @@ Candidates for a check, a rule or a skill line.
 - #139 — A how-to that chains steps compiles the chain as the reader writes it (`page.at(-1)` into the next query); a panel runs the earlier query on a hidden pool that returns rows — `branch-reviewer`, `builder`
 - #139 — A mixed-direction keyset needs a bound on the first key to get an `Index Cond`; a bare `OR` filters from the top, as `offset` does — `branch-reviewer`
 - #139 — For a scratch `tsc` outside `website/`, `@types/*` comes before `node_modules/*` in `paths`, or `pg` resolves to untyped JS (TS7016) — `builder`
+- #143 — « can't close its quotes » proves an identifier is escaped, not that it is safe as a value: a name the caller picks still chooses the column (`'title'` → `"title" = "title"`, every row) — `branch-reviewer`
+- #143 — An empty Whereable, typed or not, passes `tsc` and compiles to `TRUE`: a guide says to check before a `DELETE` / `UPDATE` — `branch-reviewer`
+- #143 — A `param()` cast is quoted, so SQL-standard spellings and upper case do not exist (`'integer'`, `'TIMESTAMPTZ'` → 42704) — `branch-reviewer`
+- #143 — A security probe for « matches every row » uses a `DELETE` on a table nothing references, or a foreign key stops it and proves nothing — `builder`
 
 ## Minors kept
 
