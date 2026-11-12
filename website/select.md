@@ -191,7 +191,7 @@ As [`selectOne()`](#selectOne), but its type has no `undefined`: when no row mat
 db.count(table, where, options?)
 ```
 
-`SELECT count(*) AS result`, with no `jsonb_agg`: `.run(pool)` gives a `number`, `0` when no row matches. The `bigint` that Postgres returns goes through `Number()`.
+`SELECT count(*) AS result`, with no `jsonb_agg`: `.run(pool)` gives a `number`, `0` when no row matches the `where`. The `bigint` that Postgres returns goes through `Number()`.
 
 <CastPanel example="count">
 
@@ -205,11 +205,14 @@ db.count(table, where, options?)
 |---|---|---|
 | `columns: ['subtitled']` | `count("subtitled")` in place of `count(*)`: the rows where it is not `NULL` | none |
 | `distinct: true` | `SELECT DISTINCT count(*)`, on the one result: not `count(DISTINCT …)`, which needs a `sql` template | none |
-| `groupBy: 'film_id'` | `GROUP BY "film_id"`; `.run()` gives the first group's value only | none |
+| `groupBy: 'film_id'` | `GROUP BY "film_id"`; `.run()` gives the first group's value only, and with no group rejects with a `TypeError` | none |
 | `extras` | nothing | none |
 | `lateral: { … }` | its `LEFT JOIN LATERAL`s, whose results are not read; one subquery writes `SELECT  AS result`, which Postgres refuses | none |
+| `having`, `limit`, `offset` | as in `select()`; when they leave no row (a `having` that keeps none, `limit: 0`, `offset: 1`), `.run()` rejects with a `TypeError` | none |
 
-`where`, `alias`, `having`, `order`, `limit`, `offset` and `lock` add what they add to `select()`.
+`where`, `alias`, `order` and `lock` add what they add to `select()`.
+
+`.run()` reads the first row of the result. When the query returns none, it rejects with `TypeError: Cannot read properties of undefined (reading 'result')`; so do `sum()`, `avg()`, `min()` and `max()`.
 
 ## `sum()` {#sum}
 
@@ -217,7 +220,7 @@ db.count(table, where, options?)
 db.sum(table, where, options?)
 ```
 
-`SELECT sum("column") AS result`, a `number`; otherwise as [`count()`](#count). Give one column in `columns`: without it, the SQL is `sum(*)`, which Postgres refuses (42883). Over no rows, Postgres returns `NULL`, and `Number(null)` makes it `0`.
+`SELECT sum("column") AS result`, a `number`; otherwise as [`count()`](#count). Give one column in `columns`: without it, the SQL is `sum(*)`, which Postgres refuses (42883). When no row matches the `where`, Postgres returns `NULL`, and `Number(null)` makes it `0`.
 
 <CastPanel example="sum">
 
@@ -231,7 +234,7 @@ db.sum(table, where, options?)
 db.avg(table, where, options?)
 ```
 
-`SELECT avg("column") AS result`: the mean, through `Number()`, so `0` over no rows. Otherwise as [`sum()`](#sum).
+`SELECT avg("column") AS result`: the mean, through `Number()`, so `0` when no row matches. Otherwise as [`sum()`](#sum).
 
 <CastPanel example="avg">
 
@@ -245,7 +248,7 @@ db.avg(table, where, options?)
 db.min(table, where, options?)
 ```
 
-`SELECT min("column") AS result`, through `Number()`, so `0` over no rows. The type says `number` whatever the column:
+`SELECT min("column") AS result`, through `Number()`, so `0` when no row matches. The type says `number` whatever the column:
 
 - a date or time column (`date`, `timestamp`, `timestamptz`) gives its milliseconds since 1970, as node-postgres reads it as a `Date`;
 - text or an enum gives `NaN`, unless the text reads as a number: `'9'` gives `9`.
@@ -264,7 +267,7 @@ Otherwise as [`sum()`](#sum).
 db.max(table, where, options?)
 ```
 
-`SELECT max("column") AS result`; as [`min()`](#min): `0` over no rows, a date's milliseconds, and `NaN` on text or an enum unless the text reads as a number.
+`SELECT max("column") AS result`; as [`min()`](#min): `0` when no row matches, a date's milliseconds, and `NaN` on text or an enum unless the text reads as a number.
 
 <CastPanel example="max">
 
