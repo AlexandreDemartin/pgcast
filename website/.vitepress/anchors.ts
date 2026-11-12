@@ -93,7 +93,9 @@ export function checkLinks(config: SiteConfig) {
     }
     if (!existsSync(markdown)) continue;  // a "Coming" page, from `[page].md`
     for (const [line, written] of fencedSiteUrls(readFileSync(markdown, 'utf8'))) {
-      const problem = problemOf(new URL(written.slice(host.length), 'http://site'));
+      const url = new URL(written.slice(host.length), 'http://site');
+      if (url.pathname === base.slice(0, -1)) url.pathname = base;  // the home without its slash, which GitHub redirects
+      const problem = problemOf(url);
       if (problem) problems.add(`${page}:${line}: ${written}, ${problem}`);
     }
   }

@@ -56,7 +56,7 @@ One per group, in `templates/`, not published (`srcExclude` in `.vitepress/confi
 - **Links**: root-relative, without `.md`: `[Install](/install)`, an entry as `` [`select()`](/select#select) ``. A link to a page that does not exist fails the build.
   - The hash is the anchor exactly as written: an entry's name, case and dots kept (`` [`Config.castArrayParamsToJson`](/runtime-config#Config.castArrayParamsToJson) ``, `` [`SelectResultMode`](#SelectResultMode) `` on its own page); a heading without `{#…}` by its slug, in lower case with hyphens (`## Insert options` → `#insert-options`). No raw `<a href>`.
   - The build also fails on a raw `<a href>` to a page that does not exist, on a link to an anchor that its page does not define (the part before a text fragment's `:~:`, if any), and on a root link outside the site's base, with the page and the link (`.vitepress/anchors.ts`). A name still in `reference-pending.json` counts as an anchor of its page, so a page can link an entry of a "Coming" page.
-  - A URL of the site in a fenced block (`https://alexandredemartin.github.io/pgcast/…`), such as the rules file of `ai-assistant.md` that readers copy into their projects, is checked the same way, page and anchor, and reported with its line.
+  - A URL of the site in a fenced block (`https://alexandredemartin.github.io/pgcast/…`), such as the rules file of `ai-assistant.md` that readers copy into their projects, is checked the same way, page and anchor, and reported with its line. The home may be written without its slash, as GitHub Pages redirects it.
   - A tutorial ends on the three other groups.
   - A how-to links each option it uses to its entry.
   - A reference entry links its explanation for the why.
