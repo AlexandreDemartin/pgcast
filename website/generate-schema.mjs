@@ -13,7 +13,7 @@ if (!process.env.TEST_DATABASE_URL) throw new Error('TEST_DATABASE_URL is not se
 
 const
   server = new URL(process.env.TEST_DATABASE_URL),
-  name = `pgcast_test_docs_${process.pid}`,  // the prefix the test suite owns
+  name = `pgcast_test_${process.pid}_docs`,  // a concurrent test run leaves pgcast_test_<pid>_* alone while <pid> lives
   url = Object.assign(new URL(server), { pathname: `/${name}` }).toString(),
   admin = new pg.Client({ connectionString: server.toString() });
 
@@ -21,11 +21,14 @@ await admin.connect();
 await admin.query(`CREATE DATABASE "${name}"`);
 try {
   const client = new pg.Client({ connectionString: url });
-  await client.connect();
-  await client.query(readFileSync(new URL('schema.sql', import.meta.url), 'utf8'));
-  await client.end();
+  try {
+    await client.connect();
+    await client.query(readFileSync(new URL('schema.sql', import.meta.url), 'utf8'));
+  } finally {
+    await client.end();
+  }
   await generate({ db: { connectionString: url }, outDir: fileURLToPath(new URL('.', import.meta.url)) });
 } finally {
-  await admin.query(`DROP DATABASE IF EXISTS "${name}"`);
+  await admin.query(`DROP DATABASE IF EXISTS "${name}" WITH (FORCE)`);
   await admin.end();
 }
