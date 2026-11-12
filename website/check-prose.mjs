@@ -168,12 +168,12 @@ for (const page of pages) {
         if (!pattern(quote).test(sql.replace(/\n/g, ' '))) problems.push(`${where}: \`${quote}\` is not in ${sql}`);
         continue;
       }
-      // A block: its lines, `--` comments aside, are queries the probe sends, whole and in this order.
+      // A block: its lines, `--` comments aside, are the queries the probe sends, all of them, whole and in this order.
       const queries = [];
       for (i += 2; i < lines.length && !/^\s*```\s*$/.test(lines[i]); i++)
         if (lines[i].trim() !== '' && !/^\s*--/.test(lines[i])) queries.push(lines[i]);
-      if (!new RegExp(queries.map(query => `^${pattern(query).source}$`).join('[\\s\\S]*?'), 'm').test(sql))
-        problems.push(`${where}: the block's queries are not those its probe sends, in order:\n    ` +
+      if (!new RegExp(`^${queries.map(query => pattern(query).source).join('\\n')}$`).test(sql))
+        problems.push(`${where}: the block's queries are not all those its probe sends, in order:\n    ` +
           sql.replace(/\n/g, '\n    '));
     }
   }
