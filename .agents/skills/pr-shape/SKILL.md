@@ -1,6 +1,6 @@
 ---
 name: pr-shape
-description: 'The shape of a pgcast PR, after the commits of George MacKerron: size, splitting, stacking, PR title, branch, commits. USE FOR: splitting a step, stacking dependent PRs, naming a PR, a branch or a commit. DO NOT USE FOR: code, JSDoc and docs style (zapatos-spirit), the shape of a helper (zero-abstraction).'
+description: 'The shape of a pgcast PR, after the commits of George MacKerron: size, splitting, stacking, PR title, branch, commits. USE FOR: splitting a step, stacking dependent PRs, naming a PR, a branch or a commit. DO NOT USE FOR: code, JSDoc and docs style (code-style), the shape of a helper (zero-abstraction).'
 ---
 
 # The shape of a PR

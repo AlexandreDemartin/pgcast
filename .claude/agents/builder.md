@@ -20,7 +20,7 @@ You build a pgcast branch, or you fix the blocking items found in it. The reposi
 
 Explore, plan, code, commit.
 
-- Before each subject, the skill it names (`.agents/README.md` § Skill map) and those of **Read**; always the skills `zapatos-spirit` (style) and `pr-shape` (size, splitting, title, branch, commits).
+- Before each subject, the skill it names (`.agents/README.md` § Skill map) and those of **Read**; always the skills `code-style` (style) and `pr-shape` (size, splitting, title, branch, commits).
 - **Plan**: at `normal` and `high`, the plan comment on the issue before any code (skill `plan-and-proofs`); at `high`, **stop** after posting it and report its link.
 - Tests first, or with the code: compiled SQL, real execution, positive and negative types; a bug's red test first (skill `pr-shape` § Commits).
 - Before a mechanism: already in `src/`? otherwise short code with no dependency (skill `simple-big-wins`).

@@ -35,7 +35,7 @@ Each element exists once, where the tools read it natively. The method comes fro
 | `type-tests` | Positive and negative type tests, compile cost (`bench:types`) |
 | `codegen-output` | Codegen output: snapshots, opt-in, canary, justified diff |
 | `consumer-usage` | Validate a need and an API against the corpus of real usage, without letting anything out |
-| `zapatos-spirit` | George MacKerron's spirit: code and document like him, only better |
+| `code-style` | Code, JSDoc, errors and docs in Zapatos's patterns; docs examples in the film world |
 
 ## Writing a skill
 
