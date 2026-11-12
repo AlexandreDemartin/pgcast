@@ -265,7 +265,7 @@ db.isDatabaseError(err, ...types)
 
 `true` when the `code` of `err`, five characters, starts with the code of one of `types`; otherwise `false`, and always with no `types`.
 
-- `err`: an object with an optional `code` string. On an error from Postgres, `.run()` rejects with node-postgres's `DatabaseError`, whose `code` is the SQLSTATE; it also has `constraint`, `detail`, `table` and the other fields Postgres sends. `null` or `undefined` throws a `TypeError`.
+- `err`: an object with an optional `code` string. The type accepts `any`, `pg.DatabaseError` and `{ code?: string }`, and refuses `unknown` and the global `Error` (below); `err instanceof pg.DatabaseError` narrows a `catch` variable to one it accepts. On an error from Postgres, `.run()` rejects with node-postgres's `DatabaseError`, whose `code` is the SQLSTATE; it also has `constraint`, `detail`, `table` and the other fields Postgres sends. `null` or `undefined` throws a `TypeError`.
 - `types`: one or more names, of two kinds:
 
 | Name | Code | Matches |
@@ -302,6 +302,21 @@ try {
   await db.insert('seat_bookings', { screening_id: 1002, seat: 'C4', customer: 'Tamsin Rowe' }).run(pool);
 } catch (err) {
   db.isDatabaseError(err, 'IntegrityConstraintViolation_UniqueViolation');
+}
+```
+
+- A value typed as the global `Error`, as `instanceof Error` narrows it, is refused too, with `strict` on or off (2559): the parameter's type is `{ code?: string }`, and `Error` has no property in common with it.
+
+```ts twoslash
+// @errors: 2559
+import * as db from 'zapatos/db';
+import type pg from 'pg';
+declare const pool: pg.Pool;
+// ---cut---
+try {
+  await db.insert('seat_bookings', { screening_id: 1002, seat: 'C4', customer: 'Tamsin Rowe' }).run(pool);
+} catch (err) {
+  if (err instanceof Error && db.isDatabaseError(err, 'IntegrityConstraintViolation_UniqueViolation')) {}
 }
 ```
 
