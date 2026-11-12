@@ -187,44 +187,59 @@ describe('Whereable', () => {
     await expect(ids({ id: Default })).rejects.not.toHaveProperty('code');
   });
 
-  it('characterization: raw(), cols(x) and vals(x) as a value are sent as JSON: no row, or every row with isNotIn', async () => {
-    // characterization: the type takes raw() as a Parameter<string> (or <JSONValue>), cols(x) and vals(x) as a
-    // Parameter<T> of any column; pg sends {"value":"'Ada'"}, so raw() is no SQL here, deletes() with isNotIn
-    // deletes every row, and outside text and jsonb it is 22P02; as in 6.6.1 (#101)
-    expect(await ids({ display_name: raw("'Ada'") })).toEqual([]);
-    expect(await ids({ display_name: c.isIn([raw("'Ada'")]) })).toEqual([]);
-    expect(await ids({ display_name: c.eq(raw("'Ada'")) })).toEqual([]);
-    expect(await ids({ settings: raw(`'{"theme": "dark"}'`) })).toEqual([]);
-    expect(await ids({ display_name: cols('Ada') })).toEqual([]);
-    expect(await ids({ display_name: vals('Ada') })).toEqual([]);
+  it('raw(), cols(x) and vals(x) as a filter value reject run() before any query, writes included', async () => {
+    // 6.6.1 sent them as JSON ({"value":"'Ada'"}): no row on text and jsonb, every row with isNotIn, so deletes()
+    // emptied the table, 22P02 elsewhere; this Error comes from compiling, so it has no code and no query is sent
+    const queries: unknown[] = [];
+    db.setConfig({ queryListener: query => queries.push(query) });
+    const rejected = async (query: Promise<unknown>) => {
+      const err = await query.then(() => undefined, (e: unknown) => e) as Error | undefined;
+      return err instanceof Error && !('code' in err) ? err.message : err;
+    };
+    const inWhereable = {
+      rawValue: await rejected(ids({ display_name: raw("'Ada'") })),
+      rawJsonb: await rejected(ids({ settings: raw(`'{"theme": "dark"}'`) })),
+      rawHostile: await rejected(ids({ display_name: raw("'Ada'; DELETE FROM memberships; --") })),
+      colsValue: await rejected(ids({ display_name: cols('Ada') })),
+      valsValue: await rejected(ids({ id: vals(1) })),
+      colsArray: await rejected(ids({ tags: cols(['admin']) })),
+      isInRaw: await rejected(ids({ display_name: c.isIn([raw("'Ada'")]) })),
+      isNotInRaw: await rejected(ids({ display_name: c.isNotIn([raw("'Ada'")]) })),
+      isInCols: await rejected(ids({ mood: c.isIn([cols('ok')]) })),
+      and: await rejected(ids(c.and({ display_name: raw("'Ada'") }, { id: 1 }))),
+      deletesIsNotIn: await rejected(db.deletes('memberships', { role: c.isNotIn([raw("'owner'")]) }).run(t.client)),
+      updateWhere: await rejected(db.update('users', { mood: 'ok' }, { display_name: raw("'Ada'") }).run(t.client)),
+      lateral: await rejected(db.select('users', db.all, { lateral: { n: db.count('memberships', { role: raw("'owner'") }) } }).run(t.client)),
+      upsertWhereable: await rejected(db.upsert('users', { email: 'bob@example.com', display_name: 'Bob' }, 'email', {
+        updateValues: { settings: { theme: raw("'x'") } as any },
+      }).run(t.client)),
+      valsInFragment: await rejected(db.insert('users', { email: 'dan@example.com', display_name: sql`${vals([raw("'Dan'")])}` }).run(t.client)),
+    };
+    const inCondition = {
+      eqRaw: await rejected(ids({ display_name: c.eq(raw("'Ada'")) })),
+      neRaw: await rejected(ids({ display_name: c.ne(raw("'Ada'")) })),
+      eqVals: await rejected(ids({ id: c.eq(vals(1)) })),
+      deletesNe: await rejected(db.deletes('memberships', { role: c.ne(raw("'owner'")) }).run(t.client)),
+      updateAdd: await rejected(db.update('accounts', { lifetime_ops: c.add(raw('1') as any) }, { id: 1 }).run(t.client)),
+    };
+    const inFilter = '`db.raw()`, `db.cols()` and `db.vals()` have no meaning as a value in a Whereable (a filter), nor in `isIn()`: to compare with SQL, use a `sql` fragment value, where `db.self` stands for the column; to compare with a value, give the value itself, or `db.param()`.';
+    const asCondition = '`db.raw()`, `db.cols()` and `db.vals()` have no meaning as the value of `eq()`, `add()` and the other conditions: for SQL, write a `sql` fragment with `db.self` in place of the condition; for a value, give the value itself, or `db.param()`.';
+    expect(inWhereable).toEqual(Object.fromEntries(Object.keys(inWhereable).map(k => [k, inFilter])));
+    expect(inCondition).toEqual(Object.fromEntries(Object.keys(inCondition).map(k => [k, asCondition])));
+    expect(queries).toEqual([]);
+    expect(await db.count('memberships', db.all).run(t.client)).toBe(2);
+  });
+
+  it('raw() in a fragment value, or in the updateValues of upsert, is SQL, and a plain { value } is a value', async () => {
+    // the migration of a raw() filter value, and the slots where raw() and cols() compiled as SQL in 6.6.1 too
+    expect(await ids({ display_name: sql`${self} = ${raw("'Ada'")}` })).toEqual([{ id: 1 }]);
     expect(await ids({ display_name: { value: 'Ada' } })).toEqual([]);
-    expect(await ids({ display_name: c.isNotIn([raw("'Ada'")]) })).toEqual([{ id: 1 }, { id: 2 }, { id: 3 }]);
-    const deleted = await db.deletes('memberships', { role: c.isNotIn([raw("'owner'")]) }, { returning: ['user_id'] }).run(t.client);
-    expect(deleted.map(m => m.user_id).sort()).toEqual([1, 2]);
-    expect(await pgError(t.client, () => ids({ tags: cols(['admin']) }))).toMatchInlineSnapshot(`
-      {
-        "code": "22P02",
-        "message": "malformed array literal: "{"value":["admin"]}"",
-      }
-    `);
-    expect(await pgError(t.client, () => ids({ id: vals(1) }))).toMatchInlineSnapshot(`
-      {
-        "code": "22P02",
-        "message": "invalid input syntax for type integer: "{"value":1}"",
-      }
-    `);
-    expect(await pgError(t.client, () => ids({ id: c.eq(vals(1)) }))).toMatchInlineSnapshot(`
-      {
-        "code": "22P02",
-        "message": "invalid input syntax for type integer: "{"value":1}"",
-      }
-    `);
-    expect(await pgError(t.client, () => ids({ mood: c.isIn([cols('ok')]) }))).toMatchInlineSnapshot(`
-      {
-        "code": "22P02",
-        "message": "invalid input value for enum mood: "{"value":"ok"}"",
-      }
-    `);
+    expect(await db.upsert('users', { email: 'bob@example.com', display_name: 'Bobby' }, 'email', {
+      updateValues: { display_name: raw(`"users"."display_name" || '!'`) }, returning: ['display_name'],
+    }).run(t.client)).toEqual({ display_name: 'Bob!', $action: 'UPDATE' });
+    expect(await db.upsert('users', { email: 'cyd@example.com', display_name: 'Cyd', tags: ['x'] }, 'email', {
+      updateValues: { tags: cols(['users.tags']) }, returning: ['tags'],
+    }).run(t.client)).toEqual({ tags: ['new', 'remote'], $action: 'UPDATE' });
   });
 
   it('parent() in isIn and isNotIn is the parent column in a lateral', async () => {

@@ -277,6 +277,21 @@ describe('values stay parameters', () => {
   });
 });
 
+describe('raw, cols and vals as a filter value', () => {
+  it('raw(input) as a Whereable value, in isIn or in eq throws, and is never written into the text', () => {
+    // 6.6.1 sent it as JSON, so raw(input) there was a parameter by accident; compiling it as SQL would make
+    // it an injection, so it throws before any text is returned (#108)
+    for (const build of [
+      (v: string) => sql`WHERE ${{ display_name: db.raw(v) }}`,
+      (v: string) => sql`WHERE ${{ display_name: db.conditions.isIn([db.raw(v)]) }}`,
+      (v: string) => sql`WHERE ${{ display_name: db.conditions.eq(db.raw(v)) }}`,
+      (v: string) => db.deletes('users', { display_name: db.conditions.isNotIn([db.raw(v)]) }),
+    ]) {
+      expect(new Set(Object.values(matrix(build)).map(text => text.startsWith('throws: ')))).toEqual(new Set([true]));
+    }
+  });
+});
+
 describe('a Parameter in a Whereable or in vals of an array', () => {
   it('its cast compiles as in sql`${param(x, cast)}`, in a Whereable, isIn and vals', () => {
     for (const cast of [...Object.values(hostile), ...Object.values(hostileCasts)]) {
