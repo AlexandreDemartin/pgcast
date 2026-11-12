@@ -52,7 +52,7 @@ export function checkLinks(config: SiteConfig) {
         path = url.pathname.slice(base.length),
         target = /\.(?!html$)[^./]+$/.test(path) ? path :  // a file, `llms.txt`
           `${path.replace(/\.html$/, '').replace(/(^|\/)$/, '$1index')}.html`,
-        anchor = decodeURIComponent(url.hash.slice(1)),
+        anchor = decodeURIComponent(url.hash.slice(1)).split(':~:')[0],  // `#name:~:text=…`: the name
         problem =
           !inBase ? `not under the site's base, ${base}` :
           !files.has(target) ? 'no such page' :
