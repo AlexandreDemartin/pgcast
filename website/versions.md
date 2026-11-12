@@ -43,7 +43,7 @@ Call that `update()` on 6.7 and Node prints, once:
 (Use `node --trace-deprecation ...` to show where the warning was created)
 ```
 
-In brackets is the code, one per opt-in, there to search for: [Opt-ins and warnings](/runtime-config#opt-ins-and-warnings) lists them, with what sets each off. Then the message says what still happens, which option changes it, and that 7.0 will make it the default. Nothing else changes: the query runs as it did in 6.6.1, unless Node runs with `--throw-deprecation`, which ends the process ([Opt-ins and warnings](/runtime-config#opt-ins-and-warnings)).
+In brackets is the code, one per deprecated behaviour of the runtime, there to search for: [Opt-ins and warnings](/runtime-config#opt-ins-and-warnings) lists them, with what sets each off. Then the message says what still happens, which option changes it, and that 7.0 will make it the default. Nothing else changes: the query runs as it did in 6.6.1, unless Node runs with `--throw-deprecation`, which ends the process ([Opt-ins and warnings](/runtime-config#opt-ins-and-warnings)).
 
 The warning comes when you call the shortcut, before `.run()`, and only if the old behaviour is actually used: an `update()` with no `undefined` in it never warns. It comes once per process for each code, so it tells you that the old path ran, not where nor how often. `node --trace-deprecation` adds the stack, down to the line that called `update()`; for the rest, turn the option on and let your tests find what changes. Where `undefined` meant "clear it", `null` says so under either setting, and never warns.
 
