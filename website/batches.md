@@ -22,10 +22,10 @@ Postgres takes at most 65,535 parameters in a query. Past that, it refuses the q
 A query's parameters, to count before you send it:
 
 - one per cell: rows × columns;
-- none for a cell that is `DEFAULT`, a key missing from its row or `db.Default`; a `sql` fragment sends its own;
-- one per column of `returning` and per key of `extras`, and the parameters of `updateValues`, once.
+- none for a cell that is `DEFAULT`, a key missing from its row or [`db.Default`](/sql-template#Default); a `sql` fragment sends its own;
+- one per column of `returning` and per key of [`extras`](/insert#insert-options), and the parameters of `updateValues`, once.
 
-Or ask the query itself: `.compile().values.length`.
+Or ask the query itself: [`.compile()`](/sql-template#compile)`.values.length`.
 
 Then send the rows in chunks of a fixed size, well under the limit. In one transaction, every chunk goes in or none does:
 
