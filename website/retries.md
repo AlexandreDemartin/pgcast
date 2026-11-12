@@ -34,12 +34,12 @@ The callback runs once per attempt, up to five times by default. Postgres rolls 
 
 <<< ./examples/plain/retries_outside.ts{ts twoslash}
 
-| Work | Where | Because |
-|---|---|---|
-| the queries of the rule and the booking | in the callback, on `txnClient` | rolled back and run again together |
-| a `fetch()`, a file, a price from another service | before | it runs once, and the transaction stays short, so it conflicts less |
-| an email, a payment, a message on a queue | after the `await`, from what the callback returned | it runs once, and only once the rows are committed |
-| a counter, an array, a log line | from the return value, not changed in the callback | an attempt that is rolled back would leave its trace |
+| Work | Where |
+|---|---|
+| the queries of the rule and the booking | in the callback, on `txnClient` |
+| a `fetch()`, a file, a price from another service | before |
+| an email, a payment, a message on a queue | after the `await`, from what the callback returned |
+| a counter, an array, a log line | from the return value, not changed in the callback |
 
 Moved into the callback, a retried booking sends two confirmation emails, and pushes its seats twice onto an array outside it.
 
