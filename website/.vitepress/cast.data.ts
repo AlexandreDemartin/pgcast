@@ -34,10 +34,19 @@ const
 /**
  * The one query that `run` sends to the pool. With no rows to give back, a shortcut that expects one (a single-row
  * `insert`, `count`, `selectExactlyOne`) throws once its query is recorded: that throw is expected, and ignored.
+ * An example may call `db.setConfig()`: every example shares this process's `zapatos/db`, so the configuration goes
+ * back to what it was, each key the example added unset, before the next one runs. `getConfig()` copies one level
+ * only, so `transactionRetryDelay` is copied by value: an example may change it in place.
  */
 async function record(run: () => Promise<unknown>, what: string) {
+  const config = db.getConfig();
+  config.transactionRetryDelay = { ...config.transactionRetryDelay };
   sent.length = 0;
-  await run().catch(error => { if (sent.length !== 1) throw error; });
+  try {
+    await run().catch(error => { if (sent.length !== 1) throw error; });
+  } finally {
+    db.setConfig({ ...Object.fromEntries(Object.keys(db.getConfig()).map(key => [key, undefined])), ...config });
+  }
   if (sent.length !== 1) throw new Error(`${what}: ran ${sent.length} queries, not 1`);
   return sent[0]!;
 }
@@ -59,6 +68,14 @@ export default defineLoader({
       ['count', db.count('films', db.all)],
       ['selectExactlyOne', db.selectExactlyOne('films', { id: 1000 })],
     ] as const) await record(() => query.run(pool), `cast.data.ts, the recording pool given ${what}`);
+    const before = JSON.stringify(db.getConfig());
+    await record(() => {
+      db.getConfig().transactionRetryDelay.minMs = -1;
+      db.setConfig({ castArrayParamsToJson: true, queryListener: () => {} });
+      return db.sql`SELECT 1`.run(pool);
+    }, 'cast.data.ts, an example that changes the configuration');
+    if (JSON.stringify(db.getConfig()) !== before || db.getConfig().queryListener)
+      throw new Error('cast.data.ts: an example left the configuration changed for the next: check `record`');
 
     for (const file of files.filter(f => !f.endsWith('.d.ts'))) {
       const { sql, values, type } = await castOf(file, twoslasher);
