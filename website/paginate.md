@@ -91,7 +91,7 @@ Give the `where` as a [`sql`](/sql-template#sql) fragment that compares the `ord
 
 ### With a filter
 
-To keep a filter beside the comparison, give the comparison as the value of the first key in a [Whereable](/sql-template#whereable): there [`db.self`](/sql-template#self) stands for that column, and the Whereable joins it to the other keys with `AND`.
+To keep a filter beside the comparison, give the comparison in a [Whereable](/sql-template#whereable), as the value of the `order`'s first column, `release_year`: there [`db.self`](/sql-template#self) stands for that column, and the Whereable joins it to the other keys with `AND`.
 
 <CastPanel example="paginate_keyset_filter">
 
