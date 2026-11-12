@@ -19,7 +19,7 @@ Each member is a [`sql`](/sql-template#sql) fragment written around [`db.self`](
 
 - **Where**: as a Whereable value, so in the `where` of [`select()`](/select#select), [`count()`](/select#count), [`update()`](/insert#update) and [`deletes()`](/insert#deletes), the `having` of `select()`, and a Whereable in a `sql` template. Elsewhere `self` has no column: `` db.sql`SELECT ${db.conditions.isNull}` `` throws "The 'self' column alias has no meaning here" as it compiles. [`and()`](#conditions.and), [`or()`](#conditions.or) and [`not()`](#conditions.not) also take Whereables, so they can be a whole `where`; [`now`](#conditions.now) and [`fromNow()`](#conditions.fromNow) hold no `self`, and go anywhere.
 - **Values**: each value is a parameter, `$1`, except a [`Parameter`](/sql-template#Parameter), kept as it is with its cast; a `sql` fragment, written as its SQL; and [`parent()`](/sql-template#parent), the parent query's column in a `lateral` subquery. `Default`, `self`, `raw()`, `cols()` and `vals()` throw: [Values a condition refuses](#refused-values).
-- **Type**: a condition is a `SQLFragment<boolean | null, T>`, `T` the type of the value it compares with (its `Constraint`); the Whereable checks `T` against the column's type. The eight tests, `now` and `fromNow()` have no `T`, and pass on any column.
+- **Type**: a condition is a `SQLFragment` whose second type argument, `T`, is the type of the value it compares with (its `Constraint`, [`sql`](/sql-template#sql)); the Whereable checks `T` against the column's type. The eight tests, `now` and `fromNow()` have no `T`, and pass on any column.
 
 A value of another type does not compile:
 
@@ -271,7 +271,7 @@ With [`castArrayParamsToJson`](/runtime-config#Config.castArrayParamsToJson) on,
 
 ## Combining: `and()`, `or()`, `not()` {#combining}
 
-Each takes conditions, or Whereables, each compiled with its own column. As a Whereable value, `self` reaches the conditions inside: `{ release_year: or(lt(1980), gt(2010)) }` gives `((("release_year" < $1 OR "release_year" > $2)))`. As a whole `where`, they take Whereables:
+Each takes conditions or Whereables, a Whereable compiled with its own keys. As a Whereable value, `self` reaches the conditions inside: `{ release_year: or(lt(1980), gt(2010)) }` gives `((("release_year" < $1 OR "release_year" > $2)))`. As a whole `where`, they take Whereables:
 
 <CastPanel example="conditions_or">
 
