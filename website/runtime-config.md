@@ -22,7 +22,9 @@ db.setConfig({
 ```
 
 - The merge is one level deep: `transactionRetryDelay` is replaced whole, so the type needs both `minMs` and `maxMs`.
-- A key you give as `undefined` is set to `undefined`. It does not go back to its default: after `setConfig({ transactionAttemptsMax: undefined })`, `transaction()` gives up after its first attempt ("… on attempt 1 of undefined, giving up").
+- A key you give as `undefined` is set to `undefined`: it does not go back to its default, and it compiles.
+  - After `setConfig({ transactionAttemptsMax: undefined })`, `transaction()` gives up after its first attempt ("… on attempt 1 of undefined, giving up", [#179](https://github.com/AlexandreDemartin/pgcast/issues/179)).
+  - After `setConfig({ transactionRetryDelay: undefined })`, every `transaction()` rejects with "TypeError: Cannot destructure property 'minMs' of 'config.transactionRetryDelay' as it is undefined.", and never releases the client it took from a pool ([#182](https://github.com/AlexandreDemartin/pgcast/issues/182)).
 - It returns the new configuration itself, not a copy, so changing that object changes the configuration.
 - An unknown key does not compile (TS2353), and neither does a value of the wrong type (TS2322):
 
