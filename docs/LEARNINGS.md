@@ -212,6 +212,12 @@ Candidates for a check, a rule or a skill line.
 - #140 — A Postgres message that quotes a count is probed at more than one size (08P01 at 65,536 and at 200,000 differ): quote it as an example — `branch-reviewer`, `builder`
 - #140 — A guide that shortens a reference rule loses its condition (« an array or string conflict target » became « the conflict target »): copy the condition or link — `branch-reviewer`
 - #140 — 21000 comes with any `DO UPDATE` batch that names a key twice, not only with an existing row — `branch-reviewer`
+- #142 — A `${number}` template type takes leading spaces and hex (`'( 1.5,2.5)'`, `'0x10'`): a claim that it « takes only » one form needs a negative `tsc` probe — `branch-reviewer`, `builder`
+- #142 — Every type inside `declare module 'zapatos/custom'` is exported and the blocks merge: a helper type in a placeholder takes a prefixed name — `branch-reviewer`, `builder`
+- #142 — A placeholder in the shared docs schema is a cross-page dependency: `git grep` the open worktrees before narrowing it — `builder`
+- #142 — Bulk inserts into the docs schema without ids hit 23505 at the 1000th row (seeds from 1000, sequences from 1): probes set explicit ids from 2000 — `branch-reviewer`
+- #128 — A page that states a future version's contract (what 7.x keeps, what 8.0 removes) copies the narrowest wording of decision 003, the README § Versions and the milestones: more precise is a new promise — `branch-reviewer`, `builder`
+- #128 — `process.emitWarning` reports on the next tick: under `--throw-deprecation` the call returns, then the process ends, before a probe's `finally` (drop its databases by prefix afterwards) — `branch-reviewer`, `builder`
 
 ## Minors kept
 
@@ -238,3 +244,4 @@ Minor review defects, taken up by the end-of-chapter review.
 - #31 — `src/db/conditions.ts:21`: `conditionalParam` still wraps `Default`, so `{ display_name: eq(Default) }` sends `'Symbol(DEFAULT)'` and matches nothing (both versions): a candidate finding, with #101 — `branch-reviewer` → R64, #106
 - #107 — `insert('books', { title: parent('name') })` (object branch) still stores `'{"value":"name"}'`: a candidate finding — `builder`
 - #137 — `website/check-reference.mjs`: a fence closed by a line with an info string (```` ```ts ````) is taken as closed, so a later entry is missed (fails loudly) — `branch-reviewer`
+- #128 — `website/insert.md` § undefined values: with `undefinedMeansMissing: true`, an `update()` whose only key is `undefined` throws « nothing to update: an Updatable needs at least one column »; worth one line there — `builder`
