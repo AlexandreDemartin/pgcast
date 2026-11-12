@@ -6,10 +6,15 @@
   "scripts": {
     "docs:dev": "vitepress dev",
     "docs:build": "vitepress build",
-    "docs:preview": "vitepress preview"
+    "docs:preview": "vitepress preview",
+    "docs:schema": "node generate-schema.mjs"
   },
   "devDependencies": {
+    "@shikijs/vitepress-twoslash": "4.5.0",
+    "twoslash": "0.3.9",
+    "typescript": "5.9.3",
     "vitepress": "2.0.0-alpha.21",
-    "vue": "3.5.44"
+    "vue": "3.5.44",
+    "zapatos": "file:.."
   }
 }

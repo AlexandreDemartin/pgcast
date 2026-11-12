@@ -109,7 +109,8 @@ jobs:
       - run: npm run bench:types
 
   docs:
-    # The docs site, a package of its own (decision 004): its build fails on a dead link. docs.yml deploys it from master.
+    # The docs site, a package of its own (decision 004): its build fails on a dead link or a type error in an example.
+    # It installs the built library (`file:..`), so the root is built first. docs.yml deploys it from master.
     needs: changes
     if: needs.changes.outputs.docs == 'true'
     runs-on: ubuntu-latest
@@ -122,7 +123,11 @@ jobs:
         with:
           node-version: 22.x
           cache: npm
-          cache-dependency-path: website/package-lock.json
+          cache-dependency-path: |
+            package-lock.json
+            website/package-lock.json
+      - run: npm ci && npm run build
+        working-directory: .
       - run: npm ci
       - run: npm run docs:build
 
