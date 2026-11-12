@@ -185,7 +185,7 @@ describe('upsert', () => {
     ], 'id', { returning: ['id', 'sku', 'title', 'price_cents'] })), 'sku');
     expect(tee).toEqual({ id, sku: 'TEE', title: 'T-shirt small', price_cents: 1300, $action: 'UPDATE' });
     expect(cap).toEqual({ id: expect.any(Number), sku: 'CAP', title: null, price_cents: 900, $action: 'INSERT' });
-    expect(cap.id).not.toBe(id);
+    expect(cap).not.toMatchObject({ id });
   });
 
   it('constraint()', async () => {
