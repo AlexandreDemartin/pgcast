@@ -77,6 +77,8 @@ The SQL of each `INSERT`: [`insert()`](/insert#insert). A serialisation failure 
 
 ::: warning Lost writes
 Don't catch a database error inside the callback and carry on. Postgres has aborted the transaction: each query after it is refused with 25P02 (`InvalidTransactionState_InFailedSqlTransaction`), and if the callback returns, pgcast sends `COMMIT`, which Postgres turns into a rollback without an error. The promise resolves, and nothing the callback wrote is saved ([#190](https://github.com/AlexandreDemartin/pgcast/issues/190)).
+
+For a seat that may be taken, ask Postgres not to refuse: [`upsert()` with `doNothing`](/insert#doNothing) writes `ON CONFLICT ON CONSTRAINT "seat_bookings_pkey" DO NOTHING` and gives `undefined` for a taken seat, with no error, and the transaction goes on.
 :::
 
 ## Tell a missing row from the others
