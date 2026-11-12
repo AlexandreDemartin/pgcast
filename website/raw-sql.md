@@ -81,7 +81,7 @@ Postgres gives a parameter a type from where it stands. Compared with a column, 
 - `db.param(from, 'timestamptz')` writes `CAST($2 AS "timestamptz")`; `` ${db.param(from)}::timestamptz `` in the text does the same.
 - The cast is the type's catalog name, in lower case (`int4`, `timestamptz`, `crew_job`), quoted as one name. `'integer'` gives `CAST($1 AS "integer")`, a type that does not exist (42704), as do `'int'` and `'TIMESTAMPTZ'`.
 - Name a schema as `'public"."crew_job'`, which gives `"public"."crew_job"`: `'public.crew_job'` gives `"public.crew_job"`, and `'int4[]'` gives `"int4[]"`, types that do not exist (42704; [#37](https://github.com/AlexandreDemartin/pgcast/issues/37)). Write an array type in the text: `` ${db.param(ids, false)}::int4[] `` (`false`: below).
-- With [`castArrayParamsToJson`](/runtime-config#Config.castArrayParamsToJson) on, an array parameter is sent as JSON, `CAST($1 AS "json")`, even with a string cast ([#171](https://github.com/AlexandreDemartin/pgcast/issues/171)). To send it as an array, pass `false`: `` ${db.param(ids, false)}::int4[] ``. The same goes for a plain object and [`castObjectParamsToJson`](/runtime-config#Config.castObjectParamsToJson).
+- With [`castArrayParamsToJson`](/runtime-config#Config.castArrayParamsToJson) on, an array parameter is sent as JSON, `CAST($1 AS "json")`, even with a string cast ([#171](https://github.com/AlexandreDemartin/pgcast/issues/171), [#36](https://github.com/AlexandreDemartin/pgcast/issues/36)). To send it as an array, pass `false`: `` ${db.param(ids, false)}::int4[] ``. The same goes for a plain object and [`castObjectParamsToJson`](/runtime-config#Config.castObjectParamsToJson).
 
 Every form of the cast: [`param()`](/sql-template#param).
 
