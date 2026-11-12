@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from 'vitest';
 import * as db from '../../src/db';
-import { sql, param, parent, conditions as dc } from '../../src/db';
+import { sql, param, parent, raw, cols, self, Default, conditions as dc } from '../../src/db';
 
 /** The compiled `{ text, values }` of `{ col: condition }`, nested under a parent table for parent(); values raw. */
 const show = (condition: db.SQL) => sql`${{ col: condition }}`.copy({ parentTable: 'p' }).compile();
@@ -172,6 +172,52 @@ describe('conditions', () => {
         "ne": {
           "text": "(("col" <> lower("x")))",
           "values": [],
+        },
+      }
+    `);
+  });
+
+  it('characterization: a comparison wraps raw, cols, Default and self in a parameter', () => {
+    // characterization: conditionalParam() passes only a SQLFragment, a Parameter or parent() through; pg
+    // sends the rest as JSON ('{"value":"Ada"}') or as a string ('Symbol(DEFAULT)', 'Symbol(self)') (#101)
+    expect({
+      raw: show(dc.eq(raw("'Ada'"))), cols: show(dc.eq(cols('Ada'))),
+      eqDefault: show(dc.eq(Default)), neDefault: show(dc.ne(Default)), self: show(dc.eq(self)),
+    }).toMatchInlineSnapshot(`
+      {
+        "cols": {
+          "text": "(("col" = $1))",
+          "values": [
+            ColumnNames {
+              "value": "Ada",
+            },
+          ],
+        },
+        "eqDefault": {
+          "text": "(("col" = $1))",
+          "values": [
+            Symbol(DEFAULT),
+          ],
+        },
+        "neDefault": {
+          "text": "(("col" <> $1))",
+          "values": [
+            Symbol(DEFAULT),
+          ],
+        },
+        "raw": {
+          "text": "(("col" = $1))",
+          "values": [
+            DangerousRawString {
+              "value": "'Ada'",
+            },
+          ],
+        },
+        "self": {
+          "text": "(("col" = $1))",
+          "values": [
+            Symbol(self),
+          ],
         },
       }
     `);

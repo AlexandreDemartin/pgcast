@@ -92,6 +92,69 @@ describe('type surprises', () => {
     db.select('users', { id: c.isIn([db.Default]) });
   });
 
+  test('characterization: raw(), cols(x) and vals(x) pass as a Parameter<T>, in a Whereable, isIn and eq', () => {
+    // characterization: Parameter<T> is structural ({ value: T, cast? }), so DangerousRawString ({ value: string })
+    // matches it on a text or jsonb column, and the generic ColumnNames<T> and ColumnValues<T> on any column, as
+    // does a plain { value } object; the runtime sends each as a parameter, as JSON
+    // (test/integration/core.test.ts, "raw(), cols(x) and vals(x) as a value are sent as JSON")
+    db.select('users', { display_name: db.raw("'Ada'") });
+    db.select('users', { settings: db.raw(`'{"theme": "dark"}'`) });
+    db.select('users', { display_name: c.isIn([db.raw("'Ada'")]) });
+    db.select('users', { display_name: c.isNotIn([db.raw("'Ada'")]) });
+    db.select('users', { display_name: c.eq(db.raw("'Ada'")) });
+    db.update('users', { mood: 'ok' }, { display_name: db.raw("'Ada'") });
+    db.select('users', { display_name: db.cols('Ada') });
+    db.select('users', { display_name: db.vals('Ada') });
+    db.select('users', { display_name: c.isIn([db.cols('Ada'), db.vals('Ada')]) });
+    db.select('users', { display_name: c.eq(db.cols('Ada')) });
+    db.select('users', { tags: db.cols(['admin']) });
+    db.select('users', { tags: db.vals(['admin']) });
+    db.select('users', { id: db.vals(1) });
+    db.select('users', { id: db.cols(1) });
+    db.select('users', { id: c.isIn([db.vals(1)]) });
+    db.select('users', { id: c.eq(db.vals(1)) });
+    db.select('users', { mood: db.cols('ok') });
+    db.select('users', { mood: c.isIn([db.cols('ok')]) });
+    db.select('users', { mood: c.eq(db.vals('ok')) });
+    db.select('users', { display_name: { value: 'Ada' } });
+    // @ts-expect-error raw() is a Parameter<string>, not of an int column
+    db.select('users', { id: db.raw('1') });
+    // @ts-expect-error nor of an enum column
+    db.select('users', { mood: db.raw("'ok'") });
+    // @ts-expect-error nor in isIn on an int column
+    db.select('users', { id: c.isIn([db.raw('1')]) });
+  });
+
+  test('characterization: parent() is accepted in isIn, in a lateral or not', () => {
+    // characterization: isIn<T> takes T = ParentColumn<'id'>, which a Whereable value accepts; the runtime sends it
+    // as a parameter, as JSON (test/integration/core.test.ts, "parent() in isIn is sent as JSON")
+    db.select('users', db.all, { lateral: { n: db.count('accounts', { owner_id: c.isIn([db.parent('id')]) }) } });
+    db.select('users', db.all, { lateral: { n: db.count('accounts', { owner_id: c.isNotIn([db.parent('id')]) }) } });
+    db.select('users', { id: c.isIn([db.parent('id')]) });
+  });
+
+  test('characterization: parent() as a value, or in eq(), is accepted outside a lateral', () => {
+    // characterization: the type does not know whether there is a parent query; outside one, the runtime throws
+    db.select('users', db.all, { lateral: { n: db.count('accounts', { owner_id: db.parent('id') }) } });
+    db.select('users', db.all, { lateral: { n: db.count('accounts', { owner_id: c.eq(db.parent('id')) }) } });
+    db.select('users', { id: db.parent('id') });
+    db.select('users', { id: c.eq(db.parent('id')) });
+  });
+
+  test('self as a value, and Default in a condition, are refused', () => {
+    // the runtime would send them as strings, 'Symbol(self)' and 'Symbol(DEFAULT)'
+    // @ts-expect-error self is no value of the column
+    db.select('users', { display_name: db.self });
+    // @ts-expect-error nor in isIn
+    db.select('users', { display_name: c.isIn([db.self]) });
+    // @ts-expect-error nor in eq
+    db.select('users', { display_name: c.eq(db.self) });
+    // @ts-expect-error Default has no meaning in a filter, in eq() too
+    db.select('users', { display_name: c.eq(db.Default) });
+    // @ts-expect-error nor in ne(), on an int column
+    db.select('users', { id: c.ne(db.Default) });
+  });
+
   test('updateValues takes a plain value of the column, sent as a parameter', () => {
     // (test/integration/shortcuts.test.ts, "updateValues: a plain value is stored as it is")
     db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { display_name: 'x', mood: 'happy', manager_id: null } });

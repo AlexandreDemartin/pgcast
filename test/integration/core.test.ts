@@ -4,6 +4,7 @@
 // test/unit/core.test.ts does once run on the fixture, surprises included.
 
 import { afterEach, describe, expect, it } from 'vitest';
+import type { Whereable } from 'zapatos/schema';
 import * as db from '../../src/db';
 import { sql, param, raw, cols, vals, parent, self, Default } from '../../src/db';
 import { resetConfig } from '../helpers/config';
@@ -184,6 +185,95 @@ describe('Whereable', () => {
     await expect(ids({ display_name: Default })).rejects.toThrowErrorMatchingInlineSnapshot(`[Error: \`db.Default\` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. \`DEFAULT\` is for INSERT and UPDATE values.]`);
     await expect(ids({ id: c.isIn([Default]) })).rejects.toThrowErrorMatchingInlineSnapshot(`[Error: \`db.Default\` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. \`DEFAULT\` is for INSERT and UPDATE values.]`);
     await expect(ids({ id: Default })).rejects.not.toHaveProperty('code');
+  });
+
+  it('characterization: raw(), cols(x) and vals(x) as a value are sent as JSON: no row, or every row with isNotIn', async () => {
+    // characterization: the type takes raw() as a Parameter<string> (or <JSONValue>), cols(x) and vals(x) as a
+    // Parameter<T> of any column; pg sends {"value":"'Ada'"}, so raw() is no SQL here, deletes() with isNotIn
+    // deletes every row, and outside text and jsonb it is 22P02; as in 6.6.1 (#101)
+    expect(await ids({ display_name: raw("'Ada'") })).toEqual([]);
+    expect(await ids({ display_name: c.isIn([raw("'Ada'")]) })).toEqual([]);
+    expect(await ids({ display_name: c.eq(raw("'Ada'")) })).toEqual([]);
+    expect(await ids({ settings: raw(`'{"theme": "dark"}'`) })).toEqual([]);
+    expect(await ids({ display_name: cols('Ada') })).toEqual([]);
+    expect(await ids({ display_name: vals('Ada') })).toEqual([]);
+    expect(await ids({ display_name: { value: 'Ada' } })).toEqual([]);
+    expect(await ids({ display_name: c.isNotIn([raw("'Ada'")]) })).toEqual([{ id: 1 }, { id: 2 }, { id: 3 }]);
+    const deleted = await db.deletes('memberships', { role: c.isNotIn([raw("'owner'")]) }, { returning: ['user_id'] }).run(t.client);
+    expect(deleted.map(m => m.user_id).sort()).toEqual([1, 2]);
+    expect(await pgError(t.client, () => ids({ tags: cols(['admin']) }))).toMatchInlineSnapshot(`
+      {
+        "code": "22P02",
+        "message": "malformed array literal: "{"value":["admin"]}"",
+      }
+    `);
+    expect(await pgError(t.client, () => ids({ id: vals(1) }))).toMatchInlineSnapshot(`
+      {
+        "code": "22P02",
+        "message": "invalid input syntax for type integer: "{"value":1}"",
+      }
+    `);
+    expect(await pgError(t.client, () => ids({ id: c.eq(vals(1)) }))).toMatchInlineSnapshot(`
+      {
+        "code": "22P02",
+        "message": "invalid input syntax for type integer: "{"value":1}"",
+      }
+    `);
+    expect(await pgError(t.client, () => ids({ mood: c.isIn([cols('ok')]) }))).toMatchInlineSnapshot(`
+      {
+        "code": "22P02",
+        "message": "invalid input value for enum mood: "{"value":"ok"}"",
+      }
+    `);
+  });
+
+  it('characterization: parent() in isIn is sent as JSON, in a lateral or not', async () => {
+    // characterization: vals([…]) wraps the ParentColumn in a parameter, '{"value":"id"}': 22P02 on an int
+    // column, and on a text one no row, or every row with isNotIn; as in 6.6.1 (#101)
+    const counts = (where: Whereable) =>
+      db.select('users', db.all, { columns: ['id'], order: { by: 'id', direction: 'ASC' }, lateral: { n: db.count('active_users', where) } }).run(t.client);
+    expect(await pgError(t.client, () => counts({ id: c.isIn([parent('id')]) }))).toMatchInlineSnapshot(`
+      {
+        "code": "22P02",
+        "message": "invalid input syntax for type integer: "{"value":"id"}"",
+      }
+    `);
+    expect(await counts({ display_name: c.isIn([parent('display_name')]) })).toEqual([{ id: 1, n: 0 }, { id: 2, n: 0 }, { id: 3, n: 0 }]);
+    expect(await counts({ display_name: c.isNotIn([parent('display_name')]) })).toEqual([{ id: 1, n: 2 }, { id: 2, n: 2 }, { id: 3, n: 2 }]);
+    expect(await pgError(t.client, () => ids({ id: c.isIn([parent('id')]) }))).toMatchInlineSnapshot(`
+      {
+        "code": "22P02",
+        "message": "invalid input syntax for type integer: "{"value":"id"}"",
+      }
+    `);
+    expect(await ids({ display_name: c.isIn([parent('display_name')]) })).toEqual([]);
+  });
+
+  it('characterization: parent() as a value, or in eq(), is the parent column in a lateral, and throws outside one', async () => {
+    // characterization: the type accepts both anywhere; outside a lateral, compiling throws, so run() rejects
+    const counts = (where: Whereable) =>
+      db.select('users', db.all, { columns: ['id'], order: { by: 'id', direction: 'ASC' }, lateral: { n: db.count('accounts', where) } }).run(t.client);
+    const perOwner = [{ id: 1, n: 2 }, { id: 2, n: 1 }, { id: 3, n: 0 }];
+    expect(await counts({ owner_id: parent('id') })).toEqual(perOwner);
+    expect(await counts({ owner_id: c.eq(parent('id')) })).toEqual(perOwner);
+    await expect(ids({ id: parent('id') })).rejects.toThrowErrorMatchingInlineSnapshot(`[Error: The 'parent' table alias has no meaning here]`);
+    await expect(ids({ id: c.eq(parent('id')) })).rejects.toThrowErrorMatchingInlineSnapshot(`[Error: The 'parent' table alias has no meaning here]`);
+  });
+
+  it('characterization: Default and self in a comparison, and self as a value, are sent as strings', async () => {
+    // characterization: the type refuses each; pg sends 'Symbol(DEFAULT)' and 'Symbol(self)': no row on a text
+    // column, every row with ne(), 22P02 on the others; as in 6.6.1 (#101)
+    expect(await ids({ display_name: c.eq(Default) })).toEqual([]);
+    expect(await ids({ display_name: c.ne(Default) })).toEqual([{ id: 1 }, { id: 2 }, { id: 3 }]);
+    expect(await pgError(t.client, () => ids({ id: c.eq(Default) }))).toMatchInlineSnapshot(`
+      {
+        "code": "22P02",
+        "message": "invalid input syntax for type integer: "Symbol(DEFAULT)"",
+      }
+    `);
+    expect(await ids({ display_name: c.eq(self) })).toEqual([]);
+    expect(await ids({ display_name: self })).toEqual([]);
+    expect(await ids({ display_name: c.isIn([self]) })).toEqual([]);
   });
 });
 

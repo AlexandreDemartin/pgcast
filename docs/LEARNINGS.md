@@ -113,6 +113,9 @@ Candidates for a check, a rule or a skill line.
 - #98 — Pinning only the direct dependencies leaves the tree free to resolve recent versions: `npm install --before=<date>` enforces the two-week rule for the whole lock file, and Dependabot's `cooldown: { default-days: 14 }` keeps it after — `builder`, `branch-reviewer`
 - #98 — Skill `plan-and-proofs` says "No screenshots: pgcast has no UI", and skill `ci-gate` that a Markdown-only PR runs two small jobs: both stop being true with `website/` (screenshots go to a private artifact, since `gh` cannot attach images; Markdown under `website/` runs the `docs` job) (candidate: both skills) — `builder`
 - #98 — `vitepress preview` keeps its file list from start-up: restart it after each rebuild, or new assets return 404; headless Chrome cannot go below ~500px, so phone-width shots go through the DevTools protocol — `builder`
+- #101 — `Parameter<T>` is structural: a generic wrapper `{ value: T }` (`cols<T>`, `vals<T>`) matches it on every column type, while `raw(x: string)` only on text-like ones; characterise a structural match on an int and an enum column, not only on text (candidate: skill `type-tests`) — `branch-reviewer`
+- #101 — 6.6.1's declarations for a type replay: `git archive v6.6.1 src/db src/typings tsconfig.json`, emit with its own tsconfig passing every file (`--noCheck` on one entry emits only `index.js`), add `import type * as pg from "pg"` where `pg.QueryResult` lost its import (candidate: skill `backward-compat`) — `builder`
+- #101 — `vals([…])`, `conditionalParam` and the Whereable branch each keep their own list of what passes through as is: probing every wrapper and symbol against all three slots (Whereable value, `isIn`, `eq`) found R62 to R64 — `builder`
 
 ## Minors kept
 
@@ -136,4 +139,4 @@ Minor review defects, taken up by the end-of-chapter review.
 - #81 — CI: the integration hooks' 10 s timeout was hit once while creating the test databases on a slow runner (Node 20, Postgres 14); the rerun passed — raise `hookTimeout` for the database setup — `orchestrator`
 - #29 — `src/db/shortcuts.ts:313`: with `undefinedMeansMissing`, an `upsert` / `insert` whose keys are all `undefined` compiles to `INSERT INTO "t" () VALUES ()` (42601), as master's `upsert('t', {})` does: should an empty `Insertable` throw early, as `update` does since R24? — `branch-reviewer`
 - #29 — pre-existing: an `undefined` in `updateValues` still adds its column to `SET` as `EXCLUDED.col`, even when the column was not inserted, which writes its `DEFAULT` into the existing row: a candidate line for the characterisation report — `builder`
-- #31 — `src/db/conditions.ts:21`: `conditionalParam` still wraps `Default`, so `{ display_name: eq(Default) }` sends `'Symbol(DEFAULT)'` and matches nothing (both versions): a candidate finding, with #101 — `branch-reviewer`
+- #31 — `src/db/conditions.ts:21`: `conditionalParam` still wraps `Default`, so `{ display_name: eq(Default) }` sends `'Symbol(DEFAULT)'` and matches nothing (both versions): a candidate finding, with #101 — `branch-reviewer` → R64, #106
