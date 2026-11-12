@@ -144,7 +144,7 @@ describe('Whereable', () => {
 
   it('a Parameter value matches on a bytea column', async () => {
     // 6.6.1 sent '{"value":{"type":"Buffer","data":[1]}}', valid bytea input: no row, and isNotIn deleted the row
-    const [{ id }] = await db.insert('extra.type_zoo', [{ c_bytea: Buffer.from([1]) }], { returning: ['id'] }).run(t.client);
+    const [{ id }] = await sql`INSERT INTO ${'extra.type_zoo'} (${'c_bytea'}) VALUES (${param(Buffer.from([1]))}) RETURNING ${'id'}`.run(t.client);
     const bytes = () => param(Buffer.from([1]));
     expect(await db.select('extra.type_zoo', { c_bytea: bytes() }, { columns: ['id'] }).run(t.client)).toEqual([{ id }]);
     expect(await db.deletes('extra.type_zoo', { c_bytea: c.isNotIn([bytes()]) }, { returning: ['id'] }).run(t.client)).toEqual([]);

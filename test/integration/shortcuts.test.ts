@@ -302,7 +302,7 @@ describe('upsert', () => {
     const upsertAdaBob = (displayName: any) => run(db.upsert('users',
       [{ email: 'Ada@Example.com', display_name: 'A' }, { email: 'bob@example.com', display_name: 'B' }], 'email', {
         updateColumns: [], updateValues: { display_name: displayName }, returning: ['email', 'display_name'],
-      })).then(rows => sortBy(rows, 'email').map(row => row.display_name));
+      })).then((rows: { email: string; display_name: string }[]) => sortBy(rows, 'email').map(row => row.display_name));
     expect(await upsertAdaBob({ 'users.email': param('bob@example.com') })).toEqual(['false', 'true']);
     expect(await upsertAdaBob({ 'users.email': db.conditions.isNotIn([param('bob@example.com')]) })).toEqual(['true', 'false']);
     await expect(upsertAdaBob({ 'users.email': Default })).rejects.toThrow('`db.Default` has no meaning in a Whereable');
