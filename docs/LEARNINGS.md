@@ -233,6 +233,8 @@ Candidates for a check, a rule or a skill line.
 - #129 — A hostile payload in an example is run inlined into that query's exact compiled text: `--` breaks on a shortcut's trailing `)) AS "sq_…"` and gives 42601, not the attack described — `branch-reviewer`, `builder`
 - #129 — A caller's name reaches any relation the role can read as a table (`pg_catalog.pg_roles`) and any column in scope, system columns included — `branch-reviewer`
 - #129 — node-postgres uses the extended protocol when there are values or a statement name: « no values means plain text » names `.prepared()` — `branch-reviewer`
+- #161 — A before/after comparison of a generated file is rebuilt after merging master: new pages change the counts — `builder`
+- #161 — Nothing lints or type-checks `website/.vitepress/*.ts`: only `docs:build` exercises them, and line length is kept by hand — `builder`
 
 ## Minors kept
 
