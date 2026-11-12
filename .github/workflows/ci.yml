@@ -118,10 +118,10 @@ jobs:
       run:
         working-directory: website
 
-    # docs:schema loads schema.sql into its own pgcast_test_<pid>_docs database.
+    # docs:schema loads schema.sql into its own pgcast_test_<pid>_docs database, on the oldest Postgres of the matrix.
     services:
       postgres:
-        image: postgres:18
+        image: postgres:14
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: pgcast

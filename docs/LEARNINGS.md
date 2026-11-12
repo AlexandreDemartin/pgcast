@@ -135,6 +135,14 @@ Candidates for a check, a rule or a skill line.
 - #114 — `generate()` never deletes a `custom/` placeholder it no longer needs, and a regenerate-and-diff check does not catch a stale committed one: code that reads `zapatos/custom/` copes with the folder being absent (candidate: skill `codegen-output`) — `builder`
 - #114 — A change to the codegen output in `src/generate` also needs `npm run docs:schema`, or the `docs` job fails on a stale `website/zapatos/` (#130 writes it into skill `codegen-output`) — `branch-reviewer`
 - #114 — A builder told not to mark its PR ready cannot prove a CI-only criterion (a matrix, a failing step): brief it to push temporary commits on a ready PR, or the orchestrator does that half — `builder`
+- #131 — A schema for docs examples starts from a checklist of the Postgres features the pages need (array, nullable boolean, domain, enum, `POINT`, comments, nullable column, foreign keys, a self-reference, a many-to-many), or a page finds nowhere to show its function — `builder`, `branch-reviewer`
+- #131 — The array conditions and `isTrue` / `isFalse` / `isUnknown` type-check on a `text` column: only running the example (#115) catches it — `branch-reviewer`
+- #131 — `upsert` `updateValues: { votes: sql`${self} + 1` }` throws "The 'self' column alias has no meaning here": upsert counts qualify the column or use `EXCLUDED` (#124, #140) — `branch-reviewer`
+- #131 — A `POINT` comes back as the string `"(x,y)"` through `to_jsonb` and as `{ x, y }` through node-postgres's parser: a typed `PgPoint` placeholder covers both (#142) — `branch-reviewer`
+- #131 — When master moves while a builder works, merge it and read the three-dot diff: a plain `git diff origin/master` makes the branch look as if it reverts the other PR — `builder`
+- #130 — `check:agents` prints word counts but fails only on lines over 150: the ~1,200-word budget of a skill is not enforced (`pr-shape` was at 1,236 on master); a word limit in `scripts/check-agents.mjs`, or the budget restated — `builder`
+- #130 — A worktree has no `node_modules`: a builder there runs `npm ci` before `lint`, next to copying `src/.env` (candidate: agent `builder`) — `builder`
+- #134 — A per-column type in a union changes what TypeScript infers for a generic call next to it: a member whose `value` is `string`, `any` or `unknown` widens a literal (dates, `${number}`); a grid of calls (each column × literals of each Postgres type) compiled against 6.6.1's declarations and the branch's finds it (candidate: skill `type-tests`, a reusable compat check) — `builder`
 
 ## Minors kept
 

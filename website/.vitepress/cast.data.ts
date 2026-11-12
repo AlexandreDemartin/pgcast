@@ -21,7 +21,7 @@ export interface Cast {
 declare const data: Record<string, Cast>;
 export { data };
 
-// The row type, one level deep, under the named type that a hover shows (`books.JSONSelectable`, `LateralResult<…>`).
+// The row type, one level deep, under the named type that a hover shows (`films.JSONSelectable`, `LateralResult<…>`).
 const shown = (name: string) => `
 type Shown<T> = T extends readonly (infer R)[] ? { [K in keyof R]: R[K] }[] : T extends object ? { [K in keyof T]: T[K] } : T;
 declare const shown: Shown<typeof ${name}>;
@@ -55,9 +55,9 @@ export default defineLoader({
     if (!throws(() => twoslasher('const n: number = ""', 'ts')))
       throw new Error('cast.data.ts: Twoslash let a type error through: check `vfsRoot` in twoslash.ts');
     for (const [what, query] of [
-      ['a single-row insert', db.insert('books', { authorId: 1, title: 'Northern Lights' })],
-      ['count', db.count('books', db.all)],
-      ['selectExactlyOne', db.selectExactlyOne('books', { id: 1 })],
+      ['a single-row insert', db.insert('tags', { film_id: 1000, tag: 'coastal' })],
+      ['count', db.count('films', db.all)],
+      ['selectExactlyOne', db.selectExactlyOne('films', { id: 1000 })],
     ] as const) await record(() => query.run(pool), `cast.data.ts, the recording pool given ${what}`);
 
     (globalThis as any).pool = pool;
