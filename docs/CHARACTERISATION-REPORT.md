@@ -2,7 +2,7 @@
 
 What steps 1.1 to 1.5 found in Zapatos 6.6.1. Nothing is fixed: each finding is pinned as it is by its test, and the fixes become the sub-issues of the chapter 2 Epic, [#18](https://github.com/AlexandreDemartin/pgcast/issues/18).
 
-Sources: the "Surprises" sections of PRs #4, #5, #7 and #8, the `characterization:` tests of `test/`, and a reading of `src/db/transaction.ts`.
+Sources: the "Surprises" sections of PRs #4, #5, #7 and #8, the `characterization:` tests of `test/`, and a reading of `src/db/transaction.ts`. R62 to R64 come later, from #101 (chapter 2), and their class awaits the owner.
 
 ## Summary
 
@@ -10,14 +10,14 @@ Sources: the "Surprises" sections of PRs #4, #5, #7 and #8, the `characterizatio
 |---|---|---|---|
 | Security | 7 | 1 | 6 |
 | Data loss | 3 | 3 | 0 |
-| Wrong result | 12 | 11 | 1 |
+| Wrong result | 15 | 13 | 2 |
 | Invalid SQL or error | 9 | 0 | 9 |
 | Wrong type | 15 | 7 | 8 |
 | Codegen | 11 | 4 | 7 |
 | Docs | 4 | 3 | 1 |
-| **Total** | **61** | **29** | **32** |
+| **Total** | **64** | **31** | **33** |
 
-32 findings to fix, 17 to document and 12 to leave.
+35 findings to fix, 17 to document and 12 to leave.
 
 The three that matter most:
 
@@ -71,6 +71,9 @@ The three that matter most:
 | R20 | `conditions.ts` | A `Date` on a `date` column keeps the local day and loses the time; `subtract(date)` gives days. | `integration/conditions › date: the local day of the Date, its time dropped` | breaking | document: it is node-postgres and Postgres | — |
 | R21 | `shortcuts.ts` | `withTies` without `limit` is silently ignored; without `order`, Postgres refuses it. | `unit/shortcuts › limit, offset, withTies` ; `integration/shortcuts › withTies without order is a Postgres error` | breaking | document | — |
 | R22 | `transaction.ts` | A transaction client passed through keeps its level: `serializable(clientReadCommitted, …)` is not checked at run time. | `integration/transaction › passes a transaction client through: no nested transaction, whatever the level asked` | non-breaking: the type already refuses | leave: the type protects; a check would need the table of levels at run time | — |
+| R62 | `core.ts`, `conditions.ts` | `raw()`, `cols(x)` and `vals(x)` as a `Whereable` value, in `isIn` / `isNotIn` or in `eq()` and the other comparisons, are sent as one parameter, as JSON: `{ display_name: raw("'Ada'") }` compares with `{"value":"'Ada'"}`. The type accepts them on a text or `jsonb` column (`raw`) or a text array (`cols([…])`): `Parameter<T>` is structural (`{ value: T }`). No row; `isNotIn` matches every row, so `deletes('memberships', { role: isNotIn([raw("'owner'")]) })` deletes them all; 22P02 on an array column. A plain `{ value }` object passes the type too, and stays a value. Same in 6.6.1. | `` integration/core › raw(), cols(x) and vals(x) as a value are sent as JSON: no row, or every row with isNotIn `` ; `unit/core › a raw value is wrapped in another parameter` ; `unit/core › cols, vals and self as a value are wrapped in a parameter too` ; `unit/core › vals of an array wraps raw, cols, parent() and self in a parameter` ; `unit/conditions › a comparison wraps raw, cols, Default and self in a parameter` ; `types/core › raw(), cols(x) and vals(x) pass as a Parameter<T>, in a Whereable, isIn and eq` | breaking: refusing them narrows an accepted type; `isNotIn` stops matching every row | fix, to decide (#101): throw while compiling, with an error that says what to do (`` sql`${self} = ${raw(…)}` ``, or `param()`), and refuse them in the type; a plain `{ value }` object stays a value (`jsonb`, `req.body`). Not compiled as SQL: a value slot is a parameter today, even for `raw(input)`, which would become an injection without a change in the caller's code | Refuse raw(), cols() and vals() as Whereable and isIn values |
+| R63 | `core.ts` | `parent()` in `vals([…])`, so `isIn([parent('id')])` and `isNotIn`, is sent as one parameter, as JSON (`'{"value":"id"}'`), in a lateral or not: 22P02 on an int column; on a text one, no row, or every row with `isNotIn`. The type accepts it. A `parent()` value (`{ owner_id: parent('id') }`) and `eq(parent('id'))` compile to the parent column; outside a lateral they throw "The 'parent' table alias has no meaning here", which the type cannot see (as R38). Same in 6.6.1. | `integration/core › parent() in isIn is sent as JSON, in a lateral or not` ; `integration/core › parent() as a value, or in eq(), is the parent column in a lateral, and throws outside one` ; `unit/core › vals of an array wraps raw, cols, parent() and self in a parameter` ; `types/core › parent() is accepted in isIn, in a lateral or not` ; `types/core › parent() as a value, or in eq(), is accepted outside a lateral` | breaking: on a text column, the result changes | fix, to decide (#101): compile it as a `Whereable` value and `eq()` do, `"owner_id" IN ("users"."id")`, so it throws outside a lateral; a quoted identifier (R1), so no injection path; a `core.ts` stop point | Compile parent() in isIn as the parent column, not as JSON |
+| R64 | `conditions.ts`, `core.ts` | `Default` and `self` in `eq()` and the other comparisons, and `self` as a `Whereable` value or in `isIn`, are sent as strings, `'Symbol(DEFAULT)'` and `'Symbol(self)'`: no row on a text column, every row with `ne()`, 22P02 on the others. The type refuses them. Same in 6.6.1. | `integration/core › Default and self in a comparison, and self as a value, are sent as strings` ; `unit/conditions › a comparison wraps raw, cols, Default and self in a parameter` ; `unit/core › cols, vals and self as a value are wrapped in a parameter too` ; `types/core › self as a value, and Default in a condition, are refused` | non-breaking: the type already refuses | fix, to decide (#101): throw while compiling, as R13 does for `Default` in a `Whereable` | Throw on Default and self as condition values, as in a Whereable |
 
 ## Invalid SQL or error
 
