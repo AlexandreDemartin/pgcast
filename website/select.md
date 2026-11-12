@@ -60,7 +60,7 @@ The SQL of each row is what the built library compiles, on the docs schema; `…
 
 ### `order`, `limit`, `offset` and `withTies`
 
-- `order`: one `{ by, direction, nulls? }` or an array of them, in that order. `by` is a column or a `sql` fragment (`` db.sql`array_length(${'genres'}, 1)` ``); `direction` is `'ASC'` or `'DESC'`; `nulls`, `'FIRST'` or `'LAST'`.
+- `order`: one `{ by, direction, nulls? }` or an array of them, in that order. `by` is a column or any SQL of the table, its `SQL` type: a `sql` fragment (`` db.sql`array_length(${'genres'}, 1)` ``), [`db.parent()`](/sql-template#parent); `direction` is `'ASC'` or `'DESC'`; `nulls`, `'FIRST'` or `'LAST'`.
 - `limit` and `offset`: numbers, sent as parameters.
 - `withTies: true`, with `limit` and `order`: also the rows that tie with the last one on the `order`. Without `limit` it adds nothing; without `order`, Postgres refuses the query (42601).
 
