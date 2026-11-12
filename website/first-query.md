@@ -6,6 +6,7 @@ By the end of this page, you'll have generated the types of a database, asked it
 ## Before you start
 
 - pgcast installed under the `zapatos` alias, with `pg` and `@types/pg`: [Install](/install).
+- TypeScript in your project: `npm install --save-dev typescript`.
 - A Postgres database you can connect to, its connection string in the `DATABASE_URL` environment variable.
 - The films of these docs in it: [`schema.sql`](https://github.com/AlexandreDemartin/pgcast/blob/master/website/schema.sql) holds `studios`, their `films`, the `actors` and the `roles` they play, and a few more tables, with some rows to query.
 
@@ -15,18 +16,25 @@ psql "$DATABASE_URL" -f schema.sql
 
 Every example below runs on that schema. A database of your own works too: swap in your table and column names as you go.
 
-## Check your tsconfig
+## Set up the project
 
-The generated types need `strictNullChecks`, which `strict` turns on. Without it, a query that names its `columns` (as one does below) gets the type of every column, and a missing row stops showing up as `undefined`.
+The examples use `import` and a top-level `await`, so your project is an ES module:
 
-The generator writes ordinary `.d.ts` files into your source tree, and `zapatos/schema` is declared in one of them, so they must be part of your compilation. With `"include": ["src"]` and the `outDir` below, they are.
+```sh
+npm pkg set type=module
+```
+
+Then a `tsconfig.json` that compiles them as Node runs them:
 
 ::: code-group
 
 ```json [tsconfig.json]
 {
   "compilerOptions": {
-    "strict": true
+    "module": "nodenext",
+    "target": "es2022",
+    "strict": true,
+    "noEmit": true
   },
   "include": ["src"]
 }
@@ -34,7 +42,10 @@ The generator writes ordinary `.d.ts` files into your source tree, and `zapatos/
 
 :::
 
-If you run TypeScript through `ts-node`, give it `--files`, or it may not read them.
+- `"module": "nodenext"` makes `import pg from 'pg'` and the top-level `await` compile, as in a `"type": "module"` project.
+- `strict` turns on `strictNullChecks`, which the generated types need. Without it, a query that names its `columns` (as one does below) gets the type of every column, and a missing row stops showing up as `undefined`.
+- `noEmit`: `tsc` only checks your code; Node runs the `.ts` file itself.
+- The generator writes ordinary `.d.ts` files into your source tree, and `zapatos/schema` is declared in one of them, so they must be part of your compilation. With `"include": ["src"]` and the `outDir` below, they are.
 
 ## Configure the generator
 
@@ -108,7 +119,7 @@ const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 
 :::
 
-The import is the same whether your project is CommonJS or ESM. The examples below carry on in this file.
+The examples below carry on in this file. Their top-level `await` needs ESM: that's the `"type": "module"` above.
 
 ## Ask for one film
 
