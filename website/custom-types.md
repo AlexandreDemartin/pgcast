@@ -144,7 +144,7 @@ declare module 'zapatos/custom' {
 
 :::
 
-`screen: { format: 'VHS', seats: 120 }` then fails to compile (TS2769), and a cinema's `screen.format` is typed `'35mm' | '70mm' | 'digital'`. Postgres checks none of it, and stores `{"format": "VHS", "seats": 120}` all the same: the type is your promise about what the column holds.
+`db.insert('cinemas', { …, screen: { format: 'VHS', seats: 120 } })` then fails to compile (TS2769), and a cinema's `screen.format` is typed `'35mm' | '70mm' | 'digital'`. Postgres checks none of it, and stores that value all the same: the type is your promise about what the column holds.
 
 ## Keep it across runs
 
