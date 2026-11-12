@@ -357,7 +357,7 @@ db.enableCustomJSONParsingForLargeNumbers(pg);
 type RangeString<Bound extends string | number> = `${'[' | '('}${Bound},${Bound}${']' | ')'}`
 ```
 
-A range as Postgres writes it: a bracket, two bounds, a bracket.
+A range as Postgres writes it: a bracket, two bounds, a bracket. It does not cover an empty range, which Postgres writes `empty`: `to_jsonb('empty'::int4range)` is `"empty"`, and `const r: db.NumberRangeString = 'empty'` does not compile (TS2322, [#185](https://github.com/AlexandreDemartin/pgcast/issues/185)).
 
 ### `NumberRangeString` {#NumberRangeString}
 
@@ -373,7 +373,7 @@ An `int4range`, `int8range` or `numrange`: `'[1,5)'`, or `'[1.5,)'` with no uppe
 type DateRangeString = RangeString<string>
 ```
 
-A `tsrange`, `tstzrange` or `daterange`. Its bounds follow the session's `DateStyle`, so they are typed `string`: `daterange('2030-03-01', '2030-03-08')` is `'[2030-03-01,2030-03-08)'` with the `ISO` style, and `'[01/03/2030,08/03/2030)'` with `SQL, DMY`.
+A `tsrange`, `tstzrange` or `daterange`. Its bounds follow the session's `DateStyle`, so they are typed `string`: `daterange('2030-03-01', '2030-03-08')` is `'[2030-03-01,2030-03-08)'` with the `ISO` style, and `'[01/03/2030,08/03/2030)'` with `SQL, DMY`. The bounds of a `tsrange` or `tstzrange` come quoted, since they hold a space: `'["2030-03-01 19:30:00","2030-03-02 00:00:00")'`.
 
 ## Bytes {#bytes}
 
