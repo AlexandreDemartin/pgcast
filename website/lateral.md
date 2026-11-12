@@ -1,6 +1,6 @@
 # Join through a lateral
 
-Get rows with the rows they relate to, in one query and one typed result: a film with its cast, a crew member with their mentor. You nest a shortcut in the [`lateral`](/select#lateral) option of `select()`; it becomes a `LEFT JOIN LATERAL`<!-- probe: examples/lateral_cast.ts -->, and its result a key of each row. You already know `select()` from the [tutorial](/first-query).
+Get rows with the rows they relate to, in one query and one typed result: a film with its cast, a crew member with their mentor. You nest a shortcut in the [`lateral`](/select#lateral) option of `select()`; it becomes a `LEFT JOIN LATERAL`, and its result a key of each row. You already know `select()` from the [tutorial](/first-query).
 {.lede}
 
 ## Add the rows that point to it
