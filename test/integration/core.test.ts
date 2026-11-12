@@ -240,6 +240,12 @@ describe('Whereable', () => {
     `);
     expect(await counts({ display_name: c.isIn([parent('display_name')]) })).toEqual([{ id: 1, n: 0 }, { id: 2, n: 0 }, { id: 3, n: 0 }]);
     expect(await counts({ display_name: c.isNotIn([parent('display_name')]) })).toEqual([{ id: 1, n: 2 }, { id: 2, n: 2 }, { id: 3, n: 2 }]);
+    expect(await pgError(t.client, () => ids({ id: c.isIn([parent('id')]) }))).toMatchInlineSnapshot(`
+      {
+        "code": "22P02",
+        "message": "invalid input syntax for type integer: "{"value":"id"}"",
+      }
+    `);
     expect(await ids({ display_name: c.isIn([parent('display_name')]) })).toEqual([]);
   });
 
