@@ -94,7 +94,7 @@ const here: c.PgPoint = '(0.5,1)';
 
 ## Type a domain
 
-A domain gets a placeholder too, with the type of its base type instead of `any`. `seat_label` is a `TEXT` with a `CHECK`, so `src/zapatos/custom/PgSeat_label.d.ts` holds `string`:
+A domain gets a placeholder too, which holds its base type's `Selectable` type instead of `any`: the type `pg` returns. That one type serves all five interfaces, `JSONSelectable` included. `seat_label` is a `TEXT` with a `CHECK`, so `src/zapatos/custom/PgSeat_label.d.ts` holds `string`, right in each:
 
 <<< ./zapatos/custom/PgSeat_label.d.ts{ts}
 
@@ -169,18 +169,21 @@ A domain's placeholder holds its base type's TypeScript name, and imports `zapat
 | `db.Int8String`, for a domain over `bigint`; `numeric`, `time` and the ranges alike | TS2503, `Cannot find namespace 'db'.` | `import type * as db from 'zapatos/db';` |
 | `genre`, for a domain over the enum `genre` | TS2304, `Cannot find name 'genre'.` | `import type { genre } from 'zapatos/schema';` |
 
-For `CREATE DOMAIN ticket_no AS bigint`, the fixed placeholder reads:
+For `CREATE DOMAIN ticket_no AS bigint`, the placeholder holds `db.Int8String`, the string `pg` returns for a `bigint`. But the shortcuts return a `bigint` as a JSON number: a `ticket_no` that [`select()`](/select#select) returns is a `number` typed `db.Int8String`, so `.padStart()` compiles, then throws; and [`insert()`](/insert#insert) refuses `1` (TS2769). With the import, type it as both:
 
 ::: code-group
 
 ```ts [src/zapatos/custom/PgTicket_no.d.ts]
 declare module 'zapatos/custom' {
   import type * as db from 'zapatos/db';
-  export type PgTicket_no = db.Int8String;  // replace with your custom type or interface as desired
+  export type PgTicket_no = number | db.Int8String;  // pg returns a string, the shortcuts a number
 }
 ```
 
 :::
+
+- A domain over `numeric`, `date`, `timestamp`, `timestamptz` or `bytea` is in the same case: its placeholder holds what `pg` returns, not what the shortcuts return ([#194](https://github.com/AlexandreDemartin/pgcast/issues/194)).
+- Past `Number.MAX_SAFE_INTEGER`, the number loses its last digits, as for any `bigint`: `9007199254740993` comes back as `9007199254740992` ([`customJSONParsingForLargeNumbers`](/generator#generate.customJSONParsingForLargeNumbers)).
 
 ## See also
 
