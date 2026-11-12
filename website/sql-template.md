@@ -52,7 +52,7 @@ Each value between `${…}` compiles by what it is. The SQL is the built library
 | `raw(s)` | `s`, as it is | [`raw()`](#raw) |
 | `cols(o)` / `cols(a)` | the object's keys, sorted, or the array's items, quoted: `"film_id", "tag"` | [`cols()`](#cols) |
 | `vals(o)` / `vals(a)` | the values, in the order of `cols(o)`, or the array's: `$1, $2` | [`vals()`](#vals) |
-| a plain object | a Whereable: `("studio_id" = $1)`; `{}` → `TRUE` | [Whereable objects](#whereable) |
+| any other object | a Whereable of its own enumerable keys, plain or not: `("studio_id" = $1)`; `{}` → `TRUE`, and so `new Date()` → `TRUE` | [Whereable objects](#whereable) |
 | `self` | the current column, in a Whereable's fragment value | [`self`](#self) |
 | `parent(c?)` | the column of the parent query: `"studios"."id"` | [`parent()`](#parent) |
 | `Default` | `DEFAULT` | [`Default`](#Default) |
@@ -229,7 +229,7 @@ What `vals()` returns. A type-only member keeps it from passing as a `Parameter`
 
 ## Whereable objects {#whereable}
 
-A plain object is a Whereable of the table: each key a column, each value what it must match. The keys are sorted, each pair compiled as below, joined by `AND`, the whole in parentheses; there is no `WHERE`, which you write. An empty object is `TRUE`.
+An object is a Whereable of the table: each own enumerable key a column, each value what it must match. The keys are sorted, each pair compiled as below, joined by `AND`, the whole in parentheses; there is no `WHERE`, which you write. An empty object is `TRUE`.
 
 <CastPanel example="sql_whereable">
 
@@ -250,6 +250,10 @@ A plain object is a Whereable of the table: each key a column, each value what i
 - `null` is a parameter too, and `= NULL` matches no row: use [`conditions.isNull`](/conditions#conditions.isNull).
 - `Default` throws "`` `db.Default` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. `DEFAULT` is for INSERT and UPDATE values. ``"; Zapatos 6.6.1 sent it as `'Symbol(DEFAULT)'`.
 - The shortcuts take the same object as their `where` ([`select()`](/select#select)).
+
+::: warning Security
+An interpolated object that is not one of the other [interpolations](#interpolations) compiles as a Whereable, plain or not: a class instance `{ title }` gives `("title" = $1)`, and a `Date` or a `Map`, which have no own enumerable key, give `TRUE`. So `` db.sql`DELETE FROM ${'films'} WHERE ${new Date()}` `` is `DELETE FROM "films" WHERE TRUE`, and deletes every row. The type refuses a `Date` or a `Map` (TS2345), so this hits a value typed `any` or untyped: check what reaches a `where` at run time.
+:::
 
 ## `self` {#self}
 
