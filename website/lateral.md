@@ -45,7 +45,7 @@ Films and actors are many-to-many, through `roles`. Nest a lateral in the latera
 
 ## Keep only the far side
 
-For the actors without their roles, give the inner `lateral` one subquery rather than an object: its result takes the place of each role.
+For the actors alone, without the role's columns, give the inner `lateral` one subquery rather than an object: its result takes the place of each role.
 
 <CastPanel example="lateral_passthrough">
 
