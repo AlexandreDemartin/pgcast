@@ -25,7 +25,7 @@ Returns a [`SQLFragment`](#SQLFragment): the literal parts as you wrote them, ea
 
 | Argument | Default | What it sets |
 |---|---|---|
-| `Interpolations` | [`db.SQL`](#SQL): every table and column of the schema | what may be interpolated; `s.films.SQL` allows only the names of `films` |
+| `Interpolations` | [`db.SQL`](#SQL): every table and column of the schema | what may be interpolated; `s.films.SQL` allows only the names of `films`, and `cols()` / `vals()` of any value |
 | `RunResult` | `pg.QueryResult['rows']` (`any[]`) | what `run()` resolves to, and the type of the fragment as a `lateral` or `extras` value |
 | `Constraint` | `never` | the value type a condition compares with; set by [`conditions`](/conditions#conditions), checked by a Whereable. You rarely give it. |
 
@@ -465,7 +465,7 @@ What `run()` takes: a pool, a client, or the client a [`transaction()`](/transac
 type SQL = SQLExpression | SQLExpression[]
 ```
 
-The default `Interpolations` of `sql`: an expression, or an array of them. Each table of the generated schema has its own, `s.films.SQL`, which takes only the names, Whereable and `cols()` / `vals()` objects of that table.
+The default `Interpolations` of `sql`: an expression, or an array of them. Each table of the generated schema has its own, `s.films.SQL`, which takes the names and Whereables of that table only; `cols()` and `vals()` of any value, as in Zapatos 6.6.1. So `` db.sql<s.films.SQL>`INSERT INTO ${'films'} (${db.cols({ seat: 1 })}) VALUES (${db.vals({ seat: 1 })})` `` type-checks, and fails only in Postgres (42703: `films` has no `seat`).
 
 ### `SQLExpression` {#SQLExpression}
 
@@ -474,7 +474,7 @@ type SQLExpression = Table | ColumnNames<Updatable | (keyof Updatable)[]> | Colu
   | Whereable | Column | ParentColumn | GenericSQLExpression
 ```
 
-One interpolation: a table or column name of any table, a Whereable, `parent()`, `cols()` / `vals()` of an Updatable, or a [`GenericSQLExpression`](#GenericSQLExpression).
+One interpolation: a table or column name of any table, a Whereable, `parent()`, `cols()` / `vals()` of an Updatable, or a [`GenericSQLExpression`](#GenericSQLExpression), which takes `cols()` / `vals()` of any value.
 
 ### `GenericSQLExpression` {#GenericSQLExpression}
 
@@ -483,4 +483,4 @@ type GenericSQLExpression = SQLFragment<any, any> | Parameter | DefaultType | Da
   | SelfType | ColumnNames<any> | ColumnValues<any>
 ```
 
-The interpolations that hold no name of the schema: they fit in any table's `SQL`.
+The interpolations whose type is the same for every table: they fit in any table's `SQL`. `ColumnNames<any>` and `ColumnValues<any>` are among them, so the keys of `cols()` and `vals()` are not checked against the table.
