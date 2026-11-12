@@ -176,6 +176,18 @@ describe('upsert', () => {
     expect(tee).toEqual({ sku: 'TEE', title: 'T-shirt small', price_cents: 1300, $action: 'UPDATE' });
   });
 
+  it('with upsertRequiresSameKeys, new rows without their serial id among existing rows run, and nothing is overwritten', async () => {
+    db.setConfig({ upsertRequiresSameKeys: true });
+    const { id } = await run(db.selectExactlyOne('products', { sku: 'TEE', variant: 'S' }, { columns: ['id'] }));
+    const [cap, tee] = sortBy(await run(db.upsert('products', [
+      { id, sku: 'TEE', variant: 'S', price_cents: 1300 },
+      { sku: 'CAP', variant: '', price_cents: 900 },
+    ], 'id', { returning: ['id', 'sku', 'title', 'price_cents'] })), 'sku');
+    expect(tee).toEqual({ id, sku: 'TEE', title: 'T-shirt small', price_cents: 1300, $action: 'UPDATE' });
+    expect(cap).toEqual({ id: expect.any(Number), sku: 'CAP', title: null, price_cents: 900, $action: 'INSERT' });
+    expect(cap.id).not.toBe(id);
+  });
+
   it('constraint()', async () => {
     expect(await run(db.upsert('users', { email: 'bob@example.com', display_name: 'Bobby' },
       db.constraint('users_email_key'), { returning: ['id', 'display_name'] })))

@@ -621,7 +621,7 @@ describe('upsertRequiresSameKeys', () => {
     db.setConfig({ upsertRequiresSameKeys: true });
     expect(() => db.upsert('products', rows, ['sku', 'variant']))
       .toThrow('rows have different keys: pass updateColumns, or give every row the same keys');
-    expect(() => db.upsert('products', rows, ['sku', 'variant'], { updateValues: { title: 'x' } }))
+    expect(() => db.upsert('products', rows, ['sku', 'variant'], { updateValues: { price_cents: 1 } }))
       .toThrow('rows have different keys: pass updateColumns, or give every row the same keys');
   });
 
@@ -652,6 +652,13 @@ describe('upsertRequiresSameKeys', () => {
   });
 });
 
+/** A fresh src/db, which has emitted no warning yet, and a spy on the warnings. */
+const fresh = async () => {
+  vi.resetModules();
+  const emitWarning = vi.spyOn(process, 'emitWarning').mockImplementation(() => { });
+  return { fdb: await import('../../src/db'), emitWarning };
+};
+
 describe('upsert of rows with different keys, without upsertRequiresSameKeys', () => {
   afterEach(() => { vi.restoreAllMocks(); });
   const rows = [
@@ -659,18 +666,11 @@ describe('upsert of rows with different keys, without upsertRequiresSameKeys', (
     { sku: 'CAP', variant: '', price_cents: 900, title: 'Cap' },
   ];
 
-  /** A fresh src/db, which has emitted no warning yet, and a spy on the warnings. */
-  const fresh = async () => {
-    vi.resetModules();
-    const emitWarning = vi.spyOn(process, 'emitWarning').mockImplementation(() => { });
-    return { fdb: await import('../../src/db'), emitWarning };
-  };
-
   it('emits a DeprecationWarning once per process, PGCAST_DEP001, naming the option', async () => {
     // the SQL is unchanged: see 'several conflict columns and several rows' above
     const { fdb, emitWarning } = await fresh();
     fdb.upsert('products', rows, ['sku', 'variant']);
-    fdb.upsert('products', rows, ['sku', 'variant'], { updateValues: { title: 'x' } });
+    fdb.upsert('products', rows, ['sku', 'variant'], { updateValues: { price_cents: 1 } });
     expect(emitWarning).toHaveBeenCalledTimes(1);
     const [message, options] = emitWarning.mock.calls[0];
     expect(options).toEqual({ type: 'DeprecationWarning', code: 'PGCAST_DEP001' });
@@ -687,6 +687,61 @@ describe('upsert of rows with different keys, without upsertRequiresSameKeys', (
     fdb.setConfig({ upsertRequiresSameKeys: true });
     expect(() => fdb.upsert('products', rows, ['sku', 'variant'])).toThrow();
     expect(emitWarning).not.toHaveBeenCalled();
+  });
+});
+
+describe('upsert of rows with different keys: only a missing key still set from EXCLUDED counts', () => {
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  /** Whether `call` warns without upsertRequiresSameKeys, and what it throws with it. */
+  const outcome = async (call: (fdb: typeof db) => unknown) => {
+    const { fdb, emitWarning } = await fresh();
+    call(fdb);
+    const warns = emitWarning.mock.calls.length > 0;
+    fdb.setConfig({ upsertRequiresSameKeys: true });
+    try { call(fdb); return { warns, throws: undefined }; }
+    catch (err: any) { return { warns, throws: err.message as string }; }
+  };
+  const none = { warns: false, throws: undefined };
+  const both = { warns: true, throws: 'rows have different keys: pass updateColumns, or give every row the same keys' };
+
+  it('new rows without their serial id, conflict target id, among existing rows: neither', async () => {
+    // a missing id is inserted as DEFAULT, a new serial value; on conflict, EXCLUDED.id is the existing id
+    const rows = [
+      { id: 1, sku: 'TEE', variant: 'S', price_cents: 1300 },
+      { sku: 'NEW', variant: '', price_cents: 900 },
+    ];
+    expect(await outcome(fdb => fdb.upsert('products', rows, 'id'))).toEqual(none);
+    expect(await outcome(fdb => fdb.upsert('products', rows, ['id']))).toEqual(none);
+  });
+
+  it('a missing key given in updateValues: neither', async () => {
+    // it compiles to ROW(..., $n), never to EXCLUDED."title"
+    const rows = [
+      { sku: 'TEE', variant: 'S', price_cents: 1300 },
+      { sku: 'CAP', variant: '', price_cents: 900, title: 'Cap' },
+    ];
+    expect(await outcome(fdb => fdb.upsert('products', rows, ['sku', 'variant'], { updateValues: { title: 'x' } })))
+      .toEqual(none);
+  });
+
+  it('a missing key really overwritten from EXCLUDED: both, even with another conflict column missing', async () => {
+    const rows = [
+      { id: 1, sku: 'TEE', variant: 'S', price_cents: 1300 },
+      { sku: 'CAP', variant: '', price_cents: 900, title: 'Cap' },
+    ];
+    expect(await outcome(fdb => fdb.upsert('products', rows, 'id'))).toEqual(both);
+    expect(await outcome(fdb => fdb.upsert('products', rows, 'id', { noNullUpdateColumns: 'title' }))).toEqual(both);
+  });
+
+  it('a constraint() target keeps the plain rule: a missing column of the constraint counts', async () => {
+    // its columns are not known at compile time
+    const rows = [
+      { sku: 'TEE', variant: 'S', price_cents: 1300 },
+      { sku: 'MUG', price_cents: 900 },
+    ];
+    expect(await outcome(fdb => fdb.upsert('products', rows, fdb.constraint('products_sku_variant_key')))).toEqual(both);
+    expect(await outcome(fdb => fdb.upsert('products', rows, ['sku', 'variant']))).toEqual(none);
   });
 });
 
