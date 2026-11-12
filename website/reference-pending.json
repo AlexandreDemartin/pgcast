@@ -25,19 +25,6 @@
     "SQLFragment",
     "RunResultForSQLFragment"
   ],
-  "insert.md": [
-    "constraint",
-    "ReturningOptionsForTable",
-    "insert",
-    "Constraint",
-    "UpsertAction",
-    "doNothing",
-    "upsert",
-    "update",
-    "DeleteSignatures",
-    "deletes",
-    "truncate"
-  ],
   "conditions.md": [
     "conditions",
     "conditions.isNull",
