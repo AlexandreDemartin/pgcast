@@ -116,6 +116,8 @@ Every option is optional. Each one given replaces its default whole: `schemas` w
 
 `{ [schema]: { include, exclude } }`, each of `include` and `exclude` `"*"` or an array of relation names. The schemas to generate, and which relations of each: tables, views, materialised views and foreign tables.
 
+Both keys are required. In `generate()`, a rule without one fails to compile (TS2741); in the JSON, the CLI stops with `TypeError: Cannot read properties of undefined (reading 'indexOf')` ([#45](https://github.com/AlexandreDemartin/pgcast/issues/45)).
+
 | Rule | Generates |
 |---|---|
 | `{ "include": "*", "exclude": [] }` | every relation of the schema |
