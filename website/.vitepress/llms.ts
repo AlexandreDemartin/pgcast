@@ -1,7 +1,8 @@
 // Copyright (C) 2026 Alexandre Demartin
 // llms.txt and llms-full.txt (https://llmstxt.org/), written to the site's root at build (`buildEnd`, config.ts), for
 // assistants: an index of the written pages, then all of them as plain Markdown, in the order of the outline. An
-// entry with no `<link>.md` of its own is a "Coming" page ([page].paths.ts), left out of both.
+// entry with no `<link>.md` of its own is a "Coming" page ([page].paths.ts), left out of both. On the way, it checks
+// each example's copy of a block of its page (`checkCopy()`).
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createTwoslasher } from 'twoslash';
@@ -71,8 +72,10 @@ function plain(source: string, casts: Record<string, string>, srcDir: string, ur
         if (casts[name] === undefined) throw new Error(`llms.ts: no cast for the panel of examples/${name}.ts`);
         return `You write:\n${example.replace(/<template[\s\S]*?<\/template>/g, '')}\n${casts[name]}\n`;
       })
-      .replace(/^<<< (\S+?)(?:#([\w.-]+))?(?:\{(.*?)\})?( \[.+\])?$/gm, (_, path, region, info = '', label = '') =>
-        '```' + info + label + '\n' + snippet(join(srcDir, path), region) + '\n```')
+      .replace(/^<<< (\S+?)(?:#([\w.-]+))?(?:\{(.*?)\})?( \[.+\])?$/gm, (_, path, region, info = '', label = '') => {
+        checkCopy(join(srcDir, path), source);
+        return '```' + info + label + '\n' + snippet(join(srcDir, path), region) + '\n```';
+      })
       .replace(/<InstallLine command="([^"]*)" \/>/g, '```sh\n$1\n```'),
     missed = /<\/?CastPanel\b.*/.exec(expanded)?.[0];
 
@@ -118,6 +121,19 @@ function snippet(file: string, region?: string) {
     end = region ? lines.findIndex(line => line.trim() === `// #endregion ${region}`) : lines.length;
   if (region && (start < 0 || end < start)) throw new Error(`llms.ts: no region ${region} in ${file}`);
   return lines.slice(start + 1, end).join('\n');
+}
+
+/**
+ * An example's hidden lines between `// #region copy` and `// #endregion copy` repeat a block the page shows (a function
+ * the example calls): they must stay that block, blank lines aside, or the two drift apart silently.
+ */
+function checkCopy(file: string, page: string) {
+  if (!readFileSync(file, 'utf8').includes('// #region copy')) return;
+  const
+    lines = (code: string) => code.split('\n').map(line => line.trimEnd()).filter(line => line !== '').join('\n'),
+    copy = lines(snippet(file, 'copy')),
+    blocks = [...page.matchAll(/^```.*\n([\s\S]*?)^```$/gm)].map(([, code]) => lines(code!));
+  if (!blocks.includes(copy)) throw new Error(`llms.ts: the copy region of ${file} is no longer a block of its page`);
 }
 
 /** The code a Twoslash block shows: what follows `// ---cut---`, without Twoslash's own `// @` and `// ^` lines. */

@@ -241,6 +241,16 @@ Candidates for a check, a rule or a skill line.
 - #200 — Under 6.6.1 a `sql` fragment on a NOT NULL column fails in `updateValues` (TS2769): a migration example for 6.6.1 users needs a nullable column — `builder`
 - #161 — A before/after comparison of a generated file is rebuilt after merging master: new pages change the counts — `builder`
 - #161 — Nothing lints or type-checks `website/.vitepress/*.ts`: only `docs:build` exercises them, and line length is kept by hand — `builder`
+- #172 — pgcast's declarations need TypeScript 5.7 for a full check (`toBuffer()` returns `Buffer<ArrayBuffer>`, as in Zapatos 6.6.1), while the peer range says `>=4.1`: a version claim is checked with real installs per version, not read from `peerDependencies` — `builder`
+- #172 — `skipLibCheck` also skips the generated `.d.ts`, so the version canary goes quiet: say so wherever it is suggested — `builder`
+- #115 — A script that creates databases drops at start the ones whose process is gone (pid in the name), since `finally` does not run on SIGINT, SIGKILL or an unhandled rejection — `branch-reviewer`, `builder`
+- #115 — pg-pool's `end()` waits for every checked-out client and never settles a queued query: check `totalCount - idleCount` and `waitingCount`, and drop `WITH (FORCE)` — `branch-reviewer`, `builder`
+- #115 — No regex built from a file name (CodeQL `js/incomplete-sanitization`, high): find the stack frame with `includes()` — `branch-reviewer`, `builder`
+- #115 — On a draft PR « CI passed » is green with every job skipped: proofs taken on a draft are local only — `branch-reviewer`
+- #203 — A check that tests only the type (`Number.isInteger`) leaves out the column's range: probe each « answer 400 » with an out-of-range value, `1e300`, an empty string and hex, or Postgres turns it into a 500 — `branch-reviewer`
+- #203 — `Number(s)` is not a parser for query-string ids (`Number('')` is 0, `Number('0x3e8')` is 1000): test the string first (`/^\d{1,9}$/`) — `branch-reviewer`
+- #203 — Re-encoding a decoded cursor and comparing it with the input is the simplest way to refuse a string the server did not make — `builder`
+- #203 — Parallel builders that name their probe databases alike see each other's rows: put the agent's own folder name in the database name, and check the row count before a proof run — orchestrator
 
 ## Minors kept
 
@@ -270,3 +280,5 @@ Minor review defects, taken up by the end-of-chapter review.
 - #128 — `website/insert.md` § undefined values: with `undefinedMeansMissing: true`, an `update()` whose only key is `undefined` throws « nothing to update: an Updatable needs at least one column »; worth one line there — `builder`
 - #147 — `website/why.md`: « all fixed in 6.6.2 » and, two paragraphs later, « The security fixes came first, in 6.6.2 » repeat each other; merge them in a later edit — `builder`
 - #200 — `src/db/shortcuts.ts:298`: the `upsert()` JSDoc still shows `` { name: db.sql`${'users.name'}` } ``, which fails with TS2345 on a real schema; write `` db.sql`${'users'}.${'name'}` `` — `builder`
+- #217 — `src/db/shortcuts.ts` `UpsertReturnableForTable`: `undefined extends RA ? UpsertAction : {}` is always true without `strictNullChecks`, so `reportAction: 'suppress'` keeps `$action` in the type while it is `undefined` at run time (as in Zapatos 6.6.1) — `builder`
+- #215 — `website/.vitepress/cast.data.ts` `layOut` keeps the template's whitespace before a keyword it does not break on: write an `INSERT … SELECT` and check its panel — `builder`
