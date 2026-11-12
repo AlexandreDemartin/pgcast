@@ -13,14 +13,14 @@ Zapatos broke things in its majors too, each at once: 1.0 renamed the transactio
 
 ## Four answers to a surprise
 
-Characterising Zapatos 6.6.1 turned up 64 surprises ([the report](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/CHARACTERISATION-REPORT.md)): SQL that Postgres refuses, results that contradict a function's name, holes in the escaping. 31 of them can't be fixed without changing a result that is valid today. [Decision 003](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/003-fixes-and-deprecation.md) sorts each one by a single question: could working code depend on what it does now?
+Characterising Zapatos 6.6.1 turned up 64 surprises ([the report](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/CHARACTERISATION-REPORT.md)): SQL that Postgres refuses, results that contradict a function's name, holes in the escaping. 31 of them can't be fixed without changing a result that is valid today, and [decision 003](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/003-fixes-and-deprecation.md) sorts those by a single question: could working code depend on what it does now? The report leaves a few as they are, each with its reason.
 
 | Class | When | What changes for you | Example |
 |---|---|---|---|
 | Fix | Postgres or the type already refused it, or it contradicts the function's name; every security hole | at once; the changelog lists each result that changes | [`not()`](/conditions#conditions.not) negates its whole condition: `` not(sql`a OR b`) `` gave `(NOT a OR b)`, which Postgres reads `(NOT a) OR b` |
 | Opt-in | the result is valid, and code may rely on it | nothing until you opt in; the old behaviour warns | an `undefined` value sent as `NULL`, until [`undefinedMeansMissing`](/runtime-config#Config.undefinedMeansMissing) makes it a missing key |
 | Document | Postgres does it, or it is meant | nothing; the docs say so | [`isNotIn()`](/conditions#conditions.isNotIn) with a `NULL` in its list matches no row: that is how Postgres reads `NOT IN` |
-| Leave | the type protects, the case is rare, or a fix would need a guess | nothing | an `int[][]` column is typed `number[]`: Postgres doesn't enforce the dimensions, and stores one, two or three in it alike |
+| Leave | [the report](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/CHARACTERISATION-REPORT.md) gives the reason: the type protects, the case is rare, or a fix would need a guess | nothing | an `int[][]` column is typed `number[]`: Postgres doesn't enforce the dimensions, and stores one, two or three in it alike |
 
 A fix can still stop a call that only worked through the bug. 6.6.2's escaping fixes are an example: a column name such as `id" AS "x` used to close its quotes and add an alias, and now names a column that doesn't exist. The changelog lists every such call, with what to write instead.
 
