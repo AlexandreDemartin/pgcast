@@ -202,6 +202,10 @@ Candidates for a check, a rule or a skill line.
 - #139 — A how-to that chains steps compiles the chain as the reader writes it (`page.at(-1)` into the next query); a panel runs the earlier query on a hidden pool that returns rows — `branch-reviewer`, `builder`
 - #139 — A mixed-direction keyset needs a bound on the first key to get an `Index Cond`; a bare `OR` filters from the top, as `offset` does — `branch-reviewer`
 - #139 — For a scratch `tsc` outside `website/`, `@types/*` comes before `node_modules/*` in `paths`, or `pg` resolves to untyped JS (TS7016) — `builder`
+- #142 — A `${number}` template type takes leading spaces and hex (`'( 1.5,2.5)'`, `'0x10'`): a claim that it « takes only » one form needs a negative `tsc` probe — `branch-reviewer`, `builder`
+- #142 — Every type inside `declare module 'zapatos/custom'` is exported and the blocks merge: a helper type in a placeholder takes a prefixed name — `branch-reviewer`, `builder`
+- #142 — A placeholder in the shared docs schema is a cross-page dependency: `git grep` the open worktrees before narrowing it — `builder`
+- #142 — Bulk inserts into the docs schema without ids hit 23505 at the 1000th row (seeds from 1000, sequences from 1): probes set explicit ids from 2000 — `branch-reviewer`
 
 ## Minors kept
 
