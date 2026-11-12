@@ -94,6 +94,8 @@ A numbered parameter: `$1`, `$2`…, numbered across the whole query, and `value
 
 </CastPanel>
 
+The last row applies when [`castArrayParamsToJson`](/runtime-config#Config.castArrayParamsToJson) or [`castObjectParamsToJson`](/runtime-config#Config.castObjectParamsToJson) is on; both are off by default.
+
 | `cast` | Compiles to | Value sent |
 |---|---|---|
 | none | `$1` | `value`, as `pg` serialises it |
@@ -102,10 +104,10 @@ A numbered parameter: `$1`, `$2`…, numbered across the whole query, and `value
 | `'public.mood'`, `'int4[]'` | `CAST($1 AS "public.mood")`, `CAST($1 AS "int4[]")`: one name, not split | `value` |
 | `true` | `CAST($1 AS "json")` for an array or a plain object; `$1` otherwise | `JSON.stringify(value)`; otherwise `value` |
 | `false` | `$1` | `value`, never as JSON |
+| none or a string, for an array with `castArrayParamsToJson` on, or a plain object with `castObjectParamsToJson` on | `CAST($1 AS "json")`: a string `cast` is dropped, `param([1, 2], 'int4[]')` included | `JSON.stringify(value)` |
 
 - A string `cast` is written as `"cast"` if that is well-formed (quoted parts joined by `.`); otherwise it is one quoted name, any `"` doubled, so it cannot close its quotes: `'int4") || (SELECT 1) || ("int4'` gives `CAST($1 AS "int4"") || (SELECT 1) || (""int4")`, a type that does not exist. Zapatos 6.6.1 wrote any `cast` as it is between quotes.
-- An array type takes `sql`: `` db.sql`${db.param(ids)}::int4[]` ``.
-- Without a `cast`, an array or a plain object is sent as JSON with `CAST($1 AS "json")` when [`castArrayParamsToJson`](/runtime-config#Config.castArrayParamsToJson) or [`castObjectParamsToJson`](/runtime-config#Config.castObjectParamsToJson) is on (both off by default).
+- For an array type, cast in `sql` and pass `false`, which keeps the value out of JSON under either option: `` db.sql`${db.param(ids, false)}::int4[]` `` gives `$1::int4[]`. Without `false`, `castArrayParamsToJson` makes it `CAST($1 AS "json")::int4[]`, which Postgres rejects (42846).
 - As a Whereable value or in `vals([…])` (so in [`isIn()`](/conditions#conditions.isIn)), a `Parameter` compiles as it is, with its cast: `{ title: db.param('x', 'text') }` gives `("title" = CAST($1 AS "text"))`. Zapatos 6.6.1 wrapped it in a second parameter, sent as JSON (`'{"value":"x","cast":"text"}'`).
 
 ### `Parameter` {#Parameter}
