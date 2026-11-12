@@ -13,7 +13,7 @@
 import type pg from 'pg';
 import { describe, expect, it, vi } from 'vitest';
 import * as db from '../../src/db';
-import { sql, param, all } from '../../src/db';
+import { sql, param, vals, all } from '../../src/db';
 import { useTestDatabase } from '../helpers/db';
 import { hostileCasts } from '../helpers/hostileCasts';
 import { pgError } from '../helpers/pgError';
@@ -236,6 +236,38 @@ describe('with parameters (extended protocol)', () => {
         "trailingDot": "42704",
       }
     `);
+  });
+});
+
+describe('a Parameter in a Whereable, in isIn or in vals', () => {
+  it('a hostile cast does what it does in sql`${param(x, cast)}`, and reads nothing', async () => {
+    // compiled text: test/unit/injection.test.ts; outcomes of the cast alone: "no hostile cast reads anything"
+    const outcome = async (q: db.SQLFragment<any[]>) => {
+      await t.client.query('SAVEPOINT pgcast_cast');
+      try {
+        const rows = await q.run(t.client);
+        // read before the savepoint goes: a second statement that ran shows here
+        return rows.length === 1 && await adaName() === 'Ada' ? 'one row' : rows;
+      } catch (err) {
+        return (err as { code?: string }).code;
+      } finally {
+        await t.client.query('ROLLBACK TO SAVEPOINT pgcast_cast');
+      }
+    };
+    for (const [name, cast] of Object.entries(hostileCasts)) {
+      const alone = await outcome(sql`SELECT ${param('1', cast)} AS v`);
+      expect({
+        name,
+        whereable: await outcome(sql`SELECT ${'id'} FROM ${'users'} WHERE ${{ id: param('1', cast) }}`),
+        isIn: await outcome(sql`SELECT ${'id'} FROM ${'users'} WHERE ${{ id: db.conditions.isIn([param('1', cast)]) }}`),
+        vals: await outcome(sql`INSERT INTO ${'extra.type_zoo'} (${'c_int4'}) VALUES (${vals([param('1', cast)])}) RETURNING ${'id'}`),
+      }).toEqual({ name, whereable: alone, isIn: alone, vals: alone });
+    }
+  });
+
+  it('a hostile value is sent as a parameter', async () => {
+    expect(await db.select('users', { display_name: param(`Ada' OR '1' = '1`) }).run(t.client)).toEqual([]);
+    expect(await db.select('users', { display_name: db.conditions.isIn([param(`Ada' OR '1' = '1`)]) }).run(t.client)).toEqual([]);
   });
 });
 

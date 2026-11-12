@@ -77,10 +77,19 @@ describe('conditions: the constraint on the column', () => {
 });
 
 describe('type surprises', () => {
-  test('characterization: a Parameter in a Whereable is accepted, the runtime wraps it twice', () => {
-    // characterization: Whereable accepts db.Parameter<number>; compiled, it is sent as '{"value":1}'
-    // (test/integration/core.test.ts, "a Parameter value fails")
+  test('a Parameter in a Whereable is accepted, of the column type', () => {
+    // compiled as it is (test/integration/core.test.ts, "a Parameter value is a parameter, with its cast")
     db.select('users', { id: db.param(1) });
+    db.select('users', { display_name: db.param('Ada', 'text') });
+    db.select('users', { id: c.isIn([db.param(1), 2]) });
+    // @ts-expect-error Parameter<string> on an int column
+    db.select('users', { id: db.param('1') });
+    // @ts-expect-error Parameter<string> in isIn on an int column
+    db.select('users', { id: c.isIn([db.param('1')]) });
+    // @ts-expect-error Default has no meaning in a filter (it throws at run time)
+    db.select('users', { id: db.Default });
+    // @ts-expect-error Default in isIn
+    db.select('users', { id: c.isIn([db.Default]) });
   });
 
   test('updateValues takes a plain value of the column, sent as a parameter', () => {

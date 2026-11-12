@@ -23,7 +23,10 @@ const timing = typeof performance === 'object' ?
 // === symbols, types, wrapper classes and shortcuts ===
 
 /**
- * Compiles to `DEFAULT` for use in `INSERT`/`UPDATE` queries.
+ * Compiles to `DEFAULT` for use in `INSERT`/`UPDATE` queries. As a `Whereable`
+ * value or in `isIn` it throws: a filter has no default. So does `vals([Default])`
+ * in a fragment value of `vals({…})`, compiled with its key as the current column,
+ * as a `Whereable` value is. Zapatos 6.6.1 sent it as the string `'Symbol(DEFAULT)'`.
  */
 export const Default = Symbol('DEFAULT');
 export type DefaultType = typeof Default;
@@ -136,7 +139,9 @@ export class Parameter<T = any> { constructor(public value: T, public cast?: boo
 /**
  * Returns a `Parameter` instance, which compiles to a numbered query parameter
  * (`$1`, `$2`, etc) and adds its wrapped value at the appropriate position of
- * the values array passed to `pg`.
+ * the values array passed to `pg`. As a `Whereable` value, or in `vals([…])`
+ * (so `isIn`), it compiles the same way: `"col" = CAST($1 AS "text")`. Zapatos
+ * 6.6.1 wrapped it in another parameter there, sent as JSON (`'{"value":1}'`).
  * @param x The value to be wrapped
  * @param cast Optional cast type. If a string, the parameter will be cast to
  * this type within the query e.g. `CAST($1 AS "type")` instead of plain `$1`.
@@ -196,7 +201,11 @@ export class ColumnValues<T> { constructor(public value: T) { } }
 /**
  * Returns a ColumnValues instance, wrapping an object. ColumnValues compiles to
  * a quoted, comma-separated list of object keys for use in an INSERT, UPDATE
- * or UPSERT query alongside a `ColumnNames`.
+ * or UPSERT query alongside a `ColumnNames`. In an array as in an object, a
+ * `Parameter` compiles as it is (`$1`, `CAST($1 AS "text")`) and `Default` to
+ * `DEFAULT`; Zapatos 6.6.1 wrapped both in another parameter in an array. An array
+ * throws on `Default` in a filter (`isIn`), and in a fragment value of `vals({…})`
+ * (`` { role: sql`${vals([Default])}` } ``), compiled as a `Whereable` value is.
  */
 export function vals<T>(x: T) { return new ColumnValues<T>(x); }
 
@@ -255,6 +264,8 @@ const quotedIdentifiers = /^"(?:[^"\0]|"")+"(?:[ \t\n\r\f\v]*\.[ \t\n\r\f\v]*"(?
 // a table or column name already quoted, as Postgres lexes it: a quoted identifier, then quoted, `U&` quoted
 // or unquoted ones after a `.` (`"s".t."c"`, `"t".U&"c"`), ending with `"`, so no `UESCAPE '…'` can follow
 const quotedName = new RegExp(`^"(?:[^"\\0]|"")+"(?:${space}\\.${space}(?:${identifier}))*(?<=")$`, 'u');
+
+const defaultInWhereable = '`db.Default` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. `DEFAULT` is for INSERT and UPDATE values.';
 
 export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never> {
   protected constraint?: Constraint;
@@ -448,7 +459,11 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
         for (let i = 0, len = values.length; i < len; i++) {
           const value = values[i];
           if (i > 0) result.text += ', ';
-          if (value instanceof SQLFragment) this.compileExpression(value, result, parentTable);
+          // a set currentColumn means we are in a Whereable (`isIn`), where there is no default
+          if (value === Default && currentColumn) throw new Error(defaultInWhereable);
+          if (value instanceof SQLFragment ||
+            value instanceof Parameter ||
+            value === Default) this.compileExpression(value, result, parentTable);
           else this.compileExpression(new Parameter(value), result, parentTable);
         }
 
@@ -488,10 +503,12 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
             result.text += ')';
 
           } else {
+            // a Parameter is compiled as it is, with its cast; Zapatos 6.6.1 wrapped it in another one
+            if (columnValue === Default) throw new Error(defaultInWhereable);
             this.compileExpression(columnName, result);
             result.text += ` = `;
-            this.compileExpression(columnValue instanceof ParentColumn ? columnValue : new Parameter(columnValue),
-              result, parentTable, columnName);
+            this.compileExpression(columnValue instanceof ParentColumn || columnValue instanceof Parameter ? columnValue :
+              new Parameter(columnValue), result, parentTable, columnName);
           }
         }
         result.text += ')';
