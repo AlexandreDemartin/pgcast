@@ -65,7 +65,7 @@ Here are two columns of `screenings`, from the generated schema:
 | `Insertable` | a new row | required: `TimestampTzString \| Date` | optional: `boolean`, `null` or `DEFAULT` |
 | `Updatable` | changes to a row: every key optional | `TimestampTzString \| Date` | `boolean`, `null` or `DEFAULT` |
 
-Wherever a value goes in, it may also be a [`param()`](/sql-template#param) or a [`sql`](/sql-template#sql) fragment, and in a filter a [`parent()`](/sql-template#parent) column. A `Whereable` refuses `null` because `"subtitled" = NULL` is never true in SQL: given one anyway (the type lets it through when `strictNullChecks` is off), the filter compiles to `"subtitled" = $1`, with `null` as `$1`, and finds nothing. [`conditions.isNull`](/conditions#conditions.isNull) writes the `IS NULL` you meant.
+Wherever a value goes in, it may also be a [`param()`](/sql-template#param) or a [`sql`](/sql-template#sql) fragment, and in a filter a [`parent()`](/sql-template#parent) column. A `Whereable` refuses `null` because `"subtitled" = NULL` is never true in SQL: given one anyway (the type lets it through when `strictNullChecks` is off), the filter compiles to `"subtitled" = $1`<!-- probe: db.sql`${{ subtitled: null }}` -->, with `null` as `$1`, and finds nothing. [`conditions.isNull`](/conditions#conditions.isNull) writes the `IS NULL`<!-- probe: db.sql`${{ subtitled: db.conditions.isNull }}` --> you meant.
 
 The first does not compile (TS2322, with `strict` on); the second is the filter you meant:
 

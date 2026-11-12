@@ -13,7 +13,7 @@ Every value pgcast sends, from a filter, an `insert()` or a [`param()`](/sql-tem
 
 </CastPanel>
 
-Written into the text, that title would close its string and match every film: `("title" = 'x' OR 'a' = 'a')`. As `$1`, it is a title no film has, and the query returns none. This is Zapatos's foundation, kept as it was.
+Written into the text, that title would close its string and match every film: `("title" = 'x' OR 'a' = 'a')`. As `("title" = $1)`<!-- probe: examples/security_values.ts -->, it is a title no film has, and the query returns none. This is Zapatos's foundation, kept as it was.
 
 The split has a second effect. node-postgres sends a query with values through Postgres's extended protocol, where a query is one statement: `SELECT $1::int; SELECT 2` is refused with "cannot insert multiple commands into a prepared statement" (42601). A query with no values, and no `.prepared()` name, goes as plain text, where a `;` can start a second statement, which is why the holes below were at their worst in a query without parameters.
 
@@ -21,7 +21,7 @@ The split has a second effect. node-postgres sends a query with values through P
 
 A parameter stands for a value, never for a table or a column: `SELECT * FROM $1` is a syntax error (42601). So names go into the text, and pgcast guards them twice. First the type: `Table` and `Column` are unions of the names the generator read from the catalog, so a name you write is one the database has.
 
-Then the quoting, because the type is gone at run time and names can arrive without passing it: the keys of a request's JSON body, given to `select()` as its filter, are column names. Each string pgcast writes as a name is double-quoted and split on `.`, any `"` in it doubled unless it is already a well-formed quoted name (`'"title"'` is `"title"`, `'a""b'` stays `"a""b"`), so it can never close its quotes:
+Then the quoting, because the type is gone at run time and names can arrive without passing it: the keys of a request's JSON body, given to `select()` as its filter, are column names. Each string pgcast writes as a name is double-quoted and split on `.`, any `"` in it doubled unless it is already a well-formed quoted name (`'"title"'` is `"title"`<!-- probe: db.sql`${'"title"'}` -->, `'a""b'` stays `"a""b"`<!-- probe: db.sql`${'a""b'}` -->), so it can never close its quotes:
 
 <CastPanel example="security_names">
 
@@ -53,7 +53,7 @@ The characterisation of Zapatos 6.6.1 found seven ways for a caller's string to 
 
 | What reaches pgcast | Zapatos 6.6.1 | pgcast |
 |---|---|---|
-| a `"` in a name: a table, a column, a filter key, `cols()`, `order.by` | closes its quotes | doubled: `'a"b'` is `"a""b"` |
+| a `"` in a name: a table, a column, a filter key, `cols()`, `order.by` | closes its quotes | doubled: `'a"b'` is `"a""b"`<!-- probe: db.sql`${'a"b'}` --> |
 | a string that starts and ends with `"` | written as it is | as it is only if it is a well-formed quoted name |
 | the type of `param(x, cast)` | written between quotes as it is | as it is if well-formed once quoted (`pg_catalog"."int4`); otherwise one quoted name, any `"` doubled |
 | a `lateral` key, or the `alias` or table name of `select()` | spliced into `"lateral_…"` and `"sq_…"` | one name there too |
@@ -70,7 +70,7 @@ pgcast keeps a caller's input from becoming code; it can't tell whether the SQL 
 
 ### A caller's string as a name
 
-Quoted, a name is still the one the caller chose. As a table name, `'schema.table'` included, it is any relation the role can read: given `'pg_catalog.pg_roles'`, `select()` lists the database's roles. As a column name, it is any column in scope, a system column such as `xmin` included, or none (42703). `` ${'title'} = ${title} ``, with `title` typed `any` and set to `'title'`, compiles to `"title" = "title"`, true for every film. Map a caller's choice to a name from your own list, and remember that the keys of a request's body, given as a filter, are names too.
+Quoted, a name is still the one the caller chose. As a table name, `'schema.table'` included, it is any relation the role can read: given `'pg_catalog.pg_roles'`, `select()` lists the database's roles. As a column name, it is any column in scope, a system column such as `xmin` included, or none (42703). `` ${'title'} = ${title} ``, with `title` typed `any` and set to `'title'`, compiles to `"title" = "title"`<!-- probe: db.sql`${'title'} = ${'title'}` -->, true for every film. Map a caller's choice to a name from your own list, and remember that the keys of a request's body, given as a filter, are names too.
 
 ### An empty filter
 
@@ -88,7 +88,7 @@ In `deletes()` or `update()`, an empty filter is every row: `removeRatings()` de
 
 ### An object that is not a filter
 
-An interpolated object that is not one of pgcast's values compiles as a filter of its own enumerable keys. A class instance gives its fields; a `Date` or a `Map`, which have none, gives `TRUE`, so `` db.sql`DELETE FROM ${'ratings'} WHERE ${when}` ``, with `when` a `Date`, compiles to `DELETE FROM "ratings" WHERE TRUE`. The type refuses a `Date` (TS2345), so this hits a value typed `any`, or a wider type such as `object`; pass a date as `db.param(when)`. Unchanged from Zapatos 6.6.1, and planned: [#170](https://github.com/AlexandreDemartin/pgcast/issues/170).
+An interpolated object that is not one of pgcast's values compiles as a filter of its own enumerable keys. A class instance gives its fields; a `Date` or a `Map`, which have none, gives `TRUE`, so `` db.sql`DELETE FROM ${'ratings'} WHERE ${when}` ``, with `when` a `Date`, compiles to `DELETE FROM "ratings" WHERE TRUE`<!-- probe: db.sql`DELETE FROM ${'ratings'} WHERE ${new Date()}` -->. The type refuses a `Date` (TS2345), so this hits a value typed `any`, or a wider type such as `object`; pass a date as `db.param(when)`. Unchanged from Zapatos 6.6.1, and planned: [#170](https://github.com/AlexandreDemartin/pgcast/issues/170).
 
 ## Report a flaw
 

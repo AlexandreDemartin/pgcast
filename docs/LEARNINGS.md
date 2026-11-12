@@ -282,6 +282,11 @@ Candidates for a check, a rule or a skill line.
 - #115 — A mark detector with `\b` after the keyword misses `<!---` and plurals: plant those as well as case and spacing, and watch that the mark count does not drop — `branch-reviewer`
 - #115 — A probe written in a Markdown mark is code the build runs, and GitHub's rendered view hides HTML comments: review a page's diff in source view — `branch-reviewer`
 - #115 — A probe timer stays ref'd, or Node exits 13 on an unsettled top-level await before the timeout reports the page — `builder`
+- #115 — A substring mark pins a span only as far as it is unique in the SQL: a bare `$n` passes whenever the query has that many parameters; the span carries its role (`LIMIT $4`); find weak marks by mutating each span by one token — `branch-reviewer`, `builder`
+- #115 — A probe is the call its sentence describes (nested or top-level, same aliases): parameter numbers shift under `lateral` — `branch-reviewer`
+- #115 — A probe can wrap the recording `pool` in its own `connect()` to script a refusal (the first `COMMIT` with 40001), which makes retry sequences checkable without a database — `branch-reviewer`, `builder`
+- #115 — A review that relies on a harness saves the harness, not only its report, so the fix round re-runs the same one — `builder`
+- #115 — `gh pr ready` from a subagent is refused by the auto-mode classifier: the orchestrator runs it — orchestrator
 
 ## Minors kept
 

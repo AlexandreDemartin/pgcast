@@ -11,11 +11,13 @@ The rule: four seats per customer per screening, at most. No constraint can say 
 
 Ines has two tabs open, and books from both at once. Each transaction counts 0 seats held, then books, which would give her five. At `SERIALIZABLE`, Postgres refuses one of the two, at its `INSERT` or at its `COMMIT`, with 40001 (`serialization_failure`); pgcast rolls it back and runs the whole callback again. Here, `tabTwo`'s transaction sends:
 
+<!-- probe: (refused => db.serializable({ connect: async () => ({ release() {}, query: async query => { await pool.query(query); if (query.text === 'COMMIT' && !refused++) throw Object.assign(new Error(), { code: '40001' }); return { rows: [] }; } }) }, async () => {}))(0) -->
 ```sql
 -- attempt 1
 START TRANSACTION ISOLATION LEVEL SERIALIZABLE
 -- count(): 0 seats held, then insert() of E4, E5 and E6
-COMMIT    -- refused with 40001: tabOne has committed D4 and D5
+COMMIT
+-- refused with 40001: tabOne has committed D4 and D5
 ROLLBACK
 -- attempt 2, 25 to 250 ms later
 START TRANSACTION ISOLATION LEVEL SERIALIZABLE
@@ -45,7 +47,7 @@ Moved into the callback, a retried booking sends two confirmation emails, and pu
 
 ## Let the error through
 
-pgcast retries only what reaches it. Don't swallow a database error inside the callback: after it, Postgres refuses every query of the transaction with 25P02 (`current transaction is aborted, commands ignored until end of transaction block`), and if the callback returns, pgcast sends `COMMIT`, which Postgres turns into a rollback without an error. The promise then resolves with what the callback returned, nothing is saved, and a 40001 caught this way is never retried ([#190](https://github.com/AlexandreDemartin/pgcast/issues/190)).
+pgcast retries only what reaches it. Don't swallow a database error inside the callback: after it, Postgres refuses every query of the transaction with 25P02 (`current transaction is aborted, commands ignored until end of transaction block`), and if the callback returns, pgcast sends `COMMIT`<!-- probe: db.serializable(pool, async () => {}) -->, which Postgres turns into a rollback without an error. The promise then resolves with what the callback returned, nothing is saved, and a 40001 caught this way is never retried ([#190](https://github.com/AlexandreDemartin/pgcast/issues/190)).
 
 If you catch one inside, rethrow it: an `Error`, not `null` or `undefined`, for which pgcast rejects with a `TypeError` of its own instead ([#179](https://github.com/AlexandreDemartin/pgcast/issues/179)).
 
@@ -66,7 +68,7 @@ Given the `txnClient` of a transaction already open, `bookSeats()` joins it: `se
 
 <<< ./examples/plain/retries_larger.ts{ts twoslash}
 
-One transaction: `START TRANSACTION ISOLATION LEVEL SERIALIZABLE`, the two `count()`s and `insert()`s, `COMMIT`. If either `bookSeats()` resolves with `null`, the `throw` sends `ROLLBACK` in place of `COMMIT`, and the `await` rejects with that `Error`, not retried. On a 40001, it is the outer transaction that rolls back and runs its callback again, both bookings included.
+One transaction: `START TRANSACTION ISOLATION LEVEL SERIALIZABLE`<!-- probe: db.serializable(pool, async () => {}) -->, the two `count()`s and `insert()`s, `COMMIT`<!-- probe: db.serializable(pool, async () => {}) -->. If either `bookSeats()` resolves with `null`, the `throw` sends `ROLLBACK`<!-- probe: db.serializable(pool, async () => { throw new Error(); }) --> in place of `COMMIT`, and the `await` rejects with that `Error`, not retried. On a 40001, it is the outer transaction that rolls back and runs its callback again, both bookings included.
 
 Typed `pg.Pool | db.TxnClientForSerializable`, the first parameter refuses the client of a transaction at a lower level, where the rule would no longer hold (2345, with `strict` on or off):
 

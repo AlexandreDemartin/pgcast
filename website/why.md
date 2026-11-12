@@ -42,7 +42,7 @@ Each shortcut writes one query, and its reference shows that SQL. Zapatos's docs
 
 </CastPanel>
 
-The panel is what you get in your own code: [`.compile()`](/sql-template#compile) gives the same `text` and `values`, and sends nothing. Every value is a parameter, the JSON keys included; every table and column name is quoted. The nesting is Postgres's own work, `jsonb_agg` in a `LEFT JOIN LATERAL`: the studio and its films come back as one JSON value, in one round trip, with no rows to stitch together in JavaScript.
+The panel is what you get in your own code: [`.compile()`](/sql-template#compile) gives the same `text` and `values`, and sends nothing. Every value is a parameter, the JSON keys included; every table and column name is quoted. The nesting is Postgres's own work, `jsonb_agg`<!-- probe: examples/why_studio.ts --> in a `LEFT JOIN LATERAL`<!-- probe: examples/why_studio.ts -->: the studio and its films come back as one JSON value, in one round trip, with no rows to stitch together in JavaScript.
 
 TypeScript knows the one column asked for, the films beneath it, and `undefined` when no studio has that `id`: that takes `strict`, as [Your first typed query](/first-query#set-up-the-project) sets it.
 
@@ -52,7 +52,7 @@ When a shortcut doesn't fit, the [`sql`](/sql-template#sql) template is always t
 
 There are no models. A query gives back plain objects, typed: "just (fully-typed) POJOs", in the words of Zapatos's docs. There's no class to extend, no relationship to declare, nothing loaded lazily behind a property, and no state for a later save to write back.
 
-Nor is there a default connection: each `.run()` takes the pool or client to run on, as "Zapatos is always explicit about what client or pool is running your query". A transaction starts only when you call [`transaction()`](/transaction#transaction). It sends `START TRANSACTION` at the isolation level you chose, then `COMMIT` or `ROLLBACK`, and runs your callback again after a serialisation failure or a deadlock ([Retry a transaction](/retries)).
+Nor is there a default connection: each `.run()` takes the pool or client to run on, as "Zapatos is always explicit about what client or pool is running your query". A transaction starts only when you call [`transaction()`](/transaction#transaction). It sends `START TRANSACTION`<!-- probe: db.serializable(pool, async () => {}) --> at the isolation level you chose, then `COMMIT`<!-- probe: db.serializable(pool, async () => {}) --> or `ROLLBACK`<!-- probe: db.serializable(pool, async () => { throw new Error(); }) -->, and runs your callback again after a serialisation failure or a deadlock ([Retry a transaction](/retries)).
 
 The same goes for your own functions. Zapatos's docs advise against giving a function's client argument the pool as its default: "I find that way it's too easy to accidentally issue queries outside of transactions." So a function of yours takes its client with no default, and each caller passes the pool or its transaction's client. One that only runs queries takes a [`Queryable`](/sql-template#Queryable). One that opens a transaction takes the pool or the client of its level, `pg.Pool | db.TxnClientForSerializable` for [`serializable()`](/transaction#serializable): a `Queryable` would also take the client of a transaction at a lower level, and the function would run inside it, at that level ([Book inside a larger transaction](/retries#book-inside-a-larger-transaction)).
 
@@ -62,7 +62,7 @@ pgcast starts from Zapatos 6.6.1. Before changing it, the fork pinned what 6.6.1
 
 | Path | When | What changes for you | Example |
 |---|---|---|---|
-| Fix | a security hole; or Postgres or the type already refused the call; or the result contradicts the function's name, type or docs | the call does what it says, or throws an error that says what to do, before any query | [`update()`](/insert#update) with no columns throws `nothing to update: an Updatable needs at least one column`, where Postgres refused `SET () = ROW()` |
+| Fix | a security hole; or Postgres or the type already refused the call; or the result contradicts the function's name, type or docs | the call does what it says, or throws an error that says what to do, before any query | [`update()`](/insert#update) with no columns throws `nothing to update: an Updatable needs at least one column`<!-- message -->, where Postgres refused `SET () = ROW()` |
 | Opt-in | the result is valid, and code may rely on it | nothing until you turn the option on; the old path warns once per process | [`undefinedMeansMissing`](/runtime-config#Config.undefinedMeansMissing): an `undefined` value is a missing key, not `NULL`; warning `PGCAST_DEP002` |
 | Document | Postgres works that way, or it was meant | nothing: the docs say so | [`isNotIn()`](/conditions#conditions.isNotIn) with a `NULL` in its list matches no row, as Postgres reads `NOT IN` |
 

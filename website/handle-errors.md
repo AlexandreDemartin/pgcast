@@ -60,12 +60,13 @@ const bookingProblem = (err: pg.DatabaseError) =>
 
 ## Catch outside a transaction
 
-In a transaction, let the error out of the callback and catch it around [`transaction()`](/transaction#transaction): pgcast sends `ROLLBACK`, then rejects with the same error. A customer books seats H1 and H2 of screening 1001, both or neither, and H2 is taken:
+In a transaction, let the error out of the callback and catch it around [`transaction()`](/transaction#transaction): pgcast sends `ROLLBACK`<!-- probe: db.serializable(pool, async () => { throw new Error(); }) -->, then rejects with the same error. A customer books seats H1 and H2 of screening 1001, both or neither, and H2 is taken:
 
 <<< ./examples/plain/errors_book_pair.ts{ts twoslash}
 
 `booked` is `false`, and H1 isn't booked. The transaction sends:
 
+<!-- probe: db.serializable(pool, async () => { throw Object.assign(new Error(), { code: '23505' }); }) -->
 ```sql
 START TRANSACTION ISOLATION LEVEL SERIALIZABLE
 -- the insert() of H1
@@ -76,9 +77,9 @@ ROLLBACK
 The SQL of each `INSERT`: [`insert()`](/insert#insert). A serialisation failure (40001) or a deadlock (40P01) has already been retried by then, up to [`transactionAttemptsMax`](/runtime-config#Config.transactionAttemptsMax) attempts; if the promise still rejects with one, `'TransactionRollback'` recognises both, and the request can be tried again later ([Retry a transaction](/retries)).
 
 ::: warning Lost writes
-Don't catch a database error inside the callback and carry on. Postgres has aborted the transaction: each query after it is refused with 25P02 (`InvalidTransactionState_InFailedSqlTransaction`), and if the callback returns, pgcast sends `COMMIT`, which Postgres turns into a rollback without an error. The promise resolves, and nothing the callback wrote is saved ([#190](https://github.com/AlexandreDemartin/pgcast/issues/190)).
+Don't catch a database error inside the callback and carry on. Postgres has aborted the transaction: each query after it is refused with 25P02 (`InvalidTransactionState_InFailedSqlTransaction`), and if the callback returns, pgcast sends `COMMIT`<!-- probe: db.serializable(pool, async () => {}) -->, which Postgres turns into a rollback without an error. The promise resolves, and nothing the callback wrote is saved ([#190](https://github.com/AlexandreDemartin/pgcast/issues/190)).
 
-For a seat that may be taken, ask Postgres not to refuse: [`upsert()` with `doNothing`](/insert#doNothing) writes `ON CONFLICT ON CONSTRAINT "seat_bookings_pkey" DO NOTHING` and gives `undefined` for a taken seat, with no error, and the transaction goes on.
+For a seat that may be taken, ask Postgres not to refuse: [`upsert()` with `doNothing`](/insert#doNothing) writes `ON CONFLICT ON CONSTRAINT "seat_bookings_pkey" DO NOTHING`<!-- probe: db.upsert('seat_bookings', { screening_id: 1001, seat: 'H2', customer: 'Wren Abernathy' }, db.constraint('seat_bookings_pkey'), { updateColumns: db.doNothing }) --> and gives `undefined` for a taken seat, with no error, and the transaction goes on.
 :::
 
 ## Tell a missing row from the others
@@ -92,8 +93,8 @@ For a seat that may be taken, ask Postgres not to refuse: [`upsert()` with `doNo
 </CastPanel>
 
 - Recognise it with `err instanceof db.NotExactlyOneError`. It is not a `pg.DatabaseError` and has no `code`, so `isDatabaseError()` gives `false`.
-- Its message is "One result expected but none returned (hint: check `.query.compile()` on this Error)", and `err.query.compile()` gives the SQL and values of the panel.
-- It asks for `LIMIT 1`, so two matching rows are not an error: it gives the first, as in Zapatos 6.6.1 ([#32](https://github.com/AlexandreDemartin/pgcast/issues/32)).
+- Its message is "One result expected but none returned (hint: check `.query.compile()` on this Error)"<!-- message -->, and `err.query.compile()` gives the SQL and values of the panel.
+- It asks for `LIMIT $2`<!-- probe: examples/errors_not_found.ts -->, its value `1`, so two matching rows are not an error: it gives the first, as in Zapatos 6.6.1 ([#32](https://github.com/AlexandreDemartin/pgcast/issues/32)).
 - In a `lateral`, a missing row is `null`, not an error ([`selectExactlyOne()`](/select#selectExactlyOne)).
 - When a missing row is ordinary, as in a search, [`selectOne()`](/select#selectOne) gives `undefined` instead, and TypeScript makes you check it.
 
@@ -122,7 +123,7 @@ pgcast throws a plain `Error`, with no `code`, before the query is sent, when a 
 
 Every one of them, with its page: [Errors pgcast throws before any query](/transaction#errors-pgcast-throws-before-any-query). Zapatos 6.6.1 sent some of these values to Postgres instead: `db.Default` in a filter as the string `'Symbol(DEFAULT)'`.
 
-A `.catch()` chained on `.run()` misses what the call throws. The type refuses `'desc'`, but a cast lets it through, and `select()` throws "Direction must be ASC/DESC, not 'desc'":
+A `.catch()` chained on `.run()` misses what the call throws. The type refuses `'desc'`, but a cast lets it through, and `select()` throws "Direction must be ASC/DESC, not 'desc'"<!-- message -->:
 
 ```ts twoslash
 import * as db from 'zapatos/db';
@@ -148,7 +149,7 @@ const direction = request.query.sort === 'desc' ? 'DESC' : 'ASC';
 const films = await db.select('films', db.all, { order: { by: 'title', direction } }).run(pool);
 ```
 
-If a call still throws, inside an `async` function the throw becomes the promise's rejection, so the caller's `.catch()` gets it, and a `try` around the call catches it too. In a `transaction()` callback, `ROLLBACK` follows.
+If a call still throws, inside an `async` function the throw becomes the promise's rejection, so the caller's `.catch()` gets it, and a `try` around the call catches it too. In a `transaction()` callback, `ROLLBACK`<!-- probe: db.serializable(pool, async () => { throw new Error(); }) --> follows.
 
 ## Answer each kind in one place
 

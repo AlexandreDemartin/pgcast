@@ -13,7 +13,7 @@ Write the SQL as you would in `psql`, but put each table and column name between
 
 </CastPanel>
 
-- An interpolated name is quoted, `"films"`, and checked against the first type argument: here `Tables`, the `SQL` type of each table the query names. Qualify a column as `${'films'}.${'title'}`: the type knows each table's columns, not `'films.title'`.
+- An interpolated name is quoted, `"films"`<!-- probe: examples/raw_sql_join.ts -->, and checked against the first type argument: here `Tables`, the `SQL` type of each table the query names. Qualify a column as `${'films'}.${'title'}`: the type knows each table's columns, not `'films.title'`.
 - The second type argument is your word for what comes back: nothing checks it against the SQL. The rows come as `pg` parses them, as a `Selectable` describes them (a `Date` for a `timestamptz`), not as the JSON of the shortcuts' `JSONSelectable`. A `count(*)` is a `bigint`, which `pg` gives as a string: `'4'`.
 - Keywords stay in the text. SQL you write yourself is safe there; only what comes from outside needs the steps below.
 
@@ -35,7 +35,7 @@ A write is written the same way. This `INSERT … SELECT` copies one film's tags
 
 </CastPanel>
 
-- [`db.cols()`](/sql-template#cols) writes the column list, `"film_id", "tag"`. `columns`, typed `s.tags.Column[]`, checks the names: `db.cols()` alone takes any, so `'tagz'` would compile, and Postgres refuse it (42703).
+- [`db.cols()`](/sql-template#cols) writes the column list, `"film_id", "tag"`<!-- probe: examples/raw_sql_insert_select.ts -->. `columns`, typed `s.tags.Column[]`, checks the names: `db.cols()` alone takes any, so `'tagz'` would compile, and Postgres refuse it (42703).
 - `ON CONFLICT DO NOTHING` skips a tag the film has already. Without it, Postgres refuses the whole `INSERT` with 23505, and adds none.
 
 ## Pass each value as a parameter
@@ -48,8 +48,8 @@ A value from a caller (a form, a URL, a row you read elsewhere) goes in as [`db.
 
 </CastPanel>
 
-- <code v-pre>${{ studio_id: studioId }}</code> is `("studio_id" = $1)`: a filter of `films`, as the `where` of [`select()`](/select#select) takes it, so [conditions](/conditions) work in it too: [`gte()`](/conditions#conditions.gte) in `{ release_year: db.conditions.gte(1990) }`.
-- `${db.param(genre)}` is `$2`: a parameter fits wherever SQL takes a value.
+- <code v-pre>${{ studio_id: studioId }}</code> is `("studio_id" = $1)`<!-- probe: examples/raw_sql_values.ts -->: a filter of `films`, as the `where` of [`select()`](/select#select) takes it, so [conditions](/conditions) work in it too: [`gte()`](/conditions#conditions.gte) in `{ release_year: db.conditions.gte(1990) }`.
+- `${db.param(genre)}` is `$2`, in `$2 = ANY("genres")`<!-- probe: examples/raw_sql_values.ts -->: a parameter fits wherever SQL takes a value.
 - An array is one parameter: `` ${'id'} = ANY(${db.param(ids)}) `` sends `ids` as a Postgres array by default; with `castArrayParamsToJson` on, it does not ([below](#cast-a-parameter-postgres-can-t-type)).
 - A part of the query that only some calls need is a nested fragment, or `[]` for nothing ([Nested fragments](/sql-template#nested-fragments)).
 
@@ -67,15 +67,15 @@ function filmTitled(title: string) {
 
 If it got past the type (an `any`, a `@ts-ignore`), it would still be a name, and the caller would pick it:
 
-- A real column matches every row: `'title'` compiles to `"title" = "title"`, true wherever `title` is not null, and so do `'films.title'` and `'"title"'`. In a `DELETE`, that deletes them.
-- An unknown one fails: `'The Salt Orchard'` gives `"title" = "The Salt Orchard"`, a column that does not exist (42703).
+- A real column matches every row: `'title'` compiles to `"title" = "title"`<!-- probe: db.sql`${'title'} = ${'title'}` -->, true wherever `title` is not null, and so do `'films.title'` and `'"title"'`. In a `DELETE`, that deletes them.
+- An unknown one fails: `'The Salt Orchard'` gives `"title" = "The Salt Orchard"`<!-- probe: db.sql`${'title'} = ${'The Salt Orchard'}` -->, a column that does not exist (42703).
 - It can be any column in scope, a system column such as `xmin` included, and, where a table goes, any relation the role can read, `'schema.table'` included: `` FROM ${'pg_catalog.pg_roles'} `` lists the database's roles.
 - Any `"` in it is doubled, so it can't close its quotes (in Zapatos 6.6.1 it could, [Identifiers](/sql-template#identifiers)), but that does not make it a value.
 
 The keys of an interpolated object are names too. The type refuses an unknown key only in an object literal (TS2353): an object built at run time (a `Record<string, string>`, `Object.fromEntries()`, a variable with extra keys) passes it with any key.
 
 ::: warning Security
-An interpolated object that is not a `param()`, a fragment or another of pgcast's values compiles as a Whereable, whatever it is. A `Date` has no keys of its own, so it gives `TRUE`: `` db.sql`DELETE FROM ${'ratings'} WHERE ${when}` ``, with `when` a `Date` typed `any`, compiles to `DELETE FROM "ratings" WHERE TRUE` and deletes every rating. The type refuses a `Date` (TS2345), not an `any` or an `object`. Pass a date as `db.param(when)` ([#170](https://github.com/AlexandreDemartin/pgcast/issues/170)).
+An interpolated object that is not a `param()`, a fragment or another of pgcast's values compiles as a Whereable, whatever it is. A `Date` has no keys of its own, so it gives `TRUE`: `` db.sql`DELETE FROM ${'ratings'} WHERE ${when}` ``, with `when` a `Date` typed `any`, compiles to `DELETE FROM "ratings" WHERE TRUE`<!-- probe: db.sql`DELETE FROM ${'ratings'} WHERE ${new Date()}` --> and deletes every rating. The type refuses a `Date` (TS2345), not an `any` or an `object`. Pass a date as `db.param(when)` ([#170](https://github.com/AlexandreDemartin/pgcast/issues/170)).
 
 Any object with no keys is `TRUE`, a typed Whereable included: `const where: s.ratings.Whereable = {}`, given a `film_id` only `if (filmId)`, compiles with no error to the same `DELETE`. Check for an empty filter before a `DELETE` or an `UPDATE` ([Whereable objects](/sql-template#whereable)). The check below catches `{}`, not a key whose value compiles to `true`, such as `film_id: db.conditions.isNotIn([])`:
 
@@ -103,12 +103,12 @@ Postgres gives a parameter a type from where it stands. Compared with a column, 
 
 </CastPanel>
 
-- `$1`, compared with `starts_at`, is a `timestamptz` already.
-- `$2` is added to an `interval`, so without its cast Postgres reads it as one, and fails: `operator does not exist: timestamp with time zone < interval` (42883).
-- `db.param(from, 'timestamptz')` writes `CAST($2 AS "timestamptz")`; `` ${db.param(from)}::timestamptz `` in the text does the same.
-- The cast is the type's catalog name, in lower case (`int4`, `timestamptz`, `crew_job`), quoted as one name. `'integer'` gives `CAST($1 AS "integer")`, a type that does not exist (42704), as do `'int'` and `'TIMESTAMPTZ'`.
-- Name a schema as `'public"."crew_job'`, which gives `"public"."crew_job"`: `'public.crew_job'` gives `"public.crew_job"`, and `'int4[]'` gives `"int4[]"`, types that do not exist (42704; [#37](https://github.com/AlexandreDemartin/pgcast/issues/37)). Write an array type in the text: `` ${db.param(ids, false)}::int4[] `` (`false`: below).
-- With [`castArrayParamsToJson`](/runtime-config#Config.castArrayParamsToJson) on, an array parameter is sent as JSON, `CAST($1 AS "json")`, even with a string cast ([#171](https://github.com/AlexandreDemartin/pgcast/issues/171), [#36](https://github.com/AlexandreDemartin/pgcast/issues/36)). To send it as an array, pass `false`: `` ${db.param(ids, false)}::int4[] ``. The same goes for a plain object and [`castObjectParamsToJson`](/runtime-config#Config.castObjectParamsToJson).
+- `$1`, compared with `starts_at` in `"starts_at" >= $1`<!-- probe: examples/raw_sql_cast.ts -->, is a `timestamptz` already.
+- `$2`, in `CAST($2 AS "timestamptz") + make_interval(hours => $3)`<!-- probe: examples/raw_sql_cast.ts -->, is added to an `interval`, so without its cast Postgres reads it as one, and fails: `operator does not exist: timestamp with time zone < interval` (42883).
+- `db.param(from, 'timestamptz')` writes `CAST($2 AS "timestamptz")`<!-- probe: examples/raw_sql_cast.ts -->; `` ${db.param(from)}::timestamptz `` in the text does the same.
+- The cast is the type's catalog name, in lower case (`int4`, `timestamptz`, `crew_job`), quoted as one name. `'integer'` gives `CAST($1 AS "integer")`<!-- probe: db.sql`${db.param(1, 'integer')}` -->, a type that does not exist (42704), as do `'int'` and `'TIMESTAMPTZ'`.
+- Name a schema as `'public"."crew_job'`, which gives `"public"."crew_job"`<!-- probe: db.sql`${db.param(1, 'public"."crew_job')}` -->: `'public.crew_job'` gives `"public.crew_job"`<!-- probe: db.sql`${db.param(1, 'public.crew_job')}` -->, and `'int4[]'` gives `"int4[]"`<!-- probe: db.sql`${db.param(1, 'int4[]')}` -->, types that do not exist (42704; [#37](https://github.com/AlexandreDemartin/pgcast/issues/37)). Write an array type in the text: `` ${db.param(ids, false)}::int4[] `` (`false`: below).
+- With [`castArrayParamsToJson`](/runtime-config#Config.castArrayParamsToJson) on, an array parameter is sent as JSON, `CAST($1 AS "json")`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${db.param([1], 'int4[]')}`) -->, even with a string cast ([#171](https://github.com/AlexandreDemartin/pgcast/issues/171), [#36](https://github.com/AlexandreDemartin/pgcast/issues/36)). To send it as an array, pass `false`: `` ${db.param(ids, false)}::int4[] ``. The same goes for a plain object and [`castObjectParamsToJson`](/runtime-config#Config.castObjectParamsToJson).
 
 Every form of the cast: [`param()`](/sql-template#param).
 
@@ -135,11 +135,12 @@ const title = "x' OR TRUE --";  // from the caller
 db.sql`SELECT ${'title'} FROM ${'films'} WHERE ${'title'} = ${db.raw(`'${title}'`)}`;
 ```
 
+<!-- probe: db.sql`SELECT ${'title'} FROM ${'films'} WHERE ${'title'} = ${db.raw("'x' OR TRUE -" + "-'")}` -->
 ```sql
 SELECT "title" FROM "films" WHERE "title" = 'x' OR TRUE --'
 ```
 
-That returns every film. A value is a `param()`, always: `${db.param(title)}` gives `"title" = $1`, and no film.
+That returns every film. A value is a `param()`, always: `${db.param(title)}` gives `"title" = $1`<!-- probe: db.sql`SELECT ${'title'} FROM ${'films'} WHERE ${'title'} = ${db.param('x')}` -->, and no film.
 :::
 
 ## Compare a column with SQL, through `self`
@@ -152,10 +153,10 @@ A fragment as a Whereable value compares its column with SQL of your own, [`db.s
 
 </CastPanel>
 
-- `lower(${db.self})` is `lower("title")`, and the caller's text is still `$1`.
+- `lower(${db.self})` is `lower("title")`<!-- probe: examples/raw_sql_self.ts -->, and the caller's text is still a parameter, `lower($1)`<!-- probe: examples/raw_sql_self.ts -->.
 - An equality, unlike [`ilike()`](/conditions#conditions.ilike): a `_` or a `%` in the caller's text matches only itself.
 - The same object works as the `where` of [`select()`](/select#select) and the other shortcuts.
-- Where it has no column to stand for, `self` throws "The 'self' column alias has no meaning here", so [`run()`](/sql-template#run) rejects before any query.
+- Where it has no column to stand for, `self` throws "The 'self' column alias has no meaning here"<!-- message -->, so [`run()`](/sql-template#run) rejects before any query.
 
 ## Reach the outer row, through `parent()`
 
@@ -167,10 +168,10 @@ A hand-written subquery can go in a shortcut's `lateral`, where [`db.parent()`](
 
 </CastPanel>
 
-- `${db.parent('id')}` is `"studios"."id"`, the studio of each row.
+- `${db.parent('id')}` is `"studios"."id"`<!-- probe: examples/raw_sql_parent.ts -->, the studio of each row.
 - The subquery gives one column, named `result`: that is what `lateral` reads. Its type argument, `string | null`, is the key's type: `string_agg()` of no rows is `NULL`.
 - With `strict` off, the key is not in the type ([`lateral`](/select#lateral)).
-- Outside a `lateral`, `parent()` throws "The 'parent' table alias has no meaning here", so [`run()`](/sql-template#run) rejects before any query.
+- Outside a `lateral`, `parent()` throws "The 'parent' table alias has no meaning here"<!-- message -->, so [`run()`](/sql-template#run) rejects before any query.
 
 Joins through `lateral`, step by step: [Join through a lateral](/lateral).
 
@@ -182,7 +183,7 @@ Joins through `lateral`, step by step: [Join through a lateral](/lateral).
 
 - Here with `test` from `node:test` and `assert` from `node:assert/strict`; any test runner does.
 - `text` keeps the line breaks of the template: the test collapses its whitespace, so that only a change to the SQL fails it.
-- A search of `text` is not enough: a name compiled from `x" --` is there as `"x"" --"`, its `"` doubled, and a lone `'` matches the query's own literals.
+- A search of `text` is not enough: a name compiled from `x" --` is there as `"x"" --"`<!-- probe: db.sql`${'x" -' + '-'}` -->, its `"` doubled, and a lone `'` matches the query's own literals.
 
 ## See also
 

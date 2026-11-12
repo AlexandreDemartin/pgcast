@@ -1,6 +1,6 @@
 # Join through a lateral
 
-Get rows with the rows they relate to, in one query and one typed result: a film with its cast, a crew member with their mentor. You nest a shortcut in the [`lateral`](/select#lateral) option of `select()`; it becomes a `LEFT JOIN LATERAL`, and its result a key of each row. You already know `select()` from the [tutorial](/first-query).
+Get rows with the rows they relate to, in one query and one typed result: a film with its cast, a crew member with their mentor. You nest a shortcut in the [`lateral`](/select#lateral) option of `select()`; it becomes a `LEFT JOIN LATERAL`<!-- probe: examples/lateral_cast.ts -->, and its result a key of each row. You already know `select()` from the [tutorial](/first-query).
 {.lede}
 
 ## Add the rows that point to it
@@ -14,7 +14,7 @@ A film's cast is the `roles` whose `film_id` is the film's `id`. Nest a `select(
 </CastPanel>
 
 - `cast` becomes a key of the film, holding an array: `[]` when no role matches.
-- `db.parent('id')` is `"films"."id"`, a column of the query around it ([`parent()`](/sql-template#parent)). When the two columns share a name, `db.parent()` alone takes the column of its filter.
+- `db.parent('id')` is `"films"."id"`<!-- probe: examples/lateral_cast.ts -->, a column of the query around it ([`parent()`](/sql-template#parent)). When the two columns share a name, `db.parent()` alone takes the column of its filter.
 - The subquery takes the options of any `select()`, here `columns` and `order` ([Options](/select#options)).
 
 ## Add the row it points to
@@ -41,7 +41,7 @@ Films and actors are many-to-many, through `roles`. Nest a lateral in the latera
 
 </CastPanel>
 
-`db.parent()` names a column of the nearest query around it: in `actor`, `"roles"."actor_id"`. Each role's `actor` is `{ name: string }`. Nest as deep as you need; each level adds a `LEFT JOIN LATERAL` to the same query.
+`db.parent()` names a column of the nearest query around it: in `actor`, `"roles"."actor_id"`<!-- probe: examples/lateral_actors.ts -->. Each role's `actor` is `{ name: string }`. Nest as deep as you need; each level adds a `LEFT JOIN LATERAL`<!-- probe: examples/lateral_actors.ts --> to the same query.
 
 ## Keep only the far side
 
@@ -77,7 +77,7 @@ A crew member's mentor is another row of `crew`. Give the subquery an `alias`, s
 
 - `mentor` holds the row or `null`: Wilhelmina Strand has no mentor.
 - [`count()`](/select#count) gives a number, here each member's protégés.
-- Without the aliases, the subquery's `FROM "crew"` hides the outer one, and `"crew"."mentor_id"` is the subquery's own row. Postgres runs it with no error, and every `mentor` comes back `null`, every count `0`:
+- Without the aliases, the subquery's `FROM "crew"`<!-- probe: db.select('crew', db.all, { lateral: { mentor: db.selectOne('crew', { id: db.parent('mentor_id') }, { columns: ['name'] }) } }) --> hides the outer one, and `"crew"."mentor_id"`<!-- probe: db.select('crew', db.all, { lateral: { mentor: db.selectOne('crew', { id: db.parent('mentor_id') }, { columns: ['name'] }) } }) --> is the subquery's own row. Postgres runs it with no error, and every `mentor` comes back `null`, every count `0`:
 
   ```sql
   SELECT jsonb_build_object($5::text, "name") AS result
@@ -86,7 +86,7 @@ A crew member's mentor is another row of `crew`. Give the subquery an `alias`, s
   LIMIT $6
   ```
 
-- One alias on the outer query does for both: with `alias: 'member'` there, `db.parent('mentor_id')` is `"member"."mentor_id"` ([`alias`](/select#alias)).
+- One alias on the outer query does for both: with `alias: 'member'` there, `db.parent('mentor_id')` is `"member"."mentor_id"`<!-- probe: db.select('crew', db.all, { alias: 'member', lateral: { mentor: db.selectOne('crew', { id: db.parent('mentor_id') }) } }) --> ([`alias`](/select#alias)).
 
 ## Order by a computed value
 
@@ -107,8 +107,8 @@ Each cinema, and the nearest other one: a self-join again, with the distance as 
 
 - **`strictNullChecks`**: without it (or `strict`), `columns`, `extras` and `lateral` leave the type as the full row, and it refuses nothing ([Strict](/select#options)).
 - **An unchecked join**: `db.parent()` takes a column of any table, so a join on the wrong column compiles. Postgres refuses a column the parent doesn't have: `db.parent('billing')` under `films` fails with 42703, "column films.billing does not exist".
-- **[`withTies`](/select#order-limit-offset-and-withties) in a nested `selectOne()`**: it writes `FETCH FIRST $1 ROWS WITH TIES`, which keeps every tied row. Under an outer `select()`, the parent row comes back once per tie; under `selectOne()`, with one of them. In a nested `select()`, the ties stay in the array. Unchanged from Zapatos 6.6.1, and open as [#164](https://github.com/AlexandreDemartin/pgcast/issues/164).
-- **A `lock`**: without `of`, `FOR UPDATE` reaches the subqueries, and Postgres refuses the query (0A000): "FOR UPDATE is not allowed with aggregate functions" under `select()` or `count()`, "FOR UPDATE cannot be applied to the nullable side of an outer join" under `selectOne()`. Name the table ([`lock`](/select#lock)):
+- **[`withTies`](/select#order-limit-offset-and-withties) in a nested `selectOne()`**: it writes `FETCH FIRST $2 ROWS WITH TIES`<!-- probe: db.select('films', db.all, { lateral: { lead: db.selectOne('roles', { film_id: db.parent('id') }, { order: { by: 'billing', direction: 'ASC' }, withTies: true }) } }) -->, which keeps every tied row. Under an outer `select()`, the parent row comes back once per tie; under `selectOne()`, with one of them. In a nested `select()`, the ties stay in the array. Unchanged from Zapatos 6.6.1, and open as [#164](https://github.com/AlexandreDemartin/pgcast/issues/164).
+- **A `lock`**: without `of`, `FOR UPDATE`<!-- probe: db.select('films', db.all, { lock: { for: 'UPDATE' } }) --> reaches the subqueries, and Postgres refuses the query (0A000): "FOR UPDATE is not allowed with aggregate functions" under `select()` or `count()`, "FOR UPDATE cannot be applied to the nullable side of an outer join" under `selectOne()`. Name the table ([`lock`](/select#lock)):
 
 <CastPanel example="lateral_lock">
 
@@ -116,7 +116,7 @@ Each cinema, and the nearest other one: a self-join again, with the distance as 
 
 </CastPanel>
 
-`FOR UPDATE OF "films"` locks the film's row, and only it, until the transaction ends: run it on a [`txnClient`](/transaction#transaction). The rows of `roles` are read, not locked.
+`FOR UPDATE OF "films"`<!-- probe: examples/lateral_lock.ts --> locks the film's row, and only it, until the transaction ends: run it on a [`txnClient`](/transaction#transaction). The rows of `roles` are read, not locked.
 
 ## See also
 
