@@ -51,7 +51,7 @@ Give [`upsert()`](/insert#upsert) the rows and [`updateColumns: db.doNothing`](/
 
 </CastPanel>
 
-- Only the rows inserted come back: with `orchards` already tagged, `added` holds `lighthouses` alone; run it again, and it's `[]`.
+- Only the rows inserted come back ([`doNothing`](/insert#doNothing)): with `orchards` already tagged, `added` holds `lighthouses` alone.
 - A row given twice in the array is inserted once.
 
 ## Add up counts
@@ -88,7 +88,7 @@ Then add each row's votes to those stored: set `votes` in [`updateValues`](/inse
 
 - The first run inserts the three rows. The second updates them, to 4, 2 and 6 votes, each with `$action: 'UPDATE'`.
 - `updateValues` is one expression for every row: `EXCLUDED."votes"` is what makes it each row's own count.
-- An `undefined` in `updateValues` doesn't leave `votes` alone: `{ votes: undefined }` sends `EXCLUDED."votes"`, so a stored count becomes the new row's ([#168](https://github.com/AlexandreDemartin/pgcast/issues/168)).
+- An `undefined` in `updateValues` doesn't leave `votes` alone ([An `undefined` value](/insert#undefined-values), [#168](https://github.com/AlexandreDemartin/pgcast/issues/168)).
 
 ## Rows with different keys
 
@@ -107,10 +107,10 @@ Name the columns to update instead, with [`updateColumns`](/insert#upsert-option
 
 - The update is `DO UPDATE SET ("customer") = ROW(EXCLUDED."customer")`: F8 keeps its booking time. A new row still takes the `booked_at` given, or the default.
 - Or give every row the same keys: upsert the rows with a `booked_at` and those without in two calls.
-- A key of `updateValues`, or a column of an array or string conflict target, doesn't count as missing ([Rows with different keys](/insert#upsert-different-keys)).
+- Not every key counts as missing ([Rows with different keys](/insert#upsert-different-keys)).
 
 ::: tip Opt-in
-With `db.setConfig({ upsertRequiresSameKeys: true })` ([`Config.upsertRequiresSameKeys`](/runtime-config#Config.upsertRequiresSameKeys)), such an upsert throws before it sends anything: "rows have different keys: pass updateColumns, or give every row the same keys". It becomes the default in 7.0 ([Versions, opt-ins and warnings](/versions)).
+With `db.setConfig({ upsertRequiresSameKeys: true })` ([`Config.upsertRequiresSameKeys`](/runtime-config#Config.upsertRequiresSameKeys)), such an upsert throws before it sends anything.
 :::
 
 ### An `undefined` in a row
@@ -118,7 +118,7 @@ With `db.setConfig({ upsertRequiresSameKeys: true })` ([`Config.upsertRequiresSa
 Rows built from input often hold an `undefined`, such as a `booked_at` the form left empty. By default it's sent as `NULL`, as in Zapatos 6.6.1. `booked_at` is `NOT NULL`, so Postgres refuses the whole batch, 23502, `null value in column "booked_at" of relation "seat_bookings" violates not-null constraint`, and pgcast warns once, `PGCAST_DEP002`.
 
 ::: tip Opt-in
-With `db.setConfig({ undefinedMeansMissing: true })` ([`Config.undefinedMeansMissing`](/runtime-config#Config.undefinedMeansMissing)), an `undefined` is a missing key: `DEFAULT` in its row, `(DEFAULT, $1, $2, $3)`. In an upsert, it's then a row with different keys, as above: it warns, or throws with `upsertRequiresSameKeys`. It becomes the default in 7.0.
+With `db.setConfig({ undefinedMeansMissing: true })` ([`Config.undefinedMeansMissing`](/runtime-config#Config.undefinedMeansMissing)), an `undefined` is a missing key, `(DEFAULT, $1, $2, $3)`: a row with different keys, as above ([An `undefined` value](/insert#undefined-values)).
 :::
 
 ## Choose what comes back
@@ -134,7 +134,7 @@ Each row comes back whole by default, and from an upsert with its `$action`. For
 - [`returning: ['seat']`](/insert#insert-options) sends `jsonb_build_object($8::text, "seat")` in place of `to_jsonb("seat_bookings".*)`.
 - `$action` tells the new rows from the updated ones: `newSeats` is `['F8']` when F7 was already booked.
 - [`reportAction: 'suppress'`](/insert#upsert-options) leaves `$action` out of the SQL and of the type, for a batch that doesn't need it.
-- Both narrow the type only with `strictNullChecks` on: without it, each result has every column, and `$action` stays.
+- Both narrow the type only with `strictNullChecks` on ([Options](/insert#insert-options)).
 
 ## See also
 
