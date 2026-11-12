@@ -165,7 +165,22 @@ const film = await db.selectOne('films', { title: 'The Salt Orchard' }).run(pool
 if (film) console.log(film.release_year);  // 1974
 ```
 
-To see the SQL in your own code, call `.compile()` where you'd call `.run()`: it gives the `text` (on one line) and `values` the panel shows, and sends nothing.
+To see the SQL in your own code, call `.compile()` where you'd call `.run()`: it gives the `text` (on one line) and `values` the panel shows, and sends nothing. Add this line to the file:
+
+```ts twoslash
+import * as db from 'zapatos/db';
+// ---cut---
+console.log(db.selectOne('films', { title: 'The Salt Orchard' }).compile());
+```
+
+Run it, and after `1974` it prints:
+
+```txt
+{
+  text: 'SELECT to_jsonb("films".*) AS result FROM "films" WHERE ("title" = $1) LIMIT $2',
+  values: [ 'The Salt Orchard', 1 ]
+}
+```
 
 ## Ask for several, and only what you need
 
@@ -191,7 +206,7 @@ const films = await db.select('films', { studio_id: 1000 }, {
 console.log(films);
 ```
 
-Run the file again, and after `1974` it prints:
+Run the file again, and after the year and the SQL it prints:
 
 ```txt
 [
@@ -204,7 +219,13 @@ With no matching film, the array is empty: `select()` never gives `undefined`.
 
 ## Add a film
 
-`insert()` takes a `films.Insertable` and gives back the row as Postgres stored it:
+`insert()` takes a `films.Insertable` and gives back the row as Postgres stored it. Type the row first, with the schema's types. Add this import at the top of the file, with the other two:
+
+```ts twoslash
+import type * as s from 'zapatos/schema';
+```
+
+Then the row and the query:
 
 <CastPanel example="first-query-insert">
 
@@ -212,23 +233,20 @@ With no matching film, the array is empty: `select()` never gives `undefined`.
 
 </CastPanel>
 
-Print it, and run the file:
+The type lists the columns you must give and, with a `?`, those you can leave out; each takes its value, or a `db.Parameter`, `db.Default` or SQL fragment, which you won't need here. Typed on its own, the row gets errors that name the column at fault. Print the new film:
 
 ```ts twoslash
 import * as db from 'zapatos/db';
+import type * as s from 'zapatos/schema';
 import type pg from 'pg';
 declare const pool: pg.Pool;
-const newFilm = await db.insert('films', {
-  studio_id: 1002,
-  title: 'The Night Ferry to Orkesund',
-  release_year: 2024,
-  runtime_minutes: 117,
-}).run(pool);
+declare const row: s.films.Insertable;
+const newFilm = await db.insert('films', row).run(pool);
 // ---cut---
 console.log(newFilm);
 ```
 
-It prints the new row:
+Hover `newFilm`: a `films.JSONSelectable`, the row type `selectOne()` gave. Run the file, and it prints the new row:
 
 ```txt
 {
@@ -247,27 +265,89 @@ The columns you left out took their defaults: the new `id` from its sequence, `g
 A `NOT NULL` column with no default can't be left out. Forget the running time, and TypeScript says so before Postgres can:
 
 ```ts twoslash
-// @errors: 2769
-import * as db from 'zapatos/db';
-import type pg from 'pg';
-declare const pool: pg.Pool;
+// @errors: 2741
+import type * as s from 'zapatos/schema';
 // ---cut---
-await db.insert('films', {
+const row: s.films.Insertable = {
   studio_id: 1002,
   title: 'The Night Ferry to Orkesund',
   release_year: 2024,
-}).run(pool);
+};
 ```
-
-Of the two forms of `insert()` it reports on, one row or an array, the line to read is `Property 'runtime_minutes' is missing`.
 
 ::: tip Opt-in
 Leave a key out to get its column's default. A key set to `undefined` is sent as `NULL`, as in Zapatos 6.6.1, and pgcast warns once (`PGCAST_DEP002`). With `db.setConfig({ undefinedMeansMissing: true })`, it counts as left out; that's the default from 7.0 ([Versions, opt-ins and warnings](/versions)).
 :::
 
+With the running time back in the row, here is your whole file, the steps of this page in order:
+
+::: code-group
+
+```ts twoslash [src/films.ts]
+import * as db from 'zapatos/db';
+import type * as s from 'zapatos/schema';
+import pg from 'pg';
+
+const pool = new pg.Pool({
+  connectionString: process.env.DATABASE_URL,
+  allowExitOnIdle: true,  // so the script ends once its queries are done
+});
+
+const film = await db.selectOne('films', {
+  title: 'The Salt Orchard',
+}).run(pool);
+if (film) console.log(film.release_year);  // 1974
+console.log(db.selectOne('films', { title: 'The Salt Orchard' }).compile());
+
+const films = await db.select('films', { studio_id: 1000 }, {
+  columns: ['title', 'release_year'],
+  order: { by: 'release_year', direction: 'ASC' },
+}).run(pool);
+console.log(films);
+
+const row: s.films.Insertable = {
+  studio_id: 1002,
+  title: 'The Night Ferry to Orkesund',
+  release_year: 2024,
+  runtime_minutes: 117,
+};
+const newFilm = await db.insert('films', row).run(pool);
+console.log(newFilm);
+```
+
+:::
+
 ## When the schema changes
 
-Run `npx pgcast` again after each migration. `schema.d.ts` is written afresh, and TypeScript checks every query against it: rename `runtime_minutes`, and each query that names it stops compiling, the insert above included.
+Run `npx pgcast` again after each migration. `schema.d.ts` is written afresh, and TypeScript checks every query against it. Try it: rename a column, regenerate, and check the file:
+
+```sh
+psql "$DATABASE_URL" -c 'ALTER TABLE films RENAME runtime_minutes TO minutes'
+npx pgcast
+npx tsc
+```
+
+The row names `runtime_minutes`, which `films.Insertable` no longer has, so it stops compiling:
+
+```txt
+src/films.ts:26:3 - error TS2353: Object literal may only specify known properties, and 'runtime_minutes' does not exist in type 'Insertable'.
+
+26   runtime_minutes: 117,
+     ~~~~~~~~~~~~~~~
+
+
+Found 1 error in src/films.ts:26
+```
+
+Any query that names the column stops compiling too, until you write `minutes` instead. Here, rename it back, so the rest of these docs run as written:
+
+```sh
+psql "$DATABASE_URL" -c 'ALTER TABLE films RENAME minutes TO runtime_minutes'
+npx pgcast
+npx tsc
+```
+
+This time `tsc` prints nothing: every query fits the schema again.
 
 After you upgrade pgcast, a type error on `schemaVersionCanary` in `schema.d.ts` means the same thing: the generated format has changed, so run the generator again.
 

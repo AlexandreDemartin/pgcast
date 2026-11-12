@@ -84,6 +84,7 @@ One per group, in `templates/`, not published (`srcExclude` in `.vitepress/confi
   - An example that shows an error says which, above `// ---cut---`: `// rejects with 42703` (a SQLSTATE) or `// rejects with NotExactlyOneError` (an error's name). It fails if it rejects with anything else, or not at all.
   - An example also fails if a promise it does not await rejects, or, in `examples/plain/`, if it leaves a client in use or a query waiting. One that does not settle within 10 s ends the run.
   - A name an example only declares (`declare const tags: …`) runs with a stand-in from `run-examples.mjs`; a new one goes there.
+- Code a page shows in its own block and an example needs above its `// ---cut---`, such as a function it calls, goes between `// #region copy` and `// #endregion copy` (`examples/plain/paginate_handler.ts`). The build fails, in `.vitepress/llms.ts`, unless those lines are still a block of the page, blank lines aside.
 - An optional caption goes under the panel: `<template #caption><span>…</span></template>` (`index.md`).
 
 ### The reference
