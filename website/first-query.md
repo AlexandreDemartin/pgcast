@@ -219,7 +219,7 @@ With no matching film, the array is empty: `select()` never gives `undefined`.
 
 ## Add a film
 
-`insert()` takes a `films.Insertable` and gives back the row as Postgres stored it:
+`insert()` takes a `films.Insertable` and gives back the row as Postgres stored it. Type the row first, with the schema's types imported at the top of the file:
 
 <CastPanel example="first-query-insert">
 
@@ -227,18 +227,15 @@ With no matching film, the array is empty: `select()` never gives `undefined`.
 
 </CastPanel>
 
-Print it, and run the file:
+The type lists the columns you must give and, with a `?`, those you can leave out; each takes its value, or a `db.Parameter` or SQL fragment, which you won't need here. `db.insert('films', { … })` runs the same, but a typed row gets the clearer errors: TypeScript checks it on its own, not against both forms of `insert()`, one row or an array. Print the new film, and run the file:
 
 ```ts twoslash
 import * as db from 'zapatos/db';
+import type * as s from 'zapatos/schema';
 import type pg from 'pg';
 declare const pool: pg.Pool;
-const newFilm = await db.insert('films', {
-  studio_id: 1002,
-  title: 'The Night Ferry to Orkesund',
-  release_year: 2024,
-  runtime_minutes: 117,
-}).run(pool);
+declare const row: s.films.Insertable;
+const newFilm = await db.insert('films', row).run(pool);
 // ---cut---
 console.log(newFilm);
 ```
@@ -262,19 +259,15 @@ The columns you left out took their defaults: the new `id` from its sequence, `g
 A `NOT NULL` column with no default can't be left out. Forget the running time, and TypeScript says so before Postgres can:
 
 ```ts twoslash
-// @errors: 2769
-import * as db from 'zapatos/db';
-import type pg from 'pg';
-declare const pool: pg.Pool;
+// @errors: 2741
+import type * as s from 'zapatos/schema';
 // ---cut---
-await db.insert('films', {
+const row: s.films.Insertable = {
   studio_id: 1002,
   title: 'The Night Ferry to Orkesund',
   release_year: 2024,
-}).run(pool);
+};
 ```
-
-Of the two forms of `insert()` it reports on, one row or an array, the line to read is `Property 'runtime_minutes' is missing`.
 
 ::: tip Opt-in
 Leave a key out to get its column's default. A key set to `undefined` is sent as `NULL`, as in Zapatos 6.6.1, and pgcast warns once (`PGCAST_DEP002`). With `db.setConfig({ undefinedMeansMissing: true })`, it counts as left out; that's the default from 7.0 ([Versions, opt-ins and warnings](/versions)).
@@ -290,22 +283,18 @@ npx pgcast
 npx tsc
 ```
 
-The insert names `runtime_minutes`, so it stops compiling:
+The row names `runtime_minutes`, which `films.Insertable` no longer has, so it stops compiling:
 
 ```txt
-src/films.ts:21:26 - error TS2769: No overload matches this call.
-  Overload 1 of 2, '(table: "films", values: Insertable, options?: ReturningOptionsForTable<"films", ColumnsOption<"films">, ExtrasOption<"films">> | undefined): SQLFragment<...>', gave the following error.
-    Object literal may only specify known properties, and 'runtime_minutes' does not exist in type 'Insertable'.
-  Overload 2 of 2, '(table: "films", values: Insertable[], options?: ReturningOptionsForTable<"films", ColumnsOption<"films">, ExtrasOption<"films">> | undefined): SQLFragment<...>', gave the following error.
-    Object literal may only specify known properties, and 'studio_id' does not exist in type 'Insertable[]'.
+src/films.ts:26:3 - error TS2353: Object literal may only specify known properties, and 'runtime_minutes' does not exist in type 'Insertable'.
 
-21 const newFilm = await db.insert('films', {
-                            ~~~~~~
+26   runtime_minutes: 117,
+     ~~~~~~~~~~~~~~~
 
-Found 1 error in src/films.ts:21
+Found 1 error in src/films.ts:26
 ```
 
-As with the missing running time, the line to read is the one-row form's: `'runtime_minutes' does not exist`. Any query that names the column fails the same way, until you write `minutes` instead. Here, rename it back, so the rest of these docs run as written:
+Any query that names the column stops compiling too, until you write `minutes` instead. Here, rename it back, so the rest of these docs run as written:
 
 ```sh
 psql "$DATABASE_URL" -c 'ALTER TABLE films RENAME minutes TO runtime_minutes'
