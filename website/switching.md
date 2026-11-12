@@ -87,6 +87,7 @@ pgcast fixes, with no option to turn on, what no code could rely on in Zapatos 6
 | [`update()`](/insert#update) with no column: `update('films', {}, …)` | 42601 from Postgres → throws when called: "nothing to update: an Updatable needs at least one column" | nothing, unless you catch a `DatabaseError` there |
 
 - Each change in the last column gives the same result under Zapatos 6.6.1, so you can make it before you switch; only the `jsonb` one finds its rows under pgcast alone.
+- The text and values of `.compile()` change beyond these rows, where the rows returned don't: every `not()` gains a pair of parentheses, `(NOT ("release_year" = $2))` where it was `(NOT "release_year" = $2)`, and every `param()` filter value is sent as it is, `{ title: db.param('x', 'text') }` giving `CAST($2 AS "text")` with `'x'` where it was `$2` with `{"value":"x","cast":"text"}`. Tests that snapshot SQL fail at [Read the warnings](#read-the-warnings): check the rows first, then update the snapshots.
 - Every case of each fix: the [changelog](https://github.com/AlexandreDemartin/pgcast/blob/master/CHANGELOG.md), § Fixed and § Security.
 
 ## Read the warnings
