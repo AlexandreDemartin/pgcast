@@ -7,7 +7,8 @@
     "docs:dev": "vitepress dev",
     "docs:build": "tsc && node check-reference.mjs && vitepress build",
     "docs:preview": "vitepress preview",
-    "docs:schema": "node generate-schema.mjs"
+    "docs:schema": "node generate-schema.mjs",
+    "docs:examples": "node run-examples.mjs"
   },
   "devDependencies": {
     "@shikijs/vitepress-twoslash": "4.5.0",

@@ -16,6 +16,9 @@ const host = 'https://alexandredemartin.github.io';  // GitHub Pages, under the 
 export async function writeLlmsFiles(config: SiteConfig) {
   const
     url = (link: string) => host + config.site.base + link.slice(1),
+    // a page's links as absolute URLs: root-relative (`/select#select`), and in-page (`#options`) too, since
+    // llms-full.txt puts every page in one file
+    linksOf = (page: string) => (link: string) => url(link.startsWith('#') ? page + link : link),
     read = (link: string) => {
       const file = join(config.srcDir, link === '/' ? 'index.md' : `${link.slice(1)}.md`);
       if (!existsSync(file)) return;
@@ -26,7 +29,7 @@ export async function writeLlmsFiles(config: SiteConfig) {
         lede = /^(.+)\n\{\.lede\}$/m.exec(source)?.[1];
       if (!title || !lede)
         throw new Error(`llms.ts: ${file} needs a title (\`# \` or \`<h1>\`) and a \`{.lede}\` paragraph, for llms.txt`);
-      return { link, source, title: inline(title, url), lede: inline(lede, url) };
+      return { link, source, title: inline(title, linksOf(link)), lede: inline(lede, linksOf(link)) };
     },
     home = read('/')!,
     groups = outline.map(group => ({
@@ -50,7 +53,7 @@ export async function writeLlmsFiles(config: SiteConfig) {
       casts[name!] = `Postgres runs:\n\n\`\`\`sql\n${sql}\n\`\`\`\n\nValues: \`${values}\`\n\n` +
         `TypeScript knows:\n\n\`\`\`ts\n${type}\n\`\`\``;
     }
-    full.push(plain(source, casts, config.srcDir, url).replace(/^# .*$/m, `$&\n\nSource: ${url(link)}`));
+    full.push(plain(source, casts, config.srcDir, linksOf(link)).replace(/^# .*$/m, `$&\n\nSource: ${url(link)}`));
   }
   writeFileSync(join(config.outDir, 'llms-full.txt'), full.join('\n\n---\n\n') + '\n');
 }
@@ -137,15 +140,20 @@ function checkCopy(file: string, page: string) {
 const shown = (code: string) => code.split('// ---cut---').pop()!.trim().split('\n')
   .filter(line => !/^\s*\/\/\s*[@^]/.test(line)).join('\n');
 
-/** One line of a page as plain Markdown: HTML and Markdown attributes dropped, links to the site made absolute. */
+/**
+ * One line of a page as plain Markdown: HTML and Markdown attributes dropped, links to the site and within the page
+ * made absolute (`url`).
+ */
 const inline = (line: string, url: (link: string) => string) => line
   .replace(/<code[^>]*>(.*?)<\/code>/g, '`$1`')
   .replace(/(\]\([^)]*\))\{[^}]*\}/g, '$1')  // `[Get started](/install){.btn}`
   .replace(/\s*\{[.#][^}]*\}$/, '')  // `## Options {#options}`
-  .split(/(`[^`]*`)/)  // odd parts are inline code: kept as they are
-  .map((part, i) => i % 2 ? part : part
+  // inline code, between two runs of as many backticks (`` sql`now()` ``), is kept as it is: split, it is every part
+  // 1 (mod 3), then its run of backticks, dropped
+  .split(/((?<!`)(`+)(?!`).*?[^`]\2(?!`))/)
+  .map((part, i) => i % 3 === 1 ? part : i % 3 === 2 ? '' : part
     .replace(/<h([1-6])[^>]*>(.*?)<\/h\1>/g, (_, level, text) => '#'.repeat(level) + ' ' + text)
     .replace(/<small[^>]*>(.*?)<\/small>/g, ': $1')
     .replace(/<\/?[A-Za-z][^>]*>/g, '')
-    .replace(/\]\((\/[^)\s]*)\)/g, (_, link) => `](${url(link)})`))
+    .replace(/\]\(([/#][^)\s]*)\)/g, (_, link) => `](${url(link)})`))
   .join('');
