@@ -166,7 +166,14 @@ db.sql<s.films.SQL>`SELECT * FROM ${'films'} WHERE ${{ title: db.raw("'x'") }}`;
 class DangerousRawString { value: string }
 ```
 
-What `raw()` returns. A type-only member keeps it from passing as a `Parameter`: `const r: db.DangerousRawString = { value: 'x' }` does not compile.
+What `raw()` returns. A type-only member keeps it from passing as a `Parameter`, and an object of the same shape from passing as it:
+
+```ts twoslash
+// @errors: 2741
+import * as db from 'zapatos/db';
+// ---cut---
+const notRaw: db.DangerousRawString = { value: 'x' };
+```
 
 ## `cols()` {#cols}
 
@@ -413,7 +420,13 @@ fragment.run(queryable: Queryable, force = false): Promise<RunResult>
 3. Sends the query to `queryable`, and passes `pg`'s result through [`runResultTransform`](#runResultTransform). A `noop` fragment sends nothing and gives `noopResult`, unless `force` is `true`.
 4. Calls [`resultListener`](/runtime-config#Config.resultListener) with the result, the transaction's id, the time taken and the query, if set.
 
-A `noop` fragment still compiles, its SQL behind a comment: `/* marked no-op: won't hit DB unless forced -> */ INSERT INTO "tags" SELECT null WHERE false`.
+A `noop` fragment still compiles, its SQL behind a comment. `force` sends it, and it inserts nothing: `.run()` gives `[]`.
+
+<CastPanel example="sql_run_force">
+
+<<< ./examples/sql_run_force.ts{ts twoslash}
+
+</CastPanel>
 
 ### `compile()` {#compile}
 
@@ -453,6 +466,10 @@ fragment.prepared(name = `_zapatos_prepared_${n}`): this
 
 Sets the `name` that `compile()` adds to the query, so that Postgres prepares the statement once per connection and runs it by name after ([node-postgres](https://node-postgres.com/features/queries#prepared-statements)). Without a name, `_zapatos_prepared_0`, `_1`… in the order of the calls.
 
+The values are parameters, not part of the text, so one name serves every call of a query function:
+
+<<< ./examples/plain/sql_prepared.ts{ts twoslash}
+
 A name stands for one text: on a connection that has prepared `'p'`, a fragment of another text named `'p'` makes `pg` reject with "Prepared statements must be unique - 'p' was used for a different statement".
 
 ## `RunResultForSQLFragment` {#RunResultForSQLFragment}
@@ -461,7 +478,18 @@ A name stands for one text: on a connection that has prepared `'p'`, a fragment 
 type RunResultForSQLFragment<F extends SQLFragment<any, any>>
 ```
 
-The `RunResult` of `F`, with `undefined` read as `null`: a fragment nested as a `lateral` or `extras` value comes back as JSON, where a missing row is `null`. So `selectOne()`'s `films.JSONSelectable | undefined` becomes `films.JSONSelectable | null` there.
+The `RunResult` of `F`, with `undefined` read as `null`: a fragment nested as a `lateral` or `extras` value comes back as JSON, where a missing row is `null`. So `selectOne()`'s `studios.JSONSelectable | undefined` becomes `studios.JSONSelectable | null` there:
+
+```ts twoslash
+import * as db from 'zapatos/db';
+// ---cut---
+const studioOf = db.selectOne('studios', { id: db.parent('studio_id') });
+
+type Alone = Awaited<ReturnType<typeof studioOf.run>>;
+//   ^?
+type InLateral = db.RunResultForSQLFragment<typeof studioOf>;
+//   ^?
+```
 
 ## `Queryable` {#Queryable}
 
@@ -469,7 +497,11 @@ The `RunResult` of `F`, with `undefined` read as `null`: a fragment nested as a 
 type Queryable = pg.ClientBase | pg.Pool
 ```
 
-What `run()` takes: a pool, a client, or the client a [`transaction()`](/transaction#transaction) gives its callback.
+What `run()` takes: a pool, a client, or the client a [`transaction()`](/transaction#transaction) gives its callback. Typed so, a query function runs on any of them:
+
+<<< ./examples/plain/sql_queryable.ts{ts twoslash}
+
+`Queryable` takes a transaction's client whatever its level: a function that needs `SERIALIZABLE` takes a [`TxnClientForSerializable`](/transaction#TxnClientForSerializable) instead ([Book inside a larger transaction](/retries#book-inside-a-larger-transaction)).
 
 ## `SQL` {#SQL}
 
