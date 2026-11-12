@@ -103,7 +103,7 @@ The last row applies when [`castArrayParamsToJson`](/runtime-config#Config.castA
 | none | `$1` | `value`, as `pg` serialises it |
 | `'timestamptz'` | `CAST($1 AS "timestamptz")` | `value` |
 | `'pg_catalog"."text'` | `CAST($1 AS "pg_catalog"."text")` | `value` |
-| `'public.mood'`, `'int4[]'` | `CAST($1 AS "public.mood")`, `CAST($1 AS "int4[]")`: one name, not split | `value` |
+| `'public.crew_job'`, `'int4[]'` | `CAST($1 AS "public.crew_job")`, `CAST($1 AS "int4[]")`: one name, not split | `value` |
 | `true` | `CAST($1 AS "json")` for an array or a plain object; `$1` otherwise | `JSON.stringify(value)`; otherwise `value` |
 | `false` | `$1` | `value`, never as JSON |
 | none or a string, for an array with `castArrayParamsToJson` on, or a plain object with `castObjectParamsToJson` on | `CAST($1 AS "json")`: a string `cast` is dropped, `param([1, 2], 'int4[]')` included | `JSON.stringify(value)` |
@@ -325,7 +325,7 @@ The keyword `DEFAULT`: a column's default, in an `INSERT` or `UPDATE` value, alo
 - In a filter it throws while compiling.
   - As a Whereable value ([above](#whereable)), in `isIn()` / `isNotIn()`, and in `vals([…])` with a current column ([`vals()`](#vals)): "`` `db.Default` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. `DEFAULT` is for INSERT and UPDATE values. ``"
   - As the value of `eq()`, `add()` and the other conditions: "`` `db.Default` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To set a column to its default in an UPDATE, give `db.Default` as the value itself: `{ n: db.Default }`. ``"
-- For `add()` and `subtract()`, set the column itself: `{ n: db.Default }`.
+- For `add()` and `subtract()`, set the column itself: `{ booked_at: db.Default }`.
 - Zapatos 6.6.1 sent it as the string `'Symbol(DEFAULT)'` in all of these, and in `vals([…])`, where it is now `DEFAULT`.
 
 ### `DefaultType` {#DefaultType}
