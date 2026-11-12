@@ -188,14 +188,16 @@ describe('Whereable', () => {
   });
 
   it('characterization: raw(), cols(x) and vals(x) as a value are sent as JSON: no row, or every row with isNotIn', async () => {
-    // characterization: the type takes each as a Parameter<string> (or <JSONValue>, <string[]>); pg sends
-    // {"value":"'Ada'"}, so raw() is no SQL here, and deletes() with isNotIn deletes every row; as in 6.6.1 (#101)
+    // characterization: the type takes raw() as a Parameter<string> (or <JSONValue>), cols(x) and vals(x) as a
+    // Parameter<T> of any column; pg sends {"value":"'Ada'"}, so raw() is no SQL here, deletes() with isNotIn
+    // deletes every row, and outside text and jsonb it is 22P02; as in 6.6.1 (#101)
     expect(await ids({ display_name: raw("'Ada'") })).toEqual([]);
     expect(await ids({ display_name: c.isIn([raw("'Ada'")]) })).toEqual([]);
     expect(await ids({ display_name: c.eq(raw("'Ada'")) })).toEqual([]);
     expect(await ids({ settings: raw(`'{"theme": "dark"}'`) })).toEqual([]);
     expect(await ids({ display_name: cols('Ada') })).toEqual([]);
     expect(await ids({ display_name: vals('Ada') })).toEqual([]);
+    expect(await ids({ display_name: { value: 'Ada' } })).toEqual([]);
     expect(await ids({ display_name: c.isNotIn([raw("'Ada'")]) })).toEqual([{ id: 1 }, { id: 2 }, { id: 3 }]);
     const deleted = await db.deletes('memberships', { role: c.isNotIn([raw("'owner'")]) }, { returning: ['user_id'] }).run(t.client);
     expect(deleted.map(m => m.user_id).sort()).toEqual([1, 2]);
@@ -203,6 +205,24 @@ describe('Whereable', () => {
       {
         "code": "22P02",
         "message": "malformed array literal: "{"value":["admin"]}"",
+      }
+    `);
+    expect(await pgError(t.client, () => ids({ id: vals(1) }))).toMatchInlineSnapshot(`
+      {
+        "code": "22P02",
+        "message": "invalid input syntax for type integer: "{"value":1}"",
+      }
+    `);
+    expect(await pgError(t.client, () => ids({ id: c.eq(vals(1)) }))).toMatchInlineSnapshot(`
+      {
+        "code": "22P02",
+        "message": "invalid input syntax for type integer: "{"value":1}"",
+      }
+    `);
+    expect(await pgError(t.client, () => ids({ mood: c.isIn([cols('ok')]) }))).toMatchInlineSnapshot(`
+      {
+        "code": "22P02",
+        "message": "invalid input value for enum mood: "{"value":"ok"}"",
       }
     `);
   });

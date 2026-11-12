@@ -93,9 +93,10 @@ describe('type surprises', () => {
   });
 
   test('characterization: raw(), cols(x) and vals(x) pass as a Parameter<T>, in a Whereable, isIn and eq', () => {
-    // characterization: Parameter<T> is structural ({ value: T, cast? }), so DangerousRawString ({ value: string }),
-    // ColumnNames<T> and ColumnValues<T> match it, as does a plain { value } object; the runtime sends each as a
-    // parameter, as JSON (test/integration/core.test.ts, "raw(), cols(x) and vals(x) as a value are sent as JSON")
+    // characterization: Parameter<T> is structural ({ value: T, cast? }), so DangerousRawString ({ value: string })
+    // matches it on a text or jsonb column, and the generic ColumnNames<T> and ColumnValues<T> on any column, as
+    // does a plain { value } object; the runtime sends each as a parameter, as JSON
+    // (test/integration/core.test.ts, "raw(), cols(x) and vals(x) as a value are sent as JSON")
     db.select('users', { display_name: db.raw("'Ada'") });
     db.select('users', { settings: db.raw(`'{"theme": "dark"}'`) });
     db.select('users', { display_name: c.isIn([db.raw("'Ada'")]) });
@@ -108,6 +109,13 @@ describe('type surprises', () => {
     db.select('users', { display_name: c.eq(db.cols('Ada')) });
     db.select('users', { tags: db.cols(['admin']) });
     db.select('users', { tags: db.vals(['admin']) });
+    db.select('users', { id: db.vals(1) });
+    db.select('users', { id: db.cols(1) });
+    db.select('users', { id: c.isIn([db.vals(1)]) });
+    db.select('users', { id: c.eq(db.vals(1)) });
+    db.select('users', { mood: db.cols('ok') });
+    db.select('users', { mood: c.isIn([db.cols('ok')]) });
+    db.select('users', { mood: c.eq(db.vals('ok')) });
     db.select('users', { display_name: { value: 'Ada' } });
     // @ts-expect-error raw() is a Parameter<string>, not of an int column
     db.select('users', { id: db.raw('1') });
