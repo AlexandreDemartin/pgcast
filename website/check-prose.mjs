@@ -154,6 +154,10 @@ for (const page of pages) {
           `\`${end === -1 ? line.slice(index) : mark}\``);
         continue;
       }
+      if (/^\s*\|/.test(line) && mark.includes('|')) {  // markdown-it would end the table cell there
+        problems.push(`${where}: a mark in a table holds no \`|\` (write '\\x7c'): ${mark}`);
+        continue;
+      }
       if (quote === undefined && !block) {
         problems.push(`${where}: ${mark} has no ${probe ? 'code span right before it, nor a `sql` block below' :
           'code span or "quote" right before it'}`);
