@@ -237,6 +237,10 @@ Candidates for a check, a rule or a skill line.
 - #148 — `information_schema` reports a view's `NOT NULL` domain column as `NO`, while a materialised view's `attnotnull` is false even for it: probe both read paths with a `NOT NULL` domain — `branch-reviewer`, `builder`
 - #148 — An explanation that names open issues « as they are today » is tied back to them (a comment on each, rule of #130), or it outlives the behaviour — `branch-reviewer`
 - #148 — `<sup>` is stripped in `llms-full.txt` (2<sup>53</sup> became « 253 »): write the value another way — `builder`
+- #115 — A script that creates databases drops at start the ones whose process is gone (pid in the name), since `finally` does not run on SIGINT, SIGKILL or an unhandled rejection — `branch-reviewer`, `builder`
+- #115 — pg-pool's `end()` waits for every checked-out client and never settles a queued query: check `totalCount - idleCount` and `waitingCount`, and drop `WITH (FORCE)` — `branch-reviewer`, `builder`
+- #115 — No regex built from a file name (CodeQL `js/incomplete-sanitization`, high): find the stack frame with `includes()` — `branch-reviewer`, `builder`
+- #115 — On a draft PR « CI passed » is green with every job skipped: proofs taken on a draft are local only — `branch-reviewer`
 
 ## Minors kept
 
