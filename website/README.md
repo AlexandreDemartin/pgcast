@@ -32,6 +32,15 @@ npm run docs:build             # or docs:dev, docs:preview
 
 Every export of `zapatos/db` (a member of `conditions` as `conditions.eq`), every option of its `Config` (`Config.transactionAttemptsMax`) and of the generator's (`generate.outDir`) has an entry: a heading of a Reference page that ends in its name as an anchor, `` ## `insert()` {#insert} ``. Until its page is written, a name waits in `reference-pending.json`, under that page. `docs:build` runs `check-reference.mjs` after `tsc`: it reads the names from the built library's declarations, and fails on a name with neither, on a pending name that already has its entry, and on a pending name the library no longer has; each line says which page to add it to. So the list only shrinks: a reference page's PR removes its names.
 
+## For assistants
+
+At build, `.vitepress/llms.ts` writes two files to the site's root, from the outline and the pages, in its order ([llmstxt.org](https://llmstxt.org/)):
+
+- `llms.txt`: `# pgcast`, a summary (the site's description and the home's lede), then one section per group, each written page with its URL and lede. So a page needs a `# ` title and a `{.lede}` paragraph, or the build fails.
+- `llms-full.txt`: every written page as plain Markdown, each cast panel with the SQL, values and type `cast.data.ts` computes.
+
+A "Coming" page has no `.md` file, so it is in neither.
+
 ## The docs schema
 
 `schema.sql`, pgcast's own example world: a film's cast (studios, films, actors and their roles, crew, cinemas, screenings, seat bookings, ratings, tags), every name invented, seeded rows from id 1000. The seeded screenings have fixed dates, in March 2030: an example filters on an explicit date, never on `now()`, so its result stays the same. `zapatos/` is generated from it by pgcast's own generator and committed, so a build needs no database; CI regenerates it and fails if anything differs. After a change to `schema.sql` or to the generator, regenerate it:
