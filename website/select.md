@@ -212,7 +212,7 @@ db.count(table, where, options?)
 | `lateral: { … }` | its `LEFT JOIN LATERAL`s, whose results are not read; one subquery writes `SELECT  AS result`, which Postgres refuses | none |
 | `having`, `limit`, `offset` | as in `select()`; when they leave no row (a `having` that keeps none, `limit: 0`, `offset: 1`), `.run()` rejects with a `TypeError` | none |
 
-`where`, `alias`, `order` and `lock` add what they add to `select()`.
+`where`, `alias`, `withTies` and `lock` add what they add to `select()`. So does `order`, by a `groupBy` column or a `sql` fragment (`` db.sql`count(*)` ``): by another column, Postgres refuses the query (42803).
 
 `.run()` reads the first row of the result. When the query returns none, it rejects with `TypeError: Cannot read properties of undefined (reading 'result')`; so do `sum()`, `avg()`, `min()` and `max()`.
 
