@@ -64,7 +64,10 @@ async function run(example, pool) {
     await import(file.href);
     await Promise.all(pending);
   } catch (error) {
-    if (expected === undefined || ![error?.code, error?.name].includes(expected)) throw error;
+    if (expected === undefined) throw error;
+    if (![error?.code, error?.name].includes(expected)) {
+      throw new Error(`rejects with ${error?.code ?? error?.name}, not ${expected}: ${error?.message}`, { cause: error });
+    }
     return;
   } finally {
     db.setConfig({ ...Object.fromEntries(Object.keys(db.getConfig()).map(key => [key, undefined])), ...config });
@@ -83,7 +86,7 @@ let current;  // the example last started: a promise it leaves unawaited that re
 function note(example, error, what = '') {
   const
     href = new URL(example, import.meta.url).href,  // as the stack names it: no regex built from a file name
-    frame = error?.stack?.split('\n').find(at => at.includes(`${href}:`)),
+    frame = `${error?.stack}\n${error?.cause?.stack}`.split('\n').find(at => at.includes(`${href}:`)),
     line = frame?.match(/:(\d+):\d+\)?$/)?.[1],
     where = (pagesOf.get(example) ?? ['(on no page)']).join(', ');
   what += error?.code ? `${error.code} ${error.message}` : String(error?.message ?? error);
