@@ -99,12 +99,19 @@ Steps, nesting and self-joins: [Join through a lateral](/lateral). Since pgcast 
 
 ### `alias`
 
-`alias?: string`: a name for the table in this query, needed to join a table to itself (`crew` and its `mentor_id`). It replaces the table name in the columns, in `"sq_<alias>"` and for the `parent()` of each `lateral` subquery, and `lock.of` takes it.
+`alias?: string`: a name for the table in this query, needed to join a table to itself (`crew` and its `mentor_id`). It replaces the table name in the columns, in `"sq_<alias>"` and for the `parent()` of each `lateral` subquery, and `lock.of` takes it. Its steps: [Join a table to itself](/lateral#join-a-table-to-itself).
 
 ### `distinct`
 
-- `true`: `SELECT DISTINCT`, on the whole result object. The select list is that one `result`, so Postgres refuses an `order` on a column with it (42P10).
-- A column, an array of columns or a `sql` fragment: `SELECT DISTINCT ON (…)`, one row for each value. Give an `order` that starts with the same columns, or which row you get is up to Postgres.
+With `true`: `SELECT DISTINCT`, on the whole result object. The select list is that one `result`, so Postgres refuses an `order` on a column with it (42P10).
+
+<CastPanel example="selectDistinctAll">
+
+<<< ./examples/selectDistinctAll.ts{ts twoslash}
+
+</CastPanel>
+
+With a column, an array of columns or a `sql` fragment: `SELECT DISTINCT ON (…)`, one row for each value. Give an `order` that starts with the same columns, or which row you get is up to Postgres.
 
 <CastPanel example="selectDistinct">
 
@@ -195,7 +202,7 @@ class NotExactlyOneError extends Error {
 }
 ```
 
-What `selectExactlyOne()`, the mode `ExactlyOne` of `select()`, rejects with when no row matches. Its `name` is `'NotExactlyOneError'`, its `message` "One result expected but none returned (hint: check `.query.compile()` on this Error)", and its `query` the [`SQLFragment`](/sql-template#SQLFragment) that ran: `err.query.compile()` gives its SQL and values. `err instanceof db.NotExactlyOneError` recognises it.
+What `selectExactlyOne()`, the mode `ExactlyOne` of `select()`, rejects with when no row matches. Its `name` is `'NotExactlyOneError'`, its `message` "One result expected but none returned (hint: check `.query.compile()` on this Error)", and its `query` the [`SQLFragment`](/sql-template#SQLFragment) that ran: `err.query.compile()` gives its SQL and values. `err instanceof db.NotExactlyOneError` recognises it; catching it: [Tell a missing row from the others](/handle-errors#tell-a-missing-row-from-the-others).
 
 ## `count()` {#count}
 
@@ -221,6 +228,22 @@ db.count(table, where, options?)
 | `extras` | nothing | none |
 | `lateral: { … }` | its `LEFT JOIN LATERAL`s, whose results are not read; one subquery writes `SELECT  AS result`, which Postgres refuses | none |
 | `having`, `limit`, `offset` | as in `select()`; when they leave no row (a `having` that keeps none, `limit: 0`, `offset: 1`), `.run()` rejects with a `TypeError` | none |
+
+With `columns`, it counts two of the four screenings: the other two have `subtitled` `NULL`.
+
+<CastPanel example="count_columns">
+
+<<< ./examples/count_columns.ts{ts twoslash}
+
+</CastPanel>
+
+`count(DISTINCT …)` is a `sql` template. Postgres's `count()` returns a `bigint`, which `pg` gives as a string (`'3'`): `::int` makes it a number, here `3` cinemas.
+
+<CastPanel example="count_distinct">
+
+<<< ./examples/count_distinct.ts{ts twoslash}
+
+</CastPanel>
 
 `where`, `alias`, `withTies` and `lock` add what they add to `select()`. So does `order`, by a `groupBy` column or a `sql` fragment (`` db.sql`count(*)` ``): by another column, Postgres refuses the query (42803).
 
@@ -343,7 +366,17 @@ One locking clause of [`lock`](#lock). `of` takes a table name without its schem
 
 ### `JSONOnlyColsForTable` {#JSONOnlyColsForTable}
 
-`JSONOnlyColsForTable<T, C> = Pick<JSONSelectableForTable<T>, C[number]>`: a row with only the `columns` (or `returning`) given.
+`JSONOnlyColsForTable<T, C> = Pick<JSONSelectableForTable<T>, C[number]>`: a row with only the `columns` (or `returning`) given. It names that row in a signature:
+
+```ts twoslash
+import * as db from 'zapatos/db';
+// ---cut---
+type FilmCard = db.JSONOnlyColsForTable<'films', ['id', 'title']>;
+
+function filmCardsOf(queryable: db.Queryable, studio_id: number): Promise<FilmCard[]> {
+  return db.select('films', { studio_id }, { columns: ['id', 'title'] }).run(queryable);
+}
+```
 
 ### `ExtrasResult` {#ExtrasResult}
 
