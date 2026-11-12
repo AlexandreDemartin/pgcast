@@ -191,6 +191,13 @@ Candidates for a check, a rule or a skill line.
 - #123 — « each / every X does Y » is searched for its exceptions before it is written (`grep runResultTransform` showed the aggregates' `Number()`) — `branch-reviewer`
 - #123 — The docs examples share one process: an example that changes module state is undone by value (nested objects included) and a self-check proves it — `branch-reviewer`, `builder`
 - #123 — A probe that leaks pool clients on purpose crashes Node once its database is dropped (57P01): run it last, in its own process — `builder`
+- #125 — A claim that rows are duplicated inside a lateral is probed under an outer `select()` and an outer `selectOne()`: the outer `LIMIT 1` hides it — `branch-reviewer`, `builder`
+- #125 — A cast panel types the module's first `const`: a helper above the query is written as a `function` declaration, or the query repeats it — `builder`, `branch-reviewer`
+- #125 — In type probes, mutual assignability (`[A] extends [B]` both ways) tests what a reader sees; strict identity fails on `JSONOnlyColsForTable & LateralResult` — `branch-reviewer`
+- #141 — Under SERIALIZABLE, a concurrent unique violation comes back as 40001 (retried) or 23505 (not) depending on the earlier read's plan: a how-to promises neither — `branch-reviewer`, `builder`
+- #141 — Helpers that refuse by returning `null` are not « both or neither » inside one outer transaction: only a throw rolls it back — `branch-reviewer`
+- #141 — A docs example that writes cleans its own rows, or a second run fails — `branch-reviewer`, `builder`
+- #141 — `queryListener` logs a `COMMIT` before Postgres answers it: a log line is no proof of a commit (#190) — `builder`
 - #139 — A plan claim is proved with `EXPLAIN (ANALYZE)` on a table of realistic size: « Filter: » on 4 rows hid « Rows Removed by Filter: 148671 » — `branch-reviewer`, `builder`
 - #139 — A how-to that chains steps compiles the chain as the reader writes it (`page.at(-1)` into the next query); a panel runs the earlier query on a hidden pool that returns rows — `branch-reviewer`, `builder`
 - #139 — A mixed-direction keyset needs a bound on the first key to get an `Index Cond`; a bare `OR` filters from the top, as `offset` does — `branch-reviewer`
