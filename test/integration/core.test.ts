@@ -142,6 +142,14 @@ describe('Whereable', () => {
     expect(await ids({ tags: param(['admin']) })).toEqual([{ id: 1 }]);
   });
 
+  it('a Parameter value matches on a bytea column', async () => {
+    // 6.6.1 sent '{"value":{"type":"Buffer","data":[1]}}', valid bytea input: no row, and isNotIn deleted the row
+    const [{ id }] = await db.insert('extra.type_zoo', [{ c_bytea: Buffer.from([1]) }], { returning: ['id'] }).run(t.client);
+    const bytes = () => param(Buffer.from([1]));
+    expect(await db.select('extra.type_zoo', { c_bytea: bytes() }, { columns: ['id'] }).run(t.client)).toEqual([{ id }]);
+    expect(await db.deletes('extra.type_zoo', { c_bytea: c.isNotIn([bytes()]) }, { returning: ['id'] }).run(t.client)).toEqual([]);
+  });
+
   it('a Parameter cast to json is compared as json, which jsonb refuses', async () => {
     // as `` sql`${self} = ${param(x, true)}` `` is; 6.6.1 found no row
     expect(await pgError(t.client, () => ids({ settings: param({ theme: 'dark' }, true) }))).toMatchInlineSnapshot(`

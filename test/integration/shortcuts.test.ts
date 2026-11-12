@@ -297,6 +297,17 @@ describe('upsert', () => {
     });
   });
 
+  it('updateValues: a plain object that holds a Parameter compares with its value (#31); one that holds Default throws', async () => {
+    // a Whereable of the existing row; 6.6.1 sent '{"value":"bob@example.com"}', and stored false (true for isNotIn) on both rows
+    const upsertAdaBob = (displayName: any) => run(db.upsert('users',
+      [{ email: 'Ada@Example.com', display_name: 'A' }, { email: 'bob@example.com', display_name: 'B' }], 'email', {
+        updateColumns: [], updateValues: { display_name: displayName }, returning: ['email', 'display_name'],
+      })).then(rows => sortBy(rows, 'email').map(row => row.display_name));
+    expect(await upsertAdaBob({ 'users.email': param('bob@example.com') })).toEqual(['false', 'true']);
+    expect(await upsertAdaBob({ 'users.email': db.conditions.isNotIn([param('bob@example.com')]) })).toEqual(['true', 'false']);
+    await expect(upsertAdaBob({ 'users.email': Default })).rejects.toThrow('`db.Default` has no meaning in a Whereable');
+  });
+
   it('noNullUpdateColumns: a NULL does not overwrite (one column, a list, all)', async () => {
     const values = { email: 'ada@example.com', display_name: 'Ada', mood: null, manager_id: null };
     const returning = ['mood', 'manager_id'] as const;

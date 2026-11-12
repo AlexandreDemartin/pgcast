@@ -398,7 +398,8 @@ describe('upsert', () => {
     expect({
       like: set({ 'users.mood': dc.like('h%') }), sql: set({ x: sql`'happy'` }), inArray: set([{ x: sql`'happy'` }]),
       nullPrototype: set(Object.assign(Object.create(null), { x: sql`'happy'` })),
-      param: set({ 'users.mood': param('happy') }), deep: set({ a: { b: [db.raw(`'happy'`)] } }),
+      param: set({ 'users.mood': param('happy') }), notIn: set({ 'users.mood': dc.isNotIn([param('happy')]) }),
+      deep: set({ a: { b: [db.raw(`'happy'`)] } }),
       default: set({ a: Default }), parent: set({ a: parent('id') }),
     }).toMatchInlineSnapshot(`
       {
@@ -423,6 +424,12 @@ describe('upsert', () => {
           "("mood") = ROW((("users"."mood" LIKE $3)))",
           [
             "h%",
+          ],
+        ],
+        "notIn": [
+          "("mood") = ROW((("users"."mood" NOT IN ($3))))",
+          [
+            "happy",
           ],
         ],
         "nullPrototype": [

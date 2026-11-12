@@ -13,7 +13,7 @@
 import type pg from 'pg';
 import { describe, expect, it, vi } from 'vitest';
 import * as db from '../../src/db';
-import { sql, param, all } from '../../src/db';
+import { sql, param, vals, all } from '../../src/db';
 import { useTestDatabase } from '../helpers/db';
 import { hostileCasts } from '../helpers/hostileCasts';
 import { pgError } from '../helpers/pgError';
@@ -239,7 +239,7 @@ describe('with parameters (extended protocol)', () => {
   });
 });
 
-describe('a Parameter in a Whereable or in isIn', () => {
+describe('a Parameter in a Whereable, in isIn or in vals', () => {
   it('a hostile cast does what it does in sql`${param(x, cast)}`, and reads nothing', async () => {
     // compiled text: test/unit/injection.test.ts; outcomes of the cast alone: "no hostile cast reads anything"
     const outcome = async (q: db.SQLFragment<any[]>) => {
@@ -260,7 +260,8 @@ describe('a Parameter in a Whereable or in isIn', () => {
         name,
         whereable: await outcome(sql`SELECT ${'id'} FROM ${'users'} WHERE ${{ id: param('1', cast) }}`),
         isIn: await outcome(sql`SELECT ${'id'} FROM ${'users'} WHERE ${{ id: db.conditions.isIn([param('1', cast)]) }}`),
-      }).toEqual({ name, whereable: alone, isIn: alone });
+        vals: await outcome(sql`INSERT INTO ${'extra.type_zoo'} (${'c_int4'}) VALUES (${vals([param('1', cast)])}) RETURNING ${'id'}`),
+      }).toEqual({ name, whereable: alone, isIn: alone, vals: alone });
     }
   });
 

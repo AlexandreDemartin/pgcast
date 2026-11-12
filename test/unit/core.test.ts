@@ -390,6 +390,11 @@ describe('cols and vals', () => {
   it('vals of an array throws on Default in a Whereable: a filter has no default', () => {
     expect(() => one({ id: db.conditions.isIn([1, Default]) })).toThrowErrorMatchingInlineSnapshot(`[Error: \`db.Default\` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. \`DEFAULT\` is for INSERT and UPDATE values.]`);
   });
+
+  it('vals of an array throws on Default in a fragment value of vals of an object, which reads as a Whereable', () => {
+    // the fragment is compiled with its key as the current column, as in a Whereable; 6.6.1 sent 'Symbol(DEFAULT)'
+    expect(() => one(vals({ role: sql`${vals([Default])}` }))).toThrowErrorMatchingInlineSnapshot(`[Error: \`db.Default\` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. \`DEFAULT\` is for INSERT and UPDATE values.]`);
+  });
 });
 
 describe('Whereable', () => {
