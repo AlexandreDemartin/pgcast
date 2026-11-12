@@ -13,6 +13,8 @@ The source of truth for the look of pgcast's docs, whatever tool builds them ([d
 
 Defined on `:root`. Three themes: **system** (the default: no attribute, `prefers-color-scheme` decides), **light** and **dark**, forced by `data-theme="light"` or `data-theme="dark"` on `<html>`. The dark values apply under `@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) }` and under `:root[data-theme="dark"]`, with `color-scheme: dark`. The theme button cycles system → light → dark and remembers the choice (`localStorage`, key `pgcast-theme`).
 
+On the site, VitePress's own switch: the `.dark` class on `<html>` and the key `vitepress-theme-appearance` (`auto` · `light` · `dark`), because VitePress's pre-paint script reads only that key, and another one would flash the wrong theme on load. Same three themes, same values, system by default.
+
 | Token | Light | Dark | Role |
 |---|---|---|---|
 | `--bg` | `#f6f8f9` | `#0d1318` | page background |
@@ -64,7 +66,7 @@ Other tokens: `--radius: 10px` (the cast panel 14px, buttons 9px, chips and the 
 
 ## Layout
 
-- **Top bar**, sticky, 56px, on `--surface` with a bottom rule: menu button (under 900px), wordmark, version pill, search (`⌘K` or `/`), links Docs · Changelog · GitHub (hidden under 900px), theme button.
+- **Top bar**, sticky, 56px, on `--surface` with a bottom rule: menu button (under 900px), wordmark, version pill, search (`⌘K` or `/`), links Docs · Changelog · GitHub (`--muted`, 400, `--fg` on hover; on the site, the current section in `--fg` too; no external-link icon; hidden under 900px), theme button.
 - **Shell**, at most 1360px: left nav 260px · reading column · "On this page" rail 220px. Gutters of 16px at least, and the safe-area insets.
 - **Left nav**, sticky, in four groups:
   - Getting started: Install, Configure, Generate your schema, Import it.
@@ -74,7 +76,7 @@ Other tokens: `--radius: 10px` (the cast panel 14px, buttons 9px, chips and the 
   - The current page on `--accent-soft`, in `--accent`, 600.
 - **Reading column**: the article at most 72ch, paragraphs and list items at most 68ch; padding 36px 48px 80px.
 - **"On this page"** from 1200px: the page's `h2`s, the current one in `--accent` with an accent rule on its left.
-- **Breakpoints**: under 1200px, nav 240px and no rail; under 900px, one column and the nav becomes a drawer, `min(300px, 86vw)`, sliding in from the left; under 560px, search as an icon, no version pill, the pager stacked.
+- **Breakpoints**: under 1200px, nav 240px and no rail; under 900px, one column and the nav becomes a drawer, `min(300px, 86vw)`, sliding in from the left; under 560px, search as an icon, no version pill, the pager stacked. On the site, VitePress's own (768 / 960 / 1280px) for the shell, the top bar and the nav, rather than fighting its layout; the home grid, the notes, the page `h1` and the version pill keep 560 / 900px.
 - **Home**: hero (eyebrow, line, lede, "Get started" as the primary button, "Switching from Zapatos", the install command with Copy), the cast panel of authors with their books, four pillars (Postgres is the source · SQL you can read · Values are parameters · Drop-in for Zapatos), three "read next" links.
 - **Footer**, on the home page and under every page: "pgcast is maintained by Alexandre Demartin. Zapatos and its original documentation are by George MacKerron. MIT licence.", each name linking to their GitHub profile.
 
