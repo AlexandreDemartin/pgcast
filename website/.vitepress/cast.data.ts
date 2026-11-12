@@ -34,10 +34,17 @@ const
 /**
  * The one query that `run` sends to the pool. With no rows to give back, a shortcut that expects one (a single-row
  * `insert`, `count`, `selectExactlyOne`) throws once its query is recorded: that throw is expected, and ignored.
+ * An example may call `db.setConfig()`: every example shares this process's `zapatos/db`, so the configuration goes
+ * back to what it was, each key the example added unset, before the next one runs.
  */
 async function record(run: () => Promise<unknown>, what: string) {
+  const config = db.getConfig();
   sent.length = 0;
-  await run().catch(error => { if (sent.length !== 1) throw error; });
+  try {
+    await run().catch(error => { if (sent.length !== 1) throw error; });
+  } finally {
+    db.setConfig({ ...Object.fromEntries(Object.keys(db.getConfig()).map(key => [key, undefined])), ...config });
+  }
   if (sent.length !== 1) throw new Error(`${what}: ran ${sent.length} queries, not 1`);
   return sent[0]!;
 }

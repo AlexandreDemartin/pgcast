@@ -77,7 +77,7 @@ One per group, in `templates/`, not published (`srcExclude` in `.vitepress/confi
   </CastPanel>
   ```
 
-  At build, `.vitepress/cast.data.ts` runs it against a pool that only records the query `.run()` gets from `.compile()`: its SQL (laid out on lines, whitespace only) and values fill "Postgres runs". "TypeScript knows" is the type Twoslash gives the module's first `const`: its name, then one level down. Nothing in a panel is typed by hand; the loader checks itself before each build (a type error must fail, the layout must change whitespace only, a query whose result transform throws on no rows is still recorded).
+  At build, `.vitepress/cast.data.ts` runs it against a pool that only records the query `.run()` gets from `.compile()`: its SQL (laid out on lines, whitespace only) and values fill "Postgres runs". "TypeScript knows" is the type Twoslash gives the module's first `const`: its name, then one level down. Nothing in a panel is typed by hand; the loader checks itself before each build (a type error must fail, the layout must change whitespace only, a query whose result transform throws on no rows is still recorded). The examples share one `zapatos/db`: one may call `db.setConfig()`, and the loader puts the configuration back before the next.
 - An optional caption goes under the panel: `<template #caption><span>…</span></template>` (`index.md`).
 
 ### The reference
