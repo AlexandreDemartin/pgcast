@@ -61,13 +61,19 @@ const page = await db.select('films', db.all, {
 }).run(pool);
 // ---cut---
 const last = page.at(-1);
+if (last === undefined) throw new Error('No next page');
 ```
 
-Hover `last` to see its type: the `columns` you asked for, so the keys must be among them. Leave `id` out, and `last.id` does not compile, with `strict` on (TS2339).
+Hover `last` to see its type: a row of the `columns` you asked for, or `undefined`, so the keys must be among them. With `strict` on, the compiler holds you to both:
+
+- Without the guard, `last.id` does not compile: `'last' is possibly 'undefined'` (TS18048).
+- Without `id` in `columns`, it does not compile either (TS2339).
+
+With `strict` off, both compile: a missing key goes as `NULL`, and the next page skips the rest of that year.
 
 ### Ask for the rows after it
 
-Give the `where` as a [`sql`](/sql-template#sql) fragment that compares the `order`'s columns, in its order, with those of `last`, each value through [`db.param()`](/sql-template#param). Here `last` is the page above's last film, 2008 and 1002:
+Give the `where` as a [`sql`](/sql-template#sql) fragment that compares the `order`'s columns, in its order, with those of `last`, each value through [`db.param()`](/sql-template#param). Here `last` is the one kept above, past its guard, 2008 and 1002:
 
 <CastPanel example="paginate_keyset">
 
