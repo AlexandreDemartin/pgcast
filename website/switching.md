@@ -6,7 +6,7 @@ Move a project from Zapatos 6.6.1 to pgcast: change one line of `package.json`, 
 ## Swap the package
 
 ::: info Not on npm yet
-pgcast hasn't had its first release, so this command will work once it has. Until then, the [README](https://github.com/AlexandreDemartin/pgcast#readme) says where things stand.
+pgcast hasn't had its first release, so this command will work once it has. To try the switch today, run `npm ci` then `npm pack` in a clone of the repository, copy the archive it writes into your project, and `npm install zapatos@file:pgcast-<version>.tgz` installs it under the same alias. The [README](https://github.com/AlexandreDemartin/pgcast#readme) says where things stand.
 :::
 
 Install pgcast under the name Zapatos had:
