@@ -243,7 +243,8 @@ In the values of `insert()`, `update()` and `upsert()`, Zapatos 6.6.1 sends `und
 | `upsert()` | inserts `NULL`, then sets it from `EXCLUDED` | left out: not inserted, nor updated unless `updateColumns` names it (then from `EXCLUDED`, so an existing row takes the column's `DEFAULT`); in several rows, its cell is `DEFAULT` and counts as missing ([Rows with different keys](#upsert-different-keys)) |
 
 - By default, each sends the SQL of 6.6.1 and warns once per process: `PGCAST_DEP002`.
-- An `undefined` in a `where` or in `updateValues` is unchanged.
+- An `undefined` in a `where` is unchanged.
+- An `undefined` in `updateValues` is unchanged too, in both modes: its key is still updated, from `EXCLUDED`. So an existing row takes the value inserted, or the column's `DEFAULT` when the row doesn't insert it, with no warning: `upsert('ratings', { film_id: 1002, stars: 4 }, ['film_id', 'stars'], { updateValues: { votes: undefined } })` sends `EXCLUDED."votes"`, and an existing count goes back to 1.
 
 ::: tip Opt-in
 `undefinedMeansMissing: true` ([`Config`](/runtime-config)) reads an `undefined` value as a missing key, as `JSON.stringify()` does. Without it, pgcast warns as `PGCAST_DEP002`; it becomes the default in 7.0 ([Versions, opt-ins and warnings](/versions)).
