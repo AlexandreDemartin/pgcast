@@ -8,9 +8,19 @@ const skillsDirectory = '.agents/skills';
 const agentsDirectory = '.claude/agents';
 const userLevelSkills = new Set(['branch-review']);  // lives in the user's ~/.claude, not in this repository
 const maxDescriptionLength = 350;
-const maxSkillLines = 150;
+const maxLines = 150;  // hard limit of a skill or an agent (.agents/README.md § Writing a skill); the budget is ~100
 
 const errors = [];
+const sizes = [];
+
+/** Lines and words as `wc -l` and `wc -w` count them; fails a skill or an agent above `maxLines`. */
+function measure(path, limited) {
+  const text = readFileSync(path, 'utf8');
+  const lines = text.split('\n').length - (text.endsWith('\n') ? 1 : 0);
+  const words = text.split(/\s+/).filter(Boolean).length;
+  sizes.push({path, lines, words});
+  if (limited && lines > maxLines) errors.push(`${path}: ${lines} lines, max ${maxLines}`);
+}
 
 function frontmatterOf(path) {
   const match = readFileSync(path, 'utf8').match(/^---\n([\s\S]*?)\n---\n/);
@@ -38,8 +48,7 @@ for (const skill of skills) {
     errors.push(`${path}: description is ${description.length} characters, max ${maxDescriptionLength}`);
   }
   if (!/USE FOR:/.test(description)) errors.push(`${path}: description lacks USE FOR:`);
-  const lines = readFileSync(path, 'utf8').split('\n').length;
-  if (lines > maxSkillLines) errors.push(`${path}: ${lines} lines, max ${maxSkillLines}`);
+  measure(path, true);
 }
 
 for (const file of readdirSync(agentsDirectory).filter(f => f.endsWith('.md'))) {
@@ -47,12 +56,15 @@ for (const file of readdirSync(agentsDirectory).filter(f => f.endsWith('.md'))) 
   const {name, description} = frontmatterOf(path);
   if (name !== file.replace(/\.md$/, '')) errors.push(`${path}: name '${name}' differs from its file name`);
   if (!description) errors.push(`${path}: missing description`);
+  measure(path, true);
 }
+for (const path of ['AGENTS.md', '.agents/README.md']) measure(path, false);
 
 // Every "skill `x`" cited in the method docs must exist.
 const citingFiles = [
   'AGENTS.md',
   '.agents/README.md',
+  'docs/WORKFLOW.md',
   ...skills.map(s => join(skillsDirectory, s, 'SKILL.md')),
   ...readdirSync(agentsDirectory).filter(f => f.endsWith('.md')).map(f => join(agentsDirectory, f)),
 ].filter(existsSync);
@@ -62,6 +74,9 @@ for (const path of citingFiles) {
   }
 }
 
+for (const {path, lines, words} of sizes) {
+  console.log(`${String(lines).padStart(4)} lines ${String(words).padStart(5)} words  ${path}`);
+}
 if (errors.length > 0) {
   console.error(errors.map(e => `✗ ${e}`).join('\n'));
   process.exit(1);
