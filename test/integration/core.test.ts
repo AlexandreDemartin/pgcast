@@ -227,30 +227,67 @@ describe('Whereable', () => {
     `);
   });
 
-  it('characterization: parent() in isIn is sent as JSON, in a lateral or not', async () => {
-    // characterization: vals([…]) wraps the ParentColumn in a parameter, '{"value":"id"}': 22P02 on an int
-    // column, and on a text one no row, or every row with isNotIn; as in 6.6.1 (#101)
-    const counts = (where: Whereable) =>
-      db.select('users', db.all, { columns: ['id'], order: { by: 'id', direction: 'ASC' }, lateral: { n: db.count('active_users', where) } }).run(t.client);
-    expect(await pgError(t.client, () => counts({ id: c.isIn([parent('id')]) }))).toMatchInlineSnapshot(`
-      {
-        "code": "22P02",
-        "message": "invalid input syntax for type integer: "{"value":"id"}"",
-      }
-    `);
-    expect(await counts({ display_name: c.isIn([parent('display_name')]) })).toEqual([{ id: 1, n: 0 }, { id: 2, n: 0 }, { id: 3, n: 0 }]);
-    expect(await counts({ display_name: c.isNotIn([parent('display_name')]) })).toEqual([{ id: 1, n: 2 }, { id: 2, n: 2 }, { id: 3, n: 2 }]);
-    expect(await pgError(t.client, () => ids({ id: c.isIn([parent('id')]) }))).toMatchInlineSnapshot(`
-      {
-        "code": "22P02",
-        "message": "invalid input syntax for type integer: "{"value":"id"}"",
-      }
-    `);
-    expect(await ids({ display_name: c.isIn([parent('display_name')]) })).toEqual([]);
+  it('parent() in isIn and isNotIn is the parent column in a lateral', async () => {
+    // 6.6.1 sent '{"value":"id"}': 22P02 on an int column; on a text one no row, or every row with isNotIn (#107)
+    const counts = (lateral: db.SQLFragment<any>) =>
+      db.select('users', db.all, { columns: ['id'], order: { by: 'id', direction: 'ASC' }, lateral: { n: lateral } }).run(t.client);
+    const perOwner = [{ id: 1, n: 2 }, { id: 2, n: 1 }, { id: 3, n: 0 }];
+    expect(await counts(db.count('accounts', { owner_id: c.isIn([parent('id')]) }))).toEqual(perOwner);
+    expect(await counts(db.count('accounts', { owner_id: c.isNotIn([parent('id')]) }))).toEqual([{ id: 1, n: 1 }, { id: 2, n: 2 }, { id: 3, n: 3 }]);
+    expect(await counts(db.count('accounts', { owner_id: c.isIn([parent('id'), 2]) }))).toEqual([{ id: 1, n: 3 }, { id: 2, n: 1 }, { id: 3, n: 1 }]);
+    expect(await counts(db.count('active_users', { display_name: c.isIn([parent('display_name')]) }))).toEqual([{ id: 1, n: 1 }, { id: 2, n: 1 }, { id: 3, n: 0 }]);
+    expect(await counts(db.count('active_users', { display_name: c.isNotIn([parent('display_name')]) }))).toEqual([{ id: 1, n: 1 }, { id: 2, n: 1 }, { id: 3, n: 2 }]);
+    // parent() with no column takes the column of the filter, as { id: parent() } does
+    expect(await counts(db.count('active_users', { id: c.isIn([parent()]) }))).toEqual([{ id: 1, n: 1 }, { id: 2, n: 1 }, { id: 3, n: 0 }]);
+    // and a vals([…]) written by hand, in a fragment value or in a lateral subquery of its own
+    expect(await counts(db.count('accounts', { owner_id: sql`${self} IN (${vals([parent('id')])})` }))).toEqual(perOwner);
+    expect(await counts(sql`SELECT count(*)::int AS result FROM ${'accounts'} WHERE ${'owner_id'} IN (${vals([parent('id')])})`)).toEqual(perOwner);
   });
 
-  it('characterization: parent() as a value, or in eq(), is the parent column in a lateral, and throws outside one', async () => {
-    // characterization: the type accepts both anywhere; outside a lateral, compiling throws, so run() rejects
+  it('parent() in isIn is the nearest parent in nested laterals, and the alias of an aliased one', async () => {
+    const accounts = db.select('accounts', { owner_id: c.isIn([parent('id')]) }, {
+      columns: ['id'], order: { by: 'id', direction: 'ASC' },
+      lateral: { out: db.count('transfers', { from_account: c.isIn([parent('id')]) }) },
+    });
+    expect(await db.select('users', db.all, { columns: ['id'], order: { by: 'id', direction: 'ASC' }, lateral: { accounts } }).run(t.client))
+      .toEqual([{ id: 1, accounts: [{ id: 1, out: 1 }, { id: 2, out: 0 }] }, { id: 2, accounts: [{ id: 3, out: 1 }] }, { id: 3, accounts: [] }]);
+    const q = db.select('users', db.all, {
+      alias: 'u', order: { by: 'id', direction: 'ASC' }, lateral: db.count('accounts', { owner_id: c.isIn([parent('id')]) }),
+    });
+    expect(q.compile().text).toContain(`WHERE (("owner_id" IN ("u"."id")))`);
+    expect(await q.run(t.client)).toEqual([2, 1, 0]);
+  });
+
+  it('parent() in vals([…]) outside a lateral rejects run() before any query, writes included', async () => {
+    // 6.6.1 sent '{"value":"…"}': select() and count() found no row on a text column, every row with isNotIn,
+    // so deletes() and update() reached them all; 22P02 on an int column; the writes stored '{"value":"display_name"}'
+    const queries: unknown[] = [];
+    db.setConfig({ queryListener: query => queries.push(query) });
+    const rejected = async (query: Promise<unknown>) => {
+      const err = await query.then(() => undefined, (e: unknown) => e) as Error | undefined;
+      return err instanceof Error && !('code' in err) ? err.message : err;
+    };
+    const outcomes = {
+      selectIsIn: await rejected(db.select('users', { id: c.isIn([parent('id')]) }).run(t.client)),
+      selectIsNotIn: await rejected(db.select('users', { display_name: c.isNotIn([parent('display_name')]) }).run(t.client)),
+      countIsNotIn: await rejected(db.count('users', { display_name: c.isNotIn([parent('display_name')]) }).run(t.client)),
+      deletesIsNotIn: await rejected(db.deletes('memberships', { role: c.isNotIn([parent('role')]) }).run(t.client)),
+      updateIsNotIn: await rejected(db.update('users', { mood: 'ok' }, { display_name: c.isNotIn([parent('display_name')]) }).run(t.client)),
+      handInsert: await rejected(sql`INSERT INTO ${'users'} (${cols(['email', 'display_name'])}) VALUES (${vals(['dan@example.com', parent('display_name')])})`.run(t.client)),
+      insertFragment: await rejected(db.insert('users', { email: 'dan@example.com', display_name: sql`${vals([parent('display_name')])}` }).run(t.client)),
+      upsertUpdateValues: await rejected(db.upsert('users', { email: 'bob@example.com', display_name: 'Bob' }, 'email', {
+        updateValues: { display_name: vals([parent('display_name')]) as any },
+      }).run(t.client)),
+    };
+    expect(outcomes).toEqual(Object.fromEntries(Object.keys(outcomes).map(k => [k, `The 'parent' table alias has no meaning here`])));
+    expect(queries).toEqual([]);
+    expect(await sql`SELECT ${'display_name'}, ${'mood'} FROM ${'users'} ORDER BY ${'id'}`.run(t.client))
+      .toEqual([{ display_name: 'Ada', mood: 'happy' }, { display_name: 'Bob', mood: 'ok' }, { display_name: 'Cyd', mood: 'sad' }]);
+    expect(await db.count('memberships', db.all).run(t.client)).toBe(2);
+  });
+
+  it('parent() as a value, or in eq(), is the parent column in a lateral, and throws outside one', async () => {
+    // the type accepts both anywhere (types/core); outside a lateral, compiling throws, so run() rejects
     const counts = (where: Whereable) =>
       db.select('users', db.all, { columns: ['id'], order: { by: 'id', direction: 'ASC' }, lateral: { n: db.count('accounts', where) } }).run(t.client);
     const perOwner = [{ id: 1, n: 2 }, { id: 2, n: 1 }, { id: 3, n: 0 }];
