@@ -165,7 +165,22 @@ const film = await db.selectOne('films', { title: 'The Salt Orchard' }).run(pool
 if (film) console.log(film.release_year);  // 1974
 ```
 
-To see the SQL in your own code, call `.compile()` where you'd call `.run()`: it gives the `text` (on one line) and `values` the panel shows, and sends nothing.
+To see the SQL in your own code, call `.compile()` where you'd call `.run()`: it gives the `text` (on one line) and `values` the panel shows, and sends nothing. Add this line to the file:
+
+```ts twoslash
+import * as db from 'zapatos/db';
+// ---cut---
+console.log(db.selectOne('films', { title: 'The Salt Orchard' }).compile());
+```
+
+Run it, and after `1974` it prints:
+
+```txt
+{
+  text: 'SELECT to_jsonb("films".*) AS result FROM "films" WHERE ("title" = $1) LIMIT $2',
+  values: [ 'The Salt Orchard', 1 ]
+}
+```
 
 ## Ask for several, and only what you need
 
@@ -191,7 +206,7 @@ const films = await db.select('films', { studio_id: 1000 }, {
 console.log(films);
 ```
 
-Run the file again, and after `1974` it prints:
+Run the file again, and after the year and the SQL it prints:
 
 ```txt
 [
@@ -267,7 +282,38 @@ Leave a key out to get its column's default. A key set to `undefined` is sent as
 
 ## When the schema changes
 
-Run `npx pgcast` again after each migration. `schema.d.ts` is written afresh, and TypeScript checks every query against it: rename `runtime_minutes`, and each query that names it stops compiling, the insert above included.
+Run `npx pgcast` again after each migration. `schema.d.ts` is written afresh, and TypeScript checks every query against it. Try it: rename a column, regenerate, and check the file:
+
+```sh
+psql "$DATABASE_URL" -c 'ALTER TABLE films RENAME runtime_minutes TO minutes'
+npx pgcast
+npx tsc
+```
+
+The insert names `runtime_minutes`, so it stops compiling:
+
+```txt
+src/films.ts:21:26 - error TS2769: No overload matches this call.
+  Overload 1 of 2, '(table: "films", values: Insertable, options?: ReturningOptionsForTable<"films", ColumnsOption<"films">, ExtrasOption<"films">> | undefined): SQLFragment<...>', gave the following error.
+    Object literal may only specify known properties, and 'runtime_minutes' does not exist in type 'Insertable'.
+  Overload 2 of 2, '(table: "films", values: Insertable[], options?: ReturningOptionsForTable<"films", ColumnsOption<"films">, ExtrasOption<"films">> | undefined): SQLFragment<...>', gave the following error.
+    Object literal may only specify known properties, and 'studio_id' does not exist in type 'Insertable[]'.
+
+21 const newFilm = await db.insert('films', {
+                            ~~~~~~
+
+Found 1 error in src/films.ts:21
+```
+
+As with the missing running time, the line to read is the one-row form's: `'runtime_minutes' does not exist`. Any query that names the column fails the same way, until you write `minutes` instead. Here, rename it back, so the rest of these docs run as written:
+
+```sh
+psql "$DATABASE_URL" -c 'ALTER TABLE films RENAME minutes TO runtime_minutes'
+npx pgcast
+npx tsc
+```
+
+This time `tsc` prints nothing: every query fits the schema again.
 
 After you upgrade pgcast, a type error on `schemaVersionCanary` in `schema.d.ts` means the same thing: the generated format has changed, so run the generator again.
 
