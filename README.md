@@ -17,7 +17,7 @@ npm install zapatos@npm:pgcast
 npx zapatos        # or: npx pgcast
 ```
 
-Installing it as plain `npm install pgcast` breaks every `zapatos/*` import, by design for now. Native `pgcast/*` module names will come later as an opt-in ([decision 002](docs/decisions/002-noms-de-modules.md)).
+Installing it as plain `npm install pgcast` breaks every `zapatos/*` import, by design for now. Native `pgcast/*` module names will come later as an opt-in ([decision 002](docs/decisions/002-module-names.md)).
 
 ## Roadmap
 

@@ -1,9 +1,9 @@
-# Notes de décision
+# Decision notes
 
-Une note par décision ambiguë : contexte, options, choix proposé, puis validation par l'utilisateur avant d'implémenter (`AGENTS.md` § Stop points). Une note remplacée n'est jamais supprimée : son statut pointe vers celle qui la remplace.
+One note per ambiguous decision: context, options, proposed choice, then validation by the user before implementing (`AGENTS.md` § Stop points). A superseded note is never deleted: its status points to the one that replaces it.
 
-| # | Titre | Statut |
+| # | Title | Status |
 |---|---|---|
-| [001](./001-outillage-build-et-tests.md) | Outillage : build et tests | accepté (2026-11-11) |
-| [002](./002-noms-de-modules.md) | Noms de modules `zapatos/*` ou `pgcast/*` | accepté (2026-11-11) |
-| [003](./003-correctifs-et-depreciation.md) | Correctifs cassants : corriger, ou déprécier | accepté (2026-11-12), révisée après audit |
+| [001](./001-build-and-test-tooling.md) | Tooling: build and tests | accepted (2026-11-11) |
+| [002](./002-module-names.md) | Module names `zapatos/*` or `pgcast/*` | accepted (2026-11-11) |
+| [003](./003-fixes-and-deprecation.md) | Breaking fixes: fix, or deprecate | accepted (2026-11-12), revised after audit |
