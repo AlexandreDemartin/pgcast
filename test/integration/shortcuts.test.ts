@@ -94,8 +94,8 @@ describe('insert', () => {
     `);
   });
 
-  it('characterization: an undefined value inserts NULL, not the column DEFAULT', async () => {
-    // characterization: accounts.balance is NOT NULL DEFAULT 0, yet `balance: undefined` sends NULL
+  it('an undefined value inserts NULL without undefinedMeansMissing, the column DEFAULT with it', async () => {
+    // deprecated (PGCAST_DEP002): accounts.balance is NOT NULL DEFAULT 0, yet `balance: undefined` sends NULL
     expect(await fails(db.insert('accounts', { owner_id: 1, balance: undefined }))).toMatchInlineSnapshot(`
       {
         "code": "23502",
@@ -106,6 +106,10 @@ describe('insert', () => {
       returning: ['ratio', 'lifetime_ops'],
     }));
     expect(row).toEqual({ ratio: null, lifetime_ops: 0 });
+    db.setConfig({ undefinedMeansMissing: true });
+    expect(sortBy(await run(db.insert('accounts', [{ owner_id: 1, balance: undefined }, { owner_id: 1, balance: 5 }], {
+      returning: ['balance'],
+    })), 'balance')).toEqual([{ balance: 0 }, { balance: 5 }]);
   });
 });
 
@@ -186,6 +190,16 @@ describe('upsert', () => {
     expect(tee).toEqual({ id, sku: 'TEE', title: 'T-shirt small', price_cents: 1300, $action: 'UPDATE' });
     expect(cap).toEqual({ id: expect.any(Number), sku: 'CAP', title: null, price_cents: 900, $action: 'INSERT' });
     expect(cap).not.toMatchObject({ id });
+  });
+
+  it('an undefined value: set from EXCLUDED as NULL without undefinedMeansMissing, left as it is with it', async () => {
+    const tee = { sku: 'TEE', variant: 'S', price_cents: 1400, title: undefined };
+    db.setConfig({ undefinedMeansMissing: true });
+    expect(await run(db.upsert('products', tee, ['sku', 'variant'], { returning: ['title', 'price_cents'] })))
+      .toEqual({ title: 'T-shirt small', price_cents: 1400, $action: 'UPDATE' });
+    db.setConfig({ undefinedMeansMissing: false });  // deprecated (PGCAST_DEP002)
+    expect(await run(db.upsert('products', tee, ['sku', 'variant'], { returning: ['title', 'price_cents'] })))
+      .toEqual({ title: null, price_cents: 1400, $action: 'UPDATE' });
   });
 
   it('constraint()', async () => {
@@ -340,8 +354,8 @@ describe('update', () => {
     expect(await run(db.select('accounts', { id: 1 }, { columns: ['id'] }))).toEqual([{ id: 1 }]);
   });
 
-  it('characterization: an undefined value sets the column to NULL', async () => {
-    // characterization: Bob loses his manager; on a NOT NULL column the update fails
+  it('an undefined value sets the column to NULL without undefinedMeansMissing, leaves it with it', async () => {
+    // deprecated (PGCAST_DEP002): Bob loses his manager; on a NOT NULL column the update fails
     expect(await run(db.update('users', { mood: 'sad', manager_id: undefined }, { id: 2 }, { returning: ['mood', 'manager_id'] })))
       .toEqual([{ mood: 'sad', manager_id: null }]);
     expect(await fails(db.update('users', { display_name: undefined }, { id: 2 }))).toMatchInlineSnapshot(`
@@ -350,6 +364,14 @@ describe('update', () => {
         "message": "null value in column "display_name" of relation "users" violates not-null constraint",
       }
     `);
+  });
+
+  it('with undefinedMeansMissing, an undefined value leaves its column', async () => {
+    db.setConfig({ undefinedMeansMissing: true });
+    expect(await run(db.update('users', { mood: 'sad', manager_id: undefined }, { id: 3 }, { returning: ['mood', 'manager_id'] })))
+      .toEqual([{ mood: 'sad', manager_id: 1 }]);
+    expect(await run(db.update('users', { mood: 'ok', display_name: undefined }, { id: 2 }, { returning: ['display_name'] })))
+      .toEqual([{ display_name: 'Bob' }]);
   });
 });
 
