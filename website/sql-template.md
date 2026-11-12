@@ -72,9 +72,11 @@ An interpolated string is a table or column name. It is double-quoted, so its ca
 | `'a"b'` | `"a""b"` | a `"` is doubled, as `quote_ident` does |
 | `'a""b'` | `"a""b"` | already escaped by hand: as it is |
 | `'"Films"."title"'` | `"Films"."title"` | already a well-formed quoted name: as it is |
+| `'"films".title."x"'` | `"films".title."x"` | well-formed, ending with a quoted part: as it is |
+| `'"films".title'` | `"""films"""."title"` | not well-formed, as it ends unquoted: each `"` doubled, split on `.` |
 | `'"a" \|\| "b"'` | `"""a"" \|\| ""b"""` | not well-formed: one name |
 
-- Well-formed: a quoted identifier, then quoted, `U&` quoted or unquoted ones after each `.`, with or without spaces around it.
+- Well-formed: a quoted identifier, then quoted, `U&` quoted or unquoted ones after each `.`, with or without spaces around it, the last one quoted.
 - The cost: a real column named `a""b` compiles to `"a""b"`, the column `a"b`.
 - Zapatos 6.6.1 wrapped the string in `"` without escaping, and wrote as it is any string that started and ended with `"`: a name could splice SQL around it. The generated `Table` and `Column` types already refused such names; the why is in [The security model](/security).
 
