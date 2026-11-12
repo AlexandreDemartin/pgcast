@@ -126,4 +126,4 @@ npm run build                  # at the root
 cd website && npm run docs:schema
 ```
 
-`docs:schema` loads `schema.sql` into a temporary `pgcast_test_<pid>_docs` database on the server of `TEST_DATABASE_URL` (the environment, else `src/.env`), runs `generate()`, and drops the database.
+`docs:schema` loads `schema.sql` into a temporary `pgcast_test_<pid>_docs` database on the server of `TEST_DATABASE_URL` (the environment, else `src/.env`), runs `generate()`, and drops the database. It and `docs:examples` first drop the `pgcast_test_<pid>_docs` databases of a run whose process is gone (stopped by Ctrl-C, killed, or crashed).

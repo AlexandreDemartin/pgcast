@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import pg from 'pg';
 import * as db from 'zapatos/db';
+import { dropOrphanDocsDatabases } from './orphan-databases.mjs';
 
 const envFile = new URL('../src/.env', import.meta.url);
 if (!process.env.TEST_DATABASE_URL && existsSync(envFile)) process.loadEnvFile(envFile);
@@ -88,6 +89,7 @@ async function check(example, pool) {
 }
 
 await admin.connect();
+await dropOrphanDocsDatabases(admin);
 await admin.query(`CREATE DATABASE "${name}"`);
 try {
   const client = new pg.Client({ connectionString: urlOf(name) });
