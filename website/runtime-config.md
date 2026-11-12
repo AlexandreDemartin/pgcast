@@ -43,6 +43,20 @@ db.getConfig(): Config
 
 A copy of the configuration. The copy is one level deep: `getConfig().transactionAttemptsMax = 1` changes nothing, but `getConfig().transactionRetryDelay.minMs = 1` changes the configuration, since that object is shared ([#182](https://github.com/AlexandreDemartin/pgcast/issues/182)).
 
+To change the configuration for a while, as tests do, keep the copy and give it back:
+
+```ts twoslash
+import * as db from 'zapatos/db';
+// ---cut---
+const saved = db.getConfig();
+db.setConfig({ transactionRetryDelay: { minMs: 0, maxMs: 0 } });
+// … the transactions that should retry at once
+db.setConfig(saved);
+```
+
+- It puts back each key `saved` holds. `setConfig()` gives `transactionRetryDelay` a new object, so the one `saved` shares is unchanged.
+- A key `saved` doesn't hold stays as set: a listener set in between keeps listening. Give it as `undefined` to remove it: `db.setConfig({ queryListener: undefined })`.
+
 ## `Config` {#Config}
 
 ```ts
@@ -245,9 +259,17 @@ Each warning is a Node.js `DeprecationWarning`, emitted once per process for eac
 (node:4242) [PGCAST_DEP002] DeprecationWarning: An undefined value in insert(), update() or upsert() is sent as NULL. Set undefinedMeansMissing: true (db.setConfig) to treat it as a missing key instead (DEFAULT in insert(), left out of update() and upsert()); it will be the default in pgcast 7.0.
 ```
 
-- `process.on('warning', w => …)` gets it, with `w.name` `'DeprecationWarning'` and `w.code` `'PGCAST_DEP002'`.
-- `node --no-deprecation` hides it; `node --throw-deprecation` throws it, uncaught, so the process ends.
+- `process.on('warning', …)` gets it, with `name` `'DeprecationWarning'` and `code` `'PGCAST_DEP002'`.
+- `node --no-deprecation` hides it, from that hook too; `node --no-warnings` hides it from `stderr` only. `node --throw-deprecation` throws it, uncaught, so the process ends.
 - With the option on, the shortcut never warns.
+
+To pick out pgcast's warnings in that hook, to log them your way: `@types/node` types the warning `Error`, which has no `code`, so say it may have one.
+
+```ts twoslash
+process.on('warning', (warning: Error & { code?: string }) => {
+  if (warning.code?.startsWith('PGCAST_')) console.warn(warning.code, warning.message);
+});
+```
 
 ## Value types
 
@@ -388,10 +410,17 @@ A `bytea` in JSON, as hex after `\x`: `'\\x4c61'` in TypeScript source.
 ### `toBuffer()` {#toBuffer}
 
 ```ts
-db.toBuffer<T extends ByteArrayString | null>(d: T): T extends ByteArrayString ? Exclude<T, ByteArrayString> | Buffer : T
+db.toBuffer<T extends ByteArrayString | null>(d: T): T extends ByteArrayString ? Buffer<ArrayBuffer> | Exclude<T, ByteArrayString> : T
 ```
 
-Decodes the hex of a `ByteArrayString` into a `Buffer`: `db.toBuffer('\\x4c61726b73707572').toString()` is `'Larkspur'`. `null` gives `null`, and the type keeps it ([`strict()`](#strict)). It decodes the whole value in memory.
+Decodes the hex of a `ByteArrayString` into a `Buffer`, typed `Buffer<ArrayBuffer>`. `null` gives `null`, and the type keeps it ([`strict()`](#strict)). It decodes the whole value in memory.
+
+```ts twoslash
+import * as db from 'zapatos/db';
+// ---cut---
+const bytes = db.toBuffer('\\x4c61726b73707572');
+const word = bytes.toString();  // 'Larkspur'
+```
 
 ## Dates and times {#dates-and-times}
 
@@ -501,6 +530,14 @@ db.toString<D extends Date | null, T extends 'timestamptz' | 'timestamp:UTC' | '
 ```
 
 Makes a string Postgres reads of a `Date`, typed by `stringTypeTz`; `null` gives `null`.
+
+```ts twoslash
+import * as db from 'zapatos/db';
+// ---cut---
+const curtain = new Date('2030-03-01T19:30:00Z');
+const day: db.DateString = db.toString(curtain, 'date:UTC');                // '2030-03-01'
+const stamp: db.TimestampTzString = db.toString(curtain, 'timestamptz');  // '2030-03-01T19:30:00.000Z'
+```
 
 | `stringTypeTz` | Gives | For 19:30 UTC on 1 March 2030, in a process with `TZ=Asia/Kolkata` |
 |---|---|---|
