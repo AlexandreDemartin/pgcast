@@ -354,7 +354,7 @@ db.conditions.fromNow(n: number, unit: IntervalUnit = 'millisecond')
 
 `now() + $1`, the value `` `${n} ${unit}` ``, which Postgres reads as an interval: `fromNow(-7, 'days')` sends `'-7 days'`, `fromNow(1.5, 'hours')` `'1.5 hours'`. `unit` is one of `microsecond`, `millisecond`, `second`, `minute`, `hour`, `day`, `week`, `month`, `year`, `decade`, each with or without an `s`, then `century`, `centuries`, `millennium`, `millennia`. A value, as [`now`](#conditions.now). An `n` whose string Postgres does not read (`NaN`, `1e21`, written `1e+21`) fails with 22007.
 
-The screenings of the next seven days, from the time of the query:
+The screenings of the next seven days, from `now()`, here the time of the query:
 
 <CastPanel example="conditions_now">
 
