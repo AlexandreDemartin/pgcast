@@ -156,6 +156,10 @@ Candidates for a check, a rule or a skill line.
 - #137 — A pending list that assigns names to pages is cross-read against the scopes of the issues that will write those pages — `branch-reviewer`
 - #137 — `check-reference.mjs` has no tests: a fixtures mode (pages and pending file as arguments) would let its probes run in CI — `builder`
 - #151 — `git checkout -- <file>` after a temporary `sed` also reverts that file's uncommitted edits: copy the file aside before such a probe — `builder`
+- #121 — Before stating what `Number()` or `String()` makes of a result, probe what node-postgres hands over: `date` and the timestamps arrive as `Date`, so `Number()` gives milliseconds, not `NaN` — `branch-reviewer`
+- #121 — A transform that reads `rows[0]` assumes a row: document each option that can return none (`groupBy` with no group, `having`, `offset`, `limit: 0`) from a run, not from the code — `branch-reviewer`
+- #121 — `NaN` shows as `null` in `JSON.stringify` and in a cast panel: a probe checks `Number.isNaN` — `builder`
+- #121 — Parallel builders share the session scratchpad: brief each to its own subfolder — orchestrator
 
 ## Minors kept
 
