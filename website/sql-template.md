@@ -466,7 +466,7 @@ fragment.prepared(name = `_zapatos_prepared_${n}`): this
 
 Sets the `name` that `compile()` adds to the query, so that Postgres prepares the statement once per connection and runs it by name after ([node-postgres](https://node-postgres.com/features/queries#prepared-statements)). Without a name, `_zapatos_prepared_0`, `_1`… in the order of the calls.
 
-The values are parameters, not part of the text, so one name serves every call of a query function:
+The values are parameters, not part of the text, so one name serves every call of a query function whose text does not change; without a name, each call prepares another statement:
 
 <<< ./examples/plain/sql_prepared.ts{ts twoslash}
 
