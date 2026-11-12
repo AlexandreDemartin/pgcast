@@ -125,8 +125,8 @@ const shown = (code: string) => code.split('// ---cut---').pop()!.trim().split('
   .filter(line => !/^\s*\/\/\s*[@^]/.test(line)).join('\n');
 
 /**
- * One line of a page as plain Markdown: HTML and Markdown attributes dropped, links to the site and within the page made
- * absolute (`url`).
+ * One line of a page as plain Markdown: HTML and Markdown attributes dropped, links to the site and within the page
+ * made absolute (`url`).
  */
 const inline = (line: string, url: (link: string) => string) => line
   .replace(/<code[^>]*>(.*?)<\/code>/g, '`$1`')
