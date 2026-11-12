@@ -55,7 +55,7 @@ Catch it outside the transaction instead, once pgcast has given up, with [`isDat
 |---|---|---|
 | booked | resolves with the rows | `'Booked'` |
 | over the four seats | resolves with `null` | `'Four seats each, at most'` |
-| a seat already booked by someone else | rejects with 23505, after a retry if both were running | `'Seat taken'` |
+| a seat already booked by someone else | rejects with 23505, sometimes after a retry | `'Seat taken'` |
 | a conflict on every attempt | rejects with the last attempt's 40001 or 40P01 | `'Busy: please try again'` |
 
 Throw an `Error`, or the error you caught; not `null` or `undefined`, for which pgcast rejects with a `TypeError` of its own instead ([#179](https://github.com/AlexandreDemartin/pgcast/issues/179)).
