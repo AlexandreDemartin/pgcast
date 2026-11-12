@@ -22,7 +22,7 @@ Then pick how the reader moves on:
 | | `offset` | The last row's keys |
 |---|---|---|
 | Go to page *n* | yes | no: the next page, from the one before |
-| A deep page | Postgres computes every row it skips | Postgres starts at the last row, with an index on the `order`'s columns |
+| A deep page | Postgres computes every row it skips | Postgres starts at the last row, with an index that matches the `order` |
 | A film added or removed meanwhile | shifts every later page by one | the next page still starts after the last row shown |
 | It needs | an `order` | an `order` that never ties, its columns in `columns` |
 
@@ -76,7 +76,7 @@ Give the `where` as a [`sql`](/sql-template#sql) fragment that compares the `ord
 </CastPanel>
 
 - `("release_year", "id") < ($4, $5)` keeps the rows before 2008 and 1002 in the order: an earlier year, or 2008 and a smaller `id` ([row-wise comparison](https://www.postgresql.org/docs/current/functions-comparisons.html#ROW-WISE-COMPARISON)). `<` goes with `DESC`; for an `ASC` order, write `>`.
-- With an index on `(release_year, id)`, Postgres starts reading at the last row: its plan shows `Index Cond: (ROW(release_year, id) < ROW(2008, 1002))`, and nothing to skip.
+- With an index on `(release_year, id)`, Postgres starts reading at the last row. On 300,000 films, after the last row (1960, 150000), `EXPLAIN (ANALYZE)` shows an `Index Scan Backward` with `Index Cond: (ROW(release_year, id) < ROW(1960, 150000))`: it reads the 2 rows it returns, and none to skip.
 - Keep the key columns `NOT NULL`, as these are: where the comparison reaches a `NULL`, it gives `NULL`, and that row never shows up.
 - `s.films.SQL` lets the fragment name only the columns of `films`.
 
@@ -92,7 +92,7 @@ To keep a filter beside the comparison, give the comparison as the value of the 
 
 ### When the directions differ
 
-A row comparison goes one way. With `release_year` `DESC` and `id` `ASC`, spell it out with [`conditions.or`](/conditions#conditions.or): an earlier year, or the same year and a larger `id`.
+A row comparison goes one way. With `release_year` `DESC` and `id` `ASC`, spell it out with [`conditions.or`](/conditions#conditions.or): an earlier year, or the same year and a larger `id`. Then bound it on the first key, with [`conditions.and`](/conditions#conditions.and) and [`conditions.lte`](/conditions#conditions.lte): that year or an earlier one.
 
 <CastPanel example="paginate_mixed">
 
@@ -100,7 +100,8 @@ A row comparison goes one way. With `release_year` `DESC` and `id` `ASC`, spell 
 
 </CastPanel>
 
-Postgres reads this `OR` as a filter, not as a range of the index: its plan shows `Filter:`, where the row comparison's shows `Index Cond:`.
+- Create the index in the `order`'s directions, `(release_year DESC, id ASC)`. Postgres starts reading at the last row's year: on 300,000 films, after the last row (1960, 150000), `EXPLAIN (ANALYZE)` shows `Index Cond: (release_year <= 1960)`, then a `Filter:` that removes the rest of that year, 1,167 rows.
+- Without the bound, the `OR` is only a `Filter:`: Postgres reads and throws away every row before the last one, 148,671 here, as for an `offset`.
 
 ## Count the total
 
