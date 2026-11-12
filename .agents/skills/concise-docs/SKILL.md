@@ -12,6 +12,7 @@ Complete in substance, concise in form.
 | Information | Source |
 |---|---|
 | Philosophy, stop points, commands | `AGENTS.md` |
+| The method, for a human reader | `docs/WORKFLOW.md`: one page that links to the skills |
 | A code rule | a single skill |
 | A decision and its why | `docs/decisions/NNN-*.md` |
 | Order of changes and their reason | the Epics, `type: epic` issues (skill `run-step`) |
@@ -40,7 +41,7 @@ Complete in substance, concise in form.
 
 | Document | Target |
 |---|---|
-| Skill | ≤ 150 lines |
+| Skill, agent | ~100 lines, 150 at most (`.agents/README.md` § Writing a skill) |
 | JSDoc | 1 to 3 lines: the contract, and the SQL produced for a helper |
-| PR description | `Closes #n`, then **What** · **Why** · **Verify**, as bullets |
+| PR description | `Closes #n`, then **What** · **Why** · **Proofs** · **Decided alone**, as bullets (skill `plan-and-proofs`) |
 | Decision note | context, options in a table, proposed choice, question to the user |

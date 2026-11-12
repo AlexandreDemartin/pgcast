@@ -1,11 +1,11 @@
 ---
 name: pr-shape
-description: 'The shape of a pgcast PR, after the commits of George MacKerron: size, splitting, stacking, PR title, commits. USE FOR: splitting a step, stacking dependent PRs, naming a PR or a commit. DO NOT USE FOR: code, JSDoc and docs style (zapatos-spirit), the shape of a helper (zero-abstraction).'
+description: 'The shape of a pgcast PR, after the commits of George MacKerron: size, splitting, stacking, PR title, branch, commits. USE FOR: splitting a step, stacking dependent PRs, naming a PR, a branch or a commit. DO NOT USE FOR: code, JSDoc and docs style (zapatos-spirit), the shape of a helper (zero-abstraction).'
 ---
 
 # The shape of a PR
 
-George committed straight to `master`: **one George commit is one pgcast PR**. Source: `git log upstream/master`.
+George committed straight to `master`: **one George commit is one pgcast PR**, squashed into one commit on `master` (skill `merge-gate`). Source: `git log upstream/master`.
 
 ## Size and scope
 
@@ -18,7 +18,8 @@ Measured on his 212 commits that touch `src/`:
 
 - **One PR = one visible change**, described in one sentence. Never mix a fix, a feature and a refactor.
 - **`src/`: ~100 lines changed at most per PR** (his p90). Beyond that, split into independent PRs, each useful on its own.
-- **Tests in proportion**: a tests-only PR stays readable in one go (~800 hand-written lines, not counting generated snapshots). Beyond that, split by subject (types, injection, a module).
+- **The whole PR: ~400 hand-written lines**, not counting generated snapshots.
+- **Tests in proportion**: a tests-only PR stays readable in one go (~800 hand-written lines). Beyond that, split by subject (types, injection, a module).
 - Example of the right size: "Add conditions with array operators", 4 lines in `conditions.ts`.
 - Counter-example: PR #5, ~2,900 lines in one PR; today it would be split into core, shortcuts, conditions and transaction.
 
@@ -55,11 +56,10 @@ Sources: GitHub docs "Stack code changes in pull requests", Thoughtworks Radar (
 | Each layer is a George PR, readable on its own. | A PR that stands on its own; a stack used as an excuse for a big change ("an excuse to write one enormous change", Thoughtworks). |
 | **3 layers at most**, each ≤ ~250 lines and 25 files (Graphite's warning threshold). | A layer that makes no sense without the one above: split it again. |
 
-- **Mechanics without rewriting**, compatible with `guard.mjs`: layer N starts from branch N-1 and its PR targets branch N-1 (`--base <branch N-1>`). A fix from below goes up by `git merge origin/<branch N-1>` into each layer above, from bottom to top (agent `chores`).
+- **No rewriting** (`guard.mjs`): layer N starts from branch N-1 and its PR targets it (`--base <branch N-1>`); a fix from below goes up by `git merge origin/<branch N-1>` into each layer above, bottom to top (agent `chores`).
 - **No `gh stack sync` nor `gh stack push`**: they rebase and force each branch.
 - **Review**: each layer is reviewed on its own, as soon as it is open, without waiting for the bottom; the reviewer gets the layer's number and its base.
-- **Merge from bottom to top**, as a merge commit (`gh pr merge --merge`): the next layer has nothing to redo, and GitHub retargets it to `master` (`delete_branch_on_merge` is on). Then `git merge origin/master` into the retargeted layer if `master` has moved, green CI, merge.
-- A middle layer is never merged before the ones below it.
+- **Merge from bottom to top**, each layer squashed, then `origin/master` merged into the next (skill `merge-gate` § A stack).
 
 ## PR title
 
@@ -69,20 +69,27 @@ Sources: GitHub docs "Stack code changes in pull requests", Thoughtworks Radar (
 - **The step's issue at the end, always**: `(closes #n)`, like George ("Stop generating .eslintrc.json (closes #184)"); the body also carries `Closes #n`, which closes the issue on merge. `(addresses #n)` for a PR that does only part of it.
 - Examples: "Fix not() so it parenthesises its condition (closes #30)", "Add related() and relatedMany() for lateral joins on foreign keys".
 
+## Branch
+
+- `<type>/<issue>-<slug>`, types `fix`, `feat`, `test`, `docs`, `chore`: `fix/26-upsert-update-values`.
+- From an up-to-date `origin/master`, or from the layer below in a stack.
+
 ## Commits
 
-Same voice as PR titles; his recent subjects give the model.
+Same voice as PR titles.
 
 - **One line**, in plain English, a capital at the start, no prefix nor final full stop: "Add conditions with array operators", "Stop generating .eslintrc.json (closes #184)".
 - **Imperative**, like his recent commits: `Add`, `Allow`, `Fix`, `Make`, `Stop`, `Ensure`, `Export`, `Characterise`.
 - **Docs**: "Update docs for …"; **dependencies**: "Update dependencies"; **version**: the number alone ("6.7.0").
 - **Learnings**: "Record what #22 taught"; **merge of master**: "Merge master into <branch>".
-- No more commits that tick a box: merging the PR closes its issue.
+- **A bug**: the failing test is committed before the fix, so the proof can show it red (skill `plan-and-proofs` § Proofs).
+- No Conventional Commits, no commits that tick a box: merging the PR closes its issue.
 - No body, except a reason that does not fit on the line; the requested `Co-Authored-By` line always stays.
 - Old format (`test: …`, `fix: …`): history of PRs #1 to #12, not rewritten.
 
 ## Checklist
 
 - [ ] A single visible change, described in one sentence
-- [ ] `src/` ≤ ~100 lines, otherwise split
+- [ ] `src/` ≤ ~100 lines, the PR ≤ ~400, otherwise split
+- [ ] Branch `<type>/<issue>-<slug>`; a bug's failing test before its fix
 - [ ] Title in plain English, no prefix, British spelling, `(closes #n)` at the end

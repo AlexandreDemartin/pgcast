@@ -29,13 +29,11 @@ user code ──► src/db/ (runtime: sql``, shortcuts, conditions, transactions
 ```
 
 - `src/generate/`: the codegen (CLI `pgcast`, alias `zapatos`).
-  - `cli.ts` reads `zapatosconfig.json` and/or a JSON argument, and interpolates `{{ENV_VAR}}`.
-  - `config.ts` holds the config and its defaults.
+  - `cli.ts` reads `zapatosconfig.json` and/or a JSON argument, and interpolates `{{ENV_VAR}}`; `config.ts` holds the config and its defaults.
   - `write.ts` (`generate()`) writes `zapatos/schema.d.ts` and the `zapatos/custom/` placeholders.
   - `tsOutput.ts` assembles the `zapatos/schema` module (namespaces per schema, aggregate types, `*ForTable<T>` lookups, version canary).
   - `tables.ts` introspects relations, columns, unique indexes and comments, then produces `Selectable`, `JSONSelectable`, `Whereable`, `Insertable`, `Updatable` per table.
-  - `enums.ts` and `pgTypes.ts` map Postgres types to TS (by context: Selectable, Insertable, etc.).
-  - `legacy.ts` prints the migration warning for the old "srcMode".
+  - `enums.ts` and `pgTypes.ts` map Postgres types to TS (by context: Selectable, Insertable, etc.); `legacy.ts` prints the migration warning for the old "srcMode".
 - `src/db/`: the runtime (import `zapatos/db`).
   - `core.ts`: ⚠️ **sensitive zone**: `sql`, `SQLFragment`, compilation and escaping (`param`, `raw`, `cols`, `vals`, `parent`, `self`, `Default`).
   - `shortcuts.ts`: `insert`, `upsert`, `update`, `deletes`, `truncate`, `select*`, aggregates, `lateral`, locks.
@@ -67,33 +65,31 @@ A task is **done** only if `lint`, `typecheck`, `test` and `test:types` pass.
 
 ## Method
 
-- AI tooling and skill map: [.agents/README.md](.agents/README.md). Before a subject, read the skill it names.
-- Steps: the sub-issues of the Epics, one at a time, read with `gh issue view <n> --repo AlexandreDemartin/pgcast`, orchestrated by the skill `run-step` (agents `builder`, `branch-reviewer`, `chores`). Each PR closes its issue (`Closes #n`). Earlier history: [docs/HISTORY.md](docs/HISTORY.md).
-- CI: PR in draft while iterating, `gh pr ready` once ready (skill `ci-gate`).
-- Reviews: agent `branch-reviewer`, which relies on the user skill `branch-review`.
-- Deciding alone or asking: skill `decision-philosophy`.
-- George MacKerron's size, splitting, titles and commits: skill `pr-shape`; his style, pushed further without betraying it: skill `zapatos-spirit`.
+- The method on one page: [docs/WORKFLOW.md](docs/WORKFLOW.md). AI tooling and skill map: [.agents/README.md](.agents/README.md). Before a subject, read the skill it names.
+- Steps: the sub-issues of the Epics, one at a time, read with `gh issue view <n> --repo AlexandreDemartin/pgcast`; each issue carries **Files** and **Risk** (`.github/ISSUE_TEMPLATE/task.md`). Orchestrated by the skill `run-step`, with the agents `builder`, `branch-reviewer` and `chores`. Earlier history: [docs/HISTORY.md](docs/HISTORY.md).
+- Plan comment and PR proofs: skill `plan-and-proofs`; review comments: skill `review-comments` (the agent `branch-reviewer` relies on the user skill `branch-review`).
+- CI: skill `ci-gate`; merge by risk (Ship / Show / Ask), squashed, closing its issue: skill `merge-gate`.
+- Deciding alone or asking: skill `decision-philosophy`. Size, splitting, titles, branches and commits: skill `pr-shape`; George MacKerron's style, pushed further: skill `zapatos-spirit`.
 
 ## Working rules
 
 - **Read the code concerned before changing it**, and summarise what you understood.
 - **Tests first**, or at least with the implementation: runtime, compiled SQL (`text` and `values`) and types (positive **and** negative cases with `@ts-expect-error`).
-- **One feature = one branch = one PR** on `AlexandreDemartin/pgcast`, small like one of George's commits. Commits, PR titles and splitting in George MacKerron's manner (skill `pr-shape`).
+- **One feature = one branch = one PR** on `AlexandreDemartin/pgcast`, small like one of George's commits (skill `pr-shape`).
 - **No breaking change** to the public API. If it is unavoidable, stop and ask (skill `backward-compat`).
 - **`core.ts` (escaping, parameterisation, identifier compilation)**: never touch it without saying so explicitly. Each change adds SQL injection tests (skill `sql-safety`).
-- **Advanced types**: watch compile time (`bench:types`, +20 % threshold). A type that compiles is not necessarily correct (skill `type-tests`).
-- A helper is designed with the skill `zero-abstraction`, the codegen output with the skill `codegen-output`, and a need is validated with the skill `consumer-usage`.
+- A helper is designed with the skill `zero-abstraction`, an advanced type is tested and its compile time watched with the skill `type-tests`, the codegen output follows the skill `codegen-output`, and a need is validated with the skill `consumer-usage`.
 - Update `CHANGELOG.md` and the docs with each feature (skill `concise-docs`).
 - Keep the existing copyright headers (George MacKerron). New files may carry `Copyright (C) 2026 Alexandre Demartin`.
-- An ambiguous design decision: write `docs/decisions/NNN-title.md` (context, options, proposed choice) and **ask for validation before implementing**.
 
 ## Stop points (mandatory: stop and ask)
 
 - Before any change to the public API or to the codegen output (except an opt-in addition).
 - Before any change to escaping or SQL compilation in `core.ts`.
-- At each decision note.
-- If the compile benchmark exceeds its threshold.
-- Before any npm publication or release. The original `postversion` script, which published automatically, has been removed; `prepack` guarantees a build before any `npm pack` or `npm publish`.
+- An ambiguous design decision: write `docs/decisions/NNN-title.md` (context, options, proposed choice) and ask for validation before implementing.
+- If the compile benchmark exceeds its threshold (+20 %).
+- Before merging a `high` PR: the owner's OK (skill `merge-gate`).
+- Before any npm publication or release; `prepack` builds before any `npm pack` or `npm publish`.
 - Before any change to `exports`, `bin`, `files`, `engines`, `peerDependencies` or `dependencies`: they are part of the public API.
 
 ## Local environment
