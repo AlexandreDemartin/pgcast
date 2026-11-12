@@ -186,7 +186,7 @@ With `withTies` and `order`, it writes `FETCH FIRST $1 ROWS WITH TIES`, here and
 db.selectExactlyOne(table, where, options?)
 ```
 
-As [`selectOne()`](#selectOne), but its type has no `undefined`: when no row matches, `.run()` rejects with a [`NotExactlyOneError`](#NotExactlyOneError). It does not check that only one row matches: with `LIMIT 1`, it takes the first. In a `lateral`, a missing row gives `null` and no error, though the type says otherwise.
+As [`selectOne()`](#selectOne), but its type has no `undefined`: when no row matches, `.run()` rejects with a [`NotExactlyOneError`](#NotExactlyOneError). It does not check that only one row matches: with `LIMIT $2`<!-- probe: examples/selectExactlyOne.ts -->, its value `1`, it takes the first. In a `lateral`, a missing row gives `null` and no error, though the type says otherwise.
 
 <CastPanel example="selectExactlyOne">
 
