@@ -30,7 +30,9 @@ npm run docs:build             # or docs:dev, docs:preview
 
 ## The docs schema
 
-`schema.sql`, in George MacKerron's world. `zapatos/schema.d.ts` is generated from it by pgcast's own generator and committed, so a build needs no database. After a change to `schema.sql` or to the generator, regenerate it:
+`schema.sql`, in George MacKerron's world: the tables of his guide, as his docs create them, and his rows. Plain Postgres, 14 or later: `stores` has a `point` where his had a PostGIS geometry. Seeded keys start at 1000, so an example that inserts gets 1, 2, 3, as in his docs.
+
+`zapatos/` is generated from it by pgcast's own generator and committed, so a build needs no database: `schema.d.ts`, and in `custom/` the placeholder for `point` (`PgPoint`, `any` until edited; the generator never overwrites it). CI regenerates it and fails if anything differs. After a change to `schema.sql` or to the generator, regenerate it:
 
 ```sh
 npm run build                  # at the root
