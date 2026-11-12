@@ -79,7 +79,7 @@ export interface ReturningOptionsForTable<T extends Table, C extends ColumnsOpti
   extras?: E;
 };
 
-type ReturningTypeForTable<T extends Table, C extends ColumnsOption<T>, E extends ExtrasOption<T>> =
+export type ReturningTypeForTable<T extends Table, C extends ColumnsOption<T>, E extends ExtrasOption<T>> =
   (undefined extends C ? JSONSelectableForTable<T> :
     C extends ColumnForTable<T>[] ? JSONOnlyColsForTable<T, C> :
     never) &
@@ -203,7 +203,7 @@ export function constraint<T extends Table>(x: UniqueIndexForTable<T>) { return 
 export interface UpsertAction { $action: 'INSERT' | 'UPDATE' }
 
 type UpsertReportAction = 'suppress';
-type UpsertReturnableForTable<
+export type UpsertReturnableForTable<
   T extends Table,
   C extends ColumnsOption<T>,
   E extends ExtrasOption<T>,
