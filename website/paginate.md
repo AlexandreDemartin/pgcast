@@ -11,6 +11,7 @@ Ask for the first page: an `order` that ends on a unique column, then a `limit`.
 
 <<< ./examples/paginate.ts{ts twoslash}
 
+<template #caption><span>Page 1: Small Hours at Calder Bay (2019, id 1003), then The Cartographer's Silence (2008, id 1002).</span></template>
 </CastPanel>
 
 - End the [`order`](/select#order-limit-offset-and-withties) on a unique column, `id` here. Two films of the same year can otherwise come back in either order, and from one request to the next a film can turn up on two pages or on none: Postgres promises no order among ties ([LIMIT and OFFSET](https://www.postgresql.org/docs/current/queries-limit.html)).
@@ -34,6 +35,7 @@ Skip `(n - 1) × size` rows with [`offset`](/select#order-limit-offset-and-witht
 
 <<< ./examples/paginate_offset.ts{ts twoslash}
 
+<template #caption><span>Page 2: A Lantern for Edith (1991, id 1001), then The Salt Orchard (1974, id 1000).</span></template>
 </CastPanel>
 
 - Past the last page, `select()` gives `[]`.
@@ -79,6 +81,7 @@ Give the `where` as a [`sql`](/sql-template#sql) fragment that compares the `ord
 
 <<< ./examples/paginate_keyset.ts{ts twoslash}
 
+<template #caption><span>The same page 2 as with offset: A Lantern for Edith (1991, id 1001), then The Salt Orchard (1974, id 1000).</span></template>
 </CastPanel>
 
 - `("release_year", "id") < ($4, $5)` keeps the rows before 2008 and 1002 in the order: an earlier year, or 2008 and a smaller `id` ([row-wise comparison](https://www.postgresql.org/docs/current/functions-comparisons.html#ROW-WISE-COMPARISON)). `<` goes with `DESC`; for an `ASC` order, write `>`.
@@ -94,6 +97,7 @@ To keep a filter beside the comparison, give the comparison as the value of the 
 
 <<< ./examples/paginate_keyset_filter.ts{ts twoslash}
 
+<template #caption><span>Of studio 1000's films after 2008 and 1002: The Salt Orchard (1974, id 1000) alone.</span></template>
 </CastPanel>
 
 ### When the directions differ
@@ -104,6 +108,7 @@ A row comparison goes one way. With `release_year` `DESC` and `id` `ASC`, spell 
 
 <<< ./examples/paginate_mixed.ts{ts twoslash}
 
+<template #caption><span>Page 2 again: A Lantern for Edith (1991, id 1001), then The Salt Orchard (1974, id 1000).</span></template>
 </CastPanel>
 
 - Create the index in the `order`'s directions, `(release_year DESC, id ASC)`. Postgres starts reading at the last row's year: on 300,000 films, after the last row (1960, 150000), `EXPLAIN (ANALYZE)` shows `Index Cond: (release_year <= 1960)`, then a `Filter:` that removes the rest of that year, 1,167 rows.
