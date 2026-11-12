@@ -14,7 +14,7 @@ export function keepLinkHashes(md: MarkdownRenderer) {
   md.renderer.rules.link_open = (tokens, idx, options, env, self) => {
     const token = tokens[idx]!, href = () => String(token.attrGet('href') ?? ''), hash = /#.*$/.exec(href())?.[0];
     linkOpen(tokens, idx, options, env, self);  // VitePress's page, base and clean URL, and its dead-link list
-    if (hash) token.attrSet('href', href().replace(/#.*$|$/, hash));
+    if (hash) token.attrSet('href', href().replace(/#.*$|$/, () => hash));  // a function: `$&` in the hash stays
     return self.renderToken(tokens, idx, options);
   };
 }
