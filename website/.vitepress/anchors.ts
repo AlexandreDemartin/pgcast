@@ -34,7 +34,7 @@ const
   },
   // `[line, url]` of each URL of the site in a fenced block (```` ``` ```` or `~~~`, indented in a list too), without
   // a full stop or comma after it. A ```` ``` ```` line with a backtick after it opens no fence: it is inline code, as
-  // in CommonMark. A fence closes on its marker alone, as long, with nothing after it.
+  // in CommonMark. A fence closes on its marker alone, as long or longer, with nothing after it.
   fencedSiteUrls = (markdown: string) => {
     const urls: [number, string][] = [];
     let fence: string | null = null;
