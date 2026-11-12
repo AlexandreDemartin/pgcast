@@ -63,7 +63,7 @@ db.upsert(table, values, conflictTarget, options?)
 `INSERT … ON CONFLICT … DO UPDATE`: insert each row, or update the existing row it conflicts with.
 
 - `table`, `values`: as for [`insert()`](#insert).
-- `conflictTarget`: the arbiter of the conflict: a column, an array of columns, or a unique index wrapped in [`constraint()`](#constraint).
+- `conflictTarget`: the arbiter of the conflict: a column, an array of columns, or the name of a unique or primary-key constraint wrapped in [`constraint()`](#constraint).
 - `options`: `updateColumns`, `noNullUpdateColumns`, `updateValues` and `reportAction` ([Options](#upsert-options)); `returning` and `extras`, as for [`insert()`](#insert-options).
 
 <CastPanel example="upsert">
@@ -116,10 +116,10 @@ With `upsertRequiresSameKeys: true` ([`Config`](/runtime-config)), such an upser
 ## `constraint()` {#constraint}
 
 ```ts
-db.constraint(index)
+db.constraint(name)
 ```
 
-Wrap a unique index of the table, for the `conflictTarget` of `upsert()`: `ON CONFLICT ON CONSTRAINT "ratings_pkey"`, in place of `ON CONFLICT ("film_id", "stars")`. The index names come from the schema, so one the table doesn't have fails to compile:
+Wrap the name of a unique or primary-key constraint of the table, for the `conflictTarget` of `upsert()`: `ON CONFLICT ON CONSTRAINT "ratings_pkey"`, in place of `ON CONFLICT ("film_id", "stars")`. The names come from the schema, so one the table doesn't have fails to compile:
 
 ```ts twoslash
 // @errors: 2345
@@ -129,9 +129,12 @@ db.upsert('ratings', { film_id: 1002, stars: 4 }, db.constraint('ratings_pkey'))
 db.upsert('ratings', { film_id: 1002, stars: 4 }, db.constraint('ratings_stars_key'));
 ```
 
+- The type takes every unique index of the table, and Postgres only a constraint. An index made with `CREATE UNIQUE INDEX`, which is no constraint, type-checks, and Postgres refuses it: 42704, `constraint "…" for table "…" does not exist`.
+- For such an index, pass its columns as the `conflictTarget`: `'code'` for a unique index on `code`.
+
 ## `Constraint` {#Constraint}
 
-The class that `constraint()` returns, its index name in `value`: `new db.Constraint<'ratings'>('ratings_pkey')` is the same.
+The class that `constraint()` returns, its constraint name in `value`: `new db.Constraint<'ratings'>('ratings_pkey')` is the same.
 
 ## `doNothing` {#doNothing}
 
