@@ -92,10 +92,23 @@ For a seat that may be taken, ask Postgres not to refuse: [`upsert()` with `doNo
 </CastPanel>
 
 - Recognise it with `err instanceof db.NotExactlyOneError`. It is not a `pg.DatabaseError` and has no `code`, so `isDatabaseError()` gives `false`.
-- Its message is "One result expected but none returned (hint: check `.query.compile()` on this Error)", and `err.query.compile()` gives the SQL and values of the panel: log them.
+- Its message is "One result expected but none returned (hint: check `.query.compile()` on this Error)", and `err.query.compile()` gives the SQL and values of the panel.
 - It asks for `LIMIT 1`, so two matching rows are not an error: it gives the first, as in Zapatos 6.6.1 ([#32](https://github.com/AlexandreDemartin/pgcast/issues/32)).
 - In a `lateral`, a missing row is `null`, not an error ([`selectExactlyOne()`](/select#selectExactlyOne)).
 - When a missing row is ordinary, as in a search, [`selectOne()`](/select#selectOne) gives `undefined` instead, and TypeScript makes you check it.
+
+Log its SQL and values where you catch it, then let the error go on:
+
+```ts twoslash
+import * as db from 'zapatos/db';
+import type pg from 'pg';
+declare const pool: pg.Pool;
+// ---cut---
+const screening = await db.selectExactlyOne('screenings', { id: 1042 }).run(pool).catch((err: unknown) => {
+  if (err instanceof db.NotExactlyOneError) console.error(err.query.compile());
+  throw err;
+});
+```
 
 ## Fix the errors pgcast throws
 
@@ -123,7 +136,19 @@ db.select('films', db.all, { order: { by: 'title', direction } })
   .catch(err => console.error(err));  // never called: select() has thrown already
 ```
 
-Check the value instead of casting it. Inside an `async` function, the throw becomes the promise's rejection, so the caller's `.catch()` gets it, and a `try` around the call catches it too. In a `transaction()` callback, `ROLLBACK` follows.
+Check the value instead of casting it, so that `direction` is one you wrote:
+
+```ts twoslash
+import * as db from 'zapatos/db';
+import type pg from 'pg';
+declare const pool: pg.Pool;
+declare const request: { query: { sort: string } };  // ?sort=desc
+// ---cut---
+const direction = request.query.sort === 'desc' ? 'DESC' : 'ASC';
+const films = await db.select('films', db.all, { order: { by: 'title', direction } }).run(pool);
+```
+
+If a call still throws, inside an `async` function the throw becomes the promise's rejection, so the caller's `.catch()` gets it, and a `try` around the call catches it too. In a `transaction()` callback, `ROLLBACK` follows.
 
 ## Answer each kind in one place
 
