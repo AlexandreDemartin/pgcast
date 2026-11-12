@@ -243,6 +243,10 @@ Candidates for a check, a rule or a skill line.
 - #161 — Nothing lints or type-checks `website/.vitepress/*.ts`: only `docs:build` exercises them, and line length is kept by hand — `builder`
 - #172 — pgcast's declarations need TypeScript 5.7 for a full check (`toBuffer()` returns `Buffer<ArrayBuffer>`, as in Zapatos 6.6.1), while the peer range says `>=4.1`: a version claim is checked with real installs per version, not read from `peerDependencies` — `builder`
 - #172 — `skipLibCheck` also skips the generated `.d.ts`, so the version canary goes quiet: say so wherever it is suggested — `builder`
+- #115 — A script that creates databases drops at start the ones whose process is gone (pid in the name), since `finally` does not run on SIGINT, SIGKILL or an unhandled rejection — `branch-reviewer`, `builder`
+- #115 — pg-pool's `end()` waits for every checked-out client and never settles a queued query: check `totalCount - idleCount` and `waitingCount`, and drop `WITH (FORCE)` — `branch-reviewer`, `builder`
+- #115 — No regex built from a file name (CodeQL `js/incomplete-sanitization`, high): find the stack frame with `includes()` — `branch-reviewer`, `builder`
+- #115 — On a draft PR « CI passed » is green with every job skipped: proofs taken on a draft are local only — `branch-reviewer`
 
 ## Minors kept
 

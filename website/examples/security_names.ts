@@ -1,6 +1,7 @@
 import * as db from 'zapatos/db';
 import type pg from 'pg';
 declare const pool: pg.Pool;  // at build, cast.data.ts passes a pool that records the query
+// rejects with 42703
 // ---cut---
 function filmsMatching(filter: any) {  // a request's JSON body, as it came
   return db.select('films', filter);
