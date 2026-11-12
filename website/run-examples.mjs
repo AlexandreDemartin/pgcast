@@ -20,6 +20,8 @@ if (!process.env.TEST_DATABASE_URL) throw new Error('TEST_DATABASE_URL is not se
 const
   server = new URL(process.env.TEST_DATABASE_URL),
   name = `pgcast_test_${process.pid}_docs`,  // a concurrent test run leaves pgcast_test_<pid>_* alone while <pid> lives
+  copy = `${name}_copy`,
+  timeLimit = 10_000,  // each example, in ms: all of them run in about 2 s
   urlOf = database => Object.assign(new URL(server), { pathname: `/${database}` }).toString(),
   admin = new pg.Client({ connectionString: server.toString() }),
   pending = [],  // what a stand-in `test()` was given, awaited before the example counts as run
@@ -90,13 +92,32 @@ function note(example, error, what = '') {
 
 process.on('unhandledRejection', error => note(current, error, 'a promise it does not await rejects: '));
 
-/** Run `example`, noting its failure. */
+/** Print the problems, if any, and set the exit code. */
+function report() {
+  if (problems.length > 0) {
+    console.error(`The examples check failed (README.md § Examples):\n  ${problems.join('\n  ')}`);
+    process.exitCode = 1;
+  } else {
+    console.log(`The examples ran against Postgres: ${examples.length}, each on the docs schema.`);
+  }
+}
+
+/** Run `example`, noting its failure. One that does not settle in time ends the run: its client may never be free. */
 async function check(example, pool) {
   current = example;
+  let timer;
   try {
-    await run(example, pool);
+    const timedOut = new Promise(resolve => { timer = setTimeout(resolve, timeLimit, true); });
+    if (await Promise.race([run(example, pool), timedOut])) {
+      note(example, new Error(`does not settle within ${timeLimit / 1000} s; the examples after it did not run`));
+      for (const database of [copy, name]) await admin.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
+      report();
+      process.exit();
+    }
   } catch (error) {
     note(example, error);
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -105,6 +126,7 @@ await dropOrphanDocsDatabases(admin);
 await admin.query(`CREATE DATABASE "${name}"`);
 try {
   const client = new pg.Client({ connectionString: urlOf(name) });
+  client.on('error', () => {});  // DROP … WITH (FORCE) ends its session when an example does not settle
   await client.connect();
   try {
     await client.query(readFileSync(new URL('schema.sql', import.meta.url), 'utf8'));
@@ -117,10 +139,9 @@ try {
     await client.end();  // a template database has no other session
   }
   for (const example of examples.filter(example => example.startsWith('examples/plain/'))) {
-    const copy = `${name}_copy`;
     await admin.query(`CREATE DATABASE "${copy}" TEMPLATE "${name}"`);
     const pool = new pg.Pool({ connectionString: urlOf(copy) });
-    // DROP … WITH (FORCE) ends the sessions of a client the example did not release: its error is expected.
+    // DROP … WITH (FORCE) ends the sessions of a client the example did not release: their errors are expected.
     pool.on('error', () => {}).on('connect', client => client.on('error', () => {}));
     let settled = false;
     try {
@@ -139,9 +160,4 @@ try {
   await admin.end();
 }
 
-if (problems.length > 0) {
-  console.error(`The examples check failed (README.md § Examples):\n  ${problems.join('\n  ')}`);
-  process.exitCode = 1;
-} else {
-  console.log(`The examples ran against Postgres: ${examples.length}, each on the docs schema.`);
-}
+report();

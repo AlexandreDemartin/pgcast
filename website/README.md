@@ -82,7 +82,7 @@ One per group, in `templates/`, not published (`srcExclude` in `.vitepress/confi
 - An example that sends more than one query, such as a transaction, cannot be a panel: it goes in `examples/plain/`, which `tsc` checks and `cast.data.ts` does not run, as `<<< ./examples/plain/<name>.ts{ts twoslash}`; the SQL it sends, where the page shows it, in a `sql` block: only the lines pgcast sends itself, such as `START TRANSACTION`, with a comment and a link for each query's own.
 - Every example runs against Postgres in CI's `docs` job (`npm run docs:examples`, with `TEST_DATABASE_URL`), on the docs schema: a query that type-checks but that Postgres refuses fails, with the page and the line that include it. A panel's example runs between `BEGIN` and `ROLLBACK`; one in `examples/plain/`, which commits its own transactions, on its own copy of the database.
   - An example that shows an error says which, above `// ---cut---`: `// rejects with 42703` (a SQLSTATE) or `// rejects with NotExactlyOneError` (an error's name). It fails if it rejects with anything else, or not at all.
-  - An example also fails if a promise it does not await rejects, or, in `examples/plain/`, if it leaves a client in use or a query waiting.
+  - An example also fails if a promise it does not await rejects, or, in `examples/plain/`, if it leaves a client in use or a query waiting. One that does not settle within 10 s ends the run.
   - A name an example only declares (`declare const tags: …`) runs with a stand-in from `run-examples.mjs`; a new one goes there.
 - An optional caption goes under the panel: `<template #caption><span>…</span></template>` (`index.md`).
 

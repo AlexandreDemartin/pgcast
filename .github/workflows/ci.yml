@@ -114,6 +114,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.docs == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 15  # a hang the examples' own time limit misses holds the runner up to GitHub's 6 h
     defaults:
       run:
         working-directory: website
