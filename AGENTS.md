@@ -68,7 +68,7 @@ A task is **done** only if `lint`, `typecheck`, `test` and `test:types` pass.
 ## Method
 
 - AI tooling and skill map: [.agents/README.md](.agents/README.md). Before a subject, read the skill it names.
-- Steps: the sub-issues of the Epics, one at a time, read with `gh issue view <n> --repo AlexandreDemartin/pgcast`, orchestrated by the skill `run-step` (agents `builder`, `branch-reviewer`, `chores`). Each PR closes its issue (`Closes #n`). Earlier history: [docs/SUIVI.md](docs/SUIVI.md).
+- Steps: the sub-issues of the Epics, one at a time, read with `gh issue view <n> --repo AlexandreDemartin/pgcast`, orchestrated by the skill `run-step` (agents `builder`, `branch-reviewer`, `chores`). Each PR closes its issue (`Closes #n`). Earlier history: [docs/HISTORY.md](docs/HISTORY.md).
 - CI: PR in draft while iterating, `gh pr ready` once ready (skill `ci-gate`).
 - Reviews: agent `branch-reviewer`, which relies on the user skill `branch-review`.
 - Deciding alone or asking: skill `decision-philosophy`.

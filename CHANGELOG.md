@@ -19,7 +19,7 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 - Vitest harness (`test`, `test:watch`, `test:types`) and a `typecheck` script.
 - `AGENTS.md` (+ `CLAUDE.md` symlink) and design decision notes under `docs/`. The roadmap lives in GitHub issues: one epic per chapter, one sub-issue per step, closed by its pull request.
 - CI matrix: Node 20, 22 and latest LTS; draft PRs run no job.
-- Agent workflow: `.agents/skills/`, `.claude/agents/` (`builder`, `branch-reviewer`, `chores`), `.claude/hooks/guard.mjs`, `npm run check:agents`, `docs/APPRENTISSAGES.md`.
+- Agent workflow: `.agents/skills/`, `.claude/agents/` (`builder`, `branch-reviewer`, `chores`), `.claude/hooks/guard.mjs`, `npm run check:agents`, `docs/LEARNINGS.md`.
 - Integration test harness: reference fixture `test/fixtures/schema.sql` (Postgres 14+), a template database built once per run, a fresh database per test file and a `ROLLBACK` per test (`useTestDatabase()`, `test/helpers/db.ts`). Needs `TEST_DATABASE_URL` (the environment, else `src/.env`); tests only create and drop `pgcast_test_*` databases.
 - CI matrix: Postgres 14, 16 and 18 service containers × Node 20, 22 and latest LTS.
 - Codegen characterization (`test/integration/codegen.test.ts`): the output for the fixture is frozen per configuration in `test/__snapshots__/codegen/`; the main configuration's files, as `generate()` writes them, are committed in `test/generated/` and compiled by `npm run typecheck` against the declarations of `src/db`.
