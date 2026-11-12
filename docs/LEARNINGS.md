@@ -258,6 +258,10 @@ Candidates for a check, a rule or a skill line.
 - #203 — A panel's caption matches the entry it sits under: on `pool`, `now()` is the query's time only because the query is its own transaction — `branch-reviewer`
 - #203 — A link's text does not repeat a section title of the page that holds it, or it reads as an in-page anchor — `branch-reviewer`
 - #203 — A snippet whose caption names variable values keeps them in scope after any `try` — `branch-reviewer`, `builder`
+- #203 — `castOf()` matched the type hover by name alone, so a `const` named like a table namespace showed `namespace cinemas`; it now takes only `const <name>: ` and a self-check fails the build otherwise — `branch-reviewer`, `builder`
+- #203 — An emptiness guard on a Whereable (`Object.keys(where).length`) does not catch a condition that compiles to `TRUE` (`isNotIn([])` is one key, `WHERE ((true))`) — `branch-reviewer`
+- #203 — A `lock` run on a pool lasts for that one statement: an example that shows `FOR UPDATE` says it holds only inside a transaction — `branch-reviewer`, `builder`
+- #203 — Diffing `llms-full.txt` from one build to the next proves a `cast.data.ts` change touches only the panels it should — `builder`
 
 ## Minors kept
 
