@@ -273,6 +273,44 @@ const row: s.films.Insertable = {
 Leave a key out to get its column's default. A key set to `undefined` is sent as `NULL`, as in Zapatos 6.6.1, and pgcast warns once (`PGCAST_DEP002`). With `db.setConfig({ undefinedMeansMissing: true })`, it counts as left out; that's the default from 7.0 ([Versions, opt-ins and warnings](/versions)).
 :::
 
+With the running time back in the row, here is your whole file, the steps of this page in order:
+
+::: code-group
+
+```ts twoslash [src/films.ts]
+import * as db from 'zapatos/db';
+import type * as s from 'zapatos/schema';
+import pg from 'pg';
+
+const pool = new pg.Pool({
+  connectionString: process.env.DATABASE_URL,
+  allowExitOnIdle: true,  // so the script ends once its queries are done
+});
+
+const film = await db.selectOne('films', {
+  title: 'The Salt Orchard',
+}).run(pool);
+if (film) console.log(film.release_year);  // 1974
+console.log(db.selectOne('films', { title: 'The Salt Orchard' }).compile());
+
+const films = await db.select('films', { studio_id: 1000 }, {
+  columns: ['title', 'release_year'],
+  order: { by: 'release_year', direction: 'ASC' },
+}).run(pool);
+console.log(films);
+
+const row: s.films.Insertable = {
+  studio_id: 1002,
+  title: 'The Night Ferry to Orkesund',
+  release_year: 2024,
+  runtime_minutes: 117,
+};
+const newFilm = await db.insert('films', row).run(pool);
+console.log(newFilm);
+```
+
+:::
+
 ## When the schema changes
 
 Run `npx pgcast` again after each migration. `schema.d.ts` is written afresh, and TypeScript checks every query against it. Try it: rename a column, regenerate, and check the file:
