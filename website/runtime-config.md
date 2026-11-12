@@ -91,7 +91,7 @@ How many times [`transaction()`](/transaction#transaction) runs its callback. Af
 transactionRetryDelay: { minMs: number; maxMs: number }  // default: { minMs: 25, maxMs: 250 }
 ```
 
-Before each retry, `transaction()` waits a random whole number of milliseconds from `minMs` to `maxMs`, evenly spread: `Math.round(minMs + (maxMs - minMs) * Math.random())`. [`transactionListener`](#Config.transactionListener) is told the wait.
+Before each retry, `transaction()` waits a whole number of milliseconds from `minMs` to `maxMs`, rounded from a uniform draw between them: `Math.round(minMs + (maxMs - minMs) * Math.random())`. So `minMs` and `maxMs` come up half as often as each value between them. [`transactionListener`](#Config.transactionListener) is told the wait.
 
 ### `castArrayParamsToJson` {#Config.castArrayParamsToJson}
 
