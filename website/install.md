@@ -40,7 +40,7 @@ The generated schema and the run-time code talk about `zapatos/db` and `zapatos/
 
 ## Your first query
 
-Point the generator at your database, then import the run-time code and the generated types. The examples in these docs use a small schema of `authors`, `books` and `tags`.
+Point the generator at your database, then import the run-time code and the generated types. The examples in these docs use a small schema of a film's cast: `films`, `actors`, the `roles` between them, and the `cinemas` that screen them.
 
 ::: code-group
 
@@ -66,7 +66,7 @@ npx pgcast   # or: npx zapatos
 
 ::: code-group
 
-```ts twoslash [src/books.ts]
+```ts twoslash [src/films.ts]
 import * as db from 'zapatos/db';
 import pg from 'pg';
 
@@ -75,7 +75,7 @@ const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 
 :::
 
-Then ask for a book. Here's what you write, the SQL it becomes, and the type of what comes back, straight from your schema:
+Then ask for a film. Here's what you write, the SQL it becomes, and the type of what comes back, straight from your schema:
 
 <CastPanel example="install">
 

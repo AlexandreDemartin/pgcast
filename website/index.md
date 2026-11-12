@@ -26,7 +26,7 @@ pgcast reads your Postgres schema and writes the TypeScript types. Its shortcuts
 
 <<< ./examples/home.ts{ts twoslash}
 
-<template #caption><span>Hover a dashed name to see its type.</span><span>Authors with their books, in one query and one round trip.</span></template>
+<template #caption><span>Hover a dashed name to see its type.</span><span>Films with their cast, in one query and one round trip.</span></template>
 </CastPanel>
 
 <div class="pillars">
