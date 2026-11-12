@@ -230,15 +230,19 @@ interface UpsertSignatures {
 
 export const doNothing = [];
 
-// a plain value is sent as a parameter, as `vals()` sends it; our own objects (`sql`, `param`, `raw`,
-// `cols`, `vals`, `parent`, and the symbols `Default`, `self`) are compiled as they always were, as is
-// an array that holds one at any depth (item by item, as in a `sql` template), and a function or the
-// global object, which throw there
-const compiledAsIs = (value: any): boolean =>
-  value instanceof SQLFragment || value instanceof Parameter || value instanceof DangerousRawString ||
-  value instanceof ColumnNames || value instanceof ColumnValues || value instanceof ParentColumn ||
-  typeof value === 'symbol' || typeof value === 'function' || value === globalThis ||
-  (Array.isArray(value) && value.some(compiledAsIs));
+// a plain value is sent as a parameter, as `vals()` sends it; a value that holds one of our own objects
+// (`sql`, `param`, `raw`, `cols`, `vals`, `parent`, a symbol such as `Default` or `self`) anywhere in its
+// arrays and plain objects is compiled as it always was, as in a `sql` template; so is a function or the
+// global object where a `sql` template throws on it, alone or as an array item, but not as the value of
+// an object's key, which a `sql` template sends as a parameter (a `toPostgres()` method, say)
+const compiledAsIs = (value: any, inObject = false): boolean =>
+  typeof value === 'function' || value === globalThis ? !inObject :
+    value instanceof SQLFragment || value instanceof Parameter || value instanceof DangerousRawString ||
+    value instanceof ColumnNames || value instanceof ColumnValues || value instanceof ParentColumn ||
+    typeof value === 'symbol' ||
+    (Array.isArray(value) ? value.some(item => compiledAsIs(item, inObject)) :
+      typeof value === 'object' && value !== null && [Object.prototype, null].includes(Object.getPrototypeOf(value)) &&
+      Object.values(value).some(item => compiledAsIs(item, true)));
 
 const updateValueSQL = (value: any) => compiledAsIs(value) ? value : param(value);
 
