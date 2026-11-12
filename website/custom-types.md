@@ -29,7 +29,7 @@ The file's name, `PgPoint`, comes from [`customTypesTransform`](/generator#gener
 
 ## Fill it in
 
-The shortcuts return each row through `to_jsonb()`, which writes a point as Postgres prints it: `"(0.4,1.2)"`. Postgres takes that string back as a value too. So in `src/zapatos/custom/PgPoint.d.ts`, replace `any` with that form, a template literal type:
+The shortcuts return each row as JSON, which writes a point as Postgres prints it: `"(0.4,1.2)"`. Postgres takes that string back as a value too. So in `src/zapatos/custom/PgPoint.d.ts`, replace `any` with that form, a template literal type:
 
 <<< ./zapatos/custom/PgPoint.d.ts{ts}
 
