@@ -50,8 +50,8 @@ const
 
 /**
  * Fail the build on a link outside the site's base, to a page or a file that the build did not write, or to an anchor
- * that its page does not define; a URL of the site in a fenced block too (the rules file of `ai-assistant.md`, copied
- * into projects), with its line. A name still in `reference-pending.json` counts as an anchor of its page: a link to it
+ * that its page does not define, a link written with the site's host included; a URL of the site in a fenced block
+ * too (the rules file of `ai-assistant.md`, copied into projects), with its line. A name still in `reference-pending.json` counts as an anchor of its page: a link to it
  * lands once its entry is written, and writing it removes the name. Run once every file is written (`llms.txt` too).
  */
 export function checkLinks(config: SiteConfig) {
@@ -67,7 +67,11 @@ export function checkLinks(config: SiteConfig) {
       ...pending[file.replace(/\.html$/, '.md')] ?? [],
     ])])),
     problems = new Set<string>(),  // a link written twice on a page is reported once
-    problemOf = (url: URL) => {  // a URL on `http://site`
+    atHome = (url: URL) => {  // the home written without its slash, which GitHub Pages redirects, is the home
+      if (url.pathname === base.slice(0, -1)) url.pathname = base;
+      return url;
+    },
+    problemOf = (url: URL) => {  // reads its path and its hash only
       const
         path = url.pathname.slice(base.length),
         target = /\.(?!html$)[^./]+$/.test(path) ? path :  // a file, `llms.txt`
@@ -84,18 +88,20 @@ export function checkLinks(config: SiteConfig) {
   for (const [file, html] of pages) {
     const page = file.replace(/\.html$/, '.md'), markdown = join(config.srcDir, page);
     for (const [, href] of html.matchAll(/<a\s(?:[^>]*?\s)?href="([^"]*)"/g)) {
-      const url = new URL(unescape(href!), `http://site${base}${file.replace(/(^|\/)index\.html$|\.html$/, '$1')}`);
-      if (url.host !== 'site') continue;  // another site, or `mailto:`
       const
-        link = url.pathname.slice(url.pathname.startsWith(base) ? base.length - 1 : 0),  // as written: `/select`
-        problem = problemOf(url);
-      if (problem) problems.add(`${page}: ${link}${url.hash}, ${problem}`);
+        written = unescape(href!),
+        url = new URL(written, `http://site${base}${file.replace(/(^|\/)index\.html$|\.html$/, '$1')}`),
+        absolute = url.origin === host;  // a link to the site with its host, against the convention: checked too
+      if (!absolute && url.host !== 'site') continue;  // another site, or `mailto:`
+      const
+        link = absolute ? written :
+          url.pathname.slice(url.pathname.startsWith(base) ? base.length - 1 : 0) + url.hash,  // as written: `/select`
+        problem = problemOf(absolute ? atHome(url) : url);
+      if (problem) problems.add(`${page}: ${link}, ${problem}`);
     }
     if (!existsSync(markdown)) continue;  // a "Coming" page, from `[page].md`
     for (const [line, written] of fencedSiteUrls(readFileSync(markdown, 'utf8'))) {
-      const url = new URL(written.slice(host.length), 'http://site');
-      if (url.pathname === base.slice(0, -1)) url.pathname = base;  // the home without its slash, which GitHub redirects
-      const problem = problemOf(url);
+      const problem = problemOf(atHome(new URL(written.slice(host.length), 'http://site')));
       if (problem) problems.add(`${page}:${line}: ${written}, ${problem}`);
     }
   }
