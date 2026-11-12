@@ -82,9 +82,11 @@ describe('on users', () => {
     expect(await ids('users', { id: dc.isNotIn([2, null]) })).toEqual([]);
   });
 
-  it('characterization: not() does not parenthesise a fragment', async () => {
-    // characterization: `(NOT "id" = 1 OR "id" = 2)` reads `(NOT "id" = 1) OR "id" = 2`: [2, 3], not [3]
-    expect(await ids('users', { id: dc.not(sql`${db.self} = 1 OR ${db.self} = 2`) })).toEqual([2, 3]);
+  it('not() parenthesises a fragment', async () => {
+    // `(NOT ("id" = 1 OR "id" = 2))`; 6.6.1 wrote `(NOT "id" = 1 OR "id" = 2)`, read `(NOT "id" = 1) OR "id" = 2`
+    expect(await ids('users', { id: dc.not(sql`${db.self} = 1 OR ${db.self} = 2`) })).toEqual([3]);
+    expect(await ids('users', { id: dc.not(sql`${db.self} >= 1 AND ${db.self} <= 2`) })).toEqual([3]);
+    expect(await ids('users', { id: dc.not(dc.not(sql`${db.self} = 1 OR ${db.self} = 2`)) })).toEqual([1, 2]);
     expect(await ids('users', { id: dc.not(dc.or(dc.eq(1), dc.eq(2))) })).toEqual([3]);
   });
 
