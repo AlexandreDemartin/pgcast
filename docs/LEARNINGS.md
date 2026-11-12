@@ -95,6 +95,10 @@ Candidates for a check, a rule or a skill line.
 - #28 — Moving an error from `.run()` to build time changes how it reaches the caller: a synchronous `Error` instead of a rejected promise and a pg `DatabaseError`, so `.run(c).catch(…)`, `Promise.allSettled` over a batch and `isDatabaseError` behave differently; name it in the PR (candidate: skill `backward-compat`) — `builder`, `branch-reviewer`
 - #28 — A guard based on `Object.keys` matches what `cols()` / `vals()` compile exactly; replaying odd objects (inherited, symbol, non-enumerable keys) shows it cheaply — `builder`
 - #28 → #29 — Once `undefinedMeansMissing` leaves out `undefined` keys, `{ col: undefined }` can come back as `SET () = ROW()`: the empty check of `update()` must count the kept keys, frozen by a test — `branch-reviewer`
+- #29 — An option that turns `undefined` into a missing key inherits every quirk of a missing key (an overwrite through `EXCLUDED` when `updateColumns` names it, an empty `VALUES ()`): check its JSDoc against each `upsert` option, not only the default call — `branch-reviewer`
+- #29 — To prove an opt-in leaves the default path untouched, replay master's runtime beside the branch's on hostile shapes (a `null` row, a getter, a class instance, inherited, non-enumerable or symbol keys, nested `undefined`): they catch a stray `Object.values` that disagrees with `Object.keys` (candidate: skill `backward-compat`) — `branch-reviewer`
+- #29 — `test/integration/codegen.test.ts` freezes the TS error codes of `src/db` compiled against the generated schema: a new internal helper typed `T | T[] → T | T[]` added a TS2322 there while the lib's own `tsc` passed; check that snapshot when typing a helper — `builder`
+- #29 — With `exactOptionalPropertyTypes`, a test helper typed `typeof rows` refuses `{ ...row, title: undefined }`: type such helpers loosely — `builder`
 
 ## Minors kept
 
@@ -116,3 +120,5 @@ Minor review defects, taken up by the end-of-chapter review.
 - #26 — `test/integration/shortcuts.test.ts:182`: a `Buffer` written to a `bytea` column is checked only in the unit test; one round trip on the same connection — `branch-reviewer`
 - #27 — `src/db/config.ts:22`: the comment of `upsertRequiresSameKeys` still says "rows with different keys throw", broader than the refined trigger — `orchestrator`
 - #81 — CI: the integration hooks' 10 s timeout was hit once while creating the test databases on a slow runner (Node 20, Postgres 14); the rerun passed — raise `hookTimeout` for the database setup — `orchestrator`
+- #29 — `src/db/shortcuts.ts:313`: with `undefinedMeansMissing`, an `upsert` / `insert` whose keys are all `undefined` compiles to `INSERT INTO "t" () VALUES ()` (42601), as master's `upsert('t', {})` does: should an empty `Insertable` throw early, as `update` does since R24? — `branch-reviewer`
+- #29 — pre-existing: an `undefined` in `updateValues` still adds its column to `SET` as `EXCLUDED.col`, even when the column was not inserted, which writes its `DEFAULT` into the existing row: a candidate line for the characterisation report — `builder`
