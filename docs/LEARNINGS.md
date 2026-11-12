@@ -255,6 +255,10 @@ Candidates for a check, a rule or a skill line.
 - #203 — TypeScript 7 prints only the last overload's error for a failed overloaded call (TS2769), so a typed row (`const row: s.t.Insertable`) is the form whose errors read the same on 5.9, 6.0 and 7.0; `satisfies` does not help — `branch-reviewer`, `builder`
 - #203 — A terminal's `tsc` output is `--pretty` with colours stripped, two blank lines before `Found N error(s)`; a pipe prints the plain form — `branch-reviewer`
 - #203 — Twoslash hovers are in the page's `assets/<page>.md.*.js` chunk, not in its `.html` — `builder`
+- #203 — `castOf()` matched the type hover by name alone, so a `const` named like a table namespace showed `namespace cinemas`; it now takes only `const <name>: ` and a self-check fails the build otherwise — `branch-reviewer`, `builder`
+- #203 — An emptiness guard on a Whereable (`Object.keys(where).length`) does not catch a condition that compiles to `TRUE` (`isNotIn([])` is one key, `WHERE ((true))`) — `branch-reviewer`
+- #203 — A `lock` run on a pool lasts for that one statement: an example that shows `FOR UPDATE` says it holds only inside a transaction — `branch-reviewer`, `builder`
+- #203 — Diffing `llms-full.txt` from one build to the next proves a `cast.data.ts` change touches only the panels it should — `builder`
 
 ## Minors kept
 
