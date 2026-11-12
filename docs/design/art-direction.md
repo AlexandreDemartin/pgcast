@@ -66,7 +66,7 @@ Other tokens: `--radius: 10px` (the cast panel 14px, buttons 9px, chips and the 
 
 ## Layout
 
-- **Top bar**, sticky, 56px, on `--surface` with a bottom rule: menu button (under 900px), wordmark, version pill, search (`⌘K` or `/`; on the site, the `⌘K` hint hidden under 1100px and the text under 900px), links Tutorial · Guides · Reference · Changelog · GitHub (`--muted`, 400, `--fg` on hover; the current group in `--fg` too; no external-link icon; hidden under 900px), theme button. Explanation is reached from the nav and the home: a fourth group link would push the theme button into VitePress's `⋯` menu between 960 and 1280px.
+- **Top bar**, sticky, 56px, on `--surface` with a bottom rule: menu button (under 900px), wordmark, version pill, search (`⌘K` or `/`; on the site, the `⌘K` hint hidden under 1100px and the text under 900px), links Tutorial · Guides · Reference · Changelog · GitHub (`--muted`, 400, `--fg` on hover; the current group in `--fg` too; no external-link icon; hidden under 900px), theme button. Explanation is reached from the nav and the home: a fourth group link would push the theme button into VitePress's `⋯` menu at most widths from 768 to 1050px, with Changelog and GitHub at 960px (measured on a page with the left nav).
 - **Shell**, at most 1360px: left nav 260px · reading column · "On this page" rail 220px. Gutters of 16px at least, and the safe-area insets.
 - **Left nav**, sticky, in the four groups of Diátaxis (amended 2026-11-12, [decision 004](../decisions/004-documentation-site.md) § The site, which lists their pages): Tutorial · How-to guides · Reference · Explanation. The prototype's groups predate them.
   - Each group label links its landing page: the label, then two lines on what the group is for, then its pages.

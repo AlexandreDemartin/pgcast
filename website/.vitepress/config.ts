@@ -46,8 +46,8 @@ export default defineConfig({
   themeConfig: {
     siteTitle: 'pg<b>::</b>cast',
     nav: [
-      // a group with a `nav` text is current on its landing page and on each of its pages; Explanation has none, so
-      // that the theme button stays in the bar from 960px (VitePress moves what does not fit into its ⋯ menu)
+      // a group with a `nav` text is current on its landing page and on each of its pages; Explanation has none: a
+      // fourth link would push the theme button into VitePress's ⋯ menu at most widths from 768 to 1050px
       ...outline.flatMap(({ nav, link, items }) => nav === undefined ? [] : [{
         text: nav,
         link,
