@@ -499,7 +499,7 @@ What `run()` takes: a pool, a client, or the client a [`transaction()`](/transac
 
 <<< ./examples/plain/sql_queryable.ts{ts twoslash}
 
-`Queryable` takes a transaction's client whatever its level: a function that needs `SERIALIZABLE` takes a [`TxnClientForSerializable`](/transaction#TxnClientForSerializable) instead ([Book inside a larger transaction](/retries#book-inside-a-larger-transaction)).
+`Queryable` takes a transaction's client whatever its level: a function that needs `SERIALIZABLE` takes `pg.Pool | TxnClientForSerializable` instead ([`TxnClientForSerializable`](/transaction#TxnClientForSerializable), [Book inside a larger transaction](/retries#book-inside-a-larger-transaction)).
 
 ## `SQL` {#SQL}
 
