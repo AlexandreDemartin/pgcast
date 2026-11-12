@@ -118,7 +118,8 @@ jobs:
       run:
         working-directory: website
 
-    # docs:schema loads schema.sql into its own pgcast_test_<pid>_docs database, on the oldest Postgres of the matrix.
+    # docs:schema and docs:examples load schema.sql into their own pgcast_test_<pid>_docs database, on the oldest
+    # Postgres of the matrix.
     services:
       postgres:
         image: postgres:14
@@ -153,6 +154,8 @@ jobs:
           npm run docs:schema
           git add --intent-to-add zapatos
           git diff --exit-code -- zapatos
+      - name: Every example runs against Postgres
+        run: npm run docs:examples
       - run: npm run docs:build
 
   ci-passed:
