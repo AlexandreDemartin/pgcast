@@ -58,6 +58,34 @@ describe('values are data', () => {
     const q = db.select('users', { display_name: `Ada' OR '1' = '1` });
     expect(await q.run(t.client)).toEqual([]);
   });
+
+  it('a hostile string in the updateValues of upsert is stored as it is, and runs nothing', async () => {
+    // compiled text: test/unit/injection.test.ts; under 6.6.1 each was an identifier, and `reads`
+    // closed its quotes to read every email into Bob's name
+    const inputs: Record<string, string> = {
+      dquote: 'a"b', squote: "a'b", semicolon: 'a;b', dashes: 'a--b', comment: 'a/*b', dollar: 'a$1b',
+      backslash: 'a\\b', nul: 'a\0b', dot: 'a.b', lone: '"', prequoted: '"a"', qualified: 'users.display_name',
+      closes: `display_name" FROM users; ${update}; SELECT "display_name`,
+      reads: `xmin" || (SELECT string_agg(email::text, ',') FROM users) || "xmin`,
+    };
+    const outcomes: Record<string, unknown> = {};
+    for (const [name, input] of Object.entries(inputs)) {
+      await t.client.query('SAVEPOINT pgcast_update_value');
+      try {
+        const row = await db.upsert('users', { email: 'bob@example.com', display_name: 'Bob' }, 'email', {
+          updateColumns: [], updateValues: { display_name: input }, returning: ['display_name'],
+        }).run(t.client);
+        // read before the savepoint goes: a second statement that ran shows here
+        outcomes[name] = row?.display_name === input && await adaName() === 'Ada' ? 'stored' : row?.display_name;
+        await t.client.query('ROLLBACK TO SAVEPOINT pgcast_update_value');
+      } catch (err) {
+        await t.client.query('ROLLBACK TO SAVEPOINT pgcast_update_value');
+        outcomes[name] = (err as { code?: string }).code;
+      }
+    }
+    // a NUL is refused in any text parameter (22021)
+    expect(outcomes).toEqual(Object.fromEntries(Object.keys(inputs).map(name => [name, name === 'nul' ? '22021' : 'stored'])));
+  });
 });
 
 describe('with parameters (extended protocol)', () => {

@@ -7,6 +7,7 @@
 import { describe, expect, it } from 'vitest';
 import * as db from '../../src/db';
 import { sql, param, parent, Default, all, conditions as dc } from '../../src/db';
+import { resetConfig } from '../helpers/config';
 
 describe('insert', () => {
   it('one row: columns in sorted key order, RETURNING to_jsonb', () => {
@@ -176,19 +177,91 @@ describe('upsert', () => {
     `);
   });
 
-  it('characterization: updateValues with a plain value', () => {
-    // characterization: a string is compiled as an identifier (`"x"`), a number throws: neither is a parameter
+  it('updateValues: a plain value is a parameter, sent as update() sends it', () => {
     expect(db.upsert('users', ada, 'email', { updateValues: { mood: 'happy' } }).compile()).toMatchInlineSnapshot(`
       {
-        "text": "INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("email", "display_name", "mood") = ROW(EXCLUDED."email", EXCLUDED."display_name", "happy") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "text": "INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("email", "display_name", "mood") = ROW(EXCLUDED."email", EXCLUDED."display_name", $3) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "values": [
           "Ada L.",
           "ada@example.com",
+          "happy",
         ],
       }
     `);
-    expect(() => db.upsert('accounts', { id: 1, owner_id: 1 }, 'id', { updateValues: { balance: 5 } }).compile())
-      .toThrowErrorMatchingInlineSnapshot(`[Error: Alien object while interpolating SQL: 5]`);
+    const plain = {
+      string: 'x', number: 5, bigint: BigInt(5), boolean: true, null: null, date: new Date(0),
+      array: [1, 2], object: { a: 1 }, emptyObject: {}, buffer: Buffer.from('ab'),
+    };
+    const compare = () => Object.entries(plain).forEach(([kind, v]) => {
+      const
+        upserted = db.upsert('accounts', { id: 1, owner_id: 1 }, 'id', { updateColumns: [], updateValues: { balance: v } } as any).compile(),
+        updated = db.update('accounts', { balance: v } as any, { id: 1 }).compile();
+      expect(upserted.text.replace(/.* DO UPDATE SET (.*) RETURNING .*/, '$1'), kind)
+        .toBe(updated.text.replace(/.* SET (.*) WHERE .*/, '$1').replace('$1', '$3'));
+      expect(upserted.values[2], kind).toBe(updated.values[0]);
+    });
+    compare();
+    // with the JSON casts on, an array or an object is cast as update() casts it
+    db.setConfig({ castArrayParamsToJson: true, castObjectParamsToJson: true });
+    try {
+      compare();
+      expect(db.upsert('users', ada, 'email', { updateColumns: [], updateValues: { settings: { a: 1 } } }).compile().text)
+        .toContain(`DO UPDATE SET ("settings") = ROW(CAST($3 AS "json")) RETURNING`);
+    } finally {
+      resetConfig();
+    }
+  });
+
+  it('updateValues: pgcast objects compile as under 6.6.1, and a Parameter is not wrapped twice', () => {
+    const set = (v: any) => {
+      try {
+        const q = db.upsert('users', ada, 'email', { updateColumns: [], updateValues: { mood: v } } as any).compile();
+        return [q.text.replace(/.* DO UPDATE SET (.*) RETURNING .*/, '$1'), q.values.slice(2)];
+      } catch (err) {
+        return `throws: ${(err as Error).message}`;
+      }
+    };
+    expect({
+      param: set(param('happy')), cast: set(param('happy', 'mood')), default: set(Default),
+      raw: set(db.raw('now()')), cols: set(db.cols(['a', 'b'])), vals: set(db.vals({ a: 1 })),
+      parent: set(parent('id')), self: set(db.self), all: set(all),
+    }).toMatchInlineSnapshot(`
+      {
+        "all": "throws: Cannot convert a Symbol value to a string",
+        "cast": [
+          "("mood") = ROW(CAST($3 AS "mood"))",
+          [
+            "happy",
+          ],
+        ],
+        "cols": [
+          "("mood") = ROW("a", "b")",
+          [],
+        ],
+        "default": [
+          "("mood") = ROW(DEFAULT)",
+          [],
+        ],
+        "param": [
+          "("mood") = ROW($3)",
+          [
+            "happy",
+          ],
+        ],
+        "parent": "throws: The 'parent' table alias has no meaning here",
+        "raw": [
+          "("mood") = ROW(now())",
+          [],
+        ],
+        "self": "throws: The 'self' column alias has no meaning here",
+        "vals": [
+          "("mood") = ROW($3)",
+          [
+            1,
+          ],
+        ],
+      }
+    `);
   });
 
   it('noNullUpdateColumns: one column, a list, or all', () => {

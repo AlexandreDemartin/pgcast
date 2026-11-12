@@ -179,16 +179,45 @@ describe('upsert', () => {
     }))).toEqual({ display_name: 'Bob!', $action: 'UPDATE' });
   });
 
-  it('characterization: updateValues with a plain string fails', async () => {
-    // characterization: 'happy' is compiled as the identifier "happy"
-    expect(await fails(db.upsert('users', { email: 'bob@example.com', display_name: 'Bob' }, 'email', {
-      updateValues: { mood: 'happy' },
+  it('updateValues: a plain value is stored as it is', async () => {
+    const createdAt = new Date('2020-01-02T03:04:05.000Z');
+    expect(await run(db.upsert('users', { email: 'bob@example.com', display_name: 'Bob' }, 'email', {
+      updateColumns: [],
+      updateValues: { display_name: 'Bobby', mood: 'happy', manager_id: null, settings: { theme: 'light' }, tags: ['a', 'b'], created_at: createdAt },
+      returning: ['display_name', 'mood', 'manager_id', 'settings', 'tags'],
+    }))).toEqual({ display_name: 'Bobby', mood: 'happy', manager_id: null, settings: { theme: 'light' }, tags: ['a', 'b'], $action: 'UPDATE' });
+    expect(await scalar(`SELECT created_at = '2020-01-02T03:04:05Z' AS v FROM users WHERE email = 'bob@example.com'`)).toBe(true);
+    const id = await scalar(`SELECT min(id) AS v FROM accounts WHERE owner_id = 2`);
+    expect(await run(db.upsert('accounts', { id, owner_id: 2 }, 'id', {
+      updateColumns: [], updateValues: { balance: 5, lifetime_ops: BigInt(42) }, returning: ['balance', 'lifetime_ops'],
+    }))).toEqual({ balance: 5, lifetime_ops: 42, $action: 'UPDATE' });
+  });
+
+  it('updateValues: a string that named a column is now stored as text; in sql it reads the column, as before', async () => {
+    const upsertBob = (displayName: any) => run(db.upsert('users', { email: 'bob@example.com', display_name: 'Robert' }, 'email', {
+      updateColumns: [], updateValues: { display_name: displayName }, returning: ['display_name'],
+    }));
+    expect(await upsertBob('users.display_name')).toEqual({ display_name: 'users.display_name', $action: 'UPDATE' });
+    // the same string in a fragment compiles to the same identifier as under 6.6.1
+    expect(await upsertBob(sql`${'users.display_name'}`)).toEqual({ display_name: 'users.display_name', $action: 'UPDATE' });
+    expect(await upsertBob(sql`${'excluded.display_name'}`)).toEqual({ display_name: 'Robert', $action: 'UPDATE' });
+    // a bare column name is ambiguous here, between the existing row and EXCLUDED: it never ran
+    expect(await fails(db.upsert('users', { email: 'bob@example.com', display_name: 'Robert' }, 'email', {
+      updateColumns: [], updateValues: { display_name: sql`${'email'}` },
     }))).toMatchInlineSnapshot(`
       {
-        "code": "42703",
-        "message": "column "happy" does not exist",
+        "code": "42702",
+        "message": "column reference "email" is ambiguous",
       }
     `);
+  });
+
+  it('updateValues: raw, param and Default compile as under 6.6.1', async () => {
+    expect(await run(db.upsert('users', { email: 'bob@example.com', display_name: 'Bob' }, 'email', {
+      updateColumns: [], updateValues: { created_at: db.raw('now()'), mood: Default, display_name: param('Bobby') },
+      returning: ['mood', 'display_name'],
+    }))).toEqual({ mood: null, display_name: 'Bobby', $action: 'UPDATE' });
+    expect(await scalar(`SELECT created_at = now() AS v FROM users WHERE email = 'bob@example.com'`)).toBe(true);
   });
 
   it('noNullUpdateColumns: a NULL does not overwrite (one column, a list, all)', async () => {
