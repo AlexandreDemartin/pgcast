@@ -90,7 +90,7 @@ Each SQL replaces the `DO UPDATE SET …` of the plain upsert, on `ratings` (on 
 | ``updateValues: { votes: db.sql`${'ratings'}.${'votes'} + 1` }`` | `"ratings"."votes" + 1` in place of `EXCLUDED."votes"` | none |
 | `reportAction: 'suppress'` | no `\|\| jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END)` | no `UpsertAction` |
 
-- `updateColumns` takes a column or an array; `noNullUpdateColumns` a column, an array, or `db.all` for every column. [Rows with different keys](/batches#rows-with-different-keys) has a panel of `updateColumns`: a booking keeps its time.
+- `updateColumns` takes a column or an array; `noNullUpdateColumns` a column, an array, or `db.all` for every column. [Insert and upsert in batches](/batches#rows-with-different-keys) has a panel of `updateColumns`: a booking keeps its time.
 - `updateValues` is one set of values for every row updated. Its keys are always updated, even when `updateColumns` leaves them out, or is `doNothing` (then the SQL is `DO UPDATE SET`, not `DO NOTHING`).
 - In `updateValues`, a plain value is a parameter. A value that holds a fragment, `param()`, `raw()`, `cols()`, `vals()`, `parent()`, `Default` or `self`, at any depth of its arrays and plain objects, is compiled as in a `sql` template.
 - To read a column there, name the table for the existing row, `${'ratings'}.${'votes'}`, or `EXCLUDED` for the new one, `` db.sql`EXCLUDED.${'votes'}` ``. `db.self`, or a fragment or condition that uses it (`` db.sql`${db.self} + 1` ``, [`conditions.add()`](/conditions#conditions.add)), throws "The 'self' column alias has no meaning here", as in Zapatos 6.6.1; `db.parent()`, alone or in a fragment, throws "The 'parent' table alias has no meaning here".
