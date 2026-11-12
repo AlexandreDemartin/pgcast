@@ -21,7 +21,7 @@ The split has a second effect. node-postgres sends a query with values through P
 
 A parameter stands for a value, never for a table or a column: `SELECT * FROM $1` is a syntax error (42601). So names go into the text, and pgcast guards them twice. First the type: `Table` and `Column` are unions of the names the generator read from the catalog, so a name you write is one the database has.
 
-Then the quoting, because the type is gone at run time and names can arrive without passing it: the keys of a request's JSON body, given to `select()` as its filter, are column names. Each string pgcast writes as a name is double-quoted, any `"` in it doubled, as Postgres's `quote_ident` does, so it can never close its quotes:
+Then the quoting, because the type is gone at run time and names can arrive without passing it: the keys of a request's JSON body, given to `select()` as its filter, are column names. Each string pgcast writes as a name is double-quoted and split on `.`, any `"` in it doubled unless it is already a well-formed quoted name (`'"title"'` is `"title"`, `'a""b'` stays `"a""b"`), so it can never close its quotes:
 
 <CastPanel example="security_names">
 
@@ -55,7 +55,7 @@ The characterisation of Zapatos 6.6.1 found seven ways for a caller's string to 
 |---|---|---|
 | a `"` in a name: a table, a column, a filter key, `cols()`, `order.by` | closes its quotes | doubled: `'a"b'` is `"a""b"` |
 | a string that starts and ends with `"` | written as it is | as it is only if it is a well-formed quoted name |
-| the type of `param(x, cast)` | written between quotes as it is | one quoted name, any `"` doubled |
+| the type of `param(x, cast)` | written between quotes as it is | as it is if well-formed once quoted (`pg_catalog"."int4`); otherwise one quoted name, any `"` doubled |
 | a `lateral` key, or the `alias` of `select()` | spliced into `"lateral_…"` and `"sq_…"` | one name there too |
 | `lock.for`, `lock.wait`, the options of `truncate()`, the level of `transaction()` | written as it is | checked: anything else throws |
 | the `aggregate` of `select()` | written as it is | a function name, or it throws |
