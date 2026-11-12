@@ -109,11 +109,12 @@ Two ways, by where you want the number:
 
 | | [`count()`](/select#count) | `count(*) OVER ()` in `extras` |
 |---|---|---|
-| Queries | one more | none: the page's own |
+| Queries | one more | none, but it reads every row of the `where`, as `count()` does |
 | The total | a `number` | a key on each row |
 | An empty page | still the total | no row, so no total |
+| With the last row's keys | the list's total, given the list's filter | the rows left: use `count()` |
 
-Both count the rows of the `where`: with a last row's comparison in it, the rows left after that row, not the whole list. Give them the list's filter alone.
+Both count the rows of the `where`. The window's `where` is the page's own: with the last row's comparison in it, it counts the rows left, not the whole list.
 
 ### With `count()`
 
@@ -140,6 +141,7 @@ A window function in [`extras`](/select#extras) counts the rows before `LIMIT` c
 
 - Each row has `total: 4`. The type is the fragment's second type argument, `number`; Postgres's `bigint` arrives as a JSON number.
 - On an empty page, past the last one, there is no row to carry it: `page[0]?.total` is `undefined`, not the total.
+- The window makes the page's query read and sort every row of the `where`. On 300,000 films, `EXPLAIN (ANALYZE)` shows a `Seq Scan` and a `WindowAgg` over all of them, where the page alone is an `Index Scan Backward` that stops at its 2 rows.
 - With `strict` off, `total` is not in the type ([Options](/select#options)), and `page[0].total` does not compile (TS2339).
 
 ## See also
