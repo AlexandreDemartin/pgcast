@@ -198,6 +198,10 @@ Candidates for a check, a rule or a skill line.
 - #141 — Helpers that refuse by returning `null` are not « both or neither » inside one outer transaction: only a throw rolls it back — `branch-reviewer`
 - #141 — A docs example that writes cleans its own rows, or a second run fails — `branch-reviewer`, `builder`
 - #141 — `queryListener` logs a `COMMIT` before Postgres answers it: a log line is no proof of a commit (#190) — `builder`
+- #139 — A plan claim is proved with `EXPLAIN (ANALYZE)` on a table of realistic size: « Filter: » on 4 rows hid « Rows Removed by Filter: 148671 » — `branch-reviewer`, `builder`
+- #139 — A how-to that chains steps compiles the chain as the reader writes it (`page.at(-1)` into the next query); a panel runs the earlier query on a hidden pool that returns rows — `branch-reviewer`, `builder`
+- #139 — A mixed-direction keyset needs a bound on the first key to get an `Index Cond`; a bare `OR` filters from the top, as `offset` does — `branch-reviewer`
+- #139 — For a scratch `tsc` outside `website/`, `@types/*` comes before `node_modules/*` in `paths`, or `pg` resolves to untyped JS (TS7016) — `builder`
 
 ## Minors kept
 
