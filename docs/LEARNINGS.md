@@ -194,6 +194,10 @@ Candidates for a check, a rule or a skill line.
 - #125 — A claim that rows are duplicated inside a lateral is probed under an outer `select()` and an outer `selectOne()`: the outer `LIMIT 1` hides it — `branch-reviewer`, `builder`
 - #125 — A cast panel types the module's first `const`: a helper above the query is written as a `function` declaration, or the query repeats it — `builder`, `branch-reviewer`
 - #125 — In type probes, mutual assignability (`[A] extends [B]` both ways) tests what a reader sees; strict identity fails on `JSONOnlyColsForTable & LateralResult` — `branch-reviewer`
+- #141 — Under SERIALIZABLE, a concurrent unique violation comes back as 40001 (retried) or 23505 (not) depending on the earlier read's plan: a how-to promises neither — `branch-reviewer`, `builder`
+- #141 — Helpers that refuse by returning `null` are not « both or neither » inside one outer transaction: only a throw rolls it back — `branch-reviewer`
+- #141 — A docs example that writes cleans its own rows, or a second run fails — `branch-reviewer`, `builder`
+- #141 — `queryListener` logs a `COMMIT` before Postgres answers it: a log line is no proof of a commit (#190) — `builder`
 
 ## Minors kept
 
