@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { transformerTwoslash } from '@shikijs/vitepress-twoslash';
 import { defineConfig } from 'vitepress';
+import { checkLinks, keepLinkHashes } from './anchors.ts';
 import { writeLlmsFiles } from './llms.ts';
 import { outline } from './outline.ts';
 import { sqlParameters, syntax } from './syntax.ts';
@@ -22,7 +23,10 @@ export default defineConfig({
   base: '/pgcast/',  // GitHub Pages: alexandredemartin.github.io/pgcast/
   cleanUrls: true,
   srcExclude: ['README.md', 'templates/**'],  // for whoever writes the site, not pages of it
-  buildEnd: writeLlmsFiles,  // llms.txt and llms-full.txt, for assistants
+  buildEnd: async config => {
+    await writeLlmsFiles(config);  // llms.txt and llms-full.txt, for assistants
+    checkLinks(config);  // a link to a page or an anchor that does not exist fails the build
+  },
   head: [
     ['link', { rel: 'preconnect', href: 'https://fonts.googleapis.com' }],
     ['link', { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' }],
@@ -34,6 +38,7 @@ export default defineConfig({
     languages: ['js', 'bash'],
     // an unexpected type error in a `ts twoslash` block fails the build; a block meant to fail says so with `// @errors`
     codeTransformers: [transformerTwoslash({ twoslashOptions }), focusableHovers, sqlParameters],
+    config: keepLinkHashes,  // `[Config.upsertRequiresSameKeys](/runtime-config#Config.upsertRequiresSameKeys)`
   },
   vite: {
     define: { __PGCAST_VERSION__: JSON.stringify(version) },

@@ -171,6 +171,10 @@ Candidates for a check, a rule or a skill line.
 - #120 — SQL in prose said to be « from `.compile()` » still drifted (an outer pair of parentheses): page SQL comes from a probe the build compiles and compares (candidate for #115) — `branch-reviewer`
 - #120 — A quoted error message is a literal that exists in `src/db`: a check that greps each quoted message would have caught the Whereable / condition mix-up — `branch-reviewer`
 - #120 — A probe compiles the exact code the page shows (`${'films'}`, not `films`), and inserts no ids the seeded schema already holds — `builder`
+- #160 — A check that spans pages (anchors, pending lists) holds only on the merged result: rerun the docs build on each open page PR after a sibling merges — `branch-reviewer`
+- #160 — `String.prototype.replace` with a replacement string built from input expands `$&`, `$'` and `$$`: use a function — `branch-reviewer`
+- #160 — In VitePress 2.0.0-alpha.21 `markdown.config` runs after the built-in plugins, and a heading's permalink is a `link_open` token too: a wrapper of that rule is paired with a check on the built HTML — `branch-reviewer`, `builder`
+- #160 — The docs checks have no tests, so red-first proofs are scratch pages built and deleted (a fixtures mode would let them run in CI, as noted for #137) — `builder`
 
 ## Minors kept
 
