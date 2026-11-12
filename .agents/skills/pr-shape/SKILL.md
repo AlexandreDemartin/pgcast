@@ -67,6 +67,7 @@ Sources: GitHub docs "Stack code changes in pull requests", Thoughtworks Radar (
 
 - **Plain English, a capital at the start, no prefix** (`test:`, `feat:`), with a verb that says the effect for the user: `Add …`, `Allow …`, `Fix …`, `Make …`, `Stop …`, `Characterise …`.
 - **British spelling**, as in Zapatos (`licence`, `characterise`, `parenthesise`, `favour`).
+- **Zapatos, not its author**, in issue, PR and commit titles and bodies: "as in Zapatos", "the Zapatos style". His name stays only where credit and the licence call for it (README credit line, docs footer, `LICENCE`, copyright headers, `package.json`); a skill may name him where it explains the method's sources.
 - API names as they are, without backticks: "Allow db.all as value of noNullUpdateColumns".
 - **The step's issue at the end, always**: `(closes #n)`, as in Zapatos ("Stop generating .eslintrc.json (closes #184)"); the body also carries `Closes #n`, which closes the issue on merge. `(addresses #n)` for a PR that does only part of it.
 - Examples: "Fix not() so it parenthesises its condition (closes #30)", "Add related() and relatedMany() for lateral joins on foreign keys".

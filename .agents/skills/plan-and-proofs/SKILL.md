@@ -33,6 +33,7 @@ Closes #n
 
 - `Closes #n` on the first line; a layer of a stack starts with "Stacked on #m" (skill `pr-shape` § Stacking), then `Closes #n`.
 - **What** and **Why** as bullets; unnamed patterns, never an extract from the corpus (skill `consumer-usage`).
+- The body, like the plan comment, names Zapatos, not its author (skill `pr-shape` § PR title).
 - It ends with the requested "Generated with Claude Code" line.
 
 ## Proofs

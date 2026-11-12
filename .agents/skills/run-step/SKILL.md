@@ -41,7 +41,7 @@ The issue is the agent's brief, from `.github/ISSUE_TEMPLATE/task.md`, in Englis
 - **Done when**: the acceptance criteria as checkboxes; it names the commands beyond `lint`, `typecheck`, `test`, `test:types`, `build` (`bench:types`…).
 - **Files**: the targeted paths, the feature's docs page included (skill `pr-shape` § Splitting like Zapatos).
 - **Notes**: **Risk** (level, lens, blockers), **Class** (note 003), **Read** (skills), **Frozen by** (tests).
-- Public: unnamed patterns (skill `consumer-usage`).
+- Public: unnamed patterns (skill `consumer-usage`); Zapatos, not its author (skill `pr-shape` § PR title).
 - An older issue without **Files** or **Risk** (its **Review** gives the level): the orchestrator adds them before the `builder` starts.
 
 ## Risk
