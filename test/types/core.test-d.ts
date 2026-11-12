@@ -186,19 +186,24 @@ describe('type surprises', () => {
     db.sql`INSERT INTO ${'users'} (${db.cols({ email: 'a@b' })}) VALUES (${db.vals({ email: 'a@b' })})`;
   });
 
-  test('updateValues takes raw() and cols(x) on any column, and vals(x) of the column type', () => {
-    // compiled as in a sql template; 6.6.1 took raw() only on a text or jsonb column (test/integration/core.test.ts,
-    // "raw() in a fragment value, or in the updateValues of upsert, is SQL")
-    db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { display_name: db.raw(`"users"."display_name" || '!'`) } });
-    db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { manager_id: db.raw('"users"."manager_id"'), tags: db.cols(['users.tags']) } });
-    db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { manager_id: db.vals(1) } });
-    // x keeps its literal type beside raw() and cols(), as 6.6.1 inferred it from Parameter<T>
-    db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { mood: db.vals('ok'), created_at: db.vals('2020-01-01T12:00:00Z') } });
-    // kept for compatibility: 6.6.1 accepted vals(x) of the column type, though it compiles to the values of x
+  test('updateValues takes raw(), cols(x) and vals(x) where 6.6.1 took them, and keeps the type of param(x)', () => {
+    // compiled as in a sql template (test/integration/core.test.ts, "raw() in a fragment value, or in the updateValues
+    // of upsert, is SQL"); each where 6.6.1 took it as the column's Parameter<V>: raw() if V takes a string, cols(x)
+    // of V, vals(x) of the column's type
+    db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { display_name: db.raw(`"users"."display_name" || '!'`), settings: db.raw(`'{}'`), tags: db.cols(['users.tags']) } });
+    db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { manager_id: db.vals(1), mood: db.vals('ok'), created_at: db.vals('2020-01-01T12:00:00Z') } });
+    // param(x) keeps its literal type, as in 6.6.1: a wider member would widen it to string
+    db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { mood: db.param('ok'), created_at: db.param('2020-01-01T12:00:00Z') } });
+    db.upsert('accounts', {} as s.accounts.Insertable, 'id', { updateValues: { opened_on: db.param('2020-01-01'), lifetime_ops: db.param('1') } });
+    // kept for compatibility: 6.6.1 accepted vals(x) of the column's type, though it compiles to the values of x
     // (here `1`), not to x
     db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { settings: db.vals({ a: 1 }) } });
     // @ts-expect-error vals(x) of another type, refused by 6.6.1 too
     db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { manager_id: db.vals('nonsense') } });
+    // @ts-expect-error raw() on an int column, refused by 6.6.1 too
+    db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { manager_id: db.raw('"users"."manager_id"') } });
+    // @ts-expect-error cols(x) of another type
+    db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { manager_id: db.cols(['users.manager_id']) } });
     // @ts-expect-error still the columns of the table
     db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { nope: db.raw('1') } });
   });
