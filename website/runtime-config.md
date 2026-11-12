@@ -25,7 +25,7 @@ db.setConfig({
 - A key you give as `undefined` is set to `undefined`: it does not go back to its default, and it compiles.
   - After `setConfig({ transactionAttemptsMax: undefined })`, `transaction()` gives up after its first attempt ("… on attempt 1 of undefined, giving up", [#179](https://github.com/AlexandreDemartin/pgcast/issues/179)).
   - After `setConfig({ transactionRetryDelay: undefined })`, every `transaction()` rejects with "TypeError: Cannot destructure property 'minMs' of 'config.transactionRetryDelay' as it is undefined.", and never releases the client it took from a pool ([#182](https://github.com/AlexandreDemartin/pgcast/issues/182)).
-- It returns the new configuration itself, not a copy, so changing that object changes the configuration.
+- It returns the new configuration itself, not a copy, so changing that object changes the configuration ([#182](https://github.com/AlexandreDemartin/pgcast/issues/182)).
 - An unknown key does not compile (TS2353), and neither does a value of the wrong type (TS2322):
 
 ```ts twoslash
@@ -41,7 +41,7 @@ db.setConfig({ retries: 3 });
 db.getConfig(): Config
 ```
 
-A copy of the configuration. The copy is one level deep: `getConfig().transactionAttemptsMax = 1` changes nothing, but `getConfig().transactionRetryDelay.minMs = 1` changes the configuration, since that object is shared.
+A copy of the configuration. The copy is one level deep: `getConfig().transactionAttemptsMax = 1` changes nothing, but `getConfig().transactionRetryDelay.minMs = 1` changes the configuration, since that object is shared ([#182](https://github.com/AlexandreDemartin/pgcast/issues/182)).
 
 ## `Config` {#Config}
 
@@ -81,7 +81,7 @@ transactionAttemptsMax: number  // default: 5
 
 How many times [`transaction()`](/transaction#transaction) runs its callback. After a serialisation failure (`40001`) or a deadlock (`40P01`), it rolls back and runs the callback again, until this many attempts have failed; then it throws the last error. Any other error is rolled back and thrown at once.
 
-- `1`, `0` or less: one attempt, no retry.
+- `1`, `0` or less: one attempt, no retry. With `0`, the message reads "… on attempt 1 of 0, giving up" ([#179](https://github.com/AlexandreDemartin/pgcast/issues/179)).
 - Read when `transaction()` starts, so a change affects the next transaction, not the one running.
 - How to write a callback that can run twice: [Retry a transaction](/retries).
 
@@ -99,7 +99,7 @@ Before each retry, `transaction()` waits a whole number of milliseconds from `mi
 castArrayParamsToJson: boolean  // default: false
 ```
 
-With `true`, every array sent as a parameter is sent as JSON: `CAST($1 AS "json")`, its value `JSON.stringify()`'d. That is `param(x)` and `param(x, 'type')`, and the values of the shortcuts and Whereables, which are parameters too. Off, `pg` sends an array as a Postgres array.
+With `true`, every array sent as a parameter is sent as JSON: `CAST($1 AS "json")`, its value `JSON.stringify()`'d. That is `param(x)`, the values of the shortcuts and Whereables, which are parameters too, and `param(x, 'type')`, whose cast is dropped: `param([1, 2], 'int4[]')` gives `CAST($1 AS "json")` ([#171](https://github.com/AlexandreDemartin/pgcast/issues/171)). Off, `pg` sends an array as a Postgres array.
 
 <CastPanel example="castArrayParamsToJson">
 
@@ -119,7 +119,7 @@ With `true`, every array sent as a parameter is sent as JSON: `CAST($1 AS "json"
 castObjectParamsToJson: boolean  // default: false
 ```
 
-With `true`, every plain object sent as a parameter is sent as `CAST($1 AS "json")`, its value `JSON.stringify()`'d. Off, it is `$1`, and `pg` sends the same JSON text, with no type: Postgres then infers one from where `$1` stands.
+With `true`, every plain object sent as a parameter is sent as `CAST($1 AS "json")`, its value `JSON.stringify()`'d, even with `param(x, 'type')`, whose cast is dropped ([#171](https://github.com/AlexandreDemartin/pgcast/issues/171)). Off, it is `$1`, and `pg` sends the same JSON text, with no type: Postgres then infers one from where `$1` stands.
 
 <CastPanel example="castObjectParamsToJson">
 
@@ -527,7 +527,7 @@ const shout = db.strict((s: string) => s.toUpperCase());
 const loud = shout(tagline);
 ```
 
-- Only `null`: `undefined` is passed to `fn`.
+- Only `null`: `undefined` is passed to `fn`, which may throw on it: `db.toBuffer(undefined)` throws "TypeError: Cannot read properties of undefined (reading 'slice')" ([#182](https://github.com/AlexandreDemartin/pgcast/issues/182)).
 - With `strictNullChecks` off, a type has no `null` in it, and none of these types say anything of it: `toDate(null)` is typed `Date`, `shout(null)` `any`.
 
 ## `SchemaVersionCanary` {#SchemaVersionCanary}
