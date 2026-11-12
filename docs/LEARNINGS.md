@@ -265,6 +265,10 @@ Candidates for a check, a rule or a skill line.
 - #203 — `llms-full.txt` drops Twoslash's `// @` lines, so a block meant to fail says so in its prose (« does not compile (TSnnnn) ») or the text-only reader — an assistant — takes it as working code (#220) — `branch-reviewer`
 - #203 — `fragment.prepared()` with no name takes a new `_zapatos_prepared_<n>` per call: a prepared query function always needs a fixed name, and a fixed name only for a text that does not change — `branch-reviewer`
 - #203 — A block that reads a `lateral` key does not compile with `strict` off (TS2339): a « strict on and off » check expects it — `builder`
+- #203 — A `TxnClient` is a `pg.ClientBase`, so a parameter typed `Queryable` takes a transaction client of any level: a function that opens a transaction takes `pg.Pool | db.TxnClientFor<Level>` to keep the check — `branch-reviewer`, `builder`
+- #203 — `process.on('warning', …)` does not stop Node's own print; only `--no-warnings` does, and `--no-deprecation` stops the warning before the listener — `branch-reviewer`
+- #203 — The generator sends its catalog queries concurrently: a `debugListener` sample's `<n>` holds only for a named config with one relation — `branch-reviewer`, `builder`
+- #203 — Each fix round gets its own scratch folder named after its PR, or two batches share probes — `builder`
 
 ## Minors kept
 
