@@ -25,9 +25,11 @@ const timing = typeof performance === 'object' ?
 /**
  * Compiles to `DEFAULT` for use in `INSERT`/`UPDATE` queries. As a `Whereable`
  * value, in `isIn`, or as the value of `eq()`, `add()` and the other conditions,
- * it throws: a filter has no default. So does `vals([Default])`
- * in a fragment value of `vals({…})`, compiled with its key as the current column,
- * as a `Whereable` value is. Zapatos 6.6.1 sent it as the string `'Symbol(DEFAULT)'`.
+ * it throws: a filter has no default. For `add()` and `subtract()`, which are
+ * UPDATE values, give `Default` as the value itself: `{ n: Default }`.
+ * `vals([Default])` throws too in a fragment value of `vals({…})`, compiled with
+ * its key as the current column, as a `Whereable` value is. Zapatos 6.6.1 sent it
+ * as the string `'Symbol(DEFAULT)'`.
  */
 export const Default = Symbol('DEFAULT');
 export type DefaultType = typeof Default;

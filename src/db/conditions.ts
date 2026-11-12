@@ -20,7 +20,7 @@ import { mapWithSeparator } from './utils';
 import type { Whereable } from 'zapatos/schema';
 
 const
-  defaultInCondition = '`db.Default` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. `DEFAULT` is for INSERT and UPDATE values.',
+  defaultInCondition = '`db.Default` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To set a column to its default in an UPDATE, give `db.Default` as the value itself: `{ n: db.Default }`.',
   selfInCondition = '`db.self` has no meaning as the value of `eq()`, `add()` and the other conditions: it is already the column on the left. To compare the column with itself, write a `sql` fragment with `db.self` on both sides.';
 
 // a fragment that throws when compiled, so that `run()` rejects before any query, as for `Default` in a

@@ -533,7 +533,7 @@ describe('Default and self as the value of a condition', () => {
     expect({ Default: messages(Default), self: messages(self) }).toMatchInlineSnapshot(`
       {
         "Default": Set {
-          "\`db.Default\` has no meaning as the value of \`eq()\`, \`add()\` and the other conditions: compare with a value. \`DEFAULT\` is for INSERT and UPDATE values.",
+          "\`db.Default\` has no meaning as the value of \`eq()\`, \`add()\` and the other conditions: compare with a value. To set a column to its default in an UPDATE, give \`db.Default\` as the value itself: \`{ n: db.Default }\`.",
         },
         "self": Set {
           "\`db.self\` has no meaning as the value of \`eq()\`, \`add()\` and the other conditions: it is already the column on the left. To compare the column with itself, write a \`sql\` fragment with \`db.self\` on both sides.",
