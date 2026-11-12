@@ -110,7 +110,7 @@ With `true`, every array sent as a parameter is sent as JSON: `CAST($1 AS "json"
 - Off, the same query fails: `json_array_length($1)` gives 22P02 "invalid input syntax for type json". `param(x, true)` sends the array as JSON under either setting.
 - On a Postgres array column, Postgres refuses an array sent this way: 42804 "column "genres" is of type text[] but expression is of type json" in an `insert()` or `update()`, 42883 "operator does not exist: text[] = json" in a Whereable, and "… text[] && json" with [`arrayOverlaps()`](/conditions#conditions.arrayOverlaps).
 - `param(x, false)` sends the array as it is, under either setting: `{ genres: db.param(['mystery', 'drama'], false) }` gives `SET ("genres") = ROW($1)`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.update('films', { genres: db.param(['mystery', 'drama'], false) }, { id: 1000 })) -->.
-- The items of `isIn()` are parameters one by one, so an array of numbers there is unchanged: `("id" IN ($1, $2))`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${{ id: db.conditions.isIn([1000, 1001]) }}`) -->.
+- The items of `isIn()` are parameters one by one, so an array of numbers there is unchanged: `"id" IN ($1, $2)`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${{ id: db.conditions.isIn([1000, 1001]) }}`) -->.
 - How `param()` compiles each `cast`: [`param()`](/sql-template#param).
 
 ### `castObjectParamsToJson` {#Config.castObjectParamsToJson}
