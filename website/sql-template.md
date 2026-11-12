@@ -297,7 +297,7 @@ A column of the parent query's table, in a subquery given to `lateral` ([Join th
 </CastPanel>
 
 - Without a column, the column of the filter it sits in: `{ film_id: db.parent() }`, in a `lateral` of `roles`, gives `("film_id" = "roles"."film_id")`. With no filter, it throws.
-- It works as a Whereable value, in a `sql` fragment, in `eq()` and in `vals([…])`, so in `isIn()`: `{ film_id: isIn([db.parent()]) }` gives `("film_id" IN ("roles"."film_id"))`. In `vals([…])`, Zapatos 6.6.1 sent it as JSON: `isIn([parent('id')])` compared with `'{"value":"id"}'`.
+- It works as a Whereable value, in a `sql` fragment, in `eq()` and in `vals([…])`, so in `isIn()`: `{ film_id: isIn([db.parent()]) }` gives `(("film_id" IN ("roles"."film_id")))`. In `vals([…])`, Zapatos 6.6.1 sent it as JSON: `isIn([parent('id')])` compared with `'{"value":"id"}'`.
 - Outside a nested query, it throws "The 'parent' table alias has no meaning here", so `run()` rejects before any query.
 
 ### `ParentColumn` {#ParentColumn}
