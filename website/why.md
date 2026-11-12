@@ -44,7 +44,9 @@ Each shortcut writes one query, and its reference shows that SQL. Zapatos's docs
 
 The panel is what you get in your own code: [`.compile()`](/sql-template#compile) gives the same `text` and `values`, and sends nothing. Every value is a parameter, the JSON keys included; every table and column name is quoted. The nesting is Postgres's own work, `jsonb_agg` in a `LEFT JOIN LATERAL`: the studio and its films come back as one JSON value, in one round trip, with no rows to stitch together in JavaScript.
 
-TypeScript knows the one column asked for, the films beneath it, and `undefined` when no studio has that `id`: that takes `strict`, as [Your first typed query](/first-query#set-up-the-project) sets it. When a shortcut doesn't fit, the [`sql`](/sql-template#sql) template is always there. You write the SQL, it interpolates names, values as parameters, and other fragments, and you type the result with the generated types. The shortcuts are built on it.
+TypeScript knows the one column asked for, the films beneath it, and `undefined` when no studio has that `id`: that takes `strict`, as [Your first typed query](/first-query#set-up-the-project) sets it.
+
+When a shortcut doesn't fit, the [`sql`](/sql-template#sql) template is always there. You write the SQL, it interpolates names, values as parameters, and other fragments, and you type the result with the generated types. The shortcuts are built on it.
 
 ## Explicit, never hidden
 
