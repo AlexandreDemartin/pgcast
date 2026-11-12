@@ -94,7 +94,7 @@ For a seat that may be taken, ask Postgres not to refuse: [`upsert()` with `doNo
 
 - Recognise it with `err instanceof db.NotExactlyOneError`. It is not a `pg.DatabaseError` and has no `code`, so `isDatabaseError()` gives `false`.
 - Its message is "One result expected but none returned (hint: check `.query.compile()` on this Error)"<!-- message -->, and `err.query.compile()` gives the SQL and values of the panel.
-- It asks for `LIMIT 1`<!-- probe: examples/errors_not_found.ts -->, so two matching rows are not an error: it gives the first, as in Zapatos 6.6.1 ([#32](https://github.com/AlexandreDemartin/pgcast/issues/32)).
+- It asks for `LIMIT $2`<!-- probe: examples/errors_not_found.ts -->, its value `1`, so two matching rows are not an error: it gives the first, as in Zapatos 6.6.1 ([#32](https://github.com/AlexandreDemartin/pgcast/issues/32)).
 - In a `lateral`, a missing row is `null`, not an error ([`selectExactlyOne()`](/select#selectExactlyOne)).
 - When a missing row is ordinary, as in a search, [`selectOne()`](/select#selectOne) gives `undefined` instead, and TypeScript makes you check it.
 
