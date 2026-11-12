@@ -9,7 +9,7 @@ pgcast is Zapatos, kept going. Zapatos's docs open with its aim:
 
 > Postgres and TypeScript are each, individually, fabulous. Zapatos aims to make them work beautifully together. No abstractions, no distractions: just your database, with type safety.
 
-Its case is against ORMs. "It is a truth universally acknowledged that ORMs aren't very good," its author writes, and "abstractions that obscure the underlying SQL, or that prioritise ease of switching to another database tomorrow over effective use of this database today, are a source of misery." TypeScript's checks and autocomplete "speed development, prevent bugs, and simplify refactoring", but "talking to the database is a place where they really don't just happen."
+Its case is against ORMs. "It is a truth universally acknowledged that ORMs aren't very good," its author writes, and "abstractions that obscure the underlying SQL, or that prioritise ease of switching to another database tomorrow over effective use of this database today, are a source of misery." VS Code's type checking and autocomplete "speed development, prevent bugs, and simplify refactoring", but "talking to the database is a place where they really don't just happen."
 
 So Zapatos makes three choices, and pgcast keeps all three: the types come from the database, the SQL stays in sight, and nothing happens that you didn't ask for.
 
