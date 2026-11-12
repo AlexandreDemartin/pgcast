@@ -90,6 +90,10 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
   height: 36px; border: 1px solid var(--line) !important; border-radius: 8px !important; background: var(--sunken) !important;
   color: var(--muted); font-size: 14px;
 }
+/* room for the three group links by the search field, from 960px */
+@media (max-width: 1100px) { .VPNavBarSearchButton .keys { display: none; } }
+/* and an icon only under 900px, so that GitHub and the theme button stay in the bar down to 768px */
+@media (max-width: 900px) { .VPNavBarSearchButton .text { display: none; } }
 /* one class more than VitePress's scoped `.VPNavMenuLink` and `.VPNavMenuLink.active`, so that these win */
 .VPNavBar .VPNavBarMenuLink.VPNavMenuLink { color: var(--muted); font-size: 14px; font-weight: 400; }
 .VPNavBar .VPNavBarMenuLink.VPNavMenuLink:hover, .VPNavBar .VPNavBarMenuLink.VPNavMenuLink.active { color: var(--fg); }
@@ -112,7 +116,10 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 .VPSidebarItem.level-1 .text { font-size: 14px; line-height: 1.5; padding: 0; color: var(--fg); }
 .VPSidebarItem.level-1.is-active .link { background: var(--accent-soft); }
 .VPSidebarItem.level-1.is-active .text { color: var(--accent); font-weight: 600; }
-.VPSidebarItem .since { float: right; line-height: 21px; font-size: 11px; font-weight: 500; color: var(--muted); }
+/* a minor's badge, in the nav, on its group's landing page and in the pager: an inline block, so out of a link's
+   underline, and glued to the text in outline.ts, so that no underlined space comes before it */
+.since { display: inline-block; margin-left: 8px; font-size: 11px; font-weight: 500; color: var(--muted); }
+.VPSidebarItem .since { float: right; line-height: 21px; }
 .VPSidebarItem .text code { font-size: .9em; }
 
 /* "On this page" */
@@ -222,7 +229,7 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 }
 .landing .pillars h3 { font-size: 1rem; font-weight: 700; margin: 0 0 6px; }
 .landing .pillars p { margin: 0; color: var(--muted); font-size: 14px; }
-.landing .readnext p { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; }
+.landing .readnext p { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 0; }
 .landing .readnext a {
   display: block; border: 1px solid var(--line); border-radius: var(--radius); padding: 16px;
   text-decoration: none; color: var(--fg); background: var(--surface);
@@ -231,10 +238,10 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 .landing .readnext small { display: block; color: var(--muted); margin-top: 4px; font-size: 13px; }
 @media (max-width: 900px) {
   .landing .pillars { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .landing .readnext p { grid-template-columns: minmax(0, 1fr); }
+  .landing .readnext p { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 560px) {
-  .landing .pillars { grid-template-columns: minmax(0, 1fr); }
+  .landing .pillars, .landing .readnext p { grid-template-columns: minmax(0, 1fr); }
   .landing .hero { padding-block: 44px 28px; }
 }
 

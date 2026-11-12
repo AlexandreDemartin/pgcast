@@ -7,6 +7,7 @@ import '@shikijs/vitepress-twoslash/style.css';
 import DefaultTheme from 'vitepress/theme-without-fonts';
 import type { Theme } from 'vitepress';
 import CastPanel from './CastPanel.vue';
+import GroupPages from './GroupPages.vue';
 import InstallLine from './InstallLine.vue';
 import Layout from './Layout.vue';
 import SiteFooter from './SiteFooter.vue';
@@ -21,6 +22,7 @@ export default {
   enhanceApp({ app }) {
     app.use(TwoslashFloatingVue, { themes: { twoslash: { triggers: isMobile ? ['touch'] : ['hover', 'touch', 'focus'] } } });
     app.component('CastPanel', CastPanel);
+    app.component('GroupPages', GroupPages);
     app.component('InstallLine', InstallLine);
     app.component('SiteFooter', SiteFooter);
   },
