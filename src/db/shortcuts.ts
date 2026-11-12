@@ -231,11 +231,16 @@ interface UpsertSignatures {
 export const doNothing = [];
 
 // a plain value is sent as a parameter, as `vals()` sends it; our own objects (`sql`, `param`, `raw`,
-// `cols`, `vals`, `parent`, and the symbols `Default`, `self`) are compiled as they always were
-const updateValueSQL = (value: any) =>
+// `cols`, `vals`, `parent`, and the symbols `Default`, `self`) are compiled as they always were, as is
+// an array that holds one at any depth (item by item, as in a `sql` template), and a function or the
+// global object, which throw there
+const compiledAsIs = (value: any): boolean =>
   value instanceof SQLFragment || value instanceof Parameter || value instanceof DangerousRawString ||
-    value instanceof ColumnNames || value instanceof ColumnValues || value instanceof ParentColumn ||
-    typeof value === 'symbol' ? value : param(value);
+  value instanceof ColumnNames || value instanceof ColumnValues || value instanceof ParentColumn ||
+  typeof value === 'symbol' || typeof value === 'function' || value === globalThis ||
+  (Array.isArray(value) && value.some(compiledAsIs));
+
+const updateValueSQL = (value: any) => compiledAsIs(value) ? value : param(value);
 
 /**
  * Generate an 'upsert' (`INSERT ... ON CONFLICT ...`) query `SQLFragment`.
