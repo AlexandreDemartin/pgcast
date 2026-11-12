@@ -92,6 +92,9 @@ Candidates for a check, a rule or a skill line.
 - #27 — Under `node --throw-deprecation`, `process.emitWarning(…, { type: 'DeprecationWarning' })` throws later, on `process.nextTick`, not at the call site; under `--no-deprecation` it is silent — `branch-reviewer`
 - #27 — When master cuts a release, a branch's CHANGELOG lines can land under the release heading in a clean merge: check against `git show origin/master:CHANGELOG.md` — `builder`
 - #27 — In zsh, `git show $B:src/…` fails (`:s` is a history modifier): quote it, `"${B}:src/…"` — `branch-reviewer`
+- #28 — Moving an error from `.run()` to build time changes how it reaches the caller: a synchronous `Error` instead of a rejected promise and a pg `DatabaseError`, so `.run(c).catch(…)`, `Promise.allSettled` over a batch and `isDatabaseError` behave differently; name it in the PR (candidate: skill `backward-compat`) — `builder`, `branch-reviewer`
+- #28 — A guard based on `Object.keys` matches what `cols()` / `vals()` compile exactly; replaying odd objects (inherited, symbol, non-enumerable keys) shows it cheaply — `builder`
+- #28 → #29 — Once `undefinedMeansMissing` leaves out `undefined` keys, `{ col: undefined }` can come back as `SET () = ROW()`: the empty check of `update()` must count the kept keys, frozen by a test — `branch-reviewer`
 
 ## Minors kept
 
