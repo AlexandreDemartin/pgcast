@@ -41,7 +41,8 @@ for (const [prefix, file] of [['Config', dbFile], ['generate', generateFile]]) {
 // An entry is a heading of a Reference page that ends in `{#name}`, outside fenced code.
 const
   referencePages = outline.find(group => group.link === '/reference').items.map(({ link }) => `${link.slice(1)}.md`),
-  entries = new Map();  // name → page
+  entries = new Map(),  // name → page
+  problems = [];
 
 for (const page of referencePages.filter(page => existsSync(new URL(page, import.meta.url)))) {
   let fence = null;
@@ -50,13 +51,13 @@ for (const page of referencePages.filter(page => existsSync(new URL(page, import
     if (marker && fence === null) fence = marker;
     else if (marker && marker[0] === fence[0] && marker.length >= fence.length) fence = null;
     const anchor = fence === null && line.match(/^#{1,6}\s.*\{#([^\s}]+)\}\s*$/)?.[1];
-    if (anchor) entries.set(anchor, page);
+    if (anchor && names.has(anchor) && entries.has(anchor) && entries.get(anchor) !== page) {
+      problems.push(`${anchor}: has an entry in ${entries.get(anchor)} and in ${page}; keep one`);
+    } else if (anchor) entries.set(anchor, page);
   }
 }
 
-const
-  pending = new Map(),  // name → page
-  problems = [];
+const pending = new Map();  // name → page
 
 for (const [page, list] of Object.entries(JSON.parse(readFileSync(new URL(pendingFile, import.meta.url), 'utf8')))) {
   if (!referencePages.includes(page)) {
