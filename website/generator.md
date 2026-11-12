@@ -77,7 +77,7 @@ await generate({
 
 - It opens a `pg.Pool` of its own on `config.db`, and ends it before resolving.
 - It sends only `SELECT`s, on `information_schema` and `pg_catalog`: one for the relations of each schema, one for its enums, then two per relation, its columns and its unique indexes.
-- A query that fails, the connection included, prints `*** error <n> ***` and the error with `console.log`, then ends the process with `process.exit(1)`, as in Zapatos 6.6.1. The promise never rejects, so a `try`/`catch` around it does not run.
+- A query that fails, the connection included, prints `*** error <n> ***` and the error with `console.log`, then ends the process with `process.exit(1)`, as in Zapatos 6.6.1 ([#183](https://github.com/AlexandreDemartin/pgcast/issues/183)). On a failed query the promise never settles, so a `try`/`catch` around it does not run. Other errors reject it: a write that fails (`ENOTDIR: not a directory, mkdir 'afile/zapatos'` when `outDir` is a file), a malformed [rule](#generate.schemas).
 - At run time, a key it doesn't know is ignored: an old `srcMode`, a misspelt `outdir`. In TypeScript, an object literal with one fails to compile (TS2561).
 - `zapatos/generate` also exports `Config` and the functions `generate()` is built from (`tsForConfig()`, `definitionForRelationInSchema()` and others), with no entry here.
 
