@@ -32,7 +32,7 @@ For views, pgcast keeps to what Postgres states, as Zapatos did: a nullability t
 - An enum of another schema becomes an `any` placeholder ([#44](https://github.com/AlexandreDemartin/pgcast/issues/44)).
 
 ::: info Coming
-Reading more of the catalog, each as an opt-in: foreign keys, for laterals that know their join ([#54](https://github.com/AlexandreDemartin/pgcast/issues/54)); a domain's `CHECK (VALUE = ANY (ARRAY[…]))` as a union of its values ([#55](https://github.com/AlexandreDemartin/pgcast/issues/55)); the result types of hand-written SQL ([#62](https://github.com/AlexandreDemartin/pgcast/issues/62)).
+Reading more of the catalog, each as an opt-in: foreign keys, for laterals that know their join ([#54](https://github.com/AlexandreDemartin/pgcast/issues/54)); a domain's `CHECK (VALUE = ANY (ARRAY[…]))` as a union of its values ([#55](https://github.com/AlexandreDemartin/pgcast/issues/55)); and, as a separate tool, the result types of hand-written SQL ([#62](https://github.com/AlexandreDemartin/pgcast/issues/62)).
 :::
 
 ## One column, five types
