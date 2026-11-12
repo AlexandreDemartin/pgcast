@@ -38,7 +38,7 @@ Given a client you checked out, `transaction()` runs on it and leaves it connect
 
 <<< ./examples/plain/checked_out_client.ts{ts twoslash}
 
-The two `count()`s run on `client`, outside the transaction: `before` is 0, `after` 1.
+The two `count()`s run on `client`, outside the transaction: after the block, `before` is 0, `after` 1.
 
 ### The SQL it sends
 
