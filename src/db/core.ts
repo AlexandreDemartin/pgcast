@@ -226,7 +226,8 @@ export class ParentColumn<T extends Column | undefined = Column | undefined> { c
 /**
  * Returns a `ParentColumn` instance, wrapping a column name, which compiles to
  * that column name of the table of the parent query. Without a column, it takes
- * the column of the filter. As a `Whereable` value, in `eq()` and in `isIn()` /
+ * the column of the filter; with no filter, it throws, as `` sql`${parent()}` ``
+ * does (R58). As a `Whereable` value, in `eq()` and in `isIn()` /
  * `isNotIn()`, in a `lateral` subquery of `authors`:
  * `{ authorId: isIn([parent('id'), 2]) }` gives `("authorId" IN ("authors"."id", $1))`.
  * Outside a nested query it throws. Zapatos 6.6.1 sent it in `isIn()` as JSON
