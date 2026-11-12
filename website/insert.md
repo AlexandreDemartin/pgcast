@@ -90,7 +90,7 @@ Each SQL replaces the `DO UPDATE SET …` of the plain upsert, on `ratings` (on 
 | ``updateValues: { votes: db.sql`${'ratings'}.${'votes'} + 1` }`` | `"ratings"."votes" + 1` in place of `EXCLUDED."votes"` | none |
 | `reportAction: 'suppress'` | no `\|\| jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END)` | no `UpsertAction` |
 
-- `updateColumns` takes a column or an array; `noNullUpdateColumns` a column, an array, or `db.all` for every column.
+- `updateColumns` takes a column or an array; `noNullUpdateColumns` a column, an array, or `db.all` for every column. [Rows with different keys](/batches#rows-with-different-keys) has a panel of `updateColumns`: a booking keeps its time.
 - `updateValues` is one set of values for every row updated. Its keys are always updated, even when `updateColumns` leaves them out, or is `doNothing` (then the SQL is `DO UPDATE SET`, not `DO NOTHING`).
 - In `updateValues`, a plain value is a parameter. A value that holds a fragment, `param()`, `raw()`, `cols()`, `vals()`, `parent()`, `Default` or `self`, at any depth of its arrays and plain objects, is compiled as in a `sql` template.
 - To read a column there, name the table for the existing row, `${'ratings'}.${'votes'}`, or `EXCLUDED` for the new one, `` db.sql`EXCLUDED.${'votes'}` ``. `db.self`, or a fragment or condition that uses it (`` db.sql`${db.self} + 1` ``, [`conditions.add()`](/conditions#conditions.add)), throws "The 'self' column alias has no meaning here", as in Zapatos 6.6.1; `db.parent()`, alone or in a fragment, throws "The 'parent' table alias has no meaning here".
@@ -98,6 +98,27 @@ Each SQL replaces the `DO UPDATE SET …` of the plain upsert, on `ratings` (on 
 ::: warning Security
 Zapatos 6.6.1 wrote a plain string in `updateValues` as an identifier: `{ tagline: 'happy' }` put `"happy"` in the `ROW(…)`, and a string from a user could read other columns or tables. pgcast sends it as a parameter, `$3` in its place, as its type and `update()` always said. To read a column there, write a fragment, as in the table ([The security model](/security)).
 :::
+
+With `noNullUpdateColumns`, a `NULL` leaves the existing value. Film 1002 comes back from a feed with no tagline, and keeps its own:
+
+<CastPanel example="upsert_no_null">
+
+<<< ./examples/upsert_no_null.ts{ts twoslash}
+
+</CastPanel>
+
+- The update still sets every column inserted, `"id"` included; only `"tagline"` reads the existing row first.
+- `film` is the updated row: `$action` is `'UPDATE'`, and `tagline` is still `'Every map leaves something out.'`.
+
+With `reportAction: 'suppress'`, the result has no `$action`:
+
+<CastPanel example="upsert_suppress">
+
+<<< ./examples/upsert_suppress.ts{ts twoslash}
+
+</CastPanel>
+
+With `strictNullChecks` off, the type keeps `$action`, which is then `undefined`.
 
 ### Rows with different keys {#upsert-different-keys}
 
@@ -201,7 +222,19 @@ Delete the rows that match, and return them. `delete` is a reserved word in Java
 
 ## `DeleteSignatures` {#DeleteSignatures}
 
-The interface of `deletes()`'s call signature, `(table, where, options?) => SQLFragment<…[]>`, for a function that wraps it and keeps its types.
+The interface of `deletes()`'s call signature, `(table, where, options?) => SQLFragment<…[]>`, for a function that wraps it and keeps its types. A wrapper typed with it gets the types of its parameters from it, with no cast, and its calls are checked and typed as those of `deletes()`:
+
+```ts twoslash
+import * as db from 'zapatos/db';
+// ---cut---
+const loggedDeletes: db.DeleteSignatures = (table, where, options) => {
+  const query = db.deletes(table, where, options);
+  console.log(query.compile().text);
+  return query;
+};
+
+const removed = loggedDeletes('tags', { film_id: 1003 }, { returning: ['tag'] });
+```
 
 ## `truncate()` {#truncate}
 
@@ -227,6 +260,14 @@ Empty one table, or several in one statement.
 | `'RESTART IDENTITY'` | `RESTART IDENTITY`: the tables' sequences restart | none |
 | `'RESTRICT'` | `RESTRICT`: Postgres refuses if a table not in the list references one of them, as by default | none |
 | `'CASCADE'` | `CASCADE`: also empties the tables that reference them | none |
+
+With `'CASCADE'`, Postgres empties every table that references one of them, at any depth: `films` takes `roles`, `screenings`, `ratings` and `tags` with it, and `seat_bookings` through `screenings`, each named in a notice, `truncate cascades to table "roles"`:
+
+<CastPanel example="truncate_cascade">
+
+<<< ./examples/truncate_cascade.ts{ts twoslash}
+
+</CastPanel>
 
 - `.run()` resolves with `[]`, where the type says `undefined`.
 - The type takes the options in that order, one of each kind. pgcast writes them as given: in JavaScript, or past the type with `as any`, `truncate('tags', 'CASCADE', 'RESTART IDENTITY')` sends `TRUNCATE "tags" CASCADE RESTART IDENTITY`, and Postgres refuses it (42601).
