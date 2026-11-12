@@ -391,14 +391,13 @@ describe('cols and vals', () => {
     expect(() => one({ id: db.conditions.isIn([1, Default]) })).toThrowErrorMatchingInlineSnapshot(`[Error: \`db.Default\` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. \`DEFAULT\` is for INSERT and UPDATE values.]`);
   });
 
-  it('characterization: vals of an array wraps raw, cols and parent() in a parameter', () => {
-    // characterization: only a SQLFragment, a Parameter or Default is compiled as it is; pg sends the
-    // others as JSON ('{"value":"id"}'), so isIn([parent('id')]) compares with a string, not with the
-    // parent column (#101)
-    const nested = sql`${{ owner_id: db.conditions.isIn([raw('1'), cols('x'), parent('id')]) }}`.copy({ parentTable: 'users' });
+  it('characterization: vals of an array wraps raw and cols in a parameter', () => {
+    // characterization: only a SQLFragment, a Parameter, Default or parent() is compiled as it is; pg
+    // sends the others as JSON ('{"value":"x"}'), so isIn([cols('x')]) compares with a string (#101)
+    const nested = sql`${{ owner_id: db.conditions.isIn([raw('1'), cols('x')]) }}`.copy({ parentTable: 'users' });
     expect(nested.compile()).toMatchInlineSnapshot(`
       {
-        "text": "(("owner_id" IN ($1, $2, $3)))",
+        "text": "(("owner_id" IN ($1, $2)))",
         "values": [
           DangerousRawString {
             "value": "1",
@@ -406,9 +405,28 @@ describe('cols and vals', () => {
           ColumnNames {
             "value": "x",
           },
-          ParentColumn {
-            "value": "id",
-          },
+        ],
+      }
+    `);
+  });
+
+  it('vals of an array compiles parent() as the parent column, as a Whereable value does', () => {
+    // 6.6.1 wrapped it in a parameter, sent as '{"value":"id"}' (#107); parent() takes the column of the filter
+    const c = db.conditions;
+    const nested = sql`${{ owner_id: c.isIn([parent('id'), 2]), id: c.isNotIn([parent()]), manager_id: sql`${self} IN (${vals([parent('id')])})` }}`;
+    expect(nested.copy({ parentTable: 'users' }).compile()).toMatchInlineSnapshot(`
+      {
+        "text": "(("id" NOT IN ("users"."id")) AND ("manager_id" IN ("users"."id")) AND ("owner_id" IN ("users"."id", $1)))",
+        "values": [
+          2,
+        ],
+      }
+    `);
+    expect(sql`${vals([1, parent('id')])}`.copy({ parentTable: 'users' }).compile()).toMatchInlineSnapshot(`
+      {
+        "text": "$1, "users"."id"",
+        "values": [
+          1,
         ],
       }
     `);
@@ -622,6 +640,13 @@ describe('errors', () => {
 
   it('refuses parent outside a nested query', () => {
     expect(() => one(parent('id'))).toThrowErrorMatchingInlineSnapshot(`[Error: The 'parent' table alias has no meaning here]`);
+  });
+
+  it('refuses parent in vals of an array outside a nested query, in a filter or not', () => {
+    // 6.6.1 sent '{"value":"id"}' (#107)
+    expect(() => one({ id: db.conditions.isIn([parent('id')]) })).toThrowErrorMatchingInlineSnapshot(`[Error: The 'parent' table alias has no meaning here]`);
+    expect(() => one({ id: db.conditions.isNotIn([1, parent()]) })).toThrowErrorMatchingInlineSnapshot(`[Error: The 'parent' table alias has no meaning here]`);
+    expect(() => one(vals([1, parent('id')]))).toThrowErrorMatchingInlineSnapshot(`[Error: The 'parent' table alias has no meaning here]`);
   });
 
   it('characterization: parent() with no column and no current column', () => {

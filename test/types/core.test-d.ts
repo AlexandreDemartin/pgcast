@@ -125,20 +125,20 @@ describe('type surprises', () => {
     db.select('users', { id: c.isIn([db.raw('1')]) });
   });
 
-  test('characterization: parent() is accepted in isIn, in a lateral or not', () => {
-    // characterization: isIn<T> takes T = ParentColumn<'id'>, which a Whereable value accepts; the runtime sends it
-    // as a parameter, as JSON (test/integration/core.test.ts, "parent() in isIn is sent as JSON")
+  test('parent() is accepted in isIn and isNotIn', () => {
+    // isIn<T> takes T = ParentColumn<'id'>, which a Whereable value accepts; the runtime compiles it to the
+    // parent column (test/integration/core.test.ts, "parent() in isIn and isNotIn is the parent column in a lateral")
     db.select('users', db.all, { lateral: { n: db.count('accounts', { owner_id: c.isIn([db.parent('id')]) }) } });
-    db.select('users', db.all, { lateral: { n: db.count('accounts', { owner_id: c.isNotIn([db.parent('id')]) }) } });
-    db.select('users', { id: c.isIn([db.parent('id')]) });
+    db.select('users', db.all, { lateral: { n: db.count('accounts', { owner_id: c.isNotIn([db.parent('id'), 2]) }) } });
   });
 
-  test('characterization: parent() as a value, or in eq(), is accepted outside a lateral', () => {
+  test('characterization: parent() as a value, in eq() or in isIn, is accepted outside a lateral', () => {
     // characterization: the type does not know whether there is a parent query; outside one, the runtime throws
     db.select('users', db.all, { lateral: { n: db.count('accounts', { owner_id: db.parent('id') }) } });
     db.select('users', db.all, { lateral: { n: db.count('accounts', { owner_id: c.eq(db.parent('id')) }) } });
     db.select('users', { id: db.parent('id') });
     db.select('users', { id: c.eq(db.parent('id')) });
+    db.select('users', { id: c.isIn([db.parent('id')]) });
   });
 
   test('self as a value, and Default in a condition, are refused', () => {
