@@ -11,7 +11,7 @@ import { castOf } from './cast.data.ts';
 import { outline } from './outline.ts';
 import { twoslashOptions } from './twoslash.ts';
 
-const host = 'https://alexandredemartin.github.io';  // GitHub Pages, under the config's `base`
+export const host = 'https://alexandredemartin.github.io';  // GitHub Pages, under the config's `base`
 
 export async function writeLlmsFiles(config: SiteConfig) {
   const
