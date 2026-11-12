@@ -94,8 +94,8 @@ Each SQL replaces the `DO UPDATE SET …` of the plain upsert, on `ratings` (on 
 
 - `updateColumns` takes a column or an array; `noNullUpdateColumns` a column, an array, or `db.all` for every column.
 - `updateValues` is one set of values for every row updated. Its keys are always updated, even when `updateColumns` leaves them out, or is `doNothing` (then the SQL is `DO UPDATE SET`, not `DO NOTHING`).
-- In `updateValues`, a plain value is a parameter. A value that holds a fragment, `param()`, `raw()`, `cols()`, `vals()`, `Default` or `self`, at any depth of its arrays and plain objects, is compiled as in a `sql` template.
-- To read a column there, name the table for the existing row, `${'ratings'}.${'votes'}`, or `EXCLUDED` for the new one, `` db.sql`EXCLUDED.${'votes'}` ``. `db.self`, and a condition that uses it ([`conditions.add()`](/conditions)), throw "The 'self' column alias has no meaning here", as in Zapatos 6.6.1.
+- In `updateValues`, a plain value is a parameter. A value that holds a fragment, `param()`, `raw()`, `cols()`, `vals()`, `parent()`, `Default` or `self`, at any depth of its arrays and plain objects, is compiled as in a `sql` template.
+- To read a column there, name the table for the existing row, `${'ratings'}.${'votes'}`, or `EXCLUDED` for the new one, `` db.sql`EXCLUDED.${'votes'}` ``. `db.self`, or a fragment or condition that uses it (`` db.sql`${db.self} + 1` ``, [`conditions.add()`](/conditions)), throws "The 'self' column alias has no meaning here", as in Zapatos 6.6.1; `db.parent()` throws "The 'parent' table alias has no meaning here".
 
 ::: warning Security
 Zapatos 6.6.1 wrote a plain string in `updateValues` as an identifier: `{ mood: 'happy' }` gave `ROW("happy")`, and a string from a user could read other columns or tables. pgcast sends it as a parameter, `ROW($3)`, as its type and `update()` always said. To read a column there, write a fragment, as in the table ([The security model](/security)).
