@@ -117,16 +117,30 @@ describe('type surprises', () => {
     db.select('users', { display_name: c.isIn([db.cols('Ada'), db.vals('Ada')]) });
     // @ts-expect-error in eq
     db.select('users', { display_name: c.eq(db.cols('Ada')) });
-    // @ts-expect-error on an array column
+    // @ts-expect-error cols(x) on an array column
+    db.select('users', { tags: db.cols(['admin']) });
+    // @ts-expect-error vals(x) on an array column
     db.select('users', { tags: db.vals(['admin']) });
-    // @ts-expect-error on an int column
+    // @ts-expect-error vals(x) on an int column
     db.select('users', { id: db.vals(1) });
+    // @ts-expect-error cols(x) on an int column
+    db.select('users', { id: db.cols(1) });
     // @ts-expect-error in isIn, on an int column
     db.select('users', { id: c.isIn([db.vals(1)]) });
     // @ts-expect-error in eq, on an int column
     db.select('users', { id: c.eq(db.vals(1)) });
+    // @ts-expect-error cols(x) on an enum column
+    db.select('users', { mood: db.cols('ok') });
     // @ts-expect-error in isIn, on an enum column
     db.select('users', { mood: c.isIn([db.cols('ok')]) });
+    // @ts-expect-error vals(x) in eq, on an enum column
+    db.select('users', { mood: c.eq(db.vals('ok')) });
+    // @ts-expect-error raw() on an int column
+    db.select('users', { id: db.raw('1') });
+    // @ts-expect-error raw() on an enum column
+    db.select('users', { mood: db.raw("'ok'") });
+    // @ts-expect-error raw() in isIn, on an int column
+    db.select('users', { id: c.isIn([db.raw('1')]) });
     // @ts-expect-error as an insert() value
     db.insert('users', { email: 'a@b', display_name: db.raw("'A'") });
     // @ts-expect-error as an update() value
@@ -158,12 +172,17 @@ describe('type surprises', () => {
     db.sql`INSERT INTO ${'users'} (${db.cols({ email: 'a@b' })}) VALUES (${db.vals({ email: 'a@b' })})`;
   });
 
-  test('updateValues takes raw(), cols(x) and vals(x) on any column, compiled as SQL', () => {
-    // as in 6.6.1, which took raw() only on a text or jsonb column (test/integration/core.test.ts, "raw() in a
-    // fragment value, or in the updateValues of upsert, is SQL")
+  test('updateValues takes raw() and cols(x) on any column, and vals(x) of the column type', () => {
+    // compiled as in a sql template; 6.6.1 took raw() only on a text or jsonb column (test/integration/core.test.ts,
+    // "raw() in a fragment value, or in the updateValues of upsert, is SQL")
     db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { display_name: db.raw(`"users"."display_name" || '!'`) } });
     db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { manager_id: db.raw('"users"."manager_id"'), tags: db.cols(['users.tags']) } });
+    db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { manager_id: db.vals(1) } });
+    // kept for compatibility: 6.6.1 accepted vals(x) of the column type, though it compiles to the values of x
+    // (here `1`), not to x
     db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { settings: db.vals({ a: 1 }) } });
+    // @ts-expect-error vals(x) of another type, refused by 6.6.1 too
+    db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { manager_id: db.vals('nonsense') } });
     // @ts-expect-error still the columns of the table
     db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { nope: db.raw('1') } });
   });
