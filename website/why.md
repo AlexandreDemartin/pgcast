@@ -70,7 +70,7 @@ The security fixes came first, in 6.6.2: no name (a table, a column, a key, an a
 
 Zapatos 6.6.1 shipped no test suite of its own (its first consumer's tests exercised "most of the code base at least a little"); its CI linted and built. Its roadmap called one "kind of indispensable", one that tests "not just returned values but also inferred types". pgcast's tests check the SQL each call compiles, run it on Postgres 14, 16 and 18, check the types, accepted and refused, and measure what they cost the compiler.
 
-These docs are the last addition. Every example compiles against the library at build: its SQL comes from its own `.compile()`, its type from TypeScript, and an example that no longer fits fails the build.
+These docs are the latest addition. Every example compiles against the library at build: its SQL comes from its own `.compile()`, its type from TypeScript, and an example that no longer fits fails the build.
 
 What stays is everything you import. The module names are still `zapatos/db` and `zapatos/schema`, the API is Zapatos's, and so is the behaviour, but for the fixes: installed under the `zapatos` alias, pgcast needs no change to your imports ([Switch from Zapatos](/switching)).
 
