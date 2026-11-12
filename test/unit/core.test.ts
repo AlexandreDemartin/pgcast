@@ -391,6 +391,30 @@ describe('cols and vals', () => {
     expect(() => one({ id: db.conditions.isIn([1, Default]) })).toThrowErrorMatchingInlineSnapshot(`[Error: \`db.Default\` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. \`DEFAULT\` is for INSERT and UPDATE values.]`);
   });
 
+  it('characterization: vals of an array wraps raw, cols, parent() and self in a parameter', () => {
+    // characterization: only a SQLFragment, a Parameter or Default is compiled as it is; pg sends the
+    // others as JSON ('{"value":"id"}') or as a string ('Symbol(self)'), so isIn([parent('id')]) compares
+    // with a string, not with the parent column (#101)
+    const nested = sql`${{ owner_id: db.conditions.isIn([raw('1'), cols('x'), parent('id'), self]) }}`.copy({ parentTable: 'users' });
+    expect(nested.compile()).toMatchInlineSnapshot(`
+      {
+        "text": "(("owner_id" IN ($1, $2, $3, $4)))",
+        "values": [
+          DangerousRawString {
+            "value": "1",
+          },
+          ColumnNames {
+            "value": "x",
+          },
+          ParentColumn {
+            "value": "id",
+          },
+          Symbol(self),
+        ],
+      }
+    `);
+  });
+
   it('vals of an array throws on Default in a fragment value of vals of an object, which reads as a Whereable', () => {
     // the fragment is compiled with its key as the current column, as in a Whereable; 6.6.1 sent 'Symbol(DEFAULT)'
     expect(() => one(vals({ role: sql`${vals([Default])}` }))).toThrowErrorMatchingInlineSnapshot(`[Error: \`db.Default\` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. \`DEFAULT\` is for INSERT and UPDATE values.]`);
@@ -496,6 +520,27 @@ describe('Whereable', () => {
         "values": [
           DangerousRawString {
             "value": "'ok'",
+          },
+        ],
+      }
+    `);
+  });
+
+  it('characterization: cols, vals and self as a value are wrapped in a parameter too', () => {
+    // characterization: as raw(); pg sends '{"value":"Ada"}' and 'Symbol(self)'. A parent() value is the one
+    // wrapper compiled as it is (#101)
+    expect(one({ display_name: cols('Ada'), tags: vals(['admin']), mood: self })).toMatchInlineSnapshot(`
+      {
+        "text": "("display_name" = $1 AND "mood" = $2 AND "tags" = $3)",
+        "values": [
+          ColumnNames {
+            "value": "Ada",
+          },
+          Symbol(self),
+          ColumnValues {
+            "value": [
+              "admin",
+            ],
           },
         ],
       }
