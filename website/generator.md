@@ -40,7 +40,7 @@ Then it ends with the cause:
 
 | Cause | Ending |
 |---|---|
-| not valid JSON | `JSON.parse`'s message: `Unexpected end of JSON input` |
+| not valid JSON | `JSON.parse`'s message, which depends on the input and on Node: on Node 22, `Unexpected end of JSON input` for an empty file, `No number after minus sign in JSON at position 1 (line 1 column 2)` for `--help`, `Expected double-quoted property name in JSON at position 15 (line 1 column 16)` for a trailing comma |
 | a variable is not set | `Environment variable 'DATABASE_URL' is not set` |
 
 A query that fails, the connection included, also ends it with code 1, as [`generate()`](#generate) says.
