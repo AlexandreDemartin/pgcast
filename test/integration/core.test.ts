@@ -189,7 +189,7 @@ describe('Whereable', () => {
 
   it('characterization: raw(), cols(x) and vals(x) as a value are sent as JSON: no row, or every row with isNotIn', async () => {
     // characterization: the type takes each as a Parameter<string> (or <JSONValue>, <string[]>); pg sends
-    // '{"value":"\'Ada\'"}', so raw() is no SQL here, and deletes() with isNotIn deletes every row; as in 6.6.1 (#101)
+    // {"value":"'Ada'"}, so raw() is no SQL here, and deletes() with isNotIn deletes every row; as in 6.6.1 (#101)
     expect(await ids({ display_name: raw("'Ada'") })).toEqual([]);
     expect(await ids({ display_name: c.isIn([raw("'Ada'")]) })).toEqual([]);
     expect(await ids({ display_name: c.eq(raw("'Ada'")) })).toEqual([]);
