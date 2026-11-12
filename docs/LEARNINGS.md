@@ -258,6 +258,9 @@ Candidates for a check, a rule or a skill line.
 - #203 — A panel's caption matches the entry it sits under: on `pool`, `now()` is the query's time only because the query is its own transaction — `branch-reviewer`
 - #203 — A link's text does not repeat a section title of the page that holds it, or it reads as an in-page anchor — `branch-reviewer`
 - #203 — A snippet whose caption names variable values keeps them in scope after any `try` — `branch-reviewer`, `builder`
+- #203 — `llms-full.txt` drops Twoslash's `// @` lines, so a block meant to fail says so in its prose (« does not compile (TSnnnn) ») or the text-only reader — an assistant — takes it as working code (#220) — `branch-reviewer`
+- #203 — `fragment.prepared()` with no name takes a new `_zapatos_prepared_<n>` per call: a prepared query function always needs a fixed name, and a fixed name only for a text that does not change — `branch-reviewer`
+- #203 — A block that reads a `lateral` key does not compile with `strict` off (TS2339): a « strict on and off » check expects it — `builder`
 
 ## Minors kept
 
