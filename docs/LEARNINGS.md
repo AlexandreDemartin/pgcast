@@ -258,6 +258,13 @@ Candidates for a check, a rule or a skill line.
 - #203 — A panel's caption matches the entry it sits under: on `pool`, `now()` is the query's time only because the query is its own transaction — `branch-reviewer`
 - #203 — A link's text does not repeat a section title of the page that holds it, or it reads as an in-page anchor — `branch-reviewer`
 - #203 — A snippet whose caption names variable values keeps them in scope after any `try` — `branch-reviewer`, `builder`
+- #203 — `castOf()` matched the type hover by name alone, so a `const` named like a table namespace showed `namespace cinemas`; it now takes only `const <name>: ` and a self-check fails the build otherwise — `branch-reviewer`, `builder`
+- #203 — An emptiness guard on a Whereable (`Object.keys(where).length`) does not catch a condition that compiles to `TRUE` (`isNotIn([])` is one key, `WHERE ((true))`) — `branch-reviewer`
+- #203 — A `lock` run on a pool lasts for that one statement: an example that shows `FOR UPDATE` says it holds only inside a transaction — `branch-reviewer`, `builder`
+- #203 — Diffing `llms-full.txt` from one build to the next proves a `cast.data.ts` change touches only the panels it should — `builder`
+- #203 — `llms-full.txt` drops Twoslash's `// @` lines, so a block meant to fail says so in its prose (« does not compile (TSnnnn) ») or the text-only reader — an assistant — takes it as working code (#220) — `branch-reviewer`
+- #203 — `fragment.prepared()` with no name takes a new `_zapatos_prepared_<n>` per call: a prepared query function always needs a fixed name, and a fixed name only for a text that does not change — `branch-reviewer`
+- #203 — A block that reads a `lateral` key does not compile with `strict` off (TS2339): a « strict on and off » check expects it — `builder`
 - #203 — A `TxnClient` is a `pg.ClientBase`, so a parameter typed `Queryable` takes a transaction client of any level: a function that opens a transaction takes `pg.Pool | db.TxnClientFor<Level>` to keep the check — `branch-reviewer`, `builder`
 - #203 — `process.on('warning', …)` does not stop Node's own print; only `--no-warnings` does, and `--no-deprecation` stops the warning before the listener — `branch-reviewer`
 - #203 — The generator sends its catalog queries concurrently: a `debugListener` sample's `<n>` holds only for a named config with one relation — `branch-reviewer`, `builder`
