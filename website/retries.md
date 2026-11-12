@@ -109,8 +109,8 @@ A retried transaction then logs:
 [txn 0] Retrying transaction, attempt 2 of 10
 ```
 
-- [`transactionAttemptsMax`](/runtime-config#Config.transactionAttemptsMax): the attempts in all, `5` by default. `1` turns the retries off; so does `0`, whose message reads `on attempt 1 of 0, giving up` ([#179](https://github.com/AlexandreDemartin/pgcast/issues/179)).
-- [`transactionRetryDelay`](/runtime-config#Config.transactionRetryDelay): the wait before each retry, a random number of milliseconds between the two. The client stays checked out of the pool while it waits.
+- [`transactionAttemptsMax`](/runtime-config#Config.transactionAttemptsMax): the attempts in all. `1` turns the retries off.
+- [`transactionRetryDelay`](/runtime-config#Config.transactionRetryDelay): the wait before each retry. The client stays checked out of the pool while it waits.
 - [`transactionListener`](/runtime-config#Config.transactionListener): every message it gets is in [Retries](/transaction#retries).
 
 ## Test a retry
