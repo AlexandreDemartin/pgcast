@@ -44,7 +44,7 @@ export async function writeLlmsFiles(config: SiteConfig) {
 
   for (const { link, source } of [home, ...groups.flatMap(group => group.pages)]) {
     const casts: Record<string, string> = {};
-    for (const [, name] of source.matchAll(/<CastPanel example="(\w+)">/g)) {
+    for (const [, name] of source.matchAll(/<CastPanel example="([\w-]+)">/g)) {
       const { sql, values, type } = await castOf(join(config.srcDir, 'examples', `${name}.ts`), twoslasher);
       casts[name!] = `Postgres runs:\n\n\`\`\`sql\n${sql}\n\`\`\`\n\nValues: \`${values}\`\n\n` +
         `TypeScript knows:\n\n\`\`\`ts\n${type}\n\`\`\``;
@@ -64,11 +64,17 @@ function plain(source: string, casts: Record<string, string>, srcDir: string, ur
     quotes: string[] = [],  // for each open container: the prefix of its lines
     expanded = source
       .replace(/<!--[\s\S]*?-->/g, '')
-      .replace(/<CastPanel example="(\w+)">([\s\S]*?)<\/CastPanel>/g, (_, name, example) =>
-        `You write:\n${example.replace(/<template[\s\S]*?<\/template>/g, '')}\n${casts[name]}\n`)
+      .replace(/<CastPanel example="([\w-]+)">([\s\S]*?)<\/CastPanel>/g, (_, name, example) => {
+        if (casts[name] === undefined) throw new Error(`llms.ts: no cast for the panel of examples/${name}.ts`);
+        return `You write:\n${example.replace(/<template[\s\S]*?<\/template>/g, '')}\n${casts[name]}\n`;
+      })
       .replace(/^<<< (\S+?)(?:\{(.*)\})?$/gm, (_, path, info = '') =>
         '```' + info + '\n' + readFileSync(join(srcDir, path), 'utf8').trimEnd() + '\n```')
-      .replace(/<InstallLine command="([^"]*)" \/>/g, '```sh\n$1\n```');
+      .replace(/<InstallLine command="([^"]*)" \/>/g, '```sh\n$1\n```'),
+    missed = /<\/?CastPanel\b.*/.exec(expanded)?.[0];
+
+  // a panel written another way (`example='…'`, a second attribute) would drop silently out of llms-full.txt
+  if (missed) throw new Error(`llms.ts: write \`${missed}\` as \`<CastPanel example="<name>">\`, for llms-full.txt`);
 
   let fence: { info: string; code: string[] } | undefined;
   for (const line of expanded.split('\n')) {
