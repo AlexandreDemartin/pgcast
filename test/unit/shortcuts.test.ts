@@ -315,10 +315,21 @@ describe('upsert', () => {
         ],
       }
     `);
-    // an array of plain values only is one parameter, as update() sends it
-    expect({ strings: set(['a', 'b']), numbers: set([1, 2]), empty: set([]), objects: set([{}, { a: [1] }]) }).toMatchInlineSnapshot(`
+    // an array of plain values only is one parameter, as update() sends it; so is what mapWithSeparator()
+    // returns for one string or none, with no separator in it
+    expect({
+      strings: set(['a', 'b']), numbers: set([1, 2]), empty: set([]), objects: set([{}, { a: [1] }]),
+      oneItem: set(db.mapWithSeparator(['users.mood'], sql` || `, c => c)),
+      noItem: set(db.mapWithSeparator([], sql` || `, c => c)),
+    }).toMatchInlineSnapshot(`
       {
         "empty": [
+          "("mood") = ROW($3)",
+          [
+            [],
+          ],
+        ],
+        "noItem": [
           "("mood") = ROW($3)",
           [
             [],
@@ -346,6 +357,14 @@ describe('upsert', () => {
             ],
           ],
         ],
+        "oneItem": [
+          "("mood") = ROW($3)",
+          [
+            [
+              "users.mood",
+            ],
+          ],
+        ],
         "strings": [
           "("mood") = ROW($3)",
           [
@@ -357,6 +376,136 @@ describe('upsert', () => {
         ],
       }
     `);
+  });
+
+  it('updateValues: a plain object that holds a pgcast object, at any depth, compiles as under 6.6.1', () => {
+    // as in a sql template: a WHERE-style condition of its keys, each value a fragment or a parameter
+    expect({
+      like: set({ 'users.mood': dc.like('h%') }), sql: set({ x: sql`'happy'` }), inArray: set([{ x: sql`'happy'` }]),
+      nullPrototype: set(Object.assign(Object.create(null), { x: sql`'happy'` })),
+      param: set({ 'users.mood': param('happy') }), deep: set({ a: { b: [db.raw(`'happy'`)] } }),
+      default: set({ a: Default }), parent: set({ a: parent('id') }),
+    }).toMatchInlineSnapshot(`
+      {
+        "deep": [
+          "("mood") = ROW(("a" = $3))",
+          [
+            {
+              "b": [
+                DangerousRawString {
+                  "value": "'happy'",
+                },
+              ],
+            },
+          ],
+        ],
+        "default": [
+          "("mood") = ROW(("a" = $3))",
+          [
+            Symbol(DEFAULT),
+          ],
+        ],
+        "inArray": [
+          "("mood") = ROW((('happy')))",
+          [],
+        ],
+        "like": [
+          "("mood") = ROW((("users"."mood" LIKE $3)))",
+          [
+            "h%",
+          ],
+        ],
+        "nullPrototype": [
+          "("mood") = ROW((('happy')))",
+          [],
+        ],
+        "param": [
+          "("mood") = ROW(("users"."mood" = $3))",
+          [
+            Parameter {
+              "cast": undefined,
+              "value": "happy",
+            },
+          ],
+        ],
+        "parent": "throws: The 'parent' table alias has no meaning here",
+        "sql": [
+          "("mood") = ROW((('happy')))",
+          [],
+        ],
+      }
+    `);
+    // an object or a class instance of plain values only is one parameter, as update() sends it; a function
+    // in an object is data there too (a toPostgres() method), as under 6.6.1
+    class Holder { x = sql`'happy'`; }
+    expect({
+      empty: set({}), nullPrototype: set(Object.create(null)), where: set({ 'users.mood': 'happy' }),
+      date: set(new Date(0)), buffer: set(Buffer.alloc(0)), map: set(new Map()),
+      toPostgres: set({ toPostgres: () => 'happy' }), inArray: set([{ toPostgres: () => 'happy' }]),
+    }).toMatchInlineSnapshot(`
+      {
+        "buffer": [
+          "("mood") = ROW($3)",
+          [
+            {
+              "data": [],
+              "type": "Buffer",
+            },
+          ],
+        ],
+        "date": [
+          "("mood") = ROW($3)",
+          [
+            1970-01-01T00:00:00.000Z,
+          ],
+        ],
+        "empty": [
+          "("mood") = ROW($3)",
+          [
+            {},
+          ],
+        ],
+        "inArray": [
+          "("mood") = ROW($3)",
+          [
+            [
+              {
+                "toPostgres": [Function],
+              },
+            ],
+          ],
+        ],
+        "map": [
+          "("mood") = ROW($3)",
+          [
+            Map {},
+          ],
+        ],
+        "nullPrototype": [
+          "("mood") = ROW($3)",
+          [
+            {},
+          ],
+        ],
+        "toPostgres": [
+          "("mood") = ROW($3)",
+          [
+            {
+              "toPostgres": [Function],
+            },
+          ],
+        ],
+        "where": [
+          "("mood") = ROW($3)",
+          [
+            {
+              "users.mood": "happy",
+            },
+          ],
+        ],
+      }
+    `);
+    expect(set(new Holder())[0]).toBe(`("mood") = ROW($3)`);
   });
 
   it('updateValues: a function or the global object throws, as under 6.6.1, alone or in an array', () => {

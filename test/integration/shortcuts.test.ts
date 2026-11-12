@@ -234,6 +234,26 @@ describe('upsert', () => {
     }).toEqual({ sql: 'ROBERT', param: 'Bobby', raw: 'Bobby', mapWithSeparator: 'Bobby', mixed: 'ROBERT' });
   });
 
+  it('updateValues: a plain object that holds a pgcast object runs as under 6.6.1; one of plain values is stored', async () => {
+    const upsertBob = (displayName: any) => run(db.upsert('users', { email: 'bob@example.com', display_name: 'Robert' }, 'email', {
+      updateColumns: [], updateValues: { display_name: displayName }, returning: ['display_name'],
+    })).then(row => row.display_name);
+    expect({
+      like: await upsertBob({ 'users.display_name': db.conditions.like('B%') }),
+      sql: await upsertBob({ x: sql`'Robert'` }),
+      inArray: await upsertBob([{ x: sql`'Bobby'` }]),
+      // under 6.6.1, these gave TRUE or a comparison, stored as true; in sql, they still do
+      empty: await upsertBob({}),
+      emptyBuffer: await upsertBob(Buffer.alloc(0)),
+      where: await upsertBob({ 'users.email': 'bob@example.com' }),
+      emptyInSql: await upsertBob(sql`${{}}`),
+      whereInSql: await upsertBob(sql`${{ 'users.email': 'bob@example.com' }}`),
+    }).toEqual({
+      like: 'true', sql: 'Robert', inArray: 'Bobby',
+      empty: '{}', emptyBuffer: '', where: '{"users.email":"bob@example.com"}', emptyInSql: 'true', whereInSql: 'true',
+    });
+  });
+
   it('noNullUpdateColumns: a NULL does not overwrite (one column, a list, all)', async () => {
     const values = { email: 'ada@example.com', display_name: 'Ada', mood: null, manager_id: null };
     const returning = ['mood', 'manager_id'] as const;
