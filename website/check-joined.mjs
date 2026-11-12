@@ -48,8 +48,8 @@ function joinsOf(page) {
     } else if (include) {
       pieces.push(...kept(readFileSync(root + include, 'utf8').split('\n')
         .map((text, j) => ({ text, at: `${at}: ${include}:${j + 1}` }))));
-    } else if (line.startsWith('<<< ')) {
-      problems.push(`${at}: a joined page includes only \`<<< ./examples/<name>.ts{ts twoslash}\`: ${line}`);
+    } else if (/^\s*<<< /.test(line)) {  // a region or an indented include, which the line above misses
+      problems.push(`${at}: a joined page includes only \`<<< ./examples/<name>.ts{ts twoslash}\`, unindented: ${line}`);
     } else if (joined) {
       joins.push({ file: joined, at, pieces });
       pieces = [];
