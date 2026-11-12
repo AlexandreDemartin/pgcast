@@ -175,6 +175,10 @@ Candidates for a check, a rule or a skill line.
 - #160 — `String.prototype.replace` with a replacement string built from input expands `$&`, `$'` and `$$`: use a function — `branch-reviewer`
 - #160 — In VitePress 2.0.0-alpha.21 `markdown.config` runs after the built-in plugins, and a heading's permalink is a `link_open` token too: a wrapper of that rule is paired with a check on the built HTML — `branch-reviewer`, `builder`
 - #160 — The docs checks have no tests, so red-first proofs are scratch pages built and deleted (a fixtures mode would let them run in CI, as noted for #137) — `builder`
+- #126 — Whether a shortcut error throws or rejects depends on where it is raised: in the shortcut's body it throws at the call, in `compileExpression` it rejects at `.run()`; probe with `.run(pool).catch(h)` outside any `async` — `branch-reviewer`, `builder`
+- #126 — The theme styles h1–h3 only: a `####` heading renders outside the art direction and the build stays green — `branch-reviewer`
+- #126 — A hand-copied `sql` block goes stale silently: show only pgcast's fixed strings and link to the panels — `builder`
+- #126 — A SERIALIZABLE race shows only on a warm pool: warm two connections before the probe — `builder`
 
 ## Minors kept
 
