@@ -39,7 +39,7 @@ Syntax tokens:
 | `--t` | `#0a6b63` | `#4fcfbf` | type names (the accent) |
 | `--n` | `#b0245a` | `#f08ab3` | numbers |
 | `--c` | `#7a8794` | `#6c7d8a` | comments, in italics |
-| `--qi` | `#12202b` | `#e2e9ee` | SQL quoted identifiers (`"authors"`), as plain text |
+| `--qi` | `#12202b` | `#e2e9ee` | SQL quoted identifiers (`"films"`), as plain text |
 | `--p` | `#b0245a` | `#f08ab3` | SQL parameters (`$1`) and their values, in bold |
 
 Other tokens: `--radius: 10px` (the cast panel 14px, buttons 9px, chips and the version pill `999px`); `--top: 56px`, the top bar's height.
@@ -77,12 +77,12 @@ Other tokens: `--radius: 10px` (the cast panel 14px, buttons 9px, chips and the 
 - **Reading column**: the article at most 72ch, paragraphs and list items at most 68ch; padding 36px 48px 80px.
 - **"On this page"** from 1200px: the page's `h2`s, the current one in `--accent` with an accent rule on its left.
 - **Breakpoints**: under 1200px, nav 240px and no rail; under 900px, one column and the nav becomes a drawer, `min(300px, 86vw)`, sliding in from the left; under 560px, search as an icon, no version pill, the pager stacked. On the site, VitePress's own (768 / 960 / 1280px) for the shell, the top bar and the nav, rather than fighting its layout; the home grid, the notes, the page `h1` and the version pill keep 560 / 900px.
-- **Home**: hero (eyebrow, line, lede, "Get started" as the primary button, "Switching from Zapatos", the install command with Copy), the cast panel of authors with their books, four pillars (Postgres is the source · SQL you can read · Values are parameters · Drop-in for Zapatos), three "read next" links.
+- **Home**: hero (eyebrow, line, lede, "Get started" as the primary button, "Switching from Zapatos", the install command with Copy), the cast panel of films with their cast, four pillars (Postgres is the source · SQL you can read · Values are parameters · Drop-in for Zapatos), three "read next" links.
 - **Footer**, on the home page and under every page: "pgcast is maintained by Alexandre Demartin. Zapatos and its original documentation are by George MacKerron. MIT licence.", each name linking to their GitHub profile.
 
 ## Signature components
 
-- **Cast panel**: three columns (`1.15fr 1.2fr .85fr`) in one bordered panel, radius 14px, dashed dividers. Each column has a header with a mono tag in an accent outline: `TS` You write · `SQL` Postgres runs · `::` TypeScript knows. The SQL column ends with its values row (`values ["books"]`, dashed rule above). One column when the panel itself is under 900px wide (a container query), as in a page's reading column. An optional caption row under it, 13px, `--muted`.
+- **Cast panel**: three columns (`1.15fr 1.2fr .85fr`) in one bordered panel, radius 14px, dashed dividers. Each column has a header with a mono tag in an accent outline: `TS` You write · `SQL` Postgres runs · `::` TypeScript knows. The SQL column ends with its values row (`values ["cast"]`, dashed rule above). One column when the panel itself is under 900px wide (a container query), as in a page's reading column. An optional caption row under it, 13px, `--muted`.
 - **Hover types**: a dashed `--muted` underline, `cursor: help`, `--accent-soft` on hover or focus; focusable from the keyboard. The tooltip: mono, `--surface`, border, soft shadow. On the site, Twoslash computes every type at build from the docs schema; the prototype's types are written by hand.
 - **Code blocks**: on `--code-bg`, border, `--radius`; a 38px bar with a label or tabs (npm · pnpm · yarn, mono 12px, the selected one underlined in `--accent`) and a Copy button ("Copied" for 1.4s; it selects the text when the clipboard is refused).
 - **Notes**: a chip, then the text, on `--surface` with a border, **no coloured side rail**. Chips: Opt-in (`--accent-soft`, `--accent`), Security (`--warn-soft`, `--warn`, a 1px `--warn` border, the note itself on `--warn-soft`), Coming (`--sunken`, `--muted`).
@@ -95,7 +95,7 @@ Other tokens: `--radius: 10px` (the cast panel 14px, buttons 9px, chips and the 
 ## Voice
 
 - George MacKerron's: warm, brief, first person where natural; British spelling.
-- His world for every example: `authors`, `books`, `tags`, `employees`, `photos` and `subjects`, `stores`, `bankAccounts`, `doctors` and `shifts`. Never an extract from a real project.
+- pgcast's own world for every example (amended 2026-11-12, [decision 004](../decisions/004-documentation-site.md) § Decision, 7): a film's cast, in `website/schema.sql`: `studios`, `films`, `actors` and their `roles`, `crew`, `cinemas`, `screenings`, `seat_bookings`, `ratings`, `tags`; snake_case columns. Every title and name invented; never an extract from a real project. Zapatos's `authors` and `books` stay for the tests' fixture and existing JSDoc.
 
 ## What to avoid
 

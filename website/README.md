@@ -30,7 +30,7 @@ npm run docs:build             # or docs:dev, docs:preview
 
 ## The docs schema
 
-`schema.sql`, in George MacKerron's world. `zapatos/` is generated from it by pgcast's own generator and committed, so a build needs no database; CI regenerates it and fails if anything differs. After a change to `schema.sql` or to the generator, regenerate it:
+`schema.sql`, pgcast's own example world: a film's cast (studios, films, actors and their roles, crew, cinemas, screenings, seat bookings, ratings, tags), every name invented, seeded rows from id 1000. The seeded screenings have fixed dates, in March 2030: an example filters on an explicit date, never on `now()`, so its result stays the same. `zapatos/` is generated from it by pgcast's own generator and committed, so a build needs no database; CI regenerates it and fails if anything differs. After a change to `schema.sql` or to the generator, regenerate it:
 
 ```sh
 npm run build                  # at the root

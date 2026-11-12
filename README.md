@@ -22,15 +22,17 @@ The goal is Zapatos going the last mile. Foreign-key joins, the conditions Postg
 
 ## At a glance
 
-George's `authors` and `books` tables, where `books."authorId"` references `authors."id"`. The TypeScript you write:
+A film and its cast: the `films` and `roles` tables, where `roles.film_id` references `films.id`. The TypeScript you write:
 
 ```typescript
 import * as db from 'zapatos/db';
 import pool from './pgPool';
 
-const authorBooks = await db.select('authors', db.all, {
+const films = await db.select('films', db.all, {
   lateral: {
-    books: db.select('books', { authorId: db.parent('id') }),
+    cast: db.select('roles', { film_id: db.parent('id') }, {
+      order: { by: 'billing', direction: 'ASC' },
+    }),
   },
 }).run(pool);
 ```
@@ -40,25 +42,27 @@ The SQL it runs, in one round trip:
 ```sql
 SELECT coalesce(jsonb_agg(result), '[]') AS result
 FROM (
-  SELECT to_jsonb("authors".*) || jsonb_build_object($1::text, "lateral_books".result) AS result
-  FROM "authors"
+  SELECT to_jsonb("films".*) || jsonb_build_object($1::text, "lateral_cast".result) AS result
+  FROM "films"
   LEFT JOIN LATERAL (
     SELECT coalesce(jsonb_agg(result), '[]') AS result
     FROM (
-      SELECT to_jsonb("books".*) AS result
-      FROM "books"
-      WHERE ("authorId" = "authors"."id")
-    ) AS "sq_books"
-  ) AS "lateral_books" ON true
-) AS "sq_authors"
--- values: ["books"]
+      SELECT to_jsonb("roles".*) AS result
+      FROM "roles"
+      WHERE ("film_id" = "films"."id")
+      ORDER BY "billing" ASC
+    ) AS "sq_roles"
+  ) AS "lateral_cast" ON true
+) AS "sq_films"
+-- values: ["cast"]
 ```
 
 The type you get, with no annotation (`s` is `zapatos/schema`, the generated module):
 
 ```typescript
-const authorBooks: (s.authors.JSONSelectable & { books: s.books.JSONSelectable[] })[]
-// s.authors.JSONSelectable is { id: number; name: string; isLiving: boolean | null }
+const films: (s.films.JSONSelectable & { cast: s.roles.JSONSelectable[] })[]
+// s.films.JSONSelectable is { genres: string[]; id: number; release_year: number;
+//   runtime_minutes: number; studio_id: number; tagline: string | null; title: string }
 ```
 
 ## Install
