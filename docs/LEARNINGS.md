@@ -225,6 +225,10 @@ Candidates for a check, a rule or a skill line.
 - #149 — A rules file for assistants names the cases a reviewer would: a request body passed whole, an empty filter before a write, side effects in a callback that may run again, `@ts-ignore` — `branch-reviewer`
 - #149 — `RAISE EXCEPTION … USING ERRCODE = '40001'` in a `DO` block probes a retry in one line, with no concurrent transactions — `builder`
 - #149 — `git merge -m` takes a trailer only as a second `-m`: brief merges as `-m "<subject>" -m "Co-Authored-By: …"` — `builder`
+- #129 — TypeScript checks excess keys only in a fresh object literal: a claim that « the type refuses this key » is checked on a value built at run time (`Record<string, string>`, `Object.fromEntries()`) and on wider types (`object`, `{}`) — `branch-reviewer`, `builder`
+- #129 — A hostile payload in an example is run inlined into that query's exact compiled text: `--` breaks on a shortcut's trailing `)) AS "sq_…"` and gives 42601, not the attack described — `branch-reviewer`, `builder`
+- #129 — A caller's name reaches any relation the role can read as a table (`pg_catalog.pg_roles`) and any column in scope, system columns included — `branch-reviewer`
+- #129 — node-postgres uses the extended protocol when there are values or a statement name: « no values means plain text » names `.prepared()` — `branch-reviewer`
 
 ## Minors kept
 
