@@ -49,7 +49,7 @@ The warning comes when you call the shortcut, before `.run()`, and only if the o
 
 ## 7.0 and 8.0
 
-7.0 turns the opt-ins on by default: `upsertRequiresSameKeys`, `undefinedMeansMissing` and those still to come in 6.x, except `selectExactlyOne()`'s. Decision 003 makes that the whole of 7.0's break, and the warnings announce it, so a project that has turned every option on, and sees no `PGCAST_DEP` warning, has nothing to change. The old behaviours go in 8.0.
+7.0 turns on by default the opt-ins that decision 003 lists: `upsertRequiresSameKeys`, `undefinedMeansMissing` and those 6.7 still brings, except `selectExactlyOne()`'s. Decision 003 makes that the whole of 7.0's break, and the warnings announce it, so a project that has turned every option on, and sees no `PGCAST_DEP` warning, has nothing to change. The old behaviours go in 8.0.
 
 The generator gets opt-ins of its own in 6.7, typing the enums of other schemas ([#44](https://github.com/AlexandreDemartin/pgcast/issues/44)) and keeping enum values in their declared order ([#49](https://github.com/AlexandreDemartin/pgcast/issues/49)). Their warnings will come through [`warningListener`](/generator#generate.warningListener), and only when your schema has something they would change.
 
