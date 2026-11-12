@@ -206,6 +206,9 @@ Candidates for a check, a rule or a skill line.
 - #143 — An empty Whereable, typed or not, passes `tsc` and compiles to `TRUE`: a guide says to check before a `DELETE` / `UPDATE` — `branch-reviewer`
 - #143 — A `param()` cast is quoted, so SQL-standard spellings and upper case do not exist (`'integer'`, `'TIMESTAMPTZ'` → 42704) — `branch-reviewer`
 - #143 — A security probe for « matches every row » uses a `DELETE` on a table nothing references, or a foreign key stops it and proves nothing — `builder`
+- #145 — `.catch(err => { …; return undefined; throw err; })` is typed `any` without `strictNullChecks`: write `(err): undefined =>` to keep the row type in every mode — `branch-reviewer`, `builder`
+- #145 — `pg.DatabaseError` exists from pg 8.6 and `pg.native` rejects with plain `Error`s, while the peer range is `pg >=7.18.2`: a docs clause on pg versions is checked on the tarballs — `branch-reviewer`, `builder`
+- #145 — pgcast is stricter than SQL for options (`'desc'`, `'serializable'` run in Postgres): « cannot mean anything in SQL » is checked against Postgres itself — `branch-reviewer`
 
 ## Minors kept
 
