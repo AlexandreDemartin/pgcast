@@ -50,7 +50,7 @@ The SQL of each row is what the built library compiles, on the docs schema; `…
 | `having: …` | `HAVING sum("votes") >= $1` | none |
 | `lock: { for: 'UPDATE' }` | `FOR UPDATE` | none |
 
-::: tip Strict null checks
+::: tip Strict
 `columns`, `extras` and `lateral` change the type only with `strictNullChecks` (or `strict`) on. Without it, the result stays the full `JSONSelectable` and an extra or a lateral key is not in the type; the type refuses nothing, not even `columns` beside one `lateral` subquery, and one subquery is typed as the table's row while its own result comes back.
 :::
 
@@ -93,7 +93,7 @@ Paging through a long list: [Paginate a list](/paginate).
 `lateral?: { [key: string]: SQLFragment } | SQLFragment`, a [`LateralOption`](#LateralOption): other shortcuts, nested, each joined with `LEFT JOIN LATERAL … ON true`. In them, [`db.parent()`](/sql-template#parent) names a column of this query's table.
 
 - **An object**: each key becomes a key of the result, holding its subquery's result: an array for `select()`, an object or `null` for `selectOne()`, a number for `count()`. The keys are joined in alphabetical order; each is one identifier, `"lateral_<key>"`.
-- **One subquery**: its result is passed through in place of each row, as for a many-to-many table whose own columns you don't need. Then `columns` and `extras` have nothing to add to, and the type refuses them, with `strictNullChecks` on.
+- **One subquery**: its result is passed through in place of each row. Then `columns` and `extras` have nothing to add to, and the type refuses them, with `strictNullChecks` on.
 
 Steps, nesting and self-joins: [Join through a lateral](/lateral). Since pgcast 6.6.2, a key or an `alias` with a `"` in it stays one identifier; in Zapatos 6.6.1 it could close its quotes ([changelog](https://github.com/AlexandreDemartin/pgcast/blob/master/CHANGELOG.md), § Security).
 
@@ -127,7 +127,7 @@ Postgres returns only the grouped columns, those a grouped primary key determine
 
 ### `lock`
 
-`lock?: SelectLockingOptions | SelectLockingOptions[]`: a locking clause each, in order, written after everything else. For a lock that lasts, run the query in a [`transaction()`](/transaction#transaction).
+`lock?: SelectLockingOptions | SelectLockingOptions[]`: a locking clause each, in order, written after everything else.
 
 | Key | Values | SQL |
 |---|---|---|
@@ -179,7 +179,7 @@ With `withTies` and `order`, it writes `FETCH FIRST $1 ROWS WITH TIES`, here and
 db.selectExactlyOne(table, where, options?)
 ```
 
-As [`selectOne()`](#selectOne), but its type has no `undefined`: when no row matches, `.run()` rejects with a [`NotExactlyOneError`](#NotExactlyOneError). It does not check that only one row matches: with `LIMIT 1`, it takes the first. In a `lateral`, a missing row gives `null` and no error, though the type says otherwise; it fits a `NOT NULL` foreign key.
+As [`selectOne()`](#selectOne), but its type has no `undefined`: when no row matches, `.run()` rejects with a [`NotExactlyOneError`](#NotExactlyOneError). It does not check that only one row matches: with `LIMIT 1`, it takes the first. In a `lateral`, a missing row gives `null` and no error, though the type says otherwise.
 
 <CastPanel example="selectExactlyOne">
 
