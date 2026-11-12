@@ -38,7 +38,8 @@ for (const [prefix, file] of [['Config', dbFile], ['generate', generateFile]]) {
   }
 }
 
-// An entry is a heading of a Reference page that ends in `{#name}`, outside fenced code and HTML comments.
+// An entry is a heading of a Reference page that ends in `{#name}`, other attributes allowed (`{#name .since}`),
+// outside fenced code and HTML comments.
 const
   referencePages = outline.find(group => group.link === '/reference').items.map(({ link }) => `${link.slice(1)}.md`),
   entries = new Map(),  // name → page
@@ -54,7 +55,7 @@ for (const page of referencePages.filter(page => existsSync(new URL(page, import
       comment = !line.replace(/^\s*<!--/, '').includes('-->');
       continue;
     }
-    const anchor = fence === null && line.match(/^#{1,6}\s.*\{#([^\s}]+)\}\s*$/)?.[1];
+    const anchor = fence === null && line.match(/^#{1,6}\s.*\{(?:[^}]*\s)?#([^\s}]+)[^}]*\}\s*$/)?.[1];
     if (anchor && names.has(anchor) && entries.has(anchor) && entries.get(anchor) !== page) {
       problems.push(`${anchor}: has an entry in ${entries.get(anchor)} and in ${page}; keep one`);
     } else if (anchor) entries.set(anchor, page);
