@@ -66,7 +66,7 @@ To compare with SQL, give a `sql` fragment as the value, `db.self` for the colum
 - To compare with a plain value, give the value itself, or `db.param(x)`.
 - In a fragment, a plain string is a name, not a value: `${'the salt orchard'}` would be the column `"the salt orchard"` ([Identifiers](/sql-template#identifiers)).
 - [`DangerousRawString`](/sql-template#DangerousRawString), [`ColumnNames`](/sql-template#ColumnNames) and [`ColumnValues`](/sql-template#ColumnValues) no longer match a plain `{ value }`, nor each other: `const r: db.DangerousRawString = { value: 'x' }` fails (2741). Make them with `db.raw()`, `db.cols()` and `db.vals()`.
-- As a value of `insert()`, `update()` or `upsert()`, the type refuses them too, though the run time still sends them as JSON ([#132](https://github.com/AlexandreDemartin/pgcast/issues/132)).
+- As an inserted or updated value of `insert()`, `update()` or `upsert()` (not in `updateValues`), the type refuses them too, though the run time still sends them as JSON ([#132](https://github.com/AlexandreDemartin/pgcast/issues/132)).
 
 ## Find the calls whose result changes
 
