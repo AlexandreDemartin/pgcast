@@ -654,6 +654,7 @@ describe('upsertRequiresSameKeys', () => {
 
 /** A fresh src/db, which has emitted no warning yet, and a spy on the warnings. */
 const fresh = async () => {
+  vi.restoreAllMocks();
   vi.resetModules();
   const emitWarning = vi.spyOn(process, 'emitWarning').mockImplementation(() => { });
   return { fdb: await import('../../src/db'), emitWarning };
