@@ -117,6 +117,24 @@ jobs:
     defaults:
       run:
         working-directory: website
+
+    # docs:schema loads schema.sql into its own pgcast_test_<pid>_docs database.
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: pgcast
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/pgcast
+
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -129,6 +147,12 @@ jobs:
       - run: npm ci && npm run build
         working-directory: .
       - run: npm ci
+      - name: Committed docs schema types match schema.sql
+        # --intent-to-add: a new file the generator writes (a custom type placeholder) shows in the diff too.
+        run: |
+          npm run docs:schema
+          git add --intent-to-add zapatos
+          git diff --exit-code -- zapatos
       - run: npm run docs:build
 
   ci-passed:
