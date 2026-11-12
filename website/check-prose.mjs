@@ -50,6 +50,15 @@ async function sqlOf(probe) {
   return sent.map(text => text.replace(/\s+/g, ' ').trim()).join('\n');
 }
 
+/** `promise`, or an error once `ms` have passed: Node would otherwise exit on a probe that never settles. */
+function settles(promise, ms) {
+  let timer;
+  const late = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`does not settle in ${ms / 1000} s`)), ms);
+  });
+  return Promise.race([promise, late]).finally(() => clearTimeout(timer));
+}
+
 const escape = text => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /**
@@ -93,8 +102,8 @@ for (const file of readdirSync(dist).filter(file => file.endsWith('.js'))) {
 
 /**
  * Whether `quote` is a message of the library: the whole of a literal, `…` for a value or for text left out, or the
- * literal with a value in place of each `…`, one word (`1ms`, not `1 ms`). A quote that shows a `${…}` is the source of
- * a template literal, between backticks or not, each `${…}` as written.
+ * literal with a value in place of each `…`, one word (`1ms`, not `1 ms`). A quote that shows a `${…}` is the source
+ * of a template literal, between backticks or not, each `${…}` as written.
  */
 function isMessage(quote) {
   const text = quote.replace(/^`(.*)`$/, '$1'), quoted = new RegExp(`^${pattern(text).source}$`);
@@ -170,7 +179,7 @@ for (const page of pages) {
         continue;
       }
 
-      if (!probes.has(probe)) probes.set(probe, await sqlOf(probe).catch(error => error));
+      if (!probes.has(probe)) probes.set(probe, await settles(sqlOf(probe), 5000).catch(error => error));
       const sql = probes.get(probe);
       if (sql instanceof Error) {
         problems.push(`${where}: its probe ${sql.message}: ${probe}`);
