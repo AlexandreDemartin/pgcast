@@ -73,6 +73,7 @@ function plain(
     lines: string[] = [],
     quotes: string[] = [],  // for each open container: the prefix of its lines
     expanded = source
+      .replace(/^[ \t]*<!--(?:(?!-->)[\s\S])*-->[ \t]*\n/gm, '')  // a line that holds only a comment, so a mark leaves no line
       .replace(/<!--[\s\S]*?-->/g, '')
       .replace(/<CastPanel example="([\w-]+)">([\s\S]*?)<\/CastPanel>/g, (_, name, example) => {
         if (casts[name] === undefined) throw new Error(`llms.ts: no cast for the panel of examples/${name}.ts`);
