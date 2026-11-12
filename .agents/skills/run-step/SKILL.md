@@ -1,6 +1,6 @@
 ---
 name: run-step
-description: 'Orchestrate a step, sub-issue of a GitHub Epic: builder, review by **Review**, blocking / minor triage, verify, merge that closes the issue, end of chapter, learnings. USE FOR: starting the next step, starting a feature, choosing the review, triaging defects, merging. DO NOT USE FOR: writing the code (agent builder), CI (ci-gate).'
+description: 'Orchestrate a step, sub-issue of a GitHub Epic: issue body, risk, plan, builder, review, fixes, verify, gate, end of chapter, learnings. USE FOR: starting the next step or a feature, writing an issue, choosing the risk, briefing an agent, triaging. DO NOT USE FOR: writing the code (agent builder), CI (ci-gate), the merge itself (merge-gate).'
 ---
 
 # Orchestrating a step
@@ -28,63 +28,56 @@ It lives in the issues of `AlexandreDemartin/pgcast` (`--repo AlexandreDemartin/
 - Read it: `gh issue view <n> --repo AlexandreDemartin/pgcast`; only it, and its Epic if the order requires.
 - A `type: feature` that starts: first create its `type: task` issues from **Planned PRs**, in order, each under the feature:
   `gh api repos/AlexandreDemartin/pgcast/issues/<feature>/sub_issues -F sub_issue_id=<id>`, where `<id>` is the task's `id`, not its number (`gh api repos/AlexandreDemartin/pgcast/issues/<n> -q .id`).
-- A step too wide for one PR in George's manner (skill `zapatos-spirit` § Splitting like George): split it into sub-issues before starting the `builder`.
+- A step too wide for one PR in George's manner (skill `pr-shape` § Splitting like George): split it into sub-issues before starting the `builder`.
 - `needs decision`, or a stop point of `AGENTS.md` (`core.ts`, codegen output, publication): ask the user **before** the `builder`.
 - A new idea: a `type: feature` issue under its Epic, at its place in the order (`PATCH …/issues/<epic>/sub_issues/priority`, with `sub_issue_id` and `after_id`).
 - Unstable network: each `gh` call can be retried; before recreating, list what exists (no duplicates).
 
 ## Issue body
 
-In English, concise (skill `concise-docs`): **What** (the expected behaviour, the SQL before / after when it matters) · **Why** · **Done when** · **Notes**: **Class** (note 003), **Review** (level, lens, blockers), **Read** (skills), **Frozen by** (tests). **Done when** names the commands beyond `lint`, `typecheck`, `test`, `test:types`, `build` (`bench:types`…). Public: unnamed patterns (skill `consumer-usage`).
+The issue is the agent's brief, from `.github/ISSUE_TEMPLATE/task.md`, in English, concise (skill `concise-docs`):
 
-## Review level
+- **What**: the expected behaviour, the SQL before / after when it matters · **Why**.
+- **Done when**: the acceptance criteria as checkboxes; it names the commands beyond `lint`, `typecheck`, `test`, `test:types`, `build` (`bench:types`…).
+- **Files**: the targeted paths.
+- **Notes**: **Risk** (level, lens, blockers), **Class** (note 003), **Read** (skills), **Frozen by** (tests).
+- Public: unnamed patterns (skill `consumer-usage`).
+- An older issue without **Files** or **Risk** (its **Review** gives the level): the orchestrator adds them before the `builder` starts.
 
-| Level | For | Review |
-|---|---|---|
-| `low` | docs, method, CI only | the CI, and the `builder` rereads its diff before the PR; no reviewer |
-| `normal` | tests, opt-in addition (condition, option, codegen emitter) | `branch-reviewer`; a fresh `builder` only for blockers; no `verify` |
-| `high` | `core.ts` (compilation, escaping), `transaction.ts`, driver interface, existing public types, default codegen output | `branch-reviewer` with the subject's lens; fresh `builder`; `verify` |
+## Risk
+
+| Risk | For | Plan | Review | Gate |
+|---|---|---|---|---|
+| `low` | docs, method, CI only | none | the CI, and the `builder` rereads its diff before the PR; no reviewer | Ship |
+| `normal` | tests, opt-in addition (condition, option, codegen emitter) | posted, the builder goes on | `branch-reviewer`; a fresh `builder` only for blockers; no verify | Show |
+| `high` | `core.ts` (compilation, escaping), `transaction.ts`, driver interface, existing public types, default codegen output | posted, the builder stops until checked | `branch-reviewer` with the subject's lens; fresh `builder`; verify | Ask |
+
+The plan: skill `plan-and-proofs`; the comments: skill `review-comments`; the gate: skill `merge-gate`.
 
 ## Sequence
 
-1. `builder` builds the step, checks locally, opens its PR in **draft**, base `master` (skill `ci-gate`), with `Closes #n` in the body and `(closes #n)` at the end of the title.
-2. The level's reviews, in parallel, even on a draft PR.
-3. Each defect is classed:
-   - **blocking** (bug, injection, breaking change, wrong or too wide type, SQL different from the one announced, missing test on a risk): a fresh `builder` fixes it in the step;
-   - **minor** (naming, JSDoc, form): added to `docs/LEARNINGS.md` § Minors kept, or dropped.
-4. Level `high`: `branch-reviewer` in `verify` mode on the fix commits; `not fixed` or `regressed` goes back to 3.
-5. The agents' "learning" remarks: one line each in `docs/LEARNINGS.md`, last commit of the branch ("Record what #22 taught").
-6. `gh pr ready`, green CI on the last commit (skill `ci-gate`); `gh pr merge --merge`: the merge closes the issue, the Epic ticks itself. No "Tick step" commit. Clean up (`builder.md` § Clean up).
+1. **Issue**: **Files** and **Risk** present; stop points asked.
+2. **Plan** (`normal`, `high`): the `builder` posts it on the issue. At `high` it stops; the orchestrator checks the plan against the issue, then resumes it.
+3. **Build**: tests first, George commits (skill `pr-shape`), checks; draft PR, base `master` (skill `ci-gate`), body with **Proofs** (skill `plan-and-proofs`).
+4. **Review** (`normal`, `high`): a fresh `branch-reviewer`, even on a draft PR; the orchestrator posts its comment (skill `review-comments`).
+5. **Fixes**: a fresh `builder`, blocking items only; the others go to `docs/LEARNINGS.md` § Minors kept.
+6. **Verify** (`high`): `branch-reviewer` in `verify` mode on the fix commits, posted as a second comment; `not fixed` or `regressed` goes back to 5.
+7. **Learnings**: the agents' "learning" remarks, one line each in `docs/LEARNINGS.md`, last commit of the branch ("Record what #22 taught").
+8. **Gate**: `gh pr ready`, green CI (skill `ci-gate`), then the gate of the **Risk**, squash and clean-up (skill `merge-gate`). The merge closes the issue; no "Tick step" commit.
 
 ## Briefs
 
 An agent knows only what its brief says.
 
-- **`builder`**: the issue number, the decisions taken with the user; to fix, the PR, its branch and the blockers (`file:line`, expected fix).
-- **`branch-reviewer`**: the PR, the level, the blockers of **Review**, the lens (`sql`, `types`, `codegen`, `compat`) if the issue has one.
+- **`builder`**: the issue number, the decisions taken with the user; to resume at `high`, "plan checked" and any correction; to fix, the PR, its branch and the blocking items (`file:line`, expected fix).
+- **`branch-reviewer`**: the PR, the **Risk** and its blockers, the lens (`sql`, `types`, `codegen`, `compat`) if the issue has one; in `verify` mode, the blocking items and the range of the fix commits.
 - Never the expected conclusion: a reviewer fed the hypothesis confirms it.
 
 ## Ritual rules
 
-- **A reviewer's report**: at most 10 defects, from most to least serious, each blocking or minor.
 - **No worktree by default**; one only for two pieces of work in parallel, removed after the merge.
 - A pushed branch is never rebased nor forced; a fix from below goes up by merge (`guard.mjs`).
-
-## Stacking PRs
-
-Sources: GitHub docs "Stack code changes in pull requests", Thoughtworks Radar (*Caution* ring), Graphite, cubic (2026).
-
-| Stack | Do not stack |
-|---|---|
-| The steps of a **same feature** depend on each other (PR 2 needs PR 1's code), and waiting for the bottom to merge would block what follows. Example: the series of #54, FK metadata → `related()` → `relatedMany()`. | **Independent** changes, like most fixes of Epic #18: separate PRs to `master`. |
-| Each layer is a George PR, readable on its own. | A PR that stands on its own; a stack used as an excuse for a big change ("an excuse to write one enormous change", Thoughtworks). |
-| **3 layers at most**, each ≤ ~250 lines and 25 files (Graphite's warning threshold). | A layer that makes no sense without the one above: split it again. |
-
-- **Mechanics without rewriting**, compatible with `guard.mjs`: layer N starts from branch N-1 and its PR targets branch N-1 (`--base <branch N-1>`). A fix from below goes up by `git merge origin/<branch N-1>` into each layer above, from bottom to top (agent `chores`).
-- **No `gh stack sync` nor `gh stack push`**: they rebase and force each branch.
-- **Review**: each layer is reviewed on its own, as soon as it is open, without waiting for the bottom; the reviewer gets the layer's number and its base.
-- **Merge from bottom to top**, as a merge commit (`gh pr merge --merge`): the next layer has nothing to redo, and GitHub retargets it to `master` (`delete_branch_on_merge` is on). Then `git merge origin/master` into the retargeted layer if `master` has moved, green CI, merge.
-- A middle layer is never merged before the ones below it.
+- Stacking dependent steps: skill `pr-shape` § Stacking.
 
 ## End of chapter
 
@@ -93,8 +86,8 @@ Sources: GitHub docs "Stack code changes in pull requests", Thoughtworks Radar (
 
 ## Checklist
 
-- [ ] Only the step's issue read; stop points asked before the `builder`
-- [ ] Review of the level, brief without a fed conclusion
-- [ ] Each defect classed; blockers fixed by a fresh `builder`
-- [ ] Minors and learnings written in `docs/LEARNINGS.md`
-- [ ] PR merged with `Closes #n`, issue closed, local clean
+- [ ] Only the step's issue read, with **Files** and **Risk**; stop points asked before the `builder`
+- [ ] Plan posted at `normal` and `high`, checked at `high`
+- [ ] Review of the **Risk**, brief without a fed conclusion, comment posted
+- [ ] Blockers fixed by a fresh `builder`; minors and learnings in `docs/LEARNINGS.md`
+- [ ] Gate passed, PR squashed with `Closes #n`, issue closed, local clean

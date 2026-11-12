@@ -1,6 +1,6 @@
 ---
 name: ci-gate
-description: 'When CI runs and when to wait for it: draft PR while iterating, `gh pr ready`, docs only, the CI passed check of master, exceptional `[skip ci]`, merge, rerun. USE FOR: opening, finalising or merging a PR, rerunning CI, docs-only PR. DO NOT USE FOR: local checks (**Done when** of the issue), review level (run-step).'
+description: 'When CI runs and when to wait for it: draft PR while iterating, `gh pr ready`, docs only, the CI passed check of master, exceptional `[skip ci]`, rerun. USE FOR: opening or finalising a PR, rerunning CI, docs-only PR. DO NOT USE FOR: local checks (**Done when** of the issue), risk (run-step), the merge (merge-gate).'
 ---
 
 # Run, wait, or move on
@@ -19,9 +19,9 @@ We validate locally while iterating; CI runs **once ready**.
 
 ## Iterate, then run
 
-1. `gh pr create --draft --base master`: reviews possible straight away.
+1. `gh pr create --draft --base master --repo AlexandreDemartin/pgcast`: reviews possible straight away.
 2. Check locally (the issue's **Done when**).
-3. Ready: `gh pr ready`, then `gh pr checks --watch`.
+3. Ready: `gh pr ready`, then `gh pr checks --watch`; the merge follows its gate (skill `merge-gate`).
 4. Fixes after ready: each push reruns CI; group them.
 
 ## The check of `master`
@@ -41,8 +41,3 @@ We validate locally while iterating; CI runs **once ready**.
 - Draft PR: `gh pr ready` first.
 - Then `gh run rerun <id>`, or `git commit --allow-empty -m "Rerun CI"`.
 - Follow with `gh pr checks --watch` in the background, never by polling by hand.
-
-## Merge
-
-- `gh pr merge --merge`; the body's `Closes #n` closes the step's issue, the Epic updates itself: no commit after the green CI.
-- After merge: `git branch -d <branch>`, `git fetch --prune`, `git switch master && git pull --ff-only`.

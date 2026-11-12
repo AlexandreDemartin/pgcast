@@ -10,7 +10,7 @@ description: 'The core.ts sensitive zone: identifier escaping, parameterisation,
 ## Stop point
 
 - Any change to `compileExpression`, `Parameter`, `DangerousRawString`, `ColumnNames`, `ColumnValues`, `ParentColumn` or to quoting: **tell the user before writing**, with the SQL before/after.
-- Review level `high`, lens `sql` (skill `run-step`).
+- Risk `high`, lens `sql` (skill `run-step` § Risk).
 
 ## Rules
 
