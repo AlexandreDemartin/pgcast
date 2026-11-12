@@ -128,14 +128,15 @@ function encodeCursor({ release_year, id }: Cursor): string {
 function decodeCursor(cursor: string): Cursor | undefined {
   try {
     const { release_year, id } = JSON.parse(Buffer.from(cursor, 'base64url').toString());
-    if (Number.isInteger(release_year) && Number.isInteger(id)) return { release_year, id };
+    const isKey = (key: number) => Number.isInteger(key) && Math.abs(key) < 2 ** 31;  // within Postgres's integer
+    if (isKey(release_year) && isKey(id)) return { release_year, id };
   } catch {}  // not base64url JSON
   return undefined;
 }
 ```
 
 - For 2008 and 1002, the cursor is `eyJyZWxlYXNlX3llYXIiOjIwMDgsImlkIjoxMDAyfQ`: JSON in base64url, which a URL takes as it is.
-- `decodeCursor()` gives `undefined` for a string it did not make: `nonsense`, an empty string, JSON that is not an object, keys that are not integers (`"2008"`, `2008.5`). Answer 400, as the [handler](#a-handler-from-request-to-response) does.
+- `decodeCursor()` gives `undefined` for a string it did not make: `nonsense`, an empty string, JSON that is not an object, keys that are not integers (`"2008"`, `2008.5`) or that Postgres's `integer` does not take (`99999999999`, `1e300`). Answer 400, as the [handler](#a-handler-from-request-to-response) does.
 - A cursor is encoded, not signed: the client can read it and change it. It holds only where the page starts, and each key goes to Postgres as a parameter: a changed cursor moves the page, nothing more.
 
 ## Go back a page
@@ -216,7 +217,7 @@ On the docs schema, `GET /films` replies:
 
 - `limit: size + 1` asks for one row more than the page. If it comes back, there is a next page, and the cursor is the page's last row, not the extra one; `GET /films?after=eyJyZWxlYXNlX3llYXIiOjIwMDgsImlkIjoxMDAyfQ` gives 1001 and 1000, then `"nextCursor": null`. With `limit: size`, a full last page would send a cursor to an empty one.
 - The page's `where` is [the one with a filter](#with-a-filter): `filter`, then the comparison when a cursor came. [`count()`](#with-count) takes `filter` alone, so each page has the list's total: `GET /films?studio=1000` gives 1002 and 1000, and `"total": 2`. Leave it out, and its query, if the page shows no total.
-- A `studio` that is not an integer, or an `after` that `decodeCursor()` refuses, gets a 400 before any query.
+- A `studio` that is not 1 to 9 digits, or an `after` that `decodeCursor()` refuses, gets a 400 before any query: `Number()` alone would read `''` as 0, `0x3e8` as 1000, and let `99999999999` reach Postgres, which refuses it.
 
 ## See also
 

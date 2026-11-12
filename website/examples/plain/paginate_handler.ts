@@ -10,7 +10,8 @@ function encodeCursor({ release_year, id }: Cursor): string {
 function decodeCursor(cursor: string): Cursor | undefined {
   try {
     const { release_year, id } = JSON.parse(Buffer.from(cursor, 'base64url').toString());
-    if (Number.isInteger(release_year) && Number.isInteger(id)) return { release_year, id };
+    const isKey = (key: number) => Number.isInteger(key) && Math.abs(key) < 2 ** 31;  // within Postgres's integer
+    if (isKey(release_year) && isKey(id)) return { release_year, id };
   } catch {}  // not base64url JSON
   return undefined;
 }
@@ -21,7 +22,7 @@ async function listFilms(request: Request): Promise<Response> {
   const params = new URL(request.url).searchParams;
   const studio = params.get('studio'), after = params.get('after');
   const cursor = after === null ? undefined : decodeCursor(after);
-  const badStudio = studio !== null && !Number.isInteger(Number(studio));
+  const badStudio = studio !== null && !/^\d{1,9}$/.test(studio);  // 1 to 9 digits: within Postgres's integer
   const badCursor = after !== null && cursor === undefined;
   if (badStudio || badCursor) return Response.json({ error: 'Bad studio or cursor' }, { status: 400 });
 
