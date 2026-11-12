@@ -166,7 +166,7 @@ db.sql<s.films.SQL>`SELECT * FROM ${'films'} WHERE ${{ title: db.raw("'x'") }}`;
 class DangerousRawString { value: string }
 ```
 
-What `raw()` returns. A type-only member keeps it from passing as a `Parameter`, and an object of the same shape from passing as it:
+What `raw()` returns. A type-only member keeps it from passing as a `Parameter`, and an object of the same shape does not compile in its place (TS2741):
 
 ```ts twoslash
 // @errors: 2741
