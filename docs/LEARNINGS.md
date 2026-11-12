@@ -216,6 +216,15 @@ Candidates for a check, a rule or a skill line.
 - #142 — Every type inside `declare module 'zapatos/custom'` is exported and the blocks merge: a helper type in a placeholder takes a prefixed name — `branch-reviewer`, `builder`
 - #142 — A placeholder in the shared docs schema is a cross-page dependency: `git grep` the open worktrees before narrowing it — `builder`
 - #142 — Bulk inserts into the docs schema without ids hit 23505 at the 1000th row (seeds from 1000, sequences from 1): probes set explicit ids from 2000 — `branch-reviewer`
+- #128 — A page that states a future version's contract (what 7.x keeps, what 8.0 removes) copies the narrowest wording of decision 003, the README § Versions and the milestones: more precise is a new promise — `branch-reviewer`, `builder`
+- #128 — `process.emitWarning` reports on the next tick: under `--throw-deprecation` the call returns, then the process ends, before a probe's `finally` (drop its databases by prefix afterwards) — `branch-reviewer`, `builder`
+- #147 — A word-for-word quote check misses a changed subject or a dropped clause: read the 300 characters around each match, and keep the subject and any clause whose loss would be unfair to Zapatos — `branch-reviewer`, `builder`
+- #147 — A user-facing page does not copy a running count from a living report; a count closed by a release can be — `branch-reviewer`
+- #149 — URLs inside a fenced block escape `anchors.ts`: a copyable file that points into the site needs its own check (#115) — `branch-reviewer`, `builder`
+- #149 — A Cursor rule's behaviour comes from how `alwaysApply`, `description` and `globs` combine (`globs` takes over); Claude Code reads `AGENTS.md` only without a `CLAUDE.md` (or through `@AGENTS.md`): cite the tools' current sections — `branch-reviewer`, `builder`
+- #149 — A rules file for assistants names the cases a reviewer would: a request body passed whole, an empty filter before a write, side effects in a callback that may run again, `@ts-ignore` — `branch-reviewer`
+- #149 — `RAISE EXCEPTION … USING ERRCODE = '40001'` in a `DO` block probes a retry in one line, with no concurrent transactions — `builder`
+- #149 — `git merge -m` takes a trailer only as a second `-m`: brief merges as `-m "<subject>" -m "Co-Authored-By: …"` — `builder`
 - #127 — A guide's « same under both libraries » is probed in both directions: the fixes a project starts relying on are what going back undoes (`isNotIn([param(x)])` in `deletes()` hits every row again) — `branch-reviewer`
 - #127 — A migration guide names the changed `.compile()` text as well as the changed rows: SQL snapshots in tests change where rows do not — `branch-reviewer`
 - #127 — A `CHANGELOG.md` migration snippet is never compiled: run each through `tsc` on the fixture (#200) — `branch-reviewer`
@@ -246,3 +255,5 @@ Minor review defects, taken up by the end-of-chapter review.
 - #31 — `src/db/conditions.ts:21`: `conditionalParam` still wraps `Default`, so `{ display_name: eq(Default) }` sends `'Symbol(DEFAULT)'` and matches nothing (both versions): a candidate finding, with #101 — `branch-reviewer` → R64, #106
 - #107 — `insert('books', { title: parent('name') })` (object branch) still stores `'{"value":"name"}'`: a candidate finding — `builder`
 - #137 — `website/check-reference.mjs`: a fence closed by a line with an info string (```` ```ts ````) is taken as closed, so a later entry is missed (fails loudly) — `branch-reviewer`
+- #128 — `website/insert.md` § undefined values: with `undefinedMeansMissing: true`, an `update()` whose only key is `undefined` throws « nothing to update: an Updatable needs at least one column »; worth one line there — `builder`
+- #147 — `website/why.md`: « all fixed in 6.6.2 » and, two paragraphs later, « The security fixes came first, in 6.6.2 » repeat each other; merge them in a later edit — `builder`
