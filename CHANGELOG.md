@@ -24,6 +24,7 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 - Dependabot version updates (`.github/dependabot.yml`), weekly: dev dependencies, minor and patch, in one PR; GitHub Actions in another. A minor or patch never changes `dependencies` or `peerDependencies`.
 
 ### Changed
+- A cast panel shows the type of its example's first `const` with no type written, the query's, so an example can type its input first: the tutorial's "Add a film" shows the inserted row again, `films.JSONSelectable`, not the `films.Insertable` it was given.
 - Links in the docs site keep their hash as written, so they reach a reference entry anchored with capitals or dots (`/runtime-config#Config.upsertRequiresSameKeys`); VitePress made it `#config-upsertrequiressamekeys`, which went nowhere.
 - The docs site in the four groups of [Diátaxis](https://diataxis.fr/) ([decision 004](docs/decisions/004-documentation-site.md), amended): Tutorial, How-to guides, Reference and Explanation, each with a landing page that says what it is for and lists its pages, every planned page in its group ("Coming" until written). Install keeps its URL and opens the tutorial; the nav bar reads Tutorial · Guides · Reference, and the home's "read next" links the four groups.
 - `README.md` rewritten for pgcast: what it fixes and adds, an example with its SQL and type, what differs from Zapatos 6.6.1, the versions policy, the relationship with Zapatos.

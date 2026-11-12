@@ -269,6 +269,7 @@ Candidates for a check, a rule or a skill line.
 - #203 — `process.on('warning', …)` does not stop Node's own print; only `--no-warnings` does, and `--no-deprecation` stops the warning before the listener — `branch-reviewer`
 - #203 — The generator sends its catalog queries concurrently: a `debugListener` sample's `<n>` holds only for a named config with one relation — `branch-reviewer`, `builder`
 - #203 — Each fix round gets its own scratch folder named after its PR, or two batches share probes — `builder`
+- #214 — A cast panel shows the first `const` with no type written: an example that types its input first keeps its result in the panel; a Twoslash hover on an annotated `const` shows only the type's name — `builder`
 
 ## Minors kept
 
