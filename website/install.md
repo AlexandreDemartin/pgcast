@@ -11,7 +11,34 @@ pgcast hasn't had its first release. These commands will work once it has; until
 
 - Postgres. The test suite runs against 14, 16 and 18.
 - Node, and `pg` (node-postgres), with `@types/pg` for TypeScript.
-- TypeScript 4.1 or later: the generated types use template literal types.
+- TypeScript 5.7 or later. `@types/pg` brings in `@types/node` and `pg-protocol`, whose types now need it; so does [`toBuffer()`](/runtime-config#toBuffer)'s, `Buffer<ArrayBuffer>`, as in Zapatos 6.6.1.
+
+### On an older TypeScript
+
+pgcast's own types go back to TypeScript 4.1, the first with template literal types. Below 5.7, tell TypeScript not to check the types in `node_modules` (`toBuffer()` then returns `any`):
+
+::: code-group
+
+```json [tsconfig.json]
+{
+  "compilerOptions": {
+    "skipLibCheck": true
+  }
+}
+```
+
+:::
+
+- From 5.0, that's all.
+- Below 5.0, TypeScript can't read today's `@types/node`. Install the one made for your version, by its tag, and pin it: here for 4.1, `ts4.9` for 4.9.
+
+```sh
+npm install --save-dev --save-exact @types/node@ts4.1
+```
+
+::: warning Stale schema
+`skipLibCheck` skips your generated `schema.d.ts` too. After an upgrade of pgcast, a schema you haven't regenerated no longer fails on `schemaVersionCanary` ([When the schema changes](/first-query#when-the-schema-changes)): run `npx pgcast` each time.
+:::
 
 ## Add the package
 
