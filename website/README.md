@@ -85,6 +85,7 @@ One per group, in `templates/`, not published (`srcExclude` in `.vitepress/confi
   - An example also fails if a promise it does not await rejects, or, in `examples/plain/`, if it leaves a client in use or a query waiting. One that does not settle within 10 s ends the run.
   - A name an example only declares (`declare const tags: …`) runs with a stand-in from `run-examples.mjs`; a new one goes there.
 - Code a page shows in its own block and an example needs above its `// ---cut---`, such as a function it calls, goes between `// #region copy` and `// #endregion copy` (`examples/plain/paginate_handler.ts`). The build fails, in `.vitepress/llms.ts`, unless those lines are still a block of the page, blank lines aside.
+- A page whose examples the reader keeps in one file, as the tutorial's `src/films.ts`, says so with a line `<!-- joined: src/films.ts -->` under its last step. `docs:build` joins the code below `// ---cut---` of each `ts twoslash` block and `<<< ./examples/<name>.ts{ts twoslash}` above it (up to the previous such line), in page order, leaving out a block that shows an error (`// @errors:`), and type-checks the join (`check-joined.mjs`): a name declared twice or an import the page never gives fails, with the page and the line.
 - An optional caption goes under the panel: `<template #caption><span>…</span></template>` (`index.md`).
 
 ### The reference
