@@ -1,6 +1,6 @@
 ---
 name: code-style
-description: 'Code style of pgcast, after the patterns of Zapatos: code in src/, JSDoc, error messages, the voice and examples of the docs, how to go further than Zapatos. USE FOR: writing code, a JSDoc, an error or docs; judging whether a change reads like the rest of Zapatos. DO NOT USE FOR: size, split, titles, commits (pr-shape), the shape of a helper (zero-abstraction).'
+description: 'Code style of pgcast, in the patterns of Zapatos: code in src/, JSDoc, error messages, docs voice and examples, going further than Zapatos. USE FOR: writing code, a JSDoc, an error or docs; judging whether a change reads like Zapatos. DO NOT USE FOR: size, split, titles, commits (pr-shape), the shape of a helper (zero-abstraction).'
 ---
 
 # Code style
