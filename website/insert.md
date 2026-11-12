@@ -96,7 +96,7 @@ Each SQL replaces the `DO UPDATE SET …` of the plain upsert, on `ratings` (on 
 - To read a column there, name the table for the existing row, `${'ratings'}.${'votes'}`, or `EXCLUDED` for the new one, `` db.sql`EXCLUDED.${'votes'}` ``. `db.self`, or a fragment or condition that uses it (`` db.sql`${db.self} + 1` ``, [`conditions.add()`](/conditions)), throws "The 'self' column alias has no meaning here", as in Zapatos 6.6.1; `db.parent()`, alone or in a fragment, throws "The 'parent' table alias has no meaning here".
 
 ::: warning Security
-Zapatos 6.6.1 wrote a plain string in `updateValues` as an identifier: `{ mood: 'happy' }` gave `ROW("happy")`, and a string from a user could read other columns or tables. pgcast sends it as a parameter, `ROW($3)`, as its type and `update()` always said. To read a column there, write a fragment, as in the table ([The security model](/security)).
+Zapatos 6.6.1 wrote a plain string in `updateValues` as an identifier: `{ tagline: 'happy' }` put `"happy"` in the `ROW(…)`, and a string from a user could read other columns or tables. pgcast sends it as a parameter, `$3` in its place, as its type and `update()` always said. To read a column there, write a fragment, as in the table ([The security model](/security)).
 :::
 
 ### Rows with different keys {#upsert-different-keys}
