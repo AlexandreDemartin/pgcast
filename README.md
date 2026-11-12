@@ -126,7 +126,6 @@ npm run lint && npm run typecheck && npm test && npm run test:types && npm run b
 ```
 
 Contributor and agent guidelines: [AGENTS.md](AGENTS.md).
-How to contribute: [CONTRIBUTING.md](CONTRIBUTING.md). To report a vulnerability, never a public issue: [SECURITY.md](SECURITY.md).
 
 ## Licence
 
