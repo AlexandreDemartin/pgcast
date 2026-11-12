@@ -282,6 +282,10 @@ describe('Whereable', () => {
       updateWhereSelf: await rejected(db.update('users', { mood: 'ok' }, { display_name: self }).run(t.client)),
       lateralSelf: await rejected(db.select('users', db.all, { lateral: { n: db.count('accounts', { owner_id: self }) } }).run(t.client)),
       lateralEqDefault: await rejected(db.select('users', db.all, { lateral: { n: db.count('accounts', { owner_id: c.eq(Default) }) } }).run(t.client)),
+      upsertSelfInWhereable: await rejected(db.upsert('users', { email: 'bob@example.com', display_name: 'Bob' }, 'email', {
+        updateValues: { settings: { theme: self } as any },
+      }).run(t.client)),
+      upsertAddDefault: await rejected(db.upsert('accounts', { id: 1, owner_id: 1 }, 'id', { updateValues: { lifetime_ops: c.add(Default as any) } }).run(t.client)),
     }).toMatchInlineSnapshot(`
       {
         "deletesNeDefault": "\`db.Default\` has no meaning as the value of \`eq()\`, \`add()\` and the other conditions: compare with a value. \`DEFAULT\` is for INSERT and UPDATE values.",
@@ -296,6 +300,8 @@ describe('Whereable', () => {
         "selfValue": "\`db.self\` has no meaning as a value in a Whereable (a filter), nor in \`isIn()\`: compare with a value, or use it in a \`sql\` fragment value, where it stands for the column.",
         "updateAddDefault": "\`db.Default\` has no meaning as the value of \`eq()\`, \`add()\` and the other conditions: compare with a value. \`DEFAULT\` is for INSERT and UPDATE values.",
         "updateWhereSelf": "\`db.self\` has no meaning as a value in a Whereable (a filter), nor in \`isIn()\`: compare with a value, or use it in a \`sql\` fragment value, where it stands for the column.",
+        "upsertAddDefault": "The 'self' column alias has no meaning here",
+        "upsertSelfInWhereable": "\`db.self\` has no meaning as a value in a Whereable (a filter), nor in \`isIn()\`: compare with a value, or use it in a \`sql\` fragment value, where it stands for the column.",
       }
     `);
     expect(queries).toEqual([]);
