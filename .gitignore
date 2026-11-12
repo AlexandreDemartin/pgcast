@@ -6,3 +6,5 @@ coverage/
 .env
 .env.*
 .agents/local/
+# The docs site's build cache (its output, website/.vitepress/dist/, is caught by dist/ above)
+website/.vitepress/cache/
