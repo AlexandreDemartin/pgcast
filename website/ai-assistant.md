@@ -135,7 +135,7 @@ db.select('films', { year: 1974 });
 db.sql`SELECT * FROM ${'films'} ORDER BY ${sort}`;
 ```
 
-Fix the code, not the type: with `as any`, or `as s.films.Column`, both compile, and the second sorts by whatever name the request sends. Map the request to names written in the code instead ([Write raw SQL safely](/raw-sql#choose-sql-at-run-time-from-your-own-constants)), and let a shortcut do the rest:
+Fix the code, not the type: with `as any`, or `as s.films.Column`, both compile, and the second sorts by whatever name the request sends. Map the request to names written in the code instead ([Write raw SQL safely](/raw-sql#choose-sql-at-run-time-from-your-own-constants)), and let a shortcut do the rest, here [`select()`](/select#select) with [`db.all`](/sql-template#all) and [`order`](/select#order-limit-offset-and-withties):
 
 ```ts twoslash
 import * as db from 'zapatos/db';
@@ -148,7 +148,7 @@ db.select('films', db.all, { order: { by, direction: 'ASC' } });
 
 ### Read the SQL
 
-Call `.compile()` where the code calls `.run()`, and print it: it gives `{ text, values }`, the SQL and its values, and sends nothing. Here, the assistant's answer to "the three longest films of studio 1000", and what Postgres runs:
+Call [`.compile()`](/sql-template#compile) where the code calls `.run()`, and print it: it gives `{ text, values }`, the SQL and its values. Here, the assistant's answer to "the three longest films of studio 1000", with [`columns`](/select#columns), [`order` and `limit`](/select#order-limit-offset-and-withties), and what Postgres runs:
 
 <CastPanel example="ai_assistant_longest">
 
