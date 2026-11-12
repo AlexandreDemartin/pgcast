@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { transformerTwoslash } from '@shikijs/vitepress-twoslash';
 import { defineConfig } from 'vitepress';
+import { checkLinkAnchors } from './anchors.ts';
 import { writeLlmsFiles } from './llms.ts';
 import { outline } from './outline.ts';
 import { sqlParameters, syntax } from './syntax.ts';
@@ -22,7 +23,10 @@ export default defineConfig({
   base: '/pgcast/',  // GitHub Pages: alexandredemartin.github.io/pgcast/
   cleanUrls: true,
   srcExclude: ['README.md', 'templates/**'],  // for whoever writes the site, not pages of it
-  buildEnd: writeLlmsFiles,  // llms.txt and llms-full.txt, for assistants
+  buildEnd: async config => {
+    checkLinkAnchors(config);  // a link to an anchor no page defines fails the build
+    await writeLlmsFiles(config);  // llms.txt and llms-full.txt, for assistants
+  },
   head: [
     ['link', { rel: 'preconnect', href: 'https://fonts.googleapis.com' }],
     ['link', { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' }],
