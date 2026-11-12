@@ -316,7 +316,7 @@ On `release_year`, `` not(db.sql`${db.self} = 1974 OR ${db.self} = 1991`) `` wri
 
 ## Dates and times {#dates}
 
-[`after()`](#conditions.after) and [`before()`](#conditions.before) compare with a value: a `Date`, a string Postgres reads as a time (`'2030-03-01T20:00:00Z'`), or one of the two fragments below. `pg` sends a `Date` as a string in the local time zone, with its offset: the same instant.
+[`after()`](#conditions.after) and [`before()`](#conditions.before) compare with a value: a `Date`, an ISO 8601 string with its offset (`'2030-03-01T20:00:00Z'`, a `TimestampTzString`; the type refuses another form such as `'2030-03-02'`, TS2322), or one of the two fragments below. `pg` sends a `Date` as a string in the local time zone, with its offset: on a `timestamptz` column, the same instant.
 
 <CastPanel example="conditions_dates">
 
