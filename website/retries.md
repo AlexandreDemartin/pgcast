@@ -123,6 +123,8 @@ Here with `test` from `node:test` and `assert` from `node:assert/strict`; any te
 
 - The second test gives up: its callback throws on every attempt, so with `transactionAttemptsMax: 2` it runs twice, and the promise rejects with the very error it threw, after `on attempt 2 of 2, giving up`.
 - `transactionRetryDelay` at `0` keeps the test fast. `setConfig()` holds for the whole process: put back what the other tests expect.
+- `transactionRetryDelay` at `0` keeps the test fast. `setConfig()` holds for the whole process: put back what the other tests expect ([`getConfig()`](/runtime-config#getConfig)).
+- To test giving up, throw on every attempt with `transactionAttemptsMax: 2`: the promise rejects with the very error you threw, after `on attempt 2 of 2, giving up`.
 
 ## See also
 

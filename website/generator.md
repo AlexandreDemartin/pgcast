@@ -132,11 +132,35 @@ Both keys are required. In `generate()`, a rule without one fails to compile (TS
 - The relations of a schema other than [`unprefixedSchema`](#generate.unprefixedSchema) are in its namespace: `archive.screenings`, its `Table` type `'archive.screenings'`.
 - A schema, relation or enum whose name is not a TypeScript identifier (`"box office"`) is written as it is, and `schema.d.ts` does not compile (TS1005) ([#48](https://github.com/AlexandreDemartin/pgcast/issues/48)). A column's name is quoted, and works.
 
+With a second schema, `archive`, that holds a `screenings` table of its own:
+
+::: code-group
+
+```json [zapatosconfig.json]
+{
+  "db": { "connectionString": "{{DATABASE_URL}}" },
+  "schemas": {
+    "public": { "include": "*", "exclude": [] },
+    "archive": { "include": "*", "exclude": [] }
+  }
+}
+```
+
+:::
+
+A query names its table with the schema, and its rows are `s.archive.screenings.JSONSelectable[]`:
+
+```ts
+const past = await db.select('archive.screenings', { film_id: 1000 }).run(pool);
+```
+
+Its SQL is [`select()`](/select#select)'s, with the name quoted part by part: `to_jsonb("archive"."screenings".*)`, `FROM "archive"."screenings"`, and the alias `"sq_archive.screenings"`.
+
 ### `unprefixedSchema` {#generate.unprefixedSchema}
 
 `string | null`, default `"public"`. The schema whose relations are named without their schema: `films`, its `Table` type `'films'`, so `db.select('films', …)` and `"films"` in the SQL, which Postgres finds through its `search_path`.
 
-- `null`: every relation is prefixed, `public.films` its namespace and `'public.films'` its `Table` type.
+- `null`: every relation is prefixed, `public.films` its namespace and `'public.films'` its `Table` type. A query names it so, `db.select('public.films', db.all)`, and the SQL too: `FROM "public"."films"`. `db.select('films', db.all)` no longer compiles.
 - Set it to `null` when a schema has the name of a relation of `public`: a schema `films` beside the table `films` makes two `films` namespaces, which TypeScript merges, and `schema.d.ts` fails with TS2300, `Duplicate identifier 'Table'`.
 - A schema missing from [`schemas`](#generate.schemas) is allowed: every schema is then prefixed.
 
@@ -241,7 +265,32 @@ Writing custom types file: src/zapatos/custom/index.d.ts
 
 ### `debugListener` {#generate.debugListener}
 
-`boolean`, or in `generate()` a function `(s: string) => void`; default `false`. Gets each query the generator sends, `>>> query <n> >>>`, its text and its values, then its result as `pg` returns it, as JSON, `<<< result <n> <<<`.
+`boolean`, or in `generate()` a function `(s: string) => void`; default `false`. Gets each query the generator sends, `>>> query <n> >>>`, its text and its values, then its result as `pg` returns it, as JSON, `<<< result <n> <<<`. The relations are read concurrently: with several, the results come back interleaved, and a query's number can change from one run to the next, so `<n>` is what pairs a result with its query. The unique indexes of `tags`, with `"schemas": { "public": { "include": ["tags"], "exclude": [] } }`, cut after its rows:
+
+```txt
+>>> query 3 >>>
+SELECT DISTINCT i.indexname
+FROM pg_catalog.pg_indexes i
+JOIN pg_catalog.pg_class c ON c.relname = i.indexname
+JOIN pg_catalog.pg_index idx ON idx.indexrelid = c.oid AND idx.indisunique
+WHERE i.tablename = $1 AND i.schemaname = $2
+ORDER BY i.indexname
++ ["tags","public"]
+
+<<< result 3 <<<
+{
+  "command": "SELECT",
+  "rowCount": 1,
+  "oid": null,
+  "rows": [
+    {
+      "indexname": "tags_pkey"
+    }
+  ],
+  …
+```
+
+The result is `pg`'s whole `Result` object: after `rows` come `fields`, its column types, and about seventy lines of `pg`'s own type parsers, the same for every query.
 
 ## The files it writes {#the-files-it-writes}
 
