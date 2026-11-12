@@ -299,7 +299,9 @@ const updateValueSQL = (value: any) => compiledAsIs(value) ? value : param(value
  * An `undefined` value in `values` is sent as `NULL`, then set from `EXCLUDED`,
  * and emits a `DeprecationWarning` (`PGCAST_DEP002`), once. With the
  * `undefinedMeansMissing` config option (the default in 7.0), its key is left
- * out, as if it were missing: one row neither inserts nor updates that column.
+ * out, as if it were missing: one row does not insert that column, nor update
+ * it unless `updateColumns` names it, in which case it is still set from
+ * `EXCLUDED` and an existing row takes the column `DEFAULT`.
  */
 export const upsert: UpsertSignatures = function (
   table: Table,
