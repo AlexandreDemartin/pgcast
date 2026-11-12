@@ -81,7 +81,9 @@ async function check(example, pool) {
     await run(example, pool);
   } catch (error) {
     const
-      line = error?.stack?.match(new RegExp(`${example.replace(/[./]/g, '\\$&')}:(\\d+)`))?.[1],
+      href = new URL(example, import.meta.url).href,  // as the stack names it: no regex built from a file name
+      frame = error?.stack?.split('\n').find(at => at.includes(`${href}:`)),
+      line = frame?.match(/:(\d+):\d+\)?$/)?.[1],
       where = (pagesOf.get(example) ?? ['(on no page)']).join(', '),
       what = error?.code ? `${error.code} ${error.message}` : String(error?.message ?? error);
     problems.push(`${where}: ${example}${line ? `:${line}` : ''}: ${what}`);
