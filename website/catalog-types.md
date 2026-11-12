@@ -11,13 +11,13 @@ A Postgres database knows its own shape, and keeps it in its catalog: the system
 |---|---|---|
 | each relation, its kind, and whether it takes an `INSERT` | `information_schema.tables`, `pg_matviews` | a namespace per table, view, foreign table or materialised view |
 | each column's type, or its domain and the domain's base type | `information_schema.columns`; `pg_attribute` and `pg_type` for a materialised view | the column's TypeScript type, once per context ([below](#one-column-five-types)) |
-| whether the column may be `NULL` | `is_nullable` | `\| null`, and optional in `Insertable` |
+| whether the column may be `NULL` | `is_nullable`; `attnotnull` for a materialised view | `\| null`, and optional in `Insertable` |
 | its default, identity or generated value | `column_default`, `identity_generation`, `is_generated` | optional in `Insertable`; a `GENERATED ALWAYS` column is left out of `Insertable` and `Updatable` |
 | its `COMMENT ON COLUMN` | `pg_description` | the JSDoc your editor shows for the column, with its Postgres type and default |
 | each enum and its labels | `pg_enum` | a union of strings, and the tuple `every.<name>` |
 | each unique index | `pg_indexes`, `pg_index` | `UniqueIndex`, the names [`constraint()`](/insert#constraint) takes |
 
-To watch the queries themselves, set [`debugListener`](/generator#generate.debugListener). A domain, such as `seat_label`, and a type the generator has no mapping for, such as `point`, each get a placeholder in `zapatos/custom/`, yours to fill in ([Use custom types and domains](/custom-types)). And what the catalog can't see, such as a column a trigger fills in, you say in the config: [`columnOptions`](/generator#generate.columnOptions) leaves it out of `Insertable`, or makes it optional there.
+To watch the queries themselves, set [`debugListener`](/generator#generate.debugListener). A domain, such as `seat_label`, and a type the generator has no mapping for, such as `point`, each get a placeholder in `zapatos/custom/`, yours to fill in ([Use custom types and domains](/custom-types)). And what the catalog can't see, such as a column a trigger fills in, you say in the config: [`columnOptions`](/generator#generate.columnOptions) leaves it out of `Insertable` or `Updatable`, or makes it optional in `Insertable`.
 
 ### What the generator doesn't read
 
