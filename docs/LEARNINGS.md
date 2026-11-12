@@ -156,6 +156,14 @@ Candidates for a check, a rule or a skill line.
 - #137 — A pending list that assigns names to pages is cross-read against the scopes of the issues that will write those pages — `branch-reviewer`
 - #137 — `check-reference.mjs` has no tests: a fixtures mode (pages and pending file as arguments) would let its probes run in CI — `builder`
 - #151 — `git checkout -- <file>` after a temporary `sed` also reverts that file's uncommitted edits: copy the file aside before such a probe — `builder`
+- #121 — Before stating what `Number()` or `String()` makes of a result, probe what node-postgres hands over: `date` and the timestamps arrive as `Date`, so `Number()` gives milliseconds, not `NaN` — `branch-reviewer`
+- #121 — A transform that reads `rows[0]` assumes a row: document each option that can return none (`groupBy` with no group, `having`, `offset`, `limit: 0`) from a run, not from the code — `branch-reviewer`
+- #121 — `NaN` shows as `null` in `JSON.stringify` and in a cast panel: a probe checks `Number.isNaN` — `builder`
+- #121 — Parallel builders share the session scratchpad: brief each to its own subfolder — orchestrator
+- #124 — A reference claim about a type is checked on the result type, not only the parameter: a readonly `returning` is accepted and gives `never` — `branch-reviewer`
+- #124 — `ON CONFLICT ON CONSTRAINT` takes a constraint, not any unique index: a codegen type built from `pg_index.indisunique` is wider than Postgres (#166) — `branch-reviewer`
+- #124 — `tsc`'s `include` skips folders starting with a dot: a type probe in `.probe/` checks nothing — `builder`
+- #124 — Options tables number parameters as if the other rows were there: one row per panel, its SQL from that panel — `builder`
 
 ## Minors kept
 
