@@ -11,11 +11,13 @@ The rule: four seats per customer per screening, at most. No constraint can say 
 
 Ines has two tabs open, and books from both at once. Each transaction counts 0 seats held, then books, which would give her five. At `SERIALIZABLE`, Postgres refuses one of the two, at its `INSERT` or at its `COMMIT`, with 40001 (`serialization_failure`); pgcast rolls it back and runs the whole callback again. Here, `tabTwo`'s transaction sends:
 
+<!-- probe: (refused => db.serializable({ connect: async () => ({ release() {}, query: async query => { await pool.query(query); if (query.text === 'COMMIT' && !refused++) throw Object.assign(new Error(), { code: '40001' }); return { rows: [] }; } }) }, async () => {}))(0) -->
 ```sql
 -- attempt 1
 START TRANSACTION ISOLATION LEVEL SERIALIZABLE
 -- count(): 0 seats held, then insert() of E4, E5 and E6
-COMMIT    -- refused with 40001: tabOne has committed D4 and D5
+COMMIT
+-- refused with 40001: tabOne has committed D4 and D5
 ROLLBACK
 -- attempt 2, 25 to 250 ms later
 START TRANSACTION ISOLATION LEVEL SERIALIZABLE
