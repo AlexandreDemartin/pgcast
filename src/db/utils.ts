@@ -6,6 +6,14 @@ Released under the MIT licence: see LICENCE file
 
 export type NoInfer<T> = [T][T extends any ? 0 : never];  // https://github.com/Microsoft/TypeScript/issues/14829
 
+// an identifier as Postgres lexes it, as a regexp source for the `u` flag: unquoted, any non-ASCII character
+// is a letter and `$` may follow the first one; quoted, or `U&` quoted, anything but NUL, with `""` for `"`;
+// and the spaces Postgres allows around a dot, its ASCII ones only: a non-ASCII space is a letter to it, and
+// `\s` would make a test backtrack for ever on a long run of them (see https://github.com/postgres/postgres/blob/master/src/backend/parser/scan.l)
+export const
+  identifier = /[A-Za-z_\u0080-\u{10FFFF}][A-Za-z0-9_$\u0080-\u{10FFFF}]*|(?:[Uu]&)?"(?:[^"\0]|"")+"/u.source,
+  space = '[ \\t\\n\\r\\f\\v]*';
+
 /**
  * Basic zero-padding for small, positive integers
  * @param n The integer to pad

@@ -32,6 +32,18 @@ const hostile = {
   escapedDot: 'a"."b',
   escapedNul: 'a""\0""b',
   escapedOdd: 'a"""b',
+  // a string that starts and ends with `"` is written as is only if it is a well-formed quoted name,
+  // which stays one name (prequotedEscaped); otherwise it is quoted as above (prequotedEmpty, prequotedCloses)
+  prequotedEscaped: '"a"" OR TRUE OR ""b"',
+  prequotedEmpty: '""',
+  prequotedCloses: '"a" OR TRUE OR "b"',
+  // after its first part, such a name may go on with unquoted or `U&` quoted parts, and stays names
+  // (mixedEscaped; unicodeEscaped, where `\0022` is a `"` inside the name); a `\` does not escape the `"`
+  // that ends a `U&` part (unicodeCloses), and a `UESCAPE` clause is not a name (uescape)
+  mixedEscaped: '"s".a$1."b"" OR TRUE OR ""c"',
+  unicodeEscaped: '"s".U&"a\\0022"" OR TRUE OR ""\\0022b"',
+  unicodeCloses: '"s".U&"a\\" OR TRUE OR \\"b"',
+  uescape: `"s".U&"a" UESCAPE '!' || "b"`,
 };
 
 const visible = (text: string) =>
@@ -48,9 +60,9 @@ const matrix = (build: (input: any) => db.SQLFragment<any, any>, inputs: Record<
   }));
 
 describe('identifiers', () => {
-  it('characterization: a string (Table, Column): `"` is doubled, a pre-quoted string is raw', () => {
-    // `a"b` gives `"a""b"`, one identifier, and `.` still splits (`"a"."b"`); characterization: `"`
-    // alone starts and ends with `"`, so it is written raw, here and in every matrix below
+  it('a string (Table, Column): `"` is doubled, a well-formed quoted name is written as is', () => {
+    // `a"b` gives `"a""b"`, one identifier, and `.` still splits (`"a"."b"`); `"a"` is written as is,
+    // but `"` alone is not a quoted name, so it is one identifier `"`, here and in every matrix below
     expect(matrix(v => sql`SELECT ${v}`)).toMatchInlineSnapshot(`
       {
         "backslash": "SELECT "a\\b"",
@@ -63,12 +75,19 @@ describe('identifiers', () => {
         "escapedDot": "SELECT "a"".""b"",
         "escapedNul": "SELECT "a""""<NUL>""""b"",
         "escapedOdd": "SELECT "a""""""b"",
-        "lone": "SELECT "",
+        "lone": "SELECT """"",
+        "mixedEscaped": "SELECT "s".a$1."b"" OR TRUE OR ""c"",
         "nul": "SELECT "a<NUL>b"",
         "prequoted": "SELECT "a"",
+        "prequotedCloses": "SELECT """a"" OR TRUE OR ""b"""",
+        "prequotedEmpty": "SELECT """"",
+        "prequotedEscaped": "SELECT "a"" OR TRUE OR ""b"",
         "qualifiedEscaped": "SELECT "s"."a"" OR TRUE OR ""b"",
         "semicolon": "SELECT "a;b"",
         "squote": "SELECT "a'b"",
+        "uescape": "SELECT """s"""."U&""a"" UESCAPE '!' || ""b"""",
+        "unicodeCloses": "SELECT """s"""."U&""a\\"" OR TRUE OR \\""b"""",
+        "unicodeEscaped": "SELECT "s".U&"a\\0022"" OR TRUE OR ""\\0022b"",
       }
     `);
   });
@@ -87,9 +106,15 @@ describe('identifiers', () => {
   it('a string identifier check stays fast on a long run of doubled quotes', () => {
     const name = `${'a"".'.repeat(100_000)}"`;
     expect(sql`${name}`.compile().text).toBe(`"${name.replace(/"/g, '""').replace(/[.]/g, '"."')}"`);
+    // and on a long string that starts and ends with `"` but is not a quoted name
+    const prequoted = `"${'a" . "'.repeat(100_000)}" x"`;
+    expect(sql`${prequoted}`.compile().text).toBe(`"${prequoted.replace(/"/g, '""').replace(/[.]/g, '"."')}"`);
+    // and on a long run of unquoted and `U&` quoted parts that ends in something else
+    const mixed = `"a"${' . b$ . U&"c"'.repeat(100_000)} x"`;
+    expect(sql`${mixed}`.compile().text).toBe(`"${mixed.replace(/"/g, '""').replace(/[.]/g, '"."')}"`);
   });
 
-  it('characterization: Whereable keys', () => {
+  it('Whereable keys', () => {
     expect(matrix(v => sql`WHERE ${{ [v]: 1 }}`)).toMatchInlineSnapshot(`
       {
         "backslash": "WHERE ("a\\b" = $1)",
@@ -102,17 +127,24 @@ describe('identifiers', () => {
         "escapedDot": "WHERE ("a"".""b" = $1)",
         "escapedNul": "WHERE ("a""""<NUL>""""b" = $1)",
         "escapedOdd": "WHERE ("a""""""b" = $1)",
-        "lone": "WHERE (" = $1)",
+        "lone": "WHERE ("""" = $1)",
+        "mixedEscaped": "WHERE ("s".a$1."b"" OR TRUE OR ""c" = $1)",
         "nul": "WHERE ("a<NUL>b" = $1)",
         "prequoted": "WHERE ("a" = $1)",
+        "prequotedCloses": "WHERE ("""a"" OR TRUE OR ""b""" = $1)",
+        "prequotedEmpty": "WHERE ("""" = $1)",
+        "prequotedEscaped": "WHERE ("a"" OR TRUE OR ""b" = $1)",
         "qualifiedEscaped": "WHERE ("s"."a"" OR TRUE OR ""b" = $1)",
         "semicolon": "WHERE ("a;b" = $1)",
         "squote": "WHERE ("a'b" = $1)",
+        "uescape": "WHERE ("""s"""."U&""a"" UESCAPE '!' || ""b""" = $1)",
+        "unicodeCloses": "WHERE ("""s"""."U&""a\\"" OR TRUE OR \\""b""" = $1)",
+        "unicodeEscaped": "WHERE ("s".U&"a\\0022"" OR TRUE OR ""\\0022b" = $1)",
       }
     `);
   });
 
-  it('characterization: cols / vals keys', () => {
+  it('cols / vals keys', () => {
     expect(matrix(v => sql`(${cols({ [v]: 1 })}) VALUES (${vals({ [v]: 1 })})`)).toMatchInlineSnapshot(`
       {
         "backslash": "("a\\b") VALUES ($1)",
@@ -125,17 +157,24 @@ describe('identifiers', () => {
         "escapedDot": "("a"".""b") VALUES ($1)",
         "escapedNul": "("a""""<NUL>""""b") VALUES ($1)",
         "escapedOdd": "("a""""""b") VALUES ($1)",
-        "lone": "(") VALUES ($1)",
+        "lone": "("""") VALUES ($1)",
+        "mixedEscaped": "("s".a$1."b"" OR TRUE OR ""c") VALUES ($1)",
         "nul": "("a<NUL>b") VALUES ($1)",
         "prequoted": "("a") VALUES ($1)",
+        "prequotedCloses": "("""a"" OR TRUE OR ""b""") VALUES ($1)",
+        "prequotedEmpty": "("""") VALUES ($1)",
+        "prequotedEscaped": "("a"" OR TRUE OR ""b") VALUES ($1)",
         "qualifiedEscaped": "("s"."a"" OR TRUE OR ""b") VALUES ($1)",
         "semicolon": "("a;b") VALUES ($1)",
         "squote": "("a'b") VALUES ($1)",
+        "uescape": "("""s"""."U&""a"" UESCAPE '!' || ""b""") VALUES ($1)",
+        "unicodeCloses": "("""s"""."U&""a\\"" OR TRUE OR \\""b""") VALUES ($1)",
+        "unicodeEscaped": "("s".U&"a\\0022"" OR TRUE OR ""\\0022b") VALUES ($1)",
       }
     `);
   });
 
-  it('characterization: cols of an array', () => {
+  it('cols of an array', () => {
     expect(matrix(v => sql`SELECT ${cols([v])}`)).toMatchInlineSnapshot(`
       {
         "backslash": "SELECT "a\\b"",
@@ -148,16 +187,23 @@ describe('identifiers', () => {
         "escapedDot": "SELECT "a"".""b"",
         "escapedNul": "SELECT "a""""<NUL>""""b"",
         "escapedOdd": "SELECT "a""""""b"",
-        "lone": "SELECT "",
+        "lone": "SELECT """"",
+        "mixedEscaped": "SELECT "s".a$1."b"" OR TRUE OR ""c"",
         "nul": "SELECT "a<NUL>b"",
         "prequoted": "SELECT "a"",
+        "prequotedCloses": "SELECT """a"" OR TRUE OR ""b"""",
+        "prequotedEmpty": "SELECT """"",
+        "prequotedEscaped": "SELECT "a"" OR TRUE OR ""b"",
         "qualifiedEscaped": "SELECT "s"."a"" OR TRUE OR ""b"",
         "semicolon": "SELECT "a;b"",
         "squote": "SELECT "a'b"",
+        "uescape": "SELECT """s"""."U&""a"" UESCAPE '!' || ""b"""",
+        "unicodeCloses": "SELECT """s"""."U&""a\\"" OR TRUE OR \\""b"""",
+        "unicodeEscaped": "SELECT "s".U&"a\\0022"" OR TRUE OR ""\\0022b"",
       }
     `);
   });
-  it('characterization: the column of parent()', () => {
+  it('the column of parent()', () => {
     expect(matrix(v => sql`WHERE ${{ owner_id: db.parent(v) }}`.copy({ parentTable: 'users' }))).toMatchInlineSnapshot(`
       {
         "backslash": "WHERE ("owner_id" = "users"."a\\b")",
@@ -170,12 +216,19 @@ describe('identifiers', () => {
         "escapedDot": "WHERE ("owner_id" = "users"."a"".""b")",
         "escapedNul": "WHERE ("owner_id" = "users"."a""""<NUL>""""b")",
         "escapedOdd": "WHERE ("owner_id" = "users"."a""""""b")",
-        "lone": "WHERE ("owner_id" = "users".")",
+        "lone": "WHERE ("owner_id" = "users"."""")",
+        "mixedEscaped": "WHERE ("owner_id" = "users"."s".a$1."b"" OR TRUE OR ""c")",
         "nul": "WHERE ("owner_id" = "users"."a<NUL>b")",
         "prequoted": "WHERE ("owner_id" = "users"."a")",
+        "prequotedCloses": "WHERE ("owner_id" = "users"."""a"" OR TRUE OR ""b""")",
+        "prequotedEmpty": "WHERE ("owner_id" = "users"."""")",
+        "prequotedEscaped": "WHERE ("owner_id" = "users"."a"" OR TRUE OR ""b")",
         "qualifiedEscaped": "WHERE ("owner_id" = "users"."s"."a"" OR TRUE OR ""b")",
         "semicolon": "WHERE ("owner_id" = "users"."a;b")",
         "squote": "WHERE ("owner_id" = "users"."a'b")",
+        "uescape": "WHERE ("owner_id" = "users"."""s"""."U&""a"" UESCAPE '!' || ""b""")",
+        "unicodeCloses": "WHERE ("owner_id" = "users"."""s"""."U&""a\\"" OR TRUE OR \\""b""")",
+        "unicodeEscaped": "WHERE ("owner_id" = "users"."s".U&"a\\0022"" OR TRUE OR ""\\0022b")",
       }
     `);
   });
@@ -211,12 +264,19 @@ describe('shortcut arguments', () => {
         "escapedDot": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("a"".""b".*) AS result FROM "a"".""b") AS "sq_a"".""b"",
         "escapedNul": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("a""""<NUL>""""b".*) AS result FROM "a""""<NUL>""""b") AS "sq_a""""<NUL>""""b"",
         "escapedOdd": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("a""""""b".*) AS result FROM "a""""""b") AS "sq_a""""""b"",
-        "lone": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb(".*) AS result FROM ") AS "sq_"""",
+        "lone": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("""".*) AS result FROM """") AS "sq_"""",
+        "mixedEscaped": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("s".a$1."b"" OR TRUE OR ""c".*) AS result FROM "s".a$1."b"" OR TRUE OR ""c") AS "sq_""s"".a$1.""b"""" OR TRUE OR """"c"""",
         "nul": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("a<NUL>b".*) AS result FROM "a<NUL>b") AS "sq_a<NUL>b"",
         "prequoted": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("a".*) AS result FROM "a") AS "sq_""a"""",
+        "prequotedCloses": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("""a"" OR TRUE OR ""b""".*) AS result FROM """a"" OR TRUE OR ""b""") AS "sq_""a"" OR TRUE OR ""b"""",
+        "prequotedEmpty": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("""".*) AS result FROM """") AS "sq_"""",
+        "prequotedEscaped": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("a"" OR TRUE OR ""b".*) AS result FROM "a"" OR TRUE OR ""b") AS "sq_""a"""" OR TRUE OR """"b"""",
         "qualifiedEscaped": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("s"."a"" OR TRUE OR ""b".*) AS result FROM "s"."a"" OR TRUE OR ""b") AS "sq_s.a"" OR TRUE OR ""b"",
         "semicolon": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("a;b".*) AS result FROM "a;b") AS "sq_a;b"",
         "squote": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("a'b".*) AS result FROM "a'b") AS "sq_a'b"",
+        "uescape": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("""s"""."U&""a"" UESCAPE '!' || ""b""".*) AS result FROM """s"""."U&""a"" UESCAPE '!' || ""b""") AS "sq_""s"".U&""a"" UESCAPE '!' || ""b"""",
+        "unicodeCloses": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("""s"""."U&""a\\"" OR TRUE OR \\""b""".*) AS result FROM """s"""."U&""a\\"" OR TRUE OR \\""b""") AS "sq_""s"".U&""a\\"" OR TRUE OR \\""b"""",
+        "unicodeEscaped": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("s".U&"a\\0022"" OR TRUE OR ""\\0022b".*) AS result FROM "s".U&"a\\0022"" OR TRUE OR ""\\0022b") AS "sq_""s"".U&""a\\0022"""" OR TRUE OR """"\\0022b"""",
       }
     `);
     // insert, update, upsert and truncate write it the same way, without "sq_"
@@ -232,12 +292,19 @@ describe('shortcut arguments', () => {
         "escapedDot": "DELETE FROM "a"".""b" WHERE ("id" = $1) RETURNING to_jsonb("a"".""b".*) AS result",
         "escapedNul": "DELETE FROM "a""""<NUL>""""b" WHERE ("id" = $1) RETURNING to_jsonb("a""""<NUL>""""b".*) AS result",
         "escapedOdd": "DELETE FROM "a""""""b" WHERE ("id" = $1) RETURNING to_jsonb("a""""""b".*) AS result",
-        "lone": "DELETE FROM " WHERE ("id" = $1) RETURNING to_jsonb(".*) AS result",
+        "lone": "DELETE FROM """" WHERE ("id" = $1) RETURNING to_jsonb("""".*) AS result",
+        "mixedEscaped": "DELETE FROM "s".a$1."b"" OR TRUE OR ""c" WHERE ("id" = $1) RETURNING to_jsonb("s".a$1."b"" OR TRUE OR ""c".*) AS result",
         "nul": "DELETE FROM "a<NUL>b" WHERE ("id" = $1) RETURNING to_jsonb("a<NUL>b".*) AS result",
         "prequoted": "DELETE FROM "a" WHERE ("id" = $1) RETURNING to_jsonb("a".*) AS result",
+        "prequotedCloses": "DELETE FROM """a"" OR TRUE OR ""b""" WHERE ("id" = $1) RETURNING to_jsonb("""a"" OR TRUE OR ""b""".*) AS result",
+        "prequotedEmpty": "DELETE FROM """" WHERE ("id" = $1) RETURNING to_jsonb("""".*) AS result",
+        "prequotedEscaped": "DELETE FROM "a"" OR TRUE OR ""b" WHERE ("id" = $1) RETURNING to_jsonb("a"" OR TRUE OR ""b".*) AS result",
         "qualifiedEscaped": "DELETE FROM "s"."a"" OR TRUE OR ""b" WHERE ("id" = $1) RETURNING to_jsonb("s"."a"" OR TRUE OR ""b".*) AS result",
         "semicolon": "DELETE FROM "a;b" WHERE ("id" = $1) RETURNING to_jsonb("a;b".*) AS result",
         "squote": "DELETE FROM "a'b" WHERE ("id" = $1) RETURNING to_jsonb("a'b".*) AS result",
+        "uescape": "DELETE FROM """s"""."U&""a"" UESCAPE '!' || ""b""" WHERE ("id" = $1) RETURNING to_jsonb("""s"""."U&""a"" UESCAPE '!' || ""b""".*) AS result",
+        "unicodeCloses": "DELETE FROM """s"""."U&""a\\"" OR TRUE OR \\""b""" WHERE ("id" = $1) RETURNING to_jsonb("""s"""."U&""a\\"" OR TRUE OR \\""b""".*) AS result",
+        "unicodeEscaped": "DELETE FROM "s".U&"a\\0022"" OR TRUE OR ""\\0022b" WHERE ("id" = $1) RETURNING to_jsonb("s".U&"a\\0022"" OR TRUE OR ""\\0022b".*) AS result",
       }
     `);
   });
@@ -258,11 +325,18 @@ describe('shortcut arguments', () => {
         "escapedNul": "throws: Aggregate must be a function name (e.g. sum, or my_schema.my_agg), not 'a""<NUL>""b'",
         "escapedOdd": "throws: Aggregate must be a function name (e.g. sum, or my_schema.my_agg), not 'a"""b'",
         "lone": "throws: Aggregate must be a function name (e.g. sum, or my_schema.my_agg), not '"'",
+        "mixedEscaped": "SELECT "s".a$1."b"" OR TRUE OR ""c"(*) AS result FROM "users"",
         "nul": "throws: Aggregate must be a function name (e.g. sum, or my_schema.my_agg), not 'a<NUL>b'",
         "prequoted": "SELECT "a"(*) AS result FROM "users"",
+        "prequotedCloses": "throws: Aggregate must be a function name (e.g. sum, or my_schema.my_agg), not '"a" OR TRUE OR "b"'",
+        "prequotedEmpty": "throws: Aggregate must be a function name (e.g. sum, or my_schema.my_agg), not '""'",
+        "prequotedEscaped": "SELECT "a"" OR TRUE OR ""b"(*) AS result FROM "users"",
         "qualifiedEscaped": "throws: Aggregate must be a function name (e.g. sum, or my_schema.my_agg), not 's.a"" OR TRUE OR ""b'",
         "semicolon": "throws: Aggregate must be a function name (e.g. sum, or my_schema.my_agg), not 'a;b'",
         "squote": "throws: Aggregate must be a function name (e.g. sum, or my_schema.my_agg), not 'a'b'",
+        "uescape": "throws: Aggregate must be a function name (e.g. sum, or my_schema.my_agg), not '"s".U&"a" UESCAPE '!' || "b"'",
+        "unicodeCloses": "throws: Aggregate must be a function name (e.g. sum, or my_schema.my_agg), not '"s".U&"a\\" OR TRUE OR \\"b"'",
+        "unicodeEscaped": "SELECT "s".U&"a\\0022"" OR TRUE OR ""\\0022b"(*) AS result FROM "users"",
       }
     `);
   });
@@ -322,7 +396,7 @@ describe('shortcut arguments', () => {
         .toThrow(`Aggregate must be a function name (e.g. sum, or my_schema.my_agg), not '${aggregate}'`);
   });
 
-  it('characterization: upsert values keys, also written after EXCLUDED.', () => {
+  it('upsert values keys, also written after EXCLUDED.', () => {
     expect(matrix(v => db.upsert('users', { [v]: 1 } as any, 'email'))).toMatchInlineSnapshot(`
       {
         "backslash": "INSERT INTO "users" ("a\\b") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a\\b") = ROW(EXCLUDED."a\\b") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
@@ -335,17 +409,24 @@ describe('shortcut arguments', () => {
         "escapedDot": "INSERT INTO "users" ("a"".""b") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a"".""b") = ROW(EXCLUDED."a"".""b") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "escapedNul": "INSERT INTO "users" ("a""""<NUL>""""b") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a""""<NUL>""""b") = ROW(EXCLUDED."a""""<NUL>""""b") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "escapedOdd": "INSERT INTO "users" ("a""""""b") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a""""""b") = ROW(EXCLUDED."a""""""b") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
-        "lone": "INSERT INTO "users" (") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET (") = ROW(EXCLUDED.") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "lone": "INSERT INTO "users" ("""") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("""") = ROW(EXCLUDED."""") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "mixedEscaped": "INSERT INTO "users" ("s".a$1."b"" OR TRUE OR ""c") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("s".a$1."b"" OR TRUE OR ""c") = ROW(EXCLUDED."s".a$1."b"" OR TRUE OR ""c") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "nul": "INSERT INTO "users" ("a<NUL>b") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a<NUL>b") = ROW(EXCLUDED."a<NUL>b") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "prequoted": "INSERT INTO "users" ("a") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a") = ROW(EXCLUDED."a") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "prequotedCloses": "INSERT INTO "users" ("""a"" OR TRUE OR ""b""") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("""a"" OR TRUE OR ""b""") = ROW(EXCLUDED."""a"" OR TRUE OR ""b""") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "prequotedEmpty": "INSERT INTO "users" ("""") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("""") = ROW(EXCLUDED."""") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "prequotedEscaped": "INSERT INTO "users" ("a"" OR TRUE OR ""b") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a"" OR TRUE OR ""b") = ROW(EXCLUDED."a"" OR TRUE OR ""b") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "qualifiedEscaped": "INSERT INTO "users" ("s"."a"" OR TRUE OR ""b") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("s"."a"" OR TRUE OR ""b") = ROW(EXCLUDED."s"."a"" OR TRUE OR ""b") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "semicolon": "INSERT INTO "users" ("a;b") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a;b") = ROW(EXCLUDED."a;b") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "squote": "INSERT INTO "users" ("a'b") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a'b") = ROW(EXCLUDED."a'b") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "uescape": "INSERT INTO "users" ("""s"""."U&""a"" UESCAPE '!' || ""b""") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("""s"""."U&""a"" UESCAPE '!' || ""b""") = ROW(EXCLUDED."""s"""."U&""a"" UESCAPE '!' || ""b""") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "unicodeCloses": "INSERT INTO "users" ("""s"""."U&""a\\"" OR TRUE OR \\""b""") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("""s"""."U&""a\\"" OR TRUE OR \\""b""") = ROW(EXCLUDED."""s"""."U&""a\\"" OR TRUE OR \\""b""") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "unicodeEscaped": "INSERT INTO "users" ("s".U&"a\\0022"" OR TRUE OR ""\\0022b") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("s".U&"a\\0022"" OR TRUE OR ""\\0022b") = ROW(EXCLUDED."s".U&"a\\0022"" OR TRUE OR ""\\0022b") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
       }
     `);
   });
 
-  it('characterization: upsert conflict columns', () => {
+  it('upsert conflict columns', () => {
     expect(matrix(v => db.upsert('users', { email: 'x' }, v))).toMatchInlineSnapshot(`
       {
         "backslash": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("a\\b") DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
@@ -358,17 +439,24 @@ describe('shortcut arguments', () => {
         "escapedDot": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("a"".""b") DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "escapedNul": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("a""""<NUL>""""b") DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "escapedOdd": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("a""""""b") DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
-        "lone": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT (") DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "lone": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("""") DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "mixedEscaped": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("s".a$1."b"" OR TRUE OR ""c") DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "nul": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("a<NUL>b") DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "prequoted": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("a") DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "prequotedCloses": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("""a"" OR TRUE OR ""b""") DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "prequotedEmpty": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("""") DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "prequotedEscaped": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("a"" OR TRUE OR ""b") DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "qualifiedEscaped": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("s"."a"" OR TRUE OR ""b") DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "semicolon": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("a;b") DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "squote": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("a'b") DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "uescape": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("""s"""."U&""a"" UESCAPE '!' || ""b""") DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "unicodeCloses": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("""s"""."U&""a\\"" OR TRUE OR \\""b""") DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "unicodeEscaped": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("s".U&"a\\0022"" OR TRUE OR ""\\0022b") DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
       }
     `);
   });
 
-  it('characterization: upsert constraint()', () => {
+  it('upsert constraint()', () => {
     expect(matrix(v => db.upsert('users', { email: 'x' }, db.constraint(v)))).toMatchInlineSnapshot(`
       {
         "backslash": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ON CONSTRAINT "a\\b" DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
@@ -381,19 +469,26 @@ describe('shortcut arguments', () => {
         "escapedDot": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ON CONSTRAINT "a"".""b" DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "escapedNul": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ON CONSTRAINT "a""""<NUL>""""b" DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "escapedOdd": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ON CONSTRAINT "a""""""b" DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
-        "lone": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ON CONSTRAINT " DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "lone": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ON CONSTRAINT """" DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "mixedEscaped": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ON CONSTRAINT "s".a$1."b"" OR TRUE OR ""c" DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "nul": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ON CONSTRAINT "a<NUL>b" DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "prequoted": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ON CONSTRAINT "a" DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "prequotedCloses": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ON CONSTRAINT """a"" OR TRUE OR ""b""" DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "prequotedEmpty": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ON CONSTRAINT """" DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "prequotedEscaped": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ON CONSTRAINT "a"" OR TRUE OR ""b" DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "qualifiedEscaped": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ON CONSTRAINT "s"."a"" OR TRUE OR ""b" DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "semicolon": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ON CONSTRAINT "a;b" DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "squote": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ON CONSTRAINT "a'b" DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "uescape": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ON CONSTRAINT """s"""."U&""a"" UESCAPE '!' || ""b""" DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "unicodeCloses": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ON CONSTRAINT """s"""."U&""a\\"" OR TRUE OR \\""b""" DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "unicodeEscaped": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ON CONSTRAINT "s".U&"a\\0022"" OR TRUE OR ""\\0022b" DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
       }
     `);
   });
 });
 
 describe('shortcut options', () => {
-  it('characterization: columns', () => {
+  it('columns', () => {
     expect(matrix(v => db.select('users', all, { columns: [v] } as any))).toMatchInlineSnapshot(`
       {
         "backslash": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT jsonb_build_object($1::text, "a\\b") AS result FROM "users") AS "sq_users"",
@@ -406,17 +501,24 @@ describe('shortcut options', () => {
         "escapedDot": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT jsonb_build_object($1::text, "a"".""b") AS result FROM "users") AS "sq_users"",
         "escapedNul": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT jsonb_build_object($1::text, "a""""<NUL>""""b") AS result FROM "users") AS "sq_users"",
         "escapedOdd": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT jsonb_build_object($1::text, "a""""""b") AS result FROM "users") AS "sq_users"",
-        "lone": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT jsonb_build_object($1::text, ") AS result FROM "users") AS "sq_users"",
+        "lone": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT jsonb_build_object($1::text, """") AS result FROM "users") AS "sq_users"",
+        "mixedEscaped": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT jsonb_build_object($1::text, "s".a$1."b"" OR TRUE OR ""c") AS result FROM "users") AS "sq_users"",
         "nul": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT jsonb_build_object($1::text, "a<NUL>b") AS result FROM "users") AS "sq_users"",
         "prequoted": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT jsonb_build_object($1::text, "a") AS result FROM "users") AS "sq_users"",
+        "prequotedCloses": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT jsonb_build_object($1::text, """a"" OR TRUE OR ""b""") AS result FROM "users") AS "sq_users"",
+        "prequotedEmpty": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT jsonb_build_object($1::text, """") AS result FROM "users") AS "sq_users"",
+        "prequotedEscaped": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT jsonb_build_object($1::text, "a"" OR TRUE OR ""b") AS result FROM "users") AS "sq_users"",
         "qualifiedEscaped": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT jsonb_build_object($1::text, "s"."a"" OR TRUE OR ""b") AS result FROM "users") AS "sq_users"",
         "semicolon": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT jsonb_build_object($1::text, "a;b") AS result FROM "users") AS "sq_users"",
         "squote": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT jsonb_build_object($1::text, "a'b") AS result FROM "users") AS "sq_users"",
+        "uescape": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT jsonb_build_object($1::text, """s"""."U&""a"" UESCAPE '!' || ""b""") AS result FROM "users") AS "sq_users"",
+        "unicodeCloses": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT jsonb_build_object($1::text, """s"""."U&""a\\"" OR TRUE OR \\""b""") AS result FROM "users") AS "sq_users"",
+        "unicodeEscaped": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT jsonb_build_object($1::text, "s".U&"a\\0022"" OR TRUE OR ""\\0022b") AS result FROM "users") AS "sq_users"",
       }
     `);
   });
 
-  it('characterization: returning', () => {
+  it('returning', () => {
     // insert, update and upsert build it the same way (SQLForColumnsOfTable)
     expect(matrix(v => db.deletes('users', { id: 1 }, { returning: [v] } as any))).toMatchInlineSnapshot(`
       {
@@ -430,17 +532,24 @@ describe('shortcut options', () => {
         "escapedDot": "DELETE FROM "users" WHERE ("id" = $1) RETURNING jsonb_build_object($2::text, "a"".""b") AS result",
         "escapedNul": "DELETE FROM "users" WHERE ("id" = $1) RETURNING jsonb_build_object($2::text, "a""""<NUL>""""b") AS result",
         "escapedOdd": "DELETE FROM "users" WHERE ("id" = $1) RETURNING jsonb_build_object($2::text, "a""""""b") AS result",
-        "lone": "DELETE FROM "users" WHERE ("id" = $1) RETURNING jsonb_build_object($2::text, ") AS result",
+        "lone": "DELETE FROM "users" WHERE ("id" = $1) RETURNING jsonb_build_object($2::text, """") AS result",
+        "mixedEscaped": "DELETE FROM "users" WHERE ("id" = $1) RETURNING jsonb_build_object($2::text, "s".a$1."b"" OR TRUE OR ""c") AS result",
         "nul": "DELETE FROM "users" WHERE ("id" = $1) RETURNING jsonb_build_object($2::text, "a<NUL>b") AS result",
         "prequoted": "DELETE FROM "users" WHERE ("id" = $1) RETURNING jsonb_build_object($2::text, "a") AS result",
+        "prequotedCloses": "DELETE FROM "users" WHERE ("id" = $1) RETURNING jsonb_build_object($2::text, """a"" OR TRUE OR ""b""") AS result",
+        "prequotedEmpty": "DELETE FROM "users" WHERE ("id" = $1) RETURNING jsonb_build_object($2::text, """") AS result",
+        "prequotedEscaped": "DELETE FROM "users" WHERE ("id" = $1) RETURNING jsonb_build_object($2::text, "a"" OR TRUE OR ""b") AS result",
         "qualifiedEscaped": "DELETE FROM "users" WHERE ("id" = $1) RETURNING jsonb_build_object($2::text, "s"."a"" OR TRUE OR ""b") AS result",
         "semicolon": "DELETE FROM "users" WHERE ("id" = $1) RETURNING jsonb_build_object($2::text, "a;b") AS result",
         "squote": "DELETE FROM "users" WHERE ("id" = $1) RETURNING jsonb_build_object($2::text, "a'b") AS result",
+        "uescape": "DELETE FROM "users" WHERE ("id" = $1) RETURNING jsonb_build_object($2::text, """s"""."U&""a"" UESCAPE '!' || ""b""") AS result",
+        "unicodeCloses": "DELETE FROM "users" WHERE ("id" = $1) RETURNING jsonb_build_object($2::text, """s"""."U&""a\\"" OR TRUE OR \\""b""") AS result",
+        "unicodeEscaped": "DELETE FROM "users" WHERE ("id" = $1) RETURNING jsonb_build_object($2::text, "s".U&"a\\0022"" OR TRUE OR ""\\0022b") AS result",
       }
     `);
   });
 
-  it('characterization: order.by', () => {
+  it('order.by', () => {
     expect(matrix(v => db.select('users', all, { order: { by: v, direction: 'ASC' } } as any))).toMatchInlineSnapshot(`
       {
         "backslash": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" ORDER BY "a\\b" ASC) AS "sq_users"",
@@ -453,17 +562,24 @@ describe('shortcut options', () => {
         "escapedDot": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" ORDER BY "a"".""b" ASC) AS "sq_users"",
         "escapedNul": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" ORDER BY "a""""<NUL>""""b" ASC) AS "sq_users"",
         "escapedOdd": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" ORDER BY "a""""""b" ASC) AS "sq_users"",
-        "lone": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" ORDER BY " ASC) AS "sq_users"",
+        "lone": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" ORDER BY """" ASC) AS "sq_users"",
+        "mixedEscaped": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" ORDER BY "s".a$1."b"" OR TRUE OR ""c" ASC) AS "sq_users"",
         "nul": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" ORDER BY "a<NUL>b" ASC) AS "sq_users"",
         "prequoted": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" ORDER BY "a" ASC) AS "sq_users"",
+        "prequotedCloses": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" ORDER BY """a"" OR TRUE OR ""b""" ASC) AS "sq_users"",
+        "prequotedEmpty": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" ORDER BY """" ASC) AS "sq_users"",
+        "prequotedEscaped": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" ORDER BY "a"" OR TRUE OR ""b" ASC) AS "sq_users"",
         "qualifiedEscaped": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" ORDER BY "s"."a"" OR TRUE OR ""b" ASC) AS "sq_users"",
         "semicolon": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" ORDER BY "a;b" ASC) AS "sq_users"",
         "squote": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" ORDER BY "a'b" ASC) AS "sq_users"",
+        "uescape": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" ORDER BY """s"""."U&""a"" UESCAPE '!' || ""b""" ASC) AS "sq_users"",
+        "unicodeCloses": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" ORDER BY """s"""."U&""a\\"" OR TRUE OR \\""b""" ASC) AS "sq_users"",
+        "unicodeEscaped": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" ORDER BY "s".U&"a\\0022"" OR TRUE OR ""\\0022b" ASC) AS "sq_users"",
       }
     `);
   });
 
-  it('characterization: upsert updateColumns, written after EXCLUDED.', () => {
+  it('upsert updateColumns, written after EXCLUDED.', () => {
     expect(matrix(v => db.upsert('users', { email: 'x' }, 'email', { updateColumns: [v] } as any))).toMatchInlineSnapshot(`
       {
         "backslash": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a\\b") = ROW(EXCLUDED."a\\b") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
@@ -476,12 +592,19 @@ describe('shortcut options', () => {
         "escapedDot": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a"".""b") = ROW(EXCLUDED."a"".""b") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "escapedNul": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a""""<NUL>""""b") = ROW(EXCLUDED."a""""<NUL>""""b") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "escapedOdd": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a""""""b") = ROW(EXCLUDED."a""""""b") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
-        "lone": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET (") = ROW(EXCLUDED.") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "lone": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("""") = ROW(EXCLUDED."""") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "mixedEscaped": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("s".a$1."b"" OR TRUE OR ""c") = ROW(EXCLUDED."s".a$1."b"" OR TRUE OR ""c") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "nul": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a<NUL>b") = ROW(EXCLUDED."a<NUL>b") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "prequoted": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a") = ROW(EXCLUDED."a") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "prequotedCloses": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("""a"" OR TRUE OR ""b""") = ROW(EXCLUDED."""a"" OR TRUE OR ""b""") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "prequotedEmpty": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("""") = ROW(EXCLUDED."""") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "prequotedEscaped": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a"" OR TRUE OR ""b") = ROW(EXCLUDED."a"" OR TRUE OR ""b") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "qualifiedEscaped": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("s"."a"" OR TRUE OR ""b") = ROW(EXCLUDED."s"."a"" OR TRUE OR ""b") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "semicolon": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a;b") = ROW(EXCLUDED."a;b") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         "squote": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a'b") = ROW(EXCLUDED."a'b") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "uescape": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("""s"""."U&""a"" UESCAPE '!' || ""b""") = ROW(EXCLUDED."""s"""."U&""a"" UESCAPE '!' || ""b""") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "unicodeCloses": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("""s"""."U&""a\\"" OR TRUE OR \\""b""") = ROW(EXCLUDED."""s"""."U&""a\\"" OR TRUE OR \\""b""") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "unicodeEscaped": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("s".U&"a\\0022"" OR TRUE OR ""\\0022b") = ROW(EXCLUDED."s".U&"a\\0022"" OR TRUE OR ""\\0022b") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
       }
     `);
     // with noNullUpdateColumns, the same column is also written after the table name
@@ -498,12 +621,19 @@ describe('shortcut options', () => {
           "escapedDot": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a"".""b") = ROW(CASE WHEN EXCLUDED."a"".""b" IS NULL THEN "users"."a"".""b" ELSE EXCLUDED."a"".""b" END) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
           "escapedNul": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a""""<NUL>""""b") = ROW(CASE WHEN EXCLUDED."a""""<NUL>""""b" IS NULL THEN "users"."a""""<NUL>""""b" ELSE EXCLUDED."a""""<NUL>""""b" END) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
           "escapedOdd": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a""""""b") = ROW(CASE WHEN EXCLUDED."a""""""b" IS NULL THEN "users"."a""""""b" ELSE EXCLUDED."a""""""b" END) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
-          "lone": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET (") = ROW(CASE WHEN EXCLUDED." IS NULL THEN "users"." ELSE EXCLUDED." END) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+          "lone": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("""") = ROW(CASE WHEN EXCLUDED."""" IS NULL THEN "users"."""" ELSE EXCLUDED."""" END) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+          "mixedEscaped": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("s".a$1."b"" OR TRUE OR ""c") = ROW(CASE WHEN EXCLUDED."s".a$1."b"" OR TRUE OR ""c" IS NULL THEN "users"."s".a$1."b"" OR TRUE OR ""c" ELSE EXCLUDED."s".a$1."b"" OR TRUE OR ""c" END) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
           "nul": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a<NUL>b") = ROW(CASE WHEN EXCLUDED."a<NUL>b" IS NULL THEN "users"."a<NUL>b" ELSE EXCLUDED."a<NUL>b" END) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
           "prequoted": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a") = ROW(CASE WHEN EXCLUDED."a" IS NULL THEN "users"."a" ELSE EXCLUDED."a" END) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+          "prequotedCloses": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("""a"" OR TRUE OR ""b""") = ROW(CASE WHEN EXCLUDED."""a"" OR TRUE OR ""b""" IS NULL THEN "users"."""a"" OR TRUE OR ""b""" ELSE EXCLUDED."""a"" OR TRUE OR ""b""" END) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+          "prequotedEmpty": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("""") = ROW(CASE WHEN EXCLUDED."""" IS NULL THEN "users"."""" ELSE EXCLUDED."""" END) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+          "prequotedEscaped": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a"" OR TRUE OR ""b") = ROW(CASE WHEN EXCLUDED."a"" OR TRUE OR ""b" IS NULL THEN "users"."a"" OR TRUE OR ""b" ELSE EXCLUDED."a"" OR TRUE OR ""b" END) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
           "qualifiedEscaped": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("s"."a"" OR TRUE OR ""b") = ROW(CASE WHEN EXCLUDED."s"."a"" OR TRUE OR ""b" IS NULL THEN "users"."s"."a"" OR TRUE OR ""b" ELSE EXCLUDED."s"."a"" OR TRUE OR ""b" END) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
           "semicolon": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a;b") = ROW(CASE WHEN EXCLUDED."a;b" IS NULL THEN "users"."a;b" ELSE EXCLUDED."a;b" END) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
           "squote": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a'b") = ROW(CASE WHEN EXCLUDED."a'b" IS NULL THEN "users"."a'b" ELSE EXCLUDED."a'b" END) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+          "uescape": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("""s"""."U&""a"" UESCAPE '!' || ""b""") = ROW(CASE WHEN EXCLUDED."""s"""."U&""a"" UESCAPE '!' || ""b""" IS NULL THEN "users"."""s"""."U&""a"" UESCAPE '!' || ""b""" ELSE EXCLUDED."""s"""."U&""a"" UESCAPE '!' || ""b""" END) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+          "unicodeCloses": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("""s"""."U&""a\\"" OR TRUE OR \\""b""") = ROW(CASE WHEN EXCLUDED."""s"""."U&""a\\"" OR TRUE OR \\""b""" IS NULL THEN "users"."""s"""."U&""a\\"" OR TRUE OR \\""b""" ELSE EXCLUDED."""s"""."U&""a\\"" OR TRUE OR \\""b""" END) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+          "unicodeEscaped": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("s".U&"a\\0022"" OR TRUE OR ""\\0022b") = ROW(CASE WHEN EXCLUDED."s".U&"a\\0022"" OR TRUE OR ""\\0022b" IS NULL THEN "users"."s".U&"a\\0022"" OR TRUE OR ""\\0022b" ELSE EXCLUDED."s".U&"a\\0022"" OR TRUE OR ""\\0022b" END) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         }
       `);
   });
@@ -522,12 +652,19 @@ describe('shortcut options', () => {
           "escapedDot": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a"".""b") = ROW(1) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
           "escapedNul": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a""""<NUL>""""b") = ROW(1) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
           "escapedOdd": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a""""""b") = ROW(1) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
-          "lone": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET (") = ROW(1) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+          "lone": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("""") = ROW(1) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+          "mixedEscaped": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("s".a$1."b"" OR TRUE OR ""c") = ROW(1) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
           "nul": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a<NUL>b") = ROW(1) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
           "prequoted": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a") = ROW(1) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+          "prequotedCloses": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("""a"" OR TRUE OR ""b""") = ROW(1) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+          "prequotedEmpty": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("""") = ROW(1) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+          "prequotedEscaped": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a"" OR TRUE OR ""b") = ROW(1) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
           "qualifiedEscaped": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("s"."a"" OR TRUE OR ""b") = ROW(1) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
           "semicolon": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a;b") = ROW(1) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
           "squote": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("a'b") = ROW(1) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+          "uescape": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("""s"""."U&""a"" UESCAPE '!' || ""b""") = ROW(1) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+          "unicodeCloses": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("""s"""."U&""a\\"" OR TRUE OR \\""b""") = ROW(1) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+          "unicodeEscaped": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("s".U&"a\\0022"" OR TRUE OR ""\\0022b") = ROW(1) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         }
       `);
     expect(matrix(v => db.upsert('users', { email: 'x' }, 'email', { updateColumns: [], updateValues: { mood: v } } as any)))
@@ -543,12 +680,19 @@ describe('shortcut options', () => {
           "escapedDot": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("mood") = ROW("a"".""b") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
           "escapedNul": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("mood") = ROW("a""""<NUL>""""b") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
           "escapedOdd": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("mood") = ROW("a""""""b") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
-          "lone": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("mood") = ROW(") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+          "lone": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("mood") = ROW("""") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+          "mixedEscaped": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("mood") = ROW("s".a$1."b"" OR TRUE OR ""c") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
           "nul": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("mood") = ROW("a<NUL>b") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
           "prequoted": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("mood") = ROW("a") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+          "prequotedCloses": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("mood") = ROW("""a"" OR TRUE OR ""b""") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+          "prequotedEmpty": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("mood") = ROW("""") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+          "prequotedEscaped": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("mood") = ROW("a"" OR TRUE OR ""b") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
           "qualifiedEscaped": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("mood") = ROW("s"."a"" OR TRUE OR ""b") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
           "semicolon": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("mood") = ROW("a;b") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
           "squote": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("mood") = ROW("a'b") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+          "uescape": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("mood") = ROW("""s"""."U&""a"" UESCAPE '!' || ""b""") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+          "unicodeCloses": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("mood") = ROW("""s"""."U&""a\\"" OR TRUE OR \\""b""") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+          "unicodeEscaped": "INSERT INTO "users" ("email") VALUES ($1) ON CONFLICT ("email") DO UPDATE SET ("mood") = ROW("s".U&"a\\0022"" OR TRUE OR ""\\0022b") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
         }
       `);
   });
@@ -567,11 +711,18 @@ describe('shortcut options', () => {
         "escapedNul": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) || jsonb_build_object($1::text, 1) AS result FROM "users") AS "sq_users"",
         "escapedOdd": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) || jsonb_build_object($1::text, 1) AS result FROM "users") AS "sq_users"",
         "lone": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) || jsonb_build_object($1::text, 1) AS result FROM "users") AS "sq_users"",
+        "mixedEscaped": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) || jsonb_build_object($1::text, 1) AS result FROM "users") AS "sq_users"",
         "nul": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) || jsonb_build_object($1::text, 1) AS result FROM "users") AS "sq_users"",
         "prequoted": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) || jsonb_build_object($1::text, 1) AS result FROM "users") AS "sq_users"",
+        "prequotedCloses": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) || jsonb_build_object($1::text, 1) AS result FROM "users") AS "sq_users"",
+        "prequotedEmpty": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) || jsonb_build_object($1::text, 1) AS result FROM "users") AS "sq_users"",
+        "prequotedEscaped": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) || jsonb_build_object($1::text, 1) AS result FROM "users") AS "sq_users"",
         "qualifiedEscaped": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) || jsonb_build_object($1::text, 1) AS result FROM "users") AS "sq_users"",
         "semicolon": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) || jsonb_build_object($1::text, 1) AS result FROM "users") AS "sq_users"",
         "squote": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) || jsonb_build_object($1::text, 1) AS result FROM "users") AS "sq_users"",
+        "uescape": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) || jsonb_build_object($1::text, 1) AS result FROM "users") AS "sq_users"",
+        "unicodeCloses": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) || jsonb_build_object($1::text, 1) AS result FROM "users") AS "sq_users"",
+        "unicodeEscaped": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) || jsonb_build_object($1::text, 1) AS result FROM "users") AS "sq_users"",
       }
     `);
   });
@@ -601,11 +752,18 @@ describe('shortcut options', () => {
         "escapedNul": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) || jsonb_build_object($1::text, "lateral_a""""<NUL>""""b".result) AS result FROM "users" LEFT JOIN LATERAL (SELECT to_jsonb("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $2) AS "lateral_a""""<NUL>""""b" ON true) AS "sq_users"",
         "escapedOdd": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) || jsonb_build_object($1::text, "lateral_a""""""b".result) AS result FROM "users" LEFT JOIN LATERAL (SELECT to_jsonb("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $2) AS "lateral_a""""""b" ON true) AS "sq_users"",
         "lone": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) || jsonb_build_object($1::text, "lateral_""".result) AS result FROM "users" LEFT JOIN LATERAL (SELECT to_jsonb("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $2) AS "lateral_""" ON true) AS "sq_users"",
+        "mixedEscaped": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) || jsonb_build_object($1::text, "lateral_""s"".a$1.""b"""" OR TRUE OR """"c""".result) AS result FROM "users" LEFT JOIN LATERAL (SELECT to_jsonb("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $2) AS "lateral_""s"".a$1.""b"""" OR TRUE OR """"c""" ON true) AS "sq_users"",
         "nul": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) || jsonb_build_object($1::text, "lateral_a<NUL>b".result) AS result FROM "users" LEFT JOIN LATERAL (SELECT to_jsonb("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $2) AS "lateral_a<NUL>b" ON true) AS "sq_users"",
         "prequoted": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) || jsonb_build_object($1::text, "lateral_""a""".result) AS result FROM "users" LEFT JOIN LATERAL (SELECT to_jsonb("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $2) AS "lateral_""a""" ON true) AS "sq_users"",
+        "prequotedCloses": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) || jsonb_build_object($1::text, "lateral_""a"" OR TRUE OR ""b""".result) AS result FROM "users" LEFT JOIN LATERAL (SELECT to_jsonb("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $2) AS "lateral_""a"" OR TRUE OR ""b""" ON true) AS "sq_users"",
+        "prequotedEmpty": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) || jsonb_build_object($1::text, "lateral_""".result) AS result FROM "users" LEFT JOIN LATERAL (SELECT to_jsonb("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $2) AS "lateral_""" ON true) AS "sq_users"",
+        "prequotedEscaped": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) || jsonb_build_object($1::text, "lateral_""a"""" OR TRUE OR """"b""".result) AS result FROM "users" LEFT JOIN LATERAL (SELECT to_jsonb("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $2) AS "lateral_""a"""" OR TRUE OR """"b""" ON true) AS "sq_users"",
         "qualifiedEscaped": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) || jsonb_build_object($1::text, "lateral_s.a"" OR TRUE OR ""b".result) AS result FROM "users" LEFT JOIN LATERAL (SELECT to_jsonb("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $2) AS "lateral_s.a"" OR TRUE OR ""b" ON true) AS "sq_users"",
         "semicolon": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) || jsonb_build_object($1::text, "lateral_a;b".result) AS result FROM "users" LEFT JOIN LATERAL (SELECT to_jsonb("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $2) AS "lateral_a;b" ON true) AS "sq_users"",
         "squote": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) || jsonb_build_object($1::text, "lateral_a'b".result) AS result FROM "users" LEFT JOIN LATERAL (SELECT to_jsonb("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $2) AS "lateral_a'b" ON true) AS "sq_users"",
+        "uescape": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) || jsonb_build_object($1::text, "lateral_""s"".U&""a"" UESCAPE '!' || ""b""".result) AS result FROM "users" LEFT JOIN LATERAL (SELECT to_jsonb("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $2) AS "lateral_""s"".U&""a"" UESCAPE '!' || ""b""" ON true) AS "sq_users"",
+        "unicodeCloses": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) || jsonb_build_object($1::text, "lateral_""s"".U&""a\\"" OR TRUE OR \\""b""".result) AS result FROM "users" LEFT JOIN LATERAL (SELECT to_jsonb("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $2) AS "lateral_""s"".U&""a\\"" OR TRUE OR \\""b""" ON true) AS "sq_users"",
+        "unicodeEscaped": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) || jsonb_build_object($1::text, "lateral_""s"".U&""a\\0022"""" OR TRUE OR """"\\0022b""".result) AS result FROM "users" LEFT JOIN LATERAL (SELECT to_jsonb("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id") LIMIT $2) AS "lateral_""s"".U&""a\\0022"""" OR TRUE OR """"\\0022b""" ON true) AS "sq_users"",
       }
     `);
   });
@@ -626,12 +784,19 @@ describe('shortcut options', () => {
         "escapedDot": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("a"".""b".*) AS result FROM "users" AS "a"".""b") AS "sq_a"".""b"",
         "escapedNul": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("a""""<NUL>""""b".*) AS result FROM "users" AS "a""""<NUL>""""b") AS "sq_a""""<NUL>""""b"",
         "escapedOdd": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("a""""""b".*) AS result FROM "users" AS "a""""""b") AS "sq_a""""""b"",
-        "lone": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb(".*) AS result FROM "users" AS ") AS "sq_"""",
+        "lone": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("""".*) AS result FROM "users" AS """") AS "sq_"""",
+        "mixedEscaped": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("s".a$1."b"" OR TRUE OR ""c".*) AS result FROM "users" AS "s".a$1."b"" OR TRUE OR ""c") AS "sq_""s"".a$1.""b"""" OR TRUE OR """"c"""",
         "nul": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("a<NUL>b".*) AS result FROM "users" AS "a<NUL>b") AS "sq_a<NUL>b"",
         "prequoted": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("a".*) AS result FROM "users" AS "a") AS "sq_""a"""",
+        "prequotedCloses": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("""a"" OR TRUE OR ""b""".*) AS result FROM "users" AS """a"" OR TRUE OR ""b""") AS "sq_""a"" OR TRUE OR ""b"""",
+        "prequotedEmpty": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("""".*) AS result FROM "users" AS """") AS "sq_"""",
+        "prequotedEscaped": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("a"" OR TRUE OR ""b".*) AS result FROM "users" AS "a"" OR TRUE OR ""b") AS "sq_""a"""" OR TRUE OR """"b"""",
         "qualifiedEscaped": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("s"."a"" OR TRUE OR ""b".*) AS result FROM "users" AS "s"."a"" OR TRUE OR ""b") AS "sq_s.a"" OR TRUE OR ""b"",
         "semicolon": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("a;b".*) AS result FROM "users" AS "a;b") AS "sq_a;b"",
         "squote": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("a'b".*) AS result FROM "users" AS "a'b") AS "sq_a'b"",
+        "uescape": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("""s"""."U&""a"" UESCAPE '!' || ""b""".*) AS result FROM "users" AS """s"""."U&""a"" UESCAPE '!' || ""b""") AS "sq_""s"".U&""a"" UESCAPE '!' || ""b"""",
+        "unicodeCloses": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("""s"""."U&""a\\"" OR TRUE OR \\""b""".*) AS result FROM "users" AS """s"""."U&""a\\"" OR TRUE OR \\""b""") AS "sq_""s"".U&""a\\"" OR TRUE OR \\""b"""",
+        "unicodeEscaped": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("s".U&"a\\0022"" OR TRUE OR ""\\0022b".*) AS result FROM "users" AS "s".U&"a\\0022"" OR TRUE OR ""\\0022b") AS "sq_""s"".U&""a\\0022"""" OR TRUE OR """"\\0022b"""",
       }
     `);
   });
@@ -655,11 +820,18 @@ describe('shortcut options', () => {
         "escapedNul": "throws: Direction must be ASC/DESC, not 'a""<NUL>""b'",
         "escapedOdd": "throws: Direction must be ASC/DESC, not 'a"""b'",
         "lone": "throws: Direction must be ASC/DESC, not '"'",
+        "mixedEscaped": "throws: Direction must be ASC/DESC, not '"s".a$1."b"" OR TRUE OR ""c"'",
         "nul": "throws: Direction must be ASC/DESC, not 'a<NUL>b'",
         "prequoted": "throws: Direction must be ASC/DESC, not '"a"'",
+        "prequotedCloses": "throws: Direction must be ASC/DESC, not '"a" OR TRUE OR "b"'",
+        "prequotedEmpty": "throws: Direction must be ASC/DESC, not '""'",
+        "prequotedEscaped": "throws: Direction must be ASC/DESC, not '"a"" OR TRUE OR ""b"'",
         "qualifiedEscaped": "throws: Direction must be ASC/DESC, not 's.a"" OR TRUE OR ""b'",
         "semicolon": "throws: Direction must be ASC/DESC, not 'a;b'",
         "squote": "throws: Direction must be ASC/DESC, not 'a'b'",
+        "uescape": "throws: Direction must be ASC/DESC, not '"s".U&"a" UESCAPE '!' || "b"'",
+        "unicodeCloses": "throws: Direction must be ASC/DESC, not '"s".U&"a\\" OR TRUE OR \\"b"'",
+        "unicodeEscaped": "throws: Direction must be ASC/DESC, not '"s".U&"a\\0022"" OR TRUE OR ""\\0022b"'",
       }
     `);
     expect(matrix(v => db.select('users', all, { order: { by: 'id', direction: 'ASC', nulls: v } } as any))).toMatchInlineSnapshot(`
@@ -675,11 +847,18 @@ describe('shortcut options', () => {
         "escapedNul": "throws: Nulls must be FIRST/LAST/undefined, not 'a""<NUL>""b'",
         "escapedOdd": "throws: Nulls must be FIRST/LAST/undefined, not 'a"""b'",
         "lone": "throws: Nulls must be FIRST/LAST/undefined, not '"'",
+        "mixedEscaped": "throws: Nulls must be FIRST/LAST/undefined, not '"s".a$1."b"" OR TRUE OR ""c"'",
         "nul": "throws: Nulls must be FIRST/LAST/undefined, not 'a<NUL>b'",
         "prequoted": "throws: Nulls must be FIRST/LAST/undefined, not '"a"'",
+        "prequotedCloses": "throws: Nulls must be FIRST/LAST/undefined, not '"a" OR TRUE OR "b"'",
+        "prequotedEmpty": "throws: Nulls must be FIRST/LAST/undefined, not '""'",
+        "prequotedEscaped": "throws: Nulls must be FIRST/LAST/undefined, not '"a"" OR TRUE OR ""b"'",
         "qualifiedEscaped": "throws: Nulls must be FIRST/LAST/undefined, not 's.a"" OR TRUE OR ""b'",
         "semicolon": "throws: Nulls must be FIRST/LAST/undefined, not 'a;b'",
         "squote": "throws: Nulls must be FIRST/LAST/undefined, not 'a'b'",
+        "uescape": "throws: Nulls must be FIRST/LAST/undefined, not '"s".U&"a" UESCAPE '!' || "b"'",
+        "unicodeCloses": "throws: Nulls must be FIRST/LAST/undefined, not '"s".U&"a\\" OR TRUE OR \\"b"'",
+        "unicodeEscaped": "throws: Nulls must be FIRST/LAST/undefined, not '"s".U&"a\\0022"" OR TRUE OR ""\\0022b"'",
       }
     `);
   });
@@ -698,11 +877,18 @@ describe('shortcut options', () => {
         "escapedNul": "throws: Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not 'a""<NUL>""b'",
         "escapedOdd": "throws: Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not 'a"""b'",
         "lone": "throws: Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not '"'",
+        "mixedEscaped": "throws: Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not '"s".a$1."b"" OR TRUE OR ""c"'",
         "nul": "throws: Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not 'a<NUL>b'",
         "prequoted": "throws: Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not '"a"'",
+        "prequotedCloses": "throws: Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not '"a" OR TRUE OR "b"'",
+        "prequotedEmpty": "throws: Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not '""'",
+        "prequotedEscaped": "throws: Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not '"a"" OR TRUE OR ""b"'",
         "qualifiedEscaped": "throws: Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not 's.a"" OR TRUE OR ""b'",
         "semicolon": "throws: Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not 'a;b'",
         "squote": "throws: Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not 'a'b'",
+        "uescape": "throws: Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not '"s".U&"a" UESCAPE '!' || "b"'",
+        "unicodeCloses": "throws: Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not '"s".U&"a\\" OR TRUE OR \\"b"'",
+        "unicodeEscaped": "throws: Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not '"s".U&"a\\0022"" OR TRUE OR ""\\0022b"'",
       }
     `);
     expect(matrix(v => db.select('users', all, { lock: { for: 'UPDATE', wait: v } } as any))).toMatchInlineSnapshot(`
@@ -718,16 +904,23 @@ describe('shortcut options', () => {
         "escapedNul": "throws: Lock wait must be NOWAIT/SKIP LOCKED/undefined, not 'a""<NUL>""b'",
         "escapedOdd": "throws: Lock wait must be NOWAIT/SKIP LOCKED/undefined, not 'a"""b'",
         "lone": "throws: Lock wait must be NOWAIT/SKIP LOCKED/undefined, not '"'",
+        "mixedEscaped": "throws: Lock wait must be NOWAIT/SKIP LOCKED/undefined, not '"s".a$1."b"" OR TRUE OR ""c"'",
         "nul": "throws: Lock wait must be NOWAIT/SKIP LOCKED/undefined, not 'a<NUL>b'",
         "prequoted": "throws: Lock wait must be NOWAIT/SKIP LOCKED/undefined, not '"a"'",
+        "prequotedCloses": "throws: Lock wait must be NOWAIT/SKIP LOCKED/undefined, not '"a" OR TRUE OR "b"'",
+        "prequotedEmpty": "throws: Lock wait must be NOWAIT/SKIP LOCKED/undefined, not '""'",
+        "prequotedEscaped": "throws: Lock wait must be NOWAIT/SKIP LOCKED/undefined, not '"a"" OR TRUE OR ""b"'",
         "qualifiedEscaped": "throws: Lock wait must be NOWAIT/SKIP LOCKED/undefined, not 's.a"" OR TRUE OR ""b'",
         "semicolon": "throws: Lock wait must be NOWAIT/SKIP LOCKED/undefined, not 'a;b'",
         "squote": "throws: Lock wait must be NOWAIT/SKIP LOCKED/undefined, not 'a'b'",
+        "uescape": "throws: Lock wait must be NOWAIT/SKIP LOCKED/undefined, not '"s".U&"a" UESCAPE '!' || "b"'",
+        "unicodeCloses": "throws: Lock wait must be NOWAIT/SKIP LOCKED/undefined, not '"s".U&"a\\" OR TRUE OR \\"b"'",
+        "unicodeEscaped": "throws: Lock wait must be NOWAIT/SKIP LOCKED/undefined, not '"s".U&"a\\0022"" OR TRUE OR ""\\0022b"'",
       }
     `);
   });
 
-  it('characterization: lock.of', () => {
+  it('lock.of', () => {
     expect(matrix(v => db.select('users', all, { lock: { for: 'UPDATE', of: v } } as any))).toMatchInlineSnapshot(`
       {
         "backslash": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" FOR UPDATE OF "a\\b") AS "sq_users"",
@@ -740,12 +933,19 @@ describe('shortcut options', () => {
         "escapedDot": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" FOR UPDATE OF "a"".""b") AS "sq_users"",
         "escapedNul": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" FOR UPDATE OF "a""""<NUL>""""b") AS "sq_users"",
         "escapedOdd": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" FOR UPDATE OF "a""""""b") AS "sq_users"",
-        "lone": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" FOR UPDATE OF ") AS "sq_users"",
+        "lone": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" FOR UPDATE OF """") AS "sq_users"",
+        "mixedEscaped": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" FOR UPDATE OF "s".a$1."b"" OR TRUE OR ""c") AS "sq_users"",
         "nul": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" FOR UPDATE OF "a<NUL>b") AS "sq_users"",
         "prequoted": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" FOR UPDATE OF "a") AS "sq_users"",
+        "prequotedCloses": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" FOR UPDATE OF """a"" OR TRUE OR ""b""") AS "sq_users"",
+        "prequotedEmpty": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" FOR UPDATE OF """") AS "sq_users"",
+        "prequotedEscaped": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" FOR UPDATE OF "a"" OR TRUE OR ""b") AS "sq_users"",
         "qualifiedEscaped": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" FOR UPDATE OF "s"."a"" OR TRUE OR ""b") AS "sq_users"",
         "semicolon": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" FOR UPDATE OF "a;b") AS "sq_users"",
         "squote": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" FOR UPDATE OF "a'b") AS "sq_users"",
+        "uescape": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" FOR UPDATE OF """s"""."U&""a"" UESCAPE '!' || ""b""") AS "sq_users"",
+        "unicodeCloses": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" FOR UPDATE OF """s"""."U&""a\\"" OR TRUE OR \\""b""") AS "sq_users"",
+        "unicodeEscaped": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" FOR UPDATE OF "s".U&"a\\0022"" OR TRUE OR ""\\0022b") AS "sq_users"",
       }
     `);
   });
@@ -764,11 +964,18 @@ describe('shortcut options', () => {
         "escapedNul": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not 'a""<NUL>""b'",
         "escapedOdd": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not 'a"""b'",
         "lone": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not '"'",
+        "mixedEscaped": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not '"s".a$1."b"" OR TRUE OR ""c"'",
         "nul": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not 'a<NUL>b'",
         "prequoted": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not '"a"'",
+        "prequotedCloses": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not '"a" OR TRUE OR "b"'",
+        "prequotedEmpty": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not '""'",
+        "prequotedEscaped": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not '"a"" OR TRUE OR ""b"'",
         "qualifiedEscaped": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not 's.a"" OR TRUE OR ""b'",
         "semicolon": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not 'a;b'",
         "squote": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not 'a'b'",
+        "uescape": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not '"s".U&"a" UESCAPE '!' || "b"'",
+        "unicodeCloses": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not '"s".U&"a\\" OR TRUE OR \\"b"'",
+        "unicodeEscaped": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not '"s".U&"a\\0022"" OR TRUE OR ""\\0022b"'",
       }
     `);
     expect(matrix(v => db.truncate('users', 'RESTART IDENTITY', v))).toMatchInlineSnapshot(`
@@ -784,16 +991,23 @@ describe('shortcut options', () => {
         "escapedNul": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not 'a""<NUL>""b'",
         "escapedOdd": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not 'a"""b'",
         "lone": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not '"'",
+        "mixedEscaped": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not '"s".a$1."b"" OR TRUE OR ""c"'",
         "nul": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not 'a<NUL>b'",
         "prequoted": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not '"a"'",
+        "prequotedCloses": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not '"a" OR TRUE OR "b"'",
+        "prequotedEmpty": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not '""'",
+        "prequotedEscaped": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not '"a"" OR TRUE OR ""b"'",
         "qualifiedEscaped": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not 's.a"" OR TRUE OR ""b'",
         "semicolon": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not 'a;b'",
         "squote": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not 'a'b'",
+        "uescape": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not '"s".U&"a" UESCAPE '!' || "b"'",
+        "unicodeCloses": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not '"s".U&"a\\" OR TRUE OR \\"b"'",
+        "unicodeEscaped": "throws: Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not '"s".U&"a\\0022"" OR TRUE OR ""\\0022b"'",
       }
     `);
   });
 
-  it('characterization: distinct and groupBy', () => {
+  it('distinct and groupBy', () => {
     expect(matrix(v => db.select('users', all, { distinct: v } as any))).toMatchInlineSnapshot(`
       {
         "backslash": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("a\\b") to_jsonb("users".*) AS result FROM "users") AS "sq_users"",
@@ -806,12 +1020,19 @@ describe('shortcut options', () => {
         "escapedDot": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("a"".""b") to_jsonb("users".*) AS result FROM "users") AS "sq_users"",
         "escapedNul": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("a""""<NUL>""""b") to_jsonb("users".*) AS result FROM "users") AS "sq_users"",
         "escapedOdd": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("a""""""b") to_jsonb("users".*) AS result FROM "users") AS "sq_users"",
-        "lone": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT DISTINCT ON (") to_jsonb("users".*) AS result FROM "users") AS "sq_users"",
+        "lone": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("""") to_jsonb("users".*) AS result FROM "users") AS "sq_users"",
+        "mixedEscaped": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("s".a$1."b"" OR TRUE OR ""c") to_jsonb("users".*) AS result FROM "users") AS "sq_users"",
         "nul": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("a<NUL>b") to_jsonb("users".*) AS result FROM "users") AS "sq_users"",
         "prequoted": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("a") to_jsonb("users".*) AS result FROM "users") AS "sq_users"",
+        "prequotedCloses": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("""a"" OR TRUE OR ""b""") to_jsonb("users".*) AS result FROM "users") AS "sq_users"",
+        "prequotedEmpty": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("""") to_jsonb("users".*) AS result FROM "users") AS "sq_users"",
+        "prequotedEscaped": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("a"" OR TRUE OR ""b") to_jsonb("users".*) AS result FROM "users") AS "sq_users"",
         "qualifiedEscaped": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("s"."a"" OR TRUE OR ""b") to_jsonb("users".*) AS result FROM "users") AS "sq_users"",
         "semicolon": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("a;b") to_jsonb("users".*) AS result FROM "users") AS "sq_users"",
         "squote": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("a'b") to_jsonb("users".*) AS result FROM "users") AS "sq_users"",
+        "uescape": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("""s"""."U&""a"" UESCAPE '!' || ""b""") to_jsonb("users".*) AS result FROM "users") AS "sq_users"",
+        "unicodeCloses": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("""s"""."U&""a\\"" OR TRUE OR \\""b""") to_jsonb("users".*) AS result FROM "users") AS "sq_users"",
+        "unicodeEscaped": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT DISTINCT ON ("s".U&"a\\0022"" OR TRUE OR ""\\0022b") to_jsonb("users".*) AS result FROM "users") AS "sq_users"",
       }
     `);
     expect(matrix(v => db.select('users', all, { groupBy: v } as any))).toMatchInlineSnapshot(`
@@ -826,12 +1047,19 @@ describe('shortcut options', () => {
         "escapedDot": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" GROUP BY "a"".""b") AS "sq_users"",
         "escapedNul": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" GROUP BY "a""""<NUL>""""b") AS "sq_users"",
         "escapedOdd": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" GROUP BY "a""""""b") AS "sq_users"",
-        "lone": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" GROUP BY ") AS "sq_users"",
+        "lone": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" GROUP BY """") AS "sq_users"",
+        "mixedEscaped": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" GROUP BY "s".a$1."b"" OR TRUE OR ""c") AS "sq_users"",
         "nul": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" GROUP BY "a<NUL>b") AS "sq_users"",
         "prequoted": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" GROUP BY "a") AS "sq_users"",
+        "prequotedCloses": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" GROUP BY """a"" OR TRUE OR ""b""") AS "sq_users"",
+        "prequotedEmpty": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" GROUP BY """") AS "sq_users"",
+        "prequotedEscaped": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" GROUP BY "a"" OR TRUE OR ""b") AS "sq_users"",
         "qualifiedEscaped": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" GROUP BY "s"."a"" OR TRUE OR ""b") AS "sq_users"",
         "semicolon": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" GROUP BY "a;b") AS "sq_users"",
         "squote": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" GROUP BY "a'b") AS "sq_users"",
+        "uescape": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" GROUP BY """s"""."U&""a"" UESCAPE '!' || ""b""") AS "sq_users"",
+        "unicodeCloses": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" GROUP BY """s"""."U&""a\\"" OR TRUE OR \\""b""") AS "sq_users"",
+        "unicodeEscaped": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" GROUP BY "s".U&"a\\0022"" OR TRUE OR ""\\0022b") AS "sq_users"",
       }
     `);
   });
@@ -853,11 +1081,18 @@ describe('param cast', () => {
         "escapedNul": "SELECT CAST($1 AS "a""""<NUL>""""b")",
         "escapedOdd": "SELECT CAST($1 AS "a""""""b")",
         "lone": "SELECT CAST($1 AS """")",
+        "mixedEscaped": "SELECT CAST($1 AS """s"".a$1.""b"""" OR TRUE OR """"c""")",
         "nul": "SELECT CAST($1 AS "a<NUL>b")",
         "prequoted": "SELECT CAST($1 AS """a""")",
+        "prequotedCloses": "SELECT CAST($1 AS """a"" OR TRUE OR ""b""")",
+        "prequotedEmpty": "SELECT CAST($1 AS """")",
+        "prequotedEscaped": "SELECT CAST($1 AS """a"""" OR TRUE OR """"b""")",
         "qualifiedEscaped": "SELECT CAST($1 AS "s.a"" OR TRUE OR ""b")",
         "semicolon": "SELECT CAST($1 AS "a;b")",
         "squote": "SELECT CAST($1 AS "a'b")",
+        "uescape": "SELECT CAST($1 AS """s"".U&""a"" UESCAPE '!' || ""b""")",
+        "unicodeCloses": "SELECT CAST($1 AS """s"".U&""a\\"" OR TRUE OR \\""b""")",
+        "unicodeEscaped": "SELECT CAST($1 AS """s"".U&""a\\0022"""" OR TRUE OR """"\\0022b""")",
       }
     `);
   });
@@ -938,11 +1173,18 @@ describe('transaction', () => {
         "escapedNul": "throws: Isolation level must be an IsolationLevel value (e.g. IsolationLevel.Serializable), not 'a""<NUL>""b'",
         "escapedOdd": "throws: Isolation level must be an IsolationLevel value (e.g. IsolationLevel.Serializable), not 'a"""b'",
         "lone": "throws: Isolation level must be an IsolationLevel value (e.g. IsolationLevel.Serializable), not '"'",
+        "mixedEscaped": "throws: Isolation level must be an IsolationLevel value (e.g. IsolationLevel.Serializable), not '"s".a$1."b"" OR TRUE OR ""c"'",
         "nul": "throws: Isolation level must be an IsolationLevel value (e.g. IsolationLevel.Serializable), not 'a<NUL>b'",
         "prequoted": "throws: Isolation level must be an IsolationLevel value (e.g. IsolationLevel.Serializable), not '"a"'",
+        "prequotedCloses": "throws: Isolation level must be an IsolationLevel value (e.g. IsolationLevel.Serializable), not '"a" OR TRUE OR "b"'",
+        "prequotedEmpty": "throws: Isolation level must be an IsolationLevel value (e.g. IsolationLevel.Serializable), not '""'",
+        "prequotedEscaped": "throws: Isolation level must be an IsolationLevel value (e.g. IsolationLevel.Serializable), not '"a"" OR TRUE OR ""b"'",
         "qualifiedEscaped": "throws: Isolation level must be an IsolationLevel value (e.g. IsolationLevel.Serializable), not 's.a"" OR TRUE OR ""b'",
         "semicolon": "throws: Isolation level must be an IsolationLevel value (e.g. IsolationLevel.Serializable), not 'a;b'",
         "squote": "throws: Isolation level must be an IsolationLevel value (e.g. IsolationLevel.Serializable), not 'a'b'",
+        "uescape": "throws: Isolation level must be an IsolationLevel value (e.g. IsolationLevel.Serializable), not '"s".U&"a" UESCAPE '!' || "b"'",
+        "unicodeCloses": "throws: Isolation level must be an IsolationLevel value (e.g. IsolationLevel.Serializable), not '"s".U&"a\\" OR TRUE OR \\"b"'",
+        "unicodeEscaped": "throws: Isolation level must be an IsolationLevel value (e.g. IsolationLevel.Serializable), not '"s".U&"a\\0022"" OR TRUE OR ""\\0022b"'",
       }
     `);
     expect(queryable.connect).not.toHaveBeenCalled();
