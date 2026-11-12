@@ -65,6 +65,11 @@ https://alexandredemartin.github.io/pgcast/llms-full.txt
   from outside the code (a request, a user, a file): map it to a name written
   in the code, and never cast it to make it compile.
   https://alexandredemartin.github.io/pgcast/raw-sql#choose-sql-at-run-time-from-your-own-constants
+- A shortcut's object and a Whereable take their keys as column names: build
+  them from fields you name, never pass a request's body or query whole. An
+  empty Whereable is `TRUE`: check that a filter has a key before
+  `db.update()` or `db.deletes()`.
+  https://alexandredemartin.github.io/pgcast/raw-sql#pass-each-value-as-a-parameter
 - Run each query on the pool or client you are given; inside a transaction, on
   its `txnClient`.
   https://alexandredemartin.github.io/pgcast/transaction#transaction
