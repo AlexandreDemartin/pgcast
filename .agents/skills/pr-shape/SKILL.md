@@ -31,20 +31,22 @@ When steps depend on each other, the series becomes a stack of PRs (§ Stacking)
 |---|---|---|
 | A feature grows by steps: one case, then the others, then the generalisation | "Added returning option to insert shortcut" → "Added returning option to upsert" → "Returning (and now also extras) options for insert/upsert/update/deletes" | One PR per step, each useful on its own. The first carries the simplest case. |
 | Runtime and codegen apart (22 mixed commits out of 154) | "Direct lateral subquery support" (`db`); "add support for schema generation for materialized views" (`gen`) | One `src/generate` PR, then one `src/db` PR that uses it. Never both, except a format change that ties them (canary). |
-| Docs follow the code (5 mixed commits out of 154) | "Updated docs for returning/extras and 2.0" | The code PR carries its `CHANGELOG.md` line and its JSDoc; the usage guide comes in a "Document …" PR after the series. |
+| Docs follow the code (5 mixed commits out of 154) | "Updated docs for returning/extras and 2.0" | Each feature PR updates its docs page in `website/` (below), with its `CHANGELOG.md` line and its JSDoc. A "Document …" PR remains only for a guide that spans a series. |
 | Fixing along the way | "Direct lateral subquery support" then "Fixed type inference for lateral direct subqueries" | A defect found after merge becomes a small "Fix …" PR, never a big fix mixed into what follows. |
 | Dependencies apart | "Updated dependencies" | One PR for dependency updates, with no code. |
 | Small, frequent versions (94 version commits) | "6.4.1", "6.4.2", one fix each | A version as soon as a useful change is merged. Publication remains a stop point. |
 | Big exploratory work on a branch | "Started work on multi schema support" → "Progress on multi-schema work" → "Multi-schema updates" | First a decision note, then a series of small PRs. Never a giant PR. |
 | The reason in the title when it is not obvious | "… to count(*) rather than count(alias.*) for performance reasons" | A short reason at the end of the title, if it helps. |
 
-Example for step ③ (foreign keys):
+- **The docs page** sits in its Diátaxis group, tutorial, how-to, reference or explanation (decided 2026-11-12). Every export keeps its reference entry, which the docs build checks (#137). Examples: skill `code-style` § Examples.
+
+Example for step ③ (foreign keys), each of 1 to 4 with its docs page:
 
 1. "Generate foreign key metadata for each table" (`src/generate`, opt-in)
 2. "Add related() for many-to-one lateral joins" (`src/db`)
 3. "Add relatedMany() for one-to-many lateral joins" (`src/db`)
 4. "Allow lateral results to be referenced in order and groupBy" (`src/db`)
-5. "Document related() and relatedMany()" (docs)
+5. "Document lateral joins on foreign keys" (a how-to that spans the series)
 
 ## Stacking
 
@@ -91,5 +93,6 @@ Same voice as PR titles.
 
 - [ ] A single visible change, described in one sentence
 - [ ] `src/` ≤ ~100 lines, the PR ≤ ~400, otherwise split
+- [ ] A feature's docs page updated in the same PR
 - [ ] Branch `<type>/<issue>-<slug>`; a bug's failing test before its fix
 - [ ] Title in plain English, no prefix, British spelling, `(closes #n)` at the end
