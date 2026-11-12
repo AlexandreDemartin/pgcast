@@ -156,6 +156,21 @@ Candidates for a check, a rule or a skill line.
 - #137 — A pending list that assigns names to pages is cross-read against the scopes of the issues that will write those pages — `branch-reviewer`
 - #137 — `check-reference.mjs` has no tests: a fixtures mode (pages and pending file as arguments) would let its probes run in CI — `builder`
 - #151 — `git checkout -- <file>` after a temporary `sed` also reverts that file's uncommitted edits: copy the file aside before such a probe — `builder`
+- #121 — Before stating what `Number()` or `String()` makes of a result, probe what node-postgres hands over: `date` and the timestamps arrive as `Date`, so `Number()` gives milliseconds, not `NaN` — `branch-reviewer`
+- #121 — A transform that reads `rows[0]` assumes a row: document each option that can return none (`groupBy` with no group, `having`, `offset`, `limit: 0`) from a run, not from the code — `branch-reviewer`
+- #121 — `NaN` shows as `null` in `JSON.stringify` and in a cast panel: a probe checks `Number.isNaN` — `builder`
+- #121 — Parallel builders share the session scratchpad: brief each to its own subfolder — orchestrator
+- #124 — A reference claim about a type is checked on the result type, not only the parameter: a readonly `returning` is accepted and gives `never` — `branch-reviewer`
+- #124 — `ON CONFLICT ON CONSTRAINT` takes a constraint, not any unique index: a codegen type built from `pg_index.indisunique` is wider than Postgres (#166) — `branch-reviewer`
+- #124 — `tsc`'s `include` skips folders starting with a dot: a type probe in `.probe/` checks nothing — `builder`
+- #124 — Options tables number parameters as if the other rows were there: one row per panel, its SQL from that panel — `builder`
+- #119 — A tutorial's setup is checked on the oldest TypeScript the docs support, not the site's: 6+/7 defaults (`module`, `esModuleInterop`) hide errors every 5.x user hits — `branch-reviewer`
+- #119 — Examples a page says to keep in one file are type-checked joined in page order: separate modules hide a repeated `const` (candidate for #115) — `branch-reviewer`
+- #119 — A tutorial gives its run command early: without one the outputs cannot be reproduced, which hid the module setup gap and the pool's 10 s exit delay — `builder`
+- #119 — `psql` is not on PATH on the dev machine (`/Library/PostgreSQL/17/bin`): agents that load SQL use its full path or `pg` — `builder`
+- #120 — SQL in prose said to be « from `.compile()` » still drifted (an outer pair of parentheses): page SQL comes from a probe the build compiles and compares (candidate for #115) — `branch-reviewer`
+- #120 — A quoted error message is a literal that exists in `src/db`: a check that greps each quoted message would have caught the Whereable / condition mix-up — `branch-reviewer`
+- #120 — A probe compiles the exact code the page shows (`${'films'}`, not `films`), and inserts no ids the seeded schema already holds — `builder`
 
 ## Minors kept
 
