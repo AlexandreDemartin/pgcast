@@ -80,7 +80,10 @@ A crew member's mentor is another row of `crew`. Give the subquery an `alias`, s
 - Without the aliases, the subquery's `FROM "crew"` hides the outer one, and `"crew"."mentor_id"` is the subquery's own row. Postgres runs it with no error, and every `mentor` comes back `null`, every count `0`:
 
   ```sql
-  SELECT jsonb_build_object($5::text, "name") AS result FROM "crew" WHERE ("id" = "crew"."mentor_id") LIMIT $6
+  SELECT jsonb_build_object($5::text, "name") AS result
+  FROM "crew"
+  WHERE ("id" = "crew"."mentor_id")
+  LIMIT $6
   ```
 
 - One alias on the outer query does for both: with `alias: 'member'` there, `db.parent('mentor_id')` is `"member"."mentor_id"` ([`alias`](/select#alias)).
