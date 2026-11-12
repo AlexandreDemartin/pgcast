@@ -7,6 +7,7 @@ By the end of this page, you'll have generated the types of a database, asked it
 
 - pgcast installed under the `zapatos` alias, with `pg` and `@types/pg`: [Install](/install).
 - TypeScript in your project: `npm install --save-dev typescript`.
+- Node 22.18 or later, which runs a TypeScript file as it is, stripping its types.
 - A Postgres database you can connect to, its connection string in the `DATABASE_URL` environment variable.
 - The films of these docs in it: [`schema.sql`](https://github.com/AlexandreDemartin/pgcast/blob/master/website/schema.sql) holds `studios`, their `films`, the `actors` and the `roles` they play, and a few more tables, with some rows to query.
 
@@ -114,12 +115,21 @@ The run-time code never opens a connection of its own: each query runs on the po
 import * as db from 'zapatos/db';
 import pg from 'pg';
 
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+const pool = new pg.Pool({
+  connectionString: process.env.DATABASE_URL,
+  allowExitOnIdle: true,  // so the script ends once its queries are done
+});
 ```
 
 :::
 
-The examples below carry on in this file. Their top-level `await` needs ESM: that's the `"type": "module"` above.
+The examples below carry on in this file. Their top-level `await` needs ESM: that's the `"type": "module"` above. After each step, run it:
+
+```sh
+node src/films.ts
+```
+
+And check its types with `npx tsc`, as your editor does while you type.
 
 ## Ask for one film
 
@@ -143,7 +153,7 @@ const film = await db.selectOne('films', { title: 'The Salt Orchard' }).run(pool
 console.log(film.release_year);
 ```
 
-Check for it, and the type narrows to the row (hover `film` to see):
+Check for it instead, and the type narrows to the row (hover `film` to see). Run the file, and it prints `1974`:
 
 ```ts twoslash
 import * as db from 'zapatos/db';
@@ -166,7 +176,21 @@ To see the SQL in your own code, call `.compile()` where you'd call `.run()`: it
 
 </CastPanel>
 
-Each column name shows up twice: as a value, `$1`, the key of the JSON object, and quoted, `"title"`, the column it reads. The type follows the query: two columns asked for, two in the type. Leave `columns` out and you get every column, `films.JSONSelectable[]`. Run on the docs schema, it gives:
+Each column name shows up twice: as a value, `$1`, the key of the JSON object, and quoted, `"title"`, the column it reads. The type follows the query: two columns asked for, two in the type. Leave `columns` out and you get every column, `films.JSONSelectable[]`. Print them:
+
+```ts twoslash
+import * as db from 'zapatos/db';
+import type pg from 'pg';
+declare const pool: pg.Pool;
+const films = await db.select('films', { studio_id: 1000 }, {
+  columns: ['title', 'release_year'],
+  order: { by: 'release_year', direction: 'ASC' },
+}).run(pool);
+// ---cut---
+console.log(films);
+```
+
+Run the file again, and after `1974` it prints:
 
 ```txt
 [
@@ -187,7 +211,37 @@ With no matching film, the array is empty: `select()` never gives `undefined`.
 
 </CastPanel>
 
-The columns you left out took their defaults: the new `id` from its sequence, `genres` as `[]`, `tagline` as `null`. On a freshly loaded docs schema, the first film you add gets the `id` 1, as the seeded films start at 1000.
+Print it, and run the file:
+
+```ts twoslash
+import * as db from 'zapatos/db';
+import type pg from 'pg';
+declare const pool: pg.Pool;
+const newFilm = await db.insert('films', {
+  studio_id: 1002,
+  title: 'The Night Ferry to Orkesund',
+  release_year: 2024,
+  runtime_minutes: 117,
+}).run(pool);
+// ---cut---
+console.log(newFilm);
+```
+
+It prints the new row:
+
+```txt
+{
+  id: 1,
+  title: 'The Night Ferry to Orkesund',
+  genres: [],
+  tagline: null,
+  studio_id: 1002,
+  release_year: 2024,
+  runtime_minutes: 117
+}
+```
+
+The columns you left out took their defaults: the new `id` from its sequence, `genres` as `[]`, `tagline` as `null`. On a freshly loaded docs schema, the first film you add gets the `id` 1, as the seeded films start at 1000; each run after that adds it again, with the next `id`.
 
 A column with no default can't be left out. Forget the running time, and TypeScript says so before Postgres can:
 
