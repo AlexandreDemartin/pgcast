@@ -165,6 +165,8 @@ db.selectOne(table, where, options?)
 
 As [`select()`](#select), with `LIMIT 1` and no `jsonb_agg`: `.run(pool)` gives the first row, or `undefined` when none matches. Any `limit` you pass is replaced by `1`; `offset` and the other options are kept. In a `lateral`, its key holds the row or `null`.
 
+With `withTies` and `order`, it writes `FETCH FIRST $1 ROWS WITH TIES`, here and in `selectExactlyOne()`. `.run()` then gives one of the tied rows; in a `lateral`, the parent row comes back once per tie.
+
 <CastPanel example="selectOne">
 
 <<< ./examples/selectOne.ts{ts twoslash}
