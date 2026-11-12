@@ -263,7 +263,7 @@ Each warning is a Node.js `DeprecationWarning`, emitted once per process for eac
 - `node --no-deprecation` hides it, from that hook too; `node --no-warnings` hides it from `stderr` only. `node --throw-deprecation` throws it, uncaught, so the process ends.
 - With the option on, the shortcut never warns.
 
-To pick out pgcast's warnings in that hook, to log them your way: `@types/node` types the warning `Error`, which has no `code`, so say it may have one.
+To pick out pgcast's warnings in that hook, to log them your way: `@types/node` types the warning `Error`, which has no `code`, so say it may have one. Node still prints each warning to `stderr`; run with `node --no-warnings` to leave the hook's as the only output.
 
 ```ts twoslash
 process.on('warning', (warning: Error & { code?: string }) => {
