@@ -9,5 +9,5 @@ const page = await db.select('films', db.all, {
     { by: 'id', direction: 'DESC' },
   ],
   limit: 2,
-  offset: 2,  // (page 2 - 1) × 2 a page
+  offset: 2,  // page 2: (2 - 1) × 2 rows
 }).run(pool);
