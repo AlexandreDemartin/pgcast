@@ -279,6 +279,8 @@ const row: s.films.Insertable = {
 Leave a key out to get its column's default. A key set to `undefined` is sent as `NULL`, as in Zapatos 6.6.1, and pgcast warns once (`PGCAST_DEP002`). With `db.setConfig({ undefinedMeansMissing: true })`, it counts as left out; that's the default from 7.0 ([Versions, opt-ins and warnings](/versions)).
 :::
 
+<!-- joined: src/films.ts -->
+
 With the running time back in the row, here is your whole file, the steps of this page in order:
 
 ::: code-group
