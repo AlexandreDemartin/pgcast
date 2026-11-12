@@ -5,8 +5,8 @@
 // `<!-- joined` fails, so that a near miss does not turn the check off): each `ts twoslash` block and
 // `<<< ./examples/….ts{ts twoslash}` above it, up to the previous such line, adds its code below `// ---cut---` (all
 // of it if it has none), but a block that shows an error (`// @errors:`), which the reader does not keep. The join is
-// checked in memory, with the options of tsconfig.json, against the built `zapatos/db` and the docs schema. Run by
-// `npm run docs:build`.
+// checked in memory, with the options of tsconfig.json but `skipLibCheck`, against the built `zapatos/db` and the docs
+// schema. Run by `npm run docs:build`.
 import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
@@ -14,7 +14,9 @@ import ts from 'typescript';
 const
   root = fileURLToPath(new URL('.', import.meta.url)),
   { config } = ts.readConfigFile(`${root}tsconfig.json`, ts.sys.readFile),
-  { options, fileNames: schemaFiles } = ts.parseJsonConfigFileContent({ ...config, include: ['zapatos'] }, ts.sys, root),
+  parsed = ts.parseJsonConfigFileContent({ ...config, include: ['zapatos'] }, ts.sys, root),
+  options = { ...parsed.options, skipLibCheck: true },  // the `tsc` before it in `docs:build` checks the declarations
+  schemaFiles = parsed.fileNames,
   problems = [],
   checked = [];
 
