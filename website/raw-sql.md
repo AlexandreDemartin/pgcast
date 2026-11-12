@@ -54,7 +54,11 @@ function filmTitled(title: string) {
 }
 ```
 
-If it got past the type (an `any`, a `@ts-ignore`), `'The Salt Orchard'` would compile to `"title" = "The Salt Orchard"`, a column that does not exist (42703). Any `"` in it is doubled, so it can't close its quotes; in Zapatos 6.6.1 it could ([Identifiers](/sql-template#identifiers)).
+If it got past the type (an `any`, a `@ts-ignore`), it would still be a name, and the caller would pick it:
+
+- A real column matches every row: `'title'` compiles to `"title" = "title"`, true wherever `title` is not null, and so do `'films.title'` and `'"title"'`. In a `DELETE`, that deletes them.
+- An unknown one fails: `'The Salt Orchard'` gives `"title" = "The Salt Orchard"`, a column that does not exist (42703).
+- Any `"` in it is doubled, so it can't close its quotes (in Zapatos 6.6.1 it could, [Identifiers](/sql-template#identifiers)), but that does not make it a value.
 
 ::: warning Security
 An interpolated object that is not a `param()`, a fragment or another of pgcast's values compiles as a Whereable, whatever it is. A `Date` has no keys of its own, so it gives `TRUE`: `` db.sql`DELETE FROM ${'ratings'} WHERE ${when}` ``, with `when` a `Date` typed `any`, compiles to `DELETE FROM "ratings" WHERE TRUE` and deletes every rating. The type refuses a `Date` (TS2345), not an `any`. Pass a date as `db.param(when)` ([#170](https://github.com/AlexandreDemartin/pgcast/issues/170)).
