@@ -191,6 +191,10 @@ Candidates for a check, a rule or a skill line.
 - #123 — « each / every X does Y » is searched for its exceptions before it is written (`grep runResultTransform` showed the aggregates' `Number()`) — `branch-reviewer`
 - #123 — The docs examples share one process: an example that changes module state is undone by value (nested objects included) and a self-check proves it — `branch-reviewer`, `builder`
 - #123 — A probe that leaks pool clients on purpose crashes Node once its database is dropped (57P01): run it last, in its own process — `builder`
+- #139 — A plan claim is proved with `EXPLAIN (ANALYZE)` on a table of realistic size: « Filter: » on 4 rows hid « Rows Removed by Filter: 148671 » — `branch-reviewer`, `builder`
+- #139 — A how-to that chains steps compiles the chain as the reader writes it (`page.at(-1)` into the next query); a panel runs the earlier query on a hidden pool that returns rows — `branch-reviewer`, `builder`
+- #139 — A mixed-direction keyset needs a bound on the first key to get an `Index Cond`; a bare `OR` filters from the top, as `offset` does — `branch-reviewer`
+- #139 — For a scratch `tsc` outside `website/`, `@types/*` comes before `node_modules/*` in `paths`, or `pg` resolves to untyped JS (TS7016) — `builder`
 
 ## Minors kept
 
