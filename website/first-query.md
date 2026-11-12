@@ -259,7 +259,7 @@ await db.insert('films', {
 }).run(pool);
 ```
 
-`insert()` takes one row or an array of them, so TypeScript tries both and reports on each. The line to read is under the first: `Property 'runtime_minutes' is missing`.
+Of the two forms of `insert()` it reports on, one row or an array, the line to read is `Property 'runtime_minutes' is missing`.
 
 ::: tip Opt-in
 Leave a key out to get its column's default. A key set to `undefined` is sent as `NULL`, as in Zapatos 6.6.1, and pgcast warns once (`PGCAST_DEP002`). With `db.setConfig({ undefinedMeansMissing: true })`, it counts as left out; that's the default from 7.0 ([Versions, opt-ins and warnings](/versions)).
