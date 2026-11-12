@@ -229,31 +229,31 @@ The client a [`transaction()`](#transaction) callback gets: the one checked out 
 - `T`: the levels the client stands for, an [`IsolationSatisfying`](#IsolationSatisfying) union in the seven types below.
 - `_zapatos` is optional in the type, so any `pg.PoolClient` is accepted as a `TxnClient`, with or without a transaction open on it.
 
-#### `TxnClientForSerializable` {#TxnClientForSerializable}
+### `TxnClientForSerializable` {#TxnClientForSerializable}
 
 `TxnClient<IsolationSatisfying<IsolationLevel.Serializable>>`: the client of [`serializable()`](#serializable).
 
-#### `TxnClientForRepeatableRead` {#TxnClientForRepeatableRead}
+### `TxnClientForRepeatableRead` {#TxnClientForRepeatableRead}
 
 `TxnClient<IsolationSatisfying<IsolationLevel.RepeatableRead>>`: the client of [`repeatableRead()`](#repeatableRead); takes that of `serializable()` too.
 
-#### `TxnClientForReadCommitted` {#TxnClientForReadCommitted}
+### `TxnClientForReadCommitted` {#TxnClientForReadCommitted}
 
 `TxnClient<IsolationSatisfying<IsolationLevel.ReadCommitted>>`: the client of [`readCommitted()`](#readCommitted); takes that of `serializable()` and `repeatableRead()` too.
 
-#### `TxnClientForSerializableRO` {#TxnClientForSerializableRO}
+### `TxnClientForSerializableRO` {#TxnClientForSerializableRO}
 
 `TxnClient<IsolationSatisfying<IsolationLevel.SerializableRO>>`: the client of [`serializableRO()`](#serializableRO); takes that of `serializable()` too.
 
-#### `TxnClientForRepeatableReadRO` {#TxnClientForRepeatableReadRO}
+### `TxnClientForRepeatableReadRO` {#TxnClientForRepeatableReadRO}
 
 `TxnClient<IsolationSatisfying<IsolationLevel.RepeatableReadRO>>`: the client of [`repeatableReadRO()`](#repeatableReadRO); takes that of `serializable()`, `repeatableRead()` and `serializableRO()` too.
 
-#### `TxnClientForReadCommittedRO` {#TxnClientForReadCommittedRO}
+### `TxnClientForReadCommittedRO` {#TxnClientForReadCommittedRO}
 
 `TxnClient<IsolationSatisfying<IsolationLevel.ReadCommittedRO>>`: the client of [`readCommittedRO()`](#readCommittedRO); takes that of every shortcut but `serializableRODeferrable()`.
 
-#### `TxnClientForSerializableRODeferrable` {#TxnClientForSerializableRODeferrable}
+### `TxnClientForSerializableRODeferrable` {#TxnClientForSerializableRODeferrable}
 
 `TxnClient<IsolationSatisfying<IsolationLevel.SerializableRODeferrable>>`: the client of [`serializableRODeferrable()`](#serializableRODeferrable); takes that of `serializable()` and `serializableRO()` too.
 
