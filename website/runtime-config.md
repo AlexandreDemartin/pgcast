@@ -327,7 +327,7 @@ A `numeric` as `pg` returns it, a string that keeps its digits: `'1.10'`.
 db.enableCustomJSONParsingForLargeNumbers(pg: typeof import('pg')): void
 ```
 
-Makes `pg` parse `json` and `jsonb` values with [json-custom-numbers](https://www.npmjs.com/package/json-custom-numbers), which gives a number as a string when a `number` would change it. Each shortcut returns `jsonb`, so it applies to their results.
+Makes `pg` parse `json` and `jsonb` values with [json-custom-numbers](https://www.npmjs.com/package/json-custom-numbers), which gives a number as a string when a `number` would change it. Each shortcut except the aggregates returns `jsonb`, so it applies to their results.
 
 ```ts twoslash
 import * as db from 'zapatos/db';
@@ -344,6 +344,7 @@ db.enableCustomJSONParsingForLargeNumbers(pg);
 | `1.00000000000000000001` | `1` | `'1.00000000000000000001'` |
 | a `numeric` past `Number.MAX_VALUE` | `Infinity` | its digits, as a string |
 
+- It does nothing for `count()`, `sum()`, `avg()`, `min()` and `max()`: their result is not JSON, and goes through `Number()` ([`count()`](/select#count), [#163](https://github.com/AlexandreDemartin/pgcast/issues/163)). A `sum()` of `9007199254740993` still gives `9007199254740992`.
 - It sets the type parsers of the `pg` module you give, so every pool and client of that module, from then on, pgcast's queries or not.
 - It does not change the types: the generator's [`customJSONParsingForLargeNumbers`](/generator#generate.customJSONParsingForLargeNumbers) does.
 - An `int8` or `numeric` column outside JSON is a string already, by `pg`'s own parser.
