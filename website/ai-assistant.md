@@ -22,7 +22,7 @@ Paste a URL into the chat, or let the rules file below name it.
 `npx pgcast` writes `zapatos/schema.d.ts` into your [`outDir`](/generator#generate.outDir): `src/zapatos/schema.d.ts` in the tutorial. It holds what an assistant would otherwise guess: each table's columns, the type of each in a row, a filter, an insert and an update ([The files it writes](/generator#the-files-it-writes)), and a comment on each column with its Postgres type, whether it is `NOT NULL`, and its default.
 
 - Tell the assistant to read it before writing a query, and never to edit it: the next run writes it again. The rules file below does both; change its path if your `outDir` differs.
-- A `COMMENT ON COLUMN` in a migration reaches that comment too ([`schemaJSDoc`](/generator#generate.schemaJSDoc)): the place to tell the assistant what a column means.
+- A `COMMENT ON COLUMN` on a table's column, in a migration, reaches that comment too ([`schemaJSDoc`](/generator#generate.schemaJSDoc)): the place to tell the assistant what a column means. A view's, a foreign table's or a partitioned table's does not yet ([#47](https://github.com/AlexandreDemartin/pgcast/issues/47)).
 - After each migration, run `npx pgcast` again, so that the assistant reads the schema as it is.
 
 ## Add the rules file
