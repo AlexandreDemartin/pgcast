@@ -116,7 +116,7 @@ Each cinema, and the nearest other one: a self-join again, with the distance as 
 
 </CastPanel>
 
-`FOR UPDATE OF "films"` locks the film's row, and only it: the rows of `roles` are read, not locked.
+`FOR UPDATE OF "films"` locks the film's row, and only it, until the transaction ends: run it on a [`txnClient`](/transaction#transaction). The rows of `roles` are read, not locked.
 
 ## See also
 
