@@ -107,7 +107,7 @@ With `noNullUpdateColumns`, a `NULL` leaves the existing value. Film 1002 comes 
 
 </CastPanel>
 
-- The update still sets every column inserted, `"id"` included; only `"tagline"` reads the existing row first.
+- The update still sets every column inserted, `"id"` included; only `"tagline"` keeps the existing value when the new one is `NULL`.
 - `film` is the updated row: `$action` is `'UPDATE'`, and `tagline` is still `'Every map leaves something out.'`.
 
 With `reportAction: 'suppress'`, the result has no `$action`:
