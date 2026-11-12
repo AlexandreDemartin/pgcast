@@ -70,7 +70,7 @@ pgcast keeps a caller's input from becoming code; it can't tell whether the SQL 
 
 ### A caller's string as a name
 
-Quoted, a name is still the one the caller chose: any column of the query, or none. `` ${'title'} = ${title} ``, with `title` typed `any` and set to `'title'`, compiles to `"title" = "title"`, true for every film. Pick a name from outside out of your own list first, and remember that the keys of a request's body, given as a filter, are names too.
+Quoted, a name is still the one the caller chose. As a table name, `'schema.table'` included, it is any relation the role can read: given `'pg_catalog.pg_roles'`, `select()` lists the database's roles. As a column name, it is any column in scope, a system column such as `xmin` included, or none (42703). `` ${'title'} = ${title} ``, with `title` typed `any` and set to `'title'`, compiles to `"title" = "title"`, true for every film. Map a caller's choice to a name from your own list, and remember that the keys of a request's body, given as a filter, are names too.
 
 ### An empty filter
 
