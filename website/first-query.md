@@ -233,7 +233,7 @@ Then the row and the query:
 
 </CastPanel>
 
-The type lists the columns you must give and, with a `?`, those you can leave out; each takes its value, or a `db.Parameter` or SQL fragment, which you won't need here. `db.insert('films', { … })` runs the same, but a typed row gets the clearer errors: TypeScript checks it on its own, not against both forms of `insert()`, one row or an array. Print the new film:
+The type lists the columns you must give and, with a `?`, those you can leave out; each takes its value, or a `db.Parameter`, `db.Default` or SQL fragment, which you won't need here. Typed on its own, the row gets errors that name the column at fault. Print the new film:
 
 ```ts twoslash
 import * as db from 'zapatos/db';
