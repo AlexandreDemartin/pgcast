@@ -7,7 +7,9 @@ Why pgcast's version numbers carry on from Zapatos's, how it decides whether a f
 
 pgcast starts where Zapatos 6.6.1 stopped, so its first version is 6.6.2, not 1.0. The module names are still `zapatos/db` and `zapatos/schema`, and the generated schema keeps 6.6.1's [canary](/runtime-config#SchemaVersionCanary), so a project switches by changing its dependency, not its code ([Switch from Zapatos](/switching)). A number that carries on says exactly that: this is the next version of the library you already have.
 
-The numbers follow [SemVer](https://semver.org/), read from the side of a project on 6.6.1. A patch fixes: 6.6.2 closes the security holes that pgcast's characterisation of 6.6.1 found. A minor adds: 6.7.0 brings the opt-ins below, with fixes and new features. Only a major may change a result that working code can rely on, so a range such as `^6.6.2` never brings one of those.
+The numbers follow [SemVer](https://semver.org/), read from the side of a project on 6.6.1. A patch fixes: 6.6.2 closes the security holes that pgcast's characterisation of 6.6.1 found. A minor adds: 6.7.0 brings the opt-ins below, with fixes and new features.
+
+Only a major may change a result that working code can rely on, so a range such as `^6.6.2` never brings one of those.
 
 Zapatos broke things in its majors too, each at once: 1.0 renamed the transaction types, 2.0 made the last argument of `upsert()` an options object, 6.0 put the schema in the names of tables and enums outside `public`. Each came with notes on what to rewrite. pgcast spreads a break over two majors instead, and warns you ahead of the first.
 
@@ -49,7 +51,9 @@ Call that `update()` on 6.7 and Node prints, once:
 
 In brackets is the code, one per deprecated behaviour of the runtime, there to search for: [Opt-ins and warnings](/runtime-config#opt-ins-and-warnings) lists them, with what sets each off. Then the message says what still happens, which option changes it, and that 7.0 will make it the default. Nothing else changes: the query runs as it did in 6.6.1, unless Node runs with `--throw-deprecation`, which ends the process ([Opt-ins and warnings](/runtime-config#opt-ins-and-warnings)).
 
-The warning comes when you call the shortcut, before `.run()`, and only if the old behaviour is actually used: an `update()` with no `undefined` in it never warns. It comes once per process for each code, so it tells you that the old path ran, not where nor how often. `node --trace-deprecation` adds the stack, down to the line that called `update()`; for the rest, turn the option on and let your tests find what changes. Where `undefined` meant "clear it", `null` says so under either setting, and never warns.
+The warning comes when you call the shortcut, before `.run()`, and only if the old behaviour is actually used: an `update()` with no `undefined` in it never warns. It comes once per process for each code, so it tells you that the old path ran, not where nor how often. `node --trace-deprecation` adds the stack, down to the line that called `update()`; for the rest, turn the option on and let your tests find what changes.
+
+Where `undefined` meant "clear it", `null` says so under either setting, and never warns.
 
 ## 7.0 and 8.0
 
