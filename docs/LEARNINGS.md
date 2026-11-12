@@ -198,6 +198,24 @@ Candidates for a check, a rule or a skill line.
 - #141 — Helpers that refuse by returning `null` are not « both or neither » inside one outer transaction: only a throw rolls it back — `branch-reviewer`
 - #141 — A docs example that writes cleans its own rows, or a second run fails — `branch-reviewer`, `builder`
 - #141 — `queryListener` logs a `COMMIT` before Postgres answers it: a log line is no proof of a commit (#190) — `builder`
+- #139 — A plan claim is proved with `EXPLAIN (ANALYZE)` on a table of realistic size: « Filter: » on 4 rows hid « Rows Removed by Filter: 148671 » — `branch-reviewer`, `builder`
+- #139 — A how-to that chains steps compiles the chain as the reader writes it (`page.at(-1)` into the next query); a panel runs the earlier query on a hidden pool that returns rows — `branch-reviewer`, `builder`
+- #139 — A mixed-direction keyset needs a bound on the first key to get an `Index Cond`; a bare `OR` filters from the top, as `offset` does — `branch-reviewer`
+- #139 — For a scratch `tsc` outside `website/`, `@types/*` comes before `node_modules/*` in `paths`, or `pg` resolves to untyped JS (TS7016) — `builder`
+- #143 — « can't close its quotes » proves an identifier is escaped, not that it is safe as a value: a name the caller picks still chooses the column (`'title'` → `"title" = "title"`, every row) — `branch-reviewer`
+- #143 — An empty Whereable, typed or not, passes `tsc` and compiles to `TRUE`: a guide says to check before a `DELETE` / `UPDATE` — `branch-reviewer`
+- #143 — A `param()` cast is quoted, so SQL-standard spellings and upper case do not exist (`'integer'`, `'TIMESTAMPTZ'` → 42704) — `branch-reviewer`
+- #143 — A security probe for « matches every row » uses a `DELETE` on a table nothing references, or a foreign key stops it and proves nothing — `builder`
+- #145 — `.catch(err => { …; return undefined; throw err; })` is typed `any` without `strictNullChecks`: write `(err): undefined =>` to keep the row type in every mode — `branch-reviewer`, `builder`
+- #145 — `pg.DatabaseError` exists from pg 8.6 and `pg.native` rejects with plain `Error`s, while the peer range is `pg >=7.18.2`: a docs clause on pg versions is checked on the tarballs — `branch-reviewer`, `builder`
+- #145 — pgcast is stricter than SQL for options (`'desc'`, `'serializable'` run in Postgres): « cannot mean anything in SQL » is checked against Postgres itself — `branch-reviewer`
+- #140 — A Postgres message that quotes a count is probed at more than one size (08P01 at 65,536 and at 200,000 differ): quote it as an example — `branch-reviewer`, `builder`
+- #140 — A guide that shortens a reference rule loses its condition (« an array or string conflict target » became « the conflict target »): copy the condition or link — `branch-reviewer`
+- #140 — 21000 comes with any `DO UPDATE` batch that names a key twice, not only with an existing row — `branch-reviewer`
+- #142 — A `${number}` template type takes leading spaces and hex (`'( 1.5,2.5)'`, `'0x10'`): a claim that it « takes only » one form needs a negative `tsc` probe — `branch-reviewer`, `builder`
+- #142 — Every type inside `declare module 'zapatos/custom'` is exported and the blocks merge: a helper type in a placeholder takes a prefixed name — `branch-reviewer`, `builder`
+- #142 — A placeholder in the shared docs schema is a cross-page dependency: `git grep` the open worktrees before narrowing it — `builder`
+- #142 — Bulk inserts into the docs schema without ids hit 23505 at the 1000th row (seeds from 1000, sequences from 1): probes set explicit ids from 2000 — `branch-reviewer`
 
 ## Minors kept
 
