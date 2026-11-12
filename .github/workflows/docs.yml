@@ -31,6 +31,9 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22.x
+      # the site installs the built library (`file:..`)
+      - run: npm ci && npm run build
+        working-directory: .
       - run: npm ci
       - run: npm run docs:build
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
