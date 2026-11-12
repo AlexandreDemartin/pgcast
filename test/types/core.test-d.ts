@@ -164,6 +164,20 @@ describe('type surprises', () => {
     expectTypeOf(db.param('Ada')).toEqualTypeOf<db.Parameter<string>>();
   });
 
+  test('DangerousRawString, ColumnNames and ColumnValues match neither a plain { value } nor each other', () => {
+    // Parameter still matches a plain { value } (above)
+    // @ts-expect-error a plain { value } is no DangerousRawString
+    const r: db.DangerousRawString = { value: 'x' };
+    // @ts-expect-error a ColumnValues is no ColumnNames
+    const n: db.ColumnNames<string[]> = db.vals(['a']);
+    // @ts-expect-error a ColumnNames is no ColumnValues
+    const v: db.ColumnValues<string[]> = db.cols(['a']);
+    // @ts-expect-error a ColumnNames is no DangerousRawString
+    const x: db.DangerousRawString = db.cols('x');
+    const p: db.Parameter<string> = { value: 'x' };
+    expectTypeOf([r, n, v, x, p]).not.toBeAny();
+  });
+
   test('cols(x) and vals(x) of any value are still accepted in a sql template', () => {
     // a Parameter<any> accepted them before the tag that refuses them as values
     const ids: readonly number[] = [1, 2];
@@ -178,6 +192,8 @@ describe('type surprises', () => {
     db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { display_name: db.raw(`"users"."display_name" || '!'`) } });
     db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { manager_id: db.raw('"users"."manager_id"'), tags: db.cols(['users.tags']) } });
     db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { manager_id: db.vals(1) } });
+    // x keeps its literal type beside raw() and cols(), as 6.6.1 inferred it from Parameter<T>
+    db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { mood: db.vals('ok'), created_at: db.vals('2020-01-01T12:00:00Z') } });
     // kept for compatibility: 6.6.1 accepted vals(x) of the column type, though it compiles to the values of x
     // (here `1`), not to x
     db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { settings: db.vals({ a: 1 }) } });
