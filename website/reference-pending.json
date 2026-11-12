@@ -35,19 +35,5 @@
     "Config.queryListener",
     "Config.resultListener",
     "Config.transactionListener"
-  ],
-  "generator.md": [
-    "generate.db",
-    "generate.outDir",
-    "generate.outExt",
-    "generate.schemas",
-    "generate.debugListener",
-    "generate.progressListener",
-    "generate.warningListener",
-    "generate.customTypesTransform",
-    "generate.columnOptions",
-    "generate.schemaJSDoc",
-    "generate.unprefixedSchema",
-    "generate.customJSONParsingForLargeNumbers"
   ]
 }

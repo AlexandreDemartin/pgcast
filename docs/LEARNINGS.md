@@ -183,6 +183,11 @@ Candidates for a check, a rule or a skill line.
 - #122 — The TS error code depends on the signature: an unbounded `<T>(a: T)` fails at the key (TS2322), a bounded one at the argument (TS2345), some at both; probe each form — `branch-reviewer`, `builder`
 - #122 — A page named like the namespace it documents clashes with its own `{#name}` entry: the h1 says `db.conditions` — `builder`
 - #122 — A scratch type probe needs `paths` mapping `zapatos/*` to `website/node_modules/zapatos` — `builder`
+- #146 — A page that describes generated output in words compiles that output for each kind of input it covers (domains over `text`, `bigint`, `date`, `jsonb`, an enum): the docs schema's one domain hid a placeholder that does not compile — `branch-reviewer`
+- #146 — A page that documents a known defect as it is links its open issue, or it reads as intended — `branch-reviewer`
+- #146 — VitePress interpolates `{{…}}` in inline code: use `<code v-pre>`; fenced blocks are safe — `builder`
+- #146 — To test the CLI as a user runs it, `npm pack` and install the tarball in a scratch project (`website/node_modules/.bin` has no `pgcast`) — `builder`
+- #146 — A builder's worktree can miss a master that moved: check `git fetch` then `git merge-base` before saying no merge is needed — orchestrator
 
 ## Minors kept
 
