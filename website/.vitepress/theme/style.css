@@ -116,7 +116,10 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 .VPSidebarItem.level-1 .text { font-size: 14px; line-height: 1.5; padding: 0; color: var(--fg); }
 .VPSidebarItem.level-1.is-active .link { background: var(--accent-soft); }
 .VPSidebarItem.level-1.is-active .text { color: var(--accent); font-weight: 600; }
-.VPSidebarItem .since { float: right; line-height: 21px; font-size: 11px; font-weight: 500; color: var(--muted); }
+/* a minor's badge, in the nav, on its group's landing page and in the pager: an inline block, so out of a link's
+   underline, and glued to the text in outline.ts, so that no underlined space comes before it */
+.since { display: inline-block; margin-left: 8px; font-size: 11px; font-weight: 500; color: var(--muted); }
+.VPSidebarItem .since { float: right; line-height: 21px; }
 .VPSidebarItem .text code { font-size: .9em; }
 
 /* "On this page" */

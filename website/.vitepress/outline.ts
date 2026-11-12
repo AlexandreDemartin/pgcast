@@ -48,7 +48,7 @@ export const outline = [
     items: [
       { text: 'Why pgcast', link: '/why' },
       { text: 'How types are cast from the catalog', link: '/catalog-types' },
-      { text: 'Versions, opt-ins and warnings <small class="since">6.7</small>', link: '/versions' },
+      { text: 'Versions, opt-ins and warnings<small class="since">6.7</small>', link: '/versions' },
       { text: 'The security model', link: '/security' },
     ],
   },
