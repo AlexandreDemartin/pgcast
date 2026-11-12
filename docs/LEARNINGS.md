@@ -239,6 +239,10 @@ Candidates for a check, a rule or a skill line.
 - #148 — `<sup>` is stripped in `llms-full.txt` (2<sup>53</sup> became « 253 »): write the value another way — `builder`
 - #200 — The fixture cannot prove whether a `sql` interpolation type-checks (its `products` table makes `SQLForTable` take any string): type-check docs snippets on the docs schema — `builder`
 - #200 — Under 6.6.1 a `sql` fragment on a NOT NULL column fails in `updateValues` (TS2769): a migration example for 6.6.1 users needs a nullable column — `builder`
+- #203 — A `tsc` output quoted on a tutorial page carries line numbers: quote them from a file the page shows whole, or the reader's assembly moves them (26, 29, 30 for the same steps) — `branch-reviewer`
+- #203 — TypeScript 7 prints only the last overload's error for a failed overloaded call (TS2769), so a typed row (`const row: s.t.Insertable`) is the form whose errors read the same on 5.9, 6.0 and 7.0; `satisfies` does not help — `branch-reviewer`, `builder`
+- #203 — A terminal's `tsc` output is `--pretty` with colours stripped, two blank lines before `Found N error(s)`; a pipe prints the plain form — `branch-reviewer`
+- #203 — Twoslash hovers are in the page's `assets/<page>.md.*.js` chunk, not in its `.html` — `builder`
 
 ## Minors kept
 
