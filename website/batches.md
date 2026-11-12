@@ -104,7 +104,7 @@ Name the columns to update instead, with [`updateColumns`](/insert#upsert-option
 
 - The update is `DO UPDATE SET ("customer") = ROW(EXCLUDED."customer")`: F8 keeps its booking time. A new row still takes the `booked_at` given, or the default.
 - Or give every row the same keys: upsert the rows with a `booked_at` and those without in two calls.
-- A key of `updateValues`, or a column of the conflict target, doesn't count as missing ([Rows with different keys](/insert#upsert-different-keys)).
+- A key of `updateValues`, or a column of an array or string conflict target, doesn't count as missing ([Rows with different keys](/insert#upsert-different-keys)).
 
 ::: tip Opt-in
 With `db.setConfig({ upsertRequiresSameKeys: true })` ([`Config.upsertRequiresSameKeys`](/runtime-config#Config.upsertRequiresSameKeys)), such an upsert throws before it sends anything: "rows have different keys: pass updateColumns, or give every row the same keys". It becomes the default in 7.0 ([Versions, opt-ins and warnings](/versions)).
