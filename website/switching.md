@@ -99,7 +99,7 @@ Run your tests, then your app. Where Zapatos 6.6.1 did something that code may r
 (Use `node --trace-deprecation ...` to show where the warning was created)
 ```
 
-To find the call, run with `--trace-deprecation`: Node prints the stack, and its first line outside `node_modules/zapatos` is yours. A test runner's processes get it from `NODE_OPTIONS`:
+To find the call, run with `--trace-deprecation`: Node prints the stack, and the first line below pgcast's own `dist/db/` frames is yours. A test runner's processes get it from `NODE_OPTIONS`:
 
 ```sh
 NODE_OPTIONS=--trace-deprecation npm test
