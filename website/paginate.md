@@ -5,7 +5,7 @@ Show a long list a page at a time: here the films, newest first, two to a page. 
 
 ## Order, then limit
 
-Ask for the first page: an `order` that ends on a unique column, then a `limit`.
+Ask for the first page of all the films ([`db.all`](/sql-template#all)): an `order` that ends on a unique column, then a `limit`.
 
 <CastPanel example="paginate">
 
@@ -102,7 +102,7 @@ To keep a filter beside the comparison, give the comparison in a [Whereable](/sq
 
 ### When the directions differ
 
-A row comparison goes one way. With `release_year` `DESC` and `id` `ASC`, spell it out with [`conditions.or`](/conditions#conditions.or): an earlier year, or the same year and a larger `id`. Then bound it on the first key, with [`conditions.and`](/conditions#conditions.and) and [`conditions.lte`](/conditions#conditions.lte): that year or an earlier one.
+A row comparison goes one way. With `release_year` `DESC` and `id` `ASC`, spell it out with [`conditions.or`](/conditions#conditions.or): an earlier year ([`conditions.lt`](/conditions#conditions.lt)), or the same year and a larger `id` ([`conditions.gt`](/conditions#conditions.gt)). Then bound it on the first key, with [`conditions.and`](/conditions#conditions.and) and [`conditions.lte`](/conditions#conditions.lte): that year or an earlier one.
 
 <CastPanel example="paginate_mixed">
 
