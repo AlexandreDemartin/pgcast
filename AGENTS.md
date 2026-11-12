@@ -72,13 +72,13 @@ A task is **done** only if `lint`, `typecheck`, `test` and `test:types` pass.
 - CI: PR in draft while iterating, `gh pr ready` once ready (skill `ci-gate`).
 - Reviews: agent `branch-reviewer`, which relies on the user skill `branch-review`.
 - Deciding alone or asking: skill `decision-philosophy`.
-- George MacKerron's size, splitting, titles and style, pushed further without betraying them: skill `zapatos-spirit`.
+- George MacKerron's size, splitting, titles and commits: skill `pr-shape`; his style, pushed further without betraying it: skill `zapatos-spirit`.
 
 ## Working rules
 
 - **Read the code concerned before changing it**, and summarise what you understood.
 - **Tests first**, or at least with the implementation: runtime, compiled SQL (`text` and `values`) and types (positive **and** negative cases with `@ts-expect-error`).
-- **One feature = one branch = one PR** on `AlexandreDemartin/pgcast`, small like one of George's commits. Commits, PR titles and splitting in George MacKerron's manner (skill `zapatos-spirit`).
+- **One feature = one branch = one PR** on `AlexandreDemartin/pgcast`, small like one of George's commits. Commits, PR titles and splitting in George MacKerron's manner (skill `pr-shape`).
 - **No breaking change** to the public API. If it is unavoidable, stop and ask (skill `backward-compat`).
 - **`core.ts` (escaping, parameterisation, identifier compilation)**: never touch it without saying so explicitly. Each change adds SQL injection tests (skill `sql-safety`).
 - **Advanced types**: watch compile time (`bench:types`, +20 % threshold). A type that compiles is not necessarily correct (skill `type-tests`).

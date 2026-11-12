@@ -17,7 +17,7 @@ You build a pgcast branch, or you fix the defects found in it. The repository an
 
 ## Build
 
-- Before each subject, the skill it names (`.agents/README.md` § Skill map) and those of **Read**; always the skill `zapatos-spirit` (size, splitting, style).
+- Before each subject, the skill it names (`.agents/README.md` § Skill map) and those of **Read**; always the skills `zapatos-spirit` (style) and `pr-shape` (size, splitting, title, commits).
 - Tests first, or with the code: compiled SQL, real execution, positive and negative types.
 - Before a mechanism: already in `src/`? otherwise short code with no dependency (skill `simple-big-wins`).
 - A stop point (`AGENTS.md` § Stop points) that the orchestrator has not settled: **stop** and report it.
@@ -34,15 +34,15 @@ You build a pgcast branch, or you fix the defects found in it. The repository an
 ## Git
 
 - Branch from an up-to-date `master`: `git fetch && git switch -c <branch> origin/master`.
-- Layer of a stack, only if the orchestrator asks (skill `run-step` § Stacking PRs): the branch starts from the layer below (`git switch -c <branch> origin/<branch below>`), and a fix from below goes up by `git merge`, never by rebase.
-- Small, atomic commits, in George's manner (skill `zapatos-spirit` § Commits): one line in plain English, no prefix; each ends with the requested `Co-Authored-By` line.
+- Layer of a stack, only if the orchestrator asks (skill `pr-shape` § Stacking): the branch starts from the layer below (`git switch -c <branch> origin/<branch below>`), and a fix from below goes up by `git merge`, never by rebase.
+- Small, atomic commits, in George's manner (skill `pr-shape` § Commits): one line in plain English, no prefix; each ends with the requested `Co-Authored-By` line.
 - Normal push; never `--amend`, `rebase` nor `--force` (`guard.mjs`).
 
 ## The PR
 
 - `gh pr create --draft --base master --repo AlexandreDemartin/pgcast`: never to `jawj/zapatos`. For a layer of a stack, `--base <branch below>`, and the description starts with "Stacked on #n".
-- Title in George's manner (skill `zapatos-spirit` § PR title): plain English, no prefix, British spelling, ending with `(closes #n)`.
-- A PR too big for the skill `zapatos-spirit` § Size and scope: stop and propose a split to the orchestrator.
+- Title in George's manner (skill `pr-shape` § PR title): plain English, no prefix, British spelling, ending with `(closes #n)`.
+- A PR too big for the skill `pr-shape` § Size and scope: stop and propose a split to the orchestrator.
 - Body in English: `Closes #n` on the first line, then **What** · **Why** · **Verify**, as bullets; "decided alone" points; unnamed patterns, never an extract from the corpus (skill `consumer-usage`); it ends with the requested "Generated with Claude Code" line.
 - The `builder` does not mark the PR ready, does not close the issue and never merges: the orchestrator does, and the merge closes the issue (skill `run-step`).
 

@@ -3,7 +3,7 @@ name: CI
 on:
   push:
     branches: [master]
-  # Every PR, including a layer of a stack whose base is the branch below it (skill run-step, § Stacking PRs).
+  # Every PR, including a layer of a stack whose base is the branch below it (skill pr-shape, § Stacking).
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
 

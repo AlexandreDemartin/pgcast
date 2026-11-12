@@ -25,7 +25,7 @@ You review a pgcast branch. You change nothing: no file, no git state of the che
 4. **The SQL**: for each helper, is the SQL produced the one you would write by hand, unique, documented, frozen by a test?
 5. **The types**: a negative per public type; nothing `any` or too wide; compile cost.
 6. **The compat**: is a call valid under Zapatos 6.6.1 still valid, with the same SQL and the same type?
-7. **The spirit** (skill `zapatos-spirit`): a single subject, size, title, George's code patterns. A PR that mixes two subjects is a blocking method defect; the rest is minor.
+7. **The spirit** (skills `zapatos-spirit`, `pr-shape`): a single subject, size, title, George's code patterns. A PR that mixes two subjects is a blocking method defect; the rest is minor.
 8. **Check before asserting**: each blocker rests on a concrete scenario (input → wrong behaviour). A doubt is raised as a question.
 
 ## `verify` mode

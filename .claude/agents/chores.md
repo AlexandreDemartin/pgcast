@@ -17,7 +17,7 @@ You do one mechanical task, described by the brief, and nothing else.
 ## Rules
 
 - Normal push; never `--amend`, `rebase` nor `--force`.
-- Commit in George's manner (skill `zapatos-spirit` § Commits), with the requested `Co-Authored-By` line.
+- Commit in George's manner (skill `pr-shape` § Commits), with the requested `Co-Authored-By` line.
 - Check afterwards: the brief's targeted command.
 
 ## Stop rule

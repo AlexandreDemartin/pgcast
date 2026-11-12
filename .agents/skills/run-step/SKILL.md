@@ -28,7 +28,7 @@ It lives in the issues of `AlexandreDemartin/pgcast` (`--repo AlexandreDemartin/
 - Read it: `gh issue view <n> --repo AlexandreDemartin/pgcast`; only it, and its Epic if the order requires.
 - A `type: feature` that starts: first create its `type: task` issues from **Planned PRs**, in order, each under the feature:
   `gh api repos/AlexandreDemartin/pgcast/issues/<feature>/sub_issues -F sub_issue_id=<id>`, where `<id>` is the task's `id`, not its number (`gh api repos/AlexandreDemartin/pgcast/issues/<n> -q .id`).
-- A step too wide for one PR in George's manner (skill `zapatos-spirit` § Splitting like George): split it into sub-issues before starting the `builder`.
+- A step too wide for one PR in George's manner (skill `pr-shape` § Splitting like George): split it into sub-issues before starting the `builder`.
 - `needs decision`, or a stop point of `AGENTS.md` (`core.ts`, codegen output, publication): ask the user **before** the `builder`.
 - A new idea: a `type: feature` issue under its Epic, at its place in the order (`PATCH …/issues/<epic>/sub_issues/priority`, with `sub_issue_id` and `after_id`).
 - Unstable network: each `gh` call can be retried; before recreating, list what exists (no duplicates).
@@ -69,22 +69,7 @@ An agent knows only what its brief says.
 - **A reviewer's report**: at most 10 defects, from most to least serious, each blocking or minor.
 - **No worktree by default**; one only for two pieces of work in parallel, removed after the merge.
 - A pushed branch is never rebased nor forced; a fix from below goes up by merge (`guard.mjs`).
-
-## Stacking PRs
-
-Sources: GitHub docs "Stack code changes in pull requests", Thoughtworks Radar (*Caution* ring), Graphite, cubic (2026).
-
-| Stack | Do not stack |
-|---|---|
-| The steps of a **same feature** depend on each other (PR 2 needs PR 1's code), and waiting for the bottom to merge would block what follows. Example: the series of #54, FK metadata → `related()` → `relatedMany()`. | **Independent** changes, like most fixes of Epic #18: separate PRs to `master`. |
-| Each layer is a George PR, readable on its own. | A PR that stands on its own; a stack used as an excuse for a big change ("an excuse to write one enormous change", Thoughtworks). |
-| **3 layers at most**, each ≤ ~250 lines and 25 files (Graphite's warning threshold). | A layer that makes no sense without the one above: split it again. |
-
-- **Mechanics without rewriting**, compatible with `guard.mjs`: layer N starts from branch N-1 and its PR targets branch N-1 (`--base <branch N-1>`). A fix from below goes up by `git merge origin/<branch N-1>` into each layer above, from bottom to top (agent `chores`).
-- **No `gh stack sync` nor `gh stack push`**: they rebase and force each branch.
-- **Review**: each layer is reviewed on its own, as soon as it is open, without waiting for the bottom; the reviewer gets the layer's number and its base.
-- **Merge from bottom to top**, as a merge commit (`gh pr merge --merge`): the next layer has nothing to redo, and GitHub retargets it to `master` (`delete_branch_on_merge` is on). Then `git merge origin/master` into the retargeted layer if `master` has moved, green CI, merge.
-- A middle layer is never merged before the ones below it.
+- Stacking dependent steps: skill `pr-shape` § Stacking.
 
 ## End of chapter
 
