@@ -269,6 +269,7 @@ Candidates for a check, a rule or a skill line.
 - #203 — `process.on('warning', …)` does not stop Node's own print; only `--no-warnings` does, and `--no-deprecation` stops the warning before the listener — `branch-reviewer`
 - #203 — The generator sends its catalog queries concurrently: a `debugListener` sample's `<n>` holds only for a named config with one relation — `branch-reviewer`, `builder`
 - #203 — Each fix round gets its own scratch folder named after its PR, or two batches share probes — `builder`
+- #214 — A cast panel shows the first `const` with no type written: an example that types its input first keeps its result in the panel; a Twoslash hover on an annotated `const` shows only the type's name — `builder`
 - #220 — `llms.ts` has no self-check, unlike `cast.data.ts`: a regression of its nested-block or `@errors` handling would pass the build; a small self-check would guard both — `builder`
 - #220 — A per-page list of changes in a generated file is attributed from the file itself (the `Source:` line before each change), not from grep order — `builder`
 
