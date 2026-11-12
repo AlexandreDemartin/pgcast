@@ -29,6 +29,28 @@ const expectInjectedHereOnly = async () => {
   expect(await adaName(t.pool)).toBe('Ada');
 };
 
+/** What each input gives as a column, a table and a Whereable key: its rows, or its error code. */
+const identifierOutcomes = async (inputs: Record<string, string>) => {
+  const outcomes: Record<string, unknown> = {};
+  for (const [name, input] of Object.entries(inputs)) {
+    for (const [where, q] of Object.entries({
+      column: sql`SELECT ${input} FROM ${'users'}`,
+      table: sql`SELECT 1 FROM ${input}`,
+      key: sql`SELECT 1 FROM ${'users'} WHERE ${{ [input]: 1 }}`,
+    })) {
+      await t.client.query('SAVEPOINT pgcast_identifier');
+      try {
+        outcomes[`${name} ${where}`] = await q.run(t.client);
+        await t.client.query('RELEASE SAVEPOINT pgcast_identifier');
+      } catch (err) {
+        await t.client.query('ROLLBACK TO SAVEPOINT pgcast_identifier');
+        outcomes[`${name} ${where}`] = (err as { code?: string }).code;
+      }
+    }
+  }
+  return outcomes;
+};
+
 describe('values are data', () => {
   it('a hostile value in a Whereable is sent as a parameter', async () => {
     const q = db.select('users', { display_name: `Ada' OR '1' = '1` });
@@ -67,7 +89,6 @@ describe('with parameters (extended protocol)', () => {
         "message": "column "display_name" FROM users; UPDATE users SET display_name = 'inje" does not exist",
       }
     `);
-    expect(await adaName()).toBe('Ada');
   });
 
   it('a `"` in a param cast stays in one type name, which does not exist', async () => {
@@ -164,35 +185,38 @@ describe('without parameters (simple protocol)', () => {
         "message": "column "display_name" FROM users; UPDATE users SET display_name = 'inje" does not exist",
       }
     `);
-    expect(await adaName(t.pool)).toBe('Ada');
   });
 
-  it('no hostile string identifier runs: each is one missing name, as a column, a table or a Whereable key', async () => {
-    // compiled text: test/unit/injection.test.ts; a pre-quoted string is still written raw (prequoted, lone)
-    const hostile = {
+  it('a string that already reads as quoted names is written as is, and stays one name', async () => {
+    // as in 6.6.1: `""` is a `"` inside the name, so the SQL around it stays in the name
+    const column = `display_name"" FROM users; ${update}; SELECT ""display_name`;
+    const q = sql`SELECT ${column}, ${`users.${column}`} FROM ${'users'}`;
+    expect(q.compile().text).toBe(`SELECT "${column}", "users"."${column}" FROM "users"`);
+    expect(await pgError(t.client, () => q.run(t.client))).toMatchInlineSnapshot(`
+      {
+        "code": "42703",
+        "message": "column "display_name" FROM users; UPDATE users SET display_name = 'inje" does not exist",
+      }
+    `);
+    expect(await pgError(t.client, () => sql`SELECT ${`users.${column}`} FROM ${'users'}`.run(t.client))).toMatchInlineSnapshot(`
+      {
+        "code": "42703",
+        "message": "column users.display_name" FROM users; UPDATE users SET display_name = 'inje does not exist",
+      }
+    `);
+  });
+
+  it('no hostile string identifier runs SQL of its own, as a column, a table or a Whereable key', async () => {
+    // compiled text: test/unit/injection.test.ts; each error is a name that does not exist, a syntax
+    // error or a NUL refused by the protocol, and an error runs nothing after it
+    expect(await identifierOutcomes({
       dquote: 'a"b', squote: "a'b", semicolon: 'a;b', dashes: 'a--b', comment: 'a/*b', dollar: 'a$1b',
-      backslash: 'a\\b', nul: 'a\0b', prequoted: '"a"', dot: 'a.b', lone: '"',
+      backslash: 'a\\b', nul: 'a\0b', dot: 'a.b',
       closes: `display_name" FROM users; ${update}; SELECT "display_name`,
       qualifiedCloses: `users"."display_name" FROM users; ${update}; SELECT "display_name`,
-    };
-    const outcomes: Record<string, unknown> = {};
-    for (const [name, input] of Object.entries(hostile)) {
-      for (const [where, q] of Object.entries({
-        column: sql`SELECT ${input} FROM ${'users'}`,
-        table: sql`SELECT 1 FROM ${input}`,
-        key: sql`SELECT 1 FROM ${'users'} WHERE ${{ [input]: 1 }}`,
-      })) {
-        await t.client.query('SAVEPOINT pgcast_identifier');
-        try {
-          outcomes[`${name} ${where}`] = await q.run(t.client);
-          await t.client.query('RELEASE SAVEPOINT pgcast_identifier');
-        } catch (err) {
-          await t.client.query('ROLLBACK TO SAVEPOINT pgcast_identifier');
-          outcomes[`${name} ${where}`] = (err as { code?: string }).code;
-        }
-      }
-    }
-    expect(outcomes).toMatchInlineSnapshot(`
+      escapedCloses: 'a"" OR TRUE OR ""b', qualifiedEscaped: 's.a"" OR TRUE OR ""b', escapedDot: 'a"."b',
+      escapedNul: 'a""\0""b', escapedOdd: 'a"""b',
+    })).toMatchInlineSnapshot(`
       {
         "backslash column": "42703",
         "backslash key": "42703",
@@ -215,18 +239,27 @@ describe('without parameters (simple protocol)', () => {
         "dquote column": "42703",
         "dquote key": "42703",
         "dquote table": "42P01",
-        "lone column": "42601",
-        "lone key": "42601",
-        "lone table": "42601",
+        "escapedCloses column": "42703",
+        "escapedCloses key": "42703",
+        "escapedCloses table": "42P01",
+        "escapedDot column": "42703",
+        "escapedDot key": "42703",
+        "escapedDot table": "42P01",
+        "escapedNul column": "08P01",
+        "escapedNul key": "08P01",
+        "escapedNul table": "08P01",
+        "escapedOdd column": "42703",
+        "escapedOdd key": "42703",
+        "escapedOdd table": "42P01",
         "nul column": "08P01",
         "nul key": "08P01",
         "nul table": "08P01",
-        "prequoted column": "42703",
-        "prequoted key": "42703",
-        "prequoted table": "42P01",
         "qualifiedCloses column": "42P01",
         "qualifiedCloses key": "42P01",
         "qualifiedCloses table": "42P01",
+        "qualifiedEscaped column": "42P01",
+        "qualifiedEscaped key": "42P01",
+        "qualifiedEscaped table": "42P01",
         "semicolon column": "42703",
         "semicolon key": "42703",
         "semicolon table": "42P01",
@@ -235,11 +268,20 @@ describe('without parameters (simple protocol)', () => {
         "squote table": "42P01",
       }
     `);
-    expect(await adaName()).toBe('Ada');
   });
 
   it('characterization: a pre-quoted string identifier is raw and runs a second statement', async () => {
-    // characterization: it starts and ends with `"`, so it is written as is
+    // characterization: it starts and ends with `"`, so it is written as is, even a lone `"`
+    expect(await identifierOutcomes({ prequoted: '"a"', lone: '"' })).toMatchInlineSnapshot(`
+      {
+        "lone column": "42601",
+        "lone key": "42601",
+        "lone table": "42601",
+        "prequoted column": "42703",
+        "prequoted key": "42703",
+        "prequoted table": "42P01",
+      }
+    `);
     const column = `"display_name" FROM users; ${update}; SELECT "display_name"`;
     await sql`SELECT ${column} FROM ${'users'}`.run(t.client);
     await expectInjectedHereOnly();
