@@ -126,8 +126,10 @@ const inline = (line: string, url: (link: string) => string) => line
   .replace(/<code[^>]*>(.*?)<\/code>/g, '`$1`')
   .replace(/(\]\([^)]*\))\{[^}]*\}/g, '$1')  // `[Get started](/install){.btn}`
   .replace(/\s*\{[.#][^}]*\}$/, '')  // `## Options {#options}`
-  .split(/(`[^`]*`)/)  // odd parts are inline code: kept as they are
-  .map((part, i) => i % 2 ? part : part
+  // inline code, between two runs of as many backticks (`` sql`now()` ``), is kept as it is: split, it is every part
+  // 1 (mod 3), then its run of backticks, dropped
+  .split(/((?<!`)(`+)(?!`).*?[^`]\2(?!`))/)
+  .map((part, i) => i % 3 === 1 ? part : i % 3 === 2 ? '' : part
     .replace(/<h([1-6])[^>]*>(.*?)<\/h\1>/g, (_, level, text) => '#'.repeat(level) + ' ' + text)
     .replace(/<small[^>]*>(.*?)<\/small>/g, ': $1')
     .replace(/<\/?[A-Za-z][^>]*>/g, '')
