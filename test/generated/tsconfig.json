@@ -9,7 +9,7 @@
     "noEmit": true,
     "rootDir": "../..",
     "paths": {
-      "zapatos/db": ["node_modules/.cache/pgcast/db"]
+      "zapatos/db": ["../../node_modules/.cache/pgcast/db"]
     }
   }
 }

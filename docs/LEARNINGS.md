@@ -287,6 +287,7 @@ Candidates for a check, a rule or a skill line.
 - #115 — A probe can wrap the recording `pool` in its own `connect()` to script a refusal (the first `COMMIT` with 40001), which makes retry sequences checkable without a database — `branch-reviewer`, `builder`
 - #115 — A review that relies on a harness saves the harness, not only its report, so the fix round re-runs the same one — `builder`
 - #115 — `gh pr ready` from a subagent is refused by the auto-mode classifier: the orchestrator runs it — orchestrator
+- #212 — Without `baseUrl`, a relative `paths` entry passed through the TypeScript API resolves against the directory of the tsconfig `parseJsonConfigFileContent` read, not the root: give programmatic `paths` overrides absolute paths (`test/integration/codegen.test.ts:201`) — `builder`
 
 ## Minors kept
 
