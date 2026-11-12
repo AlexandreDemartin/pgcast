@@ -1,0 +1,15 @@
+{
+  "name": "pgcast-website",
+  "private": true,
+  "description": "The pgcast documentation site (decision 004): a package of its own, so nothing here reaches the library.",
+  "type": "module",
+  "scripts": {
+    "docs:dev": "vitepress dev",
+    "docs:build": "vitepress build",
+    "docs:preview": "vitepress preview"
+  },
+  "devDependencies": {
+    "vitepress": "2.0.0-alpha.21",
+    "vue": "3.5.44"
+  }
+}

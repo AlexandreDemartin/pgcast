@@ -17,6 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       code: ${{ steps.diff.outputs.code }}
+      docs: ${{ steps.diff.outputs.docs }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -24,17 +25,23 @@ jobs:
       - id: diff
         name: Is there anything besides docs to check?
         # Markdown outside .agents/ and .claude/ needs no build: those two hold the agent method, which check:agents checks.
+        # The docs site builds on a change to website/ (its pages are Markdown too), to src/, which its examples use, or to
+        # the workflows.
         # A push to master always runs everything.
         env:
           EVENT: ${{ github.event_name }}
           BASE: ${{ github.base_ref }}
         run: |
           code=true
+          docs=true
           if [ "$EVENT" = pull_request ]; then
             code=false
+            docs=false
             while IFS= read -r file; do
               case "$file" in
                 '') ;;
+                website/*) docs=true ;;
+                src/*|.github/workflows/*) code=true; docs=true ;;
                 .agents/*|.claude/*) code=true ;;
                 *.md) ;;
                 *) code=true ;;
@@ -42,6 +49,7 @@ jobs:
             done <<< "$(git diff --name-only "origin/$BASE...HEAD")"
           fi
           echo "code=$code" | tee -a "$GITHUB_OUTPUT"
+          echo "docs=$docs" | tee -a "$GITHUB_OUTPUT"
 
   build:
     needs: changes
@@ -100,16 +108,34 @@ jobs:
       - run: npm ci
       - run: npm run bench:types
 
+  docs:
+    # The docs site, a package of its own (decision 004): its build fails on a dead link. docs.yml deploys it from master.
+    needs: changes
+    if: needs.changes.outputs.docs == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: website
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+      - run: npm ci
+      - run: npm run docs:build
+
   ci-passed:
     # The one check master requires: it stays stable when the matrix changes, and passes when docs-only skips the rest.
     name: CI passed
-    needs: [changes, build, bench-types]
+    needs: [changes, build, bench-types, docs]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Every job passed, or was skipped on purpose
         env:
-          RESULTS: ${{ needs.changes.result }} ${{ needs.build.result }} ${{ needs.bench-types.result }}
+          RESULTS: ${{ needs.changes.result }} ${{ needs.build.result }} ${{ needs.bench-types.result }} ${{ needs.docs.result }}
         run: |
           for result in $RESULTS; do
             case "$result" in

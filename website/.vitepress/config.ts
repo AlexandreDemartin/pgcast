@@ -1,0 +1,55 @@
+// Copyright (C) 2026 Alexandre Demartin
+// The docs site (decision 004), on VitePress's default theme; its look is docs/design/art-direction.md.
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { defineConfig } from 'vitepress';
+import { outline } from './outline.ts';
+import { syntax } from './syntax.ts';
+
+const
+  repo = 'https://github.com/AlexandreDemartin/pgcast',
+  { version } = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')),
+  fonts = 'https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@500;700;800' +
+    '&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap';
+
+export default defineConfig({
+  title: 'pgcast',
+  description: 'Zero-abstraction Postgres for TypeScript: types cast from your database schema. A maintained fork of Zapatos.',
+  lang: 'en-GB',
+  base: '/pgcast/',  // GitHub Pages: alexandredemartin.github.io/pgcast/
+  cleanUrls: true,
+  head: [
+    ['link', { rel: 'preconnect', href: 'https://fonts.googleapis.com' }],
+    ['link', { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' }],
+    ['link', { rel: 'stylesheet', href: fonts }],
+  ],
+  markdown: { theme: syntax },
+  vite: {
+    define: { __PGCAST_VERSION__: JSON.stringify(version) },
+    resolve: {
+      // VitePress's light / dark switch becomes system / light / dark (its "overriding internal components").
+      alias: [{
+        find: /^.*\/VPSwitchAppearance\.vue$/,
+        replacement: fileURLToPath(new URL('./theme/AppearanceSwitch.vue', import.meta.url)),
+      }],
+    },
+  },
+  themeConfig: {
+    siteTitle: 'pg<b>::</b>cast',
+    nav: [
+      { text: 'Docs', link: '/install', activeMatch: '^/(?!$)' },
+      // no ↗ after the external links, as the prototype
+      { text: 'Changelog', link: `${repo}/blob/master/CHANGELOG.md`, noIcon: true },
+      { text: 'GitHub', link: repo, noIcon: true },
+    ],
+    sidebar: outline,
+    search: {
+      provider: 'local',
+      options: { translations: { button: { buttonText: 'Search the docs', buttonAriaLabel: 'Search the docs' } } },
+    },
+    editLink: { pattern: `${repo}/edit/master/website/:path`, text: 'Edit this page on GitHub' },
+    docFooter: { prev: 'Previous', next: 'Next' },
+    outline: { level: 2, label: 'On this page' },
+    darkModeSwitchLabel: 'Colour theme',
+  },
+});
