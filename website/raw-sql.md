@@ -39,7 +39,7 @@ A value from a caller (a form, a URL, a row you read elsewhere) goes in as [`db.
 
 - <code v-pre>${{ studio_id: studioId }}</code> is `("studio_id" = $1)`: a filter of `films`, as the `where` of [`select()`](/select#select) takes it, so [conditions](/conditions) work in it too: `{ release_year: db.conditions.gte(1990) }`.
 - `${db.param(genre)}` is `$2`: a parameter fits wherever SQL takes a value.
-- An array is one parameter: `` ${'id'} = ANY(${db.param(ids)}) `` sends `ids` as a Postgres array.
+- An array is one parameter: `` ${'id'} = ANY(${db.param(ids)}) `` sends `ids` as a Postgres array by default; with `castArrayParamsToJson` on, it does not ([below](#cast-a-parameter-postgres-can-t-type)).
 - A part of the query that only some calls need is a nested fragment, or `[]` for nothing ([Nested fragments](/sql-template#nested-fragments)).
 
 A bare string between `${…}` is a name, not a value, so the type refuses it:
