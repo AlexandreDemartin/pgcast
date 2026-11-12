@@ -191,6 +191,10 @@ Candidates for a check, a rule or a skill line.
 - #123 — « each / every X does Y » is searched for its exceptions before it is written (`grep runResultTransform` showed the aggregates' `Number()`) — `branch-reviewer`
 - #123 — The docs examples share one process: an example that changes module state is undone by value (nested objects included) and a self-check proves it — `branch-reviewer`, `builder`
 - #123 — A probe that leaks pool clients on purpose crashes Node once its database is dropped (57P01): run it last, in its own process — `builder`
+- #143 — « can't close its quotes » proves an identifier is escaped, not that it is safe as a value: a name the caller picks still chooses the column (`'title'` → `"title" = "title"`, every row) — `branch-reviewer`
+- #143 — An empty Whereable, typed or not, passes `tsc` and compiles to `TRUE`: a guide says to check before a `DELETE` / `UPDATE` — `branch-reviewer`
+- #143 — A `param()` cast is quoted, so SQL-standard spellings and upper case do not exist (`'integer'`, `'TIMESTAMPTZ'` → 42704) — `branch-reviewer`
+- #143 — A security probe for « matches every row » uses a `DELETE` on a table nothing references, or a foreign key stops it and proves nothing — `builder`
 
 ## Minors kept
 
