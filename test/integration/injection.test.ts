@@ -402,6 +402,22 @@ describe('without parameters (simple protocol)', () => {
     `);
   });
 
+  it('a `"` in the column of parent() in isIn stays in one column name, which does not exist', async () => {
+    // compiled as a Whereable value of parent() is (#107); 6.6.1 sent it as a parameter, '{"value":…}'
+    const column = `id"))); ${update}; --`;
+    const q = sql`SELECT (SELECT count(*) FROM ${'accounts'} WHERE ${{ owner_id: db.conditions.isIn([db.parent(column)]) }}) AS n FROM ${'users'}`
+      .copy({ parentTable: 'users' });
+    const { text, values } = q.compile();
+    expect(text).toBe(`SELECT (SELECT count(*) FROM "accounts" WHERE (("owner_id" IN ("users"."id""))); ${update}; --")))) AS n FROM "users"`);
+    expect(values).toEqual([]);
+    expect(await pgError(t.client, () => q.run(t.client))).toMatchInlineSnapshot(`
+      {
+        "code": "42703",
+        "message": "column users.id"))); UPDATE users SET display_name = 'injected' WHERE id = 1 does not exist",
+      }
+    `);
+  });
+
   it('an alias that closes its quotes stays one alias, in "sq_<alias>" too', async () => {
     // `) AS "sq_u"; UPDATE …; --"`; 6.6.1: a syntax error; since #74: a second statement that ran
     const q = db.select('users', all, { alias: `u"; ${update}; --`, order: { by: 'id', direction: 'ASC' } } as any);

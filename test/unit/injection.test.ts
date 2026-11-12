@@ -232,6 +232,37 @@ describe('identifiers', () => {
       }
     `);
   });
+
+  it('the column of parent() in isIn, quoted as a Whereable value quotes it', () => {
+    // the same text inside `IN (…)`: no new interpolated input (#107)
+    expect(matrix(v => sql`WHERE ${{ owner_id: db.conditions.isIn([db.parent(v)]) }}`.copy({ parentTable: 'users' }))).toMatchInlineSnapshot(`
+      {
+        "backslash": "WHERE (("owner_id" IN ("users"."a\\b")))",
+        "comment": "WHERE (("owner_id" IN ("users"."a/*b")))",
+        "dashes": "WHERE (("owner_id" IN ("users"."a--b")))",
+        "dollar": "WHERE (("owner_id" IN ("users"."a$1b")))",
+        "dot": "WHERE (("owner_id" IN ("users"."a"."b")))",
+        "dquote": "WHERE (("owner_id" IN ("users"."a""b")))",
+        "escapedCloses": "WHERE (("owner_id" IN ("users"."a"" OR TRUE OR ""b")))",
+        "escapedDot": "WHERE (("owner_id" IN ("users"."a"".""b")))",
+        "escapedNul": "WHERE (("owner_id" IN ("users"."a""""<NUL>""""b")))",
+        "escapedOdd": "WHERE (("owner_id" IN ("users"."a""""""b")))",
+        "lone": "WHERE (("owner_id" IN ("users"."""")))",
+        "mixedEscaped": "WHERE (("owner_id" IN ("users"."s".a$1."b"" OR TRUE OR ""c")))",
+        "nul": "WHERE (("owner_id" IN ("users"."a<NUL>b")))",
+        "prequoted": "WHERE (("owner_id" IN ("users"."a")))",
+        "prequotedCloses": "WHERE (("owner_id" IN ("users"."""a"" OR TRUE OR ""b""")))",
+        "prequotedEmpty": "WHERE (("owner_id" IN ("users"."""")))",
+        "prequotedEscaped": "WHERE (("owner_id" IN ("users"."a"" OR TRUE OR ""b")))",
+        "qualifiedEscaped": "WHERE (("owner_id" IN ("users"."s"."a"" OR TRUE OR ""b")))",
+        "semicolon": "WHERE (("owner_id" IN ("users"."a;b")))",
+        "squote": "WHERE (("owner_id" IN ("users"."a'b")))",
+        "uescape": "WHERE (("owner_id" IN ("users"."""s"""."U&""a"" UESCAPE '!' || ""b""")))",
+        "unicodeCloses": "WHERE (("owner_id" IN ("users"."""s"""."U&""a\\"" OR TRUE OR \\""b""")))",
+        "unicodeEscaped": "WHERE (("owner_id" IN ("users"."s".U&"a\\0022"" OR TRUE OR ""\\0022b")))",
+      }
+    `);
+  });
 });
 
 describe('values stay parameters', () => {
