@@ -131,8 +131,9 @@ for (const page of pages) {
     if (fence !== null) continue;  // a page may show a mark as code
 
     // A mark follows what it checks, glued to it: at the start of a line, VitePress would read it as an HTML block.
-    // Any comment that starts like a mark is one, so a near miss (`<!--probe:x-->`, a comment over two lines) fails.
-    for (const { index } of line.matchAll(/<!--\s*(probe|message)\b/gi)) {
+    // Any comment that starts like a mark is one, so a near miss (`<!--- probe:`, `<!-- probes:`, `<!-- messages -->`,
+    // a comment over two lines) fails.
+    for (const { index } of line.matchAll(/<!--[\s-]*(probe|message)/gi)) {
       checked++;
       const
         end = line.indexOf('-->', index),
