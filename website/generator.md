@@ -14,6 +14,7 @@ The same program under two names: `pgcast`, and `zapatos`, as in Zapatos 6.6.1. 
 
 - `zapatosconfig.json`: read from the folder you run it in, if it is there; never from a parent folder. Without it, the config is `{}`.
 - `config`: one optional argument, a JSON object, merged over the file key by key: `npx pgcast '{"outDir": "./generated"}'` keeps the file's `db` and replaces its `outDir`. A key given here replaces the file's whole value, so `'{"db": {"application_name": "codegen"}}'` drops the file's `connectionString`.
+  The file is filled in before the merge: a variable it names must be set even when the argument replaces that key.
 - Each string in both, at any depth, has its environment variables filled in ([Environment variables](#environment-variables)).
 - There are no flags: `--help` is read as the JSON argument, and fails. Any argument after the first is ignored.
 - Paths are relative to the folder you run it in: `outDir`, and so the `zapatos` folder.
