@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { transformerTwoslash } from '@shikijs/vitepress-twoslash';
 import { defineConfig } from 'vitepress';
+import { writeLlmsFiles } from './llms.ts';
 import { outline } from './outline.ts';
 import { sqlParameters, syntax } from './syntax.ts';
 import { focusableHovers, twoslashOptions } from './twoslash.ts';
@@ -21,6 +22,7 @@ export default defineConfig({
   base: '/pgcast/',  // GitHub Pages: alexandredemartin.github.io/pgcast/
   cleanUrls: true,
   srcExclude: ['README.md'],  // for whoever works on the site, not a page of it
+  buildEnd: writeLlmsFiles,  // llms.txt and llms-full.txt, for assistants
   head: [
     ['link', { rel: 'preconnect', href: 'https://fonts.googleapis.com' }],
     ['link', { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' }],

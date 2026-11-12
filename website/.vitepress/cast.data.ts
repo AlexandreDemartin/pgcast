@@ -60,36 +60,45 @@ export default defineLoader({
       ['selectExactlyOne', db.selectExactlyOne('films', { id: 1000 })],
     ] as const) await record(() => query.run(pool), `cast.data.ts, the recording pool given ${what}`);
 
-    (globalThis as any).pool = pool;
     for (const file of files.filter(f => !f.endsWith('.d.ts'))) {
-      const
-        name = basename(file, '.ts'),
-        source = readFileSync(file, 'utf8'),
-        result = /^const (\w+)/m.exec(source.split('// ---cut---')[1] ?? '')?.[1];
-
-      if (!result) throw new Error(`examples/${name}.ts: no \`const\` after \`// ---cut---\` to give the type of`);
-
-      const
-        run = () => import(`${pathToFileURL(file)}?${Date.now()}`),  // a fresh run on each change, in dev
-        { text, values } = await record(run, `examples/${name}.ts`),
-        sql = layOut(text),
-        hovers = twoslasher(source + shown(result), 'ts').nodes,
-        typeOf = (target: string) => hovers.find(n => n.type === 'hover' && n.target === target)?.text
-          .replace(/^const \w+: /, '').replace(/^((?: {4})+)/gm, s => s.slice(s.length / 2)),
-        [named, expanded] = [typeOf(result), typeOf('shown')];
-
-      if (normalised(sql) !== normalised(text)) throw new Error(`examples/${name}.ts: layOut changed more than whitespace`);
-      if (!named || !expanded) throw new Error(`examples/${name}.ts: Twoslash gave no type for \`${result}\``);
-
-      casts[name] = {
-        sql: await highlight(sql, 'sql'),
-        values: '[' + values.map(value => JSON.stringify(value)).join(', ') + ']',
-        type: await highlight(`const ${result}: ${named}` + (expanded === named ? '' : `\n// that is\nconst ${result}: ${expanded}`), 'ts'),
-      };
+      const { sql, values, type } = await castOf(file, twoslasher);
+      casts[basename(file, '.ts')] = { sql: await highlight(sql, 'sql'), values, type: await highlight(type, 'ts') };
     }
     return casts;
   },
 });
+
+/**
+ * What the cast panel of `file` (examples/<name>.ts) shows, as plain text: its SQL laid out on lines, its values, and
+ * its type. Also read by llms.ts, for llms-full.txt.
+ */
+export async function castOf(file: string, twoslasher: ReturnType<typeof createTwoslasher>) {
+  const
+    name = basename(file, '.ts'),
+    source = readFileSync(file, 'utf8'),
+    result = /^const (\w+)/m.exec(source.split('// ---cut---')[1] ?? '')?.[1];
+
+  if (!result) throw new Error(`examples/${name}.ts: no \`const\` after \`// ---cut---\` to give the type of`);
+
+  (globalThis as any).pool = pool;
+  const
+    run = () => import(`${pathToFileURL(file)}?${Date.now()}`),  // a fresh run on each change, in dev
+    { text, values } = await record(run, `examples/${name}.ts`),
+    sql = layOut(text),
+    hovers = twoslasher(source + shown(result), 'ts').nodes,
+    typeOf = (target: string) => hovers.find(n => n.type === 'hover' && n.target === target)?.text
+      .replace(/^const \w+: /, '').replace(/^((?: {4})+)/gm, s => s.slice(s.length / 2)),
+    [named, expanded] = [typeOf(result), typeOf('shown')];
+
+  if (normalised(sql) !== normalised(text)) throw new Error(`examples/${name}.ts: layOut changed more than whitespace`);
+  if (!named || !expanded) throw new Error(`examples/${name}.ts: Twoslash gave no type for \`${result}\``);
+
+  return {
+    sql,
+    values: '[' + values.map(value => JSON.stringify(value)).join(', ') + ']',
+    type: `const ${result}: ${named}` + (expanded === named ? '' : `\n// that is\nconst ${result}: ${expanded}`),
+  };
+}
 
 const throws = (f: () => unknown) => { try { f(); } catch { return true; } return false; };
 

@@ -149,6 +149,8 @@ Candidates for a check, a rule or a skill line.
 - #136 — Headless Chrome cannot go below ~500 px with `--window-size`; a phone layout needs CDP `Emulation.setDeviceMetricsOverride` with `mobile: true` — `branch-reviewer`
 - #136 — VitePress 2.0's nav has no fixed breakpoints: it measures what fits and moves the rest into `⋯`, so any change to the nav text is checked at every width from 768 to 1280 px, not only 960 and 1280 — `branch-reviewer`
 - #136 — `vitepress preview` keeps the file list it read at start-up and 404s the new hashed CSS after a rebuild: restart it, cache off, before measuring — `builder`
+- #138 — `git worktree add -b <branch> origin/master` makes the branch track origin/master, so a bare `git push` aims at master: add `--no-track` in briefs — `builder`
+- #138 — Under zsh, an unquoted `===` separator fails (`=word` expansion): quote separators in shell commands — `builder`
 
 ## Minors kept
 

@@ -84,3 +84,5 @@ Then ask for a film. Here's what you write, the SQL it becomes, and the type of 
 </CastPanel>
 
 That's it: one query, one round trip, and a result typed from the table it came from. Change a column, run the generator again, and TypeScript points at every query that no longer fits.
+
+Working with an assistant? It can read these docs from [llms.txt](/llms.txt), an index of the pages, or [llms-full.txt](/llms-full.txt), all of them in one file.
