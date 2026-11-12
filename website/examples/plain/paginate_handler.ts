@@ -18,10 +18,12 @@ function decodeCursor(cursor: string): Cursor | undefined {
 const size = 2;
 
 async function listFilms(request: Request): Promise<Response> {
-  const params = new URL(request.url).searchParams, studio = params.get('studio'), after = params.get('after');
+  const params = new URL(request.url).searchParams;
+  const studio = params.get('studio'), after = params.get('after');
   const cursor = after === null ? undefined : decodeCursor(after);
-  if ((studio !== null && !Number.isInteger(Number(studio))) || (after !== null && cursor === undefined))
-    return Response.json({ error: 'Give studio as an id, and after as the cursor sent' }, { status: 400 });
+  const badStudio = studio !== null && !Number.isInteger(Number(studio));
+  const badCursor = after !== null && cursor === undefined;
+  if (badStudio || badCursor) return Response.json({ error: 'Bad studio or cursor' }, { status: 400 });
 
   const filter: s.films.Whereable = studio === null ? {} : { studio_id: Number(studio) };
   const rows = await db.select('films', {
