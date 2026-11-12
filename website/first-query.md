@@ -90,12 +90,12 @@ And you have:
 src/zapatos/
 ├── schema.d.ts            every table, written again on each run: don't edit it
 └── custom/
-    ├── index.d.ts
+    ├── index.d.ts         written again on each run too
     ├── PgPoint.d.ts       cinemas.location, a POINT: any, until you say otherwise
     └── PgSeat_label.d.ts  seat_bookings.seat, the seat_label domain: string
 ```
 
-The files in `custom/` are yours: the generator writes each one once and never overwrites it. In `schema.d.ts`, each table is a namespace of types, and the shortcuts pick the right one for you:
+The placeholders in `custom/` are yours: the generator writes each one once and never overwrites it, while `index.d.ts` is written again on each run. In `schema.d.ts`, each table is a namespace of types, and the shortcuts pick the right one for you:
 
 | Type | What it describes | Used by |
 |---|---|---|
