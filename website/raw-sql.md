@@ -162,7 +162,7 @@ const { text, values } = listings("x' OR TRUE --").compile();
 // values: [ "x' OR TRUE --" ]
 ```
 
-A test that compiles each query with hostile input (`'`, `"`, `;`, `--`) and looks for it in `text` keeps it that way.
+A test that compiles each query with hostile input (`x' OR TRUE --`, `x" --`), expects it in `values` and freezes `text` keeps it that way. A search of `text` is not enough: a name compiled from `x" --` is there as `"x"" --"`, its `"` doubled, and a lone `'` matches the query's own literals.
 
 ## See also
 
