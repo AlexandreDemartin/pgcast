@@ -25,8 +25,8 @@ jobs:
       - id: diff
         name: Is there anything besides docs to check?
         # Markdown outside .agents/ and .claude/ needs no build: those two hold the agent method, which check:agents checks.
-        # The docs site builds on a change to website/ (its pages are Markdown too), to src/, which its examples use, or to
-        # the workflows.
+        # The docs site builds on a change to website/ (its pages are Markdown too), to src/, which its examples use, to
+        # what builds the library it installs (the root package.json, package-lock.json, tsconfig.json), or to the workflows.
         # A push to master always runs everything.
         env:
           EVENT: ${{ github.event_name }}
@@ -41,7 +41,7 @@ jobs:
               case "$file" in
                 '') ;;
                 website/*) docs=true ;;
-                src/*|.github/workflows/*) code=true; docs=true ;;
+                src/*|package.json|package-lock.json|tsconfig.json|.github/workflows/*) code=true; docs=true ;;
                 .agents/*|.claude/*) code=true ;;
                 *.md) ;;
                 *) code=true ;;
