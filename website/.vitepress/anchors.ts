@@ -38,22 +38,26 @@ export function checkLinkAnchors(config: SiteConfig) {
       ...[...html.matchAll(/\sid="([^"]*)"/g)].map(([, id]) => unescape(id!)),
       ...pending[file.replace(/\.html$/, '.md')] ?? [],
     ])])),
-    problems: string[] = [];
+    problems = new Set<string>();  // a link written twice on a page is reported once
 
   for (const [file, html] of pages) {
     for (const [, href] of html.matchAll(/\shref="([^"]*#[^"]*)"/g)) {
       const url = new URL(unescape(href!), `http://site${base}${file.replace(/(^|\/)index\.html$|\.html$/, '$1')}`);
-      if (url.host !== 'site' || !url.pathname.startsWith(base) || url.hash.length < 2) continue;
+      if (url.host !== 'site' || url.hash.length < 2) continue;  // another site, or a bare `#`
       const
-        target = (url.pathname.slice(base.length).replace(/\.html$/, '').replace(/(^|\/)$/, '$1index')) + '.html',
-        anchor = decodeURIComponent(url.hash.slice(1));
-      if (!anchors.get(target)?.has(anchor)) {
-        problems.push(`${file.replace(/\.html$/, '.md')}: ${url.pathname.slice(base.length - 1)}#${anchor}, ` +
-          (anchors.has(target) ? 'no such anchor on that page' : 'no such page'));
-      }
+        inBase = url.pathname.startsWith(base),
+        link = url.pathname.slice(inBase ? base.length - 1 : 0),  // as written: `/select`
+        target = `${url.pathname.slice(base.length).replace(/\.html$/, '').replace(/(^|\/)$/, '$1index')}.html`,
+        anchor = decodeURIComponent(url.hash.slice(1)),
+        problem =
+          !inBase ? `not under the site's base, ${base}` :
+          !anchors.has(target) ? 'no such page' :
+          !anchors.get(target)!.has(anchor) ? 'no such anchor on that page' :
+          null;
+      if (problem) problems.add(`${file.replace(/\.html$/, '.md')}: ${link}#${anchor}, ${problem}`);
     }
   }
-  if (problems.length > 0) {
-    throw new Error(`The link check failed (README.md § Conventions, Links):\n  ${[...new Set(problems)].join('\n  ')}`);
+  if (problems.size > 0) {
+    throw new Error(`The link check failed (README.md § Conventions, Links):\n  ${[...problems].join('\n  ')}`);
   }
 }
