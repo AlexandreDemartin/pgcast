@@ -7,10 +7,10 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 ## [Unreleased]
 
 ### Added
-- The `upsertRequiresSameKeys` config option (`db.setConfig({ upsertRequiresSameKeys: true })`, off by default): a multi-row `upsert()` whose rows have different keys, without `updateColumns`, throws before any query ("rows have different keys: pass updateColumns, or give every row the same keys"), instead of overwriting the existing value of a missing key with its `DEFAULT`. Rows with the same keys, one row, and any `updateColumns` compile as before.
+- The `upsertRequiresSameKeys` config option (`db.setConfig({ upsertRequiresSameKeys: true })`, off by default, optional in `Config`): a multi-row `upsert()` without `updateColumns`, where a key missing from some row is still set from `EXCLUDED`, throws before any query ("rows have different keys: pass updateColumns, or give every row the same keys"), instead of overwriting the existing value with its `DEFAULT`. A key of `updateValues` or a column of an array or string `conflictTarget` does not count (new rows without their serial `id`, upserted on `'id'`, pass); with `constraint()`, every key counts. Rows with the same keys, one row, and any `updateColumns` compile as before.
 
 ### Deprecated
-- A multi-row `upsert()` whose rows have different keys, without `updateColumns`: a missing key is inserted as `DEFAULT`, then overwrites the existing value on conflict. It still runs, with the same SQL, and emits a `DeprecationWarning` (`PGCAST_DEP001`) once per process. `upsertRequiresSameKeys` will be the default in 7.0.
+- A multi-row `upsert()` without `updateColumns`, where a key missing from some row is still set from `EXCLUDED`: it is inserted as `DEFAULT`, then overwrites the existing value on conflict. It still runs, with the same SQL, and emits a `DeprecationWarning` (`PGCAST_DEP001`) once per process. `upsertRequiresSameKeys` will be the default in 7.0.
 
 ## [6.6.2] - 2026-11-12
 
