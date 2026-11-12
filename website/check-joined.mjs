@@ -1,7 +1,8 @@
 // Copyright (C) 2026 Alexandre Demartin
 // Fails the docs build when the examples a page says to keep in one file do not type-check joined, in page order, as
 // the reader assembles that file (README.md § Examples): as separate modules, a repeated `const` or a missing import
-// passes. A page opts in with a line `<!-- joined: src/films.ts -->` under its last step: each `ts twoslash` block and
+// passes. A page opts in with a line `<!-- joined: src/films.ts -->` under its last step (any other line holding
+// `<!-- joined` fails, so that a near miss does not turn the check off): each `ts twoslash` block and
 // `<<< ./examples/….ts{ts twoslash}` above it, up to the previous such line, adds its code below `// ---cut---` (all
 // of it if it has none), but a block that shows an error (`// @errors:`), which the reader does not keep. The join is
 // checked in memory, with the options of tsconfig.json, against the built `zapatos/db` and the docs schema. Run by
@@ -27,7 +28,7 @@ const belowCut = lines => lines.slice(lines.findIndex(({ text }) => text.trim() 
 function joinsOf(page) {
   const joins = [], source = readFileSync(root + page, 'utf8');
   let pieces = [], fence, block;
-  if (!source.includes('<!-- joined: ')) return joins;
+  if (!/<!--\s*joined/i.test(source)) return joins;
   source.split('\n').forEach((line, i) => {
     const at = `${page}:${i + 1}`, trimmed = line.trim();
     if (fence) {  // inside a fenced block, until a line of at least as many of its backticks or tildes
@@ -40,7 +41,7 @@ function joinsOf(page) {
     const
       open = line.match(/^\s*(`{3,}|~{3,})(.*)$/),
       include = line.match(/^<<< \.\/(examples\/[\w/-]+\.ts)\{ts twoslash\}$/)?.[1],
-      joined = line.match(/^<!-- joined: (\S+) -->$/)?.[1];
+      joined = line.match(/^\s*<!--\s*joined:\s*(\S+)\s*-->\s*$/)?.[1];
     if (open) {
       fence = open[1];
       block = /^ts twoslash\b/.test(open[2].trim()) ? [] : undefined;
@@ -52,6 +53,8 @@ function joinsOf(page) {
     } else if (joined) {
       joins.push({ file: joined, at, pieces });
       pieces = [];
+    } else if (/<!--\s*joined/i.test(line.replace(/`[^`]*`/g, ''))) {  // a marker the line above misses would pass
+      problems.push(`${at}: a marker is \`<!-- joined: <file> -->\`, alone on its line: ${line}`);
     }
   });
   return joins;
