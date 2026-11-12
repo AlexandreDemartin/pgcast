@@ -160,6 +160,10 @@ Candidates for a check, a rule or a skill line.
 - #121 — A transform that reads `rows[0]` assumes a row: document each option that can return none (`groupBy` with no group, `having`, `offset`, `limit: 0`) from a run, not from the code — `branch-reviewer`
 - #121 — `NaN` shows as `null` in `JSON.stringify` and in a cast panel: a probe checks `Number.isNaN` — `builder`
 - #121 — Parallel builders share the session scratchpad: brief each to its own subfolder — orchestrator
+- #124 — A reference claim about a type is checked on the result type, not only the parameter: a readonly `returning` is accepted and gives `never` — `branch-reviewer`
+- #124 — `ON CONFLICT ON CONSTRAINT` takes a constraint, not any unique index: a codegen type built from `pg_index.indisunique` is wider than Postgres (#166) — `branch-reviewer`
+- #124 — `tsc`'s `include` skips folders starting with a dot: a type probe in `.probe/` checks nothing — `builder`
+- #124 — Options tables number parameters as if the other rows were there: one row per panel, its SQL from that panel — `builder`
 
 ## Minors kept
 
