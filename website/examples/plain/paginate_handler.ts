@@ -12,7 +12,8 @@ function decodeCursor(cursor: string): Cursor | undefined {
   try {
     const { release_year, id } = JSON.parse(Buffer.from(cursor, 'base64url').toString());
     const isKey = (key: number) => Number.isInteger(key) && Math.abs(key) < 2 ** 31;  // within Postgres's integer
-    if (isKey(release_year) && isKey(id)) return { release_year, id };
+    const made = encodeCursor({ release_year, id }) === cursor;  // no stray character, no other key
+    if (isKey(release_year) && isKey(id) && made) return { release_year, id };
   } catch {}  // not base64url JSON
   return undefined;
 }
