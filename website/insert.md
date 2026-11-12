@@ -20,6 +20,7 @@ Insert one row or several, and return them as Postgres stored them, defaults and
 
 - `table`: a table of the schema.
 - `values`: an `Insertable`, or an array of them. A `sql` fragment is written as SQL (`` db.sql`now()` ``), `db.Default` as `DEFAULT`; an `undefined` value is `NULL` ([An `undefined` value](#undefined-values)).
+  - `raw()`, `cols()` and `vals()` are no values here: pgcast's type refuses them, where Zapatos 6.6.1's took them. At run time they are still sent as one parameter, as JSON: `{ tagline: db.raw("'x'") }` sends `{"value":"'x'"}` ([#132](https://github.com/AlexandreDemartin/pgcast/issues/132)). For SQL, write a `sql` fragment.
 - `options`: `returning` and `extras` ([Options](#insert-options)).
 
 <CastPanel example="insert">
@@ -162,7 +163,7 @@ db.update(table, values, where, options?)
 Update the rows that match, and return them. The arguments come in the order of the SQL: `SET`, then `WHERE`.
 
 - `table`: a table of the schema.
-- `values`: an `Updatable`, with at least one key. A `sql` fragment is written as SQL, where `db.self` is the column, and so is a condition such as [`conditions.add()`](/conditions). An `undefined` value is `NULL` ([An `undefined` value](#undefined-values)).
+- `values`: an `Updatable`, with at least one key. A `sql` fragment is written as SQL, where `db.self` is the column, and so is a condition such as [`conditions.add()`](/conditions). `raw()`, `cols()` and `vals()` are refused, as for [`insert()`](#insert). An `undefined` value is `NULL` ([An `undefined` value](#undefined-values)).
 - `where`: a `Whereable`, or a `sql` fragment ([Conditions](/conditions)).
 - `options`: `returning` and `extras`, as for [`insert()`](#insert-options).
 
