@@ -485,10 +485,8 @@ import * as db from 'zapatos/db';
 // ---cut---
 const studioOf = db.selectOne('studios', { id: db.parent('studio_id') });
 
-type Alone = Awaited<ReturnType<typeof studioOf.run>>;
-//   ^?
-type InLateral = db.RunResultForSQLFragment<typeof studioOf>;
-//   ^?
+type Studio = db.RunResultForSQLFragment<typeof studioOf>;
+const nameOf = (studio: Studio) => studio?.name ?? 'no studio';
 ```
 
 ## `Queryable` {#Queryable}
