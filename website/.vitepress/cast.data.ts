@@ -63,6 +63,9 @@ export default defineLoader({
     // Self-checks: each guards against a panel that would show something untrue and still build.
     if (!throws(() => twoslasher('const n: number = ""', 'ts')))
       throw new Error('cast.data.ts: Twoslash let a type error through: check `vfsRoot` in twoslash.ts');
+    const sameName = "import type * as s from 'zapatos/schema';\nconst cinemas: s.cinemas.Selectable[] = [];";
+    if (typeOf(twoslasher(sameName, 'ts').nodes, 'cinemas') !== 's.cinemas.Selectable[]')
+      throw new Error('cast.data.ts: a panel took the type of another `cinemas` than the `const`: check `typeOf`');
     for (const [what, query] of [
       ['a single-row insert', db.insert('tags', { film_id: 1000, tag: 'coastal' })],
       ['count', db.count('films', db.all)],
@@ -103,9 +106,7 @@ export async function castOf(file: string, twoslasher: ReturnType<typeof createT
     { text, values } = await record(run, `examples/${name}.ts`),
     sql = layOut(text),
     hovers = twoslasher(source + shown(result), 'ts').nodes,
-    typeOf = (target: string) => hovers.find(n => n.type === 'hover' && n.target === target)?.text
-      .replace(/^const \w+: /, '').replace(/^((?: {4})+)/gm, s => s.slice(s.length / 2)),
-    [named, expanded] = [typeOf(result), typeOf('shown')];
+    [named, expanded] = [typeOf(hovers, result), typeOf(hovers, 'shown')];
 
   if (normalised(sql) !== normalised(text)) throw new Error(`examples/${name}.ts: layOut changed more than whitespace`);
   if (!named || !expanded) throw new Error(`examples/${name}.ts: Twoslash gave no type for \`${result}\``);
@@ -116,6 +117,14 @@ export async function castOf(file: string, twoslasher: ReturnType<typeof createT
     type: `const ${result}: ${named}` + (expanded === named ? '' : `\n// that is\nconst ${result}: ${expanded}`),
   };
 }
+
+/**
+ * The type of `const <name>`, from its hover: never from another hover on the same name, which may come first
+ * (the namespace `s.cinemas` before `const cinemas`). Nested lines are indented by 2, not 4.
+ */
+const typeOf = (hovers: ReturnType<ReturnType<typeof createTwoslasher>>['nodes'], name: string) => hovers
+  .find(n => n.type === 'hover' && n.target === name && n.text.startsWith(`const ${name}: `))?.text
+  .replace(/^const \w+: /, '').replace(/^((?: {4})+)/gm, s => s.slice(s.length / 2));
 
 const throws = (f: () => unknown) => { try { f(); } catch { return true; } return false; };
 
