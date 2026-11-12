@@ -123,7 +123,7 @@ db.select('films', db.all, { order: { by: 'title', direction } })
   .catch(err => console.error(err));  // never called: select() has thrown already
 ```
 
-Check the value instead of casting it. Inside an `async` function, as in a `try` with `await`, the throw becomes the promise's rejection, so the caller's `.catch()` gets it; in a `transaction()` callback, `ROLLBACK` follows.
+Check the value instead of casting it. Inside an `async` function, the throw becomes the promise's rejection, so the caller's `.catch()` gets it; a `try` around the call catches it too; in a `transaction()` callback, `ROLLBACK` follows.
 
 ## Answer each kind in one place
 
