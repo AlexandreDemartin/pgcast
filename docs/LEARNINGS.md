@@ -225,6 +225,10 @@ Candidates for a check, a rule or a skill line.
 - #149 — A rules file for assistants names the cases a reviewer would: a request body passed whole, an empty filter before a write, side effects in a callback that may run again, `@ts-ignore` — `branch-reviewer`
 - #149 — `RAISE EXCEPTION … USING ERRCODE = '40001'` in a `DO` block probes a retry in one line, with no concurrent transactions — `builder`
 - #149 — `git merge -m` takes a trailer only as a second `-m`: brief merges as `-m "<subject>" -m "Co-Authored-By: …"` — `builder`
+- #127 — A guide's « same under both libraries » is probed in both directions: the fixes a project starts relying on are what going back undoes (`isNotIn([param(x)])` in `deletes()` hits every row again) — `branch-reviewer`
+- #127 — A migration guide names the changed `.compile()` text as well as the changed rows: SQL snapshots in tests change where rows do not — `branch-reviewer`
+- #127 — A `CHANGELOG.md` migration snippet is never compiled: run each through `tsc` on the fixture (#200) — `branch-reviewer`
+- #127 — A review's example is run on the real docs schema before it goes on the page (`deletes('films', …)` stops on foreign keys) — `builder`
 - #129 — TypeScript checks excess keys only in a fresh object literal: a claim that « the type refuses this key » is checked on a value built at run time (`Record<string, string>`, `Object.fromEntries()`) and on wider types (`object`, `{}`) — `branch-reviewer`, `builder`
 - #129 — A hostile payload in an example is run inlined into that query's exact compiled text: `--` breaks on a shortcut's trailing `)) AS "sq_…"` and gives 42601, not the attack described — `branch-reviewer`, `builder`
 - #129 — A caller's name reaches any relation the role can read as a table (`pg_catalog.pg_roles`) and any column in scope, system columns included — `branch-reviewer`
