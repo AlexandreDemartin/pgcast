@@ -56,24 +56,15 @@ Give [`upsert()`](/insert#upsert) the rows and [`updateColumns: db.doNothing`](/
 
 ## Add up counts
 
-To add each row's votes to those stored, set `votes` in [`updateValues`](/insert#upsert-options) from both: the stored row by its table's name, the new one as `EXCLUDED`.
-
-<CastPanel example="batches_counts">
-
-<<< ./examples/batches_counts.ts{ts twoslash}
-
-</CastPanel>
-
-- The first run inserts the three rows. The second updates them, to 4, 2 and 6 votes, each with `$action: 'UPDATE'`.
-- `updateValues` is one expression for every row: `EXCLUDED."votes"` is what makes it each row's own count.
-- An `undefined` in `updateValues` doesn't leave `votes` alone: `{ votes: undefined }` sends `EXCLUDED."votes"`, so a stored count becomes the new row's ([#168](https://github.com/AlexandreDemartin/pgcast/issues/168)).
-
-Postgres refuses an array that holds the same `film_id` and `stars` twice: 21000, `ON CONFLICT DO UPDATE command cannot affect row a second time`. So sum them first, then pass `rows` to `upsert()` as above:
+Except with `doNothing`, an upsert refuses an array that holds the same key twice: 21000, `ON CONFLICT DO UPDATE command cannot affect row a second time`. So sum the ballots first, one row per `film_id` and `stars`:
 
 ```ts twoslash
 const ballots = [
   { film_id: 1002, stars: 4 },
   { film_id: 1002, stars: 4 },
+  { film_id: 1002, stars: 5 },
+  { film_id: 1000, stars: 5 },
+  { film_id: 1000, stars: 5 },
   { film_id: 1000, stars: 5 },
 ];
 
@@ -84,8 +75,20 @@ for (const { film_id, stars } of ballots) {
   row.votes += 1;
   counts.set(key, row);
 }
-const rows = [...counts.values()];  // 2 votes of 4 stars for 1002, 1 of 5 stars for 1000
+const rows = [...counts.values()];  // the three rows below
 ```
+
+Then add each row's votes to those stored: set `votes` in [`updateValues`](/insert#upsert-options) from both, the stored row by its table's name, the new one as `EXCLUDED`.
+
+<CastPanel example="batches_counts">
+
+<<< ./examples/batches_counts.ts{ts twoslash}
+
+</CastPanel>
+
+- The first run inserts the three rows. The second updates them, to 4, 2 and 6 votes, each with `$action: 'UPDATE'`.
+- `updateValues` is one expression for every row: `EXCLUDED."votes"` is what makes it each row's own count.
+- An `undefined` in `updateValues` doesn't leave `votes` alone: `{ votes: undefined }` sends `EXCLUDED."votes"`, so a stored count becomes the new row's ([#168](https://github.com/AlexandreDemartin/pgcast/issues/168)).
 
 ## Rows with different keys
 
