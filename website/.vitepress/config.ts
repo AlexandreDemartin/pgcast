@@ -2,9 +2,11 @@
 // The docs site (decision 004), on VitePress's default theme; its look is docs/design/art-direction.md.
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { transformerTwoslash } from '@shikijs/vitepress-twoslash';
 import { defineConfig } from 'vitepress';
 import { outline } from './outline.ts';
-import { syntax } from './syntax.ts';
+import { sqlParameters, syntax } from './syntax.ts';
+import { focusableHovers, twoslashOptions } from './twoslash.ts';
 
 const
   repo = 'https://github.com/AlexandreDemartin/pgcast',
@@ -18,12 +20,19 @@ export default defineConfig({
   lang: 'en-GB',
   base: '/pgcast/',  // GitHub Pages: alexandredemartin.github.io/pgcast/
   cleanUrls: true,
+  srcExclude: ['README.md'],  // for whoever works on the site, not a page of it
   head: [
     ['link', { rel: 'preconnect', href: 'https://fonts.googleapis.com' }],
     ['link', { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' }],
     ['link', { rel: 'stylesheet', href: fonts }],
   ],
-  markdown: { theme: syntax },
+  markdown: {
+    theme: syntax,
+    // a hover's JSDoc can hold these (`process.env`, from @types/node), and Shiki loads only the languages a page names
+    languages: ['js', 'bash'],
+    // an unexpected type error in a `ts twoslash` block fails the build; a block meant to fail says so with `// @errors`
+    codeTransformers: [transformerTwoslash({ twoslashOptions }), focusableHovers, sqlParameters],
+  },
   vite: {
     define: { __PGCAST_VERSION__: JSON.stringify(version) },
     resolve: {

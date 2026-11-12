@@ -237,3 +237,54 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
   .landing .pillars { grid-template-columns: minmax(0, 1fr); }
   .landing .hero { padding-block: 44px 28px; }
 }
+
+/* the cast panel: what you write, what Postgres runs, what TypeScript knows; one column when it is under 900px wide,
+   in a page's reading column as on a narrow screen */
+.CastPanel-frame { container-type: inline-size; margin: 20px 0 28px; }
+.CastPanel {
+  display: grid; grid-template-columns: 1.15fr 1.2fr .85fr;
+  border: 1px solid var(--line); border-radius: 14px; background: var(--surface); overflow: hidden;
+}
+.CastPanel > div { min-width: 0; display: flex; flex-direction: column; border-right: 1px dashed var(--line); }
+.CastPanel > div:last-child { border-right: 0; }
+.CastPanel h5 {
+  display: flex; align-items: center; gap: 8px; margin: 0; padding: 12px 16px 10px; border-bottom: 1px solid var(--line);
+  font: 600 12px/1 var(--font-body); letter-spacing: .02em; color: var(--muted);
+}
+.CastPanel h5 em {
+  font: 700 11px/1 var(--font-mono); font-style: normal; color: var(--accent);
+  border: 1px solid var(--accent); border-radius: 999px; padding: 3px 6px;
+}
+.CastPanel > div > div { flex: 1; min-width: 0; }  /* the code, above the values row */
+.CastPanel div[class*='language-'] { margin: 0; border: 0; border-radius: 0; background: transparent; }
+.CastPanel div[class*='language-'] > .copy, .CastPanel div[class*='language-'] > .lang { display: none; }
+.CastPanel pre.shiki { background: transparent !important; margin: 0; padding: 14px 16px; overflow-x: auto; }
+.CastPanel pre.shiki code {
+  display: block; width: fit-content; min-width: 100%; padding: 0;
+  font: 13px/1.6 var(--font-mono); tab-size: 2; color: var(--fg);
+}
+.CastPanel .values {
+  margin: auto 0 0; max-width: none; padding: 8px 16px; border-top: 1px dashed var(--line);
+  font: 12px/1.5 var(--font-mono); color: var(--muted);
+}
+.CastPanel .values b { color: var(--p); font-weight: 700; }
+.CastPanel-caption { display: flex; gap: 16px; flex-wrap: wrap; margin: 12px 0 0; font-size: 13px; color: var(--muted); }
+@container (max-width: 900px) {
+  .CastPanel { grid-template-columns: minmax(0, 1fr); }
+  .CastPanel > div { border-right: 0; border-bottom: 1px dashed var(--line); }
+  .CastPanel > div:last-child { border-bottom: 0; }
+}
+
+/* hover types, computed by Twoslash: a dashed underline, and a mono tooltip on the surface */
+:root, .dark {
+  --twoslash-popup-bg: var(--surface);
+  --twoslash-border-color: var(--line);
+  --twoslash-underline-color: var(--muted);
+  --twoslash-code-font: var(--font-mono);
+  --twoslash-code-size: 12.5px;
+}
+.twoslash .twoslash-hover { border-bottom: 1px dashed var(--muted); cursor: help; }
+.twoslash .twoslash-hover:hover, .twoslash .twoslash-hover:focus-within { background: var(--accent-soft); border-radius: 2px; }
+.twoslash .twoslash-hover > span:focus-visible { outline: none; }  /* the background says it, as the prototype */
+.v-popper--theme-twoslash .v-popper__inner { border-radius: 8px; box-shadow: 0 8px 28px rgba(0, 0, 0, .18); }
+.twoslash-floating .twoslash-popup-code { line-height: 1.5; background: transparent !important; }

@@ -40,6 +40,9 @@ updates:
       website:
         patterns: ["*"]
         exclude-patterns: [vitepress]
+    ignore:
+      # Bumped by hand with the root's, so the examples compile with the TypeScript the library is built and tested with.
+      - dependency-name: typescript
 
   - package-ecosystem: github-actions
     directory: /

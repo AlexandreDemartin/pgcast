@@ -121,6 +121,11 @@ Candidates for a check, a rule or a skill line.
 - #106 — `no-template-curly-in-string` is an error in `src/`: an error message that shows a fix describes `sql` templates in words — `builder`
 - #106 — A CHANGELOG line that names a route to a check (`upsert()` `updateValues`, `lateral`) is frozen by a test of that route, and the test is run against the base branch's runtime to prove it catches the change — `branch-reviewer`
 - #106 — A changed error message reaches every inline snapshot of it: `git grep` its fixed tail first — `builder`
+- #100 — Twoslash reports errors only in a block's own code, never in `extraFiles`, and defaults to `skipLibCheck: true`: a stale docs schema builds green; a `tsc --noEmit` pass on the schema and examples guards it — `branch-reviewer`
+- #100 — A Twoslash `vfsRoot` ending in `/` silently reports no error: the build self-tests that a known type error still throws — `builder`, `branch-reviewer`
+- #100 — VitePress loads Shiki languages lazily: hover docs that hold code blocks (`process.env`'s JSDoc) need `markdown.languages` (`js`, `bash`) — `branch-reviewer`
+- #100 — A tool that creates databases on the test server names them `pgcast_test_<pid>_…`, or the test suite's global setup drops them `WITH (FORCE)` mid-use — `branch-reviewer`
+- #100 — A container query styles only what is inside the container: a panel that stacks by its own width needs a wrapper with `container-type: inline-size` — `builder`
 - #107 — When a fix moves a value from a parameter to compiled SQL, replay one call per write path (`insert` value and fragment, `update` fragment, `upsert` values and `updateValues`, hand-written `sql`) and per column type that accepted the old JSON (text, jsonb, an array element): the CHANGELOG list is built from that matrix (candidate: skill `backward-compat`) — `branch-reviewer`
 - #107 — New assertions added to an existing `it` whose earlier ones already fail under the old runtime are proved red one at a time: the first old failure hides the rest — `branch-reviewer`
 - #107 — In a lateral whose subquery reads its parent's table, `parent('c')` compiles to the same name as the inner column: such tests alias the outer select or use another table — `builder`
@@ -150,3 +155,4 @@ Minor review defects, taken up by the end-of-chapter review.
 - #29 — `src/db/shortcuts.ts:313`: with `undefinedMeansMissing`, an `upsert` / `insert` whose keys are all `undefined` compiles to `INSERT INTO "t" () VALUES ()` (42601), as master's `upsert('t', {})` does: should an empty `Insertable` throw early, as `update` does since R24? — `branch-reviewer`
 - #29 — pre-existing: an `undefined` in `updateValues` still adds its column to `SET` as `EXCLUDED.col`, even when the column was not inserted, which writes its `DEFAULT` into the existing row: a candidate line for the characterisation report — `builder`
 - #31 — `src/db/conditions.ts:21`: `conditionalParam` still wraps `Default`, so `{ display_name: eq(Default) }` sends `'Symbol(DEFAULT)'` and matches nothing (both versions): a candidate finding, with #101 — `branch-reviewer` → R64, #106
+- #107 — `insert('books', { title: parent('name') })` (object branch) still stores `'{"value":"name"}'`: a candidate finding — `builder`
