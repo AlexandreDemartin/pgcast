@@ -391,14 +391,14 @@ describe('cols and vals', () => {
     expect(() => one({ id: db.conditions.isIn([1, Default]) })).toThrowErrorMatchingInlineSnapshot(`[Error: \`db.Default\` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. \`DEFAULT\` is for INSERT and UPDATE values.]`);
   });
 
-  it('characterization: vals of an array wraps raw, cols, parent() and self in a parameter', () => {
+  it('characterization: vals of an array wraps raw, cols and parent() in a parameter', () => {
     // characterization: only a SQLFragment, a Parameter or Default is compiled as it is; pg sends the
-    // others as JSON ('{"value":"id"}') or as a string ('Symbol(self)'), so isIn([parent('id')]) compares
-    // with a string, not with the parent column (#101)
-    const nested = sql`${{ owner_id: db.conditions.isIn([raw('1'), cols('x'), parent('id'), self]) }}`.copy({ parentTable: 'users' });
+    // others as JSON ('{"value":"id"}'), so isIn([parent('id')]) compares with a string, not with the
+    // parent column (#101)
+    const nested = sql`${{ owner_id: db.conditions.isIn([raw('1'), cols('x'), parent('id')]) }}`.copy({ parentTable: 'users' });
     expect(nested.compile()).toMatchInlineSnapshot(`
       {
-        "text": "(("owner_id" IN ($1, $2, $3, $4)))",
+        "text": "(("owner_id" IN ($1, $2, $3)))",
         "values": [
           DangerousRawString {
             "value": "1",
@@ -409,8 +409,47 @@ describe('cols and vals', () => {
           ParentColumn {
             "value": "id",
           },
-          Symbol(self),
         ],
+      }
+    `);
+  });
+
+  it('vals of an array throws on self in a Whereable: self is the column, not a value', () => {
+    // 6.6.1 sent 'Symbol(self)'; so does vals([self]) in a fragment value of vals of an object, as for Default
+    expect(() => one({ display_name: db.conditions.isIn(['Ada', self]) })).toThrowErrorMatchingInlineSnapshot(`[Error: \`db.self\` has no meaning as a value in a Whereable (a filter), nor in \`isIn()\`: compare with a value, or use it in a \`sql\` fragment value, where it stands for the column.]`);
+    expect(() => one(vals({ role: sql`${vals([self])}` }))).toThrowErrorMatchingInlineSnapshot(`[Error: \`db.self\` has no meaning as a value in a Whereable (a filter), nor in \`isIn()\`: compare with a value, or use it in a \`sql\` fragment value, where it stands for the column.]`);
+  });
+
+  it('characterization: outside a filter, vals([self]), vals({ a: self }), param(self) and param(Default) are parameters', () => {
+    // characterization: pg sends 'Symbol(self)' and 'Symbol(DEFAULT)'; left as they are by #106
+    expect({
+      vals: one(vals([self])), valsObject: one(vals({ a: self })), param: one(param(self)), paramDefault: one(param(Default)),
+    }).toMatchInlineSnapshot(`
+      {
+        "param": {
+          "text": "$1",
+          "values": [
+            Symbol(self),
+          ],
+        },
+        "paramDefault": {
+          "text": "$1",
+          "values": [
+            Symbol(DEFAULT),
+          ],
+        },
+        "vals": {
+          "text": "$1",
+          "values": [
+            Symbol(self),
+          ],
+        },
+        "valsObject": {
+          "text": "$1",
+          "values": [
+            Symbol(self),
+          ],
+        },
       }
     `);
   });
@@ -526,23 +565,36 @@ describe('Whereable', () => {
     `);
   });
 
-  it('characterization: cols, vals and self as a value are wrapped in a parameter too', () => {
-    // characterization: as raw(); pg sends '{"value":"Ada"}' and 'Symbol(self)'. A parent() value is the one
-    // wrapper compiled as it is (#101)
-    expect(one({ display_name: cols('Ada'), tags: vals(['admin']), mood: self })).toMatchInlineSnapshot(`
+  it('characterization: cols and vals as a value are wrapped in a parameter too', () => {
+    // characterization: as raw(); pg sends '{"value":"Ada"}'. A parent() value is the one wrapper compiled
+    // as it is (#101)
+    expect(one({ display_name: cols('Ada'), tags: vals(['admin']) })).toMatchInlineSnapshot(`
       {
-        "text": "("display_name" = $1 AND "mood" = $2 AND "tags" = $3)",
+        "text": "("display_name" = $1 AND "tags" = $2)",
         "values": [
           ColumnNames {
             "value": "Ada",
           },
-          Symbol(self),
           ColumnValues {
             "value": [
               "admin",
             ],
           },
         ],
+      }
+    `);
+  });
+
+  it('a self value throws: self is the column, not a value to compare it with', () => {
+    // 6.6.1 sent 'Symbol(self)': no row on a text column, 22P02 on the others
+    expect(() => one({ display_name: self })).toThrowErrorMatchingInlineSnapshot(`[Error: \`db.self\` has no meaning as a value in a Whereable (a filter), nor in \`isIn()\`: compare with a value, or use it in a \`sql\` fragment value, where it stands for the column.]`);
+  });
+
+  it('self in a fragment value is the column, as before', () => {
+    expect(one({ display_name: sql`${self} = ${self}`, id: sql`${self} > 0` })).toMatchInlineSnapshot(`
+      {
+        "text": "(("display_name" = "display_name") AND ("id" > 0))",
+        "values": [],
       }
     `);
   });

@@ -24,15 +24,22 @@ const timing = typeof performance === 'object' ?
 
 /**
  * Compiles to `DEFAULT` for use in `INSERT`/`UPDATE` queries. As a `Whereable`
- * value or in `isIn` it throws: a filter has no default. So does `vals([Default])`
- * in a fragment value of `vals({…})`, compiled with its key as the current column,
- * as a `Whereable` value is. Zapatos 6.6.1 sent it as the string `'Symbol(DEFAULT)'`.
+ * value, in `isIn`, or as the value of `eq()`, `add()` and the other conditions,
+ * it throws: a filter has no default. For `add()` and `subtract()`, which are
+ * UPDATE values, give `Default` as the value itself: `{ n: Default }`.
+ * `vals([Default])` throws too in a fragment value of `vals({…})`, compiled with
+ * its key as the current column, as a `Whereable` value is. Zapatos 6.6.1 sent it
+ * as the string `'Symbol(DEFAULT)'`.
  */
 export const Default = Symbol('DEFAULT');
 export type DefaultType = typeof Default;
 
 /**
- * Compiles to the current column name within a `Whereable`.
+ * Compiles to the current column name within a `Whereable`, in a fragment value:
+ * `` { n: sql`${self} > 0` } `` gives `("n" > 0)`. As a `Whereable` value, in
+ * `isIn`, or as the value of `eq()` and the other conditions, it throws: it is
+ * the column, not a value to compare it with. Zapatos 6.6.1 sent it as the
+ * string `'Symbol(self)'`.
  */
 export const self = Symbol('self');
 export type SelfType = typeof self;
@@ -265,7 +272,9 @@ const quotedIdentifiers = /^"(?:[^"\0]|"")+"(?:[ \t\n\r\f\v]*\.[ \t\n\r\f\v]*"(?
 // or unquoted ones after a `.` (`"s".t."c"`, `"t".U&"c"`), ending with `"`, so no `UESCAPE '…'` can follow
 const quotedName = new RegExp(`^"(?:[^"\\0]|"")+"(?:${space}\\.${space}(?:${identifier}))*(?<=")$`, 'u');
 
-const defaultInWhereable = '`db.Default` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. `DEFAULT` is for INSERT and UPDATE values.';
+const
+  defaultInWhereable = '`db.Default` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. `DEFAULT` is for INSERT and UPDATE values.',
+  selfInWhereable = '`db.self` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: compare with a value, or use it in a `sql` fragment value, where it stands for the column.';
 
 export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never> {
   protected constraint?: Constraint;
@@ -459,8 +468,9 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
         for (let i = 0, len = values.length; i < len; i++) {
           const value = values[i];
           if (i > 0) result.text += ', ';
-          // a set currentColumn means we are in a Whereable (`isIn`), where there is no default
+          // a set currentColumn means we are in a Whereable (`isIn`), where there is no default, and `self` is no value
           if (value === Default && currentColumn) throw new Error(defaultInWhereable);
+          if (value === self && currentColumn) throw new Error(selfInWhereable);
           if (value instanceof SQLFragment ||
             value instanceof Parameter ||
             value === Default) this.compileExpression(value, result, parentTable);
@@ -505,6 +515,7 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
           } else {
             // a Parameter is compiled as it is, with its cast; Zapatos 6.6.1 wrapped it in another one
             if (columnValue === Default) throw new Error(defaultInWhereable);
+            if (columnValue === self) throw new Error(selfInWhereable);
             this.compileExpression(columnName, result);
             result.text += ` = `;
             this.compileExpression(columnValue instanceof ParentColumn || columnValue instanceof Parameter ? columnValue :

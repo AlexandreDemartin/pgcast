@@ -177,13 +177,10 @@ describe('conditions', () => {
     `);
   });
 
-  it('characterization: a comparison wraps raw, cols, Default and self in a parameter', () => {
+  it('characterization: a comparison wraps raw and cols in a parameter', () => {
     // characterization: conditionalParam() passes only a SQLFragment, a Parameter or parent() through; pg
-    // sends the rest as JSON ('{"value":"Ada"}') or as a string ('Symbol(DEFAULT)', 'Symbol(self)') (#101)
-    expect({
-      raw: show(dc.eq(raw("'Ada'"))), cols: show(dc.eq(cols('Ada'))),
-      eqDefault: show(dc.eq(Default)), neDefault: show(dc.ne(Default)), self: show(dc.eq(self)),
-    }).toMatchInlineSnapshot(`
+    // sends the rest as JSON ('{"value":"Ada"}') (#101)
+    expect({ raw: show(dc.eq(raw("'Ada'"))), cols: show(dc.eq(cols('Ada'))) }).toMatchInlineSnapshot(`
       {
         "cols": {
           "text": "(("col" = $1))",
@@ -193,30 +190,12 @@ describe('conditions', () => {
             },
           ],
         },
-        "eqDefault": {
-          "text": "(("col" = $1))",
-          "values": [
-            Symbol(DEFAULT),
-          ],
-        },
-        "neDefault": {
-          "text": "(("col" <> $1))",
-          "values": [
-            Symbol(DEFAULT),
-          ],
-        },
         "raw": {
           "text": "(("col" = $1))",
           "values": [
             DangerousRawString {
               "value": "'Ada'",
             },
-          ],
-        },
-        "self": {
-          "text": "(("col" = $1))",
-          "values": [
-            Symbol(self),
           ],
         },
       }
@@ -514,6 +493,72 @@ describe('conditions', () => {
             1970-01-01T00:00:00.000Z,
           ],
         },
+      }
+    `);
+  });
+});
+
+describe('Default and self as the value of a condition', () => {
+  // each condition that takes a value, by arity; the others take none, or take conditions (and, or, not)
+  const one: Record<string, (a: any) => db.SQLFragment<any, any>> = {
+    isDistinctFrom: dc.isDistinctFrom, isNotDistinctFrom: dc.isNotDistinctFrom,
+    eq: dc.eq, ne: dc.ne, gt: dc.gt, gte: dc.gte, lt: dc.lt, lte: dc.lte, after: dc.after, before: dc.before,
+    like: dc.like, notLike: dc.notLike, ilike: dc.ilike, notIlike: dc.notIlike, similarTo: dc.similarTo,
+    notSimilarTo: dc.notSimilarTo, reMatch: dc.reMatch, reImatch: dc.reImatch, notReMatch: dc.notReMatch,
+    notReImatch: dc.notReImatch, arrayContains: dc.arrayContains, arrayContainedIn: dc.arrayContainedIn,
+    arrayOverlaps: dc.arrayOverlaps, add: dc.add, subtract: dc.subtract,
+  };
+  const two: Record<string, (a: any, b: any) => db.SQLFragment<any, any>> = {
+    between: dc.between, betweenSymmetric: dc.betweenSymmetric, notBetween: dc.notBetween, notBetweenSymmetric: dc.notBetweenSymmetric,
+  };
+  const lists: Record<string, (a: any[]) => db.SQLFragment<any, any>> = { isIn: dc.isIn, isNotIn: dc.isNotIn };
+  const noValue = ['isNull', 'isNotNull', 'isTrue', 'isNotTrue', 'isFalse', 'isNotFalse', 'isUnknown', 'isNotUnknown',
+    'and', 'or', 'not', 'fromNow', 'now'];
+
+  /** What compiling `{ col: condition }` throws, or 'compiled'; building the condition must not throw. */
+  const thrown = (condition: db.SQL) => {
+    try { show(condition); return 'compiled'; } catch (err) { return (err as Error).message; }
+  };
+  const messages = (value: unknown) => {
+    const conditions = [...Object.values(one).map(f => f(value)), ...Object.values(two).flatMap(f => [f(value, 1), f(1, value)])];
+    return new Set(conditions.map(thrown));
+  };
+
+  it('covers every condition of db.conditions', () => {
+    expect([...Object.keys(one), ...Object.keys(two), ...Object.keys(lists), ...noValue].sort()).toEqual(Object.keys(dc).sort());
+  });
+
+  it('a condition given Default or self throws when compiled, not when called', () => {
+    // 6.6.1 sent 'Symbol(DEFAULT)' and 'Symbol(self)': no row on a text column, every row with ne(), 22P02 on the others
+    expect({ Default: messages(Default), self: messages(self) }).toMatchInlineSnapshot(`
+      {
+        "Default": Set {
+          "\`db.Default\` has no meaning as the value of \`eq()\`, \`add()\` and the other conditions: compare with a value. To set a column to its default in an UPDATE, give \`db.Default\` as the value itself: \`{ n: db.Default }\`.",
+        },
+        "self": Set {
+          "\`db.self\` has no meaning as the value of \`eq()\`, \`add()\` and the other conditions: it is already the column on the left. To compare the column with itself, write a \`sql\` fragment with \`db.self\` on both sides.",
+        },
+      }
+    `);
+  });
+
+  it('isIn and isNotIn given Default or self throw when compiled', () => {
+    expect(Object.fromEntries(Object.entries(lists).flatMap(([name, f]) =>
+      [[`${name}Default`, thrown(f(['Ada', Default]))], [`${name}Self`, thrown(f(['Ada', self]))]]))).toMatchInlineSnapshot(`
+      {
+        "isInDefault": "\`db.Default\` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. \`DEFAULT\` is for INSERT and UPDATE values.",
+        "isInSelf": "\`db.self\` has no meaning as a value in a Whereable (a filter), nor in \`isIn()\`: compare with a value, or use it in a \`sql\` fragment value, where it stands for the column.",
+        "isNotInDefault": "\`db.Default\` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. \`DEFAULT\` is for INSERT and UPDATE values.",
+        "isNotInSelf": "\`db.self\` has no meaning as a value in a Whereable (a filter), nor in \`isIn()\`: compare with a value, or use it in a \`sql\` fragment value, where it stands for the column.",
+      }
+    `);
+  });
+
+  it('self keeps its meaning in a fragment written by hand', () => {
+    expect(show(sql`${self} = ${self}`)).toMatchInlineSnapshot(`
+      {
+        "text": "(("col" = "col"))",
+        "values": [],
       }
     `);
   });
