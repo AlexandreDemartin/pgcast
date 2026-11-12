@@ -3,7 +3,7 @@
 // (cast.data.ts): `zapatos/db` as installed in node_modules (the built library, `file:..`), and the generated
 // `zapatos/schema` and `zapatos/custom`, ambient modules that a user's tsconfig would include. Twoslash reads no
 // tsconfig, so the generated files go in as extra files of its virtual file system.
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { TwoslashOptions } from 'twoslash';
@@ -17,7 +17,8 @@ export const twoslashOptions: TwoslashOptions = {
   vfsRoot: dirname(fileURLToPath(new URL('../package.json', import.meta.url))),  // with no final slash: one hides errors
   extraFiles: {
     'zapatos-schema.d.ts': readFileSync(new URL('../zapatos/schema.d.ts', import.meta.url), 'utf8'),
-    ...Object.fromEntries(readdirSync(custom).map(file =>
+    // custom/ exists only once the schema has a type the generator leaves to the user
+    ...Object.fromEntries((existsSync(custom) ? readdirSync(custom) : []).map(file =>
       [`zapatos-custom-${file}`, readFileSync(new URL(file, custom), 'utf8')])),
   },
   // `db` itself says only "import db": no dashed underline under each `db.`
