@@ -241,6 +241,8 @@ Candidates for a check, a rule or a skill line.
 - #200 — Under 6.6.1 a `sql` fragment on a NOT NULL column fails in `updateValues` (TS2769): a migration example for 6.6.1 users needs a nullable column — `builder`
 - #161 — A before/after comparison of a generated file is rebuilt after merging master: new pages change the counts — `builder`
 - #161 — Nothing lints or type-checks `website/.vitepress/*.ts`: only `docs:build` exercises them, and line length is kept by hand — `builder`
+- #172 — pgcast's declarations need TypeScript 5.7 for a full check (`toBuffer()` returns `Buffer<ArrayBuffer>`, as in Zapatos 6.6.1), while the peer range says `>=4.1`: a version claim is checked with real installs per version, not read from `peerDependencies` — `builder`
+- #172 — `skipLibCheck` also skips the generated `.d.ts`, so the version canary goes quiet: say so wherever it is suggested — `builder`
 
 ## Minors kept
 
