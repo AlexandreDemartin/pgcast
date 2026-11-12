@@ -66,7 +66,7 @@ Add `zapatosconfig.json` at the root of your project, where you'll run the gener
 
 - `db` takes what you'd give `new pg.Pool()`.
 - `outDir` is where the `zapatos` folder goes; without it, the folder you run the generator in.
-- <code v-pre>{{DATABASE_URL}}</code> is filled in from the environment, so the connection string stays out of your repository. If the variable isn't set, the generator stops: `Environment variable 'DATABASE_URL' is not set`.
+- <code v-pre>{{DATABASE_URL}}</code> is filled in from the environment, so the connection string stays out of your repository. If the variable isn't set, the generator stops with `Error: If present, zapatosconfig.json must be a valid JSON file, and all referenced environment variables must exist: Environment variable 'DATABASE_URL' is not set`.
 
 Every other option, from the schemas to include to per-column settings, is in [The generator: config and CLI](/generator).
 
