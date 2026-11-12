@@ -198,6 +198,9 @@ Candidates for a check, a rule or a skill line.
 - #141 — Helpers that refuse by returning `null` are not « both or neither » inside one outer transaction: only a throw rolls it back — `branch-reviewer`
 - #141 — A docs example that writes cleans its own rows, or a second run fails — `branch-reviewer`, `builder`
 - #141 — `queryListener` logs a `COMMIT` before Postgres answers it: a log line is no proof of a commit (#190) — `builder`
+- #145 — `.catch(err => { …; return undefined; throw err; })` is typed `any` without `strictNullChecks`: write `(err): undefined =>` to keep the row type in every mode — `branch-reviewer`, `builder`
+- #145 — `pg.DatabaseError` exists from pg 8.6 and `pg.native` rejects with plain `Error`s, while the peer range is `pg >=7.18.2`: a docs clause on pg versions is checked on the tarballs — `branch-reviewer`, `builder`
+- #145 — pgcast is stricter than SQL for options (`'desc'`, `'serializable'` run in Postgres): « cannot mean anything in SQL » is checked against Postgres itself — `branch-reviewer`
 
 ## Minors kept
 
