@@ -1,6 +1,6 @@
 # 004 — The documentation site
 
-- **Status**: proposed (2026-11-12), awaiting the owner.
+- **Status**: accepted (2026-11-12).
 - **Scope**: step 1 of Epic [#85](https://github.com/AlexandreDemartin/pgcast/issues/85), issue [#89](https://github.com/AlexandreDemartin/pgcast/issues/89). Nothing is implemented here.
 
 ## Context
@@ -101,14 +101,16 @@ Others seen: tRPC left Docusaurus for TanStack Start with `@shikijs/twoslash`; T
 - **TypeScript 7** is now `latest` on npm, and Twoslash supports 5.5 to 6 only; `website/` pins the root's TypeScript (5.9.3).
 - **The ambient `zapatos/schema`**: Twoslash reads no `tsconfig.json`; the generated file goes in through `compilerOptions` or `extraFiles`, to prove in the cast panel PR. If it fails: George's way, the TypeScript API at build (as #93 checks the README's example).
 
-## Question to the owner
+## Decision
 
-1. Do you accept **VitePress with Twoslash** in a separate `website/` package, with its dev dependencies (`vitepress`, `@shikijs/vitepress-twoslash`, `vue`, `typescript`, `pg`), none of them in the library?
-2. VitePress **2.0 alpha** pinned (as Vite and Vitest), or **1.6.4** with the older plugin?
-3. **GitHub Pages** at `alexandredemartin.github.io/pgcast/` (Pages to be turned on, source "GitHub Actions"), or a custom domain?
-4. **Versions**: the latest release at the root, `/next/` for `master`, one frozen copy per major. Agreed?
-5. The rule **"each feature PR updates its docs page"**, written in skill `pr-shape`. Agreed?
-6. George's `docs/index.html`, once the site is live: kept as an archive of the Zapatos 6.6.1 docs, or removed (git keeps it)?
+The owner's answers, 2026-11-12:
+
+1. **VitePress with Twoslash**, in a separate `website/` package. Its dev dependencies (`vitepress`, `@shikijs/vitepress-twoslash`, `vue`, `typescript`, `pg`) are approved there only; none goes in the library.
+2. **VitePress 2.0 alpha**, pinned exactly.
+3. **GitHub Pages** at `alexandredemartin.github.io/pgcast/`. The owner turns Pages on, source "GitHub Actions", at the skeleton step.
+4. **Versions** as written: the latest release at the root, `/next/` for `master`, one frozen copy per major, as Docusaurus and Vite do (the industry standard).
+5. **"Each feature PR updates its docs page"** as written, docs as code, as Write the Docs and Django require.
+6. George's `docs/index.html` and its bundle are **removed** once pgcast's site is live; the site links [jawj.github.io/zapatos](https://jawj.github.io/zapatos/) as the Zapatos 6.6.1 docs.
 
 ## Sources
 
