@@ -156,7 +156,7 @@ export async function bookSeat(pool: pg.Pool, screening_id: number, seat: string
 
 - `seat: 'f7'` then fails to compile, TS2322 in a row typed `s.seat_bookings.Insertable`; `'Z100'` still compiles, and Postgres still refuses it.
 - Each type in `declare module 'zapatos/custom'` is exported, `PgSeat_labelRow` too: a helper named `Row` would clash with another placeholder's (TS2300).
-- A `string` from a form no longer fits (TS2322): check it first, with the `CHECK`'s pattern, in a type guard, as `src/seats.ts` does.
+- A `string` from a form no longer fits (TS2322 in a typed row, TS2769 in the call): check it first, with the `CHECK`'s pattern, in a type guard, as `src/seats.ts` does.
 - These docs keep `PgSeat_label` as generated, `string`.
 
 ### A `jsonb` domain
