@@ -17,7 +17,7 @@ Each cell is a parameter: three rows of two columns, `$1` to `$6`. An empty arra
 
 ## Split under the parameter limit
 
-Postgres takes at most 65,535 parameters in a query. Past that, it refuses the query as a protocol violation, 08P01, with a message that doesn't say why: `bind message supplies 0 parameters, but prepared statement "" requires 65536`.
+Postgres takes at most 65,535 parameters in a query. Past that, it refuses the query as a protocol violation, 08P01, with a message that varies with the count and doesn't say why, such as `bind message supplies 0 parameters, but prepared statement "" requires 65536`.
 
 A query's parameters, to count before you send it:
 
