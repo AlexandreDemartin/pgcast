@@ -82,23 +82,29 @@ function plain(source: string, casts: Record<string, string>, srcDir: string, ur
   // a panel written another way (`example='…'`, a second attribute) would drop silently out of llms-full.txt
   if (missed) throw new Error(`llms.ts: write \`${missed}\` as \`<CastPanel example="<name>">\`, for llms-full.txt`);
 
-  let fence: { info: string; code: string[] } | undefined;
+  // a block nested in a list is indented as its opening fence: its lines lose that indent before Twoslash's are
+  // dropped, then every line, the fences too, gets it back
+  let fence: { indent: string; info: string; code: string[] } | undefined;
   for (const line of expanded.split('\n')) {
     const prefix = quotes.join('');
     if (fence) {
-      if (!/^\s*```\s*$/.test(line)) { fence.code.push(line); continue; }
+      const { indent } = fence;
+      if (!/^\s*```\s*$/.test(line)) {
+        fence.code.push(line.slice(Math.min(indent.length, /^\s*/.exec(line)![0].length)));
+        continue;
+      }
       const
         twoslash = /\btwoslash\b/.test(fence.info),
         code = twoslash ? shown(fence.code.join('\n')) : fence.code.join('\n'),
         info = fence.info.replace(/\s*\btwoslash\b/, '').replace(/\{.*?\}/, '').trim();
-      lines.push(...['```' + info, ...code.split('\n'), '```'].map(l => prefix + l));
+      lines.push(...['```' + info, ...code.split('\n'), '```'].map(l => prefix + (l === '' ? '' : indent) + l));
       fence = undefined;
       continue;
     }
     const
-      open = /^\s*```(.*)$/.exec(line),
+      open = /^(\s*)```(.*)$/.exec(line),
       container = /^::: ?([\w-]+)\s*(.*)$/.exec(line);
-    if (open) fence = { info: open[1]!, code: [] };
+    if (open) fence = { indent: open[1]!, info: open[2]!, code: [] };
     else if (/^:::\s*$/.test(line)) quotes.pop();
     else if (container?.[1] === 'code-group') quotes.push('');
     else if (container) {
