@@ -219,7 +219,13 @@ With no matching film, the array is empty: `select()` never gives `undefined`.
 
 ## Add a film
 
-`insert()` takes a `films.Insertable` and gives back the row as Postgres stored it. Type the row first, with the schema's types imported at the top of the file:
+`insert()` takes a `films.Insertable` and gives back the row as Postgres stored it. Type the row first, with the schema's types. Add this import at the top of the file, with the other two:
+
+```ts twoslash
+import type * as s from 'zapatos/schema';
+```
+
+Then the row and the query:
 
 <CastPanel example="first-query-insert">
 
