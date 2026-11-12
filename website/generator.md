@@ -256,7 +256,7 @@ src/zapatos/
 
 | File | Written | Holds |
 |---|---|---|
-| `schema.d.ts` | on each run | `declare module 'zapatos/schema'`: a namespace per relation, its `Table`, `Selectable`, `JSONSelectable`, `Whereable`, `Insertable`, `Updatable`, `UniqueIndex`, `Column` and `SQL`; the enums; the unions and `*ForTable<T>` lookups; the version canary |
+| `schema.d.ts` | on each run | `declare module 'zapatos/schema'`: a namespace per relation, its `Table`, `Selectable`, `JSONSelectable`, `Whereable`, `Insertable`, `Updatable`, `UniqueIndex`, `Column`, `OnlyCols`, `SQLExpression` and `SQL`; each enum, and its tuple `every.<name>`; `Schema` and the tuple `AllSchemas`; per schema and over all of them, the unions (`Table`, `Selectable`…) and the tuples `AllBaseTables`, `AllForeignTables`, `AllViews`, `AllMaterializedViews` and `AllTablesAndViews`; the `*ForTable<T>` lookups; the version canary |
 | `custom/index.d.ts` | on each run, when there is a custom type | an empty `declare module 'zapatos/custom'` |
 | `custom/<Name>.d.ts` | once: never overwritten | a placeholder, `export type PgSeat_label = string;`, yours to edit |
 
