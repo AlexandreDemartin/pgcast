@@ -1,0 +1,11 @@
+import * as db from 'zapatos/db';
+import type pg from 'pg';
+declare const pool: pg.Pool;  // at build, cast.data.ts passes a pool that records the query
+// ---cut---
+const ratings = await db.upsert('ratings', [
+  { film_id: 1002, stars: 4, votes: 2 },
+  { film_id: 1002, stars: 5, votes: 1 },
+  { film_id: 1000, stars: 5, votes: 3 },
+], ['film_id', 'stars'], {
+  updateValues: { votes: db.sql`${'ratings'}.${'votes'} + EXCLUDED.${'votes'}` },
+}).run(pool);
