@@ -71,11 +71,16 @@ import * as db from 'zapatos/db';
 import pg from 'pg';
 
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
-
-const book = await db.selectOne('books', { title: 'Northern Lights' }).run(pool);
-// book: books.JSONSelectable | undefined, straight from your schema
 ```
 
 :::
+
+Then ask for a book. Here's what you write, the SQL it becomes, and the type of what comes back, straight from your schema:
+
+<CastPanel example="install">
+
+<<< ./examples/install.ts{ts twoslash}
+
+</CastPanel>
 
 That's it: one query, one round trip, and a result typed from the table it came from. Change a column, run the generator again, and TypeScript points at every query that no longer fits.
