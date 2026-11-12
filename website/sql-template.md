@@ -285,7 +285,7 @@ type SelfType = typeof self
 ## `parent()` {#parent}
 
 ```ts
-db.parent<C extends Column | undefined = Column | undefined>(column?: C): ParentColumn<C>
+db.parent<T extends Column | undefined = Column | undefined>(x?: T): ParentColumn<T>
 ```
 
 A column of the parent query's table, in a subquery given to `lateral` ([Join through a lateral](/lateral)): `"<parent table or alias>"."<column>"`.
@@ -303,7 +303,7 @@ A column of the parent query's table, in a subquery given to `lateral` ([Join th
 ### `ParentColumn` {#ParentColumn}
 
 ```ts
-class ParentColumn<C extends Column | undefined = Column | undefined> { value?: C }
+class ParentColumn<T extends Column | undefined = Column | undefined> { value?: T }
 ```
 
 What `parent()` returns.
@@ -354,13 +354,13 @@ An array's items compile one after the other, each as if interpolated alone, wit
 
 ```ts
 db.mapWithSeparator<TIn, TSep, TOut>(
-  items: readonly TIn[],
+  arr: readonly TIn[],
   separator: TSep,
-  map: (item: TIn, index: number, items: readonly TIn[]) => TOut,
+  cb: (x: TIn, i: number, a: readonly TIn[]) => TOut,
 ): (TOut | TSep)[]
 ```
 
-Maps `items` with `map`, `separator` between each two results; `[]` for no items. A plain array, so it compiles as [one](#arrays):
+Maps `arr` with `cb`, `separator` between each two results; `[]` for no items. A plain array, so it compiles as [one](#arrays):
 
 <CastPanel example="sql_map_with_separator">
 
