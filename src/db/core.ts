@@ -213,6 +213,8 @@ export class ColumnValues<T> { constructor(public value: T) { } }
  * `DEFAULT`; Zapatos 6.6.1 wrapped both in another parameter in an array. An array
  * throws on `Default` in a filter (`isIn`), and in a fragment value of `vals({…})`
  * (`` { role: sql`${vals([Default])}` } ``), compiled as a `Whereable` value is.
+ * In an array, `parent()` compiles to the parent column (`"authors"."id"`), as
+ * in a `sql` template; Zapatos 6.6.1 sent it as JSON (`'{"value":"id"}'`).
  */
 export function vals<T>(x: T) { return new ColumnValues<T>(x); }
 
@@ -223,7 +225,12 @@ export function vals<T>(x: T) { return new ColumnValues<T>(x); }
 export class ParentColumn<T extends Column | undefined = Column | undefined> { constructor(public value?: T) { } }
 /**
  * Returns a `ParentColumn` instance, wrapping a column name, which compiles to
- * that column name of the table of the parent query.
+ * that column name of the table of the parent query. Without a column, it takes
+ * the column of the filter. As a `Whereable` value, in `eq()` and in `isIn()` /
+ * `isNotIn()`, in a `lateral` subquery of `authors`:
+ * `{ authorId: isIn([parent('id'), 2]) }` gives `("authorId" IN ("authors"."id", $1))`.
+ * Outside a nested query it throws. Zapatos 6.6.1 sent it in `isIn()` as JSON
+ * (`'{"value":"id"}'`).
  */
 export function parent<T extends Column | undefined = Column | undefined>(x?: T) { return new ParentColumn<T>(x); }
 
@@ -474,6 +481,8 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
           if (value instanceof SQLFragment ||
             value instanceof Parameter ||
             value === Default) this.compileExpression(value, result, parentTable);
+          // parent() is the parent column, as in a `sql` template; with no column, the column of the filter
+          else if (value instanceof ParentColumn) this.compileExpression(value, result, parentTable, currentColumn);
           else this.compileExpression(new Parameter(value), result, parentTable);
         }
 
