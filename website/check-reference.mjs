@@ -38,18 +38,22 @@ for (const [prefix, file] of [['Config', dbFile], ['generate', generateFile]]) {
   }
 }
 
-// An entry is a heading of a Reference page that ends in `{#name}`, outside fenced code.
+// An entry is a heading of a Reference page that ends in `{#name}`, outside fenced code and HTML comments.
 const
   referencePages = outline.find(group => group.link === '/reference').items.map(({ link }) => `${link.slice(1)}.md`),
   entries = new Map(),  // name → page
   problems = [];
 
 for (const page of referencePages.filter(page => existsSync(new URL(page, import.meta.url)))) {
-  let fence = null;
+  let fence = null, comment = false;  // VitePress renders no heading in either
   for (const line of readFileSync(new URL(page, import.meta.url), 'utf8').split('\n')) {
-    const marker = line.match(/^\s*(`{3,}|~{3,})/)?.[1];
+    const marker = !comment && line.match(/^\s*(`{3,}|~{3,})/)?.[1];
     if (marker && fence === null) fence = marker;
     else if (marker && marker[0] === fence[0] && marker.length >= fence.length) fence = null;
+    else if (fence === null && (comment || /^\s*<!--/.test(line))) {
+      comment = !line.replace(/^\s*<!--/, '').includes('-->');
+      continue;
+    }
     const anchor = fence === null && line.match(/^#{1,6}\s.*\{#([^\s}]+)\}\s*$/)?.[1];
     if (anchor && names.has(anchor) && entries.has(anchor) && entries.get(anchor) !== page) {
       problems.push(`${anchor}: has an entry in ${entries.get(anchor)} and in ${page}; keep one`);
