@@ -135,8 +135,9 @@ function statusOf(err: unknown) {
   if (err instanceof pg.DatabaseError) {
     if (db.isDatabaseError(err, 'IntegrityConstraintViolation_UniqueViolation')) return 409;  // already there
     if (db.isDatabaseError(err, 'IntegrityConstraintViolation', 'DataException')) return 422;  // a value Postgres refuses
+    if (db.isDatabaseError(err, 'TransactionRollback')) return 503;  // try again later
   }
-  return 500;  // anything else, pgcast's own errors included: a bug to fix
+  return 500;  // anything else: a bug, or the database out of reach
 }
 ```
 
