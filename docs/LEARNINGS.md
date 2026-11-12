@@ -277,6 +277,11 @@ Candidates for a check, a rule or a skill line.
 - #115 — Re-checking an `@errors` claim depends on the compiler options (TS18048 needs `strictNullChecks`) — `builder`
 - #115 — A hand-written fence scanner is checked against markdown-it's `fence` tokens across every page (0 differences here); synthetic inputs show where it departs (CRLF, blockquotes, a backtick in the info string) — `branch-reviewer`
 - #115 — VitePress's own dead-link check fails first on a Markdown link to a missing page: a planted case for `anchors.ts` uses a missing anchor or a raw `<a href>` — `branch-reviewer`, `builder`
+- #115 — A regex built from a message literal turns `${…}` into one token (`\S+?`), never `.*?`, which absorbs any change next to a value — `branch-reviewer`, `builder`
+- #115 — « Each line is a query, in order », checked with `[\s\S]*?` between lines, accepts a block that leaves out a query (a dropped `ROLLBACK`): check equality — `branch-reviewer`
+- #115 — A mark detector with `\b` after the keyword misses `<!---` and plurals: plant those as well as case and spacing, and watch that the mark count does not drop — `branch-reviewer`
+- #115 — A probe written in a Markdown mark is code the build runs, and GitHub's rendered view hides HTML comments: review a page's diff in source view — `branch-reviewer`
+- #115 — A probe timer stays ref'd, or Node exits 13 on an unsettled top-level await before the timeout reports the page — `builder`
 
 ## Minors kept
 

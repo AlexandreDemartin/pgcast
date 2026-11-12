@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "docs:dev": "vitepress dev",
-    "docs:build": "tsc && node check-reference.mjs && node check-joined.mjs && vitepress build",
+    "docs:build": "tsc && node check-reference.mjs && node check-prose.mjs && node check-joined.mjs && vitepress build",
     "docs:preview": "vitepress preview",
     "docs:schema": "node generate-schema.mjs",
     "docs:examples": "node run-examples.mjs"
