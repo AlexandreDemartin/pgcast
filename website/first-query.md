@@ -138,9 +138,8 @@ The title went to Postgres as a parameter, `$1`, never pasted into the SQL. The 
 import * as db from 'zapatos/db';
 import type pg from 'pg';
 declare const pool: pg.Pool;
-// ---cut---
 const film = await db.selectOne('films', { title: 'The Salt Orchard' }).run(pool);
-
+// ---cut---
 console.log(film.release_year);
 ```
 
@@ -198,7 +197,7 @@ import * as db from 'zapatos/db';
 import type pg from 'pg';
 declare const pool: pg.Pool;
 // ---cut---
-const film = await db.insert('films', {
+await db.insert('films', {
   studio_id: 1002,
   title: 'The Night Ferry to Orkesund',
   release_year: 2024,
