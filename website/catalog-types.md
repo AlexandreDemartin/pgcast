@@ -71,7 +71,7 @@ Zapatos returned JSON from every shortcut that returns rows, even those that cou
 
 ## How a result type follows the query
 
-A shortcut's result type is never declared: TypeScript works it out from the call. The table gives its `JSONSelectable`; `columns` keeps only those keys; each `extras` key adds the type of its column, or of its `sql` fragment; each `lateral` key adds the result type of its subquery, worked out the same way, one level down. Then the shortcut sets the shape: an array for `select()`, the row or `undefined` for `selectOne()`, the row for `selectExactlyOne()`, a number for `count()`. Hover `films` to see what came of this one:
+A shortcut's result type is never declared: TypeScript works it out from the call. The table gives its `JSONSelectable`; `columns` keeps only those keys, as `returning` does for [`insert()` and the other writes](/insert#insert-options); each `extras` key adds the type of its column, or of its `sql` fragment; each `lateral` key adds the result type of its subquery, worked out the same way, one level down, and a `lateral` given as [one subquery](/lateral#keep-only-the-far-side) replaces the row with its result. Then the shortcut sets the shape: an array for `select()`, the row or `undefined` for `selectOne()`, the row for `selectExactlyOne()`, a number for `count()`. Hover `films` to see what came of this one:
 
 <CastPanel example="catalog_types_result">
 
@@ -85,7 +85,7 @@ Three things in that type are worth a closer look:
 - **`hours` is a `number` because you said so.** A `sql` fragment's type is its second type argument, here `number`, and pgcast doesn't parse your SQL to check it ([Type arguments](/sql-template#type-arguments)). `year`, a column, takes its type from the schema.
 - **`roles` is a `number`**, the type of `count()`, though Postgres counts in `int8`: like Zapatos, pgcast assumes no count comes near `Number.MAX_SAFE_INTEGER`.
 
-All of this needs `strictNullChecks`, or `strict`. Without it, `columns`, `extras` and `lateral` leave the type at the table's full `JSONSelectable[]`, and `films[0].studio` doesn't compile ([`select()` options](/select#options)).
+All of this needs `strictNullChecks`, or `strict`. Without it, `columns`, `extras`, `lateral` and `returning` leave the type at the table's full `JSONSelectable`, and `films[0].studio` doesn't compile ([`select()` options](/select#options)).
 
 ## What pgcast kept, and what it changes
 
