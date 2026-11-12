@@ -36,7 +36,7 @@ export const outline = [
       { text: 'The <code>sql</code> template', link: '/sql-template' },
       { text: '<code>select()</code> and the aggregates', link: '/select' },
       { text: '<code>insert()</code>, <code>update()</code> and the other writes', link: '/insert' },
-      { text: 'Conditions', link: '/conditions' },
+      { text: '<code>db.conditions</code>', link: '/conditions' },
       { text: '<code>transaction()</code> and errors', link: '/transaction' },
       { text: 'Run-time configuration and utility types', link: '/runtime-config' },
       { text: 'The generator: config and CLI', link: '/generator' },

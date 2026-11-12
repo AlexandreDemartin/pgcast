@@ -179,6 +179,10 @@ Candidates for a check, a rule or a skill line.
 - #126 — The theme styles h1–h3 only: a `####` heading renders outside the art direction and the build stays green — `branch-reviewer`
 - #126 — A hand-copied `sql` block goes stale silently: show only pgcast's fixed strings and link to the panels — `builder`
 - #126 — A SERIALIZABLE race shows only on a warm pool: warm two connections before the probe — `builder`
+- #122 — « as Postgres reads it » is checked against the generated type first: the date string types are template literals, far narrower than Postgres — `branch-reviewer`
+- #122 — The TS error code depends on the signature: an unbounded `<T>(a: T)` fails at the key (TS2322), a bounded one at the argument (TS2345), some at both; probe each form — `branch-reviewer`, `builder`
+- #122 — A page named like the namespace it documents clashes with its own `{#name}` entry: the h1 says `db.conditions` — `builder`
+- #122 — A scratch type probe needs `paths` mapping `zapatos/*` to `website/node_modules/zapatos` — `builder`
 
 ## Minors kept
 
