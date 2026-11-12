@@ -296,7 +296,7 @@ A column of the parent query's table, in a subquery given to `lateral` ([Join th
 
 </CastPanel>
 
-- Without a column, the column of the filter it sits in: `{ film_id: db.parent() }`, in a `lateral` of `roles`, gives `("film_id" = "roles"."film_id")`. With no filter, it throws.
+- Without a column, the column of the filter it sits in: `{ film_id: db.parent() }`, in a `lateral` of `roles`, gives `("film_id" = "roles"."film_id")`. With no filter, it throws "Alien object while interpolating SQL: undefined".
 - It works as a Whereable value, in a `sql` fragment, in `eq()` and in `vals([…])`, so in `isIn()`: `{ film_id: isIn([db.parent()]) }` gives `(("film_id" IN ("roles"."film_id")))`. In `vals([…])`, Zapatos 6.6.1 sent it as JSON: `isIn([parent('id')])` compared with `'{"value":"id"}'`.
 - Outside a nested query, it throws "The 'parent' table alias has no meaning here", so `run()` rejects before any query.
 
@@ -452,6 +452,8 @@ fragment.prepared(name = `_zapatos_prepared_${n}`): this
 ```
 
 Sets the `name` that `compile()` adds to the query, so that Postgres prepares the statement once per connection and runs it by name after ([node-postgres](https://node-postgres.com/features/queries#prepared-statements)). Without a name, `_zapatos_prepared_0`, `_1`… in the order of the calls.
+
+A name stands for one text: on a connection that has prepared `'p'`, a fragment of another text named `'p'` makes `pg` reject with "Prepared statements must be unique - 'p' was used for a different statement".
 
 ## `RunResultForSQLFragment` {#RunResultForSQLFragment}
 
