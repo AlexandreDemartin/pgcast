@@ -83,7 +83,7 @@ Others seen: tRPC left Docusaurus for TanStack Start with `@shikijs/twoslash`; T
 ### Docs follow the code
 
 - New rule: **each feature PR updates its docs page**, checked by the same build. A "Document …" PR remains only for a guide that spans a series.
-- Written in skill `pr-shape` § Splitting like George, the row "Docs follow the code", which says today that the usage guide comes in a "Document …" PR after the series; and in the issue template's **Files**.
+- Written in skill `pr-shape` § Splitting like Zapatos, the row "Docs follow the code", which says today that the usage guide comes in a "Document …" PR after the series; and in the issue template's **Files**.
 
 ### Planned PRs, in the order of Epic #85
 

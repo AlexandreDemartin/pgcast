@@ -18,6 +18,20 @@ The roadmap lives in the GitHub issues, one Epic per chapter ([README](README.md
 
 If a request breaks one of these points: **stop and say so** instead of implementing it.
 
+### What pgcast does not do
+
+A change that makes one of these moves is refused, whatever its gain. Sources: Zapatos's docs (`docs/index.html`).
+
+- A model, an entity class, a relationship declared in TypeScript (Zapatos returns "just (fully-typed) POJOs").
+- Lazy loading, an identity map, change tracking, a query cache.
+- A method chain that builds a query and hides its SQL (`.where().join()`).
+- An implicit, default or global client, or a transaction opened without being asked for: "Zapatos is always explicit about what client or pool is running your query", as it is "too easy to accidentally issue queries outside of transactions".
+- Managing the connection pool or migrations ("Zapatos doesn't handle schema migrations").
+- A layer to switch databases tomorrow at the expense of Postgres today ("a source of misery").
+- A guessed type that the database does not state; a concatenated value instead of a parameter.
+- SQL that depends on state, or changes with the values, without being documented.
+- Core complexity for a niche case or for a gain drowned in network latency ("Small is beautiful"): it goes to a separate package, or opt-in.
+
 ## Architecture
 
 ```
@@ -69,13 +83,13 @@ A task is **done** only if `lint`, `typecheck`, `test` and `test:types` pass.
 - Steps: the sub-issues of the Epics, one at a time, read with `gh issue view <n> --repo AlexandreDemartin/pgcast`; each issue carries **Files** and **Risk** (`.github/ISSUE_TEMPLATE/task.md`). Orchestrated by the skill `run-step`, with the agents `builder`, `branch-reviewer` and `chores`. Earlier history: [docs/HISTORY.md](docs/HISTORY.md).
 - Plan comment and PR proofs: skill `plan-and-proofs`; review comments: skill `review-comments` (the agent `branch-reviewer` relies on the user skill `branch-review`).
 - CI: skill `ci-gate`; merge by risk (Ship / Show / Ask), squashed, closing its issue: skill `merge-gate`.
-- Deciding alone or asking: skill `decision-philosophy`. Size, splitting, titles, branches and commits: skill `pr-shape`; George MacKerron's style, pushed further: skill `zapatos-spirit`.
+- Deciding alone or asking: skill `decision-philosophy`. Size, splitting, titles, branches and commits: skill `pr-shape`; code, JSDoc, errors and the docs voice: skill `code-style`.
 
 ## Working rules
 
 - **Read the code concerned before changing it**, and summarise what you understood.
 - **Tests first**, or at least with the implementation: runtime, compiled SQL (`text` and `values`) and types (positive **and** negative cases with `@ts-expect-error`).
-- **One feature = one branch = one PR** on `AlexandreDemartin/pgcast`, small like one of George's commits (skill `pr-shape`).
+- **One feature = one branch = one PR** on `AlexandreDemartin/pgcast`, small like a Zapatos commit (skill `pr-shape`).
 - **No breaking change** to the public API. If it is unavoidable, stop and ask (skill `backward-compat`).
 - **`core.ts` (escaping, parameterisation, identifier compilation)**: never touch it without saying so explicitly. Each change adds SQL injection tests (skill `sql-safety`).
 - A helper is designed with the skill `zero-abstraction`, an advanced type is tested and its compile time watched with the skill `type-tests`, the codegen output follows the skill `codegen-output`, and a need is validated with the skill `consumer-usage`.
