@@ -43,15 +43,18 @@ db.getConfig(): Config
 
 A copy of the configuration. The copy is one level deep: `getConfig().transactionAttemptsMax = 1` changes nothing, but `getConfig().transactionRetryDelay.minMs = 1` changes the configuration, since that object is shared ([#182](https://github.com/AlexandreDemartin/pgcast/issues/182)).
 
-To change the configuration for a while, as tests do, keep the copy and give it back:
+To change the configuration for a while, as tests do, keep the copy and give it back in a `finally`, so that a throw in between, a failing test, still restores it:
 
 ```ts twoslash
 import * as db from 'zapatos/db';
 // ---cut---
 const saved = db.getConfig();
 db.setConfig({ transactionRetryDelay: { minMs: 0, maxMs: 0 } });
-// … the transactions that should retry at once
-db.setConfig(saved);
+try {
+  // … the transactions that should retry at once
+} finally {
+  db.setConfig(saved);
+}
 ```
 
 - It puts back each key `saved` holds. `setConfig()` gives `transactionRetryDelay` a new object, so the one `saved` shares is unchanged.
