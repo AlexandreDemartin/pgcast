@@ -56,13 +56,13 @@ The characterisation of Zapatos 6.6.1 found seven ways for a caller's string to 
 | a `"` in a name: a table, a column, a filter key, `cols()`, `order.by` | closes its quotes | doubled: `'a"b'` is `"a""b"` |
 | a string that starts and ends with `"` | written as it is | as it is only if it is a well-formed quoted name |
 | the type of `param(x, cast)` | written between quotes as it is | as it is if well-formed once quoted (`pg_catalog"."int4`); otherwise one quoted name, any `"` doubled |
-| a `lateral` key, or the `alias` of `select()` | spliced into `"lateral_…"` and `"sq_…"` | one name there too |
+| a `lateral` key, or the `alias` or table name of `select()` | spliced into `"lateral_…"` and `"sq_…"` | one name there too |
 | `lock.for`, `lock.wait`, the options of `truncate()`, the level of `transaction()` | written as it is | checked: anything else throws |
 | the `aggregate` of `select()` | written as it is | a function name, or it throws |
 | a string in the `updateValues` of `upsert()` | a column name | a parameter |
 | `db.Default`, `db.self`, `db.raw()`, `db.cols()` or `db.vals()` as a filter value | a string, or JSON | throws |
 
-Zapatos 6.6.1 already checked `order.direction`. Each hole, what it let through and the test that pins it: the [characterisation report](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/CHARACTERISATION-REPORT.md#security); the SQL before and after: [CHANGELOG.md](https://github.com/AlexandreDemartin/pgcast/blob/master/CHANGELOG.md).
+Zapatos 6.6.1 already checked `order.direction` and `order.nulls`. Each hole, what it let through and the test that pins it: the [characterisation report](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/CHARACTERISATION-REPORT.md#security); the SQL before and after: [CHANGELOG.md](https://github.com/AlexandreDemartin/pgcast/blob/master/CHANGELOG.md).
 
 ## What pgcast can't guard against
 
