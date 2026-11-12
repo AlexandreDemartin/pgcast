@@ -158,7 +158,7 @@ db.sql<s.films.SQL>`SELECT * FROM ${'films'} WHERE ${{ title: db.raw("'x'") }}`;
 
 - To compare with SQL: a fragment value, `` { title: db.sql`${db.self} = ${db.raw("'x'")}` } ``.
 - Zapatos 6.6.1 sent them there as one parameter, as JSON (`'{"value":…}'`): no row on a text or `jsonb` column, every row with `ne()` and `isNotIn()`, an error (22P02) on other types.
-- Outside a filter, `vals([db.raw(x)])` is still a parameter, `x` as JSON; in `upsert()`'s `updateValues`, `raw()` is SQL ([`upsert()`](/insert#upsert)).
+- Outside a filter, `vals([db.raw('x')])` is still a parameter, the wrapper as JSON: `'{"value":"x"}'`, which a text column stores as it is; in `upsert()`'s `updateValues`, `raw()` is SQL ([`upsert()`](/insert#upsert)).
 
 ### `DangerousRawString` {#DangerousRawString}
 
