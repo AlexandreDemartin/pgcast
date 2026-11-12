@@ -14,6 +14,7 @@ The generated file (`zapatos/schema.d.ts`) is compiled by every user project: it
 - **Deterministic**: explicitly sorted order (`ORDER BY` + name), never `pg_catalog`'s order.
 - **Qualify by schema**: every introspection query filters on `pg_namespace`, never on the object name alone.
 - **The generated output compiles**: `npm run typecheck` compiles the fixture's output.
+- **The docs schema follows**: after the root `npm run build`, `cd website && npm run docs:schema`, and commit what changes in `website/zapatos/`; the `docs` job fails on a stale one.
 - **Canary**: an incompatible change of format increments `SchemaVersionCanary` (`src/db/canary.ts` and `src/generate/tsOutput.ts`): a stop point.
 - **`zapatos/*` strings** unchanged (note 002).
 - **Comments**: a `COMMENT ON` text goes into a JSDoc; `*/` must be neutralised in it.
@@ -24,3 +25,4 @@ The generated file (`zapatos/schema.d.ts`) is compiled by every user project: it
 - [ ] Opt-in option, default = current output
 - [ ] Introspection queries qualified by schema and sorted
 - [ ] The fixture's output compiles
+- [ ] `npm run docs:schema` run, `website/zapatos/` committed

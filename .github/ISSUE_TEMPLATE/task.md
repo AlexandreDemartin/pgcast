@@ -20,7 +20,7 @@ labels: 'type: task'
 
 ## Files
 
-<!-- The targeted paths: `src/db/conditions.ts`, `test/unit/conditions.test.ts`. -->
+<!-- The targeted paths, the feature's docs page included (skill pr-shape § Splitting like Zapatos): `src/db/conditions.ts`, `test/unit/conditions.test.ts`, `website/conditions.md`. -->
 
 ## Notes
 

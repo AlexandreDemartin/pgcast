@@ -140,6 +140,9 @@ Candidates for a check, a rule or a skill line.
 - #131 — `upsert` `updateValues: { votes: sql`${self} + 1` }` throws "The 'self' column alias has no meaning here": upsert counts qualify the column or use `EXCLUDED` (#124, #140) — `branch-reviewer`
 - #131 — A `POINT` comes back as the string `"(x,y)"` through `to_jsonb` and as `{ x, y }` through node-postgres's parser: a typed `PgPoint` placeholder covers both (#142) — `branch-reviewer`
 - #131 — When master moves while a builder works, merge it and read the three-dot diff: a plain `git diff origin/master` makes the branch look as if it reverts the other PR — `builder`
+- #130 — `check:agents` prints word counts but fails only on lines over 150: the ~1,200-word budget of a skill is not enforced (`pr-shape` was at 1,236 on master); a word limit in `scripts/check-agents.mjs`, or the budget restated — `builder`
+- #130 — A worktree has no `node_modules`: a builder there runs `npm ci` before `lint`, next to copying `src/.env` (candidate: agent `builder`) — `builder`
+- #134 — A per-column type in a union changes what TypeScript infers for a generic call next to it: a member whose `value` is `string`, `any` or `unknown` widens a literal (dates, `${number}`); a grid of calls (each column × literals of each Postgres type) compiled against 6.6.1's declarations and the branch's finds it (candidate: skill `type-tests`, a reusable compat check) — `builder`
 
 ## Minors kept
 
