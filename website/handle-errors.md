@@ -15,7 +15,7 @@ When Postgres refuses a query, `.run()` rejects with node-postgres's `DatabaseEr
 
 If C4 is taken, Postgres refuses the `INSERT` with 23505, a unique violation, and `booking` is `undefined`; if not, it is the new row. Any other error, from Postgres or not, is thrown again.
 
-With `try` and `await`, the `catch` variable is `unknown` under `strict`, which `isDatabaseError()` refuses ([why](/transaction#isDatabaseError)). Narrow it with `instanceof pg.DatabaseError` first: then TypeScript knows its fields too.
+With `try` and `await`, the `catch` variable is `unknown` under `strict`, which `isDatabaseError()` refuses ([why](/transaction#isDatabaseError)). Narrow it with `instanceof pg.DatabaseError` first (pg 8.6 or later, not `pg.native`, whose errors are plain `Error`s): then TypeScript knows its fields too.
 
 ```ts twoslash
 // @strict: true
