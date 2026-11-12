@@ -73,6 +73,12 @@ Candidates for a check, a rule or a skill line.
 - #24 — `columns:` in `select()` adds a parameter (`$1::text`): a test meant for the simple protocol asserts `compile().values` is empty — `branch-reviewer`
 - #24 — `pg` returns an array of results for a multi-statement simple query, so `runResultTransform` throws (`reading '0'`) after the second statement ran: a thrown error does not prove nothing ran — `builder`
 - #24 — Replay harness: `git archive v6.6.1 src/db` under `node_modules/.cache/`, a throwaway test importing both runtimes, output to a scratch file; delete before committing (candidate: skill `sql-safety`) — `builder`
+- #25 — A rule "written as is if Postgres lexes it as X" is replayed against valid names too (plain, quoted, `U&`, mixed parts, lists), not only hostile inputs, or a CHANGELOG line that claims to list every changed form is wrong unnoticed (candidate: skill `sql-safety`) — `branch-reviewer`
+- #25 — An issue's example can contradict its own rule: `"; DROP TABLE t; --"` is one well-formed identifier. Check each example against the lexer before using it as the "before" SQL — `builder`
+- #25 — V8 regexps can throw `RangeError: Maximum call stack size exceeded` on a few MB when a group with alternatives repeats under `*`, even in linear time: a speed test at 100k repetitions misses it, 1M catches it — `branch-reviewer`
+- #25 — A replay that runs several runtimes in one transaction rolls back to its savepoint after an injected write, or every later case looks injected — `builder`
+- #25 — A long input built with `repeat` can turn out well-formed by accident and test the accept branch silently: assert which branch a speed-test input takes — `builder`
+- #25 — Substituting values into SQL text with `.replace('$1', …)` hits a `$1` inside a name (`"a".x$1$."b"`): use real parameters in an oracle — `branch-reviewer`
 
 ## Minors kept
 
@@ -88,3 +94,5 @@ Minor review defects, taken up by the end-of-chapter review.
 - #23 — `test/integration/injection.test.ts:210`: the comment still lists "a syntax error", but no 42601 is left in that snapshot since `lone` moved out — `branch-reviewer`
 - #23 — `test/integration/injection.test.ts:293,300`: `expect(await adaName()).toBe('Ada')` after a `toThrow` on a builder that never runs a query can never fail — `branch-reviewer`
 - #71 — `docs/CHARACTERISATION-REPORT.md`: the intro still says nothing is fixed, while R3, R5, R6 (and now R1) are — `builder`
+- #25 — `src/db/core.ts:257`: an accepted chain of about a million parts makes `quotedName.test` throw `RangeError` (fails closed, before any query) — a comment or a length guard — `branch-reviewer`
+- #25 — `docs/CHARACTERISATION-REPORT.md:43`: the R2 cell's short list leaves out a statement and a table alias — point to the CHANGELOG only — `branch-reviewer`
