@@ -29,7 +29,7 @@ db.sql<s.films.SQL>`SELECT * FROM ${'screenings'}`;
 
 ## Pass each value as a parameter
 
-A value from a caller (a form, a URL, a row you read elsewhere) goes in as [`db.param()`](/sql-template#param), or in a Whereable object, which makes a parameter of each value:
+A value from a caller (a form, a URL, a row you read elsewhere) goes in as [`db.param()`](/sql-template#param), or in a [Whereable object](/sql-template#whereable), which makes a parameter of each value:
 
 <CastPanel example="raw_sql_values">
 
@@ -37,7 +37,7 @@ A value from a caller (a form, a URL, a row you read elsewhere) goes in as [`db.
 
 </CastPanel>
 
-- <code v-pre>${{ studio_id: studioId }}</code> is `("studio_id" = $1)`: a filter of `films`, as the `where` of [`select()`](/select#select) takes it, so [conditions](/conditions) work in it too: `{ release_year: db.conditions.gte(1990) }`.
+- <code v-pre>${{ studio_id: studioId }}</code> is `("studio_id" = $1)`: a filter of `films`, as the `where` of [`select()`](/select#select) takes it, so [conditions](/conditions) work in it too: [`gte()`](/conditions#conditions.gte) in `{ release_year: db.conditions.gte(1990) }`.
 - `${db.param(genre)}` is `$2`: a parameter fits wherever SQL takes a value.
 - An array is one parameter: `` ${'id'} = ANY(${db.param(ids)}) `` sends `ids` as a Postgres array by default; with `castArrayParamsToJson` on, it does not ([below](#cast-a-parameter-postgres-can-t-type)).
 - A part of the query that only some calls need is a nested fragment, or `[]` for nothing ([Nested fragments](/sql-template#nested-fragments)).
@@ -128,7 +128,7 @@ A fragment as a Whereable value compares its column with SQL of your own, [`db.s
 - `lower(${db.self})` is `lower("title")`, and the caller's text is still `$1`.
 - An equality, unlike [`ilike()`](/conditions#conditions.ilike): a `_` or a `%` in the caller's text matches only itself.
 - The same object works as the `where` of [`select()`](/select#select) and the other shortcuts.
-- Where it has no column to stand for, `self` throws "The 'self' column alias has no meaning here", so `run()` rejects before any query.
+- Where it has no column to stand for, `self` throws "The 'self' column alias has no meaning here", so [`run()`](/sql-template#run) rejects before any query.
 
 ## Reach the outer row, through `parent()`
 
@@ -143,7 +143,7 @@ A hand-written subquery can go in a shortcut's `lateral`, where [`db.parent()`](
 - `${db.parent('id')}` is `"studios"."id"`, the studio of each row.
 - The subquery gives one column, named `result`: that is what `lateral` reads. Its type argument, `string | null`, is the key's type: `string_agg()` of no rows is `NULL`.
 - With `strict` off, the key is not in the type ([`lateral`](/select#lateral)).
-- Outside a `lateral`, `parent()` throws "The 'parent' table alias has no meaning here", so `run()` rejects before any query.
+- Outside a `lateral`, `parent()` throws "The 'parent' table alias has no meaning here", so [`run()`](/sql-template#run) rejects before any query.
 
 Joins through `lateral`, step by step: [Join through a lateral](/lateral).
 
