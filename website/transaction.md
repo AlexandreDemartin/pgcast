@@ -42,7 +42,7 @@ The SQL of the callback's queries: [`selectOne()`](/select#selectOne) and [`inse
 | the callback resolves | `COMMIT` |
 | `START TRANSACTION`, the callback or `COMMIT` rejects | `ROLLBACK`, then a retry or the rejection |
 
-- These three run on the transaction's client, as the callback's queries do. Each reaches [`queryListener`](/runtime-config#Config.queryListener) and [`resultListener`](/runtime-config#Config.resultListener) with the transaction's id: a counter from 0, one per call, kept across retries.
+- These three run on the transaction's client, as the callback's queries do. Each reaches [`queryListener`](/runtime-config#Config.queryListener) and [`resultListener`](/runtime-config#Config.resultListener) with the transaction's id: a counter from 0, one per transaction opened, kept across retries; a transaction passed through keeps the outer one's.
 - No `SAVEPOINT`: a transaction inside another is the outer one ([Passing a transaction through](#passing-a-transaction-through)).
 
 ### Retries
