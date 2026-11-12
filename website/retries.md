@@ -45,9 +45,11 @@ Moved into the callback, a retried booking sends two confirmation emails, and pu
 
 ## Let the error through
 
-pgcast retries only what reaches it. Don't catch a database error inside the callback: after it, Postgres refuses every query of the transaction with 25P02 (`current transaction is aborted, commands ignored until end of transaction block`), and if the callback returns, pgcast sends `COMMIT`, which Postgres turns into a rollback without an error. The promise then resolves with what the callback returned, nothing is saved, and a 40001 caught this way is never retried ([#190](https://github.com/AlexandreDemartin/pgcast/issues/190)).
+pgcast retries only what reaches it. Don't swallow a database error inside the callback: after it, Postgres refuses every query of the transaction with 25P02 (`current transaction is aborted, commands ignored until end of transaction block`), and if the callback returns, pgcast sends `COMMIT`, which Postgres turns into a rollback without an error. The promise then resolves with what the callback returned, nothing is saved, and a 40001 caught this way is never retried ([#190](https://github.com/AlexandreDemartin/pgcast/issues/190)).
 
-Catch it outside the transaction instead, once pgcast has given up, with [`isDatabaseError()`](/transaction#isDatabaseError):
+If you catch one inside, rethrow it: an `Error`, not `null` or `undefined`, for which pgcast rejects with a `TypeError` of its own instead ([#179](https://github.com/AlexandreDemartin/pgcast/issues/179)).
+
+Catch it outside the transaction, once pgcast has given up, with [`isDatabaseError()`](/transaction#isDatabaseError):
 
 <<< ./examples/plain/retries_catch.ts{ts twoslash}
 
@@ -57,8 +59,6 @@ Catch it outside the transaction instead, once pgcast has given up, with [`isDat
 | over the four seats | resolves with `null` | `'Four seats each, at most'` |
 | a seat already booked by someone else | rejects with 23505, sometimes after a retry | `'Seat taken'` |
 | a conflict on every attempt | rejects with the last attempt's 40001 or 40P01 | `'Busy: please try again'` |
-
-Throw an `Error`, or the error you caught; not `null` or `undefined`, for which pgcast rejects with a `TypeError` of its own instead ([#179](https://github.com/AlexandreDemartin/pgcast/issues/179)).
 
 ## Book inside a larger transaction
 
