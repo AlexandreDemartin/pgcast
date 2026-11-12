@@ -22,7 +22,7 @@ Explore, plan, code, commit.
 
 - Before each subject, the skill it names (`.agents/README.md` § Skill map) and those of **Read**; always the skills `zapatos-spirit` (style) and `pr-shape` (size, splitting, title, branch, commits).
 - **Plan**: at `normal` and `high`, the plan comment on the issue before any code (skill `plan-and-proofs`); at `high`, **stop** after posting it and report its link.
-- Tests first, or with the code: compiled SQL, real execution, positive and negative types; for a bug, the failing test in its own commit before the fix.
+- Tests first, or with the code: compiled SQL, real execution, positive and negative types; a bug's red test first (skill `pr-shape` § Commits).
 - Before a mechanism: already in `src/`? otherwise short code with no dependency (skill `simple-big-wins`).
 - A stop point (`AGENTS.md` § Stop points) that the orchestrator has not settled: **stop** and report it.
 - No new dependency, even a dev one, without the user's agreement.
