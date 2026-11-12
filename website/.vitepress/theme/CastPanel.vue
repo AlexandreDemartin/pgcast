@@ -12,20 +12,22 @@ if (!cast) throw new Error(`<CastPanel example="${props.example}">: there is no 
 </script>
 
 <template>
-  <div class="CastPanel" role="group" aria-label="What you write, what Postgres runs, what TypeScript knows">
-    <div>
-      <h5><em>TS</em>You write</h5>
-      <slot />
+  <div class="CastPanel-frame">
+    <div class="CastPanel" role="group" aria-label="What you write, what Postgres runs, what TypeScript knows">
+      <div>
+        <h5><em>TS</em>You write</h5>
+        <slot />
+      </div>
+      <div>
+        <h5><em>SQL</em>Postgres runs</h5>
+        <div v-html="cast.sql" />
+        <p class="values">values <b>{{ cast.values }}</b></p>
+      </div>
+      <div>
+        <h5><em>::</em>TypeScript knows</h5>
+        <div v-html="cast.type" />
+      </div>
     </div>
-    <div>
-      <h5><em>SQL</em>Postgres runs</h5>
-      <div v-html="cast.sql" />
-      <p class="values">values <b>{{ cast.values }}</b></p>
-    </div>
-    <div>
-      <h5><em>::</em>TypeScript knows</h5>
-      <div v-html="cast.type" />
-    </div>
+    <p v-if="$slots.caption" class="CastPanel-caption"><slot name="caption" /></p>
   </div>
-  <p v-if="$slots.caption" class="CastPanel-caption"><slot name="caption" /></p>
 </template>
