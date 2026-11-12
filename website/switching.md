@@ -105,7 +105,7 @@ To find the call, run with `--trace-deprecation`: Node prints the stack, and its
 NODE_OPTIONS=--trace-deprecation npm test
 ```
 
-Then fix the call, or turn on its option:
+Each code warns once, so the stack shows only its first call: fix it, then run again, and the next call with the same code warns in turn. Fix the call, or turn on its option:
 
 | Warning | The call | Fix it, or turn on |
 |---|---|---|
@@ -114,7 +114,7 @@ Then fix the call, or turn on its option:
 
 ## Turn on the opt-ins
 
-Once no warning is left, or each one comes from a call you've checked, turn both options on, once, before the first query:
+Once a run shows no warning, or each one comes from a call you've checked, turn both options on, once, before the first query:
 
 ```ts twoslash
 import * as db from 'zapatos/db';
