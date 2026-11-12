@@ -1,8 +1,8 @@
 // Copyright (C) 2026 Alexandre Demartin
 // The SQL and the type of each cast panel, computed at build from its example (examples/<name>.ts), never typed by
 // hand. Each example runs once against a pool that only records: what it records is the `{ text, values }` that the
-// query's `.run()` gets from `.compile()`. The type is the one Twoslash gives the example's first `const`: its name,
-// then one level down.
+// query's `.run()` gets from `.compile()`. The type is the one Twoslash gives the example's first `const` with no type
+// written, the query's (a row typed first, `const row: s.films.Insertable`, is skipped): its name, then one level down.
 import { readFileSync } from 'node:fs';
 import { basename } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -96,9 +96,9 @@ export async function castOf(file: string, twoslasher: ReturnType<typeof createT
   const
     name = basename(file, '.ts'),
     source = readFileSync(file, 'utf8'),
-    result = /^const (\w+)/m.exec(source.split('// ---cut---')[1] ?? '')?.[1];
+    result = /^const (\w+) =/m.exec(source.split('// ---cut---')[1] ?? '')?.[1];
 
-  if (!result) throw new Error(`examples/${name}.ts: no \`const\` after \`// ---cut---\` to give the type of`);
+  if (!result) throw new Error(`examples/${name}.ts: no \`const <name> =\` after \`// ---cut---\` to give the type of`);
 
   (globalThis as any).pool = pool;
   const

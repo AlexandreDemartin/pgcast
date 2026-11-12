@@ -233,7 +233,7 @@ Then the row and the query:
 
 </CastPanel>
 
-The type lists the columns you must give and, with a `?`, those you can leave out; each takes its value, or a `db.Parameter`, `db.Default` or SQL fragment, which you won't need here. Typed on its own, the row gets errors that name the column at fault. Print the new film:
+`newFilm` is a `films.JSONSelectable`, the row type `selectOne()` gave. The row's `films.Insertable` asks for the `NOT NULL` columns with no default and leaves the others optional; typed on its own, the row gets errors that name the column at fault. Print the new film:
 
 ```ts twoslash
 import * as db from 'zapatos/db';
@@ -246,7 +246,7 @@ const newFilm = await db.insert('films', row).run(pool);
 console.log(newFilm);
 ```
 
-Hover `newFilm`: a `films.JSONSelectable`, the row type `selectOne()` gave. Run the file, and it prints the new row:
+Run the file, and it prints the new row:
 
 ```txt
 {
@@ -278,6 +278,8 @@ const row: s.films.Insertable = {
 ::: tip Opt-in
 Leave a key out to get its column's default. A key set to `undefined` is sent as `NULL`, as in Zapatos 6.6.1, and pgcast warns once (`PGCAST_DEP002`). With `db.setConfig({ undefinedMeansMissing: true })`, it counts as left out; that's the default from 7.0 ([Versions, opt-ins and warnings](/versions)).
 :::
+
+<!-- joined: src/films.ts -->
 
 With the running time back in the row, here is your whole file, the steps of this page in order:
 

@@ -269,6 +269,12 @@ Candidates for a check, a rule or a skill line.
 - #203 — `process.on('warning', …)` does not stop Node's own print; only `--no-warnings` does, and `--no-deprecation` stops the warning before the listener — `branch-reviewer`
 - #203 — The generator sends its catalog queries concurrently: a `debugListener` sample's `<n>` holds only for a named config with one relation — `branch-reviewer`, `builder`
 - #203 — Each fix round gets its own scratch folder named after its PR, or two batches share probes — `builder`
+- #214 — A cast panel shows the first `const` with no type written: an example that types its input first keeps its result in the panel; a Twoslash hover on an annotated `const` shows only the type's name — `builder`
+- #220 — `llms.ts` has no self-check, unlike `cast.data.ts`: a regression of its nested-block or `@errors` handling would pass the build; a small self-check would guard both — `builder`
+- #220 — A per-page list of changes in a generated file is attributed from the file itself (the `Source:` line before each change), not from grep order — `builder`
+- #115 — A check that opts in with a marker needs a loose detector beside its strict parser: any line the detector sees and the parser cannot read fails, or a near miss turns the check off silently — `branch-reviewer`, `builder`
+- #115 — A page that shows « the whole file » beside its steps holds two copies of one fact: compare them at build — `branch-reviewer`
+- #115 — Re-checking an `@errors` claim depends on the compiler options (TS18048 needs `strictNullChecks`) — `builder`
 - #115 — A hand-written fence scanner is checked against markdown-it's `fence` tokens across every page (0 differences here); synthetic inputs show where it departs (CRLF, blockquotes, a backtick in the info string) — `branch-reviewer`
 - #115 — VitePress's own dead-link check fails first on a Markdown link to a missing page: a planted case for `anchors.ts` uses a missing anchor or a raw `<a href>` — `branch-reviewer`, `builder`
 
@@ -302,4 +308,5 @@ Minor review defects, taken up by the end-of-chapter review.
 - #200 — `src/db/shortcuts.ts:298`: the `upsert()` JSDoc still shows `` { name: db.sql`${'users.name'}` } ``, which fails with TS2345 on a real schema; write `` db.sql`${'users'}.${'name'}` `` — `builder`
 - #217 — `src/db/shortcuts.ts` `UpsertReturnableForTable`: `undefined extends RA ? UpsertAction : {}` is always true without `strictNullChecks`, so `reportAction: 'suppress'` keeps `$action` in the type while it is `undefined` at run time (as in Zapatos 6.6.1) — `builder`
 - #215 — `website/.vitepress/cast.data.ts` `layOut` keeps the template's whitespace before a keyword it does not break on: write an `INSERT … SELECT` and check its panel — `builder`
+- #115 — the root `npm run lint` does not cover `website/*.mjs`, which has 4 `no-undef` errors under the root ESLint config — `builder`
 - #115 — no `.gitattributes`: a CRLF page breaks `llms.ts`'s title check before any other docs check; `* text=auto eol=lf` would cover every checker at once — `builder`
