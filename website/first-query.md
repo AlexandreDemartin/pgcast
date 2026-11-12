@@ -233,7 +233,7 @@ Then the row and the query:
 
 </CastPanel>
 
-The type lists the columns you must give and, with a `?`, those you can leave out; each takes its value, or a `db.Parameter` or SQL fragment, which you won't need here. `db.insert('films', { … })` runs the same, but a typed row gets the clearer errors: TypeScript checks it on its own, not against both forms of `insert()`, one row or an array. Print the new film, and run the file:
+The type lists the columns you must give and, with a `?`, those you can leave out; each takes its value, or a `db.Parameter` or SQL fragment, which you won't need here. `db.insert('films', { … })` runs the same, but a typed row gets the clearer errors: TypeScript checks it on its own, not against both forms of `insert()`, one row or an array. Print the new film:
 
 ```ts twoslash
 import * as db from 'zapatos/db';
@@ -246,7 +246,7 @@ const newFilm = await db.insert('films', row).run(pool);
 console.log(newFilm);
 ```
 
-It prints the new row:
+Hover `newFilm`: a `films.JSONSelectable`, the row type `selectOne()` gave. Run the file, and it prints the new row:
 
 ```txt
 {
