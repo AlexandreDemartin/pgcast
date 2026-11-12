@@ -388,7 +388,7 @@ function filmCardsOf(queryable: db.Queryable, studio_id: number): Promise<FilmCa
 
 ### `FullSelectReturnTypeForTable` {#FullSelectReturnTypeForTable}
 
-`FullSelectReturnTypeForTable<T, C, L, E, M>`: what `.run()` gives for a mode `M`: the row (the `JSONSelectable`, narrowed by `columns`, with `extras` and `lateral`; or the passed-through subquery's result), as an array, as is, or with `undefined`; or a `number`.
+`FullSelectReturnTypeForTable<T, C, L, E, M>`: what `.run()` gives for a mode `M`: the row (the `JSONSelectable`, narrowed by `columns`, with `extras` and `lateral`; or the passed-through subquery's result), as an array, as is, or with `undefined`; or a `number`. The row of the writes is [`ReturningTypeForTable`](/insert#ReturningTypeForTable).
 
 ### `SelectSignatures` {#SelectSignatures}
 
