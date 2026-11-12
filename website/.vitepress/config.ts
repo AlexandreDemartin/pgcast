@@ -21,7 +21,7 @@ export default defineConfig({
   lang: 'en-GB',
   base: '/pgcast/',  // GitHub Pages: alexandredemartin.github.io/pgcast/
   cleanUrls: true,
-  srcExclude: ['README.md'],  // for whoever works on the site, not a page of it
+  srcExclude: ['README.md', 'templates/**'],  // for whoever writes the site, not pages of it
   buildEnd: writeLlmsFiles,  // llms.txt and llms-full.txt, for assistants
   head: [
     ['link', { rel: 'preconnect', href: 'https://fonts.googleapis.com' }],
