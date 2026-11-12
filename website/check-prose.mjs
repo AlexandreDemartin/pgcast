@@ -67,9 +67,10 @@ function pattern(quote) {
 
 /**
  * Each string or template literal of the built `zapatos/db` that can be a message, with 20 characters or more of its
- * own; a value it interpolates written `…`.
+ * own; a value it interpolates written `…`. `templates`: the source of each such template literal, between its
+ * backticks, `${…}` as written.
  */
-const messages = [];
+const messages = [], templates = [];
 const dist = new URL('dist/db/', import.meta.resolve('zapatos/db'));
 if (!existsSync(dist)) throw new Error('check-prose.mjs: no zapatos/dist/db: `npm ci && npm run build` at the root');
 for (const file of readdirSync(dist).filter(file => file.endsWith('.js'))) {
@@ -79,19 +80,24 @@ for (const file of readdirSync(dist).filter(file => file.endsWith('.js'))) {
       ts.isTemplateExpression(node) ? [node.head, ...node.templateSpans.map(span => span.literal)].map(part => part.text)
         .join('…') :
       undefined;
-    if (literal !== undefined && literal.replaceAll('…', '').length >= 20) messages.push(literal);
+    if (literal !== undefined && literal.replaceAll('…', '').length >= 20) {
+      messages.push(literal);
+      if (ts.isTemplateExpression(node)) templates.push(node.getText(source).slice(1, -1).replace(/\s+/g, ' '));
+    }
     ts.forEachChild(node, visit);
   };
-  visit(ts.createSourceFile(file, readFileSync(new URL(file, dist), 'utf8'), ts.ScriptTarget.Latest));
+  const source = ts.createSourceFile(file, readFileSync(new URL(file, dist), 'utf8'), ts.ScriptTarget.Latest);
+  visit(source);
 }
 
 /**
  * Whether `quote` is a message of the library: the whole of a literal, `…` for a value or for text left out, or the
- * literal with a value in place of each `…`, one word (`1ms`, not `1 ms`). A quote may show it as the template literal
- * it is, between backticks.
+ * literal with a value in place of each `…`, one word (`1ms`, not `1 ms`). A quote that shows a `${…}` is the source of
+ * a template literal, between backticks or not, each `${…}` as written.
  */
 function isMessage(quote) {
   const text = quote.replace(/^`(.*)`$/, '$1'), quoted = new RegExp(`^${pattern(text).source}$`);
+  if (text.includes('${')) return templates.some(template => quoted.test(template));
   return messages.some(literal =>
     quoted.test(literal) || new RegExp(`^${literal.split('…').map(escape).join('\\S+?')}$`).test(text));
 }
