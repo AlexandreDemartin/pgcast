@@ -71,6 +71,9 @@ describe('identifiers (strings)', () => {
     // `"; DROP TABLE t; --"` is one quoted name too, the column `; DROP TABLE t; --`, as under 6.6.1
     for (const name of ['"a"', '"a"."b"', '"a""b"', '"a.b"', '"a" . "b"', '"a"\n.\n"b"', '"s"."t"."c"', '"; DROP TABLE t; --"'])
       expect(one(name), name).toEqual({ text: name, values: [] });
+    // after the first part, a part may also be unquoted or `U&` quoted, as Postgres lexes it
+    for (const name of ['"s".t."c"', '"s" . t . "c"', '"s".a$1.é."c"', '"t".U&"c"', '"t".u&"c"', '"s".t.U&"c"', '"t".U&"\\0063"'])
+      expect(one(name), name).toEqual({ text: name, values: [] });
   });
 
   it('quotes any other string that starts and ends with a double quote like any other name', () => {
@@ -78,6 +81,10 @@ describe('identifiers (strings)', () => {
     expect(one('"a" FROM t; DROP TABLE t; SELECT "a"')).toEqual({ text: '"""a"" FROM t; DROP TABLE t; SELECT ""a"""', values: [] });
     expect(one('"a" || "b"')).toEqual({ text: '"""a"" || ""b"""', values: [] });
     expect(one('"a"/**/."b"')).toEqual({ text: '"""a""/**/"."""b"""', values: [] });
+    // a `UESCAPE` clause, a space after `U&` (`U & "b"`, an expression) or an unquoted part that is not an identifier
+    expect(one(`"t".U&"c" UESCAPE '!' || "d"`)).toEqual({ text: `"""t"""."U&""c"" UESCAPE '!' || ""d"""`, values: [] });
+    expect(one('"t".U& "c"')).toEqual({ text: '"""t"""."U& ""c"""', values: [] });
+    expect(one('"t".$1."c"')).toEqual({ text: '"""t"""."$1"."""c"""', values: [] });
     expect(one('"')).toEqual({ text: '""""', values: [] });
     // as for `a""b`, a name that compiles to quoted names only is written so: `""` gives the column `"`
     expect(one('""')).toEqual({ text: '""""', values: [] });
