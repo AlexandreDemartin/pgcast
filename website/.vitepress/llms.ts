@@ -68,8 +68,8 @@ function plain(source: string, casts: Record<string, string>, srcDir: string, ur
         if (casts[name] === undefined) throw new Error(`llms.ts: no cast for the panel of examples/${name}.ts`);
         return `You write:\n${example.replace(/<template[\s\S]*?<\/template>/g, '')}\n${casts[name]}\n`;
       })
-      .replace(/^<<< (\S+?)(?:\{(.*)\})?$/gm, (_, path, info = '') =>
-        '```' + info + '\n' + readFileSync(join(srcDir, path), 'utf8').trimEnd() + '\n```')
+      .replace(/^<<< (\S+?)(?:#([\w.-]+))?(?:\{(.*?)\})?( \[.+\])?$/gm, (_, path, region, info = '', label = '') =>
+        '```' + info + label + '\n' + snippet(join(srcDir, path), region) + '\n```')
       .replace(/<InstallLine command="([^"]*)" \/>/g, '```sh\n$1\n```'),
     missed = /<\/?CastPanel\b.*/.exec(expanded)?.[0];
 
@@ -102,6 +102,19 @@ function plain(source: string, casts: Record<string, string>, srcDir: string, ur
     else if (!/^\{[.#][^}]*\}$/.test(line)) lines.push((prefix + inline(line, url)).trimEnd());
   }
   return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+/**
+ * A file as `<<< file` shows it; with a region, `<<< file#name`, its lines between `// #region name` and
+ * `// #endregion name`.
+ */
+function snippet(file: string, region?: string) {
+  const
+    lines = readFileSync(file, 'utf8').trimEnd().split('\n'),
+    start = region ? lines.findIndex(line => line.trim() === `// #region ${region}`) : -1,
+    end = region ? lines.findIndex(line => line.trim() === `// #endregion ${region}`) : lines.length;
+  if (region && (start < 0 || end < start)) throw new Error(`llms.ts: no region ${region} in ${file}`);
+  return lines.slice(start + 1, end).join('\n');
 }
 
 /** The code a Twoslash block shows: what follows `// ---cut---`, without Twoslash's own `// @` and `// ^` lines. */

@@ -209,6 +209,13 @@ Candidates for a check, a rule or a skill line.
 - #145 — `.catch(err => { …; return undefined; throw err; })` is typed `any` without `strictNullChecks`: write `(err): undefined =>` to keep the row type in every mode — `branch-reviewer`, `builder`
 - #145 — `pg.DatabaseError` exists from pg 8.6 and `pg.native` rejects with plain `Error`s, while the peer range is `pg >=7.18.2`: a docs clause on pg versions is checked on the tarballs — `branch-reviewer`, `builder`
 - #145 — pgcast is stricter than SQL for options (`'desc'`, `'serializable'` run in Postgres): « cannot mean anything in SQL » is checked against Postgres itself — `branch-reviewer`
+- #140 — A Postgres message that quotes a count is probed at more than one size (08P01 at 65,536 and at 200,000 differ): quote it as an example — `branch-reviewer`, `builder`
+- #140 — A guide that shortens a reference rule loses its condition (« an array or string conflict target » became « the conflict target »): copy the condition or link — `branch-reviewer`
+- #140 — 21000 comes with any `DO UPDATE` batch that names a key twice, not only with an existing row — `branch-reviewer`
+- #142 — A `${number}` template type takes leading spaces and hex (`'( 1.5,2.5)'`, `'0x10'`): a claim that it « takes only » one form needs a negative `tsc` probe — `branch-reviewer`, `builder`
+- #142 — Every type inside `declare module 'zapatos/custom'` is exported and the blocks merge: a helper type in a placeholder takes a prefixed name — `branch-reviewer`, `builder`
+- #142 — A placeholder in the shared docs schema is a cross-page dependency: `git grep` the open worktrees before narrowing it — `builder`
+- #142 — Bulk inserts into the docs schema without ids hit 23505 at the 1000th row (seeds from 1000, sequences from 1): probes set explicit ids from 2000 — `branch-reviewer`
 
 ## Minors kept
 
