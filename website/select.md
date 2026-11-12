@@ -51,7 +51,7 @@ The SQL of each row is what the built library compiles, on the docs schema; `…
 | `lock: { for: 'UPDATE' }` | `FOR UPDATE` | none |
 
 ::: tip Strict null checks
-`columns`, `extras` and `lateral` change the type only with `strictNullChecks` (or `strict`) on. Without it, the result stays the full `JSONSelectable` and an extra or a lateral key is not in the type.
+`columns`, `extras` and `lateral` change the type only with `strictNullChecks` (or `strict`) on. Without it, the result stays the full `JSONSelectable` and an extra or a lateral key is not in the type; the type refuses nothing, not even `columns` beside one `lateral` subquery, and one subquery is typed as the table's row while its own result comes back.
 :::
 
 ### `columns`
@@ -93,7 +93,7 @@ Paging through a long list: [Paginate a list](/paginate).
 `lateral?: { [key: string]: SQLFragment } | SQLFragment`, a [`LateralOption`](#LateralOption): other shortcuts, nested, each joined with `LEFT JOIN LATERAL … ON true`. In them, [`db.parent()`](/sql-template#parent) names a column of this query's table.
 
 - **An object**: each key becomes a key of the result, holding its subquery's result: an array for `select()`, an object or `null` for `selectOne()`, a number for `count()`. The keys are joined in alphabetical order; each is one identifier, `"lateral_<key>"`.
-- **One subquery**: its result is passed through in place of each row, as for a many-to-many table whose own columns you don't need. Then `columns` and `extras` have nothing to add to, and the type refuses them.
+- **One subquery**: its result is passed through in place of each row, as for a many-to-many table whose own columns you don't need. Then `columns` and `extras` have nothing to add to, and the type refuses them, with `strictNullChecks` on.
 
 Steps, nesting and self-joins: [Join through a lateral](/lateral). Since pgcast 6.6.2, a key or an `alias` with a `"` in it stays one identifier; in Zapatos 6.6.1 it could close its quotes ([changelog](https://github.com/AlexandreDemartin/pgcast/blob/master/CHANGELOG.md), § Security).
 
