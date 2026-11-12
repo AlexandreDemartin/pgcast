@@ -21,6 +21,7 @@ Runs `callback` in one transaction, then commits it, retries it or rolls it back
 
 One of `ines` and `barnaby` is `true`, the other `false`. When both read before either commits, Postgres refuses one of the two `INSERT`s with 40001, and pgcast runs that callback again, which finds the seat taken. That transaction sends:
 
+<!-- probe: (n => db.serializable(pool, async () => { if (n++ === 0) throw Object.assign(new Error(), { code: '40001' }); }))(0) -->
 ```sql
 -- attempt 1
 START TRANSACTION ISOLATION LEVEL SERIALIZABLE
@@ -44,9 +45,9 @@ The two `count()`s run on `client`, outside the transaction: after the block, `b
 
 | When | SQL |
 |---|---|
-| before the callback | `START TRANSACTION ISOLATION LEVEL SERIALIZABLE`: the level's value, written as it is |
-| the callback resolves | `COMMIT` |
-| `START TRANSACTION`, the callback or `COMMIT` rejects | `ROLLBACK`, then a retry or the rejection |
+| before the callback | `START TRANSACTION ISOLATION LEVEL SERIALIZABLE`<!-- probe: db.serializable(pool, async () => {}) -->: the level's value, written as it is |
+| the callback resolves | `COMMIT`<!-- probe: db.serializable(pool, async () => {}) --> |
+| `START TRANSACTION`, the callback or `COMMIT` rejects | `ROLLBACK`<!-- probe: db.serializable(pool, async () => { throw new Error(); }) -->, then a retry or the rejection |
 
 - These three run on the transaction's client, as the callback's queries do. Each reaches [`queryListener`](/runtime-config#Config.queryListener) and [`resultListener`](/runtime-config#Config.resultListener) with the transaction's id: a counter from 0, one per transaction opened, kept across retries; a transaction passed through keeps the outer one's.
 - No `SAVEPOINT`: a transaction inside another is the outer one ([Passing a transaction through](#passing-a-transaction-through)).
@@ -66,9 +67,9 @@ When `START TRANSACTION`, the callback or `COMMIT` rejects with a `code` of 4000
 
 | Message | When |
 |---|---|
-| ``Transaction rollback (code ${err.code}) on attempt ${attempt} of ${maxAttempts}, retrying in ${delayBeforeRetry}ms`` | before the wait |
-| ``Retrying transaction, attempt ${attempt} of ${maxAttempts}`` | before `START TRANSACTION` again |
-| ``Transaction rollback (code ${err.code}) on attempt ${attempt} of ${maxAttempts}, giving up`` | before it rejects |
+| ``Transaction rollback (code ${err.code}) on attempt ${attempt} of ${maxAttempts}, retrying in ${delayBeforeRetry}ms``<!-- message --> | before the wait |
+| ``Retrying transaction, attempt ${attempt} of ${maxAttempts}``<!-- message --> | before `START TRANSACTION` again |
+| ``Transaction rollback (code ${err.code}) on attempt ${attempt} of ${maxAttempts}, giving up``<!-- message --> | before it rejects |
 
 The callback may run several times: [Retry a transaction](/retries).
 
@@ -78,7 +79,7 @@ Given the client of a transaction that `transaction()` has open, it sends nothin
 
 <<< ./examples/plain/pass_through.ts{ts twoslash}
 
-One transaction, both seats or neither: `START TRANSACTION ISOLATION LEVEL SERIALIZABLE`, the two `INSERT`s, `COMMIT`.
+One transaction, both seats or neither: `START TRANSACTION ISOLATION LEVEL SERIALIZABLE`<!-- probe: db.serializable(pool, async () => {}) -->, the two `INSERT`s, `COMMIT`.
 
 - The callback runs at the outer transaction's level, and that level is not checked, at run time or by the type: every `TxnClient` is a [`Queryable`](/sql-template#Queryable), so `db.serializable(txnClient, …)` type-checks with a client of `db.readCommitted()`, and its callback runs in that `READ COMMITTED` transaction.
 - A function whose parameter is a `TxnClientFor…` type is checked: [`IsolationSatisfying`](#IsolationSatisfying).
@@ -88,7 +89,7 @@ One transaction, both seats or neither: `START TRANSACTION ISOLATION LEVEL SERIA
 
 | Rejects with | When | Since |
 |---|---|---|
-| `Isolation level must be an IsolationLevel value (e.g. IsolationLevel.Serializable), not '…'` | `isolationLevel` is not a value of `IsolationLevel`; thrown before a client is checked out or a query sent | pgcast 6.6.2 |
+| `Isolation level must be an IsolationLevel value (e.g. IsolationLevel.Serializable), not '…'`<!-- message --> | `isolationLevel` is not a value of `IsolationLevel`; thrown before a client is checked out or a query sent | pgcast 6.6.2 |
 | the callback's error | after `ROLLBACK`; for 40001 and 40P01, after the last attempt | Zapatos |
 | a `TypeError`, `Cannot destructure property 'code' of 'err' as it is null.` (or `undefined`) | the callback throws `null` or `undefined`, after `ROLLBACK` | Zapatos |
 
@@ -111,7 +112,7 @@ Zapatos 6.6.1 wrote any value after `ISOLATION LEVEL` as it was, where it could 
 db.serializable(txnClientOrQueryable, callback)
 ```
 
-[`transaction()`](#transaction) at `IsolationLevel.Serializable`: `START TRANSACTION ISOLATION LEVEL SERIALIZABLE`. Its callback gets a [`TxnClientForSerializable`](#TxnClientForSerializable).
+[`transaction()`](#transaction) at `IsolationLevel.Serializable`: `START TRANSACTION ISOLATION LEVEL SERIALIZABLE`<!-- probe: db.transaction(pool, db.IsolationLevel.Serializable, async () => {}) -->. Its callback gets a [`TxnClientForSerializable`](#TxnClientForSerializable).
 
 ## `repeatableRead()` {#repeatableRead}
 
@@ -119,7 +120,7 @@ db.serializable(txnClientOrQueryable, callback)
 db.repeatableRead(txnClientOrQueryable, callback)
 ```
 
-[`transaction()`](#transaction) at `IsolationLevel.RepeatableRead`: `START TRANSACTION ISOLATION LEVEL REPEATABLE READ`. Its callback gets a [`TxnClientForRepeatableRead`](#TxnClientForRepeatableRead).
+[`transaction()`](#transaction) at `IsolationLevel.RepeatableRead`: `START TRANSACTION ISOLATION LEVEL REPEATABLE READ`<!-- probe: db.transaction(pool, db.IsolationLevel.RepeatableRead, async () => {}) -->. Its callback gets a [`TxnClientForRepeatableRead`](#TxnClientForRepeatableRead).
 
 ## `readCommitted()` {#readCommitted}
 
@@ -127,7 +128,7 @@ db.repeatableRead(txnClientOrQueryable, callback)
 db.readCommitted(txnClientOrQueryable, callback)
 ```
 
-[`transaction()`](#transaction) at `IsolationLevel.ReadCommitted`: `START TRANSACTION ISOLATION LEVEL READ COMMITTED`. Its callback gets a [`TxnClientForReadCommitted`](#TxnClientForReadCommitted).
+[`transaction()`](#transaction) at `IsolationLevel.ReadCommitted`: `START TRANSACTION ISOLATION LEVEL READ COMMITTED`<!-- probe: db.transaction(pool, db.IsolationLevel.ReadCommitted, async () => {}) -->. Its callback gets a [`TxnClientForReadCommitted`](#TxnClientForReadCommitted).
 
 ## `serializableRO()` {#serializableRO}
 
@@ -135,7 +136,7 @@ db.readCommitted(txnClientOrQueryable, callback)
 db.serializableRO(txnClientOrQueryable, callback)
 ```
 
-[`transaction()`](#transaction) at `IsolationLevel.SerializableRO`: `START TRANSACTION ISOLATION LEVEL SERIALIZABLE, READ ONLY`. Its callback gets a [`TxnClientForSerializableRO`](#TxnClientForSerializableRO). Postgres refuses a write in it (25006).
+[`transaction()`](#transaction) at `IsolationLevel.SerializableRO`: `START TRANSACTION ISOLATION LEVEL SERIALIZABLE, READ ONLY`<!-- probe: db.transaction(pool, db.IsolationLevel.SerializableRO, async () => {}) -->. Its callback gets a [`TxnClientForSerializableRO`](#TxnClientForSerializableRO). Postgres refuses a write in it (25006).
 
 ## `repeatableReadRO()` {#repeatableReadRO}
 
@@ -143,7 +144,7 @@ db.serializableRO(txnClientOrQueryable, callback)
 db.repeatableReadRO(txnClientOrQueryable, callback)
 ```
 
-[`transaction()`](#transaction) at `IsolationLevel.RepeatableReadRO`: `START TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY`. Its callback gets a [`TxnClientForRepeatableReadRO`](#TxnClientForRepeatableReadRO). Postgres refuses a write in it (25006).
+[`transaction()`](#transaction) at `IsolationLevel.RepeatableReadRO`: `START TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY`<!-- probe: db.transaction(pool, db.IsolationLevel.RepeatableReadRO, async () => {}) -->. Its callback gets a [`TxnClientForRepeatableReadRO`](#TxnClientForRepeatableReadRO). Postgres refuses a write in it (25006).
 
 ## `readCommittedRO()` {#readCommittedRO}
 
@@ -151,7 +152,7 @@ db.repeatableReadRO(txnClientOrQueryable, callback)
 db.readCommittedRO(txnClientOrQueryable, callback)
 ```
 
-[`transaction()`](#transaction) at `IsolationLevel.ReadCommittedRO`: `START TRANSACTION ISOLATION LEVEL READ COMMITTED, READ ONLY`. Its callback gets a [`TxnClientForReadCommittedRO`](#TxnClientForReadCommittedRO). Postgres refuses a write in it (25006).
+[`transaction()`](#transaction) at `IsolationLevel.ReadCommittedRO`: `START TRANSACTION ISOLATION LEVEL READ COMMITTED, READ ONLY`<!-- probe: db.transaction(pool, db.IsolationLevel.ReadCommittedRO, async () => {}) -->. Its callback gets a [`TxnClientForReadCommittedRO`](#TxnClientForReadCommittedRO). Postgres refuses a write in it (25006).
 
 ## `serializableRODeferrable()` {#serializableRODeferrable}
 
@@ -159,7 +160,7 @@ db.readCommittedRO(txnClientOrQueryable, callback)
 db.serializableRODeferrable(txnClientOrQueryable, callback)
 ```
 
-[`transaction()`](#transaction) at `IsolationLevel.SerializableRODeferrable`: `START TRANSACTION ISOLATION LEVEL SERIALIZABLE, READ ONLY, DEFERRABLE`. Its callback gets a [`TxnClientForSerializableRODeferrable`](#TxnClientForSerializableRODeferrable). Postgres refuses a write in it (25006). With `DEFERRABLE`, Postgres may wait for a snapshot, then runs the transaction without the overhead of a serializable one and with no risk of a serialization failure (40001) ([SET TRANSACTION](https://www.postgresql.org/docs/current/sql-set-transaction.html)): suited to a long report or a backup.
+[`transaction()`](#transaction) at `IsolationLevel.SerializableRODeferrable`: `START TRANSACTION ISOLATION LEVEL SERIALIZABLE, READ ONLY, DEFERRABLE`<!-- probe: db.transaction(pool, db.IsolationLevel.SerializableRODeferrable, async () => {}) -->. Its callback gets a [`TxnClientForSerializableRODeferrable`](#TxnClientForSerializableRODeferrable). Postgres refuses a write in it (25006). With `DEFERRABLE`, Postgres may wait for a snapshot, then runs the transaction without the overhead of a serializable one and with no risk of a serialization failure (40001) ([SET TRANSACTION](https://www.postgresql.org/docs/current/sql-set-transaction.html)): suited to a long report or a backup.
 
 A report whose two counts read the same snapshot:
 
@@ -167,6 +168,7 @@ A report whose two counts read the same snapshot:
 
 `report` is `{ films: 4, bookings: 0 }` on the docs schema. The transaction sends:
 
+<!-- probe: db.serializableRODeferrable(pool, async () => {}) -->
 ```sql
 START TRANSACTION ISOLATION LEVEL SERIALIZABLE, READ ONLY, DEFERRABLE
 -- the callback's two count() queries

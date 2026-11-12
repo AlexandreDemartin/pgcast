@@ -12,7 +12,7 @@ db.select(table, where, options?, mode?, aggregate?)
 Builds one `SELECT` of the rows of `table` that match `where`. It returns a [`SQLFragment`](/sql-template#SQLFragment): `.run(pool)` gives an array of the table's `JSONSelectable` rows, `[]` when none match.
 
 - `table`: a table of the generated schema.
-- `where`: a `Whereable`, an object of columns and their values or [conditions](/conditions), its keys in alphabetical order, joined by `AND` in one pair of parentheses, a condition or `sql` value in its own (`("id" = $1 AND ("studio_id" > $2) AND "title" = $3)`); a [`sql`](/sql-template#sql) fragment, written as it is; or [`db.all`](/sql-template#all), for no `WHERE` at all.
+- `where`: a `Whereable`, an object of columns and their values or [conditions](/conditions), its keys in alphabetical order, joined by `AND` in one pair of parentheses, a condition or `sql` value in its own (`("id" = $1 AND ("studio_id" > $2) AND "title" = $3)`<!-- probe: db.select('films', { title: 'x', id: 1000, studio_id: db.conditions.gt(1000) }) -->); a [`sql`](/sql-template#sql) fragment, written as it is; or [`db.all`](/sql-template#all), for no `WHERE` at all.
 - `options`: the [options](#options) below, all optional.
 - `mode` and `aggregate`: what `selectOne()`, `count()` and the others pass; see [`SelectResultMode`](#SelectResultMode).
 
@@ -24,8 +24,8 @@ Builds one `SELECT` of the rows of `table` that match `where`. It returns a [`SQ
 
 ### The SQL it writes
 
-- Each row is one `jsonb` value, `to_jsonb("films".*)`, so dates and times come back as strings and `bigint` as a number: the `JSONSelectable` types say so ([How types are cast from the catalog](/catalog-types)).
-- The rows are gathered into one array, `coalesce(jsonb_agg(result), '[]')`, around a subquery aliased `"sq_<alias or table>"`, so `ORDER BY` and `LIMIT` apply to the rows. One query, one value back.
+- Each row is one `jsonb` value, `to_jsonb("films".*)`<!-- probe: examples/select.ts -->, so dates and times come back as strings and `bigint` as a number: the `JSONSelectable` types say so ([How types are cast from the catalog](/catalog-types)).
+- The rows are gathered into one array, `coalesce(jsonb_agg(result), '[]')`<!-- probe: examples/select.ts -->, around a subquery aliased `"sq_<alias or table>"`, so `ORDER BY` and `LIMIT` apply to the rows. One query, one value back.
 - Inside, the clauses come in this order: `SELECT [DISTINCT …]` · the columns `AS result` · `FROM` the table `[AS alias]` · each `LEFT JOIN LATERAL` · `WHERE` · `GROUP BY` · `HAVING` · `ORDER BY` · `LIMIT` or `FETCH FIRST … WITH TIES` · `OFFSET` · each `FOR …` lock.
 - Every value is a parameter (`$1`, `$2`); every name is quoted as Postgres quotes it, any `"` in it doubled. Zapatos 6.6.1 let a name that held a `"` close its quotes; pgcast fixed this ([changelog](https://github.com/AlexandreDemartin/pgcast/blob/master/CHANGELOG.md), § Security).
 
@@ -35,20 +35,20 @@ The SQL of each row is what the built library compiles, on the docs schema; `…
 
 | Option | SQL it adds | Effect on the type |
 |---|---|---|
-| `columns: ['title']` | `jsonb_build_object($1::text, "title")` in place of `to_jsonb("films".*)` | only those keys (`JSONOnlyColsForTable`) |
-| `order: { by: 'title', direction: 'ASC' }` | `ORDER BY "title" ASC` | none |
-| `limit: 2` | `LIMIT $1` | none |
-| `offset: 2` | `OFFSET $1` | none |
-| `withTies: true` | `FETCH FIRST $1 ROWS WITH TIES` in place of `LIMIT $1` | none |
-| `extras: { cinema: 'name' }` | `\|\| jsonb_build_object($1::text, "name")` | a key per extra (`ExtrasResult`) |
-| `lateral: { cast: … }` | `LEFT JOIN LATERAL (…) AS "lateral_cast" ON true`, read by `\|\| jsonb_build_object($1::text, "lateral_cast".result)` | a key per subquery (`LateralResult`) |
-| `lateral: …`, one subquery | `"lateral_passthru".result` in place of the columns, and its `LEFT JOIN LATERAL` | the subquery's result, in place of the row |
-| `alias: 'mentor'` | `FROM "crew" AS "mentor"`, then `"mentor"` for the table | none |
-| `distinct: true` | `SELECT DISTINCT` | none |
-| `distinct: 'cinema_id'` | `SELECT DISTINCT ON ("cinema_id")` | none |
-| `groupBy: 'film_id'` | `GROUP BY "film_id"` | none |
-| `having: …` | `HAVING sum("votes") >= $1` | none |
-| `lock: { for: 'UPDATE' }` | `FOR UPDATE` | none |
+| `columns: ['title']` | `jsonb_build_object($1::text, "title")`<!-- probe: db.select('films', db.all, { columns: ['title'] }) --> in place of `to_jsonb("films".*)` | only those keys (`JSONOnlyColsForTable`) |
+| `order: { by: 'title', direction: 'ASC' }` | `ORDER BY "title" ASC`<!-- probe: db.select('films', db.all, { order: { by: 'title', direction: 'ASC' } }) --> | none |
+| `limit: 2` | `LIMIT $1`<!-- probe: db.select('films', db.all, { limit: 2 }) --> | none |
+| `offset: 2` | `OFFSET $1`<!-- probe: db.select('films', db.all, { offset: 2 }) --> | none |
+| `withTies: true` | `FETCH FIRST $1 ROWS WITH TIES`<!-- probe: db.select('films', db.all, { order: { by: 'release_year', direction: 'ASC' }, limit: 2, withTies: true }) --> in place of `LIMIT $1` | none |
+| `extras: { cinema: 'name' }` | `\|\| jsonb_build_object($1::text, "name")`<!-- probe: db.select('cinemas', db.all, { extras: { cinema: 'name' } }) --> | a key per extra (`ExtrasResult`) |
+| `lateral: { cast: … }` | `LEFT JOIN LATERAL (…) AS "lateral_cast" ON true`<!-- probe: db.select('films', db.all, { lateral: { cast: db.select('roles', { film_id: db.parent('id') }) } }) -->, read by `\|\| jsonb_build_object($1::text, "lateral_cast".result)`<!-- probe: db.select('films', db.all, { lateral: { cast: db.select('roles', { film_id: db.parent('id') }) } }) --> | a key per subquery (`LateralResult`) |
+| `lateral: …`, one subquery | `"lateral_passthru".result`<!-- probe: db.select('films', db.all, { lateral: db.select('roles', { film_id: db.parent('id') }) }) --> in place of the columns, and its `LEFT JOIN LATERAL` | the subquery's result, in place of the row |
+| `alias: 'mentor'` | `FROM "crew" AS "mentor"`<!-- probe: db.select('crew', db.all, { alias: 'mentor' }) -->, then `"mentor"` for the table | none |
+| `distinct: true` | `SELECT DISTINCT`<!-- probe: db.select('films', db.all, { distinct: true }) --> | none |
+| `distinct: 'cinema_id'` | `SELECT DISTINCT ON ("cinema_id")`<!-- probe: db.select('screenings', db.all, { distinct: 'cinema_id' }) --> | none |
+| `groupBy: 'film_id'` | `GROUP BY "film_id"`<!-- probe: db.select('ratings', db.all, { columns: ['film_id'], groupBy: 'film_id' }) --> | none |
+| `having: …` | `HAVING sum("votes") >= $1`<!-- probe: db.select('ratings', db.all, { groupBy: 'film_id', having: db.sql`sum(${'votes'}) >= ${db.param(10)}` }) --> | none |
+| `lock: { for: 'UPDATE' }` | `FOR UPDATE`<!-- probe: db.select('films', db.all, { lock: { for: 'UPDATE' } }) --> | none |
 
 ::: tip Strict
 `columns`, `extras` and `lateral` change the type only with `strictNullChecks` (or `strict`) on. Without it, the result stays the full `JSONSelectable` and an extra or a lateral key is not in the type; the type refuses nothing, not even `columns` beside one `lateral` subquery, and one subquery is typed as the table's row while its own result comes back.
@@ -103,8 +103,8 @@ Steps, nesting and self-joins: [Join through a lateral](/lateral). Since pgcast 
 
 ### `distinct`
 
-- `true`: `SELECT DISTINCT`, on the whole result object. The select list is that one `result`, so Postgres refuses an `order` on a column with it (42P10).
-- A column, an array of columns or a `sql` fragment: `SELECT DISTINCT ON (…)`, one row for each value. Give an `order` that starts with the same columns, or which row you get is up to Postgres.
+- `true`: `SELECT DISTINCT`<!-- probe: db.select('films', db.all, { distinct: true }) -->, on the whole result object. The select list is that one `result`, so Postgres refuses an `order` on a column with it (42P10).
+- A column, an array of columns or a `sql` fragment: `SELECT DISTINCT ON (…)`<!-- probe: db.select('screenings', db.all, { distinct: 'cinema_id' }) -->, one row for each value. Give an `order` that starts with the same columns, or which row you get is up to Postgres.
 
 <CastPanel example="selectDistinct">
 
@@ -114,7 +114,7 @@ Steps, nesting and self-joins: [Join through a lateral](/lateral). Since pgcast 
 
 ### `groupBy` and `having`
 
-- `groupBy`: a column, an array of columns (`GROUP BY "film_id", "stars"`) or a `sql` fragment.
+- `groupBy`: a column, an array of columns (`GROUP BY "film_id", "stars"`<!-- probe: db.select('ratings', db.all, { groupBy: ['film_id', 'stars'] }) -->) or a `sql` fragment.
 - `having`: a `Whereable`, in parentheses as in `where`, or a `sql` fragment.
 
 Postgres returns only the grouped columns, those a grouped primary key determines, and aggregates, and refuses any other (42803): the whole row, without `columns`, runs when `groupBy` holds the primary key.
@@ -131,9 +131,9 @@ Postgres returns only the grouped columns, those a grouped primary key determine
 
 | Key | Values | SQL |
 |---|---|---|
-| `for` | `'UPDATE'`, `'NO KEY UPDATE'`, `'SHARE'`, `'KEY SHARE'` | `FOR UPDATE` |
-| `of`, optional | a table name, or the `alias`; or an array of them | `OF "screenings"` |
-| `wait`, optional | `'NOWAIT'`, `'SKIP LOCKED'` | `NOWAIT` |
+| `for` | `'UPDATE'`, `'NO KEY UPDATE'`, `'SHARE'`, `'KEY SHARE'` | `FOR UPDATE`<!-- probe: db.select('screenings', db.all, { lock: { for: 'UPDATE' } }) --> |
+| `of`, optional | a table name, or the `alias`; or an array of them | `OF "screenings"`<!-- probe: db.select('screenings', db.all, { lock: { for: 'UPDATE', of: 'screenings' } }) --> |
+| `wait`, optional | `'NOWAIT'`, `'SKIP LOCKED'` | `NOWAIT`<!-- probe: db.select('screenings', db.all, { lock: { for: 'UPDATE', wait: 'NOWAIT' } }) --> |
 
 Postgres refuses a lock with `DISTINCT`, `GROUP BY` or an aggregate (0A000).
 
@@ -149,11 +149,11 @@ Postgres refuses a lock with `DISTINCT`, `GROUP BY` or an aggregate (0A000).
 
 | Message | When | Since |
 |---|---|---|
-| `Direction must be ASC/DESC, not '…'` | an `order` with another `direction` | Zapatos |
-| `Nulls must be FIRST/LAST/undefined, not '…'` | an `order` with another `nulls` | Zapatos |
-| `Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not '…'` | a `lock` with another `for` | pgcast 6.6.2 |
-| `Lock wait must be NOWAIT/SKIP LOCKED/undefined, not '…'` | a `lock` with another `wait` | pgcast 6.6.2 |
-| `Aggregate must be a function name (e.g. sum, or my_schema.my_agg), not '…'` | an `aggregate` that is not one, in `SelectResultMode.Numeric` | pgcast 6.6.2 |
+| `Direction must be ASC/DESC, not '…'`<!-- message --> | an `order` with another `direction` | Zapatos |
+| `Nulls must be FIRST/LAST/undefined, not '…'`<!-- message --> | an `order` with another `nulls` | Zapatos |
+| `Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not '…'`<!-- message --> | a `lock` with another `for` | pgcast 6.6.2 |
+| `Lock wait must be NOWAIT/SKIP LOCKED/undefined, not '…'`<!-- message --> | a `lock` with another `wait` | pgcast 6.6.2 |
+| `Aggregate must be a function name (e.g. sum, or my_schema.my_agg), not '…'`<!-- message --> | an `aggregate` that is not one, in `SelectResultMode.Numeric` | pgcast 6.6.2 |
 
 The type refuses a bad `direction`, `nulls` or `lock`, not a bad `aggregate`, a `string`. Zapatos 6.6.1 wrote a bad `lock` or `aggregate` into the SQL as it was, where it could run a second statement. A value that has no meaning in `where` or `having` (`db.Default`, `db.self`, `db.raw()`) throws as the query compiles: [Conditions](/conditions).
 
@@ -163,7 +163,7 @@ The type refuses a bad `direction`, `nulls` or `lock`, not a bad `aggregate`, a 
 db.selectOne(table, where, options?)
 ```
 
-As [`select()`](#select), with `LIMIT 1` and no `jsonb_agg`: `.run(pool)` gives the first row, or `undefined` when none matches. Any `limit` you pass is replaced by `1`; `offset` and the other options are kept. In a `lateral`, its key holds the row or `null`.
+As [`select()`](#select), with `LIMIT 1`<!-- probe: db.selectOne('films', db.all) --> and no `jsonb_agg`: `.run(pool)` gives the first row, or `undefined` when none matches. Any `limit` you pass is replaced by `1`; `offset` and the other options are kept. In a `lateral`, its key holds the row or `null`.
 
 With `withTies` and `order`, it writes `FETCH FIRST $1 ROWS WITH TIES`, here and in `selectExactlyOne()`. `.run()` then gives one of the tied rows; in a `lateral`, the parent row comes back once per tie.
 
@@ -203,7 +203,7 @@ What `selectExactlyOne()`, the mode `ExactlyOne` of `select()`, rejects with whe
 db.count(table, where, options?)
 ```
 
-`SELECT count(*) AS result`, with no `jsonb_agg`: `.run(pool)` gives a `number`, `0` when no row matches the `where`. The `bigint` that Postgres returns goes through `Number()`.
+`SELECT count(*) AS result`<!-- probe: db.count('films', db.all) -->, with no `jsonb_agg`: `.run(pool)` gives a `number`, `0` when no row matches the `where`. The `bigint` that Postgres returns goes through `Number()`.
 
 <CastPanel example="count">
 
@@ -215,11 +215,11 @@ db.count(table, where, options?)
 
 | Option | SQL it adds | Effect on the type |
 |---|---|---|
-| `columns: ['subtitled']` | `count("subtitled")` in place of `count(*)`: the rows where it is not `NULL` | none |
-| `distinct: true` | `SELECT DISTINCT count(*)`, on the one result: not `count(DISTINCT …)`, which needs a `sql` template | none |
-| `groupBy: 'film_id'` | `GROUP BY "film_id"`; `.run()` gives the first group's value only, and with no group rejects with a `TypeError` | none |
+| `columns: ['subtitled']` | `count("subtitled")`<!-- probe: db.count('screenings', db.all, { columns: ['subtitled'] }) --> in place of `count(*)`: the rows where it is not `NULL` | none |
+| `distinct: true` | `SELECT DISTINCT count(*)`<!-- probe: db.count('films', db.all, { distinct: true }) -->, on the one result: not `count(DISTINCT …)`, which needs a `sql` template | none |
+| `groupBy: 'film_id'` | `GROUP BY "film_id"`<!-- probe: db.count('ratings', db.all, { groupBy: 'film_id' }) -->; `.run()` gives the first group's value only, and with no group rejects with a `TypeError` | none |
 | `extras` | nothing | none |
-| `lateral: { … }` | its `LEFT JOIN LATERAL`s, whose results are not read; one subquery writes `SELECT  AS result`, which Postgres refuses | none |
+| `lateral: { … }` | its `LEFT JOIN LATERAL`s, whose results are not read; one subquery writes `SELECT  AS result`<!-- probe: db.count('films', db.all, { lateral: db.select('roles', { film_id: db.parent('id') }) }) -->, which Postgres refuses | none |
 | `having`, `limit`, `offset` | as in `select()`; when they leave no row (a `having` that keeps none, `limit: 0`, `offset: 1`), `.run()` rejects with a `TypeError` | none |
 
 `where`, `alias`, `withTies` and `lock` add what they add to `select()`. So does `order`, by a `groupBy` column or a `sql` fragment (`` db.sql`count(*)` ``): by another column, Postgres refuses the query (42803).
@@ -232,7 +232,7 @@ db.count(table, where, options?)
 db.sum(table, where, options?)
 ```
 
-`SELECT sum("column") AS result`, a `number`; otherwise as [`count()`](#count). Give one column in `columns`: without it, the SQL is `sum(*)`, which Postgres refuses (42883). When no row matches the `where`, Postgres returns `NULL`, and `Number(null)` makes it `0`.
+`SELECT sum("column") AS result`<!-- probe: db.sum('ratings', db.all, { columns: ['column'] }) -->, a `number`; otherwise as [`count()`](#count). Give one column in `columns`: without it, the SQL is `sum(*)`<!-- probe: db.sum('ratings', db.all) -->, which Postgres refuses (42883). When no row matches the `where`, Postgres returns `NULL`, and `Number(null)` makes it `0`.
 
 <CastPanel example="sum">
 
@@ -246,7 +246,7 @@ db.sum(table, where, options?)
 db.avg(table, where, options?)
 ```
 
-`SELECT avg("column") AS result`: the mean, through `Number()`, so `0` when no row matches. Otherwise as [`sum()`](#sum).
+`SELECT avg("column") AS result`<!-- probe: db.avg('ratings', db.all, { columns: ['column'] }) -->: the mean, through `Number()`, so `0` when no row matches. Otherwise as [`sum()`](#sum).
 
 <CastPanel example="avg">
 
@@ -260,7 +260,7 @@ db.avg(table, where, options?)
 db.min(table, where, options?)
 ```
 
-`SELECT min("column") AS result`, through `Number()`, so `0` when no row matches. The type says `number` whatever the column:
+`SELECT min("column") AS result`<!-- probe: db.min('ratings', db.all, { columns: ['column'] }) -->, through `Number()`, so `0` when no row matches. The type says `number` whatever the column:
 
 - a date or time column (`date`, `timestamp`, `timestamptz`) gives its milliseconds since 1970, as node-postgres reads it as a `Date`;
 - text or an enum gives `NaN`, unless the text reads as a number: `'9'` gives `9`.
@@ -279,7 +279,7 @@ Otherwise as [`sum()`](#sum).
 db.max(table, where, options?)
 ```
 
-`SELECT max("column") AS result`; as [`min()`](#min): `0` when no row matches, a date's milliseconds, and `NaN` on text or an enum unless the text reads as a number.
+`SELECT max("column") AS result`<!-- probe: db.max('ratings', db.all, { columns: ['column'] }) -->; as [`min()`](#min): `0` when no row matches, a date's milliseconds, and `NaN` on text or an enum unless the text reads as a number.
 
 <CastPanel example="max">
 

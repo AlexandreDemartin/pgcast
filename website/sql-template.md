@@ -47,19 +47,19 @@ Each value between `${…}` compiles by what it is. The SQL is the built library
 
 | Value | Compiles to | Entry |
 |---|---|---|
-| a string | a quoted name: `'films'` → `"films"`, `'public.films'` → `"public"."films"` | [Identifiers](#identifiers) |
-| `param(x, cast?)` | `$1`, or `CAST($1 AS "timestamptz")`; `x` in the values | [`param()`](#param) |
+| a string | a quoted name: `'films'` → `"films"`<!-- probe: db.sql`${'films'}` -->, `'public.films'` → `"public"."films"`<!-- probe: db.sql`${'public.films'}` --> | [Identifiers](#identifiers) |
+| `param(x, cast?)` | `$1`<!-- probe: db.sql`${db.param('x')}` -->, or `CAST($1 AS "timestamptz")`<!-- probe: db.sql`${db.param('x', 'timestamptz')}` -->; `x` in the values | [`param()`](#param) |
 | `raw(s)` | `s`, as it is | [`raw()`](#raw) |
-| `cols(o)` / `cols(a)` | the object's keys, sorted, or the array's items, quoted: `"film_id", "tag"` | [`cols()`](#cols) |
-| `vals(o)` / `vals(a)` | the values, in the order of `cols(o)`, or the array's: `$1, $2` | [`vals()`](#vals) |
-| any other object | a Whereable of its own enumerable keys, plain or not: `("studio_id" = $1)`; `{}` → `TRUE`, and so `new Date()` → `TRUE` | [Whereable objects](#whereable) |
+| `cols(o)` / `cols(a)` | the object's keys, sorted, or the array's items, quoted: `"film_id", "tag"`<!-- probe: db.sql`${db.cols({ tag: 'x', film_id: 1 })}` --> | [`cols()`](#cols) |
+| `vals(o)` / `vals(a)` | the values, in the order of `cols(o)`, or the array's: `$1, $2`<!-- probe: db.sql`${db.vals({ tag: 'x', film_id: 1 })}` --> | [`vals()`](#vals) |
+| any other object | a Whereable of its own enumerable keys, plain or not: `("studio_id" = $1)`<!-- probe: db.sql`${{ studio_id: 1000 }}` -->; `{}` → `TRUE`<!-- probe: db.sql`${{}}` -->, and so `new Date()` → `TRUE`<!-- probe: db.sql`${new Date()}` --> | [Whereable objects](#whereable) |
 | `self` | the current column, in a Whereable's fragment value | [`self`](#self) |
-| `parent(c?)` | the column of the parent query: `"studios"."id"` | [`parent()`](#parent) |
-| `Default` | `DEFAULT` | [`Default`](#Default) |
+| `parent(c?)` | the column of the parent query: `"studios"."id"`<!-- probe: db.select('studios', db.all, { lateral: { films: db.select('films', { studio_id: db.parent('id') }) } }) --> | [`parent()`](#parent) |
+| `Default` | `DEFAULT`<!-- probe: db.sql`${db.Default}` --> | [`Default`](#Default) |
 | a `sql` fragment | its own SQL, its parameters numbered on | [Nested fragments](#nested-fragments) |
 | an array | each item in turn, nothing between; `[]` → nothing | [Arrays](#arrays) |
 
-Anything else throws while compiling, so `run()` rejects before any query, and the type refuses it: a number or a boolean (`Alien object while interpolating SQL: 42`), `null`, `undefined`, a symbol such as [`all`](#all). The global object, which the type lets through, throws too: "Did you use `self` (the global object) where you meant `db.self` (the Zapatos value)?…".
+Anything else throws while compiling, so `run()` rejects before any query, and the type refuses it: a number or a boolean (`Alien object while interpolating SQL: 42`<!-- message -->), `null`, `undefined`, a symbol such as [`all`](#all). The global object, which the type lets through, throws too: "Did you use `self` (the global object) where you meant `db.self` (the Zapatos value)?…"<!-- message -->.
 
 ## Identifiers {#identifiers}
 
@@ -67,17 +67,17 @@ An interpolated string is a table or column name. It is double-quoted, so its ca
 
 | String | Compiles to | |
 |---|---|---|
-| `'films'` | `"films"` | |
-| `'public.films'` | `"public"."films"` | split on `.` |
-| `'a"b'` | `"a""b"` | a `"` is doubled, as `quote_ident` does |
-| `'a""b'` | `"a""b"` | already escaped by hand: as it is |
-| `'"Films"."title"'` | `"Films"."title"` | already a well-formed quoted name: as it is |
-| `'"films".title."x"'` | `"films".title."x"` | well-formed, ending with a quoted part: as it is |
-| `'"films".title'` | `"""films"""."title"` | not well-formed, as it ends unquoted: each `"` doubled, split on `.` |
-| `'"a" \|\| "b"'` | `"""a"" \|\| ""b"""` | not well-formed: one name |
+| `'films'` | `"films"`<!-- probe: db.sql`${'films'}` --> | |
+| `'public.films'` | `"public"."films"`<!-- probe: db.sql`${'public.films'}` --> | split on `.` |
+| `'a"b'` | `"a""b"`<!-- probe: db.sql`${'a"b'}` --> | a `"` is doubled, as `quote_ident` does |
+| `'a""b'` | `"a""b"`<!-- probe: db.sql`${'a""b'}` --> | already escaped by hand: as it is |
+| `'"Films"."title"'` | `"Films"."title"`<!-- probe: db.sql`${'"Films"."title"'}` --> | already a well-formed quoted name: as it is |
+| `'"films".title."x"'` | `"films".title."x"`<!-- probe: db.sql`${'"films".title."x"'}` --> | well-formed, ending with a quoted part: as it is |
+| `'"films".title'` | `"""films"""."title"`<!-- probe: db.sql`${'"films".title'}` --> | not well-formed, as it ends unquoted: each `"` doubled, split on `.` |
+| `'"a" \|\| "b"'` | `"""a"" \|\| ""b"""`<!-- probe: db.sql`${'"a" \x7c\x7c "b"'}` --> | not well-formed: one name |
 
 - Well-formed: a quoted identifier, then quoted, `U&` quoted or unquoted ones after each `.`, with or without spaces around it, the last one quoted.
-- The cost: a real column named `a""b` compiles to `"a""b"`, the column `a"b`.
+- The cost: a real column named `a""b` compiles to `"a""b"`<!-- probe: db.sql`${'a""b'}` -->, the column `a"b`.
 - Zapatos 6.6.1 wrapped the string in `"` without escaping, and wrote as it is any string that started and ended with `"`: a name could splice SQL around it. The generated `Table` and `Column` types already refused such names; the why is in [The security model](/security).
 
 Interpolate names rather than writing them in the literal: they are type-checked, and they follow the schema when you regenerate it.
@@ -100,17 +100,17 @@ The last row applies when [`castArrayParamsToJson`](/runtime-config#Config.castA
 
 | `cast` | Compiles to | Value sent |
 |---|---|---|
-| none | `$1` | `value`, as `pg` serialises it |
-| `'timestamptz'` | `CAST($1 AS "timestamptz")` | `value` |
-| `'pg_catalog"."text'` | `CAST($1 AS "pg_catalog"."text")` | `value` |
-| `'public.crew_job'`, `'int4[]'` | `CAST($1 AS "public.crew_job")`, `CAST($1 AS "int4[]")`: one name, not split | `value` |
-| `true` | `CAST($1 AS "json")` for an array or a plain object; `$1` otherwise | `JSON.stringify(value)`; otherwise `value` |
-| `false` | `$1` | `value`, never as JSON |
-| none or a string, for an array with `castArrayParamsToJson` on, or a plain object with `castObjectParamsToJson` on | `CAST($1 AS "json")`: a string `cast` is dropped, `param([1, 2], 'int4[]')` included | `JSON.stringify(value)` |
+| none | `$1`<!-- probe: db.sql`${db.param('x')}` --> | `value`, as `pg` serialises it |
+| `'timestamptz'` | `CAST($1 AS "timestamptz")`<!-- probe: db.sql`${db.param('x', 'timestamptz')}` --> | `value` |
+| `'pg_catalog"."text'` | `CAST($1 AS "pg_catalog"."text")`<!-- probe: db.sql`${db.param('x', 'pg_catalog"."text')}` --> | `value` |
+| `'public.crew_job'`, `'int4[]'` | `CAST($1 AS "public.crew_job")`<!-- probe: db.sql`${db.param('x', 'public.crew_job')}` -->, `CAST($1 AS "int4[]")`<!-- probe: db.sql`${db.param([1], 'int4[]')}` -->: one name, not split | `value` |
+| `true` | `CAST($1 AS "json")`<!-- probe: db.sql`${db.param([1], true)}` --> for an array or a plain object; `$1`<!-- probe: db.sql`${db.param('x', true)}` --> otherwise | `JSON.stringify(value)`; otherwise `value` |
+| `false` | `$1`<!-- probe: db.sql`${db.param([1], false)}` --> | `value`, never as JSON |
+| none or a string, for an array with `castArrayParamsToJson` on, or a plain object with `castObjectParamsToJson` on | `CAST($1 AS "json")`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${db.param([1, 2], 'int4[]')}`) -->: a string `cast` is dropped, `param([1, 2], 'int4[]')` included | `JSON.stringify(value)` |
 
-- A string `cast` is written as `"cast"` if that is well-formed (quoted parts joined by `.`); otherwise it is one quoted name, any `"` doubled, so it cannot close its quotes: `'int4") || (SELECT 1) || ("int4'` gives `CAST($1 AS "int4"") || (SELECT 1) || (""int4")`, a type that does not exist. Zapatos 6.6.1 wrote any `cast` as it is between quotes.
-- For an array type, cast in `sql` and pass `false`, which keeps the value out of JSON under either option: `` db.sql`${db.param(ids, false)}::int4[]` `` gives `$1::int4[]`. Without `false`, `castArrayParamsToJson` makes it `CAST($1 AS "json")::int4[]`, which Postgres rejects (42846).
-- As a Whereable value or in `vals([…])` (so in [`isIn()`](/conditions#conditions.isIn)), a `Parameter` compiles as it is, with its cast: `{ title: db.param('x', 'text') }` gives `("title" = CAST($1 AS "text"))`. Zapatos 6.6.1 wrapped it in a second parameter, sent as JSON (`'{"value":"x","cast":"text"}'`).
+- A string `cast` is written as `"cast"` if that is well-formed (quoted parts joined by `.`); otherwise it is one quoted name, any `"` doubled, so it cannot close its quotes: `'int4") || (SELECT 1) || ("int4'` gives `CAST($1 AS "int4"") || (SELECT 1) || (""int4")`<!-- probe: db.sql`${db.param(1, 'int4") || (SELECT 1) || ("int4')}` -->, a type that does not exist. Zapatos 6.6.1 wrote any `cast` as it is between quotes.
+- For an array type, cast in `sql` and pass `false`, which keeps the value out of JSON under either option: `` db.sql`${db.param(ids, false)}::int4[]` `` gives `$1::int4[]`<!-- probe: db.sql`${db.param([1], false)}::int4[]` -->. Without `false`, `castArrayParamsToJson` makes it `CAST($1 AS "json")::int4[]`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${db.param([1])}::int4[]`) -->, which Postgres rejects (42846).
+- As a Whereable value or in `vals([…])` (so in [`isIn()`](/conditions#conditions.isIn)), a `Parameter` compiles as it is, with its cast: `{ title: db.param('x', 'text') }` gives `("title" = CAST($1 AS "text"))`<!-- probe: db.sql`${{ title: db.param('x', 'text') }}` -->. Zapatos 6.6.1 wrapped it in a second parameter, sent as JSON (`'{"value":"x","cast":"text"}'`).
 
 ### `Parameter` {#Parameter}
 
@@ -140,11 +140,11 @@ Whatever reaches `raw()` runs as SQL. Never give it a caller's text; a value is 
 
 As a filter value, `raw()` throws while compiling, and so do `cols()` and `vals()`. As a Whereable value, in `isIn()` / `isNotIn()`, and in `vals([…])` within a filter:
 
-> `` `db.raw()`, `db.cols()` and `db.vals()` have no meaning as a value in a Whereable (a filter), nor in `isIn()`: to compare with SQL, use a `sql` fragment value, where `db.self` stands for the column; to compare with a value, give the value itself, or `db.param()`. ``
+> `` `db.raw()`, `db.cols()` and `db.vals()` have no meaning as a value in a Whereable (a filter), nor in `isIn()`: to compare with SQL, use a `sql` fragment value, where `db.self` stands for the column; to compare with a value, give the value itself, or `db.param()`. ``<!-- message -->
 
 As the value of `eq()`, `add()` and the other [conditions](/conditions):
 
-> `` `db.raw()`, `db.cols()` and `db.vals()` have no meaning as the value of `eq()`, `add()` and the other conditions: for SQL, write a `sql` fragment with `db.self` in place of the condition; for a value, give the value itself, or `db.param()`. ``
+> `` `db.raw()`, `db.cols()` and `db.vals()` have no meaning as the value of `eq()`, `add()` and the other conditions: for SQL, write a `sql` fragment with `db.self` in place of the condition; for a value, give the value itself, or `db.param()`. ``<!-- message -->
 
 The type refuses them there, and as an `insert()` or `update()` value:
 
@@ -223,7 +223,7 @@ A comma-separated list of values. Each value compiles as follows.
 | `self`, `raw()`, `cols()`, `vals()` | a parameter | throw in a filter; a parameter outside one |
 
 - An object's values come in the order of its sorted keys, as `cols()` lists them.
-- "In a filter" is wherever `vals([…])` has a current column: in `isIn()` and `isNotIn()`, and in a fragment value of a Whereable or of `vals({…})`. There `Default` throws "`` `db.Default` has no meaning in a Whereable (a filter)… ``", `self` "`` `db.self` has no meaning as a value in a Whereable (a filter), nor in `isIn()`… ``", and `raw()`, `cols()` and `vals()` as [`raw()`](#raw) says.
+- "In a filter" is wherever `vals([…])` has a current column: in `isIn()` and `isNotIn()`, and in a fragment value of a Whereable or of `vals({…})`. There `Default` throws "`` `db.Default` has no meaning in a Whereable (a filter)… ``<!-- message -->", `self` "`` `db.self` has no meaning as a value in a Whereable (a filter), nor in `isIn()`… ``<!-- message -->", and `raw()`, `cols()` and `vals()` as [`raw()`](#raw) says.
 - As a filter value itself, `vals()` throws, as [`raw()`](#raw) does.
 - Zapatos 6.6.1 wrapped a `Parameter`, `Default` and `parent()` in a second parameter in an array: `'{"value":…}'`, `'Symbol(DEFAULT)'`, `'{"value":"id"}'`.
 
@@ -247,20 +247,20 @@ An object is a Whereable of the table: each own enumerable key a column, each va
 
 | Value | Compiles to |
 |---|---|
-| a plain value, `null` and arrays included | `("title" = $1)` |
-| a `Parameter` | `("title" = CAST($1 AS "text"))`, as it is |
+| a plain value, `null` and arrays included | `("title" = $1)`<!-- probe: db.sql`${{ title: 'x' }}` --> |
+| a `Parameter` | `("title" = CAST($1 AS "text"))`<!-- probe: db.sql`${{ title: db.param('x', 'text') }}` -->, as it is |
 | a `sql` fragment | `(…)`, compiled with the key as the current column: [`self`](#self) is the column |
 | a [condition](/conditions) | the same: a condition is a fragment, `like('The%')` |
-| `parent(c?)` | `("studio_id" = "studios"."id")`, in a `lateral` subquery |
+| `parent(c?)` | `("studio_id" = "studios"."id")`<!-- probe: db.select('studios', db.all, { lateral: { films: db.select('films', { studio_id: db.parent('id') }) } }) -->, in a `lateral` subquery |
 | `Default`, `self` | throws |
 | `raw()`, `cols()`, `vals()` | throws ([`raw()`](#raw)) |
 
 - `null` is a parameter too, and `= NULL` matches no row: use [`conditions.isNull`](/conditions#conditions.isNull).
-- `Default` throws "`` `db.Default` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. `DEFAULT` is for INSERT and UPDATE values. ``"; Zapatos 6.6.1 sent it as `'Symbol(DEFAULT)'`.
+- `Default` throws "`` `db.Default` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. `DEFAULT` is for INSERT and UPDATE values. ``<!-- message -->"; Zapatos 6.6.1 sent it as `'Symbol(DEFAULT)'`.
 - The shortcuts take the same object as their `where` ([`select()`](/select#select)).
 
 ::: warning Security
-An interpolated object that is not one of the other [interpolations](#interpolations) compiles as a Whereable, plain or not: a class instance `{ title }` gives `("title" = $1)`, and a `Date` or a `Map`, which have no own enumerable key, give `TRUE`. So `` db.sql`DELETE FROM ${'films'} WHERE ${new Date()}` `` is `DELETE FROM "films" WHERE TRUE`, and deletes every row. The type refuses a `Date` or a `Map` (TS2345), so this hits a value typed `any` or untyped: check what reaches a `where` at run time.
+An interpolated object that is not one of the other [interpolations](#interpolations) compiles as a Whereable, plain or not: a class instance `{ title }` gives `("title" = $1)`<!-- probe: db.sql`${new (class { title = 'x' })()}` -->, and a `Date` or a `Map`, which have no own enumerable key, give `TRUE`. So `` db.sql`DELETE FROM ${'films'} WHERE ${new Date()}` `` is `DELETE FROM "films" WHERE TRUE`<!-- probe: db.sql`DELETE FROM ${'films'} WHERE ${new Date()}` -->, and deletes every row. The type refuses a `Date` or a `Map` (TS2345), so this hits a value typed `any` or untyped: check what reaches a `where` at run time.
 :::
 
 ## `self` {#self}
@@ -269,12 +269,12 @@ An interpolated object that is not one of the other [interpolations](#interpolat
 db.self
 ```
 
-The current column, in a Whereable's fragment value: `` { runtime_minutes: db.sql`${db.self} > ${db.param(100)}` } `` gives `(("runtime_minutes" > $1))`. In a fragment value of `vals({…})`, the current column is its key: `` vals({ tag: db.sql`upper(${db.self})` }) `` gives `upper("tag")`.
+The current column, in a Whereable's fragment value: `` { runtime_minutes: db.sql`${db.self} > ${db.param(100)}` } `` gives `(("runtime_minutes" > $1))`<!-- probe: db.sql`${{ runtime_minutes: db.sql`${db.self} > ${db.param(100)}` }}` -->. In a fragment value of `vals({…})`, the current column is its key: `` vals({ tag: db.sql`upper(${db.self})` }) `` gives `upper("tag")`<!-- probe: db.sql`${db.vals({ tag: db.sql`upper(${db.self})` })}` -->.
 
-- Where there is no current column, it throws: "The 'self' column alias has no meaning here".
+- Where there is no current column, it throws: "The 'self' column alias has no meaning here"<!-- message -->.
 - As a filter value it throws: it is the column, not a value to compare with it. Zapatos 6.6.1 sent it as the string `'Symbol(self)'`.
-  - As a Whereable value, in `isIn()` / `isNotIn()` and in `vals([…])` within a filter: "`` `db.self` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: compare with a value, or use it in a `sql` fragment value, where it stands for the column. ``"
-  - As the value of `eq()`, `add()` and the other conditions: "`` `db.self` has no meaning as the value of `eq()`, `add()` and the other conditions: it is already the column on the left. To compare the column with itself, write a `sql` fragment with `db.self` on both sides. ``"
+  - As a Whereable value, in `isIn()` / `isNotIn()` and in `vals([…])` within a filter: "`` `db.self` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: compare with a value, or use it in a `sql` fragment value, where it stands for the column. ``<!-- message -->"
+  - As the value of `eq()`, `add()` and the other conditions: "`` `db.self` has no meaning as the value of `eq()`, `add()` and the other conditions: it is already the column on the left. To compare the column with itself, write a `sql` fragment with `db.self` on both sides. ``<!-- message -->"
 
 ### `SelfType` {#SelfType}
 
@@ -296,9 +296,9 @@ A column of the parent query's table, in a subquery given to `lateral` ([Join th
 
 </CastPanel>
 
-- Without a column, the column of the filter it sits in: `{ film_id: db.parent() }`, in a `lateral` of `roles`, gives `("film_id" = "roles"."film_id")`. With no filter, it throws "Alien object while interpolating SQL: undefined".
-- It works as a Whereable value, in a `sql` fragment, in `eq()` and in `vals([…])`, so in `isIn()`: `{ film_id: isIn([db.parent()]) }` gives `(("film_id" IN ("roles"."film_id")))`. In `vals([…])`, Zapatos 6.6.1 sent it as JSON: `isIn([parent('id')])` compared with `'{"value":"id"}'`.
-- Outside a nested query, it throws "The 'parent' table alias has no meaning here", so `run()` rejects before any query.
+- Without a column, the column of the filter it sits in: `{ film_id: db.parent() }`, in a `lateral` of `roles`, gives `("film_id" = "roles"."film_id")`<!-- probe: db.select('roles', db.all, { lateral: { film: db.selectOne('films', { film_id: db.parent() }) } }) -->. With no filter, it throws "Alien object while interpolating SQL: undefined"<!-- message -->.
+- It works as a Whereable value, in a `sql` fragment, in `eq()` and in `vals([…])`, so in `isIn()`: `{ film_id: isIn([db.parent()]) }` gives `(("film_id" IN ("roles"."film_id")))`<!-- probe: db.select('roles', db.all, { lateral: { film: db.selectOne('films', { film_id: db.conditions.isIn([db.parent()]) }) } }) -->. In `vals([…])`, Zapatos 6.6.1 sent it as JSON: `isIn([parent('id')])` compared with `'{"value":"id"}'`.
+- Outside a nested query, it throws "The 'parent' table alias has no meaning here"<!-- message -->, so `run()` rejects before any query.
 
 ### `ParentColumn` {#ParentColumn}
 
@@ -323,8 +323,8 @@ The keyword `DEFAULT`: a column's default, in an `INSERT` or `UPDATE` value, alo
 </CastPanel>
 
 - In a filter it throws while compiling.
-  - As a Whereable value ([above](#whereable)), in `isIn()` / `isNotIn()`, and in `vals([…])` with a current column ([`vals()`](#vals)): "`` `db.Default` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. `DEFAULT` is for INSERT and UPDATE values. ``"
-  - As the value of `eq()`, `add()` and the other conditions: "`` `db.Default` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To set a column to its default in an UPDATE, give `db.Default` as the value itself: `{ n: db.Default }`. ``"
+  - As a Whereable value ([above](#whereable)), in `isIn()` / `isNotIn()`, and in `vals([…])` with a current column ([`vals()`](#vals)): "`` `db.Default` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. `DEFAULT` is for INSERT and UPDATE values. ``<!-- message -->"
+  - As the value of `eq()`, `add()` and the other conditions: "`` `db.Default` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To set a column to its default in an UPDATE, give `db.Default` as the value itself: `{ n: db.Default }`. ``<!-- message -->"
 - For `add()` and `subtract()`, set the column itself: `{ booked_at: db.Default }`.
 - Zapatos 6.6.1 sent it as the string `'Symbol(DEFAULT)'` in all of these, and in `vals([…])`, where it is now `DEFAULT`.
 
@@ -348,7 +348,7 @@ A nested fragment's `RunResult` and `runResultTransform` are not used: only the 
 
 ## Arrays {#arrays}
 
-An array's items compile one after the other, each as if interpolated alone, with nothing between them: ``[db.sql`a`, ' ', 'b']`` gives `a" ""b"`, the string `' '` being a name. An empty array compiles to nothing. To put something between the items, [`mapWithSeparator()`](#mapWithSeparator).
+An array's items compile one after the other, each as if interpolated alone, with nothing between them: ``[db.sql`a`, ' ', 'b']`` gives `a" ""b"`<!-- probe: db.sql`${[db.sql`a`, ' ', 'b']}` -->, the string `' '` being a name. An empty array compiles to nothing. To put something between the items, [`mapWithSeparator()`](#mapWithSeparator).
 
 ## `mapWithSeparator()` {#mapWithSeparator}
 

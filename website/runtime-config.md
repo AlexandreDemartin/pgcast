@@ -65,8 +65,8 @@ The keys pgcast adds are optional, so a `Config` written for Zapatos 6.6.1 still
 |---|---|---|---|
 | [`transactionAttemptsMax`](#Config.transactionAttemptsMax) | `5` | how many times `transaction()` runs its callback | at each `transaction()` |
 | [`transactionRetryDelay`](#Config.transactionRetryDelay) | `{ minMs: 25, maxMs: 250 }` | the wait before each retry | at each `transaction()` |
-| [`castArrayParamsToJson`](#Config.castArrayParamsToJson) | `false` | an array parameter: `CAST($1 AS "json")` in place of `$1` | at each `compile()` |
-| [`castObjectParamsToJson`](#Config.castObjectParamsToJson) | `false` | a plain object parameter: `CAST($1 AS "json")` in place of `$1` | at each `compile()` |
+| [`castArrayParamsToJson`](#Config.castArrayParamsToJson) | `false` | an array parameter: `CAST($1 AS "json")`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${db.param([1])}`) --> in place of `$1` | at each `compile()` |
+| [`castObjectParamsToJson`](#Config.castObjectParamsToJson) | `false` | a plain object parameter: `CAST($1 AS "json")`<!-- probe: (db.setConfig({ castObjectParamsToJson: true }), db.sql`${db.param({ a: 1 })}`) --> in place of `$1` | at each `compile()` |
 | [`upsertRequiresSameKeys`](#Config.upsertRequiresSameKeys) | `false` | a multi-row `upsert()` with a key missing from some row, still set from `EXCLUDED`: throw, not warn | at each `upsert()` |
 | [`undefinedMeansMissing`](#Config.undefinedMeansMissing) | `false` | an `undefined` value in `insert()`, `update()` and `upsert()`: a missing key, not `NULL` | at each call of those |
 | [`queryListener`](#Config.queryListener) | none | called with each query `run()` sends | at each `run()` |
@@ -99,7 +99,7 @@ Before each retry, `transaction()` waits a whole number of milliseconds from `mi
 castArrayParamsToJson: boolean  // default: false
 ```
 
-With `true`, every array sent as a parameter is sent as JSON: `CAST($1 AS "json")`, its value `JSON.stringify()`'d. That is `param(x)`, the values of the shortcuts and Whereables, which are parameters too, and `param(x, 'type')`, whose cast is dropped: `param([1, 2], 'int4[]')` gives `CAST($1 AS "json")` ([#171](https://github.com/AlexandreDemartin/pgcast/issues/171)). Off, `pg` sends an array as a Postgres array.
+With `true`, every array sent as a parameter is sent as JSON: `CAST($1 AS "json")`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${db.param([1])}`) -->, its value `JSON.stringify()`'d. That is `param(x)`, the values of the shortcuts and Whereables, which are parameters too, and `param(x, 'type')`, whose cast is dropped: `param([1, 2], 'int4[]')` gives `CAST($1 AS "json")`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${db.param([1, 2], 'int4[]')}`) --> ([#171](https://github.com/AlexandreDemartin/pgcast/issues/171)). Off, `pg` sends an array as a Postgres array.
 
 <CastPanel example="castArrayParamsToJson">
 
@@ -109,8 +109,8 @@ With `true`, every array sent as a parameter is sent as JSON: `CAST($1 AS "json"
 
 - Off, the same query fails: `json_array_length($1)` gives 22P02 "invalid input syntax for type json". `param(x, true)` sends the array as JSON under either setting.
 - On a Postgres array column, Postgres refuses an array sent this way: 42804 "column "genres" is of type text[] but expression is of type json" in an `insert()` or `update()`, 42883 "operator does not exist: text[] = json" in a Whereable, and "… text[] && json" with [`arrayOverlaps()`](/conditions#conditions.arrayOverlaps).
-- `param(x, false)` sends the array as it is, under either setting: `{ genres: db.param(['mystery', 'drama'], false) }` gives `SET ("genres") = ROW($1)`.
-- The items of `isIn()` are parameters one by one, so an array of numbers there is unchanged: `("id" IN ($1, $2))`.
+- `param(x, false)` sends the array as it is, under either setting: `{ genres: db.param(['mystery', 'drama'], false) }` gives `SET ("genres") = ROW($1)`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.update('films', { genres: db.param(['mystery', 'drama'], false) }, { id: 1000 })) -->.
+- The items of `isIn()` are parameters one by one, so an array of numbers there is unchanged: `("id" IN ($1, $2))`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${{ id: db.conditions.isIn([1000, 1001]) }}`) -->.
 - How `param()` compiles each `cast`: [`param()`](/sql-template#param).
 
 ### `castObjectParamsToJson` {#Config.castObjectParamsToJson}
@@ -119,7 +119,7 @@ With `true`, every array sent as a parameter is sent as JSON: `CAST($1 AS "json"
 castObjectParamsToJson: boolean  // default: false
 ```
 
-With `true`, every plain object sent as a parameter is sent as `CAST($1 AS "json")`, its value `JSON.stringify()`'d, even with `param(x, 'type')`, whose cast is dropped ([#171](https://github.com/AlexandreDemartin/pgcast/issues/171)). Off, it is `$1`, and `pg` sends the same JSON text, with no type: Postgres then infers one from where `$1` stands.
+With `true`, every plain object sent as a parameter is sent as `CAST($1 AS "json")`<!-- probe: (db.setConfig({ castObjectParamsToJson: true }), db.sql`${db.param({ a: 1 }, 'jsonb')}`) -->, its value `JSON.stringify()`'d, even with `param(x, 'type')`, whose cast is dropped ([#171](https://github.com/AlexandreDemartin/pgcast/issues/171)). Off, it is `$1`, and `pg` sends the same JSON text, with no type: Postgres then infers one from where `$1` stands.
 
 <CastPanel example="castObjectParamsToJson">
 
@@ -129,7 +129,7 @@ With `true`, every plain object sent as a parameter is sent as `CAST($1 AS "json
 
 - Off, the same query fails: `$1 ->> 'title'` gives 42725 "operator is not unique: unknown ->> unknown". A cast in the SQL, `$1::jsonb`, works either way.
 - A plain object is an object literal, `{…}`: a `Date`, a `Buffer` or a class instance is sent as `$1`, unchanged.
-- `param(x, false)` gives `$1` under either setting; `param(x, true)` gives `CAST($1 AS "json")`.
+- `param(x, false)` gives `$1`<!-- probe: db.sql`${db.param({ a: 1 }, false)}` --> under either setting; `param(x, true)` gives `CAST($1 AS "json")`<!-- probe: db.sql`${db.param({ a: 1 }, true)}` -->.
 
 ### `upsertRequiresSameKeys` {#Config.upsertRequiresSameKeys}
 
@@ -137,7 +137,7 @@ With `true`, every plain object sent as a parameter is sent as `CAST($1 AS "json
 upsertRequiresSameKeys?: boolean  // default: false; the default in 7.0
 ```
 
-With `true`, a multi-row [`upsert()`](/insert#upsert) without `updateColumns`, where a key missing from some row is still set from `EXCLUDED`, throws when called, before any query: "rows have different keys: pass updateColumns, or give every row the same keys". Off, it runs as in Zapatos 6.6.1 and warns once per process: `PGCAST_DEP001`. Which keys count, and the SQL: [Rows with different keys](/insert#upsert-different-keys).
+With `true`, a multi-row [`upsert()`](/insert#upsert) without `updateColumns`, where a key missing from some row is still set from `EXCLUDED`, throws when called, before any query: "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message -->. Off, it runs as in Zapatos 6.6.1 and warns once per process: `PGCAST_DEP001`. Which keys count, and the SQL: [Rows with different keys](/insert#upsert-different-keys).
 
 ### `undefinedMeansMissing` {#Config.undefinedMeansMissing}
 
@@ -157,7 +157,7 @@ Called by [`run()`](/sql-template#run) once the query is compiled, before it is 
 
 - `query`: the [`SQLQuery`](#SQLQuery) `run()` sends, `{ text, values }`, and `name` once [prepared](/sql-template#prepared).
 - `txnId`: in a [transaction](#transaction-ids), its id; otherwise `undefined`.
-- It is called for a no-op fragment too, which sends nothing: `insert('tags', [])` gives `/* marked no-op: won't hit DB unless forced -> */ INSERT INTO "tags" SELECT null WHERE false`.
+- It is called for a no-op fragment too, which sends nothing: `insert('tags', [])` gives `/* marked no-op: won't hit DB unless forced -> */ INSERT INTO "tags" SELECT null WHERE false`<!-- probe: db.insert('tags', []) -->.
 - It is not called when compiling throws. If it throws, `run()` rejects, and the query is not sent.
 
 ```ts twoslash
@@ -197,11 +197,11 @@ Called by `transaction()` when an attempt fails with `40001` or `40P01`, and aga
 
 | When | Message |
 |---|---|
-| an attempt failed, another is left | `` `Transaction rollback (code ${err.code}) on attempt ${attempt} of ${maxAttempts}, retrying in ${delayBeforeRetry}ms` `` |
-| the next attempt starts | `` `Retrying transaction, attempt ${attempt} of ${maxAttempts}` `` |
-| the last attempt failed | `` `Transaction rollback (code ${err.code}) on attempt ${attempt} of ${maxAttempts}, giving up` `` |
+| an attempt failed, another is left | `` `Transaction rollback (code ${err.code}) on attempt ${attempt} of ${maxAttempts}, retrying in ${delayBeforeRetry}ms` ``<!-- message --> |
+| the next attempt starts | `` `Retrying transaction, attempt ${attempt} of ${maxAttempts}` ``<!-- message --> |
+| the last attempt failed | `` `Transaction rollback (code ${err.code}) on attempt ${attempt} of ${maxAttempts}, giving up` ``<!-- message --> |
 
-With `transactionAttemptsMax: 3` and `transactionRetryDelay: { minMs: 1, maxMs: 2 }`, a callback that fails with `40001` each time gives `Transaction rollback (code 40001) on attempt 1 of 3, retrying in 1ms`, `Retrying transaction, attempt 2 of 3`, then the same for attempt 2, and `Transaction rollback (code 40001) on attempt 3 of 3, giving up`.
+With `transactionAttemptsMax: 3` and `transactionRetryDelay: { minMs: 1, maxMs: 2 }`, a callback that fails with `40001` each time gives `Transaction rollback (code 40001) on attempt 1 of 3, retrying in 1ms`<!-- message -->, `Retrying transaction, attempt 2 of 3`<!-- message -->, then the same for attempt 2, and `Transaction rollback (code 40001) on attempt 3 of 3, giving up`<!-- message -->.
 
 It is not called for a transaction that commits on its first attempt, nor for any other error.
 
@@ -210,7 +210,7 @@ It is not called for a transaction that commits on its first attempt, nor for an
 The `txnId` the listeners get.
 
 - Each `transaction()` call that opens a transaction takes the next id: `0` for the first in the process, then `1`…
-- Every query `run()` sends on its client gets that id, through every retry: yours, and `transaction()`'s own `START TRANSACTION ISOLATION LEVEL SERIALIZABLE`, `COMMIT` and `ROLLBACK`, which go through both query listeners like any other.
+- Every query `run()` sends on its client gets that id, through every retry: yours, and `transaction()`'s own `START TRANSACTION ISOLATION LEVEL SERIALIZABLE`<!-- probe: db.serializable(pool, async () => {}) -->, `COMMIT`<!-- probe: db.serializable(pool, async () => {}) --> and `ROLLBACK`<!-- probe: db.serializable(pool, async () => { throw new Error(); }) -->, which go through both query listeners like any other.
 - A `transaction()` given that client opens no transaction, and its queries keep the outer id.
 - Outside a transaction, and on the client once it has ended, the id is `undefined`.
 

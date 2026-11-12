@@ -31,7 +31,7 @@ Insert one row or several, and return them as Postgres stored them, defaults and
 
 - One row gives one result; an array gives an array, in the order Postgres returns them, in practice the order given.
 - The columns are the keys of every row; a key missing from a row is `DEFAULT` in that row, as `tagline` above.
-- An empty array is a no-op: `.run(pool)` resolves with `[]` and sends nothing, unless forced with `.run(pool, true)`. Its SQL, `INSERT INTO "films" SELECT null WHERE false`, is marked as a no-op.
+- An empty array is a no-op: `.run(pool)` resolves with `[]` and sends nothing, unless forced with `.run(pool, true)`. Its SQL, `INSERT INTO "films" SELECT null WHERE false`<!-- probe: db.insert('films', []) -->, is marked as a no-op.
 - Postgres takes at most 65,535 parameters in a query: split a bigger insert ([Insert and upsert in batches](/batches)).
 
 ### Options {#insert-options}
@@ -46,9 +46,9 @@ Insert one row or several, and return them as Postgres stored them, defaults and
 
 | Option | SQL it adds | Effect on the type |
 |---|---|---|
-| none | `RETURNING to_jsonb("films".*) AS result` | `films.JSONSelectable` |
-| `returning: ['id']` | `jsonb_build_object($5::text, "id")` in place of `to_jsonb("films".*)` | `Pick<films.JSONSelectable, 'id'>` |
-| `extras: { name: 'title', shouted: … }`, as above | `\|\| jsonb_build_object($6::text, "title", $7::text, upper("title"))` | adds `name`, of the column's type, and `shouted`, of the fragment's `RunResult`: `string`, from `db.sql<s.films.SQL, string>` |
+| none | `RETURNING to_jsonb("films".*) AS result`<!-- probe: examples/insert.ts --> | `films.JSONSelectable` |
+| `returning: ['id']` | `jsonb_build_object($5::text, "id")`<!-- probe: examples/insert_returning.ts --> in place of `to_jsonb("films".*)` | `Pick<films.JSONSelectable, 'id'>` |
+| `extras: { name: 'title', shouted: … }`, as above | `\|\| jsonb_build_object($6::text, "title", $7::text, upper("title"))`<!-- probe: examples/insert_returning.ts --> | adds `name`, of the column's type, and `shouted`, of the fragment's `RunResult`: `string`, from `db.sql<s.films.SQL, string>` |
 
 - A `readonly` array in `returning` (`['id'] as const`) sends the same SQL, but the result type is `never` for now ([#41](https://github.com/AlexandreDemartin/pgcast/issues/41)): write the array without `as const`.
 - Both need `strictNullChecks` for their types.
@@ -82,18 +82,18 @@ Each SQL replaces the `DO UPDATE SET …` of the plain upsert, on `ratings` (on 
 
 | Option | SQL it adds | Effect on the type |
 |---|---|---|
-| none | `DO UPDATE SET ("film_id", "stars", "votes") = ROW(EXCLUDED."film_id", EXCLUDED."stars", EXCLUDED."votes")` | `ratings.JSONSelectable & UpsertAction` |
-| `updateColumns: 'votes'` | `DO UPDATE SET ("votes") = ROW(EXCLUDED."votes")` | none |
-| `updateColumns: db.doNothing` | `DO NOTHING` | `\| undefined`, for one row |
-| `noNullUpdateColumns: 'tagline'` | `CASE WHEN EXCLUDED."tagline" IS NULL THEN "films"."tagline" ELSE EXCLUDED."tagline" END` in place of `EXCLUDED."tagline"` | none |
-| `updateValues: { votes: 10 }` | `$3` in place of `EXCLUDED."votes"` | none |
-| ``updateValues: { votes: db.sql`${'ratings'}.${'votes'} + 1` }`` | `"ratings"."votes" + 1` in place of `EXCLUDED."votes"` | none |
-| `reportAction: 'suppress'` | no `\|\| jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END)` | no `UpsertAction` |
+| none | `DO UPDATE SET ("film_id", "stars", "votes") = ROW(EXCLUDED."film_id", EXCLUDED."stars", EXCLUDED."votes")`<!-- probe: db.upsert('ratings', { film_id: 1000, stars: 5, votes: 1 }, ['film_id', 'stars']) --> | `ratings.JSONSelectable & UpsertAction` |
+| `updateColumns: 'votes'` | `DO UPDATE SET ("votes") = ROW(EXCLUDED."votes")`<!-- probe: db.upsert('ratings', { film_id: 1000, stars: 5, votes: 1 }, ['film_id', 'stars'], { updateColumns: 'votes' }) --> | none |
+| `updateColumns: db.doNothing` | `DO NOTHING`<!-- probe: db.upsert('ratings', { film_id: 1000, stars: 5, votes: 1 }, ['film_id', 'stars'], { updateColumns: db.doNothing }) --> | `\| undefined`, for one row |
+| `noNullUpdateColumns: 'tagline'` | `CASE WHEN EXCLUDED."tagline" IS NULL THEN "films"."tagline" ELSE EXCLUDED."tagline" END`<!-- probe: db.upsert('films', { id: 1002, tagline: null }, 'id', { noNullUpdateColumns: 'tagline' }) --> in place of `EXCLUDED."tagline"` | none |
+| `updateValues: { votes: 10 }` | `$3`<!-- probe: db.upsert('ratings', { film_id: 1000, stars: 5 }, ['film_id', 'stars'], { updateValues: { votes: 10 } }) --> in place of `EXCLUDED."votes"` | none |
+| ``updateValues: { votes: db.sql`${'ratings'}.${'votes'} + 1` }`` | `"ratings"."votes" + 1`<!-- probe: db.upsert('ratings', { film_id: 1000, stars: 5 }, ['film_id', 'stars'], { updateValues: { votes: db.sql`${'ratings'}.${'votes'} + 1` } }) --> in place of `EXCLUDED."votes"` | none |
+| `reportAction: 'suppress'` | no `\|\| jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END)`<!-- probe: db.upsert('ratings', { film_id: 1000, stars: 5, votes: 1 }, ['film_id', 'stars']) --> | no `UpsertAction` |
 
 - `updateColumns` takes a column or an array; `noNullUpdateColumns` a column, an array, or `db.all` for every column. [Insert and upsert in batches](/batches#rows-with-different-keys) has a panel of `updateColumns`: a booking keeps its time.
-- `updateValues` is one set of values for every row updated. Its keys are always updated, even when `updateColumns` leaves them out, or is `doNothing` (then the SQL is `DO UPDATE SET`, not `DO NOTHING`).
+- `updateValues` is one set of values for every row updated. Its keys are always updated, even when `updateColumns` leaves them out, or is `doNothing` (then the SQL is `DO UPDATE SET`<!-- probe: db.upsert('ratings', { film_id: 1000, stars: 5 }, ['film_id', 'stars'], { updateColumns: db.doNothing, updateValues: { votes: 1 } }) -->, not `DO NOTHING`).
 - In `updateValues`, a plain value is a parameter. A value that holds a fragment, `param()`, `raw()`, `cols()`, `vals()`, `parent()`, `Default` or `self`, at any depth of its arrays and plain objects, is compiled as in a `sql` template.
-- To read a column there, name the table for the existing row, `${'ratings'}.${'votes'}`, or `EXCLUDED` for the new one, `` db.sql`EXCLUDED.${'votes'}` ``. `db.self`, or a fragment or condition that uses it (`` db.sql`${db.self} + 1` ``, [`conditions.add()`](/conditions#conditions.add)), throws "The 'self' column alias has no meaning here", as in Zapatos 6.6.1; `db.parent()`, alone or in a fragment, throws "The 'parent' table alias has no meaning here".
+- To read a column there, name the table for the existing row, `${'ratings'}.${'votes'}`, or `EXCLUDED` for the new one, `` db.sql`EXCLUDED.${'votes'}` ``. `db.self`, or a fragment or condition that uses it (`` db.sql`${db.self} + 1` ``, [`conditions.add()`](/conditions#conditions.add)), throws "The 'self' column alias has no meaning here"<!-- message -->, as in Zapatos 6.6.1; `db.parent()`, alone or in a fragment, throws "The 'parent' table alias has no meaning here"<!-- message -->.
 
 ::: warning Security
 Zapatos 6.6.1 wrote a plain string in `updateValues` as an identifier: `{ tagline: 'happy' }` put `"happy"` in the `ROW(…)`, and a string from a user could read other columns or tables. pgcast sends it as a parameter, `$3` in its place, as its type and `update()` always said. To read a column there, write a fragment, as in the table ([The security model](/security)).
@@ -124,13 +124,13 @@ With `strictNullChecks` off, the type keeps `$action`, which is then `undefined`
 
 In several rows without `updateColumns`, a key missing from one row is inserted as `DEFAULT`, then set from `EXCLUDED` on conflict: that row's existing value is lost.
 
-- `[{ film_id: 1002, stars: 5, votes: 3 }, { film_id: 1002, stars: 4 }]` sends `($4, $5, DEFAULT)`, so an existing count of 4-star votes goes back to 1.
+- `[{ film_id: 1002, stars: 5, votes: 3 }, { film_id: 1002, stars: 4 }]` sends `($4, $5, DEFAULT)`<!-- probe: db.upsert('ratings', [{ film_id: 1002, stars: 5, votes: 3 }, { film_id: 1002, stars: 4 }], ['film_id', 'stars']) -->, so an existing count of 4-star votes goes back to 1.
 - It runs, as in Zapatos 6.6.1, and warns once per process: `PGCAST_DEP001`.
 - A key of `updateValues`, or a column of an array or string `conflictTarget`, does not count: new rows without their serial `id`, upserted on `'id'`, neither warn nor throw. With `constraint()`, every key counts.
 - Rows with the same keys, one row, and any `updateColumns` never warn.
 
 ::: tip Opt-in
-With `upsertRequiresSameKeys: true` ([`Config`](/runtime-config#Config.upsertRequiresSameKeys)), such an upsert throws before any query: "rows have different keys: pass updateColumns, or give every row the same keys". Without it, pgcast warns as `PGCAST_DEP001`; it becomes the default in 7.0 ([Versions, opt-ins and warnings](/versions)).
+With `upsertRequiresSameKeys: true` ([`Config`](/runtime-config#Config.upsertRequiresSameKeys)), such an upsert throws before any query: "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message -->. Without it, pgcast warns as `PGCAST_DEP001`; it becomes the default in 7.0 ([Versions, opt-ins and warnings](/versions)).
 :::
 
 ## `constraint()` {#constraint}
@@ -139,7 +139,7 @@ With `upsertRequiresSameKeys: true` ([`Config`](/runtime-config#Config.upsertReq
 db.constraint(name)
 ```
 
-Wrap the name of a unique or primary-key constraint of the table, for the `conflictTarget` of `upsert()`: `ON CONFLICT ON CONSTRAINT "ratings_pkey"`, in place of `ON CONFLICT ("film_id", "stars")`. The names come from the schema, so one the table doesn't have fails to compile:
+Wrap the name of a unique or primary-key constraint of the table, for the `conflictTarget` of `upsert()`: `ON CONFLICT ON CONSTRAINT "ratings_pkey"`<!-- probe: db.upsert('ratings', { film_id: 1000, stars: 5, votes: 1 }, db.constraint('ratings_pkey')) -->, in place of `ON CONFLICT ("film_id", "stars")`<!-- probe: db.upsert('ratings', { film_id: 1000, stars: 5, votes: 1 }, ['film_id', 'stars']) -->. The names come from the schema, so one the table doesn't have fails to compile:
 
 ```ts twoslash
 // @errors: 2345
@@ -194,10 +194,10 @@ Update the rows that match, and return them. The arguments come in the order of 
 
 - Always an array: every row updated, `[]` when none matches.
 - `SET (…) = ROW(…)`: `ROW()` keeps a single column valid since Postgres 10.
-- `values` with no key throws: "nothing to update: an Updatable needs at least one column". Zapatos 6.6.1 sent `SET () = ROW()`, which Postgres refused (42601).
+- `values` with no key throws: "nothing to update: an Updatable needs at least one column"<!-- message -->. Zapatos 6.6.1 sent `SET () = ROW()`, which Postgres refused (42601).
 
 ::: warning Every row
-An empty `Whereable`, `{}`, compiles to `WHERE TRUE`: `update()` updates every row of the table, and `deletes()` deletes them all.
+An empty `Whereable`, `{}`, compiles to `WHERE TRUE`<!-- probe: db.update('films', { title: 'x' }, {}) -->: `update()` updates every row of the table, and `deletes()` deletes them all.
 :::
 
 ## `deletes()` {#deletes}
@@ -255,11 +255,11 @@ Empty one table, or several in one statement.
 
 | Option | SQL it adds | Effect on the type |
 |---|---|---|
-| none | `TRUNCATE "tags"` | `undefined` |
-| `'CONTINUE IDENTITY'` | `CONTINUE IDENTITY`: sequences keep their values, as by default | none |
-| `'RESTART IDENTITY'` | `RESTART IDENTITY`: the tables' sequences restart | none |
-| `'RESTRICT'` | `RESTRICT`: Postgres refuses if a table not in the list references one of them, as by default | none |
-| `'CASCADE'` | `CASCADE`: also empties the tables that reference them | none |
+| none | `TRUNCATE "tags"`<!-- probe: db.truncate('tags') --> | `undefined` |
+| `'CONTINUE IDENTITY'` | `CONTINUE IDENTITY`<!-- probe: db.truncate('tags', 'CONTINUE IDENTITY') -->: sequences keep their values, as by default | none |
+| `'RESTART IDENTITY'` | `RESTART IDENTITY`<!-- probe: db.truncate('tags', 'RESTART IDENTITY') -->: the tables' sequences restart | none |
+| `'RESTRICT'` | `RESTRICT`<!-- probe: db.truncate('tags', 'RESTRICT') -->: Postgres refuses if a table not in the list references one of them, as by default | none |
+| `'CASCADE'` | `CASCADE`<!-- probe: db.truncate('tags', 'CASCADE') -->: also empties the tables that reference them | none |
 
 With `'CASCADE'`, Postgres empties every table that references one of them, at any depth: `films` takes `roles`, `screenings`, `ratings` and `tags` with it, and `seat_bookings` through `screenings`, each named in a notice, `truncate cascades to table "roles"`:
 
@@ -270,8 +270,8 @@ With `'CASCADE'`, Postgres empties every table that references one of them, at a
 </CastPanel>
 
 - `.run()` resolves with `[]`, where the type says `undefined`.
-- The type takes the options in that order, one of each kind. pgcast writes them as given: in JavaScript, or past the type with `as any`, `truncate('tags', 'CASCADE', 'RESTART IDENTITY')` sends `TRUNCATE "tags" CASCADE RESTART IDENTITY`, and Postgres refuses it (42601).
-- Any other option throws: "Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not '…'". Zapatos 6.6.1 wrote it into the SQL as it was.
+- The type takes the options in that order, one of each kind. pgcast writes them as given: in JavaScript, or past the type with `as any`, `truncate('tags', 'CASCADE', 'RESTART IDENTITY')` sends `TRUNCATE "tags" CASCADE RESTART IDENTITY`<!-- probe: db.truncate('tags', 'CASCADE', 'RESTART IDENTITY') -->, and Postgres refuses it (42601).
+- Any other option throws: "Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not '…'"<!-- message -->. Zapatos 6.6.1 wrote it into the SQL as it was.
 
 ## An `undefined` value {#undefined-values}
 
@@ -279,13 +279,13 @@ In the values of `insert()`, `update()` and `upsert()`, Zapatos 6.6.1 sends `und
 
 | In | By default, as in 6.6.1 | With `undefinedMeansMissing: true` |
 |---|---|---|
-| `insert()` | `NULL` | `DEFAULT`: `VALUES ($1, $2, $3, DEFAULT, $4)` |
-| `update()` | sets the column to `NULL`, and counts as a key | left out: `SET ("title") = ROW($1)`; with no key left, it throws "nothing to update…" |
+| `insert()` | `NULL` | `DEFAULT`: `VALUES ($1, $2, $3, DEFAULT, $4)`<!-- probe: (db.setConfig({ undefinedMeansMissing: true }), db.insert('films', { studio_id: 1000, title: 'x', release_year: 2030, tagline: undefined, runtime_minutes: 90 })) --> |
+| `update()` | sets the column to `NULL`, and counts as a key | left out: `SET ("title") = ROW($1)`<!-- probe: (db.setConfig({ undefinedMeansMissing: true }), db.update('films', { title: 'x', tagline: undefined }, { id: 1000 })) -->; with no key left, it throws "nothing to update…"<!-- message --> |
 | `upsert()` | inserts `NULL`, then sets it from `EXCLUDED` | left out: not inserted, nor updated unless `updateColumns` names it (then from `EXCLUDED`, so an existing row takes the column's `DEFAULT`); in several rows, its cell is `DEFAULT` and counts as missing ([Rows with different keys](#upsert-different-keys)) |
 
 - By default, each sends the SQL of 6.6.1 and warns once per process: `PGCAST_DEP002`.
 - An `undefined` in a `where` is unchanged.
-- An `undefined` in `updateValues` is unchanged too, in both modes: its key is still updated, from `EXCLUDED`. So an existing row takes the value inserted, or the column's `DEFAULT` when the row doesn't insert it, with no warning: `upsert('ratings', { film_id: 1002, stars: 4 }, ['film_id', 'stars'], { updateValues: { votes: undefined } })` sends `EXCLUDED."votes"`, and an existing count goes back to 1.
+- An `undefined` in `updateValues` is unchanged too, in both modes: its key is still updated, from `EXCLUDED`. So an existing row takes the value inserted, or the column's `DEFAULT` when the row doesn't insert it, with no warning: `upsert('ratings', { film_id: 1002, stars: 4 }, ['film_id', 'stars'], { updateValues: { votes: undefined } })` sends `EXCLUDED."votes"`<!-- probe: db.upsert('ratings', { film_id: 1002, stars: 4 }, ['film_id', 'stars'], { updateValues: { votes: undefined } }) -->, and an existing count goes back to 1.
 
 ::: tip Opt-in
 `undefinedMeansMissing: true` ([`Config`](/runtime-config#Config.undefinedMeansMissing)) reads an `undefined` value as a missing key, as `JSON.stringify()` does. Without it, pgcast warns as `PGCAST_DEP002`; it becomes the default in 7.0 ([Versions, opt-ins and warnings](/versions)).
