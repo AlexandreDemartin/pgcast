@@ -56,15 +56,15 @@ https://alexandredemartin.github.io/pgcast/llms-full.txt
   https://alexandredemartin.github.io/pgcast/lateral
 - Write what no shortcut covers in a `db.sql` template, typed with the table's
   names and its rows: `` db.sql<s.films.SQL, s.films.Selectable[]>`…` ``.
-  https://alexandredemartin.github.io/pgcast/sql-template#sql
+  https://alexandredemartin.github.io/pgcast/raw-sql
 - Never concatenate a value into SQL, and never pass one to `db.raw()`. A value
   goes in a shortcut's object, in a Whereable (`${{ studio_id }}`) or in
   `db.param()`, and Postgres gets it as a parameter, `$1`.
-  https://alexandredemartin.github.io/pgcast/sql-template#param
+  https://alexandredemartin.github.io/pgcast/raw-sql#pass-each-value-as-a-parameter
 - An interpolated string is a table or column name. Never interpolate a string
   from outside the code (a request, a user, a file): map it to a name written
   in the code, and never cast it to make it compile.
-  https://alexandredemartin.github.io/pgcast/sql-template#identifiers
+  https://alexandredemartin.github.io/pgcast/raw-sql#choose-sql-at-run-time-from-your-own-constants
 - Run each query on the pool or client you are given; inside a transaction, on
   its `txnClient`.
   https://alexandredemartin.github.io/pgcast/transaction#transaction
@@ -122,7 +122,7 @@ db.select('films', { year: 1974 });
 db.sql`SELECT * FROM ${'films'} ORDER BY ${sort}`;
 ```
 
-Fix the code, not the type: with `as any`, or `as s.films.Column`, both compile, and the second sorts by whatever column the request names. Map the request to names written in the code instead, and let a shortcut do the rest:
+Fix the code, not the type: with `as any`, or `as s.films.Column`, both compile, and the second sorts by whatever name the request sends. Map the request to names written in the code instead ([Write raw SQL safely](/raw-sql#choose-sql-at-run-time-from-your-own-constants)), and let a shortcut do the rest:
 
 ```ts twoslash
 import * as db from 'zapatos/db';
@@ -169,5 +169,6 @@ It prints:
 
 ## See also
 
-- [The `sql` template](/sql-template#sql): what each interpolation compiles to, names and values.
+- [Write raw SQL safely](/raw-sql): the queries no shortcut writes, their names and their values.
+- [The `sql` template](/sql-template#sql): what each interpolation compiles to.
 - [Your first typed query](/first-query): the generator, the types it writes, and `.compile()`, step by step.
