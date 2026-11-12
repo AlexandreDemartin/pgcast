@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "docs:dev": "vitepress dev",
-    "docs:build": "vitepress build",
+    "docs:build": "tsc && vitepress build",
     "docs:preview": "vitepress preview",
     "docs:schema": "node generate-schema.mjs"
   },

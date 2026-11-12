@@ -1,0 +1,15 @@
+{
+  // `docs:build` runs `tsc` first, on the docs schema and the cast panels' examples, as a user's project would check
+  // them. Twoslash reports only the errors of a page's own code: one in the schema (a stale version canary, a type the
+  // library no longer has) would pass it.
+  "compilerOptions": {
+    "target": "es2022",
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": false,
+    "types": []
+  },
+  "include": ["zapatos/schema.d.ts", "examples"]
+}
