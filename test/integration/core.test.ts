@@ -242,6 +242,17 @@ describe('Whereable', () => {
     // and a vals([…]) written by hand, in a fragment value or in a lateral subquery of its own
     expect(await counts(db.count('accounts', { owner_id: sql`${self} IN (${vals([parent('id')])})` }))).toEqual(perOwner);
     expect(await counts(sql`SELECT count(*)::int AS result FROM ${'accounts'} WHERE ${'owner_id'} IN (${vals([parent('id')])})`)).toEqual(perOwner);
+    // on jsonb, 6.6.1 compared with {"value": "settings"}: no row, or every row with isNotIn; an alias, as the subquery is on users too
+    const sameSettings = (lateral: db.SQLFragment<any>) =>
+      db.select('users', db.all, { alias: 'u', columns: ['id'], order: { by: 'id', direction: 'ASC' }, lateral: { n: lateral } }).run(t.client);
+    expect(await sameSettings(db.count('users', { settings: c.isIn([parent('settings')]) }))).toEqual([{ id: 1, n: 1 }, { id: 2, n: 2 }, { id: 3, n: 2 }]);
+    expect(await sameSettings(db.count('users', { settings: c.isNotIn([parent('settings')]) }))).toEqual([{ id: 1, n: 2 }, { id: 2, n: 1 }, { id: 3, n: 1 }]);
+    // any fragment of the subquery, an extras one too: 6.6.1 returned ['{"value":"display_name"}']
+    const accounts = db.select('accounts', { owner_id: parent('id') }, {
+      columns: ['id'], order: { by: 'id', direction: 'ASC' }, extras: { a: sql<db.SQL, string[]>`ARRAY[${vals([parent('display_name')])}]` },
+    });
+    expect(await db.select('users', db.all, { columns: ['id'], order: { by: 'id', direction: 'ASC' }, lateral: { accounts } }).run(t.client))
+      .toEqual([{ id: 1, accounts: [{ id: 1, a: ['Ada'] }, { id: 2, a: ['Ada'] }] }, { id: 2, accounts: [{ id: 3, a: ['Bob'] }] }, { id: 3, accounts: [] }]);
   });
 
   it('parent() in isIn is the nearest parent in nested laterals, and the alias of an aliased one', async () => {
@@ -260,7 +271,8 @@ describe('Whereable', () => {
 
   it('parent() in vals([…]) outside a lateral rejects run() before any query, writes included', async () => {
     // 6.6.1 sent '{"value":"…"}': select() and count() found no row on a text column, every row with isNotIn,
-    // so deletes() and update() reached them all; 22P02 on an int column; the writes stored '{"value":"display_name"}'
+    // so deletes() and update() reached them all; 22P02 on an int column; the writes stored '{"value":"display_name"}',
+    // {"value": "x"} in jsonb and {"{\"value\":\"t\"}"} in text[]
     const queries: unknown[] = [];
     db.setConfig({ queryListener: query => queries.push(query) });
     const rejected = async (query: Promise<unknown>) => {
@@ -275,6 +287,10 @@ describe('Whereable', () => {
       updateIsNotIn: await rejected(db.update('users', { mood: 'ok' }, { display_name: c.isNotIn([parent('display_name')]) }).run(t.client)),
       handInsert: await rejected(sql`INSERT INTO ${'users'} (${cols(['email', 'display_name'])}) VALUES (${vals(['dan@example.com', parent('display_name')])})`.run(t.client)),
       insertFragment: await rejected(db.insert('users', { email: 'dan@example.com', display_name: sql`${vals([parent('display_name')])}` }).run(t.client)),
+      insertJsonb: await rejected(db.insert('users', { email: 'dan@example.com', display_name: 'Dan', settings: sql`${vals([parent('x')])}` }).run(t.client)),
+      insertTextArray: await rejected(db.insert('users', { email: 'dan@example.com', display_name: 'Dan', tags: sql`ARRAY[${vals([parent('t')])}]` }).run(t.client)),
+      updateFragment: await rejected(db.update('users', { display_name: sql`${vals([parent('display_name')])}` }, { id: 1 }).run(t.client)),
+      upsertValues: await rejected(db.upsert('users', { email: 'bob@example.com', display_name: sql`${vals([parent('display_name')])}` }, 'email').run(t.client)),
       upsertUpdateValues: await rejected(db.upsert('users', { email: 'bob@example.com', display_name: 'Bob' }, 'email', {
         updateValues: { display_name: vals([parent('display_name')]) as any },
       }).run(t.client)),
