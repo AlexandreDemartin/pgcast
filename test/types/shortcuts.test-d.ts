@@ -167,6 +167,14 @@ describe('upsert', () => {
     db.upsert('users', row, k);
     db.upsert('users', [row], k);
   });
+
+  test('upsertRequiresSameKeys: an optional boolean of setConfig, a boolean of getConfig', () => {
+    db.setConfig({ upsertRequiresSameKeys: true });
+    expectTypeOf(db.getConfig().upsertRequiresSameKeys).toEqualTypeOf<boolean>();
+    expectTypeOf<db.NewConfig['upsertRequiresSameKeys']>().toEqualTypeOf<boolean | undefined>();
+    // @ts-expect-error a boolean, not a string
+    db.setConfig({ upsertRequiresSameKeys: 'yes' });
+  });
 });
 
 describe('update, deletes', () => {

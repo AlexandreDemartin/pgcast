@@ -4,7 +4,7 @@
 // `text` + `values` of each shortcut and option, as Zapatos 6.6.1 produces them.
 // Execution on the fixture: test/integration/shortcuts.test.ts.
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as db from '../../src/db';
 import { sql, param, parent, Default, all, conditions as dc } from '../../src/db';
 import { resetConfig } from '../helpers/config';
@@ -605,6 +605,88 @@ describe('upsert', () => {
         "values": [],
       }
     `);
+  });
+});
+
+describe('upsertRequiresSameKeys', () => {
+  afterEach(resetConfig);
+  const
+    rows = [
+      { sku: 'TEE', variant: 'S', price_cents: 1300 },
+      { sku: 'CAP', variant: '', price_cents: 900, title: 'Cap' },
+    ],
+    sameKeys = [{ ...rows[0], title: 'Tee' }, rows[1]];
+
+  it('with it, rows with different keys throw before any query', () => {
+    db.setConfig({ upsertRequiresSameKeys: true });
+    expect(() => db.upsert('products', rows, ['sku', 'variant']))
+      .toThrow('rows have different keys: pass updateColumns, or give every row the same keys');
+    expect(() => db.upsert('products', rows, ['sku', 'variant'], { updateValues: { title: 'x' } }))
+      .toThrow('rows have different keys: pass updateColumns, or give every row the same keys');
+  });
+
+  it('with it, the same keys, one row, updateColumns or doNothing compile as without it', () => {
+    const queries = () => [
+      db.upsert('products', sameKeys, ['sku', 'variant']),
+      db.upsert('products', rows[0], ['sku', 'variant']),
+      db.upsert('products', rows, ['sku', 'variant'], { updateColumns: ['title'] }),
+      db.upsert('products', rows, ['sku', 'variant'], { updateColumns: db.doNothing }),
+    ].map(q => q.compile());
+    const without = queries();
+    db.setConfig({ upsertRequiresSameKeys: true });
+    expect(queries()).toEqual(without);
+    expect(without[2]).toMatchInlineSnapshot(`
+      {
+        "text": "INSERT INTO "products" ("price_cents", "sku", "title", "variant") VALUES ($1, $2, DEFAULT, $3), ($4, $5, $6, $7) ON CONFLICT ("sku", "variant") DO UPDATE SET ("title") = ROW(EXCLUDED."title") RETURNING to_jsonb("products".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "values": [
+          1300,
+          "TEE",
+          "S",
+          900,
+          "CAP",
+          "Cap",
+          "",
+        ],
+      }
+    `);
+  });
+});
+
+describe('upsert of rows with different keys, without upsertRequiresSameKeys', () => {
+  afterEach(() => { vi.restoreAllMocks(); });
+  const rows = [
+    { sku: 'TEE', variant: 'S', price_cents: 1300 },
+    { sku: 'CAP', variant: '', price_cents: 900, title: 'Cap' },
+  ];
+
+  /** A fresh src/db, which has emitted no warning yet, and a spy on the warnings. */
+  const fresh = async () => {
+    vi.resetModules();
+    const emitWarning = vi.spyOn(process, 'emitWarning').mockImplementation(() => { });
+    return { fdb: await import('../../src/db'), emitWarning };
+  };
+
+  it('emits a DeprecationWarning once per process, PGCAST_DEP001, naming the option', async () => {
+    // the SQL is unchanged: see 'several conflict columns and several rows' above
+    const { fdb, emitWarning } = await fresh();
+    fdb.upsert('products', rows, ['sku', 'variant']);
+    fdb.upsert('products', rows, ['sku', 'variant'], { updateValues: { title: 'x' } });
+    expect(emitWarning).toHaveBeenCalledTimes(1);
+    const [message, options] = emitWarning.mock.calls[0];
+    expect(options).toEqual({ type: 'DeprecationWarning', code: 'PGCAST_DEP001' });
+    expect(message).toMatch(/upsertRequiresSameKeys: true/);
+    expect(message).toMatch(/default in pgcast 7\.0/);
+  });
+
+  it('emits none for rows with the same keys, one row, updateColumns or doNothing, nor with the option', async () => {
+    const { fdb, emitWarning } = await fresh();
+    fdb.upsert('products', [{ ...rows[0], title: 'Tee' }, rows[1]], ['sku', 'variant']);
+    fdb.upsert('products', rows[0], ['sku', 'variant']);
+    fdb.upsert('products', rows, ['sku', 'variant'], { updateColumns: ['title'] });
+    fdb.upsert('products', rows, ['sku', 'variant'], { updateColumns: fdb.doNothing });
+    fdb.setConfig({ upsertRequiresSameKeys: true });
+    expect(() => fdb.upsert('products', rows, ['sku', 'variant'])).toThrow();
+    expect(emitWarning).not.toHaveBeenCalled();
   });
 });
 
