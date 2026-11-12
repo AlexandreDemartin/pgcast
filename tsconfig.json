@@ -3,7 +3,6 @@
     "src/**/*"
   ],
   "compilerOptions": {
-    "baseUrl": ".",
     "outDir": "dist",
     "rootDir": "src",
     "target": "ES2019",
@@ -14,7 +13,7 @@
     "noUnusedLocals": true,
     "paths": {
       "*": [
-        "src/typings/*"
+        "./src/typings/*"
       ]
     }
   },

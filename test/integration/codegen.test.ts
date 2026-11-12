@@ -198,7 +198,7 @@ describe('surprises, frozen as they are', () => {
     const configPath = join(generatedDir, 'tsconfig.json');
     const { config } = ts.readConfigFile(configPath, ts.sys.readFile);
     const { options, fileNames } = ts.parseJsonConfigFileContent(config, ts.sys, generatedDir);
-    const program = ts.createProgram(fileNames, { ...options, paths: { 'zapatos/db': ['src/db'] } });
+    const program = ts.createProgram(fileNames, { ...options, paths: { 'zapatos/db': [join(root, 'src/db')] } });
     const errors = ts.getPreEmitDiagnostics(program).map(d => `${relative(root, d.file!.fileName)} TS${d.code}`);
     expect([...new Set(errors)]).toMatchInlineSnapshot(`
       [
