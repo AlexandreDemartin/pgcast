@@ -102,7 +102,7 @@ export function checkLinks(config: SiteConfig) {
     }
     if (!existsSync(markdown)) continue;  // a "Coming" page, from `[page].md`
     for (const [line, written] of fencedSiteUrls(readFileSync(markdown, 'utf8'))) {
-      const problem = problemOf(atHome(new URL(written.slice(host.length), 'http://site')));
+      const problem = problemOf(atHome(new URL(written)));
       if (problem) problems.add(`${page}:${line}: ${written}, ${problem}`);
     }
   }
