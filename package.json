@@ -56,9 +56,12 @@
     "codegen",
     "zapatos"
   ],
-  "author": "George MacKerron",
+  "author": "Alexandre Demartin (https://github.com/AlexandreDemartin)",
   "contributors": [
-    "Alexandre Demartin"
+    {
+      "name": "George MacKerron",
+      "url": "https://github.com/jawj"
+    }
   ],
   "license": "MIT",
   "peerDependencies": {

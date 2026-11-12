@@ -9,6 +9,10 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 ### Added
 - The `upsertRequiresSameKeys` config option (`db.setConfig({ upsertRequiresSameKeys: true })`, off by default, optional in `Config`): a multi-row `upsert()` without `updateColumns`, where a key missing from some row is still set from `EXCLUDED`, throws before any query ("rows have different keys: pass updateColumns, or give every row the same keys"), instead of overwriting the existing value with its `DEFAULT`. A key of `updateValues` or a column of an array or string `conflictTarget` does not count (new rows without their serial `id`, upserted on `'id'`, pass); with `constraint()`, every key counts. Rows with the same keys, one row, and any `updateColumns` compile as before.
 
+### Changed
+- `README.md` rewritten for pgcast: what it fixes and adds, an example with its SQL and type, what differs from Zapatos 6.6.1, the versions policy, the relationship with Zapatos.
+- `package.json`: the `author` is the maintainer, Alexandre Demartin; George MacKerron, the original author of Zapatos, is listed under `contributors`. `.github/FUNDING.yml` lists both. The published files are unchanged.
+
 ### Deprecated
 - A multi-row `upsert()` without `updateColumns`, where a key missing from some row is still set from `EXCLUDED`: it is inserted as `DEFAULT`, then overwrites the existing value on conflict. It still runs, with the same SQL, and emits a `DeprecationWarning` (`PGCAST_DEP001`) once per process. `upsertRequiresSameKeys` will be the default in 7.0.
 
