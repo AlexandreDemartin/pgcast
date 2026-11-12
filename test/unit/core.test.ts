@@ -373,21 +373,27 @@ describe('cols and vals', () => {
     `);
   });
 
-  it('characterization: vals of an array wraps a Parameter or Default in another parameter', () => {
-    // characterization: only SQLFragment is special-cased in the array branch; a Parameter is
-    // double-wrapped (pg then sends it JSON-stringified) and Default is sent as a Symbol value
-    expect(one(vals([param(1), Default]))).toMatchInlineSnapshot(`
+  it('vals of an array compiles a Parameter as it is, and Default as DEFAULT', () => {
+    // as vals of an object does; 6.6.1 wrapped both in another parameter, sent as '{"value":1}' and 'Symbol(DEFAULT)'
+    expect(one(vals([param(1), param('a', 'text'), Default, 2]))).toMatchInlineSnapshot(`
       {
-        "text": "$1, $2",
+        "text": "$1, CAST($2 AS "text"), DEFAULT, $3",
         "values": [
-          Parameter {
-            "cast": undefined,
-            "value": 1,
-          },
-          Symbol(DEFAULT),
+          1,
+          "a",
+          2,
         ],
       }
     `);
+  });
+
+  it('vals of an array throws on Default in a Whereable: a filter has no default', () => {
+    expect(() => one({ id: db.conditions.isIn([1, Default]) })).toThrowErrorMatchingInlineSnapshot(`[Error: \`db.Default\` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. \`DEFAULT\` is for INSERT and UPDATE values.]`);
+  });
+
+  it('vals of an array throws on Default in a fragment value of vals of an object, which reads as a Whereable', () => {
+    // the fragment is compiled with its key as the current column, as in a Whereable; 6.6.1 sent 'Symbol(DEFAULT)'
+    expect(() => one(vals({ role: sql`${vals([Default])}` }))).toThrowErrorMatchingInlineSnapshot(`[Error: \`db.Default\` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. \`DEFAULT\` is for INSERT and UPDATE values.]`);
   });
 });
 
@@ -439,17 +445,55 @@ describe('Whereable', () => {
     `);
   });
 
-  it('characterization: a Parameter, raw or Default value is wrapped in another parameter', () => {
-    // characterization: only SQLFragment and ParentColumn are special-cased in a Whereable
-    expect(one({ id: param(1), mood: raw("'ok'"), display_name: Default })).toMatchInlineSnapshot(`
+  it('a Parameter value compiles as it is, with its cast', () => {
+    // 6.6.1 wrapped it in another parameter, sent as '{"value":1}'
+    expect(one({ id: param(1), display_name: param('Ada', 'text'), settings: param({ theme: 'dark' }, true) })).toMatchInlineSnapshot(`
       {
-        "text": "("display_name" = $1 AND "id" = $2 AND "mood" = $3)",
+        "text": "("display_name" = CAST($1 AS "text") AND "id" = $2 AND "settings" = CAST($3 AS "json"))",
         "values": [
-          Symbol(DEFAULT),
+          "Ada",
+          1,
+          "{"theme":"dark"}",
+        ],
+      }
+    `);
+  });
+
+  it('a Parameter value follows castObjectParamsToJson, and is compiled once', () => {
+    // param(param(x)) stays one parameter whose value is the inner Parameter, as in sql`${param(param(x))}`;
+    // an array holding a Parameter is one value, as before
+    db.setConfig({ castObjectParamsToJson: true });
+    expect(one({ settings: param({ theme: 'dark' }), display_name: param(param('Ada')), tags: [param('a')] })).toMatchInlineSnapshot(`
+      {
+        "text": "("display_name" = $1 AND "settings" = CAST($2 AS "json") AND "tags" = $3)",
+        "values": [
           Parameter {
             "cast": undefined,
-            "value": 1,
+            "value": "Ada",
           },
+          "{"theme":"dark"}",
+          [
+            Parameter {
+              "cast": undefined,
+              "value": "a",
+            },
+          ],
+        ],
+      }
+    `);
+  });
+
+  it('a Default value throws: a filter has no default', () => {
+    // 6.6.1 sent 'Symbol(DEFAULT)', which matched no row
+    expect(() => one({ display_name: Default })).toThrowErrorMatchingInlineSnapshot(`[Error: \`db.Default\` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. \`DEFAULT\` is for INSERT and UPDATE values.]`);
+  });
+
+  it('characterization: a raw value is wrapped in another parameter', () => {
+    // characterization: pg sends it as JSON, {"value":"'ok'"} (#101)
+    expect(one({ mood: raw("'ok'") })).toMatchInlineSnapshot(`
+      {
+        "text": "("mood" = $1)",
+        "values": [
           DangerousRawString {
             "value": "'ok'",
           },

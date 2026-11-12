@@ -392,12 +392,14 @@ describe('upsert', () => {
     `);
   });
 
-  it('updateValues: a plain object that holds a pgcast object, at any depth, compiles as under 6.6.1', () => {
-    // as in a sql template: a WHERE-style condition of its keys, each value a fragment or a parameter
+  it('updateValues: a plain object that holds a pgcast object, at any depth, compiles as in a sql template', () => {
+    // a WHERE-style condition of its keys, each value a fragment or a parameter, as under 6.6.1, except
+    // that a Parameter is compiled as it is and Default throws, as in any Whereable (#31)
     expect({
       like: set({ 'users.mood': dc.like('h%') }), sql: set({ x: sql`'happy'` }), inArray: set([{ x: sql`'happy'` }]),
       nullPrototype: set(Object.assign(Object.create(null), { x: sql`'happy'` })),
-      param: set({ 'users.mood': param('happy') }), deep: set({ a: { b: [db.raw(`'happy'`)] } }),
+      param: set({ 'users.mood': param('happy') }), notIn: set({ 'users.mood': dc.isNotIn([param('happy')]) }),
+      deep: set({ a: { b: [db.raw(`'happy'`)] } }),
       default: set({ a: Default }), parent: set({ a: parent('id') }),
     }).toMatchInlineSnapshot(`
       {
@@ -413,12 +415,7 @@ describe('upsert', () => {
             },
           ],
         ],
-        "default": [
-          "("mood") = ROW(("a" = $3))",
-          [
-            Symbol(DEFAULT),
-          ],
-        ],
+        "default": "throws: \`db.Default\` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. \`DEFAULT\` is for INSERT and UPDATE values.",
         "inArray": [
           "("mood") = ROW((('happy')))",
           [],
@@ -429,6 +426,12 @@ describe('upsert', () => {
             "h%",
           ],
         ],
+        "notIn": [
+          "("mood") = ROW((("users"."mood" NOT IN ($3))))",
+          [
+            "happy",
+          ],
+        ],
         "nullPrototype": [
           "("mood") = ROW((('happy')))",
           [],
@@ -436,10 +439,7 @@ describe('upsert', () => {
         "param": [
           "("mood") = ROW(("users"."mood" = $3))",
           [
-            Parameter {
-              "cast": undefined,
-              "value": "happy",
-            },
+            "happy",
           ],
         ],
         "parent": "throws: The 'parent' table alias has no meaning here",

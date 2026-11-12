@@ -257,9 +257,10 @@ export const doNothing = [];
 
 // a plain value is sent as a parameter, as `vals()` sends it; a value that holds one of our own objects
 // (`sql`, `param`, `raw`, `cols`, `vals`, `parent`, a symbol such as `Default` or `self`) anywhere in its
-// arrays and plain objects is compiled as it always was, as in a `sql` template; so is a function or the
-// global object where a `sql` template throws on it, alone or as an array item, but not as the value of
-// an object's key, which a `sql` template sends as a parameter (a `toPostgres()` method, say)
+// arrays and plain objects is compiled as in a `sql` template; so is a function or the global object where
+// a `sql` template throws on it, alone or as an array item, but not as the value of an object's key, which
+// a `sql` template sends as a parameter (a `toPostgres()` method, say). A plain object is then a Whereable,
+// where a `Parameter` is compiled as it is and `Default` throws, unlike 6.6.1 (#31)
 const compiledAsIs = (value: any, inObject = false): boolean =>
   typeof value === 'function' || value === globalThis ? !inObject :
     value instanceof SQLFragment || value instanceof Parameter || value instanceof DangerousRawString ||

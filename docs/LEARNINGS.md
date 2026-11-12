@@ -102,6 +102,12 @@ Candidates for a check, a rule or a skill line.
 - #30 — A `Whereable` already wraps each `SQLFragment` value in parentheses: a bare `OR` is exposed only in fragments passed straight to `not()`, `and()` or `or()` (it scoped #96) — `branch-reviewer`
 - #30 — A 6.6.1 replay can transpile `core.ts` and `conditions.ts` from `git archive v6.6.1 src/db` with `tsc --noCheck --module commonjs`; run each case under a `SAVEPOINT` and `ROLLBACK TO` it on error, or one failure turns every later case into 25P02 — `branch-reviewer`
 - #30 — Vitest collects only files under `test/`: a throwaway replay sits there and moves out before `npm test`; a documented scratch spot for 6.6.1 replays would avoid it (candidate: skill `backward-compat`) — `builder`
+- #31 — A change to the `Whereable` branch of `compileExpression` reaches callers that never say "filter": `upsert` `updateValues` (through `compiledAsIs`), `lateral` subqueries, nested fragments, and a fragment value of `vals({…})` (which sets `currentColumn` too). Grep every caller that passes objects through as they are, and replay each (candidate: skill `sql-safety`) — `branch-reviewer`
+- #31 — A filter that silently matched nothing has a mirror: `isNotIn` / `not` matched every row, so a `deletes` with them deleted everything under 6.6.1; replay the negated forms and the writes too — `builder`
+- #31 — A CHANGELOG line that sorts result changes by column type is checked against each type's input function on `extra.type_zoo`, not one sample: `'{"value":…}'` and `'Symbol(DEFAULT)'` are valid input for text, varchar, name, citext, bytea, tsvector and xml, and error codes vary (22P02, 22007, 42601) — `branch-reviewer`
+- #31 — A type can accept a class it never names: `Parameter<T>` is structural, so `DangerousRawString { value: string }` passes wherever `Parameter<string>` does; probe every wrapper class against a slot typed `Parameter<T>` (led to #101) — `builder`
+- #31 — VitePress default-theme overrides with one class lose to its scoped `[data-v-…]` rules without any error: check an override in the built CSS or the computed style (#103) — `branch-reviewer`
+- #31 — Agents running at the same time share one session scratchpad: name review worktrees uniquely (PR number and PID), never `scratchpad/wt` — `branch-reviewer`
 
 ## Minors kept
 
@@ -125,3 +131,4 @@ Minor review defects, taken up by the end-of-chapter review.
 - #81 — CI: the integration hooks' 10 s timeout was hit once while creating the test databases on a slow runner (Node 20, Postgres 14); the rerun passed — raise `hookTimeout` for the database setup — `orchestrator`
 - #29 — `src/db/shortcuts.ts:313`: with `undefinedMeansMissing`, an `upsert` / `insert` whose keys are all `undefined` compiles to `INSERT INTO "t" () VALUES ()` (42601), as master's `upsert('t', {})` does: should an empty `Insertable` throw early, as `update` does since R24? — `branch-reviewer`
 - #29 — pre-existing: an `undefined` in `updateValues` still adds its column to `SET` as `EXCLUDED.col`, even when the column was not inserted, which writes its `DEFAULT` into the existing row: a candidate line for the characterisation report — `builder`
+- #31 — `src/db/conditions.ts:21`: `conditionalParam` still wraps `Default`, so `{ display_name: eq(Default) }` sends `'Symbol(DEFAULT)'` and matches nothing (both versions): a candidate finding, with #101 — `branch-reviewer`
