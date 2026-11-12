@@ -143,7 +143,7 @@ function layOut(sql: string) {
     subqueries: boolean[] = [],  // for each open parenthesis: does it hold a subquery?
     indent = (extra = 0) => '\n' + '  '.repeat(subqueries.filter(Boolean).length + extra),
     atClauseLevel = () => subqueries.length === 0 || subqueries[subqueries.length - 1]!,
-    tokens = /(\((?=SELECT\b))|(\()|(\))|((?<!LEFT|INNER)\s+(?=(?:SELECT|FROM|WHERE|(?:LEFT |INNER )?JOIN|GROUP BY|HAVING|ORDER BY|LIMIT|OFFSET|VALUES|ON CONFLICT|RETURNING)\b))|(?<=\|\|)\s+/g;
+    tokens = /(\((?=SELECT\b))|(\()|(\))|((?<!LEFT|INNER)\s+(?=(?:SELECT|FROM|WHERE|(?:LEFT |INNER )?JOIN|GROUP BY|HAVING|ORDER BY|LIMIT|OFFSET|FOR (?:NO KEY )?UPDATE|FOR (?:KEY )?SHARE|VALUES|ON CONFLICT|RETURNING)\b))|(?<=\|\|)\s+/g;
 
   return sql.split(quoted)  // odd parts are quoted: kept as they are
     .map((part, i) => i % 2 ? part : part.replace(tokens, (space, subquery, open, close, beforeClause) =>
