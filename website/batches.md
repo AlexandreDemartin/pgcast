@@ -118,7 +118,7 @@ With `db.setConfig({ upsertRequiresSameKeys: true })` ([`Config.upsertRequiresSa
 Rows built from input often hold an `undefined`, such as a `booked_at` the form left empty. By default it's sent as `NULL`, as in Zapatos 6.6.1. `booked_at` is `NOT NULL`, so Postgres refuses the whole batch, 23502, `null value in column "booked_at" of relation "seat_bookings" violates not-null constraint`, and pgcast warns once, `PGCAST_DEP002`.
 
 ::: tip Opt-in
-With `db.setConfig({ undefinedMeansMissing: true })` ([`Config.undefinedMeansMissing`](/runtime-config#Config.undefinedMeansMissing)), an `undefined` is a missing key, `(DEFAULT, $1, $2, $3)`: a row with different keys, as above ([An `undefined` value](/insert#undefined-values)).
+With `db.setConfig({ undefinedMeansMissing: true })` ([`Config.undefinedMeansMissing`](/runtime-config#Config.undefinedMeansMissing)), an `undefined` is a missing key: F8 with `booked_at: undefined` is `(DEFAULT, $5, $6, $7)`, a row with different keys as above ([An `undefined` value](/insert#undefined-values)).
 :::
 
 ## Choose what comes back
