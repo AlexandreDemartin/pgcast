@@ -55,12 +55,15 @@ A new example in the docs, the README, a JSDoc, an issue or a PR uses pgcast's o
 | Pattern | Tables |
 |---|---|
 | Plain rows, `lateral` on a foreign key | `studios`, `films` (`studio_id`, `title`, `release_year`, `runtime_minutes`) |
+| Arrays (`TEXT[]`) | `films` (`genres`) |
 | Many-to-many | `actors`, `roles` (`film_id`, `actor_id`, `character`, `billing`) |
 | Self-reference, with `alias` | `crew` (`mentor_id`) |
 | `extras` with a `POINT` and a gist index | `cinemas` (nearest cinema) |
 | Transactions, `SERIALIZABLE` | `screenings`, `seat_bookings` (one seat per screening) |
+| A nullable `BOOLEAN` | `screenings` (`subtitled`) |
+| A domain and its `custom/` placeholder | `seat_bookings` (`seat`, domain `seat_label`) |
 | `upsert` counts, `updateValues` | `ratings` |
-| Arrays, simple lookups | `tags` |
+| Simple lookups | `tags` |
 
 - Names are invented: no real person, no real film.
 - Tests keep their fixture (`test/fixtures/schema.sql`, skill `type-tests`); existing JSDoc keeps Zapatos's tables.

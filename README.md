@@ -58,8 +58,8 @@ The type you get, with no annotation (`s` is `zapatos/schema`, the generated mod
 
 ```typescript
 const films: (s.films.JSONSelectable & { cast: s.roles.JSONSelectable[] })[]
-// s.films.JSONSelectable is { id: number; release_year: number; runtime_minutes: number;
-//   studio_id: number; tagline: string | null; title: string }
+// s.films.JSONSelectable is { genres: string[]; id: number; release_year: number;
+//   runtime_minutes: number; studio_id: number; tagline: string | null; title: string }
 ```
 
 ## Install

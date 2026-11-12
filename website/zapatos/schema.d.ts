@@ -384,6 +384,12 @@ declare module 'zapatos/schema' {
     export type Table = 'films';
     export interface Selectable {
       /**
+      * **films.genres**
+      * - `_text` in database
+      * - `NOT NULL`, default: `'{}'::text[]`
+      */
+      genres: string[];
+      /**
       * **films.id**
       * - `int4` in database
       * - `NOT NULL`, default: `nextval('films_id_seq'::regclass)`
@@ -421,6 +427,12 @@ declare module 'zapatos/schema' {
       title: string;
     }
     export interface JSONSelectable {
+      /**
+      * **films.genres**
+      * - `_text` in database
+      * - `NOT NULL`, default: `'{}'::text[]`
+      */
+      genres: string[];
       /**
       * **films.id**
       * - `int4` in database
@@ -460,6 +472,12 @@ declare module 'zapatos/schema' {
     }
     export interface Whereable {
       /**
+      * **films.genres**
+      * - `_text` in database
+      * - `NOT NULL`, default: `'{}'::text[]`
+      */
+      genres?: string[] | db.Parameter<string[]> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string[] | db.Parameter<string[]> | db.SQLFragment | db.ParentColumn>;
+      /**
       * **films.id**
       * - `int4` in database
       * - `NOT NULL`, default: `nextval('films_id_seq'::regclass)`
@@ -498,6 +516,12 @@ declare module 'zapatos/schema' {
     }
     export interface Insertable {
       /**
+      * **films.genres**
+      * - `_text` in database
+      * - `NOT NULL`, default: `'{}'::text[]`
+      */
+      genres?: string[] | db.Parameter<string[]> | db.DefaultType | db.SQLFragment;
+      /**
       * **films.id**
       * - `int4` in database
       * - `NOT NULL`, default: `nextval('films_id_seq'::regclass)`
@@ -535,6 +559,12 @@ declare module 'zapatos/schema' {
       title: string | db.Parameter<string> | db.SQLFragment;
     }
     export interface Updatable {
+      /**
+      * **films.genres**
+      * - `_text` in database
+      * - `NOT NULL`, default: `'{}'::text[]`
+      */
+      genres?: string[] | db.Parameter<string[]> | db.DefaultType | db.SQLFragment | db.SQLFragment<any, string[] | db.Parameter<string[]> | db.DefaultType | db.SQLFragment>;
       /**
       * **films.id**
       * - `int4` in database
@@ -876,6 +906,14 @@ declare module 'zapatos/schema' {
       * - `NOT NULL`, no default
       */
       starts_at: Date;
+      /**
+      * **screenings.subtitled**
+      *
+      * NULL until the cinema says
+      * - `bool` in database
+      * - Nullable, no default
+      */
+      subtitled: boolean | null;
     }
     export interface JSONSelectable {
       /**
@@ -902,6 +940,14 @@ declare module 'zapatos/schema' {
       * - `NOT NULL`, no default
       */
       starts_at: db.TimestampTzString;
+      /**
+      * **screenings.subtitled**
+      *
+      * NULL until the cinema says
+      * - `bool` in database
+      * - Nullable, no default
+      */
+      subtitled: boolean | null;
     }
     export interface Whereable {
       /**
@@ -928,6 +974,14 @@ declare module 'zapatos/schema' {
       * - `NOT NULL`, no default
       */
       starts_at?: (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.SQLFragment | db.ParentColumn>;
+      /**
+      * **screenings.subtitled**
+      *
+      * NULL until the cinema says
+      * - `bool` in database
+      * - Nullable, no default
+      */
+      subtitled?: boolean | db.Parameter<boolean> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, boolean | db.Parameter<boolean> | db.SQLFragment | db.ParentColumn>;
     }
     export interface Insertable {
       /**
@@ -954,6 +1008,14 @@ declare module 'zapatos/schema' {
       * - `NOT NULL`, no default
       */
       starts_at: (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.SQLFragment;
+      /**
+      * **screenings.subtitled**
+      *
+      * NULL until the cinema says
+      * - `bool` in database
+      * - Nullable, no default
+      */
+      subtitled?: boolean | db.Parameter<boolean> | null | db.DefaultType | db.SQLFragment;
     }
     export interface Updatable {
       /**
@@ -980,6 +1042,14 @@ declare module 'zapatos/schema' {
       * - `NOT NULL`, no default
       */
       starts_at?: (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.SQLFragment | db.SQLFragment<any, (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.SQLFragment>;
+      /**
+      * **screenings.subtitled**
+      *
+      * NULL until the cinema says
+      * - `bool` in database
+      * - Nullable, no default
+      */
+      subtitled?: boolean | db.Parameter<boolean> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, boolean | db.Parameter<boolean> | null | db.DefaultType | db.SQLFragment>;
     }
     export type UniqueIndex = 'screenings_pkey';
     export type Column = keyof Selectable;
@@ -1015,10 +1085,10 @@ declare module 'zapatos/schema' {
       screening_id: number;
       /**
       * **seat_bookings.seat**
-      * - `text` in database
+      * - `seat_label` (base type: `text`) in database
       * - `NOT NULL`, no default
       */
-      seat: string;
+      seat: c.PgSeat_label;
     }
     export interface JSONSelectable {
       /**
@@ -1041,10 +1111,10 @@ declare module 'zapatos/schema' {
       screening_id: number;
       /**
       * **seat_bookings.seat**
-      * - `text` in database
+      * - `seat_label` (base type: `text`) in database
       * - `NOT NULL`, no default
       */
-      seat: string;
+      seat: c.PgSeat_label;
     }
     export interface Whereable {
       /**
@@ -1067,10 +1137,10 @@ declare module 'zapatos/schema' {
       screening_id?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
       /**
       * **seat_bookings.seat**
-      * - `text` in database
+      * - `seat_label` (base type: `text`) in database
       * - `NOT NULL`, no default
       */
-      seat?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+      seat?: c.PgSeat_label | db.Parameter<c.PgSeat_label> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgSeat_label | db.Parameter<c.PgSeat_label> | db.SQLFragment | db.ParentColumn>;
     }
     export interface Insertable {
       /**
@@ -1093,10 +1163,10 @@ declare module 'zapatos/schema' {
       screening_id: number | db.Parameter<number> | db.SQLFragment;
       /**
       * **seat_bookings.seat**
-      * - `text` in database
+      * - `seat_label` (base type: `text`) in database
       * - `NOT NULL`, no default
       */
-      seat: string | db.Parameter<string> | db.SQLFragment;
+      seat: c.PgSeat_label | db.Parameter<c.PgSeat_label> | db.SQLFragment;
     }
     export interface Updatable {
       /**
@@ -1119,10 +1189,10 @@ declare module 'zapatos/schema' {
       screening_id?: number | db.Parameter<number> | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment>;
       /**
       * **seat_bookings.seat**
-      * - `text` in database
+      * - `seat_label` (base type: `text`) in database
       * - `NOT NULL`, no default
       */
-      seat?: string | db.Parameter<string> | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment>;
+      seat?: c.PgSeat_label | db.Parameter<c.PgSeat_label> | db.SQLFragment | db.SQLFragment<any, c.PgSeat_label | db.Parameter<c.PgSeat_label> | db.SQLFragment>;
     }
     export type UniqueIndex = 'seat_bookings_pkey';
     export type Column = keyof Selectable;

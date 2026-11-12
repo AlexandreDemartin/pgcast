@@ -14,7 +14,8 @@ CREATE TABLE films
 , title TEXT NOT NULL
 , release_year INTEGER NOT NULL
 , runtime_minutes INTEGER NOT NULL
-, tagline TEXT );
+, tagline TEXT
+, genres TEXT[] NOT NULL DEFAULT '{}' );
 
 CREATE TABLE actors
 ( id SERIAL PRIMARY KEY
@@ -51,11 +52,17 @@ CREATE TABLE screenings
 ( id SERIAL PRIMARY KEY
 , film_id INTEGER NOT NULL REFERENCES films(id)
 , cinema_id INTEGER NOT NULL REFERENCES cinemas(id)
-, starts_at TIMESTAMPTZ NOT NULL );
+, starts_at TIMESTAMPTZ NOT NULL
+, subtitled BOOLEAN );
+
+COMMENT ON COLUMN screenings.subtitled IS 'NULL until the cinema says';
+
+-- A seat is a row letter and a number: A1 to Z99
+CREATE DOMAIN seat_label AS TEXT CHECK (VALUE ~ '^[A-Z][0-9]{1,2}$');
 
 CREATE TABLE seat_bookings
 ( screening_id INTEGER NOT NULL REFERENCES screenings(id)
-, seat TEXT NOT NULL
+, seat seat_label NOT NULL
 , customer TEXT NOT NULL
 , booked_at TIMESTAMPTZ NOT NULL DEFAULT now()
 , PRIMARY KEY (screening_id, seat) );
@@ -76,11 +83,11 @@ INSERT INTO studios (id, name) VALUES
 , (1001, 'Greyhaven Studios')
 , (1002, 'Ninefold Films');
 
-INSERT INTO films (id, studio_id, title, release_year, runtime_minutes, tagline) VALUES
-  (1000, 1000, 'The Salt Orchard', 1974, 112, 'Some harvests take a lifetime.')
-, (1001, 1001, 'A Lantern for Edith', 1991, 98, NULL)
-, (1002, 1000, 'The Cartographer''s Silence', 2008, 131, 'Every map leaves something out.')
-, (1003, 1002, 'Small Hours at Calder Bay', 2019, 104, NULL);
+INSERT INTO films (id, studio_id, title, release_year, runtime_minutes, tagline, genres) VALUES
+  (1000, 1000, 'The Salt Orchard', 1974, 112, 'Some harvests take a lifetime.', '{drama}')
+, (1001, 1001, 'A Lantern for Edith', 1991, 98, NULL, '{drama,romance}')
+, (1002, 1000, 'The Cartographer''s Silence', 2008, 131, 'Every map leaves something out.', '{mystery,thriller}')
+, (1003, 1002, 'Small Hours at Calder Bay', 2019, 104, NULL, '{}');
 
 INSERT INTO actors (id, name) VALUES
   (1000, 'Odile Marchetti')
@@ -117,8 +124,8 @@ INSERT INTO cinemas (id, name, location) VALUES
 , (1001, 'Kestrel Picture House', point(-2.1, 0.3))
 , (1002, 'The Old Mill Screen', point(3.5, -1.8));
 
-INSERT INTO screenings (id, film_id, cinema_id, starts_at) VALUES
-  (1000, 1000, 1000, '2030-03-01 19:30+00')
-, (1001, 1002, 1000, '2030-03-01 21:45+00')
-, (1002, 1003, 1001, '2030-03-02 18:00+00')
-, (1003, 1001, 1002, '2030-03-02 20:15+00');
+INSERT INTO screenings (id, film_id, cinema_id, starts_at, subtitled) VALUES
+  (1000, 1000, 1000, '2030-03-01 19:30+00', false)
+, (1001, 1002, 1000, '2030-03-01 21:45+00', true)
+, (1002, 1003, 1001, '2030-03-02 18:00+00', NULL)
+, (1003, 1001, 1002, '2030-03-02 20:15+00', NULL);
