@@ -12,7 +12,7 @@ db.select(table, where, options?, mode?, aggregate?)
 Builds one `SELECT` of the rows of `table` that match `where`. It returns a [`SQLFragment`](/sql-template#SQLFragment): `.run(pool)` gives an array of the table's `JSONSelectable` rows, `[]` when none match.
 
 - `table`: a table of the generated schema.
-- `where`: a `Whereable`, an object of columns and their values or [conditions](/conditions), its keys in alphabetical order joined by `AND`, each in parentheses; a [`sql`](/sql-template#sql) fragment, written as it is; or [`db.all`](/sql-template#all), for no `WHERE` at all.
+- `where`: a `Whereable`, an object of columns and their values or [conditions](/conditions), its keys in alphabetical order, joined by `AND` in one pair of parentheses, a condition or `sql` value in its own (`("id" = $1 AND ("studio_id" > $2) AND "title" = $3)`); a [`sql`](/sql-template#sql) fragment, written as it is; or [`db.all`](/sql-template#all), for no `WHERE` at all.
 - `options`: the [options](#options) below, all optional.
 - `mode` and `aggregate`: what `selectOne()`, `count()` and the others pass; see [`SelectResultMode`](#SelectResultMode).
 
