@@ -71,8 +71,10 @@ https://alexandredemartin.github.io/pgcast/llms-full.txt
   `db.update()` or `db.deletes()`.
   https://alexandredemartin.github.io/pgcast/raw-sql#pass-each-value-as-a-parameter
 - Run each query on the pool or client you are given; inside a transaction, on
-  its `txnClient`.
+  its `txnClient`. Its callback may run again (40001, 40P01): keep side effects
+  out of it.
   https://alexandredemartin.github.io/pgcast/transaction#transaction
+  https://alexandredemartin.github.io/pgcast/retries#keep-side-effects-out-of-the-callback
 - Read the SQL of a new query: `.compile()` in place of `.run()` gives
   `{ text, values }` and sends nothing.
   https://alexandredemartin.github.io/pgcast/sql-template#compile
