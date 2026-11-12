@@ -66,7 +66,7 @@ await db.insert('cinemas', {
 }).run(pool);
 ```
 
-- Postgres also takes `'1.5,2.5'` or `'(1.5, 2.5)'`; the type takes only the form it returns.
+- Postgres also takes `'1.5,2.5'`, which the type refuses. The type checks the parentheses and the comma, and lets spaces through: `'(1.5, 2.5)'` compiles, and Postgres takes it.
 - One type serves all five interfaces. Your own query typed `s.cinemas.Selectable` gets rows from `pg`, which parses a point into `{ x: 1.5, y: 2.5 }`, whatever the type says: select `${'location'}::text` there, or type that query's result yourself ([`sql`](/sql-template#sql)).
 
 ## Find the nearest cinema
