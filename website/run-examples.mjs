@@ -43,6 +43,24 @@ for (const page of readdirSync(new URL('.', import.meta.url)).filter(file => fil
   });
 }
 
+/** Every name a `declare` line gives: `a` and `b` in `declare const a: A, b: Map<K, V>;`, not `V`. */
+function declaredNames(source) {
+  return [...source.matchAll(/^declare (const|let|var|function) (.*)/gm)].flatMap(([, kind, rest]) => {
+    if (kind === 'function') return [rest.match(/^\w+/)?.[0]];
+    const parts = [''];
+    let depth = 0;
+    for (let i = 0; i < rest.length; i++) {
+      const char = rest[i];
+      if (depth === 0 && (char === ';' || rest.startsWith('//', i))) break;  // the end, or a comment
+      if ('<([{'.includes(char)) depth++;
+      else if (')]}'.includes(char) || (char === '>' && rest[i - 1] !== '=')) depth--;  // `=>` closes nothing
+      if (char === ',' && depth === 0) parts.push('');
+      else parts[parts.length - 1] += char;
+    }
+    return parts.map(part => part.match(/^\s*(\w+)/)?.[1]);
+  });
+}
+
 /**
  * Run one example with `pool` set to what it is given. Every example shares this process's `zapatos/db`, so the
  * configuration goes back to what it was before the next, as in `cast.data.ts`.
@@ -51,7 +69,7 @@ async function run(example, pool) {
   const
     file = new URL(example, import.meta.url),
     source = readFileSync(file, 'utf8'),
-    declared = [...source.matchAll(/^declare (?:const|let|var|function) (\w+)/gm)].map(([, name]) => name),
+    declared = declaredNames(source),
     unknown = declared.filter(name => name !== 'pool' && !(name in standIns)),
     expected = source.match(/^\/\/ rejects with (\w+)/m)?.[1],
     config = db.getConfig();
@@ -66,7 +84,8 @@ async function run(example, pool) {
   } catch (error) {
     if (expected === undefined) throw error;
     if (![error?.code, error?.name].includes(expected)) {
-      throw new Error(`rejects with ${error?.code ?? error?.name}, not ${expected}: ${error?.message}`, { cause: error });
+      const got = error?.code ?? error?.name;
+      throw new Error(`rejects with ${got}, not ${expected}: ${error?.message}`, { cause: error });
     }
     return;
   } finally {
