@@ -164,6 +164,10 @@ Candidates for a check, a rule or a skill line.
 - #124 — `ON CONFLICT ON CONSTRAINT` takes a constraint, not any unique index: a codegen type built from `pg_index.indisunique` is wider than Postgres (#166) — `branch-reviewer`
 - #124 — `tsc`'s `include` skips folders starting with a dot: a type probe in `.probe/` checks nothing — `builder`
 - #124 — Options tables number parameters as if the other rows were there: one row per panel, its SQL from that panel — `builder`
+- #119 — A tutorial's setup is checked on the oldest TypeScript the docs support, not the site's: 6+/7 defaults (`module`, `esModuleInterop`) hide errors every 5.x user hits — `branch-reviewer`
+- #119 — Examples a page says to keep in one file are type-checked joined in page order: separate modules hide a repeated `const` (candidate for #115) — `branch-reviewer`
+- #119 — A tutorial gives its run command early: without one the outputs cannot be reproduced, which hid the module setup gap and the pool's 10 s exit delay — `builder`
+- #119 — `psql` is not on PATH on the dev machine (`/Library/PostgreSQL/17/bin`): agents that load SQL use its full path or `pg` — `builder`
 
 ## Minors kept
 
