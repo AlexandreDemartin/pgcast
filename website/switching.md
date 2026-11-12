@@ -74,7 +74,7 @@ pgcast fixes, with no option to turn on, what no code could rely on in Zapatos 6
 
 | Your code | Zapatos 6.6.1 → pgcast | What to do |
 |---|---|---|
-| A plain value in [`upsert()`](/insert#upsert-options) `updateValues`: a string, `{ tagline: 'films.title' }`, or an object | a column name, `ROW("films"."title")`, or for an object a condition of its keys (`TRUE` with none) → a parameter, the value itself | for the old result, the value in a fragment: `` db.sql`${'films.title'}` `` |
+| A plain value in [`upsert()`](/insert#upsert-options) `updateValues`: a string, `{ tagline: 'films.title' }`, or an object | a column name, `ROW("films"."title")`, or for an object a condition of its keys (`TRUE` with none) → a parameter, the value itself | for the old result, a fragment: `` db.sql`${'films'}.${'title'}` `` |
 | [`not()`](/conditions#conditions.not) of a fragment with a bare `OR` or `AND`: on `release_year`, `` not(db.sql`${db.self} = 1974 OR ${db.self} = 1991`) `` | `(NOT a) OR b`, so the 1991 film too → `(NOT (a OR b))` | for the old rows, `` db.sql`(NOT ${db.self} = 1974) OR ${db.self} = 1991` `` |
 | [`db.param()`](/sql-template#param) as a filter value, in [`isIn()`](/conditions#conditions.isIn) and [`isNotIn()`](/conditions#conditions.isNotIn), in a plain object of `upsert()` `updateValues`, or in a [`vals([…])`](/sql-template#vals), hand-written or in a fragment value of `insert()`, `update()` or `upsert()` | sent as JSON, `{"value":…}`: no row, every row with `isNotIn()`, other booleans in `updateValues`, `'{"value":…}'` stored, or 22P02 → the value, with its cast | nothing |
 | `{ data: db.param(x, true) }` on a `jsonb` column | no row → 42883, `jsonb = json` | `{ data: db.param(JSON.stringify(x), 'jsonb') }` |
