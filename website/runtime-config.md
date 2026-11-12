@@ -463,8 +463,8 @@ A `timestamptz`.
 ### `toDate()` {#toDate}
 
 ```ts
-db.toDate<D extends TimestampTzString | null>(d: D): D extends null ? null : Date
-db.toDate<D extends TimestampString | DateString | null>(d: D, tzInterpretation: 'UTC' | 'local'): D extends null ? null : Date
+db.toDate<D extends null | TimestampTzString>(d: D, tzInterpretation?: undefined): D extends null ? null : Date
+db.toDate<D extends null | TimestampString | DateString>(d: D, tzInterpretation: 'UTC' | 'local'): D extends null ? null : Date
 ```
 
 Makes a `Date` of a string from Postgres. A `TimestampTzString` has its time zone. A `TimestampString` or a `DateString` has none, so you say which to read it in: `'UTC'`, or `'local'`, the time zone of the JavaScript process.
@@ -482,7 +482,7 @@ const opening = db.toDate('2030-03-01', 'local');
 - A `Date` keeps milliseconds: the microseconds of a Postgres value are dropped.
 - It does not check the string: one a `Date` cannot read gives an Invalid Date.
 
-A `TimestampString` without `tzInterpretation` does not compile, nor a `TimestampTzString` with one:
+A `TimestampString` without `tzInterpretation` does not compile, nor a `TimestampTzString` with one, since the first overload takes `tzInterpretation` only as `undefined` (TS2769):
 
 ```ts twoslash
 // @errors: 2345
