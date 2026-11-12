@@ -175,6 +175,10 @@ Candidates for a check, a rule or a skill line.
 - #160 — `String.prototype.replace` with a replacement string built from input expands `$&`, `$'` and `$$`: use a function — `branch-reviewer`
 - #160 — In VitePress 2.0.0-alpha.21 `markdown.config` runs after the built-in plugins, and a heading's permalink is a `link_open` token too: a wrapper of that rule is paired with a check on the built HTML — `branch-reviewer`, `builder`
 - #160 — The docs checks have no tests, so red-first proofs are scratch pages built and deleted (a fixtures mode would let them run in CI, as noted for #137) — `builder`
+- #122 — « as Postgres reads it » is checked against the generated type first: the date string types are template literals, far narrower than Postgres — `branch-reviewer`
+- #122 — The TS error code depends on the signature: an unbounded `<T>(a: T)` fails at the key (TS2322), a bounded one at the argument (TS2345), some at both; probe each form — `branch-reviewer`, `builder`
+- #122 — A page named like the namespace it documents clashes with its own `{#name}` entry: the h1 says `db.conditions` — `builder`
+- #122 — A scratch type probe needs `paths` mapping `zapatos/*` to `website/node_modules/zapatos` — `builder`
 
 ## Minors kept
 
