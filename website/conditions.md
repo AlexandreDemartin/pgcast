@@ -255,7 +255,7 @@ The type takes `T` as the element, where the Whereable expects the column's arra
 
 </CastPanel>
 
-With [`castArrayParamsToJson`](/runtime-config#Config.castArrayParamsToJson) on, the array is sent as `CAST($1 AS "json")`, which Postgres refuses (42883: `text[] @> json`; [#36](https://github.com/AlexandreDemartin/pgcast/issues/36)).
+With [`castArrayParamsToJson`](/runtime-config#Config.castArrayParamsToJson) on, the array is sent as `CAST($1 AS "json")`, which Postgres refuses (42883: `text[] @> json`). The type refuses `db.param(['drama'], false)` as the value (TS2345). A `sql` fragment in place of the condition sends the array with no cast: `` { genres: db.sql`${db.self} @> ${db.param(['drama'], false)}` } `` gives `"genres" @> $1`. [#36](https://github.com/AlexandreDemartin/pgcast/issues/36) is to let a cast given to `param()` win over the option; a condition called with a plain array keeps the option's behaviour.
 
 ### `arrayContains()` {#conditions.arrayContains}
 
