@@ -225,7 +225,7 @@ Empty one table, or several in one statement.
 | none | `TRUNCATE "tags"` | `undefined` |
 | `'CONTINUE IDENTITY'` | `CONTINUE IDENTITY`: sequences keep their values, as by default | none |
 | `'RESTART IDENTITY'` | `RESTART IDENTITY`: the tables' sequences restart | none |
-| `'RESTRICT'` | `RESTRICT`: Postgres refuses if another table references one of them, as by default | none |
+| `'RESTRICT'` | `RESTRICT`: Postgres refuses if a table not in the list references one of them, as by default | none |
 | `'CASCADE'` | `CASCADE`: also empties the tables that reference them | none |
 
 - Any other option throws: "Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not '…'". Zapatos 6.6.1 wrote it into the SQL as it was.
