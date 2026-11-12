@@ -102,7 +102,7 @@ The placeholders in `custom/` are yours: the generator writes each one once and 
 |---|---|---|
 | `films.Selectable` | a row, as `pg` returns it | your own `sql` queries |
 | `films.JSONSelectable` | a row that came back as JSON: here the same, but a `timestamptz`, for one, arrives as a string, not a `Date` ([why](/catalog-types)) | the results of `select()`, `insert()` and the other shortcuts |
-| `films.Whereable` | a filter: any columns, each with a value | the `where` of `select()`, `update()`, `deletes()` |
+| `films.Whereable` | a filter: any columns, each with a value | the `where` of `select()`, `selectOne()`, `update()`, `deletes()` |
 | `films.Insertable` | a new row: the `NOT NULL` columns with no default required, the rest optional | `insert()`, `upsert()` |
 | `films.Updatable` | changes to a row: every column optional | `update()`, `upsert()` |
 
@@ -165,7 +165,7 @@ const film = await db.selectOne('films', { title: 'The Salt Orchard' }).run(pool
 if (film) console.log(film.release_year);  // 1974
 ```
 
-To see the SQL in your own code, call `.compile()` where you'd call `.run()`: it gives the `text` and `values` the panel shows, and sends nothing.
+To see the SQL in your own code, call `.compile()` where you'd call `.run()`: it gives the `text` (on one line) and `values` the panel shows, and sends nothing.
 
 ## Ask for several, and only what you need
 
