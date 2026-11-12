@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { transformerTwoslash } from '@shikijs/vitepress-twoslash';
 import { defineConfig } from 'vitepress';
-import { checkLinkAnchors } from './anchors.ts';
+import { checkLinkAnchors, keepLinkHashes } from './anchors.ts';
 import { writeLlmsFiles } from './llms.ts';
 import { outline } from './outline.ts';
 import { sqlParameters, syntax } from './syntax.ts';
@@ -38,6 +38,7 @@ export default defineConfig({
     languages: ['js', 'bash'],
     // an unexpected type error in a `ts twoslash` block fails the build; a block meant to fail says so with `// @errors`
     codeTransformers: [transformerTwoslash({ twoslashOptions }), focusableHovers, sqlParameters],
+    config: keepLinkHashes,  // `[Config.upsertRequiresSameKeys](/runtime-config#Config.upsertRequiresSameKeys)`
   },
   vite: {
     define: { __PGCAST_VERSION__: JSON.stringify(version) },

@@ -1,9 +1,23 @@
 // Copyright (C) 2026 Alexandre Demartin
-// Links to anchors (README.md § Conventions, Links): the build fails on a link to an anchor that its page does not
-// define, read from the built HTML, so a raw `<a href>` counts too.
+// Links to anchors (README.md § Conventions, Links): a link keeps its hash as written, and the build fails on a link
+// to an anchor that its page does not define, read from the built HTML, so a raw `<a href>` counts too.
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { SiteConfig } from 'vitepress';
+import type { MarkdownRenderer, SiteConfig } from 'vitepress';
+
+/**
+ * Keep each link's hash as written. VitePress slugifies it (`#Config.upsertRequiresSameKeys` becomes
+ * `#config-upsertrequiressamekeys`), while a reference entry's `{#name}` keeps its case and dots.
+ */
+export function keepLinkHashes(md: MarkdownRenderer) {
+  const linkOpen = md.renderer.rules.link_open!;
+  md.renderer.rules.link_open = (tokens, idx, options, env, self) => {
+    const token = tokens[idx]!, href = () => String(token.attrGet('href') ?? ''), hash = /#.*$/.exec(href())?.[0];
+    linkOpen(tokens, idx, options, env, self);  // VitePress's page, base and clean URL, and its dead-link list
+    if (hash) token.attrSet('href', href().replace(/#.*$|$/, hash));
+    return self.renderToken(tokens, idx, options);
+  };
+}
 
 const
   entities: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'" },
