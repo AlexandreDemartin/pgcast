@@ -218,6 +218,8 @@ Candidates for a check, a rule or a skill line.
 - #142 — Bulk inserts into the docs schema without ids hit 23505 at the 1000th row (seeds from 1000, sequences from 1): probes set explicit ids from 2000 — `branch-reviewer`
 - #128 — A page that states a future version's contract (what 7.x keeps, what 8.0 removes) copies the narrowest wording of decision 003, the README § Versions and the milestones: more precise is a new promise — `branch-reviewer`, `builder`
 - #128 — `process.emitWarning` reports on the next tick: under `--throw-deprecation` the call returns, then the process ends, before a probe's `finally` (drop its databases by prefix afterwards) — `branch-reviewer`, `builder`
+- #147 — A word-for-word quote check misses a changed subject or a dropped clause: read the 300 characters around each match, and keep the subject and any clause whose loss would be unfair to Zapatos — `branch-reviewer`, `builder`
+- #147 — A user-facing page does not copy a running count from a living report; a count closed by a release can be — `branch-reviewer`
 
 ## Minors kept
 
@@ -245,3 +247,4 @@ Minor review defects, taken up by the end-of-chapter review.
 - #107 — `insert('books', { title: parent('name') })` (object branch) still stores `'{"value":"name"}'`: a candidate finding — `builder`
 - #137 — `website/check-reference.mjs`: a fence closed by a line with an info string (```` ```ts ````) is taken as closed, so a later entry is missed (fails loudly) — `branch-reviewer`
 - #128 — `website/insert.md` § undefined values: with `undefinedMeansMissing: true`, an `update()` whose only key is `undefined` throws « nothing to update: an Updatable needs at least one column »; worth one line there — `builder`
+- #147 — `website/why.md`: « all fixed in 6.6.2 » and, two paragraphs later, « The security fixes came first, in 6.6.2 » repeat each other; merge them in a later edit — `builder`
