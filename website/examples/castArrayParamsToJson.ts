@@ -4,5 +4,5 @@ declare const pool: pg.Pool;  // at build, cast.data.ts passes a pool that recor
 // ---cut---
 db.setConfig({ castArrayParamsToJson: true });
 
-const films = await db.update('films', { genres: ['mystery', 'drama'] }, { id: 1003 })
-  .run(pool);
+const lengths = await db.sql<db.SQL, { n: number }[]>`SELECT
+  json_array_length(${db.param(['mystery', 'drama'])}) AS n`.run(pool);

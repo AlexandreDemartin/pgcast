@@ -105,13 +105,11 @@ With `true`, every array sent as a parameter is sent as JSON: `CAST($1 AS "json"
 
 <<< ./examples/castArrayParamsToJson.ts{ts twoslash}
 
-<template #caption><span>Postgres refuses this one: <code>genres</code> is <code>text[]</code>.</span></template>
-
 </CastPanel>
 
-- So, on a Postgres array column, Postgres refuses the query: 42804 "column "genres" is of type text[] but expression is of type json" in an `insert()` or `update()`, 42883 "operator does not exist: text[] = json" in a Whereable, and "… text[] && json" with [`arrayOverlaps()`](/conditions#conditions.arrayOverlaps).
+- Off, the same query fails: `json_array_length($1)` gives 22P02 "invalid input syntax for type json". `param(x, true)` sends the array as JSON under either setting.
+- On a Postgres array column, Postgres refuses an array sent this way: 42804 "column "genres" is of type text[] but expression is of type json" in an `insert()` or `update()`, 42883 "operator does not exist: text[] = json" in a Whereable, and "… text[] && json" with [`arrayOverlaps()`](/conditions#conditions.arrayOverlaps).
 - `param(x, false)` sends the array as it is, under either setting: `{ genres: db.param(['mystery', 'drama'], false) }` gives `SET ("genres") = ROW($1)`.
-- `param(x, true)` sends it as JSON under either setting. Off, an array for a `json` parameter fails: `json_array_length($1)` with `['mystery', 'drama']` gives 22P02 "invalid input syntax for type json".
 - The items of `isIn()` are parameters one by one, so an array of numbers there is unchanged: `("id" IN ($1, $2))`.
 - How `param()` compiles each `cast`: [`param()`](/sql-template#param).
 
