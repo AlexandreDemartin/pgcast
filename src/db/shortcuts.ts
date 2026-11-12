@@ -213,10 +213,16 @@ type UpsertReturnableForTable<
 
 type UpsertConflictTargetForTable<T extends Table> = Constraint<T> | ColumnForTable<T> | ColumnForTable<T>[];
 type UpdateColumns<T extends Table> = ColumnForTable<T> | ColumnForTable<T>[];
-// updateValues are compiled as in a `sql` template, so raw(), cols() and vals() are SQL there, on any column,
-// where an Updatable value refuses them (they are sent as JSON as insert() and update() values)
-type UpdateValuesForTable<T extends Table, U = UpdatableForTable<T>> =
-  { [K in keyof U]: U[K] | DangerousRawString | ColumnNames<any> | ColumnValues<any> };
+// updateValues are compiled as in a `sql` template, so raw(), cols() and vals() are SQL there, where an Updatable
+// value refuses them (they are sent as JSON as insert() and update() values). Each is taken where 6.6.1 took it as
+// the column's Parameter<V> ({ value: V }): raw() if V takes a string, cols(x) of V, vals(x) of the column's type.
+// No more: a wider member (raw() on an int column, cols() of any) would widen the inferred type of param(x) beside
+// it, so that param('1') or param('2020-01-01') no longer fit their column
+type ParameterValue<X> = X extends Parameter<infer V> ? V : never;
+type UpdateValuesForTable<T extends Table, U = UpdatableForTable<T>> = {
+  [K in keyof U]: U[K] | ColumnValues<U[K]> | ColumnNames<ParameterValue<U[K]>> |
+    (string extends ParameterValue<U[K]> ? DangerousRawString : never)
+};
 
 interface UpsertOptions<
   T extends Table,
