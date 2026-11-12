@@ -92,7 +92,7 @@ An interpolated object that is not one of pgcast's values compiles as a filter o
 
 ## Report a flaw
 
-If a caller's input can change the SQL pgcast compiles, please report it privately: [report a vulnerability](https://github.com/AlexandreDemartin/pgcast/security/advisories/new) from the repository's Security tab, never in a public issue. Give the call, the SQL its `.compile()` gives, and what an attacker controls; a flaw pgcast shares with Zapatos is reported here too.
+If you think you have found a flaw in pgcast (the SQL it compiles from a caller's input, or the code the generator writes), please report it privately: [report a vulnerability](https://github.com/AlexandreDemartin/pgcast/security/advisories/new) from the repository's Security tab, never in a public issue. Give the call, the SQL its `.compile()` gives, and what an attacker controls; a flaw pgcast shares with Zapatos is reported here too.
 
 You'll hear back within a week. The fix ships in a patch release, with a GitHub security advisory and its CVE, published on a date agreed with you, and credit in it and in the CHANGELOG unless you'd rather not be named. What is in scope, and which versions are supported: [SECURITY.md](https://github.com/AlexandreDemartin/pgcast/blob/master/SECURITY.md).
 
