@@ -38,8 +38,9 @@ export default defineConfig({
     siteTitle: 'pg<b>::</b>cast',
     nav: [
       { text: 'Docs', link: '/install', activeMatch: '^/(?!$)' },
-      { text: 'Changelog', link: `${repo}/blob/master/CHANGELOG.md` },
-      { text: 'GitHub', link: repo },
+      // no ↗ after the external links, as the prototype
+      { text: 'Changelog', link: `${repo}/blob/master/CHANGELOG.md`, noIcon: true },
+      { text: 'GitHub', link: repo, noIcon: true },
     ],
     sidebar: outline,
     search: {
