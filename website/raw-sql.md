@@ -96,7 +96,7 @@ Some choices are syntax, not values: a sort direction, the column to sort on. A 
 </CastPanel>
 
 - [`db.raw()`](/sql-template#raw) writes its string as it is. Here it only ever gets `'DESC'` or `'ASC'`, whatever the caller sent.
-- The column is a name: quoted, it can't close its quotes, but the caller's string could name any column of the query, or none (42703). `find()` keeps one of yours, typed as the template wants.
+- The column is a name: quoted, it can't close its quotes, but the caller's string could name any column of the query, or none (42703, or 42P01 for a table outside the query). `find()` keeps one of yours, typed as the template wants.
 
 ::: warning Security
 Whatever reaches `raw()` runs as SQL, and its type takes any string. Give it a caller's text, and the caller writes your query:
