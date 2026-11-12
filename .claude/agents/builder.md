@@ -39,13 +39,13 @@ Explore, plan, code, commit.
 
 - Branch `<type>/<issue>-<slug>` (skill `pr-shape` § Branch) from an up-to-date `master`: `git fetch && git switch -c <branch> origin/master`.
 - Layer of a stack, only if the orchestrator asks (skill `pr-shape` § Stacking): the branch starts from the layer below (`git switch -c <branch> origin/<branch below>`), and a fix from below goes up by `git merge`, never by rebase.
-- Small, atomic commits, in George's manner (skill `pr-shape` § Commits); each ends with the requested `Co-Authored-By` line.
+- Small, atomic commits (skill `pr-shape` § Commits); each ends with the requested `Co-Authored-By` line.
 - Normal push; never `--amend`, `rebase` nor `--force` (`guard.mjs`).
 
 ## The PR
 
 - `gh pr create --draft --base master --repo AlexandreDemartin/pgcast`: never to `jawj/zapatos`. For a layer of a stack, `--base <branch below>`.
-- Title in George's manner (skill `pr-shape` § PR title), ending with `(closes #n)`.
+- Title per skill `pr-shape` § PR title, ending with `(closes #n)`.
 - A PR too big for the skill `pr-shape` § Size and scope: stop and propose a split to the orchestrator.
 - Body: `Closes #n`, then **What** · **Why** · **Proofs** · **Decided alone**, and the label `decided-alone` if needed (skill `plan-and-proofs`).
 - The `builder` does not mark the PR ready, does not close the issue and never merges: the orchestrator does (skill `merge-gate`).

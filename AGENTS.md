@@ -89,7 +89,7 @@ A task is **done** only if `lint`, `typecheck`, `test` and `test:types` pass.
 
 - **Read the code concerned before changing it**, and summarise what you understood.
 - **Tests first**, or at least with the implementation: runtime, compiled SQL (`text` and `values`) and types (positive **and** negative cases with `@ts-expect-error`).
-- **One feature = one branch = one PR** on `AlexandreDemartin/pgcast`, small like one of George's commits (skill `pr-shape`).
+- **One feature = one branch = one PR** on `AlexandreDemartin/pgcast`, small like a Zapatos commit (skill `pr-shape`).
 - **No breaking change** to the public API. If it is unavoidable, stop and ask (skill `backward-compat`).
 - **`core.ts` (escaping, parameterisation, identifier compilation)**: never touch it without saying so explicitly. Each change adds SQL injection tests (skill `sql-safety`).
 - A helper is designed with the skill `zero-abstraction`, an advanced type is tested and its compile time watched with the skill `type-tests`, the codegen output follows the skill `codegen-output`, and a need is validated with the skill `consumer-usage`.
