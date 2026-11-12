@@ -28,6 +28,11 @@ npm run lint && npm run typecheck && npm test && npm run test:types && npm run b
 
 - `npm run bench:types` when a type changes; `npm run check:agents` when `.agents/` or `.claude/` changes. All commands: [AGENTS.md § Commands](AGENTS.md#commands).
 
+## Docs
+
+- The docs site lives in `website/`, a package of its own. A feature's pull request updates its page; a new export of `zapatos/db` or a new option needs its reference entry, or the docs build fails.
+- Which group a page belongs to, its template, the conventions and the checklist before a pull request: [website/README.md § Writing a page](website/README.md#writing-a-page).
+
 ## Commits and pull requests
 
 - As in Zapatos: one line, plain English, imperative, British spelling, no prefix: "Add conditions with array operators".

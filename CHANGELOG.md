@@ -16,6 +16,7 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 - The docs site writes `llms.txt` and `llms-full.txt` to its root at build ([llmstxt.org](https://llmstxt.org/)), for assistants: an index of the written pages, then all of them as plain Markdown, each cast panel with its SQL, values and type as compiled at build. Install links both.
 - CI's `docs` job, now with a Postgres service, regenerates the docs schema's types (`website/zapatos/`) from `website/schema.sql` and fails if they differ from the committed files.
 - The docs build fails when an export of `zapatos/db`, or an option of its `Config` or of the generator's, has no entry in a Reference page (a heading anchored `{#name}`) and is not in `website/reference-pending.json`, the names whose page is still "Coming"; a pending name that has its entry fails it too, so the list only shrinks.
+- A guide to writing a docs page, in `website/README.md` § Writing a page, linked from `CONTRIBUTING.md`: which of the four groups a page belongs to, the conventions (title and lede, notes and their chips, options tables, links, the film world), the reference check, what feeds `llms.txt`, screenshots for a PR, and a checklist. One template per group in `website/templates/`, not published.
 - Dependabot version updates (`.github/dependabot.yml`), weekly: dev dependencies, minor and patch, in one PR; GitHub Actions in another. A minor or patch never changes `dependencies` or `peerDependencies`.
 
 ### Changed

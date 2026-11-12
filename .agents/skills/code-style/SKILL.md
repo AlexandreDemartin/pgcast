@@ -47,7 +47,7 @@ const
 
 - First person where natural, warm and brief, a little humour ("It is a truth universally acknowledged that ORMs aren't very good."); British spelling.
 - Each feature shows three things side by side: the TypeScript you write, the SQL produced, the type obtained.
-- **A docs page per feature**, in its Diátaxis group: tutorial, how-to, reference or explanation (decided 2026-11-12). Every export keeps its reference entry, checked by the docs build (#137).
+- **A docs page per feature**, in its Diátaxis group: tutorial, how-to, reference or explanation (decided 2026-11-12). Every export keeps its reference entry, checked by the docs build (#137). How to write one, from its template: `website/README.md` § Writing a page.
 
 ## Examples: the film's cast
 

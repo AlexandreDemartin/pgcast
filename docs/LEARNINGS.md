@@ -155,6 +155,7 @@ Candidates for a check, a rule or a skill line.
 - #137 — Probe a Markdown-scanning check in the silent-pass direction first (an HTML comment, a duplicate): a missed entry fails loudly, a false entry stays green — `branch-reviewer`
 - #137 — A pending list that assigns names to pages is cross-read against the scopes of the issues that will write those pages — `branch-reviewer`
 - #137 — `check-reference.mjs` has no tests: a fixtures mode (pages and pending file as arguments) would let its probes run in CI — `builder`
+- #151 — `git checkout -- <file>` after a temporary `sed` also reverts that file's uncommitted edits: copy the file aside before such a probe — `builder`
 
 ## Minors kept
 
