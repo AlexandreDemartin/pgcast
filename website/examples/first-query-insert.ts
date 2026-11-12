@@ -1,10 +1,12 @@
 import * as db from 'zapatos/db';
+import type * as s from 'zapatos/schema';
 import type pg from 'pg';
 declare const pool: pg.Pool;  // at build, cast.data.ts passes a pool that records the query
 // ---cut---
-const newFilm = await db.insert('films', {
+const row: s.films.Insertable = {
   studio_id: 1002,
   title: 'The Night Ferry to Orkesund',
   release_year: 2024,
   runtime_minutes: 117,
-}).run(pool);
+};
+const newFilm = await db.insert('films', row).run(pool);

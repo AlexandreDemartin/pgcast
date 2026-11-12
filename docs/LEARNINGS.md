@@ -251,6 +251,10 @@ Candidates for a check, a rule or a skill line.
 - #203 — `Number(s)` is not a parser for query-string ids (`Number('')` is 0, `Number('0x3e8')` is 1000): test the string first (`/^\d{1,9}$/`) — `branch-reviewer`
 - #203 — Re-encoding a decoded cursor and comparing it with the input is the simplest way to refuse a string the server did not make — `builder`
 - #203 — Parallel builders that name their probe databases alike see each other's rows: put the agent's own folder name in the database name, and check the row count before a proof run — orchestrator
+- #203 — A `tsc` output quoted on a tutorial page carries line numbers: quote them from a file the page shows whole, or the reader's assembly moves them (26, 29, 30 for the same steps) — `branch-reviewer`
+- #203 — TypeScript 7 prints only the last overload's error for a failed overloaded call (TS2769), so a typed row (`const row: s.t.Insertable`) is the form whose errors read the same on 5.9, 6.0 and 7.0; `satisfies` does not help — `branch-reviewer`, `builder`
+- #203 — A terminal's `tsc` output is `--pretty` with colours stripped, two blank lines before `Found N error(s)`; a pipe prints the plain form — `branch-reviewer`
+- #203 — Twoslash hovers are in the page's `assets/<page>.md.*.js` chunk, not in its `.html` — `builder`
 - #203 — A panel's caption matches the entry it sits under: on `pool`, `now()` is the query's time only because the query is its own transaction — `branch-reviewer`
 - #203 — A link's text does not repeat a section title of the page that holds it, or it reads as an in-page anchor — `branch-reviewer`
 - #203 — A snippet whose caption names variable values keeps them in scope after any `try` — `branch-reviewer`, `builder`
