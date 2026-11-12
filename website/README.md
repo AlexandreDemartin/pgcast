@@ -78,7 +78,7 @@ One per group, in `templates/`, not published (`srcExclude` in `.vitepress/confi
   ```
 
   At build, `.vitepress/cast.data.ts` runs it against a pool that only records the query `.run()` gets from `.compile()`: its SQL (laid out on lines, whitespace only) and values fill "Postgres runs". "TypeScript knows" is the type Twoslash gives the module's first `const`: its name, then one level down. Nothing in a panel is typed by hand; the loader checks itself before each build (a type error must fail, the layout must change whitespace only, a query whose result transform throws on no rows is still recorded).
-- An example that sends more than one query, such as a transaction, cannot be a panel: it goes in `examples/plain/`, which `tsc` checks and `cast.data.ts` does not run, as `<<< ./examples/plain/<name>.ts{ts twoslash}`; the SQL it sends, where the page shows it, in a `sql` block.
+- An example that sends more than one query, such as a transaction, cannot be a panel: it goes in `examples/plain/`, which `tsc` checks and `cast.data.ts` does not run, as `<<< ./examples/plain/<name>.ts{ts twoslash}`; the SQL it sends, where the page shows it, in a `sql` block: only the lines pgcast sends itself, such as `START TRANSACTION`, with a comment and a link for each query's own.
 - An optional caption goes under the panel: `<template #caption><span>…</span></template>` (`index.md`).
 
 ### The reference
@@ -107,7 +107,7 @@ A PR that changes how a page looks shows it, in light and dark, at a phone's wid
 - [ ] One job, the group's; its entry in `outline.ts`, a version badge if it documents a minor
 - [ ] A `# ` title and a `{.lede}` paragraph
 - [ ] Each export it documents: an entry anchored `{#name}`, its line gone from `reference-pending.json`
-- [ ] Every example in the film world, as `ts twoslash`; a query's SQL in a cast panel
+- [ ] Every example in the film world, as `ts twoslash`; a query's SQL in a cast panel, or a `sql` block for an example of several queries (`examples/plain/`)
 - [ ] Notes with a chip; options tables as Option → SQL it adds → Effect on the type
 - [ ] Links to the other groups; British spelling
 - [ ] `npm run docs:build` passes
