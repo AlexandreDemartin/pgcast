@@ -33,7 +33,10 @@ Copy it into your project, and change `src/zapatos/schema.d.ts` if your `outDir`
 # Postgres with pgcast
 
 This project queries Postgres with pgcast, a maintained fork of Zapatos,
-installed under the `zapatos` alias. Its docs, written for assistants:
+installed under the `zapatos` alias. The index of its docs, each page with its
+URL and summary:
+https://alexandredemartin.github.io/pgcast/llms.txt
+For an assistant that reads one whole file, every page in one:
 https://alexandredemartin.github.io/pgcast/llms-full.txt
 
 - The database is the source of the types. Before writing a query on a table,
