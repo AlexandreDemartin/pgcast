@@ -33,13 +33,14 @@ const
     }
   },
   // `[line, url]` of each URL of the site in a fenced block (```` ``` ```` or `~~~`, indented in a list too), without
-  // a full stop or comma after it. A fence closes on its marker alone, as long, with nothing after it.
+  // a full stop or comma after it. A ```` ``` ```` line with a backtick after it opens no fence: it is inline code, as
+  // in CommonMark. A fence closes on its marker alone, as long, with nothing after it.
   fencedSiteUrls = (markdown: string) => {
     const urls: [number, string][] = [];
     let fence: string | null = null;
-    markdown.split('\n').forEach((line, i) => {
+    markdown.split(/\r?\n/).forEach((line, i) => {  // a CRLF checkout too
       const [, marker, rest] = /^\s*(`{3,}|~{3,})(.*)$/.exec(line) ?? [];
-      if (fence === null) fence = marker ?? null;
+      if (fence === null) fence = marker?.[0] === '`' && rest!.includes('`') ? null : marker ?? null;
       else if (marker?.[0] === fence[0] && marker.length >= fence.length && rest!.trim() === '') fence = null;
       else urls.push(...[...line.matchAll(/https?:\/\/[^\s"'<>`()[\]]+/g)]
         .filter(([url]) => url.startsWith(`${host}/`))
