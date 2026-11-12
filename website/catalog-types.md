@@ -64,7 +64,7 @@ Each shortcut is one query, and Postgres builds its result itself: each row as o
 The price is that every value travels as JSON, and JSON has no dates, no bytes and one kind of number. `JSONSelectable` says what arrives instead:
 
 - a date or a time, as the ISO 8601 string `to_jsonb()` writes; a `timestamptz` with the session's offset, `+00:00` in `UTC` and `+05:30` in `Asia/Kolkata`;
-- a `bytea`, as its hex string, `'\xdeadbeef'`, where `pg` gives a `Buffer`;
+- a `bytea`, as its hex string (with the default `bytea_output`), `'\xdeadbeef'`, where `pg` gives a `Buffer`;
 - an `int8` or a `numeric`, as a JSON number, where `pg` gives a string. A large one loses precision as `JSON.parse()` reads it: the `int8` `9007199254740993` arrives as `9007199254740992`. The generator warns when a schema has such columns, and [`customJSONParsingForLargeNumbers`](/generator#generate.customJSONParsingForLargeNumbers) types them for a parser that keeps them whole.
 
 Zapatos returned JSON from every shortcut that returns rows, even those that could do without it, "in the interests of consistency", as its docs put it: one shortcut's row is the same type as another's. And it typed the strings rather than converting them behind your back: [`TimestampTzString`](/runtime-config#TimestampTzString) and its siblings check a string's shape, and [`toDate()`](/runtime-config#toDate) turns one into a `Date` when you choose to, saying in which time zone to read a string that carries none ([Dates and times](/runtime-config#dates-and-times)).
