@@ -122,7 +122,7 @@ Two real requests at once may or may not conflict, so a test can't count on it. 
 Here with `test` from `node:test` and `assert` from `node:assert/strict`; any test runner does. The first test proves the callback can run twice: the first attempt's two seats are gone, and the second books them once.
 
 - The second test gives up: its callback throws on every attempt, so with `transactionAttemptsMax: 2` it runs twice, and the promise rejects with the very error it threw, after `on attempt 2 of 2, giving up`.
-- `transactionRetryDelay` at `0` keeps the test fast. `setConfig()` holds for the whole process: put back what the other tests expect.
+- `transactionRetryDelay` at `0` keeps the test fast. `setConfig()` holds for the whole process: put back what the other tests expect ([`getConfig()`](/runtime-config#getConfig)).
 
 ## See also
 
