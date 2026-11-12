@@ -86,13 +86,14 @@ for (const file of readdirSync(dist).filter(file => file.endsWith('.js'))) {
 }
 
 /**
- * Whether `quote` is a message of the library: the whole of a literal, `…` for a value or for text left out. A quote
- * may show it as the template literal it is, between backticks.
+ * Whether `quote` is a message of the library: the whole of a literal, `…` for a value or for text left out, or the
+ * literal with a value in place of each `…`, one word (`1ms`, not `1 ms`). A quote may show it as the template literal
+ * it is, between backticks.
  */
 function isMessage(quote) {
   const text = quote.replace(/^`(.*)`$/, '$1'), quoted = new RegExp(`^${pattern(text).source}$`);
   return messages.some(literal =>
-    quoted.test(literal) || new RegExp(`^${literal.split('…').map(escape).join('.*?')}$`).test(text));
+    quoted.test(literal) || new RegExp(`^${literal.split('…').map(escape).join('\\S+?')}$`).test(text));
 }
 
 /**
