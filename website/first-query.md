@@ -142,7 +142,7 @@ Ask for a film by its title with `selectOne()`, then `.run()` it on the pool:
 
 </CastPanel>
 
-The title went to Postgres as a parameter, `$1`<!-- probe: examples/first-query.ts -->, never pasted into the SQL. The row comes back as JSON (`to_jsonb`<!-- probe: examples/first-query.ts -->), so its type is `films.JSONSelectable`, and `undefined` if no film has that title. TypeScript won't let you forget it:
+The title went to Postgres as a parameter, `("title" = $1)`<!-- probe: examples/first-query.ts -->, never pasted into the SQL. The row comes back as JSON (`to_jsonb`<!-- probe: examples/first-query.ts -->), so its type is `films.JSONSelectable`, and `undefined` if no film has that title. TypeScript won't let you forget it:
 
 ```ts twoslash
 // @errors: 18048
@@ -192,7 +192,7 @@ Run it, and after `1974` it prints:
 
 </CastPanel>
 
-Each column name shows up twice: as a value, `$1`<!-- probe: examples/first-query-columns.ts -->, the key of the JSON object, and quoted, `"title"`<!-- probe: examples/first-query-columns.ts -->, the column it reads. The type follows the query: two columns asked for, two in the type. Leave `columns` out and you get every column, `films.JSONSelectable[]`. Print them:
+Each column name shows up twice in `jsonb_build_object($1::text, "title", …)`<!-- probe: examples/first-query-columns.ts -->: as a value, `$1`, the key of the JSON object, and quoted, `"title"`, the column it reads. The type follows the query: two columns asked for, two in the type. Leave `columns` out and you get every column, `films.JSONSelectable[]`. Print them:
 
 ```ts twoslash
 import * as db from 'zapatos/db';

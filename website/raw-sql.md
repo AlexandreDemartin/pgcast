@@ -49,7 +49,7 @@ A value from a caller (a form, a URL, a row you read elsewhere) goes in as [`db.
 </CastPanel>
 
 - <code v-pre>${{ studio_id: studioId }}</code> is `("studio_id" = $1)`<!-- probe: examples/raw_sql_values.ts -->: a filter of `films`, as the `where` of [`select()`](/select#select) takes it, so [conditions](/conditions) work in it too: [`gte()`](/conditions#conditions.gte) in `{ release_year: db.conditions.gte(1990) }`.
-- `${db.param(genre)}` is `$2`<!-- probe: examples/raw_sql_values.ts -->: a parameter fits wherever SQL takes a value.
+- `${db.param(genre)}` is `$2`, in `$2 = ANY("genres")`<!-- probe: examples/raw_sql_values.ts -->: a parameter fits wherever SQL takes a value.
 - An array is one parameter: `` ${'id'} = ANY(${db.param(ids)}) `` sends `ids` as a Postgres array by default; with `castArrayParamsToJson` on, it does not ([below](#cast-a-parameter-postgres-can-t-type)).
 - A part of the query that only some calls need is a nested fragment, or `[]` for nothing ([Nested fragments](/sql-template#nested-fragments)).
 
@@ -103,8 +103,8 @@ Postgres gives a parameter a type from where it stands. Compared with a column, 
 
 </CastPanel>
 
-- `$1`<!-- probe: examples/raw_sql_cast.ts -->, compared with `starts_at`, is a `timestamptz` already.
-- `$2`<!-- probe: examples/raw_sql_cast.ts --> is added to an `interval`, so without its cast Postgres reads it as one, and fails: `operator does not exist: timestamp with time zone < interval` (42883).
+- `$1`, compared with `starts_at` in `"starts_at" >= $1`<!-- probe: examples/raw_sql_cast.ts -->, is a `timestamptz` already.
+- `$2`, in `CAST($2 AS "timestamptz") + make_interval(hours => $3)`<!-- probe: examples/raw_sql_cast.ts -->, is added to an `interval`, so without its cast Postgres reads it as one, and fails: `operator does not exist: timestamp with time zone < interval` (42883).
 - `db.param(from, 'timestamptz')` writes `CAST($2 AS "timestamptz")`<!-- probe: examples/raw_sql_cast.ts -->; `` ${db.param(from)}::timestamptz `` in the text does the same.
 - The cast is the type's catalog name, in lower case (`int4`, `timestamptz`, `crew_job`), quoted as one name. `'integer'` gives `CAST($1 AS "integer")`<!-- probe: db.sql`${db.param(1, 'integer')}` -->, a type that does not exist (42704), as do `'int'` and `'TIMESTAMPTZ'`.
 - Name a schema as `'public"."crew_job'`, which gives `"public"."crew_job"`<!-- probe: db.sql`${db.param(1, 'public"."crew_job')}` -->: `'public.crew_job'` gives `"public.crew_job"`<!-- probe: db.sql`${db.param(1, 'public.crew_job')}` -->, and `'int4[]'` gives `"int4[]"`<!-- probe: db.sql`${db.param(1, 'int4[]')}` -->, types that do not exist (42704; [#37](https://github.com/AlexandreDemartin/pgcast/issues/37)). Write an array type in the text: `` ${db.param(ids, false)}::int4[] `` (`false`: below).
@@ -153,7 +153,7 @@ A fragment as a Whereable value compares its column with SQL of your own, [`db.s
 
 </CastPanel>
 
-- `lower(${db.self})` is `lower("title")`<!-- probe: examples/raw_sql_self.ts -->, and the caller's text is still `$1`<!-- probe: examples/raw_sql_self.ts -->.
+- `lower(${db.self})` is `lower("title")`<!-- probe: examples/raw_sql_self.ts -->, and the caller's text is still a parameter, `lower($1)`<!-- probe: examples/raw_sql_self.ts -->.
 - An equality, unlike [`ilike()`](/conditions#conditions.ilike): a `_` or a `%` in the caller's text matches only itself.
 - The same object works as the `where` of [`select()`](/select#select) and the other shortcuts.
 - Where it has no column to stand for, `self` throws "The 'self' column alias has no meaning here"<!-- message -->, so [`run()`](/sql-template#run) rejects before any query.

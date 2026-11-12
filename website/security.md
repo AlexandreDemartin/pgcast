@@ -13,7 +13,7 @@ Every value pgcast sends, from a filter, an `insert()` or a [`param()`](/sql-tem
 
 </CastPanel>
 
-Written into the text, that title would close its string and match every film: `("title" = 'x' OR 'a' = 'a')`. As `$1`<!-- probe: examples/security_values.ts -->, it is a title no film has, and the query returns none. This is Zapatos's foundation, kept as it was.
+Written into the text, that title would close its string and match every film: `("title" = 'x' OR 'a' = 'a')`. As `("title" = $1)`<!-- probe: examples/security_values.ts -->, it is a title no film has, and the query returns none. This is Zapatos's foundation, kept as it was.
 
 The split has a second effect. node-postgres sends a query with values through Postgres's extended protocol, where a query is one statement: `SELECT $1::int; SELECT 2` is refused with "cannot insert multiple commands into a prepared statement" (42601). A query with no values, and no `.prepared()` name, goes as plain text, where a `;` can start a second statement, which is why the holes below were at their worst in a query without parameters.
 

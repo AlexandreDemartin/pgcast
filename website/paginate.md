@@ -15,7 +15,7 @@ Ask for the first page of all the films ([`db.all`](/sql-template#all)): an `ord
 </CastPanel>
 
 - End the [`order`](/select#order-limit-offset-and-withties) on a unique column, `id` here. Two films of the same year can otherwise come back in either order, and from one request to the next a film can turn up on two pages or on none: Postgres promises no order among ties ([LIMIT and OFFSET](https://www.postgresql.org/docs/current/queries-limit.html)).
-- `limit` is sent as a parameter, `$4`<!-- probe: examples/paginate.ts -->.
+- `limit` is sent as a parameter, `LIMIT $4`<!-- probe: examples/paginate.ts -->.
 - Name the [`columns`](/select#columns) the page shows, and keep the `order`'s among them if you'll fetch the next page from the last row (below).
 
 Then pick how the reader moves on:

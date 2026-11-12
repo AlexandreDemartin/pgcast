@@ -13,7 +13,7 @@ Give [`insert()`](/insert#insert) an array, and every row goes in one query:
 
 </CastPanel>
 
-Each cell is a parameter: three rows of two columns, `$1`<!-- probe: examples/batches_insert.ts --> to `$6`<!-- probe: examples/batches_insert.ts -->. An empty array sends nothing and resolves with `[]`.
+Each cell is a parameter: three rows of two columns, `VALUES ($1, $2), ($3, $4), ($5, $6) RETURNING`<!-- probe: examples/batches_insert.ts -->. An empty array sends nothing and resolves with `[]`.
 
 ## Split under the parameter limit
 
