@@ -5,13 +5,16 @@
 // Identity and serial values are never hard-coded: they are read back.
 
 import * as pg from 'pg';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import * as db from '../../src/db';
 import { sql, param, parent, Default, all } from '../../src/db';
 import { useTestDatabase } from '../helpers/db';
 import { pgError } from '../helpers/pgError';
+import { resetConfig } from '../helpers/config';
 
 const t = useTestDatabase();
+
+afterEach(resetConfig);
 
 // runtime behaviour only: the types (stub schema here) are step 1.4's
 const run = (q: db.SQLFragment<any>): Promise<any> => q.run(t.client);
@@ -150,13 +153,39 @@ describe('upsert', () => {
     `);
   });
 
-  it('characterization: in several rows, a key missing from one row overwrites with DEFAULT on UPDATE', async () => {
-    // characterization: the missing key is filled with DEFAULT, then `SET title = EXCLUDED.title` erases the title
+  it('in several rows, a key missing from one row overwrites with DEFAULT on UPDATE, without upsertRequiresSameKeys', async () => {
+    // deprecated (PGCAST_DEP001): the missing key is filled with DEFAULT, then `SET title = EXCLUDED.title` erases the title
     const [, tee] = sortBy(await run(db.upsert('products', [
       { sku: 'TEE', variant: 'S', price_cents: 1300 },
       { sku: 'CAP', variant: '', price_cents: 900, title: 'Cap' },
     ], ['sku', 'variant'], { returning: ['sku', 'title'] })), 'sku');
     expect(tee).toEqual({ sku: 'TEE', title: null, $action: 'UPDATE' });
+  });
+
+  it('in several rows, a key missing from one row throws with upsertRequiresSameKeys, unless updateColumns is given', async () => {
+    db.setConfig({ upsertRequiresSameKeys: true });
+    const rows = [
+      { sku: 'TEE', variant: 'S', price_cents: 1300 },
+      { sku: 'CAP', variant: '', price_cents: 900, title: 'Cap' },
+    ];
+    expect(() => db.upsert('products', rows, ['sku', 'variant']))
+      .toThrow('rows have different keys: pass updateColumns, or give every row the same keys');
+    const [, tee] = sortBy(await run(db.upsert('products', rows, ['sku', 'variant'], {
+      updateColumns: ['price_cents'], returning: ['sku', 'title', 'price_cents'],
+    })), 'sku');
+    expect(tee).toEqual({ sku: 'TEE', title: 'T-shirt small', price_cents: 1300, $action: 'UPDATE' });
+  });
+
+  it('with upsertRequiresSameKeys, new rows without their serial id among existing rows run, and nothing is overwritten', async () => {
+    db.setConfig({ upsertRequiresSameKeys: true });
+    const { id } = await run(db.selectExactlyOne('products', { sku: 'TEE', variant: 'S' }, { columns: ['id'] }));
+    const [cap, tee] = sortBy(await run(db.upsert('products', [
+      { id, sku: 'TEE', variant: 'S', price_cents: 1300 },
+      { sku: 'CAP', variant: '', price_cents: 900 },
+    ], 'id', { returning: ['id', 'sku', 'title', 'price_cents'] })), 'sku');
+    expect(tee).toEqual({ id, sku: 'TEE', title: 'T-shirt small', price_cents: 1300, $action: 'UPDATE' });
+    expect(cap).toEqual({ id: expect.any(Number), sku: 'CAP', title: null, price_cents: 900, $action: 'INSERT' });
+    expect(cap).not.toMatchObject({ id });
   });
 
   it('constraint()', async () => {
