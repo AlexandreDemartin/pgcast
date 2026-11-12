@@ -357,7 +357,10 @@ interface UpdateSignatures {
 /**
  * Generate an `UPDATE` query `SQLFragment`.
  * @param table The table to update
- * @param values An `Updatable` of the new values with which to update the table
+ * @param values An `Updatable` of the new values with which to update the table.
+ * It needs at least one key: with none, there is nothing to set, and `update()`
+ * throws before any query (a key whose value is `undefined` counts, and sets
+ * the column to `NULL`).
  * @param where A `Whereable` (or `SQLFragment`) defining which rows to update
  */
 export const update: UpdateSignatures = function (
@@ -366,6 +369,9 @@ export const update: UpdateSignatures = function (
   where: Whereable | SQLFragment<any>,
   options?: ReturningOptionsForTable<Table, ColumnsOption<Table>, ExtrasOption<Table>>
 ): SQLFragment {
+
+  // `SET () = ROW()` is a syntax error in Postgres, so say so before any query
+  if (Object.keys(values).length === 0) throw new Error('nothing to update: an Updatable needs at least one column');
 
   // note: the ROW() constructor below is required in Postgres 10+ if we're updating a single column
   // more info: https://www.postgresql-archive.org/Possible-regression-in-UPDATE-SET-lt-column-list-gt-lt-row-expression-gt-with-just-one-single-column0-td5989074.html
