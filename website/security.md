@@ -83,7 +83,7 @@ A filter is its conditions joined by `AND`, and no condition at all is `TRUE`, a
 </CastPanel>
 
 ::: warning Security
-In `deletes()` or `update()`, an empty filter is every row: `removeRatings()` deletes them all. Check that a filter built at run time has a key before you write with it.
+In `deletes()` or `update()`, an empty filter is every row: `removeRatings()` deletes them all. Check that a filter built at run time has a key, and no condition that is `TRUE` whatever the row, as `isNotIn([])` is, before you write with it.
 :::
 
 ### An object that is not a filter
