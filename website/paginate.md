@@ -1,6 +1,6 @@
 # Paginate a list
 
-Show a long list a page at a time: here the films, newest first, two to a page. You give an `order` that never ties, a `limit`, then either an `offset` for page *n* or the last row's keys for the next page; and, if the page shows one, a total. It assumes the basics of the [tutorial](/tutorial).
+Show a long list a page at a time: here the films, newest first, two to a page. You give an `order` that never ties, a `limit`, then either an `offset` for page *n* or the last row's keys for the next page; and, if the page shows one, a total. The last section puts them together in a request handler. It assumes the basics of the [tutorial](/tutorial).
 {.lede}
 
 ## Order, then limit
@@ -114,6 +114,30 @@ A row comparison goes one way. With `release_year` `DESC` and `id` `ASC`, spell 
 - Create the index in the `order`'s directions, `(release_year DESC, id ASC)`. Postgres starts reading at the last row's year: on 300,000 films, after the last row (1960, 150000), `EXPLAIN (ANALYZE)` shows `Index Cond: (release_year <= 1960)`, then a `Filter:` that removes the rest of that year, 1,167 rows.
 - Without the bound, the `OR` is only a `Filter:`: Postgres reads and throws away every row before the last one, 148,671 here, as for an `offset`.
 
+### Send the cursor to the client
+
+A client that asks for the next page sends the last row's keys back. Give them to it as one string, a cursor, and check what comes back before it goes into a query:
+
+```ts twoslash
+type Cursor = { release_year: number; id: number };
+
+function encodeCursor({ release_year, id }: Cursor): string {
+  return Buffer.from(JSON.stringify({ release_year, id })).toString('base64url');
+}
+
+function decodeCursor(cursor: string): Cursor | undefined {
+  try {
+    const { release_year, id } = JSON.parse(Buffer.from(cursor, 'base64url').toString());
+    if (Number.isInteger(release_year) && Number.isInteger(id)) return { release_year, id };
+  } catch {}  // not base64url JSON
+  return undefined;
+}
+```
+
+- For 2008 and 1002, the cursor is `eyJyZWxlYXNlX3llYXIiOjIwMDgsImlkIjoxMDAyfQ`: JSON in base64url, which a URL takes as it is.
+- `decodeCursor()` gives `undefined` for a string it did not make: `nonsense`, an empty string, JSON that is not an object, keys that are not integers (`"2008"`, `2008.5`). Answer 400, as the [handler](#a-handler-from-request-to-response) does.
+- A cursor is encoded, not signed: the client can read it and change it. It holds only where the page starts, and each key goes to Postgres as a parameter: a changed cursor moves the page, nothing more.
+
 ## Count the total
 
 Two ways, by where you want the number:
@@ -154,6 +178,29 @@ A window function in [`extras`](/select#extras) counts the rows before `LIMIT` c
 - On an empty page, past the last one, there is no row to carry it: `page[0]?.total` is `undefined`, not the total.
 - The window makes the page's query read and sort every row of the `where`. On 300,000 films, `EXPLAIN (ANALYZE)` shows a `Seq Scan` and a `WindowAgg` over all of them, where the page alone is an `Index Scan Backward` that stops at its 2 rows.
 - With `strict` off, `total` is not in the type ([Options](/select#options)), and `page[0].total` does not compile (TS2339).
+
+## A handler, from request to response
+
+The steps above in one function: the filter from the query string, the cursor, whether there is a next page, the total, and the JSON reply. `listFilms()` takes the Fetch API's [`Request`](https://developer.mozilla.org/en-US/docs/Web/API/Request) and returns a [`Response`](https://developer.mozilla.org/en-US/docs/Web/API/Response), both global in Node; `encodeCursor()` and `decodeCursor()` are those of [Send the cursor to the client](#send-the-cursor-to-the-client).
+
+<<< ./examples/plain/paginate_handler.ts{ts twoslash}
+
+On the docs schema, `GET /films` replies:
+
+```json
+{
+  "films": [
+    { "id": 1003, "title": "Small Hours at Calder Bay", "release_year": 2019 },
+    { "id": 1002, "title": "The Cartographer's Silence", "release_year": 2008 }
+  ],
+  "nextCursor": "eyJyZWxlYXNlX3llYXIiOjIwMDgsImlkIjoxMDAyfQ",
+  "total": 4
+}
+```
+
+- `limit: size + 1` asks for one row more than the page. If it comes back, there is a next page, and the cursor is the page's last row, not the extra one; `GET /films?after=eyJyZWxlYXNlX3llYXIiOjIwMDgsImlkIjoxMDAyfQ` gives 1001 and 1000, then `"nextCursor": null`. With `limit: size`, a full last page would send a cursor to an empty one.
+- The page's `where` is [the one with a filter](#with-a-filter): `filter`, then the comparison when a cursor came. [`count()`](#with-count) takes `filter` alone, so each page has the list's total: `GET /films?studio=1000` gives 1002 and 1000, and `"total": 2`. Leave it out, and its query, if the page shows no total.
+- A `studio` that is not an integer, or an `after` that `decodeCursor()` refuses, gets a 400 before any query.
 
 ## See also
 
