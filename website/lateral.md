@@ -41,7 +41,7 @@ Films and actors are many-to-many, through `roles`. Nest a lateral in the latera
 
 </CastPanel>
 
-`db.parent()` names a column of the nearest query around it: in `actor`, `"roles"."actor_id"`. Nest as deep as you need; each level adds a `LEFT JOIN LATERAL` to the same query.
+`db.parent()` names a column of the nearest query around it: in `actor`, `"roles"."actor_id"`. Each role's `actor` is `{ name: string }`. Nest as deep as you need; each level adds a `LEFT JOIN LATERAL` to the same query.
 
 ## Keep only the far side
 
