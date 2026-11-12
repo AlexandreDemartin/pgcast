@@ -54,8 +54,9 @@ const escape = text => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /**
  * A regex for `quote`, `…` standing for any text, whitespace made uniform. A word at either end must be whole, so
- * `LIMIT $1` is not found in `LIMIT $10`; a quote in parentheses must show every pair around it, so `("a")` is not
- * found in `(("a"))` (the drift #120 found).
+ * `LIMIT $1` is not found in `LIMIT $10`; a quote that starts with `(` and ends with `)` must show every pair around
+ * it, so `("a")` is not found in `(("a"))` (the drift #120 found). Not any other quote: a condition entry shows its own
+ * pair, without the Whereable's.
  */
 function pattern(quote) {
   const
