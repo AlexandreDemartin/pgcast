@@ -233,6 +233,8 @@ Candidates for a check, a rule or a skill line.
 - #129 — A hostile payload in an example is run inlined into that query's exact compiled text: `--` breaks on a shortcut's trailing `)) AS "sq_…"` and gives 42601, not the attack described — `branch-reviewer`, `builder`
 - #129 — A caller's name reaches any relation the role can read as a table (`pg_catalog.pg_roles`) and any column in scope, system columns included — `branch-reviewer`
 - #129 — node-postgres uses the extended protocol when there are values or a statement name: « no values means plain text » names `.prepared()` — `branch-reviewer`
+- #200 — The fixture cannot prove whether a `sql` interpolation type-checks (its `products` table makes `SQLForTable` take any string): type-check docs snippets on the docs schema — `builder`
+- #200 — Under 6.6.1 a `sql` fragment on a NOT NULL column fails in `updateValues` (TS2769): a migration example for 6.6.1 users needs a nullable column — `builder`
 
 ## Minors kept
 
@@ -261,3 +263,4 @@ Minor review defects, taken up by the end-of-chapter review.
 - #137 — `website/check-reference.mjs`: a fence closed by a line with an info string (```` ```ts ````) is taken as closed, so a later entry is missed (fails loudly) — `branch-reviewer`
 - #128 — `website/insert.md` § undefined values: with `undefinedMeansMissing: true`, an `update()` whose only key is `undefined` throws « nothing to update: an Updatable needs at least one column »; worth one line there — `builder`
 - #147 — `website/why.md`: « all fixed in 6.6.2 » and, two paragraphs later, « The security fixes came first, in 6.6.2 » repeat each other; merge them in a later edit — `builder`
+- #200 — `src/db/shortcuts.ts:298`: the `upsert()` JSDoc still shows `` { name: db.sql`${'users.name'}` } ``, which fails with TS2345 on a real schema; write `` db.sql`${'users'}.${'name'}` `` — `builder`
