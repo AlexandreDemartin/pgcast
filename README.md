@@ -82,6 +82,7 @@ npx zapatos        # or: npx pgcast
 | Option | Warning | Release |
 |---|---|---|
 | `upsertRequiresSameKeys`: a multi-row `upsert()` throws, rather than overwrite a column with `DEFAULT` | `PGCAST_DEP001` | 6.7.0 |
+| `undefinedMeansMissing`: an `undefined` value acts as a missing key, so `update()` leaves the column and `insert()` sends `DEFAULT` | `PGCAST_DEP002` | 6.7.0 |
 
 Everything else: [CHANGELOG.md](CHANGELOG.md); what the characterisation of 6.6.1 found: [docs/CHARACTERISATION-REPORT.md](docs/CHARACTERISATION-REPORT.md).
 
