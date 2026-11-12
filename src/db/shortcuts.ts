@@ -30,6 +30,11 @@ import {
   raw,
   param,
   Default,
+  Parameter,
+  DangerousRawString,
+  ColumnNames,
+  ColumnValues,
+  ParentColumn,
 } from './core';
 
 import {
@@ -225,6 +230,13 @@ interface UpsertSignatures {
 
 export const doNothing = [];
 
+// a plain value is sent as a parameter, as `vals()` sends it; our own objects (`sql`, `param`, `raw`,
+// `cols`, `vals`, `parent`, and the symbols `Default`, `self`) are compiled as they always were
+const updateValueSQL = (value: any) =>
+  value instanceof SQLFragment || value instanceof Parameter || value instanceof DangerousRawString ||
+    value instanceof ColumnNames || value instanceof ColumnValues || value instanceof ParentColumn ||
+    typeof value === 'symbol' ? value : param(value);
+
 /**
  * Generate an 'upsert' (`INSERT ... ON CONFLICT ...`) query `SQLFragment`.
  * @param table The table to update or insert into
@@ -235,7 +247,10 @@ export const doNothing = [];
  * get an `UPDATE` (when there's a matching existing value) or an `INSERT`
  * (when there isn't)
  * @param options Optionally, an object with any of the keys `updateColumns`,
- * `noNullUpdateColumns` and `updateValues` (see documentation).
+ * `noNullUpdateColumns` and `updateValues` (see documentation). A plain value
+ * in `updateValues` is sent as a parameter: `{ mood: 'happy' }` gives
+ * `ROW(..., $n)`. To read a column there, use a fragment, which is written as
+ * it is: ``{ name: db.sql`${'users.name'}` }`` gives `ROW(..., "users"."name")`.
  */
 export const upsert: UpsertSignatures = function (
   table: Table,
@@ -268,7 +283,7 @@ export const upsert: UpsertSignatures = function (
       sql<string>`ON CONSTRAINT ${conflictTarget.value}`,
     updateColsSQL = mapWithSeparator(updateColumns, sql`, `, c => c),
     updateValuesSQL = mapWithSeparator(updateColumns, sql`, `, c =>
-      updateValues[c] !== undefined ? updateValues[c] :
+      updateValues[c] !== undefined ? updateValueSQL(updateValues[c]) :
         (noNullUpdateColumns === all || noNullUpdateColumns.includes(c)) ? sql`CASE WHEN EXCLUDED.${c} IS NULL THEN ${table}.${c} ELSE EXCLUDED.${c} END` :
           sql`EXCLUDED.${c}`),
     returningSQL = SQLForColumnsOfTable(options?.returning, table),
