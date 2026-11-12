@@ -14,6 +14,19 @@ export const
   identifier = /[A-Za-z_\u0080-\u{10FFFF}][A-Za-z0-9_$\u0080-\u{10FFFF}]*|(?:[Uu]&)?"(?:[^"\0]|"")+"/u.source,
   space = '[ \\t\\n\\r\\f\\v]*';
 
+const warned = new Set<string>();
+
+/**
+ * Emit a `DeprecationWarning` once per process for each code.
+ * @param code The warning code, e.g. `PGCAST_DEP001`
+ * @param message What is deprecated, and the option that opts in to what replaces it
+ */
+export const warnOnce = (code: string, message: string) => {
+  if (warned.has(code)) return;
+  warned.add(code);
+  process.emitWarning(message, { type: 'DeprecationWarning', code });
+};
+
 /**
  * Basic zero-padding for small, positive integers
  * @param n The integer to pad

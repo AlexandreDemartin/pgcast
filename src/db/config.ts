@@ -15,6 +15,7 @@ export interface Config {
   transactionRetryDelay: { minMs: number; maxMs: number };
   castArrayParamsToJson: boolean;   // see https://github.com/brianc/node-postgres/issues/2012
   castObjectParamsToJson: boolean;  // useful if json will be cast onward differently from text
+  upsertRequiresSameKeys: boolean;  // multi-row upsert: rows with different keys throw, unless updateColumns is given
   queryListener?(query: SQLQuery, txnId?: number): void;
   resultListener?(result: any, txnId?: number, elapsedMs?: number, query?: SQLQuery): void;
   transactionListener?(message: string, txnId?: number): void;
@@ -26,6 +27,7 @@ let config: Config = {  // defaults
   transactionRetryDelay: { minMs: 25, maxMs: 250 },
   castArrayParamsToJson: false,
   castObjectParamsToJson: false,
+  upsertRequiresSameKeys: false,  // the default in 7.0
 };
 
 /**

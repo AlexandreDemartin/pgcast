@@ -43,7 +43,10 @@ import {
   mapWithSeparator,
   NoInfer,
   space,
+  warnOnce,
 } from './utils';
+
+import { getConfig } from './config';
 
 
 export type JSONOnlyColsForTable<T extends Table, C extends any[] /* `ColumnForTable<T>[]` gives errors here for reasons I haven't got to the bottom of */> =
@@ -260,6 +263,13 @@ const updateValueSQL = (value: any) => compiledAsIs(value) ? value : param(value
  * in `updateValues` is sent as a parameter: `{ mood: 'happy' }` gives
  * `ROW(..., $n)`. To read a column there, use a fragment, which is written as
  * it is: ``{ name: db.sql`${'users.name'}` }`` gives `ROW(..., "users"."name")`.
+ *
+ * Without `updateColumns`, rows with different keys lose data: a key missing
+ * from one row is inserted as `DEFAULT`, then overwrites that row's existing
+ * value on conflict. This emits a `DeprecationWarning` (`PGCAST_DEP001`), once.
+ * With the `upsertRequiresSameKeys` config option (the default in 7.0), it
+ * throws instead, before any query: pass `updateColumns`, or give every row
+ * the same keys.
  */
 export const upsert: UpsertSignatures = function (
   table: Table,
@@ -283,6 +293,7 @@ export const upsert: UpsertSignatures = function (
     insertColsSQL = cols(firstRow),
     insertValuesSQL = mapWithSeparator(completedValues, sql`, `, v => sql`(${vals(v)})`),
     colNames = Object.keys(firstRow) as Column[],
+    differentKeys = Array.isArray(values) && values.some(v => Object.keys(v).length < colNames.length),
     updateValues = options?.updateValues ?? {},
     updateColumns = [...new Set(  // deduplicate the keys here
       [...specifiedUpdateColumns as string[] ?? colNames, ...Object.keys(updateValues)]
@@ -298,6 +309,13 @@ export const upsert: UpsertSignatures = function (
     returningSQL = SQLForColumnsOfTable(options?.returning, table),
     extrasSQL = SQLForExtras(options?.extras),
     suppressReport = options?.reportAction === 'suppress';
+
+  // a key missing from one row is inserted as DEFAULT, then `SET col = EXCLUDED.col` overwrites the existing
+  // value: Postgres can't tell that DEFAULT from a given one, so only the caller knows which columns to update
+  if (differentKeys && specifiedUpdateColumns == null) {
+    if (getConfig().upsertRequiresSameKeys) throw new Error('rows have different keys: pass updateColumns, or give every row the same keys');
+    warnOnce('PGCAST_DEP001', 'upsert() of rows with different keys, without updateColumns: a key missing from one row is inserted as DEFAULT, then overwrites the existing value on conflict. Set upsertRequiresSameKeys: true (db.setConfig) to throw instead; it will be the default in pgcast 7.0.');
+  }
 
   // the added-on $action = 'INSERT' | 'UPDATE' key takes after SQL Server's approach to MERGE
   // (and on the use of xmax for this purpose, see: https://stackoverflow.com/questions/39058213/postgresql-upsert-differentiate-inserted-and-updated-rows-using-system-columns-x)
