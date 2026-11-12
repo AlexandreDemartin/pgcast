@@ -142,7 +142,7 @@ describe('type surprises', () => {
   });
 
   test('self as a value, and Default in a condition, are refused', () => {
-    // the runtime would send them as strings, 'Symbol(self)' and 'Symbol(DEFAULT)'
+    // the runtime throws on each while compiling (#106); 6.6.1 sent them as strings, 'Symbol(self)' and 'Symbol(DEFAULT)'
     // @ts-expect-error self is no value of the column
     db.select('users', { display_name: db.self });
     // @ts-expect-error nor in isIn

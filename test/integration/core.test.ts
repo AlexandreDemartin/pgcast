@@ -260,20 +260,50 @@ describe('Whereable', () => {
     await expect(ids({ id: c.eq(parent('id')) })).rejects.toThrowErrorMatchingInlineSnapshot(`[Error: The 'parent' table alias has no meaning here]`);
   });
 
-  it('characterization: Default and self in a comparison, and self as a value, are sent as strings', async () => {
-    // characterization: the type refuses each; pg sends 'Symbol(DEFAULT)' and 'Symbol(self)': no row on a text
-    // column, every row with ne(), 22P02 on the others; as in 6.6.1 (#101)
-    expect(await ids({ display_name: c.eq(Default) })).toEqual([]);
-    expect(await ids({ display_name: c.ne(Default) })).toEqual([{ id: 1 }, { id: 2 }, { id: 3 }]);
-    expect(await pgError(t.client, () => ids({ id: c.eq(Default) }))).toMatchInlineSnapshot(`
+  it('Default and self in a condition, and self as a value or in isIn, reject run() before any query', async () => {
+    // 6.6.1 sent 'Symbol(DEFAULT)' and 'Symbol(self)': no row on a text column, every row with ne() and isNotIn(),
+    // 22P02 on the others; this Error comes from compiling, so it has no code and no query is sent
+    const queries: unknown[] = [];
+    db.setConfig({ queryListener: query => queries.push(query) });
+    const rejected = async (query: Promise<unknown>) => {
+      const err = await query.then(() => undefined, (e: unknown) => e) as Error | undefined;
+      return err instanceof Error && !('code' in err) ? err.message : err;
+    };
+    expect({
+      eqDefault: await rejected(ids({ display_name: c.eq(Default) })),
+      neDefault: await rejected(ids({ display_name: c.ne(Default) })),
+      idEqDefault: await rejected(ids({ id: c.eq(Default) })),
+      eqSelf: await rejected(ids({ display_name: c.eq(self) })),
+      selfValue: await rejected(ids({ display_name: self })),
+      isInSelf: await rejected(ids({ display_name: c.isIn([self]) })),
+      isNotInSelf: await rejected(ids({ display_name: c.isNotIn([self]) })),
+      deletesNeDefault: await rejected(db.deletes('events', { kind: c.ne(Default) }).run(t.client)),
+      updateAddDefault: await rejected(db.update('accounts', { lifetime_ops: c.add(Default as any) }, { id: 1 }).run(t.client)),
+      updateWhereSelf: await rejected(db.update('users', { mood: 'ok' }, { display_name: self }).run(t.client)),
+      lateralSelf: await rejected(db.select('users', db.all, { lateral: { n: db.count('accounts', { owner_id: self }) } }).run(t.client)),
+      lateralEqDefault: await rejected(db.select('users', db.all, { lateral: { n: db.count('accounts', { owner_id: c.eq(Default) }) } }).run(t.client)),
+    }).toMatchInlineSnapshot(`
       {
-        "code": "22P02",
-        "message": "invalid input syntax for type integer: "Symbol(DEFAULT)"",
+        "deletesNeDefault": "\`db.Default\` has no meaning as the value of \`eq()\`, \`add()\` and the other conditions: compare with a value. \`DEFAULT\` is for INSERT and UPDATE values.",
+        "eqDefault": "\`db.Default\` has no meaning as the value of \`eq()\`, \`add()\` and the other conditions: compare with a value. \`DEFAULT\` is for INSERT and UPDATE values.",
+        "eqSelf": "\`db.self\` has no meaning as the value of \`eq()\`, \`add()\` and the other conditions: it is already the column on the left. To compare the column with itself, write sql\`\${db.self} = \${db.self}\`.",
+        "idEqDefault": "\`db.Default\` has no meaning as the value of \`eq()\`, \`add()\` and the other conditions: compare with a value. \`DEFAULT\` is for INSERT and UPDATE values.",
+        "isInSelf": "\`db.self\` has no meaning as a value in a Whereable (a filter), nor in \`isIn()\`: compare with a value, or use it in a fragment, as in { n: sql\`\${db.self} > 0\` }.",
+        "isNotInSelf": "\`db.self\` has no meaning as a value in a Whereable (a filter), nor in \`isIn()\`: compare with a value, or use it in a fragment, as in { n: sql\`\${db.self} > 0\` }.",
+        "lateralEqDefault": "\`db.Default\` has no meaning as the value of \`eq()\`, \`add()\` and the other conditions: compare with a value. \`DEFAULT\` is for INSERT and UPDATE values.",
+        "lateralSelf": "\`db.self\` has no meaning as a value in a Whereable (a filter), nor in \`isIn()\`: compare with a value, or use it in a fragment, as in { n: sql\`\${db.self} > 0\` }.",
+        "neDefault": "\`db.Default\` has no meaning as the value of \`eq()\`, \`add()\` and the other conditions: compare with a value. \`DEFAULT\` is for INSERT and UPDATE values.",
+        "selfValue": "\`db.self\` has no meaning as a value in a Whereable (a filter), nor in \`isIn()\`: compare with a value, or use it in a fragment, as in { n: sql\`\${db.self} > 0\` }.",
+        "updateAddDefault": "\`db.Default\` has no meaning as the value of \`eq()\`, \`add()\` and the other conditions: compare with a value. \`DEFAULT\` is for INSERT and UPDATE values.",
+        "updateWhereSelf": "\`db.self\` has no meaning as a value in a Whereable (a filter), nor in \`isIn()\`: compare with a value, or use it in a fragment, as in { n: sql\`\${db.self} > 0\` }.",
       }
     `);
-    expect(await ids({ display_name: c.eq(self) })).toEqual([]);
-    expect(await ids({ display_name: self })).toEqual([]);
-    expect(await ids({ display_name: c.isIn([self]) })).toEqual([]);
+    expect(queries).toEqual([]);
+    expect(await db.count('events', db.all).run(t.client)).toBe(3);
+  });
+
+  it('self in a fragment value is still the column', async () => {
+    expect(await ids({ display_name: sql`${self} = ${self}`, id: sql`${self} > 1` })).toEqual([{ id: 2 }, { id: 3 }]);
   });
 });
 
