@@ -96,11 +96,11 @@ Don't catch a database error inside the callback and carry on. Postgres has abor
 
 ## Fix the errors pgcast throws
 
-pgcast throws a plain `Error`, with no `code`, before sending anything, when a query cannot mean anything in SQL. These are bugs in the calling code, to fix rather than to catch: the messages say how. Where they surface depends on who throws:
+pgcast throws a plain `Error`, with no `code`, before the query is sent, when a value is not one it accepts: an option outside its type (`'desc'`, `'serializable'`), or a value with no meaning in SQL (`db.Default` in a filter). These are bugs in the calling code, to fix rather than to catch: the messages say how. Where they surface depends on who throws:
 
 | Who throws | For example | What you get |
 |---|---|---|
-| a shortcut, given an option it can't write | `direction: 'desc'` in an `order` of [`select()`](/select#errors) | the call throws, before `.run()` |
+| a shortcut, given an option outside its type | `direction: 'desc'` in an `order` of [`select()`](/select#errors) | the call throws, before `.run()` |
 | `.compile()`, inside `.run()`, given a value with no meaning in SQL | `db.Default` in a filter ([Whereable objects](/sql-template#whereable)) | `.run()` rejects |
 | [`transaction()`](/transaction#errors), given a level that is not an `IsolationLevel` | `'serializable'` | its promise rejects |
 
