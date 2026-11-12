@@ -56,7 +56,7 @@ The same goes for your own functions. Zapatos's docs advise against giving a fun
 
 ## What pgcast adds
 
-pgcast starts from Zapatos 6.6.1. Before changing it, the fork pinned what 6.6.1 does, with tests, and that [characterisation](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/CHARACTERISATION-REPORT.md) found 64 surprises, 7 of them about security. A finding pgcast acts on takes one of three paths ([decision 003](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/003-fixes-and-deprecation.md)):
+pgcast starts from Zapatos 6.6.1. Before changing it, the fork pinned what 6.6.1 does, with tests, and that [characterisation](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/CHARACTERISATION-REPORT.md) found dozens of surprises, 7 of them about security, all fixed in 6.6.2. A finding pgcast acts on takes one of three paths ([decision 003](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/003-fixes-and-deprecation.md)):
 
 | Path | When | What changes for you | Example |
 |---|---|---|---|
