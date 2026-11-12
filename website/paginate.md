@@ -138,6 +138,22 @@ function decodeCursor(cursor: string): Cursor | undefined {
 - `decodeCursor()` gives `undefined` for a string it did not make: `nonsense`, an empty string, JSON that is not an object, keys that are not integers (`"2008"`, `2008.5`). Answer 400, as the [handler](#a-handler-from-request-to-response) does.
 - A cursor is encoded, not signed: the client can read it and change it. It holds only where the page starts, and each key goes to Postgres as a parameter: a changed cursor moves the page, nothing more.
 
+## Go back a page
+
+Start from the first row you showed, and read the other way: flip the comparison and the `order`'s directions, then put the rows back in the page's order. Here `first` is page 2's first row, A Lantern for Edith (1991, id 1001), kept as `last` was, with `page.at(0)` and its guard:
+
+<CastPanel example="paginate_previous">
+
+<<< ./examples/paginate_previous.ts{ts twoslash}
+
+<template #caption><span>From page 2 back to page 1, once reversed: Small Hours at Calder Bay (2019, id 1003), then The Cartographer's Silence (2008, id 1002).</span></template>
+</CastPanel>
+
+- `>` with `ASC` gives the rows just before `first` in the page's order, the nearest first; `limit` keeps the page's size; [`reverse()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/reverse), in place, puts them newest first again.
+- `[]` means `first` was the list's first row: there is no page before.
+- The index on `(release_year, id)` serves both ways. On 300,000 films, before the first row (1960, 150000), `EXPLAIN (ANALYZE)` shows an `Index Scan`, forwards this time, with `Index Cond: (ROW(release_year, id) > ROW(1960, 150000))`: it reads the 2 rows it returns.
+- To let a client come back, send `encodeCursor(first)` as a second cursor, `before`, beside `after`.
+
 ## Count the total
 
 Two ways, by where you want the number:
