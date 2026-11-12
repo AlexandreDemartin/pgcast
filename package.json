@@ -1,6 +1,6 @@
 {
   "name": "pgcast",
-  "version": "6.6.1",
+  "version": "6.6.2",
   "description": "Zero-abstraction Postgres for TypeScript: types cast from your database schema. A maintained fork of Zapatos.",
   "homepage": "https://github.com/AlexandreDemartin/pgcast#readme",
   "repository": {
