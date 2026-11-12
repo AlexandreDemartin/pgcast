@@ -148,27 +148,15 @@ db.select('films', db.all, { order: { by, direction: 'ASC' } });
 
 ### Read the SQL
 
-Call `.compile()` where the code calls `.run()`, and print it. Here, the assistant's answer to "the three longest films of studio 1000":
+Call `.compile()` where the code calls `.run()`, and print it: it gives `{ text, values }`, the SQL and its values, and sends nothing. Here, the assistant's answer to "the three longest films of studio 1000", and what Postgres runs:
 
-```ts twoslash
-import * as db from 'zapatos/db';
-// ---cut---
-const query = db.select('films', { studio_id: 1000 }, {
-  columns: ['title', 'runtime_minutes'],
-  order: { by: 'runtime_minutes', direction: 'DESC' },
-  limit: 3,
-});
-console.log(query.compile());
-```
+<CastPanel example="ai_assistant_longest">
 
-It prints:
+<<< ./examples/ai_assistant_longest.ts{ts twoslash}
 
-```txt
-{
-  text: `SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT jsonb_build_object($1::text, "title", $2::text, "runtime_minutes") AS result FROM "films" WHERE ("studio_id" = $3) ORDER BY "runtime_minutes" DESC LIMIT $4) AS "sq_films"`,
-  values: [ 'title', 'runtime_minutes', 1000, 3 ]
-}
-```
+</CastPanel>
+
+With `.compile()` in place of `.run(pool)`, `console.log()` prints the same SQL as `text`, on one line, and the same values as `values`:
 
 - Each value is a `$n` in `text` and an item of `values`: here `1000` and `3`. The column names among the values are the keys of the JSON object each row comes back as ([`select()`](/select#select)).
 - Each name is in double quotes: `"films"`, `"studio_id"`.
