@@ -258,6 +258,10 @@ Candidates for a check, a rule or a skill line.
 - #203 — A panel's caption matches the entry it sits under: on `pool`, `now()` is the query's time only because the query is its own transaction — `branch-reviewer`
 - #203 — A link's text does not repeat a section title of the page that holds it, or it reads as an in-page anchor — `branch-reviewer`
 - #203 — A snippet whose caption names variable values keeps them in scope after any `try` — `branch-reviewer`, `builder`
+- #203 — A `TxnClient` is a `pg.ClientBase`, so a parameter typed `Queryable` takes a transaction client of any level: a function that opens a transaction takes `pg.Pool | db.TxnClientFor<Level>` to keep the check — `branch-reviewer`, `builder`
+- #203 — `process.on('warning', …)` does not stop Node's own print; only `--no-warnings` does, and `--no-deprecation` stops the warning before the listener — `branch-reviewer`
+- #203 — The generator sends its catalog queries concurrently: a `debugListener` sample's `<n>` holds only for a named config with one relation — `branch-reviewer`, `builder`
+- #203 — Each fix round gets its own scratch folder named after its PR, or two batches share probes — `builder`
 
 ## Minors kept
 
