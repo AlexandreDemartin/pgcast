@@ -75,18 +75,28 @@ const
     .filter(file => file.endsWith('.ts')).map(file => dir + file)),
   problems = [];
 
-/** Run `example` and note its failure with where it is shown and, if the stack has it, the example's own line. */
+let current;  // the example last started: a promise it leaves unawaited that rejects later is its problem
+
+/** Note `error` as a problem of `example`, with where it is shown and, if the stack has it, the example's own line. */
+function note(example, error, what = '') {
+  const
+    href = new URL(example, import.meta.url).href,  // as the stack names it: no regex built from a file name
+    frame = error?.stack?.split('\n').find(at => at.includes(`${href}:`)),
+    line = frame?.match(/:(\d+):\d+\)?$/)?.[1],
+    where = (pagesOf.get(example) ?? ['(on no page)']).join(', ');
+  what += error?.code ? `${error.code} ${error.message}` : String(error?.message ?? error);
+  problems.push(`${where}: ${example}${line ? `:${line}` : ''}: ${what}`);
+}
+
+process.on('unhandledRejection', error => note(current, error, 'a promise it does not await rejects: '));
+
+/** Run `example`, noting its failure. */
 async function check(example, pool) {
+  current = example;
   try {
     await run(example, pool);
   } catch (error) {
-    const
-      href = new URL(example, import.meta.url).href,  // as the stack names it: no regex built from a file name
-      frame = error?.stack?.split('\n').find(at => at.includes(`${href}:`)),
-      line = frame?.match(/:(\d+):\d+\)?$/)?.[1],
-      where = (pagesOf.get(example) ?? ['(on no page)']).join(', '),
-      what = error?.code ? `${error.code} ${error.message}` : String(error?.message ?? error);
-    problems.push(`${where}: ${example}${line ? `:${line}` : ''}: ${what}`);
+    note(example, error);
   }
 }
 
@@ -110,11 +120,18 @@ try {
     const copy = `${name}_copy`;
     await admin.query(`CREATE DATABASE "${copy}" TEMPLATE "${name}"`);
     const pool = new pg.Pool({ connectionString: urlOf(copy) });
+    // DROP … WITH (FORCE) ends the sessions of a client the example did not release: its error is expected.
+    pool.on('error', () => {}).on('connect', client => client.on('error', () => {}));
+    let settled = false;
     try {
       await check(example, pool);
+      const busy = pool.totalCount - pool.idleCount, waiting = pool.waitingCount;
+      settled = busy === 0 && waiting === 0;
+      if (!settled) note(example, new Error(
+        `leaves clients in use (${busy}) or queries waiting (${waiting}): await each query, release each client`));
     } finally {
-      await pool.end();
-      await admin.query(`DROP DATABASE "${copy}"`);
+      if (settled) await pool.end();  // it would wait for an unreleased client for good
+      await admin.query(`DROP DATABASE "${copy}" WITH (FORCE)`);
     }
   }
 } finally {
