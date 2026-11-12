@@ -83,6 +83,17 @@ function SQLForColumnsOfTable(columns: readonly Column[] | undefined, table: Tab
     sql`jsonb_build_object(${mapWithSeparator(columns, sql`, `, c => sql`${param(c)}::text, ${c}`)})`;
 }
 
+// one double-quoted identifier, as Postgres lexes it: `"a"`, `"a""b"` (core.ts also allows dotted ones)
+const quotedIdentifier = /^"(?:[^"\0]|"")+"$/;
+
+// an alias of our own (`"lateral_<key>"`, `"sq_<alias>"`) is one identifier, not split on `.`; a `"` is
+// doubled as quote_ident does, so it cannot close its quotes, unless the alias already compiled to one
+// quoted identifier (`a""b`), which is written as before
+function SQLForAlias(prefix: string, name: string) {
+  const quoted = `"${prefix}${name}"`;
+  return raw(quotedIdentifier.test(quoted) ? quoted : `"${prefix}${name.replace(/"/g, '""')}"`);
+}
+
 function SQLForExtras<T extends Table>(extras: ExtrasOption<T>) {
   return extras === undefined ? [] :
     sql` || jsonb_build_object(${mapWithSeparator(
@@ -498,9 +509,12 @@ const
  * * `lateral` — either an object mapping keys to nested `select`/`selectOne`/
  * `count` queries to be `LATERAL JOIN`ed, or a single `select`/`selectOne`/
  * `count` query whose result will be passed through directly as the result of
- * the containing query
+ * the containing query; each key is also one identifier in the SQL, any `"`
+ * doubled (`{ 'a"b': … }` gives `LEFT JOIN LATERAL (…) AS "lateral_a""b" ON true`)
  * * `alias` — table alias (string): required if using `lateral` to join a table
- * to itself
+ * to itself; the alias, or the table name, is also one identifier in the
+ * sub-select that `select` wraps the query in, any `"` doubled
+ * (`AS "sq_a""b"`)
  * * `extras` — an object mapping key(s) to `SQLFragment`s, so that derived 
  * quantities can be included in the JSON result
  * @param mode (Used internally by `selectOne` and `count`)
@@ -539,7 +553,7 @@ export const select: SelectSignatures = function (
     colsLateralSQL = lateral === undefined || mode === SelectResultMode.Numeric ? [] :
       lateral instanceof SQLFragment ? sql`"lateral_passthru".result` :
         sql` || jsonb_build_object(${mapWithSeparator(
-          Object.keys(lateral).sort(), sql`, `, k => sql`${param(k)}::text, "lateral_${raw(k)}".result`)})`,
+          Object.keys(lateral).sort(), sql`, `, k => sql`${param(k)}::text, ${SQLForAlias('lateral_', k)}.result`)})`,
     allColsSQL = sql`${colsSQL}${colsExtraSQL}${colsLateralSQL}`,
     whereSQL = where === all ? [] : sql` WHERE ${where}`,
     groupBySQL = !groupBy ? [] : sql` GROUP BY ${groupBy instanceof SQLFragment || typeof groupBy === 'string' ? groupBy : cols(groupBy)}`,
@@ -569,14 +583,14 @@ export const select: SelectSignatures = function (
         Object.keys(lateral).sort().map(k => {
           /// enables `parent('column')` in subquery's Whereables
           const subQ = lateral[k].copy({ parentTable: alias });
-          return sql` LEFT JOIN LATERAL (${subQ}) AS "lateral_${raw(k)}" ON true`;
+          return sql` LEFT JOIN LATERAL (${subQ}) AS ${SQLForAlias('lateral_', k)} ON true`;
         });
 
   const
     rowsQuery = sql<SQL, any>`SELECT${distinctSQL} ${allColsSQL} AS result FROM ${table}${tableAliasSQL}${lateralSQL}${whereSQL}${groupBySQL}${havingSQL}${orderSQL}${limitSQL}${offsetSQL}${lockSQL}`,
     query = mode !== SelectResultMode.Many ? rowsQuery :
       // we need the aggregate to sit in a sub-SELECT in order to keep ORDER and LIMIT working as usual
-      sql<SQL, any>`SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (${rowsQuery}) AS ${raw(`"sq_${alias}"`)}`;
+      sql<SQL, any>`SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (${rowsQuery}) AS ${SQLForAlias('sq_', alias)}`;
 
   query.runResultTransform =
 
