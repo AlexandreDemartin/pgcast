@@ -79,7 +79,9 @@ https://alexandredemartin.github.io/pgcast/llms-full.txt
   `{ text, values }` and sends nothing.
   https://alexandredemartin.github.io/pgcast/sql-template#compile
 - Before calling a change done, run the type check, `npx tsc --noEmit`, and fix
-  each error in the code, not with `any` or `as`.
+  each error in the code, never with `any`, a type assertion (`as` a type;
+  `as const` is fine), `@ts-ignore` or `@ts-expect-error`.
+  https://alexandredemartin.github.io/pgcast/ai-assistant#run-the-type-check
 ```
 
 Put it where your assistant reads its instructions:
