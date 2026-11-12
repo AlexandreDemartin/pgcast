@@ -789,7 +789,7 @@ describe('undefinedMeansMissing', () => {
         { sku: 'TEE', variant: 'S', price_cents: 1300 },
         { sku: 'CAP', variant: '', price_cents: 900, title: 'Cap' },
       ],
-      several = (r: typeof rows) => db.upsert('products', r, ['sku', 'variant'], { updateColumns: ['price_cents'] }).compile();
+      several = (r: any[]) => db.upsert('products', r, ['sku', 'variant'], { updateColumns: ['price_cents'] }).compile();
     db.setConfig({ undefinedMeansMissing: true });
     // one row: neither inserted nor updated
     expect(db.upsert('users', { ...ada, mood: undefined }, 'email').compile())
@@ -821,6 +821,7 @@ describe('undefinedMeansMissing', () => {
     const queries = () => [
       db.insert('users', { email: 'e@x.org', display_name: 'E' }),
       db.insert('users', [{ email: 'a@x.org', display_name: 'A' }, { email: 'b@x.org', display_name: 'B', mood: 'ok' }]),
+      db.insert('users', [null as any, { email: 'a@x.org', display_name: 'A' }]),  // untyped: all DEFAULT, as before
       db.update('users', { mood: 'ok' }, { manager_id: undefined }),
       db.upsert('users', { email: 'e@x.org', display_name: 'E' }, 'email', { updateValues: { mood: undefined } }),
       db.deletes('users', { manager_id: undefined }),

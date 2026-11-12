@@ -20,6 +20,7 @@ export interface Config {
   castArrayParamsToJson: boolean;   // see https://github.com/brianc/node-postgres/issues/2012
   castObjectParamsToJson: boolean;  // useful if json will be cast onward differently from text
   upsertRequiresSameKeys?: boolean;  // multi-row upsert: rows with different keys throw, unless updateColumns is given
+  undefinedMeansMissing?: boolean;  // an undefined value is a missing key: DEFAULT in insert, left out of update and upsert
   queryListener?(query: SQLQuery, txnId?: number): void;
   resultListener?(result: any, txnId?: number, elapsedMs?: number, query?: SQLQuery): void;
   transactionListener?(message: string, txnId?: number): void;
@@ -32,6 +33,7 @@ let config: Config = {  // defaults
   castArrayParamsToJson: false,
   castObjectParamsToJson: false,
   upsertRequiresSameKeys: false,  // the default in 7.0
+  undefinedMeansMissing: false,  // the default in 7.0
 };
 
 /**
