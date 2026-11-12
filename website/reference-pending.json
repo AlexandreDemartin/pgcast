@@ -39,7 +39,6 @@
     "SelectResultMode",
     "FullSelectReturnTypeForTable",
     "SelectSignatures",
-    "NotExactlyOneError",
     "select",
     "SelectOneSignatures",
     "selectOne",
@@ -114,6 +113,7 @@
   ],
   "transaction.md": [
     "isDatabaseError",
+    "NotExactlyOneError",
     "transaction",
     "serializable",
     "repeatableRead",
