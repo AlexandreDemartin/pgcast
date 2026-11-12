@@ -23,9 +23,10 @@ const timing = typeof performance === 'object' ?
 // === symbols, types, wrapper classes and shortcuts ===
 
 /**
- * Compiles to `DEFAULT` for use in `INSERT`/`UPDATE` queries. In a `Whereable`
- * (so in `isIn`) it throws: a filter has no default. Zapatos 6.6.1 sent it as
- * the string `'Symbol(DEFAULT)'`.
+ * Compiles to `DEFAULT` for use in `INSERT`/`UPDATE` queries. As a `Whereable`
+ * value or in `isIn` it throws: a filter has no default. So does `vals([Default])`
+ * in a fragment value of `vals({…})`, compiled with its key as the current column,
+ * as a `Whereable` value is. Zapatos 6.6.1 sent it as the string `'Symbol(DEFAULT)'`.
  */
 export const Default = Symbol('DEFAULT');
 export type DefaultType = typeof Default;
@@ -202,7 +203,9 @@ export class ColumnValues<T> { constructor(public value: T) { } }
  * a quoted, comma-separated list of object keys for use in an INSERT, UPDATE
  * or UPSERT query alongside a `ColumnNames`. In an array as in an object, a
  * `Parameter` compiles as it is (`$1`, `CAST($1 AS "text")`) and `Default` to
- * `DEFAULT`; Zapatos 6.6.1 wrapped both in another parameter in an array.
+ * `DEFAULT`; Zapatos 6.6.1 wrapped both in another parameter in an array. An array
+ * throws on `Default` in a filter (`isIn`), and in a fragment value of `vals({…})`
+ * (`` { role: sql`${vals([Default])}` } ``), compiled as a `Whereable` value is.
  */
 export function vals<T>(x: T) { return new ColumnValues<T>(x); }
 
