@@ -291,10 +291,12 @@ describe('without parameters (simple protocol)', () => {
   });
 
   it('an alias that closes its quotes stays one alias, in "sq_<alias>" too', async () => {
-    // 6.6.1, and since #23 still: `) AS "sq_u"; UPDATE …; --"`, a second statement that ran
-    const q = db.select('users', all, { alias: `u"; ${update}; --`, columns: ['id'], order: { by: 'id', direction: 'ASC' } } as any);
-    expect(q.compile().text).toContain(`AS "sq_u""; ${update}; --"`);
-    expect(await q.run(t.client)).toEqual([{ id: 1 }, { id: 2 }, { id: 3 }]);
+    // `) AS "sq_u"; UPDATE …; --"`; 6.6.1: a syntax error; since #74: a second statement that ran
+    const q = db.select('users', all, { alias: `u"; ${update}; --`, order: { by: 'id', direction: 'ASC' } } as any);
+    const { text, values } = q.compile();
+    expect(text).toContain(`AS "sq_u""; ${update}; --"`);
+    expect(values).toEqual([]);
+    expect((await q.run(t.client)).map(u => u.id)).toEqual([1, 2, 3]);
     expect(await adaName()).toBe('Ada');
   });
 

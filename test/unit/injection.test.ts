@@ -611,7 +611,7 @@ describe('shortcut options', () => {
   });
 
   it('the alias is one identifier in "sq_<alias>" too: `"` is doubled, `.` does not split', () => {
-    // 6.6.1: `AS "sq_u"; DROP TABLE users; --"`, a second statement
+    // `AS "sq_u"; DROP TABLE users; --"`; 6.6.1: a syntax error; since #74: a second statement that ran
     expect(db.select('users', all, { alias: 'u"; DROP TABLE users; --' } as any).compile().text)
       .toBe(`SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("u""; DROP TABLE users; --".*) AS result FROM "users" AS "u""; DROP TABLE users; --") AS "sq_u""; DROP TABLE users; --"`);
     expect(matrix(v => db.select('users', all, { alias: v } as any))).toMatchInlineSnapshot(`
