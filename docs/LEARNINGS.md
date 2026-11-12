@@ -86,6 +86,12 @@ Candidates for a check, a rule or a skill line.
 - #26 — A corpus of real usage wraps plain `updateValues` in `param()` as a workaround: the fix must never wrap a `Parameter` twice — `builder`
 - #26 — In zsh `${PIPESTATUS[0]}` is empty (it is `pipestatus`): a retry loop built on it cannot tell success from failure; check `$?` of a bare `git push` — `builder`
 - #26 — `to_jsonb` of a `timestamptz` follows the session time zone: compare in SQL rather than matching the JSON string — `builder`
+- #27 — A deprecation trigger is worked out from the SQL the call compiles to (which columns are still set from `EXCLUDED`), not from the shape of the input: otherwise the 7.0 default rejects calls that lose no data (a batch of new rows without their serial `id`). Applies to R9/R11 and R16 (candidate: skill `backward-compat`) — `branch-reviewer`
+- #27 — A new key of the exported `Config` is optional, or a `Config` object written for 6.6.1 stops compiling (TS2741) — `branch-reviewer`, decision 003
+- #27 — `warnOnce` keeps module state: a test of the warning takes a fresh module (`vi.resetModules()`, dynamic import) and calls `vi.restoreAllMocks()` first, or a reused `emitWarning` spy carries earlier calls — `builder`
+- #27 — Under `node --throw-deprecation`, `process.emitWarning(…, { type: 'DeprecationWarning' })` throws later, on `process.nextTick`, not at the call site; under `--no-deprecation` it is silent — `branch-reviewer`
+- #27 — When master cuts a release, a branch's CHANGELOG lines can land under the release heading in a clean merge: check against `git show origin/master:CHANGELOG.md` — `builder`
+- #27 — In zsh, `git show $B:src/…` fails (`:s` is a history modifier): quote it, `"${B}:src/…"` — `branch-reviewer`
 
 ## Minors kept
 
@@ -105,3 +111,5 @@ Minor review defects, taken up by the end-of-chapter review.
 - #25 — `docs/CHARACTERISATION-REPORT.md:43`: the R2 cell's short list leaves out a statement and a table alias — point to the CHANGELOG only — `branch-reviewer`
 - #26 — `CHANGELOG.md:39`: the R4 line is one bullet of about 400 words; split it into a short statement and a list of the changed forms (skill `concise-docs`) — orchestrator
 - #26 — `test/integration/shortcuts.test.ts:182`: a `Buffer` written to a `bytea` column is checked only in the unit test; one round trip on the same connection — `branch-reviewer`
+- #27 — `src/db/config.ts:22`: the comment of `upsertRequiresSameKeys` still says "rows with different keys throw", broader than the refined trigger — `orchestrator`
+- #81 — CI: the integration hooks' 10 s timeout was hit once while creating the test databases on a slow runner (Node 20, Postgres 14); the rerun passed — raise `hookTimeout` for the database setup — `orchestrator`
