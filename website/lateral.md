@@ -86,7 +86,7 @@ A crew member's mentor is another row of `crew`. Give the subquery an `alias`, s
   LIMIT $6
   ```
 
-- One alias on the outer query does for both: with `alias: 'member'` there, `db.parent('mentor_id')` is `"member"."mentor_id"`<!-- probe: db.select('crew', db.all, { alias: 'member', lateral: { mentor: db.selectOne('crew', { id: db.parent('mentor_id') }, { alias: 'mentor' }) } }) --> ([`alias`](/select#alias)).
+- One alias on the outer query does for both: with `alias: 'member'` there, `db.parent('mentor_id')` is `"member"."mentor_id"`<!-- probe: db.select('crew', db.all, { alias: 'member', lateral: { mentor: db.selectOne('crew', { id: db.parent('mentor_id') }) } }) --> ([`alias`](/select#alias)).
 
 ## Order by a computed value
 
