@@ -776,12 +776,16 @@ describe('update', () => {
       `);
   });
 
-  it('characterization: no column at all', () => {
-    // characterization: `SET () = ROW()` is invalid SQL (see the integration test)
-    expect(db.update('accounts', {}, { id: 1 }).compile()).toMatchInlineSnapshot(`
+  it('no column at all', () => {
+    // `SET () = ROW()` is invalid SQL, so update() throws while it builds the query
+    expect(() => db.update('accounts', {}, { id: 1 }))
+      .toThrow('nothing to update: an Updatable needs at least one column');
+    // a key whose value is undefined is still a column (see below)
+    expect(db.update('accounts', { ratio: undefined }, { id: 1 }).compile()).toMatchInlineSnapshot(`
       {
-        "text": "UPDATE "accounts" SET () = ROW() WHERE ("id" = $1) RETURNING to_jsonb("accounts".*) AS result",
+        "text": "UPDATE "accounts" SET ("ratio") = ROW($1) WHERE ("id" = $2) RETURNING to_jsonb("accounts".*) AS result",
         "values": [
+          undefined,
           1,
         ],
       }

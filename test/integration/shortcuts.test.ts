@@ -333,13 +333,11 @@ describe('update', () => {
     expect(await run(db.update('accounts', { balance: 1 }, { id: -1 }))).toEqual([]);
   });
 
-  it('characterization: no column at all is a syntax error', async () => {
-    expect(await fails(db.update('accounts', {}, { id: 1 }))).toMatchInlineSnapshot(`
-      {
-        "code": "42601",
-        "message": "syntax error at or near ")"",
-      }
-    `);
+  it('no column at all throws before any query', async () => {
+    expect(() => db.update('accounts', {}, { id: 1 }))
+      .toThrow('nothing to update: an Updatable needs at least one column');
+    // no query was sent, so the transaction is not aborted
+    expect(await run(db.select('accounts', { id: 1 }, { columns: ['id'] }))).toEqual([{ id: 1 }]);
   });
 
   it('characterization: an undefined value sets the column to NULL', async () => {

@@ -12,6 +12,9 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 ### Deprecated
 - A multi-row `upsert()` without `updateColumns`, where a key missing from some row is still set from `EXCLUDED`: it is inserted as `DEFAULT`, then overwrites the existing value on conflict. It still runs, with the same SQL, and emits a `DeprecationWarning` (`PGCAST_DEP001`) once per process. `upsertRequiresSameKeys` will be the default in 7.0.
 
+### Fixed
+- `update()` with an `Updatable` that has no keys (`update('authors', {}, …)`) throws as it builds the query, before anything reaches Postgres: "nothing to update: an Updatable needs at least one column". It compiled to `SET () = ROW()`, which Postgres refused (42601), so no call that ran stops; the error now comes from `update()` itself, not from `.run()`. A key whose value is `undefined` still counts, and sets the column to `NULL` as before.
+
 ## [6.6.2] - 2026-11-12
 
 ### Changed
