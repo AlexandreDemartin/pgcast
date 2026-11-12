@@ -287,8 +287,12 @@ db.conditions.and<T>(...conditions: (SQLFragment<any, T> | Whereable)[])
 
 `(a AND b)`: its operands joined by `AND`, in one pair of parentheses.
 
-- A Whereable is in its own parentheses; a `sql` fragment is not: one with a bare `OR` at its top level takes the next `AND`. `` and(db.sql`${'id'} = 1000 OR ${'id'} = 1001`, { studio_id: 1001 }) `` gives `("id" = 1000 OR "id" = 1001 AND ("studio_id" = $1))`, which Postgres reads `"id" = 1000 OR ("id" = 1001 AND …)` ([#96](https://github.com/AlexandreDemartin/pgcast/issues/96)).
+- A Whereable is in its own parentheses; a `sql` fragment is not (below).
 - With no argument, `()`, which Postgres refuses (42601; [#33](https://github.com/AlexandreDemartin/pgcast/issues/33)).
+
+::: warning Wrong rows
+A `sql` fragment with a bare `OR` at its top level takes the next `AND`. `` and(db.sql`${'id'} = 1000 OR ${'id'} = 1001`, { studio_id: 1001 }) `` gives `("id" = 1000 OR "id" = 1001 AND ("studio_id" = $1))`, which Postgres reads `"id" = 1000 OR ("id" = 1001 AND …)`: film 1000 too, whatever its studio. Given to `deletes()` or `update()`, it deletes or updates that row ([#96](https://github.com/AlexandreDemartin/pgcast/issues/96)). Put such a fragment in its own parentheses, `` db.sql`(${'id'} = 1000 OR ${'id'} = 1001)` ``, or write it with `or()`: `` or({ id: 1000 }, { id: 1001 }) ``.
+:::
 
 ### `or()` {#conditions.or}
 
