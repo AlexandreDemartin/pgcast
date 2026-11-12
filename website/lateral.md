@@ -1,6 +1,6 @@
 # Join through a lateral
 
-Get rows with the rows they relate to, in one query and one typed result: a film with its cast, a crew member with their mentor. You nest a shortcut in the `lateral` option of `select()`; it becomes a `LEFT JOIN LATERAL`, and its result a key of each row. You already know `select()` from the [tutorial](/first-query).
+Get rows with the rows they relate to, in one query and one typed result: a film with its cast, a crew member with their mentor. You nest a shortcut in the [`lateral`](/select#lateral) option of `select()`; it becomes a `LEFT JOIN LATERAL`, and its result a key of each row. You already know `select()` from the [tutorial](/first-query).
 {.lede}
 
 ## Add the rows that point to it
@@ -28,7 +28,7 @@ Each film has one studio: `studio_id` is `NOT NULL REFERENCES studios(id)`, so t
 </CastPanel>
 
 - The joins come in the alphabetical order of their keys, whatever order you write them in.
-- On a nullable foreign key, nest `selectOne()`: the key holds the row or `null`, as the mentor below.
+- On a nullable foreign key, nest [`selectOne()`](/select#selectOne): the key holds the row or `null`, as the mentor below.
 - In a lateral, `selectExactlyOne()` checks nothing: a missing row gives `null` and no error, though its type has no `null` ([`selectExactlyOne()`](/select#selectExactlyOne)). Keep it for a `NOT NULL` foreign key.
 
 ## Go through a join table
@@ -76,7 +76,7 @@ A crew member's mentor is another row of `crew`. Give the subquery an `alias`, s
 </CastPanel>
 
 - `mentor` holds the row or `null`: Wilhelmina Strand has no mentor.
-- `count()` gives a number, here each member's protégés.
+- [`count()`](/select#count) gives a number, here each member's protégés.
 - Without the aliases, the subquery's `FROM "crew"` hides the outer one, and `"crew"."mentor_id"` is the subquery's own row. Postgres runs it with no error, and every `mentor` comes back `null`, every count `0`:
 
   ```sql
@@ -98,13 +98,13 @@ Each cinema, and the nearest other one: a self-join again, with the distance as 
 - `<->` is Postgres's distance between two points: kilometres here, as `location` is in kilometres east and north of the city centre.
 - `km` is a `number` because the fragment says so: `db.sql<s.cinemas.SQL, number>`.
 - [`ne(db.parent('id'))`](/conditions#conditions.ne) leaves the cinema itself out.
-- For the three nearest, nest `select()` with `limit: 3`: `nearest` becomes an array.
+- For the three nearest, nest `select()` with [`limit: 3`](/select#order-limit-offset-and-withties): `nearest` becomes an array.
 
 ## Watch for
 
 - **`strictNullChecks`**: without it, or `strict`, the lateral keys are not in the type ([`select()`](/select#options)).
 - **An unchecked join**: `db.parent()` takes a column of any table, so a join on the wrong column compiles. Postgres refuses a column the parent doesn't have: `db.parent('billing')` under `films` fails with 42703, "column films.billing does not exist".
-- **`withTies` in a nested `selectOne()`**: it writes `FETCH FIRST $1 ROWS WITH TIES`, which keeps every tied row. Under an outer `select()`, the parent row comes back once per tie; under `selectOne()`, with one of them. In a nested `select()`, the ties stay in the array. Unchanged from Zapatos 6.6.1, and open as [#164](https://github.com/AlexandreDemartin/pgcast/issues/164).
+- **[`withTies`](/select#order-limit-offset-and-withties) in a nested `selectOne()`**: it writes `FETCH FIRST $1 ROWS WITH TIES`, which keeps every tied row. Under an outer `select()`, the parent row comes back once per tie; under `selectOne()`, with one of them. In a nested `select()`, the ties stay in the array. Unchanged from Zapatos 6.6.1, and open as [#164](https://github.com/AlexandreDemartin/pgcast/issues/164).
 - **A `lock`**: without `of`, `FOR UPDATE` reaches the subqueries, and Postgres refuses the query (0A000): "FOR UPDATE is not allowed with aggregate functions" under `select()` or `count()`, "FOR UPDATE cannot be applied to the nullable side of an outer join" under `selectOne()`. Name the table: `lock: { for: 'UPDATE', of: 'films' }` ([`lock`](/select#lock)).
 
 ## See also
