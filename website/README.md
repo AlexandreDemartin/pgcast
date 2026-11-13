@@ -72,19 +72,21 @@ One per group, in `templates/`, not published (`srcExclude` in `.vitepress/confi
 
 ### Easy reading
 
-A reader scans before reading. A page keeps every fact and its voice, and gives each the form that fits it (`switching.md` and `security.md` show each one):
+A reader scans before reading, so a page breathes. Less is more: it keeps every fact and its voice, and adds structure only where it reads better than the prose it replaces (`switching.md` and `security.md` show each form):
 
 | Content | Form |
 |---|---|
-| A page of over ~1,500 words | **At a glance** under the lede: three to five bullets, what the page answers or the rules to keep |
+| A page of over ~1,500 words | **At a glance** under the lede: three bullets at most, what the page answers or the rules to keep |
 | A sequence | numbered steps; a how-to's steps as numbered headings, their anchor kept: `## 3. Compile {#compile}` |
 | An enumeration | a list, one idea per item |
-| A grid: options, behaviour by case, before / after Zapatos, errors and what to do | a table, Zapatos 6.6.1 and pgcast in columns of their own |
-| A flow that is the point | a diagram (art direction § Diagrams) |
-| A warning inside a paragraph | its note: `::: warning Security`, `::: tip Opt-in` |
+| A true grid: behaviour by case, before / after Zapatos, errors and what to do | a table, Zapatos 6.6.1 and pgcast in columns of their own |
+| A flow that is the point | a diagram (art direction § Diagrams), one per page at most |
 | Anything else | paragraphs of at most ~60 words, three sentences |
 
-- Each table, list and diagram says something a paragraph said less clearly; a table of two short rows is a sentence.
+- When in doubt, a shorter paragraph is enough: a table of two short rows, or a list of two, is a sentence.
+- Fewer words where the same fact can be said shorter, never a fact dropped.
+- No new notes, chips, colours or decorations: a risk the reader must not miss gets the `::: warning Security` the site has.
+- The spacing is the theme's (art direction § Layout, Rhythm): no `<br>`, no empty paragraph, no margin in a page.
 - At a glance is a component, so "On this page" does not list it, and `llms-full.txt` gets it as `**At a glance**` and its list:
 
   ```md
@@ -180,7 +182,7 @@ A PR that changes how a page looks shows it, in light and dark, at a phone's wid
 - [ ] Each export it documents: an entry anchored `{#name}`, its line gone from `reference-pending.json`
 - [ ] Every example in the film world, as `ts twoslash`; a query's SQL in a cast panel, or a `sql` block for an example of several queries (`examples/plain/`)
 - [ ] Notes with a chip; options tables as Option → SQL it adds → Effect on the type
-- [ ] Paragraphs of at most ~60 words; At a glance on a page of over ~1,500 words (§ Easy reading)
+- [ ] Paragraphs of at most ~60 words; At a glance, three bullets, on a page of over ~1,500 words; structure only where it reads better (§ Easy reading)
 - [ ] Each SQL span of pgcast's and each pgcast message quoted, marked: `<!-- probe: … -->`, `<!-- message -->`
 - [ ] Links to the other groups; British spelling
 - [ ] `npm run docs:build` passes, and `npm run docs:examples` if an example changed
