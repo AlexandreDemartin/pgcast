@@ -59,7 +59,7 @@ Each value between `${…}` compiles by what it is. The SQL is the built library
 | a `sql` fragment | its own SQL, its parameters numbered on | [Nested fragments](#nested-fragments) |
 | an array | each item in turn, nothing between; `[]` → nothing | [Arrays](#arrays) |
 
-Anything else throws while compiling, so `run()` rejects before any query, and the type refuses it (`null` and `undefined` only with `strictNullChecks`): a number or a boolean (`Alien object while interpolating SQL: 42`<!-- message -->), `null`, `undefined`, a symbol such as [`all`](#all). The global object, which the type lets through, throws too: "Did you use `self` (the global object) where you meant `db.self` (the Zapatos value)?…"<!-- message -->.
+Anything else throws while compiling, so `run()` rejects before any query, and the type refuses it (`null` and `undefined` only with `strictNullChecks`): a number or a boolean (`Alien object while interpolating SQL: 42`<!-- message -->), `undefined`, a symbol such as [`all`](#all), and `null`: "Interpolating `null` has no meaning in SQL: for a `NULL` value, interpolate `db.param(null)`…"<!-- message -->. Zapatos 6.6.1 threw a `TypeError` on `null`. The global object, which the type lets through, throws too: "Did you use `self` (the global object) where you meant `db.self` (the Zapatos value)?…"<!-- message -->.
 
 ## Identifiers {#identifiers}
 
@@ -321,7 +321,7 @@ A column of the parent query's table, in a subquery given to `lateral` ([Join th
 
 </CastPanel>
 
-- Without a column, the column of the filter it sits in: `{ film_id: db.parent() }`, in a `lateral` of `roles`, gives `("film_id" = "roles"."film_id")`<!-- probe: db.select('roles', db.all, { lateral: { film: db.selectOne('films', { film_id: db.parent() }) } }) -->. With no filter, it throws "Alien object while interpolating SQL: undefined"<!-- message -->.
+- Without a column, the column of the filter it sits in: `{ film_id: db.parent() }`, in a `lateral` of `roles`, gives `("film_id" = "roles"."film_id")`<!-- probe: db.select('roles', db.all, { lateral: { film: db.selectOne('films', { film_id: db.parent() }) } }) -->. With no filter, it throws before writing anything: "`db.parent()` with no column has no meaning here: name the column, `db.parent('id')`…"<!-- message -->. Zapatos 6.6.1 wrote the table and its `.`, then threw "Alien object while interpolating SQL: undefined".
 - It works as a Whereable value, in a `sql` fragment, in `eq()` and in `vals([…])`, so in `isIn()`: `{ film_id: isIn([db.parent()]) }` gives `(("film_id" IN ("roles"."film_id")))`<!-- probe: db.select('roles', db.all, { lateral: { film: db.selectOne('films', { film_id: db.conditions.isIn([db.parent()]) }) } }) -->. In `vals([…])`, Zapatos 6.6.1 sent it as JSON: `isIn([parent('id')])` compared with `'{"value":"id"}'`.
 - In `vals({…})` too, where without a column it takes the column of its key: `` db.sql`SELECT ${db.vals({ name: db.parent() })} AS result` ``, in a `lateral` of `studios`, gives `SELECT "studios"."name" AS result`<!-- probe: db.select('studios', db.all, { lateral: { n: db.sql`SELECT ${db.vals({ name: db.parent() })} AS result` } }) -->. Zapatos 6.6.1 sent it there as JSON too.
 - Outside a nested query, it throws "The 'parent' table alias has no meaning here"<!-- message -->, so `run()` rejects before any query. So does every `insert()`, `upsert()` or `update()` value, where Zapatos 6.6.1 stored `{"value":"id"}` on a text column.
