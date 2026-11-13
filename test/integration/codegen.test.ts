@@ -14,6 +14,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
+import * as pg from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, inject, it } from 'vitest';
 import { finaliseConfig, generate, tsForConfig, type Config } from '../../src/generate';
 import { urlForDatabase } from '../helpers/databases';
@@ -574,11 +575,13 @@ describe('typeEnumsAcrossSchemas', () => {
 
 describe('enumOrder', () => {
   // schemas of their own, committed to this file's database: no other test configures them;
-  // order_y is never generated, and order_z declares its labels in alphabetical order
+  // order_y is never generated, order_z declares its labels in alphabetical order, and order_w.take
+  // has 42 labels added BEFORE 'cut', so that float4 sortorders close in on 2
   beforeAll(() => t.pool.query(`
     CREATE SCHEMA order_x;
     CREATE SCHEMA order_y;
     CREATE SCHEMA order_z;
+    CREATE SCHEMA order_w;
     CREATE TYPE order_x.reel AS ENUM ('trailer', 'feature');
     ALTER TYPE order_x.reel ADD VALUE 'credits' BEFORE 'feature';
     CREATE TYPE order_y.st AS ENUM ('yours', 'theirs');
@@ -586,8 +589,12 @@ describe('enumOrder', () => {
     CREATE TABLE order_x.t (r order_x.reel, a order_y.st, b order_y.st[], d order_y.st_d);
     CREATE MATERIALIZED VIEW order_x.mv AS SELECT NULL::order_y.st AS a;
     CREATE TYPE order_z.pos AS ENUM ('a', 'b');
+    CREATE TYPE order_w.take AS ENUM ('slate', 'cut');
+    DO $$ BEGIN
+      FOR i IN 1..42 LOOP EXECUTE format('ALTER TYPE order_w.take ADD VALUE %L BEFORE %L', 'take_' || i, 'cut'); END LOOP;
+    END $$;
   `));
-  afterAll(() => t.pool.query('DROP SCHEMA order_x, order_y, order_z CASCADE'));
+  afterAll(() => t.pool.query('DROP SCHEMA order_x, order_y, order_z, order_w CASCADE'));
 
   const orderX = { schemas: { order_x: all }, schemaJSDoc: false };
   const enumsOnly = { include: '*' as const, exclude: '*' as const };
@@ -622,6 +629,23 @@ describe('enumOrder', () => {
     expect(schema).toContain(`export type reel = 'trailer' | 'credits' | 'feature';`);
     expect(schema).toContain(`export type reel = ['trailer', 'credits', 'feature'];`);
     expect((await codegen(orderX)).ts).toContain(`export type reel = ['credits', 'feature', 'trailer'];`);
+  });
+
+  it('keeps the order of enum_range() when the session prints sortorders rounded (extra_float_digits=0)', async () => {
+    const options = '-c extra_float_digits=0';  // 6 significant digits, the default before Postgres 12
+    const client = new pg.Client({ ...db(), options });
+    await client.connect();
+    const { rows: [{ labels, printed, distinct }] } = await client.query(`
+      SELECT enum_range(NULL::order_w.take)::text[] AS labels, count(*)::int AS printed,
+        count(DISTINCT enumsortorder::text)::int AS distinct
+      FROM pg_catalog.pg_enum WHERE enumtypid = 'order_w.take'::regtype`);
+    await client.end();
+    expect(distinct).toBeLessThan(printed);  // control: two sortorders print alike
+    expect(labels).toEqual(['slate', ...Array.from({ length: 42 }, (_, i) => `take_${i + 1}`), 'cut']);
+    const { ts: schema } = await tsForConfig(finaliseConfig({
+      schemas: { order_w: all }, enumOrder: 'declared', ...quiet, db: { ...db(), options },
+    }), noDebug);
+    expect(schema).toContain(`export type take = [${labels.map((l: string) => `'${l}'`).join(', ')}];`);
   });
 
   it('writes an enum of another schema in the same order, with typeEnumsAcrossSchemas', async () => {

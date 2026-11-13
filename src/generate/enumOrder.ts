@@ -24,7 +24,8 @@ export const enumOrderOf = (config: CompleteConfig): EnumOrder => {
 
 /**
  * Read the enums of a schema in one query: the labels of each in alphabetical order, as Postgres sorts them,
- * and in their declared order, `enumsortorder`, a `float4` (fractional after `ALTER TYPE … ADD VALUE … BEFORE`).
+ * and in their declared order, ranked by Postgres on `enumsortorder`: a `float4`, fractional after
+ * `ALTER TYPE … ADD VALUE … BEFORE`, whose text the session may round (`extra_float_digits` 0 or below).
  */
 export const enumOrdersForSchema = async (schemaName: string, queryFn: (q: pg.QueryConfig) => Promise<pg.QueryResult<any>>) => {
   const
@@ -34,7 +35,7 @@ export const enumOrdersForSchema = async (schemaName: string, queryFn: (q: pg.Qu
           n.nspname AS schema
         , t.typname AS name
         , e.enumlabel AS value
-        , e.enumsortorder AS sortorder
+        , row_number() OVER (PARTITION BY e.enumtypid ORDER BY e.enumsortorder)::int AS sortorder
         FROM pg_catalog.pg_type t
         JOIN pg_catalog.pg_enum e ON t.oid = e.enumtypid
         JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace
