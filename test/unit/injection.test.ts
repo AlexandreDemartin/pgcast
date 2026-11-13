@@ -13,7 +13,7 @@ import { describe, expect, it, vi } from 'vitest';
 import * as db from '../../src/db';
 import { sql, param, cols, vals, all } from '../../src/db';
 import { builtinObjects } from '../helpers/builtinObjects';
-import { hostileCasts } from '../helpers/hostileCasts';
+import { hostileArrayCasts, hostileCasts } from '../helpers/hostileCasts';
 
 const hostile = {
   dquote: 'a"b',
@@ -296,7 +296,7 @@ describe('raw, cols and vals as a filter value', () => {
 
 describe('a Parameter in a Whereable or in vals of an array', () => {
   it('its cast compiles as in sql`${param(x, cast)}`, in a Whereable, isIn and vals', () => {
-    for (const cast of [...Object.values(hostile), ...Object.values(hostileCasts)]) {
+    for (const cast of [...Object.values(hostile), ...Object.values(hostileCasts), ...Object.values(hostileArrayCasts)]) {
       const alone = sql`${param(1, cast)}`.compile().text;
       expect(sql`${{ display_name: param(1, cast) }}`.compile()).toEqual({ text: `("display_name" = ${alone})`, values: [1] });
       expect(sql`${{ display_name: db.conditions.isIn([param(1, cast)]) }}`.compile())
@@ -1291,14 +1291,15 @@ describe('a built-in object as a Whereable', () => {
 
 describe('param cast', () => {
   it('the cast type is one quoted identifier: `"` is doubled', () => {
-    // as quote_ident: `a"b` gives `"a""b"`; a pre-quoted type is quoted again, not written raw
+    // as quote_ident: `a"b` gives `"a""b"`; without a `"`, `.` splits (`"a"."b"`); a type already
+    // quoted is written as is (prequoted, prequotedEscaped), any other is quoted again, not written raw
     expect(matrix(v => sql`SELECT ${param(1, v)}`)).toMatchInlineSnapshot(`
       {
         "backslash": "SELECT CAST($1 AS "a\\b")",
         "comment": "SELECT CAST($1 AS "a/*b")",
         "dashes": "SELECT CAST($1 AS "a--b")",
         "dollar": "SELECT CAST($1 AS "a$1b")",
-        "dot": "SELECT CAST($1 AS "a.b")",
+        "dot": "SELECT CAST($1 AS "a"."b")",
         "dquote": "SELECT CAST($1 AS "a""b")",
         "escapedCloses": "SELECT CAST($1 AS "a"" OR TRUE OR ""b")",
         "escapedDot": "SELECT CAST($1 AS "a"."b")",
@@ -1307,10 +1308,10 @@ describe('param cast', () => {
         "lone": "SELECT CAST($1 AS """")",
         "mixedEscaped": "SELECT CAST($1 AS """s"".a$1.""b"""" OR TRUE OR """"c""")",
         "nul": "SELECT CAST($1 AS "a<NUL>b")",
-        "prequoted": "SELECT CAST($1 AS """a""")",
+        "prequoted": "SELECT CAST($1 AS "a")",
         "prequotedCloses": "SELECT CAST($1 AS """a"" OR TRUE OR ""b""")",
         "prequotedEmpty": "SELECT CAST($1 AS """")",
-        "prequotedEscaped": "SELECT CAST($1 AS """a"""" OR TRUE OR """"b""")",
+        "prequotedEscaped": "SELECT CAST($1 AS "a"" OR TRUE OR ""b")",
         "qualifiedEscaped": "SELECT CAST($1 AS "s.a"" OR TRUE OR ""b")",
         "semicolon": "SELECT CAST($1 AS "a;b")",
         "squote": "SELECT CAST($1 AS "a'b")",
@@ -1328,20 +1329,32 @@ describe('param cast', () => {
   });
 
   it('a cast is written as is only if it is well-formed once quoted', () => {
-    // `"${cast}"` passes as is only as quoted identifiers without NUL joined by `.`, with whitespace
-    // around it but no comment (qualified, threeParts, escaped, leadingDot, newlineInside, newlineOutside,
-    // spacesAroundDot, tabsAroundDot, otherSpaces, verticalTab); any other cast is one identifier, `"` doubled
+    // without a `"`, a cast is split on `.`, each part quoted (leadingDot, newlineInside, the dotted…
+    // inputs); with one, `"${cast}"` passes as is only as quoted identifiers without NUL joined by `.`,
+    // with whitespace around it but no comment (qualified, threeParts, escaped, newlineOutside,
+    // spacesAroundDot, tabsAroundDot, otherSpaces, verticalTab), and so does a cast already quoted that
+    // way (prequoted, dottedPrequoted, prequotedDot); any other cast is one identifier, `"` doubled
     expect(matrix(v => sql`SELECT ${param(1, v)}`, hostileCasts)).toMatchInlineSnapshot(`
       {
         "closes": "SELECT CAST($1 AS "int4"") || (SELECT display_name FROM users WHERE id = 1) || (""int4")",
         "comment": "SELECT CAST($1 AS "int4""/*.""*/""int4")",
         "commentBetween": "SELECT CAST($1 AS "pg_catalog""/**/.""int4")",
+        "dotted": "SELECT CAST($1 AS "pg_catalog"."int4")",
+        "dottedBackslash": "SELECT CAST($1 AS "pg_catalog\\"."int4")",
+        "dottedComment": "SELECT CAST($1 AS "pg_catalog/*"."*/int4")",
+        "dottedDashes": "SELECT CAST($1 AS "pg_catalog--"."int4")",
+        "dottedDollar": "SELECT CAST($1 AS "$1"."int4")",
+        "dottedEmpty": "SELECT CAST($1 AS "pg_catalog".""."int4")",
+        "dottedNul": "SELECT CAST($1 AS "pg_catalog"."in<NUL>t4")",
+        "dottedPrequoted": "SELECT CAST($1 AS "pg_catalog"."int4")",
+        "dottedSemicolon": "SELECT CAST($1 AS "int4; (SELECT display_name FROM users WHERE id = 1); --"."int4")",
+        "dottedSquote": "SELECT CAST($1 AS "pg_catalog"."int4' || (SELECT display_name FROM users WHERE id = 1) || '")",
         "dquote": "SELECT CAST($1 AS "a""b")",
         "empty": "SELECT CAST($1 AS "")",
         "emptyLast": "SELECT CAST($1 AS "pg_catalog"".""")",
         "emptyPart": "SELECT CAST($1 AS "pg_catalog""..""int4")",
         "escaped": "SELECT CAST($1 AS "int4""")",
-        "leadingDot": "SELECT CAST($1 AS ".int4")",
+        "leadingDot": "SELECT CAST($1 AS ""."int4")",
         "lineCommentBetween": "SELECT CAST($1 AS "pg_catalog""--
       .""int4")",
         "lone": "SELECT CAST($1 AS """")",
@@ -1355,7 +1368,8 @@ describe('param cast', () => {
         "operator": "SELECT CAST($1 AS "int4"" || ""int4")",
         "otherSpaces": "SELECT CAST($1 AS "pg_catalog"<CR>
       <FF>."int4")",
-        "prequoted": "SELECT CAST($1 AS """a""")",
+        "prequoted": "SELECT CAST($1 AS "a")",
+        "prequotedDot": "SELECT CAST($1 AS "pg_catalog.int4")",
         "qualified": "SELECT CAST($1 AS "pg_catalog"."int4")",
         "qualifiedCloses": "SELECT CAST($1 AS "pg_catalog"".""int4"") || (SELECT display_name FROM users WHERE id = 1) || (""int4")",
         "spacesAroundDot": "SELECT CAST($1 AS "pg_catalog" . "int4")",
@@ -1370,6 +1384,55 @@ describe('param cast', () => {
   it('a cast check stays fast on a long run of spaces around a dot', () => {
     const cast = `pg_catalog"${' '.repeat(100_000)}.${' '.repeat(100_000)}x`;
     expect(sql`${param(1, cast)}`.compile().text).toBe(`CAST($1 AS "pg_catalog""${' '.repeat(100_000)}.${' '.repeat(100_000)}x")`);
+  });
+
+  it('array bounds at the end of a cast are written after its type only as `[]` or `[n]`', () => {
+    // the type before them follows the rules above; anything else between brackets stays in the type name
+    expect(matrix(v => sql`SELECT ${param(1, v)}`, hostileArrayCasts)).toEqual({
+      array: 'SELECT CAST($1 AS "int4"[])',
+      arrayBounds: 'SELECT CAST($1 AS "int4"[3][])',
+      arrayDotted: 'SELECT CAST($1 AS "pg_catalog"."int4"[])',
+      arrayQualified: 'SELECT CAST($1 AS "pg_catalog"."int4"[])',
+      arrayPrequoted: 'SELECT CAST($1 AS "pg_catalog"."int4"[])',
+      arrayOnly: 'SELECT CAST($1 AS ""[])',
+      arrayAfterQuote: 'SELECT CAST($1 AS "int4"""[])',
+      arrayCloses: 'SELECT CAST($1 AS "int4"") || (SELECT display_name FROM users WHERE id = 1) || (""int4"[])',
+      arrayInside: 'SELECT CAST($1 AS "int4[1]) || (SELECT display_name FROM users WHERE id = 1) || CAST(1 AS int4"[])',
+      arraySplice: 'SELECT CAST($1 AS "int4[1] || (SELECT display_name FROM users WHERE id = 1) || ARRAY"[1])',
+      arraySemicolon: 'SELECT CAST($1 AS "int4; (SELECT display_name FROM users WHERE id = 1); --"[])',
+      arraySpace: 'SELECT CAST($1 AS "int4[ ]")',
+      arrayNegative: 'SELECT CAST($1 AS "int4[-1]")',
+      arrayUnclosed: 'SELECT CAST($1 AS "int4[1")',
+      arrayNested: 'SELECT CAST($1 AS "int4[[]]")',
+      arrayNul: 'SELECT CAST($1 AS "int4[<NUL>]")',
+      arrayBackslash: 'SELECT CAST($1 AS "int4\\"[])',
+    });
+  });
+
+  it('every cast compiles to quoted identifiers joined by `.`, then array bounds, and nothing else', () => {
+    const castType = /^CAST\(\$1 AS "(?:[^"]|"")*"(?:[ \t\n\r\f\v]*\.[ \t\n\r\f\v]*"(?:[^"]|"")*")*(?:\[[0-9]*\])*\)$/;
+    for (const cast of [...Object.values(hostile), ...Object.values(hostileCasts), ...Object.values(hostileArrayCasts)])
+      expect(sql`${param(1, cast)}`.compile().text).toMatch(castType);
+  });
+
+  it('a cast check stays fast on long runs of brackets, digits and dots', () => {
+    const
+      n = 1_000_000,
+      text = (cast: string) => sql`${param(1, cast)}`.compile().text,
+      pairs = '[]'.repeat(n),
+      digits = `[${'1'.repeat(n)}`;
+    // all bounds, after an empty type name (which Postgres refuses)
+    expect(text(pairs)).toBe(`CAST($1 AS ""${pairs})`);
+    expect(text(`${digits}]`)).toBe(`CAST($1 AS ""${digits}])`);
+    // bounds followed by anything else stay in the type name
+    expect(text(`${pairs}x`)).toBe(`CAST($1 AS "${pairs}x")`);
+    expect(text(`${digits}x]`)).toBe(`CAST($1 AS "${digits}x]")`);
+    expect(text('['.repeat(n))).toBe(`CAST($1 AS "${'['.repeat(n)}")`);
+    expect(text(']'.repeat(n))).toBe(`CAST($1 AS "${']'.repeat(n)}")`);
+    expect(text('[x]'.repeat(n))).toBe(`CAST($1 AS "${'[x]'.repeat(n)}")`);
+    // only the last bounds are bounds when a name comes between
+    expect(text('a[1]'.repeat(n))).toBe(`CAST($1 AS "${'a[1]'.repeat(n - 1)}a"[1])`);
+    expect(text('.'.repeat(n))).toBe(`CAST($1 AS "${'"."'.repeat(n)}")`);
   });
 });
 
