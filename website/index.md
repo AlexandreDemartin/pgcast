@@ -6,7 +6,7 @@ titleTemplate: Zero-abstraction Postgres for TypeScript
 description: "pgcast reads your Postgres schema and writes the TypeScript types. Readable, predictable SQL: no ORM, no models, no hidden state. A maintained fork of Zapatos."
 ---
 
-<div class="landing">
+<main class="landing">
 <section class="hero">
 
 <p class="eyebrow">-- a maintained fork of Zapatos 6.6.1</p>
@@ -72,4 +72,4 @@ Same module names, same SQL, same types. Safer behaviours wait behind opt-ins un
 </div>
 
 <SiteFooter />
-</div>
+</main>
