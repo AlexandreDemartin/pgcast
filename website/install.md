@@ -62,7 +62,7 @@ bun add -d @types/pg
 
 :::
 
-Yarn 2 and later need a version range in an alias, and Yarn 1 and bun write none without one: hence the `@^6`.
+Yarn 2 and later need a version range in an alias, and Yarn 1 and bun before 1.4 write none without one: hence the `@^6`.
 
 ::: tip Why the alias
 The generated schema and the run-time code talk about `zapatos/db` and `zapatos/schema`. Installed as plain `@pgcast/pgcast`, those imports wouldn't resolve. Native `pgcast/*` names will come later, as an opt-in ([decision 002](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/002-module-names.md)).
