@@ -41,11 +41,16 @@ let config: Config = {  // defaults
 /**
  * Get (a copy of) the current configuration.
  */
-export const getConfig = () => ({ ...config });
+export const getConfig = () => {
+  const d = config.transactionRetryDelay;  // its one nested object, copied too; the listeners are functions, kept as they are
+  return { ...config, transactionRetryDelay: d && { minMs: d.minMs, maxMs: d.maxMs } };
+};
 
 /**
- * Set key(s) on the configuration.
+ * Set key(s) on the configuration, and return (a copy of) the new configuration.
  * @param newConfig Partial configuration object
  */
-export const setConfig = (newConfig: NewConfig) =>
+export const setConfig = (newConfig: NewConfig) => {
   config = { ...config, ...newConfig };
+  return getConfig();
+};
