@@ -75,7 +75,8 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; scroll-behavior: auto !important; } }
 
 /* top bar: wordmark, version pill, search, links, theme button */
-/* one surface and one rule across the whole width, as the prototype: VitePress starts them after the sidebar */
+/* one surface and one rule across the whole width, so the bar reads as one piece: VitePress starts them after the
+   sidebar */
 .VPNavBar.has-sidebar { --vp-nav-col-offset: 0px !important; }
 .VPNavBar .divider-line { background-color: var(--line) !important; }
 .VPNavBar.has-sidebar .divider::before { display: none; }
@@ -105,47 +106,56 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 }
 .AppearanceSwitch svg { width: 18px; height: 18px; }
 
-/* left nav, in four groups */
+/* left nav, in four groups: rows of 32px, 4px apart; a group's label 24px under the group above, 8px over its pages,
+   and in line with their text */
+.VPSidebar .group, .VPSidebar .group + .group { border-top: 0; padding-top: 0; }
+.VPSidebar .group .VPSidebarItem.level-0 { padding-bottom: 12px; }  /* over VitePress's scoped 24px */
 .VPSidebarItem.level-0 > .item .text {
-  font: 600 11px/1 var(--font-body); text-transform: uppercase; letter-spacing: .08em; color: var(--muted);
-  padding: 14px 0 8px;
+  font: 600 13px/20px var(--font-body); color: var(--muted); padding: 8px 12px;
 }
-.VPSidebar .group + .group { border-top: 0; }
 .VPSidebarItem.level-1 > .item { padding: 0; }
 .VPSidebarItem.level-1 > .item .indicator { display: none; }
-.VPSidebarItem.level-1 .link { flex: 1; padding: 5px 10px; margin: 1px 0; border-radius: 7px; }
+.VPSidebarItem.level-1 .link { flex: 1; padding: 6px 12px; margin: 0 0 4px; border-radius: 8px; }
 .VPSidebarItem.level-1 .link:hover { background: var(--sunken); }
-.VPSidebarItem.level-1 .text { font-size: 14px; line-height: 1.5; padding: 0; color: var(--fg); }
+.VPSidebarItem.level-1 .text { font-size: 14px; line-height: 20px; padding: 0; color: var(--fg); }
 .VPSidebarItem.level-1.is-active .link { background: var(--accent-soft); }
 .VPSidebarItem.level-1.is-active .text { color: var(--accent); font-weight: 600; }
 /* a minor's badge, in the nav, on its group's landing page and in the pager: an inline block, so out of a link's
    underline, and glued to the text in outline.ts, so that no underlined space comes before it */
 .since { display: inline-block; margin-left: 8px; font-size: 11px; font-weight: 500; color: var(--muted); }
-.VPSidebarItem .since { float: right; line-height: 21px; }
+.VPSidebarItem .since { float: right; line-height: 20px; }
 .VPSidebarItem .text code { font-size: .9em; }
 
 /* "On this page" */
-.VPDocAsideOutline .outline-title { font: 600 11px/1 var(--font-body); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 10px; }
+.VPDocAsideOutline .outline-title { font: 600 13px/20px var(--font-body); color: var(--muted); margin-bottom: 8px; }
 .VPDocAsideOutline .outline-link { font-size: 13px; color: var(--muted); }
 .VPDocAsideOutline .outline-link:hover, .VPDocAsideOutline .outline-link.active { color: var(--accent); }
 
 /* reading column */
 .vp-doc { font-size: 15px; line-height: 1.65; }
 .vp-doc p, .vp-doc li { max-width: 68ch; line-height: 1.65; }
+/* one weight, 600: the hierarchy is in the size; tighter letters only from the page title up */
 .vp-doc h1, .vp-doc h2, .vp-doc h3, .landing h1, .landing h2 {
-  font-family: var(--font-display); line-height: 1.15; letter-spacing: -.01em; text-wrap: balance;
+  font-family: var(--font-display); font-weight: 600; line-height: 1.15; letter-spacing: 0; text-wrap: balance;
 }
-.vp-doc h1 { font-size: 2.3rem; font-weight: 800; margin: 0 0 12px; }
-.vp-doc h2 { font-size: 1.45rem; font-weight: 700; margin: 44px 0 12px; padding-top: 4px; border-top: 0; }
-.vp-doc h3 { font-size: 1.1rem; font-weight: 700; margin: 28px 0 8px; }
-@media (max-width: 560px) { .vp-doc h1 { font-size: 1.9rem; } }
+.vp-doc h1 { font-size: 2.5rem; letter-spacing: -.01em; margin: 0 0 12px; }
+.vp-doc h2 { font-size: 1.5rem; margin: 44px 0 12px; padding-top: 4px; border-top: 0; }
+.vp-doc h3 { font-size: 1.125rem; margin: 28px 0 8px; }
+@media (max-width: 560px) { .vp-doc h1 { font-size: 2rem; } }
 .vp-doc .lede { font-size: 1.1rem; color: var(--muted); margin: 0 0 28px; max-width: 62ch; }
 .vp-doc a, .landing a:not(.btn) { font-weight: inherit; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
 .vp-doc a:hover, .landing a:not(.btn):hover { text-decoration-thickness: 2px; }
+/* inline code: a tint, no border, so a name does not read as a button */
 .vp-doc :not(pre) > code, .landing :not(pre) > code {
-  font-size: .88em; color: var(--fg); background: var(--sunken); border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px;
+  font-size: .88em; color: var(--fg); background: var(--sunken); border: 0; border-radius: 4px; padding: 0 4px;
 }
 .vp-doc .header-anchor { color: var(--line); }
+/* a group's landing page: each of its pages, the title then its line */
+.vp-doc .GroupPages { list-style: none; padding: 0; margin: 32px 0 0; display: grid; gap: 20px; }
+.vp-doc .GroupPages li { margin: 0; }
+.vp-doc .GroupPages a { font-size: 16px; font-weight: 500; color: var(--fg); text-decoration: none; }
+.vp-doc .GroupPages a:hover { color: var(--accent); text-decoration: underline 1px; }
+.vp-doc .GroupPages p { margin: 4px 0 0; color: var(--muted); }
 
 /* code blocks */
 .vp-doc div[class*='language-'], .vp-code-group { border: 1px solid var(--line); border-radius: var(--radius); }
@@ -156,7 +166,7 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 .vp-code-group .tabs label::after { bottom: -1px; height: 2px; }
 .vp-doc div[class*='language-'] span.lang { font-family: var(--font-mono); }
 .vp-code-group span.lang { display: none; }
-@media (max-width: 639px) {  /* VitePress bleeds code to the screen's edges there; the prototype keeps the 16px gutter */
+@media (max-width: 639px) {  /* VitePress bleeds code to the screen's edges there; kept in the 16px gutter of every other block */
   .vp-doc div[class*='language-'], .vp-code-group .tabs { margin-left: 0; margin-right: 0; }
   .vp-doc div[class*='language-'] { border-radius: var(--radius); }
 }
@@ -204,37 +214,40 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 
 /* home */
 .landing { max-width: 1180px; margin: 0 auto; padding: 0 max(16px, env(safe-area-inset-right, 0px)) 80px max(16px, env(safe-area-inset-left, 0px)); }
-.landing .hero { padding-block: 72px 40px; }
-.landing .eyebrow { font: 500 13px/1 var(--font-mono); color: var(--accent); margin: 0 0 18px; }
-.landing .hero h1 { font-size: clamp(2.3rem, 5.4vw, 4rem); font-weight: 800; margin: 0 0 18px; max-width: 16ch; letter-spacing: -.025em; }
+/* the home's rhythm: 48px from the hero to the cast panel, 56px between the sections under it */
+.landing .hero { padding-block: 72px 48px; }
+.landing .eyebrow { font: 500 13px/1 var(--font-mono); color: var(--accent); margin: 0 0 16px; }
+.landing .hero h1 { font-size: clamp(2.5rem, 6vw, 4.5rem); margin: 0 0 20px; max-width: 16ch; letter-spacing: -.025em; }
 .landing .hero h1 .op { font-family: var(--font-mono); color: var(--accent); font-weight: 700; letter-spacing: -.06em; }
 .landing .lede { font-size: 1.18rem; color: var(--muted); max-width: 58ch; margin: 0 0 28px; }
-.landing .ctas { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 8px 0 0; }
+.landing .ctas { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 0; }
 .landing .ctas p { display: contents; }
 .landing .btn {
-  display: inline-flex; align-items: center; height: 42px; padding: 0 18px; border-radius: 9px; font-weight: 600;
+  display: inline-flex; align-items: center; height: 40px; padding: 0 20px; border-radius: 9px; font-weight: 600;
   text-decoration: none; border: 1px solid var(--line); color: var(--fg); background: var(--surface);
 }
 .landing .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
-.InstallLine {
-  display: flex; align-items: center; gap: 10px; height: 42px; padding: 0 6px 0 14px; min-width: 0;
-  border: 1px solid var(--line); border-radius: 9px; background: var(--code-bg); font: 13px var(--font-mono);
-}
-.landing .InstallLine code { background: none; border: 0; padding: 0; font-size: inherit; }
-.InstallLine code { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+/* the install command, under the two buttons: one quiet line, not a third control */
+.InstallLine { display: flex; align-items: center; gap: 8px; margin: 16px 0 0; min-width: 0; font: 13px/20px var(--font-mono); }
+.landing .InstallLine code { background: none; padding: 0; font-size: inherit; }
+.InstallLine code { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; color: var(--fg); }
 .InstallLine .dollar { color: var(--muted); }
 .InstallLine .copy {
-  font: 500 12px/1 var(--font-body); color: var(--muted); background: var(--surface);
-  border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; cursor: pointer;
+  display: grid; place-items: center; flex-shrink: 0; width: 28px; height: 28px; padding: 0;
+  border: 0; border-radius: 8px; background: none; color: var(--muted); cursor: pointer;
 }
-.InstallLine .copy:hover { color: var(--fg); }
+.InstallLine .copy:hover { background: var(--sunken); color: var(--fg); }
+.InstallLine .copy svg { width: 16px; height: 16px; }
+.InstallLine .copied { font: 12px/1 var(--font-body); color: var(--muted); }
+.landing .CastPanel-frame { margin: 0; }
 .landing .pillars {
-  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 28px;
-  margin: 44px 0 56px; padding-top: 28px; border-top: 1px solid var(--line);
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 32px;
+  margin: 56px 0; padding-top: 32px; border-top: 1px solid var(--line);
 }
-.landing .pillars h2 { font-size: 1rem; font-weight: 700; margin: 0 0 6px; }
+.landing .pillars h2 { font-size: 1rem; margin: 0 0 8px; }
 .landing .pillars p { margin: 0; color: var(--muted); font-size: 14px; }
 .landing .readnext p { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 0; }
+.landing .readnext strong { font-weight: 600; }
 .landing .readnext a {
   display: block; border: 1px solid var(--line); border-radius: var(--radius); padding: 16px;
   text-decoration: none; color: var(--fg); background: var(--surface);
@@ -247,14 +260,15 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 }
 @media (max-width: 560px) {
   .landing .pillars, .landing .readnext p { grid-template-columns: minmax(0, 1fr); }
-  .landing .hero { padding-block: 44px 28px; }
+  .landing .hero { padding-block: 48px 32px; }
 }
 
-/* the cast panel: what you write, what Postgres runs, what TypeScript knows; one column when it is under 900px wide,
-   in a page's reading column as on a narrow screen */
+/* the cast panel: what you write, what Postgres runs, what TypeScript knows. Three columns from 1140px wide, where
+   what you write and the type fit their columns (the home's, at 1280px and up); under that, what you write and the SQL
+   side by side, the type below; one column under 900px, in a page's reading column as on a narrow screen */
 .CastPanel-frame { container-type: inline-size; margin: 20px 0 28px; }
 .CastPanel {
-  display: grid; grid-template-columns: 1.15fr 1.2fr .85fr;
+  display: grid; grid-template-columns: 1.15fr 1fr 1fr;
   border: 1px solid var(--line); border-radius: 14px; background: var(--surface); overflow: hidden;
 }
 .CastPanel > div { min-width: 0; display: flex; flex-direction: column; border-right: 1px dashed var(--line); }
@@ -272,19 +286,32 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 .CastPanel > div > div { flex: 1; min-width: 0; }  /* the code, above the values row */
 .CastPanel div[class*='language-'] { margin: 0; border: 0; border-radius: 0; background: transparent; }
 .CastPanel div[class*='language-'] > .copy, .CastPanel div[class*='language-'] > .lang { display: none; }
-.CastPanel pre.shiki { background: transparent !important; margin: 0; padding: 14px 16px; overflow-x: auto; }
+/* a line too long for its column wraps rather than hide its end: no three columns hold all the home's lines at
+   1440px, nor one column the reference's longest SQL. It goes on under the line's own text, 2ch further in
+   (`--indent`, lineIndents in syntax.ts); a name longer than the column breaks anywhere. */
+.CastPanel pre.shiki { background: transparent !important; margin: 0; padding: 14px 16px; white-space: pre-wrap; }
 .CastPanel pre.shiki code {
-  display: block; width: fit-content; min-width: 100%; padding: 0;
+  display: block; width: auto; min-width: 0; padding: 0; overflow-wrap: anywhere;
   font: 13px/1.6 var(--font-mono); tab-size: 2; color: var(--fg);
 }
+.CastPanel pre.shiki .line {
+  display: inline-block; width: 100%;
+  padding-left: calc(var(--indent, 0ch) + 2ch); text-indent: calc(-2ch - var(--indent, 0ch));
+}
+.CastPanel pre.shiki .line * { text-indent: 0; }
 .CastPanel .values {
   margin: auto 0 0; max-width: none; padding: 8px 16px; border-top: 1px dashed var(--line);
   font: 12px/1.5 var(--font-mono); color: var(--muted);
 }
 .CastPanel .values b { color: var(--p); font-weight: 700; }
 .CastPanel-caption { display: flex; gap: 16px; flex-wrap: wrap; margin: 12px 0 0; font-size: 13px; color: var(--muted); }
+@container (max-width: 1139px) {
+  .CastPanel { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .CastPanel > div:last-child { grid-column: 1 / -1; border-top: 1px dashed var(--line); }
+}
 @container (max-width: 900px) {
   .CastPanel { grid-template-columns: minmax(0, 1fr); }
+  .CastPanel > div:last-child { border-top: 0; }
   .CastPanel > div { border-right: 0; border-bottom: 1px dashed var(--line); }
   .CastPanel > div:last-child { border-bottom: 0; }
 }
@@ -299,6 +326,6 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 }
 .twoslash .twoslash-hover { border-bottom: 1px dashed var(--muted); cursor: help; }
 .twoslash .twoslash-hover:hover, .twoslash .twoslash-hover:focus-within { background: var(--accent-soft); border-radius: 2px; }
-.twoslash .twoslash-hover > span:focus-visible { outline: none; }  /* the background says it, as the prototype */
+.twoslash .twoslash-hover > span:focus-visible { outline: none; }  /* the background says it, as on hover */
 .v-popper--theme-twoslash .v-popper__inner { border-radius: 8px; box-shadow: 0 8px 28px rgba(0, 0, 0, .18); }
 .twoslash-floating .twoslash-popup-code { line-height: 1.5; background: transparent !important; }
