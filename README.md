@@ -10,14 +10,14 @@ The goal is Zapatos going the last mile. Foreign-key joins, the conditions Postg
 
 ## Drop-in replacement for Zapatos
 
-The generated schema and the runtime still use the `zapatos/*` module names (`zapatos/db`, `zapatos/schema`). To switch an existing project **without touching a single import**, install pgcast under the `zapatos` alias (once published: pgcast is not on npm yet):
+The generated schema and the runtime still use the `zapatos/*` module names (`zapatos/db`, `zapatos/schema`). To switch an existing project **without touching a single import**, install pgcast under the `zapatos` alias:
 
 ```bash
-npm install zapatos@npm:pgcast
+npm install zapatos@npm:@pgcast/pgcast
 npx zapatos        # or: npx pgcast
 ```
 
-Installing it as plain `npm install pgcast` breaks every `zapatos/*` import, by design for now. Native `pgcast/*` module names will come later as an opt-in ([decision 002](docs/decisions/002-module-names.md)).
+Installing it as plain `npm install @pgcast/pgcast` breaks every `zapatos/*` import, by design for now. Native `pgcast/*` module names will come later as an opt-in ([decision 002](docs/decisions/002-module-names.md)).
 
 ## Roadmap
 
