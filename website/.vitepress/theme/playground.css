@@ -1,0 +1,17 @@
+/* Copyright (C) 2026 Alexandre Demartin
+   The playground's editor (PlaygroundEditor.vue), in a cast panel: put in by the editor itself, so on /playground only
+   (VitePress merges every other stylesheet into the one all pages load). */
+
+/* its height is its content's, set by the editor: not the column's share of a cast panel's code */
+.Playground .Playground-editor { flex: none; }
+/* the page's focus ring goes round the editor, not round Monaco's hidden text area at the cursor */
+.Playground .Playground-editor textarea:focus-visible { outline: none; }
+.Playground .Playground-editor:focus-within { outline: 2px solid var(--accent); outline-offset: -2px; }
+.Playground-note {
+  margin: 0; max-width: none; padding: 8px 16px; border-top: 1px dashed var(--line);
+  font: 12px/1.5 var(--font-mono); color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere;
+}
+/* Monaco's hover and suggestions, as the docs' hover types (art direction § Hover types) */
+.Playground-overflow .monaco-hover, .Playground-overflow .suggest-widget {
+  border-radius: 8px; box-shadow: 0 8px 28px rgba(0, 0, 0, .18);
+}

@@ -9,6 +9,7 @@ import { changelogPage, dateChangelog, writeChangelogFeed } from './changelog.ts
 import { writeLlmsFiles } from './llms.ts';
 import { describePage, pageHead, repo } from './meta.ts';
 import { outline } from './outline.ts';
+import { playgroundVite } from './playground/build.ts';
 import { sqlParameters, syntax } from './syntax.ts';
 import { focusableHovers, twoslashOptions } from './twoslash.ts';
 
@@ -61,6 +62,7 @@ export default defineConfig({
     },
   },
   vite: {
+    ...playgroundVite,  // Monaco and the runner's worker, on /playground only
     define: { __PGCAST_VERSION__: JSON.stringify(version) },
     resolve: {
       // VitePress's light / dark switch becomes system / light / dark (its "overriding internal components").
