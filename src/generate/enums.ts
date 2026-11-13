@@ -34,12 +34,18 @@ export const enumDataForSchema = async (schemaName: string, queryFn: (q: pg.Quer
   return enums;
 };
 
+/**
+ * Write an enum label as a TypeScript string literal type, the one place labels are quoted.
+ * A `'` or a `\\` in the label is not escaped yet: #48.
+ */
+export const enumLabel = (value: string) => `'${value}'`;
+
 export const enumTypesForEnumData = (enums: EnumData) => {
   const types = Object.keys(enums)
     .map(name => `
-export type ${name} = ${enums[name].map(v => `'${v}'`).join(' | ')};
+export type ${name} = ${enums[name].map(enumLabel).join(' | ')};
 export namespace every {
-  export type ${name} = [${enums[name].map(v => `'${v}'`).join(', ')}];
+  export type ${name} = [${enums[name].map(enumLabel).join(', ')}];
 }`)
     .join('');
 
