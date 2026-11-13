@@ -100,8 +100,11 @@ export const and = <T>(...conditions: (SQLFragment<any, T> | Whereable)[]) =>
  */
 export const not = <T>(condition: SQLFragment<any, T> | Whereable) => sql<SQL, boolean | null, T>`(NOT (${condition}))`;
 
+/** `"col" @> $1`, typed on the element, as in Zapatos 6.6.1. On an `int4[]` column: `arrayContains<number[]>([[1]])`, or `` sql`${self} @> ${param([1], 'int4[]')}` ``. */
 export const arrayContains = <T>(a: T[] | ParentColumn) => sql<SQL, boolean | null, T>`${self} @> ${conditionalParam(a)}`;
+/** `"col" <@ $1`, typed on the element, as in Zapatos 6.6.1. On an `int4[]` column: `arrayContainedIn<number[]>([[1, 2]])`, or `` sql`${self} <@ ${param([1, 2], 'int4[]')}` ``. */
 export const arrayContainedIn = <T>(a: T[] | ParentColumn) => sql<SQL, boolean | null, T>`${self} <@ ${conditionalParam(a)}`;
+/** `"col" && $1`, typed on the element, as in Zapatos 6.6.1. On an `int4[]` column: `arrayOverlaps<number[]>([[1, 2]])`, or `` sql`${self} && ${param([1, 2], 'int4[]')}` ``. */
 export const arrayOverlaps = <T>(a: T[] | ParentColumn) => sql<SQL, boolean | null, T>`${self} && ${conditionalParam(a)}`;
 
 // things that aren't genuinely conditions

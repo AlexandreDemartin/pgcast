@@ -68,6 +68,9 @@ Candidates for a check, a rule or a skill line.
 - #39 — Each new `Parameter<T>` slot inherits its structural match: `{ value: x }` passes, and is sent as JSON (#274) — `branch-reviewer`
 - #39 — The report's summary drifts across PRs; recount it from the first word of each Proposal cell, after stripping `**`: substring regexes miscount rows such as « leave: … a fix » (#253) — `builder`
 - #39 — Merging master over an uncommitted generated edit: save the edit, merge, reapply it with its script — `builder`
+- #40 — Overloads are not a compat-neutral way to widen a generic export: passed as an argument (`.map`, `apply`, `.then`) the overload set loses generic inference, and a user overload chosen on a function parameter can switch — `builder`
+- #40 — State the contradiction before prototyping: a mock `<T>(a: T[]) => SQLFragment<…, T>` assigned to the new type forces the result to include the element type, which the column refuses; no type can satisfy both — `builder`
+- #40 — Build a PR body from absolute paths and check its fenced blocks once posted: a relative path failing inside `{ … } >` sent a body without its replay — `builder`
 
 ## Minors kept
 
