@@ -253,7 +253,16 @@ Zapatos 6.6.1 sent a `Parameter` and `parent()` there as one more parameter, as 
 
 Each takes an array, sent as one parameter, or [`parent()`](/sql-template#parent): `<T>(a: T[] | ParentColumn)`. They compare the elements, whatever the dimensions: `{drama,romance}` overlaps `{{romance,thriller}}`.
 
-The type takes `T` as the element, where the Whereable expects the column's array type, so on `genres`, a `text[]`, it refuses `arrayOverlaps(['romance'])` (TS2322; [#40](https://github.com/AlexandreDemartin/pgcast/issues/40)). Given the column's type as `T`, the call compiles, its value then an array of arrays:
+`T` is the element, as in Zapatos 6.6.1, where the Whereable expects the column's array type: on `genres`, a `text[]`, the type refuses `arrayOverlaps(['romance'])`.
+
+```ts twoslash
+import * as db from 'zapatos/db';
+// ---cut---
+// @ts-expect-error genres takes a string[], and arrayOverlaps(['romance']) gives a string (TS2322)
+db.select('films', { genres: db.conditions.arrayOverlaps(['romance']) });
+```
+
+It stays that way: every type I tried on the column broke some code that compiles under 6.6.1, either a mock written to its signature or the typed result of `.map(db.conditions.arrayContains)` ([#40](https://github.com/AlexandreDemartin/pgcast/issues/40)). Two ways compile. Given the column's type as `T`, the value is an array of arrays:
 
 <CastPanel example="conditions_arrays">
 
@@ -261,7 +270,15 @@ The type takes `T` as the element, where the Whereable expects the column's arra
 
 </CastPanel>
 
-With [`castArrayParamsToJson`](/runtime-config#Config.castArrayParamsToJson) on, the array is sent as `CAST($1 AS "json")`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${{ genres: db.conditions.arrayContains(['drama']) }}`) -->, which Postgres refuses (42883: `text[] @> json`). The type refuses `db.param(['drama'], false)` as the value (TS2345). A `sql` fragment in place of the condition sends the array with no cast: `` { genres: db.sql`${db.self} @> ${db.param(['drama'], false)}` } `` gives `"genres" @> $1`<!-- probe: db.sql`${{ genres: db.sql`${db.self} @> ${db.param(['drama'], false)}` }}` -->. A cast given to `param()` wins over the option ([#36](https://github.com/AlexandreDemartin/pgcast/issues/36)), but the condition's type refuses a `Parameter`, so the fragment is the way here; a condition called with a plain array keeps the option's behaviour.
+Or write a `sql` fragment value, where `db.self` is the column, and cast its parameter: `` db.sql`${db.self} @> ${db.param(['drama'], 'text[]')}` `` gives `"col" @> CAST($1 AS "text"[])`<!-- probe: db.sql`${{ col: db.sql`${db.self} @> ${db.param(['drama'], 'text[]')}` }}` -->.
+
+<CastPanel example="conditions_arrays_fragment">
+
+<<< ./examples/conditions_arrays_fragment.ts{ts twoslash}
+
+</CastPanel>
+
+With [`castArrayParamsToJson`](/runtime-config#Config.castArrayParamsToJson) on, a condition sends its array as `CAST($1 AS "json")`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${{ genres: db.conditions.arrayContains(['drama']) }}`) -->, an array of arrays too, which Postgres refuses (42883: `text[] @> json`). The condition's type refuses a `Parameter` (TS2345), but in the fragment, the cast given to `param()` wins over the option ([#36](https://github.com/AlexandreDemartin/pgcast/issues/36)): it runs either way.
 
 ### `arrayContains()` {#conditions.arrayContains}
 
