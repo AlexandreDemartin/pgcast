@@ -40,6 +40,14 @@ type Shown<T> = T extends readonly (infer R)[] ? { [K in keyof R]: R[K] }[] : T 
 declare const shown: Shown<typeof ${name}>;
 `;
 
+/**
+ * The `const` whose type the playground gives: its code's first with no type written, as a cast panel's
+ * (cast.data.ts), or the first after a line `// the playground gives the type of the next const`, which an example
+ * that runs a query above its cut writes there (examples/paginate_keyset.ts).
+ */
+export const typedConst = (code: string) =>
+  /^const (\w+) =/m.exec(code.split(/^\/\/ the playground gives the type of the next const$/m).at(-1)!)?.[1];
+
 /** The type in a hover of `const <name>`, without `const <name>: `; nested lines are indented by 2, not 4. */
 export const hoverType = (text: string) =>
   text.replace(/^const \w+: /, '').replace(/^((?: {4})+)/gm, s => s.slice(s.length / 2));
