@@ -12,9 +12,9 @@ We validate locally while iterating; CI runs **once ready**.
 | Situation | What happens |
 |---|---|
 | **Draft** PR | no heavy job (`.github/workflows/ci.yml`, condition on `draft`) |
-| Ready PR, **docs only** (`.md` outside `.agents/`, `.claude/` and `website/`) | `changes` then **CI passed**; `build`, `bench-types` and `docs` skipped |
-| Ready PR, **docs site only** (anything under `website/`, its Markdown included) | `docs` (builds the site, checks its examples), then **CI passed**; `build` and `bench-types` skipped |
-| Ready PR, anything else | full run: `build` (9 jobs), `bench-types`, `docs` when `src/`, the root `package*.json`, `tsconfig.json` or a workflow changes, then **CI passed** |
+| Ready PR, **docs only** (`.md` outside `.agents/`, `.claude/` and `website/`) | `changes` then **CI passed**; `build`, `bench-types`, `typescript-7` and `docs` skipped |
+| Ready PR, **docs site only** (anything under `website/`, its Markdown included) | `docs` (builds the site, checks its examples), then **CI passed**; `build`, `bench-types` and `typescript-7` skipped |
+| Ready PR, anything else | full run: `build` (9 jobs), `bench-types`, `typescript-7`, `docs` when `src/`, the root `package*.json`, `tsconfig.json` or a workflow changes, then **CI passed** |
 | Push to `master` | full run |
 | Layer of a stack (base: the branch below) | same rule as a PR to `master`: CI runs on each layer |
 
