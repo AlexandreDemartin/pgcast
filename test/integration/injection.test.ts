@@ -416,6 +416,35 @@ describe('without parameters (simple protocol)', () => {
     `);
   });
 
+  it('a `"` in the column of parent() in vals({…}) stays in one column name, which does not exist', async () => {
+    // compiled as a Whereable value of parent() is (#259); 6.6.1 sent it as a parameter, '{"value":…}';
+    // Postgres truncates the name to 63 bytes in its message
+    const column = `id")); ${update}; --`;
+    const q = sql`SELECT (SELECT x.a FROM (VALUES (${vals({ a: db.parent(column) })})) AS x(a)) AS n FROM ${'users'}`
+      .copy({ parentTable: 'users' });
+    const { text, values } = q.compile();
+    expect(text).toBe(`SELECT (SELECT x.a FROM (VALUES ("users"."id"")); ${update}; --")) AS x(a)) AS n FROM "users"`);
+    expect(values).toEqual([]);
+    expect(await pgError(t.client, () => q.run(t.client))).toEqual({
+      code: '42703', message: `column users.id")); ${update}; does not exist`,
+    });
+    expect(await adaName()).toBe('Ada');
+  });
+
+  it('a `"` in the key of vals({…}) given parent() with no column stays in one column name, which does not exist', async () => {
+    // parent() takes its key as the column, as in a Whereable (#259); 6.6.1 sent it as a parameter, '{}'
+    const key = `id")); ${update}; --`;
+    const q = sql`SELECT (SELECT x.a FROM (VALUES (${vals({ [key]: db.parent() })})) AS x(a)) AS n FROM ${'users'}`
+      .copy({ parentTable: 'users' });
+    const { text, values } = q.compile();
+    expect(text).toBe(`SELECT (SELECT x.a FROM (VALUES ("users"."id"")); ${update}; --")) AS x(a)) AS n FROM "users"`);
+    expect(values).toEqual([]);
+    expect(await pgError(t.client, () => q.run(t.client))).toEqual({
+      code: '42703', message: `column users.id")); ${update}; does not exist`,
+    });
+    expect(await adaName()).toBe('Ada');
+  });
+
   it('an alias that closes its quotes stays one alias, in "sq_<alias>" too', async () => {
     // `) AS "sq_u"; UPDATE …; --"`; 6.6.1: a syntax error; since #74: a second statement that ran
     const q = db.select('users', all, { alias: `u"; ${update}; --`, order: { by: 'id', direction: 'ASC' } } as any);
@@ -662,6 +691,34 @@ describe('without parameters (simple protocol)', () => {
       await t.client.query(`CREATE AGGREGATE ${aggregate} (int) (sfunc = int4pl, stype = int, initcond = '0')`);
       expect(await db.select('users', all, { columns: ['id'] }, db.SelectResultMode.Numeric, aggregate).run(t.client), aggregate).toBe(6);
     }
+  });
+});
+
+describe('raw as a write value', () => {
+  it('raw(input) as an insert(), upsert() or update() value, or in vals({…}), rejects run() before any query', async () => {
+    // 6.6.1 stored it as JSON, a parameter by accident; compiled as SQL it would run `update` (#259)
+    const
+      input = `'x')); ${update}; --`,
+      outcomes: Record<string, string> = {},
+      query = vi.spyOn(t.client, 'query');
+    try {
+      const queries = {
+        insert: db.insert('users', { email: 'x@x.org', display_name: db.raw(input) }),
+        upsert: db.upsert('users', { email: 'Ada@Example.com', display_name: db.raw(input) }, 'email'),
+        update: db.update('users', { display_name: db.raw(input) }, { id: 1 }),
+        sql: sql`INSERT INTO ${'users'} (${db.cols({ display_name: 1, email: 1 })}) VALUES (${vals({ display_name: db.raw(input), email: 'y@x.org' })})`,
+      };
+      for (const [name, q] of Object.entries(queries))
+        outcomes[name] = await q.run(t.client).then(
+          () => 'ran',
+          (err: { code?: string, message: string }) =>
+            err.message.startsWith('`db.raw()`, `db.cols()` and `db.vals()` have no meaning as a value in `vals({…})`') ? 'throws' : err.code ?? err.message);
+      outcomes.queried = String(query.mock.calls.length);
+    } finally {
+      query.mockRestore();
+    }
+    expect(outcomes).toEqual({ insert: 'throws', upsert: 'throws', update: 'throws', sql: 'throws', queried: '0' });
+    expect(await adaName()).toBe('Ada');
   });
 });
 
