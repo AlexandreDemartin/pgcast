@@ -3,8 +3,7 @@
 // so one theme serves light and dark.
 import type { MarkdownOptions } from 'vitepress';
 
-const colour = (scope: string[], foreground: string, fontStyle?: string) =>
-  ({ scope, settings: fontStyle ? { foreground, fontStyle } : { foreground } });
+const colour = (scope: string[], foreground: string) => ({ scope, settings: { foreground } });  // no italics
 
 export const syntax = {
   name: 'pgcast',
@@ -12,7 +11,7 @@ export const syntax = {
   fg: 'var(--fg)',
   bg: 'var(--code-bg)',
   settings: [
-    colour(['comment', 'punctuation.definition.comment'], 'var(--c)', 'italic'),
+    colour(['comment', 'punctuation.definition.comment'], 'var(--c)'),
     colour(['keyword', 'storage', 'constant.language', 'variable.language', 'entity.name.command'], 'var(--k)'),
     colour(['keyword.operator', 'punctuation', 'string.unquoted.argument'], 'var(--fg)'),
     colour(['keyword.operator.new', 'keyword.operator.expression'], 'var(--k)'),
@@ -23,8 +22,22 @@ export const syntax = {
   ],
 };
 
+type Transformer = NonNullable<MarkdownOptions['codeTransformers']>[number];
+
+/**
+ * Each indented line's indent, as `--indent` in `ch`: the cast panel wraps a line too long for its column under the
+ * line's own text, 2ch further in (theme/style.css).
+ */
+export const lineIndents: Transformer = {
+  name: 'pgcast:line-indents',
+  line(node, line) {
+    const indent = /^ */.exec(this.tokens[line - 1]?.map(token => token.content).join('') ?? '')![0].length;
+    if (indent) node.properties.style = `--indent:${indent}ch`;
+  },
+};
+
 /** `$1`, `$2`: Shiki's SQL grammar reads a `$`, then a number. Each becomes one token, in `--p` and bold. */
-export const sqlParameters: NonNullable<MarkdownOptions['codeTransformers']>[number] = {
+export const sqlParameters: Transformer = {
   name: 'pgcast:sql-parameters',
   tokens(lines) {
     if (this.options.lang !== 'sql') return;

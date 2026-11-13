@@ -9,20 +9,28 @@ import { host, plainText, readPage } from './llms.ts';
 export const repo = 'https://github.com/AlexandreDemartin/pgcast';
 
 /**
- * Set a page's description (`transformPageData`): its front matter's `description`, or its lede as plain text, cut
- * after the last whole sentence within 160 characters, the first kept whatever its length, as search results show
- * about that much. A "Coming" page, which has no file nor lede, takes the site's.
+ * Set a page's description (`transformPageData`): its front matter's `description`, or its lede cut by `fromLede()`.
+ * A "Coming" page, which has no file nor lede, takes the site's.
  */
 export function describePage(pageData: PageData, { siteConfig }: TransformPageContext) {
   const lede = readPage(join(siteConfig.srcDir, pageData.relativePath))?.lede;
   if (pageData.frontmatter.description !== undefined || lede === undefined) return;
+  pageData.description = fromLede(lede);
+}
+
+/**
+ * A lede as plain text, cut after the last whole sentence within 160 characters, the first kept whatever its length,
+ * as search results show about that much: a page's description, and its line on its group's landing page
+ * (groups.data.ts).
+ */
+export function fromLede(lede: string) {
   const [first, ...rest] = plainText(lede).split(/(?<=[.!?])\s+/);
   let description = first!;
   for (const sentence of rest) {
     if (description.length + 1 + sentence.length > 160) break;
     description += ' ' + sentence;
   }
-  pageData.description = description;
+  return description;
 }
 
 /**
