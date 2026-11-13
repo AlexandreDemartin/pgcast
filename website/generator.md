@@ -232,6 +232,7 @@ billing: number;
 - A comment over several lines puts each of them behind a `*`, whether it breaks them with `\n`, `\r\n` or `\r`. On a table or a materialised view, one holding `*/` keeps the lines after the first as Zapatos 6.6.1 writes them, until [#48](https://github.com/AlexandreDemartin/pgcast/issues/48) escapes it.
 - Each relation shows its own comments, whatever its kind: Postgres copies none to a partition, an inheriting table or a view, so a view over `roles` shows no comment on `billing`.
 - A comment holding `*/` ends the JSDoc early on a table or a materialised view, and `schema.d.ts` usually does not compile (TS1131). On a view, a foreign table or a partitioned table, whose column comments Zapatos 6.6.1 never wrote, it is left out ([#48](https://github.com/AlexandreDemartin/pgcast/issues/48)).
+- A comment, or one of its lines, starting with a JSDoc tag (`@deprecated use lead`) becomes that tag in the hover, on every kind of relation, and swallows the generated lines after it ([#309](https://github.com/AlexandreDemartin/pgcast/issues/309)).
 
 `false` writes none, so `schema.d.ts` is shorter.
 
