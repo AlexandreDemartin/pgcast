@@ -29,6 +29,9 @@ const write = (c: db.Queryable, note: string) => sql`INSERT INTO ${'txn_probe'} 
 const raise = (c: db.Queryable, sqlstate: '40001' | '40P01' | '23505') =>
   sql`DO $$BEGIN RAISE EXCEPTION 'simulated' USING ERRCODE = '${db.raw(sqlstate)}'; END$$`.run(c);
 
+/** `{ [key]: undefined }`, which setConfig() accepts without exactOptionalPropertyTypes (TypeScript's default, not this suite's). */
+const undefinedKey = (key: keyof db.Config) => ({ [key]: undefined }) as db.NewConfig;
+
 /** Records the transaction listener's messages, and checks they all carry the same txnId. */
 const listen = () => {
   const messages: string[] = [];
@@ -292,6 +295,71 @@ describe('transaction', () => {
   });
 });
 
+// #246: setConfig() accepts undefined for any key (Partial<Config>); a key with a default then reads as
+// that default, and transaction() releases the client it checked out from the pool on every path
+describe('a config key set to undefined', () => {
+  /**
+   * Runs fn, and counts the pool's clients it left checked out. A leaked client still has _zapatos:
+   * it is released here, so that the file's pool can end (pool.end() waits for checked-out clients).
+   */
+  const leakCheck = async <T>(fn: () => Promise<T>) => {
+    const acquired: db.TxnClient<IsolationLevel>[] = [];
+    const onAcquire = (c: db.TxnClient<IsolationLevel>) => { acquired.push(c); };
+    const checkedOut = () => t.pool.totalCount - t.pool.idleCount;
+    const before = checkedOut();
+    t.pool.on('acquire', onAcquire);
+    const outcome = await fn().then(value => ({ value, error: undefined }), (error: unknown) => ({ value: undefined, error }));
+    t.pool.off('acquire', onAcquire);
+    const leaked = checkedOut() - before;
+    for (const c of acquired) if (c._zapatos) { delete c._zapatos; c.release(); }
+    return { ...outcome, leaked };
+  };
+
+  it('reads an undefined transactionRetryDelay as its default, and releases its client', async () => {
+    const { messages } = listen();
+    db.setConfig(undefinedKey('transactionRetryDelay'));
+    let attempts = 0;
+    const { value, error, leaked } = await leakCheck(() => db.serializable(t.pool, async c => {
+      if (attempts++ === 0) await raise(c, '40001');
+      await write(c, 'retried');
+      return 'done';
+    }));
+    expect(leaked).toBe(0);
+    expect(error).toBeUndefined();
+    expect(value).toBe('done');
+    expect(attempts).toBe(2);
+    expect(await notes()).toEqual(['retried']);
+    const delay = Number(/retrying in (\d+)ms$/.exec(messages[0])?.[1]);
+    expect(delay).toBeGreaterThanOrEqual(25);  // the default: { minMs: 25, maxMs: 250 }
+    expect(delay).toBeLessThanOrEqual(250);
+  });
+
+  it('with an undefined transactionRetryDelay, rejects with the error of a callback that throws, and releases its client', async () => {
+    db.setConfig(undefinedKey('transactionRetryDelay'));
+    const { error, leaked } = await leakCheck(() => db.readCommitted(t.pool, async c => {
+      await write(c, 'rolled back');
+      throw new Error('boom');
+    }));
+    expect(leaked).toBe(0);
+    expect((error as Error).message).toBe('boom');
+    expect(await notes()).toEqual([]);
+  });
+
+  it('reads an undefined transactionAttemptsMax as its default', async () => {
+    const { messages } = listen();
+    db.setConfig(undefinedKey('transactionAttemptsMax'));
+    let attempts = 0;
+    const { error, leaked } = await leakCheck(() => db.serializable(t.pool, async c => {
+      attempts++;
+      await raise(c, '40001');
+    }));
+    expect((error as { code: string }).code).toBe('40001');
+    expect(leaked).toBe(0);
+    expect(attempts).toBe(5);
+    expect(messages.at(-1)).toBe('Transaction rollback (code 40001) on attempt 5 of 5, giving up');
+  });
+});
+
 // #190: after a database error the callback catches, Postgres has aborted the transaction,
 // and answers the COMMIT that follows with the command tag ROLLBACK, without an error
 describe('a COMMIT that Postgres answers with ROLLBACK', () => {
@@ -385,6 +453,14 @@ describe('a COMMIT that Postgres answers with ROLLBACK', () => {
     expect(options).toEqual({ type: 'DeprecationWarning', code: 'PGCAST_DEP003' });
     expect(message).toMatch(/transactionRequiresCommit: true/);
     expect(message).toMatch(/default in pgcast 7\.0/);
+  });
+
+  it('reads an undefined transactionRequiresCommit as its default (false): resolves and warns', async () => {
+    const { fdb, emitWarning } = await fresh();
+    fdb.setConfig(undefinedKey('transactionRequiresCommit'));
+    expect(await fdb.serializable(t.pool, swallow('23505'))).toBe('swallowed');
+    expect(emitWarning).toHaveBeenCalledTimes(1);
+    expect(emitWarning.mock.calls[0][1]).toEqual({ type: 'DeprecationWarning', code: 'PGCAST_DEP003' });
   });
 
   it('does not warn on a committed transaction, a callback that throws, nor with the option', async () => {
