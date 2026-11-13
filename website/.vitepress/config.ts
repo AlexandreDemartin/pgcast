@@ -9,6 +9,7 @@ import { changelogPage, dateChangelog, writeChangelogFeed } from './changelog.ts
 import { writeLlmsFiles } from './llms.ts';
 import { describePage, pageHead, repo } from './meta.ts';
 import { outline } from './outline.ts';
+import { playgroundVite } from './playground/build.ts';
 import { lineIndents, sqlParameters, syntax } from './syntax.ts';
 import { labelTableCells } from './tables.ts';
 import { focusableHovers, twoslashOptions } from './twoslash.ts';
@@ -63,6 +64,7 @@ export default defineConfig({
     },
   },
   vite: {
+    ...playgroundVite,  // Monaco and the runner's worker, on /playground only
     define: { __PGCAST_VERSION__: JSON.stringify(version) },
     resolve: {
       // VitePress's light / dark switch becomes system / light / dark (its "overriding internal components").
@@ -82,7 +84,7 @@ export default defineConfig({
         link,
         activeMatch: `^(${[link, ...items.map(item => item.link)].join('|')})$`,
       }]),
-      { text: 'Changelog', link: '/changelog' },
+      { text: 'Playground', link: '/playground' },  // the changelog is in the footer (SiteFooter.vue)
       // no ↗ after the external link: the bar's links look alike, wherever they lead
       { text: 'GitHub', link: repo, noIcon: true },
     ],
