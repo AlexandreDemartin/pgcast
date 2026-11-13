@@ -113,5 +113,7 @@ export const before = lt;
 export const now = sql`now()`;
 
 // these are really more operations than conditions, but we sneak them in here for now, for use e.g. in UPDATE queries
+/** `"col" + $1`, of a number or a `Date`. To add days to a date: `` sql`${self} + ${param(3, 'int4')}` ``. */
 export const add = <T extends number | Date>(a: T) => sql<SQL, number, T>`${self} + ${conditionalParam(a)}`;
+/** `"col" - $1`, of a number or a `Date`. To subtract days from a date: `` sql`${self} - ${param(3, 'int4')}` ``. */
 export const subtract = <T extends number | Date>(a: T) => sql<SQL, number, T>`${self} - ${conditionalParam(a)}`;
