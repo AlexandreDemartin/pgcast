@@ -17,7 +17,7 @@ Sources: the "Surprises" sections of PRs #4, #5, #7 and #8, the `characterizatio
 | Docs | 4 | 3 | 1 |
 | **Total** | **67** | **34** | **33** |
 
-30 findings to fix (R65, R66 decided), 6 behind an opt-in, 19 to document and 12 to leave.
+29 findings to fix (R65, R66 decided), 7 behind an opt-in, 19 to document and 12 to leave.
 
 The three that matter most:
 
@@ -119,7 +119,7 @@ The three that matter most:
 | R47 | codegen | The output does not parse with awkward names: `export type traffic-light`, `namespace odd table`, `namespace class`, `'amber's'`, and `*/` in a name, a `DEFAULT` or a comment. | `integration/codegen › edge: the output does not parse` | non-breaking | fix | Quote awkward names and escape comments so the generated schema always parses |
 | R48 | codegen | A multi-line `COMMENT ON COLUMN` breaks the JSDoc: the following lines lose ` * `. | `integration/codegen › keeps column comments of tables and materialized views only` | non-breaking | fix | Prefix every line of a multi-line column comment |
 | R49 | codegen | Column comments are lost on partitioned tables, foreign tables and views (`relkind = 'r'` only). | `integration/codegen › keeps column comments of tables and materialized views only` | non-breaking: JSDoc only | fix | Keep column comments on views, foreign tables and partitioned tables |
-| R50 | codegen | The values of an enum are sorted alphabetically, not by `enumsortorder`, down to the `every.<enum>` tuple. | `integration/codegen › sorts enum values alphabetically, not in declaration order (enumsortorder)` | breaking: the order of the tuple changes | fix: the declared order has a meaning in Postgres (`<` on an enum) | Keep enum values in their declared order |
+| R50 | codegen | The values of an enum are sorted alphabetically, not by `enumsortorder`, down to the `every.<enum>` tuple. | `integration/codegen › is off by default: labels in alphabetical order, every.<enum> included` ; `integration/codegen › keeps the declared order with enumOrder: 'declared', every.<enum> included` ; `types/schema › every.<enum>: its labels in alphabetical order without enumOrder` | breaking: the order of the tuple changes | **opt-in**, PR #317 (`enumOrder: 'declared'`, a note through `warningListener`) | Keep enum values in their declared order |
 | R51 | codegen | An `include` entry that names no table is silently ignored. | `integration/codegen › include entries that match no relation` | non-breaking: a warning | **fixed**, PR #299 | Warn about an include entry that matches no table |
 | R52 | codegen | In `columnOptions`, a table entry replaces the column's `'*'` entry wholesale; only prefixed schemas take a prefix, so `'public.accounts'` finds nothing. | `integration/codegen › columnOptions` (snapshot `columnOptions.d.ts`) | breaking | document | — |
 | R53 | codegen | `COMMENT ON` tables, views, schemas, enums and domains is ignored. | `integration/codegen › drops COMMENT ON of tables, views, schemas and types` | non-breaking | leave: it is an addition, not a fix (④, [#55](https://github.com/AlexandreDemartin/pgcast/issues/55)) | — |
