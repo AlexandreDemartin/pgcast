@@ -6,7 +6,7 @@
 import { warnings } from './globals.ts';  // first: zapatos/db reads them as it loads
 import * as db from 'zapatos/db';
 import { layOut, normalised, valuesShown } from '../panel.ts';
-import type { QueryConfig } from './pglite.ts';
+import { configOf, poolOf, type QueryConfig } from './pool.ts';
 
 export interface Query {
   sql: string;
@@ -50,14 +50,17 @@ const
     queries.push(query);
     return query;
   },
-  recorded = async (config: QueryConfig) => (record(config), { rows: [], rowCount: 0 }),
-  // a transaction checks out a client (`connect()`) and gives it back (`release()`); `_connected`: pglite.ts's `poolOf`
-  recording = { query: recorded, connect: async () => ({ query: recorded, release() {}, _connected: true }) };
+  recorded = async (query: string | QueryConfig, values?: unknown[]) =>
+    (record(configOf(query, values)), { rows: [], rowCount: 0 }),
+  // a transaction checks out a client (`connect()`) and gives it back (`release()`); `_connected`: pool.ts's `poolOf`
+  recording = {
+    query: recorded, connect: async () => ({ query: recorded, release() {}, _connected: true }), async end() {},
+  };
 
 /** Postgres on the docs schema, as a pool whose every query is recorded with Postgres's answer. */
 async function postgres() {
   const
-    [{ open, poolOf }, { default: schema }] =
+    [{ open }, { default: schema }] =
       await Promise.all([import('./pglite.ts'), import('../../schema.sql?raw')]),
     pglite = await open(schema);
 

@@ -1,8 +1,9 @@
 // Copyright (C) 2026 Alexandre Demartin
-// Postgres in the playground's worker (decision 005): PGlite, with `pg`'s parsers, as a `pg.Pool` of one connection.
-// run.worker.ts imports it on a Run only, so that a reader who only edits never downloads Postgres; run-examples.mjs
-// checks in Node that it parses the docs schema's types as `pg` does, and gets values as `pg` sends them.
-import { PGlite, types, type ParserOptions, type Results } from '@electric-sql/pglite';
+// Postgres in the playground's worker (decision 005): PGlite, with `pg`'s parsers, given to the code as a `pg.Pool` of
+// one connection (pool.ts). run.worker.ts imports it on a Run only, so that a reader who only edits never downloads
+// Postgres; run-examples.mjs checks in Node that it parses the docs schema's types as `pg` does, and gets values as
+// `pg` sends them.
+import { PGlite, types, type ParserOptions } from '@electric-sql/pglite';
 import { prepareValue } from './prepareValue.ts';
 
 const
@@ -45,37 +46,4 @@ export async function open(schema: string) {
   pglite.serializers = new Proxy({}, { get: () => prepareValue as unknown as (value: unknown) => string });
   await pglite.exec(schema);
   return pglite;
-}
-
-/** A query as `zapatos/db` gives it to `pg`. */
-export interface QueryConfig { text: string; values?: unknown[] }
-
-/**
- * A `pg.Pool` of one connection, as `new pg.Pool({ max: 1 })`: PGlite "only has a single exclusive connection".
- * `connect()` waits for the client before it to be released, and a query on the pool for the client in use; every
- * query goes to `send`. The client has `_connected`, as a `pg.Client`: zapatos/db tells a client from a pool by it
- * (pg.ts), and would check a client out of it.
- */
-export function poolOf(send: (query: QueryConfig) => Promise<Results>) {
-  let free = Promise.resolve();
-  const take = async () => {
-    const previous = free;
-    let release!: () => void;
-    free = new Promise(resolve => { release = resolve; });
-    await previous;
-    return release;
-  };
-  return {
-    async query(query: QueryConfig) {
-      const release = await take();
-      try {
-        return await send(query);
-      } finally {
-        release();
-      }
-    },
-    async connect() {
-      return { query: send, release: await take(), _connected: true };
-    },
-  };
 }

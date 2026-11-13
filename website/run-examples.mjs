@@ -13,7 +13,8 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { inspect } from 'node:util';
 import pg from 'pg';
 import * as db from 'zapatos/db';
-import { open, poolOf } from './.vitepress/playground/pglite.ts';
+import { open } from './.vitepress/playground/pglite.ts';
+import { poolOf } from './.vitepress/playground/pool.ts';
 import { dropOrphanDocsDatabases } from './orphan-databases.mjs';
 
 const envFile = new URL('../src/.env', import.meta.url);
