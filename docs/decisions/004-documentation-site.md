@@ -1,6 +1,6 @@
 # 004 — The documentation site
 
-- **Status**: accepted (2026-11-12); amended 2026-11-12: the example world (§ Decision, 7); amended 2026-11-12: Diátaxis, the hand-written reference checked at build ([#137](https://github.com/AlexandreDemartin/pgcast/issues/137)), llms.txt ([#138](https://github.com/AlexandreDemartin/pgcast/issues/138)) (§ Decision, 8).
+- **Status**: accepted (2026-11-12); amended 2026-11-12: the example world (§ Decision, 7); amended 2026-11-12: Diátaxis, the hand-written reference checked at build ([#137](https://github.com/AlexandreDemartin/pgcast/issues/137)), llms.txt ([#138](https://github.com/AlexandreDemartin/pgcast/issues/138)) (§ Decision, 8); amended 2026-11-13: the site's domain, pgcast.dev ([#273](https://github.com/AlexandreDemartin/pgcast/issues/273)) (§ Decision, 3).
 - **Scope**: step 1 of Epic [#85](https://github.com/AlexandreDemartin/pgcast/issues/85), issue [#89](https://github.com/AlexandreDemartin/pgcast/issues/89). Nothing is implemented here.
 
 ## Context
@@ -107,7 +107,7 @@ The owner's answers, 2026-11-12:
 
 1. **VitePress with Twoslash**, in a separate `website/` package. Its dev dependencies (`vitepress`, `@shikijs/vitepress-twoslash`, `vue`, `typescript`, `pg`) are approved there only; none goes in the library.
 2. **VitePress 2.0 alpha**, pinned exactly.
-3. **GitHub Pages** at `alexandredemartin.github.io/pgcast/`. The owner turns Pages on, source "GitHub Actions", at the skeleton step.
+3. **GitHub Pages**, source "GitHub Actions", which the owner turns on at the skeleton step. Amended 2026-11-13 ([#273](https://github.com/AlexandreDemartin/pgcast/issues/273)): at its own domain, `https://pgcast.dev/` (`www` and the first address, under the owner's `github.io`, redirect to it), so that it has a `robots.txt` and a sitemap at its root.
 4. **Versions** as written: the latest release at the root, `/next/` for `master`, one frozen copy per major, as Docusaurus and Vite do (the industry standard).
 5. **"Each feature PR updates its docs page"** as written, docs as code, as Write the Docs and Django require.
 6. George's `docs/index.html` and its bundle are **removed** once pgcast's site is live; the site links [jawj.github.io/zapatos](https://jawj.github.io/zapatos/) as the Zapatos 6.6.1 docs.

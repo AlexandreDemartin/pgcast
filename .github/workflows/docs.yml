@@ -1,6 +1,6 @@
 name: Docs
 
-# The docs site (decision 004), deployed to GitHub Pages on every push to master: https://alexandredemartin.github.io/pgcast/.
+# The docs site (decision 004), deployed to GitHub Pages on every push to master: https://pgcast.dev/.
 # A PR builds it in ci.yml (job `docs`) and never deploys. Pages takes its source from "GitHub Actions": no gh-pages branch.
 on:
   push:

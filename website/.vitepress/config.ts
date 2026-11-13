@@ -20,7 +20,7 @@ export default defineConfig({
   title: 'pgcast',
   description: 'Zero-abstraction Postgres for TypeScript: types cast from your database schema. A maintained fork of Zapatos.',
   lang: 'en-GB',
-  base: '/pgcast/',  // GitHub Pages: alexandredemartin.github.io/pgcast/
+  base: '/',  // GitHub Pages, at the domain's root: https://pgcast.dev/
   cleanUrls: true,
   srcExclude: ['README.md', 'templates/**'],  // for whoever writes the site, not pages of it
   buildEnd: async config => {
