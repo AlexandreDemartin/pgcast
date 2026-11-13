@@ -377,24 +377,20 @@ describe('conditions', () => {
     `);
   });
 
-  it('characterization: and() / or() without argument compile to ()', () => {
-    // characterization: `()` is invalid SQL (see the integration test); `TRUE` / `FALSE` would be valid
-    expect({ and: show(dc.and()), or: show(dc.or()), topLevelAnd: dc.and().compile() }).toMatchInlineSnapshot(`
-      {
-        "and": {
-          "text": "((()))",
-          "values": [],
-        },
-        "or": {
-          "text": "((()))",
-          "values": [],
-        },
-        "topLevelAnd": {
-          "text": "()",
-          "values": [],
-        },
-      }
-    `);
+  // their identities; 6.6.1 wrote `()`, which Postgres refuses (42601): each case red on its own there
+  it.each([
+    ['and()', () => dc.and().compile(), { text: 'TRUE', values: [] }],
+    ['or()', () => dc.or().compile(), { text: 'FALSE', values: [] }],
+    ['and() as a Whereable value', () => show(dc.and()), { text: '((TRUE))', values: [] }],
+    ['or() as a Whereable value', () => show(dc.or()), { text: '((FALSE))', values: [] }],
+    ['not(and())', () => dc.not(dc.and()).compile(), { text: '(NOT (TRUE))', values: [] }],
+    ['not(or())', () => dc.not(dc.or()).compile(), { text: '(NOT (FALSE))', values: [] }],
+    ['and(or())', () => dc.and(dc.or()).compile(), { text: '(FALSE)', values: [] }],
+    ['or(and())', () => dc.or(dc.and()).compile(), { text: '(TRUE)', values: [] }],
+    ['and(or(), Whereable)', () => dc.and(dc.or(), { id: 1 }).compile(), { text: '(FALSE AND ("id" = $1))', values: [1] }],
+    ['or(and(), Whereable)', () => dc.or(dc.and(), { id: 1 }).compile(), { text: '(TRUE OR ("id" = $1))', values: [1] }],
+  ])('and() / or() without argument: %s', (_name, compile, expected) => {
+    expect(compile()).toEqual(expected);
   });
 
   it('array operators: the array is one parameter', () => {
