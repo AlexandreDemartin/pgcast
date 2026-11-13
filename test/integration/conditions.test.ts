@@ -90,20 +90,24 @@ describe('on users', () => {
     expect(await ids('users', { id: dc.not(dc.or(dc.eq(1), dc.eq(2))) })).toEqual([3]);
   });
 
-  it('characterization: and() / or() without argument are a syntax error', async () => {
-    // characterization: `WHERE ()` and `WHERE ((()))`; a Whereable `{}` gives TRUE instead
-    expect(await pgError(t.client, () => ids('users', dc.and()))).toMatchInlineSnapshot(`
-      {
-        "code": "42601",
-        "message": "syntax error at or near ")"",
-      }
-    `);
-    expect(await pgError(t.client, () => ids('users', { id: dc.or() }))).toMatchInlineSnapshot(`
-      {
-        "code": "42601",
-        "message": "syntax error at or near ")"",
-      }
-    `);
+  // `and()` is TRUE and `or()` FALSE, as a Whereable `{}` is TRUE; 6.6.1 wrote `()`: each case was 42601 there
+  it.each([
+    ['and()', dc.and(), [1, 2, 3]],
+    ['or()', dc.or(), []],
+    ['and() as a Whereable value', { id: dc.and() }, [1, 2, 3]],
+    ['or() as a Whereable value', { id: dc.or() }, []],
+    ['not(and())', dc.not(dc.and()), []],
+    ['not(or())', dc.not(dc.or()), [1, 2, 3]],
+    ['and(or(), Whereable)', dc.and(dc.or(), { id: 1 }), []],
+    ['or(and(), Whereable)', dc.or(dc.and(), { id: 1 }), [1, 2, 3]],
+    ['or(or(), Whereable)', dc.or(dc.or(), { id: 1 }), [1]],
+    ['and(and(), Whereable)', dc.and(dc.and(), { id: 1 }), [1]],
+    ['or(Whereable) of an and()', dc.or({ id: dc.and() }, { id: 1 }), [1, 2, 3]],
+  ] as [string, db.SQL, number[]][])('and() / or() without argument: %s', async (_name, where, expected) => {
+    expect(await ids('users', where)).toEqual(expected);
+  });
+
+  it('a Whereable {} matches every row, as and() does', async () => {
     expect(await ids('users', {})).toEqual([1, 2, 3]);
   });
 });

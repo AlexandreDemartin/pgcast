@@ -24,6 +24,11 @@ Candidates for a check, a rule or a skill line.
 - #112 — Git can merge a summary table quietly while its rows conflict: two report PRs merged one after the other get the table recounted by script — `builder`
 - #112 — The report's « N to fix, M to document » sentence counts R16 (now opt-in) as document, so a recount by script disagrees — `builder`
 - #112 — `npx tsc` from a scratch folder resolves to the unrelated npm package « tsc »: a probe calls `<worktree>/node_modules/.bin/tsc` — `builder`
+- #33 — A change to the empty case of a generic `SQLFragment` also reaches positions that are not conditions (`GROUP BY ()`, `ROW()`, a call with no arguments, all valid SQL): replay wherever the fragment's type is accepted before claiming « every changed call failed before » — `branch-reviewer`
+- #33 — A fix that turns an error into « every row » for a destructive call (`deletes(t, and(...[]))`) goes to the owner, and the CHANGELOG says to keep the guard rather than drop it — orchestrator
+- #33 — A docs probe follows a code span that appears in the compiled SQL: « `deletes(…)` deletes them all » is rephrased « `deletes(…)` sends `WHERE TRUE` » to carry the mark — `builder`
+- #33 — `git merge --no-edit` leaves out the Co-Authored-By line: pass `-m` with it on every merge — `builder`
+- #33 — Two-dot `git diff origin/master` shows master's newer commits as reverted once master moves: size and grep checks use three dots — `builder`
 
 ## Minors kept
 
@@ -34,3 +39,4 @@ Minor review defects, taken up by the end-of-chapter review.
 - #132 — `docs/CHARACTERISATION-REPORT.md:20`: the summary sentence counts R16 (now opt-in) as document: 37 to fix, 16 to document, 12 to leave — `branch-reviewer`
 - #132 — `docs/CHARACTERISATION-REPORT.md:77` (R66): « a text column » leaves out `varchar`, `citext`, `json`, `xml`, `name`, `bytea`; and the nested case rests only on the cost of walking every value (6.6.1's type refused it too) — `branch-reviewer`
 - #112 — `test/types/shortcuts.test-d.ts:260`: `not.toBeAny()` where an equality compiles (`resolves.toEqualTypeOf<db.UpsertReturnableForTable<'users', undefined, undefined, undefined>>()`) — `branch-reviewer`
+- #33 — `CHANGELOG.md`: `groupBy: and()` sent `GROUP BY ()` (valid, the empty grouping set) in 6.6.1 and now fails with 42601; only the PR body says so: one « Changed too » line — `builder`
