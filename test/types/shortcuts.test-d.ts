@@ -122,27 +122,38 @@ describe('selectOne, selectExactlyOne, count', () => {
     expectTypeOf(pick('accounts', db.all, { columns: ['balance'] }).run(pool)).resolves.toEqualTypeOf<number>();
   });
 
-  test('aggregates: several columns are refused', () => {
-    const two = ['id', 'mood'] as const;
-    // @ts-expect-error count() aggregates one column, not two
-    db.count('users', db.all, { columns: ['id', 'mood'] });
-    // @ts-expect-error count() aggregates one column, not two
-    db.count('users', db.all, { columns: two });
-    // @ts-expect-error sum() aggregates one column, not two
-    db.sum('accounts', db.all, { columns: ['balance', 'ratio'] });
-  });
-
-  test('aggregates: a passthru lateral is refused, a lateral map is not', () => {
+  test('aggregates keep the type of Zapatos 6.6.1: several columns and a passthru lateral compile, and throw at run time', () => {
+    // the owner's decision on #34: nothing that compiles under Zapatos 6.6.1 stops compiling
     const n = db.count('accounts', { owner_id: db.parent('id') });
-    // @ts-expect-error an aggregate has no row to pass a lateral query through
-    db.count('users', db.all, { lateral: n });
-    // @ts-expect-error an aggregate has no row to pass a lateral query through
-    db.max('users', db.all, { lateral: n });
+    expectTypeOf(db.count('users', db.all, { columns: ['id', 'mood'] })).toEqualTypeOf<db.SQLFragment<number>>();
+    expectTypeOf(db.sum('accounts', db.all, { columns: ['balance', 'ratio'] as const })).toEqualTypeOf<db.SQLFragment<number>>();
+    expectTypeOf(db.count('users', db.all, { lateral: n })).toEqualTypeOf<db.SQLFragment<number>>();
     expectTypeOf(db.count('users', db.all, { lateral: { n } }).run(pool)).resolves.toEqualTypeOf<number>();
   });
 
+  test('aggregates take options typed with the types of Zapatos 6.6.1', () => {
+    // a generic forwarder, as a pagination helper writes it
+    const countOf = <T extends s.Table, C extends db.ColumnsOption<T>, L extends db.LateralOption<C, E>, E extends db.ExtrasOption<T>, A extends string>(
+      table: T, where: s.WhereableForTable<T> | db.SQLFragment<any> | db.AllType, options: db.SelectOptionsForTable<T, C, L, E, A>) =>
+      db.count(table, where, options);
+    expectTypeOf(countOf('users', db.all, { limit: 10 }).run(pool)).resolves.toEqualTypeOf<number>();
+    // an annotated {}, and columns under LateralOption
+    const none: db.SelectOptionsForTable<'users', undefined, db.LateralOption<undefined, undefined>, undefined, never> = {};
+    expectTypeOf(db.count('users', db.all, none)).toEqualTypeOf<db.SQLFragment<number>>();
+    const balance: db.SelectOptionsForTable<'accounts', db.ColumnsOption<'accounts'>, db.LateralOption<db.ColumnsOption<'accounts'>, undefined>, undefined, never> = { columns: ['balance'] };
+    expectTypeOf(db.sum('accounts', db.all, balance)).toEqualTypeOf<db.SQLFragment<number>>();
+    // a union holding a two-column tuple, whose value has one
+    const oneOrTwo: ['balance'] | ['balance', 'ratio'] = ['balance'];
+    expectTypeOf(db.sum('accounts', db.all, { columns: oneOrTwo })).toEqualTypeOf<db.SQLFragment<number>>();
+    expectTypeOf(db.sum('accounts', db.all, { columns: Math.random() > 0.5 ? ['balance'] : ['balance', 'ratio'] })).toEqualTypeOf<db.SQLFragment<number>>();
+    // a hand-written signature of 6.6.1's shape
+    type Agg661 = <T extends s.Table, C extends db.ColumnsOption<T>, L extends db.LateralOption<C, E>, E extends db.ExtrasOption<T>, A extends string>(
+      table: T, where: s.WhereableForTable<T> | db.SQLFragment<any> | db.AllType, options?: db.SelectOptionsForTable<T, C, L, E, A>) => db.SQLFragment<number>;
+    const agg: Agg661 = db.count;
+    expectTypeOf(agg('users', db.all)).toEqualTypeOf<db.SQLFragment<number>>();
+  });
+
   test('sum, avg, min, max without columns compile as in 6.6.1, and throw at run time', () => {
-    // the owner's decision on #34: nothing that compiles under Zapatos 6.6.1 stops compiling
     expectTypeOf(db.sum('accounts', db.all)).toEqualTypeOf<db.SQLFragment<number>>();
     expectTypeOf(db.avg('accounts', db.all, { columns: undefined })).toEqualTypeOf<db.SQLFragment<number>>();
     expectTypeOf(db.min).toEqualTypeOf<db.NumericAggregateSignatures>();

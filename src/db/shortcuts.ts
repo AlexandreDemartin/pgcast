@@ -802,15 +802,11 @@ export const selectExactlyOne: SelectExactlyOneSignatures = function (table, whe
 
 /* === count, sum, avg === */
 
-// one column: a tuple of another length is refused, an array of unknown length is not (the run time checks it)
-type AggregateColumnsOption<T extends Table> =
-  readonly [ColumnForTable<T>] | (readonly ColumnForTable<T>[] & { 1?: never }) | undefined;
-
 export interface NumericAggregateSignatures {
   <
     T extends Table,
-    C extends AggregateColumnsOption<T>,
-    L extends LimitedLateralOption,
+    C extends ColumnsOption<T>,
+    L extends LateralOption<C, E>,
     E extends ExtrasOption<T>,
     A extends string,
   >(
@@ -821,21 +817,28 @@ export interface NumericAggregateSignatures {
 }
 
 // the aggregate takes one column, none for count(*), and has no row to pass a lateral query through: Zapatos 6.6.1
-// sent `sum(*)`, `count("a", "b")` or `SELECT  AS result`; the type lets a missing column through, as 6.6.1 did
+// sent `sum(*)`, `count("a", "b")` or `SELECT  AS result`, which Postgres refuses. The type is 6.6.1's, so these
+// throw as the query compiles, as a value with no meaning does in core.ts: `run()` rejects, before any query
 const numericAggregate = (
   table: Table,
   where: Whereable | SQLFragment<any> | AllType,
-  options: SelectOptionsForTable<Table, ColumnsOption<Table>, LimitedLateralOption, ExtrasOption<Table>, any> = {},
+  options: SelectOptionsForTable<Table, ColumnsOption<Table>, LateralOption<ColumnsOption<Table>, ExtrasOption<Table>>, ExtrasOption<Table>, any> = {},
   aggregate: string,
-) => {
-  const { columns, lateral } = options;
-  if (!columns) {
-    if (aggregate !== 'count') throw new Error(`${aggregate}() needs one column to aggregate: pass columns: ['column']`);
-  } else if (Array.isArray(columns) && columns.length !== 1) {
-    throw new Error(`${aggregate}() takes one column in columns, not ${columns.length}${aggregate === 'count' ? ' (leave columns out for count(*))' : ''}`);
-  }
-  if (lateral instanceof SQLFragment) throw new Error(`${aggregate}() cannot pass a lateral query through: nest it in the lateral of a select() instead`);
-  return select(table, where, options, SelectResultMode.Numeric, aggregate);
+): SQLFragment<number> => {
+  const
+    query = select(table, where, options, SelectResultMode.Numeric, aggregate),
+    { columns, lateral } = options,
+    columnsRefusal =
+      !columns ? (aggregate === 'count' ? undefined : `${aggregate}() needs one column to aggregate: pass columns: ['column']`) :
+        Array.isArray(columns) && columns.length !== 1 ? `${aggregate}() takes one column in columns, not ${columns.length}${aggregate === 'count' ? ' (leave columns out for count(*))' : ''}` :
+          undefined,
+    refusal = columnsRefusal ?? (lateral instanceof SQLFragment ? `${aggregate}() cannot pass a lateral query through: nest it in the lateral of a select() instead` : undefined);
+
+  if (refusal === undefined) return query;
+  // the refusal sits in the expressions, which copy() shares, so that a copy nested in a lateral throws too
+  const refused = sql``;
+  refused.compile = () => { throw new Error(refusal); };
+  return sql<SQL, number>`${refused}`;
 };
 
 /**
@@ -846,7 +849,8 @@ const numericAggregate = (
  * or `all`
  * @param options Options object. Useful keys may be: `columns`, `alias`.
  * `columns: ['col']` gives `count("col")`, and no `columns` `count(*)`;
- * several columns, or a single query as `lateral`, throw.
+ * several columns, or a single query as `lateral`, throw as the query
+ * compiles, so `run()` rejects before any query is sent.
  */
 export const count: NumericAggregateSignatures = function (table, where, options?) {
   return numericAggregate(table, where, options, 'count');
@@ -860,7 +864,8 @@ export const count: NumericAggregateSignatures = function (table, where, options
  * aggregated, or `all`
  * @param options Options object. Useful keys may be: `columns`, `alias`.
  * `columns` holds the one column to aggregate: `columns: ['col']` gives
- * `sum("col")`; no column, several, or a single query as `lateral`, throw.
+ * `sum("col")`; no column, several, or a single query as `lateral`, throw as
+ * the query compiles, so `run()` rejects before any query is sent.
  */
 export const sum: NumericAggregateSignatures = function (table, where, options?) {
   return numericAggregate(table, where, options, 'sum');

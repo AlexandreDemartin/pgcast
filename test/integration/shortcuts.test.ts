@@ -752,21 +752,26 @@ describe('count, sum, avg, min, max', () => {
     expect(await run(db.max('accounts', all, { columns: ['balance'] }))).toBe(1500.5);
   });
 
-  it('sum, avg, min, max without columns throw as the query is built, before any is sent', () => {
-    // 6.6.1 sent `sum(*)`, which Postgres refuses (42883)
-    expect(() => db.sum('accounts', all)).toThrow("sum() needs one column to aggregate: pass columns: ['column']");
-    expect(() => db.avg('accounts', all, {})).toThrow("avg() needs one column to aggregate: pass columns: ['column']");
-    expect(() => db.min('accounts', all, { alias: 'a' })).toThrow("min() needs one column to aggregate: pass columns: ['column']");
-    expect(() => db.max('accounts', all, { columns: undefined })).toThrow("max() needs one column to aggregate: pass columns: ['column']");
+  it('sum, avg, min, max without columns reject run() before any query is sent', async () => {
+    // 6.6.1 sent `sum(*)`, which Postgres refuses (42883); this Error comes from compiling, so it has no code
+    const sent: unknown[] = [];
+    db.setConfig({ queryListener: query => sent.push(query) });
+    await expect(run(db.sum('accounts', all))).rejects.toThrow("sum() needs one column to aggregate: pass columns: ['column']");
+    await expect(run(db.avg('accounts', all, {}))).rejects.toThrow("avg() needs one column to aggregate: pass columns: ['column']");
+    await expect(run(db.min('accounts', all, { alias: 'a' }))).rejects.toThrow("min() needs one column to aggregate: pass columns: ['column']");
+    await expect(run(db.max('accounts', all, { columns: undefined }))).rejects.toThrow("max() needs one column to aggregate: pass columns: ['column']");
+    await expect(run(db.sum('accounts', all))).rejects.not.toHaveProperty('code');
+    expect(sent).toEqual([]);
   });
 
-  it('several columns, or none, throw as the query is built', () => {
+  it('several columns, or none, reject run() before any query is sent', async () => {
     // 6.6.1 sent `count("id", "mood")` and `count()`, which Postgres refuses (42883, 42809)
-    // @ts-expect-error two columns (refused by the type too)
-    expect(() => db.count('users', all, { columns: ['id', 'mood'] })).toThrow('count() takes one column in columns, not 2 (leave columns out for count(*))');
-    expect(() => db.count('users', all, { columns: [] })).toThrow('count() takes one column in columns, not 0 (leave columns out for count(*))');
-    // @ts-expect-error two columns (refused by the type too)
-    expect(() => db.sum('accounts', all, { columns: ['balance', 'ratio'] })).toThrow('sum() takes one column in columns, not 2');
+    const sent: unknown[] = [];
+    db.setConfig({ queryListener: query => sent.push(query) });
+    await expect(run(db.count('users', all, { columns: ['id', 'mood'] }))).rejects.toThrow('count() takes one column in columns, not 2 (leave columns out for count(*))');
+    await expect(run(db.count('users', all, { columns: [] }))).rejects.toThrow('count() takes one column in columns, not 0 (leave columns out for count(*))');
+    await expect(run(db.sum('accounts', all, { columns: ['balance', 'ratio'] }))).rejects.toThrow('sum() takes one column in columns, not 2');
+    expect(sent).toEqual([]);
   });
 
   it('characterization: on an empty set, sum / avg / min / max return 0, not null', async () => {
@@ -789,12 +794,19 @@ describe('count, sum, avg, min, max', () => {
     expect(await run(db.max('users', all, { columns: ['display_name'] }))).toBeNaN();
   });
 
-  it('a passthru lateral throws as the query is built; a lateral map runs', async () => {
+  it('a passthru lateral rejects run() before any query is sent, nested too; a lateral map runs', async () => {
     // 6.6.1 sent `SELECT  AS result`, which Postgres refuses (42601)
-    // @ts-expect-error a passthru lateral (refused by the type too)
-    expect(() => db.count('users', all, { lateral: db.count('accounts', { owner_id: parent('id') }) }))
-      .toThrow('count() cannot pass a lateral query through: nest it in the lateral of a select() instead');
+    const sent: unknown[] = [], n = db.count('accounts', { owner_id: parent('id') });
+    db.setConfig({ queryListener: query => sent.push(query) });
+    await expect(run(db.count('users', all, { lateral: n })))
+      .rejects.toThrow('count() cannot pass a lateral query through: nest it in the lateral of a select() instead');
+    // a refused aggregate nested in a lateral, or as an extra, rejects the run() of the query around it
+    await expect(run(db.select('users', all, { lateral: { n: db.max('accounts', { owner_id: parent('id') }) } })))
+      .rejects.toThrow("max() needs one column to aggregate: pass columns: ['column']");
+    await expect(run(db.selectOne('users', all, { extras: { s: db.sum('accounts', { owner_id: parent('id') }) } })))
+      .rejects.toThrow("sum() needs one column to aggregate: pass columns: ['column']");
+    expect(sent).toEqual([]);
     // the map is joined, its results not read
-    expect(await run(db.count('users', all, { lateral: { n: db.count('accounts', { owner_id: parent('id') }) } }))).toBe(3);
+    expect(await run(db.count('users', all, { lateral: { n } }))).toBe(3);
   });
 });
