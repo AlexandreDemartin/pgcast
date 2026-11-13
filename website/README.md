@@ -61,8 +61,8 @@ One per group, in `templates/`, not published (`srcExclude` in `.vitepress/confi
   - Any comment that starts as a mark is one: a mark the script cannot read fails. In a table, a mark holding a `|` fails, as markdown-it would end the cell there: write `'\x7c'`. Postgres's own messages and the SQL the reader writes are not marked. A probe is code the build runs: review a page's diff in source view.
 - **Links**: root-relative, without `.md`: `[Install](/install)`, an entry as `` [`select()`](/select#select) ``. A link to a page that does not exist fails the build.
   - The hash is the anchor exactly as written: an entry's name, case and dots kept (`` [`Config.castArrayParamsToJson`](/runtime-config#Config.castArrayParamsToJson) ``, `` [`SelectResultMode`](#SelectResultMode) `` on its own page); a heading without `{#…}` by its slug, in lower case with hyphens (`## Insert options` → `#insert-options`). No raw `<a href>`.
-  - The build also fails on a raw `<a href>` to a page that does not exist, on a link to an anchor that its page does not define (the part before a text fragment's `:~:`, if any), and on a root link outside the site's base, with the page and the link (`.vitepress/anchors.ts`). A link written with the site's host (`https://alexandredemartin.github.io/pgcast/…`) is checked the same way. A name still in `reference-pending.json` counts as an anchor of its page, so a page can link an entry of a "Coming" page.
-  - A URL of the site in a fenced block (`https://alexandredemartin.github.io/pgcast/…`), such as the rules file of `ai-assistant.md` that readers copy into their projects, is checked the same way, page and anchor, and reported with its line. The home may be written without its slash, as GitHub Pages redirects it.
+  - The build also fails on a raw `<a href>` to a page that does not exist, on a link to an anchor that its page does not define (the part before a text fragment's `:~:`, if any), and on a root link outside the site's base, with the page and the link (`.vitepress/anchors.ts`). A link written with the site's host (`https://pgcast.dev/…`) is checked the same way. A name still in `reference-pending.json` counts as an anchor of its page, so a page can link an entry of a "Coming" page.
+  - A URL of the site in a fenced block (`https://pgcast.dev/…`), such as the rules file of `ai-assistant.md` that readers copy into their projects, is checked the same way, page and anchor, and reported with its line. The home may be written without its slash.
   - A tutorial ends on the three other groups.
   - A how-to links each option it uses to its entry.
   - A reference entry links its explanation for the why.
@@ -114,6 +114,8 @@ At build, `.vitepress/llms.ts` writes two files to the site's root, from the out
 - `llms-full.txt`: every written page as plain Markdown, each cast panel with the SQL, values and type `cast.data.ts` computes. A panel not written `<CastPanel example="<name>">` fails the build.
 
 A "Coming" page has no `.md` file, so it is in neither; nor are the templates and this README, which the outline does not list.
+
+`public/robots.txt`, copied to the root as it is, lets every crawler in, assistants' included, and names `sitemap.xml`, which VitePress writes from the config's `sitemap`.
 
 ### Screenshots for a PR
 

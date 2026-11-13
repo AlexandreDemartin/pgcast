@@ -13,7 +13,7 @@ import { twoslashOptions } from './twoslash.ts';
 
 type Twoslasher = ReturnType<typeof createTwoslasher>;
 
-export const host = 'https://alexandredemartin.github.io';  // GitHub Pages, under the config's `base`
+export const host = 'https://pgcast.dev';  // GitHub Pages, under the config's `base`
 
 export async function writeLlmsFiles(config: SiteConfig) {
   const
