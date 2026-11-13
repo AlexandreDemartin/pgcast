@@ -78,18 +78,20 @@ export const isNotIn = <T>(a: readonly T[]) => a.length > 0 ? sql<SQL, boolean |
 
 /**
  * Join conditions with `OR`: `or(a, b)` compiles to `(a OR b)`, and `or()` to `FALSE`, so that
- * it matches no row. Zapatos 6.6.1 wrote `()`, which Postgres refuses.
+ * it matches no row. Zapatos 6.6.1 wrote `()`, which Postgres refuses. Its operands need no
+ * parentheses of their own: `AND` binds tighter than `OR`.
  * @param conditions `SQLFragment`s (other conditions, or `sql` using `self`) or `Whereable`s
  */
 export const or = <T>(...conditions: (SQLFragment<any, T> | Whereable)[]) =>
   conditions.length > 0 ? sql<SQL, boolean | null, T>`(${mapWithSeparator(conditions, sql` OR `, c => c)})` : sql<SQL, boolean | null, T>`FALSE`;
 /**
- * Join conditions with `AND`: `and(a, b)` compiles to `(a AND b)`, and `and()` to `TRUE`, so that
- * it matches every row, as a `Whereable` `{}` does. Zapatos 6.6.1 wrote `()`, which Postgres refuses.
+ * Join conditions with `AND`, each in its own parentheses: `` and(sql`a OR b`, c) `` compiles to
+ * `((a OR b) AND (c))`, and `and()` to `TRUE`, so that it matches every row, as a `Whereable` `{}`
+ * does. Zapatos 6.6.1 wrote `(a OR b AND c)`, which reads `a OR (b AND c)`, and `()` for `and()`.
  * @param conditions `SQLFragment`s (other conditions, or `sql` using `self`) or `Whereable`s
  */
 export const and = <T>(...conditions: (SQLFragment<any, T> | Whereable)[]) =>
-  conditions.length > 0 ? sql<SQL, boolean | null, T>`(${mapWithSeparator(conditions, sql` AND `, c => c)})` : sql<SQL, boolean | null, T>`TRUE`;
+  conditions.length > 0 ? sql<SQL, boolean | null, T>`(${mapWithSeparator(conditions, sql` AND `, c => sql`(${c})`)})` : sql<SQL, boolean | null, T>`TRUE`;
 /**
  * Negate a condition, all of it: `` not(sql`a OR b`) `` compiles to `(NOT (a OR b))`, and
  * `not({ id: 1 })` to `(NOT (("id" = $1)))`. Zapatos 6.6.1 wrote `(NOT a OR b)`, which reads
