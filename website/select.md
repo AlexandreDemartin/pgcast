@@ -58,6 +58,8 @@ The SQL of each row is what the built library compiles, on the docs schema; `…
 
 `columns?: readonly ColumnForTable<T>[]`, a [`ColumnsOption`](#ColumnsOption): only these columns, each a key of the result object, in place of the whole row. It does not rename a column: [`extras`](#extras) does.
 
+A `readonly` array (`['id', 'title'] as const`) sends the same SQL, but the result type is `never` for now ([#41](https://github.com/AlexandreDemartin/pgcast/issues/41)), which is assignable to any type: write the array without `as const`.
+
 ### `order`, `limit`, `offset` and `withTies`
 
 - `order`: one `{ by, direction, nulls? }` or an array of them, in that order. `by` is a column or any SQL of the table, its `SQL` type: a `sql` fragment (`` db.sql`array_length(${'genres'}, 1)` ``), [`db.parent()`](/sql-template#parent); `direction` is `'ASC'` or `'DESC'`; `nulls`, `'FIRST'` or `'LAST'`.
@@ -346,7 +348,7 @@ One locking clause of [`lock`](#lock). `of` takes a table name without its schem
 
 ### `ColumnsOption` {#ColumnsOption}
 
-`ColumnsOption<T> = readonly ColumnForTable<T>[] | undefined`: the type of `columns`, and of `returning` in [`insert()`](/insert#insert) and the other writes.
+`ColumnsOption<T> = readonly ColumnForTable<T>[] | undefined`: the type of `columns`, and of `returning` in [`insert()`](/insert#insert) and the other writes. It takes a `readonly` array, which types the result as `never` for now ([`columns`](#columns)).
 
 ### `ExtrasOption` {#ExtrasOption}
 
