@@ -2,7 +2,7 @@
 // The docs site (decision 004), on VitePress's default theme; its look is docs/design/art-direction.md.
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { transformerTwoslash } from '@shikijs/vitepress-twoslash';
+import { defaultHoverInfoProcessor, transformerTwoslash } from '@shikijs/vitepress-twoslash';
 import { defineConfig, type HeadConfig } from 'vitepress';
 import { checkLinks, keepLinkHashes } from './anchors.ts';
 import { changelogPage, dateChangelog, writeChangelogFeed } from './changelog.ts';
@@ -11,7 +11,7 @@ import { describePage, pageHead, repo } from './meta.ts';
 import { outline } from './outline.ts';
 import { lineIndents, sqlParameters, syntax } from './syntax.ts';
 import { labelTableCells } from './tables.ts';
-import { focusableHovers, twoslashOptions } from './twoslash.ts';
+import { focusableHovers, moduleNames, twoslashOptions } from './twoslash.ts';
 
 const
   { version } = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')),
@@ -55,7 +55,10 @@ export default defineConfig({
     // a hover's JSDoc can hold these (`process.env`, from @types/node), and Shiki loads only the languages a page names
     languages: ['js', 'bash'],
     // an unexpected type error in a `ts twoslash` block fails the build; a block meant to fail says so with `// @errors`
-    codeTransformers: [transformerTwoslash({ twoslashOptions }), focusableHovers, sqlParameters, lineIndents],
+    codeTransformers: [
+      transformerTwoslash({ twoslashOptions, processHoverInfo: type => defaultHoverInfoProcessor(moduleNames(type)) }),
+      focusableHovers, sqlParameters, lineIndents,
+    ],
     config: md => {
       keepLinkHashes(md);  // `[Config.upsertRequiresSameKeys](/runtime-config#Config.upsertRequiresSameKeys)`
       changelogPage(md);  // CHANGELOG.md in changelog.md

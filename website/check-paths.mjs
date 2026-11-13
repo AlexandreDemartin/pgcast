@@ -1,8 +1,8 @@
 // Copyright (C) 2026 Alexandre Demartin
 // Fails the docs build when a built file holds an absolute path of a machine: this checkout's, or one that starts
-// `/home/`, `/Users/`, `/runner/` or a drive letter (`C:\`, `C:/`). TypeScript prints a module it has no name for by
-// its path (`typeof import("/home/runner/…/node_modules/@types/pg/index")`), and a hover type is in the page's
-// JavaScript, not its HTML: every text file of `.vitepress/dist` is read. A path that a package's own JSDoc gives as
+// `/home/`, `/Users/`, `/runner/` or a drive letter (`C:\`, `C:/`). TypeScript's hover gives a module by its file's
+// path (`typeof import("/home/runner/…/node_modules/@types/pg/index")`, see `moduleNames` in .vitepress/twoslash.ts),
+// and a hover type is in the page's JavaScript, not its HTML: every text file of `.vitepress/dist` is read. A path that a package's own JSDoc gives as
 // an example goes in `allowed`. Run by `npm run docs:build`, after VitePress.
 import { readdirSync, readFileSync } from 'node:fs';
 import { extname } from 'node:path';
