@@ -428,15 +428,16 @@ describe('typeEnumsAcrossSchemas', () => {
     expect(tableBlock(schema, 'mv')).toContain(`s: ('archived' | 'draft' | 'published') | null;`);
   });
 
-  it('is off by default, with a note that names each column it would change', async () => {
+  it('is off by default, with a note that names each column it would change, and its type', async () => {
     expect(await notesFor(enumX)).toEqual([
-      'Note: enum_x.mv.a, enum_x.mv.s, enum_x.t.a, enum_x.t.b, enum_x.t.d and enum_x.t.o have a type of another ' +
+      'Note: enum_x.mv.a (enum_y.st), enum_x.mv.s (extra.status), enum_x.t.a (enum_y.st), enum_x.t.b (enum_y.st[]), ' +
+      'enum_x.t.d (enum_y.st) and enum_x.t.o (enum_y.solo) have a type of another ' +  // d: the type under its domain
       'schema, which is looked up by name in the schema of their relation: an enum becomes an `any` custom type, ' +
       'or the enum of the same name there. Set typeEnumsAcrossSchemas: true to look it up in its own schema; ' +
       'it will be the default in pgcast 7.0.',
     ]);
     expect(await notesFor({ schemas: { public: only('products') } })).toEqual([
-      'Note: public.products.status has a type of another schema, which is looked up by name in the schema of ' +
+      'Note: public.products.status (extra.status) has a type of another schema, which is looked up by name in the schema of ' +
       'its relation: an enum becomes an `any` custom type, or the enum of the same name there. ' +
       'Set typeEnumsAcrossSchemas: true to look it up in its own schema; it will be the default in pgcast 7.0.',
     ]);
@@ -524,7 +525,8 @@ describe('include entries that match no relation', () => {
   });
 
   it('warns, of main and the snapshot variants, only about no_such_table of include-exclude-lists, and the enums note', async () => {
-    const enumsNote = 'Note: extra.type_zoo.c_enum_array and public.products.status have a type of another schema, ' +
+    const enumsNote = 'Note: extra.type_zoo.c_enum_array (public.mood[]) and public.products.status (extra.status) ' +
+      'have a type of another schema, ' +
       'which is looked up by name in the schema of their relation: an enum becomes an `any` custom type, or the enum of ' +
       'the same name there. Set typeEnumsAcrossSchemas: true to look it up in its own schema; it will be the default in pgcast 7.0.';
     const warnings: Record<string, string[]> = {};

@@ -264,7 +264,7 @@ CREATE TABLE prints (id int PRIMARY KEY, format archive.print_format NOT NULL, f
 
 - The labels are written out, not named: the enum's schema needn't be in [`schemas`](#generate.schemas). In alphabetical order, as for every enum ([#49](https://github.com/AlexandreDemartin/pgcast/issues/49)).
 - A domain over such an enum stays a custom type, `c.<name>`; its new placeholder gets the labels rather than `any`. An existing placeholder is never overwritten.
-- `false` notes, through [`warningListener`](#generate.warningListener), the columns `true` would change.
+- `false` notes, through [`warningListener`](#generate.warningListener), the columns `true` would change, each with its type: for a domain, the type under it.
 
 ### `progressListener` {#generate.progressListener}
 
@@ -286,7 +286,7 @@ Writing custom types file: src/zapatos/custom/index.d.ts
 - `Note: custom types "archive"."notes" and "public"."notes" are both named PgNotes in TypeScript, so they share one type and one placeholder file, src/zapatos/custom/PgNotes.d.ts. To type them apart, rename one of them in the database.`, once per run for each name that two Postgres types share ([`customTypesTransform`](#generate.customTypesTransform)); when their names differ, it adds that a `customTypesTransform` function can keep them apart;
 - `Note: the include entry "Films" of schema "public" matches no relation there, so it generates nothing. Check its spelling and case, that the relation is in schema "public", and that the database role has a privilege on it: include names tables, views, materialised views and foreign tables.`, once per run for each entry of an [`include`](#generate.schemas) list that its schema doesn't have;
 - the note on `bigint` and `numeric` columns, once per process ([`customJSONParsingForLargeNumbers`](#generate.customJSONParsingForLargeNumbers));
-- `` Note: public.prints.format, public.prints.formats and public.prints.keeper have a type of another schema, which is looked up by name in the schema of their relation: an enum becomes an `any` custom type, or the enum of the same name there. Set typeEnumsAcrossSchemas: true to look it up in its own schema; it will be the default in pgcast 7.0. ``, once per run, without [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas), when a column it would change is generated;
+- `` Note: public.prints.format (archive.print_format), public.prints.formats (archive.print_format[]) and public.prints.keeper (archive.crew_job) have a type of another schema, which is looked up by name in the schema of their relation: an enum becomes an `any` custom type, or the enum of the same name there. Set typeEnumsAcrossSchemas: true to look it up in its own schema; it will be the default in pgcast 7.0. ``, once per run, without [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas), when a column it would change is generated;
 - the [old layout warning](#the-old-layout-warning).
 
 ### `debugListener` {#generate.debugListener}

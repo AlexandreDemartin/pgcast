@@ -6,6 +6,7 @@ export const crossSchemaTypesForSchemas = mod.crossSchemaTypesForSchemas;
 export const crossTableTypesForTables = mod.crossTableTypesForTables;
 export const definitionForRelationInSchema = mod.definitionForRelationInSchema;
 export const enumDataForSchema = mod.enumDataForSchema;
+export const enumLabel = mod.enumLabel;
 export const enumTypesForEnumData = mod.enumTypesForEnumData;
 export const finaliseConfig = mod.finaliseConfig;
 export const generate = mod.generate;

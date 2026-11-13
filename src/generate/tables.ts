@@ -141,7 +141,8 @@ export const definitionForRelationInSchema = async (
 
     if (!typeEnumsAcrossSchemas && acrossSchemas &&
       tsTypeForPgType(udtName, otherEnums[udtSchema], 'Selectable', config, true) !== selectableType) {
-      columnsTypedByEnumName.push(`${schemaName}.${rel.name}.${column}`);
+      const isArray = udtName.charAt(0) === '_' && !Object.prototype.hasOwnProperty.call(otherEnums[udtSchema], udtName);
+      columnsTypedByEnumName.push(`${schemaName}.${rel.name}.${column} (${udtSchema}.${isArray ? udtName.slice(1) + '[]' : udtName})`);
     }
 
     const
