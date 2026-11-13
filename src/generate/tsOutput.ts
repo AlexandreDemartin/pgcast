@@ -7,7 +7,8 @@ Released under the MIT licence: see LICENCE file
 import * as path from 'path';
 import * as pg from 'pg';
 
-import { enumDataForSchema, enumTypesForEnumData, type EnumData } from './enums';
+import { enumTypesForEnumData } from './enums';
+import { enumOrderOf, enumOrdersForSchema, enumsOutOfOrder, warnAboutEnumOrder, type EnumOrders } from './enumOrder';
 import { header } from './header';
 import type { CompleteConfig } from './config';
 import type { SchemaVersionCanary } from "../db/canary";
@@ -122,6 +123,7 @@ export const tsForConfig = async (config: CompleteConfig, debug: (s: string) => 
   let querySeq = 0;
   const
     { schemas, db } = config,
+    enumOrder = enumOrderOf(config),  // throws before any query
     pool = new pg.Pool(db),
     queryFn = async (query: pg.QueryConfig, seq = querySeq++) => {
       try {
@@ -137,8 +139,9 @@ export const tsForConfig = async (config: CompleteConfig, debug: (s: string) => 
     },
     customTypes = {},
     customTypeOrigins: CustomTypeOrigins = {},
-    enumsBySchema: Record<string, Promise<EnumData>> = {},
-    enumsForSchema = (schema: string) => enumsBySchema[schema] ??= enumDataForSchema(schema, queryFn),
+    enumsBySchema: Record<string, Promise<EnumOrders>> = {},
+    enumOrdersFor = (schema: string) => enumsBySchema[schema] ??= enumOrdersForSchema(schema, queryFn),
+    enumsForSchema = async (schema: string) => (await enumOrdersFor(schema))[enumOrder],
     columnsTypedByEnumName: string[] = [],
     schemaNames = Object.keys(schemas),
     schemaData = (await Promise.all(
@@ -154,7 +157,9 @@ export const tsForConfig = async (config: CompleteConfig, debug: (s: string) => 
             rules.include
               .filter(name => !relations.some(rel => rel.name === name))
               .map(name => ({ schema, name })),
-          enums = await enumsForSchema(schema),
+          enumOrders = await enumOrdersFor(schema),
+          enums = enumOrders[enumOrder],
+          outOfOrder = enumOrder === 'declared' ? [] : enumsOutOfOrder(enumOrders).map(name => `${schema}.${name}`),
           tableDefs = await Promise.all(tables.map(async table =>
             definitionForRelationInSchema(table, schema, enums, customTypes, config, queryFn, customTypeOrigins,
               enumsForSchema, columnsTypedByEnumName))),
@@ -174,7 +179,7 @@ export const tsForConfig = async (config: CompleteConfig, debug: (s: string) => 
             ) + '\n' +
             (schemaIsUnprefixed ? '' : `}\n`);
 
-        return { schemaDef, tables, unmatched };
+        return { schemaDef, tables, unmatched, outOfOrder };
       }))
     ),
     schemaDefs = schemaData.map(r => r.schemaDef),
@@ -196,6 +201,7 @@ export const tsForConfig = async (config: CompleteConfig, debug: (s: string) => 
   warnAboutUnmatchedIncludes(schemaData.flatMap(r => r.unmatched), config);
   warnAboutSharedCustomTypeNames(customTypeOrigins, config);
   warnAboutEnumsAcrossSchemas(columnsTypedByEnumName, config);
+  warnAboutEnumOrder(schemaData.flatMap(r => r.outOfOrder), config);
 
   await pool.end();
   return { ts, customTypeSourceFiles };
