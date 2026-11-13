@@ -360,16 +360,19 @@ describe('column comments', () => {
     // a * before that line is code (TS1131)
     await t.pool.query(String.raw`
       CREATE SCHEMA comment_closer;
-      CREATE TABLE comment_closer.notes (reopen int, plain int);
+      CREATE TABLE comment_closer.notes (reopen int, later int, plain int);
       COMMENT ON COLUMN comment_closer.notes.reopen IS E'Closes here */\n/* and reopens';
+      COMMENT ON COLUMN comment_closer.notes.later IS E'line one\nCloses */\n/* reopens';
       COMMENT ON COLUMN comment_closer.notes.plain IS E'First line\nsecond line';`);
     try {
       const { ts: schema } = await codegen({ schemas: { comment_closer: all } });
       expect(commentLines(schema, 'notes')).toEqual({
         reopen: ['* Closes here */', '/* and reopens'],
+        later: ['* line one', 'Closes */', '/* reopens'],  // its */ on a later line: no * on any line after the first
         plain: ['* First line', '* second line'],
       });
       expect(schema).toContain('* Closes here */\n    /* and reopens\n');  // the line after */ as master writes it
+      expect(schema).toContain('* line one\n    Closes */\n    /* reopens\n');
       expect(syntaxErrors(schema)).toEqual([]);
     } finally {
       await t.pool.query('DROP SCHEMA comment_closer CASCADE');
