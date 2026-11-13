@@ -201,7 +201,7 @@ Update the rows that match, and return them. The arguments come in the order of 
 - `values` with no key throws: "nothing to update: an Updatable needs at least one column"<!-- message -->. Zapatos 6.6.1 sent `SET () = ROW()`, which Postgres refused (42601).
 
 ::: warning Every row
-An empty `Whereable`, `{}`, compiles to `WHERE TRUE`<!-- probe: db.update('films', { title: 'x' }, {}) -->: `update()` updates every row of the table, and `deletes()` deletes them all.
+An empty `Whereable`, `{}`, compiles to `WHERE TRUE`<!-- probe: db.update('films', { title: 'x' }, {}) -->: `update()` updates every row of the table, and `deletes()` deletes them all. An empty list in [`and(...filters)` or `not(or(...ids))`](/conditions#conditions.and) reaches every row too.
 :::
 
 ## `deletes()` {#deletes}

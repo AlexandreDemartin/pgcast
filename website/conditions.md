@@ -294,7 +294,11 @@ db.conditions.and<T>(...conditions: (SQLFragment<any, T> | Whereable)[])
 `(a AND b)`<!-- probe: db.conditions.and(db.sql`a`, db.sql`b`) -->: its operands joined by `AND`, in one pair of parentheses.
 
 - A Whereable is in its own parentheses; a `sql` fragment is not (below).
-- With no argument, `TRUE`<!-- probe: db.conditions.and() -->: every row, as a Whereable `{}`. So `and(...filters)` needs no check that `filters` has an item, and `deletes('films', and())` deletes them all. Zapatos 6.6.1 wrote `()`, which Postgres refuses (42601).
+- With no argument, `TRUE`<!-- probe: db.conditions.and() -->: every row, as a Whereable `{}`. Zapatos 6.6.1 wrote `()`, which Postgres refuses (42601).
+
+::: warning Every row
+`update()` and `deletes()` given `and(...filters)` or `not(or(...ids))` with an empty list now reach every row: `deletes('films', and())` sends `WHERE TRUE` and deletes them all, `not(or())` gives `(NOT (FALSE))`<!-- probe: db.conditions.not(db.conditions.or()) -->. Zapatos 6.6.1 threw (42601) before any row changed. Keep the length check where an empty list must not reach every row.
+:::
 
 ::: warning Wrong rows
 A `sql` fragment with a bare `OR` at its top level takes the next `AND`. `` and(db.sql`${'id'} = 1000 OR ${'id'} = 1001`, { studio_id: 1001 }) `` gives `("id" = 1000 OR "id" = 1001 AND ("studio_id" = $1))`<!-- probe: db.conditions.and(db.sql`${'id'} = 1000 OR ${'id'} = 1001`, { studio_id: 1001 }) -->, which Postgres reads `"id" = 1000 OR ("id" = 1001 AND …)`: film 1000 too, whatever its studio. Given to `deletes()` or `update()`, it deletes or updates that row ([#96](https://github.com/AlexandreDemartin/pgcast/issues/96)). Put such a fragment in its own parentheses, `` db.sql`(${'id'} = 1000 OR ${'id'} = 1001)` ``, or write it with `or()`: `` or({ id: 1000 }, { id: 1001 }) ``.
