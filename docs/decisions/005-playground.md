@@ -1,6 +1,6 @@
 # 005 — A playground in the browser
 
-- **Status**: proposed (2026-11-13), waiting for the owner.
+- **Status**: accepted (2026-11-13), the owner's answers in § Decision.
 - **Scope**: issue [#296](https://github.com/AlexandreDemartin/pgcast/issues/296) of feature [#291](https://github.com/AlexandreDemartin/pgcast/issues/291). Nothing is implemented here.
 
 ## Context
@@ -122,12 +122,14 @@ Later: the playground on #58's PGlite package, once it ships.
 - **Site size**: ~27 MB more per copy of the docs (the root and `/next/`, decision 004), ~54 MB of the 1 GB Pages limit.
 - **GitHub Pages' 10-minute cache**: after it, the 5.2 MB is revalidated by its `etag`, not downloaded again.
 
-## Questions for the owner
+## Decision
 
-1. **B through A, with Monaco**? Or C, for phones?
-2. **Dev dependencies of `website/`**, pinned exactly: `monaco-editor` 0.57.0 (PR 1), `@electric-sql/pglite` 0.5.16 (PR 2)?
-3. **Where the link goes**: the nav is full (a fourth group link pushes the theme button into the ⋯ menu from 768 to 1050 px, `config.ts`). Proposed: the home's hero and each cast panel; the nav once the changelog moves onto the site (#293).
-4. **The schema read-only** in the first version?
+The owner, 2026-11-13, on the four questions of the proposal:
+
+1. **B, reached through A, with Monaco.** Phones get the code read-only, with its compiled SQL, and a line saying the playground runs on a computer; not C.
+2. **Two dev dependencies of `website/`**, pinned exactly: `monaco-editor` 0.57.0 (PR 1), `@electric-sql/pglite` 0.5.16 (PR 2). None in the library.
+3. **The link**: Playground takes Changelog's place in the top bar (no fourth link), and the changelog moves to the footer, now that it is on the site (#293); "Open in playground" on each cast panel (PR 4). The hero keeps its two actions.
+4. **The schema read-only** in the first version; an editable schema gets its own note if readers ask for it.
 
 ## Sources
 
