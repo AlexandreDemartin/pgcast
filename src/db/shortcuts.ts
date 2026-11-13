@@ -197,6 +197,11 @@ export class Constraint<T extends Table> { constructor(public value: UniqueIndex
 /**
  * Returns a `Constraint` instance, wrapping a unique index of the target table
  * for use as the arbiter constraint of an `upsert` shortcut query.
+ *
+ * The type does not check that it belongs to the upsert's table, and Postgres
+ * refuses another table's (42704): held in a variable, `constraint('...')`
+ * takes any table's name; `constraint<'users'>('users_pkey')` checks the name
+ * against `users`.
  */
 export function constraint<T extends Table>(x: UniqueIndexForTable<T>) { return new Constraint<T>(x); }
 
@@ -290,7 +295,8 @@ const updateValueSQL = (value: any) => compiledAsIs(value) ? value : param(value
  * @param conflictTarget A `UNIQUE`-indexed column (or array thereof) or a 
  * `UNIQUE` index (wrapped in `db.constraint(...)`) that determines whether we
  * get an `UPDATE` (when there's a matching existing value) or an `INSERT`
- * (when there isn't)
+ * (when there isn't); the type does not check that a `constraint()` is one of
+ * this table's (see `constraint`)
  * @param options Optionally, an object with any of the keys `updateColumns`,
  * `noNullUpdateColumns` and `updateValues` (see documentation). A plain value
  * in `updateValues` is sent as a parameter: `{ mood: 'happy' }` gives

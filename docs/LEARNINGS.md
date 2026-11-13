@@ -61,6 +61,11 @@ Candidates for a check, a rule or a skill line.
 - #36 — When the code's rule is about how a name is written (ends with `[]`), the docs state that rule, not the database idea behind it (« an array type »): `_int4` and a domain over an array take the other branch — `branch-reviewer`
 - #36 — A « calls that change » list comes from a replayed grid that includes a bare SELECT and a function argument, not only column writes; a classifier over its output turns « every changed cell is named » into a check — `branch-reviewer`, `builder`
 - #36 — A replay of thousands of writes under `SAVEPOINT`s in one transaction runs out of shared memory (53200) and turns every later cell into an error: one transaction per cell, and the harness fails on 53200 — `branch-reviewer`
+- #38 — In a Twoslash block, `// @errors: <code>` does not fail the build when the expected error disappears; `// @ts-expect-error` does: a page that claims a refusal uses it, or nothing checks the claim (#253) — `builder`
+- #38 — Any extra type parameter inferred from the `Constraint<…>` position, through an intersection, perturbs the contextual inference of an inline generic `db.constraint(…)`; it showed only in the emitted-type diff and `bench:types`, so a types grid includes the inferred-type diff — `builder`
+- #38, #39 — Widening a parameter of an exported function changes `typeof fn`: a function or mock typed with 6.6.1's signature stops compiling, and an overload chosen on that parameter can change; probe assignment to `typeof fn`, not only calls — `branch-reviewer`
+- #39 — On a typed schema, a condition's column check comes from its argument's type: probe an issue's example on the generated schema before the plan (the date case of #39 was out of reach) — `builder`
+- #39 — Each new `Parameter<T>` slot inherits its structural match: `{ value: x }` passes, and is sent as JSON (#274) — `branch-reviewer`
 
 ## Minors kept
 
