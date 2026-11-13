@@ -295,7 +295,7 @@ const updateValueSQL = (value: any) => compiledAsIs(value) ? value : param(value
  * `noNullUpdateColumns` and `updateValues` (see documentation). A plain value
  * in `updateValues` is sent as a parameter: `{ mood: 'happy' }` gives
  * `ROW(..., $n)`. To read a column there, use a fragment, which is written as
- * it is: ``{ name: db.sql`${'users.name'}` }`` gives `ROW(..., "users"."name")`.
+ * it is: ``{ name: db.sql`${'users'}.${'name'}` }`` gives `ROW(..., "users"."name")`.
  *
  * Without `updateColumns`, rows with different keys can lose data: a key
  * missing from one row is inserted as `DEFAULT`, then overwrites that row's

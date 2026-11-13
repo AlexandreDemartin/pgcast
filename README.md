@@ -16,7 +16,7 @@ A maintained fork of [Zapatos](https://github.com/jawj/zapatos) 6.6.1 by George 
 - **Postgres is the source of the types.** The codegen reads the catalog and writes them; none is written by hand. No ORM, no models, no hidden state.
 - **SQL you can read.** Each shortcut compiles to one predictable query, and the `sql` template is always there: the SQL you write is the SQL that runs.
 - **Values are parameters, and names cannot break out.** Every value is sent as `$1`, `$2`, …; a table, column or key that may come from outside is quoted with its `"` doubled.
-- **A drop-in for Zapatos.** Same module names, same API, the old behaviour by default: switch without touching an import.
+- **A drop-in for Zapatos.** Same module names, same API, the old behaviour by default wherever code may rely on it ([what differs](#what-differs-from-zapatos-661)): switch without touching an import.
 
 The goal is Zapatos going the last mile. Foreign-key joins, the conditions Postgres offers, CTEs, functions and raw SQL each get a typed form, so that real code never has to fall back on `db.raw`, hand-written row types or casts.
 
@@ -80,7 +80,7 @@ npx zapatos        # or: npx pgcast
 ## What differs from Zapatos 6.6.1
 
 - **Security (6.6.2).** A string can no longer close its quotes as a table or column name, a `Whereable` key, a `lateral` key or alias, or the cast of `param()`; plain `updateValues` of `upsert()` are parameters; lock, `truncate()`, isolation and aggregate keywords are checked before any query. The few 6.6.1 calls that relied on this, and their migration, are listed under `Security` in the [changelog](CHANGELOG.md).
-- **Fixes.** A call that Postgres already refused throws a helpful error first, such as `update()` with no columns.
+- **Fixes.** A call that Postgres already refused throws a helpful error first, such as `update()` with no columns, and a result that contradicts the function's name, type or docs changes, such as `not()`, which now negates its whole condition: each is listed under `Fixed` in the [changelog](CHANGELOG.md).
 - **Opt-ins**, for surprises that code may rely on. Each is off by default; the old path emits a `DeprecationWarning` once per process, with a code to search for ([decision 003](docs/decisions/003-fixes-and-deprecation.md)).
 
 | Option | Warning | Release |
