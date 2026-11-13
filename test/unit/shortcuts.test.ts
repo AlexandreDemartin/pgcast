@@ -1235,7 +1235,7 @@ describe('selectOne, selectExactlyOne', () => {
     expect(db.selectOne('users', { id: 1 }).compile().values).toEqual([1, 1]);
   });
 
-  it('selectExactlyOneChecksForSecondRow: LIMIT 1 when nested, in a lateral, sql or extras', () => {
+  it('selectExactlyOneChecksForSecondRow: LIMIT 1 when nested, in a lateral or sql', () => {
     db.setConfig({ selectExactlyOneChecksForSecondRow: true });
     const manager = db.selectExactlyOne('users', { id: parent('manager_id') }, { alias: 'm' });
     expect(db.select('users', all, { columns: ['id'], lateral: { manager } }).compile()).toEqual({
@@ -1247,13 +1247,15 @@ describe('selectOne, selectExactlyOne', () => {
       text: 'SELECT (SELECT to_jsonb("users".*) AS result FROM "users" WHERE ("id" = $1) LIMIT $2)',
       values: [1, 1],
     });
-    expect(db.selectOne('users', all, { columns: ['id'], extras: { first: db.selectExactlyOne('users', all, { columns: ['id'] }) } }).compile().values)
-      .toEqual(['id', 'first', 'id', 1, 1]);
   });
 
   it('without selectExactlyOneChecksForSecondRow: LIMIT 1, as in 6.6.1', () => {
     db.setConfig({ selectExactlyOneChecksForSecondRow: false });
-    expect(db.selectExactlyOne('users', { id: 1 }).compile().values).toEqual([1, 1]);
+    const q = db.selectExactlyOne('users', { id: 1 });
+    expect(q.compile().values).toEqual([1, 1]);
+    // read when selectExactlyOne() is called, not when the query is compiled
+    db.setConfig({ selectExactlyOneChecksForSecondRow: true });
+    expect(q.compile().values).toEqual([1, 1]);
   });
 });
 

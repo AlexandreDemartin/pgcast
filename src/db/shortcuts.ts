@@ -692,7 +692,7 @@ export const select: SelectSignatures = function (
 
   if (checksSecondRow) {
     // compiled on its own, as `run()` does, the query asks for a second row; a parent query compiles it
-    // into its own `result` (`sql`, `extras`) or compiles a copy (`lateral`), so nested it keeps `LIMIT 1`,
+    // into its own `result` (`sql`) or compiles a copy (`lateral`), so nested it keeps `LIMIT 1`,
     // where a second row would duplicate the parent row
     const topLevelQuery = rowsSQL(2), nestedCompile = query.compile;
     query.compile = (result, parentTable, currentColumn) => {
@@ -786,7 +786,7 @@ export interface SelectExactlyOneSignatures {
  * With the `selectExactlyOneChecksForSecondRow` config option, the query run
  * (or compiled) on its own asks for `LIMIT 2` and also throws on a second row:
  * `SELECT to_jsonb("films".*) AS result FROM "films" WHERE ("id" = $1) LIMIT $2`,
- * `$2` being `2`. Nested in another query (`lateral`, `extras`, `sql`), or
+ * `$2` being `2`. Nested in another query (a `lateral`, a `sql` template), or
  * compiled into a `result` of its own, it keeps `LIMIT 1`.
  * @param table The table to select from
  * @param where A `Whereable` or `SQLFragment` defining the rows to be selected,
