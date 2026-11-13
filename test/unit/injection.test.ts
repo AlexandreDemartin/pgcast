@@ -8,6 +8,7 @@
 // fixed yet (chapter 2).
 // Inputs are cast to `any`: at run time they may come from untyped data (req.body).
 
+import { runInNewContext } from 'node:vm';
 import { describe, expect, it, vi } from 'vitest';
 import * as db from '../../src/db';
 import { sql, param, cols, vals, all } from '../../src/db';
@@ -1137,6 +1138,12 @@ describe('a built-in object as a Whereable', () => {
     expect(() => sql`DELETE FROM ${'users'} WHERE ${new Date(0) as any}`.compile()).toThrowErrorMatchingInlineSnapshot(`[Error: A built-in \`Date\` has no meaning as a Whereable (a filter): it would compile to its own enumerable keys, and to \`TRUE\`, every row, when it has none. To compare with a value, give it as \`db.param(…)\`; to filter, give a plain object (\`{ column: value }\`); await a \`Promise\` first.]`);
   });
 
+  it('throws for a built-in with own enumerable keys too', () => {
+    // 6.6.1 compiled its keys, a filter that type-checks: ("id" = $1); still refused, as a built-in
+    expect(() => sql`DELETE FROM ${'users'} WHERE ${Object.assign(new Date(0), { id: 1 })}`.compile())
+      .toThrow('A built-in `Date` has no meaning as a Whereable (a filter)');
+  });
+
   it('throws for each built-in, through sql, a condition and the where of each shortcut', () => {
     const
       expected = (name: string) => `throws: A built-in \`${name}\` has no meaning as a Whereable (a filter)`,
@@ -1159,9 +1166,13 @@ describe('a built-in object as a Whereable', () => {
   });
 
   it('a plain object, a null-prototype object, a class instance and a built-in value compile as before', () => {
-    // a class instance is never refused, even of a class that extends a built-in: its own keys, as in 6.6.1
+    // a class instance is never refused, even of a class that extends a built-in: its own keys, as in 6.6.1;
+    // nor is a built-in of another realm (a vm context), whose prototype is not this realm's
     class Premiere extends Date {}
     class FilmError extends Error { id = 1; }
+    class Frames extends Uint8Array {}
+    class Reel extends Buffer {}
+    class Window extends DataView {}
     const kept: Record<string, any> = {
       plain: { display_name: 'Ada' },
       empty: {},
@@ -1170,6 +1181,11 @@ describe('a built-in object as a Whereable', () => {
       classWithoutOwnKeys: new (class { get display_name() { return 'Ada'; } })(),
       subclassOfDate: new Premiere(0),
       subclassOfError: new FilmError('x'),
+      subclassOfTypedArray: new Frames(1),
+      subclassOfTypedArrayEmpty: new Frames(0),
+      subclassOfBuffer: Object.setPrototypeOf(Buffer.from('id'), Reel.prototype),  // new Buffer() returns a Buffer
+      subclassOfDataView: new Window(new ArrayBuffer(1)),
+      otherRealmDate: runInNewContext('new Date(0)'),
       builtinValues: { created_at: new Date(0), tags: new Set(['a']), settings: new Map(), photo: Buffer.from('a') },
       array: [{ id: 1 }, sql` AND TRUE`],
     };
@@ -1220,6 +1236,10 @@ describe('a built-in object as a Whereable', () => {
             "Ada",
           ],
         },
+        "otherRealmDate": {
+          "text": "DELETE FROM "users" WHERE TRUE",
+          "values": [],
+        },
         "param": {
           "text": "DELETE FROM "users" WHERE "created_at" < $1",
           "values": [
@@ -1232,6 +1252,17 @@ describe('a built-in object as a Whereable', () => {
             "Ada",
           ],
         },
+        "subclassOfBuffer": {
+          "text": "DELETE FROM "users" WHERE ("0" = $1 AND "1" = $2)",
+          "values": [
+            105,
+            100,
+          ],
+        },
+        "subclassOfDataView": {
+          "text": "DELETE FROM "users" WHERE TRUE",
+          "values": [],
+        },
         "subclassOfDate": {
           "text": "DELETE FROM "users" WHERE TRUE",
           "values": [],
@@ -1241,6 +1272,16 @@ describe('a built-in object as a Whereable', () => {
           "values": [
             1,
           ],
+        },
+        "subclassOfTypedArray": {
+          "text": "DELETE FROM "users" WHERE ("0" = $1)",
+          "values": [
+            0,
+          ],
+        },
+        "subclassOfTypedArrayEmpty": {
+          "text": "DELETE FROM "users" WHERE TRUE",
+          "values": [],
         },
       }
     `);
