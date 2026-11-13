@@ -305,6 +305,7 @@ Candidates for a check, a rule or a skill line.
 - #238 — Before rewording the comment of a snapshot, check every error code in it: dropping « a syntax error » left the `0A000` (a three-part name, a cross-database reference) unexplained — `builder`
 - #236 — A docs check that cannot be imported alone (`anchors.ts` pulls a data loader through `llms.ts`) runs its self-check only inside `vitepress build`: put the rule in a module with no loader, test it there — `builder`
 - #236 — `check-prose.mjs` reads `zapatos/dist/db`: run the root `npm run build` before `website`'s `npm ci` and the checks — `builder`
+- #237 — `check-prose` accepts a one-word value in a quoted message: a message quoted with an injected value writes `…` in its place — `builder`
 
 ## Minors kept
 
