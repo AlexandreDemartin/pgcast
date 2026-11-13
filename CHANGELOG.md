@@ -87,6 +87,8 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
   - Every row: `update()` and `deletes()` given `and(...filters)` or `not(or(...ids))` with an empty list now reach every row (`WHERE TRUE`, `WHERE (NOT (FALSE))`), where Zapatos 6.6.1 threw (42601) before any row changed. Keep the length check where an empty list must not reach every row.
 - A string cast of `param()` with no `"` is split on `.`, each part quoted, and array bounds at its end (`[]`, `[n]`) follow the quotes: `param(x, 'public.mood')` gives `CAST($1 AS "public"."mood")` and `param(x, 'int4[]')` gives `CAST($1 AS "int4"[])`. Both quoted the whole name, a type that does not exist (42704). A cast already quoted is written as it is (`'"public"."mood"'`), and one that is well-formed once quoted as before (`'pg_catalog"."int4'`); any other cast stays one name, `"` doubled.
   - Changed: `param(x, 'a.b')` reached a type whose own name holds a `.` (`CREATE TYPE "a.b"`); it is now type `b` in schema `a`, and that type is `param(x, '"a.b"')`.
+  - Changed: `param(x, 'tag[]')` reached a type whose own name ends with `[]` or `[n]` (`CREATE DOMAIN "tag[]"`); it is now an array of `tag`, with no error when both exist, and that type is `param(x, '"tag[]"')`. `'public"."tag[]'` moves the same way.
+  - Changed from pgcast 6.6.2 (R3): `param(x, '"q"')` was `CAST($1 AS """q""")`, the type `"q"`; it is now `CAST($1 AS "q")`, the type `q`.
   - Unchanged: each part stays quoted, so a name only the SQL grammar knows (`'int'`, `'double precision'`, `'varchar(10)'`) is still no type (42704): give the type's own name (`'int4'`, `'float8'`), or cast in `sql`.
 
 ## [6.6.2] - 2026-11-12
