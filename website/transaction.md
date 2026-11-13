@@ -3,6 +3,14 @@
 `transaction()` and its seven shortcuts, one per isolation level: the SQL they send, their retries and the types of the client they give. Then the errors: `isDatabaseError()` for those from Postgres, and those pgcast throws before any query.
 {.lede}
 
+<AtAGlance>
+
+- Only the queries you `.run(txnClient)` are in the transaction; one run on the pool is not.
+- On 40001 or 40P01, the whole callback runs again, five attempts in all by default: write it so it can.
+- A query error that the callback catches turns `COMMIT` into `ROLLBACK`, and nothing is saved: let the error out.
+
+</AtAGlance>
+
 ## `transaction()` {#transaction}
 
 ```ts
@@ -57,6 +65,8 @@ The two `count()`s run on `client`, outside the transaction: after the block, `b
 
 When `START TRANSACTION`, the callback or `COMMIT` rejects with a `code` of 40001 (`serialization_failure`) or 40P01 (`deadlock_detected`), at any level, `transaction()` sends `ROLLBACK`, waits, then starts again: `START TRANSACTION`, the whole callback, `COMMIT`.
 
+<RetryFlow />
+
 | [`Config`](/runtime-config#Config) option | Default | What it sets |
 |---|---|---|
 | [`transactionAttemptsMax`](/runtime-config#Config.transactionAttemptsMax) | `5` | the attempts in all, the first included; `0` or `1` gives one |
@@ -89,12 +99,16 @@ One transaction, both seats or neither: `START TRANSACTION ISOLATION LEVEL SERIA
 
 ### Errors
 
+<div class="stack">
+
 | Rejects with | When | Since |
 |---|---|---|
 | `Isolation level must be an IsolationLevel value (e.g. IsolationLevel.Serializable), not '…'`<!-- message --> | `isolationLevel` is not a value of `IsolationLevel`; thrown before a client is checked out or a query sent | pgcast 6.6.2 |
 | the callback's error | after `ROLLBACK`; for 40001 and 40P01, after the last attempt | Zapatos |
 | a `TypeError`, `Cannot destructure property 'code' of 'err' as it is null.` (or `undefined`) | the callback throws `null` or `undefined`, after `ROLLBACK` | Zapatos |
 | "the transaction was rolled back, not committed: a query in it failed and the callback caught the error, so Postgres answered COMMIT with ROLLBACK; let the error out of the callback, or ROLLBACK TO a SAVEPOINT before going on"<!-- message --> | with [`transactionRequiresCommit`](/runtime-config#Config.transactionRequiresCommit), Postgres answered the `COMMIT` with `ROLLBACK`; not retried, and no `ROLLBACK` of its own | pgcast 6.7.0 |
+
+</div>
 
 The type refuses a level that is not an `IsolationLevel` (2345), a string included:
 
@@ -163,7 +177,9 @@ db.readCommittedRO(txnClientOrQueryable, callback)
 db.serializableRODeferrable(txnClientOrQueryable, callback)
 ```
 
-[`transaction()`](#transaction) at `IsolationLevel.SerializableRODeferrable`: `START TRANSACTION ISOLATION LEVEL SERIALIZABLE, READ ONLY, DEFERRABLE`<!-- probe: db.transaction(pool, db.IsolationLevel.SerializableRODeferrable, async () => {}) -->. Its callback gets a [`TxnClientForSerializableRODeferrable`](#TxnClientForSerializableRODeferrable). Postgres refuses a write in it (25006). With `DEFERRABLE`, Postgres may wait for a snapshot, then runs the transaction without the overhead of a serializable one and with no risk of a serialisation failure (40001) ([SET TRANSACTION](https://www.postgresql.org/docs/current/sql-set-transaction.html)): suited to a long report or a backup.
+[`transaction()`](#transaction) at `IsolationLevel.SerializableRODeferrable`: `START TRANSACTION ISOLATION LEVEL SERIALIZABLE, READ ONLY, DEFERRABLE`<!-- probe: db.transaction(pool, db.IsolationLevel.SerializableRODeferrable, async () => {}) -->. Its callback gets a [`TxnClientForSerializableRODeferrable`](#TxnClientForSerializableRODeferrable). Postgres refuses a write in it (25006).
+
+With `DEFERRABLE`, Postgres may wait for a snapshot, then runs the transaction without the overhead of a serializable one and with no risk of a serialisation failure (40001) ([SET TRANSACTION](https://www.postgresql.org/docs/current/sql-set-transaction.html)): suited to a long report or a backup.
 
 A report whose two counts read the same snapshot:
 
@@ -291,7 +307,8 @@ db.isDatabaseError(err, ...types)
 
 `true` when the `code` of `err`, five characters, starts with the code of one of `types`; otherwise `false`, and always with no `types`.
 
-- `err`: an object with an optional `code` string. The type accepts `any`, `pg.DatabaseError` and `{ code?: string }`, and refuses `unknown` and the global `Error` (below); `err instanceof pg.DatabaseError` narrows a `catch` variable to one it accepts. On an error from Postgres, `.run()` rejects with node-postgres's `DatabaseError`, whose `code` is the SQLSTATE; it also has `constraint`, `detail`, `table` and the other fields Postgres sends. `null` or `undefined` throws a `TypeError`.
+- `err`: an object with an optional `code` string; `null` or `undefined` throws a `TypeError`. On an error from Postgres, `.run()` rejects with node-postgres's `DatabaseError`, whose `code` is the SQLSTATE; it also has `constraint`, `detail`, `table` and the other fields Postgres sends.
+  - The type accepts `any`, `pg.DatabaseError` and `{ code?: string }`, and refuses `unknown` and the global `Error` (below); `err instanceof pg.DatabaseError` narrows a `catch` variable to one it accepts.
 - `types`: names, any number; with none, `false`. Two kinds:
 
 | Name | Code | Matches |
@@ -350,7 +367,11 @@ Handling them in an app: [Handle errors](/handle-errors).
 
 ## Errors pgcast throws before any query
 
-A plain `Error`, with no `code`, before anything is sent. A shortcut throws its own synchronously, from the call itself: `.run()` is never reached, so a `.catch()` chained on it does not get them. The others are thrown as `.compile()` compiles the query, so `.run()` rejects with them; `transaction()` rejects with its own. Each is listed with what throws it:
+A plain `Error`, with no `code`, before anything is sent. A shortcut throws its own synchronously, from the call itself: `.run()` is never reached, so a `.catch()` chained on it does not get them.
+
+The others are thrown as `.compile()` compiles the query, so `.run()` rejects with them; `transaction()` rejects with its own. Each is listed with what throws it:
+
+<div class="stack">
 
 | Thrown by | How | Messages |
 |---|---|---|
@@ -362,5 +383,7 @@ A plain `Error`, with no `code`, before anything is sent. A shortcut throws its 
 | `db.self` with no column; `db.parent()` with no parent table, so as an `insert()`, `upsert()` or `update()` value | `.run()` rejects | [`self`](/sql-template#self), [`parent()`](/sql-template#parent) |
 | `db.Default`, `db.self`, `db.raw()`, `db.cols()` or `db.vals()` as a filter value; `db.raw()`, `db.cols()` or `db.vals()` as an `insert()`, `upsert()` or `update()` value, or in any `vals({…})` | `.run()` rejects | [Whereable objects](/sql-template#whereable), [Conditions](/conditions), [`insert()`](/insert#insert), [`vals()`](/sql-template#vals) |
 | `transaction()` with another isolation level | its promise rejects | [`transaction()`, Errors](#errors) |
+
+</div>
 
 After a query, pgcast rejects in three cases of its own: `selectExactlyOne()` with no row, or a second one under [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow), with a [`NotExactlyOneError`](/select#NotExactlyOneError); `count()` and the other aggregates with no row to read, with a `TypeError` ([`count()`](/select#count)); `transaction()` whose `COMMIT` Postgres answers with `ROLLBACK`, with [`transactionRequiresCommit`](/runtime-config#Config.transactionRequiresCommit) ([Errors](#errors)).
