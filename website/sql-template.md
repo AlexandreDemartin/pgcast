@@ -146,7 +146,11 @@ As the value of `eq()`, `add()` and the other [conditions](/conditions):
 
 > `` `db.raw()`, `db.cols()` and `db.vals()` have no meaning as the value of `eq()`, `add()` and the other conditions: for SQL, write a `sql` fragment with `db.self` in place of the condition; for a value, give the value itself, or `db.param()`. ``<!-- message -->
 
-The type refuses them there, and as an `insert()` or `update()` value:
+In [`vals({…})`](#vals), so as an `insert()`, `upsert()` or `update()` value, and in a `sql` template of your own, in a `lateral` or not:
+
+> `` `db.raw()`, `db.cols()` and `db.vals()` have no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value: to write SQL, use a `sql` fragment value, where `db.self` stands for the column; to write a value, give the value itself, or `db.param()`. ``<!-- message -->
+
+The type refuses them there and as an `insert()` or `update()` value, on every column it types (a column typed `any`, as a `zapatos/custom` placeholder is, takes anything); it takes them in `vals({…})` of a `sql` template:
 
 ```ts twoslash
 // @errors: 2345
@@ -157,7 +161,7 @@ db.sql<s.films.SQL>`SELECT * FROM ${'films'} WHERE ${{ title: db.raw("'x'") }}`;
 ```
 
 - To compare with SQL: a fragment value, `` { title: db.sql`${db.self} = ${db.raw("'x'")}` } ``.
-- Zapatos 6.6.1 sent them there as one parameter, as JSON (`'{"value":…}'`): no row on a text or `jsonb` column, every row with `ne()` and `isNotIn()`, an error (22P02) on other types.
+- Zapatos 6.6.1 sent them there as one parameter, as JSON (`'{"value":…}'`): no row on a text or `jsonb` column, every row with `ne()` and `isNotIn()`, an error (22P02) on other types; as a write value, a text or `jsonb` column stored it.
 - Outside a filter, `vals([db.raw('x')])` is still a parameter, the wrapper as JSON: `'{"value":"x"}'`, which a text column stores as it is; in `upsert()`'s `updateValues`, `raw()` is SQL ([`upsert()`](/insert#upsert)).
 
 ### `DangerousRawString` {#DangerousRawString}
@@ -202,7 +206,7 @@ With arrays, a `SELECT` of some columns and an `IN` list; `s.films.OnlyCols<…>
 
 </CastPanel>
 
-As a filter value, `cols()` throws, as [`raw()`](#raw) does.
+As a filter value, and as a value in `vals({…})` (so in a write), `cols()` throws, as [`raw()`](#raw) does.
 
 ### `ColumnNames` {#ColumnNames}
 
@@ -226,13 +230,15 @@ A comma-separated list of values. Each value compiles as follows.
 | a `Parameter` | as it is, with its cast | as it is, with its cast |
 | a `sql` fragment | its SQL, with its key as the current column (so [`self`](#self) works) | its SQL |
 | `Default` | `DEFAULT` | `DEFAULT`; throws in a filter |
-| `parent(c?)` | a parameter, as JSON | the [parent column](#parent) |
-| `self`, `raw()`, `cols()`, `vals()` | a parameter | throw in a filter; a parameter outside one |
+| `parent(c?)` | the [parent column](#parent), without `c` the column of its key; throws outside a nested query | the [parent column](#parent) |
+| `raw()`, `cols()`, `vals()` | throw | throw in a filter; a parameter outside one |
+| `self` | a parameter | throws in a filter; a parameter outside one |
 
 - An object's values come in the order of its sorted keys, as `cols()` lists them.
 - "In a filter" is wherever `vals([…])` has a current column: in `isIn()` and `isNotIn()`, and in a fragment value of a Whereable or of `vals({…})`. There `Default` throws "`` `db.Default` has no meaning in a Whereable (a filter)… ``<!-- message -->", `self` "`` `db.self` has no meaning as a value in a Whereable (a filter), nor in `isIn()`… ``<!-- message -->", and `raw()`, `cols()` and `vals()` as [`raw()`](#raw) says.
-- As a filter value itself, `vals()` throws, as [`raw()`](#raw) does.
-- Zapatos 6.6.1 wrapped a `Parameter`, `Default` and `parent()` in a second parameter in an array: `'{"value":…}'`, `'Symbol(DEFAULT)'`, `'{"value":"id"}'`.
+- As a filter value itself, or a value in `vals({…})`, `vals()` throws, as [`raw()`](#raw) does.
+- `insert()`, `upsert()` and `update()` compile their values with `vals({…})`, outside a nested query: `parent()`, `raw()`, `cols()` and `vals()` throw there, before any query.
+- Zapatos 6.6.1 wrapped a `Parameter`, `Default` and `parent()` in a second parameter in an array: `'{"value":…}'`, `'Symbol(DEFAULT)'`, `'{"value":"id"}'`; and `parent()`, `raw()`, `cols()` and `vals()` in an object, which the writes stored on a text or `jsonb` column.
 
 ### `ColumnValues` {#ColumnValues}
 
@@ -313,7 +319,8 @@ A column of the parent query's table, in a subquery given to `lateral` ([Join th
 
 - Without a column, the column of the filter it sits in: `{ film_id: db.parent() }`, in a `lateral` of `roles`, gives `("film_id" = "roles"."film_id")`<!-- probe: db.select('roles', db.all, { lateral: { film: db.selectOne('films', { film_id: db.parent() }) } }) -->. With no filter, it throws "Alien object while interpolating SQL: undefined"<!-- message -->.
 - It works as a Whereable value, in a `sql` fragment, in `eq()` and in `vals([…])`, so in `isIn()`: `{ film_id: isIn([db.parent()]) }` gives `(("film_id" IN ("roles"."film_id")))`<!-- probe: db.select('roles', db.all, { lateral: { film: db.selectOne('films', { film_id: db.conditions.isIn([db.parent()]) }) } }) -->. In `vals([…])`, Zapatos 6.6.1 sent it as JSON: `isIn([parent('id')])` compared with `'{"value":"id"}'`.
-- Outside a nested query, it throws "The 'parent' table alias has no meaning here"<!-- message -->, so `run()` rejects before any query.
+- In `vals({…})` too, where without a column it takes the column of its key: `` db.sql`SELECT ${db.vals({ name: db.parent() })} AS result` ``, in a `lateral` of `studios`, gives `SELECT "studios"."name" AS result`<!-- probe: db.select('studios', db.all, { lateral: { n: db.sql`SELECT ${db.vals({ name: db.parent() })} AS result` } }) -->. Zapatos 6.6.1 sent it there as JSON too.
+- Outside a nested query, it throws "The 'parent' table alias has no meaning here"<!-- message -->, so `run()` rejects before any query. So does every `insert()`, `upsert()` or `update()` value, where Zapatos 6.6.1 stored `{"value":"id"}` on a text column.
 
 ### `ParentColumn` {#ParentColumn}
 
