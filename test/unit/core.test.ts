@@ -287,17 +287,54 @@ describe('param', () => {
     `);
   });
 
-  it('characterization: a JSON cast wins over a text cast when the config asks for it', () => {
-    // characterization: with castArrayParamsToJson, param(array, 'int4[]') compiles to CAST($1 AS "json")
+  it('a string cast wins over castArrayParamsToJson: an array type sends the array', () => {
+    // 6.6.1 dropped the cast: CAST($1 AS "json") with '[1,2]', which `int4[] =` and `@>` refuse
     db.setConfig({ castArrayParamsToJson: true });
-    expect(one(param([1, 2], 'int4[]'))).toMatchInlineSnapshot(`
-      {
-        "text": "CAST($1 AS "json")",
-        "values": [
-          "[1,2]",
-        ],
-      }
-    `);
+    expect(one(param([1, 2], 'int4[]'))).toEqual({ text: 'CAST($1 AS "int4"[])', values: [[1, 2]] });
+  });
+
+  it('a string cast wins over castArrayParamsToJson: any other type keeps the JSON', () => {
+    // 6.6.1: CAST($1 AS "json"), the same value
+    db.setConfig({ castArrayParamsToJson: true });
+    expect(one(param([1, 2], 'jsonb'))).toEqual({ text: 'CAST($1 AS "jsonb")', values: ['[1,2]'] });
+  });
+
+  it('a string cast wins over castObjectParamsToJson, and keeps the JSON', () => {
+    // 6.6.1: CAST($1 AS "json"), the same value, which `jsonb =` and `@>` refuse
+    db.setConfig({ castObjectParamsToJson: true });
+    expect(one(param({ a: 1 }, 'jsonb'))).toEqual({ text: 'CAST($1 AS "jsonb")', values: ['{"a":1}'] });
+  });
+
+  it('an array cast on a plain object keeps the JSON under castObjectParamsToJson', () => {
+    db.setConfig({ castArrayParamsToJson: true, castObjectParamsToJson: true });
+    expect(one(param({ a: 1 }, 'jsonb[]'))).toEqual({ text: 'CAST($1 AS "jsonb"[])', values: ['{"a":1}'] });
+  });
+
+  it('castArrayParamsToJson alone, with a string cast: an array follows it, a plain object is sent as it is', () => {
+    db.setConfig({ castArrayParamsToJson: true, castObjectParamsToJson: false });
+    expect(sql`${param([1, 2], 'jsonb')}, ${param([1, 2], 'int4[]')}, ${param({ a: 1 }, 'jsonb')}, ${param({ a: 1 }, 'jsonb[]')}`.compile())
+      .toEqual({
+        text: 'CAST($1 AS "jsonb"), CAST($2 AS "int4"[]), CAST($3 AS "jsonb"), CAST($4 AS "jsonb"[])',
+        values: ['[1,2]', [1, 2], { a: 1 }, { a: 1 }],
+      });
+  });
+
+  it('castObjectParamsToJson alone, with a string cast: a plain object follows it, an array is sent as it is', () => {
+    db.setConfig({ castArrayParamsToJson: false, castObjectParamsToJson: true });
+    expect(sql`${param([1, 2], 'jsonb')}, ${param([1, 2], 'int4[]')}, ${param({ a: 1 }, 'jsonb')}, ${param({ a: 1 }, 'jsonb[]')}`.compile())
+      .toEqual({
+        text: 'CAST($1 AS "jsonb"), CAST($2 AS "int4"[]), CAST($3 AS "jsonb"), CAST($4 AS "jsonb"[])',
+        values: [[1, 2], [1, 2], '{"a":1}', '{"a":1}'],
+      });
+  });
+
+  it('a string cast with no config, true, false and no cast are unchanged by the config', () => {
+    db.setConfig({ castArrayParamsToJson: true, castObjectParamsToJson: true });
+    expect(sql`${param([1])}, ${param([1], true)}, ${param([1], false)}, ${param({ a: 1 })}, ${param('x', 'text')}`.compile())
+      .toEqual({ text: 'CAST($1 AS "json"), CAST($2 AS "json"), $3, CAST($4 AS "json"), CAST($5 AS "text")', values: ['[1]', '[1]', [1], '{"a":1}', 'x'] });
+    db.setConfig({ castArrayParamsToJson: false, castObjectParamsToJson: false });
+    expect(sql`${param([1, 2], 'jsonb')}, ${param({ a: 1 }, 'jsonb')}`.compile())
+      .toEqual({ text: 'CAST($1 AS "jsonb"), CAST($2 AS "jsonb")', values: [[1, 2], { a: 1 }] });
   });
 });
 
