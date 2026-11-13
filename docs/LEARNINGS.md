@@ -77,6 +77,10 @@ Candidates for a check, a rule or a skill line.
 - #41 — A `@ts-expect-error` above `const x: T['k'] = v` also holds when `T` collapses to `never`: put the indexed access where a value goes (`null as unknown as T['k']`) and check the directive is unused on the base — `branch-reviewer`
 - #41 — An `@ts-expect-error` on an `expectTypeOf<X['missing']>()` line hides two errors (TS2339, then TS2349); a `const` line gives one — `builder`
 - #41 — A detached worktree with `node_modules` symlinked shares `node_modules/.cache/pgcast`: `bench:types` there overwrites the branch's emitted declarations — `builder`
+- #42 — A query that reads one fact two ways (`information_schema` for tables, `pg_catalog` for mat views) needs one test per path where the answers differ; a fixture where type and relation share a schema cannot tell them apart: check with a mutant — `branch-reviewer`
+- #42 — A warning that names a file the user has is built from `config.outDir`, as `write.ts` does; only a test with an `outDir` other than `.` catches it — `builder`
+- #42 — A PR body that quotes a message's exact text is checked after every review round — `builder`
+- #42 — A colliding pair lives in scratch schemas the test creates in its own database and drops in `afterAll`, which keeps the fixture and every snapshot untouched — `builder`
 
 ## Minors kept
 

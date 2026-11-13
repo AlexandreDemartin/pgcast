@@ -4,6 +4,7 @@ Copyright (C) 2020 - 2023 George MacKerron
 Released under the MIT licence: see LICENCE file
 */
 
+import * as path from 'path';
 import * as pg from 'pg';
 
 import { enumDataForSchema, enumTypesForEnumData } from './enums';
@@ -22,6 +23,10 @@ import {
 
 export interface CustomTypes {
   [name: string]: string;  // any, or TS type for domain's base type
+}
+
+export interface CustomTypeOrigins {
+  [name: string]: { [qualifiedType: string]: string };  // "schema"."type" -> type, for each Postgres type of that name
 }
 
 const
@@ -53,6 +58,29 @@ const sourceFilesForCustomTypes = (customTypes: CustomTypes) =>
       )
     ]));
 
+/**
+ * Warn about each custom type name that stands for more than one Postgres type: they share one
+ * placeholder, and so one type. The placeholders keep their names, which edited files depend on.
+ */
+const warnAboutSharedCustomTypeNames = (origins: CustomTypeOrigins, config: CompleteConfig) => {
+  const warn = config.warningListener === true ? console.log : config.warningListener || (() => void 0);
+
+  for (const name of Object.keys(origins).sort()) {
+    const types = Object.keys(origins[name]).sort();
+    if (types.length < 2) continue;
+
+    const
+      typeList = types.slice(0, -1).join(', ') + ' and ' + types[types.length - 1],
+      namesDiffer = new Set(Object.values(origins[name])).size > 1,
+      filePath = path.join(config.outDir, 'zapatos', 'custom', name + config.outExt);
+
+    warn(`Note: custom types ${typeList} are ${types.length === 2 ? 'both' : 'all'} named ${name} in TypeScript, ` +
+      `so they share one type and one placeholder file, ${filePath}. ` +
+      `To type them apart, rename one of them in the database` +
+      (namesDiffer ? `, or give customTypesTransform a function that keeps their names apart.` : `.`));
+  }
+};
+
 function indentAll(level: number, s: string) {
   if (level === 0) return s;
   return s.replace(/^/gm, ' '.repeat(level));
@@ -76,6 +104,7 @@ export const tsForConfig = async (config: CompleteConfig, debug: (s: string) => 
       }
     },
     customTypes = {},
+    customTypeOrigins: CustomTypeOrigins = {},
     schemaNames = Object.keys(schemas),
     schemaData = (await Promise.all(
       schemaNames.map(async schema => {
@@ -87,7 +116,7 @@ export const tsForConfig = async (config: CompleteConfig, debug: (s: string) => 
               .filter(rel => rules.exclude.indexOf(rel.name) < 0),
           enums = await enumDataForSchema(schema, queryFn),
           tableDefs = await Promise.all(tables.map(async table =>
-            definitionForRelationInSchema(table, schema, enums, customTypes, config, queryFn))),
+            definitionForRelationInSchema(table, schema, enums, customTypes, config, queryFn, customTypeOrigins))),
           schemaIsUnprefixed = schema === config.unprefixedSchema,
           none = '/* (none) */',
           schemaDef = `/* === schema: ${schema} === */\n` +
@@ -122,6 +151,8 @@ export const tsForConfig = async (config: CompleteConfig, debug: (s: string) => 
       crossSchemaTypesForAllTables(allTables, config.unprefixedSchema)
     ),
     customTypeSourceFiles = sourceFilesForCustomTypes(customTypes);
+
+  warnAboutSharedCustomTypeNames(customTypeOrigins, config);
 
   await pool.end();
   return { ts, customTypeSourceFiles };

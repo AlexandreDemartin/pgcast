@@ -209,6 +209,80 @@ describe('surprises, frozen as they are', () => {
   });
 });
 
+describe('custom types that share a placeholder name', () => {
+  // two schemas of their own, committed to this file's database: no other test configures them
+  beforeAll(() => t.pool.query(`
+    CREATE SCHEMA collide_a;
+    CREATE SCHEMA collide_b;
+    CREATE DOMAIN collide_a.code AS text;
+    CREATE DOMAIN collide_b.code AS integer;
+    CREATE TYPE collide_a.pair AS (x int, y int);
+    CREATE TYPE collide_b.pair AS (x text, y text);
+    CREATE DOMAIN collide_a."code-x" AS text;
+    CREATE DOMAIN collide_a.code_x AS text;
+    CREATE TABLE collide_a.things (code collide_a.code, pair collide_a.pair, amount public.positive_int);
+    CREATE TABLE collide_b.things (pair collide_b.pair, amount public.positive_int);
+    CREATE MATERIALIZED VIEW collide_b.codes AS SELECT 1::collide_b.code AS code;
+    CREATE MATERIALIZED VIEW collide_b.pairs AS SELECT NULL::collide_a.pair AS a, NULL::collide_b.pair AS b;
+    CREATE MATERIALIZED VIEW collide_b.amounts AS SELECT 1::public.positive_int AS amount;
+    CREATE TABLE collide_a.labels (dashed collide_a."code-x", underscored collide_a.code_x);
+    CREATE DOMAIN collide_a."code x" AS text;
+    CREATE TABLE collide_a.spaced (spaced collide_a."code x");
+  `));
+  afterAll(() => t.pool.query('DROP SCHEMA collide_a, collide_b CASCADE'));
+
+  const warningsFor = async (schemas: Schemas) => {
+    const warnings: string[] = [];
+    await tsForConfig(finaliseConfig({
+      schemas, ...quiet, warningListener: s => warnings.push(s), db: db(), outDir: 'src',
+    }), noDebug);
+    return warnings.filter(w => !w.startsWith('Note: this database has bigint'));  // once per process
+  };
+
+  it('warns once per name that types of two schemas share, a table and a materialized view alike', async () => {
+    expect(await warningsFor({ collide_a: only('things'), collide_b: only('things', 'codes') })).toEqual([
+      'Note: custom types "collide_a"."code" and "collide_b"."code" are both named PgCode in TypeScript, ' +
+      'so they share one type and one placeholder file, src/zapatos/custom/PgCode.d.ts. ' +
+      'To type them apart, rename one of them in the database.',
+      'Note: custom types "collide_a"."pair" and "collide_b"."pair" are both named PgPair in TypeScript, ' +
+      'so they share one type and one placeholder file, src/zapatos/custom/PgPair.d.ts. ' +
+      'To type them apart, rename one of them in the database.',
+    ]);
+  });
+
+  it('names the schema of each type, not of the materialized view that selects it', async () => {
+    expect(await warningsFor({ collide_b: only('pairs') })).toEqual([
+      'Note: custom types "collide_a"."pair" and "collide_b"."pair" are both named PgPair in TypeScript, ' +
+      'so they share one type and one placeholder file, src/zapatos/custom/PgPair.d.ts. ' +
+      'To type them apart, rename one of them in the database.',
+    ]);
+  });
+
+  it('warns when two names become one, and points at customTypesTransform', async () => {
+    expect(await warningsFor({ collide_a: only('labels') })).toEqual([
+      'Note: custom types "collide_a"."code-x" and "collide_a"."code_x" are both named PgCode_x in TypeScript, ' +
+      'so they share one type and one placeholder file, src/zapatos/custom/PgCode_x.d.ts. ' +
+      'To type them apart, rename one of them in the database, ' +
+      'or give customTypesTransform a function that keeps their names apart.',
+    ]);
+  });
+
+  it('lists three types that share a name', async () => {
+    expect(await warningsFor({ collide_a: only('labels', 'spaced') })).toEqual([
+      'Note: custom types "collide_a"."code x", "collide_a"."code-x" and "collide_a"."code_x" are all named PgCode_x ' +
+      'in TypeScript, so they share one type and one placeholder file, src/zapatos/custom/PgCode_x.d.ts. ' +
+      'To type them apart, rename one of them in the database, ' +
+      'or give customTypesTransform a function that keeps their names apart.',
+    ]);
+  });
+
+  it('does not warn when no name is shared', async () => {
+    // public.positive_int, in a table of each schema and a materialized view of collide_b, is one type
+    expect(await warningsFor({ public: all, collide_b: only('things', 'amounts') })).toEqual([]);
+    expect(await warningsFor(main.schemas!)).toEqual([]);
+  });
+});
+
 describe('generate()', () => {
   let outDir: string;
   beforeEach(() => { outDir = mkdtempSync(join(tmpdir(), 'pgcast-generate-')); });
