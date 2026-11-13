@@ -121,6 +121,8 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
   - Changed: an aggregate of your own that takes another number of arguments under a built-in name ran. After `CREATE AGGREGATE max(int4, int4) (…)`, `max('ratings', db.all, { columns: ['stars', 'votes'] })` sent `max("stars", "votes")`; it now rejects. `select('ratings', db.all, { columns: ['stars', 'votes'] }, SelectResultMode.Numeric, 'max')` sends the same SQL.
   - Changed: a refused aggregate marked `noop` resolved to its `noopResult`; it now rejects, as `run()` compiles the query before it reads `noop`.
   - Unchanged: every other call that ran, a `lateral` map included, and `select()` in `SelectResultMode.Numeric`, which keeps several columns for an aggregate of several arguments (`corr("rating", "minutes")`).
+- The generated `UniqueIndex` of a table, so `UniqueIndexForTable<T>` and the names `constraint()` takes, lists only that table's own unique indexes. Zapatos 6.6.1 matched an index on its name alone, across schemas: a table with a plain index named like another schema's unique index got that name too, and Postgres refuses it in `ON CONSTRAINT` (42704). The name now fails to compile on that table (TS2345, or TS2322 for a value typed with it); a name that unique indexes of two schemas share stays on each table. R41.
+  - Changed: given `ratings` with a plain index `film_stars_key`, and `archive.ratings` whose `UNIQUE` constraint has that name, `db.upsert('archive.ratings', …, db.constraint<'ratings'>('film_stars_key'))` compiled and ran, two type errors cancelling out. Name the table that has the constraint: `db.constraint<'archive.ratings'>('film_stars_key')`, or leave the table out inside the call.
 
 ## [6.6.2] - 2026-11-12
 
