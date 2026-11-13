@@ -44,6 +44,7 @@ const variants: [string, Config][] = [
   ['customTypesTransform-my_type', { schemas: customTypesSchemas, customTypesTransform: 'my_type' }],
   ['customTypesTransform-PgMyType', { schemas: customTypesSchemas, customTypesTransform: 'PgMyType' }],
   ['customTypesTransform-function', { schemas: customTypesSchemas, customTypesTransform: s => `Custom_${s}` }],
+  ['typeEnumsAcrossSchemas', { schemas: customTypesSchemas, typeEnumsAcrossSchemas: true }],
   ['columnOptions', {
     schemas: { public: only('users', 'accounts'), extra: only('articles') },
     columnOptions: {
@@ -89,7 +90,9 @@ const warningsOf = async (config: Config) => {
   return warnings.filter(w => !w.startsWith('Note: this database has bigint'));
 };
 
-const warningsFor = (schemas: Schemas) => warningsOf({ schemas });
+/** The same, but the note on enums of another schema, which has its own tests (§ typeEnumsAcrossSchemas). */
+const warningsFor = async (schemas: Schemas) =>
+  (await warningsOf({ schemas })).filter(w => !w.includes('typeEnumsAcrossSchemas'));
 
 /** Custom type placeholders, sorted by name: tsForConfig() inserts them in query completion order. */
 const customFiles = (files: Record<string, string>) =>
@@ -147,6 +150,30 @@ describe('variant snapshots', () => {
     expect(errors).toEqual([]);
   });
 
+  it('typeEnumsAcrossSchemas: an enum of another schema takes its labels, and only them', async () => {
+    const { ts: schema, customTypeSourceFiles } = await codegen({ ...main, typeEnumsAcrossSchemas: true });
+    const dir = mkdtempSync(join(declarationDir, 'probe-'));
+    const probe = `
+      import type * as s from 'zapatos/schema';
+      export const ok: s.products.Insertable = { sku: 'x', price_cents: 1, status: 'draft' };
+      // @ts-expect-error not a label of extra.status
+      export const ko: s.products.Insertable = { sku: 'x', price_cents: 1, status: 'nope' };
+      export const moods: s.extra.type_zoo.Selectable['c_enum_array'] = ['happy', 'sad'];
+      // @ts-expect-error not a label of public.mood
+      export const meh: s.extra.type_zoo.Selectable['c_enum_array'] = ['meh'];
+    `;
+    writeFileSync(join(dir, 'schema.d.ts'), schema);
+    writeFileSync(join(dir, 'custom.d.ts'), customFiles(customTypeSourceFiles));
+    writeFileSync(join(dir, 'probe.ts'), probe);
+    const { config } = ts.readConfigFile(join(generatedDir, 'tsconfig.json'), ts.sys.readFile);
+    const { options } = ts.parseJsonConfigFileContent(config, ts.sys, generatedDir);
+    const rootNames = ['schema.d.ts', 'custom.d.ts', 'probe.ts'].map(f => join(dir, f));
+    const program = ts.createProgram(rootNames, { ...options, paths: { 'zapatos/db': [join(declarationDir, 'db')] } });
+    const errors = ts.getPreEmitDiagnostics(program).map(d =>
+      `${d.file ? relative(dir, d.file.fileName) : ''} TS${d.code} ${ts.flattenDiagnosticMessageText(d.messageText, ' ')}`);
+    expect(errors).toEqual([]);
+  });
+
   it('holds no orphan file', () => {
     const expected = variants.flatMap(([name]) =>
       withoutCustomTypes.includes(name) ? [`${name}.d.ts`] : [`${name}.custom.d.ts`, `${name}.d.ts`]);
@@ -176,13 +203,6 @@ describe('surprises, frozen as they are', () => {
       'People who can sign in', 'Users not currently sad', 'Balances per owner, refreshed on demand',
       'Second application schema', 'How a user feels', 'Case-insensitive e-mail address',
     ]) expect(schema).not.toContain(comment);
-  });
-
-  it('types enums of another schema as custom types (`any` placeholder)', async () => {
-    const { ts: schema, customTypeSourceFiles } = await codegen(main);
-    expect(tableBlock(schema, 'products')).toContain('status: c.PgStatus;');  // extra.status
-    expect(customTypeSourceFiles.PgStatus).toContain('export type PgStatus = any;');
-    expect(customTypeSourceFiles.Pg_mood).toContain('export type Pg_mood = any;');  // public.mood[] in extra.type_zoo
   });
 
   it('edge: the output does not parse', async () => {
@@ -396,6 +416,117 @@ describe('custom types that share a placeholder name', () => {
   });
 });
 
+describe('typeEnumsAcrossSchemas', () => {
+  // schemas of their own, committed to this file's database: no other test configures them;
+  // enum_y is never generated, and enum_x has an enum of the same name as one of enum_y
+  beforeAll(() => t.pool.query(`
+    CREATE SCHEMA enum_x;
+    CREATE SCHEMA enum_y;
+    CREATE TYPE enum_x.st AS ENUM ('mine');
+    CREATE TYPE enum_y.st AS ENUM ('yours', 'theirs');
+    CREATE TYPE enum_y.solo AS ENUM ('only');
+    CREATE DOMAIN enum_y.st_d AS enum_y.st;
+    CREATE TABLE enum_x.t (a enum_y.st, b enum_y.st[], d enum_y.st_d, o enum_y.solo, own enum_x.st, n int);
+    CREATE MATERIALIZED VIEW enum_x.mv AS SELECT NULL::enum_y.st AS a, NULL::extra.status AS s;
+  `));
+  afterAll(() => t.pool.query('DROP SCHEMA enum_x, enum_y CASCADE'));
+
+  const enumX = { schemas: { enum_x: all }, schemaJSDoc: false };
+  const notesFor = async (config: Config) => {
+    const warnings: string[] = [];
+    await tsForConfig(finaliseConfig({ ...config, ...quiet, warningListener: s => warnings.push(s), db: db() }), noDebug);
+    return warnings.filter(w => !w.startsWith('Note: this database has bigint'));  // once per process
+  };
+
+  it('is off by default: an enum of another schema is an `any` custom type', async () => {
+    const { ts: schema, customTypeSourceFiles } = await codegen(main);
+    expect(tableBlock(schema, 'products')).toContain('status: c.PgStatus;');  // extra.status
+    expect(customTypeSourceFiles.PgStatus).toContain('export type PgStatus = any;');
+    expect(customTypeSourceFiles.Pg_mood).toContain('export type Pg_mood = any;');  // public.mood[] in extra.type_zoo
+  });
+
+  it('is off by default: an enum of the same name in the relation\'s schema takes its place', async () => {
+    const { ts: schema, customTypeSourceFiles } = await codegen(enumX);
+    const block = tableBlock(schema, 't');
+    expect(block).toContain('a: st | null;');  // enum_y.st, typed as enum_x.st: 'mine'
+    expect(block).toContain('b: st[] | null;');
+    expect(block).toContain('o: c.PgSolo | null;');
+    expect(customTypeSourceFiles.PgSt_d).toContain('export type PgSt_d = st;');
+    expect(tableBlock(schema, 'mv')).toContain('a: st | null;');
+  });
+
+  it('types an enum of another schema by its values, inlined', async () => {
+    const { ts: schema, customTypeSourceFiles } = await codegen({ ...main, typeEnumsAcrossSchemas: true });
+    expect(tableBlock(schema, 'products')).toContain(`status: ('archived' | 'draft' | 'published');`);
+    expect(tableBlock(schema, 'type_zoo')).toContain(`c_enum_array: ('happy' | 'ok' | 'sad')[] | null;`);
+    expect(Object.keys(customTypeSourceFiles)).not.toContain('PgStatus');
+    expect(Object.keys(customTypeSourceFiles)).not.toContain('Pg_mood');
+  });
+
+  it('looks an enum up in the schema of its type, not by name in the relation\'s', async () => {
+    const { ts: schema, customTypeSourceFiles } = await codegen({ ...enumX, typeEnumsAcrossSchemas: true });
+    const block = tableBlock(schema, 't');
+    expect(block).toContain(`a: ('theirs' | 'yours') | null;`);
+    expect(block).toContain(`b: ('theirs' | 'yours')[] | null;`);
+    expect(block).toContain(`d: c.PgSt_d | null;`);  // a domain stays a custom type...
+    expect(customTypeSourceFiles.PgSt_d).toContain(`export type PgSt_d = ('theirs' | 'yours');`);  // ...typed by its enum
+    expect(block).toContain(`o: 'only' | null;`);
+    expect(block).toContain('own: st | null;');
+    expect(block).toContain('n: number | null;');
+    expect(Object.keys(customTypeSourceFiles)).toEqual(['PgSt_d']);
+    expect(tableBlock(schema, 'mv')).toContain(`a: ('theirs' | 'yours') | null;`);
+    expect(tableBlock(schema, 'mv')).toContain(`s: ('archived' | 'draft' | 'published') | null;`);
+  });
+
+  it('is off by default, with a note that names each column it would change, and its type', async () => {
+    expect(await notesFor(enumX)).toEqual([
+      'Note: enum_x.mv.a (enum_y.st), enum_x.mv.s (extra.status), enum_x.t.a (enum_y.st), enum_x.t.b (enum_y.st[]), ' +
+      'enum_x.t.d (enum_y.st) and enum_x.t.o (enum_y.solo) have a type of another ' +  // d: the type under its domain
+      'schema, which is looked up by name in the schema of their relation: an enum becomes an `any` custom type, ' +
+      'or the enum of the same name there. Set typeEnumsAcrossSchemas: true to look it up in its own schema; ' +
+      'it will be the default in pgcast 7.0.',
+    ]);
+    expect(await notesFor({ schemas: { public: only('products') } })).toEqual([
+      'Note: public.products.status (extra.status) has a type of another schema, which is looked up by name in the schema of ' +
+      'its relation: an enum becomes an `any` custom type, or the enum of the same name there. ' +
+      'Set typeEnumsAcrossSchemas: true to look it up in its own schema; it will be the default in pgcast 7.0.',
+    ]);
+  });
+
+  it('gives no note with the option on, or when no column would change', async () => {
+    expect(await notesFor({ ...enumX, typeEnumsAcrossSchemas: true })).toEqual([]);
+    expect(await notesFor({ ...main, typeEnumsAcrossSchemas: true })).toEqual([]);
+    expect(await notesFor({ schemas: { public: only('users') } })).toEqual([]);  // public.mood, its own schema
+  });
+
+  it('reads the enums of each schema once per run, however many columns use them, option on or off', async () => {
+    const enumQueriesFor = async (config: Config) => {
+      const schemas: string[] = [];
+      await tsForConfig(finaliseConfig({ ...config, ...quiet, db: db() }), s => {
+        const values = s.startsWith('>>> query') && s.includes('pg_catalog.pg_enum') && s.match(/\n\+ (.*)\n$/);
+        if (values) schemas.push(...JSON.parse(values[1]));
+      });
+      return schemas.sort();
+    };
+    for (const on of [false, true]) {
+      // enum_y.st in t and mv, int4 in t (pg_catalog), extra.status in mv
+      expect(await enumQueriesFor({ ...enumX, typeEnumsAcrossSchemas: on }))
+        .toEqual(['enum_x', 'enum_y', 'extra', 'pg_catalog']);
+      // ext.citext, as in extra.type_zoo; pg_catalog in nearly every table
+      expect(await enumQueriesFor({ ...main, typeEnumsAcrossSchemas: on })).toEqual(['ext', 'extra', 'pg_catalog', 'public']);
+    }
+  });
+
+  it('is optional in Config, read as false when absent', () => {
+    expect(finaliseConfig({}).typeEnumsAcrossSchemas).toBeUndefined();
+    const right: Config = { typeEnumsAcrossSchemas: true };
+    void right;
+    // @ts-expect-error a boolean
+    const wrong: Config = { typeEnumsAcrossSchemas: 'yes' };
+    void wrong;
+  });
+});
+
 describe('include entries that match no relation', () => {
   const unmatched = (name: string, schema: string) =>
     `Note: the include entry "${name}" of schema "${schema}" matches no relation there, so it generates nothing. ` +
@@ -443,11 +574,16 @@ describe('include entries that match no relation', () => {
     expect(await warningsFor({ public: all, extra: { include: '*', exclude: ['no_such_table'] } })).toEqual([]);
   });
 
-  it('warns, of main and the snapshot variants, only about no_such_table of include-exclude-lists', async () => {
+  it('warns, of main and the snapshot variants, only about no_such_table of include-exclude-lists, and the enums note', async () => {
+    const enumsNote = 'Note: extra.type_zoo.c_enum_array (public.mood[]) and public.products.status (extra.status) ' +
+      'have a type of another schema, ' +
+      'which is looked up by name in the schema of their relation: an enum becomes an `any` custom type, or the enum of ' +
+      'the same name there. Set typeEnumsAcrossSchemas: true to look it up in its own schema; it will be the default in pgcast 7.0.';
     const warnings: Record<string, string[]> = {};
     for (const [name, config] of [['main', main] as const, ...variants]) warnings[name] = await warningsOf(config);
     expect(warnings).toEqual(Object.fromEntries(Object.keys(warnings).map(name =>
-      [name, name === 'include-exclude-lists' ? [unmatched('no_such_table', 'public')] : []])));
+      [name, name === 'include-exclude-lists' ? [unmatched('no_such_table', 'public')] :
+        name === 'main' || name.startsWith('customTypesTransform-') ? [enumsNote] : []])));
   });
 });
 

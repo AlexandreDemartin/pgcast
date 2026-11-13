@@ -7,7 +7,7 @@ Released under the MIT licence: see LICENCE file
 import * as path from 'path';
 import * as pg from 'pg';
 
-import { enumDataForSchema, enumTypesForEnumData } from './enums';
+import { enumDataForSchema, enumTypesForEnumData, type EnumData } from './enums';
 import { header } from './header';
 import type { CompleteConfig } from './config';
 import type { SchemaVersionCanary } from "../db/canary";
@@ -82,6 +82,24 @@ const warnAboutSharedCustomTypeNames = (origins: CustomTypeOrigins, config: Comp
 };
 
 /**
+ * Without `typeEnumsAcrossSchemas`, note the columns it would type otherwise, once per run: their type is of
+ * another schema, and its enum is looked up by name in the schema of the relation.
+ */
+const warnAboutEnumsAcrossSchemas = (columns: string[], config: CompleteConfig) => {
+  if (columns.length === 0) return;
+
+  const
+    warn = config.warningListener === true ? console.log : config.warningListener || (() => void 0),
+    sorted = [...columns].sort(),
+    one = sorted.length === 1,
+    list = one ? sorted[0] : sorted.slice(0, -1).join(', ') + ' and ' + sorted[sorted.length - 1];
+
+  warn(`Note: ${list} ${one ? 'has' : 'have'} a type of another schema, which is looked up by name in the schema of ` +
+    `${one ? 'its' : 'their'} relation: an enum becomes an \`any\` custom type, or the enum of the same name there. ` +
+    `Set typeEnumsAcrossSchemas: true to look it up in its own schema; it will be the default in pgcast 7.0.`);
+};
+
+/**
  * Warn about each `include` entry that names no relation of its schema: it generates nothing.
  * `information_schema.tables` lists only the tables and views the connecting role has a privilege on.
  */
@@ -119,6 +137,9 @@ export const tsForConfig = async (config: CompleteConfig, debug: (s: string) => 
     },
     customTypes = {},
     customTypeOrigins: CustomTypeOrigins = {},
+    enumsBySchema: Record<string, Promise<EnumData>> = {},
+    enumsForSchema = (schema: string) => enumsBySchema[schema] ??= enumDataForSchema(schema, queryFn),
+    columnsTypedByEnumName: string[] = [],
     schemaNames = Object.keys(schemas),
     schemaData = (await Promise.all(
       schemaNames.map(async schema => {
@@ -133,9 +154,10 @@ export const tsForConfig = async (config: CompleteConfig, debug: (s: string) => 
             rules.include
               .filter(name => !relations.some(rel => rel.name === name))
               .map(name => ({ schema, name })),
-          enums = await enumDataForSchema(schema, queryFn),
+          enums = await enumsForSchema(schema),
           tableDefs = await Promise.all(tables.map(async table =>
-            definitionForRelationInSchema(table, schema, enums, customTypes, config, queryFn, customTypeOrigins))),
+            definitionForRelationInSchema(table, schema, enums, customTypes, config, queryFn, customTypeOrigins,
+              enumsForSchema, columnsTypedByEnumName))),
           schemaIsUnprefixed = schema === config.unprefixedSchema,
           none = '/* (none) */',
           schemaDef = `/* === schema: ${schema} === */\n` +
@@ -173,6 +195,7 @@ export const tsForConfig = async (config: CompleteConfig, debug: (s: string) => 
 
   warnAboutUnmatchedIncludes(schemaData.flatMap(r => r.unmatched), config);
   warnAboutSharedCustomTypeNames(customTypeOrigins, config);
+  warnAboutEnumsAcrossSchemas(columnsTypedByEnumName, config);
 
   await pool.end();
   return { ts, customTypeSourceFiles };

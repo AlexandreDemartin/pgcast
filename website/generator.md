@@ -77,7 +77,7 @@ await generate({
 ```
 
 - It opens a `pg.Pool` of its own on `config.db`, and ends it before resolving.
-- It sends only `SELECT`s, on `information_schema` and `pg_catalog`: one for the relations of each schema, one for its enums, then two per relation, its columns and its unique indexes.
+- It sends only `SELECT`s, on `information_schema` and `pg_catalog`: one for the relations of each schema, one for its enums, then two per relation, its columns and its unique indexes, and one for the enums of each other schema a column's type comes from (`pg_catalog` included).
 - A query that fails, the connection included, prints `*** error <n> ***` and the error with `console.log`, then ends the process with `process.exit(1)`, as in Zapatos 6.6.1 ([#183](https://github.com/AlexandreDemartin/pgcast/issues/183)). On a failed query the promise never settles, so a `try`/`catch` around it does not run. Other errors reject it: a write that fails (`ENOTDIR: not a directory, mkdir 'afile/zapatos'` when `outDir` is a file), a malformed [rule](#generate.schemas).
 - At run time, a key it doesn't know is ignored: an old `srcMode`, a misspelt `outdir`. In TypeScript, an object literal with one fails to compile (TS2353, or TS2561 with a suggestion for a near-miss such as `outdir`).
 - `zapatos/generate` also exports `Config` and the functions `generate()` is built from (`tsForConfig()`, `definitionForRelationInSchema()` and others), with no entry here.
@@ -97,6 +97,7 @@ Every option is optional. Each one given replaces its default whole: `schemas` w
 | [`customTypesTransform`](#generate.customTypesTransform) | `"PgMy_type"` | the names of custom types |
 | [`schemaJSDoc`](#generate.schemaJSDoc) | `true` | a JSDoc comment on each relation and column |
 | [`customJSONParsingForLargeNumbers`](#generate.customJSONParsingForLargeNumbers) | `false` | the `JSONSelectable` type of `bigint` and `numeric` |
+| [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas) | `false` | the type of an enum of another schema |
 | [`progressListener`](#generate.progressListener) | `false` | where each step is reported |
 | [`warningListener`](#generate.warningListener) | `true` | where warnings go |
 | [`debugListener`](#generate.debugListener) | `false` | where each query and its result go |
@@ -245,6 +246,27 @@ billing: number;
 - The other interfaces don't change: `Selectable` is `db.Int8String` or `db.NumericString` either way.
 - `true` also silences the warning such a column gives: "Note: this database has bigint/int8 and/or numeric/decimal columns, for which JSON.parse may lose precision…".
 
+### `typeEnumsAcrossSchemas` {#generate.typeEnumsAcrossSchemas}
+
+`boolean`, default `false`; an opt-in, `true` by default from 7.0 ([Versions, opt-ins and warnings](/versions)). The type of a column whose type is an enum of another schema. `false`, as in Zapatos 6.6.1, looks the enum up by name in the schema of the column's relation; `true` looks it up in its own schema, and writes its labels:
+
+```sql
+CREATE SCHEMA archive;
+CREATE TYPE archive.print_format AS ENUM ('nitrate', 'safety', 'digital');
+CREATE TYPE archive.crew_job AS ENUM ('projectionist', 'archivist');  -- public has a crew_job too
+CREATE TABLE prints (id int PRIMARY KEY, format archive.print_format NOT NULL, formats archive.print_format[], keeper archive.crew_job);
+```
+
+| Column of `prints` | `false` | `true` |
+|---|---|---|
+| `format` | `c.PgPrint_format`, an `any` placeholder | `('digital' \| 'nitrate' \| 'safety')` |
+| `formats` | `c.Pg_print_format \| null`, an `any` placeholder | `('digital' \| 'nitrate' \| 'safety')[] \| null` |
+| `keeper` | `crew_job \| null`: the labels of `public.crew_job` | `('archivist' \| 'projectionist') \| null` |
+
+- The labels are written out, not named: the enum's schema needn't be in [`schemas`](#generate.schemas). In alphabetical order, as for every enum ([#49](https://github.com/AlexandreDemartin/pgcast/issues/49)).
+- A domain over such an enum stays a custom type, `c.<name>`; its new placeholder gets the labels rather than `any`. An existing placeholder is never overwritten.
+- `false` notes, through [`warningListener`](#generate.warningListener), the columns `true` would change, each with its type: for a domain, the type under it.
+
 ### `progressListener` {#generate.progressListener}
 
 `boolean`, or in `generate()` a function `(s: string) => void`; default `false`. `true` prints each step with `console.log`; a function gets each line.
@@ -265,6 +287,7 @@ Writing custom types file: src/zapatos/custom/index.d.ts
 - `Note: custom types "archive"."notes" and "public"."notes" are both named PgNotes in TypeScript, so they share one type and one placeholder file, src/zapatos/custom/PgNotes.d.ts. To type them apart, rename one of them in the database.`, once per run for each name that two Postgres types share ([`customTypesTransform`](#generate.customTypesTransform)); when their names differ, it adds that a `customTypesTransform` function can keep them apart;
 - `Note: the include entry "Films" of schema "public" matches no relation there, so it generates nothing. Check its spelling and case, that the relation is in schema "public", and that the database role has a privilege on it: include names tables, views, materialised views and foreign tables.`, once per run for each entry of an [`include`](#generate.schemas) list that its schema doesn't have;
 - the note on `bigint` and `numeric` columns, once per process ([`customJSONParsingForLargeNumbers`](#generate.customJSONParsingForLargeNumbers));
+- `` Note: public.prints.format (archive.print_format), public.prints.formats (archive.print_format[]) and public.prints.keeper (archive.crew_job) have a type of another schema, which is looked up by name in the schema of their relation: an enum becomes an `any` custom type, or the enum of the same name there. Set typeEnumsAcrossSchemas: true to look it up in its own schema; it will be the default in pgcast 7.0. ``, once per run, without [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas), when a column it would change is generated;
 - the [old layout warning](#the-old-layout-warning).
 
 ### `debugListener` {#generate.debugListener}
