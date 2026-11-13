@@ -36,6 +36,10 @@ Candidates for a check, a rule or a skill line.
 - #259 — A fix that changes the run time greps `website/` for its characterisation's issue numbers and for the pages that list errors or « calls whose result changes » — `branch-reviewer`
 - #259 — An error message that names a remedy is probed on each call that throws it: `db.self` cannot read a column in an `INSERT`'s `VALUES` (42703) — `branch-reviewer`
 - #259 — To prove an injection test can fail, break only the branch it guards (a scratch copy), so the run shows the new test doing the work — `branch-reviewer`
+- #35 — Replay, do not reason: reading the code suggested R26 was live on current pg; the pg tarballs showed the branch is dead since pg 8.0.0 — `builder`
+- #35 — A test that stubs a package mocks the entry Vitest loads (`pg`'s ESM file through its `exports` « import » condition), not the CommonJS object — `builder`
+- #35 — A fake queryable models queueing: a real client holds every `query()` until `connect()`, so a fake that answers at once turns a pending promise into « ok » — `branch-reviewer`
+- #35 — pg-native replays locally with no dependency: `pg@7.18.2` and `pg-native@3` in a scratch folder, `node-gyp rebuild` in `libpq` with `/Library/PostgreSQL/17/bin` on `PATH`, run with `DYLD_LIBRARY_PATH=/Library/PostgreSQL/17/lib` — `branch-reviewer`
 
 ## Minors kept
 
@@ -52,3 +56,6 @@ Minor review defects, taken up by the end-of-chapter review.
 - #32 — `test/unit/shortcuts.test.ts:1223`: the option's `withTies` (`FETCH FIRST $n ROWS WITH TIES`, 2) and `offset` forms are not frozen by a test — `branch-reviewer`
 - #32 — `README.md:84`, `:91`: « except `selectExactlyOneChecksForSecondRow`'s » attaches to « a code »; line 91 names only `lateral` as the nested case — `branch-reviewer`
 - #259 — `src/db/core.ts:240-241`: « throw in an object, and in an array in a filter, as `Default` does » reads as if `Default` throws in an object — `branch-reviewer`
+- #35 — `CHANGELOG.md:88`: a native client not yet connected waits for its `connect()`, as a `pg.Client` does (6.6.1 rejected at once) — `branch-reviewer`
+- #35 — `test/unit/transaction.test.ts:28`: the native `Pool` stub is a class; a real pg 7 pool is a `pg-pool` instance classed by `_connected`, so the control proves the outcome, not the path — `branch-reviewer`
+- #35 — `src/db/transaction.ts:57`, `docs/CHARACTERISATION-REPORT.md:87`: the comment says « with pg-native » (the guard passes on pg 7 without it); R26's test cell still says « none » — `branch-reviewer`

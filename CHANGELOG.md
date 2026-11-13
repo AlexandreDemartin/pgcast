@@ -90,6 +90,7 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 - `getConfig()` and `setConfig()` return a copy of the configuration, `transactionRetryDelay` included: changing what they return no longer changes the configuration. Zapatos 6.6.1 shared `transactionRetryDelay` from `getConfig()` (`getConfig().transactionRetryDelay.minMs = 1` set it), and `setConfig()` returned the configuration itself. The listeners are the functions you set, and `setConfig()` still keeps the `transactionRetryDelay` object it is given.
 - `and()` with no argument compiles to `TRUE`, and `or()` to `FALSE`: every row and no row, as a `Whereable` `{}` is `TRUE`. Zapatos 6.6.1 wrote `()`, which Postgres refuses (42601), alone, as a `Whereable` value, under `not()` or inside another `and()` / `or()`. With one condition or more, the SQL is unchanged.
   - Every row: `update()` and `deletes()` given `and(...filters)` or `not(or(...ids))` with an empty list now reach every row (`WHERE TRUE`, `WHERE (NOT (FALSE))`), where Zapatos 6.6.1 threw (42601) before any row changed. Keep the length check where an empty list must not reach every row.
+- `transaction()` given a `pg.native.Client`, with pg 7 and pg-native, runs on that client and leaves it connected, as for a `pg.Client`. Zapatos 6.6.1 took it for a pool and called its `connect()`: the call rejected, with "Client has already been connected" for a connected client, or with a `TypeError` for one not yet connected. With pg 8, a native client was already treated as a client: unchanged.
 
 ## [6.6.2] - 2026-11-12
 

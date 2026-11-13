@@ -54,13 +54,15 @@ function typeofQueryable(queryable: Queryable) {
   if (queryable instanceof pg.Pool) return 'pool';
   if (queryable instanceof pg.Client) return 'client';
 
+  // only pg 7 makes `native` enumerable, so this runs with pg 7 and pg-native;
+  // from pg 8.0, a native client skips it and is told apart by `_connected`, below
   if (
     Object.prototype.hasOwnProperty.call(pg, 'native') &&
     Object.prototype.propertyIsEnumerable.call(pg, 'native') &&
     pg.native
   ) {
     if (queryable instanceof pg.native.Pool) return 'pool';
-    if (queryable instanceof pg.native.Client) return 'pool';
+    if (queryable instanceof pg.native.Client) return 'client';
   }
 
   // for pg < 8, and sometimes in 8.x for reasons that aren't clear, all the
@@ -84,7 +86,9 @@ let txnSeq = 0;
  * `transactionRequiresCommit` config option, this rejects; without it, it
  * resolves and emits a `DeprecationWarning` (`PGCAST_DEP003`), once.
  * @param txnClientOrQueryable The `pg.Pool` from which to check out a client,
- * a plain client, or an existing transaction client to be passed through
+ * a plain client (`pg.Client`, `pg.native.Client` or a `pg.PoolClient`, used
+ * as is and not released), or an existing transaction client to be passed
+ * through
  * @param isolationLevel The desired isolation level (e.g.
  * `IsolationLevel.Serializable`)
  * @param callback A callback function that runs queries on the client provided
