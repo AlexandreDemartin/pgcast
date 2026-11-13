@@ -319,7 +319,7 @@ describe('column comments', () => {
     // tsForConfig() reads through its own connection: the schema is committed, then dropped
     await t.pool.query(String.raw`
       CREATE SCHEMA comment_lines;
-      CREATE TABLE comment_lines.notes (lf int, crlf int, cr int, blank int, trail int, lead int, indented int, one int);
+      CREATE TABLE comment_lines.notes (lf int, crlf int, cr int, blank int, trail int, lead int, indented int, one int, ls int, ps int);
       COMMENT ON COLUMN comment_lines.notes.lf IS E'First line\nsecond line';
       COMMENT ON COLUMN comment_lines.notes.crlf IS E'First line\r\nsecond line';
       COMMENT ON COLUMN comment_lines.notes.cr IS E'First line\rsecond line';
@@ -328,6 +328,8 @@ describe('column comments', () => {
       COMMENT ON COLUMN comment_lines.notes.lead IS E'\nStarts with a line break';
       COMMENT ON COLUMN comment_lines.notes.indented IS E'A list:\n  - one\n  - two';
       COMMENT ON COLUMN comment_lines.notes.one IS 'A single line';
+      COMMENT ON COLUMN comment_lines.notes.ls IS E'Before\u2028after';
+      COMMENT ON COLUMN comment_lines.notes.ps IS E'Before\u2029after';
       CREATE MATERIALIZED VIEW comment_lines.note_totals AS SELECT count(*) AS n FROM comment_lines.notes;
       COMMENT ON COLUMN comment_lines.note_totals.n IS E'Count of notes\nrefreshed on demand';`);
     try {
@@ -341,6 +343,10 @@ describe('column comments', () => {
         lead: ['* ', '* Starts with a line break'],
         indented: ['* A list:', '*   - one', '*   - two'],
         one: ['* A single line'],
+        // one line, as under Zapatos 6.6.1: TypeScript does not end a JSDoc line at U+2028 or U+2029,
+        // but the indentation of the namespace (/^/gm) still comes after them
+        ls: ['* Before\u2028    after'],
+        ps: ['* Before\u2029    after'],
         n: ['* Count of notes', '* refreshed on demand'],
       });
       expect(syntaxErrors(schema)).toEqual([]);
