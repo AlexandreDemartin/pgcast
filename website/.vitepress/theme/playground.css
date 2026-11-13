@@ -4,8 +4,9 @@
 
 /* its height is its content's, set by the editor: not the column's share of a cast panel's code */
 .Playground .Playground-editor { flex: none; }
-/* the page's focus ring goes round the editor, not round Monaco's hidden text area at the cursor */
-.Playground .Playground-editor textarea:focus-visible { outline: none; }
+/* the page's focus ring goes round the editor, not round the element Monaco focuses at the cursor:
+   `.native-edit-context` in Chrome (Monaco 0.57), its hidden `textarea` elsewhere */
+.Playground .Playground-editor :is(.native-edit-context, textarea):focus-visible { outline: none; }
 .Playground .Playground-editor:focus-within { outline: 2px solid var(--accent); outline-offset: -2px; }
 .Playground-note {
   margin: 0; max-width: none; padding: 8px 16px; border-top: 1px dashed var(--line);
