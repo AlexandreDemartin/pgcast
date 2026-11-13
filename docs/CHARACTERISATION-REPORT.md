@@ -2,7 +2,7 @@
 
 What steps 1.1 to 1.5 found in Zapatos 6.6.1. Nothing is fixed: each finding is pinned as it is by its test, and the fixes become the sub-issues of the chapter 2 Epic, [#18](https://github.com/AlexandreDemartin/pgcast/issues/18).
 
-Sources: the "Surprises" sections of PRs #4, #5, #7 and #8, the `characterization:` tests of `test/`, and a reading of `src/db/transaction.ts`. R62 to R64 come later, from #101 (chapter 2); the owner chose their class on 2026-11-12. R65 comes from #112 and R66 from #132; the owner chose their class on 2026-11-13.
+Sources: the "Surprises" sections of PRs #4, #5, #7 and #8, the `characterization:` tests of `test/`, and a reading of `src/db/transaction.ts`. R62 to R64 come later, from #101 (chapter 2); the owner chose their class on 2026-11-12. R65 comes from #112 and R66 from #132; the owner chose their class on 2026-11-13. R67 comes from #96, found while fixing R12; fixed outright, as R12 (decision 003).
 
 ## Summary
 
@@ -10,14 +10,14 @@ Sources: the "Surprises" sections of PRs #4, #5, #7 and #8, the `characterizatio
 |---|---|---|---|
 | Security | 7 | 1 | 6 |
 | Data loss | 3 | 3 | 0 |
-| Wrong result | 17 | 15 | 2 |
+| Wrong result | 18 | 16 | 2 |
 | Invalid SQL or error | 9 | 0 | 9 |
 | Wrong type | 15 | 7 | 8 |
 | Codegen | 11 | 4 | 7 |
 | Docs | 4 | 3 | 1 |
-| **Total** | **66** | **33** | **33** |
+| **Total** | **67** | **34** | **33** |
 
-37 findings to fix (R65, R66 decided), 17 to document and 12 to leave.
+35 findings to fix (R65, R66 decided), 4 behind an opt-in, 16 to document and 12 to leave.
 
 The three that matter most:
 
@@ -76,6 +76,7 @@ The three that matter most:
 | R64 | `conditions.ts`, `core.ts` | `Default` and `self` in `eq()` and the other comparisons, and `self` as a `Whereable` value or in `isIn`, are sent as strings, `'Symbol(DEFAULT)'` and `'Symbol(self)'`: no row on a text column, every row with `ne()`, 22P02 on the others. The type refuses them. Same in 6.6.1. | `integration/core › Default and self in a condition, and self as a value or in isIn, reject run() before any query` ; `unit/conditions › a condition given Default or self throws when compiled, not when called` ; `unit/conditions › isIn and isNotIn given Default or self throw when compiled` ; `unit/core › a self value throws: self is the column, not a value to compare it with` ; `unit/core › vals of an array throws on self in a Whereable: self is the column, not a value` ; `types/core › self as a value, and Default in a condition, are refused` | non-breaking: the type already refuses | **fixed**, PR #109 | Throw on Default and self in eq(), ne(), isIn() and as a Whereable value |
 | R65 | `core.ts` | `parent()` as an `insert()`, `upsert()` or `update()` value, or in `vals({…})`, is sent as one parameter, as JSON: a text column stores `'{"value":"id"}'`, jsonb `{"value": "id"}`, and `upsert()` copies it onto the existing row through `EXCLUDED`; `parent()` with no column is `'{}'`, an empty array in text[]; 22P02 on int, an enum or a composite. An INSERT or an UPDATE has no parent query: in `vals([…])` or a fragment value, `parent()` throws "The 'parent' table alias has no meaning here" (R63). The type refuses it on every column it types, with or without `strict`; a column typed `any` (a `zapatos/custom` placeholder) takes it. Same in 6.6.1. | `integration/shortcuts › parent() as an insert(), upsert() or update() value is a parameter, sent as JSON` ; `types/shortcuts › parent() as an insert(), upsert() or update() value is refused, except on a column typed any` | breaking on a column typed `any`, so every `zapatos/custom` placeholder: `c_xml` stores `{"value":"id"}`, and `parent()` stores `[]` in an array placeholder | fix: `{"value":"id"}` contradicts `parent()`'s docs, the parent column; compile it as `vals([…])` does: the parent column in a nested query, a throw outside one, which every write is | Throw on parent() as an insert() or update() value, as in vals([…]) |
 | R66 | `core.ts` | `raw()`, `cols(x)` and `vals(x)` as an `insert()`, `upsert()` or `update()` value are sent as one parameter, as JSON, as R62's filter values were: `{ display_name: raw("upper('Ada')") }` stores `{"value":"upper('Ada')"}` in a text column, `{"value": …}` in a `jsonb` one; 22P02 on int, enum and `text[]`. A conflicting row of `upsert()` takes it through `EXCLUDED`; `update()` with `cols('display_name')` stores `{"value":"display_name"}`, not the column. Nested in an array or a `jsonb` object, the same JSON. `raw()` is never SQL there, so a `raw(input)` is stored, inert. The type refuses them since PR #134; 6.6.1's accepted `raw()` on text and `jsonb`, `cols(x)` and `vals(x)` with `x` of the column's type. The run time is the same in 6.6.1. In `upsert()` `updateValues` they are SQL (R62). | `integration/shortcuts › raw(), cols(x) and vals(x) as values are sent as JSON, stored on text and jsonb, 22P02 elsewhere` (in `insert` and in `update`) ; `integration/shortcuts › raw(), cols(x) and vals(x) as values are sent as JSON, inserted or set from EXCLUDED` | breaking: on text and `jsonb`, a stored value becomes an error | fix: throw while compiling, as a filter value does (R62), with an error that says what to do (a `sql` fragment value, or the value itself); not compiled as SQL, which would turn a `raw(input)` into an injection; a wrapper nested in an array or a `jsonb` object stays a value, as the type already refuses it | Refuse raw(), cols() and vals() as insert(), upsert() and update() values |
+| R67 | `conditions.ts` | `and()` does not parenthesise its operands: `` and(sql`a OR b`, c) `` reads `a OR (b AND c)`, so a fragment with a bare `OR` takes the `AND` of its neighbour, in a `where` (`deletes()` and `update()` included), a `lateral`, a `having`, or as a value (`extras`, `groupBy`, an inserted value). `or()` is not affected: `AND` binds tighter. Same in 6.6.1. | `integration/conditions › and() parenthesises a fragment with a bare OR: <case>` ; `unit/conditions › and() parenthesises each operand: <case>` | breaking: such a call gets other rows; an operand that is not a whole expression (`` and(sql`x BETWEEN 1`, sql`5`) ``) fails (42601) | **fixed**, PR #265 | Fix and() so it parenthesises each of its operands |
 
 ## Invalid SQL or error
 
