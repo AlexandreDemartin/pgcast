@@ -101,6 +101,13 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
   - Changed: `param(x, 'tag[]')` reached a type whose own name ends with `[]` or `[n]` (`CREATE DOMAIN "tag[]"`); it is now an array of `tag`, with no error when both exist, and that type is `param(x, '"tag[]"')`. `'public"."tag[]'` moves the same way.
   - Changed from pgcast 6.6.2 (R3): `param(x, '"q"')` was `CAST($1 AS """q""")`, the type `"q"`; it is now `CAST($1 AS "q")`, the type `q`.
   - Unchanged: each part stays quoted, so a name only the SQL grammar knows (`'int'`, `'double precision'`, `'varchar(10)'`) is still no type (42704): give the type's own name (`'int4'`, `'float8'`), or cast in `sql`.
+- `count()`, `sum()`, `avg()`, `min()` and `max()` throw while compiling on three options that Zapatos 6.6.1 compiled to SQL Postgres refuses, so `.run()` rejects with a plain `Error`, not a `DatabaseError`, before any query; `.compile()` throws it. Building the query does not throw, so a `.catch()` attached to `.run()` gets the error, and a query that nests one, in a `lateral` or `extras`, rejects too. The type is unchanged.
+  - `sum()`, `avg()`, `min()` or `max()` without `columns`: 6.6.1 sent `sum(*)` (42883). The error is "sum() needs one column to aggregate: pass columns: ['column']".
+  - `columns` with several columns, or none: 6.6.1 sent `count("id", "mood")` (42883) or `count()` (42809). The error is "count() takes one column in columns, not 2 (leave columns out for count(*))".
+  - A single query as `lateral`: 6.6.1 sent `SELECT  AS result` (42601). The error is "count() cannot pass a lateral query through: nest it in the lateral of a select() instead".
+  - Changed: an aggregate of your own that takes another number of arguments under a built-in name ran. After `CREATE AGGREGATE max(int4, int4) (…)`, `max('ratings', db.all, { columns: ['stars', 'votes'] })` sent `max("stars", "votes")`; it now rejects. `select('ratings', db.all, { columns: ['stars', 'votes'] }, SelectResultMode.Numeric, 'max')` sends the same SQL.
+  - Changed: a refused aggregate marked `noop` resolved to its `noopResult`; it now rejects, as `run()` compiles the query before it reads `noop`.
+  - Unchanged: every other call that ran, a `lateral` map included, and `select()` in `SelectResultMode.Numeric`, which keeps several columns for an aggregate of several arguments (`corr("rating", "minutes")`).
 
 ## [6.6.2] - 2026-11-12
 
