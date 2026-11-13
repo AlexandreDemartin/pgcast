@@ -291,6 +291,11 @@ Candidates for a check, a rule or a skill line.
 - #208 — With `noUnusedLocals` on, a `// @ts-expect-error` above an unused `type X = …` is satisfied by the unused-local error alone: write a negative type test as an `expectTypeOf<…>()` call, and make each negative valid once to see « Unused @ts-expect-error » (candidate: skill `type-tests`) — `builder`
 - #208 — In the result types, `undefined extends X ? … : …` is always true without `strictNullChecks`, so a docs claim about narrowing by `columns`, `returning`, `extras` or `reportAction` holds only under strict; the docs build is strict, so only a `strict: false` probe catches it — `branch-reviewer`
 - #208 — The `bench:types` baseline drifts on master with no type change (+0.4 % Instantiations, −1.1 % Types): refresh it with `-- --update` in a chore PR so later PRs measure against master — `builder`
+- #190 — A command tag (`COMMIT` answered `ROLLBACK`) can be read without changing what `resultListener` gets: a `runResultTransform` that records `qr.command` and still returns `qr.rows` — `builder`
+- #190 — In `test/integration`, `t.pool` already has the harness's client checked out: a release check compares `totalCount - idleCount` before and after — `builder`
+- #190 — `isDatabaseError(err)` with no code argument always gives `false`: a test that shows an error has no SQLSTATE checks `code` is `undefined` (see #178) — `builder`
+- #190 — A PR that adds an opt-in updates every place that lists them: `git grep -e upsertRequiresSameKeys --and -e undefinedMeansMissing`, minus the lines naming the new option, finds each one still stale (README « What differs », `why.md`, `versions.md`, `runtime-config.md`, `switching.md`, `batches.md`) — `branch-reviewer`, `builder`
+- #190 — A link label that counts what its target lists (« the two opt-ins ») goes stale when the target grows: write labels without a count — `builder`
 
 ## Minors kept
 
@@ -326,3 +331,5 @@ Minor review defects, taken up by the end-of-chapter review.
 - #115 — no `.gitattributes`: a CRLF page breaks `llms.ts`'s title check before any other docs check; `* text=auto eol=lf` would cover every checker at once — `builder`
 - #208 — `website/insert.md:178,304`: the `ReturningTypeForTable` and `UpsertReturnableForTable` entries do not say they need `strictNullChecks`, as the same page does at lines 54 and 121; without it `C`, `E` and `RA` are ignored — `branch-reviewer`
 - #208 — `test/types/shortcuts.test-d.ts:325`: no test pins that `UpsertReturnableForTable` leaves out the `undefined` of `updateColumns: db.doNothing` (`R | undefined` comes from the signature), as `insert.md:178` says — `branch-reviewer`
+- #190 — `src/db/config.ts:24`: `transactionRequiresCommit` has no type test, where the other two opt-ins have one each (`test/types/shortcuts.test-d.ts:171`, `:190`) — `branch-reviewer`
+- #190 — `docs/decisions/003-fixes-and-deprecation.md:38`: the heading « The 11 breaking findings » now sits over a #190 row, which is not a characterisation finding — `branch-reviewer`
