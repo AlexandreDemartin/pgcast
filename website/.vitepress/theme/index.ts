@@ -6,11 +6,13 @@ import TwoslashFloatingVue from '@shikijs/vitepress-twoslash/client';
 import '@shikijs/vitepress-twoslash/style.css';
 import DefaultTheme from 'vitepress/theme-without-fonts';
 import type { Theme } from 'vitepress';
+import AtAGlance from './AtAGlance.vue';
 import CastPanel from './CastPanel.vue';
 import GroupPages from './GroupPages.vue';
 import InstallLine from './InstallLine.vue';
 import Layout from './Layout.vue';
 import SiteFooter from './SiteFooter.vue';
+import ValuesFlow from './ValuesFlow.vue';
 import './fonts.css';
 import './style.css';
 
@@ -22,9 +24,11 @@ export default {
   Layout,
   enhanceApp({ app }) {
     app.use(TwoslashFloatingVue, { themes: { twoslash: { triggers: isMobile ? ['touch'] : ['hover', 'touch', 'focus'] } } });
+    app.component('AtAGlance', AtAGlance);
     app.component('CastPanel', CastPanel);
     app.component('GroupPages', GroupPages);
     app.component('InstallLine', InstallLine);
     app.component('SiteFooter', SiteFooter);
+    app.component('ValuesFlow', ValuesFlow);
   },
 } satisfies Theme;
