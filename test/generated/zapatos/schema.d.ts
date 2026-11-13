@@ -444,6 +444,8 @@ declare module 'zapatos/schema' {
     export interface Selectable {
       /**
       * **active_users.display_name**
+      *
+      * View column comment
       * - `text` in database
       * - Nullable, no default
       */
@@ -470,6 +472,8 @@ declare module 'zapatos/schema' {
     export interface JSONSelectable {
       /**
       * **active_users.display_name**
+      *
+      * View column comment
       * - `text` in database
       * - Nullable, no default
       */
@@ -496,6 +500,8 @@ declare module 'zapatos/schema' {
     export interface Whereable {
       /**
       * **active_users.display_name**
+      *
+      * View column comment
       * - `text` in database
       * - Nullable, no default
       */
@@ -522,6 +528,8 @@ declare module 'zapatos/schema' {
     export interface Insertable {
       /**
       * **active_users.display_name**
+      *
+      * View column comment
       * - `text` in database
       * - Nullable, no default
       */
@@ -548,6 +556,8 @@ declare module 'zapatos/schema' {
     export interface Updatable {
       /**
       * **active_users.display_name**
+      *
+      * View column comment
       * - `text` in database
       * - Nullable, no default
       */
@@ -593,6 +603,8 @@ declare module 'zapatos/schema' {
       id: db.Int8String;
       /**
       * **events.kind**
+      *
+      * Partitioned table column comment
       * - `text` in database
       * - `NOT NULL`, no default
       */
@@ -619,6 +631,8 @@ declare module 'zapatos/schema' {
       id: number;
       /**
       * **events.kind**
+      *
+      * Partitioned table column comment
       * - `text` in database
       * - `NOT NULL`, no default
       */
@@ -645,6 +659,8 @@ declare module 'zapatos/schema' {
       id?: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment | db.ParentColumn>;
       /**
       * **events.kind**
+      *
+      * Partitioned table column comment
       * - `text` in database
       * - `NOT NULL`, no default
       */
@@ -671,6 +687,8 @@ declare module 'zapatos/schema' {
       id?: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.DefaultType | db.SQLFragment;
       /**
       * **events.kind**
+      *
+      * Partitioned table column comment
       * - `text` in database
       * - `NOT NULL`, no default
       */
@@ -697,6 +715,8 @@ declare module 'zapatos/schema' {
       id?: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.DefaultType | db.SQLFragment | db.SQLFragment<any, (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.DefaultType | db.SQLFragment>;
       /**
       * **events.kind**
+      *
+      * Partitioned table column comment
       * - `text` in database
       * - `NOT NULL`, no default
       */
@@ -2870,6 +2890,8 @@ declare module 'zapatos/schema' {
       export interface Selectable {
         /**
         * **extra.imported_lines.line**
+        *
+        * Foreign table column comment
         * - `text` in database
         * - Nullable, no default
         */
@@ -2878,6 +2900,8 @@ declare module 'zapatos/schema' {
       export interface JSONSelectable {
         /**
         * **extra.imported_lines.line**
+        *
+        * Foreign table column comment
         * - `text` in database
         * - Nullable, no default
         */
@@ -2886,6 +2910,8 @@ declare module 'zapatos/schema' {
       export interface Whereable {
         /**
         * **extra.imported_lines.line**
+        *
+        * Foreign table column comment
         * - `text` in database
         * - Nullable, no default
         */

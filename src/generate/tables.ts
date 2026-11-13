@@ -87,8 +87,11 @@ const columnsForRelation = async (rel: Relation, schemaName: string, queryFn: (q
         , d.description AS "description"
         FROM information_schema.columns AS c
         LEFT JOIN pg_catalog.pg_namespace ns ON ns.nspname = c.table_schema
-        LEFT JOIN pg_catalog.pg_class cl ON cl.relkind = 'r' AND cl.relname = c.table_name AND cl.relnamespace = ns.oid
+        LEFT JOIN pg_catalog.pg_class cl ON cl.relkind IN ('r', 'v', 'f', 'p') AND cl.relname = c.table_name AND cl.relnamespace = ns.oid
         LEFT JOIN pg_catalog.pg_description d ON d.objoid = cl.oid AND d.objsubid = c.ordinal_position
+          -- Zapatos 6.6.1 read these comments on tables only: on a view, a foreign table or a partitioned
+          -- table, one holding */ stays out until #48 escapes it, so that a file which parses today still parses
+          AND (cl.relkind = 'r' OR strpos(d.description, '*/') = 0)
         WHERE c.table_name = $1 AND c.table_schema = $2
         ORDER BY "column"`,
     values: [rel.name, schemaName],
