@@ -26,6 +26,7 @@ export interface OptionalConfig {
   schemaJSDoc: boolean;
   unprefixedSchema: string | null;
   customJSONParsingForLargeNumbers: boolean;
+  typeEnumsAcrossSchemas?: boolean;  // optional, so a CompleteConfig written for 6.6.1 still compiles; read ?? false
 }
 
 interface SchemaRules {
