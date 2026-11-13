@@ -11,6 +11,7 @@ import { describePage, pageHead, repo } from './meta.ts';
 import { outline } from './outline.ts';
 import { playgroundVite } from './playground/build.ts';
 import { lineIndents, sqlParameters, syntax } from './syntax.ts';
+import { labelTableCells } from './tables.ts';
 import { focusableHovers, twoslashOptions } from './twoslash.ts';
 
 const
@@ -59,6 +60,7 @@ export default defineConfig({
     config: md => {
       keepLinkHashes(md);  // `[Config.upsertRequiresSameKeys](/runtime-config#Config.upsertRequiresSameKeys)`
       changelogPage(md);  // CHANGELOG.md in changelog.md
+      labelTableCells(md);  // `<td data-label="…">`, for a table that stacks on a phone
     },
   },
   vite: {
