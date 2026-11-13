@@ -297,6 +297,11 @@ Candidates for a check, a rule or a skill line.
 - #209 — A probe of a fake's `rows` covers the empty case of each result mode: `select()` reads `rows[0]?.result`, so `[]` gives `undefined`, not `[]` — `branch-reviewer`
 - #209 — A docs probe mark can check a `ROLLBACK` that `transaction()` sends with a callback that throws (`async () => { throw 0; }`) — `builder`
 - #209, #190 — Any `npm test` drops every `pgcast_test_*` database whose name has no live pid (`orphanDatabases`, `test/helpers/databases.ts:62`): a probe database is named `pgcast_test_${process.pid}_<agent>_<tag>` inside its script, or a concurrent run drops it mid-probe — `branch-reviewer`, orchestrator
+- #190 — A command tag (`COMMIT` answered `ROLLBACK`) can be read without changing what `resultListener` gets: a `runResultTransform` that records `qr.command` and still returns `qr.rows` — `builder`
+- #190 — In `test/integration`, `t.pool` already has the harness's client checked out: a release check compares `totalCount - idleCount` before and after — `builder`
+- #190 — `isDatabaseError(err)` with no code argument always gives `false`: a test that shows an error has no SQLSTATE checks `code` is `undefined` (see #178) — `builder`
+- #190 — A PR that adds an opt-in updates every place that lists them: `git grep -e upsertRequiresSameKeys --and -e undefinedMeansMissing`, minus the lines naming the new option, finds each one still stale (README « What differs », `why.md`, `versions.md`, `runtime-config.md`, `switching.md`, `batches.md`) — `branch-reviewer`, `builder`
+- #190 — A link label that counts what its target lists (« the two opt-ins ») goes stale when the target grows: write labels without a count — `builder`
 
 ## Minors kept
 
@@ -336,3 +341,5 @@ Minor review defects, taken up by the end-of-chapter review.
 - #209 — `website/testing.md:26,100`: approach 1 does not state its cost (a Postgres server locally and in CI, a slower run), approach 2 not its blind spot (`lt(Number('abc'))` is `NaN` on both sides; Postgres refuses with 22P02) — `branch-reviewer`
 - #209 — `website/testing.md:151`: the rounding past 2^53 could link `customJSONParsingForLargeNumbers`, as `custom-types.md:226` and `catalog-types.md:96` do — `branch-reviewer`
 - #209 — `website/examples/plain/testing_rolled_back.ts:23-29`: when `body` throws and the `ROLLBACK` then fails, the `ROLLBACK` error replaces the one that explains the failure — `branch-reviewer`
+- #190 — `src/db/config.ts:24`: `transactionRequiresCommit` has no type test, where the other two opt-ins have one each (`test/types/shortcuts.test-d.ts:171`, `:190`) — `branch-reviewer`
+- #190 — `docs/decisions/003-fixes-and-deprecation.md:38`: the heading « The 11 breaking findings » now sits over a #190 row, which is not a characterisation finding — `branch-reviewer`

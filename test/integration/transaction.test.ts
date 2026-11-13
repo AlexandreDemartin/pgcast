@@ -7,7 +7,7 @@
 // Retries are provoked deterministically: the callback raises the SQLSTATE
 // itself on its first attempts (a DO block with RAISE ... USING ERRCODE).
 
-import { afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import * as db from '../../src/db';
 import { sql, IsolationLevel } from '../../src/db';
 import { resetConfig } from '../helpers/config';
@@ -289,5 +289,111 @@ describe('transaction', () => {
     }
     expect(called).toBe(false);
     expect(await notes()).toEqual([]);
+  });
+});
+
+// #190: after a database error the callback catches, Postgres has aborted the transaction,
+// and answers the COMMIT that follows with the command tag ROLLBACK, without an error
+describe('a COMMIT that Postgres answers with ROLLBACK', () => {
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  const rolledBack = 'the transaction was rolled back, not committed: a query in it failed and the callback caught the error, so Postgres answered COMMIT with ROLLBACK; let the error out of the callback, or ROLLBACK TO a SAVEPOINT before going on';
+
+  /** A fresh module, so that warnOnce has not warned yet, and a spy on process.emitWarning. */
+  const fresh = async () => {
+    vi.restoreAllMocks();
+    vi.resetModules();
+    const emitWarning = vi.spyOn(process, 'emitWarning').mockImplementation(() => { });
+    const fdb = await import('../../src/db');
+    fdb.setConfig({ transactionRetryDelay: { minMs: 0, maxMs: 0 } });
+    return { fdb, emitWarning };
+  };
+
+  /** Writes a note, then swallows a database error and returns: the pattern of #190. */
+  const swallow = (sqlstate: '40001' | '23505') => async (c: db.Queryable) => {
+    await write(c, 'lost');
+    try { await raise(c, sqlstate); } catch { return 'swallowed'; }
+  };
+
+  it('with transactionRequiresCommit, rejects, saves nothing and sends no ROLLBACK of its own', async () => {
+    const { messages } = listen();
+    const queries: string[] = [];
+    db.setConfig({ transactionRequiresCommit: true, queryListener: q => { queries.push(q.text); } });
+    let attempts = 0;
+    const err = await db.serializable(t.pool, async c => { attempts++; return swallow('23505')(c); }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).toBe(rolledBack);
+    expect((err as { code?: string }).code).toBeUndefined();  // so isDatabaseError() gives false, and no retry
+    expect(attempts).toBe(1);
+    expect(messages).toEqual([]);
+    expect(queries[0]).toBe('START TRANSACTION ISOLATION LEVEL SERIALIZABLE');
+    expect(queries.at(-1)).toBe('COMMIT');
+    expect(queries).not.toContain('ROLLBACK');
+    expect(await notes()).toEqual([]);
+  });
+
+  it('with transactionRequiresCommit, a swallowed 40001 is not retried', async () => {
+    const { messages } = listen();
+    db.setConfig({ transactionRequiresCommit: true });
+    let attempts = 0;
+    const err = await db.serializable(t.pool, async c => { attempts++; return swallow('40001')(c); }).catch((e: unknown) => e);
+    expect((err as Error).message).toBe(rolledBack);
+    expect(attempts).toBe(1);
+    expect(messages).toEqual([]);
+  });
+
+  it('with transactionRequiresCommit, an error caught after ROLLBACK TO SAVEPOINT commits', async () => {
+    db.setConfig({ transactionRequiresCommit: true });
+    const result = await db.serializable(t.pool, async c => {
+      await write(c, 'kept');
+      await sql`SAVEPOINT ${db.raw('before_duplicate')}`.run(c);
+      try { await raise(c, '23505'); } catch { await sql`ROLLBACK TO SAVEPOINT ${db.raw('before_duplicate')}`.run(c); }
+      return 'committed';
+    });
+    expect(result).toBe('committed');
+    expect(await notes()).toEqual(['kept']);
+  });
+
+  it('with transactionRequiresCommit, releases a pool client, and leaves a plain client checked out', async () => {
+    db.setConfig({ transactionRequiresCommit: true });
+    const counts = () => ({ total: t.pool.totalCount, idle: t.pool.idleCount });
+    const checkedOut = () => t.pool.totalCount - t.pool.idleCount;
+    const outBefore = checkedOut();
+    await expect(db.serializable(t.pool, swallow('23505'))).rejects.toThrow(rolledBack);
+    expect(checkedOut()).toBe(outBefore);  // released: no more clients checked out than before
+    const client = await t.pool.connect();
+    const before = counts();
+    try {
+      let txnClient: db.TxnClientForSerializable | undefined;
+      await expect(db.serializable(client, async c => { txnClient = c; return swallow('23505')(c); })).rejects.toThrow(rolledBack);
+      expect(counts()).toEqual(before);
+      expect(Object.prototype.hasOwnProperty.call(txnClient, '_zapatos')).toBe(false);
+      expect(await db.serializable(client, c => write(c, 'still usable'))).toBeDefined();
+    } finally {
+      client.release();
+    }
+    expect(await notes()).toEqual(['still usable']);
+  });
+
+  it('without transactionRequiresCommit (deprecated, PGCAST_DEP003), resolves as in 6.6.1 and warns once, naming the option', async () => {
+    const { fdb, emitWarning } = await fresh();
+    expect(await fdb.serializable(t.pool, swallow('23505'))).toBe('swallowed');
+    expect(await fdb.serializable(t.pool, swallow('23505'))).toBe('swallowed');
+    expect(await notes()).toEqual([]);
+    expect(emitWarning).toHaveBeenCalledTimes(1);
+    const [message, options] = emitWarning.mock.calls[0];
+    expect(options).toEqual({ type: 'DeprecationWarning', code: 'PGCAST_DEP003' });
+    expect(message).toMatch(/transactionRequiresCommit: true/);
+    expect(message).toMatch(/default in pgcast 7\.0/);
+  });
+
+  it('does not warn on a committed transaction, a callback that throws, nor with the option', async () => {
+    const { fdb, emitWarning } = await fresh();
+    expect(await fdb.serializable(t.pool, c => write(c, 'committed'))).toBeDefined();
+    await expect(fdb.serializable(t.pool, async c => { await raise(c, '23505'); })).rejects.toMatchObject({ code: '23505' });
+    fdb.setConfig({ transactionRequiresCommit: true });
+    await expect(fdb.serializable(t.pool, swallow('23505'))).rejects.toThrow(rolledBack);
+    expect(emitWarning).not.toHaveBeenCalled();
+    expect(await notes()).toEqual(['committed']);
   });
 });
