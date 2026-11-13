@@ -12,7 +12,7 @@
     "docs:images": "node render-images.mjs"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "0.5.16",
+    "@electric-sql/pglite": "0.5.13",
     "@shikijs/vitepress-twoslash": "4.5.0",
     "monaco-editor": "0.57.0",
     "twoslash": "0.3.9",
