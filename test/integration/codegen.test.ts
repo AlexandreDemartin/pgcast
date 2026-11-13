@@ -88,6 +88,11 @@ const noDebug = () => void 0;
 
 const codegen = (config: Config) => tsForConfig(finaliseConfig({ ...config, ...quiet, db: db() }), noDebug);
 
+/** The same, on a server that refuses every connection: a run that rejects with its own error sent no query. */
+const unreachable = { connectionString: 'postgres://nobody@127.0.0.1:1/none' };
+const codegenWithoutQueries = (config: Config) =>
+  tsForConfig(finaliseConfig({ ...config, ...quiet, db: unreachable }), noDebug);
+
 /** The warnings of a run, but the bigint note, which comes once per process. */
 const warningsOf = async (config: Config) => {
   const warnings: string[] = [];
@@ -826,14 +831,14 @@ describe('enumOrder', () => {
     ]);  // control: no relation, and still its enums
   });
 
-  it("is optional in Config, read as 'alphabetical' when absent; another value rejects", async () => {
+  it("is optional in Config, read as 'alphabetical' when absent; another value rejects before any query", async () => {
     expect(finaliseConfig({}).enumOrder).toBeUndefined();
     const right: Config = { enumOrder: 'declared' };
     void right;
     // @ts-expect-error 'alphabetical' or 'declared'
     const wrong: Config = { enumOrder: 'declard' };
     void wrong;
-    await expect(codegen({ ...main, enumOrder: 'declard' as 'declared' })).rejects
+    await expect(codegenWithoutQueries({ ...main, enumOrder: 'declard' as 'declared' })).rejects
       .toThrow(`enumOrder must be 'alphabetical' (the default) or 'declared', not 'declard'`);
   });
 });
@@ -1036,14 +1041,14 @@ declare module 'pgcast/custom' {
     expect(await generateWarnings({ ...scenes, moduleNames: 'pgcast' })).toEqual([]);
   });
 
-  it("is optional in Config, read as 'zapatos' when absent; another value rejects", async () => {
+  it("is optional in Config, read as 'zapatos' when absent; another value rejects before any query", async () => {
     expect(finaliseConfig({}).moduleNames).toBeUndefined();
     const right: Config = { moduleNames: 'pgcast' };
     void right;
     // @ts-expect-error 'zapatos' or 'pgcast'
     const wrong: Config = { moduleNames: 'pgcats' };
     void wrong;
-    await expect(codegen({ ...scenes, moduleNames: 'pgcats' as 'pgcast' })).rejects
+    await expect(codegenWithoutQueries({ ...scenes, moduleNames: 'pgcats' as 'pgcast' })).rejects
       .toThrow(`moduleNames must be 'zapatos' (the default) or 'pgcast', not 'pgcats'`);
   });
 });
