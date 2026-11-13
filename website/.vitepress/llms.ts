@@ -2,7 +2,8 @@
 // llms.txt and llms-full.txt (https://llmstxt.org/), written to the site's root at build (`buildEnd`, config.ts), for
 // assistants: an index of the written pages, then all of them as plain Markdown, in the order of the outline. An
 // entry with no `<link>.md` of its own is a "Coming" page ([page].paths.ts), left out of both. On the way, it checks
-// each example's copy of a block of its page (`checkCopy()`).
+// each example's copy of a block of its page (`checkCopy()`). Each page's part of llms-full.txt is also its own file,
+// `/<page>.md` (`/index.md` for the home), which its page actions copy and link (theme/PageActions.vue).
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createTwoslasher } from 'twoslash';
@@ -51,7 +52,10 @@ export async function writeLlmsFiles(config: SiteConfig) {
       casts[name!] = `Postgres runs:\n\n\`\`\`sql\n${sql}\n\`\`\`\n\nValues: \`${values}\`\n\n` +
         `TypeScript knows:\n\n\`\`\`ts\n${type}\n\`\`\``;
     }
-    full.push(plain(source, casts, config.srcDir, linksOf(link), twoslasher).replace(/^# .*$/m, `$&\n\nSource: ${url(link)}`));
+    const markdown = plain(source, casts, config.srcDir, linksOf(link), twoslasher)
+      .replace(/^# .*$/m, `$&\n\nSource: ${url(link)}`);
+    full.push(markdown);
+    writeFileSync(join(config.outDir, `${link === '/' ? 'index' : link.slice(1)}.md`), markdown + '\n');
   }
   writeFileSync(join(config.outDir, 'llms-full.txt'), full.join('\n\n---\n\n') + '\n');
 }
