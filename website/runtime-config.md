@@ -431,7 +431,7 @@ A `bytea` in JSON, as hex after `\x`: `'\\x4c61'` in TypeScript source.
 db.toBuffer<T extends ByteArrayString | null>(d: T): T extends ByteArrayString ? Buffer<ArrayBuffer> | Exclude<T, ByteArrayString> : T
 ```
 
-Decodes the hex of a `ByteArrayString` into a `Buffer`, typed `Buffer<ArrayBuffer>`. `null` gives `null`, and the type keeps it ([`strict()`](#strict)). It decodes the whole value in memory.
+Decodes the hex of a `ByteArrayString` into a `Buffer`, typed `Buffer<ArrayBuffer>`. `null` gives `null`, and the type keeps it; `undefined` throws, and the type refuses it with `strictNullChecks` on ([`strict()`](#strict)). It decodes the whole value in memory.
 
 ```ts twoslash
 import * as db from 'zapatos/db';
@@ -582,8 +582,9 @@ const shout = db.strict((s: string) => s.toUpperCase());
 const loud = shout(tagline);
 ```
 
-- Only `null`: `undefined` is passed to `fn`, which may throw on it: `db.toBuffer(undefined)` throws "TypeError: Cannot read properties of undefined (reading 'slice')" ([#182](https://github.com/AlexandreDemartin/pgcast/issues/182)).
-- With `strictNullChecks` off, a type has no `null` in it, and none of these types say anything of it: `toDate(null)` is typed `Date`, `shout(null)` `any`.
+- Only `null` passes through, as only `NULL` does for a `STRICT` function in Postgres: `undefined` reaches `fn`. A function that takes it handles it: `db.strict((title: string | undefined) => title ?? 'untitled')(undefined)` gives `'untitled'`.
+- With `strictNullChecks` on, the type refuses `undefined` unless `fn` takes it: `shout(undefined)` and `db.toBuffer(undefined)` do not compile (TS2345).
+- With `strictNullChecks` off, a type has no `null` nor `undefined` in it, and none of these types say anything of them: `toDate(null)` is typed `Date`, `shout(null)` `any`. `db.toBuffer(undefined)` then compiles, and throws "TypeError: Cannot read properties of undefined (reading 'slice')".
 
 ## `SchemaVersionCanary` {#SchemaVersionCanary}
 
