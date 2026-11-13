@@ -303,6 +303,8 @@ Candidates for a check, a rule or a skill line.
 - #190 — A PR that adds an opt-in updates every place that lists them: `git grep -e upsertRequiresSameKeys --and -e undefinedMeansMissing`, minus the lines naming the new option, finds each one still stale (README « What differs », `why.md`, `versions.md`, `runtime-config.md`, `switching.md`, `batches.md`) — `branch-reviewer`, `builder`
 - #190 — A link label that counts what its target lists (« the two opt-ins ») goes stale when the target grows: write labels without a count — `builder`
 - #238 — Before rewording the comment of a snapshot, check every error code in it: dropping « a syntax error » left the `0A000` (a three-part name, a cross-database reference) unexplained — `builder`
+- #236 — A docs check that cannot be imported alone (`anchors.ts` pulls a data loader through `llms.ts`) runs its self-check only inside `vitepress build`: put the rule in a module with no loader, test it there — `builder`
+- #236 — `check-prose.mjs` reads `zapatos/dist/db`: run the root `npm run build` before `website`'s `npm ci` and the checks — `builder`
 
 ## Minors kept
 
@@ -344,3 +346,4 @@ Minor review defects, taken up by the end-of-chapter review.
 - #209 — `website/examples/plain/testing_rolled_back.ts:23-29`: when `body` throws and the `ROLLBACK` then fails, the `ROLLBACK` error replaces the one that explains the failure — `branch-reviewer`
 - #190 — `src/db/config.ts:24`: `transactionRequiresCommit` has no type test, where the other two opt-ins have one each (`test/types/shortcuts.test-d.ts:171`, `:190`) — `branch-reviewer`
 - #190 — `docs/decisions/003-fixes-and-deprecation.md:38`: the heading « The 11 breaking findings » now sits over a #190 row, which is not a characterisation finding — `branch-reviewer`
+- #236 — `website/.vitepress/llms.ts`: a fourth fence reader, for `llms-full.txt`, opens on any backtick fence and closes only on exactly three backticks, so a four-backtick `md` block holding a three-backtick line ends early: reuse `.vitepress/fences.ts` — `builder`
