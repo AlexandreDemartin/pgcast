@@ -120,7 +120,7 @@ Before each retry, `transaction()` waits a whole number of milliseconds from `mi
 castArrayParamsToJson: boolean  // default: false
 ```
 
-With `true`, every array sent as a parameter is sent as JSON: `CAST($1 AS "json")`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${db.param([1])}`) -->, its value `JSON.stringify()`'d. That is `param(x)`, the values of the shortcuts and Whereables, which are parameters too, and `param(x, 'type')`, whose cast is dropped: `param([1, 2], 'int4[]')` gives `CAST($1 AS "json")`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${db.param([1, 2], 'int4[]')}`) --> ([#171](https://github.com/AlexandreDemartin/pgcast/issues/171)). Off, `pg` sends an array as a Postgres array.
+With `true`, every array sent as a parameter is sent as JSON: `CAST($1 AS "json")`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${db.param([1])}`) -->, its value `JSON.stringify()`'d. That is `param(x)`, and the values of the shortcuts and Whereables, which are parameters too. A string cast wins ([#36](https://github.com/AlexandreDemartin/pgcast/issues/36)): an array type sends the array, `param([1, 2], 'int4[]')` giving `CAST($1 AS "int4"[])`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${db.param([1, 2], 'int4[]')}`) -->, and any other type keeps the JSON, `param([1, 2], 'jsonb')` giving `CAST($1 AS "jsonb")`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${db.param([1, 2], 'jsonb')}`) -->. Zapatos 6.6.1 dropped the cast for `"json"`. Off, `pg` sends an array as a Postgres array.
 
 <CastPanel example="castArrayParamsToJson">
 
@@ -129,7 +129,7 @@ With `true`, every array sent as a parameter is sent as JSON: `CAST($1 AS "json"
 </CastPanel>
 
 - Off, the same query fails: `json_array_length($1)` gives 22P02 "invalid input syntax for type json". `param(x, true)` sends the array as JSON under either setting.
-- On a Postgres array column, Postgres refuses an array sent this way: 42804 "column "genres" is of type text[] but expression is of type json" in an `insert()` or `update()`, 42883 "operator does not exist: text[] = json" in a Whereable, and "… text[] && json" with [`arrayOverlaps()`](/conditions#conditions.arrayOverlaps).
+- On a Postgres array column, Postgres refuses an array sent as JSON: 42804 "column "genres" is of type text[] but expression is of type json" in an `insert()` or `update()`, 42883 "operator does not exist: text[] = json" in a Whereable, and "… text[] && json" with [`arrayOverlaps()`](/conditions#conditions.arrayOverlaps). `db.param(genres, 'text[]')` sends it as an array there.
 - `param(x, false)` sends the array as it is, under either setting: `{ genres: db.param(['mystery', 'drama'], false) }` gives `SET ("genres") = ROW($1)`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.update('films', { genres: db.param(['mystery', 'drama'], false) }, { id: 1000 })) -->.
 - The items of `isIn()` are parameters one by one, so an array of numbers there is unchanged: `"id" IN ($1, $2)`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${{ id: db.conditions.isIn([1000, 1001]) }}`) -->.
 - How `param()` compiles each `cast`: [`param()`](/sql-template#param).
@@ -140,7 +140,7 @@ With `true`, every array sent as a parameter is sent as JSON: `CAST($1 AS "json"
 castObjectParamsToJson: boolean  // default: false
 ```
 
-With `true`, every plain object sent as a parameter is sent as `CAST($1 AS "json")`<!-- probe: (db.setConfig({ castObjectParamsToJson: true }), db.sql`${db.param({ a: 1 }, 'jsonb')}`) -->, its value `JSON.stringify()`'d, even with `param(x, 'type')`, whose cast is dropped ([#171](https://github.com/AlexandreDemartin/pgcast/issues/171)). Off, it is `$1`, and `pg` sends the same JSON text, with no type: Postgres then infers one from where `$1` stands.
+With `true`, every plain object sent as a parameter is sent as `CAST($1 AS "json")`<!-- probe: (db.setConfig({ castObjectParamsToJson: true }), db.sql`${db.param({ a: 1 })}`) -->, its value `JSON.stringify()`'d. A string cast wins, the value still JSON text: `param({ a: 1 }, 'jsonb')` gives `CAST($1 AS "jsonb")`<!-- probe: (db.setConfig({ castObjectParamsToJson: true }), db.sql`${db.param({ a: 1 }, 'jsonb')}`) -->, which `=` and `@>` on a `jsonb` column take ([#36](https://github.com/AlexandreDemartin/pgcast/issues/36)); Zapatos 6.6.1 dropped it for `"json"`, which they refuse (42883). Off, it is `$1`, and `pg` sends the same JSON text, with no type: Postgres then infers one from where `$1` stands.
 
 <CastPanel example="castObjectParamsToJson">
 

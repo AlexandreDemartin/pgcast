@@ -101,6 +101,12 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
   - Changed: `param(x, 'tag[]')` reached a type whose own name ends with `[]` or `[n]` (`CREATE DOMAIN "tag[]"`); it is now an array of `tag`, with no error when both exist, and that type is `param(x, '"tag[]"')`. `'public"."tag[]'` moves the same way.
   - Changed from pgcast 6.6.2 (R3): `param(x, '"q"')` was `CAST($1 AS """q""")`, the type `"q"`; it is now `CAST($1 AS "q")`, the type `q`.
   - Unchanged: each part stays quoted, so a name only the SQL grammar knows (`'int'`, `'double precision'`, `'varchar(10)'`) is still no type (42704): give the type's own name (`'int4'`, `'float8'`), or cast in `sql`.
+- A string cast of `param()` wins over `castArrayParamsToJson` and `castObjectParamsToJson`, which made it `CAST($1 AS "json")`. Under them, an array or a plain object is still sent as JSON text, cast to the type written: `param([1, 2], 'jsonb')` gives `CAST($1 AS "jsonb")` with `'[1,2]'`. An array cast to an array type goes as an array: `param([1, 2], 'int4[]')` gives `CAST($1 AS "int4"[])` with `[1, 2]`. With such a cast, `=`, `@>` and the writes on an `int4[]`, `text[]` or `jsonb[]` column, and `=` and `@>` on a `jsonb` column, now run (42883 or 42804 before). `true`, `false`, no cast and the array conditions given a plain array are unchanged. Calls that ran under Zapatos 6.6.1 and change, each with a cast that names another type than its target, which 6.6.1 dropped:
+  - `param(arr, 'int4[]')` into a `json` or `jsonb` column is refused (42804). Write `param(arr, 'jsonb')`, or no cast.
+  - `param(arr, 'int4[]')` into a `text` column stores `{1,2}`, where it stored `[1,2]`. Write `param(arr, 'text')`, or no cast.
+  - `param(obj, 'text')` into a `json` or `jsonb` column is refused (42804), under `castObjectParamsToJson`. Write `param(obj, 'jsonb')`, or no cast.
+  - `param(x, 'jsonb')` into a `json` or `text` column stores jsonb's spacing, `[1, 2]` where it stored `[1,2]`. Write `param(x, 'json')`, or no cast.
+  - `param(arr, '_int4')` still sends JSON, which its cast now refuses (22P02, `malformed array literal`); 6.6.1 sent it as `json`, which an `int4[]` column refused (42804, 42883). Write `param(arr, 'int4[]')`.
 
 ## [6.6.2] - 2026-11-12
 
