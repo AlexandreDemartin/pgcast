@@ -11,9 +11,10 @@
 // which runs them all.
 
 import type pg from 'pg';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as db from '../../src/db';
 import { sql, param, vals, all } from '../../src/db';
+import { resetConfig } from '../helpers/config';
 import { useTestDatabase } from '../helpers/db';
 import { builtinObjects } from '../helpers/builtinObjects';
 import { hostileArrayCasts, hostileCasts } from '../helpers/hostileCasts';
@@ -54,13 +55,15 @@ const identifierOutcomes = async (
   return outcomes;
 };
 
-/** What `SELECT CAST('1' AS <cast>)` gives for each cast: its rows, or its error code. */
-const castOutcomes = async (casts: Record<string, string>) => {
+/** What `SELECT CAST(<value> AS <cast>)` gives for each cast: its rows, its error code, or 'injected'. */
+const castOutcomes = async (casts: Record<string, string>, value: unknown = '1') => {
   const outcomes: Record<string, unknown> = {};
   for (const [name, cast] of Object.entries(casts)) {
     await t.client.query('SAVEPOINT pgcast_cast');
     try {
-      outcomes[name] = await sql`SELECT ${param('1', cast)} AS v`.run(t.client);
+      outcomes[name] = await sql`SELECT ${param(value, cast)} AS v`.run(t.client);
+      // read before the savepoint goes: a second statement that ran shows here
+      if (await adaName() !== 'Ada') outcomes[name] = 'injected';
       await t.client.query('RELEASE SAVEPOINT pgcast_cast');
     } catch (err) {
       await t.client.query('ROLLBACK TO SAVEPOINT pgcast_cast');
@@ -296,6 +299,147 @@ describe('array bounds in a cast', () => {
       arrayNul: '08P01',
       arrayBackslash: '42704',
     });
+  });
+});
+
+describe('a cast under castArrayParamsToJson and castObjectParamsToJson', () => {
+  afterEach(resetConfig);
+
+  it('no hostile cast reads or writes anything, on an array or a plain object', async () => {
+    // compiled text: test/unit/injection.test.ts; 6.6.1 dropped each cast for CAST($1 AS "json").
+    // A row is a type that was found; `\v` is whitespace from Postgres 17 only, so it is left out
+    db.setConfig({ castArrayParamsToJson: true, castObjectParamsToJson: true });
+    const casts: Record<string, string> = {
+      ...hostileCasts, ...hostileArrayCasts,
+      updateBounds: `int4; ${update}; --[]`,
+      updateCloses: `int4") || 1; ${update}; --("int4[]`,
+    };
+    delete casts.verticalTab;
+    expect(sql`${param([1, 2], casts.updateBounds)}`.compile())
+      .toEqual({ text: `CAST($1 AS "int4; ${update}; --"[])`, values: [[1, 2]] });
+    expect(sql`${param({ a: 1 }, casts.updateCloses)}`.compile())
+      .toEqual({ text: `CAST($1 AS "int4"") || 1; ${update}; --(""int4"[])`, values: ['{"a":1}'] });
+    const summary = (outcomes: Record<string, unknown>) =>
+      Object.fromEntries(Object.entries(outcomes).map(([name, o]) => [name, Array.isArray(o) ? JSON.stringify(o) : o]));
+    expect({ array: summary(await castOutcomes(casts, [1, 2])), object: summary(await castOutcomes(casts, { a: 1 })) })
+      .toMatchInlineSnapshot(`
+        {
+          "array": {
+            "array": "[{"v":[1,2]}]",
+            "arrayAfterQuote": "42704",
+            "arrayBackslash": "42704",
+            "arrayBounds": "[{"v":[1,2]}]",
+            "arrayCloses": "42704",
+            "arrayDotted": "[{"v":[1,2]}]",
+            "arrayInside": "42704",
+            "arrayNegative": "42704",
+            "arrayNested": "42704",
+            "arrayNul": "08P01",
+            "arrayOnly": "42601",
+            "arrayPrequoted": "[{"v":[1,2]}]",
+            "arrayQualified": "[{"v":[1,2]}]",
+            "arraySemicolon": "42704",
+            "arraySpace": "42704",
+            "arraySplice": "42704",
+            "arrayUnclosed": "42704",
+            "closes": "42704",
+            "comment": "42704",
+            "commentBetween": "42704",
+            "dotted": "22P02",
+            "dottedBackslash": "3F000",
+            "dottedComment": "3F000",
+            "dottedDashes": "3F000",
+            "dottedDollar": "3F000",
+            "dottedEmpty": "42601",
+            "dottedNul": "08P01",
+            "dottedPrequoted": "22P02",
+            "dottedSemicolon": "3F000",
+            "dottedSquote": "42704",
+            "dquote": "42704",
+            "empty": "42601",
+            "emptyLast": "42704",
+            "emptyPart": "42704",
+            "escaped": "42704",
+            "leadingDot": "42601",
+            "lineCommentBetween": "42704",
+            "lone": "42704",
+            "newlineInside": "42704",
+            "newlineOutside": "22P02",
+            "nul": "08P01",
+            "nulQualified": "08P01",
+            "oddQuotes": "42704",
+            "operator": "42704",
+            "otherSpaces": "22P02",
+            "prequoted": "42704",
+            "prequotedDot": "42704",
+            "qualified": "22P02",
+            "qualifiedCloses": "42704",
+            "spacesAroundDot": "22P02",
+            "tabsAroundDot": "22P02",
+            "threeParts": "0A000",
+            "trailingDot": "42704",
+            "updateBounds": "42704",
+            "updateCloses": "42704",
+          },
+          "object": {
+            "array": "22P02",
+            "arrayAfterQuote": "42704",
+            "arrayBackslash": "42704",
+            "arrayBounds": "22P02",
+            "arrayCloses": "42704",
+            "arrayDotted": "22P02",
+            "arrayInside": "42704",
+            "arrayNegative": "42704",
+            "arrayNested": "42704",
+            "arrayNul": "08P01",
+            "arrayOnly": "42601",
+            "arrayPrequoted": "22P02",
+            "arrayQualified": "22P02",
+            "arraySemicolon": "42704",
+            "arraySpace": "42704",
+            "arraySplice": "42704",
+            "arrayUnclosed": "42704",
+            "closes": "42704",
+            "comment": "42704",
+            "commentBetween": "42704",
+            "dotted": "22P02",
+            "dottedBackslash": "3F000",
+            "dottedComment": "3F000",
+            "dottedDashes": "3F000",
+            "dottedDollar": "3F000",
+            "dottedEmpty": "42601",
+            "dottedNul": "08P01",
+            "dottedPrequoted": "22P02",
+            "dottedSemicolon": "3F000",
+            "dottedSquote": "42704",
+            "dquote": "42704",
+            "empty": "42601",
+            "emptyLast": "42704",
+            "emptyPart": "42704",
+            "escaped": "42704",
+            "leadingDot": "42601",
+            "lineCommentBetween": "42704",
+            "lone": "42704",
+            "newlineInside": "42704",
+            "newlineOutside": "22P02",
+            "nul": "08P01",
+            "nulQualified": "08P01",
+            "oddQuotes": "42704",
+            "operator": "42704",
+            "otherSpaces": "22P02",
+            "prequoted": "42704",
+            "prequotedDot": "42704",
+            "qualified": "22P02",
+            "qualifiedCloses": "42704",
+            "spacesAroundDot": "22P02",
+            "tabsAroundDot": "22P02",
+            "threeParts": "0A000",
+            "trailingDot": "42704",
+            "updateBounds": "42704",
+            "updateCloses": "42704",
+          },
+        }
+      `);
   });
 });
 

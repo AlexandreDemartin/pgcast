@@ -234,15 +234,17 @@ describe('on arrays (accounts)', () => {
     expect(await ids('accounts', where)).toEqual(expected);
   });
 
-  it('characterization: castArrayParamsToJson breaks the array operators', async () => {
-    // characterization: the array parameter becomes CAST($1 AS "json"); `int4[] @> json` has no operator
+  it('castArrayParamsToJson: an array operator takes an array type cast', async () => {
+    // 6.6.1 dropped the cast: `int4[] @> json` (42883). The type of the array conditions refuses a Parameter (#40)
     db.setConfig({ castArrayParamsToJson: true });
-    expect(await pgError(t.client, () => ids('accounts', { scores: dc.arrayContains([1]) }))).toMatchInlineSnapshot(`
-      {
-        "code": "42883",
-        "message": "operator does not exist: integer[] @> json",
-      }
-    `);
+    expect(await ids('accounts', { scores: dc.arrayContains(param([1], 'int4[]') as unknown as number[]) })).toEqual([1]);
+    expect(await ids('accounts', { scores: dc.arrayOverlaps(param([7, 1], 'int4[]') as unknown as number[]) })).toEqual([1, 3]);
+  });
+
+  it('castArrayParamsToJson: an array operator given a plain array sends JSON, as before', async () => {
+    db.setConfig({ castArrayParamsToJson: true });
+    expect(await pgError(t.client, () => ids('accounts', { scores: dc.arrayContains([1]) })))
+      .toEqual({ code: '42883', message: 'operator does not exist: integer[] @> json' });
   });
 });
 
