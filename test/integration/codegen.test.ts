@@ -205,15 +205,6 @@ describe('variant snapshots', () => {
 });
 
 describe('surprises, frozen as they are', () => {
-  it('keeps column comments of tables and materialized views only', async () => {
-    const { ts: schema } = await codegen(main);
-    expect(schema).toContain('Line manager.');
-    expect(schema).toContain('Materialized view column comment');
-    expect(schema).not.toContain('Partitioned table column comment');
-    expect(schema).not.toContain('Foreign table column comment');
-    expect(schema).not.toContain('View column comment');
-  });
-
   it('drops COMMENT ON of tables, views, schemas and types', async () => {
     const { ts: schema } = await codegen(main);
     for (const comment of [
@@ -393,6 +384,91 @@ describe('column comments', () => {
       expect(syntaxErrors(schema)).toEqual([]);
     } finally {
       await t.pool.query('DROP SCHEMA comment_closer CASCADE');
+    }
+  });
+
+  it('keeps the comments of views, foreign tables and partitioned tables', async () => {
+    const { ts: schema } = await codegen(main);
+    expect({
+      kind: commentLines(schema, 'events').kind,
+      line: commentLines(schema, 'imported_lines').line,
+      display_name: commentLines(schema, 'active_users').display_name,
+    }).toEqual({
+      kind: ['* Partitioned table column comment'],
+      line: ['* Foreign table column comment'],
+      display_name: ['* View column comment'],
+    });
+  });
+
+  it('gives each relation its own comments, and invents none', async () => {
+    // Postgres copies no comment to a partition, an inheriting table or a view
+    await t.pool.query(String.raw`
+      CREATE SCHEMA comment_kinds;
+      CREATE TABLE comment_kinds.shows (id int NOT NULL, kind text NOT NULL, note text) PARTITION BY LIST (kind);
+      COMMENT ON COLUMN comment_kinds.shows.kind IS 'Kind of show';
+      COMMENT ON COLUMN comment_kinds.shows.note IS E'Free note\nover two lines';
+      CREATE TABLE comment_kinds.shows_live PARTITION OF comment_kinds.shows FOR VALUES IN ('live');
+      COMMENT ON COLUMN comment_kinds.shows_live.note IS 'Note on a live show';
+      CREATE TABLE comment_kinds.shows_film PARTITION OF comment_kinds.shows FOR VALUES IN ('film');
+      CREATE TABLE comment_kinds.shows_other (note text, kind text NOT NULL, id int NOT NULL);
+      COMMENT ON COLUMN comment_kinds.shows_other.id IS 'Third column here, first in shows';
+      ALTER TABLE comment_kinds.shows ATTACH PARTITION comment_kinds.shows_other DEFAULT;
+      CREATE TABLE comment_kinds.parent_t (a int, b int);
+      COMMENT ON COLUMN comment_kinds.parent_t.a IS 'Parent a';
+      CREATE TABLE comment_kinds.child_t (c int) INHERITS (comment_kinds.parent_t);
+      COMMENT ON COLUMN comment_kinds.child_t.b IS 'Child b';
+      CREATE VIEW comment_kinds.parent_view AS SELECT a, b FROM comment_kinds.parent_t;
+      CREATE VIEW comment_kinds.own_view AS SELECT a AS va, b AS vb FROM comment_kinds.parent_t;
+      COMMENT ON COLUMN comment_kinds.own_view.vb IS 'View vb';
+      CREATE FOREIGN TABLE comment_kinds.lines (line text, n int) SERVER fixture_files OPTIONS (filename '/dev/null');
+      COMMENT ON COLUMN comment_kinds.lines.n IS 'Foreign n';`);
+    try {
+      const { ts: schema } = await codegen({ schemas: { comment_kinds: all } });
+      const relations = ['shows', 'shows_live', 'shows_film', 'shows_other', 'parent_t', 'child_t', 'parent_view', 'own_view', 'lines'];
+      expect(Object.fromEntries(relations.map(rel => [rel, commentLines(schema, rel)]))).toEqual({
+        shows: { id: [], kind: ['* Kind of show'], note: ['* Free note', '* over two lines'] },
+        shows_live: { id: [], kind: [], note: ['* Note on a live show'] },
+        shows_film: { id: [], kind: [], note: [] },
+        shows_other: { id: ['* Third column here, first in shows'], kind: [], note: [] },
+        parent_t: { a: ['* Parent a'], b: [] },
+        child_t: { a: [], b: ['* Child b'], c: [] },
+        parent_view: { a: [], b: [] },
+        own_view: { va: [], vb: ['* View vb'] },
+        lines: { line: [], n: ['* Foreign n'] },
+      });
+      expect(syntaxErrors(schema)).toEqual([]);
+    } finally {
+      await t.pool.query('DROP SCHEMA comment_kinds CASCADE');
+    }
+  });
+
+  it('leaves out a comment holding */ on a view, foreign table or partitioned table (until #48)', async () => {
+    // Zapatos 6.6.1 drops every comment of these: written as a table's is, 'ends */ early' would stop the file parsing
+    await t.pool.query(String.raw`
+      CREATE SCHEMA comment_kinds_closer;
+      CREATE TABLE comment_kinds_closer.t (x int);
+      COMMENT ON COLUMN comment_kinds_closer.t.x IS E'Closes */\n/* reopens';
+      CREATE VIEW comment_kinds_closer.v AS SELECT 1 AS x, 2 AS y, 3 AS z;
+      COMMENT ON COLUMN comment_kinds_closer.v.x IS 'Ends */ early';
+      COMMENT ON COLUMN comment_kinds_closer.v.y IS E'Closes */\n/* reopens';
+      COMMENT ON COLUMN comment_kinds_closer.v.z IS 'Plain';
+      CREATE FOREIGN TABLE comment_kinds_closer.f (x text, y text) SERVER fixture_files OPTIONS (filename '/dev/null');
+      COMMENT ON COLUMN comment_kinds_closer.f.x IS 'Ends */ early';
+      COMMENT ON COLUMN comment_kinds_closer.f.y IS 'Plain';
+      CREATE TABLE comment_kinds_closer.p (x int, y int) PARTITION BY RANGE (x);
+      COMMENT ON COLUMN comment_kinds_closer.p.x IS 'Ends */ early';
+      COMMENT ON COLUMN comment_kinds_closer.p.y IS 'Plain';`);
+    try {
+      const { ts: schema } = await codegen({ schemas: { comment_kinds_closer: all } });
+      expect(Object.fromEntries(['t', 'v', 'f', 'p'].map(rel => [rel, commentLines(schema, rel)]))).toEqual({
+        t: { x: ['* Closes */', '/* reopens'] },  // a table's, written as master writes it
+        v: { x: [], y: [], z: ['* Plain'] },
+        f: { x: [], y: ['* Plain'] },
+        p: { x: [], y: ['* Plain'] },
+      });
+      expect(syntaxErrors(schema)).toEqual([]);
+    } finally {
+      await t.pool.query('DROP SCHEMA comment_kinds_closer CASCADE');
     }
   });
 });
