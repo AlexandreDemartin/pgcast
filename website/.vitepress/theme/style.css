@@ -327,5 +327,8 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 .twoslash .twoslash-hover { border-bottom: 1px dashed var(--muted); cursor: help; }
 .twoslash .twoslash-hover:hover, .twoslash .twoslash-hover:focus-within { background: var(--accent-soft); border-radius: 2px; }
 .twoslash .twoslash-hover > span:focus-visible { outline: none; }  /* the background says it, as on hover */
+/* the search dialog's field: its bar already turns --accent on focus (VitePress's :focus-within), so the field itself
+   draws no second ring inside it */
+.VPLocalSearchBox .search-input:focus-visible { outline: none; }
 .v-popper--theme-twoslash .v-popper__inner { border-radius: 8px; box-shadow: 0 8px 28px rgba(0, 0, 0, .18); }
 .twoslash-floating .twoslash-popup-code { line-height: 1.5; background: transparent !important; }
