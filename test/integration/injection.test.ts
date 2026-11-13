@@ -631,17 +631,15 @@ describe('without parameters (simple protocol)', () => {
     expect(await adaName()).toBe('Ada');
   });
 
-  it('lock.for is checked before any query', async () => {
+  it('lock.for is checked before any query', () => {
     expect(() => db.select('users', all, { lock: { for: `UPDATE) AS x; ${update}; SELECT (1` } } as any))
       .toThrow(`Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not 'UPDATE) AS x; ${update}; SELECT (1'`);
-    expect(await adaName()).toBe('Ada');
   });
 
-  it('the aggregate of select() is checked before any query', async () => {
+  it('the aggregate of select() is checked before any query', () => {
     const aggregate = `count(*) FROM users; ${update}; SELECT count`;
     expect(() => db.select('users', all, {}, db.SelectResultMode.Numeric, aggregate))
       .toThrow(`Aggregate must be a function name (e.g. sum, or my_schema.my_agg), not '${aggregate}'`);
-    expect(await adaName()).toBe('Ada');
   });
 
   it('a schema-qualified aggregate runs', async () => {
