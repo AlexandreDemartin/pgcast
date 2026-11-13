@@ -114,6 +114,9 @@ Candidates for a check, a rule or a skill line.
 - #47 — A guard with no visible output change proves itself through a mutant whose replay shows the harm in numbers (0 to 65 syntax errors) — `builder`
 - #47 — A merge can bring the other side's summary line in without a conflict: recount the report by script after every merge that touches it — `builder`
 - #47 — In zsh, `git show $REF:test/x` applies the `:t` modifier: write `"${REF}:path"` — `branch-reviewer`
+- #310 — Lighthouse does not test a keyboard trap (WCAG 2.1.2, Level A): an embedded editor is probed with Tab presses over CDP until focus leaves it, and the page says how to leave — `branch-reviewer`
+- #310 — Monaco 0.57 in Chrome focuses `.native-edit-context`, not its `textarea`: a focus rule, a probe or a key press names both — `branch-reviewer`
+- #310 — A clean-up registered after an `await` in `onMounted` leaks when the page is left during the wait: register it before, return if the template ref is gone; a CDP probe delays the awaited call (`Page.addScriptToEvaluateOnNewDocument`) to open the window — `branch-reviewer`
 
 ## Minors kept
 
