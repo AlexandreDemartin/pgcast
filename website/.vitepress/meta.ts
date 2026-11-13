@@ -32,7 +32,8 @@ export function describePage(pageData: PageData, { siteConfig }: TransformPageCo
 export function pageHead({ page, pageData, siteConfig, title, description }: TransformContext): HeadConfig[] {
   if (pageData.isNotFound) return [];
   const
-    url = host + siteConfig.site.base + page.replace(/(^|\/)index\.md$/, '$1').replace(/\.md$/, ''),  // as sitemap.xml
+    root = host + siteConfig.site.base,
+    url = root + page.replace(/(^|\/)index\.md$/, '$1').replace(/\.md$/, ''),  // as sitemap.xml
     og = (property: string, content: string): HeadConfig => ['meta', { property, content }];
   return [
     ['link', { rel: 'canonical', href: url }],
@@ -41,7 +42,7 @@ export function pageHead({ page, pageData, siteConfig, title, description }: Tra
     og('og:title', title),
     og('og:description', description),
     og('og:url', url),
-    og('og:image', `${host}/social-card.png`),  // public/social-card.svg, rendered by render-images.mjs
+    og('og:image', `${root}social-card.png`),  // public/social-card.svg, rendered by render-images.mjs
     og('og:image:width', '1200'),
     og('og:image:height', '630'),
     og('og:image:alt', 'pg::cast. Your types, cast from your database.'),
