@@ -197,6 +197,48 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 .vp-doc .custom-block a { color: var(--accent); }
 .vp-doc .custom-block code { background: var(--sunken); }
 
+/* At a glance, under a long page's lede: a quiet box, its label as the nav's group labels, no rail, no icon */
+.vp-doc .AtAGlance {
+  border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface);
+  padding: 14px 16px; margin: 0 0 28px;
+}
+.vp-doc .AtAGlance-label { font: 600 13px/20px var(--font-body); color: var(--muted); margin: 0 0 6px; }
+.vp-doc .AtAGlance ul { margin: 0; padding-left: 1.25em; }
+.vp-doc .AtAGlance li + li { margin-top: 4px; }
+
+/* a table of cases in `<div class="stack">`: a long name in code may break, so the table fits its column; on a phone,
+   each row a block, each cell under its column's header (`data-label`, tables.ts) */
+.vp-doc .stack td code { overflow-wrap: anywhere; }
+@media (max-width: 639px) {
+  .vp-doc .stack table, .vp-doc .stack tbody, .vp-doc .stack tr, .vp-doc .stack td { display: block; }
+  .vp-doc .stack table { overflow: visible; margin: 16px 0 20px; }
+  .vp-doc .stack thead {
+    position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+  }
+  .vp-doc .stack tr {
+    border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); padding: 6px 0;
+  }
+  .vp-doc .stack tr + tr { margin-top: 12px; }
+  .vp-doc .stack td { border: 0; padding: 6px 14px; }
+  .vp-doc .stack td[data-label]::before {
+    content: attr(data-label); display: block; font: 600 12px/18px var(--font-body); color: var(--muted);
+  }
+}
+
+/* a diagram: inline SVG drawn with the tokens, so light and dark follow; at its own size, or narrower on a phone */
+.vp-doc .Diagram { margin: 20px 0 28px; }
+.vp-doc .Diagram svg { display: block; max-width: 100%; height: auto; }
+.Diagram .box { fill: var(--surface); stroke: var(--line); }
+.Diagram .box.accent { fill: var(--accent-soft); stroke: var(--accent); }
+.Diagram .label { font: 600 12px var(--font-body); fill: var(--muted); }
+.Diagram .label.accent { fill: var(--accent); }
+.Diagram .text { font: 13px var(--font-body); fill: var(--fg); }
+.Diagram .code { font: 13px var(--font-mono); fill: var(--fg); }
+.Diagram .param { fill: var(--p); font-weight: 700; }
+.Diagram .arrow { stroke: var(--muted); stroke-width: 1.5; }
+.Diagram .head { fill: var(--muted); }
+.vp-doc .Diagram figcaption { margin: 12px 0 0; font-size: 13px; color: var(--muted); max-width: 68ch; }
+
 /* pager, then the edit row */
 .VPDocFooter { display: flex; flex-direction: column; }
 .VPDocFooter .prev-next { order: 1; border-top: 0; padding-top: 0; margin-top: 56px; gap: 12px; }
