@@ -6,7 +6,7 @@
 :root {
   --bg: #f6f8f9; --surface: #ffffff; --sunken: #eef2f4; --fg: #12202b; --muted: #566673; --line: #d9e0e5;
   --accent: #0a6b63; --accent-fg: #ffffff; --accent-soft: #dcefec; --warn: #8a5a00; --warn-soft: #fbf0d9;
-  --code-bg: #f1f4f6; --k: #1458a8; --s: #8f5600; --t: #0a6b63; --n: #b0245a; --c: #7a8794; --qi: #12202b; --p: #b0245a;
+  --code-bg: #f1f4f6; --k: #1458a8; --s: #8f5600; --t: #0a6b63; --n: #b0245a; --c: #626e79; --qi: #12202b; --p: #b0245a;
   --font-display: "Schibsted Grotesk", "Helvetica Neue", Arial, sans-serif;
   --font-body: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -15,7 +15,7 @@
 .dark {
   --bg: #0d1318; --surface: #121a21; --sunken: #0a0f13; --fg: #e2e9ee; --muted: #8d9eab; --line: #23303a;
   --accent: #4fcfbf; --accent-fg: #06201d; --accent-soft: #11302c; --warn: #e8b65a; --warn-soft: #2c2412;
-  --code-bg: #0f171d; --k: #7fb6ff; --s: #e3b462; --t: #4fcfbf; --n: #f08ab3; --c: #6c7d8a; --qi: #e2e9ee; --p: #f08ab3;
+  --code-bg: #0f171d; --k: #7fb6ff; --s: #e3b462; --t: #4fcfbf; --n: #f08ab3; --c: #768794; --qi: #e2e9ee; --p: #f08ab3;
   color-scheme: dark;
 }
 

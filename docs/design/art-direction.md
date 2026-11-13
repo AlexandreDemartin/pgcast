@@ -39,7 +39,7 @@ Syntax tokens:
 | `--s` | `#8f5600` | `#e3b462` | strings |
 | `--t` | `#0a6b63` | `#4fcfbf` | type names (the accent) |
 | `--n` | `#b0245a` | `#f08ab3` | numbers |
-| `--c` | `#7a8794` | `#6c7d8a` | comments, in italics |
+| `--c` | `#626e79` | `#768794` | comments, in italics |
 | `--qi` | `#12202b` | `#e2e9ee` | SQL quoted identifiers (`"films"`), as plain text |
 | `--p` | `#b0245a` | `#f08ab3` | SQL parameters (`$1`) and their values, in bold |
 
