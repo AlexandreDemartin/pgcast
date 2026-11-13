@@ -117,7 +117,7 @@ Every option is optional. Each one given replaces its default whole: `schemas` w
 
 `{ [schema]: { include, exclude } }`, each of `include` and `exclude` `"*"` or an array of relation names. The schemas to generate, and which relations of each: tables, views, materialised views and foreign tables.
 
-Both keys are required. In `generate()`, a rule without one fails to compile (TS2741); in the JSON, the CLI stops with `TypeError: Cannot read properties of undefined (reading 'indexOf')` ([#45](https://github.com/AlexandreDemartin/pgcast/issues/45)).
+Both keys are required. In `generate()`, a rule without one fails to compile (TS2741); in the JSON, the CLI stops with `TypeError: Cannot read properties of undefined (reading 'indexOf')` ([#301](https://github.com/AlexandreDemartin/pgcast/issues/301)).
 
 | Rule | Generates |
 |---|---|
@@ -262,7 +262,7 @@ Writing custom types file: src/zapatos/custom/index.d.ts
 
 - `Writing new custom type or domain placeholder file: src/zapatos/custom/PgPoint.d.ts`, once per new placeholder;
 - `Note: custom types "archive"."notes" and "public"."notes" are both named PgNotes in TypeScript, so they share one type and one placeholder file, src/zapatos/custom/PgNotes.d.ts. To type them apart, rename one of them in the database.`, once per run for each name that two Postgres types share ([`customTypesTransform`](#generate.customTypesTransform)); when their names differ, it adds that a `customTypesTransform` function can keep them apart;
-- `Note: the include entry "Films" of schema "public" matches no relation there, so it generates nothing. Check its spelling and case, that the relation is in schema "public", and that the database role has a privilege on it: include names tables, views, materialised views and foreign tables.`, once per run for each name of an [`include`](#generate.schemas) list that its schema doesn't have;
+- `Note: the include entry "Films" of schema "public" matches no relation there, so it generates nothing. Check its spelling and case, that the relation is in schema "public", and that the database role has a privilege on it: include names tables, views, materialised views and foreign tables.`, once per run for each entry of an [`include`](#generate.schemas) list that its schema doesn't have;
 - the note on `bigint` and `numeric` columns, once per process ([`customJSONParsingForLargeNumbers`](#generate.customJSONParsingForLargeNumbers));
 - the [old layout warning](#the-old-layout-warning).
 
