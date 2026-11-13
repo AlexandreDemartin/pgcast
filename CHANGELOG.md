@@ -105,7 +105,9 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
   - `sum()`, `avg()`, `min()` or `max()` without `columns`: 6.6.1 sent `sum(*)` (42883). The error is "sum() needs one column to aggregate: pass columns: ['column']".
   - `columns` with several columns, or none: 6.6.1 sent `count("id", "mood")` (42883) or `count()` (42809). The error is "count() takes one column in columns, not 2 (leave columns out for count(*))".
   - A single query as `lateral`: 6.6.1 sent `SELECT  AS result` (42601). The error is "count() cannot pass a lateral query through: nest it in the lateral of a select() instead".
-  - Unchanged: every call that ran, a `lateral` map included, and `select()` in `SelectResultMode.Numeric`, which keeps several columns for an aggregate of several arguments (`corr("rating", "minutes")`).
+  - Changed: an aggregate of your own that takes another number of arguments under a built-in name ran. After `CREATE AGGREGATE max(int4, int4) (…)`, `max('ratings', db.all, { columns: ['stars', 'votes'] })` sent `max("stars", "votes")`; it now rejects. `select('ratings', db.all, { columns: ['stars', 'votes'] }, SelectResultMode.Numeric, 'max')` sends the same SQL.
+  - Changed: a refused aggregate marked `noop` resolved to its `noopResult`; it now rejects, as `run()` compiles the query before it reads `noop`.
+  - Unchanged: every other call that ran, a `lateral` map included, and `select()` in `SelectResultMode.Numeric`, which keeps several columns for an aggregate of several arguments (`corr("rating", "minutes")`).
 
 ## [6.6.2] - 2026-11-12
 

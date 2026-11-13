@@ -235,6 +235,11 @@ db.count(table, where, options?)
 
 `count()` and the four below throw these while compiling, so `.run()` rejects with a plain `Error`, not a `DatabaseError`, before any query, and `.compile()` throws; so does a query that nests one. Zapatos 6.6.1 sent the SQL, which Postgres refused: `sum(*)` and `count("id", "mood")` (42883), `count()` (42809), `SELECT  AS result` (42601). The type is that of 6.6.1, which lets these calls through, a single subquery as `lateral` when there is no `columns` nor `extras`.
 
+Two calls that ran under 6.6.1 now reject too:
+
+- An aggregate of your own that takes another number of arguments under a built-in name. After `CREATE AGGREGATE max(int4, int4) (…)`, `db.max('ratings', db.all, { columns: ['stars', 'votes'] })` sent `max("stars", "votes")`. `db.select('ratings', db.all, { columns: ['stars', 'votes'] }, db.SelectResultMode.Numeric, 'max')` sends the same SQL.
+- A refused aggregate marked `noop`, which resolved to its `noopResult`: `run()` compiles the query before it reads `noop`.
+
 | Message | When | Since |
 |---|---|---|
 | `…() needs one column to aggregate: pass columns: ['column']`<!-- message --> | `sum()`, `avg()`, `min()` or `max()` without `columns` | pgcast 6.7.0 |
