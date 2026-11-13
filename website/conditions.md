@@ -17,7 +17,8 @@ Each member is a [`sql`](/sql-template#sql) fragment written around [`db.self`](
 
 </CastPanel>
 
-- **Where**: as a Whereable value, so in the `where` of [`select()`](/select#select), [`count()`](/select#count), [`update()`](/insert#update) and [`deletes()`](/insert#deletes), the `having` of `select()`, and a Whereable in a `sql` template. Elsewhere `self` has no column: `` db.sql`SELECT ${db.conditions.isNull}` `` throws "The 'self' column alias has no meaning here"<!-- message --> as it compiles. [`and()`](#conditions.and), [`or()`](#conditions.or) and [`not()`](#conditions.not) also take Whereables, so they can be a whole `where`; [`now`](#conditions.now) and [`fromNow()`](#conditions.fromNow) hold no `self`, and go anywhere.
+- **Where**: as a Whereable value, so in the `where` of [`select()`](/select#select), [`count()`](/select#count), [`update()`](/insert#update) and [`deletes()`](/insert#deletes), the `having` of `select()`, and a Whereable in a `sql` template. Elsewhere `self` has no column: `` db.sql`SELECT ${db.conditions.isNull}` `` throws "The 'self' column alias has no meaning here"<!-- message --> as it compiles.
+  - [`and()`](#conditions.and), [`or()`](#conditions.or) and [`not()`](#conditions.not) also take Whereables, so they can be a whole `where`; [`now`](#conditions.now) and [`fromNow()`](#conditions.fromNow) hold no `self`, and go anywhere.
 - **Values**: each value is a parameter, `$1`, except a [`Parameter`](/sql-template#Parameter), kept as it is with its cast; a `sql` fragment, written as its SQL; and [`parent()`](/sql-template#parent), the parent query's column in a `lateral` subquery. `Default`, `self`, `raw()`, `cols()` and `vals()` throw: [Values a condition refuses](#refused-values).
 - **Type**: a condition is a `SQLFragment` whose second type argument, `T`, is the type of the value it compares with (its `Constraint`, [`sql`](/sql-template#sql)); the Whereable checks `T` against the column's type. The eight tests, `now` and `fromNow()` have no `T`, and pass on any column.
 
@@ -317,7 +318,14 @@ db.conditions.and<T>(...conditions: (SQLFragment<any, T> | Whereable)[])
 `update()` and `deletes()` given `and(...filters)` or `not(or(...ids))` with an empty list now reach every row: `deletes('films', and())` sends `WHERE TRUE`<!-- probe: db.deletes('films', db.conditions.and()) --> and deletes them all, `not(or())` gives `(NOT (FALSE))`<!-- probe: db.conditions.not(db.conditions.or()) -->. Zapatos 6.6.1 threw (42601) before any row changed. Keep the length check where an empty list must not reach every row.
 :::
 
-Zapatos 6.6.1 wrote the operands bare, `(a OR b AND c)`, which Postgres reads `a OR (b AND c)`: the example above found film 1000 too, whatever its studio, and `deletes()` or `update()` given it deleted or updated that row. Only an `and()` of two operands or more, one with a bare `OR` at its top level, now gives other rows; one whose SQL ends in the next operand now fails (42601), `` and(db.sql`${'release_year'} BETWEEN 1970`, db.sql`2000`) ``, or, when the split falls inside a quoted literal, compares with another value, with no error: `` and(db.sql`${'title'} = 'x`, db.sql`y'`) `` compares `"title"` with `'x) AND (y'`, where it was `'x AND y'`. Any other gains parentheses and gives the same rows.
+Zapatos 6.6.1 wrote the operands bare, `(a OR b AND c)`, which Postgres reads `a OR (b AND c)`: the example above found film 1000 too, whatever its studio, and `deletes()` or `update()` given it deleted or updated that row.
+
+Only an `and()` of two operands or more, one with a bare `OR` at its top level, now gives other rows. One whose SQL ends in the next operand:
+
+- now fails (42601), `` and(db.sql`${'release_year'} BETWEEN 1970`, db.sql`2000`) ``;
+- or, when the split falls inside a quoted literal, compares with another value, with no error: `` and(db.sql`${'title'} = 'x`, db.sql`y'`) `` compares `"title"` with `'x) AND (y'`, where it was `'x AND y'`.
+
+Any other gains parentheses and gives the same rows.
 
 ### `or()` {#conditions.or}
 
@@ -341,7 +349,9 @@ db.conditions.not<T>(condition: SQLFragment<any, T> | Whereable)
 
 </CastPanel>
 
-On `release_year`, `` not(db.sql`${db.self} = 1974 OR ${db.self} = 1991`) `` writes `(NOT ("release_year" = 1974 OR "release_year" = 1991))`<!-- probe: db.conditions.not(db.sql`${db.self} = 1974 OR ${db.self} = 1991`).compile(undefined, undefined, 'release_year') -->. Zapatos 6.6.1 wrote `(NOT "release_year" = 1974 OR "release_year" = 1991)`, which Postgres reads `(NOT "release_year" = 1974) OR "release_year" = 1991`: the 1991 film too. Only a condition with a bare `AND` or `OR` at its top level changes rows; any other gains one pair of parentheses.
+On `release_year`, `` not(db.sql`${db.self} = 1974 OR ${db.self} = 1991`) `` writes `(NOT ("release_year" = 1974 OR "release_year" = 1991))`<!-- probe: db.conditions.not(db.sql`${db.self} = 1974 OR ${db.self} = 1991`).compile(undefined, undefined, 'release_year') -->.
+
+Zapatos 6.6.1 wrote `(NOT "release_year" = 1974 OR "release_year" = 1991)`, which Postgres reads `(NOT "release_year" = 1974) OR "release_year" = 1991`: the 1991 film too. Only a condition with a bare `AND` or `OR` at its top level changes rows; any other gains one pair of parentheses.
 
 ## Dates and times {#dates}
 
@@ -371,7 +381,9 @@ On `release_year`, `` not(db.sql`${db.self} = 1974 OR ${db.self} = 1991`) `` wri
 db.conditions.fromNow(n: number, unit: IntervalUnit = 'millisecond')
 ```
 
-`now() + $1`<!-- probe: db.conditions.fromNow(-7, 'days') -->, the value `` `${n} ${unit}` ``, which Postgres reads as an interval: `fromNow(-7, 'days')` sends `'-7 days'`, `fromNow(1.5, 'hours')` `'1.5 hours'`. `unit` is one of `microsecond`, `millisecond`, `second`, `minute`, `hour`, `day`, `week`, `month`, `year`, `decade`, each with or without an `s`, then `century`, `centuries`, `millennium`, `millennia`. A value, as [`now`](#conditions.now). An `n` whose string Postgres does not read (`NaN`, `1e21`, written `1e+21`) fails with 22007.
+`now() + $1`<!-- probe: db.conditions.fromNow(-7, 'days') -->, the value `` `${n} ${unit}` ``, which Postgres reads as an interval: `fromNow(-7, 'days')` sends `'-7 days'`, `fromNow(1.5, 'hours')` `'1.5 hours'`. A value, as [`now`](#conditions.now).
+
+`unit` is one of `microsecond`, `millisecond`, `second`, `minute`, `hour`, `day`, `week`, `month`, `year`, `decade`, each with or without an `s`, then `century`, `centuries`, `millennium`, `millennia`. An `n` whose string Postgres does not read (`NaN`, `1e21`, written `1e+21`) fails with 22007.
 
 The screenings of the next seven days, from `now()`, here the time of the query:
 
@@ -422,7 +434,11 @@ The type does not check a fragment: an `int4` on a `timestamptz` column type-che
 
 ## Values a condition refuses {#refused-values}
 
-`Default`, `self`, `raw()`, `cols()` and `vals()` have no meaning as the value of a condition. The type refuses them (TS2322, or TS2345 where the condition bounds its argument: a pattern, a range's second bound, an array condition, `add()`, `subtract()`); at run time, calling the condition does not throw, compiling it does, so `run()` rejects with a plain `Error` before any query. Zapatos 6.6.1 sent `Default` and `self` as the strings `'Symbol(DEFAULT)'` and `'Symbol(self)'`, and `raw()`, `cols()` and `vals()` as JSON, `'{"value":…}'`: no row on a text column, every row with `ne()` or `isNotIn()`, 22P02 or 22007 on the others. Why a `raw()` value is not SQL: [The security model](/security).
+`Default`, `self`, `raw()`, `cols()` and `vals()` have no meaning as the value of a condition. The type refuses them (TS2322, or TS2345 where the condition bounds its argument: a pattern, a range's second bound, an array condition, `add()`, `subtract()`).
+
+At run time, calling the condition does not throw, compiling it does, so `run()` rejects with a plain `Error` before any query.
+
+Zapatos 6.6.1 sent `Default` and `self` as the strings `'Symbol(DEFAULT)'` and `'Symbol(self)'`, and `raw()`, `cols()` and `vals()` as JSON, `'{"value":…}'`: no row on a text column, every row with `ne()` or `isNotIn()`, 22P02 or 22007 on the others. Why a `raw()` value is not SQL: [The security model](/security).
 
 | Message | When |
 |---|---|
