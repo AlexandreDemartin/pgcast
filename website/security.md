@@ -88,7 +88,7 @@ In `deletes()` or `update()`, an empty filter is every row: `removeRatings()` de
 
 ### An object that is not a filter
 
-An interpolated object that is not one of pgcast's values compiles as a filter of its own enumerable keys. A class instance gives its fields; a `Date` or a `Map`, which have none, gives `TRUE`, so `` db.sql`DELETE FROM ${'ratings'} WHERE ${when}` ``, with `when` a `Date`, compiles to `DELETE FROM "ratings" WHERE TRUE`<!-- probe: db.sql`DELETE FROM ${'ratings'} WHERE ${new Date()}` -->. The type refuses a `Date` (TS2345), so this hits a value typed `any`, or a wider type such as `object`; pass a date as `db.param(when)`. Unchanged from Zapatos 6.6.1, and planned: [#170](https://github.com/AlexandreDemartin/pgcast/issues/170).
+An interpolated object that is not one of pgcast's values compiles as a filter of its own enumerable keys: a class instance gives its fields, and `TRUE` when it has none. A built-in object (`Date`, `Map`, `Promise`, a typed array, …) throws before any query: `` db.sql`DELETE FROM ${'ratings'} WHERE ${when}` ``, with `when` a `Date` typed `any`, compiled to `DELETE FROM "ratings" WHERE TRUE` in Zapatos 6.6.1 ([Whereable objects](/sql-template#whereable)). Pass a date as `db.param(when)`.
 
 ## Report a flaw
 
