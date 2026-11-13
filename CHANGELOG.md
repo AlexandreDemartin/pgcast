@@ -78,6 +78,7 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
   - The error says what to do: give a value as `db.param(…)`, a filter as a plain object, and await a `Promise` first.
   - The type refused most of them (TS2345), not one that shares a member with a column: `deletes('actors', new Error('x'))` type-checks where `actors` has a `name` column, and now throws.
   - Unchanged: a plain object, an object with a `null` prototype, a class instance, even of a class that extends a built-in, a view included (`class Frames extends Uint8Array {}`: `TRUE` when it has no own enumerable key, `("0" = $1 …)` for its indexes), a built-in of another realm (a `Date` from `vm.runInNewContext()`: `TRUE`), a built-in as a `Whereable` value (`{ released: new Date() }` is `$1`), the wrappers, arrays, the global object's error.
+- `getConfig()` and `setConfig()` return a copy of the configuration, `transactionRetryDelay` included, and `setConfig()` keeps a copy of the `transactionRetryDelay` it is given: changing any of these objects afterwards no longer changes the configuration. Zapatos 6.6.1 shared `transactionRetryDelay` from `getConfig()` (`getConfig().transactionRetryDelay.minMs = 1` set it), and `setConfig()` returned the configuration itself. The listeners are the functions you set; both are declared to return `Config`, as the docs give them.
 
 ## [6.6.2] - 2026-11-12
 
