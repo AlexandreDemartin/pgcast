@@ -166,7 +166,7 @@ describe('param', () => {
       `);
   });
 
-  it('with a text cast: CAST($n AS "type"), the type quoted as one identifier', () => {
+  it('with a text cast: CAST($n AS "type"), each part of the type quoted, its array bounds after it', () => {
     expect(one(param('2026-01-01', 'date'))).toMatchInlineSnapshot(`
       {
         "text": "CAST($1 AS "date")",
@@ -175,29 +175,39 @@ describe('param', () => {
         ],
       }
     `);
-    // characterization: a schema-qualified or parameterised type is quoted whole (see the integration test)
-    expect(one(param('ok', 'public.mood'))).toMatchInlineSnapshot(`
-      {
-        "text": "CAST($1 AS "public.mood")",
-        "values": [
-          "ok",
-        ],
-      }
-    `);
-    expect(one(param([1], 'int[]'))).toMatchInlineSnapshot(`
-      {
-        "text": "CAST($1 AS "int[]")",
-        "values": [
-          [
-            1,
-          ],
-        ],
-      }
-    `);
+    expect(one(param('ok', 'public.mood'))).toEqual({ text: 'CAST($1 AS "public"."mood")', values: ['ok'] });
+    expect(one(param([1], 'int4[]'))).toEqual({ text: 'CAST($1 AS "int4"[])', values: [[1]] });
+    expect(one(param([[1]], 'int4[3][]'))).toEqual({ text: 'CAST($1 AS "int4"[3][])', values: [[[1]]] });
+    expect(one(param(['ok'], 'public.mood[]'))).toEqual({ text: 'CAST($1 AS "public"."mood"[])', values: [['ok']] });
+    expect(one(param([1], 'pg_catalog"."int4[]'))).toEqual({ text: 'CAST($1 AS "pg_catalog"."int4"[])', values: [[1]] });
+    // a type already quoted is written as is, so a name that holds a `.` stays reachable
+    expect(one(param('ok', '"public"."mood"'))).toEqual({ text: 'CAST($1 AS "public"."mood")', values: ['ok'] });
+    expect(one(param('x', '"a.b"'))).toEqual({ text: 'CAST($1 AS "a.b")', values: ['x'] });
+    // no part is written unquoted, so the grammar's aliases are not types: `"int"` does not exist, `"char"` is not char(1)
+    expect(one(param([1], 'int[]'))).toEqual({ text: 'CAST($1 AS "int"[])', values: [[1]] });
+    expect(one(param('x', 'char'))).toEqual({ text: 'CAST($1 AS "char")', values: ['x'] });
+  });
+
+  it('with a text cast outside that grammar: one quoted identifier, its bounds after it only as `[]` or `[n]`', () => {
+    const text = (cast: string) => one(param(1, cast)).text;
+    expect(text('double precision')).toBe('CAST($1 AS "double precision")');
+    expect(text('timestamp with time zone')).toBe('CAST($1 AS "timestamp with time zone")');
+    expect(text('varchar(10)')).toBe('CAST($1 AS "varchar(10)")');
+    expect(text('int4 ARRAY')).toBe('CAST($1 AS "int4 ARRAY")');
+    expect(text('int4 []')).toBe('CAST($1 AS "int4 "[])');
+    expect(text('int4[ ]')).toBe('CAST($1 AS "int4[ ]")');
+    expect(text('int4[-1]')).toBe('CAST($1 AS "int4[-1]")');
+    expect(text('int4[0x10]')).toBe('CAST($1 AS "int4[0x10]")');
+    expect(text('int4[[]]')).toBe('CAST($1 AS "int4[[]]")');
+    expect(text('int4[]x')).toBe('CAST($1 AS "int4[]x")');
   });
 
   it('with a text cast that is well-formed once quoted: written as is, as in 6.6.1', () => {
     expect(one(param('1', 'pg_catalog"."int4'))).toEqual({ text: 'CAST($1 AS "pg_catalog"."int4")', values: ['1'] });
+    // with a `"`, `.` does not split: the cast is one name, `"` doubled, unless it is well-formed as above
+    expect(one(param('1', 's.a"b'))).toEqual({ text: 'CAST($1 AS "s.a""b")', values: ['1'] });
+    // well-formed once quoted comes before already quoted: `""""` is the type `""`, as in 6.6.1, not the type `"`
+    expect(one(param('1', '""""'))).toEqual({ text: 'CAST($1 AS """""")', values: ['1'] });
   });
 
   it('with true: arrays and plain objects are JSON-stringified and cast to json', () => {
