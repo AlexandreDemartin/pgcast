@@ -94,7 +94,7 @@ describe('type surprises', () => {
 
   test('raw(), cols(x) and vals(x) are refused as a value where a Parameter<T> stands, filters and writes', () => {
     // each throws in a filter (test/integration/core.test.ts, "raw(), cols(x) and vals(x) as a filter value reject
-    // run()"); as insert() and update() values 6.6.1 sent them as JSON too (#132)
+    // run()"); as insert() and update() values too, where 6.6.1 sent them as JSON (#259)
     // @ts-expect-error raw() is no Parameter<string>: in a Whereable
     db.select('users', { display_name: db.raw("'Ada'") });
     // @ts-expect-error nor Parameter<JSONValue>, on jsonb
@@ -219,6 +219,13 @@ describe('type surprises', () => {
     db.sql<s.users.SQL>`SELECT ${db.cols(['id', 'email'])} FROM ${'users'} WHERE ${'id'} IN (${db.vals([1, 2])})`;
     db.sql`SELECT * FROM ${'users'} WHERE ${'id'} IN (${db.vals(ids)})`;
     db.sql`INSERT INTO ${'users'} (${db.cols({ email: 'a@b' })}) VALUES (${db.vals({ email: 'a@b' })})`;
+  });
+
+  test('characterization: vals({…}) of a sql template takes raw(), cols(x), vals(x) and parent() as values', () => {
+    // a ColumnValues of any value is a GenericSQLExpression; compiling throws on each, but parent() in a nested
+    // query (test/integration/core.test.ts, "in vals({…}) of a sql template of its own reject run()")
+    const row = { email: 'a@b', display_name: db.raw("upper('a')"), tags: db.cols(['t']), settings: db.vals({}), mood: db.parent('mood') };
+    db.sql<s.users.SQL>`INSERT INTO ${'users'} (${db.cols(row)}) VALUES (${db.vals(row)})`;
   });
 
   test('updateValues takes raw(), cols(x) and vals(x) where 6.6.1 took them, and keeps the type of param(x)', () => {

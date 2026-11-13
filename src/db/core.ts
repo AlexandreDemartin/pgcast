@@ -193,12 +193,14 @@ export class DangerousRawString { declare readonly [wrapper]: 'raw'; constructor
  * `DangerousRawString` compiles to the wrapped string value, as-is, which may
  * enable SQL injection attacks.
  *
- * As a `Whereable` value, in `isIn()` or as the value of `eq()` and the other
- * conditions, it throws, and the type refuses it there, as it does as an
- * `insert()` or `update()` value: write a `sql` fragment value instead,
- * `` { name: sql`${self} = ${raw("'Ada'")}` } ``. Zapatos 6.6.1 sent it there
- * as JSON (`'{"value":"…"}'`), not as SQL. In `upsert()`'s
- * `updateValues` it is SQL, on a column that takes a string (text, `jsonb`).
+ * As a `Whereable` value, in `isIn()`, as the value of `eq()` and the other
+ * conditions, and in `vals({…})`, so as an `insert()`, `upsert()` or
+ * `update()` value, it throws: write a `sql` fragment value instead,
+ * `` { name: sql`${self} = ${raw("'Ada'")}` } ``. The type refuses it there,
+ * except on a column typed `any` and in `vals({…})` of a `sql` template.
+ * Zapatos 6.6.1 sent it there as JSON (`'{"value":"…"}'`), not as SQL. In
+ * `upsert()`'s `updateValues` it is SQL, on a column that takes a string
+ * (text, `jsonb`).
  */
 export function raw(x: string) { return new DangerousRawString(x); }
 
@@ -212,8 +214,9 @@ export class ColumnNames<T> { declare readonly [wrapper]: 'cols'; constructor(pu
  * Returns a `ColumnNames` instance, wrapping either an array or an object.
  * `ColumnNames` compiles to a quoted, comma-separated list of array values (for
  * use in a `SELECT` query) or object keys (for use in an `INSERT`, `UDPATE` or
- * `UPSERT` query alongside a `ColumnValues`). As a filter value it throws, and
- * as a value the type refuses it, as for `raw()`; Zapatos 6.6.1 sent it as JSON.
+ * `UPSERT` query alongside a `ColumnValues`). As a filter value and in
+ * `vals({…})`, so as a write value, it throws, and the type refuses it, as for
+ * `raw()`; Zapatos 6.6.1 sent it as JSON.
  */
 export function cols<T>(x: T) { return new ColumnNames<T>(x); }
 
@@ -232,9 +235,12 @@ export class ColumnValues<T> { declare readonly [wrapper]: 'vals'; constructor(p
  * (`` { role: sql`${vals([Default])}` } ``), compiled as a `Whereable` value is.
  * In an array, `parent()` compiles to the parent column (`"authors"."id"`), as
  * in a `sql` template; Zapatos 6.6.1 sent it as JSON (`'{"value":"id"}'`).
- * `raw()`, `cols()` and `vals()` throw in an array in a filter, as `Default`
- * does; outside one they are still sent as JSON. As a filter value `vals(x)`
- * throws, and as a value the type refuses it, as for `raw()`.
+ * In an object, it is the parent column too in a nested query, and throws
+ * outside one, so as an `insert()`, `upsert()` or `update()` value.
+ * `raw()`, `cols()` and `vals()` throw in an object, and in an array in a
+ * filter, as `Default` does; in an array outside one they are still sent as
+ * JSON. As a filter value `vals(x)` throws, and the type refuses it as a
+ * value, as for `raw()`.
  */
 export function vals<T>(x: T) { return new ColumnValues<T>(x); }
 
@@ -250,8 +256,10 @@ export class ParentColumn<T extends Column | undefined = Column | undefined> { d
  * does (R58). As a `Whereable` value, in `eq()` and in `isIn()` /
  * `isNotIn()`, in a `lateral` subquery of `authors`:
  * `{ authorId: isIn([parent('id'), 2]) }` gives `("authorId" IN ("authors"."id", $1))`.
- * Outside a nested query it throws. Zapatos 6.6.1 sent it in `isIn()` as JSON
- * (`'{"value":"id"}'`).
+ * In `vals({…})` it is the parent column too, with no column the column of its
+ * key. Outside a nested query it throws, so as an `insert()`, `upsert()` or
+ * `update()` value. Zapatos 6.6.1 sent it in `isIn()` and in `vals({…})` as
+ * JSON (`'{"value":"id"}'`).
  */
 export function parent<T extends Column | undefined = Column | undefined>(x?: T) { return new ParentColumn<T>(x); }
 
@@ -305,6 +313,7 @@ const
   defaultInWhereable = '`db.Default` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. `DEFAULT` is for INSERT and UPDATE values.',
   selfInWhereable = '`db.self` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: compare with a value, or use it in a `sql` fragment value, where it stands for the column.',
   wrapperInWhereable = '`db.raw()`, `db.cols()` and `db.vals()` have no meaning as a value in a Whereable (a filter), nor in `isIn()`: to compare with SQL, use a `sql` fragment value, where `db.self` stands for the column; to compare with a value, give the value itself, or `db.param()`.',
+  wrapperAsValue = '`db.raw()`, `db.cols()` and `db.vals()` have no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value: to write SQL, use a `sql` fragment value (in `update()`, `db.self` there stands for the column); to write a value, give the value itself, or `db.param()`.',
   builtinWhereable = (name: string) => `A built-in \`${name}\` has no meaning as a Whereable (a filter): it would compile to its own enumerable keys, and to \`TRUE\`, every row, when it has none. To compare with a value, give it as \`db.param(…)\`; to filter, give a plain object (\`{ column: value }\`); await a \`Promise\` first.`;
 
 // built-in objects that are no filter, by their exact prototype, so that a class instance never is one, even of
@@ -323,8 +332,8 @@ const isBuiltin = (x: object) => {
   return builtinPrototypes.has(prototype) || (prototype !== null && Object.getPrototypeOf(prototype) === typedArrayPrototype);
 };
 
-// raw(), cols() and vals() as a filter value: Zapatos 6.6.1 sent them as JSON; compiling raw() there as SQL would
-// turn a caller's raw(input), a parameter until now, into an injection, so they throw
+// raw(), cols() and vals() as a filter value, or in vals({…}) (so as a write value): Zapatos 6.6.1 sent them as JSON;
+// compiling raw() there as SQL would turn a caller's raw(input), a parameter until now, into an injection, so they throw
 const isWrapper = (x: unknown) => x instanceof DangerousRawString || x instanceof ColumnNames || x instanceof ColumnValues;
 
 export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never> {
@@ -541,8 +550,12 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
             columnName = columnNames[i],
             columnValue = columnValues[i];
           if (i > 0) result.text += ', ';
+          // raw(), cols() and vals() are no values here, the writes of insert(), upsert() and update() included;
+          // parent() is the parent column, as in vals([…]), and throws outside a nested query, as every write is
+          if (isWrapper(columnValue)) throw new Error(wrapperAsValue);
           if (columnValue instanceof SQLFragment ||
             columnValue instanceof Parameter ||
+            columnValue instanceof ParentColumn ||
             columnValue === Default) this.compileExpression(columnValue, result, parentTable, columnName);
           else this.compileExpression(new Parameter(columnValue), result, parentTable, columnName);
         }

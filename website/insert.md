@@ -20,7 +20,9 @@ Insert one row or several, and return them as Postgres stored them, defaults and
 
 - `table`: a table of the schema.
 - `values`: an `Insertable`, or an array of them. A `sql` fragment is written as SQL (`` db.sql`now()` ``), `db.Default` as `DEFAULT`; an `undefined` value is `NULL` ([An `undefined` value](#undefined-values)).
-  - `raw()`, `cols()` and `vals()` are no values here: pgcast's type refuses them, where Zapatos 6.6.1's took them. At run time they are still sent as one parameter, as JSON: `{ tagline: db.raw("'x'") }` sends `{"value":"'x'"}` ([#132](https://github.com/AlexandreDemartin/pgcast/issues/132)). For SQL, write a `sql` fragment.
+  - `raw()`, `cols()` and `vals()` are no values here: they throw while compiling, before any query ([`raw()`](/sql-template#raw) gives the message), and pgcast's type refuses them, where Zapatos 6.6.1's took them. For SQL, write a `sql` fragment; in an array or a `jsonb` object, they are part of the value, sent as JSON.
+  - `db.parent()` throws "The 'parent' table alias has no meaning here"<!-- message -->: an `INSERT` has no parent query. The type refuses it.
+  - A column typed `any`, as a `zapatos/custom` placeholder is, passes the type, not the run time. Zapatos 6.6.1 sent each as one parameter, as JSON: `{ tagline: db.raw("'x'") }` stored `{"value":"'x'"}`, `db.parent('id')` `{"value":"id"}` ([#259](https://github.com/AlexandreDemartin/pgcast/issues/259)).
 - `options`: `returning` and `extras` ([Options](#insert-options)).
 
 <CastPanel example="insert">
@@ -61,7 +63,7 @@ db.upsert(table, values, conflictTarget, options?)
 
 `INSERT … ON CONFLICT … DO UPDATE`: insert each row, or update the existing row it conflicts with.
 
-- `table`, `values`: as for [`insert()`](#insert).
+- `table`, `values`: as for [`insert()`](#insert); `raw()`, `cols()`, `vals()` and `parent()` throw there too, on a conflicting row or a new one.
 - `conflictTarget`: the arbiter of the conflict: a column, an array of columns, or the name of a unique or primary-key constraint wrapped in [`constraint()`](#constraint).
 - `options`: `updateColumns`, `noNullUpdateColumns`, `updateValues` and `reportAction` ([Options](#upsert-options)); `returning` and `extras`, as for [`insert()`](#insert-options).
 
@@ -186,7 +188,7 @@ db.update(table, values, where, options?)
 Update the rows that match, and return them. The arguments come in the order of the SQL: `SET`, then `WHERE`.
 
 - `table`: a table of the schema.
-- `values`: an `Updatable`, with at least one key. A `sql` fragment is written as SQL, where `db.self` is the column, and so is a condition such as [`conditions.add()`](/conditions#conditions.add). `raw()`, `cols()` and `vals()` are refused, as for [`insert()`](#insert). An `undefined` value is `NULL` ([An `undefined` value](#undefined-values)).
+- `values`: an `Updatable`, with at least one key. A `sql` fragment is written as SQL, where `db.self` is the column, and so is a condition such as [`conditions.add()`](/conditions#conditions.add). `raw()`, `cols()`, `vals()` and `parent()` throw, as for [`insert()`](#insert). An `undefined` value is `NULL` ([An `undefined` value](#undefined-values)).
 - `where`: a `Whereable`, or a `sql` fragment ([Conditions](/conditions)).
 - `options`: `returning` and `extras`, as for [`insert()`](#insert-options).
 
