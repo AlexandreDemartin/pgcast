@@ -207,6 +207,27 @@ describe('undefinedMeansMissing', () => {
   });
 });
 
+describe('selectExactlyOneChecksForSecondRow', () => {
+  test('an optional boolean of Config and setConfig, which changes no type', () => {
+    db.setConfig({ selectExactlyOneChecksForSecondRow: true });
+    expectTypeOf(db.getConfig().selectExactlyOneChecksForSecondRow).toEqualTypeOf<boolean | undefined>();
+    expectTypeOf<db.NewConfig['selectExactlyOneChecksForSecondRow']>().toEqualTypeOf<boolean | undefined>();
+    expectTypeOf(db.selectExactlyOne('users', { id: 1 }).run(pool)).resolves.toEqualTypeOf<s.users.JSONSelectable>();
+    // a Config written for 6.6.1, without the key, still compiles
+    const c: db.Config = {
+      transactionAttemptsMax: 5,
+      transactionRetryDelay: { minMs: 25, maxMs: 250 },
+      castArrayParamsToJson: false,
+      castObjectParamsToJson: false,
+    };
+    // @ts-expect-error a boolean, not a string
+    const d: db.Config = { ...c, selectExactlyOneChecksForSecondRow: 'yes' };
+    void d;
+    // @ts-expect-error a boolean, not a string
+    db.setConfig({ selectExactlyOneChecksForSecondRow: 'yes' });
+  });
+});
+
 describe('update, deletes', () => {
   test('update: JSONSelectable[]', () => {
     const q = db.update('users', { display_name: 'B' }, { id: 1 });
