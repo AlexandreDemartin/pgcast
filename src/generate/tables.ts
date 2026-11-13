@@ -191,12 +191,14 @@ export const definitionForRelationInSchema = async (
     if (isUpdatable) updatables.push(`${columnDoc}${possiblyQuotedColumn}?: ${updatableTypes} | db.SQLFragment<any, ${updatableTypes}>;`);
   });
 
+  // an index sits in its table's schema: matched on its name alone, it also took another schema's unique index
   const
     result = await queryFn({
       text: `
         SELECT DISTINCT i.indexname
         FROM pg_catalog.pg_indexes i
-        JOIN pg_catalog.pg_class c ON c.relname = i.indexname
+        JOIN pg_catalog.pg_namespace n ON n.nspname = i.schemaname
+        JOIN pg_catalog.pg_class c ON c.relname = i.indexname AND c.relnamespace = n.oid
         JOIN pg_catalog.pg_index idx ON idx.indexrelid = c.oid AND idx.indisunique
         WHERE i.tablename = $1 AND i.schemaname = $2
         ORDER BY i.indexname`,
