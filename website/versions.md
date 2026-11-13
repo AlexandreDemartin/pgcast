@@ -21,9 +21,9 @@ pgcast spreads a break over two majors instead, and warns you ahead of the first
 
 ## Four answers to a surprise
 
-Characterising Zapatos 6.6.1 turned up 64 surprises ([the report](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/CHARACTERISATION-REPORT.md)): SQL that Postgres refuses, results that contradict a function's name, holes in the escaping.
+Characterising Zapatos 6.6.1 turned up 67 surprises ([the report](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/CHARACTERISATION-REPORT.md)): SQL that Postgres refuses, results that contradict a function's name, holes in the escaping.
 
-31 of them can't be fixed without changing a result that is valid today, and [decision 003](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/003-fixes-and-deprecation.md) sorts those by a single question: could working code depend on what it does now? The report leaves a few as they are, each with its reason.
+34 of them can't be fixed without changing a result that is valid today, and [decision 003](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/003-fixes-and-deprecation.md) sorts those by a single question: could working code depend on what it does now? The report leaves a few as they are, each with its reason.
 
 <div class="stack">
 
