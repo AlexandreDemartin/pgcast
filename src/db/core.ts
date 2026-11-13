@@ -300,7 +300,24 @@ const quotedName = new RegExp(`^"(?:[^"\\0]|"")+"(?:${space}\\.${space}(?:${iden
 const
   defaultInWhereable = '`db.Default` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. `DEFAULT` is for INSERT and UPDATE values.',
   selfInWhereable = '`db.self` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: compare with a value, or use it in a `sql` fragment value, where it stands for the column.',
-  wrapperInWhereable = '`db.raw()`, `db.cols()` and `db.vals()` have no meaning as a value in a Whereable (a filter), nor in `isIn()`: to compare with SQL, use a `sql` fragment value, where `db.self` stands for the column; to compare with a value, give the value itself, or `db.param()`.';
+  wrapperInWhereable = '`db.raw()`, `db.cols()` and `db.vals()` have no meaning as a value in a Whereable (a filter), nor in `isIn()`: to compare with SQL, use a `sql` fragment value, where `db.self` stands for the column; to compare with a value, give the value itself, or `db.param()`.',
+  builtinWhereable = (name: string) => `A built-in \`${name}\` has no meaning as a Whereable (a filter): it would compile to its own enumerable keys, and to \`TRUE\`, every row, when it has none. To compare with a value, give it as \`db.param(…)\`; to filter, give a plain object (\`{ column: value }\`); await a \`Promise\` first.`;
+
+// built-in objects that are no filter, by their exact prototype, so that a class instance never is one, even of
+// a class that extends a built-in. Zapatos 6.6.1 compiled them as Whereables of their own keys: none (`TRUE`,
+// every row), or indexes (`"0" = $1`). A typed array's prototype is one whose own prototype is %TypedArray%'s:
+// `Uint8Array.prototype`, `Float64Array.prototype`…, and not a subclass's (`Buffer` is listed for this reason)
+const
+  builtinPrototypes = new Set<unknown>([
+    Date, Map, Set, WeakMap, WeakSet, RegExp, Promise, ArrayBuffer, DataView, Buffer, Number, String, Boolean,
+    Error, EvalError, RangeError, ReferenceError, SyntaxError, TypeError, URIError,
+  ].map(builtin => builtin.prototype)),
+  typedArrayPrototype = Object.getPrototypeOf(Uint8Array.prototype);
+
+const isBuiltin = (x: object) => {
+  const prototype = Object.getPrototypeOf(x);
+  return builtinPrototypes.has(prototype) || (prototype !== null && Object.getPrototypeOf(prototype) === typedArrayPrototype);
+};
 
 // raw(), cols() and vals() as a filter value: Zapatos 6.6.1 sent them as JSON; compiling raw() there as SQL would
 // turn a caller's raw(input), a parameter until now, into an injection, so they throw
@@ -529,6 +546,7 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
 
     } else if (typeof expression === 'object') {
       if (expression === globalThis) throw new Error('Did you use `self` (the global object) where you meant `db.self` (the Zapatos value)? The global object cannot be embedded in a query.');
+      if (expression !== null && isBuiltin(expression)) throw new Error(builtinWhereable(Object.getPrototypeOf(expression).constructor.name));
 
       // must be a Whereable object, so put together a WHERE clause
       const columnNames = <Column[]>Object.keys(expression).sort();

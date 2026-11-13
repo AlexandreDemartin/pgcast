@@ -52,14 +52,14 @@ Each value between `${…}` compiles by what it is. The SQL is the built library
 | `raw(s)` | `s`, as it is | [`raw()`](#raw) |
 | `cols(o)` / `cols(a)` | the object's keys, sorted, or the array's items, quoted: `"film_id", "tag"`<!-- probe: db.sql`${db.cols({ tag: 'x', film_id: 1 })}` --> | [`cols()`](#cols) |
 | `vals(o)` / `vals(a)` | the values, in the order of `cols(o)`, or the array's: `$1, $2`<!-- probe: db.sql`${db.vals({ tag: 'x', film_id: 1 })}` --> | [`vals()`](#vals) |
-| any other object | a Whereable of its own enumerable keys, plain or not: `("studio_id" = $1)`<!-- probe: db.sql`${{ studio_id: 1000 }}` -->; `{}` → `TRUE`<!-- probe: db.sql`${{}}` -->, and so `new Date()` → `TRUE`<!-- probe: db.sql`${new Date()}` --> | [Whereable objects](#whereable) |
+| any other object | a Whereable of its own enumerable keys, plain or not: `("studio_id" = $1)`<!-- probe: db.sql`${{ studio_id: 1000 }}` -->; `{}` → `TRUE`<!-- probe: db.sql`${{}}` -->; a built-in object, such as a `Date`, throws | [Whereable objects](#whereable) |
 | `self` | the current column, in a Whereable's fragment value | [`self`](#self) |
 | `parent(c?)` | the column of the parent query: `"studios"."id"`<!-- probe: db.select('studios', db.all, { lateral: { films: db.select('films', { studio_id: db.parent('id') }) } }) --> | [`parent()`](#parent) |
 | `Default` | `DEFAULT`<!-- probe: db.sql`${db.Default}` --> | [`Default`](#Default) |
 | a `sql` fragment | its own SQL, its parameters numbered on | [Nested fragments](#nested-fragments) |
 | an array | each item in turn, nothing between; `[]` → nothing | [Arrays](#arrays) |
 
-Anything else throws while compiling, so `run()` rejects before any query, and the type refuses it: a number or a boolean (`Alien object while interpolating SQL: 42`<!-- message -->), `null`, `undefined`, a symbol such as [`all`](#all). The global object, which the type lets through, throws too: "Did you use `self` (the global object) where you meant `db.self` (the Zapatos value)?…"<!-- message -->.
+Anything else throws while compiling, so `run()` rejects before any query, and the type refuses it (`null` and `undefined` only with `strictNullChecks`): a number or a boolean (`Alien object while interpolating SQL: 42`<!-- message -->), `null`, `undefined`, a symbol such as [`all`](#all). The global object, which the type lets through, throws too: "Did you use `self` (the global object) where you meant `db.self` (the Zapatos value)?…"<!-- message -->.
 
 ## Identifiers {#identifiers}
 
@@ -267,8 +267,16 @@ An object is a Whereable of the table: each own enumerable key a column, each va
 - The shortcuts take the same object as their `where` ([`select()`](/select#select)).
 
 ::: warning Security
-An interpolated object that is not one of the other [interpolations](#interpolations) compiles as a Whereable, plain or not: a class instance `{ title }` gives `("title" = $1)`<!-- probe: db.sql`${new (class { title = 'x' })()}` -->, and a `Date` or a `Map`, which have no own enumerable key, give `TRUE`. So `` db.sql`DELETE FROM ${'films'} WHERE ${new Date()}` `` is `DELETE FROM "films" WHERE TRUE`<!-- probe: db.sql`DELETE FROM ${'films'} WHERE ${new Date()}` -->, and deletes every row. The type refuses a `Date` or a `Map` (TS2345), so this hits a value typed `any` or untyped: check what reaches a `where` at run time.
+An interpolated object that is not one of the other [interpolations](#interpolations) compiles as a Whereable, plain or not: a class instance `{ title }` gives `("title" = $1)`<!-- probe: db.sql`${new (class { title = 'x' })()}` -->, and one with no own enumerable key gives `TRUE`, even of a class that extends a built-in (`class Premiere extends Date {}`). Check what reaches a `where` at run time.
 :::
+
+A built-in object throws while compiling, before any query, even with own keys added (`Object.assign(new Date(0), { id: 1 })`): `Date`, `Map`, `Set`, `WeakMap`, `WeakSet`, `RegExp`, `Promise`, `Error` and its native subtypes (`TypeError`, …), `ArrayBuffer`, a typed array, `Buffer`, `DataView`, and the boxes `Number`, `String` and `Boolean`:
+
+> `` A built-in `…` has no meaning as a Whereable (a filter): it would compile to its own enumerable keys, and to `TRUE`, every row, when it has none. To compare with a value, give it as `db.param(…)`; to filter, give a plain object (`{ column: value }`); await a `Promise` first. ``<!-- message -->
+
+Zapatos 6.6.1 compiled it as a Whereable of its own keys: `TRUE` for most, so `` db.sql`DELETE FROM ${'films'} WHERE ${new Date()}` `` was `DELETE FROM "films" WHERE TRUE` and deleted every row; `("0" = $1 …)` for a typed array. The type refuses most of them (TS2345), not where a column shares one of their members: `db.deletes('actors', new Error('x'))` type-checks, since `actors` has a `name` column.
+
+Only the built-ins of the realm that runs pgcast throw, matched by their exact prototype. As in Zapatos 6.6.1, a `Date` from another realm, such as `vm.runInNewContext('new Date(0)')` (Jest runs each test file in a `vm` context), gives `TRUE`, and an instance of a class that extends a built-in keeps its own keys: `new Frames(1)`, with `class Frames extends Uint8Array {}`, gives `("0" = $1)`.
 
 ## `self` {#self}
 

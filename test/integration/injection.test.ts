@@ -15,6 +15,7 @@ import { describe, expect, it, vi } from 'vitest';
 import * as db from '../../src/db';
 import { sql, param, vals, all } from '../../src/db';
 import { useTestDatabase } from '../helpers/db';
+import { builtinObjects } from '../helpers/builtinObjects';
 import { hostileCasts } from '../helpers/hostileCasts';
 import { pgError } from '../helpers/pgError';
 
@@ -675,5 +676,40 @@ describe('transaction', () => {
     } finally {
       connect.mockRestore();
     }
+  });
+});
+
+describe('a built-in object as a filter', () => {
+  it('throws before any query, through sql and the where of select, update and deletes', async () => {
+    // 6.6.1 ran DELETE … WHERE TRUE for a Date (every row), or failed on a column "0" for a view (#170)
+    const
+      outcomes: Record<string, string> = {},
+      query = vi.spyOn(t.client, 'query');
+    try {
+      for (const [name, x] of Object.entries(builtinObjects())) {
+        const queries = {
+          sql: sql`DELETE FROM ${'users'} WHERE ${x as any}`,
+          select: db.select('users', x as any),
+          update: db.update('users', { display_name: 'injected' }, x as any),
+          deletes: db.deletes('users', x as any),
+        };
+        for (const [where, q] of Object.entries(queries))
+          outcomes[`${name} ${where}`] = await q.run(t.client).then(
+            () => 'ran',
+            (err: { code?: string, message: string }) =>
+              err.message.startsWith(`A built-in \`${name}\` has no meaning as a Whereable`) ? 'throws' : err.code ?? err.message);
+      }
+      expect(query).not.toHaveBeenCalled();
+    } finally {
+      query.mockRestore();
+    }
+    expect(Object.entries(outcomes).filter(([, outcome]) => outcome !== 'throws')).toEqual([]);
+    expect(await adaName()).toBe('Ada');
+  });
+
+  it('an Error that type-checks as a Whereable of orgs, which has a name column, throws too', async () => {
+    // no cast: the weak-type check takes an Error where a column shares one of its members (test/types/shortcuts.test-d.ts)
+    await expect(db.deletes('orgs', new Error('x')).run(t.client))
+      .rejects.toThrow('A built-in `Error` has no meaning as a Whereable (a filter)');
   });
 });

@@ -8,9 +8,11 @@
 // fixed yet (chapter 2).
 // Inputs are cast to `any`: at run time they may come from untyped data (req.body).
 
+import { runInNewContext } from 'node:vm';
 import { describe, expect, it, vi } from 'vitest';
 import * as db from '../../src/db';
 import { sql, param, cols, vals, all } from '../../src/db';
+import { builtinObjects } from '../helpers/builtinObjects';
 import { hostileCasts } from '../helpers/hostileCasts';
 
 const hostile = {
@@ -1115,6 +1117,173 @@ describe('shortcut options', () => {
         "uescape": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" GROUP BY """s"""."U&""a"" UESCAPE '!' || ""b""") AS "sq_users"",
         "unicodeCloses": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" GROUP BY """s"""."U&""a\\"" OR TRUE OR \\""b""") AS "sq_users"",
         "unicodeEscaped": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" GROUP BY "s".U&"a\\0022"" OR TRUE OR ""\\0022b") AS "sq_users"",
+      }
+    `);
+  });
+});
+
+describe('a built-in object as a Whereable', () => {
+  // a built-in has no own enumerable key, or only index keys: 6.6.1 compiled it to TRUE, every row,
+  // or to ("0" = $1 …); each now throws while compiling, before any query (#170)
+  const outcomes = (build: (x: any) => db.SQLFragment<any, any>) =>
+    Object.fromEntries(Object.entries(builtinObjects()).map(([name, x]) => {
+      try {
+        return [name, build(x).compile().text];
+      } catch (err) {
+        return [name, `throws: ${(err as Error).message}`];
+      }
+    }));
+
+  it('throws, saying what to do', () => {
+    expect(() => sql`DELETE FROM ${'users'} WHERE ${new Date(0) as any}`.compile()).toThrowErrorMatchingInlineSnapshot(`[Error: A built-in \`Date\` has no meaning as a Whereable (a filter): it would compile to its own enumerable keys, and to \`TRUE\`, every row, when it has none. To compare with a value, give it as \`db.param(…)\`; to filter, give a plain object (\`{ column: value }\`); await a \`Promise\` first.]`);
+  });
+
+  it('throws for a built-in with own enumerable keys too', () => {
+    // 6.6.1 compiled its keys, a filter that type-checks: ("id" = $1); still refused, as a built-in
+    expect(() => sql`DELETE FROM ${'users'} WHERE ${Object.assign(new Date(0), { id: 1 })}`.compile())
+      .toThrow('A built-in `Date` has no meaning as a Whereable (a filter)');
+  });
+
+  it('throws for each built-in, through sql, a condition and the where of each shortcut', () => {
+    const
+      expected = (name: string) => `throws: A built-in \`${name}\` has no meaning as a Whereable (a filter)`,
+      entryPoints: Record<string, (x: any) => db.SQLFragment<any, any>> = {
+        sql: x => sql`DELETE FROM ${'users'} WHERE ${x}`,
+        arrayItem: x => sql`SELECT 1 WHERE ${[x]}`,
+        and: x => sql`SELECT 1 WHERE ${db.conditions.and({ id: 1 }, x)}`,
+        or: x => sql`SELECT 1 WHERE ${db.conditions.or({ id: 1 }, x)}`,
+        not: x => sql`SELECT 1 WHERE ${db.conditions.not(x)}`,
+        select: x => db.select('users', x),
+        selectOne: x => db.selectOne('users', x),
+        count: x => db.count('users', x),
+        update: x => db.update('users', { display_name: 'Ada' }, x),
+        deletes: x => db.deletes('users', x),
+        lateral: x => db.select('users', all, { lateral: { orgs: db.select('orgs', x) } }),
+      };
+    for (const [entryPoint, build] of Object.entries(entryPoints))
+      for (const [name, outcome] of Object.entries(outcomes(build)))
+        expect(outcome.startsWith(expected(name)), `${entryPoint} ${name}: ${outcome}`).toBe(true);
+  });
+
+  it('a plain object, a null-prototype object, a class instance and a built-in value compile as before', () => {
+    // a class instance is never refused, even of a class that extends a built-in: its own keys, as in 6.6.1;
+    // nor is a built-in of another realm (a vm context), whose prototype is not this realm's
+    class Premiere extends Date {}
+    class FilmError extends Error { id = 1; }
+    class Frames extends Uint8Array {}
+    // the type of Buffer gives no constructor to extend
+    class Reel extends (Buffer as any) {}
+    class Still extends DataView<ArrayBuffer> {}
+    const kept: Record<string, any> = {
+      plain: { display_name: 'Ada' },
+      empty: {},
+      nullPrototype: Object.assign(Object.create(null), { display_name: 'Ada' }),
+      classInstance: new (class { display_name = 'Ada'; })(),
+      classWithoutOwnKeys: new (class { get display_name() { return 'Ada'; } })(),
+      subclassOfDate: new Premiere(0),
+      subclassOfError: new FilmError('x'),
+      subclassOfTypedArray: new Frames(1),
+      subclassOfTypedArrayEmpty: new Frames(0),
+      subclassOfBuffer: Object.setPrototypeOf(Buffer.from('id'), Reel.prototype),  // new Buffer() returns a Buffer
+      subclassOfDataView: new Still(new ArrayBuffer(1)),
+      otherRealmDate: runInNewContext('new Date(0)'),
+      builtinValues: { created_at: new Date(0), tags: new Set(['a']), settings: new Map(), photo: Buffer.from('a') },
+      array: [{ id: 1 }, sql` AND TRUE`],
+    };
+    expect({
+      ...Object.fromEntries(Object.entries(kept).map(([name, x]) => [name, sql`DELETE FROM ${'users'} WHERE ${x}`.compile()])),
+      param: sql`DELETE FROM ${'users'} WHERE ${'created_at'} < ${param(new Date(0))}`.compile(),
+    }).toMatchInlineSnapshot(`
+      {
+        "array": {
+          "text": "DELETE FROM "users" WHERE ("id" = $1) AND TRUE",
+          "values": [
+            1,
+          ],
+        },
+        "builtinValues": {
+          "text": "DELETE FROM "users" WHERE ("created_at" = $1 AND "photo" = $2 AND "settings" = $3 AND "tags" = $4)",
+          "values": [
+            1970-01-01T00:00:00.000Z,
+            {
+              "data": [
+                97,
+              ],
+              "type": "Buffer",
+            },
+            Map {},
+            Set {
+              "a",
+            },
+          ],
+        },
+        "classInstance": {
+          "text": "DELETE FROM "users" WHERE ("display_name" = $1)",
+          "values": [
+            "Ada",
+          ],
+        },
+        "classWithoutOwnKeys": {
+          "text": "DELETE FROM "users" WHERE TRUE",
+          "values": [],
+        },
+        "empty": {
+          "text": "DELETE FROM "users" WHERE TRUE",
+          "values": [],
+        },
+        "nullPrototype": {
+          "text": "DELETE FROM "users" WHERE ("display_name" = $1)",
+          "values": [
+            "Ada",
+          ],
+        },
+        "otherRealmDate": {
+          "text": "DELETE FROM "users" WHERE TRUE",
+          "values": [],
+        },
+        "param": {
+          "text": "DELETE FROM "users" WHERE "created_at" < $1",
+          "values": [
+            1970-01-01T00:00:00.000Z,
+          ],
+        },
+        "plain": {
+          "text": "DELETE FROM "users" WHERE ("display_name" = $1)",
+          "values": [
+            "Ada",
+          ],
+        },
+        "subclassOfBuffer": {
+          "text": "DELETE FROM "users" WHERE ("0" = $1 AND "1" = $2)",
+          "values": [
+            105,
+            100,
+          ],
+        },
+        "subclassOfDataView": {
+          "text": "DELETE FROM "users" WHERE TRUE",
+          "values": [],
+        },
+        "subclassOfDate": {
+          "text": "DELETE FROM "users" WHERE TRUE",
+          "values": [],
+        },
+        "subclassOfError": {
+          "text": "DELETE FROM "users" WHERE ("id" = $1)",
+          "values": [
+            1,
+          ],
+        },
+        "subclassOfTypedArray": {
+          "text": "DELETE FROM "users" WHERE ("0" = $1)",
+          "values": [
+            0,
+          ],
+        },
+        "subclassOfTypedArrayEmpty": {
+          "text": "DELETE FROM "users" WHERE TRUE",
+          "values": [],
+        },
       }
     `);
   });

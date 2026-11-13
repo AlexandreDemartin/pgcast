@@ -5,6 +5,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { MarkdownRenderer, SiteConfig } from 'vitepress';
+import { earlyCloser, fenceClosed, fenceOpened } from './fences.ts';
 import { host } from './llms.ts';
 
 /**
@@ -33,15 +34,13 @@ const
     }
   },
   // `[line, url]` of each URL of the site in a fenced block (```` ``` ```` or `~~~`, indented in a list too), without
-  // a full stop or comma after it. A ```` ``` ```` line with a backtick after it opens no fence: it is inline code, as
-  // in CommonMark. A fence closes on its marker alone, as long or longer, with nothing after it.
+  // a full stop or comma after it.
   fencedSiteUrls = (markdown: string) => {
     const urls: [number, string][] = [];
     let fence: string | null = null;
     markdown.split(/\r?\n/).forEach((line, i) => {  // a CRLF checkout too
-      const [, marker, rest] = /^\s*(`{3,}|~{3,})(.*)$/.exec(line) ?? [];
-      if (fence === null) fence = marker?.[0] === '`' && rest!.includes('`') ? null : marker ?? null;
-      else if (marker?.[0] === fence[0] && marker.length >= fence.length && rest!.trim() === '') fence = null;
+      if (fence === null) fence = fenceOpened(line)?.marker ?? null;
+      else if (fenceClosed(fence, line)) fence = null;
       else urls.push(...[...line.matchAll(/https?:\/\/[^\s"'<>`()[\]]+/g)]
         .filter(([url]) => url.startsWith(`${host}/`))
         .map(([url]): [number, string] => [i + 1, url.replace(/[.,;:!?]+$/, '')]));
@@ -56,6 +55,9 @@ const
  * lands once its entry is written, and writing it removes the name. Run once every file is written (`llms.txt` too).
  */
 export function checkLinks(config: SiteConfig) {
+  // A self-check: a block after a ```md block that shows a ```ts line is a block.
+  if (fencedSiteUrls(`${earlyCloser}\`\`\`sh\n${host}/\n\`\`\``).length !== 1)
+    throw new Error('anchors.ts: a URL in a block after a ```md block went unchecked: check fences.ts');
   const
     { base } = config.site,
     pending: Record<string, string[]> = JSON.parse(readFileSync(join(config.srcDir, 'reference-pending.json'), 'utf8')),
