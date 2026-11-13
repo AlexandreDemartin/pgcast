@@ -107,7 +107,7 @@ declare const pool: pg.Pool;
 await db.transaction(pool, 'SERIALIZABLE', async txnClient => true);
 ```
 
-Zapatos 6.6.1 wrote any value after `ISOLATION LEVEL` as it was, where it could run a second statement ([changelog](https://github.com/AlexandreDemartin/pgcast/blob/master/CHANGELOG.md), § Security). A transaction passed through is not checked.
+Zapatos 6.6.1 wrote any value after `ISOLATION LEVEL` as it was, where it could run a second statement ([changelog](/changelog#6.6.2-security)). A transaction passed through is not checked.
 
 ## `serializable()` {#serializable}
 

@@ -99,4 +99,4 @@ Some changes are refused whatever they'd gain, because each would take away some
 
 - The entries this page talks about: [`select()`](/select#select), [`selectOne()`](/select#selectOne), the [`sql`](/sql-template#sql) template and [`.compile()`](/sql-template#compile), [`transaction()`](/transaction#transaction), [`Config.undefinedMeansMissing`](/runtime-config#Config.undefinedMeansMissing), [`Config.upsertRequiresSameKeys`](/runtime-config#Config.upsertRequiresSameKeys), [`Config.transactionRequiresCommit`](/runtime-config#Config.transactionRequiresCommit) and [`Config.selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow).
 - The guides: [Join through a lateral](/lateral), [Retry a transaction](/retries), [Switch from Zapatos](/switching).
-- Zapatos's own [docs](https://jawj.github.io/zapatos/), for 6.6.1; what pgcast changes, in the [changelog](https://github.com/AlexandreDemartin/pgcast/blob/master/CHANGELOG.md).
+- Zapatos's own [docs](https://jawj.github.io/zapatos/), for 6.6.1; what pgcast changes, in the [changelog](/changelog).
