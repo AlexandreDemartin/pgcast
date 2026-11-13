@@ -42,7 +42,10 @@ npm install zapatos@npm:pgcast
 npx zapatos
 ```
 
-pgcast's generator is Zapatos 6.6.1's: on the docs schema, it writes the same files, byte for byte, so `git diff` on your `zapatos/` folder should show nothing.
+pgcast's generator is Zapatos 6.6.1's, with two fixes to what it writes. A `git diff` on your `zapatos/` folder shows nothing, unless:
+
+- a column comment runs over several lines: each line now starts with ` * `;
+- a table has a plain index named like another schema's unique index: its `UniqueIndex` no longer borrows that name.
 
 ## 3. Compile {#compile}
 
@@ -231,8 +234,8 @@ The note of [`enumOrder`](/generator#generate.enumOrder) names each enum whose l
 npm install zapatos@6.6.1
 ```
 
-- First, remove the three options from `setConfig()`: Zapatos 6.6.1's `Config` doesn't have them (2353).
-- The generated files are the same. Zapatos 6.6.1 ignores `typeEnumsAcrossSchemas` and `enumOrder` in `zapatosconfig.json`, and generates the `any` types and the sorted labels again.
+- First, remove from `setConfig()` the options Zapatos 6.6.1's `Config` doesn't have (2353): `upsertRequiresSameKeys`, `undefinedMeansMissing`, `transactionRequiresCommit` and `selectExactlyOneChecksForSecondRow`.
+- Regenerate with Zapatos 6.6.1. It ignores `typeEnumsAcrossSchemas` and `enumOrder` in `zapatosconfig.json`, and writes again the `any` types, the sorted labels, the unprefixed comment lines and any borrowed `UniqueIndex` name.
 - Each change of [Find the calls whose result changes](#find-the-calls-whose-result-changes) runs as it did, but the `jsonb` one, which finds nothing again.
 
 ::: warning Security
