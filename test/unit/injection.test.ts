@@ -294,6 +294,86 @@ describe('raw, cols and vals as a filter value', () => {
   });
 });
 
+describe('raw, cols and vals as a write value', () => {
+  it('raw(input) as an insert(), upsert() or update() value, or in vals({…}), throws, and is never written into the text', () => {
+    // 6.6.1 sent it as JSON, so raw(input) there was a parameter by accident; compiling it as SQL would make
+    // it an injection, so it throws before any text is returned (#259)
+    const asValue = 'throws: `db.raw()`, `db.cols()` and `db.vals()` have no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value: to write SQL, use a `sql` fragment value (in `update()`, `db.self` there stands for the column); to write a value, give the value itself, or `db.param()`.';
+    const builds = {
+      insert: (v: string) => db.insert('users', { email: 'x', display_name: db.raw(v) }),
+      insertRows: (v: string) => db.insert('users', [{ email: 'x', display_name: 'X' }, { email: 'y', display_name: db.raw(v) }]),
+      upsert: (v: string) => db.upsert('users', { email: 'x', display_name: db.raw(v) }, 'email'),
+      update: (v: string) => db.update('users', { display_name: db.raw(v) }, { id: 1 }),
+      sql: (v: string) => sql`INSERT INTO ${'users'} (${cols({ display_name: 1 })}) VALUES (${vals({ display_name: db.raw(v) })})`,
+      nested: (v: string) => sql`SELECT ${vals({ a: db.raw(v) })}`.copy({ parentTable: 'users' }),
+    };
+    expect(Object.fromEntries(Object.entries(builds).map(([name, build]) => [name, new Set(Object.values(matrix(build)))])))
+      .toEqual(Object.fromEntries(Object.keys(builds).map(name => [name, new Set([asValue])])));
+  });
+
+  it('the column of parent() in vals({…}), quoted as a Whereable value quotes it', () => {
+    // the same text as { owner_id: parent(v) }; with no column, its vals({…}) key reaches the text instead (below, #259)
+    expect(matrix(v => sql`SELECT ${vals({ a: db.parent(v) })}`.copy({ parentTable: 'users' }))).toMatchInlineSnapshot(`
+      {
+        "backslash": "SELECT "users"."a\\b"",
+        "comment": "SELECT "users"."a/*b"",
+        "dashes": "SELECT "users"."a--b"",
+        "dollar": "SELECT "users"."a$1b"",
+        "dot": "SELECT "users"."a"."b"",
+        "dquote": "SELECT "users"."a""b"",
+        "escapedCloses": "SELECT "users"."a"" OR TRUE OR ""b"",
+        "escapedDot": "SELECT "users"."a"".""b"",
+        "escapedNul": "SELECT "users"."a""""<NUL>""""b"",
+        "escapedOdd": "SELECT "users"."a""""""b"",
+        "lone": "SELECT "users".""""",
+        "mixedEscaped": "SELECT "users"."s".a$1."b"" OR TRUE OR ""c"",
+        "nul": "SELECT "users"."a<NUL>b"",
+        "prequoted": "SELECT "users"."a"",
+        "prequotedCloses": "SELECT "users"."""a"" OR TRUE OR ""b"""",
+        "prequotedEmpty": "SELECT "users".""""",
+        "prequotedEscaped": "SELECT "users"."a"" OR TRUE OR ""b"",
+        "qualifiedEscaped": "SELECT "users"."s"."a"" OR TRUE OR ""b"",
+        "semicolon": "SELECT "users"."a;b"",
+        "squote": "SELECT "users"."a'b"",
+        "uescape": "SELECT "users"."""s"""."U&""a"" UESCAPE '!' || ""b"""",
+        "unicodeCloses": "SELECT "users"."""s"""."U&""a\\"" OR TRUE OR \\""b"""",
+        "unicodeEscaped": "SELECT "users"."s".U&"a\\0022"" OR TRUE OR ""\\0022b"",
+      }
+    `);
+  });
+
+  it('the key of vals({…}) given parent() with no column, quoted as the key of { [k]: parent() } is', () => {
+    // a new interpolated input: the key reaches the text as the parent column, as a Whereable key does (#259)
+    expect(matrix(v => sql`SELECT ${vals({ [v]: db.parent() })}`.copy({ parentTable: 'users' }))).toMatchInlineSnapshot(`
+      {
+        "backslash": "SELECT "users"."a\\b"",
+        "comment": "SELECT "users"."a/*b"",
+        "dashes": "SELECT "users"."a--b"",
+        "dollar": "SELECT "users"."a$1b"",
+        "dot": "SELECT "users"."a"."b"",
+        "dquote": "SELECT "users"."a""b"",
+        "escapedCloses": "SELECT "users"."a"" OR TRUE OR ""b"",
+        "escapedDot": "SELECT "users"."a"".""b"",
+        "escapedNul": "SELECT "users"."a""""<NUL>""""b"",
+        "escapedOdd": "SELECT "users"."a""""""b"",
+        "lone": "SELECT "users".""""",
+        "mixedEscaped": "SELECT "users"."s".a$1."b"" OR TRUE OR ""c"",
+        "nul": "SELECT "users"."a<NUL>b"",
+        "prequoted": "SELECT "users"."a"",
+        "prequotedCloses": "SELECT "users"."""a"" OR TRUE OR ""b"""",
+        "prequotedEmpty": "SELECT "users".""""",
+        "prequotedEscaped": "SELECT "users"."a"" OR TRUE OR ""b"",
+        "qualifiedEscaped": "SELECT "users"."s"."a"" OR TRUE OR ""b"",
+        "semicolon": "SELECT "users"."a;b"",
+        "squote": "SELECT "users"."a'b"",
+        "uescape": "SELECT "users"."""s"""."U&""a"" UESCAPE '!' || ""b"""",
+        "unicodeCloses": "SELECT "users"."""s"""."U&""a\\"" OR TRUE OR \\""b"""",
+        "unicodeEscaped": "SELECT "users"."s".U&"a\\0022"" OR TRUE OR ""\\0022b"",
+      }
+    `);
+  });
+});
+
 describe('a Parameter in a Whereable or in vals of an array', () => {
   it('its cast compiles as in sql`${param(x, cast)}`, in a Whereable, isIn and vals', () => {
     for (const cast of [...Object.values(hostile), ...Object.values(hostileCasts), ...Object.values(hostileArrayCasts)]) {

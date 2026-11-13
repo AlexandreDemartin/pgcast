@@ -32,6 +32,10 @@ Candidates for a check, a rule or a skill line.
 - #32 — A mechanism that replaces a fragment's `compile` carries every instance property `SQLFragment.compile` reads (`parentTable`, `preparedName`, `noop`: the list `copy()` overrides); one at a time, the others drop silently — `branch-reviewer`, `builder`
 - #32 — An opt-in that widens a `LIMIT` also widens a `FOR UPDATE`/`FOR SHARE` on the same query: replay a lock clause whenever a row count changes — `branch-reviewer`
 - #32 — Under `exactOptionalPropertyTypes`, `copy({ parentTable: x, preparedName: y })` with possibly `undefined` values does not compile: compile, then set `name` — `builder`
+- #259 — When a branch starts writing an object's key into the text (`parent()` with no column takes its `vals({…})` key), the injection matrix runs over the key too — `branch-reviewer`
+- #259 — A fix that changes the run time greps `website/` for its characterisation's issue numbers and for the pages that list errors or « calls whose result changes » — `branch-reviewer`
+- #259 — An error message that names a remedy is probed on each call that throws it: `db.self` cannot read a column in an `INSERT`'s `VALUES` (42703) — `branch-reviewer`
+- #259 — To prove an injection test can fail, break only the branch it guards (a scratch copy), so the run shows the new test doing the work — `branch-reviewer`
 
 ## Minors kept
 
@@ -47,3 +51,4 @@ Minor review defects, taken up by the end-of-chapter review.
 - #32 — `website/handle-errors.md:97`, `:163`: still says two matching rows are not an error, and `statusOf()` maps every `NotExactlyOneError` to 404; with the option a second row gives the same class — `branch-reviewer`
 - #32 — `test/unit/shortcuts.test.ts:1223`: the option's `withTies` (`FETCH FIRST $n ROWS WITH TIES`, 2) and `offset` forms are not frozen by a test — `branch-reviewer`
 - #32 — `README.md:84`, `:91`: « except `selectExactlyOneChecksForSecondRow`'s » attaches to « a code »; line 91 names only `lateral` as the nested case — `branch-reviewer`
+- #259 — `src/db/core.ts:240-241`: « throw in an object, and in an array in a filter, as `Default` does » reads as if `Default` throws in an object — `branch-reviewer`
