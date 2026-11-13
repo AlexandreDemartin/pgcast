@@ -16,7 +16,7 @@ export default {
         content: `# ${markdownOf(text)}
 
 ::: info Coming
-This page isn't written yet. Until it is, George MacKerron's [Zapatos docs](https://jawj.github.io/zapatos/) cover what 6.6.1 does, and the [changelog](https://github.com/AlexandreDemartin/pgcast/blob/master/CHANGELOG.md) what pgcast changes.
+This page isn't written yet. Until it is, George MacKerron's [Zapatos docs](https://jawj.github.io/zapatos/) cover what 6.6.1 does, and the [changelog](/changelog) what pgcast changes.
 :::
 `,
       }));

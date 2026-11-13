@@ -62,7 +62,7 @@ The characterisation of Zapatos 6.6.1 found seven ways for a caller's string to 
 | a string in the `updateValues` of `upsert()` | a column name | a parameter |
 | `db.Default`, `db.self`, `db.raw()`, `db.cols()` or `db.vals()` as a filter value | a string, or JSON | throws |
 
-Zapatos 6.6.1 already checked `order.direction` and `order.nulls`. Each hole, what it let through and the test that pins it: the [characterisation report](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/CHARACTERISATION-REPORT.md#security); the SQL before and after: [CHANGELOG.md](https://github.com/AlexandreDemartin/pgcast/blob/master/CHANGELOG.md).
+Zapatos 6.6.1 already checked `order.direction` and `order.nulls`. Each hole, what it let through and the test that pins it: the [characterisation report](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/CHARACTERISATION-REPORT.md#security); the SQL before and after: [the changelog](/changelog#6.6.2-security).
 
 ## What pgcast can't guard against
 
