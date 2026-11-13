@@ -86,6 +86,9 @@ Candidates for a check, a rule or a skill line.
 - #43 — A guard test that passes on master proves something only with a mutation that turns it red; record the mutation in Proofs — `branch-reviewer`
 - #43 — Check `gh pr view <n> --json mergeable` at each verify round and before the gate: a sibling PR merged minutes after a clean merge leaves the PR conflicting — `branch-reviewer`
 - #43 — Two branches that each add a `describe` at the same place conflict on the closing braces: rebuild the file from one side plus the other's added block, rather than keeping both conflict halves — orchestrator
+- #45 — A PR closing an issue that a docs page cites as a limit retargets that link before merge: `grep -rn '#<n>' website/` at review — `branch-reviewer`
+- #45 — A « no false positive » test for a codegen warning runs every snapshot variant with its full config: a mutant that checks `tables` instead of `relations` only shows on a variant that excludes a relation — `branch-reviewer`, `builder`
+- #45 — Two review items in one file that need separate commits: commit between the two edits or stage by hunk; without amend, a plain `git add <file>` leaves the message incomplete — `builder`
 
 ## Minors kept
 
