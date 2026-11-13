@@ -83,16 +83,101 @@ describe('param', () => {
     expect(await q.run(t.client)).toEqual([{ a: [1, 'a'], o: { b: [2] } }]);
   });
 
-  it('characterization: castArrayParamsToJson breaks comparing an array column with an array value', async () => {
-    // characterization: the config applies to every array parameter, so `int4[] = json` has no operator
+  it('castArrayParamsToJson still sends a plain array as JSON', async () => {
+    // the config applies to an array parameter with no string cast, so `int4[] = json` has no operator
     db.setConfig({ castArrayParamsToJson: true });
     const q = sql`SELECT count(*)::int AS n FROM ${'accounts'} WHERE ${{ scores: [1, 2, 3] }}`;
-    expect(await pgError(t.client, () => q.run(t.client))).toMatchInlineSnapshot(`
-      {
-        "code": "42883",
-        "message": "operator does not exist: integer[] = json",
-      }
-    `);
+    expect(await pgError(t.client, () => q.run(t.client)))
+      .toEqual({ code: '42883', message: 'operator does not exist: integer[] = json' });
+  });
+});
+
+describe('param under castArrayParamsToJson or castObjectParamsToJson: a string cast wins', () => {
+  /** What inserting `value` into the `column` of extra.type_zoo stores, as text, or its error. */
+  const stored = async (column: string, value: db.Parameter) => {
+    await t.client.query('SAVEPOINT pgcast_stored');
+    try {
+      const [{ v }] = await sql`INSERT INTO ${'extra.type_zoo'} (${column}) VALUES (${value}) RETURNING ${column}::text AS v`.run(t.client);
+      return v;
+    } catch (err) {
+      return (err as { code?: string }).code;
+    } finally {
+      await t.client.query('ROLLBACK TO SAVEPOINT pgcast_stored');
+    }
+  };
+
+  it('an array type cast compares an array column with an array', async () => {
+    // 6.6.1 dropped the cast: `int4[] = json` and `int4[] @> json` (42883); accounts.id is a bigint
+    db.setConfig({ castArrayParamsToJson: true });
+    expect(await sql`SELECT ${'id'} FROM ${'accounts'} WHERE ${{ scores: param([1, 2, 3], 'int4[]') }}`.run(t.client))
+      .toEqual([{ id: '1' }]);
+    expect(await sql`SELECT ${'id'} FROM ${'accounts'} WHERE ${'scores'} @> ${param([7], 'int4[]')}`.run(t.client))
+      .toEqual([{ id: '3' }]);
+  });
+
+  it('an array type cast stores an array in an array column', async () => {
+    // 6.6.1: 42804, json into text[] and jsonb[]
+    db.setConfig({ castArrayParamsToJson: true });
+    expect(await stored('c_text_array', param(['a', 'b'], 'text[]'))).toBe('{a,b}');
+    expect(await stored('c_jsonb_array', param([{ a: 1 }], 'jsonb[]'))).toBe('{"{\\"a\\": 1}"}');
+  });
+
+  it('a jsonb cast compares a jsonb column with an object', async () => {
+    // 6.6.1 dropped the cast: `jsonb = json` and `jsonb @> json` (42883)
+    db.setConfig({ castObjectParamsToJson: true });
+    expect(await sql`SELECT ${'id'} FROM ${'users'} WHERE ${{ settings: param({ theme: 'dark' }, 'jsonb') }}`.run(t.client))
+      .toEqual([{ id: 1 }]);
+    expect(await sql`SELECT ${'id'} FROM ${'users'} WHERE ${'settings'} @> ${param({ theme: 'dark' }, 'jsonb')}`.run(t.client))
+      .toEqual([{ id: 1 }]);
+  });
+
+  it('a jsonb cast on an array still sends JSON, and stores what 6.6.1 stored in a jsonb column', async () => {
+    db.setConfig({ castArrayParamsToJson: true });
+    expect(await stored('c_jsonb', param([1, 2], 'jsonb'))).toBe('[1, 2]');
+    expect(await sql`SELECT count(*)::int AS n FROM ${'users'} WHERE ${'settings'} = ${param([1, 2], 'jsonb')}`.run(t.client))
+      .toEqual([{ n: 0 }]);
+  });
+
+  // calls that ran under 6.6.1, which dropped their cast, and now do what their cast says
+  it('changed: an array type cast on an array into a json or jsonb column is refused', async () => {
+    // 6.6.1 stored [1,2]; write param(arr, 'jsonb'), or no cast
+    db.setConfig({ castArrayParamsToJson: true });
+    expect(await stored('c_json', param([1, 2], 'int4[]'))).toBe('42804');
+    expect(await stored('c_jsonb', param([1, 2], 'int4[]'))).toBe('42804');
+    expect(await stored('c_jsonb', param([1, 2], 'jsonb'))).toBe('[1, 2]');
+  });
+
+  it('changed: an array type cast on an array into a text column stores a Postgres array', async () => {
+    // 6.6.1 stored [1,2]; write param(arr, 'text'), or no cast
+    db.setConfig({ castArrayParamsToJson: true });
+    expect(await stored('c_text', param([1, 2], 'int4[]'))).toBe('{1,2}');
+    expect(await stored('c_text', param([1, 2], 'text'))).toBe('[1,2]');
+  });
+
+  it('changed: a jsonb cast into a json or text column stores jsonb\'s spacing', async () => {
+    // 6.6.1 stored [1,2] and {"a":1}; write param(x, 'json'), or no cast
+    db.setConfig({ castArrayParamsToJson: true, castObjectParamsToJson: true });
+    expect(await stored('c_json', param([1, 2], 'jsonb'))).toBe('[1, 2]');
+    expect(await stored('c_text', param([1, 2], 'jsonb'))).toBe('[1, 2]');
+    expect(await stored('c_json', param({ a: 1 }, 'jsonb'))).toBe('{"a": 1}');
+    expect(await stored('c_json', param([1, 2], 'json'))).toBe('[1,2]');
+    expect(await stored('c_text', param({ a: 1 }, 'json'))).toBe('{"a":1}');
+  });
+
+  it('changed: a text cast on an object into a json or jsonb column is refused', async () => {
+    // 6.6.1 stored {"a": 1}; write param(obj, 'jsonb'), or no cast
+    db.setConfig({ castObjectParamsToJson: true });
+    expect(await stored('c_json', param({ a: 1 }, 'text'))).toBe('42804');
+    expect(await stored('c_jsonb', param({ a: 1 }, 'text'))).toBe('42804');
+    expect(await stored('c_jsonb', param({ a: 1 }, 'jsonb'))).toBe('{"a": 1}');
+  });
+
+  it('changed: an array type named without [] still sends JSON', async () => {
+    // 6.6.1: CAST($1 AS "json"), 42804 into an int4[] column; now '[1,2]' is no array literal (22P02). Write 'int4[]'
+    db.setConfig({ castArrayParamsToJson: true });
+    expect(await pgError(t.client, () => sql`SELECT ${param([1, 2], '_int4')}`.run(t.client)))
+      .toEqual({ code: '22P02', message: 'malformed array literal: "[1,2]"' });
+    expect(await sql`SELECT ${param([1, 2], 'int4[]')} AS v`.run(t.client)).toEqual([{ v: [1, 2] }]);
   });
 });
 

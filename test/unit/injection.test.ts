@@ -9,10 +9,11 @@
 // Inputs are cast to `any`: at run time they may come from untyped data (req.body).
 
 import { runInNewContext } from 'node:vm';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as db from '../../src/db';
 import { sql, param, cols, vals, all } from '../../src/db';
 import { builtinObjects } from '../helpers/builtinObjects';
+import { resetConfig } from '../helpers/config';
 import { hostileArrayCasts, hostileCasts } from '../helpers/hostileCasts';
 
 const hostile = {
@@ -1513,6 +1514,46 @@ describe('param cast', () => {
     // only the last bounds are bounds when a name comes between
     expect(text('a[1]'.repeat(n))).toBe(`CAST($1 AS "${'a[1]'.repeat(n - 1)}a"[1])`);
     expect(text('.'.repeat(n))).toBe(`CAST($1 AS "${'"."'.repeat(n)}")`);
+  });
+});
+
+describe('param cast under castArrayParamsToJson and castObjectParamsToJson', () => {
+  afterEach(resetConfig);
+  const allCasts = [...Object.values(hostile), ...Object.values(hostileCasts), ...Object.values(hostileArrayCasts)];
+
+  it('every cast compiles as with the config off, on an array and on a plain object', () => {
+    // 6.6.1 dropped the cast for CAST($1 AS "json"); the type is now the one written, with the rules above
+    const off = allCasts.map(cast => sql`${param(1, cast)}`.compile().text);
+    db.setConfig({ castArrayParamsToJson: true, castObjectParamsToJson: true });
+    allCasts.forEach((cast, i) => {
+      expect(sql`${param([1, 2], cast)}`.compile().text).toBe(off[i]);
+      expect(sql`${param({ a: 1 }, cast)}`.compile()).toEqual({ text: off[i], values: ['{"a":1}'] });
+    });
+  });
+
+  it('an array goes as an array only when its cast ends with array bounds, otherwise as JSON', () => {
+    db.setConfig({ castArrayParamsToJson: true });
+    const sent = (inputs: Record<string, string>) => Object.fromEntries(Object.entries(inputs).map(([name, cast]) =>
+      [name, sql`${param([1, 2], cast)}`.compile().values[0]]));
+    expect(sent(hostileArrayCasts)).toEqual({
+      array: [1, 2], arrayBounds: [1, 2], arrayDotted: [1, 2], arrayQualified: [1, 2], arrayPrequoted: [1, 2],
+      arrayOnly: [1, 2], arrayAfterQuote: [1, 2], arrayCloses: [1, 2], arrayInside: [1, 2], arraySplice: [1, 2],
+      arraySemicolon: [1, 2], arrayBackslash: [1, 2],
+      // not bounds, so part of the type name: the config's JSON stays
+      arraySpace: '[1,2]', arrayNegative: '[1,2]', arrayUnclosed: '[1,2]', arrayNested: '[1,2]', arrayNul: '[1,2]',
+    });
+    for (const sentValue of Object.values(sent({ ...hostile, ...hostileCasts }))) expect(sentValue).toBe('[1,2]');
+  });
+
+  it('every cast compiles the same in a Whereable, isIn and vals, its value sent as alone', () => {
+    db.setConfig({ castArrayParamsToJson: true, castObjectParamsToJson: true });
+    for (const cast of allCasts) for (const value of [[1, 2], { a: 1 }]) {
+      const { text: alone, values } = sql`${param(value, cast)}`.compile();
+      expect(sql`${{ display_name: param(value, cast) }}`.compile()).toEqual({ text: `("display_name" = ${alone})`, values });
+      expect(sql`${{ display_name: db.conditions.isIn([param(value, cast)]) }}`.compile())
+        .toEqual({ text: `(("display_name" IN (${alone})))`, values });
+      expect(sql`${vals([param(value, cast), 2])}`.compile()).toEqual({ text: `${alone}, $2`, values: [...values, 2] });
+    }
   });
 });
 
