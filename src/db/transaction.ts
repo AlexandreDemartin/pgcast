@@ -6,7 +6,7 @@ Released under the MIT licence: see LICENCE file
 
 import * as pg from 'pg';
 import { isDatabaseError } from './pgErrors';
-import { wait } from './utils';
+import { wait, warnOnce } from './utils';
 import { sql, raw } from './core';
 import { getConfig } from './config';
 import type { Queryable } from './core';
@@ -77,7 +77,12 @@ let txnSeq = 0;
 /**
  * Provide a database client to the callback, whose queries are then wrapped in 
  * a database transaction. The transaction is committed, retried, or rolled back
- * as appropriate. 
+ * as appropriate.
+ *
+ * When the callback catches a query's error and returns, Postgres answers
+ * `COMMIT` with `ROLLBACK` and nothing is saved: with the
+ * `transactionRequiresCommit` config option, this rejects; without it, it
+ * resolves and emits a `DeprecationWarning` (`PGCAST_DEP003`), once.
  * @param txnClientOrQueryable The `pg.Pool` from which to check out a client,
  * a plain client, or an existing transaction client to be passed through
  * @param isolationLevel The desired isolation level (e.g.
@@ -115,14 +120,16 @@ export async function transaction<T, M extends IsolationLevel>(
 
   try {
     for (let attempt = 1; ; attempt++) {
+      let result: T, commandTag: string | undefined;
       try {
         if (attempt > 1 && transactionListener) transactionListener(`Retrying transaction, attempt ${attempt} of ${maxAttempts}`, txnId);
 
         await sql`START TRANSACTION ISOLATION LEVEL ${raw(isolationLevel)}`.run(txnClient);
-        const result = await callback(txnClient as TxnClient<IsolationSatisfying<M>>);
-        await sql`COMMIT`.run(txnClient);
+        result = await callback(txnClient as TxnClient<IsolationSatisfying<M>>);
 
-        return result;
+        const commit = sql`COMMIT`;
+        commit.runResultTransform = qr => { commandTag = qr.command; return qr.rows; };  // listeners get the rows, as before
+        await commit.run(txnClient);
 
       } catch (err: any) {
         await sql`ROLLBACK`.run(txnClient);
@@ -137,6 +144,7 @@ export async function transaction<T, M extends IsolationLevel>(
             const delayBeforeRetry = Math.round(minMs + (maxMs - minMs) * Math.random());
             if (transactionListener) transactionListener(`Transaction rollback (code ${err.code}) on attempt ${attempt} of ${maxAttempts}, retrying in ${delayBeforeRetry}ms`, txnId);
             await wait(delayBeforeRetry);
+            continue;
 
           } else {
             if (transactionListener) transactionListener(`Transaction rollback (code ${err.code}) on attempt ${attempt} of ${maxAttempts}, giving up`, txnId);
@@ -147,6 +155,15 @@ export async function transaction<T, M extends IsolationLevel>(
           throw err;
         }
       }
+
+      // after a query error that the callback caught, the transaction is aborted: Postgres answers COMMIT
+      // with the command tag ROLLBACK, not an error, and nothing was saved (see https://github.com/AlexandreDemartin/pgcast/issues/190)
+      if (commandTag === 'ROLLBACK') {
+        if (config.transactionRequiresCommit ?? false) throw new Error('the transaction was rolled back, not committed: a query in it failed and the callback caught the error, so Postgres answered COMMIT with ROLLBACK; let the error out of the callback, or ROLLBACK TO a SAVEPOINT before going on');
+        warnOnce('PGCAST_DEP003', 'transaction() resolved, but Postgres answered its COMMIT with ROLLBACK: a query failed and the callback caught the error, so nothing was saved. Set transactionRequiresCommit: true (db.setConfig) to reject instead; it will be the default in pgcast 7.0.');
+      }
+
+      return result;
     }
 
   } finally {

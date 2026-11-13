@@ -357,8 +357,10 @@ describe('a COMMIT that Postgres answers with ROLLBACK', () => {
   it('with transactionRequiresCommit, releases a pool client, and leaves a plain client checked out', async () => {
     db.setConfig({ transactionRequiresCommit: true });
     const counts = () => ({ total: t.pool.totalCount, idle: t.pool.idleCount });
+    const checkedOut = () => t.pool.totalCount - t.pool.idleCount;
+    const outBefore = checkedOut();
     await expect(db.serializable(t.pool, swallow('23505'))).rejects.toThrow(rolledBack);
-    expect(counts().total).toBe(counts().idle);  // released: every client of the pool is idle
+    expect(checkedOut()).toBe(outBefore);  // released: no more clients checked out than before
     const client = await t.pool.connect();
     const before = counts();
     try {
