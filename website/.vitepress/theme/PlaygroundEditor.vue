@@ -31,12 +31,15 @@ const
   notes = shallowRef<string[]>([]),
   type = shallowRef(start.type),
   limit = 10_000,  // ms, as run-examples.mjs gives each example
+  // set once Postgres has started in this browser: its files are then in the browser's cache, and the download note
+  // goes (a cleared cache downloads them again, without the note)
+  startedKey = 'pgcast-playground-postgres',
   fontFamily = '"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
 
 let
   editor: monaco.editor.IStandaloneCodeEditor | undefined, latest = 0, stop = () => {},
   runOnPostgres = () => {},  // once the editor is made
-  started = false;  // Postgres, once: its files are in the browser's cache
+  started = false;  // Postgres, in this page
 const disposables: monaco.IDisposable[] = [];
 
 self.MonacoEnvironment = {
@@ -109,11 +112,25 @@ function run(js: string, postgres: boolean) {
       time = () => { timer = setTimeout(() => done({ queries: [], warnings: [], error: stopped }), limit); },
       done = (result?: Run) => { clearTimeout(timer); worker.terminate(); resolve(result); };
     stop = done;
-    worker.onmessage = ({ data }: MessageEvent<Message>) => 'started' in data ? (started = true, time()) : done(data);
+    worker.onmessage = ({ data }: MessageEvent<Message>) => {
+      if (!('started' in data)) return done(data);
+      started = true;
+      time();
+      try { localStorage.setItem(startedKey, ''); } catch { /* no storage: the note shows again after a reload */ }
+    };
     worker.onerror = event => done({ queries: [], warnings: [], error: event.message });
     worker.postMessage({ js, postgres } satisfies Code);
     if (!postgres) time();
   });
+}
+
+/** Whether Postgres has started in this page, or in this browser before. */
+function startedBefore() {
+  try {
+    return started || localStorage.getItem(startedKey) !== null;
+  } catch {
+    return started;
+  }
 }
 
 /** Monaco's TypeScript worker, once its language is set up, a moment after the first model asks for it. */
@@ -138,7 +155,7 @@ async function update(code: string, types: monaco.editor.ITextModel, postgres = 
     hover = async (at: monaco.Uri, offset: number) => hoverType((await client.getQuickInfoAtPosition(at.toString(), offset))
       ?.displayParts?.map((part: { text: string }) => part.text).join('') ?? '');
 
-  if (postgres) notes.value = [started ? 'Running on Postgres…' :
+  if (postgres) notes.value = [startedBefore() ? 'Running on Postgres…' :
     'Starting Postgres in this page: about 5 MB to download, the first time…'];
   if (name) types.setValue(code + shown(name));
   const
