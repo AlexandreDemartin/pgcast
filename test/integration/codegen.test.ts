@@ -152,10 +152,23 @@ describe('variant snapshots', () => {
     expect(errors).toEqual([]);
   });
 
-  it('typeEnumsAcrossSchemas: an enum of another schema takes its labels, and only them', async () => {
-    const { ts: schema, customTypeSourceFiles } = await codegen({ ...main, typeEnumsAcrossSchemas: true });
+  /** The type errors of `probe`, compiled against the schema and custom types that `config` generates. */
+  const probeErrors = async (config: Config, probe: string) => {
+    const { ts: schema, customTypeSourceFiles } = await codegen(config);
     const dir = mkdtempSync(join(declarationDir, 'probe-'));
-    const probe = `
+    writeFileSync(join(dir, 'schema.d.ts'), schema);
+    writeFileSync(join(dir, 'custom.d.ts'), customFiles(customTypeSourceFiles));
+    writeFileSync(join(dir, 'probe.ts'), probe);
+    const { config: tsconfig } = ts.readConfigFile(join(generatedDir, 'tsconfig.json'), ts.sys.readFile);
+    const { options } = ts.parseJsonConfigFileContent(tsconfig, ts.sys, generatedDir);
+    const rootNames = ['schema.d.ts', 'custom.d.ts', 'probe.ts'].map(f => join(dir, f));
+    const program = ts.createProgram(rootNames, { ...options, paths: { 'zapatos/db': [join(declarationDir, 'db')] } });
+    return ts.getPreEmitDiagnostics(program).map(d =>
+      `${d.file ? relative(dir, d.file.fileName) : ''} TS${d.code} ${ts.flattenDiagnosticMessageText(d.messageText, ' ')}`);
+  };
+
+  it('typeEnumsAcrossSchemas: an enum of another schema takes its labels, and only them', async () => {
+    expect(await probeErrors({ ...main, typeEnumsAcrossSchemas: true }, `
       import type * as s from 'zapatos/schema';
       export const ok: s.products.Insertable = { sku: 'x', price_cents: 1, status: 'draft' };
       // @ts-expect-error not a label of extra.status
@@ -163,17 +176,22 @@ describe('variant snapshots', () => {
       export const moods: s.extra.type_zoo.Selectable['c_enum_array'] = ['happy', 'sad'];
       // @ts-expect-error not a label of public.mood
       export const meh: s.extra.type_zoo.Selectable['c_enum_array'] = ['meh'];
-    `;
-    writeFileSync(join(dir, 'schema.d.ts'), schema);
-    writeFileSync(join(dir, 'custom.d.ts'), customFiles(customTypeSourceFiles));
-    writeFileSync(join(dir, 'probe.ts'), probe);
-    const { config } = ts.readConfigFile(join(generatedDir, 'tsconfig.json'), ts.sys.readFile);
-    const { options } = ts.parseJsonConfigFileContent(config, ts.sys, generatedDir);
-    const rootNames = ['schema.d.ts', 'custom.d.ts', 'probe.ts'].map(f => join(dir, f));
-    const program = ts.createProgram(rootNames, { ...options, paths: { 'zapatos/db': [join(declarationDir, 'db')] } });
-    const errors = ts.getPreEmitDiagnostics(program).map(d =>
-      `${d.file ? relative(dir, d.file.fileName) : ''} TS${d.code} ${ts.flattenDiagnosticMessageText(d.messageText, ' ')}`);
-    expect(errors).toEqual([]);
+    `)).toEqual([]);
+  });
+
+  it('enumOrder-declared: every.<enum> takes the declared order, and only it', async () => {
+    expect(await probeErrors({ ...main, enumOrder: 'declared' }, `
+      import type * as s from 'zapatos/schema';
+      export const moods: s.every.mood = ['sad', 'ok', 'happy'];
+      // @ts-expect-error the alphabetical order
+      export const sorted: s.every.mood = ['happy', 'ok', 'sad'];
+      export const statuses: s.extra.every.status = ['draft', 'published', 'archived'];
+      // @ts-expect-error the alphabetical order
+      export const sortedStatuses: s.extra.every.status = ['archived', 'draft', 'published'];
+      export const mood: s.users.Insertable['mood'] = 'ok';
+      // @ts-expect-error not a label of public.mood
+      export const meh: s.users.Insertable['mood'] = 'meh';
+    `)).toEqual([]);
   });
 
   it('holds no orphan file', () => {

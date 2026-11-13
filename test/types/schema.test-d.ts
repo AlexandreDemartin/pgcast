@@ -104,6 +104,15 @@ describe('enum', () => {
     const i: s.products.Insertable = { sku: 'x', price_cents: 1, status: 'no such label' };
     void i;
   });
+
+  test('every.<enum>: its labels in alphabetical order without enumOrder', () => {
+    // declared 'sad', 'ok', 'happy'; with enumOrder: 'declared', that order:
+    // integration/codegen › enumOrder-declared: every.<enum> takes the declared order, and only it
+    expectTypeOf<s.every.mood>().toEqualTypeOf<['happy', 'ok', 'sad']>();
+    // @ts-expect-error the declared order
+    const declared: s.every.mood = ['sad', 'ok', 'happy'];
+    void declared;
+  });
 });
 
 describe('array', () => {
