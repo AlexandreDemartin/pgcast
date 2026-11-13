@@ -142,13 +142,15 @@ One more opt-in has no warning to look for, and stays off in 7.0: [`selectExactl
 
 The generator has an opt-in of its own, [`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas), whose warning is a note from `npx zapatos`, not from your tests: it names each column whose type is an enum of another schema, and that enum, typed until then as `any` or as the enum of the same name in the relation's schema. Turn it on in `zapatosconfig.json`, regenerate, and let `tsc` show the values the enum's labels refuse; it will be the default in 7.0. A domain over such an enum keeps the placeholder it already has in `zapatos/custom/`, typed the old way, as the generator never overwrites one: delete that file before regenerating, and the new one gets the labels.
 
+A second, [`enumOrder`](/generator#generate.enumOrder), has its note name each enum whose labels the generator sorts, though Postgres declares them in another order. Set it to `"declared"` and regenerate: for TypeScript, only `every.<name>` changes, so the code to read is the code that takes a label from it by index or compares it with a tuple. It will be the default in 7.0.
+
 ## Go back
 
 ```sh
 npm install zapatos@6.6.1
 ```
 
-The generated files are the same, and each change of [Find the calls whose result changes](#find-the-calls-whose-result-changes) runs as it did, but the `jsonb` one, which finds nothing again. Remove the three options from `setConfig()` first: Zapatos 6.6.1's `Config` doesn't have them (2353). Zapatos 6.6.1 ignores `typeEnumsAcrossSchemas` in `zapatosconfig.json`, and generates the `any` types again.
+The generated files are the same, and each change of [Find the calls whose result changes](#find-the-calls-whose-result-changes) runs as it did, but the `jsonb` one, which finds nothing again. Remove the three options from `setConfig()` first: Zapatos 6.6.1's `Config` doesn't have them (2353). Zapatos 6.6.1 ignores `typeEnumsAcrossSchemas` and `enumOrder` in `zapatosconfig.json`, and generates the `any` types and the sorted labels again.
 
 ::: warning Security
 Code written or left as it is against pgcast's fixes gets Zapatos 6.6.1's results back: each row whose What to do is "nothing", the `not()` row and the `jsonb` row. `db.deletes('roles', { character: db.conditions.isNotIn([db.param('The ferryman')]) })` deletes 11 roles under pgcast, and all 12 under Zapatos 6.6.1. The holes of [6.6.2's § Security](/changelog#6.6.2-security) are open again: a name, a `lock`, an `aggregate`, a plain value in `updateValues` or a `param()` cast can splice SQL ([The security model](/security)).

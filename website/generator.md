@@ -98,6 +98,7 @@ Every option is optional. Each one given replaces its default whole: `schemas` w
 | [`schemaJSDoc`](#generate.schemaJSDoc) | `true` | a JSDoc comment on each relation and column |
 | [`customJSONParsingForLargeNumbers`](#generate.customJSONParsingForLargeNumbers) | `false` | the `JSONSelectable` type of `bigint` and `numeric` |
 | [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas) | `false` | the type of an enum of another schema |
+| [`enumOrder`](#generate.enumOrder) | `"alphabetical"` | the order of an enum's labels |
 | [`progressListener`](#generate.progressListener) | `false` | where each step is reported |
 | [`warningListener`](#generate.warningListener) | `true` | where warnings go |
 | [`debugListener`](#generate.debugListener) | `false` | where each query and its result go |
@@ -263,9 +264,27 @@ CREATE TABLE prints (id int PRIMARY KEY, format archive.print_format NOT NULL, f
 | `formats` | `c.Pg_print_format \| null`, an `any` placeholder | `('digital' \| 'nitrate' \| 'safety')[] \| null` |
 | `keeper` | `crew_job \| null`: the labels of `public.crew_job` | `('archivist' \| 'projectionist') \| null` |
 
-- The labels are written out, not named: the enum's schema needn't be in [`schemas`](#generate.schemas). In alphabetical order, as for every enum ([#49](https://github.com/AlexandreDemartin/pgcast/issues/49)).
+- The labels are written out, not named: the enum's schema needn't be in [`schemas`](#generate.schemas). In the order of [`enumOrder`](#generate.enumOrder), as for every enum.
 - A domain over such an enum stays a custom type, `c.<name>`; its new placeholder gets the labels rather than `any`. An existing placeholder is never overwritten.
 - `false` notes, through [`warningListener`](#generate.warningListener), the columns `true` would change, each with its type: for a domain, the type under it.
+
+### `enumOrder` {#generate.enumOrder}
+
+`"alphabetical"` or `"declared"`, default `"alphabetical"`; an opt-in, `"declared"` by default from 7.0 ([Versions, opt-ins and warnings](/versions)). The order of an enum's labels. `"alphabetical"`, as in Zapatos 6.6.1, sorts them; `"declared"` keeps the order the enum declares them in, by which Postgres sorts and compares its values (`ORDER BY`, `<`, `enum_range()`):
+
+```sql
+CREATE TYPE crew_job AS ENUM ('director', 'writer', 'editor', 'cinematographer', 'composer');
+```
+
+| Type | `"alphabetical"` | `"declared"` |
+|---|---|---|
+| `crew_job` | `'cinematographer' \| 'composer' \| 'director' \| 'editor' \| 'writer'` | `'director' \| 'writer' \| 'editor' \| 'cinematographer' \| 'composer'` |
+| `every.crew_job` | `['cinematographer', 'composer', 'director', 'editor', 'writer']` | `['director', 'writer', 'editor', 'cinematographer', 'composer']` |
+
+- A label added by `ALTER TYPE … ADD VALUE … BEFORE` or `AFTER` takes its place in that order, as `enum_range()` gives it.
+- For TypeScript, only `every.<name>` changes: a union is the same type in any order. With [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas), the labels written out for an enum of another schema, and the new placeholder of a domain over one, take the same order.
+- Another value stops the generator before any query, and writes nothing: `enumOrder must be 'alphabetical' (the default) or 'declared', not 'declard'`. In TypeScript, it fails to compile (TS2322, or TS2820 with a suggestion for a near-miss such as `"declard"`).
+- `"alphabetical"` notes, through [`warningListener`](#generate.warningListener), each generated enum whose declared order is not alphabetical.
 
 ### `progressListener` {#generate.progressListener}
 
@@ -288,6 +307,7 @@ Writing custom types file: src/zapatos/custom/index.d.ts
 - `Note: the include entry "Films" of schema "public" matches no relation there, so it generates nothing. Check its spelling and case, that the relation is in schema "public", and that the database role has a privilege on it: include names tables, views, materialised views and foreign tables.`, once per run for each entry of an [`include`](#generate.schemas) list that its schema doesn't have;
 - the note on `bigint` and `numeric` columns, once per process ([`customJSONParsingForLargeNumbers`](#generate.customJSONParsingForLargeNumbers));
 - `` Note: public.prints.format (archive.print_format), public.prints.formats (archive.print_format[]) and public.prints.keeper (archive.crew_job) have a type of another schema, which is looked up by name in the schema of their relation: an enum becomes an `any` custom type, or the enum of the same name there. Set typeEnumsAcrossSchemas: true to look it up in its own schema; it will be the default in pgcast 7.0. ``, once per run, without [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas), when a column it would change is generated;
+- `` Note: every.crew_job lists the labels of enum public.crew_job in alphabetical order, not in their declared order, by which Postgres sorts and compares them. Set enumOrder: 'declared' to keep that order; it will be the default in pgcast 7.0. ``, once per run, with [`enumOrder`](#generate.enumOrder) `"alphabetical"`, when a schema of [`schemas`](#generate.schemas) has an enum whose declared order is not alphabetical; several as `every.<name> lists the labels of enums archive.print_format and public.crew_job`;
 - the [old layout warning](#the-old-layout-warning).
 
 ### `debugListener` {#generate.debugListener}

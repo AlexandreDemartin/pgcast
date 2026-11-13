@@ -14,8 +14,11 @@ import { tmpdir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
+import * as pg from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, inject, it } from 'vitest';
-import { finaliseConfig, generate, tsForConfig, type Config } from '../../src/generate';
+import {
+  definitionForRelationInSchema, enumDataForSchema, finaliseConfig, generate, relationsInSchema, tsForConfig, type Config,
+} from '../../src/generate';
 import { urlForDatabase } from '../helpers/databases';
 import { useTestDatabase } from '../helpers/db';
 
@@ -45,6 +48,8 @@ const variants: [string, Config][] = [
   ['customTypesTransform-PgMyType', { schemas: customTypesSchemas, customTypesTransform: 'PgMyType' }],
   ['customTypesTransform-function', { schemas: customTypesSchemas, customTypesTransform: s => `Custom_${s}` }],
   ['typeEnumsAcrossSchemas', { schemas: customTypesSchemas, typeEnumsAcrossSchemas: true }],
+  // the same, but the order of the labels
+  ['enumOrder-declared', { schemas: customTypesSchemas, typeEnumsAcrossSchemas: true, enumOrder: 'declared' }],
   ['columnOptions', {
     schemas: { public: only('users', 'accounts'), extra: only('articles') },
     columnOptions: {
@@ -90,9 +95,9 @@ const warningsOf = async (config: Config) => {
   return warnings.filter(w => !w.startsWith('Note: this database has bigint'));
 };
 
-/** The same, but the note on enums of another schema, which has its own tests (§ typeEnumsAcrossSchemas). */
+/** The same, but the notes on enums, which have their own tests (§ typeEnumsAcrossSchemas, § enumOrder). */
 const warningsFor = async (schemas: Schemas) =>
-  (await warningsOf({ schemas })).filter(w => !w.includes('typeEnumsAcrossSchemas'));
+  (await warningsOf({ schemas })).filter(w => !w.includes('typeEnumsAcrossSchemas') && !w.includes('enumOrder'));
 
 /** Custom type placeholders, sorted by name: tsForConfig() inserts them in query completion order. */
 const customFiles = (files: Record<string, string>) =>
@@ -150,10 +155,23 @@ describe('variant snapshots', () => {
     expect(errors).toEqual([]);
   });
 
-  it('typeEnumsAcrossSchemas: an enum of another schema takes its labels, and only them', async () => {
-    const { ts: schema, customTypeSourceFiles } = await codegen({ ...main, typeEnumsAcrossSchemas: true });
+  /** The type errors of `probe`, compiled against the schema and custom types that `config` generates. */
+  const probeErrors = async (config: Config, probe: string) => {
+    const { ts: schema, customTypeSourceFiles } = await codegen(config);
     const dir = mkdtempSync(join(declarationDir, 'probe-'));
-    const probe = `
+    writeFileSync(join(dir, 'schema.d.ts'), schema);
+    writeFileSync(join(dir, 'custom.d.ts'), customFiles(customTypeSourceFiles));
+    writeFileSync(join(dir, 'probe.ts'), probe);
+    const { config: tsconfig } = ts.readConfigFile(join(generatedDir, 'tsconfig.json'), ts.sys.readFile);
+    const { options } = ts.parseJsonConfigFileContent(tsconfig, ts.sys, generatedDir);
+    const rootNames = ['schema.d.ts', 'custom.d.ts', 'probe.ts'].map(f => join(dir, f));
+    const program = ts.createProgram(rootNames, { ...options, paths: { 'zapatos/db': [join(declarationDir, 'db')] } });
+    return ts.getPreEmitDiagnostics(program).map(d =>
+      `${d.file ? relative(dir, d.file.fileName) : ''} TS${d.code} ${ts.flattenDiagnosticMessageText(d.messageText, ' ')}`);
+  };
+
+  it('typeEnumsAcrossSchemas: an enum of another schema takes its labels, and only them', async () => {
+    expect(await probeErrors({ ...main, typeEnumsAcrossSchemas: true }, `
       import type * as s from 'zapatos/schema';
       export const ok: s.products.Insertable = { sku: 'x', price_cents: 1, status: 'draft' };
       // @ts-expect-error not a label of extra.status
@@ -161,17 +179,22 @@ describe('variant snapshots', () => {
       export const moods: s.extra.type_zoo.Selectable['c_enum_array'] = ['happy', 'sad'];
       // @ts-expect-error not a label of public.mood
       export const meh: s.extra.type_zoo.Selectable['c_enum_array'] = ['meh'];
-    `;
-    writeFileSync(join(dir, 'schema.d.ts'), schema);
-    writeFileSync(join(dir, 'custom.d.ts'), customFiles(customTypeSourceFiles));
-    writeFileSync(join(dir, 'probe.ts'), probe);
-    const { config } = ts.readConfigFile(join(generatedDir, 'tsconfig.json'), ts.sys.readFile);
-    const { options } = ts.parseJsonConfigFileContent(config, ts.sys, generatedDir);
-    const rootNames = ['schema.d.ts', 'custom.d.ts', 'probe.ts'].map(f => join(dir, f));
-    const program = ts.createProgram(rootNames, { ...options, paths: { 'zapatos/db': [join(declarationDir, 'db')] } });
-    const errors = ts.getPreEmitDiagnostics(program).map(d =>
-      `${d.file ? relative(dir, d.file.fileName) : ''} TS${d.code} ${ts.flattenDiagnosticMessageText(d.messageText, ' ')}`);
-    expect(errors).toEqual([]);
+    `)).toEqual([]);
+  });
+
+  it('enumOrder-declared: every.<enum> takes the declared order, and only it', async () => {
+    expect(await probeErrors({ ...main, enumOrder: 'declared' }, `
+      import type * as s from 'zapatos/schema';
+      export const moods: s.every.mood = ['sad', 'ok', 'happy'];
+      // @ts-expect-error the alphabetical order
+      export const sorted: s.every.mood = ['happy', 'ok', 'sad'];
+      export const statuses: s.extra.every.status = ['draft', 'published', 'archived'];
+      // @ts-expect-error the alphabetical order
+      export const sortedStatuses: s.extra.every.status = ['archived', 'draft', 'published'];
+      export const mood: s.users.Insertable['mood'] = 'ok';
+      // @ts-expect-error not a label of public.mood
+      export const meh: s.users.Insertable['mood'] = 'meh';
+    `)).toEqual([]);
   });
 
   it('holds no orphan file', () => {
@@ -182,12 +205,6 @@ describe('variant snapshots', () => {
 });
 
 describe('surprises, frozen as they are', () => {
-  it('sorts enum values alphabetically, not in declaration order (enumsortorder)', async () => {
-    const { ts: schema } = await codegen(main);
-    expect(schema).toContain(`export type mood = 'happy' | 'ok' | 'sad';`);  // declared: 'sad', 'ok', 'happy'
-    expect(schema).toContain(`export type status = 'archived' | 'draft' | 'published';`);  // 'draft', 'published', 'archived'
-  });
-
   it('drops COMMENT ON of tables, views, schemas and types', async () => {
     const { ts: schema } = await codegen(main);
     for (const comment of [
@@ -541,7 +558,8 @@ describe('typeEnumsAcrossSchemas', () => {
   const notesFor = async (config: Config) => {
     const warnings: string[] = [];
     await tsForConfig(finaliseConfig({ ...config, ...quiet, warningListener: s => warnings.push(s), db: db() }), noDebug);
-    return warnings.filter(w => !w.startsWith('Note: this database has bigint'));  // once per process
+    return warnings.filter(w => !w.startsWith('Note: this database has bigint') &&  // once per process
+      !w.includes('enumOrder'));  // § enumOrder
   };
 
   it('is off by default: an enum of another schema is an `any` custom type', async () => {
@@ -633,6 +651,149 @@ describe('typeEnumsAcrossSchemas', () => {
   });
 });
 
+describe('enumOrder', () => {
+  // schemas of their own, committed to this file's database: no other test configures them;
+  // order_y is never generated, order_z declares its labels in alphabetical order, and order_w.take
+  // has 42 labels added BEFORE 'cut', so that float4 sortorders close in on 2
+  beforeAll(() => t.pool.query(`
+    CREATE SCHEMA order_x;
+    CREATE SCHEMA order_y;
+    CREATE SCHEMA order_z;
+    CREATE SCHEMA order_w;
+    CREATE TYPE order_x.reel AS ENUM ('trailer', 'feature');
+    ALTER TYPE order_x.reel ADD VALUE 'credits' BEFORE 'feature';
+    CREATE TYPE order_x.edit AS ENUM ('assembly', 'rough', 'final');  -- its first label in place
+    CREATE TYPE order_y.st AS ENUM ('yours', 'theirs');
+    CREATE DOMAIN order_y.st_d AS order_y.st;
+    CREATE TABLE order_x.t (r order_x.reel, a order_y.st, b order_y.st[], d order_y.st_d);
+    CREATE MATERIALIZED VIEW order_x.mv AS SELECT NULL::order_y.st AS a;
+    CREATE TYPE order_z.pos AS ENUM ('a', 'b');
+    CREATE TYPE order_w.take AS ENUM ('slate', 'cut');
+    DO $$ BEGIN
+      FOR i IN 1..42 LOOP EXECUTE format('ALTER TYPE order_w.take ADD VALUE %L BEFORE %L', 'take_' || i, 'cut'); END LOOP;
+    END $$;
+  `));
+  afterAll(() => t.pool.query('DROP SCHEMA order_x, order_y, order_z, order_w CASCADE'));
+
+  const orderX = { schemas: { order_x: all }, schemaJSDoc: false };
+  const enumsOnly = { include: '*' as const, exclude: '*' as const };
+  const notesFor = async (config: Config) => {
+    const warnings: string[] = [];
+    await tsForConfig(finaliseConfig({ ...config, ...quiet, warningListener: s => warnings.push(s), db: db() }), noDebug);
+    return warnings.filter(w => !w.startsWith('Note: this database has bigint') &&  // once per process
+      !w.includes('typeEnumsAcrossSchemas'));  // § typeEnumsAcrossSchemas
+  };
+
+  it('is off by default: labels in alphabetical order, every.<enum> included', async () => {
+    const { ts: schema } = await codegen(main);
+    expect(schema).toContain(`export type mood = 'happy' | 'ok' | 'sad';`);  // declared: 'sad', 'ok', 'happy'
+    expect(schema).toContain(`export type mood = ['happy', 'ok', 'sad'];`);
+    expect(schema).toContain(`export type status = 'archived' | 'draft' | 'published';`);  // 'draft', 'published', 'archived'
+    expect(schema).toContain(`export type status = ['archived', 'draft', 'published'];`);
+  });
+
+  it("keeps the declared order with enumOrder: 'declared', every.<enum> included", async () => {
+    const { ts: schema } = await codegen({ ...main, enumOrder: 'declared' });
+    expect(schema).toContain(`export type mood = 'sad' | 'ok' | 'happy';`);
+    expect(schema).toContain(`export type mood = ['sad', 'ok', 'happy'];`);
+    expect(schema).toContain(`export type status = 'draft' | 'published' | 'archived';`);
+    expect(schema).toContain(`export type status = ['draft', 'published', 'archived'];`);
+  });
+
+  it('puts a value added BEFORE another where Postgres sorts it', async () => {
+    // enumsortorder 1, 1.5 and 2
+    const { rows: [{ labels }] } = await t.pool.query(`SELECT enum_range(NULL::order_x.reel)::text[] AS labels`);
+    expect(labels).toEqual(['trailer', 'credits', 'feature']);
+    const { ts: schema } = await codegen({ ...orderX, enumOrder: 'declared' });
+    expect(schema).toContain(`export type reel = 'trailer' | 'credits' | 'feature';`);
+    expect(schema).toContain(`export type reel = ['trailer', 'credits', 'feature'];`);
+    expect((await codegen(orderX)).ts).toContain(`export type reel = ['credits', 'feature', 'trailer'];`);
+  });
+
+  it('keeps the order of enum_range() when the session prints sortorders rounded (extra_float_digits=0)', async () => {
+    const options = '-c extra_float_digits=0';  // 6 significant digits, the default before Postgres 12
+    const client = new pg.Client({ ...db(), options });
+    await client.connect();
+    const { rows: [{ labels, printed, distinct }] } = await client.query(`
+      SELECT enum_range(NULL::order_w.take)::text[] AS labels, count(*)::int AS printed,
+        count(DISTINCT enumsortorder::text)::int AS distinct
+      FROM pg_catalog.pg_enum WHERE enumtypid = 'order_w.take'::regtype`);
+    await client.end();
+    expect(distinct).toBeLessThan(printed);  // control: two sortorders print alike
+    expect(labels).toEqual(['slate', ...Array.from({ length: 42 }, (_, i) => `take_${i + 1}`), 'cut']);
+    const { ts: schema } = await tsForConfig(finaliseConfig({
+      schemas: { order_w: all }, enumOrder: 'declared', ...quiet, db: { ...db(), options },
+    }), noDebug);
+    expect(schema).toContain(`export type take = [${labels.map((l: string) => `'${l}'`).join(', ')}];`);
+  });
+
+  it('leaves enumDataForSchema() alphabetical; definitionForRelationInSchema() follows the config by default', async () => {
+    const q = (query: pg.QueryConfig) => t.pool.query(query);
+    const enums = await enumDataForSchema('public', q);
+    expect(enums).toEqual({ mood: ['happy', 'ok', 'sad'] });  // as in Zapatos 6.6.1, whatever the config
+    const products = (await relationsInSchema('public', q)).find(rel => rel.name === 'products')!;
+    const orders = [
+      [{ enumOrder: 'declared' }, `('draft' | 'published' | 'archived')`],
+      [{}, `('archived' | 'draft' | 'published')`],
+    ] as const;
+    for (const [order, union] of orders) {
+      const config = finaliseConfig({ ...quiet, typeEnumsAcrossSchemas: true, ...order });
+      const def = await definitionForRelationInSchema(products, 'public', enums, {}, config, q);  // no enumsForSchema
+      expect(def).toContain(`status: ${union};`);
+    }
+  });
+
+  it('writes an enum of another schema in the same order, with typeEnumsAcrossSchemas', async () => {
+    for (const [order, union] of [[{ enumOrder: 'declared' }, `('yours' | 'theirs')`], [{}, `('theirs' | 'yours')`]] as const) {
+      const { ts: schema, customTypeSourceFiles } = await codegen({ ...orderX, typeEnumsAcrossSchemas: true, ...order });
+      const block = tableBlock(schema, 't');
+      expect(block).toContain(`r: reel | null;`);
+      expect(block).toContain(`a: ${union} | null;`);
+      expect(block).toContain(`b: ${union}[] | null;`);
+      expect(block).toContain(`d: c.PgSt_d | null;`);
+      expect(customTypeSourceFiles.PgSt_d).toContain(`export type PgSt_d = ${union};`);
+      expect(tableBlock(schema, 'mv')).toContain(`a: ${union} | null;`);
+    }
+  });
+
+  it('is off by default, with a note that names each enum whose declared order is not alphabetical', async () => {
+    expect(await notesFor({ schemas: { public: only('users') } })).toEqual([
+      'Note: every.mood lists the labels of enum public.mood in alphabetical order, not in their ' +
+      'declared order, by which Postgres sorts and compares them. ' +
+      "Set enumOrder: 'declared' to keep that order; it will be the default in pgcast 7.0.",
+    ]);
+    // order_z.pos is in order; order_y.st is not generated, though order_x.t uses it
+    expect(await notesFor({ schemas: { order_z: all, order_x: all, public: enumsOnly, extra: enumsOnly } })).toEqual([
+      'Note: every.<name> lists the labels of enums extra.status, order_x.edit, order_x.reel and public.mood ' +
+      'in alphabetical order, not in their declared order, by which Postgres sorts and compares them. ' +
+      "Set enumOrder: 'declared' to keep that order; it will be the default in pgcast 7.0.",
+    ]);
+  });
+
+  it('gives no note with the option on, or when no enum is out of order', async () => {
+    expect(await notesFor({ ...main, enumOrder: 'declared' })).toEqual([]);
+    expect(await notesFor({ ...orderX, typeEnumsAcrossSchemas: true, enumOrder: 'declared' })).toEqual([]);
+    expect(await notesFor({ schemas: { order_z: all } })).toEqual([]);
+    expect(await notesFor({ schemas: { no_such_schema: all } })).toEqual([]);  // no enum at all
+    expect(await notesFor({ schemas: { order_y: { include: [], exclude: [] } } })).toEqual([
+      'Note: every.st lists the labels of enum order_y.st in alphabetical order, not in their ' +
+      'declared order, by which Postgres sorts and compares them. ' +
+      "Set enumOrder: 'declared' to keep that order; it will be the default in pgcast 7.0.",
+    ]);  // control: no relation, and still its enums
+  });
+
+  it("is optional in Config, read as 'alphabetical' when absent; another value rejects", async () => {
+    expect(finaliseConfig({}).enumOrder).toBeUndefined();
+    const right: Config = { enumOrder: 'declared' };
+    void right;
+    // @ts-expect-error 'alphabetical' or 'declared'
+    const wrong: Config = { enumOrder: 'declard' };
+    void wrong;
+    await expect(codegen({ ...main, enumOrder: 'declard' as 'declared' })).rejects
+      .toThrow(`enumOrder must be 'alphabetical' (the default) or 'declared', not 'declard'`);
+  });
+});
+
 describe('include entries that match no relation', () => {
   const unmatched = (name: string, schema: string) =>
     `Note: the include entry "${name}" of schema "${schema}" matches no relation there, so it generates nothing. ` +
@@ -680,16 +841,33 @@ describe('include entries that match no relation', () => {
     expect(await warningsFor({ public: all, extra: { include: '*', exclude: ['no_such_table'] } })).toEqual([]);
   });
 
-  it('warns, of main and the snapshot variants, only about no_such_table of include-exclude-lists, and the enums note', async () => {
+  it('warns, of main and the snapshot variants, only about no_such_table of include-exclude-lists, and the enums notes', async () => {
     const enumsNote = 'Note: extra.type_zoo.c_enum_array (public.mood[]) and public.products.status (extra.status) ' +
       'have a type of another schema, ' +
       'which is looked up by name in the schema of their relation: an enum becomes an `any` custom type, or the enum of ' +
       'the same name there. Set typeEnumsAcrossSchemas: true to look it up in its own schema; it will be the default in pgcast 7.0.';
+    const orderNote = (every: string, list: string) => `Note: every.${every} lists the labels of ${list} ` +
+      "in alphabetical order, not in their declared order, by which Postgres sorts and compares them. " +
+      "Set enumOrder: 'declared' to keep that order; it will be the default in pgcast 7.0.";
+    const bothOrderNote = orderNote('<name>', 'enums extra.status and public.mood');
+    const expected: Record<string, string[]> = {
+      main: [enumsNote, bothOrderNote],
+      'unprefixedSchema-null': [bothOrderNote],
+      'schemaJSDoc-false': [orderNote('mood', 'enum public.mood')],
+      'customTypesTransform-PgMy_type': [enumsNote, bothOrderNote],
+      'customTypesTransform-my_type': [enumsNote, bothOrderNote],
+      'customTypesTransform-PgMyType': [enumsNote, bothOrderNote],
+      'customTypesTransform-function': [enumsNote, bothOrderNote],
+      typeEnumsAcrossSchemas: [bothOrderNote],
+      'enumOrder-declared': [],
+      columnOptions: [bothOrderNote],
+      'include-exclude-lists': [unmatched('no_such_table', 'public'), bothOrderNote],
+      'exclude-star': [bothOrderNote],  // exclude: '*' still generates the enums
+      edge: [orderNote('traffic-light', 'enum edge.traffic-light')],
+    };
     const warnings: Record<string, string[]> = {};
     for (const [name, config] of [['main', main] as const, ...variants]) warnings[name] = await warningsOf(config);
-    expect(warnings).toEqual(Object.fromEntries(Object.keys(warnings).map(name =>
-      [name, name === 'include-exclude-lists' ? [unmatched('no_such_table', 'public')] :
-        name === 'main' || name.startsWith('customTypesTransform-') ? [enumsNote] : []])));
+    expect(warnings).toEqual(expected);
   });
 });
 

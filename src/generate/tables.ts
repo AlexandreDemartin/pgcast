@@ -6,7 +6,8 @@ Released under the MIT licence: see LICENCE file
 
 import * as pg from 'pg';
 import { tsTypeForPgType } from './pgTypes';
-import { enumDataForSchema, type EnumData } from './enums';
+import type { EnumData } from './enums';
+import { enumOrderOf, enumOrdersForSchema } from './enumOrder';
 import type { CustomTypes, CustomTypeOrigins } from './tsOutput';
 import { CompleteConfig } from './config';
 
@@ -113,7 +114,7 @@ export const definitionForRelationInSchema = async (
   config: CompleteConfig,
   queryFn: (q: pg.QueryConfig) => Promise<pg.QueryResult<any>>,
   customTypeOrigins: CustomTypeOrigins = {},  // an 'out' parameter too
-  enumsForSchema = (schema: string) => enumDataForSchema(schema, queryFn),
+  enumsForSchema = async (schema: string) => (await enumOrdersForSchema(schema, queryFn))[enumOrderOf(config)],
   columnsTypedByEnumName: string[] = [],  // an 'out' parameter too: what typeEnumsAcrossSchemas would change
 ) => {
   const

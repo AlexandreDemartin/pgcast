@@ -28,6 +28,8 @@ export interface OptionalConfig {
   customJSONParsingForLargeNumbers: boolean;
   // optional, so a CompleteConfig written for 6.6.1 still compiles; read it with ?? false
   typeEnumsAcrossSchemas?: boolean;  // an enum of another schema is typed by its own labels, not by its name in the relation's schema
+  // optional too; read it with ?? 'alphabetical', as Zapatos 6.6.1 sorts labels, deprecated: 'declared' in 7.0
+  enumOrder?: 'alphabetical' | 'declared';  // the order of an enum's labels: 'declared' is Postgres's, by which it sorts and compares them
 }
 
 interface SchemaRules {
