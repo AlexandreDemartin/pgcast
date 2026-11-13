@@ -106,18 +106,29 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 }
 .AppearanceSwitch svg { width: 18px; height: 18px; }
 
-/* left nav, in four groups: rows of 32px, 4px apart; a group's label 24px under the group above, 8px over its pages,
-   and in line with their text */
+/* left nav, in four groups: rows of 32px, 4px apart; a group's label 32px under the group above, 12px over its pages,
+   and in line with their text. The label leads its pages: the headings' face, in --fg, on a --sunken band across the nav; the pages in
+   --muted, --fg on hover, the current one in --accent */
 .VPSidebar .group, .VPSidebar .group + .group { border-top: 0; padding-top: 0; }
-.VPSidebar .group .VPSidebarItem.level-0 { padding-bottom: 12px; }  /* over VitePress's scoped 24px */
-.VPSidebarItem.level-0 > .item .text {
-  font: 600 13px/20px var(--font-body); color: var(--muted); padding: 8px 12px;
+.VPSidebar .group .VPSidebarItem.level-0 { padding-bottom: 20px; }  /* over VitePress's scoped 24px */
+/* the band runs from border to border: past the nav's 2rem on the right, and as far as the nav clips it on the left
+   (VitePress widens the left padding on wide screens) */
+.VPSidebarItem.level-0 > .item { position: relative; z-index: 0; }
+.VPSidebarItem.level-0 > .item::before {
+  content: ""; position: absolute; inset: 0 -2rem 0 -100vw; z-index: -1; background: var(--sunken);
+  border-block: 1px solid var(--line);
 }
+.VPSidebarItem.level-0 > .item .text {
+  font: 600 15px/20px var(--font-display); color: var(--fg); padding: 8px 12px;
+}
+/* the band breathes: 12px between it and the section's first page */
+.VPSidebarItem.level-0 > .items { padding-top: 12px; }
 .VPSidebarItem.level-1 > .item { padding: 0; }
 .VPSidebarItem.level-1 > .item .indicator { display: none; }
 .VPSidebarItem.level-1 .link { flex: 1; padding: 6px 12px; margin: 0 0 4px; border-radius: 8px; }
 .VPSidebarItem.level-1 .link:hover { background: var(--sunken); }
-.VPSidebarItem.level-1 .text { font-size: 14px; line-height: 20px; padding: 0; color: var(--fg); }
+.VPSidebarItem.level-1 .text { font-size: 14px; line-height: 20px; padding: 0; color: var(--muted); }
+.VPSidebarItem.level-1 .link:hover .text { color: var(--fg); }
 .VPSidebarItem.level-1.is-active .link { background: var(--accent-soft); }
 .VPSidebarItem.level-1.is-active .text { color: var(--accent); font-weight: 600; }
 /* a minor's badge, in the nav, on its group's landing page and in the pager: an inline block, so out of a link's
@@ -153,8 +164,8 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 /* a group's landing page: each of its pages, the title then its line */
 .vp-doc .GroupPages { list-style: none; padding: 0; margin: 32px 0 0; display: grid; gap: 20px; }
 .vp-doc .GroupPages li { margin: 0; }
-.vp-doc .GroupPages a { font-size: 16px; font-weight: 500; color: var(--fg); text-decoration: none; }
-.vp-doc .GroupPages a:hover { color: var(--accent); text-decoration: underline 1px; }
+/* each page's title is a link like any other in the docs: --accent, underlined 1px at 3px, 2px on hover */
+.vp-doc .GroupPages a { font-size: 16px; font-weight: 500; color: var(--accent); }
 .vp-doc .GroupPages p { margin: 4px 0 0; color: var(--muted); }
 
 /* code blocks */
@@ -327,5 +338,8 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 .twoslash .twoslash-hover { border-bottom: 1px dashed var(--muted); cursor: help; }
 .twoslash .twoslash-hover:hover, .twoslash .twoslash-hover:focus-within { background: var(--accent-soft); border-radius: 2px; }
 .twoslash .twoslash-hover > span:focus-visible { outline: none; }  /* the background says it, as on hover */
+/* the search dialog's field: its bar already turns --accent on focus (VitePress's :focus-within), so the field itself
+   draws no second ring inside it */
+.VPLocalSearchBox .search-input:focus-visible { outline: none; }
 .v-popper--theme-twoslash .v-popper__inner { border-radius: 8px; box-shadow: 0 8px 28px rgba(0, 0, 0, .18); }
 .twoslash-floating .twoslash-popup-code { line-height: 1.5; background: transparent !important; }
