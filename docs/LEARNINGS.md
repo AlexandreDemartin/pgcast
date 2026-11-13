@@ -114,6 +114,9 @@ Candidates for a check, a rule or a skill line.
 - #50 — A failing `expect` before `mockRestore()` leaks a `vi.spyOn(client, 'query')` into later tests: the file's `try`/`finally` pattern prevents it — `builder`
 - #50 — `typecheck`/`test:types` in a scratch worktree whose `node_modules` is a symlink write to the shared `node_modules/.cache/pgcast`: two worktrees at different commits race on it — `branch-reviewer`
 - #50 — Before editing a quoted message, grep the exact changed substring: the review's list of quoting files was wider than the real one — `builder`
+- #310 — Lighthouse does not test a keyboard trap (WCAG 2.1.2, Level A): an embedded editor is probed with Tab presses over CDP until focus leaves it, and the page says how to leave — `branch-reviewer`
+- #310 — Monaco 0.57 in Chrome focuses `.native-edit-context`, not its `textarea`: a focus rule, a probe or a key press names both — `branch-reviewer`
+- #310 — A clean-up registered after an `await` in `onMounted` leaks when the page is left during the wait: register it before, return if the template ref is gone; a CDP probe delays the awaited call (`Page.addScriptToEvaluateOnNewDocument`) to open the window — `branch-reviewer`
 
 ## Minors kept
 
