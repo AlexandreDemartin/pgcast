@@ -49,7 +49,7 @@ import {
 import { getConfig } from './config';
 
 
-export type JSONOnlyColsForTable<T extends Table, C extends any[] /* `ColumnForTable<T>[]` gives errors here for reasons I haven't got to the bottom of */> =
+export type JSONOnlyColsForTable<T extends Table, C extends readonly any[] /* `ColumnForTable<T>[]` gives errors here for reasons I haven't got to the bottom of */> =
   Pick<JSONSelectableForTable<T>, C[number]>;
 
 export interface SQLFragmentMap { [k: string]: SQLFragment<any> }
@@ -81,7 +81,7 @@ export interface ReturningOptionsForTable<T extends Table, C extends ColumnsOpti
 
 export type ReturningTypeForTable<T extends Table, C extends ColumnsOption<T>, E extends ExtrasOption<T>> =
   (undefined extends C ? JSONSelectableForTable<T> :
-    C extends ColumnForTable<T>[] ? JSONOnlyColsForTable<T, C> :
+    C extends readonly ColumnForTable<T>[] ? JSONOnlyColsForTable<T, C> :
     never) &
   (undefined extends E ? {} :
     E extends SQLFragmentOrColumnMap<T> ? ExtrasResult<T, E> :
@@ -604,7 +604,8 @@ const functionName = new RegExp(`^${space}(?:${identifier})(?:${space}\\.${space
  * @param where A `Whereable` or `SQLFragment` defining the rows to be selected,
  * or `all`
  * @param options Options object. Keys (all optional) are: 
- * * `columns` — an array of column names: only these columns will be returned
+ * * `columns` — an array of column names, readonly (`as const`) or not: only
+ * these columns will be returned
  * * `order` – an array of `OrderSpec` objects, such as 
  * `{ by: 'column', direction: 'ASC' }`  
  * * `limit` and `offset` – numbers: apply this limit and offset to the query
