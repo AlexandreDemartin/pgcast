@@ -1235,6 +1235,16 @@ describe('selectOne, selectExactlyOne', () => {
     expect(db.selectOne('users', { id: 1 }).compile().values).toEqual([1, 1]);
   });
 
+  it('selectExactlyOneChecksForSecondRow: LIMIT 2 keeps the no-op marker', () => {
+    db.setConfig({ selectExactlyOneChecksForSecondRow: true });
+    const q = db.selectExactlyOne('users', { id: 1 });
+    q.noop = true;
+    expect(q.compile()).toEqual({
+      text: `/* marked no-op: won't hit DB unless forced -> */ SELECT to_jsonb("users".*) AS result FROM "users" WHERE ("id" = $1) LIMIT $2`,
+      values: [1, 2],
+    });
+  });
+
   it('selectExactlyOneChecksForSecondRow: LIMIT 1 when nested, in a lateral or sql', () => {
     db.setConfig({ selectExactlyOneChecksForSecondRow: true });
     const manager = db.selectExactlyOne('users', { id: parent('manager_id') }, { alias: 'm' });
