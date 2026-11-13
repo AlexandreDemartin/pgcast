@@ -535,7 +535,9 @@ describe('enumOrder', () => {
   });
 
   it('puts a value added BEFORE another where Postgres sorts it', async () => {
-    // enumsortorder 1, 1.5 and 2: SELECT enum_range(NULL::order_x.reel) gives {trailer,credits,feature}
+    // enumsortorder 1, 1.5 and 2
+    const { rows: [{ labels }] } = await t.pool.query(`SELECT enum_range(NULL::order_x.reel)::text[] AS labels`);
+    expect(labels).toEqual(['trailer', 'credits', 'feature']);
     const { ts: schema } = await codegen({ ...orderX, enumOrder: 'declared' });
     expect(schema).toContain(`export type reel = 'trailer' | 'credits' | 'feature';`);
     expect(schema).toContain(`export type reel = ['trailer', 'credits', 'feature'];`);
