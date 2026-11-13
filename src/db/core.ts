@@ -90,6 +90,10 @@ export type ByteArrayString = `\\x${string}`;
  * Make a function `STRICT` in the Postgres sense — where it's an alias for
  * `RETURNS NULL ON NULL INPUT` — with appropriate typing.
  *
+ * Only `null` is passed through, as only `NULL` is in Postgres: `undefined` is
+ * passed to `fn`, and with `strictNullChecks` the type refuses it unless `fn`
+ * takes it.
+ *
  * For example, Zapatos' `toBuffer()` function is defined as:
  *
  * ```
