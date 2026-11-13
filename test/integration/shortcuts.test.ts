@@ -24,6 +24,28 @@ const scalar = async (text: string) => (await t.client.query(text)).rows[0].v;
 const sortBy = <R extends Record<string, any>>(rows: R[], key: keyof R) =>
   [...rows].sort((a, b) => (a[key] < b[key] ? -1 : a[key] > b[key] ? 1 : 0));
 
+const
+  wrapperAsValue = '`db.raw()`, `db.cols()` and `db.vals()` have no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value: to write SQL, use a `sql` fragment value, where `db.self` stands for the column; to write a value, give the value itself, or `db.param()`.',
+  noParent = `The 'parent' table alias has no meaning here`,
+  wrappers = { raw: raw("upper('Ada')"), cols: cols('display_name'), colsArray: cols(['display_name']), vals: vals('Ada'), valsObject: vals({ theme: 'dark' }) };
+
+/**
+ * What each write's run() gives, by name, each in a savepoint: the message of an Error thrown while compiling
+ * (it has no code), Postgres's error code, or 'ran'; and `queriesSent`, the number of queries pgcast sent.
+ */
+const writeOutcomes = async (writes: Record<string, db.SQLFragment<any>>) => {
+  const outcomes: Record<string, unknown> = {}, sent: unknown[] = [];
+  db.setConfig({ queryListener: query => sent.push(query) });
+  for (const [name, q] of Object.entries(writes)) {
+    await t.client.query('SAVEPOINT write_value');
+    outcomes[name] = await q.run(t.client).then(() => 'ran', (err: { code?: string, message: string }) => err.code ?? err.message);
+    await t.client.query('ROLLBACK TO SAVEPOINT write_value');
+  }
+  return { ...outcomes, queriesSent: sent.length };
+};
+const everyOutcome = (writes: Record<string, unknown>, message: string) =>
+  ({ ...Object.fromEntries(Object.keys(writes).map(name => [name, message])), queriesSent: 0 });
+
 describe('insert', () => {
   it('one row: the inserted row as JSON, defaults applied', async () => {
     const row = await run(db.insert('users', { email: 'e@x.org', display_name: 'E', mood: 'ok' }));
@@ -112,58 +134,22 @@ describe('insert', () => {
     })), 'balance')).toEqual([{ balance: 0 }, { balance: 5 }]);
   });
 
-  it('characterization: raw(), cols(x) and vals(x) as values are sent as JSON, stored on text and jsonb, 22P02 elsewhere', async () => {
-    // characterization (R66): the type refuses them since #134, but vals({…}) makes each a Parameter, which pg
-    // sends through JSON.stringify ({"value":…}), as in 6.6.1; raw() is never SQL here, so a raw(input) stays inert
-    const q = db.insert('users', { email: 'r@x.org', display_name: raw("upper('Ada')") }, { returning: ['display_name'] });
-    expect(q.compile()).toStrictEqual({
-      text: 'INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) RETURNING jsonb_build_object($3::text, "display_name") AS result',
-      values: [raw("upper('Ada')"), 'r@x.org', 'display_name'],
-    });
-    expect(await run(q)).toEqual({ display_name: `{"value":"upper('Ada')"}` });
-    let n = 0;
-    const stored = async (column: string, value: unknown) => (await run(db.insert('users',
-      { email: `r${++n}@x.org`, display_name: 'R', [column]: value }, { returning: [column] })))[column];
-    expect({
-      colsName: await stored('display_name', cols('display_name')),
-      colsNames: await stored('display_name', cols(['display_name'])),
-      valsValue: await stored('display_name', vals('Ada')),
-      valsObject: await stored('display_name', vals({ theme: 'dark' })),
-      jsonb: await stored('settings', raw(`'{"theme": "dark"}'`)),
-      arrayItem: await stored('tags', [raw("'admin'")]),
-      inJsonb: await stored('settings', { theme: vals('dark') }),
-    }).toEqual({
-      colsName: '{"value":"display_name"}',
-      colsNames: '{"value":["display_name"]}',
-      valsValue: '{"value":"Ada"}',
-      valsObject: '{"value":{"theme":"dark"}}',
-      jsonb: { value: `'{"theme": "dark"}'` },
-      arrayItem: [`{"value":"'admin'"}`],
-      inJsonb: { theme: { value: 'dark' } },
-    });
-    expect(await fails(db.insert('users', { email: 'f@x.org', display_name: 'F', manager_id: vals(1) }))).toEqual({
-      code: '22P02', message: 'invalid input syntax for type integer: "{"value":1}"',
-    });
-    expect(await fails(db.insert('users', { email: 'f@x.org', display_name: 'F', mood: raw("'ok'") }))).toEqual({
-      code: '22P02', message: `invalid input value for enum mood: "{"value":"'ok'"}"`,
-    });
-    expect(await fails(db.insert('users', { email: 'f@x.org', display_name: 'F', tags: cols(['admin']) }))).toEqual({
-      code: '22P02', message: 'malformed array literal: "{"value":["admin"]}"',
-    });
-    // several rows: the same, row by row
-    const rows = db.insert('users', [{ email: 'r8@x.org', display_name: vals('Ada') }, { email: 'r9@x.org', display_name: 'B' }], {
-      returning: ['display_name'],
-    });
-    expect(rows.compile()).toStrictEqual({
-      text: 'INSERT INTO "users" ("display_name", "email") VALUES ($1, $2), ($3, $4) RETURNING jsonb_build_object($5::text, "display_name") AS result',
-      values: [vals('Ada'), 'r8@x.org', 'B', 'r9@x.org', 'display_name'],
-    });
-    expect(sortBy(await run(rows), 'display_name')).toEqual([{ display_name: 'B' }, { display_name: '{"value":"Ada"}' }]);
-    // a hostile raw(input) is a parameter: kept out of the text, stored as JSON, no second statement
-    const hostile = db.insert('users', { email: 'h@x.org', display_name: raw("'x'); DROP TABLE users; --") }, { returning: ['display_name'] });
-    expect(hostile.compile().text).not.toContain('DROP');
-    expect(await run(hostile)).toEqual({ display_name: `{"value":"'x'); DROP TABLE users; --"}` });
-    expect(await scalar('SELECT count(*)::int AS v FROM users')).toBe(14);
+  it('raw(), cols(x) and vals(x) as values throw before any query; in an array or a jsonb object, they stay values', async () => {
+    // R66: Zapatos 6.6.1 sent each as one parameter, as JSON ({"value":…}): stored on text and jsonb, 22P02
+    // elsewhere; compiled as SQL, a raw(input) would be an injection, so each throws, as a filter value does
+    const writes: Record<string, db.SQLFragment<any>> = {};
+    for (const [name, w] of Object.entries(wrappers)) {
+      for (const column of ['display_name', 'settings', 'manager_id', 'mood', 'tags', 'home'])
+        writes[`${name} ${column}`] = db.insert('users', { email: 'r@x.org', display_name: 'R', [column]: w });
+      writes[`${name} rows`] = db.insert('users', [{ email: 'r1@x.org', display_name: 'R' }, { email: 'r2@x.org', display_name: w }]);
+      writes[`${name} any`] = db.insert('extra.type_zoo', { c_xml: w });
+    }
+    expect(await writeOutcomes(writes)).toEqual(everyOutcome(writes, wrapperAsValue));
+    // in an array or a jsonb object, a wrapper is part of the value, sent as JSON: the type refuses it, and
+    // finding it would walk every value of every write
+    expect(await run(db.insert('users', { email: 'r3@x.org', display_name: 'R', tags: [raw("'admin'")], settings: { theme: vals('dark') } }, {
+      returning: ['tags', 'settings'],
+    }))).toEqual({ tags: [`{"value":"'admin'"}`], settings: { theme: { value: 'dark' } } });
   });
 });
 
@@ -395,24 +381,20 @@ describe('upsert', () => {
     expect(await run(db.upsert('users', [], 'email'))).toEqual([]);
   });
 
-  it('characterization: raw(), cols(x) and vals(x) as values are sent as JSON, inserted or set from EXCLUDED', async () => {
-    // characterization (R66): as insert() values; a conflicting row takes the JSON through EXCLUDED, never the SQL
-    const q = db.upsert('users', { email: 'bob@example.com', display_name: raw("upper('Bob')") }, 'email', { returning: ['display_name'] });
-    expect(q.compile()).toStrictEqual({
-      text: 'INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("email", "display_name") = ROW(EXCLUDED."email", EXCLUDED."display_name") RETURNING jsonb_build_object($3::text, "display_name") || jsonb_build_object(\'$action\', CASE xmax WHEN 0 THEN \'INSERT\' ELSE \'UPDATE\' END) AS result',
-      values: [raw("upper('Bob')"), 'bob@example.com', 'display_name'],
-    });
-    expect(await run(q)).toEqual({ display_name: `{"value":"upper('Bob')"}`, $action: 'UPDATE' });
-    expect(sortBy(await run(db.upsert('users', [
-      { email: 'cyd@example.com', display_name: 'Cyd', settings: vals({ theme: 'dark' }) },
-      { email: 'u@x.org', display_name: cols(['display_name']), settings: {} },
-    ], 'email', { returning: ['display_name', 'settings'] })), 'display_name')).toEqual([
-      { display_name: 'Cyd', settings: { value: { theme: 'dark' } }, $action: 'UPDATE' },
-      { display_name: '{"value":["display_name"]}', settings: {}, $action: 'INSERT' },
-    ]);
-    expect(await fails(db.upsert('users', { email: 'u2@x.org', display_name: 'U', manager_id: vals(1) }, 'email'))).toEqual({
-      code: '22P02', message: 'invalid input syntax for type integer: "{"value":1}"',
-    });
+  it('raw(), cols(x) and vals(x) as values throw before any query, on a conflicting row or a new one', async () => {
+    // R66: 6.6.1 inserted the JSON, or set it from EXCLUDED on conflict; in updateValues they are SQL (above)
+    const writes: Record<string, db.SQLFragment<any>> = {};
+    for (const [name, w] of Object.entries(wrappers)) {
+      writes[`${name} conflict`] = db.upsert('users', { email: 'bob@example.com', display_name: w }, 'email');
+      writes[`${name} new`] = db.upsert('users', { email: 'u@x.org', display_name: 'U', settings: w }, 'email');
+      writes[`${name} rows`] = db.upsert('users', [
+        { email: 'cyd@example.com', display_name: 'Cyd', manager_id: 1 }, { email: 'u@x.org', display_name: 'U', manager_id: w },
+      ], 'email');
+      writes[`${name} beside updateValues`] = db.upsert('users', { email: 'bob@example.com', display_name: w }, 'email', {
+        updateValues: { display_name: raw("upper('Bob')") },
+      });
+    }
+    expect(await writeOutcomes(writes)).toEqual(everyOutcome(writes, wrapperAsValue));
   });
 });
 
@@ -459,68 +441,40 @@ describe('update', () => {
       .toEqual([{ display_name: 'Bob' }]);
   });
 
-  it('characterization: raw(), cols(x) and vals(x) as values are sent as JSON, stored on text and jsonb, 22P02 elsewhere', async () => {
-    // characterization (R66): as insert() values; cols('display_name') does not read the column, it stores its JSON
-    const q = db.update('users', { display_name: cols('display_name') }, { id: 2 }, { returning: ['display_name'] });
-    expect(q.compile()).toStrictEqual({
-      text: 'UPDATE "users" SET ("display_name") = ROW($1) WHERE ("id" = $2) RETURNING jsonb_build_object($3::text, "display_name") AS result',
-      values: [cols('display_name'), 2, 'display_name'],
-    });
-    expect(await run(q)).toEqual([{ display_name: '{"value":"display_name"}' }]);
-    expect(await run(db.update('users', { settings: raw(`'{}'`), tags: [vals('x')] }, { id: 3 }, { returning: ['settings', 'tags'] })))
-      .toEqual([{ settings: { value: `'{}'` }, tags: ['{"value":"x"}'] }]);
-    expect(await fails(db.update('users', { manager_id: vals(1) }, { id: 2 }))).toEqual({
-      code: '22P02', message: 'invalid input syntax for type integer: "{"value":1}"',
-    });
+  it('raw(), cols(x) and vals(x) as values throw before any query; in an array, they stay values', async () => {
+    // R66: 6.6.1 stored the JSON: cols('display_name') did not read the column, it stored {"value":"display_name"}
+    const writes: Record<string, db.SQLFragment<any>> = {};
+    for (const [name, w] of Object.entries(wrappers)) {
+      for (const column of ['display_name', 'settings', 'manager_id', 'mood', 'tags', 'home'])
+        writes[`${name} ${column}`] = db.update('users', { [column]: w }, { id: 2 });
+      writes[`${name} second key`] = db.update('users', { mood: 'ok', display_name: w }, { id: 2 });
+      writes[`${name} any`] = db.update('extra.type_zoo', { c_xml: w }, sql`TRUE`);
+    }
+    expect(await writeOutcomes(writes)).toEqual(everyOutcome(writes, wrapperAsValue));
+    expect(await run(db.update('users', { tags: [vals('x')] }, { id: 3 }, { returning: ['tags'] }))).toEqual([{ tags: ['{"value":"x"}'] }]);
   });
 });
 
 describe('parent() as a write value', () => {
   // an INSERT or an UPDATE has no parent query; the type refuses the call on every column it types (types/shortcuts)
 
-  it('characterization: parent() as an insert(), upsert() or update() value is a parameter, sent as JSON', async () => {
-    // characterization: vals({…}) wraps it in a Parameter, and pg sends an object as JSON; same in 6.6.1
-    const insert = db.insert('users', { email: 'dan@example.com', display_name: parent('id') }, { returning: ['display_name'] });
-    const upsert = db.upsert('users', { email: 'bob@example.com', display_name: parent('id') }, 'email', { returning: ['display_name'], reportAction: 'suppress' });
-    const update = db.update('users', { display_name: parent('id') }, { id: 3 }, { returning: ['display_name'] });
-    expect(insert.compile().text).toBe('INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) RETURNING jsonb_build_object($3::text, "display_name") AS result');
-    expect(upsert.compile().text).toBe('INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("email", "display_name") = ROW(EXCLUDED."email", EXCLUDED."display_name") RETURNING jsonb_build_object($3::text, "display_name") AS result');
-    expect(update.compile().text).toBe('UPDATE "users" SET ("display_name") = ROW($1) WHERE ("id" = $2) RETURNING jsonb_build_object($3::text, "display_name") AS result');
-    for (const q of [insert, upsert, update]) {
-      const [value] = q.compile().values;
-      expect(value).toBeInstanceOf(db.ParentColumn);
-      expect(JSON.stringify(value)).toBe('{"value":"id"}');
+  it('parent() as an insert(), upsert() or update() value throws before any query, as in vals([…])', async () => {
+    // R65: 6.6.1 sent it as one parameter, as JSON ('{"value":"id"}', '{}' with no column): stored on text and
+    // jsonb, an empty array in text[], set from EXCLUDED by upsert(), 22P02 on int, an enum or a composite
+    const writes: Record<string, db.SQLFragment<any>> = {};
+    for (const [name, p] of Object.entries({ "parent('id')": parent('id'), 'parent()': parent() })) {
+      for (const column of ['display_name', 'settings', 'manager_id', 'mood', 'tags', 'home'])
+        writes[`${name} insert ${column}`] = db.insert('users', { email: 'dan@example.com', display_name: 'Dan', [column]: p });
+      writes[`${name} insert rows`] = db.insert('users', [{ email: 'e@x.org', display_name: 'E' }, { email: 'f@x.org', display_name: p }]);
+      writes[`${name} insert any`] = db.insert('extra.type_zoo', { c_xml: p });
+      writes[`${name} upsert`] = db.upsert('users', { email: 'bob@example.com', display_name: p }, 'email');
+      writes[`${name} upsert new`] = db.upsert('users', { email: 'gus@example.com', display_name: 'Gus', tags: p }, 'email');
+      writes[`${name} update`] = db.update('users', { display_name: p }, { id: 3 });
+      writes[`${name} update any`] = db.update('extra.type_zoo', { c_xml: p }, sql`TRUE`);
     }
-
-    // a text column stores the JSON text, upsert's existing row through EXCLUDED; a jsonb column the object
-    expect(await run(insert)).toEqual({ display_name: '{"value":"id"}' });
-    expect(await run(upsert)).toEqual({ display_name: '{"value":"id"}' });
-    expect(await run(update)).toEqual([{ display_name: '{"value":"id"}' }]);
-    expect(await run(db.insert('users', { email: 'eve@example.com', display_name: 'Eve', settings: parent('id') }, { returning: ['settings'] })))
-      .toEqual({ settings: { value: 'id' } });
-
-    // parent() with no column is `{}`: an empty array in text[], an empty object in jsonb
-    expect(await run(db.update('users', { settings: parent(), tags: parent() }, { id: 1 }, { returning: ['settings', 'tags'] })))
-      .toEqual([{ settings: {}, tags: [] }]);
-
-    // the path typed code reaches: a column typed any (a zapatos/custom placeholder), here xml and a composite
-    expect(await run(db.insert('extra.type_zoo', { c_xml: parent('id') }, { returning: ['c_xml'] })))
-      .toEqual({ c_xml: '{"value":"id"}' });
-    expect(await fails(db.update('users', { home: parent('id') }, { id: 1 }))).toEqual({
-      code: '22P02', message: 'malformed record literal: "{"value":"id"}"',
-    });
-
-    // a column whose type does not take the JSON text as input refuses it
-    expect(await fails(db.update('users', { manager_id: parent('id') }, { id: 3 }))).toEqual({
-      code: '22P02', message: 'invalid input syntax for type integer: "{"value":"id"}"',
-    });
-    expect(await fails(db.insert('users', { email: 'fay@example.com', display_name: 'Fay', mood: parent('mood') }))).toEqual({
-      code: '22P02', message: 'invalid input value for enum mood: "{"value":"mood"}"',
-    });
-
-    // while parent() in a fragment value, as in vals([…]), throws before any query (R63)
-    expect(() => db.insert('users', { email: 'gus@example.com', display_name: sql`${parent('id')}` }).compile())
-      .toThrow(`The 'parent' table alias has no meaning here`);
+    expect(await writeOutcomes(writes)).toEqual(everyOutcome(writes, noParent));
+    // as parent() in a fragment value
+    expect(() => db.insert('users', { email: 'gus@example.com', display_name: sql`${parent('id')}` }).compile()).toThrow(noParent);
   });
 });
 

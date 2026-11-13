@@ -456,6 +456,40 @@ describe('cols and vals', () => {
     `);
   });
 
+  it('vals of an object compiles parent() as the parent column in a nested query, as vals of an array does', () => {
+    // 6.6.1 wrapped it in a parameter, sent as '{"value":"id"}' (#259); parent() takes the column of its key
+    expect(sql`(${vals({ a: parent('id'), b: parent(), c: 1 })})`.copy({ parentTable: 'users' }).compile()).toMatchInlineSnapshot(`
+      {
+        "text": "("users"."id", "users"."b", $1)",
+        "values": [
+          1,
+        ],
+      }
+    `);
+  });
+
+  it('vals of an object throws on parent() outside a nested query, as vals of an array does', () => {
+    // 6.6.1 sent it as JSON ('{"value":"id"}', '{}'), the writes of insert(), upsert() and update() included (#259)
+    expect(new Set([parent('id'), parent()].map(value => thrown(() => one(vals({ a: 1, b: value })))))).toMatchInlineSnapshot(`
+      Set {
+        "The 'parent' table alias has no meaning here",
+      }
+    `);
+  });
+
+  it('vals of an object throws on raw, cols and vals, in a nested query or not: they are no values', () => {
+    // 6.6.1 sent each as JSON ('{"value":…}'), the writes of insert(), upsert() and update() included (#259)
+    expect(new Set([raw('now()'), cols(['a']), cols({ a: 1 }), vals([1]), vals({ a: 1 })].flatMap(value => [
+      () => one(vals({ a: value })),
+      () => sql`${vals({ a: 1, b: value })}`.copy({ parentTable: 'users' }).compile(),
+      () => one({ id: sql`${vals({ a: value })}` }),
+    ].map(thrown)))).toMatchInlineSnapshot(`
+      Set {
+        "\`db.raw()\`, \`db.cols()\` and \`db.vals()\` have no meaning as a value in \`vals({…})\`, so as an \`insert()\`, \`upsert()\` or \`update()\` value: to write SQL, use a \`sql\` fragment value, where \`db.self\` stands for the column; to write a value, give the value itself, or \`db.param()\`.",
+      }
+    `);
+  });
+
   it('vals of an array throws on self in a Whereable: self is the column, not a value', () => {
     // 6.6.1 sent 'Symbol(self)'; so does vals([self]) in a fragment value of vals of an object, as for Default
     expect(() => one({ display_name: db.conditions.isIn(['Ada', self]) })).toThrowErrorMatchingInlineSnapshot(`[Error: \`db.self\` has no meaning as a value in a Whereable (a filter), nor in \`isIn()\`: compare with a value, or use it in a \`sql\` fragment value, where it stands for the column.]`);
