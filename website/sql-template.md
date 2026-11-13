@@ -270,11 +270,13 @@ An object is a Whereable of the table: each own enumerable key a column, each va
 An interpolated object that is not one of the other [interpolations](#interpolations) compiles as a Whereable, plain or not: a class instance `{ title }` gives `("title" = $1)`<!-- probe: db.sql`${new (class { title = 'x' })()}` -->, and one with no own enumerable key gives `TRUE`, even of a class that extends a built-in (`class Premiere extends Date {}`). Check what reaches a `where` at run time.
 :::
 
-A built-in object throws while compiling, before any query: `Date`, `Map`, `Set`, `WeakMap`, `WeakSet`, `RegExp`, `Promise`, `Error` and its native subtypes (`TypeError`, …), `ArrayBuffer`, a typed array, `Buffer`, `DataView`, and the boxes `Number`, `String` and `Boolean`:
+A built-in object throws while compiling, before any query, even with own keys added (`Object.assign(new Date(0), { id: 1 })`): `Date`, `Map`, `Set`, `WeakMap`, `WeakSet`, `RegExp`, `Promise`, `Error` and its native subtypes (`TypeError`, …), `ArrayBuffer`, a typed array, `Buffer`, `DataView`, and the boxes `Number`, `String` and `Boolean`:
 
 > `` A built-in `…` has no meaning as a Whereable (a filter): it would compile to its own enumerable keys, and to `TRUE`, every row, when it has none. To compare with a value, give it as `db.param(…)`; to filter, give a plain object (`{ column: value }`); await a `Promise` first. ``<!-- message -->
 
 Zapatos 6.6.1 compiled it as a Whereable of its own keys: `TRUE` for most, so `` db.sql`DELETE FROM ${'films'} WHERE ${new Date()}` `` was `DELETE FROM "films" WHERE TRUE` and deleted every row; `("0" = $1 …)` for a typed array. The type refuses most of them (TS2345), not where a column shares one of their members: `db.deletes('actors', new Error('x'))` type-checks, since `actors` has a `name` column.
+
+Only the built-ins of the realm that runs pgcast throw, matched by their exact prototype. As in Zapatos 6.6.1, a `Date` from another realm, such as `vm.runInNewContext('new Date(0)')` (Jest runs each test file in a `vm` context), gives `TRUE`, and an instance of a class that extends a built-in keeps its own keys: `new Frames(1)`, with `class Frames extends Uint8Array {}`, gives `("0" = $1)`.
 
 ## `self` {#self}
 
