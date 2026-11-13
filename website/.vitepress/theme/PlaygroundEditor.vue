@@ -202,7 +202,7 @@ onBeforeUnmount(() => { stop(); latest++; disposables.forEach(disposable => disp
         <p class="label"><em>TS</em>You write</p>
         <div ref="host" class="Playground-editor" />
       </div>
-      <div>
+      <div aria-live="polite">
         <p class="label"><em>SQL</em>Postgres runs</p>
         <template v-for="(query, i) in queries" :key="i">
           <div v-html="query.html" />
@@ -210,7 +210,7 @@ onBeforeUnmount(() => { stop(); latest++; disposables.forEach(disposable => disp
         </template>
         <p v-for="note in notes" :key="note" class="Playground-note">{{ note }}</p>
       </div>
-      <div>
+      <div aria-live="polite">
         <p class="label"><em>::</em>TypeScript knows</p>
         <div v-html="type" />
       </div>
