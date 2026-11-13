@@ -132,7 +132,7 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 /* reading column */
 .vp-doc { font-size: 15px; line-height: 1.65; }
 .vp-doc p, .vp-doc li { max-width: 68ch; line-height: 1.65; }
-.vp-doc h1, .vp-doc h2, .vp-doc h3, .landing h1, .landing h3 {
+.vp-doc h1, .vp-doc h2, .vp-doc h3, .landing h1, .landing h2 {
   font-family: var(--font-display); line-height: 1.15; letter-spacing: -.01em; text-wrap: balance;
 }
 .vp-doc h1 { font-size: 2.3rem; font-weight: 800; margin: 0 0 12px; }
@@ -232,7 +232,7 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
   display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 28px;
   margin: 44px 0 56px; padding-top: 28px; border-top: 1px solid var(--line);
 }
-.landing .pillars h3 { font-size: 1rem; font-weight: 700; margin: 0 0 6px; }
+.landing .pillars h2 { font-size: 1rem; font-weight: 700; margin: 0 0 6px; }
 .landing .pillars p { margin: 0; color: var(--muted); font-size: 14px; }
 .landing .readnext p { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 0; }
 .landing .readnext a {
@@ -259,11 +259,13 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 }
 .CastPanel > div { min-width: 0; display: flex; flex-direction: column; border-right: 1px dashed var(--line); }
 .CastPanel > div:last-child { border-right: 0; }
-.CastPanel h5 {
-  display: flex; align-items: center; gap: 8px; margin: 0; padding: 12px 16px 10px; border-bottom: 1px solid var(--line);
+/* each column's label: a paragraph, not a heading, so that the page's outline skips no level */
+.CastPanel .label {
+  display: flex; align-items: center; gap: 8px; margin: 0; max-width: none; padding: 12px 16px 10px;
+  border-bottom: 1px solid var(--line);
   font: 600 12px/1 var(--font-body); letter-spacing: .02em; color: var(--muted);
 }
-.CastPanel h5 em {
+.CastPanel .label em {
   font: 700 11px/1 var(--font-mono); font-style: normal; color: var(--accent);
   border: 1px solid var(--accent); border-radius: 999px; padding: 3px 6px;
 }

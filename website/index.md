@@ -33,28 +33,28 @@ pgcast reads your Postgres schema and writes the TypeScript types. Its shortcuts
 <div class="pillars">
 <div>
 
-### Postgres is the source
+## Postgres is the source
 
 Types come from `pg_catalog`, never written by hand. Change a column, regenerate, and the compiler finds every query that broke.
 
 </div>
 <div>
 
-### SQL you can read
+## SQL you can read
 
 Each shortcut writes one documented query. Log it, test it, or write it yourself in a `sql` template.
 
 </div>
 <div>
 
-### Values are parameters
+## Values are parameters
 
 Values travel as `$1`, `$2`. Names are quoted as Postgres quotes them, so a stray `"` cannot change your query.
 
 </div>
 <div>
 
-### Drop-in for Zapatos
+## Drop-in for Zapatos
 
 Same module names, same SQL, same types. Safer behaviours wait behind opt-ins until 7.0.
 
