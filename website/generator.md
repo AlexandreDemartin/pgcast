@@ -101,6 +101,7 @@ Every option is optional. Each one given replaces its default whole: `schemas` w
 | [`customJSONParsingForLargeNumbers`](#generate.customJSONParsingForLargeNumbers) | `false` | the `JSONSelectable` type of `bigint` and `numeric` |
 | [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas) | `false` | the type of an enum of another schema |
 | [`enumOrder`](#generate.enumOrder) | `"alphabetical"` | the order of an enum's labels |
+| [`moduleNames`](#generate.moduleNames) | `"zapatos"` | the module names the files declare and import, and their folder |
 | [`progressListener`](#generate.progressListener) | `false` | where each step is reported |
 | [`warningListener`](#generate.warningListener) | `true` | where warnings go |
 | [`debugListener`](#generate.debugListener) | `false` | where each query and its result go |
@@ -111,7 +112,7 @@ Every option is optional. Each one given replaces its default whole: `schemas` w
 
 ### `outDir` {#generate.outDir}
 
-`string`, default `"."`. The folder that receives the `zapatos` folder, created if needed: `"./src"` writes `src/zapatos/schema.d.ts`. Relative to the current folder.
+`string`, default `"."`. The folder that receives the `zapatos` folder, created if needed: `"./src"` writes `src/zapatos/schema.d.ts`. Relative to the current folder. With [`moduleNames`](#generate.moduleNames) `"pgcast"`, the folder is `pgcast`.
 
 ### `outExt` {#generate.outExt}
 
@@ -290,6 +291,41 @@ CREATE TYPE crew_job AS ENUM ('director', 'writer', 'editor', 'cinematographer',
 - Another value stops the generator before any query, and writes nothing: `enumOrder must be 'alphabetical' (the default) or 'declared', not 'declard'`. In TypeScript, it fails to compile (TS2322, or TS2820 with a suggestion for a near-miss such as `"declard"`).
 - `"alphabetical"` notes, through [`warningListener`](#generate.warningListener), each generated enum whose declared order is not alphabetical.
 
+### `moduleNames` {#generate.moduleNames}
+
+`"zapatos"` or `"pgcast"`, default `"zapatos"`. The module names the generated files declare and import, and the folder they go in. It must match the folder pgcast is installed in, under `node_modules`: `"pgcast"` for a new project, installed as `pgcast`; `"zapatos"` for one that switched from Zapatos under the `zapatos` alias ([Switching from Zapatos](/switching)).
+
+| | `"zapatos"` | `"pgcast"` |
+|---|---|---|
+| Folder | `zapatos/` | `pgcast/` |
+| Declares | `zapatos/schema`, `zapatos/custom` | `pgcast/schema`, `pgcast/custom`, and `zapatos/schema` |
+| Imports | `zapatos/db` | `pgcast/db` |
+| Version canary comment | `` update by running `npx zapatos` `` | `` update by running `npx pgcast` `` |
+| Your imports | `zapatos/db`, `zapatos/schema`, `zapatos/generate` | `pgcast/db`, `pgcast/schema`, `pgcast/generate` |
+
+::: code-group
+
+```json [zapatosconfig.json]
+{
+  "db": { "connectionString": "{{DATABASE_URL}}" },
+  "outDir": "./src",
+  "moduleNames": "pgcast"
+}
+```
+
+```ts [films.ts]
+import * as db from 'pgcast/db';
+import type * as s from 'pgcast/schema';
+```
+
+:::
+
+- `"zapatos"` writes Zapatos 6.6.1's files, byte for byte: the option changes nothing until it is `"pgcast"`.
+- `"pgcast"` writes the same types, and ends `pgcast/schema.d.ts` with `declare module 'zapatos/schema' { export * from 'pgcast/schema'; }`: `pgcast/db`'s own declarations import `zapatos/schema`. Without it, every type would be `any`: under `skipLibCheck`, silently.
+- In the generated files, `zapatos` is left in that line and in the headers' credit to Zapatos. The config file keeps its name, `zapatosconfig.json` ([#368](https://github.com/AlexandreDemartin/pgcast/issues/368)); `npx pgcast` and `npx zapatos` both read the option.
+- Another value stops the generator before any query, and writes nothing: `moduleNames must be 'zapatos' (the default) or 'pgcast', not 'pgcats'`. In TypeScript, it fails to compile (TS2322, or TS2820 with a suggestion for a near-miss such as `"pgcats"`).
+- The other mode's schema in `outDir`, such as a `zapatos/` folder left from before the switch, is noted through [`warningListener`](#generate.warningListener). Both declare `zapatos/schema`, which TypeScript merges: with `"pgcast"`, a stale `zapatos/` that `tsconfig.json` includes lets a number through for a `text` column under `skipLibCheck`, and fails with TS2307 without it. Delete it once the placeholders you edited are moved to `pgcast/custom/`, renaming their `declare module 'zapatos/custom'` to `'pgcast/custom'`.
+
 ### `progressListener` {#generate.progressListener}
 
 `boolean`, or in `generate()` a function `(s: string) => void`; default `false`. `true` prints each step with `console.log`; a function gets each line.
@@ -316,6 +352,8 @@ Writing custom types file: src/zapatos/custom/index.d.ts
   - once per run, without [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas), when a column it would change is generated;
 - `` Note: every.crew_job lists the labels of enum public.crew_job in alphabetical order, not in their declared order, by which Postgres sorts and compares them. Set enumOrder: 'declared' to keep that order; it will be the default in pgcast 7.0. ``
   - once per run, with [`enumOrder`](#generate.enumOrder) `"alphabetical"`, when a schema of [`schemas`](#generate.schemas) has an enum whose declared order is not alphabetical; several as `every.<name> lists the labels of enums archive.print_format and public.crew_job`;
+- `Note: src/zapatos/schema.d.ts is here too, generated with moduleNames: 'zapatos'. It declares 'zapatos/schema', as src/pgcast/schema.d.ts does, and TypeScript merges the two: types can loosen, silently under skipLibCheck. Delete the folder src/zapatos, once any placeholder you edited there is moved to src/pgcast/custom.`
+  - after writing, when `outDir` holds the schema of the other [`moduleNames`](#generate.moduleNames), either way; a folder without its `schema.d.ts` is not noted;
 - the [old layout warning](#the-old-layout-warning).
 
 ### `debugListener` {#generate.debugListener}
@@ -378,6 +416,7 @@ src/zapatos/
 - Nothing is deleted: a placeholder whose type is gone stays, and so does `custom/` once there is no custom type left.
 - `schema.d.ts` declares `schemaVersionCanary`, `version: 104`. A `zapatos/db` that expects another version fails to compile there: generate again ([`SchemaVersionCanary`](/runtime-config#SchemaVersionCanary)).
 - Each file is a `declare module` of the `zapatos/*` names, so your `tsconfig.json` must include it: `"include": ["src"]`, with `outDir` `"./src"`.
+- With [`moduleNames`](#generate.moduleNames) `"pgcast"`, the tree is `src/pgcast/` and the names `pgcast/*`; the rest of this section is the same.
 
 ### The old layout warning {#the-old-layout-warning}
 

@@ -75,7 +75,7 @@ npx zapatos        # or: npx pgcast
 ```
 
 - `pg`, `@types/pg` and TypeScript 4.1 or later are peer dependencies, as in Zapatos; `zapatosconfig.json` is read as before.
-- Installing it as plain `npm install pgcast` breaks every `zapatos/*` import, by design for now. Native `pgcast/*` module names will come later as an opt-in ([decision 002](docs/decisions/002-module-names.md)).
+- Installed under its own name, pgcast resolves as `pgcast/db`, not `zapatos/db`: set the generator's [`moduleNames: 'pgcast'`](https://pgcast.dev/generator#generate.moduleNames), regenerate, and import `pgcast/db` and `pgcast/schema` ([decision 002](docs/decisions/002-module-names.md)).
 
 ## What differs from Zapatos 6.6.1
 
