@@ -51,6 +51,7 @@ The two `count()`s run on `client`, outside the transaction: after the block, `b
 
 - These three run on the transaction's client, as the callback's queries do. Each reaches [`queryListener`](/runtime-config#Config.queryListener) and [`resultListener`](/runtime-config#Config.resultListener) with the transaction's id: a counter from 0, one per transaction opened, kept across retries; a transaction passed through keeps the outer one's.
 - No `SAVEPOINT`: a transaction inside another is the outer one ([Passing a transaction through](#passing-a-transaction-through)).
+- After a query error that the callback catches, Postgres answers the `COMMIT` with `ROLLBACK`, not an error, and nothing is saved. `transaction()` resolves, as in Zapatos 6.6.1, and warns once (`PGCAST_DEP003`); with [`transactionRequiresCommit`](/runtime-config#Config.transactionRequiresCommit), it rejects.
 
 ### Retries
 
@@ -63,6 +64,7 @@ When `START TRANSACTION`, the callback or `COMMIT` rejects with a `code` of 4000
 
 - After the last attempt, it rejects with that attempt's error.
 - Any other rejection: `ROLLBACK`, then it rejects with it, at once.
+- A `COMMIT` that Postgres answers with `ROLLBACK` is not retried: pgcast doesn't know which error the callback caught.
 - [`transactionListener`](/runtime-config#Config.transactionListener) gets each message with the transaction's id:
 
 | Message | When |
@@ -92,6 +94,7 @@ One transaction, both seats or neither: `START TRANSACTION ISOLATION LEVEL SERIA
 | `Isolation level must be an IsolationLevel value (e.g. IsolationLevel.Serializable), not '…'`<!-- message --> | `isolationLevel` is not a value of `IsolationLevel`; thrown before a client is checked out or a query sent | pgcast 6.6.2 |
 | the callback's error | after `ROLLBACK`; for 40001 and 40P01, after the last attempt | Zapatos |
 | a `TypeError`, `Cannot destructure property 'code' of 'err' as it is null.` (or `undefined`) | the callback throws `null` or `undefined`, after `ROLLBACK` | Zapatos |
+| "the transaction was rolled back, not committed: a query in it failed and the callback caught the error, so Postgres answered COMMIT with ROLLBACK; let the error out of the callback, or ROLLBACK TO a SAVEPOINT before going on"<!-- message --> | with [`transactionRequiresCommit`](/runtime-config#Config.transactionRequiresCommit), Postgres answered the `COMMIT` with `ROLLBACK`; not retried, and no `ROLLBACK` of its own | pgcast 6.7.0 |
 
 The type refuses a level that is not an `IsolationLevel` (2345), a string included:
 
@@ -360,4 +363,4 @@ A plain `Error`, with no `code`, before anything is sent. A shortcut throws its 
 | `db.Default`, `db.self`, `db.raw()`, `db.cols()` or `db.vals()` as a filter value | `.run()` rejects | [Whereable objects](/sql-template#whereable), [Conditions](/conditions) |
 | `transaction()` with another isolation level | its promise rejects | [`transaction()`, Errors](#errors) |
 
-After a query, pgcast rejects in two cases of its own: `selectExactlyOne()` with no row, with a [`NotExactlyOneError`](/select#NotExactlyOneError); `count()` and the other aggregates with no row to read, with a `TypeError` ([`count()`](/select#count)).
+After a query, pgcast rejects in three cases of its own: `selectExactlyOne()` with no row, with a [`NotExactlyOneError`](/select#NotExactlyOneError); `count()` and the other aggregates with no row to read, with a `TypeError` ([`count()`](/select#count)); `transaction()` whose `COMMIT` Postgres answers with `ROLLBACK`, with [`transactionRequiresCommit`](/runtime-config#Config.transactionRequiresCommit) ([Errors](#errors)).
