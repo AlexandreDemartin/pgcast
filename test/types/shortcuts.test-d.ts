@@ -222,6 +222,17 @@ describe('update, deletes', () => {
     expectTypeOf(q.run(pool)).resolves.toEqualTypeOf<Pick<s.users.JSONSelectable, 'id'>[]>();
     expectTypeOf(q.run(pool)).resolves.not.toBeAny();
   });
+
+  test('a built-in object as the where: refused, unless it shares a member with a column', () => {
+    // @ts-expect-error a Date shares no member with a column of users
+    db.deletes('users', new Date());
+    // @ts-expect-error nor does a Map
+    db.update('users', { display_name: 'B' }, new Map());
+    // the weak-type check takes an Error where a column is called `name`, as in orgs:
+    // it type-checks, and throws at run time (#170; test/integration/injection.test.ts)
+    db.deletes('orgs', new Error('x'));
+    db.sql<s.orgs.SQL>`DELETE FROM ${'orgs'} WHERE ${new Error('x')}`;
+  });
 });
 
 describe('truncate', () => {
