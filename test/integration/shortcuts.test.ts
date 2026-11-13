@@ -386,6 +386,48 @@ describe('update', () => {
   });
 });
 
+describe('parent() as a write value', () => {
+  // an INSERT or an UPDATE has no parent query; the type refuses the call on every column it types (types/shortcuts)
+
+  it('characterization: parent() as an insert(), upsert() or update() value is a parameter, sent as JSON', async () => {
+    // characterization: vals({…}) wraps it in a Parameter, and pg sends an object as JSON; same in 6.6.1
+    const insert = db.insert('users', { email: 'dan@example.com', display_name: parent('id') }, { returning: ['display_name'] });
+    const upsert = db.upsert('users', { email: 'bob@example.com', display_name: parent('id') }, 'email', { returning: ['display_name'], reportAction: 'suppress' });
+    const update = db.update('users', { display_name: parent('id') }, { id: 3 }, { returning: ['display_name'] });
+    expect(insert.compile().text).toBe('INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) RETURNING jsonb_build_object($3::text, "display_name") AS result');
+    expect(upsert.compile().text).toBe('INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("email", "display_name") = ROW(EXCLUDED."email", EXCLUDED."display_name") RETURNING jsonb_build_object($3::text, "display_name") AS result');
+    expect(update.compile().text).toBe('UPDATE "users" SET ("display_name") = ROW($1) WHERE ("id" = $2) RETURNING jsonb_build_object($3::text, "display_name") AS result');
+    for (const q of [insert, upsert, update]) {
+      const [value] = q.compile().values;
+      expect(value).toBeInstanceOf(db.ParentColumn);
+      expect(JSON.stringify(value)).toBe('{"value":"id"}');
+    }
+
+    // a text column stores the JSON text, upsert's existing row through EXCLUDED; a jsonb column the object
+    expect(await run(insert)).toEqual({ display_name: '{"value":"id"}' });
+    expect(await run(upsert)).toEqual({ display_name: '{"value":"id"}' });
+    expect(await run(update)).toEqual([{ display_name: '{"value":"id"}' }]);
+    expect(await run(db.insert('users', { email: 'eve@example.com', display_name: 'Eve', settings: parent('id') }, { returning: ['settings'] })))
+      .toEqual({ settings: { value: 'id' } });
+
+    // parent() with no column is `{}`: an empty array in text[], an empty object in jsonb
+    expect(await run(db.update('users', { settings: parent(), tags: parent() }, { id: 1 }, { returning: ['settings', 'tags'] })))
+      .toEqual([{ settings: {}, tags: [] }]);
+
+    // a column whose type does not take the JSON text as input refuses it
+    expect(await fails(db.update('users', { manager_id: parent('id') }, { id: 3 }))).toEqual({
+      code: '22P02', message: 'invalid input syntax for type integer: "{"value":"id"}"',
+    });
+    expect(await fails(db.insert('users', { email: 'fay@example.com', display_name: 'Fay', mood: parent('mood') }))).toEqual({
+      code: '22P02', message: 'invalid input value for enum mood: "{"value":"mood"}"',
+    });
+
+    // while parent() in a fragment value, as in vals([…]), throws before any query (R63)
+    expect(() => db.insert('users', { email: 'gus@example.com', display_name: sql`${parent('id')}` }).compile())
+      .toThrow(`The 'parent' table alias has no meaning here`);
+  });
+});
+
 describe('deletes', () => {
   it('returns the deleted rows', async () => {
     expect(await run(db.deletes('memberships', { user_id: 2 }, { returning: ['org_code'], extras: { r: 'role' } })))
