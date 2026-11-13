@@ -53,11 +53,13 @@ In brackets is the code, one per deprecated behaviour of the runtime, there to s
 
 The warning comes when you call the shortcut, before `.run()`, and only if the old behaviour is actually used: an `update()` with no `undefined` in it never warns. It comes once per process for each code, so it tells you that the old path ran, not where nor how often. `node --trace-deprecation` adds the stack, down to the line that called `update()`; for the rest, turn the option on and let your tests find what changes.
 
+`PGCAST_DEP003` comes later: once `transaction()` has sent `COMMIT` and Postgres has answered `ROLLBACK`, just before the promise resolves.
+
 Where `undefined` meant "clear it", `null` says so under either setting, and never warns.
 
 ## 7.0 and 8.0
 
-7.0 turns on by default the opt-ins that decision 003 lists: `upsertRequiresSameKeys`, `undefinedMeansMissing` and those 6.7 still brings, except `selectExactlyOne()`'s. Decision 003 makes that the whole of 7.0's break, and the warnings announce it, so a project that has turned every option on, and sees no `PGCAST_DEP` warning, has nothing to change. The old behaviours go in 8.0.
+7.0 turns on by default the opt-ins that decision 003 lists: `upsertRequiresSameKeys`, `undefinedMeansMissing`, `transactionRequiresCommit` and those 6.7 still brings, except `selectExactlyOne()`'s. Decision 003 makes that the whole of 7.0's break, and the warnings announce it, so a project that has turned every option on, and sees no `PGCAST_DEP` warning, has nothing to change. The old behaviours go in 8.0.
 
 The generator gets opt-ins of its own in 6.7, typing the enums of other schemas ([#44](https://github.com/AlexandreDemartin/pgcast/issues/44)) and keeping enum values in their declared order ([#49](https://github.com/AlexandreDemartin/pgcast/issues/49)). Their warnings will come through [`warningListener`](/generator#generate.warningListener), and only when your schema has something they would change.
 
@@ -67,5 +69,5 @@ pgcast isn't on npm yet. 6.6.2 is written; 6.7.0, which brings the opt-ins, is i
 
 ## Further reading
 
-- The entries this page talks about: [`Config.upsertRequiresSameKeys`](/runtime-config#Config.upsertRequiresSameKeys), [`Config.undefinedMeansMissing`](/runtime-config#Config.undefinedMeansMissing), [Opt-ins and warnings](/runtime-config#opt-ins-and-warnings), [An `undefined` value](/insert#undefined-values), [`conditions.not()`](/conditions#conditions.not), [`conditions.isNotIn()`](/conditions#conditions.isNotIn), [`selectExactlyOne()`](/select#selectExactlyOne), [`SchemaVersionCanary`](/runtime-config#SchemaVersionCanary).
+- The entries this page talks about: [`Config.upsertRequiresSameKeys`](/runtime-config#Config.upsertRequiresSameKeys), [`Config.undefinedMeansMissing`](/runtime-config#Config.undefinedMeansMissing), [`Config.transactionRequiresCommit`](/runtime-config#Config.transactionRequiresCommit), [Opt-ins and warnings](/runtime-config#opt-ins-and-warnings), [An `undefined` value](/insert#undefined-values), [`conditions.not()`](/conditions#conditions.not), [`conditions.isNotIn()`](/conditions#conditions.isNotIn), [`selectExactlyOne()`](/select#selectExactlyOne), [`SchemaVersionCanary`](/runtime-config#SchemaVersionCanary).
 - The decision behind it: [decision 003](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/003-fixes-and-deprecation.md), and every change by version in the [changelog](https://github.com/AlexandreDemartin/pgcast/blob/master/CHANGELOG.md).

@@ -442,7 +442,7 @@ A `noop` fragment still compiles, its SQL behind a comment. `force` sends it, an
 fragment.compile(): SQLQuery
 ```
 
-The query as `pg` takes it ([`SQLQuery`](/runtime-config#SQLQuery)): `text`, its parameters numbered from `$1`, and `values`, in their order; `name` too, once [prepared](#prepared). It sends nothing, and throws where an interpolation has no meaning. Its arguments are for its own recursion: call it with none.
+The query as `pg` takes it ([`SQLQuery`](/runtime-config#SQLQuery)): `text`, its parameters numbered from `$1`, and `values`, in their order; `name` too, once [prepared](#prepared). It sends nothing, and throws where an interpolation has no meaning. Its arguments are for its own recursion: call it with none. The text is not a stable API: a minor version may change it, as long as the result does not ([Test code that uses pgcast](/testing#the-sql-text-is-not-a-stable-api)).
 
 <CastPanel example="sql_compile">
 

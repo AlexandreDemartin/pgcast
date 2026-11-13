@@ -111,18 +111,19 @@ Each code warns once, so the stack shows only its first call: fix it, then run a
 |---|---|---|
 | `PGCAST_DEP001` | a multi-row `upsert()` without [`updateColumns`](/insert#upsert-options), with a key missing from some rows: inserted as `DEFAULT`, it overwrites the existing value ([Rows with different keys](/insert#upsert-different-keys)) | give every row the key (`db.Default` keeps the SQL), or pass `updateColumns`; or [`upsertRequiresSameKeys`](/runtime-config#Config.upsertRequiresSameKeys), and such a call throws |
 | `PGCAST_DEP002` | an `undefined` value in `insert()`, `update()` or `upsert()`, sent as `NULL` ([An `undefined` value](/insert#undefined-values)) | leave the key out, or give `null` to erase the column; or [`undefinedMeansMissing`](/runtime-config#Config.undefinedMeansMissing), and `undefined` is a missing key |
+| `PGCAST_DEP003` | a [`transaction()`](/transaction#transaction) whose callback catches a query's error and returns: Postgres answers the `COMMIT` with `ROLLBACK`, and nothing is saved ([Let the error through](/retries#let-the-error-through)) | let the error out of the callback, or `ROLLBACK TO` a `SAVEPOINT` before going on; or [`transactionRequiresCommit`](/runtime-config#Config.transactionRequiresCommit), and such a transaction rejects |
 
 ## Turn on the opt-ins
 
-Once a run shows no warning, or each one comes from a call you've checked, turn both options on, once, before the first query:
+Once a run shows no warning, or each one comes from a call you've checked, turn the options on, once, before the first query:
 
 ```ts twoslash
 import * as db from 'zapatos/db';
 // ---cut---
-db.setConfig({ upsertRequiresSameKeys: true, undefinedMeansMissing: true });
+db.setConfig({ upsertRequiresSameKeys: true, undefinedMeansMissing: true, transactionRequiresCommit: true });
 ```
 
-Both will be the default in 7.0 ([Versions, opt-ins and warnings](/versions)). With them on, an `undefined` value is left out of an `update()`:
+All three will be the default in 7.0 ([Versions, opt-ins and warnings](/versions)). With them on, an `undefined` value is left out of an `update()`:
 
 <CastPanel example="switching_undefined">
 
@@ -132,7 +133,8 @@ Both will be the default in 7.0 ([Versions, opt-ins and warnings](/versions)). W
 
 - `insert()` sends `DEFAULT`<!-- probe: (db.setConfig({ undefinedMeansMissing: true }), db.insert('tags', { film_id: 1000, tag: undefined })) --> for an `undefined` value, and an `update()` with no other key throws "nothing to update: an Updatable needs at least one column"<!-- message -->.
 - The `upsert()` of `PGCAST_DEP001` throws when called, before any query: "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message -->.
-- Neither option warns. To keep it that way, `NODE_OPTIONS=--throw-deprecation npm test` fails the run at the first warning.
+- A `transaction()` whose `COMMIT` Postgres answers with `ROLLBACK` rejects, without a retry ([`transaction()`, Errors](/transaction#errors)).
+- No option warns. To keep it that way, `NODE_OPTIONS=--throw-deprecation npm test` fails the run at the first warning.
 
 ## Go back
 
@@ -140,7 +142,7 @@ Both will be the default in 7.0 ([Versions, opt-ins and warnings](/versions)). W
 npm install zapatos@6.6.1
 ```
 
-The generated files are the same, and each change of [Find the calls whose result changes](#find-the-calls-whose-result-changes) runs as it did, but the `jsonb` one, which finds nothing again. Remove the two options from `setConfig()` first: Zapatos 6.6.1's `Config` doesn't have them (2353).
+The generated files are the same, and each change of [Find the calls whose result changes](#find-the-calls-whose-result-changes) runs as it did, but the `jsonb` one, which finds nothing again. Remove the three options from `setConfig()` first: Zapatos 6.6.1's `Config` doesn't have them (2353).
 
 ::: warning Security
 Code written or left as it is against pgcast's fixes gets Zapatos 6.6.1's results back: each row whose What to do is "nothing", the `not()` row and the `jsonb` row. `db.deletes('roles', { character: db.conditions.isNotIn([db.param('The ferryman')]) })` deletes 11 roles under pgcast, and all 12 under Zapatos 6.6.1. The holes of the [changelog](https://github.com/AlexandreDemartin/pgcast/blob/master/CHANGELOG.md)'s § Security are open again: a name, a `lock`, an `aggregate`, a plain value in `updateValues` or a `param()` cast can splice SQL ([The security model](/security)).

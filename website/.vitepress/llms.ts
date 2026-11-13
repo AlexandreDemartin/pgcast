@@ -138,14 +138,15 @@ function snippet(file: string, region?: string) {
 
 /**
  * An example's hidden lines between `// #region copy` and `// #endregion copy` repeat a block the page shows (a function
- * the example calls): they must stay that block, blank lines aside, or the two drift apart silently.
+ * the example calls): they must stay the code that block shows, after its `// ---cut---` if any, blank lines aside, or
+ * the two drift apart silently.
  */
 function checkCopy(file: string, page: string) {
   if (!readFileSync(file, 'utf8').includes('// #region copy')) return;
   const
     lines = (code: string) => code.split('\n').map(line => line.trimEnd()).filter(line => line !== '').join('\n'),
     copy = lines(snippet(file, 'copy')),
-    blocks = [...page.matchAll(/^```.*\n([\s\S]*?)^```$/gm)].map(([, code]) => lines(code!));
+    blocks = [...page.matchAll(/^```.*\n([\s\S]*?)^```$/gm)].map(([, code]) => lines(code!.split('// ---cut---').pop()!));
   if (!blocks.includes(copy)) throw new Error(`llms.ts: the copy region of ${file} is no longer a block of its page`);
 }
 
