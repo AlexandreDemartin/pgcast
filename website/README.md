@@ -144,6 +144,7 @@ At build, `.vitepress/llms.ts` writes two files to the site's root, from the out
 
 - `llms.txt`: `# pgcast`, a summary (the site's description and the home's lede), then one section per group, each written page with its URL and lede, and `## Optional`, the changelog. So a page needs a `# ` title and a `{.lede}` paragraph, or the build fails.
 - `llms-full.txt`: every written page as plain Markdown, each cast panel with the SQL, values and type `cast.data.ts` computes. A panel not written `<CastPanel example="<name>">` fails the build.
+- `/<page>.md` (`/index.md` for the home): each page's part of `llms-full.txt`, in a file of its own, listed nowhere. Beside the title of each written page of the outline, its page actions (`.vitepress/theme/PageActions.vue`) copy it, link it, and open ChatGPT or Claude on a prompt that names its URL; nothing outside the site is fetched until one of those links is followed. In `docs:dev` the file does not exist: `docs:build` writes it.
 
 A "Coming" page has no `.md` file, so it is in neither; nor are the templates and this README, which the outline does not list. The changelog is in `llms.txt` only.
 
