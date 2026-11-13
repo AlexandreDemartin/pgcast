@@ -314,6 +314,11 @@ Candidates for a check, a rule or a skill line.
 - #170 — Parallel suites in other worktrees slow `npm test` (2 failures in 50 s, then green in 15 s): rerun once before treating a red suite as real — `builder`
 - #239 — Literal inference differs between TypeScript 5.9 and 7.0 (`cols('id')` against a contextual `ParentColumn<Column>`: `'id'` on 5.9, `string` on 7.0), so a red negative type test proves something only for the compiler it ran on; the type tests run on 5.9 only — `branch-reviewer`
 - #239 — An issue that asks for « `dist/` byte-identical » on a type-only change means the `.js` and `.mjs`; the `.d.ts` gains the declaration — `builder`
+- #247 — An inferred type is read from the command line with `tsc --declaration --emitDeclarationOnly --outDir <scratch>` on a file of `export const`s: the `.d.ts` shows it, strict on or off, without a hover — `builder`
+- #245 — An explicit interface return type where TypeScript inferred an object literal type drops the implicit index signature: a value assignable to `Record<string, unknown>` stops being; diff the emitted `.d.ts` when a return type changes — `branch-reviewer`
+- #245 — A spread copy reads own enumerable properties once: prototype getters are lost; copy a typed config object by naming its declared keys — `branch-reviewer`
+- #245 — A replay against 6.6.1 snapshots each value as it reads it (`{ ...x }`) and reads getters explicitly, or a shared live object or `JSON.stringify` shows a regression that does not exist — `builder`
+- #245, #246 — `test/tsconfig.json` sets `exactOptionalPropertyTypes`: a test of an `undefined` config key, as consumers write it, needs `as unknown as NewConfig` — `builder`
 
 ## Minors kept
 

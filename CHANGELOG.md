@@ -36,6 +36,7 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 - `README.md` rewritten for pgcast: what it fixes and adds, an example with its SQL and type, what differs from Zapatos 6.6.1, the versions policy, the relationship with Zapatos.
 - The docs site and the README take their examples from pgcast's own world, a film's cast, instead of Zapatos's `authors` and `books` ([decision 004](docs/decisions/004-documentation-site.md), amended): the docs schema (`website/schema.sql`) holds `studios`, `films`, `actors`, `roles`, `crew`, `cinemas`, `screenings`, `seat_bookings`, `ratings` and `tags`, snake_case, with an array column, a nullable boolean and a domain, and invented seed rows from id 1000. The tests keep their fixture.
 - `package.json`: the `author` is the maintainer, Alexandre Demartin; George MacKerron, the original author of Zapatos, is listed under `contributors`. `.github/FUNDING.yml` lists both. The published files are unchanged.
+- The docs of `strict()` and `toBuffer()`, in their JSDoc and Reference entries, say that only `null` passes through, as only `NULL` does for a `STRICT` function in Postgres: `undefined` reaches the wrapped function, which handles it if it takes it and may throw otherwise, and the type refuses it unless the function takes it, with `strictNullChecks` on. The behaviour is Zapatos 6.6.1's, unchanged.
 
 ### Deprecated
 - A multi-row `upsert()` without `updateColumns`, where a key missing from some row is still set from `EXCLUDED`: it is inserted as `DEFAULT`, then overwrites the existing value on conflict. It still runs, with the same SQL, and emits a `DeprecationWarning` (`PGCAST_DEP001`) once per process. `upsertRequiresSameKeys` will be the default in 7.0.
@@ -78,6 +79,7 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
   - The error says what to do: give a value as `db.param(…)`, a filter as a plain object, and await a `Promise` first.
   - The type refused most of them (TS2345), not one that shares a member with a column: `deletes('actors', new Error('x'))` type-checks where `actors` has a `name` column, and now throws.
   - Unchanged: a plain object, an object with a `null` prototype, a class instance, even of a class that extends a built-in, a view included (`class Frames extends Uint8Array {}`: `TRUE` when it has no own enumerable key, `("0" = $1 …)` for its indexes), a built-in of another realm (a `Date` from `vm.runInNewContext()`: `TRUE`), a built-in as a `Whereable` value (`{ released: new Date() }` is `$1`), the wrappers, arrays, the global object's error.
+- `getConfig()` and `setConfig()` return a copy of the configuration, `transactionRetryDelay` included: changing what they return no longer changes the configuration. Zapatos 6.6.1 shared `transactionRetryDelay` from `getConfig()` (`getConfig().transactionRetryDelay.minMs = 1` set it), and `setConfig()` returned the configuration itself. The listeners are the functions you set, and `setConfig()` still keeps the `transactionRetryDelay` object it is given.
 
 ## [6.6.2] - 2026-11-12
 
