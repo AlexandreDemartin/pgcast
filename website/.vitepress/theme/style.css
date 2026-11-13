@@ -81,6 +81,8 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 .VPNavBar.has-sidebar .divider::before { display: none; }
 .VPNavBarTitle .title { font: 700 19px/1 var(--font-mono); letter-spacing: -.02em; color: var(--fg); gap: 8px; }
 .VPNavBarTitle .title b { color: var(--accent); font-weight: 700; margin: 0 1px; }
+/* VitePress clips the title's span (`overflow: hidden`, for its ellipsis): a line box of 1 cut the descender of the g */
+.VPNavBarTitle .title > span:not(.version) { line-height: 1.5; }
 .VPNavBarTitle .version {
   font: 500 12px/1 var(--font-body); letter-spacing: 0; color: var(--muted);
   border: 1px solid var(--line); border-radius: 999px; padding: 4px 8px; background: var(--surface);
@@ -190,6 +192,9 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 .VPDocFooter .prev-next { order: 1; border-top: 0; padding-top: 0; margin-top: 56px; gap: 12px; }
 .VPDocFooter .edit-info { order: 2; margin-top: 40px; padding: 16px 0 0; border-top: 1px solid var(--line); font-size: 13px; }
 .VPDocFooter .edit-link-button { font-size: 13px; font-weight: 400; color: var(--accent); }
+/* "Last updated", from git (config.ts), in the edit row's type; VitePress's template drops the space before the date */
+.VPDocFooter .edit-info .VPLastUpdated { font-size: 13px; font-weight: 400; color: var(--muted); }
+.VPDocFooter .edit-info .VPLastUpdated time { margin-left: .3em; }
 .VPDocFooter .pager-link { border-color: var(--line); border-radius: var(--radius); background: var(--surface); padding: 14px 16px; }
 .VPDocFooter .pager-link:hover { border-color: var(--accent); }
 .VPDocFooter .pager-link .desc { font-size: 12px; color: var(--muted); }

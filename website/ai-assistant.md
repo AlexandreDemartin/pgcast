@@ -85,9 +85,6 @@ https://pgcast.dev/llms-full.txt
   each error in the code, never with `any`, a type assertion (`as` a type;
   `as const` is fine), `@ts-ignore` or `@ts-expect-error`.
   https://pgcast.dev/ai-assistant#run-the-type-check
-- Write `columns` and `returning` without `as const` (#41): for now it types
-  the result as `never`, which is assignable to any type.
-  https://pgcast.dev/select#columns
 ```
 
 Put it where your assistant reads its instructions:

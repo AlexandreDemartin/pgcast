@@ -522,6 +522,18 @@ describe('select', () => {
     expect(await run(db.select('users', sql`false`))).toEqual([]);
   });
 
+  it('columns and returning as a readonly tuple: the SQL and the rows of a mutable array', async () => {
+    const cols = ['id', 'display_name'] as const, order = { by: 'id', direction: 'ASC' } as const;
+    expect(db.select('users', all, { columns: cols, order }).compile())
+      .toEqual(db.select('users', all, { columns: ['id', 'display_name'], order }).compile());
+    expect(await run(db.select('users', all, { columns: cols, order })))
+      .toEqual([{ id: 1, display_name: 'Ada' }, { id: 2, display_name: 'Bob' }, { id: 3, display_name: 'Cyd' }]);
+    const row = { email: 'ro@x.org', display_name: 'Ro' };
+    expect(db.insert('users', row, { returning: cols }).compile())
+      .toEqual(db.insert('users', row, { returning: ['id', 'display_name'] }).compile());
+    expect(Object.keys(await run(db.insert('users', row, { returning: cols })))).toEqual(['id', 'display_name']);
+  });
+
   it('characterization: a full row comes through to_jsonb, int8 beyond 2^53 included', async () => {
     // characterization: lifetime_ops 9007199254740993 comes back as the JSON number 9007199254740992
     expect(await run(db.selectOne('accounts', { id: 1 }))).toMatchInlineSnapshot({ opened_on: expect.any(String) }, `
