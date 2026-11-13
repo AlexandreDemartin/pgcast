@@ -119,6 +119,11 @@ A "Coming" page has no `.md` file, so it is in neither; nor are the templates an
 
 A PR that changes how a page looks shows it, in light and dark, at a phone's width (375px) and a desktop's: from `npm run docs:preview`, on a private artifact linked from **Proofs** (skill [`plan-and-proofs`](../.agents/skills/plan-and-proofs/SKILL.md) § Proofs), as `gh` cannot attach images. In the browser, they can go in the PR's description instead.
 
+- `docs:preview` keeps the file list it read at start-up: restart it after each rebuild, or the new hashed CSS gives 404.
+- Headless Chrome stops at about 500px with `--window-size`: a phone's width goes through the DevTools protocol, `Emulation.setDeviceMetricsOverride` with `mobile: true`.
+- The nav has no fixed breakpoints, it moves what does not fit into `⋯`: a change to its text is checked at every width from 768 to 1280px.
+- A theme override is checked in the computed style: a default-theme component's scoped rules (`[data-v-…]` counts as a class) win without an error; read its `<style scoped>` first.
+
 ### Before the PR
 
 - [ ] One job, the group's; its entry in `outline.ts`, a version badge if it documents a minor

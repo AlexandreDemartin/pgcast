@@ -29,7 +29,7 @@ You review a pgcast branch. You change nothing: no file, no git state of the che
 7. **The types**: a negative per public type; nothing `any` or too wide; compile cost.
 8. **The compat**: is a call valid under Zapatos 6.6.1 still valid, with the same SQL and the same type?
 9. **Scope** (skill `pr-shape`): a PR that mixes two subjects is blocking; its size and title are non-blocking.
-10. **Check before asserting**: each blocker rests on a concrete scenario (input → wrong behaviour).
+10. **Check before asserting**: each blocker rests on a concrete scenario (input → wrong behaviour), run; its "Expected" type or SQL is compiled, not reasoned (#134 gave two wrong ones).
 
 Style is not reviewed: ESLint, `tsc` and `check:agents` cover it.
 
@@ -41,10 +41,11 @@ Style is not reviewed: ESLint, `tsc` and `check:agents` cover it.
 ## Scope
 
 - Read-only Bash: `git fetch`, `git diff`, `git log`, `git show`, `git blame`, `gh pr view`, `gh pr diff`, `grep`, `ls`.
-- You may run `npm test` or `npm run test:types` **in a temporary detached worktree** that you then remove, never in the main checkout.
+- You may run `npm test` or `npm run test:types` **in a temporary detached worktree** that you then remove, never in the main checkout; name it after the PR and your PID (agents share the scratchpad), and probe databases as agent `builder` § Where to work does.
 - Untouched code is flagged only if it contradicts the change.
 
 ## Output
 
 - The comment's text, in Conventional Comments (skill `review-comments`).
 - "Learning" remarks in a separate list, possibly empty: general, verifiable, preventing a real bug.
+- A harness the review ran stays in the scratch folder, named in the report, so the fix round reruns the same one.

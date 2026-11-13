@@ -40,6 +40,9 @@ Closes #n
 
 - **Each command run**, with the tail of its output in a code block: the issue's **Done when**, at least `lint`, `typecheck`, `test`, `test:types`, `build`.
 - **A bug**: the failing test is committed before the fix (skill `pr-shape` § Commits); the proof gives its name and its failing output at the test commit (SHA).
+  - Its expected value is written by hand: an empty inline snapshot records the current output.
+  - Each new assertion is red on its own: in one `it`, the first old failure hides the rest.
+  - A test that freezes a route a `CHANGELOG.md` line names (`upsert()` `updateValues`, `lateral`) runs red against the base's runtime.
 - **`core.ts`**: the compiled SQL before / after (skill `sql-safety`).
 - **Compat at stake**: the 6.6.1 replay, what 6.6.1 did and what the branch does (skill `backward-compat`).
 - **Types**: the `bench:types` figure when a type changes (skill `type-tests`).

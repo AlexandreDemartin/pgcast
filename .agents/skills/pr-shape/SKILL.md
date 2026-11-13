@@ -58,6 +58,7 @@ Sources: GitHub docs "Stack code changes in pull requests", Thoughtworks Radar (
 
 - **No rewriting** (`guard.mjs`): layer N starts from branch N-1 and its PR targets it (`--base <branch N-1>`); a fix from below goes up by `git merge origin/<branch N-1>` into each layer above, bottom to top (agent `chores`).
 - **No `gh stack sync` nor `gh stack push`**: they rebase and force each branch.
+- **Splitting a pushed PR**: new branches from `origin/master`, `git cherry-pick` of its commits, the old PR closed with a pointer.
 - **Review**: each layer on its own, as soon as it is open; the reviewer gets its number and its base.
 - **Merge from bottom to top**, each layer squashed, then `origin/master` merged into the next (skill `merge-gate` § A stack).
 
@@ -83,6 +84,8 @@ Same voice as PR titles.
 - **Imperative**, like Zapatos's recent commits: the verbs of § PR title, `Ensure`, `Export`.
 - **Docs**: "Update docs for …"; **dependencies**: "Update dependencies"; **version**: the number alone ("6.7.0").
 - **Learnings**: "Record what #22 taught"; **merge of master**: "Merge master into <branch>".
+  - `git merge -m "<subject>" -m "Co-Authored-By: …"` (a trailer needs its own `-m`); after a conflict `git commit -m`, never `--no-edit`, which keeps the `# Conflicts:` lines.
+  - Then `git diff origin/master...HEAD` (three dots: two make the branch revert what master gained), and no `CHANGELOG.md` line landed under a release heading.
 - **A bug**: the failing test is committed before the fix, so the proof can show it red (skill `plan-and-proofs` § Proofs).
 - No Conventional Commits, no commits that tick a box: merging the PR closes its issue.
 - No body, except a reason that does not fit on the line; the requested `Co-Authored-By` line always stays.
