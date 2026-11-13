@@ -164,19 +164,51 @@ describe('param under castArrayParamsToJson or castObjectParamsToJson: a string 
     expect(await stored('c_text', param({ a: 1 }, 'json'))).toBe('{"a":1}');
   });
 
-  it('changed: a text cast on an object into a json or jsonb column is refused', async () => {
-    // 6.6.1 stored {"a": 1}; write param(obj, 'jsonb'), or no cast
-    db.setConfig({ castObjectParamsToJson: true });
+  it('changed: a text cast on an array or an object into a json or jsonb column is refused', async () => {
+    // 6.6.1 stored the JSON; write param(x, 'jsonb'), or no cast
+    db.setConfig({ castArrayParamsToJson: true, castObjectParamsToJson: true });
+    expect(await stored('c_json', param([1, 2], 'text'))).toBe('42804');
+    expect(await stored('c_jsonb', param([1, 2], 'text'))).toBe('42804');
     expect(await stored('c_json', param({ a: 1 }, 'text'))).toBe('42804');
     expect(await stored('c_jsonb', param({ a: 1 }, 'text'))).toBe('42804');
     expect(await stored('c_jsonb', param({ a: 1 }, 'jsonb'))).toBe('{"a": 1}');
   });
 
+  it('changed: an array type cast on an object is refused into a json, jsonb or text column', async () => {
+    // 6.6.1 stored {"a":[1]}; the JSON text is no array literal (22P02). Write param(obj, 'jsonb'), or no cast
+    db.setConfig({ castObjectParamsToJson: true });
+    expect(await stored('c_json', param({ a: [1] }, 'jsonb[]'))).toBe('42804');
+    expect(await stored('c_jsonb', param({ a: [1] }, 'jsonb[]'))).toBe('42804');
+    expect(await stored('c_text', param({ a: [1] }, 'jsonb[]'))).toBe('22P02');
+    expect(await pgError(t.client, () => sql`SELECT ${param({ a: [1] }, 'jsonb[]')} AS v`.run(t.client)))
+      .toMatchObject({ code: '22P02' });
+  });
+
+  it('changed: a bare SELECT returns the type of the cast, not json', async () => {
+    // 6.6.1 returned [1, 2] for each, as json
+    db.setConfig({ castArrayParamsToJson: true });
+    expect(await sql`SELECT ${param([1, 2], 'text[]')} AS v`.run(t.client)).toEqual([{ v: ['1', '2'] }]);
+    expect(await sql`SELECT ${param([1, 2], 'text')} AS v`.run(t.client)).toEqual([{ v: '[1,2]' }]);
+    expect(await sql`SELECT ${param([1, 2], 'json')} AS v`.run(t.client)).toEqual([{ v: [1, 2] }]);
+  });
+
+  it('changed: a cast that names no type is a syntax error', async () => {
+    // 6.6.1 sent CAST($1 AS "json") for each
+    db.setConfig({ castArrayParamsToJson: true });
+    for (const cast of ['', '[]']) {
+      expect(await pgError(t.client, () => sql`SELECT ${param([1, 2], cast)} AS v`.run(t.client)))
+        .toMatchObject({ code: '42601' });
+    }
+  });
+
   it('changed: an array type named without [] still sends JSON', async () => {
-    // 6.6.1: CAST($1 AS "json"), 42804 into an int4[] column; now '[1,2]' is no array literal (22P02). Write 'int4[]'
+    // 6.6.1: CAST($1 AS "json"), which ran outside an int4[] column (42804 there); now '[1,2]' is no array literal. Write 'int4[]'
     db.setConfig({ castArrayParamsToJson: true });
     expect(await pgError(t.client, () => sql`SELECT ${param([1, 2], '_int4')}`.run(t.client)))
       .toEqual({ code: '22P02', message: 'malformed array literal: "[1,2]"' });
+    expect(await stored('c_text', param([1, 2], '_int4'))).toBe('22P02');
+    expect(await stored('c_json', param([1, 2], '_int4'))).toBe('42804');
+    expect(await stored('c_jsonb', param([1, 2], '_int4'))).toBe('42804');
     expect(await sql`SELECT ${param([1, 2], 'int4[]')} AS v`.run(t.client)).toEqual([{ v: [1, 2] }]);
   });
 });
