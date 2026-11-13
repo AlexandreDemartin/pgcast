@@ -3,6 +3,14 @@
 When no shortcut writes the query you need (a join, a window function, an `INSERT … SELECT`), write it in the `sql` template, and keep every value that comes from outside out of its text. You already know the shortcuts from the [tutorial](/tutorial); every interpolation is in [The `sql` template](/sql-template).
 {.lede}
 
+<AtAGlance>
+
+- Names go between `${…}`, checked against the tables you give `sql`; a value from outside goes in as `db.param()` or in a Whereable.
+- Syntax a caller chooses, such as a sort direction, is one of your own constants: never give `raw()` a caller's text.
+- `.compile()` shows the `text` and `values` a query would send: a test that freezes `text` keeps every value from outside in `values`.
+
+</AtAGlance>
+
 ## Write the query, its names interpolated
 
 Write the SQL as you would in `psql`, but put each table and column name between `${…}` instead of in the text. Give `sql` the tables the query may name, then the type of the rows you expect:
@@ -75,7 +83,9 @@ If it got past the type (an `any`, a `@ts-ignore`), it would still be a name, an
 The keys of an interpolated object are names too. The type refuses an unknown key only in an object literal (TS2353): an object built at run time (a `Record<string, string>`, `Object.fromEntries()`, a variable with extra keys) passes it with any key.
 
 ::: warning Security
-An interpolated object that is not a `param()`, a fragment or another of pgcast's values compiles as a Whereable, a class instance included. A built-in object throws while compiling, before any query: `` db.sql`DELETE FROM ${'ratings'} WHERE ${when}` ``, with `when` a `Date` typed `any`, no longer compiles to `DELETE FROM "ratings" WHERE TRUE`, as in Zapatos 6.6.1, which deleted every rating ([Whereable objects](/sql-template#whereable)). Pass a date as `db.param(when)`.
+An interpolated object that is not a `param()`, a fragment or another of pgcast's values compiles as a Whereable, a class instance included.
+
+A built-in object throws while compiling, before any query: `` db.sql`DELETE FROM ${'ratings'} WHERE ${when}` ``, with `when` a `Date` typed `any`, no longer compiles to `DELETE FROM "ratings" WHERE TRUE`, as in Zapatos 6.6.1, which deleted every rating ([Whereable objects](/sql-template#whereable)). Pass a date as `db.param(when)`.
 
 Any object with no keys is `TRUE`, a typed Whereable included: `const where: s.ratings.Whereable = {}`, given a `film_id` only `if (filmId)`, compiles with no error to the same `DELETE`. Check for an empty filter before a `DELETE` or an `UPDATE` ([Whereable objects](/sql-template#whereable)). The check below catches `{}`, not a key whose value compiles to `true`, such as `film_id: db.conditions.isNotIn([])`:
 
@@ -108,7 +118,8 @@ Postgres gives a parameter a type from where it stands. Compared with a column, 
 - `db.param(from, 'timestamptz')` writes `CAST($2 AS "timestamptz")`<!-- probe: examples/raw_sql_cast.ts -->; `` ${db.param(from)}::timestamptz `` in the text does the same.
 - The cast is the type's catalog name, in lower case (`int4`, `timestamptz`, `crew_job`), each part quoted. `'integer'` gives `CAST($1 AS "integer")`<!-- probe: db.sql`${db.param(1, 'integer')}` -->, a type that does not exist (42704), as do `'int'` and `'TIMESTAMPTZ'`.
 - Name a schema as `'public.crew_job'`, which gives `"public"."crew_job"`<!-- probe: db.sql`${db.param(1, 'public.crew_job')}` -->, as `'public"."crew_job'` does. An array type keeps its bounds outside the quotes: `'int4[]'` gives `"int4"[]`<!-- probe: db.sql`${db.param(1, 'int4[]')}` -->.
-- With [`castArrayParamsToJson`](/runtime-config#Config.castArrayParamsToJson) on, an array parameter is sent as JSON, `CAST($1 AS "json")`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${db.param([1])}`) -->, unless its cast ends with `[]` or `[n]`: `db.param(ids, 'int4[]')` gives `CAST($1 AS "int4"[])`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${db.param([1], 'int4[]')}`) --> with the array ([#36](https://github.com/AlexandreDemartin/pgcast/issues/36)). Any other string cast keeps the JSON, cast to that type, `'_int4'` included. With [`castObjectParamsToJson`](/runtime-config#Config.castObjectParamsToJson) on, a plain object is sent as JSON whatever its cast, cast to the type written.
+- With [`castArrayParamsToJson`](/runtime-config#Config.castArrayParamsToJson) on, an array parameter is sent as JSON, `CAST($1 AS "json")`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${db.param([1])}`) -->, unless its cast ends with `[]` or `[n]`: `db.param(ids, 'int4[]')` gives `CAST($1 AS "int4"[])`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${db.param([1], 'int4[]')}`) --> with the array ([#36](https://github.com/AlexandreDemartin/pgcast/issues/36)). Any other string cast keeps the JSON, cast to that type, `'_int4'` included.
+- With [`castObjectParamsToJson`](/runtime-config#Config.castObjectParamsToJson) on, a plain object is sent as JSON whatever its cast, cast to the type written.
 
 Every form of the cast: [`param()`](/sql-template#param).
 
