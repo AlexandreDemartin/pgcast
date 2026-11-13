@@ -1,6 +1,6 @@
 // Copyright (C) 2026 Alexandre Demartin
-// The playground's SQL and type, highlighted in the page as Shiki highlights a cast panel's at build (syntax.ts): the
-// same markup and colour tokens, for the few kinds of token that compiled SQL and a hover type hold.
+// The playground's SQL, type and rows, highlighted in the page as Shiki highlights a cast panel's at build (syntax.ts):
+// the same markup and colour tokens, for the few kinds of token that compiled SQL, a hover type and JSON hold.
 
 const
   escape = (text: string) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'),
@@ -40,3 +40,9 @@ export const typeHtml = (type: string) => block('ts', type, line => line.startsW
     /("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')|\b(\d+(?:\.\d+)?)\b|\b(const|readonly|typeof|keyof|unique|infer)\b|\b[A-Za-z_$][\w$]*(?=\??:)|([A-Za-z_$][\w$]*)/g,
     ([, string, number, keyword, name]) =>
       string ? ['s'] : number ? ['n'] : keyword ? ['k'] : name ? ['t'] : undefined));
+
+/** Rows as JSON: strings, numbers, and `true`, `false`, `null` as keywords; a key as plain text; `// and 3 more`. */
+export const jsonHtml = (json: string) => block('json', json, line => line.startsWith('//') ?
+  span(line, 'c') :
+  colour(line, /("(?:[^"\\]|\\.)*")(?=:)|("(?:[^"\\]|\\.)*")|\b(true|false|null)\b|(-?\d+(?:\.\d+)?(?:e[+-]?\d+)?)/gi,
+    ([, key, string, keyword]) => key ? undefined : string ? ['s'] : keyword ? ['k'] : ['n']));

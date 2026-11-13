@@ -28,6 +28,8 @@ const pgStub: Plugin = {
 
 export const playgroundVite = {
   plugins: [monacoCss],
+  // PGlite finds its .wasm and .data files next to its own module, which Vite's pre-bundling would move (its docs)
+  optimizeDeps: { exclude: ['@electric-sql/pglite'] },
   // module workers: the runner imports the reader's code with `import()`
   worker: { format: 'es', plugins: () => [pgStub] },
 } satisfies UserConfig;
