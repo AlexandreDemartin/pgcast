@@ -283,7 +283,7 @@ CREATE TYPE crew_job AS ENUM ('director', 'writer', 'editor', 'cinematographer',
 
 - A label added by `ALTER TYPE … ADD VALUE … BEFORE` or `AFTER` takes its place in that order, as `enum_range()` gives it.
 - For TypeScript, only `every.<name>` changes: a union is the same type in any order. With [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas), the labels written out for an enum of another schema, and the new placeholder of a domain over one, take the same order.
-- Another value stops the generator before any query, and writes nothing: `Unknown enumOrder "declard": use 'alphabetical' (the default) or 'declared'.` In TypeScript, it fails to compile (TS2322, or TS2820 with a suggestion for a near-miss such as `"declard"`).
+- Another value stops the generator before any query, and writes nothing: `enumOrder must be 'alphabetical' (the default) or 'declared', not 'declard'`. In TypeScript, it fails to compile (TS2322, or TS2820 with a suggestion for a near-miss such as `"declard"`).
 - `"alphabetical"` notes, through [`warningListener`](#generate.warningListener), each generated enum whose declared order is not alphabetical.
 
 ### `progressListener` {#generate.progressListener}

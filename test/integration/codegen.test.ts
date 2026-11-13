@@ -714,7 +714,7 @@ describe('enumOrder', () => {
     const wrong: Config = { enumOrder: 'declard' };
     void wrong;
     await expect(codegen({ ...main, enumOrder: 'declard' as 'declared' })).rejects
-      .toThrow(`Unknown enumOrder "declard": use 'alphabetical' (the default) or 'declared'.`);
+      .toThrow(`enumOrder must be 'alphabetical' (the default) or 'declared', not 'declard'`);
   });
 });
 

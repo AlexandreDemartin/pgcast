@@ -17,7 +17,7 @@ export type EnumOrders = Record<EnumOrder, EnumData>;
 export const enumOrderOf = (config: CompleteConfig): EnumOrder => {
   const order = config.enumOrder ?? 'alphabetical';
   if (order !== 'alphabetical' && order !== 'declared') {
-    throw new Error(`Unknown enumOrder ${JSON.stringify(order)}: use 'alphabetical' (the default) or 'declared'.`);
+    throw new Error(`enumOrder must be 'alphabetical' (the default) or 'declared', not '${order}'`);
   }
   return order;
 };
