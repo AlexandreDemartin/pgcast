@@ -10,6 +10,7 @@
 // a Run gives it to the code. Run by `npm run docs:examples`, after the root `npm run build`.
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { inspect } from 'node:util';
 import pg from 'pg';
 import * as db from 'zapatos/db';
 import { open, poolOf } from './.vitepress/playground/pglite.ts';
@@ -120,13 +121,16 @@ process.on('unhandledRejection', error => note(current, error, 'a promise it doe
 
 /**
  * The playground's PGlite, with its adapter's parsers, gives the rows `pg` gives through `client`: for each table of
- * the docs schema, and for what a query on it often selects. In a time zone ahead of UTC, as a reader's may be: `pg`
- * makes a `date` midnight where the code runs.
+ * the docs schema, and for what a query on it often selects. Given values, it gets them as `pg` sends them: the same
+ * rows, or the same SQLSTATE. In a time zone ahead of UTC, as a reader's may be: `pg` makes a `date` midnight where
+ * the code runs, and sends a `Date` as its local time.
  */
 async function checkPlaygroundParsers(client) {
+  const zone = process.env.TZ;
+  process.env.TZ = 'Asia/Kolkata';  // before the first `Date` below
   const
-    zone = process.env.TZ,
     pglite = await open(schema),
+    day = new Date(2030, 2, 1),  // midnight in Kolkata: 1 March there, 28 February in UTC
     { rows: tables } = await client.query("SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY 1"),
     queries = [
       ...tables.map(({ tablename }) => `SELECT * FROM "${tablename}" ORDER BY 1, 2`),
@@ -139,16 +143,46 @@ async function checkPlaygroundParsers(client) {
         ARRAY['director'::crew_job] AS jobs, 'A1'::seat_label AS seat, ARRAY['A1'::seat_label] AS seats,
         '2030-03-01'::date AS day, '0050-03-01'::date AS early, '0001-03-01 BC'::date AS bc, 'infinity'::date AS never,
         '-infinity'::timestamp AS always, ARRAY['infinity'::timestamptz] AS forever`,
-    ];
+    ],
+    given = [
+      // arrays: an enum's, a domain's, of what `pg` quotes, of bytes, of dates, nested; one as `jsonb` rejects
+      ['SELECT name FROM crew WHERE job = ANY($1) ORDER BY 1', [['director', 'editor']]],
+      ['SELECT $1::crew_job[] AS jobs, $2::seat_label[] AS seats, $3::text[] AS texts, $4::int[] AS grid',
+        [['director', 'composer'], ['A1', 'B12'], ['a"b', 'c,d', 'e\\f', '{}', '', null], [[1, 2], [3, null]]]],
+      ['SELECT $1::bytea[] AS bytes, $2::timestamptz[] AS times, $3::date[] AS days',
+        [[Buffer.from([1, 255]), new Uint8Array([2])], [day, null], [day]]],
+      ['SELECT $1::jsonb AS list', [[1, 2]]],
+      ['SELECT $1::seat_label[] AS seats', [['a1']]],
+      // a `Date` as each type that takes one, as text, and in a year BC
+      ['SELECT $1::date AS day, $1::date::text AS shown, $2::timestamp::text AS local, $3::timestamptz AS at',
+        [day, new Date(2030, 2, 1, 10, 30, 15, 250), new Date(Date.UTC(2030, 2, 1, 22))]],
+      ['SELECT $1::text AS text, $2::date AS bc', [day, new Date(-62_200_000_000_000)]],
+      // an object as JSON, or what its `toPostgres()` gives; bytes, sent as they are; null and undefined; the rest
+      // as text
+      ['SELECT $1::text AS text, $2::jsonb AS json, $3::text AS own',
+        [{ a: 1 }, { film: { title: 'Ink' }, ids: [1, 2] }, { toPostgres: () => 'its own' }]],
+      ['SELECT $1::bytea AS bytes, $2::bytea AS view, $3::text AS text',
+        [Buffer.from([0, 255]), new Uint8Array([1, 2, 3]).subarray(1), Buffer.from('café')]],
+      ['SELECT $1::bool AS yes, $2::bool AS no, $3::text AS nothing, $4::int AS missing, $5::int8 AS big, ' +
+        '$6::numeric AS number, $7::float8 AS infinite', [true, false, null, undefined, 2n ** 63n - 1n, 1.5, -Infinity]],
+    ],
+    // its rows, or its error's code
+    answer = async query => {
+      try {
+        return { rows: (await query).rows };
+      } catch (error) {
+        return { rejects: error.code ?? error.message };
+      }
+    };
 
-  process.env.TZ = 'Asia/Kolkata';
   try {
-    for (const query of queries) {
-      const [expected, got] = [(await client.query(query)).rows, (await pglite.query(query)).rows];
+    for (const [text, values] of [...queries.map(text => [text]), ...given]) {
+      const [expected, got] = [await answer(client.query({ text, values })), await answer(pglite.query(text, values))];
       try {
         assert.deepStrictEqual(got, expected);
       } catch (error) {
-        problems.push(`the playground's PGlite parses \`${query}\` unlike pg: ${error.message}`);
+        const shown = values ? ` given ${inspect(values, { breakLength: Infinity })}` : '';
+        problems.push(`the playground's PGlite answers \`${text}\`${shown} unlike pg: ${error.message}`);
       }
     }
   } finally {
