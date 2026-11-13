@@ -36,7 +36,7 @@ Syntax tokens:
 | `--k` | `#1458a8` | `#7fb6ff` | keywords (TS keywords; SQL keywords in capitals) |
 | `--s` | `#8f5600` | `#e3b462` | strings |
 | `--t` | `#0a6b63` | `#4fcfbf` | type names (the accent) |
-| `--n` | `#b0245a` | `#f08ab3` | numbers |
+| `--n` | `#b0245a` | `#f08ab3` | numbers; in the loop, tsc's `error` and its wavy underline |
 | `--c` | `#626e79` | `#768794` | comments, upright |
 | `--qi` | `#12202b` | `#e2e9ee` | SQL quoted identifiers (`"films"`), as plain text |
 | `--p` | `#b0245a` | `#f08ab3` | SQL parameters (`$1`) and their values, in bold |
@@ -55,7 +55,7 @@ Headings share one weight, 600: the hierarchy is in their size. Letters are tigh
 
 | Element | Size |
 |---|---|
-| Hero `h1` | `clamp(2.5rem, 6vw, 4.5rem)`, 600, letter-spacing `-.025em`, at most 16ch |
+| Hero `h1` | `clamp(2.5rem, 6vw, 4.5rem)`, from 960px `clamp(2.5rem, 4.4vw, 4rem)` (beside the mould), 600, letter-spacing `-.025em`, at most 16ch |
 | Hero lede | 1.18rem, at most 58ch |
 | Page `h1` | 2.5rem, 600, letter-spacing `-.01em` (2rem under 560px) |
 | `h2` / `h3` | 1.5rem / 1.125rem, 600, letter-spacing 0 |
@@ -86,8 +86,9 @@ Spacing is on a 4px grid.
 - **Breakpoints**: VitePress's (768 / 960 / 1280px) for the shell, the top bar and the nav, rather than fighting its layout: under 960px the nav becomes a drawer. The home grid, the notes, the page `h1` and the version pill keep 560 / 900px; the cast panel follows its own width (§ Signature components).
 - **Home**, on a 1180px column:
   - The hero: eyebrow, line, lede, then two buttons, "Get started" (primary) and "Switching from Zapatos", 40px tall, padding `0 20px`; under them, 16px down, the install command as one quiet mono line, 13px: a `--muted` `$`, the command in `--fg`, and a copy icon button, 28px, no border (16px icon, 2px stroke on a 24px grid, as the theme button's).
-  - Then the cast panel of films with their cast; four pillars (Postgres is the source · SQL you can read · Values are parameters · Drop-in for Zapatos), each an `h2` at 1rem, 600; four "read next" links, one per group (four columns, two under 900px, one under 560px).
-  - Rhythm: 72px over the eyebrow (48px under 560px); eyebrow 16px, line 20px, lede 28px over the buttons; 48px from the hero to the cast panel (32px under 560px); 56px between the sections under it; the pillars under a rule, 32px under it, 32px apart.
+  - Beside the hero, the mould (§ Signature components): from 960px, two equal columns 48px apart, centred on each other; under 960px, the mould 40px under the install line.
+  - Then the cast panel of films with their cast; the loop, under its `h2` at 1.5rem (20px over the panel) and over a caption, 13px, `--muted`; four pillars (Postgres is the source · SQL you can read · Values are parameters · Drop-in for Zapatos), each an `h2` at 1rem, 600; four "read next" links, one per group (four columns, two under 900px, one under 560px).
+  - Rhythm: 72px over the eyebrow (48px under 560px); eyebrow 16px, line 20px, lede 28px over the buttons; 48px from the hero to the cast panel (32px under 560px); 56px between the sections under it (the loop's included); the pillars under a rule, 32px under it, 32px apart.
 - **Footer**, on the home page and under every page: "pgcast is maintained by Alexandre Demartin. Zapatos and its original documentation are by George MacKerron. MIT licence.", each name linking to their GitHub profile.
 
 ## Signature components
@@ -95,6 +96,8 @@ Spacing is on a 4px grid.
 - **Cast panel**: what you write, what Postgres runs, what TypeScript knows, in one bordered panel, radius 14px, dashed dividers. Each column has a label (a paragraph, so no heading level is skipped) with a mono tag in an accent outline: `TS` You write · `SQL` Postgres runs · `::` TypeScript knows. The SQL column ends with its values row (`values ["cast"]`, dashed rule above). An optional caption row under it, 13px, `--muted`.
   - Its columns follow the panel's own width (container queries): three (`1.15fr 1fr 1fr`) from 1140px, the home's at 1280px and up, where what you write and the type fit their columns; from 900 to 1139px, what you write and the SQL side by side, the type below across both; one column under 900px, as in a page's reading column.
   - No line is cut: a line too long for its column wraps, and goes on under the line's own text, 2ch further in (a hanging indent, from each line's `--indent`, `lineIndents` in `syntax.ts`); a name longer than the column breaks anywhere. No three columns hold every line of the home's example at 1440px (the SQL wraps), nor one column the longest SQL of the reference, so wrapping, not scrolling, is the rule.
+- **Mould**, beside the home's hero: the cast panel's frame, labels and code, its two parts one above the other under a dashed rule. `SQL` schema.sql: the `CREATE TABLE films` of `website/schema.sql`. `::` zapatos/schema.d.ts, with `$ npx zapatos` at the label's end (mono 12px, `--muted`): `films.Selectable` as pgcast generates it, its JSDoc left out. Both read at build (`mould.data.ts`); a column in one and not the other fails it. Its one entrance: the type's lines pour in, each fading and rising 4px in 320ms, 40ms apart, from 240ms; none under `prefers-reduced-motion`.
+- **Loop**, under the cast panel: a panel of the same make, three steps. `SQL` A column changes: `website/loop/alter.sql`. `::` The type follows (`$ npx zapatos`): the `Selectable`'s changed lines in the schema regenerated after it, each line a band across its column, `-` and `--sunken` for the old, `+` in `--accent` and `--accent-soft` for the new, the mark in a 2ch gutter (read as "removed" and "added"). `TS` The query breaks (`$ npx tsc`): `website/loop/films.ts`, the code tsc flags under a wavy `--n` underline, and under a dashed rule tsc's line, mono 12px: `src/films.ts:2:15 - error TS18047: …`, `error` in `--n`, 700. All three read at build (`loop.data.ts`), the error Twoslash's on the regenerated schema. Columns `.9fr 1fr 1.4fr`; under 1140px the first two side by side, the query below; one column under 900px.
 - **Hover types**: a dashed `--muted` underline, `cursor: help`, `--accent-soft` on hover or focus; focusable from the keyboard. The tooltip: mono, `--surface`, border, soft shadow. Twoslash computes every type at build from the docs schema.
 - **Code blocks**: on `--code-bg`, border, `--radius`; a code group has a 38px bar of tabs (npm · pnpm · yarn, mono 12px, the selected one underlined in `--accent`); VitePress's Copy button. The install line's copy button: "Copied" beside it for 1.4s; it selects the command when the clipboard is refused.
 - **Notes**: a chip, then the text, on `--surface` with a border, **no coloured side rail**. Chips: Opt-in (`--accent-soft`, `--accent`), Security (`--warn-soft`, `--warn`, a 1px `--warn` border, the note itself on `--warn-soft`), Coming (`--sunken`, `--muted`).
@@ -102,7 +105,7 @@ Spacing is on a 4px grid.
 - **Pager**: two bordered links, Previous and Next, the border turning `--accent` on hover.
 - **Edit row**: a top rule; "Edit this page on GitHub" on the left; on the right "Last updated: 13 November 2026", the date of the page's last commit, 13px, `--muted`.
 - **Search**: VitePress's local search, a dialog; arrows and Enter, Escape closes; each result gives its page.
-- **Details**: `#` anchors on headings, shown on hover; links underlined 1px at 3px offset, 2px on hover; focus ring 2px `--accent`, offset 2px; `prefers-reduced-motion` honoured.
+- **Details**: `#` anchors on headings, shown on hover; links underlined 1px at 3px offset, 2px on hover; focus ring 2px `--accent`, offset 2px; `prefers-reduced-motion` honoured: no transition, no animation.
 
 ## Voice
 

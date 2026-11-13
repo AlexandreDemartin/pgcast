@@ -165,4 +165,9 @@ npm run build                  # at the root
 cd website && npm run docs:schema
 ```
 
+The home shows two moments of the schema, both read at build, so a change to `schema.sql` reaches them with no other edit:
+
+- **The mould** (`.vitepress/mould.data.ts`): a table's `CREATE TABLE` and its `Selectable` in `zapatos/schema.d.ts`, JSDoc left out. A column in one and not the other fails the build.
+- **The loop** (`.vitepress/loop.data.ts`): `loop/alter.sql` changes a column, `docs:schema` generates `loop/zapatos/schema.d.ts` after it (committed, checked by CI as `zapatos/` is), and `loop/films.ts` breaks. The build fails unless the query compiles on the docs schema and gives on the loop's exactly the errors its `// @errors` lists, or if the two schemas differ outside the changed table.
+
 `docs:schema` loads `schema.sql` into a temporary `pgcast_test_<pid>_docs` database on the server of `TEST_DATABASE_URL` (the environment, else `src/.env`), runs `generate()`, and drops the database. It and `docs:examples` first drop the `pgcast_test_<pid>_docs` databases of a run whose process is gone (stopped by Ctrl-C, killed, or crashed).
