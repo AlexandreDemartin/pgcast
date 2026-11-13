@@ -586,6 +586,7 @@ describe('enumOrder', () => {
     CREATE SCHEMA order_w;
     CREATE TYPE order_x.reel AS ENUM ('trailer', 'feature');
     ALTER TYPE order_x.reel ADD VALUE 'credits' BEFORE 'feature';
+    CREATE TYPE order_x.edit AS ENUM ('assembly', 'rough', 'final');  -- its first label in place
     CREATE TYPE order_y.st AS ENUM ('yours', 'theirs');
     CREATE DOMAIN order_y.st_d AS order_y.st;
     CREATE TABLE order_x.t (r order_x.reel, a order_y.st, b order_y.st[], d order_y.st_d);
@@ -687,8 +688,8 @@ describe('enumOrder', () => {
     ]);
     // order_z.pos is in order; order_y.st is not generated, though order_x.t uses it
     expect(await notesFor({ schemas: { order_z: all, order_x: all, public: enumsOnly, extra: enumsOnly } })).toEqual([
-      'Note: the labels of enums extra.status, order_x.reel and public.mood are in alphabetical order, in their types ' +
-      'and their every tuples, not in their declared order, by which Postgres sorts and compares them. ' +
+      'Note: the labels of enums extra.status, order_x.edit, order_x.reel and public.mood are in alphabetical order, ' +
+      'in their types and their every tuples, not in their declared order, by which Postgres sorts and compares them. ' +
       "Set enumOrder: 'declared' to keep that order; it will be the default in pgcast 7.0.",
     ]);
   });
