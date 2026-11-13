@@ -81,13 +81,15 @@ const noDebug = () => void 0;
 const codegen = (config: Config) => tsForConfig(finaliseConfig({ ...config, ...quiet, db: db() }), noDebug);
 
 /** The warnings of a run, but the bigint note, which comes once per process. */
-const warningsFor = async (schemas: Schemas) => {
+const warningsOf = async (config: Config) => {
   const warnings: string[] = [];
   await tsForConfig(finaliseConfig({
-    schemas, ...quiet, warningListener: s => warnings.push(s), db: db(), outDir: 'src',
+    ...config, ...quiet, warningListener: s => warnings.push(s), db: db(), outDir: 'src',
   }), noDebug);
   return warnings.filter(w => !w.startsWith('Note: this database has bigint'));
 };
+
+const warningsFor = (schemas: Schemas) => warningsOf({ schemas });
 
 /** Custom type placeholders, sorted by name: tsForConfig() inserts them in query completion order. */
 const customFiles = (files: Record<string, string>) =>
@@ -330,6 +332,13 @@ describe('include entries that match no relation', () => {
       extra: { include: ['articles', 'imported_lines', 'article_authors'], exclude: ['articles'] },
     })).toEqual([]);
     expect(await warningsFor({ public: all, extra: { include: '*', exclude: ['no_such_table'] } })).toEqual([]);
+  });
+
+  it('warns, of main and the snapshot variants, only about no_such_table of include-exclude-lists', async () => {
+    const warnings: Record<string, string[]> = {};
+    for (const [name, config] of [['main', main] as const, ...variants]) warnings[name] = await warningsOf(config);
+    expect(warnings).toEqual(Object.fromEntries(Object.keys(warnings).map(name =>
+      [name, name === 'include-exclude-lists' ? [unmatched('no_such_table', 'public')] : []])));
   });
 });
 
