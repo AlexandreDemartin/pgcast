@@ -346,4 +346,4 @@ Minor review defects, taken up by the end-of-chapter review.
 - #209 — `website/examples/plain/testing_rolled_back.ts:23-29`: when `body` throws and the `ROLLBACK` then fails, the `ROLLBACK` error replaces the one that explains the failure — `branch-reviewer`
 - #190 — `src/db/config.ts:24`: `transactionRequiresCommit` has no type test, where the other two opt-ins have one each (`test/types/shortcuts.test-d.ts:171`, `:190`) — `branch-reviewer`
 - #190 — `docs/decisions/003-fixes-and-deprecation.md:38`: the heading « The 11 breaking findings » now sits over a #190 row, which is not a characterisation finding — `branch-reviewer`
-- #236 — `website/.vitepress/llms.ts`: a fourth fence reader, for `llms-full.txt`, opens on any ``` line and closes only on exactly ```, so a ````` ````md ````` block holding ``` ends early: reuse `.vitepress/fences.ts` — `builder`
+- #236 — `website/.vitepress/llms.ts`: a fourth fence reader, for `llms-full.txt`, opens on any backtick fence and closes only on exactly three backticks, so a four-backtick `md` block holding a three-backtick line ends early: reuse `.vitepress/fences.ts` — `builder`
