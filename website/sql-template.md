@@ -59,7 +59,7 @@ Each value between `${…}` compiles by what it is. The SQL is the built library
 | a `sql` fragment | its own SQL, its parameters numbered on | [Nested fragments](#nested-fragments) |
 | an array | each item in turn, nothing between; `[]` → nothing | [Arrays](#arrays) |
 
-Anything else throws while compiling, so `run()` rejects before any query, and the type refuses it: a number or a boolean (`Alien object while interpolating SQL: 42`<!-- message -->), `null`, `undefined`, a symbol such as [`all`](#all). The global object, which the type lets through, throws too: "Did you use `self` (the global object) where you meant `db.self` (the Zapatos value)?…"<!-- message -->.
+Anything else throws while compiling, so `run()` rejects before any query, and the type refuses it (`null` and `undefined` only with `strictNullChecks`): a number or a boolean (`Alien object while interpolating SQL: 42`<!-- message -->), `null`, `undefined`, a symbol such as [`all`](#all). The global object, which the type lets through, throws too: "Did you use `self` (the global object) where you meant `db.self` (the Zapatos value)?…"<!-- message -->.
 
 ## Identifiers {#identifiers}
 

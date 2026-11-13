@@ -19,7 +19,7 @@ export interface Config {
   transactionRetryDelay: { minMs: number; maxMs: number };
   castArrayParamsToJson: boolean;   // see https://github.com/brianc/node-postgres/issues/2012
   castObjectParamsToJson: boolean;  // useful if json will be cast onward differently from text
-  upsertRequiresSameKeys?: boolean;  // multi-row upsert: rows with different keys throw, unless updateColumns is given
+  upsertRequiresSameKeys?: boolean;  // multi-row upsert, no updateColumns: a key missing from a row, still set from EXCLUDED, throws
   undefinedMeansMissing?: boolean;  // an undefined value is a missing key: DEFAULT in insert, left out of update and upsert
   transactionRequiresCommit?: boolean;  // transaction() rejects when Postgres answers its COMMIT with ROLLBACK
   queryListener?(query: SQLQuery, txnId?: number): void;

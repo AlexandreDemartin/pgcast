@@ -33,7 +33,7 @@ The key stays one name, a column that does not exist (42703). Zapatos 6.6.1 trus
 
 ## Keywords are checked before any query
 
-Some SQL is neither a value nor a name: `DESC`, `FOR UPDATE`, `SERIALIZABLE`, `RESTART IDENTITY`, the name of an aggregate. pgcast writes these into the text as they are, so it takes them only from a closed list, or, for an aggregate, only a function name. The type says which; at run time pgcast checks again and throws before any query, because a cast, an `any` or a JSON body can hand it anything: a `lock` of `{ for: 'UPDATE; DROP TABLE ratings; --' }` throws "Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not 'UPDATE; DROP TABLE ratings; --'".
+Some SQL is neither a value nor a name: `DESC`, `FOR UPDATE`, `SERIALIZABLE`, `RESTART IDENTITY`, the name of an aggregate. pgcast writes these into the text as they are, so it takes them only from a closed list, or, for an aggregate, only a function name. The type says which; at run time pgcast checks again and throws before any query, because a cast, an `any` or a JSON body can hand it anything: a `lock` of `{ for: 'UPDATE; DROP TABLE ratings; --' }` throws "Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not '…'"<!-- message -->.
 
 Values with no meaning where they stand are refused the same way: `db.Default`, `db.self` or `db.raw()` as a filter value throws while compiling, so `.run()` rejects before anything reaches Postgres. Zapatos 6.6.1 sent them as strings or as JSON: no row matched on a text column, every row under `ne()` and `isNotIn()`, and other types failed. Such a value is a bug in the calling code, and a bug should not become a query.
 

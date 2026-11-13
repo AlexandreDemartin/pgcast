@@ -175,7 +175,7 @@ An empty array, for the `updateColumns` of `upsert()`: a row that conflicts is l
 
 ## `UpsertReturnableForTable` {#UpsertReturnableForTable}
 
-`UpsertReturnableForTable<T, C, E, RA>`: one row of what `upsert()` returns, the [`ReturningTypeForTable`](#ReturningTypeForTable) with [`UpsertAction`](#UpsertAction), unless `RA`, the `reportAction`, is `'suppress'`: `db.UpsertReturnableForTable<'ratings', undefined, undefined, undefined>` is `ratings.JSONSelectable & UpsertAction`. It does not add the `undefined` of `updateColumns: []` ([`doNothing`](#doNothing)).
+`UpsertReturnableForTable<T, C, E, RA>`: one row of what `upsert()` returns, the [`ReturningTypeForTable`](#ReturningTypeForTable) with [`UpsertAction`](#UpsertAction), unless `RA`, the `reportAction`, is `'suppress'`: `db.UpsertReturnableForTable<'ratings', undefined, undefined, undefined>` is `ratings.JSONSelectable & UpsertAction`. It does not add the `undefined` of `updateColumns: []` ([`doNothing`](#doNothing)). It needs `strictNullChecks`: without it, it is the whole `JSONSelectable` with `UpsertAction`, whatever `C`, `E` and `RA`.
 
 ## `update()` {#update}
 
@@ -313,3 +313,4 @@ const inserted: NewFilm = { id: 1000, title: 'The Long Take' };
 
 - Stable: type tests pin it to what `.run()` gives, here for `db.insert('films', film, { returning: ['id', 'title'] })`.
 - `C` as a `readonly` tuple gives `never`, as for `returning` ([Options](#insert-options)).
+- It needs `strictNullChecks`: without it, it is the whole `JSONSelectable`, whatever `C` and `E`.

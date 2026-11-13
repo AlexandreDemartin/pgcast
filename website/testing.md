@@ -108,7 +108,7 @@ The test compares its compiled query with the one of the call it should make, co
 
 ### The SQL text is not a stable API
 
-pgcast keeps what a query does: the rows it reads or writes, and the type of what `run()` returns. It does not keep the text it compiles: a minor version may change it, a pair of parentheses, the order of clauses, a cast, as long as the result does not. The fix of `not()` is one such change: most conditions gain a pair of parentheses, and match the same rows.
+pgcast keeps what a query does: the rows it reads or writes, and the type of what `run()` returns. It does not keep the text it compiles: a minor version may change it, a pair of parentheses, the order of clauses, a cast, as long as the result does not. The fix of `not()` is one such change: each condition under `not()` gains a pair of parentheses, and most match the same rows.
 
 So a test that freezes the text of a shortcut's query, or a fake that picks its answer by matching that text, can break on an upgrade with nothing wrong in your code.
 
@@ -154,7 +154,7 @@ With `strict` off, `columns` leaves the type at the table's full `JSONSelectable
 - **The query.** A filter on the wrong column, a value Postgres refuses (`stars: 6` in `ratings`, 23514 from its `CHECK`), SQL it can't parse: the fake answers anyway.
 - **What Postgres sends back.** Which rows, in which order, which of them `null`: the fake returns what it is given.
   - A `timestamptz` comes back from a shortcut as a string in the session's time zone: `2030-03-01T19:30:00+00:00` in UTC, `2030-03-01T20:30:00+01:00` in Paris. Its type, `TimestampTzString`, takes `2030-03-01T19:30:00Z` too. From a `sql` template, `pg` gives a `Date`.
-  - A `bigint` comes back from a shortcut as a JSON number, rounded past 2<sup>53</sup>: 9007199254740993 arrives as 9007199254740992. From a `sql` template, `pg` gives a string.
+  - A `bigint` comes back from a shortcut as a JSON number, rounded past 2<sup>53</sup>: 9007199254740993 arrives as 9007199254740992 ([`customJSONParsingForLargeNumbers`](/generator#generate.customJSONParsingForLargeNumbers)). From a `sql` template, `pg` gives a string.
 
 A real database checks both: keep a test against it for each query, and fakes for the logic around them.
 

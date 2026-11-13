@@ -5,6 +5,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
+import { earlyCloser, fenceClosed, fenceOpened } from './.vitepress/fences.ts';
 import { outline } from './.vitepress/outline.ts';
 
 const
@@ -38,27 +39,44 @@ for (const [prefix, file] of [['Config', dbFile], ['generate', generateFile]]) {
   }
 }
 
-// An entry is a heading of a Reference page that ends in `{#name}`, other attributes allowed (`{#name .since}`),
-// outside fenced code and HTML comments.
+/**
+ * The names `text` anchors: each heading that ends in `{#name}`, other attributes allowed (`{#name .since}`), outside
+ * fenced code and HTML comments.
+ */
+function anchorsOf(text) {
+  const anchors = [];
+  let fence = null, comment = false;  // VitePress renders no heading in either
+  for (const line of text.split('\n')) {
+    if (fence !== null) {
+      if (fenceClosed(fence, line)) fence = null;
+      continue;
+    }
+    if (comment || /^\s*<!--/.test(line)) {
+      comment = !line.replace(/^\s*<!--/, '').includes('-->');
+      continue;
+    }
+    fence = fenceOpened(line)?.marker ?? null;
+    const anchor = fence === null && line.match(/^#{1,6}\s.*\{(?:[^}]*\s)?#([^\s}]+)[^}]*\}\s*$/)?.[1];
+    if (anchor) anchors.push(anchor);
+  }
+  return anchors;
+}
+
+// A self-check: a heading after a ```md block that shows a ```ts line is an entry.
+if (!anchorsOf(`${earlyCloser}## \`insert()\` {#insert}`).includes('insert'))
+  throw new Error('check-reference.mjs: a heading after a ```md block was not read as an entry: check fences.ts');
+
+// An entry is a heading of a Reference page anchored with its name.
 const
   referencePages = outline.find(group => group.link === '/reference').items.map(({ link }) => `${link.slice(1)}.md`),
   entries = new Map(),  // name → page
   problems = [];
 
 for (const page of referencePages.filter(page => existsSync(new URL(page, import.meta.url)))) {
-  let fence = null, comment = false;  // VitePress renders no heading in either
-  for (const line of readFileSync(new URL(page, import.meta.url), 'utf8').split('\n')) {
-    const marker = !comment && line.match(/^\s*(`{3,}|~{3,})/)?.[1];
-    if (marker && fence === null) fence = marker;
-    else if (marker && marker[0] === fence[0] && marker.length >= fence.length) fence = null;
-    else if (fence === null && (comment || /^\s*<!--/.test(line))) {
-      comment = !line.replace(/^\s*<!--/, '').includes('-->');
-      continue;
-    }
-    const anchor = fence === null && line.match(/^#{1,6}\s.*\{(?:[^}]*\s)?#([^\s}]+)[^}]*\}\s*$/)?.[1];
-    if (anchor && names.has(anchor) && entries.has(anchor) && entries.get(anchor) !== page) {
+  for (const anchor of anchorsOf(readFileSync(new URL(page, import.meta.url), 'utf8'))) {
+    if (names.has(anchor) && entries.has(anchor) && entries.get(anchor) !== page) {
       problems.push(`${anchor}: has an entry in ${entries.get(anchor)} and in ${page}; keep one`);
-    } else if (anchor) entries.set(anchor, page);
+    } else entries.set(anchor, page);
   }
 }
 

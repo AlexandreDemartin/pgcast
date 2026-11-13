@@ -58,6 +58,8 @@ The SQL of each row is what the built library compiles, on the docs schema; `…
 
 `columns?: readonly ColumnForTable<T>[]`, a [`ColumnsOption`](#ColumnsOption): only these columns, each a key of the result object, in place of the whole row. It does not rename a column: [`extras`](#extras) does.
 
+A `readonly` array (`['id', 'title'] as const`) sends the same SQL, but the result type is `never` for now ([#41](https://github.com/AlexandreDemartin/pgcast/issues/41)), which is assignable to any type: write the array without `as const`.
+
 ### `order`, `limit`, `offset` and `withTies`
 
 - `order`: one `{ by, direction, nulls? }` or an array of them, in that order. `by` is a column or any SQL of the table, its `SQL` type: a `sql` fragment (`` db.sql`array_length(${'genres'}, 1)` ``), [`db.parent()`](/sql-template#parent); `direction` is `'ASC'` or `'DESC'`; `nulls`, `'FIRST'` or `'LAST'`.
@@ -172,7 +174,7 @@ db.selectOne(table, where, options?)
 
 As [`select()`](#select), with `LIMIT $1`<!-- probe: db.selectOne('films', db.all) -->, its value `1`, and no `jsonb_agg`: `.run(pool)` gives the first row, or `undefined` when none matches. Any `limit` you pass is replaced by `1`; `offset` and the other options are kept. In a `lateral`, its key holds the row or `null`.
 
-With `withTies` and `order`, it writes `FETCH FIRST $1 ROWS WITH TIES`, here and in `selectExactlyOne()`. `.run()` then gives one of the tied rows; in a `lateral`, the parent row comes back once per tie.
+With `withTies` and `order`, it writes `FETCH FIRST $1 ROWS WITH TIES`<!-- probe: db.selectOne('films', db.all, { order: { by: 'release_year', direction: 'ASC' }, withTies: true }) -->, here and in `selectExactlyOne()`. `.run()` then gives one of the tied rows; in a `lateral`, the parent row comes back once per tie.
 
 <CastPanel example="selectOne">
 
@@ -346,7 +348,7 @@ One locking clause of [`lock`](#lock). `of` takes a table name without its schem
 
 ### `ColumnsOption` {#ColumnsOption}
 
-`ColumnsOption<T> = readonly ColumnForTable<T>[] | undefined`: the type of `columns`, and of `returning` in [`insert()`](/insert#insert) and the other writes.
+`ColumnsOption<T> = readonly ColumnForTable<T>[] | undefined`: the type of `columns`, and of `returning` in [`insert()`](/insert#insert) and the other writes. It takes a `readonly` array, which types the result as `never` for now ([`columns`](#columns)).
 
 ### `ExtrasOption` {#ExtrasOption}
 
