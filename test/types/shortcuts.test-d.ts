@@ -106,6 +106,47 @@ describe('selectOne, selectExactlyOne, count', () => {
     expectTypeOf(db.count('users', db.all).run(pool)).resolves.toEqualTypeOf<number>();
     expectTypeOf(db.sum('accounts', db.all, { columns: ['balance'] }).run(pool)).resolves.toEqualTypeOf<number>();
   });
+
+  test('aggregates: one column, as a literal, a tuple or an array of unknown length', () => {
+    const cols: s.accounts.Column[] = ['balance'];
+    const roCols: readonly s.accounts.Column[] = ['balance'];
+    const one = ['balance'] as const;
+    expectTypeOf(db.count('users', db.all, { columns: ['manager_id'] }).run(pool)).resolves.toEqualTypeOf<number>();
+    expectTypeOf(db.sum('accounts', db.all, { columns: one }).run(pool)).resolves.toEqualTypeOf<number>();
+    expectTypeOf(db.avg('accounts', db.all, { columns: cols }).run(pool)).resolves.toEqualTypeOf<number>();
+    expectTypeOf(db.max('accounts', db.all, { columns: roCols }).run(pool)).resolves.not.toBeAny();
+    // a generic wrapper, and an aggregate picked at run time
+    const sumOf = <C extends readonly s.accounts.Column[]>(columns: C) => db.sum('accounts', db.all, { columns });
+    expectTypeOf(sumOf(['balance']).run(pool)).resolves.toEqualTypeOf<number>();
+    const pick = Math.random() > 0.5 ? db.sum : db.count;
+    expectTypeOf(pick('accounts', db.all, { columns: ['balance'] }).run(pool)).resolves.toEqualTypeOf<number>();
+  });
+
+  test('aggregates: several columns are refused', () => {
+    const two = ['id', 'mood'] as const;
+    // @ts-expect-error count() aggregates one column, not two
+    db.count('users', db.all, { columns: ['id', 'mood'] });
+    // @ts-expect-error count() aggregates one column, not two
+    db.count('users', db.all, { columns: two });
+    // @ts-expect-error sum() aggregates one column, not two
+    db.sum('accounts', db.all, { columns: ['balance', 'ratio'] });
+  });
+
+  test('aggregates: a passthru lateral is refused, a lateral map is not', () => {
+    const n = db.count('accounts', { owner_id: db.parent('id') });
+    // @ts-expect-error an aggregate has no row to pass a lateral query through
+    db.count('users', db.all, { lateral: n });
+    // @ts-expect-error an aggregate has no row to pass a lateral query through
+    db.max('users', db.all, { lateral: n });
+    expectTypeOf(db.count('users', db.all, { lateral: { n } }).run(pool)).resolves.toEqualTypeOf<number>();
+  });
+
+  test('sum, avg, min, max without columns compile as in 6.6.1, and throw at run time', () => {
+    // the owner's decision on #34: nothing that compiles under Zapatos 6.6.1 stops compiling
+    expectTypeOf(db.sum('accounts', db.all)).toEqualTypeOf<db.SQLFragment<number>>();
+    expectTypeOf(db.avg('accounts', db.all, { columns: undefined })).toEqualTypeOf<db.SQLFragment<number>>();
+    expectTypeOf(db.min).toEqualTypeOf<db.NumericAggregateSignatures>();
+  });
 });
 
 describe('insert', () => {

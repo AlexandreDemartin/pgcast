@@ -798,29 +798,21 @@ describe('count, sum, avg, min, max', () => {
     expect(await run(db.max('accounts', all, { columns: ['balance'] }))).toBe(1500.5);
   });
 
-  it('characterization: sum, avg, min, max without columns fail', async () => {
-    // characterization: they compile to `sum(*)`, which Postgres refuses
-    expect(await fails(db.sum('accounts', all))).toMatchInlineSnapshot(`
-      {
-        "code": "42883",
-        "message": "function sum() does not exist",
-      }
-    `);
-    expect(await fails(db.max('accounts', all))).toMatchInlineSnapshot(`
-      {
-        "code": "42883",
-        "message": "function max() does not exist",
-      }
-    `);
+  it('sum, avg, min, max without columns throw as the query is built, before any is sent', () => {
+    // 6.6.1 sent `sum(*)`, which Postgres refuses (42883)
+    expect(() => db.sum('accounts', all)).toThrow("sum() needs one column to aggregate: pass columns: ['column']");
+    expect(() => db.avg('accounts', all, {})).toThrow("avg() needs one column to aggregate: pass columns: ['column']");
+    expect(() => db.min('accounts', all, { alias: 'a' })).toThrow("min() needs one column to aggregate: pass columns: ['column']");
+    expect(() => db.max('accounts', all, { columns: undefined })).toThrow("max() needs one column to aggregate: pass columns: ['column']");
   });
 
-  it('characterization: several columns fail', async () => {
-    expect(await fails(db.count('users', all, { columns: ['id', 'mood'] }))).toMatchInlineSnapshot(`
-      {
-        "code": "42883",
-        "message": "function count(integer, mood) does not exist",
-      }
-    `);
+  it('several columns, or none, throw as the query is built', () => {
+    // 6.6.1 sent `count("id", "mood")` and `count()`, which Postgres refuses (42883, 42809)
+    // @ts-expect-error two columns (refused by the type too)
+    expect(() => db.count('users', all, { columns: ['id', 'mood'] })).toThrow('count() takes one column in columns, not 2 (leave columns out for count(*))');
+    expect(() => db.count('users', all, { columns: [] })).toThrow('count() takes one column in columns, not 0 (leave columns out for count(*))');
+    // @ts-expect-error two columns (refused by the type too)
+    expect(() => db.sum('accounts', all, { columns: ['balance', 'ratio'] })).toThrow('sum() takes one column in columns, not 2');
   });
 
   it('characterization: on an empty set, sum / avg / min / max return 0, not null', async () => {
@@ -843,13 +835,12 @@ describe('count, sum, avg, min, max', () => {
     expect(await run(db.max('users', all, { columns: ['display_name'] }))).toBeNaN();
   });
 
-  it('characterization: a passthru lateral is a syntax error', async () => {
-    expect(await fails(db.count('users', all, { lateral: db.count('accounts', { owner_id: parent('id') }) })))
-      .toMatchInlineSnapshot(`
-        {
-          "code": "42601",
-          "message": "syntax error at or near "AS"",
-        }
-      `);
+  it('a passthru lateral throws as the query is built; a lateral map runs', async () => {
+    // 6.6.1 sent `SELECT  AS result`, which Postgres refuses (42601)
+    // @ts-expect-error a passthru lateral (refused by the type too)
+    expect(() => db.count('users', all, { lateral: db.count('accounts', { owner_id: parent('id') }) }))
+      .toThrow('count() cannot pass a lateral query through: nest it in the lateral of a select() instead');
+    // the map is joined, its results not read
+    expect(await run(db.count('users', all, { lateral: { n: db.count('accounts', { owner_id: parent('id') }) } }))).toBe(3);
   });
 });

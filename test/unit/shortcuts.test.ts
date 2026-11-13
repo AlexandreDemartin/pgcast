@@ -1270,21 +1270,21 @@ describe('selectOne, selectExactlyOne', () => {
 });
 
 describe('count, sum, avg, min, max', () => {
-  it('without columns: aggregate(*)', () => {
+  it('count without columns: count(*)', () => {
     expect(db.count('users', all).compile()).toMatchInlineSnapshot(`
       {
         "text": "SELECT count(*) AS result FROM "users"",
         "values": [],
       }
     `);
-    expect(db.sum('accounts', { owner_id: 1 }).compile()).toMatchInlineSnapshot(`
-      {
-        "text": "SELECT sum(*) AS result FROM "accounts" WHERE ("owner_id" = $1)",
-        "values": [
-          1,
-        ],
-      }
-    `);
+  });
+
+  it('sum, avg, min, max without columns throw', () => {
+    // 6.6.1 compiled `sum(*)`
+    expect(() => db.sum('accounts', { owner_id: 1 })).toThrow("sum() needs one column to aggregate: pass columns: ['column']");
+    expect(() => db.avg('accounts', all, {})).toThrow("avg() needs one column to aggregate: pass columns: ['column']");
+    expect(() => db.min('accounts', all, { columns: undefined })).toThrow("min() needs one column to aggregate: pass columns: ['column']");
+    expect(() => db.max('accounts', all, { alias: 'a' })).toThrow("max() needs one column to aggregate: pass columns: ['column']");
   });
 
   it('with columns: aggregate("col"), extras ignored', () => {
@@ -1300,13 +1300,30 @@ describe('count, sum, avg, min, max', () => {
     expect(db.max('users', all, { columns: ['display_name'] }).compile().text).toMatchInlineSnapshot(`"SELECT max("display_name") AS result FROM "users""`);
   });
 
-  it('characterization: several columns are passed to the aggregate as several arguments', () => {
-    expect(db.count('users', all, { columns: ['id', 'mood'] }).compile().text).toMatchInlineSnapshot(`"SELECT count("id", "mood") AS result FROM "users""`);
+  it('several columns, or none, throw', () => {
+    // 6.6.1 compiled `count("id", "mood")` and `count()`
+    // @ts-expect-error two columns
+    expect(() => db.count('users', all, { columns: ['id', 'mood'] })).toThrow('count() takes one column in columns, not 2 (leave columns out for count(*))');
+    expect(() => db.count('users', all, { columns: [] })).toThrow('count() takes one column in columns, not 0 (leave columns out for count(*))');
+    // @ts-expect-error three columns
+    expect(() => db.avg('accounts', all, { columns: ['balance', 'ratio', 'id'] })).toThrow('avg() takes one column in columns, not 3');
+    expect(() => db.max('accounts', all, { columns: [] })).toThrow('max() takes one column in columns, not 0');
   });
 
-  it('characterization: a passthru lateral leaves no column to aggregate', () => {
-    // characterization: `SELECT  AS result`, invalid SQL (see the integration test)
-    expect(db.count('users', all, { lateral: db.count('accounts', { owner_id: parent('id') }) }).compile().text)
-      .toMatchInlineSnapshot(`"SELECT  AS result FROM "users" LEFT JOIN LATERAL (SELECT count(*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id")) AS "lateral_passthru" ON true"`);
+  it('a passthru lateral throws; a lateral map is joined, its results not read', () => {
+    // 6.6.1 compiled `SELECT  AS result`
+    // @ts-expect-error a passthru lateral
+    expect(() => db.count('users', all, { lateral: db.count('accounts', { owner_id: parent('id') }) }))
+      .toThrow('count() cannot pass a lateral query through: nest it in the lateral of a select() instead');
+    // @ts-expect-error a passthru lateral
+    expect(() => db.sum('accounts', all, { columns: ['balance'], lateral: db.count('users', all) }))
+      .toThrow('sum() cannot pass a lateral query through: nest it in the lateral of a select() instead');
+    expect(db.count('users', all, { lateral: { n: db.count('accounts', { owner_id: parent('id') }) } }).compile().text)
+      .toMatchInlineSnapshot(`"SELECT count(*) AS result FROM "users" LEFT JOIN LATERAL (SELECT count(*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id")) AS "lateral_n" ON true"`);
+  });
+
+  it('select() in SelectResultMode.Numeric still takes several columns, for an aggregate of several arguments', () => {
+    expect(db.select('accounts', all, { columns: ['ratio', 'balance'] }, db.SelectResultMode.Numeric, 'corr').compile().text)
+      .toMatchInlineSnapshot(`"SELECT corr("ratio", "balance") AS result FROM "accounts""`);
   });
 });
