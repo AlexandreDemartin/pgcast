@@ -29,6 +29,9 @@ Candidates for a check, a rule or a skill line.
 - #33 — A docs probe follows a code span that appears in the compiled SQL: « `deletes(…)` deletes them all » is rephrased « `deletes(…)` sends `WHERE TRUE` » to carry the mark — `builder`
 - #33 — `git merge --no-edit` leaves out the Co-Authored-By line: pass `-m` with it on every merge — `builder`
 - #33 — Two-dot `git diff origin/master` shows master's newer commits as reverted once master moves: size and grep checks use three dots — `builder`
+- #32 — A mechanism that replaces a fragment's `compile` carries every instance property `SQLFragment.compile` reads (`parentTable`, `preparedName`, `noop`: the list `copy()` overrides); one at a time, the others drop silently — `branch-reviewer`, `builder`
+- #32 — An opt-in that widens a `LIMIT` also widens a `FOR UPDATE`/`FOR SHARE` on the same query: replay a lock clause whenever a row count changes — `branch-reviewer`
+- #32 — Under `exactOptionalPropertyTypes`, `copy({ parentTable: x, preparedName: y })` with possibly `undefined` values does not compile: compile, then set `name` — `builder`
 
 ## Minors kept
 
@@ -40,3 +43,7 @@ Minor review defects, taken up by the end-of-chapter review.
 - #132 — `docs/CHARACTERISATION-REPORT.md:77` (R66): « a text column » leaves out `varchar`, `citext`, `json`, `xml`, `name`, `bytea`; and the nested case rests only on the cost of walking every value (6.6.1's type refused it too) — `branch-reviewer`
 - #112 — `test/types/shortcuts.test-d.ts:260`: `not.toBeAny()` where an equality compiles (`resolves.toEqualTypeOf<db.UpsertReturnableForTable<'users', undefined, undefined, undefined>>()`) — `branch-reviewer`
 - #33 — `CHANGELOG.md`: `groupBy: and()` sent `GROUP BY ()` (valid, the empty grouping set) in 6.6.1 and now fails with 42601; only the PR body says so: one « Changed too » line — `builder`
+- #32 — `website/runtime-config.md:182`: with `lock`, the option's `LIMIT 2` also locks the second row until the transaction ends, though `.run()` rejects — `branch-reviewer`
+- #32 — `website/handle-errors.md:97`, `:163`: still says two matching rows are not an error, and `statusOf()` maps every `NotExactlyOneError` to 404; with the option a second row gives the same class — `branch-reviewer`
+- #32 — `test/unit/shortcuts.test.ts:1223`: the option's `withTies` (`FETCH FIRST $n ROWS WITH TIES`, 2) and `offset` forms are not frozen by a test — `branch-reviewer`
+- #32 — `README.md:84`, `:91`: « except `selectExactlyOneChecksForSecondRow`'s » attaches to « a code »; line 91 names only `lateral` as the nested case — `branch-reviewer`

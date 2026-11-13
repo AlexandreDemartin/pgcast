@@ -22,6 +22,7 @@ export interface Config {
   upsertRequiresSameKeys?: boolean;  // multi-row upsert, no updateColumns: a key missing from a row, still set from EXCLUDED, throws
   undefinedMeansMissing?: boolean;  // an undefined value is a missing key: DEFAULT in insert, left out of update and upsert
   transactionRequiresCommit?: boolean;  // transaction() rejects when Postgres answers its COMMIT with ROLLBACK
+  selectExactlyOneChecksForSecondRow?: boolean;  // selectExactlyOne() run on its own asks for LIMIT 2, and throws on a second row
   queryListener?(query: SQLQuery, txnId?: number): void;
   resultListener?(result: any, txnId?: number, elapsedMs?: number, query?: SQLQuery): void;
   transactionListener?(message: string, txnId?: number): void;
@@ -36,6 +37,7 @@ const defaults: Config = {
   upsertRequiresSameKeys: false,  // the default in 7.0
   undefinedMeansMissing: false,  // the default in 7.0
   transactionRequiresCommit: false,  // the default in 7.0
+  selectExactlyOneChecksForSecondRow: false,  // stays the default in 7.0
 };
 
 let config: Config = { ...defaults };

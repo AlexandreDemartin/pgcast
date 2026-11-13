@@ -71,6 +71,7 @@ interface Config {
   upsertRequiresSameKeys?: boolean;
   undefinedMeansMissing?: boolean;
   transactionRequiresCommit?: boolean;
+  selectExactlyOneChecksForSecondRow?: boolean;
   queryListener?(query: SQLQuery, txnId?: number): void;
   resultListener?(result: any, txnId?: number, elapsedMs?: number, query?: SQLQuery): void;
   transactionListener?(message: string, txnId?: number): void;
@@ -88,6 +89,7 @@ The keys pgcast adds are optional, so a `Config` written for Zapatos 6.6.1 still
 | [`upsertRequiresSameKeys`](#Config.upsertRequiresSameKeys) | `false` | a multi-row `upsert()` with a key missing from some row, still set from `EXCLUDED`: throw, not warn | at each `upsert()` |
 | [`undefinedMeansMissing`](#Config.undefinedMeansMissing) | `false` | an `undefined` value in `insert()`, `update()` and `upsert()`: a missing key, not `NULL` | at each call of those |
 | [`transactionRequiresCommit`](#Config.transactionRequiresCommit) | `false` | a `COMMIT` that Postgres answers with `ROLLBACK`: reject, not resolve | at each `transaction()` |
+| [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow) | `false` | a `selectExactlyOne()` run on its own: `LIMIT 2`, and a second row rejects | at each `selectExactlyOne()` |
 | [`queryListener`](#Config.queryListener) | none | called with each query `run()` sends | at each `run()` |
 | [`resultListener`](#Config.resultListener) | none | called with each result `run()` gives | at each `run()` |
 | [`transactionListener`](#Config.transactionListener) | none | called when an attempt of `transaction()` fails with `40001` or `40P01`, and at each retry | at each `transaction()` |
@@ -176,6 +178,18 @@ When the callback of [`transaction()`](/transaction#transaction) catches a query
 
 - Not covered: a callback that sends `COMMIT` or `ROLLBACK` itself.
 - Not tested with `pg-native`.
+
+### `selectExactlyOneChecksForSecondRow` {#Config.selectExactlyOneChecksForSecondRow}
+
+```ts
+selectExactlyOneChecksForSecondRow?: boolean  // default: false, in 7.0 too
+```
+
+With `true`, a [`selectExactlyOne()`](/select#selectExactlyOne) run on its own asks for two rows, `LIMIT $2`<!-- probe: (db.setConfig({ selectExactlyOneChecksForSecondRow: true }), db.selectExactlyOne('films', { id: 1000 })) --> with `2`, and `.run()` rejects with a [`NotExactlyOneError`](/select#NotExactlyOneError) when a second row comes: "One result expected but more returned (hint: check `.query.compile()` on this Error)"<!-- message -->. Off, it asks for one, `LIMIT 1`, and gives the first row that matches, as in Zapatos 6.6.1.
+
+- Nested in another query, in a `lateral` or a `sql` template, it keeps `LIMIT 1`, option or not: a second row there would join the parent row twice. "On its own" is how the query is compiled: `.run()` and `.compile()` compile it alone, a parent query compiles it as part of its own SQL.
+- Off, it never warns, and it stays off in 7.0: "at least one row" is how Zapatos reads `selectExactlyOne()`, nested in a `lateral` on a `NOT NULL` foreign key ([decision 003](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/003-fixes-and-deprecation.md)).
+- Read when `selectExactlyOne()` is called, not at `.run()`.
 
 ### `queryListener` {#Config.queryListener}
 
@@ -269,6 +283,8 @@ A behaviour of Zapatos 6.6.1 that code may rely on, but that pgcast would change
 | [`upsertRequiresSameKeys: true`](#Config.upsertRequiresSameKeys) | `PGCAST_DEP001` | a multi-row `upsert()` without `updateColumns` has a key missing from some row that is still set from `EXCLUDED` ([Rows with different keys](/insert#upsert-different-keys)) | 7.0 |
 | [`undefinedMeansMissing: true`](#Config.undefinedMeansMissing) | `PGCAST_DEP002` | a value of `insert()`, `update()` or `upsert()` is `undefined` ([An `undefined` value](/insert#undefined-values)) | 7.0 |
 | [`transactionRequiresCommit: true`](#Config.transactionRequiresCommit) | `PGCAST_DEP003` | Postgres answers the `COMMIT` of `transaction()` with `ROLLBACK`, after a query error the callback caught ([Let the error through](/retries#let-the-error-through)) | 7.0 |
+
+One opt-in has no warning and no default in 7.0: [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow), since 6.6.1's reading of `selectExactlyOne()`, at least one row, is one Zapatos documents.
 
 Each warning is a Node.js `DeprecationWarning`, emitted once per process for each code, when the shortcut is called (`PGCAST_DEP003`: when `transaction()` resolves), and only when the old behaviour is used. Its message names the option. Node prints it to `stderr`:
 
