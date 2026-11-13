@@ -33,7 +33,9 @@ onmessage = async ({ data: js }: MessageEvent<string>) => {
     names = Object.keys(db).filter(name => name !== 'default'),
     shim = module(`const db = globalThis.pgcastDb;\nexport const { ${names.join(', ')} } = db;\n` +
       'export default db.default;'),
-    code = js.replace(/(\bfrom\s*|\bimport\s*\(?\s*)(['"])zapatos\/db\2/g, (_, before) => before + JSON.stringify(shim));
+    // the quote it had: a string that holds `from 'zapatos/db'` keeps its own quotes closed (a blob: URL has none)
+    code = js.replace(/(\bfrom\s*|\bimport\s*\(?\s*)(['"])zapatos\/db\2/g,
+      (_, before, quote) => before + quote + shim + quote);
 
   Object.assign(globalThis, { pgcastDb: db, pool });
   try {
