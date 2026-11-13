@@ -297,12 +297,45 @@ describe('type surprises', () => {
     db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { mood: 'glad' } });
   });
 
-  test('characterization: add() and subtract() refuse a Parameter, which the runtime accepts', () => {
-    // characterization: add<T extends number | Date>; conditionalParam() passes a Parameter through
-    // @ts-expect-error Parameter<number> is not number | Date (add)
-    c.add(db.param(1));
-    // @ts-expect-error Parameter<number> is not number | Date (subtract)
-    c.subtract(db.param(1));
+  test('add() and subtract() take a Parameter of a number or a Date, its type as the constraint', () => {
+    // compiled as it is, `"col" + CAST($1 AS "int4")` (test/unit/conditions.test.ts, "add and subtract a Parameter")
+    expectTypeOf(c.add(db.param(3))).toEqualTypeOf<db.SQLFragment<number, number>>();
+    expectTypeOf(c.subtract(db.param(3, 'int4'))).toEqualTypeOf<db.SQLFragment<number, number>>();
+    expectTypeOf(c.subtract(db.param(new Date()))).toEqualTypeOf<db.SQLFragment<number, Date>>();
+    expectTypeOf(c.add(db.param(3))).not.toBeAny();
+    expectTypeOf([db.param(1)].map(c.add)).toEqualTypeOf<db.SQLFragment<number, number>[]>();
+    db.update('accounts', { balance: c.add(db.param(10, 'numeric')), lifetime_ops: c.subtract(db.param(1)) }, { id: 1 });
+    db.update('accounts', { opened_on: c.subtract(db.param(new Date())) }, { id: 1 });
+    // @ts-expect-error Parameter<string> is not a number nor a Date
+    c.add(db.param('3'));
+    // @ts-expect-error Parameter<string | number> neither
+    c.subtract(db.param(3 as number | string));
+    // @ts-expect-error a number on a text column
+    db.update('users', { display_name: c.add(db.param(1, 'int4')) }, { id: 1 });
+    // @ts-expect-error a number on an enum column
+    db.update('users', { mood: c.add(db.param(1)) }, { id: 1 });
+    // @ts-expect-error a number on a date column, as add(3): the constraint is the Parameter's type
+    db.update('events', { occurred_on: c.add(db.param(3, 'int4')) }, { kind: 'signup' });
+  });
+
+  test('add() and subtract() infer as in 6.6.1 for a value that is not a Parameter', () => {
+    const inc = <N extends number>(n: N) => c.add(n);
+    const n: number = 5;
+    expectTypeOf(c.add(1)).toEqualTypeOf<db.SQLFragment<number, 1>>();
+    expectTypeOf(c.add(n)).toEqualTypeOf<db.SQLFragment<number, number>>();
+    expectTypeOf(c.subtract(new Date() as number | Date)).toEqualTypeOf<db.SQLFragment<number, number | Date>>();
+    expectTypeOf(inc(3)).toEqualTypeOf<db.SQLFragment<number, 3>>();
+    expectTypeOf([1, 2].map(c.add)).toEqualTypeOf<db.SQLFragment<number, number>[]>();
+    expectTypeOf(c.add<1 | 2>(1)).toEqualTypeOf<db.SQLFragment<number, 1 | 2>>();
+    // @ts-expect-error a number on a date column (42725 in Postgres: date + unknown)
+    db.update('events', { occurred_on: c.add(3) }, { kind: 'signup' });
+    // @ts-expect-error a string is not a number nor a Date
+    c.add('1');
+  });
+
+  test('a sql fragment adds a cast Parameter to a date column', () => {
+    // run in test/integration/conditions.test.ts, "add a number of days to a date with a cast Parameter"
+    db.update('events', { occurred_on: db.sql`${db.self} + ${db.param(3, 'int4')}` }, { kind: 'signup' });
   });
 
   test('characterization: array conditions are typed on the element, not on the column', () => {

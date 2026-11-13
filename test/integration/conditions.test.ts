@@ -252,8 +252,8 @@ describe('add, subtract (in an update)', () => {
       { returning: ['balance', 'lifetime_ops'] }).run(t.client)).toEqual([{ balance: 10, lifetime_ops: 0 }]);
   });
 
-  it('characterization: add a number of days to a date needs a cast', async () => {
-    // characterization: `"occurred_on" + $1` leaves $1 untyped, and `date + unknown` is ambiguous
+  it('add a number of days to a date with a cast Parameter', async () => {
+    // `"occurred_on" + $1` leaves $1 untyped, and `date + unknown` is ambiguous
     expect(await pgError(t.client, () => db.update('events', { occurred_on: dc.add(1) }, { kind: 'signup' }).run(t.client)))
       .toMatchInlineSnapshot(`
         {
@@ -261,8 +261,16 @@ describe('add, subtract (in an update)', () => {
           "message": "operator is not unique: date + unknown",
         }
       `);
-    // the type of add() refuses a Parameter, its runtime accepts one
-    expect(await db.update('events', { occurred_on: dc.add(param(1, 'int4') as unknown as number) }, { kind: 'signup' }, { returning: ['occurred_on'] })
-      .run(t.client)).toEqual([{ occurred_on: '2025-06-02' }]);
+    const day = async (occurred_on: db.SQL) =>
+      (await db.update('events', { occurred_on }, { kind: 'signup' }, { returning: ['occurred_on'] }).run(t.client))[0].occurred_on;
+    expect(await day(dc.add(param(1, 'int4')))).toBe('2025-06-02');
+    expect(await day(dc.subtract(param(2, 'int4')))).toBe('2025-05-31');
+    // on a typed schema, a date column refuses add()'s number constraint: the docs' sql fragment
+    expect(await day(sql`${db.self} + ${param(3, 'int4')}`)).toBe('2025-06-03');
+  });
+
+  it('a Parameter of the wrong type: a cast to text has no operator', async () => {
+    expect(await pgError(t.client, () => db.update('accounts', { balance: dc.add(param(3, 'text')) }, { id: 1 }).run(t.client)))
+      .toEqual({ code: '42883', message: 'operator does not exist: numeric + text' });
   });
 });

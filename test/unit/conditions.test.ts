@@ -484,6 +484,13 @@ describe('conditions', () => {
       }
     `);
   });
+
+  it('add and subtract a Parameter', () => {
+    expect(show(dc.add(param(3, 'int4')))).toEqual({ text: '(("col" + CAST($1 AS "int4")))', values: [3] });
+    expect(show(dc.subtract(param(3, 'int4')))).toEqual({ text: '(("col" - CAST($1 AS "int4")))', values: [3] });
+    expect(show(dc.add(param(3, 'pg_catalog.int4')))).toEqual({ text: '(("col" + CAST($1 AS "pg_catalog"."int4")))', values: [3] });
+    expect(show(dc.add(param(3)))).toEqual({ text: '(("col" + $1))', values: [3] });
+  });
 });
 
 describe('Default, self, raw, cols and vals as the value of a condition', () => {
