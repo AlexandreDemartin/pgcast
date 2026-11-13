@@ -40,7 +40,7 @@ One per group, in `templates/`, not published (`srcExclude` in `.vitepress/confi
 
 ### Conventions
 
-- **Title and lede**: one `# ` title, the text of its outline entry; then one paragraph followed by `{.lede}` on its own line: what the page is for. `llms.txt` takes both (§ For assistants).
+- **Title and lede**: one `# ` title, the text of its outline entry; then one paragraph followed by `{.lede}` on its own line: what the page is for. `llms.txt` takes both (§ For assistants), and the page's description its lede (§ For search engines).
 - **Headings**: `##` for sections ("On this page" lists them), `###` under them, in sentence case.
 - **Notes**: a chip, then the text, with no side rail (art direction § Signature components). The text after the container's name is the chip, a word or two; a note is for what the reader must not miss.
 
@@ -116,6 +116,15 @@ At build, `.vitepress/llms.ts` writes two files to the site's root, from the out
 A "Coming" page has no `.md` file, so it is in neither; nor are the templates and this README, which the outline does not list.
 
 `public/robots.txt`, copied to the root as it is, lets every crawler in, assistants' included, and names `sitemap.xml`, which VitePress writes from the config's `sitemap`.
+
+### For search engines
+
+`.vitepress/meta.ts` gives each page's `<head>`:
+
+- `description`: the front matter's, or else the lede as plain text, cut after the last whole sentence within 160 characters (the first sentence whatever its length). A "Coming" page takes the site's.
+- A canonical URL on `https://pgcast.dev/`, Open Graph and a Twitter card, with the one social image, `public/social-card.png`; on the home, a JSON-LD `SoftwareSourceCode`.
+
+`sitemap.xml` gives each page's `lastmod`, and the page its "Last updated", from git: CI checks out the whole history. The favicons, the Apple touch icon and the social card are drawn in SVG in `public/`; after changing one, `npm run docs:images` renders the PNG and ICO with headless Chrome (`CHROME=<path>` off macOS), to commit with it.
 
 ### Screenshots for a PR
 
