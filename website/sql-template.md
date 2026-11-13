@@ -313,7 +313,7 @@ A column of the parent query's table, in a subquery given to `lateral` ([Join th
 class ParentColumn<T extends Column | undefined = Column | undefined> { value?: T }
 ```
 
-What `parent()` returns.
+What `parent()` returns. A type-only member keeps `cols()` and `vals()` from passing as a `ParentColumn`.
 
 ## `Default` {#Default}
 

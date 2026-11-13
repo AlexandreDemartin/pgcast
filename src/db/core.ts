@@ -124,7 +124,8 @@ export function strict<FnIn, FnOut>(fn: (x: FnIn) => FnOut):
 export const toBuffer = strict((ba: ByteArrayString) => Buffer.from(ba.slice(2), 'hex'));
 
 // a type-only tag (no JS is emitted): it keeps raw(), cols() and vals() from passing as a `Parameter<T>`, which
-// is structural ({ value: T }), so the generated Whereable, Insertable and Updatable types refuse them as values
+// is structural ({ value: T }), so the generated Whereable, Insertable and Updatable types refuse them as values;
+// and cols() and vals() from passing as a `ParentColumn` ({ value?: Column }), which a Whereable value also takes
 declare const wrapper: unique symbol;
 
 /**
@@ -237,7 +238,7 @@ export function vals<T>(x: T) { return new ColumnValues<T>(x); }
  * Compiles to the name of the column it wraps in the table of the parent query.
  * @param value The column name
  */
-export class ParentColumn<T extends Column | undefined = Column | undefined> { constructor(public value?: T) { } }
+export class ParentColumn<T extends Column | undefined = Column | undefined> { declare readonly [wrapper]?: 'parent'; constructor(public value?: T) { } }
 /**
  * Returns a `ParentColumn` instance, wrapping a column name, which compiles to
  * that column name of the table of the parent query. Without a column, it takes
