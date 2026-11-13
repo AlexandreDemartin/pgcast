@@ -118,9 +118,9 @@ function note(example, error, what = '') {
 process.on('unhandledRejection', error => note(current, error, 'a promise it does not await rejects: '));
 
 /**
- * The playground's PGlite, with its adapter's parsers, gives the rows `pg` gives through `client`: for each table of the
- * docs schema, and for what a query on it often selects. In a time zone ahead of UTC, as a reader's may be: `pg` makes
- * a `date` midnight where the code runs.
+ * The playground's PGlite, with its adapter's parsers, gives the rows `pg` gives through `client`: for each table of
+ * the docs schema, and for what a query on it often selects. In a time zone ahead of UTC, as a reader's may be: `pg`
+ * makes a `date` midnight where the code runs.
  */
 async function checkPlaygroundParsers(client) {
   const

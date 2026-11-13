@@ -40,7 +40,8 @@ const
     typeof item === 'bigint' ? String(item) : item, 2),
   /** The query as its panel shows it, kept with the others. */
   record = ({ text, values = [] }: QueryConfig) => {
-    const sql = layOut(text), query = { sql: normalised(sql) === normalised(text) ? sql : text, values: valuesShown(values) };
+    const sql = layOut(text);
+    const query = { sql: normalised(sql) === normalised(text) ? sql : text, values: valuesShown(values) };
     queries.push(query);
     return query;
   },
@@ -51,7 +52,8 @@ const
 /** Postgres on the docs schema, as a pool whose every query is recorded with Postgres's answer. */
 async function postgres() {
   const
-    [{ open, poolOf }, { default: schema }] = await Promise.all([import('./pglite.ts'), import('../../schema.sql?raw')]),
+    [{ open, poolOf }, { default: schema }] =
+      await Promise.all([import('./pglite.ts'), import('../../schema.sql?raw')]),
     pglite = await open(schema);
 
   return poolOf(async config => {

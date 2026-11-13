@@ -153,7 +153,8 @@ async function update(code: string, types: monaco.editor.ITextModel, postgres = 
 
   const result = await run(emitted.outputFiles[0]?.text ?? '', postgres);
   if (version !== latest || !result) return;
-  queries.value = result.queries.map(({ sql, rows, ...query }) => ({ ...query, html: sqlHtml(sql), rows: rows && jsonHtml(rows) }));
+  queries.value = result.queries.map(({ sql, rows, ...query }) =>
+    ({ ...query, html: sqlHtml(sql), rows: rows && jsonHtml(rows) }));
   notes.value = [
     ...result.error === undefined ? [] : [result.queries.length && !postgres ?
       `No rows come back as you type, so the code stopped after its query (Run gives it Postgres): ${result.error}` :
