@@ -26,6 +26,8 @@ export interface OptionalConfig {
   schemaJSDoc: boolean;
   unprefixedSchema: string | null;
   customJSONParsingForLargeNumbers: boolean;
+  // optional, so a CompleteConfig written for 6.6.1 still compiles; read it with ?? false
+  typeEnumsAcrossSchemas?: boolean;  // an enum of another schema is typed by its own labels, not by its name in the relation's schema
 }
 
 interface SchemaRules {

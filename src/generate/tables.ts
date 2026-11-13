@@ -6,7 +6,7 @@ Released under the MIT licence: see LICENCE file
 
 import * as pg from 'pg';
 import { tsTypeForPgType } from './pgTypes';
-import type { EnumData } from './enums';
+import { enumDataForSchema, type EnumData } from './enums';
 import type { CustomTypes, CustomTypeOrigins } from './tsOutput';
 import { CompleteConfig } from './config';
 
@@ -110,9 +110,15 @@ export const definitionForRelationInSchema = async (
   config: CompleteConfig,
   queryFn: (q: pg.QueryConfig) => Promise<pg.QueryResult<any>>,
   customTypeOrigins: CustomTypeOrigins = {},  // an 'out' parameter too
+  enumsForSchema = (schema: string) => enumDataForSchema(schema, queryFn),
+  columnsTypedByEnumName: string[] = [],  // an 'out' parameter too: what typeEnumsAcrossSchemas would change
 ) => {
   const
     rows = await columnsForRelation(rel, schemaName, queryFn),
+    otherSchemas = [...new Set<string>(rows.map(row => row.udtSchema))].filter(schema => schema !== schemaName),
+    otherEnums: Record<string, EnumData> = Object.fromEntries(await Promise.all(
+      otherSchemas.map(async schema => [schema, await enumsForSchema(schema)]))),
+    typeEnumsAcrossSchemas = config.typeEnumsAcrossSchemas ?? false,
     selectables: string[] = [],
     JSONSelectables: string[] = [],
     whereables: string[] = [],
@@ -120,13 +126,24 @@ export const definitionForRelationInSchema = async (
     updatables: string[] = [];
 
   rows.forEach(row => {
-    const { column, isGenerated, isNullable, hasDefault, udtName, domainName, udtSchema, domainSchema } = row;
+    const
+      { column, isGenerated, isNullable, hasDefault, udtName, domainName, udtSchema, domainSchema } = row,
+      // with typeEnumsAcrossSchemas, an enum is looked up in the schema of its type; otherwise by name, in this one
+      acrossSchemas = udtSchema !== schemaName,
+      inlineEnums = typeEnumsAcrossSchemas && acrossSchemas,
+      typeEnums = inlineEnums ? otherEnums[udtSchema] : enums;
     let
-      selectableType = tsTypeForPgType(udtName, enums, 'Selectable', config),
-      JSONSelectableType = tsTypeForPgType(udtName, enums, 'JSONSelectable', config),
-      whereableType = tsTypeForPgType(udtName, enums, 'Whereable', config),
-      insertableType = tsTypeForPgType(udtName, enums, 'Insertable', config),
-      updatableType = tsTypeForPgType(udtName, enums, 'Updatable', config);
+      selectableType = tsTypeForPgType(udtName, typeEnums, 'Selectable', config, inlineEnums),
+      JSONSelectableType = tsTypeForPgType(udtName, typeEnums, 'JSONSelectable', config, inlineEnums),
+      whereableType = tsTypeForPgType(udtName, typeEnums, 'Whereable', config, inlineEnums),
+      insertableType = tsTypeForPgType(udtName, typeEnums, 'Insertable', config, inlineEnums),
+      updatableType = tsTypeForPgType(udtName, typeEnums, 'Updatable', config, inlineEnums);
+
+    if (!typeEnumsAcrossSchemas && acrossSchemas &&
+      tsTypeForPgType(udtName, otherEnums[udtSchema], 'Selectable', config, true) !== selectableType) {
+      const isArray = udtName.charAt(0) === '_' && !Object.prototype.hasOwnProperty.call(otherEnums[udtSchema], udtName);
+      columnsTypedByEnumName.push(`${schemaName}.${rel.name}.${column} (${udtSchema}.${isArray ? udtName.slice(1) + '[]' : udtName})`);
+    }
 
     const
       columnDoc = createColumnDoc(config, schemaName, rel, row),
@@ -315,8 +332,14 @@ const createColumnDoc = (config: CompleteConfig, schemaName: string, rel: Relati
       domainName,
       description,
     } = columnDetails,
+    // every line of a multi-line comment gets its ` * `: TypeScript ends a JSDoc line at \r as at \n.
+    // A comment holding */ is written as Zapatos 6.6.1 wrote it, until #48 escapes it: its */ ends the
+    // JSDoc, so a ` * ` before a following line would be code, and break one that parses today
+    comment = description as string | null,
+    commentDoc = !comment ? '' :
+      '\n    *\n    * ' + (comment.includes('*/') ? comment : comment.split(/\r\n?|\n/).join('\n    * ')),
     doc = `/**
-    * **${schemaPrefix}${rel.name}.${column}**${description ? '\n    *\n    * ' + description : ''}
+    * **${schemaPrefix}${rel.name}.${column}**${commentDoc}
     * - ${domainName ? `\`${domainName}\` (base type: \`${udtName ?? '(none)'}\`)` : `\`${udtName ?? '(none)'}\``} in database
     * - ${rel.type === 'mview' ? 'Materialized view column' : isGenerated ? 'Generated column' :
         `${isNullable ? 'Nullable' : '`NOT NULL`'}, ${hasDefault && defaultValue === null ? `identity column` : hasDefault ? `default: \`${defaultValue}\`` : `no default`}`}

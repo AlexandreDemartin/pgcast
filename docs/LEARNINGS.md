@@ -89,6 +89,18 @@ Candidates for a check, a rule or a skill line.
 - #45 — A PR closing an issue that a docs page cites as a limit retargets that link before merge: `grep -rn '#<n>' website/` at review — `branch-reviewer`
 - #45 — A « no false positive » test for a codegen warning runs every snapshot variant with its full config: a mutant that checks `tables` instead of `relations` only shows on a variant that excludes a relation — `branch-reviewer`, `builder`
 - #45 — Two review items in one file that need separate commits: commit between the two edits or stage by hunk; without amend, a plain `git add <file>` leaves the message incomplete — `builder`
+- #44 — Once a codegen fix has landed, « byte-identical to 6.6.1 » no longer holds on master: replay three ways (6.6.1 against master shows only the fix, master against the branch is empty) — `builder`
+- #44 — Placeholders shared between two schemas make `diff -r` of a replay flip between runs, on 6.6.1 too: run twice, or leave those probe schemas out — `builder`
+- #44 — A census test collecting every warning of every fixture variant breaks when a second note lands: the second PR adds its note to the census's expectations rather than filtering it, so the census still says where each note fires — `branch-reviewer`
+- #44 — An opt-in that writes catalog strings into TS carries any existing escaping bug into schemas whose output used to parse: one quoting helper per kind of string lets the escaping fix land once — `branch-reviewer`
+- #44 — A new `export` in a module of `src/generate/index.ts`'s `export *` list becomes public API of `zapatos/generate` (the build shows it in `generate.mjs`): a helper goes in its own module, and `git status` is read for `*.mjs` before committing — `builder`
+- #44 — `git commit --no-edit` after a conflicted merge keeps the `# Conflicts:` lines; `--cleanup=strip` drops them — `builder`
+- #44 — A brief that names the SHA to merge expects `origin/master` to be newer by then — orchestrator
+- #46 — A fix that touches every line of a comment checks what an existing `*/` does to the lines after it: a replay near comment delimiters includes inputs where the old output parses by accident (a `*/` then a `/*` that reopens) — `branch-reviewer`, `builder`
+- #46 — A guard that keeps the old bytes « when the input holds X » is tested with X at every position it covers (line 1, a later line); running the suite against a narrower guard finds the gap — `branch-reviewer`
+- #46 — JS `/^/gm` matches after `\r`, U+2028 and U+2029, not only `\n`: an « indent every line » pass over catalog text normalises line ends first — `branch-reviewer`, `builder`
+- #46 — Python's text-mode `open()` turns `\r` into `\n`: a PR body or file holding CRs is written with `newline=''` — `builder`
+- #46 — A detached `git worktree add --detach <scratch>/mutant HEAD` with `node_modules` and `src/.env` symlinked is a cheap mutant copy: Vitest runs without `npm ci`, and `rm -rf` plus `git worktree prune` cleans it — `builder`
 
 ## Minors kept
 
@@ -116,3 +128,4 @@ Minor review defects, taken up by the end-of-chapter review.
 - #36 — `test/unit/core.test.ts:290`, `docs/CHARACTERISATION-REPORT.md:89`: the title « an array type sends the array » keeps the wording the PR removed elsewhere — `branch-reviewer`
 - #41 — `test/types/shortcuts.test-d.ts:431`: `const mail: Card['email'] = 'a@b'` holds its directive on master too (`Card` is `never`); `null as unknown as Card['email']` would fail only on the head — `branch-reviewer`
 - #41 — `CHANGELOG.md:133`: `{}` as a `Record<keyof Film, …>` lacks the row's keys, not the column the sentence names — `branch-reviewer`
+- #46 — `src/generate/tsOutput.ts:100`: the writer's `/^/gm` indentation puts spaces after a U+2028/U+2029 inside a comment (6.6.1 too); frozen as is by `column comments › prefixes every line whatever its line break` — `branch-reviewer`

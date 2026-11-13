@@ -45,7 +45,7 @@ For views, pgcast keeps to what Postgres states, as Zapatos did: a nullability t
 
 - Enum labels come out in alphabetical order: `crew_job` is `'cinematographer' | 'composer' | 'director' | 'editor' | 'writer'`, not the order of its `CREATE TYPE` ([#49](https://github.com/AlexandreDemartin/pgcast/issues/49)).
 - Comments are read on the columns of tables and materialised views only, not of views, foreign tables or partitioned tables ([#47](https://github.com/AlexandreDemartin/pgcast/issues/47)).
-- An enum of another schema becomes an `any` placeholder ([#44](https://github.com/AlexandreDemartin/pgcast/issues/44)).
+- An enum of another schema becomes an `any` placeholder, or takes the labels of the enum of the same name in the relation's schema, unless [`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas) is on.
 
 ::: info Coming
 Reading more of the catalog, each as an opt-in: foreign keys, for laterals that know their join ([#54](https://github.com/AlexandreDemartin/pgcast/issues/54)); a domain's `CHECK (VALUE = ANY (ARRAY[…]))` as a union of its values ([#55](https://github.com/AlexandreDemartin/pgcast/issues/55)); and, as a separate tool, the result types of hand-written SQL ([#62](https://github.com/AlexandreDemartin/pgcast/issues/62)).

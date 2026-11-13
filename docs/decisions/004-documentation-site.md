@@ -1,13 +1,14 @@
 # 004 — The documentation site
 
-- **Status**: accepted (2026-11-12); amended 2026-11-12: the example world (§ Decision, 7); amended 2026-11-12: Diátaxis, the hand-written reference checked at build ([#137](https://github.com/AlexandreDemartin/pgcast/issues/137)), llms.txt ([#138](https://github.com/AlexandreDemartin/pgcast/issues/138)) (§ Decision, 8); amended 2026-11-13: the site's domain, pgcast.dev ([#273](https://github.com/AlexandreDemartin/pgcast/issues/273)) (§ Decision, 3).
+- **Status**: accepted (2026-11-12); amended 2026-11-12: the example world (§ Decision, 7); amended 2026-11-12: Diátaxis, the hand-written reference checked at build ([#137](https://github.com/AlexandreDemartin/pgcast/issues/137)), llms.txt ([#138](https://github.com/AlexandreDemartin/pgcast/issues/138)) (§ Decision, 8); amended 2026-11-13: the site's domain, pgcast.dev ([#273](https://github.com/AlexandreDemartin/pgcast/issues/273)) (§ Decision, 3); amended 2026-11-13: the live site, not the prototype, is the design reference ([#297](https://github.com/AlexandreDemartin/pgcast/issues/297)) (§ Context).
 - **Scope**: step 1 of Epic [#85](https://github.com/AlexandreDemartin/pgcast/issues/85), issue [#89](https://github.com/AlexandreDemartin/pgcast/issues/89). Nothing is implemented here.
 
 ## Context
 
 - George MacKerron's docs (`docs/index.html`) are one long page. Each example shows the TypeScript, the SQL it produced and the result, with the inferred types on hover in Monaco. His build ran every example against a temporary database to capture the SQL and the result; the types were computed in the browser from bundled `.d.ts` files ([zapatos-docs](https://github.com/jawj/zapatos-docs), `bin/compile-docs.js`).
 - They no longer describe pgcast: its security fixes, its opt-ins and their warnings, and the features to come.
-- The owner wants the same spirit, done better: a polished site on par with the best package docs, dark and light mode, and the approved art direction ([art-direction.md](../design/art-direction.md), [prototype](../design/prototype.html)).
+- The owner wants the same spirit, done better: a polished site on par with the best package docs, dark and light mode, and the approved art direction ([art-direction.md](../design/art-direction.md), then a prototype, `docs/design/prototype.html`).
+  - Amended 2026-11-13 ([#297](https://github.com/AlexandreDemartin/pgcast/issues/297)): the prototype is removed (git keeps it). The live site, <https://pgcast.dev>, and its theme (`website/.vitepress/theme/`) are the design reference, which `art-direction.md` describes; "the prototype" below means that first draft.
 
 ## Criteria
 

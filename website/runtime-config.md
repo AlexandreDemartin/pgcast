@@ -286,6 +286,8 @@ A behaviour of Zapatos 6.6.1 that code may rely on, but that pgcast would change
 
 One opt-in has no warning and no default in 7.0: [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow), since 6.6.1's reading of `selectExactlyOne()`, at least one row, is one Zapatos documents.
 
+The generator has its own: [`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas), whose old path is a note through [`warningListener`](/generator#generate.warningListener), once per run, rather than a `DeprecationWarning`; it will be the default in 7.0 too.
+
 Each warning is a Node.js `DeprecationWarning`, emitted once per process for each code, when the shortcut is called (`PGCAST_DEP003`: when `transaction()` resolves), and only when the old behaviour is used. Its message names the option. Node prints it to `stderr`:
 
 ```txt
