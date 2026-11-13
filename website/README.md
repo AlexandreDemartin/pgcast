@@ -70,6 +70,35 @@ One per group, in `templates/`, not published (`srcExclude` in `.vitepress/confi
 - **Voice**: warm and brief, first person where natural, British spelling (`colour`, `behaviour`, `licence`), Zapatos rather than its author (skill [`code-style`](../.agents/skills/code-style/SKILL.md) § Docs voice).
 - **The film world**: every example on the docs schema (§ The docs schema), every name invented, an explicit date rather than `now()`.
 
+### Easy reading
+
+A reader scans before reading. A page keeps every fact and its voice, and gives each the form that fits it (`switching.md` and `security.md` show each one):
+
+| Content | Form |
+|---|---|
+| A page of over ~1,500 words | **At a glance** under the lede: three to five bullets, what the page answers or the rules to keep |
+| A sequence | numbered steps; a how-to's steps as numbered headings, their anchor kept: `## 3. Compile {#compile}` |
+| An enumeration | a list, one idea per item |
+| A grid: options, behaviour by case, before / after Zapatos, errors and what to do | a table, Zapatos 6.6.1 and pgcast in columns of their own |
+| A flow that is the point | a diagram (art direction § Diagrams) |
+| A warning inside a paragraph | its note: `::: warning Security`, `::: tip Opt-in` |
+| Anything else | paragraphs of at most ~60 words, three sentences |
+
+- Each table, list and diagram says something a paragraph said less clearly; a table of two short rows is a sentence.
+- At a glance is a component, so "On this page" does not list it, and `llms-full.txt` gets it as `**At a glance**` and its list:
+
+  ```md
+  <AtAGlance>
+
+  - Values travel as parameters, beside the SQL text.
+
+  </AtAGlance>
+  ```
+
+- A table of three columns or more with long cells goes in `<div class="stack">` (blank lines around it): its code may break, so it fits the column, and on a phone each row is a block, each cell under its header.
+- A diagram is a component of `.vitepress/theme/`, registered in `index.ts`. It holds no fact the page's text does not say, so `llms-full.txt` drops it, and its SQL is a span the page probes beside it.
+- A page rewritten for reading lists, in its PR, each fact of the old page and where it went, with the words and the longest paragraph before and after.
+
 ### Examples
 
 - A `ts twoslash` block is compiled against the built `zapatos/db` and the docs schema's `zapatos/schema`; hovers show the types TypeScript gives. An unexpected type error fails the build; a block meant to fail says so with `// @errors: <code>`.
@@ -151,6 +180,7 @@ A PR that changes how a page looks shows it, in light and dark, at a phone's wid
 - [ ] Each export it documents: an entry anchored `{#name}`, its line gone from `reference-pending.json`
 - [ ] Every example in the film world, as `ts twoslash`; a query's SQL in a cast panel, or a `sql` block for an example of several queries (`examples/plain/`)
 - [ ] Notes with a chip; options tables as Option → SQL it adds → Effect on the type
+- [ ] Paragraphs of at most ~60 words; At a glance on a page of over ~1,500 words (§ Easy reading)
 - [ ] Each SQL span of pgcast's and each pgcast message quoted, marked: `<!-- probe: … -->`, `<!-- message -->`
 - [ ] Links to the other groups; British spelling
 - [ ] `npm run docs:build` passes, and `npm run docs:examples` if an example changed

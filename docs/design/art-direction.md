@@ -99,6 +99,17 @@ Spacing is on a 4px grid.
 - **Code blocks**: on `--code-bg`, border, `--radius`; a code group has a 38px bar of tabs (npm · pnpm · yarn, mono 12px, the selected one underlined in `--accent`); VitePress's Copy button. The install line's copy button: "Copied" beside it for 1.4s; it selects the command when the clipboard is refused.
 - **Notes**: a chip, then the text, on `--surface` with a border, **no coloured side rail**. Chips: Opt-in (`--accent-soft`, `--accent`), Security (`--warn-soft`, `--warn`, a 1px `--warn` border, the note itself on `--warn-soft`), Coming (`--sunken`, `--muted`).
 - **Options tables**: bordered, radius, header on `--sunken`; the columns read Option → SQL it adds → Effect on the type; codes such as `PGCAST_DEP001` in mono, tabular figures.
+  - A table of cases in `<div class="stack">` (`website/README.md` § Easy reading): its code breaks anywhere, so it fits the column; under 640px each row is a block on `--surface`, border, `--radius`, 12px apart, each cell under its header (12px, 600, `--muted`), the header row hidden but read.
+- **At a glance**, under a long page's lede (`AtAGlance.vue`): a quiet box on `--surface`, border, `--radius`, padding `14px 16px`, 28px over the first section; its label "At a glance" as the nav's group labels (13px, 600, `--muted`, sentence case); then three to five bullets, 4px apart. No rail, no icon, no colour: it is a summary, not a warning.
+
+### Diagrams
+
+Only where a flow is the point (a value → parameter → Postgres; the catalog → generator → `schema.d.ts` → your code; a retried transaction), never as decoration. `ValuesFlow.vue`, on the security page, is the model.
+
+- **Inline SVG** in a component of `website/.vitepress/theme/`, no client-side diagram library; in a `<figure class="Diagram">`, with a caption under it (13px, `--muted`).
+- **Tokens, not colours**: classes of `style.css` (`.Diagram .box`, `.accent`, `.label`, `.text`, `.code`, `.param`, `.arrow`, `.head`), so light and dark follow. Boxes on `--surface` with a `--line` border and radius 10; pgcast's own step on `--accent-soft` with an `--accent` border; labels 12px 600 `--muted`; code in the mono face, 13px; a parameter and its value in `--p`, bold, as in the cast panel; arrows 1.5px `--muted`.
+- **Drawn top to bottom at 400 units wide**, shown at its size and narrower on a phone (`max-width: 100%`): about 90 % at 390px, where a column leaves 358px.
+- **Accessible**: `role="img"`, `aria-labelledby` its `<title>` and `<desc>`, which say what the diagram shows; the shapes `aria-hidden`. Every fact it shows, the page's text says too.
 - **Pager**: two bordered links, Previous and Next, the border turning `--accent` on hover.
 - **Edit row**: a top rule; "Edit this page on GitHub" on the left; on the right "Last updated: 13 November 2026", the date of the page's last commit, 13px, `--muted`.
 - **Search**: VitePress's local search, a dialog; arrows and Enter, Escape closes; each result gives its page.
