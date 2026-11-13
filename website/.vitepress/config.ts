@@ -23,6 +23,7 @@ export default defineConfig({
   base: '/',  // GitHub Pages, at the domain's root: https://pgcast.dev/
   cleanUrls: true,
   sitemap: { hostname: 'https://pgcast.dev' },  // sitemap.xml, named by public/robots.txt
+  lastUpdated: true,  // from git, so docs.yml and ci.yml check out the whole history; sitemap.xml's `lastmod` too
   transformPageData: describePage,  // meta.ts
   transformHead: pageHead,
   srcExclude: ['README.md', 'templates/**'],  // for whoever writes the site, not pages of it
@@ -82,6 +83,7 @@ export default defineConfig({
     },
     editLink: { pattern: `${repo}/edit/master/website/:path`, text: 'Edit this page on GitHub' },
     docFooter: { prev: 'Previous', next: 'Next' },
+    lastUpdated: { text: 'Last updated', formatOptions: { dateStyle: 'long', forceLocale: true } },  // 13 November 2026
     outline: { level: 2, label: 'On this page' },
     darkModeSwitchLabel: 'Colour theme',
   },
