@@ -241,8 +241,7 @@ onBeforeUnmount(() => { stop(); latest++; disposables.forEach(disposable => disp
       <div aria-live="polite">
         <p class="label">
           <em>SQL</em>Postgres runs
-          <button type="button" class="Playground-run" aria-keyshortcuts="Control+Enter Meta+Enter"
-            @click="runOnPostgres()">Run</button>
+          <button type="button" class="Playground-run" @click="runOnPostgres()">Run</button>
         </p>
         <template v-for="(query, i) in queries" :key="i">
           <div v-html="query.html" />
