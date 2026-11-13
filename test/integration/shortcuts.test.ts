@@ -753,10 +753,34 @@ describe('selectOne, selectExactlyOne', () => {
     expect((err as db.NotExactlyOneError).query.compile()).toEqual(q.compile());
   });
 
-  it('characterization: selectExactlyOne does not check for a second row', async () => {
-    // characterization: LIMIT 1 hides the second row, so "exactly one" means "at least one"
+  it('selectExactlyOne does not check for a second row, without selectExactlyOneChecksForSecondRow', async () => {
+    // LIMIT 1 hides the second row, so "exactly one" means "at least one", as in Zapatos 6.6.1
     expect(await run(db.selectExactlyOne('users', { manager_id: 1 }, { columns: ['id'], order: { by: 'id', direction: 'ASC' } })))
       .toEqual({ id: 2 });
+  });
+
+  it('selectExactlyOne throws a NotExactlyOneError on a second row, with selectExactlyOneChecksForSecondRow', async () => {
+    db.setConfig({ selectExactlyOneChecksForSecondRow: true });
+    const q = db.selectExactlyOne('users', { manager_id: 1 }, { columns: ['id'] });
+    const err = await q.run(t.client).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(db.NotExactlyOneError);
+    expect((err as db.NotExactlyOneError).message).toBe('One result expected but more returned (hint: check `.query.compile()` on this Error)');
+    expect((err as db.NotExactlyOneError).query).toBe(q);
+  });
+
+  it('selectExactlyOne gives its one row, or throws on none, with selectExactlyOneChecksForSecondRow', async () => {
+    db.setConfig({ selectExactlyOneChecksForSecondRow: true });
+    expect(await run(db.selectExactlyOne('users', { id: 3 }, { columns: ['display_name'] }))).toEqual({ display_name: 'Cyd' });
+    const err = await db.selectExactlyOne('users', { id: -1 }).run(t.client).catch((e: unknown) => e);
+    expect((err as db.NotExactlyOneError).message).toBe('One result expected but none returned (hint: check `.query.compile()` on this Error)');
+  });
+
+  it('in a lateral, selectExactlyOne keeps LIMIT 1, so the parent row comes once, with selectExactlyOneChecksForSecondRow', async () => {
+    db.setConfig({ selectExactlyOneChecksForSecondRow: true });
+    expect(await run(db.select('users', { id: 1 }, {
+      columns: ['id'],
+      lateral: { report: db.selectExactlyOne('users', { manager_id: parent('id') }, { alias: 'r', columns: ['id'], order: { by: 'id', direction: 'ASC' } }) },
+    }))).toEqual([{ id: 1, report: { id: 2 } }]);
   });
 });
 

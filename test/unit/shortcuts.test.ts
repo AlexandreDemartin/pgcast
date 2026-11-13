@@ -1219,6 +1219,54 @@ describe('selectOne, selectExactlyOne', () => {
   it('characterization: the limit option is overridden', () => {
     expect(db.selectOne('users', all, { limit: 5 }).compile().values).toEqual([1]);
   });
+
+  it('selectExactlyOneChecksForSecondRow: LIMIT 2 when compiled on its own', () => {
+    db.setConfig({ selectExactlyOneChecksForSecondRow: true });
+    expect(db.selectExactlyOne('users', { id: 1 }).compile()).toEqual({
+      text: 'SELECT to_jsonb("users".*) AS result FROM "users" WHERE ("id" = $1) LIMIT $2',
+      values: [1, 2],
+    });
+    expect(db.selectExactlyOne('users', { id: 1 }).prepared('one_user').compile()).toEqual({
+      text: 'SELECT to_jsonb("users".*) AS result FROM "users" WHERE ("id" = $1) LIMIT $2',
+      values: [1, 2],
+      name: 'one_user',
+    });
+    // selectOne is unchanged
+    expect(db.selectOne('users', { id: 1 }).compile().values).toEqual([1, 1]);
+  });
+
+  it('selectExactlyOneChecksForSecondRow: LIMIT 2 keeps the no-op marker', () => {
+    db.setConfig({ selectExactlyOneChecksForSecondRow: true });
+    const q = db.selectExactlyOne('users', { id: 1 });
+    q.noop = true;
+    expect(q.compile()).toEqual({
+      text: `/* marked no-op: won't hit DB unless forced -> */ SELECT to_jsonb("users".*) AS result FROM "users" WHERE ("id" = $1) LIMIT $2`,
+      values: [1, 2],
+    });
+  });
+
+  it('selectExactlyOneChecksForSecondRow: LIMIT 1 when nested, in a lateral or sql', () => {
+    db.setConfig({ selectExactlyOneChecksForSecondRow: true });
+    const manager = db.selectExactlyOne('users', { id: parent('manager_id') }, { alias: 'm' });
+    expect(db.select('users', all, { columns: ['id'], lateral: { manager } }).compile()).toEqual({
+      text: `SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT jsonb_build_object($1::text, "id") || jsonb_build_object($2::text, "lateral_manager".result) AS result FROM "users" LEFT JOIN LATERAL (SELECT to_jsonb("m".*) AS result FROM "users" AS "m" WHERE ("id" = "users"."manager_id") LIMIT $3) AS "lateral_manager" ON true) AS "sq_users"`,
+      values: ['id', 'manager', 1],
+    });
+    expect(db.selectOne('users', all, { lateral: manager }).compile().values).toEqual([1, 1]);
+    expect(db.sql`SELECT (${db.selectExactlyOne('users', { id: 1 })})`.compile()).toEqual({
+      text: 'SELECT (SELECT to_jsonb("users".*) AS result FROM "users" WHERE ("id" = $1) LIMIT $2)',
+      values: [1, 1],
+    });
+  });
+
+  it('without selectExactlyOneChecksForSecondRow: LIMIT 1, as in 6.6.1', () => {
+    db.setConfig({ selectExactlyOneChecksForSecondRow: false });
+    const q = db.selectExactlyOne('users', { id: 1 });
+    expect(q.compile().values).toEqual([1, 1]);
+    // read when selectExactlyOne() is called, not when the query is compiled
+    db.setConfig({ selectExactlyOneChecksForSecondRow: true });
+    expect(q.compile().values).toEqual([1, 1]);
+  });
 });
 
 describe('count, sum, avg, min, max', () => {
