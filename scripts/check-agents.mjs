@@ -8,18 +8,20 @@ const skillsDirectory = '.agents/skills';
 const agentsDirectory = '.claude/agents';
 const userLevelSkills = new Set(['branch-review']);  // lives in the user's ~/.claude, not in this repository
 const maxDescriptionLength = 350;
-const maxLines = 150;  // hard limit of a skill or an agent (.agents/README.md § Writing a skill); the budget is ~100
+const maxLines = 150;  // hard limits of a skill or an agent (.agents/README.md § Writing a skill); the budget is ~100 lines
+const maxWords = 1800;  // and ~1,200 words
 
 const errors = [];
 const sizes = [];
 
-/** Lines and words as `wc -l` and `wc -w` count them; fails a skill or an agent above `maxLines`. */
+/** Lines and words as `wc -l` and `wc -w` count them; fails a skill or an agent above `maxLines` or `maxWords`. */
 function measure(path, limited) {
   const text = readFileSync(path, 'utf8');
   const lines = text.split('\n').length - (text.endsWith('\n') ? 1 : 0);
   const words = text.split(/\s+/).filter(Boolean).length;
   sizes.push({path, lines, words});
   if (limited && lines > maxLines) errors.push(`${path}: ${lines} lines, max ${maxLines}`);
+  if (limited && words > maxWords) errors.push(`${path}: ${words} words, max ${maxWords}`);
 }
 
 function frontmatterOf(path) {

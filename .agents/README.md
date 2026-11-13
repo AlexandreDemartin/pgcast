@@ -50,7 +50,7 @@ description: 'What the skill does. USE FOR: … DO NOT USE FOR: …'
 ---
 ```
 
-- **One subject per skill**, read in full when it triggers: ~100 lines and ~1,200 words, 150 lines at most (`check:agents`); an agent too.
+- **One subject per skill**, read in full when it triggers: ~100 lines and ~1,200 words, 150 lines and 1,800 words at most (`check:agents`); an agent too.
 - **Only what the agent does not know**: pgcast's own choices, never a course on Postgres or TypeScript.
 - **One rule, one skill**: elsewhere, refer to it by name ("skill `sql-safety`").
 - **One default path**, the exception named; the why in one line.
@@ -70,7 +70,7 @@ Ritual of a step: skill `run-step`; on one page for a human: [docs/WORKFLOW.md](
 ## Method checks
 
 - `guard.mjs` refuses before execution what has no exception: `push --force`, `rebase`, `--amend`, npm publication or release, writes to generated files (`db.mjs`, `generate.mjs`, `dist/`) or to a `.env`.
-- `npm run check:agents` (`scripts/check-agents.mjs`, in CI): frontmatter of skills and agents, description length, the size of each (a skill or an agent over 150 lines fails), cited skills that exist, the hook's tests.
+- `npm run check:agents` (`scripts/check-agents.mjs`, in CI): frontmatter of skills and agents, description length, the size of each (a skill or an agent over 150 lines or 1,800 words fails), cited skills that exist, the hook's tests.
 
 ## Self-improvement
 

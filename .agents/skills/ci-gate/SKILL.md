@@ -34,6 +34,7 @@ We validate locally while iterating; CI runs **once ready**.
 ## Pitfalls
 
 - **Forgotten draft**: no checks; `gh pr ready` before waiting.
+- **Proofs on a draft**: **CI passed** is green with every job skipped; they are local only.
 - **`[skip ci]` on the last commit**: no check, the merge is blocked; push a commit without it.
 - **A job added to `ci.yml`**: add it to the `needs` of **CI passed**, otherwise its failure does not block the merge.
 

@@ -13,8 +13,10 @@ You build a pgcast branch, or you fix the blocking items found in it. The reposi
 
 ## Where to work
 
-- In the main checkout, on the step's branch; a worktree only if the orchestrator asks. It then needs `src/.env` copied from the main checkout (ignored by git), then `npm ci`.
-- Test database: `TEST_DATABASE_URL` from `src/.env`. The tests create and drop their own databases; never touch the server's other databases.
+- In the main checkout, on the step's branch; a worktree only if the orchestrator asks (skill `run-step` § Ritual rules). It then needs `src/.env` copied or linked from the main checkout (ignored by git), then `npm ci`.
+- Test database: `TEST_DATABASE_URL` from `src/.env`, never printed: test it as a boolean (auto mode refuses a command that could print it). The tests create and drop their own databases; never touch the server's other databases.
+- A probe database is named `pgcast_test_${process.pid}_<agent>_<tag>` by its own script: any `npm test` drops a `pgcast_test_*` whose pid is gone, and two agents with one name share rows.
+- Scratch files go in the folder the brief names, never in `test/` or the checkout.
 
 ## Build
 
@@ -34,13 +36,15 @@ Explore, plan, code, commit.
 - `npm run lint && npm run typecheck && npm test && npm run test:types && npm run build`.
 - Plus the commands its **Done when** names (`bench:types`, `check:agents`…).
 - Risk `low`: reread your diff before the PR.
+- A red suite while other worktrees run theirs is rerun once before it counts (#170: 2 failures in 50 s, then green in 15 s).
 
 ## Git
 
 - Branch `<type>/<issue>-<slug>` (skill `pr-shape` § Branch) from an up-to-date `master`: `git fetch && git switch -c <branch> origin/master`.
 - Layer of a stack, only if the orchestrator asks (skill `pr-shape` § Stacking): the branch starts from the layer below (`git switch -c <branch> origin/<branch below>`), and a fix from below goes up by `git merge`, never by rebase.
 - Small, atomic commits (skill `pr-shape` § Commits); each ends with the requested `Co-Authored-By` line.
-- Normal push; never `--amend`, `rebase` nor `--force` (`guard.mjs`).
+- Normal push; never `--amend`, `rebase` nor `--force` (`guard.mjs`). To retry, run `git push` alone again, then compare `git rev-parse HEAD` with `git ls-remote origin <branch>`: a loop or a pipe hides the exit code, and in a worktree the sandbox refuses compound `git` commands.
+- Another revision is read with `git show "<ref>:<path>"` or a detached worktree; never `git checkout <ref>`, `git stash` or `git checkout -- <file>` in your checkout, which move `HEAD` or drop uncommitted edits.
 
 ## The PR
 
@@ -56,7 +60,8 @@ After the merge: skill `merge-gate` § Clean up (`git branch -D` once merged).
 
 ## Known pitfalls
 
-`AGENTS.md` § Local environment (npm 10 and `npm install`); the lib's `tsc` uses the dummy schema `src/typings/zapatos/schema.ts`, the tests the fixture's generated schema (skill `type-tests`).
+- `AGENTS.md` § Local environment (npm 10 and `npm install`); the lib's `tsc` uses the dummy schema `src/typings/zapatos/schema.ts`, the tests the fixture's generated schema (skill `type-tests`).
+- The shell is zsh: quote `"${ref}:path"` (`:s` is a history modifier) and `'==='`; `$pipestatus`, not `PIPESTATUS`; macOS has no `timeout`.
 
 ## Report
 
