@@ -49,7 +49,8 @@ export interface QueryConfig { text: string; values?: unknown[] }
 /**
  * A `pg.Pool` of one connection, as `new pg.Pool({ max: 1 })`: PGlite "only has a single exclusive connection".
  * `connect()` waits for the client before it to be released, and a query on the pool for the client in use; every
- * query goes to `send`.
+ * query goes to `send`. The client has `_connected`, as a `pg.Client`: zapatos/db tells a client from a pool by it
+ * (pg.ts), and would check a client out of it.
  */
 export function poolOf(send: (query: QueryConfig) => Promise<Results>) {
   let free = Promise.resolve();
@@ -70,7 +71,7 @@ export function poolOf(send: (query: QueryConfig) => Promise<Results>) {
       }
     },
     async connect() {
-      return { query: send, release: await take() };
+      return { query: send, release: await take(), _connected: true };
     },
   };
 }

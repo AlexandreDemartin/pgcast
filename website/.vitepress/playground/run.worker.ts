@@ -46,8 +46,8 @@ const
     return query;
   },
   recorded = async (config: QueryConfig) => (record(config), { rows: [], rowCount: 0 }),
-  // a transaction checks out a client (`connect()`) and gives it back (`release()`)
-  recording = { query: recorded, connect: async () => ({ query: recorded, release() {} }) };
+  // a transaction checks out a client (`connect()`) and gives it back (`release()`); `_connected`: pglite.ts's `poolOf`
+  recording = { query: recorded, connect: async () => ({ query: recorded, release() {}, _connected: true }) };
 
 /** Postgres on the docs schema, as a pool whose every query is recorded with Postgres's answer. */
 async function postgres() {
