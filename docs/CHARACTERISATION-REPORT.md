@@ -132,7 +132,7 @@ The three that matter most:
 
 | # | Area | Finding | Test that pins it | Compat | Proposal | Title of the fix PR |
 |---|---|---|---|---|---|---|
-| R58 | `core.ts` | Interpolating `null` throws a `TypeError` instead of the "Alien object" error; `parent()` with no column outside a `Whereable` writes `"t".` before throwing on `undefined`. | `unit/core › null reaches the Whereable branch and throws a TypeError` ; `unit/core › parent() with no column and no current column` | non-breaking: the call already fails | fix: an error that says what to do | Give a helpful error on interpolating null or a column-less parent() |
+| R58 | `core.ts` | Interpolating `null` throws a `TypeError` instead of the "Alien object" error; `parent()` with no column outside a `Whereable` writes `"t".` before throwing on `undefined`. | `unit/core › refuses null with an Error that says what to give instead` ; `unit/core › refuses parent() with no column and no current column, saying to name the column` | non-breaking: the call already fails | **fixed**, PR #338 | Give a helpful error on interpolating null or a column-less parent() |
 | R59 | `shortcuts.ts` | `selectOne` overrides the `limit` option. | `unit/shortcuts › the limit option is overridden` | breaking | document | — |
 | R60 | `core.ts` | `param(x, true)` acts only on an array or a plain object: a scalar gets neither a cast nor `JSON.stringify`. | `unit/core › with true, a scalar or a non-plain object is neither stringified nor cast` | breaking | document | — |
 | R61 | `core.ts` | `queryListener` and `resultListener` are also called for a no-op. | `integration/core › queryListener and resultListener see every run, no-ops included` | breaking | document | — |
