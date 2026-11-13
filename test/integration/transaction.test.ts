@@ -297,7 +297,7 @@ describe('transaction', () => {
 
 // #246: setConfig() accepts undefined for any key (Partial<Config>); a key with a default then reads as
 // that default, and transaction() releases the client it checked out from the pool on every path
-describe('a config key set to undefined', () => {
+describe('the config transaction() reads', () => {
   /**
    * Runs fn, and counts the pool's clients it left checked out. A leaked client still has _zapatos:
    * it is released here, so that the file's pool can end (pool.end() waits for checked-out clients).
@@ -343,6 +343,15 @@ describe('a config key set to undefined', () => {
     expect(leaked).toBe(0);
     expect((error as Error).message).toBe('boom');
     expect(await notes()).toEqual([]);
+  });
+
+  it('releases its client when reading the config throws', async () => {
+    // a getter that throws, read by getConfig() when transaction() reads its config
+    class Delay { get minMs(): number { throw new Error('no delay'); } get maxMs() { return 0; } }
+    expect(() => db.setConfig({ transactionRetryDelay: new Delay() })).toThrow('no delay');  // stored, then its copy throws
+    const { error, leaked } = await leakCheck(() => db.readCommitted(t.pool, async () => 'never'));
+    expect(leaked).toBe(0);
+    expect((error as Error).message).toBe('no delay');
   });
 
   it('reads an undefined transactionAttemptsMax as its default', async () => {
