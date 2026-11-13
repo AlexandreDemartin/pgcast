@@ -831,6 +831,7 @@ describe('errors', () => {
 
   it('refuses parent outside a nested query', () => {
     expect(() => one(parent('id'))).toThrowErrorMatchingInlineSnapshot(`[Error: The 'parent' table alias has no meaning here]`);
+    expect(() => one(parent())).toThrow("The 'parent' table alias has no meaning here");
   });
 
   it('refuses parent in vals of an array outside a nested query, in a filter or not', () => {
