@@ -3,8 +3,9 @@
 // The playground's editor (decision 005), on a computer, imported by Playground.vue alone: Monaco with TypeScript only,
 // against the declarations of playground.data.ts. On each edit, the TypeScript worker emits the JavaScript, which
 // playground/run.worker.ts runs against a pool that records each query; the panel shows their SQL and values, then
-// the type of the code's first `const`, as a cast panel does (panel.ts). Run, a click or Ctrl+Enter, and never on its
-// own, runs it on Postgres in the worker: the panel shows what Postgres answers each query.
+// the type of the code's first `const`, as a cast panel does, or of the one a comment names (panel.ts). Run, a click
+// or Ctrl+Enter, and never on its own, runs it on Postgres in the worker: the panel shows what Postgres answers each
+// query.
 // A link's code (`shared`, from Playground.vue) opens with its type and no SQL: it runs only on Run, or once edited.
 // Share puts the code in the URL's fragment (playground/share.ts) and copies the link.
 import * as monaco from 'monaco-editor/editor/editor.api';
@@ -20,7 +21,7 @@ import TypeScriptWorker from 'monaco-editor/language/typescript/ts.worker?worker
 import monacoStyle from '../../node_modules/monaco-editor/min/vs/editor/editor.main.css?inline';
 import { onBeforeUnmount, onMounted, shallowRef, useTemplateRef } from 'vue';
 import { data as casts } from '../cast.data.ts';
-import { hoverType, shown, typeShown } from '../panel.ts';
+import { hoverType, shown, typedConst, typeShown } from '../panel.ts';
 import { data } from '../playground.data.ts';
 import { jsonHtml, sqlHtml, typeHtml } from '../playground/highlight.ts';
 import type { Code, Message, Query, Run } from '../playground/run.worker.ts';
@@ -159,7 +160,7 @@ async function typescript() {
 async function update(code: string, types: monaco.editor.ITextModel, postgres = false, runs = true) {
   const
     version = ++latest,
-    name = /^const (\w+) =/m.exec(code)?.[1],  // as cast.data.ts
+    name = typedConst(code),
     uri = editor!.getModel()!.uri,
     client = await (await typescript())(uri, types.uri),
     hover = async (at: monaco.Uri, offset: number) => hoverType((await client.getQuickInfoAtPosition(at.toString(), offset))

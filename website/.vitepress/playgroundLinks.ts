@@ -6,6 +6,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { deflateRawSync } from 'node:zlib';
 import type { MarkdownRenderer, SiteConfig } from 'vitepress';
+import { typedConst } from './panel.ts';
 import { codeOf } from './playground/share.ts';
 
 /** The pages whose cast panels have no link: the home, which stays as it is (#313), and the playground's own. */
@@ -14,7 +15,7 @@ export const unlinked = new Set(['index.md', 'playground.md']);
 const
   cut = '// ---cut---\n',
   pool = 'declare const pool: pg.Pool;',
-  firstConst = /^const (\w+) =/m,  // the `const` a panel gives the type of (cast.data.ts), and the playground too
+  firstConst = /^const (\w+) =/m,  // the `const` a panel gives the type of (cast.data.ts)
   examples = new URL('../examples/', import.meta.url);
 
 /**
@@ -32,10 +33,11 @@ export function playgroundCode(source: string) {
 
 /**
  * Whether the playground shows an example as its panel does: it gives the type of its code's first `const`, and an
- * example that runs a query above its cut (a page of rows to start from) has another `const` first.
+ * example that runs a query above its cut (a page of rows to start from) has another `const` first, unless it names
+ * the next one (`typedConst`).
  */
 export function opensAsShown(source: string) {
-  return firstConst.exec(playgroundCode(source))?.[1] === firstConst.exec(source.split(cut)[1] ?? '')?.[1];
+  return typedConst(playgroundCode(source)) === firstConst.exec(source.split(cut)[1] ?? '')?.[1];
 }
 
 /**
