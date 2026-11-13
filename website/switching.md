@@ -5,11 +5,9 @@ Move a project from Zapatos 6.6.1 to pgcast: change one line of `package.json`, 
 
 <AtAGlance>
 
-- One line of `package.json` swaps the package; your imports, your config and the generated files stay as they are.
-- `tsc` refuses `db.raw()`, `db.cols()` and `db.vals()` as a filter value: compare with a `sql` fragment instead.
-- A few calls now give other rows, or throw: [step 4](#find-the-calls-whose-result-changes) lists them, and what to do about each.
-- What code may rely on is kept, with a warning; three opt-ins turn on what 7.0 will do.
-- Going back is one command, and opens the holes pgcast closed again.
+- One line of `package.json` swaps the package; imports, config and generated files stay as they are.
+- A few calls give other rows, or throw: [step 4](#find-the-calls-whose-result-changes) lists them, with what to do.
+- What code may rely on is kept, with a warning, until you turn on its opt-in.
 
 </AtAGlance>
 
@@ -24,13 +22,7 @@ Move a project from Zapatos 6.6.1 to pgcast: change one line of `package.json`, 
 ## 1. Swap the package {#swap-the-package}
 
 ::: info Not on npm yet
-pgcast hasn't had its first release, so this command will work once it has. To try the switch today:
-
-1. In a clone of the repository, run `npm ci`, then `npm pack`.
-2. Copy the archive it writes into your project.
-3. `npm install zapatos@file:pgcast-<version>.tgz` installs it under the same alias.
-
-The [README](https://github.com/AlexandreDemartin/pgcast#readme) says where things stand.
+pgcast hasn't had its first release, so this command will work once it has. To try the switch today, run `npm ci` then `npm pack` in a clone of the repository, copy the archive it writes into your project, and `npm install zapatos@file:pgcast-<version>.tgz` installs it under the same alias. The [README](https://github.com/AlexandreDemartin/pgcast#readme) says where things stand.
 :::
 
 Install pgcast under the name Zapatos had:
@@ -60,8 +52,7 @@ npx tsc
 
 pgcast's types refuse a few calls that Zapatos 6.6.1's took. The one you may meet: `db.raw()`, `db.cols()` or `db.vals()` as the value of a filter or a condition.
 
-- Zapatos 6.6.1 took it as a `Parameter`, and sent it as JSON, `{"value":"initcap('the salt orchard')"}`, so it matched no film.
-- pgcast refuses it (2322, with `strict` on or off):
+Zapatos 6.6.1 took it as a `Parameter`, and sent it as JSON, `{"value":"initcap('the salt orchard')"}`, so it matched no film. pgcast refuses it (2322, with `strict` on or off):
 
 ```ts twoslash
 // @errors: 2322
@@ -89,17 +80,9 @@ To compare with SQL, give a `sql` fragment as the value, `db.self` for the colum
 
 ## 4. Find the calls whose result changes {#find-the-calls-whose-result-changes}
 
-pgcast fixes, with no option to turn on, what no code could rely on in Zapatos 6.6.1:
+pgcast fixes, with no option to turn on, what no code could rely on in Zapatos 6.6.1: a call that Postgres or the type refused, that did the opposite of its name, or that let a string splice SQL. A few such calls did run, and now give other rows, or throw.
 
-- a call that Postgres or the type refused;
-- a call that did the opposite of its name;
-- a call that let a string splice SQL.
-
-A few such calls did run, and now give other rows, or throw. Look through your code for the first column of each table below.
-
-::: tip Before you switch
-Each change in What to do gives the same result under Zapatos 6.6.1, so you can make it before you switch; only the `jsonb` one finds its rows under pgcast alone.
-:::
+Look through your code for the first column of each table below. Each change in What to do gives the same result under Zapatos 6.6.1, so you can make it before you switch; only the `jsonb` one finds its rows under pgcast alone.
 
 ### Conditions
 
@@ -225,21 +208,14 @@ All three will be the default in 7.0 ([Versions, opt-ins and warnings](/versions
 
 </CastPanel>
 
-| Option | With it on |
-|---|---|
-| `undefinedMeansMissing` | `insert()` sends `DEFAULT`<!-- probe: (db.setConfig({ undefinedMeansMissing: true }), db.insert('tags', { film_id: 1000, tag: undefined })) --> for an `undefined` value, and an `update()` with no other key throws "nothing to update: an Updatable needs at least one column"<!-- message --> |
-| `upsertRequiresSameKeys` | the `upsert()` of `PGCAST_DEP001` throws when called, before any query: "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message --> |
-| `transactionRequiresCommit` | a `transaction()` whose `COMMIT` Postgres answers with `ROLLBACK` rejects, without a retry ([`transaction()`, Errors](/transaction#errors)) |
-
-No option warns. To keep it that way, `NODE_OPTIONS=--throw-deprecation npm test` fails the run at the first warning.
-
-### An opt-in with no warning
+- `insert()` sends `DEFAULT`<!-- probe: (db.setConfig({ undefinedMeansMissing: true }), db.insert('tags', { film_id: 1000, tag: undefined })) --> for an `undefined` value, and an `update()` with no other key throws "nothing to update: an Updatable needs at least one column"<!-- message -->.
+- The `upsert()` of `PGCAST_DEP001` throws when called, before any query: "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message -->.
+- A `transaction()` whose `COMMIT` Postgres answers with `ROLLBACK` rejects, without a retry ([`transaction()`, Errors](/transaction#errors)).
+- No option warns. To keep it that way, `NODE_OPTIONS=--throw-deprecation npm test` fails the run at the first warning.
 
 One more opt-in, [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow), has no warning to look for, and stays off in 7.0. With it, a `selectExactlyOne()` run on its own rejects on a second row, not only on none. Turn it on where your tests show no `selectExactlyOne()` matching two rows.
 
-### The generator's opt-in
-
-[`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas) will be the default in 7.0. Its warning is a note from `npx zapatos`, not from your tests: it names each column whose type is an enum of another schema, and that enum, typed until then as `any` or as the enum of the same name in the relation's schema.
+The generator's own opt-in, [`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas), will be the default in 7.0. Its warning is a note from `npx zapatos`, not your tests: it names each column whose type is an enum of another schema, and that enum, typed until then as `any` or as the enum of the same name in the relation's schema.
 
 1. Turn it on in `zapatosconfig.json`.
 2. Delete the `zapatos/custom/` placeholder of a domain over such an enum: the generator never overwrites one, so the domain would keep the placeholder it already has, typed the old way. The new one gets the labels.
@@ -258,8 +234,9 @@ npm install zapatos@6.6.1
 ::: warning Security
 Code written or left as it is against pgcast's fixes gets Zapatos 6.6.1's results back: each row whose What to do is "nothing", the `not()` row and the `jsonb` row.
 
-- `db.deletes('roles', { character: db.conditions.isNotIn([db.param('The ferryman')]) })` deletes 11 roles under pgcast, and all 12 under Zapatos 6.6.1.
-- The holes of [6.6.2's § Security](/changelog#6.6.2-security) are open again: a name, a `lock`, an `aggregate`, a plain value in `updateValues` or a `param()` cast can splice SQL ([The security model](/security)).
+`db.deletes('roles', { character: db.conditions.isNotIn([db.param('The ferryman')]) })` deletes 11 roles under pgcast, and all 12 under Zapatos 6.6.1.
+
+The holes of [6.6.2's § Security](/changelog#6.6.2-security) are open again: a name, a `lock`, an `aggregate`, a plain value in `updateValues` or a `param()` cast can splice SQL ([The security model](/security)).
 :::
 
 ## See also

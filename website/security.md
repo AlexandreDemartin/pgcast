@@ -5,11 +5,9 @@ What keeps a caller's input from changing the SQL pgcast sends, what it can't gu
 
 <AtAGlance>
 
-- A value travels as a parameter, `$1`, beside the SQL text: by the time Postgres reads it, it can only be data.
-- A name is quoted, so it can never close its quotes; a keyword comes from a closed list, checked before any query.
+- Values travel as parameters, beside the SQL text; names are quoted; keywords come from a closed list.
 - `raw()` is the one door from a string to code: give it only your own constants.
 - Valid SQL can still do the wrong thing: a caller's string as a name, an empty filter, an object that is not a filter.
-- Report a flaw privately, from the repository's Security tab.
 
 </AtAGlance>
 
@@ -27,21 +25,11 @@ pgcast never escapes a value, so there is no escaping to get wrong. This is Zapa
 
 </CastPanel>
 
-<div class="stack">
+Written into the text, that title would close its string and match every film: `("title" = 'x' OR 'a' = 'a')`. As `("title" = $1)`<!-- probe: examples/security_values.ts -->, it is a title no film has, and the query returns none.
 
-| That title | Compiles to | Returns |
-|---|---|---|
-| written into the text | `("title" = 'x' OR 'a' = 'a')`: it closes its string | every film |
-| as a parameter | `("title" = $1)`<!-- probe: examples/security_values.ts -->: a title no film has | none |
+The split has a second effect. node-postgres sends a query with values through Postgres's extended protocol, where a query is one statement: `SELECT $1::int; SELECT 2` is refused with "cannot insert multiple commands into a prepared statement" (42601).
 
-</div>
-
-The split has a second effect, on how node-postgres sends a query:
-
-- **With values**, through Postgres's extended protocol, where a query is one statement: `SELECT $1::int; SELECT 2` is refused with "cannot insert multiple commands into a prepared statement" (42601).
-- **With no values, and no `.prepared()` name**, as plain text, where a `;` can start a second statement.
-
-That is why the holes below were at their worst in a query without parameters.
+A query with no values, and no `.prepared()` name, goes as plain text, where a `;` can start a second statement. That is why the holes below were at their worst in a query without parameters.
 
 ## Names are quoted, not parameters
 
@@ -58,40 +46,19 @@ Each string pgcast writes as a name is double-quoted and split on `.`, any `"` i
 
 </CastPanel>
 
-<div class="stack">
+The key stays one name, a column that does not exist (42703). Zapatos 6.6.1 trusted the type here (its docs warned never to override it), and wrote that key as `("title" = "title" OR TRUE OR "title" = $1)`, which returns every film; without parameters, such a name could run a second statement.
 
-| Under | That key | It returns |
-|---|---|---|
-| pgcast | stays one name, a column that does not exist | 42703 |
-| Zapatos 6.6.1, which trusted the type here (its docs warned never to override it) | `("title" = "title" OR TRUE OR "title" = $1)` | every film; without parameters, such a name could run a second statement |
-
-</div>
-
-Where the type helps, and where it doesn't:
-
-- It refuses such a key in an object literal (TS2353).
-- An object built at run time (a `Record<string, string>`, `Object.fromEntries()`, a variable with extra keys) passes the type, as `any` and plain JavaScript do.
-
-Every rule of the quoting, a name already quoted by hand included: [Identifiers](/sql-template#identifiers).
+The type refuses such a key in an object literal (TS2353). An object built at run time (a `Record<string, string>`, `Object.fromEntries()`, a variable with extra keys) passes it, as `any` and plain JavaScript do. Every rule of the quoting, a name already quoted by hand included: [Identifiers](/sql-template#identifiers).
 
 ## Keywords are checked before any query
 
-Some SQL is neither a value nor a name, and pgcast writes it into the text as it is:
+Some SQL is neither a value nor a name: `DESC`, `FOR UPDATE`, `SERIALIZABLE`, `RESTART IDENTITY`, the name of an aggregate. pgcast writes these into the text as they are, so it takes them only from a closed list, or, for an aggregate, only a function name.
 
-| SQL | pgcast takes only |
-|---|---|
-| `DESC`, `FOR UPDATE`, `SERIALIZABLE`, `RESTART IDENTITY` | one of a closed list |
-| the name of an aggregate | a function name |
+The type says which; at run time pgcast checks again and throws before any query, because a cast, an `any` or a JSON body can hand it anything: a `lock` of `{ for: 'UPDATE; DROP TABLE ratings; --' }` throws "Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not '…'"<!-- message -->.
 
-The type says which. At run time pgcast checks again and throws before any query, because a cast, an `any` or a JSON body can hand it anything: a `lock` of `{ for: 'UPDATE; DROP TABLE ratings; --' }` throws "Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not '…'"<!-- message -->.
+Values with no meaning where they stand are refused the same way: `db.Default`, `db.self` or `db.raw()` as a filter value throws while compiling, so `.run()` rejects before anything reaches Postgres. Zapatos 6.6.1 sent them as strings or as JSON: no row matched on a text column, every row under `ne()` and `isNotIn()`, and other types failed.
 
-Values with no meaning where they stand are refused the same way: `db.Default`, `db.self` or `db.raw()` as a filter value throws while compiling, so `.run()` rejects before anything reaches Postgres. Such a value is a bug in the calling code, and a bug should not become a query. Zapatos 6.6.1 sent them as strings or as JSON:
-
-- no row matched on a text column;
-- every row did under `ne()` and `isNotIn()`;
-- other types failed.
-
-Each of these errors, with what throws it: [Errors pgcast throws before any query](/transaction#errors-pgcast-throws-before-any-query). Telling them from Postgres's own: [Handle errors](/handle-errors#fix-the-errors-pgcast-throws).
+Such a value is a bug in the calling code, and a bug should not become a query. Each of these errors, with what throws it: [Errors pgcast throws before any query](/transaction#errors-pgcast-throws-before-any-query). Telling them from Postgres's own: [Handle errors](/handle-errors#fix-the-errors-pgcast-throws).
 
 ## `raw()` is the one door
 
@@ -101,12 +68,7 @@ Each of these errors, with what throws it: [Errors pgcast throws before any quer
 Given a caller's text, `raw()` lets the caller write your query. So it only ever gets your constants, and a caller's choice is mapped to one of them ([Choose SQL at run time from your own constants](/raw-sql#choose-sql-at-run-time-from-your-own-constants)). pgcast can't check what you put there, which is why `SECURITY.md` leaves SQL written in `raw()` out of its scope.
 :::
 
-As a filter value, `raw()` throws:
-
-- Zapatos 6.6.1 sent it there as a parameter by accident, its wrapper as JSON.
-- Compiling it as SQL instead would have turned every `{ title: db.raw(input) }` into an injection.
-
-So it is neither: to compare a column with SQL, write a fragment, where `db.self` stands for the column.
+As a filter value, `raw()` throws. Zapatos 6.6.1 sent it there as a parameter by accident, its wrapper as JSON; compiling it as SQL instead would have turned every `{ title: db.raw(input) }` into an injection. So it is neither: to compare a column with SQL, write a fragment, where `db.self` stands for the column.
 
 ## What changed from Zapatos 6.6.1
 
@@ -127,9 +89,7 @@ The characterisation of Zapatos 6.6.1 found seven ways for a caller's string to 
 
 </div>
 
-- Zapatos 6.6.1 already checked `order.direction` and `order.nulls`.
-- Each hole, what it let through and the test that pins it: the [characterisation report](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/CHARACTERISATION-REPORT.md#security).
-- The SQL before and after: [the changelog](/changelog#6.6.2-security).
+Zapatos 6.6.1 already checked `order.direction` and `order.nulls`. Each hole, what it let through and the test that pins it: the [characterisation report](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/CHARACTERISATION-REPORT.md#security); the SQL before and after: [the changelog](/changelog#6.6.2-security).
 
 ## What pgcast can't guard against
 
@@ -139,16 +99,10 @@ pgcast keeps a caller's input from becoming code; it can't tell whether the SQL 
 
 Quoted, a name is still the one the caller chose:
 
-| The caller's string, as | Can be |
-|---|---|
-| a table name, `'schema.table'` included | any relation the role can read: given `'pg_catalog.pg_roles'`, `select()` lists the database's roles |
-| a column name | any column in scope, a system column such as `xmin` included, or none (42703) |
+- As a table name, `'schema.table'` included, it is any relation the role can read: given `'pg_catalog.pg_roles'`, `select()` lists the database's roles.
+- As a column name, it is any column in scope, a system column such as `xmin` included, or none (42703). `` ${'title'} = ${title} ``, with `title` typed `any` and set to `'title'`, compiles to `"title" = "title"`<!-- probe: db.sql`${'title'} = ${'title'}` -->, true for every film.
 
-`` ${'title'} = ${title} ``, with `title` typed `any` and set to `'title'`, compiles to `"title" = "title"`<!-- probe: db.sql`${'title'} = ${'title'}` -->, true for every film.
-
-::: warning Security
 Map a caller's choice to a name from your own list, and remember that the keys of a request's body, given as a filter, are names too.
-:::
 
 ### An empty filter
 
@@ -166,28 +120,17 @@ In `deletes()` or `update()`, an empty filter is every row: `removeRatings()` de
 
 ### An object that is not a filter
 
-An interpolated object that is not one of pgcast's values compiles as a filter of its own enumerable keys:
+An interpolated object that is not one of pgcast's values compiles as a filter of its own enumerable keys: a class instance gives its fields, and `TRUE` when it has none.
 
-| The object | Compiles to |
-|---|---|
-| a class instance | its fields; `TRUE` when it has none |
-| a built-in object of the realm that runs pgcast (`Date`, `Map`, `Promise`, a typed array, …) | nothing: it throws before any query |
-| a built-in object of another realm, such as a `vm` context | its own enumerable keys, like any other object |
-
-In Zapatos 6.6.1, `` db.sql`DELETE FROM ${'ratings'} WHERE ${when}` ``, with `when` a `Date` typed `any`, compiled to `DELETE FROM "ratings" WHERE TRUE` ([Whereable objects](/sql-template#whereable)). Pass a date as `db.param(when)`.
+A built-in object of the realm that runs pgcast (`Date`, `Map`, `Promise`, a typed array, …) throws before any query; one from another realm, such as a `vm` context, does not. In Zapatos 6.6.1, `` db.sql`DELETE FROM ${'ratings'} WHERE ${when}` ``, with `when` a `Date` typed `any`, compiled to `DELETE FROM "ratings" WHERE TRUE` ([Whereable objects](/sql-template#whereable)). Pass a date as `db.param(when)`.
 
 ## Report a flaw
 
-If you think you have found a flaw in pgcast (the SQL it compiles from a caller's input, or the code the generator writes), please report it privately, never in a public issue:
+If you think you have found a flaw in pgcast (the SQL it compiles from a caller's input, or the code the generator writes), please report it privately: [report a vulnerability](https://github.com/AlexandreDemartin/pgcast/security/advisories/new) from the repository's Security tab, never in a public issue.
 
-1. [Report a vulnerability](https://github.com/AlexandreDemartin/pgcast/security/advisories/new) from the repository's Security tab.
-2. Give the call, the SQL its `.compile()` gives, and what an attacker controls. A flaw pgcast shares with Zapatos is reported here too.
+Give the call, the SQL its `.compile()` gives, and what an attacker controls; a flaw pgcast shares with Zapatos is reported here too.
 
-What happens next:
-
-- You'll hear back within a week.
-- The fix ships in a patch release, with a GitHub security advisory and its CVE, published on a date agreed with you.
-- Credit in the advisory and in the CHANGELOG, unless you'd rather not be named.
+You'll hear back within a week. The fix ships in a patch release, with a GitHub security advisory and its CVE, published on a date agreed with you, and credit in it and in the CHANGELOG unless you'd rather not be named.
 
 What is in scope, and which versions are supported: [SECURITY.md](https://github.com/AlexandreDemartin/pgcast/blob/master/SECURITY.md).
 
