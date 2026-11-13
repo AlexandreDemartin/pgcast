@@ -52,7 +52,7 @@ Insert one row or several, and return them as Postgres stored them, defaults and
 | `returning: ['id']` | `jsonb_build_object($5::text, "id")`<!-- probe: examples/insert_returning.ts --> in place of `to_jsonb("films".*)` | `Pick<films.JSONSelectable, 'id'>` |
 | `extras: { name: 'title', shouted: … }`, as above | `\|\| jsonb_build_object($6::text, "title", $7::text, upper("title"))`<!-- probe: examples/insert_returning.ts --> | adds `name`, of the column's type, and `shouted`, of the fragment's `RunResult`: `string`, from `db.sql<s.films.SQL, string>` |
 
-- A `readonly` array in `returning` (`['id'] as const`) sends the same SQL, but the result type is `never` for now ([#41](https://github.com/AlexandreDemartin/pgcast/issues/41)): write the array without `as const`.
+- A `readonly` array in `returning` (`['id'] as const`) gives the same SQL and the same type as a mutable one ([`columns`](/select#columns)).
 - Both need `strictNullChecks` for their types.
 
 ## `upsert()` {#upsert}
@@ -325,5 +325,5 @@ const inserted: NewFilm = { id: 1000, title: 'The Long Take' };
 ```
 
 - Stable: type tests pin it to what `.run()` gives, here for `db.insert('films', film, { returning: ['id', 'title'] })`.
-- `C` as a `readonly` tuple gives `never`, as for `returning` ([Options](#insert-options)).
+- `C` may be a `readonly` tuple, as `returning` may ([Options](#insert-options)).
 - It needs `strictNullChecks`: without it, it is the whole `JSONSelectable`, whatever `C` and `E`.
