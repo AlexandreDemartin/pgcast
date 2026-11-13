@@ -15,16 +15,16 @@ if (!cast) throw new Error(`<CastPanel example="${props.example}">: there is no 
   <div class="CastPanel-frame">
     <div class="CastPanel" role="group" aria-label="What you write, what Postgres runs, what TypeScript knows">
       <div>
-        <h5><em>TS</em>You write</h5>
+        <p class="label"><em>TS</em>You write</p>
         <slot />
       </div>
       <div>
-        <h5><em>SQL</em>Postgres runs</h5>
+        <p class="label"><em>SQL</em>Postgres runs</p>
         <div v-html="cast.sql" />
         <p class="values">values <b>{{ cast.values }}</b></p>
       </div>
       <div>
-        <h5><em>::</em>TypeScript knows</h5>
+        <p class="label"><em>::</em>TypeScript knows</p>
         <div v-html="cast.type" />
       </div>
     </div>
