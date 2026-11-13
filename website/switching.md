@@ -231,7 +231,7 @@ The note of [`enumOrder`](/generator#generate.enumOrder) names each enum whose l
 npm install zapatos@6.6.1
 ```
 
-- First, remove the three options from `setConfig()`: Zapatos 6.6.1's `Config` doesn't have them (2353).
+- First, remove from `setConfig()` the options Zapatos 6.6.1's `Config` doesn't have (2353): `upsertRequiresSameKeys`, `undefinedMeansMissing`, `transactionRequiresCommit` and `selectExactlyOneChecksForSecondRow`.
 - The generated files are the same. Zapatos 6.6.1 ignores `typeEnumsAcrossSchemas` and `enumOrder` in `zapatosconfig.json`, and generates the `any` types and the sorted labels again.
 - Each change of [Find the calls whose result changes](#find-the-calls-whose-result-changes) runs as it did, but the `jsonb` one, which finds nothing again.
 
