@@ -128,6 +128,13 @@ describe('on users', () => {
     }).run(t.client)).toEqual([{ owner_id: 2 }]);
   });
 
+  it('and() parenthesises each operand: a quoted literal split across two', async () => {
+    // 6.6.1 wrote `("display_name" = 'x AND y')` and found user 1; now `(("display_name" = 'x) AND (y'))`
+    await sql`UPDATE ${'users'} SET ${'display_name'} = CASE ${'id'} WHEN 1 THEN 'x AND y' WHEN 2 THEN 'x) AND (y' END
+      WHERE ${'id'} IN (1, 2)`.run(t.client);
+    expect(await ids('users', dc.and(sql`${'display_name'} = 'x`, sql`y'`))).toEqual([2]);
+  });
+
   it('or() matches the same rows whatever its operands: AND binds tighter than OR', async () => {
     expect(await ids('users', dc.or(sql`${'id'} = 1 AND ${'manager_id'} = 1`, sql`${'id'} = 2 OR ${'id'} = 3`))).toEqual([2, 3]);
   });
