@@ -71,6 +71,12 @@ Candidates for a check, a rule or a skill line.
 - #40 — Overloads are not a compat-neutral way to widen a generic export: passed as an argument (`.map`, `apply`, `.then`) the overload set loses generic inference, and a user overload chosen on a function parameter can switch — `builder`
 - #40 — State the contradiction before prototyping: a mock `<T>(a: T[]) => SQLFragment<…, T>` assigned to the new type forces the result to include the element type, which the column refuses; no type can satisfy both — `builder`
 - #40 — Build a PR body from absolute paths and check its fenced blocks once posted: a relative path failing inside `{ … } >` sent a body without its replay — `builder`
+- #41 — A fix turning a `never` result into a real type changes what happens when it is combined: `never` dropped out of a union, now subtype reduction narrows it; probe ternaries, array literals and functions with several `return`s — `branch-reviewer`
+- #41 — A `never` result let types computed from it compile (`keyof`, indexed access, `Record<keyof …>`, conditionals): a grid for such a fix needs type-level probes — `branch-reviewer`
+- #41 — A « write instead » with `'col' in row` is read for its resulting type, not only compiled: on a reduced union it gives `unknown` — `builder`, `branch-reviewer`
+- #41 — A `@ts-expect-error` above `const x: T['k'] = v` also holds when `T` collapses to `never`: put the indexed access where a value goes (`null as unknown as T['k']`) and check the directive is unused on the base — `branch-reviewer`
+- #41 — An `@ts-expect-error` on an `expectTypeOf<X['missing']>()` line hides two errors (TS2339, then TS2349); a `const` line gives one — `builder`
+- #41 — A detached worktree with `node_modules` symlinked shares `node_modules/.cache/pgcast`: `bench:types` there overwrites the branch's emitted declarations — `builder`
 - #42 — A query that reads one fact two ways (`information_schema` for tables, `pg_catalog` for mat views) needs one test per path where the answers differ; a fixture where type and relation share a schema cannot tell them apart: check with a mutant — `branch-reviewer`
 - #42 — A warning that names a file the user has is built from `config.outDir`, as `write.ts` does; only a test with an `outDir` other than `.` catches it — `builder`
 - #42 — A PR body that quotes a message's exact text is checked after every review round — `builder`
@@ -100,3 +106,5 @@ Minor review defects, taken up by the end-of-chapter review.
 - #34 — `docs/CHARACTERISATION-REPORT.md` (R25): the class cell reads plain « non-breaking »; « except a user aggregate overloading a built-in name with another arity, and a refused aggregate marked `noop` », as R28 does — `builder`
 - #36 — `CHANGELOG.md:112`: `'_int4'` failed on 6.6.1 into any array column, not only `int4[]`; « fails wherever it stands » does not hold for a `json`/`jsonb` column — `branch-reviewer`
 - #36 — `test/unit/core.test.ts:290`, `docs/CHARACTERISATION-REPORT.md:89`: the title « an array type sends the array » keeps the wording the PR removed elsewhere — `branch-reviewer`
+- #41 — `test/types/shortcuts.test-d.ts:431`: `const mail: Card['email'] = 'a@b'` holds its directive on master too (`Card` is `never`); `null as unknown as Card['email']` would fail only on the head — `branch-reviewer`
+- #41 — `CHANGELOG.md:133`: `{}` as a `Record<keyof Film, …>` lacks the row's keys, not the column the sentence names — `branch-reviewer`
