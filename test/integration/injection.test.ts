@@ -431,6 +431,20 @@ describe('without parameters (simple protocol)', () => {
     expect(await adaName()).toBe('Ada');
   });
 
+  it('a `"` in the key of vals({…}) given parent() with no column stays in one column name, which does not exist', async () => {
+    // parent() takes its key as the column, as in a Whereable (#259); 6.6.1 sent it as a parameter, '{}'
+    const key = `id")); ${update}; --`;
+    const q = sql`SELECT (SELECT x.a FROM (VALUES (${vals({ [key]: db.parent() })})) AS x(a)) AS n FROM ${'users'}`
+      .copy({ parentTable: 'users' });
+    const { text, values } = q.compile();
+    expect(text).toBe(`SELECT (SELECT x.a FROM (VALUES ("users"."id"")); ${update}; --")) AS x(a)) AS n FROM "users"`);
+    expect(values).toEqual([]);
+    expect(await pgError(t.client, () => q.run(t.client))).toEqual({
+      code: '42703', message: `column users.id")); ${update}; does not exist`,
+    });
+    expect(await adaName()).toBe('Ada');
+  });
+
   it('an alias that closes its quotes stays one alias, in "sq_<alias>" too', async () => {
     // `) AS "sq_u"; UPDATE …; --"`; 6.6.1: a syntax error; since #74: a second statement that ran
     const q = db.select('users', all, { alias: `u"; ${update}; --`, order: { by: 'id', direction: 'ASC' } } as any);

@@ -312,8 +312,39 @@ describe('raw, cols and vals as a write value', () => {
   });
 
   it('the column of parent() in vals({…}), quoted as a Whereable value quotes it', () => {
-    // the same text as { owner_id: parent(v) }: no new interpolated input (#259)
+    // the same text as { owner_id: parent(v) }; with no column, its vals({…}) key reaches the text instead (below, #259)
     expect(matrix(v => sql`SELECT ${vals({ a: db.parent(v) })}`.copy({ parentTable: 'users' }))).toMatchInlineSnapshot(`
+      {
+        "backslash": "SELECT "users"."a\\b"",
+        "comment": "SELECT "users"."a/*b"",
+        "dashes": "SELECT "users"."a--b"",
+        "dollar": "SELECT "users"."a$1b"",
+        "dot": "SELECT "users"."a"."b"",
+        "dquote": "SELECT "users"."a""b"",
+        "escapedCloses": "SELECT "users"."a"" OR TRUE OR ""b"",
+        "escapedDot": "SELECT "users"."a"".""b"",
+        "escapedNul": "SELECT "users"."a""""<NUL>""""b"",
+        "escapedOdd": "SELECT "users"."a""""""b"",
+        "lone": "SELECT "users".""""",
+        "mixedEscaped": "SELECT "users"."s".a$1."b"" OR TRUE OR ""c"",
+        "nul": "SELECT "users"."a<NUL>b"",
+        "prequoted": "SELECT "users"."a"",
+        "prequotedCloses": "SELECT "users"."""a"" OR TRUE OR ""b"""",
+        "prequotedEmpty": "SELECT "users".""""",
+        "prequotedEscaped": "SELECT "users"."a"" OR TRUE OR ""b"",
+        "qualifiedEscaped": "SELECT "users"."s"."a"" OR TRUE OR ""b"",
+        "semicolon": "SELECT "users"."a;b"",
+        "squote": "SELECT "users"."a'b"",
+        "uescape": "SELECT "users"."""s"""."U&""a"" UESCAPE '!' || ""b"""",
+        "unicodeCloses": "SELECT "users"."""s"""."U&""a\\"" OR TRUE OR \\""b"""",
+        "unicodeEscaped": "SELECT "users"."s".U&"a\\0022"" OR TRUE OR ""\\0022b"",
+      }
+    `);
+  });
+
+  it('the key of vals({…}) given parent() with no column, quoted as the key of { [k]: parent() } is', () => {
+    // a new interpolated input: the key reaches the text as the parent column, as a Whereable key does (#259)
+    expect(matrix(v => sql`SELECT ${vals({ [v]: db.parent() })}`.copy({ parentTable: 'users' }))).toMatchInlineSnapshot(`
       {
         "backslash": "SELECT "users"."a\\b"",
         "comment": "SELECT "users"."a/*b"",
