@@ -97,7 +97,8 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 /* and an icon only under 900px, so that GitHub and the theme button stay in the bar down to 768px */
 @media (max-width: 900px) { .VPNavBarSearchButton .text { display: none; } }
 /* one class more than VitePress's scoped `.VPNavMenuLink` and `.VPNavMenuLink.active`, so that these win */
-.VPNavBar .VPNavBarMenuLink.VPNavMenuLink { color: var(--muted); font-size: 14px; font-weight: 400; }
+/* 11px each side, not VitePress's 12: Playground, one letter longer than Changelog, still fits at 960px */
+.VPNavBar .VPNavBarMenuLink.VPNavMenuLink { color: var(--muted); font-size: 14px; font-weight: 400; padding: 0 11px; }
 .VPNavBar .VPNavBarMenuLink.VPNavMenuLink:hover, .VPNavBar .VPNavBarMenuLink.VPNavMenuLink.active { color: var(--fg); }
 .AppearanceSwitch {
   width: 36px; height: 36px; display: grid; place-items: center; flex-shrink: 0;

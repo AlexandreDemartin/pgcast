@@ -82,7 +82,7 @@ export default defineConfig({
         link,
         activeMatch: `^(${[link, ...items.map(item => item.link)].join('|')})$`,
       }]),
-      { text: 'Changelog', link: '/changelog' },
+      { text: 'Playground', link: '/playground' },  // the changelog is in the footer (SiteFooter.vue)
       // no ↗ after the external link, as the prototype
       { text: 'GitHub', link: repo, noIcon: true },
     ],
