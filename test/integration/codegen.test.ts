@@ -387,6 +387,8 @@ describe('typeEnumsAcrossSchemas', () => {
 
   it('is optional in Config, read as false when absent', () => {
     expect(finaliseConfig({}).typeEnumsAcrossSchemas).toBeUndefined();
+    const right: Config = { typeEnumsAcrossSchemas: true };
+    void right;
     // @ts-expect-error a boolean
     const wrong: Config = { typeEnumsAcrossSchemas: 'yes' };
     void wrong;
