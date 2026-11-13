@@ -298,7 +298,7 @@ describe('raw, cols and vals as a write value', () => {
   it('raw(input) as an insert(), upsert() or update() value, or in vals({…}), throws, and is never written into the text', () => {
     // 6.6.1 sent it as JSON, so raw(input) there was a parameter by accident; compiling it as SQL would make
     // it an injection, so it throws before any text is returned (#259)
-    const asValue = 'throws: `db.raw()`, `db.cols()` and `db.vals()` have no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value: to write SQL, use a `sql` fragment value, where `db.self` stands for the column; to write a value, give the value itself, or `db.param()`.';
+    const asValue = 'throws: `db.raw()`, `db.cols()` and `db.vals()` have no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value: to write SQL, use a `sql` fragment value (in `update()`, `db.self` there stands for the column); to write a value, give the value itself, or `db.param()`.';
     const builds = {
       insert: (v: string) => db.insert('users', { email: 'x', display_name: db.raw(v) }),
       insertRows: (v: string) => db.insert('users', [{ email: 'x', display_name: 'X' }, { email: 'y', display_name: db.raw(v) }]),

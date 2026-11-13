@@ -485,7 +485,7 @@ describe('cols and vals', () => {
       () => one({ id: sql`${vals({ a: value })}` }),
     ].map(thrown)))).toMatchInlineSnapshot(`
       Set {
-        "\`db.raw()\`, \`db.cols()\` and \`db.vals()\` have no meaning as a value in \`vals({…})\`, so as an \`insert()\`, \`upsert()\` or \`update()\` value: to write SQL, use a \`sql\` fragment value, where \`db.self\` stands for the column; to write a value, give the value itself, or \`db.param()\`.",
+        "\`db.raw()\`, \`db.cols()\` and \`db.vals()\` have no meaning as a value in \`vals({…})\`, so as an \`insert()\`, \`upsert()\` or \`update()\` value: to write SQL, use a \`sql\` fragment value (in \`update()\`, \`db.self\` there stands for the column); to write a value, give the value itself, or \`db.param()\`.",
       }
     `);
   });

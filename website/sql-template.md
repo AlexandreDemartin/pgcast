@@ -148,7 +148,7 @@ As the value of `eq()`, `add()` and the other [conditions](/conditions):
 
 In [`vals({…})`](#vals), so as an `insert()`, `upsert()` or `update()` value, and in a `sql` template of your own, in a `lateral` or not:
 
-> `` `db.raw()`, `db.cols()` and `db.vals()` have no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value: to write SQL, use a `sql` fragment value, where `db.self` stands for the column; to write a value, give the value itself, or `db.param()`. ``<!-- message -->
+> `` `db.raw()`, `db.cols()` and `db.vals()` have no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value: to write SQL, use a `sql` fragment value (in `update()`, `db.self` there stands for the column); to write a value, give the value itself, or `db.param()`. ``<!-- message -->
 
 The type refuses them there and as an `insert()` or `update()` value, on every column it types (a column typed `any`, as a `zapatos/custom` placeholder is, takes anything); it takes them in `vals({…})` of a `sql` template:
 
