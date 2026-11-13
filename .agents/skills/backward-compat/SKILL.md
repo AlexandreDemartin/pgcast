@@ -5,7 +5,7 @@ description: 'Backward compatibility with Zapatos 6.6.1: what the public API is,
 
 # Staying backward compatible
 
-Promise: a project on Zapatos 6.6.1 moves to `zapatos@npm:pgcast` without changing a line (note 002).
+Promise: a project on Zapatos 6.6.1 moves to `zapatos@npm:@pgcast/pgcast` without changing a line (note 002).
 
 ## The public API
 

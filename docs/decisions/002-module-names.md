@@ -2,6 +2,7 @@
 
 - **Status**: accepted (2026-11-11): option A now, option C as the target
 - **Date**: 2026-11-11
+- **Update** (2026-11-13): published on npm as `@pgcast/pgcast`, as npm refuses the unscoped `pgcast` (too close to `recast`); option A's alias now reads `zapatos@npm:@pgcast/pgcast`.
 
 ## Context
 
