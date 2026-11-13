@@ -8,7 +8,7 @@ import { checkLinks, keepLinkHashes } from './anchors.ts';
 import { writeLlmsFiles } from './llms.ts';
 import { describePage, pageHead, repo } from './meta.ts';
 import { outline } from './outline.ts';
-import { sqlParameters, syntax } from './syntax.ts';
+import { lineIndents, sqlParameters, syntax } from './syntax.ts';
 import { focusableHovers, twoslashOptions } from './twoslash.ts';
 
 const
@@ -48,7 +48,7 @@ export default defineConfig({
     // a hover's JSDoc can hold these (`process.env`, from @types/node), and Shiki loads only the languages a page names
     languages: ['js', 'bash'],
     // an unexpected type error in a `ts twoslash` block fails the build; a block meant to fail says so with `// @errors`
-    codeTransformers: [transformerTwoslash({ twoslashOptions }), focusableHovers, sqlParameters],
+    codeTransformers: [transformerTwoslash({ twoslashOptions }), focusableHovers, sqlParameters, lineIndents],
     config: keepLinkHashes,  // `[Config.upsertRequiresSameKeys](/runtime-config#Config.upsertRequiresSameKeys)`
   },
   vite: {
@@ -71,14 +71,14 @@ export default defineConfig({
         link,
         activeMatch: `^(${[link, ...items.map(item => item.link)].join('|')})$`,
       }]),
-      // no ↗ after the external links, as the prototype
+      // no ↗ after the external links: the bar's links look alike, wherever they lead
       { text: 'Changelog', link: `${repo}/blob/master/CHANGELOG.md`, noIcon: true },
       { text: 'GitHub', link: repo, noIcon: true },
     ],
     sidebar: outline,  // each group's heading links its landing page
     search: {
       provider: 'local',
-      options: { translations: { button: { buttonText: 'Search the docs', buttonAriaLabel: 'Search the docs' } } },
+      options: { translations: { button: { buttonText: 'Search', buttonAriaLabel: 'Search the docs' } } },
     },
     editLink: { pattern: `${repo}/edit/master/website/:path`, text: 'Edit this page on GitHub' },
     docFooter: { prev: 'Previous', next: 'Next' },

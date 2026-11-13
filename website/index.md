@@ -19,8 +19,9 @@ pgcast reads your Postgres schema and writes the TypeScript types. Its shortcuts
 
 [Get started](/install){.btn .primary} [Switching from Zapatos](/switching){.btn}
 
-<InstallLine command="npm install zapatos@npm:pgcast" />
 </div>
+
+<InstallLine command="npm install zapatos@npm:pgcast" />
 </section>
 
 <CastPanel example="home">
