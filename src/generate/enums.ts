@@ -5,6 +5,7 @@ Released under the MIT licence: see LICENCE file
 */
 
 import * as pg from 'pg';
+import { enumLabel } from './enumLabel';
 
 
 export type EnumData = { [k: string]: string[] };
@@ -37,9 +38,9 @@ export const enumDataForSchema = async (schemaName: string, queryFn: (q: pg.Quer
 export const enumTypesForEnumData = (enums: EnumData) => {
   const types = Object.keys(enums)
     .map(name => `
-export type ${name} = ${enums[name].map(v => `'${v}'`).join(' | ')};
+export type ${name} = ${enums[name].map(enumLabel).join(' | ')};
 export namespace every {
-  export type ${name} = [${enums[name].map(v => `'${v}'`).join(', ')}];
+  export type ${name} = [${enums[name].map(enumLabel).join(', ')}];
 }`)
     .join('');
 

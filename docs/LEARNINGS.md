@@ -89,6 +89,13 @@ Candidates for a check, a rule or a skill line.
 - #45 — A PR closing an issue that a docs page cites as a limit retargets that link before merge: `grep -rn '#<n>' website/` at review — `branch-reviewer`
 - #45 — A « no false positive » test for a codegen warning runs every snapshot variant with its full config: a mutant that checks `tables` instead of `relations` only shows on a variant that excludes a relation — `branch-reviewer`, `builder`
 - #45 — Two review items in one file that need separate commits: commit between the two edits or stage by hunk; without amend, a plain `git add <file>` leaves the message incomplete — `builder`
+- #44 — Once a codegen fix has landed, « byte-identical to 6.6.1 » no longer holds on master: replay three ways (6.6.1 against master shows only the fix, master against the branch is empty) — `builder`
+- #44 — Placeholders shared between two schemas make `diff -r` of a replay flip between runs, on 6.6.1 too: run twice, or leave those probe schemas out — `builder`
+- #44 — A census test collecting every warning of every fixture variant breaks when a second note lands: the second PR adds its note to the census's expectations rather than filtering it, so the census still says where each note fires — `branch-reviewer`
+- #44 — An opt-in that writes catalog strings into TS carries any existing escaping bug into schemas whose output used to parse: one quoting helper per kind of string lets the escaping fix land once — `branch-reviewer`
+- #44 — A new `export` in a module of `src/generate/index.ts`'s `export *` list becomes public API of `zapatos/generate` (the build shows it in `generate.mjs`): a helper goes in its own module, and `git status` is read for `*.mjs` before committing — `builder`
+- #44 — `git commit --no-edit` after a conflicted merge keeps the `# Conflicts:` lines; `--cleanup=strip` drops them — `builder`
+- #44 — A brief that names the SHA to merge expects `origin/master` to be newer by then — orchestrator
 
 ## Minors kept
 
