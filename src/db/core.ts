@@ -150,11 +150,12 @@ declare const wrapper: unique symbol;
  * here: use the type's own name (`int4`, `float8`, `varchar`), or `sql`
  * (`` sql`CAST(${param(x)} AS varchar(10))` ``). A string cast wins over
  * `castArrayParamsToJson` and `castObjectParamsToJson`, which Zapatos 6.6.1 let
- * replace it with `"json"`: under them, an array or a plain object is still sent
- * as JSON text, except an array cast to an array type (`int4[]`), sent as an
- * array. If `true`, the value will be JSON stringified and cast to `json`
- * (irrespective of the configuration parameters `castArrayParamsToJson` and
- * `castObjectParamsToJson`). If `false`, the value will **not** be JSON-
+ * replace it with `"json"`. Under `castArrayParamsToJson`, an array whose cast
+ * ends with `[]` or `[n]` (`int4[]`) is sent as an array, any other array as
+ * JSON text (`_int4` too); under `castObjectParamsToJson`, a plain object is
+ * sent as JSON text. If `true`, the value will be JSON stringified and cast to
+ * `json` (irrespective of the configuration parameters `castArrayParamsToJson`
+ * and `castObjectParamsToJson`). If `false`, the value will **not** be JSON-
  * stringified or cast to `json` (again irrespective of the configuration
  * parameters `castArrayParamsToJson` and `castObjectParamsToJson`).
  */
@@ -181,11 +182,12 @@ export class Parameter<T = any> { declare readonly [wrapper]?: never; constructo
  * here: use the type's own name (`int4`, `float8`, `varchar`), or `sql`
  * (`` sql`CAST(${param(x)} AS varchar(10))` ``). A string cast wins over
  * `castArrayParamsToJson` and `castObjectParamsToJson`, which Zapatos 6.6.1 let
- * replace it with `"json"`: under them, an array or a plain object is still sent
- * as JSON text, except an array cast to an array type (`int4[]`), sent as an
- * array. If `true`, the value will be JSON stringified and cast to `json`
- * (irrespective of the configuration parameters `castArrayParamsToJson` and
- * `castObjectParamsToJson`). If `false`, the value will **not** be JSON
+ * replace it with `"json"`. Under `castArrayParamsToJson`, an array whose cast
+ * ends with `[]` or `[n]` (`int4[]`) is sent as an array, any other array as
+ * JSON text (`_int4` too); under `castObjectParamsToJson`, a plain object is
+ * sent as JSON text. If `true`, the value will be JSON stringified and cast to
+ * `json` (irrespective of the configuration parameters `castArrayParamsToJson`
+ * and `castObjectParamsToJson`). If `false`, the value will **not** be JSON
  * stringified or cast to `json` (again irrespective of the configuration
  * parameters `castArrayParamsToJson` and `castObjectParamsToJson`).
  */
@@ -507,7 +509,8 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
                   `"${name.replace(/"/g, '""')}"`;
 
         // the cast wins over castArrayParamsToJson and castObjectParamsToJson (Zapatos 6.6.1 dropped it for
-        // `"json"`); the value is still the JSON text they ask for, except an array cast to an array type
+        // `"json"`); the value is still the JSON text they ask for, except an array whose cast ends with
+        // `[]` or `[n]`
         const json = Array.isArray(expression.value) ?
           config.castArrayParamsToJson && end === cast.length :
           config.castObjectParamsToJson && isPOJO(expression.value);
