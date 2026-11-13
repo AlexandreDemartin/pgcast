@@ -312,6 +312,8 @@ Candidates for a check, a rule or a skill line.
 - #170 — The npm tarball of zapatos@6.6.1, with `NODE_PATH` on the branch's `node_modules`, runs the same replay script on both versions with no transpiling; `npx -y -p node@20 node …` gives Node 20 — `builder`, `branch-reviewer`
 - #170 — A Whereable claim (« the type refuses a `Date` ») is checked on the schema: the weak-type check accepts a built-in that shares a member with a column (`name`, `size`, `source`, `length`) — `builder`
 - #170 — Parallel suites in other worktrees slow `npm test` (2 failures in 50 s, then green in 15 s): rerun once before treating a red suite as real — `builder`
+- #239 — Literal inference differs between TypeScript 5.9 and 7.0 (`cols('id')` against a contextual `ParentColumn<Column>`: `'id'` on 5.9, `string` on 7.0), so a red negative type test proves something only for the compiler it ran on; the type tests run on 5.9 only — `branch-reviewer`
+- #239 — An issue that asks for « `dist/` byte-identical » on a type-only change means the `.js` and `.mjs`; the `.d.ts` gains the declaration — `builder`
 
 ## Minors kept
 
@@ -357,3 +359,5 @@ Minor review defects, taken up by the end-of-chapter review.
 - #170 — `src/db/core.ts:310`: `AggregateError` is not among the refused `Error` subtypes (`WHERE TRUE` on 6.6.1 and now) — `branch-reviewer`
 - #170 — `website/raw-sql.md:78`: « A built-in object throws while compiling » has no realm qualifier, unlike `sql-template.md:279` and `security.md:91` — `branch-reviewer`
 - #170 — `test/unit/injection.test.ts`: `having` is covered (now throws) but neither tested nor listed in the CHANGELOG — `branch-reviewer`
+- #239 — `test/integration/core.test.ts:190`: the runtime test the type test points to does not cover the shapes #239 refuses (`{ display_name: vals(undefined) }`, `eq(cols('id'))`, `arrayContains(vals(undefined))`) — `branch-reviewer`
+- #239 — `CHANGELOG.md:72`: « with `x` a column name or `undefined` » leaves out `any`, also refused now — `branch-reviewer`
