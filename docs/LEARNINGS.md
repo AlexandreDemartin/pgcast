@@ -108,6 +108,12 @@ Candidates for a check, a rule or a skill line.
 - #49 — A mutant that rounds `enumsortorder` survives a single `ADD VALUE … BEFORE` (the stable sort breaks the tie alphabetically): a probe needs a value that breaks the tie the other way — `builder`
 - #49 — `DROP DATABASE … WITH (FORCE)` right after `generate()` can kill a pooled client still closing (57P01) and crash a replay: wait briefly first (see #302) — `builder`
 - #49 — `exactOptionalPropertyTypes` rejects `{ enumOrder: undefined }` in a test loop: spread `{}` or the set option — `builder`
+- #50 — A guard added beside another in the same branch gets one test where both conditions hold, or nothing pins which error wins (a swapped-order mutant survived the suite) — `branch-reviewer`
+- #50 — An error's advice is run as written: « use `db.conditions.isNull` » interpolated alone throws; it works only as a Whereable value — `branch-reviewer`
+- #50 — A replay of a fix runs 6.6.1, master and the branch: a change master already made (#111) would otherwise be pinned on the PR — `builder`
+- #50 — A failing `expect` before `mockRestore()` leaks a `vi.spyOn(client, 'query')` into later tests: the file's `try`/`finally` pattern prevents it — `builder`
+- #50 — `typecheck`/`test:types` in a scratch worktree whose `node_modules` is a symlink write to the shared `node_modules/.cache/pgcast`: two worktrees at different commits race on it — `branch-reviewer`
+- #50 — Before editing a quoted message, grep the exact changed substring: the review's list of quoting files was wider than the real one — `builder`
 
 ## Minors kept
 
