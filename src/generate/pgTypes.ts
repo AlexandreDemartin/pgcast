@@ -5,7 +5,8 @@ Released under the MIT licence: see LICENCE file
 */
 
 import type { CompleteConfig } from './config';
-import { enumLabel, type EnumData } from './enums';
+import { enumLabel } from './enumLabel';
+import type { EnumData } from './enums';
 
 type TypeContext = 'JSONSelectable' | 'Selectable' | 'Insertable' | 'Updatable' | 'Whereable';
 
