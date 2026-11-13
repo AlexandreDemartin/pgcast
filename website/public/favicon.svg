@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <!-- pgcast: the cast operator, ::, cut out of a tile in the accent (docs/design/art-direction.md), light and dark.
+       Rendered to favicon.ico by render-images.mjs, light. -->
+  <title>pgcast</title>
+  <style>path { fill: #0a6b63; } @media (prefers-color-scheme: dark) { path { fill: #4fcfbf; } }</style>
+  <path fill-rule="evenodd" d="M48 0h160a48 48 0 0 1 48 48v160a48 48 0 0 1-48 48h-160a48 48 0 0 1-48-48v-160a48 48 0 0 1 48-48ZM48 48h32a8 8 0 0 1 8 8v32a8 8 0 0 1-8 8h-32a8 8 0 0 1-8-8v-32a8 8 0 0 1 8-8ZM176 48h32a8 8 0 0 1 8 8v32a8 8 0 0 1-8 8h-32a8 8 0 0 1-8-8v-32a8 8 0 0 1 8-8ZM48 160h32a8 8 0 0 1 8 8v32a8 8 0 0 1-8 8h-32a8 8 0 0 1-8-8v-32a8 8 0 0 1 8-8ZM176 160h32a8 8 0 0 1 8 8v32a8 8 0 0 1-8 8h-32a8 8 0 0 1-8-8v-32a8 8 0 0 1 8-8Z"/>
+</svg>

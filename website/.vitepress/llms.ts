@@ -22,16 +22,9 @@ export async function writeLlmsFiles(config: SiteConfig) {
     // llms-full.txt puts every page in one file
     linksOf = (page: string) => (link: string) => url(link.startsWith('#') ? page + link : link),
     read = (link: string) => {
-      const file = join(config.srcDir, link === '/' ? 'index.md' : `${link.slice(1)}.md`);
-      if (!existsSync(file)) return;
-      const
-        source = readFileSync(file, 'utf8').replace(/^---\n[\s\S]*?\n---\n/, ''),  // front matter
-        text = source.replace(/<!--[\s\S]*?-->/g, ''),  // a comment, such as a mark of check-prose.mjs, is not read
-        [, h1, html] = /^# (.+)$|<h1>(.*?)<\/h1>/m.exec(text) ?? [],
-        title = (h1 ?? html)?.replace(/\s*<small.*?<\/small>/g, ''),
-        lede = /^(.+)\n\{\.lede\}$/m.exec(text)?.[1];
-      if (!title || !lede)
-        throw new Error(`llms.ts: ${file} needs a title (\`# \` or \`<h1>\`) and a \`{.lede}\` paragraph, for llms.txt`);
+      const page = readPage(join(config.srcDir, link === '/' ? 'index.md' : `${link.slice(1)}.md`));
+      if (!page) return;
+      const { source, title, lede } = page;
       return { link, source, title: inline(title, linksOf(link)), lede: inline(lede, linksOf(link)) };
     },
     home = read('/')!,
@@ -60,6 +53,36 @@ export async function writeLlmsFiles(config: SiteConfig) {
   }
   writeFileSync(join(config.outDir, 'llms-full.txt'), full.join('\n\n---\n\n') + '\n');
 }
+
+/**
+ * A page's Markdown without its front matter, and its title (`# ` or `<h1>`) and `{.lede}` paragraph as written: what
+ * llms.txt lists, and what each page's description is cut from (meta.ts). Undefined for a page with no file of its own,
+ * a "Coming" page ([page].paths.ts); a written page without both fails the build.
+ */
+export function readPage(file: string) {
+  if (!existsSync(file)) return;
+  const
+    source = readFileSync(file, 'utf8').replace(/^---\n[\s\S]*?\n---\n/, ''),  // front matter
+    text = source.replace(/<!--[\s\S]*?-->/g, ''),  // a comment, such as a mark of check-prose.mjs, is not read
+    [, h1, html] = /^# (.+)$|<h1>(.*?)<\/h1>/m.exec(text) ?? [],
+    title = (h1 ?? html)?.replace(/\s*<small.*?<\/small>/g, ''),
+    lede = /^(.+)\n\{\.lede\}$/m.exec(text)?.[1];
+  if (!title || !lede)
+    throw new Error(`llms.ts: ${file} needs a title (\`# \` or \`<h1>\`) and a \`{.lede}\` paragraph, for llms.txt and its description`);
+  return { source, title, lede };
+}
+
+/**
+ * One line of a page as plain text, for a `<meta>`: as `inline()` leaves it, then each link reduced to its text and
+ * the marks of inline code and emphasis dropped (`[\`lateral\`](/select#lateral)` reads lateral).
+ */
+export const plainText = (line: string) => inline(line, link => link)
+  .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+  .replace(/(\*\*|__)(?=\S)(.+?)(?<=\S)\1/g, '$2')
+  .replace(/(?<![\w*])([*_])(?=\S)(.+?)(?<=\S)\1(?![\w*])/g, '$2')  // `*n*`, not `release_year`'s underscore
+  .replace(/(`+) ?(.+?) ?\1(?!`)/g, '$2')  // `` sql`now()` `` keeps its inner backticks
+  .replace(/\s+/g, ' ')
+  .trim();
 
 /**
  * A page's Markdown as plain Markdown: VitePress's containers as quotes (a code group unwrapped), each Twoslash block
