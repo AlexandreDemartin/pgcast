@@ -306,6 +306,12 @@ Candidates for a check, a rule or a skill line.
 - #236 — A docs check that cannot be imported alone (`anchors.ts` pulls a data loader through `llms.ts`) runs its self-check only inside `vitepress build`: put the rule in a module with no loader, test it there — `builder`
 - #236 — `check-prose.mjs` reads `zapatos/dist/db`: run the root `npm run build` before `website`'s `npm ci` and the checks — `builder`
 - #237 — `check-prose` accepts a one-word value in a quoted message: a message quoted with an injected value writes `…` in its place — `builder`
+- #170 — To refuse a built-in and let its subclasses through, compare the prototype itself: `ArrayBuffer.isView`, `instanceof` and `util.types.*` match subclasses and other realms; test one subclass per refused kind — `branch-reviewer`, `builder`
+- #170 — The typed-array family is matched without a list by the prototype's own prototype (%TypedArray%), which takes in `Float16Array`; `Buffer.prototype` needs its own entry, one level down — `branch-reviewer`, `builder`
+- #170 — A CHANGELOG « Unchanged » list is a compatibility claim: replay each item on 6.6.1, master and the branch, with a subclass and an augmented instance of each refused kind — `branch-reviewer`
+- #170 — The npm tarball of zapatos@6.6.1, with `NODE_PATH` on the branch's `node_modules`, runs the same replay script on both versions with no transpiling; `npx -y -p node@20 node …` gives Node 20 — `builder`, `branch-reviewer`
+- #170 — A Whereable claim (« the type refuses a `Date` ») is checked on the schema: the weak-type check accepts a built-in that shares a member with a column (`name`, `size`, `source`, `length`) — `builder`
+- #170 — Parallel suites in other worktrees slow `npm test` (2 failures in 50 s, then green in 15 s): rerun once before treating a red suite as real — `builder`
 
 ## Minors kept
 
@@ -348,3 +354,6 @@ Minor review defects, taken up by the end-of-chapter review.
 - #190 — `src/db/config.ts:24`: `transactionRequiresCommit` has no type test, where the other two opt-ins have one each (`test/types/shortcuts.test-d.ts:171`, `:190`) — `branch-reviewer`
 - #190 — `docs/decisions/003-fixes-and-deprecation.md:38`: the heading « The 11 breaking findings » now sits over a #190 row, which is not a characterisation finding — `branch-reviewer`
 - #236 — `website/.vitepress/llms.ts`: a fourth fence reader, for `llms-full.txt`, opens on any backtick fence and closes only on exactly three backticks, so a four-backtick `md` block holding a three-backtick line ends early: reuse `.vitepress/fences.ts` — `builder`
+- #170 — `src/db/core.ts:310`: `AggregateError` is not among the refused `Error` subtypes (`WHERE TRUE` on 6.6.1 and now) — `branch-reviewer`
+- #170 — `website/raw-sql.md:78`: « A built-in object throws while compiling » has no realm qualifier, unlike `sql-template.md:279` and `security.md:91` — `branch-reviewer`
+- #170 — `test/unit/injection.test.ts`: `having` is covered (now throws) but neither tested nor listed in the CHANGELOG — `branch-reviewer`
