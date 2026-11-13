@@ -138,12 +138,17 @@ declare const wrapper: unique symbol;
  * @param x The value to be wrapped
  * @param cast Optional cast type. If a string, the parameter will be cast to
  * this type within the query e.g. `CAST($1 AS "type")` instead of plain `$1`.
- * The type is written as is if `"type"` is well-formed: non-empty quoted parts
- * without NUL, in which `""` stands for one `"`, joined by `.` with optional
- * whitespace around it (so `public"."mood` gives `"public"."mood"`). Otherwise
- * it is one quoted identifier, any `"` doubled (as `quote_ident` does), so it
- * cannot close its quotes: `public.mood` and `int4[]` are not split, and an
- * array type needs `sql` (`` sql`${param(x)}::int4[]` ``). If
+ * Without a `"`, the type is split on `.` and each part quoted: `public.mood`
+ * gives `"public"."mood"`. Array bounds at the end, `[]` or `[n]`, follow the
+ * quotes: `int4[]` gives `"int4"[]`. With a `"`, the type is written as is if
+ * `"type"` is well-formed: non-empty quoted parts without NUL, in which `""`
+ * stands for one `"`, joined by `.` with optional whitespace around it
+ * (`pg_catalog"."int4`), or if it is already quoted that way (`"a.b"`).
+ * Otherwise it is one quoted identifier, any `"` doubled (as `quote_ident`
+ * does), so it cannot close its quotes. No part is left unquoted, so a name
+ * the SQL grammar spells (`int`, `double precision`, `varchar(10)`) is no type
+ * here: use the type's own name (`int4`, `float8`, `varchar`), or `sql`
+ * (`` sql`CAST(${param(x)} AS varchar(10))` ``). If
  * `true`, the value will be JSON stringified and cast to `json` (irrespective
  * of the configuration parameters `castArrayParamsToJson` and
  * `castObjectParamsToJson`). If `false`, the value will **not** be JSON-
@@ -161,12 +166,17 @@ export class Parameter<T = any> { declare readonly [wrapper]?: never; constructo
  * @param x The value to be wrapped
  * @param cast Optional cast type. If a string, the parameter will be cast to
  * this type within the query e.g. `CAST($1 AS "type")` instead of plain `$1`.
- * The type is written as is if `"type"` is well-formed: non-empty quoted parts
- * without NUL, in which `""` stands for one `"`, joined by `.` with optional
- * whitespace around it (so `public"."mood` gives `"public"."mood"`). Otherwise
- * it is one quoted identifier, any `"` doubled (as `quote_ident` does), so it
- * cannot close its quotes: `public.mood` and `int4[]` are not split, and an
- * array type needs `sql` (`` sql`${param(x)}::int4[]` ``). If
+ * Without a `"`, the type is split on `.` and each part quoted: `public.mood`
+ * gives `"public"."mood"`. Array bounds at the end, `[]` or `[n]`, follow the
+ * quotes: `int4[]` gives `"int4"[]`. With a `"`, the type is written as is if
+ * `"type"` is well-formed: non-empty quoted parts without NUL, in which `""`
+ * stands for one `"`, joined by `.` with optional whitespace around it
+ * (`pg_catalog"."int4`), or if it is already quoted that way (`"a.b"`).
+ * Otherwise it is one quoted identifier, any `"` doubled (as `quote_ident`
+ * does), so it cannot close its quotes. No part is left unquoted, so a name
+ * the SQL grammar spells (`int`, `double precision`, `varchar(10)`) is no type
+ * here: use the type's own name (`int4`, `float8`, `varchar`), or `sql`
+ * (`` sql`CAST(${param(x)} AS varchar(10))` ``). If
  * `true`, the value will be JSON stringified and cast to `json` (irrespective
  * of the configuration parameters `castArrayParamsToJson` and
  * `castObjectParamsToJson`). If `false`, the value will **not** be JSON
@@ -478,14 +488,29 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
         result.text += `CAST(${placeholder} AS "json")`;
 
       } else if (typeof expression.cast === 'string') {
-        // `"${cast}"` passes as is if well-formed (`pg_catalog"."int4`, as before); otherwise
-        // it is one quoted identifier, any `"` doubled as quote_ident does, so it cannot close its quotes
+        // array bounds at the end (`[]`, `[3]`) are written after the type; they are found from the end,
+        // as a regex would be quadratic on a long run of `[]`
+        const cast = expression.cast;
+        let end = cast.length;
+        while (cast[end - 1] === ']') {
+          const open = cast.lastIndexOf('[', end - 2);
+          if (open < 0 || !/^[0-9]*$/.test(cast.slice(open + 1, end - 1))) break;
+          end = open;
+        }
+        // without a `"`, the type is split on `.` and each part quoted (`public.mood`); otherwise it
+        // passes as is if well-formed once quoted (`pg_catalog"."int4`, as before) or already quoted
+        // (`"a.b"`); anything else is one quoted identifier, any `"` doubled as quote_ident does, so it
+        // cannot close its quotes. No part is unquoted: `char` stays `"char"`, as before
         const
-          quoted = `"${expression.cast}"`,
-          type = quotedIdentifiers.test(quoted) ? quoted : `"${expression.cast.replace(/"/g, '""')}"`;
+          name = cast.slice(0, end),
+          type =
+            !name.includes('"') ? `"${name.replace(/[.]/g, '"."')}"` :
+              quotedIdentifiers.test(`"${name}"`) ? `"${name}"` :
+                quotedIdentifiers.test(name) ? name :
+                  `"${name.replace(/"/g, '""')}"`;
 
         result.values.push(expression.value);
-        result.text += `CAST(${placeholder} AS ${type})`;
+        result.text += `CAST(${placeholder} AS ${type}${cast.slice(end)})`;
 
       } else {
         result.values.push(expression.value);

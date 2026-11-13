@@ -42,22 +42,39 @@ describe('param', () => {
     expect(await q.run(t.client)).toEqual([{ n: 1 }]);
   });
 
-  it('characterization: a schema-qualified or array type cast fails', async () => {
-    // characterization: "public.mood" and "int[]" are taken as single type names
-    expect(await pgError(t.client, () => sql`SELECT ${param('ok', 'public.mood')}`.run(t.client)))
-      .toMatchInlineSnapshot(`
-        {
-          "code": "42704",
-          "message": "type "public.mood" does not exist",
-        }
-      `);
+  it('a schema-qualified or array type cast reaches its type', async () => {
+    const typed = async (value: unknown, cast: string) =>
+      (await sql`SELECT ${param(value, cast)} AS v, pg_typeof(${param(value, cast)})::text AS t`.run(t.client))[0];
+    expect(await typed('ok', 'public.mood')).toEqual({ v: 'ok', t: 'mood' });
+    expect(await typed('ok', '"public"."mood"')).toEqual({ v: 'ok', t: 'mood' });
+    // pg does not parse an enum array: it comes back as text
+    expect(await typed(['draft'], 'extra.status[]')).toEqual({ v: '{draft}', t: 'extra.status[]' });
+    expect(await typed([1, 2], 'int4[]')).toEqual({ v: [1, 2], t: 'integer[]' });
+    expect(await typed([[1], [2]], 'int4[3][]')).toEqual({ v: [[1], [2]], t: 'integer[]' });
+    expect(await typed([1], 'pg_catalog"."int4[]')).toEqual({ v: [1], t: 'integer[]' });
+    // a quoted name skips the grammar's aliases and multi-word names, as in 6.6.1: `"int"[]` is no type
     expect(await pgError(t.client, () => sql`SELECT ${param([1], 'int[]')}`.run(t.client)))
-      .toMatchInlineSnapshot(`
-        {
-          "code": "42704",
-          "message": "type "int[]" does not exist",
-        }
-      `);
+      .toEqual({ code: '42704', message: 'type "int[]" does not exist' });
+    expect(await pgError(t.client, () => sql`SELECT ${param(1, 'double precision')}`.run(t.client)))
+      .toEqual({ code: '42704', message: 'type "double precision" does not exist' });
+  });
+
+  it('a type whose own name holds a `.` is reached quoted, as `"a.b"`; `a.b` is type b in schema a', async () => {
+    await t.client.query(`CREATE TYPE "a.b" AS ENUM ('x')`);
+    expect(await sql`SELECT pg_typeof(${param('x', '"a.b"')})::text AS t`.run(t.client)).toEqual([{ t: '"a.b"' }]);
+    // 6.6.1 wrote `"a.b"` for this one too
+    expect(await pgError(t.client, () => sql`SELECT ${param('x', 'a.b')}`.run(t.client)))
+      .toEqual({ code: '3F000', message: 'schema "a" does not exist' });
+  });
+
+  it('a type whose own name ends with `[]` is reached quoted, as `"tag[]"`; `tag[]` is an array of tag', async () => {
+    await t.client.query(`CREATE TYPE tag AS ENUM ('x'); CREATE DOMAIN "tag[]" AS text`);
+    const typeOf = async (cast: string) =>
+      (await sql`SELECT pg_typeof(${param('{x}', cast)})::text AS t`.run(t.client))[0];
+    expect(await typeOf('"tag[]"')).toEqual({ t: '"tag[]"' });
+    // 6.6.1 wrote `"tag[]"` and `"public"."tag[]"` for these two, the domain
+    expect(await typeOf('tag[]')).toEqual({ t: 'tag[]' });
+    expect(await typeOf('public"."tag[]')).toEqual({ t: 'tag[]' });
   });
 
   it('a JSON cast (true, or the config) sends JSON text', async () => {

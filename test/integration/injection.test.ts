@@ -16,7 +16,7 @@ import * as db from '../../src/db';
 import { sql, param, vals, all } from '../../src/db';
 import { useTestDatabase } from '../helpers/db';
 import { builtinObjects } from '../helpers/builtinObjects';
-import { hostileCasts } from '../helpers/hostileCasts';
+import { hostileArrayCasts, hostileCasts } from '../helpers/hostileCasts';
 import { pgError } from '../helpers/pgError';
 
 const t = useTestDatabase();
@@ -49,6 +49,22 @@ const identifierOutcomes = async (
         await t.client.query('ROLLBACK TO SAVEPOINT pgcast_identifier');
         outcomes[`${name} ${where}`] = (err as { code?: string }).code;
       }
+    }
+  }
+  return outcomes;
+};
+
+/** What `SELECT CAST('1' AS <cast>)` gives for each cast: its rows, or its error code. */
+const castOutcomes = async (casts: Record<string, string>) => {
+  const outcomes: Record<string, unknown> = {};
+  for (const [name, cast] of Object.entries(casts)) {
+    await t.client.query('SAVEPOINT pgcast_cast');
+    try {
+      outcomes[name] = await sql`SELECT ${param('1', cast)} AS v`.run(t.client);
+      await t.client.query('RELEASE SAVEPOINT pgcast_cast');
+    } catch (err) {
+      await t.client.query('ROLLBACK TO SAVEPOINT pgcast_cast');
+      outcomes[name] = (err as { code?: string }).code;
     }
   }
   return outcomes;
@@ -169,21 +185,20 @@ describe('with parameters (extended protocol)', () => {
     `);
   });
 
+  it('a dotted cast that splices SQL stays in its type names, the first one a schema that does not exist', async () => {
+    // short enough for Postgres to name it whole (an identifier is cut at 63 bytes)
+    const q = sql`SELECT ${param('{1}', 'int4; DELETE FROM users; --.int4[]')} AS v`;
+    expect(q.compile().text).toBe('SELECT CAST($1 AS "int4; DELETE FROM users; --"."int4"[]) AS v');
+    expect(await pgError(t.client, () => q.run(t.client)))
+      .toEqual({ code: '3F000', message: 'schema "int4; DELETE FROM users; --" does not exist' });
+  });
+
   it('no hostile cast reads anything: each is a missing type, a syntax error or a harmless name', async () => {
     // compiled text: test/unit/injection.test.ts; a row would show what the cast let through.
-    // Rows: pg_catalog.int4, with whitespace around the dot as in 6.6.1; a comment between the parts
-    // (commentBetween, lineCommentBetween) returned 1 under 6.6.1 and is now one missing type
-    const outcomes: Record<string, unknown> = {};
-    for (const [name, cast] of Object.entries(hostileCasts)) {
-      await t.client.query('SAVEPOINT pgcast_cast');
-      try {
-        outcomes[name] = await sql`SELECT ${param('1', cast)} AS v`.run(t.client);
-        await t.client.query('RELEASE SAVEPOINT pgcast_cast');
-      } catch (err) {
-        await t.client.query('ROLLBACK TO SAVEPOINT pgcast_cast');
-        outcomes[name] = (err as { code?: string }).code;
-      }
-    }
+    // Rows: pg_catalog.int4, with whitespace around the dot as in 6.6.1, or dotted, or already quoted;
+    // a comment between the parts (commentBetween, lineCommentBetween) returned 1 under 6.6.1 and is
+    // now one missing type
+    const outcomes = await castOutcomes(hostileCasts);
     // `\v` is whitespace from Postgres 17 (scan.l); before, a syntax error
     const { verticalTab, ...others } = outcomes;
     const { rows: [{ version }] } = await t.client.query("SELECT current_setting('server_version_num')::int AS version");
@@ -193,12 +208,30 @@ describe('with parameters (extended protocol)', () => {
         "closes": "42704",
         "comment": "42704",
         "commentBetween": "42704",
+        "dotted": [
+          {
+            "v": 1,
+          },
+        ],
+        "dottedBackslash": "3F000",
+        "dottedComment": "3F000",
+        "dottedDashes": "3F000",
+        "dottedDollar": "3F000",
+        "dottedEmpty": "42601",
+        "dottedNul": "08P01",
+        "dottedPrequoted": [
+          {
+            "v": 1,
+          },
+        ],
+        "dottedSemicolon": "3F000",
+        "dottedSquote": "42704",
         "dquote": "42704",
         "empty": "42601",
         "emptyLast": "42704",
         "emptyPart": "42704",
         "escaped": "42704",
-        "leadingDot": "42704",
+        "leadingDot": "42601",
         "lineCommentBetween": "42704",
         "lone": "42704",
         "newlineInside": "42704",
@@ -217,6 +250,7 @@ describe('with parameters (extended protocol)', () => {
           },
         ],
         "prequoted": "42704",
+        "prequotedDot": "42704",
         "qualified": [
           {
             "v": 1,
@@ -240,9 +274,35 @@ describe('with parameters (extended protocol)', () => {
   });
 });
 
+describe('array bounds in a cast', () => {
+  it('no hostile array cast reads anything: each is a missing type, a syntax error or a malformed array', async () => {
+    // compiled text: test/unit/injection.test.ts; 22P02: '1' is no array literal, so the type was found
+    expect(await castOutcomes(hostileArrayCasts)).toEqual({
+      array: '22P02',
+      arrayBounds: '22P02',
+      arrayDotted: '22P02',
+      arrayQualified: '22P02',
+      arrayPrequoted: '22P02',
+      arrayOnly: '42601',
+      arrayAfterQuote: '42704',
+      arrayCloses: '42704',
+      arrayInside: '42704',
+      arraySplice: '42704',
+      arraySemicolon: '42704',
+      arraySpace: '42704',
+      arrayNegative: '42704',
+      arrayUnclosed: '42704',
+      arrayNested: '42704',
+      arrayNul: '08P01',
+      arrayBackslash: '42704',
+    });
+  });
+});
+
 describe('a Parameter in a Whereable, in isIn or in vals', () => {
   it('a hostile cast does what it does in sql`${param(x, cast)}`, and reads nothing', async () => {
     // compiled text: test/unit/injection.test.ts; outcomes of the cast alone: "no hostile cast reads anything"
+    // (array casts compile the same in each place too, but an array against an int4 column fails on its type)
     const outcome = async (q: db.SQLFragment<any[]>) => {
       await t.client.query('SAVEPOINT pgcast_cast');
       try {
