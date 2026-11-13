@@ -16,7 +16,9 @@ import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import * as pg from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, inject, it } from 'vitest';
-import { finaliseConfig, generate, tsForConfig, type Config } from '../../src/generate';
+import {
+  definitionForRelationInSchema, enumDataForSchema, finaliseConfig, generate, relationsInSchema, tsForConfig, type Config,
+} from '../../src/generate';
 import { urlForDatabase } from '../helpers/databases';
 import { useTestDatabase } from '../helpers/db';
 
@@ -646,6 +648,22 @@ describe('enumOrder', () => {
       schemas: { order_w: all }, enumOrder: 'declared', ...quiet, db: { ...db(), options },
     }), noDebug);
     expect(schema).toContain(`export type take = [${labels.map((l: string) => `'${l}'`).join(', ')}];`);
+  });
+
+  it('leaves enumDataForSchema() alphabetical; definitionForRelationInSchema() follows the config by default', async () => {
+    const q = (query: pg.QueryConfig) => t.pool.query(query);
+    const enums = await enumDataForSchema('public', q);
+    expect(enums).toEqual({ mood: ['happy', 'ok', 'sad'] });  // as in Zapatos 6.6.1, whatever the config
+    const products = (await relationsInSchema('public', q)).find(rel => rel.name === 'products')!;
+    const orders = [
+      [{ enumOrder: 'declared' }, `('draft' | 'published' | 'archived')`],
+      [{}, `('archived' | 'draft' | 'published')`],
+    ] as const;
+    for (const [order, union] of orders) {
+      const config = finaliseConfig({ ...quiet, typeEnumsAcrossSchemas: true, ...order });
+      const def = await definitionForRelationInSchema(products, 'public', enums, {}, config, q);  // no enumsForSchema
+      expect(def).toContain(`status: ${union};`);
+    }
   });
 
   it('writes an enum of another schema in the same order, with typeEnumsAcrossSchemas', async () => {
