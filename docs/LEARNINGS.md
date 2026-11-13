@@ -71,6 +71,10 @@ Candidates for a check, a rule or a skill line.
 - #40 — Overloads are not a compat-neutral way to widen a generic export: passed as an argument (`.map`, `apply`, `.then`) the overload set loses generic inference, and a user overload chosen on a function parameter can switch — `builder`
 - #40 — State the contradiction before prototyping: a mock `<T>(a: T[]) => SQLFragment<…, T>` assigned to the new type forces the result to include the element type, which the column refuses; no type can satisfy both — `builder`
 - #40 — Build a PR body from absolute paths and check its fenced blocks once posted: a relative path failing inside `{ … } >` sent a body without its replay — `builder`
+- #42 — A query that reads one fact two ways (`information_schema` for tables, `pg_catalog` for mat views) needs one test per path where the answers differ; a fixture where type and relation share a schema cannot tell them apart: check with a mutant — `branch-reviewer`
+- #42 — A warning that names a file the user has is built from `config.outDir`, as `write.ts` does; only a test with an `outDir` other than `.` catches it — `builder`
+- #42 — A PR body that quotes a message's exact text is checked after every review round — `builder`
+- #42 — A colliding pair lives in scratch schemas the test creates in its own database and drops in `afterAll`, which keeps the fixture and every snapshot untouched — `builder`
 
 ## Minors kept
 
