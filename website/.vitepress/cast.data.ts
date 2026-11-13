@@ -9,7 +9,7 @@ import { pathToFileURL } from 'node:url';
 import { createTwoslasher } from 'twoslash';
 import { createMarkdownRenderer, defineLoader } from 'vitepress';
 import * as db from 'zapatos/db';
-import { sqlParameters, syntax } from './syntax.ts';
+import { lineIndents, sqlParameters, syntax } from './syntax.ts';
 import { twoslashOptions } from './twoslash.ts';
 
 export interface Cast {
@@ -55,7 +55,7 @@ export default defineLoader({
   watch: ['../examples/*.ts', '../zapatos/schema.d.ts'],
   async load(files) {
     const
-      md = await createMarkdownRenderer(process.cwd(), { theme: syntax, codeTransformers: [sqlParameters] }),
+      md = await createMarkdownRenderer(process.cwd(), { theme: syntax, codeTransformers: [sqlParameters, lineIndents] }),
       highlight = (code: string, lang: string) => md.renderAsync('```' + lang + '\n' + code + '\n```'),
       twoslasher = createTwoslasher(twoslashOptions),
       casts: Record<string, Cast> = {};
