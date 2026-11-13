@@ -17,7 +17,7 @@ Sources: the "Surprises" sections of PRs #4, #5, #7 and #8, the `characterizatio
 | Docs | 4 | 3 | 1 |
 | **Total** | **67** | **34** | **33** |
 
-32 findings to fix (R65, R66 decided), 5 behind an opt-in, 18 to document and 12 to leave.
+31 findings to fix (R65, R66 decided), 5 behind an opt-in, 19 to document and 12 to leave.
 
 The three that matter most:
 
@@ -98,7 +98,7 @@ The three that matter most:
 |---|---|---|---|---|---|---|
 | R32 | types | `upsert` accepts the `Constraint` of another table; Postgres refuses it at run time. | `types/shortcuts › upsert accepts the constraint of another table` | non-breaking | **documented**, PR #275: refusing it in the type also refuses unions that run under 6.6.1 (`cond ? 'email' : db.constraint<'accounts'>(…)` on `users`); `constraint<'users'>(…)` checks the name | — |
 | R33 | types | `add()` and `subtract()` refuse a `Parameter`, which the runtime accepts; yet `add(1)` on a date is ambiguous (42725) without a cast. | `types/core › add() and subtract() refuse a Parameter, which the runtime accepts` ; `integration/conditions › add a number of days to a date needs a cast` | non-breaking: the type widens | **documented**, PR #276: widening the type changes `typeof add`, so a function written to 6.6.1's signature no longer fits it (TS2322), and a date column still refuses a number; date arithmetic takes a `sql` fragment, `` sql`${self} + ${param(3, 'int4')}` `` | — |
-| R34 | types | `arrayContains`, `arrayContainedIn`, `arrayOverlaps` are typed on the element: `{ scores: arrayContains([1]) }` is refused. Corpus: all three rewritten as home-made fragments. | `types/core › array conditions are typed on the element, not on the column` | non-breaking if the workaround `arrayContains<number[]>([[1]])` still compiles | fix | Type the array conditions on the array column, not on its element |
+| R34 | types | `arrayContains`, `arrayContainedIn`, `arrayOverlaps` are typed on the element: `{ scores: arrayContains([1]) }` is refused. Corpus: all three rewritten as home-made fragments. | `types/core › array conditions are typed on the element, not on the column` | non-breaking if the workaround `arrayContains<number[]>([[1]])` still compiles | **documented**, PR #282: every type tried on the column breaks code that compiles under 6.6.1, a mock written to its signature (one signature) or the typed result of `.map(arrayContains)` (overloads); an array column takes `arrayContains<number[]>([[1]])` or `` sql`${self} @> ${param([1], 'int4[]')}` `` | — |
 | R35 | types | `columns: [...] as const` gives `never[]`. | `types/core › columns as a readonly tuple gives never[]` | breaking: the returned type widens | fix | Accept a readonly array as the columns option |
 | R36 | types | An inline `` sql`${self} = 1` `` in a `Whereable` of `select` is refused: `Constraint` is inferred before `T`. | `` types/core › an inline sql`${self} …` in a Whereable is refused `` | non-breaking | document: `sql<db.SQL>` or a fragment declared beforehand; fixing it touches the inference of every shortcut | — |
 | R37 | types | An untyped `` sql`…` `` in `lateral` makes its key `any`, with no error. | ``` types/core › an untyped sql`` lateral is `any` ``` | breaking: refusing it would break these calls | document: type the fragment | — |
