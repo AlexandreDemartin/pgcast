@@ -165,7 +165,10 @@ onMounted(async () => {
 
   // as a code block of the docs: no line numbers, no guides
   editor = monaco.editor.create(host.value!, {
-    model, theme: 'pgcast', ariaLabel: 'The query, in TypeScript: edit it to update its SQL and its type',
+    model, theme: 'pgcast',
+    // Monaco's own binding (toggleTabFocusMode): Tab indents until it is pressed
+    ariaLabel: 'The query, in TypeScript: edit it to update its SQL and its type. ' +
+      'Tab indents; Ctrl+M, or Ctrl+Shift+M on a Mac, makes Tab move focus out of the editor',
     fontFamily, fontSize: 13, lineHeight: 21, tabSize: 2,
     lineNumbers: 'off', glyphMargin: false, folding: false, lineDecorationsWidth: 16, padding: { top: 14, bottom: 14 },
     minimap: { enabled: false }, overviewRulerLanes: 0, hideCursorInOverviewRuler: true, renderLineHighlight: 'none',

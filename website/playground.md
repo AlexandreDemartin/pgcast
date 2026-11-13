@@ -24,6 +24,7 @@ Edit a query on the docs schema and watch, as you type, the SQL that pgcast writ
 - **The types**: TypeScript 5.9.3, the compiler of these docs, in Monaco, the editor of VS Code. Hover a name to see its type; an error is underlined as you type.
 - **The SQL**: pgcast's own runtime, in a worker of this page, with a pool that records each query it is given. Each query appears with its values.
 - **No database yet**: a query gets no rows back, so code that needs a row stops after its query, with the error it got.
+- **The keyboard**: in the editor, Tab indents. To leave it with Tab, press Ctrl+M first (Ctrl+Shift+M on a Mac); press it again to indent with Tab.
 
 ## The schema
 
