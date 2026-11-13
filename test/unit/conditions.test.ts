@@ -327,7 +327,7 @@ describe('conditions', () => {
     }).toMatchInlineSnapshot(`
       {
         "and": {
-          "text": "((("col" > $1 AND ("other" = $2))))",
+          "text": "(((("col" > $1) AND (("other" = $2)))))",
           "values": [
             1,
             2,
@@ -377,6 +377,23 @@ describe('conditions', () => {
     `);
   });
 
+  // 6.6.1 wrote `(a OR b AND c)`, which reads `a OR (b AND c)`: each case red on its own there
+  it.each([
+    ['a fragment, then a fragment', () => dc.and(sql`a OR b`, sql`c`).compile(), { text: '((a OR b) AND (c))', values: [] }],
+    ['a fragment, then a Whereable', () => dc.and(sql`a OR b`, { id: 1 }).compile(), { text: '((a OR b) AND (("id" = $1)))', values: [1] }],
+    ['a Whereable, then a fragment', () => dc.and({ id: 1 }, sql`a OR b`).compile(), { text: '((("id" = $1)) AND (a OR b))', values: [1] }],
+    ['one operand', () => dc.and(sql`a OR b`).compile(), { text: '((a OR b))', values: [] }],
+    ['conditions, as a Whereable value', () => show(dc.and(dc.gt(1), dc.isNull)), { text: '(((("col" > $1) AND ("col" IS NULL))))', values: [1] }],
+    ['nested and(), or() and not()', () => dc.and(dc.or(sql`a`, sql`b`), dc.not(sql`c`), dc.and(sql`d OR e`, sql`f`)).compile(),
+      { text: '(((a OR b)) AND ((NOT (c))) AND (((d OR e) AND (f))))', values: [] }],
+  ])('and() parenthesises each operand: %s', (_name, compile, expected) => {
+    expect(compile()).toEqual(expected);
+  });
+
+  it('or() keeps its operands as they are: AND binds tighter than OR', () => {
+    expect(dc.or(sql`a AND b`, sql`c OR d`, { id: 1 }).compile()).toEqual({ text: '(a AND b OR c OR d OR ("id" = $1))', values: [1] });
+  });
+
   // their identities; 6.6.1 wrote `()`, which Postgres refuses (42601): each case red on its own there
   it.each([
     ['and()', () => dc.and().compile(), { text: 'TRUE', values: [] }],
@@ -385,9 +402,9 @@ describe('conditions', () => {
     ['or() as a Whereable value', () => show(dc.or()), { text: '((FALSE))', values: [] }],
     ['not(and())', () => dc.not(dc.and()).compile(), { text: '(NOT (TRUE))', values: [] }],
     ['not(or())', () => dc.not(dc.or()).compile(), { text: '(NOT (FALSE))', values: [] }],
-    ['and(or())', () => dc.and(dc.or()).compile(), { text: '(FALSE)', values: [] }],
+    ['and(or())', () => dc.and(dc.or()).compile(), { text: '((FALSE))', values: [] }],
     ['or(and())', () => dc.or(dc.and()).compile(), { text: '(TRUE)', values: [] }],
-    ['and(or(), Whereable)', () => dc.and(dc.or(), { id: 1 }).compile(), { text: '(FALSE AND ("id" = $1))', values: [1] }],
+    ['and(or(), Whereable)', () => dc.and(dc.or(), { id: 1 }).compile(), { text: '((FALSE) AND (("id" = $1)))', values: [1] }],
     ['or(and(), Whereable)', () => dc.or(dc.and(), { id: 1 }).compile(), { text: '(TRUE OR ("id" = $1))', values: [1] }],
   ])('and() / or() without argument: %s', (_name, compile, expected) => {
     expect(compile()).toEqual(expected);
