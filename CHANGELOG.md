@@ -31,6 +31,7 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 - Dependabot version updates (`.github/dependabot.yml`), weekly: dev dependencies, minor and patch, in one PR; GitHub Actions in another. A minor or patch never changes `dependencies` or `peerDependencies`.
 
 ### Changed
+- The JSDoc of `constraint()` and `upsert()`, and the Reference entry of `constraint()`, say that the type does not check that a constraint belongs to the upsert's table, which Postgres refuses (42704): a `db.constraint('…')` held in a variable takes any table's name, and `db.constraint<'users'>('users_pkey')` checks the name against that table. The type is Zapatos 6.6.1's, unchanged (R32).
 - The JSDoc of `selectExactlyOne()` and its Reference entry say that it checks for at least one row, not exactly one: `LIMIT 1`, then the first row. The behaviour is Zapatos 6.6.1's, unchanged.
 - A cast panel shows the type of its example's first `const` with no type written, the query's, so an example can type its input first: the tutorial's "Add a film" shows the inserted row again, `films.JSONSelectable`, not the `films.Insertable` it was given.
 - Links in the docs site keep their hash as written, so they reach a reference entry anchored with capitals or dots (`/runtime-config#Config.upsertRequiresSameKeys`); VitePress made it `#config-upsertrequiressamekeys`, which went nowhere.
