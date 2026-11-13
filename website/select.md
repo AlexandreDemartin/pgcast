@@ -219,7 +219,9 @@ class NotExactlyOneError extends Error {
 }
 ```
 
-What `selectExactlyOne()`, the mode `ExactlyOne` of `select()`, rejects with when no row matches. Its `name` is `'NotExactlyOneError'`, its `message` "One result expected but none returned (hint: check `.query.compile()` on this Error)"<!-- message -->; with [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow), a second row gives "One result expected but more returned (hint: check `.query.compile()` on this Error)"<!-- message -->. Its `query` is the [`SQLFragment`](/sql-template#SQLFragment) that ran: `err.query.compile()` gives its SQL and values. `err instanceof db.NotExactlyOneError` recognises it; catching it: [Tell a missing row from the others](/handle-errors#tell-a-missing-row-from-the-others).
+What `selectExactlyOne()`, the mode `ExactlyOne` of `select()`, rejects with when no row matches. Its `name` is `'NotExactlyOneError'`, its `message` "One result expected but none returned (hint: check `.query.compile()` on this Error)"<!-- message -->; with [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow), a second row gives "One result expected but more returned (hint: check `.query.compile()` on this Error)"<!-- message -->.
+
+Its `query` is the [`SQLFragment`](/sql-template#SQLFragment) that ran: `err.query.compile()` gives its SQL and values. `err instanceof db.NotExactlyOneError` recognises it; catching it: [Tell a missing row from the others](/handle-errors#tell-a-missing-row-from-the-others).
 
 ## `count()` {#count}
 
@@ -237,6 +239,8 @@ db.count(table, where, options?)
 
 `count()` and the four below take the options of [`select()`](#options), with these differences:
 
+<div class="stack">
+
 | Option | SQL it adds | Effect on the type |
 |---|---|---|
 | `columns: ['subtitled']` | `count("subtitled")`<!-- probe: db.count('screenings', db.all, { columns: ['subtitled'] }) --> in place of `count(*)`: the rows where it is not `NULL`; one column, as several (or none, `[]`) throw | none |
@@ -246,18 +250,22 @@ db.count(table, where, options?)
 | `lateral: { … }` | its `LEFT JOIN LATERAL`s, whose results are not read; a single subquery throws, as there is no row to pass it through to | none |
 | `having`, `limit`, `offset` | as in `select()`; when they leave no row (a `having` that keeps none, `limit: 0`, `offset: 1`), `.run()` rejects with a `TypeError` | none |
 
-`count()` and the four below throw these while compiling, so `.run()` rejects with a plain `Error`, not a `DatabaseError`, before any query, and `.compile()` throws; so does a query that nests one. Zapatos 6.6.1 sent the SQL, which Postgres refused: `sum(*)` and `count("id", "mood")` (42883), `count()` (42809), `SELECT  AS result` (42601). The type is that of 6.6.1, which lets these calls through, a single subquery as `lateral` when there is no `columns` nor `extras`.
+</div>
 
-Two calls that ran under 6.6.1 now reject too:
-
-- An aggregate of your own that takes another number of arguments under a built-in name. After `CREATE AGGREGATE max(int4, int4) (…)`, `db.max('ratings', db.all, { columns: ['stars', 'votes'] })` sent `max("stars", "votes")`. `db.select('ratings', db.all, { columns: ['stars', 'votes'] }, db.SelectResultMode.Numeric, 'max')` sends the same SQL.
-- A refused aggregate marked `noop`, which resolved to its `noopResult`: `run()` compiles the query before it reads `noop`.
+`count()` and the four below throw these while compiling, so `.run()` rejects with a plain `Error`, not a `DatabaseError`, before any query, and `.compile()` throws; so does a query that nests one:
 
 | Message | When | Since |
 |---|---|---|
 | `…() needs one column to aggregate: pass columns: ['column']`<!-- message --> | `sum()`, `avg()`, `min()` or `max()` without `columns` | pgcast 6.7.0 |
 | `…() takes one column in columns, not …`<!-- message --> | `columns` with several columns, or none (`[]`) | pgcast 6.7.0 |
 | `…() cannot pass a lateral query through: nest it in the lateral of a select() instead`<!-- message --> | a single subquery as `lateral` | pgcast 6.7.0 |
+
+Zapatos 6.6.1 sent the SQL, which Postgres refused: `sum(*)` and `count("id", "mood")` (42883), `count()` (42809), `SELECT  AS result` (42601). The type is that of 6.6.1, which lets these calls through, a single subquery as `lateral` when there is no `columns` nor `extras`.
+
+Two calls that ran under 6.6.1 now reject too:
+
+- An aggregate of your own that takes another number of arguments under a built-in name. After `CREATE AGGREGATE max(int4, int4) (…)`, `db.max('ratings', db.all, { columns: ['stars', 'votes'] })` sent `max("stars", "votes")`. `db.select('ratings', db.all, { columns: ['stars', 'votes'] }, db.SelectResultMode.Numeric, 'max')` sends the same SQL.
+- A refused aggregate marked `noop`, which resolved to its `noopResult`: `run()` compiles the query before it reads `noop`.
 
 With `columns`, it counts two of the four screenings: the other two have `subtitled` `NULL`.
 
@@ -350,7 +358,9 @@ What the signatures above are made of, from `zapatos/db`. `T` is a table, `C` th
 enum SelectResultMode { Many, One, ExactlyOne, Numeric }
 ```
 
-The fourth argument of `select()`: an array of rows (`select()`), a row or `undefined` (`selectOne()`), a row or an error (`selectExactlyOne()`), a number (`count()` and the others). With `Numeric`, the fifth argument names the aggregate, `'count'` by default; since pgcast 6.6.2 it must be a function name, plain, quoted or `U&` quoted, in up to three dotted parts (`stddev_pop`, `my_schema."MyAgg"`). Any aggregate that returns a number works:
+The fourth argument of `select()`: an array of rows (`select()`), a row or `undefined` (`selectOne()`), a row or an error (`selectExactlyOne()`), a number (`count()` and the others).
+
+With `Numeric`, the fifth argument names the aggregate, `'count'` by default; since pgcast 6.6.2 it must be a function name, plain, quoted or `U&` quoted, in up to three dotted parts (`stddev_pop`, `my_schema."MyAgg"`). Any aggregate that returns a number works:
 
 <CastPanel example="selectAggregate">
 

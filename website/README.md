@@ -104,6 +104,7 @@ A reader scans before reading, so a page breathes. Less is more: it keeps every 
 ### Examples
 
 - A `ts twoslash` block is compiled against the built `zapatos/db` and the docs schema's `zapatos/schema`; hovers show the types TypeScript gives. An unexpected type error fails the build; a block meant to fail says so with `// @errors: <code>`.
+- A hover names a package's module as the reader imports it (`typeof import("pg")`), where TypeScript prints its path on the build machine (`.vitepress/twoslash.ts`, `moduleNames`). After VitePress, `docs:build` fails on a machine's path in any built text file, hovers included (`check-paths.mjs`): this checkout's, or one that starts `/home/`, `/Users/`, `/runner/` or a drive letter. A path that a package's JSDoc gives as an example goes in its `allowed`.
 - Twoslash reports only a block's own errors, so `docs:build` first runs `tsc` (`tsconfig.json`) on the docs schema and `examples/`: a stale schema fails there.
 - **The cast panel** shows what you write, what Postgres runs and what TypeScript knows. It is for a query whose SQL and type the reader should see: a shortcut, an option that changes the SQL. Code that sends no query (a pool, a config, a type) is a plain `ts twoslash` block.
 - A cast panel's example is a module in `examples/`, its imports above `// ---cut---`, hidden on the page (`examples/first-query.ts` is the shortest):
@@ -128,6 +129,7 @@ A reader scans before reading, so a page breathes. Less is more: it keeps every 
   - A block that shows an error (`// @errors:`) stays out of the join, as the reader does not keep it. Its code is type-checked below the steps above it, in a `{ … }` of its own, and must give exactly the codes it lists: Twoslash checks it only against its own setup.
   - If the first `ts twoslash` block under the line is titled with the file (`ts twoslash [src/films.ts]`), it shows the whole file: it must be the join, imports in any order and blank lines aside.
 - An optional caption goes under the panel: `<template #caption><span>…</span></template>` (`index.md`).
+- On a docs page, the panel's code label ends with **Open in playground**, a link that opens its example in `/playground`, the code after `// ---cut---` and above it, deflated into `#code/…` at build (`.vitepress/playgroundLinks.ts`); its accessible name adds the heading above the panel (`Open in playground: Arrays, example 2`). None on the home nor on the playground. The playground gives the type of its code's first `const`; an example that runs a query above its cut, so that another `const` comes first, writes `// the playground gives the type of the next const` on the line above `// ---cut---` (`examples/paginate_keyset.ts`), or gets no link. After VitePress, the build decodes each link of the built pages as the playground does, and fails on a panel without its link, or whose link opens other code.
 
 ### The reference
 
@@ -143,6 +145,7 @@ At build, `.vitepress/llms.ts` writes two files to the site's root, from the out
 
 - `llms.txt`: `# pgcast`, a summary (the site's description and the home's lede), then one section per group, each written page with its URL and lede, and `## Optional`, the changelog. So a page needs a `# ` title and a `{.lede}` paragraph, or the build fails.
 - `llms-full.txt`: every written page as plain Markdown, each cast panel with the SQL, values and type `cast.data.ts` computes. A panel not written `<CastPanel example="<name>">` fails the build.
+- `/<page>.md` (`/index.md` for the home): each page's part of `llms-full.txt`, in a file of its own, listed nowhere. Beside the title of each written page of the outline, its page actions (`.vitepress/theme/PageActions.vue`) copy it, link it, and open ChatGPT or Claude on a prompt that names its URL; nothing outside the site is fetched until one of those links is followed. In `docs:dev` the file does not exist: `docs:build` writes it.
 
 A "Coming" page has no `.md` file, so it is in neither; nor are the templates and this README, which the outline does not list. The changelog is in `llms.txt` only.
 

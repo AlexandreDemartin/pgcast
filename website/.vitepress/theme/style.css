@@ -6,6 +6,7 @@
 :root {
   --bg: #f6f8f9; --surface: #ffffff; --sunken: #eef2f4; --fg: #12202b; --muted: #566673; --line: #d9e0e5;
   --accent: #0a6b63; --accent-fg: #ffffff; --accent-soft: #dcefec; --warn: #8a5a00; --warn-soft: #fbf0d9;
+  --error: #b22e2e;
   --code-bg: #f1f4f6; --k: #1458a8; --s: #8f5600; --t: #0a6b63; --n: #b0245a; --c: #626e79; --qi: #12202b; --p: #b0245a;
   --font-display: "Schibsted Grotesk", "Helvetica Neue", Arial, sans-serif;
   --font-body: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -15,6 +16,7 @@
 .dark {
   --bg: #0d1318; --surface: #121a21; --sunken: #0a0f13; --fg: #e2e9ee; --muted: #8d9eab; --line: #23303a;
   --accent: #4fcfbf; --accent-fg: #06201d; --accent-soft: #11302c; --warn: #e8b65a; --warn-soft: #2c2412;
+  --error: #d96d6d;
   --code-bg: #0f171d; --k: #7fb6ff; --s: #e3b462; --t: #4fcfbf; --n: #f08ab3; --c: #768794; --qi: #e2e9ee; --p: #f08ab3;
   color-scheme: dark;
 }
@@ -169,6 +171,34 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 .vp-doc .GroupPages a { font-size: 16px; font-weight: 500; color: var(--accent); }
 .vp-doc .GroupPages p { margin: 4px 0 0; color: var(--muted); }
 
+/* the 404 page (NotFound.vue), on the reading column's width: the home's eyebrow, a page's title and lede, a search
+   field as the top bar's, then the groups and the home as a group's landing page lists its pages */
+.NotFound {
+  max-width: 688px; margin: 0 auto;
+  padding: 96px max(16px, env(safe-area-inset-right, 0px)) 120px max(16px, env(safe-area-inset-left, 0px));
+}
+.NotFound .eyebrow { font: 500 13px/1 var(--font-mono); color: var(--accent); margin: 0 0 16px; }
+.NotFound h1 {
+  font: 600 2.5rem/1.15 var(--font-display); letter-spacing: -.01em; text-wrap: balance; margin: 0 0 12px;
+}
+.NotFound .lede { font-size: 1.1rem; color: var(--muted); margin: 0 0 28px; max-width: 62ch; }
+.NotFound .search {
+  display: flex; align-items: center; gap: 8px; width: 100%; max-width: 320px; height: 40px; padding: 0 12px;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--sunken); color: var(--muted); font-size: 14px;
+  cursor: pointer;
+}
+.NotFound .search:hover { border-color: var(--accent); }
+.NotFound ul { list-style: none; padding: 0; margin: 32px 0 0; display: grid; gap: 12px; }
+.NotFound a {
+  font-size: 16px; font-weight: 500; color: var(--accent);
+  text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px;
+}
+.NotFound a:hover { text-decoration-thickness: 2px; }
+@media (max-width: 560px) {
+  .NotFound { padding-top: 48px; }
+  .NotFound h1 { font-size: 2rem; }
+}
+
 /* code blocks */
 .vp-doc div[class*='language-'], .vp-code-group { border: 1px solid var(--line); border-radius: var(--radius); }
 .vp-code-group { margin: 16px 0 20px; background: var(--code-bg); overflow: hidden; }
@@ -246,6 +276,36 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 .Diagram .arrow { stroke: var(--muted); stroke-width: 1.5; }
 .Diagram .head { fill: var(--muted); }
 .vp-doc .Diagram figcaption { margin: 12px 0 0; font-size: 13px; color: var(--muted); max-width: 68ch; }
+
+/* a written page's actions (PageActions.vue): one quiet split button, floated beside the title, so that a long title
+   wraps under it; its menu and its "Copied" under it, over the text */
+.PageActions { float: right; position: relative; margin: 7px 0 8px 16px; z-index: 10; }  /* in line with the h1's first line */
+/* on a phone, its icon only, so the title keeps the column; its label is still its name */
+@media (max-width: 560px) {
+  .PageActions { margin-top: 2px; }
+  .PageActions .copy .label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+}
+.PageActions .split { display: flex; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.PageActions .split button {
+  display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; color: var(--muted);
+  font: 500 13px/1 var(--font-body);
+}
+.PageActions .split button:hover { background: var(--sunken); color: var(--fg); }
+.PageActions .copy { border-radius: 7px 0 0 7px; }
+.PageActions .toggle { border-left: 1px solid var(--line); border-radius: 0 7px 7px 0; padding: 0 6px !important; }
+.PageActions svg { width: 16px; height: 16px; flex: none; }
+.PageActions .menu {
+  position: absolute; top: calc(100% + 4px); right: 0; min-width: 200px; padding: 4px; display: flex; flex-direction: column;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 8px 28px rgba(0, 0, 0, .18);
+}
+.PageActions .menu > * {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 10px; border-radius: 6px;
+  font: 400 14px/20px var(--font-body); color: var(--fg); text-decoration: none; text-align: left;
+}
+.PageActions .menu > :hover, .PageActions .menu > :focus { background: var(--sunken); }
+.PageActions .menu > :focus-visible { outline-offset: -2px; }
+.PageActions .menu svg { color: var(--muted); width: 14px; height: 14px; }
+.PageActions .status { position: absolute; top: calc(100% + 4px); right: 0; white-space: nowrap; font-size: 12px; color: var(--muted); }
 
 /* pager, then the edit row */
 .VPDocFooter { display: flex; flex-direction: column; }
@@ -333,6 +393,12 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
   font: 700 11px/1 var(--font-mono); font-style: normal; color: var(--accent);
   border: 1px solid var(--accent); border-radius: 999px; padding: 3px 6px;
 }
+/* Open in playground, at the end of the code's label: in the label's type, quiet until hovered */
+.CastPanel .label .CastPanel-open {
+  margin-left: auto; font-weight: 500; color: var(--muted);
+  text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px;
+}
+.CastPanel .label .CastPanel-open:hover { color: var(--accent); text-decoration-color: currentColor; }
 .CastPanel > div > div { flex: 1; min-width: 0; }  /* the code, above the values row */
 .CastPanel div[class*='language-'] { margin: 0; border: 0; border-radius: 0; background: transparent; }
 .CastPanel div[class*='language-'] > .copy, .CastPanel div[class*='language-'] > .lang { display: none; }
@@ -373,6 +439,9 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
   --twoslash-underline-color: var(--muted);
   --twoslash-code-font: var(--font-mono);
   --twoslash-code-size: 12.5px;
+  /* an error line (`// @errors`), on a tint of its own colour as Twoslash's #d45656 has, darker or lighter for 4.5:1 */
+  --twoslash-error-color: var(--error);
+  --twoslash-error-bg: color-mix(in srgb, var(--error) 12.5%, transparent);
 }
 .twoslash .twoslash-hover { border-bottom: 1px dashed var(--muted); cursor: help; }
 .twoslash .twoslash-hover:hover, .twoslash .twoslash-hover:focus-within { background: var(--accent-soft); border-radius: 2px; }

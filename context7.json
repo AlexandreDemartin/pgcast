@@ -1,0 +1,15 @@
+{
+  "$schema": "https://context7.com/schema/context7.json",
+  "projectTitle": "pgcast",
+  "description": "Zero-abstraction Postgres for TypeScript: types cast from your database schema. A maintained fork of Zapatos.",
+  "folders": ["website"],
+  "excludeFolders": ["website/.vitepress", "website/templates", "website/zapatos", "website/public", "website/node_modules"],
+  "excludeFiles": ["README.md", "CHANGELOG.md", "changelog.md", "playground.md"],
+  "rules": [
+    "pgcast is installed under the zapatos alias (npm install zapatos@npm:pgcast): import * as db from 'zapatos/db' and import type * as s from 'zapatos/schema', never from 'pgcast'.",
+    "The types come from the database: run npx pgcast after a migration, and never edit zapatos/schema.d.ts by hand.",
+    "Pass the pool or client to .run(pool) every time: there is no global client.",
+    "Never concatenate a value into SQL or pass one to db.raw(): a value goes in a shortcut's object, a Whereable or db.param(), and Postgres gets it as a parameter.",
+    "Prefer the shortcuts (select, selectOne, count, insert, upsert, update, deletes, lateral) and drop down to a db.sql template only for what they don't cover."
+  ]
+}
