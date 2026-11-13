@@ -88,8 +88,8 @@ export const plainText = (line: string) => inline(line, link => link)
 
 /**
  * A page's Markdown as plain Markdown: VitePress's containers as quotes (a code group unwrapped), each Twoslash block
- * as the page shows it (`shown()`), each cast panel as its example followed by `casts[example]`, HTML and attributes
- * dropped.
+ * as the page shows it (`shown()`), each cast panel as its example followed by `casts[example]`, At a glance as its
+ * label and its list, HTML and attributes dropped.
  */
 function plain(
   source: string, casts: Record<string, string>, srcDir: string, url: (link: string) => string, twoslasher: Twoslasher,
@@ -108,7 +108,8 @@ function plain(
         checkCopy(join(srcDir, path), source);
         return '```' + info + label + '\n' + snippet(join(srcDir, path), region) + '\n```';
       })
-      .replace(/<InstallLine command="([^"]*)" \/>/g, '```sh\n$1\n```'),
+      .replace(/<InstallLine command="([^"]*)" \/>/g, '```sh\n$1\n```')
+      .replace(/^<AtAGlance>$/gm, '**At a glance**'),  // its label; a diagram drops out, as its page says it all
     missed = /<\/?CastPanel\b.*/.exec(expanded)?.[0];
 
   // a panel written another way (`example='…'`, a second attribute) would drop silently out of llms-full.txt
