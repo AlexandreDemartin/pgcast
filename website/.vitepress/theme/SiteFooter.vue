@@ -3,6 +3,6 @@
   <p class="SiteFooter">
     pgcast is maintained by <a href="https://github.com/AlexandreDemartin">Alexandre Demartin</a>.
     Zapatos and its original documentation are by <a href="https://github.com/jawj">George MacKerron</a>.
-    MIT licence.
+    MIT licence. What changed in each version: the <a href="/changelog">changelog</a>.
   </p>
 </template>
