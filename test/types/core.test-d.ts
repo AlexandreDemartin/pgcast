@@ -305,8 +305,9 @@ describe('type surprises', () => {
     c.subtract(db.param(1));
   });
 
-  test('characterization: array conditions are typed on the element, not on the column', () => {
-    // characterization: arrayContains<T>(a: T[] | ParentColumn) gives Constraint T = number; scores wants number[]
+  test('array conditions are typed on the element, not on the column', () => {
+    // documented (R34, #40): arrayContains<T>(a: T[] | ParentColumn) gives Constraint T = number; scores wants number[].
+    // Every type tried on the column broke code that compiles under 6.6.1 (a mock written to its signature, `.map()`)
     // @ts-expect-error valid at run time ("scores" @> '{1}'), refused by the type
     db.select('accounts', { scores: c.arrayContains([1]) });
     // @ts-expect-error same for arrayContainedIn
