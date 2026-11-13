@@ -327,7 +327,7 @@ describe('conditions', () => {
     }).toMatchInlineSnapshot(`
       {
         "and": {
-          "text": "((("col" > $1 AND ("other" = $2))))",
+          "text": "(((("col" > $1) AND (("other" = $2)))))",
           "values": [
             1,
             2,
@@ -402,9 +402,9 @@ describe('conditions', () => {
     ['or() as a Whereable value', () => show(dc.or()), { text: '((FALSE))', values: [] }],
     ['not(and())', () => dc.not(dc.and()).compile(), { text: '(NOT (TRUE))', values: [] }],
     ['not(or())', () => dc.not(dc.or()).compile(), { text: '(NOT (FALSE))', values: [] }],
-    ['and(or())', () => dc.and(dc.or()).compile(), { text: '(FALSE)', values: [] }],
+    ['and(or())', () => dc.and(dc.or()).compile(), { text: '((FALSE))', values: [] }],
     ['or(and())', () => dc.or(dc.and()).compile(), { text: '(TRUE)', values: [] }],
-    ['and(or(), Whereable)', () => dc.and(dc.or(), { id: 1 }).compile(), { text: '(FALSE AND ("id" = $1))', values: [1] }],
+    ['and(or(), Whereable)', () => dc.and(dc.or(), { id: 1 }).compile(), { text: '((FALSE) AND (("id" = $1)))', values: [1] }],
     ['or(and(), Whereable)', () => dc.or(dc.and(), { id: 1 }).compile(), { text: '(TRUE OR ("id" = $1))', values: [1] }],
   ])('and() / or() without argument: %s', (_name, compile, expected) => {
     expect(compile()).toEqual(expected);
