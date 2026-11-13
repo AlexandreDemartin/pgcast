@@ -1,6 +1,6 @@
 # 002 — Module names: `zapatos/*` or `pgcast/*`
 
-- **Status**: accepted (2026-11-11): option A now, option C as the target; update proposed 2026-11-13: option C first, with the names `pgcast/*` ([#364](https://github.com/AlexandreDemartin/pgcast/issues/364)), waiting for the owner (§ Update (2026-11-13))
+- **Status**: accepted (2026-11-11): option A now, option C as the target; updated and validated 2026-11-13: option C first, with the names `pgcast/*` ([#364](https://github.com/AlexandreDemartin/pgcast/issues/364)), § Update (2026-11-13)
 - **Date**: 2026-11-11
 
 ## Context
@@ -117,3 +117,7 @@ On 2026-11-13, with `master` packed and installed as `pgcast` (npm 10, pnpm 12),
 1. The names `pgcast/*`, and `moduleNames: 'zapatos' | 'pgcast'`?
 2. The `zapatos/schema` shim in the generated file, and the warning for a stale folder?
 3. The config file: also read `pgcastconfig.json`, first if both exist? Proposed as its own small PR, after this one.
+
+### Validation
+
+Validated by the owner on 2026-11-13: the names `pgcast/*` and `moduleNames: 'zapatos' | 'pgcast'`; the `zapatos/schema` shim, with a generator warning for a stale folder of the other mode; `pgcastconfig.json`, read first when both files exist, in its own PR after this one.
