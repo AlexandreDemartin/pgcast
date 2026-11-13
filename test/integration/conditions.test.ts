@@ -97,7 +97,8 @@ describe('on users', () => {
     ['two fragments', dc.and(sql`${'id'} = 1 OR ${'id'} = 2`, sql`${'id'} = 2 OR ${'id'} = 3`), [2]],
     ['as a Whereable value, with self', { id: dc.and(sql`${db.self} = 1 OR ${db.self} = 2`, dc.gt(1)) }, [2]],
     ['under or()', dc.or(dc.and(sql`${'id'} = 1 OR ${'id'} = 2`, { manager_id: 1 }), { id: 3 }), [2, 3]],
-    ['under not()', dc.not(dc.and(sql`${'id'} = 1 OR ${'id'} = 2`, { manager_id: 1 })), [1, 3]],
+    // on display_name, NOT NULL: user 1's manager_id would make it NOT (NULL), no row either way
+    ['under not()', dc.not(dc.and(sql`${'id'} = 1 OR ${'id'} = 2`, { display_name: 'Bob' })), [1, 3]],
   ] as [string, db.SQL, number[]][])('and() parenthesises a fragment with a bare OR: %s', async (_name, where, expected) => {
     expect(await ids('users', where)).toEqual(expected);
   });
