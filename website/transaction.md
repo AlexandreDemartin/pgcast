@@ -11,7 +11,7 @@ db.transaction(txnClientOrQueryable, isolationLevel, callback)
 
 Runs `callback` in one transaction, then commits it, retries it or rolls it back. It returns a promise of what `callback` resolves to.
 
-- `txnClientOrQueryable`: a `pg.Pool`, from which it checks out a client, released at the end; a client, `pg.Client` or a `pg.PoolClient` already checked out, used and left connected; or the client of a transaction already open, [passed through](#passing-a-transaction-through).
+- `txnClientOrQueryable`: a `pg.Pool`, from which it checks out a client, released at the end; a client, `pg.Client`, `pg.native.Client` or a `pg.PoolClient` already checked out, used and left connected; or the client of a transaction already open, [passed through](#passing-a-transaction-through).
 - `isolationLevel`: an [`IsolationLevel`](#IsolationLevel).
 - `callback`: `async txnClient => …`, given a [`TxnClient`](#TxnClient) of that level. The queries of the transaction are those `.run(txnClient)`; one run on the pool, or on any other client, is not in it.
 
@@ -359,8 +359,8 @@ A plain `Error`, with no `code`, before anything is sent. A shortcut throws its 
 | `update()` with no column to set | the call throws | [`update()`](/insert#update) |
 | `truncate()` with another option | the call throws | [`truncate()`](/insert#truncate) |
 | an interpolation that has no meaning in SQL: a number, `null`, `db.all`, the global object | `.run()` rejects | [Interpolations](/sql-template#interpolations) |
-| `db.self` with no column, `db.parent()` with no parent table | `.run()` rejects | [`self`](/sql-template#self), [`parent()`](/sql-template#parent) |
-| `db.Default`, `db.self`, `db.raw()`, `db.cols()` or `db.vals()` as a filter value | `.run()` rejects | [Whereable objects](/sql-template#whereable), [Conditions](/conditions) |
+| `db.self` with no column; `db.parent()` with no parent table, so as an `insert()`, `upsert()` or `update()` value | `.run()` rejects | [`self`](/sql-template#self), [`parent()`](/sql-template#parent) |
+| `db.Default`, `db.self`, `db.raw()`, `db.cols()` or `db.vals()` as a filter value; `db.raw()`, `db.cols()` or `db.vals()` as an `insert()`, `upsert()` or `update()` value, or in any `vals({…})` | `.run()` rejects | [Whereable objects](/sql-template#whereable), [Conditions](/conditions), [`insert()`](/insert#insert), [`vals()`](/sql-template#vals) |
 | `transaction()` with another isolation level | its promise rejects | [`transaction()`, Errors](#errors) |
 
 After a query, pgcast rejects in three cases of its own: `selectExactlyOne()` with no row, or a second one under [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow), with a [`NotExactlyOneError`](/select#NotExactlyOneError); `count()` and the other aggregates with no row to read, with a `TypeError` ([`count()`](/select#count)); `transaction()` whose `COMMIT` Postgres answers with `ROLLBACK`, with [`transactionRequiresCommit`](/runtime-config#Config.transactionRequiresCommit) ([Errors](#errors)).
