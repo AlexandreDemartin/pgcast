@@ -107,7 +107,7 @@ declare module 'zapatos/schema' {
 
 ### Prototype
 
-On 2026-11-13, with `master` packed and installed as `pgcast` (npm 10, pnpm 12), and a copy of `dist/generate` patched to read `moduleNames`: a typed `select` with `lateral`, an `insert` and negative cases compiled under TypeScript 5.9.3 and 7.0.2, strict on and off, CJS and ESM (`nodenext`), and ran against Postgres. The published 6.6.2 also installed through the alias with npm, pnpm and Yarn 4 (`nodeLinker: node-modules`). Commands and outputs: the Proofs of the PR that added this section.
+On 2026-11-13, with `master` packed and installed as `pgcast` (npm 10, pnpm 12), and a copy of `dist/generate` patched to read `moduleNames`: a typed `select` with `lateral`, an `insert` and negative cases compiled under TypeScript 5.9.3 and 7.0.2, strict on and off, CJS and ESM (`nodenext`), and ran against Postgres. The published 6.6.2 also installed through the alias with npm, pnpm and Yarn 4 (`nodeLinker: node-modules`). Commands and outputs: the Proofs of [#367](https://github.com/AlexandreDemartin/pgcast/pull/367).
 
 - `lateral`, `columns`, `returning` and `extras` need `strictNullChecks`, in both modes, as in Zapatos (`docs/index.html`): strict off was proven with a `select` and an `insert`.
 - TypeScript 7 removed `moduleResolution: node10`; `module: commonjs` passes there.
