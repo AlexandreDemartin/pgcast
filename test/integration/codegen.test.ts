@@ -682,14 +682,14 @@ describe('enumOrder', () => {
 
   it('is off by default, with a note that names each enum whose declared order is not alphabetical', async () => {
     expect(await notesFor({ schemas: { public: only('users') } })).toEqual([
-      'Note: the labels of enum public.mood are in alphabetical order, in its type and its every tuple, not in their ' +
+      'Note: every.mood lists the labels of enum public.mood in alphabetical order, not in their ' +
       'declared order, by which Postgres sorts and compares them. ' +
       "Set enumOrder: 'declared' to keep that order; it will be the default in pgcast 7.0.",
     ]);
     // order_z.pos is in order; order_y.st is not generated, though order_x.t uses it
     expect(await notesFor({ schemas: { order_z: all, order_x: all, public: enumsOnly, extra: enumsOnly } })).toEqual([
-      'Note: the labels of enums extra.status, order_x.edit, order_x.reel and public.mood are in alphabetical order, ' +
-      'in their types and their every tuples, not in their declared order, by which Postgres sorts and compares them. ' +
+      'Note: every.<name> lists the labels of enums extra.status, order_x.edit, order_x.reel and public.mood ' +
+      'in alphabetical order, not in their declared order, by which Postgres sorts and compares them. ' +
       "Set enumOrder: 'declared' to keep that order; it will be the default in pgcast 7.0.",
     ]);
   });
@@ -700,7 +700,7 @@ describe('enumOrder', () => {
     expect(await notesFor({ schemas: { order_z: all } })).toEqual([]);
     expect(await notesFor({ schemas: { no_such_schema: all } })).toEqual([]);  // no enum at all
     expect(await notesFor({ schemas: { order_y: { include: [], exclude: [] } } })).toEqual([
-      'Note: the labels of enum order_y.st are in alphabetical order, in its type and its every tuple, not in their ' +
+      'Note: every.st lists the labels of enum order_y.st in alphabetical order, not in their ' +
       'declared order, by which Postgres sorts and compares them. ' +
       "Set enumOrder: 'declared' to keep that order; it will be the default in pgcast 7.0.",
     ]);  // control: no relation, and still its enums
@@ -770,15 +770,14 @@ describe('include entries that match no relation', () => {
       'have a type of another schema, ' +
       'which is looked up by name in the schema of their relation: an enum becomes an `any` custom type, or the enum of ' +
       'the same name there. Set typeEnumsAcrossSchemas: true to look it up in its own schema; it will be the default in pgcast 7.0.';
-    const orderNote = (list: string, one = false) => `Note: the labels of ${one ? 'enum' : 'enums'} ${list} are in ` +
-      `alphabetical order, in ${one ? 'its type and its every tuple' : 'their types and their every tuples'}, not in their ` +
-      "declared order, by which Postgres sorts and compares them. Set enumOrder: 'declared' to keep that order; " +
-      'it will be the default in pgcast 7.0.';
-    const bothOrderNote = orderNote('extra.status and public.mood');
+    const orderNote = (every: string, list: string) => `Note: every.${every} lists the labels of ${list} ` +
+      "in alphabetical order, not in their declared order, by which Postgres sorts and compares them. " +
+      "Set enumOrder: 'declared' to keep that order; it will be the default in pgcast 7.0.";
+    const bothOrderNote = orderNote('<name>', 'enums extra.status and public.mood');
     const expected: Record<string, string[]> = {
       main: [enumsNote, bothOrderNote],
       'unprefixedSchema-null': [bothOrderNote],
-      'schemaJSDoc-false': [orderNote('public.mood', true)],
+      'schemaJSDoc-false': [orderNote('mood', 'enum public.mood')],
       'customTypesTransform-PgMy_type': [enumsNote, bothOrderNote],
       'customTypesTransform-my_type': [enumsNote, bothOrderNote],
       'customTypesTransform-PgMyType': [enumsNote, bothOrderNote],
@@ -788,7 +787,7 @@ describe('include entries that match no relation', () => {
       columnOptions: [bothOrderNote],
       'include-exclude-lists': [unmatched('no_such_table', 'public'), bothOrderNote],
       'exclude-star': [bothOrderNote],  // exclude: '*' still generates the enums
-      edge: [orderNote('edge.traffic-light', true)],
+      edge: [orderNote('traffic-light', 'enum edge.traffic-light')],
     };
     const warnings: Record<string, string[]> = {};
     for (const [name, config] of [['main', main] as const, ...variants]) warnings[name] = await warningsOf(config);

@@ -159,7 +159,7 @@ export const tsForConfig = async (config: CompleteConfig, debug: (s: string) => 
               .map(name => ({ schema, name })),
           enumOrders = await enumOrdersFor(schema),
           enums = enumOrders[enumOrder],
-          outOfOrder = enumOrder === 'declared' ? [] : enumsOutOfOrder(enumOrders).map(name => `${schema}.${name}`),
+          outOfOrder = enumOrder === 'declared' ? [] : enumsOutOfOrder(enumOrders).map(name => ({ schema, name })),
           tableDefs = await Promise.all(tables.map(async table =>
             definitionForRelationInSchema(table, schema, enums, customTypes, config, queryFn, customTypeOrigins,
               enumsForSchema, columnsTypedByEnumName))),
