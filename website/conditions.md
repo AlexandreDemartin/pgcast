@@ -300,7 +300,7 @@ db.conditions.and<T>(...conditions: (SQLFragment<any, T> | Whereable)[])
 `update()` and `deletes()` given `and(...filters)` or `not(or(...ids))` with an empty list now reach every row: `deletes('films', and())` sends `WHERE TRUE`<!-- probe: db.deletes('films', db.conditions.and()) --> and deletes them all, `not(or())` gives `(NOT (FALSE))`<!-- probe: db.conditions.not(db.conditions.or()) -->. Zapatos 6.6.1 threw (42601) before any row changed. Keep the length check where an empty list must not reach every row.
 :::
 
-Zapatos 6.6.1 wrote the operands bare, `(a OR b AND c)`, which Postgres reads `a OR (b AND c)`: the example above found film 1000 too, whatever its studio, and `deletes()` or `update()` given it deleted or updated that row. Only an `and()` of two operands or more, one with a bare `OR` at its top level, now gives other rows; one whose SQL ends in the next operand, `` and(db.sql`${'release_year'} BETWEEN 1970`, db.sql`2000`) ``, now fails (42601). Any other gains parentheses and gives the same rows.
+Zapatos 6.6.1 wrote the operands bare, `(a OR b AND c)`, which Postgres reads `a OR (b AND c)`: the example above found film 1000 too, whatever its studio, and `deletes()` or `update()` given it deleted or updated that row. Only an `and()` of two operands or more, one with a bare `OR` at its top level, now gives other rows; one whose SQL ends in the next operand now fails (42601), `` and(db.sql`${'release_year'} BETWEEN 1970`, db.sql`2000`) ``, or, when the split falls inside a quoted literal, compares with another value, with no error: `` and(db.sql`${'title'} = 'x`, db.sql`y'`) `` compares `"title"` with `'x) AND (y'`, where it was `'x AND y'`. Any other gains parentheses and gives the same rows.
 
 ### `or()` {#conditions.or}
 
