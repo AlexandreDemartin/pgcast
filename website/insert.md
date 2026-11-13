@@ -95,10 +95,13 @@ Each SQL replaces the `DO UPDATE SET …` of the plain upsert, on `ratings` (on 
 - `updateColumns` takes a column or an array; `noNullUpdateColumns` a column, an array, or `db.all` for every column. [Insert and upsert in batches](/batches#rows-with-different-keys) has a panel of `updateColumns`: a booking keeps its time.
 - `updateValues` is one set of values for every row updated. Its keys are always updated, even when `updateColumns` leaves them out, or is `doNothing` (then the SQL is `DO UPDATE SET`<!-- probe: db.upsert('ratings', { film_id: 1000, stars: 5 }, ['film_id', 'stars'], { updateColumns: db.doNothing, updateValues: { votes: 1 } }) -->, not `DO NOTHING`).
 - In `updateValues`, a plain value is a parameter. A value that holds a fragment, `param()`, `raw()`, `cols()`, `vals()`, `parent()`, `Default` or `self`, at any depth of its arrays and plain objects, is compiled as in a `sql` template.
-- To read a column there, name the table for the existing row, `${'ratings'}.${'votes'}`, or `EXCLUDED` for the new one, `` db.sql`EXCLUDED.${'votes'}` ``. `db.self`, or a fragment or condition that uses it (`` db.sql`${db.self} + 1` ``, [`conditions.add()`](/conditions#conditions.add)), throws "The 'self' column alias has no meaning here"<!-- message -->, as in Zapatos 6.6.1; `db.parent()`, alone or in a fragment, throws "The 'parent' table alias has no meaning here"<!-- message -->.
+- To read a column there, name the table for the existing row, `${'ratings'}.${'votes'}`, or `EXCLUDED` for the new one, `` db.sql`EXCLUDED.${'votes'}` ``.
+- There, `db.self`, or a fragment or condition that uses it (`` db.sql`${db.self} + 1` ``, [`conditions.add()`](/conditions#conditions.add)), throws "The 'self' column alias has no meaning here"<!-- message -->, as in Zapatos 6.6.1; `db.parent()`, alone or in a fragment, throws "The 'parent' table alias has no meaning here"<!-- message -->.
 
 ::: warning Security
-Zapatos 6.6.1 wrote a plain string in `updateValues` as an identifier: `{ tagline: 'happy' }` put `"happy"` in the `ROW(…)`, and a string from a user could read other columns or tables. pgcast sends it as a parameter, `$3` in its place, as its type and `update()` always said. To read a column there, write a fragment, as in the table ([The security model](/security)).
+Zapatos 6.6.1 wrote a plain string in `updateValues` as an identifier: `{ tagline: 'happy' }` put `"happy"` in the `ROW(…)`, and a string from a user could read other columns or tables.
+
+pgcast sends it as a parameter, `$3` in its place, as its type and `update()` always said. To read a column there, write a fragment, as in the table ([The security model](/security)).
 :::
 
 With `noNullUpdateColumns`, a `NULL` leaves the existing value. Film 1002 comes back from a feed with no tagline, and keeps its own:
@@ -294,11 +297,15 @@ With `'CASCADE'`, Postgres empties every table that references one of them, at a
 
 In the values of `insert()`, `update()` and `upsert()`, Zapatos 6.6.1 sends `undefined` as `NULL`: a `NOT NULL DEFAULT` column fails, and `update()` erases the column instead of leaving it.
 
+<div class="stack">
+
 | In | By default, as in 6.6.1 | With `undefinedMeansMissing: true` |
 |---|---|---|
 | `insert()` | `NULL` | `DEFAULT`: `VALUES ($1, $2, $3, DEFAULT, $4)`<!-- probe: (db.setConfig({ undefinedMeansMissing: true }), db.insert('films', { studio_id: 1000, title: 'x', release_year: 2030, tagline: undefined, runtime_minutes: 90 })) --> |
 | `update()` | sets the column to `NULL`, and counts as a key | left out: `SET ("title") = ROW($1)`<!-- probe: (db.setConfig({ undefinedMeansMissing: true }), db.update('films', { title: 'x', tagline: undefined }, { id: 1000 })) -->; with no key left, it throws "nothing to update…"<!-- message --> |
 | `upsert()` | inserts `NULL`, then sets it from `EXCLUDED` | left out: not inserted, nor updated unless `updateColumns` names it (then from `EXCLUDED`, so an existing row takes the column's `DEFAULT`); in several rows, its cell is `DEFAULT` and counts as missing ([Rows with different keys](#upsert-different-keys)) |
+
+</div>
 
 - By default, each sends the SQL of 6.6.1 and warns once per process: `PGCAST_DEP002`.
 - An `undefined` in a `where` is unchanged.
@@ -314,7 +321,9 @@ In the values of `insert()`, `update()` and `upsert()`, Zapatos 6.6.1 sends `und
 
 ## `ReturningTypeForTable` {#ReturningTypeForTable}
 
-`ReturningTypeForTable<T, C, E>`: one row of what `insert()`, `update()` and `deletes()` return, for the table `T`, the `returning` columns `C` and the `extras` `E` (`undefined` for an option not given): the `JSONSelectable`, narrowed to `C`, with the keys of `E`. `insert()` of one row returns it; `insert()` of an array, `update()` and `deletes()` return an array of it. It types a fake result, in a test, from the schema:
+`ReturningTypeForTable<T, C, E>`: one row of what `insert()`, `update()` and `deletes()` return, for the table `T`, the `returning` columns `C` and the `extras` `E` (`undefined` for an option not given): the `JSONSelectable`, narrowed to `C`, with the keys of `E`.
+
+`insert()` of one row returns it; `insert()` of an array, `update()` and `deletes()` return an array of it. It types a fake result, in a test, from the schema:
 
 ```ts twoslash
 import * as db from 'zapatos/db';
