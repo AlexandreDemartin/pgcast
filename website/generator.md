@@ -324,7 +324,7 @@ import type * as s from 'pgcast/schema';
 - `"pgcast"` writes the same types, and ends `pgcast/schema.d.ts` with `declare module 'zapatos/schema' { export * from 'pgcast/schema'; }`: `pgcast/db`'s own declarations import `zapatos/schema`. Without it, every type would be `any`: under `skipLibCheck`, silently.
 - In the generated files, `zapatos` is left in that line and in the headers' credit to Zapatos. The config file keeps its name, `zapatosconfig.json` ([#368](https://github.com/AlexandreDemartin/pgcast/issues/368)); `npx pgcast` and `npx zapatos` both read the option.
 - Another value stops the generator before any query, and writes nothing: `moduleNames must be 'zapatos' (the default) or 'pgcast', not 'pgcats'`. In TypeScript, it fails to compile (TS2322, or TS2820 with a suggestion for a near-miss such as `"pgcats"`).
-- The other mode's schema in `outDir`, such as a `zapatos/` folder left from before the switch, is noted through [`warningListener`](#generate.warningListener). Both declare `zapatos/schema`, which TypeScript merges: with `"pgcast"`, a stale `zapatos/` that `tsconfig.json` includes lets a number through for a `text` column under `skipLibCheck`, and fails with TS2307 without it. Delete it once the placeholders you edited are moved to `pgcast/custom/`, renaming their `declare module 'zapatos/custom'` to `'pgcast/custom'`.
+- The other mode's schema in `outDir`, such as a `zapatos/` folder left from before the switch, is noted through [`warningListener`](#generate.warningListener). With `"pgcast"`, a stale `zapatos/` that `tsconfig.json` includes also declares `zapatos/schema`, which TypeScript merges: it lets a number through for a `text` column under `skipLibCheck`, and fails with TS2307 without it. With `"zapatos"`, a stale `pgcast/` loosens nothing, and its import of `pgcast/db` fails with TS2307 without `skipLibCheck`. Delete the stale folder once the placeholders you edited there are moved to the other, their `declare module 'zapatos/custom'` renamed `'pgcast/custom'`, or the reverse.
 
 ### `progressListener` {#generate.progressListener}
 
@@ -353,7 +353,9 @@ Writing custom types file: src/zapatos/custom/index.d.ts
 - `` Note: every.crew_job lists the labels of enum public.crew_job in alphabetical order, not in their declared order, by which Postgres sorts and compares them. Set enumOrder: 'declared' to keep that order; it will be the default in pgcast 7.0. ``
   - once per run, with [`enumOrder`](#generate.enumOrder) `"alphabetical"`, when a schema of [`schemas`](#generate.schemas) has an enum whose declared order is not alphabetical; several as `every.<name> lists the labels of enums archive.print_format and public.crew_job`;
 - `Note: src/zapatos/schema.d.ts is here too, generated with moduleNames: 'zapatos'. It declares 'zapatos/schema', as src/pgcast/schema.d.ts does, and TypeScript merges the two: types can loosen, silently under skipLibCheck. Delete the folder src/zapatos, once any placeholder you edited there is moved to src/pgcast/custom.`
-  - after writing, when `outDir` holds the schema of the other [`moduleNames`](#generate.moduleNames), either way; a folder without its `schema.d.ts` is not noted;
+  - after writing, with [`moduleNames`](#generate.moduleNames) `"pgcast"`, when `outDir` holds a `zapatos/schema.d.ts`; a folder without its `schema.d.ts` is not noted;
+- `Note: src/pgcast/schema.d.ts is here too, generated with moduleNames: 'pgcast'. Its import of 'pgcast/db' fails to compile without skipLibCheck. Delete the folder src/pgcast, once any placeholder you edited there is moved to src/zapatos/custom.`
+  - the same, with `"zapatos"` and a `pgcast/schema.d.ts`;
 - the [old layout warning](#the-old-layout-warning).
 
 ### `debugListener` {#generate.debugListener}

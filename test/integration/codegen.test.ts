@@ -979,11 +979,15 @@ declare module 'zapatos/schema' {
   };
   const scenes = { schemas: { module_names: all } };
   const placeholder = (folder: string) => `Writing new custom type or domain placeholder file: <out>/${folder}/custom/PgScene_notes.d.ts`;
-  const otherFolder = (found: string, written: string) =>
-    `Note: <out>/${found}/schema.d.ts is here too, generated with moduleNames: '${found}'. ` +
-    `It declares 'zapatos/schema', as <out>/${written}/schema.d.ts does, and TypeScript merges the two: ` +
-    `types can loosen, silently under skipLibCheck. Delete the folder <out>/${found}, ` +
-    `once any placeholder you edited there is moved to <out>/${written}/custom.`;
+  const staleZapatos =  // in 'pgcast' mode
+    `Note: <out>/zapatos/schema.d.ts is here too, generated with moduleNames: 'zapatos'. ` +
+    `It declares 'zapatos/schema', as <out>/pgcast/schema.d.ts does, and TypeScript merges the two: ` +
+    `types can loosen, silently under skipLibCheck. ` +
+    `Delete the folder <out>/zapatos, once any placeholder you edited there is moved to <out>/pgcast/custom.`;
+  const stalePgcast =  // in 'zapatos' mode
+    `Note: <out>/pgcast/schema.d.ts is here too, generated with moduleNames: 'pgcast'. ` +
+    `Its import of 'pgcast/db' fails to compile without skipLibCheck. ` +
+    `Delete the folder <out>/pgcast, once any placeholder you edited there is moved to <out>/zapatos/custom.`;
 
   it("writes pgcast/: the files of 'zapatos', but for the module names, the CLI and the zapatos/schema shim", async () => {
     await generate({ ...main, ...quiet, db: db(), outDir, moduleNames: 'pgcast' });
@@ -1014,10 +1018,10 @@ declare module 'pgcast/custom' {
     expect(await generateWarnings(scenes)).toEqual([placeholder('zapatos')]);
     expect(await generateWarnings(scenes)).toEqual([]);
     expect(await generateWarnings({ ...scenes, moduleNames: 'pgcast' })).toEqual([
-      placeholder('pgcast'), otherFolder('zapatos', 'pgcast'),
+      placeholder('pgcast'), staleZapatos,
     ]);
-    expect(await generateWarnings({ ...scenes, moduleNames: 'pgcast' })).toEqual([otherFolder('zapatos', 'pgcast')]);
-    expect(await generateWarnings(scenes)).toEqual([otherFolder('pgcast', 'zapatos')]);
+    expect(await generateWarnings({ ...scenes, moduleNames: 'pgcast' })).toEqual([staleZapatos]);
+    expect(await generateWarnings(scenes)).toEqual([stalePgcast]);
     rmSync(join(outDir, 'zapatos'), { recursive: true });
     expect(await generateWarnings({ ...scenes, moduleNames: 'pgcast' })).toEqual([]);
     mkdirSync(join(outDir, 'zapatos/custom'), { recursive: true });  // a folder with no schema: no warning
