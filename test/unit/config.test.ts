@@ -50,6 +50,7 @@ describe('setConfig()', () => {
     upsertRequiresSameKeys: false,
     undefinedMeansMissing: false,
     transactionRequiresCommit: false,
+    selectExactlyOneChecksForSecondRow: false,
   };
   const changed = {
     transactionAttemptsMax: 2,
@@ -59,6 +60,7 @@ describe('setConfig()', () => {
     upsertRequiresSameKeys: true,
     undefinedMeansMissing: true,
     transactionRequiresCommit: true,
+    selectExactlyOneChecksForSecondRow: true,
   };
 
   it.each([undefined, null])('sets a key that has a default back to it when given as %s', value => {
