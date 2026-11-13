@@ -14,8 +14,9 @@ const
   // with a name after it: `/home/` alone, as a page may write it, is no machine's; a drive is a capital letter with a
   // folder after it (`C:\Users\…`), so that minified code such as Monaco's `e:/[+` is not one
   absolute = /(?<![\w/.])(?:\/(?:home|Users|runner)\/|[A-Z]:[\\/](?=[\w.-]+[\\/]))[^\s"'`<>()]+/g,
-  // @types/node's example of `process.env`, in the hover of `process.env`
-  allowed = new Set(['/Users/maciej']),
+  // @types/node's example of `process.env`, in the hover of `process.env`; the home folders of PGlite's own file system,
+  // in memory, in the playground's Postgres
+  allowed = new Set(['/Users/maciej', '/home/web_user', '/home/postgres', '/home/postgres/.pgpass']),
   text = new Set(['.html', '.js', '.css', '.json', '.txt', '.xml', '.svg']),
   files = readdirSync(dist, { recursive: true }).filter(file => text.has(extname(file))),
   problems = [];
