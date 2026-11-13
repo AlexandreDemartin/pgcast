@@ -64,7 +64,8 @@ const variants: [string, Config][] = [
   }],
   ['include-exclude-lists', {
     schemas: {
-      public: { include: ['users', 'accounts', 'products', 'no_such_table'], exclude: ['products'] },  // exclude wins
+      // exclude wins; no_such_table generates nothing, with a warning (§ include entries that match no relation)
+      public: { include: ['users', 'accounts', 'products', 'no_such_table'], exclude: ['products'] },
       extra: { include: '*', exclude: ['type_zoo', 'imported_lines'] },
     },
   }],
@@ -79,6 +80,19 @@ const quiet = { warningListener: false, progressListener: false, debugListener: 
 const noDebug = () => void 0;
 
 const codegen = (config: Config) => tsForConfig(finaliseConfig({ ...config, ...quiet, db: db() }), noDebug);
+
+/** The warnings of a run, but the bigint note, which comes once per process. */
+const warningsOf = async (config: Config) => {
+  const warnings: string[] = [];
+  await tsForConfig(finaliseConfig({
+    ...config, ...quiet, warningListener: s => warnings.push(s), db: db(), outDir: 'src',
+  }), noDebug);
+  return warnings.filter(w => !w.startsWith('Note: this database has bigint'));
+};
+
+/** The same, but the note on enums of another schema, which has its own tests (§ typeEnumsAcrossSchemas). */
+const warningsFor = async (schemas: Schemas) =>
+  (await warningsOf({ schemas })).filter(w => !w.includes('typeEnumsAcrossSchemas'));
 
 /** Custom type placeholders, sorted by name: tsForConfig() inserts them in query completion order. */
 const customFiles = (files: Record<string, string>) =>
@@ -308,15 +322,6 @@ describe('custom types that share a placeholder name', () => {
   `));
   afterAll(() => t.pool.query('DROP SCHEMA collide_a, collide_b CASCADE'));
 
-  const warningsFor = async (schemas: Schemas) => {
-    const warnings: string[] = [];
-    await tsForConfig(finaliseConfig({
-      schemas, ...quiet, warningListener: s => warnings.push(s), db: db(), outDir: 'src',
-    }), noDebug);
-    // the bigint note comes once per process; the note on enums of another schema has its own tests
-    return warnings.filter(w => !w.startsWith('Note: this database has bigint') && !w.includes('typeEnumsAcrossSchemas'));
-  };
-
   it('warns once per name that types of two schemas share, a table and a materialized view alike', async () => {
     expect(await warningsFor({ collide_a: only('things'), collide_b: only('things', 'codes') })).toEqual([
       'Note: custom types "collide_a"."code" and "collide_b"."code" are both named PgCode in TypeScript, ' +
@@ -450,6 +455,65 @@ describe('typeEnumsAcrossSchemas', () => {
     // @ts-expect-error a boolean
     const wrong: Config = { typeEnumsAcrossSchemas: 'yes' };
     void wrong;
+  });
+});
+
+describe('include entries that match no relation', () => {
+  const unmatched = (name: string, schema: string) =>
+    `Note: the include entry "${name}" of schema "${schema}" matches no relation there, so it generates nothing. ` +
+    `Check its spelling and case, that the relation is in schema "${schema}", and that the database role ` +
+    `has a privilege on it: include names tables, views, materialised views and foreign tables.`;
+
+  it('warns once per entry of a list that names no relation, in list order', async () => {
+    expect(await warningsFor({ public: only('users', 'no_such_table', 'Users', 'orderlines') })).toEqual([
+      unmatched('no_such_table', 'public'),
+      unmatched('Users', 'public'),
+      unmatched('orderlines', 'public'),
+    ]);
+  });
+
+  it('names the schema of the rule, for a relation listed under another schema', async () => {
+    expect(await warningsFor({ public: only('users', 'articles'), extra: only('users', 'articles') })).toEqual([
+      unmatched('articles', 'public'),
+      unmatched('users', 'extra'),
+    ]);
+  });
+
+  it('warns about an entry exclude also names, but not about an existing relation it excludes', async () => {
+    expect(await warningsFor({
+      public: { include: ['users', 'products', 'no_such_table'], exclude: ['products', 'no_such_table'] },
+    })).toEqual([unmatched('no_such_table', 'public')]);
+  });
+
+  it('does not warn when exclude is "*": the relations are not read', async () => {
+    expect(await warningsFor({ public: { include: ['no_such_table'], exclude: '*' } })).toEqual([]);
+  });
+
+  it('warns about each entry of a schema that does not exist, and not about "*"', async () => {
+    expect(await warningsFor({ no_such_schema: only('users', 'accounts') })).toEqual([
+      unmatched('users', 'no_such_schema'),
+      unmatched('accounts', 'no_such_schema'),
+    ]);
+    expect(await warningsFor({ no_such_schema: all })).toEqual([]);
+  });
+
+  it('does not warn when every entry matches, whatever the kind of relation', async () => {
+    expect(await warningsFor({
+      public: only('users', 'OrderLines', 'active_users', 'account_totals', 'events', 'events_2025'),
+      extra: { include: ['articles', 'imported_lines', 'article_authors'], exclude: ['articles'] },
+    })).toEqual([]);
+    expect(await warningsFor({ public: all, extra: { include: '*', exclude: ['no_such_table'] } })).toEqual([]);
+  });
+
+  it('warns, of main and the snapshot variants, only about no_such_table of include-exclude-lists, and the enums note', async () => {
+    const enumsNote = 'Note: extra.type_zoo.c_enum_array and public.products.status have a type of another schema, ' +
+      'which is looked up by name in the schema of their relation: an enum becomes an `any` custom type, or the enum of ' +
+      'the same name there. Set typeEnumsAcrossSchemas: true to look it up in its own schema; it will be the default in pgcast 7.0.';
+    const warnings: Record<string, string[]> = {};
+    for (const [name, config] of [['main', main] as const, ...variants]) warnings[name] = await warningsOf(config);
+    expect(warnings).toEqual(Object.fromEntries(Object.keys(warnings).map(name =>
+      [name, name === 'include-exclude-lists' ? [unmatched('no_such_table', 'public')] :
+        name === 'main' || name.startsWith('customTypesTransform-') ? [enumsNote] : []])));
   });
 });
 

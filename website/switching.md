@@ -90,7 +90,7 @@ pgcast fixes, with no option to turn on, what no code could rely on in Zapatos 6
 
 - Each change in the last column gives the same result under Zapatos 6.6.1, so you can make it before you switch; only the `jsonb` one finds its rows under pgcast alone.
 - The text and values of `.compile()` change beyond these rows, where the rows returned don't: every `not()` gains a pair of parentheses, `(NOT ("release_year" = $2))`<!-- probe: db.conditions.not(db.conditions.eq(1974)).compile({ text: '', values: [0] }, undefined, 'release_year') --> where it was `(NOT "release_year" = $2)`, every operand of `and()` one too, `((a) AND (b))`<!-- probe: db.conditions.and(db.sql`a`, db.sql`b`) --> where it was `(a AND b)`, and every `param()` filter value is sent as it is, `{ title: db.param('x', 'text') }` giving `CAST($2 AS "text")`<!-- probe: db.update('films', { tagline: 'x' }, { title: db.param('x', 'text') }) --> with `'x'` where it was `$2` with `{"value":"x","cast":"text"}`. Tests that snapshot SQL fail at [Read the warnings](#read-the-warnings): check the rows first, then update the snapshots.
-- Every case of each fix: the [changelog](https://github.com/AlexandreDemartin/pgcast/blob/master/CHANGELOG.md), § Fixed and § Security.
+- Every case of each fix: the [changelog](/changelog), § Fixed and § Security.
 
 ## Read the warnings
 
@@ -151,7 +151,7 @@ npm install zapatos@6.6.1
 The generated files are the same, and each change of [Find the calls whose result changes](#find-the-calls-whose-result-changes) runs as it did, but the `jsonb` one, which finds nothing again. Remove the three options from `setConfig()` first: Zapatos 6.6.1's `Config` doesn't have them (2353). Zapatos 6.6.1 ignores `typeEnumsAcrossSchemas` in `zapatosconfig.json`, and generates the `any` types again.
 
 ::: warning Security
-Code written or left as it is against pgcast's fixes gets Zapatos 6.6.1's results back: each row whose What to do is "nothing", the `not()` row and the `jsonb` row. `db.deletes('roles', { character: db.conditions.isNotIn([db.param('The ferryman')]) })` deletes 11 roles under pgcast, and all 12 under Zapatos 6.6.1. The holes of the [changelog](https://github.com/AlexandreDemartin/pgcast/blob/master/CHANGELOG.md)'s § Security are open again: a name, a `lock`, an `aggregate`, a plain value in `updateValues` or a `param()` cast can splice SQL ([The security model](/security)).
+Code written or left as it is against pgcast's fixes gets Zapatos 6.6.1's results back: each row whose What to do is "nothing", the `not()` row and the `jsonb` row. `db.deletes('roles', { character: db.conditions.isNotIn([db.param('The ferryman')]) })` deletes 11 roles under pgcast, and all 12 under Zapatos 6.6.1. The holes of [6.6.2's § Security](/changelog#6.6.2-security) are open again: a name, a `lock`, an `aggregate`, a plain value in `updateValues` or a `param()` cast can splice SQL ([The security model](/security)).
 :::
 
 ## See also

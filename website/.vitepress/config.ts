@@ -3,8 +3,9 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { transformerTwoslash } from '@shikijs/vitepress-twoslash';
-import { defineConfig } from 'vitepress';
+import { defineConfig, type HeadConfig } from 'vitepress';
 import { checkLinks, keepLinkHashes } from './anchors.ts';
+import { changelogPage, dateChangelog, writeChangelogFeed } from './changelog.ts';
 import { writeLlmsFiles } from './llms.ts';
 import { describePage, pageHead, repo } from './meta.ts';
 import { outline } from './outline.ts';
@@ -13,8 +14,8 @@ import { focusableHovers, twoslashOptions } from './twoslash.ts';
 
 const
   { version } = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')),
-  fonts = 'https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@500;700;800' +
-    '&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap';
+  font = (face: string): HeadConfig =>
+    ['link', { rel: 'preload', href: `/fonts/${face}-latin.woff2`, as: 'font', type: 'font/woff2', crossorigin: '' }];
 
 export default defineConfig({
   title: 'pgcast',
@@ -24,22 +25,26 @@ export default defineConfig({
   cleanUrls: true,
   sitemap: { hostname: 'https://pgcast.dev' },  // sitemap.xml, named by public/robots.txt
   lastUpdated: true,  // from git, so docs.yml and ci.yml check out the whole history; sitemap.xml's `lastmod` too
-  transformPageData: describePage,  // meta.ts
+  transformPageData: (pageData, context) => {
+    describePage(pageData, context);  // meta.ts
+    dateChangelog(pageData);
+  },
   transformHead: pageHead,
   srcExclude: ['README.md', 'templates/**'],  // for whoever writes the site, not pages of it
   buildEnd: async config => {
     await writeLlmsFiles(config);  // llms.txt and llms-full.txt, for assistants
+    await writeChangelogFeed(config);  // changelog.xml
     checkLinks(config);  // a link to a page or an anchor that does not exist fails the build
   },
   head: [
-    ['link', { rel: 'preconnect', href: 'https://fonts.googleapis.com' }],
-    ['link', { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' }],
-    ['link', { rel: 'stylesheet', href: fonts }],
+    // public/fonts/, declared in theme/fonts.css: every page's first screen sets all three faces (the wordmark is mono)
+    font('schibsted-grotesk'), font('inter'), font('jetbrains-mono'),
     // public/: favicon.svg follows the system's theme; favicon.ico and apple-touch-icon.png are rendered by
     // render-images.mjs
     ['link', { rel: 'icon', href: '/favicon.ico', sizes: '32x32' }],
     ['link', { rel: 'icon', href: '/favicon.svg', type: 'image/svg+xml' }],
     ['link', { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' }],
+    ['link', { rel: 'alternate', type: 'application/atom+xml', href: '/changelog.xml', title: 'pgcast changelog' }],
     // the top bar's `--surface`; `media` first, as VitePress keeps one `<meta>` per first attribute other than `content`
     ['meta', { media: '(prefers-color-scheme: light)', name: 'theme-color', content: '#ffffff' }],
     ['meta', { media: '(prefers-color-scheme: dark)', name: 'theme-color', content: '#121a21' }],
@@ -50,7 +55,10 @@ export default defineConfig({
     languages: ['js', 'bash'],
     // an unexpected type error in a `ts twoslash` block fails the build; a block meant to fail says so with `// @errors`
     codeTransformers: [transformerTwoslash({ twoslashOptions }), focusableHovers, sqlParameters],
-    config: keepLinkHashes,  // `[Config.upsertRequiresSameKeys](/runtime-config#Config.upsertRequiresSameKeys)`
+    config: md => {
+      keepLinkHashes(md);  // `[Config.upsertRequiresSameKeys](/runtime-config#Config.upsertRequiresSameKeys)`
+      changelogPage(md);  // CHANGELOG.md in changelog.md
+    },
   },
   vite: {
     define: { __PGCAST_VERSION__: JSON.stringify(version) },
@@ -72,8 +80,8 @@ export default defineConfig({
         link,
         activeMatch: `^(${[link, ...items.map(item => item.link)].join('|')})$`,
       }]),
-      // no ↗ after the external links, as the prototype
-      { text: 'Changelog', link: `${repo}/blob/master/CHANGELOG.md`, noIcon: true },
+      { text: 'Changelog', link: '/changelog' },
+      // no ↗ after the external link, as the prototype
       { text: 'GitHub', link: repo, noIcon: true },
     ],
     sidebar: outline,  // each group's heading links its landing page

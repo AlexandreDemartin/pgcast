@@ -110,10 +110,19 @@ Every export of `zapatos/db` (a member of `conditions` as `conditions.eq`), ever
 
 At build, `.vitepress/llms.ts` writes two files to the site's root, from the outline and the pages, in its order ([llmstxt.org](https://llmstxt.org/)):
 
-- `llms.txt`: `# pgcast`, a summary (the site's description and the home's lede), then one section per group, each written page with its URL and lede. So a page needs a `# ` title and a `{.lede}` paragraph, or the build fails.
+- `llms.txt`: `# pgcast`, a summary (the site's description and the home's lede), then one section per group, each written page with its URL and lede, and `## Optional`, the changelog. So a page needs a `# ` title and a `{.lede}` paragraph, or the build fails.
 - `llms-full.txt`: every written page as plain Markdown, each cast panel with the SQL, values and type `cast.data.ts` computes. A panel not written `<CastPanel example="<name>">` fails the build.
 
-A "Coming" page has no `.md` file, so it is in neither; nor are the templates and this README, which the outline does not list.
+A "Coming" page has no `.md` file, so it is in neither; nor are the templates and this README, which the outline does not list. The changelog is in `llms.txt` only.
+
+### The changelog
+
+`/changelog` and its Atom feed, `/changelog.xml`, are the root's `CHANGELOG.md`, read at build by `.vitepress/changelog.ts`: a change there needs no edit here, and CI's `docs` job builds on it.
+
+- The page is `changelog.md`'s title and lede, then `CHANGELOG.md`'s intro and versions in place of `<!-- @changelog -->`; its "Last updated" is `CHANGELOG.md`'s last commit.
+- A version is `## [Unreleased]` or `## [x.y.z] - yyyy-mm-dd`, anchored `#unreleased`, `#6.6.2`; each of its sections after it, `#6.6.2-security`. Any other `## ` heading fails the build.
+- A link relative to the repository (`docs/decisions/…`) becomes its page on GitHub.
+- The feed has one entry per released version, `[Unreleased]` aside: its date, its notes as HTML, its anchor on the page.
 
 `public/robots.txt`, copied to the root as it is, lets every crawler in, assistants' included, and names `sitemap.xml`, which VitePress writes from the config's `sitemap`.
 

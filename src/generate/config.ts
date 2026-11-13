@@ -31,6 +31,10 @@ export interface OptionalConfig {
 
 interface SchemaRules {
   [schema: string]: {
+    /**
+     * `'*'`, or the names of the relations to generate, case included. A name the schema doesn't have
+     * generates nothing, and is reported through `warningListener`.
+     */
     include: '*' | string[];
     exclude: '*' | string[];
   };

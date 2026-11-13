@@ -99,6 +99,20 @@ const warnAboutEnumsAcrossSchemas = (columns: string[], config: CompleteConfig) 
     `Set typeEnumsAcrossSchemas: true to look it up in its own schema; it will be the default in pgcast 7.0.`);
 };
 
+/**
+ * Warn about each `include` entry that names no relation of its schema: it generates nothing.
+ * `information_schema.tables` lists only the tables and views the connecting role has a privilege on.
+ */
+const warnAboutUnmatchedIncludes = (unmatched: { schema: string; name: string }[], config: CompleteConfig) => {
+  const warn = config.warningListener === true ? console.log : config.warningListener || (() => void 0);
+
+  for (const { schema, name } of unmatched) {
+    warn(`Note: the include entry "${name}" of schema "${schema}" matches no relation there, so it generates nothing. ` +
+      `Check its spelling and case, that the relation is in schema "${schema}", and that the database role ` +
+      `has a privilege on it: include names tables, views, materialised views and foreign tables.`);
+  }
+};
+
 function indentAll(level: number, s: string) {
   if (level === 0) return s;
   return s.replace(/^/gm, ' '.repeat(level));
@@ -131,10 +145,15 @@ export const tsForConfig = async (config: CompleteConfig, debug: (s: string) => 
       schemaNames.map(async schema => {
         const
           rules = schemas[schema],
-          tables = rules.exclude === '*' ? [] :  // exclude takes precedence
-            (await relationsInSchema(schema, queryFn))
-              .filter(rel => rules.include === '*' || rules.include.indexOf(rel.name) >= 0)
-              .filter(rel => rules.exclude.indexOf(rel.name) < 0),
+          relations = rules.exclude === '*' ? [] :  // exclude takes precedence
+            await relationsInSchema(schema, queryFn),
+          tables = relations
+            .filter(rel => rules.include === '*' || rules.include.indexOf(rel.name) >= 0)
+            .filter(rel => rules.exclude.indexOf(rel.name) < 0),
+          unmatched = rules.exclude === '*' || !Array.isArray(rules.include) ? [] :
+            rules.include
+              .filter(name => !relations.some(rel => rel.name === name))
+              .map(name => ({ schema, name })),
           enums = await enumsForSchema(schema),
           tableDefs = await Promise.all(tables.map(async table =>
             definitionForRelationInSchema(table, schema, enums, customTypes, config, queryFn, customTypeOrigins,
@@ -155,7 +174,7 @@ export const tsForConfig = async (config: CompleteConfig, debug: (s: string) => 
             ) + '\n' +
             (schemaIsUnprefixed ? '' : `}\n`);
 
-        return { schemaDef, tables };
+        return { schemaDef, tables, unmatched };
       }))
     ),
     schemaDefs = schemaData.map(r => r.schemaDef),
@@ -174,6 +193,7 @@ export const tsForConfig = async (config: CompleteConfig, debug: (s: string) => 
     ),
     customTypeSourceFiles = sourceFilesForCustomTypes(customTypes);
 
+  warnAboutUnmatchedIncludes(schemaData.flatMap(r => r.unmatched), config);
   warnAboutSharedCustomTypeNames(customTypeOrigins, config);
   warnAboutEnumsAcrossSchemas(columnsTypedByEnumName, config);
 
