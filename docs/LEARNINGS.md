@@ -19,6 +19,11 @@ Candidates for a check, a rule or a skill line.
 - #246 — A red proof without touching history: run the test on a scratch copy of the worktree with the one line changed (`node_modules` and `src/.env` linked), never `git stash` in a shared repository — `builder`, orchestrator
 - #132 — Replay characterisation tests on 6.6.1 by swapping the test file's `src/db` import for the zapatos@6.6.1 tarball's `dist/db`: the same assertions are proven; the pgcast-only tests going red shows the swap took — `branch-reviewer`
 - #132 — A characterisation of a value sent as a parameter checks `values` with `toStrictEqual` against the instance itself: a change that stringifies it first stores the same text — `branch-reviewer`
+- #112 — A « the type already refuses » claim is probed on every `zapatos/custom` placeholder (`extra.type_zoo`), not only on `users`: the placeholders are `any`, the only typed callers a fix changes — `branch-reviewer`
+- #112 — A characterisation whose type test has a positive case pins that same case at run time, or the fix PR's diff shows no change on the one path the type allows — `branch-reviewer`
+- #112 — Git can merge a summary table quietly while its rows conflict: two report PRs merged one after the other get the table recounted by script — `builder`
+- #112 — The report's « N to fix, M to document » sentence counts R16 (now opt-in) as document, so a recount by script disagrees — `builder`
+- #112 — `npx tsc` from a scratch folder resolves to the unrelated npm package « tsc »: a probe calls `<worktree>/node_modules/.bin/tsc` — `builder`
 
 ## Minors kept
 
@@ -28,3 +33,4 @@ Minor review defects, taken up by the end-of-chapter review.
 - #246 — `CHANGELOG.md:82`: « (or `null`, from JavaScript) » is too narrow: `null` compiles from TypeScript without `strictNullChecks` — `branch-reviewer`
 - #132 — `docs/CHARACTERISATION-REPORT.md:20`: the summary sentence counts R16 (now opt-in) as document: 37 to fix, 16 to document, 12 to leave — `branch-reviewer`
 - #132 — `docs/CHARACTERISATION-REPORT.md:77` (R66): « a text column » leaves out `varchar`, `citext`, `json`, `xml`, `name`, `bytea`; and the nested case rests only on the cost of walking every value (6.6.1's type refused it too) — `branch-reviewer`
+- #112 — `test/types/shortcuts.test-d.ts:260`: `not.toBeAny()` where an equality compiles (`resolves.toEqualTypeOf<db.UpsertReturnableForTable<'users', undefined, undefined, undefined>>()`) — `branch-reviewer`
