@@ -332,8 +332,14 @@ const createColumnDoc = (config: CompleteConfig, schemaName: string, rel: Relati
       domainName,
       description,
     } = columnDetails,
+    // every line of a multi-line comment gets its ` * `: TypeScript ends a JSDoc line at \r as at \n.
+    // A comment holding */ is written as Zapatos 6.6.1 wrote it, until #48 escapes it: its */ ends the
+    // JSDoc, so a ` * ` before a following line would be code, and break one that parses today
+    comment = description as string | null,
+    commentDoc = !comment ? '' :
+      '\n    *\n    * ' + (comment.includes('*/') ? comment : comment.split(/\r\n?|\n/).join('\n    * ')),
     doc = `/**
-    * **${schemaPrefix}${rel.name}.${column}**${description ? '\n    *\n    * ' + description : ''}
+    * **${schemaPrefix}${rel.name}.${column}**${commentDoc}
     * - ${domainName ? `\`${domainName}\` (base type: \`${udtName ?? '(none)'}\`)` : `\`${udtName ?? '(none)'}\``} in database
     * - ${rel.type === 'mview' ? 'Materialized view column' : isGenerated ? 'Generated column' :
         `${isNullable ? 'Nullable' : '`NOT NULL`'}, ${hasDefault && defaultValue === null ? `identity column` : hasDefault ? `default: \`${defaultValue}\`` : `no default`}`}
