@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
-  <!-- favicon.svg, opaque, as iOS wants it (it rounds the corners itself). Rendered to apple-touch-icon.png by
-       render-images.mjs. -->
+  <!-- favicon.svg in white on the accent, opaque, as iOS wants it (it rounds the corners itself). Rendered to
+       apple-touch-icon.png by render-images.mjs. -->
   <title>pgcast</title>
   <rect width="256" height="256" fill="#0a6b63"/>
-  <path fill="#ffffff" d="M48 48h32a8 8 0 0 1 8 8v32a8 8 0 0 1-8 8h-32a8 8 0 0 1-8-8v-32a8 8 0 0 1 8-8ZM176 48h32a8 8 0 0 1 8 8v32a8 8 0 0 1-8 8h-32a8 8 0 0 1-8-8v-32a8 8 0 0 1 8-8ZM48 160h32a8 8 0 0 1 8 8v32a8 8 0 0 1-8 8h-32a8 8 0 0 1-8-8v-32a8 8 0 0 1 8-8ZM176 160h32a8 8 0 0 1 8 8v32a8 8 0 0 1-8 8h-32a8 8 0 0 1-8-8v-32a8 8 0 0 1 8-8Z"/>
+  <path transform="translate(40 40) scale(0.6875)" fill="#ffffff" fill-rule="evenodd" d="M16.0 48a112.0 32 0 1 0 224.0 0a112.0 32 0 1 0 -224.0 0ZM16 64A112.0 32 0 0 0 240 64V208A112.0 32 0 0 1 16 208ZM88 112h16a8 8 0 0 1 8 8v16a8 8 0 0 1-8 8h-16a8 8 0 0 1-8-8v-16a8 8 0 0 1 8-8ZM152 112h16a8 8 0 0 1 8 8v16a8 8 0 0 1-8 8h-16a8 8 0 0 1-8-8v-16a8 8 0 0 1 8-8ZM88 192h16a8 8 0 0 1 8 8v16a8 8 0 0 1-8 8h-16a8 8 0 0 1-8-8v-16a8 8 0 0 1 8-8ZM152 192h16a8 8 0 0 1 8 8v16a8 8 0 0 1-8 8h-16a8 8 0 0 1-8-8v-16a8 8 0 0 1 8-8Z"/>
 </svg>
