@@ -113,5 +113,18 @@ export const before = lt;
 export const now = sql`now()`;
 
 // these are really more operations than conditions, but we sneak them in here for now, for use e.g. in UPDATE queries
-export const add = <T extends number | Date>(a: T) => sql<SQL, number, T>`${self} + ${conditionalParam(a)}`;
-export const subtract = <T extends number | Date>(a: T) => sql<SQL, number, T>`${self} - ${conditionalParam(a)}`;
+
+/**
+ * Add to the column: `"col" + $1`. A `Parameter` keeps its cast, `add(param(3, 'int4'))` giving
+ * `"col" + CAST($1 AS "int4")`; Zapatos 6.6.1's type refused it. The column must still be of its
+ * value's type: on a `date` column, write `` sql`${self} + ${param(3, 'int4')}` ``.
+ * @param a A number, a `Date`, or a `Parameter` of one
+ */
+export const add = <T extends number | Date>(a: T | Parameter<T>) => sql<SQL, number, T>`${self} + ${conditionalParam(a)}`;
+
+/**
+ * Subtract from the column: `"col" - $1`, or `"col" - CAST($1 AS "int4")` for
+ * `subtract(param(3, 'int4'))`, as for `add()`.
+ * @param a A number, a `Date`, or a `Parameter` of one
+ */
+export const subtract = <T extends number | Date>(a: T | Parameter<T>) => sql<SQL, number, T>`${self} - ${conditionalParam(a)}`;
