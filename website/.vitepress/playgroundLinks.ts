@@ -5,7 +5,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { deflateRawSync } from 'node:zlib';
-import type { SiteConfig } from 'vitepress';
+import type { MarkdownRenderer, SiteConfig } from 'vitepress';
 import { codeOf } from './playground/share.ts';
 
 /** The pages whose cast panels have no link: the home, which stays as it is (#313), and the playground's own. */
@@ -19,15 +19,15 @@ const
 
 /**
  * The code the playground opens for an example (examples/<name>.ts): all of it, nothing hidden, with a blank line
- * where its `// ---cut---` was and the playground's comment on its pool.
+ * where its `// ---cut---` was and the playground's comment on its pool: for the tutorial's first query, the code
+ * the playground starts from (playground.data.ts).
  */
 export function playgroundCode(source: string) {
   const [above, below] = source.split(cut);
   if (below === undefined || !above!.split('\n').some(line => line.startsWith(pool)))
     throw new Error(`playgroundLinks.ts: an example needs \`${pool}\` above its \`${cut.trim()}\``);
-  return above!.split('\n')
-    .map(line => line.startsWith(pool) ? `${pool}  // as you type, a pool that records each query; on Run, Postgres in this page` : line)
-    .join('\n') + '\n' + below;
+  const comment = '// as you type, a pool that records each query; on Run, Postgres in this page';
+  return above!.split('\n').map(line => line.startsWith(pool) ? `${pool}  ${comment}` : line).join('\n') + '\n' + below;
 }
 
 /**
@@ -46,6 +46,45 @@ export function opensAsShown(source: string) {
 export function playgroundLink(source: string) {
   if (!opensAsShown(source)) return undefined;
   return `/playground#code/${deflateRawSync(playgroundCode(source)).toString('base64url')}`;
+}
+
+/**
+ * Give each cast panel of a docs page its link (`playground`) and the name of its section (`section`), which the
+ * link's accessible name gives: the heading above it, after its parent's when another heading has the same text
+ * (`upsert(), Options`), numbered when the section has several panels (`Arrays, example 2`).
+ */
+export function linkCastPanels(md: MarkdownRenderer) {
+  md.core.ruler.push('cast_panel_links', state => {
+    if (unlinked.has(state.env.relativePath)) return;
+    const
+      path: string[] = [],  // the text of each heading above, by level
+      panels: { token: (typeof state.tokens)[number]; example: string; heading: number; path: string[] }[] = [],
+      headings = new Map<number, string>();
+    let heading = -1;
+    state.tokens.forEach((token, i) => {
+      if (token.type === 'heading_open') {
+        const text = state.tokens[i + 1]!.children!
+          .filter(child => child.type === 'text' || child.type === 'code_inline').map(child => child.content).join('')
+          .replace(/\s*\{#[^}]*\}\s*$/, '').trim();  // `Lists {#lists}`: its text
+        path.splice(Number(token.tag.slice(1)) - 1, Infinity, text);
+        headings.set(heading = i, text);
+      }
+      const example =
+        token.type === 'html_block' ? /^<CastPanel example="([\w-]+)">/.exec(token.content)?.[1] : undefined;
+      if (example) panels.push({ token, example, heading, path: path.slice(1).filter(Boolean) });  // the h1 aside
+    });
+    for (const { token, example, heading, path } of panels) {
+      const
+        link = playgroundLink(readFileSync(new URL(`${example}.ts`, examples), 'utf8')),
+        text = headings.get(heading) ?? '',
+        shared = [...headings].some(([other, otherText]) => other !== heading && otherText === text),
+        section = panels.filter(panel => panel.heading === heading),
+        name = (shared ? path.slice(-2).join(', ') : text) +
+          (section.length === 1 ? '' : `, example ${section.findIndex(panel => panel.token === token) + 1}`),
+        attribute = name.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+      if (link) token.content = token.content.replace(/>/, () => ` playground="${link}" section="${attribute}">`);
+    }
+  });
 }
 
 /**
@@ -73,8 +112,9 @@ export async function checkPlaygroundLinks(config: SiteConfig) {
     for (const [i, example] of panels.entries()) {
       const
         source = readFileSync(new URL(`${example}.ts`, examples), 'utf8'),
-        [, href, text] = /<a class="CastPanel-open" href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/.exec(frames[i] ?? '') ?? [],
-        name = text?.replace(/<[^>]*>/g, ''),
+        tag = /<a class="CastPanel-open"[^>]*>/.exec(frames[i] ?? '')?.[0],
+        [href, name] = ['href', 'aria-label']
+          .map(attribute => tag && new RegExp(` ${attribute}="([^"]*)"`).exec(tag)?.[1]),
         where = `${page}, the panel of examples/${example}.ts`;
 
       if (unlinked.has(page) || !opensAsShown(source)) {
@@ -89,7 +129,7 @@ export async function checkPlaygroundLinks(config: SiteConfig) {
       }
       if (!href.startsWith('/playground#') || await codeOf(href.slice('/playground'.length)) !== playgroundCode(source))
         problems.push(`${where}: its link does not open the example's code`);
-      if (!name?.startsWith('Open in playground: ') || names.has(name))
+      if (!/^Open in playground: \S/.test(name ?? '') || names.has(name!))
         problems.push(`${where}: its link's name, "${name}", does not name the example, or another link's has it`);
       names.add(name!);
       linked++;

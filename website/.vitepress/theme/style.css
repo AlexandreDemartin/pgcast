@@ -391,6 +391,12 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
   font: 700 11px/1 var(--font-mono); font-style: normal; color: var(--accent);
   border: 1px solid var(--accent); border-radius: 999px; padding: 3px 6px;
 }
+/* Open in playground, at the end of the code's label: in the label's type, quiet until hovered */
+.CastPanel .label .CastPanel-open {
+  margin-left: auto; font-weight: 500; color: var(--muted);
+  text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px;
+}
+.CastPanel .label .CastPanel-open:hover { color: var(--accent); text-decoration-color: currentColor; }
 .CastPanel > div > div { flex: 1; min-width: 0; }  /* the code, above the values row */
 .CastPanel div[class*='language-'] { margin: 0; border: 0; border-radius: 0; background: transparent; }
 .CastPanel div[class*='language-'] > .copy, .CastPanel div[class*='language-'] > .lang { display: none; }
