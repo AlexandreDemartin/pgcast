@@ -21,6 +21,7 @@ export interface Config {
   castObjectParamsToJson: boolean;  // useful if json will be cast onward differently from text
   upsertRequiresSameKeys?: boolean;  // multi-row upsert: rows with different keys throw, unless updateColumns is given
   undefinedMeansMissing?: boolean;  // an undefined value is a missing key: DEFAULT in insert, left out of update and upsert
+  transactionRequiresCommit?: boolean;  // transaction() rejects when Postgres answers its COMMIT with ROLLBACK
   queryListener?(query: SQLQuery, txnId?: number): void;
   resultListener?(result: any, txnId?: number, elapsedMs?: number, query?: SQLQuery): void;
   transactionListener?(message: string, txnId?: number): void;
@@ -34,6 +35,7 @@ let config: Config = {  // defaults
   castObjectParamsToJson: false,
   upsertRequiresSameKeys: false,  // the default in 7.0
   undefinedMeansMissing: false,  // the default in 7.0
+  transactionRequiresCommit: false,  // the default in 7.0
 };
 
 /**
