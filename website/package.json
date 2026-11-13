@@ -19,5 +19,8 @@
     "vitepress": "2.0.0-alpha.21",
     "vue": "3.5.44",
     "zapatos": "file:.."
+  },
+  "overrides": {
+    "dompurify": "3.4.17"
   }
 }
