@@ -223,6 +223,8 @@ describe('custom types that share a placeholder name', () => {
     CREATE TABLE collide_a.things (code collide_a.code, pair collide_a.pair, amount public.positive_int);
     CREATE TABLE collide_b.things (pair collide_b.pair, amount public.positive_int);
     CREATE MATERIALIZED VIEW collide_b.codes AS SELECT 1::collide_b.code AS code;
+    CREATE MATERIALIZED VIEW collide_b.pairs AS SELECT NULL::collide_a.pair AS a, NULL::collide_b.pair AS b;
+    CREATE MATERIALIZED VIEW collide_b.amounts AS SELECT 1::public.positive_int AS amount;
     CREATE TABLE collide_a.labels (dashed collide_a."code-x", underscored collide_a.code_x);
     CREATE DOMAIN collide_a."code x" AS text;
     CREATE TABLE collide_a.spaced (spaced collide_a."code x");
@@ -248,6 +250,14 @@ describe('custom types that share a placeholder name', () => {
     ]);
   });
 
+  it('names the schema of each type, not of the materialized view that selects it', async () => {
+    expect(await warningsFor({ collide_b: only('pairs') })).toEqual([
+      'Note: custom types "collide_a"."pair" and "collide_b"."pair" are both named PgPair in TypeScript, ' +
+      'so they share one type and one placeholder file, zapatos/custom/PgPair.d.ts. ' +
+      'To type them apart, rename them in the database.',
+    ]);
+  });
+
   it('warns when two names become one, and points at customTypesTransform', async () => {
     expect(await warningsFor({ collide_a: only('labels') })).toEqual([
       'Note: custom types "collide_a"."code-x" and "collide_a"."code_x" are both named PgCode_x in TypeScript, ' +
@@ -267,8 +277,8 @@ describe('custom types that share a placeholder name', () => {
   });
 
   it('does not warn when no name is shared', async () => {
-    // public.positive_int, in a table of each schema, is one type
-    expect(await warningsFor({ public: all, collide_b: only('things') })).toEqual([]);
+    // public.positive_int, in a table of each schema and a materialized view of collide_b, is one type
+    expect(await warningsFor({ public: all, collide_b: only('things', 'amounts') })).toEqual([]);
     expect(await warningsFor(main.schemas!)).toEqual([]);
   });
 });
