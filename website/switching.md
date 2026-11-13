@@ -21,20 +21,31 @@ Move a project from Zapatos 6.6.1 to pgcast: change one line of `package.json`, 
 
 ## 1. Swap the package {#swap-the-package}
 
-::: info Not on npm yet
-pgcast hasn't had its first release, so this command will work once it has. To try the switch today, run `npm ci` then `npm pack` in a clone of the repository, copy the archive it writes into your project, and `npm install zapatos@file:pgcast-<version>.tgz` installs it under the same alias. The [README](https://github.com/AlexandreDemartin/pgcast#readme) says where things stand.
-:::
-
 Install pgcast under the name Zapatos had:
 
-```sh
-npm install zapatos@npm:pgcast
+::: code-group
+
+```sh [npm]
+npm install zapatos@npm:@pgcast/pgcast
 ```
 
-- `package.json` now reads `"zapatos": "npm:pgcast@^…"`, and `node_modules/zapatos` holds pgcast.
-- pnpm and yarn take the same alias: [Install](/install#add-the-package).
+```sh [pnpm]
+pnpm add zapatos@npm:@pgcast/pgcast
+```
+
+```sh [yarn]
+yarn add zapatos@npm:@pgcast/pgcast@^6
+```
+
+```sh [bun]
+bun add zapatos@npm:@pgcast/pgcast@^6
+```
+
+:::
+
+- `package.json` now reads `"zapatos": "npm:@pgcast/pgcast@^…"`, and `node_modules/zapatos` holds pgcast.
 - Nothing else to add: pgcast's peer dependencies are Zapatos 6.6.1's, `pg`, `@types/pg` and TypeScript 4.1 or later.
-- Not as plain `pgcast`: your `zapatos/*` imports would no longer resolve ([Install](/install#add-the-package), § Why the alias).
+- Not as plain `@pgcast/pgcast`: your `zapatos/*` imports would no longer resolve ([Install](/install#add-the-package), § Why the alias).
 
 ## 2. Regenerate the schema {#regenerate-the-schema}
 

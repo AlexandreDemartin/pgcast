@@ -337,18 +337,19 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
   text-decoration: none; border: 1px solid var(--line); color: var(--fg); background: var(--surface);
 }
 .landing .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
-/* the install command, under the two buttons: one quiet line, not a third control */
-.InstallLine { display: flex; align-items: center; gap: 8px; margin: 16px 0 0; min-width: 0; font: 13px/20px var(--font-mono); }
+/* the install command, under the two buttons: one quiet line, not a third control. Where it does not fit, under 414px,
+   it wraps at its space rather than being cut, and the copy button stays on its first line */
+.InstallLine { display: flex; align-items: flex-start; gap: 8px; margin: 16px 0 0; padding-block: 4px; min-width: 0; font: 13px/20px var(--font-mono); }
 .landing .InstallLine code { background: none; padding: 0; font-size: inherit; }
-.InstallLine code { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; color: var(--fg); }
+.InstallLine code { overflow-wrap: anywhere; min-width: 0; color: var(--fg); }
 .InstallLine .dollar { color: var(--muted); }
 .InstallLine .copy {
-  display: grid; place-items: center; flex-shrink: 0; width: 28px; height: 28px; padding: 0;
+  display: grid; place-items: center; flex-shrink: 0; width: 28px; height: 28px; margin-block: -4px; padding: 0;
   border: 0; border-radius: 8px; background: none; color: var(--muted); cursor: pointer;
 }
 .InstallLine .copy:hover { background: var(--sunken); color: var(--fg); }
 .InstallLine .copy svg { width: 16px; height: 16px; }
-.InstallLine .copied { font: 12px/1 var(--font-body); color: var(--muted); }
+.InstallLine .copied { font: 12px/20px var(--font-body); color: var(--muted); }
 .landing .CastPanel-frame { margin: 0; }
 .landing .pillars {
   display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 32px;

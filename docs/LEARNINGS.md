@@ -126,6 +126,11 @@ Candidates for a check, a rule or a skill line.
 - #311 — With a `pg` stub of empty classes, `typeofQueryable` falls back to `_connected`: a client an adapter lends sets it `true`, or `db.readCommitted(client, …)` calls `client.connect()`; a parse check misses it, running the docs' examples on the adapter's pool finds it — `branch-reviewer`
 - #311 — A driver adapter is checked both ways against `pg`, rows parsed and values sent, in a time zone east of UTC: PGlite serializes a value by its parameter's type (`toISOString()` puts a local midnight on the day before), and a type created after `create()`, an enum's array, falls to `toString()` — `branch-reviewer`
 - #311 — `JSON.stringify` writes `Infinity`, `NaN` and an invalid `Date` as `null`, like a NULL: a replacer names them, reading `this[key]` to see a `Date` before its `toJSON()` — `branch-reviewer`, `builder`
+- #363 — An npm alias needs an explicit range on Yarn 2+, and Yarn 1 and bun before 1.4 write none without one: a doc that shows an `npm:` alias is tested on each manager, at its current release, not only the version a harness pins — `builder`, `branch-reviewer`
+- #363 — `npm install --package-lock-only` under npm 10 rewrites unrelated parts of the lock: for a name-only change, edit the `name` lines — `builder`
+- #363 — A probe against `localhost` checks it reached its own server (a port outside 43xx, a text only its build has): another agent's preview may answer on the same port — `branch-reviewer`
+- #363 — In an async `Runtime.evaluate`, read the layout before the click; `navigator.clipboard.readText()` fails headless, stub `writeText` to check what Copy sends — `builder`
+- #363 — npm's staged publishing shows a `0.0.0-stage` placeholder for a few minutes: re-run `npm view` before falling back to a tarball — `builder`
 
 ## Minors kept
 

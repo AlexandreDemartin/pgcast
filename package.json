@@ -1,5 +1,5 @@
 {
-  "name": "pgcast",
+  "name": "@pgcast/pgcast",
   "version": "6.6.2",
   "description": "Zero-abstraction Postgres for TypeScript: types cast from your database schema. A maintained fork of Zapatos.",
   "homepage": "https://pgcast.dev/",
@@ -87,5 +87,8 @@
   },
   "dependencies": {
     "json-custom-numbers": "^3.1.1"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

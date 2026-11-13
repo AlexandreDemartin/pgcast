@@ -44,6 +44,7 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 - Dependabot version updates (`.github/dependabot.yml`), weekly: dev dependencies, minor and patch, in one PR; GitHub Actions in another. A minor or patch never changes `dependencies` or `peerDependencies`.
 
 ### Changed
+- The README and the docs install pgcast by its npm name, `zapatos@npm:@pgcast/pgcast`, and no longer say it is not on npm; the docs' Install and Switch from Zapatos give the command for npm, pnpm, yarn and bun. The yarn and bun commands take the major as a range (`@pgcast/pgcast@^6`), and the docs build fails on one that is not the major of `package.json`.
 - The JSDoc of `constraint()` and `upsert()`, and the Reference entry of `constraint()`, say that the type does not check that a constraint belongs to the upsert's table, which Postgres refuses (42704): a `db.constraint('…')` held in a variable takes any table's name, and `db.constraint<'users'>('users_pkey')` checks the name against that table. The type is Zapatos 6.6.1's, unchanged (R32).
 - The JSDoc of `selectExactlyOne()` and its Reference entry say that it checks for at least one row, not exactly one: `LIMIT 1`, then the first row. The behaviour is Zapatos 6.6.1's, unchanged.
 - A cast panel shows the type of its example's first `const` with no type written, the query's, so an example can type its input first: the tutorial's "Add a film" shows the inserted row again, `films.JSONSelectable`, not the `films.Insertable` it was given.
@@ -165,7 +166,7 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 ## [6.6.2] - 2026-11-12
 
 ### Changed
-- Package renamed to `pgcast`. The CLI is available as both `pgcast` and `zapatos`. Module names (`zapatos/db`, `zapatos/schema`, `zapatos/custom`) are unchanged.
+- Package renamed to `pgcast`, published on npm as `@pgcast/pgcast` (npm refuses the unscoped name, too close to `recast`); install it as `zapatos@npm:@pgcast/pgcast`. The CLI is available as both `pgcast` and `zapatos`. Module names (`zapatos/db`, `zapatos/schema`, `zapatos/custom`) are unchanged.
 - Toolchain: TypeScript 5.9, ESLint 9 (native flat config), typescript-eslint 8, `@stylistic/eslint-plugin`. The toolchain change alone leaves the build output (`dist/`, `db.mjs`, `generate.mjs`) byte-identical to 6.6.1; the fixes below change `dist/`.
 
 ### Removed
