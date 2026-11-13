@@ -25,7 +25,8 @@ db.setConfig({
 - A key you give as `undefined` is set to `undefined`: it does not go back to its default, and it compiles.
   - After `setConfig({ transactionAttemptsMax: undefined })`, `transaction()` gives up after its first attempt ("… on attempt 1 of undefined, giving up", [#179](https://github.com/AlexandreDemartin/pgcast/issues/179)).
   - After `setConfig({ transactionRetryDelay: undefined })`, every `transaction()` rejects with "TypeError: Cannot destructure property 'minMs' of 'config.transactionRetryDelay' as it is undefined.", and never releases the client it took from a pool ([#182](https://github.com/AlexandreDemartin/pgcast/issues/182)).
-- It returns the new configuration itself, not a copy, so changing that object changes the configuration ([#182](https://github.com/AlexandreDemartin/pgcast/issues/182)).
+- It returns a copy of the new configuration, as `getConfig()` does: changing that object changes nothing. Zapatos 6.6.1 returned the configuration itself ([#245](https://github.com/AlexandreDemartin/pgcast/issues/245)).
+- It keeps the `transactionRetryDelay` object you give it, not a copy: changing its `minMs` or `maxMs` afterwards changes the configuration.
 - An unknown key does not compile (TS2353), and neither does a value of the wrong type (TS2322):
 
 ```ts twoslash
@@ -41,7 +42,7 @@ db.setConfig({ retries: 3 });
 db.getConfig(): Config
 ```
 
-A copy of the configuration. The copy is one level deep: `getConfig().transactionAttemptsMax = 1` changes nothing, but `getConfig().transactionRetryDelay.minMs = 1` changes the configuration, since that object is shared ([#182](https://github.com/AlexandreDemartin/pgcast/issues/182)).
+A copy of the configuration, `transactionRetryDelay` included: `getConfig().transactionRetryDelay.minMs = 1` changes nothing. The listeners are the functions you set. Zapatos 6.6.1 shared `transactionRetryDelay`, so that line changed the configuration ([#245](https://github.com/AlexandreDemartin/pgcast/issues/245)).
 
 To change the configuration for a while, as tests do, keep the copy and give it back in a `finally`, so that a throw in between, a failing test, still restores it:
 
@@ -57,7 +58,7 @@ try {
 }
 ```
 
-- It puts back each key `saved` holds. `setConfig()` gives `transactionRetryDelay` a new object, so the one `saved` shares is unchanged.
+- It puts back each key `saved` holds.
 - A key `saved` doesn't hold stays as set: a listener set in between keeps listening. Give it as `undefined` to remove it: `db.setConfig({ queryListener: undefined })`.
 
 ## `Config` {#Config}
@@ -430,7 +431,7 @@ A `bytea` in JSON, as hex after `\x`: `'\\x4c61'` in TypeScript source.
 db.toBuffer<T extends ByteArrayString | null>(d: T): T extends ByteArrayString ? Buffer<ArrayBuffer> | Exclude<T, ByteArrayString> : T
 ```
 
-Decodes the hex of a `ByteArrayString` into a `Buffer`, typed `Buffer<ArrayBuffer>`. `null` gives `null`, and the type keeps it ([`strict()`](#strict)). It decodes the whole value in memory.
+Decodes the hex of a `ByteArrayString` into a `Buffer`, typed `Buffer<ArrayBuffer>`. `null` gives `null`, and the type keeps it; `undefined` throws, and the type refuses it with `strictNullChecks` on ([`strict()`](#strict)). It decodes the whole value in memory.
 
 ```ts twoslash
 import * as db from 'zapatos/db';
@@ -581,8 +582,9 @@ const shout = db.strict((s: string) => s.toUpperCase());
 const loud = shout(tagline);
 ```
 
-- Only `null`: `undefined` is passed to `fn`, which may throw on it: `db.toBuffer(undefined)` throws "TypeError: Cannot read properties of undefined (reading 'slice')" ([#182](https://github.com/AlexandreDemartin/pgcast/issues/182)).
-- With `strictNullChecks` off, a type has no `null` in it, and none of these types say anything of it: `toDate(null)` is typed `Date`, `shout(null)` `any`.
+- Only `null` passes through, as only `NULL` does for a `STRICT` function in Postgres: `undefined` reaches `fn`. A function that takes it handles it: `db.strict((title: string | undefined) => title ?? 'untitled')(undefined)` gives `'untitled'`.
+- With `strictNullChecks` on, the type refuses `undefined` unless `fn` takes it: `shout(undefined)` and `db.toBuffer(undefined)` do not compile (TS2345).
+- With `strictNullChecks` off, a type has no `null` nor `undefined` in it, and none of these types say anything of them: `toDate(null)` is typed `Date`, `shout(null)` `any`. `db.toBuffer(undefined)` then compiles, and throws "TypeError: Cannot read properties of undefined (reading 'slice')".
 
 ## `SchemaVersionCanary` {#SchemaVersionCanary}
 
