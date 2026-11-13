@@ -381,8 +381,19 @@ Operations, not tests: for an [`update()`](/insert#update) value, where `self` i
 
 - In a `where`, the type lets them through, and Postgres refuses them (42804: "argument of WHERE must be type boolean").
 - In `upsert()`'s `updateValues`, there is no current column: they throw "The 'self' column alias has no meaning here"<!-- message --> ([`upsert()`](/insert#upsert)). In `insert()`, the column is written, and Postgres refuses it (42703).
-- The type refuses a `Parameter` (TS2345), which would compile ([#39](https://github.com/AlexandreDemartin/pgcast/issues/39)).
-- On a `timestamptz` column, a `Date` type-checks, and Postgres refuses both: `add()` reads it as an interval (22007), `subtract()` gives an interval, not a time (42804).
+- They take a number or a `Date`, not a `Parameter` (TS2345): for a cast, write a `sql` fragment value (below).
+- On a `date` column, the type refuses a number (TS2322), and Postgres could not run it either: `date + unknown` is ambiguous (42725).
+- On a `date`, `timestamp` or `timestamptz` column, a `Date` type-checks, and Postgres refuses it ([#180](https://github.com/AlexandreDemartin/pgcast/issues/180)). On `date`, `add()` is ambiguous (42725) and `subtract()` gives an integer, not a date (42804); on the other two, `add()` reads it as an interval (22007), `subtract()` gives an interval, not a time (42804).
+
+For dates, write a `sql` fragment value, where `db.self` is the column, and cast its parameter. On a `date` column, `` db.sql`${db.self} + ${db.param(3, 'int4')}` `` adds three days: `"col" + CAST($1 AS "int4")`<!-- probe: db.sql`${{ col: db.sql`${db.self} + ${db.param(3, 'int4')}` }}` -->. On a `timestamptz` column, add an interval: a screening moved to the next day.
+
+<CastPanel example="conditions_add_interval">
+
+<<< ./examples/conditions_add_interval.ts{ts twoslash}
+
+</CastPanel>
+
+The type does not check a fragment: an `int4` on a `timestamptz` column type-checks, and Postgres refuses it (42883).
 
 ### `add()` {#conditions.add}
 
