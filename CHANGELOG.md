@@ -85,6 +85,13 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 - `getConfig()` and `setConfig()` return a copy of the configuration, `transactionRetryDelay` included: changing what they return no longer changes the configuration. Zapatos 6.6.1 shared `transactionRetryDelay` from `getConfig()` (`getConfig().transactionRetryDelay.minMs = 1` set it), and `setConfig()` returned the configuration itself. The listeners are the functions you set, and `setConfig()` still keeps the `transactionRetryDelay` object it is given.
 - `and()` with no argument compiles to `TRUE`, and `or()` to `FALSE`: every row and no row, as a `Whereable` `{}` is `TRUE`. Zapatos 6.6.1 wrote `()`, which Postgres refuses (42601), alone, as a `Whereable` value, under `not()` or inside another `and()` / `or()`. With one condition or more, the SQL is unchanged.
   - Every row: `update()` and `deletes()` given `and(...filters)` or `not(or(...ids))` with an empty list now reach every row (`WHERE TRUE`, `WHERE (NOT (FALSE))`), where Zapatos 6.6.1 threw (42601) before any row changed. Keep the length check where an empty list must not reach every row.
+- `count()`, `sum()`, `avg()`, `min()` and `max()` throw, as the query is built and before any is sent, on three options that Zapatos 6.6.1 compiled to SQL Postgres refuses:
+  - `sum()`, `avg()`, `min()` or `max()` without `columns`: 6.6.1 sent `sum(*)` (42883). The error is "sum() needs one column to aggregate: pass columns: ['column']".
+  - `columns` with several columns, or none: 6.6.1 sent `count("id", "mood")` (42883) or `count()` (42809). The error is "count() takes one column in columns, not 2 (leave columns out for count(*))".
+  - A single query as `lateral`: 6.6.1 sent `SELECT  AS result` (42601). The error is "count() cannot pass a lateral query through: nest it in the lateral of a select() instead".
+  - The type refuses two of the three: a tuple of two columns or more (`columns: ['id', 'mood']`, `as const`) and a single query as `lateral`. An array whose length the type cannot know (`films.Column[]`) still compiles.
+  - The type still lets the third through: `sum()`, `avg()`, `min()` and `max()` keep their 6.6.1 type, `NumericAggregateSignatures`, so options built at run time compile as before. The owner decided this on #34: nothing that compiles under Zapatos 6.6.1 stops compiling.
+  - Every call that ran is unchanged, a `lateral` map included; so is `select()` in `SelectResultMode.Numeric`, which keeps several columns for an aggregate of several arguments (`corr("rating", "minutes")`).
 
 ## [6.6.2] - 2026-11-12
 
