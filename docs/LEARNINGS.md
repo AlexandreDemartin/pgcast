@@ -101,6 +101,9 @@ Candidates for a check, a rule or a skill line.
 - #46 — JS `/^/gm` matches after `\r`, U+2028 and U+2029, not only `\n`: an « indent every line » pass over catalog text normalises line ends first — `branch-reviewer`, `builder`
 - #46 — Python's text-mode `open()` turns `\r` into `\n`: a PR body or file holding CRs is written with `newline=''` — `builder`
 - #46 — A detached `git worktree add --detach <scratch>/mutant HEAD` with `node_modules` and `src/.env` symlinked is a cheap mutant copy: Vitest runs without `npm ci`, and `rm -rf` plus `git worktree prune` cleans it — `builder`
+- #310 — Lighthouse does not test a keyboard trap (WCAG 2.1.2, Level A): an embedded editor is probed with Tab presses over CDP until focus leaves it, and the page says how to leave — `branch-reviewer`
+- #310 — Monaco 0.57 in Chrome focuses `.native-edit-context`, not its `textarea`: a focus rule, a probe or a key press names both — `branch-reviewer`
+- #310 — A clean-up registered after an `await` in `onMounted` leaks when the page is left during the wait: register it before, return if the template ref is gone; a CDP probe delays the awaited call (`Page.addScriptToEvaluateOnNewDocument`) to open the window — `branch-reviewer`
 
 ## Minors kept
 
