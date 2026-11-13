@@ -660,9 +660,9 @@ export const select: SelectSignatures = function (
         if (o.nulls && !['FIRST', 'LAST'].includes(o.nulls)) throw new Error(`Nulls must be FIRST/LAST/undefined, not '${o.nulls}'`);
         return sql`${o.by} ${raw(o.direction)}${o.nulls ? sql` NULLS ${raw(o.nulls)}` : []}`;
       })}`,
-    limitSQL = allOptions.limit === undefined ? [] :
-      allOptions.withTies ? sql` FETCH FIRST ${param(allOptions.limit)} ROWS WITH TIES` :
-        sql` LIMIT ${param(allOptions.limit)}`,  // compatibility with pg pre-10.5; and fewer bytes!
+    limitSQL = (limit: number | undefined) => limit === undefined ? [] :
+      allOptions.withTies ? sql` FETCH FIRST ${param(limit)} ROWS WITH TIES` :
+        sql` LIMIT ${param(limit)}`,  // compatibility with pg pre-10.5; and fewer bytes!
     offsetSQL = allOptions.offset === undefined ? [] : sql` OFFSET ${param(allOptions.offset)}`,  // pg is lax about OFFSET following FETCH, and we exploit that
     lockSQL = lock === undefined ? [] : (lock as SelectLockingOptions<string>[]).map(lock => {  // `as` clause is required when TS not strict
       if (!['UPDATE', 'NO KEY UPDATE', 'SHARE', 'KEY SHARE'].includes(lock.for)) throw new Error(`Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not '${lock.for}'`);
@@ -683,10 +683,25 @@ export const select: SelectSignatures = function (
         });
 
   const
-    rowsQuery = sql<SQL, any>`SELECT${distinctSQL} ${allColsSQL} AS result FROM ${table}${tableAliasSQL}${lateralSQL}${whereSQL}${groupBySQL}${havingSQL}${orderSQL}${limitSQL}${offsetSQL}${lockSQL}`,
+    rowsSQL = (limit: number | undefined) => sql<SQL, any>`SELECT${distinctSQL} ${allColsSQL} AS result FROM ${table}${tableAliasSQL}${lateralSQL}${whereSQL}${groupBySQL}${havingSQL}${orderSQL}${limitSQL(limit)}${offsetSQL}${lockSQL}`,
+    rowsQuery = rowsSQL(allOptions.limit),
     query = mode !== SelectResultMode.Many ? rowsQuery :
       // we need the aggregate to sit in a sub-SELECT in order to keep ORDER and LIMIT working as usual
-      sql<SQL, any>`SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (${rowsQuery}) AS ${SQLForAlias('sq_', alias)}`;
+      sql<SQL, any>`SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (${rowsQuery}) AS ${SQLForAlias('sq_', alias)}`,
+    checksSecondRow = mode === SelectResultMode.ExactlyOne && (getConfig().selectExactlyOneChecksForSecondRow ?? false);
+
+  if (checksSecondRow) {
+    // compiled on its own, as `run()` does, the query asks for a second row; a parent query compiles it
+    // into its own `result` (`sql`, `extras`) or compiles a copy (`lateral`), so nested it keeps `LIMIT 1`,
+    // where a second row would duplicate the parent row
+    const topLevelQuery = rowsSQL(2), nestedCompile = query.compile;
+    query.compile = (result, parentTable, currentColumn) => {
+      if (result) return nestedCompile(result, parentTable, currentColumn);
+      const compiled = topLevelQuery.compile(undefined, query.parentTable ?? parentTable, currentColumn);
+      if (query.preparedName != null) compiled.name = query.preparedName;
+      return compiled;
+    };
+  }
 
   query.runResultTransform =
 
@@ -699,6 +714,7 @@ export const select: SelectSignatures = function (
         (qr) => {
           const result = qr.rows[0]?.result;
           if (result === undefined) throw new NotExactlyOneError(query, 'One result expected but none returned (hint: check `.query.compile()` on this Error)');
+          if (checksSecondRow && qr.rows.length > 1) throw new NotExactlyOneError(query, 'One result expected but more returned (hint: check `.query.compile()` on this Error)');
           return result;
         } :
         // SelectResultMode.One or SelectResultMode.Many
@@ -763,9 +779,15 @@ export interface SelectExactlyOneSignatures {
 
 /**
  * Generate a `SELECT` query `SQLFragment` that returns a single result or 
- * throws an error. A `LIMIT 1` clause is added automatically. This can be 
- * nested with other `select`/`selectOne`/`count` queries using the `lateral` 
- * option.
+ * throws an error. A `LIMIT 1` clause is added automatically, so it checks for
+ * at least one row, not exactly one. This can be nested with other
+ * `select`/`selectOne`/`count` queries using the `lateral` option.
+ *
+ * With the `selectExactlyOneChecksForSecondRow` config option, the query run
+ * (or compiled) on its own asks for `LIMIT 2` and also throws on a second row:
+ * `SELECT to_jsonb("films".*) AS result FROM "films" WHERE ("id" = $1) LIMIT $2`,
+ * `$2` being `2`. Nested in another query (`lateral`, `extras`, `sql`), or
+ * compiled into a `result` of its own, it keeps `LIMIT 1`.
  * @param table The table to select from
  * @param where A `Whereable` or `SQLFragment` defining the rows to be selected,
  * or `all`
