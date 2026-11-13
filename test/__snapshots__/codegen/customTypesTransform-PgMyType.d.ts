@@ -397,7 +397,7 @@ declare module 'zapatos/schema' {
       * **users.manager_id**
       *
       * Line manager.
-  Nullable: the top of the tree has none.
+      * Nullable: the top of the tree has none.
       * - `int4` in database
       * - Nullable, no default
       */
@@ -456,7 +456,7 @@ declare module 'zapatos/schema' {
       * **users.manager_id**
       *
       * Line manager.
-  Nullable: the top of the tree has none.
+      * Nullable: the top of the tree has none.
       * - `int4` in database
       * - Nullable, no default
       */
@@ -515,7 +515,7 @@ declare module 'zapatos/schema' {
       * **users.manager_id**
       *
       * Line manager.
-  Nullable: the top of the tree has none.
+      * Nullable: the top of the tree has none.
       * - `int4` in database
       * - Nullable, no default
       */
@@ -568,7 +568,7 @@ declare module 'zapatos/schema' {
       * **users.manager_id**
       *
       * Line manager.
-  Nullable: the top of the tree has none.
+      * Nullable: the top of the tree has none.
       * - `int4` in database
       * - Nullable, no default
       */
@@ -621,7 +621,7 @@ declare module 'zapatos/schema' {
       * **users.manager_id**
       *
       * Line manager.
-  Nullable: the top of the tree has none.
+      * Nullable: the top of the tree has none.
       * - `int4` in database
       * - Nullable, no default
       */

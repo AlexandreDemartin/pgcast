@@ -96,6 +96,11 @@ Candidates for a check, a rule or a skill line.
 - #44 — A new `export` in a module of `src/generate/index.ts`'s `export *` list becomes public API of `zapatos/generate` (the build shows it in `generate.mjs`): a helper goes in its own module, and `git status` is read for `*.mjs` before committing — `builder`
 - #44 — `git commit --no-edit` after a conflicted merge keeps the `# Conflicts:` lines; `--cleanup=strip` drops them — `builder`
 - #44 — A brief that names the SHA to merge expects `origin/master` to be newer by then — orchestrator
+- #46 — A fix that touches every line of a comment checks what an existing `*/` does to the lines after it: a replay near comment delimiters includes inputs where the old output parses by accident (a `*/` then a `/*` that reopens) — `branch-reviewer`, `builder`
+- #46 — A guard that keeps the old bytes « when the input holds X » is tested with X at every position it covers (line 1, a later line); running the suite against a narrower guard finds the gap — `branch-reviewer`
+- #46 — JS `/^/gm` matches after `\r`, U+2028 and U+2029, not only `\n`: an « indent every line » pass over catalog text normalises line ends first — `branch-reviewer`, `builder`
+- #46 — Python's text-mode `open()` turns `\r` into `\n`: a PR body or file holding CRs is written with `newline=''` — `builder`
+- #46 — A detached `git worktree add --detach <scratch>/mutant HEAD` with `node_modules` and `src/.env` symlinked is a cheap mutant copy: Vitest runs without `npm ci`, and `rm -rf` plus `git worktree prune` cleans it — `builder`
 
 ## Minors kept
 
@@ -123,3 +128,4 @@ Minor review defects, taken up by the end-of-chapter review.
 - #36 — `test/unit/core.test.ts:290`, `docs/CHARACTERISATION-REPORT.md:89`: the title « an array type sends the array » keeps the wording the PR removed elsewhere — `branch-reviewer`
 - #41 — `test/types/shortcuts.test-d.ts:431`: `const mail: Card['email'] = 'a@b'` holds its directive on master too (`Card` is `never`); `null as unknown as Card['email']` would fail only on the head — `branch-reviewer`
 - #41 — `CHANGELOG.md:133`: `{}` as a `Record<keyof Film, …>` lacks the row's keys, not the column the sentence names — `branch-reviewer`
+- #46 — `src/generate/tsOutput.ts:100`: the writer's `/^/gm` indentation puts spaces after a U+2028/U+2029 inside a comment (6.6.1 too); frozen as is by `column comments › prefixes every line whatever its line break` — `branch-reviewer`
