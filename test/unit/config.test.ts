@@ -1,7 +1,7 @@
 // Copyright (C) 2026 Alexandre Demartin
 //
-// getConfig() and setConfig() (src/db/config.ts): what they return, and what
-// they are given, share no object with the live config (#245). No database.
+// getConfig() and setConfig() (src/db/config.ts): what they return shares no
+// object with the live config (#245). No database.
 
 import { afterEach, describe, expect, it } from 'vitest';
 import * as db from '../../src/db';
@@ -24,9 +24,17 @@ describe('getConfig()', () => {
     expect(db.getConfig().queryListener).toBe(queryListener);
   });
 
-  it('keeps a transactionRetryDelay set to undefined as undefined', () => {
+  it('keeps a transactionRetryDelay set to undefined or null as it is', () => {
     db.setConfig({ transactionRetryDelay: undefined } as unknown as db.NewConfig);  // compiles in a consumer project, not under exactOptionalPropertyTypes
     expect(db.getConfig().transactionRetryDelay).toBeUndefined();
+    db.setConfig({ transactionRetryDelay: null } as unknown as db.NewConfig);
+    expect(db.getConfig().transactionRetryDelay).toBeNull();
+  });
+
+  it('copies minMs and maxMs of a transactionRetryDelay that has them as getters', () => {
+    class Delay { get minMs() { return 5; } get maxMs() { return 6; } }
+    db.setConfig({ transactionRetryDelay: new Delay() });
+    expect(db.getConfig().transactionRetryDelay).toEqual({ minMs: 5, maxMs: 6 });
   });
 });
 
@@ -40,10 +48,10 @@ describe('setConfig()', () => {
     expect(db.getConfig().transactionRetryDelay).toEqual({ minMs: 25, maxMs: 250 });
   });
 
-  it('copies the transactionRetryDelay it is given', () => {
+  it('keeps the transactionRetryDelay it is given, as Zapatos 6.6.1 does: changing it later changes the config', () => {
     const delay = { minMs: 50, maxMs: 500 };
     db.setConfig({ transactionRetryDelay: delay });
-    delay.minMs = 1;
-    expect(db.getConfig().transactionRetryDelay).toEqual({ minMs: 50, maxMs: 500 });
+    delay.maxMs = 1000;
+    expect(db.getConfig().transactionRetryDelay).toEqual({ minMs: 50, maxMs: 1000 });
   });
 });
