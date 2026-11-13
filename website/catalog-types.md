@@ -3,9 +3,21 @@
 Every type pgcast gives you is read from your database; none is written by hand. This page is about how that works: what the generator asks Postgres, why each table comes out as five types rather than one, and how the type of a query's result follows the options you give it.
 {.lede}
 
+<AtAGlance>
+
+- The generator reads your database's catalog and writes `zapatos/schema.d.ts`; your code is checked against that file alone.
+- Each table comes out five times, once per context a value travels in: `Selectable`, `JSONSelectable`, `Whereable`, `Insertable`, `Updatable`.
+- A shortcut's result is JSON that Postgres builds, and its type is worked out from the call, never declared.
+
+</AtAGlance>
+
 ## Postgres describes itself
 
-A Postgres database knows its own shape, and keeps it in its catalog: the system tables of `pg_catalog`, and the standard views of `information_schema` built over them. When you run `npx pgcast`, the generator asks those tables a handful of questions for each schema, and writes the answers down as TypeScript in `zapatos/schema.d.ts`. It doesn't connect again: from then on, your code is checked against that file alone.
+A Postgres database knows its own shape, and keeps it in its catalog: the system tables of `pg_catalog`, and the standard views of `information_schema` built over them.
+
+When you run `npx pgcast`, the generator asks those tables a handful of questions for each schema, and writes the answers down as TypeScript in `zapatos/schema.d.ts`. It doesn't connect again: from then on, your code is checked against that file alone.
+
+<CatalogFlow />
 
 | It reads | From | It becomes |
 |---|---|---|
@@ -17,13 +29,19 @@ A Postgres database knows its own shape, and keeps it in its catalog: the system
 | each enum and its labels | `pg_enum` | a union of strings, and the tuple `every.<name>` |
 | each unique index | `pg_indexes`, `pg_namespace`, `pg_class`, `pg_index` | `UniqueIndex`, the names [`constraint()`](/insert#constraint) takes |
 
-To watch the queries themselves, set [`debugListener`](/generator#generate.debugListener). A domain, such as `seat_label`, and a type the generator has no mapping for, such as `point`, each get a placeholder in `zapatos/custom/`, yours to fill in ([Use custom types and domains](/custom-types)). And what the catalog can't see, such as a column a trigger fills in, you say in the config: [`columnOptions`](/generator#generate.columnOptions) leaves it out of `Insertable` or `Updatable`, or makes it optional in `Insertable`.
+To watch the queries themselves, set [`debugListener`](/generator#generate.debugListener). A domain, such as `seat_label`, and a type the generator has no mapping for, such as `point`, each get a placeholder in `zapatos/custom/`, yours to fill in ([Use custom types and domains](/custom-types)).
+
+And what the catalog can't see, such as a column a trigger fills in, you say in the config: [`columnOptions`](/generator#generate.columnOptions) leaves it out of `Insertable` or `Updatable`, or makes it optional in `Insertable`.
 
 ### What the generator doesn't read
 
-The generator reads names, types, nullability and defaults. Postgres also keeps each foreign key and `CHECK` constraint, in `pg_constraint`, but Zapatos 6.6.1 never read that table, nor the SQL inside views and functions; pgcast doesn't yet either. So `ratings.stars`, `CHECK (stars BETWEEN 1 AND 5)`, is a `number`; a `seat_label` matching `'^[A-Z][0-9]{1,2}$'` is a `string`; and nothing tells TypeScript that `films.studio_id` points at a studio.
+The generator reads names, types, nullability and defaults. Postgres also keeps each foreign key and `CHECK` constraint, in `pg_constraint`, but Zapatos 6.6.1 never read that table, nor the SQL inside views and functions; pgcast doesn't yet either.
 
-A view is typed as Postgres reports it, and Postgres reports every column of a view as nullable, whatever the tables underneath say, unless its type is a `NOT NULL` domain. A view of the `id` and `title` of `films` types both as `| null`, and gets an `Insertable` with every column optional, since Postgres can write through it; a view over a join, which it can't write through, gets an `Insertable` and an `Updatable` that take nothing (`[key: string]: never`). A materialised view keeps no `NOT NULL` at all, not even a domain's, so its columns are nullable too.
+So `ratings.stars`, `CHECK (stars BETWEEN 1 AND 5)`, is a `number`; a `seat_label` matching `'^[A-Z][0-9]{1,2}$'` is a `string`; and nothing tells TypeScript that `films.studio_id` points at a studio.
+
+A view is typed as Postgres reports it, and Postgres reports every column of a view as nullable, whatever the tables underneath say, unless its type is a `NOT NULL` domain.
+
+A view of the `id` and `title` of `films` types both as `| null`, and gets an `Insertable` with every column optional, since Postgres can write through it. A view over a join, which it can't write through, gets an `Insertable` and an `Updatable` that take nothing (`[key: string]: never`).
 
 ```sql
 CREATE VIEW film_titles AS SELECT id, title FROM films;
@@ -41,6 +59,8 @@ export namespace film_titles {
 }
 ```
 
+A materialised view keeps no `NOT NULL` at all, not even a domain's, so its columns are nullable too.
+
 For views, pgcast keeps to what Postgres states, as Zapatos did: a nullability the database doesn't state would be a guess, and a guess is the one thing a generated type mustn't be. Some gaps in what the generator reads are known, and described here as they are today:
 
 - Enum labels come out in alphabetical order: `crew_job` is `'cinematographer' | 'composer' | 'director' | 'editor' | 'writer'`, not the order of its `CREATE TYPE`, unless [`enumOrder`](/generator#generate.enumOrder) is `"declared"`.
@@ -53,9 +73,9 @@ Reading more of the catalog, each as an opt-in: foreign keys, for laterals that 
 
 ## One column, five types
 
-A value isn't the same thing everywhere it goes. A `timestamptz` read by a plain `SELECT` reaches you as a `Date`, because `pg` parses it; read through JSON, it's a string; in a filter it may be either, or some SQL; in a new row, it may be required, or left to its default. So the generator writes each table five times, once per context, each column typed for that context.
+A value isn't the same thing everywhere it goes. A `timestamptz` read by a plain `SELECT` reaches you as a `Date`, because `pg` parses it; read through JSON, it's a string; in a filter it may be either, or some SQL; in a new row, it may be required, or left to its default.
 
-Here are two columns of `screenings`, from the generated schema:
+So the generator writes each table five times, once per context, each column typed for that context. Here are two columns of `screenings`, from the generated schema:
 
 | Type | What it describes | `starts_at`, `timestamptz NOT NULL` | `subtitled`, a nullable `boolean` |
 |---|---|---|---|
@@ -65,7 +85,9 @@ Here are two columns of `screenings`, from the generated schema:
 | `Insertable` | a new row | required: `TimestampTzString \| Date` | optional: `boolean`, `null` or `DEFAULT` |
 | `Updatable` | changes to a row: every key optional | `TimestampTzString \| Date` | `boolean`, `null` or `DEFAULT` |
 
-Wherever a value goes in, it may also be a [`param()`](/sql-template#param) or a [`sql`](/sql-template#sql) fragment, and in a filter a [`parent()`](/sql-template#parent) column. A `Whereable` refuses `null` because `"subtitled" = NULL` is never true in SQL: given one anyway (the type lets it through when `strictNullChecks` is off), the filter compiles to `"subtitled" = $1`<!-- probe: db.sql`${{ subtitled: null }}` -->, with `null` as `$1`, and finds nothing. [`conditions.isNull`](/conditions#conditions.isNull) writes the `IS NULL`<!-- probe: db.sql`${{ subtitled: db.conditions.isNull }}` --> you meant.
+Wherever a value goes in, it may also be a [`param()`](/sql-template#param) or a [`sql`](/sql-template#sql) fragment, and in a filter a [`parent()`](/sql-template#parent) column.
+
+A `Whereable` refuses `null` because `"subtitled" = NULL` is never true in SQL. Given one anyway (the type lets it through when `strictNullChecks` is off), the filter compiles to `"subtitled" = $1`<!-- probe: db.sql`${{ subtitled: null }}` -->, with `null` as `$1`, and finds nothing. [`conditions.isNull`](/conditions#conditions.isNull) writes the `IS NULL`<!-- probe: db.sql`${{ subtitled: db.conditions.isNull }}` --> you meant.
 
 The first does not compile (TS2322, with `strict` on); the second is the filter you meant:
 
@@ -87,7 +109,9 @@ In a session whose `TimeZone` is `UTC`, the first is the `Date` `2030-03-01T19:3
 
 ## Why the shortcuts return JSON
 
-Each shortcut is one query, and Postgres builds its result itself: each row as one JSON value, with `to_jsonb()` or `jsonb_build_object()`, each `lateral` nested inside it, and for `select()` the rows gathered into one array with `jsonb_agg()`. That's how `select()` brings back films with their cast already in place, in one round trip, with nothing to assemble in JavaScript afterwards.
+Each shortcut is one query, and Postgres builds its result itself: each row as one JSON value, with `to_jsonb()` or `jsonb_build_object()`, each `lateral` nested inside it, and for `select()` the rows gathered into one array with `jsonb_agg()`.
+
+That's how `select()` brings back films with their cast already in place, in one round trip, with nothing to assemble in JavaScript afterwards.
 
 The price is that every value travels as JSON, and JSON has no dates, no bytes and one kind of number. `JSONSelectable` says what arrives instead:
 
@@ -95,11 +119,18 @@ The price is that every value travels as JSON, and JSON has no dates, no bytes a
 - a `bytea`, as its hex string (with the default `bytea_output`), `'\xdeadbeef'`, where `pg` gives a `Buffer`;
 - an `int8` or a `numeric`, as a JSON number, where `pg` gives a string. A large one loses precision as `JSON.parse()` reads it: the `int8` `9007199254740993` arrives as `9007199254740992`. The generator warns when a schema has such columns, and [`customJSONParsingForLargeNumbers`](/generator#generate.customJSONParsingForLargeNumbers) types them for a parser that keeps them whole.
 
-Zapatos returned JSON from every shortcut that returns rows, even those that could do without it, "in the interests of consistency", as its docs put it: one shortcut's row is the same type as another's. And it typed the strings rather than converting them behind your back: [`TimestampTzString`](/runtime-config#TimestampTzString) and its siblings check a string's shape, and [`toDate()`](/runtime-config#toDate) turns one into a `Date` when you choose to, saying in which time zone to read a string that carries none ([Dates and times](/runtime-config#dates-and-times)).
+Zapatos returned JSON from every shortcut that returns rows, even those that could do without it, "in the interests of consistency", as its docs put it: one shortcut's row is the same type as another's.
+
+And it typed the strings rather than converting them behind your back: [`TimestampTzString`](/runtime-config#TimestampTzString) and its siblings check a string's shape, and [`toDate()`](/runtime-config#toDate) turns one into a `Date` when you choose to, saying in which time zone to read a string that carries none ([Dates and times](/runtime-config#dates-and-times)).
 
 ## How a result type follows the query
 
-A shortcut's result type is never declared: TypeScript works it out from the call. The table gives its `JSONSelectable`; `columns` keeps only those keys, as `returning` does for [`insert()` and the other writes](/insert#insert-options); each `extras` key adds the type of its column, or of its `sql` fragment; each `lateral` key adds the result type of its subquery, worked out the same way, one level down. A `lateral` given as [one subquery](/lateral#keep-only-the-far-side) replaces the row with its result instead.
+A shortcut's result type is never declared: TypeScript works it out from the call.
+
+- The table gives its `JSONSelectable`.
+- `columns` keeps only those keys, as `returning` does for [`insert()` and the other writes](/insert#insert-options).
+- Each `extras` key adds the type of its column, or of its `sql` fragment.
+- Each `lateral` key adds the result type of its subquery, worked out the same way, one level down. A `lateral` given as [one subquery](/lateral#keep-only-the-far-side) replaces the row with its result instead.
 
 Then the shortcut sets the shape: an array for `select()`, the row or `undefined` for `selectOne()`, the row for `selectExactlyOne()`, a number for `count()`. Hover `films` to see what came of this one:
 
@@ -111,15 +142,21 @@ Then the shortcut sets the shape: an array for `select()`, the row or `undefined
 
 Three things in that type are worth a closer look:
 
-- **`studio` may be `null`, not `undefined`.** `selectOne()` can find nothing, and in a nested query nothing is JSON's `null`, so the type turns the `undefined` into `null`. Here it can't find nothing, as `films.studio_id` is `NOT NULL REFERENCES studios`; but the generator doesn't read foreign keys, so say so yourself with `selectExactlyOne()`, and `studio` loses its `| null` (Zapatos's docs list this among their limitations, and [#54](https://github.com/AlexandreDemartin/pgcast/issues/54) plans to read it from the catalog).
+- **`studio` may be `null`, not `undefined`.** `selectOne()` can find nothing, and in a nested query nothing is JSON's `null`, so the type turns the `undefined` into `null`.
 - **`hours` is a `number` because you said so.** A `sql` fragment's type is its second type argument, here `number`, and pgcast doesn't parse your SQL to check it ([Type arguments](/sql-template#type-arguments)). `year`, a column, takes its type from the schema.
 - **`roles` is a `number`**, the type of `count()`, though Postgres counts in `int8`: like Zapatos, pgcast assumes no count comes near `Number.MAX_SAFE_INTEGER`.
+
+Here `studio` is never missing, as `films.studio_id` is `NOT NULL REFERENCES studios`; but the generator doesn't read foreign keys, so say so yourself with `selectExactlyOne()`, and `studio` loses its `| null`. Zapatos's docs list this among their limitations, and [#54](https://github.com/AlexandreDemartin/pgcast/issues/54) plans to read it from the catalog.
 
 All of this needs `strictNullChecks`, or `strict`. Without it, `columns`, `extras`, `lateral` and `returning` leave the type at the table's full `JSONSelectable`, and `films[0].studio` doesn't compile ([`select()` options](/select#options)).
 
 ## What pgcast kept, and what it changes
 
-The generator is Zapatos 6.6.1's, unchanged so far: the same queries, and so the same `schema.d.ts` for the same database, its version canary still at 104 ([`SchemaVersionCanary`](/runtime-config#SchemaVersionCanary)). What pgcast changes on the way in is in the run-time library, not in the generated types: [`raw()`](/sql-template#raw), [`cols()`](/sql-template#cols) and [`vals()`](/sql-template#vals) no longer type-check as a value of a `Whereable`, `Insertable` or `Updatable`, where 6.6.1 took them for a `Parameter`, an object of the same shape (`{ value }`); and an `undefined` value can mean a missing key, with [`undefinedMeansMissing`](/runtime-config#Config.undefinedMeansMissing) ([An `undefined` value](/insert#undefined-values)). Changes to the output itself will come the same way, each as a fix or an opt-in of its own ([Versions, opt-ins and warnings](/versions)).
+The generator is Zapatos 6.6.1's, its version canary still at 104 ([`SchemaVersionCanary`](/runtime-config#SchemaVersionCanary)). Its fixes change `schema.d.ts` where 6.6.1's was wrong: a table's `UniqueIndex` lists only its own unique indexes, and each line of a multi-line column comment gets its `*` ([changelog](/changelog)).
+
+What pgcast changes on the way in is in the run-time library, not in the generated types. [`raw()`](/sql-template#raw), [`cols()`](/sql-template#cols) and [`vals()`](/sql-template#vals) no longer type-check as a value of a `Whereable`, `Insertable` or `Updatable`, where 6.6.1 took them for a `Parameter`, an object of the same shape (`{ value }`).
+
+And an `undefined` value can mean a missing key, with [`undefinedMeansMissing`](/runtime-config#Config.undefinedMeansMissing) ([An `undefined` value](/insert#undefined-values)). Changes to the output itself come the same way, each as a fix or an opt-in of its own: while [`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas) and [`enumOrder`](/generator#generate.enumOrder) are off, the rest of `schema.d.ts` is 6.6.1's ([Versions, opt-ins and warnings](/versions)).
 
 What pgcast refuses is a second source of truth: a model class, a schema written in TypeScript, a type declared beside the table it describes. The database has the last word, and the cost is a habit: run the generator again after each migration, and let TypeScript point at the queries that no longer fit ([Your first typed query](/first-query#when-the-schema-changes)).
 

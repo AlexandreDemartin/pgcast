@@ -5,12 +5,16 @@
 // (examples/plain/) opens its own transactions, some at once: it gets a pool on its own copy of the database. An
 // example that shows an error says which above `// ---cut---`, `// rejects with 42703` (a SQLSTATE) or
 // `// rejects with NotExactlyOneError` (an error's name), and must reject with it. schema.sql goes into a temporary
-// database on the server of TEST_DATABASE_URL (the environment, else ../src/.env). Run by `npm run docs:examples`,
-// after the root `npm run build`.
+// database on the server of TEST_DATABASE_URL (the environment, else ../src/.env). On it too, the playground's Postgres
+// (PGlite, decision 005) must parse the docs schema's types as `pg` does, and every example runs again on its pool, as
+// a Run gives it to the code. Run by `npm run docs:examples`, after the root `npm run build`.
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { inspect } from 'node:util';
 import pg from 'pg';
 import * as db from 'zapatos/db';
+import { open } from './.vitepress/playground/pglite.ts';
+import { poolOf } from './.vitepress/playground/pool.ts';
 import { dropOrphanDocsDatabases } from './orphan-databases.mjs';
 
 const envFile = new URL('../src/.env', import.meta.url);
@@ -19,6 +23,7 @@ if (!process.env.TEST_DATABASE_URL) throw new Error('TEST_DATABASE_URL is not se
 
 const
   server = new URL(process.env.TEST_DATABASE_URL),
+  schema = readFileSync(new URL('schema.sql', import.meta.url), 'utf8'),
   name = `pgcast_test_${process.pid}_docs`,  // a concurrent test run leaves pgcast_test_<pid>_* alone while <pid> lives
   copy = `${name}_copy`,
   timeLimit = 10_000,  // each example, in ms: all of them run in about 2 s
@@ -63,9 +68,10 @@ function declaredNames(source) {
 
 /**
  * Run one example with `pool` set to what it is given. Every example shares this process's `zapatos/db`, so the
- * configuration goes back to what it was before the next, as in `cast.data.ts`.
+ * configuration goes back to what it was before the next, as in `cast.data.ts`. `search` imports it afresh, for a
+ * second run: a module runs once per URL.
  */
-async function run(example, pool) {
+async function run(example, pool, search = '') {
   const
     file = new URL(example, import.meta.url),
     source = readFileSync(file, 'utf8'),
@@ -79,7 +85,7 @@ async function run(example, pool) {
   Object.assign(globalThis, standIns, { pool });
   pending.length = 0;
   try {
-    await import(file.href);
+    await import(file.href + search);
     await Promise.all(pending);
   } catch (error) {
     if (expected === undefined) throw error;
@@ -105,7 +111,7 @@ let current;  // the example last started: a promise it leaves unawaited that re
 function note(example, error, what = '') {
   const
     href = new URL(example, import.meta.url).href,  // as the stack names it: no regex built from a file name
-    frame = `${error?.stack}\n${error?.cause?.stack}`.split('\n').find(at => at.includes(`${href}:`)),
+    frame = `${error?.stack}\n${error?.cause?.stack}`.split('\n').find(at => /^[:?]/.test(at.split(href)[1] ?? '')),
     line = frame?.match(/:(\d+):\d+\)?$/)?.[1],
     where = (pagesOf.get(example) ?? ['(on no page)']).join(', ');
   what += error?.code ? `${error.code} ${error.message}` : String(error?.message ?? error);
@@ -114,30 +120,107 @@ function note(example, error, what = '') {
 
 process.on('unhandledRejection', error => note(current, error, 'a promise it does not await rejects: '));
 
+/**
+ * The playground's PGlite, with its adapter's parsers, gives the rows `pg` gives through `client`: for each table of
+ * the docs schema, and for what a query on it often selects. Given values, it gets them as `pg` sends them: the same
+ * rows, or the same SQLSTATE. In a time zone ahead of UTC, as a reader's may be: `pg` makes a `date` midnight where
+ * the code runs, and sends a `Date` as its local time.
+ */
+async function checkPlaygroundParsers(client) {
+  const zone = process.env.TZ;
+  process.env.TZ = 'Asia/Kolkata';  // before the first `Date` below
+  const
+    pglite = await open(schema),
+    day = new Date(2030, 2, 1),  // midnight in Kolkata: 1 March there, 28 February in UTC
+    { rows: tables } = await client.query("SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY 1"),
+    queries = [
+      ...tables.map(({ tablename }) => `SELECT * FROM "${tablename}" ORDER BY 1, 2`),
+      `SELECT count(*), sum(runtime_minutes::int8), avg(runtime_minutes), array_agg(id::int8 ORDER BY id) AS ids,
+        array_agg(runtime_minutes / 60.0 ORDER BY id) AS hours, array_agg(title ORDER BY id) AS titles FROM films`,
+      `SELECT starts_at::date AS day, array_agg(starts_at::date) OVER () AS days, array_agg(starts_at) OVER () AS times,
+        location, array_agg(location) OVER () AS locations, to_jsonb(cinemas) AS cinema, row_to_json(cinemas) AS row
+        FROM screenings JOIN cinemas ON cinemas.id = cinema_id ORDER BY screenings.id`,
+      `SELECT '\\x00ff'::bytea AS bytes, ARRAY['\\x01'::bytea] AS byte_arrays, 'director'::crew_job AS job,
+        ARRAY['director'::crew_job] AS jobs, 'A1'::seat_label AS seat, ARRAY['A1'::seat_label] AS seats,
+        '2030-03-01'::date AS day, '0050-03-01'::date AS early, '0001-03-01 BC'::date AS bc, 'infinity'::date AS never,
+        '-infinity'::timestamp AS always, ARRAY['infinity'::timestamptz] AS forever`,
+    ],
+    given = [
+      // arrays: an enum's, a domain's, of what `pg` quotes, of bytes, of dates, nested; one as `jsonb` rejects
+      ['SELECT name FROM crew WHERE job = ANY($1) ORDER BY 1', [['director', 'editor']]],
+      ['SELECT $1::crew_job[] AS jobs, $2::seat_label[] AS seats, $3::text[] AS texts, $4::int[] AS grid',
+        [['director', 'composer'], ['A1', 'B12'], ['a"b', 'c,d', 'e\\f', '{}', '', null], [[1, 2], [3, null]]]],
+      ['SELECT $1::bytea[] AS bytes, $2::timestamptz[] AS times, $3::date[] AS days',
+        [[Buffer.from([1, 255]), new Uint8Array([2])], [day, null], [day]]],
+      ['SELECT $1::jsonb AS list', [[1, 2]]],
+      ['SELECT $1::seat_label[] AS seats', [['a1']]],
+      // a `Date` as each type that takes one, as text, and in a year BC
+      ['SELECT $1::date AS day, $1::date::text AS shown, $2::timestamp::text AS local, $3::timestamptz AS at',
+        [day, new Date(2030, 2, 1, 10, 30, 15, 250), new Date(Date.UTC(2030, 2, 1, 22))]],
+      ['SELECT $1::text AS text, $2::date AS bc', [day, new Date(-62_200_000_000_000)]],
+      // an object as JSON, or what its `toPostgres()` gives; bytes, sent as they are; null and undefined; the rest
+      // as text
+      ['SELECT $1::text AS text, $2::jsonb AS json, $3::text AS own',
+        [{ a: 1 }, { film: { title: 'Ink' }, ids: [1, 2] }, { toPostgres: () => 'its own' }]],
+      ['SELECT $1::bytea AS bytes, $2::bytea AS view, $3::text AS text',
+        [Buffer.from([0, 255]), new Uint8Array([1, 2, 3]).subarray(1), Buffer.from('café')]],
+      ['SELECT $1::bool AS yes, $2::bool AS no, $3::text AS nothing, $4::int AS missing, $5::int8 AS big, ' +
+        '$6::numeric AS number, $7::float8 AS infinite', [true, false, null, undefined, 2n ** 63n - 1n, 1.5, -Infinity]],
+    ],
+    // its rows, or its error's code
+    answer = async query => {
+      try {
+        return { rows: (await query).rows };
+      } catch (error) {
+        return { rejects: error.code ?? error.message };
+      }
+    };
+
+  try {
+    for (const [text, values] of [...queries.map(text => [text]), ...given]) {
+      const [expected, got] = [await answer(client.query({ text, values })), await answer(pglite.query(text, values))];
+      try {
+        assert.deepStrictEqual(got, expected);
+      } catch (error) {
+        const shown = values ? ` given ${inspect(values, { breakLength: Infinity })}` : '';
+        problems.push(`the playground's PGlite answers \`${text}\`${shown} unlike pg: ${error.message}`);
+      }
+    }
+  } finally {
+    if (zone === undefined) delete process.env.TZ;  // `= undefined` would set it to 'undefined'
+    else process.env.TZ = zone;
+    await pglite.close();
+  }
+}
+
 /** Print the problems, if any, and set the exit code. */
 function report() {
   if (problems.length > 0) {
     console.error(`The examples check failed (README.md § Examples):\n  ${problems.join('\n  ')}`);
     process.exitCode = 1;
   } else {
-    console.log(`The examples ran against Postgres: ${examples.length}, each on the docs schema.`);
+    console.log(`The examples ran against Postgres: ${examples.length}, each on the docs schema, on pg and on ` +
+      "the playground's PGlite, which parses its types as pg does and gets its values as pg sends them.");
   }
 }
 
-/** Run `example`, noting its failure. One that does not settle in time ends the run: its client may never be free. */
-async function check(example, pool) {
+/**
+ * Run `example`, noting its failure; `on` names where, if not on `pg`. One that does not settle in time ends the run:
+ * its client may never be free.
+ */
+async function check(example, pool, on) {
   current = example;
   let timer;
   try {
     const timedOut = new Promise(resolve => { timer = setTimeout(resolve, timeLimit, true); });
-    if (await Promise.race([run(example, pool), timedOut])) {
-      note(example, new Error(`does not settle within ${timeLimit / 1000} s; the examples after it did not run`));
+    if (await Promise.race([run(example, pool, on && '?pglite'), timedOut])) {
+      note(example, new Error(`does not settle within ${timeLimit / 1000} s; the examples after it did not run`), on);
       for (const database of [copy, name]) await admin.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
       report();
       process.exit();
     }
   } catch (error) {
-    note(example, error);
+    note(example, error, on);
   } finally {
     clearTimeout(timer);
   }
@@ -151,7 +234,8 @@ try {
   client.on('error', () => {});  // DROP … WITH (FORCE) ends its session when an example does not settle
   await client.connect();
   try {
-    await client.query(readFileSync(new URL('schema.sql', import.meta.url), 'utf8'));
+    await client.query(schema);
+    await checkPlaygroundParsers(client);
     for (const example of examples.filter(example => !example.startsWith('examples/plain/'))) {
       await client.query('BEGIN');
       await check(example, client);
@@ -175,6 +259,31 @@ try {
     } finally {
       if (settled) await pool.end();  // it would wait for an unreleased client for good
       await admin.query(`DROP DATABASE "${copy}" WITH (FORCE)`);
+    }
+  }
+  // Again on the playground's pool, `pool` of a Run: a cast panel's example on its client, between BEGIN and ROLLBACK,
+  // as on `pg`; an example of several queries on a fresh PGlite, as each Run starts.
+  const
+    playground = "on the playground's PGlite: ",
+    poolOn = pglite => poolOf(({ text, values }) => pglite.query(text, values)),
+    shared = await open(schema),
+    lent = await poolOn(shared).connect();
+  try {
+    for (const example of examples.filter(example => !example.startsWith('examples/plain/'))) {
+      await lent.query({ text: 'BEGIN' });
+      await check(example, lent, playground);
+      await lent.query({ text: 'ROLLBACK' });
+    }
+  } finally {
+    lent.release();
+    await shared.close();
+  }
+  for (const example of examples.filter(example => example.startsWith('examples/plain/'))) {
+    const pglite = await open(schema);
+    try {
+      await check(example, poolOn(pglite), playground);
+    } finally {
+      await pglite.close();
     }
   }
 } finally {

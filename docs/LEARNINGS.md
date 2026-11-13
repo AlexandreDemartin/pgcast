@@ -108,6 +108,12 @@ Candidates for a check, a rule or a skill line.
 - #49 — A mutant that rounds `enumsortorder` survives a single `ADD VALUE … BEFORE` (the stable sort breaks the tie alphabetically): a probe needs a value that breaks the tie the other way — `builder`
 - #49 — `DROP DATABASE … WITH (FORCE)` right after `generate()` can kill a pooled client still closing (57P01) and crash a replay: wait briefly first (see #302) — `builder`
 - #49 — `exactOptionalPropertyTypes` rejects `{ enumOrder: undefined }` in a test loop: spread `{}` or the set option — `builder`
+- #310 — Lighthouse does not test a keyboard trap (WCAG 2.1.2, Level A): an embedded editor is probed with Tab presses over CDP until focus leaves it, and the page says how to leave — `branch-reviewer`
+- #310 — Monaco 0.57 in Chrome focuses `.native-edit-context`, not its `textarea`: a focus rule, a probe or a key press names both — `branch-reviewer`
+- #310 — A clean-up registered after an `await` in `onMounted` leaks when the page is left during the wait: register it before, return if the template ref is gone; a CDP probe delays the awaited call (`Page.addScriptToEvaluateOnNewDocument`) to open the window — `branch-reviewer`
+- #311 — With a `pg` stub of empty classes, `typeofQueryable` falls back to `_connected`: a client an adapter lends sets it `true`, or `db.readCommitted(client, …)` calls `client.connect()`; a parse check misses it, running the docs' examples on the adapter's pool finds it — `branch-reviewer`
+- #311 — A driver adapter is checked both ways against `pg`, rows parsed and values sent, in a time zone east of UTC: PGlite serializes a value by its parameter's type (`toISOString()` puts a local midnight on the day before), and a type created after `create()`, an enum's array, falls to `toString()` — `branch-reviewer`
+- #311 — `JSON.stringify` writes `Infinity`, `NaN` and an invalid `Date` as `null`, like a NULL: a replacer names them, reading `this[key]` to see a `Date` before its `toJSON()` — `branch-reviewer`, `builder`
 
 ## Minors kept
 

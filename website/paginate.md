@@ -1,7 +1,15 @@
 # Paginate a list
 
-Show a long list a page at a time: here the films, newest first, two to a page. You give an `order` that never ties, a `limit`, then either an `offset` for page *n* or the last row's keys for the next page; and, if the page shows one, a total. The last section puts them together in a request handler. It assumes the basics of the [tutorial](/tutorial).
+Show a long list a page at a time: here the films, newest first, two to a page. The last section puts the steps together in a request handler. It assumes the basics of the [tutorial](/tutorial).
 {.lede}
+
+<AtAGlance>
+
+- A page is an `order` that never ties, then a `limit`.
+- To move on, an `offset` for page *n*, or the last row's keys for the next page.
+- A total, if the page shows one: `count()`, or a window in `extras`.
+
+</AtAGlance>
 
 ## Order, then limit
 
@@ -39,7 +47,8 @@ Skip `(n - 1) × size` rows with [`offset`](/select#order-limit-offset-and-witht
 </CastPanel>
 
 - Past the last page, `select()` gives `[]`.
-- Postgres still computes the rows it skips, so page 500 costs more than page 1; and a newer film added between two requests pushes the last film of page 1 onto page 2, where the reader sees it twice ([LIMIT and OFFSET](https://www.postgresql.org/docs/current/queries-limit.html)). For a long list that changes, start from the last row.
+- Postgres still computes the rows it skips, so page 500 costs more than page 1 ([LIMIT and OFFSET](https://www.postgresql.org/docs/current/queries-limit.html)).
+- A newer film added between two requests pushes the last film of page 1 onto page 2, where the reader sees it twice. For a long list that changes, start from the last row.
 
 ## Fetch the next page from the last row
 
@@ -137,7 +146,8 @@ function decodeCursor(cursor: string): Cursor | undefined {
 ```
 
 - For 2008 and 1002, the cursor is `eyJyZWxlYXNlX3llYXIiOjIwMDgsImlkIjoxMDAyfQ`: JSON in base64url, which a URL takes as it is.
-- `decodeCursor()` gives `undefined` for a string it did not make: `nonsense`, an empty string, JSON that is not an object, keys that are not integers (`"2008"`, `2008.5`) or out of Postgres's `integer` (`99999999999`, `1e300`), a key more, standard base64's `==`, a stray `!`. Base64url decoding skips the last two, and destructuring drops a key more, so it encodes the two keys again and compares. Answer 400, as the [handler](#a-handler-from-request-to-response) does.
+- `decodeCursor()` gives `undefined` for a string it did not make: `nonsense`, an empty string, JSON that is not an object, keys that are not integers (`"2008"`, `2008.5`) or out of Postgres's `integer` (`99999999999`, `1e300`). Answer 400, as the [handler](#a-handler-from-request-to-response) does.
+- It refuses a key more, standard base64's `==` and a stray `!` too: base64url decoding skips the last two, and destructuring drops a key more, so it encodes the two keys again and compares.
 - A cursor is encoded, not signed: the client can read it and change it. It holds only where the page starts, and each key goes to Postgres as a parameter: a changed cursor moves the page, nothing more.
 
 ## Go back a page

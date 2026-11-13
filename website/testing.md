@@ -108,9 +108,9 @@ The test compares its compiled query with the one of the call it should make, co
 
 ### The SQL text is not a stable API
 
-pgcast keeps what a query does: the rows it reads or writes, and the type of what `run()` returns. It does not keep the text it compiles: a minor version may change it, a pair of parentheses, the order of clauses, a cast, as long as the result does not. The fix of `not()` is one such change: each condition under `not()` gains a pair of parentheses, and most match the same rows.
+pgcast keeps what a query does: the rows it reads or writes, and the type of what `run()` returns. It does not keep the text it compiles: a minor version may change it, a pair of parentheses, the order of clauses, a cast, as long as the result does not.
 
-So a test that freezes the text of a shortcut's query, or a fake that picks its answer by matching that text, can break on an upgrade with nothing wrong in your code.
+The fix of `not()` is one such change: each condition under `not()` gains a pair of parentheses, and most match the same rows. So a test that freezes the text of a shortcut's query, or a fake that picks its answer by matching that text, can break on an upgrade with nothing wrong in your code.
 
 ## Fake a result typed from the schema
 

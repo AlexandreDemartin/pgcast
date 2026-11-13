@@ -26,6 +26,15 @@ export const twoslashOptions: TwoslashOptions = {
 };
 
 /**
+ * A hover type with each module of `node_modules` by its name, as the reader imports it: TypeScript's hover gives a
+ * module that a type refers to by its file's path on the build machine (`typeof import("/home/runner/…/node_modules/
+ * @types/pg/index")` is `typeof import("pg")`). `check-paths.mjs` fails the build on a path that is left.
+ */
+export const moduleNames = (type: string) => type.replace(
+  /import\("[^"]*\/node_modules\/(@types\/)?([^"]+?)(?:\/index)?(?:\.d\.[cm]?ts)?"\)/g,
+  (_, types, name) => `import("${types ? name.replace(/^([^/]+?)__/, '@$1/') : name}")`);  // @types/a__b is @a/b
+
+/**
  * Each hover type takes the keyboard's focus (docs/design/art-direction.md § Hover types): the menu's trigger, the
  * `<span>` that floating-vue listens on, gets a `tabindex`; the menu opens on focus (theme/index.ts).
  */

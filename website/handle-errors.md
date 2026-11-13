@@ -77,7 +77,9 @@ ROLLBACK
 The SQL of each `INSERT`: [`insert()`](/insert#insert). A serialisation failure (40001) or a deadlock (40P01) has already been retried by then, up to [`transactionAttemptsMax`](/runtime-config#Config.transactionAttemptsMax) attempts; if the promise still rejects with one, `'TransactionRollback'` recognises both, and the request can be tried again later ([Retry a transaction](/retries)).
 
 ::: warning Lost writes
-Don't catch a database error inside the callback and carry on. Postgres has aborted the transaction: each query after it is refused with 25P02 (`InvalidTransactionState_InFailedSqlTransaction`), and if the callback returns, pgcast sends `COMMIT`<!-- probe: db.serializable(pool, async () => {}) -->, which Postgres turns into a rollback without an error. The promise resolves, nothing the callback wrote is saved, and pgcast warns once, `PGCAST_DEP003`. With [`transactionRequiresCommit: true`](/runtime-config#Config.transactionRequiresCommit), the default from 7.0, it rejects instead ([`transaction()`, Errors](/transaction#errors)).
+Don't catch a database error inside the callback and carry on. Postgres has aborted the transaction: each query after it is refused with 25P02 (`InvalidTransactionState_InFailedSqlTransaction`), and if the callback returns, pgcast sends `COMMIT`<!-- probe: db.serializable(pool, async () => {}) -->, which Postgres turns into a rollback without an error.
+
+The promise resolves, nothing the callback wrote is saved, and pgcast warns once, `PGCAST_DEP003`. With [`transactionRequiresCommit: true`](/runtime-config#Config.transactionRequiresCommit), the default from 7.0, it rejects instead ([`transaction()`, Errors](/transaction#errors)).
 
 For a seat that may be taken, ask Postgres not to refuse: [`upsert()` with `doNothing`](/insert#doNothing) writes `ON CONFLICT ON CONSTRAINT "seat_bookings_pkey" DO NOTHING`<!-- probe: db.upsert('seat_bookings', { screening_id: 1001, seat: 'H2', customer: 'Wren Abernathy' }, db.constraint('seat_bookings_pkey'), { updateColumns: db.doNothing }) --> and gives `undefined` for a taken seat, with no error, and the transaction goes on.
 :::
@@ -113,7 +115,9 @@ const screening = await db.selectExactlyOne('screenings', { id: 1042 }).run(pool
 
 ## Fix the errors pgcast throws
 
-pgcast throws a plain `Error`, with no `code`, before the query is sent, when a value is not one it accepts: an option outside its type (`'desc'`, `'serializable'`), or a value with no meaning in SQL (`db.Default` in a filter). These are bugs in the calling code, to fix rather than to catch: the messages say how. Where they surface depends on who throws:
+pgcast throws a plain `Error`, with no `code`, before the query is sent, when a value is not one it accepts: an option outside its type (`'desc'`, `'serializable'`), or a value with no meaning in SQL (`db.Default` in a filter).
+
+These are bugs in the calling code, to fix rather than to catch: the messages say how. Where they surface depends on who throws:
 
 | Who throws | For example | What you get |
 |---|---|---|

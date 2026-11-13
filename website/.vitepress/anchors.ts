@@ -84,7 +84,9 @@ export function checkLinks(config: SiteConfig) {
         !url.pathname.startsWith(base) ? `not under the site's base, ${base}` :
         !files.has(target) ? 'no such page' :
         anchor === null ? 'its hash is not valid percent-encoding' :
-        anchor !== '' && !anchors.get(target)?.has(anchor) ? 'no such anchor on that page' :
+        // a playground's code (playground/share.ts), which playgroundLinks.ts decodes, is no anchor
+        anchor !== '' && !(target === 'playground.html' && anchor.startsWith('code/')) &&
+          !anchors.get(target)?.has(anchor) ? 'no such anchor on that page' :
         null);
     };
 

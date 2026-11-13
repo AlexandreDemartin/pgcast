@@ -9,6 +9,7 @@ import { pathToFileURL } from 'node:url';
 import { createTwoslasher } from 'twoslash';
 import { createMarkdownRenderer, defineLoader } from 'vitepress';
 import * as db from 'zapatos/db';
+import { hoverType, layOut, normalised, shown, typeShown, valuesShown } from './panel.ts';
 import { lineIndents, sqlParameters, syntax } from './syntax.ts';
 import { twoslashOptions } from './twoslash.ts';
 
@@ -20,12 +21,6 @@ export interface Cast {
 
 declare const data: Record<string, Cast>;
 export { data };
-
-// The row type, one level deep, under the named type that a hover shows (`films.JSONSelectable`, `LateralResult<…>`).
-const shown = (name: string) => `
-type Shown<T> = T extends readonly (infer R)[] ? { [K in keyof R]: R[K] }[] : T extends object ? { [K in keyof T]: T[K] } : T;
-declare const shown: Shown<typeof ${name}>;
-`;
 
 const
   sent: { text: string; values: unknown[] }[] = [],
@@ -113,45 +108,18 @@ export async function castOf(file: string, twoslasher: ReturnType<typeof createT
 
   return {
     sql,
-    values: '[' + values.map(value => JSON.stringify(value)).join(', ') + ']',
-    type: `const ${result}: ${named}` + (expanded === named ? '' : `\n// that is\nconst ${result}: ${expanded}`),
+    values: valuesShown(values),
+    type: typeShown(result, named, expanded),
   };
 }
 
 /**
  * The type of `const <name>`, from its hover: never from another hover on the same name, which may come first
- * (the namespace `s.cinemas` before `const cinemas`). Nested lines are indented by 2, not 4.
+ * (the namespace `s.cinemas` before `const cinemas`).
  */
-const typeOf = (hovers: ReturnType<ReturnType<typeof createTwoslasher>>['nodes'], name: string) => hovers
-  .find(n => n.type === 'hover' && n.target === name && n.text.startsWith(`const ${name}: `))?.text
-  .replace(/^const \w+: /, '').replace(/^((?: {4})+)/gm, s => s.slice(s.length / 2));
+const typeOf = (hovers: ReturnType<ReturnType<typeof createTwoslasher>>['nodes'], name: string) => {
+  const text = hovers.find(n => n.type === 'hover' && n.target === name && n.text.startsWith(`const ${name}: `))?.text;
+  return text === undefined ? undefined : hoverType(text);
+};
 
 const throws = (f: () => unknown) => { try { f(); } catch { return true; } return false; };
-
-const quoted = /('(?:[^']|'')*'|"(?:[^"]|"")*")/;  // a SQL string or quoted identifier
-
-/** The SQL with its whitespace made uniform outside quotes: what `layOut` must leave as it is. */
-const normalised = (sql: string) => sql.split(quoted)
-  .map((part, i) => i % 2 ? part : part.replace(/\s+/g, ' ').replace(/ ?([()]) ?/g, '$1')).join('').trim();
-
-/**
- * Lay out compiled SQL on lines, as you'd write it: each clause on its own line, each subquery indented. Only the
- * whitespace between tokens changes, never inside a quoted string or identifier, so it is the same query.
- */
-function layOut(sql: string) {
-  const
-    subqueries: boolean[] = [],  // for each open parenthesis: does it hold a subquery?
-    indent = (extra = 0) => '\n' + '  '.repeat(subqueries.filter(Boolean).length + extra),
-    atClauseLevel = () => subqueries.length === 0 || subqueries[subqueries.length - 1]!,
-    tokens = /(\((?=SELECT\b))|(\()|(\))|((?<!LEFT|INNER)\s+(?=(?:SELECT|FROM|WHERE|(?:LEFT |INNER )?JOIN|GROUP BY|HAVING|ORDER BY|LIMIT|OFFSET|FOR (?:NO KEY )?UPDATE|FOR (?:KEY )?SHARE|VALUES|ON CONFLICT|RETURNING)\b))|(?<=\|\|)\s+/g;
-
-  return sql.split(quoted)  // odd parts are quoted: kept as they are
-    .map((part, i) => i % 2 ? part : part.replace(tokens, (space, subquery, open, close, beforeClause) =>
-      subquery ? (subqueries.push(true), '(' + indent()) :
-      open ? (subqueries.push(false), '(') :
-      close ? (subqueries.pop() ? indent() + ')' : ')') :
-      !atClauseLevel() ? space :
-      beforeClause ? indent() :
-      indent(1)))  // after a top-level ||
-    .join('');
-}

@@ -2,16 +2,18 @@
 // The docs site (decision 004), on VitePress's default theme; its look is docs/design/art-direction.md.
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { transformerTwoslash } from '@shikijs/vitepress-twoslash';
+import { defaultHoverInfoProcessor, transformerTwoslash } from '@shikijs/vitepress-twoslash';
 import { defineConfig, type HeadConfig } from 'vitepress';
 import { checkLinks, keepLinkHashes } from './anchors.ts';
 import { changelogPage, dateChangelog, writeChangelogFeed } from './changelog.ts';
-import { writeLlmsFiles } from './llms.ts';
+import { host, writeLlmsFiles } from './llms.ts';
 import { describePage, pageHead, repo } from './meta.ts';
 import { outline } from './outline.ts';
+import { playgroundVite } from './playground/build.ts';
+import { checkPlaygroundLinks, linkCastPanels } from './playgroundLinks.ts';
 import { lineIndents, sqlParameters, syntax } from './syntax.ts';
 import { labelTableCells } from './tables.ts';
-import { focusableHovers, twoslashOptions } from './twoslash.ts';
+import { focusableHovers, moduleNames, twoslashOptions } from './twoslash.ts';
 
 const
   { version } = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')),
@@ -36,6 +38,7 @@ export default defineConfig({
     await writeLlmsFiles(config);  // llms.txt and llms-full.txt, for assistants
     await writeChangelogFeed(config);  // changelog.xml
     checkLinks(config);  // a link to a page or an anchor that does not exist fails the build
+    await checkPlaygroundLinks(config);  // so does a cast panel that does not open its example in the playground
   },
   head: [
     // public/fonts/, declared in theme/fonts.css: every page's first screen sets all three faces (the wordmark is mono)
@@ -55,15 +58,23 @@ export default defineConfig({
     // a hover's JSDoc can hold these (`process.env`, from @types/node), and Shiki loads only the languages a page names
     languages: ['js', 'bash'],
     // an unexpected type error in a `ts twoslash` block fails the build; a block meant to fail says so with `// @errors`
-    codeTransformers: [transformerTwoslash({ twoslashOptions }), focusableHovers, sqlParameters, lineIndents],
+    codeTransformers: [
+      transformerTwoslash({ twoslashOptions, processHoverInfo: type => defaultHoverInfoProcessor(moduleNames(type)) }),
+      focusableHovers, sqlParameters, lineIndents,
+    ],
     config: md => {
       keepLinkHashes(md);  // `[Config.upsertRequiresSameKeys](/runtime-config#Config.upsertRequiresSameKeys)`
       changelogPage(md);  // CHANGELOG.md in changelog.md
       labelTableCells(md);  // `<td data-label="…">`, for a table that stacks on a phone
+      linkCastPanels(md);  // "Open in playground" on a docs page's cast panel
     },
   },
   vite: {
-    define: { __PGCAST_VERSION__: JSON.stringify(version) },
+    ...playgroundVite,  // Monaco and the runner's worker, on /playground only
+    define: {
+      __PGCAST_VERSION__: JSON.stringify(version),
+      __PGCAST_SITE__: JSON.stringify(`${host}/`),  // the site's URL, which the page actions' prompts name (PageActions.vue)
+    },
     resolve: {
       // VitePress's light / dark switch becomes system / light / dark (its "overriding internal components").
       alias: [{
@@ -82,7 +93,7 @@ export default defineConfig({
         link,
         activeMatch: `^(${[link, ...items.map(item => item.link)].join('|')})$`,
       }]),
-      { text: 'Changelog', link: '/changelog' },
+      { text: 'Playground', link: '/playground' },  // the changelog is in the footer (SiteFooter.vue)
       // no ↗ after the external link: the bar's links look alike, wherever they lead
       { text: 'GitHub', link: repo, noIcon: true },
     ],
