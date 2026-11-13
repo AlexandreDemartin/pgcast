@@ -367,8 +367,8 @@ The screenings of the next seven days, from `now()`, here the time of the query:
 ## Arithmetic: `add()`, `subtract()` {#arithmetic}
 
 ```ts
-db.conditions.add<T extends number | Date>(a: T)
-db.conditions.subtract<T extends number | Date>(a: T)
+db.conditions.add<T extends number | Date>(a: T | Parameter<T>)
+db.conditions.subtract<T extends number | Date>(a: T | Parameter<T>)
 ```
 
 Operations, not tests: for an [`update()`](/insert#update) value, where `self` is the column it sets.
@@ -381,7 +381,8 @@ Operations, not tests: for an [`update()`](/insert#update) value, where `self` i
 
 - In a `where`, the type lets them through, and Postgres refuses them (42804: "argument of WHERE must be type boolean").
 - In `upsert()`'s `updateValues`, there is no current column: they throw "The 'self' column alias has no meaning here"<!-- message --> ([`upsert()`](/insert#upsert)). In `insert()`, the column is written, and Postgres refuses it (42703).
-- The type refuses a `Parameter` (TS2345), which would compile ([#39](https://github.com/AlexandreDemartin/pgcast/issues/39)).
+- A `Parameter` keeps its cast: `add(db.param(3, 'int4'))` gives `"col" + CAST($1 AS "int4")`<!-- probe: db.sql`${{ col: db.conditions.add(db.param(3, 'int4')) }}` -->. Zapatos 6.6.1's type refused it (TS2345), though it compiled the same. The cast is not checked: `add(db.param(3, 'text'))` type-checks, and Postgres refuses it (42883), as for any `Parameter`.
+- The column must still be of the value's type. On a `date` column, `add(db.param(3, 'int4'))` is still refused by the type (TS2322), as `add(3)` is, which Postgres finds ambiguous (42725). Write the fragment instead: `` db.sql`${db.self} + ${db.param(3, 'int4')}` `` adds three days, `"col" + CAST($1 AS "int4")`<!-- probe: db.sql`${{ col: db.sql`${db.self} + ${db.param(3, 'int4')}` }}` -->.
 - On a `timestamptz` column, a `Date` type-checks, and Postgres refuses both: `add()` reads it as an interval (22007), `subtract()` gives an interval, not a time (42804).
 
 ### `add()` {#conditions.add}

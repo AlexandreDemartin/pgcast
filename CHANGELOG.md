@@ -108,6 +108,11 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
   - Changed: an aggregate of your own that takes another number of arguments under a built-in name ran. After `CREATE AGGREGATE max(int4, int4) (…)`, `max('ratings', db.all, { columns: ['stars', 'votes'] })` sent `max("stars", "votes")`; it now rejects. `select('ratings', db.all, { columns: ['stars', 'votes'] }, SelectResultMode.Numeric, 'max')` sends the same SQL.
   - Changed: a refused aggregate marked `noop` resolved to its `noopResult`; it now rejects, as `run()` compiles the query before it reads `noop`.
   - Unchanged: every other call that ran, a `lateral` map included, and `select()` in `SelectResultMode.Numeric`, which keeps several columns for an aggregate of several arguments (`corr("rating", "minutes")`).
+- `add()` and `subtract()` take a `Parameter` of a number or a `Date`, compiled as it is, with its cast: `{ balance: add(param(10, 'numeric')) }` gives `"balance" + CAST($1 AS "numeric")`. Zapatos 6.6.1's type refused it (TS2345), though it compiled the same (R33).
+  - The constraint on the column is the `Parameter`'s value type, as for a plain value: on a `date` column, `add(param(3, 'int4'))` is still refused (TS2322), as `add(3)` is. To add days to a date, write `` sql`${self} + ${param(3, 'int4')}` ``.
+  - The cast is not checked: `add(param(3, 'text'))` type-checks, and Postgres refuses it (42883), as for any `Parameter`.
+  - Changed: `Parameters<typeof add>[0]` is now `number | Date | Parameter<number | Date>`, so a value of that type is no longer assignable to `number | Date`.
+  - Unchanged, on a grid of 39 calls that type-check with Zapatos 6.6.1 and 12 it refuses, on TypeScript 5.9 and 7.0, strict or not: each inferred type and each error. The grid covers literals (`add(1)` gives `SQLFragment<number, 1>`), unions, generic wrappers and `[1, 2].map(add)`.
 
 ## [6.6.2] - 2026-11-12
 
