@@ -206,6 +206,8 @@ describe('param', () => {
     expect(one(param('1', 'pg_catalog"."int4'))).toEqual({ text: 'CAST($1 AS "pg_catalog"."int4")', values: ['1'] });
     // with a `"`, `.` does not split: the cast is one name, `"` doubled, unless it is well-formed as above
     expect(one(param('1', 's.a"b'))).toEqual({ text: 'CAST($1 AS "s.a""b")', values: ['1'] });
+    // well-formed once quoted comes before already quoted: `""""` is the type `""`, as in 6.6.1, not the type `"`
+    expect(one(param('1', '""""'))).toEqual({ text: 'CAST($1 AS """""")', values: ['1'] });
   });
 
   it('with true: arrays and plain objects are JSON-stringified and cast to json', () => {
