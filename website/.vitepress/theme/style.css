@@ -150,8 +150,8 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
   font-family: var(--font-display); font-weight: 600; line-height: 1.15; letter-spacing: 0; text-wrap: balance;
 }
 .vp-doc h1 { font-size: 2.5rem; letter-spacing: -.01em; margin: 0 0 12px; }
-.vp-doc h2 { font-size: 1.5rem; margin: 44px 0 12px; padding-top: 4px; border-top: 0; }
-.vp-doc h3 { font-size: 1.125rem; margin: 28px 0 8px; }
+.vp-doc h2 { font-size: 1.5rem; margin: 44px 0 16px; padding-top: 4px; border-top: 0; }  /* 48px over its text */
+.vp-doc h3 { font-size: 1.125rem; margin: 24px 0 12px; }
 @media (max-width: 560px) { .vp-doc h1 { font-size: 2rem; } }
 .vp-doc .lede { font-size: 1.1rem; color: var(--muted); margin: 0 0 28px; max-width: 62ch; }
 .vp-doc a, .landing a:not(.btn) { font-weight: inherit; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
@@ -208,21 +208,18 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 .vp-doc .custom-block a { color: var(--accent); }
 .vp-doc .custom-block code { background: var(--sunken); }
 
-/* At a glance, under a long page's lede: a quiet box, its label as the nav's group labels, no rail, no icon */
-.vp-doc .AtAGlance {
-  border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface);
-  padding: 14px 16px; margin: 0 0 28px;
-}
-.vp-doc .AtAGlance-label { font: 600 13px/20px var(--font-body); color: var(--muted); margin: 0 0 6px; }
+/* At a glance, under a long page's lede: a quiet tint, no border, no rail, no icon; its label as the nav's group
+   labels */
+.vp-doc .AtAGlance { border-radius: var(--radius); background: var(--surface); padding: 16px 20px; }
+.vp-doc .AtAGlance-label { font: 600 13px/20px var(--font-body); color: var(--muted); margin: 0 0 8px; }
 .vp-doc .AtAGlance ul { margin: 0; padding-left: 1.25em; }
-.vp-doc .AtAGlance li + li { margin-top: 4px; }
 
 /* a table of cases in `<div class="stack">`: a long name in code may break, so the table fits its column; on a phone,
    each row a block, each cell under its column's header (`data-label`, tables.ts) */
 .vp-doc .stack td code { overflow-wrap: anywhere; }
 @media (max-width: 639px) {
   .vp-doc .stack table, .vp-doc .stack tbody, .vp-doc .stack tr, .vp-doc .stack td { display: block; }
-  .vp-doc .stack table { overflow: visible; margin: 16px 0 20px; }
+  .vp-doc .stack table { overflow: visible; }
   .vp-doc .stack thead {
     position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
   }
@@ -237,7 +234,6 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 }
 
 /* a diagram: inline SVG drawn with the tokens, so light and dark follow; at its own size, or narrower on a phone */
-.vp-doc .Diagram { margin: 20px 0 28px; }
 .vp-doc .Diagram svg { display: block; max-width: 100%; height: auto; }
 .Diagram .box { fill: var(--surface); stroke: var(--line); }
 .Diagram .box.accent { fill: var(--accent-soft); stroke: var(--accent); }
@@ -385,3 +381,19 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 .VPLocalSearchBox .search-input:focus-visible { outline: none; }
 .v-popper--theme-twoslash .v-popper__inner { border-radius: 8px; box-shadow: 0 8px 28px rgba(0, 0, 0, .18); }
 .twoslash-floating .twoslash-popup-code { line-height: 1.5; background: transparent !important; }
+
+/* the reading column's rhythm, on the 4px grid (art direction § Layout): a section 48px under the text above it
+   (h2, above), paragraphs and lists 16px apart, list items 8px, a nested list's 4px; a block (code, table, cast
+   panel, note, diagram, At a glance) 24px from the text around it, and right under its heading. Last in the file,
+   so that it wins over VitePress's margins and the components' own; the blocks inside a cast panel or a code group
+   keep theirs. */
+.vp-doc li li + li { margin-top: 4px; }
+.vp-doc li > ul, .vp-doc li > ol { margin-top: 4px; }
+.vp-doc :is(div[class*='language-'], .vp-code-group, table, .custom-block, .CastPanel-frame, .Diagram, .AtAGlance):not(
+  :where(.CastPanel *, .vp-code-group *)) { margin-top: 24px; margin-bottom: 24px; }
+.vp-doc :is(h2, h3) + :is(div[class*='language-'], .vp-code-group, table, .custom-block, .CastPanel-frame, .Diagram),
+.vp-doc :is(h2, h3) + .stack > table { margin-top: 0; }
+.vp-doc li :is(div[class*='language-'], .vp-code-group):not(:where(.CastPanel *, .vp-code-group *)) {
+  margin-top: 12px; margin-bottom: 12px;
+}
+
