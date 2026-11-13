@@ -408,6 +408,8 @@ function filmCardsOf(queryable: db.Queryable, studio_id: number): Promise<FilmCa
 }
 ```
 
+- `C` may be a `readonly` tuple, as `columns` may ([`columns`](#columns)).
+
 ### `ExtrasResult` {#ExtrasResult}
 
 `ExtrasResult<T, E>`: the keys that `extras` adds, each typed as its column in `JSONSelectable`, or as its fragment's result.
