@@ -27,6 +27,7 @@ Defined on `:root`, the dark values on `.dark` with `color-scheme: dark`. Three 
 | `--accent-soft` | `#dcefec` | `#11302c` | current nav item, chips, hover-type highlight, search selection |
 | `--warn` | `#8a5a00` | `#e8b65a` | Security chip and its border, the banner's text |
 | `--warn-soft` | `#fbf0d9` | `#2c2412` | Security note, the banner |
+| `--error` | `#b22e2e` | `#d96d6d` | an error line under a failing example (Twoslash's `// @errors`): its text and left border, on a 12.5% tint of it |
 | `--code-bg` | `#f1f4f6` | `#0f171d` | code blocks |
 
 Syntax tokens:

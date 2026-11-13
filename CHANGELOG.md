@@ -157,6 +157,7 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
     - A hand-written copy of 6.6.1's inner conditional (`C extends ColumnForTable<T>[] ? JSONOnlyColsForTable<T, C> : never`), assigned to or from a function that forwards `columns` or `returning`, such as a `.d.ts` compiled against 6.6.1, which inlines it. Write `db.ReturningTypeForTable<T, C, E>` or `db.FullSelectReturnTypeForTable<…>`, or compile the `.d.ts` again.
   - Unchanged: a mutable array, no `columns`, the aggregates (`number`), and every type with `strictNullChecks` off, where the result is the whole row whatever `columns`.
 - The docs site passes Lighthouse's accessibility audit (100 on `/` and `/select`, from 94). Code comments reach WCAG AA's 4.5:1 on every code background, light and dark: `--c` is `#626e79` in light (from 3.32:1) and `#768794` in dark (from 4.13:1). The cast panel's column labels are paragraphs, not `<h5>`, and the home's four pillars `<h2>`, not `<h3>`, so no heading skips a level; both look as before.
+- The docs site's error lines, the red block under an example that fails to compile, reach WCAG AA's 4.5:1, so `/conditions` and `/first-query` score 100 for accessibility in Lighthouse, from 96. A new token, `--error`, colours their text and border, on a 12.5% tint of itself: `#b22e2e` in light (from Twoslash's `#d45656`, 3.1:1) and `#d96d6d` in dark (from 4.01:1).
 
 ## [6.6.2] - 2026-11-12
 
