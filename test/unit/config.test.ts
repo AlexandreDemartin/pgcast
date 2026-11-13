@@ -25,7 +25,7 @@ describe('getConfig()', () => {
   });
 
   it('keeps a transactionRetryDelay set to undefined as undefined', () => {
-    db.setConfig({ transactionRetryDelay: undefined });
+    db.setConfig({ transactionRetryDelay: undefined } as unknown as db.NewConfig);  // compiles in a consumer project, not under exactOptionalPropertyTypes
     expect(db.getConfig().transactionRetryDelay).toBeUndefined();
   });
 });
