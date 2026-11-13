@@ -121,6 +121,15 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
   - Changed: an aggregate of your own that takes another number of arguments under a built-in name ran. After `CREATE AGGREGATE max(int4, int4) (…)`, `max('ratings', db.all, { columns: ['stars', 'votes'] })` sent `max("stars", "votes")`; it now rejects. `select('ratings', db.all, { columns: ['stars', 'votes'] }, SelectResultMode.Numeric, 'max')` sends the same SQL.
   - Changed: a refused aggregate marked `noop` resolved to its `noopResult`; it now rejects, as `run()` compiles the query before it reads `noop`.
   - Unchanged: every other call that ran, a `lateral` map included, and `select()` in `SelectResultMode.Numeric`, which keeps several columns for an aggregate of several arguments (`corr("rating", "minutes")`).
+- A `readonly` array as `columns` or `returning`, `['id', 'title'] as const` or a `readonly ColumnForTable<T>[]`, types the result as a mutable array does: the rows of those columns, in `select()`, `selectOne()`, `selectExactlyOne()`, `insert()`, `upsert()` (with `$action`), `update()`, `deletes()` and a `lateral`. With `strictNullChecks`, Zapatos 6.6.1 typed these rows as `never` (`selectOne()` as `undefined`), which any type accepted and whose properties could not be read. `ReturningTypeForTable`, `UpsertReturnableForTable`, `FullSelectReturnTypeForTable` and `JSONOnlyColsForTable` take a readonly tuple too. The SQL does not change.
+  - Changed, with `strictNullChecks`: a type that the query does not return no longer compiles. Each compiled under 6.6.1:
+    - A wrong annotated result type: `Promise<{ no_such_column: Date }[]>` for `select('films', db.all, { columns: ['id', 'title'] as const }).run(q)`. Write the type of those columns, `db.JSONOnlyColsForTable<'films', ['id', 'title']>[]`, or leave it to inference.
+    - The rows assigned to an unrelated type: `const n: number[] = rows`. Map them to it: `rows.map(r => r.id)`.
+    - A wrong column type: `const film: { id: string } = …` where `id` is a number. Write the column's type, `s.films.JSONSelectable['id']`.
+    - The whole row where only some columns come back: `const rows: s.films.JSONSelectable[] = …`. Write `Pick<s.films.JSONSelectable, 'id' | 'title'>[]`, or leave `columns` out.
+    - A union with an `as const` tuple, `columns: cond ? ['id'] as const : cols`: 6.6.1 typed the whole row; the rows are now either row, so a column that may be missing cannot be read. Check for it first (`'title' in row`).
+    - A hand-written copy of 6.6.1's inner conditional (`C extends ColumnForTable<T>[] ? JSONOnlyColsForTable<T, C> : never`), assigned to or from a function that forwards `columns` or `returning`, such as a `.d.ts` compiled against 6.6.1, which inlines it. Write `db.ReturningTypeForTable<T, C, E>` or `db.FullSelectReturnTypeForTable<…>`, or compile the `.d.ts` again.
+  - Unchanged: a mutable array, no `columns`, the aggregates (`number`), and every type with `strictNullChecks` off, where the result is the whole row whatever `columns`.
 
 ## [6.6.2] - 2026-11-12
 

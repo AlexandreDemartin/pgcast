@@ -58,7 +58,20 @@ The SQL of each row is what the built library compiles, on the docs schema; `…
 
 `columns?: readonly ColumnForTable<T>[]`, a [`ColumnsOption`](#ColumnsOption): only these columns, each a key of the result object, in place of the whole row. It does not rename a column: [`extras`](#extras) does.
 
-A `readonly` array (`['id', 'title'] as const`) sends the same SQL, but the result type is `never` for now ([#41](https://github.com/AlexandreDemartin/pgcast/issues/41)), which is assignable to any type: write the array without `as const`.
+A `readonly` array, `['id', 'title'] as const` or a `readonly ColumnForTable<T>[]`, gives the same SQL and the same type as a mutable one. With `strictNullChecks`, Zapatos 6.6.1 typed its rows as `never`, which any type accepted; a type that the query does not return is now refused:
+
+```ts twoslash
+import * as db from 'zapatos/db';
+// ---cut---
+const columns = ['id', 'title'] as const;
+
+async function filmCards(queryable: db.Queryable) {
+  const cards: { id: number; title: string }[] = await db.select('films', db.all, { columns }).run(queryable);
+  // @ts-expect-error tagline is not among the columns
+  const withTaglines: { title: string; tagline: string | null }[] = await db.select('films', db.all, { columns }).run(queryable);
+  return [cards, withTaglines];
+}
+```
 
 ### `order`, `limit`, `offset` and `withTies`
 
@@ -363,7 +376,7 @@ One locking clause of [`lock`](#lock). `of` takes a table name without its schem
 
 ### `ColumnsOption` {#ColumnsOption}
 
-`ColumnsOption<T> = readonly ColumnForTable<T>[] | undefined`: the type of `columns`, and of `returning` in [`insert()`](/insert#insert) and the other writes. It takes a `readonly` array, which types the result as `never` for now ([`columns`](#columns)).
+`ColumnsOption<T> = readonly ColumnForTable<T>[] | undefined`: the type of `columns`, and of `returning` in [`insert()`](/insert#insert) and the other writes. A `readonly` array gives the same type as a mutable one ([`columns`](#columns)).
 
 ### `ExtrasOption` {#ExtrasOption}
 
