@@ -39,7 +39,7 @@ let config: Config = {  // defaults
 };
 
 // copies transactionRetryDelay too, its one nested object; the listeners are functions, kept as they are
-const copyConfig = (c: Config): Config =>
+const copyConfig = (c: Config) =>
   ({ ...c, transactionRetryDelay: c.transactionRetryDelay && { ...c.transactionRetryDelay } });
 
 /**
