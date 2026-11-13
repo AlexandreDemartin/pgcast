@@ -91,9 +91,16 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
   border: 1px solid var(--line); border-radius: 999px; padding: 4px 8px; background: var(--surface);
 }
 @media (max-width: 560px) { .VPNavBarTitle .version { display: none; } }
-.VPNavBarSearchButton {
-  height: 36px; border: 1px solid var(--line) !important; border-radius: 8px !important; background: var(--sunken) !important;
-  color: var(--muted); font-size: 14px;
+/* under 768px VitePress makes the button an icon as tall as the bar, like the menu button: no box, the same --fg */
+.VPNavBarSearchButton { color: var(--fg); }
+/* their focus ring inside them, as they fill the bar's height: outside, it would cross the screen's top and the rule */
+.VPNavBarSearchButton:focus-visible, .VPNavBarHamburger:focus-visible { outline-offset: -4px; }
+@media (min-width: 768px) {
+  .VPNavBarSearchButton {
+    height: 36px; border: 1px solid var(--line) !important; border-radius: 8px !important; background: var(--sunken) !important;
+    color: var(--muted); font-size: 14px;
+  }
+  .VPNavBarSearchButton:focus-visible { outline-offset: 2px; }
 }
 /* room for the three group links by the search field, from 960px */
 @media (max-width: 1100px) { .VPNavBarSearchButton .keys { display: none; } }
