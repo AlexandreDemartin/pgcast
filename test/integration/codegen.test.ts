@@ -234,7 +234,7 @@ describe('custom types that share a placeholder name', () => {
   const warningsFor = async (schemas: Schemas) => {
     const warnings: string[] = [];
     await tsForConfig(finaliseConfig({
-      schemas, ...quiet, warningListener: s => warnings.push(s), db: db(),
+      schemas, ...quiet, warningListener: s => warnings.push(s), db: db(), outDir: 'src',
     }), noDebug);
     return warnings.filter(w => !w.startsWith('Note: this database has bigint'));  // once per process
   };
@@ -242,10 +242,10 @@ describe('custom types that share a placeholder name', () => {
   it('warns once per name that types of two schemas share, a table and a materialized view alike', async () => {
     expect(await warningsFor({ collide_a: only('things'), collide_b: only('things', 'codes') })).toEqual([
       'Note: custom types "collide_a"."code" and "collide_b"."code" are both named PgCode in TypeScript, ' +
-      'so they share one type and one placeholder file, zapatos/custom/PgCode.d.ts. ' +
+      'so they share one type and one placeholder file, src/zapatos/custom/PgCode.d.ts. ' +
       'To type them apart, rename them in the database.',
       'Note: custom types "collide_a"."pair" and "collide_b"."pair" are both named PgPair in TypeScript, ' +
-      'so they share one type and one placeholder file, zapatos/custom/PgPair.d.ts. ' +
+      'so they share one type and one placeholder file, src/zapatos/custom/PgPair.d.ts. ' +
       'To type them apart, rename them in the database.',
     ]);
   });
@@ -253,7 +253,7 @@ describe('custom types that share a placeholder name', () => {
   it('names the schema of each type, not of the materialized view that selects it', async () => {
     expect(await warningsFor({ collide_b: only('pairs') })).toEqual([
       'Note: custom types "collide_a"."pair" and "collide_b"."pair" are both named PgPair in TypeScript, ' +
-      'so they share one type and one placeholder file, zapatos/custom/PgPair.d.ts. ' +
+      'so they share one type and one placeholder file, src/zapatos/custom/PgPair.d.ts. ' +
       'To type them apart, rename them in the database.',
     ]);
   });
@@ -261,7 +261,7 @@ describe('custom types that share a placeholder name', () => {
   it('warns when two names become one, and points at customTypesTransform', async () => {
     expect(await warningsFor({ collide_a: only('labels') })).toEqual([
       'Note: custom types "collide_a"."code-x" and "collide_a"."code_x" are both named PgCode_x in TypeScript, ' +
-      'so they share one type and one placeholder file, zapatos/custom/PgCode_x.d.ts. ' +
+      'so they share one type and one placeholder file, src/zapatos/custom/PgCode_x.d.ts. ' +
       'To type them apart, rename them in the database, ' +
       'or give customTypesTransform a function that keeps their names apart.',
     ]);
@@ -270,7 +270,7 @@ describe('custom types that share a placeholder name', () => {
   it('lists three types that share a name', async () => {
     expect(await warningsFor({ collide_a: only('labels', 'spaced') })).toEqual([
       'Note: custom types "collide_a"."code x", "collide_a"."code-x" and "collide_a"."code_x" are all named PgCode_x ' +
-      'in TypeScript, so they share one type and one placeholder file, zapatos/custom/PgCode_x.d.ts. ' +
+      'in TypeScript, so they share one type and one placeholder file, src/zapatos/custom/PgCode_x.d.ts. ' +
       'To type them apart, rename them in the database, ' +
       'or give customTypesTransform a function that keeps their names apart.',
     ]);

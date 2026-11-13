@@ -4,6 +4,7 @@ Copyright (C) 2020 - 2023 George MacKerron
 Released under the MIT licence: see LICENCE file
 */
 
+import * as path from 'path';
 import * as pg from 'pg';
 
 import { enumDataForSchema, enumTypesForEnumData } from './enums';
@@ -70,10 +71,11 @@ const warnAboutSharedCustomTypeNames = (origins: CustomTypeOrigins, config: Comp
 
     const
       typeList = types.slice(0, -1).join(', ') + ' and ' + types[types.length - 1],
-      namesDiffer = new Set(Object.values(origins[name])).size > 1;
+      namesDiffer = new Set(Object.values(origins[name])).size > 1,
+      filePath = path.join(config.outDir, 'zapatos', 'custom', name + config.outExt);
 
     warn(`Note: custom types ${typeList} are ${types.length === 2 ? 'both' : 'all'} named ${name} in TypeScript, ` +
-      `so they share one type and one placeholder file, zapatos/custom/${name}${config.outExt}. ` +
+      `so they share one type and one placeholder file, ${filePath}. ` +
       `To type them apart, rename them in the database` +
       (namesDiffer ? `, or give customTypesTransform a function that keeps their names apart.` : `.`));
   }
