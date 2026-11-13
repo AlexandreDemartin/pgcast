@@ -163,7 +163,7 @@ db.readCommittedRO(txnClientOrQueryable, callback)
 db.serializableRODeferrable(txnClientOrQueryable, callback)
 ```
 
-[`transaction()`](#transaction) at `IsolationLevel.SerializableRODeferrable`: `START TRANSACTION ISOLATION LEVEL SERIALIZABLE, READ ONLY, DEFERRABLE`<!-- probe: db.transaction(pool, db.IsolationLevel.SerializableRODeferrable, async () => {}) -->. Its callback gets a [`TxnClientForSerializableRODeferrable`](#TxnClientForSerializableRODeferrable). Postgres refuses a write in it (25006). With `DEFERRABLE`, Postgres may wait for a snapshot, then runs the transaction without the overhead of a serializable one and with no risk of a serialization failure (40001) ([SET TRANSACTION](https://www.postgresql.org/docs/current/sql-set-transaction.html)): suited to a long report or a backup.
+[`transaction()`](#transaction) at `IsolationLevel.SerializableRODeferrable`: `START TRANSACTION ISOLATION LEVEL SERIALIZABLE, READ ONLY, DEFERRABLE`<!-- probe: db.transaction(pool, db.IsolationLevel.SerializableRODeferrable, async () => {}) -->. Its callback gets a [`TxnClientForSerializableRODeferrable`](#TxnClientForSerializableRODeferrable). Postgres refuses a write in it (25006). With `DEFERRABLE`, Postgres may wait for a snapshot, then runs the transaction without the overhead of a serializable one and with no risk of a serialisation failure (40001) ([SET TRANSACTION](https://www.postgresql.org/docs/current/sql-set-transaction.html)): suited to a long report or a backup.
 
 A report whose two counts read the same snapshot:
 
