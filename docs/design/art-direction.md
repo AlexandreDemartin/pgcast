@@ -7,7 +7,7 @@ The source of truth for the look of pgcast's docs, whatever tool builds them ([d
 - **Wordmark**: `pg::cast`, in the mono face, 700, 19px, letter-spacing `-.02em`; the `::` (Postgres's cast operator) in `--accent`, with 1px either side.
 - **Hero line**: "Your types, cast from your database::", the display face at 800; the closing `::` in the mono face, `--accent`, letter-spacing `-.06em`.
 - **Eyebrow** above it, as a SQL comment: `-- a maintained fork of Zapatos 6.6.1`, mono 500, 13px, `--accent`.
-- **Favicon**: a database, the usual cylinder with its top drawn apart, in `--accent`, with the `::` cut out of its body: two colons side by side, taller than wide, so the tab shows through. On a 16-unit grid of 256, so each part is whole pixels at 16px: `website/public/favicon.svg`, light and dark; white on `--accent` for the Apple touch icon. The social card, 1200×630, sets the wordmark, eyebrow and hero line in the light theme: `website/public/social-card.svg`.
+- **Favicon**: the `::` cut out of a rounded square in `--accent` (radius 3/16 of its side), so the tab shows through the four dots: `website/public/favicon.svg`, light and dark. The social card, 1200×630, sets the wordmark, eyebrow and hero line in the light theme: `website/public/social-card.svg`.
 - **Accent**: one teal. Neutrals are greys biased toward it (blue-green), never pure grey.
 
 ## Colour tokens

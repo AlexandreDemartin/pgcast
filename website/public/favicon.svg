@@ -1,8 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
-  <!-- pgcast: a database, its top apart as in the usual drawing, with the cast operator :: cut out of its body, in the
-       accent (docs/design/art-direction.md), light and dark. On a 16-unit grid, so each part is whole pixels at 16px.
+  <!-- pgcast: the cast operator, ::, cut out of a tile in the accent (docs/design/art-direction.md), light and dark.
        Rendered to favicon.ico by render-images.mjs, light. -->
   <title>pgcast</title>
   <style>path { fill: #0a6b63; } @media (prefers-color-scheme: dark) { path { fill: #4fcfbf; } }</style>
-  <path fill-rule="evenodd" d="M16.0 48a112.0 32 0 1 0 224.0 0a112.0 32 0 1 0 -224.0 0ZM16 64A112.0 32 0 0 0 240 64V208A112.0 32 0 0 1 16 208ZM88 112h16a8 8 0 0 1 8 8v16a8 8 0 0 1-8 8h-16a8 8 0 0 1-8-8v-16a8 8 0 0 1 8-8ZM152 112h16a8 8 0 0 1 8 8v16a8 8 0 0 1-8 8h-16a8 8 0 0 1-8-8v-16a8 8 0 0 1 8-8ZM88 192h16a8 8 0 0 1 8 8v16a8 8 0 0 1-8 8h-16a8 8 0 0 1-8-8v-16a8 8 0 0 1 8-8ZM152 192h16a8 8 0 0 1 8 8v16a8 8 0 0 1-8 8h-16a8 8 0 0 1-8-8v-16a8 8 0 0 1 8-8Z"/>
+  <path fill-rule="evenodd" d="M48 0h160a48 48 0 0 1 48 48v160a48 48 0 0 1-48 48h-160a48 48 0 0 1-48-48v-160a48 48 0 0 1 48-48ZM48 48h32a8 8 0 0 1 8 8v32a8 8 0 0 1-8 8h-32a8 8 0 0 1-8-8v-32a8 8 0 0 1 8-8ZM176 48h32a8 8 0 0 1 8 8v32a8 8 0 0 1-8 8h-32a8 8 0 0 1-8-8v-32a8 8 0 0 1 8-8ZM48 160h32a8 8 0 0 1 8 8v32a8 8 0 0 1-8 8h-32a8 8 0 0 1-8-8v-32a8 8 0 0 1 8-8ZM176 160h32a8 8 0 0 1 8 8v32a8 8 0 0 1-8 8h-32a8 8 0 0 1-8-8v-32a8 8 0 0 1 8-8Z"/>
 </svg>
