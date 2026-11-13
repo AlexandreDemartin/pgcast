@@ -5,12 +5,14 @@
 // (examples/plain/) opens its own transactions, some at once: it gets a pool on its own copy of the database. An
 // example that shows an error says which above `// ---cut---`, `// rejects with 42703` (a SQLSTATE) or
 // `// rejects with NotExactlyOneError` (an error's name), and must reject with it. schema.sql goes into a temporary
-// database on the server of TEST_DATABASE_URL (the environment, else ../src/.env). Run by `npm run docs:examples`,
-// after the root `npm run build`.
+// database on the server of TEST_DATABASE_URL (the environment, else ../src/.env). On it too, the playground's Postgres
+// (PGlite, decision 005) must parse the docs schema's types as `pg` does. Run by `npm run docs:examples`, after the
+// root `npm run build`.
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import pg from 'pg';
 import * as db from 'zapatos/db';
+import { open } from './.vitepress/playground/pglite.ts';
 import { dropOrphanDocsDatabases } from './orphan-databases.mjs';
 
 const envFile = new URL('../src/.env', import.meta.url);
@@ -19,6 +21,7 @@ if (!process.env.TEST_DATABASE_URL) throw new Error('TEST_DATABASE_URL is not se
 
 const
   server = new URL(process.env.TEST_DATABASE_URL),
+  schema = readFileSync(new URL('schema.sql', import.meta.url), 'utf8'),
   name = `pgcast_test_${process.pid}_docs`,  // a concurrent test run leaves pgcast_test_<pid>_* alone while <pid> lives
   copy = `${name}_copy`,
   timeLimit = 10_000,  // each example, in ms: all of them run in about 2 s
@@ -114,13 +117,53 @@ function note(example, error, what = '') {
 
 process.on('unhandledRejection', error => note(current, error, 'a promise it does not await rejects: '));
 
+/**
+ * The playground's PGlite, with its adapter's parsers, gives the rows `pg` gives through `client`: for each table of the
+ * docs schema, and for what a query on it often selects. In a time zone ahead of UTC, as a reader's may be: `pg` makes
+ * a `date` midnight where the code runs.
+ */
+async function checkPlaygroundParsers(client) {
+  const
+    zone = process.env.TZ,
+    pglite = await open(schema),
+    { rows: tables } = await client.query("SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY 1"),
+    queries = [
+      ...tables.map(({ tablename }) => `SELECT * FROM "${tablename}" ORDER BY 1, 2`),
+      `SELECT count(*), sum(runtime_minutes::int8), avg(runtime_minutes), array_agg(id::int8 ORDER BY id) AS ids,
+        array_agg(runtime_minutes / 60.0 ORDER BY id) AS hours, array_agg(title ORDER BY id) AS titles FROM films`,
+      `SELECT starts_at::date AS day, array_agg(starts_at::date) OVER () AS days, array_agg(starts_at) OVER () AS times,
+        location, array_agg(location) OVER () AS locations, to_jsonb(cinemas) AS cinema, row_to_json(cinemas) AS row
+        FROM screenings JOIN cinemas ON cinemas.id = cinema_id ORDER BY screenings.id`,
+      `SELECT '\\x00ff'::bytea AS bytes, ARRAY['\\x01'::bytea] AS byte_arrays, 'director'::crew_job AS job,
+        ARRAY['director'::crew_job] AS jobs, 'A1'::seat_label AS seat, ARRAY['A1'::seat_label] AS seats,
+        '2030-03-01'::date AS day, '0050-03-01'::date AS early, '0001-03-01 BC'::date AS bc, 'infinity'::date AS never`,
+    ];
+
+  process.env.TZ = 'Asia/Kolkata';
+  try {
+    for (const query of queries) {
+      const [expected, got] = [(await client.query(query)).rows, (await pglite.query(query)).rows];
+      try {
+        assert.deepStrictEqual(got, expected);
+      } catch (error) {
+        problems.push(`the playground's PGlite parses \`${query}\` unlike pg: ${error.message}`);
+      }
+    }
+  } finally {
+    if (zone === undefined) delete process.env.TZ;  // `= undefined` would set it to 'undefined'
+    else process.env.TZ = zone;
+    await pglite.close();
+  }
+}
+
 /** Print the problems, if any, and set the exit code. */
 function report() {
   if (problems.length > 0) {
     console.error(`The examples check failed (README.md § Examples):\n  ${problems.join('\n  ')}`);
     process.exitCode = 1;
   } else {
-    console.log(`The examples ran against Postgres: ${examples.length}, each on the docs schema.`);
+    console.log(`The examples ran against Postgres: ${examples.length}, each on the docs schema; ` +
+      "the playground's PGlite parses its types as pg does.");
   }
 }
 
@@ -151,7 +194,8 @@ try {
   client.on('error', () => {});  // DROP … WITH (FORCE) ends its session when an example does not settle
   await client.connect();
   try {
-    await client.query(readFileSync(new URL('schema.sql', import.meta.url), 'utf8'));
+    await client.query(schema);
+    await checkPlaygroundParsers(client);
     for (const example of examples.filter(example => !example.startsWith('examples/plain/'))) {
       await client.query('BEGIN');
       await check(example, client);
