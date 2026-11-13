@@ -32,6 +32,10 @@ Candidates for a check, a rule or a skill line.
 - #32 — A mechanism that replaces a fragment's `compile` carries every instance property `SQLFragment.compile` reads (`parentTable`, `preparedName`, `noop`: the list `copy()` overrides); one at a time, the others drop silently — `branch-reviewer`, `builder`
 - #32 — An opt-in that widens a `LIMIT` also widens a `FOR UPDATE`/`FOR SHARE` on the same query: replay a lock clause whenever a row count changes — `branch-reviewer`
 - #32 — Under `exactOptionalPropertyTypes`, `copy({ parentTable: x, preparedName: y })` with possibly `undefined` values does not compile: compile, then set `name` — `builder`
+- #96 — A red test can be red for the wrong reason (`NOT (NULL)` on a nullable column gives the same rows under both readings): run it against the fix too before committing it — `builder`
+- #96 — A replay that compares rows needs data where both readings differ, or it reports « same rows » for a call whose meaning changed — `builder`
+- #96 — A claim that every other call of a helper joining fragments as text keeps its meaning needs splits inside quoted literals, not only grammar splits: `` and(sql`title = 'x`, sql`y'`) `` stays valid SQL and compares with another value — `branch-reviewer`
+- #96 — A reviewer that symlinks another worktree's `node_modules` writes its `node_modules/.cache/pgcast` on `typecheck`; at another commit, use a separate `--outDir` or its own `npm ci` — `branch-reviewer`
 
 ## Minors kept
 
@@ -47,3 +51,5 @@ Minor review defects, taken up by the end-of-chapter review.
 - #32 — `website/handle-errors.md:97`, `:163`: still says two matching rows are not an error, and `statusOf()` maps every `NotExactlyOneError` to 404; with the option a second row gives the same class — `branch-reviewer`
 - #32 — `test/unit/shortcuts.test.ts:1223`: the option's `withTies` (`FETCH FIRST $n ROWS WITH TIES`, 2) and `offset` forms are not frozen by a test — `branch-reviewer`
 - #32 — `README.md:84`, `:91`: « except `selectExactlyOneChecksForSecondRow`'s » attaches to « a code »; line 91 names only `lateral` as the nested case — `branch-reviewer`
+- #96 — `CHANGELOG.md:84`: « only the parentheses of the next line change » — `or()` does not change at all, and the next line changes rows for a bare `OR` — `branch-reviewer`
+- #96 — `test/integration/conditions.test.ts:93`: no test pins the `BETWEEN` split's 42601; `website/switching.md:79` does not list it among the changed calls — `branch-reviewer`
