@@ -146,15 +146,15 @@ describe('variant snapshots', () => {
   });
   afterAll(() => { if (declarationDir) rmSync(declarationDir, { recursive: true, force: true }); });
 
-  /** 'zapatos/db' and 'pgcast/db', as test/generated/tsconfig.json maps them, but to the declarations emitted here. */
-  const dbPaths = () => ({ 'zapatos/db': [join(declarationDir, 'db')], 'pgcast/db': [join(declarationDir, 'db')] });
+  /** `<moduleNames>/db`, and only it, as test/generated/tsconfig.json maps 'zapatos/db', to the declarations emitted here. */
+  const dbPaths = (config: Config) => ({ [`${config.moduleNames ?? 'zapatos'}/db`]: [join(declarationDir, 'db')] });
 
-  it.each(variants.filter(([name]) => name !== 'edge'))('%s compiles with its custom types', name => {
+  it.each(variants.filter(([name]) => name !== 'edge'))('%s compiles with its custom types', (name, variant) => {
     const { config } = ts.readConfigFile(join(generatedDir, 'tsconfig.json'), ts.sys.readFile);
     const { options } = ts.parseJsonConfigFileContent(config, ts.sys, generatedDir);
     const custom = join(snapshotPath, `${name}.custom.d.ts`);
     const rootNames = [join(snapshotPath, `${name}.d.ts`), ...(withoutCustomTypes.includes(name) ? [] : [custom])];
-    const program = ts.createProgram(rootNames, { ...options, paths: dbPaths() });
+    const program = ts.createProgram(rootNames, { ...options, paths: dbPaths(variant) });
     const errors = ts.getPreEmitDiagnostics(program).map(d =>
       `${d.file ? relative(snapshotPath, d.file.fileName) : ''} TS${d.code} ${ts.flattenDiagnosticMessageText(d.messageText, ' ')}`);
     expect(errors).toEqual([]);
@@ -170,7 +170,7 @@ describe('variant snapshots', () => {
     const { config: tsconfig } = ts.readConfigFile(join(generatedDir, 'tsconfig.json'), ts.sys.readFile);
     const { options } = ts.parseJsonConfigFileContent(tsconfig, ts.sys, generatedDir);
     const rootNames = ['schema.d.ts', 'custom.d.ts', 'probe.ts'].map(f => join(dir, f));
-    const program = ts.createProgram(rootNames, { ...options, ...extraOptions, paths: dbPaths() });
+    const program = ts.createProgram(rootNames, { ...options, ...extraOptions, paths: dbPaths(config) });
     return ts.getPreEmitDiagnostics(program).map(d =>
       `${d.file ? relative(dir, d.file.fileName) : ''} TS${d.code} ${ts.flattenDiagnosticMessageText(d.messageText, ' ')}`);
   };

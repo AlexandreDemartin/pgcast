@@ -3,15 +3,13 @@
   // as a consumer project does: 'zapatos/schema' and 'zapatos/custom' are the ambient modules of
   // zapatos/, 'zapatos/db' is the declarations of src/db that `npm run typecheck` emits first.
   // Not src/db itself: its sources only type-check against the stub schema of src/typings.
-  // 'pgcast/db' too, for the output of moduleNames: 'pgcast', which the codegen tests compile.
   "extends": "../../tsconfig.json",
   "include": ["./zapatos/**/*"],
   "compilerOptions": {
     "noEmit": true,
     "rootDir": "../..",
     "paths": {
-      "zapatos/db": ["../../node_modules/.cache/pgcast/db"],
-      "pgcast/db": ["../../node_modules/.cache/pgcast/db"]
+      "zapatos/db": ["../../node_modules/.cache/pgcast/db"]
     }
   }
 }
