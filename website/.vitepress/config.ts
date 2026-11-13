@@ -22,6 +22,7 @@ export default defineConfig({
   lang: 'en-GB',
   base: '/',  // GitHub Pages, at the domain's root: https://pgcast.dev/
   cleanUrls: true,
+  sitemap: { hostname: 'https://pgcast.dev' },  // sitemap.xml, named by public/robots.txt
   srcExclude: ['README.md', 'templates/**'],  // for whoever writes the site, not pages of it
   buildEnd: async config => {
     await writeLlmsFiles(config);  // llms.txt and llms-full.txt, for assistants

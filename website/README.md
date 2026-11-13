@@ -115,6 +115,8 @@ At build, `.vitepress/llms.ts` writes two files to the site's root, from the out
 
 A "Coming" page has no `.md` file, so it is in neither; nor are the templates and this README, which the outline does not list.
 
+`public/robots.txt`, copied to the root as it is, lets every crawler in, assistants' included, and names `sitemap.xml`, which VitePress writes from the config's `sitemap`.
+
 ### Screenshots for a PR
 
 A PR that changes how a page looks shows it, in light and dark, at a phone's width (375px) and a desktop's: from `npm run docs:preview`, on a private artifact linked from **Proofs** (skill [`plan-and-proofs`](../.agents/skills/plan-and-proofs/SKILL.md) § Proofs), as `gh` cannot attach images. In the browser, they can go in the PR's description instead.
