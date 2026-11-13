@@ -8,6 +8,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import ts from 'typescript';
 import * as db from 'zapatos/db';
+import { earlyCloser } from './.vitepress/fences.ts';
 
 process.noDeprecation = true;  // a probe may show what pgcast warns about (PGCAST_DEP001): the warning is not news here
 
@@ -132,11 +133,9 @@ function codeSpans(line) {
   return spans;
 }
 
-let checked = 0;
-
-for (const page of pages) {
-  const lines = readFileSync(new URL(page, import.meta.url), 'utf8').split('\n');
-  let fence = null;
+/** Check the marks of `page`, its text `lines`, adding each problem to `problems`; the number of marks read. */
+async function check(page, lines, problems) {
+  let fence = null, checked = 0;
   for (let i = 0; i < lines.length; i++) {
     const
       line = lines[i],
@@ -198,7 +197,17 @@ for (const page of pages) {
           sql.replace(/\n/g, '\n    '));
     }
   }
+  return checked;
 }
+
+// A self-check: a mark after a ```md block that shows a ```ts line must be read, and this one fails.
+const missed = [];
+await check('the self-check', `${earlyCloser}\`SELECT 2\`<!-- probe: db.sql\`SELECT 1\` -->`.split('\n'), missed);
+if (missed.length !== 1) throw new Error('check-prose.mjs: a mark after a ```md block went unchecked: check fences.ts');
+
+let checked = 0;
+for (const page of pages)
+  checked += await check(page, readFileSync(new URL(page, import.meta.url), 'utf8').split('\n'), problems);
 
 if (problems.length > 0) {
   console.error(`The prose check failed (README.md § Conventions):\n  ${problems.join('\n  ')}`);

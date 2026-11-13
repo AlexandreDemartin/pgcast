@@ -13,6 +13,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
+import { earlyCloser } from './.vitepress/fences.ts';
 
 const
   root = fileURLToPath(new URL('.', import.meta.url)),
@@ -36,11 +37,12 @@ function comparable(lines) {
 }
 
 /**
- * The blocks of `page`, each `{ text, at }[]`, joined at each `<!-- joined: <file> -->` line, those that show an
- * error, each with the codes it lists and the number of blocks above it, and the whole file if the page shows it.
+ * The blocks of `page`, its text `source`, each `{ text, at }[]`, joined at each `<!-- joined: <file> -->` line, those
+ * that show an error, each with the codes it lists and the number of blocks above it, and the whole file if the page
+ * shows it. A marker it cannot read goes to `problems`.
  */
-function joinsOf(page) {
-  const joins = [], source = readFileSync(root + page, 'utf8');
+function joinsOf(page, source, problems) {
+  const joins = [];
   let pieces = [], shown = [], fence, block, title, last;
   const add = (lines, title) => {
     const listed = lines.map(({ text }) => text.match(/^\/\/ @errors:(.*)$/)?.[1]).find(codes => codes !== undefined);
@@ -140,7 +142,13 @@ function check({ file, at, pieces, shown, whole }) {
     whole ? ', the whole file' : ''})`);
 }
 
-for (const page of readdirSync(root).filter(file => file.endsWith('.md'))) joinsOf(page).forEach(check);
+// A self-check: a marker after a ```md block that shows a ```ts line must be read, and this one fails.
+const missed = [];
+joinsOf('the self-check', `${earlyCloser}<!-- joined -->`, missed);
+if (missed.length !== 1) throw new Error('check-joined.mjs: a marker after a ```md block went unread: check fences.ts');
+
+for (const page of readdirSync(root).filter(file => file.endsWith('.md')))
+  joinsOf(page, readFileSync(root + page, 'utf8'), problems).forEach(check);
 
 if (problems.length > 0) {
   console.error(`The joined examples check failed (README.md § Examples):\n  ${problems.join('\n  ')}`);

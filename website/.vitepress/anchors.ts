@@ -5,6 +5,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { MarkdownRenderer, SiteConfig } from 'vitepress';
+import { earlyCloser } from './fences.ts';
 import { host } from './llms.ts';
 
 /**
@@ -56,6 +57,9 @@ const
  * lands once its entry is written, and writing it removes the name. Run once every file is written (`llms.txt` too).
  */
 export function checkLinks(config: SiteConfig) {
+  // A self-check: a block after a ```md block that shows a ```ts line is a block.
+  if (fencedSiteUrls(`${earlyCloser}\`\`\`sh\n${host}/\n\`\`\``).length !== 1)
+    throw new Error('anchors.ts: a URL in a block after a ```md block went unchecked: check fences.ts');
   const
     { base } = config.site,
     pending: Record<string, string[]> = JSON.parse(readFileSync(join(config.srcDir, 'reference-pending.json'), 'utf8')),
