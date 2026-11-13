@@ -188,13 +188,15 @@ With `withTies` and `order`, it writes `FETCH FIRST $1 ROWS WITH TIES`<!-- probe
 db.selectExactlyOne(table, where, options?)
 ```
 
-As [`selectOne()`](#selectOne), but its type has no `undefined`: when no row matches, `.run()` rejects with a [`NotExactlyOneError`](#NotExactlyOneError). It does not check that only one row matches: with `LIMIT $2`<!-- probe: examples/selectExactlyOne.ts -->, its value `1`, it takes the first. In a `lateral`, a missing row gives `null` and no error, though the type says otherwise.
+As [`selectOne()`](#selectOne), but its type has no `undefined`: when no row matches, `.run()` rejects with a [`NotExactlyOneError`](#NotExactlyOneError). It checks for at least one row, not exactly one: with `LIMIT $2`<!-- probe: examples/selectExactlyOne.ts -->, its value `1`, it takes the first. In a `lateral`, a missing row gives `null` and no error, though the type says otherwise.
 
 <CastPanel example="selectExactlyOne">
 
 <<< ./examples/selectExactlyOne.ts{ts twoslash}
 
 </CastPanel>
+
+With [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow), the query run on its own asks for two rows, `LIMIT $2`<!-- probe: (db.setConfig({ selectExactlyOneChecksForSecondRow: true }), db.selectExactlyOne('studios', { id: 1000 })) --> with `2`, and `.run()` rejects on a second row too. Nested in another query, in a `lateral` or a `sql` template, it keeps `LIMIT 1`, option or not: a second row there would join the parent row twice.
 
 ### `NotExactlyOneError` {#NotExactlyOneError}
 
@@ -204,7 +206,7 @@ class NotExactlyOneError extends Error {
 }
 ```
 
-What `selectExactlyOne()`, the mode `ExactlyOne` of `select()`, rejects with when no row matches. Its `name` is `'NotExactlyOneError'`, its `message` "One result expected but none returned (hint: check `.query.compile()` on this Error)"<!-- message -->, and its `query` the [`SQLFragment`](/sql-template#SQLFragment) that ran: `err.query.compile()` gives its SQL and values. `err instanceof db.NotExactlyOneError` recognises it; catching it: [Tell a missing row from the others](/handle-errors#tell-a-missing-row-from-the-others).
+What `selectExactlyOne()`, the mode `ExactlyOne` of `select()`, rejects with when no row matches. Its `name` is `'NotExactlyOneError'`, its `message` "One result expected but none returned (hint: check `.query.compile()` on this Error)"<!-- message -->; with [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow), a second row gives "One result expected but more returned (hint: check `.query.compile()` on this Error)"<!-- message -->. Its `query` is the [`SQLFragment`](/sql-template#SQLFragment) that ran: `err.query.compile()` gives its SQL and values. `err instanceof db.NotExactlyOneError` recognises it; catching it: [Tell a missing row from the others](/handle-errors#tell-a-missing-row-from-the-others).
 
 ## `count()` {#count}
 

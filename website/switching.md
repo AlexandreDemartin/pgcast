@@ -136,6 +136,8 @@ All three will be the default in 7.0 ([Versions, opt-ins and warnings](/versions
 - A `transaction()` whose `COMMIT` Postgres answers with `ROLLBACK` rejects, without a retry ([`transaction()`, Errors](/transaction#errors)).
 - No option warns. To keep it that way, `NODE_OPTIONS=--throw-deprecation npm test` fails the run at the first warning.
 
+One more opt-in has no warning to look for, and stays off in 7.0: [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow), with which a `selectExactlyOne()` run on its own rejects on a second row, not only on none. Turn it on where your tests show no `selectExactlyOne()` matching two rows.
+
 ## Go back
 
 ```sh
