@@ -199,7 +199,7 @@ function report() {
     process.exitCode = 1;
   } else {
     console.log(`The examples ran against Postgres: ${examples.length}, each on the docs schema, on pg and on ` +
-      "the playground's PGlite, which parses its types as pg does.");
+      "the playground's PGlite, which parses its types as pg does and gets its values as pg sends them.");
   }
 }
 

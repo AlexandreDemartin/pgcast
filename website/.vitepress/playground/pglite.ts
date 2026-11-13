@@ -1,8 +1,9 @@
 // Copyright (C) 2026 Alexandre Demartin
 // Postgres in the playground's worker (decision 005): PGlite, with `pg`'s parsers, as a `pg.Pool` of one connection.
 // run.worker.ts imports it on a Run only, so that a reader who only edits never downloads Postgres; run-examples.mjs
-// checks in Node that it parses the docs schema's types as `pg` does.
+// checks in Node that it parses the docs schema's types as `pg` does, and gets values as `pg` sends them.
 import { PGlite, types, type ParserOptions, type Results } from '@electric-sql/pglite';
+import { prepareValue } from './prepareValue.ts';
 
 const
   // `pg`'s `Buffer` from PGlite's bytes: in the playground, globals.ts's stand-in, a `Uint8Array` too
@@ -34,11 +35,14 @@ export const parsers: ParserOptions = {
   1114: infinite(types.parsers[types.TIMESTAMP]!), 1184: infinite(types.parsers[types.TIMESTAMPTZ]!),
 };
 
-/** Postgres in memory, with `pg`'s parsers, on `schema`. */
+/** Postgres in memory, with `pg`'s parsers, on `schema`; a query's values go as `pg` sends them. */
 export async function open(schema: string) {
   const pglite = await PGlite.create({ parsers });
   // a `numeric[]` holds numbers in `pg`, though its `numeric` is a string: set once PGlite has set each array's own
   pglite.parsers[1231] = text => types.arrayParser(text, parseFloat, 1231);
+  // PGlite serializes a value by its parameter's type, or with `toString()`: here every type takes `pg`'s, whose
+  // bytes PGlite sends as binary, as `pg` sends a `Buffer`
+  pglite.serializers = new Proxy({}, { get: () => prepareValue as unknown as (value: unknown) => string });
   await pglite.exec(schema);
   return pglite;
 }
