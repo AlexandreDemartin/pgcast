@@ -1171,8 +1171,9 @@ describe('a built-in object as a Whereable', () => {
     class Premiere extends Date {}
     class FilmError extends Error { id = 1; }
     class Frames extends Uint8Array {}
-    class Reel extends Buffer {}
-    class Window extends DataView {}
+    // the type of Buffer gives no constructor to extend
+    class Reel extends (Buffer as any) {}
+    class Still extends DataView<ArrayBuffer> {}
     const kept: Record<string, any> = {
       plain: { display_name: 'Ada' },
       empty: {},
@@ -1184,7 +1185,7 @@ describe('a built-in object as a Whereable', () => {
       subclassOfTypedArray: new Frames(1),
       subclassOfTypedArrayEmpty: new Frames(0),
       subclassOfBuffer: Object.setPrototypeOf(Buffer.from('id'), Reel.prototype),  // new Buffer() returns a Buffer
-      subclassOfDataView: new Window(new ArrayBuffer(1)),
+      subclassOfDataView: new Still(new ArrayBuffer(1)),
       otherRealmDate: runInNewContext('new Date(0)'),
       builtinValues: { created_at: new Date(0), tags: new Set(['a']), settings: new Map(), photo: Buffer.from('a') },
       array: [{ id: 1 }, sql` AND TRUE`],

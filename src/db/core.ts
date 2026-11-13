@@ -303,14 +303,20 @@ const
   builtinWhereable = (name: string) => `A built-in \`${name}\` has no meaning as a Whereable (a filter): it would compile to its own enumerable keys, and to \`TRUE\`, every row, when it has none. To compare with a value, give it as \`db.param(…)\`; to filter, give a plain object (\`{ column: value }\`); await a \`Promise\` first.`;
 
 // built-in objects that are no filter, by their exact prototype, so that a class instance never is one, even of
-// a class that extends a built-in; plus every view (typed arrays, `Buffer`, `DataView`). Zapatos 6.6.1 compiled
-// them as Whereables of their own keys: none (`TRUE`, every row), or indexes (`"0" = $1`)
-const builtinPrototypes = new Set<unknown>([
-  Date, Map, Set, WeakMap, WeakSet, RegExp, Promise, ArrayBuffer, Number, String, Boolean,
-  Error, EvalError, RangeError, ReferenceError, SyntaxError, TypeError, URIError,
-].map(builtin => builtin.prototype));
+// a class that extends a built-in. Zapatos 6.6.1 compiled them as Whereables of their own keys: none (`TRUE`,
+// every row), or indexes (`"0" = $1`). A typed array's prototype is one whose own prototype is %TypedArray%'s:
+// `Uint8Array.prototype`, `Float64Array.prototype`…, and not a subclass's (`Buffer` is listed for this reason)
+const
+  builtinPrototypes = new Set<unknown>([
+    Date, Map, Set, WeakMap, WeakSet, RegExp, Promise, ArrayBuffer, DataView, Buffer, Number, String, Boolean,
+    Error, EvalError, RangeError, ReferenceError, SyntaxError, TypeError, URIError,
+  ].map(builtin => builtin.prototype)),
+  typedArrayPrototype = Object.getPrototypeOf(Uint8Array.prototype);
 
-const isBuiltin = (x: object) => builtinPrototypes.has(Object.getPrototypeOf(x)) || ArrayBuffer.isView(x);
+const isBuiltin = (x: object) => {
+  const prototype = Object.getPrototypeOf(x);
+  return builtinPrototypes.has(prototype) || (prototype !== null && Object.getPrototypeOf(prototype) === typedArrayPrototype);
+};
 
 // raw(), cols() and vals() as a filter value: Zapatos 6.6.1 sent them as JSON; compiling raw() there as SQL would
 // turn a caller's raw(input), a parameter until now, into an injection, so they throw
