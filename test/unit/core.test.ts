@@ -24,7 +24,7 @@ const failure = (f: () => unknown) => {
 };
 
 const
-  nullMessage = 'Interpolating `null` has no meaning in SQL: for a `NULL` value, interpolate `db.param(null)`; to filter on `NULL`, use `db.conditions.isNull`; to match every row, give a shortcut `db.all` as its filter.',
+  nullMessage = 'Interpolating `null` has no meaning in SQL: for a `NULL` value, interpolate `db.param(null)`; to filter on `NULL`, use `{ column: db.conditions.isNull }`; to match every row, give a shortcut `db.all` as its filter.',
   parentMessage = "`db.parent()` with no column has no meaning here: name the column, `db.parent('id')`, or give it as the value of a Whereable or `vals({…})` key, whose column it then takes.";
 
 afterEach(resetConfig);
