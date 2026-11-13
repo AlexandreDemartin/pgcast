@@ -448,6 +448,24 @@ describe('typeEnumsAcrossSchemas', () => {
     expect(await notesFor({ schemas: { public: only('users') } })).toEqual([]);  // public.mood, its own schema
   });
 
+  it('reads the enums of each schema once per run, however many columns use them, option on or off', async () => {
+    const enumQueriesFor = async (config: Config) => {
+      const schemas: string[] = [];
+      await tsForConfig(finaliseConfig({ ...config, ...quiet, db: db() }), s => {
+        const values = s.startsWith('>>> query') && s.includes('pg_catalog.pg_enum') && s.match(/\n\+ (.*)\n$/);
+        if (values) schemas.push(...JSON.parse(values[1]));
+      });
+      return schemas.sort();
+    };
+    for (const on of [false, true]) {
+      // enum_y.st in t and mv, int4 in t (pg_catalog), extra.status in mv
+      expect(await enumQueriesFor({ ...enumX, typeEnumsAcrossSchemas: on }))
+        .toEqual(['enum_x', 'enum_y', 'extra', 'pg_catalog']);
+      // ext.citext, as in extra.type_zoo; pg_catalog in nearly every table
+      expect(await enumQueriesFor({ ...main, typeEnumsAcrossSchemas: on })).toEqual(['ext', 'extra', 'pg_catalog', 'public']);
+    }
+  });
+
   it('is optional in Config, read as false when absent', () => {
     expect(finaliseConfig({}).typeEnumsAcrossSchemas).toBeUndefined();
     const right: Config = { typeEnumsAcrossSchemas: true };
