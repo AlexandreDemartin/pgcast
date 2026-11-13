@@ -108,6 +108,12 @@ Candidates for a check, a rule or a skill line.
 - #49 — A mutant that rounds `enumsortorder` survives a single `ADD VALUE … BEFORE` (the stable sort breaks the tie alphabetically): a probe needs a value that breaks the tie the other way — `builder`
 - #49 — `DROP DATABASE … WITH (FORCE)` right after `generate()` can kill a pooled client still closing (57P01) and crash a replay: wait briefly first (see #302) — `builder`
 - #49 — `exactOptionalPropertyTypes` rejects `{ enumOrder: undefined }` in a test loop: spread `{}` or the set option — `builder`
+- #47 — A condition on the right-hand table of a `LEFT JOIN` goes in its `ON` clause: in `WHERE`, `strpos(NULL, '*/') = 0` is NULL and drops every uncommented column, not just the comment — `branch-reviewer`
+- #47 — A docs claim about « a comment » is probed on every kind of relation it names, after looking up which `pg_catalog` query covers each kind (the mat-view query has its own path) — `branch-reviewer`
+- #47 — A doc sentence about how the editor renders the generated JSDoc (a tag, a hover) is checked with `ts.getJSDocTags` / `getTextOfJSDocComment` on the output; a line diff does not show it — `branch-reviewer`
+- #47 — A guard with no visible output change proves itself through a mutant whose replay shows the harm in numbers (0 to 65 syntax errors) — `builder`
+- #47 — A merge can bring the other side's summary line in without a conflict: recount the report by script after every merge that touches it — `builder`
+- #47 — In zsh, `git show $REF:test/x` applies the `:t` modifier: write `"${REF}:path"` — `branch-reviewer`
 - #310 — Lighthouse does not test a keyboard trap (WCAG 2.1.2, Level A): an embedded editor is probed with Tab presses over CDP until focus leaves it, and the page says how to leave — `branch-reviewer`
 - #310 — Monaco 0.57 in Chrome focuses `.native-edit-context`, not its `textarea`: a focus rule, a probe or a key press names both — `branch-reviewer`
 - #310 — A clean-up registered after an `await` in `onMounted` leaks when the page is left during the wait: register it before, return if the template ref is gone; a CDP probe delays the awaited call (`Page.addScriptToEvaluateOnNewDocument`) to open the window — `branch-reviewer`
