@@ -151,7 +151,7 @@ describe('surprises, frozen as they are', () => {
 
   it('keeps column comments of tables and materialized views only', async () => {
     const { ts: schema } = await codegen(main);
-    expect(schema).toContain('* Line manager.\n  Nullable: the top of the tree has none.');  // table: no * on the next lines
+    expect(schema).toContain('Line manager.');
     expect(schema).toContain('Materialized view column comment');
     expect(schema).not.toContain('Partitioned table column comment');
     expect(schema).not.toContain('Foreign table column comment');
@@ -264,6 +264,56 @@ describe('UniqueIndex', () => {
       });
     } finally {
       await t.pool.query('DROP SCHEMA part_a, part_b CASCADE');
+    }
+  });
+});
+
+describe('column comments', () => {
+  /** The comment lines of each column's JSDoc in the `Selectable` of `table`, their indentation trimmed. */
+  const commentLines = (schema: string, table: string) => {
+    const block = tableBlock(schema, table);
+    const selectable = block.slice(block.indexOf('interface Selectable {'), block.indexOf('interface JSONSelectable {'));
+    // a JSDoc: `* **name**`, `*`, the comment lines, then `* - <type>`, `* - <nullability>` and the line of `*/`
+    return Object.fromEntries([...selectable.matchAll(/\/\*\*\n([\s\S]*?)\*\/\n\s*(\w+)/g)].map(([, doc, column]) =>
+      [column, doc.split('\n').map(line => line.trimStart()).slice(2, -3)]));
+  };
+
+  it('puts every line of a multi-line comment behind its own *', async () => {
+    const { ts: schema } = await codegen(main);
+    expect(commentLines(schema, 'users').manager_id).toEqual(['* Line manager.', '* Nullable: the top of the tree has none.']);
+  });
+
+  it('prefixes every line whatever its line break, on a table and a materialized view', async () => {
+    // tsForConfig() reads through its own connection: the schema is committed, then dropped
+    await t.pool.query(String.raw`
+      CREATE SCHEMA comment_lines;
+      CREATE TABLE comment_lines.notes (lf int, crlf int, cr int, blank int, trail int, lead int, indented int, one int);
+      COMMENT ON COLUMN comment_lines.notes.lf IS E'First line\nsecond line';
+      COMMENT ON COLUMN comment_lines.notes.crlf IS E'First line\r\nsecond line';
+      COMMENT ON COLUMN comment_lines.notes.cr IS E'First line\rsecond line';
+      COMMENT ON COLUMN comment_lines.notes.blank IS E'Paragraph one\n\nParagraph two';
+      COMMENT ON COLUMN comment_lines.notes.trail IS E'Ends with a line break\n';
+      COMMENT ON COLUMN comment_lines.notes.lead IS E'\nStarts with a line break';
+      COMMENT ON COLUMN comment_lines.notes.indented IS E'A list:\n  - one\n  - two';
+      COMMENT ON COLUMN comment_lines.notes.one IS 'A single line';
+      CREATE MATERIALIZED VIEW comment_lines.note_totals AS SELECT count(*) AS n FROM comment_lines.notes;
+      COMMENT ON COLUMN comment_lines.note_totals.n IS E'Count of notes\nrefreshed on demand';`);
+    try {
+      const { ts: schema } = await codegen({ schemas: { comment_lines: all } });
+      expect({ ...commentLines(schema, 'notes'), ...commentLines(schema, 'note_totals') }).toEqual({
+        lf: ['* First line', '* second line'],
+        crlf: ['* First line', '* second line'],
+        cr: ['* First line', '* second line'],
+        blank: ['* Paragraph one', '* ', '* Paragraph two'],
+        trail: ['* Ends with a line break', '* '],
+        lead: ['* ', '* Starts with a line break'],
+        indented: ['* A list:', '*   - one', '*   - two'],
+        one: ['* A single line'],
+        n: ['* Count of notes', '* refreshed on demand'],
+      });
+      expect(syntaxErrors(schema)).toEqual([]);
+    } finally {
+      await t.pool.query('DROP SCHEMA comment_lines CASCADE');
     }
   });
 });
