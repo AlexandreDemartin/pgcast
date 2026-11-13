@@ -229,6 +229,43 @@ describe('UniqueIndex', () => {
       await t.pool.query('DROP SCHEMA shared_a, shared_b, shared_c CASCADE');
     }
   });
+
+  it("gives a partition in another schema than its parent's the unique indexes the catalog gives it", async () => {
+    await t.pool.query(`
+      CREATE SCHEMA part_a; CREATE SCHEMA part_b;
+      CREATE TABLE part_a.events (id int, k int, CONSTRAINT events_k_key UNIQUE (k, id)) PARTITION BY RANGE (id);
+      CREATE TABLE part_b.events_1 PARTITION OF part_a.events FOR VALUES FROM (0) TO (100);
+      CREATE TABLE part_b.events_2 (id int, k int);
+      CREATE UNIQUE INDEX events_2_own ON part_b.events_2 (k, id);
+      ALTER TABLE part_a.events ATTACH PARTITION part_b.events_2 FOR VALUES FROM (100) TO (200);
+      CREATE TABLE part_b.events_3 (id int, k int);
+      CREATE UNIQUE INDEX events_k_key ON part_b.events_3 (k, id);  -- the parent's name, in the partition's schema
+      ALTER TABLE part_a.events ATTACH PARTITION part_b.events_3 FOR VALUES FROM (200) TO (300);`);
+    try {
+      const { ts: schema } = await codegen({ schemas: { part_a: all, part_b: all } });
+      const { rows } = await t.pool.query<{ relname: string; names: string[] }>(`
+        SELECT c.relname, coalesce(array_agg(i.relname::text ORDER BY i.relname) FILTER (WHERE i.oid IS NOT NULL), '{}') AS names
+        FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        LEFT JOIN pg_index x ON x.indrelid = c.oid AND x.indisunique
+        LEFT JOIN pg_class i ON i.oid = x.indexrelid
+        WHERE n.nspname IN ('part_a', 'part_b') AND c.relkind IN ('r', 'p')
+        GROUP BY c.relname`);
+      const fromCatalog = Object.fromEntries(rows.map(r => [r.relname, r.names.map(n => `'${n}'`).join(' | ') || 'never']));
+      const generated = Object.fromEntries(rows.map(r =>
+        [r.relname, /export type UniqueIndex = (.*);/.exec(tableBlock(schema, r.relname))?.[1]]));
+      expect(generated).toEqual(fromCatalog);
+      expect(fromCatalog).toEqual({
+        events: "'events_k_key'",
+        events_1: "'events_1_k_id_key'",
+        // attached: its own unique index, and the one Postgres adds for the parent's constraint
+        events_2: "'events_2_k_id_key' | 'events_2_own'",
+        events_3: "'events_3_k_id_key' | 'events_k_key'",
+      });
+    } finally {
+      await t.pool.query('DROP SCHEMA part_a, part_b CASCADE');
+    }
+  });
 });
 
 describe('generate()', () => {
