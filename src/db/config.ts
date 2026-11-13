@@ -38,20 +38,19 @@ let config: Config = {  // defaults
   transactionRequiresCommit: false,  // the default in 7.0
 };
 
-// copies transactionRetryDelay too, its one nested object; the listeners are functions, kept as they are
-const copyConfig = (c: Config) =>
-  ({ ...c, transactionRetryDelay: c.transactionRetryDelay && { ...c.transactionRetryDelay } });
-
 /**
  * Get (a copy of) the current configuration.
  */
-export const getConfig = () => copyConfig(config);
+export const getConfig = () => {
+  const d = config.transactionRetryDelay;  // its one nested object, copied too; the listeners are functions, kept as they are
+  return { ...config, transactionRetryDelay: d && { minMs: d.minMs, maxMs: d.maxMs } };
+};
 
 /**
  * Set key(s) on the configuration, and return (a copy of) the new configuration.
  * @param newConfig Partial configuration object
  */
 export const setConfig = (newConfig: NewConfig) => {
-  config = copyConfig({ ...config, ...newConfig });
+  config = { ...config, ...newConfig };
   return getConfig();
 };
