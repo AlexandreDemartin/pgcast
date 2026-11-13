@@ -408,6 +408,29 @@ describe('a readonly columns or returning', () => {
     either[0]?.email;
     void [wrong, numbers, typed, whole];
   });
+
+  // 6.6.1's never[] dropped out of the union, leaving the whole row; now the union keeps the narrower row
+  test('a union with a query without columns: those columns', async () => {
+    const f = Math.random() > 0.5 ? db.select('users', db.all, { columns: cols }) : db.select('users', db.all);
+    const rows = await f.run(pool);
+    expectTypeOf(rows).toEqualTypeOf<Row[]>();
+    // @ts-expect-error email is missing when the first query runs
+    rows[0]?.email;
+    const row: Partial<s.users.JSONSelectable> | undefined = rows[0];
+    expectTypeOf(row?.email).toEqualTypeOf<string | undefined>();
+  });
+
+  // 6.6.1 made a type computed from the row never, which took any key
+  test('a type computed from the row: those columns', () => {
+    const cards = db.select('users', db.all, { columns: cols });
+    type Card = Awaited<ReturnType<typeof cards.run>>[number];
+    expectTypeOf<Card>().toEqualTypeOf<Row>();
+    // @ts-expect-error email is not a key of the row
+    const key: keyof Card = 'email';
+    // @ts-expect-error the row has no email
+    const mail: Card['email'] = 'a@b';
+    void [key, mail];
+  });
 });
 
 describe('truncate', () => {
