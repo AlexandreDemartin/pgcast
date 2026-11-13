@@ -6,12 +6,12 @@ import { transformerTwoslash } from '@shikijs/vitepress-twoslash';
 import { defineConfig } from 'vitepress';
 import { checkLinks, keepLinkHashes } from './anchors.ts';
 import { writeLlmsFiles } from './llms.ts';
+import { describePage, pageHead, repo } from './meta.ts';
 import { outline } from './outline.ts';
 import { sqlParameters, syntax } from './syntax.ts';
 import { focusableHovers, twoslashOptions } from './twoslash.ts';
 
 const
-  repo = 'https://github.com/AlexandreDemartin/pgcast',
   { version } = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')),
   fonts = 'https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@500;700;800' +
     '&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap';
@@ -23,6 +23,9 @@ export default defineConfig({
   base: '/',  // GitHub Pages, at the domain's root: https://pgcast.dev/
   cleanUrls: true,
   sitemap: { hostname: 'https://pgcast.dev' },  // sitemap.xml, named by public/robots.txt
+  lastUpdated: true,  // from git, so docs.yml and ci.yml check out the whole history; sitemap.xml's `lastmod` too
+  transformPageData: describePage,  // meta.ts
+  transformHead: pageHead,
   srcExclude: ['README.md', 'templates/**'],  // for whoever writes the site, not pages of it
   buildEnd: async config => {
     await writeLlmsFiles(config);  // llms.txt and llms-full.txt, for assistants
@@ -32,6 +35,14 @@ export default defineConfig({
     ['link', { rel: 'preconnect', href: 'https://fonts.googleapis.com' }],
     ['link', { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' }],
     ['link', { rel: 'stylesheet', href: fonts }],
+    // public/: favicon.svg follows the system's theme; favicon.ico and apple-touch-icon.png are rendered by
+    // render-images.mjs
+    ['link', { rel: 'icon', href: '/favicon.ico', sizes: '32x32' }],
+    ['link', { rel: 'icon', href: '/favicon.svg', type: 'image/svg+xml' }],
+    ['link', { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' }],
+    // the top bar's `--surface`; `media` first, as VitePress keeps one `<meta>` per first attribute other than `content`
+    ['meta', { media: '(prefers-color-scheme: light)', name: 'theme-color', content: '#ffffff' }],
+    ['meta', { media: '(prefers-color-scheme: dark)', name: 'theme-color', content: '#121a21' }],
   ],
   markdown: {
     theme: syntax,
@@ -72,6 +83,7 @@ export default defineConfig({
     },
     editLink: { pattern: `${repo}/edit/master/website/:path`, text: 'Edit this page on GitHub' },
     docFooter: { prev: 'Previous', next: 'Next' },
+    lastUpdated: { text: 'Last updated', formatOptions: { dateStyle: 'long', forceLocale: true } },  // 13 November 2026
     outline: { level: 2, label: 'On this page' },
     darkModeSwitchLabel: 'Colour theme',
   },

@@ -7,6 +7,7 @@ The source of truth for the look of pgcast's docs, whatever tool builds them ([d
 - **Wordmark**: `pg::cast`, in the mono face, 700, 19px, letter-spacing `-.02em`; the `::` (Postgres's cast operator) in `--accent`, with 1px either side.
 - **Hero line**: "Your types, cast from your database::", the display face at 800; the closing `::` in the mono face, `--accent`, letter-spacing `-.06em`.
 - **Eyebrow** above it, as a SQL comment: `-- a maintained fork of Zapatos 6.6.1`, mono 500, 13px, `--accent`.
+- **Favicon**: the `::` cut out of a rounded square in `--accent` (radius 3/16 of its side), so the tab shows through the four dots: `website/public/favicon.svg`, light and dark. The social card, 1200×630, sets the wordmark, eyebrow and hero line in the light theme: `website/public/social-card.svg`.
 - **Accent**: one teal. Neutrals are greys biased toward it (blue-green), never pure grey.
 
 ## Colour tokens
@@ -86,7 +87,7 @@ Other tokens: `--radius: 10px` (the cast panel 14px, buttons 9px, chips and the 
 - **Notes**: a chip, then the text, on `--surface` with a border, **no coloured side rail**. Chips: Opt-in (`--accent-soft`, `--accent`), Security (`--warn-soft`, `--warn`, a 1px `--warn` border, the note itself on `--warn-soft`), Coming (`--sunken`, `--muted`).
 - **Options tables**: bordered, radius, header on `--sunken`; the columns read Option → SQL it adds → Effect on the type; codes such as `PGCAST_DEP001` in mono, tabular figures.
 - **Pager**: two bordered links, Previous and Next, the border turning `--accent` on hover.
-- **Edit row**: a top rule; "Edit this page on GitHub" on the left, "Checked against the docs schema at build · pgcast 6.7.0" (the version documented) on the right.
+- **Edit row**: a top rule; "Edit this page on GitHub" on the left, "Checked against the docs schema at build · pgcast 6.7.0" (the version documented) on the right. On the site, the right holds "Last updated: 13 November 2026", the date of the page's last commit, 13px, `--muted`.
 - **Search**: a dialog, 600px, arrows and Enter, Escape closes; each result gives its page.
 - **Details**: `#` anchors on headings, shown on hover; links underlined 1px at 3px offset, 2px on hover; focus ring 2px `--accent`, offset 2px; `prefers-reduced-motion` honoured.
 
