@@ -215,11 +215,15 @@ All three will be the default in 7.0 ([Versions, opt-ins and warnings](/versions
 
 One more opt-in, [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow), has no warning to look for, and stays off in 7.0. With it, a `selectExactlyOne()` run on its own rejects on a second row, not only on none. Turn it on where your tests show no `selectExactlyOne()` matching two rows.
 
-The generator's own opt-in, [`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas), will be the default in 7.0. Its warning is a note from `npx zapatos`, not your tests: it names each column whose type is an enum of another schema, and that enum, typed until then as `any` or as the enum of the same name in the relation's schema.
+The generator has two opt-ins of its own, both to be the default in 7.0. Their warning is a note from `npx zapatos`, not your tests.
+
+The note of [`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas) names each column whose type is an enum of another schema, and that enum, typed until then as `any` or as the enum of the same name in the relation's schema:
 
 1. Turn it on in `zapatosconfig.json`.
 2. Delete the `zapatos/custom/` placeholder of a domain over such an enum: the generator never overwrites one, so the domain would keep the placeholder it already has, typed the old way. The new one gets the labels.
 3. Regenerate, and let `tsc` show the values the enum's labels refuse.
+
+The note of [`enumOrder`](/generator#generate.enumOrder) names each enum whose labels the generator sorts, though Postgres declares them in another order. Set it to `"declared"` and regenerate: for TypeScript, only `every.<name>` changes, so the code to read is the code that takes a label from it by index or compares it with a tuple.
 
 ## Go back
 
@@ -228,7 +232,7 @@ npm install zapatos@6.6.1
 ```
 
 - First, remove the three options from `setConfig()`: Zapatos 6.6.1's `Config` doesn't have them (2353).
-- The generated files are the same. Zapatos 6.6.1 ignores `typeEnumsAcrossSchemas` in `zapatosconfig.json`, and generates the `any` types again.
+- The generated files are the same. Zapatos 6.6.1 ignores `typeEnumsAcrossSchemas` and `enumOrder` in `zapatosconfig.json`, and generates the `any` types and the sorted labels again.
 - Each change of [Find the calls whose result changes](#find-the-calls-whose-result-changes) runs as it did, but the `jsonb` one, which finds nothing again.
 
 ::: warning Security

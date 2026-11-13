@@ -81,7 +81,7 @@ npx zapatos        # or: npx pgcast
 
 - **Security (6.6.2).** A string can no longer close its quotes as a table or column name, a `Whereable` key, a `lateral` key or alias, or the cast of `param()`; plain `updateValues` of `upsert()` are parameters; lock, `truncate()`, isolation and aggregate keywords are checked before any query. The few 6.6.1 calls that relied on this, and their migration, are listed under `Security` in the [changelog](CHANGELOG.md).
 - **Fixes.** A call that Postgres already refused throws a helpful error first, such as `update()` with no columns, and a result that contradicts the function's name, type or docs changes, such as `not()`, which now negates its whole condition: each is listed under `Fixed` in the [changelog](CHANGELOG.md).
-- **Opt-ins**, for surprises that code may rely on. Each is off by default; the old path emits a `DeprecationWarning` once per process, with a code to search for, except `selectExactlyOneChecksForSecondRow`'s, which stays opt-in for good, and the generator's, which notes through `warningListener` ([decision 003](docs/decisions/003-fixes-and-deprecation.md)).
+- **Opt-ins**, for surprises that code may rely on. Each is off by default; the old path emits a `DeprecationWarning` once per process, with a code to search for, except `selectExactlyOneChecksForSecondRow`'s, which stays opt-in for good, and the generator's, which note through `warningListener` ([decision 003](docs/decisions/003-fixes-and-deprecation.md)).
 
 | Option | Warning | Release |
 |---|---|---|
@@ -90,6 +90,7 @@ npx zapatos        # or: npx pgcast
 | `transactionRequiresCommit`: a `transaction()` whose `COMMIT` Postgres answers with `ROLLBACK`, after a query error the callback caught, rejects, rather than resolve with nothing saved | `PGCAST_DEP003` | 6.7.0 |
 | `selectExactlyOneChecksForSecondRow`: a `selectExactlyOne()` run on its own throws on a second row, rather than give the first; nested in a `lateral`, it keeps `LIMIT 1` | none | 6.7.0 |
 | `typeEnumsAcrossSchemas` (generator): an enum of another schema is typed by its labels, rather than as an `any` custom type or a same-named enum of the relation's schema | a note through `warningListener` | 6.7.0 |
+| `enumOrder: 'declared'` (generator): an enum's labels, `every.<name>` included, keep their declared order, by which Postgres compares them, rather than the alphabetical one | a note through `warningListener` | 6.7.0 |
 
 Everything else: [CHANGELOG.md](CHANGELOG.md); what the characterisation of 6.6.1 found: [docs/CHARACTERISATION-REPORT.md](docs/CHARACTERISATION-REPORT.md).
 

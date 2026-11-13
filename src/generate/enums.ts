@@ -6,34 +6,13 @@ Released under the MIT licence: see LICENCE file
 
 import * as pg from 'pg';
 import { enumLabel } from './enumLabel';
+import { enumOrdersForSchema } from './enumOrder';
 
 
 export type EnumData = { [k: string]: string[] };
 
-export const enumDataForSchema = async (schemaName: string, queryFn: (q: pg.QueryConfig) => Promise<pg.QueryResult<any>>) => {
-  const
-    { rows } = await queryFn({
-      text: `
-        SELECT
-          n.nspname AS schema
-        , t.typname AS name
-        , e.enumlabel AS value
-        FROM pg_catalog.pg_type t
-        JOIN pg_catalog.pg_enum e ON t.oid = e.enumtypid
-        JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace
-        WHERE n.nspname = $1
-        ORDER BY t.typname ASC, e.enumlabel ASC`,
-      values: [schemaName],
-    }),
-
-    enums: EnumData = rows.reduce((memo, row) => {
-      memo[row.name] = memo[row.name] ?? [];
-      memo[row.name].push(row.value);
-      return memo;
-    }, {});
-
-  return enums;
-};
+export const enumDataForSchema = async (schemaName: string, queryFn: (q: pg.QueryConfig) => Promise<pg.QueryResult<any>>) =>
+  (await enumOrdersForSchema(schemaName, queryFn)).alphabetical;
 
 export const enumTypesForEnumData = (enums: EnumData) => {
   const types = Object.keys(enums)

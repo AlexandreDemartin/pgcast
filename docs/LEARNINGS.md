@@ -101,6 +101,13 @@ Candidates for a check, a rule or a skill line.
 - #46 — JS `/^/gm` matches after `\r`, U+2028 and U+2029, not only `\n`: an « indent every line » pass over catalog text normalises line ends first — `branch-reviewer`, `builder`
 - #46 — Python's text-mode `open()` turns `\r` into `\n`: a PR body or file holding CRs is written with `newline=''` — `builder`
 - #46 — A detached `git worktree add --detach <scratch>/mutant HEAD` with `node_modules` and `src/.env` symlinked is a cheap mutant copy: Vitest runs without `npm ci`, and `rm -rf` plus `git worktree prune` cleans it — `builder`
+- #49 — A `float4`/`float8` read by node-postgres arrives as text rounded by the session's `extra_float_digits` (6 digits for `float4` at 0 or below, the default before Postgres 12): order by such a column in SQL (`row_number() OVER (… ORDER BY col)`), never by comparing parsed values in JS; probe with `-c extra_float_digits=0` in `db.options` — `branch-reviewer`
+- #49 — When a PR says a public export keeps its result, a test calls that export: `enumDataForSchema()` and a default argument of `definitionForRelationInSchema()` had no caller in `test/`, and two mutants passed the suite — `branch-reviewer`
+- #49 — A variant snapshot built on another variant's schemas picks up every later change to them: regenerate it after merging a PR that touched those snapshots — `branch-reviewer`
+- #49 — A brief's claim about existing code (« an unknown value is a config error as the other options do it ») is a hypothesis until read: `config.ts` validated nothing — orchestrator
+- #49 — A mutant that rounds `enumsortorder` survives a single `ADD VALUE … BEFORE` (the stable sort breaks the tie alphabetically): a probe needs a value that breaks the tie the other way — `builder`
+- #49 — `DROP DATABASE … WITH (FORCE)` right after `generate()` can kill a pooled client still closing (57P01) and crash a replay: wait briefly first (see #302) — `builder`
+- #49 — `exactOptionalPropertyTypes` rejects `{ enumOrder: undefined }` in a test loop: spread `{}` or the set option — `builder`
 
 ## Minors kept
 

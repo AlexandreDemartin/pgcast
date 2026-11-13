@@ -43,7 +43,7 @@ export namespace film_titles {
 
 For views, pgcast keeps to what Postgres states, as Zapatos did: a nullability the database doesn't state would be a guess, and a guess is the one thing a generated type mustn't be. Some gaps in what the generator reads are known, and described here as they are today:
 
-- Enum labels come out in alphabetical order: `crew_job` is `'cinematographer' | 'composer' | 'director' | 'editor' | 'writer'`, not the order of its `CREATE TYPE` ([#49](https://github.com/AlexandreDemartin/pgcast/issues/49)).
+- Enum labels come out in alphabetical order: `crew_job` is `'cinematographer' | 'composer' | 'director' | 'editor' | 'writer'`, not the order of its `CREATE TYPE`, unless [`enumOrder`](/generator#generate.enumOrder) is `"declared"`.
 - Comments are read on the columns of tables and materialised views only, not of views, foreign tables or partitioned tables ([#47](https://github.com/AlexandreDemartin/pgcast/issues/47)).
 - An enum of another schema becomes an `any` placeholder, or takes the labels of the enum of the same name in the relation's schema, unless [`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas) is on.
 
