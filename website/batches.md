@@ -140,4 +140,4 @@ Each row comes back whole by default, and from an upsert with its `$action`. For
 
 - [`insert()`](/insert#insert) and [`upsert()`](/insert#upsert): every option, the SQL it adds.
 - [`transaction()`](/transaction#transaction): its levels, retries and errors.
-- [Versions, opt-ins and warnings](/versions): the two opt-ins and their warnings.
+- [Versions, opt-ins and warnings](/versions): the opt-ins and their warnings.
