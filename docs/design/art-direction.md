@@ -77,7 +77,7 @@ Spacing is on a 4px grid.
 - **Shell**, VitePress's, at most 1440px: left nav 260px · reading column, at most 688px · "On this page" rail, at most 256px, from 1280px. Gutters of 16px at least, and the safe-area insets.
 - **Left nav**, sticky, in the four groups of Diátaxis (amended 2026-11-12, [decision 004](../decisions/004-documentation-site.md) § The site, which lists their pages): Tutorial · How-to guides · Reference · Explanation.
   - Rows of 32px (padding `6px 12px`, 14px / 20px), 4px apart, radius 8px; `--sunken` on hover.
-  - Each group's label links its landing page: a row of 36px, its text in line with its pages' text; 32px under the group above, 8px over its pages.
+  - Each group's label links its landing page: a row of 36px, its text in line with its pages' text; 32px under the group above, 12px over its pages.
   - A page that documents a minor carries its version as a small badge (Versions, opt-ins and warnings: 6.7).
   - The current page on `--accent-soft`, in `--accent`, 600.
 - **Reading column**: paragraphs and list items at most 68ch; VitePress's padding (48px 32px from 960px).
