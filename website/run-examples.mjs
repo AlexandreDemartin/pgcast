@@ -6,13 +6,13 @@
 // example that shows an error says which above `// ---cut---`, `// rejects with 42703` (a SQLSTATE) or
 // `// rejects with NotExactlyOneError` (an error's name), and must reject with it. schema.sql goes into a temporary
 // database on the server of TEST_DATABASE_URL (the environment, else ../src/.env). On it too, the playground's Postgres
-// (PGlite, decision 005) must parse the docs schema's types as `pg` does. Run by `npm run docs:examples`, after the
-// root `npm run build`.
+// (PGlite, decision 005) must parse the docs schema's types as `pg` does, and every example runs again on its pool, as
+// a Run gives it to the code. Run by `npm run docs:examples`, after the root `npm run build`.
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import pg from 'pg';
 import * as db from 'zapatos/db';
-import { open } from './.vitepress/playground/pglite.ts';
+import { open, poolOf } from './.vitepress/playground/pglite.ts';
 import { dropOrphanDocsDatabases } from './orphan-databases.mjs';
 
 const envFile = new URL('../src/.env', import.meta.url);
@@ -66,9 +66,10 @@ function declaredNames(source) {
 
 /**
  * Run one example with `pool` set to what it is given. Every example shares this process's `zapatos/db`, so the
- * configuration goes back to what it was before the next, as in `cast.data.ts`.
+ * configuration goes back to what it was before the next, as in `cast.data.ts`. `search` imports it afresh, for a
+ * second run: a module runs once per URL.
  */
-async function run(example, pool) {
+async function run(example, pool, search = '') {
   const
     file = new URL(example, import.meta.url),
     source = readFileSync(file, 'utf8'),
@@ -82,7 +83,7 @@ async function run(example, pool) {
   Object.assign(globalThis, standIns, { pool });
   pending.length = 0;
   try {
-    await import(file.href);
+    await import(file.href + search);
     await Promise.all(pending);
   } catch (error) {
     if (expected === undefined) throw error;
@@ -108,7 +109,7 @@ let current;  // the example last started: a promise it leaves unawaited that re
 function note(example, error, what = '') {
   const
     href = new URL(example, import.meta.url).href,  // as the stack names it: no regex built from a file name
-    frame = `${error?.stack}\n${error?.cause?.stack}`.split('\n').find(at => at.includes(`${href}:`)),
+    frame = `${error?.stack}\n${error?.cause?.stack}`.split('\n').find(at => /^[:?]/.test(at.split(href)[1] ?? '')),
     line = frame?.match(/:(\d+):\d+\)?$/)?.[1],
     where = (pagesOf.get(example) ?? ['(on no page)']).join(', ');
   what += error?.code ? `${error.code} ${error.message}` : String(error?.message ?? error);
@@ -163,25 +164,28 @@ function report() {
     console.error(`The examples check failed (README.md § Examples):\n  ${problems.join('\n  ')}`);
     process.exitCode = 1;
   } else {
-    console.log(`The examples ran against Postgres: ${examples.length}, each on the docs schema; ` +
-      "the playground's PGlite parses its types as pg does.");
+    console.log(`The examples ran against Postgres: ${examples.length}, each on the docs schema, on pg and on ` +
+      "the playground's PGlite, which parses its types as pg does.");
   }
 }
 
-/** Run `example`, noting its failure. One that does not settle in time ends the run: its client may never be free. */
-async function check(example, pool) {
+/**
+ * Run `example`, noting its failure; `on` names where, if not on `pg`. One that does not settle in time ends the run:
+ * its client may never be free.
+ */
+async function check(example, pool, on) {
   current = example;
   let timer;
   try {
     const timedOut = new Promise(resolve => { timer = setTimeout(resolve, timeLimit, true); });
-    if (await Promise.race([run(example, pool), timedOut])) {
-      note(example, new Error(`does not settle within ${timeLimit / 1000} s; the examples after it did not run`));
+    if (await Promise.race([run(example, pool, on && '?pglite'), timedOut])) {
+      note(example, new Error(`does not settle within ${timeLimit / 1000} s; the examples after it did not run`), on);
       for (const database of [copy, name]) await admin.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
       report();
       process.exit();
     }
   } catch (error) {
-    note(example, error);
+    note(example, error, on);
   } finally {
     clearTimeout(timer);
   }
@@ -220,6 +224,31 @@ try {
     } finally {
       if (settled) await pool.end();  // it would wait for an unreleased client for good
       await admin.query(`DROP DATABASE "${copy}" WITH (FORCE)`);
+    }
+  }
+  // Again on the playground's pool, `pool` of a Run: a cast panel's example on its client, between BEGIN and ROLLBACK,
+  // as on `pg`; an example of several queries on a fresh PGlite, as each Run starts.
+  const
+    playground = "on the playground's PGlite: ",
+    poolOn = pglite => poolOf(({ text, values }) => pglite.query(text, values)),
+    shared = await open(schema),
+    lent = await poolOn(shared).connect();
+  try {
+    for (const example of examples.filter(example => !example.startsWith('examples/plain/'))) {
+      await lent.query({ text: 'BEGIN' });
+      await check(example, lent, playground);
+      await lent.query({ text: 'ROLLBACK' });
+    }
+  } finally {
+    lent.release();
+    await shared.close();
+  }
+  for (const example of examples.filter(example => example.startsWith('examples/plain/'))) {
+    const pglite = await open(schema);
+    try {
+      await check(example, poolOn(pglite), playground);
+    } finally {
+      await pglite.close();
     }
   }
 } finally {
