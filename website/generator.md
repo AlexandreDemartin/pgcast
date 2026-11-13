@@ -260,7 +260,7 @@ Writing custom types file: src/zapatos/custom/index.d.ts
 `boolean`, or in `generate()` a function `(s: string) => void`; default `true`, with `console.log`. `false` silences:
 
 - `Writing new custom type or domain placeholder file: src/zapatos/custom/PgPoint.d.ts`, once per new placeholder;
-- `Note: custom types "archive"."notes" and "public"."notes" are both named PgNotes in TypeScript, so they share one type and one placeholder file, src/zapatos/custom/PgNotes.d.ts. To type them apart, rename them in the database.`, once per run for each name that two Postgres types share ([`customTypesTransform`](#generate.customTypesTransform)); when their names differ, it adds that a `customTypesTransform` function can keep them apart;
+- `Note: custom types "archive"."notes" and "public"."notes" are both named PgNotes in TypeScript, so they share one type and one placeholder file, src/zapatos/custom/PgNotes.d.ts. To type them apart, rename one of them in the database.`, once per run for each name that two Postgres types share ([`customTypesTransform`](#generate.customTypesTransform)); when their names differ, it adds that a `customTypesTransform` function can keep them apart;
 - the note on `bigint` and `numeric` columns, once per process ([`customJSONParsingForLargeNumbers`](#generate.customJSONParsingForLargeNumbers));
 - the [old layout warning](#the-old-layout-warning).
 

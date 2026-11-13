@@ -76,7 +76,7 @@ const warnAboutSharedCustomTypeNames = (origins: CustomTypeOrigins, config: Comp
 
     warn(`Note: custom types ${typeList} are ${types.length === 2 ? 'both' : 'all'} named ${name} in TypeScript, ` +
       `so they share one type and one placeholder file, ${filePath}. ` +
-      `To type them apart, rename them in the database` +
+      `To type them apart, rename one of them in the database` +
       (namesDiffer ? `, or give customTypesTransform a function that keeps their names apart.` : `.`));
   }
 };

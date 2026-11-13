@@ -243,10 +243,10 @@ describe('custom types that share a placeholder name', () => {
     expect(await warningsFor({ collide_a: only('things'), collide_b: only('things', 'codes') })).toEqual([
       'Note: custom types "collide_a"."code" and "collide_b"."code" are both named PgCode in TypeScript, ' +
       'so they share one type and one placeholder file, src/zapatos/custom/PgCode.d.ts. ' +
-      'To type them apart, rename them in the database.',
+      'To type them apart, rename one of them in the database.',
       'Note: custom types "collide_a"."pair" and "collide_b"."pair" are both named PgPair in TypeScript, ' +
       'so they share one type and one placeholder file, src/zapatos/custom/PgPair.d.ts. ' +
-      'To type them apart, rename them in the database.',
+      'To type them apart, rename one of them in the database.',
     ]);
   });
 
@@ -254,7 +254,7 @@ describe('custom types that share a placeholder name', () => {
     expect(await warningsFor({ collide_b: only('pairs') })).toEqual([
       'Note: custom types "collide_a"."pair" and "collide_b"."pair" are both named PgPair in TypeScript, ' +
       'so they share one type and one placeholder file, src/zapatos/custom/PgPair.d.ts. ' +
-      'To type them apart, rename them in the database.',
+      'To type them apart, rename one of them in the database.',
     ]);
   });
 
@@ -262,7 +262,7 @@ describe('custom types that share a placeholder name', () => {
     expect(await warningsFor({ collide_a: only('labels') })).toEqual([
       'Note: custom types "collide_a"."code-x" and "collide_a"."code_x" are both named PgCode_x in TypeScript, ' +
       'so they share one type and one placeholder file, src/zapatos/custom/PgCode_x.d.ts. ' +
-      'To type them apart, rename them in the database, ' +
+      'To type them apart, rename one of them in the database, ' +
       'or give customTypesTransform a function that keeps their names apart.',
     ]);
   });
@@ -271,7 +271,7 @@ describe('custom types that share a placeholder name', () => {
     expect(await warningsFor({ collide_a: only('labels', 'spaced') })).toEqual([
       'Note: custom types "collide_a"."code x", "collide_a"."code-x" and "collide_a"."code_x" are all named PgCode_x ' +
       'in TypeScript, so they share one type and one placeholder file, src/zapatos/custom/PgCode_x.d.ts. ' +
-      'To type them apart, rename them in the database, ' +
+      'To type them apart, rename one of them in the database, ' +
       'or give customTypesTransform a function that keeps their names apart.',
     ]);
   });
