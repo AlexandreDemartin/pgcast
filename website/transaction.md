@@ -11,7 +11,7 @@ db.transaction(txnClientOrQueryable, isolationLevel, callback)
 
 Runs `callback` in one transaction, then commits it, retries it or rolls it back. It returns a promise of what `callback` resolves to.
 
-- `txnClientOrQueryable`: a `pg.Pool`, from which it checks out a client, released at the end; a client, `pg.Client` or a `pg.PoolClient` already checked out, used and left connected; or the client of a transaction already open, [passed through](#passing-a-transaction-through).
+- `txnClientOrQueryable`: a `pg.Pool`, from which it checks out a client, released at the end; a client, `pg.Client`, `pg.native.Client` or a `pg.PoolClient` already checked out, used and left connected; or the client of a transaction already open, [passed through](#passing-a-transaction-through).
 - `isolationLevel`: an [`IsolationLevel`](#IsolationLevel).
 - `callback`: `async txnClient => …`, given a [`TxnClient`](#TxnClient) of that level. The queries of the transaction are those `.run(txnClient)`; one run on the pool, or on any other client, is not in it.
 
