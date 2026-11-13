@@ -10,6 +10,7 @@ import { host, writeLlmsFiles } from './llms.ts';
 import { describePage, pageHead, repo } from './meta.ts';
 import { outline } from './outline.ts';
 import { playgroundVite } from './playground/build.ts';
+import { checkPlaygroundLinks } from './playgroundLinks.ts';
 import { lineIndents, sqlParameters, syntax } from './syntax.ts';
 import { labelTableCells } from './tables.ts';
 import { focusableHovers, moduleNames, twoslashOptions } from './twoslash.ts';
@@ -37,6 +38,7 @@ export default defineConfig({
     await writeLlmsFiles(config);  // llms.txt and llms-full.txt, for assistants
     await writeChangelogFeed(config);  // changelog.xml
     checkLinks(config);  // a link to a page or an anchor that does not exist fails the build
+    await checkPlaygroundLinks(config);  // so does a cast panel that does not open its example in the playground
   },
   head: [
     // public/fonts/, declared in theme/fonts.css: every page's first screen sets all three faces (the wordmark is mono)
