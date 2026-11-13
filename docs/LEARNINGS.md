@@ -302,6 +302,7 @@ Candidates for a check, a rule or a skill line.
 - #190 — `isDatabaseError(err)` with no code argument always gives `false`: a test that shows an error has no SQLSTATE checks `code` is `undefined` (see #178) — `builder`
 - #190 — A PR that adds an opt-in updates every place that lists them: `git grep -e upsertRequiresSameKeys --and -e undefinedMeansMissing`, minus the lines naming the new option, finds each one still stale (README « What differs », `why.md`, `versions.md`, `runtime-config.md`, `switching.md`, `batches.md`) — `branch-reviewer`, `builder`
 - #190 — A link label that counts what its target lists (« the two opt-ins ») goes stale when the target grows: write labels without a count — `builder`
+- #238 — Before rewording the comment of a snapshot, check every error code in it: dropping « a syntax error » left the `0A000` (a three-part name, a cross-database reference) unexplained — `builder`
 
 ## Minors kept
 
