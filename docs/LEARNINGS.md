@@ -288,6 +288,9 @@ Candidates for a check, a rule or a skill line.
 - #115 — A review that relies on a harness saves the harness, not only its report, so the fix round re-runs the same one — `builder`
 - #115 — `gh pr ready` from a subagent is refused by the auto-mode classifier: the orchestrator runs it — orchestrator
 - #212 — Without `baseUrl`, a relative `paths` entry passed through the TypeScript API resolves against the directory of the tsconfig `parseJsonConfigFileContent` read, not the root: give programmatic `paths` overrides absolute paths (`test/integration/codegen.test.ts:201`) — `builder`
+- #208 — With `noUnusedLocals` on, a `// @ts-expect-error` above an unused `type X = …` is satisfied by the unused-local error alone: write a negative type test as an `expectTypeOf<…>()` call, and make each negative valid once to see « Unused @ts-expect-error » (candidate: skill `type-tests`) — `builder`
+- #208 — In the result types, `undefined extends X ? … : …` is always true without `strictNullChecks`, so a docs claim about narrowing by `columns`, `returning`, `extras` or `reportAction` holds only under strict; the docs build is strict, so only a `strict: false` probe catches it — `branch-reviewer`
+- #208 — The `bench:types` baseline drifts on master with no type change (+0.4 % Instantiations, −1.1 % Types): refresh it with `-- --update` in a chore PR so later PRs measure against master — `builder`
 
 ## Minors kept
 
@@ -321,3 +324,5 @@ Minor review defects, taken up by the end-of-chapter review.
 - #215 — `website/.vitepress/cast.data.ts` `layOut` keeps the template's whitespace before a keyword it does not break on: write an `INSERT … SELECT` and check its panel — `builder`
 - #115 — the root `npm run lint` does not cover `website/*.mjs`, which has 4 `no-undef` errors under the root ESLint config — `builder`
 - #115 — no `.gitattributes`: a CRLF page breaks `llms.ts`'s title check before any other docs check; `* text=auto eol=lf` would cover every checker at once — `builder`
+- #208 — `website/insert.md:178,304`: the `ReturningTypeForTable` and `UpsertReturnableForTable` entries do not say they need `strictNullChecks`, as the same page does at lines 54 and 121; without it `C`, `E` and `RA` are ignored — `branch-reviewer`
+- #208 — `test/types/shortcuts.test-d.ts:325`: no test pins that `UpsertReturnableForTable` leaves out the `undefined` of `updateColumns: db.doNothing` (`R | undefined` comes from the signature), as `insert.md:178` says — `branch-reviewer`

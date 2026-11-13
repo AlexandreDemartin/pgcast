@@ -173,6 +173,10 @@ An empty array, for the `updateColumns` of `upsert()`: a row that conflicts is l
 
 `{ $action: 'INSERT' | 'UPDATE' }`, added to each result of `upsert()`: `'INSERT'` for a new row, `'UPDATE'` for an updated one, read from the row's `xmax`. `reportAction: 'suppress'` leaves it out of the SQL and of the type.
 
+## `UpsertReturnableForTable` {#UpsertReturnableForTable}
+
+`UpsertReturnableForTable<T, C, E, RA>`: one row of what `upsert()` returns, the [`ReturningTypeForTable`](#ReturningTypeForTable) with [`UpsertAction`](#UpsertAction), unless `RA`, the `reportAction`, is `'suppress'`: `db.UpsertReturnableForTable<'ratings', undefined, undefined, undefined>` is `ratings.JSONSelectable & UpsertAction`. It does not add the `undefined` of `updateColumns: []` ([`doNothing`](#doNothing)).
+
 ## `update()` {#update}
 
 ```ts
@@ -294,3 +298,18 @@ In the values of `insert()`, `update()` and `upsert()`, Zapatos 6.6.1 sends `und
 ## `ReturningOptionsForTable` {#ReturningOptionsForTable}
 
 `{ returning?, extras? }`: the options of `insert()`, `upsert()`, `update()` and `deletes()` that shape each result ([Options](#insert-options)).
+
+## `ReturningTypeForTable` {#ReturningTypeForTable}
+
+`ReturningTypeForTable<T, C, E>`: one row of what `insert()`, `update()` and `deletes()` return, for the table `T`, the `returning` columns `C` and the `extras` `E` (`undefined` for an option not given): the `JSONSelectable`, narrowed to `C`, with the keys of `E`. `insert()` of one row returns it; `insert()` of an array, `update()` and `deletes()` return an array of it. It types a fake result, in a test, from the schema:
+
+```ts twoslash
+import * as db from 'zapatos/db';
+// ---cut---
+type NewFilm = db.ReturningTypeForTable<'films', ['id', 'title'], undefined>;
+
+const inserted: NewFilm = { id: 1000, title: 'The Long Take' };
+```
+
+- Stable: type tests pin it to what `.run()` gives, here for `db.insert('films', film, { returning: ['id', 'title'] })`.
+- `C` as a `readonly` tuple gives `never`, as for `returning` ([Options](#insert-options)).
