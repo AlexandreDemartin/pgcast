@@ -224,6 +224,8 @@ describe('custom types that share a placeholder name', () => {
     CREATE TABLE collide_b.things (pair collide_b.pair, amount public.positive_int);
     CREATE MATERIALIZED VIEW collide_b.codes AS SELECT 1::collide_b.code AS code;
     CREATE TABLE collide_a.labels (dashed collide_a."code-x", underscored collide_a.code_x);
+    CREATE DOMAIN collide_a."code x" AS text;
+    CREATE TABLE collide_a.spaced (spaced collide_a."code x");
   `));
   afterAll(() => t.pool.query('DROP SCHEMA collide_a, collide_b CASCADE'));
 
@@ -250,6 +252,15 @@ describe('custom types that share a placeholder name', () => {
     expect(await warningsFor({ collide_a: only('labels') })).toEqual([
       'Note: custom types "collide_a"."code-x" and "collide_a"."code_x" are both named PgCode_x in TypeScript, ' +
       'so they share one type and one placeholder file, zapatos/custom/PgCode_x.d.ts. ' +
+      'To type them apart, rename them in the database, ' +
+      'or give customTypesTransform a function that keeps their names apart.',
+    ]);
+  });
+
+  it('lists three types that share a name', async () => {
+    expect(await warningsFor({ collide_a: only('labels', 'spaced') })).toEqual([
+      'Note: custom types "collide_a"."code x", "collide_a"."code-x" and "collide_a"."code_x" are all named PgCode_x ' +
+      'in TypeScript, so they share one type and one placeholder file, zapatos/custom/PgCode_x.d.ts. ' +
       'To type them apart, rename them in the database, ' +
       'or give customTypesTransform a function that keeps their names apart.',
     ]);
