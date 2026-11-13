@@ -256,6 +256,33 @@ describe('update, deletes', () => {
   });
 });
 
+describe('parent() as a write value', () => {
+  test('characterization: parent() as an insert(), upsert() or update() value is refused, except on a column typed any', () => {
+    // a ParentColumn is no Parameter<T> (its tag, or in 6.6.1 its optional value), and no other member of an
+    // Insertable or Updatable value; the runtime sends it as JSON (test/integration/shortcuts.test.ts,
+    // "parent() as an insert(), upsert() or update() value"). Same in 6.6.1, with or without strict
+    // @ts-expect-error parent() is no text value
+    db.insert('users', { email: 'a@b', display_name: db.parent('id') });
+    // @ts-expect-error nor a jsonb value
+    db.insert('users', { email: 'a@b', display_name: 'A', settings: db.parent() });
+    // @ts-expect-error nor an int value, in an array of rows
+    db.insert('users', [{ email: 'a@b', display_name: 'A', manager_id: db.parent('id') }]);
+    // @ts-expect-error nor an enum value, in upsert
+    db.upsert('users', { email: 'a@b', display_name: 'A', mood: db.parent('mood') }, 'email');
+    // @ts-expect-error nor a text value, in update
+    db.update('users', { display_name: db.parent('id') }, { id: 1 });
+    // @ts-expect-error nor a text[] value, in update
+    db.update('users', { tags: db.parent() }, { id: 1 });
+    // characterization: a column typed any (here a composite, whose zapatos/custom placeholder is any) takes it
+    const i = db.insert('users', { email: 'a@b', display_name: 'A', home: db.parent('id') });
+    const u = db.upsert('users', { email: 'a@b', display_name: 'A', home: db.parent() }, 'email');
+    const v = db.update('users', { home: db.parent('id') }, { id: 1 });
+    expectTypeOf(i.run(pool)).resolves.toEqualTypeOf<s.users.JSONSelectable>();
+    expectTypeOf(u.run(pool)).resolves.not.toBeAny();
+    expectTypeOf(v.run(pool)).resolves.toEqualTypeOf<s.users.JSONSelectable[]>();
+  });
+});
+
 describe('truncate', () => {
   test('undefined; refuses an option that is not a keyword', () => {
     expectTypeOf(db.truncate('users', 'RESTART IDENTITY', 'CASCADE').run(pool)).resolves.toEqualTypeOf<undefined>();
