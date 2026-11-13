@@ -98,8 +98,8 @@ const warningsOf = async (config: Config) => {
 };
 
 /** The same, but the notes on enums, which have their own tests (§ typeEnumsAcrossSchemas, § enumOrder). */
-const warningsFor = async (schemas: Schemas) =>
-  (await warningsOf({ schemas })).filter(w => !w.includes('typeEnumsAcrossSchemas') && !w.includes('enumOrder'));
+const warningsFor = async (schemas: Schemas, config: Config = {}) =>
+  (await warningsOf({ ...config, schemas })).filter(w => !w.includes('typeEnumsAcrossSchemas') && !w.includes('enumOrder'));
 
 /** Custom type placeholders, sorted by name: tsForConfig() inserts them in query completion order. */
 const customFiles = (files: Record<string, string>) =>
@@ -546,6 +546,14 @@ describe('custom types that share a placeholder name', () => {
     expect(await warningsFor({ collide_b: only('pairs') })).toEqual([
       'Note: custom types "collide_a"."pair" and "collide_b"."pair" are both named PgPair in TypeScript, ' +
       'so they share one type and one placeholder file, src/zapatos/custom/PgPair.d.ts. ' +
+      'To type them apart, rename one of them in the database.',
+    ]);
+  });
+
+  it("names the placeholder in pgcast/custom with moduleNames: 'pgcast'", async () => {
+    expect(await warningsFor({ collide_b: only('pairs') }, { moduleNames: 'pgcast' })).toEqual([
+      'Note: custom types "collide_a"."pair" and "collide_b"."pair" are both named PgPair in TypeScript, ' +
+      'so they share one type and one placeholder file, src/pgcast/custom/PgPair.d.ts. ' +
       'To type them apart, rename one of them in the database.',
     ]);
   });
