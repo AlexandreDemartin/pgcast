@@ -152,7 +152,10 @@ async function update(code: string, types: monaco.editor.ITextModel) {
 
 onMounted(async () => {
   document.head.append(stylesheet);
+  // registered before the wait: leaving during it takes the stylesheet away, and the editor is not made
+  disposables.push({ dispose: () => stylesheet.remove() });
   await document.fonts.load(`13px ${fontFamily}`);
+  if (!host.value) return;
   defineTheme();
   const
     model = monaco.editor.createModel(data.code, 'typescript', monaco.Uri.parse('file:///playground.ts')),
@@ -182,7 +185,7 @@ onMounted(async () => {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const refresh = () => update(model.getValue(), types).catch(error => { notes.value = [String(error)]; });
   disposables.push(model, types, editor,
-    { dispose: () => { clearTimeout(timer); observer.disconnect(); overflow.remove(); stylesheet.remove(); } },
+    { dispose: () => { clearTimeout(timer); observer.disconnect(); overflow.remove(); } },
     editor.onDidContentSizeChange(({ contentHeight }) => { host.value!.style.height = `${contentHeight}px`; }),
     model.onDidChangeContent(() => { clearTimeout(timer); timer = setTimeout(refresh, 300); }));
   host.value!.style.height = `${editor.getContentHeight()}px`;
