@@ -67,6 +67,16 @@ describe('param', () => {
       .toEqual({ code: '3F000', message: 'schema "a" does not exist' });
   });
 
+  it('a type whose own name ends with `[]` is reached quoted, as `"tag[]"`; `tag[]` is an array of tag', async () => {
+    await t.client.query(`CREATE TYPE tag AS ENUM ('x'); CREATE DOMAIN "tag[]" AS text`);
+    const typeOf = async (cast: string) =>
+      (await sql`SELECT pg_typeof(${param('{x}', cast)})::text AS t`.run(t.client))[0];
+    expect(await typeOf('"tag[]"')).toEqual({ t: '"tag[]"' });
+    // 6.6.1 wrote `"tag[]"` and `"public"."tag[]"` for these two, the domain
+    expect(await typeOf('tag[]')).toEqual({ t: 'tag[]' });
+    expect(await typeOf('public"."tag[]')).toEqual({ t: 'tag[]' });
+  });
+
   it('a JSON cast (true, or the config) sends JSON text', async () => {
     db.setConfig({ castObjectParamsToJson: true });
     const q = sql`SELECT ${param([1, 'a'], true)}::jsonb AS a, ${param({ b: [2] })}::jsonb AS o`;
