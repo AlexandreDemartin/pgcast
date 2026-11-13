@@ -270,9 +270,10 @@ export class ParentColumn<T extends Column | undefined = Column | undefined> { d
 /**
  * Returns a `ParentColumn` instance, wrapping a column name, which compiles to
  * that column name of the table of the parent query. Without a column, it takes
- * the column of the filter; with no filter, it throws, as `` sql`${parent()}` ``
- * does (R58). As a `Whereable` value, in `eq()` and in `isIn()` /
- * `isNotIn()`, in a `lateral` subquery of `authors`:
+ * the column of the filter; with no filter, as in `` sql`${parent()}` ``, it
+ * throws before writing anything, saying to name the column (Zapatos 6.6.1
+ * wrote the table and its `.`, then threw on `undefined`). As a `Whereable`
+ * value, in `eq()` and in `isIn()` / `isNotIn()`, in a `lateral` subquery of `authors`:
  * `{ authorId: isIn([parent('id'), 2]) }` gives `("authorId" IN ("authors"."id", $1))`.
  * In `vals({…})` it is the parent column too, with no column the column of its
  * key. Outside a nested query it throws, so as an `insert()`, `upsert()` or
@@ -307,6 +308,10 @@ export type Queryable = pg.ClientBase | pg.Pool;
  * quoted names only is written as before (`'a""b'` gives `"a""b"`). Unlike
  * Zapatos 6.6.1, any other string that starts and ends with `"` is quoted like
  * any other name: `'"a" || "b"'` gives `"""a"" || ""b"""`, one identifier.
+ *
+ * `null` throws, before writing anything: interpolate `param(null)` for a `NULL`
+ * value. Zapatos 6.6.1 threw a `TypeError` there; `null` as a `Whereable` or
+ * `vals()` value is still a `NULL` parameter.
  */
 export function sql<
   Interpolations = SQL,
@@ -332,6 +337,8 @@ const
   selfInWhereable = '`db.self` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: compare with a value, or use it in a `sql` fragment value, where it stands for the column.',
   wrapperInWhereable = '`db.raw()`, `db.cols()` and `db.vals()` have no meaning as a value in a Whereable (a filter), nor in `isIn()`: to compare with SQL, use a `sql` fragment value, where `db.self` stands for the column; to compare with a value, give the value itself, or `db.param()`.',
   wrapperAsValue = '`db.raw()`, `db.cols()` and `db.vals()` have no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value: to write SQL, use a `sql` fragment value (in `update()`, `db.self` there stands for the column); to write a value, give the value itself, or `db.param()`.',
+  nullInterpolated = 'Interpolating `null` has no meaning in SQL: for a `NULL` value, interpolate `db.param(null)`; to filter on `NULL`, use `db.conditions.isNull`; to match every row, give a shortcut `db.all` as its filter.',
+  parentWithoutColumn = "`db.parent()` with no column has no meaning here: name the column, `db.parent('id')`, or give it as the value of a Whereable or `vals({…})` key, whose column it then takes.",
   builtinWhereable = (name: string) => `A built-in \`${name}\` has no meaning as a Whereable (a filter): it would compile to its own enumerable keys, and to \`TRUE\`, every row, when it has none. To compare with a value, give it as \`db.param(…)\`; to filter, give a plain object (\`{ column: value }\`); await a \`Promise\` first.`;
 
 // built-in objects that are no filter, by their exact prototype, so that a class instance never is one, even of
@@ -544,9 +551,12 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
     } else if (expression instanceof ParentColumn) {
       // alias to the parent table (plus optional supplied column name) of a nested query, if applicable
       if (!parentTable) throw new Error(`The 'parent' table alias has no meaning here`);
+      // with no column and no current column, throw before the table is written (Zapatos 6.6.1 wrote `"t".` first)
+      const column = expression.value ?? currentColumn;
+      if (column == null) throw new Error(parentWithoutColumn);
       this.compileExpression(parentTable, result);
       result.text += '.';
-      this.compileExpression(expression.value ?? currentColumn!, result);
+      this.compileExpression(column, result);
 
     } else if (expression instanceof ColumnNames) {
       // a ColumnNames-wrapped object -> quoted names in a repeatable order
@@ -602,8 +612,10 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
       }
 
     } else if (typeof expression === 'object') {
+      // typeof null is 'object': Zapatos 6.6.1 threw a TypeError from Object.keys(null) below
+      if (expression === null) throw new Error(nullInterpolated);
       if (expression === globalThis) throw new Error('Did you use `self` (the global object) where you meant `db.self` (the Zapatos value)? The global object cannot be embedded in a query.');
-      if (expression !== null && isBuiltin(expression)) throw new Error(builtinWhereable(Object.getPrototypeOf(expression).constructor.name));
+      if (isBuiltin(expression)) throw new Error(builtinWhereable(Object.getPrototypeOf(expression).constructor.name));
 
       // must be a Whereable object, so put together a WHERE clause
       const columnNames = <Column[]>Object.keys(expression).sort();
