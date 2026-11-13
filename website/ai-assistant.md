@@ -8,8 +8,8 @@ Give an assistant that writes your queries three things: these docs, your genera
 The site publishes itself for assistants, in two files at its root:
 
 ```txt
-https://alexandredemartin.github.io/pgcast/llms.txt
-https://alexandredemartin.github.io/pgcast/llms-full.txt
+https://pgcast.dev/llms.txt
+https://pgcast.dev/llms-full.txt
 ```
 
 - [`llms.txt`](/llms.txt): an index, each page with its URL and its summary. For an assistant that fetches the pages it needs.
@@ -35,59 +35,59 @@ Copy it into your project, and change `src/zapatos/schema.d.ts` if your `outDir`
 This project queries Postgres with pgcast, a maintained fork of Zapatos,
 installed under the `zapatos` alias. The index of its docs, each page with its
 URL and summary:
-https://alexandredemartin.github.io/pgcast/llms.txt
+https://pgcast.dev/llms.txt
 For an assistant that reads one whole file, every page in one:
-https://alexandredemartin.github.io/pgcast/llms-full.txt
+https://pgcast.dev/llms-full.txt
 
 - The database is the source of the types. Before writing a query on a table,
   read its columns and their types in `src/zapatos/schema.d.ts`; never guess a
   column. Never edit that file: it is generated.
-  https://alexandredemartin.github.io/pgcast/generator#the-files-it-writes
+  https://pgcast.dev/generator#the-files-it-writes
 - After a migration, run `npx pgcast` to generate the types again, then fix
   what no longer compiles.
-  https://alexandredemartin.github.io/pgcast/first-query#when-the-schema-changes
+  https://pgcast.dev/first-query#when-the-schema-changes
 - Import the run-time code as `import * as db from 'zapatos/db'` and the types
   as `import type * as s from 'zapatos/schema'`, never from `pgcast`.
-  https://alexandredemartin.github.io/pgcast/install
+  https://pgcast.dev/install
 - Prefer the shortcuts to hand-written SQL: `db.select()`, `db.selectOne()`,
   `db.count()` and the other aggregates, `db.insert()`, `db.upsert()`,
   `db.update()`, `db.deletes()`; filters from `db.conditions`; related rows
   through `lateral`.
-  https://alexandredemartin.github.io/pgcast/select
-  https://alexandredemartin.github.io/pgcast/insert
-  https://alexandredemartin.github.io/pgcast/conditions
-  https://alexandredemartin.github.io/pgcast/lateral
+  https://pgcast.dev/select
+  https://pgcast.dev/insert
+  https://pgcast.dev/conditions
+  https://pgcast.dev/lateral
 - Write what no shortcut covers in a `db.sql` template, typed with the table's
   names and its rows: `` db.sql<s.films.SQL, s.films.Selectable[]>`…` ``.
-  https://alexandredemartin.github.io/pgcast/raw-sql
+  https://pgcast.dev/raw-sql
 - Never concatenate a value into SQL, and never pass one to `db.raw()`. A value
   goes in a shortcut's object, in a Whereable (`${{ studio_id }}`) or in
   `db.param()`, and Postgres gets it as a parameter, `$1`.
-  https://alexandredemartin.github.io/pgcast/raw-sql#pass-each-value-as-a-parameter
+  https://pgcast.dev/raw-sql#pass-each-value-as-a-parameter
 - An interpolated string is a table or column name. Never interpolate a string
   from outside the code (a request, a user, a file): map it to a name written
   in the code, and never cast it to make it compile.
-  https://alexandredemartin.github.io/pgcast/raw-sql#choose-sql-at-run-time-from-your-own-constants
+  https://pgcast.dev/raw-sql#choose-sql-at-run-time-from-your-own-constants
 - A shortcut's object and a Whereable take their keys as column names: build
   them from fields you name, never pass a request's body or query whole. An
   empty Whereable is `TRUE`: check that a filter has a key before
   `db.update()` or `db.deletes()`.
-  https://alexandredemartin.github.io/pgcast/raw-sql#pass-each-value-as-a-parameter
+  https://pgcast.dev/raw-sql#pass-each-value-as-a-parameter
 - Run each query on the pool or client you are given; inside a transaction, on
   its `txnClient`. Its callback may run again (40001, 40P01): keep side effects
   out of it.
-  https://alexandredemartin.github.io/pgcast/transaction#transaction
-  https://alexandredemartin.github.io/pgcast/retries#keep-side-effects-out-of-the-callback
+  https://pgcast.dev/transaction#transaction
+  https://pgcast.dev/retries#keep-side-effects-out-of-the-callback
 - Read the SQL of a new query: `.compile()` in place of `.run()` gives
   `{ text, values }` and sends nothing.
-  https://alexandredemartin.github.io/pgcast/sql-template#compile
+  https://pgcast.dev/sql-template#compile
 - Before calling a change done, run the type check, `npx tsc --noEmit`, and fix
   each error in the code, never with `any`, a type assertion (`as` a type;
   `as const` is fine), `@ts-ignore` or `@ts-expect-error`.
-  https://alexandredemartin.github.io/pgcast/ai-assistant#run-the-type-check
+  https://pgcast.dev/ai-assistant#run-the-type-check
 - Write `columns` and `returning` without `as const` (#41): for now it types
   the result as `never`, which is assignable to any type.
-  https://alexandredemartin.github.io/pgcast/select#columns
+  https://pgcast.dev/select#columns
 ```
 
 Put it where your assistant reads its instructions:
