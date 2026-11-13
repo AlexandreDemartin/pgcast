@@ -106,6 +106,15 @@ describe('values are data', () => {
     // a NUL is refused in any text parameter (22021)
     expect(outcomes).toEqual(Object.fromEntries(Object.keys(inputs).map(name => [name, name === 'nul' ? '22021' : 'stored'])));
   });
+
+  it('null stays a NULL parameter, beside a hostile key that stays one column name', async () => {
+    expect(await sql`SELECT ${param(null)}::text AS v, ${{ display_name: null }} AS m FROM ${'users'} WHERE id = 1`.run(t.client)).toEqual([{ v: null, m: null }]);
+    const key = `display_name" IS NULL OR TRUE OR "`;
+    expect(await pgError(t.client, () => sql`SELECT id FROM ${'users'} WHERE ${{ [key]: null }}`.run(t.client))).toEqual({
+      code: '42703', message: `column "${key}" does not exist`,
+    });
+    expect(await adaName()).toBe('Ada');
+  });
 });
 
 describe('with parameters (extended protocol)', () => {
@@ -646,6 +655,31 @@ describe('without parameters (simple protocol)', () => {
     expect(await pgError(t.client, () => q.run(t.client))).toEqual({
       code: '42703', message: `column users.id")); ${update}; does not exist`,
     });
+    expect(await adaName()).toBe('Ada');
+  });
+
+  it('a lateral of an alias that closes its quotes, given parent() with no column, sends no query', async () => {
+    // the alias is the parent table: 6.6.1 wrote it, then threw on `undefined`; now nothing of it is written (R58)
+    const q = db.select('users', all, { alias: `u"; ${update}; --`, lateral: { n: sql`SELECT ${db.parent()} AS result` } } as any);
+    const query = vi.spyOn(t.client, 'query');
+    try {
+      await expect(q.run(t.client)).rejects.toThrow('`db.parent()` with no column has no meaning here');
+      expect(query).not.toHaveBeenCalled();
+    } finally {
+      query.mockRestore();
+    }
+    expect(await adaName()).toBe('Ada');
+  });
+
+  it('a lateral of an alias that closes its quotes, given null as its where, sends no query', async () => {
+    const q = db.select('users', all, { alias: `u"; ${update}; --`, lateral: { n: db.selectOne('users', null as any) } } as any);
+    const query = vi.spyOn(t.client, 'query');
+    try {
+      await expect(q.run(t.client)).rejects.toThrow('Interpolating `null` has no meaning in SQL');
+      expect(query).not.toHaveBeenCalled();
+    } finally {
+      query.mockRestore();
+    }
     expect(await adaName()).toBe('Ada');
   });
 

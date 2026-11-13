@@ -401,6 +401,56 @@ describe('a Parameter in a Whereable or in vals of an array', () => {
   });
 });
 
+describe('null, and parent() with no column', () => {
+  const parentMessage = "`db.parent()` with no column has no meaning here: name the column, `db.parent('id')`, or give it as the value of a Whereable or `vals({…})` key, whose column it then takes.";
+
+  it('a hostile parent table given parent() with no column throws, and none of it reaches the text', () => {
+    // 6.6.1 wrote the quoted table and its `.` before throwing on `undefined` (R58)
+    for (const input of Object.values(hostile)) {
+      const result = { text: '', values: [] };
+      expect(() => sql`SELECT ${db.parent()}`.copy({ parentTable: input }).compile(result)).toThrow(parentMessage);
+      expect(result).toEqual({ text: 'SELECT ', values: [] });
+    }
+  });
+
+  it('a hostile parent table given { id: parent() } stays one quoted name, as before', () => {
+    expect(matrix(v => sql`WHERE ${{ id: db.parent() }}`.copy({ parentTable: v }))).toMatchInlineSnapshot(`
+      {
+        "backslash": "WHERE ("id" = "a\\b"."id")",
+        "comment": "WHERE ("id" = "a/*b"."id")",
+        "dashes": "WHERE ("id" = "a--b"."id")",
+        "dollar": "WHERE ("id" = "a$1b"."id")",
+        "dot": "WHERE ("id" = "a"."b"."id")",
+        "dquote": "WHERE ("id" = "a""b"."id")",
+        "escapedCloses": "WHERE ("id" = "a"" OR TRUE OR ""b"."id")",
+        "escapedDot": "WHERE ("id" = "a"".""b"."id")",
+        "escapedNul": "WHERE ("id" = "a""""<NUL>""""b"."id")",
+        "escapedOdd": "WHERE ("id" = "a""""""b"."id")",
+        "lone": "WHERE ("id" = """"."id")",
+        "mixedEscaped": "WHERE ("id" = "s".a$1."b"" OR TRUE OR ""c"."id")",
+        "nul": "WHERE ("id" = "a<NUL>b"."id")",
+        "prequoted": "WHERE ("id" = "a"."id")",
+        "prequotedCloses": "WHERE ("id" = """a"" OR TRUE OR ""b"""."id")",
+        "prequotedEmpty": "WHERE ("id" = """"."id")",
+        "prequotedEscaped": "WHERE ("id" = "a"" OR TRUE OR ""b"."id")",
+        "qualifiedEscaped": "WHERE ("id" = "s"."a"" OR TRUE OR ""b"."id")",
+        "semicolon": "WHERE ("id" = "a;b"."id")",
+        "squote": "WHERE ("id" = "a'b"."id")",
+        "uescape": "WHERE ("id" = """s"""."U&""a"" UESCAPE '!' || ""b"""."id")",
+        "unicodeCloses": "WHERE ("id" = """s"""."U&""a\\"" OR TRUE OR \\""b"""."id")",
+        "unicodeEscaped": "WHERE ("id" = "s".U&"a\\0022"" OR TRUE OR ""\\0022b"."id")",
+      }
+    `);
+  });
+
+  it('a hostile key given null stays one quoted name, and null one parameter, as before', () => {
+    for (const input of Object.values(hostile)) {
+      expect(sql`${{ [input]: null }}`.compile()).toEqual({ ...sql`${{ [input]: 1 }}`.compile(), values: [null] });
+      expect(sql`${vals({ [input]: null })}`.compile()).toEqual({ text: '$1', values: [null] });
+    }
+  });
+});
+
 describe('shortcut arguments', () => {
   it('the table name is one identifier in "sq_<table>" too: `"` is doubled, `.` does not split', () => {
     // 6.6.1: `AS "sq_my"table"`, a syntax error; a table name 6.6.1 already wrote as one quoted

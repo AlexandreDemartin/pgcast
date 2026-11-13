@@ -5,7 +5,7 @@
 // produces them. Execution: test/integration/core.test.ts.
 // Hostile inputs are the subject of step 1.4 (test/unit/injection.test.ts).
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as db from '../../src/db';
 import { sql, param, raw, cols, vals, parent, self, Default } from '../../src/db';
 import { resetConfig } from '../helpers/config';
@@ -17,6 +17,15 @@ const one = (expression: db.SQL) => sql`${expression}`.compile();
 const thrown = (f: () => unknown) => {
   try { f(); return 'compiled'; } catch (err) { return (err as Error).message; }
 };
+
+/** The class name and message of what calling `f` throws, or 'compiled'. */
+const failure = (f: () => unknown) => {
+  try { f(); return 'compiled'; } catch (err) { return { name: (err as Error).constructor.name, message: (err as Error).message }; }
+};
+
+const
+  nullMessage = 'Interpolating `null` has no meaning in SQL: for a `NULL` value, interpolate `db.param(null)`; to filter on `NULL`, use `db.conditions.isNull`; to match every row, give a shortcut `db.all` as its filter.',
+  parentMessage = "`db.parent()` with no column has no meaning here: name the column, `db.parent('id')`, or give it as the value of a Whereable or `vals({…})` key, whose column it then takes.";
 
 afterEach(resetConfig);
 
@@ -735,9 +744,85 @@ describe('errors', () => {
     expect(() => one(undefined as any)).toThrowErrorMatchingInlineSnapshot(`[Error: Alien object while interpolating SQL: undefined]`);
   });
 
-  it('characterization: null reaches the Whereable branch and throws a TypeError', () => {
-    // characterization: typeof null === 'object', then Object.keys(null) throws, not the alien-object error
-    expect(() => one(null as any)).toThrowErrorMatchingInlineSnapshot(`[TypeError: Cannot convert undefined or null to object]`);
+  it('refuses null with an Error that says what to give instead', () => {
+    // 6.6.1: typeof null === 'object', then Object.keys(null) threw a TypeError (R58)
+    expect(failure(() => one(null as any))).toEqual({ name: 'Error', message: nullMessage });
+  });
+
+  it('refuses null in an array, a condition and the where of a shortcut', () => {
+    expect(failure(() => one([param(1), null] as any))).toEqual({ name: 'Error', message: nullMessage });
+    expect(failure(() => one(db.conditions.not(null as any)))).toEqual({ name: 'Error', message: nullMessage });
+    expect(failure(() => db.select('users', null as any).compile())).toEqual({ name: 'Error', message: nullMessage });
+  });
+
+  it('refuses null before writing anything for it', () => {
+    const result = { text: '', values: [] };
+    expect(failure(() => sql`SELECT ${param(1)}, ${null as any}`.compile(result))).toEqual({ name: 'Error', message: nullMessage });
+    expect(result).toEqual({ text: 'SELECT $1, ', values: [1] });
+  });
+
+  it('rejects run() on null, with no query sent', async () => {
+    const queryable = { query: vi.fn() } as any;
+    await expect(db.select('users', null as any).run(queryable)).rejects.toThrow(nullMessage);
+    expect(queryable.query).not.toHaveBeenCalled();
+  });
+
+  it('null as a value is still a NULL parameter, as in 6.6.1', () => {
+    expect([
+      one({ display_name: null }),
+      one(vals({ display_name: null })),
+      one(vals([1, null])),
+      one(param(null)),
+      one(param(null, 'text')),
+      one({ display_name: db.conditions.eq(null) }),
+      one({ display_name: db.conditions.isIn([null]) }),
+    ]).toMatchInlineSnapshot(`
+      [
+        {
+          "text": "("display_name" = $1)",
+          "values": [
+            null,
+          ],
+        },
+        {
+          "text": "$1",
+          "values": [
+            null,
+          ],
+        },
+        {
+          "text": "$1, $2",
+          "values": [
+            1,
+            null,
+          ],
+        },
+        {
+          "text": "$1",
+          "values": [
+            null,
+          ],
+        },
+        {
+          "text": "CAST($1 AS "text")",
+          "values": [
+            null,
+          ],
+        },
+        {
+          "text": "(("display_name" = $1))",
+          "values": [
+            null,
+          ],
+        },
+        {
+          "text": "(("display_name" IN ($1)))",
+          "values": [
+            null,
+          ],
+        },
+      ]
+    `);
   });
 
   it('refuses self outside a Whereable', () => {
@@ -755,10 +840,41 @@ describe('errors', () => {
     expect(() => one(vals([1, parent('id')]))).toThrowErrorMatchingInlineSnapshot(`[Error: The 'parent' table alias has no meaning here]`);
   });
 
-  it('characterization: parent() with no column and no current column', () => {
-    // characterization: the table and the dot are written before the alien `undefined` throws
+  it('refuses parent() with no column and no current column, saying to name the column', () => {
+    // 6.6.1 threw "Alien object while interpolating SQL: undefined" (R58)
     const q = sql`${parent()}`.copy({ parentTable: 'users' });
-    expect(() => q.compile()).toThrowErrorMatchingInlineSnapshot(`[Error: Alien object while interpolating SQL: undefined]`);
+    expect(failure(() => q.compile())).toEqual({ name: 'Error', message: parentMessage });
+  });
+
+  it('refuses parent() with no column before writing the parent table', () => {
+    // 6.6.1 wrote `"users".` first
+    const result = { text: '', values: [] };
+    expect(failure(() => sql`SELECT ${parent()}`.copy({ parentTable: 'users' }).compile(result))).toEqual({ name: 'Error', message: parentMessage });
+    expect(result.text).toBe('SELECT ');
+  });
+
+  it('refuses parent(null), and parent() in vals([…]) outside a filter, in a lateral subquery', () => {
+    expect(failure(() => sql`${parent(null as any)}`.copy({ parentTable: 'users' }).compile())).toEqual({ name: 'Error', message: parentMessage });
+    expect(failure(() => sql`${vals([parent()])}`.copy({ parentTable: 'users' }).compile())).toEqual({ name: 'Error', message: parentMessage });
+    expect(failure(() => db.select('users', db.all, { lateral: { n: sql`SELECT ${parent()} AS result` } }).compile()))
+      .toEqual({ name: 'Error', message: parentMessage });
+  });
+
+  it('rejects run() on parent() with no column, with no query sent', async () => {
+    const queryable = { query: vi.fn() } as any;
+    await expect(db.select('users', db.all, { lateral: { n: sql`SELECT ${parent()} AS result` } }).run(queryable)).rejects.toThrow(parentMessage);
+    expect(queryable.query).not.toHaveBeenCalled();
+  });
+
+  it('parent() with a column or a current column compiles as before', () => {
+    const nested = sql`${parent('id')}, ${parent('')}, ${{ id: parent() }}, ${{ id: db.conditions.eq(parent()) }}, ${vals({ id: parent() })}`
+      .copy({ parentTable: 'users' });
+    expect(nested.compile()).toMatchInlineSnapshot(`
+      {
+        "text": ""users"."id", "users"."", ("id" = "users"."id"), (("id" = "users"."id")), "users"."id"",
+        "values": [],
+      }
+    `);
   });
 });
 
