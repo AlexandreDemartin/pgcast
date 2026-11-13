@@ -26,6 +26,12 @@ description: 'Simple big wins, nothing shaky: measured gain weighed against adde
 - Each observable behaviour: its compiled SQL (`text` + `values`) and its real execution.
 - Each public type: a positive and a negative case (skill `type-tests`).
 - Outside Pareto, covered in full: escaping and parameterisation (skill `sql-safety`).
+- Nothing Postgres does not promise: a multi-row `RETURNING` is sorted before `toEqual`, a sequence value is read through `RETURNING` (`ROLLBACK` does not undo `nextval`).
+- A compiled result is snapshotted raw, never through `JSON.stringify`, which erases `Date` against string and `undefined` against `null`.
+- A check (a docs checker, `check:agents`, a guard) is first proved in the direction that passes silently: plant near misses of its marker (`<!---`, a plural, case, spacing, an info string), a duplicate, a comment.
+  - A loose detector beside the strict parser fails on any line it sees and cannot read; a scanner is compared with the real parser (markdown-it's `fence` tokens) on every page.
+  - Equality, not `[\s\S]*?` between expected lines, which accepts a dropped one.
+  - Its rule sits in a module a self-check can import alone, not one that pulls in a data loader (#236).
 
 ## Adopting a rule on existing code
 

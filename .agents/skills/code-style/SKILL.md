@@ -49,6 +49,16 @@ const
 - Each feature shows three things side by side: the TypeScript you write, the SQL produced, the type obtained.
 - **A docs page per feature**, in its Diátaxis group: tutorial, how-to, reference or explanation (decided 2026-11-12). Every export keeps its reference entry, checked by the docs build (#137). How to write one, from its template: `website/README.md` § Writing a page.
 
+## Claims
+
+A sentence in the docs, the CHANGELOG, a JSDoc, an issue or a plan states what a run showed (types: skill `type-tests` § A claim about a type; 6.6.1: skill `backward-compat` § Replay, do not reason).
+
+- **A run, not a reading**: the exact code the page shows (`${'films'}`, not `films`), as the call its sentence describes, on the docs schema (a probe write on a table nothing references, or a foreign key stops it); the outer call too (an outer `selectOne()` hides duplicated rows), a chain as the reader writes it, the CLI from `npm pack`. An issue's, a review's or an "Expected" claim is a hypothesis until run.
+- **At more than one value**: another size, isolation level or Postgres version, the empty result (`rows[0]`), a warm pool for a race, a realistic table for a plan (`EXPLAIN (ANALYZE)`), and what node-postgres hands over (`date` as a `Date`, `POINT` as `{ x, y }`; `pg.DatabaseError` from pg 8.6, on its tarballs).
+- **"Every", "only", "never"** are searched for their exceptions (`git grep` the name); "takes only" gets a negative `tsc` probe, "cannot mean anything in SQL" a run in Postgres, "the catalog doesn't say" the catalog table (`pg_constraint`).
+- **A shortened rule keeps its condition**, or links it: a guide that restates a reference, a later version's contract (the narrowest wording of decision 003), a quote of Zapatos (its subject and the clauses around it).
+- **What will move** is tied back: a known defect links its open issue, which gets a comment pointing at the line; no count of a list that grows ("the two opt-ins", a living report's tally).
+
 ## Examples: the film's cast
 
 A new example in the docs, the README, a JSDoc, an issue or a PR uses pgcast's own world (`website/schema.sql`, issue #131), in snake_case, so its columns need no double quotes:
@@ -80,5 +90,6 @@ A new example in the docs, the README, a JSDoc, an issue or a PR uses pgcast's o
 ## Checklist
 
 - [ ] Code in Zapatos's patterns; JSDoc with the SQL produced; an error that says what to do
+- [ ] Each claim from a run, its exceptions searched
 - [ ] A new example in the film world, invented names
 - [ ] The change passes Zapatos's criteria: correct, consistent, comprehensible, small
