@@ -8,6 +8,7 @@ description: "pgcast reads your Postgres schema and writes the TypeScript types.
 
 <div class="landing">
 <section class="hero">
+<div class="hero-text">
 
 <p class="eyebrow">-- a maintained fork of Zapatos 6.6.1</p>
 <h1>Your types, cast from your database<span class="op">::</span></h1>
@@ -22,6 +23,9 @@ pgcast reads your Postgres schema and writes the TypeScript types. Its shortcuts
 </div>
 
 <InstallLine command="npm install zapatos@npm:pgcast" />
+</div>
+
+<SchemaMould table="films" />
 </section>
 
 <CastPanel example="home">
@@ -30,6 +34,17 @@ pgcast reads your Postgres schema and writes the TypeScript types. Its shortcuts
 
 <template #caption><span>Hover a dashed name to see its type.</span><span>Films with their cast, in one query and one round trip.</span></template>
 </CastPanel>
+
+<section class="loop">
+
+## Change a column, and the compiler finds what broke
+
+<SchemaLoop />
+
+The type is regenerated from the changed table, and the error is the compiler's own.
+{.caption}
+
+</section>
 
 <div class="pillars">
 <div>

@@ -10,6 +10,8 @@ import CastPanel from './CastPanel.vue';
 import GroupPages from './GroupPages.vue';
 import InstallLine from './InstallLine.vue';
 import Layout from './Layout.vue';
+import SchemaLoop from './SchemaLoop.vue';
+import SchemaMould from './SchemaMould.vue';
 import SiteFooter from './SiteFooter.vue';
 import './fonts.css';
 import './style.css';
@@ -25,6 +27,8 @@ export default {
     app.component('CastPanel', CastPanel);
     app.component('GroupPages', GroupPages);
     app.component('InstallLine', InstallLine);
+    app.component('SchemaLoop', SchemaLoop);
+    app.component('SchemaMould', SchemaMould);
     app.component('SiteFooter', SiteFooter);
   },
 } satisfies Theme;

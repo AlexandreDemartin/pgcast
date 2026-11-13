@@ -36,6 +36,20 @@ export const lineIndents: Transformer = {
   },
 };
 
+/**
+ * A highlighted block's lines, each given what `mark(line)` returns (from 1): a class, a style. VitePress keeps one
+ * Markdown renderer for the whole build, with the transformers of whoever created it first (`createMarkdownRenderer`):
+ * a loader marks its own blocks on the HTML.
+ */
+export const markLines = (html: string, mark: (line: number) => { class?: string; style?: string }) => {
+  let line = 0;
+  return html.replace(/<span class="line"(?: style="([^"]*)")?>/g, (_, style?: string) => {
+    const { class: extra, style: more } = mark(++line);
+    return `<span class="${['line', extra].filter(Boolean).join(' ')}"` +
+      (style || more ? ` style="${[style, more].filter(Boolean).join(';')}"` : '') + '>';
+  });
+};
+
 /** `$1`, `$2`: Shiki's SQL grammar reads a `$`, then a number. Each becomes one token, in `--p` and bold. */
 export const sqlParameters: Transformer = {
   name: 'pgcast:sql-parameters',

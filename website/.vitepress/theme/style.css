@@ -72,7 +72,9 @@
 /* base */
 body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
-@media (prefers-reduced-motion: reduce) { * { transition: none !important; scroll-behavior: auto !important; } }
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+}
 
 /* top bar: wordmark, version pill, search, links, theme button */
 /* one surface and one rule across the whole width, so the bar reads as one piece: VitePress starts them after the
@@ -240,6 +242,15 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 .InstallLine .copy svg { width: 16px; height: 16px; }
 .InstallLine .copied { font: 12px/1 var(--font-body); color: var(--muted); }
 .landing .CastPanel-frame { margin: 0; }
+/* the hero beside its mould from 960px, both centred on each other; the mould under the hero's text below that */
+.landing .SchemaMould { margin-top: 40px; }
+@media (min-width: 960px) {
+  .landing .hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 48px; align-items: center; }
+  .landing .hero h1 { font-size: clamp(2.5rem, 4.4vw, 4rem); }
+  .landing .SchemaMould { margin-top: 0; }
+}
+.landing .loop { margin: 56px 0 0; }
+.landing .loop h2 { font-size: 1.5rem; margin: 0 0 20px; }
 .landing .pillars {
   display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 32px;
   margin: 56px 0; padding-top: 32px; border-top: 1px solid var(--line);
@@ -265,46 +276,60 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 
 /* the cast panel: what you write, what Postgres runs, what TypeScript knows. Three columns from 1140px wide, where
    what you write and the type fit their columns (the home's, at 1280px and up); under that, what you write and the SQL
-   side by side, the type below; one column under 900px, in a page's reading column as on a narrow screen */
+   side by side, the type below; one column under 900px, in a page's reading column as on a narrow screen. The home's
+   mould and loop are panels of the same make: frame, labels, code */
 .CastPanel-frame { container-type: inline-size; margin: 20px 0 28px; }
-.CastPanel {
+:is(.CastPanel, .SchemaMould, .SchemaLoop) {
   display: grid; grid-template-columns: 1.15fr 1fr 1fr;
   border: 1px solid var(--line); border-radius: 14px; background: var(--surface); overflow: hidden;
 }
-.CastPanel > div { min-width: 0; display: flex; flex-direction: column; border-right: 1px dashed var(--line); }
-.CastPanel > div:last-child { border-right: 0; }
+:is(.CastPanel, .SchemaMould, .SchemaLoop) > div {
+  min-width: 0; display: flex; flex-direction: column; border-right: 1px dashed var(--line);
+}
+:is(.CastPanel, .SchemaMould, .SchemaLoop) > div:last-child { border-right: 0; }
 /* each column's label: a paragraph, not a heading, so that the page's outline skips no level */
-.CastPanel .label {
+:is(.CastPanel, .SchemaMould, .SchemaLoop) .label {
   display: flex; align-items: center; gap: 8px; margin: 0; max-width: none; padding: 12px 16px 10px;
   border-bottom: 1px solid var(--line);
   font: 600 12px/1 var(--font-body); letter-spacing: .02em; color: var(--muted);
 }
-.CastPanel .label em {
+:is(.CastPanel, .SchemaMould, .SchemaLoop) .label em {
   font: 700 11px/1 var(--font-mono); font-style: normal; color: var(--accent);
   border: 1px solid var(--accent); border-radius: 999px; padding: 3px 6px;
 }
-.CastPanel > div > div { flex: 1; min-width: 0; }  /* the code, above the values row */
-.CastPanel div[class*='language-'] { margin: 0; border: 0; border-radius: 0; background: transparent; }
-.CastPanel div[class*='language-'] > .copy, .CastPanel div[class*='language-'] > .lang { display: none; }
+/* the command that writes a column, at the end of its label */
+:is(.SchemaMould, .SchemaLoop) .label .command {
+  margin-left: auto; padding: 0; background: none; font: 500 12px/1 var(--font-mono); color: var(--muted);
+}
+:is(.SchemaMould, .SchemaLoop) .label .command::before { content: "$ "; }
+:is(.CastPanel, .SchemaMould, .SchemaLoop) > div > div { flex: 1; min-width: 0; }  /* the code, above the values row */
+:is(.CastPanel, .SchemaMould, .SchemaLoop) div[class*='language-'] {
+  margin: 0; border: 0; border-radius: 0; background: transparent;
+}
+:is(.CastPanel, .SchemaMould, .SchemaLoop) div[class*='language-'] > :is(.copy, .lang) { display: none; }
 /* a line too long for its column wraps rather than hide its end: no three columns hold all the home's lines at
    1440px, nor one column the reference's longest SQL. It goes on under the line's own text, 2ch further in
    (`--indent`, lineIndents in syntax.ts); a name longer than the column breaks anywhere. */
-.CastPanel pre.shiki { background: transparent !important; margin: 0; padding: 14px 16px; white-space: pre-wrap; }
-.CastPanel pre.shiki code {
+:is(.CastPanel, .SchemaMould, .SchemaLoop) pre.shiki {
+  background: transparent !important; margin: 0; padding: 14px 16px; white-space: pre-wrap;
+}
+:is(.CastPanel, .SchemaMould, .SchemaLoop) pre.shiki code {
   display: block; width: auto; min-width: 0; padding: 0; overflow-wrap: anywhere;
   font: 13px/1.6 var(--font-mono); tab-size: 2; color: var(--fg);
 }
-.CastPanel pre.shiki .line {
+:is(.CastPanel, .SchemaMould, .SchemaLoop) pre.shiki .line {
   display: inline-block; width: 100%;
   padding-left: calc(var(--indent, 0ch) + 2ch); text-indent: calc(-2ch - var(--indent, 0ch));
 }
-.CastPanel pre.shiki .line * { text-indent: 0; }
-.CastPanel .values {
+:is(.CastPanel, .SchemaMould, .SchemaLoop) pre.shiki .line * { text-indent: 0; }
+:is(.CastPanel .values, .SchemaLoop .tsc-error) {
   margin: auto 0 0; max-width: none; padding: 8px 16px; border-top: 1px dashed var(--line);
   font: 12px/1.5 var(--font-mono); color: var(--muted);
 }
 .CastPanel .values b { color: var(--p); font-weight: 700; }
-.CastPanel-caption { display: flex; gap: 16px; flex-wrap: wrap; margin: 12px 0 0; font-size: 13px; color: var(--muted); }
+:is(.CastPanel-caption, .landing .caption) {
+  display: flex; gap: 16px; flex-wrap: wrap; margin: 12px 0 0; font-size: 13px; color: var(--muted);
+}
 @container (max-width: 1139px) {
   .CastPanel { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .CastPanel > div:last-child { grid-column: 1 / -1; border-top: 1px dashed var(--line); }
@@ -314,6 +339,42 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
   .CastPanel > div:last-child { border-top: 0; }
   .CastPanel > div { border-right: 0; border-bottom: 1px dashed var(--line); }
   .CastPanel > div:last-child { border-bottom: 0; }
+}
+
+/* the mould: the table, then its type under it, which pours in line by line, once (`--n`, mould.data.ts) */
+.SchemaMould { grid-template-columns: minmax(0, 1fr); }
+.SchemaMould > div { border-right: 0; }
+.SchemaMould > div + div { border-top: 1px dashed var(--line); }
+.SchemaMould .poured .line {
+  animation: pour 320ms cubic-bezier(.2, .7, .2, 1) both; animation-delay: calc(240ms + var(--n) * 40ms);
+}
+@keyframes pour { from { opacity: 0; transform: translateY(4px); } }
+
+/* the loop: the change, the type's diff, the query and tsc's error, in three columns; under 1140px the change and the
+   diff side by side, the query below; one column under 900px, as the cast panel */
+.SchemaLoop { grid-template-columns: minmax(0, .9fr) minmax(0, 1fr) minmax(0, 1.4fr); }
+/* the diff: each line a band across its column, its mark (- or +) in a gutter of 2ch */
+.SchemaLoop .diff pre.shiki { padding-inline: 0; }
+.SchemaLoop .diff pre.shiki .line { position: relative; padding: 0 16px 0 calc(16px + 4ch + var(--indent, 0ch)); }
+.SchemaLoop .diff .line::before { position: absolute; left: 16px; text-indent: 0; color: var(--muted); }
+.SchemaLoop .diff .line.del { background: var(--sunken); }
+.SchemaLoop .diff .line.del::before { content: "-" / "removed: "; }
+.SchemaLoop .diff .line.ins { background: var(--accent-soft); }
+.SchemaLoop .diff .line.ins::before { content: "+" / "added: "; color: var(--accent); }
+/* tsc's underline; Shiki's own `.shiki span` rule sets every token's decoration */
+.SchemaLoop pre.shiki span.error {
+  text-decoration: underline wavy var(--n) 1px; text-underline-offset: 4px; text-decoration-skip-ink: none;
+}
+.SchemaLoop .tsc-error { margin-top: 0; color: var(--fg); }
+.SchemaLoop .tsc-error b { color: var(--n); font-weight: 700; }
+@media (max-width: 1139px) {
+  .SchemaLoop { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .SchemaLoop > div:last-child { grid-column: 1 / -1; border-top: 1px dashed var(--line); }
+}
+@media (max-width: 900px) {
+  .SchemaLoop { grid-template-columns: minmax(0, 1fr); }
+  .SchemaLoop > div { border-right: 0; }
+  .SchemaLoop > div + div { border-top: 1px dashed var(--line); }
 }
 
 /* hover types, computed by Twoslash: a dashed underline, and a mono tooltip on the surface */
