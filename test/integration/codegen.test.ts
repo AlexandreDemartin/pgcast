@@ -525,8 +525,8 @@ describe('enumOrder', () => {
   });
 
   it('writes an enum of another schema in the same order, with typeEnumsAcrossSchemas', async () => {
-    for (const [enumOrder, union] of [['declared', `('yours' | 'theirs')`], [undefined, `('theirs' | 'yours')`]] as const) {
-      const { ts: schema, customTypeSourceFiles } = await codegen({ ...orderX, typeEnumsAcrossSchemas: true, enumOrder });
+    for (const [order, union] of [[{ enumOrder: 'declared' }, `('yours' | 'theirs')`], [{}, `('theirs' | 'yours')`]] as const) {
+      const { ts: schema, customTypeSourceFiles } = await codegen({ ...orderX, typeEnumsAcrossSchemas: true, ...order });
       const block = tableBlock(schema, 't');
       expect(block).toContain(`r: reel | null;`);
       expect(block).toContain(`a: ${union} | null;`);
@@ -570,7 +570,7 @@ describe('enumOrder', () => {
     // @ts-expect-error 'alphabetical' or 'declared'
     const wrong: Config = { enumOrder: 'declard' };
     void wrong;
-    await expect(codegen({ ...main, enumOrder: 'declard' as Config['enumOrder'] })).rejects
+    await expect(codegen({ ...main, enumOrder: 'declard' as 'declared' })).rejects
       .toThrow(`Unknown enumOrder "declard": use 'alphabetical' (the default) or 'declared'.`);
   });
 });
