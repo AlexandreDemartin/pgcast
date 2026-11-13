@@ -5,7 +5,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
-import { earlyCloser } from './.vitepress/fences.ts';
+import { earlyCloser, fenceClosed, fenceOpened } from './.vitepress/fences.ts';
 import { outline } from './.vitepress/outline.ts';
 
 const
@@ -47,13 +47,15 @@ function anchorsOf(text) {
   const anchors = [];
   let fence = null, comment = false;  // VitePress renders no heading in either
   for (const line of text.split('\n')) {
-    const marker = !comment && line.match(/^\s*(`{3,}|~{3,})/)?.[1];
-    if (marker && fence === null) fence = marker;
-    else if (marker && marker[0] === fence[0] && marker.length >= fence.length) fence = null;
-    else if (fence === null && (comment || /^\s*<!--/.test(line))) {
+    if (fence !== null) {
+      if (fenceClosed(fence, line)) fence = null;
+      continue;
+    }
+    if (comment || /^\s*<!--/.test(line)) {
       comment = !line.replace(/^\s*<!--/, '').includes('-->');
       continue;
     }
+    fence = fenceOpened(line)?.marker ?? null;
     const anchor = fence === null && line.match(/^#{1,6}\s.*\{(?:[^}]*\s)?#([^\s}]+)[^}]*\}\s*$/)?.[1];
     if (anchor) anchors.push(anchor);
   }

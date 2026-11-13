@@ -8,7 +8,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import ts from 'typescript';
 import * as db from 'zapatos/db';
-import { earlyCloser } from './.vitepress/fences.ts';
+import { earlyCloser, fenceClosed, fenceOpened } from './.vitepress/fences.ts';
 
 process.noDeprecation = true;  // a probe may show what pgcast warns about (PGCAST_DEP001): the warning is not news here
 
@@ -137,13 +137,13 @@ function codeSpans(line) {
 async function check(page, lines, problems) {
   let fence = null, checked = 0;
   for (let i = 0; i < lines.length; i++) {
-    const
-      line = lines[i],
-      where = `${page}:${i + 1}`,
-      marker = line.match(/^\s*(`{3,}|~{3,})/)?.[1];
-    if (marker && fence === null) { fence = marker; continue; }
-    if (marker && marker[0] === fence[0] && marker.length >= fence.length) { fence = null; continue; }
-    if (fence !== null) continue;  // a page may show a mark as code
+    const line = lines[i], where = `${page}:${i + 1}`;
+    if (fence !== null) {  // a page may show a mark as code
+      if (fenceClosed(fence, line)) fence = null;
+      continue;
+    }
+    fence = fenceOpened(line)?.marker ?? null;
+    if (fence !== null) continue;
 
     // A mark follows what it checks, glued to it: at the start of a line, VitePress would read it as an HTML block.
     // Any comment that starts like a mark is one, so a near miss (`<!--- probe:`, `<!-- probes:`, `<!-- messages -->`,
@@ -190,7 +190,7 @@ async function check(page, lines, problems) {
       }
       // A block: its lines, `--` comments aside, are the queries the probe sends, all of them, whole and in this order.
       const queries = [];
-      for (i += 2; i < lines.length && !/^\s*```\s*$/.test(lines[i]); i++)
+      for (i += 2; i < lines.length && !fenceClosed('```', lines[i]); i++)
         if (lines[i].trim() !== '' && !/^\s*--/.test(lines[i])) queries.push(lines[i]);
       if (!new RegExp(`^${queries.map(query => pattern(query).source).join('\\n')}$`).test(sql))
         problems.push(`${where}: the block's queries are not all those its probe sends, in order:\n    ` +

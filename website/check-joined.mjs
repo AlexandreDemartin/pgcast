@@ -13,7 +13,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
-import { earlyCloser } from './.vitepress/fences.ts';
+import { earlyCloser, fenceClosed, fenceOpened } from './.vitepress/fences.ts';
 
 const
   root = fileURLToPath(new URL('.', import.meta.url)),
@@ -53,22 +53,22 @@ function joinsOf(page, source, problems) {
   };
   if (!/<!--\s*joined/i.test(source)) return joins;
   source.split('\n').forEach((line, i) => {
-    const at = `${page}:${i + 1}`, trimmed = line.trim();
-    if (fence) {  // inside a fenced block, until a line of at least as many of its backticks or tildes
-      if (trimmed.length >= fence.length && [...trimmed].every(char => char === fence[0])) {
+    const at = `${page}:${i + 1}`;
+    if (fence) {  // inside a fenced block, until its closing marker
+      if (fenceClosed(fence, line)) {
         if (block) add(block, title);
         fence = block = undefined;
       } else block?.push({ text: line, at });
       return;
     }
     const
-      open = line.match(/^\s*(`{3,}|~{3,})(.*)$/),
+      open = fenceOpened(line),
       include = line.match(/^<<< \.\/(examples\/[\w/-]+\.ts)\{ts twoslash\}$/)?.[1],
       joined = line.match(/^\s*<!--\s*joined:\s*(\S+)\s*-->\s*$/)?.[1];
     if (open) {
-      fence = open[1];
-      block = /^ts twoslash\b/.test(open[2].trim()) ? [] : undefined;
-      title = open[2].match(/\[(.+?)\]/)?.[1];
+      fence = open.marker;
+      block = /^ts twoslash\b/.test(open.info) ? [] : undefined;
+      title = open.info.match(/\[(.+?)\]/)?.[1];
     } else if (include) {
       add(readFileSync(root + include, 'utf8').split('\n')
         .map((text, j) => ({ text, at: `${at}: ${include}:${j + 1}` })));
