@@ -136,7 +136,8 @@ async function checkPlaygroundParsers(client) {
         FROM screenings JOIN cinemas ON cinemas.id = cinema_id ORDER BY screenings.id`,
       `SELECT '\\x00ff'::bytea AS bytes, ARRAY['\\x01'::bytea] AS byte_arrays, 'director'::crew_job AS job,
         ARRAY['director'::crew_job] AS jobs, 'A1'::seat_label AS seat, ARRAY['A1'::seat_label] AS seats,
-        '2030-03-01'::date AS day, '0050-03-01'::date AS early, '0001-03-01 BC'::date AS bc, 'infinity'::date AS never`,
+        '2030-03-01'::date AS day, '0050-03-01'::date AS early, '0001-03-01 BC'::date AS bc, 'infinity'::date AS never,
+        '-infinity'::timestamp AS always, ARRAY['infinity'::timestamptz] AS forever`,
     ];
 
   process.env.TZ = 'Asia/Kolkata';

@@ -7,10 +7,13 @@ import { PGlite, types, type ParserOptions, type Results } from '@electric-sql/p
 const
   // `pg`'s `Buffer` from PGlite's bytes: in the playground, globals.ts's stand-in, a `Uint8Array` too
   buffer = (text: string) => Object.setPrototypeOf(types.parsers[types.BYTEA]!(text), Buffer.prototype),
+  // `infinity` and `-infinity` as `pg` gives them, numbers, where PGlite 0.5.13 makes an invalid `Date`
+  infinite = (parse: (text: string) => unknown) => (text: string) =>
+    text === 'infinity' ? Infinity : text === '-infinity' ? -Infinity : parse(text),
   // midnight where the code runs, as `pg` makes a `date`, where PGlite makes it in UTC
   date = (text: string) => {
     const [, year, month, day, bc] = /^(\d+)-(\d\d)-(\d\d)( BC)?$/.exec(text) ?? [];
-    if (year === undefined) return types.parsers[types.DATE]!(text);  // `infinity`, `-infinity`
+    if (year === undefined) return text;
     const parsed = new Date(+year, +month! - 1, +day!);
     parsed.setFullYear(bc ? 1 - +year : +year);  // the year 50 is not 1950
     return parsed;
@@ -22,10 +25,14 @@ const
 
 /**
  * `pg`'s parsers, for the types PGlite parses otherwise: an `int8` is a string in `pg` (a number or a `bigint` in
- * PGlite), a `bytea` a `Buffer`, a `date` local, a `point` `{ x, y }`. PGlite parses an array of each with its
- * element's parser. `interval` and `circle`, which the docs schema does not use, stay text here.
+ * PGlite), a `bytea` a `Buffer`, a `date` local, a `point` `{ x, y }`, an infinite date or timestamp a number. PGlite
+ * parses an array of each with its element's parser. `interval` and `circle`, which the docs schema does not use, stay
+ * text here.
  */
-export const parsers: ParserOptions = { 20: text => text, 17: buffer, 1082: date, 600: point };
+export const parsers: ParserOptions = {
+  20: text => text, 17: buffer, 600: point, 1082: infinite(date),
+  1114: infinite(types.parsers[types.TIMESTAMP]!), 1184: infinite(types.parsers[types.TIMESTAMPTZ]!),
+};
 
 /** Postgres in memory, with `pg`'s parsers, on `schema`. */
 export async function open(schema: string) {
