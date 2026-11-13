@@ -126,6 +126,9 @@ Candidates for a check, a rule or a skill line.
 - #311 — With a `pg` stub of empty classes, `typeofQueryable` falls back to `_connected`: a client an adapter lends sets it `true`, or `db.readCommitted(client, …)` calls `client.connect()`; a parse check misses it, running the docs' examples on the adapter's pool finds it — `branch-reviewer`
 - #311 — A driver adapter is checked both ways against `pg`, rows parsed and values sent, in a time zone east of UTC: PGlite serializes a value by its parameter's type (`toISOString()` puts a local midnight on the day before), and a type created after `create()`, an enum's array, falls to `toString()` — `branch-reviewer`
 - #311 — `JSON.stringify` writes `Infinity`, `NaN` and an invalid `Date` as `null`, like a NULL: a replacer names them, reading `this[key]` to see a `Date` before its `toJSON()` — `branch-reviewer`, `builder`
+- #365 — Headless Chrome on the CLI lays a page out wider than `--window-size` asks: phone-width shots go through the DevTools protocol (`Emulation.setDeviceMetricsOverride`, `setEmulatedMedia`), with Node 22's built-in `WebSocket`, no dependency — `builder`
+- #365 — `vitepress preview` keeps the previous build's hashed assets: restart it after each `docs:build` — `builder`
+- #365 — Our unscoped theme overrides lose to VitePress's scoped rules on the same property: check the computed style, not our CSS — `builder`
 
 ## Minors kept
 
