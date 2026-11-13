@@ -25,7 +25,8 @@ db.setConfig({
 - A key you give as `undefined` is set to `undefined`: it does not go back to its default, and it compiles.
   - After `setConfig({ transactionAttemptsMax: undefined })`, `transaction()` gives up after its first attempt ("… on attempt 1 of undefined, giving up", [#179](https://github.com/AlexandreDemartin/pgcast/issues/179)).
   - After `setConfig({ transactionRetryDelay: undefined })`, every `transaction()` rejects with "TypeError: Cannot destructure property 'minMs' of 'config.transactionRetryDelay' as it is undefined.", and never releases the client it took from a pool ([#182](https://github.com/AlexandreDemartin/pgcast/issues/182)).
-- It returns a copy of the new configuration, as `getConfig()` does, and keeps a copy of the `transactionRetryDelay` you give it: changing either object afterwards changes nothing. Zapatos 6.6.1 returned the configuration itself, and kept your object ([#245](https://github.com/AlexandreDemartin/pgcast/issues/245)).
+- It returns a copy of the new configuration, as `getConfig()` does: changing that object changes nothing. Zapatos 6.6.1 returned the configuration itself ([#245](https://github.com/AlexandreDemartin/pgcast/issues/245)).
+- It keeps the `transactionRetryDelay` object you give it, not a copy: changing its `minMs` or `maxMs` afterwards changes the configuration.
 - An unknown key does not compile (TS2353), and neither does a value of the wrong type (TS2322):
 
 ```ts twoslash
