@@ -28,7 +28,7 @@ export interface Config {
 }
 export type NewConfig = Partial<Config>;
 
-let config: Config = {  // defaults
+const defaults: Config = {
   transactionAttemptsMax: 5,
   transactionRetryDelay: { minMs: 25, maxMs: 250 },
   castArrayParamsToJson: false,
@@ -37,6 +37,8 @@ let config: Config = {  // defaults
   undefinedMeansMissing: false,  // the default in 7.0
   transactionRequiresCommit: false,  // the default in 7.0
 };
+
+let config: Config = { ...defaults };
 
 /**
  * Get (a copy of) the current configuration.
@@ -48,9 +50,12 @@ export const getConfig = () => {
 
 /**
  * Set key(s) on the configuration, and return (a copy of) the new configuration.
+ * A key that has a default and is set to `undefined` (or `null`) goes back to
+ * that default.
  * @param newConfig Partial configuration object
  */
 export const setConfig = (newConfig: NewConfig) => {
   config = { ...config, ...newConfig };
+  (Object.keys(defaults) as (keyof Config)[]).forEach(<K extends keyof Config>(key: K) => { config[key] ??= defaults[key]; });
   return getConfig();
 };

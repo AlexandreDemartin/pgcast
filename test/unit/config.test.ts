@@ -24,13 +24,6 @@ describe('getConfig()', () => {
     expect(db.getConfig().queryListener).toBe(queryListener);
   });
 
-  it('keeps a transactionRetryDelay set to undefined or null as it is', () => {
-    db.setConfig({ transactionRetryDelay: undefined } as unknown as db.NewConfig);  // compiles in a consumer project, not under exactOptionalPropertyTypes
-    expect(db.getConfig().transactionRetryDelay).toBeUndefined();
-    db.setConfig({ transactionRetryDelay: null } as unknown as db.NewConfig);
-    expect(db.getConfig().transactionRetryDelay).toBeNull();
-  });
-
   it('copies minMs and maxMs of a transactionRetryDelay that has them as getters', () => {
     class Delay { get minMs() { return 5; } get maxMs() { return 6; } }
     db.setConfig({ transactionRetryDelay: new Delay() });
@@ -46,6 +39,44 @@ describe('setConfig()', () => {
     returned.transactionRetryDelay.minMs = 1;
     expect(db.getConfig().transactionAttemptsMax).toBe(3);
     expect(db.getConfig().transactionRetryDelay).toEqual({ minMs: 25, maxMs: 250 });
+  });
+
+  // #246: a key set to undefined compiles in a consumer project, not under exactOptionalPropertyTypes (hence the casts)
+  const defaults = {
+    transactionAttemptsMax: 5,
+    transactionRetryDelay: { minMs: 25, maxMs: 250 },
+    castArrayParamsToJson: false,
+    castObjectParamsToJson: false,
+    upsertRequiresSameKeys: false,
+    undefinedMeansMissing: false,
+    transactionRequiresCommit: false,
+  };
+  const changed = {
+    transactionAttemptsMax: 2,
+    transactionRetryDelay: { minMs: 0, maxMs: 0 },
+    castArrayParamsToJson: true,
+    castObjectParamsToJson: true,
+    upsertRequiresSameKeys: true,
+    undefinedMeansMissing: true,
+    transactionRequiresCommit: true,
+  };
+
+  it.each([undefined, null])('sets a key that has a default back to it when given as %s', value => {
+    expect(db.setConfig(changed)).toMatchObject(changed);
+    const unset = Object.fromEntries(Object.keys(defaults).map(key => [key, value])) as unknown as db.NewConfig;
+    expect(db.setConfig(unset)).toMatchObject(defaults);
+    expect(db.getConfig()).toMatchObject(defaults);
+  });
+
+  it('keeps a falsy value it is given: a transactionAttemptsMax of 0 stays 0', () => {
+    expect(db.setConfig({ transactionAttemptsMax: 0 }).transactionAttemptsMax).toBe(0);
+    expect(db.getConfig().transactionAttemptsMax).toBe(0);
+  });
+
+  it('removes a listener given as undefined: it has no default', () => {
+    db.setConfig({ queryListener: () => undefined });
+    db.setConfig({ queryListener: undefined } as unknown as db.NewConfig);
+    expect(db.getConfig().queryListener).toBeUndefined();
   });
 
   it('keeps the transactionRetryDelay it is given, as Zapatos 6.6.1 does: changing it later changes the config', () => {

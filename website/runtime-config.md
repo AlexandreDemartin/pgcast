@@ -22,9 +22,8 @@ db.setConfig({
 ```
 
 - The merge is one level deep: `transactionRetryDelay` is replaced whole, so the type needs both `minMs` and `maxMs`.
-- A key you give as `undefined` is set to `undefined`: it does not go back to its default, and it compiles.
-  - After `setConfig({ transactionAttemptsMax: undefined })`, `transaction()` gives up after its first attempt ("… on attempt 1 of undefined, giving up", [#179](https://github.com/AlexandreDemartin/pgcast/issues/179)).
-  - After `setConfig({ transactionRetryDelay: undefined })`, every `transaction()` rejects with "TypeError: Cannot destructure property 'minMs' of 'config.transactionRetryDelay' as it is undefined.", and never releases the client it took from a pool ([#182](https://github.com/AlexandreDemartin/pgcast/issues/182)).
+- A key that has a default and that you give as `undefined` (or `null`) goes back to its default: `setConfig({ transactionRetryDelay: undefined })` sets `{ minMs: 25, maxMs: 250 }`. A listener has none, so `undefined` removes it. Giving `undefined` compiles, except under `exactOptionalPropertyTypes`.
+  - Zapatos 6.6.1 set the key to `undefined`. After `transactionAttemptsMax: undefined`, `transaction()` gave up after its first attempt ("… on attempt 1 of undefined, giving up"); after `transactionRetryDelay: undefined`, every `transaction()` rejected with "TypeError: Cannot destructure property 'minMs' of 'config.transactionRetryDelay' as it is undefined." and never released the client it took from a pool ([#246](https://github.com/AlexandreDemartin/pgcast/issues/246)).
 - It returns a copy of the new configuration, as `getConfig()` does: changing that object changes nothing. Zapatos 6.6.1 returned the configuration itself ([#245](https://github.com/AlexandreDemartin/pgcast/issues/245)).
 - It keeps the `transactionRetryDelay` object you give it, not a copy: changing its `minMs` or `maxMs` afterwards changes the configuration.
 - An unknown key does not compile (TS2353), and neither does a value of the wrong type (TS2322):
@@ -78,7 +77,7 @@ interface Config {
 }
 ```
 
-The keys pgcast adds are optional, so a `Config` written for Zapatos 6.6.1 still compiles; `getConfig()` types them `boolean | undefined`, though it always gives a value unless set to `undefined`. No option changes a type.
+The keys pgcast adds are optional, so a `Config` written for Zapatos 6.6.1 still compiles; `getConfig()` types them `boolean | undefined`, though it always gives a value. No option changes a type.
 
 | Option | Default | What it changes | Read |
 |---|---|---|---|
