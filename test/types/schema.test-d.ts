@@ -97,8 +97,9 @@ describe('enum', () => {
     void i;
   });
 
-  test('characterization: another schema (products.status, extra.status) is `any`', () => {
-    // characterization: typed c.PgStatus, an `any` placeholder; any value is accepted
+  test('another schema (products.status, extra.status) is `any` without typeEnumsAcrossSchemas', () => {
+    // typed c.PgStatus, an `any` placeholder; any value is accepted. With the option, the labels of extra.status:
+    // integration/codegen › typeEnumsAcrossSchemas: an enum of another schema takes its labels, and only them
     expectTypeOf<s.products.Selectable['status']>().toBeAny();
     const i: s.products.Insertable = { sku: 'x', price_cents: 1, status: 'no such label' };
     void i;
