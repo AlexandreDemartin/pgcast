@@ -57,14 +57,13 @@ function defineTheme() {
     // `#rrggbb`: the build minifies `#ffffff` to `#fff`, which Monaco refuses
     token = (name: string) => style.getPropertyValue(`--${name}`).trim().replace(/^#(.)(.)(.)$/, '#$1$1$2$2$3$3'),
     // a rule's colour is written without its `#`
-    rule = (scope: string, colour: string, fontStyle?: string) =>
-      ({ token: scope, foreground: token(colour).slice(1), fontStyle });
+    rule = (scope: string, colour: string) => ({ token: scope, foreground: token(colour).slice(1) });
 
   monaco.editor.defineTheme('pgcast', {
     base: document.documentElement.classList.contains('dark') ? 'vs-dark' : 'vs',
     inherit: true,
     rules: [
-      rule('', 'fg'), rule('comment', 'c', 'italic'), rule('keyword', 'k'), rule('string', 's'), rule('regexp', 's'),
+      rule('', 'fg'), rule('comment', 'c'), rule('keyword', 'k'), rule('string', 's'), rule('regexp', 's'),
       rule('number', 'n'), rule('type', 't'), rule('delimiter', 'fg'), rule('identifier', 'fg'),
     ],
     colors: {
@@ -85,9 +84,6 @@ function defineTheme() {
       'focusBorder': token('accent'),
       // brackets are punctuation (syntax.ts), not a colour per pair
       ...Object.fromEntries([1, 2, 3, 4, 5, 6].map(n => [`editorBracketHighlight.foreground${n}`, token('fg')])),
-      'scrollbarSlider.background': token('line'),
-      'scrollbarSlider.hoverBackground': token('muted'),
-      'scrollbarSlider.activeBackground': token('muted'),
     },
   });
   monaco.editor.setTheme('pgcast');
@@ -174,7 +170,8 @@ onMounted(async () => {
     lineNumbers: 'off', glyphMargin: false, folding: false, lineDecorationsWidth: 16, padding: { top: 14, bottom: 14 },
     minimap: { enabled: false }, overviewRulerLanes: 0, hideCursorInOverviewRuler: true, renderLineHighlight: 'none',
     guides: { indentation: false }, stickyScroll: { enabled: false }, scrollBeyondLastLine: false,
-    scrollbar: { alwaysConsumeMouseWheel: false, horizontalScrollbarSize: 8, useShadows: false },
+    // a line too long wraps 2ch further in, as in a cast panel: no line is cut
+    wordWrap: 'on', wrappingIndent: 'indent', scrollbar: { alwaysConsumeMouseWheel: false, useShadows: false },
     automaticLayout: true, fixedOverflowWidgets: true, overflowWidgetsDomNode: overflow,
   });
   observer.observe(document.documentElement, { attributeFilter: ['class'] });

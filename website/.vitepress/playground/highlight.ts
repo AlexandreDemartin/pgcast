@@ -6,9 +6,12 @@ const
   escape = (text: string) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'),
   span = (text: string, colour = 'fg', bold = false) =>
     `<span style="color:var(--${colour})${bold ? ';font-weight:bold' : ''}">${escape(text)}</span>`,
-  block = (lang: string, lines: string[]) =>
-    `<div class="language-${lang}"><pre class="shiki pgcast" tabindex="0"><code>${
-      lines.map(line => `<span class="line">${line}</span>`).join('\n')}</code></pre></div>`;
+  // each line with its indent, as `lineIndents` (syntax.ts) gives it: a line too long wraps under its own text
+  block = (lang: string, text: string, highlight: (line: string) => string) =>
+    `<div class="language-${lang}"><pre class="shiki pgcast" tabindex="0"><code>${text.split('\n').map(line => {
+      const indent = /^ */.exec(line)![0].length;
+      return `<span class="line"${indent ? ` style="--indent:${indent}ch"` : ''}>${highlight(line)}</span>`;
+    }).join('\n')}</code></pre></div>`;
 
 function colour(line: string, tokens: RegExp, colourOf: (match: RegExpExecArray) => [string, boolean?] | undefined) {
   let html = '', at = 0;
@@ -22,18 +25,18 @@ function colour(line: string, tokens: RegExp, colourOf: (match: RegExpExecArray)
 }
 
 /** pgcast's SQL: keywords in capitals, quoted identifiers as plain text, strings, numbers, and `$1` in bold. */
-export const sqlHtml = (sql: string) => block('sql', sql.split('\n').map(line => colour(line,
+export const sqlHtml = (sql: string) => block('sql', sql, line => colour(line,
   /("(?:[^"]|"")*")|('(?:[^']|'')*')|(\$\d+)|\b([A-Z][A-Z_]*)\b|\b(\d+(?:\.\d+)?)\b/g,
   ([, identifier, string, parameter, keyword]) =>
-    identifier ? ['qi'] : string ? ['s'] : parameter ? ['p', true] : keyword ? ['k'] : ['n'])));
+    identifier ? ['qi'] : string ? ['s'] : parameter ? ['p', true] : keyword ? ['k'] : ['n']));
 
 /**
  * A hover type, `const film: films.JSONSelectable | undefined`, and its `// that is` line: `const` and the type
  * operators as keywords, each name in the type as a type, a property's name and punctuation as plain text.
  */
-export const typeHtml = (type: string) => block('ts', type.split('\n').map(line => line.startsWith('//') ?
+export const typeHtml = (type: string) => block('ts', type, line => line.startsWith('//') ?
   span(line, 'c') :
   colour(line,
     /("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')|\b(\d+(?:\.\d+)?)\b|\b(const|readonly|typeof|keyof|unique|infer)\b|\b[A-Za-z_$][\w$]*(?=\??:)|([A-Za-z_$][\w$]*)/g,
     ([, string, number, keyword, name]) =>
-      string ? ['s'] : number ? ['n'] : keyword ? ['k'] : name ? ['t'] : undefined)));
+      string ? ['s'] : number ? ['n'] : keyword ? ['k'] : name ? ['t'] : undefined));
