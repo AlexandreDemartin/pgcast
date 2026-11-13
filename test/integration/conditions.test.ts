@@ -90,6 +90,47 @@ describe('on users', () => {
     expect(await ids('users', { id: dc.not(dc.or(dc.eq(1), dc.eq(2))) })).toEqual([3]);
   });
 
+  // `and()` puts each operand in parentheses; 6.6.1 wrote `("id" = 1 OR "id" = 2 AND …)`, read `"id" = 1 OR ("id" = 2 AND …)`
+  it.each([
+    ['a fragment, then a Whereable', dc.and(sql`${'id'} = 1 OR ${'id'} = 2`, { manager_id: 1 }), [2]],
+    ['a Whereable, then a fragment', dc.and({ manager_id: 1 }, sql`${'id'} = 2 OR ${'id'} = 1`), [2]],
+    ['two fragments', dc.and(sql`${'id'} = 1 OR ${'id'} = 2`, sql`${'id'} = 2 OR ${'id'} = 3`), [2]],
+    ['as a Whereable value, with self', { id: dc.and(sql`${db.self} = 1 OR ${db.self} = 2`, dc.gt(1)) }, [2]],
+    ['under or()', dc.or(dc.and(sql`${'id'} = 1 OR ${'id'} = 2`, { manager_id: 1 }), { id: 3 }), [2, 3]],
+    ['under not()', dc.not(dc.and(sql`${'id'} = 1 OR ${'id'} = 2`, { manager_id: 1 })), [1, 3]],
+  ] as [string, db.SQL, number[]][])('and() parenthesises a fragment with a bare OR: %s', async (_name, where, expected) => {
+    expect(await ids('users', where)).toEqual(expected);
+  });
+
+  it('and() parenthesises a fragment with a bare OR: the rows update() writes', async () => {
+    // 6.6.1 updated user 1 too, who has no manager
+    expect(await db.update('users', { display_name: 'Bea' }, dc.and(sql`${'id'} = 1 OR ${'id'} = 2`, { manager_id: 1 }), { returning: ['id'] })
+      .run(t.client)).toEqual([{ id: 2 }]);
+  });
+
+  it('and() parenthesises a fragment with a bare OR: in a lateral, beside parent()', async () => {
+    // 6.6.1 gave account 3 to every user
+    expect(await db.select('users', db.all, {
+      columns: ['id'], order: { by: 'id', direction: 'ASC' },
+      lateral: {
+        accounts: db.select('accounts', dc.and({ owner_id: db.parent('id') }, sql`${'id'} = 1 OR ${'id'} = 3`),
+          { columns: ['id'], order: { by: 'id', direction: 'ASC' } }),
+      },
+    }).run(t.client)).toEqual([{ id: 1, accounts: [{ id: 1 }] }, { id: 2, accounts: [{ id: 3 }] }, { id: 3, accounts: [] }]);
+  });
+
+  it('and() parenthesises a fragment with a bare OR: in a having', async () => {
+    // owner 1 has two accounts, the larger 1500.50; owner 2 one, at 0; 6.6.1 kept owner 1 too
+    expect(await db.select('accounts', db.all, {
+      columns: ['owner_id'], groupBy: 'owner_id', order: { by: 'owner_id', direction: 'ASC' },
+      having: dc.and(sql`count(*) > 1 OR min(${'balance'}) = 0`, sql`max(${'balance'}) < 100`),
+    }).run(t.client)).toEqual([{ owner_id: 2 }]);
+  });
+
+  it('or() matches the same rows whatever its operands: AND binds tighter than OR', async () => {
+    expect(await ids('users', dc.or(sql`${'id'} = 1 AND ${'manager_id'} = 1`, sql`${'id'} = 2 OR ${'id'} = 3`))).toEqual([2, 3]);
+  });
+
   // `and()` is TRUE and `or()` FALSE, as a Whereable `{}` is TRUE; 6.6.1 wrote `()`: each case was 42601 there
   it.each([
     ['and()', dc.and(), [1, 2, 3]],
