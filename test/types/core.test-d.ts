@@ -178,6 +178,41 @@ describe('type surprises', () => {
     expectTypeOf([r, n, v, x, p]).not.toBeAny();
   });
 
+  test('cols(x) and vals(x) are refused where a ParentColumn stands, parent() and param(x) still accepted', () => {
+    // ParentColumn is all-optional ({ value?: Column }): cols(x) and vals(x) of a column name, or of undefined, fit it
+    // without its tag; each throws at run time (test/integration/core.test.ts, "raw(), cols(x) and vals(x) as a filter
+    // value reject run()")
+    // @ts-expect-error cols(x) is no ParentColumn: in eq()
+    db.select('users', { id: c.eq(db.cols('id')) });
+    // @ts-expect-error vals(x) is no ParentColumn: in isIn()
+    db.select('users', { id: c.isIn([db.vals('email')]) });
+    // @ts-expect-error vals(undefined) is no ParentColumn: in a Whereable
+    db.select('users', { display_name: db.vals(undefined) });
+    // @ts-expect-error cols(undefined) neither
+    db.select('users', { display_name: db.cols(undefined) });
+    // @ts-expect-error cols(x) in isNotIn()
+    db.select('users', { id: c.isNotIn([db.cols('id')]) });
+    // @ts-expect-error vals(undefined) in ne()
+    db.select('users', { id: c.ne(db.vals(undefined)) });
+    // @ts-expect-error vals(undefined) in a lateral subquery
+    db.select('users', db.all, { lateral: { n: db.count('accounts', { owner_id: db.vals(undefined) }) } });
+    // @ts-expect-error vals(undefined) as the ParentColumn of arrayContains()
+    db.select('accounts', { scores: c.arrayContains(db.vals(undefined)) });
+    // @ts-expect-error cols(undefined) as the ParentColumn of arrayOverlaps()
+    db.select('accounts', { scores: c.arrayOverlaps(db.cols(undefined)) });
+    // @ts-expect-error a ColumnNames is no ParentColumn
+    const n: db.ParentColumn = db.cols('id' as const);
+    db.select('users', { id: db.parent('id'), display_name: db.parent() });
+    db.select('users', { id: c.eq(db.parent('id')), email: c.isIn([db.parent('email'), 'a@b']) });
+    db.select('users', { id: c.isNotIn([db.parent('id'), db.param(2)]) });
+    db.select('users', { id: db.param(1), email: c.eq(db.param('a@b')), mood: c.isIn([db.param('ok' as const)]) });
+    db.select('users', db.all, { lateral: { n: db.count('accounts', { owner_id: db.parent('id') }) } });
+    db.select('accounts', { scores: c.arrayContains(db.parent('scores')) });
+    const p: db.ParentColumn = db.parent('id');
+    const q: db.ParentColumn = db.param('id' as const);
+    expectTypeOf([n, p, q]).not.toBeAny();
+  });
+
   test('cols(x) and vals(x) of any value are still accepted in a sql template', () => {
     // a Parameter<any> accepted them before the tag that refuses them as values
     const ids: readonly number[] = [1, 2];
