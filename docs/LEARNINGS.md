@@ -56,6 +56,11 @@ Candidates for a check, a rule or a skill line.
 - #34 — To make a shortcut throw while compiling, so `.run()` rejects, put a fragment whose `compile` throws inside the returned query's expressions; overriding the query's own `compile` is lost when a parent `lateral` calls `copy()` — `builder`
 - #34 — A throw moved from a `.run()` rejection to a synchronous call escapes a `.catch()` attached to `.run()`: refusals throw while compiling — orchestrator
 - #34 — `git commit --no-edit` on a conflicted merge keeps the `# Conflicts:` lines; give `-m` again at commit time — `builder`
+- #36 — The issue's « non-breaking: Postgres refused these queries » held only when the cast names the column's own type: a fix that reorders branches in `compileExpression` gets its issue note replayed before the class is written — `builder`
+- #36 — When a branch reads several config flags, test each flag alone against each kind of value: a mutant that ORs the flags must fail (two passed 293 tests) — `branch-reviewer`
+- #36 — When the code's rule is about how a name is written (ends with `[]`), the docs state that rule, not the database idea behind it (« an array type »): `_int4` and a domain over an array take the other branch — `branch-reviewer`
+- #36 — A « calls that change » list comes from a replayed grid that includes a bare SELECT and a function argument, not only column writes; a classifier over its output turns « every changed cell is named » into a check — `branch-reviewer`, `builder`
+- #36 — A replay of thousands of writes under `SAVEPOINT`s in one transaction runs out of shared memory (53200) and turns every later cell into an error: one transaction per cell, and the harness fails on 53200 — `branch-reviewer`
 
 ## Minors kept
 
@@ -79,3 +84,5 @@ Minor review defects, taken up by the end-of-chapter review.
 - #96 — `test/integration/conditions.test.ts:93`: no test pins the `BETWEEN` split's 42601; `website/switching.md:79` does not list it among the changed calls — `branch-reviewer`
 - #37 — `src/db/core.ts` (JSDoc of `param()` and `Parameter`): the bounds sentence sits in the « Without a `"` » case, so « With a `"`, the type is written as is » reads as if bounds stay inside; say a name holding a `.` or ending with `[]` is given already quoted — `branch-reviewer`
 - #34 — `docs/CHARACTERISATION-REPORT.md` (R25): the class cell reads plain « non-breaking »; « except a user aggregate overloading a built-in name with another arity, and a refused aggregate marked `noop` », as R28 does — `builder`
+- #36 — `CHANGELOG.md:112`: `'_int4'` failed on 6.6.1 into any array column, not only `int4[]`; « fails wherever it stands » does not hold for a `json`/`jsonb` column — `branch-reviewer`
+- #36 — `test/unit/core.test.ts:290`, `docs/CHARACTERISATION-REPORT.md:89`: the title « an array type sends the array » keeps the wording the PR removed elsewhere — `branch-reviewer`
