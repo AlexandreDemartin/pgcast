@@ -25,6 +25,7 @@ export const outline = [
       { text: 'Use custom types and domains', link: '/custom-types' },
       { text: 'Write raw SQL safely', link: '/raw-sql' },
       { text: 'Handle errors', link: '/handle-errors' },
+      { text: 'Test code that uses pgcast', link: '/testing' },
       { text: 'Use an AI assistant', link: '/ai-assistant' },
     ],
   },
