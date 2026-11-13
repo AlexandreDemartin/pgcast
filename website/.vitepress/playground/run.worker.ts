@@ -34,10 +34,15 @@ const
   shownRows = 50,
   message = (error: unknown) => error instanceof Error ? `${error.name}: ${error.message}` : String(error),
   module = (code: string) => URL.createObjectURL(new Blob([code], { type: 'text/javascript' })),
-  // a `bytea` as Postgres writes it, a `bigint` as digits: JSON has neither
-  json = (value: unknown) => JSON.stringify(value, (_, item) => item instanceof Uint8Array ?
-    '\\x' + Array.from(item, byte => byte.toString(16).padStart(2, '0')).join('') :
-    typeof item === 'bigint' ? String(item) : item, 2),
+  // a `bytea` as Postgres writes it, a `bigint` as digits, `Infinity`, `-Infinity` and `NaN` (an infinite date, a
+  // `float8`) by name, an invalid `Date` as such: JSON has none of them, and would write the last two as `null`
+  json = (value: unknown) => JSON.stringify(value, function (this: Record<string, unknown>, key, item: unknown) {
+    const original = this[key];  // before its `toJSON()`, which makes an invalid `Date` `null`
+    return original instanceof Date && isNaN(original.getTime()) ? 'Invalid Date' :
+      typeof item === 'number' && !isFinite(item) ? String(item) :
+        item instanceof Uint8Array ? '\\x' + Array.from(item, byte => byte.toString(16).padStart(2, '0')).join('') :
+          typeof item === 'bigint' ? String(item) : item;
+  }, 2),
   /** The query as its panel shows it, kept with the others. */
   record = ({ text, values = [] }: QueryConfig) => {
     const sql = layOut(text);
