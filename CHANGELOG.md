@@ -107,6 +107,13 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
   - `param(obj, 'text')` into a `json` or `jsonb` column is refused (42804), under `castObjectParamsToJson`. Write `param(obj, 'jsonb')`, or no cast.
   - `param(x, 'jsonb')` into a `json` or `text` column stores jsonb's spacing, `[1, 2]` where it stored `[1,2]`. Write `param(x, 'json')`, or no cast.
   - `param(arr, '_int4')` still sends JSON, which its cast now refuses (22P02, `malformed array literal`); 6.6.1 sent it as `json`, which an `int4[]` column refused (42804, 42883). Write `param(arr, 'int4[]')`.
+- `count()`, `sum()`, `avg()`, `min()` and `max()` throw while compiling on three options that Zapatos 6.6.1 compiled to SQL Postgres refuses, so `.run()` rejects with a plain `Error`, not a `DatabaseError`, before any query; `.compile()` throws it. Building the query does not throw, so a `.catch()` attached to `.run()` gets the error, and a query that nests one, in a `lateral` or `extras`, rejects too. The type is unchanged.
+  - `sum()`, `avg()`, `min()` or `max()` without `columns`: 6.6.1 sent `sum(*)` (42883). The error is "sum() needs one column to aggregate: pass columns: ['column']".
+  - `columns` with several columns, or none: 6.6.1 sent `count("id", "mood")` (42883) or `count()` (42809). The error is "count() takes one column in columns, not 2 (leave columns out for count(*))".
+  - A single query as `lateral`: 6.6.1 sent `SELECT  AS result` (42601). The error is "count() cannot pass a lateral query through: nest it in the lateral of a select() instead".
+  - Changed: an aggregate of your own that takes another number of arguments under a built-in name ran. After `CREATE AGGREGATE max(int4, int4) (…)`, `max('ratings', db.all, { columns: ['stars', 'votes'] })` sent `max("stars", "votes")`; it now rejects. `select('ratings', db.all, { columns: ['stars', 'votes'] }, SelectResultMode.Numeric, 'max')` sends the same SQL.
+  - Changed: a refused aggregate marked `noop` resolved to its `noopResult`; it now rejects, as `run()` compiles the query before it reads `noop`.
+  - Unchanged: every other call that ran, a `lateral` map included, and `select()` in `SelectResultMode.Numeric`, which keeps several columns for an aggregate of several arguments (`corr("rating", "minutes")`).
 
 ## [6.6.2] - 2026-11-12
 

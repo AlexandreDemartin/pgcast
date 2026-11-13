@@ -49,6 +49,13 @@ Candidates for a check, a rule or a skill line.
 - #37 — The obvious end-anchored regex for trailing brackets is quadratic in V8: time it before planning, and scan from the end — `builder`
 - #37 — After a merge from master, compare `git diff <master tip> <merge>` with `git diff <merge base> <branch tip>` (`+`/`-` lines only): identical means the merge kept both sides unchanged — `branch-reviewer`
 - #37 — A mutation applied by matching the source text survives the line numbers a merge moves; line numbers quoted in a PR body go stale — `branch-reviewer`
+- #34 — Narrowing a shortcut's type parameter below Zapatos 6.6.1's exported generic (`LateralOption<C, E>`) breaks every options value typed with it; a compat grid includes values typed through the exported generics, generic forwarders and hand-written signatures, not only literals — `branch-reviewer`
+- #34 — A type parameter's constraint is checked on each member of a union: refusing one tuple shape refuses every union holding it; the grid has a union case per refused shape — `branch-reviewer`
+- #34 — A grid proof pastes the per-line output and a `diff` against the 6.6.1 tarball's own errors, never a count: 6.6.1 itself refuses some shapes — `branch-reviewer`, `builder`
+- #34 — Before calling SQL « refused by Postgres, so no call ever ran », check user overloads on the `search_path`: an unqualified built-in name (`max`, `count`) resolves to a user aggregate of another arity — `branch-reviewer`
+- #34 — To make a shortcut throw while compiling, so `.run()` rejects, put a fragment whose `compile` throws inside the returned query's expressions; overriding the query's own `compile` is lost when a parent `lateral` calls `copy()` — `builder`
+- #34 — A throw moved from a `.run()` rejection to a synchronous call escapes a `.catch()` attached to `.run()`: refusals throw while compiling — orchestrator
+- #34 — `git commit --no-edit` on a conflicted merge keeps the `# Conflicts:` lines; give `-m` again at commit time — `builder`
 
 ## Minors kept
 
@@ -71,3 +78,4 @@ Minor review defects, taken up by the end-of-chapter review.
 - #96 — `CHANGELOG.md:84`: « only the parentheses of the next line change » — `or()` does not change at all, and the next line changes rows for a bare `OR` — `branch-reviewer`
 - #96 — `test/integration/conditions.test.ts:93`: no test pins the `BETWEEN` split's 42601; `website/switching.md:79` does not list it among the changed calls — `branch-reviewer`
 - #37 — `src/db/core.ts` (JSDoc of `param()` and `Parameter`): the bounds sentence sits in the « Without a `"` » case, so « With a `"`, the type is written as is » reads as if bounds stay inside; say a name holding a `.` or ending with `[]` is given already quoted — `branch-reviewer`
+- #34 — `docs/CHARACTERISATION-REPORT.md` (R25): the class cell reads plain « non-breaking »; « except a user aggregate overloading a built-in name with another arity, and a refused aggregate marked `noop` », as R28 does — `builder`
