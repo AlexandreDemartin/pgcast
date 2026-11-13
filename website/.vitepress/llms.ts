@@ -28,6 +28,7 @@ export async function writeLlmsFiles(config: SiteConfig) {
       return { link, source, title: inline(title, linksOf(link)), lede: inline(lede, linksOf(link)) };
     },
     home = read('/')!,
+    changelog = read('/changelog')!,  // not in the outline: under llms.txt's "Optional", and not in llms-full.txt
     groups = outline.map(group => ({
       text: group.text,
       pages: [group.link, ...group.items.map(item => item.link)].map(read).filter(page => page !== undefined),
@@ -40,6 +41,7 @@ export async function writeLlmsFiles(config: SiteConfig) {
     `> ${config.site.description} ${home.lede}`,
     ...groups.map(({ text, pages }) =>
       `## ${text}\n\n` + pages.map(({ link, title, lede }) => `- [${title}](${url(link)}): ${lede}`).join('\n')),
+    `## Optional\n\n- [${changelog.title}](${url(changelog.link)}): ${changelog.lede}`,
   ].join('\n\n') + '\n');
 
   for (const { link, source } of [home, ...groups.flatMap(group => group.pages)]) {
