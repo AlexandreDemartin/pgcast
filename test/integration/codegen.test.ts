@@ -83,6 +83,12 @@ const codegen = (config: Config) => tsForConfig(finaliseConfig({ ...config, ...q
 const customFiles = (files: Record<string, string>) =>
   Object.keys(files).sort().map(name => `// ===== custom/${name}.d.ts =====\n${files[name]}`).join('\n');
 
+/** The namespace of `table` in a generated schema, up to its last type. */
+const tableBlock = (schema: string, table: string) => {
+  const start = schema.indexOf(`export namespace ${table} {`);
+  return schema.slice(start, schema.indexOf('\n  }\n', schema.indexOf('export type SQL = ', start)));
+};
+
 describe('tsForConfig()', () => {
   it.each(variants)('%s', async (name, config) => {
     const { ts: schema, customTypeSourceFiles } = await codegen(config);
@@ -137,11 +143,6 @@ describe('variant snapshots', () => {
 });
 
 describe('surprises, frozen as they are', () => {
-  const tableBlock = (schema: string, table: string) => {
-    const start = schema.indexOf(`export namespace ${table} {`);
-    return schema.slice(start, schema.indexOf('\n  }\n', schema.indexOf('export type SQL = ', start)));
-  };
-
   it('sorts enum values alphabetically, not in declaration order (enumsortorder)', async () => {
     const { ts: schema } = await codegen(main);
     expect(schema).toContain(`export type mood = 'happy' | 'ok' | 'sad';`);  // declared: 'sad', 'ok', 'happy'
@@ -163,12 +164,6 @@ describe('surprises, frozen as they are', () => {
       'People who can sign in', 'Users not currently sad', 'Balances per owner, refreshed on demand',
       'Second application schema', 'How a user feels', 'Case-insensitive e-mail address',
     ]) expect(schema).not.toContain(comment);
-  });
-
-  it('matches unique indexes by name across schemas', async () => {
-    const { ts: schema } = await codegen(main);
-    // shared_name_idx is unique on extra.articles, and a plain index on public.transfers
-    expect(tableBlock(schema, 'transfers')).toContain(`export type UniqueIndex = 'shared_name_idx' | 'transfers_pkey';`);
   });
 
   it('types enums of another schema as custom types (`any` placeholder)', async () => {
@@ -206,6 +201,144 @@ describe('surprises, frozen as they are', () => {
         "src/db/shortcuts.ts TS2345",
       ]
     `);
+  });
+});
+
+describe('UniqueIndex', () => {
+  it("lists only the table's own unique indexes", async () => {
+    const { ts: schema } = await codegen(main);
+    // shared_name_idx is unique on extra.articles, and a plain index on public.transfers
+    expect(tableBlock(schema, 'articles')).toContain(`export type UniqueIndex = 'articles_pkey' | 'shared_name_idx';`);
+    expect(tableBlock(schema, 'transfers')).toContain(`export type UniqueIndex = 'transfers_pkey';`);
+  });
+
+  it('keeps a name that unique constraints of two schemas share, for each', async () => {
+    // tsForConfig() reads through its own connection: the schemas are committed, then dropped
+    await t.pool.query(`
+      CREATE SCHEMA shared_a; CREATE SCHEMA shared_b; CREATE SCHEMA shared_c;
+      CREATE TABLE shared_a.items_a (k int, CONSTRAINT shared_key UNIQUE (k));
+      CREATE TABLE shared_b.items_b (k int, CONSTRAINT shared_key UNIQUE (k));
+      CREATE TABLE shared_c.items_c (k int);
+      CREATE INDEX shared_key ON shared_c.items_c (k);`);
+    try {
+      const { ts: schema } = await codegen({ schemas: { shared_a: all, shared_b: all, shared_c: all } });
+      expect(tableBlock(schema, 'items_a')).toContain(`export type UniqueIndex = 'shared_key';`);
+      expect(tableBlock(schema, 'items_b')).toContain(`export type UniqueIndex = 'shared_key';`);
+      expect(tableBlock(schema, 'items_c')).toContain('export type UniqueIndex = never;');  // a plain index
+    } finally {
+      await t.pool.query('DROP SCHEMA shared_a, shared_b, shared_c CASCADE');
+    }
+  });
+
+  it("gives a partition in another schema than its parent's the unique indexes the catalog gives it", async () => {
+    await t.pool.query(`
+      CREATE SCHEMA part_a; CREATE SCHEMA part_b;
+      CREATE TABLE part_a.events (id int, k int, CONSTRAINT events_k_key UNIQUE (k, id)) PARTITION BY RANGE (id);
+      CREATE TABLE part_b.events_1 PARTITION OF part_a.events FOR VALUES FROM (0) TO (100);
+      CREATE TABLE part_b.events_2 (id int, k int);
+      CREATE UNIQUE INDEX events_2_own ON part_b.events_2 (k, id);
+      ALTER TABLE part_a.events ATTACH PARTITION part_b.events_2 FOR VALUES FROM (100) TO (200);
+      CREATE TABLE part_b.events_3 (id int, k int);
+      CREATE UNIQUE INDEX events_k_key ON part_b.events_3 (k, id);  -- the parent's name, in the partition's schema
+      ALTER TABLE part_a.events ATTACH PARTITION part_b.events_3 FOR VALUES FROM (200) TO (300);`);
+    try {
+      const { ts: schema } = await codegen({ schemas: { part_a: all, part_b: all } });
+      const { rows } = await t.pool.query<{ relname: string; names: string[] }>(`
+        SELECT c.relname, coalesce(array_agg(i.relname::text ORDER BY i.relname) FILTER (WHERE i.oid IS NOT NULL), '{}') AS names
+        FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        LEFT JOIN pg_index x ON x.indrelid = c.oid AND x.indisunique
+        LEFT JOIN pg_class i ON i.oid = x.indexrelid
+        WHERE n.nspname IN ('part_a', 'part_b') AND c.relkind IN ('r', 'p')
+        GROUP BY c.relname`);
+      const fromCatalog = Object.fromEntries(rows.map(r => [r.relname, r.names.map(n => `'${n}'`).join(' | ') || 'never']));
+      const generated = Object.fromEntries(rows.map(r =>
+        [r.relname, /export type UniqueIndex = (.*);/.exec(tableBlock(schema, r.relname))?.[1]]));
+      expect(generated).toEqual(fromCatalog);
+      expect(fromCatalog).toEqual({
+        events: "'events_k_key'",
+        events_1: "'events_1_k_id_key'",
+        // attached: its own unique index, and the one Postgres adds for the parent's constraint
+        events_2: "'events_2_k_id_key' | 'events_2_own'",
+        events_3: "'events_3_k_id_key' | 'events_k_key'",
+      });
+    } finally {
+      await t.pool.query('DROP SCHEMA part_a, part_b CASCADE');
+    }
+  });
+});
+
+describe('custom types that share a placeholder name', () => {
+  // two schemas of their own, committed to this file's database: no other test configures them
+  beforeAll(() => t.pool.query(`
+    CREATE SCHEMA collide_a;
+    CREATE SCHEMA collide_b;
+    CREATE DOMAIN collide_a.code AS text;
+    CREATE DOMAIN collide_b.code AS integer;
+    CREATE TYPE collide_a.pair AS (x int, y int);
+    CREATE TYPE collide_b.pair AS (x text, y text);
+    CREATE DOMAIN collide_a."code-x" AS text;
+    CREATE DOMAIN collide_a.code_x AS text;
+    CREATE TABLE collide_a.things (code collide_a.code, pair collide_a.pair, amount public.positive_int);
+    CREATE TABLE collide_b.things (pair collide_b.pair, amount public.positive_int);
+    CREATE MATERIALIZED VIEW collide_b.codes AS SELECT 1::collide_b.code AS code;
+    CREATE MATERIALIZED VIEW collide_b.pairs AS SELECT NULL::collide_a.pair AS a, NULL::collide_b.pair AS b;
+    CREATE MATERIALIZED VIEW collide_b.amounts AS SELECT 1::public.positive_int AS amount;
+    CREATE TABLE collide_a.labels (dashed collide_a."code-x", underscored collide_a.code_x);
+    CREATE DOMAIN collide_a."code x" AS text;
+    CREATE TABLE collide_a.spaced (spaced collide_a."code x");
+  `));
+  afterAll(() => t.pool.query('DROP SCHEMA collide_a, collide_b CASCADE'));
+
+  const warningsFor = async (schemas: Schemas) => {
+    const warnings: string[] = [];
+    await tsForConfig(finaliseConfig({
+      schemas, ...quiet, warningListener: s => warnings.push(s), db: db(), outDir: 'src',
+    }), noDebug);
+    return warnings.filter(w => !w.startsWith('Note: this database has bigint'));  // once per process
+  };
+
+  it('warns once per name that types of two schemas share, a table and a materialized view alike', async () => {
+    expect(await warningsFor({ collide_a: only('things'), collide_b: only('things', 'codes') })).toEqual([
+      'Note: custom types "collide_a"."code" and "collide_b"."code" are both named PgCode in TypeScript, ' +
+      'so they share one type and one placeholder file, src/zapatos/custom/PgCode.d.ts. ' +
+      'To type them apart, rename one of them in the database.',
+      'Note: custom types "collide_a"."pair" and "collide_b"."pair" are both named PgPair in TypeScript, ' +
+      'so they share one type and one placeholder file, src/zapatos/custom/PgPair.d.ts. ' +
+      'To type them apart, rename one of them in the database.',
+    ]);
+  });
+
+  it('names the schema of each type, not of the materialized view that selects it', async () => {
+    expect(await warningsFor({ collide_b: only('pairs') })).toEqual([
+      'Note: custom types "collide_a"."pair" and "collide_b"."pair" are both named PgPair in TypeScript, ' +
+      'so they share one type and one placeholder file, src/zapatos/custom/PgPair.d.ts. ' +
+      'To type them apart, rename one of them in the database.',
+    ]);
+  });
+
+  it('warns when two names become one, and points at customTypesTransform', async () => {
+    expect(await warningsFor({ collide_a: only('labels') })).toEqual([
+      'Note: custom types "collide_a"."code-x" and "collide_a"."code_x" are both named PgCode_x in TypeScript, ' +
+      'so they share one type and one placeholder file, src/zapatos/custom/PgCode_x.d.ts. ' +
+      'To type them apart, rename one of them in the database, ' +
+      'or give customTypesTransform a function that keeps their names apart.',
+    ]);
+  });
+
+  it('lists three types that share a name', async () => {
+    expect(await warningsFor({ collide_a: only('labels', 'spaced') })).toEqual([
+      'Note: custom types "collide_a"."code x", "collide_a"."code-x" and "collide_a"."code_x" are all named PgCode_x ' +
+      'in TypeScript, so they share one type and one placeholder file, src/zapatos/custom/PgCode_x.d.ts. ' +
+      'To type them apart, rename one of them in the database, ' +
+      'or give customTypesTransform a function that keeps their names apart.',
+    ]);
+  });
+
+  it('does not warn when no name is shared', async () => {
+    // public.positive_int, in a table of each schema and a materialized view of collide_b, is one type
+    expect(await warningsFor({ public: all, collide_b: only('things', 'amounts') })).toEqual([]);
+    expect(await warningsFor(main.schemas!)).toEqual([]);
   });
 });
 

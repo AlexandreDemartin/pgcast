@@ -7,7 +7,7 @@ Released under the MIT licence: see LICENCE file
 import * as pg from 'pg';
 import { tsTypeForPgType } from './pgTypes';
 import type { EnumData } from './enums';
-import type { CustomTypes } from './tsOutput';
+import type { CustomTypes, CustomTypeOrigins } from './tsOutput';
 import { CompleteConfig } from './config';
 
 
@@ -60,12 +60,16 @@ const columnsForRelation = async (rel: Relation, schemaName: string, queryFn: (q
         , NULL as "defaultValue"
         , CASE WHEN t1.typtype = 'd' THEN t2.typname ELSE t1.typname END AS "udtName"
         , CASE WHEN t1.typtype = 'd' THEN t1.typname ELSE NULL END AS "domainName"
+        , CASE WHEN t1.typtype = 'd' THEN n2.nspname ELSE n1.nspname END AS "udtSchema"
+        , CASE WHEN t1.typtype = 'd' THEN n1.nspname ELSE NULL END AS "domainSchema"
         , d.description AS "description"     
         FROM pg_catalog.pg_class c
         LEFT JOIN pg_catalog.pg_attribute a ON c.oid = a.attrelid
         LEFT JOIN pg_catalog.pg_namespace n ON c.relnamespace = n.oid
         LEFT JOIN pg_catalog.pg_type t1 ON t1.oid = a.atttypid
         LEFT JOIN pg_catalog.pg_type t2 ON t2.oid = t1.typbasetype
+        LEFT JOIN pg_catalog.pg_namespace n1 ON n1.oid = t1.typnamespace
+        LEFT JOIN pg_catalog.pg_namespace n2 ON n2.oid = t2.typnamespace
         LEFT JOIN pg_catalog.pg_description d ON d.objoid = c.oid AND d.objsubid = a.attnum
         WHERE c.relkind = 'm' AND a.attnum >= 1 AND c.relname = $1 AND n.nspname = $2
         ORDER BY "column"`
@@ -78,6 +82,8 @@ const columnsForRelation = async (rel: Relation, schemaName: string, queryFn: (q
         , column_default::text AS "defaultValue"
         , udt_name AS "udtName"
         , domain_name AS "domainName"
+        , udt_schema AS "udtSchema"
+        , domain_schema AS "domainSchema"
         , d.description AS "description"
         FROM information_schema.columns AS c
         LEFT JOIN pg_catalog.pg_namespace ns ON ns.nspname = c.table_schema
@@ -103,6 +109,7 @@ export const definitionForRelationInSchema = async (
   customTypes: CustomTypes,  // an 'out' parameter
   config: CompleteConfig,
   queryFn: (q: pg.QueryConfig) => Promise<pg.QueryResult<any>>,
+  customTypeOrigins: CustomTypeOrigins = {},  // an 'out' parameter too
 ) => {
   const
     rows = await columnsForRelation(rel, schemaName, queryFn),
@@ -113,7 +120,7 @@ export const definitionForRelationInSchema = async (
     updatables: string[] = [];
 
   rows.forEach(row => {
-    const { column, isGenerated, isNullable, hasDefault, udtName, domainName } = row;
+    const { column, isGenerated, isNullable, hasDefault, udtName, domainName, udtSchema, domainSchema } = row;
     let
       selectableType = tsTypeForPgType(udtName, enums, 'Selectable', config),
       JSONSelectableType = tsTypeForPgType(udtName, enums, 'JSONSelectable', config),
@@ -146,9 +153,11 @@ export const definitionForRelationInSchema = async (
     if (selectableType === 'any' || domainName !== null) {  // cases 2, 3, 4
       const
         customType: string = domainName ?? udtName,
-        prefixedCustomType = transformCustomType(customType, config);
+        prefixedCustomType = transformCustomType(customType, config),
+        origins = customTypeOrigins[prefixedCustomType] ??= {};
 
-      customTypes[prefixedCustomType] = selectableType;
+      customTypes[prefixedCustomType] = selectableType;  // two origins: the last one seen wins
+      origins[`"${domainName === null ? udtSchema : domainSchema}"."${customType}"`] = customType;
       selectableType = JSONSelectableType = whereableType = insertableType = updatableType =
         'c.' + prefixedCustomType;
     }
@@ -166,12 +175,14 @@ export const definitionForRelationInSchema = async (
     if (isUpdatable) updatables.push(`${columnDoc}${possiblyQuotedColumn}?: ${updatableTypes} | db.SQLFragment<any, ${updatableTypes}>;`);
   });
 
+  // an index sits in its table's schema: matched on its name alone, it also took another schema's unique index
   const
     result = await queryFn({
       text: `
         SELECT DISTINCT i.indexname
         FROM pg_catalog.pg_indexes i
-        JOIN pg_catalog.pg_class c ON c.relname = i.indexname
+        JOIN pg_catalog.pg_namespace n ON n.nspname = i.schemaname
+        JOIN pg_catalog.pg_class c ON c.relname = i.indexname AND c.relnamespace = n.oid
         JOIN pg_catalog.pg_index idx ON idx.indexrelid = c.oid AND idx.indisunique
         WHERE i.tablename = $1 AND i.schemaname = $2
         ORDER BY i.indexname`,

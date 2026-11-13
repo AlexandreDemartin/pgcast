@@ -2284,7 +2284,7 @@ declare module 'zapatos/schema' {
       */
       value_days?: db.DateRangeString | db.Parameter<db.DateRangeString> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, db.DateRangeString | db.Parameter<db.DateRangeString> | null | db.DefaultType | db.SQLFragment>;
     }
-    export type UniqueIndex = 'shared_name_idx' | 'transfers_pkey';
+    export type UniqueIndex = 'transfers_pkey';
     export type Column = keyof Selectable;
     export type OnlyCols<T extends readonly Column[]> = Pick<Selectable, T[number]>;
     export type SQLExpression = Table | db.ColumnNames<Updatable | (keyof Updatable)[]> | db.ColumnValues<Updatable> | Whereable | Column | db.ParentColumn | db.GenericSQLExpression;
