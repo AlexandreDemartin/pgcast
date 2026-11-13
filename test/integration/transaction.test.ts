@@ -367,6 +367,19 @@ describe('the config transaction() reads', () => {
     expect(attempts).toBe(5);
     expect(messages.at(-1)).toBe('Transaction rollback (code 40001) on attempt 5 of 5, giving up');
   });
+
+  it('keeps a transactionAttemptsMax of 0: one attempt, then gives up, as Zapatos 6.6.1 does', async () => {
+    const { messages } = listen();
+    db.setConfig({ transactionAttemptsMax: 0 });
+    let attempts = 0;
+    const err = await db.serializable(t.pool, async c => {
+      attempts++;
+      await raise(c, '40001');
+    }).catch((e: unknown) => e);
+    expect((err as { code: string }).code).toBe('40001');
+    expect(attempts).toBe(1);
+    expect(messages).toEqual(['Transaction rollback (code 40001) on attempt 1 of 0, giving up']);
+  });
 });
 
 // #190: after a database error the callback catches, Postgres has aborted the transaction,

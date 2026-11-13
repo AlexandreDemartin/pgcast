@@ -68,6 +68,11 @@ describe('setConfig()', () => {
     expect(db.getConfig()).toMatchObject(defaults);
   });
 
+  it('keeps a falsy value it is given: a transactionAttemptsMax of 0 stays 0', () => {
+    expect(db.setConfig({ transactionAttemptsMax: 0 }).transactionAttemptsMax).toBe(0);
+    expect(db.getConfig().transactionAttemptsMax).toBe(0);
+  });
+
   it('removes a listener given as undefined: it has no default', () => {
     db.setConfig({ queryListener: () => undefined });
     db.setConfig({ queryListener: undefined } as unknown as db.NewConfig);
