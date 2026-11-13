@@ -4,7 +4,8 @@
 // by hand, both drift. Each is marked by an HTML comment glued after the code span (or quote) it checks:
 // `<!-- probe: … -->` after SQL, or on the line above a `sql` block, and `<!-- message -->` after a message. A probe
 // is a cast panel's example (`examples/<name>.ts`), or a JavaScript expression with `db` and a recording `pool` in
-// scope. It sends no query to Postgres, so the site still builds without a database. Run by `npm run docs:build`.
+// scope. It sends no query to Postgres, so the site still builds without a database. It also fails on an install
+// command whose `@pgcast/pgcast@^N` is not the major of the root `package.json`. Run by `npm run docs:build`.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import ts from 'typescript';
 import * as db from 'zapatos/db';
@@ -209,8 +210,24 @@ let checked = 0;
 for (const page of pages)
   checked += await check(page, readFileSync(new URL(page, import.meta.url), 'utf8').split('\n'), problems);
 
+// The yarn and bun commands pin the major, `zapatos@npm:@pgcast/pgcast@^6` (install.md § Add the package): at the
+// next major, one left behind would install the previous one.
+const
+  { version } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')),
+  major = version.split('.')[0];
+let pinned = 0;
+for (const file of [...pages, '../README.md'])
+  readFileSync(new URL(file, import.meta.url), 'utf8').split('\n').forEach((line, i) => {
+    for (const [range, n] of line.matchAll(/@pgcast\/pgcast@\^(\d+)/g)) {
+      pinned++;
+      if (n !== major) problems.push(`${file}:${i + 1}: \`${range}\` is not the major of ` +
+        `package.json, ${version}: write \`@pgcast/pgcast@^${major}\``);
+    }
+  });
+
 if (problems.length > 0) {
   console.error(`The prose check failed (README.md § Conventions):\n  ${problems.join('\n  ')}`);
   process.exit(1);
 }
-console.log(`The SQL and the messages the pages quote match pgcast: ${checked} marks.`);
+console.log(`The SQL and the messages the pages quote match pgcast: ${checked} marks; ` +
+  `${pinned} install commands pin its major, ${major}.`);
