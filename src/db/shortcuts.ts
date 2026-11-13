@@ -693,13 +693,14 @@ export const select: SelectSignatures = function (
   if (checksSecondRow) {
     // compiled on its own, as `run()` does, the query asks for a second row; a parent query compiles it
     // into its own `result` (`sql`) or compiles a copy (`lateral`), so nested it keeps `LIMIT 1`,
-    // where a second row would duplicate the parent row
+    // where a second row would duplicate the parent row; the `LIMIT 2` form takes the properties
+    // a caller may have set on the query since (those `copy()` carries over)
     const topLevelQuery = rowsSQL(2), nestedCompile = query.compile;
     query.compile = (result, parentTable, currentColumn) => {
       if (result) return nestedCompile(result, parentTable, currentColumn);
-      const compiled = topLevelQuery.compile(undefined, query.parentTable ?? parentTable, currentColumn);
-      if (query.preparedName != null) compiled.name = query.preparedName;
-      return compiled;
+      const { parentTable: queryParentTable, preparedName, noop } = query;
+      return Object.assign(topLevelQuery, { parentTable: queryParentTable, preparedName, noop })
+        .compile(undefined, parentTable, currentColumn);
     };
   }
 
