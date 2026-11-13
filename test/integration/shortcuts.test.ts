@@ -414,6 +414,13 @@ describe('parent() as a write value', () => {
     expect(await run(db.update('users', { settings: parent(), tags: parent() }, { id: 1 }, { returning: ['settings', 'tags'] })))
       .toEqual([{ settings: {}, tags: [] }]);
 
+    // the path typed code reaches: a column typed any (a zapatos/custom placeholder), here xml and a composite
+    expect(await run(db.insert('extra.type_zoo', { c_xml: parent('id') }, { returning: ['c_xml'] })))
+      .toEqual({ c_xml: '{"value":"id"}' });
+    expect(await fails(db.update('users', { home: parent('id') }, { id: 1 }))).toEqual({
+      code: '22P02', message: 'malformed record literal: "{"value":"id"}"',
+    });
+
     // a column whose type does not take the JSON text as input refuses it
     expect(await fails(db.update('users', { manager_id: parent('id') }, { id: 3 }))).toEqual({
       code: '22P02', message: 'invalid input syntax for type integer: "{"value":"id"}"',
