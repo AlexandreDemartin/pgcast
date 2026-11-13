@@ -139,7 +139,8 @@ With `strict` off, `columns` leaves the type at the table's full `JSONSelectable
 
 | Query | One result's type | The fake's `rows` |
 |---|---|---|
-| [`select()`](/select#select), [`selectOne()`](/select#selectOne), [`selectExactlyOne()`](/select#selectExactlyOne) | [`FullSelectReturnTypeForTable`](/select#FullSelectReturnTypeForTable)`<T, C, L, E, M>`, `M` the mode | `[{ result }]`, the whole result in one row; `[]` for none |
+| [`select()`](/select#select) | [`FullSelectReturnTypeForTable`](/select#FullSelectReturnTypeForTable)`<T, C, L, E, M>`, `M` the mode | `[{ result }]`, the whole array in one row; `[{ result: [] }]` for none, as Postgres sends it (`[]` gives `undefined`) |
+| [`selectOne()`](/select#selectOne), [`selectExactlyOne()`](/select#selectExactlyOne) | the same | `[{ result }]`; `[]` for none: `undefined` from `selectOne()`, a [`NotExactlyOneError`](/select#NotExactlyOneError) from `selectExactlyOne()` |
 | [`count()`](/select#count) and the other aggregates | `number` | `[{ result }]` |
 | [`insert()`](/insert#insert), [`update()`](/insert#update), [`deletes()`](/insert#deletes) | [`ReturningTypeForTable`](/insert#ReturningTypeForTable)`<T, C, E>`, for each row | one `{ result }` per row |
 | [`upsert()`](/insert#upsert) | [`UpsertReturnableForTable`](/insert#UpsertReturnableForTable)`<T, C, E, RA>`, for each row | one `{ result }` per row |
