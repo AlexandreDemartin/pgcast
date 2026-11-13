@@ -62,7 +62,12 @@ So an id is read, never hard-coded; and a prepared name stands for one text acro
 
 ### Give code that commits the pool
 
-Code that opens its own [`transaction()`](/transaction#transaction) can't join the test's. Given the test's client, inside its `BEGIN`, it sends `START TRANSACTION ISOLATION LEVEL SERIALIZABLE`<!-- probe: db.serializable(pool, async () => {}) -->, which Postgres ignores with a warning (25001, "there is already a transaction in progress"); then its `COMMIT`<!-- probe: db.serializable(pool, async () => {}) --> commits the test's transaction, rows and all, and the test's `ROLLBACK` has nothing left to undo (25P01). So give such code the pool, and delete what it commits:
+Code that opens its own [`transaction()`](/transaction#transaction) can't join the test's. Given the test's client, inside its `BEGIN`, it sends `START TRANSACTION ISOLATION LEVEL SERIALIZABLE`<!-- probe: db.serializable(pool, async () => {}) -->, which Postgres answers with a warning (25001, "there is already a transaction in progress"), then ends the test's transaction one of two ways ([#233](https://github.com/AlexandreDemartin/pgcast/issues/233)):
+
+- If the test has run no query yet, or at the session's own level (`readCommitted()`, on a default server), its `COMMIT`<!-- probe: db.serializable(pool, async () => {}) --> commits the test's transaction, rows and all.
+- At another level, after any query, the test's seeds included, Postgres refuses with 25001 ("SET TRANSACTION ISOLATION LEVEL must be called before any query"): its `ROLLBACK`<!-- probe: db.serializable(pool, async () => { throw 0; }) --> undoes the seeds, and the call rejects.
+
+Either way, the test's `ROLLBACK` has nothing left to undo (25P01). So give such code the pool, and delete what it commits:
 
 <<< ./examples/plain/testing_commits.ts{ts twoslash}
 
