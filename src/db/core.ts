@@ -148,9 +148,12 @@ declare const wrapper: unique symbol;
  * does), so it cannot close its quotes. No part is left unquoted, so a name
  * the SQL grammar spells (`int`, `double precision`, `varchar(10)`) is no type
  * here: use the type's own name (`int4`, `float8`, `varchar`), or `sql`
- * (`` sql`CAST(${param(x)} AS varchar(10))` ``). If
- * `true`, the value will be JSON stringified and cast to `json` (irrespective
- * of the configuration parameters `castArrayParamsToJson` and
+ * (`` sql`CAST(${param(x)} AS varchar(10))` ``). A string cast wins over
+ * `castArrayParamsToJson` and `castObjectParamsToJson`, which Zapatos 6.6.1 let
+ * replace it with `"json"`: under them, an array or a plain object is still sent
+ * as JSON text, except an array cast to an array type (`int4[]`), sent as an
+ * array. If `true`, the value will be JSON stringified and cast to `json`
+ * (irrespective of the configuration parameters `castArrayParamsToJson` and
  * `castObjectParamsToJson`). If `false`, the value will **not** be JSON-
  * stringified or cast to `json` (again irrespective of the configuration
  * parameters `castArrayParamsToJson` and `castObjectParamsToJson`).
@@ -176,9 +179,12 @@ export class Parameter<T = any> { declare readonly [wrapper]?: never; constructo
  * does), so it cannot close its quotes. No part is left unquoted, so a name
  * the SQL grammar spells (`int`, `double precision`, `varchar(10)`) is no type
  * here: use the type's own name (`int4`, `float8`, `varchar`), or `sql`
- * (`` sql`CAST(${param(x)} AS varchar(10))` ``). If
- * `true`, the value will be JSON stringified and cast to `json` (irrespective
- * of the configuration parameters `castArrayParamsToJson` and
+ * (`` sql`CAST(${param(x)} AS varchar(10))` ``). A string cast wins over
+ * `castArrayParamsToJson` and `castObjectParamsToJson`, which Zapatos 6.6.1 let
+ * replace it with `"json"`: under them, an array or a plain object is still sent
+ * as JSON text, except an array cast to an array type (`int4[]`), sent as an
+ * array. If `true`, the value will be JSON stringified and cast to `json`
+ * (irrespective of the configuration parameters `castArrayParamsToJson` and
  * `castObjectParamsToJson`). If `false`, the value will **not** be JSON
  * stringified or cast to `json` (again irrespective of the configuration
  * parameters `castArrayParamsToJson` and `castObjectParamsToJson`).
@@ -478,16 +484,7 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
         placeholder = '$' + String(result.values.length + 1),  // 1-based indexing
         config = getConfig();
 
-      if (
-        ((expression.cast !== false && (expression.cast === true || config.castArrayParamsToJson)) &&
-          Array.isArray(expression.value)) ||
-        ((expression.cast !== false && (expression.cast === true || config.castObjectParamsToJson)) &&
-          isPOJO(expression.value))
-      ) {
-        result.values.push(JSON.stringify(expression.value));
-        result.text += `CAST(${placeholder} AS "json")`;
-
-      } else if (typeof expression.cast === 'string') {
+      if (typeof expression.cast === 'string') {
         // array bounds at the end (`[]`, `[3]`) are written after the type; they are found from the end,
         // as a regex would be quadratic on a long run of `[]`
         const cast = expression.cast;
@@ -509,8 +506,23 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
                 quotedIdentifiers.test(name) ? name :
                   `"${name.replace(/"/g, '""')}"`;
 
-        result.values.push(expression.value);
+        // the cast wins over castArrayParamsToJson and castObjectParamsToJson (Zapatos 6.6.1 dropped it for
+        // `"json"`); the value is still the JSON text they ask for, except an array cast to an array type
+        const json = Array.isArray(expression.value) ?
+          config.castArrayParamsToJson && end === cast.length :
+          config.castObjectParamsToJson && isPOJO(expression.value);
+
+        result.values.push(json ? JSON.stringify(expression.value) : expression.value);
         result.text += `CAST(${placeholder} AS ${type}${cast.slice(end)})`;
+
+      } else if (
+        ((expression.cast !== false && (expression.cast === true || config.castArrayParamsToJson)) &&
+          Array.isArray(expression.value)) ||
+        ((expression.cast !== false && (expression.cast === true || config.castObjectParamsToJson)) &&
+          isPOJO(expression.value))
+      ) {
+        result.values.push(JSON.stringify(expression.value));
+        result.text += `CAST(${placeholder} AS "json")`;
 
       } else {
         result.values.push(expression.value);
