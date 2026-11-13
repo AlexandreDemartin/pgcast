@@ -21,7 +21,7 @@ export { data };
 // The playground's own lines above the query: the example's, with a comment about the playground's pool.
 const header = `import * as db from 'zapatos/db';
 import type pg from 'pg';
-declare const pool: pg.Pool;  // here, a pool that records each query and gives no rows back
+declare const pool: pg.Pool;  // as you type, a pool that records each query; on Run, Postgres in this page
 
 `;
 

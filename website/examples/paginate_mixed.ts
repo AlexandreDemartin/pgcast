@@ -16,6 +16,7 @@ const page = await db.select('films', db.all, {
 }).run(rowsOfPage1);
 const last = page.at(-1);
 if (last === undefined) throw new Error('No next page');
+// the playground gives the type of the next const
 // ---cut---
 const nextPage = await db.select('films', db.conditions.and(
   { release_year: db.conditions.lte(last.release_year) },

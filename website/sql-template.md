@@ -59,7 +59,9 @@ Each value between `${…}` compiles by what it is. The SQL is the built library
 | a `sql` fragment | its own SQL, its parameters numbered on | [Nested fragments](#nested-fragments) |
 | an array | each item in turn, nothing between; `[]` → nothing | [Arrays](#arrays) |
 
-Anything else throws while compiling, so `run()` rejects before any query, and the type refuses it (`null` and `undefined` only with `strictNullChecks`): a number or a boolean (`Alien object while interpolating SQL: 42`<!-- message -->), `undefined`, a symbol such as [`all`](#all), and `null`: "Interpolating `null` has no meaning in SQL: for a `NULL` value, interpolate `db.param(null)`…"<!-- message -->. Zapatos 6.6.1 threw a `TypeError` on `null`. The global object, which the type lets through, throws too: "Did you use `self` (the global object) where you meant `db.self` (the Zapatos value)?…"<!-- message -->.
+Anything else throws while compiling, so `run()` rejects before any query, and the type refuses it (`null` and `undefined` only with `strictNullChecks`): a number or a boolean (`Alien object while interpolating SQL: 42`<!-- message -->), `undefined`, a symbol such as [`all`](#all), and `null`: "Interpolating `null` has no meaning in SQL: for a `NULL` value, interpolate `db.param(null)`…"<!-- message -->. Zapatos 6.6.1 threw a `TypeError` on `null`.
+
+The global object, which the type lets through, throws too: "Did you use `self` (the global object) where you meant `db.self` (the Zapatos value)?…"<!-- message -->.
 
 ## Identifiers {#identifiers}
 
@@ -110,9 +112,13 @@ The last two rows apply when [`castArrayParamsToJson`](/runtime-config#Config.ca
 | a string, for an array or a plain object under its option | the cast, as above: `CAST($1 AS "jsonb")`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${db.param([1, 2], 'jsonb')}`) --> | `JSON.stringify(value)`; under `castArrayParamsToJson`, an array whose cast ends with `[]` or `[n]`, `CAST($1 AS "int4"[])`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${db.param([1, 2], 'int4[]')}`) -->, sends `value` |
 
 - A string `cast` without a `"` is split on `.`, each part quoted; array bounds at its end, `[]` or `[n]`, follow the quotes: `'public.crew_job[]'` gives `CAST($1 AS "public"."crew_job"[])`<!-- probe: db.sql`${db.param(['writer'], 'public.crew_job[]')}` -->.
-- With a `"`, it is written as `"cast"` if that is well-formed (quoted parts joined by `.`), or as it is if it is already quoted that way: a type whose own name holds a `.` is `'"crew.job"'`, as `'crew.job'` is type `job` in schema `crew`. Otherwise it is one quoted name, any `"` doubled, so it cannot close its quotes: `'int4") || (SELECT 1) || ("int4'` gives `CAST($1 AS "int4"") || (SELECT 1) || (""int4")`<!-- probe: db.sql`${db.param(1, 'int4") || (SELECT 1) || ("int4')}` -->, a type that does not exist. Zapatos 6.6.1 wrote any `cast` as it is between quotes, so `'public.crew_job'` and `'int4[]'` named types that do not exist.
+- With a `"`, it is written as `"cast"` if that is well-formed (quoted parts joined by `.`), or as it is if it is already quoted that way: a type whose own name holds a `.` is `'"crew.job"'`, as `'crew.job'` is type `job` in schema `crew`.
+- Any other string with a `"` is one quoted name, any `"` doubled, so it cannot close its quotes: `'int4") || (SELECT 1) || ("int4'` gives `CAST($1 AS "int4"") || (SELECT 1) || (""int4")`<!-- probe: db.sql`${db.param(1, 'int4") || (SELECT 1) || ("int4')}` -->, a type that does not exist.
+- Zapatos 6.6.1 wrote any `cast` as it is between quotes, so `'public.crew_job'` and `'int4[]'` named types that do not exist.
 - Each part stays quoted, so a name only the SQL grammar knows is no type here: `'int'`, `'double precision'`, `'varchar(10)'` fail (42704). Give the type's own name (`'int4'`, `'float8'`, `'timestamptz'`), or write the cast in `sql`: `` db.sql`CAST(${db.param(x)} AS varchar(10))` ``.
-- Under `castArrayParamsToJson` or `castObjectParamsToJson`, a string cast is the type written, and the value stays the JSON text the option sends (the last row of the table): `param({ a: 1 }, 'jsonb')` reaches `=` and `@>` on a `jsonb` column. Under `castArrayParamsToJson`, an array whose cast ends with `[]` or `[n]` goes as an array: `'_int4'` and a domain over an array still send JSON, which Postgres refuses as an array (22P02). Zapatos 6.6.1 dropped a string cast there for `CAST($1 AS "json")` ([#36](https://github.com/AlexandreDemartin/pgcast/issues/36)), so a cast that names another type than its target now applies: `param(arr, 'int4[]')` into a `json` column is refused (42804), into a `text` column stores `{1,2}` for `[1,2]`.
+- Under `castArrayParamsToJson` or `castObjectParamsToJson`, a string cast is the type written, and the value stays the JSON text the option sends (the last row of the table): `param({ a: 1 }, 'jsonb')` reaches `=` and `@>` on a `jsonb` column.
+- Under `castArrayParamsToJson`, an array whose cast ends with `[]` or `[n]` goes as an array: `'_int4'` and a domain over an array still send JSON, which Postgres refuses as an array (22P02).
+- Zapatos 6.6.1 dropped a string cast under either option for `CAST($1 AS "json")` ([#36](https://github.com/AlexandreDemartin/pgcast/issues/36)), so a cast that names another type than its target now applies: `param(arr, 'int4[]')` into a `json` column is refused (42804), into a `text` column stores `{1,2}` for `[1,2]`.
 - Without a cast, `castArrayParamsToJson` makes `` db.sql`${db.param(ids)}::int4[]` `` `CAST($1 AS "json")::int4[]`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${db.param([1])}::int4[]`) -->, which Postgres rejects (42846): write `db.param(ids, 'int4[]')`, or pass `false`, which keeps the value out of JSON under either option: `$1::int4[]`<!-- probe: db.sql`${db.param([1], false)}::int4[]` -->.
 - As a Whereable value or in `vals([…])` (so in [`isIn()`](/conditions#conditions.isIn)), a `Parameter` compiles as it is, with its cast: `{ title: db.param('x', 'text') }` gives `("title" = CAST($1 AS "text"))`<!-- probe: db.sql`${{ title: db.param('x', 'text') }}` -->. Zapatos 6.6.1 wrapped it in a second parameter, sent as JSON (`'{"value":"x","cast":"text"}'`).
 
@@ -239,7 +245,10 @@ A comma-separated list of values. Each value compiles as follows.
 | `self` | a parameter | throws in a filter; a parameter outside one |
 
 - An object's values come in the order of its sorted keys, as `cols()` lists them.
-- "In a filter" is wherever `vals([…])` has a current column: in `isIn()` and `isNotIn()`, and in a fragment value of a Whereable or of `vals({…})`. There `Default` throws "`` `db.Default` has no meaning in a Whereable (a filter)… ``<!-- message -->", `self` "`` `db.self` has no meaning as a value in a Whereable (a filter), nor in `isIn()`… ``<!-- message -->", and `raw()`, `cols()` and `vals()` as [`raw()`](#raw) says.
+- "In a filter" is wherever `vals([…])` has a current column: in `isIn()` and `isNotIn()`, and in a fragment value of a Whereable or of `vals({…})`. There:
+  - `Default` throws "`` `db.Default` has no meaning in a Whereable (a filter)… ``<!-- message -->";
+  - `self` "`` `db.self` has no meaning as a value in a Whereable (a filter), nor in `isIn()`… ``<!-- message -->";
+  - `raw()`, `cols()` and `vals()` as [`raw()`](#raw) says.
 - As a filter value itself, or a value in `vals({…})`, `vals()` throws, as [`raw()`](#raw) does.
 - `insert()`, `upsert()` and `update()` compile their values with `vals({…})`, outside a nested query: `parent()`, `raw()`, `cols()` and `vals()` throw there, before any query.
 - Zapatos 6.6.1 wrapped a `Parameter`, `Default` and `parent()` in a second parameter in an array: `'{"value":…}'`, `'Symbol(DEFAULT)'`, `'{"value":"id"}'`; and `parent()`, `raw()`, `cols()` and `vals()` in an object, which the writes stored on a text or `jsonb` column.
@@ -284,9 +293,14 @@ A built-in object throws while compiling, before any query, even with own keys a
 
 > `` A built-in `…` has no meaning as a Whereable (a filter): it would compile to its own enumerable keys, and to `TRUE`, every row, when it has none. To compare with a value, give it as `db.param(…)`; to filter, give a plain object (`{ column: value }`); await a `Promise` first. ``<!-- message -->
 
-Zapatos 6.6.1 compiled it as a Whereable of its own keys: `TRUE` for most, so `` db.sql`DELETE FROM ${'films'} WHERE ${new Date()}` `` was `DELETE FROM "films" WHERE TRUE` and deleted every row; `("0" = $1 …)` for a typed array. The type refuses most of them (TS2345), not where a column shares one of their members: `db.deletes('actors', new Error('x'))` type-checks, since `actors` has a `name` column.
+Zapatos 6.6.1 compiled it as a Whereable of its own keys: `TRUE` for most, so `` db.sql`DELETE FROM ${'films'} WHERE ${new Date()}` `` was `DELETE FROM "films" WHERE TRUE` and deleted every row; `("0" = $1 …)` for a typed array.
 
-Only the built-ins of the realm that runs pgcast throw, matched by their exact prototype. As in Zapatos 6.6.1, a `Date` from another realm, such as `vm.runInNewContext('new Date(0)')` (Jest runs each test file in a `vm` context), gives `TRUE`, and an instance of a class that extends a built-in keeps its own keys: `new Frames(1)`, with `class Frames extends Uint8Array {}`, gives `("0" = $1)`.
+The type refuses most of them (TS2345), not where a column shares one of their members: `db.deletes('actors', new Error('x'))` type-checks, since `actors` has a `name` column.
+
+Only the built-ins of the realm that runs pgcast throw, matched by their exact prototype. As in Zapatos 6.6.1:
+
+- a `Date` from another realm, such as `vm.runInNewContext('new Date(0)')` (Jest runs each test file in a `vm` context), gives `TRUE`;
+- an instance of a class that extends a built-in keeps its own keys: `new Frames(1)`, with `class Frames extends Uint8Array {}`, gives `("0" = $1)`.
 
 ## `self` {#self}
 
@@ -453,7 +467,9 @@ A `noop` fragment still compiles, its SQL behind a comment. `force` sends it, an
 fragment.compile(): SQLQuery
 ```
 
-The query as `pg` takes it ([`SQLQuery`](/runtime-config#SQLQuery)): `text`, its parameters numbered from `$1`, and `values`, in their order; `name` too, once [prepared](#prepared). It sends nothing, and throws where an interpolation has no meaning. Its arguments are for its own recursion: call it with none. The text is not a stable API: a minor version may change it, as long as the result does not ([Test code that uses pgcast](/testing#the-sql-text-is-not-a-stable-api)).
+The query as `pg` takes it ([`SQLQuery`](/runtime-config#SQLQuery)): `text`, its parameters numbered from `$1`, and `values`, in their order; `name` too, once [prepared](#prepared). It sends nothing, and throws where an interpolation has no meaning. Its arguments are for its own recursion: call it with none.
+
+The text is not a stable API: a minor version may change it, as long as the result does not ([Test code that uses pgcast](/testing#the-sql-text-is-not-a-stable-api)).
 
 <CastPanel example="sql_compile">
 
@@ -531,7 +547,9 @@ What `run()` takes: a pool, a client, or the client a [`transaction()`](/transac
 type SQL = SQLExpression | SQLExpression[]
 ```
 
-The default `Interpolations` of `sql`: an expression, or an array of them. Each table of the generated schema has its own, `s.films.SQL`, which takes the names and Whereables of that table only; `cols()` and `vals()` of any value, as in Zapatos 6.6.1. So `` db.sql<s.films.SQL>`INSERT INTO ${'films'} (${db.cols({ seat: 1 })}) VALUES (${db.vals({ seat: 1 })})` `` type-checks, and fails only in Postgres (42703: `films` has no `seat`).
+The default `Interpolations` of `sql`: an expression, or an array of them. Each table of the generated schema has its own, `s.films.SQL`, which takes the names and Whereables of that table only; `cols()` and `vals()` of any value, as in Zapatos 6.6.1.
+
+So `` db.sql<s.films.SQL>`INSERT INTO ${'films'} (${db.cols({ seat: 1 })}) VALUES (${db.vals({ seat: 1 })})` `` type-checks, and fails only in Postgres (42703: `films` has no `seat`).
 
 ### `SQLExpression` {#SQLExpression}
 

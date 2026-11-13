@@ -64,7 +64,7 @@ A materialised view keeps no `NOT NULL` at all, not even a domain's, so its colu
 For views, pgcast keeps to what Postgres states, as Zapatos did: a nullability the database doesn't state would be a guess, and a guess is the one thing a generated type mustn't be. Some gaps in what the generator reads are known, and described here as they are today:
 
 - Enum labels come out in alphabetical order: `crew_job` is `'cinematographer' | 'composer' | 'director' | 'editor' | 'writer'`, not the order of its `CREATE TYPE`, unless [`enumOrder`](/generator#generate.enumOrder) is `"declared"`.
-- Comments are read on the columns of tables and materialised views only, not of views, foreign tables or partitioned tables ([#47](https://github.com/AlexandreDemartin/pgcast/issues/47)).
+- A column comment holding `*/` ends the JSDoc early on a table or a materialised view; on a view, a foreign table or a partitioned table, it is left out ([#48](https://github.com/AlexandreDemartin/pgcast/issues/48)).
 - An enum of another schema becomes an `any` placeholder, or takes the labels of the enum of the same name in the relation's schema, unless [`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas) is on.
 
 ::: info Coming
@@ -152,11 +152,11 @@ All of this needs `strictNullChecks`, or `strict`. Without it, `columns`, `extra
 
 ## What pgcast kept, and what it changes
 
-The generator is Zapatos 6.6.1's, unchanged so far: the same queries, and so the same `schema.d.ts` for the same database, its version canary still at 104 ([`SchemaVersionCanary`](/runtime-config#SchemaVersionCanary)).
+The generator is Zapatos 6.6.1's, its version canary still at 104 ([`SchemaVersionCanary`](/runtime-config#SchemaVersionCanary)). Its fixes change `schema.d.ts` where 6.6.1's was wrong: a table's `UniqueIndex` lists only its own unique indexes, and each line of a multi-line column comment gets its `*` ([changelog](/changelog)).
 
 What pgcast changes on the way in is in the run-time library, not in the generated types. [`raw()`](/sql-template#raw), [`cols()`](/sql-template#cols) and [`vals()`](/sql-template#vals) no longer type-check as a value of a `Whereable`, `Insertable` or `Updatable`, where 6.6.1 took them for a `Parameter`, an object of the same shape (`{ value }`).
 
-And an `undefined` value can mean a missing key, with [`undefinedMeansMissing`](/runtime-config#Config.undefinedMeansMissing) ([An `undefined` value](/insert#undefined-values)). Changes to the output itself will come the same way, each as a fix or an opt-in of its own ([Versions, opt-ins and warnings](/versions)).
+And an `undefined` value can mean a missing key, with [`undefinedMeansMissing`](/runtime-config#Config.undefinedMeansMissing) ([An `undefined` value](/insert#undefined-values)). Changes to the output itself come the same way, each as a fix or an opt-in of its own: while [`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas) and [`enumOrder`](/generator#generate.enumOrder) are off, the rest of `schema.d.ts` is 6.6.1's ([Versions, opt-ins and warnings](/versions)).
 
 What pgcast refuses is a second source of truth: a model class, a schema written in TypeScript, a type declared beside the table it describes. The database has the last word, and the cost is a habit: run the generator again after each migration, and let TypeScript point at the queries that no longer fit ([Your first typed query](/first-query#when-the-schema-changes)).
 
