@@ -11,7 +11,8 @@ import { fileURLToPath } from 'node:url';
 const
   dist = fileURLToPath(new URL('.vitepress/dist/', import.meta.url)),
   checkout = fileURLToPath(new URL('..', import.meta.url)).replace(/[\\/]$/, ''),
-  absolute = /(?<![\w/.])(?:\/(?:home|Users|runner)\/|[A-Za-z]:[\\/])[^\s"'`<>()]*/g,
+  // with a name after it: `/home/` alone, as a page may write it, is no machine's
+  absolute = /(?<![\w/.])(?:\/(?:home|Users|runner)\/|[A-Za-z]:[\\/])[^\s"'`<>()]+/g,
   // @types/node's example of `process.env`, in the hover of `process.env`
   allowed = new Set(['/Users/maciej']),
   text = new Set(['.html', '.js', '.css', '.json', '.txt', '.xml', '.svg']),
