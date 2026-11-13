@@ -140,7 +140,7 @@ All three will be the default in 7.0 ([Versions, opt-ins and warnings](/versions
 
 One more opt-in has no warning to look for, and stays off in 7.0: [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow), with which a `selectExactlyOne()` run on its own rejects on a second row, not only on none. Turn it on where your tests show no `selectExactlyOne()` matching two rows.
 
-The generator has an opt-in of its own, [`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas), whose warning is a note from `npx zapatos`, not from your tests: it names each column whose type is an enum of another schema, and that enum, typed until then as `any`, or as the enum of the same name in the relation's schema. Turn it on in `zapatosconfig.json`, regenerate, and let `tsc` show the values the enum's labels refuse; it will be the default in 7.0.
+The generator has an opt-in of its own, [`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas), whose warning is a note from `npx zapatos`, not from your tests: it names each column whose type is an enum of another schema, and that enum, typed until then as `any` or as the enum of the same name in the relation's schema. Turn it on in `zapatosconfig.json`, regenerate, and let `tsc` show the values the enum's labels refuse; it will be the default in 7.0. A domain over such an enum keeps the placeholder it already has in `zapatos/custom/`, typed the old way, as the generator never overwrites one: delete that file before regenerating, and the new one gets the labels.
 
 ## Go back
 
