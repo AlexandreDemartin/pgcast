@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <!-- favicon.svg, opaque, as iOS wants it (it rounds the corners itself). Rendered to apple-touch-icon.png by
+       render-images.mjs. -->
+  <title>pgcast</title>
+  <rect width="256" height="256" fill="#0a6b63"/>
+  <path fill="#ffffff" d="M48 48h32a8 8 0 0 1 8 8v32a8 8 0 0 1-8 8h-32a8 8 0 0 1-8-8v-32a8 8 0 0 1 8-8ZM176 48h32a8 8 0 0 1 8 8v32a8 8 0 0 1-8 8h-32a8 8 0 0 1-8-8v-32a8 8 0 0 1 8-8ZM48 160h32a8 8 0 0 1 8 8v32a8 8 0 0 1-8 8h-32a8 8 0 0 1-8-8v-32a8 8 0 0 1 8-8ZM176 160h32a8 8 0 0 1 8 8v32a8 8 0 0 1-8 8h-32a8 8 0 0 1-8-8v-32a8 8 0 0 1 8-8Z"/>
+</svg>
