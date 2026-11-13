@@ -81,6 +81,8 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 .VPNavBar.has-sidebar .divider::before { display: none; }
 .VPNavBarTitle .title { font: 700 19px/1 var(--font-mono); letter-spacing: -.02em; color: var(--fg); gap: 8px; }
 .VPNavBarTitle .title b { color: var(--accent); font-weight: 700; margin: 0 1px; }
+/* VitePress clips the title's span (`overflow: hidden`, for its ellipsis): a line box of 1 cut the descender of the g */
+.VPNavBarTitle .title > span:not(.version) { line-height: 1.5; }
 .VPNavBarTitle .version {
   font: 500 12px/1 var(--font-body); letter-spacing: 0; color: var(--muted);
   border: 1px solid var(--line); border-radius: 999px; padding: 4px 8px; background: var(--surface);
