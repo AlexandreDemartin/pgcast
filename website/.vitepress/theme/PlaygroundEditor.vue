@@ -5,6 +5,8 @@
 // playground/run.worker.ts runs against a pool that records each query; the panel shows their SQL and values, then
 // the type of the code's first `const`, as a cast panel does (panel.ts). Run, a click or Ctrl+Enter, and never on its
 // own, runs it on Postgres in the worker: the panel shows what Postgres answers each query.
+// A link's code (`shared`, from Playground.vue) opens with its type and no SQL: it runs only on Run, or once edited.
+// Share puts the code in the URL's fragment (playground/share.ts) and copies the link.
 import * as monaco from 'monaco-editor/editor/editor.api';
 import 'monaco-editor/features/register.all';
 import 'monaco-editor/languages/definitions/typescript/register';
@@ -22,13 +24,21 @@ import { hoverType, shown, typeShown } from '../panel.ts';
 import { data } from '../playground.data.ts';
 import { jsonHtml, sqlHtml, typeHtml } from '../playground/highlight.ts';
 import type { Code, Message, Query, Run } from '../playground/run.worker.ts';
+import { codeOf, fragmentOf, limit as shareLimit } from '../playground/share.ts';
 import playgroundStyle from './playground.css?inline';
+
+const { shared } = defineProps<{ shared?: string | null }>();  // a link's code; `null`: a link that cannot be read
 
 const
   start = casts['first-query']!,  // the panel computed at build from the same code, until the first run
   host = useTemplateRef<HTMLDivElement>('host'),
   queries = shallowRef<(Omit<Query, 'sql'> & { html: string })[]>([{ html: start.sql, values: start.values }]),
   notes = shallowRef<string[]>([]),
+  notice = shallowRef<string>(),  // about a link, until the next run
+  linkNotices = {
+    opened: 'This code comes from a link: it runs only when you press Run, or once you edit it.',
+    broken: `This link's code could not be read (damaged, or over ${shareLimit / 1000} KB), so here is the tutorial's first query.`,
+  },
   type = shallowRef(start.type),
   limit = 10_000,  // ms, as run-examples.mjs gives each example
   // set once Postgres has started in this browser: its files are then in the browser's cache, and the download note
@@ -38,7 +48,7 @@ const
 
 let
   editor: monaco.editor.IStandaloneCodeEditor | undefined, latest = 0, stop = () => {},
-  runOnPostgres = () => {},  // once the editor is made
+  runOnPostgres = () => {}, share = () => {},  // once the editor is made
   started = false;  // Postgres, in this page
 const disposables: monaco.IDisposable[] = [];
 
@@ -145,8 +155,8 @@ async function typescript() {
   }
 }
 
-/** The type and the SQL of `code`, and on Postgres what it answers. */
-async function update(code: string, types: monaco.editor.ITextModel, postgres = false) {
+/** The type and the SQL of `code`, and on Postgres what it answers; with `runs` false, its type alone. */
+async function update(code: string, types: monaco.editor.ITextModel, postgres = false, runs = true) {
   const
     version = ++latest,
     name = /^const (\w+) =/m.exec(code)?.[1],  // as cast.data.ts
@@ -167,6 +177,7 @@ async function update(code: string, types: monaco.editor.ITextModel, postgres = 
   if (version !== latest) return;
   type.value = typeHtml(name && named && expanded ? typeShown(name, named, expanded) :
     '// no `const <name> = …` to give the type of');
+  if (!runs) return;
 
   const result = await run(emitted.outputFiles[0]?.text ?? '', postgres);
   if (version !== latest || !result) return;
@@ -213,19 +224,64 @@ onMounted(async () => {
   });
   observer.observe(document.documentElement, { attributeFilter: ['class'] });
 
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const refresh = (postgres = false) => {
-    clearTimeout(timer);  // an edit not yet updated is part of this run
-    update(model.getValue(), types, postgres).catch(error => { notes.value = [String(error)]; });
-  };
+  let
+    timer: ReturnType<typeof setTimeout> | undefined,
+    quiet = false;  // a link's code put in: not an edit
+  const
+    refresh = (postgres = false, runs = true) => {
+      clearTimeout(timer);  // an edit not yet updated is part of this run
+      notice.value = undefined;
+      update(model.getValue(), types, postgres, runs).catch(error => { notes.value = [String(error)]; });
+    },
+    // a link's code, its type alone until Run; or, if it cannot be read, the tutorial's first query, run as ever
+    open = (code: string | null) => {
+      stop();
+      quiet = true;
+      model.setValue(code ?? data.code);
+      quiet = false;
+      if (code !== null) {
+        queries.value = [];
+        notes.value = [];
+      }
+      refresh(false, code === null);
+      notice.value = linkNotices[code === null ? 'broken' : 'opened'];
+    },
+    // a link pasted in the address bar of this page: no reload, a `hashchange`; a heading's `#…` is not a link
+    onHashChange = async () => {
+      const code = await codeOf(location.hash);
+      if (code !== undefined && host.value) open(code);
+    };
   runOnPostgres = () => refresh(true);
+  share = async () => {
+    const link = await fragmentOf(model.getValue());
+    if (!host.value) return;
+    if (!link) {
+      notice.value = `Too long to share: a link holds ${shareLimit / 1000} KB of code at most.`;
+      return;
+    }
+    history.replaceState(history.state, '', link);  // VitePress's state kept: its `popstate` ignores a `null` one
+    try {
+      await navigator.clipboard.writeText(location.href);
+      notice.value = 'Link copied: it opens this code, which runs only when its reader presses Run.';
+    } catch {
+      notice.value = 'The link is in the address bar: copy it from there.';
+    }
+  };
+  addEventListener('hashchange', onHashChange);
   editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, runOnPostgres);
-  disposables.push(model, types, editor, { dispose: () => { runOnPostgres = () => {}; } },
-    { dispose: () => { clearTimeout(timer); observer.disconnect(); overflow.remove(); } },
+  disposables.push(model, types, editor, { dispose: () => { runOnPostgres = share = () => {}; } },
+    { dispose: () => {
+      clearTimeout(timer); observer.disconnect(); overflow.remove(); removeEventListener('hashchange', onHashChange);
+    } },
     editor.onDidContentSizeChange(({ contentHeight }) => { host.value!.style.height = `${contentHeight}px`; }),
-    model.onDidChangeContent(() => { clearTimeout(timer); timer = setTimeout(refresh, 300); }));
+    model.onDidChangeContent(() => {
+      if (quiet) return;
+      clearTimeout(timer);
+      timer = setTimeout(refresh, 300);
+    }));
   host.value!.style.height = `${editor.getContentHeight()}px`;
-  refresh();
+  if (shared === undefined) refresh();
+  else open(shared);
 });
 
 onBeforeUnmount(() => { stop(); latest++; disposables.forEach(disposable => disposable.dispose()); });
@@ -242,6 +298,7 @@ onBeforeUnmount(() => { stop(); latest++; disposables.forEach(disposable => disp
         <p class="label">
           <em>SQL</em>Postgres runs
           <button type="button" class="Playground-run" @click="runOnPostgres()">Run</button>
+          <button type="button" class="Playground-share" @click="share()">Share</button>
         </p>
         <template v-for="(query, i) in queries" :key="i">
           <div v-html="query.html" />
@@ -253,6 +310,7 @@ onBeforeUnmount(() => { stop(); latest++; disposables.forEach(disposable => disp
             {{ query.rejects.message }}
           </p>
         </template>
+        <p v-if="notice" class="Playground-note">{{ notice }}</p>
         <p v-for="note in notes" :key="note" class="Playground-note">{{ note }}</p>
       </div>
       <div aria-live="polite">
