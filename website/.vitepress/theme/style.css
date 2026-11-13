@@ -106,7 +106,7 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 }
 .AppearanceSwitch svg { width: 18px; height: 18px; }
 
-/* left nav, in four groups: rows of 32px, 4px apart; a group's label 32px under the group above, 8px over its pages,
+/* left nav, in four groups: rows of 32px, 4px apart; a group's label 32px under the group above, 12px over its pages,
    and in line with their text. The label leads its pages: the headings' face, in --fg, on a --sunken band across the nav; the pages in
    --muted, --fg on hover, the current one in --accent */
 .VPSidebar .group, .VPSidebar .group + .group { border-top: 0; padding-top: 0; }
@@ -121,6 +121,8 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 .VPSidebarItem.level-0 > .item .text {
   font: 600 15px/20px var(--font-display); color: var(--fg); padding: 8px 12px;
 }
+/* the band breathes: 12px between it and the section's first page */
+.VPSidebarItem.level-0 > .items { padding-top: 12px; }
 .VPSidebarItem.level-1 > .item { padding: 0; }
 .VPSidebarItem.level-1 > .item .indicator { display: none; }
 .VPSidebarItem.level-1 .link { flex: 1; padding: 6px 12px; margin: 0 0 4px; border-radius: 8px; }
