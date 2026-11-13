@@ -212,6 +212,17 @@ describe('upsert', () => {
     db.constraint<'users'>('accounts_pkey');
   });
 
+  test("constraint() refuses another schema's unique index of the same name", () => {
+    // shared_name_idx: unique on extra.articles, a plain index on public.transfers
+    const transfer = { from_account: 1, to_account: 2, amount: 1 };
+    db.upsert('extra.articles', { author_id: 1, body: 'b' }, db.constraint('shared_name_idx'));
+    // @ts-expect-error shared_name_idx is not a unique index of transfers
+    db.upsert('transfers', transfer, db.constraint('shared_name_idx'));
+    // @ts-expect-error the same; given to the upsert of a table whose constraint has that name, 6.6.1 ran it
+    const k = db.constraint<'transfers'>('shared_name_idx');
+    db.upsert('extra.articles', { author_id: 1, body: 'b' }, k);
+  });
+
   test('characterization: upsert accepts the constraint of another table', () => {
     // characterization: Constraint<'accounts'> passes as the conflict target of users;
     // at run time, ON CONSTRAINT accounts_pkey fails on users
