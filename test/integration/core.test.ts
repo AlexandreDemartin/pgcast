@@ -317,6 +317,45 @@ describe('Whereable', () => {
     expect(await db.count('memberships', db.all).run(t.client)).toBe(2);
   });
 
+  it('parent() in vals({…}) is the parent column in a lateral, as in vals([…])', async () => {
+    // 6.6.1 sent '{"value":"display_name"}' (#259); parent() with no column takes its key's column
+    const names = (lateral: db.SQLFragment<any>) =>
+      db.select('users', db.all, { columns: ['id'], order: { by: 'id', direction: 'ASC' }, lateral: { v: lateral } }).run(t.client);
+    const perUser = [{ id: 1, v: 'Ada' }, { id: 2, v: 'Bob' }, { id: 3, v: 'Cyd' }];
+    expect({
+      object: await names(sql`SELECT x.a AS result FROM (VALUES (${vals({ a: parent('display_name') })})) AS x(${cols({ a: 1 })})`),
+      noColumn: await names(sql`SELECT x.display_name AS result FROM (VALUES (${vals({ display_name: parent() })})) AS x(${cols({ display_name: 1 })})`),
+      array: await names(sql`SELECT x.a AS result FROM (VALUES (${vals([parent('display_name')])})) AS x(a)`),
+    }).toEqual({ object: perUser, noColumn: perUser, array: perUser });
+  });
+
+  it('raw(), cols(x) and vals(x) in vals({…}) reject run() in a lateral too, where parent() has a meaning', async () => {
+    // 6.6.1 sent '{"value":…}' (#259)
+    const names = (lateral: db.SQLFragment<any>) =>
+      db.select('users', db.all, { columns: ['id'], lateral: { v: lateral } }).run(t.client).then(() => 'ran', (err: Error) => err.message);
+    expect(new Set(await Promise.all([raw("'x'"), cols('display_name'), vals('x')].map(value => names(sql`SELECT ${vals({ a: value })} AS result`)))))
+      .toEqual(new Set([expect.stringMatching(/^`db.raw\(\)`, `db.cols\(\)` and `db.vals\(\)` have no meaning as a value in `vals\(\{…\}\)`/)]));
+  });
+
+  it('raw(), cols(x), vals(x) and parent() in vals({…}) of a sql template of its own reject run() before any query', async () => {
+    // as the shortcuts' writes do (integration/shortcuts); 6.6.1 inserted '{"value":…}' (#259)
+    const queries: unknown[] = [];
+    db.setConfig({ queryListener: query => queries.push(query) });
+    const outcomes: Record<string, unknown> = {};
+    for (const [name, value] of Object.entries({ raw: raw("upper('Dan')"), cols: cols('display_name'), vals: vals('Dan'), parent: parent('display_name') })) {
+      const row = { email: `${name}@example.com`, display_name: value };
+      outcomes[name] = await sql`INSERT INTO ${'users'} (${cols(row)}) VALUES (${vals(row)})`.run(t.client).then(() => 'ran', (err: Error) => err.message);
+    }
+    expect({ ...outcomes, queriesSent: queries.length }).toEqual({
+      raw: expect.stringMatching(/^`db.raw\(\)`, `db.cols\(\)` and `db.vals\(\)` have no meaning as a value in `vals\(\{…\}\)`/),
+      cols: expect.stringMatching(/^`db.raw\(\)`, `db.cols\(\)` and `db.vals\(\)` have no meaning as a value in `vals\(\{…\}\)`/),
+      vals: expect.stringMatching(/^`db.raw\(\)`, `db.cols\(\)` and `db.vals\(\)` have no meaning as a value in `vals\(\{…\}\)`/),
+      parent: `The 'parent' table alias has no meaning here`,
+      queriesSent: 0,
+    });
+    expect(await db.count('users', db.all).run(t.client)).toBe(3);
+  });
+
   it('parent() as a value, or in eq(), is the parent column in a lateral, and throws outside one', async () => {
     // the type accepts both anywhere (types/core); outside a lateral, compiling throws, so run() rejects
     const counts = (where: Whereable) =>
