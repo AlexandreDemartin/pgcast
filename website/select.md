@@ -226,22 +226,20 @@ db.count(table, where, options?)
 
 | Option | SQL it adds | Effect on the type |
 |---|---|---|
-| `columns: ['subtitled']` | `count("subtitled")`<!-- probe: db.count('screenings', db.all, { columns: ['subtitled'] }) --> in place of `count(*)`: the rows where it is not `NULL`; one column, as several (or none, `[]`) throw | refuses two columns or more |
+| `columns: ['subtitled']` | `count("subtitled")`<!-- probe: db.count('screenings', db.all, { columns: ['subtitled'] }) --> in place of `count(*)`: the rows where it is not `NULL`; one column, as several (or none, `[]`) throw | none |
 | `distinct: true` | `SELECT DISTINCT count(*)`<!-- probe: db.count('films', db.all, { distinct: true }) -->, on the one result: not `count(DISTINCT …)`, which needs a `sql` template | none |
 | `groupBy: 'film_id'` | `GROUP BY "film_id"`<!-- probe: db.count('ratings', db.all, { groupBy: 'film_id' }) -->; `.run()` gives the first group's value only, and with no group rejects with a `TypeError` | none |
 | `extras` | nothing | none |
-| `lateral: { … }` | its `LEFT JOIN LATERAL`s, whose results are not read; a single subquery throws, as there is no row to pass it through to | refuses a single subquery |
+| `lateral: { … }` | its `LEFT JOIN LATERAL`s, whose results are not read; a single subquery throws, as there is no row to pass it through to | none |
 | `having`, `limit`, `offset` | as in `select()`; when they leave no row (a `having` that keeps none, `limit: 0`, `offset: 1`), `.run()` rejects with a `TypeError` | none |
 
-`count()` and the four below throw these as they build the query, before any is sent. Zapatos 6.6.1 sent the SQL, which Postgres refused: `sum(*)` and `count("id", "mood")` (42883), `count()` (42809), `SELECT  AS result` (42601).
+`count()` and the four below throw these while compiling, so `.run()` rejects with a plain `Error`, not a `DatabaseError`, before any query, and `.compile()` throws; so does a query that nests one. Zapatos 6.6.1 sent the SQL, which Postgres refused: `sum(*)` and `count("id", "mood")` (42883), `count()` (42809), `SELECT  AS result` (42601). The type is that of 6.6.1, which lets these calls through, a single subquery as `lateral` when there is no `columns` nor `extras`.
 
 | Message | When | Since |
 |---|---|---|
 | `…() needs one column to aggregate: pass columns: ['column']`<!-- message --> | `sum()`, `avg()`, `min()` or `max()` without `columns` | pgcast 6.7.0 |
 | `…() takes one column in columns, not …`<!-- message --> | `columns` with several columns, or none (`[]`) | pgcast 6.7.0 |
 | `…() cannot pass a lateral query through: nest it in the lateral of a select() instead`<!-- message --> | a single subquery as `lateral` | pgcast 6.7.0 |
-
-The type refuses several columns given as a tuple (`['id', 'mood']`, `as const`) and a single subquery as `lateral`; it lets through an array whose length it cannot know (`films.Column[]`), and a missing `columns` on `sum()` and the others, which compiled under Zapatos 6.6.1.
 
 With `columns`, it counts two of the four screenings: the other two have `subtitled` `NULL`.
 
@@ -269,7 +267,7 @@ With `columns`, it counts two of the four screenings: the other two have `subtit
 db.sum(table, where, options?)
 ```
 
-`SELECT sum("column") AS result`<!-- probe: db.sum('ratings', db.all, { columns: ['column'] }) -->, a `number`; otherwise as [`count()`](#count). Give one column in `columns`: without it, `sum()` throws as it builds the query, where Zapatos 6.6.1 sent `sum(*)`, which Postgres refuses (42883). The type lets that call through, as in 6.6.1. When no row matches the `where`, Postgres returns `NULL`, and `Number(null)` makes it `0`.
+`SELECT sum("column") AS result`<!-- probe: db.sum('ratings', db.all, { columns: ['column'] }) -->, a `number`; otherwise as [`count()`](#count). Give one column in `columns`: without it, `.run()` rejects before any query, where Zapatos 6.6.1 sent `sum(*)`, which Postgres refuses (42883). The type lets that call through, as in 6.6.1. When no row matches the `where`, Postgres returns `NULL`, and `Number(null)` makes it `0`.
 
 <CastPanel example="sum">
 
@@ -418,4 +416,4 @@ The call signature of `selectExactlyOne()`: `table`, `where`, `options?`, with t
 
 ### `NumericAggregateSignatures` {#NumericAggregateSignatures}
 
-The call signature of `count()`, `sum()`, `avg()`, `min()` and `max()`: `table`, `where`, `options?`, returning `SQLFragment<number>`. Its `columns` refuses a tuple of two columns or more, and its `lateral` a single subquery: see [`count()`](#count).
+The call signature of `count()`, `sum()`, `avg()`, `min()` and `max()`: `table`, `where`, `options?`, returning `SQLFragment<number>`.
