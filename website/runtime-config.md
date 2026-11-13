@@ -568,13 +568,14 @@ const opening = db.toDate('2030-03-01', 'local');
 - A `Date` keeps milliseconds: the microseconds of a Postgres value are dropped.
 - It does not check the string: one a `Date` cannot read gives an Invalid Date.
 
-A `TimestampString` without `tzInterpretation` does not compile, nor a `TimestampTzString` with one, since the first overload takes `tzInterpretation` only as `undefined` (TS2769):
+A `TimestampString` or a `DateString` without `tzInterpretation` does not compile (TS2345). Nor does a `TimestampTzString` with one, since the first overload takes `tzInterpretation` only as `undefined` (TS2769):
 
 ```ts twoslash
-// @errors: 2345
+// @errors: 2345 2769
 import * as db from 'zapatos/db';
 // ---cut---
 db.toDate('2030-03-01T15:00:00');
+db.toDate('2030-03-01T19:30:00+00:00', 'UTC');
 ```
 
 ### `toString()` {#toString}
