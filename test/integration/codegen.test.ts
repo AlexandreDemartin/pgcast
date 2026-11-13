@@ -981,8 +981,8 @@ declare module 'zapatos/schema' {
   const placeholder = (folder: string) => `Writing new custom type or domain placeholder file: <out>/${folder}/custom/PgScene_notes.d.ts`;
   const otherFolder = (found: string, written: string) =>
     `Note: <out>/${found}/schema.d.ts is here too, generated with moduleNames: '${found}'. ` +
-    `It declares 'zapatos/schema' as <out>/${written}/schema.d.ts does, and TypeScript merges the two, ` +
-    `which can break the types, silently under skipLibCheck. Delete <out>/${found}, ` +
+    `It declares 'zapatos/schema', as <out>/${written}/schema.d.ts does, and TypeScript merges the two: ` +
+    `types can loosen, silently under skipLibCheck. Delete the folder <out>/${found}, ` +
     `once any placeholder you edited there is moved to <out>/${written}/custom.`;
 
   it("writes pgcast/: the files of 'zapatos', but for the module names, the CLI and the zapatos/schema shim", async () => {

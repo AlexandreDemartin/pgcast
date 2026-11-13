@@ -37,7 +37,7 @@ export const warnAboutOtherModuleNames = (config: CompleteConfig) => {
 
   const warn = config.warningListener === true ? console.log : config.warningListener || (() => void 0);
   warn(`Note: ${otherSchemaPath} is here too, generated with moduleNames: '${other}'. ` +
-    `It declares 'zapatos/schema' as ${path.join(folderPath, 'schema' + config.outExt)} does, and TypeScript merges the two, ` +
-    `which can break the types, silently under skipLibCheck. Delete ${otherFolderPath}, ` +
+    `It declares 'zapatos/schema', as ${path.join(folderPath, 'schema' + config.outExt)} does, and TypeScript merges the two: ` +
+    `types can loosen, silently under skipLibCheck. Delete the folder ${otherFolderPath}, ` +
     `once any placeholder you edited there is moved to ${path.join(folderPath, 'custom')}.`);
 };
