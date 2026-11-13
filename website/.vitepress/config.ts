@@ -6,12 +6,12 @@ import { transformerTwoslash } from '@shikijs/vitepress-twoslash';
 import { defineConfig } from 'vitepress';
 import { checkLinks, keepLinkHashes } from './anchors.ts';
 import { writeLlmsFiles } from './llms.ts';
+import { describePage, pageHead, repo } from './meta.ts';
 import { outline } from './outline.ts';
 import { sqlParameters, syntax } from './syntax.ts';
 import { focusableHovers, twoslashOptions } from './twoslash.ts';
 
 const
-  repo = 'https://github.com/AlexandreDemartin/pgcast',
   { version } = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')),
   fonts = 'https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@500;700;800' +
     '&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap';
@@ -23,6 +23,8 @@ export default defineConfig({
   base: '/',  // GitHub Pages, at the domain's root: https://pgcast.dev/
   cleanUrls: true,
   sitemap: { hostname: 'https://pgcast.dev' },  // sitemap.xml, named by public/robots.txt
+  transformPageData: describePage,  // meta.ts
+  transformHead: pageHead,
   srcExclude: ['README.md', 'templates/**'],  // for whoever writes the site, not pages of it
   buildEnd: async config => {
     await writeLlmsFiles(config);  // llms.txt and llms-full.txt, for assistants
