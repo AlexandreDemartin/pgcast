@@ -348,6 +348,27 @@ describe('column comments', () => {
       await t.pool.query('DROP SCHEMA comment_lines CASCADE');
     }
   });
+
+  it('writes a comment holding */ as Zapatos 6.6.1 does, so that one which parsed still parses (until #48)', async () => {
+    // its */ ends the JSDoc, and the next line's /* opens a comment that the JSDoc's own */ closes:
+    // a * before that line is code (TS1131)
+    await t.pool.query(String.raw`
+      CREATE SCHEMA comment_closer;
+      CREATE TABLE comment_closer.notes (reopen int, plain int);
+      COMMENT ON COLUMN comment_closer.notes.reopen IS E'Closes here */\n/* and reopens';
+      COMMENT ON COLUMN comment_closer.notes.plain IS E'First line\nsecond line';`);
+    try {
+      const { ts: schema } = await codegen({ schemas: { comment_closer: all } });
+      expect(commentLines(schema, 'notes')).toEqual({
+        reopen: ['* Closes here */', '/* and reopens'],
+        plain: ['* First line', '* second line'],
+      });
+      expect(schema).toContain('* Closes here */\n    /* and reopens\n');  // the line after */ as master writes it
+      expect(syntaxErrors(schema)).toEqual([]);
+    } finally {
+      await t.pool.query('DROP SCHEMA comment_closer CASCADE');
+    }
+  });
 });
 
 describe('custom types that share a placeholder name', () => {
