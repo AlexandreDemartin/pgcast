@@ -336,6 +336,80 @@ describe('parent() as a write value', () => {
   });
 });
 
+// `as const` makes a readonly tuple: the result is the row of those columns, as for a mutable array (R35)
+describe('a readonly columns or returning', () => {
+  const row = { email: 'a@b', display_name: 'A' };
+  const cols = ['id', 'display_name'] as const;
+  type Row = Pick<s.users.JSONSelectable, 'id' | 'display_name'>;
+
+  test('select, selectOne, selectExactlyOne: those columns', () => {
+    const q = db.select('users', db.all, { columns: cols });
+    expectTypeOf(q.run(pool)).resolves.toEqualTypeOf<Row[]>();
+    expectTypeOf(q.run(pool)).resolves.items.not.toBeNever();
+    expectTypeOf(q.run(pool)).resolves.not.toBeAny();
+    expectTypeOf(db.select('users', db.all, { columns: ['id', 'display_name'] }).run(pool)).resolves.toEqualTypeOf<Row[]>();
+    expectTypeOf(db.selectOne('users', { id: 1 }, { columns: cols }).run(pool)).resolves.toEqualTypeOf<Row | undefined>();
+    expectTypeOf(db.selectExactlyOne('users', { id: 1 }, { columns: cols }).run(pool)).resolves.toEqualTypeOf<Row>();
+    const some: readonly s.users.Column[] = ['id'];
+    expectTypeOf(db.select('users', db.all, { columns: some }).run(pool)).resolves.toEqualTypeOf<s.users.JSONSelectable[]>();
+  });
+
+  test('with extras and lateral, and in a lateral', () => {
+    const n = db.count('accounts', { owner_id: db.parent('id') });
+    const q = db.select('users', db.all, { columns: cols, extras: { mail: 'email' }, lateral: { n } });
+    expectTypeOf(q.run(pool)).resolves.items.toEqualTypeOf<Row & { mail: string } & { n: number }>();
+    const owner = db.selectOne('users', { id: db.parent('owner_id') }, { columns: cols });
+    expectTypeOf(db.select('accounts', db.all, { lateral: { owner } }).run(pool))
+      .resolves.items.toHaveProperty('owner').toEqualTypeOf<Row | null>();
+    const exact = db.selectExactlyOne('users', { id: db.parent('owner_id') }, { columns: cols });
+    expectTypeOf(db.select('accounts', db.all, { lateral: exact }).run(pool)).resolves.toEqualTypeOf<Row[]>();
+  });
+
+  test('insert, update, deletes: those columns', () => {
+    expectTypeOf(db.insert('users', row, { returning: cols }).run(pool)).resolves.toEqualTypeOf<Row>();
+    expectTypeOf(db.insert('users', [row], { returning: cols }).run(pool)).resolves.toEqualTypeOf<Row[]>();
+    expectTypeOf(db.insert('users', row, { returning: cols }).run(pool)).resolves.not.toBeNever();
+    expectTypeOf(db.update('users', { display_name: 'B' }, { id: 1 }, { returning: cols }).run(pool)).resolves.toEqualTypeOf<Row[]>();
+    expectTypeOf(db.deletes('users', { id: 1 }, { returning: cols }).run(pool)).resolves.toEqualTypeOf<Row[]>();
+  });
+
+  test("upsert: those columns, with $action unless reportAction: 'suppress'", () => {
+    const q = db.upsert('users', row, 'email', { returning: cols });
+    expectTypeOf(q.run(pool)).resolves.toEqualTypeOf<Row & db.UpsertAction>();
+    expectTypeOf(q.run(pool)).resolves.not.toBeNever();
+    expectTypeOf(db.upsert('users', [row], 'email', { returning: cols }).run(pool)).resolves.toEqualTypeOf<(Row & db.UpsertAction)[]>();
+    const quiet = db.upsert('users', row, 'email', { returning: cols, reportAction: 'suppress' });
+    expectTypeOf(quiet.run(pool)).resolves.toEqualTypeOf<Row>();
+  });
+
+  test('the result types take a readonly tuple', () => {
+    type C = typeof cols;
+    expectTypeOf<db.FullSelectReturnTypeForTable<'users', C, undefined, undefined, db.SelectResultMode.Many>>().toEqualTypeOf<Row[]>();
+    expectTypeOf<db.ReturningTypeForTable<'users', C, undefined>>().toEqualTypeOf<Row>();
+    expectTypeOf<db.UpsertReturnableForTable<'users', C, undefined, undefined>>().toEqualTypeOf<Row & db.UpsertAction>();
+    expectTypeOf<db.JSONOnlyColsForTable<'users', C>>().toEqualTypeOf<Row>();
+  });
+
+  test('refuses a type the query does not return', async () => {
+    const q = db.select('users', db.all, { columns: ['id', 'display_name'] as const });
+    // @ts-expect-error no_such_column is not among the columns
+    const wrong: Promise<{ no_such_column: Date }[]> = q.run(pool);
+    const rows = await q.run(pool);
+    // @ts-expect-error the rows are objects, not numbers
+    const numbers: number[] = rows;
+    const one = await db.selectExactlyOne('users', { id: 1 }, { columns: cols }).run(pool);
+    // @ts-expect-error users.id is a number
+    const typed: { id: string } = one;
+    // @ts-expect-error only id and display_name come back, not the whole row
+    const whole: s.users.JSONSelectable[] = rows;
+    const mutable: s.users.Column[] = ['email'];
+    const either = await db.select('users', db.all, { columns: Math.random() > 0.5 ? cols : mutable }).run(pool);
+    // @ts-expect-error email is missing when cols is chosen
+    either[0]?.email;
+    void [wrong, numbers, typed, whole];
+  });
+});
+
 describe('truncate', () => {
   test('undefined; refuses an option that is not a keyword', () => {
     expectTypeOf(db.truncate('users', 'RESTART IDENTITY', 'CASCADE').run(pool)).resolves.toEqualTypeOf<undefined>();

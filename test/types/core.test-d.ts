@@ -327,10 +327,10 @@ describe('type surprises', () => {
     db.select('users', { id: db.sql<db.SQL>`${db.self} = 1` });
   });
 
-  test('characterization: columns as a readonly tuple gives never[]', () => {
-    // characterization: ReturningTypeForTable tests `C extends ColumnForTable<T>[]`, which a readonly array is not
+  test('columns as a readonly tuple types the result as a mutable array does', () => {
     const q = db.select('accounts', db.all, { columns: ['id'] as const });
-    expectTypeOf<Run<typeof q>>().toEqualTypeOf<never[]>();
+    expectTypeOf<Run<typeof q>>().toEqualTypeOf<Pick<s.accounts.JSONSelectable, 'id'>[]>();
+    expectTypeOf<Run<typeof q>>().items.not.toBeNever();
   });
 
   test('characterization: a passthru lateral is refused after columns or extras', () => {
