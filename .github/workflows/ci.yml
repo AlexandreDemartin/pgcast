@@ -170,11 +170,12 @@ jobs:
         working-directory: .
       - run: npm ci
       - name: Committed docs schema types match schema.sql
-        # --intent-to-add: a new file the generator writes (a custom type placeholder) shows in the diff too.
+        # --intent-to-add: a new file the generator writes (a custom type placeholder) shows in the diff too. loop/zapatos
+        # is the home's loop: the schema after loop/alter.sql.
         run: |
           npm run docs:schema
-          git add --intent-to-add zapatos
-          git diff --exit-code -- zapatos
+          git add --intent-to-add zapatos loop/zapatos
+          git diff --exit-code -- zapatos loop/zapatos
       - name: Every example runs against Postgres
         run: npm run docs:examples
       - run: npm run docs:build
