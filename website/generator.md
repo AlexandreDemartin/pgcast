@@ -320,7 +320,7 @@ import type * as s from 'pgcast/schema';
 
 :::
 
-- `"zapatos"` writes Zapatos 6.6.1's files, byte for byte: the option changes nothing until it is `"pgcast"`.
+- `"zapatos"` writes the same files as without the option: it changes nothing until it is `"pgcast"`.
 - `"pgcast"` writes the same types, and ends `pgcast/schema.d.ts` with `declare module 'zapatos/schema' { export * from 'pgcast/schema'; }`: `pgcast/db`'s own declarations import `zapatos/schema`. Without it, every type would be `any`: under `skipLibCheck`, silently.
 - In the generated files, `zapatos` is left in that line and in the headers' credit to Zapatos. The config file keeps its name, `zapatosconfig.json` ([#368](https://github.com/AlexandreDemartin/pgcast/issues/368)); `npx pgcast` and `npx zapatos` both read the option.
 - Another value stops the generator before any query, and writes nothing: `moduleNames must be 'zapatos' (the default) or 'pgcast', not 'pgcats'`. In TypeScript, it fails to compile (TS2322, or TS2820 with a suggestion for a near-miss such as `"pgcats"`).
