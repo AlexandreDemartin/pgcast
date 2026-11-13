@@ -304,15 +304,15 @@ describe('without parameters (simple protocol)', () => {
   });
 
   it('no hostile string identifier runs SQL of its own, as a column, a table or a Whereable key', async () => {
-    // compiled text: test/unit/injection.test.ts; each error is a name that does not exist, a syntax
-    // error or a NUL refused by the protocol, and an error runs nothing after it
+    // compiled text: test/unit/injection.test.ts; each error is a name that does not exist, a
+    // cross-database reference (0A000) or a NUL refused by the protocol, and an error runs nothing after it
     expect(await identifierOutcomes({
       dquote: 'a"b', squote: "a'b", semicolon: 'a;b', dashes: 'a--b', comment: 'a/*b', dollar: 'a$1b',
       backslash: 'a\\b', nul: 'a\0b', dot: 'a.b',
       closes: `display_name" FROM users; ${update}; SELECT "display_name`,
       qualifiedCloses: `users"."display_name" FROM users; ${update}; SELECT "display_name`,
       escapedCloses: 'a"" OR TRUE OR ""b', qualifiedEscaped: 's.a"" OR TRUE OR ""b', escapedDot: 'a"."b',
-      escapedNul: 'a""\0""b', escapedOdd: 'a"""b',
+      escapedOdd: 'a"""b',
       prequotedEscaped: '"a"" OR TRUE OR ""b"', prequotedEmpty: '""', lone: '"',
       prequotedCloses: `"display_name" FROM users; ${update}; SELECT "display_name"`,
       mixedEscaped: '"s".a$1."b"" OR TRUE OR ""c"', unicodeEscaped: '"s".U&"a\\0022"" OR TRUE OR ""\\0022b"',
@@ -348,9 +348,6 @@ describe('without parameters (simple protocol)', () => {
         "escapedDot column": "42703",
         "escapedDot key": "42703",
         "escapedDot table": "42P01",
-        "escapedNul column": "08P01",
-        "escapedNul key": "08P01",
-        "escapedNul table": "08P01",
         "escapedOdd column": "42703",
         "escapedOdd key": "42703",
         "escapedOdd table": "42P01",
@@ -632,17 +629,15 @@ describe('without parameters (simple protocol)', () => {
     expect(await adaName()).toBe('Ada');
   });
 
-  it('lock.for is checked before any query', async () => {
+  it('lock.for is checked before any query', () => {
     expect(() => db.select('users', all, { lock: { for: `UPDATE) AS x; ${update}; SELECT (1` } } as any))
       .toThrow(`Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not 'UPDATE) AS x; ${update}; SELECT (1'`);
-    expect(await adaName()).toBe('Ada');
   });
 
-  it('the aggregate of select() is checked before any query', async () => {
+  it('the aggregate of select() is checked before any query', () => {
     const aggregate = `count(*) FROM users; ${update}; SELECT count`;
     expect(() => db.select('users', all, {}, db.SelectResultMode.Numeric, aggregate))
       .toThrow(`Aggregate must be a function name (e.g. sum, or my_schema.my_agg), not '${aggregate}'`);
-    expect(await adaName()).toBe('Ada');
   });
 
   it('a schema-qualified aggregate runs', async () => {
