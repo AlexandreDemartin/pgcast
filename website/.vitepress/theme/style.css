@@ -275,6 +275,36 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 .Diagram .head { fill: var(--muted); }
 .vp-doc .Diagram figcaption { margin: 12px 0 0; font-size: 13px; color: var(--muted); max-width: 68ch; }
 
+/* a written page's actions (PageActions.vue): one quiet split button, floated beside the title, so that a long title
+   wraps under it; its menu and its "Copied" under it, over the text */
+.PageActions { float: right; position: relative; margin: 7px 0 8px 16px; z-index: 10; }  /* in line with the h1's first line */
+/* on a phone, its icon only, so the title keeps the column; its label is still its name */
+@media (max-width: 560px) {
+  .PageActions { margin-top: 2px; }
+  .PageActions .copy .label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+}
+.PageActions .split { display: flex; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.PageActions .split button {
+  display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; color: var(--muted);
+  font: 500 13px/1 var(--font-body);
+}
+.PageActions .split button:hover { background: var(--sunken); color: var(--fg); }
+.PageActions .copy { border-radius: 7px 0 0 7px; }
+.PageActions .toggle { border-left: 1px solid var(--line); border-radius: 0 7px 7px 0; padding: 0 6px !important; }
+.PageActions svg { width: 16px; height: 16px; flex: none; }
+.PageActions .menu {
+  position: absolute; top: calc(100% + 4px); right: 0; min-width: 200px; padding: 4px; display: flex; flex-direction: column;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 8px 28px rgba(0, 0, 0, .18);
+}
+.PageActions .menu > * {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 10px; border-radius: 6px;
+  font: 400 14px/20px var(--font-body); color: var(--fg); text-decoration: none; text-align: left;
+}
+.PageActions .menu > :hover, .PageActions .menu > :focus { background: var(--sunken); }
+.PageActions .menu > :focus-visible { outline-offset: -2px; }
+.PageActions .menu svg { color: var(--muted); width: 14px; height: 14px; }
+.PageActions .status { position: absolute; top: calc(100% + 4px); right: 0; white-space: nowrap; font-size: 12px; color: var(--muted); }
+
 /* pager, then the edit row */
 .VPDocFooter { display: flex; flex-direction: column; }
 .VPDocFooter .prev-next { order: 1; border-top: 0; padding-top: 0; margin-top: 56px; gap: 12px; }

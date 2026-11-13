@@ -6,7 +6,7 @@ import { defaultHoverInfoProcessor, transformerTwoslash } from '@shikijs/vitepre
 import { defineConfig, type HeadConfig } from 'vitepress';
 import { checkLinks, keepLinkHashes } from './anchors.ts';
 import { changelogPage, dateChangelog, writeChangelogFeed } from './changelog.ts';
-import { writeLlmsFiles } from './llms.ts';
+import { host, writeLlmsFiles } from './llms.ts';
 import { describePage, pageHead, repo } from './meta.ts';
 import { outline } from './outline.ts';
 import { playgroundVite } from './playground/build.ts';
@@ -68,7 +68,10 @@ export default defineConfig({
   },
   vite: {
     ...playgroundVite,  // Monaco and the runner's worker, on /playground only
-    define: { __PGCAST_VERSION__: JSON.stringify(version) },
+    define: {
+      __PGCAST_VERSION__: JSON.stringify(version),
+      __PGCAST_SITE__: JSON.stringify(`${host}/`),  // the site's URL, which the page actions' prompts name (PageActions.vue)
+    },
     resolve: {
       // VitePress's light / dark switch becomes system / light / dark (its "overriding internal components").
       alias: [{
