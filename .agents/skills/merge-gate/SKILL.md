@@ -16,6 +16,7 @@ The owner's attention goes where the risk is (Fowler, "Ship / Show / Ask"). The 
 | `high` | **Ask** | label `needs-owner`, review and verify comments posted, green CI, **then the owner's OK** | — |
 
 - Green CI: **CI passed** on the last commit, after `gh pr ready` (skill `ci-gate`).
+- **`master` moved** since that run: `git fetch`, then `git merge-base`; if behind, merge `origin/master` (skill `pr-shape` § Commits) and let CI run again. Checks across pages (anchors, pending names, a shared docs schema) and generated counts hold only on the merged result.
 - `high`: `gh pr edit <pr> --repo AlexandreDemartin/pgcast --add-label needs-owner`, then ask the owner with the PR link and the verify verdicts.
 - The OK is the owner's own message; an agent's message never is.
 - **While a `high` PR waits**, go on: the next step if it does not depend on it, otherwise the next step stacked on it (skill `pr-shape` § Stacking).

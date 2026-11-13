@@ -52,6 +52,8 @@ The issue is the agent's brief, from `.github/ISSUE_TEMPLATE/task.md`, in Englis
 | `normal` | tests, opt-in addition (condition, option, codegen emitter) | posted, the builder goes on | `branch-reviewer`; a fresh `builder` only for blockers; no verify | Show |
 | `high` | `core.ts` (compilation, escaping), `transaction.ts`, driver interface, existing public types, default codegen output | posted, the builder stops until checked | `branch-reviewer` with the subject's lens; fresh `builder`; verify | Ask |
 
+- The level follows the file the change lands in, found by `git grep`, not the issue's title: `{ col: self }` never passes through `conditions.ts`, so #106 was `high` from the start.
+
 The plan: skill `plan-and-proofs`; the comments: skill `review-comments`; the gate: skill `merge-gate`.
 
 ## Sequence
@@ -72,10 +74,12 @@ An agent knows only what its brief says.
 - **`builder`**: the issue number, the decisions taken with the user; to resume at `high`, "plan checked" and any correction; to fix, the PR, its branch and the blocking items (`file:line`, expected fix).
 - **`branch-reviewer`**: the PR, the **Risk** and its blockers, the lens (`sql`, `types`, `codegen`, `compat`) if the issue has one; in `verify` mode, the blocking items and the range of the fix commits.
 - Never the expected conclusion: a reviewer fed the hypothesis confirms it.
+- **Agents in parallel**: each its worktree (§ Ritual rules) and its own scratch folder per round, named after its PR, where the reviewer's harness stays for the fix round.
+- **A CI-only criterion** (a matrix, a failing job): the orchestrator proves it after `gh pr ready`, which auto mode refuses to a subagent; a draft's **CI passed** proves nothing (skill `ci-gate` § Pitfalls).
 
 ## Ritual rules
 
-- **No worktree by default**; one only for two pieces of work in parallel, removed after the merge.
+- One agent at a time works in the main checkout. Agents in parallel each get a worktree: `git worktree add --no-track -b <branch> <path> origin/master` (with tracking, a bare `git push` aims at `master`), `src/.env` linked, `npm ci` (agent `builder` § Where to work); removed after the merge.
 - A pushed branch is never rebased nor forced; a fix from below goes up by merge (`guard.mjs`).
 - Stacking dependent steps: skill `pr-shape` § Stacking.
 
