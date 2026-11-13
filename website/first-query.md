@@ -18,7 +18,7 @@ psql "$DATABASE_URL" -f schema.sql
 
 Every example below runs on that schema. A database of your own works too: swap in your table and column names as you go.
 
-## Set up the project
+## 1. Set up the project {#set-up-the-project}
 
 The examples use `import` and a top-level `await`, so your project is an ES module:
 
@@ -49,7 +49,7 @@ Then a `tsconfig.json` that compiles them as Node runs them:
 - `noEmit`: `tsc` only checks your code; Node runs the `.ts` file itself.
 - The generator writes ordinary `.d.ts` files into your source tree, and `zapatos/schema` is declared in one of them, so they must be part of your compilation. With `"include": ["src"]` and the `outDir` below, they are.
 
-## Configure the generator
+## 2. Configure the generator {#configure-the-generator}
 
 Add `zapatosconfig.json` at the root of your project, where you'll run the generator:
 
@@ -70,7 +70,7 @@ Add `zapatosconfig.json` at the root of your project, where you'll run the gener
 
 Every other option, from the schemas to include to per-column settings, is in [The generator: config and CLI](/generator).
 
-## Generate the types
+## 3. Generate the types {#generate-the-types}
 
 Run the generator. It's installed under both names, `pgcast` and `zapatos`:
 
@@ -106,7 +106,7 @@ The placeholders in `custom/` are yours: the generator writes each one once and 
 | `films.Insertable` | a new row: the `NOT NULL` columns with no default required, the rest optional | `insert()`, `upsert()` |
 | `films.Updatable` | changes to a row: every column optional | `update()`, `upsert()` |
 
-## Connect
+## 4. Connect {#connect}
 
 The run-time code never opens a connection of its own: each query runs on the pool or client you give it. Import the run-time code and make a pool:
 
@@ -132,7 +132,7 @@ node src/films.ts
 
 And check its types with `npx tsc`, as your editor does while you type.
 
-## Ask for one film
+## 5. Ask for one film {#ask-for-one-film}
 
 Ask for a film by its title with `selectOne()`, then `.run()` it on the pool:
 
@@ -182,7 +182,7 @@ Run it, and after `1974` it prints:
 }
 ```
 
-## Ask for several, and only what you need
+## 6. Ask for several, and only what you need {#ask-for-several-and-only-what-you-need}
 
 `select()` gives every matching row, in an array. Ask for the films of one studio, oldest first, and name the two columns you want:
 
@@ -192,7 +192,9 @@ Run it, and after `1974` it prints:
 
 </CastPanel>
 
-Each column name shows up twice in `jsonb_build_object($1::text, "title", …)`<!-- probe: examples/first-query-columns.ts -->: as a value, `$1`, the key of the JSON object, and quoted, `"title"`, the column it reads. The type follows the query: two columns asked for, two in the type. Leave `columns` out and you get every column, `films.JSONSelectable[]`. Print them:
+Each column name shows up twice in `jsonb_build_object($1::text, "title", …)`<!-- probe: examples/first-query-columns.ts -->: as a value, `$1`, the key of the JSON object, and quoted, `"title"`, the column it reads.
+
+The type follows the query: two columns asked for, two in the type. Leave `columns` out and you get every column, `films.JSONSelectable[]`. Print them:
 
 ```ts twoslash
 import * as db from 'zapatos/db';
@@ -217,7 +219,7 @@ Run the file again, and after the year and the SQL it prints:
 
 With no matching film, the array is empty: `select()` never gives `undefined`.
 
-## Add a film
+## 7. Add a film {#add-a-film}
 
 `insert()` takes a `films.Insertable` and gives back the row as Postgres stored it. Type the row first, with the schema's types. Add this import at the top of the file, with the other two:
 
@@ -233,7 +235,9 @@ Then the row and the query:
 
 </CastPanel>
 
-`newFilm` is a `films.JSONSelectable`, the row type `selectOne()` gave. The row's `films.Insertable` asks for the `NOT NULL` columns with no default and leaves the others optional; typed on its own, the row gets errors that name the column at fault. Print the new film:
+`newFilm` is a `films.JSONSelectable`, the row type `selectOne()` gave.
+
+The row's `films.Insertable` asks for the `NOT NULL` columns with no default and leaves the others optional; typed on its own, the row gets errors that name the column at fault. Print the new film:
 
 ```ts twoslash
 import * as db from 'zapatos/db';
@@ -319,7 +323,7 @@ console.log(newFilm);
 
 :::
 
-## When the schema changes
+## 8. When the schema changes {#when-the-schema-changes}
 
 Run `npx pgcast` again after each migration. `schema.d.ts` is written afresh, and TypeScript checks every query against it. Try it: rename a column, regenerate, and check the file:
 
