@@ -63,7 +63,8 @@ const variants: [string, Config][] = [
   }],
   ['include-exclude-lists', {
     schemas: {
-      public: { include: ['users', 'accounts', 'products', 'no_such_table'], exclude: ['products'] },  // exclude wins
+      // exclude wins; no_such_table generates nothing, with a warning (§ include entries that match no relation)
+      public: { include: ['users', 'accounts', 'products', 'no_such_table'], exclude: ['products'] },
       extra: { include: '*', exclude: ['type_zoo', 'imported_lines'] },
     },
   }],
@@ -79,9 +80,26 @@ const noDebug = () => void 0;
 
 const codegen = (config: Config) => tsForConfig(finaliseConfig({ ...config, ...quiet, db: db() }), noDebug);
 
+/** The warnings of a run, but the bigint note, which comes once per process. */
+const warningsOf = async (config: Config) => {
+  const warnings: string[] = [];
+  await tsForConfig(finaliseConfig({
+    ...config, ...quiet, warningListener: s => warnings.push(s), db: db(), outDir: 'src',
+  }), noDebug);
+  return warnings.filter(w => !w.startsWith('Note: this database has bigint'));
+};
+
+const warningsFor = (schemas: Schemas) => warningsOf({ schemas });
+
 /** Custom type placeholders, sorted by name: tsForConfig() inserts them in query completion order. */
 const customFiles = (files: Record<string, string>) =>
   Object.keys(files).sort().map(name => `// ===== custom/${name}.d.ts =====\n${files[name]}`).join('\n');
+
+/** The namespace of `table` in a generated schema, up to its last type. */
+const tableBlock = (schema: string, table: string) => {
+  const start = schema.indexOf(`export namespace ${table} {`);
+  return schema.slice(start, schema.indexOf('\n  }\n', schema.indexOf('export type SQL = ', start)));
+};
 
 describe('tsForConfig()', () => {
   it.each(variants)('%s', async (name, config) => {
@@ -137,11 +155,6 @@ describe('variant snapshots', () => {
 });
 
 describe('surprises, frozen as they are', () => {
-  const tableBlock = (schema: string, table: string) => {
-    const start = schema.indexOf(`export namespace ${table} {`);
-    return schema.slice(start, schema.indexOf('\n  }\n', schema.indexOf('export type SQL = ', start)));
-  };
-
   it('sorts enum values alphabetically, not in declaration order (enumsortorder)', async () => {
     const { ts: schema } = await codegen(main);
     expect(schema).toContain(`export type mood = 'happy' | 'ok' | 'sad';`);  // declared: 'sad', 'ok', 'happy'
@@ -163,12 +176,6 @@ describe('surprises, frozen as they are', () => {
       'People who can sign in', 'Users not currently sad', 'Balances per owner, refreshed on demand',
       'Second application schema', 'How a user feels', 'Case-insensitive e-mail address',
     ]) expect(schema).not.toContain(comment);
-  });
-
-  it('matches unique indexes by name across schemas', async () => {
-    const { ts: schema } = await codegen(main);
-    // shared_name_idx is unique on extra.articles, and a plain index on public.transfers
-    expect(tableBlock(schema, 'transfers')).toContain(`export type UniqueIndex = 'shared_name_idx' | 'transfers_pkey';`);
   });
 
   it('types enums of another schema as custom types (`any` placeholder)', async () => {
@@ -209,6 +216,70 @@ describe('surprises, frozen as they are', () => {
   });
 });
 
+describe('UniqueIndex', () => {
+  it("lists only the table's own unique indexes", async () => {
+    const { ts: schema } = await codegen(main);
+    // shared_name_idx is unique on extra.articles, and a plain index on public.transfers
+    expect(tableBlock(schema, 'articles')).toContain(`export type UniqueIndex = 'articles_pkey' | 'shared_name_idx';`);
+    expect(tableBlock(schema, 'transfers')).toContain(`export type UniqueIndex = 'transfers_pkey';`);
+  });
+
+  it('keeps a name that unique constraints of two schemas share, for each', async () => {
+    // tsForConfig() reads through its own connection: the schemas are committed, then dropped
+    await t.pool.query(`
+      CREATE SCHEMA shared_a; CREATE SCHEMA shared_b; CREATE SCHEMA shared_c;
+      CREATE TABLE shared_a.items_a (k int, CONSTRAINT shared_key UNIQUE (k));
+      CREATE TABLE shared_b.items_b (k int, CONSTRAINT shared_key UNIQUE (k));
+      CREATE TABLE shared_c.items_c (k int);
+      CREATE INDEX shared_key ON shared_c.items_c (k);`);
+    try {
+      const { ts: schema } = await codegen({ schemas: { shared_a: all, shared_b: all, shared_c: all } });
+      expect(tableBlock(schema, 'items_a')).toContain(`export type UniqueIndex = 'shared_key';`);
+      expect(tableBlock(schema, 'items_b')).toContain(`export type UniqueIndex = 'shared_key';`);
+      expect(tableBlock(schema, 'items_c')).toContain('export type UniqueIndex = never;');  // a plain index
+    } finally {
+      await t.pool.query('DROP SCHEMA shared_a, shared_b, shared_c CASCADE');
+    }
+  });
+
+  it("gives a partition in another schema than its parent's the unique indexes the catalog gives it", async () => {
+    await t.pool.query(`
+      CREATE SCHEMA part_a; CREATE SCHEMA part_b;
+      CREATE TABLE part_a.events (id int, k int, CONSTRAINT events_k_key UNIQUE (k, id)) PARTITION BY RANGE (id);
+      CREATE TABLE part_b.events_1 PARTITION OF part_a.events FOR VALUES FROM (0) TO (100);
+      CREATE TABLE part_b.events_2 (id int, k int);
+      CREATE UNIQUE INDEX events_2_own ON part_b.events_2 (k, id);
+      ALTER TABLE part_a.events ATTACH PARTITION part_b.events_2 FOR VALUES FROM (100) TO (200);
+      CREATE TABLE part_b.events_3 (id int, k int);
+      CREATE UNIQUE INDEX events_k_key ON part_b.events_3 (k, id);  -- the parent's name, in the partition's schema
+      ALTER TABLE part_a.events ATTACH PARTITION part_b.events_3 FOR VALUES FROM (200) TO (300);`);
+    try {
+      const { ts: schema } = await codegen({ schemas: { part_a: all, part_b: all } });
+      const { rows } = await t.pool.query<{ relname: string; names: string[] }>(`
+        SELECT c.relname, coalesce(array_agg(i.relname::text ORDER BY i.relname) FILTER (WHERE i.oid IS NOT NULL), '{}') AS names
+        FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        LEFT JOIN pg_index x ON x.indrelid = c.oid AND x.indisunique
+        LEFT JOIN pg_class i ON i.oid = x.indexrelid
+        WHERE n.nspname IN ('part_a', 'part_b') AND c.relkind IN ('r', 'p')
+        GROUP BY c.relname`);
+      const fromCatalog = Object.fromEntries(rows.map(r => [r.relname, r.names.map(n => `'${n}'`).join(' | ') || 'never']));
+      const generated = Object.fromEntries(rows.map(r =>
+        [r.relname, /export type UniqueIndex = (.*);/.exec(tableBlock(schema, r.relname))?.[1]]));
+      expect(generated).toEqual(fromCatalog);
+      expect(fromCatalog).toEqual({
+        events: "'events_k_key'",
+        events_1: "'events_1_k_id_key'",
+        // attached: its own unique index, and the one Postgres adds for the parent's constraint
+        events_2: "'events_2_k_id_key' | 'events_2_own'",
+        events_3: "'events_3_k_id_key' | 'events_k_key'",
+      });
+    } finally {
+      await t.pool.query('DROP SCHEMA part_a, part_b CASCADE');
+    }
+  });
+});
+
 describe('custom types that share a placeholder name', () => {
   // two schemas of their own, committed to this file's database: no other test configures them
   beforeAll(() => t.pool.query(`
@@ -230,14 +301,6 @@ describe('custom types that share a placeholder name', () => {
     CREATE TABLE collide_a.spaced (spaced collide_a."code x");
   `));
   afterAll(() => t.pool.query('DROP SCHEMA collide_a, collide_b CASCADE'));
-
-  const warningsFor = async (schemas: Schemas) => {
-    const warnings: string[] = [];
-    await tsForConfig(finaliseConfig({
-      schemas, ...quiet, warningListener: s => warnings.push(s), db: db(), outDir: 'src',
-    }), noDebug);
-    return warnings.filter(w => !w.startsWith('Note: this database has bigint'));  // once per process
-  };
 
   it('warns once per name that types of two schemas share, a table and a materialized view alike', async () => {
     expect(await warningsFor({ collide_a: only('things'), collide_b: only('things', 'codes') })).toEqual([
@@ -280,6 +343,61 @@ describe('custom types that share a placeholder name', () => {
     // public.positive_int, in a table of each schema and a materialized view of collide_b, is one type
     expect(await warningsFor({ public: all, collide_b: only('things', 'amounts') })).toEqual([]);
     expect(await warningsFor(main.schemas!)).toEqual([]);
+  });
+});
+
+describe('include entries that match no relation', () => {
+  const unmatched = (name: string, schema: string) =>
+    `Note: the include entry "${name}" of schema "${schema}" matches no relation there, so it generates nothing. ` +
+    `Check its spelling and case, that the relation is in schema "${schema}", and that the database role ` +
+    `has a privilege on it: include names tables, views, materialised views and foreign tables.`;
+
+  it('warns once per entry of a list that names no relation, in list order', async () => {
+    expect(await warningsFor({ public: only('users', 'no_such_table', 'Users', 'orderlines') })).toEqual([
+      unmatched('no_such_table', 'public'),
+      unmatched('Users', 'public'),
+      unmatched('orderlines', 'public'),
+    ]);
+  });
+
+  it('names the schema of the rule, for a relation listed under another schema', async () => {
+    expect(await warningsFor({ public: only('users', 'articles'), extra: only('users', 'articles') })).toEqual([
+      unmatched('articles', 'public'),
+      unmatched('users', 'extra'),
+    ]);
+  });
+
+  it('warns about an entry exclude also names, but not about an existing relation it excludes', async () => {
+    expect(await warningsFor({
+      public: { include: ['users', 'products', 'no_such_table'], exclude: ['products', 'no_such_table'] },
+    })).toEqual([unmatched('no_such_table', 'public')]);
+  });
+
+  it('does not warn when exclude is "*": the relations are not read', async () => {
+    expect(await warningsFor({ public: { include: ['no_such_table'], exclude: '*' } })).toEqual([]);
+  });
+
+  it('warns about each entry of a schema that does not exist, and not about "*"', async () => {
+    expect(await warningsFor({ no_such_schema: only('users', 'accounts') })).toEqual([
+      unmatched('users', 'no_such_schema'),
+      unmatched('accounts', 'no_such_schema'),
+    ]);
+    expect(await warningsFor({ no_such_schema: all })).toEqual([]);
+  });
+
+  it('does not warn when every entry matches, whatever the kind of relation', async () => {
+    expect(await warningsFor({
+      public: only('users', 'OrderLines', 'active_users', 'account_totals', 'events', 'events_2025'),
+      extra: { include: ['articles', 'imported_lines', 'article_authors'], exclude: ['articles'] },
+    })).toEqual([]);
+    expect(await warningsFor({ public: all, extra: { include: '*', exclude: ['no_such_table'] } })).toEqual([]);
+  });
+
+  it('warns, of main and the snapshot variants, only about no_such_table of include-exclude-lists', async () => {
+    const warnings: Record<string, string[]> = {};
+    for (const [name, config] of [['main', main] as const, ...variants]) warnings[name] = await warningsOf(config);
+    expect(warnings).toEqual(Object.fromEntries(Object.keys(warnings).map(name =>
+      [name, name === 'include-exclude-lists' ? [unmatched('no_such_table', 'public')] : []])));
   });
 });
 

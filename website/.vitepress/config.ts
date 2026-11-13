@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { transformerTwoslash } from '@shikijs/vitepress-twoslash';
-import { defineConfig } from 'vitepress';
+import { defineConfig, type HeadConfig } from 'vitepress';
 import { checkLinks, keepLinkHashes } from './anchors.ts';
 import { changelogPage, dateChangelog, writeChangelogFeed } from './changelog.ts';
 import { writeLlmsFiles } from './llms.ts';
@@ -14,8 +14,8 @@ import { focusableHovers, twoslashOptions } from './twoslash.ts';
 
 const
   { version } = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')),
-  fonts = 'https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@500;700;800' +
-    '&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap';
+  font = (face: string): HeadConfig =>
+    ['link', { rel: 'preload', href: `/fonts/${face}-latin.woff2`, as: 'font', type: 'font/woff2', crossorigin: '' }];
 
 export default defineConfig({
   title: 'pgcast',
@@ -37,9 +37,8 @@ export default defineConfig({
     checkLinks(config);  // a link to a page or an anchor that does not exist fails the build
   },
   head: [
-    ['link', { rel: 'preconnect', href: 'https://fonts.googleapis.com' }],
-    ['link', { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' }],
-    ['link', { rel: 'stylesheet', href: fonts }],
+    // public/fonts/, declared in theme/fonts.css: every page's first screen sets all three faces (the wordmark is mono)
+    font('schibsted-grotesk'), font('inter'), font('jetbrains-mono'),
     // public/: favicon.svg follows the system's theme; favicon.ico and apple-touch-icon.png are rendered by
     // render-images.mjs
     ['link', { rel: 'icon', href: '/favicon.ico', sizes: '32x32' }],

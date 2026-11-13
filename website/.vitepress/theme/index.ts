@@ -1,5 +1,5 @@
 // Copyright (C) 2026 Alexandre Demartin
-// VitePress's default theme, without its bundled Inter: the three faces come from Google Fonts (config.ts).
+// VitePress's default theme, without its bundled Inter: the three faces are the site's own (fonts.css).
 // Twoslash's hover types are floating-vue menus. On a desktop they open on focus too, so a keyboard reaches them; on
 // a phone or tablet they keep the plugin's own trigger, a touch. `isMobile` is the plugin's test, which it does not export.
 import TwoslashFloatingVue from '@shikijs/vitepress-twoslash/client';
@@ -11,6 +11,7 @@ import GroupPages from './GroupPages.vue';
 import InstallLine from './InstallLine.vue';
 import Layout from './Layout.vue';
 import SiteFooter from './SiteFooter.vue';
+import './fonts.css';
 import './style.css';
 
 const isMobile = typeof navigator !== 'undefined' &&

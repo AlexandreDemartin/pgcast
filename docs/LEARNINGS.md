@@ -81,6 +81,14 @@ Candidates for a check, a rule or a skill line.
 - #42 — A warning that names a file the user has is built from `config.outDir`, as `write.ts` does; only a test with an `outDir` other than `.` catches it — `builder`
 - #42 — A PR body that quotes a message's exact text is checked after every review round — `builder`
 - #42 — A colliding pair lives in scratch schemas the test creates in its own database and drops in `afterAll`, which keeps the fixture and every snapshot untouched — `builder`
+- #43 — A narrowed generated union breaks code 6.6.1 forced: an exhaustive `Record<Union, …>` or a `switch` ending in `never` had to name every member; classify a removed member by whether 6.6.1 forced the code, not by whether the code sends a query — `branch-reviewer`
+- #43 — For a fix to an introspection query, the cheap oracle is the catalog itself (`pg_index` by `indrelid`) compared table by table over hostile schemas (partitions in another schema, `ATTACH PARTITION`, `USING INDEX`, `SET SCHEMA`, inheritance, quoted names) — `branch-reviewer`
+- #43 — A guard test that passes on master proves something only with a mutation that turns it red; record the mutation in Proofs — `branch-reviewer`
+- #43 — Check `gh pr view <n> --json mergeable` at each verify round and before the gate: a sibling PR merged minutes after a clean merge leaves the PR conflicting — `branch-reviewer`
+- #43 — Two branches that each add a `describe` at the same place conflict on the closing braces: rebuild the file from one side plus the other's added block, rather than keeping both conflict halves — orchestrator
+- #45 — A PR closing an issue that a docs page cites as a limit retargets that link before merge: `grep -rn '#<n>' website/` at review — `branch-reviewer`
+- #45 — A « no false positive » test for a codegen warning runs every snapshot variant with its full config: a mutant that checks `tables` instead of `relations` only shows on a variant that excludes a relation — `branch-reviewer`, `builder`
+- #45 — Two review items in one file that need separate commits: commit between the two edits or stage by hunk; without amend, a plain `git add <file>` leaves the message incomplete — `builder`
 
 ## Minors kept
 
