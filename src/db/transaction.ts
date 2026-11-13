@@ -110,15 +110,15 @@ export async function transaction<T, M extends IsolationLevel>(
     clientIsOurs = typeofQueryable(txnClientOrQueryable) === 'pool',
     txnClient = (clientIsOurs ? await txnClientOrQueryable.connect() : txnClientOrQueryable) as TxnClient<M>;
 
-  txnClient._zapatos = { isolationLevel, txnId };
+  try {  // from here, every path releases a client checked out from the pool
+    txnClient._zapatos = { isolationLevel, txnId };
 
-  const
-    config = getConfig(),
-    { transactionListener } = config,
-    maxAttempts = config.transactionAttemptsMax,
-    { minMs, maxMs } = config.transactionRetryDelay;
+    const
+      config = getConfig(),
+      { transactionListener } = config,
+      maxAttempts = config.transactionAttemptsMax,
+      { minMs, maxMs } = config.transactionRetryDelay;
 
-  try {
     for (let attempt = 1; ; attempt++) {
       let result: T, commandTag: string | undefined;
       try {
