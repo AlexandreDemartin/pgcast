@@ -62,8 +62,8 @@ Headings share one weight, 600: the hierarchy is in their size. Letters are tigh
 | Lede | 1.1rem, `--muted`, at most 62ch |
 | Code blocks | 13px / 1.6, `tab-size: 2` |
 | Inline code | `.88em` on `--sunken`, no border, radius 4px, padding `0 4px` |
-| Nav | 14px; group labels 13px, 600, `--muted`, sentence case, no letter-spacing |
-| "On this page" | its title as the nav's group labels; its links 13px |
+| Nav | pages 14px, `--muted` (`--fg` on hover, the current one `--accent`); group labels in the headings' face, 15px, 600, `--fg`, on a `--sunken` band from the nav's left edge to its right, with a `--line` rule above and below, sentence case, no letter-spacing, 32px under the group above |
+| "On this page" | its title 13px, 600, `--muted`, sentence case; its links 13px |
 | Captions, edit row, footer | 13px |
 | Hover-type tooltip | mono 12.5px / 1.5 |
 
@@ -77,12 +77,12 @@ Spacing is on a 4px grid.
 - **Shell**, VitePress's, at most 1440px: left nav 260px · reading column, at most 688px · "On this page" rail, at most 256px, from 1280px. Gutters of 16px at least, and the safe-area insets.
 - **Left nav**, sticky, in the four groups of Diátaxis (amended 2026-11-12, [decision 004](../decisions/004-documentation-site.md) § The site, which lists their pages): Tutorial · How-to guides · Reference · Explanation.
   - Rows of 32px (padding `6px 12px`, 14px / 20px), 4px apart, radius 8px; `--sunken` on hover.
-  - Each group's label links its landing page: a row of 36px, its text in line with its pages' text; 24px under the group above, 8px over its pages.
+  - Each group's label links its landing page: a row of 36px, its text in line with its pages' text; 32px under the group above, 12px over its pages.
   - A page that documents a minor carries its version as a small badge (Versions, opt-ins and warnings: 6.7).
   - The current page on `--accent-soft`, in `--accent`, 600.
 - **Reading column**: paragraphs and list items at most 68ch; VitePress's padding (48px 32px from 960px).
 - **"On this page"**: the page's `h2`s, the current one in `--accent` with an accent rule on its left.
-- **Group landing pages** (`/tutorial`, `/guides`, `/reference`, `/explanation`): the title, the lede on what the group is for, then each page: its title (16px, 500, `--fg`, no underline; `--accent` and underlined on hover), then its line, 4px under it, in `--muted`: the page's description, its lede cut as `meta.ts` cuts it (`groups.data.ts`). 20px between pages, 32px under the lede.
+- **Group landing pages** (`/tutorial`, `/guides`, `/reference`, `/explanation`): the title, the lede on what the group is for, then each page: its title, a link as every other in the docs (16px, 500, `--accent`, underlined 1px at 3px, 2px on hover), then its line, 4px under it, in `--muted`: the page's description, its lede cut as `meta.ts` cuts it (`groups.data.ts`). 20px between pages, 32px under the lede.
 - **Breakpoints**: VitePress's (768 / 960 / 1280px) for the shell, the top bar and the nav, rather than fighting its layout: under 960px the nav becomes a drawer. The home grid, the notes, the page `h1` and the version pill keep 560 / 900px; the cast panel follows its own width (§ Signature components).
 - **Home**, on a 1180px column:
   - The hero: eyebrow, line, lede, then two buttons, "Get started" (primary) and "Switching from Zapatos", 40px tall, padding `0 20px`; under them, 16px down, the install command as one quiet mono line, 13px: a `--muted` `$`, the command in `--fg`, and a copy icon button, 28px, no border (16px icon, 2px stroke on a 24px grid, as the theme button's).
