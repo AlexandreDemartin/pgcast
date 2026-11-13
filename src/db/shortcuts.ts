@@ -802,11 +802,15 @@ export const selectExactlyOne: SelectExactlyOneSignatures = function (table, whe
 
 /* === count, sum, avg === */
 
+// one column: a tuple of another length is refused, an array of unknown length is not (the run time checks it)
+type AggregateColumnsOption<T extends Table> =
+  readonly [ColumnForTable<T>] | (readonly ColumnForTable<T>[] & { 1?: never }) | undefined;
+
 export interface NumericAggregateSignatures {
   <
     T extends Table,
-    C extends ColumnsOption<T>,
-    L extends LateralOption<C, E>,
+    C extends AggregateColumnsOption<T>,
+    L extends LimitedLateralOption,
     E extends ExtrasOption<T>,
     A extends string,
   >(
@@ -816,6 +820,24 @@ export interface NumericAggregateSignatures {
   ): SQLFragment<number>;
 }
 
+// the aggregate takes one column, none for count(*), and has no row to pass a lateral query through: Zapatos 6.6.1
+// sent `sum(*)`, `count("a", "b")` or `SELECT  AS result`; the type lets a missing column through, as 6.6.1 did
+const numericAggregate = (
+  table: Table,
+  where: Whereable | SQLFragment<any> | AllType,
+  options: SelectOptionsForTable<Table, ColumnsOption<Table>, LimitedLateralOption, ExtrasOption<Table>, any> = {},
+  aggregate: string,
+) => {
+  const { columns, lateral } = options;
+  if (!columns) {
+    if (aggregate !== 'count') throw new Error(`${aggregate}() needs one column to aggregate: pass columns: ['column']`);
+  } else if (Array.isArray(columns) && columns.length !== 1) {
+    throw new Error(`${aggregate}() takes one column in columns, not ${columns.length}${aggregate === 'count' ? ' (leave columns out for count(*))' : ''}`);
+  }
+  if (lateral instanceof SQLFragment) throw new Error(`${aggregate}() cannot pass a lateral query through: nest it in the lateral of a select() instead`);
+  return select(table, where, options, SelectResultMode.Numeric, aggregate);
+};
+
 /**
  * Generate a `SELECT` query `SQLFragment` that returns a count. This can be 
  * nested in other `select`/`selectOne` queries using their `lateral` option.
@@ -823,9 +845,11 @@ export interface NumericAggregateSignatures {
  * @param where A `Whereable` or `SQLFragment` defining the rows to be counted, 
  * or `all`
  * @param options Options object. Useful keys may be: `columns`, `alias`.
+ * `columns: ['col']` gives `count("col")`, and no `columns` `count(*)`;
+ * several columns, or a single query as `lateral`, throw.
  */
 export const count: NumericAggregateSignatures = function (table, where, options?) {
-  return select(table, where, options, SelectResultMode.Numeric);
+  return numericAggregate(table, where, options, 'count');
 };
 
 /**
@@ -835,9 +859,11 @@ export const count: NumericAggregateSignatures = function (table, where, options
  * @param where A `Whereable` or `SQLFragment` defining the rows to be
  * aggregated, or `all`
  * @param options Options object. Useful keys may be: `columns`, `alias`.
+ * `columns` holds the one column to aggregate: `columns: ['col']` gives
+ * `sum("col")`; no column, several, or a single query as `lateral`, throw.
  */
 export const sum: NumericAggregateSignatures = function (table, where, options?) {
-  return select(table, where, options, SelectResultMode.Numeric, 'sum');
+  return numericAggregate(table, where, options, 'sum');
 };
 
 /**
@@ -848,9 +874,10 @@ export const sum: NumericAggregateSignatures = function (table, where, options?)
  * @param where A `Whereable` or `SQLFragment` defining the rows to be
  * aggregated, or `all`
  * @param options Options object. Useful keys may be: `columns`, `alias`.
+ * `columns` holds the one column to aggregate, as for `sum`.
  */
 export const avg: NumericAggregateSignatures = function (table, where, options?) {
-  return select(table, where, options, SelectResultMode.Numeric, 'avg');
+  return numericAggregate(table, where, options, 'avg');
 };
 
 /**
@@ -861,9 +888,10 @@ export const avg: NumericAggregateSignatures = function (table, where, options?)
  * @param where A `Whereable` or `SQLFragment` defining the rows to be 
  * aggregated, or `all`
  * @param options Options object. Useful keys may be: `columns`, `alias`.
+ * `columns` holds the one column to aggregate, as for `sum`.
  */
 export const min: NumericAggregateSignatures = function (table, where, options?) {
-  return select(table, where, options, SelectResultMode.Numeric, 'min');
+  return numericAggregate(table, where, options, 'min');
 };
 
 /**
@@ -874,7 +902,8 @@ export const min: NumericAggregateSignatures = function (table, where, options?)
  * @param where A `Whereable` or `SQLFragment` defining the rows to be
  * aggregated, or `all`
  * @param options Options object. Useful keys may be: `columns`, `alias`.
+ * `columns` holds the one column to aggregate, as for `sum`.
  */
 export const max: NumericAggregateSignatures = function (table, where, options?) {
-  return select(table, where, options, SelectResultMode.Numeric, 'max');
+  return numericAggregate(table, where, options, 'max');
 };
