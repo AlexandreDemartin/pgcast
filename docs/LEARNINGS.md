@@ -44,6 +44,11 @@ Candidates for a check, a rule or a skill line.
 - #96 — A replay that compares rows needs data where both readings differ, or it reports « same rows » for a call whose meaning changed — `builder`
 - #96 — A claim that every other call of a helper joining fragments as text keeps its meaning needs splits inside quoted literals, not only grammar splits: `` and(sql`title = 'x`, sql`y'`) `` stays valid SQL and compares with another value — `branch-reviewer`
 - #96 — A reviewer that symlinks another worktree's `node_modules` writes its `node_modules/.cache/pgcast` on `typecheck`; at another commit, use a separate `--outDir` or its own `npm ci` — `branch-reviewer`
+- #37 — A rule that turns a character of an identifier into syntax (splitting on `.`, cutting `[]`) changes every catalog name holding that character: replay it with a `CREATE TYPE`/`CREATE DOMAIN` named with each such character beside a type of the shorter name — `branch-reviewer`
+- #37 — When two accept rules overlap, a test pins one input both accept, or swapping them goes unseen — `branch-reviewer`
+- #37 — The obvious end-anchored regex for trailing brackets is quadratic in V8: time it before planning, and scan from the end — `builder`
+- #37 — After a merge from master, compare `git diff <master tip> <merge>` with `git diff <merge base> <branch tip>` (`+`/`-` lines only): identical means the merge kept both sides unchanged — `branch-reviewer`
+- #37 — A mutation applied by matching the source text survives the line numbers a merge moves; line numbers quoted in a PR body go stale — `branch-reviewer`
 
 ## Minors kept
 
@@ -65,3 +70,4 @@ Minor review defects, taken up by the end-of-chapter review.
 - #35 — `src/db/transaction.ts:57`, `docs/CHARACTERISATION-REPORT.md:87`: the comment says « with pg-native » (the guard passes on pg 7 without it); R26's test cell still says « none » — `branch-reviewer`
 - #96 — `CHANGELOG.md:84`: « only the parentheses of the next line change » — `or()` does not change at all, and the next line changes rows for a bare `OR` — `branch-reviewer`
 - #96 — `test/integration/conditions.test.ts:93`: no test pins the `BETWEEN` split's 42601; `website/switching.md:79` does not list it among the changed calls — `branch-reviewer`
+- #37 — `src/db/core.ts` (JSDoc of `param()` and `Parameter`): the bounds sentence sits in the « Without a `"` » case, so « With a `"`, the type is written as is » reads as if bounds stay inside; say a name holding a `.` or ending with `[]` is given already quoted — `branch-reviewer`
