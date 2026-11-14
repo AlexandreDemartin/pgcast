@@ -223,7 +223,7 @@ Off, the result goes through `Number()`, as in Zapatos 6.6.1: `0` when no row ma
 
 - The types follow only once it is declared in [`ConfigTypes`](#ConfigTypes) as well: `setConfig()` sets the runtime, the declaration the types.
 - Nested in a `lateral` or `extras`, the value comes back as JSON, option or not, and `null` when no row matches; declared, it is typed as its column's `JSONSelectable`.
-- Read at `.run()`, as the warning is, so a query built before `setConfig()` gets the option it runs under, as its type, declared once for the program, says. A query that returns no row, a `groupBy` with no group, still rejects with a `TypeError` ([#163](https://github.com/AlexandreDemartin/pgcast/issues/163)).
+- Read at `.run()`, as is the warning: a query built before `setConfig()` gets the option it runs under, as its type, declared for the whole program, says. A query that returns no row, a `groupBy` with no group, still rejects with a `TypeError` ([#163](https://github.com/AlexandreDemartin/pgcast/issues/163)).
 - Examples, and each type: [Typed by column](/select#typed-by-column).
 
 ### `queryListener` {#Config.queryListener}
@@ -307,7 +307,7 @@ What [`setConfig()`](#setConfig) takes: any keys of `Config`, each one whole.
 interface ConfigTypes { }
 ```
 
-From 6.7.0. The options of `Config` that change a type, declared as you set them, since TypeScript can't read `setConfig()`. Empty, every type is Zapatos 6.6.1's. Declare it once, in any file your `tsconfig.json` includes, and set the option to match:
+From 6.7.0. The options of `Config` that change a type, declared as you set them, since TypeScript can't read `setConfig()`. Empty, every type is Zapatos 6.6.1's. Declare it once, in a module your `tsconfig.json` includes, a file with an `import` or an `export`, and set the option to match:
 
 ```ts twoslash
 import * as db from 'zapatos/db';
@@ -317,6 +317,17 @@ declare module 'zapatos/db' {
 }
 
 db.setConfig({ aggregatesTypedByColumn: true });
+```
+
+A `.d.ts` that holds only the declaration needs `export {}`: without it, the file declares a `zapatos/db` of its own, which hides the package's (`db.min`, `db.all` and the rest are gone).
+
+```ts
+// pgcast.d.ts
+export {};
+
+declare module 'zapatos/db' {
+  interface ConfigTypes { aggregatesTypedByColumn: true }
+}
 ```
 
 With [`moduleNames: "pgcast"`](/generator#generate.moduleNames), it is `declare module 'pgcast/db'`. The only key it reads is [`aggregatesTypedByColumn`](#Config.aggregatesTypedByColumn).

@@ -32,7 +32,8 @@ export type NewConfig = Partial<Config>;
 
 /**
  * The options of `Config` that change a type, as you set them: the compiler cannot read `setConfig()`.
- * Declare each in your project, e.g.
+ * Declare each in a module of your project, a file with an `import` or an
+ * `export` (`export {}` in a `.d.ts`), e.g.
  * `declare module 'zapatos/db' { interface ConfigTypes { aggregatesTypedByColumn: true } }`.
  */
 export interface ConfigTypes { }
