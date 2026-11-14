@@ -84,6 +84,15 @@ const transactionStatus = (client: pg.ClientBase) => {
 };
 const inBlock = (client: pg.ClientBase) => { const s = transactionStatus(client); return s === 'T' || s === 'E'; };
 
+/**
+ * The attempts `transaction()` makes for a `transactionAttemptsMax`, at least one. A value whose conversion throws
+ * (a `Symbol`, from JavaScript) is returned as it is: comparing it after a 40001 / 40P01 throws, as in Zapatos 6.6.1.
+ */
+const attemptsMade = (max: number) => {
+  try { return Math.max(1, Math.ceil(Number(max))) || 1; }
+  catch { return max; }
+};
+
 let txnSeq = 0;
 
 /**
@@ -150,7 +159,7 @@ export async function transaction<T, M extends IsolationLevel>(
       { transactionListener } = config,
       // the attempts the loop below makes, so that its messages count them: one for 0, a negative or NaN, three
       // for 2.5 (see https://github.com/AlexandreDemartin/pgcast/issues/179); Number() keeps '3' and 3n working
-      maxAttempts = Math.max(1, Math.ceil(Number(config.transactionAttemptsMax))) || 1,
+      maxAttempts = attemptsMade(config.transactionAttemptsMax),
       { minMs, maxMs } = config.transactionRetryDelay;
 
     for (let attempt = 1; ; attempt++) {
