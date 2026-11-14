@@ -227,6 +227,9 @@ Candidates for a check, a rule or a skill line.
 - #447 — When a PR documents an exception, `git grep` the absolute words (« never », « every ») on the same subject across `website/`: « never overwritten » survived on three pages — `branch-reviewer`
 - #447 — When notes from several PRs can fire for one object (#42, #287, #447), a test of all of them together freezes their order — `branch-reviewer`
 - #447 — The CLI's « Writing new custom type or domain placeholder file » message announces a placeholder the index file then writes over: it still misleads — `builder`
+- #449 — Every value `definitionForRelationInSchema` writes into a record shared by all relations (`customTypes`, `customTypeImports`, `customTypeOrigins`) is merged from relations read concurrently (#444, #449, #455): a test through `placeholdersInEveryOrder` (`test/integration/codegen.test.ts:400`) for each `unprefixedSchema`; candidate line for skill `codegen-output` § Deterministic — `branch-reviewer`
+- #449 — #444's « relations that disagree » check compared only imports; two relations can import nothing and still write different texts (an enum named like a TypeScript type) — `builder`
+- #449 — An ordering helper that calls `definitionForRelationInSchema` in each order pins order independence deterministically; unforced `codegen()` runs are red only by chance — `builder`
 
 ## Minors kept
 
@@ -296,3 +299,7 @@ Minor review defects, taken up by the end-of-chapter review.
 - #447 — `website/generator.md:427`, `:278`, `website/switching.md:18` (and `fr/…`): « never overwritten » without the `index` exception — `branch-reviewer`
 - #447 — `test/integration/codegen.test.ts:1053`: one `index` name shared by two schemas (this note and #42's on one file) is not tested — `branch-reviewer`
 - #447 — `src/generate/tsOutput.ts:94`: the outer `types` shadowed by the inner `const types` at `:122` — `branch-reviewer`
+- #449 — `src/generate/tables.ts:197`: « the last one seen wins » inside a guard that says the opposite for labels written out — `branch-reviewer`
+- #449 — `src/generate/tables.ts:17`: `hasOwn` beside an inline `hasOwnProperty.call` at `:152` — `branch-reviewer`
+- #449 — `website/custom-types.md:214` (and `fr/…`): « When a placeholder does not compile » says nothing of `typeEnumsAcrossSchemas` — `branch-reviewer`
+- #449 — `src/generate/tables.ts:194`: `labelled` repeats `tsTypeForPgType`'s enum lookup, with no comment that they must agree — `branch-reviewer`
