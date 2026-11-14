@@ -356,7 +356,7 @@ describe('Whereable', () => {
       neRaw: await rejected(ids({ display_name: c.ne(raw("'Ada'")) })),
       eqVals: await rejected(ids({ id: c.eq(vals(1)) })),
       eqCols: await rejected(ids({ id: c.eq(cols('id')) })),
-      arrayContainsVals: await rejected(ids({ tags: c.arrayContains(vals(undefined)) })),
+      arrayContainsVals: await rejected(ids({ tags: c.arrayContains(vals(undefined) as any) })),
       deletesNe: await rejected(db.deletes('memberships', { role: c.ne(raw("'owner'")) }).run(t.client)),
       updateAdd: await rejected(db.update('accounts', { lifetime_ops: c.add(raw('1') as any) }, { id: 1 }).run(t.client)),
     };
