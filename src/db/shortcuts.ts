@@ -59,6 +59,13 @@ export interface SQLFragmentOrColumnMap<T extends Table> { [k: string]: SQLFragm
 // read after `undefined extends RunResult`, so that `any` still gives `{} | null`
 declare const nestedResult: unique symbol;
 
+/**
+ * A `min()` or `max()` typed by its column, with `aggregatesTypedByColumn`
+ * declared in `ConfigTypes`: `run()` gives `RunResult`, and nested in a
+ * `lateral` or `extras` it comes back as JSON, `NestedResult`.
+ */
+export interface ColumnAggregateFragment<RunResult, NestedResult> extends SQLFragment<RunResult> { [nestedResult]: NestedResult }
+
 export type RunResultForSQLFragment<T extends SQLFragment<any, any>> = T extends SQLFragment<infer RunResult, any> ?
   (undefined extends RunResult ? NonNullable<RunResult> | null : T extends { [nestedResult]: infer N } ? N : RunResult) :
   never;
@@ -832,7 +839,7 @@ export interface NumericAggregateSignatures {
 type TypedByColumn = ConfigTypes extends { aggregatesTypedByColumn: true } ? true : false;
 type ColumnValueOrNull<S, C> = C extends readonly (keyof S)[] ? S[C[number]] | null : never;
 
-interface NullableNumericAggregateSignatures {
+export interface NullableNumericAggregateSignatures {
   <T extends Table, C extends ColumnsOption<T>, L extends LateralOption<C, E>, E extends ExtrasOption<T>, A extends string>(
     table: T,
     where: WhereableForTable<T> | SQLFragment<any> | AllType,
@@ -840,12 +847,12 @@ interface NullableNumericAggregateSignatures {
   ): SQLFragment<number | null>;
 }
 
-interface ColumnAggregateSignatures {
+export interface ColumnAggregateSignatures {
   <T extends Table, C extends ColumnsOption<T>, L extends LateralOption<C, E>, E extends ExtrasOption<T>, A extends string>(
     table: T,
     where: WhereableForTable<T> | SQLFragment<any> | AllType,
     options?: SelectOptionsForTable<T, C, L, E, A>,
-  ): SQLFragment<ColumnValueOrNull<SelectableForTable<T>, C>> & { [nestedResult]: ColumnValueOrNull<JSONSelectableForTable<T>, C> };
+  ): ColumnAggregateFragment<ColumnValueOrNull<SelectableForTable<T>, C>, ColumnValueOrNull<JSONSelectableForTable<T>, C>>;
 }
 
 // the aggregate takes one column, none for count(*), and has no row to pass a lateral query through: Zapatos 6.6.1

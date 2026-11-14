@@ -481,4 +481,20 @@ The call signature of `selectExactlyOne()`: `table`, `where`, `options?`, with t
 
 ### `NumericAggregateSignatures` {#NumericAggregateSignatures}
 
-The call signature of `count()`, `sum()`, `avg()`, `min()` and `max()`: `table`, `where`, `options?`, returning `SQLFragment<number>`. With `aggregatesTypedByColumn` declared in [`ConfigTypes`](/runtime-config#ConfigTypes), `sum()` and `avg()` return `SQLFragment<number | null>`, and `min()` and `max()` their column's type or `null` ([Typed by column](#typed-by-column)).
+The call signature of `count()`, `sum()`, `avg()`, `min()` and `max()`: `table`, `where`, `options?`, returning `SQLFragment<number>`. With `aggregatesTypedByColumn` declared in [`ConfigTypes`](/runtime-config#ConfigTypes), `sum()` and `avg()` take [`NullableNumericAggregateSignatures`](#NullableNumericAggregateSignatures), and `min()` and `max()` [`ColumnAggregateSignatures`](#ColumnAggregateSignatures) ([Typed by column](#typed-by-column)).
+
+### `NullableNumericAggregateSignatures` {#NullableNumericAggregateSignatures}
+
+From 6.7.0. The call signature of `sum()` and `avg()` with `aggregatesTypedByColumn` declared: as [`NumericAggregateSignatures`](#NumericAggregateSignatures), returning `SQLFragment<number | null>`.
+
+### `ColumnAggregateSignatures` {#ColumnAggregateSignatures}
+
+From 6.7.0. The call signature of `min()` and `max()` with `aggregatesTypedByColumn` declared: as [`NumericAggregateSignatures`](#NumericAggregateSignatures), returning a [`ColumnAggregateFragment`](#ColumnAggregateFragment) of the column in `columns`.
+
+### `ColumnAggregateFragment` {#ColumnAggregateFragment}
+
+```ts
+interface ColumnAggregateFragment<RunResult, NestedResult> extends SQLFragment<RunResult>
+```
+
+From 6.7.0. What `min()` and `max()` return with `aggregatesTypedByColumn` declared: `.run()` gives `RunResult`, the column's `Selectable` type or `null`; nested in a `lateral` or `extras`, it is typed `NestedResult`, its `JSONSelectable` type or `null`, as [`RunResultForSQLFragment`](/sql-template#RunResultForSQLFragment) reads it. A function of yours that returns one, in a project built with `declaration: true`, has it written in its `.d.ts` by this name.
