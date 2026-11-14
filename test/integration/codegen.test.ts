@@ -19,6 +19,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, inject, i
 import {
   definitionForRelationInSchema, enumDataForSchema, finaliseConfig, generate, relationsInSchema, tsForConfig, type Config,
 } from '../../src/generate';
+import { cliConfig } from '../../src/generate/cliConfig';
 import { urlForDatabase } from '../helpers/databases';
 import { useTestDatabase } from '../helpers/db';
 
@@ -1197,6 +1198,112 @@ describe('include entries that match no relation', () => {
     const warnings: Record<string, string[]> = {};
     for (const [name, config] of [['main', main] as const, ...variants]) warnings[name] = await warningsOf(config);
     expect(warnings).toEqual(expected);
+  });
+});
+
+describe('names that Object.prototype also has', () => {
+  // schemas of their own, committed to this file's database: no other test configures them.
+  // Each name is an enum of a schema enum_<name>, a schema with a table, and a domain of proto_a and
+  // proto_b, in a table films_<name> of each; proto_c has a domain __proto__ alone, proto_d a table toString.
+  const names = ['toString', 'constructor', 'hasOwnProperty', '__proto__'];
+  beforeAll(() => t.pool.query(`
+    CREATE SCHEMA proto_a;
+    CREATE SCHEMA proto_b;
+    CREATE SCHEMA proto_c;
+    CREATE DOMAIN proto_c."__proto__" AS text;
+    CREATE TABLE proto_c.films (title proto_c."__proto__");
+    CREATE SCHEMA proto_d;
+    CREATE TABLE proto_d."toString" (id int, name text, length int);
+  ` + names.map(name => `
+    CREATE SCHEMA "enum_${name}";
+    CREATE TYPE "enum_${name}"."${name}" AS ENUM ('b', 'a');
+    CREATE SCHEMA "${name}";
+    CREATE TABLE "${name}".films (id int);
+    CREATE DOMAIN proto_a."${name}" AS text;
+    CREATE DOMAIN proto_b."${name}" AS integer;
+    CREATE TABLE proto_a."films_${name}" (d proto_a."${name}");
+    CREATE TABLE proto_b."films_${name}" (d proto_b."${name}");
+  `).join('')));
+  afterAll(() => t.pool.query(`DROP SCHEMA proto_a, proto_b, proto_c, proto_d, ` +
+    `${names.map(name => `"enum_${name}", "${name}"`).join(', ')} CASCADE`));
+
+  /** The properties a run adds to `Object`, `Object.prototype` or a method of it, removed once read. */
+  const globalsAddedBy = async (run: () => Promise<unknown>) => {
+    const
+      targets: Record<string, any>[] = [...new Set([Object, Object.prototype, ...Object.getOwnPropertyNames(Object.prototype)
+        .map(key => Object.getOwnPropertyDescriptor(Object.prototype, key)!.value)
+        .filter(value => typeof value === 'function')])],
+      before = targets.map(target => Object.getOwnPropertyNames(target));
+    let added: string[] = [];
+    try {
+      await run();
+    } finally {
+      added = targets.flatMap((target, i) => Object.getOwnPropertyNames(target)
+        .filter(key => !before[i].includes(key))
+        .map(key => { delete target[key]; return key; }));
+    }
+    return added;
+  };
+
+  it.each(names)('generates an enum named %s, in either order', async name => {
+    const schemas = { [`enum_${name}`]: all };
+    expect((await codegen({ schemas })).ts).toContain(`export type ${name} = ['a', 'b'];`);
+    expect((await codegen({ schemas, enumOrder: 'declared' })).ts).toContain(`export type ${name} = ['b', 'a'];`);
+  });
+
+  it.each(names)('gives enumDataForSchema() an enum named %s, in an object of Object.prototype as in Zapatos 6.6.1', async name => {
+    const enums = await enumDataForSchema(`enum_${name}`, query => t.pool.query(query));
+    expect(Object.getPrototypeOf(enums)).toBe(Object.prototype);
+    expect(Object.entries(enums)).toEqual([[name, ['a', 'b']]]);
+  });
+
+  it.each(names)('generates a schema named %s', async name => {
+    const { ts: schema } = await codegen({ schemas: { [name]: all } });
+    expect(schema).toContain(`export namespace ${name} {`);
+    expect(schema).toContain(`"${name}.films": ${name}.films.Selectable;`);
+  });
+
+  it('writes the placeholder of a custom type named __proto__, and imports it', async () => {
+    let schema = '', customTypeSourceFiles: Record<string, string> = {};
+    const added = await globalsAddedBy(async () => {
+      ({ ts: schema, customTypeSourceFiles } = await codegen({ schemas: { proto_c: all }, customTypesTransform: 'my_type' }));
+    });
+    expect(Object.keys(customTypeSourceFiles)).toEqual(['__proto__']);
+    expect(schema).toContain(`import type * as c from 'zapatos/custom';`);
+    expect(schema).toContain('title: c.__proto__ | null;');
+    // its origins went onto Object.prototype, where generate() took them for one more placeholder
+    expect(added).toEqual([]);
+  });
+
+  it('keeps the columnOptions of the CLI as master reads them, for a table named toString (#405)', async () => {
+    const
+      dir = mkdtempSync(join(tmpdir(), 'pgcast-cli-')),
+      json = JSON.stringify({
+        schemas: { proto_d: all }, unprefixedSchema: 'proto_d', schemaJSDoc: false,
+        columnOptions: { '*': { name: { insert: 'excluded' }, length: { insert: 'excluded' } } },
+      });
+    try {
+      const
+        { ts: schema } = await tsForConfig(finaliseConfig({ ...cliConfig(json, dir), ...quiet, db: db() }), noDebug),
+        insertable = tableBlock(schema, 'toString').split('export interface Insertable {')[1].split('\n    }')[0];
+      // toString.name and toString.length, inherited, answer before the '*' entry, as from generate() and in 6.6.1
+      expect(insertable.match(/^ {6}\w+(?=\??:)/gm)?.map(key => key.trim())).toEqual(['id', 'length', 'name']);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it.each(names)('notes the custom types named %s of two schemas, and leaves Object as it was', async name => {
+    let warnings: string[] = [];
+    const schemas = { proto_a: only(`films_${name}`), proto_b: only(`films_${name}`) };
+    expect(await globalsAddedBy(async () => {
+      warnings = await warningsFor(schemas, { customTypesTransform: 'my_type' });
+    })).toEqual([]);
+    expect(warnings).toEqual([
+      `Note: custom types "proto_a"."${name}" and "proto_b"."${name}" are both named ${name} in TypeScript, ` +
+      `so they share one type and one placeholder file, src/zapatos/custom/${name}.d.ts. ` +
+      'To type them apart, rename one of them in the database.',
+    ]);
   });
 });
 

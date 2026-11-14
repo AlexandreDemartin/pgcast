@@ -171,9 +171,10 @@ export const tsForConfig = async (config: CompleteConfig, debug: (s: string) => 
         process.exit(1);
       }
     },
-    customTypes = {},
-    customTypeOrigins: CustomTypeOrigins = {},
-    enumsBySchema: Record<string, Promise<EnumOrders>> = {},
+    // Object.create(null): a schema or a type may be named constructor or __proto__
+    customTypes: CustomTypes = Object.create(null),
+    customTypeOrigins: CustomTypeOrigins = Object.create(null),
+    enumsBySchema: Record<string, Promise<EnumOrders>> = Object.create(null),
     enumOrdersFor = (schema: string) => enumsBySchema[schema] ??= enumOrdersForSchema(schema, queryFn),
     enumsForSchema = async (schema: string) => (await enumOrdersFor(schema))[enumOrder],
     columnsTypedByEnumName: string[] = [],

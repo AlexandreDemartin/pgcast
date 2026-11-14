@@ -111,7 +111,7 @@ export const definitionForRelationInSchema = async (
   customTypes: CustomTypes,  // an 'out' parameter
   config: CompleteConfig,
   queryFn: (q: pg.QueryConfig) => Promise<pg.QueryResult<any>>,
-  customTypeOrigins: CustomTypeOrigins = {},  // an 'out' parameter too
+  customTypeOrigins: CustomTypeOrigins = Object.create(null),  // an 'out' parameter too
   enumsForSchema = async (schema: string) => (await enumOrdersForSchema(schema, queryFn))[enumOrderOf(config)],
   columnsTypedByEnumName: string[] = [],  // an 'out' parameter too: what typeEnumsAcrossSchemas would change
 ) => {
