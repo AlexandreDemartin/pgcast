@@ -865,15 +865,15 @@ const numericAggregate = (
         Array.isArray(columns) && columns.length !== 1 ? `${aggregate}() takes one column in columns, not ${columns.length}${aggregate === 'count' ? ' (leave columns out for count(*))' : ''}` :
           undefined,
     refusal = columnsRefusal ?? (lateral instanceof SQLFragment ? `${aggregate}() cannot pass a lateral query through: nest it in the lateral of a select() instead` : undefined),
-    typedByColumn = getConfig().aggregatesTypedByColumn ?? false,
     byColumn = aggregate === 'min' || aggregate === 'max';
 
   if (refusal === undefined) {
-    // Number() makes a NULL 0, a date its epoch ms, a text NaN, and an int8 or numeric string a number
+    // Number() makes a NULL 0, a date its epoch ms, a text NaN, and an int8 or numeric string a number;
+    // the option changes no SQL, so it is read at run(), as the type, declared once for the program, says
     if (aggregate !== 'count') {
       query.runResultTransform = (qr) => {
         const result = qr.rows[0].result;  // no row (a groupBy with no group): a TypeError, as in 6.6.1
-        if (typedByColumn) return byColumn || result === null ? result : Number(result);
+        if (getConfig().aggregatesTypedByColumn ?? false) return byColumn || result === null ? result : Number(result);
         if (result === null || (byColumn && typeof result !== 'number')) warnOnce('PGCAST_DEP004', 'sum(), avg(), min() or max() passed its result through Number(): an empty set gave 0 rather than null, or a min() or max() that is not a number (a date, a text, an int8 or numeric string) lost its type. Set aggregatesTypedByColumn: true (db.setConfig), and declare it in ConfigTypes, to get null and the column\'s own value instead; it will be the default in pgcast 7.0.');
         return Number(result);
       };
