@@ -112,12 +112,17 @@ function plain(
         checkCopy(join(srcDir, path), source);
         return '```' + info + label + '\n' + snippet(join(srcDir, path), region) + '\n```';
       })
-      .replace(/<InstallLine command="([^"]*)" \/>/g, '```sh\n$1\n```')
+      .replace(/<InstallLine :commands="\[(.*)\]" \/>/g, (_, commands: string) =>  // each, as a code group's tab
+        [...commands.matchAll(/'([^']*)'/g)]
+          .map(([, command]) => '```sh [' + command!.split(' ')[0] + ']\n' + command + '\n```').join('\n\n'))
       .replace(/^<AtAGlance>$/gm, '**At a glance**'),  // its label; a diagram drops out, as its page says it all
-    missed = /<\/?CastPanel\b.*/.exec(expanded)?.[0];
+    missed = /<\/?CastPanel\b.*/.exec(expanded)?.[0],
+    missedInstall = /<InstallLine\b.*/.exec(expanded)?.[0];
 
   // a panel written another way (`example='…'`, a second attribute) would drop silently out of llms-full.txt
   if (missed) throw new Error(`llms.ts: write \`${missed}\` as \`<CastPanel example="<name>">\`, for llms-full.txt`);
+  if (missedInstall) throw new Error(
+    `llms.ts: write \`${missedInstall}\` as \`<InstallLine :commands="['…', …]" />\`, for llms-full.txt`);
 
   // a block nested in a list is indented as its opening fence: its lines lose that indent before Twoslash's are
   // dropped, then every line, the fences too, gets it back
