@@ -14,7 +14,7 @@ The same program under two names: `pgcast`, and `zapatos`, as in Zapatos 6.6.1. 
 
 - The config file: read from the folder you run it in, if it is there; never from a parent folder. Without one, the config is `{}`.
   - `zapatosconfig.json`, as in Zapatos 6.6.1.
-  - `pgcastconfig.json`, from 6.7.0, read first: with both there, only `pgcastconfig.json` is, and the CLI notes it through [`warningListener`](#generate.warningListener) before generating.
+  - `pgcastconfig.json`, from 6.7.0, read first: with both there, only `pgcastconfig.json` is read, and the CLI notes it through [`warningListener`](#generate.warningListener) before generating.
 - `config`: one optional argument, a JSON object, merged over the file key by key: `npx pgcast '{"outDir": "./generated"}'` keeps the file's `db` and replaces its `outDir`.
   - A key given here replaces the file's whole value, so `'{"db": {"application_name": "codegen"}}'` drops the file's `connectionString`.
   - The file's variables are filled in before the merge: one it names must be set even when the argument replaces its key, or the CLI stops with `Environment variable 'NAME' is not set`.
@@ -36,7 +36,7 @@ The same program under two names: `pgcast`, and `zapatos`, as in Zapatos 6.6.1. 
 
 A config it can't read stops it before any query, with code 1, Node printing the error and its stack. The error starts with what it was reading:
 
-- the file: `If present, zapatosconfig.json must be a valid JSON file, and all referenced environment variables must exist:`, or `pgcastconfig.json` for that file
+- the file, by its name: `If present, zapatosconfig.json must be a valid JSON file, and all referenced environment variables must exist:` (or `pgcastconfig.json`)
 - the argument: `If present, the argument to Zapatos must be valid JSON, and all referenced environment variables must exist:`
 
 Then it ends with the cause:
