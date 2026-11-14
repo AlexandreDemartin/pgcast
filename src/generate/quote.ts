@@ -21,9 +21,9 @@ const
   refusedAsNamespace = new Set(('break case catch class const continue debugger default delete do else enum export ' +
     'extends false finally for function if import in instanceof new null return super switch this throw true try ' +
     'typeof var void while with infer keyof readonly unique').split(' ')),
-  // and for a type, `as` and the names of TypeScript's own types (TS2457)
-  refusedAsType = new Set([...refusedAsNamespace,
-    ...'as any bigint boolean never number object string symbol undefined unknown'.split(' ')]);
+  // and `as` for a type. Only words whose output does not parse: an enum named `string` keeps Zapatos 6.6.1's
+  // output, refused at type-check (TS2457) but typed `string` under skipLibCheck
+  refusedAsType = new Set([...refusedAsNamespace, 'as']);
 
 /**
  * The TypeScript name of a schema or a relation (`'namespace'`), or of an enum (`'type'`): its Postgres name if
