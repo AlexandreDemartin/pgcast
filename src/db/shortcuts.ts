@@ -129,17 +129,18 @@ function undefinedAsMissing<V extends object>(values: V, toDefault: boolean): V 
   return (Array.isArray(values) ? kept : kept[0]) as V;
 }
 
-// an undefined key of upsert()'s updateValues is set from EXCLUDED, as in 6.6.1: if no row inserts its column,
-// an existing row takes the column DEFAULT; with undefinedMeansMissing, it is a missing key, so it adds no column
-// to the update (`updated`: updateColumns, or the columns inserted, which are set from EXCLUDED either way)
-function undefinedUpdateValuesAsMissing<V extends object>(updateValues: V, updated: string[]): V {
-  const adds = Object.entries(updateValues).some(([k, v]) => v === undefined && !updated.includes(k));
-  if (!adds) return updateValues;
+// the keys of upsert()'s updateValues that join the update: an undefined one is set from EXCLUDED, as in 6.6.1,
+// so if no row inserts its column, an existing row takes the column DEFAULT; with undefinedMeansMissing, it is a
+// missing key, so it adds no column (`updated`: updateColumns, or the columns inserted, set from EXCLUDED either
+// way); the object itself is kept, as its values are still read through getters and prototypes
+function updateValuesKeys(updateValues: { [k: string]: any }, updated: string[]): string[] {
+  const keys = Object.keys(updateValues);
+  if (!keys.some(k => updateValues[k] === undefined && !updated.includes(k))) return keys;
   if (!(getConfig().undefinedMeansMissing ?? false)) {
     warnOnce('PGCAST_DEP002', undefinedWarning);
-    return updateValues;
+    return keys;
   }
-  return Object.fromEntries(Object.entries(updateValues).filter(([, v]) => v !== undefined)) as V;
+  return keys.filter(k => updateValues[k] !== undefined);
 }
 
 
@@ -366,14 +367,14 @@ export const upsert: UpsertSignatures = function (
     insertColsSQL = cols(firstRow),
     insertValuesSQL = mapWithSeparator(completedValues, sql`, `, v => sql`(${vals(v)})`),
     colNames = Object.keys(firstRow) as Column[],
-    updateValues = undefinedUpdateValuesAsMissing(options?.updateValues ?? {}, specifiedUpdateColumns as string[] ?? colNames),
+    updateValues = options?.updateValues ?? {},
     conflictColumns = Array.isArray(conflictTarget) ? conflictTarget : [],  // a constraint's are unknown here
     overwritesMissingKey = specifiedUpdateColumns == null && Array.isArray(values) && colNames.some(c =>
       updateValues[c] === undefined &&  // as below: otherwise, c is set from EXCLUDED
       !conflictColumns.includes(c) &&  // on conflict, EXCLUDED.c equals the existing value
       values.some(v => !Object.prototype.hasOwnProperty.call(v, c))),
     updateColumns = [...new Set(  // deduplicate the keys here
-      [...specifiedUpdateColumns as string[] ?? colNames, ...Object.keys(updateValues)]
+      [...specifiedUpdateColumns as string[] ?? colNames, ...updateValuesKeys(updateValues, specifiedUpdateColumns as string[] ?? colNames)]
     )],
     conflictTargetSQL = Array.isArray(conflictTarget) ?
       sql`(${mapWithSeparator(conflictTarget, sql`, `, c => c)})` :
