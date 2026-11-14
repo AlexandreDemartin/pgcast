@@ -1275,7 +1275,7 @@ describe('a built-in object as a Whereable', () => {
       .toThrow('A built-in `Date` has no meaning as a Whereable (a filter)');
   });
 
-  it('throws for each built-in, through sql, a condition and the where of each shortcut', () => {
+  it('throws for each built-in, through sql, a condition, the where of each shortcut and the having of select()', () => {
     const
       expected = (name: string) => `throws: A built-in \`${name}\` has no meaning as a Whereable (a filter)`,
       entryPoints: Record<string, (x: any) => db.SQLFragment<any, any>> = {
@@ -1290,6 +1290,7 @@ describe('a built-in object as a Whereable', () => {
         update: x => db.update('users', { display_name: 'Ada' }, x),
         deletes: x => db.deletes('users', x),
         lateral: x => db.select('users', all, { lateral: { orgs: db.select('orgs', x) } }),
+        having: x => db.select('accounts', all, { columns: ['owner_id'], groupBy: 'owner_id', having: x }),
       };
     for (const [entryPoint, build] of Object.entries(entryPoints))
       for (const [name, outcome] of Object.entries(outcomes(build)))
