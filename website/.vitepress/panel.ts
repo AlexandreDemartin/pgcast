@@ -2,15 +2,24 @@
 // What a cast panel shows, from a query and a hover: at build (cast.data.ts), and in the playground's page as you type
 // (theme/PlaygroundEditor.vue). So both lay out the SQL and give the type alike.
 
-const quoted = /('(?:[^']|'')*'|"(?:[^"]|"")*")/;  // a SQL string or quoted identifier
+const
+  quoted = /('(?:[^']|'')*'|"(?:[^"]|"")*"|--.*)/,  // a SQL string, a quoted identifier, or a comment to its line's end
+  /**
+   * The SQL with `f` applied to each part outside quotes and comments, once each run of its whitespace is one space,
+   * or a line break after a comment, which would otherwise run on.
+   */
+  outsideQuotes = (sql: string, f: (part: string) => string) => sql.split(quoted)
+    .map((part, i, parts) => i % 2 ? part :
+      f(part.replace(/\s+/g, (_, at: number) => at === 0 && parts[i - 1]?.startsWith('--') ? '\n' : ' ')))
+    .join('').trim();
 
 /** The SQL with its whitespace made uniform outside quotes: what `layOut` must leave as it is. */
-export const normalised = (sql: string) => sql.split(quoted)
-  .map((part, i) => i % 2 ? part : part.replace(/\s+/g, ' ').replace(/ ?([()]) ?/g, '$1')).join('').trim();
+export const normalised = (sql: string) => outsideQuotes(sql, part => part.replace(/ ?([()]) ?/g, '$1'));
 
 /**
- * Lay out compiled SQL on lines, as you'd write it: each clause on its own line, each subquery indented. Only the
- * whitespace between tokens changes, never inside a quoted string or identifier, so it is the same query.
+ * Lay out compiled SQL on lines, as you'd write it: each clause on its own line, each subquery indented, whatever the
+ * spacing of the template it came from. Only the whitespace between tokens changes, never inside a `'…'` string, a
+ * `"…"` identifier or a `--` comment, so it is the same query.
  */
 export function layOut(sql: string) {
   const
@@ -19,15 +28,15 @@ export function layOut(sql: string) {
     atClauseLevel = () => subqueries.length === 0 || subqueries[subqueries.length - 1]!,
     tokens = /(\((?=SELECT\b))|(\()|(\))|((?<!LEFT|INNER)\s+(?=(?:SELECT|FROM|WHERE|(?:LEFT |INNER )?JOIN|GROUP BY|HAVING|ORDER BY|LIMIT|OFFSET|FOR (?:NO KEY )?UPDATE|FOR (?:KEY )?SHARE|VALUES|ON CONFLICT|RETURNING)\b))|(?<=\|\|)\s+/g;
 
-  return sql.split(quoted)  // odd parts are quoted: kept as they are
-    .map((part, i) => i % 2 ? part : part.replace(tokens, (space, subquery, open, close, beforeClause) =>
+  // no space inside a parenthesis, as compiled SQL writes it: `( SELECT` opens a subquery too
+  return outsideQuotes(sql, part => part.replace(/\( | \)/g, paren => paren.trim())
+    .replace(tokens, (space, subquery, open, close, beforeClause) =>
       subquery ? (subqueries.push(true), '(' + indent()) :
       open ? (subqueries.push(false), '(') :
       close ? (subqueries.pop() ? indent() + ')' : ')') :
       !atClauseLevel() ? space :
       beforeClause ? indent() :
-      indent(1)))  // after a top-level ||
-    .join('');
+      indent(1)));  // after a top-level ||
 }
 
 /** A query's values, as its panel shows them under its SQL: `["The Salt Orchard"]`. */
