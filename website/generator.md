@@ -369,23 +369,24 @@ Writing custom types file: src/zapatos/custom/index.d.ts
 
 ### `debugListener` {#generate.debugListener}
 
-`boolean`, or in `generate()` a function `(s: string) => void`; default `false`. Gets each query the generator sends, `>>> query <n> >>>`, its text and its values, then its result as `pg` returns it, as JSON, `<<< result <n> <<<`.
+`boolean`, or in `generate()` a function `(s: string) => void`; default `false`. Gets each query the generator sends, `>>> query <n> >>>`, its text and its values, then its result as `pg` returns it, as JSON, `<<< result <n> <<<`. The text is the one sent, less the indentation of pgcast's source, its blank lines kept: with its values, it runs as is.
 
 The relations are read concurrently: with several, the results come back interleaved, and a query's number can change from one run to the next, so `<n>` is what pairs a result with its query.
 
 The unique indexes of `tags`, with `"schemas": { "public": { "include": ["tags"], "exclude": [] } }`, cut after its rows:
 
 ```txt
->>> query 3 >>>
+>>> query 4 >>>
 SELECT DISTINCT i.indexname
 FROM pg_catalog.pg_indexes i
-JOIN pg_catalog.pg_class c ON c.relname = i.indexname
+JOIN pg_catalog.pg_namespace n ON n.nspname = i.schemaname
+JOIN pg_catalog.pg_class c ON c.relname = i.indexname AND c.relnamespace = n.oid
 JOIN pg_catalog.pg_index idx ON idx.indexrelid = c.oid AND idx.indisunique
 WHERE i.tablename = $1 AND i.schemaname = $2
 ORDER BY i.indexname
 + ["tags","public"]
 
-<<< result 3 <<<
+<<< result 4 <<<
 {
   "command": "SELECT",
   "rowCount": 1,

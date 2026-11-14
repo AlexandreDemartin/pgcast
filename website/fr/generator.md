@@ -1,5 +1,5 @@
 ---
-english: 10af26d49010
+english: 46174ce8e563
 ---
 
 # Générateur
@@ -373,23 +373,24 @@ Writing custom types file: src/zapatos/custom/index.d.ts
 
 ### `debugListener` {#generate.debugListener}
 
-`boolean`, ou dans `generate()` une fonction `(s: string) => void` ; par défaut `false`. Reçoit chaque requête que le générateur envoie, `>>> query <n> >>>`, son texte et ses valeurs, puis son résultat tel que `pg` le renvoie, en JSON, `<<< result <n> <<<`.
+`boolean`, ou dans `generate()` une fonction `(s: string) => void` ; par défaut `false`. Reçoit chaque requête que le générateur envoie, `>>> query <n> >>>`, son texte et ses valeurs, puis son résultat tel que `pg` le renvoie, en JSON, `<<< result <n> <<<`. Le texte est celui envoyé, lignes vides comprises, sans l’indentation du code de pgcast : avec ses valeurs, il s’exécute tel quel.
 
 Les relations sont lues en parallèle : avec plusieurs, les résultats reviennent entremêlés, et le numéro d’une requête peut changer d’une exécution à l’autre, donc c’est `<n>` qui associe un résultat à sa requête.
 
 Les index uniques de `tags`, avec `"schemas": { "public": { "include": ["tags"], "exclude": [] } }`, coupés après ses lignes :
 
 ```txt
->>> query 3 >>>
+>>> query 4 >>>
 SELECT DISTINCT i.indexname
 FROM pg_catalog.pg_indexes i
-JOIN pg_catalog.pg_class c ON c.relname = i.indexname
+JOIN pg_catalog.pg_namespace n ON n.nspname = i.schemaname
+JOIN pg_catalog.pg_class c ON c.relname = i.indexname AND c.relnamespace = n.oid
 JOIN pg_catalog.pg_index idx ON idx.indexrelid = c.oid AND idx.indisunique
 WHERE i.tablename = $1 AND i.schemaname = $2
 ORDER BY i.indexname
 + ["tags","public"]
 
-<<< result 3 <<<
+<<< result 4 <<<
 {
   "command": "SELECT",
   "rowCount": 1,
