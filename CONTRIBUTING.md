@@ -26,7 +26,7 @@ npm ci
 npm run lint && npm run typecheck && npm test && npm run test:types && npm run build
 ```
 
-- `npm run bench:types` when a type changes; `npm run check:agents` when `.agents/` or `.claude/` changes. All commands: [AGENTS.md § Commands](AGENTS.md#commands).
+- `npm run bench:types` when a type changes; `npm run check:agents` when `.agents/`, `.claude/` or `docs/CHARACTERISATION-REPORT.md` changes. All commands: [AGENTS.md § Commands](AGENTS.md#commands).
 
 ## Docs
 

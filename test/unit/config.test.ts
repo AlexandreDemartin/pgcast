@@ -29,6 +29,25 @@ describe('getConfig()', () => {
     db.setConfig({ transactionRetryDelay: new Delay() });
     expect(db.getConfig().transactionRetryDelay).toEqual({ minMs: 5, maxMs: 6 });
   });
+
+  // #257: as in Zapatos 6.6.1, only transaction(), which reads the delay, throws; not every query, which calls getConfig()
+  it.each([
+    ['minMs', class { get minMs(): number { throw new Error('no delay'); } get maxMs() { return 0; } }],
+    ['maxMs', class { get minMs() { return 0; } get maxMs(): number { throw new Error('no delay'); } }],
+  ])('gives a transactionRetryDelay whose %s getter throws as it is, without throwing', (_, Delay) => {
+    const delay = new Delay();
+    expect(db.setConfig({ transactionRetryDelay: delay }).transactionRetryDelay).toBe(delay);
+    expect(db.getConfig().transactionRetryDelay).toBe(delay);
+  });
+
+  it('gives a transactionRetryDelay whose getter starts throwing after setConfig() as it is, without throwing', () => {
+    let broken = false;
+    class Delay { get minMs() { if (broken) throw new Error('no delay'); return 1; } get maxMs() { return 2; } }
+    const delay = new Delay();
+    expect(db.setConfig({ transactionRetryDelay: delay }).transactionRetryDelay).toEqual({ minMs: 1, maxMs: 2 });
+    broken = true;
+    expect(db.getConfig().transactionRetryDelay).toBe(delay);
+  });
 });
 
 describe('setConfig()', () => {

@@ -1,5 +1,5 @@
 ---
-english: 7ba9ae3afa4b
+english: 9f5a9911f2a7
 ---
 
 # Venir de Zapatos
@@ -139,7 +139,7 @@ Cherchez dans votre code la première colonne de chaque tableau ci-dessous. Chaq
 
 </div>
 
-### `updateValues` et un `update()` vide {#updatevalues-and-an-empty-update}
+### `updateValues` et les écritures sans colonne {#updatevalues-and-writes-with-no-column}
 
 <div class="stack">
 
@@ -147,6 +147,7 @@ Cherchez dans votre code la première colonne de chaque tableau ci-dessous. Chaq
 |---|---|---|---|
 | Une simple valeur dans [`upsert()`](/fr/insert#upsert-options) `updateValues` : une chaîne, `{ tagline: 'films.title' }`, ou un objet | un nom de colonne, `ROW("films"."title")`, ou pour un objet une condition sur ses clés (`TRUE` s’il n’en a aucune) | un paramètre, la valeur elle-même | pour l’ancien résultat, un fragment : `` db.sql`${'films'}.${'title'}` `` |
 | [`update()`](/fr/insert#update) sans colonne : `update('films', {}, …)` | 42601, de Postgres | lève une erreur à l’appel : "nothing to update: an Updatable needs at least one column"<!-- message --> | rien, sauf si vous y interceptez une `DatabaseError` |
+| [`insert()`](/fr/insert#insert) ou [`upsert()`](/fr/insert#upsert) d’une ligne sans colonne, `{}`, sur une table dont chaque colonne a une valeur par défaut ou accepte `NULL`, ou en passant outre le type | 42601, de Postgres | lève une erreur à l’appel : "nothing to insert: an Insertable needs at least one column; …"<!-- message --> | rien, sauf si vous y interceptez une `DatabaseError` ; pour une ligne de valeurs par défaut, `DEFAULT VALUES` dans un template `sql` |
 
 </div>
 

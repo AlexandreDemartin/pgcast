@@ -168,6 +168,10 @@ function updateValuesKeys(updateValues: { [k: string]: any }, updated: string[])
 
 /* === insert === */
 
+// `INSERT INTO t () VALUES ()` is a syntax error in Postgres, and DEFAULT VALUES has no form for several rows,
+// so say so before any query, as update() does
+const nothingToInsert = 'nothing to insert: an Insertable needs at least one column; for a row of defaults only, write INSERT ... DEFAULT VALUES in a sql template';
+
 interface InsertSignatures {
   <T extends Table, C extends ColumnsOption<T>, E extends ExtrasOption<T>>(
     table: T,
@@ -186,7 +190,9 @@ interface InsertSignatures {
  * Generate an `INSERT` query `SQLFragment`.
  * @param table The table into which to insert
  * @param values The `Insertable` values (or array thereof) to be inserted.
- * An `undefined` value is sent as `NULL`, and emits a `DeprecationWarning`
+ * They need at least one column: a row with no key, or rows with none between
+ * them, throw before any query (for a row of defaults, `DEFAULT VALUES` in a
+ * `sql` template). An `undefined` value is sent as `NULL`, and emits a `DeprecationWarning`
  * (`PGCAST_DEP002`), once; with the `undefinedMeansMissing` config option (the
  * default in 7.0), it sends `DEFAULT`, as a key missing from one of several
  * rows does: `{ title: undefined }` gives `VALUES (DEFAULT)`.
@@ -207,13 +213,15 @@ export const insert: InsertSignatures = function (
     values = undefinedAsMissing(values, true);
     const
       completedValues = Array.isArray(values) ? completeKeysWithDefaultValue(values, Default) : values,
-      colsSQL = cols(Array.isArray(completedValues) ? completedValues[0] : completedValues),
+      firstRow = Array.isArray(completedValues) ? completedValues[0] : completedValues,
+      colsSQL = cols(firstRow),
       valuesSQL = Array.isArray(completedValues) ?
         mapWithSeparator(completedValues as Insertable[], sql`, `, v => sql`(${vals(v)})`) :
         sql`(${vals(completedValues)})`,
       returningSQL = SQLForColumnsOfTable(options?.returning, table),
       extrasSQL = SQLForExtras(options?.extras);
 
+    if (firstRow != null && Object.keys(firstRow).length === 0) throw new Error(nothingToInsert);  // a null row fails in compile(), as in 6.6.1
     query = sql`INSERT INTO ${table} (${colsSQL}) VALUES ${valuesSQL} RETURNING ${returningSQL}${extrasSQL} AS result`;
   }
 
@@ -329,7 +337,8 @@ const updateValueSQL = (value: any) => compiledAsIs(value) ? value : param(value
  * Generate an 'upsert' (`INSERT ... ON CONFLICT ...`) query `SQLFragment`.
  * @param table The table to update or insert into
  * @param values An `Insertable` of values (or an array thereof) to be inserted 
- * or updated
+ * or updated; as for `insert`, they need at least one column, or it throws
+ * before any query
  * @param conflictTarget A `UNIQUE`-indexed column (or array thereof) or a 
  * `UNIQUE` index (wrapped in `db.constraint(...)`) that determines whether we
  * get an `UPDATE` (when there's a matching existing value) or an `INSERT`
@@ -356,7 +365,8 @@ const updateValueSQL = (value: any) => compiledAsIs(value) ? value : param(value
  * `undefinedMeansMissing` config option (the default in 7.0), its key is left
  * out, as if it were missing: one row does not insert that column, nor update
  * it unless `updateColumns` names it, in which case it is still set from
- * `EXCLUDED` and an existing row takes the column `DEFAULT`.
+ * `EXCLUDED` and an existing row takes the column `DEFAULT`; with no other
+ * column, it throws.
  *
  * An `undefined` key of `updateValues` is set from `EXCLUDED`: an existing
  * row takes the value inserted, or the column `DEFAULT`. When that key alone
@@ -409,6 +419,8 @@ export const upsert: UpsertSignatures = function (
     returningSQL = SQLForColumnsOfTable(options?.returning, table),
     extrasSQL = SQLForExtras(options?.extras),
     suppressReport = options?.reportAction === 'suppress';
+
+  if (colNames.length === 0) throw new Error(nothingToInsert);
 
   // a key missing from some row is inserted as DEFAULT, then `SET col = EXCLUDED.col` overwrites the existing
   // value: Postgres can't tell that DEFAULT from a given one, so only the caller knows which columns to update
