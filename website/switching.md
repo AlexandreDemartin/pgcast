@@ -247,7 +247,7 @@ All four will be the default in 7.0 ([Versions](/versions)). With them on, an `u
 
 One more opt-in, [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow), has no warning to look for, and stays off in 7.0. With it, a `selectExactlyOne()` run on its own rejects on a second row, not only on none. Turn it on where your tests show no `selectExactlyOne()` matching two rows.
 
-The generator has two opt-ins of its own, both to be the default in 7.0. Their warning is a note from `npx zapatos`, not your tests.
+The generator has three opt-ins of its own, all to be the default in 7.0. The warning of the first two is a note from `npx zapatos`, not your tests.
 
 The note of [`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas) names each column whose type is an enum of another schema, and that enum, typed until then as `any` or as the enum of the same name in the relation's schema:
 
@@ -257,6 +257,8 @@ The note of [`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchema
 
 The note of [`enumOrder`](/generator#generate.enumOrder) names each enum whose labels the generator sorts, though Postgres declares them in another order. Set it to `"declared"` and regenerate: for TypeScript, only `every.<name>` changes, so the code to read is the code that takes a label from it by index or compares it with a tuple.
 
+The note of [`rejectOnQueryError`](/generator#generate.rejectOnQueryError) comes from a script that calls `generate()`, when a query fails, never from `npx zapatos`, which always exits. Turn it on where the script awaits `generate()`, and read what its `catch` does: a refused connection now reaches it, and a script that logs the error and carries on exits with code 0, not 1.
+
 ## Go back
 
 ```sh
@@ -265,7 +267,7 @@ npm install zapatos@6.6.1
 
 - First, remove from `setConfig()` the options Zapatos 6.6.1's `Config` doesn't have (2353): `upsertRequiresSameKeys`, `undefinedMeansMissing`, `transactionRequiresCommit`, `transactionRequiresIdleClient`, `selectExactlyOneChecksForSecondRow` and `aggregatesTypedByColumn`.
 - On [`moduleNames`](/generator#generate.moduleNames) `"pgcast"`, run `npm uninstall pgcast` too: both packages have a `zapatos` command. Your `pgcast/…` imports then no longer resolve, and 6.6.1 writes `zapatos/` but leaves `pgcast/` behind. So change each import back to `zapatos/…`, move the placeholders you edited to `zapatos/custom/`, their `declare module 'pgcast/custom'` renamed `'zapatos/custom'`, and delete `pgcast/`.
-- Regenerate with Zapatos 6.6.1. It ignores `typeEnumsAcrossSchemas`, `enumOrder` and `moduleNames` in `zapatosconfig.json`, and writes again the `any` types, the sorted labels, the unprefixed comment lines and any borrowed `UniqueIndex` name.
+- Regenerate with Zapatos 6.6.1. It ignores `typeEnumsAcrossSchemas`, `enumOrder` and `moduleNames` in `zapatosconfig.json`, and writes again the `any` types, the sorted labels, the unprefixed comment lines and any borrowed `UniqueIndex` name. Its `generate()` doesn't know `rejectOnQueryError` either: TypeScript refuses it in an object literal (2353), and at run time a failed query ends the process again.
 - Each change of [Find the calls whose result changes](#find-the-calls-whose-result-changes) runs as it did, but the `jsonb` one, which finds nothing again.
 
 ::: warning Security
