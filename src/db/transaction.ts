@@ -182,7 +182,7 @@ export async function transaction<T, M extends IsolationLevel>(
         // this is also a good read:
         // https://www.enterprisedb.com/blog/serializable-postgresql-11-and-beyond
 
-        // a thrown null or undefined is rethrown as it is: isDatabaseError() would throw on it (#179)
+        // a thrown null or undefined is rethrown as it is (#179); isDatabaseError() gives false for it since #178
         if (err != null && isDatabaseError(err, "TransactionRollback_SerializationFailure", "TransactionRollback_DeadlockDetected")) {
           if (attempt < maxAttempts) {
             const delayBeforeRetry = Math.round(minMs + (maxMs - minMs) * Math.random());

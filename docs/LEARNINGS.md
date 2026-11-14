@@ -216,6 +216,10 @@ Candidates for a check, a rule or a skill line.
 - #179 — A fix that removes a documented quirk leaves its other mentions behind (a § Errors row survived the removed caveats): `git grep` the old message quoted in the issue across `website/` before marking a page translated — `branch-reviewer`
 - #179 — A test can show a count unchanged and its message fixed: the count assertion first, green, the message assertion red — `builder`
 - #179 — An existing characterisation test that records the old message (« attempt 1 of 0 ») changes on purpose with the fix: say so in Proofs with the old and new text — `builder`
+- #178 — A fix to a helper another public function calls changes that function's results too (`isDatabaseError()` inside `transaction()`): `git grep` the helper's callers in `src/`, replay each, and grep `website/` for the message the fix removes — `branch-reviewer`
+- #178 — When a parameter widens to `unknown`, probe the odd shapes of the property it reads too: a non-string with the string's members (`{ code: ['2','3','5','0','5'] }`, `{ length: 5 }`) — `branch-reviewer`
+- #178 — A stacked layer may only re-word what it makes untrue in the layer below; the behaviour, its docs row and its test stay in the lower layer (#437 / #441) — `branch-reviewer`
+- #178 — Under `exactOptionalPropertyTypes`, Zapatos 6.6.1's type also refused `pg.DatabaseError` and `NodeJS.ErrnoException` (TS2379, `code: string | undefined`): a « 6.6.1 accepted it » claim holds under the suite's options — `builder`
 
 ## Minors kept
 
@@ -274,3 +278,4 @@ Minor review defects, taken up by the end-of-chapter review.
 - #179 — `test/integration/transaction.test.ts:73`: the pool case of a thrown `null` / `undefined` checks the rows but not `totalCount - idleCount === 0`, as `:335` and `:493` do — `branch-reviewer`
 - #179 — `website/transaction.md:73` (and `fr/…:77`): « `0` or `1` gives one » could match `runtime-config.md:113` (« `1`, `0`, a negative value or `NaN` ») — `branch-reviewer`
 - #179 — `src/db/transaction.ts:162`: a `valueOf` with side effects is now called once at entry, where 6.6.1 called it at each comparison (0 times on a success) — `branch-reviewer`
+- #178 — `src/db/pgErrors.ts:19`, `website/transaction.md:349`: « any value », yet a `code` that is not a string but has a string's members (`['2','3','5','0','5']`, `{ length: 5 }`) throws `code.startsWith is not a function`; 6.6.1's type refused both: `false` would be a Fix, or the wording narrowed — `branch-reviewer`

@@ -1,5 +1,5 @@
 ---
-english: f16368417727
+english: f6ee680f8e97
 ---
 
 # Erreurs
@@ -19,7 +19,7 @@ Quand Postgres refuse une requête, la promesse de `.run()` est rejetée avec la
 
 Si C4 est prise, Postgres refuse l’`INSERT` avec 23505, une violation d’unicité, et `booking` vaut `undefined` ; sinon, c’est la nouvelle ligne. Toute autre erreur, de Postgres ou non, est relancée.
 
-Avec `try` et `await`, la variable du `catch` est `unknown` sous `strict`, ce que `isDatabaseError()` refuse ([pourquoi](/fr/transaction#isDatabaseError)). Affinez d’abord son type avec `instanceof pg.DatabaseError` (pg 8.6 ou plus récent, pas `pg.native`, dont les erreurs sont de simples `Error`) : TypeScript connaît alors aussi ses champs.
+Avec `try` et `await`, la variable du `catch` est `unknown` sous `strict`. `isDatabaseError()` l’accepte, mais n’affine pas son type ([`isDatabaseError()`](/fr/transaction#isDatabaseError)) : pour lire ses champs, affinez-le d’abord avec `instanceof pg.DatabaseError` (pg 8.6 ou plus récent, pas `pg.native`, dont les erreurs sont de simples `Error`), et TypeScript les connaît alors.
 
 ```ts twoslash
 // @strict: true
@@ -60,7 +60,7 @@ const bookingProblem = (err: pg.DatabaseError) =>
 
 - Un nom de classe, sans `_`, correspond à tous les codes de sa classe : `'IntegrityConstraintViolation'` correspond aux trois. Avec plusieurs noms, il suffit que l’un d’eux corresponde : `db.isDatabaseError(err, 'IntegrityConstraintViolation', 'DataException')`.
 - Les noms sont les [codes d’erreur](https://www.postgresql.org/docs/current/errcodes-appendix.html) de Postgres en PascalCase, et le type refuse tout autre nom : votre éditeur les complète.
-- `isDatabaseError(null, …)` lève une `TypeError`, ce qu’on évite en affinant d’abord le type ; les autres cas, comme les noms de la classe 53 : [`isDatabaseError()`](/fr/transaction#isDatabaseError).
+- Une valeur sans `code` donne `false`, y compris `null` et `undefined` ; les autres cas, comme les noms de la classe 53 : [`isDatabaseError()`](/fr/transaction#isDatabaseError).
 
 ## Intercepter hors d’une transaction {#catch-outside-a-transaction}
 

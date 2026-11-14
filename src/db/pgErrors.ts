@@ -4,17 +4,19 @@ Copyright (C) 2020 - 2023 George MacKerron
 Released under the MIT licence: see LICENCE file
 */
 
-interface Error {
-  code?: string;
-}
-
 /**
  * Check whether an error object matches any of a set of Postgres error types.
- * @param err The error to check
+ * A class name (`IntegrityConstraintViolation`) matches every code of its class, a
+ * `Class_Condition` name (`IntegrityConstraintViolation_UniqueViolation`) its own code.
+ * `DiskFull`, `OutOfMemory`, `TooManyConnections` and `ConfigurationLimitExceeded`
+ * match all of class 53, as `InsufficientResources` does: for 53100 alone, use
+ * `InsufficientResources_DiskFull`.
+ * @param err The error to check: any value, `null` and `undefined` giving `false`
  * @param types The Postgres error types to check against
  */
-export function isDatabaseError(err: Error, ...types: (keyof typeof pgErrors)[]) {
-  const { code } = err;
+export function isDatabaseError(err: unknown, ...types: (keyof typeof pgErrors)[]) {
+  if (err === null || err === undefined) return false;
+  const { code } = err as { code?: string };
   if (!code || code.length !== 5) return false;
   return types.some(type => code.startsWith(pgErrors[type]));
 }
@@ -54,6 +56,8 @@ const pgErrors = {
   SyntaxErrorOrAccessRuleViolation: "42",
   WithCheckOptionViolation: "44",
   InsufficientResources: "53",
+  // these four have the class's code, as in Zapatos 6.6.1, so each matches all of class 53;
+  // their own codes are InsufficientResources_DiskFull and so on, below (#178)
   DiskFull: "53",
   OutOfMemory: "53",
   TooManyConnections: "53",
