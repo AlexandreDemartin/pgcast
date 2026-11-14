@@ -43,8 +43,9 @@ export const enumOrdersForSchema = async (schemaName: string, queryFn: (q: pg.Qu
         ORDER BY t.typname ASC, e.enumlabel ASC`,
       values: [schemaName],
     }),
-    alphabetical: EnumData = {},
-    declared: EnumData = {};
+    // Object.create(null): an enum may be named toString or __proto__
+    alphabetical: EnumData = Object.create(null),
+    declared: EnumData = Object.create(null);
 
   for (const row of rows) (alphabetical[row.name] ??= []).push(row.value);
   for (const row of [...rows].sort((a, b) => a.sortorder - b.sortorder)) (declared[row.name] ??= []).push(row.value);
