@@ -176,6 +176,9 @@ Candidates for a check, a rule or a skill line.
 - #253 — `branch-reviewer` cannot load the user skill `branch-review` (`disable-model-invocation`), so it reviews from its brief: the agent and the skill disagree — orchestrator
 - #250 — The list of refused built-ins is hand-written and missed a native `Error` subtype twice (`AggregateError`, `SuppressedError`): a unit test listing every global constructor whose `prototype` inherits from `Error.prototype` and asserting each is in `builtinObjects()` would catch the next one, on each Node of the CI matrix — `branch-reviewer`
 - #250 — `class X extends (globalThis as any).Y {}` gets a 0-argument constructor under `tsc -p test`, which Vitest (esbuild) does not check: cast the base to a constructor type — `builder`
+- #163 — A fix that turns a rejection into a value carries a `Changed:` sub-bullet naming the silent result a caller now gets in place of the error (a count given a page's `offset` gives `0`, not the total) — `branch-reviewer`
+- #163 — When a deprecation warning starts firing in more cases, reread its message against each new case, and test the message, not only its `code` — `branch-reviewer`
+- #163 — `website/schema.sql` seeds few rows: a claim about data runs on the fixture or on probe rows of its own — `builder`
 
 ## Minors kept
 
@@ -216,3 +219,6 @@ Minor review defects, taken up by the end-of-chapter review.
 - #168 — `website/insert.md:307`, `CHANGELOG.md:19`: « `DO NOTHING` » without what it does to the result (one row: `undefined` on conflict; an array leaves that row out) — `branch-reviewer`
 - #168 — `src/db/shortcuts.ts:369`, `:376`: `specifiedUpdateColumns as string[] ?? colNames` written twice — `branch-reviewer`
 - #250 — `website/sql-template.md:294`: « `SuppressedError` from Node 24 » where the rule is whether the runtime has it, as `CHANGELOG.md:130` says — `branch-reviewer`
+- #163 — `website/runtime-config.md:226`: the no-row sentence sits in the « Read at `.run()` » bullet and names only `groupBy` — `branch-reviewer`
+- #163 — `test/integration/shortcuts.test.ts:1029`: `.catch(() => { })` swallows a rejection; assert `.toBe(0)` as `:1037` does — `branch-reviewer`
+- #163 — `website/select.md:248`, `:251`: « what no row gives (below) »: state it in place — `branch-reviewer`
