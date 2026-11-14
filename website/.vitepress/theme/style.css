@@ -216,12 +216,6 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 /* the site's icons (icons.ts): 16px unless a component sets them smaller, beside its own text */
 svg.icon { width: 16px; height: 16px; flex: none; }
 
-/* the site's icons (icons.ts): 16px unless a component sets them smaller, beside its own text */
-svg.icon { width: 16px; height: 16px; flex: none; }
-
-/* the site's icons (icons.ts): 16px unless a component sets them smaller, beside its own text */
-svg.icon { width: 16px; height: 16px; flex: none; }
-
 /* notes: a chip, then the text, with no side rail; the chip opens on its kind's icon (callouts.ts) */
 .vp-doc .custom-block {
   display: grid; grid-template-columns: auto 1fr; gap: 0 12px; align-items: start;
