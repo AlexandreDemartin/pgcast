@@ -5,7 +5,7 @@ Released under the MIT licence: see LICENCE file
 */
 
 import type { CompleteConfig } from './config';
-import { stringLiteral } from './quote';
+import { stringLiteral, tsIdentifier } from './quote';
 import type { EnumData } from './enums';
 
 type TypeContext = 'JSONSelectable' | 'Selectable' | 'Insertable' | 'Updatable' | 'Whereable';
@@ -91,7 +91,7 @@ const baseTsTypeForBasePgType = (pgType: string, enums: EnumData, context: TypeC
     case 'jsonb':
       return 'db.JSONValue';
     default:
-      if (hasOwnProp.call(enums, pgType)) return inlineEnums ? enumUnion(enums[pgType]) : pgType;
+      if (hasOwnProp.call(enums, pgType)) return inlineEnums ? enumUnion(enums[pgType]) : tsIdentifier(pgType, 'type');
       return null;
   }
 };

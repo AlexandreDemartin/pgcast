@@ -11,6 +11,7 @@ import { enumTypesForEnumData } from './enums';
 import { enumOrderOf, enumOrdersForSchema, enumsOutOfOrder, warnAboutEnumOrder, type EnumOrders } from './enumOrder';
 import { header } from './header';
 import { moduleNamesOf } from './moduleNames';
+import { jsdocText, tsIdentifier } from './quote';
 import type { CompleteConfig } from './config';
 import type { SchemaVersionCanary } from "../db/canary";
 import {
@@ -119,6 +120,30 @@ const warnAboutUnmatchedIncludes = (unmatched: { schema: string; name: string }[
   }
 };
 
+interface IdentifierGroup { kind: string; schema?: string; names: string[]; as: 'namespace' | 'type' }
+
+/**
+ * Warn about each TypeScript name that two schemas, relations or enums take (`odd table` and `odd_table`): their
+ * declarations clash.
+ */
+const warnAboutSharedIdentifiers = (groups: IdentifierGroup[], config: CompleteConfig) => {
+  const warn = config.warningListener === true ? console.log : config.warningListener || (() => void 0);
+
+  for (const { kind, schema, names, as } of groups) {
+    const byIdentifier: Record<string, string[]> = {};
+    for (const name of names) {
+      (byIdentifier[tsIdentifier(name, as)] ??= []).push(schema === undefined ? `"${name}"` : `"${schema}"."${name}"`);
+    }
+    for (const identifier of Object.keys(byIdentifier).sort()) {
+      const shared = byIdentifier[identifier].sort();
+      if (shared.length < 2) continue;
+      warn(`Note: ${kind} ${shared.slice(0, -1).join(', ')} and ${shared[shared.length - 1]} are ` +
+        `${shared.length === 2 ? 'both' : 'all'} named ${identifier} in TypeScript, so their declarations clash. ` +
+        `To type them apart, rename one of them in the database.`);
+    }
+  }
+};
+
 function indentAll(level: number, s: string) {
   if (level === 0) return s;
   return s.replace(/^/gm, ' '.repeat(level));
@@ -171,8 +196,8 @@ export const tsForConfig = async (config: CompleteConfig, debug: (s: string) => 
               enumsForSchema, columnsTypedByEnumName))),
           schemaIsUnprefixed = schema === config.unprefixedSchema,
           none = '/* (none) */',
-          schemaDef = `/* === schema: ${schema} === */\n` +
-            (schemaIsUnprefixed ? '' : `\nexport namespace ${schema} {\n`) +
+          schemaDef = `/* === schema: ${jsdocText(schema)} === */\n` +
+            (schemaIsUnprefixed ? '' : `\nexport namespace ${tsIdentifier(schema, 'namespace')} {\n`) +
             indentAll(schemaIsUnprefixed ? 0 : 2,
               `\n/* --- enums --- */\n` +
               (enumTypesForEnumData(enums) || none) +
@@ -180,12 +205,16 @@ export const tsForConfig = async (config: CompleteConfig, debug: (s: string) => 
               (tableDefs.join('\n') || none) +
               `\n\n/* --- aggregate types --- */\n` +
               (schemaIsUnprefixed ?
-                `\nexport namespace ${schema} {` + (indentAll(2, crossTableTypesForTables(tables) || none)) + '\n}\n' :
+                `\nexport namespace ${tsIdentifier(schema, 'namespace')} {` + (indentAll(2, crossTableTypesForTables(tables) || none)) + '\n}\n' :
                 (crossTableTypesForTables(tables) || none))
             ) + '\n' +
             (schemaIsUnprefixed ? '' : `}\n`);
 
-        return { schemaDef, tables, unmatched, outOfOrder };
+        const identifierGroups: IdentifierGroup[] = [
+          { kind: 'enums', schema, names: Object.keys(enums), as: 'type' },
+          { kind: 'relations', schema, names: tables.map(rel => rel.name), as: 'namespace' },
+        ];
+        return { schemaDef, tables, unmatched, outOfOrder, identifierGroups };
       }))
     ),
     schemaDefs = schemaData.map(r => r.schemaDef),
@@ -205,6 +234,8 @@ export const tsForConfig = async (config: CompleteConfig, debug: (s: string) => 
     customTypeSourceFiles = sourceFilesForCustomTypes(customTypes, names);
 
   warnAboutUnmatchedIncludes(schemaData.flatMap(r => r.unmatched), config);
+  warnAboutSharedIdentifiers([...schemaData.flatMap(r => r.identifierGroups),
+    { kind: 'schemas', names: schemaNames, as: 'namespace' }], config);
   warnAboutSharedCustomTypeNames(customTypeOrigins, config);
   warnAboutEnumsAcrossSchemas(columnsTypedByEnumName, config);
   warnAboutEnumOrder(schemaData.flatMap(r => r.outOfOrder), config);

@@ -138,7 +138,7 @@ Both keys are required. In `generate()`, a rule without one fails to compile (TS
 - The relations are those the database role can see: a table or view it has no privilege on is left out, as if it did not exist; a materialised view is always there.
 - The schema's enums are always generated, whatever `include` and `exclude` say.
 - The relations of a schema other than [`unprefixedSchema`](#generate.unprefixedSchema) are in its namespace: `archive.screenings`, its `Table` type `'archive.screenings'`.
-- A schema, relation or enum whose name is not a TypeScript identifier (`"box office"`) is written as it is, and `schema.d.ts` does not compile (TS1005) ([#48](https://github.com/AlexandreDemartin/pgcast/issues/48)). A column's name is quoted, and works.
+- A schema, relation or enum whose name TypeScript refuses there (`"box office"`, `class`) takes a legal identifier, `box_office` or `class_`: each run of characters an identifier cannot hold becomes `_`, a leading digit takes a `_` before it, a reserved word a `_` after it. Its `Table` type and the `*ForTable` lookups keep its name: `'box office'`. Two names that become one are noted through [`warningListener`](#generate.warningListener). A column's name is quoted.
 
 With a second schema, `archive`, that holds a `screenings` table of its own:
 

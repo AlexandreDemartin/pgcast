@@ -10,7 +10,7 @@ import type { EnumData } from './enums';
 import { enumOrderOf, enumOrdersForSchema } from './enumOrder';
 import type { CustomTypes, CustomTypeOrigins } from './tsOutput';
 import { CompleteConfig } from './config';
-import { jsdocText, stringLiteral } from './quote';
+import { jsdocText, stringLiteral, tsIdentifier } from './quote';
 
 
 export interface Relation {
@@ -224,7 +224,7 @@ export const definitionForRelationInSchema = async (
  * - ${friendlyRelType} in database
  */` : ``,
     tableDef = `${tableComment}
-export namespace ${rel.name} {
+export namespace ${tsIdentifier(rel.name, 'namespace')} {
   export type Table = ${stringLiteral(schemaPrefix + rel.name)};
   export interface Selectable {
     ${selectables.join('\n    ')}
@@ -266,9 +266,9 @@ const transformCustomType = (customType: string, config: CompleteConfig) => {
 
 const
   tableMappedUnion = (arr: Relation[], suffix: string) =>
-    arr.length === 0 ? 'never' : arr.map(rel => `${rel.name}.${suffix}`).join(' | '),
+    arr.length === 0 ? 'never' : arr.map(rel => `${tsIdentifier(rel.name, 'namespace')}.${suffix}`).join(' | '),
   tableMappedArray = (arr: Relation[], suffix: string) =>
-    '[' + arr.map(rel => `${rel.name}.${suffix}`).join(', ') + ']';
+    '[' + arr.map(rel => `${tsIdentifier(rel.name, 'namespace')}.${suffix}`).join(', ') + ']';
 
 export const crossTableTypesForTables = (tables: Relation[]) => `${tables.length === 0 ?
   '\n// `never` rather than `any` types would be more accurate in this no-tables case, but they stop `shortcuts.ts` compiling\n' : ''
@@ -291,15 +291,15 @@ export type AllTablesAndViews = ${tableMappedArray(tables, 'Table')};`;
 export const crossSchemaTypesForAllTables = (allTables: Relation[], unprefixedSchema: string | null) =>
   ['Selectable', 'JSONSelectable', 'Whereable', 'Insertable', 'Updatable', 'UniqueIndex', 'Column', 'SQL'].map(thingable => `
 export type ${thingable}ForTable<T extends Table> = ${allTables.length === 0 ? 'any' : `{${allTables.map(rel => `
-  ${stringLiteral((rel.schema === unprefixedSchema ? '' : `${rel.schema}.`) + rel.name, '"')}: ${rel.schema === unprefixedSchema ? '' : `${rel.schema}.`}${rel.name}.${thingable};`).join('')}
+  ${stringLiteral((rel.schema === unprefixedSchema ? '' : `${rel.schema}.`) + rel.name, '"')}: ${rel.schema === unprefixedSchema ? '' : `${tsIdentifier(rel.schema, 'namespace')}.`}${tsIdentifier(rel.name, 'namespace')}.${thingable};`).join('')}
 }[T]`};
 `).join('');
 
 const
   schemaMappedUnion = (arr: string[], suffix: string) =>
-    arr.length === 0 ? 'any' : arr.map(s => `${s}.${suffix}`).join(' | '),
+    arr.length === 0 ? 'any' : arr.map(s => `${tsIdentifier(s, 'namespace')}.${suffix}`).join(' | '),
   schemaMappedArray = (arr: string[], suffix: string) =>
-    '[' + arr.map(s => `...${s}.${suffix}`).join(', ') + ']';
+    '[' + arr.map(s => `...${tsIdentifier(s, 'namespace')}.${suffix}`).join(', ') + ']';
 
 export const crossSchemaTypesForSchemas = (schemas: string[]) => `
 export type Schema = ${schemas.map(s => stringLiteral(s)).join(' | ')};
