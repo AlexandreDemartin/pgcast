@@ -10,6 +10,7 @@ import { dirname, join } from 'node:path';
 import { createTwoslasher } from 'twoslash';
 import type { SiteConfig } from 'vitepress';
 import { castOf } from './cast.data.ts';
+import { earlyCloser, fenceClosed, fenceOpened } from './fences.ts';
 import { outlineIn } from './outline.ts';
 import { twoslashOptions } from './twoslash.ts';
 import { langs, prefixOf, words, type Lang, type Words } from './words.ts';
@@ -20,7 +21,24 @@ export const host = 'https://pgcast.dev';  // GitHub Pages, under the config's `
 
 export async function writeLlmsFiles(config: SiteConfig) {
   const twoslasher = createTwoslasher(twoslashOptions);
+  checkFences(twoslasher);
   for (const lang of langs) await writeLlmsFilesIn(lang, config, twoslasher);
+}
+
+/**
+ * A self-check, before the pages: a note after a ```` ```md ```` block that shows a ```` ```ts ```` line is a note, a
+ * block of four backticks ends on its own fence, not on the ```` ``` ```` line it holds, and a block meant to fail,
+ * nested in a list, keeps its indent and marks the line it fails on.
+ */
+function checkFences(twoslasher: Twoslasher) {
+  const
+    page = `${earlyCloser}::: tip Read\n\`\`\`\`md\n\`\`\`ts\nconst n = 1;\n\`\`\`\n\`\`\`\`\n:::\n\n- A list:\n\n` +
+      "  ```ts twoslash\n  // @errors: 2322\n  const n: number = '';\n  ```",
+    expected = `${earlyCloser}> **Read**\n>\n> \`\`\`\`md\n> \`\`\`ts\n> const n = 1;\n> \`\`\`\n> \`\`\`\`\n\n- A list:\n\n` +
+      "  ```ts\n  const n: number = '';  // error TS2322\n  ```",
+    got = plain(page, {}, '.', link => link, twoslasher, words.en);
+  if (got !== expected)
+    throw new Error(`llms.ts: the self-check's page came out as\n${got}\n\nnot\n${expected}\n\ncheck fences.ts and shown()`);
 }
 
 /** A page's file in the site's source, by its link: `/select` is `select.md`, `/fr/` is `fr/index.md`. */
@@ -139,13 +157,13 @@ function plain(
     `llms.ts: write \`${missedInstall}\` as \`<InstallLine :commands="['…', …]" />\`, for llms-full.txt`);
 
   // a block nested in a list is indented as its opening fence: its lines lose that indent before Twoslash's are
-  // dropped, then every line, the fences too, gets it back
-  let fence: { indent: string; info: string; code: string[] } | undefined;
+  // dropped, then every line, the fences too, gets it back; a fence opens and closes as in the other checks (fences.ts)
+  let fence: { indent: string; marker: string; info: string; code: string[] } | undefined;
   for (const line of expanded.split('\n')) {
     const prefix = quotes.join('');
     if (fence) {
-      const { indent } = fence;
-      if (!/^\s*```\s*$/.test(line)) {
+      const { indent, marker } = fence;
+      if (!fenceClosed(marker, line)) {
         fence.code.push(line.slice(Math.min(indent.length, /^\s*/.exec(line)![0].length)));
         continue;
       }
@@ -153,14 +171,14 @@ function plain(
         twoslash = /\btwoslash\b/.test(fence.info),
         code = twoslash ? shown(fence.code.join('\n'), twoslasher) : fence.code.join('\n'),
         info = fence.info.replace(/\s*\btwoslash\b/, '').replace(/\{.*?\}/, '').trim();
-      lines.push(...['```' + info, ...code.split('\n'), '```'].map(l => prefix + (l === '' ? '' : indent) + l));
+      lines.push(...[marker + info, ...code.split('\n'), marker].map(l => prefix + (l === '' ? '' : indent) + l));
       fence = undefined;
       continue;
     }
     const
-      open = /^(\s*)```(.*)$/.exec(line),
+      open = fenceOpened(line),
       container = /^::: ?([\w-]+)\s*(.*)$/.exec(line);
-    if (open) fence = { indent: open[1]!, info: open[2]!, code: [] };
+    if (open) fence = { indent: /^\s*/.exec(line)![0], ...open, code: [] };
     else if (/^:::\s*$/.test(line)) quotes.pop();
     else if (container?.[1] === 'code-group') quotes.push('');
     else if (container) {
@@ -195,8 +213,22 @@ function checkCopy(file: string, page: string) {
   const
     lines = (code: string) => code.split('\n').map(line => line.trimEnd()).filter(line => line !== '').join('\n'),
     copy = lines(snippet(file, 'copy')),
-    blocks = [...page.matchAll(/^```.*\n([\s\S]*?)^```$/gm)].map(([, code]) => lines(code!.split('// ---cut---').pop()!));
+    blocks = blocksOf(page).map(code => lines(code.split('// ---cut---').pop()!));
   if (!blocks.includes(copy)) throw new Error(`llms.ts: the copy region of ${file} is no longer a block of its page`);
+}
+
+/** The code of each fenced block of a page, its fences read as in the other checks (fences.ts). */
+function blocksOf(page: string) {
+  const blocks: string[][] = [];
+  let marker: string | undefined;
+  for (const line of page.split('\n')) {
+    if (marker === undefined) {
+      marker = fenceOpened(line)?.marker;
+      if (marker !== undefined) blocks.push([]);
+    } else if (fenceClosed(marker, line)) marker = undefined;
+    else blocks.at(-1)!.push(line);
+  }
+  return blocks.map(block => block.join('\n'));
 }
 
 /**

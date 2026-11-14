@@ -74,6 +74,12 @@ export default defineLoader({
     }, 'cast.data.ts, an example that changes the configuration');
     if (JSON.stringify(db.getConfig()) !== before || db.getConfig().queryListener)
       throw new Error('cast.data.ts: an example left the configuration changed for the next: check `record`');
+    const laidOut = [
+      'INSERT INTO "tags" ("film_id", "tag") SELECT $1, "tag" FROM "tags" WHERE ("film_id" = $2) ON CONFLICT -- copied\nDO NOTHING',
+      'INSERT INTO "tags"  ( "film_id",\n  "tag" )\n    SELECT $1,\t"tag" FROM "tags"\n    WHERE ( "film_id" = $2 )\n    ON CONFLICT  -- copied\n      DO NOTHING\n',
+    ].map(layOut);
+    if (laidOut.some(sql => sql !== 'INSERT INTO "tags" ("film_id", "tag")\nSELECT $1, "tag"\nFROM "tags"\nWHERE ("film_id" = $2)\nON CONFLICT -- copied\nDO NOTHING'))
+      throw new Error(`cast.data.ts: layOut kept a template's spacing, or ran a comment on: check \`layOut\`\n${laidOut.join('\n\n')}`);
 
     for (const file of files.filter(f => !f.endsWith('.d.ts'))) {
       const { sql, values, type } = await castOf(file, twoslasher);

@@ -154,13 +154,21 @@ function indentAll(level: number, s: string) {
   return s.replace(/^/gm, ' '.repeat(level));
 }
 
+/** The text of a query less its first and last blank lines and the margin of its template literal: it runs as is. */
+const unindented = (text: string) => {
+  const
+    lines = text.replace(/^\s*\n|\s+$/g, '').split('\n'),
+    margin = Math.min(...lines.map(line => /\S/.test(line) ? line.search(/\S/) : Infinity));
+  return lines.map(line => line.slice(margin)).join('\n');
+};
+
 export const tsForConfig = async (config: CompleteConfig, debug: (s: string) => void) => {
   let querySeq = 0, ended = false;
   const
     pool = new pg.Pool(config.db),  // connects at its first query
     queryFn = async (query: pg.QueryConfig, seq = querySeq++) => {
       try {
-        debug(`>>> query ${seq} >>>\n${query.text.replace(/^\s+|\s+$/mg, '')}\n+ ${JSON.stringify(query.values)}\n`);
+        debug(`>>> query ${seq} >>>\n${unindented(query.text)}\n+ ${JSON.stringify(query.values)}\n`);
         const result = await pool.query(query);
         debug(`<<< result ${seq} <<<\n${JSON.stringify(result, null, 2)}\n`);
         return result;

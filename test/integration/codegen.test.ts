@@ -1294,6 +1294,64 @@ describe('include entries that match no relation', () => {
   });
 });
 
+describe('schemas rules missing include or exclude', () => {
+  // #301: the CLI's JSON and untyped JavaScript can leave a key out, or set it to null;
+  // Zapatos 6.6.1 threw a TypeError when it came to read it
+  const rule = (given: unknown) => given as Schemas[string];
+  const note = (schema: string, missing: string, taken: string, them = false) =>
+    `Note: the schemas rule of "${schema}" has no ${missing}, so it takes ${taken}, as the default rule does. ` +
+    `Write ${them ? 'the keys' : 'the key'} in the rule to silence this note.`;
+
+  it.each([
+    ['{ include: "*" }', { include: '*' }, all],
+    ['{ include: [...] }', { include: ['users', 'accounts'] }, only('users', 'accounts')],
+    ['{ exclude: [...] }', { exclude: ['products'] }, { include: '*' as const, exclude: ['products'] }],
+    ['{}', {}, all],
+    ['null keys', { include: null, exclude: null }, all],
+  ])('generates for %s what the rule with its keys written out generates', async (_, given, written) => {
+    const expected = await codegen({ schemas: { public: written } });
+    expect((await codegen({ schemas: { public: rule(given) } })).ts).toBe(expected.ts);
+  });
+
+  it('notes each rule missing a key through generate(), in rule order, naming its schema and the default it takes', async () => {
+    const outDir = mkdtempSync(join(tmpdir(), 'pgcast-schema-rules-'));
+    try {
+      const warnings: string[] = [];
+      await generate({
+        schemas: {
+          public: rule({ include: ['users'] }),
+          extra: rule({ exclude: '*' }),  // generated the enums in 6.6.1 too
+          no_such_schema: rule({}),
+          edge: { include: [], exclude: [] },
+        },
+        ...quiet, warningListener: s => warnings.push(s), db: db(), outDir,
+      });
+      expect(warnings.filter(w => w.startsWith('Note: the schemas rule'))).toEqual([
+        note('public', 'exclude', '"exclude": []'),
+        note('extra', 'include', '"include": "*"'),
+        note('no_such_schema', 'include nor exclude', '"include": "*" and "exclude": []', true),
+      ]);
+    } finally {
+      rmSync(outDir, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps a complete rule as the same object, and a rule that is not an object as it is', () => {
+    const complete = { include: ['users'], exclude: [] };
+    const schemas = { public: complete, extra: rule(['articles']), edge: rule(null) };
+    const finalSchemas = finaliseConfig({ schemas }).schemas;
+    expect(finalSchemas).toEqual(schemas);
+    expect(finalSchemas.public).toBe(complete);
+    expect(finaliseConfig({}).schemas).toEqual({ public: all });
+  });
+
+  it('still requires both keys in Config', () => {
+    // @ts-expect-error a rule without exclude fails to compile (TS2741)
+    const wrong: Config = { schemas: { public: { include: '*' } } };
+    void wrong;
+  });
+});
+
 describe('names that Object.prototype also has', () => {
   // schemas of their own, committed to this file's database: no other test configures them.
   // Each name is an enum of a schema enum_<name>, a schema with a table, and a domain of proto_a and
@@ -1397,6 +1455,69 @@ describe('names that Object.prototype also has', () => {
       `so they share one type and one placeholder file, src/zapatos/custom/${name}.d.ts. ` +
       'To type them apart, rename one of them in the database.',
     ]);
+  });
+});
+
+describe('debugListener', () => {
+  /** Each query a run prints, as `{ text, values, rows }`, its result paired by its number. */
+  const printedQueries = async (config: Config) => {
+    const printed: string[] = [];
+    await tsForConfig(finaliseConfig({ ...config, ...quiet, db: db() }), s => printed.push(s));
+    const
+      results = new Map(printed.filter(s => s.startsWith('<<< result ')).map(s => {
+        const [header, ...json] = s.split('\n');
+        return [header.split(' ')[2], JSON.parse(json.join('\n')).rows];
+      })),
+      queries = printed.filter(s => s.startsWith('>>> query ')).map(s => {
+        const
+          lines = s.replace(/\n$/, '').split('\n'),
+          header = lines[0],
+          values = lines[lines.length - 1];
+        expect(values.startsWith('+ ')).toBe(true);
+        return {
+          seq: header.split(' ')[2],
+          text: lines.slice(1, -1).join('\n'),
+          values: JSON.parse(values.slice(2)),
+        };
+      });
+    return queries.map(q => ({ ...q, rows: results.get(q.seq) }));
+  };
+
+  it('prints a query with its blank lines and line breaks, less the margin of its source', async () => {
+    const [relations] = await printedQueries({ schemas: { public: only('users') } });
+    expect(relations.seq).toBe('0');
+    expect(relations.text).toBe(`SELECT $1 as schema
+, table_name AS name
+, lower(table_name) AS lname  -- using a case-insensitive sort, but you can't order by a function in a UNION query
+, CASE table_type WHEN 'VIEW' THEN 'view' WHEN 'FOREIGN' THEN 'fdw' ELSE 'table' END AS type
+, CASE WHEN is_insertable_into = 'YES' THEN true ELSE false END AS insertable
+FROM information_schema.tables
+WHERE table_schema = $1 AND table_type != 'LOCAL TEMPORARY'
+
+UNION ALL
+
+SELECT $1 as schema
+, matviewname AS name
+, lower(matviewname) AS lname
+, 'mview'::text AS type
+, false AS insertable
+FROM pg_catalog.pg_matviews
+WHERE schemaname = $1
+
+ORDER BY lname, name`);
+    expect(relations.values).toEqual(['public']);
+  });
+
+  it('prints each query so that it runs as is, with its values, and gives the rows printed as its result', async () => {
+    const queries = await printedQueries(main);
+    // the relations and the enums of each schema, then the columns and the unique indexes of each relation
+    expect(queries.some(q => q.text.includes('pg_catalog.pg_enum'))).toBe(true);
+    expect(queries.some(q => q.text.includes('pg_catalog.pg_indexes'))).toBe(true);
+    expect(queries.some(q => q.values.includes('account_totals') && q.text.includes('a.attname'))).toBe(true);
+    for (const { text, values, rows } of queries) {
+      const result = await t.client.query(text, values);
+      expect(JSON.parse(JSON.stringify(result.rows))).toEqual(rows);
+    }
   });
 });
 
