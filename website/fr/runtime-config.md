@@ -1,5 +1,5 @@
 ---
-english: ca278d3159d6
+english: 489020a0f5be
 ---
 
 # Configuration
@@ -62,7 +62,7 @@ try {
 ```
 
 - Elle rétablit chaque clé que contient `saved`.
-- Une clé que `saved` ne contient pas reste telle que réglée : un écouteur réglé entre-temps continue d’écouter. Réglez-le à `undefined` pour le retirer : `db.setConfig({ queryListener: undefined })`.
+- Une clé que `saved` ne contient pas reste telle que réglée : un écouteur réglé entre-temps continue d’écouter. Réglez-le à `undefined` pour le retirer : `db.setConfig({ queryListener: undefined })`. Sous `exactOptionalPropertyTypes`, qui le refuse (TS2379), castez l’objet, car le type n’offre pas d’autre moyen, pas plus que dans Zapatos 6.6.1 : `{ queryListener: undefined } as unknown as db.NewConfig`.
 
 ## `Config` {#Config}
 
@@ -76,13 +76,14 @@ interface Config {
   undefinedMeansMissing?: boolean;
   transactionRequiresCommit?: boolean;
   selectExactlyOneChecksForSecondRow?: boolean;
+  aggregatesTypedByColumn?: boolean;
   queryListener?(query: SQLQuery, txnId?: number): void;
   resultListener?(result: any, txnId?: number, elapsedMs?: number, query?: SQLQuery): void;
   transactionListener?(message: string, txnId?: number): void;
 }
 ```
 
-Les clés qu’ajoute pgcast sont facultatives, donc un `Config` écrit pour Zapatos 6.6.1 compile toujours ; `getConfig()` les type `boolean | undefined`, bien qu’elle donne toujours une valeur. Aucune option ne change un type.
+Les clés qu’ajoute pgcast sont facultatives, donc un `Config` écrit pour Zapatos 6.6.1 compile toujours ; `getConfig()` les type `boolean | undefined`, bien qu’elle donne toujours une valeur. Une option change un type, une fois déclarée aussi dans [`ConfigTypes`](#ConfigTypes) : `aggregatesTypedByColumn`.
 
 <div class="stack">
 
@@ -96,6 +97,7 @@ Les clés qu’ajoute pgcast sont facultatives, donc un `Config` écrit pour Zap
 | [`undefinedMeansMissing`](#Config.undefinedMeansMissing) | `false` | une valeur `undefined` dans `insert()`, `update()` et `upsert()` : une clé manquante, pas `NULL` | à chaque appel de l’une d’elles |
 | [`transactionRequiresCommit`](#Config.transactionRequiresCommit) | `false` | un `COMMIT` auquel Postgres répond `ROLLBACK` : être rejetée, pas se résoudre | à chaque `transaction()` |
 | [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow) | `false` | un `selectExactlyOne()` exécuté seul : `LIMIT 2`, et une deuxième ligne entraîne un rejet | à chaque `selectExactlyOne()` |
+| [`aggregatesTypedByColumn`](#Config.aggregatesTypedByColumn) | `false` | `sum()`, `avg()`, `min()` et `max()` : `null` quand aucune ligne ne correspond, et pour `min()` et `max()` la valeur de la colonne, pas son `Number()` | à chaque `run()` de l’un d’eux |
 | [`queryListener`](#Config.queryListener) | aucun | appelé avec chaque requête qu’envoie `run()` | à chaque `run()` |
 | [`resultListener`](#Config.resultListener) | aucun | appelé avec chaque résultat que donne `run()` | à chaque `run()` |
 | [`transactionListener`](#Config.transactionListener) | aucun | appelé quand une tentative de `transaction()` échoue avec `40001` ou `40P01`, et à chaque nouvelle tentative | à chaque `transaction()` |
@@ -184,7 +186,7 @@ Sans l’option, il s’exécute comme dans Zapatos 6.6.1, avec un avertissement
 undefinedMeansMissing?: boolean  // default: false; the default in 7.0
 ```
 
-Avec `true`, une valeur `undefined` dans [`insert()`](/fr/insert#insert), [`update()`](/fr/insert#update) et [`upsert()`](/fr/insert#upsert) est une clé manquante : `DEFAULT` dans `insert()`, omise dans `update()` et `upsert()`. Sans l’option, elle est envoyée comme `NULL`, comme dans Zapatos 6.6.1, avec un avertissement une fois par processus : `PGCAST_DEP002`. Le SQL de chacune : [Une valeur `undefined`](/fr/insert#undefined-values).
+Avec `true`, une valeur `undefined` dans [`insert()`](/fr/insert#insert), [`update()`](/fr/insert#update) et [`upsert()`](/fr/insert#upsert) est une clé manquante : `DEFAULT` dans `insert()`, omise dans `update()` et `upsert()`, `updateValues` compris. Sans l’option, elle est envoyée comme `NULL` (dans `updateValues`, sa colonne prend sa valeur dans `EXCLUDED`), comme dans Zapatos 6.6.1, avec un avertissement une fois par processus : `PGCAST_DEP002`. Le SQL de chacune : [Une valeur `undefined`](/fr/insert#undefined-values).
 
 ### `transactionRequiresCommit` {#Config.transactionRequiresCommit}
 
@@ -212,6 +214,21 @@ Avec `true`, un [`selectExactlyOne()`](/fr/select#selectExactlyOne) exécuté se
 - Imbriqué dans une autre requête, dans un `lateral` ou un template `sql`, il garde `LIMIT 1`, avec ou sans l’option : une deuxième ligne y joindrait deux fois la ligne parente. « Seul » dépend de la façon dont la requête est compilée : `.run()` et `.compile()` la compilent seule, une requête parente la compile dans son propre SQL.
 - Sans l’option, aucun avertissement, et elle reste désactivée en 7.0 : « au moins une ligne », c’est ainsi que Zapatos lit `selectExactlyOne()`, imbriqué dans un `lateral` sur une clé étrangère `NOT NULL` ([décision 003](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/003-fixes-and-deprecation.md)).
 - Lue quand `selectExactlyOne()` est appelée, pas à `.run()`.
+
+### `aggregatesTypedByColumn` {#Config.aggregatesTypedByColumn}
+
+```ts
+aggregatesTypedByColumn?: boolean  // default: false; the default in 7.0
+```
+
+À partir de la 6.7.0. Avec `true`, [`sum()`](/fr/select#sum), [`avg()`](/fr/select#avg), [`min()`](/fr/select#min) et [`max()`](/fr/select#max) donnent `null` quand aucune ligne ne correspond, et `min()` et `max()` donnent la valeur de la colonne telle que `pg` la lit : un `Date` pour un `timestamptz`, une chaîne pour un `text` ou un enum. Le SQL ne change pas, ni [`count()`](/fr/select#count).
+
+Sans l’option, le résultat passe par `Number()`, comme dans Zapatos 6.6.1 : `0` quand aucune ligne ne correspond, les millisecondes d’une date, `NaN` pour un texte. `.run()` avertit alors une fois par processus, `PGCAST_DEP004`, quand `Number()` a changé ce que Postgres a envoyé, ou que la requête n’a renvoyé aucune ligne.
+
+- Les types ne suivent qu’une fois l’option déclarée aussi dans [`ConfigTypes`](#ConfigTypes) : `setConfig()` règle le runtime, la déclaration les types.
+- Imbriquée dans un `lateral`, la valeur revient en JSON, avec ou sans l’option, et vaut `null` quand aucune ligne ne correspond ; une fois l’option déclarée, elle est typée comme le `JSONSelectable` de sa colonne. De même dans `extras`, une fois que [#262](https://github.com/AlexandreDemartin/pgcast/issues/262) y aura mis l’agrégat entre parenthèses ; aujourd’hui, Postgres le refuse sans parenthèses.
+- L’option est lue à `.run()`, là où l’avertissement est aussi émis : une requête construite avant `setConfig()` prend l’option sous laquelle elle s’exécute, comme le dit son type, déclaré pour tout le programme. Une requête qui ne renvoie aucune ligne, un `groupBy` sans aucun groupe, se lit comme `NULL` : `null` avec l’option, `0` sans, avec l’avertissement.
+- Les exemples, et chaque type : [Typé par colonne](/fr/select#typed-by-column).
 
 ### `queryListener` {#Config.queryListener}
 
@@ -288,6 +305,37 @@ type NewConfig = Partial<Config>
 
 Ce que prend [`setConfig()`](#setConfig) : n’importe quelles clés de `Config`, chacune entière.
 
+## `ConfigTypes` {#ConfigTypes}
+
+```ts
+interface ConfigTypes { }
+```
+
+À partir de la 6.7.0. Les options de `Config` qui changent un type, déclarées comme vous les réglez, puisque TypeScript ne peut pas lire `setConfig()`. Vide, chaque type est celui de Zapatos 6.6.1. Déclarez l’interface une fois, dans un module que votre `tsconfig.json` inclut, un fichier avec un `import` ou un `export`, et réglez l’option de la même façon :
+
+```ts twoslash
+import * as db from 'zapatos/db';
+
+declare module 'zapatos/db' {
+  interface ConfigTypes { aggregatesTypedByColumn: true }
+}
+
+db.setConfig({ aggregatesTypedByColumn: true });
+```
+
+Un `.d.ts` qui ne contient que la déclaration a besoin d’`export {}` : sans lui, le fichier déclare son propre `zapatos/db`, qui masque celui du paquet (`db.min`, `db.all` et le reste disparaissent).
+
+```ts
+// pgcast.d.ts
+export {};
+
+declare module 'zapatos/db' {
+  interface ConfigTypes { aggregatesTypedByColumn: true }
+}
+```
+
+Avec [`moduleNames: "pgcast"`](/fr/generator#generate.moduleNames), c’est `declare module 'pgcast/db'`. Seule la clé [`aggregatesTypedByColumn`](#Config.aggregatesTypedByColumn) y est lue.
+
 ## `SQLQuery` {#SQLQuery}
 
 ```ts
@@ -305,8 +353,9 @@ Un comportement de Zapatos 6.6.1 sur lequel du code peut compter, mais que pgcas
 | Option | Avertissement | Émis quand | Par défaut à partir de |
 |---|---|---|---|
 | [`upsertRequiresSameKeys: true`](#Config.upsertRequiresSameKeys) | `PGCAST_DEP001` | un `upsert()` de plusieurs lignes sans `updateColumns` a une clé absente de certaines lignes qui prend quand même sa valeur dans `EXCLUDED` ([Lignes aux clés différentes](/fr/insert#upsert-different-keys)) | 7.0 |
-| [`undefinedMeansMissing: true`](#Config.undefinedMeansMissing) | `PGCAST_DEP002` | une valeur d’`insert()`, `update()` ou `upsert()` est `undefined` ([Une valeur `undefined`](/fr/insert#undefined-values)) | 7.0 |
+| [`undefinedMeansMissing: true`](#Config.undefinedMeansMissing) | `PGCAST_DEP002` | une valeur d’`insert()`, `update()` ou `upsert()` est `undefined`, ou une clé d’`updateValues` d’`upsert()` l’est et ajoute sa colonne ([Une valeur `undefined`](/fr/insert#undefined-values)) | 7.0 |
 | [`transactionRequiresCommit: true`](#Config.transactionRequiresCommit) | `PGCAST_DEP003` | Postgres répond au `COMMIT` de `transaction()` par `ROLLBACK`, après une erreur de requête que le callback a interceptée ([Laisser passer l’erreur](/fr/retries#let-the-error-through)) | 7.0 |
+| [`aggregatesTypedByColumn: true`](#Config.aggregatesTypedByColumn) | `PGCAST_DEP004` | `Number()` change le résultat de `sum()`, `avg()`, `min()` ou `max()` : un `NULL` devenu `0`, ou un `min()` ou `max()` qui n’est pas un nombre ([Typé par colonne](/fr/select#typed-by-column)) | 7.0 |
 
 </div>
 
@@ -314,10 +363,10 @@ Un opt-in n’a pas d’avertissement et ne devient pas le comportement par déf
 
 Le générateur a les siens : [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas) et [`enumOrder`](/fr/generator#generate.enumOrder), dont les anciens chemins donnent des notes via [`warningListener`](/fr/generator#generate.warningListener), une fois par exécution, plutôt qu’un `DeprecationWarning` ; ils deviendront eux aussi le comportement par défaut en 7.0.
 
-Chaque avertissement est un `DeprecationWarning` de Node.js, émis une fois par processus pour chaque code, quand le raccourci est appelé (`PGCAST_DEP003` : quand `transaction()` se résout), et seulement quand l’ancien comportement est utilisé. Son message nomme l’option. Node l’affiche sur `stderr` :
+Chaque avertissement est un `DeprecationWarning` de Node.js, émis une fois par processus pour chaque code, quand le raccourci est appelé (`PGCAST_DEP003` : quand `transaction()` se résout ; `PGCAST_DEP004` : quand `.run()` reçoit le résultat), et seulement quand l’ancien comportement est utilisé. Son message nomme l’option. Node l’affiche sur `stderr` :
 
 ```txt
-(node:4242) [PGCAST_DEP002] DeprecationWarning: An undefined value in insert(), update() or upsert() is sent as NULL. Set undefinedMeansMissing: true (db.setConfig) to treat it as a missing key instead (DEFAULT in insert(), left out of update() and upsert()); it will be the default in pgcast 7.0.
+(node:4242) [PGCAST_DEP002] DeprecationWarning: An undefined value in insert(), update() or upsert() is sent as NULL, or, in upsert() updateValues, set from EXCLUDED. Set undefinedMeansMissing: true (db.setConfig) to treat it as a missing key instead (DEFAULT in insert(), left out of update() and upsert()); it will be the default in pgcast 7.0.
 ```
 
 - `process.on('warning', …)` le reçoit, avec pour `name` `'DeprecationWarning'` et pour `code` `'PGCAST_DEP002'`.
@@ -427,7 +476,7 @@ db.enableCustomJSONParsingForLargeNumbers(pg);
 | `1.00000000000000000001` | `1` | `'1.00000000000000000001'` |
 | un `numeric` au-delà de `Number.MAX_VALUE` | `Infinity` | ses chiffres, sous forme de chaîne |
 
-- Elle ne fait rien pour `count()`, `sum()`, `avg()`, `min()` et `max()` : leur résultat n’est pas du JSON, et passe par `Number()` ([`count()`](/fr/select#count), [#163](https://github.com/AlexandreDemartin/pgcast/issues/163)). Un `sum()` de `9007199254740993` donne toujours `9007199254740992`.
+- Elle ne fait rien pour `count()`, `sum()`, `avg()`, `min()` et `max()` : leur résultat n’est pas du JSON, et passe par `Number()` ([`count()`](/fr/select#count)). Un `sum()` de `9007199254740993` donne toujours `9007199254740992`.
 - Elle règle les analyseurs de types du module `pg` que vous donnez, donc de chaque pool et chaque client de ce module, à partir de là, requêtes de pgcast ou non.
 - Elle ne change pas les types : c’est l’option [`customJSONParsingForLargeNumbers`](/fr/generator#generate.customJSONParsingForLargeNumbers) du générateur qui le fait.
 - Une colonne `int8` ou `numeric` hors JSON est déjà une chaîne, par l’analyseur de `pg` lui-même.

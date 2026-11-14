@@ -1,5 +1,5 @@
 ---
-english: 6c6a9e64c2cc
+english: 9d34e1ff0bb4
 ---
 
 # Écritures
@@ -77,7 +77,7 @@ db.upsert(table, values, conflictTarget, options?)
 
 </CastPanel>
 
-- La mise à jour fixe chaque colonne insérée, depuis `EXCLUDED`, et chaque clé de `updateValues`.
+- La mise à jour fixe chaque colonne insérée, depuis `EXCLUDED`, et chaque clé de `updateValues`. Les colonnes du `conflictTarget` sont fixées aussi : une clé `citext`, que Postgres compare sans tenir compte de la casse, prend la casse de la nouvelle valeur. Un `updateColumns` qui ne les nomme pas les laisse telles quelles.
 - Chaque résultat a `$action`, `'INSERT'` ou `'UPDATE'` ([`UpsertAction`](#UpsertAction)).
 - Une ligne donne un résultat ; un tableau donne un tableau, sans les lignes qui ne font rien ([`doNothing`](#doNothing)).
 - Un tableau vide ne fait rien, comme pour `insert()`.
@@ -97,7 +97,7 @@ Chaque SQL remplace le `DO UPDATE SET …` de l’upsert simple, sur `ratings` (
 | `reportAction: 'suppress'` | pas de `\|\| jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END)`<!-- probe: db.upsert('ratings', { film_id: 1000, stars: 5, votes: 1 }, ['film_id', 'stars']) --> | pas d’`UpsertAction` |
 
 - `updateColumns` prend une colonne ou un tableau ; `noNullUpdateColumns` une colonne, un tableau, ou `db.all` pour toutes les colonnes. [Lots](/fr/batches#rows-with-different-keys) a un panneau cast avec `updateColumns` : une réservation garde son horaire.
-- `updateValues` est un seul jeu de valeurs pour toutes les lignes mises à jour. Ses clés sont toujours mises à jour, même quand `updateColumns` les omet, ou vaut `doNothing` (le SQL est alors `DO UPDATE SET`<!-- probe: db.upsert('ratings', { film_id: 1000, stars: 5 }, ['film_id', 'stars'], { updateColumns: db.doNothing, updateValues: { votes: 1 } }) -->, pas `DO NOTHING`).
+- `updateValues` est un seul jeu de valeurs pour toutes les lignes mises à jour. Ses clés sont toujours mises à jour, même quand `updateColumns` les omet, ou vaut `doNothing` (le SQL est alors `DO UPDATE SET`<!-- probe: db.upsert('ratings', { film_id: 1000, stars: 5 }, ['film_id', 'stars'], { updateColumns: db.doNothing, updateValues: { votes: 1 } }) -->, pas `DO NOTHING`) ; avec `undefinedMeansMissing`, une clé à `undefined` n’est pas mise à jour ([Une valeur `undefined`](#undefined-values)).
 - Dans `updateValues`, une valeur simple est un paramètre. Une valeur qui contient un fragment, `param()`, `raw()`, `cols()`, `vals()`, `parent()`, `Default` ou `self`, à n’importe quelle profondeur de ses tableaux et objets simples, est compilée comme dans un template `sql`.
 - Pour y lire une colonne, nommez la table pour la ligne existante, `${'ratings'}.${'votes'}`, ou `EXCLUDED` pour la nouvelle, `` db.sql`EXCLUDED.${'votes'}` ``.
 - Là, `db.self`, ou un fragment ou une condition qui l’utilise (`` db.sql`${db.self} + 1` ``, [`conditions.add()`](/fr/conditions#conditions.add)), lève "The 'self' column alias has no meaning here"<!-- message -->, comme dans Zapatos 6.6.1 ; `db.parent()`, seul ou dans un fragment, lève "The 'parent' table alias has no meaning here"<!-- message -->.
@@ -160,6 +160,7 @@ db.upsert('ratings', { film_id: 1002, stars: 4 }, db.constraint('ratings_stars_k
 
 - Le type accepte chaque index unique de la table, et Postgres seulement une contrainte. Un index créé avec `CREATE UNIQUE INDEX`, qui n’est pas une contrainte, passe la vérification de types, et Postgres le refuse : 42704, `constraint "…" for table "…" does not exist`.
 - Pour un tel index, passez ses colonnes comme `conflictTarget` : `'code'` pour un index unique sur `code`.
+- Une contrainte unique `DEFERRABLE` passe aussi la vérification de types, et Postgres la refuse comme arbitre, par son nom comme par ses colonnes : 55000, `ON CONFLICT does not support deferrable unique constraints/exclusion constraints as arbiters`.
 
 Le type ne vérifie pas qu’une contrainte appartient à la table de l’upsert, et Postgres refuse celle d’une autre table : 42704. `constraint()` ne prend les noms de la table qu’à l’intérieur de l’appel, comme ci-dessus. Gardé dans une variable, `const k = db.constraint('tags_pkey')` accepte le nom de n’importe quelle table, donc `db.upsert('ratings', …, k)` compile. Donnez la table, `db.constraint<'ratings'>('ratings_pkey')`, et le type vérifie le nom par rapport à elle :
 
@@ -206,7 +207,7 @@ db.update(table, values, where, options?)
 Met à jour les lignes qui correspondent, et les renvoie. Les arguments viennent dans l’ordre du SQL : `SET`, puis `WHERE`.
 
 - `table` : une table du schéma.
-- `values` : un `Updatable`, avec au moins une clé. Un fragment `sql` est écrit comme SQL, où `db.self` est la colonne, de même qu’une condition comme [`conditions.add()`](/fr/conditions#conditions.add). `raw()`, `cols()`, `vals()` et `parent()` lèvent une erreur, comme pour [`insert()`](#insert). Une valeur `undefined` est `NULL` ([Une valeur `undefined`](#undefined-values)).
+- `values` : un `Updatable`, avec au moins une clé. Un fragment `sql` est écrit comme SQL, où `db.self` est la colonne, de même qu’une condition comme [`conditions.add()`](/fr/conditions#conditions.add) ; écrit en ligne, ce fragment peut demander un argument de type ([`Constraint`](/fr/sql-template#type-arguments)). `raw()`, `cols()`, `vals()` et `parent()` lèvent une erreur, comme pour [`insert()`](#insert). Une valeur `undefined` est `NULL` ([Une valeur `undefined`](#undefined-values)).
 - `where` : un `Whereable`, ou un fragment `sql` ([Conditions](/fr/conditions)).
 - `options` : `returning` et `extras`, comme pour [`insert()`](#insert-options).
 
@@ -293,8 +294,8 @@ Avec `'CASCADE'`, Postgres vide chaque table qui référence l’une d’elles, 
 
 </CastPanel>
 
-- `.run()` se résout avec `[]`, là où le type dit `undefined`.
-- Le type prend les options dans cet ordre, une de chaque sorte. pgcast les écrit telles qu’elles sont données : en JavaScript, ou en passant outre le type avec `as any`, `truncate('tags', 'CASCADE', 'RESTART IDENTITY')` envoie `TRUNCATE "tags" CASCADE RESTART IDENTITY`<!-- probe: db.truncate('tags', 'CASCADE', 'RESTART IDENTITY') -->, et Postgres le refuse (42601).
+- `.run()` se résout avec `undefined`, comme le dit son type. Sous Zapatos 6.6.1, elle se résolvait avec `[]`.
+- Les options viennent dans cet ordre, au plus une de chaque sorte, comme Postgres les attend, et le type refuse tout autre ordre. En passant outre le type, en JavaScript ou avec `as any`, un autre ordre lève une erreur à la compilation, donc `.run()` est rejetée avec une simple `Error` avant toute requête : `truncate('tags', 'CASCADE', 'RESTART IDENTITY')` donne "Truncate options must be CONTINUE IDENTITY/RESTART IDENTITY, then RESTRICT/CASCADE, one of each at most, not '…'"<!-- message -->. Zapatos 6.6.1 envoyait `TRUNCATE "tags" CASCADE RESTART IDENTITY`, et Postgres le refusait (42601).
 - Toute autre option lève une erreur : "Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not '…'"<!-- message -->. Zapatos 6.6.1 l’écrivait telle quelle dans le SQL.
 
 ## Une valeur `undefined` {#undefined-values}
@@ -308,12 +309,14 @@ Dans les valeurs d’`insert()`, `update()` et `upsert()`, Zapatos 6.6.1 envoie 
 | `insert()` | `NULL` | `DEFAULT` : `VALUES ($1, $2, $3, DEFAULT, $4)`<!-- probe: (db.setConfig({ undefinedMeansMissing: true }), db.insert('films', { studio_id: 1000, title: 'x', release_year: 2030, tagline: undefined, runtime_minutes: 90 })) --> |
 | `update()` | met la colonne à `NULL`, et compte comme une clé | omise : `SET ("title") = ROW($1)`<!-- probe: (db.setConfig({ undefinedMeansMissing: true }), db.update('films', { title: 'x', tagline: undefined }, { id: 1000 })) --> ; sans clé restante, lève "nothing to update…"<!-- message --> |
 | `upsert()` | insère `NULL`, puis la fixe depuis `EXCLUDED` | omise : ni insérée, ni mise à jour sauf si `updateColumns` la nomme (alors depuis `EXCLUDED`, donc une ligne existante prend le `DEFAULT` de la colonne) ; sur plusieurs lignes, sa cellule est `DEFAULT` et compte comme absente ([Lignes aux clés différentes](#upsert-different-keys)) |
+| `upsert()` `updateValues` | la fixe depuis `EXCLUDED` : la valeur insérée, ou le `DEFAULT` de la colonne | omise, comme une clé que `updateValues` n’a pas : `SET ("film_id", "stars") = ROW(EXCLUDED."film_id", EXCLUDED."stars")`<!-- probe: (db.setConfig({ undefinedMeansMissing: true }), db.upsert('ratings', { film_id: 1002, stars: 4 }, ['film_id', 'stars'], { updateValues: { votes: undefined } })) -->, donc la valeur existante reste ; avec `doNothing` et aucune autre clé, `DO NOTHING`<!-- probe: (db.setConfig({ undefinedMeansMissing: true }), db.upsert('ratings', { film_id: 1002, stars: 4 }, ['film_id', 'stars'], { updateColumns: db.doNothing, updateValues: { votes: undefined } })) --> |
 
 </div>
 
 - Par défaut, chacun envoie le SQL de 6.6.1 et avertit une fois par processus : `PGCAST_DEP002`.
 - Un `undefined` dans un `where` se comporte comme avant.
-- Un `undefined` dans `updateValues` se comporte aussi comme avant, dans les deux modes : sa clé est toujours mise à jour, depuis `EXCLUDED`. Une ligne existante prend donc la valeur insérée, ou le `DEFAULT` de la colonne quand la ligne ne l’insère pas, sans avertissement : `upsert('ratings', { film_id: 1002, stars: 4 }, ['film_id', 'stars'], { updateValues: { votes: undefined } })` envoie `EXCLUDED."votes"`<!-- probe: db.upsert('ratings', { film_id: 1002, stars: 4 }, ['film_id', 'stars'], { updateValues: { votes: undefined } }) -->, et un compte existant revient à 1.
+- Dans `updateValues`, par défaut, `upsert('ratings', { film_id: 1002, stars: 4 }, ['film_id', 'stars'], { updateValues: { votes: undefined } })` envoie `EXCLUDED."votes"`<!-- probe: db.upsert('ratings', { film_id: 1002, stars: 4 }, ['film_id', 'stars'], { updateValues: { votes: undefined } }) -->, et un compte existant revient à 1. pgcast n’avertit que lorsque la clé est seule à ajouter sa colonne : `updateColumns` l’omet ou, sans `updateColumns`, aucune ligne ne l’insère.
+- Une colonne que la mise à jour fixe de toute façon, insérée sans `updateColumns` ou nommée par cette option, reste fixée depuis `EXCLUDED` dans les deux modes, comme sans clé dans `updateValues`.
 
 ::: tip Opt-in
 `undefinedMeansMissing: true` ([`Config`](/fr/runtime-config#Config.undefinedMeansMissing)) lit une valeur `undefined` comme une clé absente, comme le fait `JSON.stringify()`. Sans elle, pgcast avertit avec `PGCAST_DEP002` ; elle devient le défaut en 7.0 ([Versions](/fr/versions)).

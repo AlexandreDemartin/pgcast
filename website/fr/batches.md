@@ -1,5 +1,5 @@
 ---
-english: 4d9ca4ad5070
+english: e70ecd02d18e
 ---
 
 # Lots
@@ -92,7 +92,7 @@ Ajoutez ensuite les votes de chaque ligne à ceux déjà stockés : calculez `v
 </CastPanel>
 
 - La première exécution insère les trois lignes. La seconde les passe à 4, 2 et 6 votes, chacune avec `$action: 'UPDATE'`.
-- Un `undefined` dans `updateValues` ne laisse pas `votes` intact ([Une valeur `undefined`](/fr/insert#undefined-values), [#168](https://github.com/AlexandreDemartin/pgcast/issues/168)).
+- Un `undefined` dans `updateValues` donne à `votes` le compte du lot, puisque les lignes l’insèrent : `EXCLUDED."votes"`<!-- probe: db.upsert('ratings', [{ film_id: 1000, stars: 5, votes: 3 }], ['film_id', 'stars'], { updateValues: { votes: undefined } }) -->, et avec [`undefinedMeansMissing`](/fr/runtime-config#Config.undefinedMeansMissing) activé, `EXCLUDED."votes"`<!-- probe: (db.setConfig({ undefinedMeansMissing: true }), db.upsert('ratings', [{ film_id: 1000, stars: 5, votes: 3 }], ['film_id', 'stars'], { updateValues: { votes: undefined } })) --> aussi ([Une valeur `undefined`](/fr/insert#undefined-values)).
 
 ## Lignes aux clés différentes {#rows-with-different-keys}
 

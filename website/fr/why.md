@@ -1,5 +1,5 @@
 ---
-english: eb483b8b282d
+english: 565e7230cb8e
 ---
 
 # Pourquoi pgcast
@@ -74,7 +74,7 @@ Celle qui ouvre une transaction prend le pool ou le client de son niveau, `pg.Po
 
 ## Ce qu’ajoute pgcast {#what-pgcast-adds}
 
-pgcast part de Zapatos 6.6.1. Avant de le modifier, le fork a figé par des tests ce que fait 6.6.1, et cette [caractérisation](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/CHARACTERISATION-REPORT.md) a trouvé des dizaines de surprises, dont 7 touchant à la sécurité, toutes corrigées en 6.6.2. Une découverte sur laquelle pgcast agit suit l’une de trois voies ([décision 003](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/003-fixes-and-deprecation.md)) :
+pgcast part de Zapatos 6.6.1. Avant de le modifier, le fork a figé par des tests ce que fait 6.6.1, et cette [caractérisation](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/CHARACTERISATION-REPORT.md) a trouvé des dizaines de surprises, dont 7 touchant à la sécurité. Une découverte sur laquelle pgcast agit suit l’une de trois voies ([décision 003](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/003-fixes-and-deprecation.md)) :
 
 <div class="stack">
 
@@ -86,13 +86,13 @@ pgcast part de Zapatos 6.6.1. Avant de le modifier, le fork a figé par des test
 
 </div>
 
-Les corrections de sécurité sont venues d’abord, en 6.6.2 ([Sécurité](/fr/security)) :
+Les corrections de sécurité sont venues d’abord, toutes en 6.6.2 ([Sécurité](/fr/security)) :
 
 - aucun nom (une table, une colonne, une clé, un alias) ni aucun cast de `param()` ne peut fermer ses guillemets ;
 - une valeur simple dans les `updateValues` de [`upsert()`](/fr/insert#upsert) est un paramètre ;
 - les mots-clés d’un verrou, de `truncate()` ou d’un niveau d’isolation, et le nom d’un agrégat, sont vérifiés avant toute requête.
 
-Les opt-ins qui avertissent, [`undefinedMeansMissing`](/fr/runtime-config#Config.undefinedMeansMissing), [`upsertRequiresSameKeys`](/fr/runtime-config#Config.upsertRequiresSameKeys) et [`transactionRequiresCommit`](/fr/runtime-config#Config.transactionRequiresCommit), ainsi que [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas) et [`enumOrder`](/fr/generator#generate.enumOrder) du générateur, deviennent les valeurs par défaut en 7.0, et leurs anciens chemins disparaissent en 8.0.
+Les opt-ins qui avertissent, [`undefinedMeansMissing`](/fr/runtime-config#Config.undefinedMeansMissing), [`upsertRequiresSameKeys`](/fr/runtime-config#Config.upsertRequiresSameKeys), [`transactionRequiresCommit`](/fr/runtime-config#Config.transactionRequiresCommit) et [`aggregatesTypedByColumn`](/fr/runtime-config#Config.aggregatesTypedByColumn), ainsi que [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas) et [`enumOrder`](/fr/generator#generate.enumOrder) du générateur, deviennent les valeurs par défaut en 7.0, et leurs anciens chemins disparaissent en 8.0.
 
 [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), qui n’avertit jamais, reste désactivé. Jusqu’à la 7.0, la 6.x remplace Zapatos 6.6.1 sans autre changement ([Versions](/fr/versions)).
 

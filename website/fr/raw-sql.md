@@ -1,5 +1,5 @@
 ---
-english: d456b7097851
+english: 9c0059eb7dcb
 ---
 
 # SQL brut
@@ -26,7 +26,7 @@ Quand aucun raccourci n’écrit la requête dont vous avez besoin (une jointure
 </CastPanel>
 
 - Un nom interpolé est mis entre guillemets, `"films"`<!-- probe: examples/raw_sql_join.ts -->, et vérifié d’après le premier argument de type : ici `Tables`, le type `SQL` de chaque table que nomme la requête. Qualifiez une colonne en écrivant `${'films'}.${'title'}` : le type connaît les colonnes de chaque table, pas `'films.title'`.
-- Le second argument de type est ce que vous affirmez de ce qui revient : rien ne le confronte au SQL. Les lignes arrivent telles que `pg` les analyse, comme un `Selectable` les décrit (une `Date` pour un `timestamptz`), et non comme le JSON du `JSONSelectable` des raccourcis. Un `count(*)` est un `bigint`, que `pg` donne sous forme de chaîne : `'4'`.
+- Le second argument de type est ce que vous affirmez de ce qui revient : rien ne le confronte au SQL. Les lignes arrivent telles que `pg` les analyse, comme un `Selectable` les décrit (un `Date` pour un `timestamptz`), et non comme le JSON du `JSONSelectable` des raccourcis. Un `count(*)` est un `bigint`, que `pg` donne sous forme de chaîne : `'4'`.
 - Les mots-clés restent dans le texte. Le SQL que vous écrivez vous-même n’y risque rien ; seul ce qui vient de l’extérieur demande les étapes ci-dessous.
 
 Un nom que le type ne connaît pas ne compile pas : une requête qui nomme `screenings` demande `s.screenings.SQL` dans son premier argument de type.
@@ -89,7 +89,7 @@ Les clés d’un objet interpolé sont aussi des noms. Le type ne refuse une cl�
 ::: warning Sécurité
 Un objet interpolé qui n’est ni un `param()`, ni un fragment, ni une autre des valeurs de pgcast compile comme un Whereable, une instance de classe comprise.
 
-Un objet natif lève une erreur à la compilation, avant toute requête : `` db.sql`DELETE FROM ${'ratings'} WHERE ${when}` ``, avec `when` une `Date` typée `any`, ne compile plus en `DELETE FROM "ratings" WHERE TRUE`, comme dans Zapatos 6.6.1, ce qui supprimait toutes les notes ([Objets Whereable](/fr/sql-template#whereable)). Passez une date comme `db.param(when)`.
+Un objet natif du realm qui exécute pgcast lève une erreur à la compilation, avant toute requête ; un objet d’un autre realm, comme un contexte `vm`, non. `` db.sql`DELETE FROM ${'ratings'} WHERE ${when}` ``, avec `when` un `Date` typé `any`, ne compile plus en `DELETE FROM "ratings" WHERE TRUE`, comme dans Zapatos 6.6.1, ce qui supprimait toutes les notes ([Objets Whereable](/fr/sql-template#whereable)). Passez une date comme `db.param(when)`.
 
 Tout objet sans clé donne `TRUE`, Whereable typé compris : `const where: s.ratings.Whereable = {}`, qui ne reçoit un `film_id` que `if (filmId)`, compile sans erreur en ce même `DELETE`. Vérifiez qu’un filtre n’est pas vide avant un `DELETE` ou un `UPDATE` ([Objets Whereable](/fr/sql-template#whereable)). La vérification ci-dessous attrape `{}`, pas une clé dont la valeur compile en `true`, comme `film_id: db.conditions.isNotIn([])` :
 

@@ -1,5 +1,5 @@
 ---
-english: 65b277c0e438
+english: 2d61d65c59a2
 ---
 
 # Versions
@@ -67,7 +67,7 @@ Le coût : quelques clés de plus dans [`Config`](/fr/runtime-config#Config), e
 Appelez cet `update()` en 6.7 et Node affiche, une fois :
 
 ```txt
-(node:4242) [PGCAST_DEP002] DeprecationWarning: An undefined value in insert(), update() or upsert() is sent as NULL. Set undefinedMeansMissing: true (db.setConfig) to treat it as a missing key instead (DEFAULT in insert(), left out of update() and upsert()); it will be the default in pgcast 7.0.
+(node:4242) [PGCAST_DEP002] DeprecationWarning: An undefined value in insert(), update() or upsert() is sent as NULL, or, in upsert() updateValues, set from EXCLUDED. Set undefinedMeansMissing: true (db.setConfig) to treat it as a missing key instead (DEFAULT in insert(), left out of update() and upsert()); it will be the default in pgcast 7.0.
 (Use `node --trace-deprecation ...` to show where the warning was created)
 ```
 
@@ -79,13 +79,13 @@ L’avertissement arrive quand vous appelez le raccourci, avant `.run()`, et seu
 
 Il arrive une fois par processus pour chaque code, donc il vous dit que l’ancien chemin a été pris, pas où ni combien de fois. `node --trace-deprecation` ajoute la pile, jusqu’à la ligne qui a appelé `update()` ; pour le reste, activez l’option et laissez vos tests trouver ce qui change.
 
-`PGCAST_DEP003` arrive plus tard : une fois que `transaction()` a envoyé `COMMIT` et que Postgres a répondu `ROLLBACK`, juste avant que la promesse se résolve.
+`PGCAST_DEP003` arrive plus tard : une fois que `transaction()` a envoyé `COMMIT` et que Postgres a répondu `ROLLBACK`, juste avant que la promesse se résolve. `PGCAST_DEP004` aussi, une fois que `.run()` a le résultat de `sum()`, `avg()`, `min()` ou `max()` : c’est seulement alors que `.run()` peut voir si `Number()` le change.
 
 Là où `undefined` voulait dire « vide-la », `null` le dit avec l’un ou l’autre réglage, et n’avertit jamais.
 
 ## 7.0 et 8.0 {#_7-0-and-8-0}
 
-La 7.0 active par défaut les opt-ins que liste la décision 003 : `upsertRequiresSameKeys`, `undefinedMeansMissing`, `transactionRequiresCommit` et ceux qu’apporte encore la 6.7, sauf `selectExactlyOneChecksForSecondRow`, qui reste désactivé.
+La 7.0 active par défaut les opt-ins que liste la décision 003 : `upsertRequiresSameKeys`, `undefinedMeansMissing`, `transactionRequiresCommit`, `aggregatesTypedByColumn` et ceux qu’apporte encore la 6.7, sauf `selectExactlyOneChecksForSecondRow`, qui reste désactivé.
 
 La décision 003 fait de cela toute la rupture de la 7.0, et les avertissements l’annoncent, donc un projet qui a activé chaque option, et ne voit ni avertissement `PGCAST_DEP` ni note du générateur, n’a rien à changer. Les anciens comportements disparaissent en 8.0.
 
@@ -94,10 +94,10 @@ Le générateur a ses propres opt-ins en 6.7 : [`typeEnumsAcrossSchemas`](/fr/g
 Leurs avertissements sont des notes via [`warningListener`](/fr/generator#generate.warningListener), pas un `DeprecationWarning`, et n’arrivent que si votre schéma contient quelque chose qu’ils changeraient, une fois par exécution : celui de `typeEnumsAcrossSchemas` nomme chaque colonne, celui d’`enumOrder` chaque enum.
 
 ::: info À venir
-pgcast n’est pas encore sur npm. 6.6.2 est écrite ; 6.7.0, qui apporte les opt-ins, est en cours : [son jalon](https://github.com/AlexandreDemartin/pgcast/milestone/1).
+La 6.6.2 est sur npm, sous le nom [`@pgcast/pgcast`](https://www.npmjs.com/package/@pgcast/pgcast) ; la 6.7.0, qui apporte les opt-ins, est en cours : [son jalon](https://github.com/AlexandreDemartin/pgcast/milestone/1).
 :::
 
 ## Pour aller plus loin {#further-reading}
 
-- Les entrées dont parle cette page : [`Config.upsertRequiresSameKeys`](/fr/runtime-config#Config.upsertRequiresSameKeys), [`Config.undefinedMeansMissing`](/fr/runtime-config#Config.undefinedMeansMissing), [`Config.transactionRequiresCommit`](/fr/runtime-config#Config.transactionRequiresCommit), [`Config.selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), [Opt-ins et avertissements](/fr/runtime-config#opt-ins-and-warnings), [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas), [`enumOrder`](/fr/generator#generate.enumOrder), [Une valeur `undefined`](/fr/insert#undefined-values), [`conditions.not()`](/fr/conditions#conditions.not), [`conditions.isNotIn()`](/fr/conditions#conditions.isNotIn), [`selectExactlyOne()`](/fr/select#selectExactlyOne), [`SchemaVersionCanary`](/fr/runtime-config#SchemaVersionCanary).
+- Les entrées dont parle cette page : [`Config.upsertRequiresSameKeys`](/fr/runtime-config#Config.upsertRequiresSameKeys), [`Config.undefinedMeansMissing`](/fr/runtime-config#Config.undefinedMeansMissing), [`Config.transactionRequiresCommit`](/fr/runtime-config#Config.transactionRequiresCommit), [`Config.selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), [`Config.aggregatesTypedByColumn`](/fr/runtime-config#Config.aggregatesTypedByColumn), [Opt-ins et avertissements](/fr/runtime-config#opt-ins-and-warnings), [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas), [`enumOrder`](/fr/generator#generate.enumOrder), [Une valeur `undefined`](/fr/insert#undefined-values), [`conditions.not()`](/fr/conditions#conditions.not), [`conditions.isNotIn()`](/fr/conditions#conditions.isNotIn), [`selectExactlyOne()`](/fr/select#selectExactlyOne), [`SchemaVersionCanary`](/fr/runtime-config#SchemaVersionCanary).
 - La décision derrière : la [décision 003](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/003-fixes-and-deprecation.md), et chaque changement par version dans le [changelog](/fr/changelog).

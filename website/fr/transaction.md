@@ -1,5 +1,5 @@
 ---
-english: b1353658cead
+english: 260ba8615fc2
 ---
 
 # Transactions
@@ -100,6 +100,7 @@ Une seule transaction, les deux sièges ou aucun : `START TRANSACTION ISOLATION
 - Le callback s’exécute au niveau de la transaction extérieure, et ce niveau n’est pas vérifié, ni à l’exécution ni par le type : chaque `TxnClient` est un [`Queryable`](/fr/sql-template#Queryable), donc `db.serializable(txnClient, …)` passe la vérification de types avec un client de `db.readCommitted()`, et son callback s’exécute dans cette transaction `READ COMMITTED`.
 - Une fonction dont le paramètre est d’un type `TxnClientFor…` est vérifiée : [`IsolationSatisfying`](#IsolationSatisfying).
 - Ce qui marque le client, c’est sa propre propriété `_zapatos` ([`TxnClient`](#TxnClient)).
+- Une transaction que vous avez ouverte vous-même, par un `BEGIN` brut, n’a pas de marque, et `pg` ne dit pas qu’un client est dans une transaction. `transaction()` envoie donc son propre `START TRANSACTION`, dont Postgres se contente d’avertir, et son `COMMIT` valide votre transaction ; à un autre niveau, une fois que la vôtre a exécuté une requête, Postgres le refuse (25001), et son `ROLLBACK` annule vos écritures. Ouvrez la transaction extérieure avec `transaction()`.
 
 ### Erreurs {#errors}
 
@@ -371,7 +372,7 @@ Les gérer dans une application : [Erreurs](/fr/handle-errors).
 
 ## Erreurs que pgcast lève avant toute requête {#errors-pgcast-throws-before-any-query}
 
-Une simple `Error`, sans `code`, avant que rien ne soit envoyé. Un raccourci lève les siennes de façon synchrone, dès l’appel : `.run()` n’est jamais atteint, donc un `.catch()` chaîné dessus ne les reçoit pas.
+Une simple `Error`, sans `code`, avant que rien ne soit envoyé. Un raccourci lève les siennes de façon synchrone, dès l’appel, sauf pour les options de `truncate()` dans un autre ordre et les `columns` ou le `lateral` d’un agrégat ([`count()`](/fr/select#count)) : `.run()` n’est jamais atteint, donc un `.catch()` chaîné dessus ne les reçoit pas.
 
 Les autres sont levées quand `.compile()` compile la requête, donc `.run()` est rejetée avec elles ; `transaction()` est rejetée avec les siennes. Chacune est listée avec ce qui la lève :
 
@@ -385,9 +386,11 @@ Les autres sont levées quand `.compile()` compile la requête, donc `.run()` es
 | `truncate()` avec une autre option | l’appel lève | [`truncate()`](/fr/insert#truncate) |
 | une interpolation qui n’a pas de sens en SQL : un nombre, `null`, `db.all`, l’objet global | `.run()` est rejetée | [Interpolations](/fr/sql-template#interpolations) |
 | `db.self` sans colonne ; `db.parent()` sans table parente, donc comme valeur d’`insert()`, d’`upsert()` ou d’`update()` | `.run()` est rejetée | [`self`](/fr/sql-template#self), [`parent()`](/fr/sql-template#parent) |
+| `count()` et les autres agrégats avec des `columns` sans colonne ou à plusieurs colonnes, ou sans `columns` du tout pour `sum()`, `avg()`, `min()` et `max()` ; ou une seule sous-requête comme `lateral` ; et donc une requête qui en imbrique un | `.run()` est rejetée | [`count()`](/fr/select#count) |
 | `db.Default`, `db.self`, `db.raw()`, `db.cols()` ou `db.vals()` comme valeur de filtre ; `db.raw()`, `db.cols()` ou `db.vals()` comme valeur d’`insert()`, d’`upsert()` ou d’`update()`, ou dans tout `vals({…})` | `.run()` est rejetée | [Objets Whereable](/fr/sql-template#whereable), [Conditions](/fr/conditions), [`insert()`](/fr/insert#insert), [`vals()`](/fr/sql-template#vals) |
+| `truncate()` avec ses options dans un autre ordre | `.run()` est rejetée | [`truncate()`](/fr/insert#truncate) |
 | `transaction()` avec un autre niveau d’isolation | sa promesse est rejetée | [`transaction()`, Erreurs](#errors) |
 
 </div>
 
-Après une requête, pgcast rejette dans trois cas qui lui sont propres : `selectExactlyOne()` sans ligne, ou avec une seconde sous [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), avec une [`NotExactlyOneError`](/fr/select#NotExactlyOneError) ; `count()` et les autres agrégats sans ligne à lire, avec une `TypeError` ([`count()`](/fr/select#count)) ; `transaction()` dont Postgres répond au `COMMIT` par `ROLLBACK`, avec [`transactionRequiresCommit`](/fr/runtime-config#Config.transactionRequiresCommit) ([Erreurs](#errors)).
+Après une requête, pgcast rejette dans deux cas qui lui sont propres : `selectExactlyOne()` sans ligne, ou avec une seconde sous [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), avec une [`NotExactlyOneError`](/fr/select#NotExactlyOneError) ; `transaction()` dont Postgres répond au `COMMIT` par `ROLLBACK`, avec [`transactionRequiresCommit`](/fr/runtime-config#Config.transactionRequiresCommit) ([Erreurs](#errors)).

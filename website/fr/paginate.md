@@ -1,5 +1,5 @@
 ---
-english: e48a068050ff
+english: 412a3a6b158e
 ---
 
 # Pagination
@@ -193,7 +193,7 @@ Les deux comptent les lignes du `where`. Le `where` de la fenêtre est celui de 
 
 Donnez-lui le `where` de la liste, et aucune des options de la page :
 
-- `offset` saute l’unique ligne du comptage, et `.run()` est rejetée avec `TypeError: Cannot read properties of undefined (reading 'result')` ([#163](https://github.com/AlexandreDemartin/pgcast/issues/163)).
+- `offset` saute l’unique ligne du comptage : `.run()` donne `0`, pas le total.
 - `order` par une colonne : Postgres refuse la requête (42803).
 
 ### Avec une fenêtre dans `extras` {#with-a-window-in-extras}

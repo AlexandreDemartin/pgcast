@@ -1,10 +1,10 @@
 ---
-english: 521a94ef75bb
+english: 34d19f6f0950
 ---
 
 # Générateur
 
-Le générateur lit le catalogue de votre base et écrit les types de `zapatos/schema`. Cette page indique comment le lancer, en ligne de commande ou depuis du code, chaque option de `zapatosconfig.json` et de `generate()`, et les fichiers qu’il écrit.
+Le générateur lit le catalogue de votre base et écrit les types de `zapatos/schema`. Cette page indique comment le lancer, en ligne de commande ou depuis du code, chaque option de son fichier de configuration et de `generate()`, et les fichiers qu’il écrit.
 {.lede}
 
 ## La CLI {#cli}
@@ -16,7 +16,9 @@ npx zapatos [config]
 
 Le même programme sous deux noms : `pgcast`, et `zapatos`, comme dans Zapatos 6.6.1. Il lit la config, puis lance [`generate()`](#generate) avec elle.
 
-- `zapatosconfig.json` : lu dans le dossier où vous le lancez, s’il y est ; jamais dans un dossier parent. Sans lui, la config est `{}`.
+- Le fichier de configuration : lu dans le dossier où vous le lancez, s’il y est ; jamais dans un dossier parent. Sans fichier, la config est `{}`.
+  - `zapatosconfig.json`, comme dans Zapatos 6.6.1.
+  - `pgcastconfig.json`, à partir de la 6.7.0, lu en premier : si les deux sont là, seul `pgcastconfig.json` est lu, et la CLI le signale via [`warningListener`](#generate.warningListener) avant de générer.
 - `config` : un argument facultatif, un objet JSON, fusionné par-dessus le fichier clé par clé : `npx pgcast '{"outDir": "./generated"}'` garde le `db` du fichier et remplace son `outDir`.
   - Une clé donnée ici remplace toute la valeur du fichier, donc `'{"db": {"application_name": "codegen"}}'` écarte le `connectionString` du fichier.
   - Les variables du fichier sont substituées avant la fusion : une variable qu’il nomme doit être définie même quand l’argument remplace sa clé, sinon la CLI s’arrête avec `Environment variable 'NAME' is not set`.
@@ -38,7 +40,7 @@ Le même programme sous deux noms : `pgcast`, et `zapatos`, comme dans Zapatos 
 
 Une config qu’elle ne peut pas lire l’arrête avant toute requête, avec le code 1, et Node affiche l’erreur et sa pile. L’erreur commence par ce qu’elle lisait :
 
-- le fichier : `If present, zapatosconfig.json must be a valid JSON file, and all referenced environment variables must exist:`
+- le fichier, par son nom : `If present, zapatosconfig.json must be a valid JSON file, and all referenced environment variables must exist:` (ou `pgcastconfig.json`)
 - l’argument : `If present, the argument to Zapatos must be valid JSON, and all referenced environment variables must exist:`
 
 Puis elle se termine par la cause :
@@ -105,6 +107,7 @@ Toutes les options sont facultatives. Une option donnée remplace entièrement s
 | [`customJSONParsingForLargeNumbers`](#generate.customJSONParsingForLargeNumbers) | `false` | le type `JSONSelectable` de `bigint` et `numeric` |
 | [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas) | `false` | le type d’un enum d’un autre schéma |
 | [`enumOrder`](#generate.enumOrder) | `"alphabetical"` | l’ordre des libellés d’un enum |
+| [`moduleNames`](#generate.moduleNames) | `"zapatos"` | les noms de modules que déclarent et importent les fichiers, et leur dossier |
 | [`progressListener`](#generate.progressListener) | `false` | où chaque étape est signalée |
 | [`warningListener`](#generate.warningListener) | `true` | où vont les avertissements |
 | [`debugListener`](#generate.debugListener) | `false` | où vont chaque requête et son résultat |
@@ -115,7 +118,7 @@ Toutes les options sont facultatives. Une option donnée remplace entièrement s
 
 ### `outDir` {#generate.outDir}
 
-`string`, par défaut `"."`. Le dossier qui accueille le dossier `zapatos`, créé si besoin : `"./src"` écrit `src/zapatos/schema.d.ts`. Relatif au dossier courant.
+`string`, par défaut `"."`. Le dossier qui accueille le dossier `zapatos`, créé si besoin : `"./src"` écrit `src/zapatos/schema.d.ts`. Relatif au dossier courant. Avec [`moduleNames`](#generate.moduleNames) à `"pgcast"`, le dossier est `pgcast`.
 
 ### `outExt` {#generate.outExt}
 
@@ -139,7 +142,8 @@ Les deux clés sont obligatoires. Dans `generate()`, une règle sans l’une d�
 - Les relations sont celles que le rôle de la base peut voir : une table ou une vue sur laquelle il n’a aucun privilège est laissée de côté, comme si elle n’existait pas ; une vue matérialisée apparaît toujours.
 - Les enums du schéma sont toujours générés, quoi que disent `include` et `exclude`.
 - Les relations d’un schéma autre qu’[`unprefixedSchema`](#generate.unprefixedSchema) sont dans son namespace : `archive.screenings`, de type `Table` `'archive.screenings'`.
-- Un schéma, une relation ou un enum dont le nom n’est pas un identifiant TypeScript (`"box office"`) est écrit tel quel, et `schema.d.ts` ne compile pas (TS1005) ([#48](https://github.com/AlexandreDemartin/pgcast/issues/48)). Le nom d’une colonne, lui, est mis entre guillemets, et fonctionne.
+- Un schéma, une relation ou un enum dont TypeScript ne peut pas lire le nom à cet endroit (`"box office"`, `class`) reçoit un identifiant valide, `box_office` ou `class_` : chaque suite de caractères qu’un identifiant ne peut pas contenir devient `_`, un chiffre en tête reçoit un `_` devant lui, un mot réservé ou un opérateur de type (`keyof`) un `_` après lui, et `as` aussi pour un enum. Son type `Table` et les correspondances `*ForTable` gardent son nom : `'box office'`. Deux noms qui n’en font plus qu’un sont signalés via [`warningListener`](#generate.warningListener), de même qu’une relation d’`unprefixedSchema` qui porte le nom du namespace d’un autre schéma. Le nom d’une colonne est mis entre guillemets.
+- Un enum qui porte le nom d’un des types propres à TypeScript (`string`, `number`…) garde son nom, comme dans Zapatos 6.6.1 : `schema.d.ts` ne compile pas sans `skipLibCheck` (TS2457), et avec `skipLibCheck`, une colonne de l’enum `string` est typée `string`.
 
 Avec un second schéma, `archive`, qui contient sa propre table `screenings` :
 
@@ -238,7 +242,7 @@ billing: number;
 - La dernière ligne est `NOT NULL` ou `Nullable` et la valeur par défaut (`` default: `nextval(…)` ``, `no default`, ou `identity column` pour `GENERATED BY DEFAULT AS IDENTITY`) ; `Generated column` pour une colonne générée ou `GENERATED ALWAYS AS IDENTITY` ; `Materialized view column` pour une colonne d’une vue matérialisée.
 - Dans un commentaire sur plusieurs lignes, chaque ligne est précédée d’un `*`, que les sauts de ligne soient `\n`, `\r\n` ou `\r`.
 - Chaque relation montre ses propres commentaires, quelle que soit sa nature : Postgres n’en copie aucun vers une partition, une table qui hérite ou une vue, donc une vue sur `roles` ne montre aucun commentaire sur `billing`.
-- Sur une table ou une vue matérialisée, un commentaire contenant `*/` termine là le JSDoc, donc `schema.d.ts` ne compile généralement pas (TS1131), jusqu’à ce que [#48](https://github.com/AlexandreDemartin/pgcast/issues/48) l’échappe. Ses lignes après la première sont écrites comme Zapatos 6.6.1 les écrit, sans `*`, donc un commentaire qui compile sous 6.6.1, en ouvrant un commentaire après son `*/`, compile toujours. Sur une vue, une table distante ou une table partitionnée, dont Zapatos 6.6.1 n’écrivait jamais les commentaires de colonnes, un tel commentaire est laissé de côté ([#48](https://github.com/AlexandreDemartin/pgcast/issues/48)).
+- Un `*/` dans un commentaire, un nom, un type ou un `DEFAULT` est écrit `*\/`, pour ne pas terminer le JSDoc ; de même celui que forme un nom commençant par `/` avec le `**` qui le précède : `**\/reels**`.
 - Un commentaire, ou l’une de ses lignes, qui commence par une balise JSDoc (`@deprecated use lead`) devient cette balise au survol, sur toute relation, et avale les lignes générées qui la suivent ([#309](https://github.com/AlexandreDemartin/pgcast/issues/309)).
 
 `false` n’en écrit aucun, donc `schema.d.ts` est plus court.
@@ -294,6 +298,41 @@ CREATE TYPE crew_job AS ENUM ('director', 'writer', 'editor', 'cinematographer',
 - Une autre valeur arrête le générateur avant toute requête, et n’écrit rien : `enumOrder must be 'alphabetical' (the default) or 'declared', not 'declard'`. En TypeScript, elle ne compile pas (TS2322, ou TS2820 avec une suggestion pour une faute proche comme `"declard"`).
 - `"alphabetical"` signale, via [`warningListener`](#generate.warningListener), chaque enum généré dont l’ordre déclaré n’est pas alphabétique.
 
+### `moduleNames` {#generate.moduleNames}
+
+`"zapatos"` ou `"pgcast"`, par défaut `"zapatos"`. Les noms de modules que déclarent et importent les fichiers générés, et le dossier où ils vont. Il doit correspondre au dossier où pgcast est installé, sous `node_modules` : `"pgcast"` pour un projet qui l’installe sous son propre nom, `pgcast@npm:@pgcast/pgcast`, à partir de la 6.7.0 ([Installation](/fr/install#under-its-own-name)) ; `"zapatos"` pour un projet qui l’installe sous l’alias `zapatos`, comme un projet venu de Zapatos ([Venir de Zapatos](/fr/switching)).
+
+| | `"zapatos"` | `"pgcast"` |
+|---|---|---|
+| Dossier | `zapatos/` | `pgcast/` |
+| Déclare | `zapatos/schema`, `zapatos/custom` | `pgcast/schema`, `pgcast/custom`, et `zapatos/schema` |
+| Importe | `zapatos/db` | `pgcast/db` |
+| Commentaire du canary de version | `` update by running `npx zapatos` `` | `` update by running `npx pgcast` `` |
+| Vos imports | `zapatos/db`, `zapatos/schema`, `zapatos/generate` | `pgcast/db`, `pgcast/schema`, `pgcast/generate` |
+
+::: code-group
+
+```json [pgcastconfig.json]
+{
+  "db": { "connectionString": "{{DATABASE_URL}}" },
+  "outDir": "./src",
+  "moduleNames": "pgcast"
+}
+```
+
+```ts [films.ts]
+import * as db from 'pgcast/db';
+import type * as s from 'pgcast/schema';
+```
+
+:::
+
+- `"zapatos"` écrit les mêmes fichiers que sans l’option : elle ne change rien tant qu’elle ne vaut pas `"pgcast"`.
+- `"pgcast"` écrit les mêmes types, et termine `pgcast/schema.d.ts` par `declare module 'zapatos/schema' { export * from 'pgcast/schema'; }` : les propres déclarations de `pgcast/db` importent `zapatos/schema`. Sans cette ligne, chaque type serait `any`, et sans bruit sous `skipLibCheck`.
+- Dans les fichiers générés, `zapatos` reste dans cette ligne et dans les en-têtes, qui créditent Zapatos. Le fichier de configuration peut être `pgcastconfig.json` ou `zapatosconfig.json` ([La CLI](#cli)) ; `npx pgcast` et `npx zapatos` lisent tous deux l’option.
+- Une autre valeur arrête le générateur avant toute requête, et n’écrit rien : `moduleNames must be 'zapatos' (the default) or 'pgcast', not 'pgcats'`. En TypeScript, elle ne compile pas (TS2322, ou TS2820 avec une suggestion pour une faute proche comme `"pgcats"`).
+- Le schéma de l’autre mode dans `outDir`, comme un dossier `zapatos/` resté d’avant le changement, est signalé via [`warningListener`](#generate.warningListener). Avec `"pgcast"`, un `zapatos/` périmé que `tsconfig.json` inclut déclare aussi `zapatos/schema`, que TypeScript fusionne : il laisse passer un nombre pour une colonne `text` sous `skipLibCheck`, et échoue avec TS2307 sans `skipLibCheck`. Avec `"zapatos"`, un `pgcast/` périmé n’assouplit rien, et son import de `pgcast/db` échoue avec TS2307 sans `skipLibCheck`. Supprimez le dossier périmé une fois que les fichiers à compléter que vous y avez modifiés sont déplacés dans l’autre, leur `declare module 'zapatos/custom'` renommé en `'pgcast/custom'`, ou l’inverse.
+
 ### `progressListener` {#generate.progressListener}
 
 `boolean`, ou dans `generate()` une fonction `(s: string) => void` ; par défaut `false`. `true` affiche chaque étape avec `console.log` ; une fonction reçoit chaque ligne.
@@ -320,6 +359,12 @@ Writing custom types file: src/zapatos/custom/index.d.ts
   - une fois par exécution, sans [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas), quand une colonne qu’il changerait est générée ;
 - `` Note: every.crew_job lists the labels of enum public.crew_job in alphabetical order, not in their declared order, by which Postgres sorts and compares them. Set enumOrder: 'declared' to keep that order; it will be the default in pgcast 7.0. ``
   - une fois par exécution, avec [`enumOrder`](#generate.enumOrder) à `"alphabetical"`, quand un schéma de [`schemas`](#generate.schemas) a un enum dont l’ordre déclaré n’est pas alphabétique ; s’il y en a plusieurs, sous la forme `every.<name> lists the labels of enums archive.print_format and public.crew_job` ;
+- `Note: src/zapatos/schema.d.ts is here too, generated with moduleNames: 'zapatos'. It declares 'zapatos/schema', as src/pgcast/schema.d.ts does, and TypeScript merges the two: types can loosen, silently under skipLibCheck. Delete the folder src/zapatos, once any placeholder you edited there is moved to src/pgcast/custom.`
+  - après l’écriture, avec [`moduleNames`](#generate.moduleNames) à `"pgcast"`, quand `outDir` contient un `zapatos/schema.d.ts` ; un dossier sans son `schema.d.ts` n’est pas signalé ;
+- `Note: src/pgcast/schema.d.ts is here too, generated with moduleNames: 'pgcast'. Its import of 'pgcast/db' fails to compile without skipLibCheck. Delete the folder src/pgcast, once any placeholder you edited there is moved to src/zapatos/custom.`
+  - de même, avec `"zapatos"` et un `pgcast/schema.d.ts` ;
+- `Note: pgcastconfig.json and zapatosconfig.json are both here, and only pgcastconfig.json is read. Move any option you still need from zapatosconfig.json into pgcastconfig.json, then delete zapatosconfig.json.`
+  - depuis [la CLI](#cli), avant de générer, quand le dossier où elle tourne contient les deux fichiers ;
 - l’[avertissement sur l’ancienne arborescence](#the-old-layout-warning).
 
 ### `debugListener` {#generate.debugListener}
@@ -382,6 +427,7 @@ src/zapatos/
 - Rien n’est supprimé : un fichier à compléter dont le type a disparu reste, et `custom/` aussi une fois qu’il ne reste plus de type personnalisé.
 - `schema.d.ts` déclare `schemaVersionCanary`, `version: 104`. Un `zapatos/db` qui attend une autre version ne compile pas à cet endroit : relancez la génération ([`SchemaVersionCanary`](/fr/runtime-config#SchemaVersionCanary)).
 - Chaque fichier est un `declare module` des noms `zapatos/*`, donc votre `tsconfig.json` doit l’inclure : `"include": ["src"]`, avec `outDir` à `"./src"`.
+- Avec [`moduleNames`](#generate.moduleNames) à `"pgcast"`, l’arborescence est `src/pgcast/` et les noms `pgcast/*` ; le reste de cette section est identique.
 
 ### L’avertissement sur l’ancienne arborescence {#the-old-layout-warning}
 

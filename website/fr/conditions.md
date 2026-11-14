@@ -1,5 +1,5 @@
 ---
-english: cf4d8a957694
+english: 2b32c1f38af7
 ---
 
 # Conditions {#db-conditions}
@@ -240,6 +240,16 @@ Un élément compile comme dans `vals([…])` au sein d’un filtre :
 
 Zapatos 6.6.1 y envoyait un `Parameter` et `parent()` comme un paramètre de plus, en JSON (`'{"value":"x","cast":"text"}'`, `'{"value":"id"}'`), si bien que `isIn()` ne trouvait rien et que `isNotIn()` trouvait chaque ligne sur une colonne de texte.
 
+La liste elle-même est un tableau, `readonly` ou non. Le type refuse tout le reste, sauf typé `any` (ou, pour `null` et `undefined`, sans `strictNullChecks`) : un `Set`, un itérateur, un tableau typé, un objet semblable à un tableau, une chaîne. Une telle liste lève une erreur à la compilation de la requête, donc `run()` est rejetée avec une simple `Error` avant toute requête :
+
+> `` `isNotIn()` takes an array, not `Set`: make one with `isNotIn([...values])`, or `Array.from(values)` for an array-like object. ``<!-- message -->
+
+Une seule valeur à la place de la liste, une chaîne, un nombre, `null` ou `undefined`, reçoit l’autre conseil, car étaler `'Ada'` donnerait `'A'`, `'d'`, `'a'` :
+
+> `` `isIn()` takes an array, not `string`: for one value, write `isIn([value])`. ``<!-- message -->
+
+Zapatos 6.6.1 lisait la `length` de la liste. Un `Set` ou un itérateur n’en a pas, donc `isIn()` donnait `false` et `isNotIn()` `true`, pour chaque ligne : avec `ids` un `Set`, `db.deletes('films', { id: db.conditions.isNotIn(ids) })` était `DELETE FROM "films" WHERE ((true))`. Une chaîne donnait ses caractères, soit, pour une chaîne d’un seul caractère comme le `req.query.id` d’Express (`'5'` pour `?id=5`), sa seule valeur et donc les bonnes lignes, un cas maintenant rejeté ; un objet semblable à un tableau donnait ses valeurs puis sa `length`, et `null` une `TypeError` à l’appel.
+
 ### `isIn()` {#conditions.isIn}
 
 `"col" IN ($1, $2)`<!-- probe: db.sql`${{ col: db.conditions.isIn([1, 2]) }}` -->. Un tableau vide donne `false` : aucune ligne.
@@ -359,7 +369,7 @@ Zapatos 6.6.1 écrivait `(NOT "release_year" = 1974 OR "release_year" = 1991)`, 
 
 ## Dates et heures {#dates}
 
-[`after()`](#conditions.after) et [`before()`](#conditions.before) comparent à une valeur : une `Date`, une chaîne ISO 8601 avec son décalage (`'2030-03-01T20:00:00Z'`, un `TimestampTzString` ; le type refuse une autre forme comme `'2030-03-02'`, TS2322), ou l’un des deux fragments ci-dessous. `pg` envoie une `Date` comme une chaîne dans le fuseau horaire local, avec son décalage : sur une colonne `timestamptz`, le même instant.
+[`after()`](#conditions.after) et [`before()`](#conditions.before) comparent à une valeur : un `Date`, une chaîne ISO 8601 avec son décalage (`'2030-03-01T20:00:00Z'`, un `TimestampTzString` ; le type refuse une autre forme comme `'2030-03-02'`, TS2322), ou l’un des deux fragments ci-dessous. `pg` envoie un `Date` comme une chaîne dans le fuseau horaire local, avec son décalage : sur une colonne `timestamptz`, le même instant. Sur une colonne `date`, Postgres garde le jour local et laisse tomber l’heure : `eq(new Date(2030, 2, 1, 23, 30))` correspond à `2030-03-01`, et `lt()` du même `Date`, non.
 
 <CastPanel example="conditions_dates">
 
@@ -414,9 +424,9 @@ Des opérations, pas des tests : pour une valeur d’[`update()`](/fr/insert#up
 
 - Dans un `where`, le type les laisse passer, et Postgres les refuse (42804 : « <span lang="en">argument of WHERE must be type boolean</span> »).
 - Dans le `updateValues` d’`upsert()`, il n’y a pas de colonne courante : elles lèvent "The 'self' column alias has no meaning here"<!-- message --> ([`upsert()`](/fr/insert#upsert)). Dans `insert()`, la colonne est écrite, et Postgres la refuse (42703).
-- Elles prennent un nombre ou une `Date`, pas un `Parameter` (TS2345) : pour un cast, écrivez une valeur en fragment `sql` (ci-dessous).
+- Elles prennent un nombre ou un `Date`, pas un `Parameter` (TS2345) : pour un cast, écrivez une valeur en fragment `sql` (ci-dessous).
 - Sur une colonne `date`, le type refuse un nombre (TS2322), et Postgres ne pourrait pas l’exécuter non plus : `date + unknown` est ambigu (42725).
-- Sur une colonne `date`, `timestamp` ou `timestamptz`, une `Date` passe la vérification de types, et Postgres la refuse ([#180](https://github.com/AlexandreDemartin/pgcast/issues/180)). Sur `date`, `add()` est ambigu (42725) et `subtract()` donne un entier, pas une date (42804) ; sur les deux autres, `add()` la lit comme un intervalle (22007), `subtract()` donne un intervalle, pas un instant (42804).
+- Sur une colonne `date`, `timestamp` ou `timestamptz`, un `Date` passe la vérification de types, et Postgres le refuse ([#180](https://github.com/AlexandreDemartin/pgcast/issues/180)). Sur `date`, `add()` est ambigu (42725) et `subtract()` donne un entier, pas une date (42804) ; sur les deux autres, `add()` le lit comme un intervalle (22007), `subtract()` donne un intervalle, pas un instant (42804).
 
 Pour les dates, écrivez une valeur en fragment `sql`, où `db.self` est la colonne, et castez son paramètre. Sur une colonne `date`, `` db.sql`${db.self} + ${db.param(3, 'int4')}` `` ajoute trois jours : `"col" + CAST($1 AS "int4")`<!-- probe: db.sql`${{ col: db.sql`${db.self} + ${db.param(3, 'int4')}` }}` -->. Sur une colonne `timestamptz`, ajoutez un intervalle : une séance déplacée au lendemain.
 

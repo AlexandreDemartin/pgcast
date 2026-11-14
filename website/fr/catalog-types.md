@@ -1,5 +1,5 @@
 ---
-english: 595d70271a1b
+english: fd13aa42d7db
 ---
 
 # Le catalogue
@@ -68,7 +68,6 @@ Une vue matérialisée ne garde aucun `NOT NULL`, pas même celui d’un domaine
 Pour les vues, pgcast s’en tient à ce que Postgres déclare, comme Zapatos : une nullabilité que la base ne déclare pas serait une supposition, et une supposition est la seule chose qu’un type généré ne doit pas être. Certaines lacunes de ce que lit le générateur sont connues, et décrites ici telles qu’elles sont aujourd’hui :
 
 - Les libellés d’un enum sortent dans l’ordre alphabétique : `crew_job` est `'cinematographer' | 'composer' | 'director' | 'editor' | 'writer'`, et non dans l’ordre de son `CREATE TYPE`, sauf si [`enumOrder`](/fr/generator#generate.enumOrder) vaut `"declared"`.
-- Un commentaire de colonne qui contient `*/` termine la JSDoc trop tôt sur une table ou une vue matérialisée ; sur une vue, une table distante ou une table partitionnée, il est omis ([#48](https://github.com/AlexandreDemartin/pgcast/issues/48)).
 - Un enum d’un autre schéma devient un fichier à compléter de type `any`, ou prend les libellés de l’enum du même nom dans le schéma de la relation, sauf si [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas) est activé.
 
 ::: info À venir
@@ -109,7 +108,7 @@ La même ligne, demandée deux fois, montre les deux premiers côte à côte :
 
 <<< ../examples/plain/catalog_types_contexts.ts{ts twoslash}
 
-Dans une session dont le `TimeZone` est `UTC`, le premier est la `Date` `2030-03-01T19:30:00.000Z`, le second la chaîne `'2030-03-01T19:30:00+00:00'`. Dans la requête `sql`, `s.screenings.Selectable[]` est votre façon de dire ce que renvoie `SELECT *` ; le raccourci déduit le sien tout seul.
+Dans une session dont le `TimeZone` est `UTC`, le premier est le `Date` `2030-03-01T19:30:00.000Z`, le second la chaîne `'2030-03-01T19:30:00+00:00'`. Dans la requête `sql`, `s.screenings.Selectable[]` est votre façon de dire ce que renvoie `SELECT *` ; le raccourci déduit le sien tout seul.
 
 ## Pourquoi les raccourcis renvoient du JSON {#why-the-shortcuts-return-json}
 
@@ -125,7 +124,7 @@ Le prix, c’est que chaque valeur voyage en JSON, et que JSON n’a ni dates, n
 
 Zapatos renvoyait du JSON depuis chaque raccourci qui renvoie des lignes, même ceux qui auraient pu s’en passer, « <span lang="en">in the interests of consistency</span> », comme le dit sa doc : la ligne d’un raccourci est du même type que celle d’un autre.
 
-Et il typait les chaînes plutôt que de les convertir dans votre dos : [`TimestampTzString`](/fr/runtime-config#TimestampTzString) et ses semblables vérifient la forme d’une chaîne, et [`toDate()`](/fr/runtime-config#toDate) en fait une `Date` quand vous le décidez, en précisant dans quel fuseau horaire lire une chaîne qui n’en porte pas ([Dates et heures](/fr/runtime-config#dates-and-times)).
+Et il typait les chaînes plutôt que de les convertir dans votre dos : [`TimestampTzString`](/fr/runtime-config#TimestampTzString) et ses semblables vérifient la forme d’une chaîne, et [`toDate()`](/fr/runtime-config#toDate) en fait un `Date` quand vous le décidez, en précisant dans quel fuseau horaire lire une chaîne qui n’en porte pas ([Dates et heures](/fr/runtime-config#dates-and-times)).
 
 ## Comment le type du résultat suit la requête {#how-a-result-type-follows-the-query}
 

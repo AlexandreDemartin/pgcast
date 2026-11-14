@@ -1,5 +1,5 @@
 ---
-english: bbd896d53162
+english: 16ac94c3a46b
 ---
 
 # Tests
@@ -27,7 +27,7 @@ Elle prend un [`Queryable`](/fr/sql-template#Queryable) : un test peut donc lui
 
 ## Tester contre une vraie base {#test-against-a-real-database}
 
-L’approche que je recommande : la seule des trois qui vérifie la requête elle-même et ce que Postgres renvoie. La suite de tests de pgcast fonctionne ainsi ([`test/helpers/db.ts`](https://github.com/AlexandreDemartin/pgcast/blob/master/test/helpers/db.ts)).
+L’approche que je recommande : la seule des trois qui vérifie la requête elle-même et ce que Postgres renvoie. Son coût : un serveur Postgres, en local et en CI, et une exécution plus lente. La suite de tests de pgcast fonctionne ainsi ([`test/helpers/db.ts`](https://github.com/AlexandreDemartin/pgcast/blob/master/test/helpers/db.ts)).
 
 ### Copier une base pour chaque fichier de test {#copy-a-database-for-each-test-file}
 
@@ -51,7 +51,7 @@ Chaque test tourne sur un seul client, dans un `BEGIN`, annulé ensuite : ce qu
 
 - Ici avec `test` de `node:test` et `assert` de `node:assert/strict` ; n’importe quel lanceur de tests convient, et des hooks `beforeEach` / `afterEach` peuvent contenir les mêmes lignes.
 - Lisez une valeur générée dans ce que renvoie `insert()`, comme `studio.id` ici : ne l’écrivez jamais en dur dans le test (ci-dessous).
-- Un client dont le `ROLLBACK` échoue est cassé : `release(err)` le détruit au lieu de le passer au test suivant.
+- Un client dont le `ROLLBACK` échoue est cassé : `release(err)` le détruit au lieu de le passer au test suivant. Si le test avait déjà échoué, c’est sa propre erreur qui est levée, puisque c’est elle qui dit pourquoi.
 
 ### Savoir ce que laisse l’annulation {#know-what-a-rollback-leaves}
 
@@ -108,6 +108,7 @@ Le test compare la requête compilée de la fonction avec celle de l’appel qu�
 
 - Il échoue quand `filmSearch()` fait un autre appel, et non quand pgcast écrit autrement le SQL du même appel.
 - `values` contient plus que votre entrée : `columns` envoie chaque nom comme paramètre (`$1::text`<!-- probe: examples/testing_search.ts -->), et les clés d’un filtre suivent l’ordre alphabétique, `"release_year" < $3`<!-- probe: examples/testing_search.ts --> avant `"title" ILIKE $4`<!-- probe: examples/testing_search.ts -->. Un tableau `values` écrit à la main lie le test à ces deux détails.
+- Il ne voit pas ce que seul Postgres refuse : pour `?before=abc`, `lt(Number('abc'))` compile `NaN` des deux côtés, et le test passe, là où Postgres refuse la requête avec 22P02 (`invalid input syntax for type integer: "NaN"`).
 - Pour le SQL que vous écrivez vous-même dans un template `sql`, figer son `text` ne pose pas de problème : le texte est le vôtre ([Vérifier le SQL avant de l’exécuter](/fr/raw-sql#check-the-sql-before-you-run-it)).
 
 ### Le texte SQL n’est pas une API stable {#the-sql-text-is-not-a-stable-api}
@@ -157,7 +158,7 @@ Avec `strict` désactivé, `columns` laisse le type au `JSONSelectable` complet 
 
 - **La requête.** Un filtre sur la mauvaise colonne, une valeur que Postgres refuse (`stars: 6` dans `ratings`, 23514 à cause de son `CHECK`), du SQL qu’il ne sait pas analyser : le faux répond quand même.
 - **Ce que Postgres renvoie.** Quelles lignes, dans quel ordre, lesquelles valent `null` : le faux renvoie ce qu’on lui donne.
-  - Un `timestamptz` revient d’un raccourci sous forme de chaîne dans le fuseau horaire de la session : `2030-03-01T19:30:00+00:00` en UTC, `2030-03-01T20:30:00+01:00` à Paris. Son type, `TimestampTzString`, accepte aussi `2030-03-01T19:30:00Z`. Depuis un template `sql`, `pg` donne une `Date`.
+  - Un `timestamptz` revient d’un raccourci sous forme de chaîne dans le fuseau horaire de la session : `2030-03-01T19:30:00+00:00` en UTC, `2030-03-01T20:30:00+01:00` à Paris. Son type, `TimestampTzString`, accepte aussi `2030-03-01T19:30:00Z`. Depuis un template `sql`, `pg` donne un `Date`.
   - Un `bigint` revient d’un raccourci sous forme de nombre JSON, arrondi au-delà de 2<sup>53</sup> : 9007199254740993 arrive en 9007199254740992 ([`customJSONParsingForLargeNumbers`](/fr/generator#generate.customJSONParsingForLargeNumbers)). Depuis un template `sql`, `pg` donne une chaîne.
 
 Une vraie base vérifie les deux : gardez un test contre elle pour chaque requête, et des faux pour la logique autour.

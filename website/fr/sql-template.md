@@ -1,5 +1,5 @@
 ---
-english: 098c166c670d
+english: a3640344a745
 ---
 
 # Template SQL
@@ -30,10 +30,12 @@ Renvoie un [`SQLFragment`](#SQLFragment) : les parties littérales telles que v
 | Argument | Par défaut | Ce qu’il fixe |
 |---|---|---|
 | `Interpolations` | [`db.SQL`](#SQL) : chaque table et chaque colonne du schéma | ce qui peut être interpolé ; `s.films.SQL` n’accepte que les noms de `films`, et `cols()` / `vals()` de n’importe quelle valeur |
-| `RunResult` | `pg.QueryResult['rows']` (`any[]`) | ce en quoi `run()` se résout, et le type du fragment comme valeur de `lateral` ou d’`extras` |
+| `RunResult` | `pg.QueryResult['rows']` (`any[]`) | ce en quoi `run()` se résout, et le type du fragment comme valeur de `lateral` ou d’`extras` : sans lui, cette clé est `any`, sans erreur |
 | `Constraint` | `never` | le type de valeur auquel une condition se compare ; fixé par [`conditions`](/fr/conditions#conditions), vérifié par un Whereable. Vous le donnez rarement. |
 
 `RunResult` n’est pas confronté au SQL : c’est vous qui affirmez ce qui revient. Les raccourcis le fixent pour vous.
+
+Écrit en ligne comme valeur du `where` d’un raccourci, ou des valeurs d’`update()`, un fragment tire son `Constraint` de chaque table et vue qui a une colonne de ce nom : TypeScript l’infère avant de connaître la table. Là où leurs types diffèrent, un fragment pourtant valide ne compile pas (TS2322) : un `id` qui est un `int4` ici et un `uuid` là ; dans `update()`, une vue de `films`, dont le `title` peut être `NULL`, fait échouer `` { title: db.sql`upper(${db.self})` } ``. Donnez-lui un argument de type, `` db.sql<db.SQL>`upper(${db.self})` ``, ou déclarez-le d’abord.
 
 Un nom hors d’`Interpolations` ne compile pas :
 
@@ -56,7 +58,7 @@ Chaque valeur entre `${…}` se compile selon ce qu’elle est. Le SQL est celui
 | `raw(s)` | `s`, tel quel | [`raw()`](#raw) |
 | `cols(o)` / `cols(a)` | les clés de l’objet, triées, ou les éléments du tableau, entre guillemets : `"film_id", "tag"`<!-- probe: db.sql`${db.cols({ tag: 'x', film_id: 1 })}` --> | [`cols()`](#cols) |
 | `vals(o)` / `vals(a)` | les valeurs, dans l’ordre de `cols(o)`, ou dans celui du tableau : `$1, $2`<!-- probe: db.sql`${db.vals({ tag: 'x', film_id: 1 })}` --> | [`vals()`](#vals) |
-| tout autre objet | un Whereable de ses propres clés énumérables, objet simple ou non : `("studio_id" = $1)`<!-- probe: db.sql`${{ studio_id: 1000 }}` --> ; `{}` → `TRUE`<!-- probe: db.sql`${{}}` --> ; un objet natif, comme une `Date`, lève une erreur | [Objets Whereable](#whereable) |
+| tout autre objet | un Whereable de ses propres clés énumérables, objet simple ou non : `("studio_id" = $1)`<!-- probe: db.sql`${{ studio_id: 1000 }}` --> ; `{}` → `TRUE`<!-- probe: db.sql`${{}}` --> ; un objet natif, comme un `Date`, lève une erreur | [Objets Whereable](#whereable) |
 | `self` | la colonne courante, dans un fragment donné en valeur d’un Whereable | [`self`](#self) |
 | `parent(c?)` | la colonne de la requête parente : `"studios"."id"`<!-- probe: db.select('studios', db.all, { lateral: { films: db.select('films', { studio_id: db.parent('id') }) } }) --> | [`parent()`](#parent) |
 | `Default` | `DEFAULT`<!-- probe: db.sql`${db.Default}` --> | [`Default`](#Default) |
@@ -285,7 +287,7 @@ Un objet est un Whereable de la table : chacune de ses propres clés énumérab
 | `Default`, `self` | lève une erreur |
 | `raw()`, `cols()`, `vals()` | lève une erreur ([`raw()`](#raw)) |
 
-- `null` est aussi un paramètre, et `= NULL` ne correspond à aucune ligne : utilisez [`conditions.isNull`](/fr/conditions#conditions.isNull).
+- `null` est aussi un paramètre, et `= NULL` ne correspond à aucune ligne : utilisez [`conditions.isNull`](/fr/conditions#conditions.isNull). De même pour `undefined`, envoyé comme `NULL`, avec [`undefinedMeansMissing`](/fr/runtime-config#Config.undefinedMeansMissing) ou sans : `{ tagline: undefined }` donne `("tagline" = $1)`<!-- probe: db.sql`${{ tagline: undefined }}` -->, donc aucune ligne : omettre la clé élargirait le filtre.
 - `Default` lève "`` `db.Default` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. `DEFAULT` is for INSERT and UPDATE values. ``<!-- message -->" ; Zapatos 6.6.1 l’envoyait comme `'Symbol(DEFAULT)'`.
 - Les raccourcis prennent le même objet comme `where` ([`select()`](/fr/select#select)).
 
@@ -293,17 +295,17 @@ Un objet est un Whereable de la table : chacune de ses propres clés énumérab
 Un objet interpolé qui n’est pas l’une des autres [interpolations](#interpolations) se compile en Whereable, objet simple ou non : une instance de classe `{ title }` donne `("title" = $1)`<!-- probe: db.sql`${new (class { title = 'x' })()}` -->, et une instance sans clé propre énumérable donne `TRUE`, même d’une classe qui étend un objet natif (`class Premiere extends Date {}`). Vérifiez à l’exécution ce qui atteint un `where`.
 :::
 
-Un objet natif lève une erreur à la compilation, avant toute requête, même avec des clés propres ajoutées (`Object.assign(new Date(0), { id: 1 })`) : `Date`, `Map`, `Set`, `WeakMap`, `WeakSet`, `RegExp`, `Promise`, `Error` et ses sous-types natifs (`TypeError`, …), `ArrayBuffer`, un tableau typé, `Buffer`, `DataView`, et les objets enveloppes `Number`, `String` et `Boolean` :
+Un objet natif lève une erreur à la compilation, avant toute requête, même avec des clés propres ajoutées (`Object.assign(new Date(0), { id: 1 })`) : `Date`, `Map`, `Set`, `WeakMap`, `WeakSet`, `WeakRef`, `FinalizationRegistry`, `RegExp`, `Promise`, `Error` et ses sous-types natifs (`TypeError`, `AggregateError`, …), `ArrayBuffer`, `SharedArrayBuffer`, un tableau typé, `Buffer`, `DataView`, les objets enveloppes `Number`, `String` et `Boolean`, et, là où le runtime les fournit (Node 24), `SuppressedError`, `DisposableStack` et `AsyncDisposableStack` :
 
 > `` A built-in `…` has no meaning as a Whereable (a filter): it would compile to its own enumerable keys, and to `TRUE`, every row, when it has none. To compare with a value, give it as `db.param(…)`; to filter, give a plain object (`{ column: value }`); await a `Promise` first. ``<!-- message -->
 
-Zapatos 6.6.1 le compilait en Whereable de ses propres clés : `TRUE` pour la plupart, si bien que `` db.sql`DELETE FROM ${'films'} WHERE ${new Date()}` `` donnait `DELETE FROM "films" WHERE TRUE` et supprimait toutes les lignes ; `("0" = $1 …)` pour un tableau typé.
+Zapatos 6.6.1 le compilait en Whereable de ses propres clés : `TRUE` pour la plupart, si bien que `` db.sql`DELETE FROM ${'films'} WHERE ${new Date()}` `` donnait `DELETE FROM "films" WHERE TRUE` et supprimait toutes les lignes ; `("0" = $1 …)` pour un tableau typé. Un objet hôte (`URL`, `Blob`, `Headers`, `AbortController`) n’est pas refusé : il se compile en Whereable de ses propres clés, comme une instance de classe, donc `TRUE` quand il n’en a aucune.
 
 Le type refuse la plupart d’entre eux (TS2345), sauf là où une colonne partage l’un de leurs membres : `db.deletes('actors', new Error('x'))` passe la vérification de types, puisque `actors` a une colonne `name`.
 
 Seuls les objets natifs du realm qui exécute pgcast lèvent une erreur, reconnus à leur prototype exact. Comme dans Zapatos 6.6.1 :
 
-- une `Date` d’un autre realm, comme `vm.runInNewContext('new Date(0)')` (Jest exécute chaque fichier de test dans un contexte `vm`), donne `TRUE` ;
+- un `Date` d’un autre realm, comme `vm.runInNewContext('new Date(0)')` (Jest exécute chaque fichier de test dans un contexte `vm`), donne `TRUE` ;
 - une instance d’une classe qui étend un objet natif garde ses propres clés : `new Frames(1)`, avec `class Frames extends Uint8Array {}`, donne `("0" = $1)`.
 
 ## `self` {#self}

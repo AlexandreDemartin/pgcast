@@ -126,7 +126,7 @@ Dans `deletes()` ou `update()`, un filtre vide désigne chaque ligne : `removeR
 
 Un objet interpolé qui n’est pas l’une des valeurs de pgcast compile comme un filtre de ses propres clés énumérables : une instance de classe donne ses champs, et `TRUE` quand elle n’en a pas.
 
-Un objet natif du realm qui exécute pgcast (`Date`, `Map`, `Promise`, un tableau typé, …) lève une erreur avant toute requête ; un objet d’un autre realm, comme un contexte `vm`, non. Dans Zapatos 6.6.1, `` db.sql`DELETE FROM ${'ratings'} WHERE ${when}` ``, avec `when` une `Date` typée `any`, compilait en `DELETE FROM "ratings" WHERE TRUE` ([Objets Whereable](/fr/sql-template#whereable)). Passez une date comme `db.param(when)`.
+Un objet natif du realm qui exécute pgcast (`Date`, `Map`, `Promise`, un tableau typé, …) lève une erreur avant toute requête ; un objet d’un autre realm, comme un contexte `vm`, non. Dans Zapatos 6.6.1, `` db.sql`DELETE FROM ${'ratings'} WHERE ${when}` ``, avec `when` un `Date` typé `any`, compilait en `DELETE FROM "ratings" WHERE TRUE` ([Objets Whereable](/fr/sql-template#whereable)). Passez une date comme `db.param(when)`.
 
 ## Signaler une faille {#report-a-flaw}
 

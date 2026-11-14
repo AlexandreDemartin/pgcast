@@ -1,5 +1,5 @@
 ---
-english: fdeb6c9a99c3
+english: 317f5efabd09
 ---
 
 # Venir de Zapatos
@@ -150,6 +150,17 @@ Cherchez dans votre code la première colonne de chaque tableau ci-dessous. Chaq
 
 </div>
 
+### `truncate()` {#truncate}
+
+<div class="stack">
+
+| Votre code | Zapatos 6.6.1 | pgcast | Que faire |
+|---|---|---|---|
+| Le résultat de [`truncate()`](/fr/insert#truncate)`.run()` | `[]` | `undefined`, comme le dit son type | rien : il ne contenait aucune ligne |
+| Des options de `truncate()` dans un ordre que Postgres refuse, en passant outre le type : `truncate('tags', 'CASCADE', 'RESTART IDENTITY')` | Postgres renvoie 42601 : `.run()` est rejetée avec une `DatabaseError` | lève une erreur à la compilation : `.run()` est rejetée avec une simple `Error`, "Truncate options must be CONTINUE IDENTITY/RESTART IDENTITY, then RESTRICT/CASCADE, one of each at most, not '…'"<!-- message --> | rien, sauf si votre code y attend une `DatabaseError` (42601) : c’est désormais une simple `Error` |
+
+</div>
+
 ### Noms et mots-clés {#names-and-keywords}
 
 <div class="stack">
@@ -183,7 +194,7 @@ Le texte et les valeurs de `.compile()` changent aussi au-delà des cas ci-dessu
 Lancez vos tests, puis votre application. Là où Zapatos 6.6.1 faisait quelque chose sur quoi du code peut compter, pgcast le garde, et avertit une fois par processus, au premier appel qui le fait :
 
 ```txt
-(node:4242) [PGCAST_DEP002] DeprecationWarning: An undefined value in insert(), update() or upsert() is sent as NULL. Set undefinedMeansMissing: true (db.setConfig) to treat it as a missing key instead (DEFAULT in insert(), left out of update() and upsert()); it will be the default in pgcast 7.0.
+(node:4242) [PGCAST_DEP002] DeprecationWarning: An undefined value in insert(), update() or upsert() is sent as NULL, or, in upsert() updateValues, set from EXCLUDED. Set undefinedMeansMissing: true (db.setConfig) to treat it as a missing key instead (DEFAULT in insert(), left out of update() and upsert()); it will be the default in pgcast 7.0.
 (Use `node --trace-deprecation ...` to show where the warning was created)
 ```
 
@@ -203,8 +214,9 @@ Pour trouver chaque appel :
 | Avertissement | L’appel | Corrigez-le, ou activez |
 |---|---|---|
 | `PGCAST_DEP001` | un `upsert()` de plusieurs lignes sans [`updateColumns`](/fr/insert#upsert-options), avec une clé absente de certaines lignes : insérée comme `DEFAULT`, elle écrase la valeur existante ([Lignes aux clés différentes](/fr/insert#upsert-different-keys)) | donnez la clé à chaque ligne (`db.Default` garde le SQL), ou passez `updateColumns` ; ou [`upsertRequiresSameKeys`](/fr/runtime-config#Config.upsertRequiresSameKeys), et un tel appel lève une erreur |
-| `PGCAST_DEP002` | une valeur `undefined` dans `insert()`, `update()` ou `upsert()`, envoyée comme `NULL` ([Une valeur `undefined`](/fr/insert#undefined-values)) | omettez la clé, ou donnez `null` pour effacer la colonne ; ou [`undefinedMeansMissing`](/fr/runtime-config#Config.undefinedMeansMissing), et `undefined` est une clé absente |
+| `PGCAST_DEP002` | une valeur `undefined` dans `insert()`, `update()` ou `upsert()`, envoyée comme `NULL`, ou, dans `updateValues` d’`upsert()`, qui prend sa valeur dans `EXCLUDED` ([Une valeur `undefined`](/fr/insert#undefined-values)) | omettez la clé, ou donnez `null` pour effacer la colonne ; ou [`undefinedMeansMissing`](/fr/runtime-config#Config.undefinedMeansMissing), et `undefined` est une clé absente |
 | `PGCAST_DEP003` | une [`transaction()`](/fr/transaction#transaction) dont le callback intercepte l’erreur d’une requête et se termine : Postgres répond au `COMMIT` par `ROLLBACK`, et rien n’est enregistré ([Laisser passer l’erreur](/fr/retries#let-the-error-through)) | laissez l’erreur sortir du callback, ou faites `ROLLBACK TO` un `SAVEPOINT` avant de continuer ; ou [`transactionRequiresCommit`](/fr/runtime-config#Config.transactionRequiresCommit), et une telle transaction est rejetée |
+| `PGCAST_DEP004` | un [`sum()`, `avg()`, `min()` ou `max()`](/fr/select#typed-by-column) dont `Number()` change le résultat : `0` pour aucune ligne, les millisecondes d’une date, `NaN` pour un texte | activez [`aggregatesTypedByColumn`](/fr/runtime-config#Config.aggregatesTypedByColumn), déclaré dans [`ConfigTypes`](/fr/runtime-config#ConfigTypes) : `tsc` montre alors chaque appel dont le résultat est désormais `null` ou du type de la colonne, et `?? 0` garde un `0` |
 
 </div>
 
@@ -249,8 +261,9 @@ La note d’[`enumOrder`](/fr/generator#generate.enumOrder) nomme chaque enum do
 npm install zapatos@6.6.1
 ```
 
-- D’abord, retirez de `setConfig()` les options que la `Config` de Zapatos 6.6.1 n’a pas (2353) : `upsertRequiresSameKeys`, `undefinedMeansMissing`, `transactionRequiresCommit` et `selectExactlyOneChecksForSecondRow`.
-- Régénérez avec Zapatos 6.6.1. Il ignore `typeEnumsAcrossSchemas` et `enumOrder` dans `zapatosconfig.json`, et réécrit les types `any`, les libellés triés, les lignes de commentaire sans préfixe et tout nom d’`UniqueIndex` emprunté.
+- D’abord, retirez de `setConfig()` les options que la `Config` de Zapatos 6.6.1 n’a pas (2353) : `upsertRequiresSameKeys`, `undefinedMeansMissing`, `transactionRequiresCommit`, `selectExactlyOneChecksForSecondRow` et `aggregatesTypedByColumn`.
+- Avec [`moduleNames`](/fr/generator#generate.moduleNames) à `"pgcast"`, lancez aussi `npm uninstall pgcast` : les deux paquets ont une commande `zapatos`. Vos imports `pgcast/…` ne se résolvent alors plus, et la 6.6.1 écrit `zapatos/` mais laisse `pgcast/` en place. Remettez donc chaque import en `zapatos/…`, déplacez les fichiers à compléter que vous avez modifiés dans `zapatos/custom/`, leur `declare module 'pgcast/custom'` renommé en `'zapatos/custom'`, et supprimez `pgcast/`.
+- Régénérez avec Zapatos 6.6.1. Il ignore `typeEnumsAcrossSchemas`, `enumOrder` et `moduleNames` dans `zapatosconfig.json`, et réécrit les types `any`, les libellés triés, les lignes de commentaire sans préfixe et tout nom d’`UniqueIndex` emprunté.
 - Chaque changement de [Trouver les appels dont le résultat change](#find-the-calls-whose-result-changes) s’exécute comme avant, sauf celui du `jsonb`, qui ne trouve de nouveau rien.
 
 ::: warning Sécurité
