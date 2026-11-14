@@ -344,12 +344,14 @@ const
 // built-in objects that are no filter, by their exact prototype, so that a class instance never is one, even of
 // a class that extends a built-in. Zapatos 6.6.1 compiled them as Whereables of their own keys: none (`TRUE`,
 // every row), or indexes (`"0" = $1`). A typed array's prototype is one whose own prototype is %TypedArray%'s:
-// `Uint8Array.prototype`, `Float64Array.prototype`…, and not a subclass's (`Buffer` is listed for this reason)
+// `Uint8Array.prototype`, `Float64Array.prototype`…, and not a subclass's (`Buffer` is listed for this reason).
+// `AggregateError` (Node 15) and `SuppressedError` (Node 24) are read from `globalThis`, where the runtime has them
 const
   builtinPrototypes = new Set<unknown>([
     Date, Map, Set, WeakMap, WeakSet, RegExp, Promise, ArrayBuffer, DataView, Buffer, Number, String, Boolean,
     Error, EvalError, RangeError, ReferenceError, SyntaxError, TypeError, URIError,
-  ].map(builtin => builtin.prototype)),
+    (globalThis as any).AggregateError, (globalThis as any).SuppressedError,
+  ].filter(Boolean).map(builtin => builtin.prototype)),
   typedArrayPrototype = Object.getPrototypeOf(Uint8Array.prototype);
 
 const isBuiltin = (x: object) => {

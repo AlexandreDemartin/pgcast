@@ -8,7 +8,10 @@
 
 /** A fresh value of each refused built-in object, keyed by the name its error gives. */
 export const builtinObjects = (): Record<string, object> => {
-  const Float16Array = (globalThis as any).Float16Array;  // Node 24 and later
+  const
+    Float16Array = (globalThis as any).Float16Array,  // Node 24 and later
+    AggregateError = (globalThis as any).AggregateError,  // ES2021: not in the lib's ES2019 types
+    SuppressedError = (globalThis as any).SuppressedError;  // Node 24 and later
   return {
     Date: new Date(0),
     Map: new Map([['id', 1]]),
@@ -24,6 +27,8 @@ export const builtinObjects = (): Record<string, object> => {
     SyntaxError: new SyntaxError('id'),
     TypeError: new TypeError('id'),
     URIError: new URIError('id'),
+    AggregateError: new AggregateError([new Error('id')], 'id'),
+    ...SuppressedError && { SuppressedError: new SuppressedError(new Error('id'), new Error('id'), 'id') },
     ArrayBuffer: new ArrayBuffer(1),
     DataView: new DataView(new ArrayBuffer(1)),
     Uint8Array: new Uint8Array(1),
