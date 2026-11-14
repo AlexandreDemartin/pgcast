@@ -345,6 +345,13 @@ svg.icon { width: 16px; height: 16px; flex: none; }
 /* a written page's actions (PageActions.vue): one quiet split button, floated beside the title, so that a long title
    wraps under it; its menu and its "Copied" under it, over the text */
 .PageActions { float: right; position: relative; margin: 7px 0 8px 16px; z-index: 10; }  /* in line with the h1's first line */
+/* from 1280px, where VitePress shows "On this page", under it instead, as Cursor's docs have it: its left edge on the
+   outline's rule, 16px under its last link, fixed with it; its focus ring inside, as the rail's box cuts what overflows
+   it. The rail over the reading column, for the menu that opens leftwards from it */
+.PageActions.rail { float: none; align-self: flex-start; margin: 16px 0 0; }
+.PageActions.rail .split button:focus-visible { outline-offset: -2px; }
+.VPDoc .aside { z-index: 1; }
+@media (min-width: 1280px) { .VPDoc.has-aside .PageActions.title { display: none; } }
 /* on a phone, its icon only, so the title keeps the column; its label is still its name */
 @media (max-width: 560px) {
   .PageActions { margin-top: 2px; }
@@ -359,12 +366,16 @@ svg.icon { width: 16px; height: 16px; flex: none; }
 .PageActions .copy { border-radius: 7px 0 0 7px; }
 .PageActions .toggle { border-left: 1px solid var(--line); border-radius: 0 7px 7px 0; padding: 0 6px !important; }
 .PageActions svg { width: 16px; height: 16px; flex: none; }
-/* its menu: each row an icon, a name and, under it, what it does; as wide as its longest row, inside a 320px screen */
+/* its menu: each row an icon, a name and, under it, what it does; as wide as its longest row, inside a 320px screen.
+   Fixed, placed by PageActions.vue under its button (over it where it would not fit), its right edge under the
+   chevron's, inside the viewport; it scales in from the chevron, as a popover from its trigger, and goes at once */
 .PageActions .menu {
-  position: absolute; top: calc(100% + 4px); right: 0; width: max-content; max-width: calc(100vw - 32px); padding: 4px;
+  position: fixed; width: max-content; max-width: calc(100vw - 32px); padding: 4px;
   display: flex; flex-direction: column;
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 8px 28px rgba(0, 0, 0, .18);
+  transition: opacity 150ms cubic-bezier(.23, 1, .32, 1), transform 150ms cubic-bezier(.23, 1, .32, 1);
 }
+@starting-style { .PageActions .menu { opacity: 0; transform: scale(.97); } }
 .PageActions .menu > * {
   display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 0 10px; padding: 8px 12px 8px 10px; border-radius: 6px;
   color: var(--fg); text-decoration: none; text-align: left;

@@ -1,17 +1,21 @@
 <script setup lang="ts">
 // Copyright (C) 2026 Alexandre Demartin
-// Beside a written page's title (Layout.vue), its Markdown for an assistant: "Copy page", and a menu to copy it, view
-// it, or open a new chat in ChatGPT or Claude whose prompt names its URL. The Markdown is `/<page>.md`, the page's part
-// of llms-full.txt, written at build (llms.ts): fetched only when a copy is asked for, from the site itself; the chats
-// are plain links. Not on the home, the changelog, the playground, the 404 or a "Coming" page: the outline's written
+// A written page's Markdown for an assistant: "Copy page", and a menu to copy it, view it, or open a new chat in ChatGPT
+// or Claude whose prompt names its URL. Two in the layout (Layout.vue), one shown at a time by style.css: under "On this
+// page" from 1280px, where VitePress shows that rail, else beside the title; the hidden one is `display: none`, so out
+// of the accessibility tree, and each has its own ids. The Markdown is `/<page>.md`, the page's part of llms-full.txt,
+// written at build (llms.ts): fetched only when a copy is asked for, from the site itself; the chats are plain links. Not on the home, the changelog, the playground, the 404 or a "Coming" page: the outline's written
 // pages only, as llms-full.txt. The menu is WAI-ARIA's menu button (https://www.w3.org/WAI/ARIA/apg/patterns/menu-button/).
-import { computed, nextTick, onUnmounted, ref, watch } from 'vue';
+import { computed, nextTick, onUnmounted, ref, useId, watch } from 'vue';
 import { useData, withBase } from 'vitepress';
 import { outline } from '../outline.ts';
 import Icon from './Icon.vue';
 
+const { place } = defineProps<{ place: 'title' | 'rail' }>();
+
 const
   { page } = useData(),
+  id = useId(),
   links = new Set(outline.flatMap(group => [group.link, ...group.items.map(item => item.link)])),
   link = computed(() => '/' + page.value.relativePath.replace(/\.md$/, '')),
   written = computed(() => page.value.params === undefined && links.has(link.value)),  // a "Coming" page has `params`
@@ -50,9 +54,29 @@ async function copy() {
 
 const items = () => [...menu.value?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []];
 
+/**
+ * Place the menu, fixed, so that the rail's scrolling box does not cut it: its right edge under the chevron's, inside
+ * the viewport, under the button or, where it would not fit, over it; scaled from the chevron.
+ */
+function anchor() {
+  if (!toggle.value?.parentElement || !menu.value) return;
+  const
+    button = toggle.value.parentElement.getBoundingClientRect(),
+    chevron = toggle.value.getBoundingClientRect(),
+    { style, offsetWidth: width, offsetHeight: height } = menu.value,
+    edge = 16, gap = 4,
+    left = Math.max(edge, Math.min(button.right - width, document.documentElement.clientWidth - edge - width)),
+    below = button.bottom + gap + height <= innerHeight - edge || button.top - gap - height < edge;
+  style.left = `${left}px`;
+  style.top = below ? `${button.bottom + gap}px` : '';
+  style.bottom = below ? '' : `${innerHeight - button.top + gap}px`;
+  style.transformOrigin = `${chevron.left + chevron.width / 2 - left}px ${below ? 'top' : 'bottom'}`;
+}
+
 async function show(focus: 'first' | 'last') {
   open.value = true;
   await nextTick();
+  anchor();
   const all = items();
   all[focus === 'first' ? 0 : all.length - 1]?.focus();
 }
@@ -94,25 +118,30 @@ function onMenuKey(e: KeyboardEvent) {
   else if (e.key === 'Tab') close(false);
 }
 
-// a press outside closes the menu, as does the focus leaving it
+// a press outside closes the menu, as does the focus leaving it; a scroll or a resize moves it with its button
 function onOutside(e: Event) {
   if (!root.value?.contains(e.target as Node)) close(false);
 }
-watch(open, isOpen => {
+function listen(on: boolean) {
   for (const type of ['pointerdown', 'focusin']) {
-    if (isOpen) document.addEventListener(type, onOutside);
+    if (on) document.addEventListener(type, onOutside);
     else document.removeEventListener(type, onOutside);
   }
-});
+  for (const type of ['scroll', 'resize']) {  // a scroll in any box: the rail scrolls in its own
+    if (on) window.addEventListener(type, anchor, { capture: true, passive: true });
+    else window.removeEventListener(type, anchor, { capture: true });
+  }
+}
+watch(open, listen);
 watch(link, () => { close(false); status.value = ''; });  // another page, in the same layout
 onUnmounted(() => {
   clearTimeout(timer);
-  for (const type of ['pointerdown', 'focusin']) document.removeEventListener(type, onOutside);
+  listen(false);
 });
 </script>
 
 <template>
-  <div v-if="written" ref="root" class="PageActions">
+  <div v-if="written" ref="root" class="PageActions" :class="place">
     <div class="split">
       <button type="button" class="copy" @click="copy">
         <Icon :name="status === 'Copied' ? 'check' : 'copy'" />
@@ -124,7 +153,7 @@ onUnmounted(() => {
         class="toggle"
         aria-label="More ways to use this page"
         aria-haspopup="menu"
-        aria-controls="page-actions-menu"
+        :aria-controls="`${id}-menu`"
         :aria-expanded="open"
         @click="onToggleClick"
         @keydown="onToggleKey"
@@ -133,17 +162,25 @@ onUnmounted(() => {
       </button>
     </div>
     <!-- each row: its icon, its name, then what it does, read as its description rather than in its name -->
-    <div v-show="open" id="page-actions-menu" ref="menu" class="menu" role="menu" aria-label="This page" @keydown="onMenuKey">
-      <button type="button" role="menuitem" tabindex="-1" aria-describedby="page-actions-copy" @click="copy">
+    <div
+      v-show="open"
+      :id="`${id}-menu`"
+      ref="menu"
+      class="menu"
+      role="menu"
+      aria-label="This page"
+      @keydown="onMenuKey"
+    >
+      <button type="button" role="menuitem" tabindex="-1" :aria-describedby="`${id}-copy`" @click="copy">
         <Icon name="copy" />
         <span class="title">Copy page</span>
-        <span id="page-actions-copy" class="desc" aria-hidden="true">Copy page as Markdown for LLMs</span>
+        <span :id="`${id}-copy`" class="desc" aria-hidden="true">Copy page as Markdown for LLMs</span>
       </button>
       <!-- a `target` leaves the link to the browser: VitePress's router would look for a page at `/<page>.md` -->
-      <a role="menuitem" tabindex="-1" :href="markdown" target="_self" aria-describedby="page-actions-view" @click="close(false)">
+      <a role="menuitem" tabindex="-1" :href="markdown" target="_self" :aria-describedby="`${id}-view`" @click="close(false)">
         <Icon name="file" />
         <span class="title">View as Markdown</span>
-        <span id="page-actions-view" class="desc" aria-hidden="true">Open this page as plain text</span>
+        <span :id="`${id}-view`" class="desc" aria-hidden="true">Open this page as plain text</span>
       </a>
       <a
         v-for="chat in chats"
@@ -153,12 +190,12 @@ onUnmounted(() => {
         :href="chat.href"
         target="_blank"
         rel="noopener"
-        :aria-describedby="`page-actions-${chat.name}`"
+        :aria-describedby="`${id}-${chat.icon}`"
         @click="close(false)"
       >
         <Icon :name="chat.icon" />
         <span class="title">Open in {{ chat.name }}<span class="visually-hidden"> (new tab)</span><Icon name="external" /></span>
-        <span :id="`page-actions-${chat.name}`" class="desc" aria-hidden="true">Ask about this page in {{ chat.name }}</span>
+        <span :id="`${id}-${chat.icon}`" class="desc" aria-hidden="true">Ask about this page in {{ chat.name }}</span>
       </a>
     </div>
     <span class="status" aria-live="polite">{{ status }}</span>
