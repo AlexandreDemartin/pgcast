@@ -568,6 +568,35 @@ describe('Default, self, raw, cols and vals as the value of a condition', () => 
       `);
   });
 
+  it('isIn and isNotIn given a list that is not an array throw when compiled, not when called, saying what to do', () => {
+    // 6.6.1 compiled a Set to `false` and `true`, every row for isNotIn (#235); each kind: test/unit/injection.test.ts
+    expect(Object.fromEntries(Object.entries(lists).map(([name, f]) => [name, thrown(f(new Set([1, 2]) as any))])))
+      .toMatchInlineSnapshot(`
+        {
+          "isIn": "\`isIn()\` takes an array, not \`Set\`: make one with \`isIn([...values])\`, or \`Array.from(values)\` for an array-like object.",
+          "isNotIn": "\`isNotIn()\` takes an array, not \`Set\`: make one with \`isNotIn([...values])\`, or \`Array.from(values)\` for an array-like object.",
+        }
+      `);
+  });
+
+  it('isIn and isNotIn given one value in place of the list say to wrap it, not to spread it', () => {
+    // spread, a string gives its characters (`[...'Ada']`, the defect of #235) and null throws
+    expect(Object.fromEntries(Object.entries(lists).flatMap(([name, f]) =>
+      (['5', 5, null, undefined] as unknown[]).map(x => [`${name}(${typeof x === 'string' ? `'${x}'` : x})`, thrown(f(x as any))]))))
+      .toMatchInlineSnapshot(`
+        {
+          "isIn('5')": "\`isIn()\` takes an array, not \`string\`: for one value, write \`isIn([value])\`.",
+          "isIn(5)": "\`isIn()\` takes an array, not \`number\`: for one value, write \`isIn([value])\`.",
+          "isIn(null)": "\`isIn()\` takes an array, not \`null\`: for one value, write \`isIn([value])\`.",
+          "isIn(undefined)": "\`isIn()\` takes an array, not \`undefined\`: for one value, write \`isIn([value])\`.",
+          "isNotIn('5')": "\`isNotIn()\` takes an array, not \`string\`: for one value, write \`isNotIn([value])\`.",
+          "isNotIn(5)": "\`isNotIn()\` takes an array, not \`number\`: for one value, write \`isNotIn([value])\`.",
+          "isNotIn(null)": "\`isNotIn()\` takes an array, not \`null\`: for one value, write \`isNotIn([value])\`.",
+          "isNotIn(undefined)": "\`isNotIn()\` takes an array, not \`undefined\`: for one value, write \`isNotIn([value])\`.",
+        }
+      `);
+  });
+
   it('self keeps its meaning in a fragment written by hand', () => {
     expect(show(sql`${self} = ${self}`)).toMatchInlineSnapshot(`
       {
