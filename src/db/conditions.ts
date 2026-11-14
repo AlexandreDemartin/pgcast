@@ -73,8 +73,24 @@ export const reImatch = <T extends string>(a: T) => sql<SQL, boolean | null, T>`
 export const notReMatch = <T extends string>(a: T) => sql<SQL, boolean | null, T>`${self} !~ ${conditionalParam(a)}`;
 export const notReImatch = <T extends string>(a: T) => sql<SQL, boolean | null, T>`${self} !~* ${conditionalParam(a)}`;
 
-export const isIn = <T>(a: readonly T[]) => a.length > 0 ? sql<SQL, boolean | null, T>`${self} IN (${vals(a)})` : sql`false`;
-export const isNotIn = <T>(a: readonly T[]) => a.length > 0 ? sql<SQL, boolean | null, T>`${self} NOT IN (${vals(a)})` : sql`true`;
+// 6.6.1 read `a.length`, which an iterable lacks, so `isNotIn(new Set([1]))` compiled to `true`, every row
+const notAnArray = (fn: string, a: unknown) => {
+  const kind = a === null ? 'null' : typeof a === 'object' ? Object.prototype.toString.call(a).slice(8, -1) : typeof a;
+  return refused(`\`${fn}()\` takes an array, not \`${kind}\`: make one with \`${fn}([...values])\`, or \`Array.from(values)\` for an array-like object.`);
+};
+
+/**
+ * `"col" IN ($1, $2)`, and `false` for an empty array. A list that is not an array (a `Set`, an
+ * iterator) throws as the query compiles: spread it into one, `isIn([...values])`.
+ * @param a An array of values, `Parameter`s, `parent()` or `sql` fragments
+ */
+export const isIn = <T>(a: readonly T[]) => !Array.isArray(a) ? notAnArray('isIn', a) : a.length > 0 ? sql<SQL, boolean | null, T>`${self} IN (${vals(a)})` : sql`false`;
+/**
+ * `"col" NOT IN ($1, $2)`, and `true`, every row, for an empty array. A list that is not an array
+ * (a `Set`, an iterator) throws as the query compiles: spread it into one, `isNotIn([...values])`.
+ * @param a An array of values, `Parameter`s, `parent()` or `sql` fragments
+ */
+export const isNotIn = <T>(a: readonly T[]) => !Array.isArray(a) ? notAnArray('isNotIn', a) : a.length > 0 ? sql<SQL, boolean | null, T>`${self} NOT IN (${vals(a)})` : sql`true`;
 
 /**
  * Join conditions with `OR`: `or(a, b)` compiles to `(a OR b)`, and `or()` to `FALSE`, so that
