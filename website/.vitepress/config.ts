@@ -13,6 +13,7 @@ import { describePage, pageHead, repo } from './meta.ts';
 import { outline } from './outline.ts';
 import { playgroundVite } from './playground/build.ts';
 import { checkPlaygroundLinks, linkCastPanels } from './playgroundLinks.ts';
+import { markSteps } from './steps.ts';
 import { lineIndents, sqlParameters, syntax } from './syntax.ts';
 import { labelTableCells } from './tables.ts';
 import { svg } from './theme/icons.ts';
@@ -20,8 +21,18 @@ import { focusableHovers, moduleNames, twoslashOptions } from './twoslash.ts';
 
 const
   { version } = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')),
-  font = (face: string): HeadConfig =>
-    ['link', { rel: 'preload', href: `/fonts/${face}-latin.woff2`, as: 'font', type: 'font/woff2', crossorigin: '' }];
+  font = (file: string): HeadConfig =>
+    ['link', { rel: 'preload', href: `/fonts/${file}.woff2`, as: 'font', type: 'font/woff2', crossorigin: '' }],
+  // the wordmark's entrance (Wordmark.vue, style.css), set before the first paint: on the home only, the first time it
+  // loads in a session, and never with reduced motion; without storage, none. A client-side navigation runs no script
+  // here, so arriving on the home from another page plays nothing either: the wordmark is already on screen
+  wordmarkEntrance = `try {
+  if ((location.pathname === '/' || location.pathname === '/index.html') && !sessionStorage.getItem('pgcast-wordmark') &&
+    !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    sessionStorage.setItem('pgcast-wordmark', '1');
+    document.documentElement.dataset.wordmark = '';
+  }
+} catch {}`;
 
 export default defineConfig({
   title: 'pgcast',
@@ -44,8 +55,11 @@ export default defineConfig({
     await checkPlaygroundLinks(config);  // so does a cast panel that does not open its example in the playground
   },
   head: [
-    // public/fonts/, declared in theme/fonts.css: every page's first screen sets all three faces (the wordmark is mono)
-    font('schibsted-grotesk'), font('inter'), font('jetbrains-mono'),
+    // public/fonts/, declared in theme/fonts.css: every page's first screen sets all three faces, and the wordmark's
+    // six capitals of Saira. Those first: 1.3 KB, set `font-display: block`, they then arrive before the first paint
+    // (400ms on a throttled 1.6 Mb/s, 150ms link, against 1.2s unpreloaded and 1.5s preloaded behind the three faces)
+    font('saira-wordmark'), font('schibsted-grotesk-latin'), font('inter-latin'), font('jetbrains-mono-latin'),
+    ['script', {}, wordmarkEntrance],
     // public/: favicon.svg follows the system's theme; favicon.ico and apple-touch-icon.png are rendered by
     // render-images.mjs
     ['link', { rel: 'icon', href: '/favicon.ico', sizes: '32x32' }],
@@ -72,6 +86,7 @@ export default defineConfig({
       linkCastPanels(md);  // "Open in playground" on a docs page's cast panel
       calloutIcons(md);  // a note's chip opens on its kind's icon
       codeGroupLogos(md);  // a package manager's tab opens on its mark
+      markSteps(md);  // a step's number in a round marker: `## 1. Set up the project`
     },
   },
   vite: {
@@ -89,7 +104,7 @@ export default defineConfig({
     },
   },
   themeConfig: {
-    siteTitle: 'pg<b>::</b>cast',
+    siteTitle: false,  // the wordmark is Wordmark.vue, in Layout.vue
     nav: [
       // a group with a `nav` text is current on its landing page and on each of its pages; Explanation has none: a
       // fourth link would push the theme button into VitePress's ⋯ menu at most widths from 768 to 1050px
@@ -105,7 +120,11 @@ export default defineConfig({
     sidebar: outline,  // each group's heading links its landing page, its chevron folds it
     search: {
       provider: 'local',
-      options: { translations: { button: { buttonText: 'Search', buttonAriaLabel: 'Search the docs' } } },
+      options: {
+        // each result with two lines of its text, the match underlined (style.css); the list button still hides them
+        detailedView: true,
+        translations: { button: { buttonText: 'Search', buttonAriaLabel: 'Search the docs' } },
+      },
     },
     editLink: { pattern: `${repo}/edit/master/website/:path`, text: 'Edit this page on GitHub' },
     // VitePress writes these with `v-html`: each with the arrow of its way
