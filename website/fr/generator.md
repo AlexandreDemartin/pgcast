@@ -1,5 +1,5 @@
 ---
-english: 879e8a3f0653
+english: 2cf2e5e7746f
 ---
 
 # Générateur
@@ -243,7 +243,7 @@ billing: number;
 - Dans un commentaire sur plusieurs lignes, chaque ligne est précédée d’un `*`, que les sauts de ligne soient `\n`, `\r\n` ou `\r`.
 - Chaque relation montre ses propres commentaires, quelle que soit sa nature : Postgres n’en copie aucun vers une partition, une table qui hérite ou une vue, donc une vue sur `roles` ne montre aucun commentaire sur `billing`.
 - Un `*/` dans un commentaire, un nom, un type ou un `DEFAULT` est écrit `*\/`, pour ne pas terminer le JSDoc ; de même celui que forme un nom commençant par `/` avec le `**` qui le précède : `**\/reels**`.
-- Une balise JSDoc dans un commentaire reste une balise : `@deprecated use lead` barre la colonne là où votre code la lit, et le survol donne `use lead` pour raison. TypeScript ouvre une balise à un `@` qui commence une ligne, ou qui suit une espace sans en être suivi, pas à celui de `casting@example.com` ; à partir de la ligne qui porte la balise, le commentaire passe après les lignes générées, précédé d’une ligne `*`, pour que la balise ne les prenne pas pour son propre texte.
+- Une balise JSDoc dans un commentaire reste une balise : `@deprecated use lead` barre la colonne là où votre code la lit, et le survol donne `use lead` pour raison. TypeScript ouvre une balise à un `@` qui commence une ligne, ou qui suit une espace sans en être suivi, pas à celui de `casting@example.com` ni à celui d’un lien en ligne `{@link …}`, `{@linkcode …}` ou `{@linkplain …}` ; à partir de la ligne qui porte la balise, le commentaire passe après les lignes générées, précédé d’une ligne `*`, pour que la balise ne les prenne pas pour son propre texte.
 
 `false` n’en écrit aucun, donc `schema.d.ts` est plus court.
 
