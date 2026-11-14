@@ -619,6 +619,7 @@ describe('quotes and */', () => {
       expect.soft(schema).toContain('* **\\/reels**\n');
       expect.soft(schema).toContain('* **\\/reels.id**\n');
       expect.soft(schema).not.toMatch(/\*\*\//);
+      expect.soft(syntaxErrors(schema)).toEqual([]);  // its namespaces legalised: _lead, _reels
     } finally {
       await t.pool.query('DROP SCHEMA "/lead" CASCADE; DROP SCHEMA slash_reels CASCADE');
     }
