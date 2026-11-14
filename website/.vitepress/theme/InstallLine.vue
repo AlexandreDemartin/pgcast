@@ -79,7 +79,7 @@ async function copy() {
     <div :id="`${id}-panel`" class="panel" role="tabpanel" :aria-labelledby="`${id}-${name}`">
       <code ref="code"><span class="manager">{{ name }}</span>{{ command.slice(name.length) }}</code>
       <button type="button" class="copy" :aria-label="`Copy the ${name} command`" @click="copy">
-        <Icon :name="copied ? 'check' : 'copy'" />
+        <span class="IconSwap" :class="{ done: copied }"><Icon name="copy" /><Icon name="check" /></span>
       </button>
     </div>
     <span class="copied" aria-live="polite">{{ copied ? 'Copied' : '' }}</span>

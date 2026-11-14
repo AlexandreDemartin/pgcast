@@ -9,6 +9,8 @@ description: "pgcast reads your Postgres schema and writes the TypeScript types.
 <main class="landing">
 <section class="hero">
 
+<p class="eyebrow">-- a maintained fork of <a href="/switching">Zapatos 6.6.1</a></p>
+
 <h1>Your types, cast from your database<span class="op">::</span></h1>
 
 pgcast reads your Postgres schema and writes the TypeScript types. Its shortcuts produce SQL you can read and predict, and you can always drop down to a plain `sql` template. No ORM, no models, no hidden state.
@@ -16,7 +18,7 @@ pgcast reads your Postgres schema and writes the TypeScript types. Its shortcuts
 
 <div class="ctas">
 
-[<span>Get started</span>](/install){.btn .primary} [<span>Playground</span>](/playground){.btn}
+[Get started](/install){.btn .primary} [Playground](/playground){.btn}
 
 </div>
 
