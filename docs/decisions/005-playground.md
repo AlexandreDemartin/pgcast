@@ -140,3 +140,5 @@ The owner, 2026-11-13, on the four questions of the proposal:
 - CodeMirror: [`@valtown/codemirror-ts`](https://github.com/val-town/codemirror-ts), [`@typescript/vfs`](https://www.npmjs.com/package/@typescript/vfs).
 - [`CompressionStream`](https://developer.mozilla.org/en-US/docs/Web/API/CompressionStream) (MDN); GitHub Pages [usage limits](https://docs.github.com/en/pages/getting-started-with-github-pages/github-pages-limits) (1 GB).
 - Zapatos's docs: `docs/docs.js`, `docs/zapatos-bundle.js`, `docs/monaco/`.
+
+> Zapatos's old documentation (`docs/index.html`, `docs/docs.js`, `docs/zapatos-bundle.js`, `docs/monaco/` and their assets) was removed on 2026-11-14 (#314), as § Decision 6 of decision 004 planned; it is online at <https://jawj.github.io/zapatos/> and in the history (`git show v6.6.1:docs/index.html`).
