@@ -6,7 +6,7 @@
 :root {
   --bg: #f6f8f9; --surface: #ffffff; --sunken: #eef2f4; --fg: #12202b; --muted: #566673; --line: #d9e0e5;
   --accent: #0a6b63; --accent-fg: #ffffff; --accent-soft: #dcefec; --warn: #8a5a00; --warn-soft: #fbf0d9;
-  --error: #b22e2e;
+  --error: #b22e2e; --raised: #e4e7e9;
   --code-bg: #f1f4f6; --k: #1458a8; --s: #8f5600; --t: #0a6b63; --n: #b0245a; --c: #626e79; --qi: #12202b; --p: #b0245a;
   --font-display: "Schibsted Grotesk", "Helvetica Neue", Arial, sans-serif;
   --font-body: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -16,7 +16,7 @@
 .dark {
   --bg: #0d1318; --surface: #121a21; --sunken: #0a0f13; --fg: #e2e9ee; --muted: #8d9eab; --line: #23303a;
   --accent: #4fcfbf; --accent-fg: #06201d; --accent-soft: #11302c; --warn: #e8b65a; --warn-soft: #2c2412;
-  --error: #d96d6d;
+  --error: #d96d6d; --raised: #1e2429;
   --code-bg: #0f171d; --k: #7fb6ff; --s: #e3b462; --t: #4fcfbf; --n: #f08ab3; --c: #768794; --qi: #e2e9ee; --p: #f08ab3;
   color-scheme: dark;
 }
@@ -109,31 +109,40 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 }
 .AppearanceSwitch svg { width: 18px; height: 18px; }
 
-/* left nav, in four groups: rows of 32px, 4px apart; a group's label 32px under the group above, 12px over its pages,
-   and in line with their text. The label leads its pages: the headings' face, in --fg, on a --sunken band across the nav; the pages in
-   --muted, --fg on hover, the current one in --accent */
+/* left nav, in four groups that fold: a group's heading set apart from its pages by size and colour alone, no band
+   (the owner's call, #372); its pages a step further in, plain --muted text; the current page a filled row */
 .VPSidebar .group, .VPSidebar .group + .group { border-top: 0; padding-top: 0; }
-.VPSidebar .group .VPSidebarItem.level-0 { padding-bottom: 20px; }  /* over VitePress's scoped 24px */
-/* the band runs from border to border: past the nav's 2rem on the right, and as far as the nav clips it on the left
-   (VitePress widens the left padding on wide screens) */
-.VPSidebarItem.level-0 > .item { position: relative; z-index: 0; }
-.VPSidebarItem.level-0 > .item::before {
-  content: ""; position: absolute; inset: 0 -2rem 0 -100vw; z-index: -1; background: var(--sunken);
-  border-block: 1px solid var(--line);
+/* over VitePress's scoped 24px and 10px: 24px under an open group, 4px under a folded one */
+.VPSidebar .group .VPSidebarItem.level-0 { padding-bottom: 20px; }
+.VPSidebar .group .VPSidebarItem.level-0.collapsed { padding-bottom: 4px; }
+/* VitePress opens the current page's group only once the page runs: until then, and 300ms more (`.no-transition`),
+   it is shown open, so that a folded group does not open under the reader's eyes */
+.VPSidebar .group.no-transition .VPSidebarItem.level-0.collapsed.has-active { padding-bottom: 20px; }
+.VPSidebar .group.no-transition .VPSidebarItem.level-0.collapsed.has-active > .items { display: block; }
+.VPSidebar .group.no-transition .VPSidebarItem.level-0.collapsed.has-active .caret-icon { transform: rotate(90deg); }
+/* the heading: its text in line with the nav's edge, its row 12px wider on the left for the fill of a current
+   landing page, and as wide as its pages' rows on the right; VitePress's chevron (a button, Tab and Enter or Space)
+   at its end folds the group */
+.VPSidebarItem.level-0 > .item {
+  align-items: center; width: calc(100% + 12px); margin-left: -12px; padding-left: 12px; border-radius: 8px;
 }
-.VPSidebarItem.level-0 > .item .text {
-  font: 600 15px/20px var(--font-display); color: var(--fg); padding: 8px 12px;
-}
-/* the band breathes: 12px between it and the section's first page */
-.VPSidebarItem.level-0 > .items { padding-top: 12px; }
+.VPSidebarItem.level-0 > .item .text { font: 600 16px/24px var(--font-display); color: var(--fg); padding: 8px 0; }
+.VPSidebarItem.level-0.is-active > .item { background: var(--raised); }
+.VPSidebar .group .VPSidebarItem.level-0.is-active > .item .link > .text { color: var(--fg); }
+/* the chevron inside the row, not 7px past it as VitePress sets it: the row ends where its pages' rows end */
+.VPSidebarItem.level-0 > .item .caret { margin-inline-end: 0; border-radius: 8px; color: var(--muted); }
+.VPSidebarItem.level-0 > .item .caret:hover { color: var(--fg); }
+/* more room under the heading than between pages: 16px from its row to the first page's, 32px text to text (20px
+   between pages) */
+.VPSidebarItem.level-0 > .items { padding-top: 16px; }
 .VPSidebarItem.level-1 > .item { padding: 0; }
 .VPSidebarItem.level-1 > .item .indicator { display: none; }
-.VPSidebarItem.level-1 .link { flex: 1; padding: 6px 12px; margin: 0 0 4px; border-radius: 8px; }
-.VPSidebarItem.level-1 .link:hover { background: var(--sunken); }
-.VPSidebarItem.level-1 .text { font-size: 14px; line-height: 20px; padding: 0; color: var(--muted); }
-.VPSidebarItem.level-1 .link:hover .text { color: var(--fg); }
-.VPSidebarItem.level-1.is-active .link { background: var(--accent-soft); }
-.VPSidebarItem.level-1.is-active .text { color: var(--accent); font-weight: 600; }
+/* rows of 36px, 4px apart, the text 16px in from the heading's */
+.VPSidebarItem.level-1 .link { flex: 1; padding: 8px 12px; margin: 0 0 4px 4px; border-radius: 8px; }
+.VPSidebar .group .VPSidebarItem.level-1 .text { font: 400 14px/20px var(--font-body); padding: 0; color: var(--muted); }
+.VPSidebar .group .VPSidebarItem.level-1.is-link > .item > .link:hover .text { color: var(--fg); }
+.VPSidebarItem.level-1.is-active .link { background: var(--raised); }
+.VPSidebar .group .VPSidebarItem.level-1.is-active > .item .link > .text { color: var(--fg); font-weight: 500; }
 /* a minor's badge, in the nav, on its group's landing page and in the pager: an inline block, so out of a link's
    underline, and glued to the text in outline.ts, so that no underlined space comes before it */
 .since { display: inline-block; margin-left: 8px; font-size: 11px; font-weight: 500; color: var(--muted); }
