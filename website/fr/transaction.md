@@ -1,5 +1,5 @@
 ---
-english: e15a74bbb208
+english: b0ec5094d253
 ---
 
 # Transactions
@@ -350,8 +350,8 @@ db.isDatabaseError(err, ...types)
 
 `true` quand le `code` de `err`, cinq caractères, commence par le code de l’un des `types` ; sinon `false`, et toujours sans `types`.
 
-- `err` : un objet avec une chaîne `code` optionnelle ; `null` ou `undefined` lève une `TypeError`. Sur une erreur de Postgres, `.run()` est rejetée avec la `DatabaseError` de node-postgres, dont le `code` est le SQLSTATE ; elle a aussi `constraint`, `detail`, `table` et les autres champs qu’envoie Postgres.
-  - Le type accepte `any`, `pg.DatabaseError` et `{ code?: string }`, et refuse `unknown` et l’`Error` globale (ci-dessous) ; `err instanceof pg.DatabaseError` affine le type d’une variable de `catch` en un type qu’il accepte.
+- `err` : n’importe quelle valeur ; une valeur sans `code` de cinq caractères donne `false`, y compris `null` et `undefined`. Sur une erreur de Postgres, `.run()` est rejetée avec la `DatabaseError` de node-postgres, dont le `code` est le SQLSTATE ; elle a aussi `constraint`, `detail`, `table` et les autres champs qu’envoie Postgres.
+  - Son type est `unknown`, donc il accepte une variable de `catch` telle quelle (ci-dessous), avec `strict` activé ou non. Zapatos 6.6.1 le typait `{ code?: string }`, qui refusait `unknown`, l’`Error` globale, `null` sous `strict` et `pg.DatabaseError` sous `exactOptionalPropertyTypes`, et la fonction levait une `TypeError` sur `null` ou `undefined` ([#178](https://github.com/AlexandreDemartin/pgcast/issues/178)).
 - `types` : des noms, autant que vous voulez ; sans aucun, `false`. Deux sortes :
 
 | Nom | Code | Correspond à |
@@ -375,10 +375,9 @@ Sur le schéma de la doc :
 
 - `DiskFull`, `OutOfMemory`, `TooManyConnections` et `ConfigurationLimitExceeded` ont le code de la classe, `53`, comme `InsufficientResources` : chacun correspond à tous les codes de la classe. `InsufficientResources_DiskFull` ne correspond qu’à 53100.
 - Les erreurs que pgcast lève lui-même n’ont pas de `code` : `false` pour chacune ([plus bas](#errors-pgcast-throws-before-any-query)).
-- Avec `strict` activé, une variable de `catch` est `unknown`, que le type refuse (2345) :
+- Avec `strict` activé, une variable de `catch` est `unknown`, et `isDatabaseError()` l’accepte :
 
 ```ts twoslash
-// @errors: 2345
 // @strict: true
 import * as db from 'zapatos/db';
 import type pg from 'pg';
@@ -387,24 +386,11 @@ declare const pool: pg.Pool;
 try {
   await db.insert('seat_bookings', { screening_id: 1002, seat: 'C4', customer: 'Tamsin Rowe' }).run(pool);
 } catch (err) {
-  db.isDatabaseError(err, 'IntegrityConstraintViolation_UniqueViolation');
+  if (!db.isDatabaseError(err, 'IntegrityConstraintViolation_UniqueViolation')) throw err;
 }
 ```
 
-- Une valeur dont `instanceof Error` affine le type en l’`Error` globale est refusée aussi, avec `strict` activé ou non (2559) : le type du paramètre est `{ code?: string }`, et `Error` n’a aucune propriété en commun avec lui.
-
-```ts twoslash
-// @errors: 2559
-import * as db from 'zapatos/db';
-import type pg from 'pg';
-declare const pool: pg.Pool;
-// ---cut---
-try {
-  await db.insert('seat_bookings', { screening_id: 1002, seat: 'C4', customer: 'Tamsin Rowe' }).run(pool);
-} catch (err) {
-  if (err instanceof Error && db.isDatabaseError(err, 'IntegrityConstraintViolation_UniqueViolation')) {}
-}
-```
+- Elle renvoie un `boolean` sans affiner le type de `err` : pour lire `err.detail` ou `err.constraint`, affinez-le d’abord avec `instanceof pg.DatabaseError` ([Erreurs](/fr/handle-errors#catch-a-refusal-from-postgres)).
 
 Les gérer dans une application : [Erreurs](/fr/handle-errors).
 

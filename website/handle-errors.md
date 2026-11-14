@@ -15,7 +15,7 @@ When Postgres refuses a query, `.run()` rejects with node-postgres's `DatabaseEr
 
 If C4 is taken, Postgres refuses the `INSERT` with 23505, a unique violation, and `booking` is `undefined`; if not, it is the new row. Any other error, from Postgres or not, is thrown again.
 
-With `try` and `await`, the `catch` variable is `unknown` under `strict`, which `isDatabaseError()` refuses ([why](/transaction#isDatabaseError)). Narrow it with `instanceof pg.DatabaseError` first (pg 8.6 or later, not `pg.native`, whose errors are plain `Error`s): then TypeScript knows its fields too.
+With `try` and `await`, the `catch` variable is `unknown` under `strict`. `isDatabaseError()` takes it, but does not narrow its type ([`isDatabaseError()`](/transaction#isDatabaseError)): to read its fields, narrow it with `instanceof pg.DatabaseError` first (pg 8.6 or later, not `pg.native`, whose errors are plain `Error`s), and TypeScript then knows them.
 
 ```ts twoslash
 // @strict: true
@@ -56,7 +56,7 @@ const bookingProblem = (err: pg.DatabaseError) =>
 
 - A class name, with no `_`, matches every code of its class: `'IntegrityConstraintViolation'` matches all three. Several names match if any does: `db.isDatabaseError(err, 'IntegrityConstraintViolation', 'DataException')`.
 - The names are Postgres's [error codes](https://www.postgresql.org/docs/current/errcodes-appendix.html) in PascalCase, and the type refuses any other: your editor completes them.
-- `isDatabaseError(null, …)` throws a `TypeError`, which narrowing first avoids; the other cases, such as the names of class 53: [`isDatabaseError()`](/transaction#isDatabaseError).
+- A value with no `code` gives `false`, `null` and `undefined` included; the other cases, such as the names of class 53: [`isDatabaseError()`](/transaction#isDatabaseError).
 
 ## Catch outside a transaction
 
