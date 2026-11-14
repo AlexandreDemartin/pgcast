@@ -14,7 +14,9 @@ import { earlyCloser, fenceClosed, fenceOpened } from './.vitepress/fences.ts';
 process.noDeprecation = true;  // a probe may show what pgcast warns about (PGCAST_DEP001): the warning is not news here
 
 const
-  pages = readdirSync(new URL('.', import.meta.url)).filter(file => file.endsWith('.md') && file !== 'README.md'),
+  // the English pages and their French translations (fr/), which quote the same SQL and messages
+  pages = ['', 'fr/'].flatMap(dir => readdirSync(new URL(dir || '.', import.meta.url))
+    .filter(file => file.endsWith('.md') && file !== 'README.md').map(file => dir + file)),
   sent = [],
   // Records each query and gives no rows; a probe may open a transaction on it.
   query = async query => { sent.push(typeof query === 'string' ? query : query.text); return { rows: [] }; },

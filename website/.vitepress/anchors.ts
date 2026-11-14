@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import type { MarkdownRenderer, SiteConfig } from 'vitepress';
 import { earlyCloser, fenceClosed, fenceOpened } from './fences.ts';
 import { host } from './llms.ts';
+import { langOf, words } from './words.ts';
 
 /**
  * Keep each link's hash as written. VitePress slugifies it (`#Config.upsertRequiresSameKeys` becomes
@@ -20,6 +21,22 @@ export function keepLinkHashes(md: MarkdownRenderer) {
     if (hash) token.attrSet('href', href().replace(/#.*$|$/, () => hash));  // a function: `$&` in the hash stays
     return self.renderToken(tokens, idx, options);
   };
+}
+
+/**
+ * Name each heading's permalink, the `#` VitePress puts after it, in its page's language: VitePress writes it in English
+ * (`Permalink to “Options”`), whatever the page's.
+ */
+export function labelPermalinks(md: MarkdownRenderer) {
+  md.core.ruler.push('permalink_labels', state => {
+    const lang = langOf((state.env.relativePath ?? '') as string);
+    if (lang === 'en') return;
+    for (const token of state.tokens.flatMap(token => token.children ?? [])) {
+      const label = token.type === 'link_open' && token.attrGet('class') === 'header-anchor' ? token.attrGet('aria-label') : null;
+      const [, title] = /^Permalink to “(.*)”$/.exec(String(label ?? '')) ?? [];
+      if (title !== undefined) token.attrSet('aria-label', words[lang].permalink(title));
+    }
+  });
 }
 
 const
@@ -67,7 +84,7 @@ export function checkLinks(config: SiteConfig) {
       .map(file => [file, readFileSync(join(config.outDir, file), 'utf8')])),
     anchors = new Map([...pages].map(([file, html]) => [file, new Set([
       ...[...html.matchAll(/\sid="([^"]*)"/g)].map(([, id]) => unescape(id!)),
-      ...pending[file.replace(/\.html$/, '.md')] ?? [],
+      ...pending[file.replace(/^fr\//, '').replace(/\.html$/, '.md')] ?? [],  // a French page's are its English page's
     ])])),
     problems = new Set<string>(),  // a link written twice on a page is reported once
     atHome = (url: URL) => {  // the home written without its slash, which GitHub Pages redirects, is the home
@@ -85,7 +102,7 @@ export function checkLinks(config: SiteConfig) {
         !files.has(target) ? 'no such page' :
         anchor === null ? 'its hash is not valid percent-encoding' :
         // a playground's code (playground/share.ts), which playgroundLinks.ts decodes, is no anchor
-        anchor !== '' && !(target === 'playground.html' && anchor.startsWith('code/')) &&
+        anchor !== '' && !(/^(fr\/)?playground\.html$/.test(target) && anchor.startsWith('code/')) &&
           !anchors.get(target)?.has(anchor) ? 'no such anchor on that page' :
         null);
     };

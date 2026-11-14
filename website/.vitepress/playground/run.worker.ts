@@ -11,9 +11,12 @@ import { configOf, poolOf, type QueryConfig } from './pool.ts';
 export interface Query {
   sql: string;
   values: string;
-  // on Postgres: `2 rows` and the rows as JSON (the first of them), or `COMMIT`; or the error, with its SQLSTATE
+  // on Postgres: the count of rows and the rows as JSON (the first of them, `more` not shown), or `COMMIT`; or the
+  // error, with its SQLSTATE
   answer?: string;
+  count?: number;
   rows?: string;
+  more?: number;
   rejects?: { code?: string; message: string };
 }
 
@@ -69,10 +72,12 @@ async function postgres() {
     try {
       const result = await pglite.query(config.text, config.values);
       const { rows, fields, command, rowCount } = result, more = rows.length - shownRows;
-      // a command without rows: its name, and the count of rows it touched (`INSERT 1`, `COMMIT`)
-      query.answer = fields.length ? `${rows.length} row${rows.length === 1 ? '' : 's'}` :
-        `${command}${rowCount === undefined ? '' : ` ${rowCount}`}`;
-      if (fields.length) query.rows = json(rows.slice(0, shownRows)) + (more > 0 ? `\n// and ${more} more` : '');
+      // rows: their count, worded by the editor in the page's language; a command without rows: its name, and the
+      // count of rows it touched (`INSERT 1`, `COMMIT`)
+      if (fields.length) query.count = rows.length;
+      else query.answer = `${command}${rowCount === undefined ? '' : ` ${rowCount}`}`;
+      if (fields.length) query.rows = json(rows.slice(0, shownRows));
+      if (more > 0) query.more = more;  // the rows not shown
       return result;
     } catch (error) {
       query.rejects = { code: (error as { code?: string }).code, message: (error as Error).message };

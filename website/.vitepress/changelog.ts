@@ -1,7 +1,7 @@
 // Copyright (C) 2026 Alexandre Demartin
 // The changelog on the site, from the repository's CHANGELOG.md at build, its one source: the page `/changelog`
-// (changelog.md, a title and a lede above `<!-- @changelog -->`) and its Atom feed `/changelog.xml`, one entry per
-// released version.
+// (changelog.md, a title and a lede above `<!-- @changelog -->`), in English on the French site too (fr/changelog.md),
+// and its Atom feed `/changelog.xml`, one entry per released version.
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -13,6 +13,7 @@ import { repo } from './meta.ts';
 const
   file = fileURLToPath(new URL('../../CHANGELOG.md', import.meta.url)),
   page = 'changelog.md',
+  pages = new Set([page, 'fr/changelog.md']),
   marker = '<!-- @changelog -->',
   longDate = (date: string) =>  // 12 November 2026
     new Intl.DateTimeFormat('en-GB', { dateStyle: 'long', timeZone: 'UTC' }).format(new Date(date)),
@@ -50,19 +51,22 @@ export function readChangelog() {
 export function changelogPage(md: MarkdownRenderer) {
   md.core.ruler.after('normalize', 'changelog', state => {
     const env = state.env as { relativePath?: string; includes?: string[] };  // VitePress's
-    if (env.relativePath !== page || !state.src.includes(marker)) return;
+    if (!pages.has(env.relativePath ?? '') || !state.src.includes(marker)) return;
     const { intro, versions } = readChangelog();
-    state.src = state.src.replace(marker, () => [intro, ...versions.map(({ name, date, anchor, notes }) => [
+    const changelog = [intro, ...versions.map(({ name, date, anchor, notes }) => [
       `## ${name}${date ? ` <small class="ignore-header">${longDate(date)}</small>` : ''} {#${anchor}}`,
       notes.replace(/^### (.+)$/gm, (_, title: string) => `### ${title} {#${anchor}-${title.toLowerCase().replace(/\W+/g, '-')}}`),
-    ].join('\n\n'))].join('\n\n'));
+    ].join('\n\n'))].join('\n\n');
+    // on the French site, CHANGELOG.md is English text in a French page: read as English
+    state.src = state.src.replace(marker, () =>
+      env.relativePath === page ? changelog : `<div lang="en">\n\n${changelog}\n\n</div>`);
     env.includes?.push(file);
   });
 }
 
 /** Date changelog.md by CHANGELOG.md's last commit, not its own (`transformPageData`): its "Last updated", and its `lastmod`. */
 export function dateChangelog(pageData: PageData) {
-  if (pageData.relativePath !== page) return;
+  if (!pages.has(pageData.relativePath)) return;
   const seconds = execFileSync('git', ['log', '-1', '--format=%ct', '--', file], { encoding: 'utf8' }).trim();
   if (seconds) pageData.lastUpdated = 1000 * Number(seconds);
 }
