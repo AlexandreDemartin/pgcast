@@ -1703,6 +1703,12 @@ describe('generate()', () => {
         expect(run.printed).toEqual([['*** error 0 ***', expect.objectContaining(failures[1][2])]]);
       });
 
+      it('notes rejectOnQueryError: null, from a JSON config, as when it is left out', async () => {
+        const run = await failedRun(JSON.parse('{"rejectOnQueryError": null}') as Config, trapped());
+        expect(run.exits).toEqual([[1]]);
+        expect(run.printed).toEqual([['*** error 0 ***', expect.objectContaining(failures[1][2])], [note]]);
+      });
+
       it('still exits when warningListener throws at the note', async () => {
         const run = await failedRun({ warningListener: () => { throw new Error('a listener that throws'); } }, trapped());
         expect(run.rejection).toBe(exited);
