@@ -138,7 +138,8 @@ Both keys are required. In `generate()`, a rule without one fails to compile (TS
 - The relations are those the database role can see: a table or view it has no privilege on is left out, as if it did not exist; a materialised view is always there.
 - The schema's enums are always generated, whatever `include` and `exclude` say.
 - The relations of a schema other than [`unprefixedSchema`](#generate.unprefixedSchema) are in its namespace: `archive.screenings`, its `Table` type `'archive.screenings'`.
-- A schema, relation or enum whose name TypeScript refuses there (`"box office"`, `class`) takes a legal identifier, `box_office` or `class_`: each run of characters an identifier cannot hold becomes `_`, a leading digit takes a `_` before it, a reserved word a `_` after it. Its `Table` type and the `*ForTable` lookups keep its name: `'box office'`. Two names that become one are noted through [`warningListener`](#generate.warningListener). A column's name is quoted.
+- A schema, relation or enum whose name TypeScript cannot parse there (`"box office"`, `class`) takes a legal identifier, `box_office` or `class_`: each run of characters an identifier cannot hold becomes `_`, a leading digit takes a `_` before it, a reserved word or a type operator (`keyof`) a `_` after it, and so does `as` for an enum. Its `Table` type and the `*ForTable` lookups keep its name: `'box office'`. Two names that become one are noted through [`warningListener`](#generate.warningListener), and so is a relation of `unprefixedSchema` named like another schema's namespace. A column's name is quoted.
+- An enum named after one of TypeScript's own types (`string`, `number`…) keeps its name, as in Zapatos 6.6.1: `schema.d.ts` fails to compile without `skipLibCheck` (TS2457), and with it a column of the enum `string` is typed `string`.
 
 With a second schema, `archive`, that holds a `screenings` table of its own:
 
