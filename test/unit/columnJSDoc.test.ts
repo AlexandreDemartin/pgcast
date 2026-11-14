@@ -12,17 +12,24 @@ import { definitionForRelationInSchema, finaliseConfig, type Relation } from '..
 import { jsdocText } from '../../src/generate/quote';
 
 const
-  atoms = ['@', '{', '}', '{@link', '{@linkcode', '{@see', '\n', '\r\n', ' ', '  ', '\t',
-    'a', 'lead', 'x.y', '`', "'", '"', '/', '*', ' @x', '@deprecated'],
+  atoms = ['@', '{', '}', '{@link', '{@linkcode', '{@linkplain', '{@see', '\n', '\r\n', '\r', '\u2028', ' ', '  ', '\t',
+    '\u00a0', 'a', 'lead', 'x.y', '\\u{41}', '`', "'", '"', '/', '*', ' @x', '@deprecated'],
   count = 4000,
   rel: Relation = { schema: 'public', name: 'roles', type: 'table', insertable: true };
 
-/** `count` comments of 1 to 10 atoms, from a linear congruential generator with a fixed seed. */
+/**
+ * The comments a review found, then `count` comments of 1 to 10 atoms, from a linear congruential generator with
+ * a fixed seed.
+ */
 const comments = () => {
   let seed = 309;
   const random = (n: number) => ((seed = (Math.imul(seed, 1103515245) + 12345) >>> 0) >>> 8) % n;
-  return Array.from({ length: count }, () =>
-    Array.from({ length: 1 + random(10) }, () => atoms[random(atoms.length)]).join(''));
+  return [
+    // TypeScript reads `\u{41}` as an identifier, and a conflict marker after a line separator as a comment
+    '{@link lead \\u{41} @casting}', '{@link a\u2028<<<<<<< } @x',
+    ...Array.from({ length: count }, () =>
+      Array.from({ length: 1 + random(10) }, () => atoms[random(atoms.length)]).join('')),
+  ];
 };
 
 /** The JSDoc master wrote for column `c<i>`: the comment's lines, then the type and nullability lines. */
@@ -61,7 +68,7 @@ describe('the JSDoc of a column comment, against TypeScript', () => {
       tagsLost: string[] = [];
     let tagged = 0, moved = 0;
 
-    expect(written).toHaveLength(count);
+    expect(written).toHaveLength(texts.length);
     texts.forEach((comment, i) => {
       const [{ text, tags }, before] = [written[i], master[i]];
       if (before.tags.length) tagged++;
