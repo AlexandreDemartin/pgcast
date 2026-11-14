@@ -1,16 +1,18 @@
 // Copyright (C) 2026 Alexandre Demartin
 // "Open in playground" on the cast panels of the docs pages (decision 005): a link to /playground whose `#code/…`
 // (playground/share.ts) holds the panel's example, deflated here at build, so no JavaScript makes it. The build then
-// reads each link back from the built pages, decoded as the playground decodes it (`checkPlaygroundLinks`).
+// reads each link back from the built pages, decoded as the playground decodes it (`checkPlaygroundLinks`). A French
+// page's panel opens the French playground, `/fr/playground#code/…`, and its name is in French (words.ts).
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { deflateRawSync } from 'node:zlib';
 import type { MarkdownRenderer, SiteConfig } from 'vitepress';
 import { typedConst } from './panel.ts';
 import { codeOf } from './playground/share.ts';
+import { langOf, prefixOf, words } from './words.ts';
 
 /** The pages whose cast panels have no link: the home, which stays as it is (#313), and the playground's own. */
-export const unlinked = new Set(['index.md', 'playground.md']);
+export const unlinked = new Set(['index.md', 'playground.md', 'fr/index.md', 'fr/playground.md']);
 
 const
   cut = '// ---cut---\n',
@@ -41,13 +43,13 @@ export function opensAsShown(source: string) {
 }
 
 /**
- * The link that opens an example in the playground, `/playground#code/…`, its code deflated by zlib and
- * base64url-encoded as share.ts's `fragmentOf` does in the browser; `undefined` if the playground would not show it
- * as its panel does.
+ * The link that opens an example in the playground, `/playground#code/…` (`/fr/playground#code/…` from a French
+ * page, its `prefix`), its code deflated by zlib and base64url-encoded as share.ts's `fragmentOf` does in the browser;
+ * `undefined` if the playground would not show it as its panel does.
  */
-export function playgroundLink(source: string) {
+export function playgroundLink(source: string, prefix = '') {
   if (!opensAsShown(source)) return undefined;
-  return `/playground#code/${deflateRawSync(playgroundCode(source)).toString('base64url')}`;
+  return `${prefix}/playground#code/${deflateRawSync(playgroundCode(source)).toString('base64url')}`;
 }
 
 /**
@@ -57,8 +59,10 @@ export function playgroundLink(source: string) {
  */
 export function linkCastPanels(md: MarkdownRenderer) {
   md.core.ruler.push('cast_panel_links', state => {
-    if (unlinked.has(state.env.relativePath as string)) return;
+    const relativePath = (state.env.relativePath ?? '') as string;  // none when VitePress parses a title alone
+    if (unlinked.has(relativePath)) return;
     const
+      lang = langOf(relativePath),
       path: string[] = [],  // the text of each heading above, by level
       panels: { token: (typeof state.tokens)[number]; example: string; heading: number; path: string[] }[] = [],
       headings = new Map<number, string>();
@@ -77,12 +81,12 @@ export function linkCastPanels(md: MarkdownRenderer) {
     });
     for (const { token, example, heading, path } of panels) {
       const
-        link = playgroundLink(readFileSync(new URL(`${example}.ts`, examples), 'utf8')),
+        link = playgroundLink(readFileSync(new URL(`${example}.ts`, examples), 'utf8'), prefixOf(lang)),
         text = headings.get(heading) ?? '',
         shared = [...headings].some(([other, otherText]) => other !== heading && otherText === text),
         section = panels.filter(panel => panel.heading === heading),
         name = (shared ? path.slice(-2).join(', ') : text) +
-          (section.length === 1 ? '' : `, example ${section.findIndex(panel => panel.token === token) + 1}`),
+          (section.length === 1 ? '' : `, ${words[lang].example(section.findIndex(panel => panel.token === token) + 1)}`),
         attribute = name.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
       if (link) token.content = token.content.replace(/>/, () => ` playground="${link}" section="${attribute}">`);
     }
@@ -129,9 +133,10 @@ export async function checkPlaygroundLinks(config: SiteConfig) {
         problems.push(`${where}: no "Open in playground" link`);
         continue;
       }
-      if (!href.startsWith('/playground#') || await codeOf(href.slice('/playground'.length)) !== playgroundCode(source))
+      const playground = `${prefixOf(langOf(page))}/playground`, named = words[langOf(page)].openInPlaygroundOf('');
+      if (!href.startsWith(`${playground}#`) || await codeOf(href.slice(playground.length)) !== playgroundCode(source))
         problems.push(`${where}: its link does not open the example's code`);
-      if (!/^Open in playground: \S/.test(name ?? '') || names.has(name!))
+      if (!name?.startsWith(named) || !/^\S/.test(name.slice(named.length)) || names.has(name))
         problems.push(`${where}: its link's name, "${name}", does not name the example, or another link's has it`);
       names.add(name!);
       linked++;

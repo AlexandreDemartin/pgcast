@@ -93,7 +93,7 @@ A task is **done** only if `lint`, `typecheck`, `test` and `test:types` pass.
 - **No breaking change** to the public API. If it is unavoidable, stop and ask (skill `backward-compat`).
 - **`core.ts` (escaping, parameterisation, identifier compilation)**: never touch it without saying so explicitly. Each change adds SQL injection tests (skill `sql-safety`).
 - A helper is designed with the skill `zero-abstraction`, an advanced type is tested and its compile time watched with the skill `type-tests`, the codegen output follows the skill `codegen-output`, and a need is validated with the skill `consumer-usage`.
-- Update `CHANGELOG.md` and the docs with each feature (skill `concise-docs`).
+- Update `CHANGELOG.md` and the docs with each feature (skill `concise-docs`), the docs site in English and in French, in the same PR (`website/README.md` § Languages).
 - Keep the existing copyright headers (George MacKerron). New files may carry `Copyright (C) 2026 Alexandre Demartin`.
 
 ## Stop points (mandatory: stop and ask)

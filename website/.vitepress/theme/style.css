@@ -196,6 +196,33 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 .VPNavBar .VPNavBarMenuLink.VPNavMenuLink { color: var(--muted); font-size: 14px; font-weight: 400; padding: 0 10px; }
 .VPNavBar .VPNavBarMenuLink.VPNavMenuLink.active { color: var(--fg); }
 @media (hover: hover) and (pointer: fine) { .VPNavBar .VPNavBarMenuLink.VPNavMenuLink:hover { color: var(--fg); } }
+
+/* The language switcher (LanguageSwitch.vue): in the bar, a globe and the language's code, quiet as the nav's links;
+   its menu, both languages by their own names, the page's ticked. The globe is drawn as icons.ts draws (24px grid, 2px
+   round stroke), as a mask, the way VitePress draws its own icons. */
+.vpi-globe {
+  --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20M2 12h20'/%3E%3C/svg%3E");
+}
+.LanguageSwitch.bar { display: none; }
+@media (min-width: 768px) { .LanguageSwitch.bar { display: flex; align-items: center; } }
+.LanguageSwitch.bar .button { padding: 0 10px; }
+.LanguageSwitch.bar .text { gap: 6px; font: 400 14px/1 var(--font-body); color: var(--muted); }  /* the nav links' */
+.LanguageSwitch.bar .text .option-icon { font-size: 16px; }  /* the theme button's icon */
+.LanguageSwitch.bar .text .text-icon { margin: 0 0 0 -2px; font-size: 12px; }
+@media (hover: hover) and (pointer: fine) { .LanguageSwitch.bar:hover .text { color: var(--fg); } }
+.LanguageSwitch .button[aria-expanded='true'] .text { color: var(--fg); }
+.LanguageSwitch .items { min-width: 148px; }
+.LanguageSwitch .items .current span {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 0 12px; font: 500 14px/32px var(--font-body); color: var(--fg); white-space: nowrap;
+}
+.LanguageSwitch .items .current svg { width: 14px; height: 14px; color: var(--accent); }
+.LanguageSwitch.screen .title { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; color: var(--fg); }
+.LanguageSwitch.screen .icon { font-size: 16px; }
+.LanguageSwitch.screen .chevron { margin-inline-start: -4px; transition: transform .25s; }
+.LanguageSwitch.screen.open .chevron { transform: rotate(-180deg); }
+.LanguageSwitch.screen .list { padding: 4px 0 0 24px; }
+.LanguageSwitch.screen .link { line-height: 32px; font-size: 14px; color: var(--fg); }
 .AppearanceSwitch {
   width: 32px; height: 32px; display: grid; place-items: center; flex-shrink: 0;
   border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--fg); cursor: pointer;

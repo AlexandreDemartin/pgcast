@@ -8,6 +8,7 @@ import { onMounted, onUnmounted, ref } from 'vue';
 import { useData } from 'vitepress';
 import Icon from './Icon.vue';
 import type { IconName } from './icons.ts';
+import { useWords } from './words.ts';
 
 const
   key = 'vitepress-theme-appearance',
@@ -20,7 +21,7 @@ const
 // VitePress passes `aria-labelledby` in the `⋯` menu and the mobile screen: it would hide the mode in `aria-label`
 defineOptions({ inheritAttrs: false });
 
-const { isDark } = useData();
+const { isDark } = useData(), { w } = useWords();
 
 function show(stored: string | null) {
   mode.value = stored && modes.includes(stored) ? stored : 'auto';
@@ -54,8 +55,8 @@ function cycle() {
   <button
     type="button"
     class="AppearanceSwitch"
-    :title="`Theme: ${names[mode]}`"
-    :aria-label="`Colour theme: ${names[mode]}. Change it`"
+    :title="w.themeTitle(w.theme[mode as keyof typeof w.theme])"
+    :aria-label="w.themeLabel(w.theme[mode as keyof typeof w.theme])"
     @click="cycle"
   >
     <Icon :name="names[mode]" />

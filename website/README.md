@@ -189,8 +189,83 @@ A PR that changes how a page looks shows it, in light and dark, at a phone's wid
 - [ ] Paragraphs of at most ~60 words; At a glance, three bullets, on a page of over ~1,500 words; structure only where it reads better (§ Easy reading)
 - [ ] Each SQL span of pgcast's and each pgcast message quoted, marked: `<!-- probe: … -->`, `<!-- message -->`
 - [ ] Links to the other groups; British spelling
+- [ ] Its French page, `fr/<page>.md`, says the same, marked with `npm run docs:translated -- <page>` (§ Languages)
 - [ ] `npm run docs:build` passes, and `npm run docs:examples` if an example changed
 - [ ] Screenshots of a new page, or of one that looks different
+
+## Languages
+
+The site is in English at the root and in French under `/fr/`, with VitePress's switcher in the nav, which goes to the same page in the other language, its `#…` kept. English is written first; **every docs change is made in both languages, in the same PR**. `docs:build` fails otherwise (`check-translations.mjs`), so the French site never lags behind.
+
+- `fr/<page>.md` translates `<page>.md`. Its front matter names the English page as it translates it, by a hash: `english: 3f2a9c1b7d4e`. Once the French page says what the English one says, and is proofread (§ French), mark it: `npm run docs:translated -- <page>`, which also sets its French spacing (below). An English page that changes fails the build until then, and `git diff` of the English page shows what to carry over.
+- The theme's words and the build's (cast panel, page actions, 404, footer, search, "Coming" pages, `llms.txt`) are in `.vitepress/words.ts`, one object per language that `Words` holds to the same keys; the outline's texts are in `outline.ts`, each `{ en, fr }`; a diagram's are in `words.ts` too (`diagrams.retry`). `docs:build` type-checks both files (`tsc -p .vitepress`), and fails on a French word without its French spacing.
+- `/fr/llms.txt`, `/fr/llms-full.txt` and `/fr/<page>.md` are the French site's, as § For assistants. The changelog stays in English: `fr/changelog.md` says so above it.
+
+### What the French page keeps
+
+The build compares each French page with its English page, by VitePress's own parser, and fails on the first difference, naming it:
+
+| The French page keeps | As |
+|---|---|
+| Each heading's anchor | the English one, written after the French heading: `## Les options {#options}`. `node check-translations.mjs --anchors <page>` lists them |
+| Each code block and include | byte for byte, comments too; an include is read from `fr/`: `<<< ../examples/select.ts{ts twoslash}` |
+| Each note, component and cast panel | the same, in the same order: `::: tip`, `<CastPanel example="…">`; a note's chip and a panel's caption are translated |
+| Each mark | `<!-- probe: … -->`, `<!-- message -->`, `<!-- joined: … -->`, and the code span glued before it, which `check-prose.mjs` checks on both pages |
+| Each link to the site | from the root, under `/fr/`, its anchor kept: `` [`select()`](/fr/select#select) ``. A file of the site keeps its path (`/changelog.xml`) |
+
+### French
+
+- **Voice**: the English voice, in French: warm and brief, *vous*, first person where the English has it. A natural sentence before a word-for-word one; every fact kept, none added.
+- **Typography**: a non-breaking space (U+00A0) before `:`, `;`, `?` and `!`, and inside « », which `docs:translated` puts in the prose and the build checks; `’` as the apostrophe; « » for a quote.
+- **Words**: code stays code (`Selectable`, `upsert()`, `Whereable`); the rest in French, the same word for the same thing on every page:
+
+  | English | French |
+  |---|---|
+  | shortcut | raccourci |
+  | query, row, column | requête, ligne, colonne |
+  | the docs, the docs schema | la doc, le schéma de la doc |
+  | batch, retry, attempt | lot, nouvelle tentative, tentative |
+  | join, lateral | jointure, lateral |
+  | reject, resolve (a promise) | est rejetée, se résout |
+  | custom type, generator | type personnalisé, générateur |
+  | the `sql` template, a fragment | le template `sql`, un fragment |
+  | tutorial, how-to guide, reference, explanation | tutoriel, guide pratique, référence, explication |
+  | a note's chip: Opt-in, Coming, Security | Opt-in, À venir, Sécurité |
+  | an options table: Option → SQL it adds → Effect on the type, none | Option → SQL ajouté → Effet sur le type, aucun |
+  | cast panel | panneau cast |
+  | callback, handler, snapshot, opt-in, skill | le callback, le handler, le snapshot, l’opt-in, le skill |
+  | commit, roll back (a transaction) | valider, annuler (`COMMIT` and `ROLLBACK` stay SQL) |
+  | check out, release (a client) | emprunter, libérer |
+  | isolation level | niveau d’isolation |
+  | throw, warning | lever une erreur, avertissement |
+  | type-check | passer la vérification de types |
+  | keyset pagination, ties | pagination par clés (keyset), ex æquo |
+  | range (the Postgres types), a range of `between()` | type range, plage (`interval` is another type) |
+  | a Postgres notice, a tagline, a mock | un avis, une accroche, un mock |
+  | placeholder (`zapatos/custom/`) | fichier à compléter |
+  | foreign table, materialised view, enum label | table distante, vue matérialisée, libellé |
+  | listener, pattern | écouteur, motif |
+  | a request (HTTP) | une requête HTTP, never a bare « requête », which is a query |
+  | a cast (`::type`), to cast | un cast, caster |
+  | catch, narrow (a type), in scope | intercepter, restreindre, à portée |
+  | splice SQL (a hole), match (a condition, an error) | injecter du SQL, correspondre à |
+  | the default (value), the kind (of a relation), the layout (of files) | la valeur par défaut, la nature, l’arborescence |
+  | an error class (`DatabaseError`, `TypeError`) | feminine, as « une erreur »: une `DatabaseError` |
+  | canary (`SchemaVersionCanary`), set from `EXCLUDED` | canary, prendre sa valeur dans `EXCLUDED` |
+  | retry (a transaction), rethrow (an error) | relancer, lever de nouveau |
+  | a fake, to fake, seeds | un faux, simuler, lignes de départ |
+  | tagged template, top-level await, built-in object | template étiqueté, `await` de premier niveau, objet natif |
+  | chunk (of a batch), deadlock, a no-op fragment | paquet, interblocage, un fragment sans effet |
+  | own enumerable keys, the boxes `Number`, `String`, `Boolean` | propres clés énumérables, objets enveloppes |
+  | an array-like object, a host object, to spread | un objet semblable à un tableau, un objet hôte, étaler |
+  | the arbiter (`ON CONFLICT`), nullable | l’arbitre, peut être `NULL` |
+  | a `Date`, Off / On (a table's columns), from 6.7.0, 6.6.2 is | un `Date`, Désactivé / Activé, à partir de la 6.7.0, la 6.6.2 est |
+  | a near-miss (TS2820), the `*ForTable` lookups, written inline, refuses it bare | une faute proche, les correspondances, écrit en ligne, le refuse sans parenthèses |
+  | identity map, realm, runtime, namespace, worker, template literal type, peer dependencies | kept in English |
+- **Headings**: in the infinitive where the English gives an order (`## Book inside a larger transaction` → `## Réserver dans une transaction plus large`), so a reference to a heading reads as the heading.
+- **Links**: to the French site's own files where it has them (`/fr/llms.txt`, `/fr/llms-full.txt`); a fenced block, copied as it is, keeps its English URLs.
+- **Kept in English**: a pgcast message, as `zapatos/db` writes it, quoted or in a code span as on the English page; the changelog's section names (§ Fixed); any other quote in English, a line of Zapatos's docs or a message of Postgres or Node, in « » and in `<span lang="en">…</span>`, which keeps its English typography and is read in English: `« <span lang="en">there is already a transaction in progress</span> »`.
+- **Proofread**: a translation is read again before it is marked, by someone or an agent that did not write it: against this glossary and the English page, for the words, the turns of phrase and a reference to another page's heading (`§ Pourquoi l’alias`), which must be that heading's French text.
 
 ## The docs schema
 
