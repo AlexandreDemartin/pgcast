@@ -701,6 +701,11 @@ describe('select', () => {
       }))).toEqual({ display_name: 'Ada', first: { balance: 20, all: 3 } });
     });
 
+    it('a copy of a shortcut, as the shortcut', async () => {
+      expect(await run(db.selectOne('users', { id: 1 }, { columns: ['id'], extras: { n: db.count('accounts', owner).copy() } })))
+        .toEqual({ id: 1, n: 2 });
+    });
+
     it('in the extras of a write', async () => {
       expect(await run(db.update('users', { mood: 'ok' }, { id: 1 }, { returning: ['id'], extras: { n: db.count('accounts', owner) } })))
         .toEqual([{ id: 1, n: 2 }]);

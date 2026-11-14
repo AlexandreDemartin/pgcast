@@ -1332,6 +1332,13 @@ describe('select', () => {
       });
     });
 
+    it('a copy of a shortcut, as the shortcut', () => {
+      expect(asExtra(db.count('accounts', owner).copy())).toEqual({
+        text: outer(`SELECT count(*) AS result FROM "accounts" WHERE "owner_id" = "users"."id"`, 3),
+        values: ['id', 'x', 1, 1],
+      });
+    });
+
     it('in the extras of a write', () => {
       expect(db.update('users', { mood: 'ok' }, { id: 1 }, { returning: ['id'], extras: { n: db.count('accounts', owner) } }).compile()).toEqual({
         text: `UPDATE "users" SET ("mood") = ROW($1) WHERE ("id" = $2) RETURNING jsonb_build_object($3::text, "id") || jsonb_build_object($4::text, (SELECT count(*) AS result FROM "accounts" WHERE "owner_id" = "users"."id")) AS result`,
