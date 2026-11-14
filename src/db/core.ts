@@ -384,6 +384,9 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
 
   /**
    * Performs a shallow copy of this SQLFragment, optionally overriding some of its properties.
+   * The copy keeps `runResultTransform`, so a copied shortcut resolves to the shortcut's result.
+   * It compiles as the fragment does nested in another: a copy of `selectExactlyOne()` keeps
+   * `LIMIT 1`, even with `selectExactlyOneChecksForSecondRow`.
    * @param override The properties to override
    */
   copy(override?: {
@@ -397,6 +400,7 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
     const { literals = this.literals, expressions = this.expressions, ...overrideRest } = override ?? {};
     const copy = new SQLFragment<RunResult, Constraint>(literals, expressions);
     return Object.assign(copy, {
+      runResultTransform: this.runResultTransform,  // what the type of the copy promises
       parentTable: this.parentTable,
       preparedName: this.preparedName,
       noop: this.noop,
