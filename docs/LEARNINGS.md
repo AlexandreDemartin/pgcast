@@ -174,6 +174,9 @@ Candidates for a check, a rule or a skill line.
 - #253 — An issue cites a test by its name, not its `file:line`: the line taken from Minors kept had moved by the time the step ran — `builder`
 - #253 — A guard shared by several routes gets a route-specific mutant: removing the shared guard turns every entry red and cannot show the new one is needed — `builder`
 - #253 — `branch-reviewer` cannot load the user skill `branch-review` (`disable-model-invocation`), so it reviews from its brief: the agent and the skill disagree — orchestrator
+- #419 — Headless `Page.captureScreenshot` misses compositor (transform) animations; `Page.startScreencast` frames show them — `builder`
+- #419 — A placeholder that must not shift the page is measured across widths: Monaco wraps a long line into one, two or three lines, so the editor's height depends on the width — `builder`
+- #419 — Measure the mounted playground on `docs:preview`, not `docs:dev`, where its first run sends no query — `builder`
 
 ## Minors kept
 
