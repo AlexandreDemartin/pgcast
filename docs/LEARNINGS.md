@@ -135,6 +135,10 @@ Candidates for a check, a rule or a skill line.
 - #364 — A config-validation test runs on an unreachable `db` (`postgres://nobody@127.0.0.1:1/none`), never a live pool: a check moved after the queries otherwise still passes — `branch-reviewer`
 - #364 — A config key Zapatos 6.6.1 lacks is named in Switch § Go back, with what going back leaves behind; a `check-prose.mjs` check comparing `Config` with that list would catch a miss — `branch-reviewer`
 - #364 — Going back from the own-name route removes the `pgcast` package too: it also has a `zapatos` command, and while installed its `pgcast/*` imports still resolve — `builder`
+- #368 — `cli.ts` runs on import: its logic goes in a module that takes a `dir`, so each config-file case is tested in-process, with no database — `builder`
+- #368 — A replay of a packed CLI that may ignore its config file runs with `PGHOST=/nonexistent`: its fallback connection could otherwise reach another local database — `builder`
+- #368 — Moving work to a new file leaves `AGENTS.md` § Architecture behind: a check listing `src/generate/*.ts` and `src/db/*.ts` against the files it names would catch it — `branch-reviewer`
+- #368 — The « runs as on Zapatos 6.6.1 » CLI replay (exit code, stdout, `Error:` line, file hashes) is redone by hand on each CLI PR: a script with fixed scenarios would make it checkable — `branch-reviewer`
 
 ## Minors kept
 
@@ -163,3 +167,5 @@ Minor review defects, taken up by the end-of-chapter review.
 - #41 — `test/types/shortcuts.test-d.ts:431`: `const mail: Card['email'] = 'a@b'` holds its directive on master too (`Card` is `never`); `null as unknown as Card['email']` would fail only on the head — `branch-reviewer`
 - #41 — `CHANGELOG.md:133`: `{}` as a `Record<keyof Film, …>` lacks the row's keys, not the column the sentence names — `branch-reviewer`
 - #46 — `src/generate/tsOutput.ts:100`: the writer's `/^/gm` indentation puts spaces after a U+2028/U+2029 inside a comment (6.6.1 too); frozen as is by `column comments › prefixes every line whatever its line break` — `branch-reviewer`
+- #368 — `AGENTS.md:46`: the architecture map still says `cli.ts` reads `zapatosconfig.json`; that work is now in `cliConfig.ts` and covers both files — `branch-reviewer`
+- #368 — `website/generator.md:69`: « the options of `zapatosconfig.json` », where the lede now says « its config file » — `branch-reviewer`
