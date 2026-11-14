@@ -1026,6 +1026,26 @@ describe('truncate', () => {
     expect(db.truncate('users', 'RESTART IDENTITY', undefined as any).compile().text).toBe('TRUNCATE "users" RESTART IDENTITY ');
     expect(() => db.truncate('users', '' as any)).toThrow(`Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not ''`);
   });
+
+  it('an order Postgres takes compiles as in 6.6.1: an undefined or null option counts for nothing', () => {
+    expect(db.truncate('users', 'RESTART IDENTITY', null as any, 'CASCADE' as any).compile().text).toBe('TRUNCATE "users" RESTART IDENTITY  CASCADE');
+    expect(db.truncate('users', 'CASCADE', null as any, undefined as any).compile().text).toBe('TRUNCATE "users" CASCADE  ');
+    expect(db.truncate('users', null as any, null as any, 'CASCADE' as any).compile().text).toBe('TRUNCATE "users"   CASCADE');
+  });
+
+  // Postgres takes `[ RESTART IDENTITY | CONTINUE IDENTITY ] [ CASCADE | RESTRICT ]`; 6.6.1 sent these, and got 42601
+  it.each([
+    [['CASCADE', 'RESTART IDENTITY'], `'CASCADE', 'RESTART IDENTITY'`],
+    [['RESTRICT', 'CONTINUE IDENTITY'], `'RESTRICT', 'CONTINUE IDENTITY'`],
+    [['RESTART IDENTITY', 'CONTINUE IDENTITY'], `'RESTART IDENTITY', 'CONTINUE IDENTITY'`],
+    [['CASCADE', 'RESTRICT'], `'CASCADE', 'RESTRICT'`],
+    [['CASCADE', 'CASCADE'], `'CASCADE', 'CASCADE'`],
+    [['RESTART IDENTITY', 'CASCADE', 'CASCADE'], `'RESTART IDENTITY', 'CASCADE', 'CASCADE'`],
+    [['CASCADE', null, 'RESTART IDENTITY'], `'CASCADE', 'RESTART IDENTITY'`],
+  ])('options %j, in an order Postgres refuses, throw while compiling', (opts, given) => {
+    expect(() => (db.truncate as any)('users', ...opts)).toThrow(
+      `Truncate options must be CONTINUE IDENTITY/RESTART IDENTITY, then RESTRICT/CASCADE, one of each at most, not ${given}`);
+  });
 });
 
 describe('select', () => {
