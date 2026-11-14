@@ -215,12 +215,13 @@ Off, it sends what Zapatos 6.6.1 sends, and warns once per process, `PGCAST_DEP0
 
 - pg says whether a client is in a block from pg 8.21 (`getTransactionStatus()`). On older versions, `transaction()` runs as in 6.6.1, option or not, with no warning.
 - With `true`, when pg reports a block, `transaction()` first sends an empty query, to read the status again; [`queryListener`](#Config.queryListener) and [`resultListener`](#Config.resultListener) get it, with the transaction's id ([Your own `BEGIN`](/transaction#your-own-begin)).
-- With `true`, a `transaction()` at the same moment on that client is passed through, as in 6.6.1: its queries run in your block, which it neither commits nor rolls back.
+- With `true`, a `transaction()` at the same moment on that client is passed through, as in 6.6.1, and neither commits nor rolls back: its queries run in your block, or, when pg's report of a block was stale, as the last point says.
 - Off, nothing reads the status again: just after a `COMMIT` that failed, pg can still report its block, and the warning can come once for a client outside one.
 - Only a client you pass is checked: one the pool hands out, released while still in a block, is not.
 - A `BEGIN` you sent without `await` is not seen yet: the client reads as outside a block.
 - A `BEGIN` sent in one query string with a statement that fails can read as outside a block too: `transaction()` then runs as in 6.6.1, with no warning.
 - Not tested with `pg-native`.
+- With `true`, just after a `COMMIT` that failed, two `transaction()` calls at the same moment on one client: when pg still reports the block, the first sends its empty query, then goes on, and the second, passed through, sends its first query, and any sent with it, before the first's `START TRANSACTION`, outside any transaction, so each is committed on its own. Its later queries run in the first call's transaction.
 
 ### `selectExactlyOneChecksForSecondRow` {#Config.selectExactlyOneChecksForSecondRow}
 
