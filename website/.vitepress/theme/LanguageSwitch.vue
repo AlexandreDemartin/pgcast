@@ -12,6 +12,7 @@ import VPLink from 'vitepress/dist/client/theme-default/components/VPLink.vue';
 import VPMenuLink from 'vitepress/dist/client/theme-default/components/VPMenuLink.vue';
 import { useLangs } from 'vitepress/dist/client/theme-default/composables/langs.js';
 import { useNavOverflow } from 'vitepress/dist/client/theme-default/composables/nav-overflow.js';
+import { languageKey } from '../words.ts';
 import { svg } from './icons.ts';
 import { useWords } from './words.ts';
 
@@ -37,7 +38,13 @@ const
       current: !other,
     };
   })),
-  attributes = (lang?: string) => ({ lang, hreflang: lang, rel: 'alternate', 'data-allow-mismatch': 'attribute' });
+  // a language picked here is remembered: the home opens in it from then on (config.ts, `languageHome`)
+  attributes = (lang?: string) => ({
+    lang, hreflang: lang, rel: 'alternate', 'data-allow-mismatch': 'attribute',
+    onClick: () => {
+      try { localStorage.setItem(languageKey, lang?.split('-')[0] ?? ''); } catch { /* no storage: the browser's language */ }
+    },
+  });
 </script>
 
 <template>

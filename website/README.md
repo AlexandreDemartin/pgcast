@@ -199,6 +199,7 @@ The site is in English at the root and in French under `/fr/`, with VitePress's 
 
 - `fr/<page>.md` translates `<page>.md`. Its front matter names the English page as it translates it, by a hash: `english: 3f2a9c1b7d4e`. Once the French page says what the English one says, and is proofread (§ French), mark it: `npm run docs:translated -- <page>`, which also sets its French spacing (below). An English page that changes fails the build until then, and `git diff` of the English page shows what to carry over.
 - The theme's words and the build's (cast panel, page actions, 404, footer, search, "Coming" pages, `llms.txt`) are in `.vitepress/words.ts`, one object per language that `Words` holds to the same keys; the outline's texts are in `outline.ts`, each `{ en, fr }`; a diagram's are in `words.ts` too (`diagrams.retry`). `docs:build` type-checks both files (`tsc -p .vitepress`), and fails on a French word without its French spacing.
+- The home, `/`, opens in the reader's language before its first paint (`languageHome`, `.vitepress/config.ts`): the language they picked in the switcher, remembered in `localStorage`, else their browser's first that the site has, else English. No other page moves: a link opens the page it names, in its language, and a crawler, whose browser asks for English, indexes both (`hreflang`).
 - `/fr/llms.txt`, `/fr/llms-full.txt` and `/fr/<page>.md` are the French site's, as § For assistants. The changelog stays in English: `fr/changelog.md` says so above it.
 
 ### What the French page keeps
