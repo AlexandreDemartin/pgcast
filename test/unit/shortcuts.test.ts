@@ -900,6 +900,15 @@ describe('undefinedMeansMissing: an undefined key of upsert() updateValues', () 
       .toContain('DO UPDATE SET ("mood") = ROW($3)');
   });
 
+  it('without it, doNothing and an undefined key: the key is set from EXCLUDED, alone or beside a param()', () => {
+    expect(upsert({ updateColumns: db.doNothing, updateValues: { settings: undefined } }).text)
+      .toContain('ON CONFLICT ("email") DO UPDATE SET ("settings") = ROW(EXCLUDED."settings") RETURNING');
+    expect(upsert({ updateColumns: db.doNothing, updateValues: { settings: undefined, mood: db.param('ok') } }))
+      .toMatchObject({ values: ['E', 'e@x.org', 'ok'] });
+    expect(upsert({ updateColumns: db.doNothing, updateValues: { settings: undefined, mood: db.param('ok') } }).text)
+      .toContain('ON CONFLICT ("email") DO UPDATE SET ("settings", "mood") = ROW(EXCLUDED."settings", $3) RETURNING');
+  });
+
   // updateValues[c] is read as on master, through getters and prototypes: only the column list loses the undefined key
   class Patch { settings = undefined; get mood() { return db.param('ok'); } }
   const patches = () => [new Patch(), Object.assign(Object.create({ mood: db.param('ok') }), { settings: undefined })];
