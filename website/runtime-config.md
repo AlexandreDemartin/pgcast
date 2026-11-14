@@ -71,6 +71,7 @@ interface Config {
   upsertRequiresSameKeys?: boolean;
   undefinedMeansMissing?: boolean;
   transactionRequiresCommit?: boolean;
+  transactionRequiresIdleClient?: boolean;
   selectExactlyOneChecksForSecondRow?: boolean;
   aggregatesTypedByColumn?: boolean;
   queryListener?(query: SQLQuery, txnId?: number): void;
@@ -92,6 +93,7 @@ The keys pgcast adds are optional, so a `Config` written for Zapatos 6.6.1 still
 | [`upsertRequiresSameKeys`](#Config.upsertRequiresSameKeys) | `false` | a multi-row `upsert()` with a key missing from some row, still set from `EXCLUDED`: throw, not warn | at each `upsert()` |
 | [`undefinedMeansMissing`](#Config.undefinedMeansMissing) | `false` | an `undefined` value in `insert()`, `update()` and `upsert()`: a missing key, not `NULL` | at each call of those |
 | [`transactionRequiresCommit`](#Config.transactionRequiresCommit) | `false` | a `COMMIT` that Postgres answers with `ROLLBACK`: reject, not resolve | at each `transaction()` |
+| [`transactionRequiresIdleClient`](#Config.transactionRequiresIdleClient) | `false` | a client of yours already inside a transaction block: reject before its `START TRANSACTION`, not end your transaction | at each `transaction()` given such a client |
 | [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow) | `false` | a `selectExactlyOne()` run on its own: `LIMIT 2`, and a second row rejects | at each `selectExactlyOne()` |
 | [`aggregatesTypedByColumn`](#Config.aggregatesTypedByColumn) | `false` | `sum()`, `avg()`, `min()` and `max()`: `null` when no row matches, and `min()` and `max()` the column's value, not `Number()` of it | at each `run()` of those |
 | [`queryListener`](#Config.queryListener) | none | called with each query `run()` sends | at each `run()` |
@@ -198,6 +200,22 @@ Off, it resolves with what the callback returned, as in Zapatos 6.6.1, and warns
 
 - Not covered: a callback that sends `COMMIT` or `ROLLBACK` itself.
 - Not tested with `pg-native`.
+
+### `transactionRequiresIdleClient` {#Config.transactionRequiresIdleClient}
+
+```ts
+transactionRequiresIdleClient?: boolean  // default: false; the default in 7.0
+```
+
+Given a client you opened a transaction on yourself, with `BEGIN`, [`transaction()`](/transaction#transaction) would end your transaction: its `COMMIT`<!-- probe: db.serializable(pool, async () => {}) --> commits it, or its `ROLLBACK`<!-- probe: db.serializable(pool, async () => { throw 0; }) --> undoes it ([Your own `BEGIN`](/transaction#your-own-begin)).
+
+With `true`, it rejects before sending its `START TRANSACTION`, with "transaction() was given a client inside a transaction block, so its COMMIT or ROLLBACK would end that transaction: COMMIT or ROLLBACK it first, pass the pool, or run the queries on that client without transaction()"<!-- message -->. Your transaction stays open, for your `COMMIT` or `ROLLBACK`.
+
+Off, it runs as in Zapatos 6.6.1, and warns once per process: `PGCAST_DEP005`.
+
+- pg says whether a client is in a block from pg 8.21 (`getTransactionStatus()`), and a `pg.native.Client` from pg-native 3.8. On older versions, `transaction()` runs as in 6.6.1, option or not, with no warning.
+- Only a client you pass is checked: one the pool hands out, released while still in a block, is not.
+- A `BEGIN` you sent without `await` is not seen yet: the client reads as outside a block.
 
 ### `selectExactlyOneChecksForSecondRow` {#Config.selectExactlyOneChecksForSecondRow}
 
@@ -352,6 +370,7 @@ A behaviour of Zapatos 6.6.1 that code may rely on, but that pgcast would change
 | [`undefinedMeansMissing: true`](#Config.undefinedMeansMissing) | `PGCAST_DEP002` | a value of `insert()`, `update()` or `upsert()` is `undefined`, or a key of `upsert()` `updateValues` is and adds its column ([An `undefined` value](/insert#undefined-values)) | 7.0 |
 | [`transactionRequiresCommit: true`](#Config.transactionRequiresCommit) | `PGCAST_DEP003` | Postgres answers the `COMMIT` of `transaction()` with `ROLLBACK`, after a query error the callback caught ([Let the error through](/retries#let-the-error-through)) | 7.0 |
 | [`aggregatesTypedByColumn: true`](#Config.aggregatesTypedByColumn) | `PGCAST_DEP004` | `Number()` changes the result of `sum()`, `avg()`, `min()` or `max()`: a `NULL` made `0`, or a `min()` or `max()` that is not a number ([Typed by column](/select#typed-by-column)) | 7.0 |
+| [`transactionRequiresIdleClient: true`](#Config.transactionRequiresIdleClient) | `PGCAST_DEP005` | `transaction()` is given a client already inside a transaction block, which its `COMMIT` or `ROLLBACK` will end ([Your own `BEGIN`](/transaction#your-own-begin)) | 7.0 |
 
 </div>
 
