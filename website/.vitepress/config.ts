@@ -18,15 +18,29 @@ import { lineIndents, sqlParameters, syntax } from './syntax.ts';
 import { labelTableCells } from './tables.ts';
 import { svg } from './theme/icons.ts';
 import { focusableHovers, moduleNames, twoslashOptions } from './twoslash.ts';
-import { prefixOf, words, type Lang } from './words.ts';
+import { languageKey, langs, prefixOf, words, type Lang } from './words.ts';
 
 const
   { version } = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')),
   font = (file: string): HeadConfig =>
     ['link', { rel: 'preload', href: `/fonts/${file}.woff2`, as: 'font', type: 'font/woff2', crossorigin: '' }],
-  // the wordmark's entrance (Wordmark.vue, style.css), set before the first paint: on the home only, in either language,
-  // the first time it loads in a session, and never with reduced motion; without storage, none. A client-side navigation runs no script
-  // here, so arriving on the home from another page plays nothing either: the wordmark is already on screen
+  // the home in the reader's language, before the first paint (README.md § Languages): `/` alone, never another page,
+  // so a link opens what it names. The language picked in the switcher first, else the browser's first that the site has;
+  // English otherwise, and for a crawler, whose browser asks for English. Without storage, the browser's
+  languageHome = `try {
+  if (location.pathname === '/' || location.pathname === '/index.html') {
+    var langs = ${JSON.stringify(langs)}, picked = null;
+    try { picked = localStorage.getItem('${languageKey}'); } catch {}
+    var wanted = langs.indexOf(picked) >= 0 ? picked : (navigator.languages || [navigator.language])
+      .map(function (lang) { return String(lang).toLowerCase().split('-')[0]; })
+      .filter(function (lang) { return langs.indexOf(lang) >= 0; })[0];
+    if (wanted && wanted !== 'en') location.replace('/' + wanted + '/' + location.search + location.hash);
+  }
+} catch {}`,
+  // the wordmark's entrance (Wordmark.vue, style.css), set before the first paint: on the home only, in either
+  // language, the first time it loads in a session, and never with reduced motion; without storage, none. A client-side
+  // navigation runs no script here, so arriving on the home from another page plays nothing either: the wordmark is
+  // already on screen
   wordmarkEntrance = `try {
   if (['/', '/index.html', '/fr/', '/fr/index.html'].includes(location.pathname) && !sessionStorage.getItem('pgcast-wordmark') &&
     !matchMedia('(prefers-reduced-motion: reduce)').matches) {
@@ -102,6 +116,7 @@ export default defineConfig({
     // six capitals of Saira. Those first: 1.3 KB, set `font-display: block`, they then arrive before the first paint
     // (400ms on a throttled 1.6 Mb/s, 150ms link, against 1.2s unpreloaded and 1.5s preloaded behind the three faces)
     font('saira-wordmark'), font('schibsted-grotesk-latin'), font('inter-latin'), font('jetbrains-mono-latin'),
+    ['script', {}, languageHome],  // first: on its way to /fr/, the page sets nothing
     ['script', {}, wordmarkEntrance],
     // public/: favicon.svg follows the system's theme; favicon.ico and apple-touch-icon.png are rendered by
     // render-images.mjs

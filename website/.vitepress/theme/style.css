@@ -547,9 +547,9 @@ svg.icon { width: 16px; height: 16px; flex: none; }
 
 /* home */
 .landing { max-width: 1180px; margin: 0 auto; padding: 0 16px 80px; }
-/* the home's first screen, from 1024px: the line and the lede side by side, then one row 40px tall, the two buttons
-   under the line and the install field under the lede, on the same two columns; the cast panel rises under it, its top
-   in the first screen. Under 1024px, all in one column, the install field under the buttons; a card on a phone */
+/* the home's first screen, read in order: the line across the column, in two balanced lines whatever its language, the
+   lede under it, the two buttons, then the install field under them, each block 40px from the last. The cast panel rises under it, its top
+   in the first screen. A card on a phone */
 .landing .hero {
   --hero-top: 72px; --hero-line: clamp(2.5rem, 6vw, 4.5rem);
   position: relative; padding-block: var(--hero-top) 56px;
@@ -566,7 +566,7 @@ svg.icon { width: 16px; height: 16px; flex: none; }
   color: inherit; text-decoration-thickness: 1px; text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
 }
 @media (hover: hover) and (pointer: fine) { .landing .eyebrow a:hover { text-decoration-color: currentColor; } }
-.landing .hero h1 { font-size: var(--hero-line); margin: 0 0 20px; max-width: 16ch; letter-spacing: -.025em; }
+.landing .hero h1 { font-size: var(--hero-line); margin: 0 0 20px; letter-spacing: -.025em; text-wrap: balance; }
 .landing .hero h1 .op { font-family: var(--font-mono); color: var(--accent); font-weight: 700; letter-spacing: -.06em; }
 .landing .lede { font-size: 1.18rem; color: var(--muted); max-width: 58ch; margin: 0 0 28px; }
 .landing .ctas { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 0; }
@@ -574,16 +574,15 @@ svg.icon { width: 16px; height: 16px; flex: none; }
 .landing .InstallLine { margin: 16px 0 0; max-width: 512px; }
 @media (min-width: 1024px) {
   .landing .hero {
-    --hero-top: 80px; --hero-line: clamp(2.5rem, 4.2vw, 3.5rem);
-    display: grid; grid-template-columns: minmax(0, 1fr) 512px; column-gap: 48px; row-gap: 40px; align-items: start;
-    padding-bottom: 64px;
+    --hero-top: 80px; --hero-line: clamp(3rem, 5vw, 4.25rem);
+    display: flex; flex-wrap: wrap; align-items: center; column-gap: 16px; padding-bottom: 64px;
   }
-  /* the lede's first line on the line's caps, glyph to glyph: the line's caps .226em under its box's top, the lede's
-     7.8px under its own (17px at 1.65), so the line never moves, nor the eyebrow over it */
-  .landing .hero .lede { margin-top: calc(.226 * var(--hero-line) - 7.8px); }
-  .landing .hero h1 { max-width: none; margin: 0; }
-  .landing .lede { font-size: 1.0625rem; max-width: none; margin-bottom: 0; }
-  .landing .hero .InstallLine { margin: 0; }
+  .landing .hero :is(h1, .lede) { flex: 0 0 100%; }
+  .landing .hero h1 { margin: 0 0 24px; }
+  /* the lede a whole row of its own, so the buttons start under it, its text 62ch at most */
+  .landing .lede { font-size: 1.18rem; max-width: none; padding-inline-end: max(0px, 100% - 62ch); margin: 0 0 40px; }
+  .landing .hero .ctas { flex: 0 0 100%; }  /* a row of their own: the install field goes under them */
+  .landing .hero .InstallLine { flex: 0 1 512px; margin: 40px 0 0; }  /* as far as the buttons from the lede */
 }
 
 /* the buttons: on hover a colour step (150ms `ease`) and, with a pointer that hovers, a 1px lift on a soft shadow (150ms
@@ -654,8 +653,8 @@ svg.icon { width: 16px; height: 16px; flex: none; }
   .InstallLine { flex-direction: column; align-items: stretch; height: auto; padding: 0; border-radius: var(--radius); }
   .InstallLine .tabs { padding: 4px; margin: 0; border-right: 0; border-bottom: 1px solid var(--line); }
   .InstallLine .tabs .name { position: static; width: auto; height: auto; overflow: visible; clip-path: none; }
-  .InstallLine .panel { align-items: flex-start; padding: 12px 8px 12px 16px; }
-  .landing .InstallLine code { white-space: normal; overflow-wrap: anywhere; line-height: 22px; }
+  .InstallLine .panel { align-items: flex-start; padding: 8px 6px 8px 14px; }
+  .landing .InstallLine code { white-space: normal; overflow-wrap: anywhere; line-height: 20px; padding-top: 3px; }
   .InstallLine .copy { margin-block: -4px; }
   .InstallLine :is(.tabs button, .copy) { border-radius: 6px; }  /* nested in the card's 10px */
 }
@@ -693,7 +692,12 @@ svg.icon { width: 16px; height: 16px; flex: none; }
 }
 @media (max-width: 560px) {
   .landing .pillars, .landing .readnext p { grid-template-columns: minmax(0, 1fr); }
-  .landing .hero { --hero-top: 48px; padding-bottom: 32px; }
+  /* the first screen of a phone holds the whole hero, the install card included, under Safari's bars: a tighter line
+     and lede, closer blocks: under 548px, an iPhone SE's height under Safari's bars */
+  .landing .hero { --hero-top: 40px; --hero-line: 2.125rem; padding-bottom: 32px; }
+  .landing .hero h1 { margin-bottom: 12px; }
+  .landing .lede { font-size: 1rem; line-height: 1.55; margin-bottom: 20px; }
+  .landing .hero .InstallLine { margin-top: 12px; }
 }
 
 /* the cast panel: what you write, what Postgres runs, what TypeScript knows. Three columns from 1140px wide, where

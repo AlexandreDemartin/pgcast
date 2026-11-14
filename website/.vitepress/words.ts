@@ -10,6 +10,12 @@ export const langs: Lang[] = ['en', 'fr'];
 /** The language of a page, from its path in the site's source: `fr/select.md` is French, `select.md` English. */
 export const langOf = (relativePath: string): Lang => relativePath.startsWith('fr/') ? 'fr' : 'en';
 
+/**
+ * The reader's language, once picked in the switcher (theme/LanguageSwitch.vue), in `localStorage`: the home (`/`) opens
+ * in it, else in the browser's, before the first paint (config.ts, `languageHome`).
+ */
+export const languageKey = 'pgcast-language';
+
 /** What a language puts before a root-relative link: `/fr/select`, `/select`. */
 export const prefixOf = (lang: Lang) => lang === 'en' ? '' : `/${lang}`;
 
@@ -169,8 +175,8 @@ const fr: Words = {
   code: 'FR',
   lang: 'fr-FR',
   ogLocale: 'fr_FR',
-  description: 'Postgres sans abstraction pour TypeScript : des types moulés sur le schéma de votre base.',
-  socialAlt: 'pgcast. Vos types, moulés sur votre base.',
+  description: 'Postgres sans abstraction pour TypeScript : des types castés depuis le schéma de votre base de données.',
+  socialAlt: 'pgcast. Vos types, castés depuis votre base de données.',
   search: 'Rechercher',
   searchDocs: 'Rechercher dans la doc',
   editLink: 'Modifier cette page sur GitHub',

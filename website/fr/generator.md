@@ -106,7 +106,7 @@ Toutes les options sont facultatives. Une option donnée remplace entièrement s
 | [`schemaJSDoc`](#generate.schemaJSDoc) | `true` | un commentaire JSDoc sur chaque relation et chaque colonne |
 | [`customJSONParsingForLargeNumbers`](#generate.customJSONParsingForLargeNumbers) | `false` | le type `JSONSelectable` de `bigint` et `numeric` |
 | [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas) | `false` | le type d’un enum d’un autre schéma |
-| [`enumOrder`](#generate.enumOrder) | `"alphabetical"` | l’ordre des libellés d’un enum |
+| [`enumOrder`](#generate.enumOrder) | `"alphabetical"` | l’ordre des labels d’un enum |
 | [`moduleNames`](#generate.moduleNames) | `"zapatos"` | les noms de modules que déclarent et importent les fichiers, et leur dossier |
 | [`progressListener`](#generate.progressListener) | `false` | où chaque étape est signalée |
 | [`warningListener`](#generate.warningListener) | `true` | où vont les avertissements |
@@ -122,7 +122,7 @@ Toutes les options sont facultatives. Une option donnée remplace entièrement s
 
 ### `outExt` {#generate.outExt}
 
-`string`, par défaut `".d.ts"`. L’extension de chaque fichier écrit, fichiers à compléter compris : `".ts"` écrit `zapatos/schema.ts`, `zapatos/custom/PgPoint.ts`. Seuls les noms changent ; le contenu est le même texte `declare module`. Avec `".ts"`, le générateur ne cherche pas l’[ancienne arborescence](#the-old-layout-warning).
+`string`, par défaut `".d.ts"`. L’extension de chaque fichier écrit, placeholders compris : `".ts"` écrit `zapatos/schema.ts`, `zapatos/custom/PgPoint.ts`. Seuls les noms changent ; le contenu est le même texte `declare module`. Avec `".ts"`, le générateur ne cherche pas l’[ancienne arborescence](#the-old-layout-warning).
 
 ### `schemas` {#generate.schemas}
 
@@ -138,11 +138,11 @@ Les deux clés sont obligatoires. Dans `generate()`, une règle sans l’une d�
 | `{ "include": ["films", "studios"], "exclude": ["studios"] }` | `films` : `exclude` l’emporte |
 | `{ "include": "*", "exclude": "*" }` | aucune relation, mais toujours les enums du schéma |
 
-- Les noms doivent correspondre exactement, casse comprise. Un nom d’`include` que le schéma n’a pas ne génère rien, et le générateur émet un avertissement via [`warningListener`](#generate.warningListener) ; un schéma que la base n’a pas donne un namespace vide, et un avertissement pour chaque nom que liste son `include`. Avec `"exclude": "*"`, rien n’est vérifié.
+- Les noms doivent correspondre exactement, casse comprise. Un nom d’`include` que le schéma n’a pas ne génère rien, et le générateur émet un avertissement via [`warningListener`](#generate.warningListener) ; un schéma que la base n’a pas donne un espace de noms vide, et un avertissement pour chaque nom que liste son `include`. Avec `"exclude": "*"`, rien n’est vérifié.
 - Les relations sont celles que le rôle de la base peut voir : une table ou une vue sur laquelle il n’a aucun privilège est laissée de côté, comme si elle n’existait pas ; une vue matérialisée apparaît toujours.
 - Les enums du schéma sont toujours générés, quoi que disent `include` et `exclude`.
-- Les relations d’un schéma autre qu’[`unprefixedSchema`](#generate.unprefixedSchema) sont dans son namespace : `archive.screenings`, de type `Table` `'archive.screenings'`.
-- Un schéma, une relation ou un enum dont TypeScript ne peut pas lire le nom à cet endroit (`"box office"`, `class`) reçoit un identifiant valide, `box_office` ou `class_` : chaque suite de caractères qu’un identifiant ne peut pas contenir devient `_`, un chiffre en tête reçoit un `_` devant lui, un mot réservé ou un opérateur de type (`keyof`) un `_` après lui, et `as` aussi pour un enum. Son type `Table` et les correspondances `*ForTable` gardent son nom : `'box office'`. Deux noms qui n’en font plus qu’un sont signalés via [`warningListener`](#generate.warningListener), de même qu’une relation d’`unprefixedSchema` qui porte le nom du namespace d’un autre schéma. Le nom d’une colonne est mis entre guillemets.
+- Les relations d’un schéma autre qu’[`unprefixedSchema`](#generate.unprefixedSchema) sont dans son espace de noms : `archive.screenings`, de type `Table` `'archive.screenings'`.
+- Un schéma, une relation ou un enum dont TypeScript ne peut pas lire le nom à cet endroit (`"box office"`, `class`) reçoit un identifiant valide, `box_office` ou `class_` : chaque suite de caractères qu’un identifiant ne peut pas contenir devient `_`, un chiffre en tête reçoit un `_` devant lui, un mot réservé ou un opérateur de type (`keyof`) un `_` après lui, et `as` aussi pour un enum. Son type `Table` et les lookups `*ForTable` gardent son nom : `'box office'`. Deux noms qui n’en font plus qu’un sont signalés via [`warningListener`](#generate.warningListener), de même qu’une relation d’`unprefixedSchema` qui porte le nom de l’espace de noms d’un autre schéma. Le nom d’une colonne est mis entre guillemets.
 - Un enum qui porte le nom d’un des types propres à TypeScript (`string`, `number`…) garde son nom, comme dans Zapatos 6.6.1 : `schema.d.ts` ne compile pas sans `skipLibCheck` (TS2457), et avec `skipLibCheck`, une colonne de l’enum `string` est typée `string`.
 
 Avec un second schéma, `archive`, qui contient sa propre table `screenings` :
@@ -173,8 +173,8 @@ Son SQL est celui de [`select()`](/fr/select#select), avec le nom entre guilleme
 
 `string | null`, par défaut `"public"`. Le schéma dont les relations sont nommées sans leur schéma : `films`, de type `Table` `'films'`, donc `db.select('films', …)` et `"films"` dans le SQL, que Postgres trouve via son `search_path`.
 
-- `null` : chaque relation est préfixée, `public.films` son namespace et `'public.films'` son type `Table`. Une requête la nomme ainsi, `db.select('public.films', db.all)`, et le SQL aussi : `FROM "public"."films"`. `db.select('films', db.all)` ne compile plus.
-- Mettez-le à `null` quand un schéma porte le nom d’une relation de `public` : un schéma `films` à côté de la table `films` crée deux namespaces `films`, que TypeScript fusionne, et `schema.d.ts` échoue avec TS2300, `Duplicate identifier 'Table'`.
+- `null` : chaque relation est préfixée, `public.films` son espace de noms et `'public.films'` son type `Table`. Une requête la nomme ainsi, `db.select('public.films', db.all)`, et le SQL aussi : `FROM "public"."films"`. `db.select('films', db.all)` ne compile plus.
+- Mettez-le à `null` quand un schéma porte le nom d’une relation de `public` : un schéma `films` à côté de la table `films` crée deux espaces de noms `films`, que TypeScript fusionne, et `schema.d.ts` échoue avec TS2300, `Duplicate identifier 'Table'`.
 - Un schéma absent de [`schemas`](#generate.schemas) est autorisé : chaque schéma est alors préfixé.
 
 ### `columnOptions` {#generate.columnOptions}
@@ -209,7 +209,7 @@ Son SQL est celui de [`select()`](/fr/select#select), avec le nom entre guilleme
 
 ### `customTypesTransform` {#generate.customTypesTransform}
 
-`"PgMy_type" | "my_type" | "PgMyType"`, ou dans `generate()` une fonction `(name: string) => string` ; par défaut `"PgMy_type"`. Le nom TypeScript de chaque type que le générateur vous laisse : un domaine, ou un type qu’il ne sait pas convertir, comme `point`. Chacun reçoit un [fichier à compléter](#the-files-it-writes), et la colonne le type `c.<name>`.
+`"PgMy_type" | "my_type" | "PgMyType"`, ou dans `generate()` une fonction `(name: string) => string` ; par défaut `"PgMy_type"`. Le nom TypeScript de chaque type que le générateur vous laisse : un domaine, ou un type qu’il ne sait pas convertir, comme `point`. Chacun reçoit un [placeholder](#the-files-it-writes), et la colonne le type `c.<name>`.
 
 | Valeur | `seat_label` | `point` | `point[]` |
 |---|---|---|---|
@@ -220,8 +220,8 @@ Son SQL est celui de [`select()`](/fr/select#select), avec le nom entre guilleme
 
 - La fonction reçoit le nom du domaine, ou le nom que Postgres donne au type, `_point` pour un tableau de `point`.
 - Un tableau d’un domaine ou d’un tel type est un type personnalisé à part entière.
-- Les noms ne sont pas qualifiés par schéma : le namespace `c` est commun à tous les schémas, donc un domaine `notes` dans `public` et un autre dans `archive` sont tous deux `PgNotes`, avec un seul fichier à compléter pour les deux.
-  - Le générateur le signale via [`warningListener`](#generate.warningListener), comme pour deux noms qu’une transformation réduit à un seul (`seat-label` et `seat_label`), et garde le nom, dont dépend un fichier à compléter déjà modifié.
+- Les noms ne sont pas qualifiés par schéma : l’espace de noms `c` est commun à tous les schémas, donc un domaine `notes` dans `public` et un autre dans `archive` sont tous deux `PgNotes`, avec un seul placeholder pour les deux.
+  - Le générateur le signale via [`warningListener`](#generate.warningListener), comme pour deux noms qu’une transformation réduit à un seul (`seat-label` et `seat_label`), et garde le nom, dont dépend un placeholder déjà modifié.
 
 ### `schemaJSDoc` {#generate.schemaJSDoc}
 
@@ -249,7 +249,7 @@ billing: number;
 
 ### `customJSONParsingForLargeNumbers` {#generate.customJSONParsingForLargeNumbers}
 
-`boolean`, par défaut `false`. Le type `JSONSelectable` d’une colonne `bigint` (`int8`) ou `numeric`, pour un projet qui analyse le JSON avec [`enableCustomJSONParsingForLargeNumbers()`](/fr/runtime-config#enableCustomJSONParsingForLargeNumbers) :
+`boolean`, par défaut `false`. Le type `JSONSelectable` d’une colonne `bigint` (`int8`) ou `numeric`, pour un projet qui parse le JSON avec [`enableCustomJSONParsingForLargeNumbers()`](/fr/runtime-config#enableCustomJSONParsingForLargeNumbers) :
 
 | Colonne | `false` | `true` |
 |---|---|---|
@@ -261,7 +261,7 @@ billing: number;
 
 ### `typeEnumsAcrossSchemas` {#generate.typeEnumsAcrossSchemas}
 
-`boolean`, par défaut `false` ; un opt-in, `true` par défaut à partir de la 7.0 ([Versions](/fr/versions)). Le type d’une colonne dont le type est un enum d’un autre schéma. `false`, comme dans Zapatos 6.6.1, cherche l’enum par son nom dans le schéma de la relation de la colonne ; `true` le cherche dans son propre schéma, et écrit ses libellés :
+`boolean`, par défaut `false` ; un opt-in, `true` par défaut à partir de la 7.0 ([Versions](/fr/versions)). Le type d’une colonne dont le type est un enum d’un autre schéma. `false`, comme dans Zapatos 6.6.1, cherche l’enum par son nom dans le schéma de la relation de la colonne ; `true` le cherche dans son propre schéma, et écrit ses labels :
 
 ```sql
 CREATE SCHEMA archive;
@@ -272,17 +272,17 @@ CREATE TABLE prints (id int PRIMARY KEY, format archive.print_format NOT NULL, f
 
 | Colonne de `prints` | `false` | `true` |
 |---|---|---|
-| `format` | `c.PgPrint_format`, un fichier à compléter `any` | `('digital' \| 'nitrate' \| 'safety')` |
-| `formats` | `c.Pg_print_format \| null`, un fichier à compléter `any` | `('digital' \| 'nitrate' \| 'safety')[] \| null` |
-| `keeper` | `crew_job \| null` : les libellés de `public.crew_job` | `('archivist' \| 'projectionist') \| null` |
+| `format` | `c.PgPrint_format`, un placeholder `any` | `('digital' \| 'nitrate' \| 'safety')` |
+| `formats` | `c.Pg_print_format \| null`, un placeholder `any` | `('digital' \| 'nitrate' \| 'safety')[] \| null` |
+| `keeper` | `crew_job \| null` : les labels de `public.crew_job` | `('archivist' \| 'projectionist') \| null` |
 
-- Les libellés sont écrits en toutes lettres, pas nommés : le schéma de l’enum n’a pas besoin d’être dans [`schemas`](#generate.schemas). Dans l’ordre d’[`enumOrder`](#generate.enumOrder), comme pour chaque enum.
-- Un domaine sur un tel enum reste un type personnalisé, `c.<name>` ; son nouveau fichier à compléter reçoit les libellés plutôt que `any`. Un fichier à compléter existant n’est jamais écrasé.
+- Les labels sont écrits en toutes lettres, pas nommés : le schéma de l’enum n’a pas besoin d’être dans [`schemas`](#generate.schemas). Dans l’ordre d’[`enumOrder`](#generate.enumOrder), comme pour chaque enum.
+- Un domaine sur un tel enum reste un type personnalisé, `c.<name>` ; son nouveau placeholder reçoit les labels plutôt que `any`. Un placeholder existant n’est jamais écrasé.
 - `false` signale, via [`warningListener`](#generate.warningListener), les colonnes que `true` changerait, chacune avec son type : pour un domaine, son type sous-jacent.
 
 ### `enumOrder` {#generate.enumOrder}
 
-`"alphabetical"` ou `"declared"`, par défaut `"alphabetical"` ; un opt-in, `"declared"` par défaut à partir de la 7.0 ([Versions](/fr/versions)). L’ordre des libellés d’un enum. `"alphabetical"`, comme dans Zapatos 6.6.1, les trie ; `"declared"` garde l’ordre dans lequel l’enum les déclare, celui par lequel Postgres trie et compare ses valeurs (`ORDER BY`, `<`, `enum_range()`) :
+`"alphabetical"` ou `"declared"`, par défaut `"alphabetical"` ; un opt-in, `"declared"` par défaut à partir de la 7.0 ([Versions](/fr/versions)). L’ordre des labels d’un enum. `"alphabetical"`, comme dans Zapatos 6.6.1, les trie ; `"declared"` garde l’ordre dans lequel l’enum les déclare, celui par lequel Postgres trie et compare ses valeurs (`ORDER BY`, `<`, `enum_range()`) :
 
 ```sql
 CREATE TYPE crew_job AS ENUM ('director', 'writer', 'editor', 'cinematographer', 'composer');
@@ -293,9 +293,9 @@ CREATE TYPE crew_job AS ENUM ('director', 'writer', 'editor', 'cinematographer',
 | `crew_job` | `'cinematographer' \| 'composer' \| 'director' \| 'editor' \| 'writer'` | `'director' \| 'writer' \| 'editor' \| 'cinematographer' \| 'composer'` |
 | `every.crew_job` | `['cinematographer', 'composer', 'director', 'editor', 'writer']` | `['director', 'writer', 'editor', 'cinematographer', 'composer']` |
 
-- Un libellé ajouté par `ALTER TYPE … ADD VALUE … BEFORE` ou `AFTER` prend sa place dans cet ordre, tel que le donne `enum_range()`.
-- Pour TypeScript, seul `every.<name>` change : une union est le même type dans n’importe quel ordre. Avec [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas), les libellés écrits pour un enum d’un autre schéma, et le nouveau fichier à compléter d’un domaine sur l’un d’eux, prennent le même ordre.
-- Une autre valeur arrête le générateur avant toute requête, et n’écrit rien : `enumOrder must be 'alphabetical' (the default) or 'declared', not 'declard'`. En TypeScript, elle ne compile pas (TS2322, ou TS2820 avec une suggestion pour une faute proche comme `"declard"`).
+- Un label ajouté par `ALTER TYPE … ADD VALUE … BEFORE` ou `AFTER` prend sa place dans cet ordre, tel que le donne `enum_range()`.
+- Pour TypeScript, seul `every.<name>` change : une union est le même type dans n’importe quel ordre. Avec [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas), les labels écrits pour un enum d’un autre schéma, et le nouveau placeholder d’un domaine sur l’un d’eux, prennent le même ordre.
+- Une autre valeur arrête le générateur avant toute requête, et n’écrit rien : `enumOrder must be 'alphabetical' (the default) or 'declared', not 'declard'`. En TypeScript, elle ne compile pas (TS2322, ou TS2820 avec une suggestion pour un nom proche comme `"declard"`).
 - `"alphabetical"` signale, via [`warningListener`](#generate.warningListener), chaque enum généré dont l’ordre déclaré n’est pas alphabétique.
 
 ### `moduleNames` {#generate.moduleNames}
@@ -330,8 +330,8 @@ import type * as s from 'pgcast/schema';
 - `"zapatos"` écrit les mêmes fichiers que sans l’option : elle ne change rien tant qu’elle ne vaut pas `"pgcast"`.
 - `"pgcast"` écrit les mêmes types, et termine `pgcast/schema.d.ts` par `declare module 'zapatos/schema' { export * from 'pgcast/schema'; }` : les propres déclarations de `pgcast/db` importent `zapatos/schema`. Sans cette ligne, chaque type serait `any`, et sans bruit sous `skipLibCheck`.
 - Dans les fichiers générés, `zapatos` reste dans cette ligne et dans les en-têtes, qui créditent Zapatos. Le fichier de configuration peut être `pgcastconfig.json` ou `zapatosconfig.json` ([La CLI](#cli)) ; `npx pgcast` et `npx zapatos` lisent tous deux l’option.
-- Une autre valeur arrête le générateur avant toute requête, et n’écrit rien : `moduleNames must be 'zapatos' (the default) or 'pgcast', not 'pgcats'`. En TypeScript, elle ne compile pas (TS2322, ou TS2820 avec une suggestion pour une faute proche comme `"pgcats"`).
-- Le schéma de l’autre mode dans `outDir`, comme un dossier `zapatos/` resté d’avant le changement, est signalé via [`warningListener`](#generate.warningListener). Avec `"pgcast"`, un `zapatos/` périmé que `tsconfig.json` inclut déclare aussi `zapatos/schema`, que TypeScript fusionne : il laisse passer un nombre pour une colonne `text` sous `skipLibCheck`, et échoue avec TS2307 sans `skipLibCheck`. Avec `"zapatos"`, un `pgcast/` périmé n’assouplit rien, et son import de `pgcast/db` échoue avec TS2307 sans `skipLibCheck`. Supprimez le dossier périmé une fois que les fichiers à compléter que vous y avez modifiés sont déplacés dans l’autre, leur `declare module 'zapatos/custom'` renommé en `'pgcast/custom'`, ou l’inverse.
+- Une autre valeur arrête le générateur avant toute requête, et n’écrit rien : `moduleNames must be 'zapatos' (the default) or 'pgcast', not 'pgcats'`. En TypeScript, elle ne compile pas (TS2322, ou TS2820 avec une suggestion pour un nom proche comme `"pgcats"`).
+- Le schéma de l’autre mode dans `outDir`, comme un dossier `zapatos/` resté d’avant le changement, est signalé via [`warningListener`](#generate.warningListener). Avec `"pgcast"`, un `zapatos/` périmé que `tsconfig.json` inclut déclare aussi `zapatos/schema`, que TypeScript fusionne : il laisse passer un nombre pour une colonne `text` sous `skipLibCheck`, et échoue avec TS2307 sans `skipLibCheck`. Avec `"zapatos"`, un `pgcast/` périmé n’assouplit rien, et son import de `pgcast/db` échoue avec TS2307 sans `skipLibCheck`. Supprimez le dossier périmé une fois que les placeholders que vous y avez modifiés sont déplacés dans l’autre, leur `declare module 'zapatos/custom'` renommé en `'pgcast/custom'`, ou l’inverse.
 
 ### `progressListener` {#generate.progressListener}
 
@@ -349,7 +349,7 @@ Writing custom types file: src/zapatos/custom/index.d.ts
 
 `boolean`, ou dans `generate()` une fonction `(s: string) => void` ; par défaut `true`, avec `console.log`. `false` fait taire :
 
-- `Writing new custom type or domain placeholder file: src/zapatos/custom/PgPoint.d.ts`, une fois par nouveau fichier à compléter ;
+- `Writing new custom type or domain placeholder file: src/zapatos/custom/PgPoint.d.ts`, une fois par nouveau placeholder ;
 - `Note: custom types "archive"."notes" and "public"."notes" are both named PgNotes in TypeScript, so they share one type and one placeholder file, src/zapatos/custom/PgNotes.d.ts. To type them apart, rename one of them in the database.`
   - une fois par exécution pour chaque nom que partagent deux types Postgres ([`customTypesTransform`](#generate.customTypesTransform)) ; quand leurs noms diffèrent, il ajoute qu’une fonction `customTypesTransform` peut les distinguer ;
 - `Note: the include entry "Films" of schema "public" matches no relation there, so it generates nothing. Check its spelling and case, that the relation is in schema "public", and that the database role has a privilege on it: include names tables, views, materialised views and foreign tables.`
@@ -398,7 +398,7 @@ ORDER BY i.indexname
   …
 ```
 
-Le résultat est l’objet `Result` entier de `pg` : après `rows` viennent `fields`, les types de ses colonnes, et environ soixante-dix lignes consacrées aux analyseurs de types internes de `pg`, les mêmes pour chaque requête.
+Le résultat est l’objet `Result` entier de `pg` : après `rows` viennent `fields`, les types de ses colonnes, et environ soixante-dix lignes consacrées aux parsers de types internes de `pg`, les mêmes pour chaque requête.
 
 ## Les fichiers qu’il écrit {#the-files-it-writes}
 
@@ -415,16 +415,16 @@ src/zapatos/
 
 | Fichier | Écrit | Contient |
 |---|---|---|
-| `schema.d.ts` | à chaque exécution | `declare module 'zapatos/schema'` : un namespace par relation, son `Table`, `Selectable`, `JSONSelectable`, `Whereable`, `Insertable`, `Updatable`, `UniqueIndex`, `Column`, `OnlyCols`, `SQLExpression` et `SQL` ; chaque enum, et son tuple `every.<name>` ; `Schema` et le tuple `AllSchemas` ; par schéma et sur l’ensemble, les unions (`Table`, `Selectable`…) et les tuples `AllBaseTables`, `AllForeignTables`, `AllViews`, `AllMaterializedViews` et `AllTablesAndViews` ; les correspondances `*ForTable<T>` ; le canary de version |
+| `schema.d.ts` | à chaque exécution | `declare module 'zapatos/schema'` : un espace de noms par relation, son `Table`, `Selectable`, `JSONSelectable`, `Whereable`, `Insertable`, `Updatable`, `UniqueIndex`, `Column`, `OnlyCols`, `SQLExpression` et `SQL` ; chaque enum, et son tuple `every.<name>` ; `Schema` et le tuple `AllSchemas` ; par schéma et sur l’ensemble, les unions (`Table`, `Selectable`…) et les tuples `AllBaseTables`, `AllForeignTables`, `AllViews`, `AllMaterializedViews` et `AllTablesAndViews` ; les lookups `*ForTable<T>` ; le canary de version |
 | `custom/index.d.ts` | à chaque exécution, quand il y a un type personnalisé | un `declare module 'zapatos/custom'` vide |
-| `custom/<Name>.d.ts` | une fois : jamais écrasé | un fichier à compléter, `export type PgSeat_label = string;`, à modifier vous-même |
+| `custom/<Name>.d.ts` | une fois : jamais écrasé | un placeholder, `export type PgSeat_label = string;`, à modifier vous-même |
 
 </div>
 
-- Un fichier à compléter contient le type `Selectable` du type de base du domaine : `string` pour `seat_label`, un `text` ; `Date` pour un domaine `date` ; `db.JSONValue` pour un domaine `json` ou `jsonb`, avec son `import type * as db from 'zapatos/db'`. Un type que le générateur ne sait pas convertir (`point`) reçoit `any`. Pour le compléter : [Types personnalisés](/fr/custom-types).
-- Un type de base converti en un autre type `db.*` (`int8`, `numeric`, `time`, les types range…) donne un fichier à compléter qui ne compile pas tant que vous ne l’avez pas modifié : `export type PgTicket_no = db.Int8String;` vient sans import, et `tsc` échoue avec TS2503, `Cannot find namespace 'db'` ([#184](https://github.com/AlexandreDemartin/pgcast/issues/184)). Ajoutez `import type * as db from 'zapatos/db';` au-dessus.
+- Un placeholder contient le type `Selectable` du type de base du domaine : `string` pour `seat_label`, un `text` ; `Date` pour un domaine `date` ; `db.JSONValue` pour un domaine `json` ou `jsonb`, avec son `import type * as db from 'zapatos/db'`. Un type que le générateur ne sait pas convertir (`point`) reçoit `any`. Pour le compléter : [Types personnalisés](/fr/custom-types).
+- Un type de base converti en un autre type `db.*` (`int8`, `numeric`, `time`, les types range…) donne un placeholder qui ne compile pas tant que vous ne l’avez pas modifié : `export type PgTicket_no = db.Int8String;` vient sans import, et `tsc` échoue avec TS2503, `Cannot find namespace 'db'` ([#184](https://github.com/AlexandreDemartin/pgcast/issues/184)). Ajoutez `import type * as db from 'zapatos/db';` au-dessus.
 - Même chose pour un domaine sur un enum : `export type PgGenre_d = genre;` échoue avec TS2304 tant que vous n’ajoutez pas `import type { genre } from 'zapatos/schema';`.
-- Rien n’est supprimé : un fichier à compléter dont le type a disparu reste, et `custom/` aussi une fois qu’il ne reste plus de type personnalisé.
+- Rien n’est supprimé : un placeholder dont le type a disparu reste, et `custom/` aussi une fois qu’il ne reste plus de type personnalisé.
 - `schema.d.ts` déclare `schemaVersionCanary`, `version: 104`. Un `zapatos/db` qui attend une autre version ne compile pas à cet endroit : relancez la génération ([`SchemaVersionCanary`](/fr/runtime-config#SchemaVersionCanary)).
 - Chaque fichier est un `declare module` des noms `zapatos/*`, donc votre `tsconfig.json` doit l’inclure : `"include": ["src"]`, avec `outDir` à `"./src"`.
 - Avec [`moduleNames`](#generate.moduleNames) à `"pgcast"`, l’arborescence est `src/pgcast/` et les noms `pgcast/*` ; le reste de cette section est identique.

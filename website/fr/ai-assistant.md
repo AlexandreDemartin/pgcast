@@ -17,7 +17,7 @@ https://pgcast.dev/llms-full.txt
 ```
 
 - [`llms.txt`](/fr/llms.txt) : un index, chaque page avec son URL et son résumé. Pour un assistant qui va chercher les pages dont il a besoin.
-- [`llms-full.txt`](/fr/llms-full.txt) : toutes les pages dans un seul fichier Markdown, chaque panneau cast avec le SQL, les valeurs et le type qu’il montre. Pour un assistant qui lit tout un fichier d’un coup.
+- [`llms-full.txt`](/fr/llms-full.txt) : toutes les pages dans un seul fichier Markdown, chaque cast panel avec le SQL, les valeurs et le type qu’il montre. Pour un assistant qui lit tout un fichier d’un coup.
 
 Collez une URL dans la conversation, ou laissez le fichier de règles ci-dessous la nommer.
 
@@ -126,7 +126,7 @@ description: Querying Postgres with pgcast (zapatos/db). Use when writing or cha
 npx tsc --noEmit
 ```
 
-Ou le script de votre projet, avec `npm run`. Une colonne que l’assistant a inventée la fait échouer, tout comme une chaîne venue d’une requête HTTP utilisée comme nom :
+Ou le script de votre projet, avec `npm run`. Une colonne que l’assistant a inventée le fait échouer, tout comme une chaîne venue d’une requête HTTP utilisée comme nom :
 
 ```ts twoslash
 // @errors: 2353 2345

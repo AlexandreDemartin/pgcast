@@ -199,6 +199,7 @@ The site is in English at the root and in French under `/fr/`, with VitePress's 
 
 - `fr/<page>.md` translates `<page>.md`. Its front matter names the English page as it translates it, by a hash: `english: 3f2a9c1b7d4e`. Once the French page says what the English one says, and is proofread (§ French), mark it: `npm run docs:translated -- <page>`, which also sets its French spacing (below). An English page that changes fails the build until then, and `git diff` of the English page shows what to carry over.
 - The theme's words and the build's (cast panel, page actions, 404, footer, search, "Coming" pages, `llms.txt`) are in `.vitepress/words.ts`, one object per language that `Words` holds to the same keys; the outline's texts are in `outline.ts`, each `{ en, fr }`; a diagram's are in `words.ts` too (`diagrams.retry`). `docs:build` type-checks both files (`tsc -p .vitepress`), and fails on a French word without its French spacing.
+- The home, `/`, opens in the reader's language before its first paint (`languageHome`, `.vitepress/config.ts`): the language they picked in the switcher, remembered in `localStorage`, else their browser's first that the site has, else English. No other page moves: a link opens the page it names, in its language, and a crawler, whose browser asks for English, indexes both (`hreflang`).
 - `/fr/llms.txt`, `/fr/llms-full.txt` and `/fr/<page>.md` are the French site's, as § For assistants. The changelog stays in English: `fr/changelog.md` says so above it.
 
 ### What the French page keeps
@@ -217,51 +218,44 @@ The build compares each French page with its English page, by VitePress's own pa
 
 - **Voice**: the English voice, in French: warm and brief, *vous*, first person where the English has it. A natural sentence before a word-for-word one; every fact kept, none added.
 - **Typography**: a non-breaking space (U+00A0) before `:`, `;`, `?` and `!`, and inside « », which `docs:translated` puts in the prose and the build checks; `’` as the apostrophe; « » for a quote.
-- **Words**: code stays code (`Selectable`, `upsert()`, `Whereable`); the rest in French, the same word for the same thing on every page:
+- **Words**: as French references write them and French developers say them, the same word for the same thing on every page. A French word where PostgreSQL's French docs and server messages (which French users see), MDN, React's and Vue's French docs and TypeScript's French messages agree and it reads naturally; English where developers say the English word, or the French one is unused or ambiguous here (« analyser » next to `ANALYZE`, « intervalle » next to `interval`). Never a word-for-word French term nobody uses. Code stays code (`Selectable`, `upsert()`, `COMMIT`):
 
-  | English | French |
+  | In French | |
   |---|---|
-  | shortcut | raccourci |
-  | query, row, column | requête, ligne, colonne |
-  | the docs, the docs schema | la doc, le schéma de la doc |
-  | batch, retry, attempt | lot, nouvelle tentative, tentative |
-  | join, lateral | jointure, lateral |
-  | reject, resolve (a promise) | est rejetée, se résout |
-  | custom type, generator | type personnalisé, générateur |
-  | the `sql` template, a fragment | le template `sql`, un fragment |
-  | tutorial, how-to guide, reference, explanation | tutoriel, guide pratique, référence, explication |
-  | a note's chip: Opt-in, Coming, Security | Opt-in, À venir, Sécurité |
-  | an options table: Option → SQL it adds → Effect on the type, none | Option → SQL ajouté → Effet sur le type, aucun |
-  | cast panel | panneau cast |
-  | callback, handler, snapshot, opt-in, skill | le callback, le handler, le snapshot, l’opt-in, le skill |
-  | commit, roll back (a transaction) | valider, annuler (`COMMIT` and `ROLLBACK` stay SQL) |
-  | check out, release (a client) | emprunter, libérer |
-  | isolation level | niveau d’isolation |
-  | throw, warning | lever une erreur, avertissement |
-  | type-check | passer la vérification de types |
-  | keyset pagination, ties | pagination par clés (keyset), ex æquo |
-  | range (the Postgres types), a range of `between()` | type range, plage (`interval` is another type) |
-  | a Postgres notice, a tagline, a mock | un avis, une accroche, un mock |
-  | placeholder (`zapatos/custom/`) | fichier à compléter |
-  | foreign table, materialised view, enum label | table distante, vue matérialisée, libellé |
-  | listener, pattern | écouteur, motif |
-  | a request (HTTP) | une requête HTTP, never a bare « requête », which is a query |
-  | a cast (`::type`), to cast | un cast, caster |
-  | catch, narrow (a type), in scope | intercepter, restreindre, à portée |
-  | splice SQL (a hole), match (a condition, an error) | injecter du SQL, correspondre à |
+  | query, row, column, join, materialised view, foreign table, isolation level | requête, ligne, colonne, jointure, vue matérialisée, table distante, niveau d’isolation |
+  | window function, prepared statement, pattern (`LIKE`), a parameter (`$1`) | fonction de fenêtrage, requête préparée, motif, paramètre |
+  | shortcut, listener, (error) handler | raccourci, écouteur, gestionnaire (d’erreurs) |
+  | throw, rethrow, catch, warning | lever une erreur, relancer l’erreur, intercepter, avertissement |
+  | reject, resolve (a promise), attempt | est rejetée, se résout, tentative |
+  | type-check, type checker, type safety | vérifier les types, la vérification de types, le vérificateur de types, la sécurité de type |
+  | built-in object, host object, array-like, destructuring, shallow copy, own enumerable keys | objet natif, objet hôte, semblable à un tableau, déstructuration, copie superficielle, propres clés énumérables |
+  | namespace, package (npm), patch version, JSDoc tag | espace de noms, paquet, version corrective, balise JSDoc |
+  | a (MVCC) snapshot | un instantané |
+  | the docs, the docs schema, custom type, generator, the `sql` template, a fragment | la doc, le schéma de la doc, type personnalisé, générateur, le template `sql`, un fragment |
+  | check out, release (a client) | récupérer, libérer |
+  | ties, a range of `between()`, a version range (semver), near-miss (a suggestion), the top level (of a query), the arbiter (`ON CONFLICT`) | ex æquo, intervalle (the type: `` `interval` `` in code), une plage de versions, un nom proche, le premier niveau, l’arbitre |
   | the default (value), the kind (of a relation), the layout (of files) | la valeur par défaut, la nature, l’arborescence |
+  | splice SQL (a hole), match (a condition, an error), in scope | injecter du SQL, correspondre à, à portée |
+  | a Postgres notice, a tagline, a request (HTTP) | un avis, une accroche, une requête HTTP (never a bare « requête », which is a query) |
   | an error class (`DatabaseError`, `TypeError`) | feminine, as « une erreur »: une `DatabaseError` |
-  | canary (`SchemaVersionCanary`), set from `EXCLUDED` | canary, prendre sa valeur dans `EXCLUDED` |
-  | retry (a transaction), rethrow (an error) | relancer, lever de nouveau |
-  | a fake, to fake, seeds | un faux, simuler, lignes de départ |
-  | tagged template, top-level await, built-in object | template étiqueté, `await` de premier niveau, objet natif |
-  | chunk (of a batch), deadlock, a no-op fragment | paquet, interblocage, un fragment sans effet |
-  | own enumerable keys, the boxes `Number`, `String`, `Boolean` | propres clés énumérables, objets enveloppes |
-  | an array-like object, a host object, to spread | un objet semblable à un tableau, un objet hôte, étaler |
-  | the arbiter (`ON CONFLICT`), nullable | l’arbitre, peut être `NULL` |
   | a `Date`, Off / On (a table's columns), from 6.7.0, 6.6.2 is | un `Date`, Désactivé / Activé, à partir de la 6.7.0, la 6.6.2 est |
-  | a near-miss (TS2820), the `*ForTable` lookups, written inline, refuses it bare | une faute proche, les correspondances, écrit en ligne, le refuse sans parenthèses |
-  | identity map, realm, runtime, namespace, worker, template literal type, peer dependencies | kept in English |
+  | set from `EXCLUDED`, written inline, refuses it bare | prend sa valeur dans `EXCLUDED`, écrit en ligne, le refuse sans parenthèses |
+  | tutorial, how-to guide, reference, explanation; a note's chip: Coming, Security | tutoriel, guide pratique, référence, explication ; À venir, Sécurité |
+  | an options table: Option → SQL it adds → Effect on the type, none | Option → SQL ajouté → Effet sur le type, aucun |
+
+  | In English (masculine unless its French counterpart is feminine) | |
+  |---|---|
+  | batch, chunk, retry (to retry: réessayer), deadlock, advisory lock, command tag | le batch, le chunk, le retry, le deadlock, l’advisory lock, le command tag |
+  | commit, rollback (a transaction) | le commit, commiter, commitée ; le rollback, and to roll back: annuler, the `ROLLBACK` beside it where it helps (« annule la transaction (`ROLLBACK`) »), never the heavy « faire un rollback de » |
+  | callback, hook, worker, runtime, canary, lookup (`*ForTable`), placeholder (`zapatos/custom/`), cast panel | le callback, le hook, le placeholder… ; « à l’exécution » for a check at run time |
+  | fake, mock, stub, seed, test runner, snapshot (a test's) | le fake, mocker, le seed, le test runner; but in French as a verb or an adjective: simuler, un faux résultat, une fausse ligne |
+  | spread, tagged template, template literal type, top-level await, narrowing, type guard | le spread, le tagged template, le top-level `await`, le narrowing (verb: affiner le type) |
+  | nullable, enum label, opt-in, skill, identity map, realm, peer dependency | nullable, le label, l’opt-in, la peer dependency |
+
+  | Franglais | |
+  |---|---|
+  | to cast, a cast (`::type`), the tagline | caster, un cast ; « Vos types, castés depuis votre base de données » |
+  | parse, log, wrapper object, range type, keyset pagination, an HTTP route handler | parser, logger, les logs, objet wrapper, type range, pagination keyset, un handler |
 - **Headings**: in the infinitive where the English gives an order (`## Book inside a larger transaction` → `## Réserver dans une transaction plus large`), so a reference to a heading reads as the heading.
 - **Links**: to the French site's own files where it has them (`/fr/llms.txt`, `/fr/llms-full.txt`); a fenced block, copied as it is, keeps its English URLs.
 - **Kept in English**: a pgcast message, as `zapatos/db` writes it, quoted or in a code span as on the English page; the changelog's section names (§ Fixed); any other quote in English, a line of Zapatos's docs or a message of Postgres or Node, in « » and in `<span lang="en">…</span>`, which keeps its English typography and is read in English: `« <span lang="en">there is already a transaction in progress</span> »`.

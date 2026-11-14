@@ -26,7 +26,7 @@ Insère une ligne ou plusieurs, et les renvoie telles que Postgres les a stocké
 - `values` : un `Insertable`, ou un tableau de ceux-ci. Un fragment `sql` est écrit comme SQL (`` db.sql`now()` ``), `db.Default` comme `DEFAULT` ; une valeur `undefined` est `NULL` ([Une valeur `undefined`](#undefined-values)).
   - `raw()`, `cols()` et `vals()` ne sont pas des valeurs ici : ils lèvent une erreur à la compilation, avant toute requête ([`raw()`](/fr/sql-template#raw) donne le message), et le type de pgcast les refuse, là où celui de Zapatos 6.6.1 les acceptait. Pour du SQL, écrivez un fragment `sql` ; dans un tableau ou un objet `jsonb`, ils font partie de la valeur, envoyée en JSON.
   - `db.parent()` lève "The 'parent' table alias has no meaning here"<!-- message --> : un `INSERT` n’a pas de requête parente. Le type le refuse.
-  - Une colonne typée `any`, comme l’est celle d’un fichier à compléter de `zapatos/custom`, passe le type, pas l’exécution. Zapatos 6.6.1 envoyait chacun comme un seul paramètre, en JSON : `{ tagline: db.raw("'x'") }` stockait `{"value":"'x'"}`, `db.parent('id')` `{"value":"id"}` ([#259](https://github.com/AlexandreDemartin/pgcast/issues/259)).
+  - Une colonne typée `any`, comme l’est celle d’un placeholder de `zapatos/custom`, passe le type, pas l’exécution. Zapatos 6.6.1 envoyait chacun comme un seul paramètre, en JSON : `{ tagline: db.raw("'x'") }` stockait `{"value":"'x'"}`, `db.parent('id')` `{"value":"id"}` ([#259](https://github.com/AlexandreDemartin/pgcast/issues/259)).
 - `options` : `returning` et `extras` ([Options](#insert-options)).
 
 <CastPanel example="insert">
@@ -38,7 +38,7 @@ Insère une ligne ou plusieurs, et les renvoie telles que Postgres les a stocké
 - Une ligne donne un résultat ; un tableau donne un tableau, dans l’ordre où Postgres les renvoie, en pratique l’ordre donné.
 - Les colonnes sont les clés de toutes les lignes ; une clé absente d’une ligne vaut `DEFAULT` dans cette ligne, comme `tagline` ci-dessus.
 - Un tableau vide ne fait rien : `.run(pool)` se résout avec `[]` et n’envoie rien, sauf si on le force avec `.run(pool, true)`. Son SQL, `INSERT INTO "films" SELECT null WHERE false`<!-- probe: db.insert('films', []) -->, est marqué comme sans effet.
-- Postgres accepte au plus 65 535 paramètres par requête : découpez une insertion plus grosse ([Lots](/fr/batches)).
+- Postgres accepte au plus 65 535 paramètres par requête : découpez une insertion plus grosse ([Batches](/fr/batches)).
 
 ### Options {#insert-options}
 
@@ -96,7 +96,7 @@ Chaque SQL remplace le `DO UPDATE SET …` de l’upsert simple, sur `ratings` (
 | ``updateValues: { votes: db.sql`${'ratings'}.${'votes'} + 1` }`` | `"ratings"."votes" + 1`<!-- probe: db.upsert('ratings', { film_id: 1000, stars: 5 }, ['film_id', 'stars'], { updateValues: { votes: db.sql`${'ratings'}.${'votes'} + 1` } }) --> à la place de `EXCLUDED."votes"` | aucun |
 | `reportAction: 'suppress'` | pas de `\|\| jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END)`<!-- probe: db.upsert('ratings', { film_id: 1000, stars: 5, votes: 1 }, ['film_id', 'stars']) --> | pas d’`UpsertAction` |
 
-- `updateColumns` prend une colonne ou un tableau ; `noNullUpdateColumns` une colonne, un tableau, ou `db.all` pour toutes les colonnes. [Lots](/fr/batches#rows-with-different-keys) a un panneau cast avec `updateColumns` : une réservation garde son horaire.
+- `updateColumns` prend une colonne ou un tableau ; `noNullUpdateColumns` une colonne, un tableau, ou `db.all` pour toutes les colonnes. [Batches](/fr/batches#rows-with-different-keys) a un cast panel avec `updateColumns` : une réservation garde son horaire.
 - `updateValues` est un seul jeu de valeurs pour toutes les lignes mises à jour. Ses clés sont toujours mises à jour, même quand `updateColumns` les omet, ou vaut `doNothing` (le SQL est alors `DO UPDATE SET`<!-- probe: db.upsert('ratings', { film_id: 1000, stars: 5 }, ['film_id', 'stars'], { updateColumns: db.doNothing, updateValues: { votes: 1 } }) -->, pas `DO NOTHING`) ; avec `undefinedMeansMissing`, une clé à `undefined` n’est pas mise à jour ([Une valeur `undefined`](#undefined-values)).
 - Dans `updateValues`, une valeur simple est un paramètre. Une valeur qui contient un fragment, `param()`, `raw()`, `cols()`, `vals()`, `parent()`, `Default` ou `self`, à n’importe quelle profondeur de ses tableaux et objets simples, est compilée comme dans un template `sql`.
 - Pour y lire une colonne, nommez la table pour la ligne existante, `${'ratings'}.${'votes'}`, ou `EXCLUDED` pour la nouvelle, `` db.sql`EXCLUDED.${'votes'}` ``.
@@ -139,7 +139,7 @@ Sur plusieurs lignes sans `updateColumns`, une clé absente d’une ligne est in
 - Aucun avertissement pour des lignes aux mêmes clés, pour une seule ligne, ni avec un `updateColumns`, quel qu’il soit.
 
 ::: tip Opt-in
-Avec `upsertRequiresSameKeys: true` ([`Config`](/fr/runtime-config#Config.upsertRequiresSameKeys)), un tel upsert lève une erreur avant toute requête : "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message -->. Sans elle, pgcast avertit avec `PGCAST_DEP001` ; elle devient le défaut en 7.0 ([Versions](/fr/versions)).
+Avec `upsertRequiresSameKeys: true` ([`Config`](/fr/runtime-config#Config.upsertRequiresSameKeys)), un tel upsert lève une erreur avant toute requête : "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message -->. Sans elle, pgcast avertit avec `PGCAST_DEP001` ; elle devient le comportement par défaut en 7.0 ([Versions](/fr/versions)).
 :::
 
 ## `constraint()` {#constraint}
@@ -319,7 +319,7 @@ Dans les valeurs d’`insert()`, `update()` et `upsert()`, Zapatos 6.6.1 envoie 
 - Une colonne que la mise à jour fixe de toute façon, insérée sans `updateColumns` ou nommée par cette option, reste fixée depuis `EXCLUDED` dans les deux modes, comme sans clé dans `updateValues`.
 
 ::: tip Opt-in
-`undefinedMeansMissing: true` ([`Config`](/fr/runtime-config#Config.undefinedMeansMissing)) lit une valeur `undefined` comme une clé absente, comme le fait `JSON.stringify()`. Sans elle, pgcast avertit avec `PGCAST_DEP002` ; elle devient le défaut en 7.0 ([Versions](/fr/versions)).
+`undefinedMeansMissing: true` ([`Config`](/fr/runtime-config#Config.undefinedMeansMissing)) lit une valeur `undefined` comme une clé absente, comme le fait `JSON.stringify()`. Sans elle, pgcast avertit avec `PGCAST_DEP002` ; elle devient le comportement par défaut en 7.0 ([Versions](/fr/versions)).
 :::
 
 ## `ReturningOptionsForTable` {#ReturningOptionsForTable}

@@ -19,7 +19,7 @@ Passez un projet de Zapatos 6.6.1 à pgcast : changez une ligne de `package.jso
 
 - Les noms de modules : `zapatos/db`, `zapatos/schema`, `zapatos/custom` et `zapatos/generate`. Aucun import ne change ([décision 002](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/002-module-names.md)).
 - Le générateur : `zapatosconfig.json` et ses options, et `npx zapatos`, désormais aussi `npx pgcast` ([La CLI](/fr/generator#cli)).
-- Vos fichiers à compléter dans `zapatos/custom/` : écrits une fois, jamais écrasés.
+- Vos placeholders dans `zapatos/custom/` : écrits une fois, jamais écrasés.
 - Une `Config` écrite pour Zapatos 6.6.1 : les clés qu’ajoute pgcast sont facultatives ([`Config`](/fr/runtime-config#Config)).
 - Le canary de version du schéma, pour qu’un schéma généré par Zapatos 6.6.1 compile tel quel ([`SchemaVersionCanary`](/fr/runtime-config#SchemaVersionCanary)).
 
@@ -134,7 +134,7 @@ Cherchez dans votre code la première colonne de chaque tableau ci-dessous. Chaq
 | [`db.Default`](/fr/sql-template#Default) ou [`db.self`](/fr/sql-template#self) comme valeur de filtre, d’une condition (`ne()`, `add()`), ou dans un `vals([…])` d’un filtre ou d’un fragment donné comme valeur : `` insert('films', { …, tagline: db.sql`${db.vals([db.Default])}` }) `` | `'Symbol(DEFAULT)'` ou `'Symbol(self)'`, envoyé ou stocké | lève une erreur à la compilation de la requête | `db.Default` comme valeur elle-même, `{ …, tagline: db.Default }`, dans `insert()` ou `update()` ; dans un filtre, une valeur à comparer |
 | `db.Default` dans un `vals([…])` d’une requête que vous écrivez : `` db.sql`INSERT INTO films (…) VALUES (${db.vals([…, db.Default])})` `` | `'Symbol(DEFAULT)'` | `DEFAULT`<!-- probe: db.sql`${db.vals([db.Default])}` --> | rien |
 | `db.raw()`, `db.cols()` ou `db.vals()` comme valeur de filtre, d’une condition, ou dans un `vals([…])` d’un fragment donné comme valeur : `` { tagline: db.sql`${db.vals([db.raw("'Cy'")])}` } `` | envoyé en JSON, `{"value":"'Cy'"}` stocké | refusé par `tsc` comme valeur de filtre, et lève une erreur à la compilation de la requête | dans un filtre, un fragment `sql` comme valeur ([Compiler](#compile)) ; dans une valeur écrite, `raw()` dans le fragment lui-même : `` db.sql`${db.raw("'Cy'")}` `` |
-| `db.parent()`, `db.raw()`, `db.cols()` ou `db.vals()` comme valeur d’`insert()`, `update()` ou `upsert()` là où le type l’acceptait : sur une colonne typée `any`, comme l’est un fichier à compléter de `zapatos/custom` laissé tel que généré (`{ c: db.parent('id') }`), ou dans un `vals({…})` d’une requête que vous écrivez, `` db.sql`INSERT INTO films (…) VALUES (${db.vals({ …, tagline: db.raw("upper('x')") })})` `` | envoyé en JSON, `'{"value":…}'` stocké | lève une erreur avant toute requête | dans une écriture, la valeur elle-même, ou pour du SQL un fragment `sql` comme valeur, `` db.sql`upper(${db.param('x')})` `` |
+| `db.parent()`, `db.raw()`, `db.cols()` ou `db.vals()` comme valeur d’`insert()`, `update()` ou `upsert()` là où le type l’acceptait : sur une colonne typée `any`, comme l’est un placeholder de `zapatos/custom` laissé tel que généré (`{ c: db.parent('id') }`), ou dans un `vals({…})` d’une requête que vous écrivez, `` db.sql`INSERT INTO films (…) VALUES (${db.vals({ …, tagline: db.raw("upper('x')") })})` `` | envoyé en JSON, `'{"value":…}'` stocké | lève une erreur avant toute requête | dans une écriture, la valeur elle-même, ou pour du SQL un fragment `sql` comme valeur, `` db.sql`upper(${db.param('x')})` `` |
 | `db.parent()` sans colonne dans un `vals({…})` d’une sous-requête `lateral` : `` db.sql`SELECT ${db.vals({ name: db.parent() })}` `` | `'{}'` | la colonne du parent nommée par sa clé ([`parent()`](/fr/sql-template#parent)) | rien |
 
 </div>
@@ -200,7 +200,7 @@ Lancez vos tests, puis votre application. Là où Zapatos 6.6.1 faisait quelque 
 
 Pour trouver chaque appel :
 
-1. Lancez avec `--trace-deprecation` : Node affiche la pile, et la première ligne sous les frames `dist/db/` de pgcast lui-même est la vôtre. Les processus d’un lanceur de tests le reçoivent via `NODE_OPTIONS` :
+1. Lancez avec `--trace-deprecation` : Node affiche la pile, et la première ligne sous les frames `dist/db/` de pgcast lui-même est la vôtre. Les processus d’un test runner le reçoivent via `NODE_OPTIONS` :
 
    ```sh
    NODE_OPTIONS=--trace-deprecation npm test
@@ -234,7 +234,7 @@ db.setConfig({
 });
 ```
 
-Toutes quatre seront le comportement par défaut en 7.0 ([Versions](/fr/versions)). Avec elles, une valeur `undefined` est omise d’un `update()` :
+Les quatre deviendront le comportement par défaut dans la 7.0 ([Versions](/fr/versions)). Avec elles, une valeur `undefined` est omise d’un `update()` :
 
 <CastPanel example="switching_undefined">
 
@@ -244,21 +244,21 @@ Toutes quatre seront le comportement par défaut en 7.0 ([Versions](/fr/versions
 
 - `insert()` envoie `DEFAULT`<!-- probe: (db.setConfig({ undefinedMeansMissing: true }), db.insert('tags', { film_id: 1000, tag: undefined })) --> pour une valeur `undefined`, et un `update()` sans autre clé lève l’erreur "nothing to update: an Updatable needs at least one column"<!-- message -->.
 - L’`upsert()` de `PGCAST_DEP001` lève une erreur à l’appel, avant toute requête : "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message -->.
-- Une `transaction()` dont Postgres répond au `COMMIT` par `ROLLBACK` est rejetée, sans nouvelle tentative ([`transaction()`, Erreurs](/fr/transaction#errors)).
+- Une `transaction()` dont Postgres répond au `COMMIT` par `ROLLBACK` est rejetée, sans retry ([`transaction()`, Erreurs](/fr/transaction#errors)).
 - Une `transaction()` qui reçoit un client déjà dans un bloc de transaction est rejetée, et laisse cette transaction ouverte ([Votre propre `BEGIN`](/fr/transaction#your-own-begin)).
 - Aucune option n’avertit. Pour que cela dure, `NODE_OPTIONS=--throw-deprecation npm test` fait échouer l’exécution au premier avertissement.
 
-Un opt-in de plus, [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), n’a pas d’avertissement à guetter, et reste désactivé en 7.0. Avec lui, un `selectExactlyOne()` exécuté seul est rejeté sur une deuxième ligne, pas seulement sur aucune. Activez-le là où vos tests ne montrent aucun `selectExactlyOne()` qui trouve deux lignes.
+Un opt-in de plus, [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), n’a pas d’avertissement à guetter, et reste désactivé dans la 7.0. Avec lui, un `selectExactlyOne()` exécuté seul est rejeté sur une deuxième ligne, pas seulement sur aucune. Activez-le là où vos tests ne montrent aucun `selectExactlyOne()` qui trouve deux lignes.
 
-Le générateur a deux opt-ins qui lui sont propres, tous deux appelés à devenir le comportement par défaut en 7.0. Leur avertissement est une note de `npx zapatos`, pas de vos tests.
+Le générateur a deux opt-ins qui lui sont propres, tous deux appelés à devenir le comportement par défaut dans la 7.0. Leur avertissement est une note de `npx zapatos`, pas de vos tests.
 
 La note de [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas) nomme chaque colonne dont le type est un enum d’un autre schéma, et cet enum, typé jusque-là comme `any` ou comme l’enum du même nom dans le schéma de la relation :
 
 1. Activez-le dans `zapatosconfig.json`.
-2. Supprimez le fichier à compléter `zapatos/custom/` d’un domaine sur un tel enum : le générateur n’en écrase jamais un, donc le domaine garderait celui qu’il a déjà, typé à l’ancienne. Le nouveau reçoit les libellés.
-3. Régénérez, et laissez `tsc` montrer les valeurs que les libellés de l’enum refusent.
+2. Supprimez le placeholder `zapatos/custom/` d’un domaine sur un tel enum : le générateur n’en écrase jamais un, donc le domaine garderait celui qu’il a déjà, typé à l’ancienne. Le nouveau reçoit les labels.
+3. Régénérez, et laissez `tsc` montrer les valeurs que les labels de l’enum refusent.
 
-La note d’[`enumOrder`](/fr/generator#generate.enumOrder) nomme chaque enum dont le générateur trie les libellés, alors que Postgres les déclare dans un autre ordre. Réglez-le sur `"declared"` et régénérez : pour TypeScript, seul `every.<name>` change, donc le code à relire est celui qui y prend un libellé par son indice ou le compare à un tuple.
+La note d’[`enumOrder`](/fr/generator#generate.enumOrder) nomme chaque enum dont le générateur trie les labels, alors que Postgres les déclare dans un autre ordre. Réglez-le sur `"declared"` et régénérez : pour TypeScript, seul `every.<name>` change, donc le code à relire est celui qui y prend un label par son indice ou le compare à un tuple.
 
 ## Revenir en arrière {#go-back}
 
@@ -267,8 +267,8 @@ npm install zapatos@6.6.1
 ```
 
 - D’abord, retirez de `setConfig()` les options que la `Config` de Zapatos 6.6.1 n’a pas (2353) : `upsertRequiresSameKeys`, `undefinedMeansMissing`, `transactionRequiresCommit`, `transactionRequiresIdleClient`, `selectExactlyOneChecksForSecondRow` et `aggregatesTypedByColumn`.
-- Avec [`moduleNames`](/fr/generator#generate.moduleNames) à `"pgcast"`, lancez aussi `npm uninstall pgcast` : les deux paquets ont une commande `zapatos`. Vos imports `pgcast/…` ne se résolvent alors plus, et la 6.6.1 écrit `zapatos/` mais laisse `pgcast/` en place. Remettez donc chaque import en `zapatos/…`, déplacez les fichiers à compléter que vous avez modifiés dans `zapatos/custom/`, leur `declare module 'pgcast/custom'` renommé en `'zapatos/custom'`, et supprimez `pgcast/`.
-- Régénérez avec Zapatos 6.6.1. Il ignore `typeEnumsAcrossSchemas`, `enumOrder` et `moduleNames` dans `zapatosconfig.json`, et réécrit les types `any`, les libellés triés, les lignes de commentaire sans préfixe et tout nom d’`UniqueIndex` emprunté.
+- Avec [`moduleNames`](/fr/generator#generate.moduleNames) à `"pgcast"`, lancez aussi `npm uninstall pgcast` : les deux paquets ont une commande `zapatos`. Vos imports `pgcast/…` ne se résolvent alors plus, et la 6.6.1 écrit `zapatos/` mais laisse `pgcast/` en place. Remettez donc chaque import en `zapatos/…`, déplacez les placeholders que vous avez modifiés dans `zapatos/custom/`, leur `declare module 'pgcast/custom'` renommé en `'zapatos/custom'`, et supprimez `pgcast/`.
+- Régénérez avec Zapatos 6.6.1. Il ignore `typeEnumsAcrossSchemas`, `enumOrder` et `moduleNames` dans `zapatosconfig.json`, et réécrit les types `any`, les labels triés, les lignes de commentaire sans préfixe et tout nom d’`UniqueIndex` emprunté.
 - Chaque changement de [Trouver les appels dont le résultat change](#find-the-calls-whose-result-changes) s’exécute comme avant, sauf celui du `jsonb`, qui ne trouve de nouveau rien.
 
 ::: warning Sécurité
@@ -276,7 +276,7 @@ Le code écrit, ou laissé tel quel, en comptant sur les corrections de pgcast r
 
 `db.deletes('roles', { character: db.conditions.isNotIn([db.param('The ferryman')]) })` supprime 11 rôles sous pgcast, et les 12 sous Zapatos 6.6.1.
 
-Les failles du [§ Security de 6.6.2](/fr/changelog#6.6.2-security) sont de nouveau ouvertes : un nom, un `lock`, un `aggregate`, une simple valeur dans `updateValues` ou un cast de `param()` peuvent injecter du SQL ([Sécurité](/fr/security)).
+Les failles du [§ Security de la 6.6.2](/fr/changelog#6.6.2-security) sont de nouveau ouvertes : un nom, un `lock`, un `aggregate`, une simple valeur dans `updateValues` ou un cast de `param()` peuvent injecter du SQL ([Sécurité](/fr/security)).
 :::
 
 ## Voir aussi {#see-also}

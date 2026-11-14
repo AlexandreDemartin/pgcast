@@ -27,7 +27,7 @@ db.setConfig({
 
 - La fusion n’a qu’un niveau : `transactionRetryDelay` est remplacé en entier, donc le type exige à la fois `minMs` et `maxMs`.
 - Une clé qui a une valeur par défaut et que vous réglez à `undefined` (ou `null`) revient à sa valeur par défaut : `setConfig({ transactionRetryDelay: undefined })` rétablit `{ minMs: 25, maxMs: 250 }`. Un écouteur n’en a pas, donc `undefined` le retire. Passer `undefined` compile, sauf sous `exactOptionalPropertyTypes`.
-  - Zapatos 6.6.1 réglait la clé à `undefined`. Après `transactionAttemptsMax: undefined`, `transaction()` abandonnait après sa première tentative (« <span lang="en">… on attempt 1 of undefined, giving up</span> ») ; après `transactionRetryDelay: undefined`, chaque `transaction()` était rejetée avec « <span lang="en">TypeError: Cannot destructure property 'minMs' of 'config.transactionRetryDelay' as it is undefined.</span> » et ne libérait jamais le client qu’elle avait emprunté au pool ([#246](https://github.com/AlexandreDemartin/pgcast/issues/246)).
+  - Zapatos 6.6.1 réglait la clé à `undefined`. Après `transactionAttemptsMax: undefined`, `transaction()` abandonnait après sa première tentative (« <span lang="en">… on attempt 1 of undefined, giving up</span> ») ; après `transactionRetryDelay: undefined`, chaque `transaction()` était rejetée avec « <span lang="en">TypeError: Cannot destructure property 'minMs' of 'config.transactionRetryDelay' as it is undefined.</span> » et ne libérait jamais le client qu’elle avait récupéré du pool ([#246](https://github.com/AlexandreDemartin/pgcast/issues/246)).
 - Elle renvoie une copie de la nouvelle configuration, comme `getConfig()` : modifier cet objet ne change rien. Zapatos 6.6.1 renvoyait la configuration elle-même ([#245](https://github.com/AlexandreDemartin/pgcast/issues/245)).
 - Elle garde l’objet `transactionRetryDelay` que vous lui donnez, pas une copie : modifier ensuite son `minMs` ou son `maxMs` modifie la configuration.
 - Une clé inconnue ne compile pas (TS2353), pas plus qu’une valeur du mauvais type (TS2322) :
@@ -91,7 +91,7 @@ Les clés qu’ajoute pgcast sont facultatives, donc un `Config` écrit pour Zap
 | Option | Par défaut | Ce qu’elle change | Lue |
 |---|---|---|---|
 | [`transactionAttemptsMax`](#Config.transactionAttemptsMax) | `5` | combien de fois `transaction()` exécute son callback | à chaque `transaction()` |
-| [`transactionRetryDelay`](#Config.transactionRetryDelay) | `{ minMs: 25, maxMs: 250 }` | l’attente avant chaque nouvelle tentative | à chaque `transaction()` |
+| [`transactionRetryDelay`](#Config.transactionRetryDelay) | `{ minMs: 25, maxMs: 250 }` | l’attente avant chaque retry | à chaque `transaction()` |
 | [`castArrayParamsToJson`](#Config.castArrayParamsToJson) | `false` | un paramètre tableau : `CAST($1 AS "json")`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${db.param([1])}`) --> au lieu de `$1` | à chaque `compile()` |
 | [`castObjectParamsToJson`](#Config.castObjectParamsToJson) | `false` | un paramètre objet simple : `CAST($1 AS "json")`<!-- probe: (db.setConfig({ castObjectParamsToJson: true }), db.sql`${db.param({ a: 1 })}`) --> au lieu de `$1` | à chaque `compile()` |
 | [`upsertRequiresSameKeys`](#Config.upsertRequiresSameKeys) | `false` | un `upsert()` de plusieurs lignes dont une clé, absente de certaines lignes, prend quand même sa valeur dans `EXCLUDED` : lever une erreur, pas avertir | à chaque `upsert()` |
@@ -102,7 +102,7 @@ Les clés qu’ajoute pgcast sont facultatives, donc un `Config` écrit pour Zap
 | [`aggregatesTypedByColumn`](#Config.aggregatesTypedByColumn) | `false` | `sum()`, `avg()`, `min()` et `max()` : `null` quand aucune ligne ne correspond, et pour `min()` et `max()` la valeur de la colonne, pas son `Number()` | à chaque `run()` de l’un d’eux |
 | [`queryListener`](#Config.queryListener) | aucun | appelé avec chaque requête qu’envoie `run()` | à chaque `run()` |
 | [`resultListener`](#Config.resultListener) | aucun | appelé avec chaque résultat que donne `run()` | à chaque `run()` |
-| [`transactionListener`](#Config.transactionListener) | aucun | appelé quand une tentative de `transaction()` échoue avec `40001` ou `40P01`, et à chaque nouvelle tentative | à chaque `transaction()` |
+| [`transactionListener`](#Config.transactionListener) | aucun | appelé quand une tentative de `transaction()` échoue avec `40001` ou `40P01`, et à chaque retry | à chaque `transaction()` |
 
 </div>
 
@@ -112,11 +112,11 @@ Les clés qu’ajoute pgcast sont facultatives, donc un `Config` écrit pour Zap
 transactionAttemptsMax: number  // default: 5
 ```
 
-Combien de fois [`transaction()`](/fr/transaction#transaction) exécute son callback. Après un échec de sérialisation (`40001`) ou un interblocage (`40P01`), elle annule la transaction et exécute de nouveau le callback, jusqu’à ce que ce nombre de tentatives ait échoué ; elle lève alors la dernière erreur. Sur toute autre erreur, elle annule la transaction et lève l’erreur aussitôt.
+Combien de fois [`transaction()`](/fr/transaction#transaction) exécute son callback. Après un échec de sérialisation (`40001`) ou un deadlock (`40P01`), elle annule la transaction (`ROLLBACK`) et exécute de nouveau le callback, jusqu’à ce que ce nombre de tentatives ait échoué ; elle lève alors la dernière erreur. Sur toute autre erreur, elle annule la transaction et lève l’erreur aussitôt.
 
-- `1`, `0` ou moins : une tentative, aucune nouvelle tentative. Avec `0`, le message dit « <span lang="en">… on attempt 1 of 0, giving up</span> » ([#179](https://github.com/AlexandreDemartin/pgcast/issues/179)).
+- `1`, `0` ou moins : une tentative, aucun retry. Avec `0`, le message dit « <span lang="en">… on attempt 1 of 0, giving up</span> » ([#179](https://github.com/AlexandreDemartin/pgcast/issues/179)).
 - Lue quand `transaction()` démarre, donc un changement vaut pour la transaction suivante, pas pour celle en cours.
-- Comment écrire un callback qui peut s’exécuter deux fois : [Nouvelles tentatives](/fr/retries).
+- Comment écrire un callback qui peut s’exécuter deux fois : [Retries](/fr/retries).
 
 ### `transactionRetryDelay` {#Config.transactionRetryDelay}
 
@@ -124,7 +124,7 @@ Combien de fois [`transaction()`](/fr/transaction#transaction) exécute son call
 transactionRetryDelay: { minMs: number; maxMs: number }  // default: { minMs: 25, maxMs: 250 }
 ```
 
-Avant chaque nouvelle tentative, `transaction()` attend un nombre entier de millisecondes de `minMs` à `maxMs`, arrondi d’un tirage uniforme entre les deux : `Math.round(minMs + (maxMs - minMs) * Math.random())`. Ainsi `minMs` et `maxMs` sortent deux fois moins souvent que chaque valeur entre eux. [`transactionListener`](#Config.transactionListener) est informé de l’attente.
+Avant chaque retry, `transaction()` attend un nombre entier de millisecondes de `minMs` à `maxMs`, arrondi d’un tirage uniforme entre les deux : `Math.round(minMs + (maxMs - minMs) * Math.random())`. Ainsi `minMs` et `maxMs` sortent deux fois moins souvent que chaque valeur entre eux. [`transactionListener`](#Config.transactionListener) est informé de l’attente.
 
 ### `castArrayParamsToJson` {#Config.castArrayParamsToJson}
 
@@ -196,9 +196,9 @@ Avec `true`, une valeur `undefined` dans [`insert()`](/fr/insert#insert), [`upda
 transactionRequiresCommit?: boolean  // default: false; the default in 7.0
 ```
 
-Quand le callback de [`transaction()`](/fr/transaction#transaction) intercepte l’erreur d’une requête et se termine normalement, Postgres a interrompu la transaction : il répond au `COMMIT`<!-- probe: db.serializable(pool, async () => {}) --> par l’étiquette de commande `ROLLBACK`, pas par une erreur, et rien n’est enregistré.
+Quand le callback de [`transaction()`](/fr/transaction#transaction) intercepte l’erreur d’une requête et se termine normalement, Postgres a interrompu la transaction : il répond au `COMMIT`<!-- probe: db.serializable(pool, async () => {}) --> par le command tag `ROLLBACK`, pas par une erreur, et rien n’est enregistré.
 
-Avec `true`, `transaction()` est alors rejetée, sans nouvelle tentative, avec "the transaction was rolled back, not committed: a query in it failed and the callback caught the error, so Postgres answered COMMIT with ROLLBACK; let the error out of the callback, or ROLLBACK TO a SAVEPOINT before going on"<!-- message -->.
+Avec `true`, `transaction()` est alors rejetée, sans retry, avec "the transaction was rolled back, not committed: a query in it failed and the callback caught the error, so Postgres answered COMMIT with ROLLBACK; let the error out of the callback, or ROLLBACK TO a SAVEPOINT before going on"<!-- message -->.
 
 Sans l’option, elle se résout avec ce que le callback a renvoyé, comme dans Zapatos 6.6.1, avec un avertissement une fois par processus : `PGCAST_DEP003`. Que faire à la place : [Laisser passer l’erreur](/fr/retries#let-the-error-through).
 
@@ -311,7 +311,7 @@ Appelé par `transaction()` quand une tentative échoue avec `40001` ou `40P01`,
 
 Avec `transactionAttemptsMax: 3` et `transactionRetryDelay: { minMs: 1, maxMs: 2 }`, un callback qui échoue avec `40001` à chaque fois donne `Transaction rollback (code 40001) on attempt 1 of 3, retrying in 1ms`<!-- message -->, `Retrying transaction, attempt 2 of 3`<!-- message -->, puis la même chose pour la tentative 2, et `Transaction rollback (code 40001) on attempt 3 of 3, giving up`<!-- message -->.
 
-Il n’est pas appelé pour une transaction validée dès sa première tentative, ni pour toute autre erreur.
+Il n’est pas appelé pour une transaction commitée dès sa première tentative, ni pour toute autre erreur.
 
 ### Les ids de transaction {#transaction-ids}
 
@@ -399,7 +399,7 @@ Chaque avertissement est un `DeprecationWarning` de Node.js, émis une fois par 
 - `node --no-deprecation` le masque, y compris pour ce hook ; `node --no-warnings` le masque sur `stderr` seulement. `node --throw-deprecation` le lève comme une erreur que rien n’intercepte, donc le processus s’arrête.
 - Avec l’option activée, l’appel n’avertit jamais.
 
-Pour repérer les avertissements de pgcast dans ce hook, et les journaliser à votre façon : `@types/node` type l’avertissement comme `Error`, qui n’a pas de `code`, donc indiquez qu’il peut en avoir un. Node affiche toujours chaque avertissement sur `stderr` ; lancez avec `node --no-warnings` pour que la sortie du hook soit la seule.
+Pour repérer les avertissements de pgcast dans ce hook, et les logger à votre façon : `@types/node` type l’avertissement comme `Error`, qui n’a pas de `code`, donc indiquez qu’il peut en avoir un. Node affiche toujours chaque avertissement sur `stderr` ; lancez avec `node --no-warnings` pour que la sortie du hook soit la seule.
 
 ```ts twoslash
 process.on('warning', (warning: Error & { code?: string }) => {
@@ -485,7 +485,7 @@ Un `numeric` tel que `pg` le renvoie, une chaîne qui garde ses chiffres : `'1.
 db.enableCustomJSONParsingForLargeNumbers(pg: typeof import('pg')): void
 ```
 
-Fait analyser par `pg` les valeurs `json` et `jsonb` avec [json-custom-numbers](https://www.npmjs.com/package/json-custom-numbers), qui donne un nombre sous forme de chaîne quand le convertir en `number` le modifierait. Chaque raccourci sauf les agrégats renvoie du `jsonb`, donc elle s’applique à leurs résultats.
+Fait parser par `pg` les valeurs `json` et `jsonb` avec [json-custom-numbers](https://www.npmjs.com/package/json-custom-numbers), qui donne un nombre sous forme de chaîne quand le convertir en `number` le modifierait. Chaque raccourci sauf les agrégats renvoie du `jsonb`, donc elle s’applique à leurs résultats.
 
 ```ts twoslash
 import * as db from 'zapatos/db';
@@ -503,9 +503,9 @@ db.enableCustomJSONParsingForLargeNumbers(pg);
 | un `numeric` au-delà de `Number.MAX_VALUE` | `Infinity` | ses chiffres, sous forme de chaîne |
 
 - Elle ne fait rien pour `count()`, `sum()`, `avg()`, `min()` et `max()` : leur résultat n’est pas du JSON, et passe par `Number()` ([`count()`](/fr/select#count)). Un `sum()` de `9007199254740993` donne toujours `9007199254740992`.
-- Elle règle les analyseurs de types du module `pg` que vous donnez, donc de chaque pool et chaque client de ce module, à partir de là, requêtes de pgcast ou non.
+- Elle règle les parsers de types du module `pg` que vous donnez, donc de chaque pool et chaque client de ce module, à partir de là, requêtes de pgcast ou non.
 - Elle ne change pas les types : c’est l’option [`customJSONParsingForLargeNumbers`](/fr/generator#generate.customJSONParsingForLargeNumbers) du générateur qui le fait.
-- Une colonne `int8` ou `numeric` hors JSON est déjà une chaîne, par l’analyseur de `pg` lui-même.
+- Une colonne `int8` ou `numeric` hors JSON est déjà une chaîne, par le parser de `pg` lui-même.
 
 ## Types range {#ranges}
 

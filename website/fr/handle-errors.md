@@ -19,7 +19,7 @@ Quand Postgres refuse une requête, la promesse de `.run()` est rejetée avec la
 
 Si C4 est prise, Postgres refuse l’`INSERT` avec 23505, une violation d’unicité, et `booking` vaut `undefined` ; sinon, c’est la nouvelle ligne. Toute autre erreur, de Postgres ou non, est relancée.
 
-Avec `try` et `await`, la variable du `catch` est `unknown` sous `strict`, ce que `isDatabaseError()` refuse ([pourquoi](/fr/transaction#isDatabaseError)). Restreignez d’abord son type avec `instanceof pg.DatabaseError` (pg 8.6 ou plus récent, pas `pg.native`, dont les erreurs sont de simples `Error`) : TypeScript connaît alors aussi ses champs.
+Avec `try` et `await`, la variable du `catch` est `unknown` sous `strict`, ce que `isDatabaseError()` refuse ([pourquoi](/fr/transaction#isDatabaseError)). Affinez d’abord son type avec `instanceof pg.DatabaseError` (pg 8.6 ou plus récent, pas `pg.native`, dont les erreurs sont de simples `Error`) : TypeScript connaît alors aussi ses champs.
 
 ```ts twoslash
 // @strict: true
@@ -60,7 +60,7 @@ const bookingProblem = (err: pg.DatabaseError) =>
 
 - Un nom de classe, sans `_`, correspond à tous les codes de sa classe : `'IntegrityConstraintViolation'` correspond aux trois. Avec plusieurs noms, il suffit que l’un d’eux corresponde : `db.isDatabaseError(err, 'IntegrityConstraintViolation', 'DataException')`.
 - Les noms sont les [codes d’erreur](https://www.postgresql.org/docs/current/errcodes-appendix.html) de Postgres en PascalCase, et le type refuse tout autre nom : votre éditeur les complète.
-- `isDatabaseError(null, …)` lève une `TypeError`, ce qu’évite la restriction préalable du type ; les autres cas, comme les noms de la classe 53 : [`isDatabaseError()`](/fr/transaction#isDatabaseError).
+- `isDatabaseError(null, …)` lève une `TypeError`, ce qu’on évite en affinant d’abord le type ; les autres cas, comme les noms de la classe 53 : [`isDatabaseError()`](/fr/transaction#isDatabaseError).
 
 ## Intercepter hors d’une transaction {#catch-outside-a-transaction}
 
@@ -78,7 +78,7 @@ START TRANSACTION ISOLATION LEVEL SERIALIZABLE
 ROLLBACK
 ```
 
-Le SQL de chaque `INSERT` : [`insert()`](/fr/insert#insert). Un échec de sérialisation (40001) ou un interblocage (40P01) a déjà fait l’objet de nouvelles tentatives à ce stade, jusqu’à [`transactionAttemptsMax`](/fr/runtime-config#Config.transactionAttemptsMax) tentatives ; si la promesse est encore rejetée avec l’un d’eux, `'TransactionRollback'` reconnaît les deux, et la demande peut être retentée plus tard ([Nouvelles tentatives](/fr/retries)).
+Le SQL de chaque `INSERT` : [`insert()`](/fr/insert#insert). Un échec de sérialisation (40001) ou un deadlock (40P01) a déjà fait l’objet de retries à ce stade, jusqu’à [`transactionAttemptsMax`](/fr/runtime-config#Config.transactionAttemptsMax) tentatives ; si la promesse est encore rejetée avec l’un d’eux, `'TransactionRollback'` reconnaît les deux, et la demande peut être réessayée plus tard ([Retries](/fr/retries)).
 
 ::: warning Écritures perdues
 N’interceptez pas une erreur de base de données dans le callback pour continuer comme si de rien n’était. Postgres a interrompu la transaction : chaque requête suivante est refusée avec 25P02 (`InvalidTransactionState_InFailedSqlTransaction`), et si le callback rend la main, pgcast envoie `COMMIT`<!-- probe: db.serializable(pool, async () => {}) -->, que Postgres transforme en rollback sans erreur.
@@ -99,12 +99,12 @@ Pour une place qui peut être prise, demandez à Postgres de ne pas refuser : [
 </CastPanel>
 
 - Reconnaissez-la avec `err instanceof db.NotExactlyOneError`. Ce n’est pas une `pg.DatabaseError` et elle n’a pas de `code`, donc `isDatabaseError()` donne `false`.
-- Son message est "One result expected but none returned (hint: check `.query.compile()` on this Error)"<!-- message -->, et `err.query.compile()` donne le SQL et les valeurs du panneau.
+- Son message est "One result expected but none returned (hint: check `.query.compile()` on this Error)"<!-- message -->, et `err.query.compile()` donne le SQL et les valeurs du cast panel.
 - Elle demande `LIMIT $2`<!-- probe: examples/errors_not_found.ts -->, de valeur `1`, donc deux lignes correspondantes ne sont pas une erreur : elle donne la première, comme dans Zapatos 6.6.1 ([#32](https://github.com/AlexandreDemartin/pgcast/issues/32)).
 - Dans un `lateral`, une ligne manquante vaut `null`, et n’est pas une erreur ([`selectExactlyOne()`](/fr/select#selectExactlyOne)).
 - Quand une ligne manquante est normale, comme dans une recherche, [`selectOne()`](/fr/select#selectOne) donne `undefined` à la place, et TypeScript vous oblige à le vérifier.
 
-Journalisez son SQL et ses valeurs là où vous l’interceptez, puis laissez l’erreur poursuivre son chemin :
+Loggez son SQL et ses valeurs là où vous l’interceptez, puis laissez l’erreur poursuivre son chemin :
 
 ```ts twoslash
 import * as db from 'zapatos/db';
@@ -161,7 +161,7 @@ Si un appel lève quand même une erreur à l’intérieur d’une fonction `asy
 
 ## Répondre à chaque genre d’erreur en un seul endroit {#answer-each-kind-in-one-place}
 
-Le handler d’erreurs d’une application peut maintenant distinguer les trois genres, et donner à chacun sa réponse :
+Le gestionnaire d’erreurs d’une application peut maintenant distinguer les trois genres, et donner à chacun sa réponse :
 
 ```ts twoslash
 import * as db from 'zapatos/db';
@@ -182,5 +182,5 @@ function statusOf(err: unknown) {
 
 - [`isDatabaseError()`](/fr/transaction#isDatabaseError) : les noms qu’elle prend, et les codes du schéma de la doc.
 - [Erreurs que pgcast lève avant toute requête](/fr/transaction#errors-pgcast-throws-before-any-query) : chacune, avec ce qui la lève et ses messages.
-- [`transaction()`](/fr/transaction#transaction) : son `ROLLBACK`, ses nouvelles tentatives et ses erreurs.
-- [Nouvelles tentatives](/fr/retries) : ce que le callback doit faire quand il peut s’exécuter de nouveau.
+- [`transaction()`](/fr/transaction#transaction) : son `ROLLBACK`, ses retries et ses erreurs.
+- [Retries](/fr/retries) : ce que le callback doit faire quand il peut s’exécuter de nouveau.

@@ -12,7 +12,7 @@ description: "pgcast lit votre schéma Postgres et écrit les types TypeScript. 
 
 <p class="eyebrow">-- un fork maintenu de <a href="/fr/switching">Zapatos 6.6.1</a></p>
 
-<h1>Vos types, moulés sur votre base<span class="op">::</span></h1>
+<h1>Vos types, castés depuis votre base de données<span class="op">::</span></h1>
 
 pgcast lit votre schéma Postgres et écrit les types TypeScript. Ses raccourcis produisent un SQL que vous pouvez lire et prévoir, et vous pouvez toujours revenir à un simple template `sql`. Pas d’ORM, pas de modèles, pas d’état caché.
 {.lede}
@@ -47,7 +47,7 @@ Les types viennent de `pg_catalog`, jamais écrits à la main. Changez une colon
 
 ## Un SQL que vous pouvez lire {#sql-you-can-read}
 
-Chaque raccourci écrit une requête documentée. Journalisez-la, testez-la, ou écrivez-la vous-même dans un template `sql`.
+Chaque raccourci écrit une requête documentée. Loggez-la, testez-la, ou écrivez-la vous-même dans un template `sql`.
 
 [Le SQL de chaque raccourci](/fr/reference){.next}
 
@@ -75,7 +75,7 @@ Les valeurs voyagent en `$1`, `$2`. Les noms sont mis entre guillemets comme le 
 <div class="readnext">
 
 [**Tutoriel**<small>Installez pgcast et lancez votre première requête typée.</small>](/fr/tutorial)
-[**Guides pratiques**<small>Laterals, pages, lots, nouvelles tentatives : une tâche chacun.</small>](/fr/guides)
+[**Guides pratiques**<small>Laterals, pages, batches, retries : une tâche chacun.</small>](/fr/guides)
 [**Référence**<small>Chaque export et chaque option, et le SQL qu’ils écrivent.</small>](/fr/reference)
 [**Explication**<small>Pourquoi pgcast fonctionne comme il le fait.</small>](/fr/explanation)
 

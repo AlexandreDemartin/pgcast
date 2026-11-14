@@ -23,7 +23,7 @@ async function programme(queryable: db.Queryable, studio_id: number) {
 }
 ```
 
-Elle prend un [`Queryable`](/fr/sql-template#Queryable) : un test peut donc lui passer n’importe quel pool ou client, ou un faux.
+Elle prend un [`Queryable`](/fr/sql-template#Queryable) : un test peut donc lui passer n’importe quel pool ou client, ou un fake.
 
 ## Tester contre une vraie base {#test-against-a-real-database}
 
@@ -45,33 +45,33 @@ DROP DATABASE films_test_4f1c;
 
 ### Annuler chaque test {#roll-back-each-test}
 
-Chaque test tourne sur un seul client, dans un `BEGIN`, annulé ensuite : ce qu’il écrit a disparu avant le test suivant. Il crée ses propres lignes de départ avec [`insert()`](/fr/insert#insert) :
+Chaque test tourne sur un seul client, dans un `BEGIN`, annulé ensuite : ce qu’il écrit a disparu avant le test suivant. Il insère ses propres seeds avec [`insert()`](/fr/insert#insert) :
 
 <<< ../examples/plain/testing_rolled_back.ts{ts twoslash}
 
-- Ici avec `test` de `node:test` et `assert` de `node:assert/strict` ; n’importe quel lanceur de tests convient, et des hooks `beforeEach` / `afterEach` peuvent contenir les mêmes lignes.
+- Ici avec `test` de `node:test` et `assert` de `node:assert/strict` ; n’importe quel test runner convient, et des hooks `beforeEach` / `afterEach` peuvent contenir les mêmes lignes.
 - Lisez une valeur générée dans ce que renvoie `insert()`, comme `studio.id` ici : ne l’écrivez jamais en dur dans le test (ci-dessous).
 - Un client dont le `ROLLBACK` échoue est cassé : `release(err)` le détruit au lieu de le passer au test suivant. Si le test avait déjà échoué, c’est sa propre erreur qui est levée, puisque c’est elle qui dit pourquoi.
 
-### Savoir ce que laisse l’annulation {#know-what-a-rollback-leaves}
+### Savoir ce que laisse un rollback {#know-what-a-rollback-leaves}
 
 | Ce qu’un test a fait | Après son `ROLLBACK` |
 |---|---|
 | Des lignes insérées, modifiées ou supprimées ; `SET` ; une table temporaire | annulé |
 | Une valeur `SERIAL` ou d’identité prise | toujours prise : l’`insert()` du test suivant reçoit l’id suivant, 2 après 1, bien que la ligne 1 ait disparu |
 | `PREPARE`, ou une requête lancée avec [`prepared()`](/fr/sql-template#prepared) | gardé sur la connexion, pour le prochain test qui la reçoit du pool |
-| Un verrou consultatif de session, `pg_advisory_lock()` | toujours détenu par cette connexion |
+| Un advisory lock de session, `pg_advisory_lock()` | toujours détenu par cette connexion |
 
 Un id se lit donc, il ne s’écrit jamais en dur ; et un nom préparé désigne un seul texte dans tous les tests qui partagent le pool.
 
-### Donner le pool au code qui valide {#give-code-that-commits-the-pool}
+### Donner le pool au code qui commite {#give-code-that-commits-the-pool}
 
 Le code qui ouvre sa propre [`transaction()`](/fr/transaction#transaction) ne peut pas rejoindre celle du test. Si on lui donne le client du test, dans son `BEGIN`, il envoie `START TRANSACTION ISOLATION LEVEL SERIALIZABLE`<!-- probe: db.serializable(pool, async () => {}) -->, à quoi Postgres répond par un avertissement (25001, « <span lang="en">there is already a transaction in progress</span> »), puis il termine la transaction du test de l’une de deux façons ([#233](https://github.com/AlexandreDemartin/pgcast/issues/233)) :
 
-- Si le test n’a encore lancé aucune requête, ou au niveau propre à la session (`readCommitted()`, sur un serveur par défaut), son `COMMIT`<!-- probe: db.serializable(pool, async () => {}) --> valide la transaction du test, lignes comprises.
-- À un autre niveau, après n’importe quelle requête, lignes de départ du test comprises, Postgres refuse avec 25001 (« <span lang="en">SET TRANSACTION ISOLATION LEVEL must be called before any query</span> ») : son `ROLLBACK`<!-- probe: db.serializable(pool, async () => { throw 0; }) --> annule les lignes de départ, et l’appel est rejeté.
+- Si le test n’a encore lancé aucune requête, ou au niveau propre à la session (`readCommitted()`, sur un serveur par défaut), son `COMMIT`<!-- probe: db.serializable(pool, async () => {}) --> commite la transaction du test, lignes comprises.
+- À un autre niveau, après n’importe quelle requête, seeds du test compris, Postgres refuse avec 25001 (« <span lang="en">SET TRANSACTION ISOLATION LEVEL must be called before any query</span> ») : son `ROLLBACK`<!-- probe: db.serializable(pool, async () => { throw 0; }) --> annule les seeds, et l’appel est rejeté.
 
-Dans les deux cas, le `ROLLBACK` du test n’a plus rien à annuler (25P01), et pgcast avertit une fois, `PGCAST_DEP005`. Activez [`transactionRequiresIdleClient`](/fr/runtime-config#Config.transactionRequiresIdleClient) dans la mise en place de vos tests, et un tel appel est alors rejeté, avant son `START TRANSACTION` : le test échoue, et son `ROLLBACK` annule toujours ses lignes de départ.
+Dans les deux cas, le `ROLLBACK` du test n’a plus rien à annuler (25P01), et pgcast avertit une fois, `PGCAST_DEP005`. Activez [`transactionRequiresIdleClient`](/fr/runtime-config#Config.transactionRequiresIdleClient) dans la mise en place de vos tests, et un tel appel est alors rejeté, avant son `START TRANSACTION` : le test échoue, et son `ROLLBACK` annule toujours ses seeds.
 
 ```ts twoslash
 import * as db from 'zapatos/db';
@@ -79,7 +79,7 @@ import * as db from 'zapatos/db';
 db.setConfig({ transactionRequiresIdleClient: true });
 ```
 
-Il faut pg 8.21 ou plus récent, qui signale le `BEGIN` du test ([Votre propre `BEGIN`](/fr/transaction#your-own-begin)). Donnez ensuite le pool à ce code, et supprimez ce qu’il valide :
+Il faut pg 8.21 ou plus récent, qui signale le `BEGIN` du test ([Votre propre `BEGIN`](/fr/transaction#your-own-begin)). Donnez ensuite le pool à ce code, et supprimez ce qu’il commite :
 
 <<< ../examples/plain/testing_commits.ts{ts twoslash}
 
@@ -123,17 +123,17 @@ Le test compare la requête compilée de la fonction avec celle de l’appel qu�
 
 pgcast préserve ce que fait une requête : les lignes qu’elle lit ou écrit, et le type de ce que renvoie `run()`. Il ne préserve pas le texte qu’il compile : une version mineure peut le changer, une paire de parenthèses, l’ordre des clauses, un cast, tant que le résultat ne change pas.
 
-La correction de `not()` est un tel changement : chaque condition sous `not()` gagne une paire de parenthèses, et la plupart correspondent aux mêmes lignes. Un test qui fige le texte de la requête d’un raccourci, ou un faux qui choisit sa réponse en comparant ce texte, peut donc casser lors d’une mise à jour sans que votre code ait rien de faux.
+La correction de `not()` est un tel changement : chaque condition sous `not()` gagne une paire de parenthèses, et la plupart correspondent aux mêmes lignes. Un test qui fige le texte de la requête d’un raccourci, ou un fake qui choisit sa réponse en comparant ce texte, peut donc casser lors d’une mise à jour sans que rien ne cloche dans votre code.
 
 ## Simuler un résultat typé d’après le schéma {#fake-a-result-typed-from-the-schema}
 
-Pour la logique autour d’une requête, sans aucune base : un faux `Queryable` renvoie les lignes que vous lui donnez, et ces lignes sont typées d’après le schéma, donc une fausse ligne cesse de compiler quand sa table change. Quelques lignes de code à écrire vous-même ; pgcast ne fournit pas de faux.
+Pour la logique autour d’une requête, sans aucune base : un faux `Queryable` renvoie les lignes que vous lui donnez, et ces lignes sont typées d’après le schéma, donc une fausse ligne cesse de compiler quand sa table change. Quelques lignes de code à écrire vous-même ; pgcast ne fournit aucun fake.
 
 <<< ../examples/plain/testing_fake.ts{ts twoslash}
 
-- `run()` envoie la requête compilée à `query()` et lit son résultat dans ce qui revient ; le faux ignore la requête.
+- `run()` envoie la requête compilée à `query()` et lit son résultat dans ce qui revient ; le fake ignore la requête.
 - Ce n’est ni un `pg.Pool` ni un client, d’où `as unknown as` : un simple `as db.Queryable` ne compile pas (TS2352).
-- Une [`transaction()`](/fr/transaction#transaction) à laquelle on donne le faux appelle son `connect()`, qu’il n’a pas : un faux pour du code qui en ouvre une a aussi besoin de `connect()`, qui le renvoie lui-même avec un `release()`, et reçoit aussi `START TRANSACTION …` et `COMMIT` comme requêtes.
+- Une [`transaction()`](/fr/transaction#transaction) à laquelle on donne le fake appelle son `connect()`, qu’il n’a pas : un fake pour du code qui en ouvre une a aussi besoin de `connect()`, qui le renvoie lui-même avec un `release()`, et reçoit aussi `START TRANSACTION …` et `COMMIT` comme requêtes.
 
 Supposons qu’une migration renomme `release_year` : une fois le générateur relancé, chaque fausse ligne qui l’a encore ne compile plus. Ici, une fausse ligne avec une colonne que `films` n’a pas :
 
@@ -150,7 +150,7 @@ Avec `strict` désactivé, `columns` laisse le type au `JSONSelectable` complet 
 
 ### Typer chaque résultat {#type-each-result}
 
-| Requête | Le type d’un résultat | Les `rows` du faux |
+| Requête | Le type d’un résultat | Les `rows` du fake |
 |---|---|---|
 | [`select()`](/fr/select#select) | [`FullSelectReturnTypeForTable`](/fr/select#FullSelectReturnTypeForTable)`<T, C, L, E, M>`, `M` le mode | `[{ result }]`, tout le tableau dans une seule ligne ; `[{ result: [] }]` pour aucune, comme Postgres l’envoie (`[]` donne `undefined`) |
 | [`selectOne()`](/fr/select#selectOne), [`selectExactlyOne()`](/fr/select#selectExactlyOne) | le même | `[{ result }]` ; `[]` pour aucune : `undefined` de `selectOne()`, une [`NotExactlyOneError`](/fr/select#NotExactlyOneError) de `selectExactlyOne()` |
@@ -160,20 +160,20 @@ Avec `strict` désactivé, `columns` laisse le type au `JSONSelectable` complet 
 | Un template [`sql`](/fr/sql-template#sql) | [`RunResultForSQLFragment`](/fr/sql-template#RunResultForSQLFragment)`<typeof query>` | les lignes elles-mêmes |
 
 - `RunResultForSQLFragment` lit `undefined` comme `null`, comme une requête imbriquée revient en JSON : pour un `selectOne()` que vous lancez, `FullSelectReturnTypeForTable` avec `SelectResultMode.One` garde son `undefined`.
-- Les raccourcis lisent leur résultat dans une colonne nommée `result`<!-- probe: examples/testing_search.ts -->, qui fait partie du SQL qu’ils compilent : un faux qui répond sous cette forme en dépend, tout comme du texte.
+- Les raccourcis lisent leur résultat dans une colonne nommée `result`<!-- probe: examples/testing_search.ts -->, qui fait partie du SQL qu’ils compilent : un fake qui répond sous cette forme en dépend, autant que du texte.
 
-### Savoir ce qu’un faux ne vérifie pas {#know-what-a-fake-does-not-check}
+### Savoir ce qu’un fake ne vérifie pas {#know-what-a-fake-does-not-check}
 
-- **La requête.** Un filtre sur la mauvaise colonne, une valeur que Postgres refuse (`stars: 6` dans `ratings`, 23514 à cause de son `CHECK`), du SQL qu’il ne sait pas analyser : le faux répond quand même.
-- **Ce que Postgres renvoie.** Quelles lignes, dans quel ordre, lesquelles valent `null` : le faux renvoie ce qu’on lui donne.
+- **La requête.** Un filtre sur la mauvaise colonne, une valeur que Postgres refuse (`stars: 6` dans `ratings`, 23514 à cause de son `CHECK`), du SQL qu’il ne sait pas parser : le fake répond quand même.
+- **Ce que Postgres renvoie.** Quelles lignes, dans quel ordre, lesquelles valent `null` : le fake renvoie ce qu’on lui donne.
   - Un `timestamptz` revient d’un raccourci sous forme de chaîne dans le fuseau horaire de la session : `2030-03-01T19:30:00+00:00` en UTC, `2030-03-01T20:30:00+01:00` à Paris. Son type, `TimestampTzString`, accepte aussi `2030-03-01T19:30:00Z`. Depuis un template `sql`, `pg` donne un `Date`.
   - Un `bigint` revient d’un raccourci sous forme de nombre JSON, arrondi au-delà de 2<sup>53</sup> : 9007199254740993 arrive en 9007199254740992 ([`customJSONParsingForLargeNumbers`](/fr/generator#generate.customJSONParsingForLargeNumbers)). Depuis un template `sql`, `pg` donne une chaîne.
 
-Une vraie base vérifie les deux : gardez un test contre elle pour chaque requête, et des faux pour la logique autour.
+Une vraie base vérifie les deux : gardez un test contre elle pour chaque requête, et des fakes pour la logique autour.
 
 ## Voir aussi {#see-also}
 
 - [SQL brut](/fr/raw-sql#check-the-sql-before-you-run-it) : un test qui garde une entrée hostile dans `values`.
-- [Nouvelles tentatives](/fr/retries#test-a-retry) : un test qui fait s’exécuter de nouveau une transaction.
+- [Retries](/fr/retries#test-a-retry) : un test qui fait relancer une transaction.
 - [`compile()`](/fr/sql-template#compile), [`Queryable`](/fr/sql-template#Queryable), [`transaction()`](/fr/transaction#transaction) : ce qu’ils prennent et ce qu’ils donnent.
 - [Pourquoi pgcast](/fr/why) : pourquoi la base est la source des types.
