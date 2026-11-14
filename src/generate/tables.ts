@@ -350,14 +350,25 @@ const createColumnDoc = (config: CompleteConfig, schemaName: string, rel: Relati
       description,
     } = columnDetails,
     // every line of a multi-line comment gets its ` * `: TypeScript ends a JSDoc line at \r as at \n
-    comment = description as string | null,
-    commentDoc = !comment ? '' : '\n    *\n    * ' + jsdocText(comment).split(/\r\n?|\n/).join('\n    * '),
+    lines = description ? jsdocText(description as string).split(/\r\n?|\n/) : [],
+    // a tag (`@deprecated`) would read the generated lines after it as its own text, so the comment goes after them
+    // from the line that starts it. TypeScript can start a tag, or an inline `{@link …}` that may run on through the
+    // next line, only at an @ that follows a { or no printable ASCII character: the first line with one moves only if
+    // it surely starts a tag, with an @ first but for spaces and tabs, or one after a space or tab and before a
+    // printable character, past anything starting with `{@link` that is closed on the line with no quote, backtick,
+    // /, backslash or line separator in it (TypeScript reads a string, a template, a comment or an escape there,
+    // which can hide its }, and a line separator breaks the line); otherwise the JSDoc stays as it was
+    tagAt = lines.findIndex(line => /(?<![!-z|-~])@/.test(line)),
+    [text, tags] = tagAt < 0 || !/^[ \t]*@|^(?:\{@link[^}'"`/\\\u2028\u2029]*\}|(?!\{@link)[^])*?[ \t]@[!-~]/.test(lines[tagAt]) ?
+      [lines, []] : [lines.slice(0, tagAt), lines.slice(tagAt)],
+    commentDoc = text.length ? '\n    *\n    * ' + text.join('\n    * ') : '',
+    tagsDoc = tags.length ? '\n    *\n    * ' + tags.join('\n    * ') : '',
     [domain, udt, defaultText] = [domainName, udtName ?? '(none)', defaultValue].map(t => jsdocText(String(t))),
     doc = `/**
     * ${jsdocText(`**${schemaPrefix}${rel.name}.${column}**`)}${commentDoc}
     * - ${domainName ? `\`${domain}\` (base type: \`${udt}\`)` : `\`${udt}\``} in database
     * - ${rel.type === 'mview' ? 'Materialized view column' : isGenerated ? 'Generated column' :
-        `${isNullable ? 'Nullable' : '`NOT NULL`'}, ${hasDefault && defaultValue === null ? `identity column` : hasDefault ? `default: \`${defaultText}\`` : `no default`}`}
+        `${isNullable ? 'Nullable' : '`NOT NULL`'}, ${hasDefault && defaultValue === null ? `identity column` : hasDefault ? `default: \`${defaultText}\`` : `no default`}`}${tagsDoc}
     */
     `;
   return doc;
