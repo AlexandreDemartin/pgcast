@@ -75,7 +75,7 @@ The warning comes when you call the shortcut, before `.run()`, and only if the o
 
 It comes once per process for each code, so it tells you that the old path ran, not where nor how often. `node --trace-deprecation` adds the stack, down to the line that called `update()`; for the rest, turn the option on and let your tests find what changes.
 
-`PGCAST_DEP003` comes later: once `transaction()` has sent `COMMIT` and Postgres has answered `ROLLBACK`, just before the promise resolves. So does `PGCAST_DEP004`, once `.run()` has the result of `sum()`, `avg()`, `min()` or `max()`: only then can it see whether `Number()` changes it. And `PGCAST_DEP005`, once that empty query has its answer, with its `START TRANSACTION` already sent.
+`PGCAST_DEP003` comes later: once `transaction()` has sent `COMMIT` and Postgres has answered `ROLLBACK`, just before the promise resolves. So does `PGCAST_DEP004`, once `.run()` has the result of `sum()`, `avg()`, `min()` or `max()`: only then can it see whether `Number()` changes it. And `PGCAST_DEP005`, once that empty query has its answer, before the `START TRANSACTION`.
 
 Where `undefined` meant "clear it", `null` says so under either setting, and never warns.
 
