@@ -816,6 +816,30 @@ describe('a client already inside a transaction block', () => {
     expect(emitWarning.mock.calls[0][1]).toEqual({ type: 'DeprecationWarning', code: 'PGCAST_DEP005' });
   });
 
+  // the first call goes on after its empty query, but the mark was set before it: the second call, passed
+  // through, has its first query queued behind that empty query, so before the first call's START TRANSACTION
+  it('limitation: with transactionRequiresIdleClient, after a stale T, a call at the same moment sends its first query outside any transaction, committed on its own', async () => {
+    const { fdb, emitWarning } = await fresh();
+    fdb.setConfig({ transactionRequiresIdleClient: true });
+    const client = await t.pool.connect();
+    try {
+      vi.spyOn(client, 'getTransactionStatus').mockReturnValueOnce('T');  // as pg reads it after a failed COMMIT
+      const sent = spyQueries(client);
+      const outcomes = await Promise.allSettled([
+        fdb.readCommitted(client, async c => { await write(c, 'f'); throw new Error('f fails'); }),
+        fdb.readCommitted(client, async c => { await write(c, 'g1'); await write(c, 'g2'); }),
+      ]);
+      expect(outcomes.map(r => r.status === 'rejected' ? (r.reason as Error).message : r.status)).toEqual(['f fails', 'fulfilled']);
+      expect(sent.slice(0, 3)).toEqual(['', insertInner, start.readCommitted]);  // g1 before START TRANSACTION
+      expect(sent.at(-1)).toBe('ROLLBACK');
+      expect(client.getTransactionStatus()).toBe('I');
+    } finally {
+      client.release();
+    }
+    expect(await notes()).toEqual(['g1']);  // the ROLLBACK undid f and g2, not g1
+    expect(emitWarning).not.toHaveBeenCalled();
+  });
+
   it('with transactionRequiresIdleClient, after a failed COMMIT, neither refuses nor warns: the block is over', async () => {
     const { fdb, emitWarning } = await fresh();
     fdb.setConfig({ transactionRequiresIdleClient: true });
