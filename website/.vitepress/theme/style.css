@@ -216,6 +216,9 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 /* the site's icons (icons.ts): 16px unless a component sets them smaller, beside its own text */
 svg.icon { width: 16px; height: 16px; flex: none; }
 
+/* the site's icons (icons.ts): 16px unless a component sets them smaller, beside its own text */
+svg.icon { width: 16px; height: 16px; flex: none; }
+
 /* notes: a chip, then the text, with no side rail */
 .vp-doc .custom-block {
   display: grid; grid-template-columns: auto 1fr; gap: 0 12px; align-items: start;
@@ -297,17 +300,22 @@ svg.icon { width: 16px; height: 16px; flex: none; }
 .PageActions .copy { border-radius: 7px 0 0 7px; }
 .PageActions .toggle { border-left: 1px solid var(--line); border-radius: 0 7px 7px 0; padding: 0 6px !important; }
 .PageActions svg { width: 16px; height: 16px; flex: none; }
+/* its menu: each row an icon, a name and, under it, what it does; as wide as its longest row, inside a 320px screen */
 .PageActions .menu {
-  position: absolute; top: calc(100% + 4px); right: 0; min-width: 200px; padding: 4px; display: flex; flex-direction: column;
+  position: absolute; top: calc(100% + 4px); right: 0; width: max-content; max-width: calc(100vw - 32px); padding: 4px;
+  display: flex; flex-direction: column;
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 8px 28px rgba(0, 0, 0, .18);
 }
 .PageActions .menu > * {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 10px; border-radius: 6px;
-  font: 400 14px/20px var(--font-body); color: var(--fg); text-decoration: none; text-align: left;
+  display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 0 10px; padding: 8px 12px 8px 10px; border-radius: 6px;
+  color: var(--fg); text-decoration: none; text-align: left;
 }
 .PageActions .menu > :hover, .PageActions .menu > :focus { background: var(--sunken); }
 .PageActions .menu > :focus-visible { outline-offset: -2px; }
-.PageActions .menu svg { color: var(--muted); width: 14px; height: 14px; }
+.PageActions .menu svg { color: var(--muted); margin-top: 2px; }  /* centred on the name's line */
+.PageActions .menu .title { font: 400 14px/20px var(--font-body); }
+.PageActions .menu .title svg { display: inline; vertical-align: -1px; width: 14px; height: 14px; margin: 0 0 0 4px; }
+.PageActions .menu .desc { grid-column: 2; font: 400 13px/18px var(--font-body); color: var(--muted); }
 .PageActions .status { position: absolute; top: calc(100% + 4px); right: 0; white-space: nowrap; font-size: 12px; color: var(--muted); }
 
 /* pager, then the edit row */

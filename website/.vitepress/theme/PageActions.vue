@@ -8,6 +8,7 @@
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue';
 import { useData, withBase } from 'vitepress';
 import { outline } from '../outline.ts';
+import Icon from './Icon.vue';
 
 const
   { page } = useData(),
@@ -18,8 +19,8 @@ const
   // the site's own URL (config.ts), so that a chat opened from a preview still names the page an assistant can read
   prompt = computed(() => `Read ${__PGCAST_SITE__}${link.value.slice(1)}.md so I can ask questions about it.`),
   chats = computed(() => [
-    { text: 'Open in ChatGPT', href: `https://chatgpt.com/?q=${encodeURIComponent(prompt.value)}` },
-    { text: 'Open in Claude', href: `https://claude.ai/new?q=${encodeURIComponent(prompt.value)}` },
+    { name: 'ChatGPT', href: `https://chatgpt.com/?q=${encodeURIComponent(prompt.value)}` },
+    { name: 'Claude', href: `https://claude.ai/new?q=${encodeURIComponent(prompt.value)}` },
   ]),
   open = ref(false),
   status = ref(''),
@@ -114,10 +115,7 @@ onUnmounted(() => {
   <div v-if="written" ref="root" class="PageActions">
     <div class="split">
       <button type="button" class="copy" @click="copy">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path v-if="status === 'Copied'" d="M20 6 9 17l-5-5" />
-          <template v-else><rect x="8" y="8" width="14" height="14" rx="2" /><path d="M4 16a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2" /></template>
-        </svg>
+        <Icon :name="status === 'Copied' ? 'check' : 'copy'" />
         <span class="label">Copy page</span>
       </button>
       <button
@@ -131,16 +129,36 @@ onUnmounted(() => {
         @click="onToggleClick"
         @keydown="onToggleKey"
       >
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+        <Icon name="chevronDown" />
       </button>
     </div>
+    <!-- each row: its icon, its name, then what it does, read as its description rather than in its name -->
     <div v-show="open" id="page-actions-menu" ref="menu" class="menu" role="menu" aria-label="This page" @keydown="onMenuKey">
-      <button type="button" role="menuitem" tabindex="-1" @click="copy">Copy as Markdown</button>
+      <button type="button" role="menuitem" tabindex="-1" aria-describedby="page-actions-copy" @click="copy">
+        <Icon name="copy" />
+        <span class="title">Copy page</span>
+        <span id="page-actions-copy" class="desc" aria-hidden="true">Copy page as Markdown for LLMs</span>
+      </button>
       <!-- a `target` leaves the link to the browser: VitePress's router would look for a page at `/<page>.md` -->
-      <a role="menuitem" tabindex="-1" :href="markdown" target="_self" @click="close(false)">View as Markdown</a>
-      <a v-for="chat in chats" :key="chat.text" role="menuitem" tabindex="-1" :href="chat.href" target="_blank" rel="noopener" @click="close(false)">
-        {{ chat.text }}<span class="visually-hidden"> (new tab)</span>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9" /></svg>
+      <a role="menuitem" tabindex="-1" :href="markdown" target="_self" aria-describedby="page-actions-view" @click="close(false)">
+        <Icon name="file" />
+        <span class="title">View as Markdown</span>
+        <span id="page-actions-view" class="desc" aria-hidden="true">Open this page as plain text</span>
+      </a>
+      <a
+        v-for="chat in chats"
+        :key="chat.name"
+        role="menuitem"
+        tabindex="-1"
+        :href="chat.href"
+        target="_blank"
+        rel="noopener"
+        :aria-describedby="`page-actions-${chat.name}`"
+        @click="close(false)"
+      >
+        <Icon name="chat" />
+        <span class="title">Open in {{ chat.name }}<span class="visually-hidden"> (new tab)</span><Icon name="external" /></span>
+        <span :id="`page-actions-${chat.name}`" class="desc" aria-hidden="true">Ask about this page in {{ chat.name }}</span>
       </a>
     </div>
     <span class="status" aria-live="polite">{{ status }}</span>
