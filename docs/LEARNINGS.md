@@ -143,6 +143,8 @@ Candidates for a check, a rule or a skill line.
 - #51 — R36 depends on the schema: an inline fragment fails only when another relation has the same column name with another type, or a nullable copy of a `NOT NULL` column in `update()`; the docs schema has neither, so the page states it in prose — `builder`
 - #252 — A list of the routes that compile a Whereable is checked against every interpolation of a filter in `shortcuts.ts`, not only `where`: `having` was missing — `builder`
 - #252 — A « 6.6.1 typed X » claim is checked by `tsc` against the `zapatos@6.6.1` tarball's `dist/db/*.d.ts` through `paths`, with `NODE_PATH` on the root `node_modules` — `builder`
+- #408 — In `.ts` files `no-undef` is off (typescript-eslint's advice), so a planted undefined name there is caught by `tsc`, not ESLint: the proof goes through the type-check — `builder`
+- #408 — The docs site's type-check cannot live in the root `typecheck`: it needs the site's dependencies, which the `build` job never installs — `builder`
 
 ## Minors kept
 
