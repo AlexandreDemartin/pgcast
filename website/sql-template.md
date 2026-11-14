@@ -291,7 +291,7 @@ An object is a Whereable of the table: each own enumerable key a column, each va
 An interpolated object that is not one of the other [interpolations](#interpolations) compiles as a Whereable, plain or not: a class instance `{ title }` gives `("title" = $1)`<!-- probe: db.sql`${new (class { title = 'x' })()}` -->, and one with no own enumerable key gives `TRUE`, even of a class that extends a built-in (`class Premiere extends Date {}`). Check what reaches a `where` at run time.
 :::
 
-A built-in object throws while compiling, before any query, even with own keys added (`Object.assign(new Date(0), { id: 1 })`): `Date`, `Map`, `Set`, `WeakMap`, `WeakSet`, `RegExp`, `Promise`, `Error` and its native subtypes (`TypeError`, …), `ArrayBuffer`, a typed array, `Buffer`, `DataView`, and the boxes `Number`, `String` and `Boolean`:
+A built-in object throws while compiling, before any query, even with own keys added (`Object.assign(new Date(0), { id: 1 })`): `Date`, `Map`, `Set`, `WeakMap`, `WeakSet`, `RegExp`, `Promise`, `Error` and its native subtypes (`TypeError`, `AggregateError`, …, and `SuppressedError` from Node 24), `ArrayBuffer`, a typed array, `Buffer`, `DataView`, and the boxes `Number`, `String` and `Boolean`:
 
 > `` A built-in `…` has no meaning as a Whereable (a filter): it would compile to its own enumerable keys, and to `TRUE`, every row, when it has none. To compare with a value, give it as `db.param(…)`; to filter, give a plain object (`{ column: value }`); await a `Promise` first. ``<!-- message -->
 
