@@ -396,6 +396,34 @@ ${imports.map(line => `  ${line}\n`).join('')}  export type ${type};  // replace
 }
 `;
 
+    /** The text and the import of the placeholders `names`, the relations of `schemas` read in each order in turn. */
+    const placeholdersInEveryOrder = async (schemas: string[], config: Config, names: string[]) => {
+      const
+        q = (query: pg.QueryConfig) => t.pool.query(query),
+        relations = (await Promise.all(schemas.map(async schema =>
+          (await relationsInSchema(schema, q)).map(rel => ({ rel, schema, enums: enumDataForSchema(schema, q) })))))
+          .flat(),
+        orders = (list: typeof relations): (typeof relations)[] => list.length <= 1 ? [list] :
+          list.flatMap((first, i) => orders(list.filter((_, j) => j !== i)).map(rest => [first, ...rest])),
+        complete = finaliseConfig({ ...quiet, ...config }),
+        read: Record<string, Record<string, { type: string; imports: string | null }>> = {};
+      for (const order of orders(relations)) {
+        const customTypes = Object.create(null), customTypeImports = Object.create(null);
+        for (const { rel, schema, enums } of order) await definitionForRelationInSchema(
+          rel, schema, await enums, customTypes, complete, q, undefined, undefined, undefined, customTypeImports);
+        read[order.map(r => `${r.schema}.${r.rel.name}`).join(', ')] = Object.fromEntries(names.map(name =>
+          [name, { type: customTypes[name], imports: customTypeImports[name] || null }]));
+      }
+      return read;
+    };
+
+    /** The same read for every order, and there are `count` of them. */
+    const expectInEveryOrder = (read: Awaited<ReturnType<typeof placeholdersInEveryOrder>>, count: number,
+      expected: Record<string, { type: string; imports: string | null }>) => {
+      expect(Object.keys(read)).toHaveLength(count);
+      expect(read).toEqual(Object.fromEntries(Object.keys(read).map(order => [order, expected])));
+    };
+
     it.each([
       ['in a schema of its own', sales, 'zapatos', 'placeholder_imports', 'placeholder_imports.genre'],
       ['in unprefixedSchema', { ...sales, unprefixedSchema: 'placeholder_imports' }, 'zapatos', 'genre', 'genre'],
@@ -444,6 +472,13 @@ ${imports.map(line => `  ${line}\n`).join('')}  export type ${type};  // replace
       }
     });
 
+    it('with typeEnumsAcrossSchemas, still imports an enum that only its own schema uses', async () => {
+      const { customTypeSourceFiles: files } = await codegen({ ...sales, typeEnumsAcrossSchemas: true });
+      const schema = `import type { placeholder_imports } from 'zapatos/schema';`;
+      expect.soft(files.PgGenre_d).toBe(placeholder('zapatos', [schema], 'PgGenre_d = placeholder_imports.genre'));
+      expect.soft(files.PgGenres_d).toBe(placeholder('zapatos', [schema], 'PgGenres_d = placeholder_imports.genre[]'));
+    });
+
     // with typeEnumsAcrossSchemas off, each relation reads `genre` in its own schema: an import would type one
     // of them with the other's labels, and its text would hang on which relation is read last
     describe('a domain whose relations would import different enums', () => {
@@ -453,44 +488,88 @@ ${imports.map(line => `  ${line}\n`).join('')}  export type ${type};  // replace
         CREATE TYPE placeholder_home.genre AS ENUM ('comedy', 'drama');
         CREATE TYPE placeholder_archive.genre AS ENUM ('silent');
         CREATE DOMAIN placeholder_home.genre_d AS placeholder_home.genre;
-        CREATE TABLE placeholder_home.films (genre placeholder_home.genre_d);
-        CREATE TABLE placeholder_home.shorts (genre placeholder_home.genre_d);
-        CREATE TABLE placeholder_archive.reels (genre placeholder_home.genre_d);
+        CREATE DOMAIN placeholder_home.genres_d AS placeholder_home.genre[];
+        CREATE TABLE placeholder_home.films (genre placeholder_home.genre_d, genres placeholder_home.genres_d);
+        CREATE TABLE placeholder_home.shorts (genre placeholder_home.genre_d, genres placeholder_home.genres_d);
+        CREATE TABLE placeholder_archive.reels (genre placeholder_home.genre_d, genres placeholder_home.genres_d);
       `));
       afterAll(() => t.pool.query('DROP SCHEMA placeholder_home, placeholder_archive CASCADE'));
 
-      const unprefixed = ['placeholder_home', 'placeholder_archive', null];
+      const
+        unprefixed = ['placeholder_home', 'placeholder_archive', null],
+        bothOrders = [
+          { placeholder_home: all, placeholder_archive: all }, { placeholder_archive: all, placeholder_home: all },
+        ],
+        homeAndArchive = ['placeholder_home', 'placeholder_archive'];
 
       it.each(unprefixed)("keeps 6.6.1's text, with no import, unprefixedSchema %s", async unprefixedSchema => {
-        for (const schemas of [
-          { placeholder_home: all, placeholder_archive: all }, { placeholder_archive: all, placeholder_home: all },
-        ]) {
+        for (const schemas of bothOrders) {
           const { customTypeSourceFiles: files } = await codegen({ schemas, unprefixedSchema });
           expect(files.PgGenre_d).toBe(placeholder('zapatos', [], 'PgGenre_d = genre'));
         }
       });
 
-      it('in whichever order the relations are read', async () => {
-        const
-          q = (query: pg.QueryConfig) => t.pool.query(query),
-          relations = (await Promise.all(['placeholder_home', 'placeholder_archive'].map(async schema =>
-            (await relationsInSchema(schema, q)).map(rel => ({ rel, schema, enums: enumDataForSchema(schema, q) })))))
-            .flat(),
-          orders = (list: typeof relations): (typeof relations)[] => list.length <= 1 ? [list] :
-            list.flatMap((first, i) => orders(list.filter((_, j) => j !== i)).map(rest => [first, ...rest]));
-        expect(relations.map(r => `${r.schema}.${r.rel.name}`).sort())
-          .toEqual(['placeholder_archive.reels', 'placeholder_home.films', 'placeholder_home.shorts']);
-        for (const unprefixedSchema of unprefixed) {
-          const config = finaliseConfig({ ...quiet, unprefixedSchema });
-          for (const order of orders(relations)) {
-            const customTypes = Object.create(null), customTypeImports = Object.create(null);
-            for (const { rel, schema, enums } of order) await definitionForRelationInSchema(
-              rel, schema, await enums, customTypes, config, q, undefined, undefined, undefined, customTypeImports);
-            expect({ type: customTypes.PgGenre_d, imports: customTypeImports.PgGenre_d || null },
-              `${unprefixedSchema}: ${order.map(r => r.rel.name).join(', ')}`).toEqual({ type: 'genre', imports: null });
-          }
-        }
+      it.each(unprefixed)('in whichever order the relations are read, unprefixedSchema %s', async unprefixedSchema => {
+        expectInEveryOrder(await placeholdersInEveryOrder(homeAndArchive, { unprefixedSchema }, ['PgGenre_d']), 6,
+          { PgGenre_d: { type: 'genre', imports: null } });
       });
+
+      // with it, every relation reads placeholder_home.genre: the labels written out for placeholder_archive.reels
+      // type them all, and placeholder_home's relations, which name the enum, never replace them
+      describe('with typeEnumsAcrossSchemas', () => {
+        const labels = "('comedy' | 'drama')";
+
+        it.each(unprefixed)('writes the labels, with no import, unprefixedSchema %s', async unprefixedSchema => {
+          for (const schemas of bothOrders) {
+            const { customTypeSourceFiles: files } =
+              await codegen({ schemas, unprefixedSchema, typeEnumsAcrossSchemas: true });
+            expect.soft(files.PgGenre_d).toBe(placeholder('zapatos', [], `PgGenre_d = ${labels}`));
+            expect.soft(files.PgGenres_d).toBe(placeholder('zapatos', [], `PgGenres_d = ${labels}[]`));
+          }
+          const reels = unprefixedSchema === 'placeholder_archive' ? 's.reels' : 's.placeholder_archive.reels';
+          expect(await probeErrors({ schemas: bothOrders[0], unprefixedSchema, typeEnumsAcrossSchemas: true }, `
+            import type * as s from 'zapatos/schema';
+            export const genre: ${reels}.Selectable['genre'] = 'drama';
+            // @ts-expect-error not a label of placeholder_home.genre
+            export const western: ${reels}.Selectable['genre'] = 'western';
+            export const genres: ${reels}.Selectable['genres'] = ['comedy'];
+            // @ts-expect-error not an array of its labels
+            export const silent: ${reels}.Selectable['genres'] = ['silent'];
+          `)).toEqual([]);
+        });
+
+        it.each(unprefixed)('in whichever order the relations are read, unprefixedSchema %s', async unprefixedSchema => {
+          const config = { unprefixedSchema, typeEnumsAcrossSchemas: true };
+          expectInEveryOrder(await placeholdersInEveryOrder(homeAndArchive, config, ['PgGenre_d', 'PgGenres_d']), 6,
+            { PgGenre_d: { type: labels, imports: null }, PgGenres_d: { type: `${labels}[]`, imports: null } });
+        });
+      });
+    });
+
+    // with typeEnumsAcrossSchemas, the relation of the enum's schema names it `string`, TypeScript's own type, and
+    // imports nothing, as the relation that writes its labels out: their text differs, not their import
+    describe('a domain over an enum that may name a global type, used by a relation of another schema', () => {
+      beforeAll(() => t.pool.query(`
+        CREATE SCHEMA placeholder_loans;
+        CREATE TABLE placeholder_loans.takes (d placeholder_globals.date_d, s placeholder_globals.string_d);
+      `));
+      afterAll(() => t.pool.query('DROP SCHEMA placeholder_loans CASCADE'));
+
+      it.each(['placeholder_globals', 'placeholder_loans', null])(
+        'gets the labels with typeEnumsAcrossSchemas, in whichever order the relations are read, unprefixedSchema %s',
+        async unprefixedSchema => {
+          const config = { unprefixedSchema, typeEnumsAcrossSchemas: true };
+          expectInEveryOrder(await placeholdersInEveryOrder(['placeholder_globals', 'placeholder_loans'], config,
+            ['PgDate_d', 'PgString_d']), 2,
+          { PgDate_d: { type: "'d'", imports: null }, PgString_d: { type: "'s'", imports: null } });
+          for (const schemas of [
+            { placeholder_globals: all, placeholder_loans: all }, { placeholder_loans: all, placeholder_globals: all },
+          ]) {
+            const { customTypeSourceFiles: files } = await codegen({ ...config, schemas });
+            expect.soft(files.PgDate_d).toBe(placeholder('zapatos', [], `PgDate_d = 'd'`));
+            expect.soft(files.PgString_d).toBe(placeholder('zapatos', [], `PgString_d = 's'`));
+          }
+        });
     });
   });
 
