@@ -1571,6 +1571,31 @@ describe('selectOne, selectExactlyOne', () => {
     expect(q.copy({ preparedName: 'one_user' }).compile().values).toEqual([1, 1]);
   });
 
+  describe('characterization: withTies in selectOne() and selectExactlyOne() (#164)', () => {
+    // documented, not fixed: FETCH FIRST 1 ROWS WITH TIES, as in Zapatos 6.6.1, wherever LIMIT 1 would be
+    const
+      byOwner = { columns: ['id'], order: { by: 'owner_id', direction: 'ASC' }, withTies: true } as const,
+      topText = 'SELECT jsonb_build_object($1::text, "id") AS result FROM "accounts" WHERE ("owner_id" = $2) ORDER BY "owner_id" ASC FETCH FIRST $3 ROWS WITH TIES',
+      inLateral = (account: db.SQLFragment<any>) => db.select('users', all, { columns: ['id'], lateral: { account } }).compile(),
+      lateralText = `SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT jsonb_build_object($1::text, "id") || jsonb_build_object($2::text, "lateral_account".result) AS result FROM "users" LEFT JOIN LATERAL (SELECT jsonb_build_object($3::text, "id") AS result FROM "accounts" WHERE ("owner_id" = "users"."id") ORDER BY "owner_id" ASC FETCH FIRST $4 ROWS WITH TIES) AS "lateral_account" ON true) AS "sq_users"`;
+
+    it('selectOne, at top level and in a lateral', () => {
+      expect(db.selectOne('accounts', { owner_id: 1 }, byOwner).compile()).toEqual({ text: topText, values: ['id', 1, 1] });
+      expect(inLateral(db.selectOne('accounts', { owner_id: parent('id') }, byOwner))).toEqual({ text: lateralText, values: ['id', 'account', 'id', 1] });
+    });
+
+    it('selectExactlyOne, at top level and in a lateral', () => {
+      expect(db.selectExactlyOne('accounts', { owner_id: 1 }, byOwner).compile()).toEqual({ text: topText, values: ['id', 1, 1] });
+      expect(inLateral(db.selectExactlyOne('accounts', { owner_id: parent('id') }, byOwner))).toEqual({ text: lateralText, values: ['id', 'account', 'id', 1] });
+    });
+
+    it('selectExactlyOne with selectExactlyOneChecksForSecondRow: 2 at top level, 1 in a lateral', () => {
+      db.setConfig({ selectExactlyOneChecksForSecondRow: true });
+      expect(db.selectExactlyOne('accounts', { owner_id: 1 }, byOwner).compile()).toEqual({ text: topText, values: ['id', 1, 2] });
+      expect(inLateral(db.selectExactlyOne('accounts', { owner_id: parent('id') }, byOwner))).toEqual({ text: lateralText, values: ['id', 'account', 'id', 1] });
+    });
+  });
+
   it('copies nested in a lateral compile as the shortcuts they are copied from', () => {
     const
       n = db.count('accounts', { owner_id: parent('id') }),

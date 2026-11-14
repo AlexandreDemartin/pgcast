@@ -1,5 +1,5 @@
 ---
-english: 13116e7f98a0
+english: d5e0f9e80979
 ---
 
 # Jointures
@@ -111,7 +111,7 @@ Chaque cinéma, et l’autre cinéma le plus proche : de nouveau une table join
 
 - **`strictNullChecks`** : sans lui (ou `strict`), `columns`, `extras` et `lateral` laissent au type la ligne entière, et il ne refuse rien ([Strict](/fr/select#options)).
 - **Une jointure non vérifiée** : `db.parent()` accepte une colonne de n’importe quelle table, donc une jointure sur la mauvaise colonne compile. Postgres refuse une colonne que le parent n’a pas : `db.parent('billing')` sous `films` échoue avec 42703, « <span lang="en">column films.billing does not exist</span> ».
-- **[`withTies`](/fr/select#order-limit-offset-and-withties) dans un `selectOne()` imbriqué** : il écrit `FETCH FIRST $2 ROWS WITH TIES`<!-- probe: db.select('films', db.all, { lateral: { lead: db.selectOne('roles', { film_id: db.parent('id') }, { order: { by: 'billing', direction: 'ASC' }, withTies: true }) } }) -->, qui garde toutes les lignes ex æquo : sous un `select()` extérieur, la ligne parente revient une fois par ex æquo ; sous `selectOne()`, avec l’un d’eux. Dans un `select()` imbriqué, les ex æquo restent dans le tableau. Inchangé depuis Zapatos 6.6.1, et suivi dans le ticket ouvert [#164](https://github.com/AlexandreDemartin/pgcast/issues/164).
+- **[`withTies`](/fr/select#order-limit-offset-and-withties) dans un `selectOne()` imbriqué** : il écrit `FETCH FIRST $2 ROWS WITH TIES`<!-- probe: db.select('films', db.all, { lateral: { lead: db.selectOne('roles', { film_id: db.parent('id') }, { order: { by: 'billing', direction: 'ASC' }, withTies: true }) } }) -->, qui garde toutes les lignes ex æquo : sous un `select()` extérieur, la ligne parente revient une fois par ex æquo ; sous `selectOne()`, avec l’un d’eux. Dans un `select()` imbriqué, les ex æquo restent dans le tableau. Inchangé depuis Zapatos 6.6.1, et conservé : c’est le SQL que demande `withTies` ([#164](https://github.com/AlexandreDemartin/pgcast/issues/164#issuecomment-6883146644)).
 - **Un `lock`** : sans `of`, `FOR UPDATE`<!-- probe: db.select('films', db.all, { lock: { for: 'UPDATE' } }) --> atteint les sous-requêtes, et Postgres refuse la requête (0A000) : « <span lang="en">FOR UPDATE is not allowed with aggregate functions</span> » sous `select()` ou `count()`, « <span lang="en">FOR UPDATE cannot be applied to the nullable side of an outer join</span> » sous `selectOne()`. Nommez la table ([`lock`](/fr/select#lock)) :
 
 <CastPanel example="lateral_lock">
