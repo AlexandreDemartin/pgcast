@@ -238,6 +238,46 @@ describe('variant snapshots', () => {
     `, { skipLibCheck })).toEqual([]);
   });
 
+  it('labels, index and column names take their quote and backslash, typeEnumsAcrossSchemas on or off', async () => {
+    // tone_types is never generated: its enum is written out label by label with typeEnumsAcrossSchemas
+    await t.pool.query(String.raw`
+      CREATE SCHEMA quoting_probe;
+      CREATE SCHEMA tone_types;
+      CREATE TYPE quoting_probe.marks AS ENUM ('back\slash', 'trail\', 'it''s');
+      CREATE TYPE tone_types.tone AS ENUM ('back\slash', 'trail\', 'it''s');
+      CREATE TABLE quoting_probe.takes ("back\slash" int, "say ""cut""" int, m quoting_probe.marks, tone tone_types.tone);
+      CREATE UNIQUE INDEX "idx\back" ON quoting_probe.takes ("back\slash");`);
+    try {
+      const probe = String.raw`
+        import type * as s from 'zapatos/schema';
+        export const mark: s.quoting_probe.takes.Selectable['m'] = 'back\\slash';
+        export const trail: s.quoting_probe.takes.Selectable['m'] = 'trail\\';
+        export const quoted: s.quoting_probe.takes.Selectable['m'] = "it's";
+        // @ts-expect-error the backslash is part of the label
+        export const lost: s.quoting_probe.takes.Selectable['m'] = 'backslash';
+        export const column: s.quoting_probe.takes.Selectable['back\\slash'] = 1;
+        export const said: s.quoting_probe.takes.Selectable['say "cut"'] = 1;
+        // @ts-expect-error the backslash is part of the name
+        export const lostColumn: s.quoting_probe.takes.Selectable['backslash'] = 1;
+        export const index: s.quoting_probe.takes.UniqueIndex = 'idx\\back';
+        // @ts-expect-error the backslash is part of the name
+        export const lostIndex: s.quoting_probe.takes.UniqueIndex = 'idxback';
+      `;
+      const acrossSchemas = String.raw`
+        export const tone: s.quoting_probe.takes.Insertable['tone'] = 'back\\slash';
+        export const toneTrail: s.quoting_probe.takes.Insertable['tone'] = 'trail\\';
+        export const toneQuoted: s.quoting_probe.takes.Insertable['tone'] = "it's";
+        // @ts-expect-error the backslash is part of the label
+        export const toneLost: s.quoting_probe.takes.Insertable['tone'] = 'backslash';
+      `;
+      expect.soft(await probeErrors({ schemas: { quoting_probe: all } }, probe)).toEqual([]);
+      expect.soft(await probeErrors({ schemas: { quoting_probe: all }, typeEnumsAcrossSchemas: true }, probe + acrossSchemas))
+        .toEqual([]);
+    } finally {
+      await t.pool.query('DROP SCHEMA quoting_probe, tone_types CASCADE');
+    }
+  });
+
   it('holds no orphan file', () => {
     const expected = variants.flatMap(([name]) =>
       withoutCustomTypes.includes(name) ? [`${name}.d.ts`] : [`${name}.custom.d.ts`, `${name}.d.ts`]);
@@ -254,16 +294,11 @@ describe('surprises, frozen as they are', () => {
     ]) expect(schema).not.toContain(comment);
   });
 
-  it('edge: the output does not parse', async () => {
+  it('edge: the output does not parse, its names not being TypeScript identifiers', async () => {
     const { ts: schema } = await codegen({ schemas: { edge: all } });
-    // names that are not TS identifiers, a quote in an enum label
-    expect(schema).toContain(`export type traffic-light = 'amber's' | 'green light' | 'red';`);
+    expect(schema).toContain(`export type traffic-light = 'amber\\'s' | 'green light' | 'red';`);
     expect(schema).toContain('export namespace odd table {');
     expect(schema).toContain('export namespace class {');
-    // */ closes the JSDoc: in a column name, a DEFAULT, a COMMENT ON
-    expect(schema).toContain('* **edge.odd table.*/**');
-    expect(schema).toContain("* - Nullable, default: `'*/'::text`");
-    expect(schema).toContain('* Column comment with */ inside');
     expect(syntaxErrors(schema)).not.toEqual([]);
     expect(syntaxErrors((await codegen(main)).ts)).toEqual([]);  // control: the same check passes without edge
   });
@@ -404,9 +439,8 @@ describe('column comments', () => {
     }
   });
 
-  it('writes a comment holding */ as Zapatos 6.6.1 does, so that one which parsed still parses (until #48)', async () => {
-    // its */ ends the JSDoc, and the next line's /* opens a comment that the JSDoc's own */ closes:
-    // a * before that line is code (TS1131)
+  it('writes a comment holding */ with its */ escaped, every line behind its own *', async () => {
+    // a */ would end the JSDoc: Zapatos 6.6.1 wrote it as it is, and only a /* after it kept the file parsing
     await t.pool.query(String.raw`
       CREATE SCHEMA comment_closer;
       CREATE TABLE comment_closer.notes (reopen int, later int, plain int);
@@ -415,14 +449,13 @@ describe('column comments', () => {
       COMMENT ON COLUMN comment_closer.notes.plain IS E'First line\nsecond line';`);
     try {
       const { ts: schema } = await codegen({ schemas: { comment_closer: all } });
-      expect(commentLines(schema, 'notes')).toEqual({
-        reopen: ['* Closes here */', '/* and reopens'],
-        later: ['* line one', 'Closes */', '/* reopens'],  // its */ on a later line: no * on any line after the first
+      expect.soft(commentLines(schema, 'notes')).toEqual({
+        reopen: ['* Closes here *\\/', '* /* and reopens'],
+        later: ['* line one', '* Closes *\\/', '* /* reopens'],
         plain: ['* First line', '* second line'],
       });
-      expect(schema).toContain('* Closes here */\n    /* and reopens\n');  // the line after */ as master writes it
-      expect(schema).toContain('* line one\n    Closes */\n    /* reopens\n');
-      expect(syntaxErrors(schema)).toEqual([]);
+      expect.soft(schema).toMatch(/\* Closes here \*\\\/\n +\* \/\* and reopens\n/);  // the line after it, behind its *
+      expect.soft(syntaxErrors(schema)).toEqual([]);
     } finally {
       await t.pool.query('DROP SCHEMA comment_closer CASCADE');
     }
@@ -483,8 +516,7 @@ describe('column comments', () => {
     }
   });
 
-  it('leaves out a comment holding */ on a view, foreign table or partitioned table (until #48)', async () => {
-    // Zapatos 6.6.1 drops every comment of these: written as a table's is, 'ends */ early' would stop the file parsing
+  it('escapes a comment holding */ on every kind of relation, a materialized view included', async () => {
     await t.pool.query(String.raw`
       CREATE SCHEMA comment_kinds_closer;
       CREATE TABLE comment_kinds_closer.t (x int);
@@ -498,19 +530,54 @@ describe('column comments', () => {
       COMMENT ON COLUMN comment_kinds_closer.f.y IS 'Plain';
       CREATE TABLE comment_kinds_closer.p (x int, y int) PARTITION BY RANGE (x);
       COMMENT ON COLUMN comment_kinds_closer.p.x IS 'Ends */ early';
-      COMMENT ON COLUMN comment_kinds_closer.p.y IS 'Plain';`);
+      COMMENT ON COLUMN comment_kinds_closer.p.y IS 'Plain';
+      CREATE MATERIALIZED VIEW comment_kinds_closer.m AS SELECT 1 AS x, 2 AS y;
+      COMMENT ON COLUMN comment_kinds_closer.m.x IS 'Ends */ early';
+      COMMENT ON COLUMN comment_kinds_closer.m.y IS E'Closes */\n/* reopens';`);
     try {
       const { ts: schema } = await codegen({ schemas: { comment_kinds_closer: all } });
-      expect(Object.fromEntries(['t', 'v', 'f', 'p'].map(rel => [rel, commentLines(schema, rel)]))).toEqual({
-        t: { x: ['* Closes */', '/* reopens'] },  // a table's, written as master writes it
-        v: { x: [], y: [], z: ['* Plain'] },
-        f: { x: [], y: ['* Plain'] },
-        p: { x: [], y: ['* Plain'] },
+      expect.soft(Object.fromEntries(['t', 'v', 'f', 'p', 'm'].map(rel => [rel, commentLines(schema, rel)]))).toEqual({
+        t: { x: ['* Closes *\\/', '* /* reopens'] },
+        v: { x: ['* Ends *\\/ early'], y: ['* Closes *\\/', '* /* reopens'], z: ['* Plain'] },
+        f: { x: ['* Ends *\\/ early'], y: ['* Plain'] },
+        p: { x: ['* Ends *\\/ early'], y: ['* Plain'] },
+        m: { x: ['* Ends *\\/ early'], y: ['* Closes *\\/', '* /* reopens'] },
       });
-      expect(syntaxErrors(schema)).toEqual([]);
+      expect.soft(syntaxErrors(schema)).toEqual([]);
     } finally {
       await t.pool.query('DROP SCHEMA comment_kinds_closer CASCADE');
     }
+  });
+});
+
+describe('quotes and */', () => {
+  // a schema of its own, committed to this file's database: no other test configures it
+  beforeAll(() => t.pool.query(String.raw`
+    CREATE SCHEMA quoting;
+    CREATE TYPE quoting.marks AS ENUM ('back\slash', 'trail\', 'it''s');
+    CREATE DOMAIN quoting."code*/" AS text;
+    CREATE TABLE quoting.takes ("back\slash" int, "say ""cut""" int, m quoting.marks, code quoting."code*/");
+    CREATE UNIQUE INDEX "idx\back" ON quoting.takes ("back\slash");
+  `));
+  afterAll(() => t.pool.query('DROP SCHEMA quoting CASCADE'));
+
+  it('edge: writes */ as *\\/ in a column name, a DEFAULT and a comment', async () => {
+    const { ts: schema } = await codegen({ schemas: { edge: all } });
+    expect.soft(schema).toContain('* **edge.odd table.*\\/**');
+    expect.soft(schema).toContain("* - Nullable, default: `'*\\/'::text`");
+    expect.soft(schema).toContain('* Column comment with *\\/ inside');
+    expect.soft(schema).not.toMatch(/\*\/\*\*|'\*\/'|with \*\/ inside/);
+  });
+
+  it('escapes a quote and a backslash in a label, an index and a column name, and */ in a type name', async () => {
+    const { ts: schema } = await codegen({ schemas: { quoting: all } });
+    expect.soft(schema).toContain(`export type marks = 'back\\\\slash' | 'it\\'s' | 'trail\\\\';`);
+    expect.soft(schema).toContain(`export type marks = ['back\\\\slash', 'it\\'s', 'trail\\\\'];`);
+    expect.soft(schema).toContain('"back\\\\slash": number | null;');
+    expect.soft(schema).toContain('"say \\"cut\\"": number | null;');
+    expect.soft(schema).toContain(`export type UniqueIndex = 'idx\\\\back';`);
+    expect.soft(schema).toContain('* - `code*\\/` (base type: `text`) in database');
+    expect.soft(syntaxErrors(schema)).toEqual([]);
   });
 });
 
