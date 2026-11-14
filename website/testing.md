@@ -23,7 +23,7 @@ It takes a [`Queryable`](/sql-template#Queryable), so a test can hand it any poo
 
 ## Test against a real database
 
-The approach I recommend: the only one of the three that checks the query itself and what Postgres sends back. pgcast's own suite works this way ([`test/helpers/db.ts`](https://github.com/AlexandreDemartin/pgcast/blob/master/test/helpers/db.ts)).
+The approach I recommend: the only one of the three that checks the query itself and what Postgres sends back. Its cost: a Postgres server, locally and in CI, and a slower run. pgcast's own suite works this way ([`test/helpers/db.ts`](https://github.com/AlexandreDemartin/pgcast/blob/master/test/helpers/db.ts)).
 
 ### Copy a database for each test file
 
@@ -47,7 +47,7 @@ Each test runs on one client, inside `BEGIN`, rolled back afterwards: what it wr
 
 - Here with `test` from `node:test` and `assert` from `node:assert/strict`; any test runner does, and `beforeEach` / `afterEach` hooks can hold the same lines.
 - Read a generated value from what `insert()` returns, as `studio.id` here: never write it into the test (below).
-- A client whose `ROLLBACK` fails is broken: `release(err)` destroys it rather than handing it to the next test.
+- A client whose `ROLLBACK` fails is broken: `release(err)` destroys it rather than handing it to the next test. If the test failed first, its own error is the one thrown, as it says why.
 
 ### Know what a rollback leaves
 
@@ -104,6 +104,7 @@ The test compares its compiled query with the one of the call it should make, co
 
 - It fails when `filmSearch()` makes another call, and not when pgcast writes the same call's SQL another way.
 - `values` holds more than your input: `columns` sends each name as a parameter (`$1::text`<!-- probe: examples/testing_search.ts -->), and a filter's keys go in alphabetical order, `"release_year" < $3`<!-- probe: examples/testing_search.ts --> before `"title" ILIKE $4`<!-- probe: examples/testing_search.ts -->. A `values` array written by hand ties the test to both.
+- It does not see what only Postgres refuses: for `?before=abc`, `lt(Number('abc'))` compiles `NaN` on both sides, and the test passes, where Postgres refuses the query with 22P02 (`invalid input syntax for type integer: "NaN"`).
 - For SQL you write yourself in a `sql` template, freezing its `text` is fine: the text is yours ([Check the SQL before you run it](/raw-sql#check-the-sql-before-you-run-it)).
 
 ### The SQL text is not a stable API

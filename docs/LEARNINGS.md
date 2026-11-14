@@ -144,6 +144,12 @@ Candidates for a check, a rule or a skill line.
 - #168 — An option that drops keys from a caller's object filters the key list and leaves the object alone: rebuilding it (`Object.fromEntries(Object.entries(x))`) loses getters, inherited and non-enumerable keys that `x[k]` still reads — `branch-reviewer`
 - #168 — A replay grid also runs once on the pre-fix commit, to show it finds the defect (144 differences on the old head, 0 after) — `branch-reviewer`
 - #168 — Before planning a step that changes an opt-in, search its tests: two existing tests had frozen the very behaviour the decision changed — `builder`
+- #167 — A new refusal on a path where 6.6.1 rejected from `.run()` throws as the query compiles (a fragment whose `compile` throws, as #269 does), frozen through `.run()` with a `query` spy: thrown at the call, a `.catch()` chained on `.run()` loses it — `branch-reviewer`
+- #167 — A sentence saying when an error happens matches how its test asserts: « the call throws » for `expect(() => fn(…))`, « throws while compiling, so `.run()` rejects » for `.compile()` or `.run()` — `branch-reviewer`
+- #167 — When a row of a docs table moves to another group, reread the paragraph above it: `transaction.md` still said every shortcut throws from the call — `branch-reviewer`
+- #167 — A red commit typechecks too: Vitest runs a call past an overload's arity; write it `(fn as any)(…)` — `builder`
+- #252 — A list of the routes that compile a Whereable is checked against every interpolation of a filter in `shortcuts.ts`, not only `where`: `having` was missing — `builder`
+- #252 — A « 6.6.1 typed X » claim is checked by `tsc` against the `zapatos@6.6.1` tarball's `dist/db/*.d.ts` through `paths`, with `NODE_PATH` on the root `node_modules` — `builder`
 
 ## Minors kept
 

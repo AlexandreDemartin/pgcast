@@ -70,7 +70,7 @@ One that opens a transaction takes the pool or the client of its level, `pg.Pool
 
 ## What pgcast adds
 
-pgcast starts from Zapatos 6.6.1. Before changing it, the fork pinned what 6.6.1 does, with tests, and that [characterisation](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/CHARACTERISATION-REPORT.md) found dozens of surprises, 7 of them about security, all fixed in 6.6.2. A finding pgcast acts on takes one of three paths ([decision 003](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/003-fixes-and-deprecation.md)):
+pgcast starts from Zapatos 6.6.1. Before changing it, the fork pinned what 6.6.1 does, with tests, and that [characterisation](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/CHARACTERISATION-REPORT.md) found dozens of surprises, 7 of them about security. A finding pgcast acts on takes one of three paths ([decision 003](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/003-fixes-and-deprecation.md)):
 
 <div class="stack">
 
@@ -82,7 +82,7 @@ pgcast starts from Zapatos 6.6.1. Before changing it, the fork pinned what 6.6.1
 
 </div>
 
-The security fixes came first, in 6.6.2 ([Security](/security)):
+The security fixes came first, all of them in 6.6.2 ([Security](/security)):
 
 - no name (a table, a column, a key, an alias) and no cast of `param()` can close its quotes;
 - a plain value in [`upsert()`](/insert#upsert)'s `updateValues` is a parameter;
