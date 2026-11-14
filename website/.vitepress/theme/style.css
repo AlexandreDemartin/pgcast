@@ -86,49 +86,26 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 .VPNavBar.has-sidebar .divider::before { display: none; }
 .VPNavBarTitle .title { color: var(--fg); gap: 8px; }
 /* the wordmark (Wordmark.vue), PG⟨mark⟩CAST: capitals as tall as the 14px tile, Saira's cap height being .688em, so
-   that both stand on the baseline and share their middle; the tile 2px from each word, the tracking after the G
-   included */
+   that both stand on the baseline and share their middle; tracked .06em, which balances regular strokes against the
+   solid tile; the tile 2px from each word, the tracking after the G included */
 .Wordmark {
   display: inline-flex; align-items: baseline; flex: none;
-  font: 700 calc(14px / .688)/1.5 "Saira Wordmark", var(--font-display); letter-spacing: .04em;
+  font: 400 calc(14px / .688)/1.5 "Saira Wordmark", var(--font-display); letter-spacing: .06em;
 }
-.Wordmark .pg, .Wordmark .cast, .Wordmark .pg > span, .Wordmark .cast > span { display: inline-block; }
-.Wordmark .mark { flex: none; width: 14px; height: 14px; margin: 0 2px 0 calc(2px - .04em); fill: var(--accent); }
-/* its entrance, on a session's first page only, A or B as config.ts chooses (Wordmark.vue): the tile settles in, then
-   the words come out of it. One ease-out for both; opacity, transform, mask and filter alone, never a layout property,
-   so the words keep their place and width from the first frame. Each rule is gone once the entrance is over. */
+.Wordmark .mark { flex: none; width: 14px; height: 14px; margin: 0 2px 0 calc(2px - .06em); fill: var(--accent); }
+/* its entrance, on the home only, the first time it loads in a session (config.ts, Wordmark.vue): the tile settles in,
+   then the letters come into focus one by one from the tile outward, G and C first, in gaps that shrink (Wordmark.vue's
+   `--delay`: 0, 120, 200, 250ms) so they read as a wave; 1.85s in all, on one strong ease-out, Emil Kowalski's. Opacity,
+   transform and a 5px blur alone, never a layout property, so the letters keep their place and width from the first
+   frame. The rules are gone once it is over: it never replays, so keyframes need not be interruptible. */
 @media (prefers-reduced-motion: no-preference) {
-  html[data-wordmark] .Wordmark { --ease: cubic-bezier(.22, 1, .36, 1); }
-  html[data-wordmark] .Wordmark .mark { animation: wordmark-settle 600ms var(--ease) backwards; }
-  /* A, 2.1s: PG and CAST slide out of the tile to each side, uncovered by a mask of two layers that meet: a soft edge
-     .5em wide that keeps just ahead of the words, and one .25em wide at the tile's side that withdraws as they settle,
-     so they come out of the tile as out of a mould and never look cut by an edge */
-  html[data-wordmark="a"] .Wordmark .pg, html[data-wordmark="a"] .Wordmark .cast {
-    mask-size: calc(200% + .5em) 100%, calc(100% + .25em) 100%; mask-repeat: no-repeat; mask-composite: intersect;
-  }
-  html[data-wordmark="a"] .Wordmark .pg {
-    mask-image: linear-gradient(to right, transparent calc(50% - .25em), #000 calc(50% + .25em)),
-      linear-gradient(to left, transparent, #000 .25em);
-    mask-position: 100% 0, 0% 0;
-    animation: wordmark-uncover-pg 1700ms var(--ease) 280ms backwards;
-  }
-  html[data-wordmark="a"] .Wordmark .cast {
-    mask-image: linear-gradient(to left, transparent calc(50% - .25em), #000 calc(50% + .25em)),
-      linear-gradient(to right, transparent, #000 .25em);
-    mask-position: 0% 0, 100% 0;
-    animation: wordmark-uncover-cast 1700ms var(--ease) 400ms backwards;
-  }
-  html[data-wordmark="a"] .Wordmark .pg > span { animation: wordmark-slide 1700ms var(--ease) 280ms backwards; }
-  html[data-wordmark="a"] .Wordmark .cast > span { --from: -100%; animation: wordmark-slide 1700ms var(--ease) 400ms backwards; }
-  /* B, 1.96s: the letters come into focus one by one, from the tile outward, G and C first, 120ms apart */
-  html[data-wordmark="b"] .Wordmark .pg > span > span, html[data-wordmark="b"] .Wordmark .cast > span > span {
-    animation: wordmark-focus 1300ms var(--ease) calc(300ms + var(--i) * 120ms) backwards;
+  html[data-wordmark] .Wordmark { --ease-out: cubic-bezier(.23, 1, .32, 1); }
+  html[data-wordmark] .Wordmark .mark { animation: wordmark-settle 600ms var(--ease-out) backwards; }
+  html[data-wordmark] .Wordmark .pg > span, html[data-wordmark] .Wordmark .cast > span {
+    animation: wordmark-focus 1300ms var(--ease-out) calc(300ms + var(--delay)) backwards;
   }
 }
-@keyframes wordmark-settle { from { opacity: 0; transform: scale(.7); } }
-@keyframes wordmark-uncover-pg { from { mask-position: 0% 0, 100% 0; } }
-@keyframes wordmark-uncover-cast { from { mask-position: 100% 0, 0% 0; } }
-@keyframes wordmark-slide { from { transform: translateX(var(--from, 100%)); } }
+@keyframes wordmark-settle { from { opacity: 0; transform: scale(.9); } }
 @keyframes wordmark-focus { from { opacity: 0; filter: blur(.25em); } }
 .VPNavBarTitle .version {
   font: 500 12px/1 var(--font-body); letter-spacing: 0; color: var(--muted);

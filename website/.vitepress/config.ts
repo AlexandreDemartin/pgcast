@@ -22,15 +22,14 @@ const
   { version } = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')),
   font = (file: string): HeadConfig =>
     ['link', { rel: 'preload', href: `/fonts/${file}.woff2`, as: 'font', type: 'font/woff2', crossorigin: '' }],
-  // the wordmark's entrance (Wordmark.vue, style.css): 'a', the words slid out of the tile behind a soft edge, or 'b',
-  // their letters brought into focus one by one from the tile outward
-  entrance: 'a' | 'b' = 'a',
-  // set before the first paint: on the first page of a session only, and never with reduced motion; without storage,
-  // none
+  // the wordmark's entrance (Wordmark.vue, style.css), set before the first paint: on the home only, the first time it
+  // loads in a session, and never with reduced motion; without storage, none. A client-side navigation runs no script
+  // here, so arriving on the home from another page plays nothing either: the wordmark is already on screen
   wordmarkEntrance = `try {
-  if (!sessionStorage.getItem('pgcast-wordmark') && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  if ((location.pathname === '/' || location.pathname === '/index.html') && !sessionStorage.getItem('pgcast-wordmark') &&
+    !matchMedia('(prefers-reduced-motion: reduce)').matches) {
     sessionStorage.setItem('pgcast-wordmark', '1');
-    document.documentElement.dataset.wordmark = '${entrance}';
+    document.documentElement.dataset.wordmark = '';
   }
 } catch {}`;
 
@@ -56,7 +55,7 @@ export default defineConfig({
   },
   head: [
     // public/fonts/, declared in theme/fonts.css: every page's first screen sets all three faces, and the wordmark's
-    // six capitals of Saira. Those first: 1.3 KB, set `font-display: block`, they then arrive before the first paint
+    // six capitals of Saira. Those first: 1.2 KB, set `font-display: block`, they then arrive before the first paint
     // (400ms on a throttled 1.6 Mb/s, 150ms link, against 1.2s unpreloaded and 1.5s preloaded behind the three faces)
     font('saira-wordmark'), font('schibsted-grotesk-latin'), font('inter-latin'), font('jetbrains-mono-latin'),
     ['script', {}, wordmarkEntrance],
