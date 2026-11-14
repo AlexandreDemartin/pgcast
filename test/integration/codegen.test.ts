@@ -1652,6 +1652,21 @@ describe('names that Object.prototype also has', () => {
       expect(writablesOf(schema, '__proto__')).toEqual(writables([['hasOwnProperty', 'string'], ['id', 'number'], ['toString', 'string']]));
     });
 
+    it.each([false, 0, ''])('still lets a table entry %j hide the "*" entry, as in Zapatos 6.6.1', async entry => {
+      // 6.6.1 read columnOptions.films && columnOptions.films.title, which gave back the entry itself, and ?? stopped there
+      const
+        { ts: schema } = await codegenOf('proto_d', { ...excludedEverywhere('title'), films: entry } as unknown as Config['columnOptions']),
+        columns: [string, string][] = [['__proto__', 'string'], ['constructor', 'string'], ['hasOwnProperty', 'string'],
+          ['id', 'number'], ['title', 'string'], ['toString', 'string']];
+      expect(writablesOf(schema, 'films')).toEqual(writables(columns));
+    });
+
+    it.each([null, undefined])('still throws on columnOptions %s, as Zapatos 6.6.1 did', async columnOptions => {
+      // as JSON's null and generate()'s undefined give it: either one replaces the default {}
+      const config = { schemas: { proto_d: only('films') }, unprefixedSchema: 'proto_d', columnOptions } as unknown as Config;
+      await expect(codegen(config)).rejects.toThrow(new TypeError(`Cannot read properties of ${columnOptions} (reading 'films')`));
+    });
+
     const functionNames = names.filter(name => name !== '__proto__');
 
     it.each(functionNames)('generates a table named %s with columns caller and arguments', async name => {
