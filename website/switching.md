@@ -246,7 +246,8 @@ npm install zapatos@6.6.1
 ```
 
 - First, remove from `setConfig()` the options Zapatos 6.6.1's `Config` doesn't have (2353): `upsertRequiresSameKeys`, `undefinedMeansMissing`, `transactionRequiresCommit` and `selectExactlyOneChecksForSecondRow`.
-- Regenerate with Zapatos 6.6.1. It ignores `typeEnumsAcrossSchemas` and `enumOrder` in `zapatosconfig.json`, and writes again the `any` types, the sorted labels, the unprefixed comment lines and any borrowed `UniqueIndex` name.
+- On [`moduleNames`](/generator#generate.moduleNames) `"pgcast"`, run `npm uninstall pgcast` too: both packages have a `zapatos` command. Your `pgcast/…` imports then no longer resolve, and 6.6.1 writes `zapatos/` but leaves `pgcast/` behind. So change each import back to `zapatos/…`, move the placeholders you edited to `zapatos/custom/`, their `declare module 'pgcast/custom'` renamed `'zapatos/custom'`, and delete `pgcast/`.
+- Regenerate with Zapatos 6.6.1. It ignores `typeEnumsAcrossSchemas`, `enumOrder` and `moduleNames` in `zapatosconfig.json`, and writes again the `any` types, the sorted labels, the unprefixed comment lines and any borrowed `UniqueIndex` name.
 - Each change of [Find the calls whose result changes](#find-the-calls-whose-result-changes) runs as it did, but the `jsonb` one, which finds nothing again.
 
 ::: warning Security
