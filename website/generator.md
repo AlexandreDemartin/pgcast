@@ -1,6 +1,6 @@
 # Generator
 
-The generator reads your database's catalog and writes the types of `zapatos/schema`. This page lists how to run it, from the command line or from code, every option of `zapatosconfig.json` and `generate()`, and the files it writes.
+The generator reads your database's catalog and writes the types of `zapatos/schema`. This page lists how to run it, from the command line or from code, every option of its config file and `generate()`, and the files it writes.
 {.lede}
 
 ## The CLI {#cli}
@@ -12,7 +12,9 @@ npx zapatos [config]
 
 The same program under two names: `pgcast`, and `zapatos`, as in Zapatos 6.6.1. It reads the config, then runs [`generate()`](#generate) with it.
 
-- `zapatosconfig.json`: read from the folder you run it in, if it is there; never from a parent folder. Without it, the config is `{}`.
+- The config file: read from the folder you run it in, if it is there; never from a parent folder. Without one, the config is `{}`.
+  - `zapatosconfig.json`, as in Zapatos 6.6.1.
+  - `pgcastconfig.json`, from 6.7.0, read first: with both there, only `pgcastconfig.json` is, and the CLI notes it through [`warningListener`](#generate.warningListener) before generating.
 - `config`: one optional argument, a JSON object, merged over the file key by key: `npx pgcast '{"outDir": "./generated"}'` keeps the file's `db` and replaces its `outDir`.
   - A key given here replaces the file's whole value, so `'{"db": {"application_name": "codegen"}}'` drops the file's `connectionString`.
   - The file's variables are filled in before the merge: one it names must be set even when the argument replaces its key, or the CLI stops with `Environment variable 'NAME' is not set`.
@@ -34,7 +36,7 @@ The same program under two names: `pgcast`, and `zapatos`, as in Zapatos 6.6.1. 
 
 A config it can't read stops it before any query, with code 1, Node printing the error and its stack. The error starts with what it was reading:
 
-- the file: `If present, zapatosconfig.json must be a valid JSON file, and all referenced environment variables must exist:`
+- the file: `If present, zapatosconfig.json must be a valid JSON file, and all referenced environment variables must exist:`, or `pgcastconfig.json` for that file
 - the argument: `If present, the argument to Zapatos must be valid JSON, and all referenced environment variables must exist:`
 
 Then it ends with the cause:
@@ -305,7 +307,7 @@ CREATE TYPE crew_job AS ENUM ('director', 'writer', 'editor', 'cinematographer',
 
 ::: code-group
 
-```json [zapatosconfig.json]
+```json [pgcastconfig.json]
 {
   "db": { "connectionString": "{{DATABASE_URL}}" },
   "outDir": "./src",
@@ -322,7 +324,7 @@ import type * as s from 'pgcast/schema';
 
 - `"zapatos"` writes the same files as without the option: it changes nothing until it is `"pgcast"`.
 - `"pgcast"` writes the same types, and ends `pgcast/schema.d.ts` with `declare module 'zapatos/schema' { export * from 'pgcast/schema'; }`: `pgcast/db`'s own declarations import `zapatos/schema`. Without it, every type would be `any`: under `skipLibCheck`, silently.
-- In the generated files, `zapatos` is left in that line and in the headers' credit to Zapatos. The config file keeps its name, `zapatosconfig.json` ([#368](https://github.com/AlexandreDemartin/pgcast/issues/368)); `npx pgcast` and `npx zapatos` both read the option.
+- In the generated files, `zapatos` is left in that line and in the headers' credit to Zapatos. The config file can be `pgcastconfig.json` or `zapatosconfig.json` ([The CLI](#cli)); `npx pgcast` and `npx zapatos` both read the option.
 - Another value stops the generator before any query, and writes nothing: `moduleNames must be 'zapatos' (the default) or 'pgcast', not 'pgcats'`. In TypeScript, it fails to compile (TS2322, or TS2820 with a suggestion for a near-miss such as `"pgcats"`).
 - The other mode's schema in `outDir`, such as a `zapatos/` folder left from before the switch, is noted through [`warningListener`](#generate.warningListener). With `"pgcast"`, a stale `zapatos/` that `tsconfig.json` includes also declares `zapatos/schema`, which TypeScript merges: it lets a number through for a `text` column under `skipLibCheck`, and fails with TS2307 without it. With `"zapatos"`, a stale `pgcast/` loosens nothing, and its import of `pgcast/db` fails with TS2307 without `skipLibCheck`. Delete the stale folder once the placeholders you edited there are moved to the other, their `declare module 'zapatos/custom'` renamed `'pgcast/custom'`, or the reverse.
 
@@ -356,6 +358,8 @@ Writing custom types file: src/zapatos/custom/index.d.ts
   - after writing, with [`moduleNames`](#generate.moduleNames) `"pgcast"`, when `outDir` holds a `zapatos/schema.d.ts`; a folder without its `schema.d.ts` is not noted;
 - `Note: src/pgcast/schema.d.ts is here too, generated with moduleNames: 'pgcast'. Its import of 'pgcast/db' fails to compile without skipLibCheck. Delete the folder src/pgcast, once any placeholder you edited there is moved to src/zapatos/custom.`
   - the same, with `"zapatos"` and a `pgcast/schema.d.ts`;
+- `Note: pgcastconfig.json and zapatosconfig.json are both here, and only pgcastconfig.json is read. Move any option you still need from zapatosconfig.json into pgcastconfig.json, then delete zapatosconfig.json.`
+  - from [the CLI](#cli), before generating, when the folder it runs in has both files;
 - the [old layout warning](#the-old-layout-warning).
 
 ### `debugListener` {#generate.debugListener}

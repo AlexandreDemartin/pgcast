@@ -64,12 +64,12 @@ bun add -d @types/pg
 
 :::
 
-Then set `"moduleNames": "pgcast"` in `zapatosconfig.json`, and import `pgcast/db` and `pgcast/schema` ([`moduleNames`](/generator#generate.moduleNames)).
+Then set `"moduleNames": "pgcast"` in `pgcastconfig.json`, the generator's config file ([The CLI](/generator#cli)), and import `pgcast/db` and `pgcast/schema` ([`moduleNames`](/generator#generate.moduleNames)).
 
 Yarn 2 and later need a version range in an alias, and Yarn 1 and bun before 1.4 write none without one: hence the `@^6.7`, the first release with `moduleNames`.
 
 ::: info Coming
-6.7.0 isn't on npm yet: 6.6.2 ignores `moduleNames` and writes `zapatos/`, and the yarn and bun commands find no version. Until then, install under the `zapatos` alias ([the milestone](https://github.com/AlexandreDemartin/pgcast/milestone/1)).
+6.7.0 isn't on npm yet: 6.6.2 ignores `pgcastconfig.json` and `moduleNames`, and writes `zapatos/`, and the yarn and bun commands find no version. Until then, install under the `zapatos` alias ([the milestone](https://github.com/AlexandreDemartin/pgcast/milestone/1)).
 :::
 
 ### Under the `zapatos` alias
