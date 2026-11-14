@@ -1551,6 +1551,27 @@ describe('a built-in object as a Whereable', () => {
     expect(sql`DELETE FROM ${'users'} WHERE ${new Ids()}`.compile()).toEqual({ text: 'DELETE FROM "users" WHERE ("id" = $1)', values: [1] });
     expect(() => sql`DELETE FROM ${'users'} WHERE ${new Empty()}`.compile()).toThrow('A built-in `Iterator` has no meaning as a Whereable (a filter)');
   });
+
+  it('loads, and still refuses a sync iterator, where the async generator chain is missing', async () => {
+    // transpiled below ES2018 (Babel, esbuild --target=es2017), `async function* () {}` is a plain function whose
+    // prototype has no `.prototype`: reading %AsyncIteratorPrototype% from it threw as `zapatos/db` loaded
+    const
+      asyncGeneratorFunctionPrototype = Object.getPrototypeOf(async function* () {}),
+      descriptor = Object.getOwnPropertyDescriptor(asyncGeneratorFunctionPrototype, 'prototype')!;
+    delete asyncGeneratorFunctionPrototype.prototype;
+    vi.resetModules();
+    try {
+      const core = await import('../../src/db/core');
+      expect(() => core.sql`DELETE FROM ${'users'} WHERE ${[1].values()}`.compile())
+        .toThrow('A built-in `Array Iterator` has no meaning as a Whereable (a filter)');
+      // left out, an async generator compiles as in 6.6.1
+      expect(core.sql`DELETE FROM ${'users'} WHERE ${(async function* () {})()}`.compile())
+        .toEqual({ text: 'DELETE FROM "users" WHERE TRUE', values: [] });
+    } finally {
+      Object.defineProperty(asyncGeneratorFunctionPrototype, 'prototype', descriptor);
+      vi.resetModules();
+    }
+  });
 });
 
 describe('a list that is not an array in isIn() and isNotIn()', () => {
