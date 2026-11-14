@@ -630,7 +630,9 @@ describe('column comments', () => {
             const doc = node.getChildren().find(ts.isJSDoc)!;
             (found[node.parent.name.text] ??= {})[node.name.getText()] = {
               text: text(doc.comment),
-              tags: (doc.tags ?? []).map(tag => `@${tag.tagName.text} ${text(tag.comment)}`.trimEnd()),
+              // `@see` reads its first word as a name, the rest as its text
+              tags: (doc.tags ?? []).map(tag =>
+                `@${tag.tagName.text} ${ts.isJSDocSeeTag(tag) && tag.name ? tag.name.getText() : ''}${text(tag.comment)}`.trimEnd()),
             };
           }
           ts.forEachChild(node, visit);
