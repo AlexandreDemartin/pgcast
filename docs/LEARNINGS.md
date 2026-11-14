@@ -143,6 +143,18 @@ Candidates for a check, a rule or a skill line.
 - #51 — R36 depends on the schema: an inline fragment fails only when another relation has the same column name with another type, or a nullable copy of a `NOT NULL` column in `update()`; the docs schema has neither, so the page states it in prose — `builder`
 - #48 — Escape the whole string that goes into a JSDoc, template text included: `**` before a name starting with `/` makes a `*/` that escaping the name alone misses — `branch-reviewer`
 - #48 — Replay every example a CHANGELOG line gives, not only its main claim: the `\u` and octal wordings were reasoned, then found wrong — `branch-reviewer`
+- #168 — An option that drops keys from a caller's object filters the key list and leaves the object alone: rebuilding it (`Object.fromEntries(Object.entries(x))`) loses getters, inherited and non-enumerable keys that `x[k]` still reads — `branch-reviewer`
+- #168 — A replay grid also runs once on the pre-fix commit, to show it finds the defect (144 differences on the old head, 0 after) — `branch-reviewer`
+- #168 — Before planning a step that changes an opt-in, search its tests: two existing tests had frozen the very behaviour the decision changed — `builder`
+- #167 — A new refusal on a path where 6.6.1 rejected from `.run()` throws as the query compiles (a fragment whose `compile` throws, as #269 does), frozen through `.run()` with a `query` spy: thrown at the call, a `.catch()` chained on `.run()` loses it — `branch-reviewer`
+- #167 — A sentence saying when an error happens matches how its test asserts: « the call throws » for `expect(() => fn(…))`, « throws while compiling, so `.run()` rejects » for `.compile()` or `.run()` — `branch-reviewer`
+- #167 — When a row of a docs table moves to another group, reread the paragraph above it: `transaction.md` still said every shortcut throws from the call — `branch-reviewer`
+- #167 — A red commit typechecks too: Vitest runs a call past an overload's arity; write it `(fn as any)(…)` — `builder`
+- #252 — A list of the routes that compile a Whereable is checked against every interpolation of a filter in `shortcuts.ts`, not only `where`: `having` was missing — `builder`
+- #252 — A « 6.6.1 typed X » claim is checked by `tsc` against the `zapatos@6.6.1` tarball's `dist/db/*.d.ts` through `paths`, with `NODE_PATH` on the root `node_modules` — `builder`
+- #253 — An issue cites a test by its name, not its `file:line`: the line taken from Minors kept had moved by the time the step ran — `builder`
+- #253 — A guard shared by several routes gets a route-specific mutant: removing the shared guard turns every entry red and cannot show the new one is needed — `builder`
+- #253 — `branch-reviewer` cannot load the user skill `branch-review` (`disable-model-invocation`), so it reviews from its brief: the agent and the skill disagree — orchestrator
 
 ## Minors kept
 
@@ -175,3 +187,5 @@ Minor review defects, taken up by the end-of-chapter review.
 - #368 — `website/generator.md:69`: « the options of `zapatosconfig.json` », where the lede now says « its config file » — `branch-reviewer`
 - #48 — `src/generate/tables.ts:294`, `:305`, `:315`: the `stringLiteral` escapes of `Schema`, `AllSchemas` and a `"` in a `*ForTable` key are untested; undoing them leaves the suite green — `branch-reviewer`
 - #48 — `src/generate/enumOrder.ts:11`: « like enumLabel.ts » names a file #395 deleted (`quote.ts`) — `branch-reviewer`
+- #168 — `website/insert.md:307`, `CHANGELOG.md:19`: « `DO NOTHING` » without what it does to the result (one row: `undefined` on conflict; an array leaves that row out) — `branch-reviewer`
+- #168 — `src/db/shortcuts.ts:369`, `:376`: `specifiedUpdateColumns as string[] ?? colNames` written twice — `branch-reviewer`
