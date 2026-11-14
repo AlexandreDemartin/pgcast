@@ -98,8 +98,8 @@ let txnSeq = 0;
  *
  * Given a client already inside a transaction block (a `BEGIN` of yours), its
  * `COMMIT` or `ROLLBACK` would end yours: with the
- * `transactionRequiresIdleClient` config option, this rejects before sending
- * anything; without it, it runs and emits `PGCAST_DEP005`, once.
+ * `transactionRequiresIdleClient` config option, this rejects before its
+ * `START TRANSACTION`; without it, it runs and emits `PGCAST_DEP005`, once.
  * @param txnClientOrQueryable The `pg.Pool` from which to check out a client,
  * a plain client (`pg.Client`, `pg.native.Client` or a `pg.PoolClient`, used
  * as is and not released), or an existing transaction client to be passed
@@ -137,7 +137,7 @@ export async function transaction<T, M extends IsolationLevel>(
     await sql``.run(txnClient);
     if (inBlock(txnClient)) {
       if (getConfig().transactionRequiresIdleClient ?? false) throw new Error('transaction() was given a client inside a transaction block, so its COMMIT or ROLLBACK would end that transaction: COMMIT or ROLLBACK it first, pass the pool, or run the queries on that client without transaction()');
-      warnOnce('PGCAST_DEP005', 'transaction() was given a client inside a transaction block, and its COMMIT or ROLLBACK will end that transaction. Set transactionRequiresIdleClient: true (db.setConfig) to reject instead, before sending anything; it will be the default in pgcast 7.0.');
+      warnOnce('PGCAST_DEP005', 'transaction() was given a client inside a transaction block, and its COMMIT or ROLLBACK will end that transaction. Set transactionRequiresIdleClient: true (db.setConfig) to reject instead, before its START TRANSACTION; it will be the default in pgcast 7.0.');
     }
   }
 
