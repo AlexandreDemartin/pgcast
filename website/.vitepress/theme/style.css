@@ -202,8 +202,8 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 .vp-doc .GroupPages a { font-size: 16px; font-weight: 500; color: var(--accent); }
 .vp-doc .GroupPages p { margin: 4px 0 0; color: var(--muted); }
 
-/* the 404 page (NotFound.vue), on the reading column's width: the home's eyebrow, a page's title and lede, a search
-   field as the top bar's, then the groups and the home as a group's landing page lists its pages */
+/* the 404 page (NotFound.vue), on the reading column's width: an eyebrow as a SQL comment, a page's title and lede,
+   a search field as the top bar's, then the groups and the home as a group's landing page lists its pages */
 .NotFound {
   max-width: 688px; margin: 0 auto;
   padding: 96px max(16px, env(safe-area-inset-right, 0px)) 120px max(16px, env(safe-area-inset-left, 0px));
@@ -369,7 +369,6 @@ svg.icon { width: 16px; height: 16px; flex: none; }
 .landing { max-width: 1180px; margin: 0 auto; padding: 0 max(16px, env(safe-area-inset-right, 0px)) 80px max(16px, env(safe-area-inset-left, 0px)); }
 /* the home's rhythm: 48px from the hero to the cast panel, 56px between the sections under it */
 .landing .hero { padding-block: 72px 48px; }
-.landing .eyebrow { font: 500 13px/1 var(--font-mono); color: var(--accent); margin: 0 0 16px; }
 .landing .hero h1 { font-size: clamp(2.5rem, 6vw, 4.5rem); margin: 0 0 20px; max-width: 16ch; letter-spacing: -.025em; }
 .landing .hero h1 .op { font-family: var(--font-mono); color: var(--accent); font-weight: 700; letter-spacing: -.06em; }
 .landing .lede { font-size: 1.18rem; color: var(--muted); max-width: 58ch; margin: 0 0 28px; }

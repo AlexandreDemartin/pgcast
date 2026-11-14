@@ -19,7 +19,6 @@ export const outline = [
     link: '/guides',
     collapsed: true,  // folded: a reader comes for one task, from the search or a link
     items: [
-      { text: 'Switch from Zapatos', link: '/switching' },
       { text: 'Joins', link: '/lateral' },
       { text: 'Pagination', link: '/paginate' },
       { text: 'Batches', link: '/batches' },
@@ -29,6 +28,7 @@ export const outline = [
       { text: 'Errors', link: '/handle-errors' },
       { text: 'Testing', link: '/testing' },
       { text: 'AI assistants', link: '/ai-assistant' },
+      { text: 'Switch from Zapatos', link: '/switching' },
     ],
   },
   {

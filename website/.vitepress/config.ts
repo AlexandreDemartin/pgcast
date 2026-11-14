@@ -32,7 +32,7 @@ const
 
 export default defineConfig({
   title: 'pgcast',
-  description: 'Zero-abstraction Postgres for TypeScript: types cast from your database schema. A maintained fork of Zapatos.',
+  description: 'Zero-abstraction Postgres for TypeScript: types cast from your database schema.',
   lang: 'en-GB',
   base: '/',  // GitHub Pages, at the domain's root: https://pgcast.dev/
   cleanUrls: true,
