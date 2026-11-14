@@ -691,7 +691,8 @@ describe('column comments', () => {
         linked: { text: `**comment_tags.roles.linked**\n\n{@link lead see @casting}\n${generated}`, tags: [] },
         linkcode: { text: `**comment_tags.roles.linkcode**\n\n{@linkcode lead see @casting}\n${generated}`, tags: [] },
         linkplain: { text: `**comment_tags.roles.linkplain**\n\n{@linkplain lead see @casting}\n${generated}`, tags: [] },
-        unclosed: { text: `**comment_tags.roles.unclosed**\n\n{@link lead see @casting}\n${generated}`, tags: [] },
+        // unclosed, the link takes in the line break and the next line's *, which TypeScript reads as on master
+        unclosed: { text: `**comment_tags.roles.unclosed**\n\n{@link lead see @casting}        * ${generated}`, tags: [] },
       });
       // the same JSDoc on every interface that has the column
       expect.soft(Object.keys(others)).toEqual(['JSONSelectable', 'Whereable', 'Insertable', 'Updatable']);

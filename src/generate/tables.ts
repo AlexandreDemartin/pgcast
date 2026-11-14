@@ -336,9 +336,11 @@ const createColumnDoc = (config: CompleteConfig, schemaName: string, rel: Relati
     } = columnDetails,
     // every line of a multi-line comment gets its ` * `: TypeScript ends a JSDoc line at \r as at \n
     lines = description ? jsdocText(description as string).split(/\r\n?|\n/) : [],
-    // TypeScript starts a tag (`@deprecated`) at an @ that begins a line or follows a space: from that line on,
-    // the comment goes after the generated lines, which the tag would otherwise read as its own text
-    tagAt = lines.findIndex(line => /^\s*@|\s@(?=\S)/.test(line)),
+    // TypeScript starts a tag (`@deprecated`) at an @ that begins a line or follows a space, outside an inline
+    // `{@link …}` (which runs to its } or the line's end): from that line on, the comment goes after the generated
+    // lines, which the tag would otherwise read as its own text
+    tagAt = lines.findIndex(line =>
+      /^\s*@|\s@(?=\S)/.test(line.replace(/\{@link(?:code|plain)?(?![\p{ID_Continue}$-])[^}]*\}?/gu, '_'))),
     [text, tags] = tagAt < 0 ? [lines, []] : [lines.slice(0, tagAt), lines.slice(tagAt)],
     commentDoc = text.length ? '\n    *\n    * ' + text.join('\n    * ') : '',
     tagsDoc = tags.length ? '\n    *\n    * ' + tags.join('\n    * ') : '',
