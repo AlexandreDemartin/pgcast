@@ -75,6 +75,12 @@ describe('conditions: the constraint on the column', () => {
     db.select('users', { id: c.isIn(new Set([1])) });
     // @ts-expect-error nor is a typed array
     db.deletes('users', { id: c.isNotIn(new Uint8Array([1])) });
+    // @ts-expect-error nor an iterator
+    db.deletes('users', { id: c.isNotIn(new Map([[1, 'a']]).keys()) });
+    // @ts-expect-error nor an array-like object
+    db.deletes('users', { id: c.isNotIn({ length: 1, 0: 1 }) });
+    // @ts-expect-error nor a string
+    db.select('users', { display_name: c.isIn('Ada') });
     // @ts-expect-error 'angry' is not a mood
     db.select('users', { mood: c.eq('angry') });
     // @ts-expect-error eq(null) would compile to `= NULL`: isNull is needed

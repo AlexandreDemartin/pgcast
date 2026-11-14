@@ -236,6 +236,12 @@ An item compiles as in `vals([…])` within a filter:
 
 Zapatos 6.6.1 sent a `Parameter` and `parent()` there as one more parameter, as JSON (`'{"value":"x","cast":"text"}'`, `'{"value":"id"}'`), so `isIn()` found nothing and `isNotIn()` matched every row on a text column.
 
+The list itself is an array, `readonly` or not. Anything else gets past the type only as `any`, or as `null` and `undefined` without `strictNullChecks`: a `Set`, an iterator, a typed array, an array-like object, a string. It throws as the query compiles, so `run()` rejects with a plain `Error` before any query:
+
+> `` `isNotIn()` takes an array, not `Set`: make one with `isNotIn([...values])`, or `Array.from(values)` for an array-like object. ``<!-- message -->
+
+Zapatos 6.6.1 read the list's `length`. A `Set` or an iterator has none, so `isIn()` gave `false` and `isNotIn()` gave `true`, every row: with `ids` a `Set`, `db.deletes('films', { id: db.conditions.isNotIn(ids) })` was `DELETE FROM "films" WHERE ((true))`. A string gave its characters, an array-like object its values and then its `length`, and `null` a `TypeError` at the call.
+
 ### `isIn()` {#conditions.isIn}
 
 `"col" IN ($1, $2)`<!-- probe: db.sql`${{ col: db.conditions.isIn([1, 2]) }}` -->. An empty array gives `false`: no row.
