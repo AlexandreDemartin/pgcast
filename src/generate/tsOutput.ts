@@ -69,7 +69,7 @@ const sourceFilesForCustomTypes = (customTypes: CustomTypes, names: string) =>
  * Warn about each custom type name that stands for more than one Postgres type: they share one
  * placeholder, and so one type. The placeholders keep their names, which edited files depend on.
  * Names that differ only in case share one placeholder too on a case-insensitive file system (macOS's
- * and Windows's default), which declares only one of them: they get one note.
+ * and Windows's default), which declares only one of them: they get one note, before the note on each.
  */
 const warnAboutSharedCustomTypeNames = (origins: CustomTypeOrigins, config: CompleteConfig) => {
   const
@@ -92,21 +92,22 @@ const warnAboutSharedCustomTypeNames = (origins: CustomTypeOrigins, config: Comp
         `${listOf(names.map(name => name + config.outExt))} are one placeholder file in ${folder}, ` +
         `which declares only one of those names. To type them apart, rename one of them in the database, ` +
         `or give customTypesTransform a function that keeps their names apart.`);
-      continue;
     }
 
-    const [name] = names, types = Object.keys(origins[name]).sort();
-    if (types.length < 2) continue;
+    for (const name of names) {
+      const types = Object.keys(origins[name]).sort();
+      if (types.length < 2) continue;
 
-    const
-      typeList = listOf(types),
-      namesDiffer = new Set(Object.values(origins[name])).size > 1,
-      filePath = path.join(folder, name + config.outExt);
+      const
+        typeList = listOf(types),
+        namesDiffer = new Set(Object.values(origins[name])).size > 1,  // a function gets the same name otherwise
+        filePath = path.join(folder, name + config.outExt);
 
-    warn(`Note: custom types ${typeList} are ${types.length === 2 ? 'both' : 'all'} named ${name} in TypeScript, ` +
-      `so they share one type and one placeholder file, ${filePath}. ` +
-      `To type them apart, rename one of them in the database` +
-      (namesDiffer ? `, or give customTypesTransform a function that keeps their names apart.` : `.`));
+      warn(`Note: custom types ${typeList} are ${types.length === 2 ? 'both' : 'all'} named ${name} in TypeScript, ` +
+        `so they share one type and one placeholder file, ${filePath}. ` +
+        `To type them apart, rename one of them in the database` +
+        (namesDiffer ? `, or give customTypesTransform a function that keeps their names apart.` : `.`));
+    }
   }
 };
 
