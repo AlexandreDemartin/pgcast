@@ -350,7 +350,8 @@ const updateValueSQL = (value: any) => compiledAsIs(value) ? value : param(value
  * `ROW(..., $n)`. To read a column there, use a fragment, which is written as
  * it is: ``{ name: db.sql`${'users'}.${'name'}` }`` gives `ROW(..., "users"."name")`.
  * An `updateColumns` array that is empty at run time, with no `updateValues`
- * key, gives `DO NOTHING`, as `doNothing` does: one row that conflicts then
+ * key (with `undefinedMeansMissing`, a key set to `undefined` is none), gives
+ * `DO NOTHING`, as `doNothing` does: one row that conflicts then
  * returns `undefined`, which the type of a `Column[]` does not say; check for
  * it, or pass `doNothing`, which the type follows.
  *
