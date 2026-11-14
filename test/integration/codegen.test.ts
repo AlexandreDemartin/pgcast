@@ -7,7 +7,8 @@
 //     test/generated/, which `npm run typecheck` compiles (test/generated/tsconfig.json).
 // Update after an intended change: `npx vitest run -u test/integration/codegen.test.ts`.
 // -u never deletes a file: a stale snapshot is removed by hand (the orphan test names it).
-// tsForConfig() calls process.exit(1) on any SQL error: no test here may cause one.
+// Without rejectOnQueryError, tsForConfig() calls process.exit(1) on a failed query: a test that causes one
+// mocks process.exit (§ generate() on a failed query).
 
 import { randomBytes } from 'node:crypto';
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -1776,6 +1777,106 @@ describe('generate()', () => {
         schemas: { queued: all }, customTypesTransform: () => { throw failed; },
       }, { max: 2, connectionTimeoutMillis: timeout }, timeout * 2);
     }, dropWait);
+
+    describe('on a failed query', () => {
+      // the relations query, the first of a run, sorts on lower(table_name): a lower(name) ahead of pg_catalog in
+      // search_path takes the call, and raises
+      beforeEach(() => withAdminClient(urlForDatabase(server().url, name), c => c.query(`
+        CREATE SCHEMA query_trap;
+        CREATE FUNCTION query_trap.lower(name) RETURNS text LANGUAGE plpgsql
+          AS $$ BEGIN RAISE EXCEPTION 'introspection fails on purpose'; END $$;
+      `)));
+
+      const
+        trapped = () => ({ connectionString: urlForDatabase(server().url, name), options: '-c search_path=query_trap,pg_catalog' }),
+        failures = [
+          ['a refused connection', () => unreachable, { code: 'ECONNREFUSED' }],
+          ['a failing introspection query', trapped, { code: 'P0001', message: 'introspection fails on purpose' }],
+        ] as const,
+        exited = new Error('process.exit() called'),
+        note = 'Note: a query failed, so generate() ends the process with process.exit(1), and its promise never ' +
+          'settles (PGCAST_DEP006). Set rejectOnQueryError: true to reject with the error instead; it will be the ' +
+          'default in pgcast 7.0.';
+
+      /** A run of one schema on `db`, notes printed, process.exit mocked to throw: what it rejected with and did. */
+      const failedRun = async (config: Config, db: pg.ClientConfig) => {
+        const
+          exit = vi.spyOn(process, 'exit').mockImplementation((() => { throw exited; }) as () => never),
+          log = vi.spyOn(console, 'log').mockImplementation(() => undefined),
+          unhandled: unknown[] = [],
+          onUnhandled = (e: unknown) => void unhandled.push(e);
+        process.on('unhandledRejection', onUnhandled);
+        try {
+          const rejection = await generate({
+            ...quiet, warningListener: true, schemas: { public: only('users') }, outDir, ...config, db,
+          }).then(() => new Error('resolved'), (e: unknown) => e);
+          await new Promise(resolve => setTimeout(resolve, 0));
+          return { rejection, exits: exit.mock.calls, printed: log.mock.calls, unhandled, written: files(outDir) };
+        } finally {
+          process.off('unhandledRejection', onUnhandled);
+          exit.mockRestore();
+          log.mockRestore();
+        }
+      };
+
+      it.each(failures)('rejects with the error of %s with rejectOnQueryError: no exit, no output, nothing written', async (_, db, error) => {
+        // two schemas: the queries of the other are in flight when the first fails
+        const run = await failedRun({ ...main, rejectOnQueryError: true }, db());
+        expect(run.rejection).toMatchObject(error);
+        expect(run).toMatchObject({ exits: [], printed: [], unhandled: [], written: [] });
+        if (db === trapped) {
+          expect(run.rejection).toBeInstanceOf(pg.DatabaseError);
+          await withAdminClient(server().url, c => c.query(`DROP DATABASE "${name}"`));  // its pool has ended
+        }
+      });
+
+      it.each(failures)('prints %s, notes rejectOnQueryError once, then exits with 1, as Zapatos 6.6.1 exits', async (_, db, error) => {
+        const run = await failedRun({}, db());
+        expect(run.rejection).toBe(exited);
+        expect(run.exits).toEqual([[1]]);
+        expect(run.printed).toEqual([['*** error 0 ***', expect.objectContaining(error)], [note]]);
+        expect(run.written).toEqual([]);
+      });
+
+      it('exits with no note with rejectOnQueryError: false', async () => {
+        const run = await failedRun({ rejectOnQueryError: false }, trapped());
+        expect(run.exits).toEqual([[1]]);
+        expect(run.printed).toEqual([['*** error 0 ***', expect.objectContaining(failures[1][2])]]);
+      });
+
+      it('notes rejectOnQueryError: null, from a JSON config, as when it is left out', async () => {
+        const run = await failedRun(JSON.parse('{"rejectOnQueryError": null}') as Config, trapped());
+        expect(run.exits).toEqual([[1]]);
+        expect(run.printed).toEqual([['*** error 0 ***', expect.objectContaining(failures[1][2])], [note]]);
+      });
+
+      it('still exits when warningListener throws at the note', async () => {
+        const run = await failedRun({ warningListener: () => { throw new Error('a listener that throws'); } }, trapped());
+        expect(run.rejection).toBe(exited);
+        expect(run.exits).toEqual([[1]]);
+      });
+
+      it("exits with no note from the CLI's config, even given rejectOnQueryError: true", async () => {
+        const dir = mkdtempSync(join(tmpdir(), 'pgcast-cli-'));
+        try {
+          writeFileSync(join(dir, 'pgcastconfig.json'), '{"rejectOnQueryError": true}');
+          const run = await failedRun(cliConfig('{"rejectOnQueryError": true}', dir), trapped());
+          expect(run.exits).toEqual([[1]]);
+          expect(run.printed).toEqual([['*** error 0 ***', expect.objectContaining(failures[1][2])]]);
+        } finally {
+          rmSync(dir, { recursive: true, force: true });
+        }
+      });
+
+      it('is optional in Config, read as false when absent', () => {
+        expect(finaliseConfig({}).rejectOnQueryError).toBeUndefined();
+        const right: Config = { rejectOnQueryError: true };
+        void right;
+        // @ts-expect-error a boolean
+        const wrong: Config = { rejectOnQueryError: 'yes' };
+        void wrong;
+      });
+    });
   });
 });
 

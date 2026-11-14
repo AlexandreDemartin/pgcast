@@ -224,6 +224,10 @@ Candidates for a check, a rule or a skill line.
 - #184 — A migration hint for files already on disk is checked in both prefixed and unprefixed schemas (`import type { format }` alone gives TS2305 in a prefixed one) — `branch-reviewer`
 - #184 — A codegen placeholder that « compiles » under `skipLibCheck` hides unresolved names as `any`: replay each output claim with `skipLibCheck` both ways — `builder`
 - #287 — A merged note keeps every condition of the note it replaces (#42's withholds the `customTypesTransform` advice when the raw names are equal): a test runs the old note's scenario inside the new note's — `branch-reviewer`
+- #183 — `process.emitWarning()` is lost when `process.exit()` follows in the same tick: a deprecation on a path that ends the process goes through a synchronous channel (`warningListener`) — `builder`
+- #183 — An optional config key is read with `== null` (or `??`) in every place, never `=== undefined`: a config loaded from JSON carries `null` (grep `=== undefined` on `config.` keys under `src/generate/`) — `branch-reviewer`
+- #183 — A deprecated default whose explicit old value is kept (`rejectOnQueryError`: unset deprecated, `false` kept) fits no class of decision 003 § Rule: its docs entry lists each value, « left out » included, not a « default » cell; § Rule could name the case (owner's call) — `branch-reviewer`
+- #183 — Merge master before review when master touched the same English docs page: two PRs on one page always conflict on the French `english:` hash (`git merge-tree HEAD origin/master`) — `branch-reviewer`
 
 ## Minors kept
 
@@ -289,3 +293,4 @@ Minor review defects, taken up by the end-of-chapter review.
 - #184 — `src/generate/index.ts:10`: a direct caller of the exported `definitionForRelationInSchema` that does not pass `customTypeImports` now reads `archive.genre` rather than `genre` (both fail to compile) — `branch-reviewer`
 - #287 — `test/integration/codegen.test.ts:868`: the notes' order (case note first, then #42's) is decided alone but not pinned by a test — `branch-reviewer`
 - #287 — `CHANGELOG.md:101`: a second colon after « (…): on a case-insensitive file system », and « as in Zapatos 6.6.1 » reads as if it applied to the file system — `branch-reviewer`
+- #183 — `src/generate/tsOutput.ts:185`: the comment above the rethrow explains only the `ended` half of its condition, not `rejectOnQueryError` — `branch-reviewer`
