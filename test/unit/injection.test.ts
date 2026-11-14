@@ -1303,7 +1303,8 @@ describe('a built-in object as a Whereable', () => {
     // nor is a built-in of another realm (a vm context), whose prototype is not this realm's
     class Premiere extends Date {}
     class FilmError extends Error { id = 1; }
-    class FilmErrors extends (globalThis as any).AggregateError {}
+    // ES2021: not in the lib's ES2019 types
+    class FilmErrors extends ((globalThis as any).AggregateError as new (errors: unknown[], message: string) => Error) {}
     class Frames extends Uint8Array {}
     // the type of Buffer gives no constructor to extend
     class Reel extends (Buffer as any) {}
