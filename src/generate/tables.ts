@@ -336,12 +336,14 @@ const createColumnDoc = (config: CompleteConfig, schemaName: string, rel: Relati
     } = columnDetails,
     // every line of a multi-line comment gets its ` * `: TypeScript ends a JSDoc line at \r as at \n
     lines = description ? jsdocText(description as string).split(/\r\n?|\n/) : [],
-    // TypeScript starts a tag (`@deprecated`) at an @ that begins a line or follows a space, outside an inline
-    // `{@link …}` (which runs to its } or the line's end): from that line on, the comment goes after the generated
-    // lines, which the tag would otherwise read as its own text
-    tagAt = lines.findIndex(line =>
-      /^\s*@|\s@(?=\S)/.test(line.replace(/\{@link(?:code|plain)?(?![\p{ID_Continue}$-])[^}]*\}?/gu, '_'))),
-    [text, tags] = tagAt < 0 ? [lines, []] : [lines.slice(0, tagAt), lines.slice(tagAt)],
+    // a tag (`@deprecated`) would read the generated lines after it as its own text, so the comment goes after them
+    // from the line that starts it. TypeScript can start a tag, or an inline `{@link …}` that may run on through the
+    // next line, only at an @ after a blank, a { or nothing: the first such line moves only if it surely starts a
+    // tag, with an @ that begins it, or after a space or tab and before a printable character, past links closed on
+    // the line with no quote, backtick or / in them; otherwise the JSDoc stays as it was
+    tagAt = lines.findIndex(line => /(?<![!-z|-~])@/.test(line)),
+    [text, tags] = tagAt < 0 || !/^[ \t]*@|^(?:\{@link[^}'"`/]*\}|(?!\{@link)[^])*?[ \t]@[!-~]/.test(lines[tagAt]) ?
+      [lines, []] : [lines.slice(0, tagAt), lines.slice(tagAt)],
     commentDoc = text.length ? '\n    *\n    * ' + text.join('\n    * ') : '',
     tagsDoc = tags.length ? '\n    *\n    * ' + tags.join('\n    * ') : '',
     [domain, udt, defaultText] = [domainName, udtName ?? '(none)', defaultValue].map(t => jsdocText(String(t))),
