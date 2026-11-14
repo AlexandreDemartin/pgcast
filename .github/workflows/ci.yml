@@ -168,6 +168,10 @@ jobs:
             website/package-lock.json
       - run: npm ci && npm run build
         working-directory: .
+      - name: Lint the site's scripts and code too
+        # the build job lints them on a change outside website/; a PR to website/ alone runs only this job
+        run: npm run lint
+        working-directory: .
       - run: npm ci
       - name: Committed docs schema types match schema.sql
         # --intent-to-add: a new file the generator writes (a custom type placeholder) shows in the diff too.
