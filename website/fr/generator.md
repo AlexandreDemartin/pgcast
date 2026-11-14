@@ -1,5 +1,5 @@
 ---
-english: 34d19f6f0950
+english: faa34125d649
 ---
 
 # Générateur
@@ -128,7 +128,7 @@ Toutes les options sont facultatives. Une option donnée remplace entièrement s
 
 `{ [schema]: { include, exclude } }`, `include` et `exclude` valant chacun `"*"` ou un tableau de noms de relations. Les schémas à générer, et quelles relations de chacun : tables, vues, vues matérialisées et tables distantes.
 
-Les deux clés sont obligatoires. Dans `generate()`, une règle sans l’une d’elles ne compile pas (TS2741) ; dans le JSON, la CLI s’arrête avec `TypeError: Cannot read properties of undefined (reading 'indexOf')` ([#301](https://github.com/AlexandreDemartin/pgcast/issues/301)).
+Le type exige les deux clés : dans `generate()`, une règle sans l’une d’elles ne compile pas (TS2741). Dans le JSON, ou en JavaScript non typé, une clé omise ou mise à `null` prend la valeur de la règle par défaut, `"include": "*"` ou `"exclude": []`, et le générateur le signale via [`warningListener`](#generate.warningListener) ; Zapatos 6.6.1 s’arrêtait là où il lisait la clé manquante, avec `TypeError: Cannot read properties of undefined (reading 'indexOf')` ([#301](https://github.com/AlexandreDemartin/pgcast/issues/301)). Une chaîne autre que `"*"`, que le type refuse aussi (TS2322), est lue comme une liste d’un seul nom, `"films"` comme `["films"]`, et signalée de la même façon ; dans Zapatos 6.6.1, chaque relation dont le nom fait partie de la chaîne y correspondait aussi, `film` pour `"films"` ([#442](https://github.com/AlexandreDemartin/pgcast/issues/442)).
 
 | Règle | Génère |
 |---|---|
@@ -222,6 +222,8 @@ Son SQL est celui de [`select()`](/fr/select#select), avec le nom entre guilleme
 - Un tableau d’un domaine ou d’un tel type est un type personnalisé à part entière.
 - Les noms ne sont pas qualifiés par schéma : l’espace de noms `c` est commun à tous les schémas, donc un domaine `notes` dans `public` et un autre dans `archive` sont tous deux `PgNotes`, avec un seul placeholder pour les deux.
   - Le générateur le signale via [`warningListener`](#generate.warningListener), comme pour deux noms qu’une transformation réduit à un seul (`seat-label` et `seat_label`), et garde le nom, dont dépend un placeholder déjà modifié.
+- Des noms qui ne diffèrent que par la casse, comme `PgSeat_label` et `PgSEAT_LABEL` pour les domaines `seat_label` et `"SEAT_LABEL"`, ont deux placeholders qui ne forment qu’un seul fichier sur un système de fichiers insensible à la casse, celui par défaut sur macOS et Windows : celui écrit en premier ne déclare que son propre nom, et les autres ne sont jamais déclarés. Le générateur le signale aussi, où qu’il tourne, et écrit les mêmes fichiers.
+- Un nom dont le placeholder est `index.d.ts`, comme `index` pour un domaine `index` avec `"my_type"`, ou `Index` sur un système de fichiers insensible à la casse, partage son fichier avec [`custom/index.d.ts`](#the-files-it-writes), que le générateur écrit par-dessus à chaque exécution : ce nom n’est jamais déclaré. Le générateur le signale aussi, et écrit les mêmes fichiers.
 
 ### `schemaJSDoc` {#generate.schemaJSDoc}
 
@@ -352,8 +354,16 @@ Writing custom types file: src/zapatos/custom/index.d.ts
 - `Writing new custom type or domain placeholder file: src/zapatos/custom/PgPoint.d.ts`, une fois par nouveau placeholder ;
 - `Note: custom types "archive"."notes" and "public"."notes" are both named PgNotes in TypeScript, so they share one type and one placeholder file, src/zapatos/custom/PgNotes.d.ts. To type them apart, rename one of them in the database.`
   - une fois par exécution pour chaque nom que partagent deux types Postgres ([`customTypesTransform`](#generate.customTypesTransform)) ; quand leurs noms diffèrent, il ajoute qu’une fonction `customTypesTransform` peut les distinguer ;
+- `Note: custom types "public"."SEAT_LABEL" (PgSEAT_LABEL) and "public"."seat_label" (PgSeat_label) have TypeScript names that differ only in case: on a case-insensitive file system, the default on macOS and Windows, PgSEAT_LABEL.d.ts and PgSeat_label.d.ts are one placeholder file in src/zapatos/custom, which declares only one of those names. To type them apart, rename one of them in the database, or give customTypesTransform a function that keeps their names apart.`
+  - une fois par exécution pour des noms qui ne diffèrent que par la casse, quel que soit le système de fichiers, avant la note ci-dessus pour chacun de ces noms que partagent deux types Postgres ;
+- `Note: custom type "public"."index" (index) has the placeholder file index.d.ts in src/zapatos/custom, the file of the custom types' index: the generator writes the index over it on every run, so index is never declared. To declare it, rename it in the database, or give customTypesTransform a function that names it otherwise.`
+  - une fois par exécution pour les noms dont le placeholder est `custom/index.d.ts` : `index` et, sur un système de fichiers insensible à la casse, un nom qui n’en diffère que par la casse (`Index`, `INDEX`), après la note ci-dessus pour ces noms ;
 - `Note: the include entry "Films" of schema "public" matches no relation there, so it generates nothing. Check its spelling and case, that the relation is in schema "public", and that the database role has a privilege on it: include names tables, views, materialised views and foreign tables.`
   - une fois par exécution pour chaque entrée d’une liste [`include`](#generate.schemas) que son schéma n’a pas ;
+- `Note: the schemas rule of "public" has no exclude, so it takes "exclude": [], as the default rule does. Write the key in the rule to silence this note.`
+  - après l’écriture, pour chaque règle de [`schemas`](#generate.schemas) qui omet `include` ou `exclude`, ou le met à `null` ; pour les deux, `has no include nor exclude, so it takes "include": "*" and "exclude": []` ;
+- `Note: the schemas rule of "public" gives include as a string, "films", so it is read as the list ["films"]. Zapatos 6.6.1 also matched each relation whose name is part of the string. Write the list to silence this note.`
+  - après l’écriture, pour chaque `include` ou `exclude` d’une règle de [`schemas`](#generate.schemas) donné sous forme de chaîne autre que `"*"` ;
 - la note sur les colonnes `bigint` et `numeric`, une fois par processus ([`customJSONParsingForLargeNumbers`](#generate.customJSONParsingForLargeNumbers)) ;
 - `` Note: public.prints.format (archive.print_format), public.prints.formats (archive.print_format[]) and public.prints.keeper (archive.crew_job) have a type of another schema, which is looked up by name in the schema of their relation: an enum becomes an `any` custom type, or the enum of the same name there. Set typeEnumsAcrossSchemas: true to look it up in its own schema; it will be the default in pgcast 7.0. ``
   - une fois par exécution, sans [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas), quand une colonne qu’il changerait est générée ;
@@ -369,23 +379,24 @@ Writing custom types file: src/zapatos/custom/index.d.ts
 
 ### `debugListener` {#generate.debugListener}
 
-`boolean`, ou dans `generate()` une fonction `(s: string) => void` ; par défaut `false`. Reçoit chaque requête que le générateur envoie, `>>> query <n> >>>`, son texte et ses valeurs, puis son résultat tel que `pg` le renvoie, en JSON, `<<< result <n> <<<`.
+`boolean`, ou dans `generate()` une fonction `(s: string) => void` ; par défaut `false`. Reçoit chaque requête que le générateur envoie, `>>> query <n> >>>`, son texte et ses valeurs, puis son résultat tel que `pg` le renvoie, en JSON, `<<< result <n> <<<`. Le texte est celui envoyé, lignes vides comprises, sans l’indentation du code de pgcast : avec ses valeurs, il s’exécute tel quel.
 
 Les relations sont lues en parallèle : avec plusieurs, les résultats reviennent entremêlés, et le numéro d’une requête peut changer d’une exécution à l’autre, donc c’est `<n>` qui associe un résultat à sa requête.
 
 Les index uniques de `tags`, avec `"schemas": { "public": { "include": ["tags"], "exclude": [] } }`, coupés après ses lignes :
 
 ```txt
->>> query 3 >>>
+>>> query 4 >>>
 SELECT DISTINCT i.indexname
 FROM pg_catalog.pg_indexes i
-JOIN pg_catalog.pg_class c ON c.relname = i.indexname
+JOIN pg_catalog.pg_namespace n ON n.nspname = i.schemaname
+JOIN pg_catalog.pg_class c ON c.relname = i.indexname AND c.relnamespace = n.oid
 JOIN pg_catalog.pg_index idx ON idx.indexrelid = c.oid AND idx.indisunique
 WHERE i.tablename = $1 AND i.schemaname = $2
 ORDER BY i.indexname
 + ["tags","public"]
 
-<<< result 3 <<<
+<<< result 4 <<<
 {
   "command": "SELECT",
   "rowCount": 1,
@@ -422,8 +433,7 @@ src/zapatos/
 </div>
 
 - Un placeholder contient le type `Selectable` du type de base du domaine : `string` pour `seat_label`, un `text` ; `Date` pour un domaine `date` ; `db.JSONValue` pour un domaine `json` ou `jsonb`, avec son `import type * as db from 'zapatos/db'`. Un type que le générateur ne sait pas convertir (`point`) reçoit `any`. Pour le compléter : [Types personnalisés](/fr/custom-types).
-- Un type de base converti en un autre type `db.*` (`int8`, `numeric`, `time`, les types range…) donne un placeholder qui ne compile pas tant que vous ne l’avez pas modifié : `export type PgTicket_no = db.Int8String;` vient sans import, et `tsc` échoue avec TS2503, `Cannot find namespace 'db'` ([#184](https://github.com/AlexandreDemartin/pgcast/issues/184)). Ajoutez `import type * as db from 'zapatos/db';` au-dessus.
-- Même chose pour un domaine sur un enum : `export type PgGenre_d = genre;` échoue avec TS2304 tant que vous n’ajoutez pas `import type { genre } from 'zapatos/schema';`.
+- Un type de base converti en un autre type `db.*` (`int8`, `numeric`, `time`, les types range…) reçoit le même import : `export type PgTicket_no = db.Int8String;` vient avec `import type * as db from 'zapatos/db';`. Un domaine sur un enum l’importe : `import type { genre } from 'zapatos/schema';` au-dessus de `export type PgGenre_d = genre;`. Zapatos 6.6.1 n’importait `db` que pour `db.JSONValue`, donc ses placeholders sur ces types ne compilaient pas ([#184](https://github.com/AlexandreDemartin/pgcast/issues/184)) : [Quand un placeholder ne compile pas](/fr/custom-types#when-a-placeholder-does-not-compile).
 - Rien n’est supprimé : un placeholder dont le type a disparu reste, et `custom/` aussi une fois qu’il ne reste plus de type personnalisé.
 - `schema.d.ts` déclare `schemaVersionCanary`, `version: 104`. Un `zapatos/db` qui attend une autre version ne compile pas à cet endroit : relancez la génération ([`SchemaVersionCanary`](/fr/runtime-config#SchemaVersionCanary)).
 - Chaque fichier est un `declare module` des noms `zapatos/*`, donc votre `tsconfig.json` doit l’inclure : `"include": ["src"]`, avec `outDir` à `"./src"`.

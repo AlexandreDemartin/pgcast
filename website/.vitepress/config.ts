@@ -17,7 +17,7 @@ import { markSteps } from './steps.ts';
 import { lineIndents, sqlParameters, syntax } from './syntax.ts';
 import { labelTableCells } from './tables.ts';
 import { svg } from './theme/icons.ts';
-import { focusableHovers, moduleNames, twoslashOptions } from './twoslash.ts';
+import { createCheckedTwoslasher, focusableHovers, moduleNames, twoslashOptions } from './twoslash.ts';
 import { languageKey, langs, prefixOf, words, type Lang } from './words.ts';
 
 const
@@ -132,9 +132,13 @@ export default defineConfig({
     theme: syntax,
     // a hover's JSDoc can hold these (`process.env`, from @types/node), and Shiki loads only the languages a page names
     languages: ['js', 'bash'],
-    // an unexpected type error in a `ts twoslash` block fails the build; a block meant to fail says so with `// @errors`
+    // an unexpected type error in a `ts twoslash` block fails the build; a block meant to fail says so with `// @errors`,
+    // and fails it if one of the codes it lists is not raised
     codeTransformers: [
-      transformerTwoslash({ twoslashOptions, processHoverInfo: type => defaultHoverInfoProcessor(moduleNames(type)) }),
+      transformerTwoslash({
+        twoslashOptions, twoslasher: createCheckedTwoslasher(),
+        processHoverInfo: type => defaultHoverInfoProcessor(moduleNames(type)),
+      }),
       focusableHovers, sqlParameters, lineIndents,
     ],
     config: md => {

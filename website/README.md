@@ -104,7 +104,9 @@ A reader scans before reading, so a page breathes. Less is more: it keeps every 
 
 ### Examples
 
-- A `ts twoslash` block is compiled against the built `zapatos/db` and the docs schema's `zapatos/schema`; hovers show the types TypeScript gives. An unexpected type error fails the build; a block meant to fail says so with `// @errors: <code>`.
+- A `ts twoslash` block is compiled against the built `zapatos/db` and the docs schema's `zapatos/schema`; hovers show the types TypeScript gives. An unexpected type error fails the build. A refused line fails it too once it compiles, written one of two ways:
+  - **Shown refused**, underlined with its error: a block of its own, meant to fail, that lists the codes on a line `// @errors: 2322 2345`, at the start of the line. The build fails if its code does not raise each code listed, and on any other line holding `@errors` in a comment, which Twoslash would leave a comment (`.vitepress/twoslash.ts`).
+  - **An aside** in a block that compiles: `// @ts-expect-error <what is refused>` above the line (`select.md`), which shows no error; TypeScript fails on it once unused.
 - A hover names a package's module as the reader imports it (`typeof import("pg")`), where TypeScript prints its path on the build machine (`.vitepress/twoslash.ts`, `moduleNames`). After VitePress, `docs:build` fails on a machine's path in any built text file, hovers included (`check-paths.mjs`): this checkout's, or one that starts `/home/`, `/Users/`, `/runner/` or a drive letter. A path that a package's JSDoc gives as an example goes in its `allowed`.
 - Twoslash reports only a block's own errors, so `docs:build` first runs `tsc` (`tsconfig.json`) on the docs schema and `examples/`: a stale schema fails there. Then `tsc -p .vitepress`, on the site's own code.
 - **The cast panel** shows what you write, what Postgres runs and what TypeScript knows. It is for a query whose SQL and type the reader should see: a shortcut, an option that changes the SQL. Code that sends no query (a pool, a config, a type) is a plain `ts twoslash` block.
@@ -157,6 +159,7 @@ A "Coming" page has no `.md` file, so it is in neither; nor are the templates an
 - The page is `changelog.md`'s title and lede, then `CHANGELOG.md`'s intro and versions in place of `<!-- @changelog -->`; its "Last updated" is `CHANGELOG.md`'s last commit.
 - A version is `## [Unreleased]` or `## [x.y.z] - yyyy-mm-dd`, anchored `#unreleased`, `#6.6.2`; each of its sections after it, `#6.6.2-security`. Any other `## ` heading fails the build.
 - A link relative to the repository (`docs/decisions/…`) becomes its page on GitHub.
+- A TypeScript snippet a user copies, a migration or an option to set, carries a mark glued after its code span, which `docs:build` type-checks (`check-changelog.mjs`), on the docs schema, `db` and a `pool` in scope: `<!-- tsc -->` if the span is a module's code, `` `db.setConfig({ undefinedMeansMissing: true })`<!-- tsc --> ``; else `<!-- tsc: … -->`, the code around it, `…` standing for the span, `` `arrayOverlaps<string[]>([['romance', 'thriller']])`<!-- tsc: db.select('films', { genres: db.conditions.… }) --> ``. Any other HTML comment outside a code span fails the build, so a near miss does not turn the check off; a mark holds no `--`, and neither the page nor the feed shows it. It catches a type error only: a value that type-checks but fails at run time, as `` { name: sql`upper(${self})` } `` in `updateValues` (#237), passes.
 - The feed has one entry per released version, `[Unreleased]` aside: its date, its notes as HTML, its anchor on the page.
 
 `public/robots.txt`, copied to the root as it is, lets every crawler in, assistants' included, and names `sitemap.xml`, which VitePress writes from the config's `sitemap`.

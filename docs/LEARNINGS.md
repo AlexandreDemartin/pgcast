@@ -220,6 +220,21 @@ Candidates for a check, a rule or a skill line.
 - #178 — When a parameter widens to `unknown`, probe the odd shapes of the property it reads too: a non-string with the string's members (`{ code: ['2','3','5','0','5'] }`, `{ length: 5 }`) — `branch-reviewer`
 - #178 — A stacked layer may only re-word what it makes untrue in the layer below; the behaviour, its docs row and its test stay in the lower layer (#437 / #441) — `branch-reviewer`
 - #178 — Under `exactOptionalPropertyTypes`, Zapatos 6.6.1's type also refused `pg.DatabaseError` and `NodeJS.ErrnoException` (TS2379, `code: string | undefined`): a « 6.6.1 accepted it » claim holds under the suite's options — `builder`
+- #219 — A docs example of debug output goes stale silently when a generator query changes (its number and a `pg_namespace` join had moved on): candidate check, regenerate the example from a run on the docs schema in `docs:build` — `builder`
+- #301 — In 6.6.1 and master, a `schemas` rule's `include` given as a plain string other than `"*"` (`"films"`) goes through `String.prototype.indexOf`, so it matches substrings of relation names: filed as its own issue — `builder`
+- #301 — `finaliseConfig({}).schemas.public` is the same object as `defaultConfig.schemas.public`: a caller who mutates the returned rule changes the default for later calls (nothing in the repo does today) — `branch-reviewer`
+- #301 — A fresh worktree needs `cd website && npm ci` before `docs:translated` and `docs:build` — `builder`
+- #442 — A conflicting PR gets no CI run (GitHub runs only CodeQL): before review and merge, `gh pr view <n> --json mergeable` is not `CONFLICTING` and the CI workflow's checks are in `statusCheckRollup` — `branch-reviewer`
+- #442 — When a fix reinterprets an untyped config value, replay what a JSON user would plausibly write (a comma- or space-separated list, `""`, a wrong case), not only the issue's shapes — `branch-reviewer`
+- #442 — In 6.6.1 the substring match goes down to single letters: `"include": "studios"` pulled in a relation named `s` — `builder`
+- #287 — A custom type named `index` (a domain `index` under `my_type`) may clash with the custom `index.d.ts` the generator rewrites after the placeholders: unchecked, a candidate issue — `builder`
+- #184 — A shared out parameter filled by relations introspected concurrently (`Promise.all`) needs an order-independent merge: « last one seen wins » is safe only while every writer writes the same text; candidate line for skill `codegen-output` § Deterministic — `branch-reviewer`, `builder`
+- #184 — A migration hint for files already on disk is checked in both prefixed and unprefixed schemas (`import type { format }` alone gives TS2305 in a prefixed one) — `branch-reviewer`
+- #184 — A codegen placeholder that « compiles » under `skipLibCheck` hides unresolved names as `any`: replay each output claim with `skipLibCheck` both ways — `builder`
+- #287 — A merged note keeps every condition of the note it replaces (#42's withholds the `customTypesTransform` advice when the raw names are equal): a test runs the old note's scenario inside the new note's — `branch-reviewer`
+- #447 — When a PR documents an exception, `git grep` the absolute words (« never », « every ») on the same subject across `website/`: « never overwritten » survived on three pages — `branch-reviewer`
+- #447 — When notes from several PRs can fire for one object (#42, #287, #447), a test of all of them together freezes their order — `branch-reviewer`
+- #447 — The CLI's « Writing new custom type or domain placeholder file » message announces a placeholder the index file then writes over: it still misleads — `builder`
 
 ## Minors kept
 
@@ -279,3 +294,17 @@ Minor review defects, taken up by the end-of-chapter review.
 - #179 — `website/transaction.md:73` (and `fr/…:77`): « `0` or `1` gives one » could match `runtime-config.md:113` (« `1`, `0`, a negative value or `NaN` ») — `branch-reviewer`
 - #179 — `src/db/transaction.ts:162`: a `valueOf` with side effects is now called once at entry, where 6.6.1 called it at each comparison (0 times on a success) — `branch-reviewer`
 - #178 — `src/db/pgErrors.ts:19`, `website/transaction.md:349`: « any value », yet a `code` that is not a string but has a string's members (`['2','3','5','0','5']`, `{ length: 5 }`) throws `code.startsWith is not a function`; 6.6.1's type refused both: `false` would be a Fix, or the wording narrowed — `branch-reviewer`
+
+- #301 — `src/generate/schemaRules.ts:43`: « has no include nor exclude » reads better as « has neither include nor exclude » (frozen in the test, CHANGELOG and both generator pages) — `branch-reviewer`
+- #301 — `test/integration/codegen.test.ts:1217`: a single `null` key (`{ include: '*', exclude: null }`) is not frozen by a test — `branch-reviewer`
+- #442 — `CHANGELOG.md:99`, `website/generator.md:127` (and `fr/…:131`): a string naming several relations (`"films,studios"`) now selects none, or excludes none; the docs say a string's relation is kept without that condition, and no test row freezes it — `branch-reviewer`
+- #442 — `src/generate/schemaRules.ts:25`: `asList(names: '*' | string[])` narrows its string branch to `never`; `string | string[]` — `branch-reviewer`
+- #184 — `src/generate/tables.ts:184-185`: no test covers an enum whose TypeScript name differs from its Postgres name (`"film-format"` → `film_format`, `keyof` → `keyof_`) — `branch-reviewer`
+- #184 — `website/generator.md:424` (and `fr/…:428`): « Zapatos 6.6.1 imported `db` for `db.JSONValue` alone » also covers the enum sentence before it, and the `{ genre }` form shown is the `unprefixedSchema` one only — `branch-reviewer`
+- #184 — `src/generate/index.ts:10`: a direct caller of the exported `definitionForRelationInSchema` that does not pass `customTypeImports` now reads `archive.genre` rather than `genre` (both fail to compile) — `branch-reviewer`
+- #287 — `test/integration/codegen.test.ts:868`: the notes' order (case note first, then #42's) is decided alone but not pinned by a test — `branch-reviewer`
+- #287 — `CHANGELOG.md:101`: a second colon after « (…): on a case-insensitive file system », and « as in Zapatos 6.6.1 » reads as if it applied to the file system — `branch-reviewer`
+- #447 — `website/generator.md:356`, `:222` (and `fr/…`): the `index` note's case-insensitive clause drops « wherever it runs » — `branch-reviewer`
+- #447 — `website/generator.md:427`, `:278`, `website/switching.md:18` (and `fr/…`): « never overwritten » without the `index` exception — `branch-reviewer`
+- #447 — `test/integration/codegen.test.ts:1053`: one `index` name shared by two schemas (this note and #42's on one file) is not tested — `branch-reviewer`
+- #447 — `src/generate/tsOutput.ts:94`: the outer `types` shadowed by the inner `const types` at `:122` — `branch-reviewer`
