@@ -9,18 +9,19 @@
 // -u never deletes a file: a stale snapshot is removed by hand (the orphan test names it).
 // tsForConfig() calls process.exit(1) on any SQL error: no test here may cause one.
 
+import { randomBytes } from 'node:crypto';
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import * as pg from 'pg';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, inject, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, inject, it, vi } from 'vitest';
 import {
   definitionForRelationInSchema, enumDataForSchema, finaliseConfig, generate, relationsInSchema, tsForConfig, type Config,
 } from '../../src/generate';
 import { cliConfig } from '../../src/generate/cliConfig';
-import { urlForDatabase } from '../helpers/databases';
+import { createDatabase, dropDatabase, urlForDatabase, withAdminClient } from '../helpers/databases';
 import { useTestDatabase } from '../helpers/db';
 
 const t = useTestDatabase();
@@ -1345,6 +1346,43 @@ describe('generate()', () => {
     const first = contents(outDir);
     await run();
     expect(contents(outDir)).toEqual(first);
+  });
+
+  describe('that throws', () => {
+    // a database of its own, dropped without FORCE: the drop fails while a connection of the run is open
+    const server = () => inject('pgcastDb')!;
+    let name: string;
+    beforeEach(async () => {
+      name = `${server().prefix}throws_${randomBytes(4).toString('hex')}`;
+      await withAdminClient(server().url, c => createDatabase(c, name, server().template));
+    });
+    afterEach(() => withAdminClient(server().url, c => dropDatabase(c, name)));
+
+    const failed = new Error('failed on purpose');
+    const throwsThenDrops = async (config: Config) => {
+      const exit = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as () => never);
+      try {
+        await expect(generate({
+          ...quiet, ...config, db: { connectionString: urlForDatabase(server().url, name) }, outDir,
+        })).rejects.toBe(failed);
+        await withAdminClient(server().url, c => c.query(`DROP DATABASE "${name}"`));
+        expect(exit).not.toHaveBeenCalled();
+      } finally {
+        exit.mockRestore();
+      }
+    };
+
+    // DROP DATABASE waits 5 s for the other sessions to end before it fails: give it time to say so
+    const dropWait = 10_000;
+
+    it('ends its pool when warningListener throws, after every query', () => throwsThenDrops({
+      schemas: { public: only('users', 'no_such_table') },
+      warningListener: () => { throw failed; },
+    }), dropWait);
+
+    it('ends its pool when a customTypesTransform function throws, while other queries run', () => throwsThenDrops({
+      ...main, customTypesTransform: () => { throw failed; },
+    }), dropWait);
   });
 });
 
