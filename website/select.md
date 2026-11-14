@@ -376,7 +376,7 @@ const firstShow = await db.min('screenings', db.all, {
 | `sum()` or `avg()`, no row matching | `0`, `number` | `null`, `number \| null` |
 | `max()` of `runtime_minutes`, an `integer` | `131`, `number` | `131`, `number \| null` |
 | `min()` nested in a `lateral` | an ISO string, typed `number` | the same string, `TimestampTzString \| null` |
-| `min()` as the single `lateral` of a `selectOne()` | a `Date`, typed `number` | the same `Date`, `Date \| null \| undefined` |
+| `min()` as the single `lateral` of a `selectOne()` | a `Date`, typed `number \| undefined` | the same `Date`, `Date \| null \| undefined` |
 
 </div>
 
