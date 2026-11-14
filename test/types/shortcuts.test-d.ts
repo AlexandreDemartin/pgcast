@@ -581,5 +581,9 @@ describe('result types', () => {
     expectTypeOf<R>().not.toBeAny();
     // @ts-expect-error not a SQLFragment
     expectTypeOf<db.RunResultForSQLFragment<string>>();
+    // as in 6.6.1: any, an unknown result, and a nested count
+    expectTypeOf<db.RunResultForSQLFragment<any>>().toEqualTypeOf<{} | null>();
+    expectTypeOf<db.RunResultForSQLFragment<db.SQLFragment<unknown>>>().toEqualTypeOf<{} | null>();
+    expectTypeOf<db.RunResultForSQLFragment<ReturnType<typeof db.count>>>().toEqualTypeOf<number>();
   });
 });
