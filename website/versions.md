@@ -90,7 +90,7 @@ The generator gets opt-ins of its own in 6.7: [`typeEnumsAcrossSchemas`](/genera
 Their warnings are notes through [`warningListener`](/generator#generate.warningListener), not a `DeprecationWarning`, and come only when your schema has something they would change, once per run: `typeEnumsAcrossSchemas`'s names each column, `enumOrder`'s each enum.
 
 ::: info Coming
-pgcast isn't on npm yet. 6.6.2 is written; 6.7.0, which brings the opt-ins, is in progress: [its milestone](https://github.com/AlexandreDemartin/pgcast/milestone/1).
+6.6.2 is on npm, as [`@pgcast/pgcast`](https://www.npmjs.com/package/@pgcast/pgcast); 6.7.0, which brings the opt-ins, is in progress: [its milestone](https://github.com/AlexandreDemartin/pgcast/milestone/1).
 :::
 
 ## Further reading
