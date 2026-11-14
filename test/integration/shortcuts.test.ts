@@ -924,12 +924,47 @@ describe('count, sum, avg, min, max', () => {
     expect(await run(db.select('users', all, { lateral: one }))).toEqual(['2025-06-01', '2025-06-01', '2025-06-01']);
   });
 
-  it('with aggregatesTypedByColumn, a query that returns no row still rejects with the TypeError of 6.6.1', async () => {
-    // #163: a groupBy with no group gives no row, which `.run()` reads as rows[0].result
+  // #163: these return no row, where 6.6.1 read rows[0].result and rejected with
+  // "TypeError: Cannot read properties of undefined (reading 'result')"; no row now reads as a NULL result
+  type Where = Parameters<typeof db.count>[1];
+  const noRow: [string, Where, NonNullable<Parameters<typeof db.count>[2]>][] = [
+    ['a groupBy with no group', { id: -1 }, { groupBy: 'owner_id' }],
+    ['a having that keeps none', all, { having: sql`false` }],
+    ['offset: 1', all, { offset: 1 }],
+    ['limit: 0', all, { limit: 0 }],
+  ];
+  const eachAggregate = async (where: Where, options: object) => {
+    const outcome = (q: db.SQLFragment<any>) => run(q).catch((err: Error) => `${err.name}: ${err.message}`);
+    return {
+      count: await outcome(db.count('accounts', where, options)),
+      sum: await outcome(db.sum('accounts', where, { ...options, columns: ['balance'] })),
+      avg: await outcome(db.avg('accounts', where, { ...options, columns: ['balance'] })),
+      min: await outcome(db.min('accounts', where, { ...options, columns: ['balance'] })),
+      max: await outcome(db.max('accounts', where, { ...options, columns: ['balance'] })),
+    };
+  };
+
+  it.each(noRow)('%s gives 0, as Number(null) does, without aggregatesTypedByColumn', async (_name, where, options) => {
+    expect(await eachAggregate(where, options)).toEqual({ count: 0, sum: 0, avg: 0, min: 0, max: 0 });
+  });
+
+  it.each(noRow)('%s gives null with aggregatesTypedByColumn, and 0 for count', async (_name, where, options) => {
     db.setConfig({ aggregatesTypedByColumn: true });
-    const noGroup = db.max('accounts', { id: -1 }, { columns: ['balance'], groupBy: 'owner_id' });
-    await expect(run(noGroup)).rejects.toThrow(TypeError);
-    await expect(run(noGroup)).rejects.toThrow("Cannot read properties of undefined (reading 'result')");
+    expect(await eachAggregate(where, options)).toEqual({ count: 0, sum: null, avg: null, min: null, max: null });
+  });
+
+  it('nested in a lateral, an aggregate whose query returns no row gives null, option or not', async () => {
+    // the subquery is LEFT JOINed, so no row there is a NULL in jsonb_build_object(); unchanged from 6.6.1
+    const query = () => db.select('users', { id: 1 }, {
+      columns: ['id'],
+      lateral: {
+        n: db.count('accounts', { owner_id: parent('id') }, { having: sql`false` }),
+        top: db.max('accounts', { owner_id: parent('id') }, { columns: ['balance'], offset: 1 }),
+      },
+    });
+    expect(await run(query())).toEqual([{ id: 1, n: null, top: null }]);
+    db.setConfig({ aggregatesTypedByColumn: true });
+    expect(await run(query())).toEqual([{ id: 1, n: null, top: null }]);
   });
 
   it('a passthru lateral rejects run() before any query is sent, nested too; a lateral map runs', async () => {
@@ -985,6 +1020,22 @@ describe('sum, avg, min, max without aggregatesTypedByColumn (deprecated, PGCAST
       await query(fdb).run(t.client);
       expect(emitWarning.mock.calls.map(c => c[1])).toEqual([{ type: 'DeprecationWarning', code: 'PGCAST_DEP004' }]);
     }
+  });
+
+  it('warns for a query that returns no row, as for a NULL turned into 0', async () => {
+    const warnings: unknown[] = [];
+    for (const aggregate of ['sum', 'avg', 'min', 'max'] as const) {
+      const { fdb, emitWarning } = await fresh();
+      await fdb[aggregate]('accounts', fdb.all, { columns: ['balance'], limit: 0 }).run(t.client).catch(() => { });
+      warnings.push(emitWarning.mock.calls.map(c => c[1]));
+    }
+    expect(warnings).toEqual(Array(4).fill([{ type: 'DeprecationWarning', code: 'PGCAST_DEP004' }]));
+  });
+
+  it('does not warn for a count whose query returns no row', async () => {
+    const { fdb, emitWarning } = await fresh();
+    expect(await fdb.count('accounts', fdb.all, { offset: 1 }).run(t.client)).toBe(0);
+    expect(emitWarning).not.toHaveBeenCalled();
   });
 
   it('does not warn when the result is the same: a sum or avg of rows, a max of a float8, any count; nor with the option', async () => {
