@@ -900,6 +900,33 @@ describe('undefinedMeansMissing: an undefined key of upsert() updateValues', () 
       .toContain('DO UPDATE SET ("mood") = ROW($3)');
   });
 
+  // updateValues[c] is read as on master, through getters and prototypes: only the column list loses the undefined key
+  class Patch { settings = undefined; get mood() { return db.param('ok'); } }
+  const patches = () => [new Patch(), Object.assign(Object.create({ mood: db.param('ok') }), { settings: undefined })];
+
+  it('with it, a class instance with a getter: the getter is still read, only the undefined key goes', () => {
+    db.setConfig({ undefinedMeansMissing: true });
+    expect(upsert({ updateColumns: ['display_name', 'mood'], updateValues: patches()[0] }))
+      .toEqual(upsert({ updateColumns: ['display_name', 'mood'], updateValues: { mood: db.param('ok') } }));
+    expect(upsert({ updateColumns: ['display_name', 'mood'], updateValues: patches()[0] }).text)
+      .toContain('DO UPDATE SET ("display_name", "mood") = ROW(EXCLUDED."display_name", $3)');
+  });
+
+  it('with it, an Object.create() value: the inherited key is still read, only the undefined key goes', () => {
+    db.setConfig({ undefinedMeansMissing: true });
+    expect(upsert({ updateColumns: ['display_name', 'mood'], updateValues: patches()[1] }))
+      .toEqual(upsert({ updateColumns: ['display_name', 'mood'], updateValues: { mood: db.param('ok') } }));
+    expect(upsert({ updateColumns: ['display_name', 'mood'], updateValues: patches()[1] }).text)
+      .toContain('DO UPDATE SET ("display_name", "mood") = ROW(EXCLUDED."display_name", $3)');
+  });
+
+  it('without it, a class instance or an Object.create() value: the undefined key is set from EXCLUDED, as on master', () => {
+    for (const updateValues of patches()) expect(upsert({ updateColumns: ['display_name', 'mood'], updateValues })).toEqual({
+      text: `INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("display_name", "mood", "settings") = ROW(EXCLUDED."display_name", $3, EXCLUDED."settings") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result`,
+      values: ['E', 'e@x.org', 'ok'],
+    });
+  });
+
   it('a column inserted or named in updateColumns is still set from EXCLUDED: the same SQL with it as without it', () => {
     const queries = () => [
       upsert({ updateValues: { mood: undefined } }, { ...ada, mood: 'ok' }),
