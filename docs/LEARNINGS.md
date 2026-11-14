@@ -190,6 +190,8 @@ Candidates for a check, a rule or a skill line.
 - #233 — pg's `getTransactionStatus()` can be stale in both directions right after a rejected query (pg rejects on ErrorResponse, before ReadyForQuery): mock the status in tests rather than rely on the race — `builder`
 - #233 — An opt-in that adds a query on its old path needs exceptions in the pages that say « nothing else changes » and when the warning comes; better, keep the old path byte-identical (here: the empty query only with the option on) — orchestrator
 - #233 — pg's `util.deprecate` warnings fire once per process: a replay comparing implementations for them runs each in its own process — `branch-reviewer`
+- #416 — Three steps (#170, #250, #416) found built-ins missing from the hand-written list: a test walking the ECMA-262 global constructors (refused, or kept with a reason) on each Node of the matrix, and a check on the prototype chain for iterators — `branch-reviewer`
+- #416 — A one-loop `it` hides each failure after the first; an integration count of `query` calls shows each new entry red on its own — `builder`
 
 ## Minors kept
 
@@ -234,3 +236,4 @@ Minor review defects, taken up by the end-of-chapter review.
 - #163 — `test/integration/shortcuts.test.ts:1029`: `.catch(() => { })` swallows a rejection; assert `.toBe(0)` as `:1037` does — `branch-reviewer`
 - #163 — `website/select.md:248`, `:251`: « what no row gives (below) »: state it in place — `branch-reviewer`
 - #235 — `src/db/conditions.ts:78`: `Object.prototype.toString` follows `Symbol.toStringTag`, so a faked tag reads « takes an array, not `Array` »; error text only — `branch-reviewer`
+- #416 — `website/sql-template.md:298`: the host-object sentence belongs in the « As in Zapatos 6.6.1: » list (`:304`) — `branch-reviewer`

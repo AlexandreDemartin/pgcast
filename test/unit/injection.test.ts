@@ -1310,6 +1310,9 @@ describe('a built-in object as a Whereable', () => {
     // the type of Buffer gives no constructor to extend
     class Reel extends (Buffer as any) {}
     class Still extends DataView<ArrayBuffer> {}
+    class Watch extends ((globalThis as any).WeakRef as new (target: object) => object) { id = 1; }
+    class Cleanup extends ((globalThis as any).FinalizationRegistry as new (callback: () => void) => object) {}
+    class Shared extends SharedArrayBuffer {}
     const kept: Record<string, any> = {
       plain: { display_name: 'Ada' },
       empty: {},
@@ -1323,6 +1326,9 @@ describe('a built-in object as a Whereable', () => {
       subclassOfTypedArrayEmpty: new Frames(0),
       subclassOfBuffer: Object.setPrototypeOf(Buffer.from('id'), Reel.prototype),  // new Buffer() returns a Buffer
       subclassOfDataView: new Still(new ArrayBuffer(1)),
+      subclassOfWeakRef: new Watch({}),
+      subclassOfFinalizationRegistry: new Cleanup(() => {}),
+      subclassOfSharedArrayBuffer: new Shared(1),
       otherRealmDate: runInNewContext('new Date(0)'),
       builtinValues: { created_at: new Date(0), tags: new Set(['a']), settings: new Map(), photo: Buffer.from('a') },
       array: [{ id: 1 }, sql` AND TRUE`],
@@ -1415,6 +1421,14 @@ describe('a built-in object as a Whereable', () => {
             1,
           ],
         },
+        "subclassOfFinalizationRegistry": {
+          "text": "DELETE FROM "users" WHERE TRUE",
+          "values": [],
+        },
+        "subclassOfSharedArrayBuffer": {
+          "text": "DELETE FROM "users" WHERE TRUE",
+          "values": [],
+        },
         "subclassOfTypedArray": {
           "text": "DELETE FROM "users" WHERE ("0" = $1)",
           "values": [
@@ -1425,8 +1439,22 @@ describe('a built-in object as a Whereable', () => {
           "text": "DELETE FROM "users" WHERE TRUE",
           "values": [],
         },
+        "subclassOfWeakRef": {
+          "text": "DELETE FROM "users" WHERE ("id" = $1)",
+          "values": [
+            1,
+          ],
+        },
       }
     `);
+  });
+
+  it('a subclass of DisposableStack or AsyncDisposableStack compiles as before, where the runtime has them', () => {
+    // Node 24 and later; 6.6.1 compiled an instance with no own enumerable key to TRUE
+    for (const name of ['DisposableStack', 'AsyncDisposableStack'].filter(name => name in globalThis)) {
+      const Stack = class extends ((globalThis as any)[name] as new () => object) {};
+      expect(sql`DELETE FROM ${'users'} WHERE ${new Stack()}`.compile(), name).toEqual({ text: 'DELETE FROM "users" WHERE TRUE', values: [] });
+    }
   });
 });
 
