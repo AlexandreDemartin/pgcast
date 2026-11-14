@@ -1,5 +1,5 @@
 ---
-english: e1f69da13360
+english: d0917a383b69
 ---
 
 # Retries
@@ -55,7 +55,7 @@ pgcast ne réessaie que ce qui lui parvient. N’avalez pas une erreur de la bas
 
 La promesse se résout alors avec ce que le callback a renvoyé, rien n’est enregistré, et un 40001 intercepté ainsi n’est jamais réessayé ; pgcast avertit une fois, `PGCAST_DEP003`. Avec [`transactionRequiresCommit: true`](/fr/runtime-config#Config.transactionRequiresCommit), la valeur par défaut à partir de la 7.0, la promesse est rejetée à la place, toujours sans retry : pgcast n’a jamais vu l’erreur.
 
-Si vous en interceptez une à l’intérieur, relancez-la : une `Error`, pas `null` ni `undefined`, pour lesquels pgcast rejette plutôt la promesse avec une `TypeError` qui lui est propre ([#179](https://github.com/AlexandreDemartin/pgcast/issues/179)).
+Si vous en interceptez une à l’intérieur, relancez-la.
 
 Interceptez-la hors de la transaction, une fois que pgcast a abandonné, avec [`isDatabaseError()`](/fr/transaction#isDatabaseError) :
 

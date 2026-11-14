@@ -110,7 +110,7 @@ transactionAttemptsMax: number  // default: 5
 
 How many times [`transaction()`](/transaction#transaction) runs its callback. After a serialisation failure (`40001`) or a deadlock (`40P01`), it rolls back and runs the callback again, until this many attempts have failed; then it throws the last error. Any other error is rolled back and thrown at once.
 
-- `1`, `0` or less: one attempt, no retry. With `0`, the message reads "… on attempt 1 of 0, giving up" ([#179](https://github.com/AlexandreDemartin/pgcast/issues/179)).
+- `1`, `0`, a negative value or `NaN`: one attempt, no retry, and the message reads "… on attempt 1 of 1, giving up". A fraction is rounded up: `2.5` makes three attempts.
 - Read when `transaction()` starts, so a change affects the next transaction, not the one running.
 - How to write a callback that can run twice: [Retries](/retries).
 
