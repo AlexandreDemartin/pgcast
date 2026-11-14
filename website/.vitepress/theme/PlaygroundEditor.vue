@@ -26,6 +26,7 @@ import { data } from '../playground.data.ts';
 import { jsonHtml, sqlHtml, typeHtml } from '../playground/highlight.ts';
 import type { Code, Message, Query, Run } from '../playground/run.worker.ts';
 import { codeOf, fragmentOf, limit as shareLimit } from '../playground/share.ts';
+import Icon from './Icon.vue';
 import playgroundStyle from './playground.css?inline';
 
 const { shared } = defineProps<{ shared?: string | null }>();  // a link's code; `null`: a link that cannot be read
@@ -298,8 +299,8 @@ onBeforeUnmount(() => { stop(); latest++; disposables.forEach(disposable => disp
       <div aria-live="polite">
         <p class="label">
           <em>SQL</em>Postgres runs
-          <button type="button" class="Playground-run" @click="runOnPostgres()">Run</button>
-          <button type="button" class="Playground-share" @click="share()">Share</button>
+          <button type="button" class="Playground-run" @click="runOnPostgres()"><Icon name="play" />Run</button>
+          <button type="button" class="Playground-share" @click="share()"><Icon name="link" />Share</button>
         </p>
         <template v-for="(query, i) in queries" :key="i">
           <div v-html="query.html" />
