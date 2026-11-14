@@ -7,6 +7,7 @@ export const outline = [
     text: 'Tutorial',
     nav: 'Tutorial',
     link: '/tutorial',
+    collapsed: false,  // open: the way in, read first
     items: [
       { text: 'Install', link: '/install' },
       { text: 'Your first typed query', link: '/first-query' },
@@ -16,6 +17,7 @@ export const outline = [
     text: 'How-to guides',
     nav: 'Guides',
     link: '/guides',
+    collapsed: true,  // folded: a reader comes for one task, from the search or a link
     items: [
       { text: 'Switch from Zapatos', link: '/switching' },
       { text: 'Join through a lateral', link: '/lateral' },
@@ -33,6 +35,7 @@ export const outline = [
     text: 'Reference',
     nav: 'Reference',
     link: '/reference',
+    collapsed: false,  // open: what a reader looks up every day
     items: [
       { text: 'The <code>sql</code> template', link: '/sql-template' },
       { text: '<code>select()</code> and the aggregates', link: '/select' },
@@ -46,6 +49,7 @@ export const outline = [
   {
     text: 'Explanation',
     link: '/explanation',
+    collapsed: true,  // folded: read once, for the why
     items: [
       { text: 'Why pgcast', link: '/why' },
       { text: 'How types are cast from the catalog', link: '/catalog-types' },
