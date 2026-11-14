@@ -1,5 +1,5 @@
 ---
-english: 9d34e1ff0bb4
+english: a9c206e63b30
 ---
 
 # Écritures
@@ -37,6 +37,7 @@ Insère une ligne ou plusieurs, et les renvoie telles que Postgres les a stocké
 
 - Une ligne donne un résultat ; un tableau donne un tableau, dans l’ordre où Postgres les renvoie, en pratique l’ordre donné.
 - Les colonnes sont les clés de toutes les lignes ; une clé absente d’une ligne vaut `DEFAULT` dans cette ligne, comme `tagline` ci-dessus.
+- Une ligne sans clé, ou des lignes dont aucune n’a de clé, lèvent une erreur : "nothing to insert: an Insertable needs at least one column; for a row of defaults only, write INSERT ... DEFAULT VALUES in a sql template"<!-- message -->. Zapatos 6.6.1 envoyait `() VALUES ()`, que Postgres refusait (42601).
 - Un tableau vide ne fait rien : `.run(pool)` se résout avec `[]` et n’envoie rien, sauf si on le force avec `.run(pool, true)`. Son SQL, `INSERT INTO "films" SELECT null WHERE false`<!-- probe: db.insert('films', []) -->, est marqué comme sans effet.
 - Postgres accepte au plus 65 535 paramètres par requête : découpez une insertion plus grosse ([Batches](/fr/batches)).
 
@@ -81,6 +82,7 @@ db.upsert(table, values, conflictTarget, options?)
 - Chaque résultat a `$action`, `'INSERT'` ou `'UPDATE'` ([`UpsertAction`](#UpsertAction)).
 - Une ligne donne un résultat ; un tableau donne un tableau, sans les lignes qui ne font rien ([`doNothing`](#doNothing)).
 - Un tableau vide ne fait rien, comme pour `insert()`.
+- Une ligne sans clé, ou des lignes dont aucune n’a de clé, lèvent une erreur, comme pour `insert()` ; avec `undefinedMeansMissing`, une valeur `undefined` n’est pas une clé.
 
 ### Options {#upsert-options}
 
@@ -308,7 +310,7 @@ Dans les valeurs d’`insert()`, `update()` et `upsert()`, Zapatos 6.6.1 envoie 
 |---|---|---|
 | `insert()` | `NULL` | `DEFAULT` : `VALUES ($1, $2, $3, DEFAULT, $4)`<!-- probe: (db.setConfig({ undefinedMeansMissing: true }), db.insert('films', { studio_id: 1000, title: 'x', release_year: 2030, tagline: undefined, runtime_minutes: 90 })) --> |
 | `update()` | met la colonne à `NULL`, et compte comme une clé | omise : `SET ("title") = ROW($1)`<!-- probe: (db.setConfig({ undefinedMeansMissing: true }), db.update('films', { title: 'x', tagline: undefined }, { id: 1000 })) --> ; sans clé restante, lève "nothing to update…"<!-- message --> |
-| `upsert()` | insère `NULL`, puis la fixe depuis `EXCLUDED` | omise : ni insérée, ni mise à jour sauf si `updateColumns` la nomme (alors depuis `EXCLUDED`, donc une ligne existante prend le `DEFAULT` de la colonne) ; sur plusieurs lignes, sa cellule est `DEFAULT` et compte comme absente ([Lignes aux clés différentes](#upsert-different-keys)) |
+| `upsert()` | insère `NULL`, puis la fixe depuis `EXCLUDED` | omise : ni insérée, ni mise à jour sauf si `updateColumns` la nomme (alors depuis `EXCLUDED`, donc une ligne existante prend le `DEFAULT` de la colonne) ; sur plusieurs lignes, sa cellule est `DEFAULT` et compte comme absente ([Lignes aux clés différentes](#upsert-different-keys)) ; sans colonne restante, lève "nothing to insert…"<!-- message --> |
 | `upsert()` `updateValues` | la fixe depuis `EXCLUDED` : la valeur insérée, ou le `DEFAULT` de la colonne | omise, comme une clé que `updateValues` n’a pas : `SET ("film_id", "stars") = ROW(EXCLUDED."film_id", EXCLUDED."stars")`<!-- probe: (db.setConfig({ undefinedMeansMissing: true }), db.upsert('ratings', { film_id: 1002, stars: 4 }, ['film_id', 'stars'], { updateValues: { votes: undefined } })) -->, donc la valeur existante reste ; avec `doNothing` et aucune autre clé, `DO NOTHING`<!-- probe: (db.setConfig({ undefinedMeansMissing: true }), db.upsert('ratings', { film_id: 1002, stars: 4 }, ['film_id', 'stars'], { updateColumns: db.doNothing, updateValues: { votes: undefined } })) --> |
 
 </div>

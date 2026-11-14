@@ -373,12 +373,25 @@ describe('the config transaction() reads', () => {
   });
 
   it('releases its client when reading the config throws', async () => {
-    // a getter that throws, read by getConfig() when transaction() reads its config
+    // a getter that throws: getConfig() gives the delay as it is (#257), and transaction() throws when it reads minMs
     class Delay { get minMs(): number { throw new Error('no delay'); } get maxMs() { return 0; } }
-    expect(() => db.setConfig({ transactionRetryDelay: new Delay() })).toThrow('no delay');  // stored, then its copy throws
+    db.setConfig({ transactionRetryDelay: new Delay() });
     const { error, leaked } = await leakCheck(() => db.readCommitted(t.pool, async () => 'never'));
     expect(leaked).toBe(0);
     expect((error as Error).message).toBe('no delay');
+  });
+
+  // #257: as in Zapatos 6.6.1, a delay whose getter throws makes transaction() throw, not a query run on its own
+  it.each([
+    ['throws', () => { throw new Error('no delay'); }],
+    ['starts throwing after setConfig()', (calls: number) => { if (calls > 1) throw new Error('no delay'); return 1; }],
+  ])('runs a query outside transaction() when a getter of transactionRetryDelay %s', async (_, minMs: (calls: number) => number) => {
+    let calls = 0;
+    class Delay { get minMs() { return minMs(++calls); } get maxMs() { return 2; } }
+    db.setConfig({ transactionRetryDelay: new Delay() });
+    expect(await sql`SELECT 1 AS one`.run(t.pool)).toEqual([{ one: 1 }]);
+    await write(t.pool, 'written');
+    expect(await notes()).toEqual(['written']);
   });
 
   it('reads an undefined transactionAttemptsMax as its default', async () => {
