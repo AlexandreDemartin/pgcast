@@ -27,7 +27,7 @@ The site is in the four groups of [Diátaxis](https://diataxis.fr/) (decision 00
 
 - What belongs to another job goes to its page, as a link.
 - A new page: its entry in `outline.ts`, then `<link>.md`. Until the file exists, `[page].paths.ts` makes the entry a "Coming" page.
-- A page that documents a minor carries its version in its entry, glued to the text: `'Versions, opt-ins and warnings<small class="since">6.7</small>'`.
+- A page that documents a minor carries its version in its entry, glued to the text: `'Versions<small class="since">6.7</small>'`.
 
 ### Templates
 
@@ -40,7 +40,7 @@ One per group, in `templates/`, not published (`srcExclude` in `.vitepress/confi
 
 ### Conventions
 
-- **Title and lede**: one `# ` title, the text of its outline entry; then one paragraph followed by `{.lede}` on its own line: what the page is for. `llms.txt` takes both (§ For assistants), and the page's description its lede (§ For search engines).
+- **Title and lede**: one `# ` title, the text of its outline entry: one or two words, the concept's usual name (Conditions, Retries), no code; the function names and the detail go in the lede. Then one paragraph followed by `{.lede}` on its own line: what the page is for. `llms.txt` takes both (§ For assistants), and the page's description its lede (§ For search engines).
 - **Headings**: `##` for sections ("On this page" lists them), `###` under them, in sentence case.
 - **Notes**: a chip, then the text, with no side rail (art direction § Signature components). The text after the container's name is the chip, a word or two; a note is for what the reader must not miss.
 

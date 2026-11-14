@@ -1,4 +1,4 @@
-# The `sql` template
+# SQL template
 
 `sql` is the tagged template every query in pgcast is built from, the shortcuts included. This page lists what it takes, what each interpolation compiles to, and the `SQLFragment` it returns.
 {.lede}
@@ -80,7 +80,7 @@ An interpolated string is a table or column name. It is double-quoted, so its ca
 
 - Well-formed: a quoted identifier, then quoted, `U&` quoted or unquoted ones after each `.`, with or without spaces around it, the last one quoted.
 - The cost: a real column named `a""b` compiles to `"a""b"`<!-- probe: db.sql`${'a""b'}` -->, the column `a"b`.
-- Zapatos 6.6.1 wrapped the string in `"` without escaping, and wrote as it is any string that started and ended with `"`: a name could splice SQL around it. The generated `Table` and `Column` types already refused such names; the why is in [The security model](/security).
+- Zapatos 6.6.1 wrapped the string in `"` without escaping, and wrote as it is any string that started and ended with `"`: a name could splice SQL around it. The generated `Table` and `Column` types already refused such names; the why is in [Security](/security).
 
 Interpolate names rather than writing them in the literal: they are type-checked, and they follow the schema when you regenerate it.
 
@@ -145,7 +145,7 @@ The string, written into the SQL as it is: for syntax a parameter cannot stand f
 </CastPanel>
 
 ::: warning Security
-Whatever reaches `raw()` runs as SQL. Never give it a caller's text; a value is a [`param()`](#param). How to keep hand-written SQL safe: [Write raw SQL safely](/raw-sql).
+Whatever reaches `raw()` runs as SQL. Never give it a caller's text; a value is a [`param()`](#param). How to keep hand-written SQL safe: [Raw SQL](/raw-sql).
 :::
 
 As a filter value, `raw()` throws while compiling, and so do `cols()` and `vals()`. As a Whereable value, in `isIn()` / `isNotIn()`, and in `vals([…])` within a filter:
@@ -327,7 +327,7 @@ type SelfType = typeof self
 db.parent<T extends Column | undefined = Column | undefined>(x?: T): ParentColumn<T>
 ```
 
-A column of the parent query's table, in a subquery given to `lateral` ([Join through a lateral](/lateral)): `"<parent table or alias>"."<column>"`.
+A column of the parent query's table, in a subquery given to `lateral` ([Joins](/lateral)): `"<parent table or alias>"."<column>"`.
 
 <CastPanel example="sql_parent">
 
@@ -469,7 +469,7 @@ fragment.compile(): SQLQuery
 
 The query as `pg` takes it ([`SQLQuery`](/runtime-config#SQLQuery)): `text`, its parameters numbered from `$1`, and `values`, in their order; `name` too, once [prepared](#prepared). It sends nothing, and throws where an interpolation has no meaning. Its arguments are for its own recursion: call it with none.
 
-The text is not a stable API: a minor version may change it, as long as the result does not ([Test code that uses pgcast](/testing#the-sql-text-is-not-a-stable-api)).
+The text is not a stable API: a minor version may change it, as long as the result does not ([Testing](/testing#the-sql-text-is-not-a-stable-api)).
 
 <CastPanel example="sql_compile">
 

@@ -1,4 +1,4 @@
-# `select()` and the aggregates
+# Select {#select-and-the-aggregates}
 
 The read shortcuts: `select()`, `selectOne()` and `selectExactlyOne()` for rows, `count()`, `sum()`, `avg()`, `min()` and `max()` for one number. Each option, the SQL it adds and what it does to the type, then the types they share.
 {.lede}
@@ -24,7 +24,7 @@ Builds one `SELECT` of the rows of `table` that match `where`. It returns a [`SQ
 
 ### The SQL it writes
 
-- Each row is one `jsonb` value, `to_jsonb("films".*)`<!-- probe: examples/select.ts -->, so dates and times come back as strings and `bigint` as a number: the `JSONSelectable` types say so ([How types are cast from the catalog](/catalog-types)).
+- Each row is one `jsonb` value, `to_jsonb("films".*)`<!-- probe: examples/select.ts -->, so dates and times come back as strings and `bigint` as a number: the `JSONSelectable` types say so ([The catalog](/catalog-types)).
 - The rows are gathered into one array, `coalesce(jsonb_agg(result), '[]')`<!-- probe: examples/select.ts -->, around a subquery aliased `"sq_<alias or table>"`, so `ORDER BY` and `LIMIT` apply to the rows. One query, one value back.
 - Inside, the clauses come in this order: `SELECT [DISTINCT …]` · the columns `AS result` · `FROM` the table `[AS alias]` · each `LEFT JOIN LATERAL` · `WHERE` · `GROUP BY` · `HAVING` · `ORDER BY` · `LIMIT` or `FETCH FIRST … WITH TIES` · `OFFSET` · each `FOR …` lock.
 - Every value is a parameter (`$1`, `$2`); every name is quoted as Postgres quotes it, any `"` in it doubled. Zapatos 6.6.1 let a name that held a `"` close its quotes; pgcast fixed this ([changelog](/changelog#6.6.2-security)).
@@ -91,7 +91,7 @@ async function filmCards(queryable: db.Queryable) {
 
 </CastPanel>
 
-Paging through a long list: [Paginate a list](/paginate).
+Paging through a long list: [Pagination](/paginate).
 
 ### `extras`
 
@@ -110,7 +110,7 @@ Paging through a long list: [Paginate a list](/paginate).
 - **An object**: each key becomes a key of the result, holding its subquery's result: an array for `select()`, an object or `null` for `selectOne()`, a number for `count()`. The keys are joined in alphabetical order; each is one identifier, `"lateral_<key>"`.
 - **One subquery**: its result is passed through in place of each row. Then `columns` and `extras` have nothing to add to, and the type refuses them, with `strictNullChecks` on.
 
-Steps, nesting and self-joins: [Join through a lateral](/lateral). Since pgcast 6.6.2, a key or an `alias` with a `"` in it stays one identifier; in Zapatos 6.6.1 it could close its quotes ([changelog](/changelog#6.6.2-security)).
+Steps, nesting and self-joins: [Joins](/lateral). Since pgcast 6.6.2, a key or an `alias` with a `"` in it stays one identifier; in Zapatos 6.6.1 it could close its quotes ([changelog](/changelog#6.6.2-security)).
 
 ### `alias`
 

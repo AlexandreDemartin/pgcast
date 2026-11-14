@@ -83,7 +83,7 @@ Spacing is on a 4px grid.
   - Its pages a step further in, their text 16px right of the heading's: plain rows of 36px (padding `8px 12px`), 4px apart, radius 8px, no fill; 16px between the heading's row and its first page's, so 32px from the heading's text to the first page's, against 20px between pages.
   - The current page a filled row, `--raised`, in `--fg`, 500; a current landing page fills its heading's row the same way.
   - 24px under an open group, 4px under a folded one; the same in the phone's drawer.
-  - A page that documents a minor carries its version as a small badge on the right (Versions, opt-ins and warnings: 6.7).
+  - A page that documents a minor carries its version as a small badge on the right (Versions: 6.7).
 - **Reading column**: paragraphs and list items at most 68ch; VitePress's padding (48px 32px from 960px).
 - **Rhythm** of the reading column, on the 4px grid, moderate and even: breathing room, not empty space (`style.css`, last rule).
 

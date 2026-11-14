@@ -214,7 +214,7 @@ import * as db from 'zapatos/db';
 db.setConfig({ upsertRequiresSameKeys: true, undefinedMeansMissing: true, transactionRequiresCommit: true });
 ```
 
-All three will be the default in 7.0 ([Versions, opt-ins and warnings](/versions)). With them on, an `undefined` value is left out of an `update()`:
+All three will be the default in 7.0 ([Versions](/versions)). With them on, an `undefined` value is left out of an `update()`:
 
 <CastPanel example="switching_undefined">
 
@@ -254,11 +254,11 @@ Code written or left as it is against pgcast's fixes gets Zapatos 6.6.1's result
 
 `db.deletes('roles', { character: db.conditions.isNotIn([db.param('The ferryman')]) })` deletes 11 roles under pgcast, and all 12 under Zapatos 6.6.1.
 
-The holes of [6.6.2's § Security](/changelog#6.6.2-security) are open again: a name, a `lock`, an `aggregate`, a plain value in `updateValues` or a `param()` cast can splice SQL ([The security model](/security)).
+The holes of [6.6.2's § Security](/changelog#6.6.2-security) are open again: a name, a `lock`, an `aggregate`, a plain value in `updateValues` or a `param()` cast can splice SQL ([Security](/security)).
 :::
 
 ## See also
 
 - [Opt-ins and warnings](/runtime-config#opt-ins-and-warnings): each option, its warning and its message.
-- [Versions, opt-ins and warnings](/versions): why pgcast fixes some things outright and others behind an option.
-- [The security model](/security): why a name or a `raw()` value can no longer splice SQL.
+- [Versions](/versions): why pgcast fixes some things outright and others behind an option.
+- [Security](/security): why a name or a `raw()` value can no longer splice SQL.

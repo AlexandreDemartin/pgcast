@@ -10,7 +10,7 @@ export const outline = [
     collapsed: false,  // open: the way in, read first
     items: [
       { text: 'Install', link: '/install' },
-      { text: 'Your first typed query', link: '/first-query' },
+      { text: 'First query', link: '/first-query' },
     ],
   },
   {
@@ -20,15 +20,15 @@ export const outline = [
     collapsed: true,  // folded: a reader comes for one task, from the search or a link
     items: [
       { text: 'Switch from Zapatos', link: '/switching' },
-      { text: 'Join through a lateral', link: '/lateral' },
-      { text: 'Paginate a list', link: '/paginate' },
-      { text: 'Insert and upsert in batches', link: '/batches' },
-      { text: 'Retry a transaction', link: '/retries' },
-      { text: 'Use custom types and domains', link: '/custom-types' },
-      { text: 'Write raw SQL safely', link: '/raw-sql' },
-      { text: 'Handle errors', link: '/handle-errors' },
-      { text: 'Test code that uses pgcast', link: '/testing' },
-      { text: 'Use an AI assistant', link: '/ai-assistant' },
+      { text: 'Joins', link: '/lateral' },
+      { text: 'Pagination', link: '/paginate' },
+      { text: 'Batches', link: '/batches' },
+      { text: 'Retries', link: '/retries' },
+      { text: 'Custom types', link: '/custom-types' },
+      { text: 'Raw SQL', link: '/raw-sql' },
+      { text: 'Errors', link: '/handle-errors' },
+      { text: 'Testing', link: '/testing' },
+      { text: 'AI assistants', link: '/ai-assistant' },
     ],
   },
   {
@@ -37,13 +37,13 @@ export const outline = [
     link: '/reference',
     collapsed: false,  // open: what a reader looks up every day
     items: [
-      { text: 'The <code>sql</code> template', link: '/sql-template' },
-      { text: '<code>select()</code> and the aggregates', link: '/select' },
-      { text: '<code>insert()</code>, <code>update()</code> and the other writes', link: '/insert' },
-      { text: '<code>db.conditions</code>', link: '/conditions' },
-      { text: '<code>transaction()</code> and errors', link: '/transaction' },
-      { text: 'Run-time configuration and utility types', link: '/runtime-config' },
-      { text: 'The generator: config and CLI', link: '/generator' },
+      { text: 'SQL template', link: '/sql-template' },
+      { text: 'Select', link: '/select' },
+      { text: 'Writes', link: '/insert' },
+      { text: 'Conditions', link: '/conditions' },
+      { text: 'Transactions', link: '/transaction' },
+      { text: 'Configuration', link: '/runtime-config' },
+      { text: 'Generator', link: '/generator' },
     ],
   },
   {
@@ -52,9 +52,9 @@ export const outline = [
     collapsed: true,  // folded: read once, for the why
     items: [
       { text: 'Why pgcast', link: '/why' },
-      { text: 'How types are cast from the catalog', link: '/catalog-types' },
-      { text: 'Versions, opt-ins and warnings<small class="since">6.7</small>', link: '/versions' },
-      { text: 'The security model', link: '/security' },
+      { text: 'The catalog', link: '/catalog-types' },
+      { text: 'Versions<small class="since">6.7</small>', link: '/versions' },
+      { text: 'Security', link: '/security' },
     ],
   },
 ];
