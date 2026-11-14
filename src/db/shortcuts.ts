@@ -111,6 +111,8 @@ function SQLForExtras<T extends Table>(extras: ExtrasOption<T>) {
 }
 
 
+const undefinedWarning = 'An undefined value in insert(), update() or upsert() is sent as NULL, or, in upsert() updateValues, set from EXCLUDED. Set undefinedMeansMissing: true (db.setConfig) to treat it as a missing key instead (DEFAULT in insert(), left out of update() and upsert()); it will be the default in pgcast 7.0.';
+
 // an undefined value is sent as NULL, as in 6.6.1, but warns once; with undefinedMeansMissing (the default in 7.0)
 // it is a missing key instead, as JSON.stringify leaves it out: `toDefault` sends DEFAULT (insert), otherwise the
 // key goes (update, upsert, whose missing keys then take DEFAULT, and the rules of upsertRequiresSameKeys);
@@ -119,12 +121,26 @@ function undefinedAsMissing<V extends object>(values: V, toDefault: boolean): V 
   const rows: object[] = (Array.isArray(values) ? values : [values]).map(row => row ?? {});
   if (!rows.some(row => Object.values(row).includes(undefined))) return values;
   if (!(getConfig().undefinedMeansMissing ?? false)) {
-    warnOnce('PGCAST_DEP002', 'An undefined value in insert(), update() or upsert() is sent as NULL. Set undefinedMeansMissing: true (db.setConfig) to treat it as a missing key instead (DEFAULT in insert(), left out of update() and upsert()); it will be the default in pgcast 7.0.');
+    warnOnce('PGCAST_DEP002', undefinedWarning);
     return values;
   }
   const kept = rows.map(row => Object.fromEntries(Object.entries(row).flatMap(([k, v]) =>
     v !== undefined ? [[k, v]] : toDefault ? [[k, Default]] : [])));
   return (Array.isArray(values) ? kept : kept[0]) as V;
+}
+
+// the keys of upsert()'s updateValues that join the update: an undefined one is set from EXCLUDED, as in 6.6.1,
+// so if no row inserts its column, an existing row takes the column DEFAULT; with undefinedMeansMissing, it is a
+// missing key, so it adds no column (`updated`: updateColumns, or the columns inserted, set from EXCLUDED either
+// way); the object itself is kept, as its values are still read through getters and prototypes
+function updateValuesKeys(updateValues: { [k: string]: any }, updated: string[]): string[] {
+  const keys = Object.keys(updateValues);
+  if (!keys.some(k => updateValues[k] === undefined && !updated.includes(k))) return keys;
+  if (!(getConfig().undefinedMeansMissing ?? false)) {
+    warnOnce('PGCAST_DEP002', undefinedWarning);
+    return keys;
+  }
+  return keys.filter(k => updateValues[k] !== undefined);
 }
 
 
@@ -319,6 +335,14 @@ const updateValueSQL = (value: any) => compiledAsIs(value) ? value : param(value
  * out, as if it were missing: one row does not insert that column, nor update
  * it unless `updateColumns` names it, in which case it is still set from
  * `EXCLUDED` and an existing row takes the column `DEFAULT`.
+ *
+ * An `undefined` key of `updateValues` is set from `EXCLUDED`: an existing
+ * row takes the value inserted, or the column `DEFAULT`. When that key alone
+ * adds its column to the update (`updateColumns` leaves it out or, without
+ * `updateColumns`, no row inserts it), this emits the same warning, once.
+ * With `undefinedMeansMissing`, it is a missing key: `{ votes: undefined }`
+ * adds no `"votes"` to `DO UPDATE SET`, and with `updateColumns: doNothing`
+ * and nothing else, the SQL is `DO NOTHING`.
  */
 export const upsert: UpsertSignatures = function (
   table: Table,
@@ -350,7 +374,7 @@ export const upsert: UpsertSignatures = function (
       !conflictColumns.includes(c) &&  // on conflict, EXCLUDED.c equals the existing value
       values.some(v => !Object.prototype.hasOwnProperty.call(v, c))),
     updateColumns = [...new Set(  // deduplicate the keys here
-      [...specifiedUpdateColumns as string[] ?? colNames, ...Object.keys(updateValues)]
+      [...specifiedUpdateColumns as string[] ?? colNames, ...updateValuesKeys(updateValues, specifiedUpdateColumns as string[] ?? colNames)]
     )],
     conflictTargetSQL = Array.isArray(conflictTarget) ?
       sql`(${mapWithSeparator(conflictTarget, sql`, `, c => c)})` :

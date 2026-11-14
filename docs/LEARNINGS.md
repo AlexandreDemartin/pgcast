@@ -141,6 +141,9 @@ Candidates for a check, a rule or a skill line.
 - #368 — The « runs as on Zapatos 6.6.1 » CLI replay (exit code, stdout, `Error:` line, file hashes) is redone by hand on each CLI PR: a script with fixed scenarios would make it checkable — `branch-reviewer`
 - #51 — Before documenting a report finding, search what the docs site already says: 10 of the 16 were covered by the docs chapter — `builder`
 - #51 — R36 depends on the schema: an inline fragment fails only when another relation has the same column name with another type, or a nullable copy of a `NOT NULL` column in `update()`; the docs schema has neither, so the page states it in prose — `builder`
+- #168 — An option that drops keys from a caller's object filters the key list and leaves the object alone: rebuilding it (`Object.fromEntries(Object.entries(x))`) loses getters, inherited and non-enumerable keys that `x[k]` still reads — `branch-reviewer`
+- #168 — A replay grid also runs once on the pre-fix commit, to show it finds the defect (144 differences on the old head, 0 after) — `branch-reviewer`
+- #168 — Before planning a step that changes an opt-in, search its tests: two existing tests had frozen the very behaviour the decision changed — `builder`
 - #167 — A new refusal on a path where 6.6.1 rejected from `.run()` throws as the query compiles (a fragment whose `compile` throws, as #269 does), frozen through `.run()` with a `query` spy: thrown at the call, a `.catch()` chained on `.run()` loses it — `branch-reviewer`
 - #167 — A sentence saying when an error happens matches how its test asserts: « the call throws » for `expect(() => fn(…))`, « throws while compiling, so `.run()` rejects » for `.compile()` or `.run()` — `branch-reviewer`
 - #167 — When a row of a docs table moves to another group, reread the paragraph above it: `transaction.md` still said every shortcut throws from the call — `branch-reviewer`
@@ -177,3 +180,5 @@ Minor review defects, taken up by the end-of-chapter review.
 - #46 — `src/generate/tsOutput.ts:100`: the writer's `/^/gm` indentation puts spaces after a U+2028/U+2029 inside a comment (6.6.1 too); frozen as is by `column comments › prefixes every line whatever its line break` — `branch-reviewer`
 - #368 — `AGENTS.md:46`: the architecture map still says `cli.ts` reads `zapatosconfig.json`; that work is now in `cliConfig.ts` and covers both files — `branch-reviewer`
 - #368 — `website/generator.md:69`: « the options of `zapatosconfig.json` », where the lede now says « its config file » — `branch-reviewer`
+- #168 — `website/insert.md:307`, `CHANGELOG.md:19`: « `DO NOTHING` » without what it does to the result (one row: `undefined` on conflict; an array leaves that row out) — `branch-reviewer`
+- #168 — `src/db/shortcuts.ts:369`, `:376`: `specifiedUpdateColumns as string[] ?? colNames` written twice — `branch-reviewer`

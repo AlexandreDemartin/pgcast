@@ -242,6 +242,24 @@ describe('upsert', () => {
       .toEqual({ title: null, price_cents: 1400, $action: 'UPDATE' });
   });
 
+  it('an undefined key of updateValues: the column DEFAULT without undefinedMeansMissing, left as it is with it', async () => {
+    const ada = { email: 'Ada@Example.com', display_name: 'Ada' };
+    db.setConfig({ undefinedMeansMissing: true });
+    expect(await run(db.upsert('users', ada, 'email', { updateValues: { settings: undefined }, returning: ['settings'] })))
+      .toEqual({ settings: { theme: 'dark' }, $action: 'UPDATE' });
+    db.setConfig({ undefinedMeansMissing: false });  // deprecated (PGCAST_DEP002)
+    expect(await run(db.upsert('users', ada, 'email', { updateValues: { settings: undefined }, returning: ['settings'] })))
+      .toEqual({ settings: {}, $action: 'UPDATE' });
+  });
+
+  it('with undefinedMeansMissing, an undefined key of updateValues that leaves nothing to update: DO NOTHING', async () => {
+    // so no row back on conflict, and the row is unchanged
+    db.setConfig({ undefinedMeansMissing: true });
+    expect(await run(db.upsert('users', { email: 'Ada@Example.com', display_name: 'Ada' }, 'email',
+      { updateColumns: db.doNothing, updateValues: { settings: undefined } }))).toBeUndefined();
+    expect(await scalar(`SELECT settings AS v FROM users WHERE email = 'Ada@Example.com'`)).toEqual({ theme: 'dark' });
+  });
+
   it('constraint()', async () => {
     expect(await run(db.upsert('users', { email: 'bob@example.com', display_name: 'Bobby' },
       db.constraint('users_email_key'), { returning: ['id', 'display_name'] })))

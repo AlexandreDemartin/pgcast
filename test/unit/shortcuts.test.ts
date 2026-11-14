@@ -832,18 +832,167 @@ describe('undefinedMeansMissing', () => {
     expect(() => fdb.upsert('products', rows, ['sku', 'variant'])).not.toThrow();
   });
 
-  it('without an undefined value, in a Whereable or in updateValues: the same SQL with it as without it', () => {
+  it('without an undefined value, or with one in a Whereable: the same SQL with it as without it', () => {
+    // an undefined key of upsert() updateValues changes since #168: see below
     const queries = () => [
       db.insert('users', { email: 'e@x.org', display_name: 'E' }),
       db.insert('users', [{ email: 'a@x.org', display_name: 'A' }, { email: 'b@x.org', display_name: 'B', mood: 'ok' }]),
       db.insert('users', [null as any, { email: 'a@x.org', display_name: 'A' }]),  // untyped: all DEFAULT, as before
       db.update('users', { mood: 'ok' }, { manager_id: undefined }),
-      db.upsert('users', { email: 'e@x.org', display_name: 'E' }, 'email', { updateValues: { mood: undefined } }),
       db.deletes('users', { manager_id: undefined }),
     ].map(q => q.compile());
     const without = queries();
     db.setConfig({ undefinedMeansMissing: true });
     expect(queries()).toEqual(without);
+  });
+});
+
+describe('undefinedMeansMissing: an undefined key of upsert() updateValues', () => {
+  afterEach(() => { vi.restoreAllMocks(); });
+  const
+    ada = { display_name: 'E', email: 'e@x.org' },
+    upsert = (options: any, values: any = ada) => db.upsert('users', values, 'email', options).compile();
+
+  it('with it, adds no column, so the existing value stays; without it, sets it from EXCLUDED', () => {
+    expect(upsert({ updateValues: { settings: undefined } })).toMatchInlineSnapshot(`
+      {
+        "text": "INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("display_name", "email", "settings") = ROW(EXCLUDED."display_name", EXCLUDED."email", EXCLUDED."settings") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "values": [
+          "E",
+          "e@x.org",
+        ],
+      }
+    `);
+    db.setConfig({ undefinedMeansMissing: true });
+    expect(upsert({ updateValues: { settings: undefined } })).toMatchInlineSnapshot(`
+      {
+        "text": "INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("display_name", "email") = ROW(EXCLUDED."display_name", EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "values": [
+          "E",
+          "e@x.org",
+        ],
+      }
+    `);
+  });
+
+  it('with it, a column inserted but left out of updateColumns: the key adds nothing either', () => {
+    db.setConfig({ undefinedMeansMissing: true });
+    expect(upsert({ updateColumns: 'display_name', updateValues: { mood: undefined } }, { ...ada, mood: 'ok' }).text)
+      .toContain('DO UPDATE SET ("display_name") = ROW(EXCLUDED."display_name")');
+  });
+
+  it('with it, every key undefined: as without updateValues', () => {
+    db.setConfig({ undefinedMeansMissing: true });
+    expect(upsert({ updateValues: { display_name: undefined, settings: undefined } })).toEqual(upsert({}));
+  });
+
+  it('with it, nothing left to update: DO NOTHING, as doNothing alone', () => {
+    db.setConfig({ undefinedMeansMissing: true });
+    expect(upsert({ updateColumns: db.doNothing, updateValues: { settings: undefined } }))
+      .toEqual(upsert({ updateColumns: db.doNothing }));
+    expect(upsert({ updateColumns: db.doNothing, updateValues: { settings: undefined } }).text)
+      .toContain('ON CONFLICT ("email") DO NOTHING RETURNING');
+  });
+
+  it('with it, beside a value, only the value is updated', () => {
+    db.setConfig({ undefinedMeansMissing: true });
+    expect(upsert({ updateColumns: db.doNothing, updateValues: { settings: undefined, mood: 'ok' } }).text)
+      .toContain('DO UPDATE SET ("mood") = ROW($3)');
+  });
+
+  it('without it, doNothing and an undefined key: the key is set from EXCLUDED, alone or beside a param()', () => {
+    expect(upsert({ updateColumns: db.doNothing, updateValues: { settings: undefined } }).text)
+      .toContain('ON CONFLICT ("email") DO UPDATE SET ("settings") = ROW(EXCLUDED."settings") RETURNING');
+    expect(upsert({ updateColumns: db.doNothing, updateValues: { settings: undefined, mood: db.param('ok') } }))
+      .toMatchObject({ values: ['E', 'e@x.org', 'ok'] });
+    expect(upsert({ updateColumns: db.doNothing, updateValues: { settings: undefined, mood: db.param('ok') } }).text)
+      .toContain('ON CONFLICT ("email") DO UPDATE SET ("settings", "mood") = ROW(EXCLUDED."settings", $3) RETURNING');
+  });
+
+  // updateValues[c] is read as on master, through getters and prototypes: only the column list loses the undefined key
+  class Patch { settings = undefined; get mood() { return db.param('ok'); } }
+  const patches = () => [new Patch(), Object.assign(Object.create({ mood: db.param('ok') }), { settings: undefined })];
+
+  it('with it, a class instance with a getter: the getter is still read, only the undefined key goes', () => {
+    db.setConfig({ undefinedMeansMissing: true });
+    expect(upsert({ updateColumns: ['display_name', 'mood'], updateValues: patches()[0] }))
+      .toEqual(upsert({ updateColumns: ['display_name', 'mood'], updateValues: { mood: db.param('ok') } }));
+    expect(upsert({ updateColumns: ['display_name', 'mood'], updateValues: patches()[0] }).text)
+      .toContain('DO UPDATE SET ("display_name", "mood") = ROW(EXCLUDED."display_name", $3)');
+  });
+
+  it('with it, an Object.create() value: the inherited key is still read, only the undefined key goes', () => {
+    db.setConfig({ undefinedMeansMissing: true });
+    expect(upsert({ updateColumns: ['display_name', 'mood'], updateValues: patches()[1] }))
+      .toEqual(upsert({ updateColumns: ['display_name', 'mood'], updateValues: { mood: db.param('ok') } }));
+    expect(upsert({ updateColumns: ['display_name', 'mood'], updateValues: patches()[1] }).text)
+      .toContain('DO UPDATE SET ("display_name", "mood") = ROW(EXCLUDED."display_name", $3)');
+  });
+
+  it('without it, a class instance or an Object.create() value: the undefined key is set from EXCLUDED, as on master', () => {
+    for (const updateValues of patches()) expect(upsert({ updateColumns: ['display_name', 'mood'], updateValues })).toEqual({
+      text: `INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("display_name", "mood", "settings") = ROW(EXCLUDED."display_name", $3, EXCLUDED."settings") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result`,
+      values: ['E', 'e@x.org', 'ok'],
+    });
+  });
+
+  it('a column inserted or named in updateColumns is still set from EXCLUDED: the same SQL with it as without it', () => {
+    const queries = () => [
+      upsert({ updateValues: { mood: undefined } }, { ...ada, mood: 'ok' }),
+      upsert({ updateColumns: ['settings'], updateValues: { settings: undefined } }),
+      upsert({ updateColumns: 'settings', updateValues: { settings: undefined } }),
+    ];
+    const without = queries();
+    db.setConfig({ undefinedMeansMissing: true });
+    expect(queries()).toEqual(without);
+    expect(without[1].text).toContain('DO UPDATE SET ("settings") = ROW(EXCLUDED."settings")');
+  });
+
+  it('a key missing from some row still counts for upsertRequiresSameKeys and PGCAST_DEP001', async () => {
+    // it is set from EXCLUDED, with undefinedMeansMissing or without it
+    const rows = [
+      { sku: 'TEE', variant: 'S', price_cents: 1300 },
+      { sku: 'CAP', variant: '', price_cents: 900, title: 'Cap' },
+    ];
+    const { fdb, emitWarning } = await fresh();
+    fdb.setConfig({ undefinedMeansMissing: true });
+    fdb.upsert('products', rows, ['sku', 'variant'], { updateValues: { title: undefined } });
+    expect(emitWarning.mock.calls.map(c => c[1])).toEqual([{ type: 'DeprecationWarning', code: 'PGCAST_DEP001' }]);
+    fdb.setConfig({ upsertRequiresSameKeys: true });
+    expect(() => fdb.upsert('products', rows, ['sku', 'variant'], { updateValues: { title: undefined } }))
+      .toThrow('rows have different keys: pass updateColumns, or give every row the same keys');
+    expect(() => fdb.upsert('products', rows, ['sku', 'variant'], { updateValues: { title: 'x' } })).not.toThrow();
+  });
+
+  it('without it, emits PGCAST_DEP002 once, only when the key adds a column', async () => {
+    const quiet: ((fdb: typeof db) => unknown)[] = [
+      fdb => fdb.upsert('users', { ...ada, mood: 'ok' }, 'email', { updateValues: { mood: undefined } }),
+      fdb => fdb.upsert('users', ada, 'email', { updateColumns: 'settings', updateValues: { settings: undefined } }),
+      fdb => fdb.upsert('users', ada, 'email', { updateValues: { mood: null } }),
+      fdb => (fdb.setConfig({ undefinedMeansMissing: true }), fdb.upsert('users', ada, 'email', { updateValues: { settings: undefined } })),
+    ];
+    for (const call of quiet) {
+      const { fdb, emitWarning } = await fresh();
+      call(fdb);
+      expect(emitWarning).not.toHaveBeenCalled();
+    }
+    const adds: ((fdb: typeof db) => unknown)[] = [
+      fdb => fdb.upsert('users', ada, 'email', { updateValues: { settings: undefined } }),
+      fdb => fdb.upsert('users', ada, 'email', { updateColumns: fdb.doNothing, updateValues: { settings: undefined } }),
+      fdb => fdb.upsert('users', { ...ada, mood: 'ok' }, 'email', { updateColumns: 'display_name', updateValues: { mood: undefined } }),
+    ];
+    for (const call of adds) {
+      const { fdb, emitWarning } = await fresh();
+      call(fdb);
+      expect(emitWarning.mock.calls.map(c => c[1])).toEqual([{ type: 'DeprecationWarning', code: 'PGCAST_DEP002' }]);
+    }
+    const { fdb, emitWarning } = await fresh();
+    for (const call of adds) call(fdb);
+    expect(emitWarning).toHaveBeenCalledTimes(1);
+    const [message, options] = emitWarning.mock.calls[0];
+    expect(options).toEqual({ type: 'DeprecationWarning', code: 'PGCAST_DEP002' });
+    expect(message).toMatch(/upsert\(\) updateValues/);
+    expect(message).toMatch(/undefinedMeansMissing: true/);
   });
 });
 
@@ -877,12 +1026,12 @@ describe('an undefined value, without undefinedMeansMissing', () => {
     }
   });
 
-  it('emits none without an undefined value, for one in a Whereable or in updateValues, nor with the option', async () => {
+  it('emits none without an undefined value, for one in a Whereable, nor with the option', async () => {
+    // one in upsert() updateValues: see 'undefinedMeansMissing: an undefined key of upsert() updateValues'
     const { fdb, emitWarning } = await fresh();
     fdb.insert('users', { email: 'e@x.org', display_name: 'E', mood: null });
     fdb.update('users', { mood: 'ok' }, { manager_id: undefined });
     fdb.deletes('users', { manager_id: undefined });
-    fdb.upsert('users', { email: 'e@x.org', display_name: 'E' }, 'email', { updateValues: { mood: undefined } });
     fdb.setConfig({ undefinedMeansMissing: true });
     fdb.insert('users', { email: 'e@x.org', display_name: 'E', mood: undefined });
     fdb.update('users', { mood: 'ok', manager_id: undefined }, { id: 1 });
