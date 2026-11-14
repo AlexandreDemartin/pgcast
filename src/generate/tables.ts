@@ -12,6 +12,9 @@ import type { CustomTypes, CustomTypeOrigins } from './tsOutput';
 import { CompleteConfig } from './config';
 import { jsdocText, stringLiteral, tsIdentifier } from './quote';
 
+// TypeScript's own types that an enum may be named after: a placeholder naming one compiles without an import
+const tsOwnTypes = new Set('any bigint boolean never number object string symbol undefined unknown'.split(' '));
+
 
 export interface Relation {
   schema: string;
@@ -114,6 +117,7 @@ export const definitionForRelationInSchema = async (
   customTypeOrigins: CustomTypeOrigins = Object.create(null),  // an 'out' parameter too
   enumsForSchema = async (schema: string) => (await enumOrdersForSchema(schema, queryFn))[enumOrderOf(config)],
   columnsTypedByEnumName: string[] = [],  // an 'out' parameter too: what typeEnumsAcrossSchemas would change
+  customTypeImports: Record<string, string> = Object.create(null),  // an 'out' parameter too: what a placeholder imports from zapatos/schema, '' for nothing
 ) => {
   const
     rows = await columnsForRelation(rel, schemaName, queryFn),
@@ -173,9 +177,20 @@ export const definitionForRelationInSchema = async (
       const
         customType: string = domainName ?? udtName,
         prefixedCustomType = transformCustomType(customType, config),
-        origins = customTypeOrigins[prefixedCustomType] ??= {};
+        origins = customTypeOrigins[prefixedCustomType] ??= {},
+        // an enum of this schema, by name, is not in scope in a placeholder: it imports the enum or its namespace;
+        // a name that may be a global type (`Date`, `string`) compiles as it is, as in 6.6.1
+        enumName = selectableType.replace(/\[\]$/, ''),
+        importsEnum = !inlineEnums && enumName === enumName.toLowerCase() && !tsOwnTypes.has(enumName) &&
+          Object.keys(typeEnums).some(name => tsIdentifier(name, 'type') === enumName),
+        namespace = tsIdentifier(schemaName, 'namespace'),
+        imported = importsEnum ? (schemaPrefix ? namespace : enumName) : '',
+        // relations that would import differently keep 6.6.1's text, with no import, in whichever order they are read
+        agrees = (customTypeImports[prefixedCustomType] ?? imported) === imported;
 
-      customTypes[prefixedCustomType] = selectableType;  // two origins: the last one seen wins
+      // two origins: the last one seen wins
+      customTypes[prefixedCustomType] = agrees && importsEnum && schemaPrefix ? `${namespace}.${selectableType}` : selectableType;
+      customTypeImports[prefixedCustomType] = agrees ? imported : '';
       origins[`"${domainName === null ? udtSchema : domainSchema}"."${customType}"`] = customType;
       selectableType = JSONSelectableType = whereableType = insertableType = updatableType =
         'c.' + prefixedCustomType;
