@@ -10,6 +10,7 @@ import { computed, onMounted, ref, useId } from 'vue';
 import Icon from './Icon.vue';
 import type { IconName } from './icons.ts';
 import { remember, remembered } from './packageManager.ts';
+import { useWords } from './words.ts';
 
 const
   props = defineProps<{ commands: string[] }>(),  // each names its tab by its first word, the package manager
@@ -19,7 +20,8 @@ const
   command = computed(() => props.commands[selected.value]),
   id = useId(),
   copied = ref(false),
-  code = ref<HTMLElement>();
+  code = ref<HTMLElement>(),
+  { w } = useWords();
 
 let timer: ReturnType<typeof setTimeout> | undefined;
 
@@ -63,7 +65,7 @@ async function copy() {
 
 <template>
   <div class="InstallLine">
-    <div class="tabs" role="tablist" aria-label="Package manager" @keydown="onKey">
+    <div class="tabs" role="tablist" :aria-label="w.packageManager" @keydown="onKey">
       <button
         v-for="(tab, i) in names"
         :id="`${id}-${tab}`"
@@ -78,10 +80,10 @@ async function copy() {
     </div>
     <div :id="`${id}-panel`" class="panel" role="tabpanel" :aria-labelledby="`${id}-${name}`">
       <code ref="code"><span class="manager">{{ name }}</span>{{ command.slice(name.length) }}</code>
-      <button type="button" class="copy" :aria-label="`Copy the ${name} command`" @click="copy">
+      <button type="button" class="copy" :aria-label="w.copyCommand(name)" @click="copy">
         <span class="IconSwap" :class="{ done: copied }"><Icon name="copy" /><Icon name="check" /></span>
       </button>
     </div>
-    <span class="copied" aria-live="polite">{{ copied ? 'Copied' : '' }}</span>
+    <span class="copied" aria-live="polite">{{ copied ? w.copied : '' }}</span>
   </div>
 </template>
