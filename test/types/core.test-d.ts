@@ -60,6 +60,8 @@ describe('conditions: the constraint on the column', () => {
     db.select('users', { manager_id: c.isNull, id: c.or(c.eq(1), c.eq(2)) });
     db.select('accounts', { opened_on: c.gt(new Date()), lifetime_ops: c.gte(BigInt(1)) });
     db.update('accounts', { balance: c.add(1) }, { id: 1 });
+    const ids: readonly number[] = [1, 2];
+    db.deletes('users', { id: c.isNotIn(ids) });
   });
 
   test('a value of another type is refused', () => {
@@ -69,6 +71,10 @@ describe('conditions: the constraint on the column', () => {
     db.select('users', { id: c.like('A%') });
     // @ts-expect-error isIn of strings on an int column
     db.select('users', { id: c.isIn(['1']) });
+    // @ts-expect-error a Set is no array (it throws at run time, #235)
+    db.select('users', { id: c.isIn(new Set([1])) });
+    // @ts-expect-error nor is a typed array
+    db.deletes('users', { id: c.isNotIn(new Uint8Array([1])) });
     // @ts-expect-error 'angry' is not a mood
     db.select('users', { mood: c.eq('angry') });
     // @ts-expect-error eq(null) would compile to `= NULL`: isNull is needed

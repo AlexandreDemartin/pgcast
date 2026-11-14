@@ -568,6 +568,17 @@ describe('Default, self, raw, cols and vals as the value of a condition', () => 
       `);
   });
 
+  it('isIn and isNotIn given a list that is not an array throw when compiled, not when called, saying what to do', () => {
+    // 6.6.1 compiled a Set to `false` and `true`, every row for isNotIn (#235); each kind: test/unit/injection.test.ts
+    expect(Object.fromEntries(Object.entries(lists).map(([name, f]) => [name, thrown(f(new Set([1, 2]) as any))])))
+      .toMatchInlineSnapshot(`
+        {
+          "isIn": "\`isIn()\` takes an array, not \`Set\`: make one with \`isIn([...values])\`, or \`Array.from(values)\` for an array-like object.",
+          "isNotIn": "\`isNotIn()\` takes an array, not \`Set\`: make one with \`isNotIn([...values])\`, or \`Array.from(values)\` for an array-like object.",
+        }
+      `);
+  });
+
   it('self keeps its meaning in a fragment written by hand', () => {
     expect(show(sql`${self} = ${self}`)).toMatchInlineSnapshot(`
       {

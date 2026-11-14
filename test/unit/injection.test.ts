@@ -13,6 +13,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as db from '../../src/db';
 import { sql, param, cols, vals, all } from '../../src/db';
 import { builtinObjects } from '../helpers/builtinObjects';
+import { nonArrayLists } from '../helpers/nonArrayLists';
 import { resetConfig } from '../helpers/config';
 import { hostileArrayCasts, hostileCasts } from '../helpers/hostileCasts';
 
@@ -1416,6 +1417,82 @@ describe('a built-in object as a Whereable', () => {
         "subclassOfTypedArrayEmpty": {
           "text": "DELETE FROM "users" WHERE TRUE",
           "values": [],
+        },
+      }
+    `);
+  });
+});
+
+describe('a list that is not an array in isIn() and isNotIn()', () => {
+  // 6.6.1 read `a.length`: an iterable has none, so isNotIn() compiled to `true`, every row, and isIn() to
+  // `false`; an array-like or a string gave its keys' values, null and undefined a TypeError at the call (#235)
+  const lists = { isIn: db.conditions.isIn, isNotIn: db.conditions.isNotIn };
+  const entryPoints: Record<string, (c: db.SQL) => db.SQLFragment<any, any>> = {
+    deletes: c => db.deletes('users', { id: c }),
+    select: c => db.select('users', { id: c }),
+    update: c => db.update('users', { display_name: 'Ada' }, { id: c }),
+    and: c => db.deletes('users', db.conditions.and({ display_name: 'Ada' }, { id: c })),
+    or: c => db.deletes('users', db.conditions.or({ display_name: 'Ada' }, { id: c })),
+    not: c => db.deletes('users', db.conditions.not({ id: c })),
+  };
+
+  it('throws for each kind, in isIn() and isNotIn(), through deletes, select and update, and nested in and(), or() and not()', () => {
+    const outcomes: string[] = [];
+    for (const [fn, list] of Object.entries(lists))
+      for (const [entryPoint, build] of Object.entries(entryPoints))
+        for (const [kind, x] of Object.entries(nonArrayLists())) {
+          const expected = `\`${fn}()\` takes an array, not \`${kind}\`: make one with \`${fn}([...values])\``;
+          let outcome: string;
+          try {
+            const condition = list(x as any);
+            try { outcome = build(condition).compile().text; } catch (err) { outcome = (err as Error).message; }
+          } catch (err) {
+            outcome = `throws at the call: ${(err as Error).message}`;
+          }
+          if (!outcome.startsWith(expected)) outcomes.push(`${fn} ${entryPoint} ${kind}: ${outcome}`);
+        }
+    expect(outcomes).toEqual([]);
+  });
+
+  it('an array, empty, frozen or readonly, compiles as before', () => {
+    const ids: readonly number[] = [1, 2];
+    const show = (c: db.SQL) => db.deletes('users', { id: c }).compile();
+    expect({
+      isIn: show(db.conditions.isIn([1, 2])),
+      isInEmpty: show(db.conditions.isIn([])),
+      isInFrozen: show(db.conditions.isIn(Object.freeze([1, 2]))),
+      isNotInReadonly: show(db.conditions.isNotIn(ids)),
+      isNotInEmpty: show(db.conditions.isNotIn([])),
+    }).toMatchInlineSnapshot(`
+      {
+        "isIn": {
+          "text": "DELETE FROM "users" WHERE (("id" IN ($1, $2))) RETURNING to_jsonb("users".*) AS result",
+          "values": [
+            1,
+            2,
+          ],
+        },
+        "isInEmpty": {
+          "text": "DELETE FROM "users" WHERE ((false)) RETURNING to_jsonb("users".*) AS result",
+          "values": [],
+        },
+        "isInFrozen": {
+          "text": "DELETE FROM "users" WHERE (("id" IN ($1, $2))) RETURNING to_jsonb("users".*) AS result",
+          "values": [
+            1,
+            2,
+          ],
+        },
+        "isNotInEmpty": {
+          "text": "DELETE FROM "users" WHERE ((true)) RETURNING to_jsonb("users".*) AS result",
+          "values": [],
+        },
+        "isNotInReadonly": {
+          "text": "DELETE FROM "users" WHERE (("id" NOT IN ($1, $2))) RETURNING to_jsonb("users".*) AS result",
+          "values": [
+            1,
+            2,
+          ],
         },
       }
     `);
