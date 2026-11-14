@@ -224,6 +224,9 @@ Candidates for a check, a rule or a skill line.
 - #184 — A migration hint for files already on disk is checked in both prefixed and unprefixed schemas (`import type { format }` alone gives TS2305 in a prefixed one) — `branch-reviewer`
 - #184 — A codegen placeholder that « compiles » under `skipLibCheck` hides unresolved names as `any`: replay each output claim with `skipLibCheck` both ways — `builder`
 - #287 — A merged note keeps every condition of the note it replaces (#42's withholds the `customTypesTransform` advice when the raw names are equal): a test runs the old note's scenario inside the new note's — `branch-reviewer`
+- #447 — When a PR documents an exception, `git grep` the absolute words (« never », « every ») on the same subject across `website/`: « never overwritten » survived on three pages — `branch-reviewer`
+- #447 — When notes from several PRs can fire for one object (#42, #287, #447), a test of all of them together freezes their order — `branch-reviewer`
+- #447 — The CLI's « Writing new custom type or domain placeholder file » message announces a placeholder the index file then writes over: it still misleads — `builder`
 
 ## Minors kept
 
@@ -289,3 +292,7 @@ Minor review defects, taken up by the end-of-chapter review.
 - #184 — `src/generate/index.ts:10`: a direct caller of the exported `definitionForRelationInSchema` that does not pass `customTypeImports` now reads `archive.genre` rather than `genre` (both fail to compile) — `branch-reviewer`
 - #287 — `test/integration/codegen.test.ts:868`: the notes' order (case note first, then #42's) is decided alone but not pinned by a test — `branch-reviewer`
 - #287 — `CHANGELOG.md:101`: a second colon after « (…): on a case-insensitive file system », and « as in Zapatos 6.6.1 » reads as if it applied to the file system — `branch-reviewer`
+- #447 — `website/generator.md:356`, `:222` (and `fr/…`): the `index` note's case-insensitive clause drops « wherever it runs » — `branch-reviewer`
+- #447 — `website/generator.md:427`, `:278`, `website/switching.md:18` (and `fr/…`): « never overwritten » without the `index` exception — `branch-reviewer`
+- #447 — `test/integration/codegen.test.ts:1053`: one `index` name shared by two schemas (this note and #42's on one file) is not tested — `branch-reviewer`
+- #447 — `src/generate/tsOutput.ts:94`: the outer `types` shadowed by the inner `const types` at `:122` — `branch-reviewer`

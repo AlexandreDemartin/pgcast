@@ -957,6 +957,12 @@ describe('custom types that share a placeholder name', () => {
     CREATE DOMAIN collide_a."CODE" AS boolean;
     CREATE TABLE collide_a.cased (a collide_a."Code", b collide_a.code, d collide_a."CODE");
     CREATE TABLE collide_a.shouted (d collide_a."CODE");
+    CREATE DOMAIN collide_a.index AS integer;
+    CREATE DOMAIN collide_a."Index" AS integer;
+    CREATE DOMAIN collide_b."INDEX" AS integer;
+    CREATE TABLE collide_a.indexed (i collide_a.index);
+    CREATE TABLE collide_a.indexed_title (i collide_a."Index");
+    CREATE TABLE collide_b.indexed_upper (i collide_b."INDEX");
   `));
   afterAll(() => t.pool.query('DROP SCHEMA collide_a, collide_b CASCADE'));
 
@@ -1041,6 +1047,54 @@ describe('custom types that share a placeholder name', () => {
       'Windows, CODE.ts, Code.ts and code.ts are one placeholder file in src/zapatos/custom, which declares only one of ' +
       'those names. To type them apart, rename one of them in the database, ' +
       'or give customTypesTransform a function that keeps their names apart.',
+    ]);
+  });
+
+  it("warns for a placeholder named index, which the custom types' index file writes over", async () => {
+    const note = (outDir: string, name: string) =>
+      `Note: custom type "collide_a"."index" (${name}) has the placeholder file index.d.ts in ${outDir}/custom, ` +
+      `the file of the custom types' index: the generator writes the index over it on every run, ` +
+      `so ${name} is never declared. To declare it, rename it in the database, ` +
+      `or give customTypesTransform a function that names it otherwise.`;
+    expect.soft(await warningsFor({ collide_a: only('indexed') }, { customTypesTransform: 'my_type' }))
+      .toEqual([note('src/zapatos', 'index')]);
+    expect.soft(await warningsFor({ collide_a: only('indexed') }, { customTypesTransform: name => name }))
+      .toEqual([note('src/zapatos', 'index')]);
+    expect.soft(await warningsFor({ collide_a: only('indexed') }, { customTypesTransform: 'my_type', moduleNames: 'pgcast' }))
+      .toEqual([note('src/pgcast', 'index')]);
+    // the default transform gives PgIndex
+    expect.soft(await warningsFor({ collide_a: only('indexed') })).toEqual([]);
+  });
+
+  it('warns for a placeholder named index but for its case, on a case-insensitive file system', async () => {
+    expect(await warningsFor({ collide_a: only('indexed_title'), collide_b: only('indexed_upper') },
+      { customTypesTransform: name => name, outExt: '.ts' })).toEqual([
+      'Note: custom types "collide_a"."Index" (Index) and "collide_b"."INDEX" (INDEX) ' +
+      'have TypeScript names that differ only in case: on a case-insensitive file system, the default on macOS and ' +
+      'Windows, INDEX.ts and Index.ts are one placeholder file in src/zapatos/custom, which declares only one of ' +
+      'those names. To type them apart, rename one of them in the database, ' +
+      'or give customTypesTransform a function that keeps their names apart.',
+      'Note: custom types "collide_a"."Index" (Index) and "collide_b"."INDEX" (INDEX) have the placeholder files ' +
+      'INDEX.ts and Index.ts in src/zapatos/custom, the file of the custom types\' index on a case-insensitive file ' +
+      'system, the default on macOS and Windows: the generator writes the index over it on every run, ' +
+      'so INDEX and Index are never declared there. To declare them, rename them in the database, ' +
+      'or give customTypesTransform a function that names them otherwise.',
+    ]);
+  });
+
+  it('names the case-insensitive file system for the placeholders of index that only it makes one', async () => {
+    expect(await warningsFor({ collide_a: only('indexed', 'indexed_title') }, { customTypesTransform: 'my_type' })).toEqual([
+      'Note: custom types "collide_a"."Index" (Index) and "collide_a"."index" (index) ' +
+      'have TypeScript names that differ only in case: on a case-insensitive file system, the default on macOS and ' +
+      'Windows, Index.d.ts and index.d.ts are one placeholder file in src/zapatos/custom, which declares only one of ' +
+      'those names. To type them apart, rename one of them in the database, ' +
+      'or give customTypesTransform a function that keeps their names apart.',
+      'Note: custom types "collide_a"."Index" (Index) and "collide_a"."index" (index) have the placeholder files ' +
+      'Index.d.ts and index.d.ts in src/zapatos/custom, the file of the custom types\' index (Index.d.ts on a ' +
+      'case-insensitive file system, the default on macOS and Windows): the generator writes the index over it ' +
+      'on every run, so index is never declared, nor Index on such a file system. To declare them, ' +
+      'rename them in the database, ' +
+      'or give customTypesTransform a function that names them otherwise.',
     ]);
   });
 
