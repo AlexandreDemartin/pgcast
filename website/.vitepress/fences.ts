@@ -1,7 +1,8 @@
 // Copyright (C) 2026 Alexandre Demartin
 // Fenced code blocks as CommonMark reads them, for the checks that skip or read a page's code: `check-prose.mjs`,
-// `check-reference.mjs`, `check-joined.mjs` and the fenced URLs of `anchors.ts`. One rule for all four, so that a check
-// never reads as prose what VitePress renders as code, nor the other way round.
+// `check-reference.mjs`, `check-joined.mjs`, the fenced URLs of `anchors.ts`, and `llms.ts`, which writes the pages'
+// Markdown for assistants. One rule for all five, so that none reads as prose what VitePress renders as code, nor the
+// other way round.
 
 /**
  * The start of a page whose ```` ```md ```` block holds a ```` ```ts ```` line, as a page that shows Markdown does:
