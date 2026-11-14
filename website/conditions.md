@@ -128,7 +128,7 @@ Each takes one value of the column's type, `<T>(a: T)`, and writes the column, i
 
 ### `isNotDistinctFrom()` {#conditions.isNotDistinctFrom}
 
-`"col" IS NOT DISTINCT FROM $1`<!-- probe: db.sql`${{ col: db.conditions.isNotDistinctFrom(1) }}` -->: as `eq()`, with `NULL` a value like any other. With `strictNullChecks` on, the type refuses `null` here too: [`isNull`](#conditions.isNull) is the test for it.
+`"col" IS NOT DISTINCT FROM $1`<!-- probe: db.sql`${{ col: db.conditions.isNotDistinctFrom(1) }}` -->: as `eq()`, with `NULL` a value like any other. Both take a nullable value, `null` included: with `tagline` a `string | null`, `{ tagline: isNotDistinctFrom(tagline) }` finds the films without a tagline when it holds `null`. [`isNull`](#conditions.isNull) stays the plain test for `NULL`.
 
 ## Ranges {#ranges}
 
