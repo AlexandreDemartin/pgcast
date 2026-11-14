@@ -1,19 +1,57 @@
 <script setup lang="ts">
 // Copyright (C) 2026 Alexandre Demartin
-// The home's install command, one quiet line under the hero's buttons, and its copy button: "Copied" for 1.4 s, or the
-// command selected when the clipboard is refused (docs/design/art-direction.md § Signature components).
-import { ref } from 'vue';
+// The home's install command, under the hero's buttons: a tab per package manager, then the command in its own panel
+// with a copy button, which copies the command shown: a tick and "Copied" for 1.4 s, or the command selected when the
+// clipboard is refused (docs/design/art-direction.md § Layout, Home). The tabs are WAI-ARIA's, picked as they get
+// the focus (https://www.w3.org/WAI/ARIA/apg/patterns/tabs/); the pick is remembered with the code groups'
+// (packageManager.ts).
+import { computed, onMounted, ref, useId } from 'vue';
+import { remember, remembered } from './packageManager.ts';
 
 const
-  props = defineProps<{ command: string }>(),
+  props = defineProps<{ commands: string[] }>(),  // each names its tab by its first word, the package manager
+  names = computed(() => props.commands.map(command => command.split(' ')[0])),
+  selected = ref(0),  // npm, the first, until the page is mounted: the server renders no stored pick
+  name = computed(() => names.value[selected.value]),
+  command = computed(() => props.commands[selected.value]),
+  id = useId(),
   copied = ref(false),
   code = ref<HTMLElement>();
 
+let timer: ReturnType<typeof setTimeout> | undefined;
+
+onMounted(() => {
+  const i = names.value.indexOf(remembered() ?? '');
+  if (i > 0) selected.value = i;
+});
+
+function pick(i: number) {
+  selected.value = i;
+  copied.value = false;
+  remember(names.value[i]);
+}
+
+function onKey(e: KeyboardEvent) {
+  const
+    n = props.commands.length,
+    to =
+      e.key === 'ArrowRight' ? (selected.value + 1) % n :
+      e.key === 'ArrowLeft' ? (selected.value + n - 1) % n :
+      e.key === 'Home' ? 0 :
+      e.key === 'End' ? n - 1 :
+      undefined;
+  if (to === undefined) return;
+  e.preventDefault();
+  pick(to);
+  ((e.currentTarget as HTMLElement).children[to] as HTMLElement).focus();
+}
+
 async function copy() {
+  clearTimeout(timer);
   try {
-    await navigator.clipboard.writeText(props.command);
+    await navigator.clipboard.writeText(command.value);
     copied.value = true;
-    setTimeout(() => { copied.value = false; }, 1400);
+    timer = setTimeout(() => { copied.value = false; }, 1400);
   } catch {
     if (code.value) getSelection()?.selectAllChildren(code.value);
   }
@@ -22,14 +60,30 @@ async function copy() {
 
 <template>
   <div class="InstallLine">
-    <span class="dollar" aria-hidden="true">$</span>
-    <code ref="code">{{ command }}</code>
-    <button type="button" class="copy" aria-label="Copy the install command" @click="copy">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path v-if="copied" d="M20 6 9 17l-5-5" />
-        <template v-else><rect x="8" y="8" width="14" height="14" rx="2" /><path d="M4 16a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2" /></template>
-      </svg>
-    </button>
-    <span class="copied" aria-live="polite">{{ copied ? 'Copied' : '' }}</span>
+    <div class="bar">
+      <div class="tabs" role="tablist" aria-label="Package manager" @keydown="onKey">
+        <button
+          v-for="(tab, i) in names"
+          :id="`${id}-${tab}`"
+          :key="tab"
+          type="button"
+          role="tab"
+          :aria-selected="String(i === selected)"
+          :aria-controls="`${id}-panel`"
+          :tabindex="i === selected ? 0 : -1"
+          @click="pick(i)"
+        >{{ tab }}</button>
+      </div>
+      <span class="copied" aria-live="polite">{{ copied ? 'Copied' : '' }}</span>
+    </div>
+    <div :id="`${id}-panel`" class="panel" role="tabpanel" :aria-labelledby="`${id}-${name}`">
+      <code ref="code"><span class="manager">{{ name }}</span>{{ command.slice(name.length) }}</code>
+      <button type="button" class="copy" :aria-label="`Copy the ${name} command`" @click="copy">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path v-if="copied" d="M20 6 9 17l-5-5" />
+          <template v-else><rect x="8" y="8" width="14" height="14" rx="2" /><path d="M4 16a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2" /></template>
+        </svg>
+      </button>
+    </div>
   </div>
 </template>
