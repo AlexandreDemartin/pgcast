@@ -363,10 +363,13 @@ const
     (globalThis as any).BigInt, (globalThis as any).Symbol,
   ].filter(Boolean).map(builtin => builtin.prototype)),
   typedArrayPrototype = Object.getPrototypeOf(Uint8Array.prototype),
+  // transpiled below ES2018, `async function* () {}` is a plain function, with no `.prototype` to read: then
+  // %AsyncIteratorPrototype% is left out, rather than `zapatos/db` throwing as it loads
+  asyncGeneratorPrototype = Object.getPrototypeOf(async function* () {}).prototype,
   iteratorPrototypes = [
     Object.getPrototypeOf(Object.getPrototypeOf([][Symbol.iterator]())),
-    Object.getPrototypeOf(Object.getPrototypeOf(async function* () {}).prototype),
-  ];
+    asyncGeneratorPrototype && Object.getPrototypeOf(asyncGeneratorPrototype),
+  ].filter(Boolean);
 
 const isIterator = (x: object) =>
   iteratorPrototypes.some(prototype => Object.prototype.isPrototypeOf.call(prototype, x)) && Object.keys(x).length === 0;
