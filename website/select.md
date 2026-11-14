@@ -383,8 +383,8 @@ const firstShow = await db.min('screenings', db.all, {
 - The SQL is the same either way: `SELECT min("starts_at") AS result FROM "screenings"`<!-- probe: (db.setConfig({ aggregatesTypedByColumn: true }), db.min('screenings', db.all, { columns: ['starts_at'] })) -->.
 - `min()` and `max()` give a `bigint` or a `numeric` as `pg` sends it, a string; nested, as a JSON number.
 - `count()` never gives `NULL`: it is unchanged.
-- Passed through as the single `lateral`, it is typed as at top level by `selectOne()` and `selectExactlyOne()`, which hand its column over as it is, and as nested by `select()`, which wraps its rows in `jsonb_agg()`.
-- `.copy()` returns a plain `SQLFragment`, typed as at top level: nested in turn, a copy, or a `selectOne()` that passes a `min()` through, comes back as JSON with that type.
+- Passed through as the single `lateral`, it is typed as at top level by `selectOne()` and `selectExactlyOne()`, which hand its column over as it is, and as nested by `select()`, which wraps its rows in `jsonb_agg()`. That `selectOne()` or `selectExactlyOne()`, nested in turn, is typed as nested.
+- `.copy()` returns a plain `SQLFragment`, typed as at top level: nested in turn, a copy comes back as JSON with that type.
 
 ## Types
 
