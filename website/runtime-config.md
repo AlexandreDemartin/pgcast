@@ -72,13 +72,14 @@ interface Config {
   undefinedMeansMissing?: boolean;
   transactionRequiresCommit?: boolean;
   selectExactlyOneChecksForSecondRow?: boolean;
+  aggregatesTypedByColumn?: boolean;
   queryListener?(query: SQLQuery, txnId?: number): void;
   resultListener?(result: any, txnId?: number, elapsedMs?: number, query?: SQLQuery): void;
   transactionListener?(message: string, txnId?: number): void;
 }
 ```
 
-The keys pgcast adds are optional, so a `Config` written for Zapatos 6.6.1 still compiles; `getConfig()` types them `boolean | undefined`, though it always gives a value. No option changes a type.
+The keys pgcast adds are optional, so a `Config` written for Zapatos 6.6.1 still compiles; `getConfig()` types them `boolean | undefined`, though it always gives a value. One option changes a type, once declared in [`ConfigTypes`](#ConfigTypes) too: `aggregatesTypedByColumn`.
 
 <div class="stack">
 
@@ -92,6 +93,7 @@ The keys pgcast adds are optional, so a `Config` written for Zapatos 6.6.1 still
 | [`undefinedMeansMissing`](#Config.undefinedMeansMissing) | `false` | an `undefined` value in `insert()`, `update()` and `upsert()`: a missing key, not `NULL` | at each call of those |
 | [`transactionRequiresCommit`](#Config.transactionRequiresCommit) | `false` | a `COMMIT` that Postgres answers with `ROLLBACK`: reject, not resolve | at each `transaction()` |
 | [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow) | `false` | a `selectExactlyOne()` run on its own: `LIMIT 2`, and a second row rejects | at each `selectExactlyOne()` |
+| [`aggregatesTypedByColumn`](#Config.aggregatesTypedByColumn) | `false` | `sum()`, `avg()`, `min()` and `max()`: `null` when no row matches, and `min()` and `max()` the column's value, not `Number()` of it | at each call of those |
 | [`queryListener`](#Config.queryListener) | none | called with each query `run()` sends | at each `run()` |
 | [`resultListener`](#Config.resultListener) | none | called with each result `run()` gives | at each `run()` |
 | [`transactionListener`](#Config.transactionListener) | none | called when an attempt of `transaction()` fails with `40001` or `40P01`, and at each retry | at each `transaction()` |
@@ -209,6 +211,21 @@ With `true`, a [`selectExactlyOne()`](/select#selectExactlyOne) run on its own a
 - Off, it never warns, and it stays off in 7.0: "at least one row" is how Zapatos reads `selectExactlyOne()`, nested in a `lateral` on a `NOT NULL` foreign key ([decision 003](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/003-fixes-and-deprecation.md)).
 - Read when `selectExactlyOne()` is called, not at `.run()`.
 
+### `aggregatesTypedByColumn` {#Config.aggregatesTypedByColumn}
+
+```ts
+aggregatesTypedByColumn?: boolean  // default: false; the default in 7.0
+```
+
+From 6.7.0. With `true`, [`sum()`](/select#sum), [`avg()`](/select#avg), [`min()`](/select#min) and [`max()`](/select#max) give `null` when no row matches, and `min()` and `max()` give the column's value as `pg` reads it: a `Date` for a `timestamptz`, a string for a `text` or an enum. The SQL doesn't change, nor does [`count()`](/select#count).
+
+Off, the result goes through `Number()`, as in Zapatos 6.6.1: `0` when no row matches, a date's milliseconds, `NaN` for a text. `.run()` then warns once per process, `PGCAST_DEP004`, when `Number()` changed what Postgres sent.
+
+- The types follow only once it is declared in [`ConfigTypes`](#ConfigTypes) as well: `setConfig()` sets the runtime, the declaration the types.
+- Nested in a `lateral` or `extras`, the value comes back as JSON, option or not, and `null` when no row matches; declared, it is typed as its column's `JSONSelectable`.
+- Read when the shortcut is called; it warns at `.run()`. A query that returns no row, a `groupBy` with no group, still rejects with a `TypeError` ([#163](https://github.com/AlexandreDemartin/pgcast/issues/163)).
+- Examples, and each type: [Typed by column](/select#typed-by-column).
+
 ### `queryListener` {#Config.queryListener}
 
 ```ts
@@ -284,6 +301,26 @@ type NewConfig = Partial<Config>
 
 What [`setConfig()`](#setConfig) takes: any keys of `Config`, each one whole.
 
+## `ConfigTypes` {#ConfigTypes}
+
+```ts
+interface ConfigTypes { }
+```
+
+From 6.7.0. The options of `Config` that change a type, declared as you set them, since TypeScript can't read `setConfig()`. Empty, every type is Zapatos 6.6.1's. Declare it once, in any file your `tsconfig.json` includes, and set the option to match:
+
+```ts twoslash
+import * as db from 'zapatos/db';
+
+declare module 'zapatos/db' {
+  interface ConfigTypes { aggregatesTypedByColumn: true }
+}
+
+db.setConfig({ aggregatesTypedByColumn: true });
+```
+
+With [`moduleNames: "pgcast"`](/generator#generate.moduleNames), it is `declare module 'pgcast/db'`. The only key it reads is [`aggregatesTypedByColumn`](#Config.aggregatesTypedByColumn).
+
 ## `SQLQuery` {#SQLQuery}
 
 ```ts
@@ -303,6 +340,7 @@ A behaviour of Zapatos 6.6.1 that code may rely on, but that pgcast would change
 | [`upsertRequiresSameKeys: true`](#Config.upsertRequiresSameKeys) | `PGCAST_DEP001` | a multi-row `upsert()` without `updateColumns` has a key missing from some row that is still set from `EXCLUDED` ([Rows with different keys](/insert#upsert-different-keys)) | 7.0 |
 | [`undefinedMeansMissing: true`](#Config.undefinedMeansMissing) | `PGCAST_DEP002` | a value of `insert()`, `update()` or `upsert()` is `undefined` ([An `undefined` value](/insert#undefined-values)) | 7.0 |
 | [`transactionRequiresCommit: true`](#Config.transactionRequiresCommit) | `PGCAST_DEP003` | Postgres answers the `COMMIT` of `transaction()` with `ROLLBACK`, after a query error the callback caught ([Let the error through](/retries#let-the-error-through)) | 7.0 |
+| [`aggregatesTypedByColumn: true`](#Config.aggregatesTypedByColumn) | `PGCAST_DEP004` | `Number()` changes the result of `sum()`, `avg()`, `min()` or `max()`: a `NULL` made `0`, or a `min()` or `max()` that is not a number ([Typed by column](/select#typed-by-column)) | 7.0 |
 
 </div>
 
@@ -310,7 +348,7 @@ One opt-in has no warning and no default in 7.0: [`selectExactlyOneChecksForSeco
 
 The generator has its own: [`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas) and [`enumOrder`](/generator#generate.enumOrder), whose old paths are notes through [`warningListener`](/generator#generate.warningListener), once per run, rather than a `DeprecationWarning`; they will be the defaults in 7.0 too.
 
-Each warning is a Node.js `DeprecationWarning`, emitted once per process for each code, when the shortcut is called (`PGCAST_DEP003`: when `transaction()` resolves), and only when the old behaviour is used. Its message names the option. Node prints it to `stderr`:
+Each warning is a Node.js `DeprecationWarning`, emitted once per process for each code, when the shortcut is called (`PGCAST_DEP003`: when `transaction()` resolves; `PGCAST_DEP004`: when `.run()` gets the result), and only when the old behaviour is used. Its message names the option. Node prints it to `stderr`:
 
 ```txt
 (node:4242) [PGCAST_DEP002] DeprecationWarning: An undefined value in insert(), update() or upsert() is sent as NULL. Set undefinedMeansMissing: true (db.setConfig) to treat it as a missing key instead (DEFAULT in insert(), left out of update() and upsert()); it will be the default in pgcast 7.0.

@@ -88,7 +88,7 @@ The security fixes came first, in 6.6.2 ([Security](/security)):
 - a plain value in [`upsert()`](/insert#upsert)'s `updateValues` is a parameter;
 - the keywords of a lock, `truncate()` or an isolation level, and the name of an aggregate, are checked before any query.
 
-The opt-ins that warn, [`undefinedMeansMissing`](/runtime-config#Config.undefinedMeansMissing), [`upsertRequiresSameKeys`](/runtime-config#Config.upsertRequiresSameKeys) and [`transactionRequiresCommit`](/runtime-config#Config.transactionRequiresCommit), and the generator's [`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas) and [`enumOrder`](/generator#generate.enumOrder), become the defaults in 7.0, and their old paths go in 8.0.
+The opt-ins that warn, [`undefinedMeansMissing`](/runtime-config#Config.undefinedMeansMissing), [`upsertRequiresSameKeys`](/runtime-config#Config.upsertRequiresSameKeys), [`transactionRequiresCommit`](/runtime-config#Config.transactionRequiresCommit) and [`aggregatesTypedByColumn`](/runtime-config#Config.aggregatesTypedByColumn), and the generator's [`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas) and [`enumOrder`](/generator#generate.enumOrder), become the defaults in 7.0, and their old paths go in 8.0.
 
 [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow), which never warns, stays off. Until 7.0, 6.x is a drop-in for Zapatos 6.6.1 ([Versions](/versions)).
 

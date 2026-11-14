@@ -293,7 +293,7 @@ With `columns`, it counts two of the four screenings: the other two have `subtit
 db.sum(table, where, options?)
 ```
 
-`SELECT sum("column") AS result`<!-- probe: db.sum('ratings', db.all, { columns: ['column'] }) -->, a `number`; otherwise as [`count()`](#count). Give one column in `columns`: without it, `.run()` rejects before any query, where Zapatos 6.6.1 sent `sum(*)`, which Postgres refuses (42883). The type lets that call through, as in 6.6.1. When no row matches the `where`, Postgres returns `NULL`, and `Number(null)` makes it `0`.
+`SELECT sum("column") AS result`<!-- probe: db.sum('ratings', db.all, { columns: ['column'] }) -->, a `number`; otherwise as [`count()`](#count). Give one column in `columns`: without it, `.run()` rejects before any query, where Zapatos 6.6.1 sent `sum(*)`, which Postgres refuses (42883). The type lets that call through, as in 6.6.1. When no row matches the `where`, Postgres returns `NULL`, and `Number(null)` makes it `0`; `.run()` then warns once, `PGCAST_DEP004`. From 6.7.0, [`aggregatesTypedByColumn`](#typed-by-column) gives `null`.
 
 <CastPanel example="sum">
 
@@ -326,7 +326,7 @@ db.min(table, where, options?)
 - a date or time column (`date`, `timestamp`, `timestamptz`) gives its milliseconds since 1970, as node-postgres reads it as a `Date`;
 - text or an enum gives `NaN`, unless the text reads as a number: `'9'` gives `9`.
 
-Otherwise as [`sum()`](#sum).
+`.run()` warns once, `PGCAST_DEP004`, when `Number()` changes the value. From 6.7.0, [`aggregatesTypedByColumn`](#typed-by-column) keeps it. Otherwise as [`sum()`](#sum).
 
 <CastPanel example="min">
 
@@ -347,6 +347,41 @@ db.max(table, where, options?)
 <<< ./examples/max.ts{ts twoslash}
 
 </CastPanel>
+
+## Typed by column {#typed-by-column}
+
+From 6.7.0, [`aggregatesTypedByColumn`](/runtime-config#Config.aggregatesTypedByColumn) drops the `Number()`. Declared in [`ConfigTypes`](/runtime-config#ConfigTypes) as well, it types each result as Postgres sends it:
+
+```ts twoslash
+import * as db from 'zapatos/db';
+import type pg from 'pg';
+declare const pool: pg.Pool;
+// ---cut---
+declare module 'zapatos/db' {
+  interface ConfigTypes { aggregatesTypedByColumn: true }
+}
+db.setConfig({ aggregatesTypedByColumn: true });
+
+const firstShow = await db.min('screenings', db.all, {
+  columns: ['starts_at'],
+}).run(pool);
+```
+
+<div class="stack">
+
+| Call | Off | On |
+|---|---|---|
+| `min()` of `starts_at`, a `timestamptz` | its milliseconds, `number` | a `Date`, `Date \| null` |
+| `max()` of `title`, a `text` | `NaN`, `number` | `'The Salt Orchard'`, `string \| null` |
+| `sum()` or `avg()`, no row matching | `0`, `number` | `null`, `number \| null` |
+| `max()` of `runtime_minutes`, an `integer` | `131`, `number` | `131`, `number \| null` |
+| `min()` nested in a `lateral` | an ISO string, typed `number` | the same string, `TimestampTzString \| null` |
+
+</div>
+
+- The SQL is the same either way: `SELECT min("starts_at") AS result FROM "screenings"`<!-- probe: (db.setConfig({ aggregatesTypedByColumn: true }), db.min('screenings', db.all, { columns: ['starts_at'] })) -->.
+- `min()` and `max()` give a `bigint` or a `numeric` as `pg` sends it, a string; nested, as a JSON number.
+- `count()` never gives `NULL`: it is unchanged.
 
 ## Types
 
@@ -446,4 +481,4 @@ The call signature of `selectExactlyOne()`: `table`, `where`, `options?`, with t
 
 ### `NumericAggregateSignatures` {#NumericAggregateSignatures}
 
-The call signature of `count()`, `sum()`, `avg()`, `min()` and `max()`: `table`, `where`, `options?`, returning `SQLFragment<number>`.
+The call signature of `count()`, `sum()`, `avg()`, `min()` and `max()`: `table`, `where`, `options?`, returning `SQLFragment<number>`. With `aggregatesTypedByColumn` declared in [`ConfigTypes`](/runtime-config#ConfigTypes), `sum()` and `avg()` return `SQLFragment<number | null>`, and `min()` and `max()` their column's type or `null` ([Typed by column](#typed-by-column)).
