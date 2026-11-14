@@ -188,6 +188,9 @@ Candidates for a check, a rule or a skill line.
 - #235 — Check « must not change » files with three dots (`git diff origin/master...HEAD`): a fetch elsewhere moves `origin/master` mid-round — `builder`
 - #416 — Three steps (#170, #250, #416) found built-ins missing from the hand-written list: a test walking the ECMA-262 global constructors (refused, or kept with a reason) on each Node of the matrix, and a check on the prototype chain for iterators — `branch-reviewer`
 - #416 — A one-loop `it` hides each failure after the first; an integration count of `query` calls shows each new entry red on its own — `builder`
+- #263 — A property of a shortcut's query that changes its SQL or its result states whether `copy()` carries it, with a test of the copy: #263 (the transform) and #262 (the extras mark) both met the gap — `branch-reviewer`
+- #263 — When a change makes a value reachable by a new path (an error thrown by a copy), grep the docs for each sentence describing that value (`err.query`) and recheck it — `branch-reviewer`
+- #263 — `codegen.test.ts`'s 5 s timeouts fail under a load average near 30 (other worktrees running): rerun once with `--testTimeout 30000`, or on a quiet machine — `builder`
 
 ## Minors kept
 

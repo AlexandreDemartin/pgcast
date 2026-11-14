@@ -919,6 +919,21 @@ describe('SQLFragment', () => {
     `);
   });
 
+  it('copy(): keeps runResultTransform, overridden or not', async () => {
+    // Zapatos 6.6.1 gave the copy the default transform, the rows (#263)
+    const q = sql<db.SQL, number>`SELECT 1 AS n`;
+    q.runResultTransform = qr => qr.rows[0].n;
+    expect(q.copy().runResultTransform).toBe(q.runResultTransform);
+    expect(q.copy({ parentTable: 'users', preparedName: 'p' }).runResultTransform).toBe(q.runResultTransform);
+    const queryable = { query: vi.fn(async () => ({ rows: [{ n: 1 }] })) } as any;
+    expect(await q.copy().run(queryable)).toBe(1);
+  });
+
+  it('copy(): a fragment without a transform still resolves to its rows', async () => {
+    const queryable = { query: vi.fn(async () => ({ rows: [{ n: 1 }] })) } as any;
+    expect(await sql`SELECT 1 AS n`.copy().run(queryable)).toEqual([{ n: 1 }]);
+  });
+
   it('compile() appends to the result it is given', () => {
     const result = { text: 'x = $1 AND ', values: ['before'] };
     expect(sql`y = ${param('after')}`.compile(result)).toBe(result);

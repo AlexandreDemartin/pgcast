@@ -221,7 +221,7 @@ class NotExactlyOneError extends Error {
 
 What `selectExactlyOne()`, the mode `ExactlyOne` of `select()`, rejects with when no row matches. Its `name` is `'NotExactlyOneError'`, its `message` "One result expected but none returned (hint: check `.query.compile()` on this Error)"<!-- message -->; with [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow), a second row gives "One result expected but more returned (hint: check `.query.compile()` on this Error)"<!-- message -->.
 
-Its `query` is the [`SQLFragment`](/sql-template#SQLFragment) that ran: `err.query.compile()` gives its SQL and values. `err instanceof db.NotExactlyOneError` recognises it; catching it: [Tell a missing row from the others](/handle-errors#tell-a-missing-row-from-the-others).
+Its `query` is the [`SQLFragment`](/sql-template#SQLFragment) that ran, or, for a [`.copy()`](/sql-template#copy), the one it was copied from: `err.query.compile()` gives its SQL and values. `err instanceof db.NotExactlyOneError` recognises it; catching it: [Tell a missing row from the others](/handle-errors#tell-a-missing-row-from-the-others).
 
 ## `count()` {#count}
 
