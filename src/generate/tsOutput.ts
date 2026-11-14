@@ -153,13 +153,12 @@ function indentAll(level: number, s: string) {
 }
 
 export const tsForConfig = async (config: CompleteConfig, debug: (s: string) => void) => {
-  let querySeq = 0;
+  let querySeq = 0, ended = false;
   const
-    { schemas, db } = config,
-    enumOrder = enumOrderOf(config),  // throws before any query
-    names = moduleNamesOf(config),  // so does this
-    pool = new pg.Pool(db),
+    pool = new pg.Pool(config.db),  // connects at its first query
     queryFn = async (query: pg.QueryConfig, seq = querySeq++) => {
+      // a query still to come when the run has thrown, and so ended the pool: it rejects, as the run did
+      if (ended) throw new Error(`query ${seq} not sent: the generator has stopped`);
       try {
         debug(`>>> query ${seq} >>>\n${query.text.replace(/^\s+|\s+$/mg, '')}\n+ ${JSON.stringify(query.values)}\n`);
         const result = await pool.query(query);
@@ -170,7 +169,22 @@ export const tsForConfig = async (config: CompleteConfig, debug: (s: string) => 
         console.log(`*** error ${seq} ***`, e);
         process.exit(1);
       }
-    },
+    };
+
+  try {
+    return await tsForQueries(config, queryFn);
+
+  } finally {
+    ended = true;
+    await pool.end();  // whatever the outcome: an open connection would stop a DROP DATABASE
+  }
+};
+
+const tsForQueries = async (config: CompleteConfig, queryFn: (q: pg.QueryConfig) => Promise<pg.QueryResult<any>>) => {
+  const
+    { schemas } = config,
+    enumOrder = enumOrderOf(config),  // throws before any query
+    names = moduleNamesOf(config),  // so does this
     // Object.create(null): a schema or a type may be named constructor or __proto__
     customTypes: CustomTypes = Object.create(null),
     customTypeOrigins: CustomTypeOrigins = Object.create(null),
@@ -248,6 +262,5 @@ export const tsForConfig = async (config: CompleteConfig, debug: (s: string) => 
   warnAboutEnumsAcrossSchemas(columnsTypedByEnumName, config);
   warnAboutEnumOrder(schemaData.flatMap(r => r.outOfOrder), config);
 
-  await pool.end();
   return { ts, customTypeSourceFiles };
 };
