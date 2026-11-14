@@ -8,26 +8,28 @@
 // pages only, as llms-full.txt. The menu is WAI-ARIA's menu button (https://www.w3.org/WAI/ARIA/apg/patterns/menu-button/).
 import { computed, nextTick, onUnmounted, ref, useId, watch } from 'vue';
 import { useData, withBase } from 'vitepress';
-import { outline } from '../outline.ts';
+import { outlineIn } from '../outline.ts';
 import Icon from './Icon.vue';
+import { useWords } from './words.ts';
 
 const { place } = defineProps<{ place: 'title' | 'rail' }>();
 
 const
   { page } = useData(),
+  { lang, w } = useWords(),
   id = useId(),
-  links = new Set(outline.flatMap(group => [group.link, ...group.items.map(item => item.link)])),
+  links = computed(() => new Set(outlineIn(lang.value).flatMap(group => [group.link, ...group.items.map(item => item.link)]))),
   link = computed(() => '/' + page.value.relativePath.replace(/\.md$/, '')),
-  written = computed(() => page.value.params === undefined && links.has(link.value)),  // a "Coming" page has `params`
+  written = computed(() => page.value.params === undefined && links.value.has(link.value)),  // a "Coming" page has `params`
   markdown = computed(() => withBase(`${link.value}.md`)),
   // the site's own URL (config.ts), so that a chat opened from a preview still names the page an assistant can read
-  prompt = computed(() => `Read ${__PGCAST_SITE__}${link.value.slice(1)}.md so I can ask questions about it.`),
+  prompt = computed(() => w.value.prompt(`${__PGCAST_SITE__}${link.value.slice(1)}.md`)),
   chats = computed(() => [
     { name: 'ChatGPT', icon: 'openai' as const, href: `https://chatgpt.com/?q=${encodeURIComponent(prompt.value)}` },
     { name: 'Claude', icon: 'claude' as const, href: `https://claude.ai/new?q=${encodeURIComponent(prompt.value)}` },
   ]),
   open = ref(false),
-  status = ref(''),
+  status = ref<'' | 'copied' | 'notCopied'>(''),
   root = ref<HTMLElement>(),
   toggle = ref<HTMLButtonElement>(),
   menu = ref<HTMLElement>();
@@ -45,9 +47,9 @@ async function copy() {
   try {
     if (typeof ClipboardItem === 'undefined') await navigator.clipboard.writeText(await text);
     else await navigator.clipboard.write([new ClipboardItem({ 'text/plain': text.then(t => new Blob([t], { type: 'text/plain' })) })]);
-    status.value = 'Copied';
+    status.value = 'copied';
   } catch {
-    status.value = 'Not copied';
+    status.value = 'notCopied';
   }
   timer = setTimeout(() => { status.value = ''; }, 1400);
 }
@@ -144,14 +146,14 @@ onUnmounted(() => {
   <div v-if="written" ref="root" class="PageActions" :class="place">
     <div class="split">
       <button type="button" class="copy" @click="copy">
-        <span class="IconSwap" :class="{ done: status === 'Copied' }"><Icon name="copy" /><Icon name="check" /></span>
-        <span class="label">Copy page</span>
+        <span class="IconSwap" :class="{ done: status === 'copied' }"><Icon name="copy" /><Icon name="check" /></span>
+        <span class="label">{{ w.copyPage }}</span>
       </button>
       <button
         ref="toggle"
         type="button"
         class="toggle"
-        aria-label="More ways to use this page"
+        :aria-label="w.moreWays"
         aria-haspopup="menu"
         :aria-controls="`${id}-menu`"
         :aria-expanded="open"
@@ -168,19 +170,19 @@ onUnmounted(() => {
       ref="menu"
       class="menu"
       role="menu"
-      aria-label="This page"
+      :aria-label="w.thisPage"
       @keydown="onMenuKey"
     >
       <button type="button" role="menuitem" tabindex="-1" :aria-describedby="`${id}-copy`" @click="copy">
         <Icon name="copy" />
-        <span class="title">Copy page</span>
-        <span :id="`${id}-copy`" class="desc" aria-hidden="true">Copy page as Markdown for LLMs</span>
+        <span class="title">{{ w.copyPage }}</span>
+        <span :id="`${id}-copy`" class="desc" aria-hidden="true">{{ w.copyPageDesc }}</span>
       </button>
       <!-- a `target` leaves the link to the browser: VitePress's router would look for a page at `/<page>.md` -->
       <a role="menuitem" tabindex="-1" :href="markdown" target="_self" :aria-describedby="`${id}-view`" @click="close(false)">
         <Icon name="file" />
-        <span class="title">View as Markdown</span>
-        <span :id="`${id}-view`" class="desc" aria-hidden="true">Open this page as plain text</span>
+        <span class="title">{{ w.viewMarkdown }}</span>
+        <span :id="`${id}-view`" class="desc" aria-hidden="true">{{ w.viewMarkdownDesc }}</span>
       </a>
       <a
         v-for="chat in chats"
@@ -194,10 +196,10 @@ onUnmounted(() => {
         @click="close(false)"
       >
         <Icon :name="chat.icon" />
-        <span class="title">Open in {{ chat.name }}<span class="visually-hidden"> (new tab)</span><Icon name="external" /></span>
-        <span :id="`${id}-${chat.icon}`" class="desc" aria-hidden="true">Ask about this page in {{ chat.name }}</span>
+        <span class="title">{{ w.openIn(chat.name) }}<span class="visually-hidden"> {{ w.newTab }}</span><Icon name="external" /></span>
+        <span :id="`${id}-${chat.icon}`" class="desc" aria-hidden="true">{{ w.askIn(chat.name) }}</span>
       </a>
     </div>
-    <span class="status" aria-live="polite">{{ status }}</span>
+    <span class="status" aria-live="polite">{{ status && w[status] }}</span>
   </div>
 </template>

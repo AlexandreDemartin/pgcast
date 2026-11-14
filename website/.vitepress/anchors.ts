@@ -67,7 +67,7 @@ export function checkLinks(config: SiteConfig) {
       .map(file => [file, readFileSync(join(config.outDir, file), 'utf8')])),
     anchors = new Map([...pages].map(([file, html]) => [file, new Set([
       ...[...html.matchAll(/\sid="([^"]*)"/g)].map(([, id]) => unescape(id!)),
-      ...pending[file.replace(/\.html$/, '.md')] ?? [],
+      ...pending[file.replace(/^fr\//, '').replace(/\.html$/, '.md')] ?? [],  // a French page's are its English page's
     ])])),
     problems = new Set<string>(),  // a link written twice on a page is reported once
     atHome = (url: URL) => {  // the home written without its slash, which GitHub Pages redirects, is the home
@@ -85,7 +85,7 @@ export function checkLinks(config: SiteConfig) {
         !files.has(target) ? 'no such page' :
         anchor === null ? 'its hash is not valid percent-encoding' :
         // a playground's code (playground/share.ts), which playgroundLinks.ts decodes, is no anchor
-        anchor !== '' && !(target === 'playground.html' && anchor.startsWith('code/')) &&
+        anchor !== '' && !(/^(fr\/)?playground\.html$/.test(target) && anchor.startsWith('code/')) &&
           !anchors.get(target)?.has(anchor) ? 'no such anchor on that page' :
         null);
     };

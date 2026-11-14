@@ -1,10 +1,11 @@
 // Copyright (C) 2026 Alexandre Demartin
 // Each page's metadata, for search engines and link previews: its description, cut from its `{.lede}` unless its front
-// matter sets one; its canonical URL, Open Graph and Twitter card, with the one social image; on the home, the project
-// as JSON-LD. The favicons and `theme-color`, the same on every page, are in config.ts.
+// matter sets one; its canonical URL, its page in the other language (`hreflang`), Open Graph and Twitter card, with
+// the one social image; on the home, the project as JSON-LD. The favicons and `theme-color`, the same on every page, are in config.ts.
 import { join } from 'node:path';
 import type { HeadConfig, PageData, TransformContext, TransformPageContext } from 'vitepress';
 import { host, plainText, readPage } from './llms.ts';
+import { langOf, langs, prefixOf, words } from './words.ts';
 
 export const repo = 'https://github.com/AlexandreDemartin/pgcast';
 
@@ -34,17 +35,24 @@ export function fromLede(lede: string) {
 }
 
 /**
- * A page's canonical URL, Open Graph and Twitter card (`transformHead`), with the `<title>` and description VitePress
- * gives it; on the home, the project as a schema.org `SoftwareSourceCode`. The 404 page gets none.
+ * A page's canonical URL, the same page in each language, Open Graph and Twitter card (`transformHead`), with the
+ * `<title>` and description VitePress gives it; on the home, the project as a schema.org `SoftwareSourceCode`. Every
+ * page has its translation (check-translations.mjs), so each names both. The 404 page gets none.
  */
 export function pageHead({ page, pageData, siteConfig, title, description }: TransformContext): HeadConfig[] {
   if (pageData.isNotFound) return [];
   const
     root = host + siteConfig.site.base,
-    url = root + page.replace(/(^|\/)index\.md$/, '$1').replace(/\.md$/, ''),  // as sitemap.xml
+    lang = langOf(page),
+    path = page.slice(prefixOf(lang).length).replace(/^\//, ''),  // `select.md`, in either language
+    urlOf = (page: string) => root + page.replace(/(^|\/)index\.md$/, '$1').replace(/\.md$/, ''),  // as sitemap.xml
+    url = urlOf(page),
+    alternate = (hreflang: string, page: string): HeadConfig => ['link', { rel: 'alternate', hreflang, href: urlOf(page) }],
     og = (property: string, content: string): HeadConfig => ['meta', { property, content }];
   return [
     ['link', { rel: 'canonical', href: url }],
+    ...langs.map(other => alternate(other, other === 'en' ? path : `${other}/${path}`)),
+    alternate('x-default', path),
     og('og:type', 'website'),
     og('og:site_name', siteConfig.site.title),
     og('og:title', title),
@@ -53,8 +61,8 @@ export function pageHead({ page, pageData, siteConfig, title, description }: Tra
     og('og:image', `${root}social-card.png`),  // public/social-card.svg, rendered by render-images.mjs
     og('og:image:width', '1200'),
     og('og:image:height', '630'),
-    og('og:image:alt', 'pgcast. Your types, cast from your database.'),
-    og('og:locale', 'en_GB'),
+    og('og:image:alt', words[lang].socialAlt),
+    og('og:locale', words[lang].ogLocale),
     ['meta', { name: 'twitter:card', content: 'summary_large_image' }],  // its title, text and image: Open Graph's
     ...page === 'index.md' ? [['script', { type: 'application/ld+json' }, JSON.stringify({
       '@context': 'https://schema.org',

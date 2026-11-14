@@ -3,43 +3,56 @@
 // assistants: an index of the written pages, then all of them as plain Markdown, in the order of the outline. An
 // entry with no `<link>.md` of its own is a "Coming" page ([page].paths.ts), left out of both. On the way, it checks
 // each example's copy of a block of its page (`checkCopy()`). Each page's part of llms-full.txt is also its own file,
-// `/<page>.md` (`/index.md` for the home), which its page actions copy and link (theme/PageActions.vue).
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+// `/<page>.md` (`/index.md` for the home), which its page actions copy and link (theme/PageActions.vue). The French
+// site has its own, under `/fr/`: `/fr/llms.txt`, `/fr/llms-full.txt`, `/fr/<page>.md`.
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { createTwoslasher } from 'twoslash';
 import type { SiteConfig } from 'vitepress';
 import { castOf } from './cast.data.ts';
-import { outline } from './outline.ts';
+import { outlineIn } from './outline.ts';
 import { twoslashOptions } from './twoslash.ts';
+import { langs, prefixOf, words, type Lang, type Words } from './words.ts';
 
 type Twoslasher = ReturnType<typeof createTwoslasher>;
 
 export const host = 'https://pgcast.dev';  // GitHub Pages, under the config's `base`
 
 export async function writeLlmsFiles(config: SiteConfig) {
+  const twoslasher = createTwoslasher(twoslashOptions);
+  for (const lang of langs) await writeLlmsFilesIn(lang, config, twoslasher);
+}
+
+/** A page's file in the site's source, by its link: `/select` is `select.md`, `/fr/` is `fr/index.md`. */
+const fileOf = (link: string) => link.endsWith('/') ? `${link.slice(1)}index.md` : `${link.slice(1)}.md`;
+
+async function writeLlmsFilesIn(lang: Lang, config: SiteConfig, twoslasher: Twoslasher) {
   const
+    w = words[lang],
+    prefix = prefixOf(lang),
+    dir = join(config.outDir, prefix),
     url = (link: string) => host + config.site.base + link.slice(1),
     // a page's links as absolute URLs: root-relative (`/select#select`), and in-page (`#options`) too, since
     // llms-full.txt puts every page in one file
     linksOf = (page: string) => (link: string) => url(link.startsWith('#') ? page + link : link),
     read = (link: string) => {
-      const page = readPage(join(config.srcDir, link === '/' ? 'index.md' : `${link.slice(1)}.md`));
+      const page = readPage(join(config.srcDir, fileOf(link)));
       if (!page) return;
       const { source, title, lede } = page;
       return { link, source, title: inline(title, linksOf(link)), lede: inline(lede, linksOf(link)) };
     },
-    home = read('/')!,
-    changelog = read('/changelog')!,  // not in the outline: under llms.txt's "Optional", and not in llms-full.txt
-    groups = outline.map(group => ({
+    home = read(`${prefix}/`)!,
+    changelog = read(`${prefix}/changelog`)!,  // not in the outline: under llms.txt's "Optional", and not in llms-full.txt
+    groups = outlineIn(lang).map(group => ({
       text: group.text,
       pages: [group.link, ...group.items.map(item => item.link)].map(read).filter(page => page !== undefined),
     })),
-    twoslasher = createTwoslasher(twoslashOptions),
     full: string[] = [];
 
-  writeFileSync(join(config.outDir, 'llms.txt'), [
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'llms.txt'), [
     `# ${config.site.title}`,
-    `> ${config.site.description} ${home.lede}`,
+    `> ${w.description} ${home.lede}`,
     ...groups.map(({ text, pages }) =>
       `## ${text}\n\n` + pages.map(({ link, title, lede }) => `- [${title}](${url(link)}): ${lede}`).join('\n')),
     `## Optional\n\n- [${changelog.title}](${url(changelog.link)}): ${changelog.lede}`,
@@ -49,15 +62,15 @@ export async function writeLlmsFiles(config: SiteConfig) {
     const casts: Record<string, string> = {};
     for (const [, name] of source.matchAll(/<CastPanel example="([\w-]+)">/g)) {
       const { sql, values, type } = await castOf(join(config.srcDir, 'examples', `${name}.ts`), twoslasher);
-      casts[name!] = `Postgres runs:\n\n\`\`\`sql\n${sql}\n\`\`\`\n\nValues: \`${values}\`\n\n` +
-        `TypeScript knows:\n\n\`\`\`ts\n${type}\n\`\`\``;
+      casts[name!] = `${w.runs}\n\n\`\`\`sql\n${sql}\n\`\`\`\n\n${w.valuesLine} \`${values}\`\n\n` +
+        `${w.knows}\n\n\`\`\`ts\n${type}\n\`\`\``;
     }
-    const markdown = plain(source, casts, config.srcDir, linksOf(link), twoslasher)
-      .replace(/^# .*$/m, `$&\n\nSource: ${url(link)}`);
+    const markdown = plain(source, casts, join(config.srcDir, dirname(fileOf(link))), linksOf(link), twoslasher, w)
+      .replace(/^# .*$/m, `$&\n\n${w.source}: ${url(link)}`);
     full.push(markdown);
-    writeFileSync(join(config.outDir, `${link === '/' ? 'index' : link.slice(1)}.md`), markdown + '\n');
+    writeFileSync(join(config.outDir, fileOf(link)), markdown + '\n');
   }
-  writeFileSync(join(config.outDir, 'llms-full.txt'), full.join('\n\n---\n\n') + '\n');
+  writeFileSync(join(dir, 'llms-full.txt'), full.join('\n\n---\n\n') + '\n');
 }
 
 /**
@@ -93,10 +106,11 @@ export const plainText = (line: string) => inline(line, link => link)
 /**
  * A page's Markdown as plain Markdown: VitePress's containers as quotes (a code group unwrapped), each Twoslash block
  * as the page shows it (`shown()`), each cast panel as its example followed by `casts[example]`, At a glance as its
- * label and its list, HTML and attributes dropped.
+ * label and its list, HTML and attributes dropped. An include (`<<< ./examples/…`) is read from `pageDir`, its page's.
  */
 function plain(
-  source: string, casts: Record<string, string>, srcDir: string, url: (link: string) => string, twoslasher: Twoslasher,
+  source: string, casts: Record<string, string>, pageDir: string, url: (link: string) => string, twoslasher: Twoslasher,
+  w: Words,
 ) {
   const
     lines: string[] = [],
@@ -106,16 +120,16 @@ function plain(
       .replace(/<!--[\s\S]*?-->/g, '')
       .replace(/<CastPanel example="([\w-]+)">([\s\S]*?)<\/CastPanel>/g, (_, name, example) => {
         if (casts[name] === undefined) throw new Error(`llms.ts: no cast for the panel of examples/${name}.ts`);
-        return `You write:\n${example.replace(/<template[\s\S]*?<\/template>/g, '')}\n${casts[name]}\n`;
+        return `${w.write}\n${example.replace(/<template[\s\S]*?<\/template>/g, '')}\n${casts[name]}\n`;
       })
       .replace(/^<<< (\S+?)(?:#([\w.-]+))?(?:\{(.*?)\})?( \[.+\])?$/gm, (_, path, region, info = '', label = '') => {
-        checkCopy(join(srcDir, path), source);
-        return '```' + info + label + '\n' + snippet(join(srcDir, path), region) + '\n```';
+        checkCopy(join(pageDir, path), source);
+        return '```' + info + label + '\n' + snippet(join(pageDir, path), region) + '\n```';
       })
       .replace(/<InstallLine :commands="\[(.*)\]" \/>/g, (_, commands: string) =>  // each, as a code group's tab
         [...commands.matchAll(/'([^']*)'/g)]
           .map(([, command]) => '```sh [' + command!.split(' ')[0] + ']\n' + command + '\n```').join('\n\n'))
-      .replace(/^<AtAGlance>$/gm, '**At a glance**'),  // its label; a diagram drops out, as its page says it all
+      .replace(/^<AtAGlance>$/gm, `**${w.atAGlance}**`),  // its label; a diagram drops out, as its page says it all
     missed = /<\/?CastPanel\b.*/.exec(expanded)?.[0],
     missedInstall = /<InstallLine\b.*/.exec(expanded)?.[0];
 

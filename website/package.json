@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "docs:dev": "vitepress dev",
-    "docs:build": "tsc && tsc -p .vitepress && node check-reference.mjs && node check-prose.mjs && node check-joined.mjs && vitepress build && node check-paths.mjs",
+    "docs:build": "tsc && tsc -p .vitepress && node check-reference.mjs && node check-prose.mjs && node check-joined.mjs && node check-translations.mjs && vitepress build && node check-paths.mjs",
+    "docs:translated": "node check-translations.mjs --mark",
     "docs:preview": "vitepress preview",
     "docs:schema": "node generate-schema.mjs",
     "docs:examples": "node run-examples.mjs",
