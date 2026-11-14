@@ -17,7 +17,7 @@ Sources: the "Surprises" sections of PRs #4, #5, #7 and #8, the `characterizatio
 | Docs | 4 | 3 | 1 |
 | **Total** | **67** | **34** | **33** |
 
-29 findings to fix (R65, R66 decided), 7 behind an opt-in, 19 to document and 12 to leave.
+29 findings to fix (R65, R66 decided), all fixed, 7 behind an opt-in, 19 to document and 12 to leave.
 
 The three that matter most:
 
@@ -116,7 +116,7 @@ The three that matter most:
 
 | # | Area | Finding | Test that pins it | Compat | Proposal | Title of the fix PR |
 |---|---|---|---|---|---|---|
-| R47 | codegen | The output does not parse with awkward names: `export type traffic-light`, `namespace odd table`, `namespace class`, `'amber's'`, and `*/` in a name, a `DEFAULT` or a comment. | `integration/codegen › edge: the output does not parse, its names not being TypeScript identifiers` | non-breaking | fix | Quote awkward names and escape comments so the generated schema always parses |
+| R47 | codegen | The output does not parse with awkward names: `export type traffic-light`, `namespace odd table`, `namespace class`, `'amber's'`, and `*/` in a name, a `DEFAULT` or a comment. | `integration/codegen › edge: names a relation or an enum that TypeScript refuses with a legal identifier, its real name in strings` ; `integration/codegen › edge: writes */ as *\/ in a column name, a DEFAULT and a comment` ; `integration/codegen › edge compiles with its custom types` | non-breaking | **fixed**, PRs #395 and #397 | Quote awkward names and escape comments so the generated schema always parses |
 | R48 | codegen | A multi-line `COMMENT ON COLUMN` breaks the JSDoc: the following lines lose ` * `. | `integration/codegen › puts every line of a multi-line comment behind its own *` ; `integration/codegen › prefixes every line whatever its line break, on a table and a materialized view` | non-breaking | **fixed**, PR #306 | Prefix every line of a multi-line column comment |
 | R49 | codegen | Column comments are lost on partitioned tables, foreign tables and views (`relkind = 'r'` only). | `integration/codegen › keeps the comments of views, foreign tables and partitioned tables` ; `integration/codegen › gives each relation its own comments, and invents none` ; `integration/codegen › escapes a comment holding */ on every kind of relation, a materialized view included` | non-breaking: JSDoc only | **fixed**, PR #327 | Keep column comments on views, foreign tables and partitioned tables |
 | R50 | codegen | The values of an enum are sorted alphabetically, not by `enumsortorder`, down to the `every.<enum>` tuple. | `integration/codegen › is off by default: labels in alphabetical order, every.<enum> included` ; `integration/codegen › keeps the declared order with enumOrder: 'declared', every.<enum> included` ; `types/schema › every.<enum>: its labels in alphabetical order without enumOrder` | breaking: the order of the tuple changes | **opt-in**, PR #317 (`enumOrder: 'declared'`, a note through `warningListener`) | Keep enum values in their declared order |

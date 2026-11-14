@@ -154,7 +154,7 @@ describe('variant snapshots', () => {
   /** `<moduleNames>/db`, and only it, as test/generated/tsconfig.json maps 'zapatos/db', to the declarations emitted here. */
   const dbPaths = (config: Config) => ({ [`${config.moduleNames ?? 'zapatos'}/db`]: [join(declarationDir, 'db')] });
 
-  it.each(variants.filter(([name]) => name !== 'edge'))('%s compiles with its custom types', (name, variant) => {
+  it.each(variants)('%s compiles with its custom types', (name, variant) => {
     const { config } = ts.readConfigFile(join(generatedDir, 'tsconfig.json'), ts.sys.readFile);
     const { options } = ts.parseJsonConfigFileContent(config, ts.sys, generatedDir);
     const custom = join(snapshotPath, `${name}.custom.d.ts`);
@@ -278,6 +278,81 @@ describe('variant snapshots', () => {
     }
   });
 
+  it('awkward names compile, typed under their legal identifiers and keyed by their real names', async () => {
+    await t.pool.query(String.raw`
+      CREATE SCHEMA "probe-names";
+      CREATE TYPE "probe-names"."as" AS ENUM ('a', 'b');
+      CREATE TABLE "probe-names".keyof (s "probe-names"."as");
+      CREATE TABLE "probe-names"."it's\here" ("back\slash" int, "say ""cut""" int);
+      CREATE UNIQUE INDEX "idx\back" ON "probe-names"."it's\here" ("back\slash");`);
+    try {
+      expect(await probeErrors({ schemas: { 'probe-names': all } }, String.raw`
+        import type * as s from 'zapatos/schema';
+        export const str: s.probe_names.keyof_.Selectable['s'] = 'a';
+        // @ts-expect-error not a label of "probe-names"."as"
+        export const text: s.probe_names.keyof_.Selectable['s'] = 'some text';
+        export const row: s.SelectableForTable<'probe-names.it\'s\\here'> = { 'back\\slash': 1, 'say "cut"': null };
+        export const table: s.probe_names.it_s_here.Table = 'probe-names.it\'s\\here';
+        export const index: s.probe_names.it_s_here.UniqueIndex = 'idx\\back';
+        export const schema: s.Schema = 'probe-names';
+      `)).toEqual([]);
+    } finally {
+      await t.pool.query('DROP SCHEMA "probe-names" CASCADE');
+    }
+  });
+
+  // 6.6.1's output, kept: TS2457 is a type-check error, which skipLibCheck hides, and the column is then
+  // TypeScript's own type. Only a name whose output does not parse takes a legal identifier.
+  it.each([false, true])("an enum named after one of TypeScript's own types keeps 6.6.1's output (skipLibCheck: %s)", async skipLibCheck => {
+    await t.pool.query(`
+      CREATE SCHEMA builtin_names;
+      CREATE TYPE builtin_names."string" AS ENUM ('a');
+      CREATE TYPE builtin_names."number" AS ENUM ('one');
+      CREATE TABLE builtin_names.takes (s builtin_names."string", n builtin_names."number");`);
+    try {
+      const errors = await probeErrors({ schemas: { builtin_names: all } }, `
+        import type * as s from 'zapatos/schema';
+        export const text: s.builtin_names.takes.Selectable['s'] = 'some text';
+        export const count: s.builtin_names.takes.Selectable['n'] = 1;
+      `, { skipLibCheck });
+      expect([...new Set(errors)].sort()).toEqual(skipLibCheck ? [] : [
+        "schema.d.ts TS2457 Type alias name cannot be 'number'.",
+        "schema.d.ts TS2457 Type alias name cannot be 'string'.",
+      ]);
+    } finally {
+      await t.pool.query('DROP SCHEMA builtin_names CASCADE');
+    }
+  });
+
+  // 6.6.1's keyof[] and readonly[] parse, as keyof [] and readonly [], which take none of the labels;
+  // unique[] fails to compile without skipLibCheck (TS1005), and is `any` with it
+  it('an array of an enum named after a type operator is typed by its labels', async () => {
+    await t.pool.query(`
+      CREATE SCHEMA array_ops;
+      CREATE TYPE array_ops."keyof" AS ENUM ('a');
+      CREATE TYPE array_ops."readonly" AS ENUM ('a');
+      CREATE TYPE array_ops."unique" AS ENUM ('a');
+      CREATE TABLE array_ops.takes (k array_ops."keyof"[], r array_ops."readonly"[], u array_ops."unique"[]);`);
+    try {
+      const { ts: schema } = await codegen({ schemas: { array_ops: all } });
+      expect.soft(schema).toContain('k: keyof_[] | null;');
+      expect.soft(schema).toContain('r: readonly_[] | null;');
+      expect.soft(schema).toContain('u: unique_[] | null;');
+      for (const skipLibCheck of [false, true]) expect.soft(await probeErrors({ schemas: { array_ops: all } }, `
+        import type * as s from 'zapatos/schema';
+        export const k: s.array_ops.takes.Selectable['k'] = ['a'];
+        export const r: s.array_ops.takes.Selectable['r'] = ['a'];
+        export const u: s.array_ops.takes.Selectable['u'] = ['a'];
+        // @ts-expect-error an array's key, not a label
+        export const key: s.array_ops.takes.Selectable['k'] = 'length';
+        // @ts-expect-error not an array of labels
+        export const text: s.array_ops.takes.Selectable['u'] = 'some text';
+      `, { skipLibCheck })).toEqual([]);
+    } finally {
+      await t.pool.query('DROP SCHEMA array_ops CASCADE');
+    }
+  });
+
   it('holds no orphan file', () => {
     const expected = variants.flatMap(([name]) =>
       withoutCustomTypes.includes(name) ? [`${name}.d.ts`] : [`${name}.custom.d.ts`, `${name}.d.ts`]);
@@ -292,15 +367,6 @@ describe('surprises, frozen as they are', () => {
       'People who can sign in', 'Users not currently sad', 'Balances per owner, refreshed on demand',
       'Second application schema', 'How a user feels', 'Case-insensitive e-mail address',
     ]) expect(schema).not.toContain(comment);
-  });
-
-  it('edge: the output does not parse, its names not being TypeScript identifiers', async () => {
-    const { ts: schema } = await codegen({ schemas: { edge: all } });
-    expect(schema).toContain(`export type traffic-light = 'amber\\'s' | 'green light' | 'red';`);
-    expect(schema).toContain('export namespace odd table {');
-    expect(schema).toContain('export namespace class {');
-    expect(syntaxErrors(schema)).not.toEqual([]);
-    expect(syntaxErrors((await codegen(main)).ts)).toEqual([]);  // control: the same check passes without edge
   });
 
   it('src/db type-checks against the stub schema of src/typings, not against a generated one', () => {
@@ -582,6 +648,7 @@ describe('quotes and */', () => {
       expect.soft(schema).toContain('* **\\/reels**\n');
       expect.soft(schema).toContain('* **\\/reels.id**\n');
       expect.soft(schema).not.toMatch(/\*\*\//);
+      expect.soft(syntaxErrors(schema)).toEqual([]);  // its namespaces legalised: _lead, _reels
     } finally {
       await t.pool.query('DROP SCHEMA "/lead" CASCADE; DROP SCHEMA slash_reels CASCADE');
     }
@@ -611,6 +678,117 @@ describe('quotes and */', () => {
       }
     } finally {
       await t.pool.query('DROP SCHEMA octal CASCADE');
+    }
+  });
+});
+
+describe('awkward names', () => {
+  // a schema of its own, committed to this file's database: no other test configures it
+  beforeAll(() => t.pool.query(String.raw`
+    CREATE SCHEMA "box-office";
+    CREATE TYPE "box-office".string AS ENUM ('b', 'a');
+    CREATE TABLE "box-office"."2nd take" (id int);
+    CREATE TABLE "box-office".keyof (s "box-office".string, ss "box-office".string[]);
+    CREATE TABLE "box-office"."it's\here" (id int);
+  `));
+  afterAll(() => t.pool.query('DROP SCHEMA "box-office" CASCADE'));
+
+  it('edge: names a relation or an enum that TypeScript refuses with a legal identifier, its real name in strings', async () => {
+    const { ts: schema } = await codegen({ schemas: { edge: all } });
+    expect.soft(schema).toContain('export namespace odd_table {');
+    expect.soft(schema).toContain('export namespace class_ {');
+    expect.soft(schema).toContain(`export type traffic_light = 'amber\\'s' | 'green light' | 'red';`);
+    expect.soft(schema).toContain(`export type traffic_light = ['amber\\'s', 'green light', 'red'];`);
+    expect.soft(schema).toContain('light: traffic_light | null;');
+    expect.soft(schema).toContain('export type Table = class_.Table | odd_table.Table;');
+    expect.soft(schema).toContain(`export type Table = 'edge.odd table';`);
+    expect.soft(schema).toContain('"edge.odd table": edge.odd_table.Selectable;');
+    expect.soft(schema).toContain('"edge.class": edge.class_.Selectable;');
+    expect.soft(syntaxErrors(schema)).toEqual([]);
+  });
+
+  it("legalises a schema name, a leading digit and a type operator, but keeps an enum named after a TypeScript type", async () => {
+    const { ts: schema } = await codegen({ schemas: { 'box-office': all } });
+    expect.soft(schema).toContain('export namespace box_office {');
+    expect.soft(schema).toContain('export namespace _2nd_take {');
+    expect.soft(schema).toContain('export namespace keyof_ {');
+    expect.soft(schema).toContain('export namespace it_s_here {');
+    expect.soft(schema).toContain(`export type string = 'a' | 'b';`);
+    expect.soft(schema).toContain('s: string | null;');
+    expect.soft(schema).toContain('ss: string[] | null;');
+    expect.soft(schema).toContain(`export type Schema = 'box-office';`);
+    expect.soft(schema).toContain('"box-office.keyof": box_office.keyof_.Selectable;');
+    expect.soft(schema).toContain('export type AllBaseTables = [...box_office.AllBaseTables];');
+    expect.soft(schema).toContain(`export type Table = 'box-office.it\\'s\\\\here';`);
+    expect.soft(schema).toContain(`"box-office.it's\\\\here": box_office.it_s_here.Selectable;`);
+    expect.soft(syntaxErrors(schema)).toEqual([]);
+  });
+
+  it('escapes */ in the header of a schema, whose namespace is legalised', async () => {
+    await t.pool.query('CREATE SCHEMA "cut*/here"; CREATE TABLE "cut*/here".takes (id int);');
+    try {
+      const { ts: schema } = await codegen({ schemas: { 'cut*/here': all } });
+      expect.soft(schema).toContain('/* === schema: cut*\\/here === */');
+      expect.soft(schema).toContain('export namespace cut_here {');
+      expect.soft(syntaxErrors(schema)).toEqual([]);
+    } finally {
+      await t.pool.query('DROP SCHEMA "cut*/here" CASCADE');
+    }
+  });
+
+  it('notes two names that become one identifier', async () => {
+    await t.pool.query(`
+      CREATE SCHEMA "two-names";
+      CREATE SCHEMA two_names;
+      CREATE TYPE two_names."traffic-light" AS ENUM ('red');
+      CREATE TYPE two_names.traffic_light AS ENUM ('red');
+      CREATE TABLE two_names."odd table" (id int);
+      CREATE TABLE two_names.odd_table (id int);
+      CREATE TABLE two_names."odd-table" (id int);`);
+    try {
+      expect(await warningsFor({ 'two-names': all, two_names: all })).toEqual([
+        'Note: enums "two_names"."traffic-light" and "two_names"."traffic_light" are both named traffic_light ' +
+        'in TypeScript, so their declarations clash. To type them apart, rename one of them in the database.',
+        'Note: relations "two_names"."odd table", "two_names"."odd-table" and "two_names"."odd_table" are all named ' +
+        'odd_table in TypeScript, so their declarations clash. To type them apart, rename one of them in the database.',
+        'Note: schemas "two-names" and "two_names" are both named two_names in TypeScript, ' +
+        'so their declarations clash. To type them apart, rename one of them in the database.',
+      ]);
+      expect(await warningsFor({ edge: all, 'box-office': all })).toEqual([]);
+    } finally {
+      await t.pool.query('DROP SCHEMA "two-names", two_names CASCADE');
+    }
+  });
+
+  it("notes a relation of unprefixedSchema named like another schema's namespace, as both stand at the top", async () => {
+    await t.pool.query(`
+      CREATE SCHEMA top_level;
+      CREATE TABLE top_level."box-office" (id int);
+      CREATE TABLE top_level.takes (id int);
+      CREATE SCHEMA box_office;
+      CREATE TABLE box_office.takes (id int);`);
+    try {
+      expect.soft(await warningsFor({ top_level: all, box_office: all }, { unprefixedSchema: 'top_level' })).toEqual([
+        'Note: relation "top_level"."box-office" and schema "box_office" are both named box_office in TypeScript, ' +
+        'so their declarations clash. To type them apart, rename one of them in the database.',
+      ]);
+      // prefixed, the relation is in its schema's namespace
+      expect.soft(await warningsFor({ top_level: all, box_office: all }, { unprefixedSchema: null })).toEqual([]);
+    } finally {
+      await t.pool.query('DROP SCHEMA top_level, box_office CASCADE');
+    }
+  });
+
+  it('names a relation after a property of Object.prototype, with no note', async () => {
+    await t.pool.query(`
+      CREATE SCHEMA proto_names;
+      CREATE TABLE proto_names."constructor" (id int);
+      CREATE TABLE proto_names."toString" (id int);`);
+    try {
+      expect.soft(await warningsFor({ proto_names: all })).toEqual([]);
+      expect.soft(await warningsFor({ proto_names: all }, { unprefixedSchema: 'proto_names' })).toEqual([]);
+    } finally {
+      await t.pool.query('DROP SCHEMA proto_names CASCADE');
     }
   });
 });
