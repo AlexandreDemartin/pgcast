@@ -1,4 +1,4 @@
-# Your first typed query
+# First query
 
 By the end of this page, you'll have generated the types of a database, asked it for films and added one, with the SQL and the type of each query in front of you. It starts where [Install](/install) stops: pgcast and `pg` in your project.
 {.lede}
@@ -68,7 +68,7 @@ Add `zapatosconfig.json` at the root of your project, where you'll run the gener
 - `outDir` is where the `zapatos` folder goes; without it, the folder you run the generator in.
 - <code v-pre>{{DATABASE_URL}}</code> is filled in from the environment, so the connection string stays out of your repository. If the variable isn't set, the generator stops with `Error: If present, zapatosconfig.json must be a valid JSON file, and all referenced environment variables must exist: Environment variable 'DATABASE_URL' is not set`.
 
-Every other option, from the schemas to include to per-column settings, is in [The generator: config and CLI](/generator).
+Every other option, from the schemas to include to per-column settings, is in [Generator](/generator).
 
 ## 3. Generate the types {#generate-the-types}
 
@@ -280,7 +280,7 @@ const row: s.films.Insertable = {
 ```
 
 ::: tip Opt-in
-Leave a key out to get its column's default. A key set to `undefined` is sent as `NULL`, as in Zapatos 6.6.1, and pgcast warns once (`PGCAST_DEP002`). With `db.setConfig({ undefinedMeansMissing: true })`, it counts as left out; that's the default from 7.0 ([Versions, opt-ins and warnings](/versions)).
+Leave a key out to get its column's default. A key set to `undefined` is sent as `NULL`, as in Zapatos 6.6.1, and pgcast warns once (`PGCAST_DEP002`). With `db.setConfig({ undefinedMeansMissing: true })`, it counts as left out; that's the default from 7.0 ([Versions](/versions)).
 :::
 
 <!-- joined: src/films.ts -->

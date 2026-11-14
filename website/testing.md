@@ -1,4 +1,4 @@
-# Test code that uses pgcast
+# Testing
 
 Three ways to test a function that runs pgcast queries, the most faithful first: against a real Postgres, each test rolled back; on the query it compiles, with no database; on a fake result typed from the schema. It assumes the basics of the [tutorial](/tutorial).
 {.lede}
@@ -160,7 +160,7 @@ A real database checks both: keep a test against it for each query, and fakes fo
 
 ## See also
 
-- [Write raw SQL safely](/raw-sql#check-the-sql-before-you-run-it): a test that keeps hostile input in `values`.
-- [Retry a transaction](/retries#test-a-retry): a test that makes a transaction run again.
+- [Raw SQL](/raw-sql#check-the-sql-before-you-run-it): a test that keeps hostile input in `values`.
+- [Retries](/retries#test-a-retry): a test that makes a transaction run again.
 - [`compile()`](/sql-template#compile), [`Queryable`](/sql-template#Queryable), [`transaction()`](/transaction#transaction): what they take and give.
 - [Why pgcast](/why): why the database is the source of the types.

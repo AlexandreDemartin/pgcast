@@ -27,7 +27,7 @@ The site is in the four groups of [Diátaxis](https://diataxis.fr/) (decision 00
 
 - What belongs to another job goes to its page, as a link.
 - A new page: its entry in `outline.ts`, then `<link>.md`. Until the file exists, `[page].paths.ts` makes the entry a "Coming" page.
-- A page that documents a minor carries its version in its entry, glued to the text: `'Versions, opt-ins and warnings<small class="since">6.7</small>'`.
+- A page that documents a minor carries its version in its entry, glued to the text: `'Versions<small class="since">6.7</small>'`.
 
 ### Templates
 
@@ -40,15 +40,15 @@ One per group, in `templates/`, not published (`srcExclude` in `.vitepress/confi
 
 ### Conventions
 
-- **Title and lede**: one `# ` title, the text of its outline entry; then one paragraph followed by `{.lede}` on its own line: what the page is for. `llms.txt` takes both (§ For assistants), and the page's description its lede (§ For search engines).
+- **Title and lede**: one `# ` title, the text of its outline entry: one or two words, the concept's usual name (Conditions, Retries), no code; the function names and the detail go in the lede. Then one paragraph followed by `{.lede}` on its own line: what the page is for. `llms.txt` takes both (§ For assistants), and the page's description its lede (§ For search engines).
 - **Headings**: `##` for sections ("On this page" lists them), `###` under them, in sentence case.
 - **Notes**: a chip, then the text, with no side rail (art direction § Signature components). The text after the container's name is the chip, a word or two; a note is for what the reader must not miss.
 
   | Container | Chip | For |
   |---|---|---|
-  | `::: tip Opt-in` | teal | an opt-in, or a tip worth a box (`::: tip Why the alias`) |
-  | `::: info Coming` | grey | what isn't there yet (`::: info Coming`, `why.md`) |
-  | `::: warning Security` | amber, the note too | a risk to the reader's data or queries |
+  | `::: tip Opt-in` | teal, a lightbulb | an opt-in, or a tip worth a box (`::: tip Why the alias`) |
+  | `::: info Coming` | grey, a clock | what isn't there yet (`::: info Coming`, `why.md`) |
+  | `::: warning Security` | amber, the note too, a triangle | a risk to the reader's data or queries |
 
 - **Code**: a command in `sh`, a file in a `::: code-group` with its path as the label (`` ```ts twoslash [src/films.ts] ``), TypeScript as `ts twoslash` (§ Examples), except a signature, which does not compile on its own: plain `ts`.
 - **Install commands**: yarn and bun take a range, the major under the `zapatos` alias, `zapatos@npm:@pgcast/pgcast@^6`, and the first release with `moduleNames` under pgcast's own name, `pgcast@npm:@pgcast/pgcast@^6.7` (`install.md`); `check-prose.mjs` fails on one, in a page or the root README, that is not the major of the root `package.json`.
@@ -146,7 +146,7 @@ At build, `.vitepress/llms.ts` writes two files to the site's root, from the out
 
 - `llms.txt`: `# pgcast`, a summary (the site's description and the home's lede), then one section per group, each written page with its URL and lede, and `## Optional`, the changelog. So a page needs a `# ` title and a `{.lede}` paragraph, or the build fails.
 - `llms-full.txt`: every written page as plain Markdown, each cast panel with the SQL, values and type `cast.data.ts` computes. A panel not written `<CastPanel example="<name>">` fails the build.
-- `/<page>.md` (`/index.md` for the home): each page's part of `llms-full.txt`, in a file of its own, listed nowhere. Beside the title of each written page of the outline, its page actions (`.vitepress/theme/PageActions.vue`) copy it, link it, and open ChatGPT or Claude on a prompt that names its URL; nothing outside the site is fetched until one of those links is followed. In `docs:dev` the file does not exist: `docs:build` writes it.
+- `/<page>.md` (`/index.md` for the home): each page's part of `llms-full.txt`, in a file of its own, listed nowhere. On each written page of the outline, under "On this page" from 1280px, else beside the title, its page actions (`.vitepress/theme/PageActions.vue`) copy it, link it, and open ChatGPT or Claude on a prompt that names its URL; nothing outside the site is fetched until one of those links is followed. In `docs:dev` the file does not exist: `docs:build` writes it.
 
 A "Coming" page has no `.md` file, so it is in neither; nor are the templates and this README, which the outline does not list. The changelog is in `llms.txt` only.
 

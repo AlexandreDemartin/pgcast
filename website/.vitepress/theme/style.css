@@ -5,18 +5,23 @@
 
 :root {
   --bg: #f6f8f9; --surface: #ffffff; --sunken: #eef2f4; --fg: #12202b; --muted: #566673; --line: #d9e0e5;
-  --accent: #0a6b63; --accent-fg: #ffffff; --accent-soft: #dcefec; --warn: #8a5a00; --warn-soft: #fbf0d9;
-  --error: #b22e2e;
+  --accent: #0a6b63; --accent-fg: #ffffff; --accent-soft: #dcefec; --accent-hover: #075750; --warn: #8a5a00; --warn-soft: #fbf0d9;
+  --error: #b22e2e; --raised: #e4e7e9;
   --code-bg: #f1f4f6; --k: #1458a8; --s: #8f5600; --t: #0a6b63; --n: #b0245a; --c: #626e79; --qi: #12202b; --p: #b0245a;
   --font-display: "Schibsted Grotesk", "Helvetica Neue", Arial, sans-serif;
   --font-body: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --radius: 10px;
+  --ease-out: cubic-bezier(.23, 1, .32, 1);  /* the site's curve for what moves: fast, then settling */
+  --ease-drawer: cubic-bezier(.32, .72, 0, 1);  /* the phone's nav drawer as it opens, a sheet's curve */
+  /* where the three columns' first lines stand, from 960px: under the top bar (and the bar of "On this page" under
+     1280px), on the 4px grid; the nav's first heading, "On this page" and the page's title set their caps on it */
+  --doc-top: 48px;
 }
 .dark {
   --bg: #0d1318; --surface: #121a21; --sunken: #0a0f13; --fg: #e2e9ee; --muted: #8d9eab; --line: #23303a;
-  --accent: #4fcfbf; --accent-fg: #06201d; --accent-soft: #11302c; --warn: #e8b65a; --warn-soft: #2c2412;
-  --error: #d96d6d;
+  --accent: #4fcfbf; --accent-fg: #06201d; --accent-soft: #11302c; --accent-hover: #74ddd0; --warn: #e8b65a; --warn-soft: #2c2412;
+  --error: #d96d6d; --raised: #1e2429;
   --code-bg: #0f171d; --k: #7fb6ff; --s: #e3b462; --t: #4fcfbf; --n: #f08ab3; --c: #768794; --qi: #e2e9ee; --p: #f08ab3;
   color-scheme: dark;
 }
@@ -46,7 +51,7 @@
   --vp-button-brand-text: var(--accent-fg);
   --vp-button-brand-hover-bg: var(--accent);
   --vp-button-brand-hover-text: var(--accent-fg);
-  --vp-nav-height: 56px;
+  --vp-nav-height: 52px;  /* the top bar; VitePress offsets the content, the left nav and the local nav by it */
   --vp-nav-bg-color: var(--surface);
   --vp-nav-home-bg-color: var(--surface);
   --vp-sidebar-bg-color: var(--bg);
@@ -63,18 +68,73 @@
   --vp-code-tab-hover-text-color: var(--fg);
   --vp-code-tab-active-text-color: var(--fg);
   --vp-code-tab-active-bar-color: var(--accent);
-  --vp-local-search-bg: var(--bg);
+  /* the search dialog (below): rows on the dialog's surface, the selected one filled as the nav's current page; the
+     excerpts' fades take the row's colour */
+  --vp-local-search-bg: var(--surface);
   --vp-local-search-result-bg: var(--surface);
-  --vp-local-search-result-selected-bg: var(--accent-soft);
-  --vp-local-search-result-selected-border: var(--accent);
-  --vp-local-search-highlight-bg: var(--accent-soft);
-  --vp-local-search-highlight-text: var(--accent);
+  --vp-local-search-result-selected-bg: var(--raised);
 }
+/* behind the search dialog and the phone's nav drawer: the page dimmed toward --fg, not plain black */
+:root { --vp-backdrop-bg-color: rgb(18 32 43 / .4); }
+.dark { --vp-backdrop-bg-color: rgb(0 0 0 / .6); }
 
 /* base */
 body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
-@media (prefers-reduced-motion: reduce) { * { transition: none !important; scroll-behavior: auto !important; } }
+/* a tap acts at once (no wait for a double tap's zoom), and a long press on a control does not select its label */
+:is(button, a, label, [role='button']) { touch-action: manipulation; }
+:is(button, [role='tab'], .vp-code-group .tabs label) { -webkit-user-select: none; user-select: none; }
+/* reduced motion: nothing moves, but what changes still fades, gently (colours, opacity), in 150ms; the phone's nav
+   drawer fades out where it stands, then goes. VitePress cuts every transition to 0s with `!important` in its layer
+   `__vitepress_base`, where an `!important` beats any outside it: these rules join that layer, later, to win */
+@layer __vitepress_base { @media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    transition-property: opacity, color, background-color, border-color, text-decoration-color, fill, box-shadow !important;
+    transition-duration: 150ms !important;
+    scroll-behavior: auto !important;
+  }
+  .VPSidebar:not(.open) { transition: opacity 200ms ease, transform 0s linear 200ms !important; }
+  /* the rows the arrow keys fill keep snapping */
+  :is(body .VPLocalSearchBox .result, .PageActions .menu > *) { transition-duration: 0s !important; }
+} }
+/* hover and press, for every control of the chrome: on hover a colour step (a bordered control's border turns
+   --accent, a quiet one takes a fill); a button gives a little when pressed, scale .97 in 160ms on --ease-out, and a
+   row of a list fills at once with --raised. Colours in 150ms `ease`. Hover only with a fine pointer that can hover:
+   on a touch screen, a tapped control would keep its hover state. Reduced motion: the colour steps alone */
+:is(.VPNavBarSearchButton, .AppearanceSwitch, .PageActions .split button, .NotFound .search, .Playground-run,
+  .Playground-share, .vp-doc div[class*='language-'] > button.copy, .VPDocFooter .pager-link, .landing .readnext a) {
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, opacity 250ms ease,
+    transform 160ms var(--ease-out);
+}
+:is(.VPNavBarSearchButton, .AppearanceSwitch, .PageActions .split button, .NotFound .search, .Playground-run,
+  .Playground-share, .vp-doc div[class*='language-'] > button.copy):active { transform: scale(.97); }
+@media (prefers-reduced-motion: reduce) { :is(.VPNavBarSearchButton, .AppearanceSwitch, .PageActions .split button,
+  .NotFound .search, .Playground-run, .Playground-share, .vp-doc div[class*='language-'] > button.copy):active { transform: none; } }
+.VPDocFooter .pager-link:active { transform: scale(.98); }
+@media (prefers-reduced-motion: reduce) { .VPDocFooter .pager-link:active { transform: none; } }
+/* a row: the nav's, the page actions menu's, the search's results. The nav's fades back in 150ms once released; the
+   menu's and the results' at once, as the keys move their fill */
+:is(.VPSidebarItem.level-0 > .item, .VPSidebarItem.level-1 .link) { transition: background-color 150ms ease; }
+:is(.VPSidebarItem.level-0 > .item, .VPSidebarItem.level-1 .link, .PageActions .menu > *,
+  body .VPLocalSearchBox .result):active { background: var(--raised); transition-duration: 0ms; }
+.VPNavBarTitle .title .version { transition: border-color 150ms ease, color 150ms ease; }
+@media (hover: hover) and (pointer: fine) {
+  .VPNavBarSearchButton:hover {
+    border-color: var(--accent) !important; background: color-mix(in srgb, var(--accent) 6%, var(--surface)) !important;
+    color: var(--fg);
+  }
+  .AppearanceSwitch:hover { border-color: var(--accent); }
+  .VPNavBarTitle .title:hover .version { border-color: var(--accent); color: var(--fg); }
+  .SiteFooter a:hover, .VPDocFooter .edit-link-button:hover { text-decoration: underline 2px; text-underline-offset: 3px; }
+}
+/* without such a pointer, VitePress's menu button keeps its three lines at rest after a tap, not in their hover's
+   places */
+@media not all and (hover: hover) and (pointer: fine) {
+  body .VPNavBarHamburger:not(.active):hover .top { top: 0; transform: translateX(0); }
+  body .VPNavBarHamburger:not(.active):hover .middle { top: .375rem; transform: translateX(.5rem); }
+  body .VPNavBarHamburger:not(.active):hover .bottom { top: .75rem; transform: translateX(.25rem); }
+  body .VPNavBarHamburger.active:hover :is(.top, .middle, .bottom) { background-color: var(--vp-c-text-1); }
+}
 
 /* top bar: wordmark, version pill, search, links, theme button */
 /* one surface and one rule across the whole width, so the bar reads as one piece: VitePress starts them after the
@@ -82,68 +142,147 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 .VPNavBar.has-sidebar { --vp-nav-col-offset: 0px !important; }
 .VPNavBar .divider-line { background-color: var(--line) !important; }
 .VPNavBar.has-sidebar .divider::before { display: none; }
-.VPNavBarTitle .title { font: 700 19px/1 var(--font-mono); letter-spacing: -.02em; color: var(--fg); gap: 8px; }
-.VPNavBarTitle .title b { color: var(--accent); font-weight: 700; margin: 0 1px; }
-/* VitePress clips the title's span (`overflow: hidden`, for its ellipsis): a line box of 1 cut the descender of the g */
-.VPNavBarTitle .title > span:not(.version) { line-height: 1.5; }
+.VPNavBarTitle .title { color: var(--fg); gap: 8px; }
+/* the wordmark (Wordmark.vue), PG⟨mark⟩CAST: capitals as tall as the 14px tile, Saira's cap height being .688em, so
+   that both stand on the baseline and share their middle; the tile 2px from each word, the tracking after the G
+   included */
+.Wordmark {
+  display: inline-flex; align-items: baseline; flex: none;
+  font: 700 calc(14px / .688)/1.5 "Saira Wordmark", var(--font-display); letter-spacing: .04em;
+}
+.Wordmark .mark { flex: none; width: 14px; height: 14px; margin: 0 2px 0 calc(2px - .04em); fill: var(--accent); }
+/* its entrance, on the home only, the first time it loads in a session (config.ts, Wordmark.vue): the tile settles in,
+   then the letters come into focus one by one from the tile outward, G and C first, in gaps that shrink (Wordmark.vue's
+   `--delay`: 0, 120, 200, 250ms) so they read as a wave; 1.85s in all, on one strong ease-out, Emil Kowalski's. Opacity,
+   transform and a 5px blur alone, never a layout property, so the letters keep their place and width from the first
+   frame. The rules are gone once it is over: it never replays, so keyframes need not be interruptible. */
+@media (prefers-reduced-motion: no-preference) {
+  html[data-wordmark] .Wordmark .mark { animation: wordmark-settle 600ms var(--ease-out) backwards; }
+  html[data-wordmark] .Wordmark .pg > span, html[data-wordmark] .Wordmark .cast > span {
+    animation: wordmark-focus 1300ms var(--ease-out) calc(300ms + var(--delay)) backwards;
+  }
+}
+@keyframes wordmark-settle { from { opacity: 0; transform: scale(.9); } }
+@keyframes wordmark-focus { from { opacity: 0; filter: blur(.25em); } }
 .VPNavBarTitle .version {
   font: 500 12px/1 var(--font-body); letter-spacing: 0; color: var(--muted);
   border: 1px solid var(--line); border-radius: 999px; padding: 4px 8px; background: var(--surface);
 }
 @media (max-width: 560px) { .VPNavBarTitle .version { display: none; } }
+/* the search: a pill, as the home's buttons, on --surface with a hairline; its hover theirs, the border --accent on a
+   faint tint of it */
 .VPNavBarSearchButton {
-  height: 36px; border: 1px solid var(--line) !important; border-radius: 8px !important; background: var(--sunken) !important;
-  color: var(--muted); font-size: 14px;
+  height: 32px; border: 1px solid var(--line) !important; border-radius: 16px !important; background: var(--surface) !important;
+  padding-inline: 12px 6px !important; color: var(--muted); font-size: 14px;
 }
+/* 32px from 768px, as the theme button, over VitePress's `height: auto`, which made it 38px: the keycap 6px in */
+@media (min-width: 768px) { .VPNavBar .VPNavBarSearchButton { height: 32px; padding-block: 0; } }
+/* its ⌘K one keycap, as the dialog's keys (below) */
+.VPNavBar .VPNavBarSearchButton .keys { display: inline-flex; align-items: center; gap: 1px; }
 /* room for the three group links by the search field, from 960px */
-@media (max-width: 1100px) { .VPNavBarSearchButton .keys { display: none; } }
+@media (max-width: 1100px) { .VPNavBar .VPNavBarSearchButton .keys { display: none; } }
 /* and an icon only under 900px, so that GitHub and the theme button stay in the bar down to 768px */
 @media (max-width: 900px) { .VPNavBarSearchButton .text { display: none; } }
+/* on a phone, beside the menu button: the icon alone, no field, as the menu button beside it; its hover a colour step */
+@media (max-width: 767px) {
+  .VPNavBarSearchButton { border-color: transparent !important; background: transparent !important; }
+}
+@media (max-width: 767px) and (hover: hover) and (pointer: fine) {
+  .VPNavBarSearchButton:hover { border-color: transparent !important; color: var(--accent); }
+}
 /* one class more than VitePress's scoped `.VPNavMenuLink` and `.VPNavMenuLink.active`, so that these win */
-/* 11px each side, not VitePress's 12: Playground, one letter longer than Changelog, still fits at 960px */
-.VPNavBar .VPNavBarMenuLink.VPNavMenuLink { color: var(--muted); font-size: 14px; font-weight: 400; padding: 0 11px; }
-.VPNavBar .VPNavBarMenuLink.VPNavMenuLink:hover, .VPNavBar .VPNavBarMenuLink.VPNavMenuLink.active { color: var(--fg); }
+/* 10px each side, not VitePress's 12: a compact bar (#376), where Playground, one letter longer than Changelog, fits at
+   960px */
+.VPNavBar .VPNavBarMenuLink.VPNavMenuLink { color: var(--muted); font-size: 14px; font-weight: 400; padding: 0 10px; }
+.VPNavBar .VPNavBarMenuLink.VPNavMenuLink.active { color: var(--fg); }
+@media (hover: hover) and (pointer: fine) { .VPNavBar .VPNavBarMenuLink.VPNavMenuLink:hover { color: var(--fg); } }
 .AppearanceSwitch {
-  width: 36px; height: 36px; display: grid; place-items: center; flex-shrink: 0;
+  width: 32px; height: 32px; display: grid; place-items: center; flex-shrink: 0;
   border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--fg); cursor: pointer;
 }
-.AppearanceSwitch svg { width: 18px; height: 18px; }
+.AppearanceSwitch svg { width: 16px; height: 16px; }
+/* a finger's target: 40px, in the 52px bar */
+@media (pointer: coarse) { .AppearanceSwitch { width: 40px; height: 40px; } }
 
-/* left nav, in four groups: rows of 32px, 4px apart; a group's label 32px under the group above, 12px over its pages,
-   and in line with their text. The label leads its pages: the headings' face, in --fg, on a --sunken band across the nav; the pages in
-   --muted, --fg on hover, the current one in --accent */
+/* left nav, in four groups that fold: a group's heading set apart from its pages by size and colour alone, no band
+   (the owner's call, #372); its pages a step further in, plain --muted text; the current page a filled row. Compact,
+   as a docs sidebar reads best (#379): rows of 32px and 28px that touch, the space between groups, not between rows */
 .VPSidebar .group, .VPSidebar .group + .group { border-top: 0; padding-top: 0; }
-.VPSidebar .group .VPSidebarItem.level-0 { padding-bottom: 20px; }  /* over VitePress's scoped 24px */
-/* the band runs from border to border: past the nav's 2rem on the right, and as far as the nav clips it on the left
-   (VitePress widens the left padding on wide screens) */
-.VPSidebarItem.level-0 > .item { position: relative; z-index: 0; }
-.VPSidebarItem.level-0 > .item::before {
-  content: ""; position: absolute; inset: 0 -2rem 0 -100vw; z-index: -1; background: var(--sunken);
-  border-block: 1px solid var(--line);
+/* over VitePress's scoped 24px and 10px: 16px under an open group, 4px under a folded one */
+.VPSidebar .group .VPSidebarItem.level-0 { padding-bottom: 16px; }
+.VPSidebar .group .VPSidebarItem.level-0.collapsed { padding-bottom: 4px; }
+/* VitePress opens the current page's group only once the page runs: until then, and 300ms more (`.no-transition`),
+   it is shown open, so that a folded group does not open under the reader's eyes */
+.VPSidebar .group.no-transition .VPSidebarItem.level-0.collapsed.has-active { padding-bottom: 16px; }
+.VPSidebar .group.no-transition .VPSidebarItem.level-0.collapsed.has-active > .items { display: block; }
+.VPSidebar .group.no-transition .VPSidebarItem.level-0.collapsed.has-active .caret-icon { transform: rotate(90deg); }
+/* the heading: its text in line with the nav's edge, its row 12px wider on the left for the fill of a current
+   landing page, and as wide as its pages' rows on the right; VitePress's chevron (a button, Tab and Enter or Space)
+   at its end folds the group */
+.VPSidebarItem.level-0 > .item {
+  align-items: center; width: calc(100% + 12px); margin-left: -12px; padding-left: 12px; border-radius: 8px;
 }
-.VPSidebarItem.level-0 > .item .text {
-  font: 600 15px/20px var(--font-display); color: var(--fg); padding: 8px 12px;
-}
-/* the band breathes: 12px between it and the section's first page */
-.VPSidebarItem.level-0 > .items { padding-top: 12px; }
+.VPSidebarItem.level-0 > .item .text { font: 600 16px/24px var(--font-display); color: var(--fg); padding: 4px 0; }
+.VPSidebarItem.level-0.is-active > .item { background: var(--raised); }
+.VPSidebar .group .VPSidebarItem.level-0.is-active > .item .link > .text { color: var(--fg); }
+/* the chevron inside the row, not 7px past it as VitePress sets it: the row ends where its pages' rows end */
+.VPSidebarItem.level-0 > .item .caret { margin-inline-end: 0; border-radius: 8px; color: var(--muted); }
+@media (hover: hover) and (pointer: fine) { .VPSidebarItem.level-0 > .item .caret:hover { color: var(--fg); } }
+/* a little room under the heading, none between pages: 4px from its row to the first page's, 12px text to text (8px
+   between pages) */
+.VPSidebarItem.level-0 > .items { padding-top: 4px; }
 .VPSidebarItem.level-1 > .item { padding: 0; }
 .VPSidebarItem.level-1 > .item .indicator { display: none; }
-.VPSidebarItem.level-1 .link { flex: 1; padding: 6px 12px; margin: 0 0 4px; border-radius: 8px; }
-.VPSidebarItem.level-1 .link:hover { background: var(--sunken); }
-.VPSidebarItem.level-1 .text { font-size: 14px; line-height: 20px; padding: 0; color: var(--muted); }
-.VPSidebarItem.level-1 .link:hover .text { color: var(--fg); }
-.VPSidebarItem.level-1.is-active .link { background: var(--accent-soft); }
-.VPSidebarItem.level-1.is-active .text { color: var(--accent); font-weight: 600; }
+/* rows of 28px that touch, so a hover or the current page fills one alone; the text 16px in from the heading's. A row
+   is a target of 28px, over the 24px of WCAG 2.5.8 on a phone */
+.VPSidebarItem.level-1 .link { flex: 1; padding: 4px 12px; margin: 0 0 0 4px; border-radius: 8px; }
+.VPSidebar .group .VPSidebarItem.level-1 .text { font: 400 14px/20px var(--font-body); padding: 0; color: var(--muted); }
+@media (hover: hover) and (pointer: fine) {
+  .VPSidebar .group .VPSidebarItem.level-1.is-link > .item > .link:hover .text { color: var(--fg); }
+}
+.VPSidebarItem.level-1.is-active .link { background: var(--raised); }
+.VPSidebar .group .VPSidebarItem.level-1.is-active > .item .link > .text { color: var(--fg); font-weight: 500; }
 /* a minor's badge, in the nav, on its group's landing page and in the pager: an inline block, so out of a link's
    underline, and glued to the text in outline.ts, so that no underlined space comes before it */
 .since { display: inline-block; margin-left: 8px; font-size: 11px; font-weight: 500; color: var(--muted); }
 .VPSidebarItem .since { float: right; line-height: 20px; }
-.VPSidebarItem .text code { font-size: .9em; }
+.VPSidebarItem .text code { font-size: .9em; overflow-wrap: anywhere; }  /* a long name breaks, not cut */
+/* a finger's target: rows of 40px, headings and pages, the chevron as tall */
+@media (pointer: coarse) {
+  .VPSidebarItem.level-0 > .item .text { padding: 8px 0; }
+  .VPSidebarItem.level-0 > .item .caret { height: 40px; }
+  .VPSidebarItem.level-1 .link { padding: 10px 12px; }
+}
+
+/* the phone's nav drawer: it opens as a sheet, in 500ms on --ease-drawer, and goes faster, 250ms on --ease-out */
+@media (max-width: 959px) {
+  body .Layout .VPSidebar { transition: opacity 250ms ease, transform 250ms var(--ease-out); }
+  body .Layout .VPSidebar.open { transition: opacity 250ms ease, transform 500ms var(--ease-drawer); }
+}
+/* the three columns start on one line, from 960px: the nav's first heading, "On this page" and the page's title set
+   their caps --doc-top under the bars above the reading column, each column's padding less the room its first line
+   leaves over its caps (measured on the site's faces): the title's 9.4px (40px at 1.15), the heading's 10.8px (16px on
+   24px, in a 32px row), "On this page"'s 5.5px (13px on 20px). Under 1280px, VitePress's bar of "On this page" tops
+   the reading column, 52px: the nav starts under it too */
+@media (min-width: 960px) {
+  .VPContent .VPDoc { padding-top: calc(var(--doc-top) - 9.4px); }
+  .Layout .VPSidebar { --nav-cap: 10.8px; padding-top: calc(var(--vp-nav-height) + var(--doc-top) - var(--nav-cap)); }
+  .VPDoc .aside .aside-container {
+    padding-top: calc(var(--vp-nav-height) + var(--vp-layout-top-height, 0px) + var(--doc-top) - 5.5px);
+  }
+}
+@media (min-width: 960px) and (max-width: 1279px) {
+  .Layout:has(.VPLocalNav:not(.empty)) .VPSidebar {
+    padding-top: calc(var(--vp-nav-height) + 52px + var(--doc-top) - var(--nav-cap));
+  }
+}
+@media (pointer: coarse) and (min-width: 960px) { .Layout .VPSidebar { --nav-cap: 14.8px; } }  /* its 40px row */
 
 /* "On this page" */
 .VPDocAsideOutline .outline-title { font: 600 13px/20px var(--font-body); color: var(--muted); margin-bottom: 8px; }
 .VPDocAsideOutline .outline-link { font-size: 13px; color: var(--muted); }
-.VPDocAsideOutline .outline-link:hover, .VPDocAsideOutline .outline-link.active { color: var(--accent); }
+.VPDocAsideOutline .outline-link.active { color: var(--accent); }
+@media (hover: hover) and (pointer: fine) { .VPDocAsideOutline .outline-link:hover { color: var(--accent); } }
 
 /* reading column */
 .vp-doc { font-size: 15px; line-height: 1.65; }
@@ -156,14 +295,29 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 .vp-doc h2 { font-size: 1.5rem; margin: 44px 0 16px; padding-top: 4px; border-top: 0; }  /* 48px over its text */
 .vp-doc h3 { font-size: 1.125rem; margin: 24px 0 12px; }
 @media (max-width: 560px) { .vp-doc h1 { font-size: 2rem; } }
+/* a step of a page read in order (steps.ts): its number in a round marker, hung left of the heading's text, so that the
+   steps read at a glance and a long one wraps under its own text */
+.vp-doc h2:has(> .step) { position: relative; padding-left: 40px; }
+.vp-doc h2 > .step {
+  position: absolute; left: 0; top: 4px; display: grid; place-items: center; width: 28px; height: 28px;
+  border: 1px solid var(--line); border-radius: 50%; background: var(--surface);
+  font: 500 13px/1 var(--font-mono); color: var(--fg); letter-spacing: 0;
+}
 .vp-doc .lede { font-size: 1.1rem; color: var(--muted); margin: 0 0 28px; max-width: 62ch; }
 .vp-doc a, .landing a:not(.btn) { font-weight: inherit; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
-.vp-doc a:hover, .landing a:not(.btn):hover { text-decoration-thickness: 2px; }
+@media (hover: hover) and (pointer: fine) { .vp-doc a:hover, .landing a:not(.btn):hover { text-decoration-thickness: 2px; } }
 /* inline code: a tint, no border, so a name does not read as a button */
 .vp-doc :not(pre) > code, .landing :not(pre) > code {
   font-size: .88em; color: var(--fg); background: var(--sunken); border: 0; border-radius: 4px; padding: 0 4px;
 }
+/* a heading's `#`, shown on hover, hung left of its first line and on its baseline: its box starts where the heading's
+   text starts (its padding inherited, VitePress's 24px of an h2 being 4px here) and has its line height. A step's is
+   left of its marker. Without a pointer that hovers, it stays hidden after a tap, as VitePress means it */
 .vp-doc .header-anchor { color: var(--line); }
+body .vp-doc :is(h1, h2, h3, h4, h5, h6) .header-anchor { top: 0; padding-top: inherit; line-height: inherit; }
+@media not all and (hover: hover) and (pointer: fine) {
+  .vp-doc :is(h1, h2, h3, h4, h5, h6):hover .header-anchor:not(:focus) { opacity: 0; }
+}
 /* a group's landing page: each of its pages, the title then its line */
 .vp-doc .GroupPages { list-style: none; padding: 0; margin: 32px 0 0; display: grid; gap: 20px; }
 .vp-doc .GroupPages li { margin: 0; }
@@ -171,11 +325,11 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 .vp-doc .GroupPages a { font-size: 16px; font-weight: 500; color: var(--accent); }
 .vp-doc .GroupPages p { margin: 4px 0 0; color: var(--muted); }
 
-/* the 404 page (NotFound.vue), on the reading column's width: the home's eyebrow, a page's title and lede, a search
-   field as the top bar's, then the groups and the home as a group's landing page lists its pages */
+/* the 404 page (NotFound.vue), on the reading column's width: an eyebrow as a SQL comment, a page's title and lede,
+   a search field as the top bar's, then the groups and the home as a group's landing page lists its pages */
 .NotFound {
   max-width: 688px; margin: 0 auto;
-  padding: 96px max(16px, env(safe-area-inset-right, 0px)) 120px max(16px, env(safe-area-inset-left, 0px));
+  padding: 96px 16px 120px;
 }
 .NotFound .eyebrow { font: 500 13px/1 var(--font-mono); color: var(--accent); margin: 0 0 16px; }
 .NotFound h1 {
@@ -184,16 +338,18 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 .NotFound .lede { font-size: 1.1rem; color: var(--muted); margin: 0 0 28px; max-width: 62ch; }
 .NotFound .search {
   display: flex; align-items: center; gap: 8px; width: 100%; max-width: 320px; height: 40px; padding: 0 12px;
-  border: 1px solid var(--line); border-radius: 8px; background: var(--sunken); color: var(--muted); font-size: 14px;
-  cursor: pointer;
+  border: 1px solid var(--line); border-radius: 20px; background: var(--surface); color: var(--muted); font-size: 14px;
+  padding-inline: 16px; cursor: pointer;
 }
-.NotFound .search:hover { border-color: var(--accent); }
 .NotFound ul { list-style: none; padding: 0; margin: 32px 0 0; display: grid; gap: 12px; }
 .NotFound a {
   font-size: 16px; font-weight: 500; color: var(--accent);
   text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px;
 }
-.NotFound a:hover { text-decoration-thickness: 2px; }
+@media (hover: hover) and (pointer: fine) {
+  .NotFound .search:hover { border-color: var(--accent); }
+  .NotFound a:hover { text-decoration-thickness: 2px; }
+}
 @media (max-width: 560px) {
   .NotFound { padding-top: 48px; }
   .NotFound h1 { font-size: 2rem; }
@@ -204,33 +360,45 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 .vp-code-group { margin: 16px 0 20px; background: var(--code-bg); overflow: hidden; }
 .vp-code-group div[class*='language-'] { border: 0; border-radius: 0; margin: 0; }
 .vp-code-group .tabs { border-bottom: 1px solid var(--line); box-shadow: none; padding: 0 6px; }
-.vp-code-group .tabs label { font: 500 12px/38px var(--font-mono); padding: 0 10px; }
+/* a tab: one line, a package manager's mark (codeGroups.ts) 6px before its name, in the tab's colour */
+.vp-code-group .tabs label {
+  display: inline-flex; align-items: center; gap: 6px; flex: none; font: 500 12px/38px var(--font-mono); padding: 0 10px;
+}
+.vp-code-group .tabs label .icon { width: 14px; height: 14px; }
 .vp-code-group .tabs label::after { bottom: -1px; height: 2px; }
 .vp-doc div[class*='language-'] span.lang { font-family: var(--font-mono); }
 .vp-code-group span.lang { display: none; }
+/* without a pointer that hovers, VitePress's Copy would show only once tapped: shown, in the place of the language */
+@media not all and (hover: hover) and (pointer: fine) {
+  .vp-doc [class*='language-'] > button.copy { opacity: 1; }
+  .vp-doc [class*='language-'] > span.lang { opacity: 0; }
+}
 @media (max-width: 639px) {  /* VitePress bleeds code to the screen's edges there; kept in the 16px gutter of every other block */
   .vp-doc div[class*='language-'], .vp-code-group .tabs { margin-left: 0; margin-right: 0; }
   .vp-doc div[class*='language-'] { border-radius: var(--radius); }
 }
 
-/* notes: a chip, then the text, with no side rail */
+/* the site's icons (icons.ts): 16px unless a component sets them smaller, beside its own text */
+svg.icon { width: 16px; height: 16px; flex: none; }
+
+/* notes: a chip, then the text, with no side rail; the chip opens on its kind's icon (callouts.ts). The chip starts
+   the text's first line, centred on it (a 20px pill in a line of 24.75px, 15px at 1.65), 8px before the text; the
+   lines under it start at its left edge, as the text of any block */
 .vp-doc .custom-block {
-  display: grid; grid-template-columns: auto 1fr; gap: 0 12px; align-items: start;
+  display: flow-root;
   border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); color: var(--fg);
   padding: 14px 16px; margin: 20px 0; font-size: 15px; line-height: 1.65;
 }
-.vp-doc .custom-block > * { grid-column: 2; margin: 0; }
+.vp-doc .custom-block > * { margin: 0; }
 .vp-doc .custom-block > * + * + * { margin-top: 8px; }
-.vp-doc .custom-block .custom-block-title {
-  grid-column: 1; grid-row: 1 / span 9; margin: 2px 0 0;
-  font: 600 11px/1 var(--font-body); letter-spacing: .04em; text-transform: uppercase; white-space: nowrap;
-  border-radius: 999px; padding: 5px 8px; background: var(--accent-soft); color: var(--accent);
+/* p.: over VitePress's `.custom-block p:first-child`, whose margin 0 held the chip up */
+.vp-doc .custom-block p.custom-block-title {
+  float: left; display: flex; align-items: center; gap: 4px; height: 20px;
+  margin: calc((1.65 * 15px - 20px) / 2) 8px 0 0;
+  font: 600 12px/1 var(--font-body); white-space: nowrap;
+  border-radius: 999px; padding: 0 8px 0 6px; background: var(--accent-soft); color: var(--accent);
 }
-@media (max-width: 560px) {
-  .vp-doc .custom-block { grid-template-columns: minmax(0, 1fr); }
-  .vp-doc .custom-block > * { grid-column: 1; }
-  .vp-doc .custom-block .custom-block-title { grid-row: auto; justify-self: start; margin-bottom: 8px; }
-}
+.vp-doc .custom-block .custom-block-title .icon { width: 14px; height: 14px; }
 .vp-doc .custom-block.info .custom-block-title { background: var(--sunken); color: var(--muted); }
 .vp-doc .custom-block.warning, .vp-doc .custom-block.danger { background: var(--warn-soft); }
 .vp-doc .custom-block.warning .custom-block-title, .vp-doc .custom-block.danger .custom-block-title {
@@ -280,6 +448,13 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 /* a written page's actions (PageActions.vue): one quiet split button, floated beside the title, so that a long title
    wraps under it; its menu and its "Copied" under it, over the text */
 .PageActions { float: right; position: relative; margin: 7px 0 8px 16px; z-index: 10; }  /* in line with the h1's first line */
+/* from 1280px, where VitePress shows "On this page", under it instead, as Cursor's docs have it: its left edge on the
+   outline's rule, 16px under its last link, fixed with it; its focus ring inside, as the rail's box cuts what overflows
+   it. The rail over the reading column, for the menu that opens leftwards from it */
+.PageActions.rail { float: none; align-self: flex-start; margin: 16px 0 0; }
+.PageActions.rail .split button:focus-visible { outline-offset: -2px; }
+.VPDoc .aside { z-index: 1; }
+@media (min-width: 1280px) { .VPDoc.has-aside .PageActions.title { display: none; } }
 /* on a phone, its icon only, so the title keeps the column; its label is still its name */
 @media (max-width: 560px) {
   .PageActions { margin-top: 2px; }
@@ -290,21 +465,39 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
   display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; color: var(--muted);
   font: 500 13px/1 var(--font-body);
 }
-.PageActions .split button:hover { background: var(--sunken); color: var(--fg); }
+/* on hover --raised, as the nav's current page: on --surface, --sunken would read as a hole in dark */
+@media (hover: hover) and (pointer: fine) { .PageActions .split button:hover { background: var(--raised); color: var(--fg); } }
+/* a finger's target: 40px */
+@media (pointer: coarse) { .PageActions .split button { height: 38px; } }
 .PageActions .copy { border-radius: 7px 0 0 7px; }
 .PageActions .toggle { border-left: 1px solid var(--line); border-radius: 0 7px 7px 0; padding: 0 6px !important; }
 .PageActions svg { width: 16px; height: 16px; flex: none; }
+/* its menu: each row an icon, a name and, under it, what it does; as wide as its longest row, inside a 320px screen.
+   Fixed, placed by PageActions.vue under its button (over it where it would not fit), its right edge under the
+   chevron's, inside the viewport; it scales in from the chevron, as a popover from its trigger, and goes at once */
 .PageActions .menu {
-  position: absolute; top: calc(100% + 4px); right: 0; min-width: 200px; padding: 4px; display: flex; flex-direction: column;
+  position: fixed; width: max-content; max-width: calc(100vw - 32px); padding: 4px;
+  display: flex; flex-direction: column;
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 8px 28px rgba(0, 0, 0, .18);
+  transition: opacity 150ms var(--ease-out), transform 150ms var(--ease-out);
 }
+@starting-style { .PageActions .menu { opacity: 0; transform: scale(.97); } }
 .PageActions .menu > * {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 10px; border-radius: 6px;
-  font: 400 14px/20px var(--font-body); color: var(--fg); text-decoration: none; text-align: left;
+  display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 0 10px; padding: 8px 12px 8px 10px; border-radius: 6px;
+  color: var(--fg); text-decoration: none; text-align: left;
 }
-.PageActions .menu > :hover, .PageActions .menu > :focus { background: var(--sunken); }
+.PageActions .menu > :focus-visible { background: var(--raised); }
+@media (hover: hover) and (pointer: fine) { .PageActions .menu > :hover { background: var(--raised); } }
 .PageActions .menu > :focus-visible { outline-offset: -2px; }
-.PageActions .menu svg { color: var(--muted); width: 14px; height: 14px; }
+.PageActions .menu svg { color: var(--muted); margin-top: 2px; }  /* centred on the name's line */
+.PageActions .menu .title { font: 400 14px/20px var(--font-body); }
+.PageActions .menu .title svg { display: inline; vertical-align: -1px; width: 14px; height: 14px; margin: 0 0 0 4px; }
+.PageActions .menu .desc { grid-column: 2; font: 400 13px/18px var(--font-body); color: var(--muted); }
+/* Copy's icon turns to a tick, and back: a crossfade, the one going out shrinking and blurring (InstallLine's too) */
+.IconSwap { display: grid; flex: none; }
+.IconSwap > * { grid-area: 1 / 1; transition: opacity 150ms var(--ease-out), transform 150ms var(--ease-out), filter 150ms var(--ease-out); }
+.IconSwap > :last-child, .IconSwap.done > :first-child { opacity: 0; transform: scale(.8); filter: blur(2px); }
+.IconSwap.done > :last-child { opacity: 1; transform: none; filter: none; }
 .PageActions .status { position: absolute; top: calc(100% + 4px); right: 0; white-space: nowrap; font-size: 12px; color: var(--muted); }
 
 /* pager, then the edit row */
@@ -316,40 +509,138 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 .VPDocFooter .edit-info .VPLastUpdated { font-size: 13px; font-weight: 400; color: var(--muted); }
 .VPDocFooter .edit-info .VPLastUpdated time { margin-left: .3em; }
 .VPDocFooter .pager-link { border-color: var(--line); border-radius: var(--radius); background: var(--surface); padding: 14px 16px; }
-.VPDocFooter .pager-link:hover { border-color: var(--accent); }
-.VPDocFooter .pager-link .desc { font-size: 12px; color: var(--muted); }
+@media (hover: hover) and (pointer: fine) { .VPDocFooter .pager-link:hover { border-color: var(--accent); } }
+/* "Previous" and "Next", each with the arrow of its way (config.ts) */
+.VPDocFooter .pager-link .desc { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); }
+.VPDocFooter .pager-link.next .desc { justify-content: flex-end; }
+.VPDocFooter .pager-link .desc .icon { width: 14px; height: 14px; }
 .VPDocFooter .pager-link .title { font-size: 15px; font-weight: 400; color: var(--fg); }
 .SiteFooter { color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); padding-top: 20px; margin: 56px 0 0; }
 .SiteFooter a { color: var(--accent); text-decoration: underline 1px; text-underline-offset: 3px; }
 
 /* home */
-.landing { max-width: 1180px; margin: 0 auto; padding: 0 max(16px, env(safe-area-inset-right, 0px)) 80px max(16px, env(safe-area-inset-left, 0px)); }
-/* the home's rhythm: 48px from the hero to the cast panel, 56px between the sections under it */
-.landing .hero { padding-block: 72px 48px; }
-.landing .eyebrow { font: 500 13px/1 var(--font-mono); color: var(--accent); margin: 0 0 16px; }
-.landing .hero h1 { font-size: clamp(2.5rem, 6vw, 4.5rem); margin: 0 0 20px; max-width: 16ch; letter-spacing: -.025em; }
+.landing { max-width: 1180px; margin: 0 auto; padding: 0 16px 80px; }
+/* the home's first screen, from 1024px: the line and the lede side by side, then one row 40px tall, the two buttons
+   under the line and the install field under the lede, on the same two columns; the cast panel rises under it, its top
+   in the first screen. Under 1024px, all in one column, the install field under the buttons; a card on a phone */
+.landing .hero {
+  --hero-top: 72px; --hero-line: clamp(2.5rem, 6vw, 4.5rem);
+  position: relative; padding-block: var(--hero-top) 56px;
+}
+/* the eyebrow, a SQL comment over the line: pgcast's provenance, credited rather than pitched; Zapatos links Switch from
+   Zapatos, underlined faintly until hovered. Out of the hero's flow, so that nothing under it moves: in the room over
+   the line, as far from the top bar as from the line, glyph to glyph (the line's caps .226em under its box's top, the
+   eyebrow's cap top and baseline 1.5px and 11px under its own); its hyphen's ink on the line's left edge */
+.landing .eyebrow {
+  position: absolute; left: -1px; top: calc((var(--hero-top) + .226 * var(--hero-line) - 12.5px) / 2); margin: 0;
+  font: 500 13px/1 var(--font-mono); color: var(--accent);
+}
+.landing .eyebrow a {
+  color: inherit; text-decoration-thickness: 1px; text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
+}
+@media (hover: hover) and (pointer: fine) { .landing .eyebrow a:hover { text-decoration-color: currentColor; } }
+.landing .hero h1 { font-size: var(--hero-line); margin: 0 0 20px; max-width: 16ch; letter-spacing: -.025em; }
 .landing .hero h1 .op { font-family: var(--font-mono); color: var(--accent); font-weight: 700; letter-spacing: -.06em; }
 .landing .lede { font-size: 1.18rem; color: var(--muted); max-width: 58ch; margin: 0 0 28px; }
 .landing .ctas { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 0; }
 .landing .ctas p { display: contents; }
+.landing .InstallLine { margin: 16px 0 0; max-width: 512px; }
+@media (min-width: 1024px) {
+  .landing .hero {
+    --hero-top: 80px; --hero-line: clamp(2.5rem, 4.2vw, 3.5rem);
+    display: grid; grid-template-columns: minmax(0, 1fr) 512px; column-gap: 48px; row-gap: 40px; align-items: start;
+    padding-bottom: 64px;
+  }
+  /* the lede's first line on the line's caps, glyph to glyph: the line's caps .226em under its box's top, the lede's
+     7.8px under its own (17px at 1.65), so the line never moves, nor the eyebrow over it */
+  .landing .hero .lede { margin-top: calc(.226 * var(--hero-line) - 7.8px); }
+  .landing .hero h1 { max-width: none; margin: 0; }
+  .landing .lede { font-size: 1.0625rem; max-width: none; margin-bottom: 0; }
+  .landing .hero .InstallLine { margin: 0; }
+}
+
+/* the buttons: on hover a colour step (150ms `ease`) and, with a pointer that hovers, a 1px lift on a soft shadow (150ms
+   on --ease-out); pressed, they give a little (scale .97, the shadow gone) in 100ms, and settle back in 150ms. The label never moves. The
+   primary deepens to --accent-hover, its shadow tinted by the accent (black in dark, where a tint would glow); the
+   secondary's border turns --accent on a faint tint of it, its shadow lighter. Reduced motion: the colour step alone */
 .landing .btn {
-  display: inline-flex; align-items: center; height: 40px; padding: 0 20px; border-radius: 9px; font-weight: 600;
-  text-decoration: none; border: 1px solid var(--line); color: var(--fg); background: var(--surface);
+  position: relative; display: inline-flex; align-items: center; height: 40px; padding: 0 20px; border-radius: 20px;
+  font-weight: 600; text-decoration: none; border: 1px solid var(--line); color: var(--fg); background: var(--surface);
+  --btn-shadow: 0 2px 8px -2px color-mix(in srgb, var(--accent) 20%, transparent);
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease,
+    box-shadow 150ms var(--ease-out), transform 150ms var(--ease-out);
 }
-.landing .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
-/* the install command, under the two buttons: one quiet line, not a third control. Where it does not fit, under 414px,
-   it wraps at its space rather than being cut, and the copy button stays on its first line */
-.InstallLine { display: flex; align-items: flex-start; gap: 8px; margin: 16px 0 0; padding-block: 4px; min-width: 0; font: 13px/20px var(--font-mono); }
-.landing .InstallLine code { background: none; padding: 0; font-size: inherit; }
-.InstallLine code { overflow-wrap: anywhere; min-width: 0; color: var(--fg); }
-.InstallLine .dollar { color: var(--muted); }
+.landing .btn.primary {
+  background: var(--accent); border-color: var(--accent); color: var(--accent-fg);
+  --btn-shadow: 0 4px 12px -2px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+.dark .landing .btn { --btn-shadow: 0 2px 8px -2px rgb(0 0 0 / .4); }
+.dark .landing .btn.primary { --btn-shadow: 0 4px 12px -2px rgb(0 0 0 / .6); }
+@media (hover: hover) and (pointer: fine) {
+  .landing .btn:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 6%, var(--surface)); }
+  .landing .btn.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+}
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .landing .btn:hover { transform: translateY(-1px); box-shadow: var(--btn-shadow); }
+}
+.landing .btn:active { transform: scale(.97); box-shadow: none; transition-duration: 100ms; }
+@media (prefers-reduced-motion: reduce) { .landing .btn:active { transform: none; } }
+
+/* the install field: as tall as the buttons, on --sunken, their radius. Inside it, 4px in, a segment of tabs, one per
+   package manager, its mark alone (its name for assistive technology), the picked one raised on --surface; then the
+   command, mono 13px, and the copy button. "Copied" shows above its end for 1.4s. On a phone, a card: the tabs,
+   named, in a header row, the command under them, wrapping at a space */
+.InstallLine {
+  position: relative; display: flex; align-items: center; height: 40px; min-width: 0; padding: 0 4px;
+  border: 1px solid var(--line); border-radius: 20px; background: var(--sunken);
+}
+.InstallLine .tabs {
+  display: flex; gap: 2px; flex: none; padding-right: 4px; margin-right: 12px; border-right: 1px solid var(--line);
+}
+.InstallLine .tabs button {
+  display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 8px; border: 1px solid transparent;
+  border-radius: 15px; background: none; font: 500 13px/1 var(--font-mono); color: var(--muted); cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease, transform 160ms var(--ease-out);
+}
+.InstallLine .tabs .icon { width: 14px; height: 14px; flex: none; }
+.InstallLine .tabs .name {
+  position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+}
+@media (hover: hover) and (pointer: fine) { .InstallLine .tabs button:hover { color: var(--fg); background: var(--line); } }
+.InstallLine .tabs button[aria-selected='true'] { background: var(--surface); border-color: var(--line); color: var(--fg); }
+.InstallLine .panel { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+.landing .InstallLine code {
+  flex: 1; min-width: 0; padding: 0; background: none; font: 13px/20px var(--font-mono); color: var(--fg);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.InstallLine .manager { color: var(--t); }
 .InstallLine .copy {
-  display: grid; place-items: center; flex-shrink: 0; width: 28px; height: 28px; margin-block: -4px; padding: 0;
-  border: 0; border-radius: 8px; background: none; color: var(--muted); cursor: pointer;
+  display: grid; place-items: center; flex: none; width: 30px; height: 30px; padding: 0;
+  border: 0; border-radius: 15px; background: none; color: var(--muted); cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease, transform 160ms var(--ease-out);
 }
-.InstallLine .copy:hover { background: var(--sunken); color: var(--fg); }
-.InstallLine .copy svg { width: 16px; height: 16px; }
-.InstallLine .copied { font: 12px/20px var(--font-body); color: var(--muted); }
+@media (hover: hover) and (pointer: fine) { .InstallLine .copy:hover { background: var(--line); color: var(--fg); } }
+.InstallLine :is(.tabs button, .copy):active { transform: scale(.94); }
+.InstallLine .copy .icon { width: 16px; height: 16px; }
+.InstallLine .copied { position: absolute; right: 0; bottom: calc(100% + 6px); font: 12px/16px var(--font-body); color: var(--muted); }
+@media (max-width: 559px) {
+  .InstallLine { flex-direction: column; align-items: stretch; height: auto; padding: 0; border-radius: var(--radius); }
+  .InstallLine .tabs { padding: 4px; margin: 0; border-right: 0; border-bottom: 1px solid var(--line); }
+  .InstallLine .tabs .name { position: static; width: auto; height: auto; overflow: visible; clip-path: none; }
+  .InstallLine .panel { align-items: flex-start; padding: 12px 8px 12px 16px; }
+  .landing .InstallLine code { white-space: normal; overflow-wrap: anywhere; line-height: 22px; }
+  .InstallLine .copy { margin-block: -4px; }
+  .InstallLine :is(.tabs button, .copy) { border-radius: 6px; }  /* nested in the card's 10px */
+}
+@media (prefers-reduced-motion: reduce) { .InstallLine :is(.tabs button, .copy):active { transform: none; } }
+/* the playground's line for a phone, where its editor does not load (Playground.vue's test): in the page from the
+   server, so that nothing moves when it runs */
+.Playground-phone { display: none; }
+@media not all and (min-width: 768px) and (hover: hover) and (pointer: fine) { .Playground-phone { display: block; } }
+/* the cast panel, the home's product view: its caption above it, what the panel shows on the left, how to explore it
+   on the right */
+.landing .CastPanel-frame { display: flex; flex-direction: column; }
+.landing .CastPanel-caption { order: -1; justify-content: space-between; row-gap: 4px; margin: 0 0 12px; }
 .landing .CastPanel-frame { margin: 0; }
 .landing .pillars {
   display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 32px;
@@ -357,13 +648,17 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 }
 .landing .pillars h2 { font-size: 1rem; margin: 0 0 8px; }
 .landing .pillars p { margin: 0; color: var(--muted); font-size: 14px; }
+/* each pillar ends on where to go next, the links on one line across the row */
+.landing .pillars > div { display: flex; flex-direction: column; }
+.landing .pillars p:has(> .next) { margin-top: auto; padding-top: 12px; }
+.landing .pillars .next { font-weight: 500; color: var(--accent); }
 .landing .readnext p { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 0; }
 .landing .readnext strong { font-weight: 600; }
 .landing .readnext a {
   display: block; border: 1px solid var(--line); border-radius: var(--radius); padding: 16px;
   text-decoration: none; color: var(--fg); background: var(--surface);
 }
-.landing .readnext a:hover { border-color: var(--accent); }
+@media (hover: hover) and (pointer: fine) { .landing .readnext a:hover { border-color: var(--accent); } }
 .landing .readnext small { display: block; color: var(--muted); margin-top: 4px; font-size: 13px; }
 @media (max-width: 900px) {
   .landing .pillars { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -371,7 +666,7 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 }
 @media (max-width: 560px) {
   .landing .pillars, .landing .readnext p { grid-template-columns: minmax(0, 1fr); }
-  .landing .hero { padding-block: 48px 32px; }
+  .landing .hero { --hero-top: 48px; padding-bottom: 32px; }
 }
 
 /* the cast panel: what you write, what Postgres runs, what TypeScript knows. Three columns from 1140px wide, where
@@ -399,7 +694,9 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
   margin-left: auto; font-weight: 500; color: var(--muted);
   text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px;
 }
-.CastPanel .label .CastPanel-open:hover { color: var(--accent); text-decoration-color: currentColor; }
+@media (hover: hover) and (pointer: fine) {
+  .CastPanel .label .CastPanel-open:hover { color: var(--accent); text-decoration-color: currentColor; }
+}
 .CastPanel > div > div { flex: 1; min-width: 0; }  /* the code, above the values row */
 .CastPanel div[class*='language-'] { margin: 0; border: 0; border-radius: 0; background: transparent; }
 .CastPanel div[class*='language-'] > .copy, .CastPanel div[class*='language-'] > .lang { display: none; }
@@ -425,6 +722,7 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 @container (max-width: 1139px) {
   .CastPanel { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .CastPanel > div:last-child { grid-column: 1 / -1; border-top: 1px dashed var(--line); }
+  .CastPanel > div:nth-child(2) { border-right: 0; }  /* on the panel's own border */
 }
 @container (max-width: 900px) {
   .CastPanel { grid-template-columns: minmax(0, 1fr); }
@@ -445,13 +743,98 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
   --twoslash-error-bg: color-mix(in srgb, var(--error) 12.5%, transparent);
 }
 .twoslash .twoslash-hover { border-bottom: 1px dashed var(--muted); cursor: help; }
-.twoslash .twoslash-hover:hover, .twoslash .twoslash-hover:focus-within { background: var(--accent-soft); border-radius: 2px; }
+.twoslash .twoslash-hover:focus-within { background: var(--accent-soft); border-radius: 2px; }
+@media (hover: hover) and (pointer: fine) {
+  .twoslash .twoslash-hover:hover { background: var(--accent-soft); border-radius: 2px; }
+}
 .twoslash .twoslash-hover > span:focus-visible { outline: none; }  /* the background says it, as on hover */
-/* the search dialog's field: its bar already turns --accent on focus (VitePress's :focus-within), so the field itself
-   draws no second ring inside it */
-.VPLocalSearchBox .search-input:focus-visible { outline: none; }
 .v-popper--theme-twoslash .v-popper__inner { border-radius: 8px; box-shadow: 0 8px 28px rgba(0, 0, 0, .18); }
+/* in dark, a shadow strong enough to lift a popover off the page */
+.dark :is(.PageActions .menu, .v-popper--theme-twoslash .v-popper__inner) { box-shadow: 0 8px 28px rgb(0 0 0 / .5); }
 .twoslash-floating .twoslash-popup-code { line-height: 1.5; background: transparent !important; }
+
+/* the search dialog: VitePress's local search, laid out as Cursor's docs lay theirs (#379): one panel 640px wide, 12vh
+   down so that it stays put as results come and go; the field a row of 56px over a rule; then the results, each its
+   place in the page (a path of headings, 12px), its title, and two lines of the text that matches, the match underlined
+   in --accent; the keys at the foot. VitePress loads the dialog's own CSS after this file, so these rules start at
+   `body`, one step more specific than its scoped ones. Full screen under 768px, as VitePress has it. */
+body .VPLocalSearchBox .shell {
+  width: min(640px, 100vw - 32px); max-height: min(76vh, 640px); margin: 12vh auto auto; padding: 0; gap: 0;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, .24); overflow: hidden;
+}
+body .VPLocalSearchBox .search-bar {
+  flex: none; height: 56px; padding: 0 8px 0 16px; gap: 4px; border: 0; border-bottom: 1px solid var(--line);
+  border-radius: 0;
+}
+/* one focus mark (#322): the field draws no ring of its own, and while it has focus the bar's rule is --accent, 2px */
+body .VPLocalSearchBox .search-input:focus-visible { outline: none; }
+body .VPLocalSearchBox .search-bar:focus-within { border-color: var(--line); }
+body .VPLocalSearchBox .search-bar:has(.search-input:focus) { box-shadow: inset 0 -2px 0 var(--accent); }
+body .VPLocalSearchBox .search-icon { margin: 0 4px 0 0; font-size: 16px; color: var(--muted); }
+body .VPLocalSearchBox .search-input { padding: 0 4px; font: 400 16px/24px var(--font-body); color: var(--fg); }
+body .VPLocalSearchBox .search-input::placeholder { color: var(--muted); opacity: 1; }
+body .VPLocalSearchBox .search-actions button { padding: 8px; border-radius: 8px; color: var(--muted); }
+@media (hover: hover) and (pointer: fine) {
+  body .VPLocalSearchBox .search-actions button:not([disabled]):hover { color: var(--fg); background: var(--sunken); }
+}
+body .VPLocalSearchBox .search-actions .local-search-icon { font-size: 16px; }
+body .VPLocalSearchBox .search-actions .toggle-layout-button.detailed-list { color: var(--accent); }
+body .VPLocalSearchBox .results { padding: 8px; gap: 0; scroll-padding-block: 8px; }
+body .VPLocalSearchBox .results:empty { display: none; }
+body .VPLocalSearchBox .result { border: 0; border-radius: 8px; background: var(--vp-local-search-result-bg); line-height: 1; }
+body .VPLocalSearchBox .result > div { margin: 8px 12px; }
+body .VPLocalSearchBox .titles { gap: 0 4px; padding: 0; font: 400 12px/16px var(--font-body); color: var(--muted); }
+body .VPLocalSearchBox .title-icon { display: none; }
+body .VPLocalSearchBox .title { gap: 4px; }
+body .VPLocalSearchBox .title .local-search-icon { font-size: 12px; }
+body .VPLocalSearchBox .title:nth-last-child(2) .local-search-icon { display: none; }  /* the path ends at the title */
+body .VPLocalSearchBox .title.main { flex-basis: 100%; font: 500 14px/20px var(--font-body); color: var(--fg); }
+body .VPLocalSearchBox .titles:has(.title:not(.main)) .title.main { margin-top: 4px; }
+body .VPLocalSearchBox .titles code { font-family: var(--font-mono); font-size: .92em; }
+/* the selected row filled, its text as it was: VitePress turns it --accent */
+body .VPLocalSearchBox .result.selected .titles { color: var(--muted) !important; }
+body .VPLocalSearchBox .result.selected .title.main { color: var(--fg); }
+/* the text under the title: three lines, scrolled by VitePress to put the first match in the middle, so that the
+   match's line shows whole between the two it cuts above and below, which fade out; as plain text in --muted */
+body .VPLocalSearchBox .excerpt-wrapper { margin-top: 4px; }
+body .VPLocalSearchBox .excerpt {
+  opacity: 1; max-height: 60px; margin: 0;
+  mask-image: linear-gradient(transparent, #000 4px, #000 calc(100% - 4px), transparent);
+}
+body .VPLocalSearchBox .excerpt * {
+  font-size: 13px !important; line-height: 20px !important; margin: 0 !important; padding: 0 !important;
+  color: var(--muted); background: none !important; border: 0 !important; max-width: none;
+}
+body .VPLocalSearchBox .excerpt :is(pre, code) { font-family: var(--font-mono); white-space: pre-wrap; }
+body .VPLocalSearchBox .excerpt :is(.copy, .lang, .custom-block-title, .header-anchor, img, svg) { display: none; }
+body .VPLocalSearchBox .excerpt-gradient-top, body .VPLocalSearchBox .excerpt-gradient-bottom { display: none; }
+body .VPLocalSearchBox :is(.titles, .excerpt) mark {
+  padding: 0; border-radius: 0; background: none; color: var(--fg);
+  text-decoration: underline 2px var(--accent); text-underline-offset: 3px; text-decoration-skip-ink: none;
+}
+body .VPLocalSearchBox .no-results { padding: 32px 16px; font-size: 14px; color: var(--muted); }
+body .VPLocalSearchBox .no-results strong { font-weight: 500; color: var(--fg); }
+/* the keys, as small keycaps, over a rule at the foot */
+body .VPLocalSearchBox .search-keyboard-shortcuts {
+  flex: none; gap: 16px; padding: 10px 16px; border-top: 1px solid var(--line); opacity: 1;
+  font: 400 12px/20px var(--font-body); color: var(--muted);
+}
+body .VPLocalSearchBox .search-keyboard-shortcuts span { gap: 4px; }
+body .VPLocalSearchBox .search-keyboard-shortcuts kbd { display: inline-grid; place-items: center; }
+body .VPLocalSearchBox .search-keyboard-shortcuts kbd, .VPNavBar .VPNavBarSearchButton .keys {
+  min-width: 20px; height: 20px; padding: 0 4px;
+  background: var(--sunken); border: 1px solid var(--line); border-radius: 4px; box-shadow: none;
+  font: 500 11px/1 var(--font-mono); color: var(--muted);
+}
+.VPNavBar .VPNavBarSearchButton .keys { border-radius: 10px; }  /* nested in the pill: 16px less its 6px of room */
+body .VPLocalSearchBox .navigate-icon { font-size: 12px; }
+@media (max-width: 767px) {
+  body .VPLocalSearchBox .shell {
+    width: 100vw; height: 100dvh; max-height: none; margin: 0; border: 0; border-radius: 0; box-shadow: none;
+  }
+  body .VPLocalSearchBox .search-bar { padding: 0 8px 0 4px; }
+}
 
 /* the reading column's rhythm, on the 4px grid (art direction § Layout): a section 48px under the text above it
    (h2, above), paragraphs and lists 16px apart, list items 8px, a nested list's 4px; a block (code, table, cast

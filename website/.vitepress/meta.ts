@@ -53,7 +53,7 @@ export function pageHead({ page, pageData, siteConfig, title, description }: Tra
     og('og:image', `${root}social-card.png`),  // public/social-card.svg, rendered by render-images.mjs
     og('og:image:width', '1200'),
     og('og:image:height', '630'),
-    og('og:image:alt', 'pg::cast. Your types, cast from your database.'),
+    og('og:image:alt', 'pgcast. Your types, cast from your database.'),
     og('og:locale', 'en_GB'),
     ['meta', { name: 'twitter:card', content: 'summary_large_image' }],  // its title, text and image: Open Graph's
     ...page === 'index.md' ? [['script', { type: 'application/ld+json' }, JSON.stringify({

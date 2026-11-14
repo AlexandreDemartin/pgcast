@@ -1,4 +1,4 @@
-# `db.conditions`
+# Conditions {#db-conditions}
 
 `db.conditions` holds the tests, comparisons and operators you give as the value of a Whereable's key, each a `sql` fragment with that column on its left. This page lists each one, the SQL it writes and the values it takes.
 {.lede}
@@ -438,7 +438,7 @@ The type does not check a fragment: an `int4` on a `timestamptz` column type-che
 
 At run time, calling the condition does not throw, compiling it does, so `run()` rejects with a plain `Error` before any query.
 
-Zapatos 6.6.1 sent `Default` and `self` as the strings `'Symbol(DEFAULT)'` and `'Symbol(self)'`, and `raw()`, `cols()` and `vals()` as JSON, `'{"value":…}'`: no row on a text column, every row with `ne()` or `isNotIn()`, 22P02 or 22007 on the others. Why a `raw()` value is not SQL: [The security model](/security).
+Zapatos 6.6.1 sent `Default` and `self` as the strings `'Symbol(DEFAULT)'` and `'Symbol(self)'`, and `raw()`, `cols()` and `vals()` as JSON, `'{"value":…}'`: no row on a text column, every row with `ne()` or `isNotIn()`, 22P02 or 22007 on the others. Why a `raw()` value is not SQL: [Security](/security).
 
 | Message | When |
 |---|---|
@@ -451,4 +451,4 @@ Zapatos 6.6.1 sent `Default` and `self` as the strings `'Symbol(DEFAULT)'` and `
 | `The 'self' column alias has no meaning here`<!-- message --> | a condition where `self` has no column: in a `sql` template outside a Whereable, in `upsert()`'s `updateValues` |
 | `The 'parent' table alias has no meaning here`<!-- message --> | `parent()` in a condition outside a `lateral` subquery |
 
-A comparison with SQL is a `sql` fragment value, `` { title: db.sql`${db.self} = ${db.raw("'x'")}` } ``: [Write raw SQL safely](/raw-sql).
+A comparison with SQL is a `sql` fragment value, `` { title: db.sql`${db.self} = ${db.raw("'x'")}` } ``: [Raw SQL](/raw-sql).

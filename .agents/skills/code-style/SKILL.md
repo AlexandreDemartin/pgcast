@@ -5,13 +5,13 @@ description: 'Code style of pgcast, in the patterns of Zapatos: code in src/, JS
 
 # Code style
 
-A change to pgcast reads like the rest of Zapatos: same patterns, same vocabulary, same visible SQL. Sources: Zapatos's docs (`docs/index.html`) and history (`git log upstream/master`). What pgcast refuses whatever the gain: `AGENTS.md` § What pgcast does not do.
+A change to pgcast reads like the rest of Zapatos: same patterns, same vocabulary, same visible SQL. Sources: [Zapatos's docs](https://jawj.github.io/zapatos/) and history (`git log upstream/master`). What pgcast refuses whatever the gain: `AGENTS.md` § What pgcast does not do.
 
 ## Zapatos's criteria
 
 - "No abstractions, no distractions: just your database, with type safety."
 - Shortcuts "with no fuss and no surprises, fully and automatically typed".
-- Its contribution criteria (`docs/index.html` § Fixes, feature and contributions):
+- Its contribution criteria ([Zapatos's docs](https://jawj.github.io/zapatos/) § Fixes, feature and contributions):
   - **"Correct, consistent, comprehensible"**: fix, harmonise, make readable;
   - **"Small is beautiful"**: no complexity for a niche case nor for a performance gain drowned in network latency.
 
@@ -82,7 +82,7 @@ A new example in the docs, the README, a JSDoc, an issue or a PR uses pgcast's o
 
 ## Further than Zapatos
 
-- Its roadmap first (`docs/index.html` § What's next): a real test suite, including on inferred types, then laterals typed by foreign keys.
+- Its roadmap first ([Zapatos's docs](https://jawj.github.io/zapatos/) § What's next): a real test suite, including on inferred types, then laterals typed by foreign keys.
 - Its written limits (§ lateral, Limitations) are lifted first: joins are not checked ("REFERENCES relationships are not exploited"); `selectExactlyOne` is written by hand when the FK is `NOT NULL`, though it "might be inferred for us".
 - What it did not have: tests, checked types, CI. They come without changing how it feels to use.
 - A new API must be able to pass for Zapatos's: same vocabulary, same shape, same visible SQL.

@@ -3,13 +3,14 @@ layout: home
 markdownStyles: false
 title: pgcast
 titleTemplate: Zero-abstraction Postgres for TypeScript
-description: "pgcast reads your Postgres schema and writes the TypeScript types. Readable, predictable SQL: no ORM, no models, no hidden state. A maintained fork of Zapatos."
+description: "pgcast reads your Postgres schema and writes the TypeScript types. Readable, predictable SQL: no ORM, no models, no hidden state."
 ---
 
-<div class="landing">
+<main class="landing">
 <section class="hero">
 
-<p class="eyebrow">-- a maintained fork of Zapatos 6.6.1</p>
+<p class="eyebrow">-- a maintained fork of <a href="/switching">Zapatos 6.6.1</a></p>
+
 <h1>Your types, cast from your database<span class="op">::</span></h1>
 
 pgcast reads your Postgres schema and writes the TypeScript types. Its shortcuts produce SQL you can read and predict, and you can always drop down to a plain `sql` template. No ORM, no models, no hidden state.
@@ -17,18 +18,18 @@ pgcast reads your Postgres schema and writes the TypeScript types. Its shortcuts
 
 <div class="ctas">
 
-[Get started](/install){.btn .primary} [Switching from Zapatos](/switching){.btn}
+[Get started](/install){.btn .primary} [Playground](/playground){.btn}
 
 </div>
 
-<InstallLine command="npm install zapatos@npm:@pgcast/pgcast" />
+<InstallLine :commands="['npm install zapatos@npm:@pgcast/pgcast', 'pnpm add zapatos@npm:@pgcast/pgcast', 'yarn add zapatos@npm:@pgcast/pgcast@^6', 'bun add zapatos@npm:@pgcast/pgcast@^6']" />
 </section>
 
 <CastPanel example="home">
 
 <<< ./examples/home.ts{ts twoslash}
 
-<template #caption><span>Hover a dashed name to see its type.</span><span>Films with their cast, in one query and one round trip.</span></template>
+<template #caption><span>Films with their cast, in one query and one round trip.</span><span>Hover a dashed name to see its type.</span></template>
 </CastPanel>
 
 <div class="pillars">
@@ -38,12 +39,16 @@ pgcast reads your Postgres schema and writes the TypeScript types. Its shortcuts
 
 Types come from `pg_catalog`, never written by hand. Change a column, regenerate, and the compiler finds every query that broke.
 
+[How the catalog becomes types](/catalog-types){.next}
+
 </div>
 <div>
 
 ## SQL you can read
 
 Each shortcut writes one documented query. Log it, test it, or write it yourself in a `sql` template.
+
+[The SQL of each shortcut](/reference){.next}
 
 </div>
 <div>
@@ -52,12 +57,16 @@ Each shortcut writes one documented query. Log it, test it, or write it yourself
 
 Values travel as `$1`, `$2`. Names are quoted as Postgres quotes them, so a stray `"` cannot change your query.
 
+[What pgcast guards against](/security){.next}
+
 </div>
 <div>
 
-## Drop-in for Zapatos
+## Live playground
 
-Same module names, same SQL, same types. Safer behaviours wait behind opt-ins until 7.0.
+Write a query and see its SQL and its type as you type. Press Run, and a real Postgres answers, in your browser.
+
+[Open the playground](/playground){.next}
 
 </div>
 </div>
@@ -72,4 +81,4 @@ Same module names, same SQL, same types. Safer behaviours wait behind opt-ins un
 </div>
 
 <SiteFooter />
-</div>
+</main>

@@ -1,4 +1,4 @@
-# Paginate a list
+# Pagination
 
 The task, and when you need it, in one sentence. The reader already knows the basics of the [tutorial](/tutorial).
 {.lede}
