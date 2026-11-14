@@ -1,5 +1,5 @@
 ---
-english: 83b0dc048cd6
+english: 92339e928cd6
 ---
 
 # Types personnalisés
@@ -206,14 +206,17 @@ Custom type or domain declaration file already exists: src/zapatos/custom/PgSeat
 
 ## Quand un placeholder ne compile pas {#when-a-placeholder-does-not-compile}
 
-Le placeholder d’un domaine contient le nom TypeScript de son type de base, et n’importe `zapatos/db` que pour `db.JSONValue`. Certains ne compilent donc pas tant que vous n’ajoutez pas l’import, comme dans Zapatos 6.6.1 ([#184](https://github.com/AlexandreDemartin/pgcast/issues/184)) :
+Le placeholder d’un domaine contient le nom TypeScript de son type de base, et importe ce dont ce nom a besoin : `zapatos/db` pour un type `db.*`, `zapatos/schema` pour un enum. Zapatos 6.6.1 et pgcast jusqu’à la 6.6.2 n’importaient `zapatos/db` que pour `db.JSONValue`, et le générateur ne réécrit jamais un placeholder. Si l’un de ces placeholders ne compile pas, ajoutez l’import, ou supprimez le fichier et relancez la génération ([#184](https://github.com/AlexandreDemartin/pgcast/issues/184)) :
 
 | Type du placeholder | `tsc` dit | Ajoutez, dans `declare module` |
 |---|---|---|
 | `db.Int8String`, pour un domaine sur `bigint` ; de même pour `numeric`, `time` et les types range | TS2503, `Cannot find namespace 'db'.` | `import type * as db from 'zapatos/db';` |
 | `crew_job`, pour `CREATE DOMAIN lead_job AS crew_job`, sur un enum | TS2304, `Cannot find name 'crew_job'.` | `import type { crew_job } from 'zapatos/schema';` |
 
-Pour `CREATE DOMAIN ticket_no AS bigint`, le placeholder contient `db.Int8String`, la chaîne que `pg` renvoie pour un `bigint`. Mais les raccourcis renvoient un `bigint` sous forme de nombre JSON : un `ticket_no` que renvoie [`select()`](/fr/select#select) est un `number` typé `db.Int8String`, donc `.padStart()` compile, puis lève une erreur ; et une ligne pour [`insert()`](/fr/insert#insert), typée `Insertable`, refuse `1` (TS2322). Avec l’import, typez-le comme les deux à la fois :
+- Un enum hors de [`unprefixedSchema`](/fr/generator#generate.unprefixedSchema) est dans l’espace de noms de son schéma : le placeholder importe cet espace de noms, `import type { archive } from 'zapatos/schema';`, et contient `archive.format`.
+- Un enum dont le nom contient une majuscule ou est l’un des types propres à TypeScript (`"Date"`, `string`) ne reçoit toujours aucun import, comme dans Zapatos 6.6.1 : ce nom peut être celui d’un type global, qui compile.
+
+Pour `CREATE DOMAIN ticket_no AS bigint`, le placeholder contient `db.Int8String`, la chaîne que `pg` renvoie pour un `bigint`. Mais les raccourcis renvoient un `bigint` sous forme de nombre JSON : un `ticket_no` que renvoie [`select()`](/fr/select#select) est un `number` typé `db.Int8String`, donc `.padStart()` compile, puis lève une erreur ; et une ligne pour [`insert()`](/fr/insert#insert), typée `Insertable`, refuse `1` (TS2322). Typez-le comme les deux à la fois :
 
 ::: code-group
 

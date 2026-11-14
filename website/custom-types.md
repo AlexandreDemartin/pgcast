@@ -202,14 +202,17 @@ Custom type or domain declaration file already exists: src/zapatos/custom/PgSeat
 
 ## When a placeholder does not compile
 
-A domain's placeholder holds its base type's TypeScript name, and imports `zapatos/db` only for `db.JSONValue`. Some placeholders then fail to compile until you add the import, as in Zapatos 6.6.1 ([#184](https://github.com/AlexandreDemartin/pgcast/issues/184)):
+A domain's placeholder holds its base type's TypeScript name, and imports what that name needs: `zapatos/db` for a `db.*` type, `zapatos/schema` for an enum. Zapatos 6.6.1 and pgcast up to 6.6.2 imported `zapatos/db` for `db.JSONValue` alone, and the generator never rewrites a placeholder. If one of theirs fails to compile, add the import, or delete the file and generate again ([#184](https://github.com/AlexandreDemartin/pgcast/issues/184)):
 
 | Placeholder type | `tsc` says | Add, inside `declare module` |
 |---|---|---|
 | `db.Int8String`, for a domain over `bigint`; `numeric`, `time` and the ranges alike | TS2503, `Cannot find namespace 'db'.` | `import type * as db from 'zapatos/db';` |
 | `crew_job`, for `CREATE DOMAIN lead_job AS crew_job`, over an enum | TS2304, `Cannot find name 'crew_job'.` | `import type { crew_job } from 'zapatos/schema';` |
 
-For `CREATE DOMAIN ticket_no AS bigint`, the placeholder holds `db.Int8String`, the string `pg` returns for a `bigint`. But the shortcuts return a `bigint` as a JSON number: a `ticket_no` that [`select()`](/select#select) returns is a `number` typed `db.Int8String`, so `.padStart()` compiles, then throws; and a row for [`insert()`](/insert#insert), typed `Insertable`, refuses `1` (TS2322). With the import, type it as both:
+- An enum outside [`unprefixedSchema`](/generator#generate.unprefixedSchema) is in its schema's namespace: the placeholder imports that, `import type { archive } from 'zapatos/schema';`, and holds `archive.format`.
+- An enum whose name has a capital letter or is one of TypeScript's own types (`"Date"`, `string`) still gets no import, as in Zapatos 6.6.1: that name may be a global type, which compiles.
+
+For `CREATE DOMAIN ticket_no AS bigint`, the placeholder holds `db.Int8String`, the string `pg` returns for a `bigint`. But the shortcuts return a `bigint` as a JSON number: a `ticket_no` that [`select()`](/select#select) returns is a `number` typed `db.Int8String`, so `.padStart()` compiles, then throws; and a row for [`insert()`](/insert#insert), typed `Insertable`, refuses `1` (TS2322). Type it as both:
 
 ::: code-group
 
