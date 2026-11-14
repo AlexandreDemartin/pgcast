@@ -1,0 +1,11 @@
+{
+  // Type tests of an option declared in ConfigTypes (`npm run test:types`, with tsc): a program of its
+  // own, since the declaration merges into every file of a program, and test/types holds the types
+  // of Zapatos 6.6.1, with nothing declared. Otherwise as ../types/tsconfig.json.
+  "extends": "../generated/tsconfig.json",
+  "include": ["../generated/zapatos/**/*", "./**/*"],
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "bundler"
+  }
+}

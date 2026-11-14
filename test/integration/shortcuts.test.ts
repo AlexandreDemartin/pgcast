@@ -5,7 +5,7 @@
 // Identity and serial values are never hard-coded: they are read back.
 
 import * as pg from 'pg';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as db from '../../src/db';
 import { sql, param, raw, cols, vals, parent, Default, all } from '../../src/db';
 import { useTestDatabase } from '../helpers/db';
@@ -786,8 +786,8 @@ describe('count, sum, avg, min, max', () => {
     expect(sent).toEqual([]);
   });
 
-  it('characterization: on an empty set, sum / avg / min / max return 0, not null', async () => {
-    // characterization: Number(null) === 0
+  it('on an empty set, sum / avg / min / max return 0, not null, without aggregatesTypedByColumn', async () => {
+    // deprecated (PGCAST_DEP004): Number(null) === 0
     const none = { id: -1 };
     expect(await run(db.sum('accounts', none, { columns: ['balance'] }))).toBe(0);
     expect(await run(db.avg('accounts', none, { columns: ['balance'] }))).toBe(0);
@@ -800,10 +800,58 @@ describe('count, sum, avg, min, max', () => {
     expect(await run(db.sum('accounts', { id: 1 }, { columns: ['lifetime_ops'] }))).toBe(9007199254740992);
   });
 
-  it('characterization: min / max of a date is a timestamp in ms, of a text NaN', async () => {
-    // characterization: pg parses the date as local midnight, then Number() gives its epoch ms
+  it('min / max of a date is a timestamp in ms, of a text NaN, without aggregatesTypedByColumn', async () => {
+    // deprecated (PGCAST_DEP004): pg parses the date as local midnight, then Number() gives its epoch ms
     expect(await run(db.min('events', all, { columns: ['occurred_on'] }))).toBe(new Date(2025, 5, 1).getTime());
     expect(await run(db.max('users', all, { columns: ['display_name'] }))).toBeNaN();
+  });
+
+  it('with aggregatesTypedByColumn, sum / avg / min / max return null on an empty set; count stays 0', async () => {
+    db.setConfig({ aggregatesTypedByColumn: true });
+    const none = { id: -1 };
+    expect(await run(db.sum('accounts', none, { columns: ['balance'] }))).toBeNull();
+    expect(await run(db.avg('accounts', none, { columns: ['balance'] }))).toBeNull();
+    expect(await run(db.max('accounts', none, { columns: ['balance'] }))).toBeNull();
+    expect(await run(db.min('events', { kind: 'none' }, { columns: ['occurred_on'] }))).toBeNull();
+    expect(await run(db.count('accounts', none))).toBe(0);
+    // a set with rows: sum and avg still go through Number()
+    expect(await run(db.sum('accounts', all, { columns: ['balance'] }))).toBe(1520.5);
+    expect(await run(db.avg('accounts', all, { columns: ['ratio'] }))).toBe(0.875);
+  });
+
+  it('with aggregatesTypedByColumn, min / max give the value as pg parses it: a Date, a text, an int8 or numeric as a string', async () => {
+    db.setConfig({ aggregatesTypedByColumn: true });
+    expect(await run(db.min('events', all, { columns: ['occurred_on'] }))).toEqual(new Date(2025, 5, 1));
+    expect(await run(db.max('users', all, { columns: ['display_name'] }))).toBe('Cyd');
+    expect(await run(db.max('accounts', all, { columns: ['lifetime_ops'] }))).toBe('9007199254740993');
+    expect(await run(db.min('accounts', all, { columns: ['balance'] }))).toBe('0.00');
+    expect(await run(db.max('accounts', all, { columns: ['ratio'] }))).toBe(1.25);
+  });
+
+  it('nested in a lateral, min / max come back as JSON, NULL as null, option or not', async () => {
+    const q = db.select('users', all, {
+      columns: ['display_name'], order: { by: 'display_name', direction: 'ASC' },
+      lateral: {
+        first: db.min('events', all, { columns: ['occurred_on'] }),
+        top: db.max('accounts', { owner_id: parent('id') }, { columns: ['balance'] }),
+      },
+    });
+    const expected = [
+      { display_name: 'Ada', first: '2025-06-01', top: 1500.5 },
+      { display_name: 'Bob', first: '2025-06-01', top: 0 },
+      { display_name: 'Cyd', first: '2025-06-01', top: null },
+    ];
+    expect(await run(q)).toEqual(expected);
+    db.setConfig({ aggregatesTypedByColumn: true });
+    expect(await run(q)).toEqual(expected);
+  });
+
+  it('with aggregatesTypedByColumn, a query that returns no row still rejects with the TypeError of 6.6.1', async () => {
+    // #163: a groupBy with no group gives no row, which `.run()` reads as rows[0].result
+    db.setConfig({ aggregatesTypedByColumn: true });
+    const noGroup = db.max('accounts', { id: -1 }, { columns: ['balance'], groupBy: 'owner_id' });
+    await expect(run(noGroup)).rejects.toThrow(TypeError);
+    await expect(run(noGroup)).rejects.toThrow("Cannot read properties of undefined (reading 'result')");
   });
 
   it('a passthru lateral rejects run() before any query is sent, nested too; a lateral map runs', async () => {
@@ -820,5 +868,64 @@ describe('count, sum, avg, min, max', () => {
     expect(sent).toEqual([]);
     // the map is joined, its results not read
     expect(await run(db.count('users', all, { lateral: { n } }))).toBe(3);
+  });
+});
+
+describe('sum, avg, min, max without aggregatesTypedByColumn (deprecated, PGCAST_DEP004)', () => {
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  /** A fresh module, so that warnOnce has not warned yet, and a spy on process.emitWarning. */
+  const fresh = async () => {
+    vi.restoreAllMocks();
+    vi.resetModules();
+    const emitWarning = vi.spyOn(process, 'emitWarning').mockImplementation(() => { });
+    return { fdb: await import('../../src/db'), emitWarning };
+  };
+
+  it('warns once per process, at run(), naming the option, when Number() changes the result', async () => {
+    const { fdb, emitWarning } = await fresh();
+    const q = fdb.max('users', fdb.all, { columns: ['display_name'] });
+    expect(emitWarning).not.toHaveBeenCalled();
+    expect(await q.run(t.client)).toBeNaN();
+    expect(await fdb.sum('accounts', { id: -1 }, { columns: ['balance'] }).run(t.client)).toBe(0);
+    expect(emitWarning).toHaveBeenCalledTimes(1);
+    const [message, options] = emitWarning.mock.calls[0];
+    expect(options).toEqual({ type: 'DeprecationWarning', code: 'PGCAST_DEP004' });
+    expect(message).toMatch(/aggregatesTypedByColumn: true/);
+    expect(message).toMatch(/default in pgcast 7\.0/);
+  });
+
+  it('warns for a NULL turned into 0, and for a min / max that is not a number: a date, an int8 or numeric string', async () => {
+    const cases = [
+      (fdb: typeof db) => fdb.avg('accounts', { id: -1 }, { columns: ['ratio'] }),
+      (fdb: typeof db) => fdb.min('events', fdb.all, { columns: ['occurred_on'] }),
+      (fdb: typeof db) => fdb.max('accounts', fdb.all, { columns: ['lifetime_ops'] }),
+      (fdb: typeof db) => fdb.min('accounts', fdb.all, { columns: ['balance'] }),
+    ];
+    for (const query of cases) {
+      const { fdb, emitWarning } = await fresh();
+      await query(fdb).run(t.client);
+      expect(emitWarning.mock.calls.map(c => c[1])).toEqual([{ type: 'DeprecationWarning', code: 'PGCAST_DEP004' }]);
+    }
+  });
+
+  it('does not warn when the result is the same: a sum or avg of rows, a max of a float8, any count; nor with the option', async () => {
+    const { fdb, emitWarning } = await fresh();
+    expect(await fdb.sum('accounts', fdb.all, { columns: ['balance'] }).run(t.client)).toBe(1520.5);
+    expect(await fdb.avg('accounts', fdb.all, { columns: ['ratio'] }).run(t.client)).toBe(0.875);
+    expect(await fdb.max('accounts', fdb.all, { columns: ['ratio'] }).run(t.client)).toBe(1.25);
+    expect(await fdb.count('accounts', { id: -1 }).run(t.client)).toBe(0);
+    expect(await fdb.count('accounts', fdb.all, { columns: ['ratio'] }).run(t.client)).toBe(2);
+    fdb.setConfig({ aggregatesTypedByColumn: true });
+    expect(await fdb.max('users', fdb.all, { columns: ['display_name'] }).run(t.client)).toBe('Cyd');
+    expect(await fdb.sum('accounts', { id: -1 }, { columns: ['balance'] }).run(t.client)).toBeNull();
+    expect(emitWarning).not.toHaveBeenCalled();
+  });
+
+  it('reads an undefined aggregatesTypedByColumn as its default (false): Number(), and a warning', async () => {
+    const { fdb, emitWarning } = await fresh();
+    fdb.setConfig({ aggregatesTypedByColumn: undefined } as db.NewConfig);
+    expect(await fdb.sum('accounts', { id: -1 }, { columns: ['balance'] }).run(t.client)).toBe(0);
+    expect(emitWarning).toHaveBeenCalledTimes(1);
   });
 });

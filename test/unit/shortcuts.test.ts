@@ -1328,6 +1328,20 @@ describe('count, sum, avg, min, max', () => {
     expect(() => db.sum('accounts', all, { order: { by: 'id', direction: 'UP' } })).toThrow("Direction must be ASC/DESC, not 'UP'");
   });
 
+  it('aggregatesTypedByColumn changes no SQL, nor a refusal', () => {
+    const compiled = () => [
+      db.sum('accounts', { owner_id: 1 }, { columns: ['balance'] }),
+      db.avg('accounts', all, { columns: ['ratio'], alias: 'a' }),
+      db.min('events', all, { columns: ['occurred_on'] }),
+      db.max('users', all, { columns: ['display_name'], groupBy: 'mood' }),
+      db.count('users', { id: 1 }),
+    ].map(q => q.compile());
+    const off = compiled();
+    db.setConfig({ aggregatesTypedByColumn: true });
+    expect(compiled()).toEqual(off);
+    expect(() => db.max('accounts', all).compile()).toThrow("max() needs one column to aggregate: pass columns: ['column']");
+  });
+
   it('select() in SelectResultMode.Numeric still takes several columns, for an aggregate of several arguments', () => {
     expect(db.select('accounts', all, { columns: ['ratio', 'balance'] }, db.SelectResultMode.Numeric, 'corr').compile().text)
       .toMatchInlineSnapshot(`"SELECT corr("ratio", "balance") AS result FROM "accounts""`);

@@ -158,6 +158,16 @@ describe('selectOne, selectExactlyOne, count', () => {
     expectTypeOf(db.avg('accounts', db.all, { columns: undefined })).toEqualTypeOf<db.SQLFragment<number>>();
     expectTypeOf(db.min).toEqualTypeOf<db.NumericAggregateSignatures>();
   });
+
+  test('without aggregatesTypedByColumn declared in ConfigTypes, min and max are a number, as in 6.6.1, nested too', () => {
+    expectTypeOf<db.ConfigTypes>().toEqualTypeOf<{}>();
+    expectTypeOf(db.min('events', db.all, { columns: ['occurred_on'] }).run(pool)).resolves.toEqualTypeOf<number>();
+    expectTypeOf(db.max('users', db.all, { columns: ['display_name'] })).toEqualTypeOf<db.SQLFragment<number>>();
+    expectTypeOf(db.sum).toEqualTypeOf<db.NumericAggregateSignatures>();
+    expectTypeOf(db.max).toEqualTypeOf<db.NumericAggregateSignatures>();
+    const q = db.selectOne('users', db.all, { lateral: { first: db.min('events', db.all, { columns: ['occurred_on'] }) } });
+    expectTypeOf<NonNullable<Run<typeof q>>['first']>().toEqualTypeOf<number>();
+  });
 });
 
 describe('insert', () => {
