@@ -16,13 +16,37 @@
   margin: -6px 0 -6px auto; padding: 5px 14px 5px 11px; border-radius: 9px;
   font: 600 12px/1 var(--font-body); color: var(--accent-fg); background: var(--accent);
 }
-.Playground .Playground-run:hover { background: var(--accent-hover); }
+/* while it runs, its play icon turns to a ring that spins, 14px; with reduced motion, a ring that fades in and out */
+.Playground .Playground-run .spinner {
+  width: 14px; height: 14px; flex: none; box-sizing: border-box;
+  border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%;
+  animation: playground-spin 600ms linear infinite;
+}
+@keyframes playground-spin { to { transform: rotate(1turn); } }
+@keyframes playground-pulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) {
+  .Playground .Playground-run .spinner { border-right-color: currentColor; animation: playground-pulse 1.2s ease-in-out infinite; }
+}
+/* VitePress cuts every animation to 1ms with `!important` in its layer, where an `!important` beats any outside it: the
+   pulse joins that layer to win (style.css § reduced motion) */
+@layer __vitepress_base { @media (prefers-reduced-motion: reduce) {
+  .Playground .Playground-run .spinner {
+    animation-duration: 1.2s !important; animation-delay: 0s !important; animation-iteration-count: infinite !important;
+  }
+} }
 /* Share, beside Run: quiet, as a page's actions (style.css § PageActions) */
 .Playground .Playground-share {
   margin: -6px 0; padding: 4px 12px 4px 10px; border: 1px solid var(--line); border-radius: 9px;
   font: 500 12px/1 var(--font-body); color: var(--muted); background: var(--surface);
 }
-.Playground .Playground-share:hover { background: var(--sunken); color: var(--fg); }
+@media (hover: hover) and (pointer: fine) {
+  .Playground .Playground-run:hover { background: var(--accent-hover); }
+  .Playground .Playground-share:hover { background: var(--sunken); color: var(--fg); }
+}
+/* what Postgres answers, at most 70% of the screen tall, scrolled inside, without scrolling the page at its ends; its
+   label, with Run and Share, stays at its top */
+.Playground > div:nth-child(2) { max-height: 70vh; overflow: auto; overscroll-behavior: contain; }
+.Playground > div:nth-child(2) > .label { position: sticky; top: 0; z-index: 1; background: var(--surface); }
 .Playground .values { overflow-wrap: anywhere; }  /* an error's message, a long value */
 /* two classes, over `.vp-doc p`'s margin and 68ch; the first, right under the label, without a second line */
 .Playground .Playground-note {

@@ -144,7 +144,7 @@ onUnmounted(() => {
   <div v-if="written" ref="root" class="PageActions" :class="place">
     <div class="split">
       <button type="button" class="copy" @click="copy">
-        <Icon :name="status === 'Copied' ? 'check' : 'copy'" />
+        <span class="IconSwap" :class="{ done: status === 'Copied' }"><Icon name="copy" /><Icon name="check" /></span>
         <span class="label">Copy page</span>
       </button>
       <button

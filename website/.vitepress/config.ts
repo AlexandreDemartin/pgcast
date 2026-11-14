@@ -121,8 +121,11 @@ export default defineConfig({
     search: {
       provider: 'local',
       options: {
-        // each result with two lines of its text, the match underlined (style.css); the list button still hides them
+        // each result with three lines of its text, the match underlined (style.css); the list button still hides them
         detailedView: true,
+        // every word of the query, each allowed one typo in ten letters (`trasaction`): MiniSearch's default, any word
+        // and two typos in ten, filled the results with noise
+        miniSearch: { searchOptions: { combineWith: 'AND', fuzzy: 0.1 } },
         translations: { button: { buttonText: 'Search', buttonAriaLabel: 'Search the docs' } },
       },
     },

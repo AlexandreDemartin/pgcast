@@ -2,9 +2,10 @@
 // Copyright (C) 2026 Alexandre Demartin
 // VitePress's layout, plus the wordmark and the version pill by it, a written page's actions (beside its title, or
 // under "On this page" where that rail shows: PageActions.vue), the footer under every page and the 404 page; and, on
-// each page, its code groups of package managers on the reader's pick (packageManager.ts).
-import { onMounted, onUnmounted } from 'vue';
-import { onContentUpdated } from 'vitepress';
+// each page, its code groups of package managers on the reader's pick (packageManager.ts). The browser's bar takes the
+// top bar's colour of the theme shown, the reader's pick included: the `theme-color` of config.ts follow the system's.
+import { onMounted, onUnmounted, watch } from 'vue';
+import { onContentUpdated, useData } from 'vitepress';
 import DefaultTheme from 'vitepress/theme-without-fonts';
 import NotFound from './NotFound.vue';
 import PageActions from './PageActions.vue';
@@ -12,10 +13,17 @@ import SiteFooter from './SiteFooter.vue';
 import Wordmark from './Wordmark.vue';
 import { rememberPicked, showRemembered } from './packageManager.ts';
 
-const version = __PGCAST_VERSION__;  // the root package.json's (config.ts)
+const
+  version = __PGCAST_VERSION__,  // the root package.json's (config.ts)
+  { isDark } = useData();
 
 onContentUpdated(showRemembered);
-onMounted(() => window.addEventListener('change', rememberPicked));
+onMounted(() => {
+  window.addEventListener('change', rememberPicked);
+  watch(isDark, dark => {
+    for (const meta of document.querySelectorAll('meta[name="theme-color"]')) meta.setAttribute('content', dark ? '#121a21' : '#ffffff');
+  }, { immediate: true });
+});
 onUnmounted(() => window.removeEventListener('change', rememberPicked));
 </script>
 

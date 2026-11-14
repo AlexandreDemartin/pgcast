@@ -37,6 +37,7 @@ const
   queries = shallowRef<(Omit<Query, 'sql'> & { html: string })[]>([{ html: start.sql, values: start.values }]),
   notes = shallowRef<string[]>([]),
   notice = shallowRef<string>(),  // about a link, until the next run
+  busy = shallowRef(false),  // a run on Postgres, until it answers
   linkNotices = {
     opened: 'This code comes from a link: it runs only when you press Run, or once you edit it.',
     broken: `This link's code could not be read (damaged, or over ${shareLimit / 1000} KB), so here is the tutorial's first query.`,
@@ -167,6 +168,7 @@ async function update(code: string, types: monaco.editor.ITextModel, postgres = 
     hover = async (at: monaco.Uri, offset: number) => hoverType((await client.getQuickInfoAtPosition(at.toString(), offset))
       ?.displayParts?.map((part: { text: string }) => part.text).join('') ?? '');
 
+  busy.value = postgres;  // a new update stops the run before it
   if (postgres) notes.value = [startedBefore() ? 'Running on Postgres…' :
     'Starting Postgres in this page: about 5 MB to download, the first time…'];
   if (name) types.setValue(code + shown(name));
@@ -183,12 +185,17 @@ async function update(code: string, types: monaco.editor.ITextModel, postgres = 
 
   const result = await run(emitted.outputFiles[0]?.text ?? '', postgres);
   if (version !== latest || !result) return;
+  busy.value = false;
   queries.value = result.queries.map(({ sql, rows, ...query }) =>
     ({ ...query, html: sqlHtml(sql), rows: rows && jsonHtml(rows) }));
+  // an error that is the last query's rejection, which the code does not catch: shown once, under its query
+  const rejected = result.queries.at(-1)?.rejects?.message;
   notes.value = [
-    ...result.error === undefined ? [] : [result.queries.length && !postgres ?
-      `No rows come back as you type, so the code stopped after its query (Run gives it Postgres): ${result.error}` :
-      result.error],
+    ...result.error === undefined ? [] : [
+      rejected && result.error.endsWith(rejected) ? 'The code stopped here: it does not catch this error.' :
+      result.queries.length && !postgres ?
+        `No rows come back as you type, so the code stopped after its query (Run gives it Postgres): ${result.error}` :
+        result.error],
     ...result.queries.length || result.error !== undefined ? [] : ['This code sends no query.'],
     ...result.warnings,
   ];
@@ -233,7 +240,7 @@ onMounted(async () => {
     refresh = (postgres = false, runs = true) => {
       clearTimeout(timer);  // an edit not yet updated is part of this run
       notice.value = undefined;
-      update(model.getValue(), types, postgres, runs).catch(error => { notes.value = [String(error)]; });
+      update(model.getValue(), types, postgres, runs).catch(error => { busy.value = false; notes.value = [String(error)]; });
     },
     // a link's code, its type alone until Run; or, if it cannot be read, the tutorial's first query, run as ever
     open = (code: string | null) => {
@@ -299,7 +306,9 @@ onBeforeUnmount(() => { stop(); latest++; disposables.forEach(disposable => disp
       <div aria-live="polite">
         <p class="label">
           <em>SQL</em>Postgres runs
-          <button type="button" class="Playground-run" @click="runOnPostgres()"><Icon name="play" />Run</button>
+          <button type="button" class="Playground-run" :aria-busy="busy" @click="runOnPostgres()">
+            <span v-if="busy" class="spinner" aria-hidden="true" /><Icon v-else name="play" />Run
+          </button>
           <button type="button" class="Playground-share" @click="share()"><Icon name="link" />Share</button>
         </p>
         <template v-for="(query, i) in queries" :key="i">
