@@ -218,6 +218,7 @@ Its SQL is [`select()`](/select#select)'s, with the name quoted part by part: `t
 - An array of a domain or of such a type is a custom type of its own.
 - The names are not qualified by schema: the `c` namespace is flat across schemas, so a domain `notes` in `public` and one in `archive` are both `PgNotes`, with one placeholder for the two.
   - The generator says so through [`warningListener`](#generate.warningListener), as for two names that one transform makes one (`seat-label` and `seat_label`), and keeps the name, which an edited placeholder depends on.
+- Names that differ only in case, such as `PgSeat_label` and `PgSEAT_LABEL` for domains `seat_label` and `"SEAT_LABEL"`, have two placeholders that are one file on a case-insensitive file system, the default on macOS and Windows: the one written first declares only its own name, and the others are never declared. The generator says so too, wherever it runs, and writes the same files.
 
 ### `schemaJSDoc` {#generate.schemaJSDoc}
 
@@ -348,6 +349,8 @@ Writing custom types file: src/zapatos/custom/index.d.ts
 - `Writing new custom type or domain placeholder file: src/zapatos/custom/PgPoint.d.ts`, once per new placeholder;
 - `Note: custom types "archive"."notes" and "public"."notes" are both named PgNotes in TypeScript, so they share one type and one placeholder file, src/zapatos/custom/PgNotes.d.ts. To type them apart, rename one of them in the database.`
   - once per run for each name that two Postgres types share ([`customTypesTransform`](#generate.customTypesTransform)); when their names differ, it adds that a `customTypesTransform` function can keep them apart;
+- `Note: custom types "public"."SEAT_LABEL" (PgSEAT_LABEL) and "public"."seat_label" (PgSeat_label) have TypeScript names that differ only in case: on a case-insensitive file system, the default on macOS and Windows, PgSEAT_LABEL.d.ts and PgSeat_label.d.ts are one placeholder file in src/zapatos/custom, which declares only one of those names. To type them apart, rename one of them in the database, or give customTypesTransform a function that keeps their names apart.`
+  - once per run for names that differ only in case, whatever the file system, in place of the note above for any of them;
 - `Note: the include entry "Films" of schema "public" matches no relation there, so it generates nothing. Check its spelling and case, that the relation is in schema "public", and that the database role has a privilege on it: include names tables, views, materialised views and foreign tables.`
   - once per run for each entry of an [`include`](#generate.schemas) list that its schema doesn't have;
 - `Note: the schemas rule of "public" has no exclude, so it takes "exclude": [], as the default rule does. Write the key in the rule to silence this note.`
