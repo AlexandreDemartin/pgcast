@@ -117,7 +117,7 @@ export const definitionForRelationInSchema = async (
   customTypeOrigins: CustomTypeOrigins = Object.create(null),  // an 'out' parameter too
   enumsForSchema = async (schema: string) => (await enumOrdersForSchema(schema, queryFn))[enumOrderOf(config)],
   columnsTypedByEnumName: string[] = [],  // an 'out' parameter too: what typeEnumsAcrossSchemas would change
-  customTypeImports: Record<string, string> = Object.create(null),  // an 'out' parameter too: what a placeholder imports from zapatos/schema
+  customTypeImports: Record<string, string> = Object.create(null),  // an 'out' parameter too: what a placeholder imports from zapatos/schema, '' for nothing
 ) => {
   const
     rows = await columnsForRelation(rel, schemaName, queryFn),
@@ -183,12 +183,14 @@ export const definitionForRelationInSchema = async (
         enumName = selectableType.replace(/\[\]$/, ''),
         importsEnum = !inlineEnums && enumName === enumName.toLowerCase() && !tsOwnTypes.has(enumName) &&
           Object.keys(typeEnums).some(name => tsIdentifier(name, 'type') === enumName),
-        namespace = tsIdentifier(schemaName, 'namespace');
+        namespace = tsIdentifier(schemaName, 'namespace'),
+        imported = importsEnum ? (schemaPrefix ? namespace : enumName) : '',
+        // relations that would import differently keep 6.6.1's text, with no import, in whichever order they are read
+        agrees = (customTypeImports[prefixedCustomType] ?? imported) === imported;
 
       // two origins: the last one seen wins
-      customTypes[prefixedCustomType] = importsEnum && schemaPrefix ? `${namespace}.${selectableType}` : selectableType;
-      if (importsEnum) customTypeImports[prefixedCustomType] = schemaPrefix ? namespace : enumName;
-      else delete customTypeImports[prefixedCustomType];
+      customTypes[prefixedCustomType] = agrees && importsEnum && schemaPrefix ? `${namespace}.${selectableType}` : selectableType;
+      customTypeImports[prefixedCustomType] = agrees ? imported : '';
       origins[`"${domainName === null ? udtSchema : domainSchema}"."${customType}"`] = customType;
       selectableType = JSONSelectableType = whereableType = insertableType = updatableType =
         'c.' + prefixedCustomType;

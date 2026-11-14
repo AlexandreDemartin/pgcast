@@ -62,7 +62,7 @@ const sourceFilesForCustomTypes = (customTypes: CustomTypes, names: string, sche
       customTypeHeader + declareModule(`${names}/custom`,
         // 6.6.1 imported db for db.JSONValue alone: db.Int8String and the others failed to compile
         (baseType.startsWith('db.') ? `import type * as db from '${names}/db';\n` : ``) +
-        (name in schemaImports ? `import type { ${schemaImports[name]} } from '${names}/schema';\n` : ``) +
+        (schemaImports[name] ? `import type { ${schemaImports[name]} } from '${names}/schema';\n` : ``) +
         `export type ${name} = ${baseType};  // replace with your custom type or interface as desired`
       )
     ]));
