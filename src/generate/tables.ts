@@ -220,7 +220,7 @@ export const definitionForRelationInSchema = async (
     friendlyRelType = friendlyRelTypes[rel.type],
     tableComment = config.schemaJSDoc ? `
 /**
- * **${jsdocText(schemaPrefix + rel.name)}**
+ * ${jsdocText(`**${schemaPrefix}${rel.name}**`)}
  * - ${friendlyRelType} in database
  */` : ``,
     tableDef = `${tableComment}
@@ -339,7 +339,7 @@ const createColumnDoc = (config: CompleteConfig, schemaName: string, rel: Relati
     commentDoc = !comment ? '' : '\n    *\n    * ' + jsdocText(comment).split(/\r\n?|\n/).join('\n    * '),
     [domain, udt, defaultText] = [domainName, udtName ?? '(none)', defaultValue].map(t => jsdocText(String(t))),
     doc = `/**
-    * **${jsdocText(`${schemaPrefix}${rel.name}.${column}`)}**${commentDoc}
+    * ${jsdocText(`**${schemaPrefix}${rel.name}.${column}**`)}${commentDoc}
     * - ${domainName ? `\`${domain}\` (base type: \`${udt}\`)` : `\`${udt}\``} in database
     * - ${rel.type === 'mview' ? 'Materialized view column' : isGenerated ? 'Generated column' :
         `${isNullable ? 'Nullable' : '`NOT NULL`'}, ${hasDefault && defaultValue === null ? `identity column` : hasDefault ? `default: \`${defaultText}\`` : `no default`}`}
