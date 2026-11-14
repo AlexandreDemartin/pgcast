@@ -1489,8 +1489,9 @@ describe('a built-in object as a Whereable', () => {
       .filter(([name, x]) => x !== (kept[name] ? 'kept' : 'throws'))).toEqual([]);
   });
 
-  it('a host iterator throws too, through the prototype chain, and a host object compiles as before', () => {
-    // not ECMA-262 (#416 kept host objects out), but URLSearchParams' and Intl's iterators inherit %IteratorPrototype%
+  it('a host or ECMA-402 iterator throws too, through the prototype chain, and a host object compiles as before', () => {
+    // not ECMA-262: URLSearchParams' and Headers' iterators are host objects (#416 kept those out), Intl.Segmenter's
+    // is ECMA-402, and each inherits %IteratorPrototype%
     const
       // ES2022: not in the lib's ES2019 types
       Segmenter = (Intl as any).Segmenter as new () => { segment(s: string): Iterable<unknown> },
@@ -1504,6 +1505,7 @@ describe('a built-in object as a Whereable', () => {
       every = 'DELETE FROM "users" WHERE TRUE';
     expect(Object.fromEntries(Object.entries({
       urlSearchParamsIterator: new URLSearchParams('id=1').entries(),
+      headersIterator: new Headers({ id: '1' }).entries(),
       segmentsIterator: new Segmenter().segment('id')[Symbol.iterator](),
       url: new URL('https://example.com/'),
       urlSearchParams: new URLSearchParams('id=1'),
@@ -1512,6 +1514,7 @@ describe('a built-in object as a Whereable', () => {
       abortController: new AbortController(),
     }).map(([name, x]) => [name, outcome(x as object)]))).toEqual({
       urlSearchParamsIterator: 'throws: URLSearchParams Iterator',
+      headersIterator: 'throws: Headers Iterator',
       segmentsIterator: 'throws: Segmenter String Iterator',
       url: every,
       urlSearchParams: every,

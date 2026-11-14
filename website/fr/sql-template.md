@@ -1,5 +1,5 @@
 ---
-english: a3640344a745
+english: 6c45b0ca9923
 ---
 
 # Template SQL
@@ -295,18 +295,21 @@ Un objet est un Whereable de la table : chacune de ses propres clés énumérab
 Un objet interpolé qui n’est pas l’une des autres [interpolations](#interpolations) se compile en Whereable, objet simple ou non : une instance de classe `{ title }` donne `("title" = $1)`<!-- probe: db.sql`${new (class { title = 'x' })()}` -->, et une instance sans clé propre énumérable donne `TRUE`, même d’une classe qui étend un objet natif (`class Premiere extends Date {}`). Vérifiez à l’exécution ce qui atteint un `where`.
 :::
 
-Un objet natif lève une erreur à la compilation, avant toute requête, même avec des clés propres ajoutées (`Object.assign(new Date(0), { id: 1 })`) : `Date`, `Map`, `Set`, `WeakMap`, `WeakSet`, `WeakRef`, `FinalizationRegistry`, `RegExp`, `Promise`, `Error` et ses sous-types natifs (`TypeError`, `AggregateError`, …), `ArrayBuffer`, `SharedArrayBuffer`, un tableau typé, `Buffer`, `DataView`, les objets enveloppes `Number`, `String` et `Boolean`, et, là où le runtime les fournit (Node 24), `SuppressedError`, `DisposableStack` et `AsyncDisposableStack` :
+Un objet natif lève une erreur à la compilation, avant toute requête, même avec des clés propres ajoutées (`Object.assign(new Date(0), { id: 1 })`) : `Date`, `Map`, `Set`, `WeakMap`, `WeakSet`, `WeakRef`, `FinalizationRegistry`, `RegExp`, `Promise`, `Error` et ses sous-types natifs (`TypeError`, `AggregateError`, …), `ArrayBuffer`, `SharedArrayBuffer`, un tableau typé, `Buffer`, `DataView`, les objets enveloppes `Number`, `String`, `Boolean`, `BigInt` et `Symbol`, et, là où le runtime les fournit (Node 24), `SuppressedError`, `DisposableStack` et `AsyncDisposableStack` :
 
 > `` A built-in `…` has no meaning as a Whereable (a filter): it would compile to its own enumerable keys, and to `TRUE`, every row, when it has none. To compare with a value, give it as `db.param(…)`; to filter, give a plain object (`{ column: value }`); await a `Promise` first. ``<!-- message -->
 
 Zapatos 6.6.1 le compilait en Whereable de ses propres clés : `TRUE` pour la plupart, si bien que `` db.sql`DELETE FROM ${'films'} WHERE ${new Date()}` `` donnait `DELETE FROM "films" WHERE TRUE` et supprimait toutes les lignes ; `("0" = $1 …)` pour un tableau typé. Un objet hôte (`URL`, `Blob`, `Headers`, `AbortController`) n’est pas refusé : il se compile en Whereable de ses propres clés, comme une instance de classe, donc `TRUE` quand il n’en a aucune.
 
+Un itérateur ou un générateur, synchrone ou asynchrone, sans clé propre énumérable lève aussi une erreur, qui le nomme par son étiquette (`Set Iterator`, `Generator`) : le `.values()` d’un `Set`, le `.entries()` d’une `Map`, `(function* () {})()`, `Iterator.from(…)`, un itérateur hôte comme `new URLSearchParams().entries()` ou `new Headers().entries()` (un objet `Headers` lui-même n’est pas refusé), un itérateur ECMA-402 comme celui d’`Intl.Segmenter`, et une instance d’une classe qui étend `Iterator` sans clé propre énumérable. Chacun a `%IteratorPrototype%` ou `%AsyncIteratorPrototype%` dans sa chaîne de prototypes. Zapatos 6.6.1 compilait `` db.deletes('films', ids.values() as any) ``, pour un `Set` d’identifiants, en `DELETE FROM "films" WHERE TRUE …` : pour filtrer sur les identifiants, donnez `{ id: db.conditions.isIn([...ids]) }`.
+
 Le type refuse la plupart d’entre eux (TS2345), sauf là où une colonne partage l’un de leurs membres : `db.deletes('actors', new Error('x'))` passe la vérification de types, puisque `actors` a une colonne `name`.
 
-Seuls les objets natifs du realm qui exécute pgcast lèvent une erreur, reconnus à leur prototype exact. Comme dans Zapatos 6.6.1 :
+Seuls les objets natifs du realm qui exécute pgcast lèvent une erreur, reconnus à leur prototype exact, ou, pour un itérateur, au prototype des itérateurs dans sa chaîne. Comme dans Zapatos 6.6.1 :
 
-- un `Date` d’un autre realm, comme `vm.runInNewContext('new Date(0)')` (Jest exécute chaque fichier de test dans un contexte `vm`), donne `TRUE` ;
-- une instance d’une classe qui étend un objet natif garde ses propres clés : `new Frames(1)`, avec `class Frames extends Uint8Array {}`, donne `("0" = $1)`.
+- un `Date` ou un itérateur d’un autre realm, comme `vm.runInNewContext('new Date(0)')` (Jest exécute chaque fichier de test dans un contexte `vm`), donne `TRUE` ;
+- une instance d’une classe qui étend un objet natif garde ses propres clés : `new Frames(1)`, avec `class Frames extends Uint8Array {}`, donne `("0" = $1)` ;
+- un itérateur avec des clés propres les compile : un générateur auquel on a ajouté `{ id: 1 }`, ou une classe qui étend `Iterator` avec un champ `id = 1`, donne `("id" = $1)`.
 
 ## `self` {#self}
 
