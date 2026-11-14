@@ -12,10 +12,12 @@ import PageActions from './PageActions.vue';
 import SiteFooter from './SiteFooter.vue';
 import Wordmark from './Wordmark.vue';
 import { rememberPicked, showRemembered } from './packageManager.ts';
+import { useWords } from './words.ts';
 
 const
   version = __PGCAST_VERSION__,  // the root package.json's (config.ts)
-  { isDark } = useData();
+  { isDark } = useData(),
+  { w } = useWords();
 
 onContentUpdated(showRemembered);
 onMounted(() => {
@@ -31,7 +33,7 @@ onUnmounted(() => window.removeEventListener('change', rememberPicked));
   <DefaultTheme.Layout>
     <template #nav-bar-title-before><Wordmark /></template>
     <template #nav-bar-title-after>
-      <span class="version" title="Version shown in these docs">{{ version }}</span>
+      <span class="version" :title="w.versionShown">{{ version }}</span>
     </template>
     <template #doc-before><PageActions place="title" /></template>
     <template #aside-outline-after><PageActions place="rail" /></template>

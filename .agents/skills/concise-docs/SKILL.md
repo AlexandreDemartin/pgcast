@@ -30,7 +30,7 @@ Complete in substance, concise in form.
 - **Exact terms** in backticks: paths, functions, copyable commands.
 - **One example per rule**, the shortest, a real extract from the repository.
 - **Complete**: condensing never removes a rule, an exception or a pitfall.
-- Language: everything written to the repository or to GitHub is in English, British spelling; chat with the maintainer may stay in French.
+- Language: everything written to the repository or to GitHub is in English, British spelling, except the docs site's French pages, `website/fr/`, each the translation of its English page (`website/README.md` § Languages); chat with the maintainer may stay in French.
 
 ## To cut
 

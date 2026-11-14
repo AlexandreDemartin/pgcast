@@ -291,11 +291,11 @@ An object is a Whereable of the table: each own enumerable key a column, each va
 An interpolated object that is not one of the other [interpolations](#interpolations) compiles as a Whereable, plain or not: a class instance `{ title }` gives `("title" = $1)`<!-- probe: db.sql`${new (class { title = 'x' })()}` -->, and one with no own enumerable key gives `TRUE`, even of a class that extends a built-in (`class Premiere extends Date {}`). Check what reaches a `where` at run time.
 :::
 
-A built-in object throws while compiling, before any query, even with own keys added (`Object.assign(new Date(0), { id: 1 })`): `Date`, `Map`, `Set`, `WeakMap`, `WeakSet`, `RegExp`, `Promise`, `Error` and its native subtypes (`TypeError`, `AggregateError`, …, and `SuppressedError` from Node 24), `ArrayBuffer`, a typed array, `Buffer`, `DataView`, and the boxes `Number`, `String` and `Boolean`:
+A built-in object throws while compiling, before any query, even with own keys added (`Object.assign(new Date(0), { id: 1 })`): `Date`, `Map`, `Set`, `WeakMap`, `WeakSet`, `WeakRef`, `FinalizationRegistry`, `RegExp`, `Promise`, `Error` and its native subtypes (`TypeError`, `AggregateError`, …), `ArrayBuffer`, `SharedArrayBuffer`, a typed array, `Buffer`, `DataView`, the boxes `Number`, `String` and `Boolean`, and, where the runtime has them (Node 24), `SuppressedError`, `DisposableStack` and `AsyncDisposableStack`:
 
 > `` A built-in `…` has no meaning as a Whereable (a filter): it would compile to its own enumerable keys, and to `TRUE`, every row, when it has none. To compare with a value, give it as `db.param(…)`; to filter, give a plain object (`{ column: value }`); await a `Promise` first. ``<!-- message -->
 
-Zapatos 6.6.1 compiled it as a Whereable of its own keys: `TRUE` for most, so `` db.sql`DELETE FROM ${'films'} WHERE ${new Date()}` `` was `DELETE FROM "films" WHERE TRUE` and deleted every row; `("0" = $1 …)` for a typed array.
+Zapatos 6.6.1 compiled it as a Whereable of its own keys: `TRUE` for most, so `` db.sql`DELETE FROM ${'films'} WHERE ${new Date()}` `` was `DELETE FROM "films" WHERE TRUE` and deleted every row; `("0" = $1 …)` for a typed array. A host object (`URL`, `Blob`, `Headers`, `AbortController`) is not refused: it compiles as a Whereable of its own keys, as a class instance does, so `TRUE` when it has none.
 
 The type refuses most of them (TS2345), not where a column shares one of their members: `db.deletes('actors', new Error('x'))` type-checks, since `actors` has a `name` column.
 
@@ -438,7 +438,7 @@ What `sql` and every shortcut return: a query, or part of one, not yet compiled.
 | [`compile()`](#compile) | `{ text, values }`, the query `run()` sends |
 | [`runResultTransform`](#runResultTransform) | turns `pg`'s result into `RunResult` |
 | [`prepared(name?)`](#prepared) | makes it a prepared statement |
-| `copy(override?)` | a shallow copy, some properties replaced |
+| [`copy(override?)`](#copy) | a shallow copy, some properties replaced |
 | `noop`, `noopResult` | set by `insert()` and `upsert()` given `[]`: `run()` sends nothing and resolves to `noopResult` |
 | `parentTable` | set on a `lateral` subquery by its parent, for [`parent()`](#parent) |
 | `preparedName` | set by `prepared()` |
@@ -508,6 +508,16 @@ The values are parameters, not part of the text, so one name serves every call o
 <<< ./examples/plain/sql_prepared.ts{ts twoslash}
 
 A name stands for one text: on a connection that has prepared `'p'`, a fragment of another text named `'p'` makes `pg` reject with "Prepared statements must be unique - 'p' was used for a different statement".
+
+### `copy()` {#copy}
+
+```ts
+fragment.copy(override?: { literals?, expressions?, parentTable?, preparedName?, noop?, noopResult? }): SQLFragment<RunResult, Constraint>
+```
+
+A new fragment on the same literals and expressions. It keeps `runResultTransform`, `parentTable`, `preparedName`, `noop` and `noopResult`, except those `override` gives. So a copied shortcut resolves to what the shortcut does, as its type says: `count('films', all).copy().run(pool)` gives `4` on the docs schema, where Zapatos 6.6.1 gave the copy the default transform, so the rows: `[{ result: '4' }]`.
+
+A copy compiles as the fragment does nested in another, so a copy of `selectExactlyOne()` keeps `LIMIT $1`<!-- probe: (db.setConfig({ selectExactlyOneChecksForSecondRow: true }), db.selectExactlyOne('films', db.all).copy()) --> with `1`, even with [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow): it rejects on no row, never on a second one. `lateral` gives a copy of each subquery its parent's `parentTable`.
 
 ## `RunResultForSQLFragment` {#RunResultForSQLFragment}
 

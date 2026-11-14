@@ -1507,6 +1507,31 @@ describe('selectOne, selectExactlyOne', () => {
     });
   });
 
+  it('selectExactlyOneChecksForSecondRow: LIMIT 1 in a copy, which compiles as a nested query', () => {
+    db.setConfig({ selectExactlyOneChecksForSecondRow: true });
+    const q = db.selectExactlyOne('users', { id: 1 });
+    expect(q.compile().values).toEqual([1, 2]);
+    expect(q.copy().compile()).toEqual({
+      text: 'SELECT to_jsonb("users".*) AS result FROM "users" WHERE ("id" = $1) LIMIT $2',
+      values: [1, 1],
+    });
+    expect(q.copy({ preparedName: 'one_user' }).compile().values).toEqual([1, 1]);
+  });
+
+  it('copies nested in a lateral compile as the shortcuts they are copied from', () => {
+    const
+      n = db.count('accounts', { owner_id: parent('id') }),
+      manager = db.selectExactlyOne('users', { id: parent('manager_id') }, { alias: 'm', columns: ['display_name'] });
+    expect(db.select('users', all, { columns: ['id'], lateral: { n, manager } }).compile()).toEqual({
+      text: `SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT jsonb_build_object($1::text, "id") || jsonb_build_object($2::text, "lateral_manager".result, $3::text, "lateral_n".result) AS result FROM "users" LEFT JOIN LATERAL (SELECT jsonb_build_object($4::text, "display_name") AS result FROM "users" AS "m" WHERE ("id" = "users"."manager_id") LIMIT $5) AS "lateral_manager" ON true LEFT JOIN LATERAL (SELECT count(*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id")) AS "lateral_n" ON true) AS "sq_users"`,
+      values: ['id', 'manager', 'n', 'display_name', 1],
+    });
+    expect(db.selectOne('users', { id: 2 }, { lateral: n }).compile()).toEqual({
+      text: 'SELECT "lateral_passthru".result AS result FROM "users" LEFT JOIN LATERAL (SELECT count(*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id")) AS "lateral_passthru" ON true WHERE ("id" = $1) LIMIT $2',
+      values: [2, 1],
+    });
+  });
+
   it('without selectExactlyOneChecksForSecondRow: LIMIT 1, as in 6.6.1', () => {
     db.setConfig({ selectExactlyOneChecksForSecondRow: false });
     const q = db.selectExactlyOne('users', { id: 1 });

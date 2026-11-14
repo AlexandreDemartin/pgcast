@@ -8,11 +8,13 @@
 // runs it only on Run: nothing here runs it.
 import { onMounted, shallowRef, type Component } from 'vue';
 import { codeOf, limit } from '../playground/share.ts';
+import { useWords } from './words.ts';
 
 const
   editor = shallowRef<Component>(),
   phone = shallowRef(false),
   shared = shallowRef<string | null>(),  // a link's code; `null` for a link whose code cannot be read
+  { w } = useWords(),
   // the skeleton's lines, [indent, width] in ch (0 wide: a blank line; `full`: as wide as the column), in the shape of
   // the editor's first frame: the tutorial's first query, its long third line wrapped (`wrapped`, `wrapped-twice`: the
   // lines it takes on, by the column's width, below); then its SQL, and its type. Each column as tall as the editor's,
@@ -39,15 +41,15 @@ if (!import.meta.env.SSR) onMounted(async () => {
 <template>
   <component :is="editor" v-if="editor" :shared="shared" />
   <template v-else>
-    <p v-if="phone && typeof shared === 'string'">The playground edits and runs code on a computer. On a phone, here is the code of this link, read-only.</p>
+    <p v-if="phone && typeof shared === 'string'">{{ w.playgroundWords.phoneShared }}</p>
     <!-- rendered by the server too, and shown by style.css where the editor will not load: no shift once the page runs -->
-    <p v-else-if="typeof shared !== 'string'" class="Playground-phone">The playground edits code on a computer. On a phone, here is the tutorial's first query, read-only, with its SQL and its type.</p>
-    <p v-if="shared === null">This link's code could not be read (damaged, or over {{ limit / 1000 }} KB), so here is the tutorial's first query.</p>
+    <p v-else-if="typeof shared !== 'string'" class="Playground-phone">{{ w.playgroundWords.phone }}</p>
+    <p v-if="shared === null">{{ w.playgroundWords.broken(limit / 1000) }}</p>
     <div v-if="typeof shared === 'string'" class="CastPanel-frame Playground-static">
       <!-- one column: the link's code alone, with no SQL or type until the editor computes them -->
-      <div class="CastPanel" style="grid-template-columns: minmax(0, 1fr)" role="group" aria-label="The code of this link">
+      <div class="CastPanel" style="grid-template-columns: minmax(0, 1fr)" role="group" :aria-label="w.playgroundWords.linkCode">
         <div>
-          <p class="label"><em>TS</em>You write</p>
+          <p class="label"><em>TS</em>{{ w.youWrite }}</p>
           <div class="language-ts"><pre class="shiki pgcast" tabindex="0"><code>{{ shared }}</code></pre></div>
         </div>
       </div>
@@ -55,10 +57,10 @@ if (!import.meta.env.SSR) onMounted(async () => {
     <div v-else class="Playground-static"><slot /></div>
     <!-- the editor's panel, its labels and its lines' places; rendered by the server, shown where the editor loads -->
     <div v-if="!phone" class="CastPanel-frame Playground-skeleton" role="status" aria-busy="true">
-      <span class="visually-hidden">Loading the editor…</span>
+      <span class="visually-hidden">{{ w.playgroundWords.loading }}</span>
       <div class="CastPanel" aria-hidden="true">
         <div>
-          <p class="label"><em>TS</em>You write</p>
+          <p class="label"><em>TS</em>{{ w.youWrite }}</p>
           <div class="lines code">
             <span
               v-for="([indent, width, wrap], i) in skeleton.code" :key="i" :class="wrap"
@@ -67,7 +69,7 @@ if (!import.meta.env.SSR) onMounted(async () => {
           </div>
         </div>
         <div>
-          <p class="label"><em>SQL</em>Postgres runs<span class="button run" /><span class="button share" /></p>
+          <p class="label"><em>SQL</em>{{ w.postgresRuns }}<span class="button run" /><span class="button share" /></p>
           <div class="lines">
             <span
               v-for="([indent, width], i) in skeleton.sql" :key="i" :style="{ '--indent': indent, '--width': width }"
@@ -76,7 +78,7 @@ if (!import.meta.env.SSR) onMounted(async () => {
           <p class="values"><span :style="{ '--indent': 0, '--width': 30 }" /></p>
         </div>
         <div>
-          <p class="label"><em>::</em>TypeScript knows</p>
+          <p class="label"><em>::</em>{{ w.typescriptKnows }}</p>
           <div class="lines">
             <span
               v-for="([indent, width], i) in skeleton.type" :key="i" :style="{ '--indent': indent, '--width': width }"
