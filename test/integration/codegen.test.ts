@@ -615,6 +615,88 @@ describe('column comments', () => {
       await t.pool.query('DROP SCHEMA comment_kinds_closer CASCADE');
     }
   });
+
+  describe('a comment holding a JSDoc tag', () => {
+    /** Each column's JSDoc as TypeScript reads it, by interface: its text and its tags, as the editor's hover shows them. */
+    const hovers = (schema: string, table: string) => {
+      const
+        text = (comment: string | ts.NodeArray<ts.JSDocComment> | undefined) =>
+          typeof comment === 'string' ? comment : (comment ?? []).map(part => part.text).join(''),
+        source = ts.createSourceFile('schema.d.ts', schema, ts.ScriptTarget.Latest, true),
+        found: Record<string, Record<string, { text: string, tags: string[] }>> = {},
+        visit = (node: ts.Node): void => {
+          if (ts.isPropertySignature(node) && ts.isInterfaceDeclaration(node.parent) &&
+            ts.isModuleBlock(node.parent.parent) && node.parent.parent.parent.name.text === table) {
+            const doc = node.getChildren().find(ts.isJSDoc)!;
+            (found[node.parent.name.text] ??= {})[node.name.getText()] = {
+              text: text(doc.comment),
+              tags: (doc.tags ?? []).map(tag => `@${tag.tagName.text} ${text(tag.comment)}`.trimEnd()),
+            };
+          }
+          ts.forEachChild(node, visit);
+        };
+      visit(source);
+      return found;
+    };
+
+    // tsForConfig() reads through its own connection: the schema is committed, then dropped
+    beforeAll(() => t.pool.query(String.raw`
+      CREATE SCHEMA comment_tags;
+      CREATE TABLE comment_tags.roles (
+        dep int, first int, indented int, crlf int, two int, mid int, kept int, email int, spaced int, ticked int);
+      COMMENT ON COLUMN comment_tags.roles.dep IS E'Billing order.\n@deprecated use lead';
+      COMMENT ON COLUMN comment_tags.roles.first IS '@deprecated use lead';
+      COMMENT ON COLUMN comment_tags.roles.indented IS E'Billing order.\n  @deprecated use lead';
+      COMMENT ON COLUMN comment_tags.roles.crlf IS E'Billing order.\r\n@deprecated use lead';
+      COMMENT ON COLUMN comment_tags.roles.two IS E'Billing order.\n@deprecated use lead\n@see lead';
+      COMMENT ON COLUMN comment_tags.roles.mid IS E'Billing order.\nSince 2026 @deprecated use lead';
+      COMMENT ON COLUMN comment_tags.roles.kept IS E'@deprecated use lead\nkept for old credits';
+      COMMENT ON COLUMN comment_tags.roles.email IS 'Ask casting@example.com';
+      COMMENT ON COLUMN comment_tags.roles.spaced IS 'Fee @ 5 a day';
+      COMMENT ON COLUMN comment_tags.roles.ticked IS E'Billing order.\n\`@deprecated\` is not a tag';`));
+    afterAll(() => t.pool.query('DROP SCHEMA comment_tags CASCADE'));
+
+    it('keeps the type and nullability lines out of the tag, and keeps the tag', async () => {
+      const
+        { ts: schema } = await codegen({ schemas: { comment_tags: all } }),
+        { Selectable, ...others } = hovers(schema, 'roles'),
+        generated = '- `int4` in database\n- Nullable, no default';
+      expect.soft(Selectable).toEqual({
+        dep: { text: `**comment_tags.roles.dep**\n\nBilling order.\n${generated}`, tags: ['@deprecated use lead'] },
+        first: { text: `**comment_tags.roles.first**\n\n${generated}`, tags: ['@deprecated use lead'] },
+        indented: { text: `**comment_tags.roles.indented**\n\nBilling order.\n${generated}`, tags: ['@deprecated use lead'] },
+        crlf: { text: `**comment_tags.roles.crlf**\n\nBilling order.\n${generated}`, tags: ['@deprecated use lead'] },
+        two: { text: `**comment_tags.roles.two**\n\nBilling order.\n${generated}`, tags: ['@deprecated use lead', '@see lead'] },
+        // TypeScript also starts a tag at an @ after a space, in the middle of a line
+        mid: { text: `**comment_tags.roles.mid**\n\nBilling order.\n${generated}\n\nSince 2026`, tags: ['@deprecated use lead'] },
+        kept: { text: `**comment_tags.roles.kept**\n\n${generated}`, tags: ['@deprecated use lead\nkept for old credits'] },
+        email: { text: `**comment_tags.roles.email**\n\nAsk casting@example.com\n${generated}`, tags: [] },
+        spaced: { text: `**comment_tags.roles.spaced**\n\nFee @ 5 a day\n${generated}`, tags: [] },
+        ticked: { text: `**comment_tags.roles.ticked**\n\nBilling order.\n\`@deprecated\` is not a tag\n${generated}`, tags: [] },
+      });
+      // the same JSDoc on every interface that has the column
+      expect.soft(Object.keys(others)).toEqual(['JSONSelectable', 'Whereable', 'Insertable', 'Updatable']);
+      for (const columns of Object.values(others)) expect.soft(columns).toEqual(Selectable);
+      expect.soft(syntaxErrors(schema)).toEqual([]);
+    });
+
+    it('writes the lines before the tag, the generated lines, a * line, then the tag lines', async () => {
+      const { ts: schema } = await codegen({ schemas: { comment_tags: all } });
+      expect.soft(schema).toContain([
+        '* **comment_tags.roles.two**',
+        '*',
+        '* Billing order.',
+        '* - `int4` in database',
+        '* - Nullable, no default',
+        '*',
+        '* @deprecated use lead',
+        '* @see lead',
+        '*/',
+      ].join('\n        '));
+      // a comment without a tag keeps its JSDoc as it was: the comment's lines, then the generated ones
+      expect.soft(commentLines(schema, 'roles').spaced).toEqual(['* Fee @ 5 a day']);
+    });
+  });
 });
 
 describe('quotes and */', () => {
