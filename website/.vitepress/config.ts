@@ -3,14 +3,14 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { defaultHoverInfoProcessor, transformerTwoslash } from '@shikijs/vitepress-twoslash';
-import { defineConfig, type HeadConfig } from 'vitepress';
-import { checkLinks, keepLinkHashes } from './anchors.ts';
+import { defineConfig, type DefaultTheme, type HeadConfig, type LocaleConfig } from 'vitepress';
+import { checkLinks, keepLinkHashes, labelPermalinks } from './anchors.ts';
 import { calloutIcons } from './callouts.ts';
 import { codeGroupLogos } from './codeGroups.ts';
 import { changelogPage, dateChangelog, writeChangelogFeed } from './changelog.ts';
 import { host, writeLlmsFiles } from './llms.ts';
 import { describePage, pageHead, repo } from './meta.ts';
-import { outline } from './outline.ts';
+import { outlineIn } from './outline.ts';
 import { playgroundVite } from './playground/build.ts';
 import { checkPlaygroundLinks, linkCastPanels } from './playgroundLinks.ts';
 import { markSteps } from './steps.ts';
@@ -18,26 +18,69 @@ import { lineIndents, sqlParameters, syntax } from './syntax.ts';
 import { labelTableCells } from './tables.ts';
 import { svg } from './theme/icons.ts';
 import { focusableHovers, moduleNames, twoslashOptions } from './twoslash.ts';
+import { prefixOf, words, type Lang } from './words.ts';
 
 const
   { version } = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')),
   font = (file: string): HeadConfig =>
     ['link', { rel: 'preload', href: `/fonts/${file}.woff2`, as: 'font', type: 'font/woff2', crossorigin: '' }],
-  // the wordmark's entrance (Wordmark.vue, style.css), set before the first paint: on the home only, the first time it
-  // loads in a session, and never with reduced motion; without storage, none. A client-side navigation runs no script
+  // the wordmark's entrance (Wordmark.vue, style.css), set before the first paint: on the home only, in either language,
+  // the first time it loads in a session, and never with reduced motion; without storage, none. A client-side navigation runs no script
   // here, so arriving on the home from another page plays nothing either: the wordmark is already on screen
   wordmarkEntrance = `try {
-  if ((location.pathname === '/' || location.pathname === '/index.html') && !sessionStorage.getItem('pgcast-wordmark') &&
+  if (['/', '/index.html', '/fr/', '/fr/index.html'].includes(location.pathname) && !sessionStorage.getItem('pgcast-wordmark') &&
     !matchMedia('(prefers-reduced-motion: reduce)').matches) {
     sessionStorage.setItem('pgcast-wordmark', '1');
     document.documentElement.dataset.wordmark = '';
   }
 } catch {}`;
 
+/**
+ * A language's part of the config (README.md § Languages): its words, and its nav and sidebar from the outline in that
+ * language. VitePress's switcher, in the nav, goes to the same page in the other language, its hash kept.
+ */
+function locale(lang: Lang): LocaleConfig<DefaultTheme.Config>[string] {
+  const w = words[lang], prefix = prefixOf(lang), outline = outlineIn(lang);
+  return {
+    label: w.label,
+    lang: w.lang,
+    ...lang === 'en' ? {} : { link: `${prefix}/` },
+    description: w.description,
+    markdown: { codeCopyButton: { tooltipText: w.copyCode, copiedText: w.copied } },  // each code block's button
+    themeConfig: {
+      nav: [
+        // a group with a `nav` text is current on its landing page and on each of its pages; Explanation has none: a
+        // fourth link would push the theme button into VitePress's ⋯ menu at most widths from 768 to 1050px
+        ...outline.flatMap(({ nav, link, items }) => nav === undefined ? [] : [{
+          text: nav,
+          link,
+          activeMatch: `^(${[link, ...items.map(item => item.link)].join('|')})$`,
+        }]),
+        { text: w.playground, link: `${prefix}/playground` },  // the changelog is in the footer (SiteFooter.vue)
+        // no ↗ after the external link: the bar's links look alike, wherever they lead
+        { text: 'GitHub', link: repo, noIcon: true },
+      ],
+      sidebar: outline,  // each group's heading links its landing page, its chevron folds it
+      editLink: { pattern: `${repo}/edit/master/website/:path`, text: w.editLink },
+      // VitePress writes these with `v-html`: each with the arrow of its way
+      docFooter: { prev: `${svg('arrowLeft')}${w.previous}`, next: `${w.next}${svg('arrowRight')}` },
+      // 13 November 2026, 13 novembre 2026
+      lastUpdated: { text: w.lastUpdated, formatOptions: { dateStyle: 'long', forceLocale: true } },
+      outline: { level: 2, label: w.onThisPage },
+      darkModeSwitchLabel: w.colourTheme,
+      langMenuLabel: w.changeLanguage,
+      returnToTopLabel: w.returnToTop,
+      sidebarMenuLabel: w.menu,
+      skipToContentLabel: w.skipToContent,
+    },
+  };
+}
+
 export default defineConfig({
   title: 'pgcast',
-  description: 'Zero-abstraction Postgres for TypeScript: types cast from your database schema.',
-  lang: 'en-GB',
+  description: words.en.description,
+  lang: words.en.lang,
+  locales: { root: locale('en'), fr: locale('fr') },  // English at the root, French under /fr/ (words.ts)
   base: '/',  // GitHub Pages, at the domain's root: https://pgcast.dev/
   cleanUrls: true,
   sitemap: { hostname: 'https://pgcast.dev' },  // sitemap.xml, named by public/robots.txt
@@ -81,6 +124,7 @@ export default defineConfig({
     ],
     config: md => {
       keepLinkHashes(md);  // `[Config.upsertRequiresSameKeys](/runtime-config#Config.upsertRequiresSameKeys)`
+      labelPermalinks(md);  // a heading's `#` named in its page's language
       changelogPage(md);  // CHANGELOG.md in changelog.md
       labelTableCells(md);  // `<td data-label="…">`, for a table that stacks on a phone
       linkCastPanels(md);  // "Open in playground" on a docs page's cast panel
@@ -96,28 +140,19 @@ export default defineConfig({
       __PGCAST_SITE__: JSON.stringify(`${host}/`),  // the site's URL, which the page actions' prompts name (PageActions.vue)
     },
     resolve: {
-      // VitePress's light / dark switch becomes system / light / dark (its "overriding internal components").
+      // VitePress's light / dark switch becomes system / light / dark, and its language switcher ours (its "overriding
+      // internal components")
       alias: [{
         find: /^.*\/VPSwitchAppearance\.vue$/,
         replacement: fileURLToPath(new URL('./theme/AppearanceSwitch.vue', import.meta.url)),
+      }, {
+        find: /^.*\/VPNavTranslations\.vue$/,
+        replacement: fileURLToPath(new URL('./theme/LanguageSwitch.vue', import.meta.url)),
       }],
     },
   },
   themeConfig: {
     siteTitle: false,  // the wordmark is Wordmark.vue, in Layout.vue
-    nav: [
-      // a group with a `nav` text is current on its landing page and on each of its pages; Explanation has none: a
-      // fourth link would push the theme button into VitePress's ⋯ menu at most widths from 768 to 1050px
-      ...outline.flatMap(({ nav, link, items }) => nav === undefined ? [] : [{
-        text: nav,
-        link,
-        activeMatch: `^(${[link, ...items.map(item => item.link)].join('|')})$`,
-      }]),
-      { text: 'Playground', link: '/playground' },  // the changelog is in the footer (SiteFooter.vue)
-      // no ↗ after the external link: the bar's links look alike, wherever they lead
-      { text: 'GitHub', link: repo, noIcon: true },
-    ],
-    sidebar: outline,  // each group's heading links its landing page, its chevron folds it
     search: {
       provider: 'local',
       options: {
@@ -126,14 +161,27 @@ export default defineConfig({
         // every word of the query, each allowed one typo in ten letters (`trasaction`): MiniSearch's default, any word
         // and two typos in ten, filled the results with noise
         miniSearch: { searchOptions: { combineWith: 'AND', fuzzy: 0.1 } },
-        translations: { button: { buttonText: 'Search', buttonAriaLabel: 'Search the docs' } },
+        // each language searches its own pages
+        translations: { button: { buttonText: words.en.search, buttonAriaLabel: words.en.searchDocs } },
+        locales: {
+          fr: {
+            translations: {
+              button: { buttonText: words.fr.search, buttonAriaLabel: words.fr.searchDocs },
+              modal: {
+                displayDetails: 'Afficher la liste détaillée',
+                resetButtonTitle: 'Effacer la recherche',
+                backButtonTitle: 'Fermer la recherche',
+                noResultsText: 'Aucun résultat pour',
+                footer: {
+                  selectText: 'choisir', selectKeyAriaLabel: 'Entrée',
+                  navigateText: 'naviguer', navigateUpKeyAriaLabel: 'Flèche haut', navigateDownKeyAriaLabel: 'Flèche bas',
+                  closeText: 'fermer', closeKeyAriaLabel: 'Échap',
+                },
+              },
+            },
+          },
+        },
       },
     },
-    editLink: { pattern: `${repo}/edit/master/website/:path`, text: 'Edit this page on GitHub' },
-    // VitePress writes these with `v-html`: each with the arrow of its way
-    docFooter: { prev: `${svg('arrowLeft')}Previous`, next: `Next${svg('arrowRight')}` },
-    lastUpdated: { text: 'Last updated', formatOptions: { dateStyle: 'long', forceLocale: true } },  // 13 November 2026
-    outline: { level: 2, label: 'On this page' },
-    darkModeSwitchLabel: 'Colour theme',
   },
 });

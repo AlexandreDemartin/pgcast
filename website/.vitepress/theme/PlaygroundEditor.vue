@@ -27,9 +27,12 @@ import { jsonHtml, sqlHtml, typeHtml } from '../playground/highlight.ts';
 import type { Code, Message, Query, Run } from '../playground/run.worker.ts';
 import { codeOf, fragmentOf, limit as shareLimit } from '../playground/share.ts';
 import Icon from './Icon.vue';
+import { useWords } from './words.ts';
 import playgroundStyle from './playground.css?inline';
 
 const { shared } = defineProps<{ shared?: string | null }>();  // a link's code; `null`: a link that cannot be read
+
+const { w: words } = useWords(), w = () => words.value.playgroundWords;  // the page's language, read when it is shown
 
 const
   start = casts['first-query']!,  // the panel computed at build from the same code, until the first run
@@ -38,10 +41,6 @@ const
   notes = shallowRef<string[]>([]),
   notice = shallowRef<string>(),  // about a link, until the next run
   busy = shallowRef(false),  // a run on Postgres, until it answers
-  linkNotices = {
-    opened: 'This code comes from a link: it runs only when you press Run, or once you edit it.',
-    broken: `This link's code could not be read (damaged, or over ${shareLimit / 1000} KB), so here is the tutorial's first query.`,
-  },
   type = shallowRef(start.type),
   limit = 10_000,  // ms, as run-examples.mjs gives each example
   // set once Postgres has started in this browser: its files are then in the browser's cache, and the download note
@@ -169,8 +168,7 @@ async function update(code: string, types: monaco.editor.ITextModel, postgres = 
       ?.displayParts?.map((part: { text: string }) => part.text).join('') ?? '');
 
   busy.value = postgres;  // a new update stops the run before it
-  if (postgres) notes.value = [startedBefore() ? 'Running on Postgres…' :
-    'Starting Postgres in this page: about 5 MB to download, the first time…'];
+  if (postgres) notes.value = [startedBefore() ? w().running : w().starting];
   if (name) types.setValue(code + shown(name));
   const
     [emitted, named, expanded] = await Promise.all([
@@ -180,23 +178,25 @@ async function update(code: string, types: monaco.editor.ITextModel, postgres = 
     ]);
   if (version !== latest) return;
   type.value = typeHtml(name && named && expanded ? typeShown(name, named, expanded) :
-    '// no `const <name> = …` to give the type of');
+    w().noConst);
   if (!runs) return;
 
   const result = await run(emitted.outputFiles[0]?.text ?? '', postgres);
   if (version !== latest || !result) return;
   busy.value = false;
-  queries.value = result.queries.map(({ sql, rows, ...query }) =>
-    ({ ...query, html: sqlHtml(sql), rows: rows && jsonHtml(rows) }));
+  queries.value = result.queries.map(({ sql, rows, count, more, ...query }) => ({
+    ...query, html: sqlHtml(sql),
+    answer: count === undefined ? query.answer : w().rows(count),
+    rows: rows && jsonHtml(rows + (more ? `\n${w().more(more)}` : '')),
+  }));
   // an error that is the last query's rejection, which the code does not catch: shown once, under its query
   const rejected = result.queries.at(-1)?.rejects?.message;
   notes.value = [
     ...result.error === undefined ? [] : [
-      rejected && result.error.endsWith(rejected) ? 'The code stopped here: it does not catch this error.' :
-      result.queries.length && !postgres ?
-        `No rows come back as you type, so the code stopped after its query (Run gives it Postgres): ${result.error}` :
+      rejected && result.error.endsWith(rejected) ? w().stopped :
+      result.queries.length && !postgres ? w().noRows(result.error) :
         result.error],
-    ...result.queries.length || result.error !== undefined ? [] : ['This code sends no query.'],
+    ...result.queries.length || result.error !== undefined ? [] : [w().noQuery],
     ...result.warnings,
   ];
 }
@@ -221,8 +221,7 @@ onMounted(async () => {
   editor = monaco.editor.create(host.value!, {
     model, theme: 'pgcast',
     // Monaco's own binding (toggleTabFocusMode): Tab indents until it is pressed
-    ariaLabel: 'The query, in TypeScript: edit it to update its SQL and its type; Ctrl+Enter, or Command+Enter on a ' +
-      'Mac, runs it on Postgres. Tab indents; Ctrl+M, or Ctrl+Shift+M on a Mac, makes Tab move focus out of the editor',
+    ariaLabel: w().editor,
     fontFamily, fontSize: 13, lineHeight: 21, tabSize: 2,
     lineNumbers: 'off', glyphMargin: false, folding: false, lineDecorationsWidth: 16, padding: { top: 14, bottom: 14 },
     minimap: { enabled: false }, overviewRulerLanes: 0, hideCursorInOverviewRuler: true, renderLineHighlight: 'none',
@@ -253,7 +252,7 @@ onMounted(async () => {
         notes.value = [];
       }
       refresh(false, code === null);
-      notice.value = linkNotices[code === null ? 'broken' : 'opened'];
+      notice.value = code === null ? w().broken(shareLimit / 1000) : w().opened;
     },
     // a link pasted in the address bar of this page: no reload, a `hashchange`; a heading's `#…` is not a link
     onHashChange = async () => {
@@ -265,15 +264,15 @@ onMounted(async () => {
     const link = await fragmentOf(model.getValue());
     if (!host.value) return;
     if (!link) {
-      notice.value = `Too long to share: a link holds ${shareLimit / 1000} KB of code at most.`;
+      notice.value = w().tooLong(shareLimit / 1000);
       return;
     }
     history.replaceState(history.state, '', link);  // VitePress's state kept: its `popstate` ignores a `null` one
     try {
       await navigator.clipboard.writeText(location.href);
-      notice.value = 'Link copied: it opens this code, which runs only when its reader presses Run.';
+      notice.value = w().linkCopied;
     } catch {
-      notice.value = 'The link is in the address bar: copy it from there.';
+      notice.value = w().linkInBar;
     }
   };
   addEventListener('hashchange', onHashChange);
@@ -298,26 +297,26 @@ onBeforeUnmount(() => { stop(); latest++; disposables.forEach(disposable => disp
 
 <template>
   <div class="CastPanel-frame">
-    <div class="CastPanel Playground" role="group" aria-label="What you write, what Postgres runs, what TypeScript knows">
+    <div class="CastPanel Playground" role="group" :aria-label="words.castPanel">
       <div>
-        <p class="label"><em>TS</em>You write</p>
+        <p class="label"><em>TS</em>{{ words.youWrite }}</p>
         <div ref="host" class="Playground-editor" />
       </div>
       <div aria-live="polite">
         <p class="label">
-          <em>SQL</em>Postgres runs
+          <em>SQL</em>{{ words.postgresRuns }}
           <button type="button" class="Playground-run" :aria-busy="busy" @click="runOnPostgres()">
-            <span v-if="busy" class="spinner" aria-hidden="true" /><Icon v-else name="play" />Run
+            <span v-if="busy" class="spinner" aria-hidden="true" /><Icon v-else name="play" />{{ w().run }}
           </button>
-          <button type="button" class="Playground-share" @click="share()"><Icon name="link" />Share</button>
+          <button type="button" class="Playground-share" @click="share()"><Icon name="link" />{{ w().share }}</button>
         </p>
         <template v-for="(query, i) in queries" :key="i">
           <div v-html="query.html" />
-          <p class="values">values <b>{{ query.values }}</b></p>
-          <p v-if="query.answer" class="values">returns <b>{{ query.answer }}</b></p>
+          <p class="values">{{ words.values }} <b>{{ query.values }}</b></p>
+          <p v-if="query.answer" class="values">{{ w().returns }} <b>{{ query.answer }}</b></p>
           <div v-if="query.rows" v-html="query.rows" />
           <p v-if="query.rejects" class="values">
-            rejects<template v-if="query.rejects.code"> with <b>{{ query.rejects.code }}</b></template>:
+            {{ w().rejects }}<template v-if="query.rejects.code"> {{ w().with }} <b>{{ query.rejects.code }}</b></template>{{ w().colon }}
             {{ query.rejects.message }}
           </p>
         </template>
@@ -325,7 +324,7 @@ onBeforeUnmount(() => { stop(); latest++; disposables.forEach(disposable => disp
         <p v-for="note in notes" :key="note" class="Playground-note">{{ note }}</p>
       </div>
       <div aria-live="polite">
-        <p class="label"><em>::</em>TypeScript knows</p>
+        <p class="label"><em>::</em>{{ words.typescriptKnows }}</p>
         <div v-html="type" />
       </div>
     </div>

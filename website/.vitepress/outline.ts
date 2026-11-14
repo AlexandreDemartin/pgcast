@@ -1,60 +1,80 @@
 // Copyright (C) 2026 Alexandre Demartin
 // The docs outline, in the four groups of Diátaxis (decision 004): the sidebar, the nav bar (config.ts), each
 // group's landing page (theme/GroupPages.vue), and the "Coming" pages ([page].paths.ts) of the entries with no page yet.
+// Each entry has its text in each language (words.ts): `outlineIn('fr')` is the French site's, its links under `/fr/`.
+import { prefixOf, type Lang } from './words.ts';
 
-export const outline = [
+type Text = Record<Lang, string>;
+type Entry = { text: Text; link: string };
+type Group = Entry & { nav?: Text; collapsed: boolean; items: Entry[] };
+
+const groups: Group[] = [
   {
-    text: 'Tutorial',
-    nav: 'Tutorial',
+    text: { en: 'Tutorial', fr: 'Tutoriel' },
+    nav: { en: 'Tutorial', fr: 'Tutoriel' },
     link: '/tutorial',
     collapsed: false,  // open: the way in, read first
     items: [
-      { text: 'Install', link: '/install' },
-      { text: 'First query', link: '/first-query' },
+      { text: { en: 'Install', fr: 'Installation' }, link: '/install' },
+      { text: { en: 'First query', fr: 'Première requête' }, link: '/first-query' },
     ],
   },
   {
-    text: 'How-to guides',
-    nav: 'Guides',
+    text: { en: 'How-to guides', fr: 'Guides pratiques' },
+    nav: { en: 'Guides', fr: 'Guides' },
     link: '/guides',
     collapsed: true,  // folded: a reader comes for one task, from the search or a link
     items: [
-      { text: 'Joins', link: '/lateral' },
-      { text: 'Pagination', link: '/paginate' },
-      { text: 'Batches', link: '/batches' },
-      { text: 'Retries', link: '/retries' },
-      { text: 'Custom types', link: '/custom-types' },
-      { text: 'Raw SQL', link: '/raw-sql' },
-      { text: 'Errors', link: '/handle-errors' },
-      { text: 'Testing', link: '/testing' },
-      { text: 'AI assistants', link: '/ai-assistant' },
-      { text: 'Switch from Zapatos', link: '/switching' },
+      { text: { en: 'Joins', fr: 'Jointures' }, link: '/lateral' },
+      { text: { en: 'Pagination', fr: 'Pagination' }, link: '/paginate' },
+      { text: { en: 'Batches', fr: 'Lots' }, link: '/batches' },
+      { text: { en: 'Retries', fr: 'Nouvelles tentatives' }, link: '/retries' },
+      { text: { en: 'Custom types', fr: 'Types personnalisés' }, link: '/custom-types' },
+      { text: { en: 'Raw SQL', fr: 'SQL brut' }, link: '/raw-sql' },
+      { text: { en: 'Errors', fr: 'Erreurs' }, link: '/handle-errors' },
+      { text: { en: 'Testing', fr: 'Tests' }, link: '/testing' },
+      { text: { en: 'AI assistants', fr: 'Assistants IA' }, link: '/ai-assistant' },
+      { text: { en: 'Switch from Zapatos', fr: 'Venir de Zapatos' }, link: '/switching' },
     ],
   },
   {
-    text: 'Reference',
-    nav: 'Reference',
+    text: { en: 'Reference', fr: 'Référence' },
+    nav: { en: 'Reference', fr: 'Référence' },
     link: '/reference',
     collapsed: false,  // open: what a reader looks up every day
     items: [
-      { text: 'SQL template', link: '/sql-template' },
-      { text: 'Select', link: '/select' },
-      { text: 'Writes', link: '/insert' },
-      { text: 'Conditions', link: '/conditions' },
-      { text: 'Transactions', link: '/transaction' },
-      { text: 'Configuration', link: '/runtime-config' },
-      { text: 'Generator', link: '/generator' },
+      { text: { en: 'SQL template', fr: 'Template SQL' }, link: '/sql-template' },
+      { text: { en: 'Select', fr: 'Lectures' }, link: '/select' },
+      { text: { en: 'Writes', fr: 'Écritures' }, link: '/insert' },
+      { text: { en: 'Conditions', fr: 'Conditions' }, link: '/conditions' },
+      { text: { en: 'Transactions', fr: 'Transactions' }, link: '/transaction' },
+      { text: { en: 'Configuration', fr: 'Configuration' }, link: '/runtime-config' },
+      { text: { en: 'Generator', fr: 'Générateur' }, link: '/generator' },
     ],
   },
   {
-    text: 'Explanation',
+    text: { en: 'Explanation', fr: 'Explication' },
     link: '/explanation',
     collapsed: true,  // folded: read once, for the why
     items: [
-      { text: 'Why pgcast', link: '/why' },
-      { text: 'The catalog', link: '/catalog-types' },
-      { text: 'Versions<small class="since">6.7</small>', link: '/versions' },
-      { text: 'Security', link: '/security' },
+      { text: { en: 'Why pgcast', fr: 'Pourquoi pgcast' }, link: '/why' },
+      { text: { en: 'The catalog', fr: 'Le catalogue' }, link: '/catalog-types' },
+      { text: { en: 'Versions<small class="since">6.7</small>', fr: 'Versions<small class="since">6.7</small>' }, link: '/versions' },
+      { text: { en: 'Security', fr: 'Sécurité' }, link: '/security' },
     ],
   },
 ];
+
+/** The outline in `lang`: each text in that language, each link under its prefix (`/fr/install`). */
+export function outlineIn(lang: Lang) {
+  const prefix = prefixOf(lang), entry = ({ text, link }: Entry) => ({ text: text[lang], link: prefix + link });
+  return groups.map(({ nav, collapsed, items, ...group }) => ({
+    ...entry(group),
+    ...nav === undefined ? {} : { nav: nav[lang] },
+    collapsed,
+    items: items.map(entry),
+  }));
+}
+
+/** The English outline, at the root. */
+export const outline = outlineIn('en');
