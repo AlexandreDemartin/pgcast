@@ -335,14 +335,19 @@ const createColumnDoc = (config: CompleteConfig, schemaName: string, rel: Relati
       description,
     } = columnDetails,
     // every line of a multi-line comment gets its ` * `: TypeScript ends a JSDoc line at \r as at \n
-    comment = description as string | null,
-    commentDoc = !comment ? '' : '\n    *\n    * ' + jsdocText(comment).split(/\r\n?|\n/).join('\n    * '),
+    lines = description ? jsdocText(description as string).split(/\r\n?|\n/) : [],
+    // TypeScript starts a tag (`@deprecated`) at an @ that begins a line or follows a space: from that line on,
+    // the comment goes after the generated lines, which the tag would otherwise read as its own text
+    tagAt = lines.findIndex(line => /^\s*@|\s@(?=\S)/.test(line)),
+    [text, tags] = tagAt < 0 ? [lines, []] : [lines.slice(0, tagAt), lines.slice(tagAt)],
+    commentDoc = text.length ? '\n    *\n    * ' + text.join('\n    * ') : '',
+    tagsDoc = tags.length ? '\n    *\n    * ' + tags.join('\n    * ') : '',
     [domain, udt, defaultText] = [domainName, udtName ?? '(none)', defaultValue].map(t => jsdocText(String(t))),
     doc = `/**
     * ${jsdocText(`**${schemaPrefix}${rel.name}.${column}**`)}${commentDoc}
     * - ${domainName ? `\`${domain}\` (base type: \`${udt}\`)` : `\`${udt}\``} in database
     * - ${rel.type === 'mview' ? 'Materialized view column' : isGenerated ? 'Generated column' :
-        `${isNullable ? 'Nullable' : '`NOT NULL`'}, ${hasDefault && defaultValue === null ? `identity column` : hasDefault ? `default: \`${defaultText}\`` : `no default`}`}
+        `${isNullable ? 'Nullable' : '`NOT NULL`'}, ${hasDefault && defaultValue === null ? `identity column` : hasDefault ? `default: \`${defaultText}\`` : `no default`}`}${tagsDoc}
     */
     `;
   return doc;
