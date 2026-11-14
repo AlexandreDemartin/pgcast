@@ -6,6 +6,7 @@ import { defaultHoverInfoProcessor, transformerTwoslash } from '@shikijs/vitepre
 import { defineConfig, type HeadConfig } from 'vitepress';
 import { checkLinks, keepLinkHashes } from './anchors.ts';
 import { calloutIcons } from './callouts.ts';
+import { codeGroupLogos } from './codeGroups.ts';
 import { changelogPage, dateChangelog, writeChangelogFeed } from './changelog.ts';
 import { host, writeLlmsFiles } from './llms.ts';
 import { describePage, pageHead, repo } from './meta.ts';
@@ -84,6 +85,7 @@ export default defineConfig({
       labelTableCells(md);  // `<td data-label="…">`, for a table that stacks on a phone
       linkCastPanels(md);  // "Open in playground" on a docs page's cast panel
       calloutIcons(md);  // a note's chip opens on its kind's icon
+      codeGroupLogos(md);  // a package manager's tab opens on its mark
       markSteps(md);  // a step's number in a round marker: `## 1. Set up the project`
     },
   },
