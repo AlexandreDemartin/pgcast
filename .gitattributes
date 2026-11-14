@@ -1,2 +1,2 @@
-# Every text file is checked out with LF, on Windows too: the docs checks read pages line by line (#115).
+# Check every text file out with LF, whatever core.autocrlf says: the docs checks match pages on \n, and fail a CRLF page (#115).
 * text=auto eol=lf
