@@ -56,7 +56,8 @@ export type JSONOnlyColsForTable<T extends Table, C extends readonly any[] /* `C
 export interface SQLFragmentMap { [k: string]: SQLFragment<any> }
 export interface SQLFragmentOrColumnMap<T extends Table> { [k: string]: SQLFragment<any> | ColumnForTable<T> }
 // the type a typed min() or max() has nested in a query, as JSON, where it differs from what run() gives;
-// read after `undefined extends RunResult`, so that `any` still gives `{} | null`
+// read after `undefined extends RunResult`, so that `any` still gives `{} | null`, and only once declared
+// (TypedByColumn, resolved as the library loads), so that every other program checks 6.6.1's type
 declare const nestedResult: unique symbol;
 
 /**
@@ -67,7 +68,7 @@ declare const nestedResult: unique symbol;
 export interface ColumnAggregateFragment<RunResult, NestedResult> extends SQLFragment<RunResult> { [nestedResult]: NestedResult }
 
 export type RunResultForSQLFragment<T extends SQLFragment<any, any>> = T extends SQLFragment<infer RunResult, any> ?
-  (undefined extends RunResult ? NonNullable<RunResult> | null : T extends { [nestedResult]: infer N } ? N : RunResult) :
+  (undefined extends RunResult ? NonNullable<RunResult> | null : TypedByColumn extends true ? (T extends { [nestedResult]: infer N } ? N : RunResult) : RunResult) :
   never;
 
 export type LateralResult<L extends SQLFragmentMap> = { [K in keyof L]: RunResultForSQLFragment<L[K]> };
