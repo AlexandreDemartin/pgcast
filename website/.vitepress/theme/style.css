@@ -653,8 +653,8 @@ svg.icon { width: 16px; height: 16px; flex: none; }
   .InstallLine { flex-direction: column; align-items: stretch; height: auto; padding: 0; border-radius: var(--radius); }
   .InstallLine .tabs { padding: 4px; margin: 0; border-right: 0; border-bottom: 1px solid var(--line); }
   .InstallLine .tabs .name { position: static; width: auto; height: auto; overflow: visible; clip-path: none; }
-  .InstallLine .panel { align-items: flex-start; padding: 12px 8px 12px 16px; }
-  .landing .InstallLine code { white-space: normal; overflow-wrap: anywhere; line-height: 22px; }
+  .InstallLine .panel { align-items: flex-start; padding: 8px 6px 8px 14px; }
+  .landing .InstallLine code { white-space: normal; overflow-wrap: anywhere; line-height: 20px; padding-top: 3px; }
   .InstallLine .copy { margin-block: -4px; }
   .InstallLine :is(.tabs button, .copy) { border-radius: 6px; }  /* nested in the card's 10px */
 }
@@ -692,7 +692,12 @@ svg.icon { width: 16px; height: 16px; flex: none; }
 }
 @media (max-width: 560px) {
   .landing .pillars, .landing .readnext p { grid-template-columns: minmax(0, 1fr); }
-  .landing .hero { --hero-top: 48px; padding-bottom: 32px; }
+  /* the first screen of a phone holds the whole hero, the install card included, under Safari's bars: a tighter line
+     and lede, closer blocks: under 548px, an iPhone SE's height under Safari's bars */
+  .landing .hero { --hero-top: 40px; --hero-line: 2.125rem; padding-bottom: 32px; }
+  .landing .hero h1 { margin-bottom: 12px; }
+  .landing .lede { font-size: 1rem; line-height: 1.55; margin-bottom: 20px; }
+  .landing .hero .InstallLine { margin-top: 12px; }
 }
 
 /* the cast panel: what you write, what Postgres runs, what TypeScript knows. Three columns from 1140px wide, where
