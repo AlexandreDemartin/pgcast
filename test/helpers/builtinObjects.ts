@@ -11,13 +11,19 @@ export const builtinObjects = (): Record<string, object> => {
   const
     Float16Array = (globalThis as any).Float16Array,  // Node 24 and later
     AggregateError = (globalThis as any).AggregateError,  // ES2021: not in the lib's ES2019 types
-    SuppressedError = (globalThis as any).SuppressedError;  // Node 24 and later
+    SuppressedError = (globalThis as any).SuppressedError,  // Node 24 and later
+    WeakRef = (globalThis as any).WeakRef,  // ES2021: not in the lib's ES2019 types
+    FinalizationRegistry = (globalThis as any).FinalizationRegistry,  // ES2021: not in the lib's ES2019 types
+    DisposableStack = (globalThis as any).DisposableStack,  // Node 24 and later
+    AsyncDisposableStack = (globalThis as any).AsyncDisposableStack;  // Node 24 and later
   return {
     Date: new Date(0),
     Map: new Map([['id', 1]]),
     Set: new Set(['id']),
     WeakMap: new WeakMap(),
     WeakSet: new WeakSet(),
+    WeakRef: new WeakRef({}),
+    FinalizationRegistry: new FinalizationRegistry(() => {}),
     RegExp: /id/g,
     Promise: Promise.resolve({ id: 1 }),
     Error: new Error('id'),
@@ -30,6 +36,7 @@ export const builtinObjects = (): Record<string, object> => {
     AggregateError: new AggregateError([new Error('id')], 'id'),
     ...SuppressedError && { SuppressedError: new SuppressedError(new Error('id'), new Error('id'), 'id') },
     ArrayBuffer: new ArrayBuffer(1),
+    SharedArrayBuffer: new SharedArrayBuffer(1),
     DataView: new DataView(new ArrayBuffer(1)),
     Uint8Array: new Uint8Array(1),
     Float64Array: new Float64Array(2),
@@ -39,5 +46,7 @@ export const builtinObjects = (): Record<string, object> => {
     Number: new Number(1),
     String: new String('id'),
     Boolean: new Boolean(true),
+    ...DisposableStack && { DisposableStack: new DisposableStack() },
+    ...AsyncDisposableStack && { AsyncDisposableStack: new AsyncDisposableStack() },
   };
 };
