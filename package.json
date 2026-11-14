@@ -17,7 +17,7 @@
   "scripts": {
     "build": "tsc && gen-esm-wrapper db db.mjs && gen-esm-wrapper generate generate.mjs",
     "prepack": "npm run build",
-    "lint": "eslint src/db/*.ts src/generate/*.ts scripts/*.mjs website/*.mjs website/.vitepress/*.ts",
+    "lint": "eslint src/db/*.ts src/generate/*.ts scripts/*.mjs website/*.mjs website/*.ts \"website/.vitepress/**/*.ts\"",
     "typecheck": "tsc --emitDeclarationOnly --outDir node_modules/.cache/pgcast && tsc -p test && tsc -p test/generated",
     "test": "vitest run",
     "test:watch": "vitest",

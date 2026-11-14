@@ -62,15 +62,16 @@ export default defineConfig(
       "@stylistic/semi": ["error", "always"],
     },
   },
-  // The scripts and the docs site's code, outside the library: Node ES modules, with the recommended rules only.
+  // The scripts and the docs site's code, outside the library: ES modules, with the recommended rules only, and Node's
+  // globals for the `.mjs` scripts.
   {
-    files: ["scripts/*.mjs", "website/*.mjs", "website/.vitepress/*.ts"],
+    files: ["scripts/*.mjs", "website/*.mjs", "website/*.ts", "website/.vitepress/**/*.ts"],
     languageOptions: {
       globals: globals.node,
     },
   },
   {
-    files: ["website/.vitepress/*.ts"],
+    files: ["website/*.ts", "website/.vitepress/**/*.ts"],
     extends: [tseslint.configs.eslintRecommended],  // `no-undef` off: `tsc -p website/.vitepress` checks the names
     plugins: {
       "@typescript-eslint": tseslint.plugin,
