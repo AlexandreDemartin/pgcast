@@ -73,7 +73,7 @@ The generated code and the runtime speak of `zapatos/schema`, `zapatos/db` and `
 | `npm run test:watch` | Vitest in watch mode |
 | `npm run test:types` | emits the declarations of `src/db`, then the Vitest type tests (`test/types/*.test-d.ts`, `expectTypeOf`) on the fixture's generated schema |
 | `npm run bench:types` | compile cost of `bench/` (typed queries on the fixture's schema): `Instantiations` and `Types`, minus a floor without pgcast, compared with `bench/baseline.json`; fails above +20 %, below −5 % or if the TypeScript version differs; `-- --update` rewrites the baseline |
-| `npm run check:agents` | consistency of skills and agents, tests of the `guard` hook |
+| `npm run check:agents` | consistency of skills and agents, the summary of `docs/CHARACTERISATION-REPORT.md` recounted from its sections, tests of the `guard` hook and of that recount |
 
 A task is **done** only if `lint`, `typecheck`, `test` and `test:types` pass.
 

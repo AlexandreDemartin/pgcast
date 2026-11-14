@@ -1,8 +1,10 @@
 #!/usr/bin/env node
-// `npm run check:agents`: keeps the agent method (.agents/README.md) consistent, then runs the guard hook's tests.
+// `npm run check:agents`: keeps the agent method (.agents/README.md) consistent, recounts the summary of the
+// characterisation report, then runs the tests of the guard hook and of that recount.
 import {spawnSync} from 'node:child_process';
 import {existsSync, readdirSync, readFileSync} from 'node:fs';
 import {join} from 'node:path';
+import {checkReport} from './check-report.mjs';
 
 const skillsDirectory = '.agents/skills';
 const agentsDirectory = '.claude/agents';
@@ -76,6 +78,10 @@ for (const path of citingFiles) {
   }
 }
 
+// The summary of the characterisation report, recounted from its sections (scripts/check-report.mjs).
+const reportPath = 'docs/CHARACTERISATION-REPORT.md';
+errors.push(...checkReport(readFileSync(reportPath, 'utf8'), reportPath));
+
 for (const {path, lines, words} of sizes) {
   console.log(`${String(lines).padStart(4)} lines ${String(words).padStart(5)} words  ${path}`);
 }
@@ -83,7 +89,7 @@ if (errors.length > 0) {
   console.error(errors.map(e => `✗ ${e}`).join('\n'));
   process.exit(1);
 }
-console.log(`✓ ${skills.length} skills, ${readdirSync(agentsDirectory).filter(f => f.endsWith('.md')).length} agents`);
+console.log(`✓ ${skills.length} skills, ${readdirSync(agentsDirectory).filter(f => f.endsWith('.md')).length} agents, ${reportPath} summary`);
 
-const guardTests = spawnSync(process.execPath, ['--test', '.claude/hooks/guard.test.mjs'], {stdio: 'inherit'});
-process.exit(guardTests.status ?? 1);
+const tests = spawnSync(process.execPath, ['--test', '.claude/hooks/guard.test.mjs', 'scripts/check-report.test.mjs'], {stdio: 'inherit'});
+process.exit(tests.status ?? 1);
