@@ -163,6 +163,8 @@ Candidates for a check, a rule or a skill line.
 - #167 — A red commit typechecks too: Vitest runs a call past an overload's arity; write it `(fn as any)(…)` — `builder`
 - #252 — A list of the routes that compile a Whereable is checked against every interpolation of a filter in `shortcuts.ts`, not only `where`: `having` was missing — `builder`
 - #252 — A « 6.6.1 typed X » claim is checked by `tsc` against the `zapatos@6.6.1` tarball's `dist/db/*.d.ts` through `paths`, with `NODE_PATH` on the root `node_modules` — `builder`
+- #408 — In `.ts` files `no-undef` is off (typescript-eslint's advice), so a planted undefined name there is caught by `tsc`, not ESLint: the proof goes through the type-check — `builder`
+- #408 — The docs site's type-check cannot live in the root `typecheck`: it needs the site's dependencies, which the `build` job never installs — `builder`
 - #407 — `env -u TEST_DATABASE_URL` does not unset the URL while `src/.env` exists (`testDatabaseUrl()` loads it): a real « unset » run needs a checkout without it; an unreachable host is what tells the old behaviour from the new — `builder`
 - #399 — Swapping `{}` for `Object.create(null)` also changes every inherited lookup that object meets later (`a[x] ?? a['*'][x]`): where only an own `__proto__` key is the goal, `Object.fromEntries` keeps the prototype — `branch-reviewer`
 - #399 — A codegen change that touches `cliConfig` gets its byte-identity replay through the CLI too, not only `tsForConfig` with plain configs — `branch-reviewer`

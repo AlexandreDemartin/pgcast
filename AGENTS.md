@@ -67,7 +67,7 @@ The generated code and the runtime speak of `zapatos/schema`, `zapatos/db` and `
 |---|---|
 | `npm ci` | install (npm ≥ 10) |
 | `npm run build` | `tsc` (CJS, ES2019) + ESM wrappers |
-| `npm run lint` | ESLint 9 (flat config) on `src/` |
+| `npm run lint` | ESLint 9 (flat config) on `src/`, `scripts/` and the docs site's own code (`website/*.mjs`, `website/.vitepress/*.ts`) |
 | `npm run typecheck` | `tsc` on the lib (its declarations go to `node_modules/.cache/pgcast`), on `test/`, and on the fixture's generated output (`test/generated/`) against those declarations |
 | `npm test` | Vitest: unit and integration (`TEST_DATABASE_URL` required, `useTestDatabase()` in `test/helpers/db.ts`) |
 | `npm run test:watch` | Vitest in watch mode |

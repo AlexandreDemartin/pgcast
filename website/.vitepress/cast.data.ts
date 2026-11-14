@@ -118,7 +118,8 @@ export async function castOf(file: string, twoslasher: ReturnType<typeof createT
  * (the namespace `s.cinemas` before `const cinemas`).
  */
 const typeOf = (hovers: ReturnType<ReturnType<typeof createTwoslasher>>['nodes'], name: string) => {
-  const text = hovers.find(n => n.type === 'hover' && n.target === name && n.text.startsWith(`const ${name}: `))?.text;
+  const text = hovers.filter(n => n.type === 'hover')
+    .find(n => n.target === name && n.text.startsWith(`const ${name}: `))?.text;
   return text === undefined ? undefined : hoverType(text);
 };
 
