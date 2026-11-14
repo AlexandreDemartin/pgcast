@@ -23,11 +23,19 @@ export interface Config {
   undefinedMeansMissing?: boolean;  // an undefined value is a missing key: DEFAULT in insert, left out of update and upsert
   transactionRequiresCommit?: boolean;  // transaction() rejects when Postgres answers its COMMIT with ROLLBACK
   selectExactlyOneChecksForSecondRow?: boolean;  // selectExactlyOne() run on its own asks for LIMIT 2, and throws on a second row
+  aggregatesTypedByColumn?: boolean;  // sum/avg/min/max give null on an empty set, min/max the column's value: declare it in ConfigTypes too
   queryListener?(query: SQLQuery, txnId?: number): void;
   resultListener?(result: any, txnId?: number, elapsedMs?: number, query?: SQLQuery): void;
   transactionListener?(message: string, txnId?: number): void;
 }
 export type NewConfig = Partial<Config>;
+
+/**
+ * The options of `Config` that change a type, as you set them: the compiler cannot read `setConfig()`.
+ * Declare each in your project, e.g.
+ * `declare module 'zapatos/db' { interface ConfigTypes { aggregatesTypedByColumn: true } }`.
+ */
+export interface ConfigTypes { }
 
 const defaults: Config = {
   transactionAttemptsMax: 5,
@@ -38,6 +46,7 @@ const defaults: Config = {
   undefinedMeansMissing: false,  // the default in 7.0
   transactionRequiresCommit: false,  // the default in 7.0
   selectExactlyOneChecksForSecondRow: false,  // stays the default in 7.0
+  aggregatesTypedByColumn: false,  // the default in 7.0
 };
 
 let config: Config = { ...defaults };

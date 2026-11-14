@@ -924,7 +924,7 @@ describe('sum, avg, min, max without aggregatesTypedByColumn (deprecated, PGCAST
 
   it('reads an undefined aggregatesTypedByColumn as its default (false): Number(), and a warning', async () => {
     const { fdb, emitWarning } = await fresh();
-    fdb.setConfig({ aggregatesTypedByColumn: undefined } as db.NewConfig);
+    fdb.setConfig({ aggregatesTypedByColumn: undefined } as unknown as db.NewConfig);  // as a project without exactOptionalPropertyTypes can
     expect(await fdb.sum('accounts', { id: -1 }, { columns: ['balance'] }).run(t.client)).toBe(0);
     expect(emitWarning).toHaveBeenCalledTimes(1);
   });
