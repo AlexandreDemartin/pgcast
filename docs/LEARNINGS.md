@@ -143,6 +143,9 @@ Candidates for a check, a rule or a skill line.
 - #51 — R36 depends on the schema: an inline fragment fails only when another relation has the same column name with another type, or a nullable copy of a `NOT NULL` column in `update()`; the docs schema has neither, so the page states it in prose — `builder`
 - #252 — A list of the routes that compile a Whereable is checked against every interpolation of a filter in `shortcuts.ts`, not only `where`: `having` was missing — `builder`
 - #252 — A « 6.6.1 typed X » claim is checked by `tsc` against the `zapatos@6.6.1` tarball's `dist/db/*.d.ts` through `paths`, with `NODE_PATH` on the root `node_modules` — `builder`
+- #253 — An issue cites a test by its name, not its `file:line`: the line taken from Minors kept had moved by the time the step ran — `builder`
+- #253 — A guard shared by several routes gets a route-specific mutant: removing the shared guard turns every entry red and cannot show the new one is needed — `builder`
+- #253 — `branch-reviewer` cannot load the user skill `branch-review` (`disable-model-invocation`), so it reviews from its brief: the agent and the skill disagree — orchestrator
 
 ## Minors kept
 
