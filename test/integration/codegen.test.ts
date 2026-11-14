@@ -647,7 +647,8 @@ describe('column comments', () => {
       CREATE SCHEMA comment_tags;
       CREATE TABLE comment_tags.roles (
         dep int, first int, indented int, crlf int, two int, mid int, kept int, seen int, after int,
-        email int, spaced int, ticked int, linked int, linkcode int, linkplain int, unclosed int);
+        email int, spaced int, ticked int, linked int, linkcode int, linkplain int, unclosed int,
+        runs int, bare int, runtag int, asked int);
       COMMENT ON COLUMN comment_tags.roles.dep IS E'Billing order.\n@deprecated use lead';
       COMMENT ON COLUMN comment_tags.roles.first IS '@deprecated use lead';
       COMMENT ON COLUMN comment_tags.roles.indented IS E'Billing order.\n  @deprecated use lead';
@@ -663,7 +664,11 @@ describe('column comments', () => {
       COMMENT ON COLUMN comment_tags.roles.linked IS '{@link lead see @casting}';
       COMMENT ON COLUMN comment_tags.roles.linkcode IS '{@linkcode lead see @casting}';
       COMMENT ON COLUMN comment_tags.roles.linkplain IS '{@linkplain lead see @casting}';
-      COMMENT ON COLUMN comment_tags.roles.unclosed IS '{@link lead see @casting';`));
+      COMMENT ON COLUMN comment_tags.roles.unclosed IS '{@link lead see @casting';
+      COMMENT ON COLUMN comment_tags.roles.runs IS E'{@link lead\nsee @casting}';
+      COMMENT ON COLUMN comment_tags.roles.bare IS E'{@link\nsee @casting}';
+      COMMENT ON COLUMN comment_tags.roles.runtag IS E'{@link lead\n@deprecated use lead';
+      COMMENT ON COLUMN comment_tags.roles.asked IS E'See {@link lead\nthe lead, ask @casting}';`));
     afterAll(() => t.pool.query('DROP SCHEMA comment_tags CASCADE'));
 
     it('keeps the type and nullability lines out of the tag, and keeps the tag', async () => {
@@ -693,6 +698,11 @@ describe('column comments', () => {
         linkplain: { text: `**comment_tags.roles.linkplain**\n\n{@linkplain lead see @casting}\n${generated}`, tags: [] },
         // unclosed, the link takes in the line break and the next line's *, which TypeScript reads as on master
         unclosed: { text: `**comment_tags.roles.unclosed**\n\n{@link lead see @casting}        * ${generated}`, tags: [] },
+        // a link whose line ends on {@link or on its name runs on through the next line, * included
+        runs: { text: `**comment_tags.roles.runs**\n\n{@link lead * see @casting}\n${generated}`, tags: [] },
+        bare: { text: `**comment_tags.roles.bare**\n\n{@link  * see @casting}\n${generated}`, tags: [] },
+        runtag: { text: `**comment_tags.roles.runtag**\n\n{@link lead * @deprecated use lead}        * ${generated}`, tags: [] },
+        asked: { text: `**comment_tags.roles.asked**\n\nSee {@link lead * the lead, ask @casting}\n${generated}`, tags: [] },
       });
       // the same JSDoc on every interface that has the column
       expect.soft(Object.keys(others)).toEqual(['JSONSelectable', 'Whereable', 'Insertable', 'Updatable']);
@@ -716,6 +726,10 @@ describe('column comments', () => {
       // a comment without a tag keeps its JSDoc as it was: the comment's lines, then the generated ones
       expect.soft(commentLines(schema, 'roles').spaced).toEqual(['* Fee @ 5 a day']);
       expect.soft(commentLines(schema, 'roles').unclosed).toEqual(['* {@link lead see @casting']);
+      expect.soft(commentLines(schema, 'roles').runs).toEqual(['* {@link lead', '* see @casting}']);
+      expect.soft(commentLines(schema, 'roles').bare).toEqual(['* {@link', '* see @casting}']);
+      expect.soft(commentLines(schema, 'roles').runtag).toEqual(['* {@link lead', '* @deprecated use lead']);
+      expect.soft(commentLines(schema, 'roles').asked).toEqual(['* See {@link lead', '* the lead, ask @casting}']);
     });
   });
 });
