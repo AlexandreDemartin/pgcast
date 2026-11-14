@@ -511,6 +511,14 @@ describe('truncate', () => {
     expect(await run(db.insert('extra.articles', { author_id: 1, body: 'b' }, { returning: ['id'] }))).toEqual({ id: 1 });
   });
 
+  it('options in an order Postgres refuses: run() rejects with a plain Error, where 6.6.1 rejected with 42601', async () => {
+    // a .catch() chained on run() still gets it, as in 6.6.1: only the DatabaseError becomes an Error
+    const caught = await (db.truncate as any)('extra.articles', 'CASCADE', 'RESTART IDENTITY').run(t.client).catch((e: Error) => e);
+    expect(caught).toBeInstanceOf(Error);
+    expect(caught).not.toBeInstanceOf(pg.DatabaseError);
+    expect(caught.message).toBe(`Truncate options must be CONTINUE IDENTITY/RESTART IDENTITY, then RESTRICT/CASCADE, one of each at most, not 'CASCADE', 'RESTART IDENTITY'`);
+  });
+
   it('Postgres takes every order that compiles, an undefined or null option included', async () => {
     const orders: any[][] = [
       [], ['CONTINUE IDENTITY'], ['RESTART IDENTITY'], ['RESTRICT'], ['CASCADE'],

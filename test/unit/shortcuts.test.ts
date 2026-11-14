@@ -1043,9 +1043,14 @@ describe('truncate', () => {
     [['CASCADE', 'CASCADE'], `'CASCADE', 'CASCADE'`],
     [['RESTART IDENTITY', 'CASCADE', 'CASCADE'], `'RESTART IDENTITY', 'CASCADE', 'CASCADE'`],
     [['CASCADE', null, 'RESTART IDENTITY'], `'CASCADE', 'RESTART IDENTITY'`],
-  ])('options %j, in an order Postgres refuses, throw while compiling', (opts, given) => {
-    expect(() => (db.truncate as any)('users', ...opts)).toThrow(
-      `Truncate options must be CONTINUE IDENTITY/RESTART IDENTITY, then RESTRICT/CASCADE, one of each at most, not ${given}`);
+  ])('options %j, in an order Postgres refuses, build, then throw as they compile: run() rejects, with no query sent', async (opts, given) => {
+    const
+      message = `Truncate options must be CONTINUE IDENTITY/RESTART IDENTITY, then RESTRICT/CASCADE, one of each at most, not ${given}`,
+      query = (db.truncate as any)('users', ...opts),  // building does not throw
+      queryable = { query: vi.fn() } as any;
+    expect(() => query.compile()).toThrow(message);
+    await expect(query.run(queryable)).rejects.toThrow(message);
+    expect(queryable.query).not.toHaveBeenCalled();
   });
 });
 
