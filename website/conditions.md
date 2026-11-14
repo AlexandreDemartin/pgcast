@@ -236,6 +236,16 @@ An item compiles as in `vals([…])` within a filter:
 
 Zapatos 6.6.1 sent a `Parameter` and `parent()` there as one more parameter, as JSON (`'{"value":"x","cast":"text"}'`, `'{"value":"id"}'`), so `isIn()` found nothing and `isNotIn()` matched every row on a text column.
 
+The list itself is an array, `readonly` or not. Anything else gets past the type only as `any`, or as `null` and `undefined` without `strictNullChecks`: a `Set`, an iterator, a typed array, an array-like object, a string. It throws as the query compiles, so `run()` rejects with a plain `Error` before any query:
+
+> `` `isNotIn()` takes an array, not `Set`: make one with `isNotIn([...values])`, or `Array.from(values)` for an array-like object. ``<!-- message -->
+
+One value in place of the list, a string, a number, `null` or `undefined`, gets the other advice, as spreading `'Ada'` would give `'A'`, `'d'`, `'a'`:
+
+> `` `isIn()` takes an array, not `string`: for one value, write `isIn([value])`. ``<!-- message -->
+
+Zapatos 6.6.1 read the list's `length`. A `Set` or an iterator has none, so `isIn()` gave `false` and `isNotIn()` gave `true`, every row: with `ids` a `Set`, `db.deletes('films', { id: db.conditions.isNotIn(ids) })` was `DELETE FROM "films" WHERE ((true))`. A string gave its characters, which for a one-character string such as Express's `req.query.id` (`'5'` for `?id=5`) was its one value, the right rows, and now rejects; an array-like object gave its values and then its `length`, and `null` a `TypeError` at the call.
+
 ### `isIn()` {#conditions.isIn}
 
 `"col" IN ($1, $2)`<!-- probe: db.sql`${{ col: db.conditions.isIn([1, 2]) }}` -->. An empty array gives `false`: no row.
