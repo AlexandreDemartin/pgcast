@@ -446,7 +446,7 @@ describe('the config transaction() reads', () => {
   ])('with a transactionAttemptsMax of $name, from JavaScript', ({ max, message }) => {
     it('commits a callback that succeeds, after one attempt, as Zapatos 6.6.1 does', async () => {
       const { messages } = listen();
-      db.setConfig({ transactionAttemptsMax: max as number });
+      db.setConfig({ transactionAttemptsMax: max as unknown as number });
       let made = 0;
       const { value, error, leaked } = await leakCheck(() => db.serializable(t.pool, async c => {
         made++;
@@ -463,7 +463,7 @@ describe('the config transaction() reads', () => {
 
     it('rejects with the conversion\'s error after a 40001, as Zapatos 6.6.1 does, and releases its client', async () => {
       const { messages } = listen();
-      db.setConfig({ transactionAttemptsMax: max as number });
+      db.setConfig({ transactionAttemptsMax: max as unknown as number });
       let made = 0;
       const { error, leaked } = await leakCheck(() => db.serializable(t.pool, async c => {
         made++;
