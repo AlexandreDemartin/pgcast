@@ -224,6 +224,10 @@ Candidates for a check, a rule or a skill line.
 - #184 — A migration hint for files already on disk is checked in both prefixed and unprefixed schemas (`import type { format }` alone gives TS2305 in a prefixed one) — `branch-reviewer`
 - #184 — A codegen placeholder that « compiles » under `skipLibCheck` hides unresolved names as `any`: replay each output claim with `skipLibCheck` both ways — `builder`
 - #287 — A merged note keeps every condition of the note it replaces (#42's withholds the `customTypesTransform` advice when the raw names are equal): a test runs the old note's scenario inside the new note's — `branch-reviewer`
+- #309 — A rule that predicts how TypeScript reads generated JSDoc ships with a seeded fuzz with `typescript` (a devDependency) as the oracle, over an alphabet of the parser's token classes (`\` escapes, `\n`, `\r`, U+2028, U+2029, quotes, backticks, `/`, conflict markers, NBSP): three verify rounds stayed `partly` only for missing classes — `branch-reviewer`
+- #309 — Where a rule copies another parser, err on the side of the old output: move only when the tag is certain, any doubt keeps master's layout byte for byte — orchestrator
+- #309 — A byte-for-byte rule is tested against the real previous output (master's code via `git archive`, or the fixture snapshot), not a hand-rebuilt layout, which drifts silently — `branch-reviewer`
+- #309 — TypeScript's language service (`getQuickInfoAtPosition`, `getSuggestionDiagnostics`) replays the hover and the strike-through without an editor; it reads `@see`'s first word as a name — `builder`
 
 ## Minors kept
 
@@ -289,3 +293,6 @@ Minor review defects, taken up by the end-of-chapter review.
 - #184 — `src/generate/index.ts:10`: a direct caller of the exported `definitionForRelationInSchema` that does not pass `customTypeImports` now reads `archive.genre` rather than `genre` (both fail to compile) — `branch-reviewer`
 - #287 — `test/integration/codegen.test.ts:868`: the notes' order (case note first, then #42's) is decided alone but not pinned by a test — `branch-reviewer`
 - #287 — `CHANGELOG.md:101`: a second colon after « (…): on a case-insensitive file system », and « as in Zapatos 6.6.1 » reads as if it applied to the file system — `branch-reviewer`
+- #309 — `src/generate/tables.ts:341`: JS's `\s` is not TypeScript's `isWhiteSpaceSingleLine` (zero-width space, U+0085): harmless and exotic, at most a word in the code comment — `branch-reviewer`
+- #309 — `test/integration/codegen.test.ts:456-461`: the JSDoc of `commentLines` describes the layout without a tag, and its `slice(2, -3)` is wrong for a tagged column — `branch-reviewer`
+- #309 — out of scope: a column `DEFAULT`, domain or name holding ` @x` can still start a tag in the generated lines, on master too — `builder`
