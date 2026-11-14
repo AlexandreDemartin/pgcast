@@ -1,12 +1,14 @@
 {
-  // `docs:build` type-checks the site's own code too, which runs in Node at build: `@types/node` is the root's, as the
-  // site builds after the library (README § Build). The libraries' declarations are skipped: some of VitePress's
-  // dependencies name packages the site does not install (`@docsearch/js` names react and preact).
+  // `docs:build` type-checks the site's own code too: what runs in Node at build, whose `@types/node` is the root's, as
+  // the site builds after the library (README § Build), and the theme's and the playground's, which Vite bundles for
+  // the browser (`vite/client` types a `?raw` import; `theme/vue.d.ts` a `.vue` one). The libraries' declarations are
+  // skipped: some of VitePress's dependencies name packages the site does not install (`@docsearch/js` names react and
+  // preact).
   "extends": "../tsconfig.json",
   "compilerOptions": {
     "allowImportingTsExtensions": true,
     "skipLibCheck": true,
-    "types": ["node"]
+    "types": ["node", "vite/client"]
   },
-  "include": ["*.ts"]
+  "include": ["**/*.ts", "../*.ts"]
 }
