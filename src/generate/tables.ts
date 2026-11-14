@@ -14,6 +14,7 @@ import { jsdocText, stringLiteral, tsIdentifier } from './quote';
 
 // TypeScript's own types that an enum may be named after: a placeholder naming one compiles without an import
 const tsOwnTypes = new Set('any bigint boolean never number object string symbol undefined unknown'.split(' '));
+const hasOwn = (o: object, key: string) => Object.prototype.hasOwnProperty.call(o, key);
 
 
 export interface Relation {
@@ -117,7 +118,8 @@ export const definitionForRelationInSchema = async (
   customTypeOrigins: CustomTypeOrigins = Object.create(null),  // an 'out' parameter too
   enumsForSchema = async (schema: string) => (await enumOrdersForSchema(schema, queryFn))[enumOrderOf(config)],
   columnsTypedByEnumName: string[] = [],  // an 'out' parameter too: what typeEnumsAcrossSchemas would change
-  customTypeImports: Record<string, string> = Object.create(null),  // an 'out' parameter too: what a placeholder imports from zapatos/schema, '' for nothing
+  // an 'out' parameter too: what a placeholder imports from zapatos/schema, '' for nothing, null for an enum's labels written out
+  customTypeImports: Record<string, string | null> = Object.create(null),
 ) => {
   const
     rows = await columnsForRelation(rel, schemaName, queryFn),
@@ -186,11 +188,16 @@ export const definitionForRelationInSchema = async (
         namespace = tsIdentifier(schemaName, 'namespace'),
         imported = importsEnum ? (schemaPrefix ? namespace : enumName) : '',
         // relations that would import differently keep 6.6.1's text, with no import, in whichever order they are read
-        agrees = (customTypeImports[prefixedCustomType] ?? imported) === imported;
+        agrees = (customTypeImports[prefixedCustomType] ?? imported) === imported,
+        // with typeEnumsAcrossSchemas, every relation reads the enum in its own schema: the labels that one of them
+        // writes out type them all, and a relation that names the enum never replaces them
+        labelled = inlineEnums && (hasOwn(typeEnums, udtName) || udtName.charAt(0) === '_' && hasOwn(typeEnums, udtName.slice(1)));
 
-      // two origins: the last one seen wins
-      customTypes[prefixedCustomType] = agrees && importsEnum && schemaPrefix ? `${namespace}.${selectableType}` : selectableType;
-      customTypeImports[prefixedCustomType] = agrees ? imported : '';
+      if (labelled || customTypeImports[prefixedCustomType] !== null) {
+        // two origins: the last one seen wins
+        customTypes[prefixedCustomType] = agrees && importsEnum && schemaPrefix ? `${namespace}.${selectableType}` : selectableType;
+        customTypeImports[prefixedCustomType] = labelled ? null : agrees ? imported : '';
+      }
       origins[`"${domainName === null ? udtSchema : domainSchema}"."${customType}"`] = customType;
       selectableType = JSONSelectableType = whereableType = insertableType = updatableType =
         'c.' + prefixedCustomType;

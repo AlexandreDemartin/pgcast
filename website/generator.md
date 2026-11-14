@@ -275,7 +275,7 @@ CREATE TABLE prints (id int PRIMARY KEY, format archive.print_format NOT NULL, f
 | `keeper` | `crew_job \| null`: the labels of `public.crew_job` | `('archivist' \| 'projectionist') \| null` |
 
 - The labels are written out, not named: the enum's schema needn't be in [`schemas`](#generate.schemas). In the order of [`enumOrder`](#generate.enumOrder), as for every enum.
-- A domain over such an enum stays a custom type, `c.<name>`; its new placeholder gets the labels rather than `any`. An existing placeholder is never overwritten.
+- A domain over such an enum stays a custom type, `c.<name>`; its new placeholder gets the labels rather than `any`, with no import, even when a relation of the enum's own schema uses the domain as well. An existing placeholder is never overwritten.
 - `false` notes, through [`warningListener`](#generate.warningListener), the columns `true` would change, each with its type: for a domain, the type under it.
 
 ### `enumOrder` {#generate.enumOrder}
