@@ -141,6 +141,10 @@ Candidates for a check, a rule or a skill line.
 - #368 — The « runs as on Zapatos 6.6.1 » CLI replay (exit code, stdout, `Error:` line, file hashes) is redone by hand on each CLI PR: a script with fixed scenarios would make it checkable — `branch-reviewer`
 - #51 — Before documenting a report finding, search what the docs site already says: 10 of the 16 were covered by the docs chapter — `builder`
 - #51 — R36 depends on the schema: an inline fragment fails only when another relation has the same column name with another type, or a nullable copy of a `NOT NULL` column in `update()`; the docs schema has neither, so the page states it in prose — `builder`
+- #167 — A new refusal on a path where 6.6.1 rejected from `.run()` throws as the query compiles (a fragment whose `compile` throws, as #269 does), frozen through `.run()` with a `query` spy: thrown at the call, a `.catch()` chained on `.run()` loses it — `branch-reviewer`
+- #167 — A sentence saying when an error happens matches how its test asserts: « the call throws » for `expect(() => fn(…))`, « throws while compiling, so `.run()` rejects » for `.compile()` or `.run()` — `branch-reviewer`
+- #167 — When a row of a docs table moves to another group, reread the paragraph above it: `transaction.md` still said every shortcut throws from the call — `branch-reviewer`
+- #167 — A red commit typechecks too: Vitest runs a call past an overload's arity; write it `(fn as any)(…)` — `builder`
 
 ## Minors kept
 
