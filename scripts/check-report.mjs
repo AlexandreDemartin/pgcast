@@ -36,7 +36,7 @@ export function checkReport(text, path = 'docs/CHARACTERISATION-REPORT.md') {
     }
     if (heading === 'Summary') {
       if (line.startsWith('|') && !/^\|[-| ]+\|$/.test(line)) summaryRows.push({where, cells: cellsOf(line)});
-      else if (/to fix|to document|to leave|opt-in/.test(line)) summaryLines.push({where, line});
+      else if (/\d+ (findings? to fix|behind an opt-in|to document|to leave)\b/i.test(line)) summaryLines.push({where, line});
       continue;
     }
     if (/^\|\s*#\s*\|/.test(line)) {
