@@ -74,7 +74,7 @@ Yarn 2 and later need a version range in an alias, and Yarn 1 and bun before 1.4
 
 ### Under the `zapatos` alias
 
-For a project switching from Zapatos, whose imports stay `zapatos/*` ([Switch from Zapatos](/switching)), and for a new one until 6.7.0:
+For a project switching from Zapatos, whose imports stay `zapatos/*`, and for a new one until 6.7.0:
 
 ::: code-group
 

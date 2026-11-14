@@ -293,7 +293,7 @@ CREATE TYPE crew_job AS ENUM ('director', 'writer', 'editor', 'cinematographer',
 
 ### `moduleNames` {#generate.moduleNames}
 
-`"zapatos"` or `"pgcast"`, default `"zapatos"`. The module names the generated files declare and import, and the folder they go in. It must match the folder pgcast is installed in, under `node_modules`: `"pgcast"` for a project installed under its own name, `pgcast@npm:@pgcast/pgcast`, from 6.7.0 ([Install](/install#under-its-own-name)); `"zapatos"` for one under the `zapatos` alias, such as a project switched from Zapatos ([Switching from Zapatos](/switching)).
+`"zapatos"` or `"pgcast"`, default `"zapatos"`. The module names the generated files declare and import, and the folder they go in. It must match the folder pgcast is installed in, under `node_modules`: `"pgcast"` for a project installed under its own name, `pgcast@npm:@pgcast/pgcast`, from 6.7.0 ([Install](/install#under-its-own-name)); `"zapatos"` for one under the `zapatos` alias, such as a project switched from Zapatos ([Switch from Zapatos](/switching)).
 
 | | `"zapatos"` | `"pgcast"` |
 |---|---|---|
