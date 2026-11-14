@@ -86,6 +86,9 @@ const inBlock = (client: pg.ClientBase) => { const s = transactionStatus(client)
 
 let txnSeq = 0;
 
+/** A client of the caller's whose status `transaction()` is reading again: a call at the same moment waits for it. */
+const statusReads = new WeakMap<object, Promise<void>>();
+
 /**
  * Provide a database client to the callback, whose queries are then wrapped in 
  * a database transaction. The transaction is committed, retried, or rolled back
@@ -116,6 +119,11 @@ export async function transaction<T, M extends IsolationLevel>(
 ): Promise<T> {
 
   if (Object.prototype.hasOwnProperty.call(txnClientOrQueryable, '_zapatos')) {
+    // its queries go after the START TRANSACTION of a call still reading the status, as in 6.6.1; that call
+    // refused, this one asks again
+    const statusRead = statusReads.get(txnClientOrQueryable);
+    if (statusRead) return statusRead.then(() => transaction(txnClientOrQueryable, isolationLevel, callback));
+
     // if txnClientOrQueryable is a TxnClient, just pass it through
     return callback(txnClientOrQueryable as TxnClient<IsolationSatisfying<M>>);
   }
@@ -137,13 +145,17 @@ export async function transaction<T, M extends IsolationLevel>(
     if (!clientIsOurs && inBlock(txnClient)) {
       // pg reads the status at each ReadyForQuery, so it can lag behind a query that just rejected (a failed
       // COMMIT): an empty query, which Postgres does not count as a query of the block, reads it again
-      const resync = sql``.run(txnClient);
-      if (getConfig().transactionRequiresIdleClient ?? false) {
-        await resync;
-        if (inBlock(txnClient)) throw new Error('transaction() was given a client inside a transaction block, so its COMMIT or ROLLBACK would end that transaction: COMMIT or ROLLBACK it first, pass the pool, or run the queries on that client without transaction()');
-      } else {
-        // not awaited: START TRANSACTION is queued at once, as in 6.6.1, before any query of a call passed through
-        resync.then(() => { if (inBlock(txnClient)) warnOnce('PGCAST_DEP005', 'transaction() was given a client inside a transaction block, and its COMMIT or ROLLBACK will end that transaction. Set transactionRequiresIdleClient: true (db.setConfig) to reject instead, before its START TRANSACTION; it will be the default in pgcast 7.0.'); }, () => { });
+      let statusReadDone!: () => void;
+      statusReads.set(txnClient, new Promise<void>(resolve => { statusReadDone = resolve; }));
+      try {
+        await sql``.run(txnClient);
+        if (inBlock(txnClient)) {
+          if (getConfig().transactionRequiresIdleClient ?? false) throw new Error('transaction() was given a client inside a transaction block, so its COMMIT or ROLLBACK would end that transaction: COMMIT or ROLLBACK it first, pass the pool, or run the queries on that client without transaction()');
+          warnOnce('PGCAST_DEP005', 'transaction() was given a client inside a transaction block, and its COMMIT or ROLLBACK will end that transaction. Set transactionRequiresIdleClient: true (db.setConfig) to reject instead, before its START TRANSACTION; it will be the default in pgcast 7.0.');
+        }
+      } finally {  // the waiting calls run once this one is past its next await: after its START TRANSACTION
+        statusReads.delete(txnClient);
+        statusReadDone();
       }
     }
 
