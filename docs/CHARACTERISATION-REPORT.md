@@ -17,7 +17,7 @@ Sources: the "Surprises" sections of PRs #4, #5, #7 and #8, the `characterizatio
 | Docs | 4 | 3 | 1 |
 | **Total** | **67** | **34** | **33** |
 
-29 findings to fix (R65, R66 decided), all fixed, 7 behind an opt-in, 19 to document and 12 to leave.
+29 findings to fix (R65, R66 decided), all fixed, 8 behind an opt-in, 18 to document and 12 to leave.
 
 The three that matter most:
 
