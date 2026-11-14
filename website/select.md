@@ -97,6 +97,8 @@ Paging through a long list: [Pagination](/paginate).
 
 `extras?: { [key: string]: column | SQLFragment }`, an [`ExtrasOption`](#ExtrasOption): more keys on each result object. A column gives its value under another key; a `sql` fragment gives the type of its second type parameter, `` db.sql<s.cinemas.SQL, number>`…` ``, so `number` here. The keys are added to the row with `||`, after `columns`.
 
+A shortcut is a subquery there: `count()`, `selectOne()` or any other is written in parentheses, `(SELECT count(*) AS result FROM "films" WHERE "studio_id" = "studios"."id")`<!-- probe: db.select('studios', db.all, { extras: { films: db.count('films', db.sql`${'studio_id'} = ${'studios'}.${'id'}`) } }) -->, and comes back as JSON, as in a `lateral`, or `null` when its query returns no row. It must give one row at most: a `groupBy` that gives several is refused (21000). `db.parent()` has no meaning in `extras`, so name the outer table in a `sql` fragment, as here. A `sql` fragment is written as given: put a query of your own, or a shortcut inside one, in its parentheses.
+
 <CastPanel example="selectExtras">
 
 <<< ./examples/selectExtras.ts{ts twoslash}
@@ -500,4 +502,4 @@ From 6.7.0. The call signature of `min()` and `max()` with `aggregatesTypedByCol
 interface ColumnAggregateFragment<RunResult, NestedResult> extends SQLFragment<RunResult>
 ```
 
-From 6.7.0. What `min()` and `max()` return with `aggregatesTypedByColumn` declared: `.run()` gives `RunResult`, the column's `Selectable` type or `null`; nested in a `lateral`, it is typed `NestedResult`, its `JSONSelectable` type or `null`, as [`RunResultForSQLFragment`](/sql-template#RunResultForSQLFragment) reads it. In `extras` too, once [#262](https://github.com/AlexandreDemartin/pgcast/issues/262) parenthesises it; Postgres refuses it bare today. A function of yours that returns one, in a project built with `declaration: true`, has it written in its `.d.ts` by this name.
+From 6.7.0. What `min()` and `max()` return with `aggregatesTypedByColumn` declared: `.run()` gives `RunResult`, the column's `Selectable` type or `null`; nested in a `lateral` or as an `extras` value, it is typed `NestedResult`, its `JSONSelectable` type or `null`, as [`RunResultForSQLFragment`](/sql-template#RunResultForSQLFragment) reads it. A function of yours that returns one, in a project built with `declaration: true`, has it written in its `.d.ts` by this name.
