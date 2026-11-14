@@ -129,20 +129,20 @@ export async function transaction<T, M extends IsolationLevel>(
     clientIsOurs = typeofQueryable(txnClientOrQueryable) === 'pool',
     txnClient = (clientIsOurs ? await txnClientOrQueryable.connect() : txnClientOrQueryable) as TxnClient<M>;
 
-  // a client of the caller's, inside a block of its own (BEGIN): our COMMIT or ROLLBACK would end that
-  // transaction (see https://github.com/AlexandreDemartin/pgcast/issues/233)
-  if (!clientIsOurs && inBlock(txnClient)) {
-    // pg reads the status at each ReadyForQuery, so it can lag behind a query that just rejected (a failed
-    // COMMIT): an empty query, which Postgres does not count as a query of the block, reads it again
-    await sql``.run(txnClient);
-    if (inBlock(txnClient)) {
-      if (getConfig().transactionRequiresIdleClient ?? false) throw new Error('transaction() was given a client inside a transaction block, so its COMMIT or ROLLBACK would end that transaction: COMMIT or ROLLBACK it first, pass the pool, or run the queries on that client without transaction()');
-      warnOnce('PGCAST_DEP005', 'transaction() was given a client inside a transaction block, and its COMMIT or ROLLBACK will end that transaction. Set transactionRequiresIdleClient: true (db.setConfig) to reject instead, before its START TRANSACTION; it will be the default in pgcast 7.0.');
-    }
-  }
-
   try {  // from here, every path releases a client checked out from the pool
-    txnClient._zapatos = { isolationLevel, txnId };
+    txnClient._zapatos = { isolationLevel, txnId };  // at once, so a call at the same moment is passed through
+
+    // a client of the caller's, inside a block of its own (BEGIN): our COMMIT or ROLLBACK would end that
+    // transaction (see https://github.com/AlexandreDemartin/pgcast/issues/233)
+    if (!clientIsOurs && inBlock(txnClient)) {
+      // pg reads the status at each ReadyForQuery, so it can lag behind a query that just rejected (a failed
+      // COMMIT): an empty query, which Postgres does not count as a query of the block, reads it again
+      await sql``.run(txnClient);
+      if (inBlock(txnClient)) {
+        if (getConfig().transactionRequiresIdleClient ?? false) throw new Error('transaction() was given a client inside a transaction block, so its COMMIT or ROLLBACK would end that transaction: COMMIT or ROLLBACK it first, pass the pool, or run the queries on that client without transaction()');
+        warnOnce('PGCAST_DEP005', 'transaction() was given a client inside a transaction block, and its COMMIT or ROLLBACK will end that transaction. Set transactionRequiresIdleClient: true (db.setConfig) to reject instead, before its START TRANSACTION; it will be the default in pgcast 7.0.');
+      }
+    }
 
     const
       config = getConfig(),
