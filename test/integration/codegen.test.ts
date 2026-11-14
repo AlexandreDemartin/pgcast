@@ -443,6 +443,55 @@ ${imports.map(line => `  ${line}\n`).join('')}  export type ${type};  // replace
         expect.soft(files.PgString_d).toBe(placeholder('zapatos', [], 'PgString_d = string'));
       }
     });
+
+    // with typeEnumsAcrossSchemas off, each relation reads `genre` in its own schema: an import would type one
+    // of them with the other's labels, and its text would hang on which relation is read last
+    describe('a domain whose relations would import different enums', () => {
+      beforeAll(() => t.pool.query(`
+        CREATE SCHEMA placeholder_home;
+        CREATE SCHEMA placeholder_archive;
+        CREATE TYPE placeholder_home.genre AS ENUM ('comedy', 'drama');
+        CREATE TYPE placeholder_archive.genre AS ENUM ('silent');
+        CREATE DOMAIN placeholder_home.genre_d AS placeholder_home.genre;
+        CREATE TABLE placeholder_home.films (genre placeholder_home.genre_d);
+        CREATE TABLE placeholder_home.shorts (genre placeholder_home.genre_d);
+        CREATE TABLE placeholder_archive.reels (genre placeholder_home.genre_d);
+      `));
+      afterAll(() => t.pool.query('DROP SCHEMA placeholder_home, placeholder_archive CASCADE'));
+
+      const unprefixed = ['placeholder_home', 'placeholder_archive', null];
+
+      it.each(unprefixed)("keeps 6.6.1's text, with no import, unprefixedSchema %s", async unprefixedSchema => {
+        for (const schemas of [
+          { placeholder_home: all, placeholder_archive: all }, { placeholder_archive: all, placeholder_home: all },
+        ]) {
+          const { customTypeSourceFiles: files } = await codegen({ schemas, unprefixedSchema });
+          expect(files.PgGenre_d).toBe(placeholder('zapatos', [], 'PgGenre_d = genre'));
+        }
+      });
+
+      it('in whichever order the relations are read', async () => {
+        const
+          q = (query: pg.QueryConfig) => t.pool.query(query),
+          relations = (await Promise.all(['placeholder_home', 'placeholder_archive'].map(async schema =>
+            (await relationsInSchema(schema, q)).map(rel => ({ rel, schema, enums: enumDataForSchema(schema, q) })))))
+            .flat(),
+          orders = (list: typeof relations): (typeof relations)[] => list.length <= 1 ? [list] :
+            list.flatMap((first, i) => orders(list.filter((_, j) => j !== i)).map(rest => [first, ...rest]));
+        expect(relations.map(r => `${r.schema}.${r.rel.name}`).sort())
+          .toEqual(['placeholder_archive.reels', 'placeholder_home.films', 'placeholder_home.shorts']);
+        for (const unprefixedSchema of unprefixed) {
+          const config = finaliseConfig({ ...quiet, unprefixedSchema });
+          for (const order of orders(relations)) {
+            const customTypes = Object.create(null), customTypeImports = Object.create(null);
+            for (const { rel, schema, enums } of order) await definitionForRelationInSchema(
+              rel, schema, await enums, customTypes, config, q, undefined, undefined, undefined, customTypeImports);
+            expect({ type: customTypes.PgGenre_d, imports: customTypeImports.PgGenre_d || null },
+              `${unprefixedSchema}: ${order.map(r => r.rel.name).join(', ')}`).toEqual({ type: 'genre', imports: null });
+          }
+        }
+      });
+    });
   });
 
   it('holds no orphan file', () => {
