@@ -55,7 +55,7 @@ export default defineConfig({
   },
   head: [
     // public/fonts/, declared in theme/fonts.css: every page's first screen sets all three faces, and the wordmark's
-    // six capitals of Saira. Those first: 1.2 KB, set `font-display: block`, they then arrive before the first paint
+    // six capitals of Saira. Those first: 1.3 KB, set `font-display: block`, they then arrive before the first paint
     // (400ms on a throttled 1.6 Mb/s, 150ms link, against 1.2s unpreloaded and 1.5s preloaded behind the three faces)
     font('saira-wordmark'), font('schibsted-grotesk-latin'), font('inter-latin'), font('jetbrains-mono-latin'),
     ['script', {}, wordmarkEntrance],

@@ -4,18 +4,18 @@
   <title>pgcast. Your types, cast from your database.</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@800&amp;family=Inter:wght@400&amp;family=JetBrains+Mono:wght@500;700&amp;display=block');
-    @font-face { font-family: 'Saira Wordmark'; font-weight: 400; src: url('fonts/saira-wordmark.woff2') format('woff2'); }
-    .wordmark { font-family: 'Saira Wordmark', 'Helvetica Neue', Arial, sans-serif; font-weight: 400; }
+    @font-face { font-family: 'Saira Wordmark'; font-weight: 700; src: url('fonts/saira-wordmark.woff2') format('woff2'); }
+    .wordmark { font-family: 'Saira Wordmark', 'Helvetica Neue', Arial, sans-serif; font-weight: 700; }
     .mono { font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; }
     .display { font-family: 'Schibsted Grotesk', 'Helvetica Neue', Arial, sans-serif; font-weight: 800; }
     .body { font-family: Inter, system-ui, sans-serif; }
   </style>
   <rect width="1200" height="630" fill="#f6f8f9"/>
   <!-- the wordmark, PG⟨mark⟩CAST as in the top bar (theme/Wordmark.vue): the tile 44px, the capitals' height (Saira's
-       cap height, .688em: 63.95px), on one baseline, tracked .06em; the P's ink at x 80, the tile 6.3px from each word -->
-  <text class="wordmark" x="73.6" y="124" font-size="63.95" letter-spacing="3.84" fill="#12202b">PG</text>
-  <path transform="translate(168.65 80) scale(0.171875)" fill="#0a6b63" fill-rule="evenodd" d="M48 0h160a48 48 0 0 1 48 48v160a48 48 0 0 1-48 48h-160a48 48 0 0 1-48-48v-160a48 48 0 0 1 48-48ZM48 48h32a8 8 0 0 1 8 8v32a8 8 0 0 1-8 8h-32a8 8 0 0 1-8-8v-32a8 8 0 0 1 8-8ZM176 48h32a8 8 0 0 1 8 8v32a8 8 0 0 1-8 8h-32a8 8 0 0 1-8-8v-32a8 8 0 0 1 8-8ZM48 160h32a8 8 0 0 1 8 8v32a8 8 0 0 1-8 8h-32a8 8 0 0 1-8-8v-32a8 8 0 0 1 8-8ZM176 160h32a8 8 0 0 1 8 8v32a8 8 0 0 1-8 8h-32a8 8 0 0 1-8-8v-32a8 8 0 0 1 8-8Z"/>
-  <text class="wordmark" x="218.95" y="124" font-size="63.95" letter-spacing="3.84" fill="#12202b">CAST</text>
+       cap height, .688em: 63.95px), on one baseline; the P's ink at x 80, the tile 6.3px from each word -->
+  <text class="wordmark" x="75.5" y="124" font-size="63.95" letter-spacing="2.56" fill="#12202b">PG</text>
+  <path transform="translate(168.1 80) scale(0.171875)" fill="#0a6b63" fill-rule="evenodd" d="M48 0h160a48 48 0 0 1 48 48v160a48 48 0 0 1-48 48h-160a48 48 0 0 1-48-48v-160a48 48 0 0 1 48-48ZM48 48h32a8 8 0 0 1 8 8v32a8 8 0 0 1-8 8h-32a8 8 0 0 1-8-8v-32a8 8 0 0 1 8-8ZM176 48h32a8 8 0 0 1 8 8v32a8 8 0 0 1-8 8h-32a8 8 0 0 1-8-8v-32a8 8 0 0 1 8-8ZM48 160h32a8 8 0 0 1 8 8v32a8 8 0 0 1-8 8h-32a8 8 0 0 1-8-8v-32a8 8 0 0 1 8-8ZM176 160h32a8 8 0 0 1 8 8v32a8 8 0 0 1-8 8h-32a8 8 0 0 1-8-8v-32a8 8 0 0 1 8-8Z"/>
+  <text class="wordmark" x="218.4" y="124" font-size="63.95" letter-spacing="2.56" fill="#12202b">CAST</text>
   <text class="display" x="76" y="372" font-size="88" letter-spacing="-2.2" fill="#12202b">Your types, cast from</text>
   <text class="display" x="76" y="468" font-size="88" letter-spacing="-2.2" fill="#12202b">your database<tspan class="mono" font-weight="700" letter-spacing="-5.3" fill="#0a6b63">::</tspan></text>
   <rect x="80" y="530" width="1040" height="1" fill="#d9e0e5"/>
