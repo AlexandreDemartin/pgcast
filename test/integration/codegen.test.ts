@@ -50,6 +50,8 @@ const variants: [string, Config][] = [
   ['typeEnumsAcrossSchemas', { schemas: customTypesSchemas, typeEnumsAcrossSchemas: true }],
   // the same, but the order of the labels
   ['enumOrder-declared', { schemas: customTypesSchemas, typeEnumsAcrossSchemas: true, enumOrder: 'declared' }],
+  // pgcast/schema, pgcast/custom and pgcast/db, and the zapatos/schema that src/db's declarations import
+  ['moduleNames-pgcast', { schemas: customTypesSchemas, moduleNames: 'pgcast' }],
   ['columnOptions', {
     schemas: { public: only('users', 'accounts'), extra: only('articles') },
     columnOptions: {
@@ -86,6 +88,11 @@ const noDebug = () => void 0;
 
 const codegen = (config: Config) => tsForConfig(finaliseConfig({ ...config, ...quiet, db: db() }), noDebug);
 
+/** The same, on a server that refuses every connection: a run that rejects with its own error sent no query. */
+const unreachable = { connectionString: 'postgres://nobody@127.0.0.1:1/none' };
+const codegenWithoutQueries = (config: Config) =>
+  tsForConfig(finaliseConfig({ ...config, ...quiet, db: unreachable }), noDebug);
+
 /** The warnings of a run, but the bigint note, which comes once per process. */
 const warningsOf = async (config: Config) => {
   const warnings: string[] = [];
@@ -96,8 +103,8 @@ const warningsOf = async (config: Config) => {
 };
 
 /** The same, but the notes on enums, which have their own tests (§ typeEnumsAcrossSchemas, § enumOrder). */
-const warningsFor = async (schemas: Schemas) =>
-  (await warningsOf({ schemas })).filter(w => !w.includes('typeEnumsAcrossSchemas') && !w.includes('enumOrder'));
+const warningsFor = async (schemas: Schemas, config: Config = {}) =>
+  (await warningsOf({ ...config, schemas })).filter(w => !w.includes('typeEnumsAcrossSchemas') && !w.includes('enumOrder'));
 
 /** Custom type placeholders, sorted by name: tsForConfig() inserts them in query completion order. */
 const customFiles = (files: Record<string, string>) =>
@@ -144,19 +151,22 @@ describe('variant snapshots', () => {
   });
   afterAll(() => { if (declarationDir) rmSync(declarationDir, { recursive: true, force: true }); });
 
-  it.each(variants.filter(([name]) => name !== 'edge'))('%s compiles with its custom types', name => {
+  /** `<moduleNames>/db`, and only it, as test/generated/tsconfig.json maps 'zapatos/db', to the declarations emitted here. */
+  const dbPaths = (config: Config) => ({ [`${config.moduleNames ?? 'zapatos'}/db`]: [join(declarationDir, 'db')] });
+
+  it.each(variants.filter(([name]) => name !== 'edge'))('%s compiles with its custom types', (name, variant) => {
     const { config } = ts.readConfigFile(join(generatedDir, 'tsconfig.json'), ts.sys.readFile);
     const { options } = ts.parseJsonConfigFileContent(config, ts.sys, generatedDir);
     const custom = join(snapshotPath, `${name}.custom.d.ts`);
     const rootNames = [join(snapshotPath, `${name}.d.ts`), ...(withoutCustomTypes.includes(name) ? [] : [custom])];
-    const program = ts.createProgram(rootNames, { ...options, paths: { 'zapatos/db': [join(declarationDir, 'db')] } });
+    const program = ts.createProgram(rootNames, { ...options, paths: dbPaths(variant) });
     const errors = ts.getPreEmitDiagnostics(program).map(d =>
       `${d.file ? relative(snapshotPath, d.file.fileName) : ''} TS${d.code} ${ts.flattenDiagnosticMessageText(d.messageText, ' ')}`);
     expect(errors).toEqual([]);
   });
 
   /** The type errors of `probe`, compiled against the schema and custom types that `config` generates. */
-  const probeErrors = async (config: Config, probe: string) => {
+  const probeErrors = async (config: Config, probe: string, extraOptions: ts.CompilerOptions = {}) => {
     const { ts: schema, customTypeSourceFiles } = await codegen(config);
     const dir = mkdtempSync(join(declarationDir, 'probe-'));
     writeFileSync(join(dir, 'schema.d.ts'), schema);
@@ -165,7 +175,7 @@ describe('variant snapshots', () => {
     const { config: tsconfig } = ts.readConfigFile(join(generatedDir, 'tsconfig.json'), ts.sys.readFile);
     const { options } = ts.parseJsonConfigFileContent(tsconfig, ts.sys, generatedDir);
     const rootNames = ['schema.d.ts', 'custom.d.ts', 'probe.ts'].map(f => join(dir, f));
-    const program = ts.createProgram(rootNames, { ...options, paths: { 'zapatos/db': [join(declarationDir, 'db')] } });
+    const program = ts.createProgram(rootNames, { ...options, ...extraOptions, paths: dbPaths(config) });
     return ts.getPreEmitDiagnostics(program).map(d =>
       `${d.file ? relative(dir, d.file.fileName) : ''} TS${d.code} ${ts.flattenDiagnosticMessageText(d.messageText, ' ')}`);
   };
@@ -195,6 +205,37 @@ describe('variant snapshots', () => {
       // @ts-expect-error not a label of public.mood
       export const meh: s.users.Insertable['mood'] = 'meh';
     `)).toEqual([]);
+  });
+
+  // without the zapatos/schema that src/db's declarations import, every type below is `any`:
+  // an error under skipLibCheck: false, and only the unused @ts-expect-error under skipLibCheck: true
+  it.each([false, true])("moduleNames-pgcast: pgcast/db and pgcast/schema are typed, not `any` (skipLibCheck: %s)", async skipLibCheck => {
+    expect(await probeErrors({ schemas: customTypesSchemas, moduleNames: 'pgcast' }, `
+      import * as db from 'pgcast/db';
+      import type * as s from 'pgcast/schema';
+      import { expectTypeOf } from 'expect-type';
+      declare const pool: db.Queryable;
+      export const probe = async () => {
+        const users = await db.select('users', { mood: 'ok' }, { columns: ['id', 'display_name'] }).run(pool);
+        expectTypeOf(users).not.toBeAny();
+        expectTypeOf(users).toEqualTypeOf<{ id: number; display_name: string }[]>();
+        const user = await db.selectOne('users', { id: 1 }).run(pool);
+        expectTypeOf(user).not.toBeAny();
+        expectTypeOf(user).toEqualTypeOf<s.users.JSONSelectable | undefined>();
+        const added = await db.insert('users', { email: 'ada@example.com', display_name: 'Ada' }).run(pool);
+        expectTypeOf(added.display_name).toEqualTypeOf<string>();
+        expectTypeOf<s.SelectableForTable<'users'>>().toEqualTypeOf<s.users.Selectable>();
+        expectTypeOf<s.Table>().not.toBeAny();
+        // @ts-expect-error not a table
+        db.select('no_such_table', db.all);
+        // @ts-expect-error not a column of users
+        db.select('users', { no_such_column: 1 });
+        // @ts-expect-error display_name is a text column
+        db.insert('users', { email: 'ada@example.com', display_name: 1 });
+        // @ts-expect-error not a label of mood
+        db.select('users', { mood: 'meh' });
+      };
+    `, { skipLibCheck })).toEqual([]);
   });
 
   it('holds no orphan file', () => {
@@ -514,6 +555,14 @@ describe('custom types that share a placeholder name', () => {
     ]);
   });
 
+  it("names the placeholder in pgcast/custom with moduleNames: 'pgcast'", async () => {
+    expect(await warningsFor({ collide_b: only('pairs') }, { moduleNames: 'pgcast' })).toEqual([
+      'Note: custom types "collide_a"."pair" and "collide_b"."pair" are both named PgPair in TypeScript, ' +
+      'so they share one type and one placeholder file, src/pgcast/custom/PgPair.d.ts. ' +
+      'To type them apart, rename one of them in the database.',
+    ]);
+  });
+
   it('warns when two names become one, and points at customTypesTransform', async () => {
     expect(await warningsFor({ collide_a: only('labels') })).toEqual([
       'Note: custom types "collide_a"."code-x" and "collide_a"."code_x" are both named PgCode_x in TypeScript, ' +
@@ -782,14 +831,14 @@ describe('enumOrder', () => {
     ]);  // control: no relation, and still its enums
   });
 
-  it("is optional in Config, read as 'alphabetical' when absent; another value rejects", async () => {
+  it("is optional in Config, read as 'alphabetical' when absent; another value rejects before any query", async () => {
     expect(finaliseConfig({}).enumOrder).toBeUndefined();
     const right: Config = { enumOrder: 'declared' };
     void right;
     // @ts-expect-error 'alphabetical' or 'declared'
     const wrong: Config = { enumOrder: 'declard' };
     void wrong;
-    await expect(codegen({ ...main, enumOrder: 'declard' as 'declared' })).rejects
+    await expect(codegenWithoutQueries({ ...main, enumOrder: 'declard' as 'declared' })).rejects
       .toThrow(`enumOrder must be 'alphabetical' (the default) or 'declared', not 'declard'`);
   });
 });
@@ -860,6 +909,7 @@ describe('include entries that match no relation', () => {
       'customTypesTransform-function': [enumsNote, bothOrderNote],
       typeEnumsAcrossSchemas: [bothOrderNote],
       'enumOrder-declared': [],
+      'moduleNames-pgcast': [enumsNote, bothOrderNote],
       columnOptions: [bothOrderNote],
       'include-exclude-lists': [unmatched('no_such_table', 'public'), bothOrderNote],
       'exclude-star': [bothOrderNote],  // exclude: '*' still generates the enums
@@ -909,6 +959,97 @@ describe('generate()', () => {
     const first = contents(outDir);
     await run();
     expect(contents(outDir)).toEqual(first);
+  });
+});
+
+describe('moduleNames', () => {
+  // a schema of its own, committed to this file's database: no other test configures it;
+  // a jsonb domain, whose placeholder imports db
+  beforeAll(() => t.pool.query(`
+    CREATE SCHEMA module_names;
+    CREATE DOMAIN module_names.scene_notes AS jsonb;
+    CREATE TABLE module_names.scenes (id int PRIMARY KEY, notes module_names.scene_notes);
+  `));
+  afterAll(() => t.pool.query('DROP SCHEMA module_names CASCADE'));
+
+  let outDir: string;
+  beforeEach(() => { outDir = mkdtempSync(join(tmpdir(), 'pgcast-module-names-')); });
+  afterEach(() => rmSync(outDir, { recursive: true, force: true }));
+
+  const read = (root: string, file: string) => readFileSync(join(root, file), 'utf8');
+  const shim = `
+// pgcast/db's declarations import 'zapatos/schema'
+declare module 'zapatos/schema' {
+  export * from 'pgcast/schema';
+}
+`;
+
+  /** Every warning of a generate() run, the bigint note aside: it comes once per process. */
+  const generateWarnings = async (config: Config) => {
+    const warnings: string[] = [];
+    await generate({ ...config, ...quiet, warningListener: s => warnings.push(s), db: db(), outDir });
+    return warnings.filter(w => !w.startsWith('Note: this database has bigint')).map(w => w.split(outDir).join('<out>'));
+  };
+  const scenes = { schemas: { module_names: all } };
+  const placeholder = (folder: string) => `Writing new custom type or domain placeholder file: <out>/${folder}/custom/PgScene_notes.d.ts`;
+  const staleZapatos =  // in 'pgcast' mode
+    `Note: <out>/zapatos/schema.d.ts is here too, generated with moduleNames: 'zapatos'. ` +
+    `It declares 'zapatos/schema', as <out>/pgcast/schema.d.ts does, and TypeScript merges the two: ` +
+    `types can loosen, silently under skipLibCheck. ` +
+    `Delete the folder <out>/zapatos, once any placeholder you edited there is moved to <out>/pgcast/custom.`;
+  const stalePgcast =  // in 'zapatos' mode
+    `Note: <out>/pgcast/schema.d.ts is here too, generated with moduleNames: 'pgcast'. ` +
+    `Its import of 'pgcast/db' fails to compile without skipLibCheck. ` +
+    `Delete the folder <out>/pgcast, once any placeholder you edited there is moved to <out>/zapatos/custom.`;
+
+  it("writes pgcast/: the files of 'zapatos', but for the module names, the CLI and the zapatos/schema shim", async () => {
+    await generate({ ...main, ...quiet, db: db(), outDir, moduleNames: 'pgcast' });
+    const zapatosFiles = files(generatedDir).filter(f => f.startsWith('zapatos/'));
+    expect(files(outDir)).toEqual(zapatosFiles.map(f => f.replace(/^zapatos\//, 'pgcast/')));
+    for (const file of zapatosFiles) {
+      const expected = read(generatedDir, file).split(`'zapatos/`).join(`'pgcast/`).replace('`npx zapatos`', '`npx pgcast`');
+      expect(read(outDir, file.replace(/^zapatos\//, 'pgcast/'))).toBe(file === 'zapatos/schema.d.ts' ? expected + shim : expected);
+    }
+  });
+
+  it("imports pgcast/db in the placeholder of a json or jsonb domain", async () => {
+    await generate({ ...scenes, ...quiet, db: db(), outDir, moduleNames: 'pgcast' });
+    expect(read(outDir, 'pgcast/custom/PgScene_notes.d.ts')).toBe(`/*
+** Please edit this file as needed **
+It's been generated by Zapatos as a custom type definition placeholder, and won't be overwritten
+*/
+
+declare module 'pgcast/custom' {
+  import type * as db from 'pgcast/db';
+  export type PgScene_notes = db.JSONValue;  // replace with your custom type or interface as desired
+}
+`);
+    expect(read(outDir, 'pgcast/custom/index.d.ts')).toContain(`declare module 'pgcast/custom' { }`);
+  });
+
+  it('warns when the other mode wrote its schema in outDir, both ways, and only then', async () => {
+    expect(await generateWarnings(scenes)).toEqual([placeholder('zapatos')]);
+    expect(await generateWarnings(scenes)).toEqual([]);
+    expect(await generateWarnings({ ...scenes, moduleNames: 'pgcast' })).toEqual([
+      placeholder('pgcast'), staleZapatos,
+    ]);
+    expect(await generateWarnings({ ...scenes, moduleNames: 'pgcast' })).toEqual([staleZapatos]);
+    expect(await generateWarnings(scenes)).toEqual([stalePgcast]);
+    rmSync(join(outDir, 'zapatos'), { recursive: true });
+    expect(await generateWarnings({ ...scenes, moduleNames: 'pgcast' })).toEqual([]);
+    mkdirSync(join(outDir, 'zapatos/custom'), { recursive: true });  // a folder with no schema: no warning
+    expect(await generateWarnings({ ...scenes, moduleNames: 'pgcast' })).toEqual([]);
+  });
+
+  it("is optional in Config, read as 'zapatos' when absent; another value rejects before any query", async () => {
+    expect(finaliseConfig({}).moduleNames).toBeUndefined();
+    const right: Config = { moduleNames: 'pgcast' };
+    void right;
+    // @ts-expect-error 'zapatos' or 'pgcast'
+    const wrong: Config = { moduleNames: 'pgcats' };
+    void wrong;
+    await expect(codegenWithoutQueries({ ...scenes, moduleNames: 'pgcats' as 'pgcast' })).rejects
+      .toThrow(`moduleNames must be 'zapatos' (the default) or 'pgcast', not 'pgcats'`);
   });
 });
 

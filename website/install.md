@@ -1,6 +1,6 @@
 # Install
 
-pgcast keeps Zapatos's module names, so you install it under the `zapatos` alias. Nothing in your imports changes.
+From 6.7.0, you install pgcast under its own name and import `pgcast/db`. A project switching from Zapatos installs it under the `zapatos` alias instead, and keeps its imports.
 {.lede}
 
 ## Requirements
@@ -38,6 +38,44 @@ npm install --save-dev --save-exact @types/node@ts4.1
 
 ## Add the package
 
+### Under its own name
+
+::: code-group
+
+```sh [npm]
+npm install pgcast@npm:@pgcast/pgcast pg
+npm install --save-dev @types/pg
+```
+
+```sh [pnpm]
+pnpm add pgcast@npm:@pgcast/pgcast pg
+pnpm add -D @types/pg
+```
+
+```sh [yarn]
+yarn add pgcast@npm:@pgcast/pgcast@^6.7 pg
+yarn add -D @types/pg
+```
+
+```sh [bun]
+bun add pgcast@npm:@pgcast/pgcast@^6.7 pg
+bun add -d @types/pg
+```
+
+:::
+
+Then set `"moduleNames": "pgcast"` in `zapatosconfig.json`, and import `pgcast/db` and `pgcast/schema` ([`moduleNames`](/generator#generate.moduleNames)).
+
+Yarn 2 and later need a version range in an alias, and Yarn 1 and bun before 1.4 write none without one: hence the `@^6.7`, the first release with `moduleNames`.
+
+::: info Coming
+6.7.0 isn't on npm yet: 6.6.2 ignores `moduleNames` and writes `zapatos/`, and the yarn and bun commands find no version. Until then, install under the `zapatos` alias ([the milestone](https://github.com/AlexandreDemartin/pgcast/milestone/1)).
+:::
+
+### Under the `zapatos` alias
+
+For a project switching from Zapatos, whose imports stay `zapatos/*`, and for a new one until 6.7.0:
+
 ::: code-group
 
 ```sh [npm]
@@ -62,10 +100,10 @@ bun add -d @types/pg
 
 :::
 
-Yarn 2 and later need a version range in an alias, and Yarn 1 and bun before 1.4 write none without one: hence the `@^6`.
+Here any 6.x will do: `@^6`.
 
 ::: tip Why the alias
-The generated schema and the run-time code talk about `zapatos/db` and `zapatos/schema`. Installed as plain `@pgcast/pgcast`, those imports wouldn't resolve. Native `pgcast/*` names will come later, as an opt-in ([decision 002](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/002-module-names.md)).
+Your imports and the generated schema name the package by its folder in `node_modules`: `pgcast/db` or `zapatos/db`. Installed as plain `@pgcast/pgcast`, it lands in `node_modules/@pgcast/pgcast`, where neither resolves. The alias names the folder, and `moduleNames` must match it ([decision 002](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/002-module-names.md)).
 :::
 
 Already on Zapatos? Switching is one line of `package.json`, then a look for the few calls whose result changes: [Switch from Zapatos](/switching).

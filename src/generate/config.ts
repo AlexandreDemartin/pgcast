@@ -30,6 +30,8 @@ export interface OptionalConfig {
   typeEnumsAcrossSchemas?: boolean;  // an enum of another schema is typed by its own labels, not by its name in the relation's schema
   // optional too; read it with ?? 'alphabetical', as Zapatos 6.6.1 sorts labels, deprecated: 'declared' in 7.0
   enumOrder?: 'alphabetical' | 'declared';  // the order of an enum's labels: 'declared' is Postgres's, by which it sorts and compares them
+  // optional too; read it with ?? 'zapatos'
+  moduleNames?: 'zapatos' | 'pgcast';  // the folder written, and the module names it declares and imports: pgcast/schema, pgcast/db…
 }
 
 interface SchemaRules {

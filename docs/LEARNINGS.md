@@ -131,6 +131,10 @@ Candidates for a check, a rule or a skill line.
 - #363 — A probe against `localhost` checks it reached its own server (a port outside 43xx, a text only its build has): another agent's preview may answer on the same port — `branch-reviewer`
 - #363 — In an async `Runtime.evaluate`, read the layout before the click; `navigator.clipboard.readText()` fails headless, stub `writeText` to check what Copy sends — `builder`
 - #363 — npm's staged publishing shows a `0.0.0-stage` placeholder for a few minutes: re-run `npm view` before falling back to a tarball — `builder`
+- #364 — When a « not yet » lands (on npm, a mode), grep its wording across `website/`, `README.md` and `AGENTS.md`: `versions.md` still said « isn't on npm yet » after the CHANGELOG said otherwise — `builder`
+- #364 — A config-validation test runs on an unreachable `db` (`postgres://nobody@127.0.0.1:1/none`), never a live pool: a check moved after the queries otherwise still passes — `branch-reviewer`
+- #364 — A config key Zapatos 6.6.1 lacks is named in Switch § Go back, with what going back leaves behind; a `check-prose.mjs` check comparing `Config` with that list would catch a miss — `branch-reviewer`
+- #364 — Going back from the own-name route removes the `pgcast` package too: it also has a `zapatos` command, and while installed its `pgcast/*` imports still resolve — `builder`
 
 ## Minors kept
 

@@ -8,6 +8,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { finaliseConfig, Config } from './config';
 import * as legacy from './legacy';
+import { moduleNamesOf, warnAboutOtherModuleNames } from './moduleNames';
 import { tsForConfig } from './tsOutput';
 import { header } from './header';
 
@@ -28,13 +29,13 @@ export const generate = async (suppliedConfig: Config) => {
 
     { ts, customTypeSourceFiles } = await tsForConfig(config, debug),
 
-    folderName = 'zapatos',
+    folderName = moduleNamesOf(config),
     schemaName = 'schema' + config.outExt,
     customFolderName = 'custom',
     customTypesIndexName = 'index' + config.outExt,
     customTypesIndexContent = header() + `
 // this empty declaration appears to fix relative imports in other custom type files
-declare module 'zapatos/custom' { }
+declare module '${folderName}/custom' { }
 `,
 
     folderTargetPath = path.join(config.outDir, folderName),
@@ -67,5 +68,6 @@ declare module 'zapatos/custom' { }
     fs.writeFileSync(customTypesIndexTargetPath, customTypesIndexContent, { flag: 'w' });
   }
 
+  warnAboutOtherModuleNames(config);
   legacy.srcWarning(config);
 };
