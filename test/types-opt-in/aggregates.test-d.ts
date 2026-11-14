@@ -69,6 +69,21 @@ describe('with aggregatesTypedByColumn declared', () => {
     expectTypeOf<Row['top']>().toEqualTypeOf<db.NumericString | null>();
   });
 
+  test('passed through a single lateral: the Selectable type from selectOne and selectExactlyOne, the JSONSelectable one from select', () => {
+    // selectOne() and selectExactlyOne() hand the passed-through column over as pg parses it; select() wraps it in jsonb_agg()
+    const earliest = db.min('events', db.all, { columns: ['occurred_on'] });
+    const one = db.selectOne('users', db.all, { lateral: earliest });
+    expectTypeOf(one.run(pool)).resolves.toEqualTypeOf<Date | null | undefined>();
+    expectTypeOf(db.selectExactlyOne('users', db.all, { lateral: db.max('accounts', db.all, { columns: ['balance'] }) }).run(pool))
+      .resolves.toEqualTypeOf<db.NumericString | null>();
+    expectTypeOf(db.select('users', db.all, { lateral: earliest }).run(pool)).resolves.toEqualTypeOf<(db.DateString | null)[]>();
+    expectTypeOf(db.selectOne('users', db.all, { lateral: db.sum('accounts', db.all, { columns: ['balance'] }) }).run(pool))
+      .resolves.toEqualTypeOf<number | null | undefined>();
+    expectTypeOf(one.run(pool)).resolves.not.toBeAny();
+    // @ts-expect-error passed through selectOne(), a date comes as a Date, not a string
+    one.run(pool).then((d): db.DateString | null | undefined => d);
+  });
+
   test('calls that compile under 6.6.1 still compile, and throw at run time', () => {
     expectTypeOf(db.max('accounts', db.all)).not.toBeAny();
     expectTypeOf(db.min('accounts', db.all, { columns: ['balance', 'ratio'] })).not.toBeAny();
