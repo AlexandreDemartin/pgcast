@@ -148,7 +148,9 @@ export async function transaction<T, M extends IsolationLevel>(
     const
       config = getConfig(),
       { transactionListener } = config,
-      maxAttempts = config.transactionAttemptsMax,
+      // the attempts the loop below makes, so that its messages count them: one for 0, a negative or NaN, three
+      // for 2.5 (see https://github.com/AlexandreDemartin/pgcast/issues/179); Number() keeps '3' and 3n working
+      maxAttempts = Math.max(1, Math.ceil(Number(config.transactionAttemptsMax))) || 1,
       { minMs, maxMs } = config.transactionRetryDelay;
 
     for (let attempt = 1; ; attempt++) {
@@ -171,7 +173,8 @@ export async function transaction<T, M extends IsolationLevel>(
         // this is also a good read:
         // https://www.enterprisedb.com/blog/serializable-postgresql-11-and-beyond
 
-        if (isDatabaseError(err, "TransactionRollback_SerializationFailure", "TransactionRollback_DeadlockDetected")) {
+        // a thrown null or undefined is rethrown as it is: isDatabaseError() would throw on it (#179)
+        if (err != null && isDatabaseError(err, "TransactionRollback_SerializationFailure", "TransactionRollback_DeadlockDetected")) {
           if (attempt < maxAttempts) {
             const delayBeforeRetry = Math.round(minMs + (maxMs - minMs) * Math.random());
             if (transactionListener) transactionListener(`Transaction rollback (code ${err.code}) on attempt ${attempt} of ${maxAttempts}, retrying in ${delayBeforeRetry}ms`, txnId);
