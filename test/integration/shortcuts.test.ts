@@ -1028,6 +1028,7 @@ describe('sum, avg, min, max without aggregatesTypedByColumn (deprecated, PGCAST
       const { fdb, emitWarning } = await fresh();
       await fdb[aggregate]('accounts', fdb.all, { columns: ['balance'], limit: 0 }).run(t.client).catch(() => { });
       warnings.push(emitWarning.mock.calls.map(c => c[1]));
+      expect(emitWarning.mock.calls[0]?.[0]).toMatch(/an empty set, or a query that returned no row, gave 0 rather than null/);
     }
     expect(warnings).toEqual(Array(4).fill([{ type: 'DeprecationWarning', code: 'PGCAST_DEP004' }]));
   });

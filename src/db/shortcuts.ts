@@ -944,7 +944,7 @@ const numericAggregate = (
       query.runResultTransform = (qr) => {
         const result = qr.rows[0]?.result ?? null;  // no row reads as a NULL result, as for count()
         if (getConfig().aggregatesTypedByColumn ?? false) return byColumn || result === null ? result : Number(result);
-        if (result === null || (byColumn && typeof result !== 'number')) warnOnce('PGCAST_DEP004', 'sum(), avg(), min() or max() passed its result through Number(): an empty set gave 0 rather than null, or a min() or max() that is not a number (a date, a text, an int8 or numeric string) lost its type. Set aggregatesTypedByColumn: true (db.setConfig), and declare it in ConfigTypes, to get null and the column\'s own value instead; it will be the default in pgcast 7.0.');
+        if (result === null || (byColumn && typeof result !== 'number')) warnOnce('PGCAST_DEP004', 'sum(), avg(), min() or max() passed its result through Number(): an empty set, or a query that returned no row, gave 0 rather than null, or a min() or max() that is not a number (a date, a text, an int8 or numeric string) lost its type. Set aggregatesTypedByColumn: true (db.setConfig), and declare it in ConfigTypes, to get null and the column\'s own value instead; it will be the default in pgcast 7.0.');
         return Number(result);
       };
     }

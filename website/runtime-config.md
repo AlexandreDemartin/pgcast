@@ -219,7 +219,7 @@ aggregatesTypedByColumn?: boolean  // default: false; the default in 7.0
 
 From 6.7.0. With `true`, [`sum()`](/select#sum), [`avg()`](/select#avg), [`min()`](/select#min) and [`max()`](/select#max) give `null` when no row matches, and `min()` and `max()` give the column's value as `pg` reads it: a `Date` for a `timestamptz`, a string for a `text` or an enum. The SQL doesn't change, nor does [`count()`](/select#count).
 
-Off, the result goes through `Number()`, as in Zapatos 6.6.1: `0` when no row matches, a date's milliseconds, `NaN` for a text. `.run()` then warns once per process, `PGCAST_DEP004`, when `Number()` changed what Postgres sent.
+Off, the result goes through `Number()`, as in Zapatos 6.6.1: `0` when no row matches, a date's milliseconds, `NaN` for a text. `.run()` then warns once per process, `PGCAST_DEP004`, when `Number()` changed what Postgres sent, or the query returned no row.
 
 - The types follow only once it is declared in [`ConfigTypes`](#ConfigTypes) as well: `setConfig()` sets the runtime, the declaration the types.
 - Nested in a `lateral`, the value comes back as JSON, option or not, and `null` when no row matches; declared, it is typed as its column's `JSONSelectable`. In `extras` too, once [#262](https://github.com/AlexandreDemartin/pgcast/issues/262) parenthesises it; Postgres refuses it bare today.
