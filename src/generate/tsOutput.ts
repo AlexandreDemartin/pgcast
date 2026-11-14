@@ -120,26 +120,29 @@ const warnAboutUnmatchedIncludes = (unmatched: { schema: string; name: string }[
   }
 };
 
-interface IdentifierGroup { kind: string; schema?: string; names: string[]; as: 'namespace' | 'type' }
+interface NamedInTS { kind: 'schema' | 'relation' | 'enum'; name: string; label: string }
+interface IdentifierGroup { as: 'namespace' | 'type'; names: NamedInTS[] }
 
 /**
- * Warn about each TypeScript name that two schemas, relations or enums take (`odd table` and `odd_table`): their
- * declarations clash.
+ * Warn about each TypeScript name that two schemas, relations or enums of one scope take (`odd table` and
+ * `odd_table`): their declarations clash. The schemas share the top level with the relations of `unprefixedSchema`.
  */
 const warnAboutSharedIdentifiers = (groups: IdentifierGroup[], config: CompleteConfig) => {
   const warn = config.warningListener === true ? console.log : config.warningListener || (() => void 0);
 
-  for (const { kind, schema, names, as } of groups) {
-    const byIdentifier: Record<string, string[]> = {};
-    for (const name of names) {
-      (byIdentifier[tsIdentifier(name, as)] ??= []).push(schema === undefined ? `"${name}"` : `"${schema}"."${name}"`);
-    }
+  for (const { as, names } of groups) {
+    const byIdentifier: Record<string, NamedInTS[]> = Object.create(null);  // a table may be named `constructor`
+    for (const named of names) (byIdentifier[tsIdentifier(named.name, as)] ??= []).push(named);
     for (const identifier of Object.keys(byIdentifier).sort()) {
-      const shared = byIdentifier[identifier].sort();
-      if (shared.length < 2) continue;
-      warn(`Note: ${kind} ${shared.slice(0, -1).join(', ')} and ${shared[shared.length - 1]} are ` +
-        `${shared.length === 2 ? 'both' : 'all'} named ${identifier} in TypeScript, so their declarations clash. ` +
-        `To type them apart, rename one of them in the database.`);
+      const
+        shared = byIdentifier[identifier],
+        // `relations "a" and "b"`, but `relation "a" and schema "b"`
+        oneKind = shared.every(named => named.kind === shared[0].kind),
+        labels = shared.map(named => oneKind ? named.label : `${named.kind} ${named.label}`).sort();
+      if (labels.length < 2) continue;
+      warn(`Note: ${oneKind ? `${shared[0].kind}s ` : ''}${labels.slice(0, -1).join(', ')} and ` +
+        `${labels[labels.length - 1]} are ${labels.length === 2 ? 'both' : 'all'} named ${identifier} in TypeScript, ` +
+        `so their declarations clash. To type them apart, rename one of them in the database.`);
     }
   }
 };
@@ -210,11 +213,14 @@ export const tsForConfig = async (config: CompleteConfig, debug: (s: string) => 
             ) + '\n' +
             (schemaIsUnprefixed ? '' : `}\n`);
 
-        const identifierGroups: IdentifierGroup[] = [
-          { kind: 'enums', schema, names: Object.keys(enums), as: 'type' },
-          { kind: 'relations', schema, names: tables.map(rel => rel.name), as: 'namespace' },
-        ];
-        return { schemaDef, tables, unmatched, outOfOrder, identifierGroups };
+        const
+          named = (kind: 'relation' | 'enum', name: string): NamedInTS => ({ kind, name, label: `"${schema}"."${name}"` }),
+          relationNames = tables.map(rel => named('relation', rel.name)),
+          // the relations of unprefixedSchema are at the top level, with the schemas' namespaces
+          identifierGroups: IdentifierGroup[] = [{ as: 'type', names: Object.keys(enums).map(name => named('enum', name)) },
+            ...schemaIsUnprefixed ? [] : [{ as: 'namespace' as const, names: relationNames }]],
+          topLevelNames = schemaIsUnprefixed ? relationNames : [];
+        return { schemaDef, tables, unmatched, outOfOrder, identifierGroups, topLevelNames };
       }))
     ),
     schemaDefs = schemaData.map(r => r.schemaDef),
@@ -234,8 +240,9 @@ export const tsForConfig = async (config: CompleteConfig, debug: (s: string) => 
     customTypeSourceFiles = sourceFilesForCustomTypes(customTypes, names);
 
   warnAboutUnmatchedIncludes(schemaData.flatMap(r => r.unmatched), config);
-  warnAboutSharedIdentifiers([...schemaData.flatMap(r => r.identifierGroups),
-    { kind: 'schemas', names: schemaNames, as: 'namespace' }], config);
+  warnAboutSharedIdentifiers([...schemaData.flatMap(r => r.identifierGroups), { as: 'namespace', names: [
+    ...schemaNames.map(schema => ({ kind: 'schema' as const, name: schema, label: `"${schema}"` })),
+    ...schemaData.flatMap(r => r.topLevelNames)] }], config);
   warnAboutSharedCustomTypeNames(customTypeOrigins, config);
   warnAboutEnumsAcrossSchemas(columnsTypedByEnumName, config);
   warnAboutEnumOrder(schemaData.flatMap(r => r.outOfOrder), config);
