@@ -663,13 +663,14 @@ describe('column comments', () => {
         generated = '- `int4` in database\n- Nullable, no default';
       expect.soft(Selectable).toEqual({
         dep: { text: `**comment_tags.roles.dep**\n\nBilling order.\n${generated}`, tags: ['@deprecated use lead'] },
-        first: { text: `**comment_tags.roles.first**\n\n${generated}`, tags: ['@deprecated use lead'] },
+        // nothing before the tag: the name, then the generated lines, as for a column without a comment
+        first: { text: `**comment_tags.roles.first**\n${generated}`, tags: ['@deprecated use lead'] },
         indented: { text: `**comment_tags.roles.indented**\n\nBilling order.\n${generated}`, tags: ['@deprecated use lead'] },
         crlf: { text: `**comment_tags.roles.crlf**\n\nBilling order.\n${generated}`, tags: ['@deprecated use lead'] },
         two: { text: `**comment_tags.roles.two**\n\nBilling order.\n${generated}`, tags: ['@deprecated use lead', '@see lead'] },
         // TypeScript also starts a tag at an @ after a space, in the middle of a line
         mid: { text: `**comment_tags.roles.mid**\n\nBilling order.\n${generated}\n\nSince 2026`, tags: ['@deprecated use lead'] },
-        kept: { text: `**comment_tags.roles.kept**\n\n${generated}`, tags: ['@deprecated use lead\nkept for old credits'] },
+        kept: { text: `**comment_tags.roles.kept**\n${generated}`, tags: ['@deprecated use lead\nkept for old credits'] },
         email: { text: `**comment_tags.roles.email**\n\nAsk casting@example.com\n${generated}`, tags: [] },
         spaced: { text: `**comment_tags.roles.spaced**\n\nFee @ 5 a day\n${generated}`, tags: [] },
         ticked: { text: `**comment_tags.roles.ticked**\n\nBilling order.\n\`@deprecated\` is not a tag\n${generated}`, tags: [] },
