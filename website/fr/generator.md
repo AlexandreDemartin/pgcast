@@ -1,5 +1,5 @@
 ---
-english: 46174ce8e563
+english: 27cc88df80f1
 ---
 
 # Générateur
@@ -222,6 +222,7 @@ Son SQL est celui de [`select()`](/fr/select#select), avec le nom entre guilleme
 - Un tableau d’un domaine ou d’un tel type est un type personnalisé à part entière.
 - Les noms ne sont pas qualifiés par schéma : l’espace de noms `c` est commun à tous les schémas, donc un domaine `notes` dans `public` et un autre dans `archive` sont tous deux `PgNotes`, avec un seul placeholder pour les deux.
   - Le générateur le signale via [`warningListener`](#generate.warningListener), comme pour deux noms qu’une transformation réduit à un seul (`seat-label` et `seat_label`), et garde le nom, dont dépend un placeholder déjà modifié.
+- Des noms qui ne diffèrent que par la casse, comme `PgSeat_label` et `PgSEAT_LABEL` pour les domaines `seat_label` et `"SEAT_LABEL"`, ont deux placeholders qui ne forment qu’un seul fichier sur un système de fichiers insensible à la casse, celui par défaut sur macOS et Windows : celui écrit en premier ne déclare que son propre nom, et les autres ne sont jamais déclarés. Le générateur le signale aussi, où qu’il tourne, et écrit les mêmes fichiers.
 
 ### `schemaJSDoc` {#generate.schemaJSDoc}
 
@@ -352,6 +353,8 @@ Writing custom types file: src/zapatos/custom/index.d.ts
 - `Writing new custom type or domain placeholder file: src/zapatos/custom/PgPoint.d.ts`, une fois par nouveau placeholder ;
 - `Note: custom types "archive"."notes" and "public"."notes" are both named PgNotes in TypeScript, so they share one type and one placeholder file, src/zapatos/custom/PgNotes.d.ts. To type them apart, rename one of them in the database.`
   - une fois par exécution pour chaque nom que partagent deux types Postgres ([`customTypesTransform`](#generate.customTypesTransform)) ; quand leurs noms diffèrent, il ajoute qu’une fonction `customTypesTransform` peut les distinguer ;
+- `Note: custom types "public"."SEAT_LABEL" (PgSEAT_LABEL) and "public"."seat_label" (PgSeat_label) have TypeScript names that differ only in case: on a case-insensitive file system, the default on macOS and Windows, PgSEAT_LABEL.d.ts and PgSeat_label.d.ts are one placeholder file in src/zapatos/custom, which declares only one of those names. To type them apart, rename one of them in the database, or give customTypesTransform a function that keeps their names apart.`
+  - une fois par exécution pour des noms qui ne diffèrent que par la casse, quel que soit le système de fichiers, avant la note ci-dessus pour chacun de ces noms que partagent deux types Postgres ;
 - `Note: the include entry "Films" of schema "public" matches no relation there, so it generates nothing. Check its spelling and case, that the relation is in schema "public", and that the database role has a privilege on it: include names tables, views, materialised views and foreign tables.`
   - une fois par exécution pour chaque entrée d’une liste [`include`](#generate.schemas) que son schéma n’a pas ;
 - `Note: the schemas rule of "public" has no exclude, so it takes "exclude": [], as the default rule does. Write the key in the rule to silence this note.`
@@ -427,8 +430,7 @@ src/zapatos/
 </div>
 
 - Un placeholder contient le type `Selectable` du type de base du domaine : `string` pour `seat_label`, un `text` ; `Date` pour un domaine `date` ; `db.JSONValue` pour un domaine `json` ou `jsonb`, avec son `import type * as db from 'zapatos/db'`. Un type que le générateur ne sait pas convertir (`point`) reçoit `any`. Pour le compléter : [Types personnalisés](/fr/custom-types).
-- Un type de base converti en un autre type `db.*` (`int8`, `numeric`, `time`, les types range…) donne un placeholder qui ne compile pas tant que vous ne l’avez pas modifié : `export type PgTicket_no = db.Int8String;` vient sans import, et `tsc` échoue avec TS2503, `Cannot find namespace 'db'` ([#184](https://github.com/AlexandreDemartin/pgcast/issues/184)). Ajoutez `import type * as db from 'zapatos/db';` au-dessus.
-- Même chose pour un domaine sur un enum : `export type PgGenre_d = genre;` échoue avec TS2304 tant que vous n’ajoutez pas `import type { genre } from 'zapatos/schema';`.
+- Un type de base converti en un autre type `db.*` (`int8`, `numeric`, `time`, les types range…) reçoit le même import : `export type PgTicket_no = db.Int8String;` vient avec `import type * as db from 'zapatos/db';`. Un domaine sur un enum l’importe : `import type { genre } from 'zapatos/schema';` au-dessus de `export type PgGenre_d = genre;`. Zapatos 6.6.1 n’importait `db` que pour `db.JSONValue`, donc ses placeholders sur ces types ne compilaient pas ([#184](https://github.com/AlexandreDemartin/pgcast/issues/184)) : [Quand un placeholder ne compile pas](/fr/custom-types#when-a-placeholder-does-not-compile).
 - Rien n’est supprimé : un placeholder dont le type a disparu reste, et `custom/` aussi une fois qu’il ne reste plus de type personnalisé.
 - `schema.d.ts` déclare `schemaVersionCanary`, `version: 104`. Un `zapatos/db` qui attend une autre version ne compile pas à cet endroit : relancez la génération ([`SchemaVersionCanary`](/fr/runtime-config#SchemaVersionCanary)).
 - Chaque fichier est un `declare module` des noms `zapatos/*`, donc votre `tsconfig.json` doit l’inclure : `"include": ["src"]`, avec `outDir` à `"./src"`.
