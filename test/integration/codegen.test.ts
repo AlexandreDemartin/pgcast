@@ -1515,7 +1515,10 @@ describe('schemas rules with a string other than "*"', () => {
 describe('names that Object.prototype also has', () => {
   // schemas of their own, committed to this file's database: no other test configures them.
   // Each name is an enum of a schema enum_<name>, a schema with a table, and a domain of proto_a and
-  // proto_b, in a table films_<name> of each; proto_c has a domain __proto__ alone, proto_d a table toString.
+  // proto_b, in a table films_<name> of each; proto_c has a domain __proto__ alone. proto_d has a table of
+  // each name, its columns named like what the inherited value has, and films a column of each name;
+  // proto_e has a table of each name but __proto__ with the columns caller and arguments, which a function
+  // throws on (Object.prototype has no caller: a table __proto__ never threw).
   const names = ['toString', 'constructor', 'hasOwnProperty', '__proto__'];
   beforeAll(() => t.pool.query(`
     CREATE SCHEMA proto_a;
@@ -1525,7 +1528,14 @@ describe('names that Object.prototype also has', () => {
     CREATE TABLE proto_c.films (title proto_c."__proto__");
     CREATE SCHEMA proto_d;
     CREATE TABLE proto_d."toString" (id int, name text, length int);
-  ` + names.map(name => `
+    CREATE TABLE proto_d."constructor" (id int, name text, length int, keys text, "values" text);
+    CREATE TABLE proto_d."hasOwnProperty" (id int, name text, length int);
+    CREATE TABLE proto_d."__proto__" (id int, name text, "toString" text, "hasOwnProperty" text);
+    CREATE TABLE proto_d.films (id int, title text, "toString" text, "constructor" text, "hasOwnProperty" text, "__proto__" text);
+    CREATE SCHEMA proto_e;
+  ` + names.filter(name => name !== '__proto__').map(name => `
+    CREATE TABLE proto_e."${name}" (id int, caller text, arguments text);
+  `).join('') + names.map(name => `
     CREATE SCHEMA "enum_${name}";
     CREATE TYPE "enum_${name}"."${name}" AS ENUM ('b', 'a');
     CREATE SCHEMA "${name}";
@@ -1535,7 +1545,7 @@ describe('names that Object.prototype also has', () => {
     CREATE TABLE proto_a."films_${name}" (d proto_a."${name}");
     CREATE TABLE proto_b."films_${name}" (d proto_b."${name}");
   `).join('')));
-  afterAll(() => t.pool.query(`DROP SCHEMA proto_a, proto_b, proto_c, proto_d, ` +
+  afterAll(() => t.pool.query(`DROP SCHEMA proto_a, proto_b, proto_c, proto_d, proto_e, ` +
     `${names.map(name => `"enum_${name}", "${name}"`).join(', ')} CASCADE`));
 
   /** The properties a run adds to `Object`, `Object.prototype` or a method of it, removed once read. */
@@ -1586,22 +1596,104 @@ describe('names that Object.prototype also has', () => {
     expect(added).toEqual([]);
   });
 
-  it('keeps the columnOptions of the CLI as master reads them, for a table named toString (#405)', async () => {
+  describe('columnOptions (#405)', () => {
     const
-      dir = mkdtempSync(join(tmpdir(), 'pgcast-cli-')),
-      json = JSON.stringify({
-        schemas: { proto_d: all }, unprefixedSchema: 'proto_d', schemaJSDoc: false,
-        columnOptions: { '*': { name: { insert: 'excluded' }, length: { insert: 'excluded' } } },
+      excluded = { insert: 'excluded', update: 'excluded' } as const,
+      // Object.fromEntries: '__proto__' as a key, as JSON.parse() gives it
+      excludedEverywhere = (...columns: string[]) => ({ '*': Object.fromEntries(columns.map(column => [column, excluded])) }),
+      codegenOf = (schema: string, columnOptions: Config['columnOptions'] = {}, rule: Schemas[string] = all) =>
+        codegen({ schemas: { [schema]: rule }, unprefixedSchema: schema, schemaJSDoc: false, columnOptions });
+
+    /** The Insertable and Updatable interfaces of `table` in a schema generated with schemaJSDoc: false. */
+    const writablesOf = (schema: string, table: string) => {
+      const block = tableBlock(schema, table);
+      return ['Insertable', 'Updatable'].map(name => {
+        const start = block.indexOf(`export interface ${name} {`);
+        return block.slice(start, block.indexOf('\n    }', start) + '\n    }'.length);
       });
-    try {
+    };
+
+    /** The same, written out for nullable columns with no default, `[column, TS type]`, sorted by name. */
+    const writables = (columns: [string, string][], updatable = columns) => {
+      const writable = (type: string) => `${type} | db.Parameter<${type}> | null | db.DefaultType | db.SQLFragment`;
+      return [
+        ['export interface Insertable {', ...columns.map(([column, type]) => `      ${column}?: ${writable(type)};`), '    }'],
+        ['export interface Updatable {', ...updatable.map(([column, type]) =>
+          `      ${column}?: ${writable(type)} | db.SQLFragment<any, ${writable(type)}>;`), '    }'],
+      ].map(lines => lines.join('\n'));
+    };
+
+    it.each(names)('applies the "*" entry to the columns of a table named %s', async name => {
+      // name, length, keys and values: what the inherited Object.prototype.toString, Object… answered
+      const { ts: schema } = await codegenOf('proto_d', excludedEverywhere('name', 'length', 'keys', 'values', ...names));
+      expect(writablesOf(schema, name)).toEqual(writables([['id', 'number']]));
+    });
+
+    it.each(names)('applies the "*" entry to a column named %s of a table with an entry of its own', async name => {
       const
-        { ts: schema } = await tsForConfig(finaliseConfig({ ...cliConfig(json, dir), ...quiet, db: db() }), noDebug),
-        insertable = tableBlock(schema, 'toString').split('export interface Insertable {')[1].split('\n    }')[0];
-      // toString.name and toString.length, inherited, answer before the '*' entry, as from generate() and in 6.6.1
-      expect(insertable.match(/^ {6}\w+(?=\??:)/gm)?.map(key => key.trim())).toEqual(['id', 'length', 'name']);
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
+        { ts: schema } = await codegenOf('proto_d', {
+          ...excludedEverywhere(name), films: { title: { update: 'excluded' } },
+        }),
+        columns: [string, string][] = [['__proto__', 'string'], ['constructor', 'string'], ['hasOwnProperty', 'string'],
+          ['id', 'number'], ['title', 'string'], ['toString', 'string']].filter(([column]) => column !== name) as [string, string][];
+      expect(writablesOf(schema, 'films')).toEqual(writables(columns, columns.filter(([column]) => column !== 'title')));
+    });
+
+    it('still lets a table entry win over the "*" entry, for a table named toString', async () => {
+      const { ts: schema } = await codegenOf('proto_d', {
+        ...excludedEverywhere('name', 'length'), toString: { name: { insert: 'auto', update: 'auto' } as const },
+      });
+      expect(writablesOf(schema, 'toString')).toEqual(writables([['id', 'number'], ['name', 'string']]));
+    });
+
+    it('still reads a __proto__ key of a JS literal, which sets the prototype, as the entry of a table __proto__', async () => {
+      // as in Zapatos 6.6.1: columnOptions.__proto__ is that object
+      const { ts: schema } = await codegenOf('proto_d', { __proto__: { name: excluded } });
+      expect(writablesOf(schema, '__proto__')).toEqual(writables([['hasOwnProperty', 'string'], ['id', 'number'], ['toString', 'string']]));
+    });
+
+    it.each([false, 0, ''])('still lets a table entry %j hide the "*" entry, as in Zapatos 6.6.1', async entry => {
+      // 6.6.1 read columnOptions.films && columnOptions.films.title, which gave back the entry itself, and ?? stopped there
+      const
+        { ts: schema } = await codegenOf('proto_d', { ...excludedEverywhere('title'), films: entry } as unknown as Config['columnOptions']),
+        columns: [string, string][] = [['__proto__', 'string'], ['constructor', 'string'], ['hasOwnProperty', 'string'],
+          ['id', 'number'], ['title', 'string'], ['toString', 'string']];
+      expect(writablesOf(schema, 'films')).toEqual(writables(columns));
+    });
+
+    it.each([null, undefined])('still throws on columnOptions %s, as Zapatos 6.6.1 did', async columnOptions => {
+      // as JSON's null and generate()'s undefined give it: either one replaces the default {}
+      const config = { schemas: { proto_d: only('films') }, unprefixedSchema: 'proto_d', columnOptions } as unknown as Config;
+      await expect(codegen(config)).rejects.toThrow(new TypeError(`Cannot read properties of ${columnOptions} (reading 'films')`));
+    });
+
+    const functionNames = names.filter(name => name !== '__proto__');
+
+    it.each(functionNames)('generates a table named %s with columns caller and arguments', async name => {
+      const { ts: schema } = await codegenOf('proto_e', {}, only(name));
+      expect(writablesOf(schema, name)).toEqual(writables([['arguments', 'string'], ['caller', 'string'], ['id', 'number']]));
+    });
+
+    it.each(functionNames)('applies the "*" entry to the column caller of a table named %s', async name => {
+      const { ts: schema } = await codegenOf('proto_e', excludedEverywhere('caller'), only(name));
+      expect(writablesOf(schema, name)).toEqual(writables([['arguments', 'string'], ['id', 'number']]));
+    });
+
+    it('applies the columnOptions of the CLI to a table named toString', async () => {
+      const
+        dir = mkdtempSync(join(tmpdir(), 'pgcast-cli-')),
+        json = JSON.stringify({
+          schemas: { proto_d: all }, unprefixedSchema: 'proto_d', schemaJSDoc: false,
+          columnOptions: { '*': { name: { insert: 'excluded' }, length: { insert: 'excluded' } } },
+        });
+      try {
+        const { ts: schema } = await tsForConfig(finaliseConfig({ ...cliConfig(json, dir), ...quiet, db: db() }), noDebug);
+        // Zapatos 6.6.1 kept name and length: the inherited toString.name and toString.length answered first
+        expect(writablesOf(schema, 'toString')[0]).toBe(writables([['id', 'number']])[0]);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
   });
 
   it.each(names)('notes the custom types named %s of two schemas, and leaves Object as it was', async name => {
