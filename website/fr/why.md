@@ -19,13 +19,13 @@ La vérification des types et l’autocomplétion de VS Code « <span lang="en"
 
 Zapatos fait donc trois choix, et pgcast garde les trois : les types viennent de la base, le SQL reste sous vos yeux, et rien n’arrive que vous n’ayez demandé.
 
-## Des types moulés sur la base {#types-cast-from-the-database}
+## Des types tirés de la base {#types-cast-from-the-database}
 
 Postgres connaît déjà votre schéma : chaque colonne, son type, si elle peut être nulle, si elle a une valeur par défaut, le commentaire que vous lui avez donné. Le générateur interroge le catalogue (`pg_catalog` et `information_schema`) et écrit `zapatos/schema.d.ts`.
 
 Ce fichier contient les types de chaque table, vue, vue matérialisée et table distante, une union de chaînes pour chaque enum, et un fichier à compléter pour chaque domaine ou type qu’il ne sait pas traduire seul ([Types personnalisés](/fr/custom-types)). Aucun type de ligne n’est écrit à la main, donc aucun ne peut contredire sa table.
 
-D’où le nom. En Postgres, un cast (`::`) donne son type à une valeur ; en anglais, un *cast* est aussi un moule. Les types de pgcast sont moulés sur votre schéma, et les exemples de cette doc parlent, fort à propos, de la distribution d’un film, son *cast*.
+D’où le nom. En Postgres, un cast (`::`) donne son type à une valeur ; en anglais, un *cast* est aussi un moulage, une pièce tirée d’un moule. Les types de pgcast sont tirés de votre schéma, et les exemples de cette doc parlent, fort à propos, de la distribution d’un film, son *cast*.
 
 Une colonne que la table n’a pas est refusée avant toute requête :
 

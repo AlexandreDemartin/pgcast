@@ -233,6 +233,7 @@ The build compares each French page with its English page, by VitePress's own pa
   | tutorial, how-to guide, reference, explanation | tutoriel, guide pratique, référence, explication |
   | a note's chip: Opt-in, Coming, Security | Opt-in, À venir, Sécurité |
   | an options table: Option → SQL it adds → Effect on the type, none | Option → SQL ajouté → Effet sur le type, aucun |
+  | the tagline: types cast from your database | des types tirés de votre base (never « moulés ») |
   | cast panel | panneau cast |
   | callback, handler, snapshot, opt-in, skill | le callback, le handler, le snapshot, l’opt-in, le skill |
   | commit, roll back (a transaction) | valider, annuler (`COMMIT` and `ROLLBACK` stay SQL) |

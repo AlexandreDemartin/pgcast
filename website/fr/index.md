@@ -12,7 +12,7 @@ description: "pgcast lit votre schéma Postgres et écrit les types TypeScript. 
 
 <p class="eyebrow">-- un fork maintenu de <a href="/fr/switching">Zapatos 6.6.1</a></p>
 
-<h1>Vos types, moulés sur votre base<span class="op">::</span></h1>
+<h1>Vos types, tirés de votre base<span class="op">::</span></h1>
 
 pgcast lit votre schéma Postgres et écrit les types TypeScript. Ses raccourcis produisent un SQL que vous pouvez lire et prévoir, et vous pouvez toujours revenir à un simple template `sql`. Pas d’ORM, pas de modèles, pas d’état caché.
 {.lede}
