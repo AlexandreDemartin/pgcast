@@ -481,10 +481,11 @@ interface TruncateSignatures {
 }
 
 /**
- * Generate a `TRUNCATE` query `SQLFragment`.
+ * Generate a `TRUNCATE` query `SQLFragment`, whose `run()` resolves `undefined`.
  * @param table The table (or array thereof) to truncate
- * @param opts Options: 'CONTINUE IDENTITY'/'RESTART IDENTITY' and/or 
- * 'RESTRICT'/'CASCADE'
+ * @param opts Options: 'CONTINUE IDENTITY'/'RESTART IDENTITY' and/or
+ * 'RESTRICT'/'CASCADE', in that order; another order throws as the query
+ * compiles, so `run()` rejects before any query is sent
  */
 export const truncate: TruncateSignatures = function (
   table: Table | Table[],
@@ -494,11 +495,19 @@ export const truncate: TruncateSignatures = function (
   if (!Array.isArray(table)) table = [table];
   // without strictNullChecks, `undefined` or `null` gets past the type: join() makes it empty, as in 6.6.1
   for (const opt of opts) if (opt != null && !['CONTINUE IDENTITY', 'RESTART IDENTITY', 'RESTRICT', 'CASCADE'].includes(opt)) throw new Error(`Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not '${opt}'`);
+  // Postgres takes `[ RESTART IDENTITY | CONTINUE IDENTITY ] [ CASCADE | RESTRICT ]`, in that order (42601 otherwise):
+  // https://www.postgresql.org/docs/current/sql-truncate.html. Another order throws as the query compiles, as the
+  // aggregates' refusals do, so `run()` still rejects, as in 6.6.1, before any query
   const
+    given = opts.filter(opt => opt != null),
     tables = mapWithSeparator(table, sql`, `, t => t),
     query = sql<SQL, undefined>`TRUNCATE ${tables}${raw((opts.length ? ' ' : '') + opts.join(' '))}`;
 
-  return query;
+  query.runResultTransform = () => undefined;
+  if (given.length <= 2 && (given.length < 2 || (given[0].endsWith('IDENTITY') && !given[1].endsWith('IDENTITY')))) return query;
+  const refused = sql``;
+  refused.compile = () => { throw new Error(`Truncate options must be CONTINUE IDENTITY/RESTART IDENTITY, then RESTRICT/CASCADE, one of each at most, not ${given.map(opt => `'${opt}'`).join(', ')}`); };
+  return sql<SQL, undefined>`${refused}`;
 };
 
 
