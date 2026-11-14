@@ -1,5 +1,5 @@
 ---
-english: 2d61d65c59a2
+english: cbaf3fa415a0
 ---
 
 # Versions
@@ -85,7 +85,7 @@ Là où `undefined` voulait dire « vide-la », `null` le dit avec l’un ou l
 
 ## 7.0 et 8.0 {#_7-0-and-8-0}
 
-La 7.0 active par défaut les opt-ins que liste la décision 003 : `upsertRequiresSameKeys`, `undefinedMeansMissing`, `transactionRequiresCommit`, `aggregatesTypedByColumn` et ceux qu’apporte encore la 6.7, sauf `selectExactlyOneChecksForSecondRow`, qui reste désactivé.
+La 7.0 active par défaut les opt-ins que liste la décision 003 : `upsertRequiresSameKeys`, `undefinedMeansMissing`, `transactionRequiresCommit`, `aggregatesTypedByColumn`, `transactionRequiresIdleClient` et ceux qu’apporte encore la 6.7, sauf `selectExactlyOneChecksForSecondRow`, qui reste désactivé.
 
 La décision 003 fait de cela toute la rupture de la 7.0, et les avertissements l’annoncent, donc un projet qui a activé chaque option, et ne voit ni avertissement `PGCAST_DEP` ni note du générateur, n’a rien à changer. Les anciens comportements disparaissent en 8.0.
 
@@ -99,5 +99,5 @@ La 6.6.2 est sur npm, sous le nom [`@pgcast/pgcast`](https://www.npmjs.com/packa
 
 ## Pour aller plus loin {#further-reading}
 
-- Les entrées dont parle cette page : [`Config.upsertRequiresSameKeys`](/fr/runtime-config#Config.upsertRequiresSameKeys), [`Config.undefinedMeansMissing`](/fr/runtime-config#Config.undefinedMeansMissing), [`Config.transactionRequiresCommit`](/fr/runtime-config#Config.transactionRequiresCommit), [`Config.selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), [`Config.aggregatesTypedByColumn`](/fr/runtime-config#Config.aggregatesTypedByColumn), [Opt-ins et avertissements](/fr/runtime-config#opt-ins-and-warnings), [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas), [`enumOrder`](/fr/generator#generate.enumOrder), [Une valeur `undefined`](/fr/insert#undefined-values), [`conditions.not()`](/fr/conditions#conditions.not), [`conditions.isNotIn()`](/fr/conditions#conditions.isNotIn), [`selectExactlyOne()`](/fr/select#selectExactlyOne), [`SchemaVersionCanary`](/fr/runtime-config#SchemaVersionCanary).
+- Les entrées dont parle cette page : [`Config.upsertRequiresSameKeys`](/fr/runtime-config#Config.upsertRequiresSameKeys), [`Config.undefinedMeansMissing`](/fr/runtime-config#Config.undefinedMeansMissing), [`Config.transactionRequiresCommit`](/fr/runtime-config#Config.transactionRequiresCommit), [`Config.transactionRequiresIdleClient`](/fr/runtime-config#Config.transactionRequiresIdleClient), [`Config.selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), [`Config.aggregatesTypedByColumn`](/fr/runtime-config#Config.aggregatesTypedByColumn), [Opt-ins et avertissements](/fr/runtime-config#opt-ins-and-warnings), [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas), [`enumOrder`](/fr/generator#generate.enumOrder), [Une valeur `undefined`](/fr/insert#undefined-values), [`conditions.not()`](/fr/conditions#conditions.not), [`conditions.isNotIn()`](/fr/conditions#conditions.isNotIn), [`selectExactlyOne()`](/fr/select#selectExactlyOne), [`SchemaVersionCanary`](/fr/runtime-config#SchemaVersionCanary).
 - La décision derrière : la [décision 003](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/003-fixes-and-deprecation.md), et chaque changement par version dans le [changelog](/fr/changelog).

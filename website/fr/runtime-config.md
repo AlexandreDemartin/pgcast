@@ -1,5 +1,5 @@
 ---
-english: 560a7b05f47d
+english: fbec29c0de62
 ---
 
 # Configuration
@@ -75,6 +75,7 @@ interface Config {
   upsertRequiresSameKeys?: boolean;
   undefinedMeansMissing?: boolean;
   transactionRequiresCommit?: boolean;
+  transactionRequiresIdleClient?: boolean;
   selectExactlyOneChecksForSecondRow?: boolean;
   aggregatesTypedByColumn?: boolean;
   queryListener?(query: SQLQuery, txnId?: number): void;
@@ -96,6 +97,7 @@ Les clés qu’ajoute pgcast sont facultatives, donc un `Config` écrit pour Zap
 | [`upsertRequiresSameKeys`](#Config.upsertRequiresSameKeys) | `false` | un `upsert()` de plusieurs lignes dont une clé, absente de certaines lignes, prend quand même sa valeur dans `EXCLUDED` : lever une erreur, pas avertir | à chaque `upsert()` |
 | [`undefinedMeansMissing`](#Config.undefinedMeansMissing) | `false` | une valeur `undefined` dans `insert()`, `update()` et `upsert()` : une clé manquante, pas `NULL` | à chaque appel de l’une d’elles |
 | [`transactionRequiresCommit`](#Config.transactionRequiresCommit) | `false` | un `COMMIT` auquel Postgres répond `ROLLBACK` : être rejetée, pas se résoudre | à chaque `transaction()` |
+| [`transactionRequiresIdleClient`](#Config.transactionRequiresIdleClient) | `false` | un client à vous déjà dans un bloc de transaction : être rejetée avant son `START TRANSACTION`, pas terminer votre transaction | à chaque `transaction()` qui reçoit un tel client |
 | [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow) | `false` | un `selectExactlyOne()` exécuté seul : `LIMIT 2`, et une deuxième ligne entraîne un rejet | à chaque `selectExactlyOne()` |
 | [`aggregatesTypedByColumn`](#Config.aggregatesTypedByColumn) | `false` | `sum()`, `avg()`, `min()` et `max()` : `null` quand aucune ligne ne correspond, et pour `min()` et `max()` la valeur de la colonne, pas son `Number()` | à chaque `run()` de l’un d’eux |
 | [`queryListener`](#Config.queryListener) | aucun | appelé avec chaque requête qu’envoie `run()` | à chaque `run()` |
@@ -202,6 +204,28 @@ Sans l’option, elle se résout avec ce que le callback a renvoyé, comme dans 
 
 - Non couvert : un callback qui envoie lui-même `COMMIT` ou `ROLLBACK`.
 - Non testé avec `pg-native`.
+
+### `transactionRequiresIdleClient` {#Config.transactionRequiresIdleClient}
+
+```ts
+transactionRequiresIdleClient?: boolean  // default: false; the default in 7.0
+```
+
+Avec un client sur lequel vous avez ouvert vous-même une transaction, par `BEGIN`, [`transaction()`](/fr/transaction#transaction) terminerait votre transaction : son `COMMIT`<!-- probe: db.serializable(pool, async () => {}) --> la valide, ou son `ROLLBACK`<!-- probe: db.serializable(pool, async () => { throw 0; }) --> l’annule ([Votre propre `BEGIN`](/fr/transaction#your-own-begin)).
+
+Avec `true`, elle est rejetée avant d’envoyer son `START TRANSACTION`, avec "transaction() was given a client inside a transaction block, so its COMMIT or ROLLBACK would end that transaction: COMMIT or ROLLBACK it first, pass the pool, or run the queries on that client without transaction()"<!-- message -->. Votre transaction reste ouverte, pour votre `COMMIT` ou votre `ROLLBACK`.
+
+Sans l’option, elle envoie ce qu’envoie Zapatos 6.6.1, avec un avertissement une fois par processus, `PGCAST_DEP005`, avant son `START TRANSACTION`.
+
+- pg dit si un client est dans un bloc à partir de pg 8.21 (`getTransactionStatus()`). Avec les versions antérieures, `transaction()` s’exécute comme dans la 6.6.1, avec ou sans l’option, sans avertissement.
+- Avec `true`, quand pg signale un bloc, `transaction()` envoie d’abord une requête vide, pour relire le statut ; [`queryListener`](#Config.queryListener) et [`resultListener`](#Config.resultListener) la reçoivent, avec l’id de la transaction ([Votre propre `BEGIN`](/fr/transaction#your-own-begin)).
+- Avec `true`, une `transaction()` lancée au même moment sur ce client est transmise, comme dans la 6.6.1, et ne valide ni n’annule rien : ses requêtes s’exécutent dans votre bloc, ou, quand pg signalait un bloc déjà terminé, comme le dit le dernier point.
+- Sans l’option, rien ne relit le statut : juste après un `COMMIT` qui a échoué, pg peut encore signaler son bloc, et l’avertissement peut arriver une fois pour un client hors de tout bloc.
+- Seul un client que vous passez est vérifié : un client emprunté au pool, libéré alors qu’il était encore dans un bloc, ne l’est pas.
+- Un `BEGIN` envoyé sans `await` n’est pas encore vu : le client paraît hors de tout bloc.
+- Un `BEGIN` envoyé dans une même chaîne de requête avec une instruction qui échoue peut lui aussi paraître hors de tout bloc : `transaction()` s’exécute alors comme dans la 6.6.1, sans avertissement.
+- Non testé avec `pg-native`.
+- Avec `true`, juste après un `COMMIT` qui a échoué, deux appels de `transaction()` au même moment sur un même client : quand pg signale encore le bloc, le premier envoie sa requête vide, puis continue, et le second, transmis, envoie sa première requête, et celles envoyées avec elle, avant le `START TRANSACTION` du premier, hors de toute transaction, si bien que chacune est validée à part. Ses requêtes suivantes s’exécutent dans la transaction du premier appel.
 
 ### `selectExactlyOneChecksForSecondRow` {#Config.selectExactlyOneChecksForSecondRow}
 
@@ -357,6 +381,7 @@ Un comportement de Zapatos 6.6.1 sur lequel du code peut compter, mais que pgcas
 | [`undefinedMeansMissing: true`](#Config.undefinedMeansMissing) | `PGCAST_DEP002` | une valeur d’`insert()`, `update()` ou `upsert()` est `undefined`, ou une clé d’`updateValues` d’`upsert()` l’est et ajoute sa colonne ([Une valeur `undefined`](/fr/insert#undefined-values)) | 7.0 |
 | [`transactionRequiresCommit: true`](#Config.transactionRequiresCommit) | `PGCAST_DEP003` | Postgres répond au `COMMIT` de `transaction()` par `ROLLBACK`, après une erreur de requête que le callback a interceptée ([Laisser passer l’erreur](/fr/retries#let-the-error-through)) | 7.0 |
 | [`aggregatesTypedByColumn: true`](#Config.aggregatesTypedByColumn) | `PGCAST_DEP004` | `Number()` change le résultat de `sum()`, `avg()`, `min()` ou `max()` : un `NULL` devenu `0`, ou un `min()` ou `max()` qui n’est pas un nombre ([Typé par colonne](/fr/select#typed-by-column)) | 7.0 |
+| [`transactionRequiresIdleClient: true`](#Config.transactionRequiresIdleClient) | `PGCAST_DEP005` | `transaction()` reçoit un client déjà dans un bloc de transaction, auquel son `COMMIT` ou son `ROLLBACK` mettra fin ([Votre propre `BEGIN`](/fr/transaction#your-own-begin)) | 7.0 |
 
 </div>
 
@@ -364,7 +389,7 @@ Un opt-in n’a pas d’avertissement et ne devient pas le comportement par déf
 
 Le générateur a les siens : [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas) et [`enumOrder`](/fr/generator#generate.enumOrder), dont les anciens chemins donnent des notes via [`warningListener`](/fr/generator#generate.warningListener), une fois par exécution, plutôt qu’un `DeprecationWarning` ; ils deviendront eux aussi le comportement par défaut en 7.0.
 
-Chaque avertissement est un `DeprecationWarning` de Node.js, émis une fois par processus pour chaque code, quand le raccourci est appelé (`PGCAST_DEP003` : quand `transaction()` se résout ; `PGCAST_DEP004` : quand `.run()` reçoit le résultat), et seulement quand l’ancien comportement est utilisé. Son message nomme l’option. Node l’affiche sur `stderr` :
+Chaque avertissement est un `DeprecationWarning` de Node.js, émis une fois par processus pour chaque code, quand le raccourci est appelé (`PGCAST_DEP003` : quand `transaction()` se résout ; `PGCAST_DEP004` : quand `.run()` reçoit le résultat ; `PGCAST_DEP005` : quand `transaction()` est appelée, avant son `START TRANSACTION`), et seulement quand l’ancien comportement est utilisé. Son message nomme l’option. Node l’affiche sur `stderr` :
 
 ```txt
 (node:4242) [PGCAST_DEP002] DeprecationWarning: An undefined value in insert(), update() or upsert() is sent as NULL, or, in upsert() updateValues, set from EXCLUDED. Set undefinedMeansMissing: true (db.setConfig) to treat it as a missing key instead (DEFAULT in insert(), left out of update() and upsert()); it will be the default in pgcast 7.0.

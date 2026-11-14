@@ -186,6 +186,10 @@ Candidates for a check, a rule or a skill line.
 - #235 — A 6.6.1 replay of an « is it a list » check includes a typed array, a one-character string and an array-like: they have a `length`, so 6.6.1 sometimes got them right by accident, and refusing them must be named — `branch-reviewer`
 - #235 — An error's advice is replayed on each kind it can receive: « spread it » turns a string back into its characters, the very defect fixed — `branch-reviewer`
 - #235 — Check « must not change » files with three dots (`git diff origin/master...HEAD`): a fetch elsewhere moves `origin/master` mid-round — `builder`
+- #233 — Any `await` that `transaction()` adds before its mark (or its `START TRANSACTION`) lets a call at the same moment on that client be passed through too early: each such `await` needs a `Promise.all` test with a mocked stale status, asserting the rows left — `branch-reviewer`
+- #233 — pg's `getTransactionStatus()` can be stale in both directions right after a rejected query (pg rejects on ErrorResponse, before ReadyForQuery): mock the status in tests rather than rely on the race — `builder`
+- #233 — An opt-in that adds a query on its old path needs exceptions in the pages that say « nothing else changes » and when the warning comes; better, keep the old path byte-identical (here: the empty query only with the option on) — orchestrator
+- #233 — pg's `util.deprecate` warnings fire once per process: a replay comparing implementations for them runs each in its own process — `branch-reviewer`
 - #416 — Three steps (#170, #250, #416) found built-ins missing from the hand-written list: a test walking the ECMA-262 global constructors (refused, or kept with a reason) on each Node of the matrix, and a check on the prototype chain for iterators — `branch-reviewer`
 - #416 — A one-loop `it` hides each failure after the first; an integration count of `query` calls shows each new entry red on its own — `builder`
 - #263 — A property of a shortcut's query that changes its SQL or its result states whether `copy()` carries it, with a test of the copy: #263 (the transform) and #262 (the extras mark) both met the gap — `branch-reviewer`

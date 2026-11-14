@@ -1,5 +1,5 @@
 ---
-english: 16ac94c3a46b
+english: 680a6fab3758
 ---
 
 # Tests
@@ -71,7 +71,15 @@ Le code qui ouvre sa propre [`transaction()`](/fr/transaction#transaction) ne pe
 - Si le test n’a encore lancé aucune requête, ou au niveau propre à la session (`readCommitted()`, sur un serveur par défaut), son `COMMIT`<!-- probe: db.serializable(pool, async () => {}) --> valide la transaction du test, lignes comprises.
 - À un autre niveau, après n’importe quelle requête, lignes de départ du test comprises, Postgres refuse avec 25001 (« <span lang="en">SET TRANSACTION ISOLATION LEVEL must be called before any query</span> ») : son `ROLLBACK`<!-- probe: db.serializable(pool, async () => { throw 0; }) --> annule les lignes de départ, et l’appel est rejeté.
 
-Dans les deux cas, le `ROLLBACK` du test n’a plus rien à annuler (25P01). Donnez donc le pool à ce code, et supprimez ce qu’il valide :
+Dans les deux cas, le `ROLLBACK` du test n’a plus rien à annuler (25P01), et pgcast avertit une fois, `PGCAST_DEP005`. Activez [`transactionRequiresIdleClient`](/fr/runtime-config#Config.transactionRequiresIdleClient) dans la mise en place de vos tests, et un tel appel est alors rejeté, avant son `START TRANSACTION` : le test échoue, et son `ROLLBACK` annule toujours ses lignes de départ.
+
+```ts twoslash
+import * as db from 'zapatos/db';
+// ---cut---
+db.setConfig({ transactionRequiresIdleClient: true });
+```
+
+Il faut pg 8.21 ou plus récent, qui signale le `BEGIN` du test ([Votre propre `BEGIN`](/fr/transaction#your-own-begin)). Donnez ensuite le pool à ce code, et supprimez ce qu’il valide :
 
 <<< ../examples/plain/testing_commits.ts{ts twoslash}
 
