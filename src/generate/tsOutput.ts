@@ -157,8 +157,6 @@ export const tsForConfig = async (config: CompleteConfig, debug: (s: string) => 
   const
     pool = new pg.Pool(config.db),  // connects at its first query
     queryFn = async (query: pg.QueryConfig, seq = querySeq++) => {
-      // a query still to come when the run has thrown, and so ended the pool: it rejects, as the run did
-      if (ended) throw new Error(`query ${seq} not sent: the generator has stopped`);
       try {
         debug(`>>> query ${seq} >>>\n${query.text.replace(/^\s+|\s+$/mg, '')}\n+ ${JSON.stringify(query.values)}\n`);
         const result = await pool.query(query);
@@ -166,6 +164,9 @@ export const tsForConfig = async (config: CompleteConfig, debug: (s: string) => 
         return result;
 
       } catch (e) {
+        // the run has thrown and ended the pool, which refuses a query still to come and never serves one still
+        // queued in it (with connectionTimeoutMillis, that one rejects later): reject into the run, not exit
+        if (ended) throw e;
         console.log(`*** error ${seq} ***`, e);
         process.exit(1);
       }
