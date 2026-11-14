@@ -240,7 +240,11 @@ The list itself is an array, `readonly` or not. Anything else gets past the type
 
 > `` `isNotIn()` takes an array, not `Set`: make one with `isNotIn([...values])`, or `Array.from(values)` for an array-like object. ``<!-- message -->
 
-Zapatos 6.6.1 read the list's `length`. A `Set` or an iterator has none, so `isIn()` gave `false` and `isNotIn()` gave `true`, every row: with `ids` a `Set`, `db.deletes('films', { id: db.conditions.isNotIn(ids) })` was `DELETE FROM "films" WHERE ((true))`. A string gave its characters, an array-like object its values and then its `length`, and `null` a `TypeError` at the call.
+One value in place of the list, a string, a number, `null` or `undefined`, gets the other advice, as spreading `'Ada'` would give `'A'`, `'d'`, `'a'`:
+
+> `` `isIn()` takes an array, not `string`: for one value, write `isIn([value])`. ``<!-- message -->
+
+Zapatos 6.6.1 read the list's `length`. A `Set` or an iterator has none, so `isIn()` gave `false` and `isNotIn()` gave `true`, every row: with `ids` a `Set`, `db.deletes('films', { id: db.conditions.isNotIn(ids) })` was `DELETE FROM "films" WHERE ((true))`. A string gave its characters, which for a one-character string such as Express's `req.query.id` (`'5'` for `?id=5`) was its one value, the right rows, and now rejects; an array-like object gave its values and then its `length`, and `null` a `TypeError` at the call.
 
 ### `isIn()` {#conditions.isIn}
 
