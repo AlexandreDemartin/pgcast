@@ -82,10 +82,32 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 .VPNavBar.has-sidebar { --vp-nav-col-offset: 0px !important; }
 .VPNavBar .divider-line { background-color: var(--line) !important; }
 .VPNavBar.has-sidebar .divider::before { display: none; }
-.VPNavBarTitle .title { font: 700 19px/1 var(--font-mono); letter-spacing: -.02em; color: var(--fg); gap: 8px; }
-.VPNavBarTitle .title b { color: var(--accent); font-weight: 700; margin: 0 1px; }
-/* VitePress clips the title's span (`overflow: hidden`, for its ellipsis): a line box of 1 cut the descender of the g */
-.VPNavBarTitle .title > span:not(.version) { line-height: 1.5; }
+.VPNavBarTitle .title { color: var(--fg); gap: 8px; }
+/* the wordmark (Wordmark.vue), PG⟨mark⟩CAST: capitals as tall as the 14px tile, Saira's cap height being .688em, so
+   that both stand on the baseline and share their middle; the tile 2px from each word, the tracking after the G
+   included */
+.Wordmark {
+  display: inline-flex; align-items: baseline; flex: none;
+  font: 700 calc(14px / .688)/1.5 "Saira Wordmark", var(--font-display); letter-spacing: .04em;
+}
+.Wordmark .pg, .Wordmark .cast, .Wordmark .pg > span, .Wordmark .cast > span { display: inline-block; }
+.Wordmark .mark { flex: none; width: 14px; height: 14px; margin: 0 2px 0 calc(2px - .04em); fill: var(--accent); }
+/* its entrance, on a session's first page only (Wordmark.vue): the tile settles in, then PG and CAST come out of it to
+   each side, as out of a mould, each word slid out from behind it by as much as a clip opens; one curve, 780ms in all.
+   Transform, opacity and clip-path alone: the words keep their place and width from the first frame. */
+@media (prefers-reduced-motion: no-preference) {
+  html[data-wordmark] .Wordmark { --ease: cubic-bezier(.16, 1, .3, 1); }
+  html[data-wordmark] .Wordmark .mark { animation: wordmark-settle 320ms var(--ease) backwards; }
+  html[data-wordmark] .Wordmark .pg { animation: wordmark-open-leftward 600ms var(--ease) 120ms backwards; }
+  html[data-wordmark] .Wordmark .pg > span { animation: wordmark-slide 600ms var(--ease) 120ms backwards; }
+  html[data-wordmark] .Wordmark .cast { animation: wordmark-open-rightward 600ms var(--ease) 180ms backwards; }
+  html[data-wordmark] .Wordmark .cast > span { --from: -100%; animation: wordmark-slide 600ms var(--ease) 180ms backwards; }
+}
+@keyframes wordmark-settle { from { opacity: 0; transform: scale(.6); } }
+@keyframes wordmark-slide { from { transform: translateX(var(--from, 100%)); } }
+/* the clips reach past the line box above and below, so that nothing of a letter is cut on the way */
+@keyframes wordmark-open-leftward { from { clip-path: inset(-25% 0 -25% 100%); } to { clip-path: inset(-25% 0 -25% 0); } }
+@keyframes wordmark-open-rightward { from { clip-path: inset(-25% 100% -25% 0); } to { clip-path: inset(-25% 0 -25% 0); } }
 .VPNavBarTitle .version {
   font: 500 12px/1 var(--font-body); letter-spacing: 0; color: var(--muted);
   border: 1px solid var(--line); border-radius: 999px; padding: 4px 8px; background: var(--surface);

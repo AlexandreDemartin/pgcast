@@ -4,10 +4,11 @@ The look of pgcast's docs ([decision 004](../decisions/004-documentation-site.md
 
 ## Identity
 
-- **Wordmark**: `pg::cast`, in the mono face, 700, 19px, letter-spacing `-.02em`; the `::` (Postgres's cast operator) in `--accent`, with 1px either side.
+- **Wordmark**: **PG⟨mark⟩CAST**, the full logo: Postgres's cast operator, `::`, is the mark itself, the favicon's tile set between the two words as a seventh letter (`website/.vitepress/theme/Wordmark.vue`). The words are capitals of Saira, 700, `--fg`, letter-spacing `.04em`: a face of straight sides and rounded corners, the tile's own geometry. The tile is as tall as the capitals, so both stand on the baseline and share their middle: 14px in the top bar, where the letters are `calc(14px / .688)` (Saira's cap height is .688em), drawn there on a 14px grid (four 3px holes, 2px in, 4px apart) so that it stays sharp at 1x and 2x; it sits 2px from each word, the tracking after the G included. Its name is "pgcast"; what it shows is hidden from assistive technology. Lowercase was tried and set aside: its descenders and ascenders cannot be as tall as the tile and centred on it at once.
+- **Its entrance**, the site's one brand moment, on the first page of a session only (`sessionStorage`; never on a client-side navigation, nor without storage, nor with `prefers-reduced-motion: reduce`): the tile settles in (opacity 0 → 1, scale .6 → 1, 320ms), then PG and CAST come out of it to each side, as out of a mould, each slid out from behind it by as much as a clip opens (`translateX` ±100% → 0 and `clip-path: inset()` from the tile's side, 600ms, from 120ms and 180ms). One curve, `cubic-bezier(.16, 1, .3, 1)`, 780ms in all; transform, opacity and clip-path alone, so the words keep their place and width from the first frame. The server renders the wordmark at rest: a pre-paint script sets `data-wordmark` on `<html>`, which the entrance's rules need, and `Wordmark.vue` removes it once the entrance is over.
 - **Hero line**: "Your types, cast from your database::", the display face at 600; the closing `::` in the mono face, 700, `--accent`, letter-spacing `-.06em`.
 - **Eyebrow** above it, as a SQL comment: `-- a maintained fork of Zapatos 6.6.1`, mono 500, 13px, `--accent`.
-- **Favicon**: the `::` cut out of a rounded square in `--accent` (radius 3/16 of its side), so the tab shows through the four dots: `website/public/favicon.svg`, light and dark. The social card, 1200×630, sets the wordmark, eyebrow and hero line in the light theme: `website/public/social-card.svg`.
+- **Favicon**: the `::` cut out of a rounded square in `--accent` (radius 3/16 of its side), so the tab shows through the four dots: `website/public/favicon.svg`, light and dark. The social card, 1200×630, sets the wordmark (its tile 44px) and the hero line in the light theme, and no eyebrow: pgcast is branded on its own (`website/public/social-card.svg`).
 - **Accent**: one teal. Neutrals are greys biased toward it (blue-green), never pure grey.
 
 ## Colour tokens
@@ -51,7 +52,10 @@ Other tokens: `--radius: 10px` (the cast panel 14px, buttons 9px, nav rows and t
 |---|---|---|---|
 | Schibsted Grotesk | 600 | `"Helvetica Neue", Arial, sans-serif` | headings (`h1`–`h3`): line-height 1.15, `text-wrap: balance` |
 | Inter | 400, 500, 600 | `system-ui, -apple-system, "Segoe UI", sans-serif` | body, 15px / 1.65 |
-| JetBrains Mono | 400, 500, 700 | `ui-monospace, SFMono-Regular, Menlo, Consolas, monospace` | code, the wordmark, eyebrows, tabs, panel tags, tooltips |
+| JetBrains Mono | 400, 500, 700 | `ui-monospace, SFMono-Regular, Menlo, Consolas, monospace` | code, eyebrows, tabs, panel tags, tooltips |
+| Saira | 700 | the display face's | the wordmark alone: its six capitals P G C A S T, 1.3 KB, preloaded first, `font-display: block` |
+
+The four are SIL OFL, each served from `website/public/fonts/` beside its licence (`theme/fonts.css` says how each file was made). Saira is by Omnibus-Type, <https://github.com/Omnibus-Type/Saira>, cut from Google Fonts' file to the wordmark's capitals at 700.
 
 Headings share one weight, 600: the hierarchy is in their size. Letters are tightened only from the page title up.
 
