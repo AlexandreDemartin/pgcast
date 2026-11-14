@@ -1011,7 +1011,7 @@ describe('a built-in object as a filter', () => {
 });
 
 describe('a list that is not an array in isIn() and isNotIn()', () => {
-  it('rejects run() before any query, through deletes, select and update, and nested in and(), or() and not()', async () => {
+  it('rejects run() before any query, through deletes, select and update, nested in and(), or() and not(), and copied', async () => {
     // 6.6.1 ran DELETE … WHERE ((true)) for isNotIn(new Set([1, 2])), every row (#235)
     const
       outcomes: Record<string, string> = {},
@@ -1030,6 +1030,7 @@ describe('a list that is not an array in isIn() and isNotIn()', () => {
               and: db.deletes('users', db.conditions.and({ display_name: 'Ada' }, { id: c })),
               or: db.deletes('users', db.conditions.or({ display_name: 'Ada' }, { id: c })),
               not: db.deletes('users', db.conditions.not({ id: c })),
+              copy: db.deletes('users', { id: (c as db.SQLFragment<any, any>).copy() }),
             };
           for (const [where, q] of Object.entries(queries))
             outcomes[`${fn} ${kind} ${where}`] = await q.run(t.client).then(
@@ -1057,8 +1058,8 @@ describe('a list that is not an array in isIn() and isNotIn()', () => {
     });
     expect([await caught(new Set([1, 2])), await caught(null), await caught(undefined)]).toEqual([
       '`isNotIn()` takes an array, not `Set`: make one with `isNotIn([...values])`, or `Array.from(values)` for an array-like object.',
-      '`isNotIn()` takes an array, not `null`: make one with `isNotIn([...values])`, or `Array.from(values)` for an array-like object.',
-      '`isNotIn()` takes an array, not `undefined`: make one with `isNotIn([...values])`, or `Array.from(values)` for an array-like object.',
+      '`isNotIn()` takes an array, not `null`: for one value, write `isNotIn([value])`.',
+      '`isNotIn()` takes an array, not `undefined`: for one value, write `isNotIn([value])`.',
     ]);
     expect(await adaName()).toBe('Ada');
   });

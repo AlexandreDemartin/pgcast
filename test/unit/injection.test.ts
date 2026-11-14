@@ -1434,14 +1434,21 @@ describe('a list that is not an array in isIn() and isNotIn()', () => {
     and: c => db.deletes('users', db.conditions.and({ display_name: 'Ada' }, { id: c })),
     or: c => db.deletes('users', db.conditions.or({ display_name: 'Ada' }, { id: c })),
     not: c => db.deletes('users', db.conditions.not({ id: c })),
+    // copy() makes a fragment from the literals and expressions: a refusal must sit in them, not in compile
+    copy: c => db.deletes('users', { id: (c as db.SQLFragment<any, any>).copy() }),
+    copyInNot: c => db.deletes('users', db.conditions.not({ id: (c as db.SQLFragment<any, any>).copy() })),
+    queryCopy: c => db.deletes('users', { id: c }).copy(),
   };
+  // one value in place of the list is wrapped, not spread: `[...'5']` would split a string again
+  const message = (fn: string, kind: string) => ['string', 'null', 'undefined'].includes(kind) ?
+    `\`${fn}()\` takes an array, not \`${kind}\`: for one value, write \`${fn}([value])\`.` :
+    `\`${fn}()\` takes an array, not \`${kind}\`: make one with \`${fn}([...values])\`, or \`Array.from(values)\` for an array-like object.`;
 
-  it('throws for each kind, in isIn() and isNotIn(), through deletes, select and update, and nested in and(), or() and not()', () => {
+  it('throws for each kind, in isIn() and isNotIn(), through deletes, select and update, nested in and(), or() and not(), and copied', () => {
     const outcomes: string[] = [];
     for (const [fn, list] of Object.entries(lists))
       for (const [entryPoint, build] of Object.entries(entryPoints))
         for (const [kind, x] of Object.entries(nonArrayLists())) {
-          const expected = `\`${fn}()\` takes an array, not \`${kind}\`: make one with \`${fn}([...values])\``;
           let outcome: string;
           try {
             const condition = list(x as any);
@@ -1449,7 +1456,7 @@ describe('a list that is not an array in isIn() and isNotIn()', () => {
           } catch (err) {
             outcome = `throws at the call: ${(err as Error).message}`;
           }
-          if (!outcome.startsWith(expected)) outcomes.push(`${fn} ${entryPoint} ${kind}: ${outcome}`);
+          if (outcome !== message(fn, kind)) outcomes.push(`${fn} ${entryPoint} ${kind}: ${outcome}`);
         }
     expect(outcomes).toEqual([]);
   });
