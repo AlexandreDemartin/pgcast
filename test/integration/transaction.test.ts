@@ -682,6 +682,25 @@ describe('a client already inside a transaction block', () => {
     expect(await notes()).toEqual(['inner', 'leaked']);
   });
 
+  it('with transactionRequiresIdleClient, a call at the same moment as a refused one asks again, and is refused too', async () => {
+    const { fdb } = await fresh();
+    fdb.setConfig({ transactionRequiresIdleClient: true });
+    const client = await t.pool.connect();
+    let called = 0;
+    try {
+      await client.query('BEGIN');
+      const sent = spyQueries(client);
+      const results = await Promise.allSettled([0, 1].map(() => fdb.readCommitted(client, async () => { called++; })));
+      expect(results.map(r => r.status === 'rejected' && (r.reason as Error).message)).toEqual([inBlock, inBlock]);
+      expect(sent).toEqual(['', '']);  // one empty query each, and nothing else
+      expect(client.getTransactionStatus()).toBe('T');
+      await client.query('ROLLBACK');
+    } finally {
+      client.release();
+    }
+    expect(called).toBe(0);
+  });
+
   it('without transactionRequiresIdleClient, queues no query behind its empty query: pg deprecates a query sent while another runs', async () => {
     const { fdb } = await fresh();
     const client = await t.pool.connect();
