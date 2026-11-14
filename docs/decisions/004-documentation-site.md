@@ -127,3 +127,5 @@ The owner's answers, 2026-11-12:
 - Fumadocs: [Twoslash](https://www.fumadocs.dev/docs/markdown/twoslash), [static export](https://fumadocs.dev/docs/deploying/static), [versioning](https://www.fumadocs.dev/docs/versioning).
 - Comparables: the docs `package.json` of [Vite](https://github.com/vitejs/vite/tree/main/docs), [Vitest](https://github.com/vitest-dev/vitest/tree/main/docs), [Hono](https://github.com/honojs/website), [Kysely](https://github.com/kysely-org/kysely/tree/master/site), [pgTyped](https://github.com/adelsz/pgtyped), [tRPC](https://github.com/trpc/trpc/tree/main/www), [Zod](https://github.com/colinhacks/zod/tree/main/packages/docs), [Prisma](https://github.com/prisma/docs), [Biome](https://github.com/biomejs/website), [Astro](https://github.com/withastro/docs).
 - George's docs build: [zapatos-docs](https://github.com/jawj/zapatos-docs).
+
+> Zapatos's old documentation (`docs/index.html`, `docs/docs.js`, `docs/zapatos-bundle.js`, `docs/monaco/` and their assets) was removed on 2026-11-14 (#314), as § Decision 6 of decision 004 planned; it is online at <https://jawj.github.io/zapatos/> and in the history (`git show v6.6.1:docs/index.html`).
