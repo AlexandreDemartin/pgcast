@@ -470,6 +470,17 @@ describe('truncate', () => {
     // @ts-expect-error 'DROP' is not a TRUNCATE option
     db.truncate('users', 'DROP');
   });
+
+  test('refuses an order Postgres refuses', () => {
+    // @ts-expect-error the identity option comes first
+    db.truncate('users', 'CASCADE', 'RESTART IDENTITY');
+    // @ts-expect-error one identity option at most
+    db.truncate('users', 'RESTART IDENTITY', 'CONTINUE IDENTITY');
+    // @ts-expect-error one foreign key option at most
+    db.truncate('users', 'CASCADE', 'RESTRICT');
+    // @ts-expect-error two options at most
+    db.truncate('users', 'RESTART IDENTITY', 'CASCADE', 'CASCADE');
+  });
 });
 
 // The result types, written out as a test helper writes a fake result: each must equal what .run() resolves to.

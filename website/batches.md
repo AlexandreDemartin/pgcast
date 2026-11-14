@@ -88,7 +88,7 @@ Then add each row's votes to those stored: set `votes` in [`updateValues`](/inse
 </CastPanel>
 
 - The first run inserts the three rows. The second updates them, to 4, 2 and 6 votes, each with `$action: 'UPDATE'`.
-- An `undefined` in `updateValues` doesn't leave `votes` alone ([An `undefined` value](/insert#undefined-values), [#168](https://github.com/AlexandreDemartin/pgcast/issues/168)).
+- An `undefined` in `updateValues` sets `votes` to the batch's count, since the rows insert it: `EXCLUDED."votes"`<!-- probe: db.upsert('ratings', [{ film_id: 1000, stars: 5, votes: 3 }], ['film_id', 'stars'], { updateValues: { votes: undefined } }) -->, and with [`undefinedMeansMissing`](/runtime-config#Config.undefinedMeansMissing) on, `EXCLUDED."votes"`<!-- probe: (db.setConfig({ undefinedMeansMissing: true }), db.upsert('ratings', [{ film_id: 1000, stars: 5, votes: 3 }], ['film_id', 'stars'], { updateValues: { votes: undefined } })) --> too ([An `undefined` value](/insert#undefined-values)).
 
 ## Rows with different keys
 
