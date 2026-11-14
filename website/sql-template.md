@@ -438,7 +438,7 @@ What `sql` and every shortcut return: a query, or part of one, not yet compiled.
 | [`compile()`](#compile) | `{ text, values }`, the query `run()` sends |
 | [`runResultTransform`](#runResultTransform) | turns `pg`'s result into `RunResult` |
 | [`prepared(name?)`](#prepared) | makes it a prepared statement |
-| `copy(override?)` | a shallow copy, some properties replaced |
+| [`copy(override?)`](#copy) | a shallow copy, some properties replaced |
 | `noop`, `noopResult` | set by `insert()` and `upsert()` given `[]`: `run()` sends nothing and resolves to `noopResult` |
 | `parentTable` | set on a `lateral` subquery by its parent, for [`parent()`](#parent) |
 | `preparedName` | set by `prepared()` |
@@ -508,6 +508,16 @@ The values are parameters, not part of the text, so one name serves every call o
 <<< ./examples/plain/sql_prepared.ts{ts twoslash}
 
 A name stands for one text: on a connection that has prepared `'p'`, a fragment of another text named `'p'` makes `pg` reject with "Prepared statements must be unique - 'p' was used for a different statement".
+
+### `copy()` {#copy}
+
+```ts
+fragment.copy(override?: { literals?, expressions?, parentTable?, preparedName?, noop?, noopResult? }): SQLFragment<RunResult, Constraint>
+```
+
+A new fragment on the same literals and expressions. It keeps `runResultTransform`, `parentTable`, `preparedName`, `noop` and `noopResult`, except those `override` gives. So a copied shortcut resolves to what the shortcut does, as its type says: `count('films', all).copy().run(pool)` gives `4` on the docs schema, where Zapatos 6.6.1 gave the copy the default transform, so the rows: `[{ result: '4' }]`.
+
+A copy compiles as the fragment does nested in another, so a copy of `selectExactlyOne()` keeps `LIMIT $1`<!-- probe: (db.setConfig({ selectExactlyOneChecksForSecondRow: true }), db.selectExactlyOne('films', db.all).copy()) --> with `1`, even with [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow): it rejects on no row, never on a second one. `lateral` gives a copy of each subquery its parent's `parentTable`.
 
 ## `RunResultForSQLFragment` {#RunResultForSQLFragment}
 

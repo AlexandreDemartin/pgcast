@@ -516,6 +516,28 @@ describe('truncate', () => {
   });
 });
 
+describe('copy()', () => {
+  test('a copy of a shortcut resolves to the shortcut\'s result', () => {
+    const row = { email: 'a@b', display_name: 'A' };
+    expectTypeOf(db.count('users', db.all).copy().run(pool)).resolves.toEqualTypeOf<number>();
+    expectTypeOf(db.sum('accounts', db.all, { columns: ['balance'] }).copy().run(pool)).resolves.toEqualTypeOf<number>();
+    expectTypeOf(db.max('accounts', db.all, { columns: ['balance'] }).copy().run(pool)).resolves.toEqualTypeOf<number>();
+    expectTypeOf(db.select('users', db.all).copy().run(pool)).resolves.toEqualTypeOf<s.users.JSONSelectable[]>();
+    expectTypeOf(db.selectOne('users', { id: 1 }).copy().run(pool)).resolves.toEqualTypeOf<s.users.JSONSelectable | undefined>();
+    expectTypeOf(db.selectExactlyOne('users', { id: 1 }).copy().run(pool)).resolves.toEqualTypeOf<s.users.JSONSelectable>();
+    expectTypeOf(db.insert('users', row).copy().run(pool)).resolves.toEqualTypeOf<s.users.JSONSelectable>();
+    expectTypeOf(db.insert('users', [row]).copy().run(pool)).resolves.toEqualTypeOf<s.users.JSONSelectable[]>();
+    expectTypeOf(db.upsert('users', row, 'email', { returning: ['id'] }).copy().run(pool))
+      .resolves.toEqualTypeOf<Pick<s.users.JSONSelectable, 'id'> & db.UpsertAction>();
+    expectTypeOf(db.update('users', { display_name: 'B' }, { id: 1 }).copy().run(pool)).resolves.toEqualTypeOf<s.users.JSONSelectable[]>();
+    expectTypeOf(db.deletes('users', { id: 1 }, { returning: ['id'] }).copy().run(pool)).resolves.toEqualTypeOf<Pick<s.users.JSONSelectable, 'id'>[]>();
+    expectTypeOf(db.truncate('users').copy().run(pool)).resolves.toEqualTypeOf<undefined>();
+    expectTypeOf(db.selectOne('users', { id: 1 }).copy({ parentTable: 'u' }).run(pool)).resolves.not.toBeAny();
+    // @ts-expect-error a copied count is a number, not the rows
+    db.count('users', db.all).copy().run(pool).then((rows): { result: string }[] => rows);
+  });
+});
+
 // The result types, written out as a test helper writes a fake result: each must equal what .run() resolves to.
 describe('result types', () => {
   const row = { email: 'a@b', display_name: 'A' };

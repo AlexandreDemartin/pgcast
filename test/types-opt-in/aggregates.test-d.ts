@@ -116,6 +116,14 @@ describe('with aggregatesTypedByColumn declared', () => {
     expectTypeOf(db.select('users', db.all, { lateral: one }).run(pool)).resolves.toEqualTypeOf<(db.DateString | null)[]>();
   });
 
+  test('a copy resolves to the aggregate\'s result: the column\'s value, or null', () => {
+    expectTypeOf(db.sum('accounts', db.all, { columns: ['balance'] }).copy().run(pool)).resolves.toEqualTypeOf<number | null>();
+    expectTypeOf(db.min('events', db.all, { columns: ['occurred_on'] }).copy().run(pool)).resolves.toEqualTypeOf<Date | null>();
+    expectTypeOf(db.max('accounts', db.all, { columns: ['lifetime_ops'] }).copy().run(pool)).resolves.toEqualTypeOf<db.Int8String | null>();
+    // @ts-expect-error the copied min of a date is a Date or null, not a number
+    db.min('events', db.all, { columns: ['occurred_on'] }).copy().run(pool).then((n): number => n);
+  });
+
   test('calls that compile under 6.6.1 still compile, and throw at run time', () => {
     expectTypeOf(db.max('accounts', db.all)).not.toBeAny();
     expectTypeOf(db.min('accounts', db.all, { columns: ['balance', 'ratio'] })).not.toBeAny();

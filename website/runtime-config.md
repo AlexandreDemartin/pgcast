@@ -232,6 +232,7 @@ selectExactlyOneChecksForSecondRow?: boolean  // default: false, in 7.0 too
 With `true`, a [`selectExactlyOne()`](/select#selectExactlyOne) run on its own asks for two rows, `LIMIT $2`<!-- probe: (db.setConfig({ selectExactlyOneChecksForSecondRow: true }), db.selectExactlyOne('films', { id: 1000 })) --> with `2`, and `.run()` rejects with a [`NotExactlyOneError`](/select#NotExactlyOneError) when a second row comes: "One result expected but more returned (hint: check `.query.compile()` on this Error)"<!-- message -->. Off, it asks for one, `LIMIT 1`, and gives the first row that matches, as in Zapatos 6.6.1.
 
 - Nested in another query, in a `lateral` or a `sql` template, it keeps `LIMIT 1`, option or not: a second row there would join the parent row twice. "On its own" is how the query is compiled: `.run()` and `.compile()` compile it alone, a parent query compiles it as part of its own SQL.
+- A [`.copy()`](/sql-template#copy) of it compiles as nested, so it keeps `LIMIT 1`, run on its own too.
 - Off, it never warns, and it stays off in 7.0: "at least one row" is how Zapatos reads `selectExactlyOne()`, nested in a `lateral` on a `NOT NULL` foreign key ([decision 003](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/003-fixes-and-deprecation.md)).
 - Read when `selectExactlyOne()` is called, not at `.run()`.
 

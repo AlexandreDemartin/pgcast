@@ -1,5 +1,5 @@
 ---
-english: 159638473f5a
+english: fbec29c0de62
 ---
 
 # Configuration
@@ -236,6 +236,7 @@ selectExactlyOneChecksForSecondRow?: boolean  // default: false, in 7.0 too
 Avec `true`, un [`selectExactlyOne()`](/fr/select#selectExactlyOne) exécuté seul demande deux lignes, `LIMIT $2`<!-- probe: (db.setConfig({ selectExactlyOneChecksForSecondRow: true }), db.selectExactlyOne('films', { id: 1000 })) --> avec `2`, et `.run()` est rejetée avec une [`NotExactlyOneError`](/fr/select#NotExactlyOneError) quand une deuxième ligne arrive : "One result expected but more returned (hint: check `.query.compile()` on this Error)"<!-- message -->. Sans l’option, il en demande une, `LIMIT 1`, et donne la première ligne qui correspond, comme dans Zapatos 6.6.1.
 
 - Imbriqué dans une autre requête, dans un `lateral` ou un template `sql`, il garde `LIMIT 1`, avec ou sans l’option : une deuxième ligne y joindrait deux fois la ligne parente. « Seul » dépend de la façon dont la requête est compilée : `.run()` et `.compile()` la compilent seule, une requête parente la compile dans son propre SQL.
+- Une [`.copy()`](/fr/sql-template#copy) de celui-ci se compile comme imbriquée : elle garde donc `LIMIT 1`, exécutée seule aussi.
 - Sans l’option, aucun avertissement, et elle reste désactivée en 7.0 : « au moins une ligne », c’est ainsi que Zapatos lit `selectExactlyOne()`, imbriqué dans un `lateral` sur une clé étrangère `NOT NULL` ([décision 003](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/003-fixes-and-deprecation.md)).
 - Lue quand `selectExactlyOne()` est appelée, pas à `.run()`.
 

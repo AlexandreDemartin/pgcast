@@ -1,5 +1,5 @@
 ---
-english: 5daadf5ea1b7
+english: 4b67512a16a7
 ---
 
 # Lectures {#select-and-the-aggregates}
@@ -225,7 +225,7 @@ class NotExactlyOneError extends Error {
 
 L’erreur avec laquelle `selectExactlyOne()`, le mode `ExactlyOne` de `select()`, est rejetée quand aucune ligne ne correspond. Son `name` est `'NotExactlyOneError'`, son `message` "One result expected but none returned (hint: check `.query.compile()` on this Error)"<!-- message --> ; avec [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), une seconde ligne donne "One result expected but more returned (hint: check `.query.compile()` on this Error)"<!-- message -->.
 
-Sa `query` est le [`SQLFragment`](/fr/sql-template#SQLFragment) exécuté : `err.query.compile()` donne son SQL et ses valeurs. `err instanceof db.NotExactlyOneError` la reconnaît ; pour l’intercepter : [Distinguer une ligne manquante des autres erreurs](/fr/handle-errors#tell-a-missing-row-from-the-others).
+Sa `query` est le [`SQLFragment`](/fr/sql-template#SQLFragment) exécuté ou, pour une [`.copy()`](/fr/sql-template#copy), celui dont elle est la copie : `err.query.compile()` donne son SQL et ses valeurs. `err instanceof db.NotExactlyOneError` la reconnaît ; pour l’intercepter : [Distinguer une ligne manquante des autres erreurs](/fr/handle-errors#tell-a-missing-row-from-the-others).
 
 ## `count()` {#count}
 
