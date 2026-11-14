@@ -847,6 +847,10 @@ export interface SelectOneSignatures extends ByColumn<PassingThroughSignatures<S
  * Generate a `SELECT` query `SQLFragment` that returns only a single result (or 
  * undefined). A `LIMIT 1` clause is added automatically. This can be nested with 
  * other `select`/`selectOne`/`count` queries using the `lateral` option.
+ *
+ * With `withTies` and `order`, it is `FETCH FIRST $n ROWS WITH TIES`, `$n` being `1`:
+ * `run()` gives one of the tied rows, and in a `lateral` the parent row comes
+ * back once per tie (a nested `select()` keeps the ties in its array).
  * @param table The table to select from
  * @param where A `Whereable` or `SQLFragment` defining the rows to be selected,
  * or `all`
@@ -891,6 +895,10 @@ export interface SelectExactlyOneSignatures extends ByColumn<PassingThroughSigna
  * `SELECT to_jsonb("films".*) AS result FROM "films" WHERE ("id" = $1) LIMIT $2`,
  * `$2` being `2`. Nested in another query (a `lateral`, a `sql` template), or
  * compiled into a `result` of its own, it keeps `LIMIT 1`.
+ *
+ * With `withTies` and `order`, each `LIMIT` is `FETCH FIRST … ROWS WITH TIES`,
+ * as in `selectOne()`: nested in a `lateral`, the parent row comes back once
+ * per tie, option or not.
  * @param table The table to select from
  * @param where A `Whereable` or `SQLFragment` defining the rows to be selected,
  * or `all`
