@@ -2,15 +2,12 @@
 //
 // The types of sum(), avg(), min() and max() with aggregatesTypedByColumn declared in ConfigTypes,
 // on the fixture schema: null on an empty set, and min / max typed by their column, as pg parses it
-// at top level, as JSON nested in a query. Without the declaration: ../types/shortcuts.test-d.ts.
+// at top level, as JSON nested in a query. Declared in ./pgcast.d.ts, as the docs say to; without the
+// declaration: ../types/shortcuts.test-d.ts.
 
 import { describe, expectTypeOf, test } from 'vitest';
 import * as db from 'zapatos/db';
 import type * as s from 'zapatos/schema';
-
-declare module 'zapatos/db' {
-  interface ConfigTypes { aggregatesTypedByColumn: true }
-}
 
 declare const pool: db.Queryable;
 
