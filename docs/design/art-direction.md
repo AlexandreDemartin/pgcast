@@ -6,7 +6,8 @@ The look of pgcast's docs ([decision 004](../decisions/004-documentation-site.md
 
 - **Wordmark**: `pg::cast`, in the mono face, 700, 19px, letter-spacing `-.02em`; the `::` (Postgres's cast operator) in `--accent`, with 1px either side.
 - **Hero line**: "Your types, cast from your database::", the display face at 600; the closing `::` in the mono face, 700, `--accent`, letter-spacing `-.06em`.
-- **Eyebrow** above it, as a SQL comment: `-- a maintained fork of Zapatos 6.6.1`, mono 500, 13px, `--accent`.
+- **Eyebrow**, a SQL comment over a title, mono 500, 13px, `--accent`: the 404's `-- 404: 0 rows`. The home has none.
+- **pgcast on its own**: the home, the site's description and `llms.txt` present pgcast, not a fork. Zapatos is credited in the footer, the README and the licence; Switch from Zapatos is the last of the How-to guides, linked from Install.
 - **Favicon**: the `::` cut out of a rounded square in `--accent` (radius 3/16 of its side), so the tab shows through the four dots: `website/public/favicon.svg`, light and dark. The social card, 1200×630, sets the wordmark, eyebrow and hero line in the light theme: `website/public/social-card.svg`.
 - **Accent**: one teal. Neutrals are greys biased toward it (blue-green), never pure grey.
 
@@ -103,13 +104,13 @@ Spacing is on a 4px grid.
 - **Group landing pages** (`/tutorial`, `/guides`, `/reference`, `/explanation`): the title, the lede on what the group is for, then each page: its title, a link as every other in the docs (16px, 500, `--accent`, underlined 1px at 3px, 2px on hover), then its line, 4px under it, in `--muted`: the page's description, its lede cut as `meta.ts` cuts it (`groups.data.ts`). 20px between pages, 32px under the lede.
 - **404 page** (`NotFound.vue`), on the reading column's width, 96px down (48px under 560px): the eyebrow `-- 404: 0 rows`; "Page not found" and a lede as a page's; a button that opens the search, 40px, as the top bar's search field, at most 320px; then the four groups of the outline and the home, as a landing page's links, 12px apart.
 - **Breakpoints**: VitePress's (768 / 960 / 1280px) for the shell, the top bar and the nav, rather than fighting its layout: under 960px the nav becomes a drawer. The home grid, the notes, the page `h1` and the version pill keep 560 / 900px; the cast panel follows its own width (§ Signature components).
-- **Home**, on a 1180px column:
-  - The hero: eyebrow, line, lede, then two buttons, "Get started" (primary) and "Switching from Zapatos", 40px tall, padding `0 20px`; under them, 16px down, the install block (`InstallLine.vue`), at most 480px wide:
+- **Home**, on a 1180px column, the page's one `<main>`:
+  - The hero: line, lede, then two buttons, "Get started" (primary) and "Playground", 40px tall, padding `0 20px`; under them, 16px down, the install block (`InstallLine.vue`), at most 480px wide:
     - A tab per package manager, npm · pnpm · yarn · bun, npm first and the default: mono 500, 13px, 28px tall, padding `0 10px`, radius 8px, 4px apart; the picked one a filled pill, `--line` behind `--fg`, the others plain `--muted` text, `--fg` on hover. On their right, "Copied" for 1.4s after a copy, 12px, `--muted`.
     - 8px under them, the command in its own panel: `--sunken`, a `--line` border, `--radius`, padding `20px 24px` (16px under 560px); mono 14px / 22px, the package manager in `--t`, the rest in `--fg`, no `$`. At its end, a copy icon button, 28px, no border (16px icon, 2px stroke on a 24px grid, as the theme button's), `--line` behind it on hover; it copies the command shown, turns to a tick for 1.4s, and selects the command when the clipboard is refused. Where the command does not fit, on a phone, it wraps at a space, never cut, the button on its first line.
     - WAI-ARIA's tabs: arrows, Home and End pick a tab as they move the focus; Tab goes on to the copy button. The pick is remembered for every page and visit, with the code groups of package managers (§ Signature components).
-  - Then the cast panel of films with their cast; four pillars (Postgres is the source · SQL you can read · Values are parameters · Drop-in for Zapatos), each an `h2` at 1rem, 600; four "read next" links, one per group (four columns, two under 900px, one under 560px).
-  - Rhythm: 72px over the eyebrow (48px under 560px); eyebrow 16px, line 20px, lede 28px over the buttons; 48px from the hero to the cast panel (32px under 560px); 56px between the sections under it; the pillars under a rule, 32px under it, 32px apart.
+  - Then the cast panel of films with their cast; four pillars (Postgres is the source · SQL you can read · Values are parameters · Live playground), each an `h2` at 1rem, 600; four "read next" links, one per group (four columns, two under 900px, one under 560px).
+  - Rhythm: 72px over the line (48px under 560px); line 20px, lede 28px over the buttons; 48px from the hero to the cast panel (32px under 560px); 56px between the sections under it; the pillars under a rule, 32px under it, 32px apart.
 - **Footer**, on the home page and under every page: "pgcast is maintained by Alexandre Demartin. Zapatos and its original documentation are by George MacKerron. MIT licence. What changed in each version: the changelog.", each name linking to their GitHub profile, "changelog" to `/changelog`.
 
 ## Icons

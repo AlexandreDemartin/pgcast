@@ -32,9 +32,8 @@ Copy it into your project, and change `src/zapatos/schema.d.ts` if your `outDir`
 ```md
 # Postgres with pgcast
 
-This project queries Postgres with pgcast, a maintained fork of Zapatos,
-installed under the `zapatos` alias. The index of its docs, each page with its
-URL and summary:
+This project queries Postgres with pgcast, installed under the `zapatos` alias.
+The index of its docs, each page with its URL and summary:
 https://pgcast.dev/llms.txt
 For an assistant that reads one whole file, every page in one:
 https://pgcast.dev/llms-full.txt
