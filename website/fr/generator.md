@@ -1,5 +1,5 @@
 ---
-english: faa34125d649
+english: 689e7ab25837
 ---
 
 # Générateur
@@ -279,7 +279,7 @@ CREATE TABLE prints (id int PRIMARY KEY, format archive.print_format NOT NULL, f
 | `keeper` | `crew_job \| null` : les labels de `public.crew_job` | `('archivist' \| 'projectionist') \| null` |
 
 - Les labels sont écrits en toutes lettres, pas nommés : le schéma de l’enum n’a pas besoin d’être dans [`schemas`](#generate.schemas). Dans l’ordre d’[`enumOrder`](#generate.enumOrder), comme pour chaque enum.
-- Un domaine sur un tel enum reste un type personnalisé, `c.<name>` ; son nouveau placeholder reçoit les labels plutôt que `any`. Un placeholder existant n’est jamais écrasé.
+- Un domaine sur un tel enum reste un type personnalisé, `c.<name>` ; son nouveau placeholder reçoit les labels plutôt que `any`, sans import, même quand une relation du schéma de l’enum utilise aussi ce domaine. Un placeholder existant n’est jamais écrasé.
 - `false` signale, via [`warningListener`](#generate.warningListener), les colonnes que `true` changerait, chacune avec son type : pour un domaine, son type sous-jacent.
 
 ### `enumOrder` {#generate.enumOrder}
