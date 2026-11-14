@@ -58,7 +58,7 @@ try {
 ```
 
 - It puts back each key `saved` holds.
-- A key `saved` doesn't hold stays as set: a listener set in between keeps listening. Give it as `undefined` to remove it: `db.setConfig({ queryListener: undefined })`.
+- A key `saved` doesn't hold stays as set: a listener set in between keeps listening. Give it as `undefined` to remove it: `db.setConfig({ queryListener: undefined })`. Under `exactOptionalPropertyTypes`, which refuses it (TS2379), cast it, as the type has no other way, in Zapatos 6.6.1 too: `{ queryListener: undefined } as unknown as db.NewConfig`.
 
 ## `Config` {#Config}
 
