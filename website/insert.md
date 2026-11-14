@@ -73,7 +73,7 @@ db.upsert(table, values, conflictTarget, options?)
 
 </CastPanel>
 
-- The update sets every column inserted, from `EXCLUDED`, and each key of `updateValues`.
+- The update sets every column inserted, from `EXCLUDED`, and each key of `updateValues`. The `conflictTarget` columns are set too: a `citext` key, which Postgres matches whatever its case, takes the new value's case. An `updateColumns` without them leaves them as they are.
 - Each result has `$action`, `'INSERT'` or `'UPDATE'` ([`UpsertAction`](#UpsertAction)).
 - One row gives one result; an array gives an array, without the rows that do nothing ([`doNothing`](#doNothing)).
 - An empty array is a no-op, as for `insert()`.
@@ -202,7 +202,7 @@ db.update(table, values, where, options?)
 Update the rows that match, and return them. The arguments come in the order of the SQL: `SET`, then `WHERE`.
 
 - `table`: a table of the schema.
-- `values`: an `Updatable`, with at least one key. A `sql` fragment is written as SQL, where `db.self` is the column, and so is a condition such as [`conditions.add()`](/conditions#conditions.add). `raw()`, `cols()`, `vals()` and `parent()` throw, as for [`insert()`](#insert). An `undefined` value is `NULL` ([An `undefined` value](#undefined-values)).
+- `values`: an `Updatable`, with at least one key. A `sql` fragment is written as SQL, where `db.self` is the column, and so is a condition such as [`conditions.add()`](/conditions#conditions.add); written inline, it may need a type argument ([`Constraint`](/sql-template#type-arguments)). `raw()`, `cols()`, `vals()` and `parent()` throw, as for [`insert()`](#insert). An `undefined` value is `NULL` ([An `undefined` value](#undefined-values)).
 - `where`: a `Whereable`, or a `sql` fragment ([Conditions](/conditions)).
 - `options`: `returning` and `extras`, as for [`insert()`](#insert-options).
 

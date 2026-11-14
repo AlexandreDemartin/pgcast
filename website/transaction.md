@@ -96,6 +96,7 @@ One transaction, both seats or neither: `START TRANSACTION ISOLATION LEVEL SERIA
 - The callback runs at the outer transaction's level, and that level is not checked, at run time or by the type: every `TxnClient` is a [`Queryable`](/sql-template#Queryable), so `db.serializable(txnClient, …)` type-checks with a client of `db.readCommitted()`, and its callback runs in that `READ COMMITTED` transaction.
 - A function whose parameter is a `TxnClientFor…` type is checked: [`IsolationSatisfying`](#IsolationSatisfying).
 - What marks the client is its own `_zapatos` property ([`TxnClient`](#TxnClient)).
+- A transaction you opened yourself, with a raw `BEGIN`, has no mark, and `pg` doesn't say a client is in one. So `transaction()` sends its own `START TRANSACTION`, which Postgres only warns about, and its `COMMIT` commits your transaction; at another level, once yours has run a query, Postgres refuses it (25001), and its `ROLLBACK` undoes your writes. Open the outer transaction with `transaction()`.
 
 ### Errors
 
