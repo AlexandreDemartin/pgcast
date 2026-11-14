@@ -63,13 +63,15 @@
   --vp-code-tab-hover-text-color: var(--fg);
   --vp-code-tab-active-text-color: var(--fg);
   --vp-code-tab-active-bar-color: var(--accent);
-  --vp-local-search-bg: var(--bg);
+  /* the search dialog (below): rows on the dialog's surface, the selected one filled as the nav's current page; the
+     excerpts' fades take the row's colour */
+  --vp-local-search-bg: var(--surface);
   --vp-local-search-result-bg: var(--surface);
-  --vp-local-search-result-selected-bg: var(--accent-soft);
-  --vp-local-search-result-selected-border: var(--accent);
-  --vp-local-search-highlight-bg: var(--accent-soft);
-  --vp-local-search-highlight-text: var(--accent);
+  --vp-local-search-result-selected-bg: var(--raised);
 }
+/* behind the search dialog and the phone's nav drawer: the page dimmed toward --fg, not plain black */
+:root { --vp-backdrop-bg-color: rgb(18 32 43 / .4); }
+.dark { --vp-backdrop-bg-color: rgb(0 0 0 / .6); }
 
 /* base */
 body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; }
@@ -95,8 +97,10 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
   height: 36px; border: 1px solid var(--line) !important; border-radius: 8px !important; background: var(--sunken) !important;
   color: var(--muted); font-size: 14px;
 }
+/* its ⌘K one keycap, as the dialog's keys (below) */
+.VPNavBar .VPNavBarSearchButton .keys { display: inline-flex; align-items: center; gap: 1px; }
 /* room for the three group links by the search field, from 960px */
-@media (max-width: 1100px) { .VPNavBarSearchButton .keys { display: none; } }
+@media (max-width: 1100px) { .VPNavBar .VPNavBarSearchButton .keys { display: none; } }
 /* and an icon only under 900px, so that GitHub and the theme button stay in the bar down to 768px */
 @media (max-width: 900px) { .VPNavBarSearchButton .text { display: none; } }
 /* one class more than VitePress's scoped `.VPNavMenuLink` and `.VPNavMenuLink.active`, so that these win */
@@ -110,14 +114,15 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 .AppearanceSwitch svg { width: 18px; height: 18px; }
 
 /* left nav, in four groups that fold: a group's heading set apart from its pages by size and colour alone, no band
-   (the owner's call, #372); its pages a step further in, plain --muted text; the current page a filled row */
+   (the owner's call, #372); its pages a step further in, plain --muted text; the current page a filled row. Compact,
+   as a docs sidebar reads best (#379): rows of 32px and 28px that touch, the space between groups, not between rows */
 .VPSidebar .group, .VPSidebar .group + .group { border-top: 0; padding-top: 0; }
-/* over VitePress's scoped 24px and 10px: 24px under an open group, 4px under a folded one */
-.VPSidebar .group .VPSidebarItem.level-0 { padding-bottom: 20px; }
+/* over VitePress's scoped 24px and 10px: 16px under an open group, 4px under a folded one */
+.VPSidebar .group .VPSidebarItem.level-0 { padding-bottom: 16px; }
 .VPSidebar .group .VPSidebarItem.level-0.collapsed { padding-bottom: 4px; }
 /* VitePress opens the current page's group only once the page runs: until then, and 300ms more (`.no-transition`),
    it is shown open, so that a folded group does not open under the reader's eyes */
-.VPSidebar .group.no-transition .VPSidebarItem.level-0.collapsed.has-active { padding-bottom: 20px; }
+.VPSidebar .group.no-transition .VPSidebarItem.level-0.collapsed.has-active { padding-bottom: 16px; }
 .VPSidebar .group.no-transition .VPSidebarItem.level-0.collapsed.has-active > .items { display: block; }
 .VPSidebar .group.no-transition .VPSidebarItem.level-0.collapsed.has-active .caret-icon { transform: rotate(90deg); }
 /* the heading: its text in line with the nav's edge, its row 12px wider on the left for the fill of a current
@@ -126,19 +131,20 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 .VPSidebarItem.level-0 > .item {
   align-items: center; width: calc(100% + 12px); margin-left: -12px; padding-left: 12px; border-radius: 8px;
 }
-.VPSidebarItem.level-0 > .item .text { font: 600 16px/24px var(--font-display); color: var(--fg); padding: 8px 0; }
+.VPSidebarItem.level-0 > .item .text { font: 600 16px/24px var(--font-display); color: var(--fg); padding: 4px 0; }
 .VPSidebarItem.level-0.is-active > .item { background: var(--raised); }
 .VPSidebar .group .VPSidebarItem.level-0.is-active > .item .link > .text { color: var(--fg); }
 /* the chevron inside the row, not 7px past it as VitePress sets it: the row ends where its pages' rows end */
 .VPSidebarItem.level-0 > .item .caret { margin-inline-end: 0; border-radius: 8px; color: var(--muted); }
 .VPSidebarItem.level-0 > .item .caret:hover { color: var(--fg); }
-/* more room under the heading than between pages: 16px from its row to the first page's, 32px text to text (20px
+/* a little room under the heading, none between pages: 4px from its row to the first page's, 12px text to text (8px
    between pages) */
-.VPSidebarItem.level-0 > .items { padding-top: 16px; }
+.VPSidebarItem.level-0 > .items { padding-top: 4px; }
 .VPSidebarItem.level-1 > .item { padding: 0; }
 .VPSidebarItem.level-1 > .item .indicator { display: none; }
-/* rows of 36px, 4px apart, the text 16px in from the heading's */
-.VPSidebarItem.level-1 .link { flex: 1; padding: 8px 12px; margin: 0 0 4px 4px; border-radius: 8px; }
+/* rows of 28px that touch, so a hover or the current page fills one alone; the text 16px in from the heading's. A row
+   is a target of 28px, over the 24px of WCAG 2.5.8 on a phone */
+.VPSidebarItem.level-1 .link { flex: 1; padding: 4px 12px; margin: 0 0 0 4px; border-radius: 8px; }
 .VPSidebar .group .VPSidebarItem.level-1 .text { font: 400 14px/20px var(--font-body); padding: 0; color: var(--muted); }
 .VPSidebar .group .VPSidebarItem.level-1.is-link > .item > .link:hover .text { color: var(--fg); }
 .VPSidebarItem.level-1.is-active .link { background: var(--raised); }
@@ -165,6 +171,14 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 .vp-doc h2 { font-size: 1.5rem; margin: 44px 0 16px; padding-top: 4px; border-top: 0; }  /* 48px over its text */
 .vp-doc h3 { font-size: 1.125rem; margin: 24px 0 12px; }
 @media (max-width: 560px) { .vp-doc h1 { font-size: 2rem; } }
+/* a step of a page read in order (steps.ts): its number in a round marker, hung left of the heading's text, so that the
+   steps read at a glance and a long one wraps under its own text */
+.vp-doc h2:has(> .step) { position: relative; padding-left: 40px; }
+.vp-doc h2 > .step {
+  position: absolute; left: 0; top: 4px; display: grid; place-items: center; width: 28px; height: 28px;
+  border: 1px solid var(--line); border-radius: 50%; background: var(--surface);
+  font: 500 13px/1 var(--font-mono); color: var(--fg); letter-spacing: 0;
+}
 .vp-doc .lede { font-size: 1.1rem; color: var(--muted); margin: 0 0 28px; max-width: 62ch; }
 .vp-doc a, .landing a:not(.btn) { font-weight: inherit; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
 .vp-doc a:hover, .landing a:not(.btn):hover { text-decoration-thickness: 2px; }
@@ -483,11 +497,95 @@ svg.icon { width: 16px; height: 16px; flex: none; }
 .twoslash .twoslash-hover { border-bottom: 1px dashed var(--muted); cursor: help; }
 .twoslash .twoslash-hover:hover, .twoslash .twoslash-hover:focus-within { background: var(--accent-soft); border-radius: 2px; }
 .twoslash .twoslash-hover > span:focus-visible { outline: none; }  /* the background says it, as on hover */
-/* the search dialog's field: its bar already turns --accent on focus (VitePress's :focus-within), so the field itself
-   draws no second ring inside it */
-.VPLocalSearchBox .search-input:focus-visible { outline: none; }
 .v-popper--theme-twoslash .v-popper__inner { border-radius: 8px; box-shadow: 0 8px 28px rgba(0, 0, 0, .18); }
 .twoslash-floating .twoslash-popup-code { line-height: 1.5; background: transparent !important; }
+
+/* the search dialog: VitePress's local search, laid out as Cursor's docs lay theirs (#379): one panel 640px wide, 12vh
+   down so that it stays put as results come and go; the field a row of 56px over a rule; then the results, each its
+   place in the page (a path of headings, 12px), its title, and two lines of the text that matches, the match underlined
+   in --accent; the keys at the foot. VitePress loads the dialog's own CSS after this file, so these rules start at
+   `body`, one step more specific than its scoped ones. Full screen under 768px, as VitePress has it. */
+body .VPLocalSearchBox .shell {
+  width: min(640px, 100vw - 32px); max-height: min(76vh, 640px); margin: 12vh auto auto; padding: 0; gap: 0;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, .24); overflow: hidden;
+}
+body .VPLocalSearchBox .search-bar {
+  flex: none; height: 56px; padding: 0 8px 0 16px; gap: 4px; border: 0; border-bottom: 1px solid var(--line);
+  border-radius: 0;
+}
+/* one focus mark (#322): the field draws no ring of its own, and while it has focus the bar's rule is --accent, 2px */
+body .VPLocalSearchBox .search-input:focus-visible { outline: none; }
+body .VPLocalSearchBox .search-bar:focus-within { border-color: var(--line); }
+body .VPLocalSearchBox .search-bar:has(.search-input:focus) { box-shadow: inset 0 -2px 0 var(--accent); }
+body .VPLocalSearchBox .search-icon { margin: 0 4px 0 0; font-size: 16px; color: var(--muted); }
+body .VPLocalSearchBox .search-input { padding: 0 4px; font: 400 16px/24px var(--font-body); color: var(--fg); }
+body .VPLocalSearchBox .search-input::placeholder { color: var(--muted); opacity: 1; }
+body .VPLocalSearchBox .search-actions button { padding: 8px; border-radius: 8px; color: var(--muted); }
+body .VPLocalSearchBox .search-actions button:not([disabled]):hover { color: var(--fg); background: var(--sunken); }
+body .VPLocalSearchBox .search-actions .local-search-icon { font-size: 16px; }
+body .VPLocalSearchBox .search-actions .toggle-layout-button.detailed-list { color: var(--accent); }
+body .VPLocalSearchBox .results { padding: 8px; gap: 0; scroll-padding-block: 8px; }
+body .VPLocalSearchBox .results:empty { display: none; }
+body .VPLocalSearchBox .result { border: 0; border-radius: 8px; background: var(--vp-local-search-result-bg); line-height: 1; }
+body .VPLocalSearchBox .result > div { margin: 8px 12px; }
+body .VPLocalSearchBox .titles { gap: 0 4px; padding: 0; font: 400 12px/16px var(--font-body); color: var(--muted); }
+body .VPLocalSearchBox .title-icon { display: none; }
+body .VPLocalSearchBox .title { gap: 4px; }
+body .VPLocalSearchBox .title .local-search-icon { font-size: 12px; }
+body .VPLocalSearchBox .title:nth-last-child(2) .local-search-icon { display: none; }  /* the path ends at the title */
+body .VPLocalSearchBox .title.main { flex-basis: 100%; font: 500 14px/20px var(--font-body); color: var(--fg); }
+body .VPLocalSearchBox .titles:has(.title:not(.main)) .title.main { margin-top: 4px; }
+body .VPLocalSearchBox .titles code { font-family: var(--font-mono); font-size: .92em; }
+/* the selected row filled, its text as it was: VitePress turns it --accent */
+body .VPLocalSearchBox .result.selected .titles { color: var(--muted) !important; }
+body .VPLocalSearchBox .result.selected .title.main { color: var(--fg); }
+/* the text under the title: two lines, scrolled by VitePress to put the first match in the middle, as plain text in
+   --muted; the lines it cuts above and below fade out */
+body .VPLocalSearchBox .excerpt-wrapper { margin-top: 4px; }
+body .VPLocalSearchBox .excerpt {
+  opacity: 1; max-height: 40px; margin: 0;
+  mask-image: linear-gradient(transparent, #000 6px, #000 calc(100% - 6px), transparent);
+}
+body .VPLocalSearchBox .excerpt * {
+  font-size: 13px !important; line-height: 20px !important; margin: 0 !important; padding: 0 !important;
+  color: var(--muted); background: none !important; border: 0 !important; max-width: none;
+}
+body .VPLocalSearchBox .excerpt :is(pre, code) { font-family: var(--font-mono); white-space: pre-wrap; }
+body .VPLocalSearchBox .excerpt :is(.copy, .lang, .custom-block-title, .header-anchor, img, svg) { display: none; }
+body .VPLocalSearchBox .excerpt-gradient-top, body .VPLocalSearchBox .excerpt-gradient-bottom { display: none; }
+body .VPLocalSearchBox :is(.titles, .excerpt) mark {
+  padding: 0; border-radius: 0; background: none; color: var(--fg);
+  text-decoration: underline 2px var(--accent); text-underline-offset: 3px; text-decoration-skip-ink: none;
+}
+body .VPLocalSearchBox .no-results { padding: 32px 16px; font-size: 14px; color: var(--muted); }
+body .VPLocalSearchBox .no-results strong { font-weight: 500; color: var(--fg); }
+/* the keys, as small keycaps, over a rule at the foot */
+body .VPLocalSearchBox .search-keyboard-shortcuts {
+  flex: none; gap: 16px; padding: 10px 16px; border-top: 1px solid var(--line); opacity: 1;
+  font: 400 12px/20px var(--font-body); color: var(--muted);
+}
+body .VPLocalSearchBox .search-keyboard-shortcuts span { gap: 4px; }
+body .VPLocalSearchBox .search-keyboard-shortcuts kbd { display: inline-grid; place-items: center; }
+body .VPLocalSearchBox .search-keyboard-shortcuts kbd, .VPNavBar .VPNavBarSearchButton .keys {
+  min-width: 20px; height: 20px; padding: 0 4px;
+  background: var(--sunken); border: 1px solid var(--line); border-radius: 4px; box-shadow: none;
+  font: 500 11px/1 var(--font-mono); color: var(--muted);
+}
+.VPNavBar .VPNavBarSearchButton .keys { background: var(--surface); }  /* on the field's --sunken */
+body .VPLocalSearchBox .navigate-icon { font-size: 12px; }
+@media (max-width: 767px) {
+  body .VPLocalSearchBox .shell {
+    width: 100vw; height: 100dvh; max-height: none; margin: 0; border: 0; border-radius: 0; box-shadow: none;
+  }
+  body .VPLocalSearchBox .search-bar {
+    padding: 0 max(8px, env(safe-area-inset-right, 0px)) 0 max(4px, env(safe-area-inset-left, 0px));
+  }
+  body .VPLocalSearchBox .results {
+    padding: 8px max(8px, env(safe-area-inset-right, 0px)) max(8px, env(safe-area-inset-bottom, 0px))
+      max(8px, env(safe-area-inset-left, 0px));
+  }
+}
 
 /* the reading column's rhythm, on the 4px grid (art direction § Layout): a section 48px under the text above it
    (h2, above), paragraphs and lists 16px apart, list items 8px, a nested list's 4px; a block (code, table, cast

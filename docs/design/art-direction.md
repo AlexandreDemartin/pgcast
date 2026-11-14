@@ -20,13 +20,13 @@ Defined on `:root`, the dark values on `.dark` with `color-scheme: dark`. Three 
 | `--bg` | `#f6f8f9` | `#0d1318` | page background |
 | `--surface` | `#ffffff` | `#121a21` | top bar, nav drawer, panels, tables, notes, pager |
 | `--sunken` | `#eef2f4` | `#0a0f13` | inline code, table headers, search field, plain chip, copy button hover |
-| `--raised` | `#e4e7e9` | `#1e2429` | the nav's current page: `--fg` at 8% over `--bg` |
+| `--raised` | `#e4e7e9` | `#1e2429` | the nav's current page and the search's selected result: `--fg` at 8% over `--bg` |
 | `--fg` | `#12202b` | `#e2e9ee` | text |
 | `--muted` | `#566673` | `#8d9eab` | secondary text, labels, captions, hover-type underline |
 | `--line` | `#d9e0e5` | `#23303a` | borders and rules |
 | `--accent` | `#0a6b63` | `#4fcfbf` | links, `::`, current section of "On this page", primary button, selected tab, focus ring |
 | `--accent-fg` | `#ffffff` | `#06201d` | text on `--accent` |
-| `--accent-soft` | `#dcefec` | `#11302c` | chips, hover-type highlight, search selection |
+| `--accent-soft` | `#dcefec` | `#11302c` | chips, hover-type highlight |
 | `--warn` | `#8a5a00` | `#e8b65a` | Security chip and its border, the banner's text |
 | `--warn-soft` | `#fbf0d9` | `#2c2412` | Security note, the banner |
 | `--error` | `#b22e2e` | `#d96d6d` | an error line under a failing example (Twoslash's `// @errors`): its text and left border, on a 12.5% tint of it |
@@ -43,6 +43,8 @@ Syntax tokens:
 | `--c` | `#626e79` | `#768794` | comments, upright |
 | `--qi` | `#12202b` | `#e2e9ee` | SQL quoted identifiers (`"films"`), as plain text |
 | `--p` | `#b0245a` | `#f08ab3` | SQL parameters (`$1`) and their values, in bold |
+
+The backdrop behind the search dialog and the phone's nav drawer: `--fg` at 40% (light), black at 60% (dark).
 
 Other tokens: `--radius: 10px` (the cast panel 14px, buttons 9px, nav rows and the copy button 8px, inline code 4px, chips and the version pill `999px`); the top bar's height, `--vp-nav-height: 56px`.
 
@@ -76,14 +78,14 @@ No capitals for labels, no italics: comments included.
 
 Spacing is on a 4px grid.
 
-- **Top bar**, sticky, 56px, on `--surface` with a bottom rule across the whole width (under 960px, VitePress's Menu bar under it opens the nav; under 768px, its menu button holds the links): wordmark, version pill, search (`⌘K` or `/`: the button reads "Search", its label "Search the docs"; the `⌘K` hint hidden under 1100px and the text under 900px), links Tutorial · Guides · Reference · Playground · GitHub (`--muted`, 400, `--fg` on hover; the current group in `--fg` too; no external-link icon; 11px either side, so that Playground fits at 960px; hidden under 768px), theme button. Explanation is reached from the nav and the home: a fourth group link would push the theme button into VitePress's `⋯` menu at most widths from 768 to 1050px, with Playground and GitHub at 960px (measured on a page with the left nav). The changelog is linked from the footer.
+- **Top bar**, sticky, 56px, on `--surface` with a bottom rule across the whole width (under 960px, VitePress's Menu bar under it opens the nav; under 768px, its menu button holds the links): wordmark, version pill, search (`⌘K` or `/`: the button reads "Search", its label "Search the docs"; the `⌘K` hint one keycap, as the search dialog's, hidden under 1100px, and the text under 900px), links Tutorial · Guides · Reference · Playground · GitHub (`--muted`, 400, `--fg` on hover; the current group in `--fg` too; no external-link icon; 11px either side, so that Playground fits at 960px; hidden under 768px), theme button. Explanation is reached from the nav and the home: a fourth group link would push the theme button into VitePress's `⋯` menu at most widths from 768 to 1050px, with Playground and GitHub at 960px (measured on a page with the left nav). The changelog is linked from the footer.
 - **Shell**, VitePress's, at most 1440px: left nav 260px · reading column, at most 688px · "On this page" rail, at most 256px, from 1280px. Gutters of 16px at least, and the safe-area insets.
-- **Left nav**, sticky, in the four groups of Diátaxis (amended 2026-11-12, [decision 004](../decisions/004-documentation-site.md) § The site, which lists their pages): Tutorial · How-to guides · Reference · Explanation.
+- **Left nav**, sticky, compact as a docs sidebar is (amended 2026-11-14, #379, after Cursor's docs: rows that touch, the space between groups, not between rows), in the four groups of Diátaxis (amended 2026-11-12, [decision 004](../decisions/004-documentation-site.md) § The site, which lists their pages): Tutorial · How-to guides · Reference · Explanation.
   - Each group folds (VitePress's own `collapsed`, set per group in `outline.ts`): Tutorial and Reference open, How-to guides and Explanation folded; the group of the current page always open, on the server-rendered page too.
-  - A group's heading links its landing page: no band, no border, set apart from its pages by size and colour alone; a row of 40px, its text in line with the nav's edge, and VitePress's chevron at its end, a button (`aria-expanded`), `--muted`, `--fg` on hover, pointing down when open.
-  - Its pages a step further in, their text 16px right of the heading's: plain rows of 36px (padding `8px 12px`), 4px apart, radius 8px, no fill; 16px between the heading's row and its first page's, so 32px from the heading's text to the first page's, against 20px between pages.
+  - A group's heading links its landing page: no band, no border, set apart from its pages by size and colour alone; a row of 32px (padding `4px 0`), its text in line with the nav's edge, and VitePress's chevron at its end, a 32px button (`aria-expanded`), `--muted`, `--fg` on hover, pointing down when open.
+  - Its pages a step further in, their text 16px right of the heading's: plain rows of 28px (padding `4px 12px`) that touch, radius 8px, no fill; 4px between the heading's row and its first page's, so 12px from the heading's text to the first page's, against 8px between pages. A row is a target of 28px, over WCAG 2.5.8's 24px on a phone.
   - The current page a filled row, `--raised`, in `--fg`, 500; a current landing page fills its heading's row the same way.
-  - 24px under an open group, 4px under a folded one; the same in the phone's drawer.
+  - 16px under an open group, 4px under a folded one; the same in the phone's drawer.
   - A page that documents a minor carries its version as a small badge on the right (Versions: 6.7).
 - **Reading column**: paragraphs and list items at most 68ch; VitePress's padding (48px 32px from 960px).
 - **Rhythm** of the reading column, on the 4px grid, moderate and even: breathing room, not empty space (`style.css`, last rule).
@@ -143,7 +145,14 @@ One per page at most, only where a flow is the point (a value → parameter → 
 - **Page actions**, beside the title of each written page of the outline (not the home, the changelog, the playground, the 404 or a "Coming" page; `PageActions.vue`): one quiet split button floated right, 32px, `--surface`, a `--line` border, radius 8px, 13px `--muted` (`--fg` on `--sunken` on hover): a copy icon and "Copy page", then a chevron that opens a menu under it, `--surface`, border, `--radius`, the tooltip's shadow, as wide as its longest row and inside a 320px screen. Each row an icon (`--muted`), its name (14px, `--fg`) and under it what it does (13px, `--muted`, the row's `aria-describedby`, so that its name stays the name): Copy page, "Copy page as Markdown for LLMs" · View as Markdown, "Open this page as plain text" · Open in ChatGPT ↗ and Open in Claude ↗, "Ask about this page in …"; `--sunken` on hover or focus. "Copied" under it for 1.4s. Under 560px, the icon alone. WAI-ARIA's menu button: arrows, Home, End, Escape.
 - **Pager**: two bordered links, Previous and Next, each with the arrow of its way (14px, `--muted`), the border turning `--accent` on hover.
 - **Edit row**: a top rule; "Edit this page on GitHub" on the left; on the right "Last updated: 13 November 2026", the date of the page's last commit, 13px, `--muted`.
-- **Search**: VitePress's local search, a dialog; arrows and Enter, Escape closes; each result gives its page.
+- **Search** (amended 2026-11-14, #379, after Cursor's docs): VitePress's local search, restyled in CSS alone; nothing is sent anywhere.
+  - The dialog: one panel, 640px wide at most, 12vh from the top, so it stays put as results come and go; `--surface`, a `--line` border, `--radius`, a soft shadow, over the backdrop. Full screen under 768px, with VitePress's back button.
+  - The field: a row of 56px over a rule, a 16px search icon in `--muted`, the text 16px. One focus mark (#322): the field draws no ring, and while it has focus the rule under it is `--accent`, 2px.
+  - Each result: its place in the page, the path of its headings, 12px `--muted` with small chevrons; its title, 14px, 500, `--fg`; then two lines of its text, 13px `--muted`, scrolled to the first match, the lines cut above and below faded out. Rows of 8px by 12px padding that touch, radius 8px; the selected one filled `--raised`, as the nav's current page. The list button in the field hides the text lines.
+  - The match: no fill, `--fg`, underlined 2px in `--accent` at 3px.
+  - "No results for …" centred, 14px `--muted`, 32px of room; with no query, the field and the keys alone.
+  - The keys at the foot, over a rule: ↑ ↓ to navigate, ↵ to select, esc to close, 12px `--muted`; each key a keycap, 20px, mono 11px, `--sunken`, a `--line` border, radius 4px. Arrows, Enter and Escape as VitePress has them; Tab reaches the field's buttons, then the results.
+- **Steps** (#379, after Cursor's docs): a page read in order numbers its `h2`s, `## 1. Set up the project` (First query, Switch from Zapatos); the number sits in a round marker, 28px, `--surface`, a `--line` border, mono 13px, 500, `--fg`, hung 40px left of the heading's text, so the steps read at a glance and a long one wraps under its own text (`steps.ts`). The heading's text stays "1. Set up the project", in "On this page" and the search.
 - **Details**: `#` anchors on headings, shown on hover; links underlined 1px at 3px offset, 2px on hover; focus ring 2px `--accent`, offset 2px; `prefers-reduced-motion` honoured.
 
 ## Voice
