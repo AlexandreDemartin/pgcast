@@ -104,9 +104,17 @@ const columnsForRelation = async (rel: Relation, schemaName: string, queryFn: (q
 
 // what the config states for a table or a column, never what Object.prototype answers for a name such as
 // toString or __proto__: its function, whose caller throws, hid the '*' entry
-const stated = <T>(options: Record<string, T> | null | undefined, key: string) =>
-  options == null || options[key] === Object.prototype || options[key] === (Object.prototype as any)[key] ?
-    undefined : options[key];
+const stated = (options: any, key: string) => {
+  const value = options[key];
+  return value === Object.prototype || value === (Object.prototype as any)[key] ? undefined : value;
+};
+
+// as Zapatos 6.6.1 read options[table] && options[table][column]: a falsy table entry is given back, so it hides '*'
+const columnOptionsFor = (options: CompleteConfig['columnOptions'], table: string, column: string):
+  CompleteConfig['columnOptions'][string][string] | undefined => {
+  const tableOptions = stated(options, table);
+  return tableOptions && stated(tableOptions, column);
+};
 
 function quoteIfIllegalIdentifier(identifier: string) {
   // note: we'll redundantly quote a bunch of non-ASCII characters like this
@@ -162,8 +170,8 @@ export const definitionForRelationInSchema = async (
       schemaPrefix = config.unprefixedSchema === schemaName ? '' : `${schemaName}.`,
       prefixedRelName = schemaPrefix + rel.name,
       columnOptions =
-        stated(stated(config.columnOptions, prefixedRelName), column) ??
-        stated(stated(config.columnOptions, "*"), column),
+        columnOptionsFor(config.columnOptions, prefixedRelName, column) ??
+        columnOptionsFor(config.columnOptions, "*", column),
       isInsertable = rel.insertable && !isGenerated && columnOptions?.insert !== 'excluded',
       isUpdatable = rel.insertable && !isGenerated && columnOptions?.update !== 'excluded',
       insertablyOptional = isNullable || hasDefault || columnOptions?.insert === 'optional' ? '?' : '',
