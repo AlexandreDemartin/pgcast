@@ -476,11 +476,11 @@ The call signature of `select()`: `table`, `where`, `options?`, `mode?` (by defa
 
 ### `SelectOneSignatures` {#SelectOneSignatures}
 
-The call signature of `selectOne()`: `table`, `where`, `options?`, with the mode `One`.
+The call signature of `selectOne()`: `table`, `where`, `options?`, with the mode `One`. With `aggregatesTypedByColumn` declared in [`ConfigTypes`](/runtime-config#ConfigTypes), it returns a [`ColumnAggregateFragment`](#ColumnAggregateFragment) when its single `lateral` is a `min()` or `max()`, and a `SQLFragment` otherwise ([Typed by column](#typed-by-column)): a function typed `SelectOneSignatures` then returns what `selectOne()` does, not a `SQLFragment` of its own.
 
 ### `SelectExactlyOneSignatures` {#SelectExactlyOneSignatures}
 
-The call signature of `selectExactlyOne()`: `table`, `where`, `options?`, with the mode `ExactlyOne`.
+The call signature of `selectExactlyOne()`: `table`, `where`, `options?`, with the mode `ExactlyOne`. With `aggregatesTypedByColumn` declared, it returns a `ColumnAggregateFragment` in the same case as [`SelectOneSignatures`](#SelectOneSignatures): a function typed `SelectExactlyOneSignatures` then returns what `selectExactlyOne()` does.
 
 ### `NumericAggregateSignatures` {#NumericAggregateSignatures}
 
