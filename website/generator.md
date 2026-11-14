@@ -239,7 +239,7 @@ billing: number;
 - A comment over several lines puts each of them behind a `*`, whether it breaks them with `\n`, `\r\n` or `\r`.
 - Each relation shows its own comments, whatever its kind: Postgres copies none to a partition, an inheriting table or a view, so a view over `roles` shows no comment on `billing`.
 - A `*/` in a comment, a name, a type or a `DEFAULT` is written `*\/`, so it does not end the JSDoc; so is the one a name starting with `/` makes with the `**` before it: `**\/reels**`.
-- A comment, or one of its lines, starting with a JSDoc tag (`@deprecated use lead`) becomes that tag in the hover, on every kind of relation, and swallows the generated lines after it ([#309](https://github.com/AlexandreDemartin/pgcast/issues/309)).
+- A JSDoc tag in a comment stays a tag: `@deprecated use lead` strikes the column through where your code reads it, and the hover gives `use lead` as the reason. TypeScript starts a tag at an `@` that begins a line, or that follows a space with no space after it, not at the one in `casting@example.com`; from the line that holds the tag, the comment goes after the generated lines, behind a `*` line, so the tag does not take them as its own text.
 
 `false` writes none, so `schema.d.ts` is shorter.
 
