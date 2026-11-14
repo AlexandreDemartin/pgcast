@@ -16,16 +16,20 @@ async function programme(queryable: db.Queryable, studio_id: number) {
 // ---cut---
 async function rolledBack(body: (client: pg.PoolClient) => Promise<void>) {
   const client = await pool.connect();
+  let failed = false;
   try {
     await client.query('BEGIN');
     await body(client);
+  } catch (err) {
+    failed = true;
+    throw err;
   } finally {
     try {
       await client.query('ROLLBACK');
       client.release();
     } catch (err) {
       client.release(err as Error);  // a broken connection: destroyed, not reused
-      throw err;
+      if (!failed) throw err;  // else the test's own error, which says why it failed
     }
   }
 }

@@ -93,7 +93,7 @@ Each SQL replaces the `DO UPDATE SET …` of the plain upsert, on `ratings` (on 
 | `reportAction: 'suppress'` | no `\|\| jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END)`<!-- probe: db.upsert('ratings', { film_id: 1000, stars: 5, votes: 1 }, ['film_id', 'stars']) --> | no `UpsertAction` |
 
 - `updateColumns` takes a column or an array; `noNullUpdateColumns` a column, an array, or `db.all` for every column. [Batches](/batches#rows-with-different-keys) has a panel of `updateColumns`: a booking keeps its time.
-- `updateValues` is one set of values for every row updated. Its keys are always updated, even when `updateColumns` leaves them out, or is `doNothing` (then the SQL is `DO UPDATE SET`<!-- probe: db.upsert('ratings', { film_id: 1000, stars: 5 }, ['film_id', 'stars'], { updateColumns: db.doNothing, updateValues: { votes: 1 } }) -->, not `DO NOTHING`).
+- `updateValues` is one set of values for every row updated. Its keys are always updated, even when `updateColumns` leaves them out, or is `doNothing` (then the SQL is `DO UPDATE SET`<!-- probe: db.upsert('ratings', { film_id: 1000, stars: 5 }, ['film_id', 'stars'], { updateColumns: db.doNothing, updateValues: { votes: 1 } }) -->, not `DO NOTHING`); with `undefinedMeansMissing`, a key set to `undefined` is not ([An `undefined` value](#undefined-values)).
 - In `updateValues`, a plain value is a parameter. A value that holds a fragment, `param()`, `raw()`, `cols()`, `vals()`, `parent()`, `Default` or `self`, at any depth of its arrays and plain objects, is compiled as in a `sql` template.
 - To read a column there, name the table for the existing row, `${'ratings'}.${'votes'}`, or `EXCLUDED` for the new one, `` db.sql`EXCLUDED.${'votes'}` ``.
 - There, `db.self`, or a fragment or condition that uses it (`` db.sql`${db.self} + 1` ``, [`conditions.add()`](/conditions#conditions.add)), throws "The 'self' column alias has no meaning here"<!-- message -->, as in Zapatos 6.6.1; `db.parent()`, alone or in a fragment, throws "The 'parent' table alias has no meaning here"<!-- message -->.
@@ -156,6 +156,7 @@ db.upsert('ratings', { film_id: 1002, stars: 4 }, db.constraint('ratings_stars_k
 
 - The type takes every unique index of the table, and Postgres only a constraint. An index made with `CREATE UNIQUE INDEX`, which is no constraint, type-checks, and Postgres refuses it: 42704, `constraint "…" for table "…" does not exist`.
 - For such an index, pass its columns as the `conflictTarget`: `'code'` for a unique index on `code`.
+- A `DEFERRABLE` unique constraint type-checks too, and Postgres refuses it as an arbiter, by its name or by its columns: 55000, `ON CONFLICT does not support deferrable unique constraints/exclusion constraints as arbiters`.
 
 The type does not check that a constraint belongs to the upsert's table, and Postgres refuses another table's: 42704. Only inside the call does `constraint()` take the table's names, as above. Held in a variable, `const k = db.constraint('tags_pkey')` takes any table's name, so `db.upsert('ratings', …, k)` compiles. Give the table, `db.constraint<'ratings'>('ratings_pkey')`, and the type checks the name against it:
 
@@ -289,8 +290,8 @@ With `'CASCADE'`, Postgres empties every table that references one of them, at a
 
 </CastPanel>
 
-- `.run()` resolves with `[]`, where the type says `undefined`.
-- The type takes the options in that order, one of each kind. pgcast writes them as given: in JavaScript, or past the type with `as any`, `truncate('tags', 'CASCADE', 'RESTART IDENTITY')` sends `TRUNCATE "tags" CASCADE RESTART IDENTITY`<!-- probe: db.truncate('tags', 'CASCADE', 'RESTART IDENTITY') -->, and Postgres refuses it (42601).
+- `.run()` resolves `undefined`, as its type says. Zapatos 6.6.1 resolved `[]`.
+- The options go in that order, one of each kind at most, as Postgres takes them, and the type refuses any other. Past the type, in JavaScript or with `as any`, another order throws while compiling, so `.run()` rejects with a plain `Error` before any query: `truncate('tags', 'CASCADE', 'RESTART IDENTITY')` gives "Truncate options must be CONTINUE IDENTITY/RESTART IDENTITY, then RESTRICT/CASCADE, one of each at most, not '…'"<!-- message -->. Zapatos 6.6.1 sent `TRUNCATE "tags" CASCADE RESTART IDENTITY`, and Postgres refused it (42601).
 - Any other option throws: "Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not '…'"<!-- message -->. Zapatos 6.6.1 wrote it into the SQL as it was.
 
 ## An `undefined` value {#undefined-values}
@@ -304,12 +305,14 @@ In the values of `insert()`, `update()` and `upsert()`, Zapatos 6.6.1 sends `und
 | `insert()` | `NULL` | `DEFAULT`: `VALUES ($1, $2, $3, DEFAULT, $4)`<!-- probe: (db.setConfig({ undefinedMeansMissing: true }), db.insert('films', { studio_id: 1000, title: 'x', release_year: 2030, tagline: undefined, runtime_minutes: 90 })) --> |
 | `update()` | sets the column to `NULL`, and counts as a key | left out: `SET ("title") = ROW($1)`<!-- probe: (db.setConfig({ undefinedMeansMissing: true }), db.update('films', { title: 'x', tagline: undefined }, { id: 1000 })) -->; with no key left, it throws "nothing to update…"<!-- message --> |
 | `upsert()` | inserts `NULL`, then sets it from `EXCLUDED` | left out: not inserted, nor updated unless `updateColumns` names it (then from `EXCLUDED`, so an existing row takes the column's `DEFAULT`); in several rows, its cell is `DEFAULT` and counts as missing ([Rows with different keys](#upsert-different-keys)) |
+| `upsert()` `updateValues` | sets it from `EXCLUDED`: the value inserted, or the column's `DEFAULT` | left out, as a key `updateValues` doesn't have: `SET ("film_id", "stars") = ROW(EXCLUDED."film_id", EXCLUDED."stars")`<!-- probe: (db.setConfig({ undefinedMeansMissing: true }), db.upsert('ratings', { film_id: 1002, stars: 4 }, ['film_id', 'stars'], { updateValues: { votes: undefined } })) -->, so the existing value stays; with `doNothing` and no other key, `DO NOTHING`<!-- probe: (db.setConfig({ undefinedMeansMissing: true }), db.upsert('ratings', { film_id: 1002, stars: 4 }, ['film_id', 'stars'], { updateColumns: db.doNothing, updateValues: { votes: undefined } })) --> |
 
 </div>
 
 - By default, each sends the SQL of 6.6.1 and warns once per process: `PGCAST_DEP002`.
 - An `undefined` in a `where` is unchanged.
-- An `undefined` in `updateValues` is unchanged too, in both modes: its key is still updated, from `EXCLUDED`. So an existing row takes the value inserted, or the column's `DEFAULT` when the row doesn't insert it, with no warning: `upsert('ratings', { film_id: 1002, stars: 4 }, ['film_id', 'stars'], { updateValues: { votes: undefined } })` sends `EXCLUDED."votes"`<!-- probe: db.upsert('ratings', { film_id: 1002, stars: 4 }, ['film_id', 'stars'], { updateValues: { votes: undefined } }) -->, and an existing count goes back to 1.
+- In `updateValues`, by default, `upsert('ratings', { film_id: 1002, stars: 4 }, ['film_id', 'stars'], { updateValues: { votes: undefined } })` sends `EXCLUDED."votes"`<!-- probe: db.upsert('ratings', { film_id: 1002, stars: 4 }, ['film_id', 'stars'], { updateValues: { votes: undefined } }) -->, and an existing count goes back to 1. It warns only when the key alone adds its column: `updateColumns` leaves it out or, without `updateColumns`, no row inserts it.
+- A column the update sets anyway, inserted with no `updateColumns` or named in it, stays set from `EXCLUDED` in both modes, as with no key in `updateValues`.
 
 ::: tip Opt-in
 `undefinedMeansMissing: true` ([`Config`](/runtime-config#Config.undefinedMeansMissing)) reads an `undefined` value as a missing key, as `JSON.stringify()` does. Without it, pgcast warns as `PGCAST_DEP002`; it becomes the default in 7.0 ([Versions](/versions)).

@@ -146,6 +146,17 @@ Look through your code for the first column of each table below. Each change in 
 
 </div>
 
+### `truncate()`
+
+<div class="stack">
+
+| Your code | Zapatos 6.6.1 | pgcast | What to do |
+|---|---|---|---|
+| The result of [`truncate()`](/insert#truncate)`.run()` | `[]` | `undefined`, as its type says | nothing: it held no rows |
+| `truncate()` options in an order Postgres refuses, past the type: `truncate('tags', 'CASCADE', 'RESTART IDENTITY')` | 42601 from Postgres: `.run()` rejects with a `DatabaseError` | throws while compiling: `.run()` rejects with a plain `Error`, "Truncate options must be CONTINUE IDENTITY/RESTART IDENTITY, then RESTRICT/CASCADE, one of each at most, not '…'"<!-- message --> | nothing, unless you test for a `DatabaseError` (42601) there: it is now a plain `Error` |
+
+</div>
+
 ### Names and keywords
 
 <div class="stack">
@@ -179,7 +190,7 @@ The text and values of `.compile()` change beyond these rows, where the rows ret
 Run your tests, then your app. Where Zapatos 6.6.1 did something that code may rely on, pgcast keeps it, and warns once per process the first time a call does it:
 
 ```txt
-(node:4242) [PGCAST_DEP002] DeprecationWarning: An undefined value in insert(), update() or upsert() is sent as NULL. Set undefinedMeansMissing: true (db.setConfig) to treat it as a missing key instead (DEFAULT in insert(), left out of update() and upsert()); it will be the default in pgcast 7.0.
+(node:4242) [PGCAST_DEP002] DeprecationWarning: An undefined value in insert(), update() or upsert() is sent as NULL, or, in upsert() updateValues, set from EXCLUDED. Set undefinedMeansMissing: true (db.setConfig) to treat it as a missing key instead (DEFAULT in insert(), left out of update() and upsert()); it will be the default in pgcast 7.0.
 (Use `node --trace-deprecation ...` to show where the warning was created)
 ```
 
@@ -199,7 +210,7 @@ To find each call:
 | Warning | The call | Fix it, or turn on |
 |---|---|---|
 | `PGCAST_DEP001` | a multi-row `upsert()` without [`updateColumns`](/insert#upsert-options), with a key missing from some rows: inserted as `DEFAULT`, it overwrites the existing value ([Rows with different keys](/insert#upsert-different-keys)) | give every row the key (`db.Default` keeps the SQL), or pass `updateColumns`; or [`upsertRequiresSameKeys`](/runtime-config#Config.upsertRequiresSameKeys), and such a call throws |
-| `PGCAST_DEP002` | an `undefined` value in `insert()`, `update()` or `upsert()`, sent as `NULL` ([An `undefined` value](/insert#undefined-values)) | leave the key out, or give `null` to erase the column; or [`undefinedMeansMissing`](/runtime-config#Config.undefinedMeansMissing), and `undefined` is a missing key |
+| `PGCAST_DEP002` | an `undefined` value in `insert()`, `update()` or `upsert()`, sent as `NULL`, or in `upsert()` `updateValues`, set from `EXCLUDED` ([An `undefined` value](/insert#undefined-values)) | leave the key out, or give `null` to erase the column; or [`undefinedMeansMissing`](/runtime-config#Config.undefinedMeansMissing), and `undefined` is a missing key |
 | `PGCAST_DEP003` | a [`transaction()`](/transaction#transaction) whose callback catches a query's error and returns: Postgres answers the `COMMIT` with `ROLLBACK`, and nothing is saved ([Let the error through](/retries#let-the-error-through)) | let the error out of the callback, or `ROLLBACK TO` a `SAVEPOINT` before going on; or [`transactionRequiresCommit`](/runtime-config#Config.transactionRequiresCommit), and such a transaction rejects |
 
 </div>
