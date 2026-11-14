@@ -871,6 +871,19 @@ describe('count, sum, avg, min, max', () => {
     expect(await run(db.select('users', all, { lateral: earliest }))).toEqual(['2025-06-01', '2025-06-01', '2025-06-01']);
   });
 
+  it('passed through a selectOne / selectExactlyOne nested in a lateral, min / max come back as JSON', async () => {
+    // as an extra, the same query is a bare subquery in jsonb_build_object(), which Postgres refuses (42601)
+    db.setConfig({ aggregatesTypedByColumn: true });
+    const earliest = db.min('events', all, { columns: ['occurred_on'] }), top = db.max('accounts', all, { columns: ['balance'] });
+    expect(await run(db.select('users', all, {
+      columns: ['display_name'], order: { by: 'display_name', direction: 'ASC' }, limit: 1,
+      lateral: {
+        first: db.selectOne('users', all, { lateral: earliest }),
+        top: db.selectExactlyOne('users', all, { lateral: top }),
+      },
+    }))).toEqual([{ display_name: 'Ada', first: '2025-06-01', top: 1500.5 }]);
+  });
+
   it('with aggregatesTypedByColumn, a query that returns no row still rejects with the TypeError of 6.6.1', async () => {
     // #163: a groupBy with no group gives no row, which `.run()` reads as rows[0].result
     db.setConfig({ aggregatesTypedByColumn: true });

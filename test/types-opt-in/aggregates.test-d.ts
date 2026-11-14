@@ -81,6 +81,33 @@ describe('with aggregatesTypedByColumn declared', () => {
     one.run(pool).then((d): db.DateString | null | undefined => d);
   });
 
+  test('passed through a selectOne() or selectExactlyOne() nested in a lateral or as an extra: the JSONSelectable type, or null', () => {
+    // nested in turn, the passed-through column comes back as JSON, as a min() or max() nested directly does
+    const earliest = db.min('events', db.all, { columns: ['occurred_on'] });
+    const top = db.max('accounts', db.all, { columns: ['balance'] });
+    const q = db.select('users', db.all, {
+      columns: ['id'],
+      extras: {
+        firstAsExtra: db.selectExactlyOne('users', db.all, { lateral: earliest }),
+        topAsExtra: db.selectOne('users', db.all, { lateral: top }),
+      },
+      lateral: {
+        first: db.selectOne('users', db.all, { lateral: earliest }),
+        top: db.selectExactlyOne('users', db.all, { lateral: top }),
+      },
+    });
+    type Row = Run<typeof q>[number];
+    expectTypeOf<Row['first']>().toEqualTypeOf<db.DateString | null>();
+    expectTypeOf<Row['firstAsExtra']>().toEqualTypeOf<db.DateString | null>();
+    expectTypeOf<Row['top']>().toEqualTypeOf<number | null>();
+    expectTypeOf<Row['topAsExtra']>().toEqualTypeOf<number | null>();
+    expectTypeOf(q.run(pool)).resolves.not.toBeAny();
+    // @ts-expect-error nested in turn, a date comes back as a string, not a Date
+    expectTypeOf<Row['first']>().toEqualTypeOf<Date | null>();
+    // @ts-expect-error nested in turn, a numeric comes back as a number, not a string
+    expectTypeOf<Row['topAsExtra']>().toEqualTypeOf<db.NumericString | null>();
+  });
+
   test('calls that compile under 6.6.1 still compile, and throw at run time', () => {
     expectTypeOf(db.max('accounts', db.all)).not.toBeAny();
     expectTypeOf(db.min('accounts', db.all, { columns: ['balance', 'ratio'] })).not.toBeAny();
