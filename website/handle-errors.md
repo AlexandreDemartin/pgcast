@@ -1,6 +1,6 @@
-# Handle errors
+# Errors
 
-Tell what went wrong with a query, and answer it: a seat already booked, a screening that isn't there, an option your own code got wrong. It assumes you know the shortcuts of [Your first typed query](/first-query).
+Tell what went wrong with a query, and answer it: a seat already booked, a screening that isn't there, an option your own code got wrong. It assumes you know the shortcuts of [First query](/first-query).
 {.lede}
 
 ## Catch a refusal from Postgres
@@ -74,7 +74,7 @@ START TRANSACTION ISOLATION LEVEL SERIALIZABLE
 ROLLBACK
 ```
 
-The SQL of each `INSERT`: [`insert()`](/insert#insert). A serialisation failure (40001) or a deadlock (40P01) has already been retried by then, up to [`transactionAttemptsMax`](/runtime-config#Config.transactionAttemptsMax) attempts; if the promise still rejects with one, `'TransactionRollback'` recognises both, and the request can be tried again later ([Retry a transaction](/retries)).
+The SQL of each `INSERT`: [`insert()`](/insert#insert). A serialisation failure (40001) or a deadlock (40P01) has already been retried by then, up to [`transactionAttemptsMax`](/runtime-config#Config.transactionAttemptsMax) attempts; if the promise still rejects with one, `'TransactionRollback'` recognises both, and the request can be tried again later ([Retries](/retries)).
 
 ::: warning Lost writes
 Don't catch a database error inside the callback and carry on. Postgres has aborted the transaction: each query after it is refused with 25P02 (`InvalidTransactionState_InFailedSqlTransaction`), and if the callback returns, pgcast sends `COMMIT`<!-- probe: db.serializable(pool, async () => {}) -->, which Postgres turns into a rollback without an error.
@@ -179,4 +179,4 @@ function statusOf(err: unknown) {
 - [`isDatabaseError()`](/transaction#isDatabaseError): the names it takes, and the codes of the docs schema.
 - [Errors pgcast throws before any query](/transaction#errors-pgcast-throws-before-any-query): each, with what throws it and its messages.
 - [`transaction()`](/transaction#transaction): its `ROLLBACK`, its retries and its errors.
-- [Retry a transaction](/retries): what the callback must do when it may run again.
+- [Retries](/retries): what the callback must do when it may run again.

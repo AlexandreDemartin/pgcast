@@ -1,6 +1,6 @@
-# Write raw SQL safely
+# Raw SQL
 
-When no shortcut writes the query you need (a join, a window function, an `INSERT … SELECT`), write it in the `sql` template, and keep every value that comes from outside out of its text. You already know the shortcuts from the [tutorial](/tutorial); every interpolation is in [The `sql` template](/sql-template).
+When no shortcut writes the query you need (a join, a window function, an `INSERT … SELECT`), write it in the `sql` template, and keep every value that comes from outside out of its text. You already know the shortcuts from the [tutorial](/tutorial); every interpolation is in [SQL template](/sql-template).
 {.lede}
 
 <AtAGlance>
@@ -184,7 +184,7 @@ A hand-written subquery can go in a shortcut's `lateral`, where [`db.parent()`](
 - With `strict` off, the key is not in the type ([`lateral`](/select#lateral)).
 - Outside a `lateral`, `parent()` throws "The 'parent' table alias has no meaning here"<!-- message -->, so [`run()`](/sql-template#run) rejects before any query.
 
-Joins through `lateral`, step by step: [Join through a lateral](/lateral).
+Joins through `lateral`, step by step: [Joins](/lateral).
 
 ## Check the SQL before you run it
 
@@ -198,6 +198,6 @@ Joins through `lateral`, step by step: [Join through a lateral](/lateral).
 
 ## See also
 
-- [The `sql` template](/sql-template): every interpolation, and what it compiles to.
-- [The security model](/security): why values are parameters, and what pgcast quotes.
-- [Join through a lateral](/lateral): subqueries with `parent()`, nested.
+- [SQL template](/sql-template): every interpolation, and what it compiles to.
+- [Security](/security): why values are parameters, and what pgcast quotes.
+- [Joins](/lateral): subqueries with `parent()`, nested.

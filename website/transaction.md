@@ -1,4 +1,4 @@
-# `transaction()` and errors
+# Transactions
 
 `transaction()` and its seven shortcuts, one per isolation level: the SQL they send, their retries and the types of the client they give. Then the errors: `isDatabaseError()` for those from Postgres, and those pgcast throws before any query.
 {.lede}
@@ -83,7 +83,7 @@ When `START TRANSACTION`, the callback or `COMMIT` rejects with a `code` of 4000
 | ``Retrying transaction, attempt ${attempt} of ${maxAttempts}``<!-- message --> | before `START TRANSACTION` again |
 | ``Transaction rollback (code ${err.code}) on attempt ${attempt} of ${maxAttempts}, giving up``<!-- message --> | before it rejects |
 
-The callback may run several times: [Retry a transaction](/retries).
+The callback may run several times: [Retries](/retries).
 
 ### Passing a transaction through
 
@@ -363,7 +363,7 @@ try {
 }
 ```
 
-Handling them in an app: [Handle errors](/handle-errors).
+Handling them in an app: [Errors](/handle-errors).
 
 ## Errors pgcast throws before any query
 

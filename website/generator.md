@@ -1,4 +1,4 @@
-# The generator: config and CLI
+# Generator
 
 The generator reads your database's catalog and writes the types of `zapatos/schema`. This page lists how to run it, from the command line or from code, every option of `zapatosconfig.json` and `generate()`, and the files it writes.
 {.lede}
@@ -253,7 +253,7 @@ billing: number;
 
 ### `typeEnumsAcrossSchemas` {#generate.typeEnumsAcrossSchemas}
 
-`boolean`, default `false`; an opt-in, `true` by default from 7.0 ([Versions, opt-ins and warnings](/versions)). The type of a column whose type is an enum of another schema. `false`, as in Zapatos 6.6.1, looks the enum up by name in the schema of the column's relation; `true` looks it up in its own schema, and writes its labels:
+`boolean`, default `false`; an opt-in, `true` by default from 7.0 ([Versions](/versions)). The type of a column whose type is an enum of another schema. `false`, as in Zapatos 6.6.1, looks the enum up by name in the schema of the column's relation; `true` looks it up in its own schema, and writes its labels:
 
 ```sql
 CREATE SCHEMA archive;
@@ -274,7 +274,7 @@ CREATE TABLE prints (id int PRIMARY KEY, format archive.print_format NOT NULL, f
 
 ### `enumOrder` {#generate.enumOrder}
 
-`"alphabetical"` or `"declared"`, default `"alphabetical"`; an opt-in, `"declared"` by default from 7.0 ([Versions, opt-ins and warnings](/versions)). The order of an enum's labels. `"alphabetical"`, as in Zapatos 6.6.1, sorts them; `"declared"` keeps the order the enum declares them in, by which Postgres sorts and compares its values (`ORDER BY`, `<`, `enum_range()`):
+`"alphabetical"` or `"declared"`, default `"alphabetical"`; an opt-in, `"declared"` by default from 7.0 ([Versions](/versions)). The order of an enum's labels. `"alphabetical"`, as in Zapatos 6.6.1, sorts them; `"declared"` keeps the order the enum declares them in, by which Postgres sorts and compares its values (`ORDER BY`, `<`, `enum_range()`):
 
 ```sql
 CREATE TYPE crew_job AS ENUM ('director', 'writer', 'editor', 'cinematographer', 'composer');
@@ -372,7 +372,7 @@ src/zapatos/
 
 </div>
 
-- A placeholder holds the `Selectable` type of the domain's base type: `string` for `seat_label`, a `text`; `Date` for a `date` domain; `db.JSONValue` for a `json` or `jsonb` one, with its `import type * as db from 'zapatos/db'`. A type the generator can't map (`point`) gets `any`. How to fill one in: [Use custom types and domains](/custom-types).
+- A placeholder holds the `Selectable` type of the domain's base type: `string` for `seat_label`, a `text`; `Date` for a `date` domain; `db.JSONValue` for a `json` or `jsonb` one, with its `import type * as db from 'zapatos/db'`. A type the generator can't map (`point`) gets `any`. How to fill one in: [Custom types](/custom-types).
 - A base type mapped to another `db.*` type (`int8`, `numeric`, `time`, ranges…) gives a placeholder that does not compile until you edit it: `export type PgTicket_no = db.Int8String;` comes with no import, and `tsc` fails with TS2503, `Cannot find namespace 'db'` ([#184](https://github.com/AlexandreDemartin/pgcast/issues/184)). Add `import type * as db from 'zapatos/db';` above it.
 - A domain over an enum is the same: `export type PgGenre_d = genre;` fails with TS2304 until you add `import type { genre } from 'zapatos/schema';`.
 - Nothing is deleted: a placeholder whose type is gone stays, and so does `custom/` once there is no custom type left.
@@ -389,4 +389,4 @@ Zapatos before 3.0 copied its source into yours. After writing, when `outExt` is
 
 So moving from `outExt: ".ts"` back to `".d.ts"` warns too, until you delete the `.ts` files.
 
-Why the types look as they do, a `timestamptz` a `Date` in `Selectable` and a string in `JSONSelectable`: [How types are cast from the catalog](/catalog-types).
+Why the types look as they do, a `timestamptz` a `Date` in `Selectable` and a string in `JSONSelectable`: [The catalog](/catalog-types).

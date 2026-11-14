@@ -1,4 +1,4 @@
-# Your first typed query
+# First query
 
 What the reader has at the end, and what they need before they start, in one or two sentences. Their first steps, so nothing is assumed beyond the page before.
 {.lede}

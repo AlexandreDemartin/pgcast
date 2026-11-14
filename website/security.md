@@ -1,6 +1,6 @@
-# The security model
+# Security
 
-What keeps a caller's input from changing the SQL pgcast sends, what it can't guard against, and how to report a flaw. The steps are in [Write raw SQL safely](/raw-sql); this page is the why.
+What keeps a caller's input from changing the SQL pgcast sends, what it can't guard against, and how to report a flaw. The steps are in [Raw SQL](/raw-sql); this page is the why.
 {.lede}
 
 <AtAGlance>
@@ -58,7 +58,7 @@ The type says which; at run time pgcast checks again and throws before any query
 
 Values with no meaning where they stand are refused the same way: `db.Default`, `db.self` or `db.raw()` as a filter value throws while compiling, so `.run()` rejects before anything reaches Postgres. Zapatos 6.6.1 sent them as strings or as JSON: no row matched on a text column, every row under `ne()` and `isNotIn()`, and other types failed.
 
-Such a value is a bug in the calling code, and a bug should not become a query. Each of these errors, with what throws it: [Errors pgcast throws before any query](/transaction#errors-pgcast-throws-before-any-query). Telling them from Postgres's own: [Handle errors](/handle-errors#fix-the-errors-pgcast-throws).
+Such a value is a bug in the calling code, and a bug should not become a query. Each of these errors, with what throws it: [Errors pgcast throws before any query](/transaction#errors-pgcast-throws-before-any-query). Telling them from Postgres's own: [Errors](/handle-errors#fix-the-errors-pgcast-throws).
 
 ## `raw()` is the one door
 
@@ -136,7 +136,7 @@ What is in scope, and which versions are supported: [SECURITY.md](https://github
 
 ## Further reading
 
-- [Write raw SQL safely](/raw-sql): the steps, from parameters to `raw()` with your own constants.
-- [The `sql` template](/sql-template): every interpolation and what it compiles to, [Identifiers](/sql-template#identifiers) and [Whereable objects](/sql-template#whereable) among them.
-- [Handle errors](/handle-errors): pgcast's own errors, and Postgres's.
+- [Raw SQL](/raw-sql): the steps, from parameters to `raw()` with your own constants.
+- [SQL template](/sql-template): every interpolation and what it compiles to, [Identifiers](/sql-template#identifiers) and [Whereable objects](/sql-template#whereable) among them.
+- [Errors](/handle-errors): pgcast's own errors, and Postgres's.
 - [`SECURITY.md`](https://github.com/AlexandreDemartin/pgcast/blob/master/SECURITY.md): scope, threat model and supported versions.

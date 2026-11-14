@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { defaultHoverInfoProcessor, transformerTwoslash } from '@shikijs/vitepress-twoslash';
 import { defineConfig, type HeadConfig } from 'vitepress';
 import { checkLinks, keepLinkHashes } from './anchors.ts';
+import { calloutIcons } from './callouts.ts';
 import { changelogPage, dateChangelog, writeChangelogFeed } from './changelog.ts';
 import { host, writeLlmsFiles } from './llms.ts';
 import { describePage, pageHead, repo } from './meta.ts';
@@ -13,6 +14,7 @@ import { playgroundVite } from './playground/build.ts';
 import { checkPlaygroundLinks, linkCastPanels } from './playgroundLinks.ts';
 import { lineIndents, sqlParameters, syntax } from './syntax.ts';
 import { labelTableCells } from './tables.ts';
+import { svg } from './theme/icons.ts';
 import { focusableHovers, moduleNames, twoslashOptions } from './twoslash.ts';
 
 const
@@ -78,6 +80,7 @@ export default defineConfig({
       changelogPage(md);  // CHANGELOG.md in changelog.md
       labelTableCells(md);  // `<td data-label="…">`, for a table that stacks on a phone
       linkCastPanels(md);  // "Open in playground" on a docs page's cast panel
+      calloutIcons(md);  // a note's chip opens on its kind's icon
     },
   },
   vite: {
@@ -114,7 +117,8 @@ export default defineConfig({
       options: { translations: { button: { buttonText: 'Search', buttonAriaLabel: 'Search the docs' } } },
     },
     editLink: { pattern: `${repo}/edit/master/website/:path`, text: 'Edit this page on GitHub' },
-    docFooter: { prev: 'Previous', next: 'Next' },
+    // VitePress writes these with `v-html`: each with the arrow of its way
+    docFooter: { prev: `${svg('arrowLeft')}Previous`, next: `Next${svg('arrowRight')}` },
     lastUpdated: { text: 'Last updated', formatOptions: { dateStyle: 'long', forceLocale: true } },  // 13 November 2026
     outline: { level: 2, label: 'On this page' },
     darkModeSwitchLabel: 'Colour theme',

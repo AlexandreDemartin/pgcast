@@ -1,4 +1,4 @@
-# Insert and upsert in batches
+# Batches
 
 Write many rows at once: split them under Postgres's parameter limit, skip the ones already there, add up counts, keep rows with different keys from erasing what's stored, and get back only what you need. It assumes you know [`insert()` and `upsert()`](/insert).
 {.lede}
@@ -38,7 +38,7 @@ START TRANSACTION ISOLATION LEVEL READ COMMITTED
 COMMIT
 ```
 
-- If a chunk fails, [`readCommitted()`](/transaction#readCommitted) sends `ROLLBACK`<!-- probe: db.readCommitted(pool, async () => { throw new Error(); }) --> and rejects with its error: no tag is left in. A deadlock (40P01) runs the chunks again first ([Retry a transaction](/retries)).
+- If a chunk fails, [`readCommitted()`](/transaction#readCommitted) sends `ROLLBACK`<!-- probe: db.readCommitted(pool, async () => { throw new Error(); }) --> and rejects with its error: no tag is left in. A deadlock (40P01) runs the chunks again first ([Retries](/retries)).
 - On the pool, without the transaction, each chunk commits as it goes: the chunks before the one that failed stay.
 - `upsert()` splits the same way.
 
@@ -142,4 +142,4 @@ Each row comes back whole by default, and from an upsert with its `$action`. For
 
 - [`insert()`](/insert#insert) and [`upsert()`](/insert#upsert): every option, the SQL it adds.
 - [`transaction()`](/transaction#transaction): its levels, retries and errors.
-- [Versions, opt-ins and warnings](/versions): the opt-ins and their warnings.
+- [Versions](/versions): the opt-ins and their warnings.

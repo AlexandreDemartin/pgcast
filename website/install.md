@@ -68,6 +68,6 @@ Yarn 2 and later need a version range in an alias, and Yarn 1 and bun before 1.4
 The generated schema and the run-time code talk about `zapatos/db` and `zapatos/schema`. Installed as plain `@pgcast/pgcast`, those imports wouldn't resolve. Native `pgcast/*` names will come later, as an opt-in ([decision 002](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/002-module-names.md)).
 :::
 
-That's pgcast in your project. Next, [Your first typed query](/first-query) generates the types of a database, then runs a select and an insert with them.
+That's pgcast in your project. Next, [First query](/first-query) generates the types of a database, then runs a select and an insert with them.
 
 Working with an assistant? It can read these docs from [llms.txt](/llms.txt), an index of the pages, or [llms-full.txt](/llms-full.txt), all of them in one file.
