@@ -21,9 +21,9 @@ declare module 'zapatos/schema' {
   
     /* --- enums --- */
   
-    export type traffic-light = 'amber's' | 'green light' | 'red';
+    export type traffic-light = 'amber\'s' | 'green light' | 'red';
     export namespace every {
-      export type traffic-light = ['amber's', 'green light', 'red'];
+      export type traffic-light = ['amber\'s', 'green light', 'red'];
     }
   
     /* --- tables --- */
@@ -89,9 +89,9 @@ declare module 'zapatos/schema' {
       export type Table = 'edge.odd table';
       export interface Selectable {
         /**
-        * **edge.odd table.*/**
+        * **edge.odd table.*\/**
         * - `text` in database
-        * - Nullable, default: `'*/'::text`
+        * - Nullable, default: `'*\/'::text`
         */
         "*/": string | null;
         /**
@@ -109,7 +109,7 @@ declare module 'zapatos/schema' {
         /**
         * **edge.odd table.light**
         *
-        * Column comment with */ inside
+        * Column comment with *\/ inside
         * - `traffic-light` in database
         * - Nullable, no default
         */
@@ -117,9 +117,9 @@ declare module 'zapatos/schema' {
       }
       export interface JSONSelectable {
         /**
-        * **edge.odd table.*/**
+        * **edge.odd table.*\/**
         * - `text` in database
-        * - Nullable, default: `'*/'::text`
+        * - Nullable, default: `'*\/'::text`
         */
         "*/": string | null;
         /**
@@ -137,7 +137,7 @@ declare module 'zapatos/schema' {
         /**
         * **edge.odd table.light**
         *
-        * Column comment with */ inside
+        * Column comment with *\/ inside
         * - `traffic-light` in database
         * - Nullable, no default
         */
@@ -145,9 +145,9 @@ declare module 'zapatos/schema' {
       }
       export interface Whereable {
         /**
-        * **edge.odd table.*/**
+        * **edge.odd table.*\/**
         * - `text` in database
-        * - Nullable, default: `'*/'::text`
+        * - Nullable, default: `'*\/'::text`
         */
         "*/"?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
         /**
@@ -165,7 +165,7 @@ declare module 'zapatos/schema' {
         /**
         * **edge.odd table.light**
         *
-        * Column comment with */ inside
+        * Column comment with *\/ inside
         * - `traffic-light` in database
         * - Nullable, no default
         */
@@ -173,9 +173,9 @@ declare module 'zapatos/schema' {
       }
       export interface Insertable {
         /**
-        * **edge.odd table.*/**
+        * **edge.odd table.*\/**
         * - `text` in database
-        * - Nullable, default: `'*/'::text`
+        * - Nullable, default: `'*\/'::text`
         */
         "*/"?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment;
         /**
@@ -193,7 +193,7 @@ declare module 'zapatos/schema' {
         /**
         * **edge.odd table.light**
         *
-        * Column comment with */ inside
+        * Column comment with *\/ inside
         * - `traffic-light` in database
         * - Nullable, no default
         */
@@ -201,9 +201,9 @@ declare module 'zapatos/schema' {
       }
       export interface Updatable {
         /**
-        * **edge.odd table.*/**
+        * **edge.odd table.*\/**
         * - `text` in database
-        * - Nullable, default: `'*/'::text`
+        * - Nullable, default: `'*\/'::text`
         */
         "*/"?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment>;
         /**
@@ -221,7 +221,7 @@ declare module 'zapatos/schema' {
         /**
         * **edge.odd table.light**
         *
-        * Column comment with */ inside
+        * Column comment with *\/ inside
         * - `traffic-light` in database
         * - Nullable, no default
         */
