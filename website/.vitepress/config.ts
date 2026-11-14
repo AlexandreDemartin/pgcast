@@ -11,6 +11,7 @@ import { describePage, pageHead, repo } from './meta.ts';
 import { outline } from './outline.ts';
 import { playgroundVite } from './playground/build.ts';
 import { checkPlaygroundLinks, linkCastPanels } from './playgroundLinks.ts';
+import { markSteps } from './steps.ts';
 import { lineIndents, sqlParameters, syntax } from './syntax.ts';
 import { labelTableCells } from './tables.ts';
 import { focusableHovers, moduleNames, twoslashOptions } from './twoslash.ts';
@@ -67,6 +68,7 @@ export default defineConfig({
       changelogPage(md);  // CHANGELOG.md in changelog.md
       labelTableCells(md);  // `<td data-label="…">`, for a table that stacks on a phone
       linkCastPanels(md);  // "Open in playground" on a docs page's cast panel
+      markSteps(md);  // a step's number in a round marker: `## 1. Set up the project`
     },
   },
   vite: {
@@ -100,7 +102,11 @@ export default defineConfig({
     sidebar: outline,  // each group's heading links its landing page, its chevron folds it
     search: {
       provider: 'local',
-      options: { translations: { button: { buttonText: 'Search', buttonAriaLabel: 'Search the docs' } } },
+      options: {
+        // each result with two lines of its text, the match underlined (style.css); the list button still hides them
+        detailedView: true,
+        translations: { button: { buttonText: 'Search', buttonAriaLabel: 'Search the docs' } },
+      },
     },
     editLink: { pattern: `${repo}/edit/master/website/:path`, text: 'Edit this page on GitHub' },
     docFooter: { prev: 'Previous', next: 'Next' },
