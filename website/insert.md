@@ -156,6 +156,7 @@ db.upsert('ratings', { film_id: 1002, stars: 4 }, db.constraint('ratings_stars_k
 
 - The type takes every unique index of the table, and Postgres only a constraint. An index made with `CREATE UNIQUE INDEX`, which is no constraint, type-checks, and Postgres refuses it: 42704, `constraint "…" for table "…" does not exist`.
 - For such an index, pass its columns as the `conflictTarget`: `'code'` for a unique index on `code`.
+- A `DEFERRABLE` unique constraint type-checks too, and Postgres refuses it as an arbiter, by its name or by its columns: 55000, `ON CONFLICT does not support deferrable unique constraints/exclusion constraints as arbiters`.
 
 The type does not check that a constraint belongs to the upsert's table, and Postgres refuses another table's: 42704. Only inside the call does `constraint()` take the table's names, as above. Held in a variable, `const k = db.constraint('tags_pkey')` takes any table's name, so `db.upsert('ratings', …, k)` compiles. Give the table, `db.constraint<'ratings'>('ratings_pkey')`, and the type checks the name against it:
 
