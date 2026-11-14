@@ -1,5 +1,5 @@
 ---
-english: 34a6a48a60cf
+english: 6f356c8fe7e6
 ---
 
 # Générateur
@@ -245,7 +245,7 @@ billing: number;
 - Chaque relation montre ses propres commentaires, quelle que soit sa nature : Postgres n’en copie aucun vers une partition, une table qui hérite ou une vue, donc une vue sur `roles` ne montre aucun commentaire sur `billing`.
 - Un `*/` dans un commentaire, un nom, un type ou un `DEFAULT` est écrit `*\/`, pour ne pas terminer le JSDoc ; de même celui que forme un nom commençant par `/` avec le `**` qui le précède : `**\/reels**`.
 - Une balise JSDoc dans un commentaire reste une balise : `@deprecated use lead` barre la colonne là où votre code la lit, et le survol donne `use lead` pour raison. TypeScript ouvre une balise à un `@` qui commence une ligne, ou qui suit une espace sans en être suivi, pas à celui de `casting@example.com` ni dans un lien en ligne `{@link …}`, `{@linkcode …}` ou `{@linkplain …}`, qui se poursuit sur la ligne suivante quand la sienne se termine par `{@link` ou par le nom du lien. À partir de la ligne qui porte la balise, le commentaire passe après les lignes générées, précédé d’une ligne `*`, pour que la balise ne les prenne pas pour son propre texte.
-  - Le générateur ne le déplace que s’il est sûr de la balise : la première ligne où un `@` suit une `{` ou ne suit aucun caractère ASCII imprimable doit ouvrir la balise, à son premier caractère hors espaces et tabulations, ou après une espace ou une tabulation et avant un caractère ASCII imprimable, et tout lien en ligne avant la balise sur cette ligne doit être fermé et ne contenir ni guillemet, ni accent grave, ni `/`. Sinon le commentaire reste avant les lignes générées, que la balise prend alors pour son propre texte.
+  - Le générateur ne le déplace que s’il est sûr de la balise : la première ligne où un `@` suit une `{` ou ne suit aucun caractère ASCII imprimable doit ouvrir la balise, à son premier caractère hors espaces et tabulations, ou après une espace ou une tabulation et avant un caractère ASCII imprimable, et tout ce qui commence par `{@link` avant la balise sur cette ligne doit être fermé et ne contenir ni guillemet, ni accent grave, ni `/`, ni `\`, ni séparateur de ligne (U+2028, U+2029). Sinon le commentaire reste avant les lignes générées, que la balise prend alors pour son propre texte.
 
 `false` n’en écrit aucun, donc `schema.d.ts` est plus court.
 
