@@ -120,17 +120,15 @@ function SQLForAlias(prefix: string, name: string) {
   return raw(quotedIdentifier.test(quoted) ? quoted : `"${prefix}${name.replace(/"/g, '""')}"`);
 }
 
-// the queries select() returns (so selectOne(), selectExactlyOne(), count() and the other aggregates): as an extras
-// value, one is written in parentheses, a scalar subquery, where Zapatos 6.6.1 wrote it bare in jsonb_build_object(),
-// which Postgres refuses (42601). A sql fragment is the caller's SQL, written as given, query or not
-const shortcutQueries = new WeakSet<SQLFragment<any>>();
-
 function SQLForExtras<T extends Table>(extras: ExtrasOption<T>) {
   return extras === undefined ? [] :
     sql` || jsonb_build_object(${mapWithSeparator(
       Object.keys(extras), sql`, `, k => {
         const extra = extras[k];
-        return sql`${param(k)}::text, ${extra instanceof SQLFragment && shortcutQueries.has(extra) ? sql`(${extra})` : extra}`;
+        // the queries select() returns (so selectOne(), selectExactlyOne(), count() and the other aggregates), and
+        // their copies, are written in parentheses, a scalar subquery, where Zapatos 6.6.1 wrote them bare in
+        // jsonb_build_object(), which Postgres refuses (42601). A sql fragment is the caller's SQL, written as given
+        return sql`${param(k)}::text, ${extra instanceof SQLFragment && extra['parenthesisedInExtras'] ? sql`(${extra})` : extra}`;
       })})`;
 }
 
@@ -812,7 +810,7 @@ export const select: SelectSignatures = function (
         // SelectResultMode.One or SelectResultMode.Many
         (qr) => qr.rows[0]?.result;
 
-  shortcutQueries.add(query);
+  query['parenthesisedInExtras'] = true;
   return query;
 };
 

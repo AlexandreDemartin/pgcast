@@ -384,6 +384,8 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
   noop = false;  // if true, bypass actually running the query unless forced to e.g. for empty INSERTs
   noopResult: any;  // if noop is true and DB is bypassed, what should be returned?
 
+  protected parenthesisedInExtras = false;  // set by select(): as an extras value, its query is a scalar subquery
+
   constructor(protected literals: string[], protected expressions: SQL[]) { }
 
   /**
@@ -408,7 +410,8 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
       parentTable: this.parentTable,
       preparedName: this.preparedName,
       noop: this.noop,
-      noopResult: this.noopResult
+      noopResult: this.noopResult,
+      parenthesisedInExtras: this.parenthesisedInExtras
     }, overrideRest);
   }
 
