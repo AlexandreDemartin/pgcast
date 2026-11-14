@@ -67,13 +67,13 @@ The generated code and the runtime speak of `zapatos/schema`, `zapatos/db` and `
 |---|---|
 | `npm ci` | install (npm ≥ 10) |
 | `npm run build` | `tsc` (CJS, ES2019) + ESM wrappers |
-| `npm run lint` | ESLint 9 (flat config) on `src/`, `scripts/` and the docs site's own code (`website/*.mjs`, `website/.vitepress/*.ts`) |
+| `npm run lint` | ESLint 9 (flat config) on `src/`, `scripts/` and the docs site's own code (`website/*.mjs`, `website/*.ts`, `website/.vitepress/**/*.ts`) |
 | `npm run typecheck` | `tsc` on the lib (its declarations go to `node_modules/.cache/pgcast`), on `test/`, and on the fixture's generated output (`test/generated/`) against those declarations |
 | `npm test` | Vitest: unit and integration (`TEST_DATABASE_URL` required, `useTestDatabase()` in `test/helpers/db.ts`) |
 | `npm run test:watch` | Vitest in watch mode |
 | `npm run test:types` | emits the declarations of `src/db`, then the Vitest type tests (`test/types/*.test-d.ts`, `expectTypeOf`) on the fixture's generated schema |
 | `npm run bench:types` | compile cost of `bench/` (typed queries on the fixture's schema): `Instantiations` and `Types`, minus a floor without pgcast, compared with `bench/baseline.json`; fails above +20 %, below −5 % or if the TypeScript version differs; `-- --update` rewrites the baseline |
-| `npm run check:agents` | consistency of skills and agents, tests of the `guard` hook |
+| `npm run check:agents` | consistency of skills and agents, the summary of `docs/CHARACTERISATION-REPORT.md` recounted from its sections, tests of the `guard` hook and of that recount |
 
 A task is **done** only if `lint`, `typecheck`, `test` and `test:types` pass.
 

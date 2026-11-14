@@ -33,6 +33,7 @@ Insert one row or several, and return them as Postgres stored them, defaults and
 
 - One row gives one result; an array gives an array, in the order Postgres returns them, in practice the order given.
 - The columns are the keys of every row; a key missing from a row is `DEFAULT` in that row, as `tagline` above.
+- A row with no key, or rows with none between them, throw: "nothing to insert: an Insertable needs at least one column; for a row of defaults only, write INSERT ... DEFAULT VALUES in a sql template"<!-- message -->. Zapatos 6.6.1 sent `() VALUES ()`, which Postgres refused (42601).
 - An empty array is a no-op: `.run(pool)` resolves with `[]` and sends nothing, unless forced with `.run(pool, true)`. Its SQL, `INSERT INTO "films" SELECT null WHERE false`<!-- probe: db.insert('films', []) -->, is marked as a no-op.
 - Postgres takes at most 65,535 parameters in a query: split a bigger insert ([Batches](/batches)).
 
@@ -77,6 +78,7 @@ db.upsert(table, values, conflictTarget, options?)
 - Each result has `$action`, `'INSERT'` or `'UPDATE'` ([`UpsertAction`](#UpsertAction)).
 - One row gives one result; an array gives an array, without the rows that do nothing ([`doNothing`](#doNothing)).
 - An empty array is a no-op, as for `insert()`.
+- A row with no key, or rows with none between them, throw, as for `insert()`; with `undefinedMeansMissing`, an `undefined` value is no key.
 
 ### Options {#upsert-options}
 
@@ -304,7 +306,7 @@ In the values of `insert()`, `update()` and `upsert()`, Zapatos 6.6.1 sends `und
 |---|---|---|
 | `insert()` | `NULL` | `DEFAULT`: `VALUES ($1, $2, $3, DEFAULT, $4)`<!-- probe: (db.setConfig({ undefinedMeansMissing: true }), db.insert('films', { studio_id: 1000, title: 'x', release_year: 2030, tagline: undefined, runtime_minutes: 90 })) --> |
 | `update()` | sets the column to `NULL`, and counts as a key | left out: `SET ("title") = ROW($1)`<!-- probe: (db.setConfig({ undefinedMeansMissing: true }), db.update('films', { title: 'x', tagline: undefined }, { id: 1000 })) -->; with no key left, it throws "nothing to update…"<!-- message --> |
-| `upsert()` | inserts `NULL`, then sets it from `EXCLUDED` | left out: not inserted, nor updated unless `updateColumns` names it (then from `EXCLUDED`, so an existing row takes the column's `DEFAULT`); in several rows, its cell is `DEFAULT` and counts as missing ([Rows with different keys](#upsert-different-keys)) |
+| `upsert()` | inserts `NULL`, then sets it from `EXCLUDED` | left out: not inserted, nor updated unless `updateColumns` names it (then from `EXCLUDED`, so an existing row takes the column's `DEFAULT`); in several rows, its cell is `DEFAULT` and counts as missing ([Rows with different keys](#upsert-different-keys)); with no column left, it throws "nothing to insert…"<!-- message --> |
 | `upsert()` `updateValues` | sets it from `EXCLUDED`: the value inserted, or the column's `DEFAULT` | left out, as a key `updateValues` doesn't have: `SET ("film_id", "stars") = ROW(EXCLUDED."film_id", EXCLUDED."stars")`<!-- probe: (db.setConfig({ undefinedMeansMissing: true }), db.upsert('ratings', { film_id: 1002, stars: 4 }, ['film_id', 'stars'], { updateValues: { votes: undefined } })) -->, so the existing value stays; with `doNothing` and no other key, `DO NOTHING`<!-- probe: (db.setConfig({ undefinedMeansMissing: true }), db.upsert('ratings', { film_id: 1002, stars: 4 }, ['film_id', 'stars'], { updateColumns: db.doNothing, updateValues: { votes: undefined } })) --> |
 
 </div>

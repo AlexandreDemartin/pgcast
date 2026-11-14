@@ -16,7 +16,7 @@ export const configOf = (query: string | QueryConfig, values?: unknown[]): Query
  * query goes to `send`. The client has `_connected`, as a `pg.Client`: zapatos/db tells a client from a pool by it
  * (pg.ts), and would check a client out of it. `end()` does nothing: each Run's Postgres goes with its worker.
  */
-export function poolOf(send: (query: QueryConfig) => Promise<Results>) {
+export function poolOf(send: (query: QueryConfig) => Promise<Results<unknown>>) {
   let free = Promise.resolve();
   const take = async () => {
     const previous = free;
