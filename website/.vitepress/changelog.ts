@@ -81,8 +81,9 @@ export async function writeChangelogFeed(config: SiteConfig) {
     url = `${root}changelog`,
     md = await createMarkdownRenderer(config.srcDir, config.markdown, config.site.base, config.logger),
     env = { path: join(config.srcDir, page), relativePath: page, cleanUrls: config.cleanUrls },
-    // without the page's heading anchors and ids, each link absolute
+    // without the page's heading anchors and ids, nor the marks of check-changelog.mjs, each link absolute
     html = async (notes: string) => (await md.renderAsync(notes, { ...env }))
+      .replace(/<!--[\s\S]*?-->/g, '')
       .replace(/\s*<a class="header-anchor"[^>]*>[\s\S]*?<\/a>/g, '')
       .replace(/ (?:id="[^"]*"|tabindex="-1")/g, '')
       .replace(/(href|src)="\/(?!\/)/g, `$1="${root}`)

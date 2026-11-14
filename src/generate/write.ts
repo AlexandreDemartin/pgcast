@@ -9,6 +9,7 @@ import * as path from 'path';
 import { finaliseConfig, Config } from './config';
 import * as legacy from './legacy';
 import { moduleNamesOf, warnAboutOtherModuleNames } from './moduleNames';
+import { warnAboutSchemaRules } from './schemaRules';
 import { tsForConfig } from './tsOutput';
 import { header } from './header';
 
@@ -69,5 +70,6 @@ declare module '${folderName}/custom' { }
   }
 
   warnAboutOtherModuleNames(config);
+  warnAboutSchemaRules(suppliedConfig, config);
   legacy.srcWarning(config);
 };
