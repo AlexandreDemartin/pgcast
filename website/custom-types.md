@@ -209,8 +209,9 @@ A domain's placeholder holds its base type's TypeScript name, and imports what t
 | `db.Int8String`, for a domain over `bigint`; `numeric`, `time` and the ranges alike | TS2503, `Cannot find namespace 'db'.` | `import type * as db from 'zapatos/db';` |
 | `crew_job`, for `CREATE DOMAIN lead_job AS crew_job`, over an enum | TS2304, `Cannot find name 'crew_job'.` | `import type { crew_job } from 'zapatos/schema';` |
 
-- An enum outside [`unprefixedSchema`](/generator#generate.unprefixedSchema) is in its schema's namespace: the placeholder imports that, `import type { archive } from 'zapatos/schema';`, and holds `archive.format`.
+- An enum outside [`unprefixedSchema`](/generator#generate.unprefixedSchema) is in its schema's namespace: the placeholder imports that, `import type { archive } from 'zapatos/schema';`, and holds `archive.format`. One written before holds `format`: add that import and change `format` to `archive.format`, as `import type { format }` gives TS2305 there.
 - An enum whose name has a capital letter or is one of TypeScript's own types (`"Date"`, `string`) still gets no import, as in Zapatos 6.6.1: that name may be a global type, which compiles.
+- A domain over `genre` that a table of `archive` uses too, when `archive` has a `genre` of its own, gets no import either, as in Zapatos 6.6.1. Without [`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas), each table reads `genre` in its own schema, and one placeholder cannot import both: import the one the domain is over.
 
 For `CREATE DOMAIN ticket_no AS bigint`, the placeholder holds `db.Int8String`, the string `pg` returns for a `bigint`. But the shortcuts return a `bigint` as a JSON number: a `ticket_no` that [`select()`](/select#select) returns is a `number` typed `db.Int8String`, so `.padStart()` compiles, then throws; and a row for [`insert()`](/insert#insert), typed `Insertable`, refuses `1` (TS2322). Type it as both:
 

@@ -1,5 +1,5 @@
 ---
-english: 92339e928cd6
+english: 91715467ffed
 ---
 
 # Types personnalisés
@@ -213,8 +213,9 @@ Le placeholder d’un domaine contient le nom TypeScript de son type de base, et
 | `db.Int8String`, pour un domaine sur `bigint` ; de même pour `numeric`, `time` et les types range | TS2503, `Cannot find namespace 'db'.` | `import type * as db from 'zapatos/db';` |
 | `crew_job`, pour `CREATE DOMAIN lead_job AS crew_job`, sur un enum | TS2304, `Cannot find name 'crew_job'.` | `import type { crew_job } from 'zapatos/schema';` |
 
-- Un enum hors de [`unprefixedSchema`](/fr/generator#generate.unprefixedSchema) est dans l’espace de noms de son schéma : le placeholder importe cet espace de noms, `import type { archive } from 'zapatos/schema';`, et contient `archive.format`.
+- Un enum hors de [`unprefixedSchema`](/fr/generator#generate.unprefixedSchema) est dans l’espace de noms de son schéma : le placeholder importe cet espace de noms, `import type { archive } from 'zapatos/schema';`, et contient `archive.format`. Un placeholder écrit auparavant contient `format` : ajoutez cet import et remplacez `format` par `archive.format`, car `import type { format }` y donne TS2305.
 - Un enum dont le nom contient une majuscule ou est l’un des types propres à TypeScript (`"Date"`, `string`) ne reçoit toujours aucun import, comme dans Zapatos 6.6.1 : ce nom peut être celui d’un type global, qui compile.
+- Un domaine sur `genre` qu’utilise aussi une table du schéma `archive`, quand `archive` a son propre `genre`, ne reçoit pas d’import non plus, comme dans Zapatos 6.6.1. Sans [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas), chaque table lit `genre` dans son propre schéma, et un seul placeholder ne peut pas importer les deux : importez celui sur lequel porte le domaine.
 
 Pour `CREATE DOMAIN ticket_no AS bigint`, le placeholder contient `db.Int8String`, la chaîne que `pg` renvoie pour un `bigint`. Mais les raccourcis renvoient un `bigint` sous forme de nombre JSON : un `ticket_no` que renvoie [`select()`](/fr/select#select) est un `number` typé `db.Int8String`, donc `.padStart()` compile, puis lève une erreur ; et une ligne pour [`insert()`](/fr/insert#insert), typée `Insertable`, refuse `1` (TS2322). Typez-le comme les deux à la fois :
 
