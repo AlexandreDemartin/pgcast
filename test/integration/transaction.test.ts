@@ -682,7 +682,9 @@ describe('a client already inside a transaction block', () => {
     expect(await notes()).toEqual(['inner', 'leaked']);
   });
 
-  it('two calls at the same moment on one client in a block: the second is passed through, as in 6.6.1', async () => {
+  // serializable too: the caller's block has run no query yet, so a query of the second call sent before the
+  // first's START TRANSACTION would make Postgres refuse that START (25001)
+  it.each(['readCommitted', 'serializable'] as const)('two %s() at the same moment on one client in a block: the second is passed through, as in 6.6.1', async level => {
     const { fdb } = await fresh();
     const queries: [string, number | undefined][] = [], results: [string, number | undefined][] = [];
     fdb.setConfig({
@@ -693,13 +695,13 @@ describe('a client already inside a transaction block', () => {
     try {
       await client.query('BEGIN');
       const insert = (c: db.Queryable, note: string) => fdb.sql`INSERT INTO ${'txn_probe'} (${'note'}) VALUES (${fdb.param(note)})`.run(c);
-      await Promise.all([fdb.readCommitted(client, c => insert(c, 'f')), fdb.readCommitted(client, c => insert(c, 'g'))]);
+      await Promise.all([fdb[level](client, c => insert(c, 'f')), fdb[level](client, c => insert(c, 'g'))]);
       await client.query('ROLLBACK');
     } finally {
       client.release();
     }
     for (const sent of [queries, results]) {
-      expect(sent.filter(([text]) => text === start.readCommitted)).toHaveLength(1);
+      expect(sent.filter(([text]) => text === start[level])).toHaveLength(1);
       expect(sent.filter(([text]) => text === 'COMMIT')).toHaveLength(1);
       expect(new Set(sent.map(([, txnId]) => txnId))).toEqual(new Set([0]));  // one transaction, the first call's
     }
