@@ -19,8 +19,8 @@ const
   // the site's own URL (config.ts), so that a chat opened from a preview still names the page an assistant can read
   prompt = computed(() => `Read ${__PGCAST_SITE__}${link.value.slice(1)}.md so I can ask questions about it.`),
   chats = computed(() => [
-    { name: 'ChatGPT', href: `https://chatgpt.com/?q=${encodeURIComponent(prompt.value)}` },
-    { name: 'Claude', href: `https://claude.ai/new?q=${encodeURIComponent(prompt.value)}` },
+    { name: 'ChatGPT', icon: 'openai' as const, href: `https://chatgpt.com/?q=${encodeURIComponent(prompt.value)}` },
+    { name: 'Claude', icon: 'claude' as const, href: `https://claude.ai/new?q=${encodeURIComponent(prompt.value)}` },
   ]),
   open = ref(false),
   status = ref(''),
@@ -156,7 +156,7 @@ onUnmounted(() => {
         :aria-describedby="`page-actions-${chat.name}`"
         @click="close(false)"
       >
-        <Icon name="chat" />
+        <Icon :name="chat.icon" />
         <span class="title">Open in {{ chat.name }}<span class="visually-hidden"> (new tab)</span><Icon name="external" /></span>
         <span :id="`page-actions-${chat.name}`" class="desc" aria-hidden="true">Ask about this page in {{ chat.name }}</span>
       </a>

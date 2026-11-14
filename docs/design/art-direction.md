@@ -106,10 +106,10 @@ Spacing is on a 4px grid.
 
 ## Icons
 
-One set, drawn in one place: `website/.vitepress/theme/icons.ts`, one drawing per meaning, lines on a 24px grid with a 2px round stroke in `currentColor`, inline SVG, `aria-hidden` (the text beside an icon names what it does; the theme button, an icon alone, has its `aria-label`). `Icon.vue` draws one in a component; `svg()` writes the same markup at build. 16px; 14px beside text under 13px; 18px in the theme button. The install line's copy button (`InstallLine.vue`) still draws its own.
+One set, drawn in one place: `website/.vitepress/theme/icons.ts`, one drawing per meaning, lines on a 24px grid with a 2px round stroke in `currentColor` (the ChatGPT and Claude marks are their brands' filled shapes, in the same 24px box and `currentColor`), inline SVG, `aria-hidden` (the text beside an icon names what it does; the theme button, an icon alone, has its `aria-label`). `Icon.vue` draws one in a component; `svg()` writes the same markup at build. 16px; 14px beside text under 13px; 18px in the theme button. The install line's copy button (`InstallLine.vue`) still draws its own.
 
-- **An icon only where it helps a reader find or recognise something**, never as decoration; no emoji, no brand logo (ChatGPT and Claude share the chat icon).
-- **Where**: the page actions (copy, check once copied, chevron, Markdown file, chat, external arrow); a note's chip, by kind (tip a lightbulb; info a clock, as the site's info notes are "Coming"; warning a triangle; danger an octagon); the pager's arrows; the playground's Run (play) and Share (link); the theme button (system, light, dark). VitePress's own are kept: the pencil of the edit link, the search icon of the 404.
+- **An icon only where it helps a reader find or recognise something**, never as decoration; no emoji. Brand marks only where a row takes the reader to that product: OpenAI's for Open in ChatGPT, Claude's for Open in Claude, from Simple Icons (sources in `icons.ts`).
+- **Where**: the page actions (copy, check once copied, chevron, Markdown file, the OpenAI and Claude marks, external arrow); a note's chip, by kind (tip a lightbulb; info a clock, as the site's info notes are "Coming"; warning a triangle; danger an octagon); the pager's arrows; the playground's Run (play) and Share (link); the theme button (system, light, dark). VitePress's own are kept: the pencil of the edit link, the search icon of the 404.
 - **Left without**: the nav's group headings, At a glance, the group pages' lists, the home's pillars and "read next" links, the footer, the "since" badges, "Open in playground": text alone already says what each is, and an icon on every row would be noise.
 
 ## Signature components
