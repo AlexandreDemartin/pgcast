@@ -1,5 +1,5 @@
 ---
-english: 1b0308d9312a
+english: 6536766e6f9b
 ---
 
 # Configuration
@@ -114,7 +114,7 @@ transactionAttemptsMax: number  // default: 5
 
 Combien de fois [`transaction()`](/fr/transaction#transaction) exécute son callback. Après un échec de sérialisation (`40001`) ou un deadlock (`40P01`), elle annule la transaction (`ROLLBACK`) et exécute de nouveau le callback, jusqu’à ce que ce nombre de tentatives ait échoué ; elle lève alors la dernière erreur. Sur toute autre erreur, elle annule la transaction et lève l’erreur aussitôt.
 
-- `1`, `0` ou moins : une tentative, aucun retry. Avec `0`, le message dit « <span lang="en">… on attempt 1 of 0, giving up</span> » ([#179](https://github.com/AlexandreDemartin/pgcast/issues/179)).
+- `1`, `0`, une valeur négative ou `NaN` : une tentative, aucun retry, et le message dit « <span lang="en">… on attempt 1 of 1, giving up</span> ». Une fraction est arrondie à l’entier supérieur : `2.5` donne trois tentatives.
 - Lue quand `transaction()` démarre, donc un changement vaut pour la transaction suivante, pas pour celle en cours.
 - Comment écrire un callback qui peut s’exécuter deux fois : [Retries](/fr/retries).
 

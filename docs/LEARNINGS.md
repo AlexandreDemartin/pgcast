@@ -212,6 +212,10 @@ Candidates for a check, a rule or a skill line.
 - #257 — `getConfig()` runs on every query (`core.ts`) and while shortcuts build one (`shortcuts.ts`): whatever it does with the stored config can break every query; candidate check: `getConfig()` and `setConfig()` never throw whatever was stored, a unit test feeding a throwing getter, a Proxy, a primitive from JS (#249 and #257 are the same regression) — `branch-reviewer`
 - #257 — When a fix adds an exception to a guarantee the docs state, `git grep` the reference page that states it, English and French, not only `CHANGELOG.md` — `branch-reviewer`
 - #257 — An issue's « validate in `setConfig()` » candidate looked sound until a getter that starts throwing after a successful `setConfig()` was probed: probe the odd shapes of skill `backward-compat` before choosing between candidates — `builder`
+- #179 — A fix that converts a config value eagerly at entry, where 6.6.1 read it lazily (only on the retry branch), changes when a bad value throws: replay a fixed set of odd values (`Symbol`, `Object.create(null)`, a throwing `valueOf`, `null`) on 6.6.1, master and the branch for each config key the runtime reads (same family as #257) — `branch-reviewer`
+- #179 — A fix that removes a documented quirk leaves its other mentions behind (a § Errors row survived the removed caveats): `git grep` the old message quoted in the issue across `website/` before marking a page translated — `branch-reviewer`
+- #179 — A test can show a count unchanged and its message fixed: the count assertion first, green, the message assertion red — `builder`
+- #179 — An existing characterisation test that records the old message (« attempt 1 of 0 ») changes on purpose with the fix: say so in Proofs with the old and new text — `builder`
 - #219 — A docs example of debug output goes stale silently when a generator query changes (its number and a `pg_namespace` join had moved on): candidate check, regenerate the example from a run on the docs schema in `docs:build` — `builder`
 - #301 — In 6.6.1 and master, a `schemas` rule's `include` given as a plain string other than `"*"` (`"films"`) goes through `String.prototype.indexOf`, so it matches substrings of relation names: filed as its own issue — `builder`
 - #301 — `finaliseConfig({}).schemas.public` is the same object as `defaultConfig.schemas.public`: a caller who mutates the returned rule changes the default for later calls (nothing in the repo does today) — `branch-reviewer`
@@ -282,6 +286,9 @@ Minor review defects, taken up by the end-of-chapter review.
 - #257 — `test/integration/transaction.test.ts:367`: only the `sql` template path is frozen; shortcuts read `getConfig()` while building (`shortcuts.ts:145`, `:161`, `:416`, `:779`): an `insert()` in place of `write()` would keep them covered — `branch-reviewer`
 - #257 — `website/runtime-config.md:44` (and `fr/…:48`): « A copy of the configuration, `transactionRetryDelay` included » has no exception for a delay whose getter throws, which is now shared — `branch-reviewer`
 - #257 — `src/db/config.ts:58`: the JSDoc « Get (a copy of) the current configuration » leaves out the exception given at `:64` — `branch-reviewer`
+- #179 — `test/integration/transaction.test.ts:73`: the pool case of a thrown `null` / `undefined` checks the rows but not `totalCount - idleCount === 0`, as `:335` and `:493` do — `branch-reviewer`
+- #179 — `website/transaction.md:73` (and `fr/…:77`): « `0` or `1` gives one » could match `runtime-config.md:113` (« `1`, `0`, a negative value or `NaN` ») — `branch-reviewer`
+- #179 — `src/db/transaction.ts:162`: a `valueOf` with side effects is now called once at entry, where 6.6.1 called it at each comparison (0 times on a success) — `branch-reviewer`
 
 - #301 — `src/generate/schemaRules.ts:43`: « has no include nor exclude » reads better as « has neither include nor exclude » (frozen in the test, CHANGELOG and both generator pages) — `branch-reviewer`
 - #301 — `test/integration/codegen.test.ts:1217`: a single `null` key (`{ include: '*', exclude: null }`) is not frozen by a test — `branch-reviewer`
