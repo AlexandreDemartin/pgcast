@@ -324,6 +324,35 @@ describe('variant snapshots', () => {
     }
   });
 
+  // 6.6.1's keyof[] and readonly[] parse, as keyof [] and readonly [], which take none of the labels;
+  // unique[] fails to compile without skipLibCheck (TS1005), and is `any` with it
+  it('an array of an enum named after a type operator is typed by its labels', async () => {
+    await t.pool.query(`
+      CREATE SCHEMA array_ops;
+      CREATE TYPE array_ops."keyof" AS ENUM ('a');
+      CREATE TYPE array_ops."readonly" AS ENUM ('a');
+      CREATE TYPE array_ops."unique" AS ENUM ('a');
+      CREATE TABLE array_ops.takes (k array_ops."keyof"[], r array_ops."readonly"[], u array_ops."unique"[]);`);
+    try {
+      const { ts: schema } = await codegen({ schemas: { array_ops: all } });
+      expect.soft(schema).toContain('k: keyof_[] | null;');
+      expect.soft(schema).toContain('r: readonly_[] | null;');
+      expect.soft(schema).toContain('u: unique_[] | null;');
+      for (const skipLibCheck of [false, true]) expect.soft(await probeErrors({ schemas: { array_ops: all } }, `
+        import type * as s from 'zapatos/schema';
+        export const k: s.array_ops.takes.Selectable['k'] = ['a'];
+        export const r: s.array_ops.takes.Selectable['r'] = ['a'];
+        export const u: s.array_ops.takes.Selectable['u'] = ['a'];
+        // @ts-expect-error an array's key, not a label
+        export const key: s.array_ops.takes.Selectable['k'] = 'length';
+        // @ts-expect-error not an array of labels
+        export const text: s.array_ops.takes.Selectable['u'] = 'some text';
+      `, { skipLibCheck })).toEqual([]);
+    } finally {
+      await t.pool.query('DROP SCHEMA array_ops CASCADE');
+    }
+  });
+
   it('holds no orphan file', () => {
     const expected = variants.flatMap(([name]) =>
       withoutCustomTypes.includes(name) ? [`${name}.d.ts`] : [`${name}.custom.d.ts`, `${name}.d.ts`]);
