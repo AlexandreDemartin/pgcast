@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // Copyright (C) 2026 Alexandre Demartin
-// VitePress's layout, plus the wordmark and the version pill by it, the footer under every page and the 404 page; and,
-// on each page, its code groups of package managers on the reader's pick (packageManager.ts).
+// VitePress's layout, plus the wordmark and the version pill by it, a written page's actions (beside its title, or
+// under "On this page" where that rail shows: PageActions.vue), the footer under every page and the 404 page; and, on
+// each page, its code groups of package managers on the reader's pick (packageManager.ts).
 import { onMounted, onUnmounted } from 'vue';
 import { onContentUpdated } from 'vitepress';
 import DefaultTheme from 'vitepress/theme-without-fonts';
@@ -24,7 +25,8 @@ onUnmounted(() => window.removeEventListener('change', rememberPicked));
     <template #nav-bar-title-after>
       <span class="version" title="Version shown in these docs">{{ version }}</span>
     </template>
-    <template #doc-before><PageActions /></template>
+    <template #doc-before><PageActions place="title" /></template>
+    <template #aside-outline-after><PageActions place="rail" /></template>
     <template #doc-after><SiteFooter /></template>
     <template #not-found><NotFound /></template>
   </DefaultTheme.Layout>
