@@ -189,7 +189,7 @@ Both count the rows of the `where`. The window's `where` is the page's own: with
 
 Give it the list's `where`, and none of the page's options:
 
-- `offset` leaves the one row of the count behind, and `.run()` gives `0`.
+- `offset` leaves the one row of the count behind: `.run()` gives `0`, not the total.
 - `order` by a column: Postgres refuses the query (42803).
 
 ### With a window in `extras`
