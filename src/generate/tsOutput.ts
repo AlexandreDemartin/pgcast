@@ -176,8 +176,9 @@ function indentAll(level: number, s: string) {
 }
 
 /**
- * Without `rejectOnQueryError`, note it before a failed query ends the process: a `DeprecationWarning` comes on the
- * next tick, which `process.exit()` never reaches. `false` keeps the exit with no note: the CLI's config sets it.
+ * Without `rejectOnQueryError`, or with `null`, note it before a failed query ends the process: a `DeprecationWarning`
+ * comes on the next tick, which `process.exit()` never reaches. `false` keeps the exit with no note: the CLI's config
+ * sets it.
  */
 const warnAboutExitOnQueryError = (config: CompleteConfig) => {
   const warn = config.warningListener === true ? console.log : config.warningListener || (() => void 0);
@@ -210,7 +211,7 @@ export const tsForConfig = async (config: CompleteConfig, debug: (s: string) => 
         if (ended || (config.rejectOnQueryError ?? false)) throw e;
         console.log(`*** error ${seq} ***`, e);
         try {
-          if (config.rejectOnQueryError === undefined) warnAboutExitOnQueryError(config);
+          if (config.rejectOnQueryError == null) warnAboutExitOnQueryError(config);  // left out, or null from JSON
         } finally {
           process.exit(1);  // even if warningListener throws, as Zapatos 6.6.1 exits
         }
