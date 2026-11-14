@@ -345,12 +345,16 @@ const
 // a class that extends a built-in. Zapatos 6.6.1 compiled them as Whereables of their own keys: none (`TRUE`,
 // every row), or indexes (`"0" = $1`). A typed array's prototype is one whose own prototype is %TypedArray%'s:
 // `Uint8Array.prototype`, `Float64Array.prototype`…, and not a subclass's (`Buffer` is listed for this reason).
-// `AggregateError` (Node 15) and `SuppressedError` (Node 24) are read from `globalThis`, where the runtime has them
+// `AggregateError`, `WeakRef`, `FinalizationRegistry` (ES2021, past the lib's ES2019 types), `SuppressedError`,
+// `DisposableStack`, `AsyncDisposableStack` (Node 24) and `SharedArrayBuffer` (which a runtime may leave out) are
+// read from `globalThis`, where the runtime has them. ECMAScript built-ins only, no host object (`URL`, `Blob`)
 const
   builtinPrototypes = new Set<unknown>([
     Date, Map, Set, WeakMap, WeakSet, RegExp, Promise, ArrayBuffer, DataView, Buffer, Number, String, Boolean,
     Error, EvalError, RangeError, ReferenceError, SyntaxError, TypeError, URIError,
     (globalThis as any).AggregateError, (globalThis as any).SuppressedError,
+    (globalThis as any).WeakRef, (globalThis as any).FinalizationRegistry, (globalThis as any).SharedArrayBuffer,
+    (globalThis as any).DisposableStack, (globalThis as any).AsyncDisposableStack,
   ].filter(Boolean).map(builtin => builtin.prototype)),
   typedArrayPrototype = Object.getPrototypeOf(Uint8Array.prototype);
 
