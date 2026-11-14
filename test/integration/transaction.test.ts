@@ -68,6 +68,32 @@ describe('transaction', () => {
     expect(await notes()).toEqual([]);
   });
 
+  // #179: Zapatos 6.6.1 rejected with "TypeError: Cannot destructure property 'code' of 'err' as it is null."
+  describe.each([null, undefined])('a callback that throws %s', thrown => {
+    it.each(['pool', 'client'] as const)('rolls back and rejects with it, on a %s', async where => {
+      const client = where === 'client' ? await t.pool.connect() : undefined;
+      try {
+        let attempts = 0;
+        const outcome = await db.readCommitted(client ?? t.pool, async c => {
+          attempts++;
+          await write(c, 'rolled back');
+          throw thrown;
+        }).then(() => 'resolved', (error: unknown) => ({ error }));
+        expect(outcome).toEqual({ error: thrown });
+        expect(attempts).toBe(1);
+      } finally {
+        client?.release();
+      }
+      expect(await notes()).toEqual([]);
+    });
+
+    it('rejects with it from a transaction nested in another', async () => {
+      const outcome = await db.readCommitted(t.pool, c => db.readCommitted(c, async () => { throw thrown; }))
+        .then(() => 'resolved', (error: unknown) => ({ error }));
+      expect(outcome).toEqual({ error: thrown });
+    });
+  });
+
   it('does not retry a database error other than 40001 / 40P01', async () => {
     let attempts = 0;
     const err = await db.transaction(t.pool, IsolationLevel.Serializable, async c => {
@@ -369,17 +395,33 @@ describe('the config transaction() reads', () => {
     expect(messages.at(-1)).toBe('Transaction rollback (code 40001) on attempt 5 of 5, giving up');
   });
 
-  it('keeps a transactionAttemptsMax of 0: one attempt, then gives up, as Zapatos 6.6.1 does', async () => {
+  // #179: the attempts are those Zapatos 6.6.1 makes, replayed for each value; its messages counted
+  // "attempt 1 of 0" (of -1, of NaN) and "attempt 3 of 2.5": they now count the attempts made
+  it.each([
+    { max: 0, attempts: 1 },
+    { max: 1, attempts: 1 },
+    { max: -1, attempts: 1 },
+    { max: NaN, attempts: 1 },
+    { max: 2.5, attempts: 3 },
+    { max: '3', attempts: 3 },  // from JavaScript
+    { max: BigInt(3), attempts: 3 },  // from JavaScript
+  ])('keeps the attempts of a transactionAttemptsMax of $max, and counts them in its messages', async ({ max, attempts }) => {
     const { messages } = listen();
-    db.setConfig({ transactionAttemptsMax: 0 });
-    let attempts = 0;
+    db.setConfig({ transactionAttemptsMax: max as number });
+    let made = 0;
     const err = await db.serializable(t.pool, async c => {
-      attempts++;
+      made++;
       await raise(c, '40001');
     }).catch((e: unknown) => e);
     expect((err as { code: string }).code).toBe('40001');
-    expect(attempts).toBe(1);
-    expect(messages).toEqual(['Transaction rollback (code 40001) on attempt 1 of 0, giving up']);
+    expect(made).toBe(attempts);
+    expect(messages).toEqual([
+      ...Array.from({ length: attempts - 1 }, (_, i) => [
+        `Transaction rollback (code 40001) on attempt ${i + 1} of ${attempts}, retrying in 0ms`,
+        `Retrying transaction, attempt ${i + 2} of ${attempts}`,
+      ]).flat(),
+      `Transaction rollback (code 40001) on attempt ${attempts} of ${attempts}, giving up`,
+    ]);
   });
 });
 
