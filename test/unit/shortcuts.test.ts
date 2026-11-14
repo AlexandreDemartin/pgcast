@@ -11,6 +11,8 @@ import { resetConfig } from '../helpers/config';
 
 afterEach(resetConfig);
 
+const nothingToInsert = 'nothing to insert: an Insertable needs at least one column; for a row of defaults only, write INSERT ... DEFAULT VALUES in a sql template';
+
 describe('insert', () => {
   it('one row: columns in sorted key order, RETURNING to_jsonb', () => {
     // characterization: the column order is the sorted key order, not the object's
@@ -55,6 +57,27 @@ describe('insert', () => {
         "values": [],
       }
     `);
+  });
+
+  // `INSERT INTO "users" () VALUES ()` is invalid SQL, so insert() throws while it builds the query, as update() does
+  it.each([
+    ['one row', () => db.insert('users', {})],
+    ['an array of one row', () => db.insert('users', [{}])],
+    ['several rows', () => db.insert('users', [{}, {}])],
+  ])('no column at all: throws, %s (#251)', (_, write) => {
+    expect(write).toThrow(nothingToInsert);
+  });
+
+  it('a column in some row, or an undefined value, is a column', () => {
+    // a key in one row is a column for all: DEFAULT elsewhere
+    expect(db.insert('users', [{}, { mood: 'ok' }]).compile().text)
+      .toBe('INSERT INTO "users" ("mood") VALUES (DEFAULT), ($1) RETURNING to_jsonb("users".*) AS result');
+    // an undefined value: NULL by default, DEFAULT with undefinedMeansMissing
+    expect(db.insert('users', { mood: undefined }).compile().text)
+      .toBe('INSERT INTO "users" ("mood") VALUES ($1) RETURNING to_jsonb("users".*) AS result');
+    db.setConfig({ undefinedMeansMissing: true });
+    expect(db.insert('users', { mood: undefined }).compile().text)
+      .toBe('INSERT INTO "users" ("mood") VALUES (DEFAULT) RETURNING to_jsonb("users".*) AS result');
   });
 
   it('returning and extras', () => {
@@ -619,6 +642,29 @@ describe('upsert', () => {
         "values": [],
       }
     `);
+  });
+
+  it.each([
+    ['one row', () => db.upsert('users', {}, 'email')],
+    ['an array of one row', () => db.upsert('users', [{}], 'email')],
+    ['several rows, updateColumns: doNothing', () => db.upsert('users', [{}, {}], 'email', { updateColumns: db.doNothing })],
+  ])('no column at all: throws, %s (#251)', (_, write) => {
+    expect(write).toThrow(nothingToInsert);
+  });
+
+  it.each([
+    ['one row', () => db.upsert('users', { mood: undefined }, 'email')],
+    ['several rows', () => db.upsert('users', [{ mood: undefined }, { mood: undefined }], 'email')],
+  ])('with undefinedMeansMissing, only undefined values: no column, throws, %s (#251)', (_, write) => {
+    db.setConfig({ undefinedMeansMissing: true });
+    expect(write).toThrow(nothingToInsert);
+  });
+
+  it('an undefined value is a column without undefinedMeansMissing, and a key in some row with it', () => {
+    expect(db.upsert('users', { mood: undefined }, 'email').compile().text).toContain('INSERT INTO "users" ("mood") VALUES ($1) ON CONFLICT');
+    db.setConfig({ undefinedMeansMissing: true });
+    expect(db.upsert('users', [{ mood: undefined }, { mood: 'ok' }], 'email', { updateColumns: ['mood'] }).compile().text)
+      .toContain('INSERT INTO "users" ("mood") VALUES (DEFAULT), ($1) ON CONFLICT');
   });
 });
 
