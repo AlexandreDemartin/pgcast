@@ -59,7 +59,7 @@ user code ──► src/db/ (runtime: sql``, shortcuts, conditions, transactions
 
 ### Watch out: module names
 
-The generated code and the runtime speak of `zapatos/schema`, `zapatos/db` and `zapatos/custom`. These are **module names resolved at run time and at compile time**, not a mere matter of branding. Decision [002](docs/decisions/002-module-names.md): these strings stay `zapatos/*`; a `pgcast/*` mode will come later, opt-in. **Do not rename any of these strings.**
+The generated code and the runtime speak of `zapatos/schema`, `zapatos/db` and `zapatos/custom`. These are **module names resolved at run time and at compile time**, not a mere matter of branding. Decision [002](docs/decisions/002-module-names.md): by default these strings stay `zapatos/*`; the generator's opt-in `moduleNames: 'pgcast'` writes `pgcast/*`, and still declares `zapatos/schema`, which `src/db` imports. **Do not rename any of these strings** for the default.
 
 ## Commands
 
