@@ -46,9 +46,9 @@ One per group, in `templates/`, not published (`srcExclude` in `.vitepress/confi
 
   | Container | Chip | For |
   |---|---|---|
-  | `::: tip Opt-in` | teal | an opt-in, or a tip worth a box (`::: tip Why the alias`) |
-  | `::: info Coming` | grey | what isn't there yet (`::: info Coming`, `why.md`) |
-  | `::: warning Security` | amber, the note too | a risk to the reader's data or queries |
+  | `::: tip Opt-in` | teal, a lightbulb | an opt-in, or a tip worth a box (`::: tip Why the alias`) |
+  | `::: info Coming` | grey, a clock | what isn't there yet (`::: info Coming`, `why.md`) |
+  | `::: warning Security` | amber, the note too, a triangle | a risk to the reader's data or queries |
 
 - **Code**: a command in `sh`, a file in a `::: code-group` with its path as the label (`` ```ts twoslash [src/films.ts] ``), TypeScript as `ts twoslash` (§ Examples), except a signature, which does not compile on its own: plain `ts`.
 - **Install commands**: yarn and bun take the major as a range, `zapatos@npm:@pgcast/pgcast@^6` (`install.md`); `check-prose.mjs` fails on one, in a page or the root README, that is not the major of the root `package.json`.
