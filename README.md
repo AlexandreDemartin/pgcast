@@ -2,12 +2,10 @@
 
 **Zero-abstraction Postgres for TypeScript: your types, cast from your database.**
 
-Maintained by [Alexandre Demartin](https://github.com/AlexandreDemartin) · created as Zapatos by [George MacKerron](https://github.com/jawj)
+Maintained by [Alexandre Demartin](https://github.com/AlexandreDemartin)
 
 [![CI](https://github.com/AlexandreDemartin/pgcast/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/AlexandreDemartin/pgcast/actions/workflows/ci.yml)
 [![Licence: MIT](https://img.shields.io/badge/licence-MIT-blue.svg)](LICENCE)
-
-A maintained fork of [Zapatos](https://github.com/jawj/zapatos) 6.6.1 by George MacKerron.
 
 > **Status:** 6.6.2 is Zapatos 6.6.1 with its security holes closed. 6.7.0, in progress, adds opt-ins for the surprises that code may rely on. On npm as [`@pgcast/pgcast`](https://www.npmjs.com/package/@pgcast/pgcast).
 
@@ -119,9 +117,9 @@ The plan lives in GitHub issues: one epic per chapter, one sub-issue per step, e
 
 ## Relationship with Zapatos
 
-- Zapatos is George MacKerron's work: its design, its code and its documentation. pgcast keeps his copyright, his module names and his voice.
+- pgcast is a maintained fork of [Zapatos](https://github.com/jawj/zapatos) 6.6.1, created by [George MacKerron](https://github.com/jawj). Zapatos is his work: its design, its code and its documentation. pgcast keeps his copyright, his module names and his voice.
 - Fixes made upstream are brought over when they apply; fixes found here, the security ones first, are offered upstream.
-- Maintainer: [Alexandre Demartin](https://github.com/AlexandreDemartin). George MacKerron is the original author of Zapatos.
+- Maintainer: [Alexandre Demartin](https://github.com/AlexandreDemartin).
 
 ## Contributing and security
 
