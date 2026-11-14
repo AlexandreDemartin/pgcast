@@ -405,6 +405,17 @@ describe('upsert', () => {
     expect(await scalar(`SELECT display_name AS v FROM users WHERE id = 2`)).toBe('Bob');
   });
 
+  it('characterization: an updateColumns computed empty is DO NOTHING too, as in 6.6.1 (#402)', async () => {
+    // typed as the row, not | undefined (test/types/shortcuts.test-d.ts): the docs say to check, or pass doNothing
+    const updateColumns = ['display_name'].filter(() => false);
+    expect(await run(db.upsert('users', { email: 'bob@example.com', display_name: 'X' }, 'email', { updateColumns })))
+      .toBeUndefined();
+    expect(await run(db.upsert('users', { email: 'bob@example.com', display_name: 'X' }, 'email', {
+      updateColumns, returning: ['email'],
+    }))).toBeUndefined();
+    expect(await scalar(`SELECT display_name AS v FROM users WHERE id = 2`)).toBe('Bob');
+  });
+
   it('an empty array: []', async () => {
     expect(await run(db.upsert('users', [], 'email'))).toEqual([]);
   });
