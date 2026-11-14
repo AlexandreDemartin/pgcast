@@ -6,7 +6,7 @@ titleTemplate: Zero-abstraction Postgres for TypeScript
 description: "pgcast reads your Postgres schema and writes the TypeScript types. Readable, predictable SQL: no ORM, no models, no hidden state."
 ---
 
-<div class="landing">
+<main class="landing">
 <section class="hero">
 
 <h1>Your types, cast from your database<span class="op">::</span></h1>
@@ -71,4 +71,4 @@ Write a query in [the playground](/playground) and see its SQL and its type as y
 </div>
 
 <SiteFooter />
-</div>
+</main>

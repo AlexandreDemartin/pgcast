@@ -1,7 +1,7 @@
 {
   "$schema": "https://context7.com/schema/context7.json",
   "projectTitle": "pgcast",
-  "description": "Zero-abstraction Postgres for TypeScript: types cast from your database schema. A maintained fork of Zapatos.",
+  "description": "Zero-abstraction Postgres for TypeScript: types cast from your database schema.",
   "folders": ["website"],
   "excludeFolders": ["website/.vitepress", "website/templates", "website/zapatos", "website/public", "website/node_modules"],
   "excludeFiles": ["README.md", "CHANGELOG.md", "changelog.md", "playground.md"],
