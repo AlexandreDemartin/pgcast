@@ -63,7 +63,8 @@ declare const nestedResult: unique symbol;
 /**
  * A `min()` or `max()` typed by its column, with `aggregatesTypedByColumn`
  * declared in `ConfigTypes`: `run()` gives `RunResult`, and nested in a
- * `lateral` or `extras` it comes back as JSON, `NestedResult`.
+ * `lateral` it comes back as JSON, `NestedResult` (in `extras` too, once
+ * #262 parenthesises it; Postgres refuses it bare today).
  */
 export interface ColumnAggregateFragment<RunResult, NestedResult> extends SQLFragment<RunResult> { [nestedResult]: NestedResult }
 
