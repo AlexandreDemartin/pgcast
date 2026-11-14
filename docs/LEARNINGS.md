@@ -141,6 +141,26 @@ Candidates for a check, a rule or a skill line.
 - #368 — The « runs as on Zapatos 6.6.1 » CLI replay (exit code, stdout, `Error:` line, file hashes) is redone by hand on each CLI PR: a script with fixed scenarios would make it checkable — `branch-reviewer`
 - #51 — Before documenting a report finding, search what the docs site already says: 10 of the 16 were covered by the docs chapter — `builder`
 - #51 — R36 depends on the schema: an inline fragment fails only when another relation has the same column name with another type, or a nullable copy of a `NOT NULL` column in `update()`; the docs schema has neither, so the page states it in prose — `builder`
+- #67 — A type-level opt-in by declaration merging is tested in a program of its own (`test/types-opt-in`), compiled by plain `tsc`: the declaration merges into every file of a program — `builder`
+- #67 — Every type a public shortcut returns is nameable from `zapatos/db`: a brand on an unexported `unique symbol` breaks declaration emit (TS4023); a probe with `declaration: true` catches it — `branch-reviewer`
+- #67 — An option that changes only the result transform is read at `.run()`; one that changes the SQL, at the call — `branch-reviewer`
+- #67 — Guard for `any` (`unknown extends R`) before reading a type-only brand, and test a brand at depth 1 and 2: one round fixed depth 1 and broke depth 2 — `branch-reviewer`
+- #67 — A conditional on a non-generic flag in a generic signature's return type changes how every program displays it; choose the signature interface through `extends` instead — `builder`
+- #67 — Run a review's « Expected » fix before applying it: one would have mistyped `select()` — `builder`
+- #67 — A docs sentence about the value a nested query returns comes from a run, not from its type: `extras` was typed, Postgres refuses it bare (#262) — `branch-reviewer`
+- #67 — Pass `TEST_DATABASE_URL` to a child process through the environment, never as an argument: an `execFileSync` error printed it — `builder`
+- #48 — Escape the whole string that goes into a JSDoc, template text included: `**` before a name starting with `/` makes a `*/` that escaping the name alone misses — `branch-reviewer`
+- #48 — Replay every example a CHANGELOG line gives, not only its main claim: the `\u` and octal wordings were reasoned, then found wrong — `branch-reviewer`
+- #48 — « Of the output that parsed under 6.6.1, only X changes » is replayed per name on a scalar column, an array column and an unused type, `skipLibCheck` both ways, TS 5.9 and 7: three rounds came back to it (TS2457 on `string`, `keyof[]`, `unique[]`) — `branch-reviewer`
+- #48 — « Parses » and « compiles » are two checks: `syntaxErrors()` (transpile) sees parse errors only; checker errors in a `.d.ts` (TS1005, TS2457) hide under `skipLibCheck`, and tsc reports none while a file of the program fails to parse — `builder`
+- #48 — A map keyed by a Postgres name is `Object.create(null)` or a `Map`: a table named `constructor` or `toString` crashed the collision note (and see #399) — `builder`
+- #168 — An option that drops keys from a caller's object filters the key list and leaves the object alone: rebuilding it (`Object.fromEntries(Object.entries(x))`) loses getters, inherited and non-enumerable keys that `x[k]` still reads — `branch-reviewer`
+- #168 — A replay grid also runs once on the pre-fix commit, to show it finds the defect (144 differences on the old head, 0 after) — `branch-reviewer`
+- #168 — Before planning a step that changes an opt-in, search its tests: two existing tests had frozen the very behaviour the decision changed — `builder`
+- #167 — A new refusal on a path where 6.6.1 rejected from `.run()` throws as the query compiles (a fragment whose `compile` throws, as #269 does), frozen through `.run()` with a `query` spy: thrown at the call, a `.catch()` chained on `.run()` loses it — `branch-reviewer`
+- #167 — A sentence saying when an error happens matches how its test asserts: « the call throws » for `expect(() => fn(…))`, « throws while compiling, so `.run()` rejects » for `.compile()` or `.run()` — `branch-reviewer`
+- #167 — When a row of a docs table moves to another group, reread the paragraph above it: `transaction.md` still said every shortcut throws from the call — `branch-reviewer`
+- #167 — A red commit typechecks too: Vitest runs a call past an overload's arity; write it `(fn as any)(…)` — `builder`
 - #252 — A list of the routes that compile a Whereable is checked against every interpolation of a filter in `shortcuts.ts`, not only `where`: `having` was missing — `builder`
 - #252 — A « 6.6.1 typed X » claim is checked by `tsc` against the `zapatos@6.6.1` tarball's `dist/db/*.d.ts` through `paths`, with `NODE_PATH` on the root `node_modules` — `builder`
 - #399 — Swapping `{}` for `Object.create(null)` also changes every inherited lookup that object meets later (`a[x] ?? a['*'][x]`): where only an own `__proto__` key is the goal, `Object.fromEntries` keeps the prototype — `branch-reviewer`
@@ -148,6 +168,9 @@ Candidates for a check, a rule or a skill line.
 - #399 — A map moved to `Object.create(null)` can escape through an exported function (`enumDataForSchema()`): check what each export returns — `builder`
 - #399 — A red test that pollutes `Object.prototype` breaks later tests in its worker: clean up with a helper such as `globalsAddedBy` — `builder`
 - #399 — `{ __proto__: x }` in a JS literal sets the prototype; a `__proto__` key in a test needs `['__proto__']` or `JSON.parse` — `builder`
+- #253 — An issue cites a test by its name, not its `file:line`: the line taken from Minors kept had moved by the time the step ran — `builder`
+- #253 — A guard shared by several routes gets a route-specific mutant: removing the shared guard turns every entry red and cannot show the new one is needed — `builder`
+- #253 — `branch-reviewer` cannot load the user skill `branch-review` (`disable-model-invocation`), so it reviews from its brief: the agent and the skill disagree — orchestrator
 
 ## Minors kept
 
@@ -178,3 +201,12 @@ Minor review defects, taken up by the end-of-chapter review.
 - #46 — `src/generate/tsOutput.ts:100`: the writer's `/^/gm` indentation puts spaces after a U+2028/U+2029 inside a comment (6.6.1 too); frozen as is by `column comments › prefixes every line whatever its line break` — `branch-reviewer`
 - #368 — `AGENTS.md:46`: the architecture map still says `cli.ts` reads `zapatosconfig.json`; that work is now in `cliConfig.ts` and covers both files — `branch-reviewer`
 - #368 — `website/generator.md:69`: « the options of `zapatosconfig.json` », where the lede now says « its config file » — `branch-reviewer`
+- #67 — `src/db/shortcuts.ts:568`: `PassingThroughFragment` is unexported, so a declared library's generic-over-`L` wrapper inlines the conditional in its `.d.ts` (1758 characters against 468); valid — `branch-reviewer`
+- #67 — `website/select.md:386-387`: a mixed-union lateral (`flag ? db.min(…) : db.count(…)`) in a `selectOne()` nested in turn is still typed as at top level, as before — `branch-reviewer`
+- #48 — `src/generate/tables.ts:294`, `:305`, `:315`: the `stringLiteral` escapes of `Schema`, `AllSchemas` and a `"` in a `*ForTable` key are untested; undoing them leaves the suite green — `branch-reviewer`
+- #48 — `src/generate/enumOrder.ts:11`: « like enumLabel.ts » names a file #395 deleted (`quote.ts`) — `branch-reviewer`
+- #48 — `src/generate/quote.ts:21`: `refusedAsNamespace` / `refusedAsType` match TS 5.9.3 and 7.0.2 but are tested on three words; a table-driven test against the compiler would catch a keyword a later TypeScript adds — `branch-reviewer`
+- #48 — `website/generator.md:343`: the `warningListener` section does not list the collision note; `:141` leaves out `keyof`/`infer`/`readonly`/`unique` — `branch-reviewer`
+- #48 — `src/generate/quote.ts:36`: Node's `\p{ID_Start}` follows Unicode 17, newer than TypeScript's tables: a Unicode 16 letter is kept and still fails (TS1127), no regression; a JSDoc line — `branch-reviewer`
+- #168 — `website/insert.md:307`, `CHANGELOG.md:19`: « `DO NOTHING` » without what it does to the result (one row: `undefined` on conflict; an array leaves that row out) — `branch-reviewer`
+- #168 — `src/db/shortcuts.ts:369`, `:376`: `specifiedUpdateColumns as string[] ?? colNames` written twice — `branch-reviewer`

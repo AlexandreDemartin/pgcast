@@ -158,6 +158,16 @@ describe('selectOne, selectExactlyOne, count', () => {
     expectTypeOf(db.avg('accounts', db.all, { columns: undefined })).toEqualTypeOf<db.SQLFragment<number>>();
     expectTypeOf(db.min).toEqualTypeOf<db.NumericAggregateSignatures>();
   });
+
+  test('without aggregatesTypedByColumn declared in ConfigTypes, min and max are a number, as in 6.6.1, nested too', () => {
+    expectTypeOf<db.ConfigTypes>().toEqualTypeOf<{}>();
+    expectTypeOf(db.min('events', db.all, { columns: ['occurred_on'] }).run(pool)).resolves.toEqualTypeOf<number>();
+    expectTypeOf(db.max('users', db.all, { columns: ['display_name'] })).toEqualTypeOf<db.SQLFragment<number>>();
+    expectTypeOf(db.sum).toEqualTypeOf<db.NumericAggregateSignatures>();
+    expectTypeOf(db.max).toEqualTypeOf<db.NumericAggregateSignatures>();
+    const q = db.selectOne('users', db.all, { lateral: { first: db.min('events', db.all, { columns: ['occurred_on'] }) } });
+    expectTypeOf<NonNullable<Run<typeof q>>['first']>().toEqualTypeOf<number>();
+  });
 });
 
 describe('insert', () => {
@@ -267,6 +277,26 @@ describe('undefinedMeansMissing', () => {
     void d;
     // @ts-expect-error a boolean, not a string
     db.setConfig({ undefinedMeansMissing: 'yes' });
+  });
+});
+
+describe('transactionRequiresCommit', () => {
+  test('an optional boolean of Config and setConfig', () => {
+    db.setConfig({ transactionRequiresCommit: true });
+    expectTypeOf(db.getConfig().transactionRequiresCommit).toEqualTypeOf<boolean | undefined>();
+    expectTypeOf<db.NewConfig['transactionRequiresCommit']>().toEqualTypeOf<boolean | undefined>();
+    // a Config written for 6.6.1, without the key, still compiles
+    const c: db.Config = {
+      transactionAttemptsMax: 5,
+      transactionRetryDelay: { minMs: 25, maxMs: 250 },
+      castArrayParamsToJson: false,
+      castObjectParamsToJson: false,
+    };
+    // @ts-expect-error a boolean, not a string
+    const d: db.Config = { ...c, transactionRequiresCommit: 'yes' };
+    void d;
+    // @ts-expect-error a boolean, not a string
+    db.setConfig({ transactionRequiresCommit: 'yes' });
   });
 });
 
@@ -450,6 +480,17 @@ describe('truncate', () => {
     // @ts-expect-error 'DROP' is not a TRUNCATE option
     db.truncate('users', 'DROP');
   });
+
+  test('refuses an order Postgres refuses', () => {
+    // @ts-expect-error the identity option comes first
+    db.truncate('users', 'CASCADE', 'RESTART IDENTITY');
+    // @ts-expect-error one identity option at most
+    db.truncate('users', 'RESTART IDENTITY', 'CONTINUE IDENTITY');
+    // @ts-expect-error one foreign key option at most
+    db.truncate('users', 'CASCADE', 'RESTRICT');
+    // @ts-expect-error two options at most
+    db.truncate('users', 'RESTART IDENTITY', 'CASCADE', 'CASCADE');
+  });
 });
 
 // The result types, written out as a test helper writes a fake result: each must equal what .run() resolves to.
@@ -571,5 +612,9 @@ describe('result types', () => {
     expectTypeOf<R>().not.toBeAny();
     // @ts-expect-error not a SQLFragment
     expectTypeOf<db.RunResultForSQLFragment<string>>();
+    // as in 6.6.1: any, an unknown result, and a nested count
+    expectTypeOf<db.RunResultForSQLFragment<any>>().toEqualTypeOf<{} | null>();
+    expectTypeOf<db.RunResultForSQLFragment<db.SQLFragment<unknown>>>().toEqualTypeOf<{} | null>();
+    expectTypeOf<db.RunResultForSQLFragment<ReturnType<typeof db.count>>>().toEqualTypeOf<number>();
   });
 });

@@ -368,7 +368,7 @@ Handling them in an app: [Errors](/handle-errors).
 
 ## Errors pgcast throws before any query
 
-A plain `Error`, with no `code`, before anything is sent. A shortcut throws its own synchronously, from the call itself: `.run()` is never reached, so a `.catch()` chained on it does not get them.
+A plain `Error`, with no `code`, before anything is sent. A shortcut throws its own synchronously, from the call itself, but for `truncate()`'s options in another order and an aggregate's `columns` or `lateral` ([`count()`](/select#count)): `.run()` is never reached, so a `.catch()` chained on it does not get them.
 
 The others are thrown as `.compile()` compiles the query, so `.run()` rejects with them; `transaction()` rejects with its own. Each is listed with what throws it:
 
@@ -384,6 +384,7 @@ The others are thrown as `.compile()` compiles the query, so `.run()` rejects wi
 | `db.self` with no column; `db.parent()` with no parent table, so as an `insert()`, `upsert()` or `update()` value | `.run()` rejects | [`self`](/sql-template#self), [`parent()`](/sql-template#parent) |
 | `count()` and the other aggregates given a `columns` of no column or several, or none at all for `sum()`, `avg()`, `min()` and `max()`; or a single subquery as `lateral`; so a query that nests one | `.run()` rejects | [`count()`](/select#count) |
 | `db.Default`, `db.self`, `db.raw()`, `db.cols()` or `db.vals()` as a filter value; `db.raw()`, `db.cols()` or `db.vals()` as an `insert()`, `upsert()` or `update()` value, or in any `vals({…})` | `.run()` rejects | [Whereable objects](/sql-template#whereable), [Conditions](/conditions), [`insert()`](/insert#insert), [`vals()`](/sql-template#vals) |
+| `truncate()` with its options in another order | `.run()` rejects | [`truncate()`](/insert#truncate) |
 | `transaction()` with another isolation level | its promise rejects | [`transaction()`, Errors](#errors) |
 
 </div>

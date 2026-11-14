@@ -63,7 +63,7 @@ The cost is a few more keys in [`Config`](/runtime-config#Config), and two paths
 Call that `update()` on 6.7 and Node prints, once:
 
 ```txt
-(node:4242) [PGCAST_DEP002] DeprecationWarning: An undefined value in insert(), update() or upsert() is sent as NULL. Set undefinedMeansMissing: true (db.setConfig) to treat it as a missing key instead (DEFAULT in insert(), left out of update() and upsert()); it will be the default in pgcast 7.0.
+(node:4242) [PGCAST_DEP002] DeprecationWarning: An undefined value in insert(), update() or upsert() is sent as NULL, or, in upsert() updateValues, set from EXCLUDED. Set undefinedMeansMissing: true (db.setConfig) to treat it as a missing key instead (DEFAULT in insert(), left out of update() and upsert()); it will be the default in pgcast 7.0.
 (Use `node --trace-deprecation ...` to show where the warning was created)
 ```
 
@@ -75,13 +75,13 @@ The warning comes when you call the shortcut, before `.run()`, and only if the o
 
 It comes once per process for each code, so it tells you that the old path ran, not where nor how often. `node --trace-deprecation` adds the stack, down to the line that called `update()`; for the rest, turn the option on and let your tests find what changes.
 
-`PGCAST_DEP003` comes later: once `transaction()` has sent `COMMIT` and Postgres has answered `ROLLBACK`, just before the promise resolves.
+`PGCAST_DEP003` comes later: once `transaction()` has sent `COMMIT` and Postgres has answered `ROLLBACK`, just before the promise resolves. So does `PGCAST_DEP004`, once `.run()` has the result of `sum()`, `avg()`, `min()` or `max()`: only then can it see whether `Number()` changes it.
 
 Where `undefined` meant "clear it", `null` says so under either setting, and never warns.
 
 ## 7.0 and 8.0
 
-7.0 turns on by default the opt-ins that decision 003 lists: `upsertRequiresSameKeys`, `undefinedMeansMissing`, `transactionRequiresCommit` and those 6.7 still brings, except `selectExactlyOneChecksForSecondRow`, which stays off.
+7.0 turns on by default the opt-ins that decision 003 lists: `upsertRequiresSameKeys`, `undefinedMeansMissing`, `transactionRequiresCommit`, `aggregatesTypedByColumn` and those 6.7 still brings, except `selectExactlyOneChecksForSecondRow`, which stays off.
 
 Decision 003 makes that the whole of 7.0's break, and the warnings announce it, so a project that has turned every option on, and sees no `PGCAST_DEP` warning nor generator note, has nothing to change. The old behaviours go in 8.0.
 
@@ -95,5 +95,5 @@ Their warnings are notes through [`warningListener`](/generator#generate.warning
 
 ## Further reading
 
-- The entries this page talks about: [`Config.upsertRequiresSameKeys`](/runtime-config#Config.upsertRequiresSameKeys), [`Config.undefinedMeansMissing`](/runtime-config#Config.undefinedMeansMissing), [`Config.transactionRequiresCommit`](/runtime-config#Config.transactionRequiresCommit), [`Config.selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow), [Opt-ins and warnings](/runtime-config#opt-ins-and-warnings), [`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas), [`enumOrder`](/generator#generate.enumOrder), [An `undefined` value](/insert#undefined-values), [`conditions.not()`](/conditions#conditions.not), [`conditions.isNotIn()`](/conditions#conditions.isNotIn), [`selectExactlyOne()`](/select#selectExactlyOne), [`SchemaVersionCanary`](/runtime-config#SchemaVersionCanary).
+- The entries this page talks about: [`Config.upsertRequiresSameKeys`](/runtime-config#Config.upsertRequiresSameKeys), [`Config.undefinedMeansMissing`](/runtime-config#Config.undefinedMeansMissing), [`Config.transactionRequiresCommit`](/runtime-config#Config.transactionRequiresCommit), [`Config.selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow), [`Config.aggregatesTypedByColumn`](/runtime-config#Config.aggregatesTypedByColumn), [Opt-ins and warnings](/runtime-config#opt-ins-and-warnings), [`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas), [`enumOrder`](/generator#generate.enumOrder), [An `undefined` value](/insert#undefined-values), [`conditions.not()`](/conditions#conditions.not), [`conditions.isNotIn()`](/conditions#conditions.isNotIn), [`selectExactlyOne()`](/select#selectExactlyOne), [`SchemaVersionCanary`](/runtime-config#SchemaVersionCanary).
 - The decision behind it: [decision 003](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/003-fixes-and-deprecation.md), and every change by version in the [changelog](/changelog).
