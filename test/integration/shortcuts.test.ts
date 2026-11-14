@@ -673,6 +673,55 @@ describe('select', () => {
     }))).toEqual({ display_name: 'Ada', reports: 2, mail: 'Ada@Example.com' });
   });
 
+  describe('a shortcut as an extras value, a scalar subquery (#262)', () => {
+    // 6.6.1 wrote it bare, `jsonb_build_object($2::text, SELECT …)`, which Postgres refuses (42601)
+    const
+      owner = sql`${'owner_id'} = ${'users'}.${'id'}`,
+      ordered = { columns: ['balance'], order: { by: 'balance', direction: 'ASC' } } as const,
+      byName = { columns: ['display_name'], order: { by: 'display_name', direction: 'ASC' } } as const;
+
+    it.each<[string, () => db.SQLFragment<any>, unknown[]]>([
+      ['select', () => db.select('accounts', owner, ordered), [[{ balance: 20 }, { balance: 1500.5 }], [{ balance: 0 }], []]],
+      ['selectOne', () => db.selectOne('accounts', owner, ordered), [{ balance: 20 }, { balance: 0 }, null]],
+      ['selectExactlyOne', () => db.selectExactlyOne('accounts', owner, ordered), [{ balance: 20 }, { balance: 0 }, null]],
+      ['count', () => db.count('accounts', owner), [2, 1, 0]],
+      ['sum', () => db.sum('accounts', owner, { columns: ['balance'] }), [1520.5, 0, null]],
+      ['avg', () => db.avg('accounts', owner, { columns: ['ratio'] }), [0.5, 1.25, null]],
+      ['min', () => db.min('accounts', owner, { columns: ['balance'] }), [20, 0, null]],
+      ['max', () => db.max('accounts', owner, { columns: ['balance'] }), [1500.5, 0, null]],
+    ])('%s: its result as JSON, null where its query gives no row', async (_name, shortcut, expected) => {
+      const rows = await run(db.select('users', all, { ...byName, extras: { x: shortcut() } }));
+      expect(rows).toEqual([{ display_name: 'Ada', x: expected[0] }, { display_name: 'Bob', x: expected[1] }, { display_name: 'Cyd', x: expected[2] }]);
+    });
+
+    it('nested in the extras of a shortcut that is itself an extra', async () => {
+      expect(await run(db.selectOne('users', { id: 1 }, {
+        columns: ['display_name'],
+        extras: { first: db.selectOne('accounts', owner, { ...ordered, extras: { all: db.count('accounts', all) } }) },
+      }))).toEqual({ display_name: 'Ada', first: { balance: 20, all: 3 } });
+    });
+
+    it('in the extras of a write', async () => {
+      expect(await run(db.update('users', { mood: 'ok' }, { id: 1 }, { returning: ['id'], extras: { n: db.count('accounts', owner) } })))
+        .toEqual([{ id: 1, n: 2 }]);
+    });
+
+    it('unchanged: a column, a sql fragment, a query in parentheses, a shortcut parenthesised in a sql fragment', async () => {
+      expect(await run(db.selectOne('users', { id: 1 }, {
+        columns: ['id'],
+        extras: {
+          mail: 'email',
+          up: sql`upper(${'display_name'})`,
+          sub: sql`(SELECT count(*) FROM ${'accounts'} WHERE ${owner})`,
+          wrapped: sql`(${db.count('accounts', owner)})`,
+        },
+      }))).toEqual({ id: 1, mail: 'Ada@Example.com', up: 'ADA', sub: 2, wrapped: 2 });
+      // a shortcut in a sql fragment is the caller's SQL, written as given: bare, Postgres refuses it, as in 6.6.1
+      expect(await fails(db.selectOne('users', { id: 1 }, { extras: { bare: sql`${db.count('accounts', owner)}` } })))
+        .toEqual({ code: '42601', message: 'syntax error at or near "SELECT"' });
+    });
+  });
+
   it('groupBy and having', async () => {
     expect(await run(db.select('accounts', all, {
       columns: ['owner_id'], extras: { n: sql`count(*)` }, groupBy: 'owner_id', having: sql`count(*) > ${param(1)}`,
@@ -898,6 +947,26 @@ describe('count, sum, avg, min, max', () => {
     expect(await run(query())).toEqual(expected);
   });
 
+  it('as an extra, min / max come back as JSON, NULL as null, option or not (#262)', async () => {
+    // the types of test/types-opt-in: DateString, string and number (a numeric), or null
+    const query = () => db.select('users', all, {
+      columns: ['display_name'], order: { by: 'display_name', direction: 'ASC' },
+      extras: {
+        first: db.min('events', all, { columns: ['occurred_on'] }),
+        name: db.max('users', all, { columns: ['display_name'] }),
+        top: db.max('accounts', sql`${'owner_id'} = ${'users'}.${'id'}`, { columns: ['balance'] }),
+      },
+    });
+    const expected = [
+      { display_name: 'Ada', first: '2025-06-01', name: 'Cyd', top: 1500.5 },
+      { display_name: 'Bob', first: '2025-06-01', name: 'Cyd', top: 0 },
+      { display_name: 'Cyd', first: '2025-06-01', name: 'Cyd', top: null },
+    ];
+    expect(await run(query())).toEqual(expected);
+    db.setConfig({ aggregatesTypedByColumn: true });
+    expect(await run(query())).toEqual(expected);
+  });
+
   it('passed through a single lateral, min / max come back as pg parses them from selectOne / selectExactlyOne, as JSON from select', async () => {
     // select() wraps its rows in jsonb_agg(), selectOne() and selectExactlyOne() hand the passed-through column over as it is
     db.setConfig({ aggregatesTypedByColumn: true });
@@ -907,8 +976,19 @@ describe('count, sum, avg, min, max', () => {
     expect(await run(db.select('users', all, { lateral: earliest }))).toEqual(['2025-06-01', '2025-06-01', '2025-06-01']);
   });
 
+  it('passed through a selectOne / selectExactlyOne as an extra, min / max come back as JSON (#262)', async () => {
+    db.setConfig({ aggregatesTypedByColumn: true });
+    const earliest = db.min('events', all, { columns: ['occurred_on'] }), top = db.max('accounts', all, { columns: ['balance'] });
+    expect(await run(db.select('users', all, {
+      columns: ['display_name'], order: { by: 'display_name', direction: 'ASC' }, limit: 1,
+      extras: {
+        firstAsExtra: db.selectExactlyOne('users', all, { lateral: earliest }),
+        topAsExtra: db.selectOne('users', all, { lateral: top }),
+      },
+    }))).toEqual([{ display_name: 'Ada', firstAsExtra: '2025-06-01', topAsExtra: 1500.5 }]);
+  });
+
   it('passed through a selectOne / selectExactlyOne nested in a lateral, min / max come back as JSON', async () => {
-    // as an extra, the same query is a bare subquery in jsonb_build_object(), which Postgres refuses (42601)
     db.setConfig({ aggregatesTypedByColumn: true });
     const earliest = db.min('events', all, { columns: ['occurred_on'] }), top = db.max('accounts', all, { columns: ['balance'] });
     expect(await run(db.select('users', all, {
