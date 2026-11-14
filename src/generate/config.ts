@@ -33,6 +33,8 @@ export interface OptionalConfig {
   enumOrder?: 'alphabetical' | 'declared';  // the order of an enum's labels: 'declared' is Postgres's, by which it sorts and compares them
   // optional too; read it with ?? 'zapatos'
   moduleNames?: 'zapatos' | 'pgcast';  // the folder written, and the module names it declares and imports: pgcast/schema, pgcast/db…
+  // optional too; read it with ?? false, deprecated: true in 7.0; the CLI sets false
+  rejectOnQueryError?: boolean;  // a failed query, the connection included, rejects generate() with its error, rather than exit
 }
 
 interface SchemaRules {

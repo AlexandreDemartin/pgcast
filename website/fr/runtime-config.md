@@ -1,5 +1,5 @@
 ---
-english: 1b0308d9312a
+english: ac1f60ddaf46
 ---
 
 # Configuration
@@ -114,7 +114,7 @@ transactionAttemptsMax: number  // default: 5
 
 Combien de fois [`transaction()`](/fr/transaction#transaction) exécute son callback. Après un échec de sérialisation (`40001`) ou un deadlock (`40P01`), elle annule la transaction (`ROLLBACK`) et exécute de nouveau le callback, jusqu’à ce que ce nombre de tentatives ait échoué ; elle lève alors la dernière erreur. Sur toute autre erreur, elle annule la transaction et lève l’erreur aussitôt.
 
-- `1`, `0` ou moins : une tentative, aucun retry. Avec `0`, le message dit « <span lang="en">… on attempt 1 of 0, giving up</span> » ([#179](https://github.com/AlexandreDemartin/pgcast/issues/179)).
+- `1`, `0`, une valeur négative ou `NaN` : une tentative, aucun retry, et le message dit « <span lang="en">… on attempt 1 of 1, giving up</span> ». Une fraction est arrondie à l’entier supérieur : `2.5` donne trois tentatives.
 - Lue quand `transaction()` démarre, donc un changement vaut pour la transaction suivante, pas pour celle en cours.
 - Comment écrire un callback qui peut s’exécuter deux fois : [Retries](/fr/retries).
 
@@ -387,7 +387,7 @@ Un comportement de Zapatos 6.6.1 sur lequel du code peut compter, mais que pgcas
 
 Un opt-in n’a pas d’avertissement et ne devient pas le comportement par défaut en 7.0 : [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow), puisque la lecture de `selectExactlyOne()` par la 6.6.1, au moins une ligne, est une lecture que Zapatos documente.
 
-Le générateur a les siens : [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas) et [`enumOrder`](/fr/generator#generate.enumOrder), dont les anciens chemins donnent des notes via [`warningListener`](/fr/generator#generate.warningListener), une fois par exécution, plutôt qu’un `DeprecationWarning` ; ils deviendront eux aussi le comportement par défaut en 7.0.
+Le générateur a les siens : [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas), [`enumOrder`](/fr/generator#generate.enumOrder) et [`rejectOnQueryError`](/fr/generator#generate.rejectOnQueryError), dont les anciens chemins donnent des notes via [`warningListener`](/fr/generator#generate.warningListener), une fois par exécution, plutôt qu’un `DeprecationWarning` ; ils deviendront eux aussi le comportement par défaut en 7.0.
 
 Chaque avertissement est un `DeprecationWarning` de Node.js, émis une fois par processus pour chaque code, quand le raccourci est appelé (`PGCAST_DEP003` : quand `transaction()` se résout ; `PGCAST_DEP004` : quand `.run()` reçoit le résultat ; `PGCAST_DEP005` : quand `transaction()` est appelée, avant son `START TRANSACTION`), et seulement quand l’ancien comportement est utilisé. Son message nomme l’option. Node l’affiche sur `stderr` :
 

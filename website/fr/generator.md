@@ -1,5 +1,5 @@
 ---
-english: 6f356c8fe7e6
+english: 5e07b2786837
 ---
 
 # Générateur
@@ -50,7 +50,7 @@ Puis elle se termine par la cause :
 | JSON invalide | le message de `JSON.parse`, qui dépend de l’entrée et de Node : sur Node 22, `Unexpected end of JSON input` pour un fichier vide, `No number after minus sign in JSON at position 1 (line 1 column 2)` pour `--help`, `Expected double-quoted property name in JSON at position 15 (line 1 column 16)` pour une virgule finale |
 | une variable n’est pas définie | `Environment variable 'DATABASE_URL' is not set` |
 
-Une requête qui échoue, connexion comprise, l’arrête aussi avec le code 1, comme le dit [`generate()`](#generate).
+Une requête qui échoue, connexion comprise, l’arrête avec le code 1, après `*** error <n> ***` et l’erreur, comme dans Zapatos 6.6.1 : la CLI met [`rejectOnQueryError`](#generate.rejectOnQueryError) à `false` par-dessus le fichier et l’argument.
 
 ### Variables d’environnement {#environment-variables}
 
@@ -85,7 +85,7 @@ await generate({
 
 - Il ouvre son propre `pg.Pool` sur `config.db`, et le ferme avant de se résoudre.
 - Il n’envoie que des `SELECT`, sur `information_schema` et `pg_catalog` : un pour les relations de chaque schéma, un pour ses enums, puis deux par relation, ses colonnes et ses index uniques, et un pour les enums de chaque autre schéma d’où vient le type d’une colonne (`pg_catalog` compris).
-- Une requête qui échoue, connexion comprise, affiche `*** error <n> ***` et l’erreur avec `console.log`, puis arrête le processus avec `process.exit(1)`, comme dans Zapatos 6.6.1 ([#183](https://github.com/AlexandreDemartin/pgcast/issues/183)). Quand une requête échoue, la promesse ne se résout jamais et n’est jamais rejetée : un `try`/`catch` autour ne s’exécute donc pas.
+- Une requête qui échoue, connexion comprise, affiche `*** error <n> ***` et l’erreur avec `console.log`, puis arrête le processus avec `process.exit(1)`, comme dans Zapatos 6.6.1. La promesse ne se résout jamais et n’est jamais rejetée : un `try`/`catch` autour ne s’exécute donc pas. Avec [`rejectOnQueryError`](#generate.rejectOnQueryError), elle est rejetée avec cette erreur.
 - Sur les autres erreurs, la promesse est rejetée : une écriture qui échoue (`ENOTDIR: not a directory, mkdir 'afile/zapatos'` quand `outDir` est un fichier), une [règle](#generate.schemas) mal formée.
 - À l’exécution, une clé qu’il ne connaît pas est ignorée : un ancien `srcMode`, un `outdir` mal orthographié. En TypeScript, un littéral objet qui en contient une ne compile pas (TS2353, ou TS2561 avec une suggestion pour un nom proche comme `outdir`).
 - `zapatos/generate` exporte aussi `Config` et les fonctions qui composent `generate()` (`tsForConfig()`, `definitionForRelationInSchema()` et d’autres), non documentées ici.
@@ -108,6 +108,7 @@ Toutes les options sont facultatives. Une option donnée remplace entièrement s
 | [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas) | `false` | le type d’un enum d’un autre schéma |
 | [`enumOrder`](#generate.enumOrder) | `"alphabetical"` | l’ordre des labels d’un enum |
 | [`moduleNames`](#generate.moduleNames) | `"zapatos"` | les noms de modules que déclarent et importent les fichiers, et leur dossier |
+| [`rejectOnQueryError`](#generate.rejectOnQueryError) | aucune : arrêt, avec une note | si, quand une requête échoue, la promesse est rejetée ou le processus s’arrête |
 | [`progressListener`](#generate.progressListener) | `false` | où chaque étape est signalée |
 | [`warningListener`](#generate.warningListener) | `true` | où vont les avertissements |
 | [`debugListener`](#generate.debugListener) | `false` | où vont chaque requête et son résultat |
@@ -223,6 +224,7 @@ Son SQL est celui de [`select()`](/fr/select#select), avec le nom entre guilleme
 - Les noms ne sont pas qualifiés par schéma : l’espace de noms `c` est commun à tous les schémas, donc un domaine `notes` dans `public` et un autre dans `archive` sont tous deux `PgNotes`, avec un seul placeholder pour les deux.
   - Le générateur le signale via [`warningListener`](#generate.warningListener), comme pour deux noms qu’une transformation réduit à un seul (`seat-label` et `seat_label`), et garde le nom, dont dépend un placeholder déjà modifié.
 - Des noms qui ne diffèrent que par la casse, comme `PgSeat_label` et `PgSEAT_LABEL` pour les domaines `seat_label` et `"SEAT_LABEL"`, ont deux placeholders qui ne forment qu’un seul fichier sur un système de fichiers insensible à la casse, celui par défaut sur macOS et Windows : celui écrit en premier ne déclare que son propre nom, et les autres ne sont jamais déclarés. Le générateur le signale aussi, où qu’il tourne, et écrit les mêmes fichiers.
+- Un nom dont le placeholder est `index.d.ts`, comme `index` pour un domaine `index` avec `"my_type"`, ou `Index` sur un système de fichiers insensible à la casse, partage son fichier avec [`custom/index.d.ts`](#the-files-it-writes), que le générateur écrit par-dessus à chaque exécution : ce nom n’est jamais déclaré. Le générateur le signale aussi, et écrit les mêmes fichiers.
 
 ### `schemaJSDoc` {#generate.schemaJSDoc}
 
@@ -335,6 +337,27 @@ import type * as s from 'pgcast/schema';
 - Une autre valeur arrête le générateur avant toute requête, et n’écrit rien : `moduleNames must be 'zapatos' (the default) or 'pgcast', not 'pgcats'`. En TypeScript, elle ne compile pas (TS2322, ou TS2820 avec une suggestion pour un nom proche comme `"pgcats"`).
 - Le schéma de l’autre mode dans `outDir`, comme un dossier `zapatos/` resté d’avant le changement, est signalé via [`warningListener`](#generate.warningListener). Avec `"pgcast"`, un `zapatos/` périmé que `tsconfig.json` inclut déclare aussi `zapatos/schema`, que TypeScript fusionne : il laisse passer un nombre pour une colonne `text` sous `skipLibCheck`, et échoue avec TS2307 sans `skipLibCheck`. Avec `"zapatos"`, un `pgcast/` périmé n’assouplit rien, et son import de `pgcast/db` échoue avec TS2307 sans `skipLibCheck`. Supprimez le dossier périmé une fois que les placeholders que vous y avez modifiés sont déplacés dans l’autre, leur `declare module 'zapatos/custom'` renommé en `'pgcast/custom'`, ou l’inverse.
 
+### `rejectOnQueryError` {#generate.rejectOnQueryError}
+
+`boolean`, ou omis ; un opt-in. Ce que fait une requête qui échoue : une connexion refusée, un mauvais mot de passe, une requête que Postgres refuse.
+
+- Omis, ou `null` : comme dans Zapatos 6.6.1, le générateur affiche `*** error <n> ***` et l’erreur avec `console.log`, puis arrête le processus avec `process.exit(1)` ; entre les deux, il signale l’option via [`warningListener`](#generate.warningListener). À partir de la 7.0, l’option omise vaut `true` ([Versions](/fr/versions)).
+- `false` : le même arrêt, sans note. Cette valeur reste en 7.0 et en 8.0 : l’arrêt est le propre chemin de [la CLI](#cli), qui met `false` par-dessus son fichier de configuration et son argument.
+- `true` : la promesse de `generate()` est rejetée avec cette erreur, telle que `pg` la donne, et rien n’est affiché :
+
+```ts twoslash
+import { generate } from 'zapatos/generate';
+// ---cut---
+try {
+  await generate({ db: { connectionString: process.env.DATABASE_URL }, outDir: './src', rejectOnQueryError: true });
+} catch (err) {
+  console.error('types not regenerated:', err);  // ECONNREFUSED, or a pg DatabaseError
+}
+```
+
+- La promesse est rejetée avant toute écriture : les fichiers de la dernière exécution restent tels quels.
+- Un `warningListener` qui lève une erreur en recevant la note n’empêche pas l’arrêt.
+
 ### `progressListener` {#generate.progressListener}
 
 `boolean`, ou dans `generate()` une fonction `(s: string) => void` ; par défaut `false`. `true` affiche chaque étape avec `console.log` ; une fonction reçoit chaque ligne.
@@ -356,6 +379,8 @@ Writing custom types file: src/zapatos/custom/index.d.ts
   - une fois par exécution pour chaque nom que partagent deux types Postgres ([`customTypesTransform`](#generate.customTypesTransform)) ; quand leurs noms diffèrent, il ajoute qu’une fonction `customTypesTransform` peut les distinguer ;
 - `Note: custom types "public"."SEAT_LABEL" (PgSEAT_LABEL) and "public"."seat_label" (PgSeat_label) have TypeScript names that differ only in case: on a case-insensitive file system, the default on macOS and Windows, PgSEAT_LABEL.d.ts and PgSeat_label.d.ts are one placeholder file in src/zapatos/custom, which declares only one of those names. To type them apart, rename one of them in the database, or give customTypesTransform a function that keeps their names apart.`
   - une fois par exécution pour des noms qui ne diffèrent que par la casse, quel que soit le système de fichiers, avant la note ci-dessus pour chacun de ces noms que partagent deux types Postgres ;
+- `Note: custom type "public"."index" (index) has the placeholder file index.d.ts in src/zapatos/custom, the file of the custom types' index: the generator writes the index over it on every run, so index is never declared. To declare it, rename it in the database, or give customTypesTransform a function that names it otherwise.`
+  - une fois par exécution pour les noms dont le placeholder est `custom/index.d.ts` : `index` et, sur un système de fichiers insensible à la casse, un nom qui n’en diffère que par la casse (`Index`, `INDEX`), après la note ci-dessus pour ces noms ;
 - `Note: the include entry "Films" of schema "public" matches no relation there, so it generates nothing. Check its spelling and case, that the relation is in schema "public", and that the database role has a privilege on it: include names tables, views, materialised views and foreign tables.`
   - une fois par exécution pour chaque entrée d’une liste [`include`](#generate.schemas) que son schéma n’a pas ;
 - `Note: the schemas rule of "public" has no exclude, so it takes "exclude": [], as the default rule does. Write the key in the rule to silence this note.`
@@ -373,6 +398,8 @@ Writing custom types file: src/zapatos/custom/index.d.ts
   - de même, avec `"zapatos"` et un `pgcast/schema.d.ts` ;
 - `Note: pgcastconfig.json and zapatosconfig.json are both here, and only pgcastconfig.json is read. Move any option you still need from zapatosconfig.json into pgcastconfig.json, then delete zapatosconfig.json.`
   - depuis [la CLI](#cli), avant de générer, quand le dossier où elle tourne contient les deux fichiers ;
+- `Note: a query failed, so generate() ends the process with process.exit(1), and its promise never settles (PGCAST_DEP006). Set rejectOnQueryError: true to reject with the error instead; it will be the default in pgcast 7.0.`
+  - sans [`rejectOnQueryError`](#generate.rejectOnQueryError), quand une requête échoue, après l’erreur et juste avant l’arrêt ;
 - l’[avertissement sur l’ancienne arborescence](#the-old-layout-warning).
 
 ### `debugListener` {#generate.debugListener}

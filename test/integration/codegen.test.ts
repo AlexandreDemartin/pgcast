@@ -7,7 +7,8 @@
 //     test/generated/, which `npm run typecheck` compiles (test/generated/tsconfig.json).
 // Update after an intended change: `npx vitest run -u test/integration/codegen.test.ts`.
 // -u never deletes a file: a stale snapshot is removed by hand (the orphan test names it).
-// tsForConfig() calls process.exit(1) on any SQL error: no test here may cause one.
+// Without rejectOnQueryError, tsForConfig() calls process.exit(1) on a failed query: a test that causes one
+// mocks process.exit (§ generate() on a failed query).
 
 import { randomBytes } from 'node:crypto';
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -1073,6 +1074,12 @@ describe('custom types that share a placeholder name', () => {
     CREATE DOMAIN collide_a."CODE" AS boolean;
     CREATE TABLE collide_a.cased (a collide_a."Code", b collide_a.code, d collide_a."CODE");
     CREATE TABLE collide_a.shouted (d collide_a."CODE");
+    CREATE DOMAIN collide_a.index AS integer;
+    CREATE DOMAIN collide_a."Index" AS integer;
+    CREATE DOMAIN collide_b."INDEX" AS integer;
+    CREATE TABLE collide_a.indexed (i collide_a.index);
+    CREATE TABLE collide_a.indexed_title (i collide_a."Index");
+    CREATE TABLE collide_b.indexed_upper (i collide_b."INDEX");
   `));
   afterAll(() => t.pool.query('DROP SCHEMA collide_a, collide_b CASCADE'));
 
@@ -1157,6 +1164,54 @@ describe('custom types that share a placeholder name', () => {
       'Windows, CODE.ts, Code.ts and code.ts are one placeholder file in src/zapatos/custom, which declares only one of ' +
       'those names. To type them apart, rename one of them in the database, ' +
       'or give customTypesTransform a function that keeps their names apart.',
+    ]);
+  });
+
+  it("warns for a placeholder named index, which the custom types' index file writes over", async () => {
+    const note = (outDir: string, name: string) =>
+      `Note: custom type "collide_a"."index" (${name}) has the placeholder file index.d.ts in ${outDir}/custom, ` +
+      `the file of the custom types' index: the generator writes the index over it on every run, ` +
+      `so ${name} is never declared. To declare it, rename it in the database, ` +
+      `or give customTypesTransform a function that names it otherwise.`;
+    expect.soft(await warningsFor({ collide_a: only('indexed') }, { customTypesTransform: 'my_type' }))
+      .toEqual([note('src/zapatos', 'index')]);
+    expect.soft(await warningsFor({ collide_a: only('indexed') }, { customTypesTransform: name => name }))
+      .toEqual([note('src/zapatos', 'index')]);
+    expect.soft(await warningsFor({ collide_a: only('indexed') }, { customTypesTransform: 'my_type', moduleNames: 'pgcast' }))
+      .toEqual([note('src/pgcast', 'index')]);
+    // the default transform gives PgIndex
+    expect.soft(await warningsFor({ collide_a: only('indexed') })).toEqual([]);
+  });
+
+  it('warns for a placeholder named index but for its case, on a case-insensitive file system', async () => {
+    expect(await warningsFor({ collide_a: only('indexed_title'), collide_b: only('indexed_upper') },
+      { customTypesTransform: name => name, outExt: '.ts' })).toEqual([
+      'Note: custom types "collide_a"."Index" (Index) and "collide_b"."INDEX" (INDEX) ' +
+      'have TypeScript names that differ only in case: on a case-insensitive file system, the default on macOS and ' +
+      'Windows, INDEX.ts and Index.ts are one placeholder file in src/zapatos/custom, which declares only one of ' +
+      'those names. To type them apart, rename one of them in the database, ' +
+      'or give customTypesTransform a function that keeps their names apart.',
+      'Note: custom types "collide_a"."Index" (Index) and "collide_b"."INDEX" (INDEX) have the placeholder files ' +
+      'INDEX.ts and Index.ts in src/zapatos/custom, the file of the custom types\' index on a case-insensitive file ' +
+      'system, the default on macOS and Windows: the generator writes the index over it on every run, ' +
+      'so INDEX and Index are never declared there. To declare them, rename them in the database, ' +
+      'or give customTypesTransform a function that names them otherwise.',
+    ]);
+  });
+
+  it('names the case-insensitive file system for the placeholders of index that only it makes one', async () => {
+    expect(await warningsFor({ collide_a: only('indexed', 'indexed_title') }, { customTypesTransform: 'my_type' })).toEqual([
+      'Note: custom types "collide_a"."Index" (Index) and "collide_a"."index" (index) ' +
+      'have TypeScript names that differ only in case: on a case-insensitive file system, the default on macOS and ' +
+      'Windows, Index.d.ts and index.d.ts are one placeholder file in src/zapatos/custom, which declares only one of ' +
+      'those names. To type them apart, rename one of them in the database, ' +
+      'or give customTypesTransform a function that keeps their names apart.',
+      'Note: custom types "collide_a"."Index" (Index) and "collide_a"."index" (index) have the placeholder files ' +
+      'Index.d.ts and index.d.ts in src/zapatos/custom, the file of the custom types\' index (Index.d.ts on a ' +
+      'case-insensitive file system, the default on macOS and Windows): the generator writes the index over it ' +
+      'on every run, so index is never declared, nor Index on such a file system. To declare them, ' +
+      'rename them in the database, ' +
+      'or give customTypesTransform a function that names them otherwise.',
     ]);
   });
 
@@ -1892,6 +1947,106 @@ describe('generate()', () => {
         schemas: { queued: all }, customTypesTransform: () => { throw failed; },
       }, { max: 2, connectionTimeoutMillis: timeout }, timeout * 2);
     }, dropWait);
+
+    describe('on a failed query', () => {
+      // the relations query, the first of a run, sorts on lower(table_name): a lower(name) ahead of pg_catalog in
+      // search_path takes the call, and raises
+      beforeEach(() => withAdminClient(urlForDatabase(server().url, name), c => c.query(`
+        CREATE SCHEMA query_trap;
+        CREATE FUNCTION query_trap.lower(name) RETURNS text LANGUAGE plpgsql
+          AS $$ BEGIN RAISE EXCEPTION 'introspection fails on purpose'; END $$;
+      `)));
+
+      const
+        trapped = () => ({ connectionString: urlForDatabase(server().url, name), options: '-c search_path=query_trap,pg_catalog' }),
+        failures = [
+          ['a refused connection', () => unreachable, { code: 'ECONNREFUSED' }],
+          ['a failing introspection query', trapped, { code: 'P0001', message: 'introspection fails on purpose' }],
+        ] as const,
+        exited = new Error('process.exit() called'),
+        note = 'Note: a query failed, so generate() ends the process with process.exit(1), and its promise never ' +
+          'settles (PGCAST_DEP006). Set rejectOnQueryError: true to reject with the error instead; it will be the ' +
+          'default in pgcast 7.0.';
+
+      /** A run of one schema on `db`, notes printed, process.exit mocked to throw: what it rejected with and did. */
+      const failedRun = async (config: Config, db: pg.ClientConfig) => {
+        const
+          exit = vi.spyOn(process, 'exit').mockImplementation((() => { throw exited; }) as () => never),
+          log = vi.spyOn(console, 'log').mockImplementation(() => undefined),
+          unhandled: unknown[] = [],
+          onUnhandled = (e: unknown) => void unhandled.push(e);
+        process.on('unhandledRejection', onUnhandled);
+        try {
+          const rejection = await generate({
+            ...quiet, warningListener: true, schemas: { public: only('users') }, outDir, ...config, db,
+          }).then(() => new Error('resolved'), (e: unknown) => e);
+          await new Promise(resolve => setTimeout(resolve, 0));
+          return { rejection, exits: exit.mock.calls, printed: log.mock.calls, unhandled, written: files(outDir) };
+        } finally {
+          process.off('unhandledRejection', onUnhandled);
+          exit.mockRestore();
+          log.mockRestore();
+        }
+      };
+
+      it.each(failures)('rejects with the error of %s with rejectOnQueryError: no exit, no output, nothing written', async (_, db, error) => {
+        // two schemas: the queries of the other are in flight when the first fails
+        const run = await failedRun({ ...main, rejectOnQueryError: true }, db());
+        expect(run.rejection).toMatchObject(error);
+        expect(run).toMatchObject({ exits: [], printed: [], unhandled: [], written: [] });
+        if (db === trapped) {
+          expect(run.rejection).toBeInstanceOf(pg.DatabaseError);
+          await withAdminClient(server().url, c => c.query(`DROP DATABASE "${name}"`));  // its pool has ended
+        }
+      });
+
+      it.each(failures)('prints %s, notes rejectOnQueryError once, then exits with 1, as Zapatos 6.6.1 exits', async (_, db, error) => {
+        const run = await failedRun({}, db());
+        expect(run.rejection).toBe(exited);
+        expect(run.exits).toEqual([[1]]);
+        expect(run.printed).toEqual([['*** error 0 ***', expect.objectContaining(error)], [note]]);
+        expect(run.written).toEqual([]);
+      });
+
+      it('exits with no note with rejectOnQueryError: false', async () => {
+        const run = await failedRun({ rejectOnQueryError: false }, trapped());
+        expect(run.exits).toEqual([[1]]);
+        expect(run.printed).toEqual([['*** error 0 ***', expect.objectContaining(failures[1][2])]]);
+      });
+
+      it('notes rejectOnQueryError: null, from a JSON config, as when it is left out', async () => {
+        const run = await failedRun(JSON.parse('{"rejectOnQueryError": null}') as Config, trapped());
+        expect(run.exits).toEqual([[1]]);
+        expect(run.printed).toEqual([['*** error 0 ***', expect.objectContaining(failures[1][2])], [note]]);
+      });
+
+      it('still exits when warningListener throws at the note', async () => {
+        const run = await failedRun({ warningListener: () => { throw new Error('a listener that throws'); } }, trapped());
+        expect(run.rejection).toBe(exited);
+        expect(run.exits).toEqual([[1]]);
+      });
+
+      it("exits with no note from the CLI's config, even given rejectOnQueryError: true", async () => {
+        const dir = mkdtempSync(join(tmpdir(), 'pgcast-cli-'));
+        try {
+          writeFileSync(join(dir, 'pgcastconfig.json'), '{"rejectOnQueryError": true}');
+          const run = await failedRun(cliConfig('{"rejectOnQueryError": true}', dir), trapped());
+          expect(run.exits).toEqual([[1]]);
+          expect(run.printed).toEqual([['*** error 0 ***', expect.objectContaining(failures[1][2])]]);
+        } finally {
+          rmSync(dir, { recursive: true, force: true });
+        }
+      });
+
+      it('is optional in Config, read as false when absent', () => {
+        expect(finaliseConfig({}).rejectOnQueryError).toBeUndefined();
+        const right: Config = { rejectOnQueryError: true };
+        void right;
+        // @ts-expect-error a boolean
+        const wrong: Config = { rejectOnQueryError: 'yes' };
+        void wrong;
+      });
+    });
   });
 });
 
