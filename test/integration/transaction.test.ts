@@ -682,6 +682,30 @@ describe('a client already inside a transaction block', () => {
     expect(await notes()).toEqual(['inner', 'leaked']);
   });
 
+  it('two calls at the same moment on one client in a block: the second is passed through, as in 6.6.1', async () => {
+    const { fdb } = await fresh();
+    const queries: [string, number | undefined][] = [], results: [string, number | undefined][] = [];
+    fdb.setConfig({
+      queryListener: (q, txnId) => { queries.push([q.text, txnId]); },
+      resultListener: (_r, txnId, _ms, q) => { results.push([q!.text, txnId]); },
+    });
+    const client = await t.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const insert = (c: db.Queryable, note: string) => fdb.sql`INSERT INTO ${'txn_probe'} (${'note'}) VALUES (${fdb.param(note)})`.run(c);
+      await Promise.all([fdb.readCommitted(client, c => insert(c, 'f')), fdb.readCommitted(client, c => insert(c, 'g'))]);
+      await client.query('ROLLBACK');
+    } finally {
+      client.release();
+    }
+    for (const sent of [queries, results]) {
+      expect(sent.filter(([text]) => text === start.readCommitted)).toHaveLength(1);
+      expect(sent.filter(([text]) => text === 'COMMIT')).toHaveLength(1);
+      expect(new Set(sent.map(([, txnId]) => txnId))).toEqual(new Set([0]));  // one transaction, the first call's
+    }
+    expect(await notes()).toEqual(['f', 'g']);  // its COMMIT ended the caller's block
+  });
+
   it('with transactionRequiresIdleClient, a transaction passed through is not refused', async () => {
     const { fdb } = await fresh();
     fdb.setConfig({ transactionRequiresIdleClient: true });
