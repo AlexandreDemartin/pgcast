@@ -1059,3 +1059,65 @@ describe('sum, avg, min, max without aggregatesTypedByColumn (deprecated, PGCAST
     expect(emitWarning).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('copy()', () => {
+  /** What `q` and then `q.copy()` give once run, each in a savepoint rolled back after it. */
+  const originalAndCopy = async (q: db.SQLFragment<any>) => {
+    const results: unknown[] = [];
+    for (const fragment of [q, q.copy()]) {
+      await t.client.query('SAVEPOINT copy');
+      results.push(await fragment.run(t.client).catch((e: unknown) => e));
+      await t.client.query('ROLLBACK TO SAVEPOINT copy');
+    }
+    return results;
+  };
+
+  // Zapatos 6.6.1 resolved a copy to the raw rows (`[{ result: '3' }]` for count()), though typed as the shortcut's result (#263)
+  it.each<[string, () => db.SQLFragment<any>, unknown, db.NewConfig?]>([
+    ['count', () => db.count('users', all), 3],
+    ['count of no row', () => db.count('users', { id: -1 }), 0],
+    ['sum', () => db.sum('accounts', all, { columns: ['balance'] }), 1520.5],
+    ['avg', () => db.avg('accounts', all, { columns: ['ratio'] }), 0.875],
+    ['min', () => db.min('accounts', all, { columns: ['balance'] }), 0],
+    ['max', () => db.max('accounts', all, { columns: ['balance'] }), 1500.5],
+    ['sum of no row, with aggregatesTypedByColumn', () => db.sum('accounts', { id: -1 }, { columns: ['balance'] }), null, { aggregatesTypedByColumn: true }],
+    ['avg, with aggregatesTypedByColumn', () => db.avg('accounts', all, { columns: ['ratio'] }), 0.875, { aggregatesTypedByColumn: true }],
+    ['min of a date, with aggregatesTypedByColumn', () => db.min('events', all, { columns: ['occurred_on'] }), new Date(2025, 5, 1), { aggregatesTypedByColumn: true }],
+    ['max of an int8, with aggregatesTypedByColumn', () => db.max('accounts', all, { columns: ['lifetime_ops'] }), '9007199254740993', { aggregatesTypedByColumn: true }],
+    ['select', () => db.select('users', { id: 3 }, { columns: ['display_name'] }), [{ display_name: 'Cyd' }]],
+    ['selectOne', () => db.selectOne('users', { id: 3 }, { columns: ['display_name'] }), { display_name: 'Cyd' }],
+    ['selectOne of no row', () => db.selectOne('users', { id: -1 }), undefined],
+    ['selectExactlyOne', () => db.selectExactlyOne('users', { id: 3 }, { columns: ['display_name'] }), { display_name: 'Cyd' }],
+    ['insert, one row', () => db.insert('users', { email: 'e@x.org', display_name: 'E' }, { returning: ['display_name'] }), { display_name: 'E' }],
+    ['insert, an array', () => db.insert('users', [{ email: 'e@x.org', display_name: 'E' }], { returning: ['display_name'] }), [{ display_name: 'E' }]],
+    ['upsert, one row', () => db.upsert('users', { email: 'e@x.org', display_name: 'E' }, 'email', { returning: ['display_name'] }), { display_name: 'E', $action: 'INSERT' }],
+    ['upsert, an array', () => db.upsert('users', [{ email: 'e@x.org', display_name: 'E' }], 'email', { returning: ['display_name'] }), [{ display_name: 'E', $action: 'INSERT' }]],
+    ['update', () => db.update('users', { mood: 'ok' }, { id: 3 }, { returning: ['display_name'] }), [{ display_name: 'Cyd' }]],
+    ['deletes', () => db.deletes('memberships', { user_id: 2 }, { returning: ['org_code'] }), [{ org_code: 'acme-lyon' }]],
+    ['truncate', () => db.truncate('extra.articles'), undefined],
+  ])('a copy of %s, run, gives the result of the shortcut', async (_, make, expected, config) => {
+    if (config) db.setConfig(config);
+    expect(await originalAndCopy(make())).toEqual([expected, expected]);
+  });
+
+  it('a copy of selectExactlyOne throws a NotExactlyOneError on no row, carrying the query it was copied from', async () => {
+    const q = db.selectExactlyOne('users', { id: -1 });
+    const [original, copied] = await originalAndCopy(q);
+    expect(original).toBeInstanceOf(db.NotExactlyOneError);
+    expect(copied).toBeInstanceOf(db.NotExactlyOneError);
+    expect((copied as db.NotExactlyOneError).message).toBe('One result expected but none returned (hint: check `.query.compile()` on this Error)');
+    expect((copied as db.NotExactlyOneError).query).toBe(q);
+  });
+
+  it('a copy of selectExactlyOne keeps LIMIT 1, so checks one row only, with selectExactlyOneChecksForSecondRow', async () => {
+    // the copy compiles as a nested query does (#261): a second row is never asked for
+    db.setConfig({ selectExactlyOneChecksForSecondRow: true });
+    const [original, copied] = await originalAndCopy(db.selectExactlyOne('users', { manager_id: 1 }, { columns: ['id'], order: { by: 'id', direction: 'ASC' } }));
+    expect((original as db.NotExactlyOneError).message).toBe('One result expected but more returned (hint: check `.query.compile()` on this Error)');
+    expect(copied).toEqual({ id: 2 });
+  });
+
+  it('a copy of insert([]) still sends nothing and gives []', async () => {
+    expect(await originalAndCopy(db.insert('users', []))).toEqual([[], []]);
+  });
+});
