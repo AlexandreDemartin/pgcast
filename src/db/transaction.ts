@@ -119,8 +119,8 @@ export async function transaction<T, M extends IsolationLevel>(
 ): Promise<T> {
 
   if (Object.prototype.hasOwnProperty.call(txnClientOrQueryable, '_zapatos')) {
-    // its queries go after the START TRANSACTION of a call still reading the status, as in 6.6.1; that call
-    // refused, this one asks again
+    // a call still reading the status goes first, so these queries follow its START TRANSACTION, as in 6.6.1;
+    // if it refused, this call is checked in turn
     const statusRead = statusReads.get(txnClientOrQueryable);
     if (statusRead) return statusRead.then(() => transaction(txnClientOrQueryable, isolationLevel, callback));
 
