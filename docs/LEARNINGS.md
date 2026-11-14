@@ -195,6 +195,9 @@ Candidates for a check, a rule or a skill line.
 - #263 — A property of a shortcut's query that changes its SQL or its result states whether `copy()` carries it, with a test of the copy: #263 (the transform) and #262 (the extras mark) both met the gap — `branch-reviewer`
 - #263 — When a change makes a value reachable by a new path (an error thrown by a copy), grep the docs for each sentence describing that value (`err.query`) and recheck it — `branch-reviewer`
 - #263 — `codegen.test.ts`'s 5 s timeouts fail under a load average near 30 (other worktrees running): rerun once with `--testTimeout 30000`, or on a quiet machine — `builder`
+- #262 — A mark that changes how a shortcut compiles lives on the fragment and is carried by `copy()`, never in a module registry (`zero-abstraction`: no global registry); two open PRs that each added fragment state met only through `copy()` — orchestrator
+- #262 — `docs:translated` exists only in `website/package.json`: run from the root, `npm run -s docs:translated` exits 0 and marks nothing — `builder`
+- #262 — French pages put U+00A0 before `:` and `;`: a script matching French prose matches the NBSP, or normalises first — `builder`
 - #426 — Syntax in `src/db` read for its prototype (an async generator) must survive a consumer transpiling `node_modules` below its level: derive it defensively, and replay with `ts.transpileModule` at a lower target — `branch-reviewer`
 - #426 — `constructor.name` names nothing for an object refused through its chain (`''` for a generator, `Object` for an iterator on Node 20): use its tag — `builder`
 - #426 — The ECMA-262 constructor list can come from `vm.runInNewContext('Object.getOwnPropertyNames(globalThis)')` (a bare V8 context) instead of a hand-written one, so a built-in a Node gains turns the walk red — `branch-reviewer`
@@ -244,5 +247,6 @@ Minor review defects, taken up by the end-of-chapter review.
 - #163 — `website/select.md:248`, `:251`: « what no row gives (below) »: state it in place — `branch-reviewer`
 - #235 — `src/db/conditions.ts:78`: `Object.prototype.toString` follows `Symbol.toStringTag`, so a faked tag reads « takes an array, not `Array` »; error text only — `branch-reviewer`
 - #416 — `website/sql-template.md:298`: the host-object sentence belongs in the « As in Zapatos 6.6.1: » list (`:304`) — `branch-reviewer`
+- #262 — `parent()` has no table in `extras`, so a correlated shortcut there names the outer table in a `sql` fragment; an `extras` `parentTable`, as `lateral` has, could be a follow-up — `builder`
 - #426 — `test/unit/injection.test.ts:1460`: the walk's list of 45 names is hand-written; take it from a bare `vm` context — `branch-reviewer`
 - #426 — `website/sql-template.md:306`: « (Jest runs each test file in a `vm` context) » may no longer hold for iterators (Jest evaluates `node_modules` in the test's context); not verified, Jest not installed — `branch-reviewer`

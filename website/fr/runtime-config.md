@@ -1,5 +1,5 @@
 ---
-english: fbec29c0de62
+english: 1b0308d9312a
 ---
 
 # Configuration
@@ -251,7 +251,7 @@ aggregatesTypedByColumn?: boolean  // default: false; the default in 7.0
 Sans l’option, le résultat passe par `Number()`, comme dans Zapatos 6.6.1 : `0` quand aucune ligne ne correspond, les millisecondes d’une date, `NaN` pour un texte. `.run()` avertit alors une fois par processus, `PGCAST_DEP004`, quand `Number()` a changé ce que Postgres a envoyé, ou que la requête n’a renvoyé aucune ligne.
 
 - Les types ne suivent qu’une fois l’option déclarée aussi dans [`ConfigTypes`](#ConfigTypes) : `setConfig()` règle le runtime, la déclaration les types.
-- Imbriquée dans un `lateral`, la valeur revient en JSON, avec ou sans l’option, et vaut `null` quand aucune ligne ne correspond ; une fois l’option déclarée, elle est typée comme le `JSONSelectable` de sa colonne. De même dans `extras`, une fois que [#262](https://github.com/AlexandreDemartin/pgcast/issues/262) y aura mis l’agrégat entre parenthèses ; aujourd’hui, Postgres le refuse sans parenthèses.
+- Imbriquée dans un `lateral`, ou donnée comme valeur d’`extras`, la valeur revient en JSON, avec ou sans l’option, et vaut `null` quand aucune ligne ne correspond ; une fois l’option déclarée, elle est typée comme le `JSONSelectable` de sa colonne.
 - L’option est lue à `.run()`, là où l’avertissement est aussi émis : une requête construite avant `setConfig()` prend l’option sous laquelle elle s’exécute, comme le dit son type, déclaré pour tout le programme. Une requête qui ne renvoie aucune ligne, un `groupBy` sans aucun groupe, se lit comme `NULL` : `null` avec l’option, `0` sans, avec l’avertissement.
 - Les exemples, et chaque type : [Typé par colonne](/fr/select#typed-by-column).
 

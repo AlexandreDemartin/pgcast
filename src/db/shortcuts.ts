@@ -63,8 +63,7 @@ declare const nestedResult: unique symbol;
 /**
  * A `min()` or `max()` typed by its column, with `aggregatesTypedByColumn`
  * declared in `ConfigTypes`: `run()` gives `RunResult`, and nested in a
- * `lateral` it comes back as JSON, `NestedResult` (in `extras` too, once
- * #262 parenthesises it; Postgres refuses it bare today).
+ * `lateral` or as an `extras` value it comes back as JSON, `NestedResult`.
  */
 export interface ColumnAggregateFragment<RunResult, NestedResult> extends SQLFragment<RunResult> { [nestedResult]: NestedResult }
 
@@ -124,7 +123,13 @@ function SQLForAlias(prefix: string, name: string) {
 function SQLForExtras<T extends Table>(extras: ExtrasOption<T>) {
   return extras === undefined ? [] :
     sql` || jsonb_build_object(${mapWithSeparator(
-      Object.keys(extras), sql`, `, k => sql`${param(k)}::text, ${extras[k]}`)})`;
+      Object.keys(extras), sql`, `, k => {
+        const extra = extras[k];
+        // the queries select() returns (so selectOne(), selectExactlyOne(), count() and the other aggregates), and
+        // their copies, are written in parentheses, a scalar subquery, where Zapatos 6.6.1 wrote them bare in
+        // jsonb_build_object(), which Postgres refuses (42601). A sql fragment is the caller's SQL, written as given
+        return sql`${param(k)}::text, ${extra instanceof SQLFragment && extra['parenthesisedInExtras'] ? sql`(${extra})` : extra}`;
+      })})`;
 }
 
 
@@ -693,7 +698,9 @@ const functionName = new RegExp(`^${space}(?:${identifier})(?:${space}\\.${space
  * sub-select that `select` wraps the query in, any `"` doubled
  * (`AS "sq_a""b"`)
  * * `extras` — an object mapping key(s) to `SQLFragment`s, so that derived 
- * quantities can be included in the JSON result
+ * quantities can be included in the JSON result; a shortcut's query (`count`,
+ * `selectOne`…) or its `copy()` is written in parentheses, as a scalar subquery:
+ * `jsonb_build_object($1::text, (SELECT count(*) AS result FROM "films"))`
  * @param mode (Used internally by `selectOne` and `count`)
  * @param aggregate (Used internally by `count`, `sum`, `avg`, `min` and `max`)
  * The name of the aggregate function, plain, quoted or `U&` quoted, in up to
@@ -803,6 +810,7 @@ export const select: SelectSignatures = function (
         // SelectResultMode.One or SelectResultMode.Many
         (qr) => qr.rows[0]?.result;
 
+  query['parenthesisedInExtras'] = true;
   return query;
 };
 

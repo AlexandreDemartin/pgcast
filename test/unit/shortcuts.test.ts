@@ -1284,6 +1284,86 @@ describe('select', () => {
     `);
   });
 
+  describe('a shortcut as an extras value, a scalar subquery (#262)', () => {
+    // 6.6.1 wrote it bare, `jsonb_build_object($2::text, SELECT …)`, which Postgres refuses (42601)
+    const
+      owner = sql`${'owner_id'} = ${'users'}.${'id'}`,
+      ordered = { columns: ['balance'], order: { by: 'balance', direction: 'ASC' } } as const,
+      asExtra = (x: db.SQLFragment<any>) => db.selectOne('users', { id: 1 }, { columns: ['id'], extras: { x } }).compile(),
+      outer = (inner: string, next: number) =>
+        `SELECT jsonb_build_object($1::text, "id") || jsonb_build_object($2::text, (${inner})) AS result FROM "users" WHERE ("id" = $${next}) LIMIT $${next + 1}`;
+
+    it.each<[string, () => db.SQLFragment<any>, string, number, unknown[]]>([
+      ['select', () => db.select('accounts', owner, ordered),
+        `SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT jsonb_build_object($3::text, "balance") AS result FROM "accounts" WHERE "owner_id" = "users"."id" ORDER BY "balance" ASC) AS "sq_accounts"`, 4,
+        ['id', 'x', 'balance', 1, 1]],
+      ['selectOne', () => db.selectOne('accounts', owner, ordered),
+        `SELECT jsonb_build_object($3::text, "balance") AS result FROM "accounts" WHERE "owner_id" = "users"."id" ORDER BY "balance" ASC LIMIT $4`, 5,
+        ['id', 'x', 'balance', 1, 1, 1]],
+      ['selectExactlyOne', () => db.selectExactlyOne('accounts', owner, ordered),
+        `SELECT jsonb_build_object($3::text, "balance") AS result FROM "accounts" WHERE "owner_id" = "users"."id" ORDER BY "balance" ASC LIMIT $4`, 5,
+        ['id', 'x', 'balance', 1, 1, 1]],
+      ['count', () => db.count('accounts', owner),
+        `SELECT count(*) AS result FROM "accounts" WHERE "owner_id" = "users"."id"`, 3, ['id', 'x', 1, 1]],
+      ['sum', () => db.sum('accounts', owner, { columns: ['balance'] }),
+        `SELECT sum("balance") AS result FROM "accounts" WHERE "owner_id" = "users"."id"`, 3, ['id', 'x', 1, 1]],
+      ['avg', () => db.avg('accounts', owner, { columns: ['ratio'] }),
+        `SELECT avg("ratio") AS result FROM "accounts" WHERE "owner_id" = "users"."id"`, 3, ['id', 'x', 1, 1]],
+      ['min', () => db.min('accounts', owner, { columns: ['balance'] }),
+        `SELECT min("balance") AS result FROM "accounts" WHERE "owner_id" = "users"."id"`, 3, ['id', 'x', 1, 1]],
+      ['max', () => db.max('events', all, { columns: ['occurred_on'] }),
+        `SELECT max("occurred_on") AS result FROM "events"`, 3, ['id', 'x', 1, 1]],
+    ])('%s', (_name, shortcut, inner, next, values) => {
+      expect(asExtra(shortcut())).toEqual({ text: outer(inner, next), values });
+    });
+
+    it('nested in the extras of a shortcut that is itself an extra', () => {
+      expect(asExtra(db.selectOne('accounts', owner, { columns: ['id'], extras: { n: db.count('accounts', all) } }))).toEqual({
+        text: outer(`SELECT jsonb_build_object($3::text, "id") || jsonb_build_object($4::text, (SELECT count(*) AS result FROM "accounts")) AS result FROM "accounts" WHERE "owner_id" = "users"."id" LIMIT $5`, 6),
+        values: ['id', 'x', 'id', 'n', 1, 1, 1],
+      });
+    });
+
+    it('selectExactlyOne keeps LIMIT 1 there, with selectExactlyOneChecksForSecondRow', () => {
+      db.setConfig({ selectExactlyOneChecksForSecondRow: true });
+      expect(asExtra(db.selectExactlyOne('accounts', owner, ordered))).toEqual({
+        text: outer(`SELECT jsonb_build_object($3::text, "balance") AS result FROM "accounts" WHERE "owner_id" = "users"."id" ORDER BY "balance" ASC LIMIT $4`, 5),
+        values: ['id', 'x', 'balance', 1, 1, 1],
+      });
+    });
+
+    it('a copy of a shortcut, as the shortcut', () => {
+      expect(asExtra(db.count('accounts', owner).copy())).toEqual({
+        text: outer(`SELECT count(*) AS result FROM "accounts" WHERE "owner_id" = "users"."id"`, 3),
+        values: ['id', 'x', 1, 1],
+      });
+    });
+
+    it('in the extras of a write', () => {
+      expect(db.update('users', { mood: 'ok' }, { id: 1 }, { returning: ['id'], extras: { n: db.count('accounts', owner) } }).compile()).toEqual({
+        text: `UPDATE "users" SET ("mood") = ROW($1) WHERE ("id" = $2) RETURNING jsonb_build_object($3::text, "id") || jsonb_build_object($4::text, (SELECT count(*) AS result FROM "accounts" WHERE "owner_id" = "users"."id")) AS result`,
+        values: ['ok', 1, 'id', 'n'],
+      });
+    });
+
+    it('unchanged: a column, a sql fragment, a query in parentheses, a shortcut in a sql fragment', () => {
+      const n = db.count('accounts', owner);
+      expect(db.selectOne('users', { id: 1 }, {
+        columns: ['id'],
+        extras: {
+          mail: 'email',
+          up: sql`upper(${'display_name'})`,
+          sub: sql`(SELECT count(*) FROM ${'accounts'} WHERE ${owner})`,
+          wrapped: sql`(${n})`,
+          bare: sql`${n}`,
+        },
+      }).compile()).toEqual({
+        text: `SELECT jsonb_build_object($1::text, "id") || jsonb_build_object($2::text, "email", $3::text, upper("display_name"), $4::text, (SELECT count(*) FROM "accounts" WHERE "owner_id" = "users"."id"), $5::text, (SELECT count(*) AS result FROM "accounts" WHERE "owner_id" = "users"."id"), $6::text, SELECT count(*) AS result FROM "accounts" WHERE "owner_id" = "users"."id") AS result FROM "users" WHERE ("id" = $7) LIMIT $8`,
+        values: ['id', 'mail', 'up', 'sub', 'wrapped', 'bare', 1, 1],
+      });
+    });
+  });
+
   it('groupBy (column, list, fragment) and having (Whereable, fragment)', () => {
     expect(db.select('accounts', all, {
       columns: ['owner_id'], extras: { n: sql`count(*)` }, groupBy: 'owner_id', having: sql`count(*) > ${param(1)}`,

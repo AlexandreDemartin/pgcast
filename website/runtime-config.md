@@ -247,7 +247,7 @@ From 6.7.0. With `true`, [`sum()`](/select#sum), [`avg()`](/select#avg), [`min()
 Off, the result goes through `Number()`, as in Zapatos 6.6.1: `0` when no row matches, a date's milliseconds, `NaN` for a text. `.run()` then warns once per process, `PGCAST_DEP004`, when `Number()` changed what Postgres sent, or the query returned no row.
 
 - The types follow only once it is declared in [`ConfigTypes`](#ConfigTypes) as well: `setConfig()` sets the runtime, the declaration the types.
-- Nested in a `lateral`, the value comes back as JSON, option or not, and `null` when no row matches; declared, it is typed as its column's `JSONSelectable`. In `extras` too, once [#262](https://github.com/AlexandreDemartin/pgcast/issues/262) parenthesises it; Postgres refuses it bare today.
+- Nested in a `lateral` or as an `extras` value, the value comes back as JSON, option or not, and `null` when no row matches; declared, it is typed as its column's `JSONSelectable`.
 - Read at `.run()`, as is the warning: a query built before `setConfig()` gets the option it runs under, as its type, declared for the whole program, says. A query that returns no row, a `groupBy` with no group, reads as `NULL`: `null` on, `0` off, with the warning.
 - Examples, and each type: [Typed by column](/select#typed-by-column).
 

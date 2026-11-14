@@ -1,5 +1,5 @@
 ---
-english: 4b67512a16a7
+english: 52a9c2183d52
 ---
 
 # Lectures {#select-and-the-aggregates}
@@ -100,6 +100,8 @@ Parcourir une longue liste page par page : [Pagination](/fr/paginate).
 ### `extras` {#extras}
 
 `extras?: { [key: string]: column | SQLFragment }`, un [`ExtrasOption`](#ExtrasOption) : d’autres clés sur chaque objet résultat. Une colonne donne sa valeur sous une autre clé ; un fragment `sql` donne le type de son second paramètre de type, `` db.sql<s.cinemas.SQL, number>`…` ``, donc `number` ici. Les clés sont ajoutées à la ligne avec `||`, après `columns`.
+
+Un raccourci de lecture y est une sous-requête : `select()`, `selectOne()`, `selectExactlyOne()`, `count()`, `sum()`, `avg()`, `min()` ou `max()`, ou une copie de l’un d’eux par `.copy()`, s’écrit entre parenthèses, `(SELECT count(*) AS result FROM "films" WHERE "studio_id" = "studios"."id")`<!-- probe: db.select('studios', db.all, { extras: { films: db.count('films', db.sql`${'studio_id'} = ${'studios'}.${'id'}`) } }) -->, et revient en JSON, comme dans un `lateral`, ou vaut `null` quand sa requête ne renvoie aucune ligne. Il doit renvoyer au plus une ligne : un `groupBy` qui en renvoie plusieurs est refusé (21000). `db.parent()` n’a pas de sens dans `extras` : nommez donc la table extérieure dans un fragment `sql`, comme ici. Un fragment `sql` s’écrit tel quel : entourez de parenthèses la requête que vous y écrivez à la main, ou le raccourci que vous y placez.
 
 <CastPanel example="selectExtras">
 
@@ -504,4 +506,4 @@ La signature d’appel de `count()`, `sum()`, `avg()`, `min()` et `max()` : `ta
 interface ColumnAggregateFragment<RunResult, NestedResult> extends SQLFragment<RunResult>
 ```
 
-À partir de la 6.7.0. Ce que renvoient `min()` et `max()` avec `aggregatesTypedByColumn` déclaré : `.run()` donne `RunResult`, le type `Selectable` de la colonne ou `null` ; imbriqué dans un `lateral`, il est typé `NestedResult`, son type `JSONSelectable` ou `null`, comme le lit [`RunResultForSQLFragment`](/fr/sql-template#RunResultForSQLFragment). De même dans `extras`, une fois que [#262](https://github.com/AlexandreDemartin/pgcast/issues/262) l’aura mis entre parenthèses ; aujourd’hui, Postgres le refuse sans parenthèses. Si une de vos fonctions en renvoie un, dans un projet compilé avec `declaration: true`, son `.d.ts` l’écrit sous ce nom.
+À partir de la 6.7.0. Ce que renvoient `min()` et `max()` avec `aggregatesTypedByColumn` déclaré : `.run()` donne `RunResult`, le type `Selectable` de la colonne ou `null` ; imbriqué dans un `lateral`, ou donné comme valeur d’`extras`, il est typé `NestedResult`, son type `JSONSelectable` ou `null`, comme le lit [`RunResultForSQLFragment`](/fr/sql-template#RunResultForSQLFragment). Si une de vos fonctions en renvoie un, dans un projet compilé avec `declaration: true`, son `.d.ts` l’écrit sous ce nom.
