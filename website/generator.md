@@ -124,7 +124,7 @@ Every option is optional. Each one given replaces its default whole: `schemas` w
 
 `{ [schema]: { include, exclude } }`, each of `include` and `exclude` `"*"` or an array of relation names. The schemas to generate, and which relations of each: tables, views, materialised views and foreign tables.
 
-Both keys are required by the type: in `generate()`, a rule without one fails to compile (TS2741). In the JSON, or in untyped JavaScript, a key left out or set to `null` takes the default rule's value, `"include": "*"` or `"exclude": []`, and the generator notes it, through [`warningListener`](#generate.warningListener); Zapatos 6.6.1 stopped where it read the missing key, with `TypeError: Cannot read properties of undefined (reading 'indexOf')` ([#301](https://github.com/AlexandreDemartin/pgcast/issues/301)).
+Both keys are required by the type: in `generate()`, a rule without one fails to compile (TS2741). In the JSON, or in untyped JavaScript, a key left out or set to `null` takes the default rule's value, `"include": "*"` or `"exclude": []`, and the generator notes it, through [`warningListener`](#generate.warningListener); Zapatos 6.6.1 stopped where it read the missing key, with `TypeError: Cannot read properties of undefined (reading 'indexOf')` ([#301](https://github.com/AlexandreDemartin/pgcast/issues/301)). A string other than `"*"`, which the type refuses too (TS2322), is read as a one-name list, `"films"` as `["films"]`, and noted the same way; Zapatos 6.6.1 also matched each relation whose name is part of it, `film` for `"films"` ([#442](https://github.com/AlexandreDemartin/pgcast/issues/442)).
 
 | Rule | Generates |
 |---|---|
@@ -352,6 +352,8 @@ Writing custom types file: src/zapatos/custom/index.d.ts
   - once per run for each entry of an [`include`](#generate.schemas) list that its schema doesn't have;
 - `Note: the schemas rule of "public" has no exclude, so it takes "exclude": [], as the default rule does. Write the key in the rule to silence this note.`
   - after writing, for each rule of [`schemas`](#generate.schemas) that leaves out `include` or `exclude`, or sets it to `null`; for both, `has no include nor exclude, so it takes "include": "*" and "exclude": []`;
+- `Note: the schemas rule of "public" gives include as a string, "films", so it is read as the list ["films"]. Zapatos 6.6.1 also matched each relation whose name is part of the string. Write the list to silence this note.`
+  - after writing, for each `include` or `exclude` of a rule of [`schemas`](#generate.schemas) given as a string other than `"*"`;
 - the note on `bigint` and `numeric` columns, once per process ([`customJSONParsingForLargeNumbers`](#generate.customJSONParsingForLargeNumbers));
 - `` Note: public.prints.format (archive.print_format), public.prints.formats (archive.print_format[]) and public.prints.keeper (archive.crew_job) have a type of another schema, which is looked up by name in the schema of their relation: an enum becomes an `any` custom type, or the enum of the same name there. Set typeEnumsAcrossSchemas: true to look it up in its own schema; it will be the default in pgcast 7.0. ``
   - once per run, without [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas), when a column it would change is generated;
