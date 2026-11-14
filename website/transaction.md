@@ -143,7 +143,6 @@ client.release();
 |---|---|---|
 | `Isolation level must be an IsolationLevel value (e.g. IsolationLevel.Serializable), not '…'`<!-- message --> | `isolationLevel` is not a value of `IsolationLevel`; thrown before a client is checked out or a query sent | pgcast 6.6.2 |
 | the callback's error | after `ROLLBACK`; for 40001 and 40P01, after the last attempt | Zapatos |
-| a `TypeError`, `Cannot destructure property 'code' of 'err' as it is null.` (or `undefined`) | the callback throws `null` or `undefined`, after `ROLLBACK` | Zapatos |
 | "the transaction was rolled back, not committed: a query in it failed and the callback caught the error, so Postgres answered COMMIT with ROLLBACK; let the error out of the callback, or ROLLBACK TO a SAVEPOINT before going on"<!-- message --> | with [`transactionRequiresCommit`](/runtime-config#Config.transactionRequiresCommit), Postgres answered the `COMMIT` with `ROLLBACK`; not retried, and no `ROLLBACK` of its own | pgcast 6.7.0 |
 | "transaction() was given a client inside a transaction block, so its COMMIT or ROLLBACK would end that transaction: COMMIT or ROLLBACK it first, pass the pool, or run the queries on that client without transaction()"<!-- message --> | with [`transactionRequiresIdleClient`](/runtime-config#Config.transactionRequiresIdleClient), a client of yours is inside a transaction block ([Your own `BEGIN`](#your-own-begin)); having sent only the empty query | pgcast 6.7.0 |
 
