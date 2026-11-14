@@ -1359,15 +1359,22 @@ describe('generate()', () => {
     afterEach(() => withAdminClient(server().url, c => dropDatabase(c, name)));
 
     const failed = new Error('failed on purpose');
-    const throwsThenDrops = async (config: Config) => {
-      const exit = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as () => never);
+    const throwsThenDrops = async (config: Config, pool: pg.PoolConfig = {}, waitAfter = 0) => {
+      const
+        exit = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as () => never),
+        unhandled: unknown[] = [],
+        onUnhandled = (e: unknown) => void unhandled.push(e);
+      process.on('unhandledRejection', onUnhandled);
       try {
         await expect(generate({
-          ...quiet, ...config, db: { connectionString: urlForDatabase(server().url, name) }, outDir,
+          ...quiet, ...config, db: { ...pool, connectionString: urlForDatabase(server().url, name) }, outDir,
         })).rejects.toBe(failed);
         await withAdminClient(server().url, c => c.query(`DROP DATABASE "${name}"`));
+        await new Promise(resolve => setTimeout(resolve, waitAfter));
         expect(exit).not.toHaveBeenCalled();
+        expect(unhandled).toEqual([]);
       } finally {
+        process.off('unhandledRejection', onUnhandled);
         exit.mockRestore();
       }
     };
@@ -1383,6 +1390,19 @@ describe('generate()', () => {
     it('ends its pool when a customTypesTransform function throws, while other queries run', () => throwsThenDrops({
       ...main, customTypesTransform: () => { throw failed; },
     }), dropWait);
+
+    // a table's composite column calls customTypesTransform as soon as its columns are read, while the other
+    // tables' queries still wait for one of the pool's 2 connections; the ended pool never serves them, and
+    // each rejects once its connectionTimeoutMillis is past, long after generate() has rejected
+    it('never exits the process when a query still queued in its pool fails after it has thrown', async () => {
+      const tables = Array.from({ length: 8 }, (_, i) => `CREATE TABLE queued.t${i} (x queued.pair);`).join('\n');
+      await withAdminClient(urlForDatabase(server().url, name), c =>
+        c.query(`CREATE SCHEMA queued; CREATE TYPE queued.pair AS (a int, b int);\n${tables}`));
+      const timeout = 1000;
+      await throwsThenDrops({
+        schemas: { queued: all }, customTypesTransform: () => { throw failed; },
+      }, { max: 2, connectionTimeoutMillis: timeout }, timeout * 2);
+    }, dropWait);
   });
 });
 
