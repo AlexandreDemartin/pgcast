@@ -24,7 +24,8 @@ jobs:
           fetch-depth: 0
       - id: diff
         name: Is there anything besides docs to check?
-        # Markdown outside .agents/ and .claude/ needs no build: those two hold the agent method, which check:agents checks.
+        # Markdown outside .agents/ and .claude/ needs no build: those two hold the agent method, which check:agents checks,
+        # as it recounts the summary of docs/CHARACTERISATION-REPORT.md.
         # The docs site builds on a change to website/ (its pages are Markdown too), to CHANGELOG.md, its /changelog page, to
         # src/, which its examples use, to what builds the library it installs (the root package.json, package-lock.json,
         # tsconfig.json), or to the workflows.
@@ -43,7 +44,7 @@ jobs:
                 '') ;;
                 website/*|CHANGELOG.md) docs=true ;;
                 src/*|package.json|package-lock.json|tsconfig.json|.github/workflows/*) code=true; docs=true ;;
-                .agents/*|.claude/*) code=true ;;
+                .agents/*|.claude/*|docs/CHARACTERISATION-REPORT.md) code=true ;;
                 *.md) ;;
                 *) code=true ;;
               esac
