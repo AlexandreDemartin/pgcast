@@ -73,10 +73,11 @@ export const reImatch = <T extends string>(a: T) => sql<SQL, boolean | null, T>`
 export const notReMatch = <T extends string>(a: T) => sql<SQL, boolean | null, T>`${self} !~ ${conditionalParam(a)}`;
 export const notReImatch = <T extends string>(a: T) => sql<SQL, boolean | null, T>`${self} !~* ${conditionalParam(a)}`;
 
-// 6.6.1 read `a.length`, which an iterable lacks, so `isNotIn(new Set([1]))` compiled to `true`, every row
+// 6.6.1 read `a.length`, which an iterable lacks, so `isNotIn(new Set([1]))` compiled to `true`, every row; the
+// refusal sits in the expressions, which copy() shares, so that a copied condition throws too
 const notAnArray = (fn: string, a: unknown) => {
   const kind = a === null ? 'null' : typeof a === 'object' ? Object.prototype.toString.call(a).slice(8, -1) : typeof a;
-  return refused(`\`${fn}()\` takes an array, not \`${kind}\`: make one with \`${fn}([...values])\`, or \`Array.from(values)\` for an array-like object.`);
+  return sql`${refused(`\`${fn}()\` takes an array, not \`${kind}\`: make one with \`${fn}([...values])\`, or \`Array.from(values)\` for an array-like object.`)}`;
 };
 
 /**
