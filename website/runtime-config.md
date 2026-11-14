@@ -211,11 +211,14 @@ Given a client you opened a transaction on yourself, with `BEGIN`, [`transaction
 
 With `true`, it rejects before sending its `START TRANSACTION`, with "transaction() was given a client inside a transaction block, so its COMMIT or ROLLBACK would end that transaction: COMMIT or ROLLBACK it first, pass the pool, or run the queries on that client without transaction()"<!-- message -->. Your transaction stays open, for your `COMMIT` or `ROLLBACK`.
 
-Off, it runs as in Zapatos 6.6.1, and warns once per process: `PGCAST_DEP005`.
+Off, it sends the empty query below, then runs as in Zapatos 6.6.1, and warns once per process, `PGCAST_DEP005`, once that query has its answer.
 
-- pg says whether a client is in a block from pg 8.21 (`getTransactionStatus()`), and a `pg.native.Client` from pg-native 3.8. On older versions, `transaction()` runs as in 6.6.1, option or not, with no warning.
+- pg says whether a client is in a block from pg 8.21 (`getTransactionStatus()`). On older versions, `transaction()` runs as in 6.6.1, option or not, with no warning.
+- When pg reports a block, `transaction()` first sends an empty query, to read the status again; [`queryListener`](#Config.queryListener) and [`resultListener`](#Config.resultListener) get it, with the transaction's id ([Your own `BEGIN`](/transaction#your-own-begin)).
 - Only a client you pass is checked: one the pool hands out, released while still in a block, is not.
 - A `BEGIN` you sent without `await` is not seen yet: the client reads as outside a block.
+- A `BEGIN` sent in one query string with a statement that fails can read as outside a block too: `transaction()` then runs as in 6.6.1, with no warning.
+- Not tested with `pg-native`.
 
 ### `selectExactlyOneChecksForSecondRow` {#Config.selectExactlyOneChecksForSecondRow}
 
@@ -378,7 +381,7 @@ One opt-in has no warning and no default in 7.0: [`selectExactlyOneChecksForSeco
 
 The generator has its own: [`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas) and [`enumOrder`](/generator#generate.enumOrder), whose old paths are notes through [`warningListener`](/generator#generate.warningListener), once per run, rather than a `DeprecationWarning`; they will be the defaults in 7.0 too.
 
-Each warning is a Node.js `DeprecationWarning`, emitted once per process for each code, when the shortcut is called (`PGCAST_DEP003`: when `transaction()` resolves; `PGCAST_DEP004`: when `.run()` gets the result), and only when the old behaviour is used. Its message names the option. Node prints it to `stderr`:
+Each warning is a Node.js `DeprecationWarning`, emitted once per process for each code, when the shortcut is called (`PGCAST_DEP003`: when `transaction()` resolves; `PGCAST_DEP004`: when `.run()` gets the result; `PGCAST_DEP005`: when the empty query `transaction()` sends first has its answer, its `START TRANSACTION` already sent), and only when the old behaviour is used. Its message names the option. Node prints it to `stderr`:
 
 ```txt
 (node:4242) [PGCAST_DEP002] DeprecationWarning: An undefined value in insert(), update() or upsert() is sent as NULL, or, in upsert() updateValues, set from EXCLUDED. Set undefinedMeansMissing: true (db.setConfig) to treat it as a missing key instead (DEFAULT in insert(), left out of update() and upsert()); it will be the default in pgcast 7.0.
