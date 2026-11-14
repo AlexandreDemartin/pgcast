@@ -875,6 +875,12 @@ describe('undefinedMeansMissing: an undefined key of upsert() updateValues', () 
     `);
   });
 
+  it('with it, a column inserted but left out of updateColumns: the key adds nothing either', () => {
+    db.setConfig({ undefinedMeansMissing: true });
+    expect(upsert({ updateColumns: 'display_name', updateValues: { mood: undefined } }, { ...ada, mood: 'ok' }).text)
+      .toContain('DO UPDATE SET ("display_name") = ROW(EXCLUDED."display_name")');
+  });
+
   it('with it, every key undefined: as without updateValues', () => {
     db.setConfig({ undefinedMeansMissing: true });
     expect(upsert({ updateValues: { display_name: undefined, settings: undefined } })).toEqual(upsert({}));
@@ -934,9 +940,18 @@ describe('undefinedMeansMissing: an undefined key of upsert() updateValues', () 
       call(fdb);
       expect(emitWarning).not.toHaveBeenCalled();
     }
+    const adds: ((fdb: typeof db) => unknown)[] = [
+      fdb => fdb.upsert('users', ada, 'email', { updateValues: { settings: undefined } }),
+      fdb => fdb.upsert('users', ada, 'email', { updateColumns: fdb.doNothing, updateValues: { settings: undefined } }),
+      fdb => fdb.upsert('users', { ...ada, mood: 'ok' }, 'email', { updateColumns: 'display_name', updateValues: { mood: undefined } }),
+    ];
+    for (const call of adds) {
+      const { fdb, emitWarning } = await fresh();
+      call(fdb);
+      expect(emitWarning.mock.calls.map(c => c[1])).toEqual([{ type: 'DeprecationWarning', code: 'PGCAST_DEP002' }]);
+    }
     const { fdb, emitWarning } = await fresh();
-    fdb.upsert('users', ada, 'email', { updateValues: { settings: undefined } });
-    fdb.upsert('users', ada, 'email', { updateColumns: fdb.doNothing, updateValues: { settings: undefined } });
+    for (const call of adds) call(fdb);
     expect(emitWarning).toHaveBeenCalledTimes(1);
     const [message, options] = emitWarning.mock.calls[0];
     expect(options).toEqual({ type: 'DeprecationWarning', code: 'PGCAST_DEP002' });
