@@ -7,7 +7,7 @@ const colour = (scope: string[], foreground: string) => ({ scope, settings: { fo
 
 export const syntax = {
   name: 'pgcast',
-  type: 'light',
+  type: 'light' as const,
   fg: 'var(--fg)',
   bg: 'var(--code-bg)',
   settings: [
