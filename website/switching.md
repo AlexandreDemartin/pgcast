@@ -135,7 +135,7 @@ Look through your code for the first column of each table below. Each change in 
 
 </div>
 
-### `updateValues` and an empty `update()`
+### `updateValues` and writes with no column
 
 <div class="stack">
 
@@ -143,6 +143,7 @@ Look through your code for the first column of each table below. Each change in 
 |---|---|---|---|
 | A plain value in [`upsert()`](/insert#upsert-options) `updateValues`: a string, `{ tagline: 'films.title' }`, or an object | a column name, `ROW("films"."title")`, or for an object a condition of its keys (`TRUE` with none) | a parameter, the value itself | for the old result, a fragment: `` db.sql`${'films'}.${'title'}` `` |
 | [`update()`](/insert#update) with no column: `update('films', {}, …)` | 42601 from Postgres | throws when called: "nothing to update: an Updatable needs at least one column"<!-- message --> | nothing, unless you catch a `DatabaseError` there |
+| [`insert()`](/insert#insert) or [`upsert()`](/insert#upsert) of a row with no column, `{}`, on a table whose every column has a default or takes `NULL`, or past the type | 42601 from Postgres | throws when called: "nothing to insert: an Insertable needs at least one column; …"<!-- message --> | nothing, unless you catch a `DatabaseError` there; for a row of defaults, `DEFAULT VALUES` in a `sql` template |
 
 </div>
 

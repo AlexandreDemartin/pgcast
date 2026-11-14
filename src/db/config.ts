@@ -59,7 +59,10 @@ let config: Config = { ...defaults };
  */
 export const getConfig = () => {
   const d = config.transactionRetryDelay;  // its one nested object, copied too; the listeners are functions, kept as they are
-  return { ...config, transactionRetryDelay: d && { minMs: d.minMs, maxMs: d.maxMs } };
+  let delay = d;
+  try { delay = d && { minMs: d.minMs, maxMs: d.maxMs }; }
+  catch { /* a getter that throws: kept as it is, so that transaction() throws reading it, not every query, as in Zapatos 6.6.1 */ }
+  return { ...config, transactionRetryDelay: delay };
 };
 
 /**
