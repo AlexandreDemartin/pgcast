@@ -355,7 +355,7 @@ Zapatos 6.6.1 wrote `(NOT "release_year" = 1974 OR "release_year" = 1991)`, whic
 
 ## Dates and times {#dates}
 
-[`after()`](#conditions.after) and [`before()`](#conditions.before) compare with a value: a `Date`, an ISO 8601 string with its offset (`'2030-03-01T20:00:00Z'`, a `TimestampTzString`; the type refuses another form such as `'2030-03-02'`, TS2322), or one of the two fragments below. `pg` sends a `Date` as a string in the local time zone, with its offset: on a `timestamptz` column, the same instant.
+[`after()`](#conditions.after) and [`before()`](#conditions.before) compare with a value: a `Date`, an ISO 8601 string with its offset (`'2030-03-01T20:00:00Z'`, a `TimestampTzString`; the type refuses another form such as `'2030-03-02'`, TS2322), or one of the two fragments below. `pg` sends a `Date` as a string in the local time zone, with its offset: on a `timestamptz` column, the same instant. On a `date` column, Postgres keeps the local day and drops the time: `eq(new Date(2030, 2, 1, 23, 30))` matches `2030-03-01`, and `lt()` of it does not.
 
 <CastPanel example="conditions_dates">
 
