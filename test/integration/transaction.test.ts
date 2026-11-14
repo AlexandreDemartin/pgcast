@@ -682,6 +682,28 @@ describe('a client already inside a transaction block', () => {
     expect(await notes()).toEqual(['inner', 'leaked']);
   });
 
+  it('without transactionRequiresIdleClient, queues no query behind its empty query: pg deprecates a query sent while another runs', async () => {
+    const { fdb } = await fresh();
+    const client = await t.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const inFlight: number[] = [];  // for each query sent, how many of the client's were still unanswered
+      let pending = 0;
+      const query = client.query.bind(client) as (...args: unknown[]) => Promise<unknown>;
+      vi.spyOn(client, 'query').mockImplementation(((...args: unknown[]) => {
+        inFlight.push(pending++);
+        return query(...args).finally(() => { pending--; });
+      }) as never);
+      const busy = client.query('SELECT pg_sleep(0.05)');  // still running when transaction() is called, as a COMMIT whose error pg has passed on
+      await fdb.readCommitted(client, c => fdb.sql`SELECT 1`.run(c));
+      await busy;
+      expect(inFlight).toEqual([0, 1, 0, 0, 0]);  // pg_sleep, then the empty query behind it, then START, SELECT and COMMIT one at a time
+      await client.query('ROLLBACK');
+    } finally {
+      client.release();
+    }
+  });
+
   // pg reads the status at ReadyForQuery, after the query's rejection: a BEGIN sent in one query string with a
   // statement that fails can leave it at the I read before that string (the empty query only reads again a T or E)
   it('limitation: a BEGIN sent in one query string with a statement that fails can be read as outside a block', async () => {
