@@ -220,6 +220,9 @@ Candidates for a check, a rule or a skill line.
 - #442 — When a fix reinterprets an untyped config value, replay what a JSON user would plausibly write (a comma- or space-separated list, `""`, a wrong case), not only the issue's shapes — `branch-reviewer`
 - #442 — In 6.6.1 the substring match goes down to single letters: `"include": "studios"` pulled in a relation named `s` — `builder`
 - #287 — A custom type named `index` (a domain `index` under `my_type`) may clash with the custom `index.d.ts` the generator rewrites after the placeholders: unchecked, a candidate issue — `builder`
+- #184 — A shared out parameter filled by relations introspected concurrently (`Promise.all`) needs an order-independent merge: « last one seen wins » is safe only while every writer writes the same text; candidate line for skill `codegen-output` § Deterministic — `branch-reviewer`, `builder`
+- #184 — A migration hint for files already on disk is checked in both prefixed and unprefixed schemas (`import type { format }` alone gives TS2305 in a prefixed one) — `branch-reviewer`
+- #184 — A codegen placeholder that « compiles » under `skipLibCheck` hides unresolved names as `any`: replay each output claim with `skipLibCheck` both ways — `builder`
 - #287 — A merged note keeps every condition of the note it replaces (#42's withholds the `customTypesTransform` advice when the raw names are equal): a test runs the old note's scenario inside the new note's — `branch-reviewer`
 
 ## Minors kept
@@ -281,5 +284,8 @@ Minor review defects, taken up by the end-of-chapter review.
 - #301 — `test/integration/codegen.test.ts:1217`: a single `null` key (`{ include: '*', exclude: null }`) is not frozen by a test — `branch-reviewer`
 - #442 — `CHANGELOG.md:99`, `website/generator.md:127` (and `fr/…:131`): a string naming several relations (`"films,studios"`) now selects none, or excludes none; the docs say a string's relation is kept without that condition, and no test row freezes it — `branch-reviewer`
 - #442 — `src/generate/schemaRules.ts:25`: `asList(names: '*' | string[])` narrows its string branch to `never`; `string | string[]` — `branch-reviewer`
+- #184 — `src/generate/tables.ts:184-185`: no test covers an enum whose TypeScript name differs from its Postgres name (`"film-format"` → `film_format`, `keyof` → `keyof_`) — `branch-reviewer`
+- #184 — `website/generator.md:424` (and `fr/…:428`): « Zapatos 6.6.1 imported `db` for `db.JSONValue` alone » also covers the enum sentence before it, and the `{ genre }` form shown is the `unprefixedSchema` one only — `branch-reviewer`
+- #184 — `src/generate/index.ts:10`: a direct caller of the exported `definitionForRelationInSchema` that does not pass `customTypeImports` now reads `archive.genre` rather than `genre` (both fail to compile) — `branch-reviewer`
 - #287 — `test/integration/codegen.test.ts:868`: the notes' order (case note first, then #42's) is decided alone but not pinned by a test — `branch-reviewer`
 - #287 — `CHANGELOG.md:101`: a second colon after « (…): on a case-insensitive file system », and « as in Zapatos 6.6.1 » reads as if it applied to the file system — `branch-reviewer`
