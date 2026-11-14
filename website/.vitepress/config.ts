@@ -14,6 +14,7 @@ import { playgroundVite } from './playground/build.ts';
 import { checkPlaygroundLinks, linkCastPanels } from './playgroundLinks.ts';
 import { lineIndents, sqlParameters, syntax } from './syntax.ts';
 import { labelTableCells } from './tables.ts';
+import { svg } from './theme/icons.ts';
 import { focusableHovers, moduleNames, twoslashOptions } from './twoslash.ts';
 
 const
@@ -105,7 +106,8 @@ export default defineConfig({
       options: { translations: { button: { buttonText: 'Search', buttonAriaLabel: 'Search the docs' } } },
     },
     editLink: { pattern: `${repo}/edit/master/website/:path`, text: 'Edit this page on GitHub' },
-    docFooter: { prev: 'Previous', next: 'Next' },
+    // VitePress writes these with `v-html`: each with the arrow of its way
+    docFooter: { prev: `${svg('arrowLeft')}Previous`, next: `Next${svg('arrowRight')}` },
     lastUpdated: { text: 'Last updated', formatOptions: { dateStyle: 'long', forceLocale: true } },  // 13 November 2026
     outline: { level: 2, label: 'On this page' },
     darkModeSwitchLabel: 'Colour theme',

@@ -326,7 +326,10 @@ svg.icon { width: 16px; height: 16px; flex: none; }
 .VPDocFooter .edit-info .VPLastUpdated time { margin-left: .3em; }
 .VPDocFooter .pager-link { border-color: var(--line); border-radius: var(--radius); background: var(--surface); padding: 14px 16px; }
 .VPDocFooter .pager-link:hover { border-color: var(--accent); }
-.VPDocFooter .pager-link .desc { font-size: 12px; color: var(--muted); }
+/* "Previous" and "Next", each with the arrow of its way (config.ts) */
+.VPDocFooter .pager-link .desc { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); }
+.VPDocFooter .pager-link.next .desc { justify-content: flex-end; }
+.VPDocFooter .pager-link .desc .icon { width: 14px; height: 14px; }
 .VPDocFooter .pager-link .title { font-size: 15px; font-weight: 400; color: var(--fg); }
 .SiteFooter { color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); padding-top: 20px; margin: 56px 0 0; }
 .SiteFooter a { color: var(--accent); text-decoration: underline 1px; text-underline-offset: 3px; }
