@@ -280,6 +280,26 @@ describe('undefinedMeansMissing', () => {
   });
 });
 
+describe('transactionRequiresCommit', () => {
+  test('an optional boolean of Config and setConfig', () => {
+    db.setConfig({ transactionRequiresCommit: true });
+    expectTypeOf(db.getConfig().transactionRequiresCommit).toEqualTypeOf<boolean | undefined>();
+    expectTypeOf<db.NewConfig['transactionRequiresCommit']>().toEqualTypeOf<boolean | undefined>();
+    // a Config written for 6.6.1, without the key, still compiles
+    const c: db.Config = {
+      transactionAttemptsMax: 5,
+      transactionRetryDelay: { minMs: 25, maxMs: 250 },
+      castArrayParamsToJson: false,
+      castObjectParamsToJson: false,
+    };
+    // @ts-expect-error a boolean, not a string
+    const d: db.Config = { ...c, transactionRequiresCommit: 'yes' };
+    void d;
+    // @ts-expect-error a boolean, not a string
+    db.setConfig({ transactionRequiresCommit: 'yes' });
+  });
+});
+
 describe('selectExactlyOneChecksForSecondRow', () => {
   test('an optional boolean of Config and setConfig, which changes no type', () => {
     db.setConfig({ selectExactlyOneChecksForSecondRow: true });
@@ -459,6 +479,17 @@ describe('truncate', () => {
     expectTypeOf(db.truncate('users', 'RESTART IDENTITY', 'CASCADE').run(pool)).resolves.toEqualTypeOf<undefined>();
     // @ts-expect-error 'DROP' is not a TRUNCATE option
     db.truncate('users', 'DROP');
+  });
+
+  test('refuses an order Postgres refuses', () => {
+    // @ts-expect-error the identity option comes first
+    db.truncate('users', 'CASCADE', 'RESTART IDENTITY');
+    // @ts-expect-error one identity option at most
+    db.truncate('users', 'RESTART IDENTITY', 'CONTINUE IDENTITY');
+    // @ts-expect-error one foreign key option at most
+    db.truncate('users', 'CASCADE', 'RESTRICT');
+    // @ts-expect-error two options at most
+    db.truncate('users', 'RESTART IDENTITY', 'CASCADE', 'CASCADE');
   });
 });
 

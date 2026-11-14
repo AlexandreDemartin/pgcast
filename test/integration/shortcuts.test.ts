@@ -242,6 +242,24 @@ describe('upsert', () => {
       .toEqual({ title: null, price_cents: 1400, $action: 'UPDATE' });
   });
 
+  it('an undefined key of updateValues: the column DEFAULT without undefinedMeansMissing, left as it is with it', async () => {
+    const ada = { email: 'Ada@Example.com', display_name: 'Ada' };
+    db.setConfig({ undefinedMeansMissing: true });
+    expect(await run(db.upsert('users', ada, 'email', { updateValues: { settings: undefined }, returning: ['settings'] })))
+      .toEqual({ settings: { theme: 'dark' }, $action: 'UPDATE' });
+    db.setConfig({ undefinedMeansMissing: false });  // deprecated (PGCAST_DEP002)
+    expect(await run(db.upsert('users', ada, 'email', { updateValues: { settings: undefined }, returning: ['settings'] })))
+      .toEqual({ settings: {}, $action: 'UPDATE' });
+  });
+
+  it('with undefinedMeansMissing, an undefined key of updateValues that leaves nothing to update: DO NOTHING', async () => {
+    // so no row back on conflict, and the row is unchanged
+    db.setConfig({ undefinedMeansMissing: true });
+    expect(await run(db.upsert('users', { email: 'Ada@Example.com', display_name: 'Ada' }, 'email',
+      { updateColumns: db.doNothing, updateValues: { settings: undefined } }))).toBeUndefined();
+    expect(await scalar(`SELECT settings AS v FROM users WHERE email = 'Ada@Example.com'`)).toEqual({ theme: 'dark' });
+  });
+
   it('constraint()', async () => {
     expect(await run(db.upsert('users', { email: 'bob@example.com', display_name: 'Bobby' },
       db.constraint('users_email_key'), { returning: ['id', 'display_name'] })))
@@ -488,8 +506,9 @@ describe('deletes', () => {
 });
 
 describe('truncate', () => {
-  it('one table', async () => {
-    expect(await run(db.truncate('extra.articles'))).toEqual([]);
+  it('one table; resolves undefined, as its type says', async () => {
+    // Zapatos 6.6.1 resolved [], the rows of a TRUNCATE, though typed SQLFragment<undefined> (#167)
+    expect(await run(db.truncate('extra.articles'))).toBeUndefined();
     expect(await scalar('SELECT count(*)::int AS v FROM extra.articles')).toBe(0);
   });
 
@@ -508,6 +527,23 @@ describe('truncate', () => {
     await run(db.truncate(['extra.articles'], 'RESTART IDENTITY'));
     // the point of the option: the next identity value is the first one again
     expect(await run(db.insert('extra.articles', { author_id: 1, body: 'b' }, { returning: ['id'] }))).toEqual({ id: 1 });
+  });
+
+  it('options in an order Postgres refuses: run() rejects with a plain Error, where 6.6.1 rejected with 42601', async () => {
+    // a .catch() chained on run() still gets it, as in 6.6.1: only the DatabaseError becomes an Error
+    const caught = await (db.truncate as any)('extra.articles', 'CASCADE', 'RESTART IDENTITY').run(t.client).catch((e: Error) => e);
+    expect(caught).toBeInstanceOf(Error);
+    expect(caught).not.toBeInstanceOf(pg.DatabaseError);
+    expect(caught.message).toBe(`Truncate options must be CONTINUE IDENTITY/RESTART IDENTITY, then RESTRICT/CASCADE, one of each at most, not 'CASCADE', 'RESTART IDENTITY'`);
+  });
+
+  it('Postgres takes every order that compiles, an undefined or null option included', async () => {
+    const orders: any[][] = [
+      [], ['CONTINUE IDENTITY'], ['RESTART IDENTITY'], ['RESTRICT'], ['CASCADE'],
+      ['CONTINUE IDENTITY', 'RESTRICT'], ['CONTINUE IDENTITY', 'CASCADE'], ['RESTART IDENTITY', 'RESTRICT'], ['RESTART IDENTITY', 'CASCADE'],
+      [undefined], [null, 'CASCADE'], ['RESTART IDENTITY', null], ['RESTART IDENTITY', null, 'CASCADE'], ['CASCADE', null, null],
+    ];
+    for (const opts of orders) await run((db.truncate as any)(['extra.articles'], ...opts));
   });
 });
 

@@ -58,7 +58,7 @@ try {
 ```
 
 - It puts back each key `saved` holds.
-- A key `saved` doesn't hold stays as set: a listener set in between keeps listening. Give it as `undefined` to remove it: `db.setConfig({ queryListener: undefined })`.
+- A key `saved` doesn't hold stays as set: a listener set in between keeps listening. Give it as `undefined` to remove it: `db.setConfig({ queryListener: undefined })`. Under `exactOptionalPropertyTypes`, which refuses it (TS2379), cast it, as the type has no other way, in Zapatos 6.6.1 too: `{ queryListener: undefined } as unknown as db.NewConfig`.
 
 ## `Config` {#Config}
 
@@ -182,7 +182,7 @@ Off, it runs as in Zapatos 6.6.1 and warns once per process: `PGCAST_DEP001`. Wh
 undefinedMeansMissing?: boolean  // default: false; the default in 7.0
 ```
 
-With `true`, an `undefined` value in [`insert()`](/insert#insert), [`update()`](/insert#update) and [`upsert()`](/insert#upsert) is a missing key: `DEFAULT` in `insert()`, left out of `update()` and `upsert()`. Off, it is sent as `NULL`, as in Zapatos 6.6.1, and warns once per process: `PGCAST_DEP002`. The SQL of each: [An `undefined` value](/insert#undefined-values).
+With `true`, an `undefined` value in [`insert()`](/insert#insert), [`update()`](/insert#update) and [`upsert()`](/insert#upsert) is a missing key: `DEFAULT` in `insert()`, left out of `update()` and `upsert()`, its `updateValues` included. Off, it is sent as `NULL` (in `updateValues`, set from `EXCLUDED`), as in Zapatos 6.6.1, and warns once per process: `PGCAST_DEP002`. The SQL of each: [An `undefined` value](/insert#undefined-values).
 
 ### `transactionRequiresCommit` {#Config.transactionRequiresCommit}
 
@@ -349,7 +349,7 @@ A behaviour of Zapatos 6.6.1 that code may rely on, but that pgcast would change
 | Option | Warning | It warns when | Default from |
 |---|---|---|---|
 | [`upsertRequiresSameKeys: true`](#Config.upsertRequiresSameKeys) | `PGCAST_DEP001` | a multi-row `upsert()` without `updateColumns` has a key missing from some row that is still set from `EXCLUDED` ([Rows with different keys](/insert#upsert-different-keys)) | 7.0 |
-| [`undefinedMeansMissing: true`](#Config.undefinedMeansMissing) | `PGCAST_DEP002` | a value of `insert()`, `update()` or `upsert()` is `undefined` ([An `undefined` value](/insert#undefined-values)) | 7.0 |
+| [`undefinedMeansMissing: true`](#Config.undefinedMeansMissing) | `PGCAST_DEP002` | a value of `insert()`, `update()` or `upsert()` is `undefined`, or a key of `upsert()` `updateValues` is and adds its column ([An `undefined` value](/insert#undefined-values)) | 7.0 |
 | [`transactionRequiresCommit: true`](#Config.transactionRequiresCommit) | `PGCAST_DEP003` | Postgres answers the `COMMIT` of `transaction()` with `ROLLBACK`, after a query error the callback caught ([Let the error through](/retries#let-the-error-through)) | 7.0 |
 | [`aggregatesTypedByColumn: true`](#Config.aggregatesTypedByColumn) | `PGCAST_DEP004` | `Number()` changes the result of `sum()`, `avg()`, `min()` or `max()`: a `NULL` made `0`, or a `min()` or `max()` that is not a number ([Typed by column](/select#typed-by-column)) | 7.0 |
 
@@ -362,7 +362,7 @@ The generator has its own: [`typeEnumsAcrossSchemas`](/generator#generate.typeEn
 Each warning is a Node.js `DeprecationWarning`, emitted once per process for each code, when the shortcut is called (`PGCAST_DEP003`: when `transaction()` resolves; `PGCAST_DEP004`: when `.run()` gets the result), and only when the old behaviour is used. Its message names the option. Node prints it to `stderr`:
 
 ```txt
-(node:4242) [PGCAST_DEP002] DeprecationWarning: An undefined value in insert(), update() or upsert() is sent as NULL. Set undefinedMeansMissing: true (db.setConfig) to treat it as a missing key instead (DEFAULT in insert(), left out of update() and upsert()); it will be the default in pgcast 7.0.
+(node:4242) [PGCAST_DEP002] DeprecationWarning: An undefined value in insert(), update() or upsert() is sent as NULL, or, in upsert() updateValues, set from EXCLUDED. Set undefinedMeansMissing: true (db.setConfig) to treat it as a missing key instead (DEFAULT in insert(), left out of update() and upsert()); it will be the default in pgcast 7.0.
 ```
 
 - `process.on('warning', …)` gets it, with `name` `'DeprecationWarning'` and `code` `'PGCAST_DEP002'`.

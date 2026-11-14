@@ -35,13 +35,13 @@ Three classes, from the most direct to the most cautious:
 - **Optional keys**: a new key of the runtime `Config` is optional (`?:`) and read with `?? <default>`, so that a `Config` written for 6.6.1 still compiles (JSDoc of `Config`).
 - **JSDoc**: `@deprecated` on the old behaviour when it has a shape of its own (an option value, a signature).
 
-## The 11 breaking findings
+## The breaking findings
 
 | # | Class | Why | Option (default = 6.6.1) | Code |
 |---|---|---|---|---|
 | R4 | Fix (`Security`) | the type promises a value; a string compiled as an identifier is also an injection path | — | — |
 | R8 | Opt-in | data loss, but code may rely on every column being updated | `upsertRequiresSameKeys: true`: without `updateColumns`, a key missing from some row and still set from `EXCLUDED` (not a key of `updateValues`, not a column of an array or string `conflictTarget`; with `constraint()`, any key) throws an error that says what to do ("rows have different keys: pass updateColumns, or give every row the same keys"); no column is silently skipped, since Postgres cannot tell an inserted `DEFAULT` apart; the old path warns on the same rule. Refined 2026-11-12 in #27: new rows without their serial `id`, upserted on `'id'`, lose nothing | `PGCAST_DEP001` |
-| R9, R11 | Opt-in | `undefined` → `NULL` is observable and may be intended | `undefinedMeansMissing: true`: an `undefined` value behaves like a missing key (`update` omits it, `insert` sends `DEFAULT`); the old path warns at the first `undefined` value. Refined 2026-11-12 in #29: `upsert` leaves the key out rather than sending `DEFAULT`; in several rows its cell takes `DEFAULT` and counts as missing for `upsertRequiresSameKeys` | `PGCAST_DEP002` |
+| R9, R11 | Opt-in | `undefined` → `NULL` is observable and may be intended | `undefinedMeansMissing: true`: an `undefined` value behaves like a missing key (`update` omits it, `insert` sends `DEFAULT`); the old path warns at the first `undefined` value. Refined 2026-11-12 in #29: `upsert` leaves the key out rather than sending `DEFAULT`; in several rows its cell takes `DEFAULT` and counts as missing for `upsertRequiresSameKeys`. Refined 2026-11-14 in #168: an `undefined` key of `upsert()` `updateValues` is a missing key too | `PGCAST_DEP002` |
 | #190 | Opt-in | data loss, but `try { insert } catch (23505) { return null }` in a transaction with no other write to lose works today | `transactionRequiresCommit: true`: when Postgres answers `transaction()`'s `COMMIT` with `ROLLBACK` (the callback caught a query's error and returned), it rejects with an error that says what to do, not retried; the old path warns only when that happens. Decided 2026-11-13 in #190 | `PGCAST_DEP003` |
 | R12 | Fix | `not()` must negate its whole condition; `(NOT a) OR b` contradicts its name | — | — |
 | R13 | Fix | the type accepts a `Parameter`, the runtime wraps it twice; `Default` in a filter throws an error that says what to do | — | — |

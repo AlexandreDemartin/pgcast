@@ -85,7 +85,7 @@ The keys of an interpolated object are names too. The type refuses an unknown ke
 ::: warning Security
 An interpolated object that is not a `param()`, a fragment or another of pgcast's values compiles as a Whereable, a class instance included.
 
-A built-in object throws while compiling, before any query: `` db.sql`DELETE FROM ${'ratings'} WHERE ${when}` ``, with `when` a `Date` typed `any`, no longer compiles to `DELETE FROM "ratings" WHERE TRUE`, as in Zapatos 6.6.1, which deleted every rating ([Whereable objects](/sql-template#whereable)). Pass a date as `db.param(when)`.
+A built-in object of the realm that runs pgcast throws while compiling, before any query; one from another realm, such as a `vm` context, does not. `` db.sql`DELETE FROM ${'ratings'} WHERE ${when}` ``, with `when` a `Date` typed `any`, no longer compiles to `DELETE FROM "ratings" WHERE TRUE`, as in Zapatos 6.6.1, which deleted every rating ([Whereable objects](/sql-template#whereable)). Pass a date as `db.param(when)`.
 
 Any object with no keys is `TRUE`, a typed Whereable included: `const where: s.ratings.Whereable = {}`, given a `film_id` only `if (filmId)`, compiles with no error to the same `DELETE`. Check for an empty filter before a `DELETE` or an `UPDATE` ([Whereable objects](/sql-template#whereable)). The check below catches `{}`, not a key whose value compiles to `true`, such as `film_id: db.conditions.isNotIn([])`:
 
