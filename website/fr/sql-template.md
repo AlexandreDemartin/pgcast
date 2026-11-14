@@ -4,7 +4,7 @@ english: ba462e5de8d5
 
 # Template SQL
 
-`sql` est le template étiqueté sur lequel repose chaque requête de pgcast, raccourcis compris. Cette page liste ce qu’il accepte, ce que donne chaque interpolation une fois compilée, et le `SQLFragment` qu’il renvoie.
+`sql` est le tagged template sur lequel repose chaque requête de pgcast, raccourcis compris. Cette page liste ce qu’il accepte, ce que donne chaque interpolation une fois compilée, et le `SQLFragment` qu’il renvoie.
 {.lede}
 
 ## `sql` {#sql}
@@ -151,7 +151,7 @@ La chaîne, écrite telle quelle dans le SQL : pour une syntaxe qu’un paramè
 </CastPanel>
 
 ::: warning Sécurité
-Tout ce qui atteint `raw()` s’exécute comme du SQL. Ne lui donnez jamais le texte d’un appelant ; une valeur est un [`param()`](#param). Comment garder sûr du SQL écrit à la main : [SQL brut](/fr/raw-sql).
+Tout ce qui atteint `raw()` s’exécute comme du SQL. Ne lui donnez jamais le texte d’un appelant ; une valeur est un [`param()`](#param). Pour écrire du SQL à la main sans risque : [SQL brut](/fr/raw-sql).
 :::
 
 Comme valeur de filtre, `raw()` lève une erreur à la compilation, tout comme `cols()` et `vals()`. Comme valeur d’un Whereable, dans `isIn()` / `isNotIn()`, et dans `vals([…])` au sein d’un filtre :
@@ -166,7 +166,7 @@ Dans [`vals({…})`](#vals), donc comme valeur d’`insert()`, d’`upsert()` ou
 
 > `` `db.raw()`, `db.cols()` and `db.vals()` have no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value: to write SQL, use a `sql` fragment value (in `update()`, `db.self` there stands for the column); to write a value, give the value itself, or `db.param()`. ``<!-- message -->
 
-Le type les refuse là, et comme valeur d’`insert()` ou d’`update()`, sur chaque colonne qu’il type (une colonne typée `any`, ce que donne un fichier à compléter de `zapatos/custom`, accepte tout) ; il les accepte dans le `vals({…})` d’un template `sql` :
+Le type les refuse là, et comme valeur d’`insert()` ou d’`update()`, sur chaque colonne qu’il type (une colonne typée `any`, ce que donne un placeholder de `zapatos/custom`, accepte tout) ; il les accepte dans le `vals({…})` d’un template `sql` :
 
 ```ts twoslash
 // @errors: 2345
@@ -178,7 +178,7 @@ db.sql<s.films.SQL>`SELECT * FROM ${'films'} WHERE ${{ title: db.raw("'x'") }}`;
 
 - Pour comparer avec du SQL : un fragment en valeur, `` { title: db.sql`${db.self} = ${db.raw("'x'")}` } ``.
 - Zapatos 6.6.1 les y envoyait comme un seul paramètre, en JSON (`'{"value":…}'`) : aucune ligne sur une colonne texte ou `jsonb`, toutes les lignes avec `ne()` et `isNotIn()`, une erreur (22P02) sur les autres types ; comme valeur d’écriture, une colonne texte ou `jsonb` la stockait.
-- Hors d’un filtre, `vals([db.raw('x')])` reste un paramètre, l’enveloppe en JSON : `'{"value":"x"}'`, qu’une colonne texte stocke tel quel ; dans les `updateValues` d’`upsert()`, `raw()` est du SQL ([`upsert()`](/fr/insert#upsert)).
+- Hors d’un filtre, `vals([db.raw('x')])` reste un paramètre, son wrapper en JSON : `'{"value":"x"}'`, qu’une colonne texte stocke tel quel ; dans les `updateValues` d’`upsert()`, `raw()` est du SQL ([`upsert()`](/fr/insert#upsert)).
 
 ### `DangerousRawString` {#DangerousRawString}
 
@@ -295,7 +295,7 @@ Un objet est un Whereable de la table : chacune de ses propres clés énumérab
 Un objet interpolé qui n’est pas l’une des autres [interpolations](#interpolations) se compile en Whereable, objet simple ou non : une instance de classe `{ title }` donne `("title" = $1)`<!-- probe: db.sql`${new (class { title = 'x' })()}` -->, et une instance sans clé propre énumérable donne `TRUE`, même d’une classe qui étend un objet natif (`class Premiere extends Date {}`). Vérifiez à l’exécution ce qui atteint un `where`.
 :::
 
-Un objet natif lève une erreur à la compilation, avant toute requête, même avec des clés propres ajoutées (`Object.assign(new Date(0), { id: 1 })`) : `Date`, `Map`, `Set`, `WeakMap`, `WeakSet`, `WeakRef`, `FinalizationRegistry`, `RegExp`, `Promise`, `Error` et ses sous-types natifs (`TypeError`, `AggregateError`, …), `ArrayBuffer`, `SharedArrayBuffer`, un tableau typé, `Buffer`, `DataView`, les objets enveloppes `Number`, `String`, `Boolean`, `BigInt` et `Symbol`, et, là où le runtime les fournit (Node 24), `SuppressedError`, `DisposableStack` et `AsyncDisposableStack` :
+Un objet natif lève une erreur à la compilation, avant toute requête, même avec des clés propres ajoutées (`Object.assign(new Date(0), { id: 1 })`) : `Date`, `Map`, `Set`, `WeakMap`, `WeakSet`, `WeakRef`, `FinalizationRegistry`, `RegExp`, `Promise`, `Error` et ses sous-types natifs (`TypeError`, `AggregateError`, …), `ArrayBuffer`, `SharedArrayBuffer`, un tableau typé, `Buffer`, `DataView`, les objets wrapper `Number`, `String`, `Boolean`, `BigInt` et `Symbol`, et, là où le runtime les fournit (Node 24), `SuppressedError`, `DisposableStack` et `AsyncDisposableStack` :
 
 > `` A built-in `…` has no meaning as a Whereable (a filter): it would compile to its own enumerable keys, and to `TRUE`, every row, when it has none. To compare with a value, give it as `db.param(…)`; to filter, give a plain object (`{ column: value }`); await a `Promise` first. ``<!-- message -->
 
@@ -344,7 +344,7 @@ Une colonne de la table de la requête parente, dans une sous-requête donnée �
 
 </CastPanel>
 
-- Sans colonne, la colonne du filtre où il se trouve : `{ film_id: db.parent() }`, dans un `lateral` de `roles`, donne `("film_id" = "roles"."film_id")`<!-- probe: db.select('roles', db.all, { lateral: { film: db.selectOne('films', { film_id: db.parent() }) } }) -->. Sans filtre, il lève une erreur avant d’écrire quoi que ce soit : "`db.parent()` with no column has no meaning here: name the column, `db.parent('id')`…"<!-- message -->. Zapatos 6.6.1 écrivait la table et son `.`, puis levait "Alien object while interpolating SQL : undefined".
+- Sans colonne, la colonne du filtre où il se trouve : `{ film_id: db.parent() }`, dans un `lateral` de `roles`, donne `("film_id" = "roles"."film_id")`<!-- probe: db.select('roles', db.all, { lateral: { film: db.selectOne('films', { film_id: db.parent() }) } }) -->. Sans filtre, il lève une erreur avant d’écrire quoi que ce soit : "`db.parent()` with no column has no meaning here: name the column, `db.parent('id')`…"<!-- message -->. Zapatos 6.6.1 écrivait la table et son `.`, puis levait « <span lang="en">Alien object while interpolating SQL: undefined</span> ».
 - Il fonctionne comme valeur d’un Whereable, dans un fragment `sql`, dans `eq()` et dans `vals([…])`, donc dans `isIn()` : `{ film_id: isIn([db.parent()]) }` donne `(("film_id" IN ("roles"."film_id")))`<!-- probe: db.select('roles', db.all, { lateral: { film: db.selectOne('films', { film_id: db.conditions.isIn([db.parent()]) }) } }) -->. Dans `vals([…])`, Zapatos 6.6.1 l’envoyait en JSON : `isIn([parent('id')])` comparait avec `'{"value":"id"}'`.
 - Dans `vals({…})` aussi, où, sans colonne, il prend la colonne de sa clé : `` db.sql`SELECT ${db.vals({ name: db.parent() })} AS result` ``, dans un `lateral` de `studios`, donne `SELECT "studios"."name" AS result`<!-- probe: db.select('studios', db.all, { lateral: { n: db.sql`SELECT ${db.vals({ name: db.parent() })} AS result` } }) -->. Zapatos 6.6.1 l’y envoyait en JSON aussi.
 - Hors d’une requête imbriquée, il lève "The 'parent' table alias has no meaning here"<!-- message -->, si bien que `run()` est rejetée avant toute requête. De même pour toute valeur d’`insert()`, d’`upsert()` ou d’`update()`, là où Zapatos 6.6.1 stockait `{"value":"id"}` sur une colonne texte.
@@ -444,7 +444,7 @@ Ce que renvoient `sql` et chaque raccourci : une requête, ou une partie de req
 | [`run(queryable, force?)`](#run) | compile, exécute, et se résout en `RunResult` |
 | [`compile()`](#compile) | `{ text, values }`, la requête qu’envoie `run()` |
 | [`runResultTransform`](#runResultTransform) | transforme le résultat de `pg` en `RunResult` |
-| [`prepared(name?)`](#prepared) | en fait une instruction préparée |
+| [`prepared(name?)`](#prepared) | en fait une requête préparée |
 | [`copy(override?)`](#copy) | une copie superficielle, certaines propriétés remplacées |
 | `noop`, `noopResult` | fixés par `insert()` et `upsert()` quand ils reçoivent `[]` : `run()` n’envoie rien et se résout en `noopResult` |
 | `parentTable` | fixé sur une sous-requête `lateral` par sa parente, pour [`parent()`](#parent) |
@@ -508,13 +508,13 @@ Il ne s’applique qu’au `run()` de ce fragment : pas quand il est imbriqué 
 fragment.prepared(name = `_zapatos_prepared_${n}`): this
 ```
 
-Fixe le `name` que `compile()` ajoute à la requête, pour que Postgres prépare l’instruction une fois par connexion puis l’exécute par son nom ([node-postgres](https://node-postgres.com/features/queries#prepared-statements)). Sans nom, `_zapatos_prepared_0`, `_1`… dans l’ordre des appels.
+Fixe le `name` que `compile()` ajoute à la requête, pour que Postgres prépare la requête une fois par connexion puis l’exécute par son nom ([node-postgres](https://node-postgres.com/features/queries#prepared-statements)). Sans nom, `_zapatos_prepared_0`, `_1`… dans l’ordre des appels.
 
-Les valeurs sont des paramètres, pas une partie du texte : un seul nom sert donc à chaque appel d’une fonction de requête dont le texte ne change pas ; sans nom, chaque appel prépare une autre instruction :
+Les valeurs sont des paramètres, pas une partie du texte : un seul nom sert donc à chaque appel d’une fonction de requête dont le texte ne change pas ; sans nom, chaque appel prépare une autre requête :
 
 <<< ../examples/plain/sql_prepared.ts{ts twoslash}
 
-Un nom désigne un seul texte : sur une connexion qui a préparé `'p'`, `pg` rejette un fragment d’un autre texte nommé `'p'` avec "Prepared statements must be unique - 'p' was used for a different statement".
+Un nom désigne un seul texte : sur une connexion qui a préparé `'p'`, `pg` rejette un fragment d’un autre texte nommé `'p'` avec « <span lang="en">Prepared statements must be unique - 'p' was used for a different statement</span> ».
 
 ### `copy()` {#copy}
 

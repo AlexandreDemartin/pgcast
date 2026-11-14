@@ -7,7 +7,7 @@ english: cde3b6516b1e
 Pourquoi pgcast fonctionne comme il le fait : l’idée qu’il garde de Zapatos, ce que le fork y ajoute, et ce qu’il ne fera jamais. Les étapes sont dans les [guides](/fr/guides), chaque option dans la [référence](/fr/reference).
 {.lede}
 
-## Juste votre base, avec la sûreté des types {#just-your-database-with-type-safety}
+## Juste votre base, avec la sécurité de type {#just-your-database-with-type-safety}
 
 pgcast, c’est Zapatos qui continue. La doc de Zapatos s’ouvre sur son but :
 
@@ -15,17 +15,17 @@ pgcast, c’est Zapatos qui continue. La doc de Zapatos s’ouvre sur son but :
 
 Son plaidoyer vise les ORM. « <span lang="en">It is a truth universally acknowledged that ORMs aren’t very good</span> », écrit son auteur, et « <span lang="en">abstractions that obscure the underlying SQL, or that prioritise ease of switching to another database tomorrow over effective use of this database today, are a source of misery</span> ».
 
-La vérification des types et l’autocomplétion de VS Code « <span lang="en">speed development, prevent bugs, and simplify refactoring</span> », mais « <span lang="en">talking to the database is a place where they really don’t just happen</span> ».
+La vérification de types et l’autocomplétion de VS Code « <span lang="en">speed development, prevent bugs, and simplify refactoring</span> », mais « <span lang="en">talking to the database is a place where they really don’t just happen</span> ».
 
 Zapatos fait donc trois choix, et pgcast garde les trois : les types viennent de la base, le SQL reste sous vos yeux, et rien n’arrive que vous n’ayez demandé.
 
-## Des types tirés de la base {#types-cast-from-the-database}
+## Des types castés depuis la base de données {#types-cast-from-the-database}
 
 Postgres connaît déjà votre schéma : chaque colonne, son type, si elle peut être nulle, si elle a une valeur par défaut, le commentaire que vous lui avez donné. Le générateur interroge le catalogue (`pg_catalog` et `information_schema`) et écrit `zapatos/schema.d.ts`.
 
-Ce fichier contient les types de chaque table, vue, vue matérialisée et table distante, une union de chaînes pour chaque enum, et un fichier à compléter pour chaque domaine ou type qu’il ne sait pas traduire seul ([Types personnalisés](/fr/custom-types)). Aucun type de ligne n’est écrit à la main, donc aucun ne peut contredire sa table.
+Ce fichier contient les types de chaque table, vue, vue matérialisée et table distante, une union de chaînes pour chaque enum, et un placeholder pour chaque domaine ou type qu’il ne sait pas traduire seul ([Types personnalisés](/fr/custom-types)). Aucun type de ligne n’est écrit à la main, donc aucun ne peut contredire sa table.
 
-D’où le nom. En Postgres, un cast (`::`) donne son type à une valeur ; en anglais, un *cast* est aussi un moulage, une pièce tirée d’un moule. Les types de pgcast sont tirés de votre schéma, et les exemples de cette doc parlent, fort à propos, de la distribution d’un film, son *cast*.
+D’où le nom. En Postgres, un cast (`::`) donne son type à une valeur ; en anglais, un *cast* est aussi un moulage. Les types de pgcast sont castés depuis votre schéma, et les exemples de cette doc parlent, fort à propos, de la distribution d’un film, son *cast*.
 
 Une colonne que la table n’a pas est refusée avant toute requête :
 
@@ -38,7 +38,7 @@ declare const pool: pg.Pool;
 const films = await db.select('films', { relase_year: 1974 }).run(pool);
 ```
 
-Les types sont aussi frais que le dernier passage du générateur. Relancez-le après chaque migration, et le compilateur vous signale chaque requête qui ne colle plus. Comment chaque type Postgres devient un type TypeScript, et pourquoi une ligne en JSON diffère d’une ligne venue de `pg` : [Le catalogue](/fr/catalog-types).
+Les types datent du dernier passage du générateur. Relancez-le après chaque migration, et le compilateur vous signale chaque requête qui ne colle plus. Comment chaque type Postgres devient un type TypeScript, et pourquoi une ligne en JSON diffère d’une ligne venue de `pg` : [Le catalogue](/fr/catalog-types).
 
 ## Le SQL que vous lisez est le SQL qui s’exécute {#the-sql-you-read-is-the-sql-that-runs}
 
@@ -60,11 +60,11 @@ Quand un raccourci ne convient pas, le template [`sql`](/fr/sql-template#sql) es
 
 ## Explicite, jamais caché {#explicit-never-hidden}
 
-Il n’y a pas de modèles. Une requête renvoie des objets simples, typés : « just (fully-typed) POJOs », selon les mots de la doc de Zapatos. Aucune classe à étendre, aucune relation à déclarer, rien de chargé paresseusement derrière une propriété, et aucun état qu’un enregistrement ultérieur réécrirait.
+Il n’y a pas de modèles. Une requête renvoie des objets simples, typés : « <span lang="en">just (fully-typed) POJOs</span> », selon les mots de la doc de Zapatos. Aucune classe à étendre, aucune relation à déclarer, rien de chargé paresseusement derrière une propriété, et aucun état qu’un enregistrement ultérieur réécrirait.
 
 Pas de connexion par défaut non plus : chaque `.run()` prend le pool ou le client sur lequel s’exécuter, car « <span lang="en">Zapatos is always explicit about what client or pool is running your query</span> ».
 
-Une transaction ne commence que lorsque vous appelez [`transaction()`](/fr/transaction#transaction). Elle envoie `START TRANSACTION`<!-- probe: db.serializable(pool, async () => {}) --> au niveau d’isolation choisi, puis `COMMIT`<!-- probe: db.serializable(pool, async () => {}) --> ou `ROLLBACK`<!-- probe: db.serializable(pool, async () => { throw new Error(); }) -->, et relance votre callback après un échec de sérialisation ou un interblocage ([Nouvelles tentatives](/fr/retries)).
+Une transaction ne commence que lorsque vous appelez [`transaction()`](/fr/transaction#transaction). Elle envoie `START TRANSACTION`<!-- probe: db.serializable(pool, async () => {}) --> au niveau d’isolation choisi, puis `COMMIT`<!-- probe: db.serializable(pool, async () => {}) --> ou `ROLLBACK`<!-- probe: db.serializable(pool, async () => { throw new Error(); }) -->, et relance votre callback après un échec de sérialisation ou un deadlock ([Retries](/fr/retries)).
 
 Il en va de même pour vos propres fonctions. La doc de Zapatos déconseille de donner le pool comme valeur par défaut à l’argument client d’une fonction : « <span lang="en">I find that way it’s too easy to accidentally issue queries outside of transactions</span> ».
 
@@ -74,7 +74,7 @@ Celle qui ouvre une transaction prend le pool ou le client de son niveau, `pg.Po
 
 ## Ce qu’ajoute pgcast {#what-pgcast-adds}
 
-pgcast part de Zapatos 6.6.1. Avant de le modifier, le fork a figé par des tests ce que fait 6.6.1, et cette [caractérisation](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/CHARACTERISATION-REPORT.md) a trouvé des dizaines de surprises, dont 7 touchant à la sécurité. Une découverte sur laquelle pgcast agit suit l’une de trois voies ([décision 003](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/003-fixes-and-deprecation.md)) :
+pgcast part de Zapatos 6.6.1. Avant de le modifier, le fork a figé par des tests ce que fait la 6.6.1, et cette [caractérisation](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/CHARACTERISATION-REPORT.md) a trouvé des dizaines de surprises, dont 7 touchant à la sécurité. Une découverte sur laquelle pgcast agit suit l’une de trois voies ([décision 003](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/003-fixes-and-deprecation.md)) :
 
 <div class="stack">
 
@@ -86,13 +86,13 @@ pgcast part de Zapatos 6.6.1. Avant de le modifier, le fork a figé par des test
 
 </div>
 
-Les corrections de sécurité sont venues d’abord, toutes en 6.6.2 ([Sécurité](/fr/security)) :
+Les corrections de sécurité sont venues d’abord, toutes dans la 6.6.2 ([Sécurité](/fr/security)) :
 
 - aucun nom (une table, une colonne, une clé, un alias) ni aucun cast de `param()` ne peut fermer ses guillemets ;
 - une valeur simple dans les `updateValues` de [`upsert()`](/fr/insert#upsert) est un paramètre ;
 - les mots-clés d’un verrou, de `truncate()` ou d’un niveau d’isolation, et le nom d’un agrégat, sont vérifiés avant toute requête.
 
-Les opt-ins qui avertissent, [`undefinedMeansMissing`](/fr/runtime-config#Config.undefinedMeansMissing), [`upsertRequiresSameKeys`](/fr/runtime-config#Config.upsertRequiresSameKeys), [`transactionRequiresCommit`](/fr/runtime-config#Config.transactionRequiresCommit), [`aggregatesTypedByColumn`](/fr/runtime-config#Config.aggregatesTypedByColumn) et [`transactionRequiresIdleClient`](/fr/runtime-config#Config.transactionRequiresIdleClient), ainsi que [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas) et [`enumOrder`](/fr/generator#generate.enumOrder) du générateur, deviennent les valeurs par défaut en 7.0, et leurs anciens chemins disparaissent en 8.0.
+Les opt-ins qui avertissent, [`undefinedMeansMissing`](/fr/runtime-config#Config.undefinedMeansMissing), [`upsertRequiresSameKeys`](/fr/runtime-config#Config.upsertRequiresSameKeys), [`transactionRequiresCommit`](/fr/runtime-config#Config.transactionRequiresCommit), [`aggregatesTypedByColumn`](/fr/runtime-config#Config.aggregatesTypedByColumn) et [`transactionRequiresIdleClient`](/fr/runtime-config#Config.transactionRequiresIdleClient), ainsi que [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas) et [`enumOrder`](/fr/generator#generate.enumOrder) du générateur, deviennent les valeurs par défaut dans la 7.0, et leurs anciens chemins disparaissent dans la 8.0.
 
 [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), qui n’avertit jamais, reste désactivé. Jusqu’à la 7.0, la 6.x remplace Zapatos 6.6.1 sans autre changement ([Versions](/fr/versions)).
 
@@ -114,11 +114,11 @@ Certains changements sont refusés, quoi qu’ils apportent, parce que chacun re
 
 | pgcast n’ajoutera pas | Parce que |
 |---|---|
-| Des modèles, des classes d’entités, des relations déclarées en TypeScript | un résultat, c’est « just (fully-typed) POJOs » ; les relations sont dans la base |
+| Des modèles, des classes d’entités, des relations déclarées en TypeScript | un résultat, c’est « <span lang="en">just (fully-typed) POJOs</span> » ; les relations sont dans la base |
 | Le chargement paresseux, une identity map, le suivi des modifications, un cache de requêtes | chacun est un état caché : une requête s’exécuterait, ou non, sans que vous le demandiez |
 | Une chaîne de méthodes qui construit une requête (`.where().join()`) | elle cache le SQL ; un raccourci écrit une requête, et le template `sql` la vôtre |
 | Un client implicite, par défaut ou global ; une transaction que vous n’avez pas ouverte | « <span lang="en">Zapatos is always explicit about what client or pool is running your query</span> » |
-| Un pool de connexions, ou des migrations | `pg` rend le pool facile, et « Zapatos doesn’t handle schema migrations » : votre outil de migration s’en charge |
+| Un pool de connexions, ou des migrations | `pg` rend le pool facile, et « <span lang="en">Zapatos doesn’t handle schema migrations</span> » : votre outil de migration s’en charge |
 | Une couche pour changer de base de données | elle coûte « <span lang="en">effective use of this database today</span> » |
 | Un type que la base n’énonce pas | un type deviné s’écarte du schéma |
 | Une valeur collée dans le SQL | les valeurs sont des paramètres ; seul [`raw()`](/fr/sql-template#raw) écrit une chaîne telle quelle dans le SQL, et il renvoie une `DangerousRawString` |
@@ -128,5 +128,5 @@ Certains changements sont refusés, quoi qu’ils apportent, parce que chacun re
 ## Pour aller plus loin {#further-reading}
 
 - Les entrées dont parle cette page : [`select()`](/fr/select#select), [`selectOne()`](/fr/select#selectOne), le template [`sql`](/fr/sql-template#sql) et [`.compile()`](/fr/sql-template#compile), [`transaction()`](/fr/transaction#transaction), [`Config.undefinedMeansMissing`](/fr/runtime-config#Config.undefinedMeansMissing), [`Config.upsertRequiresSameKeys`](/fr/runtime-config#Config.upsertRequiresSameKeys), [`Config.transactionRequiresCommit`](/fr/runtime-config#Config.transactionRequiresCommit), [`Config.transactionRequiresIdleClient`](/fr/runtime-config#Config.transactionRequiresIdleClient) et [`Config.selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow).
-- Les guides : [Jointures](/fr/lateral), [Nouvelles tentatives](/fr/retries), [Venir de Zapatos](/fr/switching).
+- Les guides : [Jointures](/fr/lateral), [Retries](/fr/retries), [Venir de Zapatos](/fr/switching).
 - La [doc](https://jawj.github.io/zapatos/) de Zapatos elle-même, pour 6.6.1 ; ce que pgcast change, dans le [changelog](/fr/changelog).
