@@ -104,7 +104,9 @@ A reader scans before reading, so a page breathes. Less is more: it keeps every 
 
 ### Examples
 
-- A `ts twoslash` block is compiled against the built `zapatos/db` and the docs schema's `zapatos/schema`; hovers show the types TypeScript gives. An unexpected type error fails the build; a block meant to fail says so with `// @errors: <code>`.
+- A `ts twoslash` block is compiled against the built `zapatos/db` and the docs schema's `zapatos/schema`; hovers show the types TypeScript gives. An unexpected type error fails the build. A refused line fails it too once it compiles, written one of two ways:
+  - **Shown refused**, underlined with its error: a block of its own, meant to fail, that lists the codes on a line `// @errors: 2322 2345`, at the start of the line. The build fails if its code does not raise each code listed, and on any other line holding `@errors` in a comment, which Twoslash would leave a comment (`.vitepress/twoslash.ts`).
+  - **An aside** in a block that compiles: `// @ts-expect-error <what is refused>` above the line (`select.md`), which shows no error; TypeScript fails on it once unused.
 - A hover names a package's module as the reader imports it (`typeof import("pg")`), where TypeScript prints its path on the build machine (`.vitepress/twoslash.ts`, `moduleNames`). After VitePress, `docs:build` fails on a machine's path in any built text file, hovers included (`check-paths.mjs`): this checkout's, or one that starts `/home/`, `/Users/`, `/runner/` or a drive letter. A path that a package's JSDoc gives as an example goes in its `allowed`.
 - Twoslash reports only a block's own errors, so `docs:build` first runs `tsc` (`tsconfig.json`) on the docs schema and `examples/`: a stale schema fails there. Then `tsc -p .vitepress`, on the site's own code.
 - **The cast panel** shows what you write, what Postgres runs and what TypeScript knows. It is for a query whose SQL and type the reader should see: a shortcut, an option that changes the SQL. Code that sends no query (a pool, a config, a type) is a plain `ts twoslash` block.
