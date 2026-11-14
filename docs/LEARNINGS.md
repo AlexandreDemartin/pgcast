@@ -143,11 +143,9 @@ Candidates for a check, a rule or a skill line.
 - #51 — R36 depends on the schema: an inline fragment fails only when another relation has the same column name with another type, or a nullable copy of a `NOT NULL` column in `update()`; the docs schema has neither, so the page states it in prose — `builder`
 - #48 — Escape the whole string that goes into a JSDoc, template text included: `**` before a name starting with `/` makes a `*/` that escaping the name alone misses — `branch-reviewer`
 - #48 — Replay every example a CHANGELOG line gives, not only its main claim: the `\u` and octal wordings were reasoned, then found wrong — `branch-reviewer`
-<<<<<<< ours
 - #48 — « Of the output that parsed under 6.6.1, only X changes » is replayed per name on a scalar column, an array column and an unused type, `skipLibCheck` both ways, TS 5.9 and 7: three rounds came back to it (TS2457 on `string`, `keyof[]`, `unique[]`) — `branch-reviewer`
 - #48 — « Parses » and « compiles » are two checks: `syntaxErrors()` (transpile) sees parse errors only; checker errors in a `.d.ts` (TS1005, TS2457) hide under `skipLibCheck`, and tsc reports none while a file of the program fails to parse — `builder`
 - #48 — A map keyed by a Postgres name is `Object.create(null)` or a `Map`: a table named `constructor` or `toString` crashed the collision note (and see #399) — `builder`
-=======
 - #168 — An option that drops keys from a caller's object filters the key list and leaves the object alone: rebuilding it (`Object.fromEntries(Object.entries(x))`) loses getters, inherited and non-enumerable keys that `x[k]` still reads — `branch-reviewer`
 - #168 — A replay grid also runs once on the pre-fix commit, to show it finds the defect (144 differences on the old head, 0 after) — `branch-reviewer`
 - #168 — Before planning a step that changes an opt-in, search its tests: two existing tests had frozen the very behaviour the decision changed — `builder`
@@ -160,7 +158,6 @@ Candidates for a check, a rule or a skill line.
 - #253 — An issue cites a test by its name, not its `file:line`: the line taken from Minors kept had moved by the time the step ran — `builder`
 - #253 — A guard shared by several routes gets a route-specific mutant: removing the shared guard turns every entry red and cannot show the new one is needed — `builder`
 - #253 — `branch-reviewer` cannot load the user skill `branch-review` (`disable-model-invocation`), so it reviews from its brief: the agent and the skill disagree — orchestrator
->>>>>>> theirs
 
 ## Minors kept
 
@@ -193,11 +190,8 @@ Minor review defects, taken up by the end-of-chapter review.
 - #368 — `website/generator.md:69`: « the options of `zapatosconfig.json` », where the lede now says « its config file » — `branch-reviewer`
 - #48 — `src/generate/tables.ts:294`, `:305`, `:315`: the `stringLiteral` escapes of `Schema`, `AllSchemas` and a `"` in a `*ForTable` key are untested; undoing them leaves the suite green — `branch-reviewer`
 - #48 — `src/generate/enumOrder.ts:11`: « like enumLabel.ts » names a file #395 deleted (`quote.ts`) — `branch-reviewer`
-<<<<<<< ours
 - #48 — `src/generate/quote.ts:21`: `refusedAsNamespace` / `refusedAsType` match TS 5.9.3 and 7.0.2 but are tested on three words; a table-driven test against the compiler would catch a keyword a later TypeScript adds — `branch-reviewer`
 - #48 — `website/generator.md:343`: the `warningListener` section does not list the collision note; `:141` leaves out `keyof`/`infer`/`readonly`/`unique` — `branch-reviewer`
 - #48 — `src/generate/quote.ts:36`: Node's `\p{ID_Start}` follows Unicode 17, newer than TypeScript's tables: a Unicode 16 letter is kept and still fails (TS1127), no regression; a JSDoc line — `branch-reviewer`
-=======
 - #168 — `website/insert.md:307`, `CHANGELOG.md:19`: « `DO NOTHING` » without what it does to the result (one row: `undefined` on conflict; an array leaves that row out) — `branch-reviewer`
 - #168 — `src/db/shortcuts.ts:369`, `:376`: `specifiedUpdateColumns as string[] ?? colNames` written twice — `branch-reviewer`
->>>>>>> theirs
