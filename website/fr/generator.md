@@ -1,5 +1,5 @@
 ---
-english: 27cc88df80f1
+english: faa34125d649
 ---
 
 # Générateur
@@ -223,6 +223,7 @@ Son SQL est celui de [`select()`](/fr/select#select), avec le nom entre guilleme
 - Les noms ne sont pas qualifiés par schéma : l’espace de noms `c` est commun à tous les schémas, donc un domaine `notes` dans `public` et un autre dans `archive` sont tous deux `PgNotes`, avec un seul placeholder pour les deux.
   - Le générateur le signale via [`warningListener`](#generate.warningListener), comme pour deux noms qu’une transformation réduit à un seul (`seat-label` et `seat_label`), et garde le nom, dont dépend un placeholder déjà modifié.
 - Des noms qui ne diffèrent que par la casse, comme `PgSeat_label` et `PgSEAT_LABEL` pour les domaines `seat_label` et `"SEAT_LABEL"`, ont deux placeholders qui ne forment qu’un seul fichier sur un système de fichiers insensible à la casse, celui par défaut sur macOS et Windows : celui écrit en premier ne déclare que son propre nom, et les autres ne sont jamais déclarés. Le générateur le signale aussi, où qu’il tourne, et écrit les mêmes fichiers.
+- Un nom dont le placeholder est `index.d.ts`, comme `index` pour un domaine `index` avec `"my_type"`, ou `Index` sur un système de fichiers insensible à la casse, partage son fichier avec [`custom/index.d.ts`](#the-files-it-writes), que le générateur écrit par-dessus à chaque exécution : ce nom n’est jamais déclaré. Le générateur le signale aussi, et écrit les mêmes fichiers.
 
 ### `schemaJSDoc` {#generate.schemaJSDoc}
 
@@ -355,6 +356,8 @@ Writing custom types file: src/zapatos/custom/index.d.ts
   - une fois par exécution pour chaque nom que partagent deux types Postgres ([`customTypesTransform`](#generate.customTypesTransform)) ; quand leurs noms diffèrent, il ajoute qu’une fonction `customTypesTransform` peut les distinguer ;
 - `Note: custom types "public"."SEAT_LABEL" (PgSEAT_LABEL) and "public"."seat_label" (PgSeat_label) have TypeScript names that differ only in case: on a case-insensitive file system, the default on macOS and Windows, PgSEAT_LABEL.d.ts and PgSeat_label.d.ts are one placeholder file in src/zapatos/custom, which declares only one of those names. To type them apart, rename one of them in the database, or give customTypesTransform a function that keeps their names apart.`
   - une fois par exécution pour des noms qui ne diffèrent que par la casse, quel que soit le système de fichiers, avant la note ci-dessus pour chacun de ces noms que partagent deux types Postgres ;
+- `Note: custom type "public"."index" (index) has the placeholder file index.d.ts in src/zapatos/custom, the file of the custom types' index: the generator writes the index over it on every run, so index is never declared. To declare it, rename it in the database, or give customTypesTransform a function that names it otherwise.`
+  - une fois par exécution pour les noms dont le placeholder est `custom/index.d.ts` : `index` et, sur un système de fichiers insensible à la casse, un nom qui n’en diffère que par la casse (`Index`, `INDEX`), après la note ci-dessus pour ces noms ;
 - `Note: the include entry "Films" of schema "public" matches no relation there, so it generates nothing. Check its spelling and case, that the relation is in schema "public", and that the database role has a privilege on it: include names tables, views, materialised views and foreign tables.`
   - une fois par exécution pour chaque entrée d’une liste [`include`](#generate.schemas) que son schéma n’a pas ;
 - `Note: the schemas rule of "public" has no exclude, so it takes "exclude": [], as the default rule does. Write the key in the rule to silence this note.`
