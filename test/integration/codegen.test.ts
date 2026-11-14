@@ -281,15 +281,15 @@ describe('variant snapshots', () => {
   it('awkward names compile, typed under their legal identifiers and keyed by their real names', async () => {
     await t.pool.query(String.raw`
       CREATE SCHEMA "probe-names";
-      CREATE TYPE "probe-names".string AS ENUM ('a', 'b');
-      CREATE TABLE "probe-names".keyof (s "probe-names".string);
+      CREATE TYPE "probe-names"."as" AS ENUM ('a', 'b');
+      CREATE TABLE "probe-names".keyof (s "probe-names"."as");
       CREATE TABLE "probe-names"."it's\here" ("back\slash" int, "say ""cut""" int);
       CREATE UNIQUE INDEX "idx\back" ON "probe-names"."it's\here" ("back\slash");`);
     try {
       expect(await probeErrors({ schemas: { 'probe-names': all } }, String.raw`
         import type * as s from 'zapatos/schema';
         export const str: s.probe_names.keyof_.Selectable['s'] = 'a';
-        // @ts-expect-error not a label of "probe-names".string
+        // @ts-expect-error not a label of "probe-names"."as"
         export const text: s.probe_names.keyof_.Selectable['s'] = 'some text';
         export const row: s.SelectableForTable<'probe-names.it\'s\\here'> = { 'back\\slash': 1, 'say "cut"': null };
         export const table: s.probe_names.it_s_here.Table = 'probe-names.it\'s\\here';
@@ -298,6 +298,29 @@ describe('variant snapshots', () => {
       `)).toEqual([]);
     } finally {
       await t.pool.query('DROP SCHEMA "probe-names" CASCADE');
+    }
+  });
+
+  // 6.6.1's output, kept: TS2457 is a type-check error, which skipLibCheck hides, and the column is then
+  // TypeScript's own type. Only a name whose output does not parse takes a legal identifier.
+  it.each([false, true])("an enum named after one of TypeScript's own types keeps 6.6.1's output (skipLibCheck: %s)", async skipLibCheck => {
+    await t.pool.query(`
+      CREATE SCHEMA builtin_names;
+      CREATE TYPE builtin_names."string" AS ENUM ('a');
+      CREATE TYPE builtin_names."number" AS ENUM ('one');
+      CREATE TABLE builtin_names.takes (s builtin_names."string", n builtin_names."number");`);
+    try {
+      const errors = await probeErrors({ schemas: { builtin_names: all } }, `
+        import type * as s from 'zapatos/schema';
+        export const text: s.builtin_names.takes.Selectable['s'] = 'some text';
+        export const count: s.builtin_names.takes.Selectable['n'] = 1;
+      `, { skipLibCheck });
+      expect([...new Set(errors)].sort()).toEqual(skipLibCheck ? [] : [
+        "schema.d.ts TS2457 Type alias name cannot be 'number'.",
+        "schema.d.ts TS2457 Type alias name cannot be 'string'.",
+      ]);
+    } finally {
+      await t.pool.query('DROP SCHEMA builtin_names CASCADE');
     }
   });
 
@@ -638,15 +661,15 @@ describe('awkward names', () => {
     expect.soft(syntaxErrors(schema)).toEqual([]);
   });
 
-  it('legalises a schema name, a leading digit and a type operator, and an enum named after a TypeScript type', async () => {
+  it("legalises a schema name, a leading digit and a type operator, but keeps an enum named after a TypeScript type", async () => {
     const { ts: schema } = await codegen({ schemas: { 'box-office': all } });
     expect.soft(schema).toContain('export namespace box_office {');
     expect.soft(schema).toContain('export namespace _2nd_take {');
     expect.soft(schema).toContain('export namespace keyof_ {');
     expect.soft(schema).toContain('export namespace it_s_here {');
-    expect.soft(schema).toContain(`export type string_ = 'a' | 'b';`);
-    expect.soft(schema).toContain('s: string_ | null;');
-    expect.soft(schema).toContain('ss: string_[] | null;');
+    expect.soft(schema).toContain(`export type string = 'a' | 'b';`);
+    expect.soft(schema).toContain('s: string | null;');
+    expect.soft(schema).toContain('ss: string[] | null;');
     expect.soft(schema).toContain(`export type Schema = 'box-office';`);
     expect.soft(schema).toContain('"box-office.keyof": box_office.keyof_.Selectable;');
     expect.soft(schema).toContain('export type AllBaseTables = [...box_office.AllBaseTables];');
