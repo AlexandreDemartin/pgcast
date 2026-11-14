@@ -817,6 +817,7 @@ describe('custom types that share a placeholder name', () => {
     CREATE DOMAIN collide_a."Code" AS text;
     CREATE DOMAIN collide_a."CODE" AS boolean;
     CREATE TABLE collide_a.cased (a collide_a."Code", b collide_a.code, d collide_a."CODE");
+    CREATE TABLE collide_a.shouted (d collide_a."CODE");
   `));
   afterAll(() => t.pool.query('DROP SCHEMA collide_a, collide_b CASCADE'));
 
@@ -865,14 +866,32 @@ describe('custom types that share a placeholder name', () => {
     ]);
   });
 
-  it('warns once for names that differ only in case, whose placeholders are one file on macOS and Windows', async () => {
-    // PgCode and PgCODE: the file written first declares only its own name, and #42's note for PgCode alone said less
+  it('warns for names that differ only in case, whose placeholders are one file on macOS and Windows', async () => {
+    // PgCode and PgCODE: the file written first declares only its own name; #42's note for PgCode follows
     expect(await warningsFor({ collide_a: only('cased') })).toEqual([
       'Note: custom types "collide_a"."CODE" (PgCODE), "collide_a"."Code" (PgCode) and "collide_a"."code" (PgCode) ' +
       'have TypeScript names that differ only in case: on a case-insensitive file system, the default on macOS and ' +
       'Windows, PgCODE.d.ts and PgCode.d.ts are one placeholder file in src/zapatos/custom, which declares only one of ' +
       'those names. To type them apart, rename one of them in the database, ' +
       'or give customTypesTransform a function that keeps their names apart.',
+      'Note: custom types "collide_a"."Code" and "collide_a"."code" are both named PgCode in TypeScript, ' +
+      'so they share one type and one placeholder file, src/zapatos/custom/PgCode.d.ts. ' +
+      'To type them apart, rename one of them in the database, ' +
+      'or give customTypesTransform a function that keeps their names apart.',
+    ]);
+  });
+
+  it('keeps the note on a name that two schemas share when another name differs from it only in case', async () => {
+    // a function gets "code" for both PgCode types, so it cannot type them apart: #42's note says so
+    expect(await warningsFor({ collide_a: only('things', 'shouted'), collide_b: only('codes') })).toEqual([
+      'Note: custom types "collide_a"."CODE" (PgCODE), "collide_a"."code" (PgCode) and "collide_b"."code" (PgCode) ' +
+      'have TypeScript names that differ only in case: on a case-insensitive file system, the default on macOS and ' +
+      'Windows, PgCODE.d.ts and PgCode.d.ts are one placeholder file in src/zapatos/custom, which declares only one of ' +
+      'those names. To type them apart, rename one of them in the database, ' +
+      'or give customTypesTransform a function that keeps their names apart.',
+      'Note: custom types "collide_a"."code" and "collide_b"."code" are both named PgCode in TypeScript, ' +
+      'so they share one type and one placeholder file, src/zapatos/custom/PgCode.d.ts. ' +
+      'To type them apart, rename one of them in the database.',
     ]);
   });
 
