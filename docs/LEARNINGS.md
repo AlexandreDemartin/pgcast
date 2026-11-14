@@ -227,6 +227,9 @@ Candidates for a check, a rule or a skill line.
 - #447 — When a PR documents an exception, `git grep` the absolute words (« never », « every ») on the same subject across `website/`: « never overwritten » survived on three pages — `branch-reviewer`
 - #447 — When notes from several PRs can fire for one object (#42, #287, #447), a test of all of them together freezes their order — `branch-reviewer`
 - #447 — The CLI's « Writing new custom type or domain placeholder file » message announces a placeholder the index file then writes over: it still misleads — `builder`
+- #181 — When a function's accepted inputs widen, reread the page's general rules (« and the others », « refuses `null` »), not only the sentence the plan names: `conditions.md:34` contradicted the PR — `branch-reviewer`
+- #181 — A type test of a condition includes one literal on an enum column in context, against the generated schema: that case rests on inference through the return type, which the integration tests (stub schema) do not see — `branch-reviewer`
+- #181 — Comparing the emitted `.d.ts` of a probe file across variants is a cheap, exact check that inferred types are unchanged — `builder`
 
 ## Minors kept
 
@@ -296,3 +299,7 @@ Minor review defects, taken up by the end-of-chapter review.
 - #447 — `website/generator.md:427`, `:278`, `website/switching.md:18` (and `fr/…`): « never overwritten » without the `index` exception — `branch-reviewer`
 - #447 — `test/integration/codegen.test.ts:1053`: one `index` name shared by two schemas (this note and #42's on one file) is not tested — `branch-reviewer`
 - #447 — `src/generate/tsOutput.ts:94`: the outer `types` shadowed by the inner `const types` at `:122` — `branch-reviewer`
+- #181 — `website/conditions.md:131` (and `fr/…:135`): « Both take a nullable value » right after « as `eq()` » can read as `eq()` and `isNotDistinctFrom()`; the `isDistinctFrom()` entry at `:127` says nothing of nullable values — `branch-reviewer`
+- #181 — `test/types/core.test-d.ts:90`: no type test of a literal on an enum column in context (`{ mood: c.isDistinctFrom('sad') }`) — `branch-reviewer`
+- #181 — `CHANGELOG.md:93`: a user's generic helper now infers `SQLFragment<boolean, Exclude<V, null>>` — `branch-reviewer`
+- #181 — `website/fr/conditions.md:135`: « avec `tagline` un `string | null` » word for word; « si `tagline` est un `string | null` » — `branch-reviewer`
