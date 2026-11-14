@@ -212,6 +212,7 @@ To find each call:
 | `PGCAST_DEP001` | a multi-row `upsert()` without [`updateColumns`](/insert#upsert-options), with a key missing from some rows: inserted as `DEFAULT`, it overwrites the existing value ([Rows with different keys](/insert#upsert-different-keys)) | give every row the key (`db.Default` keeps the SQL), or pass `updateColumns`; or [`upsertRequiresSameKeys`](/runtime-config#Config.upsertRequiresSameKeys), and such a call throws |
 | `PGCAST_DEP002` | an `undefined` value in `insert()`, `update()` or `upsert()`, sent as `NULL`, or in `upsert()` `updateValues`, set from `EXCLUDED` ([An `undefined` value](/insert#undefined-values)) | leave the key out, or give `null` to erase the column; or [`undefinedMeansMissing`](/runtime-config#Config.undefinedMeansMissing), and `undefined` is a missing key |
 | `PGCAST_DEP003` | a [`transaction()`](/transaction#transaction) whose callback catches a query's error and returns: Postgres answers the `COMMIT` with `ROLLBACK`, and nothing is saved ([Let the error through](/retries#let-the-error-through)) | let the error out of the callback, or `ROLLBACK TO` a `SAVEPOINT` before going on; or [`transactionRequiresCommit`](/runtime-config#Config.transactionRequiresCommit), and such a transaction rejects |
+| `PGCAST_DEP004` | a [`sum()`, `avg()`, `min()` or `max()`](/select#typed-by-column) whose result `Number()` changes: `0` for no row, a date's milliseconds, `NaN` for a text | turn on [`aggregatesTypedByColumn`](/runtime-config#Config.aggregatesTypedByColumn), declared in [`ConfigTypes`](/runtime-config#ConfigTypes): `tsc` then shows each call whose result is now `null` or the column's type, and `?? 0` keeps a `0` |
 
 </div>
 
@@ -256,7 +257,7 @@ The note of [`enumOrder`](/generator#generate.enumOrder) names each enum whose l
 npm install zapatos@6.6.1
 ```
 
-- First, remove from `setConfig()` the options Zapatos 6.6.1's `Config` doesn't have (2353): `upsertRequiresSameKeys`, `undefinedMeansMissing`, `transactionRequiresCommit` and `selectExactlyOneChecksForSecondRow`.
+- First, remove from `setConfig()` the options Zapatos 6.6.1's `Config` doesn't have (2353): `upsertRequiresSameKeys`, `undefinedMeansMissing`, `transactionRequiresCommit`, `selectExactlyOneChecksForSecondRow` and `aggregatesTypedByColumn`.
 - On [`moduleNames`](/generator#generate.moduleNames) `"pgcast"`, run `npm uninstall pgcast` too: both packages have a `zapatos` command. Your `pgcast/…` imports then no longer resolve, and 6.6.1 writes `zapatos/` but leaves `pgcast/` behind. So change each import back to `zapatos/…`, move the placeholders you edited to `zapatos/custom/`, their `declare module 'pgcast/custom'` renamed `'zapatos/custom'`, and delete `pgcast/`.
 - Regenerate with Zapatos 6.6.1. It ignores `typeEnumsAcrossSchemas`, `enumOrder` and `moduleNames` in `zapatosconfig.json`, and writes again the `any` types, the sorted labels, the unprefixed comment lines and any borrowed `UniqueIndex` name.
 - Each change of [Find the calls whose result changes](#find-the-calls-whose-result-changes) runs as it did, but the `jsonb` one, which finds nothing again.

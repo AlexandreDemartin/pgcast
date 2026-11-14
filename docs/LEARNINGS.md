@@ -141,6 +141,14 @@ Candidates for a check, a rule or a skill line.
 - #368 — The « runs as on Zapatos 6.6.1 » CLI replay (exit code, stdout, `Error:` line, file hashes) is redone by hand on each CLI PR: a script with fixed scenarios would make it checkable — `branch-reviewer`
 - #51 — Before documenting a report finding, search what the docs site already says: 10 of the 16 were covered by the docs chapter — `builder`
 - #51 — R36 depends on the schema: an inline fragment fails only when another relation has the same column name with another type, or a nullable copy of a `NOT NULL` column in `update()`; the docs schema has neither, so the page states it in prose — `builder`
+- #67 — A type-level opt-in by declaration merging is tested in a program of its own (`test/types-opt-in`), compiled by plain `tsc`: the declaration merges into every file of a program — `builder`
+- #67 — Every type a public shortcut returns is nameable from `zapatos/db`: a brand on an unexported `unique symbol` breaks declaration emit (TS4023); a probe with `declaration: true` catches it — `branch-reviewer`
+- #67 — An option that changes only the result transform is read at `.run()`; one that changes the SQL, at the call — `branch-reviewer`
+- #67 — Guard for `any` (`unknown extends R`) before reading a type-only brand, and test a brand at depth 1 and 2: one round fixed depth 1 and broke depth 2 — `branch-reviewer`
+- #67 — A conditional on a non-generic flag in a generic signature's return type changes how every program displays it; choose the signature interface through `extends` instead — `builder`
+- #67 — Run a review's « Expected » fix before applying it: one would have mistyped `select()` — `builder`
+- #67 — A docs sentence about the value a nested query returns comes from a run, not from its type: `extras` was typed, Postgres refuses it bare (#262) — `branch-reviewer`
+- #67 — Pass `TEST_DATABASE_URL` to a child process through the environment, never as an argument: an `execFileSync` error printed it — `builder`
 - #48 — Escape the whole string that goes into a JSDoc, template text included: `**` before a name starting with `/` makes a `*/` that escaping the name alone misses — `branch-reviewer`
 - #48 — Replay every example a CHANGELOG line gives, not only its main claim: the `\u` and octal wordings were reasoned, then found wrong — `branch-reviewer`
 - #48 — « Of the output that parsed under 6.6.1, only X changes » is replayed per name on a scalar column, an array column and an unused type, `skipLibCheck` both ways, TS 5.9 and 7: three rounds came back to it (TS2457 on `string`, `keyof[]`, `unique[]`) — `branch-reviewer`
@@ -188,6 +196,8 @@ Minor review defects, taken up by the end-of-chapter review.
 - #46 — `src/generate/tsOutput.ts:100`: the writer's `/^/gm` indentation puts spaces after a U+2028/U+2029 inside a comment (6.6.1 too); frozen as is by `column comments › prefixes every line whatever its line break` — `branch-reviewer`
 - #368 — `AGENTS.md:46`: the architecture map still says `cli.ts` reads `zapatosconfig.json`; that work is now in `cliConfig.ts` and covers both files — `branch-reviewer`
 - #368 — `website/generator.md:69`: « the options of `zapatosconfig.json` », where the lede now says « its config file » — `branch-reviewer`
+- #67 — `src/db/shortcuts.ts:568`: `PassingThroughFragment` is unexported, so a declared library's generic-over-`L` wrapper inlines the conditional in its `.d.ts` (1758 characters against 468); valid — `branch-reviewer`
+- #67 — `website/select.md:386-387`: a mixed-union lateral (`flag ? db.min(…) : db.count(…)`) in a `selectOne()` nested in turn is still typed as at top level, as before — `branch-reviewer`
 - #48 — `src/generate/tables.ts:294`, `:305`, `:315`: the `stringLiteral` escapes of `Schema`, `AllSchemas` and a `"` in a `*ForTable` key are untested; undoing them leaves the suite green — `branch-reviewer`
 - #48 — `src/generate/enumOrder.ts:11`: « like enumLabel.ts » names a file #395 deleted (`quote.ts`) — `branch-reviewer`
 - #48 — `src/generate/quote.ts:21`: `refusedAsNamespace` / `refusedAsType` match TS 5.9.3 and 7.0.2 but are tested on three words; a table-driven test against the compiler would catch a keyword a later TypeScript adds — `branch-reviewer`

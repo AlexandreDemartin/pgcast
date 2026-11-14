@@ -6,6 +6,7 @@ Released under the MIT licence: see LICENCE file
 
 import type {
   JSONSelectableForTable,
+  SelectableForTable,
   WhereableForTable,
   InsertableForTable,
   UpdatableForTable,
@@ -46,7 +47,7 @@ import {
   warnOnce,
 } from './utils';
 
-import { getConfig } from './config';
+import { getConfig, ConfigTypes } from './config';
 
 
 export type JSONOnlyColsForTable<T extends Table, C extends readonly any[] /* `ColumnForTable<T>[]` gives errors here for reasons I haven't got to the bottom of */> =
@@ -54,9 +55,25 @@ export type JSONOnlyColsForTable<T extends Table, C extends readonly any[] /* `C
 
 export interface SQLFragmentMap { [k: string]: SQLFragment<any> }
 export interface SQLFragmentOrColumnMap<T extends Table> { [k: string]: SQLFragment<any> | ColumnForTable<T> }
+// the type a typed min() or max() has nested in a query, as JSON, where it differs from what run() gives;
+// read only once declared (TypedByColumn, which the compiler resolves once per program), so that every other
+// program checks 6.6.1's type, and behind `unknown extends RunResult`, so that `any` still gives `{} | null`
+declare const nestedResult: unique symbol;
+
+/**
+ * A `min()` or `max()` typed by its column, with `aggregatesTypedByColumn`
+ * declared in `ConfigTypes`: `run()` gives `RunResult`, and nested in a
+ * `lateral` it comes back as JSON, `NestedResult` (in `extras` too, once
+ * #262 parenthesises it; Postgres refuses it bare today).
+ */
+export interface ColumnAggregateFragment<RunResult, NestedResult> extends SQLFragment<RunResult> { [nestedResult]: NestedResult }
+
 export type RunResultForSQLFragment<T extends SQLFragment<any, any>> = T extends SQLFragment<infer RunResult, any> ?
-  (undefined extends RunResult ? NonNullable<RunResult> | null : RunResult) :
+  (TypedByColumn extends true ? NestedResultOf<T, RunResult> : undefined extends RunResult ? NonNullable<RunResult> | null : RunResult) :
   never;
+
+type NestedResultOf<T, RunResult> = unknown extends RunResult ? NonNullable<RunResult> | null :
+  T extends { [nestedResult]: infer N } ? N : undefined extends RunResult ? NonNullable<RunResult> | null : RunResult;
 
 export type LateralResult<L extends SQLFragmentMap> = { [K in keyof L]: RunResultForSQLFragment<L[K]> };
 export type ExtrasResult<T extends Table, E extends SQLFragmentOrColumnMap<T>> = { [K in keyof E]:
@@ -572,15 +589,39 @@ export interface SelectOptionsForTable<
   lock?: SelectLockingOptions<NoInfer<A>> | SelectLockingOptions<NoInfer<A>>[];
 };
 
+// a single lateral query is passed through as it is by selectOne() and selectExactlyOne(), as JSON by select(),
+// which wraps the rows in jsonb_agg(): the two types differ only for a typed min() or max(), so only once declared
+type PassedThroughResult<L extends SQLFragment<any>, M extends SelectResultMode> = TypedByColumn extends true ?
+  (M extends SelectResultMode.Many ? RunResultForSQLFragment<L> :
+    L extends SQLFragment<infer RunResult, any> ? (undefined extends RunResult ? NonNullable<RunResult> | null : RunResult) : never) :
+  RunResultForSQLFragment<L>;
+
+// once declared, selectOne() and selectExactlyOne() keep the brand of the min() or max() they pass through, which
+// comes back as JSON when nested in turn; not for `any` or `never`, nor for a lateral map, whose results are JSON already.
+// The signatures are chosen once per program, so that every other program checks (and shows) 6.6.1's
+type PassingThroughFragment<RunResult, L> = 0 extends 1 & L ? SQLFragment<RunResult> : [L] extends [never] ? SQLFragment<RunResult> :
+  [L] extends [ColumnAggregateFragment<any, infer N>] ? ColumnAggregateFragment<RunResult, N> : SQLFragment<RunResult>;
+
+interface PassingThroughSignatures<M extends SelectResultMode> {
+  <T extends Table, C extends ColumnsOption<T>, L extends LateralOption<C, E>, E extends ExtrasOption<T>, A extends string>(
+    table: T,
+    where: WhereableForTable<T> | SQLFragment<any> | AllType,
+    options?: SelectOptionsForTable<T, C, L, E, A>,
+  ): PassingThroughFragment<FullSelectReturnTypeForTable<T, C, L, E, M>, L>;
+}
+
+type ByColumn<Typed, Plain> = TypedByColumn extends true ? Typed : Plain;
+
 type SelectReturnTypeForTable<
   T extends Table,
   C extends ColumnsOption<T>,
   L extends LateralOption<C, E>,
   E extends ExtrasOption<T>,
+  M extends SelectResultMode = SelectResultMode.Many,
 > =
   (undefined extends L ? ReturningTypeForTable<T, C, E> :
     L extends SQLFragmentMap ? ReturningTypeForTable<T, C, E> & LateralResult<L> :
-    L extends SQLFragment<any> ? RunResultForSQLFragment<L> :
+    L extends SQLFragment<any> ? PassedThroughResult<L, M> :
     never);
 
 export enum SelectResultMode { Many, One, ExactlyOne, Numeric }
@@ -594,8 +635,8 @@ export type FullSelectReturnTypeForTable<
 > =
   {
     [SelectResultMode.Many]: SelectReturnTypeForTable<T, C, L, E>[];
-    [SelectResultMode.ExactlyOne]: SelectReturnTypeForTable<T, C, L, E>;
-    [SelectResultMode.One]: SelectReturnTypeForTable<T, C, L, E> | undefined;
+    [SelectResultMode.ExactlyOne]: SelectReturnTypeForTable<T, C, L, E, SelectResultMode.ExactlyOne>;
+    [SelectResultMode.One]: SelectReturnTypeForTable<T, C, L, E, SelectResultMode.One> | undefined;
     [SelectResultMode.Numeric]: number;
   }[M];
 
@@ -767,7 +808,7 @@ export const select: SelectSignatures = function (
 
 /* === selectOne === */
 
-export interface SelectOneSignatures {
+export interface SelectOneSignatures extends ByColumn<PassingThroughSignatures<SelectResultMode.One>, {
   <
     T extends Table,
     C extends ColumnsOption<T>,
@@ -779,7 +820,7 @@ export interface SelectOneSignatures {
     where: WhereableForTable<T> | SQLFragment<any> | AllType,
     options?: SelectOptionsForTable<T, C, L, E, A>,
   ): SQLFragment<FullSelectReturnTypeForTable<T, C, L, E, SelectResultMode.One>>;
-}
+}> { }
 
 /**
  * Generate a `SELECT` query `SQLFragment` that returns only a single result (or 
@@ -804,7 +845,7 @@ export const selectOne: SelectOneSignatures = function (table, where, options = 
 
 /* === selectExactlyOne === */
 
-export interface SelectExactlyOneSignatures {
+export interface SelectExactlyOneSignatures extends ByColumn<PassingThroughSignatures<SelectResultMode.ExactlyOne>, {
   <
     T extends Table,
     C extends ColumnsOption<T>,
@@ -816,7 +857,7 @@ export interface SelectExactlyOneSignatures {
     where: WhereableForTable<T> | SQLFragment<any> | AllType,
     options?: SelectOptionsForTable<T, C, L, E, A>,
   ): SQLFragment<FullSelectReturnTypeForTable<T, C, L, E, SelectResultMode.ExactlyOne>>;
-}
+}> { }
 
 /**
  * Generate a `SELECT` query `SQLFragment` that returns a single result or 
@@ -856,6 +897,26 @@ export interface NumericAggregateSignatures {
   ): SQLFragment<number>;
 }
 
+// with aggregatesTypedByColumn declared in ConfigTypes: null on an empty set, and min() / max() typed by their column
+type TypedByColumn = ConfigTypes extends { aggregatesTypedByColumn: true } ? true : false;
+type ColumnValueOrNull<S, C> = C extends readonly (keyof S)[] ? S[C[number]] | null : never;
+
+export interface NullableNumericAggregateSignatures {
+  <T extends Table, C extends ColumnsOption<T>, L extends LateralOption<C, E>, E extends ExtrasOption<T>, A extends string>(
+    table: T,
+    where: WhereableForTable<T> | SQLFragment<any> | AllType,
+    options?: SelectOptionsForTable<T, C, L, E, A>,
+  ): SQLFragment<number | null>;
+}
+
+export interface ColumnAggregateSignatures {
+  <T extends Table, C extends ColumnsOption<T>, L extends LateralOption<C, E>, E extends ExtrasOption<T>, A extends string>(
+    table: T,
+    where: WhereableForTable<T> | SQLFragment<any> | AllType,
+    options?: SelectOptionsForTable<T, C, L, E, A>,
+  ): ColumnAggregateFragment<ColumnValueOrNull<SelectableForTable<T>, C>, ColumnValueOrNull<JSONSelectableForTable<T>, C>>;
+}
+
 // the aggregate takes one column, none for count(*), and has no row to pass a lateral query through: Zapatos 6.6.1
 // sent `sum(*)`, `count("a", "b")` or `SELECT  AS result`, which Postgres refuses. The type is 6.6.1's, so these
 // throw as the query compiles, as a value with no meaning does in core.ts: `run()` rejects, before any query
@@ -872,9 +933,22 @@ const numericAggregate = (
       !columns ? (aggregate === 'count' ? undefined : `${aggregate}() needs one column to aggregate: pass columns: ['column']`) :
         Array.isArray(columns) && columns.length !== 1 ? `${aggregate}() takes one column in columns, not ${columns.length}${aggregate === 'count' ? ' (leave columns out for count(*))' : ''}` :
           undefined,
-    refusal = columnsRefusal ?? (lateral instanceof SQLFragment ? `${aggregate}() cannot pass a lateral query through: nest it in the lateral of a select() instead` : undefined);
+    refusal = columnsRefusal ?? (lateral instanceof SQLFragment ? `${aggregate}() cannot pass a lateral query through: nest it in the lateral of a select() instead` : undefined),
+    byColumn = aggregate === 'min' || aggregate === 'max';
 
-  if (refusal === undefined) return query;
+  if (refusal === undefined) {
+    // Number() makes a NULL 0, a date its epoch ms, a text NaN, and an int8 or numeric string a number;
+    // the option changes no SQL, so it is read at run(), as the type, declared once for the program, says
+    if (aggregate !== 'count') {
+      query.runResultTransform = (qr) => {
+        const result = qr.rows[0].result;  // no row (a groupBy with no group): a TypeError, as in 6.6.1
+        if (getConfig().aggregatesTypedByColumn ?? false) return byColumn || result === null ? result : Number(result);
+        if (result === null || (byColumn && typeof result !== 'number')) warnOnce('PGCAST_DEP004', 'sum(), avg(), min() or max() passed its result through Number(): an empty set gave 0 rather than null, or a min() or max() that is not a number (a date, a text, an int8 or numeric string) lost its type. Set aggregatesTypedByColumn: true (db.setConfig), and declare it in ConfigTypes, to get null and the column\'s own value instead; it will be the default in pgcast 7.0.');
+        return Number(result);
+      };
+    }
+    return query;
+  }
   // the refusal sits in the expressions, which copy() shares, so that a copy nested in a lateral throws too
   const refused = sql``;
   refused.compile = () => { throw new Error(refusal); };
@@ -906,8 +980,11 @@ export const count: NumericAggregateSignatures = function (table, where, options
  * `columns` holds the one column to aggregate: `columns: ['col']` gives
  * `sum("col")`; no column, several, or a single query as `lateral`, throw as
  * the query compiles, so `run()` rejects before any query is sent.
+ * On an empty set, `Number()` makes the `NULL` `0`, and `run()` warns
+ * (`PGCAST_DEP004`), once; with `aggregatesTypedByColumn` (`setConfig()` and
+ * `ConfigTypes`), it gives `null`.
  */
-export const sum: NumericAggregateSignatures = function (table, where, options?) {
+export const sum: TypedByColumn extends true ? NullableNumericAggregateSignatures : NumericAggregateSignatures = function (table, where, options?) {
   return numericAggregate(table, where, options, 'sum');
 };
 
@@ -919,9 +996,10 @@ export const sum: NumericAggregateSignatures = function (table, where, options?)
  * @param where A `Whereable` or `SQLFragment` defining the rows to be
  * aggregated, or `all`
  * @param options Options object. Useful keys may be: `columns`, `alias`.
- * `columns` holds the one column to aggregate, as for `sum`.
+ * `columns` holds the one column to aggregate, and an empty set gives `0` or
+ * `null`, as for `sum`.
  */
-export const avg: NumericAggregateSignatures = function (table, where, options?) {
+export const avg: TypedByColumn extends true ? NullableNumericAggregateSignatures : NumericAggregateSignatures = function (table, where, options?) {
   return numericAggregate(table, where, options, 'avg');
 };
 
@@ -933,9 +1011,12 @@ export const avg: NumericAggregateSignatures = function (table, where, options?)
  * @param where A `Whereable` or `SQLFragment` defining the rows to be 
  * aggregated, or `all`
  * @param options Options object. Useful keys may be: `columns`, `alias`.
- * `columns` holds the one column to aggregate, as for `sum`.
+ * `columns` holds the one column to aggregate, as for `sum`. The result goes
+ * through `Number()` (a date gives its epoch ms), and `run()` warns when that
+ * changes it (`PGCAST_DEP004`), once; with `aggregatesTypedByColumn`, it is
+ * the column's value as `pg` parses it, nested as JSON, or `null`.
  */
-export const min: NumericAggregateSignatures = function (table, where, options?) {
+export const min: TypedByColumn extends true ? ColumnAggregateSignatures : NumericAggregateSignatures = function (table, where, options?) {
   return numericAggregate(table, where, options, 'min');
 };
 
@@ -947,8 +1028,9 @@ export const min: NumericAggregateSignatures = function (table, where, options?)
  * @param where A `Whereable` or `SQLFragment` defining the rows to be
  * aggregated, or `all`
  * @param options Options object. Useful keys may be: `columns`, `alias`.
- * `columns` holds the one column to aggregate, as for `sum`.
+ * `columns` holds the one column to aggregate, and the result is typed, as
+ * for `min`.
  */
-export const max: NumericAggregateSignatures = function (table, where, options?) {
+export const max: TypedByColumn extends true ? ColumnAggregateSignatures : NumericAggregateSignatures = function (table, where, options?) {
   return numericAggregate(table, where, options, 'max');
 };

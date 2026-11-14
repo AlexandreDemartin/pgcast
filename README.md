@@ -87,6 +87,7 @@ npx zapatos        # or: npx pgcast
 | `upsertRequiresSameKeys`: a multi-row `upsert()` throws, rather than overwrite a column with `DEFAULT` | `PGCAST_DEP001` | 6.7.0 |
 | `undefinedMeansMissing`: an `undefined` value acts as a missing key, so `update()` leaves the column and `insert()` sends `DEFAULT` | `PGCAST_DEP002` | 6.7.0 |
 | `transactionRequiresCommit`: a `transaction()` whose `COMMIT` Postgres answers with `ROLLBACK`, after a query error the callback caught, rejects, rather than resolve with nothing saved | `PGCAST_DEP003` | 6.7.0 |
+| `aggregatesTypedByColumn`: `sum()`, `avg()`, `min()` and `max()` give `null` when no row matches, rather than `0`, and `min()` and `max()` their column's value, rather than `Number()` of it; declared in `ConfigTypes`, the types follow | `PGCAST_DEP004` | 6.7.0 |
 | `selectExactlyOneChecksForSecondRow`: a `selectExactlyOne()` run on its own throws on a second row, rather than give the first; nested in a `lateral`, it keeps `LIMIT 1` | none | 6.7.0 |
 | `typeEnumsAcrossSchemas` (generator): an enum of another schema is typed by its labels, rather than as an `any` custom type or a same-named enum of the relation's schema | a note through `warningListener` | 6.7.0 |
 | `enumOrder: 'declared'` (generator): an enum's labels, `every.<name>` included, keep their declared order, by which Postgres compares them, rather than the alphabetical one | a note through `warningListener` | 6.7.0 |
