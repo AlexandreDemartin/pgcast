@@ -969,6 +969,12 @@ describe('names that Object.prototype also has', () => {
     expect((await codegen({ schemas, enumOrder: 'declared' })).ts).toContain(`export type ${name} = ['b', 'a'];`);
   });
 
+  it.each(names)('gives enumDataForSchema() an enum named %s, in an object of Object.prototype as in Zapatos 6.6.1', async name => {
+    const enums = await enumDataForSchema(`enum_${name}`, query => t.pool.query(query));
+    expect(Object.getPrototypeOf(enums)).toBe(Object.prototype);
+    expect(Object.entries(enums)).toEqual([[name, ['a', 'b']]]);
+  });
+
   it.each(names)('generates a schema named %s', async name => {
     const { ts: schema } = await codegen({ schemas: { [name]: all } });
     expect(schema).toContain(`export namespace ${name} {`);
