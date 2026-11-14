@@ -111,6 +111,8 @@ function SQLForExtras<T extends Table>(extras: ExtrasOption<T>) {
 }
 
 
+const undefinedWarning = 'An undefined value in insert(), update() or upsert() is sent as NULL, or, in upsert() updateValues, set from EXCLUDED. Set undefinedMeansMissing: true (db.setConfig) to treat it as a missing key instead (DEFAULT in insert(), left out of update() and upsert()); it will be the default in pgcast 7.0.';
+
 // an undefined value is sent as NULL, as in 6.6.1, but warns once; with undefinedMeansMissing (the default in 7.0)
 // it is a missing key instead, as JSON.stringify leaves it out: `toDefault` sends DEFAULT (insert), otherwise the
 // key goes (update, upsert, whose missing keys then take DEFAULT, and the rules of upsertRequiresSameKeys);
@@ -119,12 +121,25 @@ function undefinedAsMissing<V extends object>(values: V, toDefault: boolean): V 
   const rows: object[] = (Array.isArray(values) ? values : [values]).map(row => row ?? {});
   if (!rows.some(row => Object.values(row).includes(undefined))) return values;
   if (!(getConfig().undefinedMeansMissing ?? false)) {
-    warnOnce('PGCAST_DEP002', 'An undefined value in insert(), update() or upsert() is sent as NULL. Set undefinedMeansMissing: true (db.setConfig) to treat it as a missing key instead (DEFAULT in insert(), left out of update() and upsert()); it will be the default in pgcast 7.0.');
+    warnOnce('PGCAST_DEP002', undefinedWarning);
     return values;
   }
   const kept = rows.map(row => Object.fromEntries(Object.entries(row).flatMap(([k, v]) =>
     v !== undefined ? [[k, v]] : toDefault ? [[k, Default]] : [])));
   return (Array.isArray(values) ? kept : kept[0]) as V;
+}
+
+// an undefined key of upsert()'s updateValues is set from EXCLUDED, as in 6.6.1: if no row inserts its column,
+// an existing row takes the column DEFAULT; with undefinedMeansMissing, it is a missing key, so it adds no column
+// to the update (`updated`: updateColumns, or the columns inserted, which are set from EXCLUDED either way)
+function undefinedUpdateValuesAsMissing<V extends object>(updateValues: V, updated: string[]): V {
+  const adds = Object.entries(updateValues).some(([k, v]) => v === undefined && !updated.includes(k));
+  if (!adds) return updateValues;
+  if (!(getConfig().undefinedMeansMissing ?? false)) {
+    warnOnce('PGCAST_DEP002', undefinedWarning);
+    return updateValues;
+  }
+  return Object.fromEntries(Object.entries(updateValues).filter(([, v]) => v !== undefined)) as V;
 }
 
 
@@ -319,6 +334,14 @@ const updateValueSQL = (value: any) => compiledAsIs(value) ? value : param(value
  * out, as if it were missing: one row does not insert that column, nor update
  * it unless `updateColumns` names it, in which case it is still set from
  * `EXCLUDED` and an existing row takes the column `DEFAULT`.
+ *
+ * An `undefined` key of `updateValues` is set from `EXCLUDED`: an existing
+ * row takes the value inserted, or the column `DEFAULT`. When that key alone
+ * adds its column to the update (`updateColumns` leaves it out or, without
+ * `updateColumns`, no row inserts it), this emits the same warning, once.
+ * With `undefinedMeansMissing`, it is a missing key: `{ votes: undefined }`
+ * adds no `"votes"` to `DO UPDATE SET`, and with `updateColumns: doNothing`
+ * and nothing else, the SQL is `DO NOTHING`.
  */
 export const upsert: UpsertSignatures = function (
   table: Table,
@@ -343,7 +366,7 @@ export const upsert: UpsertSignatures = function (
     insertColsSQL = cols(firstRow),
     insertValuesSQL = mapWithSeparator(completedValues, sql`, `, v => sql`(${vals(v)})`),
     colNames = Object.keys(firstRow) as Column[],
-    updateValues = options?.updateValues ?? {},
+    updateValues = undefinedUpdateValuesAsMissing(options?.updateValues ?? {}, specifiedUpdateColumns as string[] ?? colNames),
     conflictColumns = Array.isArray(conflictTarget) ? conflictTarget : [],  // a constraint's are unknown here
     overwritesMissingKey = specifiedUpdateColumns == null && Array.isArray(values) && colNames.some(c =>
       updateValues[c] === undefined &&  // as below: otherwise, c is set from EXCLUDED
