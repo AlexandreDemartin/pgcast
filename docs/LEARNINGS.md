@@ -143,6 +143,11 @@ Candidates for a check, a rule or a skill line.
 - #51 — R36 depends on the schema: an inline fragment fails only when another relation has the same column name with another type, or a nullable copy of a `NOT NULL` column in `update()`; the docs schema has neither, so the page states it in prose — `builder`
 - #252 — A list of the routes that compile a Whereable is checked against every interpolation of a filter in `shortcuts.ts`, not only `where`: `having` was missing — `builder`
 - #252 — A « 6.6.1 typed X » claim is checked by `tsc` against the `zapatos@6.6.1` tarball's `dist/db/*.d.ts` through `paths`, with `NODE_PATH` on the root `node_modules` — `builder`
+- #399 — Swapping `{}` for `Object.create(null)` also changes every inherited lookup that object meets later (`a[x] ?? a['*'][x]`): where only an own `__proto__` key is the goal, `Object.fromEntries` keeps the prototype — `branch-reviewer`
+- #399 — A codegen change that touches `cliConfig` gets its byte-identity replay through the CLI too, not only `tsForConfig` with plain configs — `branch-reviewer`
+- #399 — A map moved to `Object.create(null)` can escape through an exported function (`enumDataForSchema()`): check what each export returns — `builder`
+- #399 — A red test that pollutes `Object.prototype` breaks later tests in its worker: clean up with a helper such as `globalsAddedBy` — `builder`
+- #399 — `{ __proto__: x }` in a JS literal sets the prototype; a `__proto__` key in a test needs `['__proto__']` or `JSON.parse` — `builder`
 
 ## Minors kept
 
