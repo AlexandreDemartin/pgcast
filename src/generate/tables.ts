@@ -338,9 +338,10 @@ const createColumnDoc = (config: CompleteConfig, schemaName: string, rel: Relati
     lines = description ? jsdocText(description as string).split(/\r\n?|\n/) : [],
     // a tag (`@deprecated`) would read the generated lines after it as its own text, so the comment goes after them
     // from the line that starts it. TypeScript can start a tag, or an inline `{@link …}` that may run on through the
-    // next line, only at an @ after a blank, a { or nothing: the first such line moves only if it surely starts a
-    // tag, with an @ that begins it, or after a space or tab and before a printable character, past links closed on
-    // the line with no quote, backtick or / in them; otherwise the JSDoc stays as it was
+    // next line, only at an @ that follows a { or no printable ASCII character: the first line with one moves only if
+    // it surely starts a tag, with an @ first but for spaces and tabs, or one after a space or tab and before a
+    // printable character, past links closed on the line with no quote, backtick or / in them; otherwise the JSDoc
+    // stays as it was
     tagAt = lines.findIndex(line => /(?<![!-z|-~])@/.test(line)),
     [text, tags] = tagAt < 0 || !/^[ \t]*@|^(?:\{@link[^}'"`/]*\}|(?!\{@link)[^])*?[ \t]@[!-~]/.test(lines[tagAt]) ?
       [lines, []] : [lines.slice(0, tagAt), lines.slice(tagAt)],
