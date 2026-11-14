@@ -699,7 +699,7 @@ const functionName = new RegExp(`^${space}(?:${identifier})(?:${space}\\.${space
  * (`AS "sq_a""b"`)
  * * `extras` — an object mapping key(s) to `SQLFragment`s, so that derived 
  * quantities can be included in the JSON result; a shortcut's query (`count`,
- * `selectOne`…) is written in parentheses, as a scalar subquery:
+ * `selectOne`…) or its `copy()` is written in parentheses, as a scalar subquery:
  * `jsonb_build_object($1::text, (SELECT count(*) AS result FROM "films"))`
  * @param mode (Used internally by `selectOne` and `count`)
  * @param aggregate (Used internally by `count`, `sum`, `avg`, `min` and `max`)
