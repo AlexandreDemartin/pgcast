@@ -713,6 +713,38 @@ describe('awkward names', () => {
       await t.pool.query('DROP SCHEMA "two-names", two_names CASCADE');
     }
   });
+
+  it("notes a relation of unprefixedSchema named like another schema's namespace, as both stand at the top", async () => {
+    await t.pool.query(`
+      CREATE SCHEMA top_level;
+      CREATE TABLE top_level."box-office" (id int);
+      CREATE TABLE top_level.takes (id int);
+      CREATE SCHEMA box_office;
+      CREATE TABLE box_office.takes (id int);`);
+    try {
+      expect.soft(await warningsFor({ top_level: all, box_office: all }, { unprefixedSchema: 'top_level' })).toEqual([
+        'Note: relation "top_level"."box-office" and schema "box_office" are both named box_office in TypeScript, ' +
+        'so their declarations clash. To type them apart, rename one of them in the database.',
+      ]);
+      // prefixed, the relation is in its schema's namespace
+      expect.soft(await warningsFor({ top_level: all, box_office: all }, { unprefixedSchema: null })).toEqual([]);
+    } finally {
+      await t.pool.query('DROP SCHEMA top_level, box_office CASCADE');
+    }
+  });
+
+  it('names a relation after a property of Object.prototype, with no note', async () => {
+    await t.pool.query(`
+      CREATE SCHEMA proto_names;
+      CREATE TABLE proto_names."constructor" (id int);
+      CREATE TABLE proto_names."toString" (id int);`);
+    try {
+      expect.soft(await warningsFor({ proto_names: all })).toEqual([]);
+      expect.soft(await warningsFor({ proto_names: all }, { unprefixedSchema: 'proto_names' })).toEqual([]);
+    } finally {
+      await t.pool.query('DROP SCHEMA proto_names CASCADE');
+    }
+  });
 });
 
 describe('custom types that share a placeholder name', () => {
