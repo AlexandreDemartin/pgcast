@@ -929,6 +929,11 @@ describe('SQLFragment', () => {
     expect(await q.copy().run(queryable)).toBe(1);
   });
 
+  it('copy(): a fragment without a transform still resolves to its rows', async () => {
+    const queryable = { query: vi.fn(async () => ({ rows: [{ n: 1 }] })) } as any;
+    expect(await sql`SELECT 1 AS n`.copy().run(queryable)).toEqual([{ n: 1 }]);
+  });
+
   it('compile() appends to the result it is given', () => {
     const result = { text: 'x = $1 AND ', values: ['before'] };
     expect(sql`y = ${param('after')}`.compile(result)).toBe(result);
