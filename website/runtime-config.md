@@ -240,11 +240,11 @@ aggregatesTypedByColumn?: boolean  // default: false; the default in 7.0
 
 From 6.7.0. With `true`, [`sum()`](/select#sum), [`avg()`](/select#avg), [`min()`](/select#min) and [`max()`](/select#max) give `null` when no row matches, and `min()` and `max()` give the column's value as `pg` reads it: a `Date` for a `timestamptz`, a string for a `text` or an enum. The SQL doesn't change, nor does [`count()`](/select#count).
 
-Off, the result goes through `Number()`, as in Zapatos 6.6.1: `0` when no row matches, a date's milliseconds, `NaN` for a text. `.run()` then warns once per process, `PGCAST_DEP004`, when `Number()` changed what Postgres sent.
+Off, the result goes through `Number()`, as in Zapatos 6.6.1: `0` when no row matches, a date's milliseconds, `NaN` for a text. `.run()` then warns once per process, `PGCAST_DEP004`, when `Number()` changed what Postgres sent, or the query returned no row.
 
 - The types follow only once it is declared in [`ConfigTypes`](#ConfigTypes) as well: `setConfig()` sets the runtime, the declaration the types.
 - Nested in a `lateral`, the value comes back as JSON, option or not, and `null` when no row matches; declared, it is typed as its column's `JSONSelectable`. In `extras` too, once [#262](https://github.com/AlexandreDemartin/pgcast/issues/262) parenthesises it; Postgres refuses it bare today.
-- Read at `.run()`, as is the warning: a query built before `setConfig()` gets the option it runs under, as its type, declared for the whole program, says. A query that returns no row, a `groupBy` with no group, still rejects with a `TypeError` ([#163](https://github.com/AlexandreDemartin/pgcast/issues/163)).
+- Read at `.run()`, as is the warning: a query built before `setConfig()` gets the option it runs under, as its type, declared for the whole program, says. A query that returns no row, a `groupBy` with no group, reads as `NULL`: `null` on, `0` off, with the warning.
 - Examples, and each type: [Typed by column](/select#typed-by-column).
 
 ### `queryListener` {#Config.queryListener}
@@ -494,7 +494,7 @@ db.enableCustomJSONParsingForLargeNumbers(pg);
 | `1.00000000000000000001` | `1` | `'1.00000000000000000001'` |
 | a `numeric` past `Number.MAX_VALUE` | `Infinity` | its digits, as a string |
 
-- It does nothing for `count()`, `sum()`, `avg()`, `min()` and `max()`: their result is not JSON, and goes through `Number()` ([`count()`](/select#count), [#163](https://github.com/AlexandreDemartin/pgcast/issues/163)). A `sum()` of `9007199254740993` still gives `9007199254740992`.
+- It does nothing for `count()`, `sum()`, `avg()`, `min()` and `max()`: their result is not JSON, and goes through `Number()` ([`count()`](/select#count)). A `sum()` of `9007199254740993` still gives `9007199254740992`.
 - It sets the type parsers of the `pg` module you give, so every pool and client of that module, from then on, pgcast's queries or not.
 - It does not change the types: the generator's [`customJSONParsingForLargeNumbers`](/generator#generate.customJSONParsingForLargeNumbers) does.
 - An `int8` or `numeric` column outside JSON is a string already, by `pg`'s own parser.

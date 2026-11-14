@@ -245,10 +245,10 @@ db.count(table, where, options?)
 |---|---|---|
 | `columns: ['subtitled']` | `count("subtitled")`<!-- probe: db.count('screenings', db.all, { columns: ['subtitled'] }) --> in place of `count(*)`: the rows where it is not `NULL`; one column, as several (or none, `[]`) throw | none |
 | `distinct: true` | `SELECT DISTINCT count(*)`<!-- probe: db.count('films', db.all, { distinct: true }) -->, on the one result: not `count(DISTINCT …)`, which needs a `sql` template | none |
-| `groupBy: 'film_id'` | `GROUP BY "film_id"`<!-- probe: db.count('ratings', db.all, { groupBy: 'film_id' }) -->; `.run()` gives the first group's value only, and with no group rejects with a `TypeError` | none |
+| `groupBy: 'film_id'` | `GROUP BY "film_id"`<!-- probe: db.count('ratings', db.all, { groupBy: 'film_id' }) -->; `.run()` gives the first group's value only, and with no group what no row gives (below) | none |
 | `extras` | nothing | none |
 | `lateral: { … }` | its `LEFT JOIN LATERAL`s, whose results are not read; a single subquery throws, as there is no row to pass it through to | none |
-| `having`, `limit`, `offset` | as in `select()`; when they leave no row (a `having` that keeps none, `limit: 0`, `offset: 1`), `.run()` rejects with a `TypeError` | none |
+| `having`, `limit`, `offset` | as in `select()`; when they leave no row (a `having` that keeps none, `limit: 0`, `offset: 1`), what no row gives (below) | none |
 
 </div>
 
@@ -285,7 +285,7 @@ With `columns`, it counts two of the four screenings: the other two have `subtit
 
 `where`, `alias`, `withTies` and `lock` add what they add to `select()`. So does `order`, by a `groupBy` column or a `sql` fragment (`` db.sql`count(*)` ``): by another column, Postgres refuses the query (42803).
 
-`.run()` reads the first row of the result. When the query returns none, it rejects with `TypeError: Cannot read properties of undefined (reading 'result')`; so do `sum()`, `avg()`, `min()` and `max()`.
+`.run()` reads the first row of the result. When the query returns none, it reads a `NULL`: `count()` gives `0`, and `sum()`, `avg()`, `min()` and `max()` give what they give for an empty set, `0`, or `null` with [`aggregatesTypedByColumn`](#typed-by-column). Zapatos 6.6.1 rejected with `TypeError: Cannot read properties of undefined (reading 'result')`. Nested in a `lateral`, a query that returns no row gives `null`, `count()`'s too, though its type says `number`.
 
 ## `sum()` {#sum}
 
@@ -373,7 +373,7 @@ const firstShow = await db.min('screenings', db.all, {
 |---|---|---|
 | `min()` of `starts_at`, a `timestamptz` | its milliseconds, `number` | a `Date`, `Date \| null` |
 | `max()` of `title`, a `text` | `NaN`, `number` | `'The Salt Orchard'`, `string \| null` |
-| `sum()` or `avg()`, no row matching | `0`, `number` | `null`, `number \| null` |
+| `sum()` or `avg()`, no row matching, or no row returned | `0`, `number` | `null`, `number \| null` |
 | `max()` of `runtime_minutes`, an `integer` | `131`, `number` | `131`, `number \| null` |
 | `min()` nested in a `lateral` | an ISO string, typed `number` | the same string, `TimestampTzString \| null` |
 | `min()` as the single `lateral` of a `selectOne()` | a `Date`, typed `number \| undefined` | the same `Date`, `Date \| null \| undefined` |

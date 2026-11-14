@@ -425,4 +425,4 @@ The others are thrown as `.compile()` compiles the query, so `.run()` rejects wi
 
 </div>
 
-After a query, pgcast rejects in three cases of its own: `selectExactlyOne()` with no row, or a second one under [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow), with a [`NotExactlyOneError`](/select#NotExactlyOneError); `count()` and the other aggregates with no row to read, with a `TypeError` ([`count()`](/select#count)); `transaction()` whose `COMMIT` Postgres answers with `ROLLBACK`, with [`transactionRequiresCommit`](/runtime-config#Config.transactionRequiresCommit) ([Errors](#errors)).
+After a query, pgcast rejects in two cases of its own: `selectExactlyOne()` with no row, or a second one under [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow), with a [`NotExactlyOneError`](/select#NotExactlyOneError); `transaction()` whose `COMMIT` Postgres answers with `ROLLBACK`, with [`transactionRequiresCommit`](/runtime-config#Config.transactionRequiresCommit) ([Errors](#errors)).

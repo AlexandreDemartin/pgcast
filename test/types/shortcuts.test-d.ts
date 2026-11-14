@@ -105,6 +105,9 @@ describe('selectOne, selectExactlyOne, count', () => {
   test('count, sum: number', () => {
     expectTypeOf(db.count('users', db.all).run(pool)).resolves.toEqualTypeOf<number>();
     expectTypeOf(db.sum('accounts', db.all, { columns: ['balance'] }).run(pool)).resolves.toEqualTypeOf<number>();
+    // options that can leave no row (#163) give 0 then, which the type already holds
+    expectTypeOf(db.count('users', db.all, { offset: 1 }).run(pool)).resolves.toEqualTypeOf<number>();
+    expectTypeOf(db.max('accounts', { id: -1 }, { columns: ['balance'], groupBy: 'owner_id' }).run(pool)).resolves.toEqualTypeOf<number>();
   });
 
   test('aggregates: one column, as a literal, a tuple or an array of unknown length', () => {
