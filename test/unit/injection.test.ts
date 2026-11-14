@@ -1456,6 +1456,125 @@ describe('a built-in object as a Whereable', () => {
       expect(sql`DELETE FROM ${'users'} WHERE ${new Stack()}`.compile(), name).toEqual({ text: 'DELETE FROM "users" WHERE TRUE', values: [] });
     }
   });
+
+  it('throws for each ECMA-262 global constructor the runtime has, or keeps it for a reason', () => {
+    // the hand-written list missed built-ins three times (#250, #416, #426): an object with each one's
+    // prototype is refused, on each Node of the CI matrix, unless kept below
+    const
+      constructors = [
+        'AggregateError', 'Array', 'ArrayBuffer', 'AsyncDisposableStack', 'BigInt', 'BigInt64Array', 'BigUint64Array',
+        'Boolean', 'DataView', 'Date', 'DisposableStack', 'Error', 'EvalError', 'FinalizationRegistry', 'Float16Array',
+        'Float32Array', 'Float64Array', 'Function', 'Int8Array', 'Int16Array', 'Int32Array', 'Iterator', 'Map', 'Number',
+        'Object', 'Promise', 'Proxy', 'RangeError', 'ReferenceError', 'RegExp', 'Set', 'SharedArrayBuffer', 'String',
+        'SuppressedError', 'Symbol', 'SyntaxError', 'TypeError', 'Uint8Array', 'Uint8ClampedArray', 'Uint16Array',
+        'Uint32Array', 'URIError', 'WeakMap', 'WeakRef', 'WeakSet',
+      ],
+      kept: Record<string, string> = {
+        Object: 'a plain object is the filter itself',
+        Array: 'an array compiles as its items; Object.create(Array.prototype) is no array',
+        Function: 'a function is no object here, and throws as an alien value',
+        Proxy: 'it has no prototype, and a proxy compiles as its target',
+      },
+      outcome = (name: string) => {
+        const C = (globalThis as any)[name];
+        if (kept[name]) return C.prototype === undefined ? 'kept' :
+          sql`SELECT 1 WHERE ${Object.create(C.prototype)}`.compile().text === 'SELECT 1 WHERE TRUE' ? 'kept' : 'kept, but no longer TRUE';
+        try {
+          return `compiles: ${sql`SELECT 1 WHERE ${Object.create(C.prototype)}`.compile().text}`;
+        } catch (err) {
+          return (err as Error).message.startsWith(`A built-in \`${name}\` has no meaning as a Whereable`) ? 'throws' : (err as Error).message;
+        }
+      };
+    expect(constructors.filter(name => name in globalThis).map(name => [name, outcome(name)])
+      .filter(([name, x]) => x !== (kept[name] ? 'kept' : 'throws'))).toEqual([]);
+  });
+
+  it('a host or ECMA-402 iterator throws too, through the prototype chain, and a host object compiles as before', () => {
+    // not ECMA-262: URLSearchParams' and Headers' iterators are host objects (#416 kept those out), Intl.Segmenter's
+    // is ECMA-402, and each inherits %IteratorPrototype%
+    const
+      // ES2022: not in the lib's ES2019 types
+      Segmenter = (Intl as any).Segmenter as new () => { segment(s: string): Iterable<unknown> },
+      outcome = (x: object) => {
+        try {
+          return sql`DELETE FROM ${'users'} WHERE ${x}`.compile().text;
+        } catch (err) {
+          return `throws: ${/^A built-in `([^`]*)` has no meaning as a Whereable/.exec((err as Error).message)?.[1] ?? (err as Error).message}`;
+        }
+      },
+      every = 'DELETE FROM "users" WHERE TRUE';
+    expect(Object.fromEntries(Object.entries({
+      urlSearchParamsIterator: new URLSearchParams('id=1').entries(),
+      headersIterator: new Headers({ id: '1' }).entries(),
+      segmentsIterator: new Segmenter().segment('id')[Symbol.iterator](),
+      url: new URL('https://example.com/'),
+      urlSearchParams: new URLSearchParams('id=1'),
+      blob: new Blob([]),
+      headers: new Headers(),
+      abortController: new AbortController(),
+    }).map(([name, x]) => [name, outcome(x as object)]))).toEqual({
+      urlSearchParamsIterator: 'throws: URLSearchParams Iterator',
+      headersIterator: 'throws: Headers Iterator',
+      segmentsIterator: 'throws: Segmenter String Iterator',
+      url: every,
+      urlSearchParams: every,
+      blob: every,
+      headers: every,
+      abortController: every,
+    });
+  });
+
+  it('an iterator with own keys, of another realm or a mere iterable compiles as before', () => {
+    // 6.6.1 compiled each to its own enumerable keys; only an iterator of this realm with none is refused
+    class Reels { *[Symbol.iterator]() { yield 1; } }
+    expect(Object.fromEntries(Object.entries({
+      generatorWithOwnKey: Object.assign((function* () { yield 1; })(), { id: 1 }),
+      iteratorWithOwnKey: Object.assign([1].values(), { id: 1 }),
+      otherRealmIterator: runInNewContext('[1].values()'),
+      otherRealmGenerator: runInNewContext('(function* () {})()'),
+      iterable: new Reels(),
+      iteratorLike: { next: 1 },
+    }).map(([name, x]) => [name, sql`DELETE FROM ${'users'} WHERE ${x}`.compile()]))).toEqual({
+      generatorWithOwnKey: { text: 'DELETE FROM "users" WHERE ("id" = $1)', values: [1] },
+      iteratorWithOwnKey: { text: 'DELETE FROM "users" WHERE ("id" = $1)', values: [1] },
+      otherRealmIterator: { text: 'DELETE FROM "users" WHERE TRUE', values: [] },
+      otherRealmGenerator: { text: 'DELETE FROM "users" WHERE TRUE', values: [] },
+      iterable: { text: 'DELETE FROM "users" WHERE TRUE', values: [] },
+      iteratorLike: { text: 'DELETE FROM "users" WHERE ("next" = $1)', values: [1] },
+    });
+  });
+
+  it('a subclass of Iterator compiles its own keys as before, and throws with none, where the runtime has it', () => {
+    // Node 22 and later. With own keys, a class instance is a filter (#170); with none it was TRUE, and the
+    // prototype chain cannot tell it from a built-in iterator (each generator function has its own prototype)
+    const Iterator = (globalThis as any).Iterator as (new () => object) | undefined;
+    if (!Iterator) return;
+    class Ids extends Iterator { id = 1; next() { return { done: true, value: undefined }; } }
+    class Empty extends Iterator { next() { return { done: true, value: undefined }; } }
+    expect(sql`DELETE FROM ${'users'} WHERE ${new Ids()}`.compile()).toEqual({ text: 'DELETE FROM "users" WHERE ("id" = $1)', values: [1] });
+    expect(() => sql`DELETE FROM ${'users'} WHERE ${new Empty()}`.compile()).toThrow('A built-in `Iterator` has no meaning as a Whereable (a filter)');
+  });
+
+  it('loads, and still refuses a sync iterator, where the async generator chain is missing', async () => {
+    // transpiled below ES2018 (Babel, esbuild --target=es2017), `async function* () {}` is a plain function whose
+    // prototype has no `.prototype`: reading %AsyncIteratorPrototype% from it threw as `zapatos/db` loaded
+    const
+      asyncGeneratorFunctionPrototype = Object.getPrototypeOf(async function* () {}),
+      descriptor = Object.getOwnPropertyDescriptor(asyncGeneratorFunctionPrototype, 'prototype')!;
+    delete asyncGeneratorFunctionPrototype.prototype;
+    vi.resetModules();
+    try {
+      const core = await import('../../src/db/core');
+      expect(() => core.sql`DELETE FROM ${'users'} WHERE ${[1].values()}`.compile())
+        .toThrow('A built-in `Array Iterator` has no meaning as a Whereable (a filter)');
+      // left out, an async generator compiles as in 6.6.1
+      expect(core.sql`DELETE FROM ${'users'} WHERE ${(async function* () {})()}`.compile())
+        .toEqual({ text: 'DELETE FROM "users" WHERE TRUE', values: [] });
+    } finally {
+      Object.defineProperty(asyncGeneratorFunctionPrototype, 'prototype', descriptor);
+      vi.resetModules();
+    }
+  });
 });
 
 describe('a list that is not an array in isIn() and isNotIn()', () => {
