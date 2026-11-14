@@ -1,5 +1,5 @@
 ---
-english: 6c45b0ca9923
+english: ba462e5de8d5
 ---
 
 # Template SQL
@@ -445,7 +445,7 @@ Ce que renvoient `sql` et chaque raccourci : une requête, ou une partie de req
 | [`compile()`](#compile) | `{ text, values }`, la requête qu’envoie `run()` |
 | [`runResultTransform`](#runResultTransform) | transforme le résultat de `pg` en `RunResult` |
 | [`prepared(name?)`](#prepared) | en fait une instruction préparée |
-| `copy(override?)` | une copie superficielle, certaines propriétés remplacées |
+| [`copy(override?)`](#copy) | une copie superficielle, certaines propriétés remplacées |
 | `noop`, `noopResult` | fixés par `insert()` et `upsert()` quand ils reçoivent `[]` : `run()` n’envoie rien et se résout en `noopResult` |
 | `parentTable` | fixé sur une sous-requête `lateral` par sa parente, pour [`parent()`](#parent) |
 | `preparedName` | fixé par `prepared()` |
@@ -515,6 +515,16 @@ Les valeurs sont des paramètres, pas une partie du texte : un seul nom sert do
 <<< ../examples/plain/sql_prepared.ts{ts twoslash}
 
 Un nom désigne un seul texte : sur une connexion qui a préparé `'p'`, `pg` rejette un fragment d’un autre texte nommé `'p'` avec "Prepared statements must be unique - 'p' was used for a different statement".
+
+### `copy()` {#copy}
+
+```ts
+fragment.copy(override?: { literals?, expressions?, parentTable?, preparedName?, noop?, noopResult? }): SQLFragment<RunResult, Constraint>
+```
+
+Un nouveau fragment sur les mêmes littéraux et expressions. Il garde `runResultTransform`, `parentTable`, `preparedName`, `noop` et `noopResult`, sauf ceux que donne `override`. Un raccourci copié se résout donc en ce que donne le raccourci, comme le dit son type : `count('films', all).copy().run(pool)` donne `4` sur le schéma de la doc, là où Zapatos 6.6.1 donnait à la copie la transformation par défaut, donc les lignes : `[{ result: '4' }]`.
+
+Une copie se compile comme le fragment imbriqué dans un autre : une copie de `selectExactlyOne()` garde donc `LIMIT $1`<!-- probe: (db.setConfig({ selectExactlyOneChecksForSecondRow: true }), db.selectExactlyOne('films', db.all).copy()) --> avec `1`, même avec [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow) : elle est rejetée quand aucune ligne ne vient, jamais sur une deuxième. `lateral` donne à la copie de chaque sous-requête le `parentTable` de son parent.
 
 ## `RunResultForSQLFragment` {#RunResultForSQLFragment}
 
