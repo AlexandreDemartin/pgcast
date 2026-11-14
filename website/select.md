@@ -376,12 +376,15 @@ const firstShow = await db.min('screenings', db.all, {
 | `sum()` or `avg()`, no row matching | `0`, `number` | `null`, `number \| null` |
 | `max()` of `runtime_minutes`, an `integer` | `131`, `number` | `131`, `number \| null` |
 | `min()` nested in a `lateral` | an ISO string, typed `number` | the same string, `TimestampTzString \| null` |
+| `min()` as the single `lateral` of a `selectOne()` | a `Date`, typed `number` | the same `Date`, `Date \| null \| undefined` |
 
 </div>
 
 - The SQL is the same either way: `SELECT min("starts_at") AS result FROM "screenings"`<!-- probe: (db.setConfig({ aggregatesTypedByColumn: true }), db.min('screenings', db.all, { columns: ['starts_at'] })) -->.
 - `min()` and `max()` give a `bigint` or a `numeric` as `pg` sends it, a string; nested, as a JSON number.
 - `count()` never gives `NULL`: it is unchanged.
+- Passed through as the single `lateral`, it is typed as at top level by `selectOne()` and `selectExactlyOne()`, which hand its column over as it is, and as nested by `select()`, which wraps its rows in `jsonb_agg()`.
+- `.copy()` returns a plain `SQLFragment`, typed as at top level: nested in turn, a copy, or a `selectOne()` that passes a `min()` through, comes back as JSON with that type.
 
 ## Types
 

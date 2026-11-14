@@ -551,15 +551,21 @@ export interface SelectOptionsForTable<
   lock?: SelectLockingOptions<NoInfer<A>> | SelectLockingOptions<NoInfer<A>>[];
 };
 
+// a single lateral query is passed through as it is by selectOne() and selectExactlyOne(), as JSON by select(),
+// which wraps the rows in jsonb_agg(): the two types differ only for a typed min() or max()
+type PassedThroughResult<L extends SQLFragment<any>, M extends SelectResultMode> = M extends SelectResultMode.Many ? RunResultForSQLFragment<L> :
+  L extends SQLFragment<infer RunResult, any> ? (undefined extends RunResult ? NonNullable<RunResult> | null : RunResult) : never;
+
 type SelectReturnTypeForTable<
   T extends Table,
   C extends ColumnsOption<T>,
   L extends LateralOption<C, E>,
   E extends ExtrasOption<T>,
+  M extends SelectResultMode = SelectResultMode.Many,
 > =
   (undefined extends L ? ReturningTypeForTable<T, C, E> :
     L extends SQLFragmentMap ? ReturningTypeForTable<T, C, E> & LateralResult<L> :
-    L extends SQLFragment<any> ? RunResultForSQLFragment<L> :
+    L extends SQLFragment<any> ? PassedThroughResult<L, M> :
     never);
 
 export enum SelectResultMode { Many, One, ExactlyOne, Numeric }
@@ -573,8 +579,8 @@ export type FullSelectReturnTypeForTable<
 > =
   {
     [SelectResultMode.Many]: SelectReturnTypeForTable<T, C, L, E>[];
-    [SelectResultMode.ExactlyOne]: SelectReturnTypeForTable<T, C, L, E>;
-    [SelectResultMode.One]: SelectReturnTypeForTable<T, C, L, E> | undefined;
+    [SelectResultMode.ExactlyOne]: SelectReturnTypeForTable<T, C, L, E, SelectResultMode.ExactlyOne>;
+    [SelectResultMode.One]: SelectReturnTypeForTable<T, C, L, E, SelectResultMode.One> | undefined;
     [SelectResultMode.Numeric]: number;
   }[M];
 
