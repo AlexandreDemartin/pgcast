@@ -635,6 +635,22 @@ describe('quotes and */', () => {
     expect.soft(schema).toContain('* - `code*\\/` (base type: `text`) in database');
     expect.soft(syntaxErrors(schema)).toEqual([]);
   });
+
+  it('escapes a backslash before a digit in a label, which TypeScript reads as an octal escape', async () => {
+    await t.pool.query(String.raw`
+      CREATE SCHEMA octal;
+      CREATE TYPE octal.reels AS ENUM ('a\1', 'b\8');
+      CREATE TABLE octal.takes (r octal.reels);`);
+    try {
+      for (const typeEnumsAcrossSchemas of [false, true]) {
+        const { ts: schema } = await codegen({ schemas: { octal: all }, typeEnumsAcrossSchemas });
+        expect.soft(schema).toContain(`export type reels = 'a\\\\1' | 'b\\\\8';`);
+        expect.soft(syntaxErrors(schema)).toEqual([]);
+      }
+    } finally {
+      await t.pool.query('DROP SCHEMA octal CASCADE');
+    }
+  });
 });
 
 describe('awkward names', () => {
