@@ -15,6 +15,7 @@ export const prefixOf = (lang: Lang) => lang === 'en' ? '' : `/${lang}`;
 
 const en = {
   label: 'English',
+  code: 'EN',  // the language switcher's (theme/LanguageSwitch.vue)
   lang: 'en-GB',
   ogLocale: 'en_GB',
   description: 'Zero-abstraction Postgres for TypeScript: types cast from your database schema.',
@@ -118,6 +119,7 @@ export type Words = typeof en;
 
 const fr: Words = {
   label: 'Français',
+  code: 'FR',
   lang: 'fr-FR',
   ogLocale: 'fr_FR',
   description: 'Postgres sans abstraction pour TypeScript : des types moulés sur le schéma de votre base.',

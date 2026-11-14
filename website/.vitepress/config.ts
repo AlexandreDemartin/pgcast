@@ -138,10 +138,14 @@ export default defineConfig({
       __PGCAST_SITE__: JSON.stringify(`${host}/`),  // the site's URL, which the page actions' prompts name (PageActions.vue)
     },
     resolve: {
-      // VitePress's light / dark switch becomes system / light / dark (its "overriding internal components").
+      // VitePress's light / dark switch becomes system / light / dark, and its language switcher ours (its "overriding
+      // internal components")
       alias: [{
         find: /^.*\/VPSwitchAppearance\.vue$/,
         replacement: fileURLToPath(new URL('./theme/AppearanceSwitch.vue', import.meta.url)),
+      }, {
+        find: /^.*\/VPNavTranslations\.vue$/,
+        replacement: fileURLToPath(new URL('./theme/LanguageSwitch.vue', import.meta.url)),
       }],
     },
   },
