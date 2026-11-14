@@ -20,7 +20,7 @@ If a request breaks one of these points: **stop and say so** instead of implemen
 
 ### What pgcast does not do
 
-A change that makes one of these moves is refused, whatever its gain. Sources: Zapatos's docs (`docs/index.html`).
+A change that makes one of these moves is refused, whatever its gain. Sources: [Zapatos's docs](https://jawj.github.io/zapatos/).
 
 - A model, an entity class, a relationship declared in TypeScript (Zapatos returns "just (fully-typed) POJOs").
 - Lazy loading, an identity map, change tracking, a query cache.
