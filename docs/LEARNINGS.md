@@ -205,6 +205,9 @@ Candidates for a check, a rule or a skill line.
 - #251 — When a Fix gives an opt-in's path a pgcast error (`undefinedMeansMissing` + `upsert()`), the pages that list what turning that opt-in on changes (`switching.md`, `runtime-config.md`) need it too: `git grep` the sibling message (`nothing to update`) and name the new one beside it — `branch-reviewer`
 - #251 — The docs schema has no table whose `Insertable` takes `{}`: a page can describe that case without a typed example call — `builder`
 - #251 — `it.each` with one case per row keeps each red assertion visible on its own, where one `it` hides every failure after the first — `builder`
+- #257 — `getConfig()` runs on every query (`core.ts`) and while shortcuts build one (`shortcuts.ts`): whatever it does with the stored config can break every query; candidate check: `getConfig()` and `setConfig()` never throw whatever was stored, a unit test feeding a throwing getter, a Proxy, a primitive from JS (#249 and #257 are the same regression) — `branch-reviewer`
+- #257 — When a fix adds an exception to a guarantee the docs state, `git grep` the reference page that states it, English and French, not only `CHANGELOG.md` — `branch-reviewer`
+- #257 — An issue's « validate in `setConfig()` » candidate looked sound until a getter that starts throwing after a successful `setConfig()` was probed: probe the odd shapes of skill `backward-compat` before choosing between candidates — `builder`
 
 ## Minors kept
 
@@ -256,3 +259,6 @@ Minor review defects, taken up by the end-of-chapter review.
 - #251 — `website/switching.md:242` (and `fr/…:246`): the opt-ins list names the `update()` throw, not the new `upsert()` one under `undefinedMeansMissing` — `branch-reviewer`
 - #251 — `src/db/shortcuts.ts:423`: the guard runs after `updateValuesKeys()` (`:409`), so a doomed `upsert()` emits `PGCAST_DEP002` before throwing — `branch-reviewer`
 - #251 — `test/unit/shortcuts.test.ts:71`, `:663`: the new compile cases freeze `text` only (`toContain` for `upsert()`), not `values` — `branch-reviewer`
+- #257 — `test/integration/transaction.test.ts:367`: only the `sql` template path is frozen; shortcuts read `getConfig()` while building (`shortcuts.ts:145`, `:161`, `:416`, `:779`): an `insert()` in place of `write()` would keep them covered — `branch-reviewer`
+- #257 — `website/runtime-config.md:44` (and `fr/…:48`): « A copy of the configuration, `transactionRetryDelay` included » has no exception for a delay whose getter throws, which is now shared — `branch-reviewer`
+- #257 — `src/db/config.ts:58`: the JSDoc « Get (a copy of) the current configuration » leaves out the exception given at `:64` — `branch-reviewer`
