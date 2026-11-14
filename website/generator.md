@@ -426,8 +426,7 @@ src/zapatos/
 </div>
 
 - A placeholder holds the `Selectable` type of the domain's base type: `string` for `seat_label`, a `text`; `Date` for a `date` domain; `db.JSONValue` for a `json` or `jsonb` one, with its `import type * as db from 'zapatos/db'`. A type the generator can't map (`point`) gets `any`. How to fill one in: [Custom types](/custom-types).
-- A base type mapped to another `db.*` type (`int8`, `numeric`, `time`, ranges…) gives a placeholder that does not compile until you edit it: `export type PgTicket_no = db.Int8String;` comes with no import, and `tsc` fails with TS2503, `Cannot find namespace 'db'` ([#184](https://github.com/AlexandreDemartin/pgcast/issues/184)). Add `import type * as db from 'zapatos/db';` above it.
-- A domain over an enum is the same: `export type PgGenre_d = genre;` fails with TS2304 until you add `import type { genre } from 'zapatos/schema';`.
+- A base type mapped to another `db.*` type (`int8`, `numeric`, `time`, ranges…) gets the same import: `export type PgTicket_no = db.Int8String;` comes with `import type * as db from 'zapatos/db';`. A domain over an enum imports it: `import type { genre } from 'zapatos/schema';` above `export type PgGenre_d = genre;`. Zapatos 6.6.1 imported `db` for `db.JSONValue` alone, so its placeholders over these failed to compile ([#184](https://github.com/AlexandreDemartin/pgcast/issues/184)): [When a placeholder does not compile](/custom-types#when-a-placeholder-does-not-compile).
 - Nothing is deleted: a placeholder whose type is gone stays, and so does `custom/` once there is no custom type left.
 - `schema.d.ts` declares `schemaVersionCanary`, `version: 104`. A `zapatos/db` that expects another version fails to compile there: generate again ([`SchemaVersionCanary`](/runtime-config#SchemaVersionCanary)).
 - Each file is a `declare module` of the `zapatos/*` names, so your `tsconfig.json` must include it: `"include": ["src"]`, with `outDir` `"./src"`.
