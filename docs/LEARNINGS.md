@@ -202,6 +202,10 @@ Candidates for a check, a rule or a skill line.
 - #426 — `constructor.name` names nothing for an object refused through its chain (`''` for a generator, `Object` for an iterator on Node 20): use its tag — `builder`
 - #426 — The ECMA-262 constructor list can come from `vm.runInNewContext('Object.getOwnPropertyNames(globalThis)')` (a bare V8 context) instead of a hand-written one, so a built-in a Node gains turns the walk red — `branch-reviewer`
 - #426 — `git commit --no-edit` after a resolved conflict keeps the `# Conflicts:` lines (cleanup `whitespace`): give the message with `-m` or use `--cleanup=strip` — `builder`
+- #302 — A fix that ends a shared pool while sibling promises of a `Promise.all` still run replays what happens to work already queued inside pg-pool, not only to new calls: after `end()` its waiters never settle, or reject with `connectionTimeoutMillis`; probe with that option, more queries than `max`, and wait past the timeout — `branch-reviewer`
+- #302 — An « after the end » guard placed before the call misses work already queued inside the library; the guard where the failure lands (the `catch`) covers both in one line — `builder`
+- #302 — A custom-type column on a domain over a built-in type makes every table wait on the shared `pg_catalog` enums promise and hides the race; a composite type gives a throw while queries are still queued — `branch-reviewer`
+- #302 — In a test, spread the quieting config before the test's own: `{ ...config, ...quiet }` silently turned the throwing `warningListener` off — `builder`
 
 ## Minors kept
 
@@ -250,3 +254,4 @@ Minor review defects, taken up by the end-of-chapter review.
 - #262 — `parent()` has no table in `extras`, so a correlated shortcut there names the outer table in a `sql` fragment; an `extras` `parentTable`, as `lateral` has, could be a follow-up — `builder`
 - #426 — `test/unit/injection.test.ts:1460`: the walk's list of 45 names is hand-written; take it from a bare `vm` context — `branch-reviewer`
 - #426 — `website/sql-template.md:306`: « (Jest runs each test file in a `vm` context) » may no longer hold for iterators (Jest evaluates `node_modules` in the test's context); not verified, Jest not installed — `branch-reviewer`
+- #302 — `test/integration/codegen.test.ts:1369`: `exit.mockRestore()` right after the drop: a straggler failing later would call the real `process.exit(1)` and kill the worker instead of failing the test; keep the spy until `afterEach` — `branch-reviewer`
