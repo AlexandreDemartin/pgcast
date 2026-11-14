@@ -25,15 +25,15 @@ Quand vous lancez `npx pgcast`, le générateur pose à ces tables quelques ques
 
 | Il lit | Dans | Cela devient |
 |---|---|---|
-| chaque relation, sa nature, et si elle accepte un `INSERT` | `information_schema.tables`, `pg_matviews` | un namespace par table, vue, table distante ou vue matérialisée |
+| chaque relation, sa nature, et si elle accepte un `INSERT` | `information_schema.tables`, `pg_matviews` | un espace de noms par table, vue, table distante ou vue matérialisée |
 | le type de chaque colonne, ou son domaine et le type de base du domaine | `information_schema.columns` ; `pg_attribute` et `pg_type` pour une vue matérialisée | le type TypeScript de la colonne, une fois par contexte ([plus bas](#one-column-five-types)) |
-| si la colonne peut être `NULL` | `is_nullable` ; `attnotnull` pour une vue matérialisée | `\| null`, et facultative dans `Insertable` |
+| si la colonne est nullable | `is_nullable` ; `attnotnull` pour une vue matérialisée | `\| null`, et facultative dans `Insertable` |
 | sa valeur par défaut, d’identité ou générée | `column_default`, `identity_generation`, `is_generated` | facultative dans `Insertable` ; une colonne `GENERATED ALWAYS` est omise d’`Insertable` et d’`Updatable` |
 | son `COMMENT ON COLUMN` | `pg_description` | la JSDoc que votre éditeur affiche pour la colonne, avec son type Postgres et sa valeur par défaut |
-| chaque enum et ses libellés | `pg_enum` | une union de chaînes, et le tuple `every.<name>` |
+| chaque enum et ses labels | `pg_enum` | une union de chaînes, et le tuple `every.<name>` |
 | chaque index unique | `pg_indexes`, `pg_namespace`, `pg_class`, `pg_index` | `UniqueIndex`, les noms qu’accepte [`constraint()`](/fr/insert#constraint) |
 
-Pour voir les requêtes elles-mêmes, réglez [`debugListener`](/fr/generator#generate.debugListener). Un domaine, comme `seat_label`, et un type que le générateur ne sait pas traduire, comme `point`, reçoivent chacun un fichier à compléter dans `zapatos/custom/`, à vous de le remplir ([Types personnalisés](/fr/custom-types)).
+Pour voir les requêtes elles-mêmes, réglez [`debugListener`](/fr/generator#generate.debugListener). Un domaine, comme `seat_label`, et un type que le générateur ne sait pas traduire, comme `point`, reçoivent chacun un placeholder dans `zapatos/custom/`, à vous de le remplir ([Types personnalisés](/fr/custom-types)).
 
 Et ce que le catalogue ne voit pas, comme une colonne qu’un trigger remplit, vous le dites dans la configuration : [`columnOptions`](/fr/generator#generate.columnOptions) l’omet d’`Insertable` ou d’`Updatable`, ou la rend facultative dans `Insertable`.
 
@@ -67,8 +67,8 @@ Une vue matérialisée ne garde aucun `NOT NULL`, pas même celui d’un domaine
 
 Pour les vues, pgcast s’en tient à ce que Postgres déclare, comme Zapatos : une nullabilité que la base ne déclare pas serait une supposition, et une supposition est la seule chose qu’un type généré ne doit pas être. Certaines lacunes de ce que lit le générateur sont connues, et décrites ici telles qu’elles sont aujourd’hui :
 
-- Les libellés d’un enum sortent dans l’ordre alphabétique : `crew_job` est `'cinematographer' | 'composer' | 'director' | 'editor' | 'writer'`, et non dans l’ordre de son `CREATE TYPE`, sauf si [`enumOrder`](/fr/generator#generate.enumOrder) vaut `"declared"`.
-- Un enum d’un autre schéma devient un fichier à compléter de type `any`, ou prend les libellés de l’enum du même nom dans le schéma de la relation, sauf si [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas) est activé.
+- Les labels d’un enum sortent dans l’ordre alphabétique : `crew_job` est `'cinematographer' | 'composer' | 'director' | 'editor' | 'writer'`, et non dans l’ordre de son `CREATE TYPE`, sauf si [`enumOrder`](/fr/generator#generate.enumOrder) vaut `"declared"`.
+- Un enum d’un autre schéma devient un placeholder de type `any`, ou prend les labels de l’enum du même nom dans le schéma de la relation, sauf si [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas) est activé.
 
 ::: info À venir
 Lire davantage du catalogue, chaque fois en opt-in : les clés étrangères, pour des laterals qui connaissent leur jointure ([#54](https://github.com/AlexandreDemartin/pgcast/issues/54)) ; le `CHECK (VALUE = ANY (ARRAY[…]))` d’un domaine comme union de ses valeurs ([#55](https://github.com/AlexandreDemartin/pgcast/issues/55)) ; et, comme outil à part, les types de résultat du SQL écrit à la main ([#62](https://github.com/AlexandreDemartin/pgcast/issues/62)).
@@ -76,7 +76,7 @@ Lire davantage du catalogue, chaque fois en opt-in : les clés étrangères, po
 
 ## Une colonne, cinq types {#one-column-five-types}
 
-Une valeur n’est pas la même chose partout où elle passe. Un `timestamptz` lu par un simple `SELECT` vous arrive comme `Date`, parce que `pg` l’analyse ; lu à travers du JSON, c’est une chaîne ; dans un filtre, ce peut être l’un ou l’autre, ou du SQL ; dans une nouvelle ligne, il peut être obligatoire, ou laissé à sa valeur par défaut.
+Une valeur n’est pas la même chose partout où elle passe. Un `timestamptz` lu par un simple `SELECT` vous arrive comme `Date`, parce que `pg` le parse ; lu à travers du JSON, c’est une chaîne ; dans un filtre, ce peut être l’un ou l’autre, ou du SQL ; dans une nouvelle ligne, il peut être obligatoire, ou laissé à sa valeur par défaut.
 
 Le générateur écrit donc chaque table cinq fois, une par contexte, chaque colonne typée pour ce contexte. Voici deux colonnes de `screenings`, tirées du schéma généré :
 
@@ -102,7 +102,7 @@ db.select('screenings', { subtitled: null });
 db.select('screenings', { subtitled: db.conditions.isNull });
 ```
 
-Un domaine ou un type personnalisé fait exception : son fichier à compléter déclare un seul type, utilisé dans les cinq contextes. Cela convient à `seat_label`, une chaîne partout, mais pas à un domaine sur `int8`, `numeric`, `bytea` ou une date, dont le JSON diffère de ce que renvoie `pg` ([#194](https://github.com/AlexandreDemartin/pgcast/issues/194)).
+Un domaine ou un type personnalisé fait exception : son placeholder déclare un seul type, utilisé dans les cinq contextes. Cela convient à `seat_label`, une chaîne partout, mais pas à un domaine sur `int8`, `numeric`, `bytea` ou une date, dont le JSON diffère de ce que renvoie `pg` ([#194](https://github.com/AlexandreDemartin/pgcast/issues/194)).
 
 La même ligne, demandée deux fois, montre les deux premiers côte à côte :
 
@@ -146,7 +146,7 @@ Le raccourci fixe ensuite la forme : un tableau pour `select()`, la ligne ou `u
 Trois choses dans ce type méritent qu’on s’y arrête :
 
 - **`studio` peut être `null`, pas `undefined`.** `selectOne()` peut ne rien trouver, et dans une requête imbriquée, rien, c’est le `null` de JSON : le type change donc l’`undefined` en `null`.
-- **`hours` est un `number` parce que vous l’avez dit.** Le type d’un fragment `sql` est son second argument de type, ici `number`, et pgcast n’analyse pas votre SQL pour le vérifier ([Arguments de type](/fr/sql-template#type-arguments)). `year`, une colonne, prend son type du schéma.
+- **`hours` est un `number` parce que vous l’avez dit.** Le type d’un fragment `sql` est son second argument de type, ici `number`, et pgcast ne parse pas votre SQL pour le vérifier ([Arguments de type](/fr/sql-template#type-arguments)). `year`, une colonne, prend son type du schéma.
 - **`roles` est un `number`**, le type de `count()`, bien que Postgres compte en `int8` : comme Zapatos, pgcast suppose qu’aucun compte n’approche `Number.MAX_SAFE_INTEGER`.
 
 Ici `studio` ne manque jamais, puisque `films.studio_id` est `NOT NULL REFERENCES studios` ; mais le générateur ne lit pas les clés étrangères, alors dites-le vous-même avec `selectExactlyOne()`, et `studio` perd son `| null`. La doc de Zapatos range ce point parmi ses limites, et [#54](https://github.com/AlexandreDemartin/pgcast/issues/54) prévoit de le lire dans le catalogue.
@@ -167,4 +167,4 @@ Ce que pgcast refuse, c’est une seconde source de vérité : une classe modè
 
 - Les entrées dont parle cette page : [options de `select()`](/fr/select#options), [`JSONOnlyColsForTable`](/fr/select#JSONOnlyColsForTable), [`ExtrasResult`](/fr/select#ExtrasResult), [`LateralResult`](/fr/select#LateralResult), [`RunResultForSQLFragment`](/fr/sql-template#RunResultForSQLFragment), les [types de valeurs](/fr/runtime-config#value-types).
 - Le générateur, ses options et les fichiers qu’il écrit : [Générateur](/fr/generator).
-- Compléter un fichier à compléter : [Types personnalisés](/fr/custom-types).
+- Remplir un placeholder : [Types personnalisés](/fr/custom-types).

@@ -56,7 +56,7 @@ Sautez `(n - 1) × size` lignes avec [`offset`](/fr/select#order-limit-offset-an
 
 ## Charger la page suivante à partir de la dernière ligne {#fetch-the-next-page-from-the-last-row}
 
-C’est la pagination par clés (keyset) : demandez les lignes qui viennent après la dernière que vous avez affichée, dans le même `order`.
+C’est la pagination keyset : demandez les lignes qui viennent après la dernière que vous avez affichée, dans le même `order`.
 
 ### Garder la dernière ligne {#keep-the-last-row}
 

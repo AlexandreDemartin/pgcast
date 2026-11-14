@@ -15,7 +15,7 @@ Les modules s’appellent toujours `zapatos/db` et `zapatos/schema`, et le sché
 
 Les numéros suivent [SemVer](https://semver.org/), lu du point de vue d’un projet en 6.6.1 :
 
-- Un patch corrige : 6.6.2 ferme les failles de sécurité que la caractérisation de 6.6.1 par pgcast a trouvées.
+- Une version corrective corrige : 6.6.2 ferme les failles de sécurité que la caractérisation de 6.6.1 par pgcast a trouvées.
 - Une mineure ajoute : 6.7.0 apporte les opt-ins ci-dessous, avec des corrections et de nouvelles fonctionnalités.
 - Seule une majeure peut changer un résultat sur lequel du code qui fonctionne peut compter, donc une plage comme `^6.6.2` n’en apporte jamais.
 
@@ -89,7 +89,7 @@ La 7.0 active par défaut les opt-ins que liste la décision 003 : `upsertRequi
 
 La décision 003 fait de cela toute la rupture de la 7.0, et les avertissements l’annoncent, donc un projet qui a activé chaque option, et ne voit ni avertissement `PGCAST_DEP` ni note du générateur, n’a rien à changer. Les anciens comportements disparaissent en 8.0.
 
-Le générateur a ses propres opt-ins en 6.7 : [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas), qui type un enum d’un autre schéma par ses libellés, et [`enumOrder`](/fr/generator#generate.enumOrder), qui garde les libellés d’un enum dans leur ordre de déclaration.
+Le générateur a ses propres opt-ins en 6.7 : [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas), qui type un enum d’un autre schéma par ses labels, et [`enumOrder`](/fr/generator#generate.enumOrder), qui garde les labels d’un enum dans leur ordre de déclaration.
 
 Leurs avertissements sont des notes via [`warningListener`](/fr/generator#generate.warningListener), pas un `DeprecationWarning`, et n’arrivent que si votre schéma contient quelque chose qu’ils changeraient, une fois par exécution : celui de `typeEnumsAcrossSchemas` nomme chaque colonne, celui d’`enumOrder` chaque enum.
 

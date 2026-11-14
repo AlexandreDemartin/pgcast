@@ -26,7 +26,7 @@ Quand aucun raccourci n’écrit la requête dont vous avez besoin (une jointure
 </CastPanel>
 
 - Un nom interpolé est mis entre guillemets, `"films"`<!-- probe: examples/raw_sql_join.ts -->, et vérifié d’après le premier argument de type : ici `Tables`, le type `SQL` de chaque table que nomme la requête. Qualifiez une colonne en écrivant `${'films'}.${'title'}` : le type connaît les colonnes de chaque table, pas `'films.title'`.
-- Le second argument de type est ce que vous affirmez de ce qui revient : rien ne le confronte au SQL. Les lignes arrivent telles que `pg` les analyse, comme un `Selectable` les décrit (un `Date` pour un `timestamptz`), et non comme le JSON du `JSONSelectable` des raccourcis. Un `count(*)` est un `bigint`, que `pg` donne sous forme de chaîne : `'4'`.
+- Le second argument de type est ce que vous affirmez de ce qui revient : rien ne le confronte au SQL. Les lignes arrivent telles que `pg` les parse, comme un `Selectable` les décrit (un `Date` pour un `timestamptz`), et non comme le JSON du `JSONSelectable` des raccourcis. Un `count(*)` est un `bigint`, que `pg` donne sous forme de chaîne : `'4'`.
 - Les mots-clés restent dans le texte. Le SQL que vous écrivez vous-même n’y risque rien ; seul ce qui vient de l’extérieur demande les étapes ci-dessous.
 
 Un nom que le type ne connaît pas ne compile pas : une requête qui nomme `screenings` demande `s.screenings.SQL` dans son premier argument de type.
@@ -196,7 +196,7 @@ Les jointures par `lateral`, pas à pas : [Jointures](/fr/lateral).
 
 <<< ../examples/plain/raw_sql_test.ts{ts twoslash}
 
-- Ici avec `test` de `node:test` et `assert` de `node:assert/strict` ; n’importe quel lanceur de tests convient.
+- Ici avec `test` de `node:test` et `assert` de `node:assert/strict` ; n’importe quel test runner convient.
 - `text` garde les retours à la ligne du template : le test réduit ses espaces, pour que seul un changement du SQL le fasse échouer.
 - Chercher dans `text` ne suffit pas : un nom compilé depuis `x" --` y figure sous la forme `"x"" --"`<!-- probe: db.sql`${'x" -' + '-'}` -->, son `"` doublé, et une `'` isolée correspond aux littéraux de la requête elle-même.
 

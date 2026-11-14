@@ -17,7 +17,7 @@ Ce qui empêche l’entrée d’un appelant de changer le SQL qu’envoie pgcast
 
 ## Les valeurs n’entrent jamais dans le SQL {#values-never-enter-the-sql}
 
-Chaque valeur qu’envoie pgcast, venue d’un filtre, d’un `insert()` ou d’un [`param()`](/fr/sql-template#param), devient un paramètre numéroté, `$1`, et voyage à côté du texte SQL plutôt qu’à l’intérieur. Postgres analyse d’abord le texte, et lie les valeurs ensuite : à ce stade, une valeur ne peut être qu’une donnée.
+Chaque valeur qu’envoie pgcast, venue d’un filtre, d’un `insert()` ou d’un [`param()`](/fr/sql-template#param), devient un paramètre numéroté, `$1`, et voyage à côté du texte SQL plutôt qu’à l’intérieur. Postgres parse d’abord le texte, et lie les valeurs ensuite : à ce stade, une valeur ne peut être qu’une donnée.
 
 <ValuesFlow />
 
@@ -72,7 +72,7 @@ Une telle valeur est un bug du code appelant, et un bug ne devrait pas devenir u
 Avec le texte d’un appelant, `raw()` laisse l’appelant écrire votre requête. Il ne reçoit donc jamais que vos constantes, et le choix d’un appelant est mis en correspondance avec l’une d’elles ([Choisir le SQL à l’exécution parmi vos propres constantes](/fr/raw-sql#choose-sql-at-run-time-from-your-own-constants)). pgcast ne peut pas vérifier ce que vous y mettez, c’est pourquoi `SECURITY.md` exclut de son périmètre le SQL écrit dans `raw()`.
 :::
 
-Comme valeur de filtre, `raw()` lève une erreur. Zapatos 6.6.1 l’y envoyait comme paramètre par accident, son enveloppe en JSON ; le compiler comme SQL aurait fait de chaque `{ title: db.raw(input) }` une injection. Il n’est donc ni l’un ni l’autre : pour comparer une colonne à du SQL, écrivez un fragment, où `db.self` tient lieu de la colonne.
+Comme valeur de filtre, `raw()` lève une erreur. Zapatos 6.6.1 l’y envoyait comme paramètre par accident, son objet wrapper en JSON ; le compiler comme SQL aurait fait de chaque `{ title: db.raw(input) }` une injection. Il n’est donc ni l’un ni l’autre : pour comparer une colonne à du SQL, écrivez un fragment, où `db.self` tient lieu de la colonne.
 
 ## Ce qui a changé depuis Zapatos 6.6.1 {#what-changed-from-zapatos-6-6-1}
 
@@ -134,7 +134,7 @@ Si vous pensez avoir trouvé une faille dans pgcast (le SQL qu’il compile à p
 
 Donnez l’appel, le SQL que donne son `.compile()`, et ce que contrôle un attaquant ; une faille que pgcast partage avec Zapatos se signale ici aussi.
 
-Vous aurez une réponse sous une semaine. La correction sort dans une version de correctif, avec un avis de sécurité GitHub et son CVE, publié à une date convenue avec vous, et vous êtes crédité dans l’avis et dans le CHANGELOG, sauf si vous préférez ne pas être nommé.
+Vous aurez une réponse sous une semaine. La correction sort dans une version corrective, avec un avis de sécurité GitHub et son CVE, publié à une date convenue avec vous, et vous êtes crédité dans l’avis et dans le CHANGELOG, sauf si vous préférez ne pas être nommé.
 
 Ce qui entre dans le périmètre, et quelles versions sont prises en charge : [SECURITY.md](https://github.com/AlexandreDemartin/pgcast/blob/master/SECURITY.md).
 

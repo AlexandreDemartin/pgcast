@@ -32,7 +32,7 @@ Chaque film a un studio : `studio_id` est `NOT NULL REFERENCES studios(id)`, do
 </CastPanel>
 
 - Les jointures suivent l’ordre trié de leurs clés, quel que soit l’ordre dans lequel vous les écrivez.
-- Sur une clé étrangère qui peut être nulle, imbriquez [`selectOne()`](/fr/select#selectOne) : la clé contient la ligne ou `null`, comme le mentor plus bas.
+- Sur une clé étrangère nullable, imbriquez [`selectOne()`](/fr/select#selectOne) : la clé contient la ligne ou `null`, comme le mentor plus bas.
 - Dans un lateral, `selectExactlyOne()` ne vérifie rien : une ligne manquante donne `null` et aucune erreur, bien que son type n’ait pas de `null` ([`selectExactlyOne()`](/fr/select#selectExactlyOne)). Réservez-le à une clé étrangère `NOT NULL`.
 
 ## Passer par une table de jointure {#go-through-a-join-table}

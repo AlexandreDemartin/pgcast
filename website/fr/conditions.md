@@ -134,9 +134,9 @@ Chacune prend une valeur du type de la colonne, `<T>(a: T)`, et écrit la colonn
 
 `"col" IS NOT DISTINCT FROM $1`<!-- probe: db.sql`${{ col: db.conditions.isNotDistinctFrom(1) }}` --> : comme `eq()`, où `NULL` est une valeur comme une autre. Avec `strictNullChecks` activé, le type refuse aussi `null` ici : c’est [`isNull`](#conditions.isNull) qui le teste.
 
-## Les plages {#ranges}
+## Les intervalles {#ranges}
 
-Chacune prend deux valeurs du type de la colonne, `<T>(a: T, b: T)`, chacune un paramètre entre ses propres parenthèses. Les deux bornes sont comprises dans la plage : `between()` les trouve, `notBetween()` non.
+Chacune prend deux valeurs du type de la colonne, `<T>(a: T, b: T)`, chacune un paramètre entre ses propres parenthèses. Les deux bornes sont comprises dans l’intervalle : `between()` les trouve, `notBetween()` non.
 
 <CastPanel example="conditions_between">
 
@@ -244,7 +244,7 @@ La liste elle-même est un tableau, `readonly` ou non. Le type refuse tout le re
 
 > `` `isNotIn()` takes an array, not `Set`: make one with `isNotIn([...values])`, or `Array.from(values)` for an array-like object. ``<!-- message -->
 
-Une seule valeur à la place de la liste, une chaîne, un nombre, `null` ou `undefined`, reçoit l’autre conseil, car étaler `'Ada'` donnerait `'A'`, `'d'`, `'a'` :
+Une seule valeur à la place de la liste, une chaîne, un nombre, `null` ou `undefined`, reçoit l’autre conseil, car le spread de `'Ada'` donnerait `'A'`, `'d'`, `'a'` :
 
 > `` `isIn()` takes an array, not `string`: for one value, write `isIn([value])`. ``<!-- message -->
 
@@ -395,7 +395,7 @@ Zapatos 6.6.1 écrivait `(NOT "release_year" = 1974 OR "release_year" = 1991)`, 
 db.conditions.fromNow(n: number, unit: IntervalUnit = 'millisecond')
 ```
 
-`now() + $1`<!-- probe: db.conditions.fromNow(-7, 'days') -->, la valeur `` `${n} ${unit}` ``, que Postgres lit comme un intervalle : `fromNow(-7, 'days')` envoie `'-7 days'`, `fromNow(1.5, 'hours')` `'1.5 hours'`. Une valeur, comme [`now`](#conditions.now).
+`now() + $1`<!-- probe: db.conditions.fromNow(-7, 'days') -->, la valeur `` `${n} ${unit}` ``, que Postgres lit comme un `interval` : `fromNow(-7, 'days')` envoie `'-7 days'`, `fromNow(1.5, 'hours')` `'1.5 hours'`. Une valeur, comme [`now`](#conditions.now).
 
 `unit` est l’un de `microsecond`, `millisecond`, `second`, `minute`, `hour`, `day`, `week`, `month`, `year`, `decade`, chacun avec ou sans `s`, puis `century`, `centuries`, `millennium`, `millennia`. Un `n` dont Postgres ne lit pas la chaîne (`NaN`, `1e21`, écrit `1e+21`) échoue avec 22007.
 
@@ -426,9 +426,9 @@ Des opérations, pas des tests : pour une valeur d’[`update()`](/fr/insert#up
 - Dans le `updateValues` d’`upsert()`, il n’y a pas de colonne courante : elles lèvent "The 'self' column alias has no meaning here"<!-- message --> ([`upsert()`](/fr/insert#upsert)). Dans `insert()`, la colonne est écrite, et Postgres la refuse (42703).
 - Elles prennent un nombre ou un `Date`, pas un `Parameter` (TS2345) : pour un cast, écrivez une valeur en fragment `sql` (ci-dessous).
 - Sur une colonne `date`, le type refuse un nombre (TS2322), et Postgres ne pourrait pas l’exécuter non plus : `date + unknown` est ambigu (42725).
-- Sur une colonne `date`, `timestamp` ou `timestamptz`, un `Date` passe la vérification de types, et Postgres le refuse ([#180](https://github.com/AlexandreDemartin/pgcast/issues/180)). Sur `date`, `add()` est ambigu (42725) et `subtract()` donne un entier, pas une date (42804) ; sur les deux autres, `add()` le lit comme un intervalle (22007), `subtract()` donne un intervalle, pas un instant (42804).
+- Sur une colonne `date`, `timestamp` ou `timestamptz`, un `Date` passe la vérification de types, et Postgres le refuse ([#180](https://github.com/AlexandreDemartin/pgcast/issues/180)). Sur `date`, `add()` est ambigu (42725) et `subtract()` donne un entier, pas une date (42804) ; sur les deux autres, `add()` le lit comme un `interval` (22007), `subtract()` donne un `interval`, pas un instant (42804).
 
-Pour les dates, écrivez une valeur en fragment `sql`, où `db.self` est la colonne, et castez son paramètre. Sur une colonne `date`, `` db.sql`${db.self} + ${db.param(3, 'int4')}` `` ajoute trois jours : `"col" + CAST($1 AS "int4")`<!-- probe: db.sql`${{ col: db.sql`${db.self} + ${db.param(3, 'int4')}` }}` -->. Sur une colonne `timestamptz`, ajoutez un intervalle : une séance déplacée au lendemain.
+Pour les dates, écrivez une valeur en fragment `sql`, où `db.self` est la colonne, et castez son paramètre. Sur une colonne `date`, `` db.sql`${db.self} + ${db.param(3, 'int4')}` `` ajoute trois jours : `"col" + CAST($1 AS "int4")`<!-- probe: db.sql`${{ col: db.sql`${db.self} + ${db.param(3, 'int4')}` }}` -->. Sur une colonne `timestamptz`, ajoutez un `interval` : une séance déplacée au lendemain.
 
 <CastPanel example="conditions_add_interval">
 
@@ -448,7 +448,7 @@ Le type ne vérifie pas un fragment : un `int4` sur une colonne `timestamptz` p
 
 ## Les valeurs qu’une condition refuse {#refused-values}
 
-`Default`, `self`, `raw()`, `cols()` et `vals()` n’ont pas de sens comme valeur d’une condition. Le type les refuse (TS2322, ou TS2345 là où la condition borne son argument : un motif, la seconde borne d’une plage, une condition de tableau, `add()`, `subtract()`).
+`Default`, `self`, `raw()`, `cols()` et `vals()` n’ont pas de sens comme valeur d’une condition. Le type les refuse (TS2322, ou TS2345 là où la condition borne son argument : un motif, la seconde borne d’un intervalle, une condition de tableau, `add()`, `subtract()`).
 
 À l’exécution, c’est la compilation de la condition qui lève l’erreur, pas son appel : `run()` est donc rejetée avec une simple `Error` avant toute requête.
 
@@ -456,7 +456,7 @@ Zapatos 6.6.1 envoyait `Default` et `self` comme les chaînes `'Symbol(DEFAULT)'
 
 | Message | Quand |
 |---|---|
-| `` `db.Default` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To set a column to its default in an UPDATE, give `db.Default` as the value itself: `{ n: db.Default }`. ``<!-- message --> | `Default` comme valeur d’une comparaison, d’une plage, d’un motif, d’une condition de tableau, d’`add()` ou de `subtract()` |
+| `` `db.Default` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To set a column to its default in an UPDATE, give `db.Default` as the value itself: `{ n: db.Default }`. ``<!-- message --> | `Default` comme valeur d’une comparaison, d’un intervalle, d’un motif, d’une condition de tableau, d’`add()` ou de `subtract()` |
 | `` `db.self` has no meaning as the value of `eq()`, `add()` and the other conditions: it is already the column on the left. To compare the column with itself, write a `sql` fragment with `db.self` on both sides. ``<!-- message --> | `self` au même endroit |
 | `` `db.raw()`, `db.cols()` and `db.vals()` have no meaning as the value of `eq()`, `add()` and the other conditions: for SQL, write a `sql` fragment with `db.self` in place of the condition; for a value, give the value itself, or `db.param()`. ``<!-- message --> | `raw()`, `cols()` ou `vals()` au même endroit |
 | `` `db.Default` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. `DEFAULT` is for INSERT and UPDATE values. ``<!-- message --> | `Default` dans `isIn()` ou `isNotIn()` |

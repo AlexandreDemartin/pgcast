@@ -2,7 +2,7 @@
 english: e70ecd02d18e
 ---
 
-# Lots
+# Batches
 
 Écrivez beaucoup de lignes d’un coup : découpez-les sous la limite de paramètres de Postgres, ignorez celles qui sont déjà présentes, additionnez des comptes, empêchez des lignes aux clés différentes d’effacer ce qui est stocké, et ne récupérez que ce dont vous avez besoin. Cette page suppose que vous connaissez [`insert()` et `upsert()`](/fr/insert).
 {.lede}
@@ -31,7 +31,7 @@ Les paramètres d’une requête, à compter avant de l’envoyer :
 
 Ou demandez-le à la requête elle-même : [`.compile()`](/fr/sql-template#compile)`.values.length` d’un insert d’une ligne, comme ci-dessous, quand toutes les lignes ont les mêmes clés.
 
-Envoyez ensuite les lignes par paquets d’une taille fixe, bien en dessous de la limite. Dans une transaction, soit tous les paquets sont insérés, soit aucun :
+Envoyez ensuite les lignes par chunks d’une taille fixe, bien en dessous de la limite. Dans une transaction, soit tous les chunks sont insérés, soit aucun :
 
 <<< ../examples/plain/batches_chunks.ts{ts twoslash}
 
@@ -42,8 +42,8 @@ START TRANSACTION ISOLATION LEVEL READ COMMITTED
 COMMIT
 ```
 
-- Si un paquet échoue, [`readCommitted()`](/fr/transaction#readCommitted) envoie `ROLLBACK`<!-- probe: db.readCommitted(pool, async () => { throw new Error(); }) --> et est rejetée avec son erreur : aucun tag n’est conservé. Un interblocage (40P01) relance d’abord les paquets ([Nouvelles tentatives](/fr/retries)).
-- Sur le pool, sans la transaction, chaque paquet est validé au fur et à mesure : les paquets passés avant celui qui a échoué restent en base.
+- Si un chunk échoue, [`readCommitted()`](/fr/transaction#readCommitted) envoie `ROLLBACK`<!-- probe: db.readCommitted(pool, async () => { throw new Error(); }) --> et est rejetée avec son erreur : aucun tag n’est conservé. Un deadlock (40P01) relance d’abord les chunks ([Retries](/fr/retries)).
+- Sur le pool, sans la transaction, chaque chunk est commité au fur et à mesure : les chunks passés avant celui qui a échoué restent en base.
 - Pour `upsert()`, le découpage est le même.
 
 ## Ignorer les lignes déjà présentes {#skip-the-rows-already-there}
@@ -92,7 +92,7 @@ Ajoutez ensuite les votes de chaque ligne à ceux déjà stockés : calculez `v
 </CastPanel>
 
 - La première exécution insère les trois lignes. La seconde les passe à 4, 2 et 6 votes, chacune avec `$action: 'UPDATE'`.
-- Un `undefined` dans `updateValues` donne à `votes` le compte du lot, puisque les lignes l’insèrent : `EXCLUDED."votes"`<!-- probe: db.upsert('ratings', [{ film_id: 1000, stars: 5, votes: 3 }], ['film_id', 'stars'], { updateValues: { votes: undefined } }) -->, et avec [`undefinedMeansMissing`](/fr/runtime-config#Config.undefinedMeansMissing) activé, `EXCLUDED."votes"`<!-- probe: (db.setConfig({ undefinedMeansMissing: true }), db.upsert('ratings', [{ film_id: 1000, stars: 5, votes: 3 }], ['film_id', 'stars'], { updateValues: { votes: undefined } })) --> aussi ([Une valeur `undefined`](/fr/insert#undefined-values)).
+- Un `undefined` dans `updateValues` donne à `votes` le compte du batch, puisque les lignes l’insèrent : `EXCLUDED."votes"`<!-- probe: db.upsert('ratings', [{ film_id: 1000, stars: 5, votes: 3 }], ['film_id', 'stars'], { updateValues: { votes: undefined } }) -->, et avec [`undefinedMeansMissing`](/fr/runtime-config#Config.undefinedMeansMissing) activé, `EXCLUDED."votes"`<!-- probe: (db.setConfig({ undefinedMeansMissing: true }), db.upsert('ratings', [{ film_id: 1000, stars: 5, votes: 3 }], ['film_id', 'stars'], { updateValues: { votes: undefined } })) --> aussi ([Une valeur `undefined`](/fr/insert#undefined-values)).
 
 ## Lignes aux clés différentes {#rows-with-different-keys}
 
@@ -121,7 +121,7 @@ Avec `db.setConfig({ upsertRequiresSameKeys: true })` ([`Config.upsertRequiresSa
 
 Les lignes construites à partir d’une saisie contiennent souvent un `undefined`, comme un `booked_at` que le formulaire a laissé vide. Par défaut, pgcast l’envoie comme `NULL`, comme Zapatos 6.6.1.
 
-`booked_at` est `NOT NULL`, donc Postgres refuse tout le lot, 23502, `null value in column "booked_at" of relation "seat_bookings" violates not-null constraint`, et pgcast avertit une fois, `PGCAST_DEP002`.
+`booked_at` est `NOT NULL`, donc Postgres refuse tout le batch, 23502, `null value in column "booked_at" of relation "seat_bookings" violates not-null constraint`, et pgcast avertit une fois, `PGCAST_DEP002`.
 
 ::: tip Opt-in
 Avec `db.setConfig({ undefinedMeansMissing: true })` ([`Config.undefinedMeansMissing`](/fr/runtime-config#Config.undefinedMeansMissing)), un `undefined` est une clé manquante : F8 avec `booked_at: undefined` est `(DEFAULT, $5, $6, $7)`<!-- probe: (db.setConfig({ undefinedMeansMissing: true }), db.upsert('seat_bookings', [{ screening_id: 1000, seat: 'F7', customer: 'Ines Calloway', booked_at: '2030-02-20T09:15:00Z' }, { screening_id: 1000, seat: 'F8', customer: 'Barnaby Quill-Hart', booked_at: undefined }], ['screening_id', 'seat'], { updateColumns: 'customer' })) -->, une ligne aux clés différentes comme ci-dessus ([Une valeur `undefined`](/fr/insert#undefined-values)).
@@ -129,7 +129,7 @@ Avec `db.setConfig({ undefinedMeansMissing: true })` ([`Config.undefinedMeansMis
 
 ## Choisir ce qui revient {#choose-what-comes-back}
 
-Par défaut, chaque ligne revient entière, avec son `$action` pour un upsert. Pour un gros lot, demandez moins :
+Par défaut, chaque ligne revient entière, avec son `$action` pour un upsert. Pour un gros batch, demandez moins :
 
 <CastPanel example="batches_returning">
 
@@ -139,11 +139,11 @@ Par défaut, chaque ligne revient entière, avec son `$action` pour un upsert. P
 
 - [`returning: ['seat']`](/fr/insert#insert-options) envoie `jsonb_build_object($8::text, "seat")`<!-- probe: examples/batches_returning.ts --> au lieu de `to_jsonb("seat_bookings".*)`<!-- probe: examples/batches_different_keys.ts -->.
 - `$action` distingue les nouvelles lignes des lignes mises à jour : `newSeats` vaut `['F8']` quand F7 était déjà réservé.
-- [`reportAction: 'suppress'`](/fr/insert#upsert-options) retire `$action` du SQL et du type, pour un lot qui n’en a pas besoin.
-- Tous deux ne restreignent le type qu’avec `strictNullChecks` activé ([Options](/fr/insert#insert-options)).
+- [`reportAction: 'suppress'`](/fr/insert#upsert-options) retire `$action` du SQL et du type, pour un batch qui n’en a pas besoin.
+- Tous deux n’affinent le type qu’avec `strictNullChecks` activé ([Options](/fr/insert#insert-options)).
 
 ## Voir aussi {#see-also}
 
 - [`insert()`](/fr/insert#insert) et [`upsert()`](/fr/insert#upsert) : chaque option, le SQL qu’elle ajoute.
-- [`transaction()`](/fr/transaction#transaction) : ses niveaux, ses nouvelles tentatives et ses erreurs.
+- [`transaction()`](/fr/transaction#transaction) : ses niveaux, ses retries et ses erreurs.
 - [Versions](/fr/versions) : les opt-ins et leurs avertissements.

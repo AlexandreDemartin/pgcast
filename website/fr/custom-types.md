@@ -4,12 +4,12 @@ english: 83b0dc048cd6
 
 # Types personnalisés
 
-Un type que le générateur ne sait pas traduire en TypeScript, comme `point`, et chaque domaine vous arrivent sous forme d’un fichier à compléter dans `zapatos/custom`, que vous remplissez vous-même. Ici, nous remplissons `cinemas.location`, un `POINT`, et trouvons avec lui le cinéma le plus proche, puis nous typons le domaine `seat_label`, gardons les deux d’une génération à l’autre, et corrigeons un fichier à compléter qui ne compile pas.
+Un type que le générateur ne sait pas traduire en TypeScript, comme `point`, et chaque domaine vous arrivent sous forme d’un placeholder dans `zapatos/custom`, que vous remplissez vous-même. Ici, nous remplissons `cinemas.location`, un `POINT`, et trouvons avec lui le cinéma le plus proche, puis nous typons le domaine `seat_label`, gardons les deux d’une génération à l’autre, et corrigeons un placeholder qui ne compile pas.
 {.lede}
 
-## Trouver le fichier à compléter {#find-the-placeholder}
+## Trouver le placeholder {#find-the-placeholder}
 
-La première fois que le générateur rencontre un tel type, il écrit pour lui un fichier à compléter, et le signale :
+La première fois que le générateur rencontre un tel type, il écrit pour lui un placeholder, et le signale :
 
 ```txt
 Writing new custom type or domain placeholder file: src/zapatos/custom/PgPoint.d.ts
@@ -74,7 +74,7 @@ await db.insert('cinemas', {
 
 Postgres accepte aussi `'1.5,2.5'`, que le type refuse. Le type vérifie les parenthèses et la virgule, et laisse passer les espaces : `'(1.5, 2.5)'` compile, et Postgres l’accepte.
 
-Un seul type sert les cinq interfaces. Mais votre propre requête typée `s.cinemas.Selectable` reçoit ses lignes de `pg`, qui analyse un point en `{ x: 0.4, y: 1.2 }`, quoi que dise le type. Sélectionnez-y le point sous forme de texte, et les lignes correspondent au type :
+Un seul type sert les cinq interfaces. Mais votre propre requête typée `s.cinemas.Selectable` reçoit ses lignes de `pg`, qui parse un point en `{ x: 0.4, y: 1.2 }`, quoi que dise le type. Sélectionnez-y le point sous forme de texte, et les lignes correspondent au type :
 
 <CastPanel example="custom_types_text">
 
@@ -118,7 +118,7 @@ const here: c.PgPoint = '(0.5,1)';
 
 ## Typer un domaine {#type-a-domain}
 
-Un domaine a aussi son fichier à compléter, qui contient le type `Selectable` de son type de base au lieu de `any` : le type que renvoie `pg`. Ce seul type sert les cinq interfaces, `JSONSelectable` compris. `seat_label` est un `TEXT` avec un `CHECK`, donc `src/zapatos/custom/PgSeat_label.d.ts` contient `string`, qui est juste pour chacune :
+Un domaine a aussi son placeholder, qui contient le type `Selectable` de son type de base au lieu de `any` : le type que renvoie `pg`. Ce seul type sert les cinq interfaces, `JSONSelectable` compris. `seat_label` est un `TEXT` avec un `CHECK`, donc `src/zapatos/custom/PgSeat_label.d.ts` contient `string`, qui est juste pour chacune :
 
 ::: code-group
 
@@ -159,7 +159,7 @@ export async function bookSeat(pool: pg.Pool, screening_id: number, seat: string
 :::
 
 - `seat: 'f7'` ne compile alors plus, TS2322 dans une ligne typée `s.seat_bookings.Insertable` ; `'Z100'` compile toujours, et Postgres le refuse toujours.
-- Chaque type de `declare module 'zapatos/custom'` est exporté, `PgSeat_labelRow` aussi : un type auxiliaire nommé `Row` entrerait en conflit avec celui d’un autre fichier à compléter (TS2300).
+- Chaque type de `declare module 'zapatos/custom'` est exporté, `PgSeat_labelRow` aussi : un type auxiliaire nommé `Row` entrerait en conflit avec celui d’un autre placeholder (TS2300).
 - Une `string` venue d’un formulaire ne convient plus (TS2322 dans une ligne typée, TS2769 dans l’appel) : vérifiez-la d’abord, avec le motif du `CHECK`, dans un type guard, comme le fait `src/seats.ts`.
 - Cette doc garde `PgSeat_label` tel que généré, `string`.
 
@@ -191,7 +191,7 @@ Une ligne typée `s.cinemas.Insertable` avec `screen: { format: 'VHS', seats: 12
 
 ## Le garder d’une génération à l’autre {#keep-it-across-runs}
 
-Le générateur écrit un fichier à compléter une seule fois, quand il manque, et ne l’écrase jamais. Avec [`progressListener`](/fr/generator#generate.progressListener), les générations suivantes affichent :
+Le générateur écrit un placeholder une seule fois, quand il manque, et ne l’écrase jamais. Avec [`progressListener`](/fr/generator#generate.progressListener), les générations suivantes affichent :
 
 ```txt
 Custom type or domain declaration file already exists: src/zapatos/custom/PgPoint.d.ts
@@ -199,21 +199,21 @@ Custom type or domain declaration file already exists: src/zapatos/custom/PgSeat
 ```
 
 - Versionnez `zapatos/custom/` avec votre code : les fichiers que vous avez complétés sont à vous.
-- Le fichier à compléter ne suit pas la base. Recréez un domaine sur un autre type, et modifiez son fichier ; ou supprimez le fichier, et la génération suivante en écrit un neuf.
-- Rien n’est supprimé : renommez ou supprimez un domaine, et son ancien fichier à compléter reste jusqu’à ce que vous le supprimiez.
+- Le placeholder ne suit pas la base. Recréez un domaine sur un autre type, et modifiez son fichier ; ou supprimez le fichier, et la génération suivante en écrit un neuf.
+- Rien n’est supprimé : renommez ou supprimez un domaine, et son ancien placeholder reste jusqu’à ce que vous le supprimiez.
 - Une colonne tableau est un type personnalisé à part entière : `point[]` reçoit `Pg_point.d.ts`, `any`, et `seat_label[]` reçoit `Pg_seat_label.d.ts`, `any` aussi.
-- Deux domaines de même nom dans deux schémas partagent un seul fichier à compléter ([#42](https://github.com/AlexandreDemartin/pgcast/issues/42)).
+- Deux domaines de même nom dans deux schémas partagent un seul placeholder ([#42](https://github.com/AlexandreDemartin/pgcast/issues/42)).
 
-## Quand un fichier à compléter ne compile pas {#when-a-placeholder-does-not-compile}
+## Quand un placeholder ne compile pas {#when-a-placeholder-does-not-compile}
 
-Le fichier à compléter d’un domaine contient le nom TypeScript de son type de base, et n’importe `zapatos/db` que pour `db.JSONValue`. Certains ne compilent donc pas tant que vous n’ajoutez pas l’import, comme dans Zapatos 6.6.1 ([#184](https://github.com/AlexandreDemartin/pgcast/issues/184)) :
+Le placeholder d’un domaine contient le nom TypeScript de son type de base, et n’importe `zapatos/db` que pour `db.JSONValue`. Certains ne compilent donc pas tant que vous n’ajoutez pas l’import, comme dans Zapatos 6.6.1 ([#184](https://github.com/AlexandreDemartin/pgcast/issues/184)) :
 
-| Type du fichier à compléter | `tsc` dit | Ajoutez, dans `declare module` |
+| Type du placeholder | `tsc` dit | Ajoutez, dans `declare module` |
 |---|---|---|
 | `db.Int8String`, pour un domaine sur `bigint` ; de même pour `numeric`, `time` et les types range | TS2503, `Cannot find namespace 'db'.` | `import type * as db from 'zapatos/db';` |
 | `crew_job`, pour `CREATE DOMAIN lead_job AS crew_job`, sur un enum | TS2304, `Cannot find name 'crew_job'.` | `import type { crew_job } from 'zapatos/schema';` |
 
-Pour `CREATE DOMAIN ticket_no AS bigint`, le fichier à compléter contient `db.Int8String`, la chaîne que `pg` renvoie pour un `bigint`. Mais les raccourcis renvoient un `bigint` sous forme de nombre JSON : un `ticket_no` que renvoie [`select()`](/fr/select#select) est un `number` typé `db.Int8String`, donc `.padStart()` compile, puis lève une erreur ; et une ligne pour [`insert()`](/fr/insert#insert), typée `Insertable`, refuse `1` (TS2322). Avec l’import, typez-le comme les deux à la fois :
+Pour `CREATE DOMAIN ticket_no AS bigint`, le placeholder contient `db.Int8String`, la chaîne que `pg` renvoie pour un `bigint`. Mais les raccourcis renvoient un `bigint` sous forme de nombre JSON : un `ticket_no` que renvoie [`select()`](/fr/select#select) est un `number` typé `db.Int8String`, donc `.padStart()` compile, puis lève une erreur ; et une ligne pour [`insert()`](/fr/insert#insert), typée `Insertable`, refuse `1` (TS2322). Avec l’import, typez-le comme les deux à la fois :
 
 ::: code-group
 
@@ -226,11 +226,11 @@ declare module 'zapatos/custom' {
 
 :::
 
-- Un domaine sur `numeric`, `date`, `timestamp`, `timestamptz` ou `bytea` est dans le même cas : son fichier à compléter contient ce que renvoie `pg`, pas ce que renvoient les raccourcis ([#194](https://github.com/AlexandreDemartin/pgcast/issues/194)).
+- Un domaine sur `numeric`, `date`, `timestamp`, `timestamptz` ou `bytea` est dans le même cas : son placeholder contient ce que renvoie `pg`, pas ce que renvoient les raccourcis ([#194](https://github.com/AlexandreDemartin/pgcast/issues/194)).
 - Au-delà de `Number.MAX_SAFE_INTEGER`, le nombre perd ses derniers chiffres, comme pour tout `bigint` : `9007199254740993` revient en `9007199254740992` ([`customJSONParsingForLargeNumbers`](/fr/generator#generate.customJSONParsingForLargeNumbers)).
 
 ## Voir aussi {#see-also}
 
 - [Les fichiers qu’il écrit](/fr/generator#the-files-it-writes) : chaque fichier que le générateur écrit, et quand.
-- [`customTypesTransform`](/fr/generator#generate.customTypesTransform) : les noms des fichiers à compléter.
+- [`customTypesTransform`](/fr/generator#generate.customTypesTransform) : les noms des placeholders.
 - [Le catalogue](/fr/catalog-types) : pourquoi un type diffère entre `Selectable` et `JSONSelectable`.

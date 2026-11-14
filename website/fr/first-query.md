@@ -24,7 +24,7 @@ Chaque exemple ci-dessous tourne sur ce schéma. Votre propre base convient auss
 
 ## 1. Préparer le projet {#set-up-the-project}
 
-Les exemples utilisent `import` et un `await` de premier niveau, votre projet est donc un module ES :
+Les exemples utilisent `import` et un top-level `await`, votre projet est donc un module ES :
 
 ```sh
 npm pkg set type=module
@@ -48,7 +48,7 @@ Puis un `tsconfig.json` qui les compile comme Node les exécute :
 
 :::
 
-- `"module": "nodenext"` fait compiler `import pg from 'pg'` et le `await` de premier niveau, comme dans un projet `"type": "module"`.
+- `"module": "nodenext"` fait compiler `import pg from 'pg'` et le top-level `await`, comme dans un projet `"type": "module"`.
 - `strict` active `strictNullChecks`, dont les types générés ont besoin. Sans lui, une requête qui nomme ses `columns` (comme plus bas) reçoit le type de toutes les colonnes, et une ligne absente cesse d’apparaître comme `undefined`.
 - `noEmit` : `tsc` ne fait que vérifier votre code ; Node exécute lui-même le fichier `.ts`.
 - Le générateur écrit des fichiers `.d.ts` ordinaires dans votre arborescence source, et `zapatos/schema` est déclaré dans l’un d’eux : ils doivent donc faire partie de votre compilation. Avec `"include": ["src"]` et l’`outDir` ci-dessous, c’est le cas.
@@ -82,7 +82,7 @@ Lancez le générateur. Il est installé sous deux noms, `pgcast` et `zapatos` 
 npx pgcast
 ```
 
-Il affiche une ligne pour chaque fichier à compléter qu’il écrit, ici pour les deux types du schéma de la doc que Postgres ne sait pas, à lui seul, décrire à TypeScript :
+Il affiche une ligne pour chaque placeholder qu’il écrit, ici pour les deux types du schéma de la doc que Postgres ne sait pas, à lui seul, décrire à TypeScript :
 
 ```txt
 Writing new custom type or domain placeholder file: src/zapatos/custom/PgPoint.d.ts
@@ -100,7 +100,7 @@ src/zapatos/
     └── PgSeat_label.d.ts  seat_bookings.seat, the seat_label domain: string
 ```
 
-Les fichiers à compléter de `custom/` sont à vous : le générateur écrit chacun d’eux une seule fois et ne l’écrase jamais, alors que `index.d.ts` est réécrit à chaque exécution. Dans `schema.d.ts`, chaque table est un namespace de types, et les raccourcis choisissent le bon pour vous :
+Les placeholders de `custom/` sont à vous : le générateur écrit chacun d’eux une seule fois et ne l’écrase jamais, alors que `index.d.ts` est réécrit à chaque exécution. Dans `schema.d.ts`, chaque table est un espace de noms de types, et les raccourcis choisissent le bon pour vous :
 
 | Type | Ce qu’il décrit | Utilisé par |
 |---|---|---|
@@ -128,7 +128,7 @@ const pool = new pg.Pool({
 
 :::
 
-Les exemples ci-dessous continuent dans ce fichier. Leur `await` de premier niveau a besoin d’ESM : c’est le `"type": "module"` plus haut. Après chaque étape, exécutez-le :
+Les exemples ci-dessous continuent dans ce fichier. Leur top-level `await` a besoin d’ESM : c’est le `"type": "module"` plus haut. Après chaque étape, exécutez-le :
 
 ```sh
 node src/films.ts
@@ -158,7 +158,7 @@ const film = await db.selectOne('films', { title: 'The Salt Orchard' }).run(pool
 console.log(film.release_year);
 ```
 
-Testez plutôt ce cas, et le type se restreint à la ligne (survolez `film` pour le voir). Exécutez le fichier, et il affiche `1974` :
+Testez plutôt ce cas, et le type s’affine à celui de la ligne (survolez `film` pour le voir). Exécutez le fichier, et il affiche `1974` :
 
 ```ts twoslash
 import * as db from 'zapatos/db';
@@ -169,7 +169,7 @@ const film = await db.selectOne('films', { title: 'The Salt Orchard' }).run(pool
 if (film) console.log(film.release_year);  // 1974
 ```
 
-Pour voir le SQL dans votre propre code, appelez `.compile()` là où vous appelleriez `.run()` : il donne le `text` (sur une ligne) et les `values` que montre le panneau, et n’envoie rien. Ajoutez cette ligne au fichier :
+Pour voir le SQL dans votre propre code, appelez `.compile()` là où vous appelleriez `.run()` : il donne le `text` (sur une ligne) et les `values` que montre le cast panel, et n’envoie rien. Ajoutez cette ligne au fichier :
 
 ```ts twoslash
 import * as db from 'zapatos/db';
@@ -268,7 +268,7 @@ Exécutez le fichier, et il affiche la nouvelle ligne :
 }
 ```
 
-Les colonnes que vous avez omises ont pris leur valeur par défaut : le nouvel `id` depuis sa séquence, `genres` à `[]`, `tagline` à `null`. Sur un schéma de la doc fraîchement chargé, le premier film que vous ajoutez reçoit l’`id` 1, car les films de départ commencent à 1000 ; chaque exécution suivante l’ajoute de nouveau, avec l’`id` suivant.
+Les colonnes que vous avez omises ont pris leur valeur par défaut : le nouvel `id` depuis sa séquence, `genres` à `[]`, `tagline` à `null`. Sur un schéma de la doc fraîchement chargé, le premier film que vous ajoutez reçoit l’`id` 1, car les films chargés par le seed commencent à 1000 ; chaque exécution suivante l’ajoute de nouveau, avec l’`id` suivant.
 
 Une colonne `NOT NULL` sans valeur par défaut ne peut pas être omise. Oubliez la durée, et TypeScript le signale avant que Postgres ne le puisse :
 
