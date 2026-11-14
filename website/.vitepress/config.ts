@@ -97,7 +97,7 @@ export default defineConfig({
       // no ↗ after the external link: the bar's links look alike, wherever they lead
       { text: 'GitHub', link: repo, noIcon: true },
     ],
-    sidebar: outline,  // each group's heading links its landing page
+    sidebar: outline,  // each group's heading links its landing page, its chevron folds it
     search: {
       provider: 'local',
       options: { translations: { button: { buttonText: 'Search', buttonAriaLabel: 'Search the docs' } } },

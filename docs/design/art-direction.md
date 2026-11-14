@@ -18,13 +18,14 @@ Defined on `:root`, the dark values on `.dark` with `color-scheme: dark`. Three 
 |---|---|---|---|
 | `--bg` | `#f6f8f9` | `#0d1318` | page background |
 | `--surface` | `#ffffff` | `#121a21` | top bar, nav drawer, panels, tables, notes, pager |
-| `--sunken` | `#eef2f4` | `#0a0f13` | inline code, table headers, search field, nav hover, plain chip, copy button hover |
+| `--sunken` | `#eef2f4` | `#0a0f13` | inline code, table headers, search field, plain chip, copy button hover |
+| `--raised` | `#e4e7e9` | `#1e2429` | the nav's current page: `--fg` at 8% over `--bg` |
 | `--fg` | `#12202b` | `#e2e9ee` | text |
 | `--muted` | `#566673` | `#8d9eab` | secondary text, labels, captions, hover-type underline |
 | `--line` | `#d9e0e5` | `#23303a` | borders and rules |
-| `--accent` | `#0a6b63` | `#4fcfbf` | links, `::`, current page, primary button, selected tab, focus ring |
+| `--accent` | `#0a6b63` | `#4fcfbf` | links, `::`, current section of "On this page", primary button, selected tab, focus ring |
 | `--accent-fg` | `#ffffff` | `#06201d` | text on `--accent` |
-| `--accent-soft` | `#dcefec` | `#11302c` | current nav item, chips, hover-type highlight, search selection |
+| `--accent-soft` | `#dcefec` | `#11302c` | chips, hover-type highlight, search selection |
 | `--warn` | `#8a5a00` | `#e8b65a` | Security chip and its border, the banner's text |
 | `--warn-soft` | `#fbf0d9` | `#2c2412` | Security note, the banner |
 | `--error` | `#b22e2e` | `#d96d6d` | an error line under a failing example (Twoslash's `// @errors`): its text and left border, on a 12.5% tint of it |
@@ -63,7 +64,7 @@ Headings share one weight, 600: the hierarchy is in their size. Letters are tigh
 | Lede | 1.1rem, `--muted`, at most 62ch |
 | Code blocks | 13px / 1.6, `tab-size: 2` |
 | Inline code | `.88em` on `--sunken`, no border, radius 4px, padding `0 4px` |
-| Nav | pages 14px, `--muted` (`--fg` on hover, the current one `--accent`); group labels in the headings' face, 15px, 600, `--fg`, on a `--sunken` band from the nav's left edge to its right, with a `--line` rule above and below, sentence case, no letter-spacing, 32px under the group above |
+| Nav | group headings in the headings' face, 16px / 24px, 600, `--fg`, sentence case, no letter-spacing; pages 14px / 20px, 400, `--muted` (`--fg` on hover, the current one `--fg`, 500) |
 | "On this page" | its title 13px, 600, `--muted`, sentence case; its links 13px |
 | Captions, edit row, footer | 13px |
 | Hover-type tooltip | mono 12.5px / 1.5 |
@@ -77,10 +78,12 @@ Spacing is on a 4px grid.
 - **Top bar**, sticky, 56px, on `--surface` with a bottom rule across the whole width (under 960px, VitePress's Menu bar under it opens the nav; under 768px, its menu button holds the links): wordmark, version pill, search (`⌘K` or `/`: the button reads "Search", its label "Search the docs"; the `⌘K` hint hidden under 1100px and the text under 900px), links Tutorial · Guides · Reference · Playground · GitHub (`--muted`, 400, `--fg` on hover; the current group in `--fg` too; no external-link icon; 11px either side, so that Playground fits at 960px; hidden under 768px), theme button. Explanation is reached from the nav and the home: a fourth group link would push the theme button into VitePress's `⋯` menu at most widths from 768 to 1050px, with Playground and GitHub at 960px (measured on a page with the left nav). The changelog is linked from the footer.
 - **Shell**, VitePress's, at most 1440px: left nav 260px · reading column, at most 688px · "On this page" rail, at most 256px, from 1280px. Gutters of 16px at least, and the safe-area insets.
 - **Left nav**, sticky, in the four groups of Diátaxis (amended 2026-11-12, [decision 004](../decisions/004-documentation-site.md) § The site, which lists their pages): Tutorial · How-to guides · Reference · Explanation.
-  - Rows of 32px (padding `6px 12px`, 14px / 20px), 4px apart, radius 8px; `--sunken` on hover.
-  - Each group's label links its landing page: a row of 36px, its text in line with its pages' text; 32px under the group above, 12px over its pages.
-  - A page that documents a minor carries its version as a small badge (Versions, opt-ins and warnings: 6.7).
-  - The current page on `--accent-soft`, in `--accent`, 600.
+  - Each group folds (VitePress's own `collapsed`, set per group in `outline.ts`): Tutorial and Reference open, How-to guides and Explanation folded; the group of the current page always open, on the server-rendered page too.
+  - A group's heading links its landing page: no band, no border, set apart from its pages by size and colour alone; a row of 40px, its text in line with the nav's edge, and VitePress's chevron at its end, a button (`aria-expanded`), `--muted`, `--fg` on hover, pointing down when open.
+  - Its pages a step further in, their text 16px right of the heading's: plain rows of 36px (padding `8px 12px`), 4px apart, radius 8px, no fill; 16px between the heading's row and its first page's, so 32px from the heading's text to the first page's, against 20px between pages.
+  - The current page a filled row, `--raised`, in `--fg`, 500; a current landing page fills its heading's row the same way.
+  - 24px under an open group, 4px under a folded one; the same in the phone's drawer.
+  - A page that documents a minor carries its version as a small badge on the right (Versions, opt-ins and warnings: 6.7).
 - **Reading column**: paragraphs and list items at most 68ch; VitePress's padding (48px 32px from 960px).
 - **Rhythm** of the reading column, on the 4px grid, moderate and even: breathing room, not empty space (`style.css`, last rule).
 
