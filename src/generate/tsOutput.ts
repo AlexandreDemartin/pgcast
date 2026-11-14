@@ -152,6 +152,16 @@ function indentAll(level: number, s: string) {
   return s.replace(/^/gm, ' '.repeat(level));
 }
 
+/**
+ * Without `rejectOnQueryError`, note it before a failed query ends the process: a `DeprecationWarning` comes on the
+ * next tick, which `process.exit()` never reaches. `false` keeps the exit with no note: the CLI's config sets it.
+ */
+const warnAboutExitOnQueryError = (config: CompleteConfig) => {
+  const warn = config.warningListener === true ? console.log : config.warningListener || (() => void 0);
+  warn(`Note: a query failed, so generate() ends the process with process.exit(1), and its promise never settles ` +
+    `(PGCAST_DEP006). Set rejectOnQueryError: true to reject with the error instead; it will be the default in pgcast 7.0.`);
+};
+
 /** The text of a query less its first and last blank lines and the margin of its template literal: it runs as is. */
 const unindented = (text: string) => {
   const
@@ -174,9 +184,13 @@ export const tsForConfig = async (config: CompleteConfig, debug: (s: string) => 
       } catch (e) {
         // the run has thrown and ended the pool, which refuses a query still to come and never serves one still
         // queued in it (with connectionTimeoutMillis, that one rejects later): reject into the run, not exit
-        if (ended) throw e;
+        if (ended || (config.rejectOnQueryError ?? false)) throw e;
         console.log(`*** error ${seq} ***`, e);
-        process.exit(1);
+        try {
+          if (config.rejectOnQueryError === undefined) warnAboutExitOnQueryError(config);
+        } finally {
+          process.exit(1);  // even if warningListener throws, as Zapatos 6.6.1 exits
+        }
       }
     };
 
