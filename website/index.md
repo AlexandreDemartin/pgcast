@@ -3,13 +3,12 @@ layout: home
 markdownStyles: false
 title: pgcast
 titleTemplate: Zero-abstraction Postgres for TypeScript
-description: "pgcast reads your Postgres schema and writes the TypeScript types. Readable, predictable SQL: no ORM, no models, no hidden state. A maintained fork of Zapatos."
+description: "pgcast reads your Postgres schema and writes the TypeScript types. Readable, predictable SQL: no ORM, no models, no hidden state."
 ---
 
 <div class="landing">
 <section class="hero">
 
-<p class="eyebrow">-- a maintained fork of Zapatos 6.6.1</p>
 <h1>Your types, cast from your database<span class="op">::</span></h1>
 
 pgcast reads your Postgres schema and writes the TypeScript types. Its shortcuts produce SQL you can read and predict, and you can always drop down to a plain `sql` template. No ORM, no models, no hidden state.
@@ -17,7 +16,7 @@ pgcast reads your Postgres schema and writes the TypeScript types. Its shortcuts
 
 <div class="ctas">
 
-[Get started](/install){.btn .primary} [Switching from Zapatos](/switching){.btn}
+[Get started](/install){.btn .primary} [Playground](/playground){.btn}
 
 </div>
 
@@ -55,9 +54,9 @@ Values travel as `$1`, `$2`. Names are quoted as Postgres quotes them, so a stra
 </div>
 <div>
 
-## Drop-in for Zapatos
+## Live playground
 
-Same module names, same SQL, same types. Safer behaviours wait behind opt-ins until 7.0.
+Write a query in [the playground](/playground) and see its SQL and its type as you type. Press Run, and a real Postgres answers, in your browser.
 
 </div>
 </div>
