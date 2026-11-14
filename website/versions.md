@@ -83,11 +83,11 @@ Where `undefined` meant "clear it", `null` says so under either setting, and nev
 
 7.0 turns on by default the opt-ins that decision 003 lists: `upsertRequiresSameKeys`, `undefinedMeansMissing`, `transactionRequiresCommit`, `aggregatesTypedByColumn`, `transactionRequiresIdleClient` and those 6.7 still brings, except `selectExactlyOneChecksForSecondRow`, which stays off.
 
-Decision 003 makes that the whole of 7.0's break, and the warnings announce it, so a project that has turned every option on, and sees no `PGCAST_DEP` warning nor generator note, has nothing to change. The old behaviours go in 8.0.
+Decision 003 makes that the whole of 7.0's break, and the warnings announce it, so a project that has turned every option on, and sees no `PGCAST_DEP` warning nor generator note, has nothing to change. The old behaviours go in 8.0, except one, which stays: `rejectOnQueryError: false` (below).
 
 The generator gets opt-ins of its own in 6.7: [`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas), which types an enum of another schema by its labels, [`enumOrder`](/generator#generate.enumOrder), which keeps an enum's labels in their declared order, and [`rejectOnQueryError`](/generator#generate.rejectOnQueryError), which rejects `generate()` on a failed query rather than end the process.
 
-Their warnings are notes through [`warningListener`](/generator#generate.warningListener), not a `DeprecationWarning`, and come only when your schema has something they would change, once per run: `typeEnumsAcrossSchemas`'s names each column, `enumOrder`'s each enum. `rejectOnQueryError`'s, `PGCAST_DEP006`, comes when a query fails, just before the process ends; never from the CLI, which always exits.
+Their warnings are notes through [`warningListener`](/generator#generate.warningListener), not a `DeprecationWarning`, and come only when your schema has something they would change, once per run: `typeEnumsAcrossSchemas`'s names each column, `enumOrder`'s each enum. `rejectOnQueryError`'s, `PGCAST_DEP006`, comes when a query fails, just before the process ends; never from the CLI, which always exits. In 7.0, `generate()` without the option rejects; `false` keeps the exit with no note, in 7.0 and 8.0 alike, since the exit is the CLI's own path.
 
 ::: info Coming
 6.6.2 is on npm, as [`@pgcast/pgcast`](https://www.npmjs.com/package/@pgcast/pgcast); 6.7.0, which brings the opt-ins, is in progress: [its milestone](https://github.com/AlexandreDemartin/pgcast/milestone/1).

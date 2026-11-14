@@ -104,7 +104,7 @@ Every option is optional. Each one given replaces its default whole: `schemas` w
 | [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas) | `false` | the type of an enum of another schema |
 | [`enumOrder`](#generate.enumOrder) | `"alphabetical"` | the order of an enum's labels |
 | [`moduleNames`](#generate.moduleNames) | `"zapatos"` | the module names the files declare and import, and their folder |
-| [`rejectOnQueryError`](#generate.rejectOnQueryError) | `false` | whether a failed query rejects, or ends the process |
+| [`rejectOnQueryError`](#generate.rejectOnQueryError) | none: exits, with a note | whether a failed query rejects, or ends the process |
 | [`progressListener`](#generate.progressListener) | `false` | where each step is reported |
 | [`warningListener`](#generate.warningListener) | `true` | where warnings go |
 | [`debugListener`](#generate.debugListener) | `false` | where each query and its result go |
@@ -333,7 +333,11 @@ import type * as s from 'pgcast/schema';
 
 ### `rejectOnQueryError` {#generate.rejectOnQueryError}
 
-`boolean`, default `false`; an opt-in, `true` by default from 7.0 ([Versions](/versions)). What a failed query does: a refused connection, a wrong password, a query Postgres refuses. Without it, as in Zapatos 6.6.1, the generator prints `*** error <n> ***` and the error with `console.log`, then ends the process with `process.exit(1)`. `true` rejects `generate()` with that error, as `pg` gives it, and prints nothing:
+`boolean`, or left out; an opt-in. What a failed query does: a refused connection, a wrong password, a query Postgres refuses.
+
+- Left out, or `null`: as in Zapatos 6.6.1, the generator prints `*** error <n> ***` and the error with `console.log`, then ends the process with `process.exit(1)`; in between, it notes the option through [`warningListener`](#generate.warningListener). From 7.0, left out means `true` ([Versions](/versions)).
+- `false`: the same exit, with no note. It stays in 7.0 and 8.0: the exit is [the CLI](#cli)'s own path, and the CLI sets `false` over its config file and its argument.
+- `true`: rejects `generate()` with that error, as `pg` gives it, and prints nothing:
 
 ```ts twoslash
 import { generate } from 'zapatos/generate';
@@ -346,8 +350,7 @@ try {
 ```
 
 - It rejects before writing anything: the files of the last run stay as they are.
-- Without it, the generator notes the option through [`warningListener`](#generate.warningListener), after the error, just before it exits; a `warningListener` that throws still ends in the exit. `false` exits with no note.
-- [The CLI](#cli) always exits: it sets `false` over its config file and its argument.
+- A `warningListener` that throws at the note still ends in the exit.
 
 ### `progressListener` {#generate.progressListener}
 

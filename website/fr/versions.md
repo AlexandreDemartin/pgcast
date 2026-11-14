@@ -1,5 +1,5 @@
 ---
-english: 68e55a7d2407
+english: df97940f3795
 ---
 
 # Versions
@@ -87,11 +87,11 @@ Là où `undefined` voulait dire « vide-la », `null` le dit avec l’un ou l
 
 La 7.0 active par défaut les opt-ins que liste la décision 003 : `upsertRequiresSameKeys`, `undefinedMeansMissing`, `transactionRequiresCommit`, `aggregatesTypedByColumn`, `transactionRequiresIdleClient` et ceux qu’apporte encore la 6.7, sauf `selectExactlyOneChecksForSecondRow`, qui reste désactivé.
 
-La décision 003 fait de cela toute la rupture de la 7.0, et les avertissements l’annoncent, donc un projet qui a activé chaque option, et ne voit ni avertissement `PGCAST_DEP` ni note du générateur, n’a rien à changer. Les anciens comportements disparaissent en 8.0.
+La décision 003 fait de cela toute la rupture de la 7.0, et les avertissements l’annoncent, donc un projet qui a activé chaque option, et ne voit ni avertissement `PGCAST_DEP` ni note du générateur, n’a rien à changer. Les anciens comportements disparaissent en 8.0, sauf un, qui reste : `rejectOnQueryError: false` (plus bas).
 
 Le générateur a ses propres opt-ins en 6.7 : [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas), qui type un enum d’un autre schéma par ses labels, [`enumOrder`](/fr/generator#generate.enumOrder), qui garde les labels d’un enum dans leur ordre de déclaration, et [`rejectOnQueryError`](/fr/generator#generate.rejectOnQueryError), qui rejette la promesse de `generate()` quand une requête échoue, plutôt que d’arrêter le processus.
 
-Leurs avertissements sont des notes via [`warningListener`](/fr/generator#generate.warningListener), pas un `DeprecationWarning`, et n’arrivent que si votre schéma contient quelque chose qu’ils changeraient, une fois par exécution : celui de `typeEnumsAcrossSchemas` nomme chaque colonne, celui d’`enumOrder` chaque enum. Celui de `rejectOnQueryError`, `PGCAST_DEP006`, arrive quand une requête échoue, juste avant l’arrêt du processus ; jamais depuis la CLI, qui s’arrête toujours.
+Leurs avertissements sont des notes via [`warningListener`](/fr/generator#generate.warningListener), pas un `DeprecationWarning`, et n’arrivent que si votre schéma contient quelque chose qu’ils changeraient, une fois par exécution : celui de `typeEnumsAcrossSchemas` nomme chaque colonne, celui d’`enumOrder` chaque enum. Celui de `rejectOnQueryError`, `PGCAST_DEP006`, arrive quand une requête échoue, juste avant l’arrêt du processus ; jamais depuis la CLI, qui s’arrête toujours. En 7.0, sans l’option, la promesse de `generate()` est rejetée ; `false` garde l’arrêt sans note, en 7.0 comme en 8.0, puisque l’arrêt est le propre chemin de la CLI.
 
 ::: info À venir
 La 6.6.2 est sur npm, sous le nom [`@pgcast/pgcast`](https://www.npmjs.com/package/@pgcast/pgcast) ; la 6.7.0, qui apporte les opt-ins, est en cours : [son jalon](https://github.com/AlexandreDemartin/pgcast/milestone/1).

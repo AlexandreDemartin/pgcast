@@ -1,5 +1,5 @@
 ---
-english: 03dad39a0b9a
+english: 3ae115a1b85d
 ---
 
 # Générateur
@@ -108,7 +108,7 @@ Toutes les options sont facultatives. Une option donnée remplace entièrement s
 | [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas) | `false` | le type d’un enum d’un autre schéma |
 | [`enumOrder`](#generate.enumOrder) | `"alphabetical"` | l’ordre des labels d’un enum |
 | [`moduleNames`](#generate.moduleNames) | `"zapatos"` | les noms de modules que déclarent et importent les fichiers, et leur dossier |
-| [`rejectOnQueryError`](#generate.rejectOnQueryError) | `false` | si, quand une requête échoue, la promesse est rejetée ou le processus s’arrête |
+| [`rejectOnQueryError`](#generate.rejectOnQueryError) | aucune : arrêt, avec une note | si, quand une requête échoue, la promesse est rejetée ou le processus s’arrête |
 | [`progressListener`](#generate.progressListener) | `false` | où chaque étape est signalée |
 | [`warningListener`](#generate.warningListener) | `true` | où vont les avertissements |
 | [`debugListener`](#generate.debugListener) | `false` | où vont chaque requête et son résultat |
@@ -337,7 +337,11 @@ import type * as s from 'pgcast/schema';
 
 ### `rejectOnQueryError` {#generate.rejectOnQueryError}
 
-`boolean`, par défaut `false` ; un opt-in, `true` par défaut à partir de la 7.0 ([Versions](/fr/versions)). Ce que fait une requête qui échoue : une connexion refusée, un mauvais mot de passe, une requête que Postgres refuse. Sans lui, comme dans Zapatos 6.6.1, le générateur affiche `*** error <n> ***` et l’erreur avec `console.log`, puis arrête le processus avec `process.exit(1)`. Avec `true`, la promesse de `generate()` est rejetée avec cette erreur, telle que `pg` la donne, et rien n’est affiché :
+`boolean`, ou omis ; un opt-in. Ce que fait une requête qui échoue : une connexion refusée, un mauvais mot de passe, une requête que Postgres refuse.
+
+- Omis, ou `null` : comme dans Zapatos 6.6.1, le générateur affiche `*** error <n> ***` et l’erreur avec `console.log`, puis arrête le processus avec `process.exit(1)` ; entre les deux, il signale l’option via [`warningListener`](#generate.warningListener). À partir de la 7.0, l’option omise vaut `true` ([Versions](/fr/versions)).
+- `false` : le même arrêt, sans note. Cette valeur reste en 7.0 et en 8.0 : l’arrêt est le propre chemin de [la CLI](#cli), qui met `false` par-dessus son fichier de configuration et son argument.
+- `true` : la promesse de `generate()` est rejetée avec cette erreur, telle que `pg` la donne, et rien n’est affiché :
 
 ```ts twoslash
 import { generate } from 'zapatos/generate';
@@ -350,8 +354,7 @@ try {
 ```
 
 - La promesse est rejetée avant toute écriture : les fichiers de la dernière exécution restent tels quels.
-- Sans lui, le générateur signale l’option via [`warningListener`](#generate.warningListener), après l’erreur, juste avant de s’arrêter ; un `warningListener` qui lève une erreur n’empêche pas l’arrêt. `false` arrête le processus sans note.
-- [La CLI](#cli) s’arrête toujours : elle met `false` par-dessus son fichier de configuration et son argument.
+- Un `warningListener` qui lève une erreur en recevant la note n’empêche pas l’arrêt.
 
 ### `progressListener` {#generate.progressListener}
 
