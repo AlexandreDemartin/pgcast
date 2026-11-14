@@ -1308,6 +1308,69 @@ describe('names that Object.prototype also has', () => {
   });
 });
 
+describe('debugListener', () => {
+  /** Each query a run prints, as `{ text, values, rows }`, its result paired by its number. */
+  const printedQueries = async (config: Config) => {
+    const printed: string[] = [];
+    await tsForConfig(finaliseConfig({ ...config, ...quiet, db: db() }), s => printed.push(s));
+    const
+      results = new Map(printed.filter(s => s.startsWith('<<< result ')).map(s => {
+        const [header, ...json] = s.split('\n');
+        return [header.split(' ')[2], JSON.parse(json.join('\n')).rows];
+      })),
+      queries = printed.filter(s => s.startsWith('>>> query ')).map(s => {
+        const
+          lines = s.replace(/\n$/, '').split('\n'),
+          header = lines[0],
+          values = lines[lines.length - 1];
+        expect(values.startsWith('+ ')).toBe(true);
+        return {
+          seq: header.split(' ')[2],
+          text: lines.slice(1, -1).join('\n'),
+          values: JSON.parse(values.slice(2)),
+        };
+      });
+    return queries.map(q => ({ ...q, rows: results.get(q.seq) }));
+  };
+
+  it('prints a query with its blank lines and line breaks, less the margin of its source', async () => {
+    const [relations] = await printedQueries({ schemas: { public: only('users') } });
+    expect(relations.seq).toBe('0');
+    expect(relations.text).toBe(`SELECT $1 as schema
+, table_name AS name
+, lower(table_name) AS lname  -- using a case-insensitive sort, but you can't order by a function in a UNION query
+, CASE table_type WHEN 'VIEW' THEN 'view' WHEN 'FOREIGN' THEN 'fdw' ELSE 'table' END AS type
+, CASE WHEN is_insertable_into = 'YES' THEN true ELSE false END AS insertable
+FROM information_schema.tables
+WHERE table_schema = $1 AND table_type != 'LOCAL TEMPORARY'
+
+UNION ALL
+
+SELECT $1 as schema
+, matviewname AS name
+, lower(matviewname) AS lname
+, 'mview'::text AS type
+, false AS insertable
+FROM pg_catalog.pg_matviews
+WHERE schemaname = $1
+
+ORDER BY lname, name`);
+    expect(relations.values).toEqual(['public']);
+  });
+
+  it('prints each query so that it runs as is, with its values, and gives the rows printed as its result', async () => {
+    const queries = await printedQueries(main);
+    // the relations and the enums of each schema, then the columns and the unique indexes of each relation
+    expect(queries.some(q => q.text.includes('pg_catalog.pg_enum'))).toBe(true);
+    expect(queries.some(q => q.text.includes('pg_catalog.pg_indexes'))).toBe(true);
+    expect(queries.some(q => q.values.includes('account_totals') && q.text.includes('a.attname'))).toBe(true);
+    for (const { text, values, rows } of queries) {
+      const result = await t.client.query(text, values);
+      expect(JSON.parse(JSON.stringify(result.rows))).toEqual(rows);
+    }
+  });
+});
+
 describe('generate()', () => {
   let outDir: string;
   beforeEach(() => { outDir = mkdtempSync(join(tmpdir(), 'pgcast-generate-')); });
