@@ -1303,6 +1303,8 @@ describe('a built-in object as a Whereable', () => {
     // nor is a built-in of another realm (a vm context), whose prototype is not this realm's
     class Premiere extends Date {}
     class FilmError extends Error { id = 1; }
+    // ES2021: not in the lib's ES2019 types
+    class FilmErrors extends ((globalThis as any).AggregateError as new (errors: unknown[], message: string) => Error) {}
     class Frames extends Uint8Array {}
     // the type of Buffer gives no constructor to extend
     class Reel extends (Buffer as any) {}
@@ -1315,6 +1317,7 @@ describe('a built-in object as a Whereable', () => {
       classWithoutOwnKeys: new (class { get display_name() { return 'Ada'; } })(),
       subclassOfDate: new Premiere(0),
       subclassOfError: new FilmError('x'),
+      subclassOfAggregateError: new FilmErrors([], 'x'),
       subclassOfTypedArray: new Frames(1),
       subclassOfTypedArrayEmpty: new Frames(0),
       subclassOfBuffer: Object.setPrototypeOf(Buffer.from('id'), Reel.prototype),  // new Buffer() returns a Buffer
@@ -1385,6 +1388,10 @@ describe('a built-in object as a Whereable', () => {
           "values": [
             "Ada",
           ],
+        },
+        "subclassOfAggregateError": {
+          "text": "DELETE FROM "users" WHERE TRUE",
+          "values": [],
         },
         "subclassOfBuffer": {
           "text": "DELETE FROM "users" WHERE ("0" = $1 AND "1" = $2)",
