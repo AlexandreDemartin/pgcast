@@ -1,0 +1,12 @@
+{
+  // `docs:build` type-checks the site's own code too, which runs in Node at build: `@types/node` is the root's, as the
+  // site builds after the library (README § Build). The libraries' declarations are skipped: some of VitePress's name
+  // packages the site does not install (`@docsearch/js` names react and preact).
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  "include": ["*.ts"]
+}

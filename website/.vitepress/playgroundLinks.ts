@@ -57,7 +57,7 @@ export function playgroundLink(source: string) {
  */
 export function linkCastPanels(md: MarkdownRenderer) {
   md.core.ruler.push('cast_panel_links', state => {
-    if (unlinked.has(state.env.relativePath)) return;
+    if (unlinked.has(state.env.relativePath as string)) return;
     const
       path: string[] = [],  // the text of each heading above, by level
       panels: { token: (typeof state.tokens)[number]; example: string; heading: number; path: string[] }[] = [],
