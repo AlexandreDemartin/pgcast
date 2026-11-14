@@ -7,6 +7,7 @@
 // Retries are provoked deterministically: the callback raises the SQLSTATE
 // itself on its first attempts (a DO block with RAISE ... USING ERRCODE).
 
+import pg from 'pg';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import * as db from '../../src/db';
 import { sql, IsolationLevel } from '../../src/db';
@@ -493,5 +494,369 @@ describe('a COMMIT that Postgres answers with ROLLBACK', () => {
     await expect(fdb.serializable(t.pool, swallow('23505'))).rejects.toThrow(rolledBack);
     expect(emitWarning).not.toHaveBeenCalled();
     expect(await notes()).toEqual(['committed']);
+  });
+});
+
+// #233: given a client already inside a transaction block (BEGIN sent by the caller), transaction()'s COMMIT
+// or ROLLBACK ends the caller's transaction. pg reports the block in getTransactionStatus(), from pg 8.21
+describe('a client already inside a transaction block', () => {
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  const inBlock = 'transaction() was given a client inside a transaction block, so its COMMIT or ROLLBACK would end that transaction: COMMIT or ROLLBACK it first, pass the pool, or run the queries on that client without transaction()';
+
+  /** A fresh module, so that warnOnce has not warned yet, and a spy on process.emitWarning. */
+  const fresh = async () => {
+    vi.restoreAllMocks();
+    vi.resetModules();
+    const emitWarning = vi.spyOn(process, 'emitWarning').mockImplementation(() => { });
+    const fdb = await import('../../src/db');
+    fdb.setConfig({ transactionRetryDelay: { minMs: 0, maxMs: 0 } });
+    return { fdb, emitWarning };
+  };
+
+  /** The text of each query the client is sent from now on, by anyone: a spy on its query(). */
+  const spyQueries = (client: pg.PoolClient) => {
+    const sent: string[] = [];
+    const query = client.query.bind(client) as (...args: unknown[]) => unknown;
+    vi.spyOn(client, 'query').mockImplementation(((q: string | { text: string }, ...rest: unknown[]) => {
+      sent.push(typeof q === 'string' ? q : q.text);
+      return query(q, ...rest);
+    }) as never);
+    return sent;
+  };
+
+  /** The codes of the notices Postgres sends the client from now on (25001, 25P01). */
+  const noticesOf = (client: pg.PoolClient) => {
+    const codes: string[] = [];
+    client.on('notice', n => { codes.push(n.code ?? ''); });
+    return codes;
+  };
+
+  type Level = 'serializable' | 'readCommitted' | 'repeatableRead';
+  const start = {
+    serializable: 'START TRANSACTION ISOLATION LEVEL SERIALIZABLE',
+    readCommitted: 'START TRANSACTION ISOLATION LEVEL READ COMMITTED',
+    repeatableRead: 'START TRANSACTION ISOLATION LEVEL REPEATABLE READ',
+  };
+  const insertInner = 'INSERT INTO "txn_probe" ("note") VALUES ($1)';
+
+  // the replay of #233 on Zapatos 6.6.1 (and its comment's case, no query yet): what the caller ran, the level
+  // asked, then what 6.6.1 does and what its caller's ROLLBACK leaves
+  const cases: {
+    name: string; begin: string; prior?: (c: pg.PoolClient) => Promise<unknown>; level: Level;
+    old: { rejects?: string; left: string[] };
+  }[] = [
+    { name: 'serializable, no query yet (the comment\'s case)', begin: 'BEGIN', level: 'serializable', old: { left: ['inner'] } },
+    { name: 'readCommitted, no query yet', begin: 'BEGIN', level: 'readCommitted', old: { left: ['inner'] } },
+    { name: 'repeatableRead, no query yet', begin: 'BEGIN', level: 'repeatableRead', old: { left: ['inner'] } },
+    { name: 'serializable, after a write', begin: 'BEGIN', prior: c => write(c, 'outer'), level: 'serializable', old: { rejects: '25001', left: [] } },
+    { name: 'readCommitted, after a write', begin: 'BEGIN', prior: c => write(c, 'outer'), level: 'readCommitted', old: { left: ['inner', 'outer'] } },
+    { name: 'repeatableRead, after a select', begin: 'BEGIN', prior: c => c.query('SELECT 1'), level: 'repeatableRead', old: { rejects: '25001', left: [] } },
+    { name: 'serializable, in BEGIN ISOLATION LEVEL SERIALIZABLE, after a write', begin: 'BEGIN ISOLATION LEVEL SERIALIZABLE', prior: c => write(c, 'outer'), level: 'serializable', old: { left: ['inner', 'outer'] } },
+    { name: 'serializable, in an aborted block', begin: 'BEGIN', prior: c => c.query('SELECT 1/0').catch(() => { }), level: 'serializable', old: { rejects: '25P02', left: [] } },
+  ];
+
+  describe.each(cases)('$name', ({ begin, prior, level, old }) => {
+    it('with transactionRequiresIdleClient, rejects before sending its SQL, and leaves the caller\'s transaction to its ROLLBACK', async () => {
+      const { fdb, emitWarning } = await fresh();
+      fdb.setConfig({ transactionRequiresIdleClient: true });
+      const client = await t.pool.connect();
+      let called = false;
+      try {
+        await client.query(begin);
+        await prior?.(client);
+        const status = old.rejects === '25P02' ? 'E' : 'T';  // what the caller's block is in
+        const sent = spyQueries(client), notices = noticesOf(client);
+        const err = await fdb[level](client, async c => { called = true; await write(c, 'inner'); }).catch((e: unknown) => e);
+        expect(err).toBeInstanceOf(Error);
+        expect((err as Error).message).toBe(inBlock);
+        expect((err as { code?: string }).code).toBeUndefined();
+        expect(sent).toEqual(['']);  // the empty query that reads the status again, and nothing else
+        expect(client.getTransactionStatus()).toBe(status);  // the caller's block is still open, as it was
+        if (status === 'T') await write(client, 'after');  // and still takes writes
+        await client.query('ROLLBACK');
+        expect(notices).toEqual([]);  // no 25P01: the ROLLBACK found its transaction
+      } finally {
+        client.release();
+      }
+      expect(called).toBe(false);
+      expect(await notes()).toEqual([]);  // the caller's ROLLBACK undid its writes
+      expect(emitWarning).not.toHaveBeenCalled();
+    });
+
+    it('without transactionRequiresIdleClient (deprecated, PGCAST_DEP005), does what Zapatos 6.6.1 does, and warns', async () => {
+      const { fdb, emitWarning } = await fresh();
+      const client = await t.pool.connect();
+      try {
+        await client.query(begin);
+        await prior?.(client);
+        const sent = spyQueries(client);
+        const result = await fdb[level](client, c => write(c, 'inner')).then(() => 'resolved', (e: { code?: string }) => e.code);
+        expect(result).toBe(old.rejects ?? 'resolved');
+        expect(sent).toEqual(old.rejects ? [start[level], 'ROLLBACK'] : [start[level], insertInner, 'COMMIT']);  // no empty query
+        await client.query('ROLLBACK');
+      } finally {
+        client.release();
+      }
+      expect(await notes()).toEqual(old.left);
+      expect(emitWarning).toHaveBeenCalledTimes(1);
+      const [message, options] = emitWarning.mock.calls[0];
+      expect(options).toEqual({ type: 'DeprecationWarning', code: 'PGCAST_DEP005' });
+      expect(message).toMatch(/transactionRequiresIdleClient: true/);
+      expect(message).toMatch(/default in pgcast 7\.0/);
+    });
+  });
+
+  it('warns once per process, however many such calls', async () => {
+    const { fdb, emitWarning } = await fresh();
+    const client = await t.pool.connect();
+    try {
+      for (let i = 0; i < 3; i++) {
+        await client.query('BEGIN');
+        await fdb.readCommitted(client, c => write(c, `inner ${i}`));
+        await client.query('ROLLBACK');
+      }
+    } finally {
+      client.release();
+    }
+    expect(emitWarning).toHaveBeenCalledTimes(1);
+    expect(await notes()).toEqual(['inner 0', 'inner 1', 'inner 2']);
+  });
+
+  it('reads an undefined transactionRequiresIdleClient as its default (false): runs and warns', async () => {
+    const { fdb, emitWarning } = await fresh();
+    fdb.setConfig(undefinedKey('transactionRequiresIdleClient'));
+    const client = await t.pool.connect();
+    try {
+      await client.query('BEGIN');
+      await fdb.readCommitted(client, c => write(c, 'inner'));
+      await client.query('ROLLBACK');
+    } finally {
+      client.release();
+    }
+    expect(await notes()).toEqual(['inner']);
+    expect(emitWarning).toHaveBeenCalledTimes(1);
+    expect(emitWarning.mock.calls[0][1]).toEqual({ type: 'DeprecationWarning', code: 'PGCAST_DEP005' });
+  });
+
+  it.each([false, true])('outside a block, sends what Zapatos 6.6.1 sends, and nothing more, nor a warning (option %s)', async option => {
+    const { fdb, emitWarning } = await fresh();
+    fdb.setConfig({ transactionRequiresIdleClient: option });
+    const client = await t.pool.connect();
+    try {
+      const sent = spyQueries(client);
+      await fdb.serializable(client, c => write(c, 'inner'));
+      await expect(fdb.readCommitted(client, async () => { throw new Error('boom'); })).rejects.toThrow('boom');
+      expect(sent).toEqual([start.serializable, insertInner, 'COMMIT', start.readCommitted, 'ROLLBACK']);
+    } finally {
+      client.release();
+    }
+    expect(await notes()).toEqual(['inner']);
+    expect(emitWarning).not.toHaveBeenCalled();
+  });
+
+  it('a pool given is unaffected: its client is checked out outside a block', async () => {
+    const { fdb, emitWarning } = await fresh();
+    fdb.setConfig({ transactionRequiresIdleClient: true });
+    const queries: string[] = [];
+    fdb.setConfig({ queryListener: q => { queries.push(q.text); } });
+    await fdb.serializable(t.pool, c => fdb.sql`INSERT INTO ${'txn_probe'} (${'note'}) VALUES (${fdb.param('inner')})`.run(c));
+    expect(queries).toEqual([start.serializable, insertInner, 'COMMIT']);
+    expect(await notes()).toEqual(['inner']);
+    expect(emitWarning).not.toHaveBeenCalled();
+  });
+
+  it('limitation: a pool client released inside a block is not checked, as in 6.6.1', async () => {
+    const { fdb } = await fresh();
+    fdb.setConfig({ transactionRequiresIdleClient: true });
+    const pool = new pg.Pool({ connectionString: (t.pool as unknown as { options: { connectionString: string } }).options.connectionString, max: 1 });
+    try {
+      const leaked = await pool.connect();
+      await leaked.query('BEGIN');
+      await write(leaked, 'leaked');
+      leaked.release();  // back to the pool, inside its block
+      await fdb.readCommitted(pool, c => write(c, 'inner'));  // its COMMIT commits the leaked write too
+    } finally {
+      await pool.end();
+    }
+    expect(await notes()).toEqual(['inner', 'leaked']);
+  });
+
+  it('with transactionRequiresIdleClient, a call at the same moment as a refused one is passed through, into the caller\'s block, as in 6.6.1', async () => {
+    const { fdb } = await fresh();
+    const queries: [string, number | undefined][] = [], results: [string, number | undefined][] = [];
+    fdb.setConfig({
+      transactionRequiresIdleClient: true,
+      queryListener: (q, txnId) => { queries.push([q.text, txnId]); },
+      resultListener: (_r, txnId, _ms, q) => { results.push([q!.text, txnId]); },
+    });
+    const client = await t.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const sent = spyQueries(client);
+      const insert = (c: db.Queryable, note: string) => fdb.sql`INSERT INTO ${'txn_probe'} (${'note'}) VALUES (${fdb.param(note)})`.run(c);
+      const outcomes = await Promise.allSettled([fdb.readCommitted(client, c => insert(c, 'f')), fdb.readCommitted(client, c => insert(c, 'g'))]);
+      expect(outcomes.map(r => r.status === 'rejected' ? (r.reason as Error).message : r.status)).toEqual([inBlock, 'fulfilled']);
+      expect(sent).toEqual(['', insertInner]);  // the first call's empty query, the second's INSERT: no START, COMMIT nor ROLLBACK
+      expect(queries).toEqual([['', 0], [insertInner, 0]]);  // both listeners get the empty query with the first call's txnId
+      expect(results).toEqual([['', 0], [insertInner, 0]]);
+      expect(client.getTransactionStatus()).toBe('T');  // the caller's block is still open
+      expect(await fdb.sql`SELECT note FROM ${'txn_probe'}`.run(client)).toEqual([{ note: 'g' }]);
+      await client.query('ROLLBACK');
+    } finally {
+      client.release();
+    }
+    expect(await notes()).toEqual([]);  // the caller's ROLLBACK undid g's write
+  });
+
+  it('with transactionRequiresIdleClient, queues no query behind its empty query: pg deprecates a query sent while another runs', async () => {
+    const { fdb } = await fresh();
+    fdb.setConfig({ transactionRequiresIdleClient: true });
+    const client = await t.pool.connect();
+    try {
+      vi.spyOn(client, 'getTransactionStatus').mockReturnValueOnce('T');  // as pg reads it after a failed COMMIT
+      const inFlight: number[] = [];  // for each query sent, how many of the client's were still unanswered
+      let pending = 0;
+      const query = client.query.bind(client) as (...args: unknown[]) => Promise<unknown>;
+      vi.spyOn(client, 'query').mockImplementation(((...args: unknown[]) => {
+        inFlight.push(pending++);
+        return query(...args).finally(() => { pending--; });
+      }) as never);
+      const busy = client.query('SELECT pg_sleep(0.05)');  // still running when transaction() is called, as a COMMIT whose error pg has passed on
+      await fdb.readCommitted(client, c => fdb.sql`SELECT 1`.run(c));
+      await busy;
+      expect(inFlight).toEqual([0, 1, 0, 0, 0]);  // pg_sleep, then the empty query behind it, then START, SELECT and COMMIT one at a time
+    } finally {
+      client.release();
+    }
+  });
+
+  // pg reads the status at ReadyForQuery, after the query's rejection: a BEGIN sent in one query string with a
+  // statement that fails can leave it at the I read before that string (the empty query only reads again a T or E)
+  it('limitation: a BEGIN sent in one query string with a statement that fails can be read as outside a block', async () => {
+    const { fdb } = await fresh();
+    fdb.setConfig({ transactionRequiresIdleClient: true });
+    const client = await t.pool.connect();
+    try {
+      await client.query("BEGIN; INSERT INTO txn_probe VALUES ('outer'); SELECT 1/0").catch(() => { });
+      vi.spyOn(client, 'getTransactionStatus').mockReturnValueOnce('I');  // as pg reads it in some runs (#233)
+      const sent = spyQueries(client), notices = noticesOf(client);
+      await expect(fdb.serializable(client, c => write(c, 'inner'))).rejects.toMatchObject({ code: '25P02' });
+      expect(sent).toEqual([start.serializable, 'ROLLBACK']);  // no empty query, no refusal
+      expect(client.getTransactionStatus()).toBe('I');  // its ROLLBACK ended the caller's block
+      await client.query('ROLLBACK');
+      expect(notices).toEqual(['25P01']);  // the caller's ROLLBACK found no transaction
+    } finally {
+      client.release();
+    }
+    expect(await notes()).toEqual([]);
+  });
+
+  // serializable too: the caller's block has run no query yet, so a query of the second call sent before the
+  // first's START TRANSACTION would make Postgres refuse that START (25001)
+  it.each(['readCommitted', 'serializable'] as const)('without transactionRequiresIdleClient, two %s() at the same moment on one client in a block: the second is passed through, as in 6.6.1', async level => {
+    const { fdb } = await fresh();
+    const queries: [string, number | undefined][] = [], results: [string, number | undefined][] = [];
+    fdb.setConfig({
+      queryListener: (q, txnId) => { queries.push([q.text, txnId]); },
+      resultListener: (_r, txnId, _ms, q) => { results.push([q!.text, txnId]); },
+    });
+    const client = await t.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const insert = (c: db.Queryable, note: string) => fdb.sql`INSERT INTO ${'txn_probe'} (${'note'}) VALUES (${fdb.param(note)})`.run(c);
+      await Promise.all([fdb[level](client, c => insert(c, 'f')), fdb[level](client, c => insert(c, 'g'))]);
+      await client.query('ROLLBACK');
+    } finally {
+      client.release();
+    }
+    // exactly what 6.6.1 sends: one transaction, the first call's, with no empty query
+    const expected = [[start[level], 0], [insertInner, 0], [insertInner, 0], ['COMMIT', 0]];
+    expect(queries).toEqual(expected);
+    expect(results).toEqual(expected);
+    expect(await notes()).toEqual(['f', 'g']);  // its COMMIT ended the caller's block
+  });
+
+  it('with transactionRequiresIdleClient, a transaction passed through is not refused', async () => {
+    const { fdb } = await fresh();
+    fdb.setConfig({ transactionRequiresIdleClient: true });
+    await fdb.serializable(t.pool, c => fdb.serializable(c, inner => write(inner, 'inner')));
+    expect(await notes()).toEqual(['inner']);
+  });
+
+  it('reads the status again after a stale one: a T sends one empty query, then runs as in 6.6.1', async () => {
+    const { fdb, emitWarning } = await fresh();
+    fdb.setConfig({ transactionRequiresIdleClient: true });
+    const client = await t.pool.connect();
+    try {
+      vi.spyOn(client, 'getTransactionStatus').mockReturnValueOnce('T');  // as pg reads it after a failed COMMIT
+      const sent = spyQueries(client);
+      await fdb.serializable(client, c => write(c, 'inner'));
+      expect(sent).toEqual(['', start.serializable, insertInner, 'COMMIT']);
+    } finally {
+      client.release();
+    }
+    expect(await notes()).toEqual(['inner']);
+    expect(emitWarning).not.toHaveBeenCalled();
+  });
+
+  it('limitation: without transactionRequiresIdleClient, a stale T (after a failed COMMIT) warns once outside a block, and runs as in 6.6.1', async () => {
+    const { fdb, emitWarning } = await fresh();
+    const client = await t.pool.connect();
+    try {
+      vi.spyOn(client, 'getTransactionStatus').mockReturnValueOnce('T');  // as pg reads it after a failed COMMIT
+      const sent = spyQueries(client);
+      await fdb.serializable(client, c => write(c, 'inner'));
+      expect(sent).toEqual([start.serializable, insertInner, 'COMMIT']);  // no empty query to read it again
+    } finally {
+      client.release();
+    }
+    expect(await notes()).toEqual(['inner']);
+    expect(emitWarning).toHaveBeenCalledTimes(1);
+    expect(emitWarning.mock.calls[0][1]).toEqual({ type: 'DeprecationWarning', code: 'PGCAST_DEP005' });
+  });
+
+  // the first call goes on after its empty query, but the mark was set before it: the second call, passed
+  // through, has its first query queued behind that empty query, so before the first call's START TRANSACTION
+  it('limitation: with transactionRequiresIdleClient, after a stale T, a call at the same moment sends its first query outside any transaction, committed on its own', async () => {
+    const { fdb, emitWarning } = await fresh();
+    fdb.setConfig({ transactionRequiresIdleClient: true });
+    const client = await t.pool.connect();
+    try {
+      vi.spyOn(client, 'getTransactionStatus').mockReturnValueOnce('T');  // as pg reads it after a failed COMMIT
+      const sent = spyQueries(client);
+      const outcomes = await Promise.allSettled([
+        fdb.readCommitted(client, async c => { await write(c, 'f'); throw new Error('f fails'); }),
+        fdb.readCommitted(client, async c => { await write(c, 'g1'); await write(c, 'g2'); }),
+      ]);
+      expect(outcomes.map(r => r.status === 'rejected' ? (r.reason as Error).message : r.status)).toEqual(['f fails', 'fulfilled']);
+      expect(sent.slice(0, 3)).toEqual(['', insertInner, start.readCommitted]);  // g1 before START TRANSACTION
+      expect(sent.at(-1)).toBe('ROLLBACK');
+      expect(client.getTransactionStatus()).toBe('I');
+    } finally {
+      client.release();
+    }
+    expect(await notes()).toEqual(['g1']);  // the ROLLBACK undid f and g2, not g1
+    expect(emitWarning).not.toHaveBeenCalled();
+  });
+
+  it('with transactionRequiresIdleClient, after a failed COMMIT, neither refuses nor warns: the block is over', async () => {
+    const { fdb, emitWarning } = await fresh();
+    fdb.setConfig({ transactionRequiresIdleClient: true });
+    await t.pool.query('CREATE TABLE txn_parent (id int PRIMARY KEY); CREATE TABLE txn_child (parent_id int REFERENCES txn_parent DEFERRABLE INITIALLY DEFERRED)');
+    const client = await t.pool.connect();
+    try {
+      for (let i = 0; i < 20; i++) {  // pg reads T at once after about one failed COMMIT in three (#233)
+        await client.query('BEGIN');
+        await client.query('INSERT INTO txn_child VALUES (1)');
+        await expect(client.query('COMMIT')).rejects.toMatchObject({ code: '23503' });
+        await fdb.serializable(client, c => write(c, `inner ${i}`));
+      }
+    } finally {
+      client.release();
+      await t.pool.query('DROP TABLE txn_child, txn_parent');
+    }
+    expect(await notes()).toHaveLength(20);
+    expect(emitWarning).not.toHaveBeenCalled();
   });
 });

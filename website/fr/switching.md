@@ -1,5 +1,5 @@
 ---
-english: 317f5efabd09
+english: 7ba9ae3afa4b
 ---
 
 # Venir de Zapatos
@@ -217,6 +217,7 @@ Pour trouver chaque appel :
 | `PGCAST_DEP002` | une valeur `undefined` dans `insert()`, `update()` ou `upsert()`, envoyée comme `NULL`, ou, dans `updateValues` d’`upsert()`, qui prend sa valeur dans `EXCLUDED` ([Une valeur `undefined`](/fr/insert#undefined-values)) | omettez la clé, ou donnez `null` pour effacer la colonne ; ou [`undefinedMeansMissing`](/fr/runtime-config#Config.undefinedMeansMissing), et `undefined` est une clé absente |
 | `PGCAST_DEP003` | une [`transaction()`](/fr/transaction#transaction) dont le callback intercepte l’erreur d’une requête et se termine : Postgres répond au `COMMIT` par `ROLLBACK`, et rien n’est enregistré ([Laisser passer l’erreur](/fr/retries#let-the-error-through)) | laissez l’erreur sortir du callback, ou faites `ROLLBACK TO` un `SAVEPOINT` avant de continuer ; ou [`transactionRequiresCommit`](/fr/runtime-config#Config.transactionRequiresCommit), et une telle transaction est rejetée |
 | `PGCAST_DEP004` | un [`sum()`, `avg()`, `min()` ou `max()`](/fr/select#typed-by-column) dont `Number()` change le résultat : `0` pour aucune ligne, les millisecondes d’une date, `NaN` pour un texte | activez [`aggregatesTypedByColumn`](/fr/runtime-config#Config.aggregatesTypedByColumn), déclaré dans [`ConfigTypes`](/fr/runtime-config#ConfigTypes) : `tsc` montre alors chaque appel dont le résultat est désormais `null` ou du type de la colonne, et `?? 0` garde un `0` |
+| `PGCAST_DEP005` | une [`transaction()`](/fr/transaction#transaction) qui reçoit un client sur lequel vous avez envoyé `BEGIN` : son `COMMIT` ou son `ROLLBACK` termine votre transaction ([Votre propre `BEGIN`](/fr/transaction#your-own-begin)) | ouvrez la transaction extérieure avec `transaction()`, ou donnez-lui le pool ; ou [`transactionRequiresIdleClient`](/fr/runtime-config#Config.transactionRequiresIdleClient), et un tel appel est rejeté avant d’envoyer son `START TRANSACTION` |
 
 </div>
 
@@ -227,10 +228,13 @@ Une fois qu’une exécution ne montre plus d’avertissement, ou que chacun vie
 ```ts twoslash
 import * as db from 'zapatos/db';
 // ---cut---
-db.setConfig({ upsertRequiresSameKeys: true, undefinedMeansMissing: true, transactionRequiresCommit: true });
+db.setConfig({
+  upsertRequiresSameKeys: true, undefinedMeansMissing: true,
+  transactionRequiresCommit: true, transactionRequiresIdleClient: true,
+});
 ```
 
-Toutes trois seront le comportement par défaut en 7.0 ([Versions](/fr/versions)). Avec elles, une valeur `undefined` est omise d’un `update()` :
+Toutes quatre seront le comportement par défaut en 7.0 ([Versions](/fr/versions)). Avec elles, une valeur `undefined` est omise d’un `update()` :
 
 <CastPanel example="switching_undefined">
 
@@ -241,6 +245,7 @@ Toutes trois seront le comportement par défaut en 7.0 ([Versions](/fr/versions)
 - `insert()` envoie `DEFAULT`<!-- probe: (db.setConfig({ undefinedMeansMissing: true }), db.insert('tags', { film_id: 1000, tag: undefined })) --> pour une valeur `undefined`, et un `update()` sans autre clé lève l’erreur "nothing to update: an Updatable needs at least one column"<!-- message -->.
 - L’`upsert()` de `PGCAST_DEP001` lève une erreur à l’appel, avant toute requête : "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message -->.
 - Une `transaction()` dont Postgres répond au `COMMIT` par `ROLLBACK` est rejetée, sans nouvelle tentative ([`transaction()`, Erreurs](/fr/transaction#errors)).
+- Une `transaction()` qui reçoit un client déjà dans un bloc de transaction est rejetée, et laisse cette transaction ouverte ([Votre propre `BEGIN`](/fr/transaction#your-own-begin)).
 - Aucune option n’avertit. Pour que cela dure, `NODE_OPTIONS=--throw-deprecation npm test` fait échouer l’exécution au premier avertissement.
 
 Un opt-in de plus, [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), n’a pas d’avertissement à guetter, et reste désactivé en 7.0. Avec lui, un `selectExactlyOne()` exécuté seul est rejeté sur une deuxième ligne, pas seulement sur aucune. Activez-le là où vos tests ne montrent aucun `selectExactlyOne()` qui trouve deux lignes.
@@ -261,7 +266,7 @@ La note d’[`enumOrder`](/fr/generator#generate.enumOrder) nomme chaque enum do
 npm install zapatos@6.6.1
 ```
 
-- D’abord, retirez de `setConfig()` les options que la `Config` de Zapatos 6.6.1 n’a pas (2353) : `upsertRequiresSameKeys`, `undefinedMeansMissing`, `transactionRequiresCommit`, `selectExactlyOneChecksForSecondRow` et `aggregatesTypedByColumn`.
+- D’abord, retirez de `setConfig()` les options que la `Config` de Zapatos 6.6.1 n’a pas (2353) : `upsertRequiresSameKeys`, `undefinedMeansMissing`, `transactionRequiresCommit`, `transactionRequiresIdleClient`, `selectExactlyOneChecksForSecondRow` et `aggregatesTypedByColumn`.
 - Avec [`moduleNames`](/fr/generator#generate.moduleNames) à `"pgcast"`, lancez aussi `npm uninstall pgcast` : les deux paquets ont une commande `zapatos`. Vos imports `pgcast/…` ne se résolvent alors plus, et la 6.6.1 écrit `zapatos/` mais laisse `pgcast/` en place. Remettez donc chaque import en `zapatos/…`, déplacez les fichiers à compléter que vous avez modifiés dans `zapatos/custom/`, leur `declare module 'pgcast/custom'` renommé en `'zapatos/custom'`, et supprimez `pgcast/`.
 - Régénérez avec Zapatos 6.6.1. Il ignore `typeEnumsAcrossSchemas`, `enumOrder` et `moduleNames` dans `zapatosconfig.json`, et réécrit les types `any`, les libellés triés, les lignes de commentaire sans préfixe et tout nom d’`UniqueIndex` emprunté.
 - Chaque changement de [Trouver les appels dont le résultat change](#find-the-calls-whose-result-changes) s’exécute comme avant, sauf celui du `jsonb`, qui ne trouve de nouveau rien.

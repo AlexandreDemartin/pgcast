@@ -60,6 +60,7 @@ The two `count()`s run on `client`, outside the transaction: after the block, `b
 - These three run on the transaction's client, as the callback's queries do. Each reaches [`queryListener`](/runtime-config#Config.queryListener) and [`resultListener`](/runtime-config#Config.resultListener) with the transaction's id: a counter from 0, one per transaction opened, kept across retries; a transaction passed through keeps the outer one's.
 - No `SAVEPOINT`: a transaction inside another is the outer one ([Passing a transaction through](#passing-a-transaction-through)).
 - After a query error that the callback catches, Postgres answers the `COMMIT` with `ROLLBACK`, not an error, and nothing is saved. `transaction()` resolves, as in Zapatos 6.6.1, and warns once (`PGCAST_DEP003`); with [`transactionRequiresCommit`](/runtime-config#Config.transactionRequiresCommit), it rejects.
+- Given a client you sent `BEGIN` on, it ends your transaction, unless [`transactionRequiresIdleClient`](/runtime-config#Config.transactionRequiresIdleClient) makes it reject first ([Your own `BEGIN`](#your-own-begin)).
 
 ### Retries
 
@@ -96,7 +97,43 @@ One transaction, both seats or neither: `START TRANSACTION ISOLATION LEVEL SERIA
 - The callback runs at the outer transaction's level, and that level is not checked, at run time or by the type: every `TxnClient` is a [`Queryable`](/sql-template#Queryable), so `db.serializable(txnClient, …)` type-checks with a client of `db.readCommitted()`, and its callback runs in that `READ COMMITTED` transaction.
 - A function whose parameter is a `TxnClientFor…` type is checked: [`IsolationSatisfying`](#IsolationSatisfying).
 - What marks the client is its own `_zapatos` property ([`TxnClient`](#TxnClient)).
-- A transaction you opened yourself, with a raw `BEGIN`, has no mark, and `pg` doesn't say a client is in one. So `transaction()` sends its own `START TRANSACTION`, which Postgres only warns about, and its `COMMIT` commits your transaction; at another level, once yours has run a query, Postgres refuses it (25001), and its `ROLLBACK` undoes your writes. Open the outer transaction with `transaction()`.
+- A transaction you opened yourself, with a raw `BEGIN`, has no mark: it is not passed through ([Your own `BEGIN`](#your-own-begin)). Open the outer transaction with `transaction()`.
+
+### Your own `BEGIN`
+
+Given a client you sent `BEGIN` on, `transaction()` sends its own `START TRANSACTION`<!-- probe: db.serializable(pool, async () => {}) -->, which Postgres only warns about (25001), then ends your transaction:
+
+| Your transaction | Zapatos 6.6.1, and pgcast without the option | With [`transactionRequiresIdleClient`](/runtime-config#Config.transactionRequiresIdleClient) |
+|---|---|---|
+| no query yet, or at the session's own level (`readCommitted()`, on a default server) | its `COMMIT`<!-- probe: db.serializable(pool, async () => {}) --> commits yours, rows and all | rejects before sending its `START TRANSACTION`; yours stays open |
+| another level, after a query | Postgres refuses (25001), and its `ROLLBACK`<!-- probe: db.serializable(pool, async () => { throw 0; }) --> undoes your rows | rejects before its `START TRANSACTION`; yours stays open |
+| aborted by a failed query | Postgres refuses (25P02), and its `ROLLBACK` ends yours | rejects before its `START TRANSACTION`; yours stays open, aborted, for your `ROLLBACK` |
+
+Either way, without the option, your own `ROLLBACK` then has nothing left to undo (25P01), and pgcast warns once, `PGCAST_DEP005`. With it, your `ROLLBACK` undoes the seat:
+
+```ts twoslash
+import * as db from 'zapatos/db';
+import type pg from 'pg';
+declare const pool: pg.Pool;
+// ---cut---
+db.setConfig({ transactionRequiresIdleClient: true });
+
+const client = await pool.connect();
+await client.query('BEGIN');
+await db.insert('seat_bookings', { screening_id: 1002, seat: 'D4', customer: 'Hollis Brandt' }).run(client);
+await db.serializable(client, txnClient =>  // rejects, having sent only an empty query
+  db.insert('seat_bookings', { screening_id: 1002, seat: 'D5', customer: 'Hollis Brandt' }).run(txnClient),
+).catch(() => undefined);
+await client.query('ROLLBACK');  // D4 is free again
+client.release();
+```
+
+- pg reports the block from pg 8.21. Before, `transaction()` runs as in 6.6.1, with no warning. Not tested with `pg-native`.
+- With the option, when pg reports one, `transaction()` first sends an empty query, so as to read the status again: pg can still report a block just after a `COMMIT` that failed. Postgres counts it as no query of yours. [`queryListener`](/runtime-config#Config.queryListener) and [`resultListener`](/runtime-config#Config.resultListener) get it, with the transaction's id, as they get its `START TRANSACTION`.
+- With the option, a `transaction()` at the same moment on that client is passed through, as in 6.6.1, and neither commits nor rolls back: its queries run in your block, or, when pg's report of a block was stale, as the last point says.
+- Without it, `transaction()` sends what 6.6.1 sends, and warns before its `START TRANSACTION`. Nothing reads the status again, so just after a `COMMIT` that failed, the warning can come once for a client outside a block.
+- Not caught: a client the pool hands out still in a block, as one released before its `ROLLBACK`; a `BEGIN` sent without `await`; a `BEGIN` sent in one query string with a statement that fails (`'BEGIN; …; SELECT 1/0'`), which pg can still report as outside a block, so `transaction()` runs as in 6.6.1, with no warning.
+- With the option, just after a `COMMIT` that failed, two `transaction()` calls at the same moment on one client: when pg still reports the block, the first sends its empty query, then goes on, and the second, passed through, sends its first query, and any sent with it, before the first's `START TRANSACTION`, outside any transaction, so each is committed on its own. Its later queries run in the first call's transaction.
 
 ### Errors
 
@@ -108,6 +145,7 @@ One transaction, both seats or neither: `START TRANSACTION ISOLATION LEVEL SERIA
 | the callback's error | after `ROLLBACK`; for 40001 and 40P01, after the last attempt | Zapatos |
 | a `TypeError`, `Cannot destructure property 'code' of 'err' as it is null.` (or `undefined`) | the callback throws `null` or `undefined`, after `ROLLBACK` | Zapatos |
 | "the transaction was rolled back, not committed: a query in it failed and the callback caught the error, so Postgres answered COMMIT with ROLLBACK; let the error out of the callback, or ROLLBACK TO a SAVEPOINT before going on"<!-- message --> | with [`transactionRequiresCommit`](/runtime-config#Config.transactionRequiresCommit), Postgres answered the `COMMIT` with `ROLLBACK`; not retried, and no `ROLLBACK` of its own | pgcast 6.7.0 |
+| "transaction() was given a client inside a transaction block, so its COMMIT or ROLLBACK would end that transaction: COMMIT or ROLLBACK it first, pass the pool, or run the queries on that client without transaction()"<!-- message --> | with [`transactionRequiresIdleClient`](/runtime-config#Config.transactionRequiresIdleClient), a client of yours is inside a transaction block ([Your own `BEGIN`](#your-own-begin)); having sent only the empty query | pgcast 6.7.0 |
 
 </div>
 
@@ -386,6 +424,7 @@ The others are thrown as `.compile()` compiles the query, so `.run()` rejects wi
 | `db.Default`, `db.self`, `db.raw()`, `db.cols()` or `db.vals()` as a filter value; `db.raw()`, `db.cols()` or `db.vals()` as an `insert()`, `upsert()` or `update()` value, or in any `vals({…})` | `.run()` rejects | [Whereable objects](/sql-template#whereable), [Conditions](/conditions), [`insert()`](/insert#insert), [`vals()`](/sql-template#vals) |
 | `truncate()` with its options in another order | `.run()` rejects | [`truncate()`](/insert#truncate) |
 | `transaction()` with another isolation level | its promise rejects | [`transaction()`, Errors](#errors) |
+| `transaction()` given a client inside a transaction block, with `transactionRequiresIdleClient`, after an empty query | its promise rejects | [Your own `BEGIN`](#your-own-begin) |
 
 </div>
 

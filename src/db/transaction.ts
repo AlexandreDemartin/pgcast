@@ -74,6 +74,16 @@ function typeofQueryable(queryable: Queryable) {
   return 'client';
 }
 
+/**
+ * The client's transaction status, as pg reads it from Postgres (from pg 8.21; pg-native 3.8): `I` outside a
+ * transaction block, `T` inside one, `E` inside an aborted one; `undefined` when pg can't say.
+ */
+const transactionStatus = (client: pg.ClientBase) => {
+  try { return (client as { getTransactionStatus?(): string | null }).getTransactionStatus?.() ?? undefined; }
+  catch { return undefined; }  // a native client on pg-native < 3.8 lacks the method pg calls
+};
+const inBlock = (client: pg.ClientBase) => { const s = transactionStatus(client); return s === 'T' || s === 'E'; };
+
 let txnSeq = 0;
 
 /**
@@ -85,6 +95,11 @@ let txnSeq = 0;
  * `COMMIT` with `ROLLBACK` and nothing is saved: with the
  * `transactionRequiresCommit` config option, this rejects; without it, it
  * resolves and emits a `DeprecationWarning` (`PGCAST_DEP003`), once.
+ *
+ * Given a client already inside a transaction block (a `BEGIN` of yours), its
+ * `COMMIT` or `ROLLBACK` would end yours: with the
+ * `transactionRequiresIdleClient` config option, this rejects before its
+ * `START TRANSACTION`; without it, it runs and emits `PGCAST_DEP005`, once.
  * @param txnClientOrQueryable The `pg.Pool` from which to check out a client,
  * a plain client (`pg.Client`, `pg.native.Client` or a `pg.PoolClient`, used
  * as is and not released), or an existing transaction client to be passed
@@ -116,6 +131,19 @@ export async function transaction<T, M extends IsolationLevel>(
 
   try {  // from here, every path releases a client checked out from the pool
     txnClient._zapatos = { isolationLevel, txnId };
+
+    // a client of the caller's, inside a block of its own (BEGIN): our COMMIT or ROLLBACK would end that
+    // transaction (see https://github.com/AlexandreDemartin/pgcast/issues/233)
+    if (!clientIsOurs && inBlock(txnClient)) {
+      if (getConfig().transactionRequiresIdleClient ?? false) {
+        // pg reads the status at each ReadyForQuery, so it can lag behind a query that just rejected (a failed
+        // COMMIT): an empty query, which Postgres does not count as a query of the block, reads it again
+        await sql``.run(txnClient);  // meanwhile, a call at the same moment sees the mark, and is passed through
+        if (inBlock(txnClient)) throw new Error('transaction() was given a client inside a transaction block, so its COMMIT or ROLLBACK would end that transaction: COMMIT or ROLLBACK it first, pass the pool, or run the queries on that client without transaction()');
+      } else {
+        warnOnce('PGCAST_DEP005', 'transaction() was given a client inside a transaction block, and its COMMIT or ROLLBACK will end that transaction. Set transactionRequiresIdleClient: true (db.setConfig) to reject instead, before its START TRANSACTION; it will be the default in pgcast 7.0.');
+      }
+    }
 
     const
       config = getConfig(),

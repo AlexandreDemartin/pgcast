@@ -5,7 +5,7 @@
 // file only. Under Vitest, src imports pg's ESM entry, which has no `native`;
 // the stub adds it, own and enumerable, as pg 7 has it. No database.
 
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as db from '../../src/db';
 import { IsolationLevel } from '../../src/db';
 
@@ -64,5 +64,39 @@ describe('transaction() on a pg.native pool', () => {
     const pool = new native.Pool();
     expect(await db.transaction(queryable(pool), IsolationLevel.Serializable, async () => 'done')).toBe('done');
     expect(pool.sent).toEqual(['connect()', 'START TRANSACTION ISOLATION LEVEL SERIALIZABLE', 'COMMIT', 'release()']);
+  });
+});
+
+// #233: the status comes from getTransactionStatus(), from pg 8.21; on pg-native < 3.8 the native client's throws
+describe('transaction() on a client that cannot tell its transaction status', () => {
+  afterEach(() => { db.setConfig({ transactionRequiresIdleClient: false }); });
+
+  const inBlock = (status: string) => Object.assign(new native.Client(), { getTransactionStatus: () => status });
+
+  it.each([
+    ['without getTransactionStatus() (pg < 8.21)', () => new native.Client()],
+    ['whose getTransactionStatus() throws (pg-native < 3.8)', () => Object.assign(new native.Client(), {
+      getTransactionStatus: () => { throw new TypeError('this.native.getTransactionStatus is not a function'); },
+    })],
+  ])('%s, runs as in Zapatos 6.6.1, even with transactionRequiresIdleClient', async (_, make) => {
+    db.setConfig({ transactionRequiresIdleClient: true });
+    const client = make();
+    expect(await db.transaction(queryable(client), IsolationLevel.Serializable, async () => 'done')).toBe('done');
+    expect(client.sent).toEqual(['START TRANSACTION ISOLATION LEVEL SERIALIZABLE', 'COMMIT']);
+  });
+
+  it.each(['T', 'E'])('in a block (%s), with transactionRequiresIdleClient, sends only the empty query, then rejects', async status => {
+    db.setConfig({ transactionRequiresIdleClient: true });
+    const client = inBlock(status);
+    await expect(db.transaction(queryable(client), IsolationLevel.Serializable, async () => 'done'))
+      .rejects.toThrow(/^transaction\(\) was given a client inside a transaction block/);
+    expect(client.sent).toEqual(['']);
+  });
+
+  it.each(['I', null])('outside a block (%s), sends no empty query', async status => {
+    db.setConfig({ transactionRequiresIdleClient: true });
+    const client = Object.assign(new native.Client(), { getTransactionStatus: () => status });
+    expect(await db.transaction(queryable(client), IsolationLevel.Serializable, async () => 'done')).toBe('done');
+    expect(client.sent).toEqual(['START TRANSACTION ISOLATION LEVEL SERIALIZABLE', 'COMMIT']);
   });
 });
