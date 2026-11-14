@@ -99,6 +99,12 @@ const columnsForRelation = async (rel: Relation, schemaName: string, queryFn: (q
   return rows;
 };
 
+// what the config states for a table or a column, never what Object.prototype answers for a name such as
+// toString or __proto__: its function, whose caller throws, hid the '*' entry
+const stated = <T>(options: Record<string, T> | null | undefined, key: string) =>
+  options == null || options[key] === Object.prototype || options[key] === (Object.prototype as any)[key] ?
+    undefined : options[key];
+
 function quoteIfIllegalIdentifier(identifier: string) {
   // note: we'll redundantly quote a bunch of non-ASCII characters like this
   return identifier.match(/^[a-zA-Z_$][0-9a-zA-Z_$]*$/) ? identifier : stringLiteral(identifier, '"');
@@ -152,8 +158,8 @@ export const definitionForRelationInSchema = async (
       schemaPrefix = config.unprefixedSchema === schemaName ? '' : `${schemaName}.`,
       prefixedRelName = schemaPrefix + rel.name,
       columnOptions =
-        (config.columnOptions[prefixedRelName] && config.columnOptions[prefixedRelName][column]) ??
-        (config.columnOptions["*"] && config.columnOptions["*"][column]),
+        stated(stated(config.columnOptions, prefixedRelName), column) ??
+        stated(stated(config.columnOptions, "*"), column),
       isInsertable = rel.insertable && !isGenerated && columnOptions?.insert !== 'excluded',
       isUpdatable = rel.insertable && !isGenerated && columnOptions?.update !== 'excluded',
       insertablyOptional = isNullable || hasDefault || columnOptions?.insert === 'optional' ? '?' : '',
