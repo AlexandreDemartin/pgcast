@@ -86,6 +86,34 @@ describe('conditions: the constraint on the column', () => {
     // @ts-expect-error eq(null) would compile to `= NULL`: isNull is needed
     db.select('users', { manager_id: c.eq(null) });
   });
+
+  test('isDistinctFrom() and isNotDistinctFrom() take a nullable value (#181)', () => {
+    const nullableNum = 1 as number | null, nullableMood = 'ok' as s.mood | null, mood = 'ok' as s.mood;
+    db.select('users', { manager_id: c.isNotDistinctFrom(nullableNum), mood: c.isDistinctFrom(nullableMood) });
+    db.select('users', { id: c.isDistinctFrom(nullableNum), display_name: c.isNotDistinctFrom(null) });
+    db.sql<s.users.SQL>`SELECT * FROM ${'users'} WHERE ${{ manager_id: c.isNotDistinctFrom(nullableNum) }}`;
+    // `null` leaves the constraint, nothing else: a value without `null` keeps the type Zapatos 6.6.1 inferred
+    expectTypeOf(c.isNotDistinctFrom(nullableNum)).toEqualTypeOf<db.SQLFragment<boolean, number>>();
+    expectTypeOf(c.isDistinctFrom(null)).toEqualTypeOf<db.SQLFragment<boolean, never>>();
+    expectTypeOf(c.isDistinctFrom(mood)).toEqualTypeOf<db.SQLFragment<boolean, s.mood>>();
+    expectTypeOf(c.isNotDistinctFrom(1)).toEqualTypeOf<db.SQLFragment<boolean, number>>();
+    expectTypeOf(c.isDistinctFrom('a')).toEqualTypeOf<db.SQLFragment<boolean, string>>();
+  });
+
+  test('isDistinctFrom() and isNotDistinctFrom() still refuse undefined and a value of another type', () => {
+    const nullableNum = 1 as number | null, maybeNum = 1 as number | undefined, nullableStr = 'a' as string | null;
+    const nullableBadMood = 'angry' as 'angry' | null;
+    // @ts-expect-error undefined is not a SQL value
+    db.select('users', { manager_id: c.isNotDistinctFrom(undefined) });
+    // @ts-expect-error nor is a value that may be undefined
+    db.select('users', { manager_id: c.isDistinctFrom(maybeNum) });
+    // @ts-expect-error a nullable string on an int column (users.id)
+    db.select('users', { id: c.isNotDistinctFrom(nullableStr) });
+    // @ts-expect-error 'angry' is not a mood, nullable or not
+    db.select('users', { mood: c.isDistinctFrom(nullableBadMood) });
+    // @ts-expect-error eq() of a nullable value would compile to `= NULL` when it holds null
+    db.select('users', { manager_id: c.eq(nullableNum) });
+  });
 });
 
 describe('type surprises', () => {

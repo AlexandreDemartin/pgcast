@@ -47,8 +47,18 @@ export const isNotFalse = sql<SQL, boolean>`${self} IS NOT FALSE`;
 export const isUnknown = sql<SQL, boolean>`${self} IS UNKNOWN`;
 export const isNotUnknown = sql<SQL, boolean>`${self} IS NOT UNKNOWN`;
 
-export const isDistinctFrom = <T>(a: T) => sql<SQL, boolean, T>`${self} IS DISTINCT FROM ${conditionalParam(a)}`;
-export const isNotDistinctFrom = <T>(a: T) => sql<SQL, boolean, T>`${self} IS NOT DISTINCT FROM ${conditionalParam(a)}`;
+/**
+ * `"col" IS DISTINCT FROM $1`: as `ne()`, with `NULL` a value like any other. It takes a nullable value,
+ * `null` included, on any column: `null` leaves the column's constraint, the SQL stays the same.
+ * @param a A value, `Parameter`, `parent()` or `sql` fragment
+ */
+export const isDistinctFrom = <T>(a: T) => sql<SQL, boolean, Exclude<T, null>>`${self} IS DISTINCT FROM ${conditionalParam(a)}`;
+/**
+ * `"col" IS NOT DISTINCT FROM $1`: as `eq()`, with `NULL` a value like any other. It takes a nullable value,
+ * `null` included, on any column: `null` leaves the column's constraint, the SQL stays the same.
+ * @param a A value, `Parameter`, `parent()` or `sql` fragment
+ */
+export const isNotDistinctFrom = <T>(a: T) => sql<SQL, boolean, Exclude<T, null>>`${self} IS NOT DISTINCT FROM ${conditionalParam(a)}`;
 
 export const eq = <T>(a: T) => sql<SQL, boolean | null, T>`${self} = ${conditionalParam(a)}`;
 export const ne = <T>(a: T) => sql<SQL, boolean | null, T>`${self} <> ${conditionalParam(a)}`;
