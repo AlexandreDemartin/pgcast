@@ -139,6 +139,8 @@ Candidates for a check, a rule or a skill line.
 - #368 — A replay of a packed CLI that may ignore its config file runs with `PGHOST=/nonexistent`: its fallback connection could otherwise reach another local database — `builder`
 - #368 — Moving work to a new file leaves `AGENTS.md` § Architecture behind: a check listing `src/generate/*.ts` and `src/db/*.ts` against the files it names would catch it — `branch-reviewer`
 - #368 — The « runs as on Zapatos 6.6.1 » CLI replay (exit code, stdout, `Error:` line, file hashes) is redone by hand on each CLI PR: a script with fixed scenarios would make it checkable — `branch-reviewer`
+- #51 — Before documenting a report finding, search what the docs site already says: 10 of the 16 were covered by the docs chapter — `builder`
+- #51 — R36 depends on the schema: an inline fragment fails only when another relation has the same column name with another type, or a nullable copy of a `NOT NULL` column in `update()`; the docs schema has neither, so the page states it in prose — `builder`
 
 ## Minors kept
 
