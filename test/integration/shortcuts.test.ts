@@ -27,6 +27,7 @@ const sortBy = <R extends Record<string, any>>(rows: R[], key: keyof R) =>
 const
   wrapperAsValue = '`db.raw()`, `db.cols()` and `db.vals()` have no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value: to write SQL, use a `sql` fragment value (in `update()`, `db.self` there stands for the column); to write a value, give the value itself, or `db.param()`.',
   noParent = `The 'parent' table alias has no meaning here`,
+  nothingToInsert = 'nothing to insert: an Insertable needs at least one column; for a row of defaults only, write INSERT ... DEFAULT VALUES in a sql template',
   wrappers = { raw: raw("upper('Ada')"), cols: cols('display_name'), colsArray: cols(['display_name']), vals: vals('Ada'), valsObject: vals({ theme: 'dark' }) };
 
 /**
@@ -91,6 +92,15 @@ describe('insert', () => {
 
   it('an empty array: [] without hitting the database', async () => {
     expect(await run(db.insert('users', []))).toEqual([]);
+  });
+
+  it('no column at all throws before any query, where Postgres refused the SQL (#251)', async () => {
+    // Zapatos 6.6.1 sent `() VALUES ()`, which .run() rejected with 42601
+    expect((await pgError(t.client, () => run(sql`INSERT INTO ${'users'} () VALUES ()`))).code).toBe('42601');
+    expect(() => db.insert('users', {})).toThrow(nothingToInsert);
+    expect(() => db.insert('users', [{}, {}])).toThrow(nothingToInsert);
+    // no query was sent, so the transaction is not aborted
+    expect(await run(db.select('users', { id: 1 }, { columns: ['id'] }))).toEqual([{ id: 1 }]);
   });
 
   it('characterization: an empty array, forced, can still fail', async () => {
@@ -397,6 +407,16 @@ describe('upsert', () => {
 
   it('an empty array: []', async () => {
     expect(await run(db.upsert('users', [], 'email'))).toEqual([]);
+  });
+
+  it('no column at all throws before any query, where Postgres refused the SQL (#251)', async () => {
+    // Zapatos 6.6.1 sent `() VALUES () ON CONFLICT`, which .run() rejected with 42601
+    expect((await pgError(t.client, () => run(sql`INSERT INTO ${'users'} () VALUES () ON CONFLICT (${'email'}) DO NOTHING`))).code).toBe('42601');
+    expect(() => db.upsert('users', {}, 'email')).toThrow(nothingToInsert);
+    // with undefinedMeansMissing, an undefined key is left out, so no column is left
+    db.setConfig({ undefinedMeansMissing: true });
+    expect(() => db.upsert('users', { mood: undefined }, 'email')).toThrow(nothingToInsert);
+    expect(await run(db.select('users', { id: 1 }, { columns: ['id'] }))).toEqual([{ id: 1 }]);
   });
 
   it('raw(), cols(x) and vals(x) as values throw before any query, on a conflicting row or a new one', async () => {
