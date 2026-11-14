@@ -125,7 +125,7 @@ Every option is optional. Each one given replaces its default whole: `schemas` w
 
 `{ [schema]: { include, exclude } }`, each of `include` and `exclude` `"*"` or an array of relation names. The schemas to generate, and which relations of each: tables, views, materialised views and foreign tables.
 
-Both keys are required by the type: in `generate()`, a rule without one fails to compile (TS2741). In the JSON, or in untyped JavaScript, a key left out or set to `null` takes the default rule's value, `"include": "*"` or `"exclude": []`, and the generator notes it, through [`warningListener`](#generate.warningListener); Zapatos 6.6.1 stopped where it read the missing key, with `TypeError: Cannot read properties of undefined (reading 'indexOf')` ([#301](https://github.com/AlexandreDemartin/pgcast/issues/301)).
+Both keys are required by the type: in `generate()`, a rule without one fails to compile (TS2741). In the JSON, or in untyped JavaScript, a key left out or set to `null` takes the default rule's value, `"include": "*"` or `"exclude": []`, and the generator notes it, through [`warningListener`](#generate.warningListener); Zapatos 6.6.1 stopped where it read the missing key, with `TypeError: Cannot read properties of undefined (reading 'indexOf')` ([#301](https://github.com/AlexandreDemartin/pgcast/issues/301)). A string other than `"*"`, which the type refuses too (TS2322), is read as a one-name list, `"films"` as `["films"]`, and noted the same way; Zapatos 6.6.1 also matched each relation whose name is part of it, `film` for `"films"` ([#442](https://github.com/AlexandreDemartin/pgcast/issues/442)).
 
 | Rule | Generates |
 |---|---|
@@ -219,6 +219,7 @@ Its SQL is [`select()`](/select#select)'s, with the name quoted part by part: `t
 - An array of a domain or of such a type is a custom type of its own.
 - The names are not qualified by schema: the `c` namespace is flat across schemas, so a domain `notes` in `public` and one in `archive` are both `PgNotes`, with one placeholder for the two.
   - The generator says so through [`warningListener`](#generate.warningListener), as for two names that one transform makes one (`seat-label` and `seat_label`), and keeps the name, which an edited placeholder depends on.
+- Names that differ only in case, such as `PgSeat_label` and `PgSEAT_LABEL` for domains `seat_label` and `"SEAT_LABEL"`, have two placeholders that are one file on a case-insensitive file system, the default on macOS and Windows: the one written first declares only its own name, and the others are never declared. The generator says so too, wherever it runs, and writes the same files.
 
 ### `schemaJSDoc` {#generate.schemaJSDoc}
 
@@ -367,10 +368,14 @@ Writing custom types file: src/zapatos/custom/index.d.ts
 - `Writing new custom type or domain placeholder file: src/zapatos/custom/PgPoint.d.ts`, once per new placeholder;
 - `Note: custom types "archive"."notes" and "public"."notes" are both named PgNotes in TypeScript, so they share one type and one placeholder file, src/zapatos/custom/PgNotes.d.ts. To type them apart, rename one of them in the database.`
   - once per run for each name that two Postgres types share ([`customTypesTransform`](#generate.customTypesTransform)); when their names differ, it adds that a `customTypesTransform` function can keep them apart;
+- `Note: custom types "public"."SEAT_LABEL" (PgSEAT_LABEL) and "public"."seat_label" (PgSeat_label) have TypeScript names that differ only in case: on a case-insensitive file system, the default on macOS and Windows, PgSEAT_LABEL.d.ts and PgSeat_label.d.ts are one placeholder file in src/zapatos/custom, which declares only one of those names. To type them apart, rename one of them in the database, or give customTypesTransform a function that keeps their names apart.`
+  - once per run for names that differ only in case, whatever the file system, before the note above for each of those names that two Postgres types share;
 - `Note: the include entry "Films" of schema "public" matches no relation there, so it generates nothing. Check its spelling and case, that the relation is in schema "public", and that the database role has a privilege on it: include names tables, views, materialised views and foreign tables.`
   - once per run for each entry of an [`include`](#generate.schemas) list that its schema doesn't have;
 - `Note: the schemas rule of "public" has no exclude, so it takes "exclude": [], as the default rule does. Write the key in the rule to silence this note.`
   - after writing, for each rule of [`schemas`](#generate.schemas) that leaves out `include` or `exclude`, or sets it to `null`; for both, `has no include nor exclude, so it takes "include": "*" and "exclude": []`;
+- `Note: the schemas rule of "public" gives include as a string, "films", so it is read as the list ["films"]. Zapatos 6.6.1 also matched each relation whose name is part of the string. Write the list to silence this note.`
+  - after writing, for each `include` or `exclude` of a rule of [`schemas`](#generate.schemas) given as a string other than `"*"`;
 - the note on `bigint` and `numeric` columns, once per process ([`customJSONParsingForLargeNumbers`](#generate.customJSONParsingForLargeNumbers));
 - `` Note: public.prints.format (archive.print_format), public.prints.formats (archive.print_format[]) and public.prints.keeper (archive.crew_job) have a type of another schema, which is looked up by name in the schema of their relation: an enum becomes an `any` custom type, or the enum of the same name there. Set typeEnumsAcrossSchemas: true to look it up in its own schema; it will be the default in pgcast 7.0. ``
   - once per run, without [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas), when a column it would change is generated;

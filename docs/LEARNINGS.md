@@ -216,6 +216,11 @@ Candidates for a check, a rule or a skill line.
 - #301 — In 6.6.1 and master, a `schemas` rule's `include` given as a plain string other than `"*"` (`"films"`) goes through `String.prototype.indexOf`, so it matches substrings of relation names: filed as its own issue — `builder`
 - #301 — `finaliseConfig({}).schemas.public` is the same object as `defaultConfig.schemas.public`: a caller who mutates the returned rule changes the default for later calls (nothing in the repo does today) — `branch-reviewer`
 - #301 — A fresh worktree needs `cd website && npm ci` before `docs:translated` and `docs:build` — `builder`
+- #442 — A conflicting PR gets no CI run (GitHub runs only CodeQL): before review and merge, `gh pr view <n> --json mergeable` is not `CONFLICTING` and the CI workflow's checks are in `statusCheckRollup` — `branch-reviewer`
+- #442 — When a fix reinterprets an untyped config value, replay what a JSON user would plausibly write (a comma- or space-separated list, `""`, a wrong case), not only the issue's shapes — `branch-reviewer`
+- #442 — In 6.6.1 the substring match goes down to single letters: `"include": "studios"` pulled in a relation named `s` — `builder`
+- #287 — A custom type named `index` (a domain `index` under `my_type`) may clash with the custom `index.d.ts` the generator rewrites after the placeholders: unchecked, a candidate issue — `builder`
+- #287 — A merged note keeps every condition of the note it replaces (#42's withholds the `customTypesTransform` advice when the raw names are equal): a test runs the old note's scenario inside the new note's — `branch-reviewer`
 
 ## Minors kept
 
@@ -274,3 +279,7 @@ Minor review defects, taken up by the end-of-chapter review.
 
 - #301 — `src/generate/schemaRules.ts:43`: « has no include nor exclude » reads better as « has neither include nor exclude » (frozen in the test, CHANGELOG and both generator pages) — `branch-reviewer`
 - #301 — `test/integration/codegen.test.ts:1217`: a single `null` key (`{ include: '*', exclude: null }`) is not frozen by a test — `branch-reviewer`
+- #442 — `CHANGELOG.md:99`, `website/generator.md:127` (and `fr/…:131`): a string naming several relations (`"films,studios"`) now selects none, or excludes none; the docs say a string's relation is kept without that condition, and no test row freezes it — `branch-reviewer`
+- #442 — `src/generate/schemaRules.ts:25`: `asList(names: '*' | string[])` narrows its string branch to `never`; `string | string[]` — `branch-reviewer`
+- #287 — `test/integration/codegen.test.ts:868`: the notes' order (case note first, then #42's) is decided alone but not pinned by a test — `branch-reviewer`
+- #287 — `CHANGELOG.md:101`: a second colon after « (…): on a case-insensitive file system », and « as in Zapatos 6.6.1 » reads as if it applied to the file system — `branch-reviewer`

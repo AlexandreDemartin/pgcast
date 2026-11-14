@@ -68,23 +68,46 @@ const sourceFilesForCustomTypes = (customTypes: CustomTypes, names: string) =>
 /**
  * Warn about each custom type name that stands for more than one Postgres type: they share one
  * placeholder, and so one type. The placeholders keep their names, which edited files depend on.
+ * Names that differ only in case share one placeholder too on a case-insensitive file system (macOS's
+ * and Windows's default), which declares only one of them: they get one note, before the note on each.
  */
 const warnAboutSharedCustomTypeNames = (origins: CustomTypeOrigins, config: CompleteConfig) => {
-  const warn = config.warningListener === true ? console.log : config.warningListener || (() => void 0);
+  const
+    warn = config.warningListener === true ? console.log : config.warningListener || (() => void 0),
+    folder = path.join(config.outDir, moduleNamesOf(config), 'custom'),
+    listOf = (items: string[]) => items.slice(0, -1).join(', ') + ' and ' + items[items.length - 1],
+    namesByFile = new Map<string, string[]>();  // lower-cased name -> names, in sorted order
 
   for (const name of Object.keys(origins).sort()) {
-    const types = Object.keys(origins[name]).sort();
-    if (types.length < 2) continue;
+    const file = name.toLowerCase();
+    namesByFile.set(file, [...namesByFile.get(file) ?? [], name]);
+  }
 
-    const
-      typeList = types.slice(0, -1).join(', ') + ' and ' + types[types.length - 1],
-      namesDiffer = new Set(Object.values(origins[name])).size > 1,
-      filePath = path.join(config.outDir, moduleNamesOf(config), 'custom', name + config.outExt);
+  for (const names of namesByFile.values()) {
+    if (names.length > 1) {
+      const types = names.flatMap(name => Object.keys(origins[name]).map(type => `${type} (${name})`)).sort();
 
-    warn(`Note: custom types ${typeList} are ${types.length === 2 ? 'both' : 'all'} named ${name} in TypeScript, ` +
-      `so they share one type and one placeholder file, ${filePath}. ` +
-      `To type them apart, rename one of them in the database` +
-      (namesDiffer ? `, or give customTypesTransform a function that keeps their names apart.` : `.`));
+      warn(`Note: custom types ${listOf(types)} have TypeScript names that differ only in case: ` +
+        `on a case-insensitive file system, the default on macOS and Windows, ` +
+        `${listOf(names.map(name => name + config.outExt))} are one placeholder file in ${folder}, ` +
+        `which declares only one of those names. To type them apart, rename one of them in the database, ` +
+        `or give customTypesTransform a function that keeps their names apart.`);
+    }
+
+    for (const name of names) {
+      const types = Object.keys(origins[name]).sort();
+      if (types.length < 2) continue;
+
+      const
+        typeList = listOf(types),
+        namesDiffer = new Set(Object.values(origins[name])).size > 1,  // a function gets the same name otherwise
+        filePath = path.join(folder, name + config.outExt);
+
+      warn(`Note: custom types ${typeList} are ${types.length === 2 ? 'both' : 'all'} named ${name} in TypeScript, ` +
+        `so they share one type and one placeholder file, ${filePath}. ` +
+        `To type them apart, rename one of them in the database` +
+        (namesDiffer ? `, or give customTypesTransform a function that keeps their names apart.` : `.`));
+    }
   }
 };
 

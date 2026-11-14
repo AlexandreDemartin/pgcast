@@ -815,6 +815,10 @@ describe('custom types that share a placeholder name', () => {
     CREATE TABLE collide_a.labels (dashed collide_a."code-x", underscored collide_a.code_x);
     CREATE DOMAIN collide_a."code x" AS text;
     CREATE TABLE collide_a.spaced (spaced collide_a."code x");
+    CREATE DOMAIN collide_a."Code" AS text;
+    CREATE DOMAIN collide_a."CODE" AS boolean;
+    CREATE TABLE collide_a.cased (a collide_a."Code", b collide_a.code, d collide_a."CODE");
+    CREATE TABLE collide_a.shouted (d collide_a."CODE");
   `));
   afterAll(() => t.pool.query('DROP SCHEMA collide_a, collide_b CASCADE'));
 
@@ -859,6 +863,45 @@ describe('custom types that share a placeholder name', () => {
       'Note: custom types "collide_a"."code x", "collide_a"."code-x" and "collide_a"."code_x" are all named PgCode_x ' +
       'in TypeScript, so they share one type and one placeholder file, src/zapatos/custom/PgCode_x.d.ts. ' +
       'To type them apart, rename one of them in the database, ' +
+      'or give customTypesTransform a function that keeps their names apart.',
+    ]);
+  });
+
+  it('warns for names that differ only in case, whose placeholders are one file on macOS and Windows', async () => {
+    // PgCode and PgCODE: the file written first declares only its own name; #42's note for PgCode follows
+    expect(await warningsFor({ collide_a: only('cased') })).toEqual([
+      'Note: custom types "collide_a"."CODE" (PgCODE), "collide_a"."Code" (PgCode) and "collide_a"."code" (PgCode) ' +
+      'have TypeScript names that differ only in case: on a case-insensitive file system, the default on macOS and ' +
+      'Windows, PgCODE.d.ts and PgCode.d.ts are one placeholder file in src/zapatos/custom, which declares only one of ' +
+      'those names. To type them apart, rename one of them in the database, ' +
+      'or give customTypesTransform a function that keeps their names apart.',
+      'Note: custom types "collide_a"."Code" and "collide_a"."code" are both named PgCode in TypeScript, ' +
+      'so they share one type and one placeholder file, src/zapatos/custom/PgCode.d.ts. ' +
+      'To type them apart, rename one of them in the database, ' +
+      'or give customTypesTransform a function that keeps their names apart.',
+    ]);
+  });
+
+  it('keeps the note on a name that two schemas share when another name differs from it only in case', async () => {
+    // a function gets "code" for both PgCode types, so it cannot type them apart: #42's note says so
+    expect(await warningsFor({ collide_a: only('things', 'shouted'), collide_b: only('codes') })).toEqual([
+      'Note: custom types "collide_a"."CODE" (PgCODE), "collide_a"."code" (PgCode) and "collide_b"."code" (PgCode) ' +
+      'have TypeScript names that differ only in case: on a case-insensitive file system, the default on macOS and ' +
+      'Windows, PgCODE.d.ts and PgCode.d.ts are one placeholder file in src/zapatos/custom, which declares only one of ' +
+      'those names. To type them apart, rename one of them in the database, ' +
+      'or give customTypesTransform a function that keeps their names apart.',
+      'Note: custom types "collide_a"."code" and "collide_b"."code" are both named PgCode in TypeScript, ' +
+      'so they share one type and one placeholder file, src/zapatos/custom/PgCode.d.ts. ' +
+      'To type them apart, rename one of them in the database.',
+    ]);
+  });
+
+  it('warns for names that differ only in case under a customTypesTransform function', async () => {
+    expect(await warningsFor({ collide_a: only('cased') }, { customTypesTransform: name => name, outExt: '.ts' })).toEqual([
+      'Note: custom types "collide_a"."CODE" (CODE), "collide_a"."Code" (Code) and "collide_a"."code" (code) ' +
+      'have TypeScript names that differ only in case: on a case-insensitive file system, the default on macOS and ' +
+      'Windows, CODE.ts, Code.ts and code.ts are one placeholder file in src/zapatos/custom, which declares only one of ' +
+      'those names. To type them apart, rename one of them in the database, ' +
       'or give customTypesTransform a function that keeps their names apart.',
     ]);
   });
@@ -1257,6 +1300,74 @@ describe('schemas rules missing include or exclude', () => {
   it('still requires both keys in Config', () => {
     // @ts-expect-error a rule without exclude fails to compile (TS2741)
     const wrong: Config = { schemas: { public: { include: '*' } } };
+    void wrong;
+  });
+});
+
+describe('schemas rules with a string other than "*"', () => {
+  // #442: the CLI's JSON and untyped JavaScript can give include or exclude as one name; Zapatos 6.6.1 read it
+  // with String.prototype.indexOf, so it matched each relation whose name is part of it too
+  const rule = (given: unknown) => given as Schemas[string];
+  const note = (schema: string, key: string, name: string) =>
+    `Note: the schemas rule of "${schema}" gives ${key} as a string, "${name}", so it is read as the list ["${name}"]. ` +
+    'Zapatos 6.6.1 also matched each relation whose name is part of the string. Write the list to silence this note.';
+
+  it.each([
+    ['include "active_users", not users too', { include: 'active_users', exclude: [] }, only('active_users')],
+    ['exclude "events_2025", keeping events', { include: '*', exclude: 'events_2025' },
+      { include: '*' as const, exclude: ['events_2025'] }],
+    // kept: as in 6.6.1
+    ['include "users", which no other relation is part of', { include: 'users', exclude: [] }, only('users')],
+    ['include "users" with exclude "*"', { include: 'users', exclude: '*' }, { include: '*' as const, exclude: '*' as const }],
+    ['include "users" with no exclude', { include: 'users' }, only('users')],
+  ])('generates for %s what the one-name list generates', async (_, given, written) => {
+    const expected = await codegen({ schemas: { public: written } });
+    expect((await codegen({ schemas: { public: rule(given) } })).ts).toBe(expected.ts);
+  });
+
+  it('warns about a string that names no relation, as about a list entry', async () => {
+    expect(await warningsFor({ public: rule({ include: 'no_such_table', exclude: [] }) })).toEqual([
+      'Note: the include entry "no_such_table" of schema "public" matches no relation there, so it generates nothing. ' +
+      'Check its spelling and case, that the relation is in schema "public", and that the database role ' +
+      'has a privilege on it: include names tables, views, materialised views and foreign tables.',
+    ]);
+  });
+
+  it('notes each string key through generate(), in rule order, after the note on a missing key', async () => {
+    const outDir = mkdtempSync(join(tmpdir(), 'pgcast-schema-rules-'));
+    try {
+      const warnings: string[] = [];
+      await generate({
+        schemas: {
+          public: rule({ include: 'active_users', exclude: 'events_2025' }),
+          extra: rule({ include: 'articles' }),
+          edge: { include: '*', exclude: '*' },
+        },
+        ...quiet, warningListener: s => warnings.push(s), db: db(), outDir,
+      });
+      expect(warnings.filter(w => w.startsWith('Note: the schemas rule'))).toEqual([
+        note('public', 'include', 'active_users'),
+        note('public', 'exclude', 'events_2025'),
+        'Note: the schemas rule of "extra" has no exclude, so it takes "exclude": [], as the default rule does. ' +
+        'Write the key in the rule to silence this note.',
+        note('extra', 'include', 'articles'),
+      ]);
+    } finally {
+      rmSync(outDir, { recursive: true, force: true });
+    }
+  });
+
+  it('gives finaliseConfig() the one-name lists, leaving the supplied rule as it is', () => {
+    const given = { include: 'users', exclude: 'products' };
+    expect(finaliseConfig({ schemas: { public: rule(given) } }).schemas.public).toEqual({
+      include: ['users'], exclude: ['products'],
+    });
+    expect(given).toEqual({ include: 'users', exclude: 'products' });
+  });
+
+  it('still refuses the string in Config', () => {
+    // @ts-expect-error a string other than '*' fails to compile (TS2322)
+    const wrong: Config = { schemas: { public: { include: 'users', exclude: [] } } };
     void wrong;
   });
 });

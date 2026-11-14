@@ -7,7 +7,7 @@ Released under the MIT licence: see LICENCE file
 import * as fs from 'fs';
 import * as path from 'path';
 import type * as pg from 'pg';
-import { schemaRulesWithDefaults } from './schemaRules';
+import { schemaRulesAsTyped } from './schemaRules';
 
 
 export interface RequiredConfig {
@@ -84,6 +84,6 @@ export const moduleRoot = () => {
 
 export const finaliseConfig = (config: Config) => {
   const finalConfig = { ...defaultConfig, ...config } as CompleteConfig;
-  finalConfig.schemas = schemaRulesWithDefaults(finalConfig.schemas);  // a rule missing include or exclude (#301)
+  finalConfig.schemas = schemaRulesAsTyped(finalConfig.schemas);  // a rule missing include or exclude (#301), or giving one as a string (#442)
   return finalConfig;
 };
