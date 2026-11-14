@@ -1,4 +1,4 @@
-# How types are cast from the catalog
+# The catalog
 
 The question this page answers, in one sentence.
 {.lede}

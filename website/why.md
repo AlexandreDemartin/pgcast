@@ -19,7 +19,7 @@ So Zapatos makes three choices, and pgcast keeps all three: the types come from 
 
 Postgres already knows your schema: each column, its type, whether it can be null, whether it has a default, the comment you gave it. The generator asks the catalog (`pg_catalog` and `information_schema`) and writes `zapatos/schema.d.ts`.
 
-That file holds the types of each table, view, materialised view and foreign table, a union of strings for each enum, and a placeholder for each domain or type it can't map on its own ([Use custom types and domains](/custom-types)). No row type is written by hand, so none can disagree with its table.
+That file holds the types of each table, view, materialised view and foreign table, a union of strings for each enum, and a placeholder for each domain or type it can't map on its own ([Custom types](/custom-types)). No row type is written by hand, so none can disagree with its table.
 
 Hence the name. In Postgres, a cast (`::`) gives a value its type; in English, a cast is also a mould. pgcast's types are cast from your schema, and these docs' examples, fittingly, are about a film's cast.
 
@@ -34,7 +34,7 @@ declare const pool: pg.Pool;
 const films = await db.select('films', { relase_year: 1974 }).run(pool);
 ```
 
-The types are as fresh as the last run of the generator. Run it again after each migration, and the compiler points at every query that no longer fits. How each Postgres type becomes a TypeScript type, and why a row as JSON differs from a row from `pg`: [How types are cast from the catalog](/catalog-types).
+The types are as fresh as the last run of the generator. Run it again after each migration, and the compiler points at every query that no longer fits. How each Postgres type becomes a TypeScript type, and why a row as JSON differs from a row from `pg`: [The catalog](/catalog-types).
 
 ## The SQL you read is the SQL that runs
 
@@ -50,7 +50,7 @@ The panel is what you get in your own code: [`.compile()`](/sql-template#compile
 
 The nesting is Postgres's own work, `jsonb_agg`<!-- probe: examples/why_studio.ts --> in a `LEFT JOIN LATERAL`<!-- probe: examples/why_studio.ts -->: the studio and its films come back as one JSON value, in one round trip, with no rows to stitch together in JavaScript.
 
-TypeScript knows the one column asked for, the films beneath it, and `undefined` when no studio has that `id`: that takes `strict`, as [Your first typed query](/first-query#set-up-the-project) sets it.
+TypeScript knows the one column asked for, the films beneath it, and `undefined` when no studio has that `id`: that takes `strict`, as [First query](/first-query#set-up-the-project) sets it.
 
 When a shortcut doesn't fit, the [`sql`](/sql-template#sql) template is always there. You write the SQL, it interpolates names, values as parameters, and other fragments, and you type the result with the generated types. The shortcuts are built on it.
 
@@ -60,7 +60,7 @@ There are no models. A query gives back plain objects, typed: "just (fully-typed
 
 Nor is there a default connection: each `.run()` takes the pool or client to run on, as "Zapatos is always explicit about what client or pool is running your query".
 
-A transaction starts only when you call [`transaction()`](/transaction#transaction). It sends `START TRANSACTION`<!-- probe: db.serializable(pool, async () => {}) --> at the isolation level you chose, then `COMMIT`<!-- probe: db.serializable(pool, async () => {}) --> or `ROLLBACK`<!-- probe: db.serializable(pool, async () => { throw new Error(); }) -->, and runs your callback again after a serialisation failure or a deadlock ([Retry a transaction](/retries)).
+A transaction starts only when you call [`transaction()`](/transaction#transaction). It sends `START TRANSACTION`<!-- probe: db.serializable(pool, async () => {}) --> at the isolation level you chose, then `COMMIT`<!-- probe: db.serializable(pool, async () => {}) --> or `ROLLBACK`<!-- probe: db.serializable(pool, async () => { throw new Error(); }) -->, and runs your callback again after a serialisation failure or a deadlock ([Retries](/retries)).
 
 The same goes for your own functions. Zapatos's docs advise against giving a function's client argument the pool as its default: "I find that way it's too easy to accidentally issue queries outside of transactions."
 
@@ -82,7 +82,7 @@ pgcast starts from Zapatos 6.6.1. Before changing it, the fork pinned what 6.6.1
 
 </div>
 
-The security fixes came first, in 6.6.2 ([The security model](/security)):
+The security fixes came first, in 6.6.2 ([Security](/security)):
 
 - no name (a table, a column, a key, an alias) and no cast of `param()` can close its quotes;
 - a plain value in [`upsert()`](/insert#upsert)'s `updateValues` is a parameter;
@@ -90,7 +90,7 @@ The security fixes came first, in 6.6.2 ([The security model](/security)):
 
 The opt-ins that warn, [`undefinedMeansMissing`](/runtime-config#Config.undefinedMeansMissing), [`upsertRequiresSameKeys`](/runtime-config#Config.upsertRequiresSameKeys) and [`transactionRequiresCommit`](/runtime-config#Config.transactionRequiresCommit), and the generator's [`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas) and [`enumOrder`](/generator#generate.enumOrder), become the defaults in 7.0, and their old paths go in 8.0.
 
-[`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow), which never warns, stays off. Until 7.0, 6.x is a drop-in for Zapatos 6.6.1 ([Versions, opt-ins and warnings](/versions)).
+[`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow), which never warns, stays off. Until 7.0, 6.x is a drop-in for Zapatos 6.6.1 ([Versions](/versions)).
 
 Zapatos 6.6.1 shipped no test suite of its own (its first consumer's tests exercised "most of the code base at least a little"); its CI linted and built. Its roadmap called one "kind of indispensable", one that tests "not just returned values but also inferred types".
 
@@ -124,5 +124,5 @@ Some changes are refused whatever they'd gain, because each would take away some
 ## Further reading
 
 - The entries this page talks about: [`select()`](/select#select), [`selectOne()`](/select#selectOne), the [`sql`](/sql-template#sql) template and [`.compile()`](/sql-template#compile), [`transaction()`](/transaction#transaction), [`Config.undefinedMeansMissing`](/runtime-config#Config.undefinedMeansMissing), [`Config.upsertRequiresSameKeys`](/runtime-config#Config.upsertRequiresSameKeys), [`Config.transactionRequiresCommit`](/runtime-config#Config.transactionRequiresCommit) and [`Config.selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow).
-- The guides: [Join through a lateral](/lateral), [Retry a transaction](/retries), [Switch from Zapatos](/switching).
+- The guides: [Joins](/lateral), [Retries](/retries), [Switch from Zapatos](/switching).
 - Zapatos's own [docs](https://jawj.github.io/zapatos/), for 6.6.1; what pgcast changes, in the [changelog](/changelog).

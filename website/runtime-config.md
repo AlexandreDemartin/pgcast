@@ -1,4 +1,4 @@
-# Run-time configuration and utility types
+# Configuration
 
 What `zapatos/db` lets you set while your code runs: `setConfig()` and each option of `Config`, the listeners, the opt-ins and their warning codes. Then the types the generated schema gives values that JSON or `pg` hand back as strings, and the helpers that convert them.
 {.lede}
@@ -108,7 +108,7 @@ How many times [`transaction()`](/transaction#transaction) runs its callback. Af
 
 - `1`, `0` or less: one attempt, no retry. With `0`, the message reads "… on attempt 1 of 0, giving up" ([#179](https://github.com/AlexandreDemartin/pgcast/issues/179)).
 - Read when `transaction()` starts, so a change affects the next transaction, not the one running.
-- How to write a callback that can run twice: [Retry a transaction](/retries).
+- How to write a callback that can run twice: [Retries](/retries).
 
 ### `transactionRetryDelay` {#Config.transactionRetryDelay}
 
@@ -294,7 +294,7 @@ A compiled query, as `pg`'s `query()` takes it: what [`compile()`](/sql-template
 
 ## Opt-ins and warnings
 
-A behaviour of Zapatos 6.6.1 that code may rely on, but that pgcast would change, stays the default until 7.0: an option turns the new one on, and the old one warns. Why this way: [Versions, opt-ins and warnings](/versions).
+A behaviour of Zapatos 6.6.1 that code may rely on, but that pgcast would change, stays the default until 7.0: an option turns the new one on, and the old one warns. Why this way: [Versions](/versions).
 
 <div class="stack">
 
@@ -330,7 +330,7 @@ process.on('warning', (warning: Error & { code?: string }) => {
 
 ## Value types
 
-`pg` and JSON give some Postgres values as strings. The generated schema types them with the template string types below, by where the value is ([How types are cast from the catalog](/catalog-types)):
+`pg` and JSON give some Postgres values as strings. The generated schema types them with the template string types below, by where the value is ([The catalog](/catalog-types)):
 
 | Postgres type | `Selectable` | `JSONSelectable` | `Insertable`, `Updatable`, `Whereable` |
 |---|---|---|---|
@@ -640,4 +640,4 @@ error TS2430: Interface 'schemaVersionCanary' incorrectly extends interface 'Sch
 ```
 
 - pgcast's version is Zapatos 6.6.1's, `104`, so the canary of a schema that Zapatos 6.6.1 generated passes.
-- Regenerating the schema clears the error ([The generator: config and CLI](/generator)).
+- Regenerating the schema clears the error ([Generator](/generator)).
