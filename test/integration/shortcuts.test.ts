@@ -828,8 +828,24 @@ describe('count, sum, avg, min, max', () => {
     expect(await run(db.max('accounts', all, { columns: ['ratio'] }))).toBe(1.25);
   });
 
+  it('with aggregatesTypedByColumn set after the shortcut is called, run() reads it: min / max give the value as pg parses it', async () => {
+    // a query built at load time, before setConfig(), as the type, declared once for the program, says
+    const earliest = db.min('events', all, { columns: ['occurred_on'] }), none = db.sum('accounts', { id: -1 }, { columns: ['balance'] });
+    db.setConfig({ aggregatesTypedByColumn: true });
+    expect(await run(earliest)).toEqual(new Date(2025, 5, 1));
+    expect(await run(none)).toBeNull();
+  });
+
+  it('with aggregatesTypedByColumn unset after the shortcut is called, run() reads it: the result goes through Number()', async () => {
+    db.setConfig({ aggregatesTypedByColumn: true });
+    const earliest = db.min('events', all, { columns: ['occurred_on'] }), none = db.sum('accounts', { id: -1 }, { columns: ['balance'] });
+    db.setConfig({ aggregatesTypedByColumn: false });
+    expect(await run(earliest)).toBe(new Date(2025, 5, 1).getTime());
+    expect(await run(none)).toBe(0);
+  });
+
   it('nested in a lateral, min / max come back as JSON, NULL as null, option or not', async () => {
-    const q = db.select('users', all, {
+    const query = () => db.select('users', all, {
       columns: ['display_name'], order: { by: 'display_name', direction: 'ASC' },
       lateral: {
         first: db.min('events', all, { columns: ['occurred_on'] }),
@@ -841,9 +857,18 @@ describe('count, sum, avg, min, max', () => {
       { display_name: 'Bob', first: '2025-06-01', top: 0 },
       { display_name: 'Cyd', first: '2025-06-01', top: null },
     ];
-    expect(await run(q)).toEqual(expected);
+    expect(await run(query())).toEqual(expected);
     db.setConfig({ aggregatesTypedByColumn: true });
-    expect(await run(q)).toEqual(expected);
+    expect(await run(query())).toEqual(expected);
+  });
+
+  it('passed through a single lateral, min / max come back as pg parses them from selectOne / selectExactlyOne, as JSON from select', async () => {
+    // select() wraps its rows in jsonb_agg(), selectOne() and selectExactlyOne() hand the passed-through column over as it is
+    db.setConfig({ aggregatesTypedByColumn: true });
+    const earliest = db.min('events', all, { columns: ['occurred_on'] });
+    expect(await run(db.selectOne('users', all, { lateral: earliest }))).toEqual(new Date(2025, 5, 1));
+    expect(await run(db.selectExactlyOne('users', { display_name: 'Ada' }, { lateral: earliest }))).toEqual(new Date(2025, 5, 1));
+    expect(await run(db.select('users', all, { lateral: earliest }))).toEqual(['2025-06-01', '2025-06-01', '2025-06-01']);
   });
 
   it('with aggregatesTypedByColumn, a query that returns no row still rejects with the TypeError of 6.6.1', async () => {
