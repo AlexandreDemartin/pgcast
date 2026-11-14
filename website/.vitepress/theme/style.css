@@ -206,8 +206,8 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 .LanguageSwitch.bar { display: none; }
 @media (min-width: 768px) { .LanguageSwitch.bar { display: flex; align-items: center; } }
 .LanguageSwitch.bar .button { padding: 0 10px; }
-.LanguageSwitch.bar .text { gap: 6px; font: 500 13px/1 var(--font-body); letter-spacing: .02em; color: var(--muted); }
-.LanguageSwitch.bar .text .option-icon { font-size: 15px; }
+.LanguageSwitch.bar .text { gap: 6px; font: 400 14px/1 var(--font-body); color: var(--muted); }  /* the nav links' */
+.LanguageSwitch.bar .text .option-icon { font-size: 16px; }  /* the theme button's icon */
 .LanguageSwitch.bar .text .text-icon { margin: 0 0 0 -2px; font-size: 12px; }
 @media (hover: hover) and (pointer: fine) { .LanguageSwitch.bar:hover .text { color: var(--fg); } }
 .LanguageSwitch .button[aria-expanded='true'] .text { color: var(--fg); }

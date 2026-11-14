@@ -2,6 +2,7 @@
 // The line under each page on its group's landing page (theme/GroupPages.vue): its lede, cut as its description
 // (`fromLede()`, meta.ts), at build, in each language. A "Coming" page, with no file of its own, has none.
 import { relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { defineLoader } from 'vitepress';
 import { readPage } from './llms.ts';
 import { fromLede } from './meta.ts';
@@ -11,7 +12,7 @@ import { langs } from './words.ts';
 declare const data: Record<string, string>;  // by the page's link: `/select`, `/fr/select`
 export { data };
 
-const root = new URL('..', import.meta.url).pathname;
+const root = fileURLToPath(new URL('..', import.meta.url));
 
 export default defineLoader({
   watch: ['../*.md', '../fr/*.md'],

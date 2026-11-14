@@ -3,8 +3,8 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { defaultHoverInfoProcessor, transformerTwoslash } from '@shikijs/vitepress-twoslash';
-import { defineConfig, type DefaultTheme, type HeadConfig, type LocaleSpecificConfig } from 'vitepress';
-import { checkLinks, keepLinkHashes } from './anchors.ts';
+import { defineConfig, type DefaultTheme, type HeadConfig, type LocaleConfig } from 'vitepress';
+import { checkLinks, keepLinkHashes, labelPermalinks } from './anchors.ts';
 import { calloutIcons } from './callouts.ts';
 import { codeGroupLogos } from './codeGroups.ts';
 import { changelogPage, dateChangelog, writeChangelogFeed } from './changelog.ts';
@@ -24,11 +24,11 @@ const
   { version } = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')),
   font = (file: string): HeadConfig =>
     ['link', { rel: 'preload', href: `/fonts/${file}.woff2`, as: 'font', type: 'font/woff2', crossorigin: '' }],
-  // the wordmark's entrance (Wordmark.vue, style.css), set before the first paint: on the home only, the first time it
-  // loads in a session, and never with reduced motion; without storage, none. A client-side navigation runs no script
+  // the wordmark's entrance (Wordmark.vue, style.css), set before the first paint: on the home only, in either language,
+  // the first time it loads in a session, and never with reduced motion; without storage, none. A client-side navigation runs no script
   // here, so arriving on the home from another page plays nothing either: the wordmark is already on screen
   wordmarkEntrance = `try {
-  if (/^\/(fr\/)?(index\.html)?$/.test(location.pathname) && !sessionStorage.getItem('pgcast-wordmark') &&
+  if (['/', '/index.html', '/fr/', '/fr/index.html'].includes(location.pathname) && !sessionStorage.getItem('pgcast-wordmark') &&
     !matchMedia('(prefers-reduced-motion: reduce)').matches) {
     sessionStorage.setItem('pgcast-wordmark', '1');
     document.documentElement.dataset.wordmark = '';
@@ -39,13 +39,14 @@ const
  * A language's part of the config (README.md § Languages): its words, and its nav and sidebar from the outline in that
  * language. VitePress's switcher, in the nav, goes to the same page in the other language, its hash kept.
  */
-function locale(lang: Lang): LocaleSpecificConfig<DefaultTheme.Config> & { label: string; link?: string } {
+function locale(lang: Lang): LocaleConfig<DefaultTheme.Config>[string] {
   const w = words[lang], prefix = prefixOf(lang), outline = outlineIn(lang);
   return {
     label: w.label,
     lang: w.lang,
     ...lang === 'en' ? {} : { link: `${prefix}/` },
     description: w.description,
+    markdown: { codeCopyButton: { tooltipText: w.copyCode, copiedText: w.copied } },  // each code block's button
     themeConfig: {
       nav: [
         // a group with a `nav` text is current on its landing page and on each of its pages; Explanation has none: a
@@ -123,6 +124,7 @@ export default defineConfig({
     ],
     config: md => {
       keepLinkHashes(md);  // `[Config.upsertRequiresSameKeys](/runtime-config#Config.upsertRequiresSameKeys)`
+      labelPermalinks(md);  // a heading's `#` named in its page's language
       changelogPage(md);  // CHANGELOG.md in changelog.md
       labelTableCells(md);  // `<td data-label="…">`, for a table that stacks on a phone
       linkCastPanels(md);  // "Open in playground" on a docs page's cast panel
@@ -170,7 +172,11 @@ export default defineConfig({
                 resetButtonTitle: 'Effacer la recherche',
                 backButtonTitle: 'Fermer la recherche',
                 noResultsText: 'Aucun résultat pour',
-                footer: { selectText: 'choisir', navigateText: 'naviguer', closeText: 'fermer' },
+                footer: {
+                  selectText: 'choisir', selectKeyAriaLabel: 'Entrée',
+                  navigateText: 'naviguer', navigateUpKeyAriaLabel: 'Flèche haut', navigateDownKeyAriaLabel: 'Flèche bas',
+                  closeText: 'fermer', closeKeyAriaLabel: 'Échap',
+                },
               },
             },
           },

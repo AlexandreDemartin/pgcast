@@ -9,34 +9,8 @@ import { useWords } from './words.ts';
 
 const
   arrows = [[200, 56, 80], [200, 136, 160], [200, 216, 240]],
-  texts = {
-    en: {
-      title: 'Types read from the catalog, once',
-      desc: "Postgres's catalog, pg_catalog and information_schema, is read by pgcast's generator, npx pgcast, which " +
-        'writes zapatos/schema.d.ts. From then on, TypeScript checks your code against that file alone, without ' +
-        'connecting again.',
-      catalog: "Postgres's catalog",
-      asks: "pgcast's generator asks it",
-      writes: 'and writes the answers down',
-      code: 'Your code',
-      checked: 'checked against that file alone, no connection',
-      caption: 'The generator reads the catalog once; from then on, TypeScript checks your code against the file it wrote.',
-    },
-    fr: {
-      title: 'Des types lus dans le catalogue, une fois',
-      desc: 'Le catalogue de Postgres, pg_catalog et information_schema, est lu par le générateur de pgcast, npx ' +
-        'pgcast, qui écrit zapatos/schema.d.ts. Dès lors, TypeScript vérifie votre code avec ce seul fichier, sans ' +
-        'se reconnecter.',
-      catalog: 'Le catalogue de Postgres',
-      asks: 'le générateur de pgcast l’interroge',
-      writes: 'et note ses réponses',
-      code: 'Votre code',
-      checked: 'vérifié avec ce seul fichier, sans connexion',
-      caption: 'Le générateur lit le catalogue une fois ; dès lors, TypeScript vérifie votre code avec le fichier qu’il a écrit.',
-    },
-  },
-  { lang } = useWords(),
-  t = computed(() => texts[lang.value]);
+  { w } = useWords(),
+  t = computed(() => w.value.diagrams.catalog);  // its texts in the page's language (words.ts)
 </script>
 
 <template>

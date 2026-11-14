@@ -53,10 +53,13 @@ export function changelogPage(md: MarkdownRenderer) {
     const env = state.env as { relativePath?: string; includes?: string[] };  // VitePress's
     if (!pages.has(env.relativePath ?? '') || !state.src.includes(marker)) return;
     const { intro, versions } = readChangelog();
-    state.src = state.src.replace(marker, () => [intro, ...versions.map(({ name, date, anchor, notes }) => [
+    const changelog = [intro, ...versions.map(({ name, date, anchor, notes }) => [
       `## ${name}${date ? ` <small class="ignore-header">${longDate(date)}</small>` : ''} {#${anchor}}`,
       notes.replace(/^### (.+)$/gm, (_, title: string) => `### ${title} {#${anchor}-${title.toLowerCase().replace(/\W+/g, '-')}}`),
-    ].join('\n\n'))].join('\n\n'));
+    ].join('\n\n'))].join('\n\n');
+    // on the French site, CHANGELOG.md is English text in a French page: read as English
+    state.src = state.src.replace(marker, () =>
+      env.relativePath === page ? changelog : `<div lang="en">\n\n${changelog}\n\n</div>`);
     env.includes?.push(file);
   });
 }

@@ -19,18 +19,23 @@ import { relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createMarkdownRenderer } from 'vitepress';
 import { earlyCloser, fenceClosed, fenceOpened } from './.vitepress/fences.ts';
+import { words } from './.vitepress/words.ts';
 
 const
   root = fileURLToPath(new URL('.', import.meta.url)),
   read = file => readFileSync(root + file, 'utf8').replace(/\r\n?/g, '\n'),
   pagesIn = dir => readdirSync(root + dir).filter(file => file.endsWith('.md') && !['README.md', '[page].md'].includes(file)),
   hashOf = file => createHash('sha256').update(read(file)).digest('hex').slice(0, 12),
+  host = 'https://pgcast.dev',  // llms.ts's, which loads the cast panels' data: VitePress's alone
   frontMatter = /^---\n([\s\S]*?)\n---\n/,
   recorded = source => /^english: ([0-9a-f]{12})\s*$/m.exec(frontMatter.exec(source)?.[1] ?? '')?.[1],
   // a regular space, or none, where French puts a non-breaking one (U+00A0, or the narrow U+202F)
   // inline code in HTML, `<code v-pre>…</code>`, and a quote in English, `<span lang="en">…</span>`: as they are
   verbatim = /<code\b[^>]*>.*?<\/code>|<(\w+)\b[^>]*\blang="en"[^>]*>.*?<\/\1>/g,
-  spaced = /(?<=[^\s\u00a0\u202f:;?!])[:;?!](?=\s|$)| [:;?!](?=\s|$)|«(?![\u00a0\u202f])|(?<![\u00a0\u202f])»/;
+  // (the punctuation ends a word: a space, the end, or a closing `*`, `_`, `)` or `"` follows it)
+  spaced = /(?<=[^\s\u00a0\u202f:;?!])[:;?!](?=[\s*_)"]|$)| [:;?!](?=[\s*_)"]|$)|«(?![\u00a0\u202f])|(?<![\u00a0\u202f])»/,
+  // a table's delimiter row, `| --- | ---: |`: no prose, and a `:` that aligns
+  delimiter = /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/;
 
 /**
  * A French page with French spacing in its prose: a non-breaking space before `:`, `;`, `?` and `!`, and inside « ».
@@ -41,17 +46,15 @@ function typeset(source) {
   const
     kept = /"[^"\n]*"(?=<!--\s*message\s*-->)|<code\b[^>]*>.*?<\/code>|<(\w+)\b[^>]*\blang="en"[^>]*>.*?<\/\1>|(`+)[\s\S]*?\2|<!--[\s\S]*?-->|<[^>]+>|\]\([^)]*\)|https?:\/\/[^\s)]+|\{[.#][^}]*\}/g,
     text = t => t
-      .replace(/(?<![:;?!])[ \u202f]([:;?!])(?=\s|$)/g, '\u00a0$1')
-      .replace(/(?<=[^\s\u00a0\u202f:;?!])([:;?!])(?=\s|$)/g, '\u00a0$1')
+      .replace(/(?<![:;?!])[ \u202f]([:;?!])(?=[\s*_)"]|$)/g, '\u00a0$1')
+      .replace(/(?<=[^\s\u00a0\u202f:;?!])([:;?!])(?=[\s*_)"]|$)/g, '\u00a0$1')
       .replace(/«[ \u202f]?(?!\u00a0)/g, '«\u00a0')
       .replace(/(?<!\u00a0)[ \u202f]?»/g, '\u00a0»'),
+    // what is kept stands in the line as a placeholder, so that a `:` right after a code span or a link is spaced too
     prose = line => {
-      let out = '', last = 0;
-      for (const match of line.matchAll(kept)) {
-        out += text(line.slice(last, match.index)) + match[0];
-        last = match.index + match[0].length;
-      }
-      return out + text(line.slice(last));
+      const held = [];
+      return text(line.replace(kept, match => `\uE000${held.push(match) - 1}\uE001`))
+        .replace(/\uE000(\d+)\uE001/g, (_, i) => held[i]);
     },
     [, front = '', body] = /^(---\n[\s\S]*?\n---\n)?([\s\S]*)$/.exec(source);
   let fence = null;
@@ -62,7 +65,7 @@ function typeset(source) {
         return line;
       }
       fence = /^<(script|style)\b/.test(line) ? '<script' : fenceOpened(line)?.marker ?? null;
-      if (fence !== null || /^<<< /.test(line)) return line;
+      if (fence !== null || /^<<< /.test(line) || delimiter.test(line)) return line;
       const [, container = ''] = /^(:::\s*[\w-]*)/.exec(line) ?? [];
       return container + prose(line.slice(container.length));
     }).join('\n');
@@ -113,7 +116,10 @@ function structureOf(file) {
       .map(token => `${token.tag}#${token.attrGet('id')}`),
     code: tokens.filter(token => token.type === 'fence').map(({ info, content, meta }) =>
       meta?.src ? `<<< ${relative(root, meta.src)}${meta.region ? `#${meta.region}` : ''} {${info}}` : `${info}\n${content}`),
-    components: [...html.replace(/<!--[\s\S]*?-->/g, '').matchAll(/<([A-Z]\w*)\b[^>]*>/g)]
+    // each note and container, by its kind: `::: tip`, `::: details`, `::: code-group`
+    containers: tokens.filter(token => /^container_.*_open$/.test(token.type)).map(token => token.type),
+    // each component's tag, a comment's aside
+    components: [...html.matchAll(/<!--[\s\S]*?-->|<([A-Z]\w*)\b[^>]*>/g)].filter(([, name]) => name)
       .map(([tag, name]) => name === 'CastPanel' ? tag : name),
     marks: [...source.matchAll(/<!--\s*(probe:[\s\S]*?|message|joined:[\s\S]*?)\s*-->/g)].map(([, mark]) => mark),
     links: [
@@ -141,12 +147,12 @@ function proseOf(source) {
         return;
       }
       fence = /^<(script|style)\b/.test(line) ? '<script' : fenceOpened(line)?.marker ?? null;
-      if (fence !== null || /^<<< /.test(line)) return;
+      if (fence !== null || /^<<< /.test(line) || delimiter.test(line)) return;
       lines.push([i + 1, line
         .replace(/^:::\s*[\w-]*/, '')  // a container's kind; its chip is prose
         .replace(/(`+)[\s\S]*?\1/g, 'x')  // a code span
         .replace(/\]\([^)]*\)/g, ']')  // a link's URL
-        .replace(/<[^>]*>/g, '')  // a tag; its text is prose
+        .split(/<[^>]*>/).join('')  // a tag; its text is prose
         .replace(/\s*\{[.#][^}]*\}\s*$/, '')  // `{#anchor}`, `{.lede}`
         .replace(/https?:\/\/\S+/g, 'x')]);
     });
@@ -156,6 +162,19 @@ function proseOf(source) {
 // A self-check: prose after a ```md block that shows a ```ts line is read.
 if (proseOf(`${earlyCloser}Voici :`).length !== 1 || !spaced.test('Voici :') || spaced.test('Voici\u00a0:'))
   throw new Error('check-translations.mjs: French prose after a ```md block went unread: check fences.ts');
+// A self-check: `docs:translated` spaces what the check asks it to, after a code span, a link or bold text too, and
+// leaves a table's delimiter row alone.
+for (const sample of ['Voici `a`: b', 'Voici [a](/fr/x): b', '**Note:** b', '« a »', '| a | b |\n| --- | ---: |'])
+  if (proseOf(typeset(sample)).some(([, text]) => spaced.test(text)))
+    throw new Error(`check-translations.mjs: typeset() leaves ${JSON.stringify(sample)} to fail the check: check them both`);
+if (typeset('| --- | ---: |') !== '| --- | ---: |') throw new Error('check-translations.mjs: typeset() changed a table row');
+
+// The theme's French words are French prose too (words.ts): each string, each function's with `…` for its arguments.
+const stringsOf = value => typeof value === 'string' ? [value] : typeof value === 'function' ? stringsOf(value('…', '…')) :
+  Array.isArray(value) ? value.flatMap(stringsOf) : typeof value === 'object' ? Object.values(value).flatMap(stringsOf) : [];
+for (const text of stringsOf(words.fr).map(text => text.replace(/`[^`]*`|\[[^\]]*\]\([^)]*\)/g, 'x')))
+  if (spaced.test(text)) problems.push(`.vitepress/words.ts: a non-breaking space goes before \`:\`, \`;\`, \`?\` and \`!\`, ` +
+    `and inside « », in French: ${JSON.stringify(text)}`);
 
 for (const page of english.filter(page => !french.includes(page)))
   problems.push(`${page}: no French page; translate it as fr/${page}, then \`npm run docs:translated -- ${page.slice(0, -3)}\``);
@@ -174,15 +193,20 @@ for (const page of french.filter(page => english.includes(page))) {
   else if (hash !== hashOf(page))
     problems.push(`${file}: ${page} changed since it was translated (git diff it); update ${file}, then ` +
       `\`npm run docs:translated -- ${name}\``);
-  for (const part of ['anchors', 'code', 'components', 'marks']) {
+  for (const part of ['anchors', 'code', 'containers', 'components', 'marks']) {
     const i = [...Array(Math.max(en[part].length, fr[part].length)).keys()].find(i => en[part][i] !== fr[part][i]);
     if (i !== undefined) problems.push(`${file}: its ${part} differ from ${page}'s, from #${i + 1}: ` +
       `${JSON.stringify(en[part][i] ?? 'none')} in English, ${JSON.stringify(fr[part][i] ?? 'none')} in French` +
       (part === 'anchors' ? '; a French heading keeps the English anchor, `## Les options {#options}`' : ''));
   }
-  // a link to a page of the English site: a root link with no file extension, outside /fr/
-  for (const href of fr.links.filter(href => /^\/(?!fr(\/|$))[^.#?]*(?:[#?].*)?$/.test(href ?? '')))
-    problems.push(`${file}: ${href} is a page of the English site: link \`/fr${href === '/' ? '/' : href}\``);
+  // a link to a page of the English site: a root link with no file extension outside /fr/, the same written with the
+  // site's host, or a relative one, which reads differently from fr/
+  for (const href of fr.links.map(href => href ?? '')) {
+    const path = href.startsWith(`${host}/`) ? href.slice(host.length) : href;
+    if (/^\.\.?\//.test(path)) problems.push(`${file}: ${href} is relative: link from the site's root, \`/fr/…\``);
+    else if (/^\/(?!fr(\/|$))[^.#?]*(?:[#?].*)?$/.test(path))
+      problems.push(`${file}: ${href} is a page of the English site: link \`/fr${path === '/' ? '/' : path}\``);
+  }
   for (const [line, text] of proseOf(source))
     if (spaced.test(text)) problems.push(`${file}:${line}: a non-breaking space (U+00A0) goes before \`:\`, \`;\`, ` +
       `\`?\` and \`!\`, and inside « », in French: ${JSON.stringify(text.trim())}`);

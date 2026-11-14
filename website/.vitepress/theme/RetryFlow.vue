@@ -9,43 +9,8 @@ import { useWords } from './words.ts';
 
 const
   branches = [156, 245, 344],  // the middle of each outcome's box, where its arrow from the spine ends
-  texts = {
-    en: {
-      title: 'A transaction retried on 40001 or 40P01',
-      desc: 'An attempt: START TRANSACTION, the whole callback on the transaction\'s client, then COMMIT. If all three ' +
-        'resolve, transaction() resolves with the callback\'s value. If one rejects with 40001 or 40P01 and an attempt ' +
-        'is left, pgcast sends ROLLBACK, waits, 25 to 250 ms by default, and runs a new attempt. On any other error, or ' +
-        'the last attempt\'s, it sends ROLLBACK and transaction() rejects with that error.',
-      attempt: 'An attempt',
-      callback: "the whole callback, on the transaction's client",
-      resolve: 'all three resolve',
-      gives: " gives the callback's value",
-      retried: '40001 or 40P01, and an attempt left',
-      wait: 'a wait, 25 to 250 ms by default, then again',
-      other: "any other error, or the last attempt's",
-      rejects: ' rejects with it',
-      caption: 'On 40001 or 40P01, pgcast rolls back, waits and runs the whole attempt again; on any other error, it rolls back and rejects.',
-    },
-    fr: {
-      title: 'Une transaction relancée sur 40001 ou 40P01',
-      desc: 'Une tentative : START TRANSACTION, tout le callback sur le client de la transaction, puis COMMIT. Si les ' +
-        'trois réussissent, transaction() se résout avec la valeur du callback. Si l’un est rejeté avec 40001 ou ' +
-        '40P01 et qu’il reste une tentative, pgcast envoie ROLLBACK, attend, de 25 à 250 ms par défaut, et lance une ' +
-        'nouvelle tentative. Sur toute autre erreur, ou celle de la dernière tentative, il envoie ROLLBACK et ' +
-        'transaction() est rejetée avec cette erreur.',
-      attempt: 'Une tentative',
-      callback: 'tout le callback, sur le client de la transaction',
-      resolve: 'les trois réussissent',
-      gives: ' rend la valeur du callback',
-      retried: '40001 ou 40P01, une tentative restante',
-      wait: 'une pause, 25 à 250 ms par défaut, puis encore',
-      other: 'une autre erreur, ou celle du dernier essai',
-      rejects: ' est rejetée avec elle',
-      caption: 'Sur 40001 ou 40P01, pgcast annule, attend et relance toute la tentative ; sur toute autre erreur, il annule et rejette.',
-    },
-  },
-  { lang } = useWords(),
-  t = computed(() => texts[lang.value]);
+  { w } = useWords(),
+  t = computed(() => w.value.diagrams.retry);  // its texts in the page's language (words.ts)
 </script>
 
 <template>

@@ -5,7 +5,7 @@
 import { join } from 'node:path';
 import type { HeadConfig, PageData, TransformContext, TransformPageContext } from 'vitepress';
 import { host, plainText, readPage } from './llms.ts';
-import { langOf, langs, prefixOf, words } from './words.ts';
+import { langOf, langs, words } from './words.ts';
 
 export const repo = 'https://github.com/AlexandreDemartin/pgcast';
 
@@ -44,7 +44,7 @@ export function pageHead({ page, pageData, siteConfig, title, description }: Tra
   const
     root = host + siteConfig.site.base,
     lang = langOf(page),
-    path = page.slice(prefixOf(lang).length).replace(/^\//, ''),  // `select.md`, in either language
+    path = page.replace(/^fr\//, ''),  // `select.md`, in either language
     urlOf = (page: string) => root + page.replace(/(^|\/)index\.md$/, '$1').replace(/\.md$/, ''),  // as sitemap.xml
     url = urlOf(page),
     alternate = (hreflang: string, page: string): HeadConfig => ['link', { rel: 'alternate', hreflang, href: urlOf(page) }],

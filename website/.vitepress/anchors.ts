@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import type { MarkdownRenderer, SiteConfig } from 'vitepress';
 import { earlyCloser, fenceClosed, fenceOpened } from './fences.ts';
 import { host } from './llms.ts';
+import { langOf, words } from './words.ts';
 
 /**
  * Keep each link's hash as written. VitePress slugifies it (`#Config.upsertRequiresSameKeys` becomes
@@ -20,6 +21,22 @@ export function keepLinkHashes(md: MarkdownRenderer) {
     if (hash) token.attrSet('href', href().replace(/#.*$|$/, () => hash));  // a function: `$&` in the hash stays
     return self.renderToken(tokens, idx, options);
   };
+}
+
+/**
+ * Name each heading's permalink, the `#` VitePress puts after it, in its page's language: VitePress writes it in English
+ * (`Permalink to “Options”`), whatever the page's.
+ */
+export function labelPermalinks(md: MarkdownRenderer) {
+  md.core.ruler.push('permalink_labels', state => {
+    const lang = langOf((state.env.relativePath ?? '') as string);
+    if (lang === 'en') return;
+    for (const token of state.tokens.flatMap(token => token.children ?? [])) {
+      const label = token.type === 'link_open' && token.attrGet('class') === 'header-anchor' ? token.attrGet('aria-label') : null;
+      const [, title] = /^Permalink to “(.*)”$/.exec(String(label ?? '')) ?? [];
+      if (title !== undefined) token.attrSet('aria-label', words[lang].permalink(title));
+    }
+  });
 }
 
 const

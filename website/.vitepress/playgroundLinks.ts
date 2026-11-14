@@ -59,9 +59,10 @@ export function playgroundLink(source: string, prefix = '') {
  */
 export function linkCastPanels(md: MarkdownRenderer) {
   md.core.ruler.push('cast_panel_links', state => {
-    if (unlinked.has(state.env.relativePath as string)) return;
+    const relativePath = (state.env.relativePath ?? '') as string;  // none when VitePress parses a title alone
+    if (unlinked.has(relativePath)) return;
     const
-      lang = langOf(state.env.relativePath ?? ''),  // none when VitePress parses a title alone
+      lang = langOf(relativePath),
       path: string[] = [],  // the text of each heading above, by level
       panels: { token: (typeof state.tokens)[number]; example: string; heading: number; path: string[] }[] = [],
       headings = new Map<number, string>();

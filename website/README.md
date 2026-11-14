@@ -198,7 +198,7 @@ A PR that changes how a page looks shows it, in light and dark, at a phone's wid
 The site is in English at the root and in French under `/fr/`, with VitePress's switcher in the nav, which goes to the same page in the other language, its `#…` kept. English is written first; **every docs change is made in both languages, in the same PR**. `docs:build` fails otherwise (`check-translations.mjs`), so the French site never lags behind.
 
 - `fr/<page>.md` translates `<page>.md`. Its front matter names the English page as it translates it, by a hash: `english: 3f2a9c1b7d4e`. Once the French page says what the English one says, and is proofread (§ French), mark it: `npm run docs:translated -- <page>`, which also sets its French spacing (below). An English page that changes fails the build until then, and `git diff` of the English page shows what to carry over.
-- The theme's words and the build's (cast panel, page actions, 404, footer, search, "Coming" pages, `llms.txt`) are in `.vitepress/words.ts`, one object per language that `Words` holds to the same keys; the outline's texts are in `outline.ts`, each `{ en, fr }`. A diagram holds its own texts per language (`theme/RetryFlow.vue`).
+- The theme's words and the build's (cast panel, page actions, 404, footer, search, "Coming" pages, `llms.txt`) are in `.vitepress/words.ts`, one object per language that `Words` holds to the same keys; the outline's texts are in `outline.ts`, each `{ en, fr }`; a diagram's are in `words.ts` too (`diagrams.retry`). `docs:build` type-checks both files (`tsc -p .vitepress`), and fails on a French word without its French spacing.
 - `/fr/llms.txt`, `/fr/llms-full.txt` and `/fr/<page>.md` are the French site's, as § For assistants. The changelog stays in English: `fr/changelog.md` says so above it.
 
 ### What the French page keeps
@@ -209,9 +209,9 @@ The build compares each French page with its English page, by VitePress's own pa
 |---|---|
 | Each heading's anchor | the English one, written after the French heading: `## Les options {#options}`. `node check-translations.mjs --anchors <page>` lists them |
 | Each code block and include | byte for byte, comments too; an include is read from `fr/`: `<<< ../examples/select.ts{ts twoslash}` |
-| Each component and cast panel | the same, in the same order; a panel's caption is translated |
+| Each note, component and cast panel | the same, in the same order: `::: tip`, `<CastPanel example="…">`; a note's chip and a panel's caption are translated |
 | Each mark | `<!-- probe: … -->`, `<!-- message -->`, `<!-- joined: … -->`, and the code span glued before it, which `check-prose.mjs` checks on both pages |
-| Each link to the site | under `/fr/`, its anchor kept: `` [`select()`](/fr/select#select) ``. A file of the site keeps its path (`/changelog.xml`) |
+| Each link to the site | from the root, under `/fr/`, its anchor kept: `` [`select()`](/fr/select#select) ``. A file of the site keeps its path (`/changelog.xml`) |
 
 ### French
 
@@ -257,6 +257,10 @@ The build compares each French page with its English page, by VitePress's own pa
   | tagged template, top-level await, built-in object | template étiqueté, `await` de premier niveau, objet natif |
   | chunk (of a batch), deadlock, a no-op fragment | paquet, interblocage, un fragment sans effet |
   | own enumerable keys, the boxes `Number`, `String`, `Boolean` | propres clés énumérables, objets enveloppes |
+  | an array-like object, a host object, to spread | un objet semblable à un tableau, un objet hôte, étaler |
+  | the arbiter (`ON CONFLICT`), nullable | l’arbitre, peut être `NULL` |
+  | a `Date`, Off / On (a table's columns), from 6.7.0, 6.6.2 is | un `Date`, Désactivé / Activé, à partir de la 6.7.0, la 6.6.2 est |
+  | a near-miss (TS2820), the `*ForTable` lookups, written inline, refuses it bare | une faute proche, les correspondances, écrit en ligne, le refuse sans parenthèses |
   | identity map, realm, runtime, namespace, worker, template literal type, peer dependencies | kept in English |
 - **Headings**: in the infinitive where the English gives an order (`## Book inside a larger transaction` → `## Réserver dans une transaction plus large`), so a reference to a heading reads as the heading.
 - **Links**: to the French site's own files where it has them (`/fr/llms.txt`, `/fr/llms-full.txt`); a fenced block, copied as it is, keeps its English URLs.

@@ -3,13 +3,19 @@
 // The cast panel of docs/design/art-direction.md: what you write (the slot, an example shown with Twoslash), what
 // Postgres runs and what TypeScript knows (both computed at build by cast.data.ts from the same example). On a docs
 // page, "Open in playground" ends the code's label: a link made at build (playgroundLinks.ts), named after its section.
+import { computed } from 'vue';
 import { data } from '../cast.data.ts';
 import { useWords } from './words.ts';
 
 const
   props = defineProps<{ example: string; playground?: string; section?: string }>(),
   cast = data[props.example],
-  { w } = useWords();
+  { w } = useWords(),
+  // its SQL and its type, rendered once for both languages: their copy buttons named in the page's
+  localized = (html: string) => html.replace('title="Copy code" data-copied="Copied"',
+    () => `title="${w.value.copyCode}" data-copied="${w.value.copied}"`),
+  sql = computed(() => localized(cast?.sql ?? '')),
+  type = computed(() => localized(cast?.type ?? ''));
 
 if (!cast) throw new Error(`<CastPanel example="${props.example}">: there is no examples/${props.example}.ts`);
 </script>
@@ -28,12 +34,12 @@ if (!cast) throw new Error(`<CastPanel example="${props.example}">: there is no 
       </div>
       <div>
         <p class="label"><em>SQL</em>{{ w.postgresRuns }}</p>
-        <div v-html="cast.sql" />
+        <div v-html="sql" />
         <p class="values">{{ w.values }} <b>{{ cast.values }}</b></p>
       </div>
       <div>
         <p class="label"><em>::</em>{{ w.typescriptKnows }}</p>
-        <div v-html="cast.type" />
+        <div v-html="type" />
       </div>
     </div>
     <p v-if="$slots.caption" class="CastPanel-caption"><slot name="caption" /></p>

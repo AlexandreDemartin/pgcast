@@ -10,39 +10,8 @@ import { useWords } from './words.ts';
 
 const
   arrows = [[200, 56, 78], [100, 134, 160], [300, 134, 160], [100, 246, 272], [300, 246, 272]],
-  texts = {
-    en: {
-      title: 'A value travels beside the SQL, never inside it',
-      desc: "The caller's title, x' OR 'a' = 'a, goes to pgcast's select('films', { title }). pgcast sends two things " +
-        'apart: the SQL text, ending WHERE ("title" = $1), and the values, ["x\' OR \'a\' = \'a"]. Postgres parses the ' +
-        'text first, then binds $1, which by then can only be data: a title no film has, so no row.',
-      title2: "The caller's title",
-      compiles: 'pgcast compiles',
-      sql: 'SQL text',
-      values: 'values, beside it',
-      parses: '1. parses the text',
-      binds: ['2. binds ', ', which by then can only be data'],
-      none: '3. finds no film with that title: no row',
-      caption: 'The SQL text and the values travel apart: Postgres parses the text before it binds a value.',
-    },
-    fr: {
-      title: 'Une valeur voyage à côté du SQL, jamais dedans',
-      desc: 'Le titre de l’appelant, x\' OR \'a\' = \'a, va au select(\'films\', { title }) de pgcast. pgcast envoie ' +
-        'deux choses séparées : le texte SQL, qui finit par WHERE ("title" = $1), et les valeurs, ["x\' OR \'a\' = ' +
-        '\'a"]. Postgres analyse d’abord le texte, puis lie $1, qui ne peut alors être qu’une donnée : un titre ' +
-        'qu’aucun film n’a, donc aucune ligne.',
-      title2: 'Le titre de l’appelant',
-      compiles: 'pgcast compile',
-      sql: 'Texte SQL',
-      values: 'valeurs, à côté',
-      parses: '1. analyse le texte',
-      binds: ['2. lie ', ', qui n’est alors qu’une donnée'],
-      none: '3. aucun film n’a ce titre : aucune ligne',
-      caption: 'Le texte SQL et les valeurs voyagent séparément : Postgres analyse le texte avant de lier une valeur.',
-    },
-  },
-  { lang } = useWords(),
-  t = computed(() => texts[lang.value]);
+  { w } = useWords(),
+  t = computed(() => w.value.diagrams.values);  // its texts in the page's language (words.ts)
 </script>
 
 <template>
