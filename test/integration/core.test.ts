@@ -337,6 +337,8 @@ describe('Whereable', () => {
       colsValue: await rejected(ids({ display_name: cols('Ada') })),
       valsValue: await rejected(ids({ id: vals(1) })),
       colsArray: await rejected(ids({ tags: cols(['admin']) })),
+      // a shape the type took as a ParentColumn until #239, as eqCols and arrayContainsVals below (test/types/core.test-d.ts)
+      valsUndefined: await rejected(ids({ display_name: vals(undefined) })),
       isInRaw: await rejected(ids({ display_name: c.isIn([raw("'Ada'")]) })),
       isNotInRaw: await rejected(ids({ display_name: c.isNotIn([raw("'Ada'")]) })),
       isInCols: await rejected(ids({ mood: c.isIn([cols('ok')]) })),
@@ -353,6 +355,8 @@ describe('Whereable', () => {
       eqRaw: await rejected(ids({ display_name: c.eq(raw("'Ada'")) })),
       neRaw: await rejected(ids({ display_name: c.ne(raw("'Ada'")) })),
       eqVals: await rejected(ids({ id: c.eq(vals(1)) })),
+      eqCols: await rejected(ids({ id: c.eq(cols('id')) })),
+      arrayContainsVals: await rejected(ids({ tags: c.arrayContains(vals(undefined) as any) })),
       deletesNe: await rejected(db.deletes('memberships', { role: c.ne(raw("'owner'")) }).run(t.client)),
       updateAdd: await rejected(db.update('accounts', { lifetime_ops: c.add(raw('1') as any) }, { id: 1 }).run(t.client)),
     };
