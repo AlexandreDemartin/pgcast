@@ -1,4 +1,4 @@
-# Retry a transaction
+# Retries
 
 Book seats at a screening under `SERIALIZABLE`, so that two requests at once can't break a rule, and let pgcast run the transaction again when Postgres refuses one. Then what goes in the callback and what stays out of it, and how to test a retry. It assumes the basics of the [tutorial](/tutorial).
 {.lede}
@@ -132,4 +132,4 @@ Here with `test` from `node:test` and `assert` from `node:assert/strict`; any te
 
 - [`transaction()`](/transaction#transaction): its isolation levels, the SQL it sends, its retries and its errors.
 - [`TxnClientForSerializable`](/transaction#TxnClientForSerializable) and [`IsolationSatisfying`](/transaction#IsolationSatisfying): which client a level accepts.
-- [Handle errors](/handle-errors): the errors of an app, from Postgres and from pgcast.
+- [Errors](/handle-errors): the errors of an app, from Postgres and from pgcast.

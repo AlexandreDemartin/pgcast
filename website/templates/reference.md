@@ -1,4 +1,4 @@
-# `select()` and the aggregates
+# Select
 
 What this page lists, in one sentence: its exports, the SQL they write, their effect on the type.
 {.lede}
@@ -26,7 +26,7 @@ What it does, in one sentence, then its parameters as a list: `table`, a table o
 | `limit: 10` | `LIMIT $2` | none |
 
 ::: tip Opt-in
-Only for a behaviour behind an opt-in: the option, what it changes, the warning code until 7.0 (`PGCAST_DEP001`), and a link to [Versions, opt-ins and warnings](/versions).
+Only for a behaviour behind an opt-in: the option, what it changes, the warning code until 7.0 (`PGCAST_DEP001`), and a link to [Versions](/versions).
 :::
 
 ## `count()` {#count}

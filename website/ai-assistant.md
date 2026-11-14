@@ -1,4 +1,4 @@
-# Use an AI assistant
+# AI assistants
 
 Give an assistant that writes your queries three things: these docs, your generated schema and a short rules file, so that it writes them the pgcast way. Then check its work with the type checker and `.compile()`. It assumes the basics of the [tutorial](/tutorial).
 {.lede}
@@ -135,7 +135,7 @@ db.select('films', { year: 1974 });
 db.sql`SELECT * FROM ${'films'} ORDER BY ${sort}`;
 ```
 
-Fix the code, not the type: with `as any`, or `as s.films.Column`, both compile, and both sort by whatever name the request sends. Map the request to names written in the code instead ([Write raw SQL safely](/raw-sql#choose-sql-at-run-time-from-your-own-constants)), and let a shortcut do the rest, here [`select()`](/select#select) with [`db.all`](/sql-template#all) and [`order`](/select#order-limit-offset-and-withties):
+Fix the code, not the type: with `as any`, or `as s.films.Column`, both compile, and both sort by whatever name the request sends. Map the request to names written in the code instead ([Raw SQL](/raw-sql#choose-sql-at-run-time-from-your-own-constants)), and let a shortcut do the rest, here [`select()`](/select#select) with [`db.all`](/sql-template#all) and [`order`](/select#order-limit-offset-and-withties):
 
 ```ts twoslash
 import * as db from 'zapatos/db';
@@ -170,6 +170,6 @@ With `.compile()` in place of `.run(pool)`, `console.log()` prints the same SQL 
 
 ## See also
 
-- [Write raw SQL safely](/raw-sql): the queries no shortcut writes, their names and their values.
-- [The `sql` template](/sql-template#sql): what each interpolation compiles to.
-- [Your first typed query](/first-query): the generator, the types it writes, and `.compile()`, step by step.
+- [Raw SQL](/raw-sql): the queries no shortcut writes, their names and their values.
+- [SQL template](/sql-template#sql): what each interpolation compiles to.
+- [First query](/first-query): the generator, the types it writes, and `.compile()`, step by step.

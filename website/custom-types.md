@@ -1,4 +1,4 @@
-# Use custom types and domains
+# Custom types
 
 A type the generator can't map to TypeScript, such as `point`, and each domain come to you as a placeholder in `zapatos/custom`, for you to fill in. Here we fill in `cinemas.location`, a `POINT`, and find the nearest cinema with it, then type the domain `seat_label`, keep both across runs, and fix a placeholder that does not compile.
 {.lede}
@@ -229,4 +229,4 @@ declare module 'zapatos/custom' {
 
 - [The files it writes](/generator#the-files-it-writes): each file the generator writes, and when.
 - [`customTypesTransform`](/generator#generate.customTypesTransform): the names of the placeholders.
-- [How types are cast from the catalog](/catalog-types): why a type differs between `Selectable` and `JSONSelectable`.
+- [The catalog](/catalog-types): why a type differs between `Selectable` and `JSONSelectable`.

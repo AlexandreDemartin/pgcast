@@ -1,4 +1,4 @@
-# Paginate a list
+# Pagination
 
 Show a long list a page at a time: here the films, newest first, two to a page. The last section puts the steps together in a request handler. It assumes the basics of the [tutorial](/tutorial).
 {.lede}
@@ -233,5 +233,5 @@ On the docs schema, `GET /films` replies:
 ## See also
 
 - [`select()`](/select#select): every option and the SQL it writes; [`count()`](/select#count) and its options.
-- [The `sql` template](/sql-template#sql), [`self`](/sql-template#self) and [`param()`](/sql-template#param), for the comparison.
+- [SQL template](/sql-template#sql), [`self`](/sql-template#self) and [`param()`](/sql-template#param), for the comparison.
 - [Why pgcast](/why): why a query stays the SQL you see.
