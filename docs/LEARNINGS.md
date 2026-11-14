@@ -177,6 +177,15 @@ Candidates for a check, a rule or a skill line.
 - #419 — Headless `Page.captureScreenshot` misses compositor (transform) animations; `Page.startScreencast` frames show them — `builder`
 - #419 — A placeholder that must not shift the page is measured across widths: Monaco wraps a long line into one, two or three lines, so the editor's height depends on the width — `builder`
 - #419 — Measure the mounted playground on `docs:preview`, not `docs:dev`, where its first run sends no query — `builder`
+- #250 — The list of refused built-ins is hand-written and missed a native `Error` subtype twice (`AggregateError`, `SuppressedError`): a unit test listing every global constructor whose `prototype` inherits from `Error.prototype` and asserting each is in `builtinObjects()` would catch the next one, on each Node of the CI matrix — `branch-reviewer`
+- #250 — `class X extends (globalThis as any).Y {}` gets a 0-argument constructor under `tsc -p test`, which Vitest (esbuild) does not check: cast the base to a constructor type — `builder`
+- #163 — A fix that turns a rejection into a value carries a `Changed:` sub-bullet naming the silent result a caller now gets in place of the error (a count given a page's `offset` gives `0`, not the total) — `branch-reviewer`
+- #163 — When a deprecation warning starts firing in more cases, reread its message against each new case, and test the message, not only its `code` — `branch-reviewer`
+- #163 — `website/schema.sql` seeds few rows: a claim about data runs on the fixture or on probe rows of its own — `builder`
+- #235 — A refusal survives `copy()` only inside another fragment's expressions: return ``sql`${refused(…)}` ``, never the bare `refused()`; an injection matrix adds a `.copy()` entry point for each — `branch-reviewer`
+- #235 — A 6.6.1 replay of an « is it a list » check includes a typed array, a one-character string and an array-like: they have a `length`, so 6.6.1 sometimes got them right by accident, and refusing them must be named — `branch-reviewer`
+- #235 — An error's advice is replayed on each kind it can receive: « spread it » turns a string back into its characters, the very defect fixed — `branch-reviewer`
+- #235 — Check « must not change » files with three dots (`git diff origin/master...HEAD`): a fetch elsewhere moves `origin/master` mid-round — `builder`
 
 ## Minors kept
 
@@ -216,3 +225,8 @@ Minor review defects, taken up by the end-of-chapter review.
 - #48 — `src/generate/quote.ts:36`: Node's `\p{ID_Start}` follows Unicode 17, newer than TypeScript's tables: a Unicode 16 letter is kept and still fails (TS1127), no regression; a JSDoc line — `branch-reviewer`
 - #168 — `website/insert.md:307`, `CHANGELOG.md:19`: « `DO NOTHING` » without what it does to the result (one row: `undefined` on conflict; an array leaves that row out) — `branch-reviewer`
 - #168 — `src/db/shortcuts.ts:369`, `:376`: `specifiedUpdateColumns as string[] ?? colNames` written twice — `branch-reviewer`
+- #250 — `website/sql-template.md:294`: « `SuppressedError` from Node 24 » where the rule is whether the runtime has it, as `CHANGELOG.md:130` says — `branch-reviewer`
+- #163 — `website/runtime-config.md:226`: the no-row sentence sits in the « Read at `.run()` » bullet and names only `groupBy` — `branch-reviewer`
+- #163 — `test/integration/shortcuts.test.ts:1029`: `.catch(() => { })` swallows a rejection; assert `.toBe(0)` as `:1037` does — `branch-reviewer`
+- #163 — `website/select.md:248`, `:251`: « what no row gives (below) »: state it in place — `branch-reviewer`
+- #235 — `src/db/conditions.ts:78`: `Object.prototype.toString` follows `Symbol.toStringTag`, so a faked tag reads « takes an array, not `Array` »; error text only — `branch-reviewer`

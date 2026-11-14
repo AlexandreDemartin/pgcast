@@ -21,6 +21,10 @@ describe('with aggregatesTypedByColumn declared', () => {
     expectTypeOf(db.avg('accounts', db.all, { columns: ['ratio'] }).run(pool)).resolves.toEqualTypeOf<number | null>();
     expectTypeOf(db.count('accounts', db.all).run(pool)).resolves.toEqualTypeOf<number>();
     expectTypeOf(total.run(pool)).resolves.not.toBeAny();
+    // options that can leave no row (#163) give null then, 0 for count(), which the types already hold
+    expectTypeOf(db.sum('accounts', db.all, { columns: ['balance'], limit: 0 }).run(pool)).resolves.toEqualTypeOf<number | null>();
+    expectTypeOf(db.min('events', db.all, { columns: ['occurred_on'], having: db.sql`false` }).run(pool)).resolves.toEqualTypeOf<Date | null>();
+    expectTypeOf(db.count('accounts', db.all, { offset: 1 }).run(pool)).resolves.toEqualTypeOf<number>();
     // @ts-expect-error the sum of no row is null, not a number
     total.run(pool).then((n): number => n);
   });

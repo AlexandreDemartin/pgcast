@@ -17,6 +17,7 @@ import { sql, param, vals, all } from '../../src/db';
 import { resetConfig } from '../helpers/config';
 import { useTestDatabase } from '../helpers/db';
 import { builtinObjects } from '../helpers/builtinObjects';
+import { nonArrayLists } from '../helpers/nonArrayLists';
 import { hostileArrayCasts, hostileCasts } from '../helpers/hostileCasts';
 import { pgError } from '../helpers/pgError';
 
@@ -1006,5 +1007,71 @@ describe('a built-in object as a filter', () => {
     // no cast: the weak-type check takes an Error where a column shares one of its members (test/types/shortcuts.test-d.ts)
     await expect(db.deletes('orgs', new Error('x')).run(t.client))
       .rejects.toThrow('A built-in `Error` has no meaning as a Whereable (a filter)');
+  });
+});
+
+describe('a list that is not an array in isIn() and isNotIn()', () => {
+  it('rejects run() before any query, through deletes, select and update, nested in and(), or() and not(), and copied', async () => {
+    // 6.6.1 ran DELETE … WHERE ((true)) for isNotIn(new Set([1, 2])), every row (#235)
+    const
+      outcomes: Record<string, string> = {},
+      query = vi.spyOn(t.client, 'query');
+    try {
+      for (const [fn, list] of Object.entries({ isIn: db.conditions.isIn, isNotIn: db.conditions.isNotIn }))
+        for (const [kind, x] of Object.entries(nonArrayLists())) {
+          let c: db.SQL;
+          // 6.6.1 read null.length at the call
+          try { c = list(x as any); } catch (err) { outcomes[`${fn} ${kind}`] = `thrown at the call: ${(err as Error).message}`; continue; }
+          const
+            queries = {
+              deletes: db.deletes('users', { id: c }),
+              select: db.select('users', { id: c }),
+              update: db.update('users', { display_name: 'injected' }, { id: c }),
+              and: db.deletes('users', db.conditions.and({ display_name: 'Ada' }, { id: c })),
+              or: db.deletes('users', db.conditions.or({ display_name: 'Ada' }, { id: c })),
+              not: db.deletes('users', db.conditions.not({ id: c })),
+              copy: db.deletes('users', { id: (c as db.SQLFragment<any, any>).copy() }),
+            };
+          for (const [where, q] of Object.entries(queries))
+            outcomes[`${fn} ${kind} ${where}`] = await q.run(t.client).then(
+              () => 'ran',
+              (err: { code?: string, message: string }) =>
+                err.message.startsWith(`\`${fn}()\` takes an array, not \`${kind}\``) && err.code === undefined ? 'rejects' : err.code ?? err.message);
+        }
+      expect(query).not.toHaveBeenCalled();
+    } finally {
+      query.mockRestore();
+    }
+    expect(Object.entries(outcomes).filter(([, outcome]) => outcome !== 'rejects')).toEqual([]);
+    expect(await adaName()).toBe('Ada');
+    expect(Number((await t.client.query('SELECT count(*) FROM users')).rows[0].count)).toBe(3);
+  });
+
+  it('reaches a .catch() chained on run(), outside any async function, null and undefined too', async () => {
+    const caught = (x: unknown) => new Promise<string>(resolve => {
+      try {
+        db.deletes('users', { id: db.conditions.isNotIn(x as any) }).run(t.client)
+          .then(() => resolve('ran'), (err: Error) => resolve(err.message));
+      } catch (err) {
+        resolve(`thrown at the call: ${(err as Error).message}`);
+      }
+    });
+    expect([await caught(new Set([1, 2])), await caught(null), await caught(undefined)]).toEqual([
+      '`isNotIn()` takes an array, not `Set`: make one with `isNotIn([...values])`, or `Array.from(values)` for an array-like object.',
+      '`isNotIn()` takes an array, not `null`: for one value, write `isNotIn([value])`.',
+      '`isNotIn()` takes an array, not `undefined`: for one value, write `isNotIn([value])`.',
+    ]);
+    expect(await adaName()).toBe('Ada');
+  });
+
+  it('an array, empty or frozen, runs as before', async () => {
+    const ids = async (c: db.SQL) => (await db.select('users', { id: c }, { columns: ['id'], order: { by: 'id', direction: 'ASC' } }).run(t.client)).map(r => r.id);
+    expect({
+      isIn: await ids(db.conditions.isIn([1, 3])),
+      isInEmpty: await ids(db.conditions.isIn([])),
+      isInFrozen: await ids(db.conditions.isIn(Object.freeze([2]))),
+      isNotIn: await ids(db.conditions.isNotIn([1])),
+      isNotInEmpty: await ids(db.conditions.isNotIn([])),
+    }).toEqual({ isIn: [1, 3], isInEmpty: [], isInFrozen: [2], isNotIn: [2, 3], isNotInEmpty: [1, 2, 3] });
   });
 });
