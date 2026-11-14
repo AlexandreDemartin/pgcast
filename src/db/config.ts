@@ -22,6 +22,7 @@ export interface Config {
   upsertRequiresSameKeys?: boolean;  // multi-row upsert, no updateColumns: a key missing from a row, still set from EXCLUDED, throws
   undefinedMeansMissing?: boolean;  // an undefined value is a missing key: DEFAULT in insert, left out of update and upsert
   transactionRequiresCommit?: boolean;  // transaction() rejects when Postgres answers its COMMIT with ROLLBACK
+  transactionRequiresIdleClient?: boolean;  // transaction() rejects a client already inside a transaction block, before its START TRANSACTION
   selectExactlyOneChecksForSecondRow?: boolean;  // selectExactlyOne() run on its own asks for LIMIT 2, and throws on a second row
   aggregatesTypedByColumn?: boolean;  // sum/avg/min/max give null on an empty set, min/max the column's value: declare it in ConfigTypes too
   queryListener?(query: SQLQuery, txnId?: number): void;
@@ -46,6 +47,7 @@ const defaults: Config = {
   upsertRequiresSameKeys: false,  // the default in 7.0
   undefinedMeansMissing: false,  // the default in 7.0
   transactionRequiresCommit: false,  // the default in 7.0
+  transactionRequiresIdleClient: false,  // the default in 7.0
   selectExactlyOneChecksForSecondRow: false,  // stays the default in 7.0
   aggregatesTypedByColumn: false,  // the default in 7.0
 };

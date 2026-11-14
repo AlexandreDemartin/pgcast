@@ -50,6 +50,7 @@ describe('setConfig()', () => {
     upsertRequiresSameKeys: false,
     undefinedMeansMissing: false,
     transactionRequiresCommit: false,
+    transactionRequiresIdleClient: false,
     selectExactlyOneChecksForSecondRow: false,
   };
   const changed = {
@@ -60,6 +61,7 @@ describe('setConfig()', () => {
     upsertRequiresSameKeys: true,
     undefinedMeansMissing: true,
     transactionRequiresCommit: true,
+    transactionRequiresIdleClient: true,
     selectExactlyOneChecksForSecondRow: true,
   };
 

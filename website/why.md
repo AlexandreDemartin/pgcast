@@ -88,7 +88,7 @@ The security fixes came first, all of them in 6.6.2 ([Security](/security)):
 - a plain value in [`upsert()`](/insert#upsert)'s `updateValues` is a parameter;
 - the keywords of a lock, `truncate()` or an isolation level, and the name of an aggregate, are checked before any query.
 
-The opt-ins that warn, [`undefinedMeansMissing`](/runtime-config#Config.undefinedMeansMissing), [`upsertRequiresSameKeys`](/runtime-config#Config.upsertRequiresSameKeys), [`transactionRequiresCommit`](/runtime-config#Config.transactionRequiresCommit) and [`aggregatesTypedByColumn`](/runtime-config#Config.aggregatesTypedByColumn), and the generator's [`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas) and [`enumOrder`](/generator#generate.enumOrder), become the defaults in 7.0, and their old paths go in 8.0.
+The opt-ins that warn, [`undefinedMeansMissing`](/runtime-config#Config.undefinedMeansMissing), [`upsertRequiresSameKeys`](/runtime-config#Config.upsertRequiresSameKeys), [`transactionRequiresCommit`](/runtime-config#Config.transactionRequiresCommit), [`aggregatesTypedByColumn`](/runtime-config#Config.aggregatesTypedByColumn) and [`transactionRequiresIdleClient`](/runtime-config#Config.transactionRequiresIdleClient), and the generator's [`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas) and [`enumOrder`](/generator#generate.enumOrder), become the defaults in 7.0, and their old paths go in 8.0.
 
 [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow), which never warns, stays off. Until 7.0, 6.x is a drop-in for Zapatos 6.6.1 ([Versions](/versions)).
 
@@ -123,6 +123,6 @@ Some changes are refused whatever they'd gain, because each would take away some
 
 ## Further reading
 
-- The entries this page talks about: [`select()`](/select#select), [`selectOne()`](/select#selectOne), the [`sql`](/sql-template#sql) template and [`.compile()`](/sql-template#compile), [`transaction()`](/transaction#transaction), [`Config.undefinedMeansMissing`](/runtime-config#Config.undefinedMeansMissing), [`Config.upsertRequiresSameKeys`](/runtime-config#Config.upsertRequiresSameKeys), [`Config.transactionRequiresCommit`](/runtime-config#Config.transactionRequiresCommit) and [`Config.selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow).
+- The entries this page talks about: [`select()`](/select#select), [`selectOne()`](/select#selectOne), the [`sql`](/sql-template#sql) template and [`.compile()`](/sql-template#compile), [`transaction()`](/transaction#transaction), [`Config.undefinedMeansMissing`](/runtime-config#Config.undefinedMeansMissing), [`Config.upsertRequiresSameKeys`](/runtime-config#Config.upsertRequiresSameKeys), [`Config.transactionRequiresCommit`](/runtime-config#Config.transactionRequiresCommit), [`Config.transactionRequiresIdleClient`](/runtime-config#Config.transactionRequiresIdleClient) and [`Config.selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow).
 - The guides: [Joins](/lateral), [Retries](/retries), [Switch from Zapatos](/switching).
 - Zapatos's own [docs](https://jawj.github.io/zapatos/), for 6.6.1; what pgcast changes, in the [changelog](/changelog).

@@ -347,7 +347,12 @@ const
 // `Uint8Array.prototype`, `Float64Array.prototype`…, and not a subclass's (`Buffer` is listed for this reason).
 // `AggregateError`, `WeakRef`, `FinalizationRegistry` (ES2021, past the lib's ES2019 types), `SuppressedError`,
 // `DisposableStack`, `AsyncDisposableStack` (Node 24) and `SharedArrayBuffer` (which a runtime may leave out) are
-// read from `globalThis`, where the runtime has them. ECMAScript built-ins only, no host object (`URL`, `Blob`)
+// read from `globalThis`, where the runtime has them, as are the boxes `BigInt` (ES2020) and `Symbol`. ECMAScript
+// built-ins only, no host object (`URL`, `Blob`).
+// An iterator or a generator, sync or async, is matched by %IteratorPrototype% or %AsyncIteratorPrototype% on its
+// chain, as each generator function has its own prototype, and only with no own enumerable key, so that a class
+// that extends `Iterator` with fields stays a filter, and one without is refused. So is a host iterator
+// (`URLSearchParams`'s), which inherits them too
 const
   builtinPrototypes = new Set<unknown>([
     Date, Map, Set, WeakMap, WeakSet, RegExp, Promise, ArrayBuffer, DataView, Buffer, Number, String, Boolean,
@@ -355,13 +360,30 @@ const
     (globalThis as any).AggregateError, (globalThis as any).SuppressedError,
     (globalThis as any).WeakRef, (globalThis as any).FinalizationRegistry, (globalThis as any).SharedArrayBuffer,
     (globalThis as any).DisposableStack, (globalThis as any).AsyncDisposableStack,
+    (globalThis as any).BigInt, (globalThis as any).Symbol,
   ].filter(Boolean).map(builtin => builtin.prototype)),
-  typedArrayPrototype = Object.getPrototypeOf(Uint8Array.prototype);
+  typedArrayPrototype = Object.getPrototypeOf(Uint8Array.prototype),
+  // transpiled below ES2018, `async function* () {}` is a plain function, with no `.prototype` to read: then
+  // %AsyncIteratorPrototype% is left out, rather than `zapatos/db` throwing as it loads
+  asyncGeneratorPrototype = Object.getPrototypeOf(async function* () {}).prototype,
+  iteratorPrototypes = [
+    Object.getPrototypeOf(Object.getPrototypeOf([][Symbol.iterator]())),
+    asyncGeneratorPrototype && Object.getPrototypeOf(asyncGeneratorPrototype),
+  ].filter(Boolean);
+
+const isIterator = (x: object) =>
+  iteratorPrototypes.some(prototype => Object.prototype.isPrototypeOf.call(prototype, x)) && Object.keys(x).length === 0;
 
 const isBuiltin = (x: object) => {
   const prototype = Object.getPrototypeOf(x);
-  return builtinPrototypes.has(prototype) || (prototype !== null && Object.getPrototypeOf(prototype) === typedArrayPrototype);
+  return builtinPrototypes.has(prototype) || (prototype !== null && Object.getPrototypeOf(prototype) === typedArrayPrototype) ||
+    isIterator(x);
 };
+
+// an iterator's constructor gives no name (`''` for a generator's, `Object` before Node 22, which has no `Iterator`):
+// its tag does, `Array Iterator`, `Generator`
+const builtinName = (x: object): string => isIterator(x) ? Object.prototype.toString.call(x).slice(8, -1) :
+  Object.getPrototypeOf(x).constructor.name;
 
 // raw(), cols() and vals() as a filter value, or in vals({…}) (so as a write value): Zapatos 6.6.1 sent them as JSON;
 // compiling raw() there as SQL would turn a caller's raw(input), a parameter until now, into an injection, so they throw
@@ -628,7 +650,7 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
       // typeof null is 'object': Zapatos 6.6.1 threw a TypeError from Object.keys(null) below
       if (expression === null) throw new Error(nullInterpolated);
       if (expression === globalThis) throw new Error('Did you use `self` (the global object) where you meant `db.self` (the Zapatos value)? The global object cannot be embedded in a query.');
-      if (isBuiltin(expression)) throw new Error(builtinWhereable(Object.getPrototypeOf(expression).constructor.name));
+      if (isBuiltin(expression)) throw new Error(builtinWhereable(builtinName(expression)));
 
       // must be a Whereable object, so put together a WHERE clause
       const columnNames = <Column[]>Object.keys(expression).sort();

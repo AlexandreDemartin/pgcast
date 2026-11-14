@@ -3,7 +3,8 @@
 // One value of each built-in object that compileExpression refuses as a Whereable (#170),
 // keyed by the name its error gives. Each has no own enumerable key, or only index keys,
 // so Zapatos 6.6.1 compiled it to TRUE (every row) or to ("0" = $1 …); one with own keys
-// added throws too. A subclass instance is not one of them, and compiles as in 6.6.1.
+// added throws too, except an iterator. A subclass instance is not one of them, and
+// compiles as in 6.6.1, except a subclass of Iterator with no own key (#426).
 // test/unit/injection.test.ts compiles them, test/integration/injection.test.ts runs them.
 
 /** A fresh value of each refused built-in object, keyed by the name its error gives. */
@@ -15,7 +16,8 @@ export const builtinObjects = (): Record<string, object> => {
     WeakRef = (globalThis as any).WeakRef,  // ES2021: not in the lib's ES2019 types
     FinalizationRegistry = (globalThis as any).FinalizationRegistry,  // ES2021: not in the lib's ES2019 types
     DisposableStack = (globalThis as any).DisposableStack,  // Node 24 and later
-    AsyncDisposableStack = (globalThis as any).AsyncDisposableStack;  // Node 24 and later
+    AsyncDisposableStack = (globalThis as any).AsyncDisposableStack,  // Node 24 and later
+    Iterator = (globalThis as any).Iterator;  // Node 22 and later
   return {
     Date: new Date(0),
     Map: new Map([['id', 1]]),
@@ -46,6 +48,20 @@ export const builtinObjects = (): Record<string, object> => {
     Number: new Number(1),
     String: new String('id'),
     Boolean: new Boolean(true),
+    BigInt: Object(BigInt(1)),  // a literal (1n) needs an ES2020 target
+    Symbol: Object(Symbol('id')),
+    // iterators and generators: named by their tag, %IteratorPrototype% or %AsyncIteratorPrototype% on their chain
+    'Array Iterator': [1, 2].values(),
+    'Set Iterator': new Set([1, 2]).values(),
+    'Map Iterator': new Map([[1, 'a']]).entries(),
+    'String Iterator': 'id'[Symbol.iterator](),
+    'RegExp String Iterator': 'id'.matchAll(/i/g),
+    Generator: (function* () { yield 1; })(),
+    AsyncGenerator: (async function* () { yield 1; })(),
+    ...Iterator && {
+      Iterator: Iterator.from({ next: () => ({ done: true, value: undefined }) }),
+      'Iterator Helper': ([1].values() as any).map((x: number) => x),
+    },
     ...DisposableStack && { DisposableStack: new DisposableStack() },
     ...AsyncDisposableStack && { AsyncDisposableStack: new AsyncDisposableStack() },
   };

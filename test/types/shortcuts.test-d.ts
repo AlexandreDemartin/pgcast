@@ -303,6 +303,26 @@ describe('transactionRequiresCommit', () => {
   });
 });
 
+describe('transactionRequiresIdleClient', () => {
+  test('an optional boolean of Config and setConfig', () => {
+    db.setConfig({ transactionRequiresIdleClient: true });
+    expectTypeOf(db.getConfig().transactionRequiresIdleClient).toEqualTypeOf<boolean | undefined>();
+    expectTypeOf<db.NewConfig['transactionRequiresIdleClient']>().toEqualTypeOf<boolean | undefined>();
+    // a Config written for 6.6.1, without the key, still compiles
+    const c: db.Config = {
+      transactionAttemptsMax: 5,
+      transactionRetryDelay: { minMs: 25, maxMs: 250 },
+      castArrayParamsToJson: false,
+      castObjectParamsToJson: false,
+    };
+    // @ts-expect-error a boolean, not a string
+    const d: db.Config = { ...c, transactionRequiresIdleClient: 'yes' };
+    void d;
+    // @ts-expect-error a boolean, not a string
+    db.setConfig({ transactionRequiresIdleClient: 'yes' });
+  });
+});
+
 describe('selectExactlyOneChecksForSecondRow', () => {
   test('an optional boolean of Config and setConfig, which changes no type', () => {
     db.setConfig({ selectExactlyOneChecksForSecondRow: true });

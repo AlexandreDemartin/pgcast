@@ -67,7 +67,15 @@ Code that opens its own [`transaction()`](/transaction#transaction) can't join t
 - If the test has run no query yet, or at the session's own level (`readCommitted()`, on a default server), its `COMMIT`<!-- probe: db.serializable(pool, async () => {}) --> commits the test's transaction, rows and all.
 - At another level, after any query, the test's seeds included, Postgres refuses with 25001 ("SET TRANSACTION ISOLATION LEVEL must be called before any query"): its `ROLLBACK`<!-- probe: db.serializable(pool, async () => { throw 0; }) --> undoes the seeds, and the call rejects.
 
-Either way, the test's `ROLLBACK` has nothing left to undo (25P01). So give such code the pool, and delete what it commits:
+Either way, the test's `ROLLBACK` has nothing left to undo (25P01), and pgcast warns once, `PGCAST_DEP005`. Turn on [`transactionRequiresIdleClient`](/runtime-config#Config.transactionRequiresIdleClient) where your tests set up, and such a call rejects instead, before its `START TRANSACTION`: the test fails, and its `ROLLBACK` still undoes its seeds.
+
+```ts twoslash
+import * as db from 'zapatos/db';
+// ---cut---
+db.setConfig({ transactionRequiresIdleClient: true });
+```
+
+It needs pg 8.21 or later, which reports the test's `BEGIN` ([Your own `BEGIN`](/transaction#your-own-begin)). Then give such code the pool, and delete what it commits:
 
 <<< ./examples/plain/testing_commits.ts{ts twoslash}
 
