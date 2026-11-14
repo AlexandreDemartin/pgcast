@@ -23,12 +23,9 @@ const recursivelyInterpolateEnvVars = (obj: any): any =>
     // array? => recurse over its items
     Array.isArray(obj) ?
       obj.map(item => recursivelyInterpolateEnvVars(item)) :
-      // object? => recurse over its values (but don't touch the keys, not even a schema named __proto__)
+      // object? => recurse over its values (but don't touch the keys: fromEntries keeps a schema named __proto__ as one)
       obj !== null && typeof obj === 'object' ?
-        Object.keys(obj).reduce<any>((memo, key) => {
-          memo[key] = recursivelyInterpolateEnvVars(obj[key]);
-          return memo;
-        }, Object.create(null)) :
+        Object.fromEntries(Object.keys(obj).map(key => [key, recursivelyInterpolateEnvVars(obj[key])])) :
         // anything else (e.g. number)? => pass right through
         obj;
 
