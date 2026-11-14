@@ -57,7 +57,7 @@ export interface SQLFragmentMap { [k: string]: SQLFragment<any> }
 export interface SQLFragmentOrColumnMap<T extends Table> { [k: string]: SQLFragment<any> | ColumnForTable<T> }
 // the type a typed min() or max() has nested in a query, as JSON, where it differs from what run() gives;
 // read after `undefined extends RunResult`, so that `any` still gives `{} | null`, and only once declared
-// (TypedByColumn, resolved as the library loads), so that every other program checks 6.6.1's type
+// (TypedByColumn, which the compiler resolves once per program), so that every other program checks 6.6.1's type
 declare const nestedResult: unique symbol;
 
 /**
