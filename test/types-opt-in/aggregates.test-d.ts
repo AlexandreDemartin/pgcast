@@ -106,6 +106,10 @@ describe('with aggregatesTypedByColumn declared', () => {
     expectTypeOf<Row['first']>().toEqualTypeOf<Date | null>();
     // @ts-expect-error nested in turn, a numeric comes back as a number, not a string
     expectTypeOf<Row['topAsExtra']>().toEqualTypeOf<db.NumericString | null>();
+    // passed through again: as it is by selectOne(), as JSON by select()
+    const one = db.selectOne('users', db.all, { lateral: earliest });
+    expectTypeOf(db.selectOne('users', db.all, { lateral: one }).run(pool)).resolves.toEqualTypeOf<Date | null | undefined>();
+    expectTypeOf(db.select('users', db.all, { lateral: one }).run(pool)).resolves.toEqualTypeOf<(db.DateString | null)[]>();
   });
 
   test('calls that compile under 6.6.1 still compile, and throw at run time', () => {

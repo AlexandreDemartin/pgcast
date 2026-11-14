@@ -24,4 +24,4 @@ export const userWithAggregates = (id: number) => db.selectOne('users', { id }, 
 
 export const firstEventOfUser = (id: number) => db.selectOne('users', { id }, { lateral: db.min('events', db.all, { columns: ['occurred_on'] }) });
 
-export const { count, sum, avg, min, max } = db;
+export const { count, sum, avg, min, max, selectOne, selectExactlyOne } = db;

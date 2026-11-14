@@ -882,6 +882,10 @@ describe('count, sum, avg, min, max', () => {
         top: db.selectExactlyOne('users', all, { lateral: top }),
       },
     }))).toEqual([{ display_name: 'Ada', first: '2025-06-01', top: 1500.5 }]);
+    // passed through again: as it is by selectOne(), as JSON by select()
+    const one = db.selectOne('users', all, { lateral: earliest });
+    expect(await run(db.selectOne('users', all, { lateral: one }))).toEqual(new Date(2025, 5, 1));
+    expect(await run(db.select('users', all, { lateral: one }))).toEqual(['2025-06-01', '2025-06-01', '2025-06-01']);
   });
 
   it('with aggregatesTypedByColumn, a query that returns no row still rejects with the TypeError of 6.6.1', async () => {

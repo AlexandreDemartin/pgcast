@@ -56,8 +56,8 @@ export type JSONOnlyColsForTable<T extends Table, C extends readonly any[] /* `C
 export interface SQLFragmentMap { [k: string]: SQLFragment<any> }
 export interface SQLFragmentOrColumnMap<T extends Table> { [k: string]: SQLFragment<any> | ColumnForTable<T> }
 // the type a typed min() or max() has nested in a query, as JSON, where it differs from what run() gives;
-// read after `undefined extends RunResult`, so that `any` still gives `{} | null`, and only once declared
-// (TypedByColumn, which the compiler resolves once per program), so that every other program checks 6.6.1's type
+// read only once declared (TypedByColumn, which the compiler resolves once per program), so that every other
+// program checks 6.6.1's type, and behind `unknown extends RunResult`, so that `any` still gives `{} | null`
 declare const nestedResult: unique symbol;
 
 /**
@@ -68,8 +68,11 @@ declare const nestedResult: unique symbol;
 export interface ColumnAggregateFragment<RunResult, NestedResult> extends SQLFragment<RunResult> { [nestedResult]: NestedResult }
 
 export type RunResultForSQLFragment<T extends SQLFragment<any, any>> = T extends SQLFragment<infer RunResult, any> ?
-  (undefined extends RunResult ? NonNullable<RunResult> | null : TypedByColumn extends true ? (T extends { [nestedResult]: infer N } ? N : RunResult) : RunResult) :
+  (TypedByColumn extends true ? NestedResultOf<T, RunResult> : undefined extends RunResult ? NonNullable<RunResult> | null : RunResult) :
   never;
+
+type NestedResultOf<T, RunResult> = unknown extends RunResult ? NonNullable<RunResult> | null :
+  T extends { [nestedResult]: infer N } ? N : undefined extends RunResult ? NonNullable<RunResult> | null : RunResult;
 
 export type LateralResult<L extends SQLFragmentMap> = { [K in keyof L]: RunResultForSQLFragment<L[K]> };
 export type ExtrasResult<T extends Table, E extends SQLFragmentOrColumnMap<T>> = { [K in keyof E]:
@@ -553,9 +556,27 @@ export interface SelectOptionsForTable<
 };
 
 // a single lateral query is passed through as it is by selectOne() and selectExactlyOne(), as JSON by select(),
-// which wraps the rows in jsonb_agg(): the two types differ only for a typed min() or max()
-type PassedThroughResult<L extends SQLFragment<any>, M extends SelectResultMode> = M extends SelectResultMode.Many ? RunResultForSQLFragment<L> :
-  L extends SQLFragment<infer RunResult, any> ? (undefined extends RunResult ? NonNullable<RunResult> | null : RunResult) : never;
+// which wraps the rows in jsonb_agg(): the two types differ only for a typed min() or max(), so only once declared
+type PassedThroughResult<L extends SQLFragment<any>, M extends SelectResultMode> = TypedByColumn extends true ?
+  (M extends SelectResultMode.Many ? RunResultForSQLFragment<L> :
+    L extends SQLFragment<infer RunResult, any> ? (undefined extends RunResult ? NonNullable<RunResult> | null : RunResult) : never) :
+  RunResultForSQLFragment<L>;
+
+// once declared, selectOne() and selectExactlyOne() keep the brand of the min() or max() they pass through, which
+// comes back as JSON when nested in turn; not for `any` or `never`, nor for a lateral map, whose results are JSON already.
+// The signatures are chosen once per program, so that every other program checks (and shows) 6.6.1's
+type PassingThroughFragment<RunResult, L> = 0 extends 1 & L ? SQLFragment<RunResult> : [L] extends [never] ? SQLFragment<RunResult> :
+  [L] extends [ColumnAggregateFragment<any, infer N>] ? ColumnAggregateFragment<RunResult, N> : SQLFragment<RunResult>;
+
+interface PassingThroughSignatures<M extends SelectResultMode> {
+  <T extends Table, C extends ColumnsOption<T>, L extends LateralOption<C, E>, E extends ExtrasOption<T>, A extends string>(
+    table: T,
+    where: WhereableForTable<T> | SQLFragment<any> | AllType,
+    options?: SelectOptionsForTable<T, C, L, E, A>,
+  ): PassingThroughFragment<FullSelectReturnTypeForTable<T, C, L, E, M>, L>;
+}
+
+type ByColumn<Typed, Plain> = TypedByColumn extends true ? Typed : Plain;
 
 type SelectReturnTypeForTable<
   T extends Table,
@@ -753,7 +774,7 @@ export const select: SelectSignatures = function (
 
 /* === selectOne === */
 
-export interface SelectOneSignatures {
+export interface SelectOneSignatures extends ByColumn<PassingThroughSignatures<SelectResultMode.One>, {
   <
     T extends Table,
     C extends ColumnsOption<T>,
@@ -765,7 +786,7 @@ export interface SelectOneSignatures {
     where: WhereableForTable<T> | SQLFragment<any> | AllType,
     options?: SelectOptionsForTable<T, C, L, E, A>,
   ): SQLFragment<FullSelectReturnTypeForTable<T, C, L, E, SelectResultMode.One>>;
-}
+}> { }
 
 /**
  * Generate a `SELECT` query `SQLFragment` that returns only a single result (or 
@@ -790,7 +811,7 @@ export const selectOne: SelectOneSignatures = function (table, where, options = 
 
 /* === selectExactlyOne === */
 
-export interface SelectExactlyOneSignatures {
+export interface SelectExactlyOneSignatures extends ByColumn<PassingThroughSignatures<SelectResultMode.ExactlyOne>, {
   <
     T extends Table,
     C extends ColumnsOption<T>,
@@ -802,7 +823,7 @@ export interface SelectExactlyOneSignatures {
     where: WhereableForTable<T> | SQLFragment<any> | AllType,
     options?: SelectOptionsForTable<T, C, L, E, A>,
   ): SQLFragment<FullSelectReturnTypeForTable<T, C, L, E, SelectResultMode.ExactlyOne>>;
-}
+}> { }
 
 /**
  * Generate a `SELECT` query `SQLFragment` that returns a single result or 
