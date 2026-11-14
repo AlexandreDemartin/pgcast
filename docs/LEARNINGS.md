@@ -145,6 +145,8 @@ Candidates for a check, a rule or a skill line.
 - #167 — A sentence saying when an error happens matches how its test asserts: « the call throws » for `expect(() => fn(…))`, « throws while compiling, so `.run()` rejects » for `.compile()` or `.run()` — `branch-reviewer`
 - #167 — When a row of a docs table moves to another group, reread the paragraph above it: `transaction.md` still said every shortcut throws from the call — `branch-reviewer`
 - #167 — A red commit typechecks too: Vitest runs a call past an overload's arity; write it `(fn as any)(…)` — `builder`
+- #252 — A list of the routes that compile a Whereable is checked against every interpolation of a filter in `shortcuts.ts`, not only `where`: `having` was missing — `builder`
+- #252 — A « 6.6.1 typed X » claim is checked by `tsc` against the `zapatos@6.6.1` tarball's `dist/db/*.d.ts` through `paths`, with `NODE_PATH` on the root `node_modules` — `builder`
 
 ## Minors kept
 

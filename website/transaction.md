@@ -382,6 +382,7 @@ The others are thrown as `.compile()` compiles the query, so `.run()` rejects wi
 | `truncate()` with another option | the call throws | [`truncate()`](/insert#truncate) |
 | an interpolation that has no meaning in SQL: a number, `null`, `db.all`, the global object | `.run()` rejects | [Interpolations](/sql-template#interpolations) |
 | `db.self` with no column; `db.parent()` with no parent table, so as an `insert()`, `upsert()` or `update()` value | `.run()` rejects | [`self`](/sql-template#self), [`parent()`](/sql-template#parent) |
+| `count()` and the other aggregates given a `columns` of no column or several, or none at all for `sum()`, `avg()`, `min()` and `max()`; or a single subquery as `lateral`; so a query that nests one | `.run()` rejects | [`count()`](/select#count) |
 | `db.Default`, `db.self`, `db.raw()`, `db.cols()` or `db.vals()` as a filter value; `db.raw()`, `db.cols()` or `db.vals()` as an `insert()`, `upsert()` or `update()` value, or in any `vals({…})` | `.run()` rejects | [Whereable objects](/sql-template#whereable), [Conditions](/conditions), [`insert()`](/insert#insert), [`vals()`](/sql-template#vals) |
 | `truncate()` with its options in another order | `.run()` rejects | [`truncate()`](/insert#truncate) |
 | `transaction()` with another isolation level | its promise rejects | [`transaction()`, Errors](#errors) |
