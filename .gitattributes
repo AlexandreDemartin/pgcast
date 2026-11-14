@@ -1,0 +1,2 @@
+# Check every text file out with LF, whatever core.autocrlf says: the docs checks match pages on \n, and fail a CRLF page (#115).
+* text=auto eol=lf
