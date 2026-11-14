@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { defaultHoverInfoProcessor, transformerTwoslash } from '@shikijs/vitepress-twoslash';
 import { defineConfig, type HeadConfig } from 'vitepress';
 import { checkLinks, keepLinkHashes } from './anchors.ts';
+import { calloutIcons } from './callouts.ts';
 import { changelogPage, dateChangelog, writeChangelogFeed } from './changelog.ts';
 import { host, writeLlmsFiles } from './llms.ts';
 import { describePage, pageHead, repo } from './meta.ts';
@@ -67,6 +68,7 @@ export default defineConfig({
       changelogPage(md);  // CHANGELOG.md in changelog.md
       labelTableCells(md);  // `<td data-label="…">`, for a table that stacks on a phone
       linkCastPanels(md);  // "Open in playground" on a docs page's cast panel
+      calloutIcons(md);  // a note's chip opens on its kind's icon
     },
   },
   vite: {

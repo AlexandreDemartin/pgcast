@@ -219,7 +219,10 @@ svg.icon { width: 16px; height: 16px; flex: none; }
 /* the site's icons (icons.ts): 16px unless a component sets them smaller, beside its own text */
 svg.icon { width: 16px; height: 16px; flex: none; }
 
-/* notes: a chip, then the text, with no side rail */
+/* the site's icons (icons.ts): 16px unless a component sets them smaller, beside its own text */
+svg.icon { width: 16px; height: 16px; flex: none; }
+
+/* notes: a chip, then the text, with no side rail; the chip opens on its kind's icon (callouts.ts) */
 .vp-doc .custom-block {
   display: grid; grid-template-columns: auto 1fr; gap: 0 12px; align-items: start;
   border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); color: var(--fg);
@@ -228,10 +231,11 @@ svg.icon { width: 16px; height: 16px; flex: none; }
 .vp-doc .custom-block > * { grid-column: 2; margin: 0; }
 .vp-doc .custom-block > * + * + * { margin-top: 8px; }
 .vp-doc .custom-block .custom-block-title {
-  grid-column: 1; grid-row: 1 / span 9; margin: 2px 0 0;
+  grid-column: 1; grid-row: 1 / span 9; margin: 1px 0 0; display: flex; align-items: center; gap: 5px;
   font: 600 11px/1 var(--font-body); letter-spacing: .04em; text-transform: uppercase; white-space: nowrap;
-  border-radius: 999px; padding: 5px 8px; background: var(--accent-soft); color: var(--accent);
+  border-radius: 999px; padding: 4px 9px 4px 7px; background: var(--accent-soft); color: var(--accent);
 }
+.vp-doc .custom-block .custom-block-title .icon { width: 14px; height: 14px; }
 @media (max-width: 560px) {
   .vp-doc .custom-block { grid-template-columns: minmax(0, 1fr); }
   .vp-doc .custom-block > * { grid-column: 1; }
