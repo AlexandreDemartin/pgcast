@@ -1,11 +1,14 @@
 <script setup lang="ts">
 // Copyright (C) 2026 Alexandre Demartin
-// The home's install command, under the hero's buttons: a tab per package manager, then the command in its own panel
-// with a copy button, which copies the command shown: a tick and "Copied" for 1.4 s, or the command selected when the
-// clipboard is refused (docs/design/art-direction.md § Layout, Home). The tabs are WAI-ARIA's, picked as they get
+// The home's install command, beside the hero's buttons: one field as tall as they are, a tab per package manager (its
+// mark, its name for assistive technology), then the command and a copy button, which copies the command shown: a tick
+// and "Copied" for 1.4 s, or the command selected when the clipboard is refused (docs/design/art-direction.md § Layout,
+// Home). On a phone, a card: the tabs, named, over the command. The tabs are WAI-ARIA's, picked as they get
 // the focus (https://www.w3.org/WAI/ARIA/apg/patterns/tabs/); the pick is remembered with the code groups'
 // (packageManager.ts).
 import { computed, onMounted, ref, useId } from 'vue';
+import Icon from './Icon.vue';
+import type { IconName } from './icons.ts';
 import { remember, remembered } from './packageManager.ts';
 
 const
@@ -60,30 +63,25 @@ async function copy() {
 
 <template>
   <div class="InstallLine">
-    <div class="bar">
-      <div class="tabs" role="tablist" aria-label="Package manager" @keydown="onKey">
-        <button
-          v-for="(tab, i) in names"
-          :id="`${id}-${tab}`"
-          :key="tab"
-          type="button"
-          role="tab"
-          :aria-selected="String(i === selected)"
-          :aria-controls="`${id}-panel`"
-          :tabindex="i === selected ? 0 : -1"
-          @click="pick(i)"
-        >{{ tab }}</button>
-      </div>
-      <span class="copied" aria-live="polite">{{ copied ? 'Copied' : '' }}</span>
+    <div class="tabs" role="tablist" aria-label="Package manager" @keydown="onKey">
+      <button
+        v-for="(tab, i) in names"
+        :id="`${id}-${tab}`"
+        :key="tab"
+        type="button"
+        role="tab"
+        :aria-selected="String(i === selected)"
+        :aria-controls="`${id}-panel`"
+        :tabindex="i === selected ? 0 : -1"
+        @click="pick(i)"
+      ><Icon :name="tab as IconName" /><span class="name">{{ tab }}</span></button>
     </div>
     <div :id="`${id}-panel`" class="panel" role="tabpanel" :aria-labelledby="`${id}-${name}`">
       <code ref="code"><span class="manager">{{ name }}</span>{{ command.slice(name.length) }}</code>
       <button type="button" class="copy" :aria-label="`Copy the ${name} command`" @click="copy">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path v-if="copied" d="M20 6 9 17l-5-5" />
-          <template v-else><rect x="8" y="8" width="14" height="14" rx="2" /><path d="M4 16a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2" /></template>
-        </svg>
+        <Icon :name="copied ? 'check' : 'copy'" />
       </button>
     </div>
+    <span class="copied" aria-live="polite">{{ copied ? 'Copied' : '' }}</span>
   </div>
 </template>

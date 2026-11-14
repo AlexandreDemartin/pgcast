@@ -5,17 +5,18 @@
 
 :root {
   --bg: #f6f8f9; --surface: #ffffff; --sunken: #eef2f4; --fg: #12202b; --muted: #566673; --line: #d9e0e5;
-  --accent: #0a6b63; --accent-fg: #ffffff; --accent-soft: #dcefec; --warn: #8a5a00; --warn-soft: #fbf0d9;
+  --accent: #0a6b63; --accent-fg: #ffffff; --accent-soft: #dcefec; --accent-hover: #075750; --warn: #8a5a00; --warn-soft: #fbf0d9;
   --error: #b22e2e; --raised: #e4e7e9;
   --code-bg: #f1f4f6; --k: #1458a8; --s: #8f5600; --t: #0a6b63; --n: #b0245a; --c: #626e79; --qi: #12202b; --p: #b0245a;
   --font-display: "Schibsted Grotesk", "Helvetica Neue", Arial, sans-serif;
   --font-body: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --radius: 10px;
+  --ease-out: cubic-bezier(.23, 1, .32, 1);  /* the site's one curve for what moves: fast, then settling */
 }
 .dark {
   --bg: #0d1318; --surface: #121a21; --sunken: #0a0f13; --fg: #e2e9ee; --muted: #8d9eab; --line: #23303a;
-  --accent: #4fcfbf; --accent-fg: #06201d; --accent-soft: #11302c; --warn: #e8b65a; --warn-soft: #2c2412;
+  --accent: #4fcfbf; --accent-fg: #06201d; --accent-soft: #11302c; --accent-hover: #74ddd0; --warn: #e8b65a; --warn-soft: #2c2412;
   --error: #d96d6d; --raised: #1e2429;
   --code-bg: #0f171d; --k: #7fb6ff; --s: #e3b462; --t: #4fcfbf; --n: #f08ab3; --c: #768794; --qi: #e2e9ee; --p: #f08ab3;
   color-scheme: dark;
@@ -75,6 +76,23 @@
 body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; scroll-behavior: auto !important; } }
+/* hover and press, for every control of the chrome: on hover a colour step (a bordered control's border turns
+   --accent, a quiet one takes a --sunken fill); a button gives a little when pressed, scale .97 in 160ms on --ease-out.
+   Colours in 150ms `ease`. Reduced motion: the colour steps alone, at once */
+:is(.VPNavBarSearchButton, .AppearanceSwitch, .PageActions .split button, .NotFound .search, .Playground-run,
+  .Playground-share, .vp-doc div[class*='language-'] > button.copy, .VPDocFooter .pager-link, .landing .readnext a) {
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, opacity 250ms ease,
+    transform 160ms var(--ease-out);
+}
+:is(.VPNavBarSearchButton, .AppearanceSwitch, .PageActions .split button, .NotFound .search, .Playground-run,
+  .Playground-share, .vp-doc div[class*='language-'] > button.copy):active { transform: scale(.97); }
+@media (prefers-reduced-motion: reduce) { :is(.VPNavBarSearchButton, .AppearanceSwitch, .PageActions .split button,
+  .NotFound .search, .Playground-run, .Playground-share, .vp-doc div[class*='language-'] > button.copy):active { transform: none; } }
+.VPNavBarSearchButton:hover { border-color: var(--accent) !important; color: var(--fg); }
+.AppearanceSwitch:hover { border-color: var(--accent); }
+.VPNavBarTitle .title .version { transition: border-color 150ms ease, color 150ms ease; }
+.VPNavBarTitle .title:hover .version { border-color: var(--accent); color: var(--fg); }
+.SiteFooter a:hover, .VPDocFooter .edit-link-button:hover { text-decoration: underline 2px; text-underline-offset: 3px; }
 
 /* top bar: wordmark, version pill, search, links, theme button */
 /* one surface and one rule across the whole width, so the bar reads as one piece: VitePress starts them after the
@@ -345,55 +363,103 @@ svg.icon { width: 16px; height: 16px; flex: none; }
 
 /* home */
 .landing { max-width: 1180px; margin: 0 auto; padding: 0 max(16px, env(safe-area-inset-right, 0px)) 80px max(16px, env(safe-area-inset-left, 0px)); }
-/* the home's rhythm: 48px from the hero to the cast panel, 56px between the sections under it */
-.landing .hero { padding-block: 72px 48px; }
+/* the home's first screen, from 1024px: the line and the lede side by side, then one row 40px tall, the two buttons
+   under the line and the install field under the lede, on the same two columns; the cast panel rises under it, its top
+   in the first screen. Under 1024px, all in one column, the install field under the buttons; a card on a phone */
+.landing .hero { padding-block: 72px 56px; }
 .landing .hero h1 { font-size: clamp(2.5rem, 6vw, 4.5rem); margin: 0 0 20px; max-width: 16ch; letter-spacing: -.025em; }
 .landing .hero h1 .op { font-family: var(--font-mono); color: var(--accent); font-weight: 700; letter-spacing: -.06em; }
 .landing .lede { font-size: 1.18rem; color: var(--muted); max-width: 58ch; margin: 0 0 28px; }
 .landing .ctas { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 0; }
 .landing .ctas p { display: contents; }
+.landing .InstallLine { margin: 16px 0 0; max-width: 512px; }
+@media (min-width: 1024px) {
+  .landing .hero {
+    display: grid; grid-template-columns: minmax(0, 1fr) 512px; column-gap: 48px; row-gap: 40px; align-items: end;
+    padding-block: 80px 64px;
+  }
+  .landing .hero h1 { font-size: clamp(2.5rem, 4.2vw, 3.5rem); max-width: none; margin: 0; }
+  .landing .lede { font-size: 1.0625rem; max-width: none; margin: 0; }
+  .landing .hero .InstallLine { margin: 0; }
+}
+
+/* the buttons: a colour step on hover and a press that gives a little (scale .97). The home's two carry the brand's
+   gesture: on hover, the cast's `::` slides out after the label, which makes room for it, as the wordmark's words
+   slide out of the mould; in the button's own colour on the primary, in the accent on the secondary. No meaning rides
+   on it, so reduced motion keeps the colour step alone */
 .landing .btn {
-  display: inline-flex; align-items: center; height: 40px; padding: 0 20px; border-radius: 9px; font-weight: 600;
-  text-decoration: none; border: 1px solid var(--line); color: var(--fg); background: var(--surface);
+  position: relative; display: inline-flex; align-items: center; height: 40px; padding: 0 20px; border-radius: 9px;
+  font-weight: 600; text-decoration: none; border: 1px solid var(--line); color: var(--fg); background: var(--surface);
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, transform 160ms var(--ease-out);
 }
 .landing .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
-/* the install command, under the two buttons: a tab per package manager, the picked one a filled pill, then the command
-   in its own panel. Where it does not fit, under 414px, it wraps at a space rather than being cut, and the copy button
-   stays on its first line */
-.InstallLine { margin: 16px 0 0; max-width: 480px; min-width: 0; }
-.InstallLine .bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 8px; }
-.InstallLine .tabs { display: flex; gap: 4px; }
+.landing .btn:hover { border-color: var(--accent); }
+.landing .btn.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.landing .btn:active { transform: scale(.97); }
+.landing .btn > span { display: inline-block; transition: transform 160ms var(--ease-out); }
+.landing .btn::after {
+  content: "::" / ""; position: absolute; right: 11px; top: 50%;
+  font: 700 15px/1 var(--font-mono); letter-spacing: -.18em; color: var(--accent);
+  opacity: 0; transform: translate(-6px, -50%); transition: opacity 120ms ease, transform 160ms var(--ease-out);
+  pointer-events: none;
+}
+.landing .btn.primary::after { color: inherit; }
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .landing .btn:hover > span { transform: translateX(-10px); transition-duration: 200ms; }
+  .landing .btn:hover::after { opacity: 1; transform: translate(0, -50%); transition-duration: 180ms, 200ms; }
+}
+@media (prefers-reduced-motion: reduce) { .landing .btn:active { transform: none; } }
+
+/* the install field: as tall as the buttons, on --sunken, their radius. Inside it, 4px in, a segment of tabs, one per
+   package manager, its mark alone (its name for assistive technology), the picked one raised on --surface; then the
+   command, mono 13px, and the copy button. "Copied" shows above its end for 1.4s. On a phone, a card: the tabs,
+   named, in a header row, the command under them, wrapping at a space */
+.InstallLine {
+  position: relative; display: flex; align-items: center; height: 40px; min-width: 0; padding: 0 4px;
+  border: 1px solid var(--line); border-radius: 9px; background: var(--sunken);
+}
+.InstallLine .tabs {
+  display: flex; gap: 2px; flex: none; padding-right: 4px; margin-right: 12px; border-right: 1px solid var(--line);
+}
 .InstallLine .tabs button {
-  height: 28px; padding: 0 10px; border: 0; border-radius: 8px; background: none;
-  font: 500 13px/28px var(--font-mono); color: var(--muted); cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 8px; border: 1px solid transparent;
+  border-radius: 6px; background: none; font: 500 13px/1 var(--font-mono); color: var(--muted); cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease, transform 160ms var(--ease-out);
 }
-.InstallLine .tabs button:hover { color: var(--fg); }
-.InstallLine .tabs button[aria-selected='true'] { background: var(--line); color: var(--fg); }
-.InstallLine .copied { font: 12px/20px var(--font-body); color: var(--muted); }
-.InstallLine .panel {
-  display: flex; align-items: flex-start; gap: 12px; padding: 20px 24px;
-  border: 1px solid var(--line); border-radius: var(--radius); background: var(--sunken);
+.InstallLine .tabs .icon { width: 14px; height: 14px; flex: none; }
+.InstallLine .tabs .name {
+  position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
 }
+.InstallLine .tabs button:hover { color: var(--fg); background: var(--line); }
+.InstallLine .tabs button[aria-selected='true'] { background: var(--surface); border-color: var(--line); color: var(--fg); }
+.InstallLine .panel { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
 .landing .InstallLine code {
-  flex: 1; min-width: 0; padding: 0; background: none; font: 14px/22px var(--font-mono); color: var(--fg);
-  overflow-wrap: anywhere;
+  flex: 1; min-width: 0; padding: 0; background: none; font: 13px/20px var(--font-mono); color: var(--fg);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .InstallLine .manager { color: var(--t); }
 .InstallLine .copy {
-  display: grid; place-items: center; flex-shrink: 0; width: 28px; height: 28px; margin-block: -3px; padding: 0;
-  border: 0; border-radius: 8px; background: none; color: var(--muted); cursor: pointer;
+  display: grid; place-items: center; flex: none; width: 30px; height: 30px; padding: 0;
+  border: 0; border-radius: 6px; background: none; color: var(--muted); cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease, transform 160ms var(--ease-out);
 }
 .InstallLine .copy:hover { background: var(--line); color: var(--fg); }
-.InstallLine .copy svg { width: 16px; height: 16px; }
-@media (max-width: 560px) { .InstallLine .panel { padding: 16px; } }
-/* from 1024px, the buttons and the install block share one row across the hero, the buttons on the left, the block on
-   the right, centred on each other; the block a fixed 480px, so that picking a tab does not move it. Under that, the
-   block under the buttons */
-@media (min-width: 1024px) {
-  .landing .hero { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 48px; align-items: center; }
-  .landing .hero > :not(.ctas, .InstallLine) { grid-column: 1 / -1; }
-  .landing .hero .InstallLine { width: 480px; margin: 0; }
+.InstallLine :is(.tabs button, .copy):active { transform: scale(.94); }
+.InstallLine .copy .icon { width: 16px; height: 16px; }
+.InstallLine .copied { position: absolute; right: 0; bottom: calc(100% + 6px); font: 12px/16px var(--font-body); color: var(--muted); }
+@media (max-width: 559px) {
+  .InstallLine { flex-direction: column; align-items: stretch; height: auto; padding: 0; border-radius: var(--radius); }
+  .InstallLine .tabs { padding: 4px; margin: 0; border-right: 0; border-bottom: 1px solid var(--line); }
+  .InstallLine .tabs .name { position: static; width: auto; height: auto; overflow: visible; clip-path: none; }
+  .InstallLine .panel { align-items: flex-start; padding: 12px 8px 12px 16px; }
+  .landing .InstallLine code { white-space: normal; overflow-wrap: anywhere; line-height: 22px; }
+  .InstallLine .copy { margin-block: -4px; }
 }
+@media (prefers-reduced-motion: reduce) { .InstallLine :is(.tabs button, .copy):active { transform: none; } }
+/* the cast panel, the home's product view: its caption above it, what the panel shows on the left, how to explore it
+   on the right */
+.landing .CastPanel-frame { display: flex; flex-direction: column; }
+.landing .CastPanel-caption { order: -1; justify-content: space-between; row-gap: 4px; margin: 0 0 12px; }
 .landing .CastPanel-frame { margin: 0; }
 .landing .pillars {
   display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 32px;
@@ -401,6 +467,10 @@ svg.icon { width: 16px; height: 16px; flex: none; }
 }
 .landing .pillars h2 { font-size: 1rem; margin: 0 0 8px; }
 .landing .pillars p { margin: 0; color: var(--muted); font-size: 14px; }
+/* each pillar ends on where to go next, the links on one line across the row */
+.landing .pillars > div { display: flex; flex-direction: column; }
+.landing .pillars p:has(> .next) { margin-top: auto; padding-top: 12px; }
+.landing .pillars .next { font-weight: 500; color: var(--accent); }
 .landing .readnext p { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 0; }
 .landing .readnext strong { font-weight: 600; }
 .landing .readnext a {

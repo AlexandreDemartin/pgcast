@@ -16,7 +16,7 @@ pgcast reads your Postgres schema and writes the TypeScript types. Its shortcuts
 
 <div class="ctas">
 
-[Get started](/install){.btn .primary} [Playground](/playground){.btn}
+[<span>Get started</span>](/install){.btn .primary} [<span>Playground</span>](/playground){.btn}
 
 </div>
 
@@ -27,7 +27,7 @@ pgcast reads your Postgres schema and writes the TypeScript types. Its shortcuts
 
 <<< ./examples/home.ts{ts twoslash}
 
-<template #caption><span>Hover a dashed name to see its type.</span><span>Films with their cast, in one query and one round trip.</span></template>
+<template #caption><span>Films with their cast, in one query and one round trip.</span><span>Hover a dashed name to see its type.</span></template>
 </CastPanel>
 
 <div class="pillars">
@@ -37,12 +37,16 @@ pgcast reads your Postgres schema and writes the TypeScript types. Its shortcuts
 
 Types come from `pg_catalog`, never written by hand. Change a column, regenerate, and the compiler finds every query that broke.
 
+[How the catalog becomes types](/catalog-types){.next}
+
 </div>
 <div>
 
 ## SQL you can read
 
 Each shortcut writes one documented query. Log it, test it, or write it yourself in a `sql` template.
+
+[The SQL of each shortcut](/reference){.next}
 
 </div>
 <div>
@@ -51,12 +55,16 @@ Each shortcut writes one documented query. Log it, test it, or write it yourself
 
 Values travel as `$1`, `$2`. Names are quoted as Postgres quotes them, so a stray `"` cannot change your query.
 
+[What pgcast guards against](/security){.next}
+
 </div>
 <div>
 
 ## Live playground
 
-Write a query in [the playground](/playground) and see its SQL and its type as you type. Press Run, and a real Postgres answers, in your browser.
+Write a query and see its SQL and its type as you type. Press Run, and a real Postgres answers, in your browser.
+
+[Open the playground](/playground){.next}
 
 </div>
 </div>
