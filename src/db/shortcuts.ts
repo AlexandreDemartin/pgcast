@@ -849,8 +849,9 @@ export interface SelectOneSignatures extends ByColumn<PassingThroughSignatures<S
  * other `select`/`selectOne`/`count` queries using the `lateral` option.
  *
  * With `withTies` and `order`, it is `FETCH FIRST $n ROWS WITH TIES`, `$n` being `1`:
- * `run()` gives one of the tied rows, and in a `lateral` the parent row comes
- * back once per tie (a nested `select()` keeps the ties in its array).
+ * `run()` gives one of the tied rows, and in a `lateral` under an outer
+ * `select()` the parent row comes back once per tie (a nested `select()` keeps
+ * the ties in its array).
  * @param table The table to select from
  * @param where A `Whereable` or `SQLFragment` defining the rows to be selected,
  * or `all`
@@ -897,8 +898,8 @@ export interface SelectExactlyOneSignatures extends ByColumn<PassingThroughSigna
  * compiled into a `result` of its own, it keeps `LIMIT 1`.
  *
  * With `withTies` and `order`, each `LIMIT` is `FETCH FIRST … ROWS WITH TIES`,
- * as in `selectOne()`: nested in a `lateral`, the parent row comes back once
- * per tie, option or not.
+ * as in `selectOne()`: nested in a `lateral` under an outer `select()`, the
+ * parent row comes back once per tie, option or not.
  * @param table The table to select from
  * @param where A `Whereable` or `SQLFragment` defining the rows to be selected,
  * or `all`
