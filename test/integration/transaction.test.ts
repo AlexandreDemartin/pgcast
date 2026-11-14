@@ -682,6 +682,27 @@ describe('a client already inside a transaction block', () => {
     expect(await notes()).toEqual(['inner', 'leaked']);
   });
 
+  // pg reads the status at ReadyForQuery, after the query's rejection: a BEGIN sent in one query string with a
+  // statement that fails can leave it at the I read before that string (the empty query only reads again a T or E)
+  it('limitation: a BEGIN sent in one query string with a statement that fails can be read as outside a block', async () => {
+    const { fdb } = await fresh();
+    fdb.setConfig({ transactionRequiresIdleClient: true });
+    const client = await t.pool.connect();
+    try {
+      await client.query("BEGIN; INSERT INTO txn_probe VALUES ('outer'); SELECT 1/0").catch(() => { });
+      vi.spyOn(client, 'getTransactionStatus').mockReturnValueOnce('I');  // as pg reads it in some runs (#233)
+      const sent = spyQueries(client), notices = noticesOf(client);
+      await expect(fdb.serializable(client, c => write(c, 'inner'))).rejects.toMatchObject({ code: '25P02' });
+      expect(sent).toEqual([start.serializable, 'ROLLBACK']);  // no empty query, no refusal
+      expect(client.getTransactionStatus()).toBe('I');  // its ROLLBACK ended the caller's block
+      await client.query('ROLLBACK');
+      expect(notices).toEqual(['25P01']);  // the caller's ROLLBACK found no transaction
+    } finally {
+      client.release();
+    }
+    expect(await notes()).toEqual([]);
+  });
+
   // serializable too: the caller's block has run no query yet, so a query of the second call sent before the
   // first's START TRANSACTION would make Postgres refuse that START (25001)
   it.each(['readCommitted', 'serializable'] as const)('two %s() at the same moment on one client in a block: the second is passed through, as in 6.6.1', async level => {
@@ -701,6 +722,7 @@ describe('a client already inside a transaction block', () => {
       client.release();
     }
     for (const sent of [queries, results]) {
+      expect(sent[0]).toEqual(['', 0]);  // the empty query that reads the status again, under the first call's txnId
       expect(sent.filter(([text]) => text === start[level])).toHaveLength(1);
       expect(sent.filter(([text]) => text === 'COMMIT')).toHaveLength(1);
       expect(new Set(sent.map(([, txnId]) => txnId))).toEqual(new Set([0]));  // one transaction, the first call's
