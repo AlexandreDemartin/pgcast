@@ -1028,9 +1028,10 @@ describe('truncate', () => {
   });
 
   it('an order Postgres takes compiles as in 6.6.1: an undefined or null option counts for nothing', () => {
-    expect(db.truncate('users', 'RESTART IDENTITY', null as any, 'CASCADE' as any).compile().text).toBe('TRUNCATE "users" RESTART IDENTITY  CASCADE');
-    expect(db.truncate('users', 'CASCADE', null as any, undefined as any).compile().text).toBe('TRUNCATE "users" CASCADE  ');
-    expect(db.truncate('users', null as any, null as any, 'CASCADE' as any).compile().text).toBe('TRUNCATE "users"   CASCADE');
+    const truncate = db.truncate as any;
+    expect(truncate('users', 'RESTART IDENTITY', null, 'CASCADE').compile().text).toBe('TRUNCATE "users" RESTART IDENTITY  CASCADE');
+    expect(truncate('users', 'CASCADE', null, undefined).compile().text).toBe('TRUNCATE "users" CASCADE  ');
+    expect(truncate('users', null, null, 'CASCADE').compile().text).toBe('TRUNCATE "users"   CASCADE');
   });
 
   // Postgres takes `[ RESTART IDENTITY | CONTINUE IDENTITY ] [ CASCADE | RESTRICT ]`; 6.6.1 sent these, and got 42601
