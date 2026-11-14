@@ -436,6 +436,45 @@ describe('the config transaction() reads', () => {
       `Transaction rollback (code 40001) on attempt ${attempts} of ${attempts}, giving up`,
     ]);
   });
+
+  // #179: Zapatos 6.6.1 converted transactionAttemptsMax only to compare it after a 40001 / 40P01, so a value
+  // whose conversion throws let a callback that succeeds resolve; after a 40001, the comparison threw (replayed)
+  describe.each([
+    { name: 'a Symbol', max: Symbol('attempts'), message: 'Cannot convert a Symbol value to a number' },
+    { name: 'an object with no prototype', max: Object.create(null) as object, message: 'Cannot convert object to primitive value' },
+    { name: 'an object whose valueOf throws', max: { valueOf() { throw new Error('no number here'); } }, message: 'no number here' },
+  ])('with a transactionAttemptsMax of $name, from JavaScript', ({ max, message }) => {
+    it('commits a callback that succeeds, after one attempt, as Zapatos 6.6.1 does', async () => {
+      const { messages } = listen();
+      db.setConfig({ transactionAttemptsMax: max as number });
+      let made = 0;
+      const { value, error, leaked } = await leakCheck(() => db.serializable(t.pool, async c => {
+        made++;
+        await write(c, 'committed');
+        return 'done';
+      }));
+      expect(error).toBeUndefined();
+      expect(value).toBe('done');
+      expect(made).toBe(1);
+      expect(leaked).toBe(0);
+      expect(messages).toEqual([]);
+      expect(await notes()).toEqual(['committed']);
+    });
+
+    it('rejects with the conversion\'s error after a 40001, as Zapatos 6.6.1 does, and releases its client', async () => {
+      const { messages } = listen();
+      db.setConfig({ transactionAttemptsMax: max as number });
+      let made = 0;
+      const { error, leaked } = await leakCheck(() => db.serializable(t.pool, async c => {
+        made++;
+        await raise(c, '40001');
+      }));
+      expect((error as Error).message).toBe(message);
+      expect(made).toBe(1);
+      expect(leaked).toBe(0);
+      expect(messages).toEqual([]);
+    });
+  });
 });
 
 // #190: after a database error the callback catches, Postgres has aborted the transaction,
