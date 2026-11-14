@@ -141,6 +141,8 @@ Candidates for a check, a rule or a skill line.
 - #368 — The « runs as on Zapatos 6.6.1 » CLI replay (exit code, stdout, `Error:` line, file hashes) is redone by hand on each CLI PR: a script with fixed scenarios would make it checkable — `branch-reviewer`
 - #51 — Before documenting a report finding, search what the docs site already says: 10 of the 16 were covered by the docs chapter — `builder`
 - #51 — R36 depends on the schema: an inline fragment fails only when another relation has the same column name with another type, or a nullable copy of a `NOT NULL` column in `update()`; the docs schema has neither, so the page states it in prose — `builder`
+- #48 — Escape the whole string that goes into a JSDoc, template text included: `**` before a name starting with `/` makes a `*/` that escaping the name alone misses — `branch-reviewer`
+- #48 — Replay every example a CHANGELOG line gives, not only its main claim: the `\u` and octal wordings were reasoned, then found wrong — `branch-reviewer`
 - #168 — An option that drops keys from a caller's object filters the key list and leaves the object alone: rebuilding it (`Object.fromEntries(Object.entries(x))`) loses getters, inherited and non-enumerable keys that `x[k]` still reads — `branch-reviewer`
 - #168 — A replay grid also runs once on the pre-fix commit, to show it finds the defect (144 differences on the old head, 0 after) — `branch-reviewer`
 - #168 — Before planning a step that changes an opt-in, search its tests: two existing tests had frozen the very behaviour the decision changed — `builder`
@@ -183,5 +185,7 @@ Minor review defects, taken up by the end-of-chapter review.
 - #46 — `src/generate/tsOutput.ts:100`: the writer's `/^/gm` indentation puts spaces after a U+2028/U+2029 inside a comment (6.6.1 too); frozen as is by `column comments › prefixes every line whatever its line break` — `branch-reviewer`
 - #368 — `AGENTS.md:46`: the architecture map still says `cli.ts` reads `zapatosconfig.json`; that work is now in `cliConfig.ts` and covers both files — `branch-reviewer`
 - #368 — `website/generator.md:69`: « the options of `zapatosconfig.json` », where the lede now says « its config file » — `branch-reviewer`
+- #48 — `src/generate/tables.ts:294`, `:305`, `:315`: the `stringLiteral` escapes of `Schema`, `AllSchemas` and a `"` in a `*ForTable` key are untested; undoing them leaves the suite green — `branch-reviewer`
+- #48 — `src/generate/enumOrder.ts:11`: « like enumLabel.ts » names a file #395 deleted (`quote.ts`) — `branch-reviewer`
 - #168 — `website/insert.md:307`, `CHANGELOG.md:19`: « `DO NOTHING` » without what it does to the result (one row: `undefined` on conflict; an array leaves that row out) — `branch-reviewer`
 - #168 — `src/db/shortcuts.ts:369`, `:376`: `specifiedUpdateColumns as string[] ?? colNames` written twice — `branch-reviewer`

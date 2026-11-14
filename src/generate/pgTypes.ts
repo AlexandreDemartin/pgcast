@@ -5,7 +5,7 @@ Released under the MIT licence: see LICENCE file
 */
 
 import type { CompleteConfig } from './config';
-import { enumLabel } from './enumLabel';
+import { stringLiteral } from './quote';
 import type { EnumData } from './enums';
 
 type TypeContext = 'JSONSelectable' | 'Selectable' | 'Insertable' | 'Updatable' | 'Whereable';
@@ -14,7 +14,7 @@ type TypeContext = 'JSONSelectable' | 'Selectable' | 'Insertable' | 'Updatable' 
 let warnedAboutInt8AndNumeric = false;
 
 const enumUnion = (values: string[]) => {
-  const union = values.map(enumLabel).join(' | ');
+  const union = values.map(v => stringLiteral(v)).join(' | ');
   return values.length > 1 ? `(${union})` : union;
 };
 

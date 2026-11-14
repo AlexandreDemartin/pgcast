@@ -10,6 +10,7 @@ import type { EnumData } from './enums';
 import { enumOrderOf, enumOrdersForSchema } from './enumOrder';
 import type { CustomTypes, CustomTypeOrigins } from './tsOutput';
 import { CompleteConfig } from './config';
+import { jsdocText, stringLiteral } from './quote';
 
 
 export interface Relation {
@@ -90,9 +91,6 @@ const columnsForRelation = async (rel: Relation, schemaName: string, queryFn: (q
         LEFT JOIN pg_catalog.pg_namespace ns ON ns.nspname = c.table_schema
         LEFT JOIN pg_catalog.pg_class cl ON cl.relkind IN ('r', 'v', 'f', 'p') AND cl.relname = c.table_name AND cl.relnamespace = ns.oid
         LEFT JOIN pg_catalog.pg_description d ON d.objoid = cl.oid AND d.objsubid = c.ordinal_position
-          -- Zapatos 6.6.1 read these comments on tables only: on a view, a foreign table or a partitioned
-          -- table, one holding */ stays out until #48 escapes it, so that a file which parses today still parses
-          AND (cl.relkind = 'r' OR strpos(d.description, '*/') = 0)
         WHERE c.table_name = $1 AND c.table_schema = $2
         ORDER BY "column"`,
     values: [rel.name, schemaName],
@@ -103,7 +101,7 @@ const columnsForRelation = async (rel: Relation, schemaName: string, queryFn: (q
 
 function quoteIfIllegalIdentifier(identifier: string) {
   // note: we'll redundantly quote a bunch of non-ASCII characters like this
-  return identifier.match(/^[a-zA-Z_$][0-9a-zA-Z_$]*$/) ? identifier : `"${identifier}"`;
+  return identifier.match(/^[a-zA-Z_$][0-9a-zA-Z_$]*$/) ? identifier : stringLiteral(identifier, '"');
 }
 
 export const definitionForRelationInSchema = async (
@@ -222,12 +220,12 @@ export const definitionForRelationInSchema = async (
     friendlyRelType = friendlyRelTypes[rel.type],
     tableComment = config.schemaJSDoc ? `
 /**
- * **${schemaPrefix}${rel.name}**
+ * ${jsdocText(`**${schemaPrefix}${rel.name}**`)}
  * - ${friendlyRelType} in database
  */` : ``,
     tableDef = `${tableComment}
 export namespace ${rel.name} {
-  export type Table = '${schemaPrefix}${rel.name}';
+  export type Table = ${stringLiteral(schemaPrefix + rel.name)};
   export interface Selectable {
     ${selectables.join('\n    ')}
   }
@@ -244,7 +242,7 @@ export namespace ${rel.name} {
     ${updatables.length > 0 ? updatables.join('\n    ') : `[key: string]: never;`}
   }
   export type UniqueIndex = ${uniqueIndexes.length > 0 ?
-        uniqueIndexes.map(ui => "'" + ui.indexname + "'").join(' | ') :
+        uniqueIndexes.map(ui => stringLiteral(ui.indexname)).join(' | ') :
         'never'};
   export type Column = keyof Selectable;
   export type OnlyCols<T extends readonly Column[]> = Pick<Selectable, T[number]>;
@@ -293,7 +291,7 @@ export type AllTablesAndViews = ${tableMappedArray(tables, 'Table')};`;
 export const crossSchemaTypesForAllTables = (allTables: Relation[], unprefixedSchema: string | null) =>
   ['Selectable', 'JSONSelectable', 'Whereable', 'Insertable', 'Updatable', 'UniqueIndex', 'Column', 'SQL'].map(thingable => `
 export type ${thingable}ForTable<T extends Table> = ${allTables.length === 0 ? 'any' : `{${allTables.map(rel => `
-  "${rel.schema === unprefixedSchema ? '' : `${rel.schema}.`}${rel.name}": ${rel.schema === unprefixedSchema ? '' : `${rel.schema}.`}${rel.name}.${thingable};`).join('')}
+  ${stringLiteral((rel.schema === unprefixedSchema ? '' : `${rel.schema}.`) + rel.name, '"')}: ${rel.schema === unprefixedSchema ? '' : `${rel.schema}.`}${rel.name}.${thingable};`).join('')}
 }[T]`};
 `).join('');
 
@@ -304,7 +302,7 @@ const
     '[' + arr.map(s => `...${s}.${suffix}`).join(', ') + ']';
 
 export const crossSchemaTypesForSchemas = (schemas: string[]) => `
-export type Schema = ${schemas.map(s => `'${s}'`).join(' | ')};
+export type Schema = ${schemas.map(s => stringLiteral(s)).join(' | ')};
 export type Table = ${schemaMappedUnion(schemas, 'Table')};
 export type Selectable = ${schemaMappedUnion(schemas, 'Selectable')};
 export type JSONSelectable = ${schemaMappedUnion(schemas, 'JSONSelectable')};
@@ -314,7 +312,7 @@ export type Updatable = ${schemaMappedUnion(schemas, 'Updatable')};
 export type UniqueIndex = ${schemaMappedUnion(schemas, 'UniqueIndex')};
 export type Column = ${schemaMappedUnion(schemas, 'Column')};
 
-export type AllSchemas = [${schemas.map(s => `'${s}'`).join(', ')}];
+export type AllSchemas = [${schemas.map(s => stringLiteral(s)).join(', ')}];
 export type AllBaseTables = ${schemaMappedArray(schemas, 'AllBaseTables')};
 export type AllForeignTables = ${schemaMappedArray(schemas, 'AllForeignTables')};
 export type AllViews = ${schemaMappedArray(schemas, 'AllViews')};
@@ -336,17 +334,15 @@ const createColumnDoc = (config: CompleteConfig, schemaName: string, rel: Relati
       domainName,
       description,
     } = columnDetails,
-    // every line of a multi-line comment gets its ` * `: TypeScript ends a JSDoc line at \r as at \n.
-    // A comment holding */ is written as Zapatos 6.6.1 wrote it, until #48 escapes it: its */ ends the
-    // JSDoc, so a ` * ` before a following line would be code, and break one that parses today
+    // every line of a multi-line comment gets its ` * `: TypeScript ends a JSDoc line at \r as at \n
     comment = description as string | null,
-    commentDoc = !comment ? '' :
-      '\n    *\n    * ' + (comment.includes('*/') ? comment : comment.split(/\r\n?|\n/).join('\n    * ')),
+    commentDoc = !comment ? '' : '\n    *\n    * ' + jsdocText(comment).split(/\r\n?|\n/).join('\n    * '),
+    [domain, udt, defaultText] = [domainName, udtName ?? '(none)', defaultValue].map(t => jsdocText(String(t))),
     doc = `/**
-    * **${schemaPrefix}${rel.name}.${column}**${commentDoc}
-    * - ${domainName ? `\`${domainName}\` (base type: \`${udtName ?? '(none)'}\`)` : `\`${udtName ?? '(none)'}\``} in database
+    * ${jsdocText(`**${schemaPrefix}${rel.name}.${column}**`)}${commentDoc}
+    * - ${domainName ? `\`${domain}\` (base type: \`${udt}\`)` : `\`${udt}\``} in database
     * - ${rel.type === 'mview' ? 'Materialized view column' : isGenerated ? 'Generated column' :
-        `${isNullable ? 'Nullable' : '`NOT NULL`'}, ${hasDefault && defaultValue === null ? `identity column` : hasDefault ? `default: \`${defaultValue}\`` : `no default`}`}
+        `${isNullable ? 'Nullable' : '`NOT NULL`'}, ${hasDefault && defaultValue === null ? `identity column` : hasDefault ? `default: \`${defaultText}\`` : `no default`}`}
     */
     `;
   return doc;
