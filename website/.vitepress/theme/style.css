@@ -140,6 +140,11 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 @media (max-width: 1100px) { .VPNavBar .VPNavBarSearchButton .keys { display: none; } }
 /* and an icon only under 900px, so that GitHub and the theme button stay in the bar down to 768px */
 @media (max-width: 900px) { .VPNavBarSearchButton .text { display: none; } }
+/* on a phone, beside the menu button: the icon alone, no field, as the menu button beside it; its hover a colour step */
+@media (max-width: 767px) {
+  .VPNavBarSearchButton { border-color: transparent !important; background: transparent !important; }
+  .VPNavBarSearchButton:hover { border-color: transparent !important; color: var(--accent); }
+}
 /* one class more than VitePress's scoped `.VPNavMenuLink` and `.VPNavMenuLink.active`, so that these win */
 /* 10px each side, not VitePress's 12: a compact bar (#376), where Playground, one letter longer than Changelog, fits at
    960px */
