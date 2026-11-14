@@ -583,6 +583,24 @@ describe('quotes and */', () => {
     expect.soft(schema).not.toMatch(/\*\/\*\*|'\*\/'|with \*\/ inside/);
   });
 
+  it('escapes the */ that the ** before a name makes with its leading /, prefixed or not', async () => {
+    await t.pool.query(`
+      CREATE SCHEMA "/lead";
+      CREATE TABLE "/lead".films (id int);
+      CREATE SCHEMA slash_reels;
+      CREATE TABLE slash_reels."/reels" (id int);`);
+    try {
+      const { ts: schema } = await codegen({ schemas: { '/lead': all, slash_reels: all }, unprefixedSchema: 'slash_reels' });
+      expect.soft(schema).toContain('* **\\/lead.films**\n');
+      expect.soft(schema).toContain('* **\\/lead.films.id**\n');
+      expect.soft(schema).toContain('* **\\/reels**\n');
+      expect.soft(schema).toContain('* **\\/reels.id**\n');
+      expect.soft(schema).not.toMatch(/\*\*\//);
+    } finally {
+      await t.pool.query('DROP SCHEMA "/lead" CASCADE; DROP SCHEMA slash_reels CASCADE');
+    }
+  });
+
   it('escapes a quote and a backslash in a label, an index and a column name, and */ in a type name', async () => {
     const { ts: schema } = await codegen({ schemas: { quoting: all } });
     expect.soft(schema).toContain(`export type marks = 'back\\\\slash' | 'it\\'s' | 'trail\\\\';`);

@@ -26,10 +26,12 @@ Returns a [`SQLFragment`](#SQLFragment): the literal parts as you wrote them, ea
 | Argument | Default | What it sets |
 |---|---|---|
 | `Interpolations` | [`db.SQL`](#SQL): every table and column of the schema | what may be interpolated; `s.films.SQL` allows only the names of `films`, and `cols()` / `vals()` of any value |
-| `RunResult` | `pg.QueryResult['rows']` (`any[]`) | what `run()` resolves to, and the type of the fragment as a `lateral` or `extras` value |
+| `RunResult` | `pg.QueryResult['rows']` (`any[]`) | what `run()` resolves to, and the type of the fragment as a `lateral` or `extras` value: without it, that key is `any`, with no error |
 | `Constraint` | `never` | the value type a condition compares with; set by [`conditions`](/conditions#conditions), checked by a Whereable. You rarely give it. |
 
 `RunResult` is not checked against the SQL: it is your word for what comes back. The shortcuts set it for you.
+
+Written inline as a value of a shortcut's `where`, or of `update()`'s values, a fragment takes its `Constraint` from every table and view with a column of that name: TypeScript infers it before it knows the table. Where their types differ, the valid fragment fails to compile (TS2322): an `id` that is an `int4` here and a `uuid` there; in `update()`, a view of `films`, whose `title` is nullable, makes `` { title: db.sql`upper(${db.self})` } `` fail. Give it a type argument, `` db.sql<db.SQL>`upper(${db.self})` ``, or declare it first.
 
 A name outside `Interpolations` does not compile:
 
@@ -281,7 +283,7 @@ An object is a Whereable of the table: each own enumerable key a column, each va
 | `Default`, `self` | throws |
 | `raw()`, `cols()`, `vals()` | throws ([`raw()`](#raw)) |
 
-- `null` is a parameter too, and `= NULL` matches no row: use [`conditions.isNull`](/conditions#conditions.isNull).
+- `null` is a parameter too, and `= NULL` matches no row: use [`conditions.isNull`](/conditions#conditions.isNull). So is `undefined`, sent as `NULL`, with [`undefinedMeansMissing`](/runtime-config#Config.undefinedMeansMissing) or without: `{ tagline: undefined }` gives `("tagline" = $1)`<!-- probe: db.sql`${{ tagline: undefined }}` -->, and no row: leaving the key out would widen the filter.
 - `Default` throws "`` `db.Default` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. `DEFAULT` is for INSERT and UPDATE values. ``<!-- message -->"; Zapatos 6.6.1 sent it as `'Symbol(DEFAULT)'`.
 - The shortcuts take the same object as their `where` ([`select()`](/select#select)).
 
