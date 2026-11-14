@@ -79,6 +79,15 @@ describe('cliConfig()', () => {
     }
   });
 
+  it('keeps a schema named __proto__, from the file and from the argument', () => {
+    const json = '{"schemas": {"__proto__": {"include": "*", "exclude": []}, "public": {"include": "*", "exclude": []}}}';
+    write('pgcastconfig.json', json);
+    expect(Object.keys(cliConfig(undefined, dir).schemas!)).toEqual(['__proto__', 'public']);
+    expect(Object.keys(cliConfig(json, dir).schemas!)).toEqual(['__proto__', 'public']);
+    // in an object of Object.prototype, as in 6.6.1: columnOptions reads inherited keys (#405)
+    expect(Object.getPrototypeOf(cliConfig(json, dir).schemas)).toBe(Object.prototype);
+  });
+
   it('names the file it read in an error, with 6.6.1\'s words for zapatosconfig.json', () => {
     write('zapatosconfig.json', '{"db": {"connectionString": "{{PGCAST_UNSET}}"}}');
     expect(() => cliConfig(undefined, dir)).toThrow(new Error(

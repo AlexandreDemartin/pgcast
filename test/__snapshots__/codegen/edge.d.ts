@@ -21,9 +21,9 @@ declare module 'zapatos/schema' {
   
     /* --- enums --- */
   
-    export type traffic-light = 'amber's' | 'green light' | 'red';
+    export type traffic_light = 'amber\'s' | 'green light' | 'red';
     export namespace every {
-      export type traffic-light = ['amber's', 'green light', 'red'];
+      export type traffic_light = ['amber\'s', 'green light', 'red'];
     }
   
     /* --- tables --- */
@@ -32,7 +32,7 @@ declare module 'zapatos/schema' {
      * **edge.class**
      * - Table in database
      */
-    export namespace class {
+    export namespace class_ {
       export type Table = 'edge.class';
       export interface Selectable {
         /**
@@ -85,13 +85,13 @@ declare module 'zapatos/schema' {
      * **edge.odd table**
      * - Table in database
      */
-    export namespace odd table {
+    export namespace odd_table {
       export type Table = 'edge.odd table';
       export interface Selectable {
         /**
-        * **edge.odd table.*/**
+        * **edge.odd table.*\/**
         * - `text` in database
-        * - Nullable, default: `'*/'::text`
+        * - Nullable, default: `'*\/'::text`
         */
         "*/": string | null;
         /**
@@ -109,17 +109,17 @@ declare module 'zapatos/schema' {
         /**
         * **edge.odd table.light**
         *
-        * Column comment with */ inside
+        * Column comment with *\/ inside
         * - `traffic-light` in database
         * - Nullable, no default
         */
-        light: traffic-light | null;
+        light: traffic_light | null;
       }
       export interface JSONSelectable {
         /**
-        * **edge.odd table.*/**
+        * **edge.odd table.*\/**
         * - `text` in database
-        * - Nullable, default: `'*/'::text`
+        * - Nullable, default: `'*\/'::text`
         */
         "*/": string | null;
         /**
@@ -137,17 +137,17 @@ declare module 'zapatos/schema' {
         /**
         * **edge.odd table.light**
         *
-        * Column comment with */ inside
+        * Column comment with *\/ inside
         * - `traffic-light` in database
         * - Nullable, no default
         */
-        light: traffic-light | null;
+        light: traffic_light | null;
       }
       export interface Whereable {
         /**
-        * **edge.odd table.*/**
+        * **edge.odd table.*\/**
         * - `text` in database
-        * - Nullable, default: `'*/'::text`
+        * - Nullable, default: `'*\/'::text`
         */
         "*/"?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
         /**
@@ -165,17 +165,17 @@ declare module 'zapatos/schema' {
         /**
         * **edge.odd table.light**
         *
-        * Column comment with */ inside
+        * Column comment with *\/ inside
         * - `traffic-light` in database
         * - Nullable, no default
         */
-        light?: traffic-light | db.Parameter<traffic-light> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, traffic-light | db.Parameter<traffic-light> | db.SQLFragment | db.ParentColumn>;
+        light?: traffic_light | db.Parameter<traffic_light> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, traffic_light | db.Parameter<traffic_light> | db.SQLFragment | db.ParentColumn>;
       }
       export interface Insertable {
         /**
-        * **edge.odd table.*/**
+        * **edge.odd table.*\/**
         * - `text` in database
-        * - Nullable, default: `'*/'::text`
+        * - Nullable, default: `'*\/'::text`
         */
         "*/"?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment;
         /**
@@ -193,17 +193,17 @@ declare module 'zapatos/schema' {
         /**
         * **edge.odd table.light**
         *
-        * Column comment with */ inside
+        * Column comment with *\/ inside
         * - `traffic-light` in database
         * - Nullable, no default
         */
-        light?: traffic-light | db.Parameter<traffic-light> | null | db.DefaultType | db.SQLFragment;
+        light?: traffic_light | db.Parameter<traffic_light> | null | db.DefaultType | db.SQLFragment;
       }
       export interface Updatable {
         /**
-        * **edge.odd table.*/**
+        * **edge.odd table.*\/**
         * - `text` in database
-        * - Nullable, default: `'*/'::text`
+        * - Nullable, default: `'*\/'::text`
         */
         "*/"?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment>;
         /**
@@ -221,11 +221,11 @@ declare module 'zapatos/schema' {
         /**
         * **edge.odd table.light**
         *
-        * Column comment with */ inside
+        * Column comment with *\/ inside
         * - `traffic-light` in database
         * - Nullable, no default
         */
-        light?: traffic-light | db.Parameter<traffic-light> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, traffic-light | db.Parameter<traffic-light> | null | db.DefaultType | db.SQLFragment>;
+        light?: traffic_light | db.Parameter<traffic_light> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, traffic_light | db.Parameter<traffic_light> | null | db.DefaultType | db.SQLFragment>;
       }
       export type UniqueIndex = 'odd table_pkey';
       export type Column = keyof Selectable;
@@ -236,20 +236,20 @@ declare module 'zapatos/schema' {
   
     /* --- aggregate types --- */
   
-    export type Table = class.Table | odd table.Table;
-    export type Selectable = class.Selectable | odd table.Selectable;
-    export type JSONSelectable = class.JSONSelectable | odd table.JSONSelectable;
-    export type Whereable = class.Whereable | odd table.Whereable;
-    export type Insertable = class.Insertable | odd table.Insertable;
-    export type Updatable = class.Updatable | odd table.Updatable;
-    export type UniqueIndex = class.UniqueIndex | odd table.UniqueIndex;
-    export type Column = class.Column | odd table.Column;
+    export type Table = class_.Table | odd_table.Table;
+    export type Selectable = class_.Selectable | odd_table.Selectable;
+    export type JSONSelectable = class_.JSONSelectable | odd_table.JSONSelectable;
+    export type Whereable = class_.Whereable | odd_table.Whereable;
+    export type Insertable = class_.Insertable | odd_table.Insertable;
+    export type Updatable = class_.Updatable | odd_table.Updatable;
+    export type UniqueIndex = class_.UniqueIndex | odd_table.UniqueIndex;
+    export type Column = class_.Column | odd_table.Column;
   
-    export type AllBaseTables = [class.Table, odd table.Table];
+    export type AllBaseTables = [class_.Table, odd_table.Table];
     export type AllForeignTables = [];
     export type AllViews = [];
     export type AllMaterializedViews = [];
-    export type AllTablesAndViews = [class.Table, odd table.Table];
+    export type AllTablesAndViews = [class_.Table, odd_table.Table];
   }
 
 
@@ -276,43 +276,43 @@ declare module 'zapatos/schema' {
   /* === lookups === */
 
   export type SelectableForTable<T extends Table> = {
-    "edge.class": edge.class.Selectable;
-    "edge.odd table": edge.odd table.Selectable;
+    "edge.class": edge.class_.Selectable;
+    "edge.odd table": edge.odd_table.Selectable;
   }[T];
 
   export type JSONSelectableForTable<T extends Table> = {
-    "edge.class": edge.class.JSONSelectable;
-    "edge.odd table": edge.odd table.JSONSelectable;
+    "edge.class": edge.class_.JSONSelectable;
+    "edge.odd table": edge.odd_table.JSONSelectable;
   }[T];
 
   export type WhereableForTable<T extends Table> = {
-    "edge.class": edge.class.Whereable;
-    "edge.odd table": edge.odd table.Whereable;
+    "edge.class": edge.class_.Whereable;
+    "edge.odd table": edge.odd_table.Whereable;
   }[T];
 
   export type InsertableForTable<T extends Table> = {
-    "edge.class": edge.class.Insertable;
-    "edge.odd table": edge.odd table.Insertable;
+    "edge.class": edge.class_.Insertable;
+    "edge.odd table": edge.odd_table.Insertable;
   }[T];
 
   export type UpdatableForTable<T extends Table> = {
-    "edge.class": edge.class.Updatable;
-    "edge.odd table": edge.odd table.Updatable;
+    "edge.class": edge.class_.Updatable;
+    "edge.odd table": edge.odd_table.Updatable;
   }[T];
 
   export type UniqueIndexForTable<T extends Table> = {
-    "edge.class": edge.class.UniqueIndex;
-    "edge.odd table": edge.odd table.UniqueIndex;
+    "edge.class": edge.class_.UniqueIndex;
+    "edge.odd table": edge.odd_table.UniqueIndex;
   }[T];
 
   export type ColumnForTable<T extends Table> = {
-    "edge.class": edge.class.Column;
-    "edge.odd table": edge.odd table.Column;
+    "edge.class": edge.class_.Column;
+    "edge.odd table": edge.odd_table.Column;
   }[T];
 
   export type SQLForTable<T extends Table> = {
-    "edge.class": edge.class.SQL;
-    "edge.odd table": edge.odd table.SQL;
+    "edge.class": edge.class_.SQL;
+    "edge.odd table": edge.odd_table.SQL;
   }[T];
 
 }
