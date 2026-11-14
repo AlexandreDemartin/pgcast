@@ -1,5 +1,5 @@
 ---
-english: 277cdc130e9b
+english: e57c8c1784b0
 ---
 
 # Conditions {#db-conditions}
@@ -35,7 +35,7 @@ import * as db from 'zapatos/db';
 db.select('films', { release_year: db.conditions.eq('1991') });
 ```
 
-Avec `strictNullChecks` (ou `strict`) activé, le type refuse aussi `null` comme valeur, dans `eq()`, `isIn()` et les autres ; désactivé, `eq(null)` compile en `"col" = $1`<!-- probe: db.sql`${{ col: db.conditions.eq(null) }}` -->, qui ne trouve aucune ligne. Le test de `NULL` est [`isNull`](#conditions.isNull).
+Avec `strictNullChecks` (ou `strict`) activé, le type refuse aussi `null` comme valeur, dans `eq()`, `isIn()` et les autres, sauf [`isDistinctFrom()`](#conditions.isDistinctFrom) et [`isNotDistinctFrom()`](#conditions.isNotDistinctFrom), qui acceptent une valeur nullable. Avec l’option désactivée, `eq(null)` compile en `"col" = $1`<!-- probe: db.sql`${{ col: db.conditions.eq(null) }}` -->, qui ne trouve aucune ligne. Le test de `NULL` est [`isNull`](#conditions.isNull).
 
 ## Les tests : null, true, false, unknown {#tests}
 

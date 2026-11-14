@@ -31,7 +31,7 @@ import * as db from 'zapatos/db';
 db.select('films', { release_year: db.conditions.eq('1991') });
 ```
 
-With `strictNullChecks` (or `strict`) on, the type also refuses `null` as a value, in `eq()`, `isIn()` and the others; off, `eq(null)` compiles to `"col" = $1`<!-- probe: db.sql`${{ col: db.conditions.eq(null) }}` -->, which matches no row. The test for `NULL` is [`isNull`](#conditions.isNull).
+With `strictNullChecks` (or `strict`) on, the type also refuses `null` as a value, in `eq()`, `isIn()` and the others, except [`isDistinctFrom()`](#conditions.isDistinctFrom) and [`isNotDistinctFrom()`](#conditions.isNotDistinctFrom), which take a nullable value. With it off, `eq(null)` compiles to `"col" = $1`<!-- probe: db.sql`${{ col: db.conditions.eq(null) }}` -->, which matches no row. The test for `NULL` is [`isNull`](#conditions.isNull).
 
 ## Tests: null, true, false, unknown {#tests}
 
