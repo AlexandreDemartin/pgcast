@@ -35,7 +35,7 @@ Three classes, from the most direct to the most cautious:
 - **Optional keys**: a new key of the runtime `Config` is optional (`?:`) and read with `?? <default>`, so that a `Config` written for 6.6.1 still compiles (JSDoc of `Config`).
 - **JSDoc**: `@deprecated` on the old behaviour when it has a shape of its own (an option value, a signature).
 
-## The 11 breaking findings
+## The breaking findings
 
 | # | Class | Why | Option (default = 6.6.1) | Code |
 |---|---|---|---|---|
