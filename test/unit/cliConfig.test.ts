@@ -79,6 +79,13 @@ describe('cliConfig()', () => {
     }
   });
 
+  it('keeps a schema named __proto__, from the file and from the argument', () => {
+    const json = '{"schemas": {"__proto__": {"include": "*", "exclude": []}, "public": {"include": "*", "exclude": []}}}';
+    write('pgcastconfig.json', json);
+    expect(Object.keys(cliConfig(undefined, dir).schemas!)).toEqual(['__proto__', 'public']);
+    expect(Object.keys(cliConfig(json, dir).schemas!)).toEqual(['__proto__', 'public']);
+  });
+
   it('names the file it read in an error, with 6.6.1\'s words for zapatosconfig.json', () => {
     write('zapatosconfig.json', '{"db": {"connectionString": "{{PGCAST_UNSET}}"}}');
     expect(() => cliConfig(undefined, dir)).toThrow(new Error(
