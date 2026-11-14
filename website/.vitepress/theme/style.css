@@ -387,6 +387,14 @@ svg.icon { width: 16px; height: 16px; flex: none; }
 .InstallLine .copy:hover { background: var(--line); color: var(--fg); }
 .InstallLine .copy svg { width: 16px; height: 16px; }
 @media (max-width: 560px) { .InstallLine .panel { padding: 16px; } }
+/* from 1024px, the buttons and the install block share one row across the hero, the buttons on the left, the block on
+   the right, centred on each other; the block a fixed 480px, so that picking a tab does not move it. Under that, the
+   block under the buttons */
+@media (min-width: 1024px) {
+  .landing .hero { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 48px; align-items: center; }
+  .landing .hero > :not(.ctas, .InstallLine) { grid-column: 1 / -1; }
+  .landing .hero .InstallLine { width: 480px; margin: 0; }
+}
 .landing .CastPanel-frame { margin: 0; }
 .landing .pillars {
   display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 32px;
