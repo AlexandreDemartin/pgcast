@@ -21,12 +21,15 @@ const
   { version } = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')),
   font = (file: string): HeadConfig =>
     ['link', { rel: 'preload', href: `/fonts/${file}.woff2`, as: 'font', type: 'font/woff2', crossorigin: '' }],
-  // the wordmark's entrance (Wordmark.vue), set before the first paint: on the first page of a session only, and never
-  // with reduced motion; without storage, none
+  // the wordmark's entrance (Wordmark.vue, style.css): 'a', the words slid out of the tile behind a soft edge, or 'b',
+  // their letters brought into focus one by one from the tile outward
+  entrance: 'a' | 'b' = 'a',
+  // set before the first paint: on the first page of a session only, and never with reduced motion; without storage,
+  // none
   wordmarkEntrance = `try {
   if (!sessionStorage.getItem('pgcast-wordmark') && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
     sessionStorage.setItem('pgcast-wordmark', '1');
-    document.documentElement.dataset.wordmark = '';
+    document.documentElement.dataset.wordmark = '${entrance}';
   }
 } catch {}`;
 

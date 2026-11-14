@@ -92,22 +92,42 @@ body { font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased; 
 }
 .Wordmark .pg, .Wordmark .cast, .Wordmark .pg > span, .Wordmark .cast > span { display: inline-block; }
 .Wordmark .mark { flex: none; width: 14px; height: 14px; margin: 0 2px 0 calc(2px - .04em); fill: var(--accent); }
-/* its entrance, on a session's first page only (Wordmark.vue): the tile settles in, then PG and CAST come out of it to
-   each side, as out of a mould, each word slid out from behind it by as much as a clip opens; one curve, 780ms in all.
-   Transform, opacity and clip-path alone: the words keep their place and width from the first frame. */
+/* its entrance, on a session's first page only, A or B as config.ts chooses (Wordmark.vue): the tile settles in, then
+   the words come out of it. One ease-out for both; opacity, transform, mask and filter alone, never a layout property,
+   so the words keep their place and width from the first frame. Each rule is gone once the entrance is over. */
 @media (prefers-reduced-motion: no-preference) {
-  html[data-wordmark] .Wordmark { --ease: cubic-bezier(.16, 1, .3, 1); }
-  html[data-wordmark] .Wordmark .mark { animation: wordmark-settle 320ms var(--ease) backwards; }
-  html[data-wordmark] .Wordmark .pg { animation: wordmark-open-leftward 600ms var(--ease) 120ms backwards; }
-  html[data-wordmark] .Wordmark .pg > span { animation: wordmark-slide 600ms var(--ease) 120ms backwards; }
-  html[data-wordmark] .Wordmark .cast { animation: wordmark-open-rightward 600ms var(--ease) 180ms backwards; }
-  html[data-wordmark] .Wordmark .cast > span { --from: -100%; animation: wordmark-slide 600ms var(--ease) 180ms backwards; }
+  html[data-wordmark] .Wordmark { --ease: cubic-bezier(.22, 1, .36, 1); }
+  html[data-wordmark] .Wordmark .mark { animation: wordmark-settle 600ms var(--ease) backwards; }
+  /* A, 2.1s: PG and CAST slide out of the tile to each side, uncovered by a mask of two layers that meet: a soft edge
+     .5em wide that keeps just ahead of the words, and one .25em wide at the tile's side that withdraws as they settle,
+     so they come out of the tile as out of a mould and never look cut by an edge */
+  html[data-wordmark="a"] .Wordmark .pg, html[data-wordmark="a"] .Wordmark .cast {
+    mask-size: calc(200% + .5em) 100%, calc(100% + .25em) 100%; mask-repeat: no-repeat; mask-composite: intersect;
+  }
+  html[data-wordmark="a"] .Wordmark .pg {
+    mask-image: linear-gradient(to right, transparent calc(50% - .25em), #000 calc(50% + .25em)),
+      linear-gradient(to left, transparent, #000 .25em);
+    mask-position: 100% 0, 0% 0;
+    animation: wordmark-uncover-pg 1700ms var(--ease) 280ms backwards;
+  }
+  html[data-wordmark="a"] .Wordmark .cast {
+    mask-image: linear-gradient(to left, transparent calc(50% - .25em), #000 calc(50% + .25em)),
+      linear-gradient(to right, transparent, #000 .25em);
+    mask-position: 0% 0, 100% 0;
+    animation: wordmark-uncover-cast 1700ms var(--ease) 400ms backwards;
+  }
+  html[data-wordmark="a"] .Wordmark .pg > span { animation: wordmark-slide 1700ms var(--ease) 280ms backwards; }
+  html[data-wordmark="a"] .Wordmark .cast > span { --from: -100%; animation: wordmark-slide 1700ms var(--ease) 400ms backwards; }
+  /* B, 1.96s: the letters come into focus one by one, from the tile outward, G and C first, 120ms apart */
+  html[data-wordmark="b"] .Wordmark .pg > span > span, html[data-wordmark="b"] .Wordmark .cast > span > span {
+    animation: wordmark-focus 1300ms var(--ease) calc(300ms + var(--i) * 120ms) backwards;
+  }
 }
-@keyframes wordmark-settle { from { opacity: 0; transform: scale(.6); } }
+@keyframes wordmark-settle { from { opacity: 0; transform: scale(.7); } }
+@keyframes wordmark-uncover-pg { from { mask-position: 0% 0, 100% 0; } }
+@keyframes wordmark-uncover-cast { from { mask-position: 100% 0, 0% 0; } }
 @keyframes wordmark-slide { from { transform: translateX(var(--from, 100%)); } }
-/* the clips reach past the line box above and below, so that nothing of a letter is cut on the way */
-@keyframes wordmark-open-leftward { from { clip-path: inset(-25% 0 -25% 100%); } to { clip-path: inset(-25% 0 -25% 0); } }
-@keyframes wordmark-open-rightward { from { clip-path: inset(-25% 100% -25% 0); } to { clip-path: inset(-25% 0 -25% 0); } }
+@keyframes wordmark-focus { from { opacity: 0; filter: blur(.25em); } }
 .VPNavBarTitle .version {
   font: 500 12px/1 var(--font-body); letter-spacing: 0; color: var(--muted);
   border: 1px solid var(--line); border-radius: 999px; padding: 4px 8px; background: var(--surface);
