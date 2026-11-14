@@ -146,6 +146,17 @@ Look through your code for the first column of each table below. Each change in 
 
 </div>
 
+### `truncate()`
+
+<div class="stack">
+
+| Your code | Zapatos 6.6.1 | pgcast | What to do |
+|---|---|---|---|
+| The result of [`truncate()`](/insert#truncate)`.run()` | `[]` | `undefined`, as its type says | nothing: it held no rows |
+| `truncate()` options in an order Postgres refuses, past the type: `truncate('tags', 'CASCADE', 'RESTART IDENTITY')` | 42601 from Postgres | throws when called: "Truncate options must be CONTINUE IDENTITY/RESTART IDENTITY, then RESTRICT/CASCADE, one of each at most, not '…'"<!-- message --> | nothing, unless you catch a `DatabaseError` there |
+
+</div>
+
 ### Names and keywords
 
 <div class="stack">

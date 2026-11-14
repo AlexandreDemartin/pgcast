@@ -289,8 +289,8 @@ With `'CASCADE'`, Postgres empties every table that references one of them, at a
 
 </CastPanel>
 
-- `.run()` resolves with `[]`, where the type says `undefined`.
-- The type takes the options in that order, one of each kind. pgcast writes them as given: in JavaScript, or past the type with `as any`, `truncate('tags', 'CASCADE', 'RESTART IDENTITY')` sends `TRUNCATE "tags" CASCADE RESTART IDENTITY`<!-- probe: db.truncate('tags', 'CASCADE', 'RESTART IDENTITY') -->, and Postgres refuses it (42601).
+- `.run()` resolves `undefined`, as its type says. Zapatos 6.6.1 resolved `[]`.
+- The options go in that order, one of each kind at most, as Postgres takes them, and the type refuses any other. Past the type, in JavaScript or with `as any`, another order throws while compiling: `truncate('tags', 'CASCADE', 'RESTART IDENTITY')` gives "Truncate options must be CONTINUE IDENTITY/RESTART IDENTITY, then RESTRICT/CASCADE, one of each at most, not '…'"<!-- message -->. Zapatos 6.6.1 sent `TRUNCATE "tags" CASCADE RESTART IDENTITY`, and Postgres refused it (42601).
 - Any other option throws: "Truncate option must be CONTINUE IDENTITY/RESTART IDENTITY/RESTRICT/CASCADE, not '…'"<!-- message -->. Zapatos 6.6.1 wrote it into the SQL as it was.
 
 ## An `undefined` value {#undefined-values}
