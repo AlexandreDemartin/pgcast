@@ -1,0 +1,2 @@
+# Every text file is checked out with LF, on Windows too: the docs checks read pages line by line (#115).
+* text=auto eol=lf
