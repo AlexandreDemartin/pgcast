@@ -72,12 +72,16 @@ const sourceFilesForCustomTypes = (customTypes: CustomTypes, names: string, sche
  * placeholder, and so one type. The placeholders keep their names, which edited files depend on.
  * Names that differ only in case share one placeholder too on a case-insensitive file system (macOS's
  * and Windows's default), which declares only one of them: they get one note, before the note on each.
+ * A placeholder named `index` (or `Index`, on such a file system) is the file of the custom types' index, which
+ * write.ts writes after the placeholders: it gets a note too, after that one.
  */
 const warnAboutSharedCustomTypeNames = (origins: CustomTypeOrigins, config: CompleteConfig) => {
   const
     warn = config.warningListener === true ? console.log : config.warningListener || (() => void 0),
     folder = path.join(config.outDir, moduleNamesOf(config), 'custom'),
-    listOf = (items: string[]) => items.slice(0, -1).join(', ') + ' and ' + items[items.length - 1],
+    listOf = (items: string[]) => items.length === 1 ? items[0] :
+      items.slice(0, -1).join(', ') + ' and ' + items[items.length - 1],
+    onCaseInsensitive = 'on a case-insensitive file system, the default on macOS and Windows',
     namesByFile = new Map<string, string[]>();  // lower-cased name -> names, in sorted order
 
   for (const name of Object.keys(origins).sort()) {
@@ -85,15 +89,33 @@ const warnAboutSharedCustomTypeNames = (origins: CustomTypeOrigins, config: Comp
     namesByFile.set(file, [...namesByFile.get(file) ?? [], name]);
   }
 
-  for (const names of namesByFile.values()) {
-    if (names.length > 1) {
-      const types = names.flatMap(name => Object.keys(origins[name]).map(type => `${type} (${name})`)).sort();
+  for (const [file, names] of namesByFile) {
+    const
+      types = names.flatMap(name => Object.keys(origins[name]).map(type => `${type} (${name})`)).sort(),
+      files = listOf(names.map(name => name + config.outExt));
 
+    if (names.length > 1) {
       warn(`Note: custom types ${listOf(types)} have TypeScript names that differ only in case: ` +
-        `on a case-insensitive file system, the default on macOS and Windows, ` +
-        `${listOf(names.map(name => name + config.outExt))} are one placeholder file in ${folder}, ` +
+        `${onCaseInsensitive}, ${files} are one placeholder file in ${folder}, ` +
         `which declares only one of those names. To type them apart, rename one of them in the database, ` +
         `or give customTypesTransform a function that keeps their names apart.`);
+    }
+
+    if (file === 'index') {  // write.ts writes custom/index<outExt> after the placeholders
+      const
+        one = types.length === 1,
+        cased = names.filter(name => name !== file),  // the index's file only on a case-insensitive file system
+        where = cased.length === 0 ? '' : cased.length === names.length ? ` ${onCaseInsensitive}` :
+          ` (${listOf(cased.map(name => name + config.outExt))} ${onCaseInsensitive})`,
+        undeclared = cased.length === 0 ? `${file} is never declared` :
+          cased.length === names.length ? `${listOf(cased)} ${cased.length === 1 ? 'is' : 'are'} never declared there` :
+            `${file} is never declared, nor ${listOf(cased)} on such a file system`;
+
+      warn(`Note: custom ${one ? 'type' : 'types'} ${listOf(types)} ${one ? 'has' : 'have'} the placeholder ` +
+        `${names.length === 1 ? 'file' : 'files'} ${files} in ${folder}, the file of the custom types' index${where}: ` +
+        `the generator writes the index over it on every run, so ${undeclared}. ` +
+        `To declare ${one ? 'it' : 'them'}, rename ${one ? 'it' : 'them'} in the database, ` +
+        `or give customTypesTransform a function that names ${one ? 'it' : 'them'} otherwise.`);
     }
 
     for (const name of names) {
