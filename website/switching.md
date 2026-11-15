@@ -216,7 +216,7 @@ To find each call:
 | `PGCAST_DEP003` | a [`transaction()`](/transaction#transaction) whose callback catches a query's error and returns: Postgres answers the `COMMIT` with `ROLLBACK`, and nothing is saved ([Let the error through](/retries#let-the-error-through)) | let the error out of the callback, or `ROLLBACK TO` a `SAVEPOINT` before going on; or [`transactionRequiresCommit`](/runtime-config#Config.transactionRequiresCommit), and such a transaction rejects |
 | `PGCAST_DEP004` | a [`sum()`, `avg()`, `min()` or `max()`](/select#typed-by-column) whose result `Number()` changes: `0` for no row, a date's milliseconds, `NaN` for a text | turn on [`aggregatesTypedByColumn`](/runtime-config#Config.aggregatesTypedByColumn), declared in [`ConfigTypes`](/runtime-config#ConfigTypes): `tsc` then shows each call whose result is now `null` or the column's type, and `?? 0` keeps a `0` |
 | `PGCAST_DEP005` | a [`transaction()`](/transaction#transaction) given a client you sent `BEGIN` on: its `COMMIT` or `ROLLBACK` ends your transaction ([Your own `BEGIN`](/transaction#your-own-begin)) | open the outer transaction with `transaction()`, or give it the pool; or [`transactionRequiresIdleClient`](/runtime-config#Config.transactionRequiresIdleClient), and such a call rejects before sending its `START TRANSACTION` |
-| `PGCAST_DEP007` | a [`transaction()`](/transaction#transaction) given the client of a transaction at a level that doesn't satisfy its own, `serializable()` given `readCommitted()`'s: its callback runs at the outer level ([Passing a transaction through](/transaction#passing-a-transaction-through)) | open the outer transaction at a level that satisfies the inner one, or give the inner call the pool; or [`transactionRequiresSatisfyingLevel`](/runtime-config#Config.transactionRequiresSatisfyingLevel), and such a call rejects before its callback |
+| `PGCAST_DEP007` | a [`transaction()`](/transaction#transaction) given the client of a transaction at a level that doesn't satisfy its own, `serializable()` given `readCommitted()`'s: its callback runs at the outer level ([Passing a transaction through](/transaction#passing-a-transaction-through)) | open the outer transaction at a level that satisfies the inner one, or give the inner call the pool, for a transaction of its own, committed apart from the outer one, which waits on a row the outer one has locked; or [`transactionRequiresSatisfyingLevel`](/runtime-config#Config.transactionRequiresSatisfyingLevel), and such a call rejects before its callback |
 
 </div>
 
@@ -234,7 +234,7 @@ db.setConfig({
 });
 ```
 
-All five will be the default in 7.0 ([Versions](/versions)). With them on, an `undefined` value is left out of an `update()`:
+All of them will be the default in 7.0 ([Versions](/versions)). With them on, an `undefined` value is left out of an `update()`:
 
 <CastPanel example="switching_undefined">
 

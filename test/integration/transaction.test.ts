@@ -13,6 +13,7 @@ import * as db from '../../src/db';
 import { sql, IsolationLevel } from '../../src/db';
 import { resetConfig } from '../helpers/config';
 import { useTestDatabase } from '../helpers/db';
+import { satisfies } from '../helpers/isolation';
 
 const t = useTestDatabase();
 
@@ -956,7 +957,7 @@ describe('a client already inside a transaction block', () => {
 });
 
 // #177: given the client of a transaction already open, transaction() passes it through, whatever the level asked:
-// its callback runs at the outer transaction's level, which Postgres can't change once the transaction has begun
+// its callback runs at the outer transaction's level, which Postgres can't change once the transaction's first query has run
 describe('the client of a transaction at another level', () => {
   afterEach(() => { vi.restoreAllMocks(); });
 
@@ -972,11 +973,6 @@ describe('the client of a transaction at another level', () => {
   const
     { Serializable: S, RepeatableRead: RR, ReadCommitted: RC, SerializableRO: SRO, RepeatableReadRO: RRRO,
       ReadCommittedRO: RCRO, SerializableRODeferrable: SROD } = IsolationLevel,
-    // IsolationSatisfying<inner>, written out by hand: the outer levels whose client a call at inner may be given
-    satisfying: Record<IsolationLevel, IsolationLevel[]> = {
-      [S]: [S], [RR]: [S, RR], [RC]: [S, RR, RC], [SRO]: [S, SRO], [RRRO]: [S, RR, SRO, RRRO],
-      [RCRO]: [S, RR, RC, SRO, RRRO, RCRO], [SROD]: [S, SRO, SROD],
-    },
     // what Postgres reports inside a transaction at each level
     settingsAt: Record<IsolationLevel, string> = {
       [S]: 'serializable off off', [RR]: 'repeatable read off off', [RC]: 'read committed off off',
@@ -986,11 +982,13 @@ describe('the client of a transaction at another level', () => {
     levels = Object.values(IsolationLevel),
     pairs = levels.flatMap(outer => levels.map(inner => [outer, inner] as const)),
     settingsSQL = `SELECT concat_ws(' ', current_setting('transaction_isolation'), current_setting('transaction_read_only'), current_setting('transaction_deferrable')) AS s`,
-    refused = (outer: IsolationLevel, inner: IsolationLevel) => `transaction() at ${inner} was given the client of a transaction at ${outer}, so its callback would run at ${outer}: open the outer transaction at a level that satisfies ${inner} (IsolationSatisfying), or pass the pool`;
+    refused = (outer: IsolationLevel, inner: IsolationLevel) => `transaction() at ${inner} was given the client of a transaction at ${outer}, so its callback would run at ${outer}: open the outer transaction at a level that satisfies ${inner} (IsolationSatisfying)`;
 
-  it('the levels whose client satisfies another: 28 of the 49 pairs do not', () => {
+  it('the levels whose client satisfies another: 25 of the 49 pairs do not', () => {
     expect(pairs).toHaveLength(49);
-    expect(pairs.filter(([outer, inner]) => !satisfying[inner].includes(outer))).toHaveLength(28);
+    expect(pairs.filter(([outer, inner]) => !satisfies(outer, inner))).toHaveLength(25);
+    // SERIALIZABLE, READ ONLY, DEFERRABLE gives every guarantee of the three read-only levels, which IsolationSatisfying leaves it out of
+    expect([SRO, RRRO, RCRO].every(inner => satisfies(SROD, inner))).toBe(true);
   });
 
   /** transaction(pool, outer, c => transaction(c, inner, …)): what the inner callback sees, and the queries sent. */
@@ -1012,7 +1010,7 @@ describe('the client of a transaction at another level', () => {
     expect(called).toBe(true);
     expect(result).toBe(settingsAt[outer]);
     expect(queries).toEqual([`START TRANSACTION ISOLATION LEVEL ${outer}`, settingsSQL, 'COMMIT']);
-    if (satisfying[inner].includes(outer)) expect(emitWarning).not.toHaveBeenCalled();
+    if (satisfies(outer, inner)) expect(emitWarning).not.toHaveBeenCalled();
     else {
       expect(emitWarning).toHaveBeenCalledTimes(1);
       expect(emitWarning.mock.calls[0][1]).toEqual({ type: 'DeprecationWarning', code: 'PGCAST_DEP007' });
@@ -1023,7 +1021,7 @@ describe('the client of a transaction at another level', () => {
     const { fdb, emitWarning } = await fresh();
     fdb.setConfig({ transactionRequiresSatisfyingLevel: true });
     const { result, queries, called } = await nest(fdb, outer, inner);
-    if (satisfying[inner].includes(outer)) {
+    if (satisfies(outer, inner)) {
       expect(called).toBe(true);
       expect(result).toBe(settingsAt[outer]);
       expect(queries).toEqual([`START TRANSACTION ISOLATION LEVEL ${outer}`, settingsSQL, 'COMMIT']);
@@ -1062,6 +1060,16 @@ describe('the client of a transaction at another level', () => {
       await fdb.serializable(rc, c => write(c, 'inner'));
     })).rejects.toThrow(refused(RC, S));
     expect(await notes()).toEqual([]);
+  });
+
+  it.each([false, true])('a level the table doesn\'t know, a string from JavaScript, is passed through, as in Zapatos 6.6.1 (option %s)', async on => {
+    const { fdb, emitWarning } = await fresh();
+    fdb.setConfig({ transactionRequiresSatisfyingLevel: on });
+    for (const level of ['constructor', 'toString', '__proto__', 'hasOwnProperty', 'serializable', 'READ UNCOMMITTED']) {
+      expect(await fdb.serializable(t.pool, c => fdb.transaction(c, level as IsolationLevel, async () => 'ran'))).toBe('ran');
+      expect(await fdb.readCommitted(t.pool, c => fdb.transaction(c, level as IsolationLevel, async () => 'ran'))).toBe('ran');
+    }
+    expect(emitWarning).not.toHaveBeenCalled();
   });
 
   it('with the option, a pool, a plain client and a client kept after its transaction ended are not passed through, nor refused', async () => {

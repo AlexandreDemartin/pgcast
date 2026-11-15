@@ -1,5 +1,5 @@
 ---
-english: 14a384f11609
+english: 3b621492e460
 ---
 
 # Configuration
@@ -235,14 +235,14 @@ Sans l’option, elle envoie ce qu’envoie Zapatos 6.6.1, avec un avertissement
 transactionRequiresSatisfyingLevel?: boolean  // default: false; the default in 7.0
 ```
 
-Avec le client d’une transaction qu’elle a ouverte, [`transaction()`](/fr/transaction#transaction) le transmet, et son callback s’exécute au niveau de cette transaction, un niveau que Postgres ne peut plus changer une fois celle-ci commencée : `db.serializable(txnClient, …)`, avec le client de `db.readCommitted()`, s’exécute en `READ COMMITTED` ([Transmettre une transaction](/fr/transaction#passing-a-transaction-through)).
+Avec le client d’une transaction qu’elle a ouverte, [`transaction()`](/fr/transaction#transaction) le transmet, et son callback s’exécute au niveau de cette transaction, un niveau que Postgres ne peut plus changer une fois la première requête de la transaction exécutée : `db.serializable(txnClient, …)`, avec le client de `db.readCommitted()`, s’exécute en `READ COMMITTED` ([Transmettre une transaction](/fr/transaction#passing-a-transaction-through)).
 
-Avec `true`, quand ce niveau ne vaut pas pour celui demandé ([`IsolationSatisfying`](/fr/transaction#IsolationSatisfying)), elle est rejetée avant d’appeler son callback, avec "transaction() at … was given the client of a transaction at …, so its callback would run at …: open the outer transaction at a level that satisfies … (IsolationSatisfying), or pass the pool"<!-- message -->, chaque `…` étant un niveau de l’appel (`SERIALIZABLE`, `READ COMMITTED`). À moins que le callback extérieur n’intercepte l’erreur, la transaction extérieure est alors annulée.
+Avec `true`, quand ce niveau ne vaut pas pour celui demandé ([`IsolationSatisfying`](/fr/transaction#IsolationSatisfying)), elle est rejetée avant d’appeler son callback, avec "transaction() at … was given the client of a transaction at …, so its callback would run at …: open the outer transaction at a level that satisfies … (IsolationSatisfying)"<!-- message -->, chaque `…` étant un niveau de l’appel (`SERIALIZABLE`, `READ COMMITTED`). À moins que le callback extérieur n’intercepte l’erreur, la transaction extérieure est alors annulée.
 
 Sans l’option, elle transmet le client, comme Zapatos 6.6.1, avec un avertissement une fois par processus, `PGCAST_DEP007`, seulement quand le niveau ne vaut pas pour celui demandé.
 
-- Le client d’un niveau qui vaut pour celui demandé est transmis, comme avant, avec ou sans l’option.
-- Seul le client d’une `transaction()` est vérifié, par sa marque `_zapatos` : un pool, un client simple et un client gardé après la fin de sa transaction reçoivent leur propre transaction, comme avant.
+- Le client d’un niveau qui vaut pour celui demandé est transmis, comme avant, avec ou sans l’option. De même pour le client de `db.serializableRODeferrable()` donné à `db.serializableRO()`, `db.repeatableReadRO()` ou `db.readCommittedRO()` : il apporte toutes les garanties qu’ils demandent, bien qu’`IsolationSatisfying` l’omette ([#489](https://github.com/AlexandreDemartin/pgcast/issues/489)).
+- Seul le client d’une `transaction()` est vérifié, par sa marque `_zapatos`, que porte aussi un client simple tant qu’une `transaction()` s’exécute dessus, si bien qu’un second appel au même moment sur ce client est vérifié : un pool, un client simple inactif et un client gardé après la fin de sa transaction reçoivent leur propre transaction, comme avant.
 - Les types ne changent pas : un `Queryable` accepte le client de n’importe quel niveau ([`TxnClient`](/fr/transaction#TxnClient)).
 - Un test qui exécute du code dans une `transaction()` à lui, et lui passe ce client : ouvrez-la en `IsolationLevel.Serializable`, qui vaut pour tous les niveaux.
 
