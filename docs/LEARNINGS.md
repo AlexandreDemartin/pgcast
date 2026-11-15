@@ -332,6 +332,8 @@ Candidates for a check, a rule or a skill line.
 - #487 — in a generated message, an exception gets a clause of its own ("except for money"), never one inside a "not … nor …" list.
 - #487 — a type that means "left as the generator wrote it" is an identity check (`(<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2)`): two-way assignability lets `any[]` and `{ a: any }` through. Its type tests hold an `any[]` and an object holding `any`.
 - #487 — a new generated type that `bench/` never uses leaves "`bench:types` unchanged" measuring nothing about it.
+- #491 — a claim about a held value names what is skipped: a type argument still checks an object held in a variable (TS2559, TS2345) and only lets an extra key through. Each such sentence gets its weak-type and wrong-value probes.
+- #491 — an "each candidate tried refused X" rationale is checked against each grid column before it goes into the CHANGELOG: candidate D refused other code, not X.
 
 ## Minors kept
 
@@ -459,3 +461,4 @@ Minor review defects, taken up by the end-of-chapter review.
 - #487 — `website/catalog-types.md:69` and `website/generator.md:390` (and FR): "typed by its placeholder in all five interfaces, which, as generated, holds…" reads twice; "typed in all five interfaces by its placeholder, which…".
 - #487 — `website/custom-types.md:231` (and FR): the sentence on a domain's placeholder would read better as two.
 - #487 — `test/types/schema.test-d.ts`: `unknown`, `db.Int8String | null` under `strict`, and a generated `NumericString[]` or `Date[]` are not frozen for `DomainInContext`.
+
