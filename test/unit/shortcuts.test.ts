@@ -1777,3 +1777,163 @@ describe('count, sum, avg, min, max', () => {
       .toMatchInlineSnapshot(`"SELECT corr("ratio", "balance") AS result FROM "accounts""`);
   });
 });
+
+// 6.6.1 threw a TypeError at the call on most of these, or sent a query Postgres refused; a primitive among
+// other rows was spread into its character indexes ("0", "1"), or into no key, a row of defaults (#341)
+describe('a null or primitive row in insert(), upsert() and update()', () => {
+  afterEach(() => { vi.restoreAllMocks(); });
+  const
+    row = { email: 'a@x.org', display_name: 'A' },
+    colsMessage = (kind: string) => `\`db.cols()\` takes an object or an array, not \`${kind}\`: for one column, write \`db.cols([name])\`; for a row of \`insert()\`, \`upsert()\` or \`update()\`, give an object.`,
+    valsMessage = (kind: string) => `\`db.vals()\` takes an object or an array, not \`${kind}\`: for one value, write \`db.vals([value])\`; for a row of \`insert()\`, \`upsert()\` or \`update()\`, give an object.`,
+    single: Record<string, unknown> = {
+      null: null, undefined: undefined, string: 'ab', emptyString: '', number: 42, boolean: true,
+      bigint: (globalThis as any).BigInt(10), symbol: Symbol('s'),
+    },
+    kind = (x: unknown) => x === null ? 'null' : typeof x;
+
+  /** `.run(q).catch(h)` outside an async step: a throw at the call is not a rejection. */
+  const outcome = (build: () => db.SQLFragment<any, any>, queryable: any) => {
+    try {
+      return build().run(queryable).then(() => 'ran', (err: Error) => err.message);
+    } catch (err) {
+      return Promise.resolve(`throws at the call: ${(err as Error).message}`);
+    }
+  };
+
+  it('a single row that is null or a primitive rejects run(), with no query sent', async () => {
+    const queryable = { query: vi.fn() } as any, outcomes: Record<string, string> = {}, expected: Record<string, string> = {};
+    for (const [name, x] of Object.entries(single)) {
+      outcomes[`insert ${name}`] = await outcome(() => db.insert('users', x as any), queryable);
+      outcomes[`upsert ${name}`] = await outcome(() => db.upsert('users', x as any, 'email'), queryable);
+      outcomes[`update ${name}`] = await outcome(() => db.update('users', x as any, { id: 1 }), queryable);
+      for (const fn of ['insert', 'upsert', 'update']) expected[`${fn} ${name}`] = colsMessage(kind(x));
+    }
+    expect(outcomes).toEqual(expected);
+    expect(queryable.query).not.toHaveBeenCalled();
+  });
+
+  it('a primitive among several rows rejects run(), with no query sent', async () => {
+    const
+      queryable = { query: vi.fn() } as any,
+      rows: Record<string, unknown[]> = {
+        number: [42], string: ['ab'], rowThenNumber: [row, 42], rowThenString: [row, 'ab'], stringThenRow: ['ab', row],
+        rowThenBoolean: [row, true],
+      },
+      outcomes: Record<string, string> = {};
+    for (const [name, values] of Object.entries(rows)) {
+      outcomes[`insert ${name}`] = await outcome(() => db.insert('users', values as any), queryable);
+      outcomes[`upsert ${name}`] = await outcome(() => db.upsert('users', values as any, 'email'), queryable);
+    }
+    expect(outcomes).toEqual({
+      'insert number': colsMessage('number'), 'upsert number': colsMessage('number'),
+      'insert string': colsMessage('string'), 'upsert string': colsMessage('string'),
+      'insert rowThenNumber': valsMessage('number'), 'upsert rowThenNumber': valsMessage('number'),
+      'insert rowThenString': valsMessage('string'), 'upsert rowThenString': valsMessage('string'),
+      'insert stringThenRow': colsMessage('string'), 'upsert stringThenRow': colsMessage('string'),
+      'insert rowThenBoolean': valsMessage('boolean'), 'upsert rowThenBoolean': valsMessage('boolean'),
+    });
+    expect(queryable.query).not.toHaveBeenCalled();
+  });
+
+  it('a primitive beside a row with no keys, a null row or an empty array rejects run(), with no query sent', async () => {
+    // the first row has no column, but the check for that (nothing to insert) leaves the primitive to cols() or vals()
+    const
+      queryable = { query: vi.fn() } as any,
+      noKeys: Record<string, unknown> = { empty: {}, null: null, emptyArray: [] },
+      outcomes: Record<string, string> = {}, expected: Record<string, string> = {};
+    for (const [name, x] of Object.entries(single)) {
+      if (x == null) continue;
+      for (const [other, o] of Object.entries(noKeys)) for (const [order, values] of [['after', [o, x]], ['before', [x, o]]] as const) {
+        const key = `${name} ${order} ${other}`;
+        outcomes[`insert ${key}`] = await outcome(() => db.insert('users', values as any), queryable);
+        outcomes[`upsert ${key}`] = await outcome(() => db.upsert('users', values as any, 'email'), queryable);
+        for (const fn of ['insert', 'upsert']) expected[`${fn} ${key}`] = (order === 'after' ? valsMessage : colsMessage)(kind(x));
+      }
+    }
+    expect(outcomes).toEqual(expected);
+    expect(queryable.query).not.toHaveBeenCalled();
+  });
+
+  it('a primitive among rows whose undefined values undefinedMeansMissing drops still rejects', async () => {
+    // undefinedAsMissing rebuilds the object rows; a primitive one is left as it is, not made an object of its characters
+    db.setConfig({ undefinedMeansMissing: true });
+    const queryable = { query: vi.fn() } as any;
+    expect(await outcome(() => db.insert('users', [{ ...row, mood: undefined }, 'ab'] as any), queryable)).toBe(valsMessage('string'));
+    expect(await outcome(() => db.upsert('users', [{ ...row, mood: undefined }, 'ab'] as any, 'email'), queryable)).toBe(valsMessage('string'));
+    expect(queryable.query).not.toHaveBeenCalled();
+  });
+
+  it('upsert of a null or undefined row among others compiles as in 6.6.1, a row of defaults, and warns PGCAST_DEP001', async () => {
+    // since #27, hasOwnProperty.call(null, …) threw a TypeError at the call; the row is read as `{}`, as insert() reads
+    // it, so it misses every key, which is then set from EXCLUDED: the case PGCAST_DEP001 is about. DO UPDATE SET
+    // takes the key order of the first completed row, unsorted, as in 6.6.1
+    const { fdb, emitWarning } = await fresh();
+    const upsertSQL = (defaultsFirst: boolean) =>
+      `INSERT INTO "users" ("display_name", "email") VALUES ${defaultsFirst ? '(DEFAULT, DEFAULT), ($1, $2)' : '($1, $2), (DEFAULT, DEFAULT)'} ON CONFLICT ("email") DO UPDATE SET ("email", "display_name") = ROW(EXCLUDED."email", EXCLUDED."display_name") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result`;
+    expect(fdb.upsert('users', [row, null as any], 'email').compile()).toEqual({ text: upsertSQL(false), values: ['A', 'a@x.org'] });
+    expect(fdb.upsert('users', [null as any, row], 'email').compile()).toEqual({ text: upsertSQL(true), values: ['A', 'a@x.org'] });
+    expect(fdb.upsert('users', [row, undefined as any], 'email').compile()).toEqual({ text: upsertSQL(false), values: ['A', 'a@x.org'] });
+    expect(emitWarning).toHaveBeenCalledTimes(1);
+    expect(emitWarning.mock.calls[0][1]).toEqual({ type: 'DeprecationWarning', code: 'PGCAST_DEP001' });
+    fdb.setConfig({ upsertRequiresSameKeys: true });
+    expect(() => fdb.upsert('users', [row, null as any], 'email'))
+      .toThrow('rows have different keys: pass updateColumns, or give every row the same keys');
+    expect(fdb.upsert('users', [row, null as any], 'email', { updateColumns: ['display_name'] }).compile().text)
+      .toBe(`INSERT INTO "users" ("display_name", "email") VALUES ($1, $2), (DEFAULT, DEFAULT) ON CONFLICT ("email") DO UPDATE SET ("display_name") = ROW(EXCLUDED."display_name") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result`);
+  });
+
+  it('a null row alone in an array still throws nothing to insert at the call, as an empty row does', () => {
+    expect(() => db.insert('users', [null as any])).toThrow(nothingToInsert);
+    expect(() => db.upsert('users', [null as any], 'email')).toThrow(nothingToInsert);
+  });
+});
+
+// 6.6.1 threw a TypeError at the call, from Object.keys(null) or reading `copy` of null (#341)
+describe('lateral: null, or a lateral key whose query is null or undefined', () => {
+  const
+    lateralNull = '`lateral: null` has no meaning: for no lateral join, leave `lateral` out; to join, give it a `select()`, `selectOne()` or `count()` query, or an object of them.',
+    lateralKey = (key: string, x: string) => `The \`lateral\` key '${key}' is \`${x}\`, not a query: leave the key out, or give it a \`select()\`, \`selectOne()\` or \`count()\` query.`;
+
+  it('rejects run(), with no query sent, in each select mode, the aggregates and a nested lateral', async () => {
+    const queryable = { query: vi.fn() } as any, outcomes: Record<string, string> = {};
+    const builds: Record<string, () => db.SQLFragment<any, any>> = {
+      select: () => db.select('users', all, { lateral: null as any }),
+      selectOne: () => db.selectOne('users', all, { lateral: null as any }),
+      selectExactlyOne: () => db.selectExactlyOne('users', all, { lateral: null as any }),
+      count: () => db.count('users', all, { lateral: null as any }),
+      sum: () => db.sum('accounts', all, { columns: ['balance'], lateral: null as any }),
+      nested: () => db.select('users', all, { lateral: { n: db.select('accounts', all, { lateral: null as any }) } }),
+      keyNull: () => db.select('users', all, { lateral: { n: null as any } }),
+      keyUndefined: () => db.select('users', all, { lateral: { n: undefined as any } }),
+      keyNullNested: () => db.select('users', all, { lateral: { n: db.selectOne('accounts', all, { lateral: { m: null as any } }) } }),
+      keyNullAmongOthers: () => db.select('users', all, { lateral: { a: db.count('accounts', all), n: null as any } }),
+    };
+    for (const [name, build] of Object.entries(builds)) {
+      try {
+        outcomes[name] = await build().run(queryable).then(() => 'ran', (err: Error) => err.message);
+      } catch (err) {
+        outcomes[name] = `throws at the call: ${(err as Error).message}`;
+      }
+    }
+    expect(outcomes).toEqual({
+      select: lateralNull, selectOne: lateralNull, selectExactlyOne: lateralNull, count: lateralNull, sum: lateralNull,
+      nested: lateralNull, keyNull: lateralKey('n', 'null'), keyUndefined: lateralKey('n', 'undefined'),
+      keyNullNested: lateralKey('m', 'null'), keyNullAmongOthers: lateralKey('n', 'null'),
+    });
+    expect(queryable.query).not.toHaveBeenCalled();
+  });
+
+  it('with selectExactlyOneChecksForSecondRow, selectExactlyOne() of lateral: null rejects the same way', async () => {
+    db.setConfig({ selectExactlyOneChecksForSecondRow: true });
+    const queryable = { query: vi.fn() } as any;
+    await expect(db.selectExactlyOne('users', all, { lateral: null as any }).run(queryable)).rejects.toThrow(lateralNull);
+    expect(queryable.query).not.toHaveBeenCalled();
+  });
+
+  it('lateral: undefined and an object of queries compile as before', () => {
+    expect(db.select('users', all, { lateral: undefined }).compile()).toEqual(db.select('users', all).compile());
+    expect(db.select('users', all, { lateral: { n: db.count('accounts', all) } }).compile().text)
+      .toBe(`SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) || jsonb_build_object($1::text, "lateral_n".result) AS result FROM "users" LEFT JOIN LATERAL (SELECT count(*) AS result FROM "accounts") AS "lateral_n" ON true) AS "sq_users"`);
+  });
+});
