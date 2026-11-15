@@ -509,8 +509,12 @@ describe('variant snapshots', () => {
     });
 
     it('the edited probe\'s refusals are unused with the placeholders left as generated', async () => {
-      // typed by the innermost domain: a number, a bigint; 'horror' is refused still
-      expect(await probeErrors(on, editedProbe('// @ts-expect-error'))).toEqual(Array(2).fill(unused));
+      // typed by the innermost domain: a number, a bigint, pg's text for the array; 'horror' is refused still
+      expect(await probeErrors(on, editedProbe('// @ts-expect-error'))).toEqual([
+        "probe.ts TS1360 Type 'string | null' does not satisfy the expected type 'genre[] | null'.   " +
+          "Type 'string' is not assignable to type 'genre[]'.",
+        ...Array(2).fill(unused),
+      ]);
       expect(await probeErrors(config, editedProbe('// @ts-expect-error'))).toEqual(Array(3).fill(unused));
     });
   });
@@ -1228,11 +1232,13 @@ describe('domainsTypedByContext', () => {
     CREATE DOMAIN ctx.vip_label AS ctx.label;
     CREATE DOMAIN ctx.vip_genre AS ctx.genre_d;
     CREATE DOMAIN ctx.ticket_list AS ctx.ticket_no[];
-    -- any under its domains too: a point, an array of a domain over an array, an enum of another schema
+    -- any under its domains too: a point, an array of a domain over an array
     CREATE DOMAIN ctx.spot AS point;
     CREATE DOMAIN ctx.vip_spot AS ctx.spot;
+    -- an enum of another schema, whose name ctx gives another enum
     CREATE SCHEMA ctx_box;
     CREATE TYPE ctx_box.tone AS ENUM ('warm', 'dry');
+    CREATE TYPE ctx.tone AS ENUM ('loud');
     CREATE DOMAIN ctx_box.tone_d AS ctx_box.tone;
     CREATE DOMAIN ctx.vip_tone AS ctx_box.tone_d;
     CREATE TABLE ctx.tickets (
@@ -1240,10 +1246,11 @@ describe('domainsTypedByContext', () => {
       at ctx.starts, data ctx.blob, cost ctx.cost, nos ctx.ticket_nos);
     CREATE MATERIALIZED VIEW ctx.ticket_days AS SELECT id, day FROM ctx.tickets;
     CREATE TABLE ctx.quiet (label ctx.label, minutes ctx.minutes, notes ctx.notes, genre ctx.genre_d, spot ctx.vip_spot,
-      nos ctx.ticket_nos[], tone ctx.vip_tone);
+      nos ctx.ticket_nos[]);
     CREATE TABLE ctx.nested (
       id int PRIMARY KEY, premium ctx.premium_ticket_no NOT NULL, vip ctx.vip_ticket_no, day ctx.vip_day,
-      label ctx.vip_label, genre ctx.vip_genre, arr ctx.ticket_no[], labels ctx.label[], list ctx.ticket_list);
+      label ctx.vip_label, genre ctx.vip_genre, arr ctx.ticket_no[], labels ctx.label[], list ctx.ticket_list,
+      tone ctx.vip_tone);
     CREATE MATERIALIZED VIEW ctx.nested_days AS SELECT day, arr FROM ctx.nested;
     CREATE TABLE ctx_box.films (id int PRIMARY KEY, tones ctx_box.tone_d[]);
   `));
@@ -1371,26 +1378,26 @@ describe('domainsTypedByContext', () => {
       }
     });
 
-    it('types an enum of a prefixed schema by its name there, and one of another schema as typeEnumsAcrossSchemas says', async () => {
+    it('types an enum of the relation\'s schema by its name, and one of another schema by its labels, never by its name', async () => {
       const box = { ...on, schemas: { ctx: all, ctx_box: all } };
-      const tones = inAny('c.Pg_tone_d');
-      expect(linesOf((await codegen(box)).ts, 'films', 'tones'))
-        .toEqual(nullable('tones', tones('string'), tones('tone[]'), tones('tone[]')));
-      // ctx.quiet.tone, of ctx_box.tone: looked up by name in ctx without the option, which has no such enum
-      expect(linesOf((await codegen(box)).ts, 'quiet', 'tone')).toEqual(nullable('tone', 'c.PgVip_tone', 'c.PgVip_tone', 'c.PgVip_tone'));
-      const tone = inAny('c.PgVip_tone'), labels = "('dry' | 'warm')";
-      expect(linesOf((await codegen({ ...box, typeEnumsAcrossSchemas: true })).ts, 'quiet', 'tone'))
-        .toEqual(nullable('tone', tone(labels), tone(labels), tone(labels)));
+      const tones = inAny('c.Pg_tone_d'), tone = inAny('c.PgVip_tone'), labels = "('dry' | 'warm')";
+      for (const typeEnumsAcrossSchemas of [false, true]) {
+        const { ts: schema } = await codegen({ ...box, typeEnumsAcrossSchemas });
+        // in a prefixed schema: its namespace's enum
+        expect(linesOf(schema, 'films', 'tones')).toEqual(nullable('tones', tones('string'), tones('tone[]'), tones('tone[]')));
+        // ctx_box.tone, not ctx.tone
+        expect(linesOf(schema, 'nested', 'tone')).toEqual(nullable('tone', tone(labels), tone(labels), tone(labels)));
+      }
     });
 
     it('types what pg, the shortcuts and Postgres give: a domain over a domain parsed, an array of a domain as text', async () => {
       const row = await runtime.insert('ctx.nested' as any, {
         id: 1, premium: BigInt(1), vip: '2', day: '2030-03-01', label: 'x', genre: 'comedy',
-        arr: [1, BigInt(2)], labels: ['a'], list: ['3'],
+        arr: [1, BigInt(2)], labels: ['a'], list: ['3'], tone: 'dry',
       }).run(t.client) as any;
       // the shortcuts' JSON
       expect(row).toEqual({ id: 1, premium: 1, vip: 2, day: '2030-03-01', label: 'x', genre: 'comedy',
-        arr: [1, 2], labels: ['a'], list: [3] });
+        arr: [1, 2], labels: ['a'], list: [3], tone: 'dry' });
       // pg's own parsing
       const { rows: [fromPg] } = await t.client.query('SELECT premium, vip, day, arr, labels, list FROM ctx.nested');
       expect({ ...fromPg, day: fromPg.day instanceof Date }).toEqual({
@@ -1416,7 +1423,8 @@ describe('domainsTypedByContext', () => {
       'wrote for them; it will be the default in pgcast 7.0.',
       'Note: ctx.nested.arr (ctx.ticket_no[]), ctx.nested.day (ctx.vip_day), ctx.nested.genre (ctx.vip_genre), ' +
       'ctx.nested.label (ctx.vip_label), ctx.nested.labels (ctx.label[]), ctx.nested.list (ctx.ticket_list), ' +
-      'ctx.nested.premium (ctx.premium_ticket_no), ctx.nested.vip (ctx.vip_ticket_no), ctx.nested_days.arr ' +
+      'ctx.nested.premium (ctx.premium_ticket_no), ctx.nested.tone (ctx.vip_tone), ctx.nested.vip (ctx.vip_ticket_no), ' +
+      'ctx.nested_days.arr ' +
       '(ctx.ticket_no[]) and ctx.nested_days.day (ctx.vip_day) have domains over a domain, or arrays of a domain: ' +
       'as generated, their placeholders type them as `any`. Set domainsTypedByContext: true to type them by the base ' +
       'type of the innermost domain while their placeholders hold `any`; it will be the default in pgcast 7.0.',
