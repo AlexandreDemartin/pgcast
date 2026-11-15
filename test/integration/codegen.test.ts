@@ -1349,6 +1349,63 @@ describe('awkward names', () => {
     }
   });
 
+  it('prefixes every line of a name holding a line break, in an unprefixed and a prefixed schema', async () => {
+    /** Each JSDoc of the namespace `name` in `schema` and of its `Selectable`'s members, by member name: its lines, indentation trimmed. */
+    const docsOf = (schema: string, name: string) => {
+      const
+        lines = (node: ts.Node) => (node as { jsDoc?: ts.JSDoc[] }).jsDoc![0].getText().split(/\r\n?|\n/).map(line => line.trimStart()),
+        find = (node: ts.Node): ts.ModuleDeclaration | undefined =>
+          ts.isModuleDeclaration(node) && node.name.text === name ? node : ts.forEachChild(node, find),
+        namespace = find(ts.createSourceFile('schema.ts', schema, ts.ScriptTarget.Latest, true))!,
+        selectable = (namespace.body as ts.ModuleBlock).statements.find(s => ts.isInterfaceDeclaration(s) && s.name.text === 'Selectable') as ts.InterfaceDeclaration;
+      return { relation: lines(namespace), ...Object.fromEntries(selectable.members.map(m => [(m.name as ts.StringLiteral | ts.Identifier).text, lines(m)])) };
+    };
+    const ddl = (schema: string) => `
+      CREATE SCHEMA ${schema};
+      CREATE DOMAIN ${schema}."dom${'\n'}name" AS text;
+      CREATE TYPE ${schema}."enum${'\r\n'}name" AS ENUM ('x');
+      CREATE TYPE ${schema}."comp${'\r'}name" AS (a int);
+      CREATE TABLE ${schema}."two${'\n'}lines" ("col${'\r\n'}name" int, "col${'\r'}name" int, d ${schema}."dom${'\n'}name",
+        e ${schema}."enum${'\r\n'}name", ea ${schema}."enum${'\r\n'}name"[], t ${schema}."comp${'\r'}name", "one line" int);
+      CREATE MATERIALIZED VIEW ${schema}."view${'\n'}name" AS SELECT "col${'\r\n'}name" FROM ${schema}."two${'\n'}lines";`;
+    // tsForConfig() reads through its own connection: the schemas are committed, then dropped
+    await t.pool.query(ddl('line_names') + ddl(`"name${'\r\n'}lines"`));
+    try {
+      const { ts: schema } = await codegen({ schemas: { line_names: all, [`name${'\r\n'}lines`]: all }, unprefixedSchema: 'line_names' });
+      const expected = (prefixed: boolean) => {
+        // the title, its last line ending with `last`: an unprefixed schema names no schema in a JSDoc
+        const
+          title = (relation: string[], ...last: string[]) => {
+            const lines = [...prefixed ? ['* **name', `* lines.${relation[0]}`] : [`* **${relation[0]}`], ...relation.slice(1).map(l => `* ${l}`)];
+            return last.length ? [...lines.slice(0, -1), lines.at(-1) + '.' + last[0], ...last.slice(1).map(l => `* ${l}`)] : lines;
+          },
+          column = (last: string[], type: string[], rest = ['* - Nullable, no default']) =>
+            ['/**', ...title(['two', 'lines'], ...last), ...type, ...rest, '*/'],
+          int4 = ['* - `int4` in database'];
+        return {
+          relation: ['/**', ...title(['two', 'lines**']), '* - Table in database', '*/'],
+          [`col${'\r\n'}name`]: column(['col', 'name**'], int4),
+          [`col${'\r'}name`]: column(['col', 'name**'], int4),
+          d: column(['d**'], ['* - `dom', '* name` (base type: `text`) in database']),
+          e: column(['e**'], ['* - `enum', '* name` in database']),
+          ea: column(['ea**'], ['* - `_enum', '* name` in database']),
+          t: column(['t**'], ['* - `comp', '* name` in database']),
+          // a name on one line: as under Zapatos 6.6.1, byte for byte
+          'one line': column(['one line**'], int4),
+        };
+      };
+      expect.soft(docsOf(schema, 'two_lines')).toEqual(expected(false));
+      expect.soft(docsOf(schema.slice(schema.indexOf('export namespace name_lines {')), 'two_lines'))
+        .toEqual(expected(true));
+      // and a materialised view's column, whose JSDoc reads the name through another query
+      expect.soft(docsOf(schema, 'view_name')[`col${'\r\n'}name`])
+        .toEqual(['/**', '* **view', '* name.col', '* name**', '* - `int4` in database', '* - Materialized view column', '*/']);
+      expect.soft(syntaxErrors(schema)).toEqual([]);
+    } finally {
+      await t.pool.query(`DROP SCHEMA line_names, "name${'\r\n'}lines" CASCADE`);
+    }
+  });
+
   it('notes two names that become one identifier', async () => {
     await t.pool.query(`
       CREATE SCHEMA "two-names";
