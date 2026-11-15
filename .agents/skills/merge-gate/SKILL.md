@@ -37,7 +37,7 @@ gh pr merge <pr> --repo AlexandreDemartin/pgcast --squash \
 
 - From bottom to top; a middle layer is never merged before the ones below it.
 - The bottom is squashed; GitHub retargets the next layer to `master` (`delete_branch_on_merge` is on).
-- Then `git merge origin/master` into that layer (agent `chores`), never a rebase: its diff then shows only its own commits.
+- Then merge `origin/master` into that layer (agent `chores`, skill `pr-shape` § Commits), never a rebase: its diff then shows only its own commits.
 - Green CI, then that layer's own gate.
 
 ## Clean up

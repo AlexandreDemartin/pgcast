@@ -6,6 +6,15 @@ import {pathToFileURL} from 'node:url';
 
 const fork = 'AlexandreDemartin/pgcast';
 
+/** The words after `git` and its own options (`-C <dir>`, `-c <key=value>`): the subcommand first; none if not git. */
+function gitWordsOf(command) {
+  const words = command.split(/\s+/);
+  if (words[0] !== 'git') return [];
+  let index = 1;
+  while (index < words.length && words[index].startsWith('-')) index += /^-[Cc]$/.test(words[index]) ? 2 : 1;
+  return words.slice(index);
+}
+
 const commandRefusals = [
   {
     refuses: command => /^git\b.*\bpush\b.*(\s--force(-with-lease)?\b|\s-[a-zA-Z]*f\b|\s\+\S)/.test(command),
@@ -13,7 +22,7 @@ const commandRefusals = [
   },
   {
     refuses: command => /^git\b.*(\brebase\b|\bpull\b.*\s(--rebase\b|-r\b))/.test(command),
-    reason: 'Never rebase: `git merge origin/<branch>` instead (agent builder § Git).',
+    reason: 'Never rebase: `git merge -m "<subject>" -m "Co-Authored-By: …" origin/<branch>` instead (agent builder § Git).',
   },
   {
     refuses: command => /^git\b.*\bcommit\b.*\s--amend\b/.test(command),
@@ -22,6 +31,15 @@ const commandRefusals = [
   {
     refuses: command => /^git\b.*\b(commit|merge)\b.*\s--no-edit\b/.test(command),
     reason: 'Never `--no-edit`: it drops the Co-Authored-By line or keeps the `# Conflicts:` lines; give `-m` (skill pr-shape § Commits).',
+  },
+  {
+    // with no terminal, a bare merge writes its default message as --no-edit does; these make no commit of their own
+    refuses: command => {
+      const [subcommand, ...words] = gitWordsOf(command);
+      return subcommand === 'merge' &&
+        !words.some(word => /^(-[mF]|--(message|file|abort|continue|quit|ff-only|no-commit|squash)\b)/.test(word));
+    },
+    reason: 'A merge that commits gives `-m "<subject>" -m "Co-Authored-By: …"`: without a terminal, a bare `git merge` writes its default message, with no trailer (skill pr-shape § Commits).',
   },
   {
     refuses: command =>
