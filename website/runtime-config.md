@@ -110,7 +110,7 @@ transactionAttemptsMax: number  // default: 5
 
 How many times [`transaction()`](/transaction#transaction) runs its callback. After a serialisation failure (`40001`) or a deadlock (`40P01`), it rolls back and runs the callback again, until this many attempts have failed; then it throws the last error. Any other error is rolled back and thrown at once.
 
-- `1`, `0` or less: one attempt, no retry. With `0`, the message reads "… on attempt 1 of 0, giving up" ([#179](https://github.com/AlexandreDemartin/pgcast/issues/179)).
+- `1`, `0`, a negative value or `NaN`: one attempt, no retry, and the message reads "… on attempt 1 of 1, giving up". A fraction is rounded up: `2.5` makes three attempts.
 - Read when `transaction()` starts, so a change affects the next transaction, not the one running.
 - How to write a callback that can run twice: [Retries](/retries).
 
@@ -383,7 +383,7 @@ A behaviour of Zapatos 6.6.1 that code may rely on, but that pgcast would change
 
 One opt-in has no warning and no default in 7.0: [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow), since 6.6.1's reading of `selectExactlyOne()`, at least one row, is one Zapatos documents.
 
-The generator has its own: [`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas) and [`enumOrder`](/generator#generate.enumOrder), whose old paths are notes through [`warningListener`](/generator#generate.warningListener), once per run, rather than a `DeprecationWarning`; they will be the defaults in 7.0 too.
+The generator has its own: [`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas), [`enumOrder`](/generator#generate.enumOrder) and [`rejectOnQueryError`](/generator#generate.rejectOnQueryError), whose old paths are notes through [`warningListener`](/generator#generate.warningListener), once per run, rather than a `DeprecationWarning`; they will be the defaults in 7.0 too.
 
 Each warning is a Node.js `DeprecationWarning`, emitted once per process for each code, when the shortcut is called (`PGCAST_DEP003`: when `transaction()` resolves; `PGCAST_DEP004`: when `.run()` gets the result; `PGCAST_DEP005`: when `transaction()` is called, before its `START TRANSACTION`), and only when the old behaviour is used. Its message names the option. Node prints it to `stderr`:
 

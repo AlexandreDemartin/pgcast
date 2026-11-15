@@ -31,7 +31,8 @@ const recursivelyInterpolateEnvVars = (obj: any): any =>
 
 /**
  * The CLI's config: the file in `dir`, `pgcastconfig.json` else `zapatosconfig.json` else none, then `argsJSON`
- * merged over it, each with its environment variables filled in. With both files, a note through `warningListener`.
+ * merged over it, each with its environment variables filled in, then `rejectOnQueryError: false` over both, so a
+ * failed query ends the process. With both files, a note through `warningListener`.
  */
 export const cliConfig = (argsJSON = '{}', dir = '.') => {
   const
@@ -55,7 +56,8 @@ export const cliConfig = (argsJSON = '{}', dir = '.') => {
     throw new Error(`If present, the argument to Zapatos must be valid JSON, and all referenced environment variables must exist: ${err.message}`);
   }
 
-  const config = { ...fileConfig, ...argsConfig } as Config;
+  // the CLI exits on a failed query, printing it as Zapatos 6.6.1 does, whatever the file and the argument say
+  const config = { ...fileConfig, ...argsConfig, rejectOnQueryError: false } as Config;
 
   if (configFiles.length > 1) {
     const

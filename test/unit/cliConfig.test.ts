@@ -27,32 +27,35 @@ afterEach(() => {
 
 const write = (name: string, json: string) => fs.writeFileSync(path.join(dir, name), json);
 
+// the CLI exits on a failed query, whatever the file and the argument say (#183)
+const exits = { rejectOnQueryError: false };
+
 describe('cliConfig()', () => {
   it('takes the argument alone without a config file, and notes nothing', () => {
-    expect(cliConfig(undefined, dir)).toEqual({});
-    expect(cliConfig('{"outDir": "./src"}', dir)).toEqual({ outDir: './src' });
+    expect(cliConfig(undefined, dir)).toEqual({ ...exits });
+    expect(cliConfig('{"outDir": "./src"}', dir)).toEqual({ outDir: './src', ...exits });
     expect(log).not.toHaveBeenCalled();
   });
 
   it('reads zapatosconfig.json alone, as Zapatos 6.6.1 does', () => {
     write('zapatosconfig.json', '{"db": {"connectionString": "{{PGCAST_FILMS_URL}}"}, "outDir": "./src"}');
-    expect(cliConfig(undefined, dir)).toEqual({ db: { connectionString: 'postgresql://localhost/films' }, outDir: './src' });
+    expect(cliConfig(undefined, dir)).toEqual({ db: { connectionString: 'postgresql://localhost/films' }, outDir: './src', ...exits });
     expect(cliConfig('{"outDir": "./generated"}', dir))
-      .toEqual({ db: { connectionString: 'postgresql://localhost/films' }, outDir: './generated' });
+      .toEqual({ db: { connectionString: 'postgresql://localhost/films' }, outDir: './generated', ...exits });
     expect(log).not.toHaveBeenCalled();
   });
 
   it('reads pgcastconfig.json alone', () => {
     write('pgcastconfig.json', '{"db": {"connectionString": "{{ PGCAST_FILMS_URL }}"}, "moduleNames": "pgcast"}');
     expect(cliConfig('{"outDir": "./src"}', dir))
-      .toEqual({ db: { connectionString: 'postgresql://localhost/films' }, moduleNames: 'pgcast', outDir: './src' });
+      .toEqual({ db: { connectionString: 'postgresql://localhost/films' }, moduleNames: 'pgcast', outDir: './src', ...exits });
     expect(log).not.toHaveBeenCalled();
   });
 
   it('reads pgcastconfig.json when zapatosconfig.json is there too, and notes it once', () => {
     write('pgcastconfig.json', '{"outDir": "./src", "moduleNames": "pgcast"}');
     write('zapatosconfig.json', '{"outDir": "./legacy", "schemas": {"archive": {"include": "*", "exclude": []}}}');
-    expect(cliConfig(undefined, dir)).toEqual({ outDir: './src', moduleNames: 'pgcast' });
+    expect(cliConfig(undefined, dir)).toEqual({ outDir: './src', moduleNames: 'pgcast', ...exits });
     expect(log.mock.calls).toEqual([[
       'Note: pgcastconfig.json and zapatosconfig.json are both here, and only pgcastconfig.json is read. ' +
       'Move any option you still need from zapatosconfig.json into pgcastconfig.json, then delete zapatosconfig.json.',
@@ -62,9 +65,9 @@ describe('cliConfig()', () => {
   it('keeps that note quiet with warningListener false, from the file or the argument', () => {
     write('pgcastconfig.json', '{"warningListener": false}');
     write('zapatosconfig.json', '{}');
-    expect(cliConfig(undefined, dir)).toEqual({ warningListener: false });
+    expect(cliConfig(undefined, dir)).toEqual({ warningListener: false, ...exits });
     write('pgcastconfig.json', '{}');
-    expect(cliConfig('{"warningListener": false}', dir)).toEqual({ warningListener: false });
+    expect(cliConfig('{"warningListener": false}', dir)).toEqual({ warningListener: false, ...exits });
     expect(log).not.toHaveBeenCalled();
   });
 
@@ -75,6 +78,7 @@ describe('cliConfig()', () => {
         schemas: { '{{PGCAST_FILMS_URL}}': { include: ['postgresql://localhost/films'], exclude: [] } },
         schemaJSDoc: true,
         db: { connectionString: 'a postgresql://localhost/films b' },
+        ...exits,
       });
     }
   });
@@ -101,6 +105,12 @@ describe('cliConfig()', () => {
     expect(() => cliConfig(undefined, dir))
       .toThrow(/^If present, pgcastconfig\.json must be a valid JSON file, and all referenced environment variables must exist: /);
     expect(log).not.toHaveBeenCalled();
+  });
+
+  it('sets rejectOnQueryError to false over the file and the argument, so the CLI exits on a failed query', () => {
+    write('pgcastconfig.json', '{"rejectOnQueryError": true}');
+    expect(cliConfig(undefined, dir)).toEqual({ rejectOnQueryError: false });
+    expect(cliConfig('{"rejectOnQueryError": true}', dir)).toEqual({ rejectOnQueryError: false });
   });
 
   it('names the argument in its error', () => {

@@ -1,5 +1,5 @@
 ---
-english: e15a74bbb208
+english: 59a9046bfd71
 ---
 
 # Transactions
@@ -147,7 +147,6 @@ client.release();
 |---|---|---|
 | `Isolation level must be an IsolationLevel value (e.g. IsolationLevel.Serializable), not '…'`<!-- message --> | `isolationLevel` n’est pas une valeur d’`IsolationLevel` ; levée avant qu’un client soit récupéré ou qu’une requête soit envoyée | pgcast 6.6.2 |
 | l’erreur du callback | après `ROLLBACK` ; pour 40001 et 40P01, après la dernière tentative | Zapatos |
-| une `TypeError`, `Cannot destructure property 'code' of 'err' as it is null.` (ou `undefined`) | le callback lève `null` ou `undefined`, après `ROLLBACK` | Zapatos |
 | "the transaction was rolled back, not committed: a query in it failed and the callback caught the error, so Postgres answered COMMIT with ROLLBACK; let the error out of the callback, or ROLLBACK TO a SAVEPOINT before going on"<!-- message --> | avec [`transactionRequiresCommit`](/fr/runtime-config#Config.transactionRequiresCommit), Postgres a répondu au `COMMIT` par `ROLLBACK` ; pas de retry, ni de `ROLLBACK` propre | pgcast 6.7.0 |
 | "transaction() was given a client inside a transaction block, so its COMMIT or ROLLBACK would end that transaction: COMMIT or ROLLBACK it first, pass the pool, or run the queries on that client without transaction()"<!-- message --> | avec [`transactionRequiresIdleClient`](/fr/runtime-config#Config.transactionRequiresIdleClient), un client à vous est dans un bloc de transaction ([Votre propre `BEGIN`](#your-own-begin)) ; après n’avoir envoyé que la requête vide | pgcast 6.7.0 |
 
@@ -350,8 +349,8 @@ db.isDatabaseError(err, ...types)
 
 `true` quand le `code` de `err`, cinq caractères, commence par le code de l’un des `types` ; sinon `false`, et toujours sans `types`.
 
-- `err` : un objet avec une chaîne `code` optionnelle ; `null` ou `undefined` lève une `TypeError`. Sur une erreur de Postgres, `.run()` est rejetée avec la `DatabaseError` de node-postgres, dont le `code` est le SQLSTATE ; elle a aussi `constraint`, `detail`, `table` et les autres champs qu’envoie Postgres.
-  - Le type accepte `any`, `pg.DatabaseError` et `{ code?: string }`, et refuse `unknown` et l’`Error` globale (ci-dessous) ; `err instanceof pg.DatabaseError` affine le type d’une variable de `catch` en un type qu’il accepte.
+- `err` : n’importe quelle valeur ; une valeur sans `code` de cinq caractères donne `false`, y compris `null` et `undefined`. Sur une erreur de Postgres, `.run()` est rejetée avec la `DatabaseError` de node-postgres, dont le `code` est le SQLSTATE ; elle a aussi `constraint`, `detail`, `table` et les autres champs qu’envoie Postgres.
+  - Son type est `unknown`, donc il accepte une variable de `catch` telle quelle (ci-dessous), avec `strict` activé ou non. Zapatos 6.6.1 le typait `{ code?: string }`, qui refusait `unknown`, l’`Error` globale, `null` sous `strict` et `pg.DatabaseError` sous `exactOptionalPropertyTypes`, et la fonction levait une `TypeError` sur `null` ou `undefined` ([#178](https://github.com/AlexandreDemartin/pgcast/issues/178)).
 - `types` : des noms, autant que vous voulez ; sans aucun, `false`. Deux sortes :
 
 | Nom | Code | Correspond à |
@@ -375,10 +374,9 @@ Sur le schéma de la doc :
 
 - `DiskFull`, `OutOfMemory`, `TooManyConnections` et `ConfigurationLimitExceeded` ont le code de la classe, `53`, comme `InsufficientResources` : chacun correspond à tous les codes de la classe. `InsufficientResources_DiskFull` ne correspond qu’à 53100.
 - Les erreurs que pgcast lève lui-même n’ont pas de `code` : `false` pour chacune ([plus bas](#errors-pgcast-throws-before-any-query)).
-- Avec `strict` activé, une variable de `catch` est `unknown`, que le type refuse (2345) :
+- Avec `strict` activé, une variable de `catch` est `unknown`, et `isDatabaseError()` l’accepte :
 
 ```ts twoslash
-// @errors: 2345
 // @strict: true
 import * as db from 'zapatos/db';
 import type pg from 'pg';
@@ -387,24 +385,11 @@ declare const pool: pg.Pool;
 try {
   await db.insert('seat_bookings', { screening_id: 1002, seat: 'C4', customer: 'Tamsin Rowe' }).run(pool);
 } catch (err) {
-  db.isDatabaseError(err, 'IntegrityConstraintViolation_UniqueViolation');
+  if (!db.isDatabaseError(err, 'IntegrityConstraintViolation_UniqueViolation')) throw err;
 }
 ```
 
-- Une valeur dont `instanceof Error` affine le type en l’`Error` globale est refusée aussi, avec `strict` activé ou non (2559) : le type du paramètre est `{ code?: string }`, et `Error` n’a aucune propriété en commun avec lui.
-
-```ts twoslash
-// @errors: 2559
-import * as db from 'zapatos/db';
-import type pg from 'pg';
-declare const pool: pg.Pool;
-// ---cut---
-try {
-  await db.insert('seat_bookings', { screening_id: 1002, seat: 'C4', customer: 'Tamsin Rowe' }).run(pool);
-} catch (err) {
-  if (err instanceof Error && db.isDatabaseError(err, 'IntegrityConstraintViolation_UniqueViolation')) {}
-}
-```
+- Elle renvoie un `boolean` sans affiner le type de `err` : pour lire `err.detail` ou `err.constraint`, affinez-le d’abord avec `instanceof pg.DatabaseError` ([Erreurs](/fr/handle-errors#catch-a-refusal-from-postgres)).
 
 Les gérer dans une application : [Erreurs](/fr/handle-errors).
 
