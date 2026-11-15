@@ -52,6 +52,16 @@ describe('param, parent, self', () => {
   test('self is a unique symbol', () => {
     expectTypeOf(db.self).toEqualTypeOf<db.SelfType>();
   });
+
+  test('cols and vals keep the type of 6.6.1: a generic helper compiles; a string type-checks, and throws at run time', () => {
+    // narrowing to `T extends object` would refuse the helper and `unknown`, which run when given an object (#244)
+    const insertRow = <T>(row: T) => db.sql`INSERT INTO ${'users'} (${db.cols(row)}) VALUES (${db.vals(row)})`;
+    expectTypeOf(insertRow({ display_name: 'Ada' })).toEqualTypeOf<db.SQLFragment<any[], never>>();
+    expectTypeOf(db.cols({ id: 1 } as unknown)).toEqualTypeOf<db.ColumnNames<unknown>>();
+    expectTypeOf(db.cols('id')).toEqualTypeOf<db.ColumnNames<string>>();
+    expectTypeOf(db.vals('id')).toEqualTypeOf<db.ColumnValues<string>>();
+    expectTypeOf(db.vals('id')).not.toBeAny();
+  });
 });
 
 describe('conditions: the constraint on the column', () => {
@@ -386,5 +396,89 @@ describe('type surprises', () => {
     // characterization: without RunResult, the lateral key is `any` and no error is reported
     const q = db.select('users', db.all, { lateral: { x: db.sql`SELECT 1 AS result` } });
     expectTypeOf<Run<typeof q>[number]['x']>().toBeAny();
+  });
+});
+
+declare const row: s.transfers.Selectable;
+declare const jrow: s.transfers.JSONSelectable;
+
+describe('range strings', () => {
+  test("'empty' is a range string, as Postgres writes an empty range", () => {
+    expectTypeOf<'empty'>().toExtend<db.NumberRangeString>();
+    expectTypeOf<'empty'>().toExtend<db.DateRangeString>();
+    expectTypeOf<'empty'>().toExtend<db.RangeString<number | ''>>();
+    expectTypeOf<'[1,10)' | '(,)' | '[1,)'>().toExtend<db.NumberRangeString>();
+    expectTypeOf<s.transfers.JSONSelectable['batch_sizes']>().toEqualTypeOf<db.NumberRangeString | null>();
+    expectTypeOf<s.transfers.Selectable['value_days']>().toEqualTypeOf<db.DateRangeString | null>();
+  });
+
+  test("'empty' is taken as a value, in each write and filter", () => {
+    db.insert('transfers', { from_account: 1, to_account: 2, amount: 1, batch_sizes: 'empty', fee_band: 'empty', valid_during: 'empty', value_days: 'empty' });
+    db.update('transfers', { fee_band: 'empty' }, { note: 'x' });
+    db.upsert('transfers', { id: 'x', from_account: 1, to_account: 2, amount: 1, valid_during: 'empty' }, 'id');
+    db.select('transfers', { batch_sizes: 'empty', value_days: c.eq('empty'), fee_band: c.isIn(['empty', '[0,1.5]']) });
+    db.select('transfers', { valid_during: db.param('empty') });
+    expectTypeOf(db.select('transfers', { batch_sizes: 'empty' }).run(pool)).not.toBeAny();
+  });
+
+  test("a selected range compares with 'empty', and narrows to a bracketed one", () => {
+    if (row.batch_sizes !== null && row.batch_sizes !== 'empty') {
+      expectTypeOf(row.batch_sizes).toEqualTypeOf<`${'[' | '('}${number | ''},${number | ''}${']' | ')'}`>();
+    }
+    if (jrow.value_days === 'empty') expectTypeOf(jrow.value_days).toEqualTypeOf<'empty'>();
+  });
+
+  test('only what Postgres writes: lowercase, no space', () => {
+    // @ts-expect-error Postgres reads 'EMPTY', but writes 'empty'
+    db.insert('transfers', { from_account: 1, to_account: 2, amount: 1, batch_sizes: 'EMPTY' });
+    // @ts-expect-error nor with a space
+    db.select('transfers', { value_days: ' empty' });
+    // @ts-expect-error an empty string is no range
+    db.select('transfers', { fee_band: '' });
+    // @ts-expect-error a bracket and no closing one
+    db.select('transfers', { batch_sizes: '[1,5' });
+  });
+
+  test('a selected range may be empty, so a type that starts with a bracket refuses it', () => {
+    // @ts-expect-error 'empty' starts with no bracket
+    const bracketed: `[${string}` | `(${string}` | null = row.batch_sizes;
+    // @ts-expect-error nor once 'empty' is left out of the type
+    const nonEmpty: Exclude<db.NumberRangeString, 'empty'> | null = jrow.batch_sizes;
+    expectTypeOf(bracketed).not.toBeAny();
+    expectTypeOf(nonEmpty).not.toBeAny();
+  });
+
+  test("a Record or a mapped type keyed by a range type requires an 'empty' key, unless Partial or Exclude", () => {
+    // @ts-expect-error 'empty' is a key it requires
+    const byPeriod: Record<db.DateRangeString, number> = {};
+    // @ts-expect-error a mapped type too
+    const mapped: { [K in db.DateRangeString]: number } = {};
+    const partial: Partial<Record<db.DateRangeString, number>> = {};
+    const nonEmpty: Record<Exclude<db.DateRangeString, 'empty'>, number> = {};
+    if (row.value_days !== null) partial[row.value_days] = 1;
+    if (row.value_days !== null && row.value_days !== 'empty') nonEmpty[row.value_days] = 1;
+    expectTypeOf(byPeriod).not.toBeAny();
+    expectTypeOf(mapped).not.toBeAny();
+  });
+
+  test("a type computed from a range type gives 'empty' or never, unless Exclude or a distributive false branch of never", () => {
+    type Lower<R> = R extends `${'[' | '('}${infer L},${string}` ? L : R;
+    type LowerOrNever<R> = R extends `${'[' | '('}${infer L},${string}` ? L : never;
+    type LowerInline = db.NumberRangeString extends `${'[' | '('}${infer L},${string}` ? L : never;
+    type LowerInTuple<R> = [R] extends [`${'[' | '('}${infer L},${string}`] ? L : never;
+    type LowerInlineBack = Exclude<db.NumberRangeString, 'empty'> extends `${'[' | '('}${infer L},${string}` ? L : never;
+    // @ts-expect-error a false branch that keeps the range keeps 'empty'
+    expectTypeOf<Lower<db.NumberRangeString>>().toExtend<`${number}` | ''>();
+    // @ts-expect-error 'empty' starts with no bracket
+    expectTypeOf<db.NumberRangeString extends `[${string}` | `(${string}` ? true : false>().toEqualTypeOf<true>();
+    expectTypeOf<Lower<Exclude<db.NumberRangeString, 'empty'>>>().toEqualTypeOf<`${number}` | ''>();
+    expectTypeOf<Exclude<db.NumberRangeString, 'empty'> extends `[${string}` | `(${string}` ? true : false>().toEqualTypeOf<true>();
+    expectTypeOf<LowerOrNever<db.NumberRangeString>>().toEqualTypeOf<`${number}` | ''>();
+    // @ts-expect-error written on the type itself, it does not distribute: never
+    expectTypeOf<'1'>().toExtend<LowerInline>();
+    // @ts-expect-error nor with its type parameter wrapped in a tuple
+    expectTypeOf<'1'>().toExtend<LowerInTuple<db.NumberRangeString>>();
+    expectTypeOf<LowerInlineBack>().toEqualTypeOf<`${number}` | ''>();
+    expectTypeOf<LowerInTuple<Exclude<db.NumberRangeString, 'empty'>>>().toEqualTypeOf<`${number}` | ''>();
   });
 });

@@ -91,6 +91,7 @@ To compare with SQL, give a `sql` fragment as the value, `db.self` for the colum
 - In a fragment, a plain string is a name, not a value: `${'the salt orchard'}` would be the column `"the salt orchard"`<!-- probe: db.sql`${'the salt orchard'}` --> ([Identifiers](/sql-template#identifiers)).
 - [`DangerousRawString`](/sql-template#DangerousRawString), [`ColumnNames`](/sql-template#ColumnNames) and [`ColumnValues`](/sql-template#ColumnValues) no longer match a plain `{ value }`, nor each other: `const r: db.DangerousRawString = { value: 'x' }` fails (2741). Make them with `db.raw()`, `db.cols()` and `db.vals()`.
 - As an inserted or updated value of `insert()`, `update()` or `upsert()` (not in `updateValues`), the type refuses them too, and they throw before any query ([`insert()`](/insert#insert)).
+- A selected range may now be `'empty'`, as Postgres writes an empty range ([`RangeString`](/runtime-config#RangeString)), so it no longer assigns to a type that starts with a bracket, `` `[${string}` | `(${string}` `` (2322). Check for it first, `if (range !== 'empty')`; in a type, write `Exclude<db.DateRangeString, 'empty'>`.
 
 ## 4. Find the calls whose result changes {#find-the-calls-whose-result-changes}
 

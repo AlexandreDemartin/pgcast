@@ -221,6 +221,12 @@ With arrays, a `SELECT` of some columns and an `IN` list; `s.films.OnlyCols<…>
 
 As a filter value, and as a value in `vals({…})` (so in a write), `cols()` throws, as [`raw()`](#raw) does.
 
+A string or another primitive (a number, a boolean, `undefined`…) throws while compiling, so `run()` rejects before any query, `insert()`, `upsert()` and `update()` of a non-empty string row included:
+
+> `` `db.cols()` takes an object or an array, not `string`: for one column, write `db.cols([name])`; for a row of `insert()`, `upsert()` or `update()`, give an object. ``<!-- message -->
+
+The type takes it, as Zapatos 6.6.1's did, so that a generic helper (`<T>(row: T) => db.cols(row)`) still compiles. Zapatos 6.6.1 compiled a string's character indexes, `cols('title')` to `"0", "1", "2", "3", "4"`, and any other primitive to nothing.
+
 ### `ColumnNames` {#ColumnNames}
 
 ```ts
@@ -253,6 +259,7 @@ A comma-separated list of values. Each value compiles as follows.
   - `self` "`` `db.self` has no meaning as a value in a Whereable (a filter), nor in `isIn()`… ``<!-- message -->";
   - `raw()`, `cols()` and `vals()` as [`raw()`](#raw) says.
 - As a filter value itself, or a value in `vals({…})`, `vals()` throws, as [`raw()`](#raw) does.
+- A string or another primitive throws while compiling, as in [`cols()`](#cols): "`` `db.vals()` takes an object or an array, not `string`: for one value, write `db.vals([value])`; for a row of `insert()`, `upsert()` or `update()`, give an object. ``<!-- message -->". Zapatos 6.6.1 sent a string's characters, `vals('id')` as `$1, $2` with `'i'`, `'d'`: in an `IN` list, `vals('5')` found the rows equal to `'5'`, and now rejects, as [`isIn('5')`](/conditions#conditions.isIn) does.
 - `insert()`, `upsert()` and `update()` compile their values with `vals({…})`, outside a nested query: `parent()`, `raw()`, `cols()` and `vals()` throw there, before any query.
 - Zapatos 6.6.1 wrapped a `Parameter`, `Default` and `parent()` in a second parameter in an array: `'{"value":…}'`, `'Symbol(DEFAULT)'`, `'{"value":"id"}'`; and `parent()`, `raw()`, `cols()` and `vals()` in an object, which the writes stored on a text or `jsonb` column.
 
