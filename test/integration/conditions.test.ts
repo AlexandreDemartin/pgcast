@@ -281,14 +281,14 @@ describe('add, subtract (in an update)', () => {
 
 describe('characterization: conditions the type accepts and Postgres refuses, as in 6.6.1 (#180)', () => {
   // documented, not refused by the type: each narrower type tried refused code that runs (#180)
-  const tests: [string, db.SQLFragment<any>, string][] = [
+  const conds: [string, db.SQLFragment<any>, string][] = [
     ['isTrue', dc.isTrue, 'IS TRUE'], ['isNotTrue', dc.isNotTrue, 'IS NOT TRUE'],
     ['isFalse', dc.isFalse, 'IS FALSE'], ['isNotFalse', dc.isNotFalse, 'IS NOT FALSE'],
     ['isUnknown', dc.isUnknown, 'IS UNKNOWN'], ['isNotUnknown', dc.isNotUnknown, 'IS NOT UNKNOWN'],
   ];
 
-  it.each(tests)('%s on an int column', async (_name, test, keyword) => {
-    expect(await pgError(t.client, () => ids('users', { id: test })))
+  it.each(conds)('%s on an int column', async (_name, cond, keyword) => {
+    expect(await pgError(t.client, () => ids('users', { id: cond })))
       .toEqual({ code: '42804', message: `argument of ${keyword} must be type boolean, not type integer` });
   });
 
@@ -300,15 +300,18 @@ describe('characterization: conditions the type accepts and Postgres refuses, as
     expect(await sql`SELECT ${{ id: dc.add(1) }} AS v FROM ${'users'} WHERE ${{ id: 1 }}`.run(t.client)).toEqual([{ v: 2 }]);
   });
 
-  it('a Date in add() or subtract() as an update() value', async () => {
-    const d = new Date('2025-06-01T12:00:00Z');
+  it('a Date in add() or subtract() as an update() value, and in add() as a where value', async () => {
+    const d = new Date(2025, 5, 1, 12);
     expect(await pgError(t.client, () => db.update('accounts', { opened_on: dc.add(d) }, { id: 1 }).run(t.client)))
       .toEqual({ code: '42725', message: 'operator is not unique: date + unknown' });
     expect(await pgError(t.client, () => db.update('accounts', { opened_on: dc.subtract(d) }, { id: 1 }).run(t.client)))
       .toEqual({ code: '42804', message: 'column "opened_on" is of type date but expression is of type integer' });
     const added = await pgError(t.client, () => db.update('users', { created_at: dc.add(d) }, { id: 1 }).run(t.client));
     expect(added.code).toBe('22007');
-    expect(added.message).toMatch(/^invalid input syntax for type interval: "2025-06-01T/);
+    expect(added.message).toMatch(/^invalid input syntax for type interval: "2025-06-01T12:00:00\.000[+-]\d\d:\d\d"$/);
+    // a where refuses it before reading the Date
+    expect(await pgError(t.client, () => ids('users', { created_at: dc.add(d) })))
+      .toEqual({ code: '42804', message: 'argument of WHERE must be type boolean, not type timestamp with time zone' });
     expect(await pgError(t.client, () => db.update('users', { created_at: dc.subtract(d) }, { id: 1 }).run(t.client)))
       .toEqual({ code: '42804', message: 'column "created_at" is of type timestamp with time zone but expression is of type interval' });
   });

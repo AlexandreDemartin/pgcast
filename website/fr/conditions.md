@@ -1,5 +1,5 @@
 ---
-english: 79ea02901062
+english: 55b60067e9f2
 ---
 
 # Conditions {#db-conditions}
@@ -427,7 +427,7 @@ Des opérations, pas des tests : pour une valeur d’[`update()`](/fr/insert#up
 - Dans le `updateValues` d’`upsert()`, il n’y a pas de colonne courante : elles lèvent "The 'self' column alias has no meaning here"<!-- message --> ([`upsert()`](/fr/insert#upsert)). Dans `insert()`, le type les refuse (TS2769), comme Postgres : la colonne est écrite dans `VALUES` (42703).
 - Elles prennent un nombre ou un `Date`, pas un `Parameter` (TS2345) : pour un cast, écrivez une valeur en fragment `sql` (ci-dessous).
 - Sur une colonne `date`, le type refuse un nombre (TS2322), et Postgres ne pourrait pas l’exécuter non plus : `date + unknown` est ambigu (42725).
-- Sur une colonne `date`, `timestamp` ou `timestamptz`, un `Date` passe la vérification de types. `add()` d’un `Date` échoue où qu’il soit : sur `date`, il est ambigu (42725) ; sur les deux autres, Postgres le lit comme un `interval` (22007). `subtract()` d’un `Date` donne un nombre de jours sur `date`, un `interval` sur les deux autres, pas le type de la colonne : Postgres le refuse comme valeur d’`update()` (42804), et l’exécute dans un fragment `sql` ou une liste `SELECT`.
+- Sur une colonne `date`, `timestamp` ou `timestamptz`, un `Date` passe la vérification de types. `add()` d’un `Date` échoue où qu’il soit. Sur `date`, il est ambigu (42725), dans un `where` aussi. Sur les deux autres, un `where` le refuse avant de lire le `Date` (42804) ; comme valeur d’`update()`, imbriqué dans un fragment `sql` ou dans une liste `SELECT`, Postgres le lit comme un `interval` (22007). `subtract()` d’un `Date` donne un nombre de jours sur `date`, un `interval` sur les deux autres, pas le type de la colonne : Postgres le refuse comme valeur d’`update()` (42804), et l’exécute imbriqué dans un fragment `sql` ou dans une liste `SELECT`.
 
 Pour les dates, écrivez une valeur en fragment `sql`, où `db.self` est la colonne, et castez son paramètre. Sur une colonne `date`, `` db.sql`${db.self} + ${db.param(3, 'int4')}` `` ajoute trois jours : `"col" + CAST($1 AS "int4")`<!-- probe: db.sql`${{ col: db.sql`${db.self} + ${db.param(3, 'int4')}` }}` -->. Sur une colonne `timestamptz`, ajoutez un `interval` : une séance déplacée au lendemain.
 
