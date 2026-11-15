@@ -1,5 +1,5 @@
 ---
-english: 680a6fab3758
+english: aef7a3ccf090
 ---
 
 # Tests
@@ -79,10 +79,11 @@ import * as db from 'zapatos/db';
 db.setConfig({ transactionRequiresIdleClient: true });
 ```
 
-Il faut pg 8.21 ou plus récent, qui signale le `BEGIN` du test ([Votre propre `BEGIN`](/fr/transaction#your-own-begin)). Donnez ensuite le pool à ce code, et supprimez ce qu’il commite :
+Il faut pg 8.21 ou plus récent, qui signale le `BEGIN` du test ([Votre propre `BEGIN`](/fr/transaction#your-own-begin)). Faites ensuite tourner un tel test sur le pool, et non sur un client dans son `BEGIN` : donnez le pool au code, et supprimez ce qu’il commite :
 
 <<< ../examples/plain/testing_commits.ts{ts twoslash}
 
+- Si on donnait le pool au code pendant que le client du test est dans son `BEGIN`, il ne verrait pas les seeds du test, et resterait bloqué (sauf si `lock_timeout` est défini) sur une ligne que le test a écrite ou verrouillée, ou sur une clé que le test a insérée.
 - Le `deletes()` dans `finally` s’exécute même quand une assertion échoue.
 - D’ici là, la réservation est visible de toutes les autres connexions : un test portant sur la même séance, lancé au même moment, peut la compter.
 

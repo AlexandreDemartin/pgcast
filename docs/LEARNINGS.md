@@ -337,6 +337,10 @@ Candidates for a check, a rule or a skill line.
 - #490 — a probe of an exported function with positional out-parameters checks its arity at each ref before it runs: after #487 the 12th argument became `domainsNotByContext`, and the older probes passed the wrong object.
 - #491 — a claim about a held value names what is skipped: a type argument still checks an object held in a variable (TS2559, TS2345) and only lets an extra key through. Each such sentence gets its weak-type and wrong-value probes.
 - #491 — an "each candidate tried refused X" rationale is checked against each grid column before it goes into the CHANGELOG: candidate D refused other code, not X.
+- #492 — Advice dropped in one place (« pass the pool ») is searched in other words too (« give such code the pool », « donnez le pool »): one phrase's `git grep` missed `website/testing.md` — `branch-reviewer`
+- #492 — A claim that a call « hangs if it writes or locks a row the outer one holds » is probed with an insert of the same unique key too, the commonest wait on the docs schema — `branch-reviewer`, `builder`
+- #492 — In `test/integration/transaction.test.ts`, a failed `transactionRequiresIdleClient` test releases its client inside its block and turns later tests red: a red count there exceeds the tests that read the message — `builder`
+- #492 — « give it the pool » followed by a cost clause makes « it » the outer transaction, in English and French: name the call — `builder`
 - #495 — Skill `backward-compat` § Fixing an existing bug still says Fix when the old result contradicts the type, with no run-time exception, and does not name the kept explicit old value: it disagrees with decision 003 § Rule since #496 — `builder`
 - #495 — A rule clause worded from one case is searched against the other rows: « a value written in the config that asks for the old behaviour » also covered every opt-in's explicit `false` — `builder`
 - #495 — A fresh worktree's `npm ci` does not install `website/node_modules`: `docs:translated` fails with ERR_MODULE_NOT_FOUND until `cd website && npm ci` — `builder`

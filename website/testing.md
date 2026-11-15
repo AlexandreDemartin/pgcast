@@ -75,10 +75,11 @@ import * as db from 'zapatos/db';
 db.setConfig({ transactionRequiresIdleClient: true });
 ```
 
-It needs pg 8.21 or later, which reports the test's `BEGIN` ([Your own `BEGIN`](/transaction#your-own-begin)). Then give such code the pool, and delete what it commits:
+It needs pg 8.21 or later, which reports the test's `BEGIN` ([Your own `BEGIN`](/transaction#your-own-begin)). Then run such a test on the pool, not on a client inside its `BEGIN`: give the code the pool, and delete what it commits:
 
 <<< ./examples/plain/testing_commits.ts{ts twoslash}
 
+- Given the pool while the test's client is inside its `BEGIN`, the code wouldn't see the test's seeds, and would hang (unless `lock_timeout` is set) on a row the test has written or locked, or a key it has inserted.
 - The `deletes()` in `finally` runs even when an assertion fails.
 - Until then, the booking is there for every other connection: a test of the same screening, running at the same moment, can count it.
 
