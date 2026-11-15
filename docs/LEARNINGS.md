@@ -335,6 +335,8 @@ Candidates for a check, a rule or a skill line.
 - #490 — "only where 6.6.1's output already varied" needs a probe with `db: { max: 1 }` and the schemas in both orders: one connection fixes the read order, so a race at the default pool size is no run-to-run variance for every user.
 - #490 — before adding an out-parameter to a public export, check whether the state the run already shares (`customTypes`, origins, imports) can carry the rule: #449, #455 and #487 each added one, and they conflict.
 - #490 — a probe of an exported function with positional out-parameters checks its arity at each ref before it runs: after #487 the 12th argument became `domainsNotByContext`, and the older probes passed the wrong object.
+- #491 — a claim about a held value names what is skipped: a type argument still checks an object held in a variable (TS2559, TS2345) and only lets an extra key through. Each such sentence gets its weak-type and wrong-value probes.
+- #491 — an "each candidate tried refused X" rationale is checked against each grid column before it goes into the CHANGELOG: candidate D refused other code, not X.
 
 ## Minors kept
 
@@ -463,3 +465,4 @@ Minor review defects, taken up by the end-of-chapter review.
 - #487 — `website/custom-types.md:231` (and FR): the sentence on a domain's placeholder would read better as two.
 - #487 — `test/types/schema.test-d.ts`: `unknown`, `db.Int8String | null` under `strict`, and a generated `NumericString[]` or `Date[]` are not frozen for `DomainInContext`.
 - #484 plan — on master, an array of an enum is typed `mood[]` in `Selectable`, but `pg` returns it as a string (`'{a}'`); no issue yet.
+
