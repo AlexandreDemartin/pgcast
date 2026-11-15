@@ -139,6 +139,7 @@ export const definitionForRelationInSchema = async (
   // an 'out' parameter too: what a placeholder imports from zapatos/schema, '' for nothing, null for an enum's labels written out
   customTypeImports: Record<string, string | null> = Object.create(null),
   uniqueIndexesNotArbiters: string[] = [],  // an 'out' parameter too: what uniqueIndexConstraintsOnly would leave out
+  domainsNotByContext: string[] = [],  // an 'out' parameter too: what domainsTypedByContext would change
 ) => {
   const
     rows = await columnsForRelation(rel, schemaName, queryFn),
@@ -218,8 +219,21 @@ export const definitionForRelationInSchema = async (
         customTypeImports[prefixedCustomType] = labelled ? null : agrees ? imported : '';
       }
       origins[`"${domainName === null ? udtSchema : domainSchema}"."${customType}"`] = customType;
-      selectableType = JSONSelectableType = whereableType = insertableType = updatableType =
-        'c.' + prefixedCustomType;
+
+      // a domain over int8, numeric, bytea, money or a date: its placeholder holds what pg returns, which is neither
+      // the shortcuts' JSON nor all that a write takes; with domainsTypedByContext, each context takes its own type
+      // while the placeholder still holds what the generator wrote (db.DomainInContext), and the placeholder's otherwise
+      const
+        placeholder = 'c.' + prefixedCustomType,
+        byContext = domainName !== null && selectableType !== 'any' &&
+          [JSONSelectableType, whereableType, insertableType, updatableType].some(type => type !== selectableType),
+        typedByContext = byContext && (config.domainsTypedByContext ?? false),
+        inContext = (type: string) => typedByContext ? `db.DomainInContext<${placeholder}, ${selectableType}, ${type}>` : placeholder;
+
+      if (byContext && !typedByContext) domainsNotByContext.push(`${schemaName}.${rel.name}.${column} (${domainSchema}.${domainName})`);
+      [JSONSelectableType, whereableType, insertableType, updatableType] =
+        [JSONSelectableType, whereableType, insertableType, updatableType].map(inContext);
+      selectableType = placeholder;
     }
 
     selectables.push(`${columnDoc}${possiblyQuotedColumn}: ${selectableType}${orNull};`);

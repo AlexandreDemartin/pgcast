@@ -173,6 +173,26 @@ const warnAboutUniqueIndexesNotArbiters = (indexes: string[], config: CompleteCo
 };
 
 /**
+ * Without `domainsTypedByContext`, note the columns it would type by context, once per run: a domain over a type
+ * typed by context, such as int8, takes its placeholder's one type, what pg returns, in all five interfaces.
+ */
+const warnAboutDomainsNotByContext = (columns: string[], config: CompleteConfig) => {
+  if (columns.length === 0) return;
+
+  const
+    warn = config.warningListener === true ? console.log : config.warningListener || (() => void 0),
+    sorted = [...columns].sort(),
+    one = sorted.length === 1,
+    list = one ? sorted[0] : sorted.slice(0, -1).join(', ') + ' and ' + sorted[sorted.length - 1];
+
+  warn(`Note: ${list} ${one ? 'has a domain' : 'have domains'} over a type typed by context, such as int8 or date: ` +
+    `${one ? 'its placeholder types it' : 'their placeholders type them'} in all five interfaces as pg returns ` +
+    `${one ? 'it' : 'them'}, which the shortcuts' JSON and the values a write takes are not. ` +
+    `Set domainsTypedByContext: true to type ${one ? 'it' : 'them'} by context while ` +
+    `${one ? 'its placeholder holds' : 'their placeholders hold'} what the generator wrote; it will be the default in pgcast 7.0.`);
+};
+
+/**
  * Warn about each `include` entry that names no relation of its schema: it generates nothing.
  * `information_schema.tables` lists only the tables and views the connecting role has a privilege on.
  */
@@ -284,6 +304,7 @@ const tsForQueries = async (config: CompleteConfig, queryFn: (q: pg.QueryConfig)
     enumsForSchema = async (schema: string) => (await enumOrdersFor(schema))[enumOrder],
     columnsTypedByEnumName: string[] = [],
     uniqueIndexesNotArbiters: string[] = [],
+    domainsNotByContext: string[] = [],
     schemaNames = Object.keys(schemas),
     schemaData = (await Promise.all(
       schemaNames.map(async schema => {
@@ -303,7 +324,7 @@ const tsForQueries = async (config: CompleteConfig, queryFn: (q: pg.QueryConfig)
           outOfOrder = enumOrder === 'declared' ? [] : enumsOutOfOrder(enumOrders).map(name => ({ schema, name })),
           tableDefs = await Promise.all(tables.map(async table =>
             definitionForRelationInSchema(table, schema, enums, customTypes, config, queryFn, customTypeOrigins,
-              enumsForSchema, columnsTypedByEnumName, customTypeImports, uniqueIndexesNotArbiters))),
+              enumsForSchema, columnsTypedByEnumName, customTypeImports, uniqueIndexesNotArbiters, domainsNotByContext))),
           schemaIsUnprefixed = schema === config.unprefixedSchema,
           none = '/* (none) */',
           schemaDef = `/* === schema: ${jsdocText(schema)} === */\n` +
@@ -354,6 +375,7 @@ const tsForQueries = async (config: CompleteConfig, queryFn: (q: pg.QueryConfig)
   warnAboutEnumsAcrossSchemas(columnsTypedByEnumName, config);
   warnAboutEnumOrder(schemaData.flatMap(r => r.outOfOrder), config);
   warnAboutUniqueIndexesNotArbiters(uniqueIndexesNotArbiters, config);
+  warnAboutDomainsNotByContext(domainsNotByContext, config);
 
   return { ts, customTypeSourceFiles };
 };
