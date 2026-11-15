@@ -51,7 +51,7 @@ pgcast retries only what reaches it. Don't swallow a database error inside the c
 
 The promise then resolves with what the callback returned, nothing is saved, and a 40001 caught this way is never retried; pgcast warns once, `PGCAST_DEP003`. With [`transactionRequiresCommit: true`](/runtime-config#Config.transactionRequiresCommit), the default from 7.0, the promise rejects instead, still without a retry: pgcast never saw the error.
 
-If you catch one inside, rethrow it: an `Error`, not `null` or `undefined`, for which pgcast rejects with a `TypeError` of its own instead ([#179](https://github.com/AlexandreDemartin/pgcast/issues/179)).
+If you catch one inside, rethrow it.
 
 Catch it outside the transaction, once pgcast has given up, with [`isDatabaseError()`](/transaction#isDatabaseError):
 

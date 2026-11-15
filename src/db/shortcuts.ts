@@ -349,6 +349,11 @@ const updateValueSQL = (value: any) => compiledAsIs(value) ? value : param(value
  * in `updateValues` is sent as a parameter: `{ mood: 'happy' }` gives
  * `ROW(..., $n)`. To read a column there, use a fragment, which is written as
  * it is: ``{ name: db.sql`${'users'}.${'name'}` }`` gives `ROW(..., "users"."name")`.
+ * An `updateColumns` array that is empty at run time, with no `updateValues`
+ * key (with `undefinedMeansMissing`, a key set to `undefined` is none), gives
+ * `DO NOTHING`, as `doNothing` does: one row that conflicts then
+ * returns `undefined`, which the type of a `Column[]` does not say; check for
+ * it, or pass `doNothing`, which the type follows.
  *
  * Without `updateColumns`, rows with different keys can lose data: a key
  * missing from one row is inserted as `DEFAULT`, then overwrites that row's
@@ -847,6 +852,11 @@ export interface SelectOneSignatures extends ByColumn<PassingThroughSignatures<S
  * Generate a `SELECT` query `SQLFragment` that returns only a single result (or 
  * undefined). A `LIMIT 1` clause is added automatically. This can be nested with 
  * other `select`/`selectOne`/`count` queries using the `lateral` option.
+ *
+ * With `withTies` and `order`, it is `FETCH FIRST $n ROWS WITH TIES`, `$n` being `1`:
+ * `run()` gives one of the tied rows, and in a `lateral` under an outer
+ * `select()` the parent row comes back once per tie (a nested `select()` keeps
+ * the ties in its array).
  * @param table The table to select from
  * @param where A `Whereable` or `SQLFragment` defining the rows to be selected,
  * or `all`
@@ -891,6 +901,10 @@ export interface SelectExactlyOneSignatures extends ByColumn<PassingThroughSigna
  * `SELECT to_jsonb("films".*) AS result FROM "films" WHERE ("id" = $1) LIMIT $2`,
  * `$2` being `2`. Nested in another query (a `lateral`, a `sql` template), or
  * compiled into a `result` of its own, it keeps `LIMIT 1`.
+ *
+ * With `withTies` and `order`, each `LIMIT` is `FETCH FIRST … ROWS WITH TIES`,
+ * as in `selectOne()`: nested in a `lateral` under an outer `select()`, the
+ * parent row comes back once per tie, option or not.
  * @param table The table to select from
  * @param where A `Whereable` or `SQLFragment` defining the rows to be selected,
  * or `all`

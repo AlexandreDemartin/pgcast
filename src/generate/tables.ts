@@ -14,6 +14,7 @@ import { jsdocText, stringLiteral, tsIdentifier } from './quote';
 
 // TypeScript's own types that an enum may be named after: a placeholder naming one compiles without an import
 const tsOwnTypes = new Set('any bigint boolean never number object string symbol undefined unknown'.split(' '));
+const hasOwn = (o: object, key: string) => Object.prototype.hasOwnProperty.call(o, key);
 
 
 export interface Relation {
@@ -102,6 +103,20 @@ const columnsForRelation = async (rel: Relation, schemaName: string, queryFn: (q
   return rows;
 };
 
+// what the config states for a table or a column, never what Object.prototype answers for a name such as
+// toString or __proto__: its function, whose caller throws, hid the '*' entry
+const stated = (options: any, key: string) => {
+  const value = options[key];
+  return value === Object.prototype || value === (Object.prototype as any)[key] ? undefined : value;
+};
+
+// as Zapatos 6.6.1 read options[table] && options[table][column]: a falsy table entry is given back, so it hides '*'
+const columnOptionsFor = (options: CompleteConfig['columnOptions'], table: string, column: string):
+  CompleteConfig['columnOptions'][string][string] | undefined => {
+  const tableOptions = stated(options, table);
+  return tableOptions && stated(tableOptions, column);
+};
+
 function quoteIfIllegalIdentifier(identifier: string) {
   // note: we'll redundantly quote a bunch of non-ASCII characters like this
   return identifier.match(/^[a-zA-Z_$][0-9a-zA-Z_$]*$/) ? identifier : stringLiteral(identifier, '"');
@@ -117,7 +132,8 @@ export const definitionForRelationInSchema = async (
   customTypeOrigins: CustomTypeOrigins = Object.create(null),  // an 'out' parameter too
   enumsForSchema = async (schema: string) => (await enumOrdersForSchema(schema, queryFn))[enumOrderOf(config)],
   columnsTypedByEnumName: string[] = [],  // an 'out' parameter too: what typeEnumsAcrossSchemas would change
-  customTypeImports: Record<string, string> = Object.create(null),  // an 'out' parameter too: what a placeholder imports from zapatos/schema, '' for nothing
+  // an 'out' parameter too: what a placeholder imports from zapatos/schema, '' for nothing, null for an enum's labels written out
+  customTypeImports: Record<string, string | null> = Object.create(null),
 ) => {
   const
     rows = await columnsForRelation(rel, schemaName, queryFn),
@@ -156,8 +172,8 @@ export const definitionForRelationInSchema = async (
       schemaPrefix = config.unprefixedSchema === schemaName ? '' : `${schemaName}.`,
       prefixedRelName = schemaPrefix + rel.name,
       columnOptions =
-        (config.columnOptions[prefixedRelName] && config.columnOptions[prefixedRelName][column]) ??
-        (config.columnOptions["*"] && config.columnOptions["*"][column]),
+        columnOptionsFor(config.columnOptions, prefixedRelName, column) ??
+        columnOptionsFor(config.columnOptions, "*", column),
       isInsertable = rel.insertable && !isGenerated && columnOptions?.insert !== 'excluded',
       isUpdatable = rel.insertable && !isGenerated && columnOptions?.update !== 'excluded',
       insertablyOptional = isNullable || hasDefault || columnOptions?.insert === 'optional' ? '?' : '',
@@ -186,11 +202,16 @@ export const definitionForRelationInSchema = async (
         namespace = tsIdentifier(schemaName, 'namespace'),
         imported = importsEnum ? (schemaPrefix ? namespace : enumName) : '',
         // relations that would import differently keep 6.6.1's text, with no import, in whichever order they are read
-        agrees = (customTypeImports[prefixedCustomType] ?? imported) === imported;
+        agrees = (customTypeImports[prefixedCustomType] ?? imported) === imported,
+        // with typeEnumsAcrossSchemas, every relation reads the enum in its own schema: the labels that one of them
+        // writes out type them all, and a relation that names the enum never replaces them
+        labelled = inlineEnums && (hasOwn(typeEnums, udtName) || udtName.charAt(0) === '_' && hasOwn(typeEnums, udtName.slice(1)));
 
-      // two origins: the last one seen wins
-      customTypes[prefixedCustomType] = agrees && importsEnum && schemaPrefix ? `${namespace}.${selectableType}` : selectableType;
-      customTypeImports[prefixedCustomType] = agrees ? imported : '';
+      if (labelled || customTypeImports[prefixedCustomType] !== null) {
+        // two origins: the last one seen wins
+        customTypes[prefixedCustomType] = agrees && importsEnum && schemaPrefix ? `${namespace}.${selectableType}` : selectableType;
+        customTypeImports[prefixedCustomType] = labelled ? null : agrees ? imported : '';
+      }
       origins[`"${domainName === null ? udtSchema : domainSchema}"."${customType}"`] = customType;
       selectableType = JSONSelectableType = whereableType = insertableType = updatableType =
         'c.' + prefixedCustomType;
@@ -350,14 +371,25 @@ const createColumnDoc = (config: CompleteConfig, schemaName: string, rel: Relati
       description,
     } = columnDetails,
     // every line of a multi-line comment gets its ` * `: TypeScript ends a JSDoc line at \r as at \n
-    comment = description as string | null,
-    commentDoc = !comment ? '' : '\n    *\n    * ' + jsdocText(comment).split(/\r\n?|\n/).join('\n    * '),
+    lines = description ? jsdocText(description as string).split(/\r\n?|\n/) : [],
+    // a tag (`@deprecated`) would read the generated lines after it as its own text, so the comment goes after them
+    // from the line that starts it. TypeScript can start a tag, or an inline `{@link …}` that may run on through the
+    // next line, only at an @ that follows a { or no printable ASCII character: the first line with one moves only if
+    // it surely starts a tag, with an @ first but for spaces and tabs, or one after a space or tab and before a
+    // printable character, past anything starting with `{@link` that is closed on the line with no quote, backtick,
+    // /, backslash or line separator in it (TypeScript reads a string, a template, a comment or an escape there,
+    // which can hide its }, and a line separator breaks the line); otherwise the JSDoc stays as it was
+    tagAt = lines.findIndex(line => /(?<![!-z|-~])@/.test(line)),
+    [text, tags] = tagAt < 0 || !/^[ \t]*@|^(?:\{@link[^}'"`/\\\u2028\u2029]*\}|(?!\{@link)[^])*?[ \t]@[!-~]/.test(lines[tagAt]) ?
+      [lines, []] : [lines.slice(0, tagAt), lines.slice(tagAt)],
+    commentDoc = text.length ? '\n    *\n    * ' + text.join('\n    * ') : '',
+    tagsDoc = tags.length ? '\n    *\n    * ' + tags.join('\n    * ') : '',
     [domain, udt, defaultText] = [domainName, udtName ?? '(none)', defaultValue].map(t => jsdocText(String(t))),
     doc = `/**
     * ${jsdocText(`**${schemaPrefix}${rel.name}.${column}**`)}${commentDoc}
     * - ${domainName ? `\`${domain}\` (base type: \`${udt}\`)` : `\`${udt}\``} in database
     * - ${rel.type === 'mview' ? 'Materialized view column' : isGenerated ? 'Generated column' :
-        `${isNullable ? 'Nullable' : '`NOT NULL`'}, ${hasDefault && defaultValue === null ? `identity column` : hasDefault ? `default: \`${defaultText}\`` : `no default`}`}
+        `${isNullable ? 'Nullable' : '`NOT NULL`'}, ${hasDefault && defaultValue === null ? `identity column` : hasDefault ? `default: \`${defaultText}\`` : `no default`}`}${tagsDoc}
     */
     `;
   return doc;

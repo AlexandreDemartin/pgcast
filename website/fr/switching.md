@@ -1,5 +1,5 @@
 ---
-english: 9f5a9911f2a7
+english: 09afd5d4a77b
 ---
 
 # Venir de Zapatos
@@ -251,7 +251,7 @@ Les quatre deviendront le comportement par défaut dans la 7.0 ([Versions](/fr/v
 
 Un opt-in de plus, [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), n’a pas d’avertissement à guetter, et reste désactivé dans la 7.0. Avec lui, un `selectExactlyOne()` exécuté seul est rejeté sur une deuxième ligne, pas seulement sur aucune. Activez-le là où vos tests ne montrent aucun `selectExactlyOne()` qui trouve deux lignes.
 
-Le générateur a deux opt-ins qui lui sont propres, tous deux appelés à devenir le comportement par défaut dans la 7.0. Leur avertissement est une note de `npx zapatos`, pas de vos tests.
+Le générateur a trois opt-ins qui lui sont propres, tous appelés à devenir le comportement par défaut dans la 7.0. L’avertissement des deux premiers est une note de `npx zapatos`, pas de vos tests.
 
 La note de [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas) nomme chaque colonne dont le type est un enum d’un autre schéma, et cet enum, typé jusque-là comme `any` ou comme l’enum du même nom dans le schéma de la relation :
 
@@ -261,6 +261,8 @@ La note de [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSche
 
 La note d’[`enumOrder`](/fr/generator#generate.enumOrder) nomme chaque enum dont le générateur trie les labels, alors que Postgres les déclare dans un autre ordre. Réglez-le sur `"declared"` et régénérez : pour TypeScript, seul `every.<name>` change, donc le code à relire est celui qui y prend un label par son indice ou le compare à un tuple.
 
+La note de [`rejectOnQueryError`](/fr/generator#generate.rejectOnQueryError) vient d’un script qui appelle `generate()`, quand une requête échoue, jamais de `npx zapatos`, qui s’arrête toujours. Activez-le là où le script attend `generate()` avec `await`, et relisez ce que fait son `catch` : une connexion refusée y arrive désormais, et un script qui logge l’erreur puis continue se termine avec le code 0, pas 1.
+
 ## Revenir en arrière {#go-back}
 
 ```sh
@@ -269,7 +271,7 @@ npm install zapatos@6.6.1
 
 - D’abord, retirez de `setConfig()` les options que la `Config` de Zapatos 6.6.1 n’a pas (2353) : `upsertRequiresSameKeys`, `undefinedMeansMissing`, `transactionRequiresCommit`, `transactionRequiresIdleClient`, `selectExactlyOneChecksForSecondRow` et `aggregatesTypedByColumn`.
 - Avec [`moduleNames`](/fr/generator#generate.moduleNames) à `"pgcast"`, lancez aussi `npm uninstall pgcast` : les deux paquets ont une commande `zapatos`. Vos imports `pgcast/…` ne se résolvent alors plus, et la 6.6.1 écrit `zapatos/` mais laisse `pgcast/` en place. Remettez donc chaque import en `zapatos/…`, déplacez les placeholders que vous avez modifiés dans `zapatos/custom/`, leur `declare module 'pgcast/custom'` renommé en `'zapatos/custom'`, et supprimez `pgcast/`.
-- Régénérez avec Zapatos 6.6.1. Il ignore `typeEnumsAcrossSchemas`, `enumOrder` et `moduleNames` dans `zapatosconfig.json`, et réécrit les types `any`, les labels triés, les lignes de commentaire sans préfixe et tout nom d’`UniqueIndex` emprunté.
+- Régénérez avec Zapatos 6.6.1. Il ignore `typeEnumsAcrossSchemas`, `enumOrder` et `moduleNames` dans `zapatosconfig.json`, et réécrit les types `any`, les labels triés, les lignes de commentaire sans préfixe et tout nom d’`UniqueIndex` emprunté. Son `generate()` ne connaît pas non plus `rejectOnQueryError` : TypeScript le refuse dans un littéral d’objet (2353), et à l’exécution une requête qui échoue arrête de nouveau le processus.
 - Chaque changement de [Trouver les appels dont le résultat change](#find-the-calls-whose-result-changes) s’exécute comme avant, sauf celui du `jsonb`, qui ne trouve de nouveau rien.
 
 ::: warning Sécurité
