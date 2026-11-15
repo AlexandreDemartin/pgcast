@@ -158,7 +158,12 @@ export const definitionForRelationInSchema = async (
     isAny = (row: any) => tsTypeForPgType(row.udtName, inlineIn(row.udtSchema) ? otherEnums[row.udtSchema] : enums,
       'Selectable', config, inlineIn(row.udtSchema)) === 'any',
     roots: DomainRoots = rows.some(isAny) ? await domainRoots() : {},
-    rootOf = (row: any) => isAny(row) ? roots[JSON.stringify([row.udtSchema, row.udtName])] : undefined,
+    rootIn = (schema: string, name: string): DomainRoots[string] | undefined => roots[JSON.stringify([schema, name])],
+    // a domain over a domain over an array of a domain has that array as its root, which has a root of its own
+    rootOf = (row: any) => {
+      const root = isAny(row) ? rootIn(row.udtSchema, row.udtName) : undefined;
+      return root && !root.isArray ? rootIn(root.schema, root.name) ?? root : root;
+    },
     rootSchemas = [...new Set(rows.map(row => rootOf(row)?.schema ?? schemaName))].filter(s => s !== schemaName),
     rootEnums: Record<string, EnumData> = Object.fromEntries(await Promise.all(
       rootSchemas.map(async schema => [schema, otherEnums[schema] ?? await enumsForSchema(schema)]))),
