@@ -395,9 +395,9 @@ const isWrapper = (x: unknown) => x instanceof DangerousRawString || x instanceo
 // cols() and vals() of a primitive: Zapatos 6.6.1 compiled the object it boxes to, a string to its character indexes
 // as names ("0", "1") or its characters as values, any other primitive to nothing; null still reaches Object.keys
 const isNotObject = (x: unknown) => typeof x !== 'object' && typeof x !== 'function';
-const notAnObject = (fn: 'cols' | 'vals', x: unknown) =>
-  `\`db.${fn}()\` takes an object or an array, not \`${typeof x}\`: ${fn === 'cols' ?
-    'for one column, write `db.cols([name])`' : 'for one value, write `db.vals([value])`'}; for a row of \`insert()\`, \`upsert()\` or \`update()\`, give an object.`;
+const notAnObject = (fn: 'cols' | 'vals', x: unknown) => fn === 'cols' ?
+  `\`db.cols()\` takes an object or an array, not \`${typeof x}\`: for one column, write \`db.cols([name])\`; for a row of \`insert()\`, \`upsert()\` or \`update()\`, give an object.` :
+  `\`db.vals()\` takes an object or an array, not \`${typeof x}\`: for one value, write \`db.vals([value])\`; for a row of \`insert()\`, \`upsert()\` or \`update()\`, give an object.`;
 
 export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never> {
   protected constraint?: Constraint;
