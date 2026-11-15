@@ -324,6 +324,8 @@ Candidates for a check, a rule or a skill line.
 - #486 — advice in an error that moves where a transaction begins and ends ("pass the pool") says what it costs: a transaction of its own, committed apart, and a possible lock wait on the outer one.
 - #486 — a lookup keyed by caller input (`table[input].includes`) reaches `Object.prototype` keys and breaks a JS call that ran: use an own-key check or a `Map`.
 - #486 — a stated cost of an alternative needs a read probe, a write probe and whether the call ever returns: a lock wait on a transaction that waits in JavaScript is no deadlock to Postgres and ends only with `lock_timeout`.
+- #488 — when a fix makes the generated JSDoc lose a tag (here an `@deprecated` after U+2028), the CHANGELOG names the visible effect (strike-through, `no-deprecated`), not only the mechanism: compare the property tags of real `tsForConfig` output before and after.
+- #488 — in a tool call, a written U+2028 escape becomes the raw character and breaks a regex literal: build it with `String.fromCharCode(0x2028)` and `new RegExp(...)`.
 
 ## Minors kept
 
@@ -447,3 +449,4 @@ Minor review defects, taken up by the end-of-chapter review.
 - #341 — `test/unit/injection.test.ts:1709`: `upsert([row, null])` and `upsert([null, row])` now compile SQL with no frozen injection snapshot (a hostile key stays one quoted identifier, probed) — `branch-reviewer`
 - #485 — `order: [null]` and `lock: [null]` (a `null` array item) still throw a `TypeError` at the call, on 6.6.1 and pgcast alike.
 - #486 — `website/fr/runtime-config.md` (#233's text) says « validée à part » where the glossary has « commitée à part ».
+
