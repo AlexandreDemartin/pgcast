@@ -1233,7 +1233,7 @@ describe('count, sum, avg, min, max', () => {
     expect(await each(a => db.selectOne('users', { id: 1 }, { lateral: a }))).toEqual(asPg);
     expect(await each(a => db.selectExactlyOne('users', { id: 1 }, { lateral: a }))).toEqual(asPg);
     // passed through twice, still the string
-    expect(await each(a => db.selectOne('users', { id: 1 }, { lateral: db.selectOne('users', { id: parent('id') }, { lateral: a }) }))).toEqual(asPg);
+    expect(await each(a => db.selectOne('users', { id: 1 }, { lateral: db.selectOne('users', { id: parent('id') }, { alias: 'u2', lateral: a }) }))).toEqual(asPg);
     // no row to aggregate: count() gives '0', the others null
     const noRow = { count: '0', sumInt: null, sumBigint: null, sumNumeric: null, sumFloat8: null, avgInt: null, avgNumeric: null };
     expect(await each(a => db.selectOne('users', { id: 3 }, { lateral: a }))).toEqual(noRow);
