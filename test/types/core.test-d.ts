@@ -437,4 +437,29 @@ describe('range strings', () => {
     expectTypeOf(bracketed).not.toBeAny();
     expectTypeOf(nonEmpty).not.toBeAny();
   });
+
+  test("a Record or a mapped type keyed by a range type requires an 'empty' key, unless Partial or Exclude", () => {
+    // @ts-expect-error 'empty' is a key it requires
+    const byPeriod: Record<db.DateRangeString, number> = {};
+    // @ts-expect-error a mapped type too
+    const mapped: { [K in db.DateRangeString]: number } = {};
+    const partial: Partial<Record<db.DateRangeString, number>> = {};
+    const nonEmpty: Record<Exclude<db.DateRangeString, 'empty'>, number> = {};
+    if (row.value_days !== null) partial[row.value_days] = 1;
+    if (row.value_days !== null && row.value_days !== 'empty') nonEmpty[row.value_days] = 1;
+    expectTypeOf(byPeriod).not.toBeAny();
+    expectTypeOf(mapped).not.toBeAny();
+  });
+
+  test("a type computed from a range type gives 'empty' too, unless Exclude or a false branch of never", () => {
+    type Lower<R> = R extends `${'[' | '('}${infer L},${string}` ? L : R;
+    type LowerOrNever<R> = R extends `${'[' | '('}${infer L},${string}` ? L : never;
+    // @ts-expect-error a false branch that keeps the range keeps 'empty'
+    expectTypeOf<Lower<db.NumberRangeString>>().toExtend<`${number}` | ''>();
+    // @ts-expect-error 'empty' starts with no bracket
+    expectTypeOf<db.NumberRangeString extends `[${string}` | `(${string}` ? true : false>().toEqualTypeOf<true>();
+    expectTypeOf<Lower<Exclude<db.NumberRangeString, 'empty'>>>().toEqualTypeOf<`${number}` | ''>();
+    expectTypeOf<Exclude<db.NumberRangeString, 'empty'> extends `[${string}` | `(${string}` ? true : false>().toEqualTypeOf<true>();
+    expectTypeOf<LowerOrNever<db.NumberRangeString>>().toEqualTypeOf<`${number}` | ''>();
+  });
 });
