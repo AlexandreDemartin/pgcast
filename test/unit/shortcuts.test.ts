@@ -1824,6 +1824,25 @@ describe('a null or primitive row in insert(), upsert() and update()', () => {
     expect(queryable.query).not.toHaveBeenCalled();
   });
 
+  it('a primitive beside a row with no keys, a null row or an empty array rejects run(), with no query sent', async () => {
+    // the first row has no column, but the check for that (nothing to insert) leaves the primitive to cols() or vals()
+    const
+      queryable = { query: vi.fn() } as any,
+      noKeys: Record<string, unknown> = { empty: {}, null: null, emptyArray: [] },
+      outcomes: Record<string, string> = {}, expected: Record<string, string> = {};
+    for (const [name, x] of Object.entries(single)) {
+      if (x == null) continue;
+      for (const [other, o] of Object.entries(noKeys)) for (const [order, values] of [['after', [o, x]], ['before', [x, o]]] as const) {
+        const key = `${name} ${order} ${other}`;
+        outcomes[`insert ${key}`] = await outcome(() => db.insert('users', values as any), queryable);
+        outcomes[`upsert ${key}`] = await outcome(() => db.upsert('users', values as any, 'email'), queryable);
+        for (const fn of ['insert', 'upsert']) expected[`${fn} ${key}`] = (order === 'after' ? valsMessage : colsMessage)(kind(x));
+      }
+    }
+    expect(outcomes).toEqual(expected);
+    expect(queryable.query).not.toHaveBeenCalled();
+  });
+
   it('a primitive among rows whose undefined values undefinedMeansMissing drops still rejects', async () => {
     // undefinedAsMissing rebuilds the object rows; a primitive one is left as it is, not made an object of its characters
     db.setConfig({ undefinedMeansMissing: true });
