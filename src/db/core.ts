@@ -64,9 +64,11 @@ export type Int8String = `${number}`;
 export type NumericString = `${number}`;
 
 /**
- * Generic range value represented as a string
+ * Generic range value represented as a string: a bracket, two bounds, a
+ * bracket, or `'empty'`, as Postgres writes an empty range (`'[5,5)'::int4range`
+ * included). See https://www.postgresql.org/docs/current/rangetypes.html#RANGETYPES-IO
  */
-export type RangeString<Bound extends string | number> = `${'[' | '('}${Bound},${Bound}${']' | ')'}`;
+export type RangeString<Bound extends string | number> = `${'[' | '('}${Bound},${Bound}${']' | ')'}` | 'empty';
 
 /**
  * `tsrange`, `tstzrange` or `daterange` value represented as a string. The
