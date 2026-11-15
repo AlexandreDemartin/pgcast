@@ -4,7 +4,6 @@
 // test/unit/core.test.ts does once run on the fixture, surprises included.
 
 import { afterEach, describe, expect, it } from 'vitest';
-import type * as s from 'zapatos/schema';
 import type { Whereable } from 'zapatos/schema';
 import * as db from '../../src/db';
 import { sql, param, raw, cols, vals, parent, self, Default } from '../../src/db';
@@ -658,8 +657,7 @@ describe('range strings', () => {
     expect(await where.run(t.client)).toEqual([{ note: 'empty ranges' }]);
 
     // Selectable: pg parses no range type, so it hands over Postgres's text
-    const selectable = sql<s.transfers.SQL, Pick<s.transfers.Selectable, keyof typeof allEmpty>[]>`
-      SELECT ${'batch_sizes'}, ${'fee_band'}, ${'valid_during'}, ${'value_days'} FROM ${'transfers'} WHERE ${{ note: 'empty ranges' }}`;
+    const selectable = sql`SELECT batch_sizes, fee_band, valid_during, value_days FROM transfers WHERE note = ${param('empty ranges')}`;
     expect(await selectable.run(t.client)).toEqual([allEmpty]);
   });
 });
