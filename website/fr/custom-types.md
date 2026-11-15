@@ -1,5 +1,5 @@
 ---
-english: e2ca5393b4e2
+english: 3f73aa3e1af2
 ---
 
 # Types personnalisés
@@ -118,7 +118,7 @@ const here: c.PgPoint = '(0.5,1)';
 
 ## Typer un domaine {#type-a-domain}
 
-Un domaine a aussi son placeholder, qui contient le type `Selectable` de son type de base au lieu de `any` : le type que renvoie `pg`. Ce seul type sert les cinq interfaces, `JSONSelectable` compris, sauf si le domaine porte sur un type typé selon le contexte ([plus bas](#when-a-placeholder-does-not-compile)). `seat_label` est un `TEXT` avec un `CHECK`, donc `src/zapatos/custom/PgSeat_label.d.ts` contient `string`, qui est juste pour chacune :
+Un domaine a aussi son placeholder, qui contient le type `Selectable` de son type de base au lieu de `any` : le type que renvoie `pg`. Ce seul type sert les cinq interfaces, `JSONSelectable` compris, sauf si le domaine porte sur un type typé selon le contexte et que [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext) est activé ([plus bas](#when-a-placeholder-does-not-compile)). `seat_label` est un `TEXT` avec un `CHECK`, donc `src/zapatos/custom/PgSeat_label.d.ts` contient `string`, qui est juste pour chacune :
 
 ::: code-group
 
@@ -232,7 +232,7 @@ declare module 'zapatos/custom' {
 
 :::
 
-- Un domaine sur `numeric`, `date`, `timestamp`, `timestamptz`, `bytea` ou `money` est dans le même cas : son placeholder contient ce que renvoie `pg`, pas ce que renvoient les raccourcis ni tout ce qu’accepte une écriture, et l’option le type aussi selon le contexte.
+- Un domaine sur `numeric`, `date`, `timestamp`, `timestamptz`, `bytea` ou `money` est dans le même cas : son placeholder contient ce que renvoie `pg`, pas tout ce qu’accepte une écriture ni, sauf pour `money`, ce que renvoient les raccourcis, et l’option le type aussi selon le contexte.
 - Un placeholder modifié, comme celui-ci, garde son type dans les cinq interfaces, même avec l’option.
 - Au-delà de `Number.MAX_SAFE_INTEGER`, le nombre perd ses derniers chiffres, comme pour tout `bigint` : `9007199254740993` revient en `9007199254740992` ([`customJSONParsingForLargeNumbers`](/fr/generator#generate.customJSONParsingForLargeNumbers)).
 

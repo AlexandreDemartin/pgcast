@@ -1,5 +1,5 @@
 ---
-english: dc458d0f1dd4
+english: 1e18df8c958c
 ---
 
 # Générateur
@@ -391,7 +391,7 @@ CREATE UNIQUE INDEX festival_entries_live_idx ON festival_entries (film_id) WHER
 
 ### `domainsTypedByContext` {#generate.domainsTypedByContext}
 
-`boolean`, par défaut `false` ; un opt-in, `true` par défaut à partir de la 7.0 ([Versions](/fr/versions)). Le type d’une colonne dont le domaine porte sur `int8`, `numeric`, `bytea`, `money`, `date`, `timestamp` ou `timestamptz`, ou sur un tableau de l’un d’eux : des types que `pg`, le JSON des raccourcis et une écriture donnent chacun à leur façon ([Types de valeurs](/fr/runtime-config#value-types)). `false`, comme dans Zapatos 6.6.1, la type par son placeholder dans les cinq interfaces, telle que `pg` la renvoie ; `true` la type selon le contexte, comme l’est son type de base, tant que son placeholder contient ce qu’a écrit le générateur. Supposons qu’une réservation ait un numéro de billet :
+`boolean`, par défaut `false` ; un opt-in, `true` par défaut à partir de la 7.0 ([Versions](/fr/versions)). Le type d’une colonne dont le domaine porte sur `int8`, `numeric`, `bytea`, `money`, `date`, `timestamp` ou `timestamptz`, ou sur un tableau de l’un d’eux : des types que `pg`, le JSON des raccourcis et une écriture donnent chacun à leur façon ([Types de valeurs](/fr/runtime-config#value-types)). `false`, comme dans Zapatos 6.6.1, la type par son placeholder dans les cinq interfaces, qui, tel que généré, contient ce que renvoie `pg` ; `true` la type selon le contexte, comme l’est son type de base, tant que son placeholder contient ce que le générateur y a écrit pour elle. Supposons qu’une réservation ait un numéro de billet :
 
 ```sql
 CREATE DOMAIN ticket_no AS bigint;
@@ -408,9 +408,11 @@ Son placeholder, `PgTicket_no.d.ts`, contient `db.Int8String`. Les raccourcis re
 
 - `true` écrit [`DomainInContext`](/fr/runtime-config#DomainInContext) dans les quatre autres interfaces, `db.DomainInContext<c.PgTicket_no, db.Int8String, number>` dans `JSONSelectable` ; un éditeur affiche `number`.
 - Un placeholder que vous modifiez, vers tout autre type, type la colonne dans les cinq interfaces, comme avec `false` : `number | db.Int8String`, un type « branded », ou `any`. L’option ne change jamais un placeholder, donc l’activer ou la désactiver n’oblige à en modifier aucun.
+- Un placeholder écrit par Zapatos 6.6.1 sur `int8` ou `numeric`, ou sur un tableau de l’un d’eux, contient le même type sans son import, et le générateur ne le réécrit jamais : la colonne vaut `any`, avec `false` comme avec `true`, donc `insert()` accepte `ticket: 'abc'`. `tsc` ne signale que TS2503, dans le placeholder, et rien sous `skipLibCheck`. Ajoutez d’abord son import ([Quand un placeholder ne compile pas](/fr/custom-types#when-a-placeholder-does-not-compile)). Sur `date`, `timestamp`, `timestamptz`, `bytea` ou `money`, le placeholder de la 6.6.1 est celui qu’écrit le générateur.
+- Deux domaines qui partagent un placeholder, comme `public.ticket_no AS bigint` et `archive.ticket_no AS date`, tous deux `PgTicket_no` ([`customTypesTransform`](#generate.customTypesTransform)), partagent son type unique : `true` type selon le contexte les colonnes du domaine dont le placeholder contient le type, et laisse celles de l’autre typées par le placeholder dans les cinq interfaces, bien que la note de `false` les nomme aussi. Renommez l’un des deux dans la base.
 - Chaque type de base prend ses propres types : `numeric` `number`, puis `number | NumericString` ; `date`, `timestamp` et `timestamptz` leur type chaîne, puis celui-ci ou un `Date` ; `bytea` `ByteArrayString`, puis celui-ci ou un `Buffer` ; `money` `string`, puis `number | string` ; un tableau, ceux de son élément, en tableau. Avec [`customJSONParsingForLargeNumbers`](#generate.customJSONParsingForLargeNumbers), `int8` et `numeric` sont `number | Int8String` et `number | NumericString` dans `JSONSelectable`.
-- Inchangés : un domaine typé de la même façon dans chaque contexte, comme `seat_label`, et un domaine dont le placeholder vaut `any`, comme un domaine sur un autre domaine, ou un tableau d’un domaine.
-- `false` signale, via [`warningListener`](#generate.warningListener), chaque colonne que `true` changerait.
+- Inchangés : un domaine typé de la même façon dans chaque contexte, comme `seat_label`, et un domaine dont le placeholder vaut `any`, comme un domaine sur un autre domaine, ou un tableau d’un domaine ([#484](https://github.com/AlexandreDemartin/pgcast/issues/484)).
+- `false` signale, via [`warningListener`](#generate.warningListener), chaque colonne d’un domaine sur l’un de ces types, que `true` type selon le contexte tant que son placeholder contient ce que le générateur y a écrit pour elle.
 
 ### `progressListener` {#generate.progressListener}
 
@@ -448,7 +450,7 @@ Writing custom types file: src/zapatos/custom/index.d.ts
   - une fois par exécution, avec [`enumOrder`](#generate.enumOrder) à `"alphabetical"`, quand un schéma de [`schemas`](#generate.schemas) a un enum dont l’ordre déclaré n’est pas alphabétique ; s’il y en a plusieurs, sous la forme `every.<name> lists the labels of enums archive.print_format and public.crew_job` ;
 - `Note: UniqueIndex lists public.festival_entries.festival_entries_live_idx and public.festival_entries.festival_entries_slot_key, unique indexes of no UNIQUE or PRIMARY KEY constraint, of a DEFERRABLE or WITHOUT OVERLAPS one, or not yet valid: db.constraint() takes them, and Postgres refuses them in ON CONFLICT ON CONSTRAINT ... DO UPDATE. Set uniqueIndexConstraintsOnly: true to leave them out; it will be the default in pgcast 7.0.`
   - une fois par exécution, sans [`uniqueIndexConstraintsOnly`](#generate.uniqueIndexConstraintsOnly), quand une relation générée a un index unique que l’option laisserait de côté ; s’il n’y en a qu’un, sous la forme `lists public.festival_entries.festival_entries_live_idx, a unique index of no UNIQUE or PRIMARY KEY constraint` ;
-- `Note: public.seat_bookings.ticket (public.ticket_no) has a domain over a type typed by context, such as int8 or date: its placeholder types it in all five interfaces as pg returns it, which the shortcuts' JSON and the values a write takes are not. Set domainsTypedByContext: true to type it by context while its placeholder holds what the generator wrote; it will be the default in pgcast 7.0.`
+- `Note: public.seat_bookings.ticket (public.ticket_no) has a domain over a type typed by context, such as int8 or date: its placeholder, as generated, types it in all five interfaces as pg returns it, not as a write takes it nor, but for money, as the shortcuts' JSON gives it. Set domainsTypedByContext: true to type it by context while its placeholder holds what the generator wrote for it; it will be the default in pgcast 7.0.`
   - une fois par exécution, sans [`domainsTypedByContext`](#generate.domainsTypedByContext), quand une colonne générée a un tel domaine ; s’il y en a plusieurs, sous la forme `public.screenings.premiere (public.premiere_day) and public.seat_bookings.ticket (public.ticket_no) have domains over a type typed by context` ;
 - `Note: src/zapatos/schema.d.ts is here too, generated with moduleNames: 'zapatos'. It declares 'zapatos/schema', as src/pgcast/schema.d.ts does, and TypeScript merges the two: types can loosen, silently under skipLibCheck. Delete the folder src/zapatos, once any placeholder you edited there is moved to src/pgcast/custom.`
   - après l’écriture, avec [`moduleNames`](#generate.moduleNames) à `"pgcast"`, quand `outDir` contient un `zapatos/schema.d.ts` ; un dossier sans son `schema.d.ts` n’est pas signalé ;

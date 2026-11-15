@@ -100,7 +100,7 @@ db.select('screenings', { subtitled: null });
 db.select('screenings', { subtitled: db.conditions.isNull });
 ```
 
-A domain or custom type is the exception: its placeholder is one type, used in all five contexts. That suits `seat_label`, a string everywhere, but not a domain over `int8`, `numeric`, `bytea`, `money` or a date, whose JSON and writes differ from what `pg` returns. [`domainsTypedByContext`](/generator#generate.domainsTypedByContext) types such a domain by context, as its base type is, while its placeholder holds what the generator wrote.
+A domain or custom type is the exception: its placeholder is one type, used in all five contexts. That suits `seat_label`, a string everywhere, but not a domain over `int8`, `numeric`, `bytea`, `money` or a date, whose writes differ from what `pg` returns, and, but for `money`, its JSON too. [`domainsTypedByContext`](/generator#generate.domainsTypedByContext) types such a domain by context, as its base type is, while its placeholder holds what the generator wrote.
 
 The same row, asked for twice, shows the first two side by side:
 

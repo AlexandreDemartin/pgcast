@@ -1,5 +1,5 @@
 ---
-english: 0c1e15a26518
+english: ac9d2a562cc3
 ---
 
 # Venir de Zapatos
@@ -252,7 +252,7 @@ Les quatre deviendront le comportement par défaut dans la 7.0 ([Versions](/fr/v
 
 Un opt-in de plus, [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), n’a pas d’avertissement à guetter, et reste désactivé dans la 7.0. Avec lui, un `selectExactlyOne()` exécuté seul est rejeté sur une deuxième ligne, pas seulement sur aucune. Activez-le là où vos tests ne montrent aucun `selectExactlyOne()` qui trouve deux lignes.
 
-Le générateur a cinq opt-ins qui lui sont propres, tous appelés à devenir le comportement par défaut dans la 7.0. L’avertissement des quatre premiers est une note de `npx zapatos`, pas de vos tests.
+Le générateur a des opt-ins qui lui sont propres, chacun appelé à devenir le comportement par défaut dans la 7.0. L’avertissement de chacun, sauf `rejectOnQueryError`, est une note de `npx zapatos`, pas de vos tests.
 
 La note de [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas) nomme chaque colonne dont le type est un enum d’un autre schéma, et cet enum, typé jusque-là comme `any` ou comme l’enum du même nom dans le schéma de la relation :
 
@@ -264,7 +264,7 @@ La note d’[`enumOrder`](/fr/generator#generate.enumOrder) nomme chaque enum do
 
 La note d’[`uniqueIndexConstraintsOnly`](/fr/generator#generate.uniqueIndexConstraintsOnly) nomme chaque index unique que refuse `ON CONFLICT ON CONSTRAINT`, bien qu’`UniqueIndex` le liste : un index sans contrainte, comme celui d’une vue matérialisée, l’index d’une contrainte `DEFERRABLE` ou, sur Postgres 18, d’une clé `WITHOUT OVERLAPS`, et l’index pas encore valide d’une contrainte. Activez-le et régénérez : `tsc` montre chaque `constraint()` qui en nomme un, que Postgres refusait de toute façon (42704, 55000, 42809 ou 42P10), et tout code à vous qui prend `UniqueIndex` pour la liste de chaque index unique, comme un `Record` dont il type les clés.
 
-La note de [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext) nomme chaque colonne d’un domaine sur `bigint`, `numeric`, `bytea`, `money` ou une date, que son placeholder type telle que `pg` la renvoie dans les cinq interfaces. Activez-le et régénérez : un placeholder laissé tel que généré type désormais sa colonne selon le contexte, et `tsc` montre le code qui prenait le JSON des raccourcis pour le type du placeholder, un `Date` pour une date ou une chaîne pour un `bigint`. Un placeholder que vous avez modifié garde son type, comme avant.
+La note de [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext) nomme chaque colonne d’un domaine sur `bigint`, `numeric`, `bytea`, `money` ou une date, que son placeholder, tel que généré, type dans les cinq interfaces telle que `pg` la renvoie. Un placeholder écrit par Zapatos 6.6.1 sur `bigint` ou `numeric` n’a pas d’import, donc sa colonne vaut `any`, même avec l’option : ajoutez d’abord l’import ([Quand un placeholder ne compile pas](/fr/custom-types#when-a-placeholder-does-not-compile)). Activez-le et régénérez : un placeholder laissé tel que généré type désormais sa colonne selon le contexte, et `tsc` montre le code qui prenait le JSON des raccourcis pour le type du placeholder, un `Date` pour une date ou une chaîne pour un `bigint`. Un placeholder que vous avez modifié garde son type, comme avant.
 
 La note de [`rejectOnQueryError`](/fr/generator#generate.rejectOnQueryError) vient d’un script qui appelle `generate()`, quand une requête échoue, jamais de `npx zapatos`, qui s’arrête toujours. Activez-le là où le script attend `generate()` avec `await`, et relisez ce que fait son `catch` : une connexion refusée y arrive désormais, et un script qui logge l’erreur puis continue se termine avec le code 0, pas 1.
 

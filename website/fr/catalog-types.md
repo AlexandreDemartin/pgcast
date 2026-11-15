@@ -1,5 +1,5 @@
 ---
-english: 2bd760d67c17
+english: b4b0de31321c
 ---
 
 # Le catalogue
@@ -104,7 +104,7 @@ db.select('screenings', { subtitled: null });
 db.select('screenings', { subtitled: db.conditions.isNull });
 ```
 
-Un domaine ou un type personnalisé fait exception : son placeholder déclare un seul type, utilisé dans les cinq contextes. Cela convient à `seat_label`, une chaîne partout, mais pas à un domaine sur `int8`, `numeric`, `bytea`, `money` ou une date, dont le JSON et les écritures diffèrent de ce que renvoie `pg`. [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext) type un tel domaine selon le contexte, comme l’est son type de base, tant que son placeholder contient ce qu’a écrit le générateur.
+Un domaine ou un type personnalisé fait exception : son placeholder déclare un seul type, utilisé dans les cinq contextes. Cela convient à `seat_label`, une chaîne partout, mais pas à un domaine sur `int8`, `numeric`, `bytea`, `money` ou une date, dont les écritures diffèrent de ce que renvoie `pg`, et, sauf pour `money`, le JSON aussi. [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext) type un tel domaine selon le contexte, comme l’est son type de base, tant que son placeholder contient ce qu’a écrit le générateur.
 
 La même ligne, demandée deux fois, montre les deux premiers côte à côte :
 

@@ -114,7 +114,7 @@ const here: c.PgPoint = '(0.5,1)';
 
 ## Type a domain
 
-A domain gets a placeholder too, which holds its base type's `Selectable` type instead of `any`: the type `pg` returns. That one type serves all five interfaces, `JSONSelectable` included, unless the domain is over a type typed by context ([below](#when-a-placeholder-does-not-compile)). `seat_label` is a `TEXT` with a `CHECK`, so `src/zapatos/custom/PgSeat_label.d.ts` holds `string`, right in each:
+A domain gets a placeholder too, which holds its base type's `Selectable` type instead of `any`: the type `pg` returns. That one type serves all five interfaces, `JSONSelectable` included, unless the domain is over a type typed by context and [`domainsTypedByContext`](/generator#generate.domainsTypedByContext) is on ([below](#when-a-placeholder-does-not-compile)). `seat_label` is a `TEXT` with a `CHECK`, so `src/zapatos/custom/PgSeat_label.d.ts` holds `string`, right in each:
 
 ::: code-group
 
@@ -228,7 +228,7 @@ declare module 'zapatos/custom' {
 
 :::
 
-- A domain over `numeric`, `date`, `timestamp`, `timestamptz`, `bytea` or `money` is in the same case: its placeholder holds what `pg` returns, not what the shortcuts return nor all that a write takes, and the option types it by context too.
+- A domain over `numeric`, `date`, `timestamp`, `timestamptz`, `bytea` or `money` is in the same case: its placeholder holds what `pg` returns, not all that a write takes nor, but for `money`, what the shortcuts return, and the option types it by context too.
 - An edited placeholder, such as this one, keeps its type in all five interfaces, with the option too.
 - Past `Number.MAX_SAFE_INTEGER`, the number loses its last digits, as for any `bigint`: `9007199254740993` comes back as `9007199254740992` ([`customJSONParsingForLargeNumbers`](/generator#generate.customJSONParsingForLargeNumbers)).
 
