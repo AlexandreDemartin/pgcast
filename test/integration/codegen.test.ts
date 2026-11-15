@@ -1300,10 +1300,10 @@ describe('column comments', () => {
         lead: ['* ', '* Starts with a line break'],
         indented: ['* A list:', '*   - one', '*   - two'],
         one: ['* A single line'],
-        // one line, as under Zapatos 6.6.1: TypeScript does not end a JSDoc line at U+2028 or U+2029,
-        // but the indentation of the namespace (/^/gm) still comes after them
-        ls: ['* Before\u2028    after'],
-        ps: ['* Before\u2029    after'],
+        // one line, as under Zapatos 6.6.1: TypeScript does not end a JSDoc line at U+2028 or U+2029, nor
+        // does the namespace's indentation now, which 6.6.1 wrote after them (#481)
+        ls: ['* Before\u2028after'],
+        ps: ['* Before\u2029after'],
         n: ['* Count of notes', '* refreshed on demand'],
       });
       expect(syntaxErrors(schema)).toEqual([]);
@@ -1339,7 +1339,7 @@ describe('column comments', () => {
       COMMENT ON COLUMN default_lines_ns.prefixed.tagged IS E'Old.\n@deprecated use lf';`);
     try {
       const { ts: schema } = await codegen({ schemas: { default_lines: all, default_lines_ns: all }, unprefixedSchema: 'default_lines' });
-      const expected = (sequence: string, ls: string) => ({
+      const expected = (sequence: string) => ({
         lf: ["* - Nullable, default: `'two", "* lines'::text`"],
         crlf: ["* - Nullable, default: `'two", "* lines'::text`"],
         cr: ["* - Nullable, default: `'two", "* lines'::text`"],
@@ -1357,11 +1357,11 @@ describe('column comments', () => {
         // one line: as under Zapatos 6.6.1, byte for byte
         one: ["* - Nullable, default: `'single line'::text`"],
         at: ["* - Nullable, default: `'a @x'::text`"],
-        // and as on master, the indentation of the namespaces (/^/gm) after U+2028, at which no JSDoc line ends
-        ls: [`* - Nullable, default: \`'a\u2028${ls}b'::text\``],
+        // one line too at U+2028, at which no JSDoc line ends, and no namespace's indentation after it (#481)
+        ls: [`* - Nullable, default: \`'a\u2028b'::text\``],
       });
-      expect.soft(defaultLines(schema, 'unprefixed')).toEqual(expected('default_lines.', '  '));
-      expect.soft(defaultLines(schema, 'prefixed')).toEqual(expected('default_lines_ns.', '    '));
+      expect.soft(defaultLines(schema, 'unprefixed')).toEqual(expected('default_lines.'));
+      expect.soft(defaultLines(schema, 'prefixed')).toEqual(expected('default_lines_ns.'));
       expect.soft(syntaxErrors(schema)).toEqual([]);
     } finally {
       await t.pool.query('DROP SCHEMA default_lines, default_lines_ns CASCADE');
@@ -1769,6 +1769,52 @@ describe('awkward names', () => {
       expect.soft(syntaxErrors(schema)).toEqual([]);
     } finally {
       await t.pool.query(`DROP SCHEMA line_names, "name${'\r\n'}lines" CASCADE`);
+    }
+  });
+
+  it('keeps the namespace indentation out of a name holding U+2028 or U+2029, in an unprefixed and a prefixed schema', async () => {
+    // JavaScript's multiline ^ also matches after U+2028 and U+2029, which TypeScript reads inside a string or a JSDoc
+    const [ls, ps] = ['\u2028', '\u2029'];
+    /** Every string literal of `schema` holding a separator, as TypeScript reads it: a name, a key, a label. */
+    const separated = (schema: string) => {
+      const found = new Set<string>();
+      const visit = (node: ts.Node): void => {
+        if (ts.isStringLiteral(node) && /[\u2028\u2029]/.test(node.text)) found.add(node.text);
+        ts.forEachChild(node, visit);
+      };
+      visit(ts.createSourceFile('schema.ts', schema, ts.ScriptTarget.Latest, true));
+      return [...found].sort();
+    };
+    const ddl = (schema: string) => `
+      CREATE SCHEMA ${schema};
+      CREATE TYPE ${schema}.reels AS ENUM ('l${ls}m', '${ps}lead');
+      CREATE DOMAIN ${schema}."d${ps}x" AS text;
+      CREATE TABLE ${schema}."a${ls}rel" (id int, "c${ls}x" int, "c${ps} x" int, "c${ls}" int, r ${schema}.reels,
+        d ${schema}."d${ps}x", noted int, dflt text DEFAULT 'a${ls}b', CONSTRAINT "i${ls}x" UNIQUE (id));
+      COMMENT ON COLUMN ${schema}."a${ls}rel".noted IS 'one${ls}two';
+      CREATE MATERIALIZED VIEW ${schema}."m${ps}x" AS SELECT "c${ls}x" FROM ${schema}."a${ls}rel";`;
+    // tsForConfig() reads through its own connection: the schemas are committed, then dropped
+    await t.pool.query(ddl('separator_names') + ddl(`"sep${ls}names"`));
+    try {
+      const { ts: schema } = await codegen({ schemas: { separator_names: all, [`sep${ls}names`]: all }, unprefixedSchema: 'separator_names' });
+      // each is the database's name, byte for byte: Zapatos 6.6.1 and master wrote 2 spaces after the separator, 4 in a namespace
+      expect.soft(separated(schema)).toEqual([
+        'a\u2028rel', 'm\u2029x', 'sep\u2028names.a\u2028rel', 'sep\u2028names.m\u2029x',  // Table, and the lookups' keys
+        'sep\u2028names',  // Schema and AllSchemas
+        'c\u2028x', 'c\u2029 x', 'c\u2028', 'l\u2028m', '\u2029lead', 'i\u2028x',  // property names, enum labels, UniqueIndex
+      ].sort());
+      expect.soft(schema).toContain('"sep\u2028names.a\u2028rel": sep_names.a_rel.Selectable;');
+      expect.soft(schema).toContain(`export type Table = 'sep\u2028names.a\u2028rel';`);
+      // and in the JSDoc and the schema's header
+      expect.soft(schema).toContain('/* === schema: sep\u2028names === */');
+      expect.soft(schema).toContain('* **sep\u2028names.a\u2028rel.noted**');
+      expect.soft(schema).toContain('* one\u2028two');
+      expect.soft(schema).toContain("* - Nullable, default: `'a\u2028b'::text`");
+      expect.soft(schema).toContain('* - `d\u2029x` (base type: `text`) in database');
+      expect.soft(schema).not.toMatch(/[\u2028\u2029] {2}/);
+      expect.soft(syntaxErrors(schema)).toEqual([]);
+    } finally {
+      await t.pool.query(`DROP SCHEMA separator_names, "sep${ls}names" CASCADE`);
     }
   });
 

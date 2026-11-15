@@ -324,6 +324,8 @@ Candidates for a check, a rule or a skill line.
 - #486 — advice in an error that moves where a transaction begins and ends ("pass the pool") says what it costs: a transaction of its own, committed apart, and a possible lock wait on the outer one.
 - #486 — a lookup keyed by caller input (`table[input].includes`) reaches `Object.prototype` keys and breaks a JS call that ran: use an own-key check or a `Map`.
 - #486 — a stated cost of an alternative needs a read probe, a write probe and whether the call ever returns: a lock wait on a transaction that waits in JavaScript is no deadlock to Postgres and ends only with `lock_timeout`.
+- #488 — when a fix makes the generated JSDoc lose a tag (here an `@deprecated` after U+2028), the CHANGELOG names the visible effect (strike-through, `no-deprecated`), not only the mechanism: compare the property tags of real `tsForConfig` output before and after.
+- #488 — in a tool call, a written U+2028 escape becomes the raw character and breaks a regex literal: build it with `String.fromCharCode(0x2028)` and `new RegExp(...)`.
 - #487 — a codegen "as in Zapatos 6.6.1" claim is replayed with the placeholders 6.6.1 wrote still on disk, with and without `skipLibCheck`: the generator never rewrites them, and 6.6.1's `int8`/`numeric` placeholder is `any`.
 - #487 — a probe database is created from a process that stays alive until its drop: a concurrent run's orphan clean-up drops a database named after a dead pid.
 - #487 — a claim about an `any` placeholder gets its own array-domain probe: the `0 extends (1 & T)` guard doesn't see `any[]`, so "X, or an array of one" splits in two.
@@ -453,6 +455,7 @@ Minor review defects, taken up by the end-of-chapter review.
 - #341 — `test/unit/injection.test.ts:1709`: `upsert([row, null])` and `upsert([null, row])` now compile SQL with no frozen injection snapshot (a hostile key stays one quoted identifier, probed) — `branch-reviewer`
 - #485 — `order: [null]` and `lock: [null]` (a `null` array item) still throw a `TypeError` at the call, on 6.6.1 and pgcast alike.
 - #486 — `website/fr/runtime-config.md` (#233's text) says « validée à part » where the glossary has « commitée à part ».
+
 - #487 — `website/catalog-types.md:69` and `website/generator.md:390` (and FR): "typed by its placeholder in all five interfaces, which, as generated, holds…" reads twice; "typed in all five interfaces by its placeholder, which…".
 - #487 — `website/custom-types.md:231` (and FR): the sentence on a domain's placeholder would read better as two.
 - #487 — `test/types/schema.test-d.ts`: `unknown`, `db.Int8String | null` under `strict`, and a generated `NumericString[]` or `Date[]` are not frozen for `DomainInContext`.

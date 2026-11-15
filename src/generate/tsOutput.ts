@@ -39,9 +39,11 @@ const
 export interface schemaVersionCanary extends db.SchemaVersionCanary { version: ${canaryVersion} }
 `;
 
+// a line starts after \n or \r only: JavaScript's multiline ^ also matches after U+2028 and U+2029, which a name or a
+// comment may hold, and TypeScript reads them inside a string or a JSDoc
 const declareModule = (module: string, declarations: string) => `
 declare module '${module}' {
-${declarations.replace(/^(?=[ \t]*\S)/gm, '  ')}
+${declarations.replace(/(?<![^\n\r])(?=[ \t]*\S)/g, '  ')}
 }
 `;
 
@@ -237,7 +239,7 @@ const warnAboutSharedIdentifiers = (groups: IdentifierGroup[], config: CompleteC
 
 function indentAll(level: number, s: string) {
   if (level === 0) return s;
-  return s.replace(/^/gm, ' '.repeat(level));
+  return s.replace(/(?<![^\n\r])/g, ' '.repeat(level));  // after \n or \r only, as declareModule()
 }
 
 /**
