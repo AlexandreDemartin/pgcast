@@ -354,6 +354,12 @@ Candidates for a check, a rule or a skill line.
 - #484 — An `any` exception on a nested type is probed with `to_jsonb` as well as `pg`: nested arrays (`[[7]]`) proved the array guard was needed — `builder`
 - #484 — Last-wins on a #42 shared placeholder is a race between the pool's queries (`tsOutput.ts` `Promise.all`), not « the relation read last »; fourth time (#184, #449, #455, #484): a new `await` in `definitionForRelationInSchema` is checked by N generations giving one output — `branch-reviewer`
 - #484 — A verify round on a draft has no CI run of the red/green test: the builder reports a local run of the new test, or the PR is marked ready before verify — `branch-reviewer`
+- #501 — A guard added before code that reads the same property later changes how often a getter or Proxy is read and adds a read on the empty path: a 6.6.1 replay includes a counting and a throwing getter, with an empty rest parameter — `branch-reviewer`
+- #501 — « Every other value gives what it gave » in a CHANGELOG line is backed by a diff of the whole value grid between 6.6.1 and the branch, not by the values the fix targets — `branch-reviewer`
+- #501 — A brief's suggested guard (`typeof code !== 'string'`) is checked against the existing tests first: a `String` object `code` was frozen as matching — `builder`
+- #501 — A guard copies how the original reads the value (once per type, inside `some`), so getters and Proxies are read as before — `builder`
+- #502 — A CHANGELOG line for a fix that changes two paths (the pool's client and a plain client, #246) gives one clause each: the plain client's cleared `_zapatos` was in no line — `builder`
+- #502 — A brief names a PR by its PR number, not its issue's: #246 and #96 are issues, closed by PRs #255 and #265 — `builder`
 
 ## Minors kept
 
@@ -412,7 +418,7 @@ Minor review defects, taken up by the end-of-chapter review.
 - #179 — `test/integration/transaction.test.ts:73`: the pool case of a thrown `null` / `undefined` checks the rows but not `totalCount - idleCount === 0`, as `:335` and `:493` do — `branch-reviewer`
 - #179 — `website/transaction.md:73` (and `fr/…:77`): « `0` or `1` gives one » could match `runtime-config.md:113` (« `1`, `0`, a negative value or `NaN` ») — `branch-reviewer`
 - #179 — `src/db/transaction.ts:162`: a `valueOf` with side effects is now called once at entry, where 6.6.1 called it at each comparison (0 times on a success) — `branch-reviewer`
-- #178 — `src/db/pgErrors.ts:19`, `website/transaction.md:349`: « any value », yet a `code` that is not a string but has a string's members (`['2','3','5','0','5']`, `{ length: 5 }`) throws `code.startsWith is not a function`; 6.6.1's type refused both: `false` would be a Fix, or the wording narrowed — `branch-reviewer`
+- #178 — `src/db/pgErrors.ts:19`, `website/transaction.md:349`: « any value », yet a `code` that is not a string but has a string's members (`['2','3','5','0','5']`, `{ length: 5 }`) throws `code.startsWith is not a function`; 6.6.1's type refused both: `false` would be a Fix, or the wording narrowed — `branch-reviewer` Fixed by #505.
 
 - #301 — `src/generate/schemaRules.ts:43`: « has no include nor exclude » reads better as « has neither include nor exclude » (frozen in the test, CHANGELOG and both generator pages) — `branch-reviewer`
 - #301 — `test/integration/codegen.test.ts:1217`: a single `null` key (`{ include: '*', exclude: null }`) is not frozen by a test — `branch-reviewer`
@@ -485,3 +491,6 @@ Minor review defects, taken up by the end-of-chapter review.
 - #498 — `test/integration/codegen.test.ts:1374`: the key-off test covers `domainsTypedByContext` left out only, not `false`.
 - #498 — `src/generate/tables.ts:257`: `rootTypes[1] !== 'any'` relies on index 1 being `JSONSelectable`; name it or index through `contexts`.
 - #498 — `src/generate/tables.ts:145`: `definitionForRelationInSchema()`'s `domainRoots?` names `DomainRoots`, which `zapatos/generate` does not export; a direct six-argument caller runs one roots query per relation, unmemoised.
+- #505 — `src/db/pgErrors.ts:20-21`: the comment on the guard should say it reads `startsWith` once per type, as 6.6.1 does.
+- #505 — `website/transaction.md:349` (FR `:353`): `isDatabaseError`'s « any value » still throws for a `code` or `length` getter that throws, or `Object.create(String.prototype)` of length 5, as on 6.6.1.
+

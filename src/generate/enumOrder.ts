@@ -8,7 +8,7 @@ import type * as pg from 'pg';
 import type { CompleteConfig } from './config';
 import type { EnumData } from './enums';
 
-// kept out of zapatos/generate's exports, like enumLabel.ts
+// kept out of zapatos/generate's exports, like quote.ts
 
 type EnumOrder = NonNullable<CompleteConfig['enumOrder']>;
 export type EnumOrders = Record<EnumOrder, EnumData>;

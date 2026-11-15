@@ -18,7 +18,12 @@ export function isDatabaseError(err: unknown, ...types: (keyof typeof pgErrors)[
   if (err === null || err === undefined) return false;
   const { code } = err as { code?: string };
   if (!code || code.length !== 5) return false;
-  return types.some(type => code.startsWith(pgErrors[type]));
+  // startsWith is read once per type, as in Zapatos 6.6.1, so a String object matches as before;
+  // a code with none, such as an array of five characters, gives false, where 6.6.1 threw (#501)
+  return types.some(type => {
+    const { startsWith } = code;
+    return typeof startsWith === 'function' && Reflect.apply(startsWith, code, [pgErrors[type]]);
+  });
 }
 
 const pgErrors = {

@@ -95,6 +95,23 @@ describe('transaction', () => {
     });
   });
 
+  // #501: Zapatos 6.6.1 rejected with "TypeError: code.startsWith is not a function"
+  it.each([
+    ['an array of five characters', ['4', '0', '0', '0', '1']],
+    ['an object with a length of 5', { length: 5 }],
+  ])('rolls back and rejects with the error of a callback whose code is %s', async (_, code) => {
+    const thrown = { code };
+    let attempts = 0;
+    const outcome = await db.readCommitted(t.pool, async c => {
+      attempts++;
+      await write(c, 'rolled back');
+      throw thrown;
+    }).then(() => 'resolved', (error: unknown) => ({ error }));
+    expect(outcome).toEqual({ error: thrown });
+    expect(attempts).toBe(1);
+    expect(await notes()).toEqual([]);
+  });
+
   it('does not retry a database error other than 40001 / 40P01', async () => {
     let attempts = 0;
     const err = await db.transaction(t.pool, IsolationLevel.Serializable, async c => {
@@ -380,6 +397,24 @@ describe('the config transaction() reads', () => {
     const { error, leaked } = await leakCheck(() => db.readCommitted(t.pool, async () => 'never'));
     expect(leaked).toBe(0);
     expect((error as Error).message).toBe('no delay');
+  });
+
+  it('clears _zapatos from a plain client when reading the config throws', async () => {
+    // a client of the caller's, not the pool's: nothing to release, but a _zapatos left on it would make the
+    // next transaction() pass it through, its callback run outside any transaction
+    class Delay { get minMs(): number { throw new Error('no delay'); } get maxMs() { return 0; } }
+    db.setConfig({ transactionRetryDelay: new Delay() });
+    const client = new pg.Client({ connectionString: (t.pool as unknown as { options: { connectionString: string } }).options.connectionString });
+    await client.connect();
+    try {
+      const error = await db.readCommitted(client, async () => 'never').catch((e: unknown) => e);
+      expect((error as Error).message).toBe('no delay');
+      expect(Object.prototype.hasOwnProperty.call(client, '_zapatos')).toBe(false);
+      resetConfig();
+      expect(await db.readCommitted(client, async c => c.getTransactionStatus())).toBe('T');  // its own transaction
+    } finally {
+      await client.end();
+    }
   });
 
   // #257: as in Zapatos 6.6.1, a delay whose getter throws makes transaction() throw, not a query run on its own
