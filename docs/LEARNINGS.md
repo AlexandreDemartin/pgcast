@@ -312,6 +312,9 @@ Candidates for a check, a rule or a skill line.
 - #341 — When a new refusal moves an input's error into `compile()`, every check already run at the call on the same input can fire first and hide it: the probe table combines each new value with the inputs of the existing refusals (`{}`, `null`, `[]`) at each position — `branch-reviewer`
 - #341 — A PR that conflicts with its base gets no `pull_request` run: `gh pr view --json mergeable` before review; and check that master has not moved in the same command that pushes — `branch-reviewer`, `builder`
 - #341 — Several `null` options still throw a `TypeError` at the call on 6.6.1 too (`select(t, w, null)`, `columns: null`, `returning: null`, `extras: null`): filed as #474 — `builder`
+- #483 — docs that list conditions ("with A; without X, with B, and in C") get one type test per clause, in every mode the clause names: the `extras`-alone case slipped through on a scratch replay only.
+- #483 — check a PR still merges before calling it ready and before review: a French `english:` hash conflicts every time master edits the same English page, and CI stays green on the stale base.
+- #483 — the type tests run only under `strict` with `exactOptionalPropertyTypes`: a docs clause that holds only without `strictNullChecks` can be probed, never frozen. A non-strict type-test program would close that gap.
 
 ## Minors kept
 
@@ -432,3 +435,4 @@ Minor review defects, taken up by the end-of-chapter review.
 - #470 — `website/select.md:382`: the opt-in's table has no row for `sum()`/`avg()` passed through a `selectOne()`; `docs/CHARACTERISATION-REPORT.md:68`: R17's « aggregates always » rounded beyond 2^53, not when passed through (#470) — `branch-reviewer`
 - #341 — `src/db/shortcuts.ts:757`: the null-key check reads each `lateral` value two or three times (a getter is read twice for a valid key) — `branch-reviewer`
 - #341 — `test/unit/injection.test.ts:1709`: `upsert([row, null])` and `upsert([null, row])` now compile SQL with no frozen injection snapshot (a hostile key stays one quoted identifier, probed) — `branch-reviewer`
+
