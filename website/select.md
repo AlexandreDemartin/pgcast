@@ -109,7 +109,7 @@ A read shortcut is a subquery there: `select()`, `selectOne()`, `selectExactlyOn
 
 `lateral?: { [key: string]: SQLFragment } | SQLFragment`, a [`LateralOption`](#LateralOption): other shortcuts, nested, each joined with `LEFT JOIN LATERAL … ON true`. In them, [`db.parent()`](/sql-template#parent) names a column of this query's table.
 
-- **An object**: each key becomes a key of the result, holding its subquery's result: an array for `select()`, an object or `null` for `selectOne()`, a number for `count()`. The keys are joined in alphabetical order; each is one identifier, `"lateral_<key>"`.
+- **An object**: each key becomes a key of the result, holding its subquery's result: an array for `select()`, an object or `null` for `selectOne()`, a number for `count()`, or `null` when its query returns no row ([`count()`](#count)). A `count()` whose `groupBy` gives several groups brings the parent row back once per group under an outer `select()`; under `selectOne()` or `selectExactlyOne()`, once, with one group's count, though with [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow) `selectExactlyOne()` rejects with `NotExactlyOneError`. The keys are joined in alphabetical order; each is one identifier, `"lateral_<key>"`.
 - **One subquery**: its result is passed through in place of each row. Then `columns` and `extras` have nothing to add to, and the type refuses them, with `strictNullChecks` on.
 
 Steps, nesting and self-joins: [Joins](/lateral). Since pgcast 6.6.2, a key or an `alias` with a `"` in it stays one identifier; in Zapatos 6.6.1 it could close its quotes ([changelog](/changelog#6.6.2-security)).
@@ -260,9 +260,10 @@ db.count(table, where, options?)
 |---|---|---|
 | `…() needs one column to aggregate: pass columns: ['column']`<!-- message --> | `sum()`, `avg()`, `min()` or `max()` without `columns` | pgcast 6.7.0 |
 | `…() takes one column in columns, not …`<!-- message --> | `columns` with several columns, or none (`[]`) | pgcast 6.7.0 |
+| `…() takes columns as an array, not …: pass columns: ['column']…`<!-- message --> | a string or another primitive as `columns`, `'title'` for `['title']`; an empty string, `0` or `false` is no `columns` | pgcast 6.7.0 |
 | `…() cannot pass a lateral query through: nest it in the lateral of a select() instead`<!-- message --> | a single subquery as `lateral` | pgcast 6.7.0 |
 
-Zapatos 6.6.1 sent the SQL, which Postgres refused: `sum(*)` and `count("id", "mood")` (42883), `count()` (42809), `SELECT  AS result` (42601). The type is that of 6.6.1, which lets these calls through, a single subquery as `lateral` when there is no `columns` nor `extras`.
+Zapatos 6.6.1 sent the SQL, which Postgres refused: `sum(*)` and `count("id", "mood")` (42883), `count()` (42809), `count("0", "1")` for `'id'` past the type (42703), `SELECT  AS result` (42601). The type is that of 6.6.1, which lets the other calls through, a single subquery as `lateral` when there is no `columns` nor `extras`.
 
 Two calls that ran under 6.6.1 now reject too:
 

@@ -694,7 +694,7 @@ describe('cols and vals', () => {
   });
 
   it('rejects run() on a string or another primitive as the columns of an aggregate, with no query sent', async () => {
-    // columnsRefusal checks only an array, so the value reaches cols(): 6.6.1 sent count("0", "1"), or count() for 42
+    // 6.6.1 sent count("0", "1"), or count() for 42; columnsRefusal refuses it in its own terms before cols() does (#469)
     const queryable = { query: vi.fn() } as any;
     const queries = {
       // @ts-expect-error a string columns
@@ -715,9 +715,12 @@ describe('cols and vals', () => {
     const outcomes: Record<string, string> = {};
     for (const [name, q] of Object.entries(queries))
       outcomes[name] = await q.run(queryable).then(() => 'ran', (err: Error) => err.message);
+    const aggregateMessage = (aggregate: string, kind: string) =>
+      `${aggregate}() takes columns as an array, not ${kind}: pass columns: ['column']${aggregate === 'count' ? ' (leave columns out for count(*))' : ''}`;
     expect(outcomes).toEqual({
-      count: colsMessage('string'), sum: colsMessage('string'), avg: colsMessage('string'), min: colsMessage('string'),
-      max: colsMessage('string'), countNumber: colsMessage('number'), inLateral: colsMessage('string'),
+      count: aggregateMessage('count', 'string'), sum: aggregateMessage('sum', 'string'), avg: aggregateMessage('avg', 'string'),
+      min: aggregateMessage('min', 'string'), max: aggregateMessage('max', 'string'), countNumber: aggregateMessage('count', 'number'),
+      inLateral: aggregateMessage('count', 'string'),
     });
     expect(queryable.query).not.toHaveBeenCalled();
   });

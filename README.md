@@ -93,6 +93,7 @@ npx zapatos        # or: npx pgcast
 | `typeEnumsAcrossSchemas` (generator): an enum of another schema is typed by its labels, rather than as an `any` custom type or a same-named enum of the relation's schema | a note through `warningListener` | 6.7.0 |
 | `enumOrder: 'declared'` (generator): an enum's labels, `every.<name>` included, keep their declared order, by which Postgres compares them, rather than the alphabetical one | a note through `warningListener` | 6.7.0 |
 | `rejectOnQueryError` (generator): a failed query, the connection included, rejects `generate()` with its error, rather than end the process with `process.exit(1)`; the CLI still exits | a note through `warningListener`, `PGCAST_DEP006` | 6.7.0 |
+| `uniqueIndexConstraintsOnly` (generator): a relation's `UniqueIndex`, the names `constraint()` takes, lists only the index of each of its `UNIQUE` and `PRIMARY KEY` constraints, valid, not `DEFERRABLE` nor `WITHOUT OVERLAPS` ([generator](https://pgcast.dev/generator#generate.uniqueIndexConstraintsOnly)), rather than every unique index, some of which `ON CONFLICT ON CONSTRAINT` refuses | a note through `warningListener` | 6.7.0 |
 
 Everything else: [CHANGELOG.md](CHANGELOG.md); what the characterisation of 6.6.1 found: [docs/CHARACTERISATION-REPORT.md](docs/CHARACTERISATION-REPORT.md).
 
