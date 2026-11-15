@@ -1,5 +1,5 @@
 ---
-english: bbeda20342e4
+english: 24f0f52f24f2
 ---
 
 # Template SQL
@@ -470,6 +470,12 @@ Un fragment `noop` se compile quand même, son SQL derrière un commentaire. `fo
 <<< ../examples/sql_run_force.ts{ts twoslash}
 
 </CastPanel>
+
+Un texte de plusieurs instructions, `` db.sql`CREATE TABLE festivals (id int); INSERT INTO festivals VALUES (1)` ``, arrive en entier à Postgres quand il n’a ni valeur ni nom [`prepared()`](#prepared) : `pg` l’envoie comme une seule requête simple ([Sécurité](/fr/security#values-never-enter-the-sql)). Avec une valeur, ou en requête préparée, Postgres refuse le texte : « <span lang="en">cannot insert multiple commands into a prepared statement</span> » (42601).
+
+Hors transaction, Postgres exécute les instructions en une seule transaction, sauf si le texte contient son propre `BEGIN` ou `COMMIT` : si une instruction échoue, la promesse est rejetée avec son erreur, et celles d’avant sont annulées. Un `COMMIT` dans le texte garde ce qui le précède. Un `BEGIN` sans `COMMIT` laisse la connexion dans cette transaction : sur un pool, la prochaine requête qui récupère cette connexion s’y exécute. Avec une instruction qui ne peut pas s’exécuter dans un bloc de transaction, comme `VACUUM` ou `CREATE INDEX CONCURRENTLY`, Postgres refuse le texte entier, où qu’elle se trouve : « <span lang="en">VACUUM cannot run inside a transaction block</span> » (25001).
+
+Quand elles s’exécutent, `pg` renvoie un tableau de résultats, un par instruction, où le `runResultTransform` par défaut ne trouve pas de `rows` : `run()` se résout en `undefined` au lieu des lignes que promet son type, et `resultListener` reçoit `undefined`. Pour les lire, donnez au fragment un [`runResultTransform`](#runResultTransform) qui prend le tableau.
 
 ### `compile()` {#compile}
 
