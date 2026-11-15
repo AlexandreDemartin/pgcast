@@ -194,7 +194,7 @@ db.selectOne(table, where, options?)
 
 As [`select()`](#select), with `LIMIT $1`<!-- probe: db.selectOne('films', db.all) -->, its value `1`, and no `jsonb_agg`: `.run(pool)` gives the first row, or `undefined` when none matches. Any `limit` you pass is replaced by `1`; `offset` and the other options are kept. In a `lateral`, its key holds the row or `null`.
 
-With `withTies` and `order`, it writes `FETCH FIRST $1 ROWS WITH TIES`<!-- probe: db.selectOne('films', db.all, { order: { by: 'release_year', direction: 'ASC' }, withTies: true }) -->, here and in `selectExactlyOne()`. `.run()` then gives one of the tied rows; in a `lateral` under an outer `select()`, the parent row comes back once per tie.
+With `withTies`, it writes `FETCH FIRST $1 ROWS WITH TIES`<!-- probe: db.selectOne('films', db.all, { order: { by: 'release_year', direction: 'ASC' }, withTies: true }) -->, here and in `selectExactlyOne()`, which Postgres refuses without `order` (42601). `.run()` then gives one of the tied rows; in a `lateral` under an outer `select()`, the parent row comes back once per tie.
 
 <CastPanel example="selectOne">
 
@@ -390,7 +390,7 @@ const firstShow = await db.min('screenings', db.all, {
 
 - The SQL is the same either way: `SELECT min("starts_at") AS result FROM "screenings"`<!-- probe: (db.setConfig({ aggregatesTypedByColumn: true }), db.min('screenings', db.all, { columns: ['starts_at'] })) -->.
 - `min()` and `max()` give a `bigint` or a `numeric` as `pg` sends it, a string; nested, as a JSON number.
-- `count()` never gives `NULL`: it is unchanged.
+- `count()` is unchanged by the option: `0` at top level, and `null` nested in a `lateral` or as an `extras` value when its query returns no row.
 - Passed through as the single `lateral`, it is typed as at top level by `selectOne()` and `selectExactlyOne()`, which hand its column over as it is, and as nested by `select()`, which wraps its rows in `jsonb_agg()`. That `selectOne()` or `selectExactlyOne()`, nested in turn, is typed as nested.
 - `.copy()` returns a plain `SQLFragment`, typed as at top level: nested in turn, a copy comes back as JSON with that type.
 

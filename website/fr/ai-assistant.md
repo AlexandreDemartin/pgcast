@@ -26,12 +26,12 @@ Collez une URL dans la conversation, ou laissez le fichier de règles ci-dessous
 `npx pgcast` écrit `zapatos/schema.d.ts` dans votre [`outDir`](/fr/generator#generate.outDir) : `src/zapatos/schema.d.ts` dans le tutoriel. Il contient ce qu’un assistant devinerait sinon : les colonnes de chaque table, le type de chacune dans une ligne, un filtre, une insertion et une mise à jour ([Les fichiers qu’il écrit](/fr/generator#the-files-it-writes)), et sur chaque colonne un commentaire avec son type Postgres, si elle est `NOT NULL`, et sa valeur par défaut.
 
 - Dites à l’assistant de le lire avant d’écrire une requête, et de ne jamais le modifier : la prochaine exécution le réécrit. Le fichier de règles ci-dessous fait les deux ; changez son chemin si votre `outDir` diffère.
-- Un `COMMENT ON COLUMN` sur la colonne d’une table, dans une migration, arrive aussi dans ce commentaire ([`schemaJSDoc`](/fr/generator#generate.schemaJSDoc)) : c’est là qu’il faut dire à l’assistant ce que signifie une colonne. Celui d’une vue, d’une table distante ou d’une table partitionnée n’y arrive pas encore ([#47](https://github.com/AlexandreDemartin/pgcast/issues/47)).
+- Un `COMMENT ON COLUMN`, dans une migration, arrive aussi dans ce commentaire, sur une table, une vue, une vue matérialisée, une table distante ou une table partitionnée ([`schemaJSDoc`](/fr/generator#generate.schemaJSDoc)) : c’est là qu’il faut dire à l’assistant ce que signifie une colonne. Chaque relation montre les siens : une vue ne montre aucun de ceux de sa table.
 - Après chaque migration, relancez `npx pgcast`, pour que l’assistant lise le schéma tel qu’il est.
 
 ## Ajouter le fichier de règles {#add-the-rules-file}
 
-Copiez-le dans votre projet, et changez `src/zapatos/schema.d.ts` si votre `outDir` diffère. Chaque règle se termine par la page qui la justifie, que l’assistant peut lire :
+Copiez-le dans votre projet, et changez `src/zapatos/schema.d.ts` si votre `outDir` diffère. Installé sous son propre nom, avec [`moduleNames: "pgcast"`](/fr/generator#generate.moduleNames), échangez-y `zapatos` et `pgcast` : le paquet est `pgcast`, les imports `pgcast/db` et `pgcast/schema`, jamais `zapatos/…`, et le schéma `src/pgcast/schema.d.ts`. Chaque règle se termine par la page qui la justifie, que l’assistant peut lire :
 
 ```md
 # Postgres with pgcast

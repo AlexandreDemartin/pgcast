@@ -930,7 +930,8 @@ export interface SelectOneSignatures extends ByColumn<PassingThroughSignatures<S
  * undefined). A `LIMIT 1` clause is added automatically. This can be nested with 
  * other `select`/`selectOne`/`count` queries using the `lateral` option.
  *
- * With `withTies` and `order`, it is `FETCH FIRST $n ROWS WITH TIES`, `$n` being `1`:
+ * With `withTies`, it is `FETCH FIRST $n ROWS WITH TIES`, `$n` being `1`, which
+ * Postgres refuses without `order` (42601):
  * `run()` gives one of the tied rows, and in a `lateral` under an outer
  * `select()` the parent row comes back once per tie (a nested `select()` keeps
  * the ties in its array).
@@ -979,7 +980,7 @@ export interface SelectExactlyOneSignatures extends ByColumn<PassingThroughSigna
  * `$2` being `2`. Nested in another query (a `lateral`, a `sql` template), or
  * compiled into a `result` of its own, it keeps `LIMIT 1`.
  *
- * With `withTies` and `order`, each `LIMIT` is `FETCH FIRST … ROWS WITH TIES`,
+ * With `withTies`, each `LIMIT` is `FETCH FIRST … ROWS WITH TIES`,
  * as in `selectOne()`: nested in a `lateral` under an outer `select()`, the
  * parent row comes back once per tie, option or not.
  * @param table The table to select from
