@@ -219,6 +219,7 @@ export const insert: InsertSignatures = function (
     const
       completedValues = Array.isArray(values) ? completeKeysWithDefaultValue(values, Default) : values,
       firstRow = Array.isArray(completedValues) ? completedValues[0] : completedValues,
+      anyPrimitive = Array.isArray(completedValues) ? completedValues.some(isPrimitive) : isPrimitive(firstRow),
       colsSQL = cols(firstRow),
       valuesSQL = Array.isArray(completedValues) ?
         mapWithSeparator(completedValues as Insertable[], sql`, `, v => sql`(${vals(v)})`) :
@@ -226,8 +227,8 @@ export const insert: InsertSignatures = function (
       returningSQL = SQLForColumnsOfTable(options?.returning, table),
       extrasSQL = SQLForExtras(options?.extras);
 
-    // a null or primitive row fails in compile(), in cols(), so run() rejects
-    if (firstRow != null && !isPrimitive(firstRow) && Object.keys(firstRow).length === 0) throw new Error(nothingToInsert);
+    // a null row on its own, or a primitive row anywhere, fails in compile(), in cols() or vals(), so run() rejects
+    if (firstRow != null && !anyPrimitive && Object.keys(firstRow).length === 0) throw new Error(nothingToInsert);
     query = sql`INSERT INTO ${table} (${colsSQL}) VALUES ${valuesSQL} RETURNING ${returningSQL}${extrasSQL} AS result`;
   }
 
