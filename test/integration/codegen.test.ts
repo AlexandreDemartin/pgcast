@@ -1358,7 +1358,7 @@ describe('awkward names', () => {
           ts.isModuleDeclaration(node) && node.name.text === name ? node : ts.forEachChild(node, find),
         namespace = find(ts.createSourceFile('schema.ts', schema, ts.ScriptTarget.Latest, true))!,
         selectable = (namespace.body as ts.ModuleBlock).statements.find(s => ts.isInterfaceDeclaration(s) && s.name.text === 'Selectable') as ts.InterfaceDeclaration;
-      return { relation: lines(namespace), ...Object.fromEntries(selectable.members.map(m => [(m.name as ts.StringLiteral | ts.Identifier).text, lines(m)])) };
+      return { relation: lines(namespace), ...Object.fromEntries(selectable.members.map(m => [(m.name as ts.StringLiteral | ts.Identifier).text, lines(m)])) } as Record<string, string[]>;
     };
     const ddl = (schema: string) => `
       CREATE SCHEMA ${schema};
