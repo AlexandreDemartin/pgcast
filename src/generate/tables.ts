@@ -385,11 +385,13 @@ const createColumnDoc = (config: CompleteConfig, schemaName: string, rel: Relati
     commentDoc = text.length ? '\n    *\n    * ' + text.join('\n    * ') : '',
     tagsDoc = tags.length ? '\n    *\n    * ' + tags.join('\n    * ') : '',
     [domain, udt, defaultText] = [domainName, udtName ?? '(none)', defaultValue].map(t => jsdocText(String(t))),
+    // a default holding a line break (a string literal, a quoted name) gets its ` * ` on every line, as a comment
+    defaultLines = defaultText.split(/\r\n?|\n/).join('\n    * '),
     doc = `/**
     * ${jsdocText(`**${schemaPrefix}${rel.name}.${column}**`)}${commentDoc}
     * - ${domainName ? `\`${domain}\` (base type: \`${udt}\`)` : `\`${udt}\``} in database
     * - ${rel.type === 'mview' ? 'Materialized view column' : isGenerated ? 'Generated column' :
-        `${isNullable ? 'Nullable' : '`NOT NULL`'}, ${hasDefault && defaultValue === null ? `identity column` : hasDefault ? `default: \`${defaultText}\`` : `no default`}`}${tagsDoc}
+        `${isNullable ? 'Nullable' : '`NOT NULL`'}, ${hasDefault && defaultValue === null ? `identity column` : hasDefault ? `default: \`${defaultLines}\`` : `no default`}`}${tagsDoc}
     */
     `;
   return doc;
