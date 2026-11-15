@@ -149,8 +149,8 @@ export async function transaction<T, M extends IsolationLevel>(
 ): Promise<T> {
 
   if (Object.prototype.hasOwnProperty.call(txnClientOrQueryable, '_zapatos')) {
-    // if txnClientOrQueryable is a TxnClient, just pass it through: its callback runs at the outer transaction's level,
-    // which Postgres can't change once the transaction's first query has run (see https://github.com/AlexandreDemartin/pgcast/issues/177)
+    // if txnClientOrQueryable is a TxnClient, just pass it through: its callback runs at the outer transaction's level, as
+    // Postgres can't change the isolation level once the transaction's first query has run (see https://github.com/AlexandreDemartin/pgcast/issues/177)
     const outer = (txnClientOrQueryable as TxnClient<IsolationLevel>)._zapatos?.isolationLevel;
     if (outer !== undefined && satisfying.has(outer) && satisfying.get(isolationLevel)?.includes(outer) === false) {
       if (getConfig().transactionRequiresSatisfyingLevel ?? false) throw new Error(`transaction() at ${isolationLevel} was given the client of a transaction at ${outer}, so its callback would run at ${outer}: open the outer transaction at a level that satisfies ${isolationLevel} (IsolationSatisfying)`);

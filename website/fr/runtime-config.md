@@ -1,5 +1,5 @@
 ---
-english: 3b621492e460
+english: 8f00288485b7
 ---
 
 # Configuration
@@ -235,7 +235,7 @@ Sans l’option, elle envoie ce qu’envoie Zapatos 6.6.1, avec un avertissement
 transactionRequiresSatisfyingLevel?: boolean  // default: false; the default in 7.0
 ```
 
-Avec le client d’une transaction qu’elle a ouverte, [`transaction()`](/fr/transaction#transaction) le transmet, et son callback s’exécute au niveau de cette transaction, un niveau que Postgres ne peut plus changer une fois la première requête de la transaction exécutée : `db.serializable(txnClient, …)`, avec le client de `db.readCommitted()`, s’exécute en `READ COMMITTED` ([Transmettre une transaction](/fr/transaction#passing-a-transaction-through)).
+Avec le client d’une transaction qu’elle a ouverte, [`transaction()`](/fr/transaction#transaction) le transmet, et son callback s’exécute au niveau de cette transaction, car Postgres ne peut plus changer le niveau d’isolation une fois la première requête de la transaction exécutée : `db.serializable(txnClient, …)`, avec le client de `db.readCommitted()`, s’exécute en `READ COMMITTED` ([Transmettre une transaction](/fr/transaction#passing-a-transaction-through)).
 
 Avec `true`, quand ce niveau ne vaut pas pour celui demandé ([`IsolationSatisfying`](/fr/transaction#IsolationSatisfying)), elle est rejetée avant d’appeler son callback, avec "transaction() at … was given the client of a transaction at …, so its callback would run at …: open the outer transaction at a level that satisfies … (IsolationSatisfying)"<!-- message -->, chaque `…` étant un niveau de l’appel (`SERIALIZABLE`, `READ COMMITTED`). À moins que le callback extérieur n’intercepte l’erreur, la transaction extérieure est alors annulée.
 

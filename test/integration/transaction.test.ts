@@ -957,7 +957,7 @@ describe('a client already inside a transaction block', () => {
 });
 
 // #177: given the client of a transaction already open, transaction() passes it through, whatever the level asked:
-// its callback runs at the outer transaction's level, which Postgres can't change once the transaction's first query has run
+// its callback runs at the outer transaction's level, as Postgres can't change the isolation level once the transaction's first query has run
 describe('the client of a transaction at another level', () => {
   afterEach(() => { vi.restoreAllMocks(); });
 

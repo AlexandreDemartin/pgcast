@@ -231,7 +231,7 @@ Off, it sends what Zapatos 6.6.1 sends, and warns once per process, `PGCAST_DEP0
 transactionRequiresSatisfyingLevel?: boolean  // default: false; the default in 7.0
 ```
 
-Given the client of a transaction it has open, [`transaction()`](/transaction#transaction) passes it through, and its callback runs at that transaction's level, which Postgres can't change once the transaction's first query has run: `db.serializable(txnClient, …)`, given the client of `db.readCommitted()`, runs at `READ COMMITTED` ([Passing a transaction through](/transaction#passing-a-transaction-through)).
+Given the client of a transaction it has open, [`transaction()`](/transaction#transaction) passes it through, and its callback runs at that transaction's level, as Postgres can't change the isolation level once the transaction's first query has run: `db.serializable(txnClient, …)`, given the client of `db.readCommitted()`, runs at `READ COMMITTED` ([Passing a transaction through](/transaction#passing-a-transaction-through)).
 
 With `true`, when that level doesn't satisfy the one asked for ([`IsolationSatisfying`](/transaction#IsolationSatisfying)), it rejects before calling its callback, with "transaction() at … was given the client of a transaction at …, so its callback would run at …: open the outer transaction at a level that satisfies … (IsolationSatisfying)"<!-- message -->, each `…` a level of the call (`SERIALIZABLE`, `READ COMMITTED`). Unless the outer callback catches it, the outer transaction then rolls back.
 
