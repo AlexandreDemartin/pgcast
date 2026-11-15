@@ -184,6 +184,8 @@ Postgres refuses a lock with `DISTINCT`, `GROUP BY` or an aggregate (0A000).
 
 The type refuses a bad `direction`, `nulls` or `lock`, not a bad `aggregate`, a `string`. Zapatos 6.6.1 wrote a bad `lock` or `aggregate` into the SQL as it was, where it could run a second statement. A value that has no meaning in `where` or `having` (`db.Default`, `db.self`, `db.raw()`) throws as the query compiles: [Conditions](/conditions).
 
+A `null` that gets past the type, from JavaScript or JSON: `null` options are none, as in the [writes](/insert#insert-options). `order: null` or `lock: null` throws as the query compiles, in the aggregates and nested in a `lateral` too, so `.run()` rejects before any query: "`` `order: null` has no meaning: for no `ORDER BY`, leave `order` out; to sort, give it `{ by, direction }`, or an array of them. ``<!-- message -->", and the same for each key. So do `columns: null` and `extras: null` in `select()`, `selectOne()` and `selectExactlyOne()`, unless one `lateral` subquery takes the columns' place. Zapatos 6.6.1 threw a `TypeError` at the call, on `null` options too, except in `selectOne()` and `selectExactlyOne()`.
+
 ## `selectOne()` {#selectOne}
 
 ```ts
@@ -439,6 +441,23 @@ One locking clause of [`lock`](#lock). `of` takes a table name without its schem
 ### `LateralOption` {#LateralOption}
 
 `LateralOption<C, E>`: the type of `lateral`. An object of subqueries ([`SQLFragmentMap`](#SQLFragmentMap)); or one subquery, only when neither `columns` nor `extras` is given.
+
+In a function generic over `columns` (`C extends ColumnsOption<T>`) or `extras` (`E extends ExtrasOption<T>`), `select()`, `selectOne()` and `selectExactlyOne()` given no `lateral` type each column of their rows as `any` inside that function, as in Zapatos 6.6.1, so a wrong column compiles. That holds with generic `columns` and no `extras` or a generic one, and with a generic `extras` and no `columns`; without `strictNullChecks`, also with generic `columns` and a literal `extras`, or with literal `columns` and a generic `extras`. The function's callers get typed rows. Pass `lateral: undefined`, which changes no SQL, and the rows are typed inside the function in each of these cases: a key of a generic `extras` is then refused as well. A function that passes on a generic `lateral` of its own, or a whole options object typed with `LateralOption<C, …>`, keeps `any`.
+
+```ts twoslash
+import * as db from 'zapatos/db';
+// ---cut---
+async function filmCards<C extends db.ColumnsOption<'films'>>(queryable: db.Queryable, columns: C) {
+  const loose = await db.select('films', db.all, { columns }).run(queryable);
+  const looseYear: string = loose[0]!.release_year;  // compiles: each column is any here
+  const cards = await db.select('films', db.all, { columns, lateral: undefined }).run(queryable);
+  // @ts-expect-error release_year is a number
+  const year: string = cards[0]!.release_year;
+  // @ts-expect-error films has no rating column
+  const rating = cards[0]!.rating;
+  return [looseYear, year, rating];
+}
+```
 
 ### `SQLFragmentMap` {#SQLFragmentMap}
 

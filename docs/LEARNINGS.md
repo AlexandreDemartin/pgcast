@@ -315,6 +315,15 @@ Candidates for a check, a rule or a skill line.
 - #341 — When a new refusal moves an input's error into `compile()`, every check already run at the call on the same input can fire first and hide it: the probe table combines each new value with the inputs of the existing refusals (`{}`, `null`, `[]`) at each position — `branch-reviewer`
 - #341 — A PR that conflicts with its base gets no `pull_request` run: `gh pr view --json mergeable` before review; and check that master has not moved in the same command that pushes — `branch-reviewer`, `builder`
 - #341 — Several `null` options still throw a `TypeError` at the call on 6.6.1 too (`select(t, w, null)`, `columns: null`, `returning: null`, `extras: null`): filed as #474 — `builder`
+- #483 — docs that list conditions ("with A; without X, with B, and in C") get one type test per clause, in every mode the clause names: the `extras`-alone case slipped through on a scratch replay only.
+- #483 — check a PR still merges before calling it ready and before review: a French `english:` hash conflicts every time master edits the same English page, and CI stays green on the stale base.
+- #483 — the type tests run only under `strict` with `exactOptionalPropertyTypes`: a docs clause that holds only without `strictNullChecks` can be probed, never frozen. A non-strict type-test program would close that gap.
+- #485 — a CHANGELOG headline agrees with its own "Unchanged" sub-bullet: when a fix has exceptions, the headline names only the function and key pairs it changes. Cross the two lists in review; #341 had the same shape.
+- #485 — a new early read of `options` (#341's `options.lateral`) broke `selectOne(t, w, null)`, which ran on 6.6.1 through `{ ...null, limit: 1 }`: a replay of `null` options per entry point catches it.
+- #486 — a run-time check copied from a type inherits the type's gaps: check the table against the Postgres semantics it stands for (here `SerializableRODeferrable` satisfies every read-only level), or the 7.0 default refuses calls that lose nothing.
+- #486 — advice in an error that moves where a transaction begins and ends ("pass the pool") says what it costs: a transaction of its own, committed apart, and a possible lock wait on the outer one.
+- #486 — a lookup keyed by caller input (`table[input].includes`) reaches `Object.prototype` keys and breaks a JS call that ran: use an own-key check or a `Map`.
+- #486 — a stated cost of an alternative needs a read probe, a write probe and whether the call ever returns: a lock wait on a transaction that waits in JavaScript is no deadlock to Postgres and ends only with `lock_timeout`.
 
 ## Minors kept
 
@@ -436,3 +445,5 @@ Minor review defects, taken up by the end-of-chapter review.
 
 - #341 — `src/db/shortcuts.ts:757`: the null-key check reads each `lateral` value two or three times (a getter is read twice for a valid key) — `branch-reviewer`
 - #341 — `test/unit/injection.test.ts:1709`: `upsert([row, null])` and `upsert([null, row])` now compile SQL with no frozen injection snapshot (a hostile key stays one quoted identifier, probed) — `branch-reviewer`
+- #485 — `order: [null]` and `lock: [null]` (a `null` array item) still throw a `TypeError` at the call, on 6.6.1 and pgcast alike.
+- #486 — `website/fr/runtime-config.md` (#233's text) says « validée à part » where the glossary has « commitée à part ».

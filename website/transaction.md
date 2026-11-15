@@ -94,7 +94,8 @@ Given the client of a transaction that `transaction()` has open, it sends nothin
 
 One transaction, both seats or neither: `START TRANSACTION ISOLATION LEVEL SERIALIZABLE`<!-- probe: db.serializable(pool, async () => {}) -->, the two `INSERT`s, `COMMIT`.
 
-- The callback runs at the outer transaction's level, and that level is not checked, at run time or by the type: every `TxnClient` is a [`Queryable`](/sql-template#Queryable), so `db.serializable(txnClient, …)` type-checks with a client of `db.readCommitted()`, and its callback runs in that `READ COMMITTED` transaction.
+- The callback runs at the outer transaction's level, as Postgres can't change the isolation level once the transaction's first query has run. The type doesn't check that level: every `TxnClient` is a [`Queryable`](/sql-template#Queryable), so `db.serializable(txnClient, …)` type-checks with a client of `db.readCommitted()`, and its callback runs in that `READ COMMITTED` transaction, as in Zapatos 6.6.1, with a warning, once, `PGCAST_DEP007`.
+- With [`transactionRequiresSatisfyingLevel`](/runtime-config#Config.transactionRequiresSatisfyingLevel), when the outer level doesn't satisfy the one asked for ([`IsolationSatisfying`](#IsolationSatisfying)), it rejects before calling the callback, and the outer transaction rolls back unless its callback catches the error. A level that satisfies it is passed through, option or not.
 - A function whose parameter is a `TxnClientFor…` type is checked: [`IsolationSatisfying`](#IsolationSatisfying).
 - What marks the client is its own `_zapatos` property ([`TxnClient`](#TxnClient)).
 - A transaction you opened yourself, with a raw `BEGIN`, has no mark: it is not passed through ([Your own `BEGIN`](#your-own-begin)). Open the outer transaction with `transaction()`.
@@ -307,7 +308,7 @@ The client a [`transaction()`](#transaction) callback gets: the one checked out 
 
 - `_zapatos` is set while the transaction runs: its `isolationLevel`, and its `txnId`, the id the listeners get. Once the transaction ends, `transaction()` deletes it, and releases a client it checked out.
 - `T`: the levels the client stands for, an [`IsolationSatisfying`](#IsolationSatisfying) union in the seven types below.
-- `_zapatos` is optional in the type, so any `pg.PoolClient` is accepted as a `TxnClient`, with or without a transaction open on it.
+- `_zapatos` is optional in the type, as in Zapatos 6.6.1, so any `pg.PoolClient` is accepted as a `TxnClient`, with or without a transaction open on it, and a client kept after its transaction ended too. Nothing at run time can tell: a function whose parameter is a `TxnClientFor…` type, given such a client, runs its queries outside any transaction.
 
 ### `TxnClientForSerializable` {#TxnClientForSerializable}
 
