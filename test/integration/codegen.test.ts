@@ -722,11 +722,20 @@ describe('uniqueIndexConstraintsOnly', () => {
       ALTER INDEX arb.renamed_old_key RENAME TO renamed_new_key;  -- the constraint takes the new name
       CREATE TABLE arb.parts (id int, k int, CONSTRAINT parts_id_k_key UNIQUE (id, k)) PARTITION BY LIST (k);
       CREATE TABLE arb.parts_1 PARTITION OF arb.parts FOR VALUES IN (1);
+      -- the documented way to build a partitioned table's constraint: invalid until each partition's index is attached
+      CREATE TABLE arb.halves (id int, k int) PARTITION BY LIST (k);
+      CREATE TABLE arb.halves_1 PARTITION OF arb.halves FOR VALUES IN (1);
+      ALTER TABLE ONLY arb.halves ADD CONSTRAINT halves_id_k_key UNIQUE (id, k);
+      CREATE TABLE arb.dupes (id int);
+      INSERT INTO arb.dupes VALUES (1), (1);
       CREATE MATERIALIZED VIEW arb.item_counts AS SELECT 1 AS id;
       CREATE UNIQUE INDEX item_counts_id_key ON arb.item_counts (id);` +
       (version >= 150000 ? `CREATE TABLE arb.nnd (id int, CONSTRAINT nnd_id_key UNIQUE NULLS NOT DISTINCT (id));` : '') +
       // an exclusion constraint to Postgres, whose index is unique: range columns, so no btree_gist
       (version >= 180000 ? `CREATE TABLE arb.spans (id int4range, valid daterange, CONSTRAINT spans_pkey PRIMARY KEY (id, valid WITHOUT OVERLAPS));` : ''));
+    // a failed CREATE UNIQUE INDEX CONCURRENTLY leaves its index behind, invalid; outside a transaction block
+    await t.pool.query('CREATE UNIQUE INDEX CONCURRENTLY dupes_id_idx ON arb.dupes (id)')
+      .then(() => { throw new Error('dupes_id_idx was built'); }, (e: pg.DatabaseError) => { if (e.code !== '23505') throw e; });
   });
   afterAll(() => t.pool.query('DROP SCHEMA arb CASCADE'));
 
@@ -751,6 +760,9 @@ describe('uniqueIndexConstraintsOnly', () => {
 
   it('is off by default: UniqueIndex lists every unique index, as in Zapatos 6.6.1', async () => {
     expect(await uniqueIndexes(arb)).toEqual({
+      dupes: "'dupes_id_idx'",
+      halves: "'halves_id_k_key'",
+      halves_1: 'never',
       item_counts: "'item_counts_id_key'",
       item_notes: 'never',
       items: "'items_ab_key' | 'items_code_idx' | 'items_pkey' | 'items_sku_key' | 'items_slug_live_idx' | 'items_title_lower_idx'",
@@ -763,6 +775,9 @@ describe('uniqueIndexConstraintsOnly', () => {
 
   it('lists only the non-deferrable UNIQUE and PRIMARY KEY constraints', async () => {
     expect(await uniqueIndexes({ ...arb, uniqueIndexConstraintsOnly: true })).toEqual({
+      dupes: 'never',
+      halves: 'never',
+      halves_1: 'never',
       item_counts: 'never',
       item_notes: 'never',
       items: "'items_pkey' | 'items_sku_key'",
@@ -778,7 +793,7 @@ describe('uniqueIndexConstraintsOnly', () => {
     const off = await uniqueIndexes(arb);
     // a row, since Postgres refuses a deferrable arbiter only once it inserts one
     const rows: Record<string, string> = {
-      parts: '(id, k) VALUES (1, 1)', parts_1: '(id, k) VALUES (1, 1)',
+      parts: '(id, k) VALUES (1, 1)', parts_1: '(id, k) VALUES (1, 1)', halves: '(id, k) VALUES (1, 1)',
       spans: "(id, valid) VALUES ('[1,2)', '[2026-01-01,2026-02-01)')",
     };
     for (const [rel, type] of Object.entries(off)) {
@@ -795,6 +810,8 @@ describe('uniqueIndexConstraintsOnly', () => {
       }
     }
     expect(answers).toEqual({
+      dupes_id_idx: '42704',  // an index left by a failed CREATE UNIQUE INDEX CONCURRENTLY, with no constraint
+      halves_id_k_key: '42P10',  // there is no unique or exclusion constraint matching the ON CONFLICT specification
       item_counts_id_key: '42704',  // a materialised view has no constraint
       items_ab_key: '55000',  // ON CONFLICT does not support deferrable unique constraints
       items_code_idx: '42704',  // constraint "items_code_idx" for table "items" does not exist
@@ -824,16 +841,17 @@ describe('uniqueIndexConstraintsOnly', () => {
 
   it('is off by default, with one note per run that names each unique index it would leave out', async () => {
     expect(await notesFor(arb)).toEqual([
-      'Note: UniqueIndex lists arb.item_counts.item_counts_id_key, arb.items.items_ab_key, arb.items.items_code_idx, ' +
+      'Note: UniqueIndex lists arb.dupes.dupes_id_idx, arb.halves.halves_id_k_key, ' +
+      'arb.item_counts.item_counts_id_key, arb.items.items_ab_key, arb.items.items_code_idx, ' +
       'arb.items.items_slug_live_idx' + (version >= 180000 ? ', arb.items.items_title_lower_idx and arb.spans.spans_pkey' :
         ' and arb.items.items_title_lower_idx') +
-      ', unique indexes of no UNIQUE or PRIMARY KEY constraint, or of a DEFERRABLE or WITHOUT OVERLAPS one: ' +
+      ', unique indexes of no UNIQUE or PRIMARY KEY constraint, of a DEFERRABLE or WITHOUT OVERLAPS one, or not yet valid: ' +
       'db.constraint() takes them, and Postgres refuses them in ON CONFLICT ON CONSTRAINT ... DO UPDATE. ' +
       'Set uniqueIndexConstraintsOnly: true to leave them out; it will be the default in pgcast 7.0.',
     ]);
     expect(await notesFor({ schemas: { extra: only('articles') } })).toEqual([
       'Note: UniqueIndex lists extra.articles.shared_name_idx, a unique index of no UNIQUE or PRIMARY KEY constraint, ' +
-      'or of a DEFERRABLE or WITHOUT OVERLAPS one: db.constraint() takes it, and Postgres refuses it in ' +
+      'of a DEFERRABLE or WITHOUT OVERLAPS one, or not yet valid: db.constraint() takes it, and Postgres refuses it in ' +
       'ON CONFLICT ON CONSTRAINT ... DO UPDATE. Set uniqueIndexConstraintsOnly: true to leave it out; ' +
       'it will be the default in pgcast 7.0.',
     ]);
@@ -1807,8 +1825,8 @@ describe('include entries that match no relation', () => {
       "Set enumOrder: 'declared' to keep that order; it will be the default in pgcast 7.0.";
     const bothOrderNote = orderNote('<name>', 'enums extra.status and public.mood');
     const uniqueNote = (list: string, one = false) => `Note: UniqueIndex lists ${list}, ` +
-      `${one ? 'a unique index' : 'unique indexes'} of no UNIQUE or PRIMARY KEY constraint, or of a DEFERRABLE or ` +
-      `WITHOUT OVERLAPS one: db.constraint() takes ${one ? 'it' : 'them'}, and Postgres refuses ${one ? 'it' : 'them'} ` +
+      `${one ? 'a unique index' : 'unique indexes'} of no UNIQUE or PRIMARY KEY constraint, of a DEFERRABLE or ` +
+      `WITHOUT OVERLAPS one, or not yet valid: db.constraint() takes ${one ? 'it' : 'them'}, and Postgres refuses ${one ? 'it' : 'them'} ` +
       `in ON CONFLICT ON CONSTRAINT ... DO UPDATE. Set uniqueIndexConstraintsOnly: true to leave ${one ? 'it' : 'them'} ` +
       'out; it will be the default in pgcast 7.0.';
     const articlesNote = uniqueNote('extra.articles.shared_name_idx', true);
