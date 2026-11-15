@@ -1803,10 +1803,11 @@ describe('a null or primitive row in insert(), upsert() and update()', () => {
 
   it('upsert of a null or undefined row among others compiles as in 6.6.1, a row of defaults, and warns PGCAST_DEP001', async () => {
     // since #27, hasOwnProperty.call(null, …) threw a TypeError at the call; the row is read as `{}`, as insert() reads
-    // it, so it misses every key, which is then set from EXCLUDED: the case PGCAST_DEP001 is about
+    // it, so it misses every key, which is then set from EXCLUDED: the case PGCAST_DEP001 is about. DO UPDATE SET
+    // takes the key order of the first completed row, unsorted, as in 6.6.1
     const { fdb, emitWarning } = await fresh();
     const upsertSQL = (defaultsFirst: boolean) =>
-      `INSERT INTO "users" ("display_name", "email") VALUES ${defaultsFirst ? '(DEFAULT, DEFAULT), ($1, $2)' : '($1, $2), (DEFAULT, DEFAULT)'} ON CONFLICT ("email") DO UPDATE SET ("display_name", "email") = ROW(EXCLUDED."display_name", EXCLUDED."email") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result`;
+      `INSERT INTO "users" ("display_name", "email") VALUES ${defaultsFirst ? '(DEFAULT, DEFAULT), ($1, $2)' : '($1, $2), (DEFAULT, DEFAULT)'} ON CONFLICT ("email") DO UPDATE SET ("email", "display_name") = ROW(EXCLUDED."email", EXCLUDED."display_name") RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result`;
     expect(fdb.upsert('users', [row, null as any], 'email').compile()).toEqual({ text: upsertSQL(false), values: ['A', 'a@x.org'] });
     expect(fdb.upsert('users', [null as any, row], 'email').compile()).toEqual({ text: upsertSQL(true), values: ['A', 'a@x.org'] });
     expect(fdb.upsert('users', [row, undefined as any], 'email').compile()).toEqual({ text: upsertSQL(false), values: ['A', 'a@x.org'] });

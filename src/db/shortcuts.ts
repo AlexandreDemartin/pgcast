@@ -41,6 +41,7 @@ import {
 import {
   completeKeysWithDefaultValue,
   identifier,
+  isPrimitive,
   mapWithSeparator,
   NoInfer,
   space,
@@ -138,7 +139,8 @@ const undefinedWarning = 'An undefined value in insert(), update() or upsert() i
 // an undefined value is sent as NULL, as in 6.6.1, but warns once; with undefinedMeansMissing (the default in 7.0)
 // it is a missing key instead, as JSON.stringify leaves it out: `toDefault` sends DEFAULT (insert), otherwise the
 // key goes (update, upsert, whose missing keys then take DEFAULT, and the rules of upsertRequiresSameKeys);
-// a null row, which an untyped caller may pass among others, is read as `{}`, as completeKeysWithDefaultValue reads it
+// a null row, which an untyped caller may pass among others, is read as `{}`, as completeKeysWithDefaultValue reads it,
+// and a primitive one is kept as it is, for cols() or vals() to refuse
 function undefinedAsMissing<V extends object>(values: V, toDefault: boolean): V {
   const rows: object[] = (Array.isArray(values) ? values : [values]).map(row => row ?? {});
   if (!rows.some(row => Object.values(row).includes(undefined))) return values;
@@ -146,7 +148,7 @@ function undefinedAsMissing<V extends object>(values: V, toDefault: boolean): V 
     warnOnce('PGCAST_DEP002', undefinedWarning);
     return values;
   }
-  const kept = rows.map(row => Object.fromEntries(Object.entries(row).flatMap(([k, v]) =>
+  const kept = rows.map(row => isPrimitive(row) ? row : Object.fromEntries(Object.entries(row).flatMap(([k, v]) =>
     v !== undefined ? [[k, v]] : toDefault ? [[k, Default]] : [])));
   return (Array.isArray(values) ? kept : kept[0]) as V;
 }
@@ -192,7 +194,10 @@ interface InsertSignatures {
  * @param values The `Insertable` values (or array thereof) to be inserted.
  * They need at least one column: a row with no key, or rows with none between
  * them, throw before any query (for a row of defaults, `DEFAULT VALUES` in a
- * `sql` template). An `undefined` value is sent as `NULL`, and emits a `DeprecationWarning`
+ * `sql` template). A `null` row given on its own, not in an array, or a
+ * primitive row (a string, a number…) throws as the query compiles, so `run()`
+ * rejects before any query; a `null` row in an array gives `DEFAULT` for each
+ * column of the others. An `undefined` value is sent as `NULL`, and emits a `DeprecationWarning`
  * (`PGCAST_DEP002`), once; with the `undefinedMeansMissing` config option (the
  * default in 7.0), it sends `DEFAULT`, as a key missing from one of several
  * rows does: `{ title: undefined }` gives `VALUES (DEFAULT)`.
@@ -221,7 +226,8 @@ export const insert: InsertSignatures = function (
       returningSQL = SQLForColumnsOfTable(options?.returning, table),
       extrasSQL = SQLForExtras(options?.extras);
 
-    if (firstRow != null && Object.keys(firstRow).length === 0) throw new Error(nothingToInsert);  // a null row fails in compile(), as in 6.6.1
+    // a null or primitive row fails in compile(), in cols(), so run() rejects
+    if (firstRow != null && !isPrimitive(firstRow) && Object.keys(firstRow).length === 0) throw new Error(nothingToInsert);
     query = sql`INSERT INTO ${table} (${colsSQL}) VALUES ${valuesSQL} RETURNING ${returningSQL}${extrasSQL} AS result`;
   }
 
@@ -389,6 +395,10 @@ export const upsert: UpsertSignatures = function (
 ): SQLFragment<any> {
 
   if (Array.isArray(values) && values.length === 0) return insert(table, values);  // punt a no-op to plain insert
+  // punt a null or primitive row, alone or among others, to plain insert too, whose cols() or vals() refuse it as the
+  // query compiles; a null row among others is read as `{}`, as insert reads it
+  if (Array.isArray(values) && values.some(isPrimitive)) return insert(table, values);
+  if (!Array.isArray(values) && (values == null || isPrimitive(values))) return insert(table, values);
   if (typeof conflictTarget === 'string') conflictTarget = [conflictTarget];  // now either Column[] or Constraint
   values = undefinedAsMissing(values, false);
 
@@ -409,7 +419,7 @@ export const upsert: UpsertSignatures = function (
     overwritesMissingKey = specifiedUpdateColumns == null && Array.isArray(values) && colNames.some(c =>
       updateValues[c] === undefined &&  // as below: otherwise, c is set from EXCLUDED
       !conflictColumns.includes(c) &&  // on conflict, EXCLUDED.c equals the existing value
-      values.some(v => !Object.prototype.hasOwnProperty.call(v, c))),
+      values.some(v => !Object.prototype.hasOwnProperty.call(v ?? {}, c))),  // a null row misses every key
     updateColumns = [...new Set(  // deduplicate the keys here
       [...specifiedUpdateColumns as string[] ?? colNames, ...updateValuesKeys(updateValues, specifiedUpdateColumns as string[] ?? colNames)]
     )],
@@ -484,8 +494,9 @@ export const update: UpdateSignatures = function (
 ): SQLFragment {
 
   values = undefinedAsMissing(values, false);
-  // `SET () = ROW()` is a syntax error in Postgres, so say so before any query
-  if (Object.keys(values).length === 0) throw new Error('nothing to update: an Updatable needs at least one column');
+  // `SET () = ROW()` is a syntax error in Postgres, so say so before any query; a null or primitive row fails in
+  // compile(), in cols(), so run() rejects
+  if (values != null && !isPrimitive(values) && Object.keys(values).length === 0) throw new Error('nothing to update: an Updatable needs at least one column');
 
   // note: the ROW() constructor below is required in Postgres 10+ if we're updating a single column
   // more info: https://www.postgresql-archive.org/Possible-regression-in-UPDATE-SET-lt-column-list-gt-lt-row-expression-gt-with-just-one-single-column0-td5989074.html
@@ -709,7 +720,9 @@ const functionName = new RegExp(`^${space}(?:${identifier})(?:${space}\\.${space
  * `count` queries to be `LATERAL JOIN`ed, or a single `select`/`selectOne`/
  * `count` query whose result will be passed through directly as the result of
  * the containing query; each key is also one identifier in the SQL, any `"`
- * doubled (`{ 'a"b': … }` gives `LEFT JOIN LATERAL (…) AS "lateral_a""b" ON true`)
+ * doubled (`{ 'a"b': … }` gives `LEFT JOIN LATERAL (…) AS "lateral_a""b" ON true`);
+ * `lateral: null`, or a key whose query is `null` or `undefined`, throws as the
+ * query compiles, so `run()` rejects before any query
  * * `alias` — table alias (string): required if using `lateral` to join a table
  * to itself; the alias, or the table name, is also one identifier in the
  * sub-select that `select` wraps the query in, any `"` doubled
@@ -735,6 +748,21 @@ export const select: SelectSignatures = function (
 ) {
 
   if (mode === SelectResultMode.Numeric && !functionName.test(aggregate)) throw new Error(`Aggregate must be a function name (e.g. sum, or my_schema.my_agg), not '${aggregate}'`);
+
+  // `lateral: null`, or a key whose query is null or undefined: Zapatos 6.6.1 threw a TypeError as the query was
+  // built (`Object.keys(null)`, `null.copy`); this throws as it compiles, so run() rejects before any query, and so
+  // does a copy nested in a lateral, which shares its expressions
+  const
+    givenLateral: any = options.lateral,
+    nullKey = givenLateral && !(givenLateral instanceof SQLFragment) ? Object.keys(givenLateral).sort().find(k => givenLateral[k] == null) : undefined,
+    lateralRefusal = givenLateral === null ? '`lateral: null` has no meaning: for no lateral join, leave `lateral` out; to join, give it a `select()`, `selectOne()` or `count()` query, or an object of them.' :
+      nullKey !== undefined ? `The \`lateral\` key '${nullKey}' is \`${givenLateral[nullKey]}\`, not a query: leave the key out, or give it a \`select()\`, \`selectOne()\` or \`count()\` query.` :
+        undefined;
+  if (lateralRefusal !== undefined) {
+    const refused = sql``;
+    refused.compile = () => { throw new Error(lateralRefusal); };
+    return sql<SQL, any>`${refused}`;
+  }
 
   const
     limit1 = mode === SelectResultMode.One || mode === SelectResultMode.ExactlyOne,

@@ -245,9 +245,9 @@ export class ColumnNames<T> { declare readonly [wrapper]: 'cols'; constructor(pu
  * use in a `SELECT` query) or object keys (for use in an `INSERT`, `UDPATE` or
  * `UPSERT` query alongside a `ColumnValues`). As a filter value and in
  * `vals({…})`, so as a write value, it throws, and the type refuses it, as for
- * `raw()`; Zapatos 6.6.1 sent it as JSON. A string or another primitive throws
- * while compiling; Zapatos 6.6.1 compiled a string's character indexes,
- * `cols('id')` to `"0", "1"`.
+ * `raw()`; Zapatos 6.6.1 sent it as JSON. `null`, a string or another primitive
+ * throws while compiling; Zapatos 6.6.1 compiled a string's character indexes,
+ * `cols('id')` to `"0", "1"`, and threw a `TypeError` on `null`.
  */
 export function cols<T>(x: T) { return new ColumnNames<T>(x); }
 
@@ -271,8 +271,9 @@ export class ColumnValues<T> { declare readonly [wrapper]: 'vals'; constructor(p
  * `raw()`, `cols()` and `vals()` throw in an object, and in an array in a
  * filter, as `Default` does; in an array outside one they are still sent as
  * JSON. As a filter value `vals(x)` throws, and the type refuses it as a
- * value, as for `raw()`. A string or another primitive throws while compiling;
- * Zapatos 6.6.1 sent a string's characters, `vals('id')` as `$1, $2`.
+ * value, as for `raw()`. `null`, a string or another primitive throws while
+ * compiling; Zapatos 6.6.1 sent a string's characters, `vals('id')` as `$1, $2`,
+ * and threw a `TypeError` on `null`.
  */
 export function vals<T>(x: T) { return new ColumnValues<T>(x); }
 
@@ -403,12 +404,13 @@ const builtinName = (x: object): string => isIterator(x) ? Object.prototype.toSt
 // compiling raw() there as SQL would turn a caller's raw(input), a parameter until now, into an injection, so they throw
 const isWrapper = (x: unknown) => x instanceof DangerousRawString || x instanceof ColumnNames || x instanceof ColumnValues;
 
-// cols() and vals() of a primitive: Zapatos 6.6.1 compiled the object it boxes to, a string to its character indexes
-// as names ("0", "1") or its characters as values, any other primitive to nothing; null still reaches Object.keys
-const isNotObject = (x: unknown) => typeof x !== 'object' && typeof x !== 'function';
+// cols() and vals() of null or a primitive: Zapatos 6.6.1 compiled the object a primitive boxes to, a string to its
+// character indexes as names ("0", "1") or its characters as values, any other primitive to nothing, and threw a
+// TypeError from Object.keys on null and undefined
+const isNotObject = (x: unknown) => x === null || (typeof x !== 'object' && typeof x !== 'function');
 const notAnObject = (fn: 'cols' | 'vals', x: unknown) => fn === 'cols' ?
-  `\`db.cols()\` takes an object or an array, not \`${typeof x}\`: for one column, write \`db.cols([name])\`; for a row of \`insert()\`, \`upsert()\` or \`update()\`, give an object.` :
-  `\`db.vals()\` takes an object or an array, not \`${typeof x}\`: for one value, write \`db.vals([value])\`; for a row of \`insert()\`, \`upsert()\` or \`update()\`, give an object.`;
+  `\`db.cols()\` takes an object or an array, not \`${x === null ? 'null' : typeof x}\`: for one column, write \`db.cols([name])\`; for a row of \`insert()\`, \`upsert()\` or \`update()\`, give an object.` :
+  `\`db.vals()\` takes an object or an array, not \`${x === null ? 'null' : typeof x}\`: for one value, write \`db.vals([value])\`; for a row of \`insert()\`, \`upsert()\` or \`update()\`, give an object.`;
 
 export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never> {
   protected constraint?: Constraint;
