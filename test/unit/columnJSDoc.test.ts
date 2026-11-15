@@ -2,10 +2,11 @@
 //
 // The JSDoc of a column whose comment holds a JSDoc tag (#309), or whose default (#308) or name (#473) holds a
 // line break, fuzzed with TypeScript as the oracle: comments, defaults and names drawn from a small alphabet go
-// through definitionForRelationInSchema(), then TypeScript reads the JSDoc written and the one master wrote (the
-// comment's lines, then the generated ones; the default's or the name's lines behind no *). Seeded, so every run
-// checks the same texts. TypeScript reads each JSDoc as it lands in schema.d.ts, in an unprefixed and a prefixed
-// schema. No database.
+// through definitionForRelationInSchema(), then TypeScript reads the JSDoc written and the one master's tables.ts
+// wrote (the comment's lines, then the generated ones; the default's or the name's lines behind no *). Seeded, so
+// every run checks the same texts. TypeScript reads each JSDoc as it lands in schema.d.ts, in an unprefixed and a
+// prefixed schema, and the written one also as master's indentation put it, a line starting after U+2028 too (#481).
+// No database.
 
 import ts from 'typescript';
 import type * as pg from 'pg';
@@ -24,9 +25,14 @@ const
 
 /**
  * `fragment` as it lands in schema.d.ts: in a prefixed schema behind the 2 spaces of its namespace on every line
- * (indentAll() in src/generate/tsOutput.ts), then behind the 2 of declareModule() on every line holding text.
+ * (indentAll() in src/generate/tsOutput.ts), then behind the 2 of declareModule() on every line holding text. A line
+ * starts after \n or \r, not after U+2028 or U+2029.
  */
 const inSchemaFile = (fragment: string, schema: string) =>
+  (schema === 'public' ? fragment : fragment.replace(/(?<![^\n\r])/g, '  ')).replace(/(?<![^\n\r])(?=[ \t]*\S)/g, '  ');
+
+/** The same, as master's multiline ^ indented it: a line also started after U+2028 and U+2029. */
+const inMasterFile = (fragment: string, schema: string) =>
   (schema === 'public' ? fragment : fragment.replace(/^/gm, '  ')).replace(/^(?=[ \t]*\S)/gm, '  ');
 
 /** `count` texts of 1 to 10 atoms, from a linear congruential generator with a fixed seed. */
@@ -77,10 +83,10 @@ const isSubsequence = (part: string[], whole: string[]) => {
  * Each property's JSDoc as TypeScript reads it, in the first interface of `source` as it lands in schema.d.ts: its
  * text, and its tags.
  */
-const docs = (source: string, schema: string) => {
+const docs = (source: string, schema: string, inFile = inSchemaFile) => {
   const first = (node: ts.Node): ts.InterfaceDeclaration | undefined =>
     ts.isInterfaceDeclaration(node) ? node : ts.forEachChild(node, first);
-  return first(ts.createSourceFile('schema.ts', inSchemaFile(source, schema), ts.ScriptTarget.Latest, true))!
+  return first(ts.createSourceFile('schema.ts', inFile(source, schema), ts.ScriptTarget.Latest, true))!
     .members.map(member => {
       const doc = member.getChildren().find(ts.isJSDoc)!;
       return { text: doc.getText(), tags: (doc.tags ?? []).map(tag => ({ name: tag.tagName.text, text: tag.getText() })) };
@@ -243,5 +249,52 @@ describe('the JSDoc of a column comment, against TypeScript', () => {
     expect(dropped).toBeGreaterThan(0);
     expect(opened).toBeGreaterThan(0);
     expect(dropped + opened + split).toBeLessThan(multiLine / 50);
+  });
+  it.each(shapes)('differs from master\'s indentation only in a JSDoc holding U+2028, which gains no tag and loses one only at an @ right after it, in %s schema', async (_, schema) => {
+    const
+      // comments, defaults and names: the fuzzed texts of the three cases above
+      sets: [string[], (text: string) => object][] = [
+        [comments(), description => ({ description })],
+        [fuzzed(308), defaultValue => ({ hasDefault: true, defaultValue })],
+        [fuzzed(473), column => ({ column })],
+      ],
+      changedWithout: string[] = [],
+      gained: string[] = [],
+      lostElsewhere: string[] = [];
+    let separated = 0, lost = 0;
+
+    for (const [texts, row] of sets) {
+      const
+        rows = texts.map((text, i) => ({
+          column: `c${i}`, isGenerated: false, isNullable: true, hasDefault: false, defaultValue: null,
+          udtName: 'int4', domainName: null, udtSchema: 'public', domainSchema: null, description: null, ...row(text),
+        })),
+        queryFn = async (query: pg.QueryConfig) => ({ rows: query.text.includes('pg_indexes') ? [] : rows }) as unknown as pg.QueryResult,
+        fragment = await definitionForRelationInSchema(relIn(schema), schema, {}, {}, finaliseConfig({ warningListener: false }), queryFn),
+        [written, master] = [inSchemaFile, inMasterFile].map(inFile => docs(fragment, schema, inFile));
+
+      texts.forEach((text, i) => {
+        const [names, namesBefore] = [written[i], master[i]].map(doc => doc.tags.map(tag => tag.name));
+        if (!/[\u2028\u2029]/.test(text)) {
+          if (written[i].text !== master[i].text) changedWithout.push(text);
+          return;
+        }
+        separated++;
+        if (JSON.stringify(names) === JSON.stringify(namesBefore)) return;
+        // master's spaces after the separator put white space before that @, so a tag took in the generated lines;
+        // or a conflict marker now starts a line, which TypeScript's scanner starts after a separator
+        if (!isSubsequence(names, namesBefore)) gained.push(text);
+        else if (/[\u2028\u2029]@|[\u2028\u2029]<<<<<<</.test(text)) lost++;
+        else lostElsewhere.push(text);
+      });
+    }
+
+    expect(changedWithout).toEqual([]);
+    expect(gained).toEqual([]);
+    expect(lostElsewhere).toEqual([]);
+    // the fuzz reaches the case, and it stays rare
+    expect(separated).toBeGreaterThan(1000);
+    expect(lost).toBeGreaterThan(0);
+    expect(lost).toBeLessThan(separated / 10);
   });
 });
