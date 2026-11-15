@@ -1,5 +1,5 @@
 ---
-english: 89c4982720de
+english: 0949dd46070e
 ---
 
 # Écritures
@@ -38,7 +38,7 @@ Insère une ligne ou plusieurs, et les renvoie telles que Postgres les a stocké
 - Une ligne donne un résultat ; un tableau donne un tableau, dans l’ordre où Postgres les renvoie, en pratique l’ordre donné.
 - Les colonnes sont les clés de toutes les lignes ; une clé absente d’une ligne vaut `DEFAULT` dans cette ligne, comme `tagline` ci-dessus.
 - Une ligne sans clé, ou des lignes dont aucune n’a de clé, lèvent une erreur : "nothing to insert: an Insertable needs at least one column; for a row of defaults only, write INSERT ... DEFAULT VALUES in a sql template"<!-- message -->. Zapatos 6.6.1 envoyait `() VALUES ()`, que Postgres refusait (42601).
-- Une ligne qui vaut `null`, donnée seule, ou une chaîne, un nombre ou une autre valeur primitive, seule ou parmi d’autres lignes, lève une erreur à la compilation, si bien que `.run()` est rejetée avant toute requête, dans `upsert()` et `update()` aussi : "`` `db.cols()` takes an object or an array, not `null`: for one column, write `db.cols([name])`; for a row of `insert()`, `upsert()` or `update()`, give an object. ``<!-- message -->" ([`cols()`](/fr/sql-template#cols)). Une ligne `null` parmi d’autres donne `DEFAULT` dans chaque colonne, comme dans Zapatos 6.6.1. Sur une ligne `null` seule, Zapatos 6.6.1 échouait avec une `TypeError`, à l’appel dans `upsert()` ; il écrivait une ligne qui est une chaîne comme des colonnes `"0"`, `"1"`…, que Postgres refusait sauf si la table les avait (42703), et un nombre parmi d’autres lignes en une ligne de valeurs par défaut.
+- Une ligne qui vaut `null`, donnée seule, ou une chaîne, un nombre ou une autre valeur primitive, seule ou parmi d’autres lignes, même à côté d’une ligne sans clé, lève une erreur à la compilation, si bien que `.run()` est rejetée avant toute requête, dans `upsert()` et `update()` aussi : "`` `db.cols()` takes an object or an array, not `null`: for one column, write `db.cols([name])`; for a row of `insert()`, `upsert()` or `update()`, give an object. ``<!-- message -->" ([`cols()`](/fr/sql-template#cols)). Une ligne `null` parmi d’autres donne `DEFAULT` dans chaque colonne, comme dans Zapatos 6.6.1. Sur une ligne `null` seule, Zapatos 6.6.1 échouait avec une `TypeError`, à l’appel dans `upsert()` ; il écrivait une ligne qui est une chaîne comme des colonnes `"0"`, `"1"`…, que Postgres refusait sauf si la table les avait (42703), et une valeur primitive sans caractère (`''`, un nombre, un booléen…) à côté d’une ligne de colonnes en une ligne de valeurs par défaut, et l’insertion s’exécutait.
 - Un tableau vide ne fait rien : `.run(pool)` se résout avec `[]` et n’envoie rien, sauf si on le force avec `.run(pool, true)`. Son SQL, `INSERT INTO "films" SELECT null WHERE false`<!-- probe: db.insert('films', []) -->, est marqué comme sans effet.
 - Postgres accepte au plus 65 535 paramètres par requête : découpez une insertion plus grosse ([Batches](/fr/batches)).
 
