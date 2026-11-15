@@ -52,6 +52,16 @@ describe('param, parent, self', () => {
   test('self is a unique symbol', () => {
     expectTypeOf(db.self).toEqualTypeOf<db.SelfType>();
   });
+
+  test('cols and vals keep the type of 6.6.1: a generic helper compiles; a string type-checks, and throws at run time', () => {
+    // narrowing to `T extends object` would refuse the helper and `unknown`, which run when given an object (#244)
+    const insertRow = <T>(row: T) => db.sql`INSERT INTO ${'users'} (${db.cols(row)}) VALUES (${db.vals(row)})`;
+    expectTypeOf(insertRow({ display_name: 'Ada' })).toEqualTypeOf<db.SQLFragment<any[], never>>();
+    expectTypeOf(db.cols({ id: 1 } as unknown)).toEqualTypeOf<db.ColumnNames<unknown>>();
+    expectTypeOf(db.cols('id')).toEqualTypeOf<db.ColumnNames<string>>();
+    expectTypeOf(db.vals('id')).toEqualTypeOf<db.ColumnValues<string>>();
+    expectTypeOf(db.vals('id')).not.toBeAny();
+  });
 });
 
 describe('conditions: the constraint on the column', () => {

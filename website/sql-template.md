@@ -118,6 +118,7 @@ The last two rows apply when [`castArrayParamsToJson`](/runtime-config#Config.ca
 - Any other string with a `"` is one quoted name, any `"` doubled, so it cannot close its quotes: `'int4") || (SELECT 1) || ("int4'` gives `CAST($1 AS "int4"") || (SELECT 1) || (""int4")`<!-- probe: db.sql`${db.param(1, 'int4") || (SELECT 1) || ("int4')}` -->, a type that does not exist.
 - Zapatos 6.6.1 wrote any `cast` as it is between quotes, so `'public.crew_job'` and `'int4[]'` named types that do not exist.
 - Each part stays quoted, so a name only the SQL grammar knows is no type here: `'int'`, `'double precision'`, `'varchar(10)'` fail (42704). Give the type's own name (`'int4'`, `'float8'`, `'timestamptz'`), or write the cast in `sql`: `` db.sql`CAST(${db.param(x)} AS varchar(10))` ``.
+- Without a `"`, a part left empty throws while compiling, so `.run()` rejects with a plain `Error` before any query: `''`, `'[]'`, `'public.'` and `'.crew_job'` would give `""`, which Postgres refuses (42601). The error names the cast and the name it gives: "param() cast '…' gives an empty name, …, which Postgres refuses: name each part of the type, as in 'int4' or 'public.mood', or leave the cast out"<!-- message -->. Zapatos 6.6.1 sent them, and Postgres refused them too, except where 6.6.1 dropped the cast: for `"json"` under `castArrayParamsToJson` or `castObjectParamsToJson`, and as a Whereable value.
 - Under `castArrayParamsToJson` or `castObjectParamsToJson`, a string cast is the type written, and the value stays the JSON text the option sends (the last row of the table): `param({ a: 1 }, 'jsonb')` reaches `=` and `@>` on a `jsonb` column.
 - Under `castArrayParamsToJson`, an array whose cast ends with `[]` or `[n]` goes as an array: `'_int4'` and a domain over an array still send JSON, which Postgres refuses as an array (22P02).
 - Zapatos 6.6.1 dropped a string cast under either option for `CAST($1 AS "json")` ([#36](https://github.com/AlexandreDemartin/pgcast/issues/36)), so a cast that names another type than its target now applies: `param(arr, 'int4[]')` into a `json` column is refused (42804), into a `text` column stores `{1,2}` for `[1,2]`.
@@ -220,6 +221,12 @@ With arrays, a `SELECT` of some columns and an `IN` list; `s.films.OnlyCols<…>
 
 As a filter value, and as a value in `vals({…})` (so in a write), `cols()` throws, as [`raw()`](#raw) does.
 
+A string or another primitive (a number, a boolean, `undefined`…) throws while compiling, so `run()` rejects before any query, `insert()`, `upsert()` and `update()` of a non-empty string row included:
+
+> `` `db.cols()` takes an object or an array, not `string`: for one column, write `db.cols([name])`; for a row of `insert()`, `upsert()` or `update()`, give an object. ``<!-- message -->
+
+The type takes it, as Zapatos 6.6.1's did, so that a generic helper (`<T>(row: T) => db.cols(row)`) still compiles. Zapatos 6.6.1 compiled a string's character indexes, `cols('title')` to `"0", "1", "2", "3", "4"`, and any other primitive to nothing.
+
 ### `ColumnNames` {#ColumnNames}
 
 ```ts
@@ -252,6 +259,7 @@ A comma-separated list of values. Each value compiles as follows.
   - `self` "`` `db.self` has no meaning as a value in a Whereable (a filter), nor in `isIn()`… ``<!-- message -->";
   - `raw()`, `cols()` and `vals()` as [`raw()`](#raw) says.
 - As a filter value itself, or a value in `vals({…})`, `vals()` throws, as [`raw()`](#raw) does.
+- A string or another primitive throws while compiling, as in [`cols()`](#cols): "`` `db.vals()` takes an object or an array, not `string`: for one value, write `db.vals([value])`; for a row of `insert()`, `upsert()` or `update()`, give an object. ``<!-- message -->". Zapatos 6.6.1 sent a string's characters, `vals('id')` as `$1, $2` with `'i'`, `'d'`: in an `IN` list, `vals('5')` found the rows equal to `'5'`, and now rejects, as [`isIn('5')`](/conditions#conditions.isIn) does.
 - `insert()`, `upsert()` and `update()` compile their values with `vals({…})`, outside a nested query: `parent()`, `raw()`, `cols()` and `vals()` throw there, before any query.
 - Zapatos 6.6.1 wrapped a `Parameter`, `Default` and `parent()` in a second parameter in an array: `'{"value":…}'`, `'Symbol(DEFAULT)'`, `'{"value":"id"}'`; and `parent()`, `raw()`, `cols()` and `vals()` in an object, which the writes stored on a text or `jsonb` column.
 
