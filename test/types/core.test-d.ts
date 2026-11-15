@@ -214,6 +214,31 @@ describe('type surprises', () => {
     expectTypeOf(db.param('Ada')).toEqualTypeOf<db.Parameter<string>>();
   });
 
+  test('characterization: a Parameter is checked by its shape, so an object with a value key passes as one (#274)', () => {
+    // characterization: as in 6.6.1, sent as one parameter, as JSON ([{"value":3}], test/unit/shortcuts.test.ts),
+    // which a numeric column refuses (22P02); a value object with toPostgres() is sent through it, which works
+    class UserId { constructor(public value: number) { } toPostgres() { return String(this.value); } }
+    class Stamp<T> extends db.Parameter<T> { }
+    const typed: db.Parameter<number> = db.param(3);
+    const plain: db.Parameter<number> = { value: 3 };
+    db.update('accounts', { balance: db.param(3) }, { id: 1 });
+    db.update('accounts', { balance: new db.Parameter(3) }, { id: 1 });
+    db.update('accounts', { balance: typed }, { id: 1 });
+    db.update('accounts', { balance: new Stamp(3) }, { id: 1 });
+    db.update('accounts', { balance: { value: 3 } }, { id: 1 });
+    db.update('accounts', { balance: plain }, { id: 1 });
+    db.insert('users', { email: 'a@b', display_name: { value: 'Ada' } });
+    db.select('users', { manager_id: new UserId(1) });
+    db.update('users', { manager_id: new UserId(1) }, { id: 1 });
+    // a ParentColumn is checked by its shape too ({ value?: Column }): a column name passes on an int column
+    db.select('users', { manager_id: { value: 'email' } });
+    // @ts-expect-error the value is still checked: a string that names no column, on an int column
+    db.select('users', { manager_id: { value: 'x' } });
+    // @ts-expect-error nor a Parameter<number> on a text column
+    db.update('users', { display_name: { value: 3 } }, { id: 1 });
+    expectTypeOf(db.update('accounts', { balance: { value: 3 } }, { id: 1 }).run(pool)).not.toBeAny();
+  });
+
   test('DangerousRawString, ColumnNames and ColumnValues match neither a plain { value } nor each other', () => {
     // Parameter still matches a plain { value } (above)
     // @ts-expect-error a plain { value } is no DangerousRawString
