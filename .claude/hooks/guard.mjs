@@ -20,6 +20,10 @@ const commandRefusals = [
     reason: 'Never `--amend`: a new commit instead (agent builder § Git).',
   },
   {
+    refuses: command => /^git\b.*\b(commit|merge)\b.*\s--no-edit\b/.test(command),
+    reason: 'Never `--no-edit`: it drops the Co-Authored-By line or keeps the `# Conflicts:` lines; give `-m` (skill pr-shape § Commits).',
+  },
+  {
     refuses: command =>
       /^(npm|npx\s+npm(@\S+)?)\s+(publish|version|dist-tag|unpublish|deprecate)\b/.test(command) ||
       /^gh\s+release\s+(create|edit|upload)\b/.test(command),
