@@ -1,5 +1,5 @@
 ---
-english: 444071750814
+english: 77c41f28f3ba
 ---
 
 # Venir de Zapatos
@@ -220,6 +220,7 @@ Pour trouver chaque appel :
 | `PGCAST_DEP003` | une [`transaction()`](/fr/transaction#transaction) dont le callback intercepte l’erreur d’une requête et se termine : Postgres répond au `COMMIT` par `ROLLBACK`, et rien n’est enregistré ([Laisser passer l’erreur](/fr/retries#let-the-error-through)) | laissez l’erreur sortir du callback, ou faites `ROLLBACK TO` un `SAVEPOINT` avant de continuer ; ou [`transactionRequiresCommit`](/fr/runtime-config#Config.transactionRequiresCommit), et une telle transaction est rejetée |
 | `PGCAST_DEP004` | un [`sum()`, `avg()`, `min()` ou `max()`](/fr/select#typed-by-column) dont `Number()` change le résultat : `0` pour aucune ligne, les millisecondes d’une date, `NaN` pour un texte | activez [`aggregatesTypedByColumn`](/fr/runtime-config#Config.aggregatesTypedByColumn), déclaré dans [`ConfigTypes`](/fr/runtime-config#ConfigTypes) : `tsc` montre alors chaque appel dont le résultat est désormais `null` ou du type de la colonne, et `?? 0` garde un `0` |
 | `PGCAST_DEP005` | une [`transaction()`](/fr/transaction#transaction) qui reçoit un client sur lequel vous avez envoyé `BEGIN` : son `COMMIT` ou son `ROLLBACK` termine votre transaction ([Votre propre `BEGIN`](/fr/transaction#your-own-begin)) | ouvrez la transaction extérieure avec `transaction()`, ou donnez-lui le pool ; ou [`transactionRequiresIdleClient`](/fr/runtime-config#Config.transactionRequiresIdleClient), et un tel appel est rejeté avant d’envoyer son `START TRANSACTION` |
+| `PGCAST_DEP007` | une [`transaction()`](/fr/transaction#transaction) qui reçoit le client d’une transaction à un niveau qui ne vaut pas pour le sien, `serializable()` avec celui de `readCommitted()` : son callback s’exécute au niveau extérieur ([Transmettre une transaction](/fr/transaction#passing-a-transaction-through)) | ouvrez la transaction extérieure à un niveau qui vaut pour l’appel intérieur, ou donnez le pool à cet appel, pour une transaction à lui, qui est commitée séparément de la transaction extérieure, ne voit pas les lignes non commitées de celle-ci, et reste bloquée (sauf si `lock_timeout` est défini) si elle écrit ou verrouille une ligne que la transaction extérieure a écrite ou verrouillée (deux verrous `FOR SHARE` n’entrent pas en conflit) ; ou [`transactionRequiresSatisfyingLevel`](/fr/runtime-config#Config.transactionRequiresSatisfyingLevel), et un tel appel est rejeté avant son callback |
 
 </div>
 
@@ -233,10 +234,11 @@ import * as db from 'zapatos/db';
 db.setConfig({
   upsertRequiresSameKeys: true, undefinedMeansMissing: true,
   transactionRequiresCommit: true, transactionRequiresIdleClient: true,
+  transactionRequiresSatisfyingLevel: true,
 });
 ```
 
-Les quatre deviendront le comportement par défaut dans la 7.0 ([Versions](/fr/versions)). Avec elles, une valeur `undefined` est omise d’un `update()` :
+Toutes ces options deviendront le comportement par défaut dans la 7.0 ([Versions](/fr/versions)). Avec elles, une valeur `undefined` est omise d’un `update()` :
 
 <CastPanel example="switching_undefined">
 
@@ -248,11 +250,12 @@ Les quatre deviendront le comportement par défaut dans la 7.0 ([Versions](/fr/v
 - L’`upsert()` de `PGCAST_DEP001` lève une erreur à l’appel, avant toute requête : "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message -->.
 - Une `transaction()` dont Postgres répond au `COMMIT` par `ROLLBACK` est rejetée, sans retry ([`transaction()`, Erreurs](/fr/transaction#errors)).
 - Une `transaction()` qui reçoit un client déjà dans un bloc de transaction est rejetée, et laisse cette transaction ouverte ([Votre propre `BEGIN`](/fr/transaction#your-own-begin)).
+- Une `transaction()` qui reçoit le client d’une transaction à un niveau qui ne vaut pas pour le sien est rejetée avant son callback ([Transmettre une transaction](/fr/transaction#passing-a-transaction-through)).
 - Aucune option n’avertit. Pour que cela dure, `NODE_OPTIONS=--throw-deprecation npm test` fait échouer l’exécution au premier avertissement.
 
 Un opt-in de plus, [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), n’a pas d’avertissement à guetter, et reste désactivé dans la 7.0. Avec lui, un `selectExactlyOne()` exécuté seul est rejeté sur une deuxième ligne, pas seulement sur aucune. Activez-le là où vos tests ne montrent aucun `selectExactlyOne()` qui trouve deux lignes.
 
-Le générateur a quatre opt-ins qui lui sont propres, tous appelés à devenir le comportement par défaut dans la 7.0. L’avertissement des trois premiers est une note de `npx zapatos`, pas de vos tests.
+Le générateur a des opt-ins qui lui sont propres, chacun appelé à devenir le comportement par défaut dans la 7.0. L’avertissement de chacun, sauf `rejectOnQueryError`, est une note de `npx zapatos`, pas de vos tests.
 
 La note de [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas) nomme chaque colonne dont le type est un enum d’un autre schéma, et cet enum, typé jusque-là comme `any` ou comme l’enum du même nom dans le schéma de la relation :
 
@@ -264,6 +267,8 @@ La note d’[`enumOrder`](/fr/generator#generate.enumOrder) nomme chaque enum do
 
 La note d’[`uniqueIndexConstraintsOnly`](/fr/generator#generate.uniqueIndexConstraintsOnly) nomme chaque index unique que refuse `ON CONFLICT ON CONSTRAINT`, bien qu’`UniqueIndex` le liste : un index sans contrainte, comme celui d’une vue matérialisée, l’index d’une contrainte `DEFERRABLE` ou, sur Postgres 18, d’une clé `WITHOUT OVERLAPS`, et l’index pas encore valide d’une contrainte. Activez-le et régénérez : `tsc` montre chaque `constraint()` qui en nomme un, que Postgres refusait de toute façon (42704, 55000, 42809 ou 42P10), et tout code à vous qui prend `UniqueIndex` pour la liste de chaque index unique, comme un `Record` dont il type les clés.
 
+La note de [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext) nomme chaque colonne d’un domaine sur `bigint`, `numeric`, `bytea`, `money` ou une date, que son placeholder, tel que généré, type dans les cinq interfaces telle que `pg` la renvoie. Un placeholder écrit par Zapatos 6.6.1 sur `bigint` ou `numeric` n’a pas d’import, donc sa colonne vaut `any`, même avec l’option : ajoutez d’abord l’import ([Quand un placeholder ne compile pas](/fr/custom-types#when-a-placeholder-does-not-compile)). Activez-le et régénérez : un placeholder laissé tel que généré type désormais sa colonne selon le contexte, et `tsc` montre le code qui prenait le JSON des raccourcis pour le type du placeholder, un `Date` pour une date ou une chaîne pour un `bigint`. Un placeholder que vous avez modifié garde son type, comme avant.
+
 La note de [`rejectOnQueryError`](/fr/generator#generate.rejectOnQueryError) vient d’un script qui appelle `generate()`, quand une requête échoue, jamais de `npx zapatos`, qui s’arrête toujours. Activez-le là où le script attend `generate()` avec `await`, et relisez ce que fait son `catch` : une connexion refusée y arrive désormais, et un script qui logge l’erreur puis continue se termine avec le code 0, pas 1.
 
 ## Revenir en arrière {#go-back}
@@ -272,9 +277,9 @@ La note de [`rejectOnQueryError`](/fr/generator#generate.rejectOnQueryError) vie
 npm install zapatos@6.6.1
 ```
 
-- D’abord, retirez de `setConfig()` les options que la `Config` de Zapatos 6.6.1 n’a pas (2353) : `upsertRequiresSameKeys`, `undefinedMeansMissing`, `transactionRequiresCommit`, `transactionRequiresIdleClient`, `selectExactlyOneChecksForSecondRow` et `aggregatesTypedByColumn`.
+- D’abord, retirez de `setConfig()` les options que la `Config` de Zapatos 6.6.1 n’a pas (2353) : `upsertRequiresSameKeys`, `undefinedMeansMissing`, `transactionRequiresCommit`, `transactionRequiresIdleClient`, `transactionRequiresSatisfyingLevel`, `selectExactlyOneChecksForSecondRow` et `aggregatesTypedByColumn`.
 - Avec [`moduleNames`](/fr/generator#generate.moduleNames) à `"pgcast"`, lancez aussi `npm uninstall pgcast` : les deux paquets ont une commande `zapatos`. Vos imports `pgcast/…` ne se résolvent alors plus, et la 6.6.1 écrit `zapatos/` mais laisse `pgcast/` en place. Remettez donc chaque import en `zapatos/…`, déplacez les placeholders que vous avez modifiés dans `zapatos/custom/`, leur `declare module 'pgcast/custom'` renommé en `'zapatos/custom'`, et supprimez `pgcast/`.
-- Régénérez avec Zapatos 6.6.1. Il ignore `typeEnumsAcrossSchemas`, `enumOrder`, `uniqueIndexConstraintsOnly` et `moduleNames` dans `zapatosconfig.json`, et réécrit les types `any`, les labels triés, les lignes de commentaire sans préfixe, chaque index unique dans `UniqueIndex` et tout nom d’`UniqueIndex` emprunté. Son `generate()` ne connaît pas non plus `rejectOnQueryError` : TypeScript le refuse dans un littéral d’objet (2353), et à l’exécution une requête qui échoue arrête de nouveau le processus.
+- Régénérez avec Zapatos 6.6.1. Il ignore `typeEnumsAcrossSchemas`, `enumOrder`, `uniqueIndexConstraintsOnly`, `domainsTypedByContext` et `moduleNames` dans `zapatosconfig.json`, et réécrit les types `any`, les labels triés, les lignes de commentaire sans préfixe, chaque index unique dans `UniqueIndex`, tout nom d’`UniqueIndex` emprunté et le placeholder de chaque domaine dans les cinq interfaces. Son `generate()` ne connaît pas non plus `rejectOnQueryError` : TypeScript le refuse dans un littéral d’objet (2353), et à l’exécution une requête qui échoue arrête de nouveau le processus.
 - Chaque changement de [Trouver les appels dont le résultat change](#find-the-calls-whose-result-changes) s’exécute comme avant, sauf celui du `jsonb`, qui ne trouve de nouveau rien.
 
 ::: warning Sécurité

@@ -33,6 +33,7 @@ CREATE TYPE extra.status AS ENUM ('draft', 'published', 'archived');
 CREATE DOMAIN public.email AS ext.citext CHECK (VALUE LIKE '%_@_%');
 CREATE DOMAIN public.positive_int AS integer CHECK (VALUE > 0);
 CREATE DOMAIN public.tag_list AS text[] DEFAULT '{}';
+CREATE DOMAIN public.ticket_no AS bigint;  -- typed by context with domainsTypedByContext
 
 CREATE TYPE public.address AS (street text, city text, zip varchar(10));
 CREATE TYPE public.price AS (amount numeric(12, 2), currency char(3));
@@ -160,7 +161,8 @@ CREATE TABLE extra.type_zoo (
   c_date date, c_time time, c_timetz timetz, c_timestamp timestamp, c_timestamptz timestamptz, c_interval interval,
   c_inet inet, c_cidr cidr, c_macaddr macaddr, c_bit bit(3), c_varbit varbit, c_tsvector tsvector, c_tsquery tsquery,
   c_point point, c_oid oid, c_int4multirange int4multirange,
-  c_text_array text[], c_jsonb_array jsonb[], c_uuid_array uuid[], c_date_array date[], c_enum_array public.mood[]
+  c_text_array text[], c_jsonb_array jsonb[], c_uuid_array uuid[], c_date_array date[], c_enum_array public.mood[],
+  c_int8_domain public.ticket_no
 );
 
 CREATE TABLE extra.articles (

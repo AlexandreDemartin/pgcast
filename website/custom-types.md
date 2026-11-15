@@ -114,7 +114,7 @@ const here: c.PgPoint = '(0.5,1)';
 
 ## Type a domain
 
-A domain gets a placeholder too, which holds its base type's `Selectable` type instead of `any`: the type `pg` returns. That one type serves all five interfaces, `JSONSelectable` included. `seat_label` is a `TEXT` with a `CHECK`, so `src/zapatos/custom/PgSeat_label.d.ts` holds `string`, right in each:
+A domain gets a placeholder too, which holds its base type's `Selectable` type instead of `any`: the type `pg` returns. That one type serves all five interfaces, `JSONSelectable` included, unless the domain is over a type typed by context and [`domainsTypedByContext`](/generator#generate.domainsTypedByContext) is on ([below](#when-a-placeholder-does-not-compile)). `seat_label` is a `TEXT` with a `CHECK`, so `src/zapatos/custom/PgSeat_label.d.ts` holds `string`, right in each:
 
 ::: code-group
 
@@ -213,7 +213,9 @@ A domain's placeholder holds its base type's TypeScript name, and imports what t
 - An enum whose name has a capital letter or is one of TypeScript's own types (`"Date"`, `string`) still gets no import, as in Zapatos 6.6.1: that name may be a global type, which compiles.
 - A domain over `genre` that a table of `archive` uses too, when `archive` has a `genre` of its own, gets no import either, as in Zapatos 6.6.1. Without [`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas), each table reads `genre` in its own schema, and one placeholder cannot import both: import the one the domain is over.
 
-For `CREATE DOMAIN ticket_no AS bigint`, the placeholder holds `db.Int8String`, the string `pg` returns for a `bigint`. But the shortcuts return a `bigint` as a JSON number: a `ticket_no` that [`select()`](/select#select) returns is a `number` typed `db.Int8String`, so `.padStart()` compiles, then throws; and a row for [`insert()`](/insert#insert), typed `Insertable`, refuses `1` (TS2322). Type it as both:
+For `CREATE DOMAIN ticket_no AS bigint`, the placeholder holds `db.Int8String`, the string `pg` returns for a `bigint`. But the shortcuts return a `bigint` as a JSON number: a `ticket_no` that [`select()`](/select#select) returns is a `number` typed `db.Int8String`, so `.padStart()` compiles, then throws; and a row for [`insert()`](/insert#insert), typed `Insertable`, refuses `1` (TS2322).
+
+Turn on [`domainsTypedByContext`](/generator#generate.domainsTypedByContext), and a placeholder left as generated types the column by context instead: a `number` from the shortcuts, `number | Int8String | bigint` in a write, and the string `pg` returns in a `Selectable`. Without it, type it as both:
 
 ::: code-group
 
@@ -226,7 +228,8 @@ declare module 'zapatos/custom' {
 
 :::
 
-- A domain over `numeric`, `date`, `timestamp`, `timestamptz` or `bytea` is in the same case: its placeholder holds what `pg` returns, not what the shortcuts return ([#194](https://github.com/AlexandreDemartin/pgcast/issues/194)).
+- A domain over `numeric`, `date`, `timestamp`, `timestamptz`, `bytea` or `money` is in the same case: its placeholder holds what `pg` returns, less than a write takes and, except for `money`, other than what the shortcuts return, and the option types it by context too.
+- An edited placeholder, such as this one, keeps its type in all five interfaces, with the option too.
 - Past `Number.MAX_SAFE_INTEGER`, the number loses its last digits, as for any `bigint`: `9007199254740993` comes back as `9007199254740992` ([`customJSONParsingForLargeNumbers`](/generator#generate.customJSONParsingForLargeNumbers)).
 
 ## See also

@@ -790,6 +790,12 @@ declare module 'zapatos/schema' {
         */
         c_int8: db.Int8String | null;
         /**
+        * **extra.type_zoo.c_int8_domain**
+        * - `ticket_no` (base type: `int8`) in database
+        * - Nullable, no default
+        */
+        c_int8_domain: c.PgTicketNo | null;
+        /**
         * **extra.type_zoo.c_interval**
         * - `interval` in database
         * - Nullable, no default
@@ -1031,6 +1037,12 @@ declare module 'zapatos/schema' {
         * - Nullable, no default
         */
         c_int8: number | null;
+        /**
+        * **extra.type_zoo.c_int8_domain**
+        * - `ticket_no` (base type: `int8`) in database
+        * - Nullable, no default
+        */
+        c_int8_domain: c.PgTicketNo | null;
         /**
         * **extra.type_zoo.c_interval**
         * - `interval` in database
@@ -1274,6 +1286,12 @@ declare module 'zapatos/schema' {
         */
         c_int8?: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment | db.ParentColumn>;
         /**
+        * **extra.type_zoo.c_int8_domain**
+        * - `ticket_no` (base type: `int8`) in database
+        * - Nullable, no default
+        */
+        c_int8_domain?: c.PgTicketNo | db.Parameter<c.PgTicketNo> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgTicketNo | db.Parameter<c.PgTicketNo> | db.SQLFragment | db.ParentColumn>;
+        /**
         * **extra.type_zoo.c_interval**
         * - `interval` in database
         * - Nullable, no default
@@ -1516,6 +1534,12 @@ declare module 'zapatos/schema' {
         */
         c_int8?: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | null | db.DefaultType | db.SQLFragment;
         /**
+        * **extra.type_zoo.c_int8_domain**
+        * - `ticket_no` (base type: `int8`) in database
+        * - Nullable, no default
+        */
+        c_int8_domain?: c.PgTicketNo | db.Parameter<c.PgTicketNo> | null | db.DefaultType | db.SQLFragment;
+        /**
         * **extra.type_zoo.c_interval**
         * - `interval` in database
         * - Nullable, no default
@@ -1751,6 +1775,12 @@ declare module 'zapatos/schema' {
         * - Nullable, no default
         */
         c_int8?: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | null | db.DefaultType | db.SQLFragment>;
+        /**
+        * **extra.type_zoo.c_int8_domain**
+        * - `ticket_no` (base type: `int8`) in database
+        * - Nullable, no default
+        */
+        c_int8_domain?: c.PgTicketNo | db.Parameter<c.PgTicketNo> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgTicketNo | db.Parameter<c.PgTicketNo> | null | db.DefaultType | db.SQLFragment>;
         /**
         * **extra.type_zoo.c_interval**
         * - `interval` in database

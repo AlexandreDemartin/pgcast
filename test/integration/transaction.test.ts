@@ -13,6 +13,7 @@ import * as db from '../../src/db';
 import { sql, IsolationLevel } from '../../src/db';
 import { resetConfig } from '../helpers/config';
 import { useTestDatabase } from '../helpers/db';
+import { satisfies } from '../helpers/isolation';
 
 const t = useTestDatabase();
 
@@ -951,6 +952,140 @@ describe('a client already inside a transaction block', () => {
       await t.pool.query('DROP TABLE txn_child, txn_parent');
     }
     expect(await notes()).toHaveLength(20);
+    expect(emitWarning).not.toHaveBeenCalled();
+  });
+});
+
+// #177: given the client of a transaction already open, transaction() passes it through, whatever the level asked:
+// its callback runs at the outer transaction's level, as Postgres can't change the isolation level once the transaction's first query has run
+describe('the client of a transaction at another level', () => {
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  /** A fresh module, so that warnOnce has not warned yet, and a spy on process.emitWarning. */
+  const fresh = async () => {
+    vi.restoreAllMocks();
+    vi.resetModules();
+    const emitWarning = vi.spyOn(process, 'emitWarning').mockImplementation(() => { });
+    const fdb = await import('../../src/db');
+    return { fdb, emitWarning };
+  };
+
+  const
+    { Serializable: S, RepeatableRead: RR, ReadCommitted: RC, SerializableRO: SRO, RepeatableReadRO: RRRO,
+      ReadCommittedRO: RCRO, SerializableRODeferrable: SROD } = IsolationLevel,
+    // what Postgres reports inside a transaction at each level
+    settingsAt: Record<IsolationLevel, string> = {
+      [S]: 'serializable off off', [RR]: 'repeatable read off off', [RC]: 'read committed off off',
+      [SRO]: 'serializable on off', [RRRO]: 'repeatable read on off', [RCRO]: 'read committed on off',
+      [SROD]: 'serializable on on',
+    },
+    levels = Object.values(IsolationLevel),
+    pairs = levels.flatMap(outer => levels.map(inner => [outer, inner] as const)),
+    settingsSQL = `SELECT concat_ws(' ', current_setting('transaction_isolation'), current_setting('transaction_read_only'), current_setting('transaction_deferrable')) AS s`,
+    refused = (outer: IsolationLevel, inner: IsolationLevel) => `transaction() at ${inner} was given the client of a transaction at ${outer}, so its callback would run at ${outer}: open the outer transaction at a level that satisfies ${inner} (IsolationSatisfying)`;
+
+  it('the levels whose client satisfies another: 25 of the 49 pairs do not', () => {
+    expect(pairs).toHaveLength(49);
+    expect(pairs.filter(([outer, inner]) => !satisfies(outer, inner))).toHaveLength(25);
+    // SERIALIZABLE, READ ONLY, DEFERRABLE gives every guarantee of the three read-only levels, which IsolationSatisfying leaves it out of
+    expect([SRO, RRRO, RCRO].every(inner => satisfies(SROD, inner))).toBe(true);
+  });
+
+  /** transaction(pool, outer, c => transaction(c, inner, …)): what the inner callback sees, and the queries sent. */
+  const nest = async (fdb: typeof db, outer: IsolationLevel, inner: IsolationLevel) => {
+    const queries: string[] = [];
+    let called = false;
+    fdb.setConfig({ queryListener: q => queries.push(q.text) });
+    const result = await fdb.transaction(t.pool, outer, c => fdb.transaction(c, inner, async c2 => {
+      called = true;
+      expect(c2).toBe(c);
+      return (await fdb.sql<db.SQL, [{ s: string }]>`${fdb.raw(settingsSQL)}`.run(c2))[0].s;  // this module's sql, so its queryListener sees it
+    })).catch((e: Error) => e);
+    return { result, queries, called };
+  };
+
+  it.each(pairs)('without transactionRequiresSatisfyingLevel (deprecated, PGCAST_DEP007), %s then %s: runs at the outer level, as in Zapatos 6.6.1, and warns only when that level does not satisfy the inner one', async (outer, inner) => {
+    const { fdb, emitWarning } = await fresh();
+    const { result, queries, called } = await nest(fdb, outer, inner);
+    expect(called).toBe(true);
+    expect(result).toBe(settingsAt[outer]);
+    expect(queries).toEqual([`START TRANSACTION ISOLATION LEVEL ${outer}`, settingsSQL, 'COMMIT']);
+    if (satisfies(outer, inner)) expect(emitWarning).not.toHaveBeenCalled();
+    else {
+      expect(emitWarning).toHaveBeenCalledTimes(1);
+      expect(emitWarning.mock.calls[0][1]).toEqual({ type: 'DeprecationWarning', code: 'PGCAST_DEP007' });
+    }
+  });
+
+  it.each(pairs)('with transactionRequiresSatisfyingLevel, %s then %s: rejects before the callback when the outer level does not satisfy the inner one, and the outer transaction rolls back', async (outer, inner) => {
+    const { fdb, emitWarning } = await fresh();
+    fdb.setConfig({ transactionRequiresSatisfyingLevel: true });
+    const { result, queries, called } = await nest(fdb, outer, inner);
+    if (satisfies(outer, inner)) {
+      expect(called).toBe(true);
+      expect(result).toBe(settingsAt[outer]);
+      expect(queries).toEqual([`START TRANSACTION ISOLATION LEVEL ${outer}`, settingsSQL, 'COMMIT']);
+    } else {
+      expect(called).toBe(false);
+      expect(result).toEqual(new Error(refused(outer, inner)));
+      expect(queries).toEqual([`START TRANSACTION ISOLATION LEVEL ${outer}`, 'ROLLBACK']);
+    }
+    expect(emitWarning).not.toHaveBeenCalled();
+  });
+
+  it('without the option, warns once per process, naming the option', async () => {
+    const { fdb, emitWarning } = await fresh();
+    await fdb.readCommitted(t.pool, rc => fdb.serializable(rc, c => write(c, 'first')));
+    await fdb.readCommittedRO(t.pool, ro => fdb.repeatableReadRO(ro, async () => 'second'));
+    expect(await notes()).toEqual(['first']);
+    expect(emitWarning).toHaveBeenCalledTimes(1);
+    expect(emitWarning.mock.calls[0]).toEqual([
+      'transaction() at SERIALIZABLE was given the client of a transaction at READ COMMITTED, so its callback runs at READ COMMITTED. Set transactionRequiresSatisfyingLevel: true (db.setConfig) to reject instead; it will be the default in pgcast 7.0.',
+      { type: 'DeprecationWarning', code: 'PGCAST_DEP007' },
+    ]);
+  });
+
+  it('reads an undefined transactionRequiresSatisfyingLevel as its default (false): runs and warns', async () => {
+    const { fdb, emitWarning } = await fresh();
+    fdb.setConfig(undefinedKey('transactionRequiresSatisfyingLevel'));
+    expect(await fdb.readCommitted(t.pool, rc => fdb.serializable(rc, async () => 'ran'))).toBe('ran');
+    expect(emitWarning).toHaveBeenCalledTimes(1);
+  });
+
+  it('with the option, the issue\'s readCommitted(pool, rc => serializable(rc, …)) rejects, and nothing is saved', async () => {
+    const { fdb } = await fresh();
+    fdb.setConfig({ transactionRequiresSatisfyingLevel: true });
+    await expect(fdb.readCommitted(t.pool, async rc => {
+      await write(rc, 'outer');
+      await fdb.serializable(rc, c => write(c, 'inner'));
+    })).rejects.toThrow(refused(RC, S));
+    expect(await notes()).toEqual([]);
+  });
+
+  it.each([false, true])('a level the table doesn\'t know, a string from JavaScript, is passed through, as in Zapatos 6.6.1 (option %s)', async on => {
+    const { fdb, emitWarning } = await fresh();
+    fdb.setConfig({ transactionRequiresSatisfyingLevel: on });
+    for (const level of ['constructor', 'toString', '__proto__', 'hasOwnProperty', 'serializable', 'READ UNCOMMITTED']) {
+      expect(await fdb.serializable(t.pool, c => fdb.transaction(c, level as IsolationLevel, async () => 'ran'))).toBe('ran');
+      expect(await fdb.readCommitted(t.pool, c => fdb.transaction(c, level as IsolationLevel, async () => 'ran'))).toBe('ran');
+    }
+    expect(emitWarning).not.toHaveBeenCalled();
+  });
+
+  it('with the option, a pool, a plain client and a client kept after its transaction ended are not passed through, nor refused', async () => {
+    const { fdb, emitWarning } = await fresh();
+    fdb.setConfig({ transactionRequiresSatisfyingLevel: true });
+    const level = (c: db.Queryable) => sql<db.SQL, [{ s: string }]>`${db.raw(settingsSQL)}`.run(c).then(r => r[0].s);
+    expect(await fdb.serializable(t.pool, level)).toBe(settingsAt[S]);
+    const client = await t.pool.connect();
+    try {
+      let kept: db.TxnClientForReadCommitted | undefined;
+      expect(await fdb.readCommitted(client, async c => { kept = c; return level(c); })).toBe(settingsAt[RC]);
+      expect(Object.prototype.hasOwnProperty.call(kept, '_zapatos')).toBe(false);
+      expect(await fdb.serializable(kept!, level)).toBe(settingsAt[S]);  // its own transaction
+    } finally {
+      client.release();
+    }
     expect(emitWarning).not.toHaveBeenCalled();
   });
 });
