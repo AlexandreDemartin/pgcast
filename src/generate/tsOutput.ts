@@ -9,6 +9,7 @@ import * as pg from 'pg';
 
 import { enumTypesForEnumData } from './enums';
 import { enumOrderOf, enumOrdersForSchema, enumsOutOfOrder, warnAboutEnumOrder, type EnumOrders } from './enumOrder';
+import { domainRootsInDatabase, type DomainRoots } from './domainRoots';
 import { header } from './header';
 import { moduleNamesOf } from './moduleNames';
 import { jsdocText, tsIdentifier } from './quote';
@@ -18,8 +19,6 @@ import {
   Relation,
   relationsInSchema,
   definitionForRelationInSchema,
-  domainRootsInDatabase,
-  type DomainRoots,
   crossTableTypesForTables,
   crossSchemaTypesForAllTables,
   crossSchemaTypesForSchemas,
