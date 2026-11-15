@@ -1,5 +1,5 @@
 ---
-english: ba462e5de8d5
+english: 63ee73ef4277
 ---
 
 # Template SQL
@@ -469,6 +469,8 @@ Un fragment `noop` se compile quand même, son SQL derrière un commentaire. `fo
 <<< ../examples/sql_run_force.ts{ts twoslash}
 
 </CastPanel>
+
+Un texte de plusieurs instructions, `` db.sql`CREATE TABLE festivals (id int); INSERT INTO festivals VALUES (1)` ``, les exécute toutes quand il n’a ni valeur ni nom [`prepared()`](#prepared) : `pg` l’envoie comme une seule requête simple ([Sécurité](/fr/security#values-never-enter-the-sql)). Hors transaction, Postgres les exécute en une seule transaction, sauf si le texte contient son propre `COMMIT` : si une instruction échoue, la promesse est rejetée avec son erreur, et celles d’avant sont annulées. `pg` renvoie alors un tableau de résultats, un par instruction, où le `runResultTransform` par défaut ne trouve pas de `rows` : `run()` se résout en `undefined` au lieu des lignes que promet son type, et `resultListener` reçoit `undefined`. Pour les lire, donnez au fragment un [`runResultTransform`](#runResultTransform) qui prend le tableau. Avec une valeur, ou en requête préparée, Postgres refuse le texte : « <span lang="en">cannot insert multiple commands into a prepared statement</span> » (42601).
 
 ### `compile()` {#compile}
 
