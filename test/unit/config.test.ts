@@ -119,8 +119,8 @@ describe('getConfig() and setConfig()', () => {
   const store = (transactionRetryDelay: unknown) => db.setConfig({ transactionRetryDelay } as db.NewConfig);
 
   it.each([
-    ['a minMs getter that throws', () => { store({ get minMs() { return boom(); }, maxMs: 2 }); }],
-    ['a minMs getter that throws only after setConfig()', () => {
+    ['an object whose minMs getter throws', () => { store({ get minMs() { return boom(); }, maxMs: 2 }); }],
+    ['an object whose minMs getter throws only after setConfig()', () => {
       let broken = false;
       store({ get minMs() { return broken ? boom() : 1; }, maxMs: 2 });
       broken = true;
@@ -134,7 +134,7 @@ describe('getConfig() and setConfig()', () => {
     ['a primitive', () => { store(100); }],
     ['an Object.create(null)', () => { store(Object.assign(Object.create(null), { minMs: 1, maxMs: 2 })); }],
     ['null', () => { store(null); }],
-  ])('never throw once the transactionRetryDelay stored is %s', (_, storeIt) => {
+  ])('never throw once setConfig() is given a transactionRetryDelay that is %s', (_, storeIt) => {
     expect(storeIt).not.toThrow();
     expect(() => db.getConfig()).not.toThrow();
     expect(() => db.setConfig({ transactionAttemptsMax: 3 })).not.toThrow();
