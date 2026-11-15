@@ -5,7 +5,8 @@
 // so Zapatos 6.6.1 compiled it to TRUE (every row) or to ("0" = $1 …); one with own keys
 // added throws too, except an iterator. A subclass instance is not one of them, and
 // compiles as in 6.6.1, except a subclass of Iterator with no own key (#426).
-// test/unit/injection.test.ts compiles them, test/integration/injection.test.ts runs them.
+// test/unit/injection.test.ts compiles them, and checks the list against the global constructors of a bare vm
+// context and the iterators their values hand out; test/integration/injection.test.ts runs them.
 
 /** A fresh value of each refused built-in object, keyed by the name its error gives. */
 export const builtinObjects = (): Record<string, object> => {
@@ -40,10 +41,18 @@ export const builtinObjects = (): Record<string, object> => {
     ArrayBuffer: new ArrayBuffer(1),
     SharedArrayBuffer: new SharedArrayBuffer(1),
     DataView: new DataView(new ArrayBuffer(1)),
+    Int8Array: new Int8Array(1),
     Uint8Array: new Uint8Array(1),
+    Uint8ClampedArray: new Uint8ClampedArray(1),
+    Int16Array: new Int16Array(1),
+    Uint16Array: new Uint16Array(1),
+    Int32Array: new Int32Array(1),
+    Uint32Array: new Uint32Array(1),
+    Float32Array: new Float32Array(1),
     Float64Array: new Float64Array(2),
     Buffer: Buffer.from('id'),
     BigInt64Array: new BigInt64Array(1),
+    BigUint64Array: new BigUint64Array(1),
     ...Float16Array && { Float16Array: new Float16Array(1) },
     Number: new Number(1),
     String: new String('id'),
