@@ -324,7 +324,7 @@ The type refuses most of them (TS2345), not where a column shares one of their m
 
 Only the built-ins of the realm that runs pgcast throw, matched by their exact prototype, or an iterator's on its chain. As in Zapatos 6.6.1:
 
-- a `Date` or an iterator from another realm, such as `vm.runInNewContext('new Date(0)')` (Jest runs each test file in a `vm` context), gives `TRUE`;
+- a `Date` or an iterator from another realm, such as `vm.runInNewContext('new Date(0)')`, gives `TRUE`;
 - an instance of a class that extends a built-in keeps its own keys: `new Frames(1)`, with `class Frames extends Uint8Array {}`, gives `("0" = $1)`;
 - an iterator with own keys compiles them: a generator given `{ id: 1 }`, or a class that extends `Iterator` with a field `id = 1`, gives `("id" = $1)`.
 

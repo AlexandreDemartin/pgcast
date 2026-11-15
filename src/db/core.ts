@@ -273,10 +273,10 @@ export class ColumnValues<T> { declare readonly [wrapper]: 'vals'; constructor(p
  * in a `sql` template; Zapatos 6.6.1 sent it as JSON (`'{"value":"id"}'`).
  * In an object, it is the parent column too in a nested query, and throws
  * outside one, so as an `insert()`, `upsert()` or `update()` value.
- * `raw()`, `cols()` and `vals()` throw in an object, and in an array in a
- * filter, as `Default` does; in an array outside one they are still sent as
- * JSON. As a filter value `vals(x)` throws, and the type refuses it as a
- * value, as for `raw()`. `null`, a string or another primitive throws while
+ * `raw()`, `cols()` and `vals()` throw in an object, where `Default` compiles;
+ * in an array they throw in a filter, as `Default` does, and outside one they
+ * are still sent as JSON. As a filter value `vals(x)` throws, and the type
+ * refuses it as a value, as for `raw()`. `null`, a string or another primitive throws while
  * compiling; Zapatos 6.6.1 sent a string's characters, `vals('id')` as `$1, $2`,
  * and threw a `TypeError` on `null`.
  */

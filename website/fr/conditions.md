@@ -133,7 +133,7 @@ Chacune prend une valeur du type de la colonne, `<T>(a: T)`, et écrit la colonn
 
 ### `isNotDistinctFrom()` {#conditions.isNotDistinctFrom}
 
-`"col" IS NOT DISTINCT FROM $1`<!-- probe: db.sql`${{ col: db.conditions.isNotDistinctFrom(1) }}` --> : comme `eq()`, où `NULL` est une valeur comme une autre. Les deux acceptent une valeur nullable, `null` compris : avec `tagline` un `string | null`, `{ tagline: isNotDistinctFrom(tagline) }` trouve les films sans accroche quand `tagline` vaut `null`. [`isNull`](#conditions.isNull) reste le test simple de `NULL`.
+`"col" IS NOT DISTINCT FROM $1`<!-- probe: db.sql`${{ col: db.conditions.isNotDistinctFrom(1) }}` --> : comme `eq()`, où `NULL` est une valeur comme une autre. `isDistinctFrom()` et `isNotDistinctFrom()` acceptent tous deux une valeur nullable, `null` compris : si `tagline` est un `string | null`, `{ tagline: isNotDistinctFrom(tagline) }` trouve les films sans accroche quand `tagline` vaut `null`. [`isNull`](#conditions.isNull) reste le test simple de `NULL`.
 
 ## Les intervalles {#ranges}
 

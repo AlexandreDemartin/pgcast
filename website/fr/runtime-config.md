@@ -227,7 +227,7 @@ Sans l’option, elle envoie ce qu’envoie Zapatos 6.6.1, avec un avertissement
 - Un `BEGIN` envoyé sans `await` n’est pas encore vu : le client paraît hors de tout bloc.
 - Un `BEGIN` envoyé dans une même chaîne de requête avec une instruction qui échoue peut lui aussi paraître hors de tout bloc : `transaction()` s’exécute alors comme dans la 6.6.1, sans avertissement.
 - Non testé avec `pg-native`.
-- Avec `true`, juste après un `COMMIT` qui a échoué, deux appels de `transaction()` au même moment sur un même client : quand pg signale encore le bloc, le premier envoie sa requête vide, puis continue, et le second, transmis, envoie sa première requête, et celles envoyées avec elle, avant le `START TRANSACTION` du premier, hors de toute transaction, si bien que chacune est validée à part. Ses requêtes suivantes s’exécutent dans la transaction du premier appel.
+- Avec `true`, juste après un `COMMIT` qui a échoué, deux appels de `transaction()` au même moment sur un même client : quand pg signale encore le bloc, le premier envoie sa requête vide, puis continue, et le second, transmis, envoie sa première requête, et celles envoyées avec elle, avant le `START TRANSACTION` du premier, hors de toute transaction, si bien que chacune est commitée à part. Ses requêtes suivantes s’exécutent dans la transaction du premier appel.
 
 ### `transactionRequiresSatisfyingLevel` {#Config.transactionRequiresSatisfyingLevel}
 
@@ -256,6 +256,7 @@ Avec `true`, un [`selectExactlyOne()`](/fr/select#selectExactlyOne) exécuté se
 
 - Imbriqué dans une autre requête, dans un `lateral` ou un template `sql`, il garde `LIMIT 1`, avec ou sans l’option : une deuxième ligne y joindrait deux fois la ligne parente. « Seul » dépend de la façon dont la requête est compilée : `.run()` et `.compile()` la compilent seule, une requête parente la compile dans son propre SQL.
 - Une [`.copy()`](/fr/sql-template#copy) de celui-ci se compile comme imbriquée : elle garde donc `LIMIT 1`, exécutée seule aussi.
+- Avec un [`lock`](/fr/select#lock), `LIMIT $2` verrouille aussi la deuxième ligne : une fois `.run()` rejetée, les deux lignes restent verrouillées jusqu’à la fin de la transaction, et le `FOR UPDATE NOWAIT` d’une autre session sur l’une d’elles reçoit 55P03.
 - Sans l’option, aucun avertissement, et elle reste désactivée en 7.0 : « au moins une ligne », c’est ainsi que Zapatos lit `selectExactlyOne()`, imbriqué dans un `lateral` sur une clé étrangère `NOT NULL` ([décision 003](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/003-fixes-and-deprecation.md)).
 - Lue quand `selectExactlyOne()` est appelée, pas à `.run()`.
 

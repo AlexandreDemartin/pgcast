@@ -107,6 +107,7 @@ Look through your code for the first column of each table below. Each change in 
 |---|---|---|---|
 | [`not()`](/conditions#conditions.not) of a fragment with a bare `OR` or `AND`: on `release_year`, `` not(db.sql`${db.self} = 1974 OR ${db.self} = 1991`) `` | `(NOT a) OR b`, so the 1991 film too | `(NOT (a OR b))`<!-- probe: db.conditions.not(db.sql`a OR b`) --> | for the old rows, `` db.sql`(NOT ${db.self} = 1974) OR ${db.self} = 1991` `` |
 | [`and()`](/conditions#conditions.and) of a fragment with a bare `OR` and another operand: `` and(db.sql`${'id'} = 1000 OR ${'id'} = 1001`, { studio_id: 1001 }) `` | `a OR (b AND c)`, so film 1000 too | `((a OR b) AND (c))`<!-- probe: db.conditions.and(db.sql`a OR b`, db.sql`c`) --> | for the old rows, one fragment: `` db.sql`${'id'} = 1000 OR (${'id'} = 1001 AND ${'studio_id'} = ${db.param(1001)})` `` |
+| [`and()`](/conditions#conditions.and) of fragments that split one expression: `` and(db.sql`${'release_year'} BETWEEN 1970`, db.sql`2000`) `` | `(a BETWEEN 1970 AND 2000)`, films 1000 and 1001 | `((a BETWEEN 1970) AND (2000))`<!-- probe: db.conditions.and(db.sql`a BETWEEN 1970`, db.sql`2000`) -->, which Postgres refuses (42601) | one condition: `{ release_year: db.conditions.between(1970, 2000) }` |
 
 </div>
 
@@ -245,7 +246,7 @@ All of them will be the default in 7.0 ([Versions](/versions)). With them on, an
 
 </CastPanel>
 
-- `insert()` sends `DEFAULT`<!-- probe: (db.setConfig({ undefinedMeansMissing: true }), db.insert('tags', { film_id: 1000, tag: undefined })) --> for an `undefined` value, and an `update()` with no other key throws "nothing to update: an Updatable needs at least one column"<!-- message -->.
+- `insert()` sends `DEFAULT`<!-- probe: (db.setConfig({ undefinedMeansMissing: true }), db.insert('tags', { film_id: 1000, tag: undefined })) --> for an `undefined` value, an `update()` with no other key throws "nothing to update: an Updatable needs at least one column"<!-- message -->, and an `upsert()` with no other key "nothing to insert: an Insertable needs at least one column; for a row of defaults only, write INSERT ... DEFAULT VALUES in a sql template"<!-- message -->.
 - The `upsert()` of `PGCAST_DEP001` throws when called, before any query: "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message -->.
 - A `transaction()` whose `COMMIT` Postgres answers with `ROLLBACK` rejects, without a retry ([`transaction()`, Errors](/transaction#errors)).
 - A `transaction()` given a client already inside a transaction block rejects, and leaves that transaction open ([Your own `BEGIN`](/transaction#your-own-begin)).
