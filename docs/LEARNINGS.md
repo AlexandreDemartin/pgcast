@@ -264,6 +264,9 @@ Candidates for a check, a rule or a skill line.
 - #268 — A mock of a third-party lazy getter is compared with the package's real source at the oldest supported version (pg's peer floor, 7.18.2), not one recent version; and a counter on a getter that replaces itself counts only the first read — `branch-reviewer`
 - #268 — A pg 7 replay on Node 22 needs a patch to the handshake only (pg older than 8.0.3 cannot open a socket on Node 14+); pg-native runs there unpatched — `builder`
 - #268 — On pg 7, an installed pg-native whose addon fails to load made `transaction()` reject on a plain JS pool (6.6.1 and master) — `builder`
+- #274 — A docs claim about a parameter's compiled SQL (`$1`, JSON) names the `castArrayParamsToJson` / `castObjectParamsToJson` condition, or is probed under both: candidate check in `check-prose.mjs`, rerun each `<!-- probe -->` without `setConfig` with both options on and flag a changed text whose sentence names no option — `branch-reviewer`
+- #274 — A value object with `toPostgres()` and a `value` field compiles only because `Parameter` matches by shape: probe it whenever `Parameter` is narrowed; under `castObjectParamsToJson` an object literal's own `toPostgres()` is not used — `builder`
+- #274 — A types-only `ConfigTypes` opt-in cannot carry decision 003's warning, and a class + interface merge needs an ESLint disable in `core.ts`: weigh Document first for a niche type gap (as #402) — orchestrator
 
 ## Minors kept
 
@@ -363,3 +366,6 @@ Minor review defects, taken up by the end-of-chapter review.
 - #204 — `website/playground.md:28` (and `fr/…`): « where `pg` sends it as a simple query » could link the new paragraph — `branch-reviewer`
 - #268 — `test/unit/transaction-pg7.test.ts:68`: `expect(pg7.state.reads).toBe(1)` cannot fail (the getter replaces itself) — `branch-reviewer`
 - #268 — `src/db/transaction.ts:59`: the comment leaves out a native client built from `pg/lib/native` while the getter is in place, classed by `_connected` — `branch-reviewer`
+- #274 — `website/sql-template.md:126` (and `fr/…:130`): « A text column stores as it is » right after a filter example; « passes where a column name does » reads as « wherever » — `branch-reviewer`
+- #274 — `test/types/core.test-d.ts:208-230`: no enum column and no `upsert()` slot for the structural `{ value }` case (skill `type-tests` § Structural wrappers) — `branch-reviewer`
+- #274 — `src/db/core.ts:137-140`: interpolated directly in `sql`, `${{ value: 3 }}` passes as a Whereable and compiles to `("value" = $1)` — `branch-reviewer`
