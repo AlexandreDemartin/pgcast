@@ -53,7 +53,6 @@ const hostile = {
 const visible = (text: string) =>
   text.replace(/\0/g, '<NUL>').replace(/\r/g, '<CR>').replace(/\f/g, '<FF>').replace(/\v/g, '<VT>');
 
-/** The compiled text for each hostile input, or the error thrown; NUL, CR, FF and VT are shown as <NUL>, <CR>, <FF>, <VT>. */
 /** What compiling the fragment `build` returns gives: its `text` and `values`, or `throws: <message>`. */
 const compiled = (build: () => db.SQLFragment<any, any>) => {
   try { return build().compile(); } catch (err) { return `throws: ${(err as Error).message}`; }
@@ -63,6 +62,7 @@ const compiled = (build: () => db.SQLFragment<any, any>) => {
 const emptyName = (cast: string, type: string) =>
   `throws: param() cast '${cast}' gives an empty name, ${type}, which Postgres refuses: name each part of the type, as in 'int4' or 'public.mood', or leave the cast out`;
 
+/** The compiled text for each hostile input, or the error thrown; NUL, CR, FF and VT are shown as <NUL>, <CR>, <FF>, <VT>. */
 const matrix = (build: (input: any) => db.SQLFragment<any, any>, inputs: Record<string, string> = hostile) =>
   Object.fromEntries(Object.entries(inputs).map(([name, input]) => {
     try {
