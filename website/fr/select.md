@@ -1,5 +1,5 @@
 ---
-english: 52a9c2183d52
+english: 0e8d03e50e99
 ---
 
 # Lectures {#select-and-the-aggregates}
@@ -193,7 +193,7 @@ db.selectOne(table, where, options?)
 
 Comme [`select()`](#select), avec `LIMIT $1`<!-- probe: db.selectOne('films', db.all) -->, de valeur `1`, et sans `jsonb_agg` : `.run(pool)` donne la première ligne, ou `undefined` quand aucune ne correspond. Tout `limit` passé est remplacé par `1` ; `offset` et les autres options sont gardés. Dans un `lateral`, sa clé contient la ligne ou `null`.
 
-Avec `withTies` et `order`, il écrit `FETCH FIRST $1 ROWS WITH TIES`<!-- probe: db.selectOne('films', db.all, { order: { by: 'release_year', direction: 'ASC' }, withTies: true }) -->, ici et dans `selectExactlyOne()`. `.run()` donne alors l’une des lignes ex æquo ; dans un `lateral`, la ligne parente revient une fois par ligne ex æquo.
+Avec `withTies` et `order`, il écrit `FETCH FIRST $1 ROWS WITH TIES`<!-- probe: db.selectOne('films', db.all, { order: { by: 'release_year', direction: 'ASC' }, withTies: true }) -->, ici et dans `selectExactlyOne()`. `.run()` donne alors l’une des lignes ex æquo ; dans un `lateral` sous un `select()` extérieur, la ligne parente revient une fois par ligne ex æquo.
 
 <CastPanel example="selectOne">
 

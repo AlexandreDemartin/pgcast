@@ -858,6 +858,35 @@ describe('selectOne, selectExactlyOne', () => {
       lateral: { report: db.selectExactlyOne('users', { manager_id: parent('id') }, { alias: 'r', columns: ['id'], order: { by: 'id', direction: 'ASC' } }) },
     }))).toEqual([{ id: 1, report: { id: 2 } }]);
   });
+
+  describe('characterization: withTies (#164)', () => {
+    // documented, not fixed: user 1's two accounts tie on owner_id
+    const
+      byOwner = { columns: ['id'], order: { by: 'owner_id', direction: 'ASC' }, withTies: true } as const,
+      owned = { owner_id: parent('id') },
+      userIds = async (account: db.SQLFragment<any>) =>
+        (await run(db.select('users', all, { columns: ['id'], order: { by: 'id', direction: 'ASC' }, lateral: { account } }))).map((r: any) => r.id);
+
+    it('at top level, Postgres sends every tie and run() gives one of them', async () => {
+      expect((await t.client.query(db.selectOne('accounts', { owner_id: 1 }, byOwner).compile())).rows).toHaveLength(2);
+      expect(await run(db.selectOne('accounts', { owner_id: 1 }, byOwner))).toEqual({ id: expect.any(Number) });
+      expect(await run(db.selectExactlyOne('accounts', { owner_id: 1 }, byOwner))).toEqual({ id: expect.any(Number) });
+    });
+
+    it('in a lateral, the parent row comes once per tie', async () => {
+      expect(await userIds(db.selectOne('accounts', owned, byOwner))).toEqual([1, 1, 2, 3]);
+      expect(await userIds(db.selectExactlyOne('accounts', owned, byOwner))).toEqual([1, 1, 2, 3]);
+      db.setConfig({ selectExactlyOneChecksForSecondRow: true });
+      expect(await userIds(db.selectExactlyOne('accounts', owned, byOwner))).toEqual([1, 1, 2, 3]);
+    });
+
+    it('in a lateral, a nested select() keeps the ties in its array', async () => {
+      expect((await run(db.select('users', all, {
+        columns: ['id'], order: { by: 'id', direction: 'ASC' },
+        lateral: { accounts: db.select('accounts', owned, { ...byOwner, limit: 1 }) },
+      }))).map((r: any) => r.accounts.length)).toEqual([2, 1, 0]);
+    });
+  });
 });
 
 describe('count, sum, avg, min, max', () => {
