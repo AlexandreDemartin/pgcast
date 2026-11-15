@@ -1,5 +1,5 @@
 ---
-english: 37d5963a324c
+english: 810e8e4423a4
 ---
 
 # Lectures {#select-and-the-aggregates}
@@ -113,7 +113,7 @@ Un raccourci de lecture y est une sous-requête : `select()`, `selectOne()`, `s
 
 `lateral?: { [key: string]: SQLFragment } | SQLFragment`, un [`LateralOption`](#LateralOption) : d’autres raccourcis, imbriqués, chacun joint par `LEFT JOIN LATERAL … ON true`. Dans ceux-ci, [`db.parent()`](/fr/sql-template#parent) nomme une colonne de la table de cette requête.
 
-- **Un objet** : chaque clé devient une clé du résultat, qui contient le résultat de sa sous-requête : un tableau pour `select()`, un objet ou `null` pour `selectOne()`, un nombre pour `count()`. Les clés sont jointes dans l’ordre alphabétique ; chacune est un seul identifiant, `"lateral_<key>"`.
+- **Un objet** : chaque clé devient une clé du résultat, qui contient le résultat de sa sous-requête : un tableau pour `select()`, un objet ou `null` pour `selectOne()`, un nombre pour `count()`, ou `null` quand sa requête ne renvoie aucune ligne ([`count()`](#count)). Un `count()` dont le `groupBy` donne plusieurs groupes fait revenir la ligne parente une fois par groupe sous un `select()` extérieur ; sous `selectOne()` ou `selectExactlyOne()`, une seule fois, avec le compte de l’un des groupes, mais avec [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), `selectExactlyOne()` est rejetée avec une `NotExactlyOneError`. Les clés sont jointes dans l’ordre alphabétique ; chacune est un seul identifiant, `"lateral_<key>"`.
 - **Une seule sous-requête** : son résultat est transmis à la place de chaque ligne. `columns` et `extras` n’ont alors rien à quoi s’ajouter, et le type les refuse, avec `strictNullChecks` activé.
 - **`null`** : `lateral: null`, ou une clé dont la sous-requête vaut `null` ou `undefined`, lève une erreur à la compilation, si bien que `.run()` est rejetée avant toute requête : "`` `lateral: null` has no meaning: for no lateral join, leave `lateral` out; to join, give it a `select()`, `selectOne()` or `count()` query, or an object of them. ``<!-- message -->", ou "`` The `lateral` key 'cast' is `null`, not a query: leave the key out, or give it a `select()`, `selectOne()` or `count()` query. ``<!-- message -->". Zapatos 6.6.1 levait une `TypeError` à l’appel.
 
@@ -265,9 +265,10 @@ db.count(table, where, options?)
 |---|---|---|
 | `…() needs one column to aggregate: pass columns: ['column']`<!-- message --> | `sum()`, `avg()`, `min()` ou `max()` sans `columns` | pgcast 6.7.0 |
 | `…() takes one column in columns, not …`<!-- message --> | `columns` avec plusieurs colonnes, ou aucune (`[]`) | pgcast 6.7.0 |
+| `…() takes columns as an array, not …: pass columns: ['column']…`<!-- message --> | une chaîne ou une autre valeur primitive comme `columns`, `'title'` pour `['title']` ; une chaîne vide, `0` ou `false` équivaut à l’absence de `columns` | pgcast 6.7.0 |
 | `…() cannot pass a lateral query through: nest it in the lateral of a select() instead`<!-- message --> | une seule sous-requête comme `lateral` | pgcast 6.7.0 |
 
-Zapatos 6.6.1 envoyait le SQL, que Postgres refusait : `sum(*)` et `count("id", "mood")` (42883), `count()` (42809), `SELECT  AS result` (42601). Le type est celui de 6.6.1, qui laisse passer ces appels, une seule sous-requête comme `lateral` quand il n’y a ni `columns` ni `extras`.
+Zapatos 6.6.1 envoyait le SQL, que Postgres refusait : `sum(*)` et `count("id", "mood")` (42883), `count()` (42809), `count("0", "1")` pour `'id'` en passant outre le type (42703), `SELECT  AS result` (42601). Le type est celui de 6.6.1, qui laisse passer les autres appels, une seule sous-requête comme `lateral` quand il n’y a ni `columns` ni `extras`.
 
 Deux appels qui passaient sous 6.6.1 sont maintenant rejetés aussi :
 
