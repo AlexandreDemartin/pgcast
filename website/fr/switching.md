@@ -1,5 +1,5 @@
 ---
-english: 09afd5d4a77b
+english: 36403f18cbdb
 ---
 
 # Venir de Zapatos
@@ -95,6 +95,7 @@ Pour comparer avec du SQL, donnez un fragment `sql` comme valeur, `db.self` pour
 - Dans un fragment, une simple chaîne est un nom, pas une valeur : `${'the salt orchard'}` serait la colonne `"the salt orchard"`<!-- probe: db.sql`${'the salt orchard'}` --> ([Identifiants](/fr/sql-template#identifiers)).
 - [`DangerousRawString`](/fr/sql-template#DangerousRawString), [`ColumnNames`](/fr/sql-template#ColumnNames) et [`ColumnValues`](/fr/sql-template#ColumnValues) ne correspondent plus à un simple `{ value }`, ni l’un à l’autre : `const r: db.DangerousRawString = { value: 'x' }` échoue (2741). Créez-les avec `db.raw()`, `db.cols()` et `db.vals()`.
 - Comme valeur insérée ou mise à jour de `insert()`, `update()` ou `upsert()` (pas dans `updateValues`), le type les refuse aussi, et ils lèvent une erreur avant toute requête ([`insert()`](/fr/insert#insert)).
+- Un range sélectionné peut désormais valoir `'empty'`, puisque Postgres écrit ainsi un range vide ([`RangeString`](/fr/runtime-config#RangeString)) : il n’est donc plus assignable à un type qui commence par un crochet, `` `[${string}` | `(${string}` `` (2322). Vérifiez d’abord ce cas, `if (range !== 'empty')` ; dans un type, écrivez `Exclude<db.DateRangeString, 'empty'>`.
 
 ## 4. Trouver les appels dont le résultat change {#find-the-calls-whose-result-changes}
 

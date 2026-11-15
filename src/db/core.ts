@@ -64,9 +64,11 @@ export type Int8String = `${number}`;
 export type NumericString = `${number}`;
 
 /**
- * Generic range value represented as a string
+ * Generic range value represented as a string: a bracket, two bounds, a
+ * bracket, or `'empty'`, as Postgres writes an empty range (`'[5,5)'::int4range`
+ * included). See https://www.postgresql.org/docs/current/rangetypes.html#RANGETYPES-IO
  */
-export type RangeString<Bound extends string | number> = `${'[' | '('}${Bound},${Bound}${']' | ')'}`;
+export type RangeString<Bound extends string | number> = `${'[' | '('}${Bound},${Bound}${']' | ')'}` | 'empty';
 
 /**
  * `tsrange`, `tstzrange` or `daterange` value represented as a string. The
@@ -145,9 +147,11 @@ declare const wrapper: unique symbol;
  * this type within the query e.g. `CAST($1 AS "type")` instead of plain `$1`.
  * Without a `"`, the type is split on `.` and each part quoted: `public.mood`
  * gives `"public"."mood"`. Array bounds at the end, `[]` or `[n]`, follow the
- * quotes: `int4[]` gives `"int4"[]`. With a `"`, the type is written as is if
- * `"type"` is well-formed: non-empty quoted parts without NUL, in which `""`
- * stands for one `"`, joined by `.` with optional whitespace around it
+ * quotes: `int4[]` gives `"int4"[]`. A part left empty (`''`, `'[]'`,
+ * `'public.'`) throws while compiling, as Postgres refuses `""`. With a `"`,
+ * the type is written as is if `"type"` is well-formed: non-empty quoted parts
+ * without NUL, in which `""` stands for one `"`, joined by `.` with optional
+ * whitespace around it
  * (`pg_catalog"."int4`), or if it is already quoted that way (`"a.b"`).
  * Otherwise it is one quoted identifier, any `"` doubled (as `quote_ident`
  * does), so it cannot close its quotes. No part is left unquoted, so a name
@@ -177,9 +181,11 @@ export class Parameter<T = any> { declare readonly [wrapper]?: never; constructo
  * this type within the query e.g. `CAST($1 AS "type")` instead of plain `$1`.
  * Without a `"`, the type is split on `.` and each part quoted: `public.mood`
  * gives `"public"."mood"`. Array bounds at the end, `[]` or `[n]`, follow the
- * quotes: `int4[]` gives `"int4"[]`. With a `"`, the type is written as is if
- * `"type"` is well-formed: non-empty quoted parts without NUL, in which `""`
- * stands for one `"`, joined by `.` with optional whitespace around it
+ * quotes: `int4[]` gives `"int4"[]`. A part left empty (`''`, `'[]'`,
+ * `'public.'`) throws while compiling, as Postgres refuses `""`. With a `"`,
+ * the type is written as is if `"type"` is well-formed: non-empty quoted parts
+ * without NUL, in which `""` stands for one `"`, joined by `.` with optional
+ * whitespace around it
  * (`pg_catalog"."int4`), or if it is already quoted that way (`"a.b"`).
  * Otherwise it is one quoted identifier, any `"` doubled (as `quote_ident`
  * does), so it cannot close its quotes. No part is left unquoted, so a name
@@ -239,7 +245,9 @@ export class ColumnNames<T> { declare readonly [wrapper]: 'cols'; constructor(pu
  * use in a `SELECT` query) or object keys (for use in an `INSERT`, `UDPATE` or
  * `UPSERT` query alongside a `ColumnValues`). As a filter value and in
  * `vals({…})`, so as a write value, it throws, and the type refuses it, as for
- * `raw()`; Zapatos 6.6.1 sent it as JSON.
+ * `raw()`; Zapatos 6.6.1 sent it as JSON. A string or another primitive throws
+ * while compiling; Zapatos 6.6.1 compiled a string's character indexes,
+ * `cols('id')` to `"0", "1"`.
  */
 export function cols<T>(x: T) { return new ColumnNames<T>(x); }
 
@@ -263,7 +271,8 @@ export class ColumnValues<T> { declare readonly [wrapper]: 'vals'; constructor(p
  * `raw()`, `cols()` and `vals()` throw in an object, and in an array in a
  * filter, as `Default` does; in an array outside one they are still sent as
  * JSON. As a filter value `vals(x)` throws, and the type refuses it as a
- * value, as for `raw()`.
+ * value, as for `raw()`. A string or another primitive throws while compiling;
+ * Zapatos 6.6.1 sent a string's characters, `vals('id')` as `$1, $2`.
  */
 export function vals<T>(x: T) { return new ColumnValues<T>(x); }
 
@@ -393,6 +402,13 @@ const builtinName = (x: object): string => isIterator(x) ? Object.prototype.toSt
 // raw(), cols() and vals() as a filter value, or in vals({…}) (so as a write value): Zapatos 6.6.1 sent them as JSON;
 // compiling raw() there as SQL would turn a caller's raw(input), a parameter until now, into an injection, so they throw
 const isWrapper = (x: unknown) => x instanceof DangerousRawString || x instanceof ColumnNames || x instanceof ColumnValues;
+
+// cols() and vals() of a primitive: Zapatos 6.6.1 compiled the object it boxes to, a string to its character indexes
+// as names ("0", "1") or its characters as values, any other primitive to nothing; null still reaches Object.keys
+const isNotObject = (x: unknown) => typeof x !== 'object' && typeof x !== 'function';
+const notAnObject = (fn: 'cols' | 'vals', x: unknown) => fn === 'cols' ?
+  `\`db.cols()\` takes an object or an array, not \`${typeof x}\`: for one column, write \`db.cols([name])\`; for a row of \`insert()\`, \`upsert()\` or \`update()\`, give an object.` :
+  `\`db.vals()\` takes an object or an array, not \`${typeof x}\`: for one value, write \`db.vals([value])\`; for a row of \`insert()\`, \`upsert()\` or \`update()\`, give an object.`;
 
 export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never> {
   protected constraint?: Constraint;
@@ -559,6 +575,12 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
                 quotedIdentifiers.test(name) ? name :
                   `"${name.replace(/"/g, '""')}"`;
 
+        // an empty part (`''`, `'[]'`, `'public.'`) would be `""`, which Postgres refuses (42601); a cast with a
+        // `"` never gives one under the rules above
+        if (!name.includes('"') && /(?:^|\.)(?:\.|$)/.test(name)) {
+          throw new Error(`param() cast '${cast}' gives an empty name, ${type}${cast.slice(end)}, which Postgres refuses: name each part of the type, as in 'int4' or 'public.mood', or leave the cast out`);
+        }
+
         // the cast wins over castArrayParamsToJson and castObjectParamsToJson (Zapatos 6.6.1 dropped it for
         // `"json"`); the value is still the JSON text they ask for, except an array whose cast ends with
         // `[]` or `[n]`
@@ -605,6 +627,7 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
     } else if (expression instanceof ColumnNames) {
       // a ColumnNames-wrapped object -> quoted names in a repeatable order
       // OR a ColumnNames-wrapped array -> quoted array values
+      if (isNotObject(expression.value)) throw new Error(notAnObject('cols', expression.value));
       const columnNames = Array.isArray(expression.value) ? expression.value :
         Object.keys(expression.value).sort();
 
@@ -616,6 +639,7 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
     } else if (expression instanceof ColumnValues) {
       // a ColumnValues-wrapped object OR array
       // -> values (in ColumnNames-matching order, if applicable) punted as SQLFragments or Parameters
+      if (isNotObject(expression.value)) throw new Error(notAnObject('vals', expression.value));
 
       if (Array.isArray(expression.value)) {
         const values: any[] = expression.value;
