@@ -1,5 +1,5 @@
 ---
-english: 9ea4b5da0b61
+english: fc82d67f5ad0
 ---
 
 # Générateur
@@ -428,8 +428,8 @@ ALTER TABLE seat_bookings ADD COLUMN vip_ticket vip_ticket_no, ADD COLUMN ticket
 | `Whereable`, `Insertable`, `Updatable` | `number \| Int8String \| bigint` | `(number \| Int8String \| bigint)[]` |
 
 - `false` les type tous deux par leur placeholder, `any`, dans les cinq interfaces, comme Zapatos 6.6.1.
-- `pg` parse un domaine sur un domaine selon le type de base de son domaine le plus intérieur, mais renvoie un tableau d’un domaine sous forme de texte, faute de connaître le type de ce tableau : de même pour un domaine sur un tel tableau. Un tableau d’un domaine sur un tableau reste `any`, de même qu’un type de base que le générateur ne sait pas traduire, tel que `point`.
-- Un enum sous les domaines s’écrit par son nom quand il appartient au schéma de la relation, et par ses labels quand il appartient à un autre, avec ou sans [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas) : jamais comme l’enum du même nom dans le schéma de la relation.
+- `pg` parse un domaine sur un domaine selon le type de base de son domaine le plus intérieur, mais renvoie un tableau d’un domaine sous forme de texte, faute de connaître le type de ce tableau : de même pour un domaine sur un tel tableau, directement ou à travers d’autres domaines. Un tableau d’un domaine sur un tableau reste `any`, de même qu’un domaine sur celui-ci, ou qu’un type de base que le générateur ne sait pas traduire, tel que `point`.
+- Un enum sous un domaine sur un domaine, ou sous un tableau d’un domaine, s’écrit par son nom quand il appartient au schéma de la relation, et par ses labels quand il appartient à un autre, avec ou sans [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas) : jamais comme l’enum du même nom dans le schéma de la relation. Un simple domaine sur un enum d’un autre schéma garde son placeholder dans les cinq interfaces, et un nouveau placeholder suit `typeEnumsAcrossSchemas` : les labels de l’enum avec l’option ; sans elle, l’enum du même nom dans le schéma de la relation, ou `any` si ce schéma n’en a pas.
 - Un placeholder que vous modifiez garde son type dans les cinq, `unknown` compris. Un placeholder modifié vers `any` compte comme laissé tel que généré : écrivez `unknown`, ou laissez l’option désactivée, pour garder une telle colonne non typée.
 - `false` signale, via [`warningListener`](#generate.warningListener), chacune de ces colonnes, dans une note à part.
 

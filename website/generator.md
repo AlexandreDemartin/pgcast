@@ -424,8 +424,8 @@ ALTER TABLE seat_bookings ADD COLUMN vip_ticket vip_ticket_no, ADD COLUMN ticket
 | `Whereable`, `Insertable`, `Updatable` | `number \| Int8String \| bigint` | `(number \| Int8String \| bigint)[]` |
 
 - `false` types both as their placeholder, `any`, in all five interfaces, as Zapatos 6.6.1 does.
-- `pg` parses a domain over a domain as its innermost domain's base type, but returns an array of a domain as its text, since it doesn't know that array's type: so does a domain over such an array. An array of a domain over an array stays `any`, as does a base type the generator can't map, such as `point`.
-- An enum under the domains is written by its name when it is of the relation's schema, and by its labels when it is of another, with or without [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas): never as the enum of the same name in the relation's schema.
+- `pg` parses a domain over a domain as its innermost domain's base type, but returns an array of a domain as its text, since it doesn't know that array's type: so does a domain over such an array, directly or through other domains. An array of a domain over an array stays `any`, and so does a domain over one, or a base type the generator can't map, such as `point`.
+- An enum under a domain over a domain, or under an array of a domain, is written by its name when it is of the relation's schema, and by its labels when it is of another, with or without [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas): never as the enum of the same name in the relation's schema. A plain domain over an enum of another schema keeps its placeholder in all five interfaces, and a new placeholder follows `typeEnumsAcrossSchemas`: the enum's labels with it; without it, the enum of the same name in the relation's schema, or `any` if that schema has none.
 - A placeholder you edit keeps its type in all five, `unknown` included. One you edit to `any` counts as left as generated: write `unknown`, or leave the option off, to keep such a column untyped.
 - `false` notes, through [`warningListener`](#generate.warningListener), each such column, in a note of its own.
 
