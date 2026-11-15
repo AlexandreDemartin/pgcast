@@ -1,5 +1,5 @@
 ---
-english: d78f795201a6
+english: 14a384f11609
 ---
 
 # Configuration
@@ -76,6 +76,7 @@ interface Config {
   undefinedMeansMissing?: boolean;
   transactionRequiresCommit?: boolean;
   transactionRequiresIdleClient?: boolean;
+  transactionRequiresSatisfyingLevel?: boolean;
   selectExactlyOneChecksForSecondRow?: boolean;
   aggregatesTypedByColumn?: boolean;
   queryListener?(query: SQLQuery, txnId?: number): void;
@@ -98,6 +99,7 @@ Les clés qu’ajoute pgcast sont facultatives, donc un `Config` écrit pour Zap
 | [`undefinedMeansMissing`](#Config.undefinedMeansMissing) | `false` | une valeur `undefined` dans `insert()`, `update()` et `upsert()` : une clé manquante, pas `NULL` | à chaque appel de l’une d’elles |
 | [`transactionRequiresCommit`](#Config.transactionRequiresCommit) | `false` | un `COMMIT` auquel Postgres répond `ROLLBACK` : être rejetée, pas se résoudre | à chaque `transaction()` |
 | [`transactionRequiresIdleClient`](#Config.transactionRequiresIdleClient) | `false` | un client à vous déjà dans un bloc de transaction : être rejetée avant son `START TRANSACTION`, pas terminer votre transaction | à chaque `transaction()` qui reçoit un tel client |
+| [`transactionRequiresSatisfyingLevel`](#Config.transactionRequiresSatisfyingLevel) | `false` | le client d’une transaction à un niveau qui ne vaut pas pour celui demandé : être rejetée, pas exécuter le callback à ce niveau | à chaque `transaction()` qui reçoit un tel client |
 | [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow) | `false` | un `selectExactlyOne()` exécuté seul : `LIMIT 2`, et une deuxième ligne entraîne un rejet | à chaque `selectExactlyOne()` |
 | [`aggregatesTypedByColumn`](#Config.aggregatesTypedByColumn) | `false` | `sum()`, `avg()`, `min()` et `max()` : `null` quand aucune ligne ne correspond, et pour `min()` et `max()` la valeur de la colonne, pas son `Number()` | à chaque `run()` de l’un d’eux |
 | [`queryListener`](#Config.queryListener) | aucun | appelé avec chaque requête qu’envoie `run()` | à chaque `run()` |
@@ -226,6 +228,23 @@ Sans l’option, elle envoie ce qu’envoie Zapatos 6.6.1, avec un avertissement
 - Un `BEGIN` envoyé dans une même chaîne de requête avec une instruction qui échoue peut lui aussi paraître hors de tout bloc : `transaction()` s’exécute alors comme dans la 6.6.1, sans avertissement.
 - Non testé avec `pg-native`.
 - Avec `true`, juste après un `COMMIT` qui a échoué, deux appels de `transaction()` au même moment sur un même client : quand pg signale encore le bloc, le premier envoie sa requête vide, puis continue, et le second, transmis, envoie sa première requête, et celles envoyées avec elle, avant le `START TRANSACTION` du premier, hors de toute transaction, si bien que chacune est validée à part. Ses requêtes suivantes s’exécutent dans la transaction du premier appel.
+
+### `transactionRequiresSatisfyingLevel` {#Config.transactionRequiresSatisfyingLevel}
+
+```ts
+transactionRequiresSatisfyingLevel?: boolean  // default: false; the default in 7.0
+```
+
+Avec le client d’une transaction qu’elle a ouverte, [`transaction()`](/fr/transaction#transaction) le transmet, et son callback s’exécute au niveau de cette transaction, un niveau que Postgres ne peut plus changer une fois celle-ci commencée : `db.serializable(txnClient, …)`, avec le client de `db.readCommitted()`, s’exécute en `READ COMMITTED` ([Transmettre une transaction](/fr/transaction#passing-a-transaction-through)).
+
+Avec `true`, quand ce niveau ne vaut pas pour celui demandé ([`IsolationSatisfying`](/fr/transaction#IsolationSatisfying)), elle est rejetée avant d’appeler son callback, avec "transaction() at … was given the client of a transaction at …, so its callback would run at …: open the outer transaction at a level that satisfies … (IsolationSatisfying), or pass the pool"<!-- message -->, chaque `…` étant un niveau de l’appel (`SERIALIZABLE`, `READ COMMITTED`). À moins que le callback extérieur n’intercepte l’erreur, la transaction extérieure est alors annulée.
+
+Sans l’option, elle transmet le client, comme Zapatos 6.6.1, avec un avertissement une fois par processus, `PGCAST_DEP007`, seulement quand le niveau ne vaut pas pour celui demandé.
+
+- Le client d’un niveau qui vaut pour celui demandé est transmis, comme avant, avec ou sans l’option.
+- Seul le client d’une `transaction()` est vérifié, par sa marque `_zapatos` : un pool, un client simple et un client gardé après la fin de sa transaction reçoivent leur propre transaction, comme avant.
+- Les types ne changent pas : un `Queryable` accepte le client de n’importe quel niveau ([`TxnClient`](/fr/transaction#TxnClient)).
+- Un test qui exécute du code dans une `transaction()` à lui, et lui passe ce client : ouvrez-la en `IsolationLevel.Serializable`, qui vaut pour tous les niveaux.
 
 ### `selectExactlyOneChecksForSecondRow` {#Config.selectExactlyOneChecksForSecondRow}
 
@@ -383,6 +402,7 @@ Un comportement de Zapatos 6.6.1 sur lequel du code peut compter, mais que pgcas
 | [`transactionRequiresCommit: true`](#Config.transactionRequiresCommit) | `PGCAST_DEP003` | Postgres répond au `COMMIT` de `transaction()` par `ROLLBACK`, après une erreur de requête que le callback a interceptée ([Laisser passer l’erreur](/fr/retries#let-the-error-through)) | 7.0 |
 | [`aggregatesTypedByColumn: true`](#Config.aggregatesTypedByColumn) | `PGCAST_DEP004` | `Number()` change le résultat de `sum()`, `avg()`, `min()` ou `max()` : un `NULL` devenu `0`, ou un `min()` ou `max()` qui n’est pas un nombre ([Typé par colonne](/fr/select#typed-by-column)) | 7.0 |
 | [`transactionRequiresIdleClient: true`](#Config.transactionRequiresIdleClient) | `PGCAST_DEP005` | `transaction()` reçoit un client déjà dans un bloc de transaction, auquel son `COMMIT` ou son `ROLLBACK` mettra fin ([Votre propre `BEGIN`](/fr/transaction#your-own-begin)) | 7.0 |
+| [`transactionRequiresSatisfyingLevel: true`](#Config.transactionRequiresSatisfyingLevel) | `PGCAST_DEP007` | `transaction()` reçoit le client d’une transaction à un niveau qui ne vaut pas pour le sien, et son callback s’exécute alors à ce niveau ([Transmettre une transaction](/fr/transaction#passing-a-transaction-through)) | 7.0 |
 
 </div>
 
@@ -390,7 +410,7 @@ Un opt-in n’a pas d’avertissement et ne devient pas le comportement par déf
 
 Le générateur a les siens : [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas), [`enumOrder`](/fr/generator#generate.enumOrder), [`rejectOnQueryError`](/fr/generator#generate.rejectOnQueryError) et [`uniqueIndexConstraintsOnly`](/fr/generator#generate.uniqueIndexConstraintsOnly), dont les anciens chemins donnent des notes via [`warningListener`](/fr/generator#generate.warningListener), une fois par exécution, plutôt qu’un `DeprecationWarning` ; ils deviendront eux aussi le comportement par défaut en 7.0.
 
-Chaque avertissement est un `DeprecationWarning` de Node.js, émis une fois par processus pour chaque code, quand le raccourci est appelé (`PGCAST_DEP003` : quand `transaction()` se résout ; `PGCAST_DEP004` : quand `.run()` reçoit le résultat ; `PGCAST_DEP005` : quand `transaction()` est appelée, avant son `START TRANSACTION`), et seulement quand l’ancien comportement est utilisé. Son message nomme l’option. Node l’affiche sur `stderr` :
+Chaque avertissement est un `DeprecationWarning` de Node.js, émis une fois par processus pour chaque code, quand le raccourci est appelé (`PGCAST_DEP003` : quand `transaction()` se résout ; `PGCAST_DEP004` : quand `.run()` reçoit le résultat ; `PGCAST_DEP005` : quand `transaction()` est appelée, avant son `START TRANSACTION` ; `PGCAST_DEP007` : quand `transaction()` est appelée, avant son callback), et seulement quand l’ancien comportement est utilisé. Son message nomme l’option. Node l’affiche sur `stderr` :
 
 ```txt
 (node:4242) [PGCAST_DEP002] DeprecationWarning: An undefined value in insert(), update() or upsert() is sent as NULL, or, in upsert() updateValues, set from EXCLUDED. Set undefinedMeansMissing: true (db.setConfig) to treat it as a missing key instead (DEFAULT in insert(), left out of update() and upsert()); it will be the default in pgcast 7.0.

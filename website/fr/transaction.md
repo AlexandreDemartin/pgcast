@@ -1,5 +1,5 @@
 ---
-english: 59a9046bfd71
+english: 375952922c83
 ---
 
 # Transactions
@@ -98,7 +98,8 @@ Avec le client d’une transaction que `transaction()` a ouverte, elle n’envoi
 
 Une seule transaction, les deux sièges ou aucun : `START TRANSACTION ISOLATION LEVEL SERIALIZABLE`<!-- probe: db.serializable(pool, async () => {}) -->, les deux `INSERT`, `COMMIT`.
 
-- Le callback s’exécute au niveau de la transaction extérieure, et ce niveau n’est pas vérifié, ni à l’exécution ni par le type : chaque `TxnClient` est un [`Queryable`](/fr/sql-template#Queryable), donc `db.serializable(txnClient, …)` passe la vérification de types avec un client de `db.readCommitted()`, et son callback s’exécute dans cette transaction `READ COMMITTED`.
+- Le callback s’exécute au niveau de la transaction extérieure, un niveau que Postgres ne peut plus changer une fois celle-ci commencée. Le type ne vérifie pas ce niveau : chaque `TxnClient` est un [`Queryable`](/fr/sql-template#Queryable), donc `db.serializable(txnClient, …)` passe la vérification de types avec un client de `db.readCommitted()`, et son callback s’exécute dans cette transaction `READ COMMITTED`, comme dans Zapatos 6.6.1, avec un avertissement, une fois, `PGCAST_DEP007`.
+- Avec [`transactionRequiresSatisfyingLevel`](/fr/runtime-config#Config.transactionRequiresSatisfyingLevel), quand le niveau extérieur ne vaut pas pour celui demandé ([`IsolationSatisfying`](#IsolationSatisfying)), `transaction()` est rejetée avant d’appeler le callback, et la transaction extérieure est annulée, à moins que son callback n’intercepte l’erreur. Un niveau qui vaut pour celui demandé est transmis, avec ou sans l’option.
 - Une fonction dont le paramètre est d’un type `TxnClientFor…` est vérifiée : [`IsolationSatisfying`](#IsolationSatisfying).
 - Ce qui marque le client, c’est sa propre propriété `_zapatos` ([`TxnClient`](#TxnClient)).
 - Une transaction que vous avez ouverte vous-même, par un `BEGIN` brut, n’a pas de marque : elle n’est pas transmise ([Votre propre `BEGIN`](#your-own-begin)). Ouvrez la transaction extérieure avec `transaction()`.
@@ -311,7 +312,7 @@ Le client que reçoit le callback d’une [`transaction()`](#transaction) : cel
 
 - `_zapatos` est défini pendant que la transaction s’exécute : son `isolationLevel`, et son `txnId`, l’id que reçoivent les listeners. Une fois la transaction terminée, `transaction()` le supprime, et libère un client qu’elle a récupéré.
 - `T` : les niveaux pour lesquels le client vaut, une union [`IsolationSatisfying`](#IsolationSatisfying) dans les sept types ci-dessous.
-- `_zapatos` est optionnel dans le type, donc tout `pg.PoolClient` est accepté comme `TxnClient`, qu’une transaction y soit ouverte ou non.
+- `_zapatos` est optionnel dans le type, comme dans Zapatos 6.6.1, donc tout `pg.PoolClient` est accepté comme `TxnClient`, qu’une transaction y soit ouverte ou non, et un client gardé après la fin de sa transaction aussi. Rien ne permet de le voir à l’exécution : une fonction dont le paramètre est d’un type `TxnClientFor…`, si elle reçoit un tel client, exécute ses requêtes hors de toute transaction.
 
 ### `TxnClientForSerializable` {#TxnClientForSerializable}
 

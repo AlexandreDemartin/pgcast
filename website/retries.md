@@ -90,7 +90,7 @@ const bookSeats = (txnClientOrPool: pg.Pool | db.TxnClientForSerializable,
 await db.readCommitted(pool, txnClient => bookSeats(txnClient, 1000, ['G1'], 'Wren Abernathy'));
 ```
 
-Typed [`db.Queryable`](/sql-template#Queryable), it would take that client, and `bookSeats()` would run at `READ COMMITTED` ([#177](https://github.com/AlexandreDemartin/pgcast/issues/177)).
+Typed [`db.Queryable`](/sql-template#Queryable), it would take that client, and `bookSeats()` would run at `READ COMMITTED`, with a warning, once, `PGCAST_DEP007`. With [`transactionRequiresSatisfyingLevel`](/runtime-config#Config.transactionRequiresSatisfyingLevel), it rejects instead, before its callback.
 
 ## Tune and watch the retries
 

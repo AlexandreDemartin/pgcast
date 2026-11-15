@@ -216,6 +216,7 @@ To find each call:
 | `PGCAST_DEP003` | a [`transaction()`](/transaction#transaction) whose callback catches a query's error and returns: Postgres answers the `COMMIT` with `ROLLBACK`, and nothing is saved ([Let the error through](/retries#let-the-error-through)) | let the error out of the callback, or `ROLLBACK TO` a `SAVEPOINT` before going on; or [`transactionRequiresCommit`](/runtime-config#Config.transactionRequiresCommit), and such a transaction rejects |
 | `PGCAST_DEP004` | a [`sum()`, `avg()`, `min()` or `max()`](/select#typed-by-column) whose result `Number()` changes: `0` for no row, a date's milliseconds, `NaN` for a text | turn on [`aggregatesTypedByColumn`](/runtime-config#Config.aggregatesTypedByColumn), declared in [`ConfigTypes`](/runtime-config#ConfigTypes): `tsc` then shows each call whose result is now `null` or the column's type, and `?? 0` keeps a `0` |
 | `PGCAST_DEP005` | a [`transaction()`](/transaction#transaction) given a client you sent `BEGIN` on: its `COMMIT` or `ROLLBACK` ends your transaction ([Your own `BEGIN`](/transaction#your-own-begin)) | open the outer transaction with `transaction()`, or give it the pool; or [`transactionRequiresIdleClient`](/runtime-config#Config.transactionRequiresIdleClient), and such a call rejects before sending its `START TRANSACTION` |
+| `PGCAST_DEP007` | a [`transaction()`](/transaction#transaction) given the client of a transaction at a level that doesn't satisfy its own, `serializable()` given `readCommitted()`'s: its callback runs at the outer level ([Passing a transaction through](/transaction#passing-a-transaction-through)) | open the outer transaction at a level that satisfies the inner one, or give the inner call the pool; or [`transactionRequiresSatisfyingLevel`](/runtime-config#Config.transactionRequiresSatisfyingLevel), and such a call rejects before its callback |
 
 </div>
 
@@ -229,10 +230,11 @@ import * as db from 'zapatos/db';
 db.setConfig({
   upsertRequiresSameKeys: true, undefinedMeansMissing: true,
   transactionRequiresCommit: true, transactionRequiresIdleClient: true,
+  transactionRequiresSatisfyingLevel: true,
 });
 ```
 
-All four will be the default in 7.0 ([Versions](/versions)). With them on, an `undefined` value is left out of an `update()`:
+All five will be the default in 7.0 ([Versions](/versions)). With them on, an `undefined` value is left out of an `update()`:
 
 <CastPanel example="switching_undefined">
 
@@ -244,6 +246,7 @@ All four will be the default in 7.0 ([Versions](/versions)). With them on, an `u
 - The `upsert()` of `PGCAST_DEP001` throws when called, before any query: "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message -->.
 - A `transaction()` whose `COMMIT` Postgres answers with `ROLLBACK` rejects, without a retry ([`transaction()`, Errors](/transaction#errors)).
 - A `transaction()` given a client already inside a transaction block rejects, and leaves that transaction open ([Your own `BEGIN`](/transaction#your-own-begin)).
+- A `transaction()` given the client of a transaction at a level that doesn't satisfy its own rejects before its callback ([Passing a transaction through](/transaction#passing-a-transaction-through)).
 - No option warns. To keep it that way, `NODE_OPTIONS=--throw-deprecation npm test` fails the run at the first warning.
 
 One more opt-in, [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow), has no warning to look for, and stays off in 7.0. With it, a `selectExactlyOne()` run on its own rejects on a second row, not only on none. Turn it on where your tests show no `selectExactlyOne()` matching two rows.
@@ -268,7 +271,7 @@ The note of [`rejectOnQueryError`](/generator#generate.rejectOnQueryError) comes
 npm install zapatos@6.6.1
 ```
 
-- First, remove from `setConfig()` the options Zapatos 6.6.1's `Config` doesn't have (2353): `upsertRequiresSameKeys`, `undefinedMeansMissing`, `transactionRequiresCommit`, `transactionRequiresIdleClient`, `selectExactlyOneChecksForSecondRow` and `aggregatesTypedByColumn`.
+- First, remove from `setConfig()` the options Zapatos 6.6.1's `Config` doesn't have (2353): `upsertRequiresSameKeys`, `undefinedMeansMissing`, `transactionRequiresCommit`, `transactionRequiresIdleClient`, `transactionRequiresSatisfyingLevel`, `selectExactlyOneChecksForSecondRow` and `aggregatesTypedByColumn`.
 - On [`moduleNames`](/generator#generate.moduleNames) `"pgcast"`, run `npm uninstall pgcast` too: both packages have a `zapatos` command. Your `pgcast/…` imports then no longer resolve, and 6.6.1 writes `zapatos/` but leaves `pgcast/` behind. So change each import back to `zapatos/…`, move the placeholders you edited to `zapatos/custom/`, their `declare module 'pgcast/custom'` renamed `'zapatos/custom'`, and delete `pgcast/`.
 - Regenerate with Zapatos 6.6.1. It ignores `typeEnumsAcrossSchemas`, `enumOrder`, `uniqueIndexConstraintsOnly` and `moduleNames` in `zapatosconfig.json`, and writes again the `any` types, the sorted labels, the unprefixed comment lines, every unique index in `UniqueIndex` and any borrowed `UniqueIndex` name. Its `generate()` doesn't know `rejectOnQueryError` either: TypeScript refuses it in an object literal (2353), and at run time a failed query ends the process again.
 - Each change of [Find the calls whose result changes](#find-the-calls-whose-result-changes) runs as it did, but the `jsonb` one, which finds nothing again.

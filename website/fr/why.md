@@ -1,5 +1,5 @@
 ---
-english: 3ad69d5d82a0
+english: 379d541461d9
 ---
 
 # Pourquoi pgcast
@@ -70,7 +70,7 @@ Il en va de même pour vos propres fonctions. La doc de Zapatos déconseille de 
 
 Une fonction à vous prend donc son client sans valeur par défaut, et chaque appelant passe le pool ou le client de sa transaction. Celle qui ne fait qu’exécuter des requêtes prend un [`Queryable`](/fr/sql-template#Queryable).
 
-Celle qui ouvre une transaction prend le pool ou le client de son niveau, `pg.Pool | db.TxnClientForSerializable` pour [`serializable()`](/fr/transaction#serializable). Un `Queryable` accepterait aussi le client d’une transaction de niveau inférieur, et la fonction s’exécuterait dedans, à ce niveau ([Réserver dans une transaction plus large](/fr/retries#book-inside-a-larger-transaction)).
+Celle qui ouvre une transaction prend le pool ou le client de son niveau, `pg.Pool | db.TxnClientForSerializable` pour [`serializable()`](/fr/transaction#serializable). Un `Queryable` accepterait aussi le client d’une transaction de niveau inférieur, et la fonction s’exécuterait dedans, à ce niveau, à moins qu’avec [`transactionRequiresSatisfyingLevel`](/fr/runtime-config#Config.transactionRequiresSatisfyingLevel) elle ne soit rejetée ([Réserver dans une transaction plus large](/fr/retries#book-inside-a-larger-transaction)).
 
 ## Ce qu’ajoute pgcast {#what-pgcast-adds}
 
@@ -92,7 +92,7 @@ Les corrections de sécurité sont venues d’abord, toutes dans la 6.6.2 ([Séc
 - une valeur simple dans les `updateValues` de [`upsert()`](/fr/insert#upsert) est un paramètre ;
 - les mots-clés d’un verrou, de `truncate()` ou d’un niveau d’isolation, et le nom d’un agrégat, sont vérifiés avant toute requête.
 
-Les opt-ins qui avertissent, [`undefinedMeansMissing`](/fr/runtime-config#Config.undefinedMeansMissing), [`upsertRequiresSameKeys`](/fr/runtime-config#Config.upsertRequiresSameKeys), [`transactionRequiresCommit`](/fr/runtime-config#Config.transactionRequiresCommit), [`aggregatesTypedByColumn`](/fr/runtime-config#Config.aggregatesTypedByColumn) et [`transactionRequiresIdleClient`](/fr/runtime-config#Config.transactionRequiresIdleClient), ainsi que [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas), [`enumOrder`](/fr/generator#generate.enumOrder), [`rejectOnQueryError`](/fr/generator#generate.rejectOnQueryError) et [`uniqueIndexConstraintsOnly`](/fr/generator#generate.uniqueIndexConstraintsOnly) du générateur, deviennent les valeurs par défaut dans la 7.0, et leurs anciens chemins disparaissent dans la 8.0, sauf `rejectOnQueryError: false`, qui reste, car son arrêt est le propre chemin de la CLI.
+Les opt-ins qui avertissent, [`undefinedMeansMissing`](/fr/runtime-config#Config.undefinedMeansMissing), [`upsertRequiresSameKeys`](/fr/runtime-config#Config.upsertRequiresSameKeys), [`transactionRequiresCommit`](/fr/runtime-config#Config.transactionRequiresCommit), [`aggregatesTypedByColumn`](/fr/runtime-config#Config.aggregatesTypedByColumn), [`transactionRequiresIdleClient`](/fr/runtime-config#Config.transactionRequiresIdleClient) et [`transactionRequiresSatisfyingLevel`](/fr/runtime-config#Config.transactionRequiresSatisfyingLevel), ainsi que [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas), [`enumOrder`](/fr/generator#generate.enumOrder), [`rejectOnQueryError`](/fr/generator#generate.rejectOnQueryError) et [`uniqueIndexConstraintsOnly`](/fr/generator#generate.uniqueIndexConstraintsOnly) du générateur, deviennent les valeurs par défaut dans la 7.0, et leurs anciens chemins disparaissent dans la 8.0, sauf `rejectOnQueryError: false`, qui reste, car son arrêt est le propre chemin de la CLI.
 
 [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), qui n’avertit jamais, reste désactivé. Jusqu’à la 7.0, la 6.x remplace Zapatos 6.6.1 sans autre changement ([Versions](/fr/versions)).
 

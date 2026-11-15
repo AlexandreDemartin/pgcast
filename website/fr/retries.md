@@ -1,5 +1,5 @@
 ---
-english: d0917a383b69
+english: c529f7e481d9
 ---
 
 # Retries
@@ -94,7 +94,7 @@ const bookSeats = (txnClientOrPool: pg.Pool | db.TxnClientForSerializable,
 await db.readCommitted(pool, txnClient => bookSeats(txnClient, 1000, ['G1'], 'Wren Abernathy'));
 ```
 
-Typé [`db.Queryable`](/fr/sql-template#Queryable), il accepterait ce client, et `bookSeats()` s’exécuterait en `READ COMMITTED` ([#177](https://github.com/AlexandreDemartin/pgcast/issues/177)).
+Typé [`db.Queryable`](/fr/sql-template#Queryable), il accepterait ce client, et `bookSeats()` s’exécuterait en `READ COMMITTED`, avec un avertissement, une fois, `PGCAST_DEP007`. Avec [`transactionRequiresSatisfyingLevel`](/fr/runtime-config#Config.transactionRequiresSatisfyingLevel), elle est rejetée à la place, avant son callback.
 
 ## Régler et suivre les retries {#tune-and-watch-the-retries}
 
