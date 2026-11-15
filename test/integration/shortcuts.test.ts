@@ -466,9 +466,34 @@ describe('upsert', () => {
         'doNothing, one new': db.upsert('events', row(1000), ['id', 'occurred_on'], { updateColumns: db.doNothing }),
       };
       expect(await writeOutcomes(writes), `Postgres ${version} ran an upsert() into a partitioned table with its $action: ` +
-        'name the versions that refuse it, here and in website/insert.md (#460)')
+        'name the versions that refuse it here, in the reportAction JSDoc of src/db/shortcuts.ts, in website/insert.md, ' +
+        'website/fr/insert.md and the #460 line of CHANGELOG.md (#460)')
         .toEqual({ ...everyOutcome(writes, '0A000'), queriesSent: 5 });
       expect((await fails(conflict)).message).toBe('cannot retrieve a system column in this context');
+    });
+
+    it('upsert() into the parent reports $action when the row lands in a partition with its columns in another order', async () => {
+      await t.client.query(`CREATE TABLE events_2027 (payload jsonb, kind text NOT NULL, occurred_on date NOT NULL, id bigint NOT NULL)`);
+      await t.client.query(`ALTER TABLE events ATTACH PARTITION events_2027 FOR VALUES FROM ('2027-01-01') TO ('2028-01-01')`);
+      const later = { id: 1002, occurred_on: '2027-03-15', kind: 'logout' };
+      expect(await run(db.upsert('events', later, ['id', 'occurred_on'], { returning: ['kind'] })))
+        .toEqual({ kind: 'logout', $action: 'INSERT' });
+      expect(await run(db.upsert('events', { ...later, kind: 'login' }, db.constraint('events_pkey'), { returning: ['kind'] })))
+        .toEqual({ kind: 'login', $action: 'UPDATE' });
+      expect(await scalar(`SELECT kind AS v FROM events_2027 WHERE id = 1002`)).toBe('login');
+    });
+
+    it('upsert() into the parent reports $action when the row lands in a PARTITION OF made after a column was dropped', async () => {
+      await t.client.query(`ALTER TABLE events ADD COLUMN dropped int`);
+      await t.client.query(`ALTER TABLE events DROP COLUMN dropped`);
+      await t.client.query(`CREATE TABLE events_2027 PARTITION OF events FOR VALUES FROM ('2027-01-01') TO ('2028-01-01')`);
+      const later = { id: 1002, occurred_on: '2027-03-15', kind: 'logout' };
+      expect(await run(db.upsert('events', later, ['id', 'occurred_on'], { returning: ['kind'] })))
+        .toEqual({ kind: 'logout', $action: 'INSERT' });
+      expect(await run(db.upsert('events', { ...later, kind: 'login' }, ['id', 'occurred_on'], { returning: ['kind'] })))
+        .toEqual({ kind: 'login', $action: 'UPDATE' });
+      // the older partitions dropped the column with the table, so theirs still sit where its do
+      expect((await fails(db.upsert('events', row(await loginId()), ['id', 'occurred_on']))).code).toBe('0A000');
     });
 
     it("reportAction: 'suppress' runs, as does an upsert into the partition", async () => {
