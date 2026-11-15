@@ -1,5 +1,5 @@
 ---
-english: 2b32c1f38af7
+english: e57c8c1784b0
 ---
 
 # Conditions {#db-conditions}
@@ -35,7 +35,7 @@ import * as db from 'zapatos/db';
 db.select('films', { release_year: db.conditions.eq('1991') });
 ```
 
-Avec `strictNullChecks` (ou `strict`) activé, le type refuse aussi `null` comme valeur, dans `eq()`, `isIn()` et les autres ; désactivé, `eq(null)` compile en `"col" = $1`<!-- probe: db.sql`${{ col: db.conditions.eq(null) }}` -->, qui ne trouve aucune ligne. Le test de `NULL` est [`isNull`](#conditions.isNull).
+Avec `strictNullChecks` (ou `strict`) activé, le type refuse aussi `null` comme valeur, dans `eq()`, `isIn()` et les autres, sauf [`isDistinctFrom()`](#conditions.isDistinctFrom) et [`isNotDistinctFrom()`](#conditions.isNotDistinctFrom), qui acceptent une valeur nullable. Avec l’option désactivée, `eq(null)` compile en `"col" = $1`<!-- probe: db.sql`${{ col: db.conditions.eq(null) }}` -->, qui ne trouve aucune ligne. Le test de `NULL` est [`isNull`](#conditions.isNull).
 
 ## Les tests : null, true, false, unknown {#tests}
 
@@ -132,7 +132,7 @@ Chacune prend une valeur du type de la colonne, `<T>(a: T)`, et écrit la colonn
 
 ### `isNotDistinctFrom()` {#conditions.isNotDistinctFrom}
 
-`"col" IS NOT DISTINCT FROM $1`<!-- probe: db.sql`${{ col: db.conditions.isNotDistinctFrom(1) }}` --> : comme `eq()`, où `NULL` est une valeur comme une autre. Avec `strictNullChecks` activé, le type refuse aussi `null` ici : c’est [`isNull`](#conditions.isNull) qui le teste.
+`"col" IS NOT DISTINCT FROM $1`<!-- probe: db.sql`${{ col: db.conditions.isNotDistinctFrom(1) }}` --> : comme `eq()`, où `NULL` est une valeur comme une autre. Les deux acceptent une valeur nullable, `null` compris : avec `tagline` un `string | null`, `{ tagline: isNotDistinctFrom(tagline) }` trouve les films sans accroche quand `tagline` vaut `null`. [`isNull`](#conditions.isNull) reste le test simple de `NULL`.
 
 ## Les intervalles {#ranges}
 

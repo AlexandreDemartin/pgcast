@@ -31,7 +31,7 @@ import * as db from 'zapatos/db';
 db.select('films', { release_year: db.conditions.eq('1991') });
 ```
 
-With `strictNullChecks` (or `strict`) on, the type also refuses `null` as a value, in `eq()`, `isIn()` and the others; off, `eq(null)` compiles to `"col" = $1`<!-- probe: db.sql`${{ col: db.conditions.eq(null) }}` -->, which matches no row. The test for `NULL` is [`isNull`](#conditions.isNull).
+With `strictNullChecks` (or `strict`) on, the type also refuses `null` as a value, in `eq()`, `isIn()` and the others, except [`isDistinctFrom()`](#conditions.isDistinctFrom) and [`isNotDistinctFrom()`](#conditions.isNotDistinctFrom), which take a nullable value. With it off, `eq(null)` compiles to `"col" = $1`<!-- probe: db.sql`${{ col: db.conditions.eq(null) }}` -->, which matches no row. The test for `NULL` is [`isNull`](#conditions.isNull).
 
 ## Tests: null, true, false, unknown {#tests}
 
@@ -128,7 +128,7 @@ Each takes one value of the column's type, `<T>(a: T)`, and writes the column, i
 
 ### `isNotDistinctFrom()` {#conditions.isNotDistinctFrom}
 
-`"col" IS NOT DISTINCT FROM $1`<!-- probe: db.sql`${{ col: db.conditions.isNotDistinctFrom(1) }}` -->: as `eq()`, with `NULL` a value like any other. With `strictNullChecks` on, the type refuses `null` here too: [`isNull`](#conditions.isNull) is the test for it.
+`"col" IS NOT DISTINCT FROM $1`<!-- probe: db.sql`${{ col: db.conditions.isNotDistinctFrom(1) }}` -->: as `eq()`, with `NULL` a value like any other. Both take a nullable value, `null` included: with `tagline` a `string | null`, `{ tagline: isNotDistinctFrom(tagline) }` finds the films without a tagline when it holds `null`. [`isNull`](#conditions.isNull) stays the plain test for `NULL`.
 
 ## Ranges {#ranges}
 
