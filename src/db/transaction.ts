@@ -34,6 +34,20 @@ export type IsolationSatisfying<T extends IsolationLevel> = {
   [IsolationLevel.SerializableRODeferrable]: IsolationSatisfying<IsolationLevel.SerializableRO> | IsolationLevel.SerializableRODeferrable;
 }[T];
 
+// IsolationSatisfying, at run time: for each level, the levels of a transaction that a call at that level may join
+const
+  { Serializable: S, RepeatableRead: RR, ReadCommitted: RC, SerializableRO: SRO, RepeatableReadRO: RRRO,
+    ReadCommittedRO: RCRO, SerializableRODeferrable: SROD } = IsolationLevel,
+  satisfying: { [K in IsolationLevel]: IsolationSatisfying<K>[] } = {
+    [S]: [S], [RR]: [S, RR], [RC]: [S, RR, RC], [SRO]: [S, SRO], [RRRO]: [S, RR, SRO, RRRO],
+    [RCRO]: [S, RR, RC, SRO, RRRO, RCRO], [SROD]: [S, SRO, SROD],
+  };
+
+/**
+ * The client of a transaction, marked by `_zapatos` while `transaction()` runs it.
+ * `_zapatos` is optional, as in Zapatos 6.6.1: any `pg.PoolClient` is accepted
+ * where a `TxnClient` is asked for, with or without a transaction open on it.
+ */
 export interface TxnClient<T extends IsolationLevel> extends pg.PoolClient {
   _zapatos?: {
     isolationLevel: T;
@@ -111,6 +125,11 @@ let txnSeq = 0;
  * `COMMIT` or `ROLLBACK` would end yours: with the
  * `transactionRequiresIdleClient` config option, this rejects before its
  * `START TRANSACTION`; without it, it runs and emits `PGCAST_DEP005`, once.
+ *
+ * Given the client of a transaction at a level that doesn't satisfy this one
+ * (`IsolationSatisfying`), the callback would run at that level: with the
+ * `transactionRequiresSatisfyingLevel` config option, this rejects before
+ * calling it; without it, it runs and emits `PGCAST_DEP007`, once.
  * @param txnClientOrQueryable The `pg.Pool` from which to check out a client,
  * a plain client (`pg.Client`, `pg.native.Client` or a `pg.PoolClient`, used
  * as is and not released), or an existing transaction client to be passed
@@ -127,7 +146,13 @@ export async function transaction<T, M extends IsolationLevel>(
 ): Promise<T> {
 
   if (Object.prototype.hasOwnProperty.call(txnClientOrQueryable, '_zapatos')) {
-    // if txnClientOrQueryable is a TxnClient, just pass it through
+    // if txnClientOrQueryable is a TxnClient, just pass it through: its callback runs at the outer transaction's
+    // level, which Postgres can't change once a transaction has begun (see https://github.com/AlexandreDemartin/pgcast/issues/177)
+    const outer = (txnClientOrQueryable as TxnClient<IsolationLevel>)._zapatos?.isolationLevel;
+    if (outer !== undefined && (satisfying[isolationLevel] as IsolationLevel[] | undefined)?.includes(outer) === false) {
+      if (getConfig().transactionRequiresSatisfyingLevel ?? false) throw new Error(`transaction() at ${isolationLevel} was given the client of a transaction at ${outer}, so its callback would run at ${outer}: open the outer transaction at a level that satisfies ${isolationLevel} (IsolationSatisfying), or pass the pool`);
+      warnOnce('PGCAST_DEP007', `transaction() at ${isolationLevel} was given the client of a transaction at ${outer}, so its callback runs at ${outer}. Set transactionRequiresSatisfyingLevel: true (db.setConfig) to reject instead; it will be the default in pgcast 7.0.`);
+    }
     return callback(txnClientOrQueryable as TxnClient<IsolationSatisfying<M>>);
   }
 

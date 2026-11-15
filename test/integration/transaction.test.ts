@@ -1001,7 +1001,7 @@ describe('the client of a transaction at another level', () => {
     const result = await fdb.transaction(t.pool, outer, c => fdb.transaction(c, inner, async c2 => {
       called = true;
       expect(c2).toBe(c);
-      return (await fdb.sql<never, [{ s: string }]>`${fdb.raw(settingsSQL)}`.run(c2))[0].s;  // this module's sql, so its queryListener sees it
+      return (await fdb.sql<db.SQL, [{ s: string }]>`${fdb.raw(settingsSQL)}`.run(c2))[0].s;  // this module's sql, so its queryListener sees it
     })).catch((e: Error) => e);
     return { result, queries, called };
   };
@@ -1067,7 +1067,7 @@ describe('the client of a transaction at another level', () => {
   it('with the option, a pool, a plain client and a client kept after its transaction ended are not passed through, nor refused', async () => {
     const { fdb, emitWarning } = await fresh();
     fdb.setConfig({ transactionRequiresSatisfyingLevel: true });
-    const level = (c: db.Queryable) => sql<never, [{ s: string }]>`${db.raw(settingsSQL)}`.run(c).then(r => r[0].s);
+    const level = (c: db.Queryable) => sql<db.SQL, [{ s: string }]>`${db.raw(settingsSQL)}`.run(c).then(r => r[0].s);
     expect(await fdb.serializable(t.pool, level)).toBe(settingsAt[S]);
     const client = await t.pool.connect();
     try {
