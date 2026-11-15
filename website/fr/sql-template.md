@@ -1,5 +1,5 @@
 ---
-english: 4fd3f46438f9
+english: 52fbcf4c7ee2
 ---
 
 # Template SQL
@@ -225,7 +225,7 @@ Avec des tableaux, un `SELECT` de quelques colonnes et une liste `IN` ; `s.film
 
 </CastPanel>
 
-Dans un template typé par table (`db.sql<s.tags.SQL>`), `cols()` et `vals()` acceptent n’importe quelle valeur, comme dans Zapatos 6.6.1. Les noms de `cols()` et les clés de `vals()` ne sont pas vérifiés par rapport à la table, et Postgres refuse un nom erroné (42703). Le template refuse toujours un nom erroné interpolé seul (`${'tagz'}`) et un Whereable écrit en ligne (`{ tagz: 'x' }`). Pour faire vérifier les noms, typez la valeur, soit avec un argument de type (`db.cols<s.tags.Column[]>([…])`, `db.vals<s.tags.Updatable>({…})`), soit avec `satisfies` :
+Un template typé par table (`db.sql<s.tags.SQL>`) accepte `cols()` et `vals()` de n’importe quelle valeur, comme dans Zapatos 6.6.1. Les noms de `cols()` et les clés de `vals()` ne sont pas vérifiés par rapport à la table, et Postgres refuse un nom erroné (42703). Le template refuse toujours un nom erroné interpolé seul (`${'tagz'}`) et un Whereable écrit en ligne (`{ tagz: 'x' }`). Pour faire vérifier les noms, typez la valeur, soit avec un argument de type (`db.cols<s.tags.Column[]>([…])`, `db.vals<s.tags.Updatable>({…})`), soit avec `satisfies` :
 
 <CastPanel example="sql_cols_unchecked">
 
@@ -233,7 +233,7 @@ Dans un template typé par table (`db.sql<s.tags.SQL>`), `cols()` et `vals()` ac
 
 </CastPanel>
 
-Cela vérifie un tableau, et un objet écrit en ligne. Un objet contenu dans une variable est vérifié par son propre type, comme `tag: s.tags.Insertable` plus haut, et non par l’argument de type. `Updatable` et `Insertable` laissent de côté une colonne `GENERATED ALWAYS` : donnez donc le nom d’une telle colonne avec `Column[]`.
+Cela vérifie un tableau, et un objet écrit en ligne. Dans un objet contenu dans une variable, l’argument de type laisse passer une clé en trop, car TypeScript ne la refuse que dans un objet écrit en ligne : typez la variable, comme `tag: s.tags.Insertable` plus haut. Un tableau de noms contenu dans une variable doit lui aussi être typé : `['film_id', 'tag']` contenu dans une variable est un `string[]`, que `cols<s.tags.Column[]>` refuse. Donnez à la variable le type `s.tags.Column[]`, et pour un tableau en lecture seule, écrivez `cols<readonly s.tags.Column[]>`. `Updatable` et `Insertable` laissent de côté une colonne `GENERATED ALWAYS` : donnez donc le nom d’une telle colonne avec `Column[]`.
 
 Comme valeur de filtre, et comme valeur dans `vals({…})` (donc dans une écriture), `cols()` lève une erreur, comme [`raw()`](#raw).
 

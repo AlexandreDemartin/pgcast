@@ -297,8 +297,9 @@ describe('type surprises', () => {
   });
 
   test('characterization: a template typed by table checks neither the names of cols() nor the keys of vals(), as in 6.6.1; a typed value does (#216)', () => {
-    // characterization: Postgres refuses these (42703); checking them in the template would refuse the right
-    // cols(['email', 'display_name']) too, inferred as string[], and generic forwarders
+    // characterization: Postgres refuses these (42703); each check tried in the template refused code that compiles
+    // under 6.6.1: the right cols(['email', 'display_name']), inferred as string[], and generic forwarders; or, with
+    // cols<const T>, what cols() and vals() return (`let c = cols(['a']); c = cols(['b'])`, `.value.push()`)
     db.sql<s.users.SQL>`SELECT ${db.cols(['email', 'emial'])} FROM ${'users'}`;
     db.sql<s.users.SQL>`INSERT INTO ${'users'} (${db.cols({ emial: 'a' })}) VALUES (${db.vals({ emial: 'a' })})`;
     const forward = <T>(row: T) => db.sql<s.users.SQL>`INSERT INTO ${'users'} (${db.cols(row)}) VALUES (${db.vals(row)})`;
@@ -315,10 +316,31 @@ describe('type surprises', () => {
     db.vals<s.users.Updatable>({ email: 'a', emial: 'a' });
     // @ts-expect-error Updatable leaves out the GENERATED ALWAYS id
     db.vals<s.users.Updatable>({ id: 1 });
-    // characterization: an object held in a variable is checked by its own type, not by the type argument
+    // characterization: in an object held in a variable, the type argument lets an extra key through, since
+    // TypeScript refuses one only in an object written in place
     const loose = { email: 'a', emial: 'a' };
     db.vals<s.users.Updatable>(loose);
+    const wrongOnly = { emial: 'a' };
+    // @ts-expect-error but a held object with no key of the table, or a wrong value type, is still refused
+    db.vals<s.users.Updatable>(wrongOnly);
+    const wrongType = { manager_id: 'a' };
+    // @ts-expect-error manager_id is a number
+    db.vals<s.users.Updatable>(wrongType);
+    // the right names pass each typed form
     db.sql<s.users.SQL>`SELECT ${db.cols<s.users.Column[]>(['id', 'email'])} FROM ${'users'}`;
+    db.cols(['id', 'email'] satisfies s.users.Column[]);
+    db.vals<s.users.Updatable>({ email: 'a' });
+    db.vals({ email: 'a', display_name: 'A' } satisfies s.users.Updatable);
+    // an array held in a variable is a string[], refused by Column[]: type the variable, readonly …[] for a readonly one
+    const names = ['id', 'email'];
+    // @ts-expect-error names is a string[]
+    db.cols<s.users.Column[]>(names);
+    const typedNames: s.users.Column[] = ['id', 'email'];
+    db.cols<s.users.Column[]>(typedNames);
+    const readonlyNames: readonly s.users.Column[] = ['id', 'email'];
+    // @ts-expect-error a readonly array is no Column[]
+    db.cols<s.users.Column[]>(readonlyNames);
+    db.cols<readonly s.users.Column[]>(readonlyNames);
   });
 
   test('characterization: vals({…}) of a sql template takes raw(), cols(x), vals(x) and parent() as values', () => {

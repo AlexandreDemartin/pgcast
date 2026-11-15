@@ -221,7 +221,7 @@ With arrays, a `SELECT` of some columns and an `IN` list; `s.films.OnlyCols<…>
 
 </CastPanel>
 
-In a template typed by table (`db.sql<s.tags.SQL>`), `cols()` and `vals()` take any value, as in Zapatos 6.6.1. The names of `cols()` and the keys of `vals()` are not checked against the table, and Postgres refuses a wrong one (42703). The template still refuses a wrong name interpolated on its own (`${'tagz'}`) and a Whereable written in place (`{ tagz: 'x' }`). To have the names checked, type the value, either with a type argument (`db.cols<s.tags.Column[]>([…])`, `db.vals<s.tags.Updatable>({…})`) or with `satisfies`:
+A template typed by table (`db.sql<s.tags.SQL>`) takes `cols()` and `vals()` of any value, as in Zapatos 6.6.1. The names of `cols()` and the keys of `vals()` are not checked against the table, and Postgres refuses a wrong one (42703). The template still refuses a wrong name interpolated on its own (`${'tagz'}`) and a Whereable written in place (`{ tagz: 'x' }`). To have the names checked, type the value, either with a type argument (`db.cols<s.tags.Column[]>([…])`, `db.vals<s.tags.Updatable>({…})`) or with `satisfies`:
 
 <CastPanel example="sql_cols_unchecked">
 
@@ -229,7 +229,7 @@ In a template typed by table (`db.sql<s.tags.SQL>`), `cols()` and `vals()` take 
 
 </CastPanel>
 
-This checks an array, and an object written in place. An object held in a variable is checked by its own type, as `tag: s.tags.Insertable` is above, not by the type argument. `Updatable` and `Insertable` leave out a `GENERATED ALWAYS` column, so give such a column's name with `Column[]`.
+This checks an array, and an object written in place. In an object held in a variable, the type argument lets an extra key through, since TypeScript refuses one only in an object written in place: type the variable, as `tag: s.tags.Insertable` is above. An array of names held in a variable needs a type too: `['film_id', 'tag']` held in a variable is a `string[]`, which `cols<s.tags.Column[]>` refuses. Type the variable `s.tags.Column[]`, and for a readonly one write `cols<readonly s.tags.Column[]>`. `Updatable` and `Insertable` leave out a `GENERATED ALWAYS` column, so give such a column's name with `Column[]`.
 
 As a filter value, and as a value in `vals({…})` (so in a write), `cols()` throws, as [`raw()`](#raw) does.
 
