@@ -1,24 +1,24 @@
 // Copyright (C) 2026 Alexandre Demartin
-// Checks that each deprecation message of src/ ("Set <option>: …") has its own line under CHANGELOG.md's
-// [Unreleased] § Deprecated, for `npm run check:agents` and the docs job (a change to CHANGELOG.md alone).
+// Checks that each deprecation message of src/ ("Set <option>: …") has its own line under a `### Deprecated` of
+// CHANGELOG.md, in any release or [Unreleased]: a deprecation stays recorded once released, until 7.0 removes its
+// message. Run by `npm run check:agents` and by the docs job (a change to CHANGELOG.md alone).
 import {readFileSync} from 'node:fs';
 import {pathToFileURL} from 'node:url';
 import {execFileSync} from 'node:child_process';
 
-/** Every option whose messages outnumber its `### Deprecated` lines; empty if none. */
+/** Every option whose messages outnumber the `### Deprecated` lines naming it, all sections together; empty if none. */
 export function checkDeprecations(sources, changelog) {
   const
     messages = {},
-    deprecated = changelog.split(/^## /m).find(part => part.startsWith('[Unreleased]'))
-      ?.split(/^### /m).find(part => part.startsWith('Deprecated\n'));
-  if (!deprecated) return ['CHANGELOG.md: no [Unreleased] § Deprecated'];
+    deprecated = changelog.split(/^### /m).filter(part => part.startsWith('Deprecated\n'))
+      .flatMap(part => part.split(/^## /m)[0].split('\n').filter(line => line.startsWith('- ')));
   for (const source of sources) {
     for (const [, option] of source.matchAll(/\bSet (\w+): /g)) messages[option] = (messages[option] ?? 0) + 1;
   }
   return Object.entries(messages).flatMap(([option, count]) => {
-    const lines = deprecated.split('\n').filter(line => line.startsWith('- ') && line.includes(`\`${option}`)).length;
+    const lines = deprecated.filter(line => line.includes(`\`${option}`)).length;
     return lines >= count ? [] :
-      [`CHANGELOG.md [Unreleased] § Deprecated: ${count} message(s) of src/ say "Set ${option}:", ${lines} line(s) name it`];
+      [`CHANGELOG.md § Deprecated: ${count} message(s) of src/ say "Set ${option}:", ${lines} line(s) name it`];
   });
 }
 
