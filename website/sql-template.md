@@ -220,7 +220,7 @@ With arrays, a `SELECT` of some columns and an `IN` list; `s.films.OnlyCols<…>
 
 As a filter value, and as a value in `vals({…})` (so in a write), `cols()` throws, as [`raw()`](#raw) does.
 
-A string or another primitive (a number, a boolean, `undefined`…) throws while compiling, so `run()` rejects before any query, `insert()`, `upsert()` and `update()` of such a row included:
+A string or another primitive (a number, a boolean, `undefined`…) throws while compiling, so `run()` rejects before any query, `insert()`, `upsert()` and `update()` of a non-empty string row included:
 
 > `` `db.cols()` takes an object or an array, not `string`: for one column, write `db.cols([name])`; for a row of `insert()`, `upsert()` or `update()`, give an object. ``<!-- message -->
 

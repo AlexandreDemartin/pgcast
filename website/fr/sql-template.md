@@ -1,5 +1,5 @@
 ---
-english: 7d8686ed5fa9
+english: 3d00a2d81915
 ---
 
 # Template SQL
@@ -224,7 +224,7 @@ Avec des tableaux, un `SELECT` de quelques colonnes et une liste `IN` ; `s.film
 
 Comme valeur de filtre, et comme valeur dans `vals({…})` (donc dans une écriture), `cols()` lève une erreur, comme [`raw()`](#raw).
 
-Une chaîne ou une autre valeur primitive (un nombre, un booléen, `undefined`…) lève une erreur à la compilation, si bien que `run()` est rejetée avant toute requête, y compris pour `insert()`, `upsert()` et `update()` d’une telle ligne :
+Une chaîne ou une autre valeur primitive (un nombre, un booléen, `undefined`…) lève une erreur à la compilation, si bien que `run()` est rejetée avant toute requête, y compris pour `insert()`, `upsert()` et `update()` d’une ligne qui est une chaîne non vide :
 
 > `` `db.cols()` takes an object or an array, not `string`: for one column, write `db.cols([name])`; for a row of `insert()`, `upsert()` or `update()`, give an object. ``<!-- message -->
 
