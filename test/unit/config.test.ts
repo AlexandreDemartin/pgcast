@@ -70,6 +70,7 @@ describe('setConfig()', () => {
     undefinedMeansMissing: false,
     transactionRequiresCommit: false,
     transactionRequiresIdleClient: false,
+    transactionRequiresSatisfyingLevel: false,
     selectExactlyOneChecksForSecondRow: false,
   };
   const changed = {
@@ -81,6 +82,7 @@ describe('setConfig()', () => {
     undefinedMeansMissing: true,
     transactionRequiresCommit: true,
     transactionRequiresIdleClient: true,
+    transactionRequiresSatisfyingLevel: true,
     selectExactlyOneChecksForSecondRow: true,
   };
 
