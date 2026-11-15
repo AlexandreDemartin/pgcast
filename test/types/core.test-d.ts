@@ -451,9 +451,12 @@ describe('range strings', () => {
     expectTypeOf(mapped).not.toBeAny();
   });
 
-  test("a type computed from a range type gives 'empty' too, unless Exclude or a false branch of never", () => {
+  test("a type computed from a range type gives 'empty' or never, unless Exclude or a distributive false branch of never", () => {
     type Lower<R> = R extends `${'[' | '('}${infer L},${string}` ? L : R;
     type LowerOrNever<R> = R extends `${'[' | '('}${infer L},${string}` ? L : never;
+    type LowerInline = db.NumberRangeString extends `${'[' | '('}${infer L},${string}` ? L : never;
+    type LowerInTuple<R> = [R] extends [`${'[' | '('}${infer L},${string}`] ? L : never;
+    type LowerInlineBack = Exclude<db.NumberRangeString, 'empty'> extends `${'[' | '('}${infer L},${string}` ? L : never;
     // @ts-expect-error a false branch that keeps the range keeps 'empty'
     expectTypeOf<Lower<db.NumberRangeString>>().toExtend<`${number}` | ''>();
     // @ts-expect-error 'empty' starts with no bracket
@@ -461,5 +464,11 @@ describe('range strings', () => {
     expectTypeOf<Lower<Exclude<db.NumberRangeString, 'empty'>>>().toEqualTypeOf<`${number}` | ''>();
     expectTypeOf<Exclude<db.NumberRangeString, 'empty'> extends `[${string}` | `(${string}` ? true : false>().toEqualTypeOf<true>();
     expectTypeOf<LowerOrNever<db.NumberRangeString>>().toEqualTypeOf<`${number}` | ''>();
+    // @ts-expect-error written on the type itself, it does not distribute: never
+    expectTypeOf<'1'>().toExtend<LowerInline>();
+    // @ts-expect-error nor with its type parameter wrapped in a tuple
+    expectTypeOf<'1'>().toExtend<LowerInTuple<db.NumberRangeString>>();
+    expectTypeOf<LowerInlineBack>().toEqualTypeOf<`${number}` | ''>();
+    expectTypeOf<LowerInTuple<Exclude<db.NumberRangeString, 'empty'>>>().toEqualTypeOf<`${number}` | ''>();
   });
 });
