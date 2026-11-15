@@ -56,6 +56,8 @@ const variants: [string, Config][] = [
   ['enumOrder-declared', { schemas: customTypesSchemas, typeEnumsAcrossSchemas: true, enumOrder: 'declared' }],
   // pgcast/schema, pgcast/custom and pgcast/db, and the zapatos/schema that src/db's declarations import
   ['moduleNames-pgcast', { schemas: customTypesSchemas, moduleNames: 'pgcast' }],
+  // main, whose output is test/generated/: only the UniqueIndex of products, extra.articles and account_totals differ
+  ['uniqueIndexConstraintsOnly', { ...main, uniqueIndexConstraintsOnly: true }],
   ['columnOptions', {
     schemas: { public: only('users', 'accounts'), extra: only('articles') },
     columnOptions: {
@@ -1843,6 +1845,7 @@ describe('include entries that match no relation', () => {
       typeEnumsAcrossSchemas: [bothOrderNote, productsNote],
       'enumOrder-declared': [productsNote],
       'moduleNames-pgcast': [enumsNote, bothOrderNote, productsNote],
+      uniqueIndexConstraintsOnly: [enumsNote, bothOrderNote],
       columnOptions: [bothOrderNote, articlesNote],
       'include-exclude-lists': [unmatched('no_such_table', 'public'), bothOrderNote, articlesNote],
       'exclude-star': [bothOrderNote],  // exclude: '*' still generates the enums
