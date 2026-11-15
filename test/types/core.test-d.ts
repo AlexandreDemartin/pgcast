@@ -462,6 +462,10 @@ describe('type surprises', () => {
 
 declare const row: s.transfers.Selectable;
 declare const jrow: s.transfers.JSONSelectable;
+type Old = `${'[' | '('}${number | ''},${number | ''}${']' | ')'}`; // Zapatos 6.6.1's NumberRangeString
+type Finite = Exclude<db.NumberRangeString, 'empty' | `${string}${'Infinity' | 'NaN'}${string}`>;
+type OldNumber = `${'[' | '('}${number},${number}${']' | ')'}`; // Zapatos 6.6.1's RangeString<number>
+declare const customRange: db.RangeString<number>; // a range with a number bound, typed by hand
 
 describe('range strings', () => {
   test("'empty' is a range string, as Postgres writes an empty range", () => {
@@ -484,7 +488,7 @@ describe('range strings', () => {
 
   test("a selected range compares with 'empty', and narrows to a bracketed one", () => {
     if (row.batch_sizes !== null && row.batch_sizes !== 'empty') {
-      expectTypeOf(row.batch_sizes).toEqualTypeOf<`${'[' | '('}${number | ''},${number | ''}${']' | ')'}`>();
+      expectTypeOf(row.batch_sizes).toEqualTypeOf<Exclude<db.NumberRangeString, 'empty'>>();
     }
     if (jrow.value_days === 'empty') expectTypeOf(jrow.value_days).toEqualTypeOf<'empty'>();
   });
@@ -522,24 +526,126 @@ describe('range strings', () => {
     expectTypeOf(mapped).not.toBeAny();
   });
 
-  test("a type computed from a range type gives 'empty' or never, unless Exclude or a distributive false branch of never", () => {
+  test("a type computed from a range type gives 'empty' or never, unless Exclude", () => {
     type Lower<R> = R extends `${'[' | '('}${infer L},${string}` ? L : R;
     type LowerOrNever<R> = R extends `${'[' | '('}${infer L},${string}` ? L : never;
     type LowerInline = db.NumberRangeString extends `${'[' | '('}${infer L},${string}` ? L : never;
     type LowerInTuple<R> = [R] extends [`${'[' | '('}${infer L},${string}`] ? L : never;
-    type LowerInlineBack = Exclude<db.NumberRangeString, 'empty'> extends `${'[' | '('}${infer L},${string}` ? L : never;
+    type LowerInlineBack = Finite extends `${'[' | '('}${infer L},${string}` ? L : never;
     // @ts-expect-error a false branch that keeps the range keeps 'empty'
     expectTypeOf<Lower<db.NumberRangeString>>().toExtend<`${number}` | ''>();
     // @ts-expect-error 'empty' starts with no bracket
     expectTypeOf<db.NumberRangeString extends `[${string}` | `(${string}` ? true : false>().toEqualTypeOf<true>();
-    expectTypeOf<Lower<Exclude<db.NumberRangeString, 'empty'>>>().toEqualTypeOf<`${number}` | ''>();
+    expectTypeOf<Lower<Finite>>().toEqualTypeOf<`${number}` | ''>();
     expectTypeOf<Exclude<db.NumberRangeString, 'empty'> extends `[${string}` | `(${string}` ? true : false>().toEqualTypeOf<true>();
-    expectTypeOf<LowerOrNever<db.NumberRangeString>>().toEqualTypeOf<`${number}` | ''>();
+    expectTypeOf<LowerOrNever<Finite>>().toEqualTypeOf<`${number}` | ''>();
     // @ts-expect-error written on the type itself, it does not distribute: never
     expectTypeOf<'1'>().toExtend<LowerInline>();
     // @ts-expect-error nor with its type parameter wrapped in a tuple
     expectTypeOf<'1'>().toExtend<LowerInTuple<db.NumberRangeString>>();
     expectTypeOf<LowerInlineBack>().toEqualTypeOf<`${number}` | ''>();
-    expectTypeOf<LowerInTuple<Exclude<db.NumberRangeString, 'empty'>>>().toEqualTypeOf<`${number}` | ''>();
+    expectTypeOf<LowerInTuple<Finite>>().toEqualTypeOf<`${number}` | ''>();
+  });
+
+  test('an infinite or NaN numeric bound is a range string, as Postgres writes it', () => {
+    expectTypeOf<'[1,Infinity)' | '[-Infinity,1)' | '[-Infinity,Infinity]' | '(,Infinity)' | '[1,NaN]' | '[NaN,NaN]'>().toExtend<db.NumberRangeString>();
+    expectTypeOf<'[1,Infinity)' | '[-Infinity,0)' | '[1,NaN]'>().toExtend<db.RangeString<number>>();
+    expectTypeOf<db.NumberRangeString>().toEqualTypeOf<db.RangeString<number | ''>>();
+    expectTypeOf<db.DateRangeString>().toEqualTypeOf<`${'[' | '('}${string},${string}${']' | ')'}` | 'empty'>();
+    expectTypeOf<'[2026-01-01,infinity)' | '[-infinity,infinity]'>().toExtend<db.DateRangeString>();
+  });
+
+  test('an infinite or NaN numeric bound is taken as a value, in each write and filter', () => {
+    db.insert('transfers', { from_account: 1, to_account: 2, amount: 1, fee_band: '[1,Infinity)' });
+    db.update('transfers', { fee_band: '[1,NaN]' }, { note: 'x' });
+    db.upsert('transfers', { id: 'x', from_account: 1, to_account: 2, amount: 1, fee_band: '[-Infinity,0)' }, 'id');
+    db.select('transfers', { fee_band: '[-Infinity,Infinity]' });
+    db.select('transfers', { fee_band: c.eq('[1,NaN]') });
+    db.select('transfers', { fee_band: c.isIn(['[1,Infinity)', '[NaN,NaN]']) });
+    db.select('transfers', { fee_band: db.param('(,Infinity)') });
+    // characterization: int4range shares NumberRangeString, so the type takes a bound Postgres refuses there (22P02)
+    db.insert('transfers', { from_account: 1, to_account: 2, amount: 1, batch_sizes: '[1,Infinity)' });
+    expectTypeOf(jrow.fee_band === '[1,Infinity)' || row.fee_band === '[1,NaN]').toEqualTypeOf<boolean>();
+    expectTypeOf(db.select('transfers', { fee_band: '[1,NaN]' }).run(pool)).not.toBeAny();
+  });
+
+  test('only the spellings Postgres writes: Infinity, -Infinity, NaN', () => {
+    // @ts-expect-error Postgres reads 'infinity', but writes 'Infinity'
+    db.select('transfers', { fee_band: '[1,infinity)' });
+    // @ts-expect-error nor 'inf'
+    db.select('transfers', { fee_band: '[1,inf)' });
+    // @ts-expect-error nor '+Infinity'
+    db.select('transfers', { fee_band: '[1,+Infinity)' });
+    // @ts-expect-error nor 'nan'
+    db.select('transfers', { fee_band: '[1,nan]' });
+  });
+
+  test('a selected numrange may have an infinite or NaN bound, so a hand-written finite type refuses it', () => {
+    const toOld = (range: Old) => range;
+    // @ts-expect-error 'Infinity' is no `${number}`
+    const handWritten: Old | 'empty' | null = jrow.fee_band;
+    // @ts-expect-error nor as a parameter
+    if (row.fee_band !== null && row.fee_band !== 'empty') toOld(row.fee_band);
+    // @ts-expect-error once 'empty' is left out, the infinite bounds are still there
+    expectTypeOf<Exclude<db.NumberRangeString, 'empty'>>().toEqualTypeOf<Old>();
+    expectTypeOf<Finite>().toEqualTypeOf<Old>();
+    const asAlias: db.RangeString<number | ''> | null = jrow.fee_band;
+    expectTypeOf(handWritten).not.toBeAny();
+    expectTypeOf(asAlias).not.toBeAny();
+  });
+
+  test('a Record or a mapped type keyed by NumberRangeString requires its infinite keys, unless Partial or Exclude', () => {
+    // @ts-expect-error '[Infinity,Infinity]', '(NaN,NaN)' and the others are keys it requires
+    const byBand: Record<db.NumberRangeString, number> = { '(,)': 1, '(,]': 1, '[,)': 1, '[,]': 1, empty: 1 };
+    // @ts-expect-error a mapped type too
+    const mapped: { [K in db.NumberRangeString]: number } = { '(,)': 1, '(,]': 1, '[,)': 1, '[,]': 1, empty: 1 };
+    const partial: Partial<Record<db.NumberRangeString, number>> = {};
+    const finite: Record<Finite, number> = { '(,)': 1, '(,]': 1, '[,)': 1, '[,]': 1 };
+    if (row.fee_band !== null) partial[row.fee_band] = 1;
+    expectTypeOf(byBand).not.toBeAny();
+    expectTypeOf(mapped).not.toBeAny();
+    expectTypeOf(finite).not.toBeAny();
+  });
+
+  test('a type computed from NumberRangeString gives the infinite bounds too, unless Exclude', () => {
+    type Lower<R> = R extends `${'[' | '('}${infer L},${string}` ? L : R;
+    type LowerOrNever<R> = R extends `${'[' | '('}${infer L},${string}` ? L : never;
+    type LowerInline = Exclude<db.NumberRangeString, 'empty'> extends `${'[' | '('}${infer L},${string}` ? L : never;
+    type LowerInTuple<R> = [R] extends [`${'[' | '('}${infer L},${string}`] ? L : never;
+    type Upper<R> = R extends `${string},${infer U extends number}${']' | ')'}` ? U : never;
+    // @ts-expect-error a false branch of never keeps 'Infinity', '-Infinity' and 'NaN'
+    expectTypeOf<LowerOrNever<db.NumberRangeString>>().toEqualTypeOf<`${number}` | ''>();
+    // @ts-expect-error and on Exclude<…, 'empty'> too
+    expectTypeOf<LowerOrNever<Exclude<db.NumberRangeString, 'empty'>>>().toEqualTypeOf<`${number}` | ''>();
+    // @ts-expect-error on Exclude<…, 'empty'>, a false branch that keeps the range keeps them too
+    expectTypeOf<Lower<Exclude<db.NumberRangeString, 'empty'>>>().toExtend<`${number}` | ''>();
+    // @ts-expect-error and written on the type itself
+    expectTypeOf<LowerInline>().toExtend<`${number}` | ''>();
+    // @ts-expect-error and with its type parameter wrapped in a tuple
+    expectTypeOf<LowerInTuple<Exclude<db.NumberRangeString, 'empty'>>>().toExtend<`${number}` | ''>();
+    expectTypeOf<LowerOrNever<Finite>>().toEqualTypeOf<`${number}` | ''>();
+    expectTypeOf<Upper<db.NumberRangeString>>().toEqualTypeOf<number>();
+  });
+
+  test('a type computed from a hand-written RangeString<number> gives the infinite bounds too, unless Exclude', () => {
+    type Finite661 = Exclude<db.RangeString<number>, 'empty' | `${string}${'Infinity' | 'NaN'}${string}`>;
+    type LowerOrNever<R> = R extends `${'[' | '('}${infer L},${string}` ? L : never;
+    // @ts-expect-error '[Infinity,Infinity]', '(NaN,NaN)' and the other 34 are keys it requires
+    const byNumber: Record<db.RangeString<number>, number> = { empty: 1 };
+    // @ts-expect-error on Exclude<…, 'empty'> too
+    const nonEmpty: Record<Exclude<db.RangeString<number>, 'empty'>, number> = {};
+    // @ts-expect-error a value of it is no `${number}`-bounded range, even 'empty' aside
+    const handWritten: OldNumber | 'empty' = customRange;
+    // @ts-expect-error a false branch of never keeps 'Infinity', '-Infinity' and 'NaN'
+    expectTypeOf<LowerOrNever<db.RangeString<number>>>().toExtend<`${number}`>();
+    const finite: Record<Finite661, number> = {};
+    const asAlias: db.RangeString<number> = customRange;
+    expectTypeOf<Finite661>().toEqualTypeOf<OldNumber>();
+    expectTypeOf<LowerOrNever<Finite661>>().toEqualTypeOf<`${number}`>();
+    expectTypeOf(byNumber).not.toBeAny();
+    expectTypeOf(nonEmpty).not.toBeAny();
+    expectTypeOf(handWritten).not.toBeAny();
+    expectTypeOf(finite).not.toBeAny();
+    expectTypeOf(asAlias).not.toBeAny();
   });
 });
