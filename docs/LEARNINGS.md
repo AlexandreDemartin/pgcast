@@ -280,6 +280,13 @@ Candidates for a check, a rule or a skill line.
 - #166 — When a note's text gains a case, every page that lists its cases follows (CHANGELOG `Added`/`Deprecated`, Switching, README, JSDoc, Insert): `git grep` its SQLSTATE codes — `branch-reviewer`
 - #166 — Postgres raises 55000 for a deferrable arbiter only once it inserts a row; a unique index on a materialised view gives 42704 in `ON CONFLICT ON CONSTRAINT` — `builder`
 - #166 — Right after a push, `gh pr checks --watch` can exit before CI registers: wait for `gh run list` to show the head SHA — `builder`
+- #420 — A type test whose only assertion is `.not.toBeAny()` on a value whose type is known freezes nothing: `not.toBeAny()` goes with an equality, never instead of one (grep `test/**/*.test-d.ts`) — `branch-reviewer`
+- #420 — A claim about a nested query returning several rows names `select()`, `selectOne()`, `selectExactlyOne()`, and `selectExactlyOne()` with `selectExactlyOneChecksForSecondRow` (second time after #164) — `branch-reviewer`
+- #420 — A widened nested type is tested as a candidate cheaply: run the grid of what callers do with the value (14/19 refused here), not only the type of the value; and a characterisation type test is proved meaningful by running it against that candidate — `builder`
+- #466 — its `docs` job hung 15 min in `docs:examples` after the `PGCAST_DEP002` warning and passed on rerun: a hang in `run-examples.mjs` worth a timeout per example — orchestrator
+- #274 — A docs claim about a parameter's compiled SQL (`$1`, JSON) names the `castArrayParamsToJson` / `castObjectParamsToJson` condition, or is probed under both: candidate check in `check-prose.mjs`, rerun each `<!-- probe -->` without `setConfig` with both options on and flag a changed text whose sentence names no option — `branch-reviewer`
+- #274 — A value object with `toPostgres()` and a `value` field compiles only because `Parameter` matches by shape: probe it whenever `Parameter` is narrowed; under `castObjectParamsToJson` an object literal's own `toPostgres()` is not used — `builder`
+- #274 — A types-only `ConfigTypes` opt-in cannot carry decision 003's warning, and a class + interface merge needs an ESLint disable in `core.ts`: weigh Document first for a niche type gap (as #402) — orchestrator
 
 ## Minors kept
 
@@ -386,3 +393,7 @@ Minor review defects, taken up by the end-of-chapter review.
 - #268 — `test/unit/transaction-pg7.test.ts:68`: `expect(pg7.state.reads).toBe(1)` cannot fail (the getter replaces itself) — `branch-reviewer`
 - #268 — `src/db/transaction.ts:59`: the comment leaves out a native client built from `pg/lib/native` while the getter is in place, classed by `_connected` — `branch-reviewer`
 - #166 — `website/generator.md:382` (and `fr/…:386`): « An exclusion constraint is in neither list » next to a sentence calling a `WITHOUT OVERLAPS` key an exclusion constraint: « An `EXCLUDE` constraint » — `branch-reviewer`
+- #420 — `test/integration/shortcuts.test.ts:1115`: `offset: 1` / `limit: 0` nested, the options other than `groupBy` in `extras`, and the repeated parent row under `select()` are stated but not run — `branch-reviewer`
+- #274 — `website/sql-template.md:126` (and `fr/…:130`): « A text column stores as it is » right after a filter example; « passes where a column name does » reads as « wherever » — `branch-reviewer`
+- #274 — `test/types/core.test-d.ts:208-230`: no enum column and no `upsert()` slot for the structural `{ value }` case (skill `type-tests` § Structural wrappers) — `branch-reviewer`
+- #274 — `src/db/core.ts:137-140`: interpolated directly in `sql`, `${{ value: 3 }}` passes as a Whereable and compiles to `("value" = $1)` — `branch-reviewer`
