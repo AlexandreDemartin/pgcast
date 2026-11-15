@@ -248,6 +248,12 @@ export class Constraint<T extends Table> { constructor(public value: UniqueIndex
  * refuses another table's (42704): held in a variable, `constraint('...')`
  * takes any table's name; `constraint<'users'>('users_pkey')` checks the name
  * against `users`.
+ *
+ * The type takes every unique index, and Postgres only that of a `UNIQUE` or
+ * `PRIMARY KEY` constraint, valid, not `DEFERRABLE` nor `WITHOUT OVERLAPS`: a
+ * `CREATE UNIQUE INDEX` gives 42704. Generate with
+ * `uniqueIndexConstraintsOnly: true` (the default in 7.0) and the type takes
+ * only those.
  */
 export function constraint<T extends Table>(x: UniqueIndexForTable<T>) { return new Constraint<T>(x); }
 
