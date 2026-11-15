@@ -726,6 +726,62 @@ describe('column comments', () => {
     }
   });
 
+  it('prefixes every line of a multi-line default, in an unprefixed and a prefixed schema', async () => {
+    /** Each column's JSDoc in the `Selectable` of `table`, from its default line to its end, indentation trimmed. */
+    const defaultLines = (schema: string, table: string) => {
+      const block = tableBlock(schema, table);
+      const selectable = block.slice(block.indexOf('interface Selectable {'), block.indexOf('interface JSONSelectable {'));
+      return Object.fromEntries([...selectable.matchAll(/\/\*\*\n([\s\S]*?)\*\/\n\s*(\w+)/g)].map(([, doc, column]) => {
+        const lines = doc.split('\n').map(line => line.trimStart());
+        return [column, lines.slice(lines.findIndex(line => line.includes(', default: ')), -1)];
+      }));
+    };
+    const columns = (schema: string) => String.raw`lf text DEFAULT E'two\nlines', crlf text DEFAULT E'two\r\nlines', cr text DEFAULT E'two\rlines',
+      blank text DEFAULT E'a\n\nb', trail text DEFAULT E'ends\n', lead text DEFAULT E'\nstarts',
+      indented text DEFAULT E'a\n  b', star text DEFAULT E'a\n* b', arr text[] DEFAULT ARRAY[E'a\nb'],
+      seq bigint DEFAULT nextval(E'${schema}."two\nlines"'), closer text DEFAULT E'a\n*/ b', tagged text DEFAULT E'a\nb',
+      one text DEFAULT 'single line', at text DEFAULT 'a @x', ls text DEFAULT E'a\u2028b'`;
+    // tsForConfig() reads through its own connection: the schemas are committed, then dropped
+    await t.pool.query(String.raw`
+      CREATE SCHEMA default_lines;
+      CREATE SCHEMA default_lines_ns;
+      CREATE SEQUENCE default_lines."two${'\n'}lines";
+      CREATE TABLE default_lines.unprefixed (${columns('default_lines')});
+      CREATE SEQUENCE default_lines_ns."two${'\n'}lines";
+      CREATE TABLE default_lines_ns.prefixed (${columns('default_lines_ns')});
+      COMMENT ON COLUMN default_lines.unprefixed.tagged IS E'Old.\n@deprecated use lf';
+      COMMENT ON COLUMN default_lines_ns.prefixed.tagged IS E'Old.\n@deprecated use lf';`);
+    try {
+      const { ts: schema } = await codegen({ schemas: { default_lines: all, default_lines_ns: all }, unprefixedSchema: 'default_lines' });
+      const expected = (sequence: string, ls: string) => ({
+        lf: ["* - Nullable, default: `'two", "* lines'::text`"],
+        crlf: ["* - Nullable, default: `'two", "* lines'::text`"],
+        cr: ["* - Nullable, default: `'two", "* lines'::text`"],
+        blank: ["* - Nullable, default: `'a", '* ', "* b'::text`"],
+        trail: ["* - Nullable, default: `'ends", "* '::text`"],
+        lead: ["* - Nullable, default: `'", "* starts'::text`"],
+        // its indentation, and a * it starts with, kept behind the JSDoc's own *
+        indented: ["* - Nullable, default: `'a", "*   b'::text`"],
+        star: ["* - Nullable, default: `'a", "* * b'::text`"],
+        arr: ["* - Nullable, default: `ARRAY['a", "* b'::text]`"],
+        seq: [`* - Nullable, default: \`nextval('${sequence}"two`, `* lines"'::regclass)\``],
+        closer: ["* - Nullable, default: `'a", "* *\\/ b'::text`"],
+        // the comment's tag still after the generated lines (#309)
+        tagged: ["* - Nullable, default: `'a", "* b'::text`", '*', '* @deprecated use lf'],
+        // one line: as under Zapatos 6.6.1, byte for byte
+        one: ["* - Nullable, default: `'single line'::text`"],
+        at: ["* - Nullable, default: `'a @x'::text`"],
+        // and as on master, the indentation of the namespaces (/^/gm) after U+2028, at which no JSDoc line ends
+        ls: [`* - Nullable, default: \`'a\u2028${ls}b'::text\``],
+      });
+      expect.soft(defaultLines(schema, 'unprefixed')).toEqual(expected('default_lines.', '  '));
+      expect.soft(defaultLines(schema, 'prefixed')).toEqual(expected('default_lines_ns.', '    '));
+      expect.soft(syntaxErrors(schema)).toEqual([]);
+    } finally {
+      await t.pool.query('DROP SCHEMA default_lines, default_lines_ns CASCADE');
+    }
+  });
+
   it('writes a comment holding */ with its */ escaped, every line behind its own *', async () => {
     // a */ would end the JSDoc: Zapatos 6.6.1 wrote it as it is, and only a /* after it kept the file parsing
     await t.pool.query(String.raw`
