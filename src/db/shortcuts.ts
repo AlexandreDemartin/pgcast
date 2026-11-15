@@ -999,6 +999,9 @@ const numericAggregate = (
 /**
  * Generate a `SELECT` query `SQLFragment` that returns a count. This can be 
  * nested in other `select`/`selectOne` queries using their `lateral` option.
+ * Passed through as the single `lateral` of `selectOne`/`selectExactlyOne`, it
+ * is the column as pg reads a `bigint`, a string (`'3'`), though the type says
+ * `number`: wrap it in `Number()`, or nest it under a key.
  * @param table The table to count from
  * @param where A `Whereable` or `SQLFragment` defining the rows to be counted, 
  * or `all`
@@ -1017,6 +1020,8 @@ export const count: NumericAggregateSignatures = function (table, where, options
 /**
  * Generate a `SELECT` query `SQLFragment` that returns a sum. This can be 
  * nested in other `select`/`selectOne` queries using their `lateral` option.
+ * Passed through as for `count`, the sum of an integer or `numeric` column is
+ * a string, and `null` with no row.
  * @param table The table to aggregate from
  * @param where A `Whereable` or `SQLFragment` defining the rows to be
  * aggregated, or `all`
@@ -1041,7 +1046,7 @@ export const sum: TypedByColumn extends true ? NullableNumericAggregateSignature
  * aggregated, or `all`
  * @param options Options object. Useful keys may be: `columns`, `alias`.
  * `columns` holds the one column to aggregate, and an empty set gives `0` or
- * `null`, as for `sum`.
+ * `null`, as for `sum`; passed through, as for `sum`.
  */
 export const avg: TypedByColumn extends true ? NullableNumericAggregateSignatures : NumericAggregateSignatures = function (table, where, options?) {
   return numericAggregate(table, where, options, 'avg');
