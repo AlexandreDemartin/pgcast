@@ -1,5 +1,5 @@
 ---
-english: cb1ea7c74a7c
+english: 1115545d3a64
 ---
 
 # Configuration
@@ -473,7 +473,7 @@ Le type qu’écrit l’option [`domainsTypedByContext`](/fr/generator#generate.
 - `DomainInContext<db.Int8String, db.Int8String, number>` est `number` : un placeholder laissé tel que généré.
 - `DomainInContext<number | db.Int8String, db.Int8String, number>` est `number | db.Int8String` : un placeholder modifié garde son type, dans chaque contexte.
 - Un `any` reste `any`, et un `any[]` reste `any[]`, comme un placeholder écrit par Zapatos 6.6.1 sur `int8[]` sans import. Un placeholder modifié vers le même type, `` `${number}` `` pour `db.Int8String`, compte comme laissé tel que généré.
-- `DomainInContext<any, any, number>` est `number` : un domaine sur un domaine, dont le générateur a écrit le placeholder `any`. Modifié vers `unknown`, il reste `unknown`.
+- `DomainInContext<any, any, number>` est `number` : un domaine sur un domaine, dont le générateur a écrit `any` dans le placeholder. Modifié vers `unknown`, il reste `unknown`.
 
 ## JSON {#json}
 
