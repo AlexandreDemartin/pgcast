@@ -257,6 +257,9 @@ Candidates for a check, a rule or a skill line.
 - #402 — A types-only `ConfigTypes` opt-in cannot carry decision 003's run-time warning: weigh Document first for a niche type gap — orchestrator
 - #164 — A claim about a nested shortcut covers each nesting (map `lateral`, passthrough `lateral`, `extras` or `sql` scalar subquery) and each outer call (`select`, `selectOne`, `selectExactlyOne`, `count`): the JSDoc and CHANGELOG lost the outer-call condition the page had, and `select.md` had lost it before — `branch-reviewer`, `builder`
 - #164 — A characterisation test tells the frozen behaviour from its nearest alternative (no limit), not only from the rejected fix (`LIMIT`): the data must make them differ; and run it against a mutant of the rejected fix — `branch-reviewer`, `builder`
+- #271 — A docs bullet that restates one branch's rule loses the branch's condition (« without a `"` »), which the CHANGELOG and JSDoc kept: the French proofread could check each bullet's claim against the CHANGELOG's condition (third time tonight, after #456, #458) — `branch-reviewer`
+- #271 — `isDatabaseError(err)` called with no names always returns `false`, so it proves nothing: test a plain `Error` by its class and a missing `code` — `builder`
+- #271 — `check-prose` reads a `<!-- message -->` quote from plain `"…"` text before the mark; a code span that wraps the quotes fails the check — `builder`
 
 ## Minors kept
 
@@ -351,3 +354,4 @@ Minor review defects, taken up by the end-of-chapter review.
 - #164 — `website/lateral.md:110` (and `fr/…`): nested in `extras` or a `sql` template, `selectOne()` / `selectExactlyOne()` with `withTies` fails on a tie with 21000; and under an outer `count()` a `withTies` lateral inflates the count — `branch-reviewer`
 - #164 — `test/integration/shortcuts.test.ts:870-883`: every matching row is a tie, so the rows cannot tell `WITH TIES` from no limit; the top-level `NotExactlyOneError` with the option is frozen only by the unit `2` — `branch-reviewer`
 - #164 — `src/db/shortcuts.ts:851`: « With `withTies` and `order` » suggests `withTies` without `order` is harmless (Postgres refuses it, 42601) — `branch-reviewer`
+- #271 — `test/unit/injection.test.ts:56-57`: `compiled` carries two stacked `/** */` blocks, the first one `matrix`'s (ESLint does not lint `test/`) — `branch-reviewer`
