@@ -323,7 +323,7 @@ db.conditions.and<T>(...conditions: (SQLFragment<any, T> | Whereable)[])
 `((a) AND (b))`<!-- probe: db.conditions.and(db.sql`a`, db.sql`b`) -->: each operand in its own parentheses, joined by `AND`.
 
 - A `sql` fragment with a bare `OR` at its top level stays whole: `` and(db.sql`${'id'} = 1000 OR ${'id'} = 1001`, { studio_id: 1001 }) `` gives `(("id" = 1000 OR "id" = 1001) AND (("studio_id" = $1)))`<!-- probe: db.conditions.and(db.sql`${'id'} = 1000 OR ${'id'} = 1001`, { studio_id: 1001 }) -->, film 1001 alone.
-- With no argument, `TRUE`<!-- probe: db.conditions.and() -->: every row, as a Whereable `{}`. Zapatos 6.6.1 wrote `()`, which Postgres refuses (42601).
+- With no argument, `TRUE`<!-- probe: db.conditions.and() -->: every row, as a Whereable `{}`. Zapatos 6.6.1 wrote `()`, which Postgres refuses as a condition (42601). As a `groupBy`, `GROUP BY ()` ran, and `GROUP BY TRUE` is refused (42601): leave `groupBy` out ([Conditions](/switching#conditions)).
 
 ::: warning Every row
 `update()` and `deletes()` given `and(...filters)` or `not(or(...ids))` with an empty list now reach every row: `deletes('films', and())` sends `WHERE TRUE`<!-- probe: db.deletes('films', db.conditions.and()) --> and deletes them all, `not(or())` gives `(NOT (FALSE))`<!-- probe: db.conditions.not(db.conditions.or()) -->. Zapatos 6.6.1 threw (42601) before any row changed. Keep the length check where an empty list must not reach every row.
@@ -344,7 +344,7 @@ Any other gains parentheses and gives the same rows.
 db.conditions.or<T>(...conditions: (SQLFragment<any, T> | Whereable)[])
 ```
 
-`(a OR b)`<!-- probe: db.conditions.or(db.sql`a`, db.sql`b`) -->: its operands joined by `OR`, as they are: `AND` binds tighter than `OR`, so none reaches across it. With no argument, `FALSE`<!-- probe: db.conditions.or() -->: no row. Zapatos 6.6.1 wrote `()` here too.
+`(a OR b)`<!-- probe: db.conditions.or(db.sql`a`, db.sql`b`) -->: its operands joined by `OR`, as they are: `AND` binds tighter than `OR`, so none reaches across it. With no argument, `FALSE`<!-- probe: db.conditions.or() -->: no row. Zapatos 6.6.1 wrote `()` here too, and as a `groupBy`, `GROUP BY FALSE` is refused (42601).
 
 ### `not()` {#conditions.not}
 
