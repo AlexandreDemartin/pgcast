@@ -341,6 +341,10 @@ Candidates for a check, a rule or a skill line.
 - #492 — A claim that a call « hangs if it writes or locks a row the outer one holds » is probed with an insert of the same unique key too, the commonest wait on the docs schema — `branch-reviewer`, `builder`
 - #492 — In `test/integration/transaction.test.ts`, a failed `transactionRequiresIdleClient` test releases its client inside its block and turns later tests red: a red count there exceeds the tests that read the message — `builder`
 - #492 — « give it the pool » followed by a cost clause makes « it » the outer transaction, in English and French: name the call — `builder`
+- #495 — Skill `backward-compat` § Fixing an existing bug still says Fix when the old result contradicts the type, with no run-time exception, and does not name the kept explicit old value: it disagrees with decision 003 § Rule since #496 — `builder`
+- #495 — A rule clause worded from one case is searched against the other rows: « a value written in the config that asks for the old behaviour » also covered every opt-in's explicit `false` — `builder`
+- #495 — A fresh worktree's `npm ci` does not install `website/node_modules`: `docs:translated` fails with ERR_MODULE_NOT_FOUND until `cd website && npm ci` — `builder`
+- #495 — GitHub caps a parent issue at 100 sub-issues: an Epic past it links its last steps by « Part of #epic » in their body — orchestrator
 
 ## Minors kept
 
@@ -468,5 +472,5 @@ Minor review defects, taken up by the end-of-chapter review.
 - #487 — `website/catalog-types.md:69` and `website/generator.md:390` (and FR): "typed by its placeholder in all five interfaces, which, as generated, holds…" reads twice; "typed in all five interfaces by its placeholder, which…".
 - #487 — `website/custom-types.md:231` (and FR): the sentence on a domain's placeholder would read better as two.
 - #487 — `test/types/schema.test-d.ts`: `unknown`, `db.Int8String | null` under `strict`, and a generated `NumericString[]` or `Date[]` are not frozen for `DomainInContext`.
-- #484 plan — on master, an array of an enum is typed `mood[]` in `Selectable`, but `pg` returns it as a string (`'{a}'`); no issue yet.
+- #484 plan — on master, an array of an enum is typed `mood[]` in `Selectable`, but `pg` returns it as a string (`'{a}'`): #494.
 
