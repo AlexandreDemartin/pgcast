@@ -1,5 +1,5 @@
 ---
-english: ba462e5de8d5
+english: bbeda20342e4
 ---
 
 # Template SQL
@@ -127,6 +127,7 @@ Les deux dernières lignes s’appliquent quand [`castArrayParamsToJson`](/fr/ru
 - Zapatos 6.6.1 abandonnait un cast en chaîne sous l’une ou l’autre option au profit de `CAST($1 AS "json")` ([#36](https://github.com/AlexandreDemartin/pgcast/issues/36)), si bien qu’un cast qui nomme un autre type que sa cible s’applique désormais : `param(arr, 'int4[]')` vers une colonne `json` est refusé (42804), vers une colonne `text` stocke `{1,2}` pour `[1,2]`.
 - Sans cast, `castArrayParamsToJson` fait de `` db.sql`${db.param(ids)}::int4[]` `` `CAST($1 AS "json")::int4[]`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${db.param([1])}::int4[]`) -->, que Postgres rejette (42846) : écrivez `db.param(ids, 'int4[]')`, ou passez `false`, qui garde la valeur hors du JSON sous l’une ou l’autre option : `$1::int4[]`<!-- probe: db.sql`${db.param([1], false)}::int4[]` -->.
 - Comme valeur d’un Whereable ou dans `vals([…])` (donc dans [`isIn()`](/fr/conditions#conditions.isIn)), un `Parameter` se compile tel quel, avec son cast : `{ title: db.param('x', 'text') }` donne `("title" = CAST($1 AS "text"))`<!-- probe: db.sql`${{ title: db.param('x', 'text') }}` -->. Zapatos 6.6.1 l’enveloppait dans un second paramètre, envoyé en JSON (`'{"value":"x","cast":"text"}'`).
+- Les types reconnaissent un `Parameter` à sa forme, comme dans Zapatos 6.6.1 : un objet qui a une clé `value` du type de la colonne passe donc pour un `Parameter`, et part comme un seul paramètre, en JSON : `{ runtime_minutes: { value: 3 } }` donne `("runtime_minutes" = $1)`<!-- probe: db.sql`${{ runtime_minutes: { value: 3 } }}` --> avec `'{"value":3}'`, qu’une colonne `INTEGER` refuse (22P02) et qu’une colonne texte stocke tel quel. Enveloppez une valeur dans `param()`. Un objet doté d’une méthode `toPostgres()` est envoyé par cette méthode, comme le fait `pg`. Il en va de même pour un `ParentColumn` : dans un filtre, `{ value: 'title' }` passe là où passe un nom de colonne, et part en JSON, pas comme [`parent('title')`](#parent).
 
 ### `Parameter` {#Parameter}
 
