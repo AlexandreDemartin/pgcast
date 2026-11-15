@@ -132,6 +132,7 @@ export const definitionForRelationInSchema = async (
   enumsForSchema = async (schema: string) => (await enumOrdersForSchema(schema, queryFn))[enumOrderOf(config)],
   columnsTypedByEnumName: string[] = [],  // an 'out' parameter too: what typeEnumsAcrossSchemas would change
   customTypeImports: Record<string, string> = Object.create(null),  // an 'out' parameter too: what a placeholder imports from zapatos/schema, '' for nothing
+  uniqueIndexesNotArbiters: string[] = [],  // an 'out' parameter too: what uniqueIndexConstraintsOnly would leave out
 ) => {
   const
     rows = await columnsForRelation(rel, schemaName, queryFn),
@@ -223,11 +224,19 @@ export const definitionForRelationInSchema = async (
     if (isUpdatable) updatables.push(`${columnDoc}${possiblyQuotedColumn}?: ${updatableTypes} | db.SQLFragment<any, ${updatableTypes}>;`);
   });
 
-  // an index sits in its table's schema: matched on its name alone, it also took another schema's unique index
+  // an index sits in its table's schema: matched on its name alone, it also took another schema's unique index.
+  // ON CONFLICT ON CONSTRAINT takes the index of a UNIQUE or PRIMARY KEY constraint of the table (a foreign key's
+  // conindid is the referenced table's), but not DEFERRABLE (55000), nor WITHOUT OVERLAPS, an exclusion constraint
+  // to Postgres, which refuses it with DO UPDATE (42809): https://www.postgresql.org/docs/current/sql-insert.html
   const
     result = await queryFn({
       text: `
         SELECT DISTINCT i.indexname
+        , NOT idx.indisexclusion AND EXISTS (
+            SELECT 1 FROM pg_catalog.pg_constraint con
+            WHERE con.conindid = c.oid AND con.conrelid = idx.indrelid
+            AND con.contype IN ('p', 'u') AND NOT con.condeferrable
+          ) AS "isArbiter"
         FROM pg_catalog.pg_indexes i
         JOIN pg_catalog.pg_namespace n ON n.nspname = i.schemaname
         JOIN pg_catalog.pg_class c ON c.relname = i.indexname AND c.relnamespace = n.oid
@@ -236,7 +245,12 @@ export const definitionForRelationInSchema = async (
         ORDER BY i.indexname`,
       values: [rel.name, schemaName]
     }),
-    uniqueIndexes = result.rows;
+    constraintsOnly = config.uniqueIndexConstraintsOnly ?? false,
+    uniqueIndexes = result.rows.filter(ui => ui.isArbiter || !constraintsOnly);
+
+  if (!constraintsOnly) {
+    uniqueIndexesNotArbiters.push(...result.rows.filter(ui => !ui.isArbiter).map(ui => `${schemaName}.${rel.name}.${ui.indexname}`));
+  }
 
   const
     schemaPrefix = schemaName === config.unprefixedSchema ? '' : `${schemaName}.`,

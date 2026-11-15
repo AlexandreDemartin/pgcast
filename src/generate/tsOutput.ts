@@ -154,6 +154,25 @@ const warnAboutEnumsAcrossSchemas = (columns: string[], config: CompleteConfig) 
 };
 
 /**
+ * Without `uniqueIndexConstraintsOnly`, note the unique indexes it would leave out of `UniqueIndex`, once per run:
+ * `constraint()` takes them, and `ON CONFLICT ON CONSTRAINT` refuses them.
+ */
+const warnAboutUniqueIndexesNotArbiters = (indexes: string[], config: CompleteConfig) => {
+  if (indexes.length === 0) return;
+
+  const
+    warn = config.warningListener === true ? console.log : config.warningListener || (() => void 0),
+    sorted = [...indexes].sort(),
+    one = sorted.length === 1,
+    list = one ? sorted[0] : sorted.slice(0, -1).join(', ') + ' and ' + sorted[sorted.length - 1];
+
+  warn(`Note: UniqueIndex lists ${list}, ${one ? 'a unique index' : 'unique indexes'} of no UNIQUE or PRIMARY KEY ` +
+    `constraint, or of a DEFERRABLE or WITHOUT OVERLAPS one: db.constraint() takes ${one ? 'it' : 'them'}, and ` +
+    `Postgres refuses ${one ? 'it' : 'them'} in ON CONFLICT ON CONSTRAINT ... DO UPDATE. ` +
+    `Set uniqueIndexConstraintsOnly: true to leave ${one ? 'it' : 'them'} out; it will be the default in pgcast 7.0.`);
+};
+
+/**
  * Warn about each `include` entry that names no relation of its schema: it generates nothing.
  * `information_schema.tables` lists only the tables and views the connecting role has a privilege on.
  */
@@ -264,6 +283,7 @@ const tsForQueries = async (config: CompleteConfig, queryFn: (q: pg.QueryConfig)
     enumOrdersFor = (schema: string) => enumsBySchema[schema] ??= enumOrdersForSchema(schema, queryFn),
     enumsForSchema = async (schema: string) => (await enumOrdersFor(schema))[enumOrder],
     columnsTypedByEnumName: string[] = [],
+    uniqueIndexesNotArbiters: string[] = [],
     schemaNames = Object.keys(schemas),
     schemaData = (await Promise.all(
       schemaNames.map(async schema => {
@@ -283,7 +303,7 @@ const tsForQueries = async (config: CompleteConfig, queryFn: (q: pg.QueryConfig)
           outOfOrder = enumOrder === 'declared' ? [] : enumsOutOfOrder(enumOrders).map(name => ({ schema, name })),
           tableDefs = await Promise.all(tables.map(async table =>
             definitionForRelationInSchema(table, schema, enums, customTypes, config, queryFn, customTypeOrigins,
-              enumsForSchema, columnsTypedByEnumName, customTypeImports))),
+              enumsForSchema, columnsTypedByEnumName, customTypeImports, uniqueIndexesNotArbiters))),
           schemaIsUnprefixed = schema === config.unprefixedSchema,
           none = '/* (none) */',
           schemaDef = `/* === schema: ${jsdocText(schema)} === */\n` +
@@ -333,6 +353,7 @@ const tsForQueries = async (config: CompleteConfig, queryFn: (q: pg.QueryConfig)
   warnAboutSharedCustomTypeNames(customTypeOrigins, config);
   warnAboutEnumsAcrossSchemas(columnsTypedByEnumName, config);
   warnAboutEnumOrder(schemaData.flatMap(r => r.outOfOrder), config);
+  warnAboutUniqueIndexesNotArbiters(uniqueIndexesNotArbiters, config);
 
   return { ts, customTypeSourceFiles };
 };

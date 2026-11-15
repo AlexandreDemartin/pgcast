@@ -35,6 +35,8 @@ export interface OptionalConfig {
   moduleNames?: 'zapatos' | 'pgcast';  // the folder written, and the module names it declares and imports: pgcast/schema, pgcast/db…
   // optional too; read it with ?? false, deprecated: true in 7.0; the CLI sets false
   rejectOnQueryError?: boolean;  // a failed query, the connection included, rejects generate() with its error, rather than exit
+  // optional too; read it with ?? false, deprecated: true in 7.0
+  uniqueIndexConstraintsOnly?: boolean;  // UniqueIndex lists only what ON CONFLICT ON CONSTRAINT takes: UNIQUE and PRIMARY KEY constraints
 }
 
 interface SchemaRules {
