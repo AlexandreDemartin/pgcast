@@ -1,5 +1,5 @@
 ---
-english: 229fc7071c60
+english: 54d3f3fa9223
 ---
 
 # Lectures {#select-and-the-aggregates}
@@ -444,7 +444,7 @@ Une clause de verrouillage de [`lock`](#lock). `of` prend un nom de table sans s
 
 `LateralOption<C, E>` : le type de `lateral`. Un objet de sous-requêtes ([`SQLFragmentMap`](#SQLFragmentMap)) ; ou une seule sous-requête, seulement quand ni `columns` ni `extras` n’est donné.
 
-Dans une fonction générique sur `columns` (`C extends ColumnsOption<T>`), `select()`, `selectOne()` et `selectExactlyOne()` sans `lateral` typent chaque colonne de leurs lignes comme `any` dans cette fonction, comme dans Zapatos 6.6.1 : une colonne erronée compile donc. C’est le cas sans `extras` ou avec un `extras` générique ; sans `strictNullChecks`, aussi avec un `extras` littéral, et dans une fonction générique sur `extras` seul. Les appelants de la fonction obtiennent des lignes typées. Passez `lateral: undefined`, qui ne change pas le SQL, et les lignes sont aussi typées dans la fonction, comme avec des `columns` littérales : une clé d’un `extras` générique est alors refusée elle aussi. Une fonction qui transmet son propre `lateral` générique, ou un objet d’options entier typé avec `LateralOption<C, …>`, garde `any`.
+Dans une fonction générique sur `columns` (`C extends ColumnsOption<T>`) ou sur `extras` (`E extends ExtrasOption<T>`), `select()`, `selectOne()` et `selectExactlyOne()` sans `lateral` typent chaque colonne de leurs lignes comme `any` dans cette fonction, comme dans Zapatos 6.6.1 : une colonne erronée compile donc. C’est le cas avec des `columns` génériques, sans `extras` ou avec un `extras` générique, et avec un `extras` générique sans `columns` ; sans `strictNullChecks`, aussi avec des `columns` génériques et un `extras` littéral, ou avec des `columns` littérales et un `extras` générique. Les appelants de la fonction obtiennent des lignes typées. Passez `lateral: undefined`, qui ne change pas le SQL, et, dans chacun de ces cas, les lignes sont typées dans la fonction : une clé d’un `extras` générique est alors refusée elle aussi. Une fonction qui transmet son propre `lateral` générique, ou un objet d’options entier typé avec `LateralOption<C, …>`, garde `any`.
 
 ```ts twoslash
 import * as db from 'zapatos/db';
