@@ -382,6 +382,24 @@ describe('the config transaction() reads', () => {
     expect((error as Error).message).toBe('no delay');
   });
 
+  it('clears _zapatos from a plain client when reading the config throws', async () => {
+    // a client of the caller's, not the pool's: nothing to release, but a _zapatos left on it would make the
+    // next transaction() pass it through, its callback run outside any transaction
+    class Delay { get minMs(): number { throw new Error('no delay'); } get maxMs() { return 0; } }
+    db.setConfig({ transactionRetryDelay: new Delay() });
+    const client = new pg.Client({ connectionString: (t.pool as unknown as { options: { connectionString: string } }).options.connectionString });
+    await client.connect();
+    try {
+      const error = await db.readCommitted(client, async () => 'never').catch((e: unknown) => e);
+      expect((error as Error).message).toBe('no delay');
+      expect(Object.prototype.hasOwnProperty.call(client, '_zapatos')).toBe(false);
+      resetConfig();
+      expect(await db.readCommitted(client, async c => c.getTransactionStatus())).toBe('T');  // its own transaction
+    } finally {
+      await client.end();
+    }
+  });
+
   // #257: as in Zapatos 6.6.1, a delay whose getter throws makes transaction() throw, not a query run on its own
   it.each([
     ['throws', () => { throw new Error('no delay'); }],

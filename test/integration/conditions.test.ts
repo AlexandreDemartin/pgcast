@@ -145,6 +145,12 @@ describe('on users', () => {
     expect(await ids('users', dc.and(sql`${'display_name'} = 'x`, sql`y'`))).toEqual([2]);
   });
 
+  it('and() parenthesises each operand: a BETWEEN split across two', async () => {
+    // 6.6.1 wrote `("id" BETWEEN 1 AND 2)` and found users 1 and 2; now `(("id" BETWEEN 1) AND (2))`, which Postgres refuses
+    expect(await pgError(t.client, () => ids('users', dc.and(sql`${'id'} BETWEEN 1`, sql`2`))))
+      .toEqual({ code: '42601', message: 'syntax error at or near ")"' });
+  });
+
   it('or() matches the same rows whatever its operands: AND binds tighter than OR', async () => {
     expect(await ids('users', dc.or(sql`${'id'} = 1 AND ${'manager_id'} = 1`, sql`${'id'} = 2 OR ${'id'} = 3`))).toEqual([2, 3]);
   });
