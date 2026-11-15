@@ -17,7 +17,9 @@ Released under the MIT licence: see LICENCE file
 export function isDatabaseError(err: unknown, ...types: (keyof typeof pgErrors)[]) {
   if (err === null || err === undefined) return false;
   const { code } = err as { code?: string };
-  if (!code || code.length !== 5) return false;
+  // a code with no startsWith(), such as an array of five characters, is not a string (#501);
+  // a String object has one, and matches as in Zapatos 6.6.1
+  if (!code || code.length !== 5 || typeof code.startsWith !== 'function') return false;
   return types.some(type => code.startsWith(pgErrors[type]));
 }
 
