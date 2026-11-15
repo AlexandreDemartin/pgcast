@@ -121,7 +121,7 @@ const
   orderNull = '`order: null` has no meaning: for no `ORDER BY`, leave `order` out; to sort, give it `{ by, direction }`, or an array of them.',
   lockNull = '`lock: null` has no meaning: for no lock, leave `lock` out; to lock, give it `{ for }`, or an array of them.';
 
-function SQLForColumnsOfTable(columns: readonly Column[] | undefined, table: Table, nullMessage = returningNull) {
+function SQLForColumnsOfTable(columns: readonly Column[] | undefined, table: Table, nullMessage: string) {
   return columns === undefined ? sql`to_jsonb(${table}.*)` :
     columns === null ? refusedSQL(nullMessage) :
       sql`jsonb_build_object(${mapWithSeparator(columns, sql`, `, c => sql`${param(c)}::text, ${c}`)})`;
@@ -221,7 +221,8 @@ interface InsertSignatures {
  * rows does: `{ title: undefined }` gives `VALUES (DEFAULT)`.
  * @param options Optionally, `returning` (an array of columns) and `extras`;
  * `null` is none, and either set to `null` throws as the query compiles, so
- * `run()` rejects before any query
+ * `run()` rejects before any query, unless `values` is an empty array, a no-op
+ * (a row with no key throws first, at the call)
  */
 export const insert: InsertSignatures = function (
   table: Table,
@@ -245,7 +246,7 @@ export const insert: InsertSignatures = function (
       valuesSQL = Array.isArray(completedValues) ?
         mapWithSeparator(completedValues as Insertable[], sql`, `, v => sql`(${vals(v)})`) :
         sql`(${vals(completedValues)})`,
-      returningSQL = SQLForColumnsOfTable(options?.returning, table),
+      returningSQL = SQLForColumnsOfTable(options?.returning, table, returningNull),
       extrasSQL = SQLForExtras(options?.extras);
 
     // a null row on its own, or a primitive row anywhere, fails in compile(), in cols() or vals(), so run() rejects
@@ -471,7 +472,7 @@ export const upsert: UpsertSignatures = function (
       updateValues[c] !== undefined ? updateValueSQL(updateValues[c]) :
         (noNullUpdateColumns === all || noNullUpdateColumns.includes(c)) ? sql`CASE WHEN EXCLUDED.${c} IS NULL THEN ${table}.${c} ELSE EXCLUDED.${c} END` :
           sql`EXCLUDED.${c}`),
-    returningSQL = SQLForColumnsOfTable(options?.returning, table),
+    returningSQL = SQLForColumnsOfTable(options?.returning, table, returningNull),
     extrasSQL = SQLForExtras(options?.extras),
     suppressReport = options?.reportAction === 'suppress';
 
@@ -546,7 +547,7 @@ export const update: UpdateSignatures = function (
   // more info: https://www.postgresql-archive.org/Possible-regression-in-UPDATE-SET-lt-column-list-gt-lt-row-expression-gt-with-just-one-single-column0-td5989074.html
 
   const
-    returningSQL = SQLForColumnsOfTable(options?.returning, table),
+    returningSQL = SQLForColumnsOfTable(options?.returning, table, returningNull),
     extrasSQL = SQLForExtras(options?.extras),
     query = sql`UPDATE ${table} SET (${cols(values)}) = ROW(${vals(values)}) WHERE ${where} RETURNING ${returningSQL}${extrasSQL} AS result`;
 
@@ -578,7 +579,7 @@ export const deletes: DeleteSignatures = function (
 ): SQLFragment {
 
   const
-    returningSQL = SQLForColumnsOfTable(options?.returning, table),
+    returningSQL = SQLForColumnsOfTable(options?.returning, table, returningNull),
     extrasSQL = SQLForExtras(options?.extras),
     query = sql`DELETE FROM ${table} WHERE ${where} RETURNING ${returningSQL}${extrasSQL} AS result`;
 
@@ -624,9 +625,7 @@ export const truncate: TruncateSignatures = function (
 
   query.runResultTransform = () => undefined;
   if (given.length <= 2 && (given.length < 2 || (given[0].endsWith('IDENTITY') && !given[1].endsWith('IDENTITY')))) return query;
-  const refused = sql``;
-  refused.compile = () => { throw new Error(`Truncate options must be CONTINUE IDENTITY/RESTART IDENTITY, then RESTRICT/CASCADE, one of each at most, not ${given.map(opt => `'${opt}'`).join(', ')}`); };
-  return sql<SQL, undefined>`${refused}`;
+  return sql<SQL, undefined>`${refusedSQL(`Truncate options must be CONTINUE IDENTITY/RESTART IDENTITY, then RESTRICT/CASCADE, one of each at most, not ${given.map(opt => `'${opt}'`).join(', ')}`)}`;
 };
 
 
@@ -756,8 +755,10 @@ const functionName = new RegExp(`^${space}(?:${identifier})(?:${space}\\.${space
  * @param where A `Whereable` or `SQLFragment` defining the rows to be selected,
  * or `all`
  * @param options Options object; `null` is none. Keys (all optional) are
- * below; `columns`, `extras`, `order` or `lock` set to `null` throws as the
- * query compiles, so `run()` rejects before any query:
+ * below; `order` or `lock` set to `null` throws as the query compiles, so
+ * `run()` rejects before any query, and so do `columns` and `extras` in
+ * `select`, `selectOne` and `selectExactlyOne`, unless one `lateral` subquery
+ * takes the columns' place:
  * * `columns` — an array of column names, readonly (`as const`) or not: only
  * these columns will be returned
  * * `order` – an array of `OrderSpec` objects, such as 
@@ -808,9 +809,7 @@ export const select: SelectSignatures = function (
       nullKey !== undefined ? `The \`lateral\` key '${nullKey}' is \`${givenLateral[nullKey]}\`, not a query: leave the key out, or give it a \`select()\`, \`selectOne()\` or \`count()\` query.` :
         undefined;
   if (lateralRefusal !== undefined) {
-    const refused = sql``;
-    refused.compile = () => { throw new Error(lateralRefusal); };
-    return sql<SQL, any>`${refused}`;
+    return sql<SQL, any>`${refusedSQL(lateralRefusal)}`;
   }
 
   const
@@ -1065,9 +1064,7 @@ const numericAggregate = (
     return query;
   }
   // the refusal sits in the expressions, which copy() shares, so that a copy nested in a lateral throws too
-  const refused = sql``;
-  refused.compile = () => { throw new Error(refusal); };
-  return sql<SQL, number>`${refused}`;
+  return sql<SQL, number>`${refusedSQL(refusal)}`;
 };
 
 /**

@@ -56,7 +56,7 @@ Insert one row or several, and return them as Postgres stored them, defaults and
 
 - A `readonly` array in `returning` (`['id'] as const`) gives the same SQL and the same type as a mutable one ([`columns`](/select#columns)).
 - Both need `strictNullChecks` for their types.
-- `null` options are none. `returning: null` or `extras: null`, past the type, throws as the query compiles, so `.run()` rejects before any query, in `upsert()`, `update()` and `deletes()` too: "`` `returning: null` has no meaning: for every column, leave `returning` out; for some, give an array of their names. ``<!-- message -->". Zapatos 6.6.1 threw a `TypeError` at the call.
+- `null` options are none. `returning: null` or `extras: null`, past the type, throws as the query compiles, so `.run()` rejects before any query, in `upsert()`, `update()` and `deletes()` too: "`` `returning: null` has no meaning: for every column, leave `returning` out; for some, give an array of their names. ``<!-- message -->". An `insert()` or `upsert()` of `[]` is still a no-op, and a row with no key still throws first, at the call. Zapatos 6.6.1 threw a `TypeError` at the call.
 
 ## `upsert()` {#upsert}
 
