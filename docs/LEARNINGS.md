@@ -297,6 +297,8 @@ Candidates for a check, a rule or a skill line.
 - #469 — An item added to a list in the docs or CHANGELOG is checked against the sentence that frames it (« which lets these calls through », « three options »): #475 broke one of each — `branch-reviewer`
 - #469 — An object with zero or several keys, a `Set` or a function as an aggregate's `columns` still compiles to `count()` / `count("a", "b")`, which Postgres refuses (6.6.1 too); niche, outside the type: not filed — orchestrator
 - #469 — Under load from parallel worktrees, `codegen.test.ts` hits Vitest's 5 s timeout (a rerun is green); and a French term for an English phrase is searched on the site first (« en passant outre le type ») — `builder`
+- #473 — A test of generated JSDoc lines compares them with their indentation in at least one schema shape: a `trimStart()` or `/^ *\*/` cannot catch a wrong margin (#308 and #473 both added an unpinned margin parameter) — `branch-reviewer`
+- #473 — Placeholder files come back in query completion order: comparing outputs across runs sorts them first — `builder`
 
 ## Minors kept
 
@@ -412,3 +414,4 @@ Minor review defects, taken up by the end-of-chapter review.
 - #308 — `CHANGELOG.md:214-220`: « holding a line break, a string literal (…) or a quoted name (…) » reads as three alternatives; « one that starts with `*` » leaves out a `*` after white space — `branch-reviewer`
 - #469 — `test/unit/shortcuts.test.ts:1685`: the guard test freezes only a plain object, not a `Set`, a function or a `String` object — `branch-reviewer`
 - #469 — `website/select.md:263` (and `fr/…:267`): « an empty string, `0` or `false` » reads as the whole falsy list; `src/db/shortcuts.ts:1003`, `:1019`: « a string » where any primitive is refused; `test/unit/core.test.ts:696` duplicates `test/unit/shortcuts.test.ts:1665` — `branch-reviewer`
+- #473 — `test/integration/codegen.test.ts:1355`: the margin given to `jsdocLines()` is not pinned by any test; `src/generate/tables.ts:120`: `jsdocLines()` would sit better beside `jsdocText()` in `quote.ts` — `branch-reviewer`
