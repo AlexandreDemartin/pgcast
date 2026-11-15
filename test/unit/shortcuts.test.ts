@@ -1497,6 +1497,18 @@ describe('select', () => {
       `);
   });
 
+  // a function generic over columns passes it to type its rows (#284)
+  it.each([
+    ['select()', db.select('users', { id: 1 }, { columns: ['id', 'email'], lateral: undefined }), db.select('users', { id: 1 }, { columns: ['id', 'email'] })],
+    ['select(), no columns', db.select('users', { id: 1 }, { lateral: undefined }), db.select('users', { id: 1 })],
+    ['selectOne()', db.selectOne('users', { id: 1 }, { columns: ['id', 'email'], lateral: undefined }), db.selectOne('users', { id: 1 }, { columns: ['id', 'email'] })],
+    ['selectOne(), no columns', db.selectOne('users', { id: 1 }, { lateral: undefined }), db.selectOne('users', { id: 1 })],
+    ['selectExactlyOne()', db.selectExactlyOne('users', { id: 1 }, { columns: ['id', 'email'], lateral: undefined }), db.selectExactlyOne('users', { id: 1 }, { columns: ['id', 'email'] })],
+    ['selectExactlyOne(), no columns', db.selectExactlyOne('users', { id: 1 }, { lateral: undefined }), db.selectExactlyOne('users', { id: 1 })],
+  ])('lateral: undefined gives the SQL of no lateral: %s', (_, given, without) => {
+    expect(given.compile()).toEqual(without.compile());
+  });
+
   it('lateral nested, with alias for a self-join', () => {
     expect(db.select('users', { id: 1 }, {
       alias: 'u',
