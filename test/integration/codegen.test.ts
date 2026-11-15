@@ -200,6 +200,7 @@ describe('variant snapshots', () => {
   it('uniqueIndexConstraintsOnly: constraint() takes a constraint, and no other unique index', async () => {
     const probe = (refused: string) => `
       import * as db from 'zapatos/db';
+      import type * as s from 'zapatos/schema';
       const row = { sku: 'x', price_cents: 1, status: 'draft' } as const;
       export const kept = [
         db.upsert('products', row, db.constraint('products_pkey')),
@@ -210,10 +211,16 @@ describe('variant snapshots', () => {
         db.upsert('products', row, db.constraint('products_status_sku_key')),
         ${refused} a partial unique index on an expression, refused too
         db.upsert('products', row, db.constraint('products_title_lower_key')),
-      ];`;
+      ];
+      // a Record keyed by UniqueIndex, which lists every unique index without the option
+      export const labels: Record<s.products.UniqueIndex, string> = {
+        products_pkey: 'id', products_sku_variant_key: 'sku and variant',
+        ${refused} no longer keys of the Record
+        products_status_sku_key: 'status, sku and variant', products_title_lower_key: 'title',
+      };`;
     expect(await probeErrors({ ...main, uniqueIndexConstraintsOnly: true }, probe('// @ts-expect-error'))).toEqual([]);
     expect(await probeErrors(main, probe('//'))).toEqual([]);  // off: all four, as in Zapatos 6.6.1
-    expect(await probeErrors(main, probe('// @ts-expect-error'))).toEqual(Array(2).fill(
+    expect(await probeErrors(main, probe('// @ts-expect-error'))).toEqual(Array(3).fill(
       "probe.ts TS2578 Unused '@ts-expect-error' directive."));
   });
 
