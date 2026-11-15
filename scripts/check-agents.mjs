@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 // `npm run check:agents`: keeps the agent method (.agents/README.md) consistent, AGENTS.md § Architecture in step with
-// src/, recounts the summary of the characterisation report, then runs the tests of the guard hook and of both checks.
+// src/ and CHANGELOG.md § Deprecated with its messages, recounts the summary of the characterisation report, then runs
+// the tests of the guard hook and of these checks.
 import {spawnSync} from 'node:child_process';
 import {existsSync, readdirSync, readFileSync} from 'node:fs';
 import {join} from 'node:path';
 import {checkArchitecture} from './check-architecture.mjs';
+import {checkDeprecations, sourcesOfSrc} from './check-deprecations.mjs';
 import {checkReport} from './check-report.mjs';
 
 const skillsDirectory = '.agents/skills';
@@ -84,6 +86,9 @@ const modules = Object.fromEntries(['src/db/', 'src/generate/']
   .map(dir => [dir, readdirSync(dir).filter(f => f.endsWith('.ts'))]));
 errors.push(...checkArchitecture(readFileSync('AGENTS.md', 'utf8'), modules));
 
+// Each deprecation message of src/ with its CHANGELOG.md line (scripts/check-deprecations.mjs).
+errors.push(...checkDeprecations(sourcesOfSrc(), readFileSync('CHANGELOG.md', 'utf8')));
+
 // The summary of the characterisation report, recounted from its sections (scripts/check-report.mjs).
 const reportPath = 'docs/CHARACTERISATION-REPORT.md';
 errors.push(...checkReport(readFileSync(reportPath, 'utf8'), reportPath));
@@ -95,7 +100,8 @@ if (errors.length > 0) {
   console.error(errors.map(e => `✗ ${e}`).join('\n'));
   process.exit(1);
 }
-console.log(`✓ ${skills.length} skills, ${readdirSync(agentsDirectory).filter(f => f.endsWith('.md')).length} agents, AGENTS.md § Architecture, ${reportPath} summary`);
+console.log(`✓ ${skills.length} skills, ${readdirSync(agentsDirectory).filter(f => f.endsWith('.md')).length} agents, AGENTS.md § Architecture, CHANGELOG.md § Deprecated, ${reportPath} summary`);
 
-const tests = spawnSync(process.execPath, ['--test', '.claude/hooks/guard.test.mjs', 'scripts/check-architecture.test.mjs', 'scripts/check-report.test.mjs'], {stdio: 'inherit'});
+const tests = spawnSync(process.execPath, ['--test', '.claude/hooks/guard.test.mjs', 'scripts/check-architecture.test.mjs',
+  'scripts/check-deprecations.test.mjs', 'scripts/check-report.test.mjs'], {stdio: 'inherit'});
 process.exit(tests.status ?? 1);
