@@ -1,5 +1,5 @@
 ---
-english: d946875615d0
+english: ec626c05f9e5
 ---
 
 # Venir de Zapatos
@@ -261,7 +261,7 @@ La note de [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSche
 
 La note d’[`enumOrder`](/fr/generator#generate.enumOrder) nomme chaque enum dont le générateur trie les labels, alors que Postgres les déclare dans un autre ordre. Réglez-le sur `"declared"` et régénérez : pour TypeScript, seul `every.<name>` change, donc le code à relire est celui qui y prend un label par son indice ou le compare à un tuple.
 
-La note d’[`uniqueIndexConstraintsOnly`](/fr/generator#generate.uniqueIndexConstraintsOnly) nomme chaque index unique que refuse `ON CONFLICT ON CONSTRAINT`, bien qu’`UniqueIndex` le liste : un index sans contrainte, ou l’index d’une contrainte `DEFERRABLE`. Activez-le et régénérez : `tsc` montre chaque `constraint()` qui en nomme un, que Postgres refusait de toute façon (42704 ou 55000), et tout code à vous qui prend `UniqueIndex` pour la liste de chaque index unique, comme un `Record` dont il type les clés.
+La note d’[`uniqueIndexConstraintsOnly`](/fr/generator#generate.uniqueIndexConstraintsOnly) nomme chaque index unique que refuse `ON CONFLICT ON CONSTRAINT`, bien qu’`UniqueIndex` le liste : un index sans contrainte, comme celui d’une vue matérialisée, l’index d’une contrainte `DEFERRABLE` ou, sur Postgres 18, d’une clé `WITHOUT OVERLAPS`, et l’index pas encore valide d’une contrainte. Activez-le et régénérez : `tsc` montre chaque `constraint()` qui en nomme un, que Postgres refusait de toute façon (42704, 55000, 42809 ou 42P10), et tout code à vous qui prend `UniqueIndex` pour la liste de chaque index unique, comme un `Record` dont il type les clés.
 
 La note de [`rejectOnQueryError`](/fr/generator#generate.rejectOnQueryError) vient d’un script qui appelle `generate()`, quand une requête échoue, jamais de `npx zapatos`, qui s’arrête toujours. Activez-le là où le script attend `generate()` avec `await`, et relisez ce que fait son `catch` : une connexion refusée y arrive désormais, et un script qui logge l’erreur puis continue se termine avec le code 0, pas 1.
 
