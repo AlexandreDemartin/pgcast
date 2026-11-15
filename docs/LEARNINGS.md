@@ -277,6 +277,10 @@ Candidates for a check, a rule or a skill line.
 - #274 — A docs claim about a parameter's compiled SQL (`$1`, JSON) names the `castArrayParamsToJson` / `castObjectParamsToJson` condition, or is probed under both: candidate check in `check-prose.mjs`, rerun each `<!-- probe -->` without `setConfig` with both options on and flag a changed text whose sentence names no option — `branch-reviewer`
 - #274 — A value object with `toPostgres()` and a `value` field compiles only because `Parameter` matches by shape: probe it whenever `Parameter` is narrowed; under `castObjectParamsToJson` an object literal's own `toPostgres()` is not used — `builder`
 - #274 — A types-only `ConfigTypes` opt-in cannot carry decision 003's warning, and a class + interface merge needs an ESLint disable in `core.ts`: weigh Document first for a niche type gap (as #402) — orchestrator
+- #308 — A test that models `schema.d.ts` as text goes through the same indentation as `tsOutput.ts` (`declareModule`, `indentAll`), in an unprefixed and a prefixed schema, or is checked once against `tsForConfig`: a model without it passed review twice and counted other exceptions (#440's fuzz too) — `branch-reviewer`
+- #308 — JS multiline `^` matches after `\r`, U+2028 and U+2029, so `indentAll()` and `declareModule()` write spaces inside a `\r\n` and after a U+2028; an `@` after a U+2028 in a comment then opens a tag holding the generated lines (niche, not filed) — `builder`
+- #308 — In a JSDoc's main text TypeScript ignores backticks, so ` @x` opens a tag even in a code span (one-line defaults did under 6.6.1); after an inline `{@link` left open, it reads the next line's margin `*` as text — `builder`
+- #308 — Probes and PR bodies show invisible characters escaped (U+00A0, U+2028): `JSON.stringify` does not escape them; join tag names with `JSON.stringify`, not `','`, or a nameless tag hides — `branch-reviewer`, `builder`
 
 ## Minors kept
 
@@ -385,3 +389,5 @@ Minor review defects, taken up by the end-of-chapter review.
 - #274 — `website/sql-template.md:126` (and `fr/…:130`): « A text column stores as it is » right after a filter example; « passes where a column name does » reads as « wherever » — `branch-reviewer`
 - #274 — `test/types/core.test-d.ts:208-230`: no enum column and no `upsert()` slot for the structural `{ value }` case (skill `type-tests` § Structural wrappers) — `branch-reviewer`
 - #274 — `src/db/core.ts:137-140`: interpolated directly in `sql`, `${{ value: 3 }}` passes as a Whereable and compiles to `("value" = $1)` — `branch-reviewer`
+- #308 — `test/unit/columnJSDoc.test.ts:161-162`: `opened` and `split` check less than the comment describes — `branch-reviewer`
+- #308 — `CHANGELOG.md:214-220`: « holding a line break, a string literal (…) or a quoted name (…) » reads as three alternatives; « one that starts with `*` » leaves out a `*` after white space — `branch-reviewer`
