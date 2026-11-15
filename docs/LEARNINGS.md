@@ -354,6 +354,8 @@ Candidates for a check, a rule or a skill line.
 - #484 — An `any` exception on a nested type is probed with `to_jsonb` as well as `pg`: nested arrays (`[[7]]`) proved the array guard was needed — `builder`
 - #484 — Last-wins on a #42 shared placeholder is a race between the pool's queries (`tsOutput.ts` `Promise.all`), not « the relation read last »; fourth time (#184, #449, #455, #484): a new `await` in `definitionForRelationInSchema` is checked by N generations giving one output — `branch-reviewer`
 - #484 — A verify round on a draft has no CI run of the red/green test: the builder reports a local run of the new test, or the PR is marked ready before verify — `branch-reviewer`
+- #502 — A CHANGELOG line for a fix that changes two paths (the pool's client and a plain client, #246) gives one clause each: the plain client's cleared `_zapatos` was in no line — `builder`
+- #502 — A brief names a PR by its PR number, not its issue's: #246 and #96 are issues, closed by PRs #255 and #265 — `builder`
 
 ## Minors kept
 
@@ -485,3 +487,4 @@ Minor review defects, taken up by the end-of-chapter review.
 - #498 — `test/integration/codegen.test.ts:1374`: the key-off test covers `domainsTypedByContext` left out only, not `false`.
 - #498 — `src/generate/tables.ts:257`: `rootTypes[1] !== 'any'` relies on index 1 being `JSONSelectable`; name it or index through `contexts`.
 - #498 — `src/generate/tables.ts:145`: `definitionForRelationInSchema()`'s `domainRoots?` names `DomainRoots`, which `zapatos/generate` does not export; a direct six-argument caller runs one roots query per relation, unmemoised.
+
