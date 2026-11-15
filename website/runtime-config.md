@@ -441,15 +441,14 @@ const premiere: db.TimestampTzString = '2030-03-01T19:30:00';
 
 ```ts
 type DomainInContext<Custom, Generated, InContext> =
-  0 extends (1 & Custom) ? Custom :
-  [Custom] extends [Generated] ? [Generated] extends [Custom] ? InContext : Custom : Custom
+  (<T>() => T extends Custom ? 1 : 2) extends (<T>() => T extends Generated ? 1 : 2) ? InContext : Custom
 ```
 
-The type that the generator's [`domainsTypedByContext`](/generator#generate.domainsTypedByContext) writes for a column of a domain, in `JSONSelectable`, `Whereable`, `Insertable` and `Updatable`: `InContext`, its base type's type there, while the placeholder `Custom` is still `Generated`, the type the generator wrote in it; otherwise `Custom`, as without the option.
+The type that the generator's [`domainsTypedByContext`](/generator#generate.domainsTypedByContext) writes for a column of a domain, in `JSONSelectable`, `Whereable`, `Insertable` and `Updatable`: `InContext`, its base type's type there, while the placeholder `Custom` is still exactly `Generated`, the type the generator wrote in it; otherwise `Custom`, as without the option.
 
 - `DomainInContext<db.Int8String, db.Int8String, number>` is `number`: a placeholder left as generated.
 - `DomainInContext<number | db.Int8String, db.Int8String, number>` is `number | db.Int8String`: an edited placeholder keeps its type, in every context.
-- An `any` stays `any`. A placeholder edited to the same type, `` `${number}` `` for `db.Int8String`, counts as left as generated.
+- An `any` stays `any`, and an `any[]` stays `any[]`, such as a placeholder Zapatos 6.6.1 wrote over `int8[]` with no import. A placeholder edited to the same type, `` `${number}` `` for `db.Int8String`, counts as left as generated.
 
 ## JSON {#json}
 

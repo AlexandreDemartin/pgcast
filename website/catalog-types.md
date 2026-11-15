@@ -66,7 +66,7 @@ For views, pgcast keeps to what Postgres states, as Zapatos did: a nullability t
 - Enum labels come out in alphabetical order: `crew_job` is `'cinematographer' | 'composer' | 'director' | 'editor' | 'writer'`, not the order of its `CREATE TYPE`, unless [`enumOrder`](/generator#generate.enumOrder) is `"declared"`.
 - An enum of another schema becomes an `any` placeholder, or takes the labels of the enum of the same name in the relation's schema, unless [`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas) is on.
 - `UniqueIndex` lists every unique index, those `ON CONFLICT ON CONSTRAINT` refuses included, unless [`uniqueIndexConstraintsOnly`](/generator#generate.uniqueIndexConstraintsOnly) is on.
-- A domain over `int8`, `numeric`, `bytea`, `money` or a date is typed as `pg` returns it in all five interfaces, unless [`domainsTypedByContext`](/generator#generate.domainsTypedByContext) is on.
+- A domain over `int8`, `numeric`, `bytea`, `money` or a date is typed by its placeholder in all five interfaces, which, as generated, holds what `pg` returns, unless [`domainsTypedByContext`](/generator#generate.domainsTypedByContext) is on.
 
 ::: info Coming
 Reading more of the catalog, each as an opt-in: foreign keys, for laterals that know their join ([#54](https://github.com/AlexandreDemartin/pgcast/issues/54)); a domain's `CHECK (VALUE = ANY (ARRAY[…]))` as a union of its values ([#55](https://github.com/AlexandreDemartin/pgcast/issues/55)); and, as a separate tool, the result types of hand-written SQL ([#62](https://github.com/AlexandreDemartin/pgcast/issues/62)).

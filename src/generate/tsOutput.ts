@@ -187,8 +187,8 @@ const warnAboutDomainsNotByContext = (columns: string[], config: CompleteConfig)
     list = one ? sorted[0] : sorted.slice(0, -1).join(', ') + ' and ' + sorted[sorted.length - 1];
 
   warn(`Note: ${list} ${one ? 'has a domain' : 'have domains'} over a type typed by context, such as int8 or date: ` +
-    `${one ? 'its placeholder, as generated, types it' : 'their placeholders, as generated, type them'} in all five ` +
-    `interfaces as pg returns ${them}, not as a write takes ${them} nor, but for money, as the shortcuts' JSON gives ${them}. ` +
+    `as generated, ${one ? 'its placeholder types it' : 'their placeholders type them'} in all five interfaces as pg ` +
+    `returns ${them}, though a write takes more and, except for money, the shortcuts' JSON gives another type. ` +
     `Set domainsTypedByContext: true to type ${them} by context while ` +
     `${one ? 'its placeholder holds' : 'their placeholders hold'} what the generator wrote for ${them}; ` +
     `it will be the default in pgcast 7.0.`);

@@ -8,12 +8,12 @@ export type NoInfer<T> = [T][T extends any ? 0 : never];  // https://github.com/
 
 /**
  * The type of a domain's column in one context of the generated schema, with the generator's `domainsTypedByContext`:
- * `InContext`, its base type's type there, while its placeholder `Custom` still holds `Generated`, the type the
- * generator wrote in it; otherwise `Custom`, in every context, as without the option. An `any` stays `any`.
+ * `InContext`, its base type's type there, while its placeholder `Custom` is still exactly `Generated`, the type the
+ * generator wrote in it; otherwise `Custom`, in every context, as without the option. So an `any` stays `any`, and an
+ * `any[]` stays `any[]`, such as a placeholder Zapatos 6.6.1 wrote over `int8[]` with no import.
  */
 export type DomainInContext<Custom, Generated, InContext> =
-  0 extends (1 & Custom) ? Custom :
-  [Custom] extends [Generated] ? [Generated] extends [Custom] ? InContext : Custom : Custom;
+  (<T>() => T extends Custom ? 1 : 2) extends (<T>() => T extends Generated ? 1 : 2) ? InContext : Custom;
 
 // an identifier as Postgres lexes it, as a regexp source for the `u` flag: unquoted, any non-ASCII character
 // is a letter and `$` may follow the first one; quoted, or `U&` quoted, anything but NUL, with `""` for `"`;

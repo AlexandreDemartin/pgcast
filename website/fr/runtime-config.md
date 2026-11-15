@@ -1,5 +1,5 @@
 ---
-english: 308718d9a55f
+english: 0bce078d0d2f
 ---
 
 # Configuration
@@ -445,15 +445,14 @@ const premiere: db.TimestampTzString = '2030-03-01T19:30:00';
 
 ```ts
 type DomainInContext<Custom, Generated, InContext> =
-  0 extends (1 & Custom) ? Custom :
-  [Custom] extends [Generated] ? [Generated] extends [Custom] ? InContext : Custom : Custom
+  (<T>() => T extends Custom ? 1 : 2) extends (<T>() => T extends Generated ? 1 : 2) ? InContext : Custom
 ```
 
-Le type qu’écrit l’option [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext) du générateur pour une colonne d’un domaine, dans `JSONSelectable`, `Whereable`, `Insertable` et `Updatable` : `InContext`, le type de son type de base dans ce contexte, tant que le placeholder `Custom` vaut encore `Generated`, le type qu’y a écrit le générateur ; sinon `Custom`, comme sans l’option.
+Le type qu’écrit l’option [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext) du générateur pour une colonne d’un domaine, dans `JSONSelectable`, `Whereable`, `Insertable` et `Updatable` : `InContext`, le type de son type de base dans ce contexte, tant que le placeholder `Custom` vaut encore exactement `Generated`, le type qu’y a écrit le générateur ; sinon `Custom`, comme sans l’option.
 
 - `DomainInContext<db.Int8String, db.Int8String, number>` est `number` : un placeholder laissé tel que généré.
 - `DomainInContext<number | db.Int8String, db.Int8String, number>` est `number | db.Int8String` : un placeholder modifié garde son type, dans chaque contexte.
-- Un `any` reste `any`. Un placeholder modifié vers le même type, `` `${number}` `` pour `db.Int8String`, compte comme laissé tel que généré.
+- Un `any` reste `any`, et un `any[]` reste `any[]`, comme un placeholder écrit par Zapatos 6.6.1 sur `int8[]` sans import. Un placeholder modifié vers le même type, `` `${number}` `` pour `db.Int8String`, compte comme laissé tel que généré.
 
 ## JSON {#json}
 

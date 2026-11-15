@@ -228,7 +228,7 @@ declare module 'zapatos/custom' {
 
 :::
 
-- A domain over `numeric`, `date`, `timestamp`, `timestamptz`, `bytea` or `money` is in the same case: its placeholder holds what `pg` returns, not all that a write takes nor, but for `money`, what the shortcuts return, and the option types it by context too.
+- A domain over `numeric`, `date`, `timestamp`, `timestamptz`, `bytea` or `money` is in the same case: its placeholder holds what `pg` returns, less than a write takes and, except for `money`, other than what the shortcuts return, and the option types it by context too.
 - An edited placeholder, such as this one, keeps its type in all five interfaces, with the option too.
 - Past `Number.MAX_SAFE_INTEGER`, the number loses its last digits, as for any `bigint`: `9007199254740993` comes back as `9007199254740992` ([`customJSONParsingForLargeNumbers`](/generator#generate.customJSONParsingForLargeNumbers)).
 

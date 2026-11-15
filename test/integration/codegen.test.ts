@@ -1132,15 +1132,16 @@ describe('domainsTypedByContext', () => {
       'Note: ctx.ticket_days.day (ctx.release_day), ctx.tickets.amount (ctx.amount), ctx.tickets.at (ctx.starts), ' +
       'ctx.tickets.cost (ctx.cost), ctx.tickets.data (ctx.blob), ctx.tickets.day (ctx.release_day), ' +
       'ctx.tickets.no (ctx.ticket_no), ctx.tickets.nos (ctx.ticket_nos) and ctx.tickets.ts (ctx.local_ts) have domains ' +
-      'over a type typed by context, such as int8 or date: their placeholders, as generated, type them in all five ' +
-      'interfaces as pg returns them, not as a write takes them nor, but for money, as the shortcuts\' JSON gives them. ' +
+      'over a type typed by context, such as int8 or date: as generated, their placeholders type them in all five ' +
+      'interfaces as pg returns them, though a write takes more and, except for money, the shortcuts\' JSON gives ' +
+      'another type. ' +
       'Set domainsTypedByContext: true to type them by context while their placeholders hold what the generator ' +
       'wrote for them; it will be the default in pgcast 7.0.',
     ]);
     expect(await notesFor({ ...ctx, schemas: { ctx: only('ticket_days') } })).toEqual([
       'Note: ctx.ticket_days.day (ctx.release_day) has a domain over a type typed by context, such as int8 or date: ' +
-      'its placeholder, as generated, types it in all five interfaces as pg returns it, not as a write takes it nor, ' +
-      'but for money, as the shortcuts\' JSON gives it. Set domainsTypedByContext: true to type it by context while ' +
+      'as generated, its placeholder types it in all five interfaces as pg returns it, though a write takes more and, ' +
+      'except for money, the shortcuts\' JSON gives another type. Set domainsTypedByContext: true to type it by context while ' +
       'its placeholder holds what the generator wrote for it; it will be the default in pgcast 7.0.',
     ]);
   });
@@ -2246,8 +2247,8 @@ describe('include entries that match no relation', () => {
     const articlesNote = uniqueNote('extra.articles.shared_name_idx', true);
     const productsNote = uniqueNote('public.products.products_status_sku_key and public.products.products_title_lower_key');
     const domainsNote = 'Note: extra.type_zoo.c_int8_domain (public.ticket_no) has a domain over a type typed by context, ' +
-      'such as int8 or date: its placeholder, as generated, types it in all five interfaces as pg returns it, not as a ' +
-      'write takes it nor, but for money, as the shortcuts\' JSON gives it. Set domainsTypedByContext: true to type it ' +
+      'such as int8 or date: as generated, its placeholder types it in all five interfaces as pg returns it, though a ' +
+      'write takes more and, except for money, the shortcuts\' JSON gives another type. Set domainsTypedByContext: true to type it ' +
       'by context while its placeholder holds what the generator wrote for it; it will be the default in pgcast 7.0.';
     const expected: Record<string, string[]> = {
       main: [enumsNote, bothOrderNote, uniqueNote('extra.articles.shared_name_idx, public.account_totals.account_totals_owner_key, ' +

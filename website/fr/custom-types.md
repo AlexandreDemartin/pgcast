@@ -1,5 +1,5 @@
 ---
-english: 3f73aa3e1af2
+english: 45d42ed6d31b
 ---
 
 # Types personnalisés
@@ -232,7 +232,7 @@ declare module 'zapatos/custom' {
 
 :::
 
-- Un domaine sur `numeric`, `date`, `timestamp`, `timestamptz`, `bytea` ou `money` est dans le même cas : son placeholder contient ce que renvoie `pg`, pas tout ce qu’accepte une écriture ni, sauf pour `money`, ce que renvoient les raccourcis, et l’option le type aussi selon le contexte.
+- Un domaine sur `numeric`, `date`, `timestamp`, `timestamptz`, `bytea` ou `money` est dans le même cas : son placeholder contient ce que renvoie `pg`, moins que ce qu’accepte une écriture et, sauf pour `money`, autre chose que ce que renvoient les raccourcis, et l’option le type aussi selon le contexte.
 - Un placeholder modifié, comme celui-ci, garde son type dans les cinq interfaces, même avec l’option.
 - Au-delà de `Number.MAX_SAFE_INTEGER`, le nombre perd ses derniers chiffres, comme pour tout `bigint` : `9007199254740993` revient en `9007199254740992` ([`customJSONParsingForLargeNumbers`](/fr/generator#generate.customJSONParsingForLargeNumbers)).
 

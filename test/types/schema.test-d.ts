@@ -106,6 +106,7 @@ describe('DomainInContext, the type domainsTypedByContext writes', () => {
     expectTypeOf<db.DomainInContext<Date, Date, db.DateString | Date>>().toEqualTypeOf<db.DateString | Date>();
     // the same type, written otherwise
     expectTypeOf<db.DomainInContext<`${number}`, db.Int8String, number>>().toEqualTypeOf<number>();
+    expectTypeOf<db.DomainInContext<db.Int8String[], db.Int8String[], number[]>>().toEqualTypeOf<number[]>();
   });
 
   test('an edited placeholder keeps its type, in every context', () => {
@@ -115,6 +116,9 @@ describe('DomainInContext, the type domainsTypedByContext writes', () => {
     expectTypeOf<db.DomainInContext<string, db.Int8String, number>>().toEqualTypeOf<string>();
     expectTypeOf<db.DomainInContext<any, db.Int8String, number>>().toBeAny();
     expectTypeOf<db.DomainInContext<never, db.Int8String, number>>().toBeNever();
+    // an array of any, as a placeholder Zapatos 6.6.1 wrote over int8[] with no import: not typed by context
+    expectTypeOf<db.DomainInContext<any[], db.Int8String[], number[]>>().toEqualTypeOf<any[]>();
+    expectTypeOf<db.DomainInContext<{ a: any }, { a: db.Int8String }, number>>().toEqualTypeOf<{ a: any }>();
   });
 
   test('refused', () => {
@@ -124,6 +128,8 @@ describe('DomainInContext, the type domainsTypedByContext writes', () => {
     expectTypeOf<db.DomainInContext<number | db.Int8String, db.Int8String, number>>().toEqualTypeOf<number>();
     // @ts-expect-error a brand is not replaced either
     expectTypeOf<db.DomainInContext<db.Int8String & { readonly b: 1 }, db.Int8String, number>>().toEqualTypeOf<number>();
+    // @ts-expect-error an array of any is not replaced either
+    expectTypeOf<db.DomainInContext<any[], db.Int8String[], number[]>>().toEqualTypeOf<number[]>();
   });
 });
 

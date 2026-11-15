@@ -220,10 +220,10 @@ export const definitionForRelationInSchema = async (
       }
       origins[`"${domainName === null ? udtSchema : domainSchema}"."${customType}"`] = customType;
 
-      // a domain over int8, numeric, bytea, money or a date: its placeholder, as generated, holds what pg returns, which
-      // is not all that a write takes nor, but for money, the shortcuts' JSON; with domainsTypedByContext, each context
-      // takes its own type while the placeholder still holds what the generator wrote (db.DomainInContext), and the
-      // placeholder's otherwise
+      // a domain over int8, numeric, bytea, money or a date: as generated, its placeholder holds what pg returns, though
+      // a write takes more and, except for money, the shortcuts' JSON gives another type; with domainsTypedByContext,
+      // each context takes its own type while the placeholder still holds exactly what the generator wrote
+      // (db.DomainInContext), and the placeholder's otherwise
       const
         placeholder = 'c.' + prefixedCustomType,
         byContext = domainName !== null && selectableType !== 'any' &&
