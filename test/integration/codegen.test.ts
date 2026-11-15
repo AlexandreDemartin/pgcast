@@ -112,12 +112,13 @@ const warningsOf = async (config: Config) => {
 };
 
 /**
- * The same, but the notes on enums, unique indexes and domains, which have their own tests (§ typeEnumsAcrossSchemas,
- * § enumOrder, § uniqueIndexConstraintsOnly, § domainsTypedByContext).
+ * The same, but the notes on enums, unique indexes, domains and arrays of an enum, which have their own tests
+ * (§ typeEnumsAcrossSchemas, § enumOrder, § uniqueIndexConstraintsOnly, § domainsTypedByContext, § enumArraysTypedAsText).
  */
 const warningsFor = async (schemas: Schemas, config: Config = {}) =>
   (await warningsOf({ ...config, schemas })).filter(w => !w.includes('typeEnumsAcrossSchemas') &&
-    !w.includes('enumOrder') && !w.includes('uniqueIndexConstraintsOnly') && !w.includes('domainsTypedByContext'));
+    !w.includes('enumOrder') && !w.includes('uniqueIndexConstraintsOnly') && !w.includes('domainsTypedByContext') &&
+    !w.includes('enumArraysTypedAsText'));
 
 /** Custom type placeholders, sorted by name: tsForConfig() inserts them in query completion order. */
 const customFiles = (files: Record<string, string>) =>
@@ -516,6 +517,66 @@ describe('variant snapshots', () => {
         ...Array(2).fill(unused),
       ]);
       expect(await probeErrors(config, editedProbe('// @ts-expect-error'))).toEqual(Array(3).fill(unused));
+    });
+  });
+
+  describe('enumArraysTypedAsText, compiled', () => {
+    beforeAll(() => t.pool.query(`
+      CREATE SCHEMA arr_probe;
+      CREATE TYPE arr_probe.mood AS ENUM ('sad', 'ok', 'happy');
+      CREATE DOMAIN arr_probe.moods AS arr_probe.mood[];
+      CREATE TABLE arr_probe.films (id int PRIMARY KEY, moods arr_probe.mood[], dmoods arr_probe.moods);`));
+    afterAll(() => t.pool.query('DROP SCHEMA arr_probe CASCADE'));
+
+    const config = { schemas: { arr_probe: all } };
+    const on = { ...config, enumArraysTypedAsText: true };
+    const unused = "probe.ts TS2578 Unused '@ts-expect-error' directive.";
+
+    /** Each context with the placeholder left as generated: `refused` marks what only the option refuses. */
+    const probe = (refused: string) => `
+      import * as db from 'zapatos/db';
+      import type * as s from 'zapatos/schema';
+      declare const sel: s.arr_probe.films.Selectable, json: s.arr_probe.films.JSONSelectable;
+      export const reads = [
+        json.moods satisfies s.arr_probe.mood[] | null,
+        json.dmoods satisfies s.arr_probe.mood[] | null,
+        ${refused} the text pg returns, not an array
+        sel.moods satisfies s.arr_probe.mood[] | null,
+        ${refused} the text pg returns, through a domain
+        sel.dmoods satisfies s.arr_probe.mood[] | null,
+      ];
+      export const writes = [
+        db.insert('arr_probe.films', { id: 1, moods: ['happy'], dmoods: json.dmoods }),
+        db.select('arr_probe.films', { moods: ['ok'] }),
+        // @ts-expect-error not a label of mood, which Postgres refuses (22P02)
+        db.insert('arr_probe.films', { id: 1, moods: ['angry'] }),
+        ${refused} pg's text written back: the writes take an array
+        db.insert('arr_probe.films', { id: 1, moods: sel.moods }),
+      ];`;
+    const asText = `
+      import type * as s from 'zapatos/schema';
+      declare const sel: s.arr_probe.films.Selectable;
+      export const text: string | null = sel.moods;
+      export const domainText: string | null = sel.dmoods;`;
+
+    it('types the text pg returns in Selectable, and only there', async () => {
+      expect(await probeErrors(on, probe('// @ts-expect-error'))).toEqual([]);
+      expect(await probeErrors(on, asText)).toEqual([]);
+    });
+
+    it('is off by default: an array, as in Zapatos 6.6.1, so that each refusal is the option\'s', async () => {
+      expect(await probeErrors(config, probe('//'))).toEqual([]);
+      expect(await probeErrors(config, probe('// @ts-expect-error'))).toEqual(Array(3).fill(unused));
+      expect((await probeErrors(config, asText)).map(e => e.slice(0, 15))).toEqual(Array(2).fill('probe.ts TS2322'));
+    });
+
+    it('keeps an edited placeholder\'s type in Selectable', async () => {
+      const edits = { PgMoods: "declare module 'zapatos/custom' {\n  export type PgMoods = string[];\n}\n" };
+      const edited = `
+        import type * as s from 'zapatos/schema';
+        declare const sel: s.arr_probe.films.Selectable;
+        export const moods = sel.dmoods satisfies string[] | null;`;
+      expect(await probeErrors(on, edited, {}, edits)).toEqual([]);
     });
   });
 
@@ -1475,6 +1536,155 @@ describe('domainsTypedByContext', () => {
     void right;
     // @ts-expect-error a boolean
     const wrong: Config = { domainsTypedByContext: 'yes' };
+    void wrong;
+  });
+});
+
+describe('enumArraysTypedAsText', () => {
+  // a schema of its own, committed to this file's database: no other test configures it
+  beforeAll(() => t.pool.query(`
+    CREATE SCHEMA arr;
+    CREATE TYPE arr.mood AS ENUM ('sad', 'ok', 'happy');
+    CREATE TYPE arr.tone AS ENUM ('dry', 'a b', 'c,d');
+    CREATE DOMAIN arr.moods AS arr.mood[];
+    CREATE DOMAIN arr.one_mood AS arr.mood;
+    CREATE TABLE arr.films (
+      id int PRIMARY KEY, moods arr.mood[], moods_nn arr.mood[] NOT NULL DEFAULT '{}', grid arr.mood[][],
+      tones arr.tone[], dmoods arr.moods,
+      -- not arrays of an enum, or any as generated: nothing to change
+      mood arr.mood, texts text[], omoods arr.one_mood[]);
+    CREATE VIEW arr.films_v AS SELECT id, moods FROM arr.films;
+    CREATE MATERIALIZED VIEW arr.films_m AS SELECT id, moods FROM arr.films;
+    -- an enum of another schema: by name, the enum of the same name in arr_box; any in arr_solo, which has none
+    CREATE SCHEMA arr_box;
+    CREATE TYPE arr_box.mood AS ENUM ('blue', 'grey');
+    CREATE TABLE arr_box.films (id int PRIMARY KEY, moods arr.mood[], own arr_box.mood[]);
+    CREATE SCHEMA arr_solo;
+    CREATE TABLE arr_solo.films (id int PRIMARY KEY, moods arr.mood[]);
+  `));
+  afterAll(() => t.pool.query('DROP SCHEMA arr, arr_box, arr_solo CASCADE'));
+
+  const config = { schemas: { arr: all, arr_box: all, arr_solo: all }, schemaJSDoc: false, unprefixedSchema: 'arr' };
+  const on = { ...config, enumArraysTypedAsText: true };
+  const notesFor = async (given: Config) => {
+    const warnings: string[] = [];
+    await tsForConfig(finaliseConfig({ ...given, ...quiet, warningListener: s => warnings.push(s), db: db() }), noDebug);
+    return warnings.filter(w => w.includes('enumArraysTypedAsText'));
+  };
+  /** The line of `column` in each interface of `table`: Selectable, JSONSelectable, Whereable, Insertable, Updatable. */
+  const linesOf = (schema: string, table: string, column: string) =>
+    tableBlock(schema, table).split('\n').map(line => line.trim()).filter(line => new RegExp(`^${column}\\??: `).test(line));
+  /** The Selectable line of `column`, then its JSONSelectable line. */
+  const readsOf = (schema: string, table: string, column: string) => linesOf(schema, table, column).slice(0, 2);
+
+  /** The five lines of a nullable column with no default, given its Selectable type and its type in each other context. */
+  const nullable = (column: string, selectable: string, other: string) => {
+    const where = `${other} | db.Parameter<${other}> | db.SQLFragment | db.ParentColumn`,
+      write = `${other} | db.Parameter<${other}> | null | db.DefaultType | db.SQLFragment`;
+    return [
+      `${column}: ${selectable} | null;`,
+      `${column}: ${other} | null;`,
+      `${column}?: ${where} | db.SQLFragment<any, ${where}>;`,
+      `${column}?: ${write};`,
+      `${column}?: ${write} | db.SQLFragment<any, ${write}>;`,
+    ];
+  };
+
+  it('is off by default: an array of an enum is an array in Selectable, as in Zapatos 6.6.1', async () => {
+    const { ts: schema } = await codegen(config);
+    expect(linesOf(schema, 'films', 'moods')).toEqual(nullable('moods', 'mood[]', 'mood[]'));
+    expect(readsOf(schema, 'films', 'dmoods')).toEqual(['dmoods: c.PgMoods | null;', 'dmoods: c.PgMoods | null;']);
+  });
+
+  it('types an array of an enum as a string in Selectable, and only there', async () => {
+    const { ts: schema } = await codegen(on);
+    expect(linesOf(schema, 'films', 'moods')).toEqual(nullable('moods', 'string', 'mood[]'));
+    expect(linesOf(schema, 'films', 'tones')).toEqual(nullable('tones', 'string', 'tone[]'));
+    // pg returns a two-dimensional array as its text too
+    expect(readsOf(schema, 'films', 'grid')).toEqual(['grid: string | null;', 'grid: mood[] | null;']);
+    expect(readsOf(schema, 'films', 'moods_nn')).toEqual(['moods_nn: string;', 'moods_nn: mood[];']);
+    expect(readsOf(schema, 'films_v', 'moods')).toEqual(['moods: string | null;', 'moods: mood[] | null;']);
+    expect(readsOf(schema, 'films_m', 'moods')).toEqual(['moods: string | null;', 'moods: mood[] | null;']);
+    // typed by name in arr_box, as without the option: both are arrays of an enum, whose text pg returns
+    expect(readsOf(tableBlock(schema, 'arr_box'), 'films', 'moods')).toEqual(['moods: string | null;', 'moods: mood[] | null;']);
+    expect(readsOf(tableBlock(schema, 'arr_box'), 'films', 'own')).toEqual(['own: string | null;', 'own: mood[] | null;']);
+  });
+
+  it('types a domain over an array of an enum as a string in Selectable while its placeholder holds what the generator wrote', async () => {
+    const { ts: schema, customTypeSourceFiles } = await codegen(on);
+    expect(linesOf(schema, 'films', 'dmoods')).toEqual(
+      nullable('dmoods', 'db.DomainInContext<c.PgMoods, mood[], string>', 'c.PgMoods'));
+    expect(customTypeSourceFiles.PgMoods).toContain('export type PgMoods = mood[];');
+  });
+
+  it('types the labels\' array of an enum of another schema, with typeEnumsAcrossSchemas', async () => {
+    const { ts: schema } = await codegen({ ...on, typeEnumsAcrossSchemas: true });
+    const labels = `('happy' | 'ok' | 'sad')[]`;
+    expect(readsOf(tableBlock(schema, 'arr_box'), 'films', 'moods')).toEqual(['moods: string | null;', `moods: ${labels} | null;`]);
+    expect(readsOf(tableBlock(schema, 'arr_solo'), 'films', 'moods')).toEqual(['moods: string | null;', `moods: ${labels} | null;`]);
+  });
+
+  it('leaves the placeholders, any, and the columns that are no array of an enum as they were', async () => {
+    const off = await codegen(config), typed = await codegen(on);
+    expect(typed.customTypeSourceFiles).toEqual(off.customTypeSourceFiles);
+    for (const column of ['id', 'mood', 'texts', 'omoods']) {
+      expect(linesOf(typed.ts, 'films', column)).toEqual(linesOf(off.ts, 'films', column));
+    }
+    // an any custom type without typeEnumsAcrossSchemas
+    expect(tableBlock(typed.ts, 'arr_solo')).toBe(tableBlock(off.ts, 'arr_solo'));
+    expect(readsOf(tableBlock(typed.ts, 'arr_solo'), 'films', 'moods')).toEqual(['moods: c.Pg_mood | null;', 'moods: c.Pg_mood | null;']);
+  });
+
+  it('notes each column it would change, once per run, with the option left out', async () => {
+    expect(await notesFor(config)).toEqual([
+      'Note: arr.films.dmoods (arr.moods), arr.films.grid (arr.mood[]), arr.films.moods (arr.mood[]), ' +
+      'arr.films.moods_nn (arr.mood[]), arr.films.tones (arr.tone[]), arr.films_m.moods (arr.mood[]), ' +
+      'arr.films_v.moods (arr.mood[]), arr_box.films.moods (arr.mood[]) and arr_box.films.own (arr_box.mood[]) are ' +
+      'arrays of an enum, which pg returns as their text, such as \'{a,b}\', though Selectable types them as arrays. ' +
+      'Set enumArraysTypedAsText: true to type them as strings there, or false to keep the arrays if ' +
+      'pg.types.setTypeParser parses them; true will be the default in pgcast 7.0.',
+    ]);
+    expect(await notesFor({ ...config, schemas: { arr: only('films_v') } })).toEqual([
+      'Note: arr.films_v.moods (arr.mood[]) is an array of an enum, which pg returns as its text, such as \'{a,b}\', ' +
+      'though Selectable types it as an array. Set enumArraysTypedAsText: true to type it as a string there, or false ' +
+      'to keep the array if pg.types.setTypeParser parses it; true will be the default in pgcast 7.0.',
+    ]);
+    // with typeEnumsAcrossSchemas, arr_solo's column takes the labels' array, no longer any
+    expect((await notesFor({ ...config, schemas: { arr_solo: all }, typeEnumsAcrossSchemas: true }))[0])
+      .toMatch(/^Note: arr_solo\.films\.moods \(arr\.mood\[\]\) is an array of an enum/);
+  });
+
+  it('gives no note with true or false, or when no column would change', async () => {
+    expect(await notesFor(on)).toEqual([]);
+    expect(await notesFor({ ...config, enumArraysTypedAsText: false })).toEqual([]);
+    expect(await notesFor({ ...config, schemas: { arr_solo: all } })).toEqual([]);
+    expect(await notesFor(main)).toEqual([]);
+  });
+
+  it('types what pg and the shortcuts give: an array of an enum as its text, and as JSON', async () => {
+    const row = await runtime.insert('arr.films' as any, { id: 1, moods: ['happy', 'sad'], dmoods: ['ok'] })
+      .run(t.client) as any;
+    expect([row.moods, row.dmoods, row.moods_nn]).toEqual([['happy', 'sad'], ['ok'], []]);
+    const { rows: [fromPg] } = await t.client.query('SELECT moods, dmoods, moods_nn FROM arr.films');
+    expect(fromPg).toEqual({ moods: '{happy,sad}', dmoods: '{ok}', moods_nn: '{}' });
+    const { rows: [fromView] } = await t.client.query('SELECT moods FROM arr.films_v');
+    expect(fromView).toEqual({ moods: '{happy,sad}' });
+  });
+
+  it('leaves the output as it was without the option, or with false', async () => {
+    const absent = await codegen(config), off = await codegen({ ...config, enumArraysTypedAsText: false });
+    expect(off.ts).toBe(absent.ts);
+    expect(off.customTypeSourceFiles).toEqual(absent.customTypeSourceFiles);
+    expect((await codegen({ ...main, enumArraysTypedAsText: false })).ts)
+      .toBe(readFileSync(join(generatedDir, 'zapatos/schema.d.ts'), 'utf8'));
+  });
+
+  it('is optional in Config, read as false when absent', () => {
+    expect(finaliseConfig({}).enumArraysTypedAsText).toBeUndefined();
+    const right: Config = { enumArraysTypedAsText: true };
+    void right;
+    // @ts-expect-error a boolean
+    const wrong: Config = { enumArraysTypedAsText: 'yes' };
     void wrong;
   });
 });
@@ -2576,7 +2786,7 @@ describe('include entries that match no relation', () => {
     expect(await warningsFor({ public: all, extra: { include: '*', exclude: ['no_such_table'] } })).toEqual([]);
   });
 
-  it('warns, of main and the snapshot variants, only about no_such_table of include-exclude-lists, and the enums, unique indexes and domains notes', async () => {
+  it('warns, of main and the snapshot variants, only about no_such_table of include-exclude-lists, and the enums, unique indexes, domains and enum arrays notes', async () => {
     const enumsNote = 'Note: extra.type_zoo.c_enum_array (public.mood[]) and public.products.status (extra.status) ' +
       'have a type of another schema, ' +
       'which is looked up by name in the schema of their relation: an enum becomes an `any` custom type, or the enum of ' +
@@ -2596,6 +2806,9 @@ describe('include entries that match no relation', () => {
       'such as int8 or date: as generated, its placeholder types it in all five interfaces as pg returns it, though a ' +
       'write takes more and, except for money, the shortcuts\' JSON gives another type. Set domainsTypedByContext: true to type it ' +
       'by context while its placeholder holds what the generator wrote for it; it will be the default in pgcast 7.0.';
+    const enumArraysNote = 'Note: extra.type_zoo.c_enum_array (public.mood[]) is an array of an enum, which pg returns ' +
+      'as its text, such as \'{a,b}\', though Selectable types it as an array. Set enumArraysTypedAsText: true to type it ' +
+      'as a string there, or false to keep the array if pg.types.setTypeParser parses it; true will be the default in pgcast 7.0.';
     const expected: Record<string, string[]> = {
       main: [enumsNote, bothOrderNote, uniqueNote('extra.articles.shared_name_idx, public.account_totals.account_totals_owner_key, ' +
         'public.products.products_status_sku_key and public.products.products_title_lower_key'), domainsNote],
@@ -2605,8 +2818,8 @@ describe('include entries that match no relation', () => {
       'customTypesTransform-my_type': [enumsNote, bothOrderNote, productsNote, domainsNote],
       'customTypesTransform-PgMyType': [enumsNote, bothOrderNote, productsNote, domainsNote],
       'customTypesTransform-function': [enumsNote, bothOrderNote, productsNote, domainsNote],
-      typeEnumsAcrossSchemas: [bothOrderNote, productsNote, domainsNote],
-      'enumOrder-declared': [productsNote, domainsNote],
+      typeEnumsAcrossSchemas: [bothOrderNote, productsNote, domainsNote, enumArraysNote],
+      'enumOrder-declared': [productsNote, domainsNote, enumArraysNote],
       'moduleNames-pgcast': [enumsNote, bothOrderNote, productsNote, domainsNote],
       uniqueIndexConstraintsOnly: [enumsNote, bothOrderNote, domainsNote],
       domainsTypedByContext: [enumsNote, bothOrderNote, productsNote],
