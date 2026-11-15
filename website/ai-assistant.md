@@ -27,7 +27,7 @@ Paste a URL into the chat, or let the rules file below name it.
 
 ## Add the rules file
 
-Copy it into your project, and change `src/zapatos/schema.d.ts` if your `outDir` differs. Installed under its own name, with [`moduleNames: "pgcast"`](/generator#generate.moduleNames), swap `zapatos` and `pgcast` in it: the package is `pgcast`, the imports `pgcast/db` and `pgcast/schema`, never `zapatos/…`, and the schema `src/pgcast/schema.d.ts`. Each rule ends with the page that backs it, for the assistant to read:
+Copy it into your project, and change `src/zapatos/schema.d.ts` if your `outDir` differs. Installed under the `pgcast` alias, with [`moduleNames: "pgcast"`](/generator#generate.moduleNames), change four things in it: "installed under the `pgcast` alias" in its first line, `'pgcast/db'` and `'pgcast/schema'` in the import rule, with "never from `zapatos`", and `src/pgcast/schema.d.ts`. The URLs and `npx pgcast` stay as they are. Each rule ends with the page that backs it, for the assistant to read:
 
 ```md
 # Postgres with pgcast

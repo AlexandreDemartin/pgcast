@@ -31,7 +31,7 @@ Collez une URL dans la conversation, ou laissez le fichier de règles ci-dessous
 
 ## Ajouter le fichier de règles {#add-the-rules-file}
 
-Copiez-le dans votre projet, et changez `src/zapatos/schema.d.ts` si votre `outDir` diffère. Installé sous son propre nom, avec [`moduleNames: "pgcast"`](/fr/generator#generate.moduleNames), échangez-y `zapatos` et `pgcast` : le paquet est `pgcast`, les imports `pgcast/db` et `pgcast/schema`, jamais `zapatos/…`, et le schéma `src/pgcast/schema.d.ts`. Chaque règle se termine par la page qui la justifie, que l’assistant peut lire :
+Copiez-le dans votre projet, et changez `src/zapatos/schema.d.ts` si votre `outDir` diffère. Installé sous l’alias `pgcast`, avec [`moduleNames: "pgcast"`](/fr/generator#generate.moduleNames), changez-y quatre choses : « <span lang="en">installed under the `pgcast` alias</span> » dans sa première ligne, `'pgcast/db'` et `'pgcast/schema'` dans la règle des imports, avec « <span lang="en">never from `zapatos`</span> », et `src/pgcast/schema.d.ts`. Les URL et `npx pgcast` restent tels quels. Chaque règle se termine par la page qui la justifie, que l’assistant peut lire :
 
 ```md
 # Postgres with pgcast
