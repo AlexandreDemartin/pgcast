@@ -46,7 +46,7 @@ Then it ends with the cause:
 | not valid JSON | `JSON.parse`'s message, which depends on the input and on Node: on Node 22, `Unexpected end of JSON input` for an empty file, `No number after minus sign in JSON at position 1 (line 1 column 2)` for `--help`, `Expected double-quoted property name in JSON at position 15 (line 1 column 16)` for a trailing comma |
 | a variable is not set | `Environment variable 'DATABASE_URL' is not set` |
 
-A query that fails, the connection included, also ends it with code 1, as [`generate()`](#generate) says.
+A query that fails, the connection included, ends it with code 1, after `*** error <n> ***` and the error, as in Zapatos 6.6.1: it sets [`rejectOnQueryError`](#generate.rejectOnQueryError) to `false` over the file and the argument.
 
 ### Environment variables {#environment-variables}
 
@@ -81,7 +81,7 @@ await generate({
 
 - It opens a `pg.Pool` of its own on `config.db`, and ends it before resolving.
 - It sends only `SELECT`s, on `information_schema` and `pg_catalog`: one for the relations of each schema, one for its enums, then two per relation, its columns and its unique indexes, and one for the enums of each other schema a column's type comes from (`pg_catalog` included).
-- A query that fails, the connection included, prints `*** error <n> ***` and the error with `console.log`, then ends the process with `process.exit(1)`, as in Zapatos 6.6.1 ([#183](https://github.com/AlexandreDemartin/pgcast/issues/183)). On a failed query the promise never settles, so a `try`/`catch` around it does not run.
+- A query that fails, the connection included, prints `*** error <n> ***` and the error with `console.log`, then ends the process with `process.exit(1)`, as in Zapatos 6.6.1. The promise never settles, so a `try`/`catch` around it does not run. With [`rejectOnQueryError`](#generate.rejectOnQueryError), it rejects with that error instead.
 - Other errors reject it: a write that fails (`ENOTDIR: not a directory, mkdir 'afile/zapatos'` when `outDir` is a file), a malformed [rule](#generate.schemas).
 - At run time, a key it doesn't know is ignored: an old `srcMode`, a misspelt `outdir`. In TypeScript, an object literal with one fails to compile (TS2353, or TS2561 with a suggestion for a near-miss such as `outdir`).
 - `zapatos/generate` also exports `Config` and the functions `generate()` is built from (`tsForConfig()`, `definitionForRelationInSchema()` and others), with no entry here.
@@ -104,6 +104,7 @@ Every option is optional. Each one given replaces its default whole: `schemas` w
 | [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas) | `false` | the type of an enum of another schema |
 | [`enumOrder`](#generate.enumOrder) | `"alphabetical"` | the order of an enum's labels |
 | [`moduleNames`](#generate.moduleNames) | `"zapatos"` | the module names the files declare and import, and their folder |
+| [`rejectOnQueryError`](#generate.rejectOnQueryError) | none: exits, with a note | whether a failed query rejects, or ends the process |
 | [`progressListener`](#generate.progressListener) | `false` | where each step is reported |
 | [`warningListener`](#generate.warningListener) | `true` | where warnings go |
 | [`debugListener`](#generate.debugListener) | `false` | where each query and its result go |
@@ -219,6 +220,7 @@ Its SQL is [`select()`](/select#select)'s, with the name quoted part by part: `t
 - The names are not qualified by schema: the `c` namespace is flat across schemas, so a domain `notes` in `public` and one in `archive` are both `PgNotes`, with one placeholder for the two.
   - The generator says so through [`warningListener`](#generate.warningListener), as for two names that one transform makes one (`seat-label` and `seat_label`), and keeps the name, which an edited placeholder depends on.
 - Names that differ only in case, such as `PgSeat_label` and `PgSEAT_LABEL` for domains `seat_label` and `"SEAT_LABEL"`, have two placeholders that are one file on a case-insensitive file system, the default on macOS and Windows: the one written first declares only its own name, and the others are never declared. The generator says so too, wherever it runs, and writes the same files.
+- A name whose placeholder is `index.d.ts`, such as `index` for a domain `index` under `"my_type"`, or `Index` on a case-insensitive file system, shares its file with [`custom/index.d.ts`](#the-files-it-writes), which the generator writes over it on every run: that name is never declared. It says so too, and writes the same files.
 
 ### `schemaJSDoc` {#generate.schemaJSDoc}
 
@@ -240,7 +242,8 @@ billing: number;
 - A comment over several lines puts each of them behind a `*`, whether it breaks them with `\n`, `\r\n` or `\r`.
 - Each relation shows its own comments, whatever its kind: Postgres copies none to a partition, an inheriting table or a view, so a view over `roles` shows no comment on `billing`.
 - A `*/` in a comment, a name, a type or a `DEFAULT` is written `*\/`, so it does not end the JSDoc; so is the one a name starting with `/` makes with the `**` before it: `**\/reels**`.
-- A comment, or one of its lines, starting with a JSDoc tag (`@deprecated use lead`) becomes that tag in the hover, on every kind of relation, and swallows the generated lines after it ([#309](https://github.com/AlexandreDemartin/pgcast/issues/309)).
+- A JSDoc tag in a comment stays a tag: `@deprecated use lead` strikes the column through where your code reads it, and the hover gives `use lead` as the reason. TypeScript starts a tag at an `@` that begins a line, or that follows a space with no space after it, not at the one in `casting@example.com` nor inside an inline `{@link …}`, `{@linkcode …}` or `{@linkplain …}`, which runs on through the next line when its own ends on `{@link` or on the link's name. From the line that holds the tag, the comment goes after the generated lines, behind a `*` line, so the tag does not take them as its own text.
+  - The generator moves it only when it is sure of the tag: the first line with an `@` that follows a `{` or no printable ASCII character must start it, at its first character but for spaces and tabs, or after a space or a tab and before a printable ASCII character, and anything starting with `{@link` before the tag on that line must be closed, with no quote, backtick, `/`, `\` or line separator (U+2028, U+2029) in it. Otherwise the comment stays before the generated lines, which the tag then takes as its own text.
 
 `false` writes none, so `schema.d.ts` is shorter.
 
@@ -330,6 +333,27 @@ import type * as s from 'pgcast/schema';
 - Another value stops the generator before any query, and writes nothing: `moduleNames must be 'zapatos' (the default) or 'pgcast', not 'pgcats'`. In TypeScript, it fails to compile (TS2322, or TS2820 with a suggestion for a near-miss such as `"pgcats"`).
 - The other mode's schema in `outDir`, such as a `zapatos/` folder left from before the switch, is noted through [`warningListener`](#generate.warningListener). With `"pgcast"`, a stale `zapatos/` that `tsconfig.json` includes also declares `zapatos/schema`, which TypeScript merges: it lets a number through for a `text` column under `skipLibCheck`, and fails with TS2307 without it. With `"zapatos"`, a stale `pgcast/` loosens nothing, and its import of `pgcast/db` fails with TS2307 without `skipLibCheck`. Delete the stale folder once the placeholders you edited there are moved to the other, their `declare module 'zapatos/custom'` renamed `'pgcast/custom'`, or the reverse.
 
+### `rejectOnQueryError` {#generate.rejectOnQueryError}
+
+`boolean`, or left out; an opt-in. What a failed query does: a refused connection, a wrong password, a query Postgres refuses.
+
+- Left out, or `null`: as in Zapatos 6.6.1, the generator prints `*** error <n> ***` and the error with `console.log`, then ends the process with `process.exit(1)`; in between, it notes the option through [`warningListener`](#generate.warningListener). From 7.0, left out means `true` ([Versions](/versions)).
+- `false`: the same exit, with no note. It stays in 7.0 and 8.0: the exit is [the CLI](#cli)'s own path, and the CLI sets `false` over its config file and its argument.
+- `true`: rejects `generate()` with that error, as `pg` gives it, and prints nothing:
+
+```ts twoslash
+import { generate } from 'zapatos/generate';
+// ---cut---
+try {
+  await generate({ db: { connectionString: process.env.DATABASE_URL }, outDir: './src', rejectOnQueryError: true });
+} catch (err) {
+  console.error('types not regenerated:', err);  // ECONNREFUSED, or a pg DatabaseError
+}
+```
+
+- It rejects before writing anything: the files of the last run stay as they are.
+- A `warningListener` that throws at the note still ends in the exit.
+
 ### `progressListener` {#generate.progressListener}
 
 `boolean`, or in `generate()` a function `(s: string) => void`; default `false`. `true` prints each step with `console.log`; a function gets each line.
@@ -351,6 +375,8 @@ Writing custom types file: src/zapatos/custom/index.d.ts
   - once per run for each name that two Postgres types share ([`customTypesTransform`](#generate.customTypesTransform)); when their names differ, it adds that a `customTypesTransform` function can keep them apart;
 - `Note: custom types "public"."SEAT_LABEL" (PgSEAT_LABEL) and "public"."seat_label" (PgSeat_label) have TypeScript names that differ only in case: on a case-insensitive file system, the default on macOS and Windows, PgSEAT_LABEL.d.ts and PgSeat_label.d.ts are one placeholder file in src/zapatos/custom, which declares only one of those names. To type them apart, rename one of them in the database, or give customTypesTransform a function that keeps their names apart.`
   - once per run for names that differ only in case, whatever the file system, before the note above for each of those names that two Postgres types share;
+- `Note: custom type "public"."index" (index) has the placeholder file index.d.ts in src/zapatos/custom, the file of the custom types' index: the generator writes the index over it on every run, so index is never declared. To declare it, rename it in the database, or give customTypesTransform a function that names it otherwise.`
+  - once per run for the names whose placeholder is `custom/index.d.ts`: `index`, and, on a case-insensitive file system, a name that differs from it only in case (`Index`, `INDEX`), after the note above for those;
 - `Note: the include entry "Films" of schema "public" matches no relation there, so it generates nothing. Check its spelling and case, that the relation is in schema "public", and that the database role has a privilege on it: include names tables, views, materialised views and foreign tables.`
   - once per run for each entry of an [`include`](#generate.schemas) list that its schema doesn't have;
 - `Note: the schemas rule of "public" has no exclude, so it takes "exclude": [], as the default rule does. Write the key in the rule to silence this note.`
@@ -368,6 +394,8 @@ Writing custom types file: src/zapatos/custom/index.d.ts
   - the same, with `"zapatos"` and a `pgcast/schema.d.ts`;
 - `Note: pgcastconfig.json and zapatosconfig.json are both here, and only pgcastconfig.json is read. Move any option you still need from zapatosconfig.json into pgcastconfig.json, then delete zapatosconfig.json.`
   - from [the CLI](#cli), before generating, when the folder it runs in has both files;
+- `Note: a query failed, so generate() ends the process with process.exit(1), and its promise never settles (PGCAST_DEP006). Set rejectOnQueryError: true to reject with the error instead; it will be the default in pgcast 7.0.`
+  - without [`rejectOnQueryError`](#generate.rejectOnQueryError), when a query fails, after the error and just before the exit;
 - the [old layout warning](#the-old-layout-warning).
 
 ### `debugListener` {#generate.debugListener}
