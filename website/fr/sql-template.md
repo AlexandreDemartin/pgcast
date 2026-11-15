@@ -1,5 +1,5 @@
 ---
-english: c3091755b813
+english: c85a3b8d6810
 ---
 
 # Template SQL
@@ -241,7 +241,7 @@ Comme valeur de filtre, et comme valeur dans `vals({…})` (donc dans une écrit
 
 > `` `db.cols()` takes an object or an array, not `string`: for one column, write `db.cols([name])`; for a row of `insert()`, `upsert()` or `update()`, give an object. ``<!-- message -->
 
-Le type accepte une telle valeur, comme celui de Zapatos 6.6.1, pour qu’un helper générique (`<T>(row: T) => db.cols(row)`) compile toujours. Zapatos 6.6.1 compilait les indices des caractères d’une chaîne, `cols('title')` en `"0", "1", "2", "3", "4"`, toute autre valeur primitive en rien, et levait une `TypeError` sur `null`.
+Le type accepte une telle valeur, comme celui de Zapatos 6.6.1, pour qu’un helper générique (`<T>(row: T) => db.cols(row)`) compile toujours. Dans `updateValues` d’[`upsert()`](/fr/insert#upsert-options), il refuse une valeur primitive. Zapatos 6.6.1 compilait les indices des caractères d’une chaîne, `cols('title')` en `"0", "1", "2", "3", "4"`, toute autre valeur primitive en rien, et levait une `TypeError` sur `null`.
 
 ### `ColumnNames` {#ColumnNames}
 
