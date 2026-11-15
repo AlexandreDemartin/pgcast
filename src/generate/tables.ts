@@ -144,6 +144,7 @@ export const definitionForRelationInSchema = async (
   domainsNotByContext: string[] = [],  // an 'out' parameter too: what domainsTypedByContext would change
   domainRoots = () => domainRootsInDatabase(queryFn),
   domainsUnderDomains: string[] = [],  // an 'out' parameter too: what domainsTypedByContext would type over a domain
+  enumArraysNotAsText: string[] = [],  // an 'out' parameter too: what enumArraysTypedAsText would change
 ) => {
   const
     rows = await columnsForRelation(rel, schemaName, queryFn),
@@ -151,6 +152,7 @@ export const definitionForRelationInSchema = async (
     otherEnums: Record<string, EnumData> = Object.fromEntries(await Promise.all(
       otherSchemas.map(async schema => [schema, await enumsForSchema(schema)]))),
     typeEnumsAcrossSchemas = config.typeEnumsAcrossSchemas ?? false,
+    enumArraysAsText = config.enumArraysTypedAsText ?? false,
     inlineIn = (schema: string) => typeEnumsAcrossSchemas && schema !== schemaName,
     // a domain over a domain, or an array of a domain, is `any` to tsTypeForPgType: the base type under its domains
     // types it, read once per run if a column is `any`; an enum of another schema by its labels, never by its name in
@@ -191,6 +193,14 @@ export const definitionForRelationInSchema = async (
       tsTypeForPgType(udtName, otherEnums[udtSchema], 'Selectable', config, true) !== selectableType) {
       const isArray = udtName.charAt(0) === '_' && !Object.prototype.hasOwnProperty.call(otherEnums[udtSchema], udtName);
       columnsTypedByEnumName.push(`${schemaName}.${rel.name}.${column} (${udtSchema}.${isArray ? udtName.slice(1) + '[]' : udtName})`);
+    }
+
+    // pg has no parser for the array type of an enum, whose OID is the database's own: it returns its text, '{a,b}'
+    const enumArray = selectableType !== 'any' && udtName.charAt(0) === '_' && !hasOwn(typeEnums, udtName) &&
+      hasOwn(typeEnums, udtName.slice(1));
+    if (enumArray && config.enumArraysTypedAsText == null) {  // left out, or null from JSON
+      enumArraysNotAsText.push(`${schemaName}.${rel.name}.${column} (${domainName === null ?
+        `${udtSchema}.${udtName.slice(1)}[]` : `${domainSchema}.${domainName}`})`);
     }
 
     const
@@ -270,9 +280,13 @@ export const definitionForRelationInSchema = async (
         const type = domainName === null ? `${udtSchema}.${udtName.slice(1)}[]` : `${domainSchema}.${domainName}`;
         domainsUnderDomains.push(`${schemaName}.${rel.name}.${column} (${type})`);
       }
+      const generated = selectableType;
       [selectableType, JSONSelectableType, whereableType, insertableType, updatableType] = underDomains?.map(inContext) ??
         [placeholder, ...[JSONSelectableType, whereableType, insertableType, updatableType].map(inContext)];
-    }
+      // a domain over an array of an enum: pg's text while its placeholder holds what the generator wrote
+      if (enumArray && enumArraysAsText) selectableType = `db.DomainInContext<${placeholder}, ${generated}, string>`;
+
+    } else if (enumArray && enumArraysAsText) selectableType = 'string';
 
     selectables.push(`${columnDoc}${possiblyQuotedColumn}: ${selectableType}${orNull};`);
     JSONSelectables.push(`${columnDoc}${possiblyQuotedColumn}: ${JSONSelectableType}${orNull};`);

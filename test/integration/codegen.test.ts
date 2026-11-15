@@ -61,6 +61,8 @@ const variants: [string, Config][] = [
   ['uniqueIndexConstraintsOnly', { ...main, uniqueIndexConstraintsOnly: true }],
   // only extra.type_zoo's c_int8_domain differs, in the four interfaces but Selectable; the placeholders are the same
   ['domainsTypedByContext', { schemas: customTypesSchemas, domainsTypedByContext: true }],
+  // typeEnumsAcrossSchemas's, but extra.type_zoo's c_enum_array in Selectable: any without it
+  ['enumArraysTypedAsText', { schemas: customTypesSchemas, typeEnumsAcrossSchemas: true, enumArraysTypedAsText: true }],
   ['columnOptions', {
     schemas: { public: only('users', 'accounts'), extra: only('articles') },
     columnOptions: {
@@ -1644,11 +1646,12 @@ describe('enumArraysTypedAsText', () => {
       'Set enumArraysTypedAsText: true to type them as strings there, or false to keep the arrays if ' +
       'pg.types.setTypeParser parses them; true will be the default in pgcast 7.0.',
     ]);
-    expect(await notesFor({ ...config, schemas: { arr: only('films_v') } })).toEqual([
-      'Note: arr.films_v.moods (arr.mood[]) is an array of an enum, which pg returns as its text, such as \'{a,b}\', ' +
-      'though Selectable types it as an array. Set enumArraysTypedAsText: true to type it as a string there, or false ' +
-      'to keep the array if pg.types.setTypeParser parses it; true will be the default in pgcast 7.0.',
-    ]);
+    const viewNote = 'Note: arr.films_v.moods (arr.mood[]) is an array of an enum, which pg returns as its text, such ' +
+      'as \'{a,b}\', though Selectable types it as an array. Set enumArraysTypedAsText: true to type it as a string ' +
+      'there, or false to keep the array if pg.types.setTypeParser parses it; true will be the default in pgcast 7.0.';
+    expect(await notesFor({ ...config, schemas: { arr: only('films_v') } })).toEqual([viewNote]);
+    // null, as a JSON config may hold, is the key left out
+    expect(await notesFor({ ...config, schemas: { arr: only('films_v') }, enumArraysTypedAsText: null as any })).toEqual([viewNote]);
     // with typeEnumsAcrossSchemas, arr_solo's column takes the labels' array, no longer any
     expect((await notesFor({ ...config, schemas: { arr_solo: all }, typeEnumsAcrossSchemas: true }))[0])
       .toMatch(/^Note: arr_solo\.films\.moods \(arr\.mood\[\]\) is an array of an enum/);
@@ -2500,7 +2503,8 @@ describe('typeEnumsAcrossSchemas', () => {
     return warnings.filter(w => !w.startsWith('Note: this database has bigint') &&  // once per process
       !w.includes('enumOrder') &&  // § enumOrder
       !w.includes('uniqueIndexConstraintsOnly') &&  // § uniqueIndexConstraintsOnly
-      !w.includes('domainsTypedByContext'));  // § domainsTypedByContext
+      !w.includes('domainsTypedByContext') &&  // § domainsTypedByContext
+      !w.includes('enumArraysTypedAsText'));  // § enumArraysTypedAsText
   };
 
   it('is off by default: an enum of another schema is an `any` custom type', async () => {
@@ -2626,7 +2630,8 @@ describe('enumOrder', () => {
     return warnings.filter(w => !w.startsWith('Note: this database has bigint') &&  // once per process
       !w.includes('typeEnumsAcrossSchemas') &&  // § typeEnumsAcrossSchemas
       !w.includes('uniqueIndexConstraintsOnly') &&  // § uniqueIndexConstraintsOnly
-      !w.includes('domainsTypedByContext'));  // § domainsTypedByContext
+      !w.includes('domainsTypedByContext') &&  // § domainsTypedByContext
+      !w.includes('enumArraysTypedAsText'));  // § enumArraysTypedAsText
   };
 
   it('is off by default: labels in alphabetical order, every.<enum> included', async () => {
@@ -2823,6 +2828,7 @@ describe('include entries that match no relation', () => {
       'moduleNames-pgcast': [enumsNote, bothOrderNote, productsNote, domainsNote],
       uniqueIndexConstraintsOnly: [enumsNote, bothOrderNote, domainsNote],
       domainsTypedByContext: [enumsNote, bothOrderNote, productsNote],
+      enumArraysTypedAsText: [bothOrderNote, productsNote, domainsNote],
       columnOptions: [bothOrderNote, articlesNote],
       'include-exclude-lists': [unmatched('no_such_table', 'public'), bothOrderNote, articlesNote],
       'exclude-star': [bothOrderNote],  // exclude: '*' still generates the enums
