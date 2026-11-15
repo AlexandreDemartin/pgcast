@@ -1,5 +1,5 @@
 ---
-english: e57c8c1784b0
+english: 55b60067e9f2
 ---
 
 # Conditions {#db-conditions}
@@ -25,6 +25,7 @@ Chaque membre est un fragment [`sql`](/fr/sql-template#sql) écrit autour de [`d
   - [`and()`](#conditions.and), [`or()`](#conditions.or) et [`not()`](#conditions.not) prennent aussi des Whereables, et peuvent donc former tout un `where` ; [`now`](#conditions.now) et [`fromNow()`](#conditions.fromNow) ne contiennent pas de `self`, et vont partout.
 - **Valeurs** : chaque valeur est un paramètre, `$1`, sauf un [`Parameter`](/fr/sql-template#Parameter), gardé tel quel avec son cast ; un fragment `sql`, écrit comme son SQL ; et [`parent()`](/fr/sql-template#parent), la colonne de la requête parente dans une sous-requête `lateral`. `Default`, `self`, `raw()`, `cols()` et `vals()` lèvent une erreur : [Les valeurs qu’une condition refuse](#refused-values).
 - **Type** : une condition est un `SQLFragment` dont le second argument de type, `T`, est le type de la valeur à laquelle elle compare (sa `Constraint`, [`sql`](/fr/sql-template#sql)) ; le Whereable vérifie `T` contre le type de la colonne. Les huit tests, `now` et `fromNow()` n’ont pas de `T`, et passent sur n’importe quelle colonne.
+  - Un Whereable est aussi une expression : interpolé dans une liste `SELECT`, `{ runtime_minutes: add(10) }` est la durée de chaque film plus dix, `(("runtime_minutes" + $1))`<!-- probe: db.sql`${{ runtime_minutes: db.conditions.add(10) }}` -->. Le type laisse donc passer, comme valeur d’un Whereable, ce qui n’est pas un test : [`add()`](#conditions.add), [`subtract()`](#conditions.subtract), [`now`](#conditions.now) et [`fromNow()`](#conditions.fromNow), que Postgres refuse seuls dans un `where` (42804).
 
 Une valeur d’un autre type ne compile pas :
 
@@ -56,7 +57,7 @@ Des constantes, pas des fonctions : `{ subtitled: db.conditions.isNull }`, sans
 
 </CastPanel>
 
-`isNull` et `isNotNull` fonctionnent sur n’importe quelle colonne. Les six autres sont pour un `boolean` : sur un autre type, Postgres les refuse (42804), bien que le type les laisse passer.
+`isNull` et `isNotNull` fonctionnent sur n’importe quelle colonne. Les six autres sont pour un `boolean`, ou un domaine sur un `boolean` : sur un autre type, Postgres les refuse (42804), bien que le type les laisse passer.
 
 ### `isNull` {#conditions.isNull}
 
@@ -387,7 +388,7 @@ Zapatos 6.6.1 écrivait `(NOT "release_year" = 1974 OR "release_year" = 1991)`, 
 
 ### `now` {#conditions.now}
 
-`now()`<!-- probe: db.conditions.now --> : une constante, le début de la transaction en cours. Une valeur, pas une condition : `{ starts_at: after(now) }` donne `(("starts_at" > now()))`<!-- probe: db.sql`${{ starts_at: db.conditions.after(db.conditions.now) }}` -->, et dans `update()` elle fixe la colonne. Seule comme valeur d’un Whereable, `{ starts_at: now }`, Postgres la refuse (42804), bien que le type la laisse passer.
+`now()`<!-- probe: db.conditions.now --> : une constante, le début de la transaction en cours. Une valeur, pas une condition : `{ starts_at: after(now) }` donne `(("starts_at" > now()))`<!-- probe: db.sql`${{ starts_at: db.conditions.after(db.conditions.now) }}` -->, et dans `update()` elle fixe la colonne. Seule comme valeur d’un Whereable dans un `where`, `{ starts_at: now }`, Postgres la refuse (42804), bien que le type la laisse passer : dans une liste `SELECT`, le même Whereable s’exécute ([`conditions`](#conditions)).
 
 ### `fromNow()` {#conditions.fromNow}
 
@@ -422,11 +423,11 @@ Des opérations, pas des tests : pour une valeur d’[`update()`](/fr/insert#up
 
 </CastPanel>
 
-- Dans un `where`, le type les laisse passer, et Postgres les refuse (42804 : « <span lang="en">argument of WHERE must be type boolean</span> »).
-- Dans le `updateValues` d’`upsert()`, il n’y a pas de colonne courante : elles lèvent "The 'self' column alias has no meaning here"<!-- message --> ([`upsert()`](/fr/insert#upsert)). Dans `insert()`, la colonne est écrite, et Postgres la refuse (42703).
+- Dans un `where`, le type les laisse passer, et Postgres les refuse (42804 : « <span lang="en">argument of WHERE must be type boolean</span> ») ; dans une liste `SELECT`, le même Whereable s’exécute ([`conditions`](#conditions)).
+- Dans le `updateValues` d’`upsert()`, il n’y a pas de colonne courante : elles lèvent "The 'self' column alias has no meaning here"<!-- message --> ([`upsert()`](/fr/insert#upsert)). Dans `insert()`, le type les refuse (TS2769), comme Postgres : la colonne est écrite dans `VALUES` (42703).
 - Elles prennent un nombre ou un `Date`, pas un `Parameter` (TS2345) : pour un cast, écrivez une valeur en fragment `sql` (ci-dessous).
 - Sur une colonne `date`, le type refuse un nombre (TS2322), et Postgres ne pourrait pas l’exécuter non plus : `date + unknown` est ambigu (42725).
-- Sur une colonne `date`, `timestamp` ou `timestamptz`, un `Date` passe la vérification de types, et Postgres le refuse ([#180](https://github.com/AlexandreDemartin/pgcast/issues/180)). Sur `date`, `add()` est ambigu (42725) et `subtract()` donne un entier, pas une date (42804) ; sur les deux autres, `add()` le lit comme un `interval` (22007), `subtract()` donne un `interval`, pas un instant (42804).
+- Sur une colonne `date`, `timestamp` ou `timestamptz`, un `Date` passe la vérification de types. `add()` d’un `Date` échoue où qu’il soit. Sur `date`, il est ambigu (42725), dans un `where` aussi. Sur les deux autres, un `where` le refuse avant de lire le `Date` (42804) ; comme valeur d’`update()`, imbriqué dans un fragment `sql` ou dans une liste `SELECT`, Postgres le lit comme un `interval` (22007). `subtract()` d’un `Date` donne un nombre de jours sur `date`, un `interval` sur les deux autres, pas le type de la colonne : Postgres le refuse comme valeur d’`update()` (42804), et l’exécute imbriqué dans un fragment `sql` ou dans une liste `SELECT`.
 
 Pour les dates, écrivez une valeur en fragment `sql`, où `db.self` est la colonne, et castez son paramètre. Sur une colonne `date`, `` db.sql`${db.self} + ${db.param(3, 'int4')}` `` ajoute trois jours : `"col" + CAST($1 AS "int4")`<!-- probe: db.sql`${{ col: db.sql`${db.self} + ${db.param(3, 'int4')}` }}` -->. Sur une colonne `timestamptz`, ajoutez un `interval` : une séance déplacée au lendemain.
 
