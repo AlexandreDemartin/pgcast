@@ -274,6 +274,12 @@ Candidates for a check, a rule or a skill line.
 - #268 — A mock of a third-party lazy getter is compared with the package's real source at the oldest supported version (pg's peer floor, 7.18.2), not one recent version; and a counter on a getter that replaces itself counts only the first read — `branch-reviewer`
 - #268 — A pg 7 replay on Node 22 needs a patch to the handshake only (pg older than 8.0.3 cannot open a socket on Node 14+); pg-native runs there unpatched — `builder`
 - #268 — On pg 7, an installed pg-native whose addon fails to load made `transaction()` reject on a plain JS pool (6.6.1 and master) — `builder`
+- #166 — A catalog filter that claims to list « what Postgres accepts » is probed against objects in a transient state (`indisvalid`: a partitioned table's `ALTER TABLE ONLY … ADD CONSTRAINT`, a failed `CREATE … CONCURRENTLY`), not only finished ones — `branch-reviewer`
+- #166 — Every codegen opt-in gets an entry in `variants` (its output a frozen, compiled snapshot); checkable: each `OptionalConfig` key that changes the output appears there — `branch-reviewer`
+- #166 — A codegen test that runs several `probeErrors()` on the whole fixture sets an explicit timeout or splits: a draft runs no build jobs, so a duration near 5 s shows only after `gh pr ready` — `branch-reviewer`
+- #166 — When a note's text gains a case, every page that lists its cases follows (CHANGELOG `Added`/`Deprecated`, Switching, README, JSDoc, Insert): `git grep` its SQLSTATE codes — `branch-reviewer`
+- #166 — Postgres raises 55000 for a deferrable arbiter only once it inserts a row; a unique index on a materialised view gives 42704 in `ON CONFLICT ON CONSTRAINT` — `builder`
+- #166 — Right after a push, `gh pr checks --watch` can exit before CI registers: wait for `gh run list` to show the head SHA — `builder`
 
 ## Minors kept
 
@@ -379,3 +385,4 @@ Minor review defects, taken up by the end-of-chapter review.
 - #204 — `website/playground.md:28` (and `fr/…`): « where `pg` sends it as a simple query » could link the new paragraph — `branch-reviewer`
 - #268 — `test/unit/transaction-pg7.test.ts:68`: `expect(pg7.state.reads).toBe(1)` cannot fail (the getter replaces itself) — `branch-reviewer`
 - #268 — `src/db/transaction.ts:59`: the comment leaves out a native client built from `pg/lib/native` while the getter is in place, classed by `_connected` — `branch-reviewer`
+- #166 — `website/generator.md:382` (and `fr/…:386`): « An exclusion constraint is in neither list » next to a sentence calling a `WITHOUT OVERLAPS` key an exclusion constraint: « An `EXCLUDE` constraint » — `branch-reviewer`
