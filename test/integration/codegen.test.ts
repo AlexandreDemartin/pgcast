@@ -410,6 +410,111 @@ describe('variant snapshots', () => {
     });
   });
 
+  describe('domainsTypedByContext over a domain, or of an array of a domain, compiled (#484)', () => {
+    beforeAll(() => t.pool.query(`
+      CREATE SCHEMA nest_probe;
+      CREATE TYPE nest_probe.genre AS ENUM ('comedy', 'drama');
+      CREATE DOMAIN nest_probe.genre_d AS nest_probe.genre;
+      CREATE DOMAIN nest_probe.vip_genre AS nest_probe.genre_d;
+      CREATE DOMAIN nest_probe.label AS text;
+      CREATE DOMAIN nest_probe.vip_label AS nest_probe.label;
+      CREATE DOMAIN nest_probe.ticket_no AS bigint;
+      CREATE DOMAIN nest_probe.vip_ticket_no AS nest_probe.ticket_no;
+      CREATE DOMAIN nest_probe.release_day AS date;
+      CREATE DOMAIN nest_probe.vip_day AS nest_probe.release_day;
+      CREATE TABLE nest_probe.films (id int PRIMARY KEY, genre nest_probe.vip_genre, label nest_probe.vip_label,
+        no nest_probe.vip_ticket_no, day nest_probe.vip_day, genres nest_probe.genre_d[], nos nest_probe.ticket_no[]);`));
+    afterAll(() => t.pool.query('DROP SCHEMA nest_probe CASCADE'));
+
+    const config = { schemas: { nest_probe: all } };
+    const on = { ...config, domainsTypedByContext: true };
+    const unused = "probe.ts TS2578 Unused '@ts-expect-error' directive.";
+
+    /** Each context of the placeholders left as generated, `any`: `refused` marks what only the option refuses. */
+    const generatedProbe = (refused: string) => `
+      import * as db from 'zapatos/db';
+      import type * as s from 'zapatos/schema';
+      declare const sel: s.nest_probe.films.Selectable, json: s.nest_probe.films.JSONSelectable, text: string;
+      export const reads = [
+        // pg parses a domain over a domain by the base type of the innermost domain
+        sel.no satisfies db.Int8String | null,
+        sel.day satisfies Date | null,
+        sel.genre satisfies s.nest_probe.genre | null,
+        // and returns an array of a domain as its text
+        sel.genres satisfies string | null,
+        json.no satisfies number | null,
+        json.day satisfies db.DateString | null,
+        json.genres satisfies s.nest_probe.genre[] | null,
+        ${refused} pg's string, not the number the shortcuts give
+        sel.no satisfies number | null,
+        ${refused} the text pg returns, not an array
+        sel.genres satisfies s.nest_probe.genre[] | null,
+        ${refused} the shortcuts' number, not pg's string
+        json.no satisfies db.Int8String | null,
+      ];
+      export const writes = [
+        db.insert('nest_probe.films', {
+          id: 1, no: 1, day: '2030-03-01', label: 'x', genre: 'comedy', genres: ['comedy'], nos: [1, BigInt(2)] }),
+        db.select('nest_probe.films', { day: new Date(), label: text }),
+        db.update('nest_probe.films', { no: BigInt(1) }, { id: 1 }),
+        ${refused} not a label of genre, which Postgres refuses (22P02)
+        db.insert('nest_probe.films', { id: 1, genre: 'horror' }),
+        ${refused} any string, not a label
+        db.insert('nest_probe.films', { id: 1, genre: text }),
+        ${refused} not an array
+        db.insert('nest_probe.films', { id: 1, nos: 'abc' }),
+        ${refused} not a number
+        db.update('nest_probe.films', { no: 'abc' }, { id: 1 }),
+        ${refused} not a date
+        db.select('nest_probe.films', { day: 5 }),
+      ];`;
+
+    it('types each context by the base type of the innermost domain', async () => {
+      expect(await probeErrors(on, generatedProbe('// @ts-expect-error'))).toEqual([]);
+    });
+
+    it('is off by default: any in all five, as in Zapatos 6.6.1, so that each refusal is the option\'s', async () => {
+      expect(await probeErrors(config, generatedProbe('//'))).toEqual([]);
+      expect(await probeErrors(config, generatedProbe('// @ts-expect-error'))).toEqual(Array(8).fill(unused));
+    });
+
+    /** Edited placeholders, with or without the option: their type in all five; `refused` marks what they refuse. */
+    const editedProbe = (refused: string) => `
+      import * as db from 'zapatos/db';
+      import type * as s from 'zapatos/schema';
+      declare const sel: s.nest_probe.films.Selectable, json: s.nest_probe.films.JSONSelectable;
+      export const reads = [
+        json.no satisfies number | db.Int8String | null,
+        sel.genres satisfies s.nest_probe.genre[] | null,
+        ${refused} the edited type, not the shortcuts' number alone
+        json.no satisfies number | null,
+      ];
+      export const writes = [
+        db.insert('nest_probe.films', { id: 1, no: 1, genres: ['comedy'] }),
+        ${refused} not in the edited type
+        db.insert('nest_probe.films', { id: 1, no: BigInt(1) }),
+        ${refused} not a label
+        db.insert('nest_probe.films', { id: 1, genres: ['horror'] }),
+      ];`;
+    const placeholder = (name: string, type: string) => `declare module 'zapatos/custom' {\n  import type * as db from ` +
+      `'zapatos/db';\n  import type { nest_probe } from 'zapatos/schema';\n  export type ${name} = ${type};\n}\n`;
+    const edits = {
+      PgVip_ticket_no: placeholder('PgVip_ticket_no', 'number | db.Int8String'),
+      Pg_genre_d: placeholder('Pg_genre_d', 'nest_probe.genre[]'),
+    };
+
+    it.each([false, true])('keeps an edited placeholder\'s type in all five (domainsTypedByContext: %s)', async key => {
+      expect(await probeErrors({ ...config, domainsTypedByContext: key }, editedProbe('// @ts-expect-error'), {}, edits))
+        .toEqual([]);
+    });
+
+    it('the edited probe\'s refusals are unused with the placeholders left as generated', async () => {
+      // typed by the innermost domain: a number, a bigint; 'horror' is refused still
+      expect(await probeErrors(on, editedProbe('// @ts-expect-error'))).toEqual(Array(2).fill(unused));
+      expect(await probeErrors(config, editedProbe('// @ts-expect-error'))).toEqual(Array(3).fill(unused));
+    });
+  });
+
   it('labels, index and column names take their quote and backslash, typeEnumsAcrossSchemas on or off', async () => {
     // tone_types is never generated: its enum is written out label by label with typeEnumsAcrossSchemas
     await t.pool.query(String.raw`
@@ -1115,15 +1220,34 @@ describe('domainsTypedByContext', () => {
     CREATE DOMAIN ctx.notes AS jsonb;
     CREATE TYPE ctx.genre AS ENUM ('comedy', 'drama');
     CREATE DOMAIN ctx.genre_d AS ctx.genre;
-    CREATE DOMAIN ctx.vip_ticket_no AS ctx.ticket_no;  -- information_schema gives its udt as ctx.ticket_no: any
+    -- a domain over a domain, and an array of a domain, any as generated: information_schema gives the inner domain
+    -- as the udt of the first, the array type of the second (#484)
+    CREATE DOMAIN ctx.vip_ticket_no AS ctx.ticket_no;
+    CREATE DOMAIN ctx.premium_ticket_no AS ctx.vip_ticket_no;
+    CREATE DOMAIN ctx.vip_day AS ctx.release_day;
+    CREATE DOMAIN ctx.vip_label AS ctx.label;
+    CREATE DOMAIN ctx.vip_genre AS ctx.genre_d;
+    CREATE DOMAIN ctx.ticket_list AS ctx.ticket_no[];
+    -- any under its domains too: a point, an array of a domain over an array, an enum of another schema
+    CREATE DOMAIN ctx.spot AS point;
+    CREATE DOMAIN ctx.vip_spot AS ctx.spot;
+    CREATE SCHEMA ctx_box;
+    CREATE TYPE ctx_box.tone AS ENUM ('warm', 'dry');
+    CREATE DOMAIN ctx_box.tone_d AS ctx_box.tone;
+    CREATE DOMAIN ctx.vip_tone AS ctx_box.tone_d;
     CREATE TABLE ctx.tickets (
       id int PRIMARY KEY, no ctx.ticket_no NOT NULL, amount ctx.amount, day ctx.release_day, ts ctx.local_ts,
       at ctx.starts, data ctx.blob, cost ctx.cost, nos ctx.ticket_nos);
     CREATE MATERIALIZED VIEW ctx.ticket_days AS SELECT id, day FROM ctx.tickets;
-    CREATE TABLE ctx.quiet (
-      label ctx.label, minutes ctx.minutes, notes ctx.notes, genre ctx.genre_d, vip ctx.vip_ticket_no, arr ctx.ticket_no[]);
+    CREATE TABLE ctx.quiet (label ctx.label, minutes ctx.minutes, notes ctx.notes, genre ctx.genre_d, spot ctx.vip_spot,
+      nos ctx.ticket_nos[], tone ctx.vip_tone);
+    CREATE TABLE ctx.nested (
+      id int PRIMARY KEY, premium ctx.premium_ticket_no NOT NULL, vip ctx.vip_ticket_no, day ctx.vip_day,
+      label ctx.vip_label, genre ctx.vip_genre, arr ctx.ticket_no[], labels ctx.label[], list ctx.ticket_list);
+    CREATE MATERIALIZED VIEW ctx.nested_days AS SELECT day, arr FROM ctx.nested;
+    CREATE TABLE ctx_box.films (id int PRIMARY KEY, tones ctx_box.tone_d[]);
   `));
-  afterAll(() => t.pool.query('DROP SCHEMA ctx CASCADE'));
+  afterAll(() => t.pool.query('DROP SCHEMA ctx, ctx_box CASCADE'));
 
   const ctx = { schemas: { ctx: all }, schemaJSDoc: false, unprefixedSchema: 'ctx' };
   const on = { ...ctx, domainsTypedByContext: true };
@@ -1199,6 +1323,81 @@ describe('domainsTypedByContext', () => {
     expect(linesOf(schema, 'tickets', 'no')[1]).toBe('no: db.DomainInContext<c.PgTicket_no, db.Int8String, (number | db.Int8String)>;');
   });
 
+  describe('a domain over a domain, or an array of a domain (#484)', () => {
+    const inAny = (placeholder: string) => (type: string) => `db.DomainInContext<${placeholder}, any, ${type}>`;
+    const int8Input = '(number | db.Int8String | bigint)';
+
+    it('types all five by the base type of the innermost domain, while the placeholder holds any', async () => {
+      const { ts: schema } = await codegen(on);
+      const premium = inAny('c.PgPremium_ticket_no'), premiumInput = premium(int8Input);
+      // three domains deep, NOT NULL
+      expect(linesOf(schema, 'nested', 'premium')).toEqual([
+        `premium: ${premium('db.Int8String')};`,
+        `premium: ${premium('number')};`,
+        `premium?: ${premiumInput} | db.Parameter<${premiumInput}> | db.SQLFragment | db.ParentColumn | ` +
+          `db.SQLFragment<any, ${premiumInput} | db.Parameter<${premiumInput}> | db.SQLFragment | db.ParentColumn>;`,
+        `premium: ${premiumInput} | db.Parameter<${premiumInput}> | db.SQLFragment;`,
+        `premium?: ${premiumInput} | db.Parameter<${premiumInput}> | db.SQLFragment | ` +
+          `db.SQLFragment<any, ${premiumInput} | db.Parameter<${premiumInput}> | db.SQLFragment>;`,
+      ]);
+      // column, placeholder, Selectable, JSONSelectable, Whereable, Insertable and Updatable
+      const cases: [string, string, string, string, string][] = [
+        ['vip', 'c.PgVip_ticket_no', 'db.Int8String', 'number', int8Input],
+        ['day', 'c.PgVip_day', 'Date', 'db.DateString', '(db.DateString | Date)'],
+        ['label', 'c.PgVip_label', 'string', 'string', 'string'],
+        ['genre', 'c.PgVip_genre', 'genre', 'genre', 'genre'],
+        // pg returns an array of a domain, or a domain over one, as its text: an OID it does not know
+        ['arr', 'c.Pg_ticket_no', 'string', 'number[]', '(number | db.Int8String | bigint)[]'],
+        ['labels', 'c.Pg_label', 'string', 'string[]', 'string[]'],
+        ['list', 'c.PgTicket_list', 'string', 'number[]', '(number | db.Int8String | bigint)[]'],
+      ];
+      for (const [column, placeholder, selectable, json, input] of cases) {
+        const typed = inAny(placeholder);
+        expect.soft(linesOf(schema, 'nested', column), column)
+          .toEqual(nullable(column, typed(selectable), typed(json), typed(input)));
+      }
+      // a materialised view has a Selectable, a JSONSelectable and a Whereable
+      const day = inAny('c.PgVip_day'), arr = inAny('c.Pg_ticket_no');
+      expect(linesOf(schema, 'nested_days', 'day'))
+        .toEqual(nullable('day', day('Date'), day('db.DateString'), day('(db.DateString | Date)')).slice(0, 3));
+      expect(linesOf(schema, 'nested_days', 'arr'))
+        .toEqual(nullable('arr', arr('string'), arr('number[]'), arr('(number | db.Int8String | bigint)[]')).slice(0, 3));
+    });
+
+    it('is off by default: the placeholder in all five, as in Zapatos 6.6.1', async () => {
+      const { ts: schema } = await codegen(ctx);
+      for (const [column, placeholder] of [['vip', 'c.PgVip_ticket_no'], ['arr', 'c.Pg_ticket_no'], ['list', 'c.PgTicket_list']]) {
+        expect.soft(linesOf(schema, 'nested', column), column).toEqual(nullable(column, placeholder, placeholder, placeholder));
+      }
+    });
+
+    it('types an enum of a prefixed schema by its name there, and one of another schema as typeEnumsAcrossSchemas says', async () => {
+      const box = { ...on, schemas: { ctx: all, ctx_box: all } };
+      const tones = inAny('c.Pg_tone_d');
+      expect(linesOf((await codegen(box)).ts, 'films', 'tones'))
+        .toEqual(nullable('tones', tones('string'), tones('tone[]'), tones('tone[]')));
+      // ctx.quiet.tone, of ctx_box.tone: looked up by name in ctx without the option, which has no such enum
+      expect(linesOf((await codegen(box)).ts, 'quiet', 'tone')).toEqual(nullable('tone', 'c.PgVip_tone', 'c.PgVip_tone', 'c.PgVip_tone'));
+      const tone = inAny('c.PgVip_tone'), labels = "('dry' | 'warm')";
+      expect(linesOf((await codegen({ ...box, typeEnumsAcrossSchemas: true })).ts, 'quiet', 'tone'))
+        .toEqual(nullable('tone', tone(labels), tone(labels), tone(labels)));
+    });
+
+    it('types what pg, the shortcuts and Postgres give: a domain over a domain parsed, an array of a domain as text', async () => {
+      const row = await runtime.insert('ctx.nested' as any, {
+        id: 1, premium: BigInt(1), vip: '2', day: '2030-03-01', label: 'x', genre: 'comedy',
+        arr: [1, BigInt(2)], labels: ['a'], list: ['3'],
+      }).run(t.client) as any;
+      // the shortcuts' JSON
+      expect(row).toEqual({ id: 1, premium: 1, vip: 2, day: '2030-03-01', label: 'x', genre: 'comedy',
+        arr: [1, 2], labels: ['a'], list: [3] });
+      // pg's own parsing
+      const { rows: [fromPg] } = await t.client.query('SELECT premium, vip, day, arr, labels, list FROM ctx.nested');
+      expect({ ...fromPg, day: fromPg.day instanceof Date }).toEqual({
+        premium: '1', vip: '2', day: true, arr: '{1,2}', labels: '{a}', list: '{3}' });
+    });
+  });
+
   it('writes the same placeholders, and leaves the domains typed alike in every context, or any, as they were', async () => {
     const off = await codegen(ctx), typed = await codegen(on);
     expect(typed.customTypeSourceFiles).toEqual(off.customTypeSourceFiles);
@@ -1215,6 +1414,17 @@ describe('domainsTypedByContext', () => {
       'another type. ' +
       'Set domainsTypedByContext: true to type them by context while their placeholders hold what the generator ' +
       'wrote for them; it will be the default in pgcast 7.0.',
+      'Note: ctx.nested.arr (ctx.ticket_no[]), ctx.nested.day (ctx.vip_day), ctx.nested.genre (ctx.vip_genre), ' +
+      'ctx.nested.label (ctx.vip_label), ctx.nested.labels (ctx.label[]), ctx.nested.list (ctx.ticket_list), ' +
+      'ctx.nested.premium (ctx.premium_ticket_no), ctx.nested.vip (ctx.vip_ticket_no), ctx.nested_days.arr ' +
+      '(ctx.ticket_no[]) and ctx.nested_days.day (ctx.vip_day) have domains over a domain, or arrays of a domain: ' +
+      'as generated, their placeholders type them as `any`. Set domainsTypedByContext: true to type them by the base ' +
+      'type of the innermost domain while their placeholders hold `any`; it will be the default in pgcast 7.0.',
+    ]);
+    expect(await notesFor({ ...ctx, schemas: { ctx_box: all } })).toEqual([
+      'Note: ctx_box.films.tones (ctx_box.tone_d[]) has a domain over a domain, or an array of a domain: as generated, ' +
+      'its placeholder types it as `any`. Set domainsTypedByContext: true to type it by the base type of the innermost ' +
+      'domain while its placeholder holds `any`; it will be the default in pgcast 7.0.',
     ]);
     expect(await notesFor({ ...ctx, schemas: { ctx: only('ticket_days') } })).toEqual([
       'Note: ctx.ticket_days.day (ctx.release_day) has a domain over a type typed by context, such as int8 or date: ' +

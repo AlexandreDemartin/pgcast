@@ -131,6 +131,19 @@ describe('DomainInContext, the type domainsTypedByContext writes', () => {
     // @ts-expect-error an array of any is not replaced either
     expectTypeOf<db.DomainInContext<any[], db.Int8String[], number[]>>().toEqualTypeOf<number[]>();
   });
+
+  test('a domain over a domain, or an array of one: a placeholder that holds any, as generated, takes the context\'s type', () => {
+    expectTypeOf<db.DomainInContext<any, any, number>>().toEqualTypeOf<number>();
+    expectTypeOf<db.DomainInContext<any, any, string>>().toEqualTypeOf<string>();
+    // edited, to unknown among others: its type
+    expectTypeOf<db.DomainInContext<unknown, any, number>>().toBeUnknown();
+    expectTypeOf<db.DomainInContext<any[], any, number[]>>().toEqualTypeOf<any[]>();
+    expectTypeOf<db.DomainInContext<number | db.Int8String, any, number>>().toEqualTypeOf<number | db.Int8String>();
+    // @ts-expect-error unknown is not replaced by the context's type
+    expectTypeOf<db.DomainInContext<unknown, any, number>>().toEqualTypeOf<number>();
+    // @ts-expect-error nor an array of any
+    expectTypeOf<db.DomainInContext<any[], any, number[]>>().toEqualTypeOf<number[]>();
+  });
 });
 
 describe('enum', () => {
