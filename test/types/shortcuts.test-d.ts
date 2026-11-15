@@ -171,6 +171,37 @@ describe('selectOne, selectExactlyOne, count', () => {
     const q = db.selectOne('users', db.all, { lateral: { first: db.min('events', db.all, { columns: ['occurred_on'] }) } });
     expectTypeOf<NonNullable<Run<typeof q>>['first']>().toEqualTypeOf<number>();
   });
+
+  test('characterization: nested, a count() whose query can return no row is a number, as in 6.6.1, though it gives null (#420)', () => {
+    const n = db.count('accounts', { owner_id: db.parent('id') }, { groupBy: 'owner_id' });
+    const many = db.select('users', db.all, {
+      columns: ['id'],
+      lateral: {
+        groupBy: n,
+        having: db.count('accounts', { owner_id: db.parent('id') }, { having: db.sql`false` }),
+        offset: db.count('accounts', { owner_id: db.parent('id') }, { offset: 1 }),
+        limit: db.count('accounts', { owner_id: db.parent('id') }, { limit: 0 }),
+      },
+    });
+    type Row = Run<typeof many>[number];
+    expectTypeOf<Row['groupBy']>().toEqualTypeOf<number>();
+    expectTypeOf<Row['having']>().toEqualTypeOf<number>();
+    expectTypeOf<Row['offset']>().toEqualTypeOf<number>();
+    expectTypeOf<Row['limit']>().toEqualTypeOf<number>();
+    expectTypeOf<Row>().not.toBeAny();
+    const one = db.selectOne('users', { id: 3 }, { columns: ['id'], lateral: { n } });
+    expectTypeOf<NonNullable<Run<typeof one>>['n']>().toEqualTypeOf<number>();
+    const exactlyOne = db.selectExactlyOne('users', { id: 3 }, { columns: ['id'], lateral: { n } });
+    expectTypeOf<Run<typeof exactlyOne>['n']>().toEqualTypeOf<number>();
+    // passed through as the single lateral, and as an extras value
+    expectTypeOf(db.selectOne('users', { id: 3 }, { lateral: n }).run(pool)).resolves.toEqualTypeOf<number | undefined>();
+    expectTypeOf(db.selectExactlyOne('users', { id: 3 }, { lateral: n }).run(pool)).resolves.toEqualTypeOf<number>();
+    expectTypeOf(db.select('users', db.all, { lateral: n }).run(pool)).resolves.toEqualTypeOf<number[]>();
+    const extras = db.select('users', db.all, { columns: ['id'], extras: { n: db.count('accounts', db.sql`${'owner_id'} = ${'users'}.${'id'}`, { groupBy: 'owner_id' }) } });
+    expectTypeOf<Run<typeof extras>[number]['n']>().toEqualTypeOf<number>();
+    // at top level, run() gives 0 for no row (#163)
+    expectTypeOf(n.run(pool)).resolves.toEqualTypeOf<number>();
+  });
 });
 
 describe('insert', () => {

@@ -1,5 +1,5 @@
 ---
-english: fd1f51470dfb
+english: 6c0918b13fec
 ---
 
 # Lectures {#select-and-the-aggregates}
@@ -113,7 +113,7 @@ Un raccourci de lecture y est une sous-requête : `select()`, `selectOne()`, `s
 
 `lateral?: { [key: string]: SQLFragment } | SQLFragment`, un [`LateralOption`](#LateralOption) : d’autres raccourcis, imbriqués, chacun joint par `LEFT JOIN LATERAL … ON true`. Dans ceux-ci, [`db.parent()`](/fr/sql-template#parent) nomme une colonne de la table de cette requête.
 
-- **Un objet** : chaque clé devient une clé du résultat, qui contient le résultat de sa sous-requête : un tableau pour `select()`, un objet ou `null` pour `selectOne()`, un nombre pour `count()`. Les clés sont jointes dans l’ordre alphabétique ; chacune est un seul identifiant, `"lateral_<key>"`.
+- **Un objet** : chaque clé devient une clé du résultat, qui contient le résultat de sa sous-requête : un tableau pour `select()`, un objet ou `null` pour `selectOne()`, un nombre pour `count()`, ou `null` quand sa requête ne renvoie aucune ligne ([`count()`](#count)). Un `count()` dont le `groupBy` donne plusieurs groupes fait revenir la ligne parente une fois par groupe sous un `select()` extérieur ; sous `selectOne()` ou `selectExactlyOne()`, une seule fois, avec le compte de l’un des groupes, mais avec [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), `selectExactlyOne()` est rejetée avec une `NotExactlyOneError`. Les clés sont jointes dans l’ordre alphabétique ; chacune est un seul identifiant, `"lateral_<key>"`.
 - **Une seule sous-requête** : son résultat est transmis à la place de chaque ligne. `columns` et `extras` n’ont alors rien à quoi s’ajouter, et le type les refuse, avec `strictNullChecks` activé.
 
 Étapes, imbrication et auto-jointures : [Jointures](/fr/lateral). Depuis pgcast 6.6.2, une clé ou un `alias` contenant un `"` reste un seul identifiant ; dans Zapatos 6.6.1, il pouvait fermer ses guillemets ([changelog](/fr/changelog#6.6.2-security)).

@@ -248,6 +248,12 @@ export class Constraint<T extends Table> { constructor(public value: UniqueIndex
  * refuses another table's (42704): held in a variable, `constraint('...')`
  * takes any table's name; `constraint<'users'>('users_pkey')` checks the name
  * against `users`.
+ *
+ * The type takes every unique index, and Postgres only that of a `UNIQUE` or
+ * `PRIMARY KEY` constraint, valid, not `DEFERRABLE` nor `WITHOUT OVERLAPS`: a
+ * `CREATE UNIQUE INDEX` gives 42704. Generate with
+ * `uniqueIndexConstraintsOnly: true` (the default in 7.0) and the type takes
+ * only those.
  */
 export function constraint<T extends Table>(x: UniqueIndexForTable<T>) { return new Constraint<T>(x); }
 
@@ -1002,7 +1008,9 @@ const numericAggregate = (
  * `columns: ['col']` gives `count("col")`, and no `columns` `count(*)`;
  * several columns, a string in place of the array, or a single query as
  * `lateral`, throw as the query compiles, so `run()` rejects before any query
- * is sent.
+ * is sent. A query that returns no row (a `groupBy` with no group, a `having`
+ * that keeps none, `offset: 1`, `limit: 0`) gives `0` from `run()`, but `null`
+ * nested in a `lateral` or `extras`, though the type says `number`.
  */
 export const count: NumericAggregateSignatures = function (table, where, options?) {
   return numericAggregate(table, where, options, 'count');
