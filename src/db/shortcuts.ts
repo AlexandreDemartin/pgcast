@@ -298,6 +298,17 @@ interface UpsertOptions<
   updateValues?: UpdateValuesForTable<T>;
   updateColumns?: UC;
   noNullUpdateColumns?: ColumnForTable<T> | ColumnForTable<T>[] | typeof all;
+  /**
+   * `'suppress'` leaves `$action` out of the SQL and of the type. A partitioned
+   * table needs it when a row lands in a partition whose columns sit where the
+   * table's do: the same columns in the same order, as `PARTITION OF` gives
+   * unless the table already had a dropped column, or as a table made with
+   * `CREATE TABLE` and then attached can have. Postgres reads no `xmax` there,
+   * and rejects the query with 0A000, "cannot retrieve a system column in this
+   * context", as with Zapatos 6.6.1. A row that lands in a partition with its
+   * columns in another order reports `$action`, as does an upsert into the
+   * partition itself.
+   */
   reportAction?: RA;
 }
 
@@ -453,6 +464,9 @@ export const upsert: UpsertSignatures = function (
 
   // the added-on $action = 'INSERT' | 'UPDATE' key takes after SQL Server's approach to MERGE
   // (and on the use of xmax for this purpose, see: https://stackoverflow.com/questions/39058213/postgresql-upsert-differentiate-inserted-and-updated-rows-using-system-columns-x)
+  // a row routed to a partition whose columns sit where the parent's do is returned from the parent's virtual slot, which
+  // has no system column, so Postgres refuses xmax (0A000): see tts_virtual_getsysattr in
+  // https://github.com/postgres/postgres/blob/REL_17_STABLE/src/backend/executor/execTuples.c
 
   const
     insertPart = sql`INSERT INTO ${table} (${insertColsSQL}) VALUES ${insertValuesSQL}`,
