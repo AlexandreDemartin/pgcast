@@ -1937,3 +1937,121 @@ describe('lateral: null, or a lateral key whose query is null or undefined', () 
       .toBe(`SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) || jsonb_build_object($1::text, "lateral_n".result) AS result FROM "users" LEFT JOIN LATERAL (SELECT count(*) AS result FROM "accounts") AS "lateral_n" ON true) AS "sq_users"`);
   });
 });
+
+describe('null as options, or as an options key', () => {
+  const
+    columnsNull = '`columns: null` has no meaning: for every column, leave `columns` out; for some, give an array of their names.',
+    returningNull = '`returning: null` has no meaning: for every column, leave `returning` out; for some, give an array of their names.',
+    extrasNull = '`extras: null` has no meaning: for no extras, leave `extras` out; to add some, give an object of them.',
+    orderNull = '`order: null` has no meaning: for no `ORDER BY`, leave `order` out; to sort, give it `{ by, direction }`, or an array of them.',
+    lockNull = '`lock: null` has no meaning: for no lock, leave `lock` out; to lock, give it `{ for }`, or an array of them.',
+    row = { email: 'a@x.org', display_name: 'A' },
+    no = null as any;
+
+  /** `.run(q).catch(h)` outside an async step: a throw at the call is not a rejection. */
+  const outcomes = async (builds: Record<string, () => db.SQLFragment<any, any>>) => {
+    const queryable = { query: vi.fn() } as any, result: Record<string, string> = {};
+    for (const [name, build] of Object.entries(builds)) {
+      try {
+        result[name] = await build().run(queryable).then(() => 'ran', (err: Error) => err.message);
+      } catch (err) {
+        result[name] = `throws at the call: ${(err as Error).message}`;
+      }
+    }
+    expect(queryable.query).not.toHaveBeenCalled();
+    return result;
+  };
+
+  it('null options compile as no options in each read shortcut, nested too, as in the writes', () => {
+    // Zapatos 6.6.1 read them so in selectOne(), selectExactlyOne() and the writes, and threw a TypeError at the call
+    // in select() and the aggregates; #341 made selectOne() and selectExactlyOne() throw too
+    expect(db.selectOne('users', all, no).compile()).toEqual({ text: 'SELECT to_jsonb("users".*) AS result FROM "users" LIMIT $1', values: [1] });
+    expect(db.select('users', all, no).compile()).toEqual(db.select('users', all).compile());
+    expect(db.selectExactlyOne('users', all, no).compile()).toEqual(db.selectExactlyOne('users', all).compile());
+    expect(db.count('users', all, no).compile()).toEqual(db.count('users', all).compile());
+    expect(db.select('users', all, { lateral: { n: db.count('accounts', all, no), a: db.select('accounts', all, no) } }).compile())
+      .toEqual(db.select('users', all, { lateral: { n: db.count('accounts', all), a: db.select('accounts', all) } }).compile());
+    expect(db.select('users', all, { extras: { n: db.count('accounts', all, no) } }).compile())
+      .toEqual(db.select('users', all, { extras: { n: db.count('accounts', all) } }).compile());
+    expect(db.insert('users', row, no).compile()).toEqual(db.insert('users', row).compile());
+    expect(db.upsert('users', row, 'email', no).compile()).toEqual(db.upsert('users', row, 'email').compile());
+    expect(db.update('users', row, { id: 1 }, no).compile()).toEqual(db.update('users', row, { id: 1 }).compile());
+    expect(db.deletes('users', { id: 1 }, no).compile()).toEqual(db.deletes('users', { id: 1 }).compile());
+  });
+
+  it('null options in sum, avg, min and max reject as no options do: they need a column', async () => {
+    expect(await outcomes({
+      sum: () => db.sum('accounts', all, no), avg: () => db.avg('accounts', all, no),
+      min: () => db.min('accounts', all, no), max: () => db.max('accounts', all, no),
+    })).toEqual({
+      sum: "sum() needs one column to aggregate: pass columns: ['column']", avg: "avg() needs one column to aggregate: pass columns: ['column']",
+      min: "min() needs one column to aggregate: pass columns: ['column']", max: "max() needs one column to aggregate: pass columns: ['column']",
+    });
+  });
+
+  it('columns, extras, order or lock as null rejects run() in the read shortcuts, with no query sent, nested too', async () => {
+    const builds: Record<string, () => db.SQLFragment<any, any>> = {}, expected: Record<string, string> = {};
+    for (const fn of ['select', 'selectOne', 'selectExactlyOne'] as const) {
+      for (const [key, message] of Object.entries({ columns: columnsNull, extras: extrasNull, order: orderNull, lock: lockNull })) {
+        builds[`${fn} ${key}`] = () => (db[fn] as typeof db.select)('users', all, { [key]: no });
+        expected[`${fn} ${key}`] = message;
+      }
+    }
+    for (const fn of ['count', 'sum', 'avg', 'min', 'max'] as const) {
+      for (const [key, message] of Object.entries({ order: orderNull, lock: lockNull })) {
+        builds[`${fn} ${key}`] = () => db[fn]('accounts', all, { columns: fn === 'count' ? undefined : ['balance'], [key]: no });
+        expected[`${fn} ${key}`] = message;
+      }
+    }
+    Object.assign(builds, {
+      inLateral: () => db.select('users', all, { lateral: { a: db.select('accounts', all, { columns: no }) } }),
+      inExtras: () => db.select('users', all, { extras: { a: db.selectOne('accounts', all, { extras: no }) } }),
+      inLateralCount: () => db.selectOne('users', all, { lateral: { n: db.count('accounts', all, { order: no }) } }),
+      copied: () => db.select('users', all, { lock: no }).copy(),
+    });
+    Object.assign(expected, { inLateral: columnsNull, inExtras: extrasNull, inLateralCount: orderNull, copied: lockNull });
+    expect(await outcomes(builds)).toEqual(expected);
+  });
+
+  it('with selectExactlyOneChecksForSecondRow, selectExactlyOne() of columns: null rejects the same way', async () => {
+    db.setConfig({ selectExactlyOneChecksForSecondRow: true });
+    expect(await outcomes({ columns: () => db.selectExactlyOne('users', all, { columns: no }) })).toEqual({ columns: columnsNull });
+  });
+
+  it('returning or extras as null rejects run() in the writes, with no query sent', async () => {
+    expect(await outcomes({
+      insertReturning: () => db.insert('users', row, { returning: no }),
+      insertRowsExtras: () => db.insert('users', [row, row], { extras: no }),
+      upsertReturning: () => db.upsert('users', row, 'email', { returning: no }),
+      upsertRowsExtras: () => db.upsert('users', [row], 'email', { extras: no }),
+      updateReturning: () => db.update('users', row, { id: 1 }, { returning: no }),
+      updateExtras: () => db.update('users', row, { id: 1 }, { extras: no }),
+      deletesReturning: () => db.deletes('users', { id: 1 }, { returning: no }),
+      deletesExtras: () => db.deletes('users', { id: 1 }, { extras: no }),
+    })).toEqual({
+      insertReturning: returningNull, insertRowsExtras: extrasNull, upsertReturning: returningNull, upsertRowsExtras: extrasNull,
+      updateReturning: returningNull, updateExtras: extrasNull, deletesReturning: returningNull, deletesExtras: extrasNull,
+    });
+  });
+
+  it('a null key that ran keeps its SQL', () => {
+    // read as missing, as in Zapatos 6.6.1
+    for (const key of ['distinct', 'withTies', 'groupBy', 'having', 'alias']) {
+      expect(db.select('users', all, { [key]: no }).compile()).toEqual(db.select('users', all).compile());
+      expect(db.count('users', all, { [key]: no }).compile()).toEqual(db.count('users', all).compile());
+    }
+    for (const key of ['updateValues', 'updateColumns', 'noNullUpdateColumns', 'reportAction']) {
+      expect(db.upsert('users', [row, row], 'email', { [key]: no }).compile()).toEqual(db.upsert('users', [row, row], 'email').compile());
+    }
+    // never written: count() takes no columns as count(*), and has no extras; one lateral subquery takes their place
+    expect(db.count('users', all, { columns: no, extras: no }).compile()).toEqual(db.count('users', all).compile());
+    expect(db.select('users', all, { columns: no, extras: no, lateral: db.count('accounts', all) }).compile())
+      .toEqual(db.select('users', all, { lateral: db.count('accounts', all) }).compile());
+    expect(db.insert('users', [], { returning: no, extras: no }).compile()).toEqual(db.insert('users', []).compile());
+    // sent as a parameter: Postgres reads LIMIT NULL as no limit, OFFSET NULL as none
+    expect(db.select('users', all, { limit: no, offset: no }).compile()).toEqual({
+      text: 'SELECT coalesce(jsonb_agg(result), \'[]\') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" LIMIT $1 OFFSET $2) AS "sq_users"',
+      values: [null, null],
+    });
+  });
+});

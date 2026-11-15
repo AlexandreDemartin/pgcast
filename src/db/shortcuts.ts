@@ -105,9 +105,26 @@ export type ReturningTypeForTable<T extends Table, C extends ColumnsOption<T>, E
     never);
 
 
-function SQLForColumnsOfTable(columns: readonly Column[] | undefined, table: Table) {
+// a fragment that throws as it compiles, so that run() rejects before any query, and so does a copy nested in a
+// lateral, which shares its expressions
+function refusedSQL(message: string) {
+  const refused = sql``;
+  refused.compile = () => { throw new Error(message); };
+  return refused;
+}
+
+// `null` from JavaScript, past the type, where Zapatos 6.6.1 threw a TypeError at the call: it has no meaning here
+const
+  columnsNull = '`columns: null` has no meaning: for every column, leave `columns` out; for some, give an array of their names.',
+  returningNull = '`returning: null` has no meaning: for every column, leave `returning` out; for some, give an array of their names.',
+  extrasNull = '`extras: null` has no meaning: for no extras, leave `extras` out; to add some, give an object of them.',
+  orderNull = '`order: null` has no meaning: for no `ORDER BY`, leave `order` out; to sort, give it `{ by, direction }`, or an array of them.',
+  lockNull = '`lock: null` has no meaning: for no lock, leave `lock` out; to lock, give it `{ for }`, or an array of them.';
+
+function SQLForColumnsOfTable(columns: readonly Column[] | undefined, table: Table, nullMessage: string) {
   return columns === undefined ? sql`to_jsonb(${table}.*)` :
-    sql`jsonb_build_object(${mapWithSeparator(columns, sql`, `, c => sql`${param(c)}::text, ${c}`)})`;
+    columns === null ? refusedSQL(nullMessage) :
+      sql`jsonb_build_object(${mapWithSeparator(columns, sql`, `, c => sql`${param(c)}::text, ${c}`)})`;
 }
 
 // one double-quoted identifier, as Postgres lexes it: `"a"`, `"a""b"` (core.ts also allows dotted ones)
@@ -123,6 +140,7 @@ function SQLForAlias(prefix: string, name: string) {
 
 function SQLForExtras<T extends Table>(extras: ExtrasOption<T>) {
   return extras === undefined ? [] :
+    extras === null ? refusedSQL(extrasNull) :
     sql` || jsonb_build_object(${mapWithSeparator(
       Object.keys(extras), sql`, `, k => {
         const extra = extras[k];
@@ -201,6 +219,10 @@ interface InsertSignatures {
  * (`PGCAST_DEP002`), once; with the `undefinedMeansMissing` config option (the
  * default in 7.0), it sends `DEFAULT`, as a key missing from one of several
  * rows does: `{ title: undefined }` gives `VALUES (DEFAULT)`.
+ * @param options Optionally, `returning` (an array of columns) and `extras`;
+ * `null` is none, and either set to `null` throws as the query compiles, so
+ * `run()` rejects before any query, unless `values` is an empty array, a no-op
+ * (a row with no key throws first, at the call)
  */
 export const insert: InsertSignatures = function (
   table: Table,
@@ -224,7 +246,7 @@ export const insert: InsertSignatures = function (
       valuesSQL = Array.isArray(completedValues) ?
         mapWithSeparator(completedValues as Insertable[], sql`, `, v => sql`(${vals(v)})`) :
         sql`(${vals(completedValues)})`,
-      returningSQL = SQLForColumnsOfTable(options?.returning, table),
+      returningSQL = SQLForColumnsOfTable(options?.returning, table, returningNull),
       extrasSQL = SQLForExtras(options?.extras);
 
     // a null row on its own, or a primitive row anywhere, fails in compile(), in cols() or vals(), so run() rejects
@@ -369,7 +391,8 @@ const updateValueSQL = (value: any) => compiledAsIs(value) ? value : param(value
  * (when there isn't); the type does not check that a `constraint()` is one of
  * this table's (see `constraint`)
  * @param options Optionally, an object with any of the keys `updateColumns`,
- * `noNullUpdateColumns` and `updateValues` (see documentation). A plain value
+ * `noNullUpdateColumns` and `updateValues` (see documentation), and
+ * `returning` and `extras`, as for `insert`. A plain value
  * in `updateValues` is sent as a parameter: `{ mood: 'happy' }` gives
  * `ROW(..., $n)`. To read a column there, use a fragment, which is written as
  * it is: ``{ name: db.sql`${'users'}.${'name'}` }`` gives `ROW(..., "users"."name")`.
@@ -449,7 +472,7 @@ export const upsert: UpsertSignatures = function (
       updateValues[c] !== undefined ? updateValueSQL(updateValues[c]) :
         (noNullUpdateColumns === all || noNullUpdateColumns.includes(c)) ? sql`CASE WHEN EXCLUDED.${c} IS NULL THEN ${table}.${c} ELSE EXCLUDED.${c} END` :
           sql`EXCLUDED.${c}`),
-    returningSQL = SQLForColumnsOfTable(options?.returning, table),
+    returningSQL = SQLForColumnsOfTable(options?.returning, table, returningNull),
     extrasSQL = SQLForExtras(options?.extras),
     suppressReport = options?.reportAction === 'suppress';
 
@@ -506,6 +529,7 @@ interface UpdateSignatures {
  * left out, as `JSON.stringify` leaves it out, and does not count:
  * `{ name: 'A', isLiving: undefined }` gives `SET ("name") = ROW($1)`.
  * @param where A `Whereable` (or `SQLFragment`) defining which rows to update
+ * @param options Optionally, `returning` and `extras`, as for `insert`
  */
 export const update: UpdateSignatures = function (
   table: Table,
@@ -523,7 +547,7 @@ export const update: UpdateSignatures = function (
   // more info: https://www.postgresql-archive.org/Possible-regression-in-UPDATE-SET-lt-column-list-gt-lt-row-expression-gt-with-just-one-single-column0-td5989074.html
 
   const
-    returningSQL = SQLForColumnsOfTable(options?.returning, table),
+    returningSQL = SQLForColumnsOfTable(options?.returning, table, returningNull),
     extrasSQL = SQLForExtras(options?.extras),
     query = sql`UPDATE ${table} SET (${cols(values)}) = ROW(${vals(values)}) WHERE ${where} RETURNING ${returningSQL}${extrasSQL} AS result`;
 
@@ -546,6 +570,7 @@ export interface DeleteSignatures {
  * Generate an `DELETE` query `SQLFragment` (plain 'delete' is a reserved word)
  * @param table The table to delete from
  * @param where A `Whereable` (or `SQLFragment`) defining which rows to delete
+ * @param options Optionally, `returning` and `extras`, as for `insert`
  */
 export const deletes: DeleteSignatures = function (
   table: Table,
@@ -554,7 +579,7 @@ export const deletes: DeleteSignatures = function (
 ): SQLFragment {
 
   const
-    returningSQL = SQLForColumnsOfTable(options?.returning, table),
+    returningSQL = SQLForColumnsOfTable(options?.returning, table, returningNull),
     extrasSQL = SQLForExtras(options?.extras),
     query = sql`DELETE FROM ${table} WHERE ${where} RETURNING ${returningSQL}${extrasSQL} AS result`;
 
@@ -600,9 +625,7 @@ export const truncate: TruncateSignatures = function (
 
   query.runResultTransform = () => undefined;
   if (given.length <= 2 && (given.length < 2 || (given[0].endsWith('IDENTITY') && !given[1].endsWith('IDENTITY')))) return query;
-  const refused = sql``;
-  refused.compile = () => { throw new Error(`Truncate options must be CONTINUE IDENTITY/RESTART IDENTITY, then RESTRICT/CASCADE, one of each at most, not ${given.map(opt => `'${opt}'`).join(', ')}`); };
-  return sql<SQL, undefined>`${refused}`;
+  return sql<SQL, undefined>`${refusedSQL(`Truncate options must be CONTINUE IDENTITY/RESTART IDENTITY, then RESTRICT/CASCADE, one of each at most, not ${given.map(opt => `'${opt}'`).join(', ')}`)}`;
 };
 
 
@@ -731,7 +754,11 @@ const functionName = new RegExp(`^${space}(?:${identifier})(?:${space}\\.${space
  * @param table The table to select from
  * @param where A `Whereable` or `SQLFragment` defining the rows to be selected,
  * or `all`
- * @param options Options object. Keys (all optional) are: 
+ * @param options Options object; `null` is none. Keys (all optional) are
+ * below; `order` or `lock` set to `null` throws as the query compiles, so
+ * `run()` rejects before any query, and so do `columns` and `extras` in
+ * `select`, `selectOne` and `selectExactlyOne`, unless one `lateral` subquery
+ * takes the columns' place:
  * * `columns` — an array of column names, readonly (`as const`) or not: only
  * these columns will be returned
  * * `order` – an array of `OrderSpec` objects, such as 
@@ -769,6 +796,8 @@ export const select: SelectSignatures = function (
 ) {
 
   if (mode === SelectResultMode.Numeric && !functionName.test(aggregate)) throw new Error(`Aggregate must be a function name (e.g. sum, or my_schema.my_agg), not '${aggregate}'`);
+  // `null` options, from JavaScript, are none, as Zapatos 6.6.1's selectOne(), selectExactlyOne() and writes read them
+  options ??= {};
 
   // `lateral: null`, or a key whose query is null or undefined: Zapatos 6.6.1 threw a TypeError as the query was
   // built (`Object.keys(null)`, `null.copy`); this throws as it compiles, so run() rejects before any query, and so
@@ -780,9 +809,7 @@ export const select: SelectSignatures = function (
       nullKey !== undefined ? `The \`lateral\` key '${nullKey}' is \`${givenLateral[nullKey]}\`, not a query: leave the key out, or give it a \`select()\`, \`selectOne()\` or \`count()\` query.` :
         undefined;
   if (lateralRefusal !== undefined) {
-    const refused = sql``;
-    refused.compile = () => { throw new Error(lateralRefusal); };
-    return sql<SQL, any>`${refused}`;
+    return sql<SQL, any>`${refusedSQL(lateralRefusal)}`;
   }
 
   const
@@ -790,15 +817,15 @@ export const select: SelectSignatures = function (
     allOptions = limit1 ? { ...options, limit: 1 } : options,
     alias = allOptions.alias || table,
     { distinct, groupBy, having, lateral, columns, extras } = allOptions,
-    lock = allOptions.lock === undefined || Array.isArray(allOptions.lock) ? allOptions.lock : [allOptions.lock],
-    order = allOptions.order === undefined || Array.isArray(allOptions.order) ? allOptions.order : [allOptions.order],
+    lock = allOptions.lock == null || Array.isArray(allOptions.lock) ? allOptions.lock : [allOptions.lock],
+    order = allOptions.order == null || Array.isArray(allOptions.order) ? allOptions.order : [allOptions.order],
     tableAliasSQL = alias === table ? [] : sql<string>` AS ${alias}`,
     distinctSQL = !distinct ? [] : sql` DISTINCT${distinct instanceof SQLFragment || typeof distinct === 'string' ? sql` ON (${distinct})` :
       Array.isArray(distinct) ? sql` ON (${cols(distinct)})` : []}`,
     colsSQL = lateral instanceof SQLFragment ? [] :
       mode === SelectResultMode.Numeric ?
         (columns ? sql`${raw(aggregate)}(${cols(columns)})` : sql`${raw(aggregate)}(*)`) :
-        SQLForColumnsOfTable(columns, alias as Table),
+        SQLForColumnsOfTable(columns, alias as Table, columnsNull),
     colsExtraSQL = lateral instanceof SQLFragment || mode === SelectResultMode.Numeric ? [] : SQLForExtras(extras),
     colsLateralSQL = lateral === undefined || mode === SelectResultMode.Numeric ? [] :
       lateral instanceof SQLFragment ? sql`"lateral_passthru".result` :
@@ -809,6 +836,7 @@ export const select: SelectSignatures = function (
     groupBySQL = !groupBy ? [] : sql` GROUP BY ${groupBy instanceof SQLFragment || typeof groupBy === 'string' ? groupBy : cols(groupBy)}`,
     havingSQL = !having ? [] : sql` HAVING ${having}`,
     orderSQL = order === undefined ? [] :
+      order === null ? refusedSQL(orderNull) :
       sql` ORDER BY ${mapWithSeparator(order as OrderSpecForTable<Table>[], sql`, `, o => {  // `as` clause is required when TS not strict
         if (!['ASC', 'DESC'].includes(o.direction)) throw new Error(`Direction must be ASC/DESC, not '${o.direction}'`);
         if (o.nulls && !['FIRST', 'LAST'].includes(o.nulls)) throw new Error(`Nulls must be FIRST/LAST/undefined, not '${o.nulls}'`);
@@ -818,7 +846,7 @@ export const select: SelectSignatures = function (
       allOptions.withTies ? sql` FETCH FIRST ${param(limit)} ROWS WITH TIES` :
         sql` LIMIT ${param(limit)}`,  // compatibility with pg pre-10.5; and fewer bytes!
     offsetSQL = allOptions.offset === undefined ? [] : sql` OFFSET ${param(allOptions.offset)}`,  // pg is lax about OFFSET following FETCH, and we exploit that
-    lockSQL = lock === undefined ? [] : (lock as SelectLockingOptions<string>[]).map(lock => {  // `as` clause is required when TS not strict
+    lockSQL = lock === undefined ? [] : lock === null ? refusedSQL(lockNull) : (lock as SelectLockingOptions<string>[]).map(lock => {  // `as` clause is required when TS not strict
       if (!['UPDATE', 'NO KEY UPDATE', 'SHARE', 'KEY SHARE'].includes(lock.for)) throw new Error(`Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not '${lock.for}'`);
       if (lock.wait && !['NOWAIT', 'SKIP LOCKED'].includes(lock.wait)) throw new Error(`Lock wait must be NOWAIT/SKIP LOCKED/undefined, not '${lock.wait}'`);
       const
@@ -1013,7 +1041,7 @@ const numericAggregate = (
 ): SQLFragment<number> => {
   const
     query = select(table, where, options, SelectResultMode.Numeric, aggregate),
-    { columns, lateral } = options,
+    { columns, lateral } = options ?? {},  // `null` options are none, as in select()
     columnsRefusal =
       !columns ? (aggregate === 'count' ? undefined : `${aggregate}() needs one column to aggregate: pass columns: ['column']`) :
         typeof columns !== 'object' && typeof columns !== 'function' ? `${aggregate}() takes columns as an array, not ${typeof columns}: pass columns: ['column']${aggregate === 'count' ? ' (leave columns out for count(*))' : ''}` :
@@ -1036,9 +1064,7 @@ const numericAggregate = (
     return query;
   }
   // the refusal sits in the expressions, which copy() shares, so that a copy nested in a lateral throws too
-  const refused = sql``;
-  refused.compile = () => { throw new Error(refusal); };
-  return sql<SQL, number>`${refused}`;
+  return sql<SQL, number>`${refusedSQL(refusal)}`;
 };
 
 /**
