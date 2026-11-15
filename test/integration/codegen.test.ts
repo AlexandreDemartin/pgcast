@@ -930,6 +930,58 @@ ${imports.map(line => `  ${line}\n`).join('')}  export type ${type};  // replace
     });
   });
 
+  describe('intervalsTypedAsObjects, compiled (#499)', () => {
+    const config = { schemas: { extra: only('type_zoo') } };
+
+    /** extra.type_zoo.c_interval: `asObjects` before what only the option lets through, `asText` before what only its absence does. */
+    const intervalProbe = (asObjects: string, asText: string) => `
+      import * as db from 'zapatos/db';
+      import type * as s from 'zapatos/schema';
+      declare const client: db.Queryable;
+      export const probe = async () => {
+        const [row] = await db.sql<s.extra.type_zoo.SQL, s.extra.type_zoo.Selectable[]>\`SELECT * FROM \${'extra.type_zoo'}\`.run(client);
+        const json = await db.selectExactlyOne('extra.type_zoo', { id: 1 }).run(client);
+        const read = row!.c_interval!;
+        // the shortcuts' JSON: the text, either way
+        json.c_interval satisfies string | null;
+        ${asObjects} Selectable: pg's object
+        row!.c_interval satisfies db.PostgresInterval | null;
+        ${asObjects} one of its parts
+        read.days satisfies number | undefined;
+        ${asText} the text, which pg returns only with a type parser of your own
+        row!.c_interval satisfies string | null;
+        // written back as it was read, either way: Postgres takes the object through toPostgres()
+        db.insert('extra.type_zoo', { c_interval: read });
+        db.update('extra.type_zoo', { c_interval: read }, { id: 1 });
+        db.select('extra.type_zoo', { c_interval: read });
+        // the text, either way
+        db.insert('extra.type_zoo', { c_interval: '1 day' });
+        // @ts-expect-error a plain object, which Postgres refuses (22007), either way
+        db.insert('extra.type_zoo', { c_interval: { days: 1 } });
+        // @ts-expect-error in an update too
+        db.update('extra.type_zoo', { c_interval: { days: 1 } }, { id: 1 });
+        // @ts-expect-error and in a filter
+        db.select('extra.type_zoo', { c_interval: { days: 1 } });
+      };`;
+
+    it('types Selectable as pg parses it, takes it back in a write, and refuses a plain object', async () => {
+      expect(await probeErrors({ ...config, intervalsTypedAsObjects: true }, intervalProbe('//', '// @ts-expect-error')))
+        .toEqual([]);
+    });
+
+    it.each([undefined, false])('is the text in all five, as in Zapatos 6.6.1 (intervalsTypedAsObjects: %s)', async key => {
+      expect(await probeErrors({ ...config, intervalsTypedAsObjects: key }, intervalProbe('// @ts-expect-error', '//')))
+        .toEqual([]);
+    });
+
+    it('each refusal of one probe is an unused directive in the other', async () => {
+      const both = intervalProbe('// @ts-expect-error', '// @ts-expect-error');
+      const unused = "probe.ts TS2578 Unused '@ts-expect-error' directive.";
+      expect(await probeErrors({ ...config, intervalsTypedAsObjects: true }, both)).toEqual(Array(2).fill(unused));
+      expect(await probeErrors(config, both)).toEqual([unused]);
+    });
+  });
+
   it('holds no orphan file', () => {
     const expected = variants.flatMap(([name]) =>
       withoutCustomTypes.includes(name) ? [`${name}.d.ts`] : [`${name}.custom.d.ts`, `${name}.d.ts`]);
@@ -1475,6 +1527,154 @@ describe('domainsTypedByContext', () => {
     void right;
     // @ts-expect-error a boolean
     const wrong: Config = { domainsTypedByContext: 'yes' };
+    void wrong;
+  });
+});
+
+describe('intervalsTypedAsObjects', () => {
+  // a schema of its own, committed to this file's database: no other test configures it
+  beforeAll(() => t.pool.query(`
+    CREATE SCHEMA iv;
+    CREATE DOMAIN iv.span AS interval;
+    -- a domain over a domain, and an array of a domain: any, but with domainsTypedByContext (#484)
+    CREATE DOMAIN iv.vip_span AS iv.span;
+    CREATE TABLE iv.runs (id int PRIMARY KEY, runtime interval, breaks interval[], span iv.span, vip iv.vip_span, spans iv.span[]);
+    CREATE TABLE iv.gaps (gap interval);
+    CREATE TABLE iv.quiet (id int PRIMARY KEY, label text);
+  `));
+  afterAll(() => t.pool.query('DROP SCHEMA iv CASCADE'));
+
+  const iv = { schemas: { iv: all }, schemaJSDoc: false, unprefixedSchema: 'iv' };
+  const on = { ...iv, intervalsTypedAsObjects: true };
+  const notesFor = async (config: Config) => {
+    const warnings: string[] = [];
+    await tsForConfig(finaliseConfig({ ...config, ...quiet, warningListener: s => warnings.push(s), db: db() }), noDebug);
+    return warnings.filter(w => w.includes('intervalsTypedAsObjects'));
+  };
+  /** The line of `column` in each interface of `table`: Selectable, JSONSelectable, Whereable, Insertable, Updatable. */
+  const linesOf = (schema: string, table: string, column: string) =>
+    tableBlock(schema, table).split('\n').map(line => line.trim()).filter(line => new RegExp(`^${column}\\??: `).test(line));
+  /** The five lines of a nullable column with no default, given its Selectable type and its type in each other context. */
+  const nullable = (column: string, selectable: string, json: string, input: string) => {
+    const where = `${input} | db.Parameter<${input}> | db.SQLFragment | db.ParentColumn`,
+      write = `${input} | db.Parameter<${input}> | null | db.DefaultType | db.SQLFragment`;
+    return [
+      `${column}: ${selectable} | null;`,
+      `${column}: ${json} | null;`,
+      `${column}?: ${where} | db.SQLFragment<any, ${where}>;`,
+      `${column}?: ${write};`,
+      `${column}?: ${write} | db.SQLFragment<any, ${write}>;`,
+    ];
+  };
+  const placeholder = (name: string, type: string) =>
+    `${type.startsWith('db.') ? `  import type * as db from 'zapatos/db';\n` : ''}  export type ${name} = ${type};`;
+  const object = 'db.PostgresInterval', input = '(string | db.PostgresInterval)';
+  const inContext = (custom: string, generated: string) => (type: string) => `db.DomainInContext<${custom}, ${generated}, ${type}>`;
+
+  it.each([undefined, false])('is the text in all five by default, as in Zapatos 6.6.1 (intervalsTypedAsObjects: %s)', async key => {
+    const { ts: schema, customTypeSourceFiles: files } = await codegen({ ...iv, intervalsTypedAsObjects: key });
+    expect(linesOf(schema, 'runs', 'runtime')).toEqual(nullable('runtime', 'string', 'string', 'string'));
+    expect(linesOf(schema, 'runs', 'breaks')).toEqual(nullable('breaks', 'string[]', 'string[]', 'string[]'));
+    expect(linesOf(schema, 'runs', 'span')).toEqual(nullable('span', 'c.PgSpan', 'c.PgSpan', 'c.PgSpan'));
+    expect(files.PgSpan).toContain(placeholder('PgSpan', 'string'));
+  });
+
+  it('types Selectable as pg parses it, and a write takes that back; the JSON stays the text', async () => {
+    const { ts: schema, customTypeSourceFiles: files } = await codegen(on);
+    expect(linesOf(schema, 'runs', 'runtime')).toEqual(nullable('runtime', object, 'string', input));
+    expect(linesOf(schema, 'runs', 'breaks')).toEqual(nullable('breaks', `${object}[]`, 'string[]', `${input}[]`));
+    // a domain over one: its placeholder, which as generated holds what pg returns
+    expect(linesOf(schema, 'runs', 'span')).toEqual(nullable('span', 'c.PgSpan', 'c.PgSpan', 'c.PgSpan'));
+    expect(files.PgSpan).toContain(placeholder('PgSpan', object));
+    // any, as without the option
+    expect(linesOf(schema, 'runs', 'vip')).toEqual(nullable('vip', 'c.PgVip_span', 'c.PgVip_span', 'c.PgVip_span'));
+    expect(linesOf(schema, 'runs', 'spans')).toEqual(nullable('spans', 'c.Pg_span', 'c.Pg_span', 'c.Pg_span'));
+  });
+
+  it('types a domain over one by context with domainsTypedByContext, and one under other domains by its base type', async () => {
+    const { ts: schema } = await codegen({ ...on, domainsTypedByContext: true });
+    const span = inContext('c.PgSpan', object), vip = inContext('c.PgVip_span', 'any'), spans = inContext('c.Pg_span', 'any');
+    expect(linesOf(schema, 'runs', 'span')).toEqual(nullable('span', 'c.PgSpan', span('string'), span(input)));
+    expect(linesOf(schema, 'runs', 'vip')).toEqual(nullable('vip', vip(object), vip('string'), vip(input)));
+    // pg returns an array of a domain as its text
+    expect(linesOf(schema, 'runs', 'spans')).toEqual(nullable('spans', spans('string'), spans('string[]'), spans(`${input}[]`)));
+  });
+
+  it('leaves a domain over one alike in every context with domainsTypedByContext alone', async () => {
+    const { ts: schema } = await codegen({ ...iv, domainsTypedByContext: true });
+    const vip = inContext('c.PgVip_span', 'any'), spans = inContext('c.Pg_span', 'any');
+    expect(linesOf(schema, 'runs', 'span')).toEqual(nullable('span', 'c.PgSpan', 'c.PgSpan', 'c.PgSpan'));
+    expect(linesOf(schema, 'runs', 'vip')).toEqual(nullable('vip', vip('string'), vip('string'), vip('string')));
+    expect(linesOf(schema, 'runs', 'spans')).toEqual(nullable('spans', spans('string'), spans('string[]'), spans('string[]')));
+  });
+
+  const note = (list: string, one = false) => `Note: ${list} ${one ? 'is' : 'are'} of interval, an array of it, or a ` +
+    `domain over either: as generated, ${one ? 'it is' : 'they are'} typed as its text, though pg's default type parser ` +
+    `returns an interval from a query of your own as an object, a PostgresInterval. Set intervalsTypedAsObjects: true ` +
+    `to type ${one ? 'it' : 'them'} as pg parses ${one ? 'it' : 'them'}; it will be the default in pgcast 7.0. ` +
+    `Set it to false to keep the text, if a type parser of yours returns it.`;
+
+  it('notes each column it would change, once per run, when left out', async () => {
+    expect(await notesFor(iv)).toEqual([note('iv.gaps.gap (interval), iv.runs.breaks (interval[]), ' +
+      'iv.runs.runtime (interval) and iv.runs.span (iv.span)')]);
+    // left out, or null from JSON
+    expect(await notesFor({ ...iv, intervalsTypedAsObjects: null as unknown as boolean, schemas: { iv: only('gaps') } }))
+      .toEqual([note('iv.gaps.gap (interval)', true)]);
+    // under other domains too, which only domainsTypedByContext types by their base type
+    expect(await notesFor({ ...iv, domainsTypedByContext: true, schemas: { iv: only('runs') } })).toEqual([
+      note('iv.runs.breaks (interval[]), iv.runs.runtime (interval), iv.runs.span (iv.span), iv.runs.spans (iv.span[]) ' +
+        'and iv.runs.vip (iv.vip_span)')]);
+  });
+
+  it('gives no note with true or false, or when no column would change', async () => {
+    expect(await notesFor(on)).toEqual([]);
+    expect(await notesFor({ ...iv, intervalsTypedAsObjects: false })).toEqual([]);
+    expect(await notesFor({ ...iv, schemas: { iv: only('quiet') } })).toEqual([]);
+  });
+
+  it('types what pg, the shortcuts and Postgres give: an object from pg, the text as JSON', async () => {
+    const written = await runtime.insert('iv.runs' as any, {
+      id: 1, runtime: '1 day 02:00:00', breaks: ['01:00:00'], span: '3 mons', vip: '1 year', spans: ['00:05:00'],
+    }).run(t.client) as any;
+    // the shortcuts' JSON, at the top level and in a lateral
+    const text = { id: 1, runtime: '1 day 02:00:00', breaks: ['01:00:00'], span: '3 mons', vip: '1 year', spans: ['00:05:00'] };
+    expect(written).toEqual(text);
+    const withLateral = await runtime.selectExactlyOne('iv.runs' as any, { id: 1 } as any, {
+      lateral: { again: runtime.selectExactlyOne('iv.runs' as any, { id: runtime.parent('id' as any) } as any) },
+    } as any).run(t.client) as any;
+    expect(withLateral.again).toEqual(text);
+    // pg's own parsing: an object of each part that isn't zero, with toPostgres() and toISO(); an array of a domain as text
+    const { rows: [fromPg] } = await t.client.query('SELECT runtime, breaks, span, vip, spans FROM iv.runs');
+    const parts = (v: any) => ({ ...v, toPostgres: typeof v.toPostgres, toISO: typeof v.toISO });
+    expect({ runtime: parts(fromPg.runtime), breaks: fromPg.breaks.map(parts), span: parts(fromPg.span), vip: parts(fromPg.vip),
+      spans: fromPg.spans }).toEqual({
+      runtime: { days: 1, hours: 2, toPostgres: 'function', toISO: 'function' },
+      breaks: [{ hours: 1, toPostgres: 'function', toISO: 'function' }],
+      span: { months: 3, toPostgres: 'function', toISO: 'function' },
+      vip: { years: 1, toPostgres: 'function', toISO: 'function' },
+      spans: '{00:05:00}',
+    });
+    // written back as it was read
+    await runtime.update('iv.runs' as any, { runtime: fromPg.span, breaks: [fromPg.runtime] } as any, { id: 1 } as any).run(t.client);
+    const { rows: [stored] } = await t.client.query('SELECT runtime::text, breaks::text FROM iv.runs');
+    expect(stored).toEqual({ runtime: '3 mons', breaks: '{"1 day 02:00:00"}' });
+    // a plain object is no interval to Postgres; last, as the error aborts the transaction
+    await expect(runtime.insert('iv.runs' as any, { id: 2, runtime: { days: 1 } } as any).run(t.client))
+      .rejects.toMatchObject({ code: '22007' });
+  });
+
+  it('leaves the output as it was without the option, or with false', async () => {
+    const { ts: absent } = await codegen(main);
+    expect((await codegen({ ...main, intervalsTypedAsObjects: false })).ts).toBe(absent);
+    expect(absent).toBe(readFileSync(join(generatedDir, 'zapatos/schema.d.ts'), 'utf8'));
+  });
+
+  it('is optional in Config, read as false when absent', () => {
+    expect(finaliseConfig({}).intervalsTypedAsObjects).toBeUndefined();
+    const right: Config = { intervalsTypedAsObjects: true };
+    void right;
+    // @ts-expect-error a boolean
+    const wrong: Config = { intervalsTypedAsObjects: 'yes' };
     void wrong;
   });
 });
