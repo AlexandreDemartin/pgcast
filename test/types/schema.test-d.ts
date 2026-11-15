@@ -87,6 +87,50 @@ describe('domain (users.email, accounts.overdraft_limit, users.tags)', () => {
     expectTypeOf<s.accounts.Selectable['overdraft_limit']>().toEqualTypeOf<number | null>();
     expectTypeOf<s.users.Selectable['tags']>().toEqualTypeOf<string[] | null>();
   });
+
+  test('characterization: a domain over int8 (extra.type_zoo.c_int8_domain) is pg\'s string in all five, without domainsTypedByContext', () => {
+    type Int8 = db.Int8String;
+    expectTypeOf<s.extra.type_zoo.Selectable['c_int8_domain']>().toEqualTypeOf<Int8 | null>();
+    // the shortcuts give a number
+    expectTypeOf<s.extra.type_zoo.JSONSelectable['c_int8_domain']>().toEqualTypeOf<Int8 | null>();
+    expectTypeOf<s.extra.type_zoo.Whereable['c_int8_domain']>().toEqualTypeOf<Where<Int8> | undefined>();
+    // Postgres takes a number
+    expectTypeOf<s.extra.type_zoo.Insertable['c_int8_domain']>()
+      .toEqualTypeOf<Int8 | db.Parameter<Int8> | null | db.DefaultType | db.SQLFragment | undefined>();
+  });
+});
+
+describe('DomainInContext, the type domainsTypedByContext writes', () => {
+  test('a placeholder that holds what the generator wrote takes the type of the context', () => {
+    expectTypeOf<db.DomainInContext<db.Int8String, db.Int8String, number>>().toEqualTypeOf<number>();
+    expectTypeOf<db.DomainInContext<Date, Date, db.DateString | Date>>().toEqualTypeOf<db.DateString | Date>();
+    // the same type, written otherwise
+    expectTypeOf<db.DomainInContext<`${number}`, db.Int8String, number>>().toEqualTypeOf<number>();
+    expectTypeOf<db.DomainInContext<db.Int8String[], db.Int8String[], number[]>>().toEqualTypeOf<number[]>();
+  });
+
+  test('an edited placeholder keeps its type, in every context', () => {
+    type Brand = db.Int8String & { readonly __brand: 'ticket_no' };
+    expectTypeOf<db.DomainInContext<number | db.Int8String, db.Int8String, number>>().toEqualTypeOf<number | db.Int8String>();
+    expectTypeOf<db.DomainInContext<Brand, db.Int8String, number>>().toEqualTypeOf<Brand>();
+    expectTypeOf<db.DomainInContext<string, db.Int8String, number>>().toEqualTypeOf<string>();
+    expectTypeOf<db.DomainInContext<any, db.Int8String, number>>().toBeAny();
+    expectTypeOf<db.DomainInContext<never, db.Int8String, number>>().toBeNever();
+    // an array of any, as a placeholder Zapatos 6.6.1 wrote over int8[] with no import: not typed by context
+    expectTypeOf<db.DomainInContext<any[], db.Int8String[], number[]>>().toEqualTypeOf<any[]>();
+    expectTypeOf<db.DomainInContext<{ a: any }, { a: db.Int8String }, number>>().toEqualTypeOf<{ a: any }>();
+  });
+
+  test('refused', () => {
+    // @ts-expect-error the context's number, not the placeholder's string
+    expectTypeOf<db.DomainInContext<db.Int8String, db.Int8String, number>>().toEqualTypeOf<db.Int8String>();
+    // @ts-expect-error an edited placeholder is not replaced by the context's type
+    expectTypeOf<db.DomainInContext<number | db.Int8String, db.Int8String, number>>().toEqualTypeOf<number>();
+    // @ts-expect-error a brand is not replaced either
+    expectTypeOf<db.DomainInContext<db.Int8String & { readonly b: 1 }, db.Int8String, number>>().toEqualTypeOf<number>();
+    // @ts-expect-error an array of any is not replaced either
+    expectTypeOf<db.DomainInContext<any[], db.Int8String[], number[]>>().toEqualTypeOf<number[]>();
+  });
 });
 
 describe('enum', () => {

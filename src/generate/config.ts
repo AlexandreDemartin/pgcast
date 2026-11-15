@@ -37,6 +37,8 @@ export interface OptionalConfig {
   rejectOnQueryError?: boolean;  // a failed query, the connection included, rejects generate() with its error, rather than exit
   // optional too; read it with ?? false, deprecated: true in 7.0
   uniqueIndexConstraintsOnly?: boolean;  // UniqueIndex lists only what ON CONFLICT ON CONSTRAINT takes: UNIQUE and PRIMARY KEY constraints
+  // optional too; read it with ?? false, deprecated: true in 7.0
+  domainsTypedByContext?: boolean;  // a domain is typed by context, as its base type is, while its placeholder holds what the generator wrote
 }
 
 interface SchemaRules {
