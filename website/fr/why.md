@@ -1,5 +1,5 @@
 ---
-english: 5ac8f987684e
+english: 409c332f19e8
 ---
 
 # Pourquoi pgcast
@@ -82,7 +82,7 @@ pgcast part de Zapatos 6.6.1. Avant de le modifier, le fork a figé par des test
 |---|---|---|---|
 | Correction | une faille de sécurité ; ou Postgres ou le type refusait déjà l’appel ; ou le résultat contredit le nom, le type ou la doc de la fonction | l’appel fait ce qu’il dit, ou lève une erreur qui dit quoi faire, avant toute requête | [`update()`](/fr/insert#update) sans colonnes lève `nothing to update: an Updatable needs at least one column`<!-- message -->, là où Postgres refusait `SET () = ROW()` |
 | Opt-in | le résultat est valide, et du code peut en dépendre | rien tant que vous n’activez pas l’option ; l’ancien chemin avertit une fois par processus | [`undefinedMeansMissing`](/fr/runtime-config#Config.undefinedMeansMissing) : une valeur `undefined` est une clé absente, pas `NULL` ; avertissement `PGCAST_DEP002` |
-| Documentation | Postgres fonctionne ainsi, ou c’était voulu | rien : la doc le dit | [`isNotIn()`](/fr/conditions#conditions.isNotIn) avec un `NULL` dans sa liste ne correspond à aucune ligne, comme Postgres lit `NOT IN` |
+| Documentation | Postgres fonctionne ainsi, c’était voulu, ou le type ne peut pas voir une valeur connue seulement à l’exécution | rien : la doc le dit | [`isNotIn()`](/fr/conditions#conditions.isNotIn) avec un `NULL` dans sa liste ne correspond à aucune ligne, comme Postgres lit `NOT IN` |
 
 </div>
 

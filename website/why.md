@@ -78,7 +78,7 @@ pgcast starts from Zapatos 6.6.1. Before changing it, the fork pinned what 6.6.1
 |---|---|---|---|
 | Fix | a security hole; or Postgres or the type already refused the call; or the result contradicts the function's name, type or docs | the call does what it says, or throws an error that says what to do, before any query | [`update()`](/insert#update) with no columns throws `nothing to update: an Updatable needs at least one column`<!-- message -->, where Postgres refused `SET () = ROW()` |
 | Opt-in | the result is valid, and code may rely on it | nothing until you turn the option on; the old path warns once per process | [`undefinedMeansMissing`](/runtime-config#Config.undefinedMeansMissing): an `undefined` value is a missing key, not `NULL`; warning `PGCAST_DEP002` |
-| Document | Postgres works that way, or it was meant | nothing: the docs say so | [`isNotIn()`](/conditions#conditions.isNotIn) with a `NULL` in its list matches no row, as Postgres reads `NOT IN` |
+| Document | Postgres works that way, it was meant, or the type can't see a value known only at run time | nothing: the docs say so | [`isNotIn()`](/conditions#conditions.isNotIn) with a `NULL` in its list matches no row, as Postgres reads `NOT IN` |
 
 </div>
 

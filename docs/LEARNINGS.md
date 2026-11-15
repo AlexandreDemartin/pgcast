@@ -337,6 +337,10 @@ Candidates for a check, a rule or a skill line.
 - #490 — a probe of an exported function with positional out-parameters checks its arity at each ref before it runs: after #487 the 12th argument became `domainsNotByContext`, and the older probes passed the wrong object.
 - #491 — a claim about a held value names what is skipped: a type argument still checks an object held in a variable (TS2559, TS2345) and only lets an extra key through. Each such sentence gets its weak-type and wrong-value probes.
 - #491 — an "each candidate tried refused X" rationale is checked against each grid column before it goes into the CHANGELOG: candidate D refused other code, not X.
+- #495 — Skill `backward-compat` § Fixing an existing bug still says Fix when the old result contradicts the type, with no run-time exception, and does not name the kept explicit old value: it disagrees with decision 003 § Rule since #496 — `builder`
+- #495 — A rule clause worded from one case is searched against the other rows: « a value written in the config that asks for the old behaviour » also covered every opt-in's explicit `false` — `builder`
+- #495 — A fresh worktree's `npm ci` does not install `website/node_modules`: `docs:translated` fails with ERR_MODULE_NOT_FOUND until `cd website && npm ci` — `builder`
+- #495 — GitHub caps a parent issue at 100 sub-issues: an Epic past it links its last steps by « Part of #epic » in their body — orchestrator
 
 ## Minors kept
 
@@ -464,5 +468,5 @@ Minor review defects, taken up by the end-of-chapter review.
 - #487 — `website/catalog-types.md:69` and `website/generator.md:390` (and FR): "typed by its placeholder in all five interfaces, which, as generated, holds…" reads twice; "typed in all five interfaces by its placeholder, which…".
 - #487 — `website/custom-types.md:231` (and FR): the sentence on a domain's placeholder would read better as two.
 - #487 — `test/types/schema.test-d.ts`: `unknown`, `db.Int8String | null` under `strict`, and a generated `NumericString[]` or `Date[]` are not frozen for `DomainInContext`.
-- #484 plan — on master, an array of an enum is typed `mood[]` in `Selectable`, but `pg` returns it as a string (`'{a}'`); no issue yet.
+- #484 plan — on master, an array of an enum is typed `mood[]` in `Selectable`, but `pg` returns it as a string (`'{a}'`): #494.
 

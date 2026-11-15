@@ -104,7 +104,7 @@ Everything else: [CHANGELOG.md](CHANGELOG.md); what the characterisation of 6.6.
 - pgcast continues Zapatos's version numbers: 6.6.2 follows Zapatos 6.6.1.
 - **6.x** is a drop-in replacement for Zapatos 6.6.1: the opt-ins stay off.
 - **7.0** switches the opt-in defaults of [decision 003](docs/decisions/003-fixes-and-deprecation.md); the warnings announce it.
-- **8.0** removes the old paths.
+- **8.0** removes the old paths, except an old value asked for by choice: `rejectOnQueryError: false` stays.
 - Releases follow the [milestones](https://github.com/AlexandreDemartin/pgcast/milestones).
 
 ## Documentation
