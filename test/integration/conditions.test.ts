@@ -72,6 +72,16 @@ describe('on users', () => {
     expect(await ids('users', where)).toEqual(expected);
   });
 
+  it('isDistinctFrom() and isNotDistinctFrom() of a nullable value, holding null or not (#181)', async () => {
+    const none = null as number | null, one = 1 as number | null;
+    expect({
+      notDistinctFromNone: await ids('users', { manager_id: dc.isNotDistinctFrom(none) }),
+      distinctFromNone: await ids('users', { manager_id: dc.isDistinctFrom(none) }),
+      notDistinctFromOne: await ids('users', { manager_id: dc.isNotDistinctFrom(one) }),
+      distinctFromOne: await ids('users', { manager_id: dc.isDistinctFrom(one) }),
+    }).toEqual({ notDistinctFromNone: [1], distinctFromNone: [2, 3], notDistinctFromOne: [2, 3], distinctFromOne: [1] });
+  });
+
   it('characterization: eq(null) matches no row', async () => {
     // characterization: `"manager_id" = NULL`; isNull or isNotDistinctFrom(null) are needed
     expect(await ids('users', { manager_id: dc.eq(null) })).toEqual([]);
