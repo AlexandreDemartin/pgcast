@@ -1,5 +1,5 @@
 ---
-english: e75494b11570
+english: 52fbcf4c7ee2
 ---
 
 # Template SQL
@@ -225,6 +225,16 @@ Avec des tableaux, un `SELECT` de quelques colonnes et une liste `IN` ; `s.film
 
 </CastPanel>
 
+Un template typé par table (`db.sql<s.tags.SQL>`) accepte `cols()` et `vals()` de n’importe quelle valeur, comme dans Zapatos 6.6.1. Les noms de `cols()` et les clés de `vals()` ne sont pas vérifiés par rapport à la table, et Postgres refuse un nom erroné (42703). Le template refuse toujours un nom erroné interpolé seul (`${'tagz'}`) et un Whereable écrit en ligne (`{ tagz: 'x' }`). Pour faire vérifier les noms, typez la valeur, soit avec un argument de type (`db.cols<s.tags.Column[]>([…])`, `db.vals<s.tags.Updatable>({…})`), soit avec `satisfies` :
+
+<CastPanel example="sql_cols_unchecked">
+
+<<< ../examples/sql_cols_unchecked.ts{ts twoslash}
+
+</CastPanel>
+
+Cela vérifie un tableau, et un objet écrit en ligne. Dans un objet contenu dans une variable, l’argument de type laisse passer une clé en trop, car TypeScript ne la refuse que dans un objet écrit en ligne : typez la variable, comme `tag: s.tags.Insertable` plus haut. Un tableau de noms contenu dans une variable doit lui aussi être typé : `['film_id', 'tag']` contenu dans une variable est un `string[]`, que `cols<s.tags.Column[]>` refuse. Donnez à la variable le type `s.tags.Column[]`, et pour un tableau en lecture seule, écrivez `cols<readonly s.tags.Column[]>`. `Updatable` et `Insertable` laissent de côté une colonne `GENERATED ALWAYS` : donnez donc le nom d’une telle colonne avec `Column[]`.
+
 Comme valeur de filtre, et comme valeur dans `vals({…})` (donc dans une écriture), `cols()` lève une erreur, comme [`raw()`](#raw).
 
 `null`, une chaîne ou une autre valeur primitive (un nombre, un booléen, `undefined`…) lève une erreur à la compilation, si bien que `run()` est rejetée avant toute requête, y compris pour les lignes d’`insert()`, d’`upsert()` et d’`update()` ([`insert()`](/fr/insert#insert)) :
@@ -260,6 +270,7 @@ Une liste de valeurs séparées par des virgules. Chaque valeur se compile comme
 | `self` | un paramètre | lève une erreur dans un filtre ; un paramètre hors d’un filtre |
 
 - Les valeurs d’un objet viennent dans l’ordre de ses clés triées, comme `cols()` les liste.
+- Dans un template typé par table, ses clés ne sont pas vérifiées par rapport à la table, comme l’explique [`cols()`](#cols).
 - « Dans un filtre », c’est partout où `vals([…])` a une colonne courante : dans `isIn()` et `isNotIn()`, et dans un fragment donné en valeur d’un Whereable ou de `vals({…})`. Là :
   - `Default` lève "`` `db.Default` has no meaning in a Whereable (a filter)… ``<!-- message -->" ;
   - `self` "`` `db.self` has no meaning as a value in a Whereable (a filter), nor in `isIn()`… ``<!-- message -->" ;

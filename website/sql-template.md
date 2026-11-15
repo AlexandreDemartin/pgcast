@@ -221,6 +221,16 @@ With arrays, a `SELECT` of some columns and an `IN` list; `s.films.OnlyCols<…>
 
 </CastPanel>
 
+A template typed by table (`db.sql<s.tags.SQL>`) takes `cols()` and `vals()` of any value, as in Zapatos 6.6.1. The names of `cols()` and the keys of `vals()` are not checked against the table, and Postgres refuses a wrong one (42703). The template still refuses a wrong name interpolated on its own (`${'tagz'}`) and a Whereable written in place (`{ tagz: 'x' }`). To have the names checked, type the value, either with a type argument (`db.cols<s.tags.Column[]>([…])`, `db.vals<s.tags.Updatable>({…})`) or with `satisfies`:
+
+<CastPanel example="sql_cols_unchecked">
+
+<<< ./examples/sql_cols_unchecked.ts{ts twoslash}
+
+</CastPanel>
+
+This checks an array, and an object written in place. In an object held in a variable, the type argument lets an extra key through, since TypeScript refuses one only in an object written in place: type the variable, as `tag: s.tags.Insertable` is above. An array of names held in a variable needs a type too: `['film_id', 'tag']` held in a variable is a `string[]`, which `cols<s.tags.Column[]>` refuses. Type the variable `s.tags.Column[]`, and for a readonly one write `cols<readonly s.tags.Column[]>`. `Updatable` and `Insertable` leave out a `GENERATED ALWAYS` column, so give such a column's name with `Column[]`.
+
 As a filter value, and as a value in `vals({…})` (so in a write), `cols()` throws, as [`raw()`](#raw) does.
 
 `null`, a string or another primitive (a number, a boolean, `undefined`…) throws while compiling, so `run()` rejects before any query, the rows of `insert()`, `upsert()` and `update()` included ([`insert()`](/insert#insert)):
@@ -256,6 +266,7 @@ A comma-separated list of values. Each value compiles as follows.
 | `self` | a parameter | throws in a filter; a parameter outside one |
 
 - An object's values come in the order of its sorted keys, as `cols()` lists them.
+- In a template typed by table, its keys are not checked against the table, as [`cols()`](#cols) explains.
 - "In a filter" is wherever `vals([…])` has a current column: in `isIn()` and `isNotIn()`, and in a fragment value of a Whereable or of `vals({…})`. There:
   - `Default` throws "`` `db.Default` has no meaning in a Whereable (a filter)… ``<!-- message -->";
   - `self` "`` `db.self` has no meaning as a value in a Whereable (a filter), nor in `isIn()`… ``<!-- message -->";
