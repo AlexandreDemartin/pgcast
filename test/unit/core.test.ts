@@ -590,6 +590,79 @@ describe('cols and vals', () => {
     // the fragment is compiled with its key as the current column, as in a Whereable; 6.6.1 sent 'Symbol(DEFAULT)'
     expect(() => one(vals({ role: sql`${vals([Default])}` }))).toThrowErrorMatchingInlineSnapshot(`[Error: \`db.Default\` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. \`DEFAULT\` is for INSERT and UPDATE values.]`);
   });
+
+  // 6.6.1 compiled a primitive as the object it boxes to: a string to its character indexes as names ("0", "1")
+  // or to its characters as values ('i', 'd'), any other primitive to nothing; undefined threw a TypeError (#244)
+  const
+    primitives: Record<string, unknown> = {
+      string: 'id', oneCharacter: '5', emptyString: '', number: 42, zero: 0, boolean: true,
+      bigint: (globalThis as any).BigInt(10), symbol: Symbol('s'), undefined: undefined,
+    },
+    colsMessage = (kind: string) => `\`db.cols()\` takes an object or an array, not \`${kind}\`: for one column, write \`db.cols([name])\`; for a row of \`insert()\`, \`upsert()\` or \`update()\`, give an object.`,
+    valsMessage = (kind: string) => `\`db.vals()\` takes an object or an array, not \`${kind}\`: for one value, write \`db.vals([value])\`; for a row of \`insert()\`, \`upsert()\` or \`update()\`, give an object.`;
+
+  it('cols and vals of a primitive throw, in a sql template, a nested fragment and a lateral subquery', () => {
+    const outcomes: string[] = [];
+    for (const [name, x] of Object.entries(primitives))
+      for (const [fn, wrap, message] of [['cols', cols, colsMessage], ['vals', vals, valsMessage]] as const) {
+        const places = {
+          template: () => sql`SELECT ${wrap(x)}`.compile(),
+          nested: () => sql`SELECT ${sql`(${wrap(x)})`}`.compile(),
+          lateral: () => db.select('users', db.all, { lateral: { n: sql`SELECT ${wrap(x)}` } }).compile(),
+        };
+        for (const [place, f] of Object.entries(places)) {
+          const outcome = failure(f);
+          if (JSON.stringify(outcome) !== JSON.stringify({ name: 'Error', message: message(typeof x) }))
+            outcomes.push(`${fn} ${name} ${place}: ${JSON.stringify(outcome)}`);
+        }
+      }
+    expect(outcomes).toEqual([]);
+  });
+
+  it('cols and vals of a primitive throw before writing anything for it', () => {
+    const result = { text: '', values: [] };
+    expect(failure(() => sql`SELECT ${param(1)}, ${vals('id')}`.compile(result))).toEqual({ name: 'Error', message: valsMessage('string') });
+    expect(result).toEqual({ text: 'SELECT $1, ', values: [1] });
+  });
+
+  it('rejects run() on a string row of insert(), upsert() and update(), or in updateValues, with no query sent', async () => {
+    const queryable = { query: vi.fn() } as any;
+    const queries = {
+      insert: db.insert('users', 'ab' as any),
+      upsert: db.upsert('users', 'ab' as any, 'email'),
+      update: db.update('users', 'ab' as any, { id: 1 }),
+      updateValuesCols: db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { display_name: cols('display_name') } }),
+      updateValuesVals: db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { display_name: vals('display_name') } }),
+    };
+    const outcomes: Record<string, string> = {};
+    for (const [name, q] of Object.entries(queries))
+      outcomes[name] = await q.run(queryable).then(() => 'ran', (err: Error) => err.message);
+    expect(outcomes).toEqual({
+      insert: colsMessage('string'), upsert: colsMessage('string'), update: colsMessage('string'),
+      updateValuesCols: colsMessage('string'), updateValuesVals: valsMessage('string'),
+    });
+    expect(queryable.query).not.toHaveBeenCalled();
+  });
+
+  it('cols and vals of an object, an array, a function or a boxed string compile as before, and null still throws a TypeError', () => {
+    // a function and a String object are objects, not primitives: their own enumerable keys, as in 6.6.1;
+    // null is left to #341
+    const f = () => null;
+    expect({
+      colsObject: one(cols({ id: 1 })), valsObject: one(vals({ id: 1 })),
+      colsArray: one(cols(['id'])), valsArray: one(vals(['id'])),
+      colsFunction: one(cols(f)), valsFunction: one(vals(f)),
+      colsBoxedString: one(cols(new String('id'))), valsBoxedString: one(vals(new String('id'))),
+      colsNull: failure(() => one(cols(null))), valsNull: failure(() => one(vals(null))),
+    }).toEqual({
+      colsObject: { text: '"id"', values: [] }, valsObject: { text: '$1', values: [1] },
+      colsArray: { text: '"id"', values: [] }, valsArray: { text: '$1', values: ['id'] },
+      colsFunction: { text: '', values: [] }, valsFunction: { text: '', values: [] },
+      colsBoxedString: { text: '"0", "1"', values: [] }, valsBoxedString: { text: '$1, $2', values: ['i', 'd'] },
+      colsNull: { name: 'TypeError', message: 'Cannot convert undefined or null to object' },
+      valsNull: { name: 'TypeError', message: 'Cannot convert undefined or null to object' },
+    });
+  });
 });
 
 describe('Whereable', () => {

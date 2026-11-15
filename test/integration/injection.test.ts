@@ -961,6 +961,36 @@ describe('raw as a write value', () => {
   });
 });
 
+describe('cols and vals given a string', () => {
+  it('a hostile string in cols() or vals(), in a sql template or through the shortcuts, rejects run() before any query', async () => {
+    // 6.6.1 compiled its character indexes as names and its characters as parameters; it now throws (#244)
+    const
+      input = `x'); ${update}; --`,
+      outcomes: Record<string, string> = {},
+      query = vi.spyOn(t.client, 'query');
+    try {
+      const queries = {
+        cols: sql`SELECT ${db.cols(input)} FROM ${'users'}`,
+        vals: sql`SELECT ${'id'} FROM ${'users'} WHERE ${'display_name'} IN (${vals(input)})`,
+        insert: db.insert('users', input as any),
+        upsert: db.upsert('users', input as any, 'email'),
+        update: db.update('users', input as any, { id: 1 }),
+        updateValues: db.upsert('users', { email: 'Ada@Example.com', display_name: 'A' }, 'email', { updateValues: { display_name: db.cols(input) } }),
+      };
+      for (const [name, q] of Object.entries(queries))
+        outcomes[name] = await q.run(t.client).then(
+          () => 'ran',
+          (err: { code?: string, message: string }) =>
+            /^`db\.(cols|vals)\(\)` takes an object or an array, not `string`/.test(err.message) ? 'throws' : err.code ?? err.message);
+      outcomes.queried = String(query.mock.calls.length);
+    } finally {
+      query.mockRestore();
+    }
+    expect(outcomes).toEqual({ cols: 'throws', vals: 'throws', insert: 'throws', upsert: 'throws', update: 'throws', updateValues: 'throws', queried: '0' });
+    expect(await adaName()).toBe('Ada');
+  });
+});
+
 describe('transaction', () => {
   it('the isolation level is checked before a client is checked out', async () => {
     // the pool would commit: connect() is stubbed, so a regression runs nothing either
