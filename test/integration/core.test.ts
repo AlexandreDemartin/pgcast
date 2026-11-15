@@ -731,4 +731,33 @@ describe('range strings', () => {
     const selectable = sql`SELECT batch_sizes, fee_band, valid_during, value_days FROM transfers WHERE note = ${param('empty ranges')}`;
     expect(await selectable.run(t.client)).toEqual([allEmpty]);
   });
+
+  it('an infinite or NaN numeric bound comes back as Postgres writes it, in Selectable and JSONSelectable, and a filter finds it', async () => {
+    const bands = [
+      { note: 'band 1', fee_band: '[1,Infinity)', value_days: '[2026-01-01,infinity)' },
+      { note: 'band 2', fee_band: '[-Infinity,1)', value_days: '[-infinity,2026-01-01)' },
+      { note: 'band 3', fee_band: '[1,NaN]', value_days: null },
+      { note: 'band 4', fee_band: '[NaN,NaN]', value_days: null },
+    ] as const;
+    // Postgres reads 'infinity', 'inf' and 'nan' too, but writes them as above
+    await sql`INSERT INTO transfers (from_account, to_account, amount, note, fee_band) VALUES (1, 2, 1, 'band 5', ${param('[-inf,infinity]')}), (1, 2, 1, 'band 6', ${param('[1,nan)')})`.run(t.client);
+    const written = [...bands, { note: 'band 5', fee_band: '[-Infinity,Infinity]', value_days: null }, { note: 'band 6', fee_band: '[1,NaN)', value_days: null }];
+    // JSONSelectable: to_jsonb writes the range as its text
+    expect(await db.insert('transfers', bands.map(b => ({ from_account: 1, to_account: 2, amount: 1, ...b })), { returning: ['note', 'fee_band', 'value_days'] }).run(t.client)).toEqual(bands);
+    expect(await db.select('transfers', { note: c.like('band %') }, { columns: ['note', 'fee_band', 'value_days'], order: { by: 'note', direction: 'ASC' } }).run(t.client)).toEqual(written);
+
+    const where = db.select('transfers', { fee_band: '[1,Infinity)', value_days: c.eq('[2026-01-01,infinity)') }, { columns: ['note'] });
+    expect(where.compile()).toEqual({
+      text: 'SELECT coalesce(jsonb_agg(result), \'[]\') AS result FROM (SELECT jsonb_build_object($1::text, "note") AS result '
+        + 'FROM "transfers" WHERE ("fee_band" = $2 AND ("value_days" = $3))) AS "sq_transfers"',
+      values: ['note', '[1,Infinity)', '[2026-01-01,infinity)'],
+    });
+    expect(await where.run(t.client)).toEqual([{ note: 'band 1' }]);
+    expect(await db.select('transfers', { fee_band: c.isIn(['[1,NaN]', '[-Infinity,Infinity]']) }, { columns: ['note'], order: { by: 'note', direction: 'ASC' } }).run(t.client))
+      .toEqual([{ note: 'band 3' }, { note: 'band 5' }]);
+
+    // Selectable: pg parses no range type, so it hands over Postgres's text
+    const selectable = sql`SELECT note, fee_band, value_days FROM transfers WHERE note LIKE 'band %' ORDER BY note`;
+    expect(await selectable.run(t.client)).toEqual(written);
+  });
 });

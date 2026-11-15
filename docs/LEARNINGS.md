@@ -299,6 +299,15 @@ Candidates for a check, a rule or a skill line.
 - #469 — Under load from parallel worktrees, `codegen.test.ts` hits Vitest's 5 s timeout (a rerun is green); and a French term for an English phrase is searched on the site first (« en passant outre le type ») — `builder`
 - #473 — A test of generated JSDoc lines compares them with their indentation in at least one schema shape: a `trimStart()` or `/^ *\*/` cannot catch a wrong margin (#308 and #473 both added an unpinned margin parameter) — `branch-reviewer`
 - #473 — Placeholder files come back in query completion order: comparing outputs across runs sorts them first — `builder`
+- #462 — When an exported generic widens (`RangeString<Bound>`), each break is stated and frozen on the generic as consumers write it (`db.RangeString<number>`), not only on the aliases the codegen emits — `branch-reviewer`
+- #462 — When a PR overturns a positive type test, the old claim stays as a `@ts-expect-error`, one per form, each shown to bite on the base's types (TS2578); moving it to the new way back is not enough — `branch-reviewer`
+- #462 — An equality check (`===`) does not narrow a union of pattern template literals to the literal compared: a type test of a comparison takes the `boolean` form; in a `tsc` grid, assigning `{} as never` always compiles, assign a value (`const x: L = '1'`) — `builder`
+- #462 — On macOS `cp -R` of `src/` copies the linked `src/.env` into a scratch copy: remove it after — `builder`
+- #470 — « Under X() » in a passthrough rule names the outermost call: a characterisation grid of outer calls includes both nestings (X of X, and `select()` of X), which differ — `branch-reviewer`
+- #470 — A Document PR that establishes a fact `git grep`s the claims it contradicts (« option or not », « always ») and fixes them or links the new note — `branch-reviewer`
+- #470 — A review's « Expected » wording is a hypothesis too: « with no row to aggregate » was wrong for a `count()` with no matching row (`"0"`); probe before writing — `builder`
+- #470 — A self-join `selectOne('t', { id: parent('id') })` with no `alias` compiles `"t"."id" = "t"."id"` (always true): a test with that shape passes by row order; give it an `alias` and mutate the parent row once — `builder`
+- #470 — `select.md:389` says a passed-through `selectOne()` nested in turn is typed as nested, while at run time it hands the column over as is (`min()` of a `timestamptz` gives a `Date`): the types may differ, unchecked — `builder`
 
 ## Minors kept
 
@@ -415,3 +424,5 @@ Minor review defects, taken up by the end-of-chapter review.
 - #469 — `test/unit/shortcuts.test.ts:1685`: the guard test freezes only a plain object, not a `Set`, a function or a `String` object — `branch-reviewer`
 - #469 — `website/select.md:263` (and `fr/…:267`): « an empty string, `0` or `false` » reads as the whole falsy list; `src/db/shortcuts.ts:1003`, `:1019`: « a string » where any primitive is refused; `test/unit/core.test.ts:696` duplicates `test/unit/shortcuts.test.ts:1665` — `branch-reviewer`
 - #473 — `test/integration/codegen.test.ts:1355`: the margin given to `jsdocLines()` is not pinned by any test; `src/generate/tables.ts:120`: `jsdocLines()` would sit better beside `jsdocText()` in `quote.ts` — `branch-reviewer`
+- #462 — `src/db/core.ts:86`: the 22P02 for an infinite bound in an `int4range` is stated but not frozen by an integration test; `website/runtime-config.md:512` (and `fr/…`): `RangeBound` shown but not exported — `branch-reviewer`
+- #470 — `website/select.md:382`: the opt-in's table has no row for `sum()`/`avg()` passed through a `selectOne()`; `docs/CHARACTERISATION-REPORT.md:68`: R17's « aggregates always » rounded beyond 2^53, not when passed through (#470) — `branch-reviewer`

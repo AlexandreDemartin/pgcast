@@ -1,5 +1,5 @@
 ---
-english: f2dc922ff1bc
+english: d78f795201a6
 ---
 
 # Configuration
@@ -252,6 +252,7 @@ Sans l’option, le résultat passe par `Number()`, comme dans Zapatos 6.6.1 : 
 
 - Les types ne suivent qu’une fois l’option déclarée aussi dans [`ConfigTypes`](#ConfigTypes) : `setConfig()` règle le runtime, la déclaration les types.
 - Imbriquée dans un `lateral`, ou donnée comme valeur d’`extras`, la valeur revient en JSON, avec ou sans l’option, et vaut `null` quand aucune ligne ne correspond ; une fois l’option déclarée, elle est typée comme le `JSONSelectable` de sa colonne.
+  - Sauf quand la requête exécutée est un `selectOne()` ou un `selectExactlyOne()` qui la transmet : il rend la colonne telle que `pg` la lit ([`lateral`](/fr/select#lateral)).
 - L’option est lue à `.run()`, là où l’avertissement est aussi émis : une requête construite avant `setConfig()` prend l’option sous laquelle elle s’exécute, comme le dit son type, déclaré pour tout le programme. Une requête qui ne renvoie aucune ligne, un `groupBy` sans aucun groupe, se lit comme `NULL` : `null` avec l’option, `0` sans, avec l’avertissement.
 - Les exemples, et chaque type : [Typé par colonne](/fr/select#typed-by-column).
 
@@ -512,10 +513,11 @@ db.enableCustomJSONParsingForLargeNumbers(pg);
 ### `RangeString` {#RangeString}
 
 ```ts
-type RangeString<Bound extends string | number> = `${'[' | '('}${Bound},${Bound}${']' | ')'}` | 'empty'
+type RangeString<Bound extends string | number> = `${'[' | '('}${RangeBound<Bound>},${RangeBound<Bound>}${']' | ')'}` | 'empty'
+type RangeBound<Bound extends string | number> = Bound | (number extends Bound ? 'Infinity' | '-Infinity' | 'NaN' : never)
 ```
 
-Une valeur range telle que Postgres l’écrit : un crochet, deux bornes, un crochet, ou `'empty'` pour un range vide. Un range dont les bornes n’encadrent aucune valeur est vide lui aussi : `'[5,5)'::int4range` revient sous la forme `'empty'`. Postgres lit aussi `'EMPTY'`, et des espaces autour, mais n’écrit que `'empty'` : le type n’accepte donc que cette forme. Zapatos 6.6.1 laissait `'empty'` de côté.
+Une valeur range telle que Postgres l’écrit : un crochet, deux bornes, un crochet, ou `'empty'` pour un range vide. Un range dont les bornes n’encadrent aucune valeur est vide lui aussi : `'[5,5)'::int4range` revient sous la forme `'empty'`. Postgres lit aussi `'EMPTY'`, et des espaces autour, mais n’écrit que `'empty'` : le type n’accepte donc que cette forme. Une borne `number` peut aussi valoir `Infinity`, `-Infinity` ou `NaN`, comme Postgres les écrit dans un `numrange`, même à partir de `infinity`, `inf` ou `nan` ; le type n’accepte que ces graphies. Zapatos 6.6.1 laissait de côté `'empty'` et ces trois valeurs.
 
 ### `NumberRangeString` {#NumberRangeString}
 
@@ -523,7 +525,7 @@ Une valeur range telle que Postgres l’écrit : un crochet, deux bornes, un cr
 type NumberRangeString = RangeString<number | ''>
 ```
 
-Un `int4range`, `int8range` ou `numrange` : `'[1,5)'`, ou `'[1.5,)'` sans borne supérieure.
+Un `int4range`, `int8range` ou `numrange` : `'[1,5)'`, `'[1.5,)'` sans borne supérieure, ou `'[0,Infinity)'` pour un `numrange`, dont les bornes peuvent être infinies ou `NaN`. Le type accepte aussi une telle borne pour les ranges d’entiers, alors que Postgres l’y refuse.
 
 ### `DateRangeString` {#DateRangeString}
 
