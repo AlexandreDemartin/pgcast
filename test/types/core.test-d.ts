@@ -428,6 +428,8 @@ declare const row: s.transfers.Selectable;
 declare const jrow: s.transfers.JSONSelectable;
 type Old = `${'[' | '('}${number | ''},${number | ''}${']' | ')'}`; // Zapatos 6.6.1's NumberRangeString
 type Finite = Exclude<db.NumberRangeString, 'empty' | `${string}${'Infinity' | 'NaN'}${string}`>;
+type OldNumber = `${'[' | '('}${number},${number}${']' | ')'}`; // Zapatos 6.6.1's RangeString<number>
+declare const customRange: db.RangeString<number>; // a range with a number bound, typed by hand
 
 describe('range strings', () => {
   test("'empty' is a range string, as Postgres writes an empty range", () => {
@@ -570,13 +572,44 @@ describe('range strings', () => {
   });
 
   test('a type computed from NumberRangeString gives the infinite bounds too, unless Exclude', () => {
+    type Lower<R> = R extends `${'[' | '('}${infer L},${string}` ? L : R;
     type LowerOrNever<R> = R extends `${'[' | '('}${infer L},${string}` ? L : never;
+    type LowerInline = Exclude<db.NumberRangeString, 'empty'> extends `${'[' | '('}${infer L},${string}` ? L : never;
+    type LowerInTuple<R> = [R] extends [`${'[' | '('}${infer L},${string}`] ? L : never;
     type Upper<R> = R extends `${string},${infer U extends number}${']' | ')'}` ? U : never;
     // @ts-expect-error a false branch of never keeps 'Infinity', '-Infinity' and 'NaN'
     expectTypeOf<LowerOrNever<db.NumberRangeString>>().toEqualTypeOf<`${number}` | ''>();
     // @ts-expect-error and on Exclude<…, 'empty'> too
     expectTypeOf<LowerOrNever<Exclude<db.NumberRangeString, 'empty'>>>().toEqualTypeOf<`${number}` | ''>();
+    // @ts-expect-error on Exclude<…, 'empty'>, a false branch that keeps the range keeps them too
+    expectTypeOf<Lower<Exclude<db.NumberRangeString, 'empty'>>>().toExtend<`${number}` | ''>();
+    // @ts-expect-error and written on the type itself
+    expectTypeOf<LowerInline>().toExtend<`${number}` | ''>();
+    // @ts-expect-error and with its type parameter wrapped in a tuple
+    expectTypeOf<LowerInTuple<Exclude<db.NumberRangeString, 'empty'>>>().toExtend<`${number}` | ''>();
     expectTypeOf<LowerOrNever<Finite>>().toEqualTypeOf<`${number}` | ''>();
     expectTypeOf<Upper<db.NumberRangeString>>().toEqualTypeOf<number>();
+  });
+
+  test('a type computed from a hand-written RangeString<number> gives the infinite bounds too, unless Exclude', () => {
+    type Finite661 = Exclude<db.RangeString<number>, 'empty' | `${string}${'Infinity' | 'NaN'}${string}`>;
+    type LowerOrNever<R> = R extends `${'[' | '('}${infer L},${string}` ? L : never;
+    // @ts-expect-error '[Infinity,Infinity]', '(NaN,NaN)' and the other 34 are keys it requires
+    const byNumber: Record<db.RangeString<number>, number> = { empty: 1 };
+    // @ts-expect-error on Exclude<…, 'empty'> too
+    const nonEmpty: Record<Exclude<db.RangeString<number>, 'empty'>, number> = {};
+    // @ts-expect-error a value of it is no `${number}`-bounded range, even 'empty' aside
+    const handWritten: OldNumber | 'empty' = customRange;
+    // @ts-expect-error a false branch of never keeps 'Infinity', '-Infinity' and 'NaN'
+    expectTypeOf<LowerOrNever<db.RangeString<number>>>().toExtend<`${number}`>();
+    const finite: Record<Finite661, number> = {};
+    const asAlias: db.RangeString<number> = customRange;
+    expectTypeOf<Finite661>().toEqualTypeOf<OldNumber>();
+    expectTypeOf<LowerOrNever<Finite661>>().toEqualTypeOf<`${number}`>();
+    expectTypeOf(byNumber).not.toBeAny();
+    expectTypeOf(nonEmpty).not.toBeAny();
+    expectTypeOf(handWritten).not.toBeAny();
+    expectTypeOf(finite).not.toBeAny();
+    expectTypeOf(asAlias).not.toBeAny();
   });
 });
