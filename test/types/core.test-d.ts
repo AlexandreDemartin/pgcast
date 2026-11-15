@@ -380,6 +380,43 @@ describe('type surprises', () => {
     c.subtract(db.param(1));
   });
 
+  test('characterization: conditions that type-check where Postgres refuses them, as in 6.6.1 (#180)', () => {
+    // documented, not refused: each narrower type tried refused code that runs (#180)
+    // the six boolean tests have no constraint: on an int column, 42804
+    expectTypeOf(db.select('users', { id: c.isTrue })).not.toBeAny();
+    expectTypeOf(db.select('users', { id: c.isNotTrue })).not.toBeAny();
+    expectTypeOf(db.select('users', { id: c.isFalse })).not.toBeAny();
+    expectTypeOf(db.select('users', { id: c.isNotFalse })).not.toBeAny();
+    expectTypeOf(db.select('users', { id: c.isUnknown })).not.toBeAny();
+    expectTypeOf(db.select('users', { id: c.isNotUnknown })).not.toBeAny();
+    expectTypeOf(c.isTrue).toEqualTypeOf<db.SQLFragment<boolean, never>>();
+    // a SQLFragment<any> holding one, on a boolean column, runs: a constraint of boolean would refuse it
+    const cond: db.SQLFragment<any> = c.isTrue;
+    expectTypeOf(db.select('extra.type_zoo', { c_bool: cond })).not.toBeAny();
+    // add() and now alone as a where value: 42804 in a WHERE, but the same Whereable runs in a SELECT list
+    expectTypeOf(db.select('users', { id: c.add(1) })).not.toBeAny();
+    expectTypeOf(db.select('users', { created_at: c.now })).not.toBeAny();
+    db.sql<s.users.SQL>`SELECT ${{ id: c.add(1) }} FROM ${'users'}`;
+    expectTypeOf(c.now).toEqualTypeOf<db.SQLFragment<any[], never>>();
+    // a Date in add() or subtract() as an update() value: 42725 or 22007, and 42804
+    expectTypeOf(db.update('accounts', { opened_on: c.add(new Date()) }, { id: 1 })).not.toBeAny();
+    expectTypeOf(db.update('accounts', { opened_on: c.subtract(new Date()) }, { id: 1 })).not.toBeAny();
+    expectTypeOf(db.update('users', { created_at: c.add(new Date()) }, { id: 1 })).not.toBeAny();
+    expectTypeOf(db.update('users', { created_at: c.subtract(new Date()) }, { id: 1 })).not.toBeAny();
+    expectTypeOf(c.add(new Date())).toEqualTypeOf<db.SQLFragment<number, Date>>();
+    expectTypeOf(c.subtract(new Date())).toEqualTypeOf<db.SQLFragment<number, Date>>();
+  });
+
+  test('add() and the boolean tests are refused as insert() values, which Postgres refuses too (42703); now is accepted', () => {
+    // Insertable takes a SQLFragment with no constraint and rows as its RunResult: add() has a constraint and a
+    // non-rows RunResult; a boolean test has a non-rows RunResult
+    // @ts-expect-error add() as an insert() value ("balance" + $1 in VALUES)
+    db.insert('accounts', { owner_id: 1, balance: c.add(1) });
+    // @ts-expect-error isTrue as an insert() value
+    db.insert('extra.type_zoo', { c_bool: c.isTrue });
+    expectTypeOf(db.insert('users', { email: 'a@b', display_name: 'A', created_at: c.now })).not.toBeAny();
+  });
+
   test('array conditions are typed on the element, not on the column', () => {
     // documented (R34, #40): arrayContains<T>(a: T[] | ParentColumn) gives Constraint T = number; scores wants number[].
     // Every type tried on the column broke code that compiles under 6.6.1 (a mock written to its signature, `.map()`)
