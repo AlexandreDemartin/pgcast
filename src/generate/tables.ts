@@ -117,6 +117,10 @@ const columnOptionsFor = (options: CompleteConfig['columnOptions'], table: strin
   return tableOptions && stated(tableOptions, column);
 };
 
+// a text in a JSDoc, every line behind its `*`: a name, a type or a default may hold a line break, at which
+// TypeScript ends a JSDoc line, \r as \n
+const jsdocLines = (text: string, margin: string) => jsdocText(text).split(/\r\n?|\n/).join(`\n${margin}* `);
+
 function quoteIfIllegalIdentifier(identifier: string) {
   // note: we'll redundantly quote a bunch of non-ASCII characters like this
   return identifier.match(/^[a-zA-Z_$][0-9a-zA-Z_$]*$/) ? identifier : stringLiteral(identifier, '"');
@@ -272,7 +276,7 @@ export const definitionForRelationInSchema = async (
     friendlyRelType = friendlyRelTypes[rel.type],
     tableComment = config.schemaJSDoc ? `
 /**
- * ${jsdocText(`**${schemaPrefix}${rel.name}**`)}
+ * ${jsdocLines(`**${schemaPrefix}${rel.name}**`, ' ')}
  * - ${friendlyRelType} in database
  */` : ``,
     tableDef = `${tableComment}
@@ -400,11 +404,10 @@ const createColumnDoc = (config: CompleteConfig, schemaName: string, rel: Relati
       [lines, []] : [lines.slice(0, tagAt), lines.slice(tagAt)],
     commentDoc = text.length ? '\n    *\n    * ' + text.join('\n    * ') : '',
     tagsDoc = tags.length ? '\n    *\n    * ' + tags.join('\n    * ') : '',
-    [domain, udt, defaultText] = [domainName, udtName ?? '(none)', defaultValue].map(t => jsdocText(String(t))),
-    // a default holding a line break (a string literal, a quoted name) gets its ` * ` on every line, as a comment
-    defaultLines = defaultText.split(/\r\n?|\n/).join('\n    * '),
+    // a quoted name or a default (a string literal, a quoted name) holding a line break: ` * ` on every line
+    [domain, udt, defaultLines] = [domainName, udtName ?? '(none)', defaultValue].map(t => jsdocLines(String(t), '    ')),
     doc = `/**
-    * ${jsdocText(`**${schemaPrefix}${rel.name}.${column}**`)}${commentDoc}
+    * ${jsdocLines(`**${schemaPrefix}${rel.name}.${column}**`, '    ')}${commentDoc}
     * - ${domainName ? `\`${domain}\` (base type: \`${udt}\`)` : `\`${udt}\``} in database
     * - ${rel.type === 'mview' ? 'Materialized view column' : isGenerated ? 'Generated column' :
         `${isNullable ? 'Nullable' : '`NOT NULL`'}, ${hasDefault && defaultValue === null ? `identity column` : hasDefault ? `default: \`${defaultLines}\`` : `no default`}`}${tagsDoc}

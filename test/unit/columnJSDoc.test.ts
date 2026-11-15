@@ -1,10 +1,10 @@
 // Copyright (C) 2026 Alexandre Demartin
 //
-// The JSDoc of a column whose comment holds a JSDoc tag (#309), or whose default holds a line break (#308),
-// fuzzed with TypeScript as the oracle: comments and defaults drawn from a small alphabet go through
-// definitionForRelationInSchema(), then TypeScript reads the JSDoc written and the one master wrote (the
-// comment's lines, then the generated ones; the default's lines behind no *). Seeded, so every run checks
-// the same comments. TypeScript reads each JSDoc as it lands in schema.d.ts, in an unprefixed and a prefixed
+// The JSDoc of a column whose comment holds a JSDoc tag (#309), or whose default (#308) or name (#473) holds a
+// line break, fuzzed with TypeScript as the oracle: comments, defaults and names drawn from a small alphabet go
+// through definitionForRelationInSchema(), then TypeScript reads the JSDoc written and the one master wrote (the
+// comment's lines, then the generated ones; the default's or the name's lines behind no *). Seeded, so every run
+// checks the same texts. TypeScript reads each JSDoc as it lands in schema.d.ts, in an unprefixed and a prefixed
 // schema. No database.
 
 import ts from 'typescript';
@@ -59,6 +59,13 @@ const masterDefaultDoc = (schema: string, i: number, value: string) => `/**
     * - Nullable, default: \`${jsdocText(value)}\`
     */`;
 
+/** The JSDoc master wrote for a column named `name`: its lines after the first behind no `*`. */
+const masterNameDoc = (schema: string, name: string) => `/**
+    * ${jsdocText(`**${titleIn(schema)}.${name}**`)}
+    * - \`int4\` in database
+    * - Nullable, no default
+    */`;
+
 /** Whether the names of `part` all come in `whole`, in their order. */
 const isSubsequence = (part: string[], whole: string[]) => {
   let at = 0;
@@ -78,6 +85,27 @@ const docs = (source: string, schema: string) => {
       const doc = member.getChildren().find(ts.isJSDoc)!;
       return { text: doc.getText(), tags: (doc.tags ?? []).map(tag => ({ name: tag.tagName.text, text: tag.getText() })) };
     });
+};
+
+/**
+ * How the tags TypeScript reads in the JSDoc of `value`, a default or a name on several lines, differ from master's:
+ * none (`undefined`), or one of three cases, else `'changed'`:
+ * - dropped: a line led by * (after white space) opens no tag, where master read that * as the margin;
+ * - opened: master's inline link left open ran on through a blank line, or a line holding only its name, and
+ *   took in the next line; the prefix's * ends it a line earlier, so an @ on that next line can open a tag;
+ * - split: in a prefixed schema, master's namespace put its 2 spaces between a \r and its \n, a line more,
+ *   after which an @ past a link left open could open a tag; the prefixed lines have no such line.
+ */
+const tagChange = (value: string, tags: { name: string }[], tagsBefore: { name: string }[], schema: string) => {
+  const
+    [names, namesBefore] = [tags, tagsBefore].map(t => t.map(tag => tag.name)),
+    lines = value.split(/\r\n?|\n/),
+    afterOpenLink = lines.slice(0, -1).some(line => /\{@link(?:code|plain)?(?![^}]*\})/.test(line));
+  if (JSON.stringify(names) === JSON.stringify(namesBefore)) return undefined;
+  if (isSubsequence(names, namesBefore) && lines.slice(1).some(line => /^\s*\*/.test(line))) return 'dropped';
+  if (isSubsequence(namesBefore, names) && afterOpenLink) return 'opened';
+  if (isSubsequence(names, namesBefore) && afterOpenLink && schema !== 'public' && value.includes('\r\n')) return 'split';
+  return 'changed';
 };
 
 describe('the JSDoc of a column comment, against TypeScript', () => {
@@ -146,21 +174,12 @@ describe('the JSDoc of a column comment, against TypeScript', () => {
       if (text.split(/\r\n?|\n/).slice(1).some(line => !/^ *\*/.test(line))) unprefixed.push(value);
       // the comment ends at its own */, after the default's last line
       if (!text.endsWith(inSchemaFile(`    * ${jsdocText(value).split(/\r\n?|\n/).at(-1)}\`\n    */`, schema))) cut.push(value);
-      // the tags master read, but for three cases, each counted:
-      // - dropped: a line led by * (after white space) opens no tag, where master read that * as the margin;
-      // - opened: master's inline link left open ran on through a blank line, or a line holding only its name, and
-      //   took in the next line; the prefix's * ends it a line earlier, so an @ on that next line can open a tag;
-      // - split: in a prefixed schema, master's namespace put its 2 spaces between a \r and its \n, a line more,
-      //   after which an @ past a link left open could open a tag; the prefixed lines have no such line
-      const
-        [names, namesBefore] = [tags, before.tags].map(t => t.map(tag => tag.name)),
-        lines = value.split(/\r\n?|\n/),
-        afterOpenLink = lines.slice(0, -1).some(line => /\{@link(?:code|plain)?(?![^}]*\})/.test(line));
-      if (JSON.stringify(names) === JSON.stringify(namesBefore)) return;
-      if (isSubsequence(names, namesBefore) && lines.slice(1).some(line => /^\s*\*/.test(line))) dropped++;
-      else if (isSubsequence(namesBefore, names) && afterOpenLink) opened++;
-      else if (isSubsequence(names, namesBefore) && afterOpenLink && schema !== 'public' && value.includes('\r\n')) split++;
-      else tagsChanged.push(value);
+      // the tags master read, but for three cases, each counted (tagChange())
+      const change = tagChange(value, tags, before.tags, schema);
+      if (change === 'dropped') dropped++;
+      else if (change === 'opened') opened++;
+      else if (change === 'split') split++;
+      else if (change) tagsChanged.push(value);
     });
 
     expect(changedOnOneLine).toEqual([]);
@@ -173,6 +192,56 @@ describe('the JSDoc of a column comment, against TypeScript', () => {
     expect(dropped).toBeGreaterThan(0);
     expect(opened).toBeGreaterThan(0);
     expect(split > 0).toBe(schema !== 'public');
+    expect(dropped + opened + split).toBeLessThan(multiLine / 50);
+  });
+
+  it.each(shapes)('puts every line of a column name behind its *, keeps master\'s JSDoc for one of one line, and master\'s tags but at a * or an open link, in %s schema', async (_, schema) => {
+    const
+      // a line led by *, which master's JSDoc read as its margin, a line after a link left open over a blank line,
+      // then the fuzzed names
+      texts = ['a\n*@x', 'see {@link\n\n@deprecated b', ...fuzzed(473)],
+      rows = texts.map(column => ({
+        column, isGenerated: false, isNullable: true, hasDefault: false, defaultValue: null,
+        udtName: 'int4', domainName: null, udtSchema: 'public', domainSchema: null, description: null,
+      })),
+      queryFn = async (query: pg.QueryConfig) => ({ rows: query.text.includes('pg_indexes') ? [] : rows }) as unknown as pg.QueryResult,
+      config = finaliseConfig({ warningListener: false }),
+      written = docs(await definitionForRelationInSchema(relIn(schema), schema, {}, {}, config, queryFn), schema),
+      master = docs(`interface Master {\n    ${texts.map((name, i) => `${masterNameDoc(schema, name)}\n    c${i}: number;`).join('\n    ')}\n}`, schema),
+      changedOnOneLine: string[] = [],
+      unprefixed: string[] = [],
+      cut: string[] = [],
+      tagsChanged: string[] = [];
+    let multiLine = 0, tagged = 0, dropped = 0, opened = 0, split = 0;
+
+    expect(written).toHaveLength(texts.length);
+    texts.forEach((name, i) => {
+      const [{ text, tags }, before] = [written[i], master[i]];
+      if (before.tags.length) tagged++;
+      if (!/[\r\n]/.test(name)) {
+        if (text !== before.text) changedOnOneLine.push(name);
+        return;
+      }
+      multiLine++;
+      if (text.split(/\r\n?|\n/).slice(1).some(line => !/^ *\*/.test(line))) unprefixed.push(name);
+      // the comment ends at its own */, after the generated lines
+      if (!text.endsWith(inSchemaFile('    * - `int4` in database\n    * - Nullable, no default\n    */', schema))) cut.push(name);
+      const change = tagChange(name, tags, before.tags, schema);
+      if (change === 'dropped') dropped++;
+      else if (change === 'opened') opened++;
+      else if (change === 'split') split++;
+      else if (change) tagsChanged.push(name);
+    });
+
+    expect(changedOnOneLine).toEqual([]);
+    expect(unprefixed).toEqual([]);
+    expect(cut).toEqual([]);
+    expect(tagsChanged).toEqual([]);
+    // the fuzz reaches every case, and the exceptions stay rare
+    expect(multiLine).toBeGreaterThan(1000);
+    expect(tagged).toBeGreaterThan(100);
+    expect(dropped).toBeGreaterThan(0);
+    expect(opened).toBeGreaterThan(0);
     expect(dropped + opened + split).toBeLessThan(multiLine / 50);
   });
 });

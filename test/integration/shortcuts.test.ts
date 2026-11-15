@@ -1405,3 +1405,16 @@ describe('copy()', () => {
     expect(await originalAndCopy(db.insert('users', []))).toEqual([[], []]);
   });
 });
+
+describe('a null row among others in upsert()', () => {
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  it('inserts a row of defaults, as in 6.6.1, and warns PGCAST_DEP001', async () => {
+    // since #27 it threw a TypeError at the call; the null row is read as `{}`, as insert() reads it (#341)
+    const emitWarning = vi.spyOn(process, 'emitWarning').mockImplementation(() => { });
+    const rows = await db.upsert('extra.type_zoo', [{ c_text: 'x' }, null as any], 'id', { returning: ['c_text'] }).run(t.client);
+    expect(rows).toEqual([{ c_text: 'x', $action: 'INSERT' }, { c_text: null, $action: 'INSERT' }]);
+    // once per process: an earlier test of this file may have emitted it already
+    for (const [, options] of emitWarning.mock.calls) expect(options).toEqual({ type: 'DeprecationWarning', code: 'PGCAST_DEP001' });
+  });
+});
