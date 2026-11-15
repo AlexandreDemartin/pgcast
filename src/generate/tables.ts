@@ -139,8 +139,6 @@ export const definitionForRelationInSchema = async (
   // an 'out' parameter too: what a placeholder imports from zapatos/schema, '' for nothing, null for an enum's labels written out
   customTypeImports: Record<string, string | null> = Object.create(null),
   uniqueIndexesNotArbiters: string[] = [],  // an 'out' parameter too: what uniqueIndexConstraintsOnly would leave out
-  /** An 'out' parameter too: for each placeholder whose text a relation wrote without naming an enum, its Postgres type. */
-  placeholdersNamingNoEnum: Record<string, string> = Object.create(null),
 ) => {
   const
     rows = await columnsForRelation(rel, schemaName, queryFn),
@@ -215,17 +213,16 @@ export const definitionForRelationInSchema = async (
         // writes out type them all, and a relation that names the enum never replaces them
         labelled = inlineEnums && hasEnum,
         // without it, a relation of a schema with no enum of that name reads the type as `any`: that text wins, in
-        // whichever order the relations are read; two types of one name (one placeholder) keep 6.6.1's last-wins
+        // whichever order the relations are read; a placeholder that two types of one name share (#42) keeps 6.6.1's
+        // last-wins
         qualifiedType = `"${domainName === null ? udtSchema : domainSchema}"."${customType}"`,
-        namesEnum = !inlineEnums && hasEnum,
-        keepsText = namesEnum && placeholdersNamingNoEnum[prefixedCustomType] === qualifiedType;
+        keepsText = !inlineEnums && hasEnum && customTypes[prefixedCustomType] === 'any' &&
+          Object.keys(origins).every(type => type === qualifiedType);
 
       if (!keepsText && (labelled || customTypeImports[prefixedCustomType] !== null)) {
         // two origins: the last one seen wins
         customTypes[prefixedCustomType] = agrees && importsEnum && schemaPrefix ? `${namespace}.${selectableType}` : selectableType;
         customTypeImports[prefixedCustomType] = labelled ? null : agrees ? imported : '';
-        if (namesEnum) delete placeholdersNamingNoEnum[prefixedCustomType];
-        else placeholdersNamingNoEnum[prefixedCustomType] = qualifiedType;
       }
       origins[qualifiedType] = customType;
       selectableType = JSONSelectableType = whereableType = insertableType = updatableType =

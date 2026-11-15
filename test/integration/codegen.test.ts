@@ -450,10 +450,10 @@ ${imports.map(line => `  ${line}\n`).join('')}  export type ${type};  // replace
         complete = finaliseConfig({ ...quiet, ...config }),
         read: Record<string, Record<string, { type: string; imports: string | null }>> = {};
       for (const order of orders(relations)) {
-        const customTypes = Object.create(null), customTypeImports = Object.create(null), namingNoEnum = Object.create(null);
+        // shared across the relations, as tsForConfig shares them
+        const customTypes = Object.create(null), origins = Object.create(null), customTypeImports = Object.create(null);
         for (const { rel, schema, enums } of order) await definitionForRelationInSchema(
-          rel, schema, await enums, customTypes, complete, q, undefined, undefined, undefined, customTypeImports, undefined,
-          namingNoEnum);
+          rel, schema, await enums, customTypes, complete, q, origins, undefined, undefined, customTypeImports);
         read[order.map(r => `${r.schema}.${r.rel.name}`).join(', ')] = Object.fromEntries(names.map(name =>
           [name, { type: customTypes[name], imports: customTypeImports[name] || null }]));
       }
@@ -630,14 +630,16 @@ ${imports.map(line => `  ${line}\n`).join('')}  export type ${type};  // replace
         });
     });
 
-    // two domains named code_d, one over an enum: one placeholder, which 6.6.1 gave the column read last, by name
+    // two domains named code_d, each over an enum, which placeholder_reels_a reads as `mood` and `any`: one
+    // placeholder (#42), which 6.6.1 gave the column read last, by name
     it('leaves two types of one name in one relation as 6.6.1 wrote them', async () => {
       await t.pool.query(`
         CREATE SCHEMA placeholder_reels_a;
         CREATE SCHEMA placeholder_reels_b;
         CREATE TYPE placeholder_reels_a.mood AS ENUM ('tense');
+        CREATE TYPE placeholder_reels_b.feel AS ENUM ('calm');
         CREATE DOMAIN placeholder_reels_a.code_d AS placeholder_reels_a.mood;
-        CREATE DOMAIN placeholder_reels_b.code_d AS text;
+        CREATE DOMAIN placeholder_reels_b.code_d AS placeholder_reels_b.feel;
         CREATE TABLE placeholder_reels_a.mixed (a placeholder_reels_b.code_d, b placeholder_reels_a.code_d);
       `);
       try {

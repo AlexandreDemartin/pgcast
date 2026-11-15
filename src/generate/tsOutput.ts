@@ -284,7 +284,6 @@ const tsForQueries = async (config: CompleteConfig, queryFn: (q: pg.QueryConfig)
     enumsForSchema = async (schema: string) => (await enumOrdersFor(schema))[enumOrder],
     columnsTypedByEnumName: string[] = [],
     uniqueIndexesNotArbiters: string[] = [],
-    placeholdersNamingNoEnum: Record<string, string> = Object.create(null),
     schemaNames = Object.keys(schemas),
     schemaData = (await Promise.all(
       schemaNames.map(async schema => {
@@ -304,8 +303,7 @@ const tsForQueries = async (config: CompleteConfig, queryFn: (q: pg.QueryConfig)
           outOfOrder = enumOrder === 'declared' ? [] : enumsOutOfOrder(enumOrders).map(name => ({ schema, name })),
           tableDefs = await Promise.all(tables.map(async table =>
             definitionForRelationInSchema(table, schema, enums, customTypes, config, queryFn, customTypeOrigins,
-              enumsForSchema, columnsTypedByEnumName, customTypeImports, uniqueIndexesNotArbiters,
-              placeholdersNamingNoEnum))),
+              enumsForSchema, columnsTypedByEnumName, customTypeImports, uniqueIndexesNotArbiters))),
           schemaIsUnprefixed = schema === config.unprefixedSchema,
           none = '/* (none) */',
           schemaDef = `/* === schema: ${jsdocText(schema)} === */\n` +
