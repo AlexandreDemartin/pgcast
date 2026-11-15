@@ -3,7 +3,7 @@
 // Characterization of src/db/core.ts against Postgres: what the SQL compiled in
 // test/unit/core.test.ts does once run on the fixture, surprises included.
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Whereable } from 'zapatos/schema';
 import * as db from '../../src/db';
 import { sql, param, raw, cols, vals, parent, self, Default } from '../../src/db';
@@ -608,6 +608,43 @@ describe('SQLFragment.run', () => {
     const q = sql<db.SQL, unknown[][]>`SELECT 1 AS a; SELECT 2 AS b`;
     q.runResultTransform = (qr: unknown) => (qr as { rows: unknown[] }[]).map(r => r.rows);
     expect(await q.run(t.client)).toEqual([[{ a: 1 }], [{ b: 2 }]]);
+  });
+
+  // on t.pool, outside the test's transaction, so that what commits shows; the table is dropped after each test
+  describe('several statements, on the pool', () => {
+    const count = async () => (await t.pool.query('SELECT count(*)::int AS n FROM pgcast_204_pool')).rows[0].n;
+    beforeEach(() => t.pool.query('CREATE TABLE pgcast_204_pool (id int)'));
+    afterEach(() => t.pool.query('DROP TABLE IF EXISTS pgcast_204_pool'));
+
+    it('a statement that fails rejects with its error, and undoes those before it (22012)', async () => {
+      await expect(sql`INSERT INTO pgcast_204_pool VALUES (1); SELECT 1/0`.run(t.pool))
+        .rejects.toMatchObject({ code: '22012', message: 'division by zero' });
+      expect(await count()).toBe(0);
+    });
+
+    it('a COMMIT of its own keeps what came before it', async () => {
+      await expect(sql`INSERT INTO pgcast_204_pool VALUES (1); COMMIT; INSERT INTO pgcast_204_pool VALUES (2); SELECT 1/0`
+        .run(t.pool)).rejects.toMatchObject({ code: '22012' });
+      expect(await count()).toBe(1);
+    });
+
+    it('a statement that cannot run in a transaction block makes Postgres refuse the whole text (25001)', async () => {
+      await expect(sql`INSERT INTO pgcast_204_pool VALUES (1); CREATE INDEX CONCURRENTLY pgcast_204_pool_id ON pgcast_204_pool (id)`
+        .run(t.pool)).rejects.toMatchObject({
+        code: '25001',
+        message: 'CREATE INDEX CONCURRENTLY cannot run inside a transaction block',
+      });
+      await expect(sql`VACUUM pgcast_204_pool; INSERT INTO pgcast_204_pool VALUES (1)`.run(t.pool))
+        .rejects.toMatchObject({ code: '25001', message: 'VACUUM cannot run inside a transaction block' });
+      expect(await count()).toBe(0);
+    });
+
+    it('inside transaction(), two INSERTs in one text resolve undefined and are both committed', async () => {
+      expect(await db.transaction(t.pool, db.IsolationLevel.ReadCommitted,
+        txn => sql`INSERT INTO pgcast_204_pool VALUES (1); INSERT INTO pgcast_204_pool VALUES (2)`.run(txn)))
+        .toBeUndefined();
+      expect(await count()).toBe(2);
+    });
   });
 
   it('queryListener and resultListener see every run, no-ops included', async () => {
