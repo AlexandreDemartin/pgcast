@@ -219,6 +219,55 @@ describe('param', () => {
     expect(one(param('1', '""""'))).toEqual({ text: 'CAST($1 AS """""")', values: ['1'] });
   });
 
+  describe('with a text cast that leaves a part of the name empty', () => {
+    // Postgres refuses `""` (42601, zero-length delimited identifier), wherever it stands; 6.6.1 wrote
+    // CAST($1 AS "") and CAST($1 AS "public.") (42704), unless castArrayParamsToJson or castObjectParamsToJson
+    // dropped the cast for "json", which #36 changed
+    const emptyName = (cast: string, type: string) => ({
+      name: 'Error',
+      message: `param() cast '${cast}' gives an empty name, ${type}, which Postgres refuses: name each part of the type, as in 'int4' or 'public.mood', or leave the cast out`,
+    });
+
+    it('throws while compiling, naming the cast and the name it gives', () => {
+      expect(failure(() => one(param(1, '')))).toEqual(emptyName('', '""'));
+      expect(failure(() => one(param([1], '[]')))).toEqual(emptyName('[]', '""[]'));
+      expect(failure(() => one(param([1], '[3]')))).toEqual(emptyName('[3]', '""[3]'));
+      expect(failure(() => one(param('ok', 'public.')))).toEqual(emptyName('public.', '"public".""'));
+      expect(failure(() => one(param(1, '.int4')))).toEqual(emptyName('.int4', '""."int4"'));
+      expect(failure(() => one(param(1, 'pg_catalog..int4')))).toEqual(emptyName('pg_catalog..int4', '"pg_catalog".""."int4"'));
+      expect(failure(() => one(param(1, '.')))).toEqual(emptyName('.', '"".""'));
+      expect(failure(() => one(param([1], '.int4[]')))).toEqual(emptyName('.int4[]', '""."int4"[]'));
+      expect(failure(() => one(new db.Parameter(1, '')))).toEqual(emptyName('', '""'));
+    });
+
+    it('throws under castArrayParamsToJson and castObjectParamsToJson too, on a scalar, an array and a plain object', () => {
+      db.setConfig({ castArrayParamsToJson: true, castObjectParamsToJson: true });
+      for (const value of [1, [1, 2], { a: 1 }]) {
+        expect(failure(() => one(param(value, '')))).toEqual(emptyName('', '""'));
+        expect(failure(() => one(param(value, '[]')))).toEqual(emptyName('[]', '""[]'));
+        expect(failure(() => one(param(value, 'public.')))).toEqual(emptyName('public.', '"public".""'));
+      }
+    });
+
+    it('a name of spaces or of quotes is not empty, and compiles as before', () => {
+      expect(one(param(1, ' '))).toEqual({ text: 'CAST($1 AS " ")', values: [1] });
+      expect(one(param(1, 'public .mood'))).toEqual({ text: 'CAST($1 AS "public "."mood")', values: [1] });
+      expect(one(param(1, '"public."'))).toEqual({ text: 'CAST($1 AS "public.")', values: [1] });
+      expect(one(param(1, '""'))).toEqual({ text: 'CAST($1 AS """")', values: [1] });
+    });
+
+    it('building the query does not throw; .run() rejects before any query', async () => {
+      const queryable = { query: vi.fn() };
+      const q = db.select('users', { display_name: param('Ada', '') });
+      await expect(q.run(queryable as any)).rejects.toThrow(emptyName('', '""').message);
+      const err = await sql`SELECT ${param(1, 'public.')}`.run(queryable as any).catch((e: unknown) => e);
+      // a plain Error, not pg's DatabaseError: no SQLSTATE code
+      expect((err as Error).constructor).toBe(Error);
+      expect((err as { code?: string }).code).toBeUndefined();
+      expect(queryable.query).not.toHaveBeenCalled();
+    });
+  });
+
   it('with true: arrays and plain objects are JSON-stringified and cast to json', () => {
     expect(sql`${param([1, 'a'], true)}, ${param({ a: [1] }, true)}`.compile()).toMatchInlineSnapshot(`
       {
