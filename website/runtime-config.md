@@ -211,7 +211,7 @@ transactionRequiresIdleClient?: boolean  // default: false; the default in 7.0
 
 Given a client you opened a transaction on yourself, with `BEGIN`, [`transaction()`](/transaction#transaction) would end your transaction: its `COMMIT`<!-- probe: db.serializable(pool, async () => {}) --> commits it, or its `ROLLBACK`<!-- probe: db.serializable(pool, async () => { throw 0; }) --> undoes it ([Your own `BEGIN`](/transaction#your-own-begin)).
 
-With `true`, it rejects before sending its `START TRANSACTION`, with "transaction() was given a client inside a transaction block, so its COMMIT or ROLLBACK would end that transaction: COMMIT or ROLLBACK it first, pass the pool, or run the queries on that client without transaction()"<!-- message -->. Your transaction stays open, for your `COMMIT` or `ROLLBACK`.
+With `true`, it rejects before sending its `START TRANSACTION`, with "transaction() was given a client inside a transaction block, so its COMMIT or ROLLBACK would end that transaction: COMMIT or ROLLBACK it first, or run the queries on that client without transaction()"<!-- message -->. Your transaction stays open, for your `COMMIT` or `ROLLBACK`.
 
 Off, it sends what Zapatos 6.6.1 sends, and warns once per process, `PGCAST_DEP005`, before its `START TRANSACTION`.
 

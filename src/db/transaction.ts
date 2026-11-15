@@ -178,7 +178,7 @@ export async function transaction<T, M extends IsolationLevel>(
         // pg reads the status at each ReadyForQuery, so it can lag behind a query that just rejected (a failed
         // COMMIT): an empty query, which Postgres does not count as a query of the block, reads it again
         await sql``.run(txnClient);  // meanwhile, a call at the same moment sees the mark, and is passed through
-        if (inBlock(txnClient)) throw new Error('transaction() was given a client inside a transaction block, so its COMMIT or ROLLBACK would end that transaction: COMMIT or ROLLBACK it first, pass the pool, or run the queries on that client without transaction()');
+        if (inBlock(txnClient)) throw new Error('transaction() was given a client inside a transaction block, so its COMMIT or ROLLBACK would end that transaction: COMMIT or ROLLBACK it first, or run the queries on that client without transaction()');
       } else {
         warnOnce('PGCAST_DEP005', 'transaction() was given a client inside a transaction block, and its COMMIT or ROLLBACK will end that transaction. Set transactionRequiresIdleClient: true (db.setConfig) to reject instead, before its START TRANSACTION; it will be the default in pgcast 7.0.');
       }
