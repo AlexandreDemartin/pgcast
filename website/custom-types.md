@@ -114,7 +114,7 @@ const here: c.PgPoint = '(0.5,1)';
 
 ## Type a domain
 
-A domain gets a placeholder too, which holds its base type's `Selectable` type instead of `any`: the type `pg` returns. That one type serves all five interfaces, `JSONSelectable` included, unless the domain is over a type typed by context and [`domainsTypedByContext`](/generator#generate.domainsTypedByContext) is on ([below](#when-a-placeholder-does-not-compile)). `seat_label` is a `TEXT` with a `CHECK`, so `src/zapatos/custom/PgSeat_label.d.ts` holds `string`, right in each:
+A domain gets a placeholder too, which holds its base type's `Selectable` type instead of `any`: the type `pg` returns. That one type serves all five interfaces, `JSONSelectable` included, unless the domain is over a type typed by context and [`domainsTypedByContext`](/generator#generate.domainsTypedByContext) is on ([below](#when-a-placeholder-does-not-compile)). A domain over another domain, or an array of a domain, gets `any`, which that option types by the base type of its innermost domain. `seat_label` is a `TEXT` with a `CHECK`, so `src/zapatos/custom/PgSeat_label.d.ts` holds `string`, right in each:
 
 ::: code-group
 

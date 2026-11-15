@@ -1,5 +1,5 @@
 ---
-english: ac08382b2c65
+english: b5140a7e37e6
 ---
 
 # Le catalogue
@@ -71,6 +71,7 @@ Pour les vues, pgcast s’en tient à ce que Postgres déclare, comme Zapatos :
 - Un enum d’un autre schéma devient un placeholder de type `any`, ou prend les labels de l’enum du même nom dans le schéma de la relation, sauf si [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas) est activé.
 - `UniqueIndex` liste chaque index unique, y compris ceux que refuse `ON CONFLICT ON CONSTRAINT`, sauf si [`uniqueIndexConstraintsOnly`](/fr/generator#generate.uniqueIndexConstraintsOnly) est activé.
 - Un domaine sur `int8`, `numeric`, `bytea`, `money` ou une date est typé par son placeholder dans les cinq interfaces, qui, tel que généré, contient ce que renvoie `pg`, sauf si [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext) est activé.
+- Un domaine sur un domaine, ou un tableau d’un domaine, vaut `any`, le type de son placeholder tel que généré, sauf si [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext) est activé.
 
 ::: info À venir
 Lire davantage du catalogue, chaque fois en opt-in : les clés étrangères, pour des laterals qui connaissent leur jointure ([#54](https://github.com/AlexandreDemartin/pgcast/issues/54)) ; le `CHECK (VALUE = ANY (ARRAY[…]))` d’un domaine comme union de ses valeurs ([#55](https://github.com/AlexandreDemartin/pgcast/issues/55)) ; et, comme outil à part, les types de résultat du SQL écrit à la main ([#62](https://github.com/AlexandreDemartin/pgcast/issues/62)).

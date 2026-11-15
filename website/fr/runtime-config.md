@@ -1,5 +1,5 @@
 ---
-english: cd1faac225bb
+english: 1f78dbee1a48
 ---
 
 # Configuration
@@ -468,11 +468,12 @@ type DomainInContext<Custom, Generated, InContext> =
   (<T>() => T extends Custom ? 1 : 2) extends (<T>() => T extends Generated ? 1 : 2) ? InContext : Custom
 ```
 
-Le type qu’écrit l’option [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext) du générateur pour une colonne d’un domaine, dans `JSONSelectable`, `Whereable`, `Insertable` et `Updatable` : `InContext`, le type de son type de base dans ce contexte, tant que le placeholder `Custom` vaut encore exactement `Generated`, le type qu’y a écrit le générateur ; sinon `Custom`, comme sans l’option.
+Le type qu’écrit l’option [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext) du générateur pour une colonne d’un domaine, dans `JSONSelectable`, `Whereable`, `Insertable` et `Updatable`, et aussi dans `Selectable` pour un domaine sur un domaine ou un tableau d’un domaine : `InContext`, le type de son type de base dans ce contexte, tant que le placeholder `Custom` vaut encore exactement `Generated`, le type qu’y a écrit le générateur ; sinon `Custom`, comme sans l’option.
 
 - `DomainInContext<db.Int8String, db.Int8String, number>` est `number` : un placeholder laissé tel que généré.
 - `DomainInContext<number | db.Int8String, db.Int8String, number>` est `number | db.Int8String` : un placeholder modifié garde son type, dans chaque contexte.
 - Un `any` reste `any`, et un `any[]` reste `any[]`, comme un placeholder écrit par Zapatos 6.6.1 sur `int8[]` sans import. Un placeholder modifié vers le même type, `` `${number}` `` pour `db.Int8String`, compte comme laissé tel que généré.
+- `DomainInContext<any, any, number>` est `number` : un domaine sur un domaine, dont le générateur a écrit `any` dans le placeholder. Modifié vers `unknown`, il reste `unknown`.
 
 ## JSON {#json}
 

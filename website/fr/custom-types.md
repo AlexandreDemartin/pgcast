@@ -1,5 +1,5 @@
 ---
-english: 2543ecd524e5
+english: 986dad0fd46c
 ---
 
 # Types personnalisés
@@ -118,7 +118,7 @@ const here: c.PgPoint = '(0.5,1)';
 
 ## Typer un domaine {#type-a-domain}
 
-Un domaine a aussi son placeholder, qui contient le type `Selectable` de son type de base au lieu de `any` : le type que renvoie `pg`. Ce seul type sert les cinq interfaces, `JSONSelectable` compris, sauf si le domaine porte sur un type typé selon le contexte et que [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext) est activé ([plus bas](#when-a-placeholder-does-not-compile)). `seat_label` est un `TEXT` avec un `CHECK`, donc `src/zapatos/custom/PgSeat_label.d.ts` contient `string`, qui est juste pour chacune :
+Un domaine a aussi son placeholder, qui contient le type `Selectable` de son type de base au lieu de `any` : le type que renvoie `pg`. Ce seul type sert les cinq interfaces, `JSONSelectable` compris, sauf si le domaine porte sur un type typé selon le contexte et que [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext) est activé ([plus bas](#when-a-placeholder-does-not-compile)). Un domaine sur un autre domaine, ou un tableau d’un domaine, reçoit `any`, que cette option type par le type de base de son domaine le plus intérieur. `seat_label` est un `TEXT` avec un `CHECK`, donc `src/zapatos/custom/PgSeat_label.d.ts` contient `string`, qui est juste pour chacune :
 
 ::: code-group
 

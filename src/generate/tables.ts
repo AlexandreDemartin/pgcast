@@ -8,6 +8,7 @@ import * as pg from 'pg';
 import { tsTypeForPgType } from './pgTypes';
 import type { EnumData } from './enums';
 import { enumOrderOf, enumOrdersForSchema } from './enumOrder';
+import { domainRootsInDatabase, type DomainRoots } from './domainRoots';
 import type { CustomTypes, CustomTypeOrigins } from './tsOutput';
 import { CompleteConfig } from './config';
 import { jsdocText, stringLiteral, tsIdentifier } from './quote';
@@ -15,6 +16,7 @@ import { jsdocText, stringLiteral, tsIdentifier } from './quote';
 // TypeScript's own types that an enum may be named after: a placeholder naming one compiles without an import
 const tsOwnTypes = new Set('any bigint boolean never number object string symbol undefined unknown'.split(' '));
 const hasOwn = (o: object, key: string) => Object.prototype.hasOwnProperty.call(o, key);
+const contexts = ['Selectable', 'JSONSelectable', 'Whereable', 'Insertable', 'Updatable'] as const;
 
 
 export interface Relation {
@@ -140,6 +142,8 @@ export const definitionForRelationInSchema = async (
   customTypeImports: Record<string, string | null> = Object.create(null),
   uniqueIndexesNotArbiters: string[] = [],  // an 'out' parameter too: what uniqueIndexConstraintsOnly would leave out
   domainsNotByContext: string[] = [],  // an 'out' parameter too: what domainsTypedByContext would change
+  domainRoots = () => domainRootsInDatabase(queryFn),
+  domainsUnderDomains: string[] = [],  // an 'out' parameter too: what domainsTypedByContext would type over a domain
 ) => {
   const
     rows = await columnsForRelation(rel, schemaName, queryFn),
@@ -147,6 +151,22 @@ export const definitionForRelationInSchema = async (
     otherEnums: Record<string, EnumData> = Object.fromEntries(await Promise.all(
       otherSchemas.map(async schema => [schema, await enumsForSchema(schema)]))),
     typeEnumsAcrossSchemas = config.typeEnumsAcrossSchemas ?? false,
+    inlineIn = (schema: string) => typeEnumsAcrossSchemas && schema !== schemaName,
+    // a domain over a domain, or an array of a domain, is `any` to tsTypeForPgType: the base type under its domains
+    // types it, read once per run if a column is `any`; an enum of another schema by its labels, never by its name in
+    // this one, which may be another enum's
+    isAny = (row: any) => tsTypeForPgType(row.udtName, inlineIn(row.udtSchema) ? otherEnums[row.udtSchema] : enums,
+      'Selectable', config, inlineIn(row.udtSchema)) === 'any',
+    roots: DomainRoots = rows.some(isAny) ? await domainRoots() : {},
+    rootIn = (schema: string, name: string): DomainRoots[string] | undefined => roots[JSON.stringify([schema, name])],
+    // a domain over a domain over an array of a domain has that array as its root, which has a root of its own
+    rootOf = (row: any) => {
+      const root = isAny(row) ? rootIn(row.udtSchema, row.udtName) : undefined;
+      return root && !root.isArray ? rootIn(root.schema, root.name) ?? root : root;
+    },
+    rootSchemas = [...new Set(rows.map(row => rootOf(row)?.schema ?? schemaName))].filter(s => s !== schemaName),
+    rootEnums: Record<string, EnumData> = Object.fromEntries(await Promise.all(
+      rootSchemas.map(async schema => [schema, otherEnums[schema] ?? await enumsForSchema(schema)]))),
     selectables: string[] = [],
     JSONSelectables: string[] = [],
     whereables: string[] = [],
@@ -230,18 +250,28 @@ export const definitionForRelationInSchema = async (
       // a domain over int8, numeric, bytea, money or a date: as generated, its placeholder holds what pg returns, though
       // a write takes more and, except for money, the shortcuts' JSON gives another type; with domainsTypedByContext,
       // each context takes its own type while the placeholder still holds exactly what the generator wrote
-      // (db.DomainInContext), and the placeholder's otherwise
+      // (db.DomainInContext), and the placeholder's otherwise. A domain over a domain, or an array of a domain, has an
+      // `any` placeholder: all five take the type of the base type under its domains, but an array's Selectable, a
+      // string, since pg returns an array of a type it does not know as its text
       const
         placeholder = 'c.' + prefixedCustomType,
+        root = rootOf(row),
+        inlineRoot = root !== undefined && root.schema !== schemaName,
+        rootTypes = root && contexts.map(context => context === 'Selectable' && root.isArray ? 'string' :
+          tsTypeForPgType((root.isArray ? '_' : '') + root.name, inlineRoot ? rootEnums[root.schema] : enums, context, config, inlineRoot)),
+        underDomains = rootTypes && rootTypes[1] !== 'any' ? rootTypes : undefined,
         byContext = domainName !== null && selectableType !== 'any' &&
           [JSONSelectableType, whereableType, insertableType, updatableType].some(type => type !== selectableType),
-        typedByContext = byContext && (config.domainsTypedByContext ?? false),
+        typedByContext = (byContext || underDomains !== undefined) && (config.domainsTypedByContext ?? false),
         inContext = (type: string) => typedByContext ? `db.DomainInContext<${placeholder}, ${selectableType}, ${type}>` : placeholder;
 
       if (byContext && !typedByContext) domainsNotByContext.push(`${schemaName}.${rel.name}.${column} (${domainSchema}.${domainName})`);
-      [JSONSelectableType, whereableType, insertableType, updatableType] =
-        [JSONSelectableType, whereableType, insertableType, updatableType].map(inContext);
-      selectableType = placeholder;
+      if (underDomains && !typedByContext) {
+        const type = domainName === null ? `${udtSchema}.${udtName.slice(1)}[]` : `${domainSchema}.${domainName}`;
+        domainsUnderDomains.push(`${schemaName}.${rel.name}.${column} (${type})`);
+      }
+      [selectableType, JSONSelectableType, whereableType, insertableType, updatableType] = underDomains?.map(inContext) ??
+        [placeholder, ...[JSONSelectableType, whereableType, insertableType, updatableType].map(inContext)];
     }
 
     selectables.push(`${columnDoc}${possiblyQuotedColumn}: ${selectableType}${orNull};`);
