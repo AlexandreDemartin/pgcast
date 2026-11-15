@@ -1116,6 +1116,22 @@ describe('update', () => {
       `);
   });
 
+  it('characterization: an object with a value key is one parameter, sent as JSON, not a Parameter (#274)', () => {
+    // characterization: the types take it as a Parameter, checked by its shape; a numeric column refuses
+    // '{"value":3}' (22P02); param(3) sends 3
+    expect(db.update('accounts', { balance: { value: 3 } }, { id: 1 }).compile()).toMatchInlineSnapshot(`
+      {
+        "text": "UPDATE "accounts" SET ("balance") = ROW($1) WHERE ("id" = $2) RETURNING to_jsonb("accounts".*) AS result",
+        "values": [
+          {
+            "value": 3,
+          },
+          1,
+        ],
+      }
+    `);
+  });
+
   it('no column at all', () => {
     // `SET () = ROW()` is invalid SQL, so update() throws while it builds the query
     expect(() => db.update('accounts', {}, { id: 1 }))
