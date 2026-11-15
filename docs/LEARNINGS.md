@@ -257,6 +257,13 @@ Candidates for a check, a rule or a skill line.
 - #402 — A types-only `ConfigTypes` opt-in cannot carry decision 003's run-time warning: weigh Document first for a niche type gap — orchestrator
 - #164 — A claim about a nested shortcut covers each nesting (map `lateral`, passthrough `lateral`, `extras` or `sql` scalar subquery) and each outer call (`select`, `selectOne`, `selectExactlyOne`, `count`): the JSDoc and CHANGELOG lost the outer-call condition the page had, and `select.md` had lost it before — `branch-reviewer`, `builder`
 - #164 — A characterisation test tells the frozen behaviour from its nearest alternative (no limit), not only from the rejected fix (`LIMIT`): the data must make them differ; and run it against a mutant of the rejected fix — `branch-reviewer`, `builder`
+- #185 — When a template-literal type widens in output position, the 6.6.1 `tsc` grid adds `Record<T, X>` / a mapped type over `T` (a literal member turns an index signature into a required key) and conditional types in three forms: distributive over a type parameter, inline on the concrete type, wrapped in a tuple — an « Unchanged » line names which form it covers — `branch-reviewer`
+- #185 — The stub schema in `src/typings` types the integration tests, not the fixture's: a table type like `s.transfers` belongs in `test/types` only — `builder`
+- #185 — A `Record` keyed by `NumberRangeString` already needed its 4 unbounded keys under 6.6.1 (TS2739 on `{}`): the `{}` example of the break works only on `DateRangeString` — `builder`
+- #244 — When a fix lands in a value-builder the shortcuts call (`cols()`/`vals()`, `isIn()`), their own synchronous guards (« nothing to insert… », `TypeError` on `undefined`/`null`) decide which rows reach it: a « `run()` rejects for shortcut X of value Y » claim rests on a probe table (each value × `insert`/`upsert`/`update`, throw vs rejection) — `branch-reviewer`
+- #244 — The « Each place the value lands » list misses paths that reach the changed function indirectly (`numericAggregate` → `select()` → `cols()`): `grep -nE '\b(cols|vals)\(' src/db/shortcuts.ts src/db/conditions.ts` as a required step of skill `sql-safety` § Every branch, every place — `branch-reviewer`
+- #244 — `check-prose.mjs` matches a quoted message only against a whole string or template literal: each message is one literal, not text chosen by a ternary — `builder`
+- #244 — `completeKeysWithDefaultValue` turns any non-object row into an object, which hides it from checks in `core.ts` — `builder`
 - #271 — A docs bullet that restates one branch's rule loses the branch's condition (« without a `"` »), which the CHANGELOG and JSDoc kept: the French proofread could check each bullet's claim against the CHANGELOG's condition (third time tonight, after #456, #458) — `branch-reviewer`
 - #271 — `isDatabaseError(err)` called with no names always returns `false`, so it proves nothing: test a plain `Error` by its class and a missing `code` — `builder`
 - #271 — `check-prose` reads a `<!-- message -->` quote from plain `"…"` text before the mark; a code span that wraps the quotes fails the check — `builder`
@@ -267,6 +274,9 @@ Candidates for a check, a rule or a skill line.
 - #268 — A mock of a third-party lazy getter is compared with the package's real source at the oldest supported version (pg's peer floor, 7.18.2), not one recent version; and a counter on a getter that replaces itself counts only the first read — `branch-reviewer`
 - #268 — A pg 7 replay on Node 22 needs a patch to the handshake only (pg older than 8.0.3 cannot open a socket on Node 14+); pg-native runs there unpatched — `builder`
 - #268 — On pg 7, an installed pg-native whose addon fails to load made `transaction()` reject on a plain JS pool (6.6.1 and master) — `builder`
+- #274 — A docs claim about a parameter's compiled SQL (`$1`, JSON) names the `castArrayParamsToJson` / `castObjectParamsToJson` condition, or is probed under both: candidate check in `check-prose.mjs`, rerun each `<!-- probe -->` without `setConfig` with both options on and flag a changed text whose sentence names no option — `branch-reviewer`
+- #274 — A value object with `toPostgres()` and a `value` field compiles only because `Parameter` matches by shape: probe it whenever `Parameter` is narrowed; under `castObjectParamsToJson` an object literal's own `toPostgres()` is not used — `builder`
+- #274 — A types-only `ConfigTypes` opt-in cannot carry decision 003's warning, and a class + interface merge needs an ESLint disable in `core.ts`: weigh Document first for a niche type gap (as #402) — orchestrator
 
 ## Minors kept
 
@@ -361,9 +371,17 @@ Minor review defects, taken up by the end-of-chapter review.
 - #164 — `website/lateral.md:110` (and `fr/…`): nested in `extras` or a `sql` template, `selectOne()` / `selectExactlyOne()` with `withTies` fails on a tie with 21000; and under an outer `count()` a `withTies` lateral inflates the count — `branch-reviewer`
 - #164 — `test/integration/shortcuts.test.ts:870-883`: every matching row is a tie, so the rows cannot tell `WITH TIES` from no limit; the top-level `NotExactlyOneError` with the option is frozen only by the unit `2` — `branch-reviewer`
 - #164 — `src/db/shortcuts.ts:851`: « With `withTies` and `order` » suggests `withTies` without `order` is harmless (Postgres refuses it, 42601) — `branch-reviewer`
+- #185 — `website/runtime-config.md:522` (and `fr/…:526`): `NumberRangeString` still refuses `'[1,Infinity)'` and `'[1,NaN]'` (#462), not linked — `branch-reviewer`
+- #185 — `website/switching.md:94` (and `fr/…:98`): the range bullet sits after the `db.raw()` example, whose lead-in (`:64`) names a single refused call — `branch-reviewer`
+- #185 — `test/integration/core.test.ts:648`, `CHANGELOG.md:230`, `src/db/core.ts:67-69`: « bounds hold nothing » / « included » wording — `branch-reviewer`
+- #244 — `src/db/shortcuts.ts:267-275`: `UpdateValuesForTable` still gives a text column `ColumnNames<string> | ColumnValues<string>`, so `updateValues: { title: cols('title') }` type-checks and now always throws; the comment at `:270` no longer says a primitive `V` throws — `branch-reviewer`
+- #244 — `CHANGELOG.md:164`: « a string row » where the docs say « a non-empty string row »; `{ columns: '' }` unchanged, not in the « Unchanged » list — `branch-reviewer`
 - #271 — `test/unit/injection.test.ts:56-57`: `compiled` carries two stacked `/** */` blocks, the first one `matrix`'s (ESLint does not lint `test/`) — `branch-reviewer`
 - #204 — `CHANGELOG.md:67`: the line says the JSDoc of `run()` covers the 42601 refusal; it does not — `branch-reviewer`
 - #204 — `test/integration/core.test.ts:584`: « all run », but two `SELECT`s leave no trace and the test asserts only `undefined` — `branch-reviewer`
 - #204 — `website/playground.md:28` (and `fr/…`): « where `pg` sends it as a simple query » could link the new paragraph — `branch-reviewer`
 - #268 — `test/unit/transaction-pg7.test.ts:68`: `expect(pg7.state.reads).toBe(1)` cannot fail (the getter replaces itself) — `branch-reviewer`
 - #268 — `src/db/transaction.ts:59`: the comment leaves out a native client built from `pg/lib/native` while the getter is in place, classed by `_connected` — `branch-reviewer`
+- #274 — `website/sql-template.md:126` (and `fr/…:130`): « A text column stores as it is » right after a filter example; « passes where a column name does » reads as « wherever » — `branch-reviewer`
+- #274 — `test/types/core.test-d.ts:208-230`: no enum column and no `upsert()` slot for the structural `{ value }` case (skill `type-tests` § Structural wrappers) — `branch-reviewer`
+- #274 — `src/db/core.ts:137-140`: interpolated directly in `sql`, `${{ value: 3 }}` passes as a Whereable and compiles to `("value" = $1)` — `branch-reviewer`

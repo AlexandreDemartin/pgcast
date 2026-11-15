@@ -1680,6 +1680,31 @@ describe('a list that is not an array in isIn() and isNotIn()', () => {
   });
 });
 
+describe('cols and vals given a string', () => {
+  it('a hostile string in cols() or vals() throws, in a sql template and through the shortcuts, and none of it reaches the text', () => {
+    // 6.6.1 compiled the string's character indexes as names ("0", "1"…) and its characters as parameters,
+    // so none of it reached the text then either; it now throws while compiling (#244)
+    const
+      colsThrows = 'throws: `db.cols()` takes an object or an array, not `string`: for one column, write `db.cols([name])`; for a row of `insert()`, `upsert()` or `update()`, give an object.',
+      valsThrows = 'throws: `db.vals()` takes an object or an array, not `string`: for one value, write `db.vals([value])`; for a row of `insert()`, `upsert()` or `update()`, give an object.',
+      builds: Record<string, [(v: any) => db.SQLFragment<any, any>, string]> = {
+        cols: [v => sql`SELECT ${cols(v)} FROM ${'users'}`, colsThrows],
+        vals: [v => sql`SELECT ${'id'} FROM ${'users'} WHERE ${'display_name'} IN (${vals(v)})`, valsThrows],
+        insert: [v => db.insert('users', v), colsThrows],
+        upsert: [v => db.upsert('users', v, 'email'), colsThrows],
+        update: [v => db.update('users', v, { id: 1 }), colsThrows],
+        updateValuesCols: [v => db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { display_name: cols(v) } }), colsThrows],
+        updateValuesVals: [v => db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { display_name: vals(v) } }), valsThrows],
+        lateral: [v => db.select('users', all, { lateral: { n: sql`SELECT ${cols(v)}` } }), colsThrows],
+      };
+    const outcomes: string[] = [];
+    for (const [name, [build, expected]] of Object.entries(builds))
+      for (const [input, outcome] of Object.entries(matrix(build)))
+        if (outcome !== expected) outcomes.push(`${name} ${input}: ${outcome}`);
+    expect(outcomes).toEqual([]);
+  });
+});
+
 describe('param cast', () => {
   it('the cast type is one quoted identifier: `"` is doubled', () => {
     // as quote_ident: `a"b` gives `"a""b"`; without a `"`, `.` splits (`"a"."b"`); a type already

@@ -124,6 +124,8 @@ The last two rows apply when [`castArrayParamsToJson`](/runtime-config#Config.ca
 - Zapatos 6.6.1 dropped a string cast under either option for `CAST($1 AS "json")` ([#36](https://github.com/AlexandreDemartin/pgcast/issues/36)), so a cast that names another type than its target now applies: `param(arr, 'int4[]')` into a `json` column is refused (42804), into a `text` column stores `{1,2}` for `[1,2]`.
 - Without a cast, `castArrayParamsToJson` makes `` db.sql`${db.param(ids)}::int4[]` `` `CAST($1 AS "json")::int4[]`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${db.param([1])}::int4[]`) -->, which Postgres rejects (42846): write `db.param(ids, 'int4[]')`, or pass `false`, which keeps the value out of JSON under either option: `$1::int4[]`<!-- probe: db.sql`${db.param([1], false)}::int4[]` -->.
 - As a Whereable value or in `vals([…])` (so in [`isIn()`](/conditions#conditions.isIn)), a `Parameter` compiles as it is, with its cast: `{ title: db.param('x', 'text') }` gives `("title" = CAST($1 AS "text"))`<!-- probe: db.sql`${{ title: db.param('x', 'text') }}` -->. Zapatos 6.6.1 wrapped it in a second parameter, sent as JSON (`'{"value":"x","cast":"text"}'`).
+- The types check a `Parameter` by its shape, as in Zapatos 6.6.1, so an object with a `value` key of the column's type passes as one, and is sent as one parameter, as JSON. With [`castObjectParamsToJson`](/runtime-config#Config.castObjectParamsToJson) off, the default, `{ runtime_minutes: { value: 3 } }` gives `("runtime_minutes" = $1)`<!-- probe: db.sql`${{ runtime_minutes: { value: 3 } }}` --> with `'{"value":3}'`, which an `INTEGER` column refuses (22P02) and a text column stores as it is. Wrap a value with `param()`. An object with a `toPostgres()` method is sent through that method, as `pg` does. The same holds for a `ParentColumn`: in a filter, `{ value: 'title' }` passes where a column name does, and is sent as JSON, not as [`parent('title')`](#parent).
+- With `castObjectParamsToJson` on, the same filter gives `("runtime_minutes" = CAST($1 AS "json"))`<!-- probe: (db.setConfig({ castObjectParamsToJson: true }), db.sql`${{ runtime_minutes: { value: 3 } }}`) -->, which Postgres refuses (42883), and `update()` sets `ROW(CAST($1 AS "json"))`<!-- probe: (db.setConfig({ castObjectParamsToJson: true }), db.update('films', { runtime_minutes: { value: 3 } }, { id: 1 })) -->, which an `INTEGER` column refuses (42804). An object literal with its own `toPostgres()` method is then sent as `JSON.stringify()` writes it, not through the method; a class instance still is.
 
 ### `Parameter` {#Parameter}
 
@@ -221,6 +223,12 @@ With arrays, a `SELECT` of some columns and an `IN` list; `s.films.OnlyCols<…>
 
 As a filter value, and as a value in `vals({…})` (so in a write), `cols()` throws, as [`raw()`](#raw) does.
 
+A string or another primitive (a number, a boolean, `undefined`…) throws while compiling, so `run()` rejects before any query, `insert()`, `upsert()` and `update()` of a non-empty string row included:
+
+> `` `db.cols()` takes an object or an array, not `string`: for one column, write `db.cols([name])`; for a row of `insert()`, `upsert()` or `update()`, give an object. ``<!-- message -->
+
+The type takes it, as Zapatos 6.6.1's did, so that a generic helper (`<T>(row: T) => db.cols(row)`) still compiles. Zapatos 6.6.1 compiled a string's character indexes, `cols('title')` to `"0", "1", "2", "3", "4"`, and any other primitive to nothing.
+
 ### `ColumnNames` {#ColumnNames}
 
 ```ts
@@ -253,6 +261,7 @@ A comma-separated list of values. Each value compiles as follows.
   - `self` "`` `db.self` has no meaning as a value in a Whereable (a filter), nor in `isIn()`… ``<!-- message -->";
   - `raw()`, `cols()` and `vals()` as [`raw()`](#raw) says.
 - As a filter value itself, or a value in `vals({…})`, `vals()` throws, as [`raw()`](#raw) does.
+- A string or another primitive throws while compiling, as in [`cols()`](#cols): "`` `db.vals()` takes an object or an array, not `string`: for one value, write `db.vals([value])`; for a row of `insert()`, `upsert()` or `update()`, give an object. ``<!-- message -->". Zapatos 6.6.1 sent a string's characters, `vals('id')` as `$1, $2` with `'i'`, `'d'`: in an `IN` list, `vals('5')` found the rows equal to `'5'`, and now rejects, as [`isIn('5')`](/conditions#conditions.isIn) does.
 - `insert()`, `upsert()` and `update()` compile their values with `vals({…})`, outside a nested query: `parent()`, `raw()`, `cols()` and `vals()` throw there, before any query.
 - Zapatos 6.6.1 wrapped a `Parameter`, `Default` and `parent()` in a second parameter in an array: `'{"value":…}'`, `'Symbol(DEFAULT)'`, `'{"value":"id"}'`; and `parent()`, `raw()`, `cols()` and `vals()` in an object, which the writes stored on a text or `jsonb` column.
 

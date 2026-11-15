@@ -1,5 +1,5 @@
 ---
-english: af6c478cb4e3
+english: d411dc6703e7
 ---
 
 # Template SQL
@@ -128,6 +128,8 @@ Les deux dernières lignes s’appliquent quand [`castArrayParamsToJson`](/fr/ru
 - Zapatos 6.6.1 abandonnait un cast en chaîne sous l’une ou l’autre option au profit de `CAST($1 AS "json")` ([#36](https://github.com/AlexandreDemartin/pgcast/issues/36)), si bien qu’un cast qui nomme un autre type que sa cible s’applique désormais : `param(arr, 'int4[]')` vers une colonne `json` est refusé (42804), vers une colonne `text` stocke `{1,2}` pour `[1,2]`.
 - Sans cast, `castArrayParamsToJson` fait de `` db.sql`${db.param(ids)}::int4[]` `` `CAST($1 AS "json")::int4[]`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${db.param([1])}::int4[]`) -->, que Postgres rejette (42846) : écrivez `db.param(ids, 'int4[]')`, ou passez `false`, qui garde la valeur hors du JSON sous l’une ou l’autre option : `$1::int4[]`<!-- probe: db.sql`${db.param([1], false)}::int4[]` -->.
 - Comme valeur d’un Whereable ou dans `vals([…])` (donc dans [`isIn()`](/fr/conditions#conditions.isIn)), un `Parameter` se compile tel quel, avec son cast : `{ title: db.param('x', 'text') }` donne `("title" = CAST($1 AS "text"))`<!-- probe: db.sql`${{ title: db.param('x', 'text') }}` -->. Zapatos 6.6.1 l’enveloppait dans un second paramètre, envoyé en JSON (`'{"value":"x","cast":"text"}'`).
+- Les types reconnaissent un `Parameter` à sa forme, comme dans Zapatos 6.6.1 : un objet qui a une clé `value` du type de la colonne passe donc pour un `Parameter`, et part comme un seul paramètre, en JSON. Avec [`castObjectParamsToJson`](/fr/runtime-config#Config.castObjectParamsToJson) désactivé, la valeur par défaut, `{ runtime_minutes: { value: 3 } }` donne `("runtime_minutes" = $1)`<!-- probe: db.sql`${{ runtime_minutes: { value: 3 } }}` --> avec `'{"value":3}'`, qu’une colonne `INTEGER` refuse (22P02) et qu’une colonne texte stocke tel quel. Enveloppez une valeur dans `param()`. Un objet doté d’une méthode `toPostgres()` est envoyé par cette méthode, comme le fait `pg`. Il en va de même pour un `ParentColumn` : dans un filtre, `{ value: 'title' }` passe là où passe un nom de colonne, et part en JSON, pas comme [`parent('title')`](#parent).
+- Avec `castObjectParamsToJson` activé, le même filtre donne `("runtime_minutes" = CAST($1 AS "json"))`<!-- probe: (db.setConfig({ castObjectParamsToJson: true }), db.sql`${{ runtime_minutes: { value: 3 } }}`) -->, que Postgres refuse (42883), et `update()` affecte `ROW(CAST($1 AS "json"))`<!-- probe: (db.setConfig({ castObjectParamsToJson: true }), db.update('films', { runtime_minutes: { value: 3 } }, { id: 1 })) -->, qu’une colonne `INTEGER` refuse (42804). Un objet littéral doté de sa propre méthode `toPostgres()` part alors tel que `JSON.stringify()` l’écrit, sans passer par cette méthode ; une instance de classe, elle, y passe toujours.
 
 ### `Parameter` {#Parameter}
 
@@ -225,6 +227,12 @@ Avec des tableaux, un `SELECT` de quelques colonnes et une liste `IN` ; `s.film
 
 Comme valeur de filtre, et comme valeur dans `vals({…})` (donc dans une écriture), `cols()` lève une erreur, comme [`raw()`](#raw).
 
+Une chaîne ou une autre valeur primitive (un nombre, un booléen, `undefined`…) lève une erreur à la compilation, si bien que `run()` est rejetée avant toute requête, y compris pour `insert()`, `upsert()` et `update()` d’une ligne qui est une chaîne non vide :
+
+> `` `db.cols()` takes an object or an array, not `string`: for one column, write `db.cols([name])`; for a row of `insert()`, `upsert()` or `update()`, give an object. ``<!-- message -->
+
+Le type accepte une telle valeur, comme celui de Zapatos 6.6.1, pour qu’un helper générique (`<T>(row: T) => db.cols(row)`) compile toujours. Zapatos 6.6.1 compilait les indices des caractères d’une chaîne, `cols('title')` en `"0", "1", "2", "3", "4"`, et toute autre valeur primitive en rien.
+
 ### `ColumnNames` {#ColumnNames}
 
 ```ts
@@ -257,6 +265,7 @@ Une liste de valeurs séparées par des virgules. Chaque valeur se compile comme
   - `self` "`` `db.self` has no meaning as a value in a Whereable (a filter), nor in `isIn()`… ``<!-- message -->" ;
   - `raw()`, `cols()` et `vals()`, comme le dit [`raw()`](#raw).
 - Employé lui-même comme valeur de filtre, ou comme valeur dans `vals({…})`, `vals()` lève une erreur, comme [`raw()`](#raw).
+- Une chaîne ou une autre valeur primitive lève une erreur à la compilation, comme dans [`cols()`](#cols) : "`` `db.vals()` takes an object or an array, not `string`: for one value, write `db.vals([value])`; for a row of `insert()`, `upsert()` or `update()`, give an object. ``<!-- message -->". Zapatos 6.6.1 envoyait les caractères d’une chaîne, `vals('id')` en `$1, $2` avec `'i'`, `'d'` : dans une liste `IN`, `vals('5')` trouvait les lignes égales à `'5'`, un cas désormais rejeté, comme avec [`isIn('5')`](/fr/conditions#conditions.isIn).
 - `insert()`, `upsert()` et `update()` compilent leurs valeurs avec `vals({…})`, hors d’une requête imbriquée : `parent()`, `raw()`, `cols()` et `vals()` y lèvent une erreur, avant toute requête.
 - Zapatos 6.6.1 enveloppait un `Parameter`, `Default` et `parent()` dans un second paramètre au sein d’un tableau : `'{"value":…}'`, `'Symbol(DEFAULT)'`, `'{"value":"id"}'` ; et `parent()`, `raw()`, `cols()` et `vals()` au sein d’un objet, que les écritures stockaient sur une colonne texte ou `jsonb`.
 

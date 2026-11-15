@@ -64,9 +64,11 @@ export type Int8String = `${number}`;
 export type NumericString = `${number}`;
 
 /**
- * Generic range value represented as a string
+ * Generic range value represented as a string: a bracket, two bounds, a
+ * bracket, or `'empty'`, as Postgres writes an empty range (`'[5,5)'::int4range`
+ * included). See https://www.postgresql.org/docs/current/rangetypes.html#RANGETYPES-IO
  */
-export type RangeString<Bound extends string | number> = `${'[' | '('}${Bound},${Bound}${']' | ')'}`;
+export type RangeString<Bound extends string | number> = `${'[' | '('}${Bound},${Bound}${']' | ')'}` | 'empty';
 
 /**
  * `tsrange`, `tstzrange` or `daterange` value represented as a string. The
@@ -134,7 +136,12 @@ declare const wrapper: unique symbol;
 
 /**
  * Compiles to a numbered query parameter (`$1`, `$2`, etc) and adds the wrapped value
- * at the appropriate position of the values array passed to `pg`.
+ * at the appropriate position of the values array passed to `pg`. The type is
+ * checked by its shape: an object with a `value` key of the right type passes
+ * as one, and is sent as one parameter, as JSON (`'{"value":3}'`), cast to
+ * `"json"` under `castObjectParamsToJson`. A class instance with a
+ * `toPostgres()` method is sent through it; an object literal with one, only
+ * while `castObjectParamsToJson` is off. Wrap a value with `param()`.
  * @param x The value to be wrapped
  * @param cast Optional cast type. If a string, the parameter will be cast to
  * this type within the query e.g. `CAST($1 AS "type")` instead of plain `$1`.
@@ -238,7 +245,9 @@ export class ColumnNames<T> { declare readonly [wrapper]: 'cols'; constructor(pu
  * use in a `SELECT` query) or object keys (for use in an `INSERT`, `UDPATE` or
  * `UPSERT` query alongside a `ColumnValues`). As a filter value and in
  * `vals({…})`, so as a write value, it throws, and the type refuses it, as for
- * `raw()`; Zapatos 6.6.1 sent it as JSON.
+ * `raw()`; Zapatos 6.6.1 sent it as JSON. A string or another primitive throws
+ * while compiling; Zapatos 6.6.1 compiled a string's character indexes,
+ * `cols('id')` to `"0", "1"`.
  */
 export function cols<T>(x: T) { return new ColumnNames<T>(x); }
 
@@ -262,7 +271,8 @@ export class ColumnValues<T> { declare readonly [wrapper]: 'vals'; constructor(p
  * `raw()`, `cols()` and `vals()` throw in an object, and in an array in a
  * filter, as `Default` does; in an array outside one they are still sent as
  * JSON. As a filter value `vals(x)` throws, and the type refuses it as a
- * value, as for `raw()`.
+ * value, as for `raw()`. A string or another primitive throws while compiling;
+ * Zapatos 6.6.1 sent a string's characters, `vals('id')` as `$1, $2`.
  */
 export function vals<T>(x: T) { return new ColumnValues<T>(x); }
 
@@ -392,6 +402,13 @@ const builtinName = (x: object): string => isIterator(x) ? Object.prototype.toSt
 // raw(), cols() and vals() as a filter value, or in vals({…}) (so as a write value): Zapatos 6.6.1 sent them as JSON;
 // compiling raw() there as SQL would turn a caller's raw(input), a parameter until now, into an injection, so they throw
 const isWrapper = (x: unknown) => x instanceof DangerousRawString || x instanceof ColumnNames || x instanceof ColumnValues;
+
+// cols() and vals() of a primitive: Zapatos 6.6.1 compiled the object it boxes to, a string to its character indexes
+// as names ("0", "1") or its characters as values, any other primitive to nothing; null still reaches Object.keys
+const isNotObject = (x: unknown) => typeof x !== 'object' && typeof x !== 'function';
+const notAnObject = (fn: 'cols' | 'vals', x: unknown) => fn === 'cols' ?
+  `\`db.cols()\` takes an object or an array, not \`${typeof x}\`: for one column, write \`db.cols([name])\`; for a row of \`insert()\`, \`upsert()\` or \`update()\`, give an object.` :
+  `\`db.vals()\` takes an object or an array, not \`${typeof x}\`: for one value, write \`db.vals([value])\`; for a row of \`insert()\`, \`upsert()\` or \`update()\`, give an object.`;
 
 export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never> {
   protected constraint?: Constraint;
@@ -610,6 +627,7 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
     } else if (expression instanceof ColumnNames) {
       // a ColumnNames-wrapped object -> quoted names in a repeatable order
       // OR a ColumnNames-wrapped array -> quoted array values
+      if (isNotObject(expression.value)) throw new Error(notAnObject('cols', expression.value));
       const columnNames = Array.isArray(expression.value) ? expression.value :
         Object.keys(expression.value).sort();
 
@@ -621,6 +639,7 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
     } else if (expression instanceof ColumnValues) {
       // a ColumnValues-wrapped object OR array
       // -> values (in ColumnNames-matching order, if applicable) punted as SQLFragments or Parameters
+      if (isNotObject(expression.value)) throw new Error(notAnObject('vals', expression.value));
 
       if (Array.isArray(expression.value)) {
         const values: any[] = expression.value;

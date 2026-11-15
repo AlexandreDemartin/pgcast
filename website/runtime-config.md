@@ -508,10 +508,10 @@ db.enableCustomJSONParsingForLargeNumbers(pg);
 ### `RangeString` {#RangeString}
 
 ```ts
-type RangeString<Bound extends string | number> = `${'[' | '('}${Bound},${Bound}${']' | ')'}`
+type RangeString<Bound extends string | number> = `${'[' | '('}${Bound},${Bound}${']' | ')'}` | 'empty'
 ```
 
-A range as Postgres writes it: a bracket, two bounds, a bracket. It does not cover an empty range, which Postgres writes `empty`: `to_jsonb('empty'::int4range)` is `"empty"`, and `const r: db.NumberRangeString = 'empty'` does not compile (TS2322, [#185](https://github.com/AlexandreDemartin/pgcast/issues/185)).
+A range as Postgres writes it: a bracket, two bounds, a bracket, or `'empty'` for an empty range. A range whose bounds enclose no value is empty too: `'[5,5)'::int4range` comes back as `'empty'`. Postgres also reads `'EMPTY'` and spaces around it, but writes only `'empty'`, so the type takes only that. Zapatos 6.6.1 left `'empty'` out.
 
 ### `NumberRangeString` {#NumberRangeString}
 
