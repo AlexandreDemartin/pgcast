@@ -1023,6 +1023,47 @@ describe('cols and vals given a string', () => {
   });
 });
 
+describe('null and primitive rows, null lateral queries', () => {
+  it('a hostile string among rows, a hostile lateral key with a null query, and null rows reject run() before any query', async () => {
+    // 6.6.1 sent the string's characters as columns "0", "1"… (42703) and threw a TypeError at the call on the
+    // others; each now rejects while compiling (#341)
+    const
+      input = `x'); ${update}; --`,
+      row = { email: 'Ada@Example.com', display_name: 'A' },
+      outcomes: Record<string, string> = {},
+      query = vi.spyOn(t.client, 'query');
+    try {
+      const builds: Record<string, () => db.SQLFragment<any, any>> = {
+        insertRows: () => db.insert('users', [row, input as any]),
+        upsertRows: () => db.upsert('users', [input as any, row], 'email'),
+        lateralKey: () => db.select('users', all, { lateral: { [input]: null as any } }),
+        lateralNull: () => db.select('users', all, { lateral: null as any }),
+        insertNull: () => db.insert('users', null as any),
+        upsertNull: () => db.upsert('users', null as any, 'email'),
+        updateNull: () => db.update('users', null as any, { id: 1 }),
+      };
+      for (const [name, build] of Object.entries(builds)) {
+        try {
+          outcomes[name] = await build().run(t.client).then(
+            () => 'ran',
+            (err: { code?: string, message: string }) =>
+              /^(`db\.(cols|vals)\(\)` takes an object or an array, not `(string|null)`|`lateral: null` has no meaning|The `lateral` key )/.test(err.message) ? 'rejects' : err.code ?? err.message);
+        } catch (err) {
+          outcomes[name] = `throws at the call: ${(err as Error).message}`;
+        }
+      }
+      outcomes.queried = String(query.mock.calls.length);
+    } finally {
+      query.mockRestore();
+    }
+    expect(outcomes).toEqual({
+      insertRows: 'rejects', upsertRows: 'rejects', lateralKey: 'rejects', lateralNull: 'rejects',
+      insertNull: 'rejects', upsertNull: 'rejects', updateNull: 'rejects', queried: '0',
+    });
+    expect(await adaName()).toBe('Ada');
+  });
+});
+
 describe('transaction', () => {
   it('the isolation level is checked before a client is checked out', async () => {
     // the pool would commit: connect() is stubbed, so a regression runs nothing either

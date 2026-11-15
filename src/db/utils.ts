@@ -82,10 +82,18 @@ export const mapWithSeparator = <TIn, TSep, TOut>(
  * @param defaultValue The default value to assign to missing keys for each object
  */
 export const completeKeysWithDefaultValue = <T extends object>(objs: T[], defaultValue: any): T[] => {
-  const unionKeys = Object.assign({}, ...objs);
+  // a primitive is left as it is, for cols() or vals() to refuse as the query compiles: spread, a string gave its
+  // character indexes as keys, a number none; null and undefined are read as {}, as in Zapatos 6.6.1
+  const unionKeys = Object.assign({}, ...objs.filter(o => !isPrimitive(o)));
   for (const k in unionKeys) unionKeys[k] = defaultValue;
-  return objs.map(o => ({ ...unionKeys, ...o }));
+  return objs.map(o => isPrimitive(o) ? o : ({ ...unionKeys, ...o }));
 };
+
+/**
+ * Test that a value is a primitive other than `null` and `undefined` (a string, a number…), which is no row
+ * @param x The value to test
+ */
+export const isPrimitive = (x: unknown) => x != null && typeof x !== 'object' && typeof x !== 'function';
 
 /**
  * Test that a value is a Plain Old JavaScript Object (such as one created by an object 
