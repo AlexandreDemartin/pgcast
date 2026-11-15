@@ -1,5 +1,5 @@
 ---
-english: ba462e5de8d5
+english: 7d8686ed5fa9
 ---
 
 # Template SQL
@@ -224,6 +224,12 @@ Avec des tableaux, un `SELECT` de quelques colonnes et une liste `IN` ; `s.film
 
 Comme valeur de filtre, et comme valeur dans `vals({…})` (donc dans une écriture), `cols()` lève une erreur, comme [`raw()`](#raw).
 
+Une chaîne ou une autre valeur primitive (un nombre, un booléen, `undefined`…) lève une erreur à la compilation, si bien que `run()` est rejetée avant toute requête, y compris pour `insert()`, `upsert()` et `update()` d’une telle ligne :
+
+> `` `db.cols()` takes an object or an array, not `string`: for one column, write `db.cols([name])`; for a row of `insert()`, `upsert()` or `update()`, give an object. ``<!-- message -->
+
+Le type accepte une telle valeur, comme celui de Zapatos 6.6.1, pour qu’un helper générique (`<T>(row: T) => db.cols(row)`) compile toujours. Zapatos 6.6.1 compilait les indices des caractères d’une chaîne, `cols('title')` en `"0", "1", "2", "3", "4"`, et toute autre valeur primitive en rien.
+
 ### `ColumnNames` {#ColumnNames}
 
 ```ts
@@ -256,6 +262,7 @@ Une liste de valeurs séparées par des virgules. Chaque valeur se compile comme
   - `self` "`` `db.self` has no meaning as a value in a Whereable (a filter), nor in `isIn()`… ``<!-- message -->" ;
   - `raw()`, `cols()` et `vals()`, comme le dit [`raw()`](#raw).
 - Employé lui-même comme valeur de filtre, ou comme valeur dans `vals({…})`, `vals()` lève une erreur, comme [`raw()`](#raw).
+- Une chaîne ou une autre valeur primitive lève une erreur à la compilation, comme dans [`cols()`](#cols) : "`` `db.vals()` takes an object or an array, not `string`: for one value, write `db.vals([value])`; for a row of `insert()`, `upsert()` or `update()`, give an object. ``<!-- message -->". Zapatos 6.6.1 envoyait les caractères d’une chaîne, `vals('id')` en `$1, $2` avec `'i'`, `'d'` : dans une liste `IN`, `vals('5')` trouvait les lignes égales à `'5'`, un cas désormais rejeté, comme avec [`isIn('5')`](/fr/conditions#conditions.isIn).
 - `insert()`, `upsert()` et `update()` compilent leurs valeurs avec `vals({…})`, hors d’une requête imbriquée : `parent()`, `raw()`, `cols()` et `vals()` y lèvent une erreur, avant toute requête.
 - Zapatos 6.6.1 enveloppait un `Parameter`, `Default` et `parent()` dans un second paramètre au sein d’un tableau : `'{"value":…}'`, `'Symbol(DEFAULT)'`, `'{"value":"id"}'` ; et `parent()`, `raw()`, `cols()` et `vals()` au sein d’un objet, que les écritures stockaient sur une colonne texte ou `jsonb`.
 
