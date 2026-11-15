@@ -40,11 +40,17 @@ const conditionalParam = (a: any) =>
 
 export const isNull = sql<SQL, boolean>`${self} IS NULL`;
 export const isNotNull = sql<SQL, boolean>`${self} IS NOT NULL`;
+/** `"col" IS TRUE`, for a `boolean` or a domain over one: on another type, Postgres refuses it (42804), which the type lets through. */
 export const isTrue = sql<SQL, boolean>`${self} IS TRUE`;
+/** `"col" IS NOT TRUE`, for a `boolean` or a domain over one: on another type, Postgres refuses it (42804), which the type lets through. */
 export const isNotTrue = sql<SQL, boolean>`${self} IS NOT TRUE`;
+/** `"col" IS FALSE`, for a `boolean` or a domain over one: on another type, Postgres refuses it (42804), which the type lets through. */
 export const isFalse = sql<SQL, boolean>`${self} IS FALSE`;
+/** `"col" IS NOT FALSE`, for a `boolean` or a domain over one: on another type, Postgres refuses it (42804), which the type lets through. */
 export const isNotFalse = sql<SQL, boolean>`${self} IS NOT FALSE`;
+/** `"col" IS UNKNOWN`, for a `boolean` or a domain over one: on another type, Postgres refuses it (42804), which the type lets through. */
 export const isUnknown = sql<SQL, boolean>`${self} IS UNKNOWN`;
+/** `"col" IS NOT UNKNOWN`, for a `boolean` or a domain over one: on another type, Postgres refuses it (42804), which the type lets through. */
 export const isNotUnknown = sql<SQL, boolean>`${self} IS NOT UNKNOWN`;
 
 /**
@@ -138,13 +144,26 @@ export const arrayOverlaps = <T>(a: T[] | ParentColumn) => sql<SQL, boolean | nu
 // things that aren't genuinely conditions
 type PluralisingIntervalUnit = 'microsecond' | 'millisecond' | 'second' | 'minute' | 'hour' | 'day' | 'week' | 'month' | 'year' | 'decade';
 type IntervalUnit = PluralisingIntervalUnit | `${PluralisingIntervalUnit}s` | 'century' | 'centuries' | 'millennium' | 'millennia';
+/** `now() + $1`, `$1` being `` `${n} ${unit}` ``, an interval: a value, as `now`. */
 export const fromNow = (n: number, unit: IntervalUnit = 'millisecond') => sql`now() + ${param(String(n) + ' ' + unit)}`;
 export const after = gt;
 export const before = lt;
+/**
+ * `now()`: a value, not a test, to compare with (`after(now)`) or to set a column to. Alone as a `where` value,
+ * Postgres refuses it (42804), which the type lets through: in a `SELECT` list, the same Whereable runs.
+ */
 export const now = sql`now()`;
 
 // these are really more operations than conditions, but we sneak them in here for now, for use e.g. in UPDATE queries
-/** `"col" + $1`, of a number or a `Date`. To add days to a date: `` sql`${self} + ${param(3, 'int4')}` ``. */
+/**
+ * `"col" + $1`, of a number. A `Date` type-checks on a `date`, `timestamp` or `timestamptz` column, and Postgres refuses
+ * it: 42725 on a `date`; on the other two, 42804 in a `where`, 22007 elsewhere. To add days to a date:
+ * `` sql`${self} + ${param(3, 'int4')}` ``; a day to a timestamp: `` sql`${self} + ${param('1 day', 'interval')}` ``.
+ */
 export const add = <T extends number | Date>(a: T) => sql<SQL, number, T>`${self} + ${conditionalParam(a)}`;
-/** `"col" - $1`, of a number or a `Date`. To subtract days from a date: `` sql`${self} - ${param(3, 'int4')}` ``. */
+/**
+ * `"col" - $1`, of a number. Of a `Date`, it gives days on a `date`, an interval on a `timestamp` or `timestamptz`:
+ * Postgres refuses it as an `update()` value (42804), and runs it nested in a `sql` fragment or in a `SELECT` list.
+ * To subtract days from a date: `` sql`${self} - ${param(3, 'int4')}` ``.
+ */
 export const subtract = <T extends number | Date>(a: T) => sql<SQL, number, T>`${self} - ${conditionalParam(a)}`;
