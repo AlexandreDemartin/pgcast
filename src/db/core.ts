@@ -451,8 +451,10 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
   /**
    * Compile and run this query using the provided database connection. What's
    * returned is piped via `runResultTransform` before being returned.
-   * A text of several statements, with no values and not prepared, runs them all,
-   * and the default `runResultTransform` gives `undefined`: `pg` returns an array of results.
+   * A text of several statements, with no values and not prepared, runs as one transaction
+   * unless it holds its own `BEGIN` or `COMMIT`, and Postgres refuses it whole if one of them
+   * cannot run in a transaction block (`VACUUM`, `CREATE INDEX CONCURRENTLY`: 25001). When it
+   * runs, the default `runResultTransform` gives `undefined`: `pg` returns an array of results.
    * @param queryable A database client or pool
    * @param force If true, force this query to hit the DB even if it's marked as a no-op
    */
