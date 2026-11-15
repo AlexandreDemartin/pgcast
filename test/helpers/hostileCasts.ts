@@ -52,6 +52,24 @@ export const hostileCasts = {
   prequotedDot: '"pg_catalog.int4"',
 };
 
+// the casts above whose name, without a `"` and its array bounds, is empty or has an empty part on `.`:
+// each throws while compiling, as Postgres refuses `""` (#271); hostileEmptyCasts adds payloads to them
+export const emptyCastNames = ['empty', 'leadingDot', 'dottedEmpty', 'arrayOnly'];
+
+export const hostileEmptyCasts = {
+  emptySemicolon: `.; ${read}; --`,
+  emptyAfterSemicolon: `int4; ${read}; --.`,
+  emptySquote: `.int4' || ${read} || '`,
+  emptyDollar: '$1.',
+  emptyComment: '/*.',
+  emptyDashes: '--..int4',
+  emptyBackslash: '\\.',
+  emptyNul: 'a.\0.',
+  emptyDots: '..',
+  emptyArray: '.int4[]',
+  emptyBounds: 'pg_catalog.[3]',
+};
+
 // casts that end with array bounds; on a scalar such as '1', each is a missing type, a syntax error or 22P02
 export const hostileArrayCasts = {
   array: 'int4[]',

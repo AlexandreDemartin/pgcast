@@ -15,7 +15,7 @@ import { sql, param, cols, vals, all } from '../../src/db';
 import { builtinObjects } from '../helpers/builtinObjects';
 import { nonArrayLists } from '../helpers/nonArrayLists';
 import { resetConfig } from '../helpers/config';
-import { hostileArrayCasts, hostileCasts } from '../helpers/hostileCasts';
+import { emptyCastNames, hostileArrayCasts, hostileCasts, hostileEmptyCasts } from '../helpers/hostileCasts';
 
 const hostile = {
   dquote: 'a"b',
@@ -54,6 +54,15 @@ const visible = (text: string) =>
   text.replace(/\0/g, '<NUL>').replace(/\r/g, '<CR>').replace(/\f/g, '<FF>').replace(/\v/g, '<VT>');
 
 /** The compiled text for each hostile input, or the error thrown; NUL, CR, FF and VT are shown as <NUL>, <CR>, <FF>, <VT>. */
+/** What compiling the fragment `build` returns gives: its `text` and `values`, or `throws: <message>`. */
+const compiled = (build: () => db.SQLFragment<any, any>) => {
+  try { return build().compile(); } catch (err) { return `throws: ${(err as Error).message}`; }
+};
+
+/** The error of a cast that leaves a part of its type name empty (#271). */
+const emptyName = (cast: string, type: string) =>
+  `throws: param() cast '${cast}' gives an empty name, ${type}, which Postgres refuses: name each part of the type, as in 'int4' or 'public.mood', or leave the cast out`;
+
 const matrix = (build: (input: any) => db.SQLFragment<any, any>, inputs: Record<string, string> = hostile) =>
   Object.fromEntries(Object.entries(inputs).map(([name, input]) => {
     try {
@@ -378,8 +387,19 @@ describe('raw, cols and vals as a write value', () => {
 
 describe('a Parameter in a Whereable or in vals of an array', () => {
   it('its cast compiles as in sql`${param(x, cast)}`, in a Whereable, isIn and vals', () => {
-    for (const cast of [...Object.values(hostile), ...Object.values(hostileCasts), ...Object.values(hostileArrayCasts)]) {
-      const alone = sql`${param(1, cast)}`.compile().text;
+    const casts = [...Object.values(hostile), ...Object.values(hostileCasts), ...Object.values(hostileArrayCasts), ...Object.values(hostileEmptyCasts)];
+    for (const cast of casts) {
+      const compiledAlone = compiled(() => sql`${param(1, cast)}`);
+      if (typeof compiledAlone === 'string') {
+        // a cast that leaves a part of its name empty throws the same error in each place
+        expect([
+          compiled(() => sql`${{ display_name: param(1, cast) }}`),
+          compiled(() => sql`${{ display_name: db.conditions.isIn([param(1, cast)]) }}`),
+          compiled(() => sql`${vals([param(1, cast), 2])}`),
+        ]).toEqual([compiledAlone, compiledAlone, compiledAlone]);
+        continue;
+      }
+      const alone = compiledAlone.text;
       expect(sql`${{ display_name: param(1, cast) }}`.compile()).toEqual({ text: `("display_name" = ${alone})`, values: [1] });
       expect(sql`${{ display_name: db.conditions.isIn([param(1, cast)]) }}`.compile())
         .toEqual({ text: `(("display_name" IN (${alone})))`, values: [1] });
@@ -1740,17 +1760,17 @@ describe('param cast', () => {
         "dottedComment": "SELECT CAST($1 AS "pg_catalog/*"."*/int4")",
         "dottedDashes": "SELECT CAST($1 AS "pg_catalog--"."int4")",
         "dottedDollar": "SELECT CAST($1 AS "$1"."int4")",
-        "dottedEmpty": "SELECT CAST($1 AS "pg_catalog".""."int4")",
+        "dottedEmpty": "throws: param() cast 'pg_catalog..int4' gives an empty name, "pg_catalog".""."int4", which Postgres refuses: name each part of the type, as in 'int4' or 'public.mood', or leave the cast out",
         "dottedNul": "SELECT CAST($1 AS "pg_catalog"."in<NUL>t4")",
         "dottedPrequoted": "SELECT CAST($1 AS "pg_catalog"."int4")",
         "dottedSemicolon": "SELECT CAST($1 AS "int4; (SELECT display_name FROM users WHERE id = 1); --"."int4")",
         "dottedSquote": "SELECT CAST($1 AS "pg_catalog"."int4' || (SELECT display_name FROM users WHERE id = 1) || '")",
         "dquote": "SELECT CAST($1 AS "a""b")",
-        "empty": "SELECT CAST($1 AS "")",
+        "empty": "throws: param() cast '' gives an empty name, "", which Postgres refuses: name each part of the type, as in 'int4' or 'public.mood', or leave the cast out",
         "emptyLast": "SELECT CAST($1 AS "pg_catalog"".""")",
         "emptyPart": "SELECT CAST($1 AS "pg_catalog""..""int4")",
         "escaped": "SELECT CAST($1 AS "int4""")",
-        "leadingDot": "SELECT CAST($1 AS ""."int4")",
+        "leadingDot": "throws: param() cast '.int4' gives an empty name, ""."int4", which Postgres refuses: name each part of the type, as in 'int4' or 'public.mood', or leave the cast out",
         "lineCommentBetween": "SELECT CAST($1 AS "pg_catalog""--
       .""int4")",
         "lone": "SELECT CAST($1 AS """")",
@@ -1790,7 +1810,7 @@ describe('param cast', () => {
       arrayDotted: 'SELECT CAST($1 AS "pg_catalog"."int4"[])',
       arrayQualified: 'SELECT CAST($1 AS "pg_catalog"."int4"[])',
       arrayPrequoted: 'SELECT CAST($1 AS "pg_catalog"."int4"[])',
-      arrayOnly: 'SELECT CAST($1 AS ""[])',
+      arrayOnly: emptyName('[]', '""[]'),
       arrayAfterQuote: 'SELECT CAST($1 AS "int4"""[])',
       arrayCloses: 'SELECT CAST($1 AS "int4"") || (SELECT display_name FROM users WHERE id = 1) || (""int4"[])',
       arrayInside: 'SELECT CAST($1 AS "int4[1]) || (SELECT display_name FROM users WHERE id = 1) || CAST(1 AS int4"[])',
@@ -1805,10 +1825,32 @@ describe('param cast', () => {
     });
   });
 
-  it('every cast compiles to quoted identifiers joined by `.`, then array bounds, and nothing else', () => {
-    const castType = /^CAST\(\$1 AS "(?:[^"]|"")*"(?:[ \t\n\r\f\v]*\.[ \t\n\r\f\v]*"(?:[^"]|"")*")*(?:\[[0-9]*\])*\)$/;
-    for (const cast of [...Object.values(hostile), ...Object.values(hostileCasts), ...Object.values(hostileArrayCasts)])
-      expect(sql`${param(1, cast)}`.compile().text).toMatch(castType);
+  it('every cast compiles to non-empty quoted identifiers joined by `.`, then array bounds, and nothing else', () => {
+    // or throws, when its name leaves a part empty: Postgres refuses `""` (#271)
+    const castType = /^CAST\(\$1 AS "(?:[^"]|"")+"(?:[ \t\n\r\f\v]*\.[ \t\n\r\f\v]*"(?:[^"]|"")+")*(?:\[[0-9]*\])*\)$/;
+    const thrown: string[] = [];
+    for (const [name, cast] of Object.entries({ ...hostile, ...hostileCasts, ...hostileArrayCasts })) {
+      const q = compiled(() => sql`${param(1, cast)}`);
+      if (typeof q === 'string') thrown.push(name);
+      else expect(q.text).toMatch(castType);
+    }
+    expect(thrown.sort()).toEqual([...emptyCastNames].sort());
+  });
+
+  it('a cast that leaves a part of its name empty throws, whatever it holds besides', () => {
+    expect(matrix(v => sql`SELECT ${param(1, v)}`, hostileEmptyCasts)).toEqual({
+      emptySemicolon: emptyName('.; (SELECT display_name FROM users WHERE id = 1); --', '""."; (SELECT display_name FROM users WHERE id = 1); --"'),
+      emptyAfterSemicolon: emptyName('int4; (SELECT display_name FROM users WHERE id = 1); --.', '"int4; (SELECT display_name FROM users WHERE id = 1); --".""'),
+      emptySquote: emptyName(".int4' || (SELECT display_name FROM users WHERE id = 1) || '", `""."int4' || (SELECT display_name FROM users WHERE id = 1) || '"`),
+      emptyDollar: emptyName('$1.', '"$1".""'),
+      emptyComment: emptyName('/*.', '"/*".""'),
+      emptyDashes: emptyName('--..int4', '"--".""."int4"'),
+      emptyBackslash: emptyName('\\.', '"\\".""'),
+      emptyNul: emptyName('a.<NUL>.', '"a"."<NUL>".""'),
+      emptyDots: emptyName('..', '""."".""'),
+      emptyArray: emptyName('.int4[]', '""."int4"[]'),
+      emptyBounds: emptyName('pg_catalog.[3]', '"pg_catalog".""[3]'),
+    });
   });
 
   it('a cast check stays fast on long runs of brackets, digits and dots', () => {
@@ -1817,9 +1859,9 @@ describe('param cast', () => {
       text = (cast: string) => sql`${param(1, cast)}`.compile().text,
       pairs = '[]'.repeat(n),
       digits = `[${'1'.repeat(n)}`;
-    // all bounds, after an empty type name (which Postgres refuses)
-    expect(text(pairs)).toBe(`CAST($1 AS ""${pairs})`);
-    expect(text(`${digits}]`)).toBe(`CAST($1 AS ""${digits}])`);
+    // all bounds, after an empty type name, which Postgres refuses: it throws, naming them
+    expect(compiled(() => sql`${param(1, pairs)}`)).toBe(emptyName(pairs, `""${pairs}`));
+    expect(compiled(() => sql`${param(1, `${digits}]`)}`)).toBe(emptyName(`${digits}]`, `""${digits}]`));
     // bounds followed by anything else stay in the type name
     expect(text(`${pairs}x`)).toBe(`CAST($1 AS "${pairs}x")`);
     expect(text(`${digits}x]`)).toBe(`CAST($1 AS "${digits}x]")`);
@@ -1828,42 +1870,61 @@ describe('param cast', () => {
     expect(text('[x]'.repeat(n))).toBe(`CAST($1 AS "${'[x]'.repeat(n)}")`);
     // only the last bounds are bounds when a name comes between
     expect(text('a[1]'.repeat(n))).toBe(`CAST($1 AS "${'a[1]'.repeat(n - 1)}a"[1])`);
-    expect(text('.'.repeat(n))).toBe(`CAST($1 AS "${'"."'.repeat(n)}")`);
+    // an empty part anywhere throws, found in one pass; a part on each side of every `.` compiles
+    expect(compiled(() => sql`${param(1, '.'.repeat(n))}`)).toBe(emptyName('.'.repeat(n), `"${'"."'.repeat(n)}"`));
+    expect(compiled(() => sql`${param(1, 'a.'.repeat(n))}`)).toBe(emptyName('a.'.repeat(n), `"${'a"."'.repeat(n)}"`));
+    expect(text(`${'a.'.repeat(n)}b`)).toBe(`CAST($1 AS "${'a"."'.repeat(n)}b")`);
   });
 });
 
 describe('param cast under castArrayParamsToJson and castObjectParamsToJson', () => {
   afterEach(resetConfig);
-  const allCasts = [...Object.values(hostile), ...Object.values(hostileCasts), ...Object.values(hostileArrayCasts)];
+  const allCasts = [...Object.values(hostile), ...Object.values(hostileCasts), ...Object.values(hostileArrayCasts), ...Object.values(hostileEmptyCasts)];
+  const textOf = (q: ReturnType<typeof compiled>) => typeof q === 'string' ? q : q.text;
 
   it('every cast compiles as with the config off, on an array and on a plain object', () => {
-    // 6.6.1 dropped the cast for CAST($1 AS "json"); the type is now the one written, with the rules above
-    const off = allCasts.map(cast => sql`${param(1, cast)}`.compile().text);
+    // 6.6.1 dropped the cast for CAST($1 AS "json"); the type is now the one written, with the rules above.
+    // A cast that leaves a part of its name empty throws as with the config off: 6.6.1 sent JSON there
+    const off = allCasts.map(cast => textOf(compiled(() => sql`${param(1, cast)}`)));
     db.setConfig({ castArrayParamsToJson: true, castObjectParamsToJson: true });
     allCasts.forEach((cast, i) => {
-      expect(sql`${param([1, 2], cast)}`.compile().text).toBe(off[i]);
-      expect(sql`${param({ a: 1 }, cast)}`.compile()).toEqual({ text: off[i], values: ['{"a":1}'] });
+      expect(textOf(compiled(() => sql`${param([1, 2], cast)}`))).toBe(off[i]);
+      expect(compiled(() => sql`${param({ a: 1 }, cast)}`))
+        .toEqual(off[i]!.startsWith('throws: ') ? off[i] : { text: off[i], values: ['{"a":1}'] });
     });
   });
 
   it('an array goes as an array only when its cast ends with array bounds, otherwise as JSON', () => {
     db.setConfig({ castArrayParamsToJson: true });
-    const sent = (inputs: Record<string, string>) => Object.fromEntries(Object.entries(inputs).map(([name, cast]) =>
-      [name, sql`${param([1, 2], cast)}`.compile().values[0]]));
+    const sent = (inputs: Record<string, string>) => Object.fromEntries(Object.entries(inputs).map(([name, cast]) => {
+      const q = compiled(() => sql`${param([1, 2], cast)}`);
+      return [name, typeof q === 'string' ? q : q.values[0]];
+    }));
     expect(sent(hostileArrayCasts)).toEqual({
       array: [1, 2], arrayBounds: [1, 2], arrayDotted: [1, 2], arrayQualified: [1, 2], arrayPrequoted: [1, 2],
-      arrayOnly: [1, 2], arrayAfterQuote: [1, 2], arrayCloses: [1, 2], arrayInside: [1, 2], arraySplice: [1, 2],
+      arrayOnly: emptyName('[]', '""[]'), arrayAfterQuote: [1, 2], arrayCloses: [1, 2], arrayInside: [1, 2], arraySplice: [1, 2],
       arraySemicolon: [1, 2], arrayBackslash: [1, 2],
       // not bounds, so part of the type name: the config's JSON stays
       arraySpace: '[1,2]', arrayNegative: '[1,2]', arrayUnclosed: '[1,2]', arrayNested: '[1,2]', arrayNul: '[1,2]',
     });
-    for (const sentValue of Object.values(sent({ ...hostile, ...hostileCasts }))) expect(sentValue).toBe('[1,2]');
+    for (const [name, sentValue] of Object.entries(sent({ ...hostile, ...hostileCasts })))
+      if (emptyCastNames.includes(name)) expect(sentValue).toMatch(/^throws: param\(\) cast /);
+      else expect(sentValue).toBe('[1,2]');
   });
 
   it('every cast compiles the same in a Whereable, isIn and vals, its value sent as alone', () => {
     db.setConfig({ castArrayParamsToJson: true, castObjectParamsToJson: true });
     for (const cast of allCasts) for (const value of [[1, 2], { a: 1 }]) {
-      const { text: alone, values } = sql`${param(value, cast)}`.compile();
+      const compiledAlone = compiled(() => sql`${param(value, cast)}`);
+      if (typeof compiledAlone === 'string') {
+        expect([
+          compiled(() => sql`${{ display_name: param(value, cast) }}`),
+          compiled(() => sql`${{ display_name: db.conditions.isIn([param(value, cast)]) }}`),
+          compiled(() => sql`${vals([param(value, cast), 2])}`),
+        ]).toEqual([compiledAlone, compiledAlone, compiledAlone]);
+        continue;
+      }
+      const { text: alone, values } = compiledAlone;
       expect(sql`${{ display_name: param(value, cast) }}`.compile()).toEqual({ text: `("display_name" = ${alone})`, values });
       expect(sql`${{ display_name: db.conditions.isIn([param(value, cast)]) }}`.compile())
         .toEqual({ text: `(("display_name" IN (${alone})))`, values });

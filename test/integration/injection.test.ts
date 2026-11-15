@@ -18,7 +18,7 @@ import { resetConfig } from '../helpers/config';
 import { useTestDatabase } from '../helpers/db';
 import { builtinObjects } from '../helpers/builtinObjects';
 import { nonArrayLists } from '../helpers/nonArrayLists';
-import { hostileArrayCasts, hostileCasts } from '../helpers/hostileCasts';
+import { emptyCastNames, hostileArrayCasts, hostileCasts, hostileEmptyCasts } from '../helpers/hostileCasts';
 import { pgError } from '../helpers/pgError';
 
 const t = useTestDatabase();
@@ -56,7 +56,7 @@ const identifierOutcomes = async (
   return outcomes;
 };
 
-/** What `SELECT CAST(<value> AS <cast>)` gives for each cast: its rows, its error code, or 'injected'. */
+/** What `SELECT CAST(<value> AS <cast>)` gives for each cast: its rows, its error code, 'injected', or 'throws' for an error without a code. */
 const castOutcomes = async (casts: Record<string, string>, value: unknown = '1') => {
   const outcomes: Record<string, unknown> = {};
   for (const [name, cast] of Object.entries(casts)) {
@@ -68,7 +68,7 @@ const castOutcomes = async (casts: Record<string, string>, value: unknown = '1')
       await t.client.query('RELEASE SAVEPOINT pgcast_cast');
     } catch (err) {
       await t.client.query('ROLLBACK TO SAVEPOINT pgcast_cast');
-      outcomes[name] = (err as { code?: string }).code;
+      outcomes[name] = (err as { code?: string }).code ?? 'throws';
     }
   }
   return outcomes;
@@ -230,7 +230,7 @@ describe('with parameters (extended protocol)', () => {
         "dottedComment": "3F000",
         "dottedDashes": "3F000",
         "dottedDollar": "3F000",
-        "dottedEmpty": "42601",
+        "dottedEmpty": "throws",
         "dottedNul": "08P01",
         "dottedPrequoted": [
           {
@@ -240,11 +240,11 @@ describe('with parameters (extended protocol)', () => {
         "dottedSemicolon": "3F000",
         "dottedSquote": "42704",
         "dquote": "42704",
-        "empty": "42601",
+        "empty": "throws",
         "emptyLast": "42704",
         "emptyPart": "42704",
         "escaped": "42704",
-        "leadingDot": "42601",
+        "leadingDot": "throws",
         "lineCommentBetween": "42704",
         "lone": "42704",
         "newlineInside": "42704",
@@ -296,7 +296,7 @@ describe('array bounds in a cast', () => {
       arrayDotted: '22P02',
       arrayQualified: '22P02',
       arrayPrequoted: '22P02',
-      arrayOnly: '42601',
+      arrayOnly: 'throws',
       arrayAfterQuote: '42704',
       arrayCloses: '42704',
       arrayInside: '42704',
@@ -309,6 +309,38 @@ describe('array bounds in a cast', () => {
       arrayNul: '08P01',
       arrayBackslash: '42704',
     });
+  });
+});
+
+describe('a cast that leaves a part of its name empty', () => {
+  afterEach(resetConfig);
+
+  it('rejects with a plain Error before any query, in each place and under either option', async () => {
+    // 42601 from Postgres before #271; now nothing reaches it: queryListener never fires, and Ada keeps her name
+    const sent: unknown[] = [];
+    db.setConfig({ queryListener: q => { sent.push(q); } });
+    const casts = { ...Object.fromEntries(emptyCastNames.map(name => [name, { ...hostileCasts, ...hostileArrayCasts }[name]!])), ...hostileEmptyCasts };
+    for (const config of [{}, { castArrayParamsToJson: true, castObjectParamsToJson: true }]) {
+      db.setConfig(config);
+      for (const [name, cast] of Object.entries(casts)) for (const value of ['1', [1, 2], { a: 1 }]) {
+        const queries = {
+          alone: sql`SELECT ${param(value, cast)} AS v`,
+          whereable: sql`SELECT ${'id'} FROM ${'users'} WHERE ${{ id: param(value, cast) }}`,
+          isIn: sql`SELECT ${'id'} FROM ${'users'} WHERE ${{ id: db.conditions.isIn([param(value, cast)]) }}`,
+          vals: sql`INSERT INTO ${'extra.type_zoo'} (${'c_int4'}) VALUES (${vals([param(value, cast)])}) RETURNING ${'id'}`,
+          update: db.update('users', { display_name: param(String(value), cast) }, { id: 1 }),
+        };
+        for (const [where, q] of Object.entries(queries)) {
+          const err = await q.run(t.client).then(() => 'resolved', (e: unknown) => e);
+          // a plain Error, not pg's DatabaseError: no SQLSTATE code
+          expect({ name, where, class: (err as Error).constructor, code: (err as { code?: string }).code })
+            .toEqual({ name, where, class: Error, code: undefined });
+          expect((err as Error).message).toMatch(/^param\(\) cast .* gives an empty name, /s);
+        }
+      }
+    }
+    expect(sent).toEqual([]);
+    expect(await adaName()).toBe('Ada');
   });
 });
 
@@ -345,7 +377,7 @@ describe('a cast under castArrayParamsToJson and castObjectParamsToJson', () => 
             "arrayNegative": "42704",
             "arrayNested": "42704",
             "arrayNul": "08P01",
-            "arrayOnly": "42601",
+            "arrayOnly": "throws",
             "arrayPrequoted": "[{"v":[1,2]}]",
             "arrayQualified": "[{"v":[1,2]}]",
             "arraySemicolon": "42704",
@@ -360,17 +392,17 @@ describe('a cast under castArrayParamsToJson and castObjectParamsToJson', () => 
             "dottedComment": "3F000",
             "dottedDashes": "3F000",
             "dottedDollar": "3F000",
-            "dottedEmpty": "42601",
+            "dottedEmpty": "throws",
             "dottedNul": "08P01",
             "dottedPrequoted": "22P02",
             "dottedSemicolon": "3F000",
             "dottedSquote": "42704",
             "dquote": "42704",
-            "empty": "42601",
+            "empty": "throws",
             "emptyLast": "42704",
             "emptyPart": "42704",
             "escaped": "42704",
-            "leadingDot": "42601",
+            "leadingDot": "throws",
             "lineCommentBetween": "42704",
             "lone": "42704",
             "newlineInside": "42704",
@@ -402,7 +434,7 @@ describe('a cast under castArrayParamsToJson and castObjectParamsToJson', () => 
             "arrayNegative": "42704",
             "arrayNested": "42704",
             "arrayNul": "08P01",
-            "arrayOnly": "42601",
+            "arrayOnly": "throws",
             "arrayPrequoted": "22P02",
             "arrayQualified": "22P02",
             "arraySemicolon": "42704",
@@ -417,17 +449,17 @@ describe('a cast under castArrayParamsToJson and castObjectParamsToJson', () => 
             "dottedComment": "3F000",
             "dottedDashes": "3F000",
             "dottedDollar": "3F000",
-            "dottedEmpty": "42601",
+            "dottedEmpty": "throws",
             "dottedNul": "08P01",
             "dottedPrequoted": "22P02",
             "dottedSemicolon": "3F000",
             "dottedSquote": "42704",
             "dquote": "42704",
-            "empty": "42601",
+            "empty": "throws",
             "emptyLast": "42704",
             "emptyPart": "42704",
             "escaped": "42704",
-            "leadingDot": "42601",
+            "leadingDot": "throws",
             "lineCommentBetween": "42704",
             "lone": "42704",
             "newlineInside": "42704",
@@ -464,7 +496,7 @@ describe('a Parameter in a Whereable, in isIn or in vals', () => {
         // read before the savepoint goes: a second statement that ran shows here
         return rows.length === 1 && await adaName() === 'Ada' ? 'one row' : rows;
       } catch (err) {
-        return (err as { code?: string }).code;
+        return (err as { code?: string }).code ?? 'throws';
       } finally {
         await t.client.query('ROLLBACK TO SAVEPOINT pgcast_cast');
       }

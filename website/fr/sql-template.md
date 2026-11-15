@@ -1,5 +1,5 @@
 ---
-english: 3d00a2d81915
+english: 3853451e8c43
 ---
 
 # Template SQL
@@ -122,6 +122,7 @@ Les deux dernières lignes s’appliquent quand [`castArrayParamsToJson`](/fr/ru
 - Toute autre chaîne avec un `"` est un seul nom entre guillemets, chaque `"` doublé, si bien qu’elle ne peut pas fermer ses guillemets : `'int4") || (SELECT 1) || ("int4'` donne `CAST($1 AS "int4"") || (SELECT 1) || (""int4")`<!-- probe: db.sql`${db.param(1, 'int4") || (SELECT 1) || ("int4')}` -->, un type qui n’existe pas.
 - Zapatos 6.6.1 écrivait tout `cast` tel quel entre guillemets : `'public.crew_job'` et `'int4[]'` nommaient donc des types qui n’existent pas.
 - Chaque partie reste entre guillemets, si bien qu’un nom que seule la grammaire SQL connaît n’est pas un type ici : `'int'`, `'double precision'`, `'varchar(10)'` échouent (42704). Donnez le nom que le type porte lui-même (`'int4'`, `'float8'`, `'timestamptz'`), ou écrivez le cast dans `sql` : `` db.sql`CAST(${db.param(x)} AS varchar(10))` ``.
+- Sans `"`, une partie laissée vide lève une erreur à la compilation, si bien que `.run()` est rejetée avec une simple `Error` avant toute requête : `''`, `'[]'`, `'public.'` et `'.crew_job'` donneraient `""`, que Postgres refuse (42601). L’erreur nomme le cast et le nom qu’il donne : "param() cast '…' gives an empty name, …, which Postgres refuses: name each part of the type, as in 'int4' or 'public.mood', or leave the cast out"<!-- message -->. Zapatos 6.6.1 les envoyait, et Postgres les refusait aussi, sauf là où la 6.6.1 abandonnait le cast : au profit de `"json"` sous `castArrayParamsToJson` ou `castObjectParamsToJson`, et comme valeur d’un Whereable.
 - Sous `castArrayParamsToJson` ou `castObjectParamsToJson`, un cast en chaîne est le type écrit, et la valeur reste le texte JSON que l’option envoie (la dernière ligne du tableau) : `param({ a: 1 }, 'jsonb')` fonctionne avec `=` et `@>` sur une colonne `jsonb`.
 - Sous `castArrayParamsToJson`, un tableau dont le cast finit par `[]` ou `[n]` part comme un tableau : `'_int4'` et un domaine sur un tableau envoient toujours du JSON, que Postgres refuse comme tableau (22P02).
 - Zapatos 6.6.1 abandonnait un cast en chaîne sous l’une ou l’autre option au profit de `CAST($1 AS "json")` ([#36](https://github.com/AlexandreDemartin/pgcast/issues/36)), si bien qu’un cast qui nomme un autre type que sa cible s’applique désormais : `param(arr, 'int4[]')` vers une colonne `json` est refusé (42804), vers une colonne `text` stocke `{1,2}` pour `[1,2]`.
@@ -476,6 +477,12 @@ Un fragment `noop` se compile quand même, son SQL derrière un commentaire. `fo
 <<< ../examples/sql_run_force.ts{ts twoslash}
 
 </CastPanel>
+
+Un texte de plusieurs instructions, `` db.sql`CREATE TABLE festivals (id int); INSERT INTO festivals VALUES (1)` ``, arrive en entier à Postgres quand il n’a ni valeur ni nom [`prepared()`](#prepared) : `pg` l’envoie comme une seule requête simple ([Sécurité](/fr/security#values-never-enter-the-sql)). Avec une valeur, ou en requête préparée, Postgres refuse le texte : « <span lang="en">cannot insert multiple commands into a prepared statement</span> » (42601).
+
+Hors transaction, Postgres exécute les instructions en une seule transaction, sauf si le texte contient son propre `BEGIN` ou `COMMIT` : si une instruction échoue, la promesse est rejetée avec son erreur, et celles d’avant sont annulées. Un `COMMIT` dans le texte garde ce qui le précède. Un `BEGIN` sans `COMMIT` laisse la connexion dans cette transaction : sur un pool, la prochaine requête qui récupère cette connexion s’y exécute. Avec une instruction qui ne peut pas s’exécuter dans un bloc de transaction, comme `VACUUM` ou `CREATE INDEX CONCURRENTLY`, Postgres refuse le texte entier, où qu’elle se trouve : « <span lang="en">VACUUM cannot run inside a transaction block</span> » (25001).
+
+Quand elles s’exécutent, `pg` renvoie un tableau de résultats, un par instruction, où le `runResultTransform` par défaut ne trouve pas de `rows` : `run()` se résout en `undefined` au lieu des lignes que promet son type, et `resultListener` reçoit `undefined`. Pour les lire, donnez au fragment un [`runResultTransform`](#runResultTransform) qui prend le tableau.
 
 ### `compile()` {#compile}
 

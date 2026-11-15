@@ -118,6 +118,7 @@ The last two rows apply when [`castArrayParamsToJson`](/runtime-config#Config.ca
 - Any other string with a `"` is one quoted name, any `"` doubled, so it cannot close its quotes: `'int4") || (SELECT 1) || ("int4'` gives `CAST($1 AS "int4"") || (SELECT 1) || (""int4")`<!-- probe: db.sql`${db.param(1, 'int4") || (SELECT 1) || ("int4')}` -->, a type that does not exist.
 - Zapatos 6.6.1 wrote any `cast` as it is between quotes, so `'public.crew_job'` and `'int4[]'` named types that do not exist.
 - Each part stays quoted, so a name only the SQL grammar knows is no type here: `'int'`, `'double precision'`, `'varchar(10)'` fail (42704). Give the type's own name (`'int4'`, `'float8'`, `'timestamptz'`), or write the cast in `sql`: `` db.sql`CAST(${db.param(x)} AS varchar(10))` ``.
+- Without a `"`, a part left empty throws while compiling, so `.run()` rejects with a plain `Error` before any query: `''`, `'[]'`, `'public.'` and `'.crew_job'` would give `""`, which Postgres refuses (42601). The error names the cast and the name it gives: "param() cast '…' gives an empty name, …, which Postgres refuses: name each part of the type, as in 'int4' or 'public.mood', or leave the cast out"<!-- message -->. Zapatos 6.6.1 sent them, and Postgres refused them too, except where 6.6.1 dropped the cast: for `"json"` under `castArrayParamsToJson` or `castObjectParamsToJson`, and as a Whereable value.
 - Under `castArrayParamsToJson` or `castObjectParamsToJson`, a string cast is the type written, and the value stays the JSON text the option sends (the last row of the table): `param({ a: 1 }, 'jsonb')` reaches `=` and `@>` on a `jsonb` column.
 - Under `castArrayParamsToJson`, an array whose cast ends with `[]` or `[n]` goes as an array: `'_int4'` and a domain over an array still send JSON, which Postgres refuses as an array (22P02).
 - Zapatos 6.6.1 dropped a string cast under either option for `CAST($1 AS "json")` ([#36](https://github.com/AlexandreDemartin/pgcast/issues/36)), so a cast that names another type than its target now applies: `param(arr, 'int4[]')` into a `json` column is refused (42804), into a `text` column stores `{1,2}` for `[1,2]`.
@@ -472,6 +473,12 @@ A `noop` fragment still compiles, its SQL behind a comment. `force` sends it, an
 <<< ./examples/sql_run_force.ts{ts twoslash}
 
 </CastPanel>
+
+A text of several statements, `` db.sql`CREATE TABLE festivals (id int); INSERT INTO festivals VALUES (1)` ``, goes to Postgres whole when it has no values and no [`prepared()`](#prepared) name: `pg` sends it as one simple query ([Security](/security#values-never-enter-the-sql)). With a value, or prepared, Postgres refuses the text: "cannot insert multiple commands into a prepared statement" (42601).
+
+Outside a transaction, Postgres runs the statements as one transaction, unless the text holds its own `BEGIN` or `COMMIT`: a statement that fails rejects with its error, and undoes those before it. A `COMMIT` in the text keeps what came before it. A `BEGIN` with no `COMMIT` leaves the connection inside that transaction: on a pool, the next query to get that connection runs in it. A statement that cannot run in a transaction block, such as `VACUUM` or `CREATE INDEX CONCURRENTLY`, makes Postgres refuse the whole text, wherever it stands: "VACUUM cannot run inside a transaction block" (25001).
+
+When they run, `pg` returns an array of results, one per statement, where the default `runResultTransform` finds no `rows`: `run()` resolves `undefined`, not the rows its type promises, and `resultListener` gets `undefined`. To read them, give the fragment a [`runResultTransform`](#runResultTransform) that takes the array.
 
 ### `compile()` {#compile}
 
