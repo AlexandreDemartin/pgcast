@@ -235,11 +235,13 @@ export const definitionForRelationInSchema = async (
   // ON CONFLICT ON CONSTRAINT takes the index of a UNIQUE or PRIMARY KEY constraint of the table (a foreign key's
   // conindid is the referenced table's), but not DEFERRABLE (55000), nor WITHOUT OVERLAPS, an exclusion constraint
   // to Postgres, which refuses it with DO UPDATE (42809): https://www.postgresql.org/docs/current/sql-insert.html
+  // Nor an index not yet valid (42P10), such as a partitioned table's constraint added with ALTER TABLE ONLY, until
+  // each partition's index is attached: https://www.postgresql.org/docs/current/ddl-partitioning.html
   const
     result = await queryFn({
       text: `
         SELECT DISTINCT i.indexname
-        , NOT idx.indisexclusion AND EXISTS (
+        , idx.indisvalid AND NOT idx.indisexclusion AND EXISTS (
             SELECT 1 FROM pg_catalog.pg_constraint con
             WHERE con.conindid = c.oid AND con.conrelid = idx.indrelid
             AND con.contype IN ('p', 'u') AND NOT con.condeferrable

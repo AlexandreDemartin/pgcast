@@ -167,7 +167,7 @@ const warnAboutUniqueIndexesNotArbiters = (indexes: string[], config: CompleteCo
     list = one ? sorted[0] : sorted.slice(0, -1).join(', ') + ' and ' + sorted[sorted.length - 1];
 
   warn(`Note: UniqueIndex lists ${list}, ${one ? 'a unique index' : 'unique indexes'} of no UNIQUE or PRIMARY KEY ` +
-    `constraint, or of a DEFERRABLE or WITHOUT OVERLAPS one: db.constraint() takes ${one ? 'it' : 'them'}, and ` +
+    `constraint, of a DEFERRABLE or WITHOUT OVERLAPS one, or not yet valid: db.constraint() takes ${one ? 'it' : 'them'}, and ` +
     `Postgres refuses ${one ? 'it' : 'them'} in ON CONFLICT ON CONSTRAINT ... DO UPDATE. ` +
     `Set uniqueIndexConstraintsOnly: true to leave ${one ? 'it' : 'them'} out; it will be the default in pgcast 7.0.`);
 };
