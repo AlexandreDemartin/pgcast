@@ -296,6 +296,31 @@ describe('type surprises', () => {
     db.sql`INSERT INTO ${'users'} (${db.cols({ email: 'a@b' })}) VALUES (${db.vals({ email: 'a@b' })})`;
   });
 
+  test('characterization: a template typed by table checks neither the names of cols() nor the keys of vals(), as in 6.6.1; a typed value does (#216)', () => {
+    // characterization: Postgres refuses these (42703); checking them in the template would refuse the right
+    // cols(['email', 'display_name']) too, inferred as string[], and generic forwarders
+    db.sql<s.users.SQL>`SELECT ${db.cols(['email', 'emial'])} FROM ${'users'}`;
+    db.sql<s.users.SQL>`INSERT INTO ${'users'} (${db.cols({ emial: 'a' })}) VALUES (${db.vals({ emial: 'a' })})`;
+    const forward = <T>(row: T) => db.sql<s.users.SQL>`INSERT INTO ${'users'} (${db.cols(row)}) VALUES (${db.vals(row)})`;
+    expectTypeOf(forward({ emial: 'a' })).toEqualTypeOf<db.SQLFragment<any[], never>>();
+    // @ts-expect-error a name interpolated on its own is checked
+    db.sql<s.users.SQL>`SELECT ${'emial'} FROM ${'users'}`;
+    // @ts-expect-error so is a Whereable written in place
+    db.sql<s.users.SQL>`SELECT * FROM ${'users'} WHERE ${{ emial: 'a' }}`;
+    // @ts-expect-error a type argument checks the names of cols()
+    db.cols<s.users.Column[]>(['email', 'emial']);
+    // @ts-expect-error so does satisfies
+    db.cols(['email', 'emial'] satisfies s.users.Column[]);
+    // @ts-expect-error and the keys of vals()
+    db.vals<s.users.Updatable>({ email: 'a', emial: 'a' });
+    // @ts-expect-error Updatable leaves out the GENERATED ALWAYS id
+    db.vals<s.users.Updatable>({ id: 1 });
+    // characterization: an object held in a variable is checked by its own type, not by the type argument
+    const loose = { email: 'a', emial: 'a' };
+    db.vals<s.users.Updatable>(loose);
+    db.sql<s.users.SQL>`SELECT ${db.cols<s.users.Column[]>(['id', 'email'])} FROM ${'users'}`;
+  });
+
   test('characterization: vals({…}) of a sql template takes raw(), cols(x), vals(x) and parent() as values', () => {
     // a ColumnValues of any value is a GenericSQLExpression; compiling throws on each, but parent() in a nested
     // query (test/integration/core.test.ts, "in vals({…}) of a sql template of its own reject run()")
