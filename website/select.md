@@ -184,6 +184,8 @@ Postgres refuses a lock with `DISTINCT`, `GROUP BY` or an aggregate (0A000).
 
 The type refuses a bad `direction`, `nulls` or `lock`, not a bad `aggregate`, a `string`. Zapatos 6.6.1 wrote a bad `lock` or `aggregate` into the SQL as it was, where it could run a second statement. A value that has no meaning in `where` or `having` (`db.Default`, `db.self`, `db.raw()`) throws as the query compiles: [Conditions](/conditions).
 
+A `null` that gets past the type, from JavaScript or JSON: `null` options are none, as in the [writes](/insert#insert-options). `columns: null`, `extras: null`, `order: null` or `lock: null` throws as the query compiles, nested in a `lateral` too, so `.run()` rejects before any query: "`` `order: null` has no meaning: for no `ORDER BY`, leave `order` out; to sort, give it `{ by, direction }`, or an array of them. ``<!-- message -->", and the same for each key. Zapatos 6.6.1 threw a `TypeError` at the call, on `null` options too, except in `selectOne()` and `selectExactlyOne()`.
+
 ## `selectOne()` {#selectOne}
 
 ```ts

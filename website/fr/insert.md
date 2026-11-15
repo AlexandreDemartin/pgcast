@@ -1,5 +1,5 @@
 ---
-english: c614e7afb789
+english: 391702c44e41
 ---
 
 # Écritures
@@ -60,6 +60,7 @@ Insère une ligne ou plusieurs, et les renvoie telles que Postgres les a stocké
 
 - Un tableau `readonly` dans `returning` (`['id'] as const`) donne le même SQL et le même type qu’un tableau modifiable ([`columns`](/fr/select#columns)).
 - Les deux ont besoin de `strictNullChecks` pour leurs types.
+- Des options `null` reviennent à n’en passer aucune. `returning: null` ou `extras: null`, en passant outre le type, lève une erreur à la compilation de la requête, si bien que `.run()` est rejetée avant toute requête, dans `upsert()`, `update()` et `deletes()` aussi : "`` `returning: null` has no meaning: for every column, leave `returning` out; for some, give an array of their names. ``<!-- message -->". Zapatos 6.6.1 levait une `TypeError` à l’appel.
 
 ## `upsert()` {#upsert}
 

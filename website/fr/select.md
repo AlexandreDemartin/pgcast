@@ -1,5 +1,5 @@
 ---
-english: 299889332c37
+english: 981e79be67bb
 ---
 
 # Lectures {#select-and-the-aggregates}
@@ -187,6 +187,8 @@ Postgres refuse un verrou avec `DISTINCT`, `GROUP BY` ou un agrégat (0A000).
 | `Aggregate must be a function name (e.g. sum, or my_schema.my_agg), not '…'`<!-- message --> | un `aggregate` qui n’en est pas un, dans `SelectResultMode.Numeric` | pgcast 6.6.2 |
 
 Le type refuse une mauvaise `direction`, un mauvais `nulls` ou un mauvais `lock`, pas un mauvais `aggregate`, qui est un `string`. Zapatos 6.6.1 écrivait un mauvais `lock` ou `aggregate` tel quel dans le SQL, où il pouvait exécuter une seconde instruction. Une valeur qui n’a pas de sens dans `where` ou `having` (`db.Default`, `db.self`, `db.raw()`) lève une erreur à la compilation de la requête : [Conditions](/fr/conditions).
+
+Un `null` qui passe le type, en JavaScript ou dans du JSON : des options `null` reviennent à n’en passer aucune, comme dans les [écritures](/fr/insert#insert-options). `columns: null`, `extras: null`, `order: null` ou `lock: null` lève une erreur à la compilation de la requête, même imbriquée dans un `lateral`, si bien que `.run()` est rejetée avant toute requête : "`` `order: null` has no meaning: for no `ORDER BY`, leave `order` out; to sort, give it `{ by, direction }`, or an array of them. ``<!-- message -->", et de même pour chaque clé. Zapatos 6.6.1 levait une `TypeError` à l’appel, sur des options `null` aussi, sauf dans `selectOne()` et `selectExactlyOne()`.
 
 ## `selectOne()` {#selectOne}
 
