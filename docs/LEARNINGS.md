@@ -287,6 +287,9 @@ Candidates for a check, a rule or a skill line.
 - #274 — A docs claim about a parameter's compiled SQL (`$1`, JSON) names the `castArrayParamsToJson` / `castObjectParamsToJson` condition, or is probed under both: candidate check in `check-prose.mjs`, rerun each `<!-- probe -->` without `setConfig` with both options on and flag a changed text whose sentence names no option — `branch-reviewer`
 - #274 — A value object with `toPostgres()` and a `value` field compiles only because `Parameter` matches by shape: probe it whenever `Parameter` is narrowed; under `castObjectParamsToJson` an object literal's own `toPostgres()` is not used — `builder`
 - #274 — A types-only `ConfigTypes` opt-in cannot carry decision 003's warning, and a class + interface merge needs an ESLint disable in `core.ts`: weigh Document first for a niche type gap (as #402) — orchestrator
+- #460 — On a partitioned parent, the 0A000 of `RETURNING xmax` depends on each partition's column layout (Postgres's virtual slot for an unconverted routed row), not only on the table being partitioned: a claim names the condition; a docs condition written « as X has » has its exceptions searched (a dropped column) — `builder`, `branch-reviewer`
+- #460 — A PR opened on a base it already conflicts with gets no CI (only CodeQL): before calling a PR ready, `gh pr view --json mergeable` is `MERGEABLE` and `gh pr checks` lists **CI passed** (also #477) — `branch-reviewer`
+- #460 — The local and CI test counts differ (1018 vs 1021): « none skipped » is read from the CI log, not inferred from a local run — `builder`
 
 ## Minors kept
 
@@ -397,3 +400,4 @@ Minor review defects, taken up by the end-of-chapter review.
 - #274 — `website/sql-template.md:126` (and `fr/…:130`): « A text column stores as it is » right after a filter example; « passes where a column name does » reads as « wherever » — `branch-reviewer`
 - #274 — `test/types/core.test-d.ts:208-230`: no enum column and no `upsert()` slot for the structural `{ value }` case (skill `type-tests` § Structural wrappers) — `branch-reviewer`
 - #274 — `src/db/core.ts:137-140`: interpolated directly in `sql`, `${{ value: 3 }}` passes as a Whereable and compiles to `("value" = $1)` — `branch-reviewer`
+- #460 — `src/db/shortcuts.ts:449`: the Postgres source link pins `REL_17_STABLE` while the claim covers 14 to 18 — `branch-reviewer`
