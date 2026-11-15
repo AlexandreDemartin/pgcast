@@ -4,6 +4,7 @@
 // test/unit/core.test.ts does once run on the fixture, surprises included.
 
 import { afterEach, describe, expect, it } from 'vitest';
+import type * as s from 'zapatos/schema';
 import type { Whereable } from 'zapatos/schema';
 import * as db from '../../src/db';
 import { sql, param, raw, cols, vals, parent, self, Default } from '../../src/db';
@@ -630,5 +631,35 @@ describe('SQLFragment.run', () => {
         ],
       ]
     `);
+  });
+});
+
+describe('range strings', () => {
+  it('an empty range comes back as \'empty\', in Selectable and JSONSelectable, and a filter finds it', async () => {
+    const empty = { batch_sizes: 'empty', fee_band: '[1.5,1.5)', valid_during: 'empty', value_days: '[2026-01-01,2026-01-01)' } as const;
+    const insert = db.insert('transfers', { from_account: 1, to_account: 2, amount: 1, note: 'empty ranges', ...empty },
+      { returning: ['batch_sizes', 'fee_band', 'valid_during', 'value_days'] });
+    expect(insert.compile()).toEqual({
+      text: 'INSERT INTO "transfers" ("amount", "batch_sizes", "fee_band", "from_account", "note", "to_account", "valid_during", "value_days") '
+        + 'VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING jsonb_build_object($9::text, "batch_sizes", $10::text, "fee_band", '
+        + '$11::text, "valid_during", $12::text, "value_days") AS result',
+      values: [1, 'empty', '[1.5,1.5)', 1, 'empty ranges', 2, 'empty', '[2026-01-01,2026-01-01)', 'batch_sizes', 'fee_band', 'valid_during', 'value_days'],
+    });
+    const allEmpty = { batch_sizes: 'empty', fee_band: 'empty', valid_during: 'empty', value_days: 'empty' };
+    // JSONSelectable: to_jsonb writes an empty range, and one whose bounds hold nothing, as "empty"
+    expect(await insert.run(t.client)).toEqual(allEmpty);
+
+    const where = db.select('transfers', { batch_sizes: 'empty', value_days: c.eq('empty') }, { columns: ['note'] });
+    expect(where.compile()).toEqual({
+      text: 'SELECT coalesce(jsonb_agg(result), \'[]\') AS result FROM (SELECT jsonb_build_object($1::text, "note") AS result '
+        + 'FROM "transfers" WHERE ("batch_sizes" = $2 AND ("value_days" = $3))) AS "sq_transfers"',
+      values: ['note', 'empty', 'empty'],
+    });
+    expect(await where.run(t.client)).toEqual([{ note: 'empty ranges' }]);
+
+    // Selectable: pg parses no range type, so it hands over Postgres's text
+    const selectable = sql<s.transfers.SQL, Pick<s.transfers.Selectable, keyof typeof allEmpty>[]>`
+      SELECT ${'batch_sizes'}, ${'fee_band'}, ${'valid_during'}, ${'value_days'} FROM ${'transfers'} WHERE ${{ note: 'empty ranges' }}`;
+    expect(await selectable.run(t.client)).toEqual([allEmpty]);
   });
 });
