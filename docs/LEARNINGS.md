@@ -360,6 +360,23 @@ Candidates for a check, a rule or a skill line.
 - #501 — A guard copies how the original reads the value (once per type, inside `some`), so getters and Proxies are read as before — `builder`
 - #502 — A CHANGELOG line for a fix that changes two paths (the pool's client and a plain client, #246) gives one clause each: the plain client's cleared `_zapatos` was in no line — `builder`
 - #502 — A brief names a PR by its PR number, not its issue's: #246 and #96 are issues, closed by PRs #255 and #265 — `builder`
+- A guide's full opt-in `setConfig()` block is checked against the `Config` keys whose comment says "the default in 7.0" (#398 missed `switching.md`) — `branch-reviewer`
+- Each generator note ending "it will be the default in pgcast 7.0" has its `### Deprecated` line: count notes against lines — `branch-reviewer`
+- A summary of decision 003's 7.0/8.0 fate keeps both exceptions, R14 and `rejectOnQueryError: false` (`git grep -n '7\.0 switches\|8\.0 removes'`) — `branch-reviewer`
+- Closing an issue a page links as an open defect (« does not yet … (#47) ») is checked: `git grep` the issue number in `website/` for « not yet » / « Coming » wording — `branch-reviewer`
+- « never », « always », « only » beside an aggregate or option is probed at `.run()` and nested in `lateral`/`extras`, where `count()`'s `null` hides — `branch-reviewer`
+- The copied rules file in `ai-assistant.md` restates install and import rules: a new install path (`moduleNames`, `pgcastconfig.json`) lists it among the pages to update — `branch-reviewer`
+- An exception living on an open issue (#489) is carried by every restatement of the rule, JSDoc included: `git grep` the issue number against the option's name — `branch-reviewer`
+- chapter review — A Minors kept entry quotes a short phrase to grep beside its `file:line`: cited lines had moved up to 150 lines by the end of the chapter (as #253's learning suggests) — `branch-reviewer`
+- chapter review — Assertions that cannot fail (`not.toBeAny()` beside a `toEqualTypeOf`, a `@ts-expect-error` that also passes on master, a self-replacing getter): a new `@ts-expect-error` is checked against master — `branch-reviewer`
+- chapter review — After a behaviour changes, other pages kept the old one (handle-errors after #32, switching after #251 and #96, the warningListener list after #48): `git grep` the old behaviour's phrase across `website/` and `README.md`, both languages — `branch-reviewer`
+- chapter review — A run-time refusal added without narrowing the type slot that still accepts it (#244 → #503): when a call starts to always throw, its type is narrowed in the same PR, or the gap filed — `branch-reviewer`
+- chapter review — About 80 % of the Minors kept were form only: each kept item tagged `form` or `defect`, so the end-of-chapter pass reads the defects — `branch-reviewer`
+- #506 — A « Changed: » sub-bullet under CHANGELOG § Fixed, where 6.6.1 ran and pgcast rejects, has its mirror: a row in `switching.md` § Find the calls whose result changes and an « except » in the report's class cell (R25, R23) — `branch-reviewer`
+- #506 — A sentence added to a paragraph ending « Unchanged from Zapatos 6.6.1 » inherits that claim: its case is replayed on the 6.6.1 tarball too — `branch-reviewer`, `builder`
+- #506 — Message strings in `src/` (generator notes, errors) are claims too: the `git grep` of corrected phrases includes them — `branch-reviewer`
+- #506 — Size is measured with `git diff origin/master...HEAD` (three dots) once master moves; two dots count the other PRs' lines — `builder`
+- #506 — `db.select` with `{ id: [a, b] }` is not `IN`: a probe takes `conditions.isIn()` — `builder`
 
 ## Minors kept
 
@@ -493,4 +510,6 @@ Minor review defects, taken up by the end-of-chapter review.
 - #498 — `src/generate/tables.ts:145`: `definitionForRelationInSchema()`'s `domainRoots?` names `DomainRoots`, which `zapatos/generate` does not export; a direct six-argument caller runs one roots query per relation, unmemoised.
 - #505 — `src/db/pgErrors.ts:20-21`: the comment on the guard should say it reads `startsWith` once per type, as 6.6.1 does.
 - #505 — `website/transaction.md:349` (FR `:353`): `isDatabaseError`'s « any value » still throws for a `code` or `length` getter that throws, or `Object.create(String.prototype)` of length 5, as on 6.6.1.
-
+- #506 — `src/generate/tsOutput.ts:174`: the `uniqueIndexConstraintsOnly` note names only `DO UPDATE`; with `doNothing` Postgres refuses these names too (55000 `DEFERRABLE`, 42704 an index with no constraint, 42P10 not yet valid).
+- #506 — `src/db/shortcuts.ts:933-935`: the `withTies` JSDoc chains « refuses without `order` (42601): » into « `run()` gives one of the tied rows ».
+- #506 — `src/generate/config.ts:39` « not DEFERRABLE nor » → « neither … nor »; `src/db/core.ts:482-486` and `src/db/transaction.ts:134` past the JSDoc's wrap; `CHANGELOG.md:196` « its own line below » unnamed.

@@ -1,5 +1,5 @@
 ---
-english: 55b60067e9f2
+english: 3cdaae4aa95e
 ---
 
 # Conditions {#db-conditions}
@@ -133,7 +133,7 @@ Chacune prend une valeur du type de la colonne, `<T>(a: T)`, et écrit la colonn
 
 ### `isNotDistinctFrom()` {#conditions.isNotDistinctFrom}
 
-`"col" IS NOT DISTINCT FROM $1`<!-- probe: db.sql`${{ col: db.conditions.isNotDistinctFrom(1) }}` --> : comme `eq()`, où `NULL` est une valeur comme une autre. Les deux acceptent une valeur nullable, `null` compris : avec `tagline` un `string | null`, `{ tagline: isNotDistinctFrom(tagline) }` trouve les films sans accroche quand `tagline` vaut `null`. [`isNull`](#conditions.isNull) reste le test simple de `NULL`.
+`"col" IS NOT DISTINCT FROM $1`<!-- probe: db.sql`${{ col: db.conditions.isNotDistinctFrom(1) }}` --> : comme `eq()`, où `NULL` est une valeur comme une autre. `isDistinctFrom()` et `isNotDistinctFrom()` acceptent tous deux une valeur nullable, `null` compris : si `tagline` est un `string | null`, `{ tagline: isNotDistinctFrom(tagline) }` trouve les films sans accroche quand `tagline` vaut `null`. [`isNull`](#conditions.isNull) reste le test simple de `NULL`.
 
 ## Les intervalles {#ranges}
 
@@ -327,7 +327,7 @@ db.conditions.and<T>(...conditions: (SQLFragment<any, T> | Whereable)[])
 `((a) AND (b))`<!-- probe: db.conditions.and(db.sql`a`, db.sql`b`) --> : chaque opérande entre ses propres parenthèses, reliés par `AND`.
 
 - Un fragment `sql` avec un `OR` nu à son niveau supérieur reste entier : `` and(db.sql`${'id'} = 1000 OR ${'id'} = 1001`, { studio_id: 1001 }) `` donne `(("id" = 1000 OR "id" = 1001) AND (("studio_id" = $1)))`<!-- probe: db.conditions.and(db.sql`${'id'} = 1000 OR ${'id'} = 1001`, { studio_id: 1001 }) --> : seul le film 1001.
-- Sans argument, `TRUE`<!-- probe: db.conditions.and() --> : chaque ligne, comme un Whereable `{}`. Zapatos 6.6.1 écrivait `()`, que Postgres refuse (42601).
+- Sans argument, `TRUE`<!-- probe: db.conditions.and() --> : chaque ligne, comme un Whereable `{}`. Zapatos 6.6.1 écrivait `()`, que Postgres refuse comme condition (42601). Comme `groupBy`, `GROUP BY ()` s’exécutait, et `GROUP BY TRUE` est refusé (42601) : omettez `groupBy` ([Conditions](/fr/switching#conditions)).
 
 ::: warning Toutes les lignes
 `update()` et `deletes()` à qui l’on donne `and(...filters)` ou `not(or(...ids))` avec une liste vide atteignent désormais toutes les lignes : `deletes('films', and())` envoie `WHERE TRUE`<!-- probe: db.deletes('films', db.conditions.and()) --> et les supprime toutes, `not(or())` donne `(NOT (FALSE))`<!-- probe: db.conditions.not(db.conditions.or()) -->. Zapatos 6.6.1 levait une erreur (42601) avant qu’une ligne ne change. Gardez la vérification de longueur là où une liste vide ne doit pas atteindre toutes les lignes.
@@ -348,7 +348,7 @@ Tout autre `and()` gagne des parenthèses et donne les mêmes lignes.
 db.conditions.or<T>(...conditions: (SQLFragment<any, T> | Whereable)[])
 ```
 
-`(a OR b)`<!-- probe: db.conditions.or(db.sql`a`, db.sql`b`) --> : ses opérandes reliés par `OR`, tels quels : `AND` lie plus fort que `OR`, donc aucun ne passe par-dessus. Sans argument, `FALSE`<!-- probe: db.conditions.or() --> : aucune ligne. Zapatos 6.6.1 écrivait `()` ici aussi.
+`(a OR b)`<!-- probe: db.conditions.or(db.sql`a`, db.sql`b`) --> : ses opérandes reliés par `OR`, tels quels : `AND` lie plus fort que `OR`, donc aucun ne passe par-dessus. Sans argument, `FALSE`<!-- probe: db.conditions.or() --> : aucune ligne. Zapatos 6.6.1 écrivait `()` ici aussi, et comme `groupBy`, `GROUP BY FALSE` est refusé (42601).
 
 ### `not()` {#conditions.not}
 

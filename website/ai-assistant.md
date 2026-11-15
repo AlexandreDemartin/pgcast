@@ -22,12 +22,12 @@ Paste a URL into the chat, or let the rules file below name it.
 `npx pgcast` writes `zapatos/schema.d.ts` into your [`outDir`](/generator#generate.outDir): `src/zapatos/schema.d.ts` in the tutorial. It holds what an assistant would otherwise guess: each table's columns, the type of each in a row, a filter, an insert and an update ([The files it writes](/generator#the-files-it-writes)), and a comment on each column with its Postgres type, whether it is `NOT NULL`, and its default.
 
 - Tell the assistant to read it before writing a query, and never to edit it: the next run writes it again. The rules file below does both; change its path if your `outDir` differs.
-- A `COMMENT ON COLUMN` on a table's column, in a migration, reaches that comment too ([`schemaJSDoc`](/generator#generate.schemaJSDoc)): the place to tell the assistant what a column means. A view's, a foreign table's or a partitioned table's does not yet ([#47](https://github.com/AlexandreDemartin/pgcast/issues/47)).
+- A `COMMENT ON COLUMN`, in a migration, reaches that comment too, on a table, a view, a materialised view, a foreign table or a partitioned table ([`schemaJSDoc`](/generator#generate.schemaJSDoc)): the place to tell the assistant what a column means. Each relation shows its own: a view shows none of its table's.
 - After each migration, run `npx pgcast` again, so that the assistant reads the schema as it is.
 
 ## Add the rules file
 
-Copy it into your project, and change `src/zapatos/schema.d.ts` if your `outDir` differs. Each rule ends with the page that backs it, for the assistant to read:
+Copy it into your project, and change `src/zapatos/schema.d.ts` if your `outDir` differs. Installed under the `pgcast` alias, with [`moduleNames: "pgcast"`](/generator#generate.moduleNames), change four things in it: "installed under the `pgcast` alias" in its first line, `'pgcast/db'` and `'pgcast/schema'` in the import rule, with "never from `zapatos`", and `src/pgcast/schema.d.ts`. The URLs and `npx pgcast` stay as they are. Each rule ends with the page that backs it, for the assistant to read:
 
 ```md
 # Postgres with pgcast

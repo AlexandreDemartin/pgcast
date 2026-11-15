@@ -1,5 +1,5 @@
 ---
-english: b643b4709146
+english: 76c135fceb89
 ---
 
 # Transactions
@@ -99,7 +99,7 @@ Avec le client d’une transaction que `transaction()` a ouverte, elle n’envoi
 Une seule transaction, les deux sièges ou aucun : `START TRANSACTION ISOLATION LEVEL SERIALIZABLE`<!-- probe: db.serializable(pool, async () => {}) -->, les deux `INSERT`, `COMMIT`.
 
 - Le callback s’exécute au niveau de la transaction extérieure, car Postgres ne peut plus changer le niveau d’isolation une fois la première requête de celle-ci exécutée. Le type ne vérifie pas ce niveau : chaque `TxnClient` est un [`Queryable`](/fr/sql-template#Queryable), donc `db.serializable(txnClient, …)` passe la vérification de types avec un client de `db.readCommitted()`, et son callback s’exécute dans cette transaction `READ COMMITTED`, comme dans Zapatos 6.6.1, avec un avertissement, une fois, `PGCAST_DEP007`.
-- Avec [`transactionRequiresSatisfyingLevel`](/fr/runtime-config#Config.transactionRequiresSatisfyingLevel), quand le niveau extérieur ne vaut pas pour celui demandé ([`IsolationSatisfying`](#IsolationSatisfying)), `transaction()` est rejetée avant d’appeler le callback, et la transaction extérieure est annulée, à moins que son callback n’intercepte l’erreur. Un niveau qui vaut pour celui demandé est transmis, avec ou sans l’option.
+- Avec [`transactionRequiresSatisfyingLevel`](/fr/runtime-config#Config.transactionRequiresSatisfyingLevel), quand le niveau extérieur ne vaut pas pour celui demandé ([`IsolationSatisfying`](#IsolationSatisfying)), `transaction()` est rejetée avant d’appeler le callback, et la transaction extérieure est annulée, à moins que son callback n’intercepte l’erreur. Un niveau qui vaut pour celui demandé est transmis, avec ou sans l’option, de même que le client de `db.serializableRODeferrable()` donné à `db.serializableRO()`, `db.repeatableReadRO()` ou `db.readCommittedRO()`, qu’`IsolationSatisfying` omet ([#489](https://github.com/AlexandreDemartin/pgcast/issues/489)).
 - Une fonction dont le paramètre est d’un type `TxnClientFor…` est vérifiée : [`IsolationSatisfying`](#IsolationSatisfying).
 - Ce qui marque le client, c’est sa propre propriété `_zapatos` ([`TxnClient`](#TxnClient)).
 - Une transaction que vous avez ouverte vous-même, par un `BEGIN` brut, n’a pas de marque : elle n’est pas transmise ([Votre propre `BEGIN`](#your-own-begin)). Ouvrez la transaction extérieure avec `transaction()`.

@@ -273,10 +273,10 @@ export class ColumnValues<T> { declare readonly [wrapper]: 'vals'; constructor(p
  * in a `sql` template; Zapatos 6.6.1 sent it as JSON (`'{"value":"id"}'`).
  * In an object, it is the parent column too in a nested query, and throws
  * outside one, so as an `insert()`, `upsert()` or `update()` value.
- * `raw()`, `cols()` and `vals()` throw in an object, and in an array in a
- * filter, as `Default` does; in an array outside one they are still sent as
- * JSON. As a filter value `vals(x)` throws, and the type refuses it as a
- * value, as for `raw()`. `null`, a string or another primitive throws while
+ * `raw()`, `cols()` and `vals()` throw in an object, where `Default` compiles;
+ * in an array they throw in a filter, as `Default` does, and outside one they
+ * are still sent as JSON. As a filter value `vals(x)` throws, and the type
+ * refuses it as a value, as for `raw()`. `null`, a string or another primitive throws while
  * compiling; Zapatos 6.6.1 sent a string's characters, `vals('id')` as `$1, $2`,
  * and threw a `TypeError` on `null`.
  */
@@ -479,10 +479,11 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
   /**
    * Compile and run this query using the provided database connection. What's
    * returned is piped via `runResultTransform` before being returned.
-   * A text of several statements, with no values and not prepared, runs as one transaction
-   * unless it holds its own `BEGIN` or `COMMIT`, and Postgres refuses it whole if one of them
-   * cannot run in a transaction block (`VACUUM`, `CREATE INDEX CONCURRENTLY`: 25001). When it
-   * runs, the default `runResultTransform` gives `undefined`: `pg` returns an array of results.
+   * A text of several statements, with no values and not prepared, runs outside a transaction
+   * as one transaction (inside one, as part of it) unless it holds its own `BEGIN` or `COMMIT`,
+   * and Postgres refuses it whole if one of them cannot run in a transaction block (`VACUUM`,
+   * `CREATE INDEX CONCURRENTLY`: 25001). With a value, or prepared, Postgres refuses it (42601).
+   * When it runs, the default `runResultTransform` gives `undefined`: `pg` returns an array of results.
    * @param queryable A database client or pool
    * @param force If true, force this query to hit the DB even if it's marked as a no-op
    */

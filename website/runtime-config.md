@@ -252,6 +252,7 @@ With `true`, a [`selectExactlyOne()`](/select#selectExactlyOne) run on its own a
 
 - Nested in another query, in a `lateral` or a `sql` template, it keeps `LIMIT 1`, option or not: a second row there would join the parent row twice. "On its own" is how the query is compiled: `.run()` and `.compile()` compile it alone, a parent query compiles it as part of its own SQL.
 - A [`.copy()`](/sql-template#copy) of it compiles as nested, so it keeps `LIMIT 1`, run on its own too.
+- With a [`lock`](/select#lock), `LIMIT $2` locks the second row too: after `.run()` rejects, both rows stay locked until the transaction ends, and another session's `FOR UPDATE NOWAIT` on either gets 55P03.
 - Off, it never warns, and it stays off in 7.0: "at least one row" is how Zapatos reads `selectExactlyOne()`, nested in a `lateral` on a `NOT NULL` foreign key ([decision 003](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/003-fixes-and-deprecation.md)).
 - Read when `selectExactlyOne()` is called, not at `.run()`.
 

@@ -130,7 +130,8 @@ let txnSeq = 0;
  * `START TRANSACTION`; without it, it runs and emits `PGCAST_DEP005`, once.
  *
  * Given the client of a transaction at a level that doesn't satisfy this one
- * (`IsolationSatisfying`), the callback would run at that level: with the
+ * (`IsolationSatisfying`, plus `SerializableRODeferrable` for the three other
+ * read-only levels, which the type leaves out, #489), the callback would run at that level: with the
  * `transactionRequiresSatisfyingLevel` config option, this rejects before
  * calling it; without it, it runs and emits `PGCAST_DEP007`, once.
  * @param txnClientOrQueryable The `pg.Pool` from which to check out a client,

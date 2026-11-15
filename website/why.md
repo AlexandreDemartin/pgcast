@@ -70,7 +70,7 @@ One that opens a transaction takes the pool or the client of its level, `pg.Pool
 
 ## What pgcast adds
 
-pgcast starts from Zapatos 6.6.1. Before changing it, the fork pinned what 6.6.1 does, with tests, and that [characterisation](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/CHARACTERISATION-REPORT.md) found dozens of surprises, 7 of them about security. A finding pgcast acts on takes one of three paths ([decision 003](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/003-fixes-and-deprecation.md)):
+pgcast starts from Zapatos 6.6.1. Before changing it, the fork pinned what 6.6.1 does, with tests, and that [characterisation](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/CHARACTERISATION-REPORT.md) found dozens of surprises, some of them about security ([its summary](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/CHARACTERISATION-REPORT.md#summary)). A finding pgcast acts on takes one of three paths ([decision 003](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/003-fixes-and-deprecation.md)):
 
 <div class="stack">
 

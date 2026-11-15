@@ -1,5 +1,5 @@
 ---
-english: 52fbcf4c7ee2
+english: c3091755b813
 ---
 
 # Template SQL
@@ -328,7 +328,7 @@ Le type refuse la plupart d’entre eux (TS2345), sauf là où une colonne parta
 
 Seuls les objets natifs du realm qui exécute pgcast lèvent une erreur, reconnus à leur prototype exact, ou, pour un itérateur, au prototype des itérateurs dans sa chaîne. Comme dans Zapatos 6.6.1 :
 
-- un `Date` ou un itérateur d’un autre realm, comme `vm.runInNewContext('new Date(0)')` (Jest exécute chaque fichier de test dans un contexte `vm`), donne `TRUE` ;
+- un `Date` ou un itérateur d’un autre realm, comme `vm.runInNewContext('new Date(0)')`, donne `TRUE` ;
 - une instance d’une classe qui étend un objet natif garde ses propres clés : `new Frames(1)`, avec `class Frames extends Uint8Array {}`, donne `("0" = $1)` ;
 - un itérateur avec des clés propres les compile : un générateur auquel on a ajouté `{ id: 1 }`, ou une classe qui étend `Iterator` avec un champ `id = 1`, donne `("id" = $1)`.
 

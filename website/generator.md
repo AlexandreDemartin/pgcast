@@ -106,7 +106,7 @@ Every option is optional. Each one given replaces its default whole: `schemas` w
 | [`moduleNames`](#generate.moduleNames) | `"zapatos"` | the module names the files declare and import, and their folder |
 | [`rejectOnQueryError`](#generate.rejectOnQueryError) | none: exits, with a note | whether a failed query rejects, or ends the process |
 | [`uniqueIndexConstraintsOnly`](#generate.uniqueIndexConstraintsOnly) | `false` | the names in each relation's `UniqueIndex` |
-| [`domainsTypedByContext`](#generate.domainsTypedByContext) | `false` | the type of a domain over `bigint`, `numeric`, `bytea`, `money` or a date, outside `Selectable`, and of a domain over a domain or an array of a domain |
+| [`domainsTypedByContext`](#generate.domainsTypedByContext) | `false` | the type of a domain over `bigint`, `numeric`, `bytea`, `money` or a date, or over an array of one, outside `Selectable`, and of a domain over a domain or an array of a domain |
 | [`progressListener`](#generate.progressListener) | `false` | where each step is reported |
 | [`warningListener`](#generate.warningListener) | `true` | where warnings go |
 | [`debugListener`](#generate.debugListener) | `false` | where each query and its result go |
@@ -380,7 +380,7 @@ CREATE UNIQUE INDEX festival_entries_live_idx ON festival_entries (film_id) WHER
 | `festival_entries_slot_key`, `DEFERRABLE` | yes | no | 55000, `ON CONFLICT does not support deferrable unique constraints/exclusion constraints as arbiters` |
 | `festival_entries_live_idx`, an index and no constraint | yes | no | 42704, `constraint "festival_entries_live_idx" for table "festival_entries" does not exist` |
 
-- `true` also leaves out a materialised view's unique indexes, and, on Postgres 18, those of a `WITHOUT OVERLAPS` key, which Postgres treats as an exclusion constraint: 42809 with `DO UPDATE`. An exclusion constraint is in neither list, since its index isn't unique.
+- `true` also leaves out a materialised view's unique indexes, and, on Postgres 18, those of a `WITHOUT OVERLAPS` key, which Postgres treats as an exclusion constraint: 42809 with `DO UPDATE`. An `EXCLUDE` constraint is in neither list, since its index isn't unique.
 - `true` leaves out, too, a constraint whose index isn't valid yet: a partitioned table's, added with `ALTER TABLE ONLY`, until each partition's index is attached ([Partitioning](https://www.postgresql.org/docs/current/ddl-partitioning.html#DDL-PARTITIONING-DECLARATIVE-MAINTENANCE)). Postgres answers 42P10 meanwhile, `there is no unique or exclusion constraint matching the ON CONFLICT specification`; regenerate once they are.
 - A relation left with none gets `never`. `UniqueIndexForTable` and the aggregate `UniqueIndex` types follow.
 - `false` notes, through [`warningListener`](#generate.warningListener), each unique index `true` would leave out.
@@ -448,6 +448,8 @@ Writing custom types file: src/zapatos/custom/index.d.ts
 - `Writing new custom type or domain placeholder file: src/zapatos/custom/PgPoint.d.ts`, once per new placeholder;
 - `Note: custom types "archive"."notes" and "public"."notes" are both named PgNotes in TypeScript, so they share one type and one placeholder file, src/zapatos/custom/PgNotes.d.ts. To type them apart, rename one of them in the database.`
   - once per run for each name that two Postgres types share ([`customTypesTransform`](#generate.customTypesTransform)); when their names differ, it adds that a `customTypesTransform` function can keep them apart;
+- `Note: relations "public"."film notes" and "public"."film_notes" are both named film_notes in TypeScript, so their declarations clash. To type them apart, rename one of them in the database.`
+  - once per run for each TypeScript name that two schemas, relations or enums of one scope take;
 - `Note: custom types "public"."SEAT_LABEL" (PgSEAT_LABEL) and "public"."seat_label" (PgSeat_label) have TypeScript names that differ only in case: on a case-insensitive file system, the default on macOS and Windows, PgSEAT_LABEL.d.ts and PgSeat_label.d.ts are one placeholder file in src/zapatos/custom, which declares only one of those names. To type them apart, rename one of them in the database, or give customTypesTransform a function that keeps their names apart.`
   - once per run for names that differ only in case, whatever the file system, before the note above for each of those names that two Postgres types share;
 - `Note: custom type "public"."index" (index) has the placeholder file index.d.ts in src/zapatos/custom, the file of the custom types' index: the generator writes the index over it on every run, so index is never declared. To declare it, rename it in the database, or give customTypesTransform a function that names it otherwise.`

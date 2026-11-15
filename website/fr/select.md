@@ -1,5 +1,5 @@
 ---
-english: 1b6cfee7be41
+english: 89ac2e463d23
 ---
 
 # Lectures {#select-and-the-aggregates}
@@ -198,7 +198,7 @@ db.selectOne(table, where, options?)
 
 Comme [`select()`](#select), avec `LIMIT $1`<!-- probe: db.selectOne('films', db.all) -->, de valeur `1`, et sans `jsonb_agg` : `.run(pool)` donne la première ligne, ou `undefined` quand aucune ne correspond. Tout `limit` passé est remplacé par `1` ; `offset` et les autres options sont gardés. Dans un `lateral`, sa clé contient la ligne ou `null`.
 
-Avec `withTies` et `order`, il écrit `FETCH FIRST $1 ROWS WITH TIES`<!-- probe: db.selectOne('films', db.all, { order: { by: 'release_year', direction: 'ASC' }, withTies: true }) -->, ici et dans `selectExactlyOne()`. `.run()` donne alors l’une des lignes ex æquo ; dans un `lateral` sous un `select()` extérieur, la ligne parente revient une fois par ligne ex æquo.
+Avec `withTies`, il écrit `FETCH FIRST $1 ROWS WITH TIES`<!-- probe: db.selectOne('films', db.all, { order: { by: 'release_year', direction: 'ASC' }, withTies: true }) -->, ici et dans `selectExactlyOne()` ; Postgres le refuse sans `order` (42601). `.run()` donne alors l’une des lignes ex æquo ; dans un `lateral` sous un `select()` extérieur, la ligne parente revient une fois par ligne ex æquo.
 
 <CastPanel example="selectOne">
 
@@ -394,7 +394,7 @@ const firstShow = await db.min('screenings', db.all, {
 
 - Le SQL est le même dans les deux cas : `SELECT min("starts_at") AS result FROM "screenings"`<!-- probe: (db.setConfig({ aggregatesTypedByColumn: true }), db.min('screenings', db.all, { columns: ['starts_at'] })) -->.
 - `min()` et `max()` donnent un `bigint` ou un `numeric` tel que `pg` l’envoie, en chaîne ; imbriqués, en nombre JSON.
-- `count()` ne donne jamais `NULL` : il ne change pas.
+- `count()` ne change pas avec l’option : `0` au premier niveau, et `null` imbriqué dans un `lateral` ou comme valeur d’`extras` quand sa requête ne renvoie aucune ligne.
 - Passé comme unique `lateral`, l’agrégat est typé comme au premier niveau par `selectOne()` et `selectExactlyOne()`, qui rendent sa colonne telle quelle, et comme imbriqué par `select()`, qui enveloppe ses lignes dans `jsonb_agg()`. Ce `selectOne()` ou ce `selectExactlyOne()`, imbriqué à son tour, est typé comme imbriqué.
 - `.copy()` renvoie un simple `SQLFragment`, typé comme au premier niveau : imbriquée à son tour, une copie revient en JSON avec ce type.
 

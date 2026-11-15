@@ -107,6 +107,8 @@ Look through your code for the first column of each table below. Each change in 
 |---|---|---|---|
 | [`not()`](/conditions#conditions.not) of a fragment with a bare `OR` or `AND`: on `release_year`, `` not(db.sql`${db.self} = 1974 OR ${db.self} = 1991`) `` | `(NOT a) OR b`, so the 1991 film too | `(NOT (a OR b))`<!-- probe: db.conditions.not(db.sql`a OR b`) --> | for the old rows, `` db.sql`(NOT ${db.self} = 1974) OR ${db.self} = 1991` `` |
 | [`and()`](/conditions#conditions.and) of a fragment with a bare `OR` and another operand: `` and(db.sql`${'id'} = 1000 OR ${'id'} = 1001`, { studio_id: 1001 }) `` | `a OR (b AND c)`, so film 1000 too | `((a OR b) AND (c))`<!-- probe: db.conditions.and(db.sql`a OR b`, db.sql`c`) --> | for the old rows, one fragment: `` db.sql`${'id'} = 1000 OR (${'id'} = 1001 AND ${'studio_id'} = ${db.param(1001)})` `` |
+| [`and()`](/conditions#conditions.and) of fragments that split one expression: `` and(db.sql`${'release_year'} BETWEEN 1970`, db.sql`2000`) `` | `(a BETWEEN 1970 AND 2000)`, films 1000 and 1001 | `((a BETWEEN 1970) AND (2000))`<!-- probe: db.conditions.and(db.sql`a BETWEEN 1970`, db.sql`2000`) -->, which Postgres refuses (42601) | one condition: `{ release_year: db.conditions.between(1970, 2000) }` |
+| `groupBy` given an `and()` or `or()` with no argument: `count('films', db.all, { groupBy: db.conditions.and() })` | `GROUP BY ()`, the empty grouping set: 4 | `GROUP BY TRUE`<!-- probe: db.count('films', db.all, { groupBy: db.conditions.and() }) -->, which Postgres refuses (42601), `GROUP BY FALSE` for `or()` | leave `groupBy` out: 4 |
 
 </div>
 
@@ -227,10 +229,13 @@ Once a run shows no warning, or each one comes from a call you've checked, turn 
 ```ts twoslash
 import * as db from 'zapatos/db';
 // ---cut---
+declare module 'zapatos/db' {
+  interface ConfigTypes { aggregatesTypedByColumn: true }
+}
 db.setConfig({
   upsertRequiresSameKeys: true, undefinedMeansMissing: true,
   transactionRequiresCommit: true, transactionRequiresIdleClient: true,
-  transactionRequiresSatisfyingLevel: true,
+  transactionRequiresSatisfyingLevel: true, aggregatesTypedByColumn: true,
 });
 ```
 
@@ -242,11 +247,12 @@ All of them will be the default in 7.0 ([Versions](/versions)). With them on, an
 
 </CastPanel>
 
-- `insert()` sends `DEFAULT`<!-- probe: (db.setConfig({ undefinedMeansMissing: true }), db.insert('tags', { film_id: 1000, tag: undefined })) --> for an `undefined` value, and an `update()` with no other key throws "nothing to update: an Updatable needs at least one column"<!-- message -->.
+- `insert()` sends `DEFAULT`<!-- probe: (db.setConfig({ undefinedMeansMissing: true }), db.insert('tags', { film_id: 1000, tag: undefined })) --> for an `undefined` value, an `update()` with no other key throws "nothing to update: an Updatable needs at least one column"<!-- message -->, and an `upsert()` with no other key "nothing to insert: an Insertable needs at least one column; for a row of defaults only, write INSERT ... DEFAULT VALUES in a sql template"<!-- message -->.
 - The `upsert()` of `PGCAST_DEP001` throws when called, before any query: "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message -->.
 - A `transaction()` whose `COMMIT` Postgres answers with `ROLLBACK` rejects, without a retry ([`transaction()`, Errors](/transaction#errors)).
 - A `transaction()` given a client already inside a transaction block rejects, and leaves that transaction open ([Your own `BEGIN`](/transaction#your-own-begin)).
 - A `transaction()` given the client of a transaction at a level that doesn't satisfy its own rejects before its callback ([Passing a transaction through](/transaction#passing-a-transaction-through)).
+- `sum()`, `avg()`, `min()` and `max()` give `null` when no row matches, and `min()` and `max()` their column's value, typed so by the `ConfigTypes` declaration ([Typed by column](/select#typed-by-column)).
 - No option warns. To keep it that way, `NODE_OPTIONS=--throw-deprecation npm test` fails the run at the first warning.
 
 One more opt-in, [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow), has no warning to look for, and stays off in 7.0. With it, a `selectExactlyOne()` run on its own rejects on a second row, not only on none. Turn it on where your tests show no `selectExactlyOne()` matching two rows.
@@ -263,7 +269,7 @@ The note of [`enumOrder`](/generator#generate.enumOrder) names each enum whose l
 
 The note of [`uniqueIndexConstraintsOnly`](/generator#generate.uniqueIndexConstraintsOnly) names each unique index that `ON CONFLICT ON CONSTRAINT` refuses, though `UniqueIndex` lists it: an index with no constraint, a materialised view's among them, the index of a `DEFERRABLE` constraint or, on Postgres 18, of a `WITHOUT OVERLAPS` key, and a constraint's index not yet valid. Turn it on and regenerate: `tsc` shows each `constraint()` that names one, which Postgres refused anyway (42704, 55000, 42809 or 42P10), and any code of yours that takes `UniqueIndex` for every unique index, such as a `Record` keyed by it.
 
-The note of [`domainsTypedByContext`](/generator#generate.domainsTypedByContext) names each column of a domain over `bigint`, `numeric`, `bytea`, `money` or a date, which its placeholder, as generated, types as `pg` returns it in all five interfaces. A placeholder Zapatos 6.6.1 wrote over `bigint` or `numeric` has no import, so its column is `any`, with the option too: add the import first ([When a placeholder does not compile](/custom-types#when-a-placeholder-does-not-compile)). Turn it on and regenerate: a placeholder left as generated now types its column by context, and `tsc` shows the code that took the shortcuts' JSON for the placeholder's type, a `Date` for a date or a string for a `bigint`. A placeholder you edited keeps its type, as before. Its second note names each column of a domain over a domain, or of an array of a domain, which its placeholder types as `any`: turned on, it types them by the base type of the innermost domain, and `tsc` shows the code that wrote a value of another type there.
+The note of [`domainsTypedByContext`](/generator#generate.domainsTypedByContext) names each column of a domain over `bigint`, `numeric`, `bytea`, `money` or a date, or over an array of one, which its placeholder, as generated, types as `pg` returns it in all five interfaces. A placeholder Zapatos 6.6.1 wrote over `bigint` or `numeric` has no import, so its column is `any`, with the option too: add the import first ([When a placeholder does not compile](/custom-types#when-a-placeholder-does-not-compile)). Turn it on and regenerate: a placeholder left as generated now types its column by context, and `tsc` shows the code that took the shortcuts' JSON for the placeholder's type, a `Date` for a date or a string for a `bigint`. A placeholder you edited keeps its type, as before. Its second note names each column of a domain over a domain, or of an array of a domain, which its placeholder types as `any`: turned on, it types them by the base type of the innermost domain, and `tsc` shows the code that wrote a value of another type there.
 
 The note of [`rejectOnQueryError`](/generator#generate.rejectOnQueryError) comes from a script that calls `generate()`, when a query fails, never from `npx zapatos`, which always exits. Turn it on where the script awaits `generate()`, and read what its `catch` does: a refused connection now reaches it, and a script that logs the error and carries on exits with code 0, not 1.
 
@@ -275,6 +281,7 @@ npm install zapatos@6.6.1
 
 - First, remove from `setConfig()` the options Zapatos 6.6.1's `Config` doesn't have (2353): `upsertRequiresSameKeys`, `undefinedMeansMissing`, `transactionRequiresCommit`, `transactionRequiresIdleClient`, `transactionRequiresSatisfyingLevel`, `selectExactlyOneChecksForSecondRow` and `aggregatesTypedByColumn`.
 - On [`moduleNames`](/generator#generate.moduleNames) `"pgcast"`, run `npm uninstall pgcast` too: both packages have a `zapatos` command. Your `pgcast/…` imports then no longer resolve, and 6.6.1 writes `zapatos/` but leaves `pgcast/` behind. So change each import back to `zapatos/…`, move the placeholders you edited to `zapatos/custom/`, their `declare module 'pgcast/custom'` renamed `'zapatos/custom'`, and delete `pgcast/`.
+- Rename a `pgcastconfig.json` to `zapatosconfig.json`: Zapatos 6.6.1's CLI reads no other file.
 - Regenerate with Zapatos 6.6.1. It ignores `typeEnumsAcrossSchemas`, `enumOrder`, `uniqueIndexConstraintsOnly`, `domainsTypedByContext` and `moduleNames` in `zapatosconfig.json`, and writes again the `any` types, the sorted labels, the unprefixed comment lines, every unique index in `UniqueIndex`, any borrowed `UniqueIndex` name and each domain's placeholder in all five interfaces. Its `generate()` doesn't know `rejectOnQueryError` either: TypeScript refuses it in an object literal (2353), and at run time a failed query ends the process again.
 - Each change of [Find the calls whose result changes](#find-the-calls-whose-result-changes) runs as it did, but the `jsonb` one, which finds nothing again.
 
@@ -288,6 +295,6 @@ The holes of [6.6.2's § Security](/changelog#6.6.2-security) are open again: a 
 
 ## See also
 
-- [Opt-ins and warnings](/runtime-config#opt-ins-and-warnings): each option, its warning and its message.
+- [Opt-ins and warnings](/runtime-config#opt-ins-and-warnings): each option, its warning and when it warns.
 - [Versions](/versions): why pgcast fixes some things outright and others behind an option.
 - [Security](/security): why a name or a `raw()` value can no longer splice SQL.
