@@ -1178,6 +1178,9 @@ describe('count, sum, avg, min, max', () => {
     // under select() and in a lateral map, JSON numbers
     const asJson = { count: 2, sumInt: 2, sumBigint: 9007199254740992, sumNumeric: 1520.5, sumFloat8: 0.5, avgInt: 1, avgNumeric: 760.25 };
     expect(await each(a => db.select('users', { id: 1 }, { lateral: a }))).toEqual(Object.fromEntries(Object.entries(asJson).map(([k, v]) => [k, [v]])));
+    // the outermost call decides: a selectOne() passing it through, under an outer select(), comes back as JSON
+    expect(await each(a => db.select('users', { id: 1 }, { lateral: db.selectOne('users', { id: parent('id') }, { alias: 'u2', lateral: a }) })))
+      .toEqual(Object.fromEntries(Object.entries(asJson).map(([k, v]) => [k, [v]])));
     expect(await each(a => db.selectOne('users', { id: 1 }, { columns: ['id'], lateral: { n: a } })))
       .toEqual(Object.fromEntries(Object.entries(asJson).map(([k, v]) => [k, { id: 1, n: v }])));
   });
