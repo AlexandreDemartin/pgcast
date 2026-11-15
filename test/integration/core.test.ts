@@ -192,12 +192,15 @@ describe('param under castArrayParamsToJson or castObjectParamsToJson: a string 
     expect(await sql`SELECT ${param([1, 2], 'json')} AS v`.run(t.client)).toEqual([{ v: [1, 2] }]);
   });
 
-  it('changed: a cast that names no type is a syntax error', async () => {
-    // 6.6.1 sent CAST($1 AS "json") for each
+  it('changed: a cast that names no type throws while compiling', async () => {
+    // 6.6.1 sent CAST($1 AS "json") for each; #36 sent CAST($1 AS "") and CAST($1 AS ""[]), which Postgres
+    // refused (42601); since #271 the error comes before any query, a plain Error without a code
     db.setConfig({ castArrayParamsToJson: true });
-    for (const cast of ['', '[]']) {
-      expect(await pgError(t.client, () => sql`SELECT ${param([1, 2], cast)} AS v`.run(t.client)))
-        .toMatchObject({ code: '42601' });
+    for (const [cast, type] of [['', '""'], ['[]', '""[]']]) {
+      expect(await pgError(t.client, () => sql`SELECT ${param([1, 2], cast)} AS v`.run(t.client))).toMatchObject({
+        code: undefined,
+        message: `param() cast '${cast}' gives an empty name, ${type}, which Postgres refuses: name each part of the type, as in 'int4' or 'public.mood', or leave the cast out`,
+      });
     }
   });
 

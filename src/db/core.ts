@@ -140,9 +140,11 @@ declare const wrapper: unique symbol;
  * this type within the query e.g. `CAST($1 AS "type")` instead of plain `$1`.
  * Without a `"`, the type is split on `.` and each part quoted: `public.mood`
  * gives `"public"."mood"`. Array bounds at the end, `[]` or `[n]`, follow the
- * quotes: `int4[]` gives `"int4"[]`. With a `"`, the type is written as is if
- * `"type"` is well-formed: non-empty quoted parts without NUL, in which `""`
- * stands for one `"`, joined by `.` with optional whitespace around it
+ * quotes: `int4[]` gives `"int4"[]`. A part left empty (`''`, `'[]'`,
+ * `'public.'`) throws while compiling, as Postgres refuses `""`. With a `"`,
+ * the type is written as is if `"type"` is well-formed: non-empty quoted parts
+ * without NUL, in which `""` stands for one `"`, joined by `.` with optional
+ * whitespace around it
  * (`pg_catalog"."int4`), or if it is already quoted that way (`"a.b"`).
  * Otherwise it is one quoted identifier, any `"` doubled (as `quote_ident`
  * does), so it cannot close its quotes. No part is left unquoted, so a name
@@ -172,9 +174,11 @@ export class Parameter<T = any> { declare readonly [wrapper]?: never; constructo
  * this type within the query e.g. `CAST($1 AS "type")` instead of plain `$1`.
  * Without a `"`, the type is split on `.` and each part quoted: `public.mood`
  * gives `"public"."mood"`. Array bounds at the end, `[]` or `[n]`, follow the
- * quotes: `int4[]` gives `"int4"[]`. With a `"`, the type is written as is if
- * `"type"` is well-formed: non-empty quoted parts without NUL, in which `""`
- * stands for one `"`, joined by `.` with optional whitespace around it
+ * quotes: `int4[]` gives `"int4"[]`. A part left empty (`''`, `'[]'`,
+ * `'public.'`) throws while compiling, as Postgres refuses `""`. With a `"`,
+ * the type is written as is if `"type"` is well-formed: non-empty quoted parts
+ * without NUL, in which `""` stands for one `"`, joined by `.` with optional
+ * whitespace around it
  * (`pg_catalog"."int4`), or if it is already quoted that way (`"a.b"`).
  * Otherwise it is one quoted identifier, any `"` doubled (as `quote_ident`
  * does), so it cannot close its quotes. No part is left unquoted, so a name
@@ -549,6 +553,12 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
               quotedIdentifiers.test(`"${name}"`) ? `"${name}"` :
                 quotedIdentifiers.test(name) ? name :
                   `"${name.replace(/"/g, '""')}"`;
+
+        // an empty part (`''`, `'[]'`, `'public.'`) would be `""`, which Postgres refuses (42601); a cast with a
+        // `"` never gives one under the rules above
+        if (!name.includes('"') && /(?:^|\.)(?:\.|$)/.test(name)) {
+          throw new Error(`param() cast '${cast}' gives an empty name, ${type}${cast.slice(end)}, which Postgres refuses: name each part of the type, as in 'int4' or 'public.mood', or leave the cast out`);
+        }
 
         // the cast wins over castArrayParamsToJson and castObjectParamsToJson (Zapatos 6.6.1 dropped it for
         // `"json"`); the value is still the JSON text they ask for, except an array whose cast ends with

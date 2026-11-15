@@ -1,5 +1,5 @@
 ---
-english: ba462e5de8d5
+english: b339807c479d
 ---
 
 # Template SQL
@@ -122,6 +122,7 @@ Les deux dernières lignes s’appliquent quand [`castArrayParamsToJson`](/fr/ru
 - Toute autre chaîne avec un `"` est un seul nom entre guillemets, chaque `"` doublé, si bien qu’elle ne peut pas fermer ses guillemets : `'int4") || (SELECT 1) || ("int4'` donne `CAST($1 AS "int4"") || (SELECT 1) || (""int4")`<!-- probe: db.sql`${db.param(1, 'int4") || (SELECT 1) || ("int4')}` -->, un type qui n’existe pas.
 - Zapatos 6.6.1 écrivait tout `cast` tel quel entre guillemets : `'public.crew_job'` et `'int4[]'` nommaient donc des types qui n’existent pas.
 - Chaque partie reste entre guillemets, si bien qu’un nom que seule la grammaire SQL connaît n’est pas un type ici : `'int'`, `'double precision'`, `'varchar(10)'` échouent (42704). Donnez le nom que le type porte lui-même (`'int4'`, `'float8'`, `'timestamptz'`), ou écrivez le cast dans `sql` : `` db.sql`CAST(${db.param(x)} AS varchar(10))` ``.
+- Une partie laissée vide lève une erreur à la compilation, si bien que `.run()` est rejetée avec une simple `Error` avant toute requête : `''`, `'[]'`, `'public.'` et `'.crew_job'` donneraient `""`, que Postgres refuse (42601). L’erreur nomme le cast et le nom qu’il donne : "param() cast '…' gives an empty name, …, which Postgres refuses: name each part of the type, as in 'int4' or 'public.mood', or leave the cast out"<!-- message -->. Zapatos 6.6.1 les envoyait, et Postgres les refusait aussi, sauf là où la 6.6.1 abandonnait le cast : au profit de `"json"` sous `castArrayParamsToJson` ou `castObjectParamsToJson`, et comme valeur d’un Whereable.
 - Sous `castArrayParamsToJson` ou `castObjectParamsToJson`, un cast en chaîne est le type écrit, et la valeur reste le texte JSON que l’option envoie (la dernière ligne du tableau) : `param({ a: 1 }, 'jsonb')` fonctionne avec `=` et `@>` sur une colonne `jsonb`.
 - Sous `castArrayParamsToJson`, un tableau dont le cast finit par `[]` ou `[n]` part comme un tableau : `'_int4'` et un domaine sur un tableau envoient toujours du JSON, que Postgres refuse comme tableau (22P02).
 - Zapatos 6.6.1 abandonnait un cast en chaîne sous l’une ou l’autre option au profit de `CAST($1 AS "json")` ([#36](https://github.com/AlexandreDemartin/pgcast/issues/36)), si bien qu’un cast qui nomme un autre type que sa cible s’applique désormais : `param(arr, 'int4[]')` vers une colonne `json` est refusé (42804), vers une colonne `text` stocke `{1,2}` pour `[1,2]`.
