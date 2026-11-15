@@ -28,6 +28,58 @@ describe('sql<Interpolations, RunResult, Constraint>', () => {
     // @ts-expect-error 'accounts' is not the users table
     db.sql<s.users.SQL>`SELECT * FROM ${'accounts'}`;
   });
+
+  // users.id and products.id are a number, transfers.id a string, accounts.id an int8: a shortcut reads the
+  // key's contextual type across every table, and the template no longer takes its Constraint from it (#493)
+  test('a bare template is the value of a column whose name other tables type otherwise (#493)', () => {
+    const isNull = db.sql`${db.self} IS NULL`;
+    expectTypeOf(db.select('users', { id: db.sql`${db.self} IS NULL` })).toEqualTypeOf<db.SQLFragment<s.users.JSONSelectable[]>>();
+    expectTypeOf(db.select('users', { id: db.sql`${db.self} IS NULL` })).not.toBeAny();
+    expectTypeOf(db.select('accounts', { id: db.sql`${db.self} IS NULL` })).toEqualTypeOf<db.SQLFragment<s.accounts.JSONSelectable[]>>();
+    expectTypeOf(db.select('transfers', { id: db.sql`${db.self} IS NULL` })).toEqualTypeOf<db.SQLFragment<s.transfers.JSONSelectable[]>>();
+    expectTypeOf(db.selectOne('users', { id: db.sql`${db.self} IS NULL` })).toEqualTypeOf<db.SQLFragment<s.users.JSONSelectable | undefined>>();
+    expectTypeOf(db.count('users', { id: db.sql`${db.self} IS NULL` })).toEqualTypeOf<db.SQLFragment<number>>();
+    expectTypeOf(db.deletes('users', { id: db.sql`${db.self} IS NULL` })).toEqualTypeOf<db.SQLFragment<s.users.JSONSelectable[]>>();
+    expectTypeOf(db.update('users', { display_name: 'Ada' }, { id: db.sql`${db.self} IS NULL` })).toEqualTypeOf<db.SQLFragment<s.users.JSONSelectable[]>>();
+    expectTypeOf(db.update('products', { id: db.sql`${db.self} + 1` }, { id: 1 })).toEqualTypeOf<db.SQLFragment<s.products.JSONSelectable[]>>();
+    // two tables whose id is a number, while transfers.id is a string; then all three
+    const two = 'users' as 'users' | 'products', three = 'users' as 'users' | 'products' | 'transfers';
+    expectTypeOf(db.select(two, { id: db.sql`${db.self} IS NULL` })).toEqualTypeOf<db.SQLFragment<(s.users.JSONSelectable | s.products.JSONSelectable)[]>>();
+    expectTypeOf(db.selectOne(two, { id: db.sql`${db.self} IS NULL` })).toEqualTypeOf<db.SQLFragment<s.users.JSONSelectable | s.products.JSONSelectable | undefined>>();
+    expectTypeOf(db.select(three, { id: db.sql`${db.self} IS NULL` })).toEqualTypeOf<db.SQLFragment<(s.users.JSONSelectable | s.products.JSONSelectable | s.transfers.JSONSelectable)[]>>();
+    // as before: a template built apart, or with a type argument
+    expectTypeOf(isNull).toEqualTypeOf<db.SQLFragment<any[], never>>();
+    db.select('users', { id: isNull });
+    db.select('users', { id: db.sql<s.users.SQL>`${db.self} IS NULL` });
+    db.select('users', { id: db.sql<db.SQL, any, number>`${db.self} IS NULL` });
+  });
+
+  test('a template whose Constraint is given is still checked against the column (#493)', () => {
+    // @ts-expect-error a string Constraint on an int column (users.id)
+    db.select('users', { id: db.sql<db.SQL, any, string>`${db.self} IS NULL` });
+    // @ts-expect-error a string on an int column, as before
+    db.select('users', { id: '1' });
+    // @ts-expect-error Parameter<string> on an int column, as before
+    db.select('users', { id: db.param('1') });
+    // @ts-expect-error a number is no SQL interpolation
+    db.sql`SELECT ${5}`;
+    // @ts-expect-error nor in a template typed by its table
+    db.sql<s.users.SQL>`SELECT ${5}`;
+  });
+
+  test('a template with three type arguments, its wrappers and typeof sql keep their types (#493)', () => {
+    // a caller's condition, as conditions.ts writes eq(): its Constraint is inferred from the column (#181)
+    const myEq = <T>(a: T) => db.sql<db.SQL, boolean | null, T>`${db.self} = ${db.param(a)}`;
+    expectTypeOf(myEq(1)).toEqualTypeOf<db.SQLFragment<boolean | null, number>>();
+    db.select('users', { mood: myEq('happy'), id: myEq(1) });
+    db.select('users', { mood: c.eq('happy') });
+    // @ts-expect-error 'angry' is not a mood
+    db.select('users', { mood: myEq('angry') });
+    expectTypeOf<ReturnType<typeof db.sql>>().toEqualTypeOf<db.SQLFragment<unknown, unknown>>();
+    expectTypeOf<Parameters<typeof db.sql>>().toEqualTypeOf<never>();  // as in Zapatos 6.6.1: NoInfer<unknown> in a rest
+    const plain: (literals: TemplateStringsArray, ...expressions: db.SQL[]) => db.SQLFragment<number> = db.sql;
+    expectTypeOf(plain`SELECT 1`).toEqualTypeOf<db.SQLFragment<number>>();
+  });
 });
 
 describe('param, parent, self', () => {
