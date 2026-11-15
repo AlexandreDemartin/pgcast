@@ -579,6 +579,37 @@ describe('SQLFragment.run', () => {
     `);
   });
 
+  // #204: a text of several statements, with no values, goes to Postgres as one simple query, which runs them all;
+  // pg then gives an array of results, and the default qr => qr.rows reads undefined off it, as in Zapatos 6.6.1
+  it('several statements, no values: all run, and run() resolves undefined, resultListener too', async () => {
+    const seen: unknown[] = [];
+    db.setConfig({ resultListener: result => seen.push(result) });
+    expect(await sql`SELECT 1 AS a; SELECT 2 AS b`.run(t.client)).toBeUndefined();
+    expect(seen).toEqual([undefined]);
+  });
+
+  it('several statements, no values: a script runs to its end', async () => {
+    expect(await sql`CREATE TABLE pgcast_204 (id int); INSERT INTO pgcast_204 VALUES (1), (2)`.run(t.client))
+      .toBeUndefined();
+    expect((await t.client.query('SELECT count(*)::int AS n FROM pgcast_204')).rows).toEqual([{ n: 2 }]);
+  });
+
+  it('several statements with a value, or prepared: Postgres refuses them (42601)', async () => {
+    const refused = {
+      code: '42601',
+      message: 'cannot insert multiple commands into a prepared statement',
+    };
+    expect(await pgError(t.client, () => sql`SELECT ${param(1)} AS a; SELECT 2 AS b`.run(t.client))).toEqual(refused);
+    expect(await pgError(t.client, () => sql`SELECT 1 AS a; SELECT 2 AS b`.prepared(`pgcast_204_${Date.now()}`)
+      .run(t.client))).toEqual(refused);
+  });
+
+  it('several statements: a runResultTransform of its own gets pg\'s array, one result per statement', async () => {
+    const q = sql<db.SQL, unknown[][]>`SELECT 1 AS a; SELECT 2 AS b`;
+    q.runResultTransform = (qr: unknown) => (qr as { rows: unknown[] }[]).map(r => r.rows);
+    expect(await q.run(t.client)).toEqual([[{ a: 1 }], [{ b: 2 }]]);
+  });
+
   it('queryListener and resultListener see every run, no-ops included', async () => {
     const seen: unknown[] = [];
     db.setConfig({
