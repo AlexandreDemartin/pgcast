@@ -199,8 +199,8 @@ describe('variant snapshots', () => {
     `)).toEqual([]);
   });
 
-  it('uniqueIndexConstraintsOnly: constraint() takes a constraint, and no other unique index', async () => {
-    const probe = (refused: string) => `
+  /** Two constraints kept by uniqueIndexConstraintsOnly, two unique indexes refused, each line after a `refused` comment. */
+  const constraintProbe = (refused: string) => `
       import * as db from 'zapatos/db';
       import type * as s from 'zapatos/schema';
       const row = { sku: 'x', price_cents: 1, status: 'draft' } as const;
@@ -220,9 +220,19 @@ describe('variant snapshots', () => {
         ${refused} no longer keys of the Record
         products_status_sku_key: 'status, sku and variant', products_title_lower_key: 'title',
       };`;
-    expect(await probeErrors({ ...main, uniqueIndexConstraintsOnly: true }, probe('// @ts-expect-error'))).toEqual([]);
-    expect(await probeErrors(main, probe('//'))).toEqual([]);  // off: all four, as in Zapatos 6.6.1
-    expect(await probeErrors(main, probe('// @ts-expect-error'))).toEqual(Array(3).fill(
+
+  // one codegen and one compile per `it`: the three in one took more than the 5 s default on CI
+  it('uniqueIndexConstraintsOnly: constraint() takes a constraint, and no other unique index', async () => {
+    expect(await probeErrors({ ...main, uniqueIndexConstraintsOnly: true }, constraintProbe('// @ts-expect-error')))
+      .toEqual([]);
+  });
+
+  it('uniqueIndexConstraintsOnly off: constraint() takes all four unique indexes, as in Zapatos 6.6.1', async () => {
+    expect(await probeErrors(main, constraintProbe('//'))).toEqual([]);
+  });
+
+  it('uniqueIndexConstraintsOnly off: each refusal of the key-on probe is an unused directive', async () => {
+    expect(await probeErrors(main, constraintProbe('// @ts-expect-error'))).toEqual(Array(3).fill(
       "probe.ts TS2578 Unused '@ts-expect-error' directive."));
   });
 
