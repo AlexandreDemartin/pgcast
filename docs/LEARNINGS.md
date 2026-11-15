@@ -274,7 +274,7 @@ Candidates for a check, a rule or a skill line.
 - #420 — A type test whose only assertion is `.not.toBeAny()` on a value whose type is known freezes nothing: `not.toBeAny()` goes with an equality, never instead of one (grep `test/**/*.test-d.ts`) — `branch-reviewer`
 - #420 — A claim about a nested query returning several rows names `select()`, `selectOne()`, `selectExactlyOne()`, and `selectExactlyOne()` with `selectExactlyOneChecksForSecondRow` (second time after #164) — `branch-reviewer`
 - #420 — A widened nested type is tested as a candidate cheaply: run the grid of what callers do with the value (14/19 refused here), not only the type of the value; and a characterisation type test is proved meaningful by running it against that candidate — `builder`
-- #466 — the's `docs` job hung 15 min in `docs:examples` after the `PGCAST_DEP002` warning and passed on rerun: a hang in `run-examples.mjs` worth a timeout per example — orchestrator
+- #466 — its `docs` job hung 15 min in `docs:examples` after the `PGCAST_DEP002` warning and passed on rerun: a hang in `run-examples.mjs` worth a timeout per example — orchestrator
 
 ## Minors kept
 
