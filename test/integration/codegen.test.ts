@@ -1232,6 +1232,8 @@ describe('domainsTypedByContext', () => {
     CREATE DOMAIN ctx.vip_label AS ctx.label;
     CREATE DOMAIN ctx.vip_genre AS ctx.genre_d;
     CREATE DOMAIN ctx.ticket_list AS ctx.ticket_no[];
+    -- whose base type, an array of a domain, has a root of its own
+    CREATE DOMAIN ctx.vip_ticket_list AS ctx.ticket_list;
     -- any under its domains too: a point, an array of a domain over an array
     CREATE DOMAIN ctx.spot AS point;
     CREATE DOMAIN ctx.vip_spot AS ctx.spot;
@@ -1250,7 +1252,7 @@ describe('domainsTypedByContext', () => {
     CREATE TABLE ctx.nested (
       id int PRIMARY KEY, premium ctx.premium_ticket_no NOT NULL, vip ctx.vip_ticket_no, day ctx.vip_day,
       label ctx.vip_label, genre ctx.vip_genre, arr ctx.ticket_no[], labels ctx.label[], list ctx.ticket_list,
-      tone ctx.vip_tone);
+      tone ctx.vip_tone, vip_list ctx.vip_ticket_list);
     CREATE MATERIALIZED VIEW ctx.nested_days AS SELECT day, arr FROM ctx.nested;
     CREATE TABLE ctx_box.films (id int PRIMARY KEY, tones ctx_box.tone_d[]);
   `));
@@ -1357,6 +1359,7 @@ describe('domainsTypedByContext', () => {
         ['arr', 'c.Pg_ticket_no', 'string', 'number[]', '(number | db.Int8String | bigint)[]'],
         ['labels', 'c.Pg_label', 'string', 'string[]', 'string[]'],
         ['list', 'c.PgTicket_list', 'string', 'number[]', '(number | db.Int8String | bigint)[]'],
+        ['vip_list', 'c.PgVip_ticket_list', 'string', 'number[]', '(number | db.Int8String | bigint)[]'],
       ];
       for (const [column, placeholder, selectable, json, input] of cases) {
         const typed = inAny(placeholder);
@@ -1373,7 +1376,8 @@ describe('domainsTypedByContext', () => {
 
     it('is off by default: the placeholder in all five, as in Zapatos 6.6.1', async () => {
       const { ts: schema } = await codegen(ctx);
-      for (const [column, placeholder] of [['vip', 'c.PgVip_ticket_no'], ['arr', 'c.Pg_ticket_no'], ['list', 'c.PgTicket_list']]) {
+      for (const [column, placeholder] of [['vip', 'c.PgVip_ticket_no'], ['arr', 'c.Pg_ticket_no'], ['list', 'c.PgTicket_list'],
+        ['vip_list', 'c.PgVip_ticket_list']]) {
         expect.soft(linesOf(schema, 'nested', column), column).toEqual(nullable(column, placeholder, placeholder, placeholder));
       }
     });
@@ -1393,15 +1397,15 @@ describe('domainsTypedByContext', () => {
     it('types what pg, the shortcuts and Postgres give: a domain over a domain parsed, an array of a domain as text', async () => {
       const row = await runtime.insert('ctx.nested' as any, {
         id: 1, premium: BigInt(1), vip: '2', day: '2030-03-01', label: 'x', genre: 'comedy',
-        arr: [1, BigInt(2)], labels: ['a'], list: ['3'], tone: 'dry',
+        arr: [1, BigInt(2)], labels: ['a'], list: ['3'], tone: 'dry', vip_list: [4, BigInt(5)],
       }).run(t.client) as any;
       // the shortcuts' JSON
       expect(row).toEqual({ id: 1, premium: 1, vip: 2, day: '2030-03-01', label: 'x', genre: 'comedy',
-        arr: [1, 2], labels: ['a'], list: [3], tone: 'dry' });
+        arr: [1, 2], labels: ['a'], list: [3], tone: 'dry', vip_list: [4, 5] });
       // pg's own parsing
-      const { rows: [fromPg] } = await t.client.query('SELECT premium, vip, day, arr, labels, list FROM ctx.nested');
+      const { rows: [fromPg] } = await t.client.query('SELECT premium, vip, day, arr, labels, list, vip_list FROM ctx.nested');
       expect({ ...fromPg, day: fromPg.day instanceof Date }).toEqual({
-        premium: '1', vip: '2', day: true, arr: '{1,2}', labels: '{a}', list: '{3}' });
+        premium: '1', vip: '2', day: true, arr: '{1,2}', labels: '{a}', list: '{3}', vip_list: '{4,5}' });
     });
   });
 
@@ -1424,7 +1428,7 @@ describe('domainsTypedByContext', () => {
       'Note: ctx.nested.arr (ctx.ticket_no[]), ctx.nested.day (ctx.vip_day), ctx.nested.genre (ctx.vip_genre), ' +
       'ctx.nested.label (ctx.vip_label), ctx.nested.labels (ctx.label[]), ctx.nested.list (ctx.ticket_list), ' +
       'ctx.nested.premium (ctx.premium_ticket_no), ctx.nested.tone (ctx.vip_tone), ctx.nested.vip (ctx.vip_ticket_no), ' +
-      'ctx.nested_days.arr ' +
+      'ctx.nested.vip_list (ctx.vip_ticket_list), ctx.nested_days.arr ' +
       '(ctx.ticket_no[]) and ctx.nested_days.day (ctx.vip_day) have domains over a domain, or arrays of a domain: ' +
       'as generated, their placeholders type them as `any`. Set domainsTypedByContext: true to type them by the base ' +
       'type of the innermost domain while their placeholders hold `any`; it will be the default in pgcast 7.0.',
