@@ -74,4 +74,34 @@ describe('isDatabaseError()', () => {
     // a String object, which 6.6.1 reads as a string
     expect(db.isDatabaseError({ code: new String('23505') }, name)).toBe(true);
   });
+
+  // #501: Zapatos 6.6.1 threw "TypeError: code.startsWith is not a function" on these
+  it.each([
+    ['an array of five characters', ['2', '3', '5', '0', '5']],
+    ['an object with a length of 5', { length: 5 }],
+  ])('gives false for a code that is %s', (_, code) => {
+    expect(db.isDatabaseError({ code }, 'IntegrityConstraintViolation')).toBe(false);
+  });
+
+  // #501: startsWith is read once per type, as Zapatos 6.6.1 reads it, so a getter sees the same reads
+  it.each([
+    [[], 0, false],
+    [['IntegrityConstraintViolation'], 1, true],
+    [['IntegrityConstraintViolation_CheckViolation', 'IntegrityConstraintViolation_UniqueViolation'], 2, true],
+  ] as const)('reads a startsWith getter once per type, for the types %j', (types, reads, matches) => {
+    let n = 0;
+    const code = { length: 5, get startsWith() { n++; return (prefix: string) => '23505'.startsWith(prefix); } };
+    expect(db.isDatabaseError({ code }, ...types)).toBe(matches);
+    expect(n).toBe(reads);
+  });
+
+  it('gives false with no types for a code whose startsWith getter throws, as Zapatos 6.6.1 does', () => {
+    const code = { length: 5, get startsWith(): never { throw new Error('startsWith getter'); } };
+    expect(db.isDatabaseError({ code })).toBe(false);
+  });
+
+  it('throws what a startsWith getter throws with a type, as Zapatos 6.6.1 does', () => {
+    const code = { length: 5, get startsWith(): never { throw new Error('startsWith getter'); } };
+    expect(() => db.isDatabaseError({ code }, 'IntegrityConstraintViolation')).toThrow('startsWith getter');
+  });
 });

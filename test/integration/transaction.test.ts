@@ -95,6 +95,23 @@ describe('transaction', () => {
     });
   });
 
+  // #501: Zapatos 6.6.1 rejected with "TypeError: code.startsWith is not a function"
+  it.each([
+    ['an array of five characters', ['4', '0', '0', '0', '1']],
+    ['an object with a length of 5', { length: 5 }],
+  ])('rolls back and rejects with the error of a callback whose code is %s', async (_, code) => {
+    const thrown = { code };
+    let attempts = 0;
+    const outcome = await db.readCommitted(t.pool, async c => {
+      attempts++;
+      await write(c, 'rolled back');
+      throw thrown;
+    }).then(() => 'resolved', (error: unknown) => ({ error }));
+    expect(outcome).toEqual({ error: thrown });
+    expect(attempts).toBe(1);
+    expect(await notes()).toEqual([]);
+  });
+
   it('does not retry a database error other than 40001 / 40P01', async () => {
     let attempts = 0;
     const err = await db.transaction(t.pool, IsolationLevel.Serializable, async c => {
