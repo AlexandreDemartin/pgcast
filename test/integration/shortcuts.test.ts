@@ -445,6 +445,72 @@ describe('upsert', () => {
     }
     expect(await writeOutcomes(writes)).toEqual(everyOutcome(writes, wrapperAsValue));
   });
+
+  describe('characterization: a partitioned table, as in 6.6.1 (#460)', () => {
+    // events' partitions are PARTITION OF it, so have its column layout: Postgres routes a row there without converting
+    // it, and reads RETURNING from the parent's slot, which has no system column, so no xmax for $action. Documented,
+    // not fixed: the SQL is the same for every table, so these pass on master
+    const loginId = () => scalar(`SELECT id AS v FROM events WHERE kind = 'login'`);
+    const row = (id: string | number) => ({ id, occurred_on: '2026-03-15', kind: 'logout' });
+
+    it('upsert() into the parent rejects with 0A000, whatever the target and the number of rows', async () => {
+      const id = await loginId(), version = await scalar(`SELECT current_setting('server_version') AS v`);
+      const conflict = db.upsert('events', row(id), ['id', 'occurred_on']);
+      expect(conflict.compile().text).toBe(
+        `INSERT INTO "events" ("id", "kind", "occurred_on") VALUES ($1, $2, $3) ON CONFLICT ("id", "occurred_on") DO UPDATE SET ("id", "occurred_on", "kind") = ROW(EXCLUDED."id", EXCLUDED."occurred_on", EXCLUDED."kind") RETURNING to_jsonb("events".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result`);
+      const writes = {
+        'one conflict': conflict,
+        'one new': db.upsert('events', row(1000), ['id', 'occurred_on']),
+        'constraint()': db.upsert('events', row(id), db.constraint('events_pkey')),
+        'several rows': db.upsert('events', [row(id), row(1000)], ['id', 'occurred_on']),
+        'doNothing, one new': db.upsert('events', row(1000), ['id', 'occurred_on'], { updateColumns: db.doNothing }),
+      };
+      expect(await writeOutcomes(writes), `Postgres ${version} ran an upsert() into a partitioned table with its $action: ` +
+        'name the versions that refuse it here, in the reportAction JSDoc of src/db/shortcuts.ts, in website/insert.md, ' +
+        'website/fr/insert.md and the #460 line of CHANGELOG.md (#460)')
+        .toEqual({ ...everyOutcome(writes, '0A000'), queriesSent: 5 });
+      expect((await fails(conflict)).message).toBe('cannot retrieve a system column in this context');
+    });
+
+    it('upsert() into the parent reports $action when the row lands in a partition with its columns in another order', async () => {
+      await t.client.query(`CREATE TABLE events_2027 (payload jsonb, kind text NOT NULL, occurred_on date NOT NULL, id bigint NOT NULL)`);
+      await t.client.query(`ALTER TABLE events ATTACH PARTITION events_2027 FOR VALUES FROM ('2027-01-01') TO ('2028-01-01')`);
+      const later = { id: 1002, occurred_on: '2027-03-15', kind: 'logout' };
+      expect(await run(db.upsert('events', later, ['id', 'occurred_on'], { returning: ['kind'] })))
+        .toEqual({ kind: 'logout', $action: 'INSERT' });
+      expect(await run(db.upsert('events', { ...later, kind: 'login' }, db.constraint('events_pkey'), { returning: ['kind'] })))
+        .toEqual({ kind: 'login', $action: 'UPDATE' });
+      expect(await scalar(`SELECT kind AS v FROM events_2027 WHERE id = 1002`)).toBe('login');
+    });
+
+    it('upsert() into the parent reports $action when the row lands in a PARTITION OF made after a column was dropped', async () => {
+      await t.client.query(`ALTER TABLE events ADD COLUMN dropped int`);
+      await t.client.query(`ALTER TABLE events DROP COLUMN dropped`);
+      await t.client.query(`CREATE TABLE events_2027 PARTITION OF events FOR VALUES FROM ('2027-01-01') TO ('2028-01-01')`);
+      const later = { id: 1002, occurred_on: '2027-03-15', kind: 'logout' };
+      expect(await run(db.upsert('events', later, ['id', 'occurred_on'], { returning: ['kind'] })))
+        .toEqual({ kind: 'logout', $action: 'INSERT' });
+      expect(await run(db.upsert('events', { ...later, kind: 'login' }, ['id', 'occurred_on'], { returning: ['kind'] })))
+        .toEqual({ kind: 'login', $action: 'UPDATE' });
+      // the older partitions dropped the column with the table, so theirs still sit where its do
+      expect((await fails(db.upsert('events', row(await loginId()), ['id', 'occurred_on']))).code).toBe('0A000');
+    });
+
+    it("reportAction: 'suppress' runs, as does an upsert into the partition", async () => {
+      const id = await loginId();
+      expect(await run(db.upsert('events', row(id), ['id', 'occurred_on'], { reportAction: 'suppress', returning: ['kind'] })))
+        .toEqual({ kind: 'logout' });
+      expect(sortBy(await run(db.upsert('events', [row(id), row(1000)], db.constraint('events_pkey'), {
+        reportAction: 'suppress', returning: ['id'],
+      })), 'id')).toEqual(sortBy([{ id: Number(id) }, { id: 1000 }], 'id'));
+      expect(await run(db.upsert('events_2026', row(1001), ['id', 'occurred_on'], { returning: ['kind'] })))
+        .toEqual({ kind: 'logout', $action: 'INSERT' });
+      expect(await run(db.upsert('events_2026', { ...row(id), kind: 'login again' }, db.constraint('events_2026_pkey'), {
+        returning: ['kind'],
+      }))).toEqual({ kind: 'login again', $action: 'UPDATE' });
+      expect(await scalar(`SELECT kind AS v FROM events WHERE id = ${Number(id)}`)).toBe('login again');
+    });
+  });
 });
 
 describe('update', () => {
@@ -933,6 +999,20 @@ describe('count, sum, avg, min, max', () => {
     await expect(run(db.count('users', all, { columns: ['id', 'mood'] }))).rejects.toThrow('count() takes one column in columns, not 2 (leave columns out for count(*))');
     await expect(run(db.count('users', all, { columns: [] }))).rejects.toThrow('count() takes one column in columns, not 0 (leave columns out for count(*))');
     await expect(run(db.sum('accounts', all, { columns: ['balance', 'ratio'] }))).rejects.toThrow('sum() takes one column in columns, not 2');
+    expect(sent).toEqual([]);
+  });
+
+  it('a string or another primitive as columns rejects run() before any query is sent, nested too', async () => {
+    // 6.6.1 sent `count("0", "1")` for 'id' (42703) and `count()` for 42 (42809)
+    const sent: unknown[] = [];
+    db.setConfig({ queryListener: query => sent.push(query) });
+    await expect(run(db.count('users', all, { columns: 'id' as any })))
+      .rejects.toThrow(new Error("count() takes columns as an array, not string: pass columns: ['column'] (leave columns out for count(*))"));
+    await expect(run(db.avg('accounts', all, { columns: 42 as any })))
+      .rejects.toThrow(new Error("avg() takes columns as an array, not number: pass columns: ['column']"));
+    await expect(run(db.select('users', all, { lateral: { top: db.max('accounts', { owner_id: parent('id') }, { columns: 'balance' as any }) } })))
+      .rejects.toThrow(new Error("max() takes columns as an array, not string: pass columns: ['column']"));
+    await expect(run(db.count('users', all, { columns: 'id' as any }))).rejects.not.toHaveProperty('code');
     expect(sent).toEqual([]);
   });
 

@@ -291,6 +291,17 @@ interface UpsertOptions<
   updateValues?: UpdateValuesForTable<T>;
   updateColumns?: UC;
   noNullUpdateColumns?: ColumnForTable<T> | ColumnForTable<T>[] | typeof all;
+  /**
+   * `'suppress'` leaves `$action` out of the SQL and of the type. A partitioned
+   * table needs it when a row lands in a partition whose columns sit where the
+   * table's do: the same columns in the same order, as `PARTITION OF` gives
+   * unless the table already had a dropped column, or as a table made with
+   * `CREATE TABLE` and then attached can have. Postgres reads no `xmax` there,
+   * and rejects the query with 0A000, "cannot retrieve a system column in this
+   * context", as with Zapatos 6.6.1. A row that lands in a partition with its
+   * columns in another order reports `$action`, as does an upsert into the
+   * partition itself.
+   */
   reportAction?: RA;
 }
 
@@ -442,6 +453,9 @@ export const upsert: UpsertSignatures = function (
 
   // the added-on $action = 'INSERT' | 'UPDATE' key takes after SQL Server's approach to MERGE
   // (and on the use of xmax for this purpose, see: https://stackoverflow.com/questions/39058213/postgresql-upsert-differentiate-inserted-and-updated-rows-using-system-columns-x)
+  // a row routed to a partition whose columns sit where the parent's do is returned from the parent's virtual slot, which
+  // has no system column, so Postgres refuses xmax (0A000): see tts_virtual_getsysattr in
+  // https://github.com/postgres/postgres/blob/REL_17_STABLE/src/backend/executor/execTuples.c
 
   const
     insertPart = sql`INSERT INTO ${table} (${insertColsSQL}) VALUES ${insertValuesSQL}`,
@@ -960,7 +974,8 @@ export interface ColumnAggregateSignatures {
 
 // the aggregate takes one column, none for count(*), and has no row to pass a lateral query through: Zapatos 6.6.1
 // sent `sum(*)`, `count("a", "b")` or `SELECT  AS result`, which Postgres refuses. The type is 6.6.1's, so these
-// throw as the query compiles, as a value with no meaning does in core.ts: `run()` rejects, before any query
+// throw as the query compiles, as a value with no meaning does in core.ts: `run()` rejects, before any query.
+// A string or another primitive as `columns` is refused here, before cols() refuses it in terms of db.cols()
 const numericAggregate = (
   table: Table,
   where: Whereable | SQLFragment<any> | AllType,
@@ -972,8 +987,9 @@ const numericAggregate = (
     { columns, lateral } = options,
     columnsRefusal =
       !columns ? (aggregate === 'count' ? undefined : `${aggregate}() needs one column to aggregate: pass columns: ['column']`) :
-        Array.isArray(columns) && columns.length !== 1 ? `${aggregate}() takes one column in columns, not ${columns.length}${aggregate === 'count' ? ' (leave columns out for count(*))' : ''}` :
-          undefined,
+        typeof columns !== 'object' && typeof columns !== 'function' ? `${aggregate}() takes columns as an array, not ${typeof columns}: pass columns: ['column']${aggregate === 'count' ? ' (leave columns out for count(*))' : ''}` :
+          Array.isArray(columns) && columns.length !== 1 ? `${aggregate}() takes one column in columns, not ${columns.length}${aggregate === 'count' ? ' (leave columns out for count(*))' : ''}` :
+            undefined,
     refusal = columnsRefusal ?? (lateral instanceof SQLFragment ? `${aggregate}() cannot pass a lateral query through: nest it in the lateral of a select() instead` : undefined),
     byColumn = aggregate === 'min' || aggregate === 'max';
 
@@ -1004,11 +1020,11 @@ const numericAggregate = (
  * or `all`
  * @param options Options object. Useful keys may be: `columns`, `alias`.
  * `columns: ['col']` gives `count("col")`, and no `columns` `count(*)`;
- * several columns, or a single query as `lateral`, throw as the query
- * compiles, so `run()` rejects before any query is sent. A query that returns
- * no row (a `groupBy` with no group, a `having` that keeps none, `offset: 1`,
- * `limit: 0`) gives `0` from `run()`, but `null` nested in a `lateral` or
- * `extras`, though the type says `number`.
+ * several columns, a string in place of the array, or a single query as
+ * `lateral`, throw as the query compiles, so `run()` rejects before any query
+ * is sent. A query that returns no row (a `groupBy` with no group, a `having`
+ * that keeps none, `offset: 1`, `limit: 0`) gives `0` from `run()`, but `null`
+ * nested in a `lateral` or `extras`, though the type says `number`.
  */
 export const count: NumericAggregateSignatures = function (table, where, options?) {
   return numericAggregate(table, where, options, 'count');
@@ -1022,8 +1038,9 @@ export const count: NumericAggregateSignatures = function (table, where, options
  * aggregated, or `all`
  * @param options Options object. Useful keys may be: `columns`, `alias`.
  * `columns` holds the one column to aggregate: `columns: ['col']` gives
- * `sum("col")`; no column, several, or a single query as `lateral`, throw as
- * the query compiles, so `run()` rejects before any query is sent.
+ * `sum("col")`; no column, several, a string in place of the array, or a
+ * single query as `lateral`, throw as the query compiles, so `run()` rejects
+ * before any query is sent.
  * On an empty set, `Number()` makes the `NULL` `0`, and `run()` warns
  * (`PGCAST_DEP004`), once; with `aggregatesTypedByColumn` (`setConfig()` and
  * `ConfigTypes`), it gives `null`.
