@@ -219,6 +219,55 @@ describe('param', () => {
     expect(one(param('1', '""""'))).toEqual({ text: 'CAST($1 AS """""")', values: ['1'] });
   });
 
+  describe('with a text cast that leaves a part of the name empty', () => {
+    // Postgres refuses `""` (42601, zero-length delimited identifier), wherever it stands; 6.6.1 wrote
+    // CAST($1 AS "") and CAST($1 AS "public.") (42704), unless castArrayParamsToJson or castObjectParamsToJson
+    // dropped the cast for "json", which #36 changed
+    const emptyName = (cast: string, type: string) => ({
+      name: 'Error',
+      message: `param() cast '${cast}' gives an empty name, ${type}, which Postgres refuses: name each part of the type, as in 'int4' or 'public.mood', or leave the cast out`,
+    });
+
+    it('throws while compiling, naming the cast and the name it gives', () => {
+      expect(failure(() => one(param(1, '')))).toEqual(emptyName('', '""'));
+      expect(failure(() => one(param([1], '[]')))).toEqual(emptyName('[]', '""[]'));
+      expect(failure(() => one(param([1], '[3]')))).toEqual(emptyName('[3]', '""[3]'));
+      expect(failure(() => one(param('ok', 'public.')))).toEqual(emptyName('public.', '"public".""'));
+      expect(failure(() => one(param(1, '.int4')))).toEqual(emptyName('.int4', '""."int4"'));
+      expect(failure(() => one(param(1, 'pg_catalog..int4')))).toEqual(emptyName('pg_catalog..int4', '"pg_catalog".""."int4"'));
+      expect(failure(() => one(param(1, '.')))).toEqual(emptyName('.', '"".""'));
+      expect(failure(() => one(param([1], '.int4[]')))).toEqual(emptyName('.int4[]', '""."int4"[]'));
+      expect(failure(() => one(new db.Parameter(1, '')))).toEqual(emptyName('', '""'));
+    });
+
+    it('throws under castArrayParamsToJson and castObjectParamsToJson too, on a scalar, an array and a plain object', () => {
+      db.setConfig({ castArrayParamsToJson: true, castObjectParamsToJson: true });
+      for (const value of [1, [1, 2], { a: 1 }]) {
+        expect(failure(() => one(param(value, '')))).toEqual(emptyName('', '""'));
+        expect(failure(() => one(param(value, '[]')))).toEqual(emptyName('[]', '""[]'));
+        expect(failure(() => one(param(value, 'public.')))).toEqual(emptyName('public.', '"public".""'));
+      }
+    });
+
+    it('a name of spaces or of quotes is not empty, and compiles as before', () => {
+      expect(one(param(1, ' '))).toEqual({ text: 'CAST($1 AS " ")', values: [1] });
+      expect(one(param(1, 'public .mood'))).toEqual({ text: 'CAST($1 AS "public "."mood")', values: [1] });
+      expect(one(param(1, '"public."'))).toEqual({ text: 'CAST($1 AS "public.")', values: [1] });
+      expect(one(param(1, '""'))).toEqual({ text: 'CAST($1 AS """")', values: [1] });
+    });
+
+    it('building the query does not throw; .run() rejects before any query', async () => {
+      const queryable = { query: vi.fn() };
+      const q = db.select('users', { display_name: param('Ada', '') });
+      await expect(q.run(queryable as any)).rejects.toThrow(emptyName('', '""').message);
+      const err = await sql`SELECT ${param(1, 'public.')}`.run(queryable as any).catch((e: unknown) => e);
+      // a plain Error, not pg's DatabaseError: no SQLSTATE code
+      expect((err as Error).constructor).toBe(Error);
+      expect((err as { code?: string }).code).toBeUndefined();
+      expect(queryable.query).not.toHaveBeenCalled();
+    });
+  });
+
   it('with true: arrays and plain objects are JSON-stringified and cast to json', () => {
     expect(sql`${param([1, 'a'], true)}, ${param({ a: [1] }, true)}`.compile()).toMatchInlineSnapshot(`
       {
@@ -589,6 +638,108 @@ describe('cols and vals', () => {
   it('vals of an array throws on Default in a fragment value of vals of an object, which reads as a Whereable', () => {
     // the fragment is compiled with its key as the current column, as in a Whereable; 6.6.1 sent 'Symbol(DEFAULT)'
     expect(() => one(vals({ role: sql`${vals([Default])}` }))).toThrowErrorMatchingInlineSnapshot(`[Error: \`db.Default\` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. \`DEFAULT\` is for INSERT and UPDATE values.]`);
+  });
+
+  // 6.6.1 compiled a primitive as the object it boxes to: a string to its character indexes as names ("0", "1")
+  // or to its characters as values ('i', 'd'), any other primitive to nothing; undefined threw a TypeError (#244)
+  const
+    primitives: Record<string, unknown> = {
+      string: 'id', oneCharacter: '5', emptyString: '', number: 42, zero: 0, boolean: true,
+      bigint: (globalThis as any).BigInt(10), symbol: Symbol('s'), undefined: undefined,
+    },
+    colsMessage = (kind: string) => `\`db.cols()\` takes an object or an array, not \`${kind}\`: for one column, write \`db.cols([name])\`; for a row of \`insert()\`, \`upsert()\` or \`update()\`, give an object.`,
+    valsMessage = (kind: string) => `\`db.vals()\` takes an object or an array, not \`${kind}\`: for one value, write \`db.vals([value])\`; for a row of \`insert()\`, \`upsert()\` or \`update()\`, give an object.`;
+
+  it('cols and vals of a primitive throw, in a sql template, a nested fragment and a lateral subquery', () => {
+    const outcomes: string[] = [];
+    for (const [name, x] of Object.entries(primitives))
+      for (const [fn, wrap, message] of [['cols', cols, colsMessage], ['vals', vals, valsMessage]] as const) {
+        const places = {
+          template: () => sql`SELECT ${wrap(x)}`.compile(),
+          nested: () => sql`SELECT ${sql`(${wrap(x)})`}`.compile(),
+          lateral: () => db.select('users', db.all, { lateral: { n: sql`SELECT ${wrap(x)}` } }).compile(),
+        };
+        for (const [place, f] of Object.entries(places)) {
+          const outcome = failure(f);
+          if (JSON.stringify(outcome) !== JSON.stringify({ name: 'Error', message: message(typeof x) }))
+            outcomes.push(`${fn} ${name} ${place}: ${JSON.stringify(outcome)}`);
+        }
+      }
+    expect(outcomes).toEqual([]);
+  });
+
+  it('cols and vals of a primitive throw before writing anything for it', () => {
+    const result = { text: '', values: [] };
+    expect(failure(() => sql`SELECT ${param(1)}, ${vals('id')}`.compile(result))).toEqual({ name: 'Error', message: valsMessage('string') });
+    expect(result).toEqual({ text: 'SELECT $1, ', values: [1] });
+  });
+
+  it('rejects run() on a string row of insert(), upsert() and update(), or in updateValues, with no query sent', async () => {
+    const queryable = { query: vi.fn() } as any;
+    const queries = {
+      insert: db.insert('users', 'ab' as any),
+      upsert: db.upsert('users', 'ab' as any, 'email'),
+      update: db.update('users', 'ab' as any, { id: 1 }),
+      updateValuesCols: db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { display_name: cols('display_name') } }),
+      updateValuesVals: db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { display_name: vals('display_name') } }),
+    };
+    const outcomes: Record<string, string> = {};
+    for (const [name, q] of Object.entries(queries))
+      outcomes[name] = await q.run(queryable).then(() => 'ran', (err: Error) => err.message);
+    expect(outcomes).toEqual({
+      insert: colsMessage('string'), upsert: colsMessage('string'), update: colsMessage('string'),
+      updateValuesCols: colsMessage('string'), updateValuesVals: valsMessage('string'),
+    });
+    expect(queryable.query).not.toHaveBeenCalled();
+  });
+
+  it('rejects run() on a string or another primitive as the columns of an aggregate, with no query sent', async () => {
+    // columnsRefusal checks only an array, so the value reaches cols(): 6.6.1 sent count("0", "1"), or count() for 42
+    const queryable = { query: vi.fn() } as any;
+    const queries = {
+      // @ts-expect-error a string columns
+      count: db.count('users', db.all, { columns: 'id' }),
+      // @ts-expect-error a string columns
+      sum: db.sum('accounts', db.all, { columns: 'balance' }),
+      // @ts-expect-error a string columns
+      avg: db.avg('accounts', db.all, { columns: 'balance' }),
+      // @ts-expect-error a string columns
+      min: db.min('accounts', db.all, { columns: 'balance' }),
+      // @ts-expect-error a string columns
+      max: db.max('accounts', db.all, { columns: 'balance' }),
+      // @ts-expect-error a number columns
+      countNumber: db.count('users', db.all, { columns: 42 }),
+      // @ts-expect-error a string columns
+      inLateral: db.select('users', db.all, { lateral: { n: db.count('users', db.all, { columns: 'id' }) } }),
+    };
+    const outcomes: Record<string, string> = {};
+    for (const [name, q] of Object.entries(queries))
+      outcomes[name] = await q.run(queryable).then(() => 'ran', (err: Error) => err.message);
+    expect(outcomes).toEqual({
+      count: colsMessage('string'), sum: colsMessage('string'), avg: colsMessage('string'), min: colsMessage('string'),
+      max: colsMessage('string'), countNumber: colsMessage('number'), inLateral: colsMessage('string'),
+    });
+    expect(queryable.query).not.toHaveBeenCalled();
+  });
+
+  it('cols and vals of an object, an array, a function or a boxed string compile as before, and null still throws a TypeError', () => {
+    // a function and a String object are objects, not primitives: their own enumerable keys, as in 6.6.1;
+    // null is left to #341
+    const f = () => null;
+    expect({
+      colsObject: one(cols({ id: 1 })), valsObject: one(vals({ id: 1 })),
+      colsArray: one(cols(['id'])), valsArray: one(vals(['id'])),
+      colsFunction: one(cols(f)), valsFunction: one(vals(f)),
+      colsBoxedString: one(cols(new String('id'))), valsBoxedString: one(vals(new String('id'))),
+      colsNull: failure(() => one(cols(null))), valsNull: failure(() => one(vals(null))),
+    }).toEqual({
+      colsObject: { text: '"id"', values: [] }, valsObject: { text: '$1', values: [1] },
+      colsArray: { text: '"id"', values: [] }, valsArray: { text: '$1', values: ['id'] },
+      colsFunction: { text: '', values: [] }, valsFunction: { text: '', values: [] },
+      colsBoxedString: { text: '"0", "1"', values: [] }, valsBoxedString: { text: '$1, $2', values: ['i', 'd'] },
+      colsNull: { name: 'TypeError', message: 'Cannot convert undefined or null to object' },
+      valsNull: { name: 'TypeError', message: 'Cannot convert undefined or null to object' },
+    });
   });
 });
 
