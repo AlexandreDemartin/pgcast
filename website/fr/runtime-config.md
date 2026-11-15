@@ -1,5 +1,5 @@
 ---
-english: 1d2c4fb18406
+english: d78f795201a6
 ---
 
 # Configuration
@@ -252,6 +252,7 @@ Sans l’option, le résultat passe par `Number()`, comme dans Zapatos 6.6.1 : 
 
 - Les types ne suivent qu’une fois l’option déclarée aussi dans [`ConfigTypes`](#ConfigTypes) : `setConfig()` règle le runtime, la déclaration les types.
 - Imbriquée dans un `lateral`, ou donnée comme valeur d’`extras`, la valeur revient en JSON, avec ou sans l’option, et vaut `null` quand aucune ligne ne correspond ; une fois l’option déclarée, elle est typée comme le `JSONSelectable` de sa colonne.
+  - Sauf quand la requête exécutée est un `selectOne()` ou un `selectExactlyOne()` qui la transmet : il rend la colonne telle que `pg` la lit ([`lateral`](/fr/select#lateral)).
 - L’option est lue à `.run()`, là où l’avertissement est aussi émis : une requête construite avant `setConfig()` prend l’option sous laquelle elle s’exécute, comme le dit son type, déclaré pour tout le programme. Une requête qui ne renvoie aucune ligne, un `groupBy` sans aucun groupe, se lit comme `NULL` : `null` avec l’option, `0` sans, avec l’avertissement.
 - Les exemples, et chaque type : [Typé par colonne](/fr/select#typed-by-column).
 

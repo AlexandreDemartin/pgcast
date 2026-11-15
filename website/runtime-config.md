@@ -248,6 +248,7 @@ Off, the result goes through `Number()`, as in Zapatos 6.6.1: `0` when no row ma
 
 - The types follow only once it is declared in [`ConfigTypes`](#ConfigTypes) as well: `setConfig()` sets the runtime, the declaration the types.
 - Nested in a `lateral` or as an `extras` value, the value comes back as JSON, option or not, and `null` when no row matches; declared, it is typed as its column's `JSONSelectable`.
+  - Except when the query run is a `selectOne()` or `selectExactlyOne()` that passes it through: it hands the column over as `pg` reads it ([`lateral`](/select#lateral)).
 - Read at `.run()`, as is the warning: a query built before `setConfig()` gets the option it runs under, as its type, declared for the whole program, says. A query that returns no row, a `groupBy` with no group, reads as `NULL`: `null` on, `0` off, with the warning.
 - Examples, and each type: [Typed by column](/select#typed-by-column).
 
