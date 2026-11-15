@@ -1660,6 +1660,38 @@ describe('count, sum, avg, min, max', () => {
     expect(() => db.max('accounts', all, { columns: [] }).compile()).toThrow('max() takes one column in columns, not 0');
   });
 
+  it('a string or another primitive as columns throws as it compiles, with the aggregate\'s own message, nested too', () => {
+    // 6.6.1 compiled `count("0", "1")` for 'id' and `count()` for 42; since #244 cols() threw, naming db.cols()
+    // @ts-expect-error columns is an array of column names
+    expect(() => db.count('users', all, { columns: 'id' }).compile())
+      .toThrow(new Error("count() takes columns as an array, not string: pass columns: ['column'] (leave columns out for count(*))"));
+    expect(() => db.count('users', all, { columns: '*' as any }).compile())
+      .toThrow(new Error("count() takes columns as an array, not string: pass columns: ['column'] (leave columns out for count(*))"));
+    const primitives: [unknown, string][] = [
+      ['balance', 'string'], [42, 'number'], [true, 'boolean'], [(globalThis as any).BigInt(1), 'bigint'], [Symbol('balance'), 'symbol'],
+    ];
+    for (const [columns, type] of primitives) {
+      for (const aggregate of ['sum', 'avg', 'min', 'max'] as const) {
+        expect(() => db[aggregate]('accounts', all, { columns: columns as any }).compile())
+          .toThrow(new Error(`${aggregate}() takes columns as an array, not ${type}: pass columns: ['column']`));
+      }
+      expect(() => db.count('users', all, { columns: columns as any }).compile())
+        .toThrow(new Error(`count() takes columns as an array, not ${type}: pass columns: ['column'] (leave columns out for count(*))`));
+    }
+    expect(() => db.select('users', all, { lateral: { n: db.max('accounts', { owner_id: parent('id') }, { columns: 'balance' as any }) } }).compile())
+      .toThrow(new Error("max() takes columns as an array, not string: pass columns: ['column']"));
+  });
+
+  it('a falsy columns, an array of one column or an object compile or throw as before', () => {
+    for (const columns of ['', 0, false, (globalThis as any).BigInt(0), NaN, null, undefined]) {
+      expect(db.count('users', all, { columns: columns as any }).compile().text).toBe('SELECT count(*) AS result FROM "users"');
+      expect(() => db.sum('accounts', all, { columns: columns as any }).compile()).toThrow(new Error("sum() needs one column to aggregate: pass columns: ['column']"));
+    }
+    expect(db.min('accounts', all, { columns: ['balance'] }).compile().text).toBe('SELECT min("balance") AS result FROM "accounts"');
+    // an object still reaches cols(), its keys as the columns, as in 6.6.1
+    expect(db.sum('accounts', all, { columns: { balance: true } as any }).compile().text).toBe('SELECT sum("balance") AS result FROM "accounts"');
+  });
+
   it('a passthru lateral throws as it compiles, nested or copied too; a lateral map is joined, its results not read', () => {
     // 6.6.1 compiled `SELECT  AS result`
     const passthru = db.count('users', all, { lateral: db.count('accounts', { owner_id: parent('id') }) });
