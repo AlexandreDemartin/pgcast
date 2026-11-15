@@ -105,6 +105,7 @@ Every option is optional. Each one given replaces its default whole: `schemas` w
 | [`enumOrder`](#generate.enumOrder) | `"alphabetical"` | the order of an enum's labels |
 | [`moduleNames`](#generate.moduleNames) | `"zapatos"` | the module names the files declare and import, and their folder |
 | [`rejectOnQueryError`](#generate.rejectOnQueryError) | none: exits, with a note | whether a failed query rejects, or ends the process |
+| [`uniqueIndexConstraintsOnly`](#generate.uniqueIndexConstraintsOnly) | `false` | the names in each relation's `UniqueIndex` |
 | [`progressListener`](#generate.progressListener) | `false` | where each step is reported |
 | [`warningListener`](#generate.warningListener) | `true` | where warnings go |
 | [`debugListener`](#generate.debugListener) | `false` | where each query and its result go |
@@ -354,6 +355,34 @@ try {
 - It rejects before writing anything: the files of the last run stay as they are.
 - A `warningListener` that throws at the note still ends in the exit.
 
+### `uniqueIndexConstraintsOnly` {#generate.uniqueIndexConstraintsOnly}
+
+`boolean`, default `false`; an opt-in, `true` by default from 7.0 ([Versions](/versions)). The names in each relation's `UniqueIndex`, which [`constraint()`](/insert#constraint) takes. `false`, as in Zapatos 6.6.1, lists every unique index; `true` lists only the index of each `UNIQUE` or `PRIMARY KEY` constraint that isn't `DEFERRABLE`, the names Postgres takes in `ON CONFLICT ON CONSTRAINT`:
+
+```sql
+CREATE TABLE festival_entries (
+  id int PRIMARY KEY,
+  film_id int NOT NULL REFERENCES films,
+  festival text NOT NULL,
+  slot int,
+  withdrawn boolean NOT NULL DEFAULT false,
+  CONSTRAINT festival_entries_film_festival_key UNIQUE (film_id, festival),
+  CONSTRAINT festival_entries_slot_key UNIQUE (festival, slot) DEFERRABLE
+);
+CREATE UNIQUE INDEX festival_entries_live_idx ON festival_entries (film_id) WHERE NOT withdrawn;
+```
+
+| In `UniqueIndex` | `false` | `true` | `ON CONFLICT ON CONSTRAINT … DO UPDATE` |
+|---|---|---|---|
+| `festival_entries_pkey` | yes | yes | taken |
+| `festival_entries_film_festival_key` | yes | yes | taken |
+| `festival_entries_slot_key`, `DEFERRABLE` | yes | no | 55000, `ON CONFLICT does not support deferrable unique constraints/exclusion constraints as arbiters` |
+| `festival_entries_live_idx`, an index and no constraint | yes | no | 42704, `constraint "festival_entries_live_idx" for table "festival_entries" does not exist` |
+
+- `true` also leaves out a materialised view's unique indexes, and, on Postgres 18, those of a `WITHOUT OVERLAPS` key, which Postgres treats as an exclusion constraint: 42809 with `DO UPDATE`. An exclusion constraint is in neither list, since its index isn't unique.
+- A relation left with none gets `never`. `UniqueIndexForTable` and the aggregate `UniqueIndex` types follow.
+- `false` notes, through [`warningListener`](#generate.warningListener), each unique index `true` would leave out.
+
 ### `progressListener` {#generate.progressListener}
 
 `boolean`, or in `generate()` a function `(s: string) => void`; default `false`. `true` prints each step with `console.log`; a function gets each line.
@@ -388,6 +417,8 @@ Writing custom types file: src/zapatos/custom/index.d.ts
   - once per run, without [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas), when a column it would change is generated;
 - `` Note: every.crew_job lists the labels of enum public.crew_job in alphabetical order, not in their declared order, by which Postgres sorts and compares them. Set enumOrder: 'declared' to keep that order; it will be the default in pgcast 7.0. ``
   - once per run, with [`enumOrder`](#generate.enumOrder) `"alphabetical"`, when a schema of [`schemas`](#generate.schemas) has an enum whose declared order is not alphabetical; several as `every.<name> lists the labels of enums archive.print_format and public.crew_job`;
+- `Note: UniqueIndex lists public.festival_entries.festival_entries_live_idx and public.festival_entries.festival_entries_slot_key, unique indexes of no UNIQUE or PRIMARY KEY constraint, or of a DEFERRABLE or WITHOUT OVERLAPS one: db.constraint() takes them, and Postgres refuses them in ON CONFLICT ON CONSTRAINT ... DO UPDATE. Set uniqueIndexConstraintsOnly: true to leave them out; it will be the default in pgcast 7.0.`
+  - once per run, without [`uniqueIndexConstraintsOnly`](#generate.uniqueIndexConstraintsOnly), when a generated relation has a unique index it would leave out; one as `lists public.festival_entries.festival_entries_live_idx, a unique index of no UNIQUE or PRIMARY KEY constraint`;
 - `Note: src/zapatos/schema.d.ts is here too, generated with moduleNames: 'zapatos'. It declares 'zapatos/schema', as src/pgcast/schema.d.ts does, and TypeScript merges the two: types can loosen, silently under skipLibCheck. Delete the folder src/zapatos, once any placeholder you edited there is moved to src/pgcast/custom.`
   - after writing, with [`moduleNames`](#generate.moduleNames) `"pgcast"`, when `outDir` holds a `zapatos/schema.d.ts`; a folder without its `schema.d.ts` is not noted;
 - `Note: src/pgcast/schema.d.ts is here too, generated with moduleNames: 'pgcast'. Its import of 'pgcast/db' fails to compile without skipLibCheck. Delete the folder src/pgcast, once any placeholder you edited there is moved to src/zapatos/custom.`
@@ -409,6 +440,11 @@ The unique indexes of `tags`, with `"schemas": { "public": { "include": ["tags"]
 ```txt
 >>> query 4 >>>
 SELECT DISTINCT i.indexname
+, NOT idx.indisexclusion AND EXISTS (
+    SELECT 1 FROM pg_catalog.pg_constraint con
+    WHERE con.conindid = c.oid AND con.conrelid = idx.indrelid
+    AND con.contype IN ('p', 'u') AND NOT con.condeferrable
+  ) AS "isArbiter"
 FROM pg_catalog.pg_indexes i
 JOIN pg_catalog.pg_namespace n ON n.nspname = i.schemaname
 JOIN pg_catalog.pg_class c ON c.relname = i.indexname AND c.relnamespace = n.oid
@@ -424,7 +460,8 @@ ORDER BY i.indexname
   "oid": null,
   "rows": [
     {
-      "indexname": "tags_pkey"
+      "indexname": "tags_pkey",
+      "isArbiter": true
     }
   ],
   …
