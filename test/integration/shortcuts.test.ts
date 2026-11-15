@@ -1209,6 +1209,48 @@ describe('count, sum, avg, min, max', () => {
     }))).toEqual({ id: 3, n: null });
   });
 
+  it('characterization: passed through selectOne() / selectExactlyOne(), count(), sum() and avg() come as pg parses a bigint or numeric, a string, though typed number, as in 6.6.1 (#470)', async () => {
+    // the passed-through column is handed over as it is, not through the aggregate's Number(); select() and a
+    // lateral map read it from JSON, a number (rounded beyond 2^53). Ada (id 1) has two accounts, Cyd (id 3) none
+    const aggregates = {
+      count: db.count('accounts', { owner_id: parent('id') }),
+      sumInt: db.sum('accounts', { owner_id: parent('id') }, { columns: ['owner_id'] }),
+      sumBigint: db.sum('accounts', { owner_id: parent('id') }, { columns: ['lifetime_ops'] }),
+      sumNumeric: db.sum('accounts', { owner_id: parent('id') }, { columns: ['balance'] }),
+      sumFloat8: db.sum('accounts', { owner_id: parent('id') }, { columns: ['ratio'] }),
+      avgInt: db.avg('accounts', { owner_id: parent('id') }, { columns: ['owner_id'] }),
+      avgNumeric: db.avg('accounts', { owner_id: parent('id') }, { columns: ['balance'] }),
+    };
+    const each = async (outer: (lateral: db.SQLFragment<any>) => db.SQLFragment<any>) => {
+      const results: Record<string, unknown> = {};
+      for (const [k, a] of Object.entries(aggregates)) results[k] = await run(outer(a));
+      return results;
+    };
+    const asPg = {
+      count: '2', sumInt: '2', sumBigint: '9007199254740993', sumNumeric: '1520.50', sumFloat8: 0.5,
+      avgInt: '1.00000000000000000000', avgNumeric: '760.2500000000000000',
+    };
+    expect(await each(a => db.selectOne('users', { id: 1 }, { lateral: a }))).toEqual(asPg);
+    expect(await each(a => db.selectExactlyOne('users', { id: 1 }, { lateral: a }))).toEqual(asPg);
+    // passed through twice, still the string
+    expect(await each(a => db.selectOne('users', { id: 1 }, { lateral: db.selectOne('users', { id: parent('id') }, { alias: 'u2', lateral: a }) }))).toEqual(asPg);
+    // no row to aggregate: count() gives '0', the others null
+    const noRow = { count: '0', sumInt: null, sumBigint: null, sumNumeric: null, sumFloat8: null, avgInt: null, avgNumeric: null };
+    expect(await each(a => db.selectOne('users', { id: 3 }, { lateral: a }))).toEqual(noRow);
+    expect(await each(a => db.selectExactlyOne('users', { id: 3 }, { lateral: a }))).toEqual(noRow);
+    // the option changes none of these
+    db.setConfig({ aggregatesTypedByColumn: true });
+    expect(await each(a => db.selectOne('users', { id: 1 }, { lateral: a }))).toEqual(asPg);
+    // under select() and in a lateral map, JSON numbers
+    const asJson = { count: 2, sumInt: 2, sumBigint: 9007199254740992, sumNumeric: 1520.5, sumFloat8: 0.5, avgInt: 1, avgNumeric: 760.25 };
+    expect(await each(a => db.select('users', { id: 1 }, { lateral: a }))).toEqual(Object.fromEntries(Object.entries(asJson).map(([k, v]) => [k, [v]])));
+    // the outermost call decides: a selectOne() passing it through, under an outer select(), comes back as JSON
+    expect(await each(a => db.select('users', { id: 1 }, { lateral: db.selectOne('users', { id: parent('id') }, { alias: 'u2', lateral: a }) })))
+      .toEqual(Object.fromEntries(Object.entries(asJson).map(([k, v]) => [k, [v]])));
+    expect(await each(a => db.selectOne('users', { id: 1 }, { columns: ['id'], lateral: { n: a } })))
+      .toEqual(Object.fromEntries(Object.entries(asJson).map(([k, v]) => [k, { id: 1, n: v }])));
+  });
+
   it('a passthru lateral rejects run() before any query is sent, nested too; a lateral map runs', async () => {
     // 6.6.1 sent `SELECT  AS result`, which Postgres refuses (42601)
     const sent: unknown[] = [], n = db.count('accounts', { owner_id: parent('id') });
