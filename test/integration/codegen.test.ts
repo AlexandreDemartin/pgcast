@@ -21,6 +21,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, inject, i
 import {
   definitionForRelationInSchema, enumDataForSchema, finaliseConfig, generate, relationsInSchema, tsForConfig, type Config,
 } from '../../src/generate';
+import * as runtime from '../../src/db';
 import { cliConfig } from '../../src/generate/cliConfig';
 import { createDatabase, dropDatabase, urlForDatabase, withAdminClient } from '../helpers/databases';
 import { useTestDatabase } from '../helpers/db';
@@ -58,6 +59,8 @@ const variants: [string, Config][] = [
   ['moduleNames-pgcast', { schemas: customTypesSchemas, moduleNames: 'pgcast' }],
   // main, whose output is test/generated/: only the UniqueIndex of products, extra.articles and account_totals differ
   ['uniqueIndexConstraintsOnly', { ...main, uniqueIndexConstraintsOnly: true }],
+  // only extra.type_zoo's c_int8_domain differs, in the four interfaces but Selectable; the placeholders are the same
+  ['domainsTypedByContext', { schemas: customTypesSchemas, domainsTypedByContext: true }],
   ['columnOptions', {
     schemas: { public: only('users', 'accounts'), extra: only('articles') },
     columnOptions: {
@@ -108,10 +111,13 @@ const warningsOf = async (config: Config) => {
   return warnings.filter(w => !w.startsWith('Note: this database has bigint'));
 };
 
-/** The same, but the notes on enums and unique indexes, which have their own tests (§ typeEnumsAcrossSchemas, § enumOrder, § uniqueIndexConstraintsOnly). */
+/**
+ * The same, but the notes on enums, unique indexes and domains, which have their own tests (§ typeEnumsAcrossSchemas,
+ * § enumOrder, § uniqueIndexConstraintsOnly, § domainsTypedByContext).
+ */
 const warningsFor = async (schemas: Schemas, config: Config = {}) =>
-  (await warningsOf({ ...config, schemas })).filter(w =>
-    !w.includes('typeEnumsAcrossSchemas') && !w.includes('enumOrder') && !w.includes('uniqueIndexConstraintsOnly'));
+  (await warningsOf({ ...config, schemas })).filter(w => !w.includes('typeEnumsAcrossSchemas') &&
+    !w.includes('enumOrder') && !w.includes('uniqueIndexConstraintsOnly') && !w.includes('domainsTypedByContext'));
 
 /** Custom type placeholders, sorted by name: tsForConfig() inserts them in query completion order. */
 const customFiles = (files: Record<string, string>) =>
@@ -172,12 +178,15 @@ describe('variant snapshots', () => {
     expect(errors).toEqual([]);
   });
 
-  /** The type errors of `probe`, compiled against the schema and custom types that `config` generates. */
-  const probeErrors = async (config: Config, probe: string, extraOptions: ts.CompilerOptions = {}) => {
+  /**
+   * The type errors of `probe`, compiled against the schema and custom types that `config` generates, each placeholder
+   * named in `edits` replaced by its text, as a user edits it.
+   */
+  const probeErrors = async (config: Config, probe: string, extraOptions: ts.CompilerOptions = {}, edits: Record<string, string> = {}) => {
     const { ts: schema, customTypeSourceFiles } = await codegen(config);
     const dir = mkdtempSync(join(declarationDir, 'probe-'));
     writeFileSync(join(dir, 'schema.d.ts'), schema);
-    writeFileSync(join(dir, 'custom.d.ts'), customFiles(customTypeSourceFiles));
+    writeFileSync(join(dir, 'custom.d.ts'), customFiles({ ...customTypeSourceFiles, ...edits }));
     writeFileSync(join(dir, 'probe.ts'), probe);
     const { config: tsconfig } = ts.readConfigFile(join(generatedDir, 'tsconfig.json'), ts.sys.readFile);
     const { options } = ts.parseJsonConfigFileContent(tsconfig, ts.sys, generatedDir);
@@ -280,6 +289,125 @@ describe('variant snapshots', () => {
         db.select('users', { mood: 'meh' });
       };
     `, { skipLibCheck })).toEqual([]);
+  });
+
+  describe('domainsTypedByContext, compiled', () => {
+    // extra.type_zoo.c_int8_domain, of the fixture's public.ticket_no, and domains over the other base types
+    beforeAll(() => t.pool.query(`
+      CREATE SCHEMA ctx_probe;
+      CREATE DOMAIN ctx_probe.release_day AS date;
+      CREATE DOMAIN ctx_probe.blob AS bytea;
+      CREATE DOMAIN ctx_probe.cost AS money;
+      CREATE TABLE ctx_probe.sales (id int PRIMARY KEY, day ctx_probe.release_day, data ctx_probe.blob, cost ctx_probe.cost);`));
+    afterAll(() => t.pool.query('DROP SCHEMA ctx_probe CASCADE'));
+
+    const config = { schemas: { extra: only('type_zoo'), ctx_probe: all } };
+    const on = { ...config, domainsTypedByContext: true };
+    const edited = (name: string, type: string) => ({
+      [name]: `declare module 'zapatos/custom' {\n  import type * as db from 'zapatos/db';\n  export type ${name} = ${type};\n}\n`,
+    });
+
+    /**
+     * Each context of a placeholder left as generated, one line after each marker: `byContext` before what only the
+     * option lets through, `once` before what only its absence does; the last call is refused either way.
+     */
+    const generatedProbe = (byContext: string, once: string) => `
+      import * as db from 'zapatos/db';
+      import type * as s from 'zapatos/schema';
+      declare const sel: s.extra.type_zoo.Selectable, json: s.extra.type_zoo.JSONSelectable;
+      declare const sale: s.ctx_probe.sales.JSONSelectable;
+      // Selectable: what pg returns, a string, either way
+      export const fromPg: string | null = sel.c_int8_domain;
+      export const reads = [
+        ${byContext} JSONSelectable: the shortcuts give a number
+        json.c_int8_domain satisfies number | null,
+        ${once} the placeholder's string, which the shortcuts never give
+        json.c_int8_domain satisfies string | null,
+        ${byContext} a date as JSON's string
+        sale.day satisfies db.DateString | null,
+        ${once} a Date, which the shortcuts never give
+        sale.day satisfies Date | null,
+        ${byContext} a bytea as its hex string
+        sale.data satisfies db.ByteArrayString | null,
+      ];
+      export const writes = [
+        ${byContext} Whereable: a number, which Postgres takes
+        db.select('extra.type_zoo', { c_int8_domain: 1 }),
+        ${byContext} Insertable: a number
+        db.insert('extra.type_zoo', { c_int8_domain: 1 }),
+        ${byContext} Updatable: a bigint
+        db.update('extra.type_zoo', { c_int8_domain: BigInt(1) }, { id: 1 }),
+        ${byContext} a date as a string
+        db.insert('ctx_probe.sales', { id: 1, day: '2030-03-01' }),
+        ${byContext} a bytea as its hex string
+        db.update('ctx_probe.sales', { data: '\\\\xdead' }, { id: 1 }),
+        ${byContext} money as a number
+        db.insert('ctx_probe.sales', { id: 1, cost: 5 }),
+        // @ts-expect-error not a number, either way
+        db.insert('extra.type_zoo', { c_int8_domain: 'abc' }),
+        // @ts-expect-error not a date, either way
+        db.select('ctx_probe.sales', { day: 5 }),
+      ];`;
+
+    it('types each context as its base type, while the placeholder holds what the generator wrote', async () => {
+      expect(await probeErrors(on, generatedProbe('//', '// @ts-expect-error'))).toEqual([]);
+    });
+
+    it('is off by default: the placeholder\'s type in all five, as in Zapatos 6.6.1', async () => {
+      expect(await probeErrors(config, generatedProbe('// @ts-expect-error', '//'))).toEqual([]);
+    });
+
+    it('each refusal of one probe is an unused directive in the other', async () => {
+      const both = generatedProbe('// @ts-expect-error', '// @ts-expect-error');
+      const unused = "probe.ts TS2578 Unused '@ts-expect-error' directive.";
+      expect(await probeErrors(on, both)).toEqual(Array(9).fill(unused));
+      expect(await probeErrors(config, both)).toEqual(Array(2).fill(unused));
+    });
+
+    /** An edited placeholder, with or without the option: its type in all five; `refused` marks what it refuses. */
+    const editedProbe = (refused: string) => `
+      import * as db from 'zapatos/db';
+      import type * as s from 'zapatos/schema';
+      declare const json: s.extra.type_zoo.JSONSelectable;
+      export const reads = [
+        json.c_int8_domain satisfies number | db.Int8String | null,
+        ${refused} the edited type, not the shortcuts' number alone
+        json.c_int8_domain satisfies number | null,
+      ];
+      export const writes = [
+        db.insert('extra.type_zoo', { c_int8_domain: 1 }),
+        ${refused} not in the edited type
+        db.insert('extra.type_zoo', { c_int8_domain: BigInt(1) }),
+        ${refused} not a number
+        db.insert('extra.type_zoo', { c_int8_domain: 'abc' }),
+      ];`;
+    const docsWorkaround = edited('PgTicket_no', 'number | db.Int8String');
+
+    it.each([false, true])('keeps an edited placeholder\'s type in all five (domainsTypedByContext: %s)', async key => {
+      expect(await probeErrors({ ...config, domainsTypedByContext: key }, editedProbe('// @ts-expect-error'), {}, docsWorkaround))
+        .toEqual([]);
+    });
+
+    it('the edited probe\'s refusals are unused with the placeholder left as generated, or edited to any', async () => {
+      const unused = "probe.ts TS2578 Unused '@ts-expect-error' directive.";
+      // as generated, typed by context: a number, a bigint; 'abc' is refused still
+      expect(await probeErrors(on, editedProbe('// @ts-expect-error'))).toEqual(Array(2).fill(unused));
+      // any stays any, with the option too
+      expect(await probeErrors(on, editedProbe('// @ts-expect-error'), {}, edited('PgTicket_no', 'any')))
+        .toEqual(Array(3).fill(unused));
+    });
+
+    it('keeps a brand, refusing the base type\'s values', async () => {
+      const brand = edited('PgTicket_no', "db.Int8String & { readonly __brand: 'ticket_no' }");
+      const probe = `
+        import * as db from 'zapatos/db';
+        // @ts-expect-error not branded
+        export const plain = db.insert('extra.type_zoo', { c_int8_domain: '1' });
+        // @ts-expect-error not branded
+        export const number = db.insert('extra.type_zoo', { c_int8_domain: 1 });`;
+      expect(await probeErrors(on, probe, {}, brand)).toEqual([]);
+      expect(await probeErrors(on, probe)).toEqual(Array(2).fill("probe.ts TS2578 Unused '@ts-expect-error' directive."));
+    });
   });
 
   it('labels, index and column names take their quote and backslash, typeEnumsAcrossSchemas on or off', async () => {
@@ -887,6 +1015,166 @@ describe('uniqueIndexConstraintsOnly', () => {
     void right;
     // @ts-expect-error a boolean
     const wrong: Config = { uniqueIndexConstraintsOnly: 'yes' };
+    void wrong;
+  });
+});
+
+describe('domainsTypedByContext', () => {
+  // a schema of its own, committed to this file's database: no other test configures it
+  beforeAll(() => t.pool.query(`
+    CREATE SCHEMA ctx;
+    CREATE DOMAIN ctx.ticket_no AS bigint;
+    CREATE DOMAIN ctx.amount AS numeric(12, 2);
+    CREATE DOMAIN ctx.release_day AS date;
+    CREATE DOMAIN ctx.local_ts AS timestamp;
+    CREATE DOMAIN ctx.starts AS timestamptz;
+    CREATE DOMAIN ctx.blob AS bytea;
+    CREATE DOMAIN ctx.cost AS money;
+    CREATE DOMAIN ctx.ticket_nos AS bigint[];
+    -- typed alike in every context, or any: nothing to change
+    CREATE DOMAIN ctx.label AS text;
+    CREATE DOMAIN ctx.minutes AS int4;
+    CREATE DOMAIN ctx.notes AS jsonb;
+    CREATE TYPE ctx.genre AS ENUM ('comedy', 'drama');
+    CREATE DOMAIN ctx.genre_d AS ctx.genre;
+    CREATE DOMAIN ctx.vip_ticket_no AS ctx.ticket_no;  -- information_schema gives its udt as ctx.ticket_no: any
+    CREATE TABLE ctx.tickets (
+      id int PRIMARY KEY, no ctx.ticket_no NOT NULL, amount ctx.amount, day ctx.release_day, ts ctx.local_ts,
+      at ctx.starts, data ctx.blob, cost ctx.cost, nos ctx.ticket_nos);
+    CREATE MATERIALIZED VIEW ctx.ticket_days AS SELECT id, day FROM ctx.tickets;
+    CREATE TABLE ctx.quiet (
+      label ctx.label, minutes ctx.minutes, notes ctx.notes, genre ctx.genre_d, vip ctx.vip_ticket_no, arr ctx.ticket_no[]);
+  `));
+  afterAll(() => t.pool.query('DROP SCHEMA ctx CASCADE'));
+
+  const ctx = { schemas: { ctx: all }, schemaJSDoc: false, unprefixedSchema: 'ctx' };
+  const on = { ...ctx, domainsTypedByContext: true };
+  const notesFor = async (config: Config) => {
+    const warnings: string[] = [];
+    await tsForConfig(finaliseConfig({ ...config, ...quiet, warningListener: s => warnings.push(s), db: db() }), noDebug);
+    return warnings.filter(w => w.includes('domainsTypedByContext'));
+  };
+  /** The line of `column` in each interface of `table`: Selectable, JSONSelectable, Whereable, Insertable, Updatable. */
+  const linesOf = (schema: string, table: string, column: string) =>
+    tableBlock(schema, table).split('\n').map(line => line.trim()).filter(line => new RegExp(`^${column}\\??: `).test(line));
+
+  /** The five lines of a nullable column with no default, given its Selectable type and its type in each other context. */
+  const nullable = (column: string, selectable: string, json: string, input: string) => {
+    const where = `${input} | db.Parameter<${input}> | db.SQLFragment | db.ParentColumn`,
+      write = `${input} | db.Parameter<${input}> | null | db.DefaultType | db.SQLFragment`;
+    return [
+      `${column}: ${selectable} | null;`,
+      `${column}: ${json} | null;`,
+      `${column}?: ${where} | db.SQLFragment<any, ${where}>;`,
+      `${column}?: ${write};`,
+      `${column}?: ${write} | db.SQLFragment<any, ${write}>;`,
+    ];
+  };
+
+  it('is off by default: a domain takes its placeholder in all five interfaces, as in Zapatos 6.6.1', async () => {
+    const { ts: schema } = await codegen(ctx);
+    expect(linesOf(schema, 'tickets', 'no')).toEqual([
+      'no: c.PgTicket_no;',
+      'no: c.PgTicket_no;',
+      'no?: c.PgTicket_no | db.Parameter<c.PgTicket_no> | db.SQLFragment | db.ParentColumn | ' +
+        'db.SQLFragment<any, c.PgTicket_no | db.Parameter<c.PgTicket_no> | db.SQLFragment | db.ParentColumn>;',
+      'no: c.PgTicket_no | db.Parameter<c.PgTicket_no> | db.SQLFragment;',
+      'no?: c.PgTicket_no | db.Parameter<c.PgTicket_no> | db.SQLFragment | ' +
+        'db.SQLFragment<any, c.PgTicket_no | db.Parameter<c.PgTicket_no> | db.SQLFragment>;',
+    ]);
+    expect(linesOf(schema, 'tickets', 'day')).toEqual(nullable('day', 'c.PgRelease_day', 'c.PgRelease_day', 'c.PgRelease_day'));
+  });
+
+  it('types the four other contexts as the base type, unless the placeholder was edited', async () => {
+    const { ts: schema } = await codegen(on);
+    const inContext = (placeholder: string, generated: string) => (type: string) =>
+      `db.DomainInContext<${placeholder}, ${generated}, ${type}>`;
+    const no = inContext('c.PgTicket_no', 'db.Int8String'), noInput = no('(number | db.Int8String | bigint)');
+    expect(linesOf(schema, 'tickets', 'no')).toEqual([
+      'no: c.PgTicket_no;',
+      `no: ${no('number')};`,
+      `no?: ${noInput} | db.Parameter<${noInput}> | db.SQLFragment | db.ParentColumn | ` +
+        `db.SQLFragment<any, ${noInput} | db.Parameter<${noInput}> | db.SQLFragment | db.ParentColumn>;`,
+      `no: ${noInput} | db.Parameter<${noInput}> | db.SQLFragment;`,
+      `no?: ${noInput} | db.Parameter<${noInput}> | db.SQLFragment | db.SQLFragment<any, ${noInput} | db.Parameter<${noInput}> | db.SQLFragment>;`,
+    ]);
+    const cases: [string, string, string, string, string][] = [
+      ['amount', 'c.PgAmount', 'db.NumericString', 'number', '(number | db.NumericString)'],
+      ['day', 'c.PgRelease_day', 'Date', 'db.DateString', '(db.DateString | Date)'],
+      ['ts', 'c.PgLocal_ts', 'Date', 'db.TimestampString', '(db.TimestampString | Date)'],
+      ['at', 'c.PgStarts', 'Date', 'db.TimestampTzString', '(db.TimestampTzString | Date)'],
+      ['data', 'c.PgBlob', 'Buffer', 'db.ByteArrayString', '(db.ByteArrayString | Buffer)'],
+      ['cost', 'c.PgCost', 'string', 'string', '(number | string)'],
+      ['nos', 'c.PgTicket_nos', 'db.Int8String[]', 'number[]', '(number | db.Int8String | bigint)[]'],
+    ];
+    for (const [column, placeholder, generated, json, input] of cases) {
+      const typed = inContext(placeholder, generated);
+      expect.soft(linesOf(schema, 'tickets', column), column).toEqual(nullable(column, placeholder, typed(json), typed(input)));
+    }
+    // a materialised view has a Selectable, a JSONSelectable and a Whereable
+    const day = inContext('c.PgRelease_day', 'Date');
+    expect(linesOf(schema, 'ticket_days', 'day')).toEqual(nullable('day', 'c.PgRelease_day', day('db.DateString'), day('(db.DateString | Date)')).slice(0, 3));
+  });
+
+  it('types a bigint domain\'s JSON for customJSONParsingForLargeNumbers', async () => {
+    const { ts: schema } = await codegen({ ...on, customJSONParsingForLargeNumbers: true });
+    expect(linesOf(schema, 'tickets', 'no')[1]).toBe('no: db.DomainInContext<c.PgTicket_no, db.Int8String, (number | db.Int8String)>;');
+  });
+
+  it('writes the same placeholders, and leaves the domains typed alike in every context, or any, as they were', async () => {
+    const off = await codegen(ctx), typed = await codegen(on);
+    expect(typed.customTypeSourceFiles).toEqual(off.customTypeSourceFiles);
+    expect(tableBlock(typed.ts, 'quiet')).toBe(tableBlock(off.ts, 'quiet'));
+  });
+
+  it('notes each column it would change, once per run, without the option', async () => {
+    expect(await notesFor(ctx)).toEqual([
+      'Note: ctx.ticket_days.day (ctx.release_day), ctx.tickets.amount (ctx.amount), ctx.tickets.at (ctx.starts), ' +
+      'ctx.tickets.cost (ctx.cost), ctx.tickets.data (ctx.blob), ctx.tickets.day (ctx.release_day), ' +
+      'ctx.tickets.no (ctx.ticket_no), ctx.tickets.nos (ctx.ticket_nos) and ctx.tickets.ts (ctx.local_ts) have domains ' +
+      'over a type typed by context, such as int8 or date: as generated, their placeholders type them in all five ' +
+      'interfaces as pg returns them, though a write takes more and, except for money, the shortcuts\' JSON gives ' +
+      'another type. ' +
+      'Set domainsTypedByContext: true to type them by context while their placeholders hold what the generator ' +
+      'wrote for them; it will be the default in pgcast 7.0.',
+    ]);
+    expect(await notesFor({ ...ctx, schemas: { ctx: only('ticket_days') } })).toEqual([
+      'Note: ctx.ticket_days.day (ctx.release_day) has a domain over a type typed by context, such as int8 or date: ' +
+      'as generated, its placeholder types it in all five interfaces as pg returns it, though a write takes more and, ' +
+      'except for money, the shortcuts\' JSON gives another type. Set domainsTypedByContext: true to type it by context while ' +
+      'its placeholder holds what the generator wrote for it; it will be the default in pgcast 7.0.',
+    ]);
+  });
+
+  it('gives no note with the option on, or when no domain would change', async () => {
+    expect(await notesFor(on)).toEqual([]);
+    expect(await notesFor({ ...ctx, schemas: { ctx: only('quiet') } })).toEqual([]);
+    expect(await notesFor({ schemas: { public: only('users', 'products') } })).toEqual([]);
+  });
+
+  it('types what Postgres and the shortcuts give: a write it takes, a row as JSON', async () => {
+    const row = await runtime.insert('ctx.tickets' as any, {
+      id: 1, no: 1, amount: 1.5, day: '2030-03-01', ts: '2030-03-01T19:30:00', at: '2030-03-01T19:30:00+00:00',
+      data: '\\xdead', cost: 5, nos: [1, 2],
+    }).run(t.client) as any;
+    expect(Object.fromEntries(Object.entries(row).map(([k, v]) => [k, Array.isArray(v) ? v.map(e => typeof e) : typeof v])))
+      .toEqual({ id: 'number', no: 'number', amount: 'number', day: 'string', ts: 'string', at: 'string',
+        data: 'string', cost: 'string', nos: ['number', 'number'] });
+    expect(row.data).toBe('\\xdead');
+  });
+
+  it('leaves the output as it was without the option, or with false', async () => {
+    const { ts: absent } = await codegen(main);
+    expect((await codegen({ ...main, domainsTypedByContext: false })).ts).toBe(absent);
+    expect(absent).toBe(readFileSync(join(generatedDir, 'zapatos/schema.d.ts'), 'utf8'));
+  });
+
+  it('is optional in Config, read as false when absent', () => {
+    expect(finaliseConfig({}).domainsTypedByContext).toBeUndefined();
+    const right: Config = { domainsTypedByContext: true };
+    void right;
+    // @ts-expect-error a boolean
+    const wrong: Config = { domainsTypedByContext: 'yes' };
     void wrong;
   });
 });
@@ -1701,7 +1989,8 @@ describe('typeEnumsAcrossSchemas', () => {
     await tsForConfig(finaliseConfig({ ...config, ...quiet, warningListener: s => warnings.push(s), db: db() }), noDebug);
     return warnings.filter(w => !w.startsWith('Note: this database has bigint') &&  // once per process
       !w.includes('enumOrder') &&  // § enumOrder
-      !w.includes('uniqueIndexConstraintsOnly'));  // § uniqueIndexConstraintsOnly
+      !w.includes('uniqueIndexConstraintsOnly') &&  // § uniqueIndexConstraintsOnly
+      !w.includes('domainsTypedByContext'));  // § domainsTypedByContext
   };
 
   it('is off by default: an enum of another schema is an `any` custom type', async () => {
@@ -1826,7 +2115,8 @@ describe('enumOrder', () => {
     await tsForConfig(finaliseConfig({ ...config, ...quiet, warningListener: s => warnings.push(s), db: db() }), noDebug);
     return warnings.filter(w => !w.startsWith('Note: this database has bigint') &&  // once per process
       !w.includes('typeEnumsAcrossSchemas') &&  // § typeEnumsAcrossSchemas
-      !w.includes('uniqueIndexConstraintsOnly'));  // § uniqueIndexConstraintsOnly
+      !w.includes('uniqueIndexConstraintsOnly') &&  // § uniqueIndexConstraintsOnly
+      !w.includes('domainsTypedByContext'));  // § domainsTypedByContext
   };
 
   it('is off by default: labels in alphabetical order, every.<enum> included', async () => {
@@ -1986,7 +2276,7 @@ describe('include entries that match no relation', () => {
     expect(await warningsFor({ public: all, extra: { include: '*', exclude: ['no_such_table'] } })).toEqual([]);
   });
 
-  it('warns, of main and the snapshot variants, only about no_such_table of include-exclude-lists, and the enums and unique indexes notes', async () => {
+  it('warns, of main and the snapshot variants, only about no_such_table of include-exclude-lists, and the enums, unique indexes and domains notes', async () => {
     const enumsNote = 'Note: extra.type_zoo.c_enum_array (public.mood[]) and public.products.status (extra.status) ' +
       'have a type of another schema, ' +
       'which is looked up by name in the schema of their relation: an enum becomes an `any` custom type, or the enum of ' +
@@ -2002,19 +2292,24 @@ describe('include entries that match no relation', () => {
       'out; it will be the default in pgcast 7.0.';
     const articlesNote = uniqueNote('extra.articles.shared_name_idx', true);
     const productsNote = uniqueNote('public.products.products_status_sku_key and public.products.products_title_lower_key');
+    const domainsNote = 'Note: extra.type_zoo.c_int8_domain (public.ticket_no) has a domain over a type typed by context, ' +
+      'such as int8 or date: as generated, its placeholder types it in all five interfaces as pg returns it, though a ' +
+      'write takes more and, except for money, the shortcuts\' JSON gives another type. Set domainsTypedByContext: true to type it ' +
+      'by context while its placeholder holds what the generator wrote for it; it will be the default in pgcast 7.0.';
     const expected: Record<string, string[]> = {
       main: [enumsNote, bothOrderNote, uniqueNote('extra.articles.shared_name_idx, public.account_totals.account_totals_owner_key, ' +
-        'public.products.products_status_sku_key and public.products.products_title_lower_key')],
+        'public.products.products_status_sku_key and public.products.products_title_lower_key'), domainsNote],
       'unprefixedSchema-null': [bothOrderNote, articlesNote],
       'schemaJSDoc-false': [orderNote('mood', 'enum public.mood')],
-      'customTypesTransform-PgMy_type': [enumsNote, bothOrderNote, productsNote],
-      'customTypesTransform-my_type': [enumsNote, bothOrderNote, productsNote],
-      'customTypesTransform-PgMyType': [enumsNote, bothOrderNote, productsNote],
-      'customTypesTransform-function': [enumsNote, bothOrderNote, productsNote],
-      typeEnumsAcrossSchemas: [bothOrderNote, productsNote],
-      'enumOrder-declared': [productsNote],
-      'moduleNames-pgcast': [enumsNote, bothOrderNote, productsNote],
-      uniqueIndexConstraintsOnly: [enumsNote, bothOrderNote],
+      'customTypesTransform-PgMy_type': [enumsNote, bothOrderNote, productsNote, domainsNote],
+      'customTypesTransform-my_type': [enumsNote, bothOrderNote, productsNote, domainsNote],
+      'customTypesTransform-PgMyType': [enumsNote, bothOrderNote, productsNote, domainsNote],
+      'customTypesTransform-function': [enumsNote, bothOrderNote, productsNote, domainsNote],
+      typeEnumsAcrossSchemas: [bothOrderNote, productsNote, domainsNote],
+      'enumOrder-declared': [productsNote, domainsNote],
+      'moduleNames-pgcast': [enumsNote, bothOrderNote, productsNote, domainsNote],
+      uniqueIndexConstraintsOnly: [enumsNote, bothOrderNote, domainsNote],
+      domainsTypedByContext: [enumsNote, bothOrderNote, productsNote],
       columnOptions: [bothOrderNote, articlesNote],
       'include-exclude-lists': [unmatched('no_such_table', 'public'), bothOrderNote, articlesNote],
       'exclude-star': [bothOrderNote],  // exclude: '*' still generates the enums

@@ -1,5 +1,5 @@
 ---
-english: 91715467ffed
+english: 45d42ed6d31b
 ---
 
 # Types personnalisés
@@ -118,7 +118,7 @@ const here: c.PgPoint = '(0.5,1)';
 
 ## Typer un domaine {#type-a-domain}
 
-Un domaine a aussi son placeholder, qui contient le type `Selectable` de son type de base au lieu de `any` : le type que renvoie `pg`. Ce seul type sert les cinq interfaces, `JSONSelectable` compris. `seat_label` est un `TEXT` avec un `CHECK`, donc `src/zapatos/custom/PgSeat_label.d.ts` contient `string`, qui est juste pour chacune :
+Un domaine a aussi son placeholder, qui contient le type `Selectable` de son type de base au lieu de `any` : le type que renvoie `pg`. Ce seul type sert les cinq interfaces, `JSONSelectable` compris, sauf si le domaine porte sur un type typé selon le contexte et que [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext) est activé ([plus bas](#when-a-placeholder-does-not-compile)). `seat_label` est un `TEXT` avec un `CHECK`, donc `src/zapatos/custom/PgSeat_label.d.ts` contient `string`, qui est juste pour chacune :
 
 ::: code-group
 
@@ -217,7 +217,9 @@ Le placeholder d’un domaine contient le nom TypeScript de son type de base, et
 - Un enum dont le nom contient une majuscule ou est l’un des types propres à TypeScript (`"Date"`, `string`) ne reçoit toujours aucun import, comme dans Zapatos 6.6.1 : ce nom peut être celui d’un type global, qui compile.
 - Un domaine sur `genre` qu’utilise aussi une table du schéma `archive`, quand `archive` a son propre `genre`, ne reçoit pas d’import non plus, comme dans Zapatos 6.6.1. Sans [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas), chaque table lit `genre` dans son propre schéma, et un seul placeholder ne peut pas importer les deux : importez celui sur lequel porte le domaine.
 
-Pour `CREATE DOMAIN ticket_no AS bigint`, le placeholder contient `db.Int8String`, la chaîne que `pg` renvoie pour un `bigint`. Mais les raccourcis renvoient un `bigint` sous forme de nombre JSON : un `ticket_no` que renvoie [`select()`](/fr/select#select) est un `number` typé `db.Int8String`, donc `.padStart()` compile, puis lève une erreur ; et une ligne pour [`insert()`](/fr/insert#insert), typée `Insertable`, refuse `1` (TS2322). Typez-le comme les deux à la fois :
+Pour `CREATE DOMAIN ticket_no AS bigint`, le placeholder contient `db.Int8String`, la chaîne que `pg` renvoie pour un `bigint`. Mais les raccourcis renvoient un `bigint` sous forme de nombre JSON : un `ticket_no` que renvoie [`select()`](/fr/select#select) est un `number` typé `db.Int8String`, donc `.padStart()` compile, puis lève une erreur ; et une ligne pour [`insert()`](/fr/insert#insert), typée `Insertable`, refuse `1` (TS2322).
+
+Activez [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext), et un placeholder laissé tel que généré type plutôt la colonne selon le contexte : un `number` renvoyé par les raccourcis, `number | Int8String | bigint` dans une écriture, et la chaîne que renvoie `pg` dans un `Selectable`. Sans l’option, typez-le comme les deux à la fois :
 
 ::: code-group
 
@@ -230,7 +232,8 @@ declare module 'zapatos/custom' {
 
 :::
 
-- Un domaine sur `numeric`, `date`, `timestamp`, `timestamptz` ou `bytea` est dans le même cas : son placeholder contient ce que renvoie `pg`, pas ce que renvoient les raccourcis ([#194](https://github.com/AlexandreDemartin/pgcast/issues/194)).
+- Un domaine sur `numeric`, `date`, `timestamp`, `timestamptz`, `bytea` ou `money` est dans le même cas : son placeholder contient ce que renvoie `pg`, moins que ce qu’accepte une écriture et, sauf pour `money`, autre chose que ce que renvoient les raccourcis, et l’option le type aussi selon le contexte.
+- Un placeholder modifié, comme celui-ci, garde son type dans les cinq interfaces, même avec l’option.
 - Au-delà de `Number.MAX_SAFE_INTEGER`, le nombre perd ses derniers chiffres, comme pour tout `bigint` : `9007199254740993` revient en `9007199254740992` ([`customJSONParsingForLargeNumbers`](/fr/generator#generate.customJSONParsingForLargeNumbers)).
 
 ## Voir aussi {#see-also}
