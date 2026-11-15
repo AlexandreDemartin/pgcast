@@ -81,8 +81,9 @@ type RangeBound<Bound extends string | number> = Bound | (number extends Bound ?
 export type DateRangeString = RangeString<string>;
 
 /**
- * `int4range`, `int8range` or `numrange` value represented as a string; only a
- * `numrange` has an infinite or `NaN` bound
+ * `int4range`, `int8range` or `numrange` value represented as a string. The
+ * type takes an infinite or `NaN` bound for each of them, though Postgres
+ * refuses one in an `int4range` or `int8range` (22P02).
  */
 export type NumberRangeString = RangeString<number | ''>;
 
