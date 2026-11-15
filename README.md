@@ -95,6 +95,7 @@ npx zapatos        # or: npx pgcast
 | `enumOrder: 'declared'` (generator): an enum's labels, `every.<name>` included, keep their declared order, by which Postgres compares them, rather than the alphabetical one | a note through `warningListener` | 6.7.0 |
 | `rejectOnQueryError` (generator): a failed query, the connection included, rejects `generate()` with its error, rather than end the process with `process.exit(1)`; the CLI still exits | a note through `warningListener`, `PGCAST_DEP006` | 6.7.0 |
 | `uniqueIndexConstraintsOnly` (generator): a relation's `UniqueIndex`, the names `constraint()` takes, lists only the index of each of its `UNIQUE` and `PRIMARY KEY` constraints, valid, not `DEFERRABLE` nor `WITHOUT OVERLAPS` ([generator](https://pgcast.dev/generator#generate.uniqueIndexConstraintsOnly)), rather than every unique index, some of which `ON CONFLICT ON CONSTRAINT` refuses | a note through `warningListener` | 6.7.0 |
+| `domainsTypedByContext` (generator): a domain over `int8`, `numeric`, `bytea`, `money` or a date is typed by context, as its base type is, while its placeholder holds what the generator wrote ([generator](https://pgcast.dev/generator#generate.domainsTypedByContext)), rather than as `pg` returns it in all five interfaces | a note through `warningListener` | 6.7.0 |
 
 Everything else: [CHANGELOG.md](CHANGELOG.md); what the characterisation of 6.6.1 found: [docs/CHARACTERISATION-REPORT.md](docs/CHARACTERISATION-REPORT.md).
 
