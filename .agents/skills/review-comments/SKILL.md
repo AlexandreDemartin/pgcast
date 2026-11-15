@@ -9,7 +9,7 @@ A review leaves one comment per round on the PR. The reviewer stays read-only an
 
 ## Labels
 
-[Conventional Comments](https://conventionalcomments.org/), one item per line, each with its `file:line`:
+[Conventional Comments](https://conventionalcomments.org/), one item per line, each with its `file:line` and a short phrase to grep, since lines move (up to 150 by the end of a chapter); a test by its name, a PR by its own number, not its issue's (#253, #502):
 
 | Label | For |
 |---|---|
@@ -30,7 +30,7 @@ A review leaves one comment per round on the PR. The reviewer stays read-only an
 ## Rounds
 
 1. **Review**: the orchestrator posts it with `gh pr comment <pr> --repo AlexandreDemartin/pgcast --body-file <file>`; the URL it prints ends with `#issuecomment-<id>`.
-2. **Fixes**: blocking items only, by a fresh `builder` (skill `run-step` § Sequence). Non-blocking items do not block ("LGTM with comments"): they go to `docs/LEARNINGS.md` § Minors kept.
+2. **Fixes**: blocking items only, by a fresh `builder` (skill `run-step` § Sequence). Non-blocking items do not block ("LGTM with comments"): they go to `docs/LEARNINGS.md` § Minors kept, each tagged `form` or `defect`, so the end-of-chapter review reads the defects first.
 3. **Verify** (`high`): a second comment, posted the same way (§ Verify comment).
 4. **Marked fixed**: once a blocking item's fix is verified, the orchestrator edits the review comment and ends the item with `→ fixed in <sha>`:
    `gh api -X PATCH repos/AlexandreDemartin/pgcast/issues/comments/<id> -F body=@<file>`.

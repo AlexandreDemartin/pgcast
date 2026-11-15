@@ -79,7 +79,7 @@ An agent knows only what its brief says.
 
 ## Ritual rules
 
-- One agent at a time works in the main checkout. Agents in parallel each get a worktree: `git worktree add --no-track -b <branch> <path> origin/master` (with tracking, a bare `git push` aims at `master`), `src/.env` linked, `npm ci` (agent `builder` § Where to work); removed after the merge.
+- One agent at a time works in the main checkout. Agents in parallel each get a worktree: `git worktree add --no-track -b <branch> <path> origin/master` (with tracking, a bare `git push` aims at `master`), `src/.env` linked, `npm ci` (agent `builder` § Where to work); removed after the merge. A checkout whose `node_modules` is a link shares `node_modules/.cache/pgcast`: its `typecheck`, `test:types` and `bench:types` overwrite the other's declarations, so at another commit it runs its own `npm ci` (#41, #50, #96).
 - A pushed branch is never rebased nor forced; a fix from below goes up by merge (`guard.mjs`).
 - Stacking dependent steps: skill `pr-shape` § Stacking.
 

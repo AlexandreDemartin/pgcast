@@ -56,7 +56,7 @@ Sources: GitHub docs "Stack code changes in pull requests", Thoughtworks Radar (
 | Each layer is a PR the size of a Zapatos commit, readable on its own. | A PR that stands on its own; a stack as "an excuse to write one enormous change" (Thoughtworks). |
 | **3 layers at most**, each ≤ ~250 lines and 25 files (Graphite's warning threshold). | A layer that makes no sense without the one above: split it again. |
 
-- **No rewriting** (`guard.mjs`): layer N starts from branch N-1 and its PR targets it (`--base <branch N-1>`); a fix from below goes up by `git merge origin/<branch N-1>` into each layer above, bottom to top (agent `chores`).
+- **No rewriting** (`guard.mjs`): layer N starts from branch N-1 and its PR targets it (`--base <branch N-1>`); a fix from below goes up by a merge of `origin/<branch N-1>` (§ Commits) into each layer above, bottom to top (agent `chores`).
 - **No `gh stack sync` nor `gh stack push`**: they rebase and force each branch.
 - **Splitting a pushed PR**: new branches from `origin/master`, `git cherry-pick` of its commits, the old PR closed with a pointer.
 - **Review**: each layer on its own, as soon as it is open; the reviewer gets its number and its base.
@@ -84,8 +84,8 @@ Same voice as PR titles.
 - **Imperative**, like Zapatos's recent commits: the verbs of § PR title, `Ensure`, `Export`.
 - **Docs**: "Update docs for …"; **dependencies**: "Update dependencies"; **version**: the number alone ("6.7.0").
 - **Learnings**: "Record what #22 taught"; **merge of master**: "Merge master into <branch>".
-  - `git merge -m "<subject>" -m "Co-Authored-By: …"` (a trailer needs its own `-m`); after a conflict `git commit -m`, never `--no-edit`, which keeps the `# Conflicts:` lines.
-  - Then `git diff origin/master...HEAD` (three dots: two make the branch revert what master gained), and no `CHANGELOG.md` line landed under a release heading.
+  - `git merge -m "<subject>" -m "Co-Authored-By: …"` (a trailer needs its own `-m`); after a conflict `git commit -m`. Never `--no-edit`, which drops the trailer or keeps the `# Conflicts:` lines: `guard.mjs` refuses it.
+  - Then `git diff origin/master...HEAD`, and no `CHANGELOG.md` line landed under a release heading. Every diff against master, size and "must not change" checks included, takes three dots: two make the branch revert what master gained (#33, #235, #506).
 - **A bug**: the failing test is committed before the fix, so the proof can show it red (skill `plan-and-proofs` § Proofs).
 - No Conventional Commits, no commits that tick a box: merging the PR closes its issue.
 - No body, except a reason that does not fit on the line; the requested `Co-Authored-By` line always stays.

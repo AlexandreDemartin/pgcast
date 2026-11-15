@@ -15,6 +15,7 @@ A pgcast helper is a writing shortcut to SQL you would have written by hand; not
 - **Parameter, never literal**: a value goes through `param()`; an identifier goes through `Column`/`Table` typing (skill `sql-safety`).
 - **Derived from the database**: a type comes from the generated schema (`ColumnForTable<T>`, `SelectableForTable<T>`), never from a hand-written declaration.
 - **No state, no magic**: no cache, no global registry, no lazy read, no implicit extra query.
+- **State lives on the fragment**: a mark or a property that changes how a query compiles or what it returns (`parentTable`, `preparedName`, `noop`, a transform) is carried by `copy()`, with a test of the copy (#32, #262, #263).
 - **Minimal surface**: one more option only if real usage asks for it (skill `consumer-usage`); otherwise a `sql` fragment is enough.
 - **Opt-in**: anything that changes the default output or adds a dependency sits behind an option (skill `backward-compat`).
 - **Valid empty case**: a variadic or array helper produces valid SQL with no argument (`and()` → `TRUE`, `or()` → `FALSE`), never `()`.

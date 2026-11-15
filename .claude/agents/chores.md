@@ -8,8 +8,8 @@ You do one mechanical task, described by the brief, and nothing else.
 
 ## Tasks
 
-- **Bring up a stack**: in the branch above, `git merge origin/<branch below>`, push; once the layer below is squashed, `git merge origin/master` (skill `merge-gate` § A stack).
-- **Update**: `git merge origin/master`, push.
+- **Bring up a stack**: in the branch above, merge `origin/<branch below>`, push; once the layer below is squashed, merge `origin/master` (skill `merge-gate` § A stack). Each merge as skill `pr-shape` § Commits gives it, with `-m`.
+- **Update**: merge `origin/master` (skill `pr-shape` § Commits), push.
 - **Rerun CI**: skill `ci-gate` § Rerun.
 - **Regenerate**: `npm run build`, or the snapshots the brief asks for (`npx vitest run -u <file>`); commit the result.
 - **Clean up after merge**: skill `merge-gate` § Clean up (`git branch -D` once merged).

@@ -13,8 +13,8 @@ You build a pgcast branch, or you fix the blocking items found in it. The reposi
 
 ## Where to work
 
-- In the main checkout, on the step's branch; a worktree only if the orchestrator asks (skill `run-step` § Ritual rules). It then needs `src/.env` copied or linked from the main checkout (ignored by git), then `npm ci`.
-- Test database: `TEST_DATABASE_URL` from `src/.env`, never printed: test it as a boolean (auto mode refuses a command that could print it). The tests create and drop their own databases; never touch the server's other databases.
+- In the main checkout, on the step's branch; a worktree only if the orchestrator asks (skill `run-step` § Ritual rules). It then needs `src/.env` copied or linked from the main checkout (ignored by git), then `npm ci`, and `cd website && npm ci` before a `docs:*` script: the root's `npm ci` does not install it, and `docs:translated` exists only there (#262, #301, #495).
+- Test database: `TEST_DATABASE_URL` from `src/.env`, never printed: test it as a boolean (auto mode refuses a command that could print it); a child process gets it through the environment, never as an argument, which an `execFileSync` error prints (#67). The tests create and drop their own databases; never touch the server's other databases.
 - A probe database is named `pgcast_test_${process.pid}_<agent>_<tag>` by its own script: any `npm test` drops a `pgcast_test_*` whose pid is gone, and two agents with one name share rows.
 - Scratch files go in the folder the brief names, never in `test/` or the checkout.
 
@@ -61,6 +61,7 @@ After the merge: skill `merge-gate` § Clean up (`git branch -D` once merged).
 ## Known pitfalls
 
 - `AGENTS.md` § Local environment (npm 10 and `npm install`); the lib's `tsc` uses the dummy schema `src/typings/zapatos/schema.ts`, the tests the fixture's generated schema (skill `type-tests`).
+- French pages hold U+00A0 (`website/README.md` § Typography): a scripted find-and-replace matches it or normalises first (#262, #484).
 - The shell is zsh: quote `"${ref}:path"` (`:s` is a history modifier) and `'==='`; `$pipestatus`, not `PIPESTATUS`; macOS has no `timeout`.
 
 ## Report

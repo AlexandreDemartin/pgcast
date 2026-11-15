@@ -6,7 +6,7 @@ import {refusalOf} from './guard.mjs';
 const bash = command => refusalOf({tool_name: 'Bash', tool_input: {command}});
 const write = file_path => refusalOf({tool_name: 'Write', tool_input: {file_path}});
 
-test('refuses force-push, rebase and amend, even after another command', () => {
+test('refuses force-push, rebase, amend, --no-edit and a merge with no message, even after another command', () => {
   for (const command of [
     'git push --force',
     'git push -f origin x',
@@ -15,6 +15,12 @@ test('refuses force-push, rebase and amend, even after another command', () => {
     'cd src && git rebase master',
     'git pull --rebase',
     'git commit --amend -m x',
+    'git commit --no-edit',
+    'git merge --no-edit origin/master',
+    'cd x && git -C y merge origin/master --no-edit',
+    'git merge origin/master',
+    'git -C y merge origin/x',
+    'git -c core.editor=true merge origin/master',
   ]) {
     assert.ok(bash(command), command);
   }
@@ -41,7 +47,17 @@ test('lets ordinary commands run, and ignores mentions inside quotes and heredoc
     'npm test',
     'git commit -m "never git push --force nor npm publish"',
     'cat > x.md <<\'EOF\'\ngit rebase\nnpm publish\nEOF',
-    'git merge origin/master',
+    'git merge -m "Merge master into x" -m "Co-Authored-By: x" origin/master',
+    'git merge origin/master -m "Merge master into $br" -m "$CO" >/dev/null 2>&1',
+    'git merge --abort',
+    'git merge --continue',
+    'git merge --ff-only origin/master',
+    'git merge --no-commit origin/master',
+    'git merge-base --is-ancestor origin/master HEAD',
+    'git commit -m "say why --no-edit is refused"',
+    'git commit -q -m "Merge master into x" -m "Co-Authored-By: x"',
+    'git pull --ff-only',
+    'gh pr merge 509 --repo AlexandreDemartin/pgcast --squash --subject "x (closes #18)" --body "y"',
   ]) {
     assert.equal(bash(command), undefined, command);
   }
