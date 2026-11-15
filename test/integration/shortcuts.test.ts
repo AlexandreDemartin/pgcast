@@ -1122,6 +1122,7 @@ describe('count, sum, avg, min, max', () => {
     expect(await run(db.selectExactlyOne('users', { id: 3 }, { columns: ['id'], lateral: { n } }))).toEqual({ id: 3, n: null });
     // passed through as the single lateral, and as an extras value
     expect(await run(db.selectOne('users', { id: 3 }, { lateral: n }))).toBeNull();
+    expect(await run(db.selectExactlyOne('users', { id: 3 }, { lateral: n }))).toBeNull();
     expect(await run(db.select('users', { id: 3 }, { lateral: n }))).toEqual([null]);
     expect(await run(db.selectOne('users', { id: 3 }, {
       columns: ['id'], extras: { n: db.count('accounts', sql`${'owner_id'} = ${'users'}.${'id'}`, { groupBy: 'owner_id' }) },

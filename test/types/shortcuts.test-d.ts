@@ -195,7 +195,7 @@ describe('selectOne, selectExactlyOne, count', () => {
     expectTypeOf<Run<typeof exactlyOne>['n']>().toEqualTypeOf<number>();
     // passed through as the single lateral, and as an extras value
     expectTypeOf(db.selectOne('users', { id: 3 }, { lateral: n }).run(pool)).resolves.toEqualTypeOf<number | undefined>();
-    expectTypeOf(db.selectExactlyOne('users', { id: 3 }, { lateral: n }).run(pool)).resolves.not.toBeAny();
+    expectTypeOf(db.selectExactlyOne('users', { id: 3 }, { lateral: n }).run(pool)).resolves.toEqualTypeOf<number>();
     expectTypeOf(db.select('users', db.all, { lateral: n }).run(pool)).resolves.toEqualTypeOf<number[]>();
     const extras = db.select('users', db.all, { columns: ['id'], extras: { n: db.count('accounts', db.sql`${'owner_id'} = ${'users'}.${'id'}`, { groupBy: 'owner_id' }) } });
     expectTypeOf<Run<typeof extras>[number]['n']>().toEqualTypeOf<number>();
