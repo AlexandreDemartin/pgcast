@@ -1112,6 +1112,22 @@ describe('count, sum, avg, min, max', () => {
     expect(await run(query())).toEqual([{ id: 1, n: null, top: null }]);
   });
 
+  it('characterization: nested, a count() with a groupBy and no group gives null, though typed number, as in 6.6.1 (#420)', async () => {
+    // Cyd (id 3) has no account: the groupBy leaves no row, and LEFT JOIN LATERAL reads it as NULL; a plain count() gives 0
+    const n = db.count('accounts', { owner_id: parent('id') }, { groupBy: 'owner_id' }),
+      plain = db.count('accounts', { owner_id: parent('id') });
+    expect(await run(db.select('users', all, { columns: ['id'], order: { by: 'id', direction: 'ASC' }, lateral: { n, plain } })))
+      .toEqual([{ id: 1, n: 2, plain: 2 }, { id: 2, n: 1, plain: 1 }, { id: 3, n: null, plain: 0 }]);
+    expect(await run(db.selectOne('users', { id: 3 }, { columns: ['id'], lateral: { n } }))).toEqual({ id: 3, n: null });
+    expect(await run(db.selectExactlyOne('users', { id: 3 }, { columns: ['id'], lateral: { n } }))).toEqual({ id: 3, n: null });
+    // passed through as the single lateral, and as an extras value
+    expect(await run(db.selectOne('users', { id: 3 }, { lateral: n }))).toBeNull();
+    expect(await run(db.select('users', { id: 3 }, { lateral: n }))).toEqual([null]);
+    expect(await run(db.selectOne('users', { id: 3 }, {
+      columns: ['id'], extras: { n: db.count('accounts', sql`${'owner_id'} = ${'users'}.${'id'}`, { groupBy: 'owner_id' }) },
+    }))).toEqual({ id: 3, n: null });
+  });
+
   it('a passthru lateral rejects run() before any query is sent, nested too; a lateral map runs', async () => {
     // 6.6.1 sent `SELECT  AS result`, which Postgres refuses (42601)
     const sent: unknown[] = [], n = db.count('accounts', { owner_id: parent('id') });
