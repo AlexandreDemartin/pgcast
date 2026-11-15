@@ -54,15 +54,17 @@ function typeofQueryable(queryable: Queryable) {
   if (queryable instanceof pg.Pool) return 'pool';
   if (queryable instanceof pg.Client) return 'client';
 
-  // only pg 7 makes `native` enumerable, so this runs with pg 7 and pg-native;
-  // from pg 8.0, a native client skips it and is told apart by `_connected`, below
-  if (
-    Object.prototype.hasOwnProperty.call(pg, 'native') &&
-    Object.prototype.propertyIsEnumerable.call(pg, 'native') &&
-    pg.native
-  ) {
-    if (queryable instanceof pg.native.Pool) return 'pool';
-    if (queryable instanceof pg.native.Client) return 'client';
+  // only pg 7 makes `native` enumerable, so this runs with pg 7 only; from pg 8.0, a native client skips it and
+  // is told apart by `_connected`, below. pg 7's `native` is a getter that loads pg-native (printing an error
+  // when it is missing) and then turns into a value: still a getter, nobody has made a native client from it,
+  // so it is not read (see https://github.com/AlexandreDemartin/pgcast/issues/268)
+  const
+    descriptor = Object.getOwnPropertyDescriptor(pg, 'native'),
+    native: typeof pg.native = descriptor?.enumerable ? descriptor.value ?? null : null;
+
+  if (native) {
+    if (queryable instanceof native.Pool) return 'pool';
+    if (queryable instanceof native.Client) return 'client';
   }
 
   // for pg < 8, and sometimes in 8.x for reasons that aren't clear, all the
