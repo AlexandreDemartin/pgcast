@@ -25,7 +25,7 @@ description: 'The core.ts sensitive zone: identifier escaping, parameterisation,
 
 ## Every branch, every place
 
-- A change to what one branch of `compileExpression` passes through as it is (fragments, arrays, Whereables, `cols`/`vals`, `parent`, `vals([…])`, `conditionalParam`) is replayed through each caller that hands objects on (`upsert` `updateValues`, `lateral`, nested fragments) and each slot (Whereable value, `isIn`, `eq`). Three review rounds of #26 each found one more container.
+- A change to what one branch of `compileExpression` passes through as it is (fragments, arrays, Whereables, `cols`/`vals`, `parent`, `vals([…])`, `conditionalParam`) is replayed through each caller that hands objects on (`upsert` `updateValues`, `lateral`, nested fragments) and each slot (Whereable value, `isIn`, `eq`). Three review rounds of #26 each found one more container. The callers come from `git grep` of the changed function in `src/`, not from the plan (`grep -nE '\b(cols|vals)\(' src/db/*.ts`): `having`, and `numericAggregate` → `select()` → `cols()`, were missed (#244, #252); and each position its type accepts (`GROUP BY ()`, `ROW()`, #33).
 - One PR fixes every place an input lands: after a fix of one place, an alias spliced into the other ran a second statement that 6.6.1 refused (#24).
 
 ## Injection tests

@@ -43,6 +43,7 @@ Closes #n
   - Its expected value is written by hand: an empty inline snapshot records the current output.
   - Each new assertion is red on its own: in one `it`, the first old failure hides the rest.
   - A test that freezes a route a `CHANGELOG.md` line names (`upsert()` `updateValues`, `lateral`) runs red against the base's runtime.
+- **A guard or a test that passes on the base** proves something only through a mutant: break only the branch it guards, in a scratch copy (`git worktree add --detach <scratch>/mutant HEAD`, `node_modules` and `src/.env` linked; never `git stash`), then record the mutant and its red. Two guards in one branch, two overlapping accept rules or two flags read together get a test where both hold (#36, #37, #43, #50, #253).
 - **`core.ts`**: the compiled SQL before / after (skill `sql-safety`).
 - **Compat at stake**: the 6.6.1 replay, what 6.6.1 did and what the branch does (skill `backward-compat`).
 - **Types**: the `bench:types` figure when a type changes (skill `type-tests`).

@@ -27,6 +27,8 @@ description: 'Simple big wins, nothing shaky: measured gain weighed against adde
 - Each public type: a positive and a negative case (skill `type-tests`).
 - Outside Pareto, covered in full: escaping and parameterisation (skill `sql-safety`).
 - Nothing Postgres does not promise: a multi-row `RETURNING` is sorted before `toEqual`, a sequence value is read through `RETURNING` (`ROLLBACK` does not undo `nextval`).
+- `transaction()`: a change is probed on a pool and on a plain client, with a second call at the same moment (`Promise.all`); a test of commit or rollback runs on `t.pool` (`t.client` is already inside `BEGIN`). A fake of `pg` follows pg's source at its peer floor (7.18.2) and at the latest: a client queues each `query()` until `connect()`, `getTransactionStatus()` lags a rejected query, a lazy getter replaces itself (#35, #233, #246, #268, #302).
+- A test or a replay that must not reach a database (config validation, a CLI that may ignore its config) runs against an unreachable one (`postgres://nobody@127.0.0.1:1/none`, `PGHOST=/nonexistent`): a live pool or a fallback connection hides the difference (#364, #368, #407).
 - A compiled result is snapshotted raw, never through `JSON.stringify`, which erases `Date` against string and `undefined` against `null`.
 - A check (a docs checker, `check:agents`, a guard) is first proved in the direction that passes silently: plant near misses of its marker (`<!---`, a plural, case, spacing, an info string), a duplicate, a comment.
   - A loose detector beside the strict parser fails on any line it sees and cannot read; a scanner is compared with the real parser (markdown-it's `fence` tokens) on every page.

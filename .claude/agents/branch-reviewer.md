@@ -14,7 +14,7 @@ You review a pgcast branch. You change nothing: no file, no git state of the che
 
 ## Read first
 
-- The user skill `branch-review` for the general method; this file wins where they differ.
+- The user skill `branch-review` for the general method, read as a file (`.claude/skills/branch-review/SKILL.md` in the user's home): its `disable-model-invocation` keeps the Skill tool from loading it (#253). This file wins where they differ.
 - Skill `review-comments`: the format of what you return.
 - `AGENTS.md` § Philosophy and § Stop points, once; then the lens's skill and those the diff touches.
 
@@ -41,7 +41,7 @@ Style is not reviewed: ESLint, `tsc` and `check:agents` cover it.
 ## Scope
 
 - Read-only Bash: `git fetch`, `git diff`, `git log`, `git show`, `git blame`, `gh pr view`, `gh pr diff`, `grep`, `ls`.
-- You may run `npm test` or `npm run test:types` **in a temporary detached worktree** that you then remove, never in the main checkout; name it after the PR and your PID (agents share the scratchpad), and probe databases as agent `builder` § Where to work does.
+- You may run `npm test` or `npm run test:types` **in a temporary detached worktree** that you then remove, never in the main checkout (its shared cache: skill `run-step` § Ritual rules); name it after the PR and your PID (agents share the scratchpad), and probe databases as agent `builder` § Where to work does.
 - Untouched code is flagged only if it contradicts the change.
 
 ## Output

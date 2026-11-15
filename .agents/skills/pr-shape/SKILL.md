@@ -84,8 +84,8 @@ Same voice as PR titles.
 - **Imperative**, like Zapatos's recent commits: the verbs of § PR title, `Ensure`, `Export`.
 - **Docs**: "Update docs for …"; **dependencies**: "Update dependencies"; **version**: the number alone ("6.7.0").
 - **Learnings**: "Record what #22 taught"; **merge of master**: "Merge master into <branch>".
-  - `git merge -m "<subject>" -m "Co-Authored-By: …"` (a trailer needs its own `-m`); after a conflict `git commit -m`, never `--no-edit`, which keeps the `# Conflicts:` lines.
-  - Then `git diff origin/master...HEAD` (three dots: two make the branch revert what master gained), and no `CHANGELOG.md` line landed under a release heading.
+  - `git merge -m "<subject>" -m "Co-Authored-By: …"` (a trailer needs its own `-m`); after a conflict `git commit -m`. Never `--no-edit`, which drops the trailer or keeps the `# Conflicts:` lines: `guard.mjs` refuses it.
+  - Then `git diff origin/master...HEAD`, and no `CHANGELOG.md` line landed under a release heading. Every diff against master, size and "must not change" checks included, takes three dots: two make the branch revert what master gained (#33, #235, #506).
 - **A bug**: the failing test is committed before the fix, so the proof can show it red (skill `plan-and-proofs` § Proofs).
 - No Conventional Commits, no commits that tick a box: merging the PR closes its issue.
 - No body, except a reason that does not fit on the line; the requested `Co-Authored-By` line always stays.
