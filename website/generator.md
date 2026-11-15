@@ -106,6 +106,7 @@ Every option is optional. Each one given replaces its default whole: `schemas` w
 | [`moduleNames`](#generate.moduleNames) | `"zapatos"` | the module names the files declare and import, and their folder |
 | [`rejectOnQueryError`](#generate.rejectOnQueryError) | none: exits, with a note | whether a failed query rejects, or ends the process |
 | [`uniqueIndexConstraintsOnly`](#generate.uniqueIndexConstraintsOnly) | `false` | the names in each relation's `UniqueIndex` |
+| [`domainsTypedByContext`](#generate.domainsTypedByContext) | `false` | the type of a domain over `bigint`, `numeric`, `bytea`, `money` or a date, outside `Selectable` |
 | [`progressListener`](#generate.progressListener) | `false` | where each step is reported |
 | [`warningListener`](#generate.warningListener) | `true` | where warnings go |
 | [`debugListener`](#generate.debugListener) | `false` | where each query and its result go |
@@ -384,6 +385,29 @@ CREATE UNIQUE INDEX festival_entries_live_idx ON festival_entries (film_id) WHER
 - A relation left with none gets `never`. `UniqueIndexForTable` and the aggregate `UniqueIndex` types follow.
 - `false` notes, through [`warningListener`](#generate.warningListener), each unique index `true` would leave out.
 
+### `domainsTypedByContext` {#generate.domainsTypedByContext}
+
+`boolean`, default `false`; an opt-in, `true` by default from 7.0 ([Versions](/versions)). The type of a column whose domain is over `int8`, `numeric`, `bytea`, `money`, `date`, `timestamp` or `timestamptz`, or over an array of one: types that `pg`, the shortcuts' JSON and a write each give in their own way ([Value types](/runtime-config#value-types)). `false`, as in Zapatos 6.6.1, types it by its placeholder in all five interfaces, as `pg` returns it; `true` types it by context, as its base type is, while its placeholder holds what the generator wrote. Say a booking has a ticket number:
+
+```sql
+CREATE DOMAIN ticket_no AS bigint;
+ALTER TABLE seat_bookings ADD COLUMN ticket ticket_no;
+```
+
+Its placeholder, `PgTicket_no.d.ts`, holds `db.Int8String`. The shortcuts return the ticket as a JSON number, and Postgres takes a number for it:
+
+| `seat_bookings.ticket` | `false` | `true` |
+|---|---|---|
+| `Selectable`, a row from `pg` | `PgTicket_no`, a string | the same |
+| `JSONSelectable`, a row from the shortcuts | `PgTicket_no`, a string | `number` |
+| `Whereable`, `Insertable`, `Updatable` | `PgTicket_no`, a string: `insert()` refuses `ticket: 1` (TS2769) | `number \| Int8String \| bigint` |
+
+- `true` writes [`DomainInContext`](/runtime-config#DomainInContext) in the four other interfaces, `db.DomainInContext<c.PgTicket_no, db.Int8String, number>` in `JSONSelectable`; an editor shows `number`.
+- A placeholder you edit, to any other type, types the column in all five interfaces, as with `false`: `number | db.Int8String`, a branded type, or `any`. The option never changes a placeholder, so turning it on or off needs no edit to one.
+- Each base type takes its own types: `numeric` `number`, then `number | NumericString`; `date`, `timestamp` and `timestamptz` their string type, then that or a `Date`; `bytea` `ByteArrayString`, then that or a `Buffer`; `money` `string`, then `number | string`; an array, its item's, as an array. With [`customJSONParsingForLargeNumbers`](#generate.customJSONParsingForLargeNumbers), `int8` and `numeric` are `number | Int8String` and `number | NumericString` in `JSONSelectable`.
+- Unchanged: a domain typed alike in every context, such as `seat_label`, and one whose placeholder is `any`, such as a domain over another domain, or an array of a domain.
+- `false` notes, through [`warningListener`](#generate.warningListener), each column `true` would change.
+
 ### `progressListener` {#generate.progressListener}
 
 `boolean`, or in `generate()` a function `(s: string) => void`; default `false`. `true` prints each step with `console.log`; a function gets each line.
@@ -420,6 +444,8 @@ Writing custom types file: src/zapatos/custom/index.d.ts
   - once per run, with [`enumOrder`](#generate.enumOrder) `"alphabetical"`, when a schema of [`schemas`](#generate.schemas) has an enum whose declared order is not alphabetical; several as `every.<name> lists the labels of enums archive.print_format and public.crew_job`;
 - `Note: UniqueIndex lists public.festival_entries.festival_entries_live_idx and public.festival_entries.festival_entries_slot_key, unique indexes of no UNIQUE or PRIMARY KEY constraint, of a DEFERRABLE or WITHOUT OVERLAPS one, or not yet valid: db.constraint() takes them, and Postgres refuses them in ON CONFLICT ON CONSTRAINT ... DO UPDATE. Set uniqueIndexConstraintsOnly: true to leave them out; it will be the default in pgcast 7.0.`
   - once per run, without [`uniqueIndexConstraintsOnly`](#generate.uniqueIndexConstraintsOnly), when a generated relation has a unique index it would leave out; one as `lists public.festival_entries.festival_entries_live_idx, a unique index of no UNIQUE or PRIMARY KEY constraint`;
+- `Note: public.seat_bookings.ticket (public.ticket_no) has a domain over a type typed by context, such as int8 or date: its placeholder types it in all five interfaces as pg returns it, which the shortcuts' JSON and the values a write takes are not. Set domainsTypedByContext: true to type it by context while its placeholder holds what the generator wrote; it will be the default in pgcast 7.0.`
+  - once per run, without [`domainsTypedByContext`](#generate.domainsTypedByContext), when a generated column has such a domain; several as `public.screenings.premiere (public.premiere_day) and public.seat_bookings.ticket (public.ticket_no) have domains over a type typed by context`;
 - `Note: src/zapatos/schema.d.ts is here too, generated with moduleNames: 'zapatos'. It declares 'zapatos/schema', as src/pgcast/schema.d.ts does, and TypeScript merges the two: types can loosen, silently under skipLibCheck. Delete the folder src/zapatos, once any placeholder you edited there is moved to src/pgcast/custom.`
   - after writing, with [`moduleNames`](#generate.moduleNames) `"pgcast"`, when `outDir` holds a `zapatos/schema.d.ts`; a folder without its `schema.d.ts` is not noted;
 - `Note: src/pgcast/schema.d.ts is here too, generated with moduleNames: 'pgcast'. Its import of 'pgcast/db' fails to compile without skipLibCheck. Delete the folder src/pgcast, once any placeholder you edited there is moved to src/zapatos/custom.`

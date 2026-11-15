@@ -1,5 +1,5 @@
 ---
-english: d78f795201a6
+english: 308718d9a55f
 ---
 
 # Configuration
@@ -388,7 +388,7 @@ Un comportement de Zapatos 6.6.1 sur lequel du code peut compter, mais que pgcas
 
 Un opt-in n’a pas d’avertissement et ne devient pas le comportement par défaut en 7.0 : [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow), puisque la lecture de `selectExactlyOne()` par la 6.6.1, au moins une ligne, est une lecture que Zapatos documente.
 
-Le générateur a les siens : [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas), [`enumOrder`](/fr/generator#generate.enumOrder), [`rejectOnQueryError`](/fr/generator#generate.rejectOnQueryError) et [`uniqueIndexConstraintsOnly`](/fr/generator#generate.uniqueIndexConstraintsOnly), dont les anciens chemins donnent des notes via [`warningListener`](/fr/generator#generate.warningListener), une fois par exécution, plutôt qu’un `DeprecationWarning` ; ils deviendront eux aussi le comportement par défaut en 7.0.
+Le générateur a les siens : [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas), [`enumOrder`](/fr/generator#generate.enumOrder), [`rejectOnQueryError`](/fr/generator#generate.rejectOnQueryError), [`uniqueIndexConstraintsOnly`](/fr/generator#generate.uniqueIndexConstraintsOnly) et [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext), dont les anciens chemins donnent des notes via [`warningListener`](/fr/generator#generate.warningListener), une fois par exécution, plutôt qu’un `DeprecationWarning` ; ils deviendront eux aussi le comportement par défaut en 7.0.
 
 Chaque avertissement est un `DeprecationWarning` de Node.js, émis une fois par processus pour chaque code, quand le raccourci est appelé (`PGCAST_DEP003` : quand `transaction()` se résout ; `PGCAST_DEP004` : quand `.run()` reçoit le résultat ; `PGCAST_DEP005` : quand `transaction()` est appelée, avant son `START TRANSACTION`), et seulement quand l’ancien comportement est utilisé. Son message nomme l’option. Node l’affiche sur `stderr` :
 
@@ -429,6 +429,7 @@ process.on('warning', (warning: Error & { code?: string }) => {
 - Une colonne tableau prend le tableau du type de son élément : `int8[]` donne `Int8String[]` dans un `Selectable`.
 - Avec l’option [`customJSONParsingForLargeNumbers`](/fr/generator#generate.customJSONParsingForLargeNumbers) du générateur, `int8` et `numeric` sont `number | Int8String` et `number | NumericString` dans un `JSONSelectable` ([`enableCustomJSONParsingForLargeNumbers()`](#enableCustomJSONParsingForLargeNumbers)).
 - Les raccourcis renvoient des `JSONSelectable`. Un `Selectable` est ce que `pg` renvoie pour un simple `SELECT` de la ligne.
+- Un domaine sur l’un de ces types prend le type de son placeholder, celui du `Selectable`, dans chaque interface, sauf si l’option [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext) du générateur est activée ([`DomainInContext`](#DomainInContext)).
 
 Chaque type vérifie la forme d’une chaîne, pas sa valeur : `'2030-13-45'` est un `DateString`.
 
@@ -439,6 +440,20 @@ import * as db from 'zapatos/db';
 const opening: db.DateString = '2030-03-01';
 const premiere: db.TimestampTzString = '2030-03-01T19:30:00';
 ```
+
+### `DomainInContext` {#DomainInContext}
+
+```ts
+type DomainInContext<Custom, Generated, InContext> =
+  0 extends (1 & Custom) ? Custom :
+  [Custom] extends [Generated] ? [Generated] extends [Custom] ? InContext : Custom : Custom
+```
+
+Le type qu’écrit l’option [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext) du générateur pour une colonne d’un domaine, dans `JSONSelectable`, `Whereable`, `Insertable` et `Updatable` : `InContext`, le type de son type de base dans ce contexte, tant que le placeholder `Custom` vaut encore `Generated`, le type qu’y a écrit le générateur ; sinon `Custom`, comme sans l’option.
+
+- `DomainInContext<db.Int8String, db.Int8String, number>` est `number` : un placeholder laissé tel que généré.
+- `DomainInContext<number | db.Int8String, db.Int8String, number>` est `number | db.Int8String` : un placeholder modifié garde son type, dans chaque contexte.
+- Un `any` reste `any`. Un placeholder modifié vers le même type, `` `${number}` `` pour `db.Int8String`, compte comme laissé tel que généré.
 
 ## JSON {#json}
 

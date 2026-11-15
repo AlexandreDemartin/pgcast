@@ -384,7 +384,7 @@ A behaviour of Zapatos 6.6.1 that code may rely on, but that pgcast would change
 
 One opt-in has no warning and no default in 7.0: [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow), since 6.6.1's reading of `selectExactlyOne()`, at least one row, is one Zapatos documents.
 
-The generator has its own: [`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas), [`enumOrder`](/generator#generate.enumOrder), [`rejectOnQueryError`](/generator#generate.rejectOnQueryError) and [`uniqueIndexConstraintsOnly`](/generator#generate.uniqueIndexConstraintsOnly), whose old paths are notes through [`warningListener`](/generator#generate.warningListener), once per run, rather than a `DeprecationWarning`; they will be the defaults in 7.0 too.
+The generator has its own: [`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas), [`enumOrder`](/generator#generate.enumOrder), [`rejectOnQueryError`](/generator#generate.rejectOnQueryError), [`uniqueIndexConstraintsOnly`](/generator#generate.uniqueIndexConstraintsOnly) and [`domainsTypedByContext`](/generator#generate.domainsTypedByContext), whose old paths are notes through [`warningListener`](/generator#generate.warningListener), once per run, rather than a `DeprecationWarning`; they will be the defaults in 7.0 too.
 
 Each warning is a Node.js `DeprecationWarning`, emitted once per process for each code, when the shortcut is called (`PGCAST_DEP003`: when `transaction()` resolves; `PGCAST_DEP004`: when `.run()` gets the result; `PGCAST_DEP005`: when `transaction()` is called, before its `START TRANSACTION`), and only when the old behaviour is used. Its message names the option. Node prints it to `stderr`:
 
@@ -425,6 +425,7 @@ process.on('warning', (warning: Error & { code?: string }) => {
 - An array column takes the array of its item's type: `int8[]` gives `Int8String[]` in a `Selectable`.
 - With the generator's [`customJSONParsingForLargeNumbers`](/generator#generate.customJSONParsingForLargeNumbers), `int8` and `numeric` are `number | Int8String` and `number | NumericString` in a `JSONSelectable` ([`enableCustomJSONParsingForLargeNumbers()`](#enableCustomJSONParsingForLargeNumbers)).
 - The shortcuts return `JSONSelectable`s. A `Selectable` is what `pg` returns for a plain `SELECT` of the row.
+- A domain over one of these types takes its placeholder's type, the `Selectable` one, in every interface, unless the generator's [`domainsTypedByContext`](/generator#generate.domainsTypedByContext) is on ([`DomainInContext`](#DomainInContext)).
 
 Each type checks the shape of a string, not its value: `'2030-13-45'` is a `DateString`.
 
@@ -435,6 +436,20 @@ import * as db from 'zapatos/db';
 const opening: db.DateString = '2030-03-01';
 const premiere: db.TimestampTzString = '2030-03-01T19:30:00';
 ```
+
+### `DomainInContext` {#DomainInContext}
+
+```ts
+type DomainInContext<Custom, Generated, InContext> =
+  0 extends (1 & Custom) ? Custom :
+  [Custom] extends [Generated] ? [Generated] extends [Custom] ? InContext : Custom : Custom
+```
+
+The type that the generator's [`domainsTypedByContext`](/generator#generate.domainsTypedByContext) writes for a column of a domain, in `JSONSelectable`, `Whereable`, `Insertable` and `Updatable`: `InContext`, its base type's type there, while the placeholder `Custom` is still `Generated`, the type the generator wrote in it; otherwise `Custom`, as without the option.
+
+- `DomainInContext<db.Int8String, db.Int8String, number>` is `number`: a placeholder left as generated.
+- `DomainInContext<number | db.Int8String, db.Int8String, number>` is `number | db.Int8String`: an edited placeholder keeps its type, in every context.
+- An `any` stays `any`. A placeholder edited to the same type, `` `${number}` `` for `db.Int8String`, counts as left as generated.
 
 ## JSON {#json}
 
