@@ -1,5 +1,5 @@
 ---
-english: 558f2b6d2784
+english: d78f795201a6
 ---
 
 # Configuration
@@ -513,10 +513,11 @@ db.enableCustomJSONParsingForLargeNumbers(pg);
 ### `RangeString` {#RangeString}
 
 ```ts
-type RangeString<Bound extends string | number> = `${'[' | '('}${Bound},${Bound}${']' | ')'}` | 'empty'
+type RangeString<Bound extends string | number> = `${'[' | '('}${RangeBound<Bound>},${RangeBound<Bound>}${']' | ')'}` | 'empty'
+type RangeBound<Bound extends string | number> = Bound | (number extends Bound ? 'Infinity' | '-Infinity' | 'NaN' : never)
 ```
 
-Une valeur range telle que Postgres l’écrit : un crochet, deux bornes, un crochet, ou `'empty'` pour un range vide. Un range dont les bornes n’encadrent aucune valeur est vide lui aussi : `'[5,5)'::int4range` revient sous la forme `'empty'`. Postgres lit aussi `'EMPTY'`, et des espaces autour, mais n’écrit que `'empty'` : le type n’accepte donc que cette forme. Zapatos 6.6.1 laissait `'empty'` de côté.
+Une valeur range telle que Postgres l’écrit : un crochet, deux bornes, un crochet, ou `'empty'` pour un range vide. Un range dont les bornes n’encadrent aucune valeur est vide lui aussi : `'[5,5)'::int4range` revient sous la forme `'empty'`. Postgres lit aussi `'EMPTY'`, et des espaces autour, mais n’écrit que `'empty'` : le type n’accepte donc que cette forme. Une borne `number` peut aussi valoir `Infinity`, `-Infinity` ou `NaN`, comme Postgres les écrit dans un `numrange`, même à partir de `infinity`, `inf` ou `nan` ; le type n’accepte que ces graphies. Zapatos 6.6.1 laissait de côté `'empty'` et ces trois valeurs.
 
 ### `NumberRangeString` {#NumberRangeString}
 
@@ -524,7 +525,7 @@ Une valeur range telle que Postgres l’écrit : un crochet, deux bornes, un cr
 type NumberRangeString = RangeString<number | ''>
 ```
 
-Un `int4range`, `int8range` ou `numrange` : `'[1,5)'`, ou `'[1.5,)'` sans borne supérieure.
+Un `int4range`, `int8range` ou `numrange` : `'[1,5)'`, `'[1.5,)'` sans borne supérieure, ou `'[0,Infinity)'` pour un `numrange`, dont les bornes peuvent être infinies ou `NaN`. Le type accepte aussi une telle borne pour les ranges d’entiers, alors que Postgres l’y refuse.
 
 ### `DateRangeString` {#DateRangeString}
 

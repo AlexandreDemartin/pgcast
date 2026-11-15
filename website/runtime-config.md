@@ -509,10 +509,11 @@ db.enableCustomJSONParsingForLargeNumbers(pg);
 ### `RangeString` {#RangeString}
 
 ```ts
-type RangeString<Bound extends string | number> = `${'[' | '('}${Bound},${Bound}${']' | ')'}` | 'empty'
+type RangeString<Bound extends string | number> = `${'[' | '('}${RangeBound<Bound>},${RangeBound<Bound>}${']' | ')'}` | 'empty'
+type RangeBound<Bound extends string | number> = Bound | (number extends Bound ? 'Infinity' | '-Infinity' | 'NaN' : never)
 ```
 
-A range as Postgres writes it: a bracket, two bounds, a bracket, or `'empty'` for an empty range. A range whose bounds enclose no value is empty too: `'[5,5)'::int4range` comes back as `'empty'`. Postgres also reads `'EMPTY'` and spaces around it, but writes only `'empty'`, so the type takes only that. Zapatos 6.6.1 left `'empty'` out.
+A range as Postgres writes it: a bracket, two bounds, a bracket, or `'empty'` for an empty range. A range whose bounds enclose no value is empty too: `'[5,5)'::int4range` comes back as `'empty'`. Postgres also reads `'EMPTY'` and spaces around it, but writes only `'empty'`, so the type takes only that. A `number` bound may also be `Infinity`, `-Infinity` or `NaN`, as Postgres writes them in a `numrange`, from `infinity`, `inf` or `nan` too; the type takes only these spellings. Zapatos 6.6.1 left out `'empty'` and these three.
 
 ### `NumberRangeString` {#NumberRangeString}
 
@@ -520,7 +521,7 @@ A range as Postgres writes it: a bracket, two bounds, a bracket, or `'empty'` fo
 type NumberRangeString = RangeString<number | ''>
 ```
 
-An `int4range`, `int8range` or `numrange`: `'[1,5)'`, or `'[1.5,)'` with no upper bound.
+An `int4range`, `int8range` or `numrange`: `'[1,5)'`, `'[1.5,)'` with no upper bound, or `'[0,Infinity)'` for a `numrange`, whose bounds may be infinite or `NaN`. The type takes such a bound for the integer ranges too, though Postgres refuses it there.
 
 ### `DateRangeString` {#DateRangeString}
 

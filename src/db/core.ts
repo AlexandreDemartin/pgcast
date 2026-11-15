@@ -66,9 +66,12 @@ export type NumericString = `${number}`;
 /**
  * Generic range value represented as a string: a bracket, two bounds, a
  * bracket, or `'empty'`, as Postgres writes an empty range (`'[5,5)'::int4range`
- * included). See https://www.postgresql.org/docs/current/rangetypes.html#RANGETYPES-IO
+ * included). A `number` bound may also be `Infinity`, `-Infinity` or `NaN`, as
+ * Postgres writes them in a `numrange` (`'[1,Infinity)'`), which `${number}`
+ * leaves out. See https://www.postgresql.org/docs/current/rangetypes.html#RANGETYPES-IO
  */
-export type RangeString<Bound extends string | number> = `${'[' | '('}${Bound},${Bound}${']' | ')'}` | 'empty';
+export type RangeString<Bound extends string | number> = `${'[' | '('}${RangeBound<Bound>},${RangeBound<Bound>}${']' | ')'}` | 'empty';
+type RangeBound<Bound extends string | number> = Bound | (number extends Bound ? 'Infinity' | '-Infinity' | 'NaN' : never);
 
 /**
  * `tsrange`, `tstzrange` or `daterange` value represented as a string. The
@@ -78,7 +81,9 @@ export type RangeString<Bound extends string | number> = `${'[' | '('}${Bound},$
 export type DateRangeString = RangeString<string>;
 
 /**
- * `int4range`, `int8range` or `numrange` value represented as a string
+ * `int4range`, `int8range` or `numrange` value represented as a string. The
+ * type takes an infinite or `NaN` bound for each of them, though Postgres
+ * refuses one in an `int4range` or `int8range` (22P02).
  */
 export type NumberRangeString = RangeString<number | ''>;
 
