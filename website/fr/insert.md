@@ -1,5 +1,5 @@
 ---
-english: a5be9b827bf6
+english: b8353d5e62fe
 ---
 
 # Écritures
@@ -132,6 +132,8 @@ Avec `reportAction: 'suppress'`, le résultat n’a pas de `$action` :
 
 Avec `strictNullChecks` désactivé, le type garde `$action`, qui vaut alors `undefined`.
 
+Une table partitionnée a besoin de `'suppress'` quand une ligne arrive dans une partition qui a la même disposition de colonnes que la table, comme une partition créée par `PARTITION OF`. Postgres n’y lit pas de `xmax`, et refuse la requête (0A000) : « <span lang="en">cannot retrieve a system column in this context</span> », comme avec Zapatos 6.6.1. Un upsert dans la partition elle-même renvoie `$action`.
+
 ### Lignes aux clés différentes {#upsert-different-keys}
 
 Sur plusieurs lignes sans `updateColumns`, une clé absente d’une ligne est insérée comme `DEFAULT`, puis fixée depuis `EXCLUDED` en cas de conflit : la valeur existante de cette ligne est perdue.
@@ -195,7 +197,7 @@ Un tableau vide, pour le `updateColumns` d’`upsert()` : une ligne en conflit 
 
 ## `UpsertAction` {#UpsertAction}
 
-`{ $action: 'INSERT' | 'UPDATE' }`, ajouté à chaque résultat d’`upsert()` : `'INSERT'` pour une nouvelle ligne, `'UPDATE'` pour une ligne mise à jour, lu dans le `xmax` de la ligne. `reportAction: 'suppress'` l’ôte du SQL et du type.
+`{ $action: 'INSERT' | 'UPDATE' }`, ajouté à chaque résultat d’`upsert()` : `'INSERT'` pour une nouvelle ligne, `'UPDATE'` pour une ligne mise à jour, lu dans le `xmax` de la ligne. `reportAction: 'suppress'` l’ôte du SQL et du type ; une table partitionnée peut en avoir besoin, car Postgres ne lit pas de `xmax` dans une partition qui a la même disposition de colonnes que la table ([Options](#upsert-options)).
 
 ## `UpsertReturnableForTable` {#UpsertReturnableForTable}
 

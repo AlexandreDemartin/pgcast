@@ -128,6 +128,8 @@ With `reportAction: 'suppress'`, the result has no `$action`:
 
 With `strictNullChecks` off, the type keeps `$action`, which is then `undefined`.
 
+A partitioned table needs `'suppress'` when a row lands in a partition with the table's column layout, as one made with `PARTITION OF` has. Postgres reads no `xmax` there, and refuses the query (0A000): "cannot retrieve a system column in this context", as with Zapatos 6.6.1. An upsert into the partition itself reports `$action`.
+
 ### Rows with different keys {#upsert-different-keys}
 
 In several rows without `updateColumns`, a key missing from one row is inserted as `DEFAULT`, then set from `EXCLUDED` on conflict: that row's existing value is lost.
@@ -191,7 +193,7 @@ An empty array, for the `updateColumns` of `upsert()`: a row that conflicts is l
 
 ## `UpsertAction` {#UpsertAction}
 
-`{ $action: 'INSERT' | 'UPDATE' }`, added to each result of `upsert()`: `'INSERT'` for a new row, `'UPDATE'` for an updated one, read from the row's `xmax`. `reportAction: 'suppress'` leaves it out of the SQL and of the type.
+`{ $action: 'INSERT' | 'UPDATE' }`, added to each result of `upsert()`: `'INSERT'` for a new row, `'UPDATE'` for an updated one, read from the row's `xmax`. `reportAction: 'suppress'` leaves it out of the SQL and of the type; a partitioned table can need it, as Postgres reads no `xmax` in a partition with the table's column layout ([Options](#upsert-options)).
 
 ## `UpsertReturnableForTable` {#UpsertReturnableForTable}
 
