@@ -1,5 +1,5 @@
 ---
-english: 6c0918b13fec
+english: 810e8e4423a4
 ---
 
 # Lectures {#select-and-the-aggregates}
@@ -267,7 +267,7 @@ db.count(table, where, options?)
 | `…() takes columns as an array, not …: pass columns: ['column']…`<!-- message --> | une chaîne ou une autre valeur primitive comme `columns`, `'title'` pour `['title']` ; une chaîne vide, `0` ou `false` équivaut à l’absence de `columns` | pgcast 6.7.0 |
 | `…() cannot pass a lateral query through: nest it in the lateral of a select() instead`<!-- message --> | une seule sous-requête comme `lateral` | pgcast 6.7.0 |
 
-Zapatos 6.6.1 envoyait le SQL, que Postgres refusait : `sum(*)` et `count("id", "mood")` (42883), `count()` (42809), `count("0", "1")` pour `'id'` (42703), `SELECT  AS result` (42601). Le type est celui de 6.6.1, qui laisse passer ces appels, une seule sous-requête comme `lateral` quand il n’y a ni `columns` ni `extras`.
+Zapatos 6.6.1 envoyait le SQL, que Postgres refusait : `sum(*)` et `count("id", "mood")` (42883), `count()` (42809), `count("0", "1")` pour `'id'` en passant outre le type (42703), `SELECT  AS result` (42601). Le type est celui de 6.6.1, qui laisse passer les autres appels, une seule sous-requête comme `lateral` quand il n’y a ni `columns` ni `extras`.
 
 Deux appels qui passaient sous 6.6.1 sont maintenant rejetés aussi :
 

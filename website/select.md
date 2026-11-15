@@ -263,7 +263,7 @@ db.count(table, where, options?)
 | `…() takes columns as an array, not …: pass columns: ['column']…`<!-- message --> | a string or another primitive as `columns`, `'title'` for `['title']`; an empty string, `0` or `false` is no `columns` | pgcast 6.7.0 |
 | `…() cannot pass a lateral query through: nest it in the lateral of a select() instead`<!-- message --> | a single subquery as `lateral` | pgcast 6.7.0 |
 
-Zapatos 6.6.1 sent the SQL, which Postgres refused: `sum(*)` and `count("id", "mood")` (42883), `count()` (42809), `count("0", "1")` for `'id'` (42703), `SELECT  AS result` (42601). The type is that of 6.6.1, which lets these calls through, a single subquery as `lateral` when there is no `columns` nor `extras`.
+Zapatos 6.6.1 sent the SQL, which Postgres refused: `sum(*)` and `count("id", "mood")` (42883), `count()` (42809), `count("0", "1")` for `'id'` past the type (42703), `SELECT  AS result` (42601). The type is that of 6.6.1, which lets the other calls through, a single subquery as `lateral` when there is no `columns` nor `extras`.
 
 Two calls that ran under 6.6.1 now reject too:
 
