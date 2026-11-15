@@ -212,6 +212,14 @@ Candidates for a check, a rule or a skill line.
 - #257 — `getConfig()` runs on every query (`core.ts`) and while shortcuts build one (`shortcuts.ts`): whatever it does with the stored config can break every query; candidate check: `getConfig()` and `setConfig()` never throw whatever was stored, a unit test feeding a throwing getter, a Proxy, a primitive from JS (#249 and #257 are the same regression) — `branch-reviewer`
 - #257 — When a fix adds an exception to a guarantee the docs state, `git grep` the reference page that states it, English and French, not only `CHANGELOG.md` — `branch-reviewer`
 - #257 — An issue's « validate in `setConfig()` » candidate looked sound until a getter that starts throwing after a successful `setConfig()` was probed: probe the odd shapes of skill `backward-compat` before choosing between candidates — `builder`
+- #179 — A fix that converts a config value eagerly at entry, where 6.6.1 read it lazily (only on the retry branch), changes when a bad value throws: replay a fixed set of odd values (`Symbol`, `Object.create(null)`, a throwing `valueOf`, `null`) on 6.6.1, master and the branch for each config key the runtime reads (same family as #257) — `branch-reviewer`
+- #179 — A fix that removes a documented quirk leaves its other mentions behind (a § Errors row survived the removed caveats): `git grep` the old message quoted in the issue across `website/` before marking a page translated — `branch-reviewer`
+- #179 — A test can show a count unchanged and its message fixed: the count assertion first, green, the message assertion red — `builder`
+- #179 — An existing characterisation test that records the old message (« attempt 1 of 0 ») changes on purpose with the fix: say so in Proofs with the old and new text — `builder`
+- #178 — A fix to a helper another public function calls changes that function's results too (`isDatabaseError()` inside `transaction()`): `git grep` the helper's callers in `src/`, replay each, and grep `website/` for the message the fix removes — `branch-reviewer`
+- #178 — When a parameter widens to `unknown`, probe the odd shapes of the property it reads too: a non-string with the string's members (`{ code: ['2','3','5','0','5'] }`, `{ length: 5 }`) — `branch-reviewer`
+- #178 — A stacked layer may only re-word what it makes untrue in the layer below; the behaviour, its docs row and its test stay in the lower layer (#437 / #441) — `branch-reviewer`
+- #178 — Under `exactOptionalPropertyTypes`, Zapatos 6.6.1's type also refused `pg.DatabaseError` and `NodeJS.ErrnoException` (TS2379, `code: string | undefined`): a « 6.6.1 accepted it » claim holds under the suite's options — `builder`
 - #219 — A docs example of debug output goes stale silently when a generator query changes (its number and a `pg_namespace` join had moved on): candidate check, regenerate the example from a run on the docs schema in `docs:build` — `builder`
 - #301 — In 6.6.1 and master, a `schemas` rule's `include` given as a plain string other than `"*"` (`"films"`) goes through `String.prototype.indexOf`, so it matches substrings of relation names: filed as its own issue — `builder`
 - #301 — `finaliseConfig({}).schemas.public` is the same object as `defaultConfig.schemas.public`: a caller who mutates the returned rule changes the default for later calls (nothing in the repo does today) — `branch-reviewer`
@@ -224,6 +232,17 @@ Candidates for a check, a rule or a skill line.
 - #184 — A migration hint for files already on disk is checked in both prefixed and unprefixed schemas (`import type { format }` alone gives TS2305 in a prefixed one) — `branch-reviewer`
 - #184 — A codegen placeholder that « compiles » under `skipLibCheck` hides unresolved names as `any`: replay each output claim with `skipLibCheck` both ways — `builder`
 - #287 — A merged note keeps every condition of the note it replaces (#42's withholds the `customTypesTransform` advice when the raw names are equal): a test runs the old note's scenario inside the new note's — `branch-reviewer`
+- #405 — Rewriting a lookup with `&&`/`??`/`?.`: the replay grid covers falsy non-object values (`false`, `0`, `""`, `null`) at each level and a `null` root, with the expression loaded from each shipped `dist` (6.6.1, master, branch), not a hand copy — `branch-reviewer`
+- #405 — Every method on `Object.prototype` throws on `.caller` and `.arguments` in Node 22: a prototype-key replay includes those two names, as a lookup can crash, not only be masked — `builder`
+- #405 — A crash test needs one table per run (`only(name)`): one crashing table fails the whole schema and turns every row red for the wrong reason — `builder`
+- #309 — A rule that predicts how TypeScript reads generated JSDoc ships with a seeded fuzz with `typescript` (a devDependency) as the oracle, over an alphabet of the parser's token classes (`\` escapes, `\n`, `\r`, U+2028, U+2029, quotes, backticks, `/`, conflict markers, NBSP): three verify rounds stayed `partly` only for missing classes — `branch-reviewer`
+- #309 — Where a rule copies another parser, err on the side of the old output: move only when the tag is certain, any doubt keeps master's layout byte for byte — orchestrator
+- #309 — A byte-for-byte rule is tested against the real previous output (master's code via `git archive`, or the fixture snapshot), not a hand-rebuilt layout, which drifts silently — `branch-reviewer`
+- #309 — TypeScript's language service (`getQuickInfoAtPosition`, `getSuggestionDiagnostics`) replays the hover and the strike-through without an editor; it reads `@see`'s first word as a name — `builder`
+- #183 — `process.emitWarning()` is lost when `process.exit()` follows in the same tick: a deprecation on a path that ends the process goes through a synchronous channel (`warningListener`) — `builder`
+- #183 — An optional config key is read with `== null` (or `??`) in every place, never `=== undefined`: a config loaded from JSON carries `null` (grep `=== undefined` on `config.` keys under `src/generate/`) — `branch-reviewer`
+- #183 — A deprecated default whose explicit old value is kept (`rejectOnQueryError`: unset deprecated, `false` kept) fits no class of decision 003 § Rule: its docs entry lists each value, « left out » included, not a « default » cell; § Rule could name the case (owner's call) — `branch-reviewer`
+- #183 — Merge master before review when master touched the same English docs page: two PRs on one page always conflict on the French `english:` hash (`git merge-tree HEAD origin/master`) — `branch-reviewer`
 - #447 — When a PR documents an exception, `git grep` the absolute words (« never », « every ») on the same subject across `website/`: « never overwritten » survived on three pages — `branch-reviewer`
 - #447 — When notes from several PRs can fire for one object (#42, #287, #447), a test of all of them together freezes their order — `branch-reviewer`
 - #447 — The CLI's « Writing new custom type or domain placeholder file » message announces a placeholder the index file then writes over: it still misleads — `builder`
@@ -284,6 +303,10 @@ Minor review defects, taken up by the end-of-chapter review.
 - #257 — `test/integration/transaction.test.ts:367`: only the `sql` template path is frozen; shortcuts read `getConfig()` while building (`shortcuts.ts:145`, `:161`, `:416`, `:779`): an `insert()` in place of `write()` would keep them covered — `branch-reviewer`
 - #257 — `website/runtime-config.md:44` (and `fr/…:48`): « A copy of the configuration, `transactionRetryDelay` included » has no exception for a delay whose getter throws, which is now shared — `branch-reviewer`
 - #257 — `src/db/config.ts:58`: the JSDoc « Get (a copy of) the current configuration » leaves out the exception given at `:64` — `branch-reviewer`
+- #179 — `test/integration/transaction.test.ts:73`: the pool case of a thrown `null` / `undefined` checks the rows but not `totalCount - idleCount === 0`, as `:335` and `:493` do — `branch-reviewer`
+- #179 — `website/transaction.md:73` (and `fr/…:77`): « `0` or `1` gives one » could match `runtime-config.md:113` (« `1`, `0`, a negative value or `NaN` ») — `branch-reviewer`
+- #179 — `src/db/transaction.ts:162`: a `valueOf` with side effects is now called once at entry, where 6.6.1 called it at each comparison (0 times on a success) — `branch-reviewer`
+- #178 — `src/db/pgErrors.ts:19`, `website/transaction.md:349`: « any value », yet a `code` that is not a string but has a string's members (`['2','3','5','0','5']`, `{ length: 5 }`) throws `code.startsWith is not a function`; 6.6.1's type refused both: `false` would be a Fix, or the wording narrowed — `branch-reviewer`
 
 - #301 — `src/generate/schemaRules.ts:43`: « has no include nor exclude » reads better as « has neither include nor exclude » (frozen in the test, CHANGELOG and both generator pages) — `branch-reviewer`
 - #301 — `test/integration/codegen.test.ts:1217`: a single `null` key (`{ include: '*', exclude: null }`) is not frozen by a test — `branch-reviewer`
@@ -294,6 +317,13 @@ Minor review defects, taken up by the end-of-chapter review.
 - #184 — `src/generate/index.ts:10`: a direct caller of the exported `definitionForRelationInSchema` that does not pass `customTypeImports` now reads `archive.genre` rather than `genre` (both fail to compile) — `branch-reviewer`
 - #287 — `test/integration/codegen.test.ts:868`: the notes' order (case note first, then #42's) is decided alone but not pinned by a test — `branch-reviewer`
 - #287 — `CHANGELOG.md:101`: a second colon after « (…): on a case-insensitive file system », and « as in Zapatos 6.6.1 » reads as if it applied to the file system — `branch-reviewer`
+- #405 — `test/integration/codegen.test.ts:1604`: `codegenOf` always sets `unprefixedSchema` to the schema under test; « in any schema » (`CHANGELOG.md:215`) and the `archive.toString` control exist only in the replay — `branch-reviewer`
+- #405 — `CHANGELOG.md:193`: « … give the same files, byte for byte », then the next sentence says `'*'` « now applies » — `branch-reviewer`
+- #405 — `src/generate/tables.ts:114-115`: `columnOptionsFor`'s return type leaves out the falsy values it returns on purpose — `branch-reviewer`
+- #309 — `src/generate/tables.ts:341`: JS's `\s` is not TypeScript's `isWhiteSpaceSingleLine` (zero-width space, U+0085): harmless and exotic, at most a word in the code comment — `branch-reviewer`
+- #309 — `test/integration/codegen.test.ts:456-461`: the JSDoc of `commentLines` describes the layout without a tag, and its `slice(2, -3)` is wrong for a tagged column — `branch-reviewer`
+- #309 — out of scope: a column `DEFAULT`, domain or name holding ` @x` can still start a tag in the generated lines, on master too — `builder`
+- #183 — `src/generate/tsOutput.ts:185`: the comment above the rethrow explains only the `ended` half of its condition, not `rejectOnQueryError` — `branch-reviewer`
 - #447 — `website/generator.md:356`, `:222` (and `fr/…`): the `index` note's case-insensitive clause drops « wherever it runs » — `branch-reviewer`
 - #447 — `website/generator.md:427`, `:278`, `website/switching.md:18` (and `fr/…`): « never overwritten » without the `index` exception — `branch-reviewer`
 - #447 — `test/integration/codegen.test.ts:1053`: one `index` name shared by two schemas (this note and #42's on one file) is not tested — `branch-reviewer`
