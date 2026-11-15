@@ -139,6 +139,8 @@ export const definitionForRelationInSchema = async (
   // an 'out' parameter too: what a placeholder imports from zapatos/schema, '' for nothing, null for an enum's labels written out
   customTypeImports: Record<string, string | null> = Object.create(null),
   uniqueIndexesNotArbiters: string[] = [],  // an 'out' parameter too: what uniqueIndexConstraintsOnly would leave out
+  /** An 'out' parameter too: for each placeholder whose text a relation wrote without naming an enum, its Postgres type. */
+  placeholdersNamingNoEnum: Record<string, string> = Object.create(null),
 ) => {
   const
     rows = await columnsForRelation(rel, schemaName, queryFn),
@@ -208,16 +210,24 @@ export const definitionForRelationInSchema = async (
         imported = importsEnum ? (schemaPrefix ? namespace : enumName) : '',
         // relations that would import differently keep 6.6.1's text, with no import, in whichever order they are read
         agrees = (customTypeImports[prefixedCustomType] ?? imported) === imported,
+        hasEnum = hasOwn(typeEnums, udtName) || udtName.charAt(0) === '_' && hasOwn(typeEnums, udtName.slice(1)),
         // with typeEnumsAcrossSchemas, every relation reads the enum in its own schema: the labels that one of them
         // writes out type them all, and a relation that names the enum never replaces them
-        labelled = inlineEnums && (hasOwn(typeEnums, udtName) || udtName.charAt(0) === '_' && hasOwn(typeEnums, udtName.slice(1)));
+        labelled = inlineEnums && hasEnum,
+        // without it, a relation of a schema with no enum of that name reads the type as `any`: that text wins, in
+        // whichever order the relations are read; two types of one name (one placeholder) keep 6.6.1's last-wins
+        qualifiedType = `"${domainName === null ? udtSchema : domainSchema}"."${customType}"`,
+        namesEnum = !inlineEnums && hasEnum,
+        keepsText = namesEnum && placeholdersNamingNoEnum[prefixedCustomType] === qualifiedType;
 
-      if (labelled || customTypeImports[prefixedCustomType] !== null) {
+      if (!keepsText && (labelled || customTypeImports[prefixedCustomType] !== null)) {
         // two origins: the last one seen wins
         customTypes[prefixedCustomType] = agrees && importsEnum && schemaPrefix ? `${namespace}.${selectableType}` : selectableType;
         customTypeImports[prefixedCustomType] = labelled ? null : agrees ? imported : '';
+        if (namesEnum) delete placeholdersNamingNoEnum[prefixedCustomType];
+        else placeholdersNamingNoEnum[prefixedCustomType] = qualifiedType;
       }
-      origins[`"${domainName === null ? udtSchema : domainSchema}"."${customType}"`] = customType;
+      origins[qualifiedType] = customType;
       selectableType = JSONSelectableType = whereableType = insertableType = updatableType =
         'c.' + prefixedCustomType;
     }

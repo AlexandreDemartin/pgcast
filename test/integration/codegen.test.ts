@@ -450,9 +450,10 @@ ${imports.map(line => `  ${line}\n`).join('')}  export type ${type};  // replace
         complete = finaliseConfig({ ...quiet, ...config }),
         read: Record<string, Record<string, { type: string; imports: string | null }>> = {};
       for (const order of orders(relations)) {
-        const customTypes = Object.create(null), customTypeImports = Object.create(null);
+        const customTypes = Object.create(null), customTypeImports = Object.create(null), namingNoEnum = Object.create(null);
         for (const { rel, schema, enums } of order) await definitionForRelationInSchema(
-          rel, schema, await enums, customTypes, complete, q, undefined, undefined, undefined, customTypeImports);
+          rel, schema, await enums, customTypes, complete, q, undefined, undefined, undefined, customTypeImports, undefined,
+          namingNoEnum);
         read[order.map(r => `${r.schema}.${r.rel.name}`).join(', ')] = Object.fromEntries(names.map(name =>
           [name, { type: customTypes[name], imports: customTypeImports[name] || null }]));
       }
