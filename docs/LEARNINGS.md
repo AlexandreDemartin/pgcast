@@ -246,6 +246,12 @@ Candidates for a check, a rule or a skill line.
 - #447 — When a PR documents an exception, `git grep` the absolute words (« never », « every ») on the same subject across `website/`: « never overwritten » survived on three pages — `branch-reviewer`
 - #447 — When notes from several PRs can fire for one object (#42, #287, #447), a test of all of them together freezes their order — `branch-reviewer`
 - #447 — The CLI's « Writing new custom type or domain placeholder file » message announces a placeholder the index file then writes over: it still misleads — `builder`
+- #181 — When a function's accepted inputs widen, reread the page's general rules (« and the others », « refuses `null` »), not only the sentence the plan names: `conditions.md:34` contradicted the PR — `branch-reviewer`
+- #181 — A type test of a condition includes one literal on an enum column in context, against the generated schema: that case rests on inference through the return type, which the integration tests (stub schema) do not see — `branch-reviewer`
+- #181 — Comparing the emitted `.d.ts` of a probe file across variants is a cheap, exact check that inferred types are unchanged — `builder`
+- #449 — Every value `definitionForRelationInSchema` writes into a record shared by all relations (`customTypes`, `customTypeImports`, `customTypeOrigins`) is merged from relations read concurrently (#444, #449, #455): a test through `placeholdersInEveryOrder` (`test/integration/codegen.test.ts:400`) for each `unprefixedSchema`; candidate line for skill `codegen-output` § Deterministic — `branch-reviewer`
+- #449 — #444's « relations that disagree » check compared only imports; two relations can import nothing and still write different texts (an enum named like a TypeScript type) — `builder`
+- #449 — An ordering helper that calls `definitionForRelationInSchema` in each order pins order independence deterministically; unforced `codegen()` runs are red only by chance — `builder`
 - #402 — Claims about when `upsert()` gives `DO NOTHING` keep losing the `undefinedMeansMissing` clause (#168, #402): any « no `updateValues` key » wording carries it or links `#undefined-values` (`git grep "no \`updateValues\` key"`) — `branch-reviewer`
 - #402 — Decision 003 has no class for « the type cannot know a run-time value » (a computed `Column[]` that may be empty, a computed `Whereable` that may be `{}`): such cases end as Document by delegation against the literal Fix criterion; a sentence in 003 would make it checkable (owner's call) — `branch-reviewer`
 - #402 — A types-only `ConfigTypes` opt-in cannot carry decision 003's run-time warning: weigh Document first for a niche type gap — orchestrator
@@ -334,6 +340,14 @@ Minor review defects, taken up by the end-of-chapter review.
 - #447 — `website/generator.md:427`, `:278`, `website/switching.md:18` (and `fr/…`): « never overwritten » without the `index` exception — `branch-reviewer`
 - #447 — `test/integration/codegen.test.ts:1053`: one `index` name shared by two schemas (this note and #42's on one file) is not tested — `branch-reviewer`
 - #447 — `src/generate/tsOutput.ts:94`: the outer `types` shadowed by the inner `const types` at `:122` — `branch-reviewer`
+- #181 — `website/conditions.md:131` (and `fr/…:135`): « Both take a nullable value » right after « as `eq()` » can read as `eq()` and `isNotDistinctFrom()`; the `isDistinctFrom()` entry at `:127` says nothing of nullable values — `branch-reviewer`
+- #181 — `test/types/core.test-d.ts:90`: no type test of a literal on an enum column in context (`{ mood: c.isDistinctFrom('sad') }`) — `branch-reviewer`
+- #181 — `CHANGELOG.md:93`: a user's generic helper now infers `SQLFragment<boolean, Exclude<V, null>>` — `branch-reviewer`
+- #181 — `website/fr/conditions.md:135`: « avec `tagline` un `string | null` » word for word; « si `tagline` est un `string | null` » — `branch-reviewer`
+- #449 — `src/generate/tables.ts:197`: « the last one seen wins » inside a guard that says the opposite for labels written out — `branch-reviewer`
+- #449 — `src/generate/tables.ts:17`: `hasOwn` beside an inline `hasOwnProperty.call` at `:152` — `branch-reviewer`
+- #449 — `website/custom-types.md:214` (and `fr/…`): « When a placeholder does not compile » says nothing of `typeEnumsAcrossSchemas` — `branch-reviewer`
+- #449 — `src/generate/tables.ts:194`: `labelled` repeats `tsTypeForPgType`'s enum lookup, with no comment that they must agree — `branch-reviewer`
 - #402 — `test/integration/shortcuts.test.ts:408`: the SQL of the computed-empty case is frozen only by the docs probe, not by `npm test` — `branch-reviewer`
 - #402 — `test/types/shortcuts.test-d.ts:242`: `expectTypeOf(unchecked).not.toBeAny()` checks an arrow function, which can never be `any` — `branch-reviewer`
 - #402 — `website/insert.md:98` (and `fr/…:102`): « which the type follows » holds only with `strictNullChecks` — `branch-reviewer`
