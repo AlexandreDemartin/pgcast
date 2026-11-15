@@ -227,10 +227,13 @@ Once a run shows no warning, or each one comes from a call you've checked, turn 
 ```ts twoslash
 import * as db from 'zapatos/db';
 // ---cut---
+declare module 'zapatos/db' {
+  interface ConfigTypes { aggregatesTypedByColumn: true }
+}
 db.setConfig({
   upsertRequiresSameKeys: true, undefinedMeansMissing: true,
   transactionRequiresCommit: true, transactionRequiresIdleClient: true,
-  transactionRequiresSatisfyingLevel: true,
+  transactionRequiresSatisfyingLevel: true, aggregatesTypedByColumn: true,
 });
 ```
 
@@ -247,6 +250,7 @@ All of them will be the default in 7.0 ([Versions](/versions)). With them on, an
 - A `transaction()` whose `COMMIT` Postgres answers with `ROLLBACK` rejects, without a retry ([`transaction()`, Errors](/transaction#errors)).
 - A `transaction()` given a client already inside a transaction block rejects, and leaves that transaction open ([Your own `BEGIN`](/transaction#your-own-begin)).
 - A `transaction()` given the client of a transaction at a level that doesn't satisfy its own rejects before its callback ([Passing a transaction through](/transaction#passing-a-transaction-through)).
+- `sum()`, `avg()`, `min()` and `max()` give `null` when no row matches, and `min()` and `max()` their column's value, typed so by the `ConfigTypes` declaration ([Typed by column](/select#typed-by-column)).
 - No option warns. To keep it that way, `NODE_OPTIONS=--throw-deprecation npm test` fails the run at the first warning.
 
 One more opt-in, [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow), has no warning to look for, and stays off in 7.0. With it, a `selectExactlyOne()` run on its own rejects on a second row, not only on none. Turn it on where your tests show no `selectExactlyOne()` matching two rows.
@@ -263,7 +267,7 @@ The note of [`enumOrder`](/generator#generate.enumOrder) names each enum whose l
 
 The note of [`uniqueIndexConstraintsOnly`](/generator#generate.uniqueIndexConstraintsOnly) names each unique index that `ON CONFLICT ON CONSTRAINT` refuses, though `UniqueIndex` lists it: an index with no constraint, a materialised view's among them, the index of a `DEFERRABLE` constraint or, on Postgres 18, of a `WITHOUT OVERLAPS` key, and a constraint's index not yet valid. Turn it on and regenerate: `tsc` shows each `constraint()` that names one, which Postgres refused anyway (42704, 55000, 42809 or 42P10), and any code of yours that takes `UniqueIndex` for every unique index, such as a `Record` keyed by it.
 
-The note of [`domainsTypedByContext`](/generator#generate.domainsTypedByContext) names each column of a domain over `bigint`, `numeric`, `bytea`, `money` or a date, which its placeholder, as generated, types as `pg` returns it in all five interfaces. A placeholder Zapatos 6.6.1 wrote over `bigint` or `numeric` has no import, so its column is `any`, with the option too: add the import first ([When a placeholder does not compile](/custom-types#when-a-placeholder-does-not-compile)). Turn it on and regenerate: a placeholder left as generated now types its column by context, and `tsc` shows the code that took the shortcuts' JSON for the placeholder's type, a `Date` for a date or a string for a `bigint`. A placeholder you edited keeps its type, as before. Its second note names each column of a domain over a domain, or of an array of a domain, which its placeholder types as `any`: turned on, it types them by the base type of the innermost domain, and `tsc` shows the code that wrote a value of another type there.
+The note of [`domainsTypedByContext`](/generator#generate.domainsTypedByContext) names each column of a domain over `bigint`, `numeric`, `bytea`, `money` or a date, or over an array of one, which its placeholder, as generated, types as `pg` returns it in all five interfaces. A placeholder Zapatos 6.6.1 wrote over `bigint` or `numeric` has no import, so its column is `any`, with the option too: add the import first ([When a placeholder does not compile](/custom-types#when-a-placeholder-does-not-compile)). Turn it on and regenerate: a placeholder left as generated now types its column by context, and `tsc` shows the code that took the shortcuts' JSON for the placeholder's type, a `Date` for a date or a string for a `bigint`. A placeholder you edited keeps its type, as before. Its second note names each column of a domain over a domain, or of an array of a domain, which its placeholder types as `any`: turned on, it types them by the base type of the innermost domain, and `tsc` shows the code that wrote a value of another type there.
 
 The note of [`rejectOnQueryError`](/generator#generate.rejectOnQueryError) comes from a script that calls `generate()`, when a query fails, never from `npx zapatos`, which always exits. Turn it on where the script awaits `generate()`, and read what its `catch` does: a refused connection now reaches it, and a script that logs the error and carries on exits with code 0, not 1.
 
@@ -288,6 +292,6 @@ The holes of [6.6.2's § Security](/changelog#6.6.2-security) are open again: a 
 
 ## See also
 
-- [Opt-ins and warnings](/runtime-config#opt-ins-and-warnings): each option, its warning and its message.
+- [Opt-ins and warnings](/runtime-config#opt-ins-and-warnings): each option, its warning and when it warns.
 - [Versions](/versions): why pgcast fixes some things outright and others behind an option.
 - [Security](/security): why a name or a `raw()` value can no longer splice SQL.

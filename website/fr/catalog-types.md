@@ -70,7 +70,7 @@ Pour les vues, pgcast s’en tient à ce que Postgres déclare, comme Zapatos :
 - Les labels d’un enum sortent dans l’ordre alphabétique : `crew_job` est `'cinematographer' | 'composer' | 'director' | 'editor' | 'writer'`, et non dans l’ordre de son `CREATE TYPE`, sauf si [`enumOrder`](/fr/generator#generate.enumOrder) vaut `"declared"`.
 - Un enum d’un autre schéma devient un placeholder de type `any`, ou prend les labels de l’enum du même nom dans le schéma de la relation, sauf si [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas) est activé.
 - `UniqueIndex` liste chaque index unique, y compris ceux que refuse `ON CONFLICT ON CONSTRAINT`, sauf si [`uniqueIndexConstraintsOnly`](/fr/generator#generate.uniqueIndexConstraintsOnly) est activé.
-- Un domaine sur `int8`, `numeric`, `bytea`, `money` ou une date est typé par son placeholder dans les cinq interfaces, qui, tel que généré, contient ce que renvoie `pg`, sauf si [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext) est activé.
+- Un domaine sur `int8`, `numeric`, `bytea`, `money` ou une date, ou sur un tableau de l’un d’eux, est typé par son placeholder dans les cinq interfaces, qui, tel que généré, contient ce que renvoie `pg`, sauf si [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext) est activé.
 - Un domaine sur un domaine, ou un tableau d’un domaine, vaut `any`, le type de son placeholder tel que généré, sauf si [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext) est activé.
 
 ::: info À venir
@@ -105,7 +105,7 @@ db.select('screenings', { subtitled: null });
 db.select('screenings', { subtitled: db.conditions.isNull });
 ```
 
-Un domaine ou un type personnalisé fait exception : son placeholder déclare un seul type, utilisé dans les cinq contextes. Cela convient à `seat_label`, une chaîne partout, mais pas à un domaine sur `int8`, `numeric`, `bytea`, `money` ou une date, dont les écritures diffèrent de ce que renvoie `pg`, et, sauf pour `money`, le JSON aussi. [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext) type un tel domaine selon le contexte, comme l’est son type de base, tant que son placeholder contient ce qu’a écrit le générateur.
+Un domaine ou un type personnalisé fait exception : son placeholder déclare un seul type, utilisé dans les cinq contextes. Cela convient à `seat_label`, une chaîne partout, mais pas à un domaine sur `int8`, `numeric`, `bytea`, `money` ou une date, ou sur un tableau de l’un d’eux, dont les écritures diffèrent de ce que renvoie `pg`, et, sauf pour `money`, le JSON aussi. [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext) type un tel domaine selon le contexte, comme l’est son type de base, tant que son placeholder contient ce qu’a écrit le générateur.
 
 La même ligne, demandée deux fois, montre les deux premiers côte à côte :
 

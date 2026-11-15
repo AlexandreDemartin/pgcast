@@ -66,7 +66,7 @@ For views, pgcast keeps to what Postgres states, as Zapatos did: a nullability t
 - Enum labels come out in alphabetical order: `crew_job` is `'cinematographer' | 'composer' | 'director' | 'editor' | 'writer'`, not the order of its `CREATE TYPE`, unless [`enumOrder`](/generator#generate.enumOrder) is `"declared"`.
 - An enum of another schema becomes an `any` placeholder, or takes the labels of the enum of the same name in the relation's schema, unless [`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas) is on.
 - `UniqueIndex` lists every unique index, those `ON CONFLICT ON CONSTRAINT` refuses included, unless [`uniqueIndexConstraintsOnly`](/generator#generate.uniqueIndexConstraintsOnly) is on.
-- A domain over `int8`, `numeric`, `bytea`, `money` or a date is typed by its placeholder in all five interfaces, which, as generated, holds what `pg` returns, unless [`domainsTypedByContext`](/generator#generate.domainsTypedByContext) is on.
+- A domain over `int8`, `numeric`, `bytea`, `money` or a date, or over an array of one, is typed by its placeholder in all five interfaces, which, as generated, holds what `pg` returns, unless [`domainsTypedByContext`](/generator#generate.domainsTypedByContext) is on.
 - A domain over a domain, or an array of a domain, is `any`, its placeholder's type as generated, unless [`domainsTypedByContext`](/generator#generate.domainsTypedByContext) is on.
 
 ::: info Coming
@@ -101,7 +101,7 @@ db.select('screenings', { subtitled: null });
 db.select('screenings', { subtitled: db.conditions.isNull });
 ```
 
-A domain or custom type is the exception: its placeholder is one type, used in all five contexts. That suits `seat_label`, a string everywhere, but not a domain over `int8`, `numeric`, `bytea`, `money` or a date, whose writes differ from what `pg` returns, and, but for `money`, its JSON too. [`domainsTypedByContext`](/generator#generate.domainsTypedByContext) types such a domain by context, as its base type is, while its placeholder holds what the generator wrote.
+A domain or custom type is the exception: its placeholder is one type, used in all five contexts. That suits `seat_label`, a string everywhere, but not a domain over `int8`, `numeric`, `bytea`, `money` or a date, or over an array of one, whose writes differ from what `pg` returns, and, but for `money`, its JSON too. [`domainsTypedByContext`](/generator#generate.domainsTypedByContext) types such a domain by context, as its base type is, while its placeholder holds what the generator wrote.
 
 The same row, asked for twice, shows the first two side by side:
 

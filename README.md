@@ -95,7 +95,7 @@ npx zapatos        # or: npx pgcast
 | `enumOrder: 'declared'` (generator): an enum's labels, `every.<name>` included, keep their declared order, by which Postgres compares them, rather than the alphabetical one | a note through `warningListener` | 6.7.0 |
 | `rejectOnQueryError` (generator): a failed query, the connection included, rejects `generate()` with its error, rather than end the process with `process.exit(1)`; the CLI still exits | a note through `warningListener`, `PGCAST_DEP006` | 6.7.0 |
 | `uniqueIndexConstraintsOnly` (generator): a relation's `UniqueIndex`, the names `constraint()` takes, lists only the index of each of its `UNIQUE` and `PRIMARY KEY` constraints, valid, not `DEFERRABLE` nor `WITHOUT OVERLAPS` ([generator](https://pgcast.dev/generator#generate.uniqueIndexConstraintsOnly)), rather than every unique index, some of which `ON CONFLICT ON CONSTRAINT` refuses | a note through `warningListener` | 6.7.0 |
-| `domainsTypedByContext` (generator): a domain over `int8`, `numeric`, `bytea`, `money` or a date is typed by context, as its base type is, while its placeholder holds what the generator wrote ([generator](https://pgcast.dev/generator#generate.domainsTypedByContext)), rather than as `pg` returns it in all five interfaces; a domain over a domain, or an array of a domain, by the base type of its innermost domain, rather than as `any` | a note through `warningListener` | 6.7.0 |
+| `domainsTypedByContext` (generator): a domain over `int8`, `numeric`, `bytea`, `money` or a date, or over an array of one, is typed by context, as its base type is, while its placeholder holds what the generator wrote ([generator](https://pgcast.dev/generator#generate.domainsTypedByContext)), rather than as `pg` returns it in all five interfaces; a domain over a domain, or an array of a domain, by the base type of its innermost domain, rather than as `any` | a note through `warningListener` | 6.7.0 |
 
 Everything else: [CHANGELOG.md](CHANGELOG.md); what the characterisation of 6.6.1 found: [docs/CHARACTERISATION-REPORT.md](docs/CHARACTERISATION-REPORT.md).
 
@@ -103,8 +103,8 @@ Everything else: [CHANGELOG.md](CHANGELOG.md); what the characterisation of 6.6.
 
 - pgcast continues Zapatos's version numbers: 6.6.2 follows Zapatos 6.6.1.
 - **6.x** is a drop-in replacement for Zapatos 6.6.1: the opt-ins stay off.
-- **7.0** switches the opt-in defaults of [decision 003](docs/decisions/003-fixes-and-deprecation.md); the warnings announce it.
-- **8.0** removes the old paths, except an old value asked for by choice: `rejectOnQueryError: false` stays.
+- **7.0** switches the opt-in defaults of [decision 003](docs/decisions/003-fixes-and-deprecation.md), except `selectExactlyOneChecksForSecondRow`, which stays opt-in for good; the warnings announce it.
+- **8.0** removes the old paths, except `selectExactlyOneChecksForSecondRow`'s and an old value asked for by choice: `rejectOnQueryError: false` stays.
 - Releases follow the [milestones](https://github.com/AlexandreDemartin/pgcast/milestones).
 
 ## Documentation

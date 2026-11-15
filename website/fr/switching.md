@@ -231,10 +231,13 @@ Une fois qu’une exécution ne montre plus d’avertissement, ou que chacun vie
 ```ts twoslash
 import * as db from 'zapatos/db';
 // ---cut---
+declare module 'zapatos/db' {
+  interface ConfigTypes { aggregatesTypedByColumn: true }
+}
 db.setConfig({
   upsertRequiresSameKeys: true, undefinedMeansMissing: true,
   transactionRequiresCommit: true, transactionRequiresIdleClient: true,
-  transactionRequiresSatisfyingLevel: true,
+  transactionRequiresSatisfyingLevel: true, aggregatesTypedByColumn: true,
 });
 ```
 
@@ -251,6 +254,7 @@ Toutes ces options deviendront le comportement par défaut dans la 7.0 ([Version
 - Une `transaction()` dont Postgres répond au `COMMIT` par `ROLLBACK` est rejetée, sans retry ([`transaction()`, Erreurs](/fr/transaction#errors)).
 - Une `transaction()` qui reçoit un client déjà dans un bloc de transaction est rejetée, et laisse cette transaction ouverte ([Votre propre `BEGIN`](/fr/transaction#your-own-begin)).
 - Une `transaction()` qui reçoit le client d’une transaction à un niveau qui ne vaut pas pour le sien est rejetée avant son callback ([Transmettre une transaction](/fr/transaction#passing-a-transaction-through)).
+- `sum()`, `avg()`, `min()` et `max()` donnent `null` quand aucune ligne ne correspond, et `min()` et `max()` la valeur de leur colonne, typées ainsi par la déclaration dans `ConfigTypes` ([Typé par colonne](/fr/select#typed-by-column)).
 - Aucune option n’avertit. Pour que cela dure, `NODE_OPTIONS=--throw-deprecation npm test` fait échouer l’exécution au premier avertissement.
 
 Un opt-in de plus, [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), n’a pas d’avertissement à guetter, et reste désactivé dans la 7.0. Avec lui, un `selectExactlyOne()` exécuté seul est rejeté sur une deuxième ligne, pas seulement sur aucune. Activez-le là où vos tests ne montrent aucun `selectExactlyOne()` qui trouve deux lignes.
@@ -267,7 +271,7 @@ La note d’[`enumOrder`](/fr/generator#generate.enumOrder) nomme chaque enum do
 
 La note d’[`uniqueIndexConstraintsOnly`](/fr/generator#generate.uniqueIndexConstraintsOnly) nomme chaque index unique que refuse `ON CONFLICT ON CONSTRAINT`, bien qu’`UniqueIndex` le liste : un index sans contrainte, comme celui d’une vue matérialisée, l’index d’une contrainte `DEFERRABLE` ou, sur Postgres 18, d’une clé `WITHOUT OVERLAPS`, et l’index pas encore valide d’une contrainte. Activez-le et régénérez : `tsc` montre chaque `constraint()` qui en nomme un, que Postgres refusait de toute façon (42704, 55000, 42809 ou 42P10), et tout code à vous qui prend `UniqueIndex` pour la liste de chaque index unique, comme un `Record` dont il type les clés.
 
-La note de [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext) nomme chaque colonne d’un domaine sur `bigint`, `numeric`, `bytea`, `money` ou une date, que son placeholder, tel que généré, type dans les cinq interfaces telle que `pg` la renvoie. Un placeholder écrit par Zapatos 6.6.1 sur `bigint` ou `numeric` n’a pas d’import, donc sa colonne vaut `any`, même avec l’option : ajoutez d’abord l’import ([Quand un placeholder ne compile pas](/fr/custom-types#when-a-placeholder-does-not-compile)). Activez-le et régénérez : un placeholder laissé tel que généré type désormais sa colonne selon le contexte, et `tsc` montre le code qui prenait le JSON des raccourcis pour le type du placeholder, un `Date` pour une date ou une chaîne pour un `bigint`. Un placeholder que vous avez modifié garde son type, comme avant. Sa seconde note nomme chaque colonne d’un domaine sur un domaine, ou d’un tableau d’un domaine, que son placeholder type comme `any` : une fois activée, l’option les type par le type de base du domaine le plus intérieur, et `tsc` montre le code qui y écrivait une valeur d’un autre type.
+La note de [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext) nomme chaque colonne d’un domaine sur `bigint`, `numeric`, `bytea`, `money` ou une date, ou sur un tableau de l’un d’eux, que son placeholder, tel que généré, type dans les cinq interfaces telle que `pg` la renvoie. Un placeholder écrit par Zapatos 6.6.1 sur `bigint` ou `numeric` n’a pas d’import, donc sa colonne vaut `any`, même avec l’option : ajoutez d’abord l’import ([Quand un placeholder ne compile pas](/fr/custom-types#when-a-placeholder-does-not-compile)). Activez-le et régénérez : un placeholder laissé tel que généré type désormais sa colonne selon le contexte, et `tsc` montre le code qui prenait le JSON des raccourcis pour le type du placeholder, un `Date` pour une date ou une chaîne pour un `bigint`. Un placeholder que vous avez modifié garde son type, comme avant. Sa seconde note nomme chaque colonne d’un domaine sur un domaine, ou d’un tableau d’un domaine, que son placeholder type comme `any` : une fois activée, l’option les type par le type de base du domaine le plus intérieur, et `tsc` montre le code qui y écrivait une valeur d’un autre type.
 
 La note de [`rejectOnQueryError`](/fr/generator#generate.rejectOnQueryError) vient d’un script qui appelle `generate()`, quand une requête échoue, jamais de `npx zapatos`, qui s’arrête toujours. Activez-le là où le script attend `generate()` avec `await`, et relisez ce que fait son `catch` : une connexion refusée y arrive désormais, et un script qui logge l’erreur puis continue se termine avec le code 0, pas 1.
 
@@ -292,6 +296,6 @@ Les failles du [§ Security de la 6.6.2](/fr/changelog#6.6.2-security) sont de n
 
 ## Voir aussi {#see-also}
 
-- [Opt-ins et avertissements](/fr/runtime-config#opt-ins-and-warnings) : chaque option, son avertissement et son message.
+- [Opt-ins et avertissements](/fr/runtime-config#opt-ins-and-warnings) : chaque option, son avertissement et quand il est émis.
 - [Versions](/fr/versions) : pourquoi pgcast corrige certaines choses d’emblée et d’autres derrière une option.
 - [Sécurité](/fr/security) : pourquoi un nom ou une valeur `raw()` ne peut plus injecter de SQL.
