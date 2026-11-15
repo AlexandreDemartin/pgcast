@@ -21,6 +21,7 @@ Each member is a [`sql`](/sql-template#sql) fragment written around [`db.self`](
   - [`and()`](#conditions.and), [`or()`](#conditions.or) and [`not()`](#conditions.not) also take Whereables, so they can be a whole `where`; [`now`](#conditions.now) and [`fromNow()`](#conditions.fromNow) hold no `self`, and go anywhere.
 - **Values**: each value is a parameter, `$1`, except a [`Parameter`](/sql-template#Parameter), kept as it is with its cast; a `sql` fragment, written as its SQL; and [`parent()`](/sql-template#parent), the parent query's column in a `lateral` subquery. `Default`, `self`, `raw()`, `cols()` and `vals()` throw: [Values a condition refuses](#refused-values).
 - **Type**: a condition is a `SQLFragment` whose second type argument, `T`, is the type of the value it compares with (its `Constraint`, [`sql`](/sql-template#sql)); the Whereable checks `T` against the column's type. The eight tests, `now` and `fromNow()` have no `T`, and pass on any column.
+  - A Whereable is also an expression: interpolated in a `SELECT` list, `{ runtime_minutes: add(10) }` is each film's runtime plus ten, `(("runtime_minutes" + $1))`<!-- probe: db.sql`${{ runtime_minutes: db.conditions.add(10) }}` -->. So the type lets through, as a Whereable value, what is no test: [`add()`](#conditions.add), [`subtract()`](#conditions.subtract), [`now`](#conditions.now) and [`fromNow()`](#conditions.fromNow), which Postgres refuses alone in a `where` (42804).
 
 A value of another type does not compile:
 
@@ -52,7 +53,7 @@ Constants, not functions: `{ subtitled: db.conditions.isNull }`, no `()`. Each w
 
 </CastPanel>
 
-`isNull` and `isNotNull` work on any column. The six others are for a `boolean`: on another type Postgres refuses them (42804), though the type lets them through.
+`isNull` and `isNotNull` work on any column. The six others are for a `boolean`, or a domain over one: on another type Postgres refuses them (42804), though the type lets them through.
 
 ### `isNull` {#conditions.isNull}
 
@@ -383,7 +384,7 @@ Zapatos 6.6.1 wrote `(NOT "release_year" = 1974 OR "release_year" = 1991)`, whic
 
 ### `now` {#conditions.now}
 
-`now()`<!-- probe: db.conditions.now -->: a constant, the start of the current transaction. A value, not a condition: `{ starts_at: after(now) }` gives `(("starts_at" > now()))`<!-- probe: db.sql`${{ starts_at: db.conditions.after(db.conditions.now) }}` -->, and in `update()` it sets the column. Alone as a Whereable value, `{ starts_at: now }`, Postgres refuses it (42804), though the type lets it through.
+`now()`<!-- probe: db.conditions.now -->: a constant, the start of the current transaction. A value, not a condition: `{ starts_at: after(now) }` gives `(("starts_at" > now()))`<!-- probe: db.sql`${{ starts_at: db.conditions.after(db.conditions.now) }}` -->, and in `update()` it sets the column. Alone as a Whereable value in a `where`, `{ starts_at: now }`, Postgres refuses it (42804), though the type lets it through: in a `SELECT` list, the same Whereable runs ([`conditions`](#conditions)).
 
 ### `fromNow()` {#conditions.fromNow}
 
@@ -418,11 +419,11 @@ Operations, not tests: for an [`update()`](/insert#update) value, where `self` i
 
 </CastPanel>
 
-- In a `where`, the type lets them through, and Postgres refuses them (42804: "argument of WHERE must be type boolean").
-- In `upsert()`'s `updateValues`, there is no current column: they throw "The 'self' column alias has no meaning here"<!-- message --> ([`upsert()`](/insert#upsert)). In `insert()`, the column is written, and Postgres refuses it (42703).
+- In a `where`, the type lets them through, and Postgres refuses them (42804: "argument of WHERE must be type boolean"); in a `SELECT` list, the same Whereable runs ([`conditions`](#conditions)).
+- In `upsert()`'s `updateValues`, there is no current column: they throw "The 'self' column alias has no meaning here"<!-- message --> ([`upsert()`](/insert#upsert)). In `insert()`, the type refuses them (TS2769), as Postgres does: the column is written in `VALUES` (42703).
 - They take a number or a `Date`, not a `Parameter` (TS2345): for a cast, write a `sql` fragment value (below).
 - On a `date` column, the type refuses a number (TS2322), and Postgres could not run it either: `date + unknown` is ambiguous (42725).
-- On a `date`, `timestamp` or `timestamptz` column, a `Date` type-checks, and Postgres refuses it ([#180](https://github.com/AlexandreDemartin/pgcast/issues/180)). On `date`, `add()` is ambiguous (42725) and `subtract()` gives an integer, not a date (42804); on the other two, `add()` reads it as an interval (22007), `subtract()` gives an interval, not a time (42804).
+- On a `date`, `timestamp` or `timestamptz` column, a `Date` type-checks. `add()` of one fails wherever it stands: on `date` it is ambiguous (42725), on the other two Postgres reads it as an interval (22007). `subtract()` of one gives a number of days on `date`, an interval on the other two, not the column's type: Postgres refuses it as an `update()` value (42804), and runs it in a `sql` fragment or a `SELECT` list.
 
 For dates, write a `sql` fragment value, where `db.self` is the column, and cast its parameter. On a `date` column, `` db.sql`${db.self} + ${db.param(3, 'int4')}` `` adds three days: `"col" + CAST($1 AS "int4")`<!-- probe: db.sql`${{ col: db.sql`${db.self} + ${db.param(3, 'int4')}` }}` -->. On a `timestamptz` column, add an interval: a screening moved to the next day.
 
