@@ -64,9 +64,11 @@ export type Int8String = `${number}`;
 export type NumericString = `${number}`;
 
 /**
- * Generic range value represented as a string
+ * Generic range value represented as a string: a bracket, two bounds, a
+ * bracket, or `'empty'`, as Postgres writes an empty range (`'[5,5)'::int4range`
+ * included). See https://www.postgresql.org/docs/current/rangetypes.html#RANGETYPES-IO
  */
-export type RangeString<Bound extends string | number> = `${'[' | '('}${Bound},${Bound}${']' | ')'}`;
+export type RangeString<Bound extends string | number> = `${'[' | '('}${Bound},${Bound}${']' | ')'}` | 'empty';
 
 /**
  * `tsrange`, `tstzrange` or `daterange` value represented as a string. The
@@ -134,7 +136,12 @@ declare const wrapper: unique symbol;
 
 /**
  * Compiles to a numbered query parameter (`$1`, `$2`, etc) and adds the wrapped value
- * at the appropriate position of the values array passed to `pg`.
+ * at the appropriate position of the values array passed to `pg`. The type is
+ * checked by its shape: an object with a `value` key of the right type passes
+ * as one, and is sent as one parameter, as JSON (`'{"value":3}'`), cast to
+ * `"json"` under `castObjectParamsToJson`. A class instance with a
+ * `toPostgres()` method is sent through it; an object literal with one, only
+ * while `castObjectParamsToJson` is off. Wrap a value with `param()`.
  * @param x The value to be wrapped
  * @param cast Optional cast type. If a string, the parameter will be cast to
  * this type within the query e.g. `CAST($1 AS "type")` instead of plain `$1`.
