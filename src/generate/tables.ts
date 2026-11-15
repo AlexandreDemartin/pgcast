@@ -293,8 +293,10 @@ export const definitionForRelationInSchema = async (
         inContext = (type: string) => typedByContext ? `db.DomainInContext<${placeholder}, ${selectableType}, ${type}>` : placeholder;
 
       if (byContext && !typedByContext) domainsNotByContext.push(`${schemaName}.${rel.name}.${column} (${domainSchema}.${domainName})`);
-      if (underDomains && !typedByContext) domainsUnderDomains.push(`${schemaName}.${rel.name}.${column} (` +
-        (domainName === null ? `${udtSchema}.${udtName.slice(1)}[])` : `${domainSchema}.${domainName})`));
+      if (underDomains && !typedByContext) {
+        const type = domainName === null ? `${udtSchema}.${udtName.slice(1)}[]` : `${domainSchema}.${domainName}`;
+        domainsUnderDomains.push(`${schemaName}.${rel.name}.${column} (${type})`);
+      }
       [selectableType, JSONSelectableType, whereableType, insertableType, updatableType] = underDomains?.map(inContext) ??
         [placeholder, ...[JSONSelectableType, whereableType, insertableType, updatableType].map(inContext)];
     }
