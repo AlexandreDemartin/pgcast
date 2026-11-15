@@ -437,6 +437,23 @@ One locking clause of [`lock`](#lock). `of` takes a table name without its schem
 
 `LateralOption<C, E>`: the type of `lateral`. An object of subqueries ([`SQLFragmentMap`](#SQLFragmentMap)); or one subquery, only when neither `columns` nor `extras` is given.
 
+In a function generic over `columns` (`C extends ColumnsOption<T>`), `select()`, `selectOne()` and `selectExactlyOne()` given no `lateral` type each column of their rows as `any` inside that function, as in Zapatos 6.6.1, so a wrong column compiles. That holds with no `extras` or a generic one; without `strictNullChecks`, with a literal one too, and in a function generic over `extras` alone. The function's callers get typed rows. Pass `lateral: undefined`, which changes no SQL, and the rows are typed inside the function too, as with literal `columns`: a key of a generic `extras` is then refused as well. A function that passes on a generic `lateral` of its own, or a whole options object typed with `LateralOption<C, …>`, keeps `any`.
+
+```ts twoslash
+import * as db from 'zapatos/db';
+// ---cut---
+async function filmCards<C extends db.ColumnsOption<'films'>>(queryable: db.Queryable, columns: C) {
+  const loose = await db.select('films', db.all, { columns }).run(queryable);
+  const looseYear: string = loose[0]!.release_year;  // compiles: each column is any here
+  const cards = await db.select('films', db.all, { columns, lateral: undefined }).run(queryable);
+  // @ts-expect-error release_year is a number
+  const year: string = cards[0]!.release_year;
+  // @ts-expect-error films has no rating column
+  const rating = cards[0]!.rating;
+  return [looseYear, year, rating];
+}
+```
+
 ### `SQLFragmentMap` {#SQLFragmentMap}
 
 `interface SQLFragmentMap { [k: string]: SQLFragment<any> }`: the object form of `lateral`, a key per subquery.
