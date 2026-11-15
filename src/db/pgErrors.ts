@@ -17,10 +17,13 @@ Released under the MIT licence: see LICENCE file
 export function isDatabaseError(err: unknown, ...types: (keyof typeof pgErrors)[]) {
   if (err === null || err === undefined) return false;
   const { code } = err as { code?: string };
-  // a code with no startsWith(), such as an array of five characters, is not a string (#501);
-  // a String object has one, and matches as in Zapatos 6.6.1
-  if (!code || code.length !== 5 || typeof code.startsWith !== 'function') return false;
-  return types.some(type => code.startsWith(pgErrors[type]));
+  if (!code || code.length !== 5) return false;
+  // startsWith is read once per type, as in Zapatos 6.6.1, so a String object matches as before;
+  // a code with none, such as an array of five characters, gives false, where 6.6.1 threw (#501)
+  return types.some(type => {
+    const { startsWith } = code;
+    return typeof startsWith === 'function' && Reflect.apply(startsWith, code, [pgErrors[type]]);
+  });
 }
 
 const pgErrors = {
