@@ -1132,6 +1132,25 @@ describe('update', () => {
     `);
   });
 
+  it('characterization: under castObjectParamsToJson, an object with a value key is cast to json (#274)', () => {
+    // characterization: a numeric column refuses the json (42804), as a filter does (42883); an object literal's
+    // own toPostgres() is left out by JSON.stringify(), a class instance's is still used
+    db.setConfig({ castObjectParamsToJson: true });
+    class Minutes { constructor(public value: number) { } toPostgres() { return String(this.value); } }
+    expect(db.update('accounts', { balance: { value: 3 } }, { id: 1 }).compile()).toMatchInlineSnapshot(`
+      {
+        "text": "UPDATE "accounts" SET ("balance") = ROW(CAST($1 AS "json")) WHERE ("id" = $2) RETURNING to_jsonb("accounts".*) AS result",
+        "values": [
+          "{"value":3}",
+          1,
+        ],
+      }
+    `);
+    expect(db.sql`${{ balance: { value: 3, toPostgres: () => '3' } }}`.compile())
+      .toEqual({ text: '("balance" = CAST($1 AS "json"))', values: ['{"value":3}'] });
+    expect(db.sql`${{ balance: new Minutes(3) }}`.compile().text).toBe('("balance" = $1)');
+  });
+
   it('no column at all', () => {
     // `SET () = ROW()` is invalid SQL, so update() throws while it builds the query
     expect(() => db.update('accounts', {}, { id: 1 }))
