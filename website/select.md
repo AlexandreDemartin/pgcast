@@ -111,6 +111,7 @@ A read shortcut is a subquery there: `select()`, `selectOne()`, `selectExactlyOn
 
 - **An object**: each key becomes a key of the result, holding its subquery's result: an array for `select()`, an object or `null` for `selectOne()`, a number for `count()`. The keys are joined in alphabetical order; each is one identifier, `"lateral_<key>"`.
 - **One subquery**: its result is passed through in place of each row. Then `columns` and `extras` have nothing to add to, and the type refuses them, with `strictNullChecks` on.
+- **`null`**: `lateral: null`, or a key whose subquery is `null` or `undefined`, throws while compiling, so `.run()` rejects before any query: "`` `lateral: null` has no meaning: for no lateral join, leave `lateral` out; to join, give it a `select()`, `selectOne()` or `count()` query, or an object of them. ``<!-- message -->", or "`` The `lateral` key 'cast' is `null`, not a query: leave the key out, or give it a `select()`, `selectOne()` or `count()` query. ``<!-- message -->". Zapatos 6.6.1 threw a `TypeError` at the call.
 
 Steps, nesting and self-joins: [Joins](/lateral). Since pgcast 6.6.2, a key or an `alias` with a `"` in it stays one identifier; in Zapatos 6.6.1 it could close its quotes ([changelog](/changelog#6.6.2-security)).
 

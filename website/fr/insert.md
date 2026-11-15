@@ -1,5 +1,5 @@
 ---
-english: a5be9b827bf6
+english: 62c6708c30f8
 ---
 
 # Écritures
@@ -38,6 +38,7 @@ Insère une ligne ou plusieurs, et les renvoie telles que Postgres les a stocké
 - Une ligne donne un résultat ; un tableau donne un tableau, dans l’ordre où Postgres les renvoie, en pratique l’ordre donné.
 - Les colonnes sont les clés de toutes les lignes ; une clé absente d’une ligne vaut `DEFAULT` dans cette ligne, comme `tagline` ci-dessus.
 - Une ligne sans clé, ou des lignes dont aucune n’a de clé, lèvent une erreur : "nothing to insert: an Insertable needs at least one column; for a row of defaults only, write INSERT ... DEFAULT VALUES in a sql template"<!-- message -->. Zapatos 6.6.1 envoyait `() VALUES ()`, que Postgres refusait (42601).
+- Une ligne qui vaut `null`, donnée seule, ou une chaîne, un nombre ou une autre valeur primitive, seule ou parmi d’autres lignes, lève une erreur à la compilation, si bien que `.run()` est rejetée avant toute requête, dans `upsert()` et `update()` aussi : "`` `db.cols()` takes an object or an array, not `null`: for one column, write `db.cols([name])`; for a row of `insert()`, `upsert()` or `update()`, give an object. ``<!-- message -->" ([`cols()`](/fr/sql-template#cols)). Une ligne `null` parmi d’autres donne `DEFAULT` dans chaque colonne, comme dans Zapatos 6.6.1. Sur une ligne `null` seule, Zapatos 6.6.1 échouait avec une `TypeError`, à l’appel dans `upsert()` ; il écrivait une ligne qui est une chaîne comme des colonnes `"0"`, `"1"`…, que Postgres refusait sauf si la table les avait (42703), et un nombre parmi d’autres lignes en une ligne de valeurs par défaut.
 - Un tableau vide ne fait rien : `.run(pool)` se résout avec `[]` et n’envoie rien, sauf si on le force avec `.run(pool, true)`. Son SQL, `INSERT INTO "films" SELECT null WHERE false`<!-- probe: db.insert('films', []) -->, est marqué comme sans effet.
 - Postgres accepte au plus 65 535 paramètres par requête : découpez une insertion plus grosse ([Batches](/fr/batches)).
 
@@ -140,6 +141,7 @@ Sur plusieurs lignes sans `updateColumns`, une clé absente d’une ligne est in
 - La requête s’exécute, comme dans Zapatos 6.6.1, et pgcast avertit une fois par processus : `PGCAST_DEP001`.
 - Une clé de `updateValues`, ou une colonne d’un `conflictTarget` tableau ou chaîne, ne compte pas : de nouvelles lignes sans leur `id` serial, upsertées sur `'id'`, n’avertissent ni ne lèvent d’erreur. Avec `constraint()`, chaque clé compte.
 - Aucun avertissement pour des lignes aux mêmes clés, pour une seule ligne, ni avec un `updateColumns`, quel qu’il soit.
+- Une ligne `null` parmi d’autres n’a aucune des clés, donc elle avertit aussi ; la requête s’exécute comme dans Zapatos 6.6.1, avec une ligne de valeurs par défaut.
 
 ::: tip Opt-in
 Avec `upsertRequiresSameKeys: true` ([`Config`](/fr/runtime-config#Config.upsertRequiresSameKeys)), un tel upsert lève une erreur avant toute requête : "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message -->. Sans elle, pgcast avertit avec `PGCAST_DEP001` ; elle devient le comportement par défaut en 7.0 ([Versions](/fr/versions)).

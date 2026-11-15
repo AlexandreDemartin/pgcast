@@ -1,5 +1,5 @@
 ---
-english: 0e8d03e50e99
+english: 37d5963a324c
 ---
 
 # Lectures {#select-and-the-aggregates}
@@ -115,6 +115,7 @@ Un raccourci de lecture y est une sous-requête : `select()`, `selectOne()`, `s
 
 - **Un objet** : chaque clé devient une clé du résultat, qui contient le résultat de sa sous-requête : un tableau pour `select()`, un objet ou `null` pour `selectOne()`, un nombre pour `count()`. Les clés sont jointes dans l’ordre alphabétique ; chacune est un seul identifiant, `"lateral_<key>"`.
 - **Une seule sous-requête** : son résultat est transmis à la place de chaque ligne. `columns` et `extras` n’ont alors rien à quoi s’ajouter, et le type les refuse, avec `strictNullChecks` activé.
+- **`null`** : `lateral: null`, ou une clé dont la sous-requête vaut `null` ou `undefined`, lève une erreur à la compilation, si bien que `.run()` est rejetée avant toute requête : "`` `lateral: null` has no meaning: for no lateral join, leave `lateral` out; to join, give it a `select()`, `selectOne()` or `count()` query, or an object of them. ``<!-- message -->", ou "`` The `lateral` key 'cast' is `null`, not a query: leave the key out, or give it a `select()`, `selectOne()` or `count()` query. ``<!-- message -->". Zapatos 6.6.1 levait une `TypeError` à l’appel.
 
 Étapes, imbrication et auto-jointures : [Jointures](/fr/lateral). Depuis pgcast 6.6.2, une clé ou un `alias` contenant un `"` reste un seul identifiant ; dans Zapatos 6.6.1, il pouvait fermer ses guillemets ([changelog](/fr/changelog#6.6.2-security)).
 
