@@ -251,6 +251,9 @@ Candidates for a check, a rule or a skill line.
 - #402 — A types-only `ConfigTypes` opt-in cannot carry decision 003's run-time warning: weigh Document first for a niche type gap — orchestrator
 - #164 — A claim about a nested shortcut covers each nesting (map `lateral`, passthrough `lateral`, `extras` or `sql` scalar subquery) and each outer call (`select`, `selectOne`, `selectExactlyOne`, `count`): the JSDoc and CHANGELOG lost the outer-call condition the page had, and `select.md` had lost it before — `branch-reviewer`, `builder`
 - #164 — A characterisation test tells the frozen behaviour from its nearest alternative (no limit), not only from the rejected fix (`LIMIT`): the data must make them differ; and run it against a mutant of the rejected fix — `branch-reviewer`, `builder`
+- #268 — A mock of a third-party lazy getter is compared with the package's real source at the oldest supported version (pg's peer floor, 7.18.2), not one recent version; and a counter on a getter that replaces itself counts only the first read — `branch-reviewer`
+- #268 — A pg 7 replay on Node 22 needs a patch to the handshake only (pg older than 8.0.3 cannot open a socket on Node 14+); pg-native runs there unpatched — `builder`
+- #268 — On pg 7, an installed pg-native whose addon fails to load made `transaction()` reject on a plain JS pool (6.6.1 and master) — `builder`
 
 ## Minors kept
 
@@ -337,3 +340,5 @@ Minor review defects, taken up by the end-of-chapter review.
 - #164 — `website/lateral.md:110` (and `fr/…`): nested in `extras` or a `sql` template, `selectOne()` / `selectExactlyOne()` with `withTies` fails on a tie with 21000; and under an outer `count()` a `withTies` lateral inflates the count — `branch-reviewer`
 - #164 — `test/integration/shortcuts.test.ts:870-883`: every matching row is a tie, so the rows cannot tell `WITH TIES` from no limit; the top-level `NotExactlyOneError` with the option is frozen only by the unit `2` — `branch-reviewer`
 - #164 — `src/db/shortcuts.ts:851`: « With `withTies` and `order` » suggests `withTies` without `order` is harmless (Postgres refuses it, 42601) — `branch-reviewer`
+- #268 — `test/unit/transaction-pg7.test.ts:68`: `expect(pg7.state.reads).toBe(1)` cannot fail (the getter replaces itself) — `branch-reviewer`
+- #268 — `src/db/transaction.ts:59`: the comment leaves out a native client built from `pg/lib/native` while the getter is in place, classed by `_connected` — `branch-reviewer`
