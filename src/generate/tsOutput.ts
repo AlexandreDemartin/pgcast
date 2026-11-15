@@ -18,6 +18,8 @@ import {
   Relation,
   relationsInSchema,
   definitionForRelationInSchema,
+  domainRootsInDatabase,
+  type DomainRoots,
   crossTableTypesForTables,
   crossSchemaTypesForAllTables,
   crossSchemaTypesForSchemas,
@@ -197,6 +199,26 @@ const warnAboutDomainsNotByContext = (columns: string[], config: CompleteConfig)
 };
 
 /**
+ * Without `domainsTypedByContext`, note the columns it would type by the base type under their domains, once per run:
+ * a domain over a domain, or an array of a domain, has a placeholder that holds `any`.
+ */
+const warnAboutDomainsUnderDomains = (columns: string[], config: CompleteConfig) => {
+  if (columns.length === 0) return;
+
+  const
+    warn = config.warningListener === true ? console.log : config.warningListener || (() => void 0),
+    sorted = [...columns].sort(),
+    one = sorted.length === 1,
+    them = one ? 'it' : 'them',
+    list = one ? sorted[0] : sorted.slice(0, -1).join(', ') + ' and ' + sorted[sorted.length - 1];
+
+  warn(`Note: ${list} ${one ? 'has a domain over a domain, or an array' : 'have domains over a domain, or arrays'} of a ` +
+    `domain: as generated, ${one ? 'its placeholder types it' : 'their placeholders type them'} as \`any\`. ` +
+    `Set domainsTypedByContext: true to type ${them} by the base type of the innermost domain while ` +
+    `${one ? 'its placeholder holds' : 'their placeholders hold'} \`any\`; it will be the default in pgcast 7.0.`);
+};
+
+/**
  * Warn about each `include` entry that names no relation of its schema: it generates nothing.
  * `information_schema.tables` lists only the tables and views the connecting role has a privilege on.
  */
@@ -309,6 +331,9 @@ const tsForQueries = async (config: CompleteConfig, queryFn: (q: pg.QueryConfig)
     columnsTypedByEnumName: string[] = [],
     uniqueIndexesNotArbiters: string[] = [],
     domainsNotByContext: string[] = [],
+    domainRootsOnce: Promise<DomainRoots>[] = [],
+    domainRoots = () => domainRootsOnce[0] ??= domainRootsInDatabase(queryFn),
+    domainsUnderDomains: string[] = [],
     schemaNames = Object.keys(schemas),
     schemaData = (await Promise.all(
       schemaNames.map(async schema => {
@@ -328,7 +353,8 @@ const tsForQueries = async (config: CompleteConfig, queryFn: (q: pg.QueryConfig)
           outOfOrder = enumOrder === 'declared' ? [] : enumsOutOfOrder(enumOrders).map(name => ({ schema, name })),
           tableDefs = await Promise.all(tables.map(async table =>
             definitionForRelationInSchema(table, schema, enums, customTypes, config, queryFn, customTypeOrigins,
-              enumsForSchema, columnsTypedByEnumName, customTypeImports, uniqueIndexesNotArbiters, domainsNotByContext))),
+              enumsForSchema, columnsTypedByEnumName, customTypeImports, uniqueIndexesNotArbiters, domainsNotByContext,
+              domainRoots, domainsUnderDomains))),
           schemaIsUnprefixed = schema === config.unprefixedSchema,
           none = '/* (none) */',
           schemaDef = `/* === schema: ${jsdocText(schema)} === */\n` +
@@ -380,6 +406,7 @@ const tsForQueries = async (config: CompleteConfig, queryFn: (q: pg.QueryConfig)
   warnAboutEnumOrder(schemaData.flatMap(r => r.outOfOrder), config);
   warnAboutUniqueIndexesNotArbiters(uniqueIndexesNotArbiters, config);
   warnAboutDomainsNotByContext(domainsNotByContext, config);
+  warnAboutDomainsUnderDomains(domainsUnderDomains, config);
 
   return { ts, customTypeSourceFiles };
 };

@@ -15,6 +15,40 @@ import { jsdocText, stringLiteral, tsIdentifier } from './quote';
 // TypeScript's own types that an enum may be named after: a placeholder naming one compiles without an import
 const tsOwnTypes = new Set('any bigint boolean never number object string symbol undefined unknown'.split(' '));
 const hasOwn = (o: object, key: string) => Object.prototype.hasOwnProperty.call(o, key);
+const contexts = ['Selectable', 'JSONSelectable', 'Whereable', 'Insertable', 'Updatable'] as const;
+
+/** The base type of a domain's innermost domain, by the domain's `[schema, name]`, or by its array type's. */
+export type DomainRoots = Record<string, { schema: string; name: string; isArray: boolean }>;
+
+/**
+ * Read in one query the base type under the domains of each domain, and of each domain's array type: information_schema
+ * gives a domain over a domain its inner domain as its type, and an array of a domain its array type.
+ */
+export const domainRootsInDatabase = async (queryFn: (q: pg.QueryConfig) => Promise<pg.QueryResult<any>>) => {
+  const
+    { rows } = await queryFn({
+      text: `
+        WITH RECURSIVE bases AS (
+          SELECT oid AS domain, typbasetype AS base FROM pg_catalog.pg_type WHERE typtype = 'd'
+          UNION ALL
+          SELECT bases.domain, t.typbasetype FROM bases JOIN pg_catalog.pg_type t ON t.oid = bases.base AND t.typtype = 'd'
+        )
+        SELECT tn.nspname AS "typeSchema", t.typname AS "typeName", n.nspname AS schema, r.typname AS name
+        , t.oid = d.typarray AS "isArray"
+        FROM bases
+        JOIN pg_catalog.pg_type r ON r.oid = bases.base AND r.typtype <> 'd'
+        JOIN pg_catalog.pg_namespace n ON n.oid = r.typnamespace
+        JOIN pg_catalog.pg_type d ON d.oid = bases.domain
+        JOIN pg_catalog.pg_type t ON t.oid IN (d.oid, d.typarray)
+        JOIN pg_catalog.pg_namespace tn ON tn.oid = t.typnamespace
+        ORDER BY "typeSchema", "typeName"`,
+      values: [],
+    }),
+    roots: DomainRoots = Object.create(null);
+
+  for (const { typeSchema, typeName, ...root } of rows) roots[JSON.stringify([typeSchema, typeName])] = root;
+  return roots;
+};
 
 
 export interface Relation {
@@ -140,6 +174,8 @@ export const definitionForRelationInSchema = async (
   customTypeImports: Record<string, string | null> = Object.create(null),
   uniqueIndexesNotArbiters: string[] = [],  // an 'out' parameter too: what uniqueIndexConstraintsOnly would leave out
   domainsNotByContext: string[] = [],  // an 'out' parameter too: what domainsTypedByContext would change
+  domainRoots = () => domainRootsInDatabase(queryFn),
+  domainsUnderDomains: string[] = [],  // an 'out' parameter too: what domainsTypedByContext would type over a domain
 ) => {
   const
     rows = await columnsForRelation(rel, schemaName, queryFn),
@@ -147,6 +183,17 @@ export const definitionForRelationInSchema = async (
     otherEnums: Record<string, EnumData> = Object.fromEntries(await Promise.all(
       otherSchemas.map(async schema => [schema, await enumsForSchema(schema)]))),
     typeEnumsAcrossSchemas = config.typeEnumsAcrossSchemas ?? false,
+    inlineIn = (schema: string) => typeEnumsAcrossSchemas && schema !== schemaName,
+    // a domain over a domain, or an array of a domain, is `any` to tsTypeForPgType: the base type under its domains
+    // types it, read once per run if a column is `any`; an enum of another schema by its labels, never by its name in
+    // this one, which may be another enum's
+    isAny = (row: any) => tsTypeForPgType(row.udtName, inlineIn(row.udtSchema) ? otherEnums[row.udtSchema] : enums,
+      'Selectable', config, inlineIn(row.udtSchema)) === 'any',
+    roots: DomainRoots = rows.some(isAny) ? await domainRoots() : {},
+    rootOf = (row: any) => isAny(row) ? roots[JSON.stringify([row.udtSchema, row.udtName])] : undefined,
+    rootSchemas = [...new Set(rows.map(row => rootOf(row)?.schema ?? schemaName))].filter(s => s !== schemaName),
+    rootEnums: Record<string, EnumData> = Object.fromEntries(await Promise.all(
+      rootSchemas.map(async schema => [schema, otherEnums[schema] ?? await enumsForSchema(schema)]))),
     selectables: string[] = [],
     JSONSelectables: string[] = [],
     whereables: string[] = [],
@@ -230,18 +277,26 @@ export const definitionForRelationInSchema = async (
       // a domain over int8, numeric, bytea, money or a date: as generated, its placeholder holds what pg returns, though
       // a write takes more and, except for money, the shortcuts' JSON gives another type; with domainsTypedByContext,
       // each context takes its own type while the placeholder still holds exactly what the generator wrote
-      // (db.DomainInContext), and the placeholder's otherwise
+      // (db.DomainInContext), and the placeholder's otherwise. A domain over a domain, or an array of a domain, has an
+      // `any` placeholder: all five take the type of the base type under its domains, but an array's Selectable, a
+      // string, since pg returns an array of a type it does not know as its text
       const
         placeholder = 'c.' + prefixedCustomType,
+        root = rootOf(row),
+        inlineRoot = root !== undefined && root.schema !== schemaName,
+        rootTypes = root && contexts.map(context => context === 'Selectable' && root.isArray ? 'string' :
+          tsTypeForPgType((root.isArray ? '_' : '') + root.name, inlineRoot ? rootEnums[root.schema] : enums, context, config, inlineRoot)),
+        underDomains = rootTypes && rootTypes[1] !== 'any' ? rootTypes : undefined,
         byContext = domainName !== null && selectableType !== 'any' &&
           [JSONSelectableType, whereableType, insertableType, updatableType].some(type => type !== selectableType),
-        typedByContext = byContext && (config.domainsTypedByContext ?? false),
+        typedByContext = (byContext || underDomains !== undefined) && (config.domainsTypedByContext ?? false),
         inContext = (type: string) => typedByContext ? `db.DomainInContext<${placeholder}, ${selectableType}, ${type}>` : placeholder;
 
       if (byContext && !typedByContext) domainsNotByContext.push(`${schemaName}.${rel.name}.${column} (${domainSchema}.${domainName})`);
-      [JSONSelectableType, whereableType, insertableType, updatableType] =
-        [JSONSelectableType, whereableType, insertableType, updatableType].map(inContext);
-      selectableType = placeholder;
+      if (underDomains && !typedByContext) domainsUnderDomains.push(`${schemaName}.${rel.name}.${column} (` +
+        (domainName === null ? `${udtSchema}.${udtName.slice(1)}[])` : `${domainSchema}.${domainName})`));
+      [selectableType, JSONSelectableType, whereableType, insertableType, updatableType] = underDomains?.map(inContext) ??
+        [placeholder, ...[JSONSelectableType, whereableType, insertableType, updatableType].map(inContext)];
     }
 
     selectables.push(`${columnDoc}${possiblyQuotedColumn}: ${selectableType}${orNull};`);
