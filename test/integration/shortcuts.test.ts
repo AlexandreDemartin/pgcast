@@ -1002,6 +1002,20 @@ describe('count, sum, avg, min, max', () => {
     expect(sent).toEqual([]);
   });
 
+  it('a string or another primitive as columns rejects run() before any query is sent, nested too', async () => {
+    // 6.6.1 sent `count("0", "1")` for 'id' (42703) and `count()` for 42 (42809)
+    const sent: unknown[] = [];
+    db.setConfig({ queryListener: query => sent.push(query) });
+    await expect(run(db.count('users', all, { columns: 'id' as any })))
+      .rejects.toThrow(new Error("count() takes columns as an array, not string: pass columns: ['column'] (leave columns out for count(*))"));
+    await expect(run(db.avg('accounts', all, { columns: 42 as any })))
+      .rejects.toThrow(new Error("avg() takes columns as an array, not number: pass columns: ['column']"));
+    await expect(run(db.select('users', all, { lateral: { top: db.max('accounts', { owner_id: parent('id') }, { columns: 'balance' as any }) } })))
+      .rejects.toThrow(new Error("max() takes columns as an array, not string: pass columns: ['column']"));
+    await expect(run(db.count('users', all, { columns: 'id' as any }))).rejects.not.toHaveProperty('code');
+    expect(sent).toEqual([]);
+  });
+
   it('on an empty set, sum / avg / min / max return 0, not null, without aggregatesTypedByColumn', async () => {
     // deprecated (PGCAST_DEP004): Number(null) === 0
     const none = { id: -1 };

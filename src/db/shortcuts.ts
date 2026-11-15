@@ -974,7 +974,8 @@ export interface ColumnAggregateSignatures {
 
 // the aggregate takes one column, none for count(*), and has no row to pass a lateral query through: Zapatos 6.6.1
 // sent `sum(*)`, `count("a", "b")` or `SELECT  AS result`, which Postgres refuses. The type is 6.6.1's, so these
-// throw as the query compiles, as a value with no meaning does in core.ts: `run()` rejects, before any query
+// throw as the query compiles, as a value with no meaning does in core.ts: `run()` rejects, before any query.
+// A string or another primitive as `columns` is refused here, before cols() refuses it in terms of db.cols()
 const numericAggregate = (
   table: Table,
   where: Whereable | SQLFragment<any> | AllType,
@@ -986,8 +987,9 @@ const numericAggregate = (
     { columns, lateral } = options,
     columnsRefusal =
       !columns ? (aggregate === 'count' ? undefined : `${aggregate}() needs one column to aggregate: pass columns: ['column']`) :
-        Array.isArray(columns) && columns.length !== 1 ? `${aggregate}() takes one column in columns, not ${columns.length}${aggregate === 'count' ? ' (leave columns out for count(*))' : ''}` :
-          undefined,
+        typeof columns !== 'object' && typeof columns !== 'function' ? `${aggregate}() takes columns as an array, not ${typeof columns}: pass columns: ['column']${aggregate === 'count' ? ' (leave columns out for count(*))' : ''}` :
+          Array.isArray(columns) && columns.length !== 1 ? `${aggregate}() takes one column in columns, not ${columns.length}${aggregate === 'count' ? ' (leave columns out for count(*))' : ''}` :
+            undefined,
     refusal = columnsRefusal ?? (lateral instanceof SQLFragment ? `${aggregate}() cannot pass a lateral query through: nest it in the lateral of a select() instead` : undefined),
     byColumn = aggregate === 'min' || aggregate === 'max';
 
@@ -1018,11 +1020,11 @@ const numericAggregate = (
  * or `all`
  * @param options Options object. Useful keys may be: `columns`, `alias`.
  * `columns: ['col']` gives `count("col")`, and no `columns` `count(*)`;
- * several columns, or a single query as `lateral`, throw as the query
- * compiles, so `run()` rejects before any query is sent. A query that returns
- * no row (a `groupBy` with no group, a `having` that keeps none, `offset: 1`,
- * `limit: 0`) gives `0` from `run()`, but `null` nested in a `lateral` or
- * `extras`, though the type says `number`.
+ * several columns, a string in place of the array, or a single query as
+ * `lateral`, throw as the query compiles, so `run()` rejects before any query
+ * is sent. A query that returns no row (a `groupBy` with no group, a `having`
+ * that keeps none, `offset: 1`, `limit: 0`) gives `0` from `run()`, but `null`
+ * nested in a `lateral` or `extras`, though the type says `number`.
  */
 export const count: NumericAggregateSignatures = function (table, where, options?) {
   return numericAggregate(table, where, options, 'count');
@@ -1036,8 +1038,9 @@ export const count: NumericAggregateSignatures = function (table, where, options
  * aggregated, or `all`
  * @param options Options object. Useful keys may be: `columns`, `alias`.
  * `columns` holds the one column to aggregate: `columns: ['col']` gives
- * `sum("col")`; no column, several, or a single query as `lateral`, throw as
- * the query compiles, so `run()` rejects before any query is sent.
+ * `sum("col")`; no column, several, a string in place of the array, or a
+ * single query as `lateral`, throw as the query compiles, so `run()` rejects
+ * before any query is sent.
  * On an empty set, `Number()` makes the `NULL` `0`, and `run()` warns
  * (`PGCAST_DEP004`), once; with `aggregatesTypedByColumn` (`setConfig()` and
  * `ConfigTypes`), it gives `null`.

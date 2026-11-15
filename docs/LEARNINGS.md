@@ -290,6 +290,13 @@ Candidates for a check, a rule or a skill line.
 - #460 — On a partitioned parent, the 0A000 of `RETURNING xmax` depends on each partition's column layout (Postgres's virtual slot for an unconverted routed row), not only on the table being partitioned: a claim names the condition; a docs condition written « as X has » has its exceptions searched (a dropped column) — `builder`, `branch-reviewer`
 - #460 — A PR opened on a base it already conflicts with gets no CI (only CodeQL): before calling a PR ready, `gh pr view --json mergeable` is `MERGEABLE` and `gh pr checks` lists **CI passed** (also #477) — `branch-reviewer`
 - #460 — The local and CI test counts differ (1018 vs 1021): « none skipped » is read from the CI log, not inferred from a local run — `builder`
+- #308 — A test that models `schema.d.ts` as text goes through the same indentation as `tsOutput.ts` (`declareModule`, `indentAll`), in an unprefixed and a prefixed schema, or is checked once against `tsForConfig`: a model without it passed review twice and counted other exceptions (#440's fuzz too) — `branch-reviewer`
+- #308 — JS multiline `^` matches after `\r`, U+2028 and U+2029, so `indentAll()` and `declareModule()` write spaces inside a `\r\n` and after a U+2028; an `@` after a U+2028 in a comment then opens a tag holding the generated lines (niche, not filed) — `builder`
+- #308 — In a JSDoc's main text TypeScript ignores backticks, so ` @x` opens a tag even in a code span (one-line defaults did under 6.6.1); after an inline `{@link` left open, it reads the next line's margin `*` as text — `builder`
+- #308 — Probes and PR bodies show invisible characters escaped (U+00A0, U+2028): `JSON.stringify` does not escape them; join tag names with `JSON.stringify`, not `','`, or a nameless tag hides — `branch-reviewer`, `builder`
+- #469 — An item added to a list in the docs or CHANGELOG is checked against the sentence that frames it (« which lets these calls through », « three options »): #475 broke one of each — `branch-reviewer`
+- #469 — An object with zero or several keys, a `Set` or a function as an aggregate's `columns` still compiles to `count()` / `count("a", "b")`, which Postgres refuses (6.6.1 too); niche, outside the type: not filed — orchestrator
+- #469 — Under load from parallel worktrees, `codegen.test.ts` hits Vitest's 5 s timeout (a rerun is green); and a French term for an English phrase is searched on the site first (« en passant outre le type ») — `builder`
 
 ## Minors kept
 
@@ -401,3 +408,7 @@ Minor review defects, taken up by the end-of-chapter review.
 - #274 — `test/types/core.test-d.ts:208-230`: no enum column and no `upsert()` slot for the structural `{ value }` case (skill `type-tests` § Structural wrappers) — `branch-reviewer`
 - #274 — `src/db/core.ts:137-140`: interpolated directly in `sql`, `${{ value: 3 }}` passes as a Whereable and compiles to `("value" = $1)` — `branch-reviewer`
 - #460 — `src/db/shortcuts.ts:449`: the Postgres source link pins `REL_17_STABLE` while the claim covers 14 to 18 — `branch-reviewer`
+- #308 — `test/unit/columnJSDoc.test.ts:161-162`: `opened` and `split` check less than the comment describes — `branch-reviewer`
+- #308 — `CHANGELOG.md:214-220`: « holding a line break, a string literal (…) or a quoted name (…) » reads as three alternatives; « one that starts with `*` » leaves out a `*` after white space — `branch-reviewer`
+- #469 — `test/unit/shortcuts.test.ts:1685`: the guard test freezes only a plain object, not a `Set`, a function or a `String` object — `branch-reviewer`
+- #469 — `website/select.md:263` (and `fr/…:267`): « an empty string, `0` or `false` » reads as the whole falsy list; `src/db/shortcuts.ts:1003`, `:1019`: « a string » where any primitive is refused; `test/unit/core.test.ts:696` duplicates `test/unit/shortcuts.test.ts:1665` — `branch-reviewer`
