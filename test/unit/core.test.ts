@@ -644,6 +644,35 @@ describe('cols and vals', () => {
     expect(queryable.query).not.toHaveBeenCalled();
   });
 
+  it('rejects run() on a string or another primitive as the columns of an aggregate, with no query sent', async () => {
+    // columnsRefusal checks only an array, so the value reaches cols(): 6.6.1 sent count("0", "1"), or count() for 42
+    const queryable = { query: vi.fn() } as any;
+    const queries = {
+      // @ts-expect-error a string columns
+      count: db.count('users', db.all, { columns: 'id' }),
+      // @ts-expect-error a string columns
+      sum: db.sum('accounts', db.all, { columns: 'balance' }),
+      // @ts-expect-error a string columns
+      avg: db.avg('accounts', db.all, { columns: 'balance' }),
+      // @ts-expect-error a string columns
+      min: db.min('accounts', db.all, { columns: 'balance' }),
+      // @ts-expect-error a string columns
+      max: db.max('accounts', db.all, { columns: 'balance' }),
+      // @ts-expect-error a number columns
+      countNumber: db.count('users', db.all, { columns: 42 }),
+      // @ts-expect-error a string columns
+      inLateral: db.select('users', db.all, { lateral: { n: db.count('users', db.all, { columns: 'id' }) } }),
+    };
+    const outcomes: Record<string, string> = {};
+    for (const [name, q] of Object.entries(queries))
+      outcomes[name] = await q.run(queryable).then(() => 'ran', (err: Error) => err.message);
+    expect(outcomes).toEqual({
+      count: colsMessage('string'), sum: colsMessage('string'), avg: colsMessage('string'), min: colsMessage('string'),
+      max: colsMessage('string'), countNumber: colsMessage('number'), inLateral: colsMessage('string'),
+    });
+    expect(queryable.query).not.toHaveBeenCalled();
+  });
+
   it('cols and vals of an object, an array, a function or a boxed string compile as before, and null still throws a TypeError', () => {
     // a function and a String object are objects, not primitives: their own enumerable keys, as in 6.6.1;
     // null is left to #341
