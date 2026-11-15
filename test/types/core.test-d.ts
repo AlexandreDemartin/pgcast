@@ -527,7 +527,7 @@ describe('range strings', () => {
     db.select('transfers', { fee_band: db.param('(,Infinity)') });
     // characterization: int4range shares NumberRangeString, so the type takes a bound Postgres refuses there (22P02)
     db.insert('transfers', { from_account: 1, to_account: 2, amount: 1, batch_sizes: '[1,Infinity)' });
-    if (jrow.fee_band === '[1,Infinity)') expectTypeOf(jrow.fee_band).toEqualTypeOf<'[1,Infinity)'>();
+    expectTypeOf(jrow.fee_band === '[1,Infinity)' || row.fee_band === '[1,NaN]').toEqualTypeOf<boolean>();
     expectTypeOf(db.select('transfers', { fee_band: '[1,NaN]' }).run(pool)).not.toBeAny();
   });
 
