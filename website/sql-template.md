@@ -466,6 +466,12 @@ A `noop` fragment still compiles, its SQL behind a comment. `force` sends it, an
 
 </CastPanel>
 
+A text of several statements, `` db.sql`CREATE TABLE festivals (id int); INSERT INTO festivals VALUES (1)` ``, goes to Postgres whole when it has no values and no [`prepared()`](#prepared) name: `pg` sends it as one simple query ([Security](/security#values-never-enter-the-sql)). With a value, or prepared, Postgres refuses the text: "cannot insert multiple commands into a prepared statement" (42601).
+
+Outside a transaction, Postgres runs the statements as one transaction, unless the text holds its own `BEGIN` or `COMMIT`: a statement that fails rejects with its error, and undoes those before it. A `COMMIT` in the text keeps what came before it. A `BEGIN` with no `COMMIT` leaves the connection inside that transaction: on a pool, the next query to get that connection runs in it. A statement that cannot run in a transaction block, such as `VACUUM` or `CREATE INDEX CONCURRENTLY`, makes Postgres refuse the whole text, wherever it stands: "VACUUM cannot run inside a transaction block" (25001).
+
+When they run, `pg` returns an array of results, one per statement, where the default `runResultTransform` finds no `rows`: `run()` resolves `undefined`, not the rows its type promises, and `resultListener` gets `undefined`. To read them, give the fragment a [`runResultTransform`](#runResultTransform) that takes the array.
+
 ### `compile()` {#compile}
 
 ```ts

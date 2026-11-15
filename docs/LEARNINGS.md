@@ -257,6 +257,10 @@ Candidates for a check, a rule or a skill line.
 - #402 — A types-only `ConfigTypes` opt-in cannot carry decision 003's run-time warning: weigh Document first for a niche type gap — orchestrator
 - #164 — A claim about a nested shortcut covers each nesting (map `lateral`, passthrough `lateral`, `extras` or `sql` scalar subquery) and each outer call (`select`, `selectOne`, `selectExactlyOne`, `count`): the JSDoc and CHANGELOG lost the outer-call condition the page had, and `select.md` had lost it before — `branch-reviewer`, `builder`
 - #164 — A characterisation test tells the frozen behaviour from its nearest alternative (no limit), not only from the rejected fix (`LIMIT`): the data must make them differ; and run it against a mutant of the rejected fix — `branch-reviewer`, `builder`
+- #204 — A docs claim about what Postgres does with a whole text (« runs them all », « as one transaction ») is checked against the statements that refuse a transaction block (25001: `VACUUM`, `CREATE INDEX CONCURRENTLY`, `CREATE DATABASE`) and the text's own `BEGIN`/`COMMIT` — `branch-reviewer`
+- #204 — A characterisation test of transaction behaviour (« outside a transaction », « committed », « undone ») runs on `t.pool` with cleanup, not on `t.client`, already inside `BEGIN` — `branch-reviewer`
+- #204 — An issue's observed error is replayed before choosing a class: the `TypeError` #204 named is not what 6.6.1 does for a plain `sql` — `builder`
+- #204 — Inside `transaction()`, a `COMMIT` in a multi-statement text ends its transaction early, and `transaction()` then sends a `COMMIT` with nothing to commit — `builder`
 - #268 — A mock of a third-party lazy getter is compared with the package's real source at the oldest supported version (pg's peer floor, 7.18.2), not one recent version; and a counter on a getter that replaces itself counts only the first read — `branch-reviewer`
 - #268 — A pg 7 replay on Node 22 needs a patch to the handshake only (pg older than 8.0.3 cannot open a socket on Node 14+); pg-native runs there unpatched — `builder`
 - #268 — On pg 7, an installed pg-native whose addon fails to load made `transaction()` reject on a plain JS pool (6.6.1 and master) — `builder`
@@ -354,5 +358,8 @@ Minor review defects, taken up by the end-of-chapter review.
 - #164 — `website/lateral.md:110` (and `fr/…`): nested in `extras` or a `sql` template, `selectOne()` / `selectExactlyOne()` with `withTies` fails on a tie with 21000; and under an outer `count()` a `withTies` lateral inflates the count — `branch-reviewer`
 - #164 — `test/integration/shortcuts.test.ts:870-883`: every matching row is a tie, so the rows cannot tell `WITH TIES` from no limit; the top-level `NotExactlyOneError` with the option is frozen only by the unit `2` — `branch-reviewer`
 - #164 — `src/db/shortcuts.ts:851`: « With `withTies` and `order` » suggests `withTies` without `order` is harmless (Postgres refuses it, 42601) — `branch-reviewer`
+- #204 — `CHANGELOG.md:67`: the line says the JSDoc of `run()` covers the 42601 refusal; it does not — `branch-reviewer`
+- #204 — `test/integration/core.test.ts:584`: « all run », but two `SELECT`s leave no trace and the test asserts only `undefined` — `branch-reviewer`
+- #204 — `website/playground.md:28` (and `fr/…`): « where `pg` sends it as a simple query » could link the new paragraph — `branch-reviewer`
 - #268 — `test/unit/transaction-pg7.test.ts:68`: `expect(pg7.state.reads).toBe(1)` cannot fail (the getter replaces itself) — `branch-reviewer`
 - #268 — `src/db/transaction.ts:59`: the comment leaves out a native client built from `pg/lib/native` while the getter is in place, classed by `_connected` — `branch-reviewer`
