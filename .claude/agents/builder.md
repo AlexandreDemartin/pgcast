@@ -61,7 +61,7 @@ After the merge: skill `merge-gate` § Clean up (`git branch -D` once merged).
 ## Known pitfalls
 
 - `AGENTS.md` § Local environment (npm 10 and `npm install`); the lib's `tsc` uses the dummy schema `src/typings/zapatos/schema.ts`, the tests the fixture's generated schema (skill `type-tests`).
-- French pages put U+00A0 before `:` and `;`: a scripted find-and-replace matches it or normalises first, and a probe or a PR body shows invisible characters escaped (#262, #308, #484).
+- French pages hold U+00A0 (`website/README.md` § Typography): a scripted find-and-replace matches it or normalises first (#262, #484).
 - The shell is zsh: quote `"${ref}:path"` (`:s` is a history modifier) and `'==='`; `$pipestatus`, not `PIPESTATUS`; macOS has no `timeout`.
 
 ## Report

@@ -16,7 +16,7 @@ A type that compiles is not necessarily correct: it may be `any`, too wide, or a
 - **Structural wrappers**: `Parameter<T>` is `{ value: T }`, so a wrapper class passes wherever its shape fits: probe each against each slot typed `Parameter<T>`, on an int and an enum column, not only text. A mapped `Wrapper<U[K]>` wraps the whole union (`null`, `DefaultType`, `SQLFragment`): pull `T` out first (`ParameterValue<U[K]>`).
 - **No `any` slipping through**: `expectTypeOf(x).not.toBeAny()` on each tested shortcut's return, beside an equality, never instead of one (#420).
 - **Real schema**: types are tested against the schema generated from the fixture (`test/fixtures/schema.sql`), not against the dummy schema of `src/typings`.
-- **Edge cases**: nullable column, with a default, generated, identity; `columns`, `extras`, nested `lateral`; a view's table (no `Insertable`).
+- **Edge cases**: nullable column, with a default, generated, identity; a literal on an enum column in context, which rests on inference through the return type (#181); `columns`, `extras`, nested `lateral`; a view's table (no `Insertable`).
 - `exactOptionalPropertyTypes` is on: a test covers `{ col: undefined }` when the type is concerned.
 
 ## A claim about a type

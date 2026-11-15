@@ -40,10 +40,10 @@ Closes #n
 
 - **Each command run**, with the tail of its output in a code block: the issue's **Done when**, at least `lint`, `typecheck`, `test`, `test:types`, `build`.
 - **A bug**: the failing test is committed before the fix (skill `pr-shape` § Commits); the proof gives its name and its failing output at the test commit (SHA).
-  - Its expected value is written by hand: an empty inline snapshot records the current output.
+  - Its expected value is written by hand: an empty inline snapshot records the current output. It also runs against the fix, or it may be red for the wrong reason (#96), and its data tell the frozen behaviour from its nearest alternative, not only from the rejected fix (#164).
   - Each new assertion is red on its own: in one `it`, the first old failure hides the rest.
   - A test that freezes a route a `CHANGELOG.md` line names (`upsert()` `updateValues`, `lateral`) runs red against the base's runtime.
-- **A guard or a test that passes on the base** proves something only through a mutant: break only the branch it guards, in a scratch copy (`git worktree add --detach <scratch>/mutant HEAD`, `node_modules` and `src/.env` linked; never `git stash`), then record the mutant and its red. Two guards in one branch, two overlapping accept rules or two flags read together get a test where both hold (#36, #37, #43, #50, #253).
+- **A guard or a test that passes on the base** proves something only through a mutant: break only the branch it guards, in a scratch copy (`git worktree add --detach <scratch>/mutant HEAD`, `node_modules` and `src/.env` linked; never `git stash`), then record the mutant and its red. Two guards in one branch or two overlapping accept rules get a test where both hold, which pins which wins (#37, #50); flags read together get one test per flag alone, so a mutant that ORs them fails (#36); a guard shared by several routes gets a mutant per route (#253). An export said to keep its result is called by a test (#49); an assertion that cannot fail (`isDatabaseError(err)` with no names, a counter on a getter that replaces itself) freezes nothing (#268, #271).
 - **`core.ts`**: the compiled SQL before / after (skill `sql-safety`).
 - **Compat at stake**: the 6.6.1 replay, what 6.6.1 did and what the branch does (skill `backward-compat`).
 - **Types**: the `bench:types` figure when a type changes (skill `type-tests`).
