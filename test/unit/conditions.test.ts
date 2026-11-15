@@ -177,6 +177,18 @@ describe('conditions', () => {
     `);
   });
 
+  it('isDistinctFrom() and isNotDistinctFrom() of a nullable value: one parameter, whatever it holds (#181)', () => {
+    const none = null as number | null, one = 1 as number | null;
+    expect({
+      isDistinctFromNone: show(dc.isDistinctFrom(none)), isNotDistinctFromNone: show(dc.isNotDistinctFrom(none)),
+      isNotDistinctFromOne: show(dc.isNotDistinctFrom(one)),
+    }).toEqual({
+      isDistinctFromNone: { text: '(("col" IS DISTINCT FROM $1))', values: [null] },
+      isNotDistinctFromNone: { text: '(("col" IS NOT DISTINCT FROM $1))', values: [null] },
+      isNotDistinctFromOne: { text: '(("col" IS NOT DISTINCT FROM $1))', values: [1] },
+    });
+  });
+
   it('BETWEEN, [NOT] BETWEEN [SYMMETRIC]', () => {
     expect({
       between: show(dc.between(1, 2)), betweenSymmetric: show(dc.betweenSymmetric(2, 1)),
