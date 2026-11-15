@@ -43,11 +43,12 @@ user code ──► src/db/ (runtime: sql``, shortcuts, conditions, transactions
 ```
 
 - `src/generate/`: the codegen (CLI `pgcast`, alias `zapatos`).
-  - `cli.ts` reads `zapatosconfig.json` and/or a JSON argument, and interpolates `{{ENV_VAR}}`; `config.ts` holds the config and its defaults.
-  - `write.ts` (`generate()`) writes `zapatos/schema.d.ts` and the `zapatos/custom/` placeholders.
-  - `tsOutput.ts` assembles the `zapatos/schema` module (namespaces per schema, aggregate types, `*ForTable<T>` lookups, version canary).
-  - `tables.ts` introspects relations, columns, unique indexes and comments, then produces `Selectable`, `JSONSelectable`, `Whereable`, `Insertable`, `Updatable` per table.
-  - `enums.ts` and `pgTypes.ts` map Postgres types to TS (by context: Selectable, Insertable, etc.); `legacy.ts` prints the migration warning for the old "srcMode".
+  - `cli.ts` runs the CLI; `cliConfig.ts` reads `pgcastconfig.json` else `zapatosconfig.json`, and/or a JSON argument, and interpolates `{{ENV_VAR}}`; `config.ts` holds the config and its defaults, `schemaRules.ts` checks its `schemas` rules.
+  - `write.ts` (`generate()`) writes `zapatos/schema.d.ts` and the `zapatos/custom/` placeholders, each under `header.ts`'s header.
+  - `tsOutput.ts` assembles the `zapatos/schema` module (namespaces per schema, aggregate types, `*ForTable<T>` lookups, version canary); `moduleNames.ts` picks `zapatos/*` or `pgcast/*`.
+  - `tables.ts` introspects relations, columns, unique indexes and comments, then produces `Selectable`, `JSONSelectable`, `Whereable`, `Insertable`, `Updatable` per table; `quote.ts` writes a Postgres name or a text into the output.
+  - `enums.ts` and `pgTypes.ts` map Postgres types to TS (by context: Selectable, Insertable, etc.), `enumOrder.ts` reads an enum's declared order, `domainRoots.ts` the base type under a domain; `legacy.ts` prints the migration warning for the old "srcMode".
+  - Each module is listed here (`npm run check:agents`); those outside `index.ts`'s `export *` stay out of `zapatos/generate`.
 - `src/db/`: the runtime (import `zapatos/db`).
   - `core.ts`: ⚠️ **sensitive zone**: `sql`, `SQLFragment`, compilation and escaping (`param`, `raw`, `cols`, `vals`, `parent`, `self`, `Default`).
   - `shortcuts.ts`: `insert`, `upsert`, `update`, `deletes`, `truncate`, `select*`, aggregates, `lateral`, locks.
@@ -73,7 +74,7 @@ The generated code and the runtime speak of `zapatos/schema`, `zapatos/db` and `
 | `npm run test:watch` | Vitest in watch mode |
 | `npm run test:types` | emits the declarations of `src/db`, then the Vitest type tests (`test/types/*.test-d.ts`, `expectTypeOf`) on the fixture's generated schema |
 | `npm run bench:types` | compile cost of `bench/` (typed queries on the fixture's schema): `Instantiations` and `Types`, minus a floor without pgcast, compared with `bench/baseline.json`; fails above +20 %, below −5 % or if the TypeScript version differs; `-- --update` rewrites the baseline |
-| `npm run check:agents` | consistency of skills and agents, the summary of `docs/CHARACTERISATION-REPORT.md` recounted from its sections, tests of the `guard` hook and of that recount |
+| `npm run check:agents` | consistency of skills and agents, § Architecture against `src/`, the summary of `docs/CHARACTERISATION-REPORT.md` recounted from its sections, tests of the `guard` hook and of both checks |
 
 A task is **done** only if `lint`, `typecheck`, `test` and `test:types` pass.
 

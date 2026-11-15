@@ -69,8 +69,8 @@ Ritual of a step: skill `run-step`; on one page for a human: [docs/WORKFLOW.md](
 
 ## Method checks
 
-- `guard.mjs` refuses before execution what has no exception: `push --force`, `rebase`, `--amend`, npm publication or release, writes to generated files (`db.mjs`, `generate.mjs`, `dist/`) or to a `.env`.
-- `npm run check:agents` (`scripts/check-agents.mjs`, in CI): frontmatter of skills and agents, description length, the size of each (a skill or an agent over 150 lines or 1,800 words fails), cited skills that exist, the summary of `docs/CHARACTERISATION-REPORT.md` recounted from its sections (`scripts/check-report.mjs`), the tests of the hook and of that recount.
+- `guard.mjs` refuses before execution what has no exception: `push --force`, `rebase`, `--amend`, `commit` or `merge` with `--no-edit`, npm publication or release, writes to generated files (`db.mjs`, `generate.mjs`, `dist/`) or to a `.env`.
+- `npm run check:agents` (`scripts/check-agents.mjs`, in CI): frontmatter of skills and agents, description length, the size of each (a skill or an agent over 150 lines or 1,800 words fails), cited skills that exist, each module of `src/db` and `src/generate` named in `AGENTS.md` § Architecture (`scripts/check-architecture.mjs`), the summary of `docs/CHARACTERISATION-REPORT.md` recounted from its sections (`scripts/check-report.mjs`), the tests of the hook and of both checks.
 
 ## Self-improvement
 
