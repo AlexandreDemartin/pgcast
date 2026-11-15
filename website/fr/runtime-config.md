@@ -1,5 +1,5 @@
 ---
-english: ac1f60ddaf46
+english: a2031fe9e645
 ---
 
 # Configuration
@@ -512,10 +512,10 @@ db.enableCustomJSONParsingForLargeNumbers(pg);
 ### `RangeString` {#RangeString}
 
 ```ts
-type RangeString<Bound extends string | number> = `${'[' | '('}${Bound},${Bound}${']' | ')'}`
+type RangeString<Bound extends string | number> = `${'[' | '('}${Bound},${Bound}${']' | ')'}` | 'empty'
 ```
 
-Une valeur range telle que Postgres l’écrit : un crochet, deux bornes, un crochet. Le type ne couvre pas un range vide, que Postgres écrit `empty` : `to_jsonb('empty'::int4range)` vaut `"empty"`, et `const r: db.NumberRangeString = 'empty'` ne compile pas (TS2322, [#185](https://github.com/AlexandreDemartin/pgcast/issues/185)).
+Une valeur range telle que Postgres l’écrit : un crochet, deux bornes, un crochet, ou `'empty'` pour un range vide. Un range dont les bornes n’encadrent aucune valeur est vide lui aussi : `'[5,5)'::int4range` revient sous la forme `'empty'`. Postgres lit aussi `'EMPTY'`, et des espaces autour, mais n’écrit que `'empty'` : le type n’accepte donc que cette forme. Zapatos 6.6.1 laissait `'empty'` de côté.
 
 ### `NumberRangeString` {#NumberRangeString}
 
