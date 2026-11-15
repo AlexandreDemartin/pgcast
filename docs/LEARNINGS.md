@@ -246,6 +246,9 @@ Candidates for a check, a rule or a skill line.
 - #447 — When a PR documents an exception, `git grep` the absolute words (« never », « every ») on the same subject across `website/`: « never overwritten » survived on three pages — `branch-reviewer`
 - #447 — When notes from several PRs can fire for one object (#42, #287, #447), a test of all of them together freezes their order — `branch-reviewer`
 - #447 — The CLI's « Writing new custom type or domain placeholder file » message announces a placeholder the index file then writes over: it still misleads — `builder`
+- #402 — Claims about when `upsert()` gives `DO NOTHING` keep losing the `undefinedMeansMissing` clause (#168, #402): any « no `updateValues` key » wording carries it or links `#undefined-values` (`git grep "no \`updateValues\` key"`) — `branch-reviewer`
+- #402 — Decision 003 has no class for « the type cannot know a run-time value » (a computed `Column[]` that may be empty, a computed `Whereable` that may be `{}`): such cases end as Document by delegation against the literal Fix criterion; a sentence in 003 would make it checkable (owner's call) — `branch-reviewer`
+- #402 — A types-only `ConfigTypes` opt-in cannot carry decision 003's run-time warning: weigh Document first for a niche type gap — orchestrator
 - #164 — A claim about a nested shortcut covers each nesting (map `lateral`, passthrough `lateral`, `extras` or `sql` scalar subquery) and each outer call (`select`, `selectOne`, `selectExactlyOne`, `count`): the JSDoc and CHANGELOG lost the outer-call condition the page had, and `select.md` had lost it before — `branch-reviewer`, `builder`
 - #164 — A characterisation test tells the frozen behaviour from its nearest alternative (no limit), not only from the rejected fix (`LIMIT`): the data must make them differ; and run it against a mutant of the rejected fix — `branch-reviewer`, `builder`
 
@@ -328,6 +331,9 @@ Minor review defects, taken up by the end-of-chapter review.
 - #447 — `website/generator.md:427`, `:278`, `website/switching.md:18` (and `fr/…`): « never overwritten » without the `index` exception — `branch-reviewer`
 - #447 — `test/integration/codegen.test.ts:1053`: one `index` name shared by two schemas (this note and #42's on one file) is not tested — `branch-reviewer`
 - #447 — `src/generate/tsOutput.ts:94`: the outer `types` shadowed by the inner `const types` at `:122` — `branch-reviewer`
+- #402 — `test/integration/shortcuts.test.ts:408`: the SQL of the computed-empty case is frozen only by the docs probe, not by `npm test` — `branch-reviewer`
+- #402 — `test/types/shortcuts.test-d.ts:242`: `expectTypeOf(unchecked).not.toBeAny()` checks an arrow function, which can never be `any` — `branch-reviewer`
+- #402 — `website/insert.md:98` (and `fr/…:102`): « which the type follows » holds only with `strictNullChecks` — `branch-reviewer`
 - #164 — `website/lateral.md:110` (and `fr/…`): nested in `extras` or a `sql` template, `selectOne()` / `selectExactlyOne()` with `withTies` fails on a tie with 21000; and under an outer `count()` a `withTies` lateral inflates the count — `branch-reviewer`
 - #164 — `test/integration/shortcuts.test.ts:870-883`: every matching row is a tie, so the rows cannot tell `WITH TIES` from no limit; the top-level `NotExactlyOneError` with the option is frozen only by the unit `2` — `branch-reviewer`
 - #164 — `src/db/shortcuts.ts:851`: « With `withTies` and `order` » suggests `withTies` without `order` is harmless (Postgres refuses it, 42601) — `branch-reviewer`
