@@ -722,24 +722,51 @@ describe('cols and vals', () => {
     expect(queryable.query).not.toHaveBeenCalled();
   });
 
-  it('cols and vals of an object, an array, a function or a boxed string compile as before, and null still throws a TypeError', () => {
-    // a function and a String object are objects, not primitives: their own enumerable keys, as in 6.6.1;
-    // null is left to #341
+  it('cols and vals of an object, an array, a function or a boxed string compile as before', () => {
+    // a function and a String object are objects, not primitives: their own enumerable keys, as in 6.6.1
     const f = () => null;
     expect({
       colsObject: one(cols({ id: 1 })), valsObject: one(vals({ id: 1 })),
       colsArray: one(cols(['id'])), valsArray: one(vals(['id'])),
       colsFunction: one(cols(f)), valsFunction: one(vals(f)),
       colsBoxedString: one(cols(new String('id'))), valsBoxedString: one(vals(new String('id'))),
-      colsNull: failure(() => one(cols(null))), valsNull: failure(() => one(vals(null))),
     }).toEqual({
       colsObject: { text: '"id"', values: [] }, valsObject: { text: '$1', values: [1] },
       colsArray: { text: '"id"', values: [] }, valsArray: { text: '$1', values: ['id'] },
       colsFunction: { text: '', values: [] }, valsFunction: { text: '', values: [] },
       colsBoxedString: { text: '"0", "1"', values: [] }, valsBoxedString: { text: '$1, $2', values: ['i', 'd'] },
-      colsNull: { name: 'TypeError', message: 'Cannot convert undefined or null to object' },
-      valsNull: { name: 'TypeError', message: 'Cannot convert undefined or null to object' },
     });
+  });
+
+  // 6.6.1 threw a TypeError from Object.keys(null), "Cannot convert undefined or null to object" (#341)
+  it('cols and vals of null throw, in a sql template, a nested fragment, an IN list, a lateral subquery and updateValues', () => {
+    const outcomes: Record<string, unknown> = {};
+    for (const [fn, wrap] of [['cols', cols], ['vals', vals]] as const) {
+      const places = {
+        template: () => sql`SELECT ${wrap(null)}`.compile(),
+        nested: () => sql`SELECT ${sql`(${wrap(null)})`}`.compile(),
+        inList: () => sql`SELECT 1 WHERE ${'id'} IN (${wrap(null)})`.compile(),
+        lateral: () => db.select('users', db.all, { lateral: { n: sql`SELECT ${wrap(null)}` } }).compile(),
+        updateValues: () => db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { display_name: wrap(null) } }).compile(),
+      };
+      for (const [place, f] of Object.entries(places)) outcomes[`${fn} ${place}`] = failure(f);
+    }
+    const c = { name: 'Error', message: colsMessage('null') }, v = { name: 'Error', message: valsMessage('null') };
+    expect(outcomes).toEqual({
+      'cols template': c, 'cols nested': c, 'cols inList': c, 'cols lateral': c, 'cols updateValues': c,
+      'vals template': v, 'vals nested': v, 'vals inList': v, 'vals lateral': v, 'vals updateValues': v,
+    });
+  });
+
+  it('cols and vals of null throw before writing anything for it', () => {
+    const result = { text: '', values: [] };
+    expect(failure(() => sql`SELECT ${param(1)}, ${cols(null)}`.compile(result))).toEqual({ name: 'Error', message: colsMessage('null') });
+    expect(result).toEqual({ text: 'SELECT $1, ', values: [1] });
+  });
+
+  it('vals() of an array holding cols(null) still sends it as JSON, as in 6.6.1', () => {
+    // a wrapper in an array outside a filter is a JSON parameter (#259), so cols(null) is never compiled there
+    expect(one(vals([cols(null)]))).toEqual({ text: '$1', values: [{ value: null }] });
   });
 });
 

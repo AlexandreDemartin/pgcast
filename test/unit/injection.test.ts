@@ -1705,6 +1705,37 @@ describe('cols and vals given a string', () => {
   });
 });
 
+describe('null and primitive rows, null lateral queries', () => {
+  it('a hostile string among several rows of insert() or upsert() throws, and none of it reaches the text', () => {
+    // 6.6.1 spread it into its character indexes as columns ("0", "1"…) and its characters as parameters,
+    // so none of it reached the text then either; it is now left for vals() or cols() to refuse (#341)
+    const
+      row = { email: 'a@b', display_name: 'A' },
+      colsThrows = 'throws: `db.cols()` takes an object or an array, not `string`: for one column, write `db.cols([name])`; for a row of `insert()`, `upsert()` or `update()`, give an object.',
+      valsThrows = 'throws: `db.vals()` takes an object or an array, not `string`: for one value, write `db.vals([value])`; for a row of `insert()`, `upsert()` or `update()`, give an object.',
+      builds: Record<string, [(v: any) => db.SQLFragment<any, any>, string]> = {
+        insertAfterRow: [v => db.insert('users', [row, v]), valsThrows],
+        insertBeforeRow: [v => db.insert('users', [v, row]), colsThrows],
+        upsertAfterRow: [v => db.upsert('users', [row, v], 'email'), valsThrows],
+        upsertBeforeRow: [v => db.upsert('users', [v, row], 'email'), colsThrows],
+      };
+    const outcomes: string[] = [];
+    for (const [name, [build, expected]] of Object.entries(builds))
+      for (const [input, outcome] of Object.entries(matrix(build)))
+        if (outcome !== expected) outcomes.push(`${name} ${input}: ${outcome}`);
+    expect(outcomes).toEqual([]);
+  });
+
+  it('a hostile lateral key whose query is null throws while compiling, and none of it reaches the text', () => {
+    // 6.6.1 threw a TypeError at the call, reading `copy` of null; the key is named in the message only (#341)
+    const outcomes: string[] = [];
+    for (const [input, outcome] of Object.entries(matrix(v => db.select('users', all, { lateral: { [v]: null as any } }))))
+      if (outcome !== visible(`throws: The \`lateral\` key '${hostile[input as keyof typeof hostile]}' is \`null\`, not a query: leave the key out, or give it a \`select()\`, \`selectOne()\` or \`count()\` query.`))
+        outcomes.push(`${input}: ${outcome}`);
+    expect(outcomes).toEqual([]);
+  });
+});
+
 describe('param cast', () => {
   it('the cast type is one quoted identifier: `"` is doubled', () => {
     // as quote_ident: `a"b` gives `"a""b"`; without a `"`, `.` splits (`"a"."b"`); a type already
