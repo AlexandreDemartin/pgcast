@@ -552,6 +552,104 @@ describe('a readonly columns or returning', () => {
   });
 });
 
+// without lateral, L takes its constraint, LateralOption<C, E>, which stays unresolved while C or E is generic (#284)
+describe('a function generic over columns or extras', () => {
+  test('characterization: without lateral, each column is any inside the function, as in 6.6.1; its callers get the row', async () => {
+    const many = async <C extends db.ColumnsOption<'users'>>(columns: C) => {
+      const rows = await db.select('users', db.all, { columns }).run(pool);
+      expectTypeOf(rows[0]!.id).toBeAny();
+      expectTypeOf(rows[0]!.no_such_column).toBeAny();
+      return rows;
+    };
+    const one = async <C extends db.ColumnsOption<'users'>>(columns: C) => {
+      const row = await db.selectOne('users', { id: 1 }, { columns }).run(pool);
+      expectTypeOf(row!.id).toBeAny();
+      expectTypeOf(row!.no_such_column).toBeAny();
+      return row;
+    };
+    const exactlyOne = async <C extends db.ColumnsOption<'users'>>(columns: C) => {
+      const row = await db.selectExactlyOne('users', { id: 1 }, { columns }).run(pool);
+      expectTypeOf(row.id).toBeAny();
+      expectTypeOf(row.no_such_column).toBeAny();
+      return row;
+    };
+    type Card = Pick<s.users.JSONSelectable, 'id' | 'email'>;
+    expectTypeOf(await many(['id', 'email'])).toEqualTypeOf<Card[]>();
+    expectTypeOf(await one(['id', 'email'])).toEqualTypeOf<Card | undefined>();
+    expectTypeOf(await exactlyOne(['id', 'email'])).toEqualTypeOf<Card>();
+    expectTypeOf(await many(['id', 'email'])).not.toBeAny();
+  });
+
+  test('characterization: a generic extras, with or without generic columns, gives any without lateral, as in 6.6.1; its callers get the row', async () => {
+    const extrasOnly = async <E extends db.ExtrasOption<'users'>>(extras: E) => {
+      const rows = await db.select('users', db.all, { extras }).run(pool);
+      const one = await db.selectOne('users', { id: 1 }, { extras }).run(pool);
+      const exactlyOne = await db.selectExactlyOne('users', { id: 1 }, { extras }).run(pool);
+      expectTypeOf(rows[0]!.id).toBeAny();
+      expectTypeOf(rows[0]!.no_such_column).toBeAny();
+      expectTypeOf(one!.no_such_column).toBeAny();
+      expectTypeOf(exactlyOne.no_such_column).toBeAny();
+      return rows;
+    };
+    const both = async <C extends db.ColumnsOption<'users'>, E extends db.ExtrasOption<'users'>>(columns: C, extras: E) => {
+      const rows = await db.select('users', db.all, { columns, extras }).run(pool);
+      const one = await db.selectOne('users', { id: 1 }, { columns, extras }).run(pool);
+      const exactlyOne = await db.selectExactlyOne('users', { id: 1 }, { columns, extras }).run(pool);
+      expectTypeOf(rows[0]!.id).toBeAny();
+      expectTypeOf(rows[0]!.no_such_column).toBeAny();
+      expectTypeOf(one!.no_such_column).toBeAny();
+      expectTypeOf(exactlyOne.no_such_column).toBeAny();
+      return rows;
+    };
+    const extras = { up: db.sql<s.users.SQL, string>`upper(${'display_name'})` };
+    expectTypeOf(await extrasOnly(extras)).toEqualTypeOf<(s.users.JSONSelectable & { up: string })[]>();
+    expectTypeOf(await both(['id'], extras)).toEqualTypeOf<(Pick<s.users.JSONSelectable, 'id'> & { up: string })[]>();
+  });
+
+  test('lateral: undefined types the rows inside the function', async () => {
+    const cards = async <C extends db.ColumnsOption<'users'>>(columns: C) => {
+      const rows = await db.select('users', db.all, { columns, lateral: undefined }).run(pool);
+      const one = await db.selectOne('users', { id: 1 }, { columns, lateral: undefined }).run(pool);
+      const exactlyOne = await db.selectExactlyOne('users', { id: 1 }, { columns, lateral: undefined }).run(pool);
+      expectTypeOf(rows[0]!.id).toEqualTypeOf<number>();
+      expectTypeOf(one!.id).toEqualTypeOf<number>();
+      expectTypeOf(exactlyOne.id).toEqualTypeOf<number>();
+      // @ts-expect-error users.id is a number
+      const created: Date = rows[0]!.id;
+      // @ts-expect-error users has no such column
+      void one!.no_such_column;
+      // @ts-expect-error users has no such column
+      void exactlyOne.no_such_column;
+      return created;
+    };
+    void cards;
+  });
+
+  test('lateral: undefined types the rows with a generic extras too, and refuses its keys', async () => {
+    const extrasOnly = async <E extends { up: db.SQLFragment<string> }>(extras: E) => {
+      const rows = await db.select('users', db.all, { extras, lateral: undefined }).run(pool);
+      expectTypeOf(rows[0]!.id).toEqualTypeOf<number>();
+      // @ts-expect-error a key of a generic extras is refused
+      return rows[0]!.up;
+    };
+    const both = async <C extends db.ColumnsOption<'users'>, E extends { up: db.SQLFragment<string> }>(columns: C, extras: E) => {
+      const rows = await db.select('users', db.all, { columns, extras, lateral: undefined }).run(pool);
+      expectTypeOf(rows[0]!.id).toEqualTypeOf<number>();
+      // @ts-expect-error a key of a generic extras is refused
+      return rows[0]!.up;
+    };
+    void [extrasOnly, both];
+  });
+
+  test('characterization: a generic lateral of its own keeps any', async () => {
+    const card = async <C extends db.ColumnsOption<'users'>, L extends db.LateralOption<C, db.ExtrasOption<'users'>>>(columns?: C, lateral?: L) => {
+      const row = await db.selectOne('users', { id: 1 }, { columns, lateral }).run(pool);
+      expectTypeOf(row!.no_such_column).toBeAny();
+    };
+    void card;
+  });
+});
+
 describe('truncate', () => {
   test('undefined; refuses an option that is not a keyword', () => {
     expectTypeOf(db.truncate('users', 'RESTART IDENTITY', 'CASCADE').run(pool)).resolves.toEqualTypeOf<undefined>();

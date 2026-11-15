@@ -1418,3 +1418,25 @@ describe('a null row among others in upsert()', () => {
     for (const [, options] of emitWarning.mock.calls) expect(options).toEqual({ type: 'DeprecationWarning', code: 'PGCAST_DEP001' });
   });
 });
+
+describe('null as options, or as an options key', () => {
+  it('null options run as no options in the read shortcuts, as in the writes', async () => {
+    // Zapatos 6.6.1 ran selectOne() and selectExactlyOne() so, and threw a TypeError at the call in select() and count()
+    expect(await run(db.selectOne('users', { id: 1 }, null as any))).toMatchObject({ id: 1, display_name: 'Ada' });
+    expect(await run(db.selectExactlyOne('users', { id: 2 }, null as any))).toMatchObject({ id: 2, display_name: 'Bob' });
+    expect((await run(db.select('users', all, null as any))).map((u: any) => u.display_name).sort()).toEqual(['Ada', 'Bob', 'Cyd']);
+    expect(await run(db.count('users', all, null as any))).toBe(3);
+    expect(await run(db.deletes('users', { id: 3 }, null as any))).toMatchObject([{ id: 3 }]);
+  });
+
+  it('returning: null or order: null rejects run() before any query', async () => {
+    const sent: unknown[] = [];
+    db.setConfig({ queryListener: query => sent.push(query) });
+    await expect(run(db.update('users', { display_name: 'X' }, { id: 1 }, { returning: null as any })))
+      .rejects.toThrow('`returning: null` has no meaning: for every column, leave `returning` out; for some, give an array of their names.');
+    await expect(run(db.select('users', all, { order: null as any })))
+      .rejects.toThrow('`order: null` has no meaning: for no `ORDER BY`, leave `order` out; to sort, give it `{ by, direction }`, or an array of them.');
+    expect(sent).toEqual([]);
+    expect(await scalar(`SELECT display_name AS v FROM users WHERE id = 1`)).toBe('Ada');
+  });
+});

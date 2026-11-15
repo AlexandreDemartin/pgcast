@@ -1,5 +1,5 @@
 ---
-english: 299889332c37
+english: 1b6cfee7be41
 ---
 
 # Lectures {#select-and-the-aggregates}
@@ -187,6 +187,8 @@ Postgres refuse un verrou avec `DISTINCT`, `GROUP BY` ou un agrégat (0A000).
 | `Aggregate must be a function name (e.g. sum, or my_schema.my_agg), not '…'`<!-- message --> | un `aggregate` qui n’en est pas un, dans `SelectResultMode.Numeric` | pgcast 6.6.2 |
 
 Le type refuse une mauvaise `direction`, un mauvais `nulls` ou un mauvais `lock`, pas un mauvais `aggregate`, qui est un `string`. Zapatos 6.6.1 écrivait un mauvais `lock` ou `aggregate` tel quel dans le SQL, où il pouvait exécuter une seconde instruction. Une valeur qui n’a pas de sens dans `where` ou `having` (`db.Default`, `db.self`, `db.raw()`) lève une erreur à la compilation de la requête : [Conditions](/fr/conditions).
+
+Un `null` qui passe le type, en JavaScript ou dans du JSON : des options `null` reviennent à n’en passer aucune, comme dans les [écritures](/fr/insert#insert-options). `order: null` ou `lock: null` lève une erreur à la compilation de la requête, dans les agrégats et même imbriquée dans un `lateral`, si bien que `.run()` est rejetée avant toute requête : "`` `order: null` has no meaning: for no `ORDER BY`, leave `order` out; to sort, give it `{ by, direction }`, or an array of them. ``<!-- message -->", et de même pour chaque clé. Il en va de même pour `columns: null` et `extras: null` dans `select()`, `selectOne()` et `selectExactlyOne()`, sauf si une seule sous-requête `lateral` prend la place des colonnes. Zapatos 6.6.1 levait une `TypeError` à l’appel, sur des options `null` aussi, sauf dans `selectOne()` et `selectExactlyOne()`.
 
 ## `selectOne()` {#selectOne}
 
@@ -443,6 +445,23 @@ Une clause de verrouillage de [`lock`](#lock). `of` prend un nom de table sans s
 ### `LateralOption` {#LateralOption}
 
 `LateralOption<C, E>` : le type de `lateral`. Un objet de sous-requêtes ([`SQLFragmentMap`](#SQLFragmentMap)) ; ou une seule sous-requête, seulement quand ni `columns` ni `extras` n’est donné.
+
+Dans une fonction générique sur `columns` (`C extends ColumnsOption<T>`) ou sur `extras` (`E extends ExtrasOption<T>`), `select()`, `selectOne()` et `selectExactlyOne()` sans `lateral` typent chaque colonne de leurs lignes comme `any` dans cette fonction, comme dans Zapatos 6.6.1 : une colonne erronée compile donc. C’est le cas avec des `columns` génériques, sans `extras` ou avec un `extras` générique, et avec un `extras` générique sans `columns` ; sans `strictNullChecks`, aussi avec des `columns` génériques et un `extras` littéral, ou avec des `columns` littérales et un `extras` générique. Les appelants de la fonction obtiennent des lignes typées. Passez `lateral: undefined`, qui ne change pas le SQL, et, dans chacun de ces cas, les lignes sont typées dans la fonction : une clé d’un `extras` générique est alors refusée elle aussi. Une fonction qui transmet son propre `lateral` générique, ou un objet d’options entier typé avec `LateralOption<C, …>`, garde `any`.
+
+```ts twoslash
+import * as db from 'zapatos/db';
+// ---cut---
+async function filmCards<C extends db.ColumnsOption<'films'>>(queryable: db.Queryable, columns: C) {
+  const loose = await db.select('films', db.all, { columns }).run(queryable);
+  const looseYear: string = loose[0]!.release_year;  // compiles: each column is any here
+  const cards = await db.select('films', db.all, { columns, lateral: undefined }).run(queryable);
+  // @ts-expect-error release_year is a number
+  const year: string = cards[0]!.release_year;
+  // @ts-expect-error films has no rating column
+  const rating = cards[0]!.rating;
+  return [looseYear, year, rating];
+}
+```
 
 ### `SQLFragmentMap` {#SQLFragmentMap}
 
