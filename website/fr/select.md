@@ -1,5 +1,5 @@
 ---
-english: 0e9b4e575e06
+english: 299889332c37
 ---
 
 # Lectures {#select-and-the-aggregates}
@@ -115,6 +115,8 @@ Un raccourci de lecture y est une sous-requête : `select()`, `selectOne()`, `s
 
 - **Un objet** : chaque clé devient une clé du résultat, qui contient le résultat de sa sous-requête : un tableau pour `select()`, un objet ou `null` pour `selectOne()`, un nombre pour `count()`, ou `null` quand sa requête ne renvoie aucune ligne ([`count()`](#count)). Un `count()` dont le `groupBy` donne plusieurs groupes fait revenir la ligne parente une fois par groupe sous un `select()` extérieur ; sous `selectOne()` ou `selectExactlyOne()`, une seule fois, avec le compte de l’un des groupes, mais avec [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), `selectExactlyOne()` est rejetée avec une `NotExactlyOneError`. Les clés sont jointes dans l’ordre alphabétique ; chacune est un seul identifiant, `"lateral_<key>"`.
 - **Une seule sous-requête** : son résultat est transmis à la place de chaque ligne. `columns` et `extras` n’ont alors rien à quoi s’ajouter, et le type les refuse, avec `strictNullChecks` activé.
+  - Quand la requête exécutée est un `selectOne()` ou un `selectExactlyOne()` qui le transmet, directement ou à travers un autre raccourci qui le transmet de même, un [`count()`](#count), ou un `sum()` ou un `avg()` d’une colonne de type entier ou `numeric`, est une chaîne (`"3"`), car `pg` lit `bigint` et `numeric` en chaînes, bien que typé `number`, ou `number | null` pour `sum()` et `avg()` avec [`aggregatesTypedByColumn`](#typed-by-column) déclaré. Sous une clé ou sous un `select()` extérieur, il revient en nombre JSON.
+  - Passez à `Number()` cette chaîne, et non les autres valeurs : l’agrégat vaut `null` quand sa requête ne renvoie aucune ligne (un `groupBy` sans aucun groupe), et, pour `sum()` et `avg()`, quand aucune ligne ne correspond ; `selectOne()` donne `undefined` sans ligne parente.
 - **`null`** : `lateral: null`, ou une clé dont la sous-requête vaut `null` ou `undefined`, lève une erreur à la compilation, si bien que `.run()` est rejetée avant toute requête : "`` `lateral: null` has no meaning: for no lateral join, leave `lateral` out; to join, give it a `select()`, `selectOne()` or `count()` query, or an object of them. ``<!-- message -->", ou "`` The `lateral` key 'cast' is `null`, not a query: leave the key out, or give it a `select()`, `selectOne()` or `count()` query. ``<!-- message -->". Zapatos 6.6.1 levait une `TypeError` à l’appel.
 
 Étapes, imbrication et auto-jointures : [Jointures](/fr/lateral). Depuis pgcast 6.6.2, une clé ou un `alias` contenant un `"` reste un seul identifiant ; dans Zapatos 6.6.1, il pouvait fermer ses guillemets ([changelog](/fr/changelog#6.6.2-security)).
