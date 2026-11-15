@@ -597,7 +597,7 @@ describe('a COMMIT that Postgres answers with ROLLBACK', () => {
 describe('a client already inside a transaction block', () => {
   afterEach(() => { vi.restoreAllMocks(); });
 
-  const inBlock = 'transaction() was given a client inside a transaction block, so its COMMIT or ROLLBACK would end that transaction: COMMIT or ROLLBACK it first, pass the pool, or run the queries on that client without transaction()';
+  const inBlock = 'transaction() was given a client inside a transaction block, so its COMMIT or ROLLBACK would end that transaction: COMMIT or ROLLBACK it first, or run the queries on that client without transaction()';
 
   /** A fresh module, so that warnOnce has not warned yet, and a spy on process.emitWarning. */
   const fresh = async () => {
