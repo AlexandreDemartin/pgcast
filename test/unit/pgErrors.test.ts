@@ -74,4 +74,12 @@ describe('isDatabaseError()', () => {
     // a String object, which 6.6.1 reads as a string
     expect(db.isDatabaseError({ code: new String('23505') }, name)).toBe(true);
   });
+
+  // #501: Zapatos 6.6.1 threw "TypeError: code.startsWith is not a function" on these
+  it.each([
+    ['an array of five characters', ['2', '3', '5', '0', '5']],
+    ['an object with a length of 5', { length: 5 }],
+  ])('gives false for a code that is %s', (_, code) => {
+    expect(db.isDatabaseError({ code }, 'IntegrityConstraintViolation')).toBe(false);
+  });
 });
