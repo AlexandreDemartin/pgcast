@@ -358,6 +358,8 @@ Candidates for a check, a rule or a skill line.
 - #501 — « Every other value gives what it gave » in a CHANGELOG line is backed by a diff of the whole value grid between 6.6.1 and the branch, not by the values the fix targets — `branch-reviewer`
 - #501 — A brief's suggested guard (`typeof code !== 'string'`) is checked against the existing tests first: a `String` object `code` was frozen as matching — `builder`
 - #501 — A guard copies how the original reads the value (once per type, inside `some`), so getters and Proxies are read as before — `builder`
+- #502 — A CHANGELOG line for a fix that changes two paths (the pool's client and a plain client, #246) gives one clause each: the plain client's cleared `_zapatos` was in no line — `builder`
+- #502 — A brief names a PR by its PR number, not its issue's: #246 and #96 are issues, closed by PRs #255 and #265 — `builder`
 
 ## Minors kept
 
@@ -491,3 +493,4 @@ Minor review defects, taken up by the end-of-chapter review.
 - #498 — `src/generate/tables.ts:145`: `definitionForRelationInSchema()`'s `domainRoots?` names `DomainRoots`, which `zapatos/generate` does not export; a direct six-argument caller runs one roots query per relation, unmemoised.
 - #505 — `src/db/pgErrors.ts:20-21`: the comment on the guard should say it reads `startsWith` once per type, as 6.6.1 does.
 - #505 — `website/transaction.md:349` (FR `:353`): `isDatabaseError`'s « any value » still throws for a `code` or `length` getter that throws, or `Object.create(String.prototype)` of length 5, as on 6.6.1.
+
