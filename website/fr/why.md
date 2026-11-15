@@ -1,5 +1,5 @@
 ---
-english: 409c332f19e8
+english: 8ada99ce74ec
 ---
 
 # Pourquoi pgcast
@@ -74,7 +74,7 @@ Celle qui ouvre une transaction prend le pool ou le client de son niveau, `pg.Po
 
 ## Ce qu’ajoute pgcast {#what-pgcast-adds}
 
-pgcast part de Zapatos 6.6.1. Avant de le modifier, le fork a figé par des tests ce que fait la 6.6.1, et cette [caractérisation](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/CHARACTERISATION-REPORT.md) a trouvé des dizaines de surprises, dont certaines touchant à la sécurité ([son résumé](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/CHARACTERISATION-REPORT.md#summary)). Une découverte sur laquelle pgcast agit suit l’une de trois voies ([décision 003](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/003-fixes-and-deprecation.md)) :
+pgcast part de Zapatos 6.6.1. Avant de le modifier, le fork a figé par des tests ce que fait la 6.6.1, et cette [caractérisation](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/CHARACTERISATION-REPORT.md) a trouvé des dizaines de surprises, dont certaines touchant à la sécurité ([son résumé](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/CHARACTERISATION-REPORT.md#summary)). Une découverte sur laquelle pgcast agit suit l’une des trois voies ([décision 003](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/003-fixes-and-deprecation.md)) :
 
 <div class="stack">
 
