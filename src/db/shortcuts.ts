@@ -999,7 +999,10 @@ const numericAggregate = (
  * @param options Options object. Useful keys may be: `columns`, `alias`.
  * `columns: ['col']` gives `count("col")`, and no `columns` `count(*)`;
  * several columns, or a single query as `lateral`, throw as the query
- * compiles, so `run()` rejects before any query is sent.
+ * compiles, so `run()` rejects before any query is sent. A query that returns
+ * no row (a `groupBy` with no group, a `having` that keeps none, `offset: 1`,
+ * `limit: 0`) gives `0` from `run()`, but `null` nested in a `lateral` or
+ * `extras`, though the type says `number`.
  */
 export const count: NumericAggregateSignatures = function (table, where, options?) {
   return numericAggregate(table, where, options, 'count');
