@@ -257,6 +257,9 @@ Candidates for a check, a rule or a skill line.
 - #402 — A types-only `ConfigTypes` opt-in cannot carry decision 003's run-time warning: weigh Document first for a niche type gap — orchestrator
 - #164 — A claim about a nested shortcut covers each nesting (map `lateral`, passthrough `lateral`, `extras` or `sql` scalar subquery) and each outer call (`select`, `selectOne`, `selectExactlyOne`, `count`): the JSDoc and CHANGELOG lost the outer-call condition the page had, and `select.md` had lost it before — `branch-reviewer`, `builder`
 - #164 — A characterisation test tells the frozen behaviour from its nearest alternative (no limit), not only from the rejected fix (`LIMIT`): the data must make them differ; and run it against a mutant of the rejected fix — `branch-reviewer`, `builder`
+- #185 — When a template-literal type widens in output position, the 6.6.1 `tsc` grid adds `Record<T, X>` / a mapped type over `T` (a literal member turns an index signature into a required key) and conditional types in three forms: distributive over a type parameter, inline on the concrete type, wrapped in a tuple — an « Unchanged » line names which form it covers — `branch-reviewer`
+- #185 — The stub schema in `src/typings` types the integration tests, not the fixture's: a table type like `s.transfers` belongs in `test/types` only — `builder`
+- #185 — A `Record` keyed by `NumberRangeString` already needed its 4 unbounded keys under 6.6.1 (TS2739 on `{}`): the `{}` example of the break works only on `DateRangeString` — `builder`
 
 ## Minors kept
 
@@ -351,3 +354,6 @@ Minor review defects, taken up by the end-of-chapter review.
 - #164 — `website/lateral.md:110` (and `fr/…`): nested in `extras` or a `sql` template, `selectOne()` / `selectExactlyOne()` with `withTies` fails on a tie with 21000; and under an outer `count()` a `withTies` lateral inflates the count — `branch-reviewer`
 - #164 — `test/integration/shortcuts.test.ts:870-883`: every matching row is a tie, so the rows cannot tell `WITH TIES` from no limit; the top-level `NotExactlyOneError` with the option is frozen only by the unit `2` — `branch-reviewer`
 - #164 — `src/db/shortcuts.ts:851`: « With `withTies` and `order` » suggests `withTies` without `order` is harmless (Postgres refuses it, 42601) — `branch-reviewer`
+- #185 — `website/runtime-config.md:522` (and `fr/…:526`): `NumberRangeString` still refuses `'[1,Infinity)'` and `'[1,NaN]'` (#462), not linked — `branch-reviewer`
+- #185 — `website/switching.md:94` (and `fr/…:98`): the range bullet sits after the `db.raw()` example, whose lead-in (`:64`) names a single refused call — `branch-reviewer`
+- #185 — `test/integration/core.test.ts:648`, `CHANGELOG.md:230`, `src/db/core.ts:67-69`: « bounds hold nothing » / « included » wording — `branch-reviewer`
