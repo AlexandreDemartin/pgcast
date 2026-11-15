@@ -7,7 +7,8 @@
 //     test/generated/, which `npm run typecheck` compiles (test/generated/tsconfig.json).
 // Update after an intended change: `npx vitest run -u test/integration/codegen.test.ts`.
 // -u never deletes a file: a stale snapshot is removed by hand (the orphan test names it).
-// tsForConfig() calls process.exit(1) on any SQL error: no test here may cause one.
+// Without rejectOnQueryError, tsForConfig() calls process.exit(1) on a failed query: a test that causes one
+// mocks process.exit (§ generate() on a failed query).
 
 import { randomBytes } from 'node:crypto';
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -834,6 +835,122 @@ describe('column comments', () => {
       await t.pool.query('DROP SCHEMA comment_kinds_closer CASCADE');
     }
   });
+
+  describe('a comment holding a JSDoc tag', () => {
+    /** Each column's JSDoc as TypeScript reads it, by interface: its text and its tags, as the editor's hover shows them. */
+    const hovers = (schema: string, table: string) => {
+      const
+        // an inline `{@link name text}` as TypeScript writes it back
+        text = (comment: string | ts.NodeArray<ts.JSDocComment> | undefined) => ts.getTextOfJSDocComment(comment) ?? '',
+        source = ts.createSourceFile('schema.d.ts', schema, ts.ScriptTarget.Latest, true),
+        found: Record<string, Record<string, { text: string, tags: string[] }>> = {},
+        visit = (node: ts.Node): void => {
+          if (ts.isPropertySignature(node) && ts.isInterfaceDeclaration(node.parent) &&
+            ts.isModuleBlock(node.parent.parent) && node.parent.parent.parent.name.text === table) {
+            const doc = node.getChildren().find(ts.isJSDoc)!;
+            (found[node.parent.name.text] ??= {})[node.name.getText()] = {
+              text: text(doc.comment),
+              // `@see` reads its first word as a name, the rest as its text
+              tags: (doc.tags ?? []).map(tag =>
+                `@${tag.tagName.text} ${ts.isJSDocSeeTag(tag) && tag.name ? tag.name.getText() : ''}${text(tag.comment)}`.trimEnd()),
+            };
+          }
+          ts.forEachChild(node, visit);
+        };
+      visit(source);
+      return found;
+    };
+
+    // tsForConfig() reads through its own connection: the schema is committed, then dropped
+    beforeAll(() => t.pool.query(String.raw`
+      CREATE SCHEMA comment_tags;
+      CREATE TABLE comment_tags.roles (
+        dep int, first int, indented int, crlf int, two int, mid int, kept int, seen int, after int,
+        email int, spaced int, ticked int, linked int, linkcode int, linkplain int, unclosed int,
+        runs int, bare int, runtag int, asked int);
+      COMMENT ON COLUMN comment_tags.roles.dep IS E'Billing order.\n@deprecated use lead';
+      COMMENT ON COLUMN comment_tags.roles.first IS '@deprecated use lead';
+      COMMENT ON COLUMN comment_tags.roles.indented IS E'Billing order.\n  @deprecated use lead';
+      COMMENT ON COLUMN comment_tags.roles.crlf IS E'Billing order.\r\n@deprecated use lead';
+      COMMENT ON COLUMN comment_tags.roles.two IS E'Billing order.\n@deprecated use lead\n@see lead';
+      COMMENT ON COLUMN comment_tags.roles.mid IS E'Billing order.\nSince 2026 @deprecated use lead';
+      COMMENT ON COLUMN comment_tags.roles.kept IS E'@deprecated use lead\nkept for old credits';
+      COMMENT ON COLUMN comment_tags.roles.seen IS '{@see lead @casting}';
+      COMMENT ON COLUMN comment_tags.roles.after IS '{@link lead} or @casting';
+      COMMENT ON COLUMN comment_tags.roles.email IS 'Ask casting@example.com';
+      COMMENT ON COLUMN comment_tags.roles.spaced IS 'Fee @ 5 a day';
+      COMMENT ON COLUMN comment_tags.roles.ticked IS E'Billing order.\n\`@deprecated\` is not a tag';
+      COMMENT ON COLUMN comment_tags.roles.linked IS '{@link lead see @casting}';
+      COMMENT ON COLUMN comment_tags.roles.linkcode IS '{@linkcode lead see @casting}';
+      COMMENT ON COLUMN comment_tags.roles.linkplain IS '{@linkplain lead see @casting}';
+      COMMENT ON COLUMN comment_tags.roles.unclosed IS '{@link lead see @casting';
+      COMMENT ON COLUMN comment_tags.roles.runs IS E'{@link lead\nsee @casting}';
+      COMMENT ON COLUMN comment_tags.roles.bare IS E'{@link\nsee @casting}';
+      COMMENT ON COLUMN comment_tags.roles.runtag IS E'{@link lead\n@deprecated use lead';
+      COMMENT ON COLUMN comment_tags.roles.asked IS E'See {@link lead\nthe lead, ask @casting}';`));
+    afterAll(() => t.pool.query('DROP SCHEMA comment_tags CASCADE'));
+
+    it('keeps the type and nullability lines out of the tag, and keeps the tag', async () => {
+      const
+        { ts: schema } = await codegen({ schemas: { comment_tags: all } }),
+        { Selectable, ...others } = hovers(schema, 'roles'),
+        generated = '- `int4` in database\n- Nullable, no default';
+      expect.soft(Selectable).toEqual({
+        dep: { text: `**comment_tags.roles.dep**\n\nBilling order.\n${generated}`, tags: ['@deprecated use lead'] },
+        // nothing before the tag: the name, then the generated lines, as for a column without a comment
+        first: { text: `**comment_tags.roles.first**\n${generated}`, tags: ['@deprecated use lead'] },
+        indented: { text: `**comment_tags.roles.indented**\n\nBilling order.\n${generated}`, tags: ['@deprecated use lead'] },
+        crlf: { text: `**comment_tags.roles.crlf**\n\nBilling order.\n${generated}`, tags: ['@deprecated use lead'] },
+        two: { text: `**comment_tags.roles.two**\n\nBilling order.\n${generated}`, tags: ['@deprecated use lead', '@see lead'] },
+        // TypeScript also starts a tag at an @ after a space, in the middle of a line
+        mid: { text: `**comment_tags.roles.mid**\n\nBilling order.\n${generated}\n\nSince 2026`, tags: ['@deprecated use lead'] },
+        kept: { text: `**comment_tags.roles.kept**\n${generated}`, tags: ['@deprecated use lead\nkept for old credits'] },
+        // {@see} is no inline link: the @ after its space starts a tag, as after an inline link's closing }
+        seen: { text: `**comment_tags.roles.seen**\n${generated}\n\n{@see lead`, tags: ['@casting }'] },
+        after: { text: `**comment_tags.roles.after**\n${generated}\n\n{@link lead} or`, tags: ['@casting'] },
+        email: { text: `**comment_tags.roles.email**\n\nAsk casting@example.com\n${generated}`, tags: [] },
+        spaced: { text: `**comment_tags.roles.spaced**\n\nFee @ 5 a day\n${generated}`, tags: [] },
+        ticked: { text: `**comment_tags.roles.ticked**\n\nBilling order.\n\`@deprecated\` is not a tag\n${generated}`, tags: [] },
+        // an @ inside an inline link, closed or not, is the link's text
+        linked: { text: `**comment_tags.roles.linked**\n\n{@link lead see @casting}\n${generated}`, tags: [] },
+        linkcode: { text: `**comment_tags.roles.linkcode**\n\n{@linkcode lead see @casting}\n${generated}`, tags: [] },
+        linkplain: { text: `**comment_tags.roles.linkplain**\n\n{@linkplain lead see @casting}\n${generated}`, tags: [] },
+        // unclosed, the link takes in the line break and the next line's *, which TypeScript reads as on master
+        unclosed: { text: `**comment_tags.roles.unclosed**\n\n{@link lead see @casting}        * ${generated}`, tags: [] },
+        // a link whose line ends on {@link or on its name runs on through the next line, * included
+        runs: { text: `**comment_tags.roles.runs**\n\n{@link lead * see @casting}\n${generated}`, tags: [] },
+        bare: { text: `**comment_tags.roles.bare**\n\n{@link  * see @casting}\n${generated}`, tags: [] },
+        runtag: { text: `**comment_tags.roles.runtag**\n\n{@link lead * @deprecated use lead}        * ${generated}`, tags: [] },
+        asked: { text: `**comment_tags.roles.asked**\n\nSee {@link lead * the lead, ask @casting}\n${generated}`, tags: [] },
+      });
+      // the same JSDoc on every interface that has the column
+      expect.soft(Object.keys(others)).toEqual(['JSONSelectable', 'Whereable', 'Insertable', 'Updatable']);
+      for (const columns of Object.values(others)) expect.soft(columns).toEqual(Selectable);
+      expect.soft(syntaxErrors(schema)).toEqual([]);
+    });
+
+    it('writes the lines before the tag, the generated lines, a * line, then the tag lines', async () => {
+      const { ts: schema } = await codegen({ schemas: { comment_tags: all } });
+      expect.soft(schema).toContain([
+        '* **comment_tags.roles.two**',
+        '*',
+        '* Billing order.',
+        '* - `int4` in database',
+        '* - Nullable, no default',
+        '*',
+        '* @deprecated use lead',
+        '* @see lead',
+        '*/',
+      ].join('\n        '));
+      // a comment without a tag keeps its JSDoc as it was: the comment's lines, then the generated ones
+      expect.soft(commentLines(schema, 'roles').spaced).toEqual(['* Fee @ 5 a day']);
+      expect.soft(commentLines(schema, 'roles').unclosed).toEqual(['* {@link lead see @casting']);
+      expect.soft(commentLines(schema, 'roles').runs).toEqual(['* {@link lead', '* see @casting}']);
+      expect.soft(commentLines(schema, 'roles').bare).toEqual(['* {@link', '* see @casting}']);
+      expect.soft(commentLines(schema, 'roles').runtag).toEqual(['* {@link lead', '* @deprecated use lead']);
+      expect.soft(commentLines(schema, 'roles').asked).toEqual(['* See {@link lead', '* the lead, ask @casting}']);
+    });
+  });
 });
 
 describe('quotes and */', () => {
@@ -1648,7 +1765,10 @@ describe('schemas rules with a string other than "*"', () => {
 describe('names that Object.prototype also has', () => {
   // schemas of their own, committed to this file's database: no other test configures them.
   // Each name is an enum of a schema enum_<name>, a schema with a table, and a domain of proto_a and
-  // proto_b, in a table films_<name> of each; proto_c has a domain __proto__ alone, proto_d a table toString.
+  // proto_b, in a table films_<name> of each; proto_c has a domain __proto__ alone. proto_d has a table of
+  // each name, its columns named like what the inherited value has, and films a column of each name;
+  // proto_e has a table of each name but __proto__ with the columns caller and arguments, which a function
+  // throws on (Object.prototype has no caller: a table __proto__ never threw).
   const names = ['toString', 'constructor', 'hasOwnProperty', '__proto__'];
   beforeAll(() => t.pool.query(`
     CREATE SCHEMA proto_a;
@@ -1658,7 +1778,14 @@ describe('names that Object.prototype also has', () => {
     CREATE TABLE proto_c.films (title proto_c."__proto__");
     CREATE SCHEMA proto_d;
     CREATE TABLE proto_d."toString" (id int, name text, length int);
-  ` + names.map(name => `
+    CREATE TABLE proto_d."constructor" (id int, name text, length int, keys text, "values" text);
+    CREATE TABLE proto_d."hasOwnProperty" (id int, name text, length int);
+    CREATE TABLE proto_d."__proto__" (id int, name text, "toString" text, "hasOwnProperty" text);
+    CREATE TABLE proto_d.films (id int, title text, "toString" text, "constructor" text, "hasOwnProperty" text, "__proto__" text);
+    CREATE SCHEMA proto_e;
+  ` + names.filter(name => name !== '__proto__').map(name => `
+    CREATE TABLE proto_e."${name}" (id int, caller text, arguments text);
+  `).join('') + names.map(name => `
     CREATE SCHEMA "enum_${name}";
     CREATE TYPE "enum_${name}"."${name}" AS ENUM ('b', 'a');
     CREATE SCHEMA "${name}";
@@ -1668,7 +1795,7 @@ describe('names that Object.prototype also has', () => {
     CREATE TABLE proto_a."films_${name}" (d proto_a."${name}");
     CREATE TABLE proto_b."films_${name}" (d proto_b."${name}");
   `).join('')));
-  afterAll(() => t.pool.query(`DROP SCHEMA proto_a, proto_b, proto_c, proto_d, ` +
+  afterAll(() => t.pool.query(`DROP SCHEMA proto_a, proto_b, proto_c, proto_d, proto_e, ` +
     `${names.map(name => `"enum_${name}", "${name}"`).join(', ')} CASCADE`));
 
   /** The properties a run adds to `Object`, `Object.prototype` or a method of it, removed once read. */
@@ -1719,22 +1846,104 @@ describe('names that Object.prototype also has', () => {
     expect(added).toEqual([]);
   });
 
-  it('keeps the columnOptions of the CLI as master reads them, for a table named toString (#405)', async () => {
+  describe('columnOptions (#405)', () => {
     const
-      dir = mkdtempSync(join(tmpdir(), 'pgcast-cli-')),
-      json = JSON.stringify({
-        schemas: { proto_d: all }, unprefixedSchema: 'proto_d', schemaJSDoc: false,
-        columnOptions: { '*': { name: { insert: 'excluded' }, length: { insert: 'excluded' } } },
+      excluded = { insert: 'excluded', update: 'excluded' } as const,
+      // Object.fromEntries: '__proto__' as a key, as JSON.parse() gives it
+      excludedEverywhere = (...columns: string[]) => ({ '*': Object.fromEntries(columns.map(column => [column, excluded])) }),
+      codegenOf = (schema: string, columnOptions: Config['columnOptions'] = {}, rule: Schemas[string] = all) =>
+        codegen({ schemas: { [schema]: rule }, unprefixedSchema: schema, schemaJSDoc: false, columnOptions });
+
+    /** The Insertable and Updatable interfaces of `table` in a schema generated with schemaJSDoc: false. */
+    const writablesOf = (schema: string, table: string) => {
+      const block = tableBlock(schema, table);
+      return ['Insertable', 'Updatable'].map(name => {
+        const start = block.indexOf(`export interface ${name} {`);
+        return block.slice(start, block.indexOf('\n    }', start) + '\n    }'.length);
       });
-    try {
+    };
+
+    /** The same, written out for nullable columns with no default, `[column, TS type]`, sorted by name. */
+    const writables = (columns: [string, string][], updatable = columns) => {
+      const writable = (type: string) => `${type} | db.Parameter<${type}> | null | db.DefaultType | db.SQLFragment`;
+      return [
+        ['export interface Insertable {', ...columns.map(([column, type]) => `      ${column}?: ${writable(type)};`), '    }'],
+        ['export interface Updatable {', ...updatable.map(([column, type]) =>
+          `      ${column}?: ${writable(type)} | db.SQLFragment<any, ${writable(type)}>;`), '    }'],
+      ].map(lines => lines.join('\n'));
+    };
+
+    it.each(names)('applies the "*" entry to the columns of a table named %s', async name => {
+      // name, length, keys and values: what the inherited Object.prototype.toString, Object… answered
+      const { ts: schema } = await codegenOf('proto_d', excludedEverywhere('name', 'length', 'keys', 'values', ...names));
+      expect(writablesOf(schema, name)).toEqual(writables([['id', 'number']]));
+    });
+
+    it.each(names)('applies the "*" entry to a column named %s of a table with an entry of its own', async name => {
       const
-        { ts: schema } = await tsForConfig(finaliseConfig({ ...cliConfig(json, dir), ...quiet, db: db() }), noDebug),
-        insertable = tableBlock(schema, 'toString').split('export interface Insertable {')[1].split('\n    }')[0];
-      // toString.name and toString.length, inherited, answer before the '*' entry, as from generate() and in 6.6.1
-      expect(insertable.match(/^ {6}\w+(?=\??:)/gm)?.map(key => key.trim())).toEqual(['id', 'length', 'name']);
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
+        { ts: schema } = await codegenOf('proto_d', {
+          ...excludedEverywhere(name), films: { title: { update: 'excluded' } },
+        }),
+        columns: [string, string][] = [['__proto__', 'string'], ['constructor', 'string'], ['hasOwnProperty', 'string'],
+          ['id', 'number'], ['title', 'string'], ['toString', 'string']].filter(([column]) => column !== name) as [string, string][];
+      expect(writablesOf(schema, 'films')).toEqual(writables(columns, columns.filter(([column]) => column !== 'title')));
+    });
+
+    it('still lets a table entry win over the "*" entry, for a table named toString', async () => {
+      const { ts: schema } = await codegenOf('proto_d', {
+        ...excludedEverywhere('name', 'length'), toString: { name: { insert: 'auto', update: 'auto' } as const },
+      });
+      expect(writablesOf(schema, 'toString')).toEqual(writables([['id', 'number'], ['name', 'string']]));
+    });
+
+    it('still reads a __proto__ key of a JS literal, which sets the prototype, as the entry of a table __proto__', async () => {
+      // as in Zapatos 6.6.1: columnOptions.__proto__ is that object
+      const { ts: schema } = await codegenOf('proto_d', { __proto__: { name: excluded } });
+      expect(writablesOf(schema, '__proto__')).toEqual(writables([['hasOwnProperty', 'string'], ['id', 'number'], ['toString', 'string']]));
+    });
+
+    it.each([false, 0, ''])('still lets a table entry %j hide the "*" entry, as in Zapatos 6.6.1', async entry => {
+      // 6.6.1 read columnOptions.films && columnOptions.films.title, which gave back the entry itself, and ?? stopped there
+      const
+        { ts: schema } = await codegenOf('proto_d', { ...excludedEverywhere('title'), films: entry } as unknown as Config['columnOptions']),
+        columns: [string, string][] = [['__proto__', 'string'], ['constructor', 'string'], ['hasOwnProperty', 'string'],
+          ['id', 'number'], ['title', 'string'], ['toString', 'string']];
+      expect(writablesOf(schema, 'films')).toEqual(writables(columns));
+    });
+
+    it.each([null, undefined])('still throws on columnOptions %s, as Zapatos 6.6.1 did', async columnOptions => {
+      // as JSON's null and generate()'s undefined give it: either one replaces the default {}
+      const config = { schemas: { proto_d: only('films') }, unprefixedSchema: 'proto_d', columnOptions } as unknown as Config;
+      await expect(codegen(config)).rejects.toThrow(new TypeError(`Cannot read properties of ${columnOptions} (reading 'films')`));
+    });
+
+    const functionNames = names.filter(name => name !== '__proto__');
+
+    it.each(functionNames)('generates a table named %s with columns caller and arguments', async name => {
+      const { ts: schema } = await codegenOf('proto_e', {}, only(name));
+      expect(writablesOf(schema, name)).toEqual(writables([['arguments', 'string'], ['caller', 'string'], ['id', 'number']]));
+    });
+
+    it.each(functionNames)('applies the "*" entry to the column caller of a table named %s', async name => {
+      const { ts: schema } = await codegenOf('proto_e', excludedEverywhere('caller'), only(name));
+      expect(writablesOf(schema, name)).toEqual(writables([['arguments', 'string'], ['id', 'number']]));
+    });
+
+    it('applies the columnOptions of the CLI to a table named toString', async () => {
+      const
+        dir = mkdtempSync(join(tmpdir(), 'pgcast-cli-')),
+        json = JSON.stringify({
+          schemas: { proto_d: all }, unprefixedSchema: 'proto_d', schemaJSDoc: false,
+          columnOptions: { '*': { name: { insert: 'excluded' }, length: { insert: 'excluded' } } },
+        });
+      try {
+        const { ts: schema } = await tsForConfig(finaliseConfig({ ...cliConfig(json, dir), ...quiet, db: db() }), noDebug);
+        // Zapatos 6.6.1 kept name and length: the inherited toString.name and toString.length answered first
+        expect(writablesOf(schema, 'toString')[0]).toBe(writables([['id', 'number']])[0]);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
   });
 
   it.each(names)('notes the custom types named %s of two schemas, and leaves Object as it was', async name => {
@@ -1909,6 +2118,106 @@ describe('generate()', () => {
         schemas: { queued: all }, customTypesTransform: () => { throw failed; },
       }, { max: 2, connectionTimeoutMillis: timeout }, timeout * 2);
     }, dropWait);
+
+    describe('on a failed query', () => {
+      // the relations query, the first of a run, sorts on lower(table_name): a lower(name) ahead of pg_catalog in
+      // search_path takes the call, and raises
+      beforeEach(() => withAdminClient(urlForDatabase(server().url, name), c => c.query(`
+        CREATE SCHEMA query_trap;
+        CREATE FUNCTION query_trap.lower(name) RETURNS text LANGUAGE plpgsql
+          AS $$ BEGIN RAISE EXCEPTION 'introspection fails on purpose'; END $$;
+      `)));
+
+      const
+        trapped = () => ({ connectionString: urlForDatabase(server().url, name), options: '-c search_path=query_trap,pg_catalog' }),
+        failures = [
+          ['a refused connection', () => unreachable, { code: 'ECONNREFUSED' }],
+          ['a failing introspection query', trapped, { code: 'P0001', message: 'introspection fails on purpose' }],
+        ] as const,
+        exited = new Error('process.exit() called'),
+        note = 'Note: a query failed, so generate() ends the process with process.exit(1), and its promise never ' +
+          'settles (PGCAST_DEP006). Set rejectOnQueryError: true to reject with the error instead; it will be the ' +
+          'default in pgcast 7.0.';
+
+      /** A run of one schema on `db`, notes printed, process.exit mocked to throw: what it rejected with and did. */
+      const failedRun = async (config: Config, db: pg.ClientConfig) => {
+        const
+          exit = vi.spyOn(process, 'exit').mockImplementation((() => { throw exited; }) as () => never),
+          log = vi.spyOn(console, 'log').mockImplementation(() => undefined),
+          unhandled: unknown[] = [],
+          onUnhandled = (e: unknown) => void unhandled.push(e);
+        process.on('unhandledRejection', onUnhandled);
+        try {
+          const rejection = await generate({
+            ...quiet, warningListener: true, schemas: { public: only('users') }, outDir, ...config, db,
+          }).then(() => new Error('resolved'), (e: unknown) => e);
+          await new Promise(resolve => setTimeout(resolve, 0));
+          return { rejection, exits: exit.mock.calls, printed: log.mock.calls, unhandled, written: files(outDir) };
+        } finally {
+          process.off('unhandledRejection', onUnhandled);
+          exit.mockRestore();
+          log.mockRestore();
+        }
+      };
+
+      it.each(failures)('rejects with the error of %s with rejectOnQueryError: no exit, no output, nothing written', async (_, db, error) => {
+        // two schemas: the queries of the other are in flight when the first fails
+        const run = await failedRun({ ...main, rejectOnQueryError: true }, db());
+        expect(run.rejection).toMatchObject(error);
+        expect(run).toMatchObject({ exits: [], printed: [], unhandled: [], written: [] });
+        if (db === trapped) {
+          expect(run.rejection).toBeInstanceOf(pg.DatabaseError);
+          await withAdminClient(server().url, c => c.query(`DROP DATABASE "${name}"`));  // its pool has ended
+        }
+      });
+
+      it.each(failures)('prints %s, notes rejectOnQueryError once, then exits with 1, as Zapatos 6.6.1 exits', async (_, db, error) => {
+        const run = await failedRun({}, db());
+        expect(run.rejection).toBe(exited);
+        expect(run.exits).toEqual([[1]]);
+        expect(run.printed).toEqual([['*** error 0 ***', expect.objectContaining(error)], [note]]);
+        expect(run.written).toEqual([]);
+      });
+
+      it('exits with no note with rejectOnQueryError: false', async () => {
+        const run = await failedRun({ rejectOnQueryError: false }, trapped());
+        expect(run.exits).toEqual([[1]]);
+        expect(run.printed).toEqual([['*** error 0 ***', expect.objectContaining(failures[1][2])]]);
+      });
+
+      it('notes rejectOnQueryError: null, from a JSON config, as when it is left out', async () => {
+        const run = await failedRun(JSON.parse('{"rejectOnQueryError": null}') as Config, trapped());
+        expect(run.exits).toEqual([[1]]);
+        expect(run.printed).toEqual([['*** error 0 ***', expect.objectContaining(failures[1][2])], [note]]);
+      });
+
+      it('still exits when warningListener throws at the note', async () => {
+        const run = await failedRun({ warningListener: () => { throw new Error('a listener that throws'); } }, trapped());
+        expect(run.rejection).toBe(exited);
+        expect(run.exits).toEqual([[1]]);
+      });
+
+      it("exits with no note from the CLI's config, even given rejectOnQueryError: true", async () => {
+        const dir = mkdtempSync(join(tmpdir(), 'pgcast-cli-'));
+        try {
+          writeFileSync(join(dir, 'pgcastconfig.json'), '{"rejectOnQueryError": true}');
+          const run = await failedRun(cliConfig('{"rejectOnQueryError": true}', dir), trapped());
+          expect(run.exits).toEqual([[1]]);
+          expect(run.printed).toEqual([['*** error 0 ***', expect.objectContaining(failures[1][2])]]);
+        } finally {
+          rmSync(dir, { recursive: true, force: true });
+        }
+      });
+
+      it('is optional in Config, read as false when absent', () => {
+        expect(finaliseConfig({}).rejectOnQueryError).toBeUndefined();
+        const right: Config = { rejectOnQueryError: true };
+        void right;
+        // @ts-expect-error a boolean
+        const wrong: Config = { rejectOnQueryError: 'yes' };
+        void wrong;
+      });
+    });
   });
 });
 

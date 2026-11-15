@@ -218,6 +218,30 @@ describe('upsert', () => {
     expectTypeOf(many.run(pool)).resolves.toEqualTypeOf<(s.users.JSONSelectable & db.UpsertAction)[]>();
   });
 
+  test('characterization: undefined for an updateColumns typed empty, not for a Column[], as in 6.6.1 (#402)', () => {
+    type Row = s.users.JSONSelectable & db.UpsertAction;
+    const asConst = db.upsert('users', row, 'email', { updateColumns: [] as const });
+    expectTypeOf(asConst.run(pool)).resolves.toEqualTypeOf<Row | undefined>();
+    const none: never[] = [];
+    expectTypeOf(db.upsert('users', row, 'email', { updateColumns: none }).run(pool)).resolves.toEqualTypeOf<Row | undefined>();
+    expectTypeOf(db.upsert('users', row, 'email', { updateColumns: db.doNothing }).run(pool))
+      .resolves.toEqualTypeOf<Row | undefined>();
+    // a Column[] may be empty at run time, then DO NOTHING gives undefined (integration test): the docs say so
+    const computed: s.users.Column[] = [];
+    const q = db.upsert('users', row, 'email', { updateColumns: computed });
+    expectTypeOf(q.run(pool)).resolves.toEqualTypeOf<Row>();
+    expectTypeOf(q.run(pool)).resolves.not.toBeAny();
+    expectTypeOf(db.upsert('users', row, 'email', { updateColumns: computed, returning: ['id'] }).run(pool))
+      .resolves.toEqualTypeOf<{ id: number } & db.UpsertAction>();
+    expectTypeOf(db.upsert('users', [row], 'email', { updateColumns: computed }).run(pool)).resolves.toEqualTypeOf<Row[]>();
+    const unchecked = async () => {
+      const r = await db.upsert('users', row, 'email', { updateColumns: db.doNothing }).run(pool);
+      // @ts-expect-error doNothing: one row may come back undefined, so it must be checked first
+      return r.id;
+    };
+    expectTypeOf(unchecked).not.toBeAny();
+  });
+
   test('refuses an unknown conflict column; constraint<T>() refuses an index of another table', () => {
     // @ts-expect-error 'nope' is not a column of users
     db.upsert('users', row, 'nope');
