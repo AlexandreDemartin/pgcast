@@ -302,6 +302,10 @@ Candidates for a check, a rule or a skill line.
 - #470 — A review's « Expected » wording is a hypothesis too: « with no row to aggregate » was wrong for a `count()` with no matching row (`"0"`); probe before writing — `builder`
 - #470 — A self-join `selectOne('t', { id: parent('id') })` with no `alias` compiles `"t"."id" = "t"."id"` (always true): a test with that shape passes by row order; give it an `alias` and mutate the parent row once — `builder`
 - #470 — `select.md:389` says a passed-through `selectOne()` nested in turn is typed as nested, while at run time it hands the column over as is (`min()` of a `timestamptz` gives a `Date`): the types may differ, unchecked — `builder`
+- #341 — A shortcut check that reads only `firstRow` misses a bad row elsewhere in the array (two review rounds): a check that decides between throwing at the call and leaving the error to `.run()` is tested on every row position, a grid of row kinds × positions (`test/unit/shortcuts.test.ts:1827`) — `branch-reviewer`
+- #341 — When a new refusal moves an input's error into `compile()`, every check already run at the call on the same input can fire first and hide it: the probe table combines each new value with the inputs of the existing refusals (`{}`, `null`, `[]`) at each position — `branch-reviewer`
+- #341 — A PR that conflicts with its base gets no `pull_request` run: `gh pr view --json mergeable` before review; and check that master has not moved in the same command that pushes — `branch-reviewer`, `builder`
+- #341 — Several `null` options still throw a `TypeError` at the call on 6.6.1 too (`select(t, w, null)`, `columns: null`, `returning: null`, `extras: null`): filed as #474 — `builder`
 
 ## Minors kept
 
@@ -418,3 +422,5 @@ Minor review defects, taken up by the end-of-chapter review.
 - #469 — `test/unit/shortcuts.test.ts:1685`: the guard test freezes only a plain object, not a `Set`, a function or a `String` object — `branch-reviewer`
 - #469 — `website/select.md:263` (and `fr/…:267`): « an empty string, `0` or `false` » reads as the whole falsy list; `src/db/shortcuts.ts:1003`, `:1019`: « a string » where any primitive is refused; `test/unit/core.test.ts:696` duplicates `test/unit/shortcuts.test.ts:1665` — `branch-reviewer`
 - #470 — `website/select.md:382`: the opt-in's table has no row for `sum()`/`avg()` passed through a `selectOne()`; `docs/CHARACTERISATION-REPORT.md:68`: R17's « aggregates always » rounded beyond 2^53, not when passed through (#470) — `branch-reviewer`
+- #341 — `src/db/shortcuts.ts:757`: the null-key check reads each `lateral` value two or three times (a getter is read twice for a valid key) — `branch-reviewer`
+- #341 — `test/unit/injection.test.ts:1709`: `upsert([row, null])` and `upsert([null, row])` now compile SQL with no frozen injection snapshot (a hostile key stays one quoted identifier, probed) — `branch-reviewer`
