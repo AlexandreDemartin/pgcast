@@ -287,6 +287,9 @@ Candidates for a check, a rule or a skill line.
 - #274 — A docs claim about a parameter's compiled SQL (`$1`, JSON) names the `castArrayParamsToJson` / `castObjectParamsToJson` condition, or is probed under both: candidate check in `check-prose.mjs`, rerun each `<!-- probe -->` without `setConfig` with both options on and flag a changed text whose sentence names no option — `branch-reviewer`
 - #274 — A value object with `toPostgres()` and a `value` field compiles only because `Parameter` matches by shape: probe it whenever `Parameter` is narrowed; under `castObjectParamsToJson` an object literal's own `toPostgres()` is not used — `builder`
 - #274 — A types-only `ConfigTypes` opt-in cannot carry decision 003's warning, and a class + interface merge needs an ESLint disable in `core.ts`: weigh Document first for a niche type gap (as #402) — orchestrator
+- #469 — An item added to a list in the docs or CHANGELOG is checked against the sentence that frames it (« which lets these calls through », « three options »): #475 broke one of each — `branch-reviewer`
+- #469 — An object with zero or several keys, a `Set` or a function as an aggregate's `columns` still compiles to `count()` / `count("a", "b")`, which Postgres refuses (6.6.1 too); niche, outside the type: not filed — orchestrator
+- #469 — Under load from parallel worktrees, `codegen.test.ts` hits Vitest's 5 s timeout (a rerun is green); and a French term for an English phrase is searched on the site first (« en passant outre le type ») — `builder`
 
 ## Minors kept
 
@@ -397,3 +400,5 @@ Minor review defects, taken up by the end-of-chapter review.
 - #274 — `website/sql-template.md:126` (and `fr/…:130`): « A text column stores as it is » right after a filter example; « passes where a column name does » reads as « wherever » — `branch-reviewer`
 - #274 — `test/types/core.test-d.ts:208-230`: no enum column and no `upsert()` slot for the structural `{ value }` case (skill `type-tests` § Structural wrappers) — `branch-reviewer`
 - #274 — `src/db/core.ts:137-140`: interpolated directly in `sql`, `${{ value: 3 }}` passes as a Whereable and compiles to `("value" = $1)` — `branch-reviewer`
+- #469 — `test/unit/shortcuts.test.ts:1685`: the guard test freezes only a plain object, not a `Set`, a function or a `String` object — `branch-reviewer`
+- #469 — `website/select.md:263` (and `fr/…:267`): « an empty string, `0` or `false` » reads as the whole falsy list; `src/db/shortcuts.ts:1003`, `:1019`: « a string » where any primitive is refused; `test/unit/core.test.ts:696` duplicates `test/unit/shortcuts.test.ts:1665` — `branch-reviewer`
