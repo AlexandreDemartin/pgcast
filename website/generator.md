@@ -102,7 +102,7 @@ if (!upToDate) process.exitCode = 1;
 
 - It takes the config of [`generate()`](#generate), and resolves to `true` when every file matches. The exit code is yours to set.
 - It prints only through the listeners: a line per file that differs or is missing through [`warningListener`](#generate.warningListener), so with `console.log` by default; `The generated files in src/zapatos are up to date.` through [`progressListener`](#generate.progressListener). Not the CLI's last line, `Run the generator without --check to write them.`
-- A failed query ends the process, as it ends `generate()`; with [`rejectOnQueryError`](#generate.rejectOnQueryError), it rejects with the error.
+- A failed query rejects it with the error, before writing anything and with no note: unlike `generate()`, only [`rejectOnQueryError: false`](#generate.rejectOnQueryError) ends the process.
 
 ## `generate()` {#generate}
 
@@ -387,9 +387,9 @@ import type * as s from 'pgcast/schema';
 
 `boolean`, or left out; an opt-in. What a failed query does: a refused connection, a wrong password, a query Postgres refuses.
 
-- Left out, or `null`: as in Zapatos 6.6.1, the generator prints `*** error <n> ***` and the error with `console.log`, then ends the process with `process.exit(1)`; in between, it notes the option through [`warningListener`](#generate.warningListener). From 7.0, left out means `true` ([Versions](/versions)).
-- `false`: the same exit, with no note. It stays in 7.0 and 8.0: the exit is [the CLI](#cli)'s own path, and the CLI sets `false` over its config file and its argument.
-- `true`: rejects `generate()` with that error, as `pg` gives it, and prints nothing:
+- Left out, or `null`: as in Zapatos 6.6.1, the generator prints `*** error <n> ***` and the error with `console.log`, then ends the process with `process.exit(1)`; in between, it notes the option through [`warningListener`](#generate.warningListener). From 7.0, left out means `true` ([Versions](/versions)). [`check()`](#check), which Zapatos 6.6.1 doesn't have, reads it as `true` already, with no note.
+- `false`: the same exit, with no note, from `generate()` and `check()` alike. It stays in 7.0 and 8.0: the exit is [the CLI](#cli)'s own path, and the CLI sets `false` over its config file and its argument.
+- `true`: rejects `generate()` or `check()` with that error, as `pg` gives it, and prints nothing:
 
 ```ts twoslash
 import { generate } from 'zapatos/generate';
@@ -573,7 +573,7 @@ Writing custom types file: src/zapatos/custom/index.d.ts
 - `Note: unknown flag --chek ignored: the only flag is --check, before or after the JSON argument.`
   - from [the CLI](#cli), before generating or checking, for each argument after `config` that starts with `--` and is not `--check`;
 - `Note: a query failed, so generate() ends the process with process.exit(1), and its promise never settles (PGCAST_DEP006). Set rejectOnQueryError: true to reject with the error instead; it will be the default in pgcast 7.0.`
-  - without [`rejectOnQueryError`](#generate.rejectOnQueryError), when a query fails, after the error and just before the exit;
+  - from `generate()` without [`rejectOnQueryError`](#generate.rejectOnQueryError), when a query fails, after the error and just before the exit;
 - the [old layout warning](#the-old-layout-warning);
 - `Out of date: src/zapatos/schema.d.ts` and `Missing: src/zapatos/custom/PgSeat_label.d.ts`
   - from [`check()`](#check), for each file that differs or is missing, after the notes of a run.

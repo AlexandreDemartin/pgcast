@@ -1,5 +1,5 @@
 ---
-english: bc3b14bc4960
+english: 64b65b78c440
 ---
 
 # Générateur
@@ -106,7 +106,7 @@ if (!upToDate) process.exitCode = 1;
 
 - Elle prend la config de [`generate()`](#generate), et se résout avec `true` quand chaque fichier correspond. Le code de sortie, c’est à vous de le fixer.
 - Elle n’affiche que par les écouteurs : une ligne par fichier qui diffère ou manque via [`warningListener`](#generate.warningListener), donc avec `console.log` par défaut ; `The generated files in src/zapatos are up to date.` via [`progressListener`](#generate.progressListener). Pas la dernière ligne de la CLI, `Run the generator without --check to write them.`
-- Une requête qui échoue arrête le processus, comme elle arrête `generate()` ; avec [`rejectOnQueryError`](#generate.rejectOnQueryError), sa promesse est rejetée avec l’erreur.
+- Si une requête échoue, sa promesse est rejetée avec l’erreur, avant toute écriture et sans note : contrairement à `generate()`, seul [`rejectOnQueryError: false`](#generate.rejectOnQueryError) arrête le processus.
 
 ## `generate()` {#generate}
 
@@ -391,9 +391,9 @@ import type * as s from 'pgcast/schema';
 
 `boolean`, ou omis ; un opt-in. Ce que fait une requête qui échoue : une connexion refusée, un mauvais mot de passe, une requête que Postgres refuse.
 
-- Omis, ou `null` : comme dans Zapatos 6.6.1, le générateur affiche `*** error <n> ***` et l’erreur avec `console.log`, puis arrête le processus avec `process.exit(1)` ; entre les deux, il signale l’option via [`warningListener`](#generate.warningListener). À partir de la 7.0, l’option omise vaut `true` ([Versions](/fr/versions)).
-- `false` : le même arrêt, sans note. Cette valeur reste en 7.0 et en 8.0 : l’arrêt est le propre chemin de [la CLI](#cli), qui met `false` par-dessus son fichier de configuration et son argument.
-- `true` : la promesse de `generate()` est rejetée avec cette erreur, telle que `pg` la donne, et rien n’est affiché :
+- Omis, ou `null` : comme dans Zapatos 6.6.1, le générateur affiche `*** error <n> ***` et l’erreur avec `console.log`, puis arrête le processus avec `process.exit(1)` ; entre les deux, il signale l’option via [`warningListener`](#generate.warningListener). À partir de la 7.0, l’option omise vaut `true` ([Versions](/fr/versions)). [`check()`](#check), que Zapatos 6.6.1 n’a pas, la traite déjà comme `true`, sans note.
+- `false` : le même arrêt, sans note, depuis `generate()` comme depuis `check()`. Cette valeur reste en 7.0 et en 8.0 : l’arrêt est le propre chemin de [la CLI](#cli), qui met `false` par-dessus son fichier de configuration et son argument.
+- `true` : la promesse de `generate()` ou de `check()` est rejetée avec cette erreur, telle que `pg` la donne, et rien n’est affiché :
 
 ```ts twoslash
 import { generate } from 'zapatos/generate';
@@ -577,7 +577,7 @@ Writing custom types file: src/zapatos/custom/index.d.ts
 - `Note: unknown flag --chek ignored: the only flag is --check, before or after the JSON argument.`
   - depuis [la CLI](#cli), avant de générer ou de vérifier, pour chaque argument après `config` qui commence par `--` et n’est pas `--check` ;
 - `Note: a query failed, so generate() ends the process with process.exit(1), and its promise never settles (PGCAST_DEP006). Set rejectOnQueryError: true to reject with the error instead; it will be the default in pgcast 7.0.`
-  - sans [`rejectOnQueryError`](#generate.rejectOnQueryError), quand une requête échoue, après l’erreur et juste avant l’arrêt ;
+  - depuis `generate()` sans [`rejectOnQueryError`](#generate.rejectOnQueryError), quand une requête échoue, après l’erreur et juste avant l’arrêt ;
 - l’[avertissement sur l’ancienne arborescence](#the-old-layout-warning) ;
 - `Out of date: src/zapatos/schema.d.ts` et `Missing: src/zapatos/custom/PgSeat_label.d.ts`
   - depuis [`check()`](#check), pour chaque fichier qui diffère ou manque, après les notes d’une exécution.
