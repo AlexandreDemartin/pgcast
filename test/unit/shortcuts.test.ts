@@ -231,7 +231,7 @@ describe('upsert', () => {
 
   it('updateValues: a key added to Object.prototype by something else is no update value', () => {
     const proto = Object.prototype as any;
-    proto.mood = 'polluted';
+    proto.mood = 'calm';
     try {
       expect(db.upsert('users', { ...ada, mood: 'ok' }, 'email').compile()).toMatchObject({
         text: expect.stringContaining('DO UPDATE SET ("email", "display_name", "mood") = ROW(EXCLUDED."email", EXCLUDED."display_name", EXCLUDED."mood")'),
