@@ -2711,6 +2711,8 @@ describe('a shortcut option added to Object.prototype by something else is no op
       { text: 'DELETE FROM "users" WHERE ("email" = $1) RETURNING to_jsonb("users".*) AS result', values: ['e@x.org'] }, 1],
     ['upsert(): updateValues', 'updateValues', () => ({ display_name: 'X' }), () => db.upsert('users', row, 'email', {}),
       { text: 'INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("email", "display_name") = ROW(EXCLUDED."email", EXCLUDED."display_name")' + upsertReturning, values: ['E', 'e@x.org'] }, 1],
+    ['upsert(): a column of updateValues', 'mood', () => param('X'), () => db.upsert('users', { email: 'e@x.org', mood: 'ok' }, 'email', { updateValues: {} }),
+      { text: 'INSERT INTO "users" ("email", "mood") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("email", "mood") = ROW(EXCLUDED."email", EXCLUDED."mood")' + upsertReturning, values: ['e@x.org', 'ok'] }, 1],
     ['select(): order', 'order', () => ({ by: 'email', direction: 'DESC' }), () => db.select('users', all, {}),
       { text: selectMany(plain.text), values: [] }, 2],
     ['select(): an order item\'s nulls', 'nulls', () => 'FIRST', () => db.select('users', all, { order: { by: 'email', direction: 'ASC' } }),
