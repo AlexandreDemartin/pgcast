@@ -1,5 +1,5 @@
 ---
-english: ffcb2825427a
+english: c3091755b813
 ---
 
 # Template SQL
@@ -35,12 +35,12 @@ Renvoie un [`SQLFragment`](#SQLFragment) : les parties littérales telles que v
 
 `RunResult` n’est pas confronté au SQL : c’est vous qui affirmez ce qui revient. Les raccourcis le fixent pour vous.
 
-Omis, `Constraint` est `never` : un fragment écrit en ligne comme valeur du `where` d’un raccourci, ou des valeurs d’`update()`, convient donc à toute colonne. Zapatos 6.6.1 l’y inférait de chaque table et vue qui a une colonne de ce nom, avant que TypeScript connaisse la table : là où leurs types différaient, un fragment pourtant valide ne compilait pas (TS2322), pour un `id` qui est un `int4` ici et un `uuid` là, ou, dans `update()`, une colonne nullable dans une vue. Il fallait lui donner un argument de type, `` db.sql<db.SQL>`upper(${db.self})` ``, ou le déclarer d’abord ([#493](https://github.com/AlexandreDemartin/pgcast/issues/493)).
+Écrit en ligne comme valeur du `where` d’un raccourci, ou des valeurs d’`update()`, un fragment tire son `Constraint` de chaque table et vue qui a une colonne de ce nom : TypeScript l’infère avant de connaître la table. Là où leurs types diffèrent, un fragment pourtant valide ne compile pas (TS2322) : un `id` qui est un `int4` ici et un `uuid` là ; dans `update()`, une vue de `films`, dont le `title` peut être `NULL`, fait échouer `` { title: db.sql`upper(${db.self})` } ``. Donnez-lui un argument de type, `` db.sql<db.SQL>`upper(${db.self})` ``, ou déclarez-le d’abord.
 
 Un nom hors d’`Interpolations` ne compile pas :
 
 ```ts twoslash
-// @errors: 2769
+// @errors: 2345
 import * as db from 'zapatos/db';
 import type * as s from 'zapatos/schema';
 // ---cut---
@@ -172,7 +172,7 @@ Dans [`vals({…})`](#vals), donc comme valeur d’`insert()`, d’`upsert()` ou
 Le type les refuse là, et comme valeur d’`insert()` ou d’`update()`, sur chaque colonne qu’il type (une colonne typée `any`, ce que donne un placeholder de `zapatos/custom`, accepte tout) ; il les accepte dans le `vals({…})` d’un template `sql` :
 
 ```ts twoslash
-// @errors: 2769
+// @errors: 2345
 import * as db from 'zapatos/db';
 import type * as s from 'zapatos/schema';
 // ---cut---
@@ -324,7 +324,7 @@ Zapatos 6.6.1 le compilait en Whereable de ses propres clés : `TRUE` pour la p
 
 Un itérateur ou un générateur, synchrone ou asynchrone, sans clé propre énumérable lève aussi une erreur, qui le nomme par son étiquette (`Set Iterator`, `Generator`) : le `.values()` d’un `Set`, le `.entries()` d’une `Map`, `(function* () {})()`, `Iterator.from(…)`, un itérateur hôte comme `new URLSearchParams().entries()` ou `new Headers().entries()` (un objet `Headers` lui-même n’est pas refusé), un itérateur ECMA-402 comme celui d’`Intl.Segmenter`, et une instance d’une classe qui étend `Iterator` sans clé propre énumérable. Chacun a `%IteratorPrototype%` ou `%AsyncIteratorPrototype%` dans sa chaîne de prototypes. Zapatos 6.6.1 compilait `` db.deletes('films', ids.values() as any) ``, pour un `Set` d’identifiants, en `DELETE FROM "films" WHERE TRUE …` : pour filtrer sur les identifiants, donnez `{ id: db.conditions.isIn([...ids]) }`.
 
-Le type refuse la plupart d’entre eux (TS2345, ou TS2769 quand ils sont interpolés dans un template `sql`), sauf là où une colonne partage l’un de leurs membres : `db.deletes('actors', new Error('x'))` passe la vérification de types, puisque `actors` a une colonne `name`.
+Le type refuse la plupart d’entre eux (TS2345), sauf là où une colonne partage l’un de leurs membres : `db.deletes('actors', new Error('x'))` passe la vérification de types, puisque `actors` a une colonne `name`.
 
 Seuls les objets natifs du realm qui exécute pgcast lèvent une erreur, reconnus à leur prototype exact, ou, pour un itérateur, au prototype des itérateurs dans sa chaîne. Comme dans Zapatos 6.6.1 :
 

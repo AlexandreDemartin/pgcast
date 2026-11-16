@@ -31,12 +31,12 @@ Returns a [`SQLFragment`](#SQLFragment): the literal parts as you wrote them, ea
 
 `RunResult` is not checked against the SQL: it is your word for what comes back. The shortcuts set it for you.
 
-Left out, `Constraint` is `never`, so a fragment written inline as a value of a shortcut's `where`, or of `update()`'s values, fits any column. Zapatos 6.6.1 inferred it there from every table and view with a column of that name, before TypeScript knew the table: where their types differed, the valid fragment failed to compile (TS2322), for an `id` that is an `int4` here and a `uuid` there, or in `update()` a column that a view has nullable. It needed a type argument, `` db.sql<db.SQL>`upper(${db.self})` ``, or to be declared first ([#493](https://github.com/AlexandreDemartin/pgcast/issues/493)).
+Written inline as a value of a shortcut's `where`, or of `update()`'s values, a fragment takes its `Constraint` from every table and view with a column of that name: TypeScript infers it before it knows the table. Where their types differ, the valid fragment fails to compile (TS2322): an `id` that is an `int4` here and a `uuid` there; in `update()`, a view of `films`, whose `title` is nullable, makes `` { title: db.sql`upper(${db.self})` } `` fail. Give it a type argument, `` db.sql<db.SQL>`upper(${db.self})` ``, or declare it first.
 
 A name outside `Interpolations` does not compile:
 
 ```ts twoslash
-// @errors: 2769
+// @errors: 2345
 import * as db from 'zapatos/db';
 import type * as s from 'zapatos/schema';
 // ---cut---
@@ -168,7 +168,7 @@ In [`vals({…})`](#vals), so as an `insert()`, `upsert()` or `update()` value, 
 The type refuses them there and as an `insert()` or `update()` value, on every column it types (a column typed `any`, as a `zapatos/custom` placeholder is, takes anything); it takes them in `vals({…})` of a `sql` template:
 
 ```ts twoslash
-// @errors: 2769
+// @errors: 2345
 import * as db from 'zapatos/db';
 import type * as s from 'zapatos/schema';
 // ---cut---
@@ -320,7 +320,7 @@ Zapatos 6.6.1 compiled it as a Whereable of its own keys: `TRUE` for most, so ``
 
 An iterator or a generator with no own enumerable key throws too, sync or async, named by its tag (`Set Iterator`, `Generator`): a `Set`'s `.values()`, a `Map`'s `.entries()`, `(function* () {})()`, `Iterator.from(…)`, a host one such as `new URLSearchParams().entries()` or `new Headers().entries()` (a `Headers` object itself is not refused), an ECMA-402 one such as `Intl.Segmenter`'s, and an instance of a class that extends `Iterator` with no own enumerable key. Each has `%IteratorPrototype%` or `%AsyncIteratorPrototype%` on its prototype chain. Zapatos 6.6.1 compiled `` db.deletes('films', ids.values() as any) ``, for a `Set` of ids, to `DELETE FROM "films" WHERE TRUE …`: to filter on the ids, give `{ id: db.conditions.isIn([...ids]) }`.
 
-The type refuses most of them (TS2345, or TS2769 interpolated in a `sql` template), not where a column shares one of their members: `db.deletes('actors', new Error('x'))` type-checks, since `actors` has a `name` column.
+The type refuses most of them (TS2345), not where a column shares one of their members: `db.deletes('actors', new Error('x'))` type-checks, since `actors` has a `name` column.
 
 Only the built-ins of the realm that runs pgcast throw, matched by their exact prototype, or an iterator's on its chain. As in Zapatos 6.6.1:
 

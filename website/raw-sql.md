@@ -28,7 +28,7 @@ Write the SQL as you would in `psql`, but put each table and column name between
 A name the type doesn't know fails to compile: a query that names `screenings` needs `s.screenings.SQL` in its first type argument.
 
 ```ts twoslash
-// @errors: 2769
+// @errors: 2345
 import * as db from 'zapatos/db';
 import type * as s from 'zapatos/schema';
 // ---cut---
@@ -64,7 +64,7 @@ A value from a caller (a form, a URL, a row you read elsewhere) goes in as [`db.
 A bare string between `${…}` is a name, not a value, so the type refuses it:
 
 ```ts twoslash
-// @errors: 2769
+// @errors: 2345
 import * as db from 'zapatos/db';
 import type * as s from 'zapatos/schema';
 // ---cut---
