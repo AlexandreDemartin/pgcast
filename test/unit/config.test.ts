@@ -1,7 +1,8 @@
 // Copyright (C) 2026 Alexandre Demartin
 //
 // getConfig() and setConfig() (src/db/config.ts): what they return shares no
-// object with the live config (#245). No database.
+// object with the live config (#245), and they never throw, whatever was stored
+// (#257, #508). No database.
 
 import { afterEach, describe, expect, it } from 'vitest';
 import * as db from '../../src/db';
@@ -109,5 +110,33 @@ describe('setConfig()', () => {
     db.setConfig({ transactionRetryDelay: delay });
     delay.maxMs = 1000;
     expect(db.getConfig().transactionRetryDelay).toEqual({ minMs: 50, maxMs: 1000 });
+  });
+});
+
+// #508: getConfig() runs on every query, so a value stored from JavaScript that throws when read must not break them all
+describe('getConfig() and setConfig()', () => {
+  const boom = (): never => { throw new Error('no delay'); };
+  const store = (transactionRetryDelay: unknown) => db.setConfig({ transactionRetryDelay } as db.NewConfig);
+
+  it.each([
+    ['an object whose minMs getter throws', () => { store({ get minMs() { return boom(); }, maxMs: 2 }); }],
+    ['an object whose minMs getter throws only after setConfig()', () => {
+      let broken = false;
+      store({ get minMs() { return broken ? boom() : 1; }, maxMs: 2 });
+      broken = true;
+    }],
+    ['a Proxy whose get trap throws', () => { store(new Proxy({ minMs: 1, maxMs: 2 }, { get: boom })); }],
+    ['a Proxy revoked after setConfig()', () => {
+      const { proxy, revoke } = Proxy.revocable({ minMs: 1, maxMs: 2 }, {});
+      store(proxy);
+      revoke();
+    }],
+    ['a primitive', () => { store(100); }],
+    ['an Object.create(null)', () => { store(Object.assign(Object.create(null), { minMs: 1, maxMs: 2 })); }],
+    ['null', () => { store(null); }],
+  ])('never throw once setConfig() is given a transactionRetryDelay that is %s', (_, storeIt) => {
+    expect(storeIt).not.toThrow();
+    expect(() => db.getConfig()).not.toThrow();
+    expect(() => db.setConfig({ transactionAttemptsMax: 3 })).not.toThrow();
   });
 });
