@@ -189,6 +189,15 @@ Candidates for a check, a rule or a skill line.
 - #571: before the docs say a misuse throws, check whether the type already refuses it: freeze that refusal as a negative and say "does not compile" first.
 - #571: git can auto-merge an `[Unreleased]` CHANGELOG entry under the new release heading after a release, with no conflict: after every master merge, `git diff origin/master -- CHANGELOG.md`.
 - #571: a bare `U&"…"` given as `parent` compiles as one quoted literal name; only a dotted name whose `U&` part follows a quoted part (`"public".U&"…"`) reaches the decoding, so a test row needs that shape.
+- #572: `bench:types` calls no condition, so it cannot see a new condition's cost: compare N calls with `tsc --extendedDiagnostics` against a no-condition baseline of the same N.
+- #572: a value typed by an `interface` is refused as a `JSONValue` (no implicit index signature), as an `insert()` on a jsonb column already refuses it (TS2769).
+- #572: a column added to the docs schema ripples into the hand-printed row of `first-query.md` (EN and FR), whose key order follows jsonb's (key length, then bytes).
+- #572: `JSON.stringify` already visits every value, so a replacer detects what it drops (`undefined`, functions, symbols) for about 0.5 µs per call: "a deep check would walk every value" is no cost argument.
+- #572: a condition with a fixed constraint is refused by a column whose `zapatos/custom` placeholder is narrowed (the documented jsonb-domain pattern): condition type tests need a narrowed domain placeholder.
+- #572: a docs claim "the type refuses X" is probed under the docs' tsconfig (`strict`, no `exactOptionalPropertyTypes`), where an optional property holding `undefined` passes.
+- #572: a narrowed placeholder is type-tested without a new program: an `exclude` of the generated file in the type-test tsconfig plus a file of its own.
+- #572: adding a fixture column moves about 22 codegen snapshots; the first `vitest -u` fails the cross-checks against `test/generated` until a second run.
+- #572: a red test freezing a refusal can fail `typecheck` under `exactOptionalPropertyTypes`: run `typecheck` before committing it.
 
 ## Minors kept
 
@@ -225,4 +234,4 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #557 (form): `website/first-query.md` "Run `npx pgcast` again after each migration" and `website/install.md` `::: warning Stale schema`: a link to `/generator#check`, EN and FR.
 - #567 (form): `docs/decisions/README.md` lists 005 as "proposed (2026-11-13)", while the note says it was accepted that day.
 - #567 (form): note 006 types `isInSelect()` on the subquery column's `Selectable`, so an int4 key over an int8 column (`Int8String`) is refused though Postgres compares them, as `eq()` does.
-
+- #572 (form): `website/conditions.md` § jsonb, "A value typed by an `interface` is refused (TS2345)": a `readonly string[]` and a class instance are too, `['a'] as const` passes.
