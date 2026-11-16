@@ -1,10 +1,10 @@
 ---
-english: 4a55a7ed608d
+english: 07dd060dd810
 layout: home
 markdownStyles: false
 title: pgcast
 titleTemplate: Postgres sans abstraction pour TypeScript
-description: "pgcast lit votre schéma Postgres et écrit les types TypeScript. Un SQL lisible et prévisible : pas d’ORM, pas de modèles, pas d’état caché."
+description: "Le Postgres que vous maîtrisez, avec la sécurité de TypeScript. pgcast lit votre schéma et en tire les types ; chaque requête est un SQL que vous pouvez lire et prévoir. Pas d’ORM, pas de modèles, pas d’état caché."
 ---
 
 <main class="landing">
@@ -12,9 +12,9 @@ description: "pgcast lit votre schéma Postgres et écrit les types TypeScript. 
 
 <p class="eyebrow">-- un fork maintenu de <a href="/fr/switching">Zapatos 6.6.1</a></p>
 
-<h1>Vos types, castés depuis votre base de données<span class="op">::</span></h1>
+<h1>Le Postgres que vous maîtrisez, avec la sécurité de TypeScript<span class="op">::</span></h1>
 
-pgcast lit votre schéma Postgres et écrit les types TypeScript. Ses raccourcis produisent un SQL que vous pouvez lire et prévoir, et vous pouvez toujours revenir à un simple template `sql`. Pas d’ORM, pas de modèles, pas d’état caché.
+pgcast lit votre schéma et en tire les types. Vous écrivez vos requêtes dans le vocabulaire de Postgres, chaque raccourci produit un SQL que vous pouvez lire et prévoir, et TypeScript attrape les erreurs avant toute exécution. Pas d’ORM, pas de modèles, pas d’état caché.
 {.lede}
 
 <div class="ctas">

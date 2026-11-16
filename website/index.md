@@ -3,7 +3,7 @@ layout: home
 markdownStyles: false
 title: pgcast
 titleTemplate: Zero-abstraction Postgres for TypeScript
-description: "pgcast reads your Postgres schema and writes the TypeScript types. Readable, predictable SQL: no ORM, no models, no hidden state."
+description: "The Postgres you know, with the safety of TypeScript. pgcast reads your schema and writes the types; each query is SQL you can read and predict. No ORM, no models, no hidden state."
 ---
 
 <main class="landing">
@@ -11,9 +11,9 @@ description: "pgcast reads your Postgres schema and writes the TypeScript types.
 
 <p class="eyebrow">-- a maintained fork of <a href="/switching">Zapatos 6.6.1</a></p>
 
-<h1>Your types, cast from your database<span class="op">::</span></h1>
+<h1>The Postgres you know, with the safety of TypeScript<span class="op">::</span></h1>
 
-pgcast reads your Postgres schema and writes the TypeScript types. Its shortcuts produce SQL you can read and predict, and you can always drop down to a plain `sql` template. No ORM, no models, no hidden state.
+pgcast reads your schema and writes the types. You write your queries in Postgres’s own words, each shortcut produces SQL you can read and predict, and TypeScript catches the mistakes before anything runs. No ORM, no models, no hidden state.
 {.lede}
 
 <div class="ctas">
