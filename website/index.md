@@ -13,7 +13,7 @@ description: "The Postgres you know, with the safety of TypeScript. pgcast reads
 
 <h1>The Postgres you know, with the safety of TypeScript<span class="op">::</span></h1>
 
-Nothing between you and Postgres: you write your queries in its natural vocabulary, each shortcut produces clean SQL you can read and predict, and the `sql` template is always there. pgcast reads your schema and writes the types, so TypeScript catches the mistakes before anything runs. No ORM, no models, no hidden state.
+You write your queries in Postgres’s natural vocabulary. Each shortcut produces clean SQL you can read and predict, and when a shortcut isn’t enough, you write the SQL yourself in a `sql` template. pgcast reads your schema and writes the types, so TypeScript catches the mistakes before the query runs. There is no ORM and no models between you and the database, and pgcast keeps no hidden state.
 {.lede}
 
 <div class="ctas">
