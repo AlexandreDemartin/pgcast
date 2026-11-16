@@ -1905,6 +1905,24 @@ describe('a built-in object as a Whereable', () => {
       plain: await withSegmenter(plain, outcomes),
     }).toEqual({ throwing: before, plain: before });
   });
+
+  it('a stand-in Segmenter whose segment() gives an iterator refuses no iterator with own keys', async () => {
+    // %IntlSegmentsPrototype% inherits Object.prototype directly; an array iterator's prototype does not, so the one
+    // read is left out, and an iterator given `{ id: 1 }` compiles its keys, as in 6.6.1 (#517)
+    const
+      iterating = class { segment(s: string) { return [...s][Symbol.iterator](); } },
+      segments = new NativeSegmenter('en').segment('Metropolis');
+    expect(await withSegmenter(iterating, core => ({
+      iteratorWithKey: where(core, Object.assign([1][Symbol.iterator](), { id: 1 })),
+      iterator: where(core, [1][Symbol.iterator]()),
+      segments: where(core, segments),
+    }))).toEqual({
+      iteratorWithKey: 'SELECT 1 WHERE ("id" = $1)',
+      iterator: 'A built-in `Array Iterator`',
+      // the Segmenter present at the first filter that reads it decides it
+      segments: 'SELECT 1 WHERE TRUE',
+    });
+  });
 });
 
 describe('a list that is not an array in isIn() and isNotIn()', () => {

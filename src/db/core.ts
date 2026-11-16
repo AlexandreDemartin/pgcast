@@ -382,9 +382,9 @@ const
 // The `Segments` object that `Intl.Segmenter`'s `segment()` returns has no constructor to read a prototype from
 // (ECMA-402's %IntlSegmentsPrototype%), so its prototype is read from one, the first time a filter's prototype has
 // no `constructor` of its own: making a Segmenter as `zapatos/db` loads would cost every process about 7 ms, and
-// a plain object, an array or a class instance never pays it. A runtime without `Intl.Segmenter`, or a stand-in
-// whose `segment()` throws, leaves it out; one whose `segment()` gives a plain object matches nothing, as
-// `Object.prototype` has a `constructor`
+// a plain object, an array or a class instance never pays it. It is kept only if it inherits `Object.prototype`
+// directly, as %IntlSegmentsPrototype% does: a runtime without `Intl.Segmenter`, or a stand-in whose `segment()`
+// throws or gives a plain object or an iterator, leaves it out, so that an iterator with own keys stays a filter
 const
   intl = (globalThis as any).Intl,
   temporal = (globalThis as any).Temporal,
@@ -417,8 +417,10 @@ let segmentsPrototype: object | null | undefined;
 const isSegments = (prototype: object | null) => {
   if (prototype === null || Object.prototype.hasOwnProperty.call(prototype, 'constructor')) return false;
   if (segmentsPrototype === undefined) {
-    try { segmentsPrototype = Object.getPrototypeOf(new intl.Segmenter().segment('')); }
-    catch { segmentsPrototype = null; }
+    try {
+      const read = Object.getPrototypeOf(new intl.Segmenter().segment(''));
+      segmentsPrototype = Object.getPrototypeOf(read) === Object.prototype ? read : null;
+    } catch { segmentsPrototype = null; }
   }
   return prototype === segmentsPrototype;
 };

@@ -4,10 +4,10 @@
 // keyed by the name its error gives. Each has no own enumerable key, or only index keys,
 // so Zapatos 6.6.1 compiled it to TRUE (every row) or to ("0" = $1 …); one with own keys
 // added throws too, except an iterator. An Intl or a Temporal object goes by its constructor's
-// name (`Collator`, `PlainDate`), but `Segments`, which has none (#517), a namespace object by its
-// path (`Math`, `Temporal.Now`, #523), which is the namespace itself, not a fresh value. A subclass
-// instance is not one of them, and compiles as in 6.6.1, except a subclass of Iterator with no own
-// key (#426).
+// name (`Collator`, `PlainDate`), `Segments`, which has none, by its ECMA-402 name (#517), and a
+// namespace object by its path (`Math`, `Temporal.Now`, #523), which is the namespace itself, not a
+// fresh value. A subclass instance is not one of them, and compiles as in 6.6.1, except a subclass of
+// Iterator with no own key (#426).
 // test/unit/injection.test.ts compiles them, and checks the list against the global constructors and namespaces
 // of a bare vm context and the objects their values' methods hand out; test/integration/injection.test.ts runs them.
 
