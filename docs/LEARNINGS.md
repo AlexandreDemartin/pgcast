@@ -133,6 +133,13 @@ Candidates for a check, a rule or a skill line.
 - #548: once a helper gets an optional second parameter, a bare `.some(fn)` or `.map(fn)` passes the index into it; Vitest does not type-check, so only `tsc` caught it.
 - #548: diffing a fix round's grid against the previous head's isolates the round to exactly the cases it targets (here 4).
 - #548: an "Unchanged" sentence is checked with a probe per noun in it, and a "behaves as X does" claim by comparing X and `Proxy(X)` route by route; reading the sentence missed `Proxy(Date)` and a `Buffer` with keys in round 1.
+- #553: on a plain object `for…in` meets own keys before inherited ones, so `for (const k in x) return hasOwnProperty(x, k)` tells in one step whether an object has an own key, without listing them.
+- #553: a union target of `{}` can be given a new prototype by `Object.assign` copying a row's own `__proto__` (from `JSON.parse`); `Object.create(null)` avoids it.
+- #553: a trap-count check that skips the case with a key added to `Object.prototype` misses how two fixes interact: after #550, master read the row once more for that key, which #553 no longer does.
+- #553: in V8 an `Object.create(null)` object is in dictionary mode, and spreading or copying it on a hot path is several times slower than from a literal: gather keys into it, then build the object you copy with `Object.fromEntries`.
+- #553: a `Proxy` trap-count grid needs a `Proxy` row with no own keys: some branches (`hasKey` false, then `isBuiltin`) run only for such a row.
+- #553: a CHANGELOG line taken from a review ("no longer throws", "master reset it") can describe master's unreleased state: replay it on the last release before writing it.
+- #553: a speed fix that changes no SQL is proved by interleaved runs in the PR body, run a second time in reversed order to cancel the order effect.
 
 ## Minors kept
 
@@ -158,3 +165,4 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #551 (form): `src/db/customJSON.ts` comment keeps "O(n²)" next to the regex; describes the mechanism only.
 - #548 (form): `src/db/shortcuts.ts` `insert()` JSDoc, "no own enumerable key (a `Date`, a `Map`…) beside a row with keys": a `Buffer` row alone in an array now rejects too.
 - #548 (form): `CHANGELOG.md` #543 line, "counts as one in `upsert()`": reads as "one row"; "counts as a row with no key".
+- #553 (form): `CHANGELOG.md` #549 line, "compiled to `("rating") VALUES (DEFAULT)` and wrote a row of defaults": true for `insert()` only; to fix in the 6.7.2 version PR.

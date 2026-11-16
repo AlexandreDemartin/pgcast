@@ -1419,6 +1419,27 @@ describe('a null row among others in upsert()', () => {
   });
 });
 
+describe('a key added to Object.prototype beside several upsert() rows', () => {
+  it('is no column: the existing value is kept on conflict, with upsertRequiresSameKeys off and on', async () => {
+    // master inserted it as DEFAULT and set it from EXCLUDED, so Bob's mood went from 'ok' to NULL; with
+    // upsertRequiresSameKeys it threw "rows have different keys"
+    const stored: Record<string, unknown> = {}, proto = Object.prototype as any;
+    for (const upsertRequiresSameKeys of [false, true]) {
+      db.setConfig({ upsertRequiresSameKeys });
+      await t.client.query('SAVEPOINT prototype_key');
+      proto.mood = 'sad';
+      try {
+        await run(db.upsert('users', [{ email: 'bob@example.com', display_name: 'Bob 2' }, { email: 'dee@example.com', display_name: 'Dee' }], 'email'));
+      } finally { delete proto.mood; }
+      stored[`upsertRequiresSameKeys ${upsertRequiresSameKeys}`] = (await t.client.query(
+        `SELECT email, display_name, mood FROM users WHERE email IN ('bob@example.com', 'dee@example.com') ORDER BY email`)).rows;
+      await t.client.query('ROLLBACK TO SAVEPOINT prototype_key');
+    }
+    const kept = [{ email: 'bob@example.com', display_name: 'Bob 2', mood: 'ok' }, { email: 'dee@example.com', display_name: 'Dee', mood: null }];
+    expect(stored).toEqual({ 'upsertRequiresSameKeys false': kept, 'upsertRequiresSameKeys true': kept });
+  });
+});
+
 describe('null as options, or as an options key', () => {
   it('null options run as no options in the read shortcuts, as in the writes', async () => {
     // Zapatos 6.6.1 ran selectOne() and selectExactlyOne() so, and threw a TypeError at the call in select() and count()
