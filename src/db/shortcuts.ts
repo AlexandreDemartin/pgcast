@@ -189,10 +189,12 @@ function updateValuesKeys(updateValues: { [k: string]: any }, updated: string[])
 // the value of upsert()'s updateValues for a column, read as in 6.6.1 (getters, prototypes, a Proxy's `get`), except
 // a key of Object.prototype that neither updateValues nor a prototype of its own has: there, `valueOf` or
 // `hasOwnProperty` is a function, which threw, `__proto__` is Object.prototype, and any other key was added there by
-// other code, not by the caller
+// other code, not by the caller; the chain is walked only when the value read is the one Object.prototype gives (the
+// receiver covers `__proto__`), so a Proxy answering through `get` alone keeps its value
 function updateValueOf(updateValues: { [k: string]: any }, c: string): any {
   const value = updateValues[c];
-  if (value === undefined || !Object.prototype.hasOwnProperty.call(Object.prototype, c)) return value;
+  if (value === undefined || !Object.prototype.hasOwnProperty.call(Object.prototype, c) ||
+    value !== Reflect.get(Object.prototype, c, updateValues)) return value;
   for (let o: object | null = updateValues; o !== null && o !== Object.prototype; o = Object.getPrototypeOf(o)) {
     if (Object.prototype.hasOwnProperty.call(o, c)) return value;
   }
