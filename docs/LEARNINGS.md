@@ -118,6 +118,14 @@ Candidates for a check, a rule or a skill line.
 - #551: when a disclosure stays quiet, the contents of intermediate commits leak as much as their messages: check `git log -p origin/master..HEAD` before the first push, not only the final diff; an unpushed branch may still be rebuilt from master then.
 - #551: a test that bounds the time of synchronous code hangs instead of failing when it regresses (Vitest's timeout fires only once the work returns): size the input so the slow version still ends within tens of seconds, or give the job a `timeout-minutes`.
 - #551: two regexes are compared by their full match arrays (`""` versus `undefined` captures), on every string up to length 7 over a small alphabet plus random long inputs, not only by what is built from them.
+- #543: a `Proxy` check costs no extra traps when it reuses the spread `completeKeysWithDefaultValue` already makes; an extra `Object.keys` per row would add trap calls.
+- #543: a 10 MB `Buffer` as a row cost master 0.9–18 s, or ran out of memory in `upsert([plain, x])`, before anything refused it: a refusal that lists keys first is no refusal for a large built-in.
+- #548: `upsert()` and `insert()` give different trap counts (7 against 6 `getOwnPropertyDescriptor` for two keys: `upsert()` also calls `hasOwnProperty`): measure before writing a trap-count test's expected values.
+- #548: an "Unchanged:" list carries the same conditions as the list of what changes: one test (`refused()`) contradicted it; a grep of the refused values against the "Unchanged" nouns catches it before review.
+- #548: when a check moves from "keys listed after a rebuild" to "this type is kept as it is", replay the empty-with-an-`undefined`-key variant with `undefinedMeansMissing` on: the one shape where the old rebuild gave "nothing to …" at the call.
+- #548: once a helper gets an optional second parameter, a bare `.some(fn)` or `.map(fn)` passes the index into it; Vitest does not type-check, so only `tsc` caught it.
+- #548: diffing a fix round's grid against the previous head's isolates the round to exactly the cases it targets (here 4).
+- #548: an "Unchanged" sentence is checked with a probe per noun in it, and a "behaves as X does" claim by comparing X and `Proxy(X)` route by route; reading the sentence missed `Proxy(Date)` and a `Buffer` with keys in round 1.
 
 ## Minors kept
 
@@ -141,3 +149,5 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #546 (form): `website/fr/sql-template.md`, "doté de propres clés énumérables" next to "sans clé propre énumérable".
 - #545 (form): `test/helpers/builtinObjects.ts` header, "but `Segments`, which has none (#517), a namespace object by its path": the inserted clause garbles the sentence.
 - #551 (form): `src/db/customJSON.ts` comment keeps "O(n²)" next to the regex; describes the mechanism only.
+- #548 (form): `src/db/shortcuts.ts` `insert()` JSDoc, "no own enumerable key (a `Date`, a `Map`…) beside a row with keys": a `Buffer` row alone in an array now rejects too.
+- #548 (form): `CHANGELOG.md` #543 line, "counts as one in `upsert()`": reads as "one row"; "counts as a row with no key".
