@@ -102,6 +102,7 @@ Candidates for a check, a rule or a skill line.
 - #545: a hot-path bench compares master and branch in the same process, interleaved: separate processes showed a 3–5 % gap that the same-process run puts within noise.
 - #545: a check that reads a prototype from whatever global is present also checks the shape of what it read (it inherits `Object.prototype` directly), not only how it is reached; otherwise any stand-in widens what gets refused.
 - #545: a security gate matching by prototype shape gets a stand-in matrix test (class-shaped, literal-shaped, iterator, null-prototype; installed before and after the first read) compared against master's output, so anything newly refused shows as a diff: two blockers came from a heuristic checked only against the real built-in.
+- #544: a release leaves implicit "in progress" phrases ("those 6.7 still brings") that a grep for "in progress" or "not on npm" misses; grep "still|yet|until" next to the version number too.
 
 ## Minors kept
 

@@ -1,5 +1,5 @@
 ---
-english: 44d63adb849d
+english: dda7b9d4b411
 ---
 
 # Versions
@@ -16,7 +16,7 @@ Les modules s’appellent toujours `zapatos/db` et `zapatos/schema`, et le sché
 Les numéros suivent [SemVer](https://semver.org/), lu du point de vue d’un projet en 6.6.1 :
 
 - Une version corrective corrige : 6.6.2 ferme les failles de sécurité que la caractérisation de 6.6.1 par pgcast a trouvées.
-- Une mineure ajoute : 6.7.0 apporte les opt-ins ci-dessous, avec des corrections et de nouvelles fonctionnalités.
+- Une mineure ajoute : 6.7.0, sur npm sous le nom [`@pgcast/pgcast`](https://www.npmjs.com/package/@pgcast/pgcast), apporte les opt-ins ci-dessous, avec des corrections et de nouvelles fonctionnalités.
 - Seule une majeure peut changer un résultat sur lequel du code qui fonctionne peut compter, donc une plage comme `^6.6.2` n’en apporte jamais.
 
 Zapatos cassait aussi des choses dans ses majeures, chaque fois d’un coup : 1.0 a renommé les types de transaction, 2.0 a fait du dernier argument d’`upsert()` un objet d’options, 6.0 a mis le schéma dans les noms des tables et des enums hors de `public`. Chacune était accompagnée de notes sur ce qu’il fallait réécrire.
@@ -85,17 +85,13 @@ Là où `undefined` voulait dire « vide-la », `null` le dit avec l’un ou l
 
 ## 7.0 et 8.0 {#_7-0-and-8-0}
 
-La 7.0 active par défaut les opt-ins que liste la décision 003 : `upsertRequiresSameKeys`, `undefinedMeansMissing`, `transactionRequiresCommit`, `aggregatesTypedByColumn`, `transactionRequiresIdleClient`, `transactionRequiresSatisfyingLevel` et ceux qu’apporte encore la 6.7, sauf `selectExactlyOneChecksForSecondRow`, qui reste désactivé.
+La 7.0 active par défaut les opt-ins que liste la décision 003 : `upsertRequiresSameKeys`, `undefinedMeansMissing`, `transactionRequiresCommit`, `aggregatesTypedByColumn`, `transactionRequiresIdleClient`, `transactionRequiresSatisfyingLevel` et ceux du générateur (plus bas), sauf `selectExactlyOneChecksForSecondRow`, qui reste désactivé.
 
 La décision 003 fait de cela toute la rupture de la 7.0, et les avertissements l’annoncent, donc un projet qui a activé chaque option, et ne voit ni avertissement `PGCAST_DEP` ni note du générateur, n’a rien à changer. Les anciens comportements disparaissent en 8.0, sauf trois, qui restent : `rejectOnQueryError: false`, `enumArraysTypedAsText: false` et `intervalsTypedAsObjects: false` (plus bas).
 
 Le générateur a ses propres opt-ins en 6.7 : [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas), qui type un enum d’un autre schéma par ses labels, [`enumOrder`](/fr/generator#generate.enumOrder), qui garde les labels d’un enum dans leur ordre de déclaration, [`rejectOnQueryError`](/fr/generator#generate.rejectOnQueryError), qui rejette la promesse de `generate()` quand une requête échoue, plutôt que d’arrêter le processus, [`uniqueIndexConstraintsOnly`](/fr/generator#generate.uniqueIndexConstraintsOnly), qui ne liste dans `UniqueIndex` que les noms qu’accepte `ON CONFLICT ON CONSTRAINT`, [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext), qui type un domaine sur `bigint`, `numeric`, `bytea`, `money` ou une date, ou sur un tableau de l’un d’eux, selon le contexte, comme l’est son type de base, et un domaine sur un domaine ou un tableau d’un domaine, `any` sans l’option, par le type de base de son domaine le plus intérieur, [`enumArraysTypedAsText`](/fr/generator#generate.enumArraysTypedAsText), qui type dans `Selectable` un tableau d’un enum comme le texte que renvoie `pg`, et [`intervalsTypedAsObjects`](/fr/generator#generate.intervalsTypedAsObjects), qui type un `interval` dans `Selectable` comme `pg` le parse.
 
 Leurs avertissements sont des notes via [`warningListener`](/fr/generator#generate.warningListener), pas un `DeprecationWarning`, et n’arrivent que si votre schéma contient quelque chose qu’ils changeraient, une fois par exécution : celui de `typeEnumsAcrossSchemas` nomme chaque colonne, celui d’`enumOrder` chaque enum, celui d’`uniqueIndexConstraintsOnly` chaque index unique, ceux de `domainsTypedByContext`, d’`enumArraysTypedAsText` et d’`intervalsTypedAsObjects` chaque colonne. `enumArraysTypedAsText: false` garde le tableau sans note, en 7.0 comme en 8.0, pour un projet qui le parse avec `pg.types.setTypeParser` ; seule l’option omise bascule en 7.0. Celui de `rejectOnQueryError`, `PGCAST_DEP006`, arrive quand une requête échoue, juste avant l’arrêt du processus ; jamais depuis la CLI, qui s’arrête toujours. En 7.0, sans l’option, la promesse de `generate()` est rejetée ; `false` garde l’arrêt sans note, en 7.0 comme en 8.0, puisque l’arrêt est le propre chemin de la CLI. `intervalsTypedAsObjects: false` reste aussi, sans note, pour un parser de types à vous qui renvoie le texte d’un `interval`.
-
-::: info À venir
-La 6.6.2 est sur npm, sous le nom [`@pgcast/pgcast`](https://www.npmjs.com/package/@pgcast/pgcast) ; la 6.7.0, qui apporte les opt-ins, est en cours : [son jalon](https://github.com/AlexandreDemartin/pgcast/milestone/1).
-:::
 
 ## Pour aller plus loin {#further-reading}
 
