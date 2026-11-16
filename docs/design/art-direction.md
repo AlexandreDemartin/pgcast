@@ -66,7 +66,7 @@ Headings share one weight, 600: the hierarchy is in their size. Letters are tigh
 | Element | Size |
 |---|---|
 | Hero `h1` | `clamp(2.5rem, 6vw, 4.5rem)` (`clamp(3rem, 5vw, 3.875rem)` from 1024px, so the French line's second half holds on one line), 600, letter-spacing `-.025em`, balanced, each half of the line (`.half`) an inline block, so it breaks after the comma |
-| Hero lede | 1.18rem, at most 58ch (62ch from 1024px); its key phrases (`strong`, two at most) in `--fg`, 500, over a band of `--accent` at 30% on their lower 38%, a highlighter's stroke |
+| Hero lede | 1.18rem, at most 58ch (62ch from 1024px); its key phrases (`strong`, two at most) in `--fg`, 500, over a band of `--accent` at 30% on their lower 38%, a highlighter's stroke, each phrase on one line (`nowrap`) |
 | Page `h1` | 2.5rem, 600, letter-spacing `-.01em` (2rem under 560px) |
 | `h2` / `h3` | 1.5rem / 1.125rem, 600, letter-spacing 0 |
 | Lede | 1.1rem, `--muted`, at most 62ch |
