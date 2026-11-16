@@ -49,6 +49,7 @@ import {
 } from './utils';
 
 import { getConfig, ConfigTypes } from './config';
+import type { PostgresInterval } from './date';
 
 
 export type JSONOnlyColsForTable<T extends Table, C extends readonly any[] /* `ColumnForTable<T>[]` gives errors here for reasons I haven't got to the bottom of */> =
@@ -302,15 +303,19 @@ type UpdateColumns<T extends Table> = ColumnForTable<T> | ColumnForTable<T>[];
 // updateValues are compiled as in a `sql` template, so raw(), cols() and vals() are SQL there, where an Updatable
 // value refuses them (they throw as insert() and update() values). Each is taken where 6.6.1 took it as
 // the column's Parameter<V> ({ value: V }): raw() if V takes a string, cols(x) and vals(x) of V, but for a
-// primitive x, which throws while compiling (#244, #503).
+// primitive x, which throws while compiling (#244, #503), and for a Date, a Buffer (a Uint8Array) or an interval
+// object, which compile their own keys: none for a Date, `ROW(…, )`, and for a one-byte Buffer the number of its byte (#514).
 // No more: a wider member (raw() on an int column, cols() of any) would widen the inferred type of param(x) beside
 // it, so that param('1') or param('2020-01-01') no longer fit their column
 type ParameterValue<X> = X extends Parameter<infer V> ? V : never;
-// Where V holds only primitives, a type no value has, which an argument typed any still fits, as under 6.6.1.
+// Where V holds only these, V branded with a key no value has, which an argument typed any still fits, as under 6.6.1.
+// A subtype of V, so that param('sad') beside it infers its literal from V whatever TypeScript resolved first, where
+// a type of its own was a second candidate, and TypeScript 5.9 picked one of the two by the order it made them (#538).
 // An object type, not a unique symbol: a consumer's .d.ts can write it out, where it cannot name an unexported symbol
-type NoValue = { readonly 'pgcast: no value': never };
-type WrappedValue<X, W = Exclude<ParameterValue<X>, string | number | boolean | bigint | symbol | null | undefined>> =
-  [W] extends [never] ? NoValue : W;
+type NoValue<V> = V & { readonly 'pgcast: no value': never };
+type WrappedValue<X, W = Exclude<ParameterValue<X>,
+  string | number | boolean | bigint | symbol | null | undefined | Date | Uint8Array | PostgresInterval>> =
+  [W] extends [never] ? NoValue<ParameterValue<X>> : W;
 type UpdateValuesForTable<T extends Table, U = UpdatableForTable<T>> = {
   [K in keyof U]: U[K] | ColumnValues<WrappedValue<U[K]>> | ColumnNames<WrappedValue<U[K]>> |
     (string extends ParameterValue<U[K]> ? DangerousRawString : never)
@@ -323,7 +328,11 @@ interface UpsertOptions<
   UC extends UpdateColumns<T> | undefined,
   RA extends UpsertReportAction | undefined,
 > extends ReturningOptionsForTable<T, C, E> {
-  updateValues?: UpdateValuesForTable<T>;
+  // while T is a type parameter, TypeScript relates no object to a type mapped over it, but it checks a lookup by T
+  // against T's tables on write: so 6.6.1's own type first, then the mapped type looked up per table (#533).
+  // Its keys remapped (`as K`), or TypeScript rewrites the lookup as the type mapped over T, whose raw() member, a
+  // conditional it cannot resolve, widens param('sad') to a string while T is generic, and over every table (#538)
+  updateValues?: UpdatableForTable<T> | { [K in Table as K]: UpdateValuesForTable<K> }[T];
   updateColumns?: UC;
   noNullUpdateColumns?: ColumnForTable<T> | ColumnForTable<T>[] | typeof all;
   /**

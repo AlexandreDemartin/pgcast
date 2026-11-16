@@ -67,6 +67,33 @@ Candidates for a check, a rule or a skill line.
 - #522: `check:agents` fails during a conflicted merge: `git ls-files src/*.ts` lists each unmerged file once per stage, so the deprecations check counts each "Set <key>:" message three times; it passes once the resolution is staged.
 - #522: merging two opt-ins that touch the same lists is cleanest by putting each side's whole block back from `git show <side>:<file>`: diff3 interleaves the shared lines of two new blocks.
 - #522: a claim that Postgres refuses a value is run on the oldest Postgres of CI (14), not only the local 17: interval input got stricter in 17 (commit 617f9b7d4), and 14/16 store `{ days: 1 }` sent as JSON as one second; with no older Postgres installed, the 14 and 16 legs are the only run of that branch, so the PR is marked ready early for them.
+- #530: on 6.6.1 a plain `Date` or `Buffer` in `updateValues` compiled as a filter (`TRUE`, `("0" = $2)`): advice that must hold on 6.6.1 names `db.param()`.
+- #530: the French site writes « un `Date` » (masculine), a choice the glossary does not record, so a new French line easily gets it wrong.
+- #530: one "except" clause covering several kinds of value lists each that stored a value, identical to the CHANGELOG's list: `switching.md` dropped a case the CHANGELOG had (as in #503).
+- #530: a 6.6.1 cell also tries the value as `pg` returns it through the column's old `Selectable` type (an interval typed `string` is an object at run time): the builder's grid and the docs both missed it.
+- #530: advice for one value differs by place: in `updateValues` the plain value is sent as a parameter, in a `sql` template a plain `Date` throws and needs `db.param()`; a shared advice line names its place.
+- #530: when a type change refuses calls that "worked", every shape whose own enumerable keys add up to one value (one character, one byte, one own field, one interval part) silently stored a wrong value under 6.6.1 (#503, #530): the replay grid holds a one-key variant of each refused built-in.
+- #536: once `[Unreleased]` becomes a release, its notes enter `changelog.xml` as escaped HTML, so feed-only checks (the paths check read `/Users/&lt;/code&gt;` as a machine's path) are first exercised by the release PR: run `docs:build` on a release branch early.
+- #537: the whole 6.7.0 section (~151,000 characters) exceeds GitHub's 125,000-character release body: the release notes are a subset (Security, Deprecated) plus links to the changelog page's anchors.
+- #532: a fix of a generic `where` needs a large synthetic schema in its grid: the cross-product TS2590 ("union too complex") shows only from a few dozen tables, never on the 3-table fixture.
+- #532: excess-property checks skip a generic indexed-access member of a union, so making each member a lookup by `T` turns the check off; the annotated form (`const w: s.WhereableForTable<K>`) keeps it.
+- #532: a mutant also checks that each characterisation line fails for the reason it claims: a bare `sql` value stayed refused under the fix because #493 refuses it too.
+- #532: a conflicting PR runs no `pull_request` workflow, so only CodeQL shows and it reads as "checks pass": the gate checks a CI run exists for the head SHA (`gh run list --commit <sha>`) and `mergeable` is not `CONFLICTING` (skill `ci-gate` § Pitfalls says it; a check could enforce it).
+- #532: after a mutant `test:types` run, every probe reads the mutant's declarations from `node_modules/.cache/pgcast` until `test:types` runs again on the restored source; a docs replay wrongly showed calls compiling.
+- #532: a claim like "keys still checked" on a generic intersection type is probed with a column of only one table, not only a key no table has: `WhereableForTable<K>` resolves to `A.Whereable & B.Whereable`, which takes either table's columns.
+- #539: a union of 6.6.1's lookup with a lookup of the mapped type per table (`UpdatableForTable<T> | { [K in Table]: UpdateValuesForTable<K> }[T]`) restores generic bodies without TS2590 at 49 tables; a union with the generic mapped type itself breaks the excess check over a union of tables.
+- #539: on TS 5.9, inferring `param('ok')` against the mapped `updateValues` depends on the order the program resolves types: a cell red in a small probe can be green in `test/types`, so its red test needs a program of its own (#538).
+- #539: a replay grid for a value slot holds a `param()` of a string literal on an enum column and on a template-literal column (`TimeString`), in every context, generic ones included: `param(date)` and `param(1)` never test literal widening.
+- #539: a stacked PR is re-merged onto its base's final head before review (`git merge-base --is-ancestor origin/<base> origin/<head>`), or the review diffs against a stale base.
+- #539: a mutant that leaves an alias unused fails the declaration emit on `noUnusedLocals` (TS6196) before any test runs: keep the alias used (an export) so the mutant reaches the tests.
+- #539: a characterisation over every table (`<T extends s.Table>`) holds a refused line beside the taken ones, to show its boundary: only `{}` and `any`-typed values get through there.
+- #539: a clause listing the column kinds a type gap hits comes from a probe over every value-type shape of the fixture's `extra.type_zoo`, not a hand-picked list: `timetz` and a template-literal domain were missed twice (the PR and #538).
+- #539: since #134's brands, "6.6.1's type" (`UpdatableForTable<T>`) no longer means 6.6.1's behaviour: a revert to an old type name is replayed against what the name now resolves to, and a decision that drops machinery counts the cells it re-admits as well as those it refuses.
+- #541: indexing a mapped type over a concrete key union by a generic `T` is rewritten by TypeScript into a type mapped over `T` (microsoft/TypeScript#47109); a key-remapped mapped type (`[K in Table as K]`) is not, so `T` resolves through its constraint.
+- #541: on TS 5.9, `param<T>()`'s inference picks between the column's `V` and a brand type by creation order; a brand written as a subtype of `V` (`V & { … }`) always loses to `V`, so a literal stays a literal.
+- #541: the bench measures a small program, so a fixed per-program cost reads as +47 %; the PR measures the fixed part (+4,756 instantiations at 17 tables, +9,204 at 49) and the per-call part (12 against 72) separately.
+- #541: an order-dependent type test needs a `tsc` program with a fixed `files` order; `AGENTS.md`'s `test:types` row and skill `type-tests` should name the programs `test:types` runs (`test/types-opt-in`, `test/types-order`).
+- #541: merging #539 left `bench:types` at +4.4 % without refreshing the baseline, and #541's update absorbed it: a PR that moves the bench refreshes the baseline, or says how much of a change is inherited.
 
 ## Minors kept
 
@@ -81,4 +108,9 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #519 (defect): `CHANGELOG.md` enumArraysTypedAsText line and `website/generator.md`: an array of another schema's enum named like a built-in (`box.int4[]`) is typed `number[]` without `typeEnumsAcrossSchemas`, `string` under the key; not named, not frozen by a test.
 - #516 (form): `website/switching.md` § Compile, "Give the value itself, sent as a parameter": for `{ title: db.cols('title') }` the advice could also name `db.cols([name])`.
 - #516 (form): `test/types-opt-in/tsconfig.json`, "Type tests of an option declared in ConfigTypes": the program now also holds a declaration-emit test.
-
+- #530 (form): `CHANGELOG.md` #503 entry, "The exception is `vals()` of one character": with the default config the interval is typed `string`, so #503 is what refuses `vals(row.c_interval)`, which stored 2 seconds under 6.6.1; the entry could point to it.
+- #539 (form): `test/types/shortcuts.test-d.ts`, `const two = <T extends 'users' | 'active_users'>`: `{ created_at: date }` is refused by Postgres on `active_users` (42703); a comment would mark it a characterisation.
+- #539 (form): `test/types-opt-in/updateValues.ts`: extra blank line at the end of the file.
+- #541 (defect): `test/types/shortcuts.test-d.ts`, over every table: `param(anyV)`, taken by master on TS 5.9 `strict`, is now refused (as 6.6.1); no `@ts-expect-error` freezes it, and the PR body says "`any` itself is still taken".
+- #541 (form): `AGENTS.md` `test:types` row and skill `type-tests`: the plain-`tsc` programs `test/types-opt-in` and `test/types-order` are not named.
+- #541 (form): `scripts/bench-types.mjs` header, "each later call costs 12 where it cost 72": shape-dependent (about 21 against 77 for mixed one- or two-key calls).

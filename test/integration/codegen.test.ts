@@ -1029,6 +1029,8 @@ ${imports.map(line => `  ${line}\n`).join('')}  export type ${type};  // replace
         db.update('extra.type_zoo', { c_interval: { days: 1 } }, { id: 1 });
         // @ts-expect-error and in a filter
         db.select('extra.type_zoo', { c_interval: { days: 1 } });
+        // @ts-expect-error vals() of it in upsert()'s updateValues, which compiles its own keys: { hours: 2 } stored 2 seconds
+        db.upsert('extra.type_zoo', { c_interval: read }, 'id', { updateValues: { c_interval: db.vals(read) } });
       };`;
 
     it('types Selectable as pg parses it, takes it back in a write, and refuses a plain object', async () => {
