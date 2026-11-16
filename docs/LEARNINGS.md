@@ -27,6 +27,8 @@ Candidates for a check, a rule or a skill line.
 - #519: a note on a domain column waits for the placeholder's final text, known only once every relation is read (#42's last-wins; a schema with no enum of that name gives `any`): filter in `tsForQueries` on the shared `customTypes`.
 - #519: under load from parallel worktrees the 5 s Vitest timeout fails different, unrelated tests on each full run: rerun the failing files alone.
 - #519: two "would change" notes in a row (#484, #519) listed columns the option did not change: a test helper could diff the output with the key off and on and compare the changed columns with the note's list.
+- #526: on a rerun, `gh run view --job <id> --log` returns the latest attempt's log, not the failed one; the failed attempt's needs `gh api repos/…/actions/jobs/<id>/logs`.
+- #526: under load a compile can block the event loop past Vitest's timer, so a test passed at 11 s under a 5 s limit: timeouts on compile-heavy tests are not deterministic; size them from CI's measures with a margin.
 
 ## Minors kept
 
