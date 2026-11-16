@@ -1,5 +1,5 @@
 ---
-english: d533d7765ed2
+english: 75079b14641d
 ---
 
 # Générateur
@@ -111,6 +111,7 @@ Toutes les options sont facultatives. Une option donnée remplace entièrement s
 | [`rejectOnQueryError`](#generate.rejectOnQueryError) | aucune : arrêt, avec une note | si, quand une requête échoue, la promesse est rejetée ou le processus s’arrête |
 | [`uniqueIndexConstraintsOnly`](#generate.uniqueIndexConstraintsOnly) | `false` | les noms de l’`UniqueIndex` de chaque relation |
 | [`domainsTypedByContext`](#generate.domainsTypedByContext) | `false` | le type d’un domaine sur `bigint`, `numeric`, `bytea`, `money` ou une date, ou sur un tableau de l’un d’eux, hors de `Selectable`, et d’un domaine sur un domaine ou d’un tableau d’un domaine |
+| [`enumArraysTypedAsText`](#generate.enumArraysTypedAsText) | aucune : un tableau, avec une note | le type `Selectable` d’un tableau d’un enum |
 | [`progressListener`](#generate.progressListener) | `false` | où chaque étape est signalée |
 | [`warningListener`](#generate.warningListener) | `true` | où vont les avertissements |
 | [`debugListener`](#generate.debugListener) | `false` | où vont chaque requête et son résultat |
@@ -433,6 +434,27 @@ ALTER TABLE seat_bookings ADD COLUMN vip_ticket vip_ticket_no, ADD COLUMN ticket
 - Un placeholder que vous modifiez garde son type dans les cinq, `unknown` compris. Un placeholder modifié vers `any` compte comme laissé tel que généré : écrivez `unknown`, ou laissez l’option désactivée, pour garder une telle colonne non typée.
 - `false` signale, via [`warningListener`](#generate.warningListener), chacune de ces colonnes, dans une note à part.
 
+### `enumArraysTypedAsText` {#generate.enumArraysTypedAsText}
+
+`boolean`, ou omis ; un opt-in. Le type `Selectable` d’une colonne dont le type est un tableau d’un enum, ou un domaine sur un tel tableau. Postgres donne au type d’un tel tableau un numéro propre à chaque base, donc `pg` n’a pas de parser pour lui : une ligne de `pg`, comme celle d’une requête [`sql`](/fr/sql-template), contient le texte du tableau, tandis que le JSON des raccourcis contient le tableau. Supposons qu’un membre de l’équipe puisse occuper d’autres postes, et garde ceux qu’il a déjà occupés dans un domaine sur le tableau :
+
+```sql
+CREATE DOMAIN job_list AS crew_job[];
+ALTER TABLE crew ADD COLUMN other_jobs crew_job[] NOT NULL DEFAULT '{}', ADD COLUMN past_jobs job_list;
+```
+
+| `crew.other_jobs` | omis, ou `false` | `true` |
+|---|---|---|
+| `Selectable`, une ligne de `pg` | `crew_job[]`, bien que `pg` donne `'{writer,editor}'` | `string` |
+| `JSONSelectable`, une ligne des raccourcis | `crew_job[]` : `['writer', 'editor']` | le même |
+| `Whereable`, `Insertable`, `Updatable` | `crew_job[]` | le même |
+
+- Omis, ou `null` : le tableau, comme dans Zapatos 6.6.1, et le générateur signale via [`warningListener`](#generate.warningListener) chaque colonne que `true` changerait. À partir de la 7.0, l’option omise vaut `true` ([Versions](/fr/versions)).
+- `false` : le tableau, sans note, en 7.0 et après : le bon type pour un projet qui le parse avec `pg.types.setTypeParser`, en lui donnant l’OID du type du tableau (`SELECT 'crew_job[]'::regtype::oid`) et le parser de `text[]`, `pg.types.getTypeParser(1009)`.
+- `true` : `string`, le texte que renvoie `pg`. Les écritures prennent toujours un tableau, donc le texte d’une ligne de `sql` ne se réécrit pas tel quel : `insert()` et `update()` le refusent (TS2769, TS2322), alors que Postgres l’accepterait.
+- Un domaine sur un tel tableau, comme `crew.past_jobs`, prend `db.DomainInContext<c.PgJob_list, crew_job[], string>` dans `Selectable` ([`DomainInContext`](/fr/runtime-config#DomainInContext)) : `string` tant que son placeholder contient ce que le générateur y a écrit, et un placeholder que vous modifiez garde son type. Ses autres interfaces et son placeholder ne changent pas.
+- Un tableau d’un enum d’un autre schéma, typé par ses labels avec [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas), ou sinon comme l’enum du même nom dans le schéma de la relation, est lui aussi un `string` dans `Selectable`. Sans l’un ni l’autre, c’est un placeholder `any`, et il le reste. Un tableau d’un domaine sur un enum relève de [`domainsTypedByContext`](#generate.domainsTypedByContext).
+
 ### `progressListener` {#generate.progressListener}
 
 `boolean`, ou dans `generate()` une fonction `(s: string) => void` ; par défaut `false`. `true` affiche chaque étape avec `console.log` ; une fonction reçoit chaque ligne.
@@ -469,12 +491,14 @@ Writing custom types file: src/zapatos/custom/index.d.ts
   - une fois par exécution, sans [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas), quand une colonne qu’il changerait est générée ;
 - `` Note: every.crew_job lists the labels of enum public.crew_job in alphabetical order, not in their declared order, by which Postgres sorts and compares them. Set enumOrder: 'declared' to keep that order; it will be the default in pgcast 7.0. ``
   - une fois par exécution, avec [`enumOrder`](#generate.enumOrder) à `"alphabetical"`, quand un schéma de [`schemas`](#generate.schemas) a un enum dont l’ordre déclaré n’est pas alphabétique ; s’il y en a plusieurs, sous la forme `every.<name> lists the labels of enums archive.print_format and public.crew_job` ;
-- `Note: UniqueIndex lists public.festival_entries.festival_entries_live_idx and public.festival_entries.festival_entries_slot_key, unique indexes of no UNIQUE or PRIMARY KEY constraint, of a DEFERRABLE or WITHOUT OVERLAPS one, or not yet valid: db.constraint() takes them, and Postgres refuses them in ON CONFLICT ON CONSTRAINT ... DO UPDATE. Set uniqueIndexConstraintsOnly: true to leave them out; it will be the default in pgcast 7.0.`
+- `Note: UniqueIndex lists public.festival_entries.festival_entries_live_idx and public.festival_entries.festival_entries_slot_key, unique indexes of no UNIQUE or PRIMARY KEY constraint, of a DEFERRABLE or WITHOUT OVERLAPS one, or not yet valid: db.constraint() takes them, and Postgres refuses them in ON CONFLICT ON CONSTRAINT ... DO UPDATE, and in ... DO NOTHING except a WITHOUT OVERLAPS key. Set uniqueIndexConstraintsOnly: true to leave them out; it will be the default in pgcast 7.0.`
   - une fois par exécution, sans [`uniqueIndexConstraintsOnly`](#generate.uniqueIndexConstraintsOnly), quand une relation générée a un index unique que l’option laisserait de côté ; s’il n’y en a qu’un, sous la forme `lists public.festival_entries.festival_entries_live_idx, a unique index of no UNIQUE or PRIMARY KEY constraint` ;
 - `Note: public.seat_bookings.ticket (public.ticket_no) has a domain over a type typed by context, such as int8 or date: as generated, its placeholder types it in all five interfaces as pg returns it, though a write takes more and, except for money, the shortcuts' JSON gives another type. Set domainsTypedByContext: true to type it by context while its placeholder holds what the generator wrote for it; it will be the default in pgcast 7.0.`
   - une fois par exécution, sans [`domainsTypedByContext`](#generate.domainsTypedByContext), quand une colonne générée a un tel domaine ; s’il y en a plusieurs, sous la forme `public.screenings.premiere (public.premiere_day) and public.seat_bookings.ticket (public.ticket_no) have domains over a type typed by context` ;
 - `` Note: public.seat_bookings.tickets (public.ticket_no[]) and public.seat_bookings.vip_ticket (public.vip_ticket_no) have domains over a domain, or arrays of a domain: as generated, their placeholders type them as `any`. Set domainsTypedByContext: true to type them by the base type of the innermost domain while their placeholders hold `any`; it will be the default in pgcast 7.0. ``
   - une fois par exécution, sans [`domainsTypedByContext`](#generate.domainsTypedByContext), quand une colonne générée a un tel type, sur un type de base que le générateur sait traduire ; s’il n’y en a qu’une, sous la forme `public.seat_bookings.vip_ticket (public.vip_ticket_no) has a domain over a domain, or an array of a domain` ;
+- `Note: public.crew.other_jobs (public.crew_job[]) is an array of an enum, which pg returns as its text, such as '{a,b}', though Selectable types it as an array. Set enumArraysTypedAsText: true to type it as a string there, or false to keep the array if pg.types.setTypeParser parses it; true will be the default in pgcast 7.0.`
+  - une fois par exécution, avec [`enumArraysTypedAsText`](#generate.enumArraysTypedAsText) omis, quand une colonne générée a un tel type ; s’il y en a plusieurs, sous la forme `public.crew.other_jobs (public.crew_job[]) and public.crew.past_jobs (public.job_list) are arrays of an enum` ;
 - `Note: src/zapatos/schema.d.ts is here too, generated with moduleNames: 'zapatos'. It declares 'zapatos/schema', as src/pgcast/schema.d.ts does, and TypeScript merges the two: types can loosen, silently under skipLibCheck. Delete the folder src/zapatos, once any placeholder you edited there is moved to src/pgcast/custom.`
   - après l’écriture, avec [`moduleNames`](#generate.moduleNames) à `"pgcast"`, quand `outDir` contient un `zapatos/schema.d.ts` ; un dossier sans son `schema.d.ts` n’est pas signalé ;
 - `Note: src/pgcast/schema.d.ts is here too, generated with moduleNames: 'pgcast'. Its import of 'pgcast/db' fails to compile without skipLibCheck. Delete the folder src/pgcast, once any placeholder you edited there is moved to src/zapatos/custom.`
