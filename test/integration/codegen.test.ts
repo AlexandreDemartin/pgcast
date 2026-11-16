@@ -1573,8 +1573,15 @@ describe('enumArraysTypedAsText', () => {
     CREATE TYPE arr_edge.int4 AS ENUM ('x', 'y');
     CREATE TYPE arr_edge.text AS ENUM ('p');
     CREATE TABLE arr_edge.films (id int PRIMARY KEY, nums int4[], words text[], own arr_edge.int4[]);
+    -- a domain over an array of an enum, also used in arr_none, which has no enum of that name: its placeholder is any
+    CREATE SCHEMA arr_dom;
+    CREATE TYPE arr_dom.mood AS ENUM ('sad', 'happy');
+    CREATE DOMAIN arr_dom.moods AS arr_dom.mood[];
+    CREATE TABLE arr_dom.films (id int PRIMARY KEY, moods arr_dom.mood[], dmoods arr_dom.moods);
+    CREATE SCHEMA arr_none;
+    CREATE TABLE arr_none.films (id int PRIMARY KEY, dmoods arr_dom.moods);
   `));
-  afterAll(() => t.pool.query('DROP SCHEMA arr, arr_box, arr_solo, arr_edge CASCADE'));
+  afterAll(() => t.pool.query('DROP SCHEMA arr, arr_box, arr_solo, arr_edge, arr_dom, arr_none CASCADE'));
 
   const config = { schemas: { arr: all, arr_box: all, arr_solo: all }, schemaJSDoc: false, unprefixedSchema: 'arr' };
   const on = { ...config, enumArraysTypedAsText: true };
@@ -1683,6 +1690,21 @@ describe('enumArraysTypedAsText', () => {
     // with typeEnumsAcrossSchemas, arr_solo's column takes the labels' array, no longer any
     expect((await notesFor({ ...config, schemas: { arr_solo: all }, typeEnumsAcrossSchemas: true }))[0])
       .toMatch(/^Note: arr_solo\.films\.moods \(arr\.mood\[\]\) is an array of an enum/);
+  });
+
+  it('notes no column of a domain whose placeholder ends any, which stays any with the option', async () => {
+    const both = { schemas: { arr_dom: all, arr_none: all }, schemaJSDoc: false };
+    const typed = await codegen({ ...both, enumArraysTypedAsText: true });
+    expect(typed.customTypeSourceFiles.PgMoods).toContain('export type PgMoods = any;');
+    expect(readsOf(tableBlock(typed.ts, 'arr_dom'), 'films', 'dmoods'))
+      .toEqual(['dmoods: db.DomainInContext<c.PgMoods, mood[], string> | null;', 'dmoods: c.PgMoods | null;']);
+    const note = (columns: string) => `Note: ${columns} is an array of an enum, which pg returns as its text, such as ` +
+      '\'{a,b}\', though Selectable types it as an array. Set enumArraysTypedAsText: true to type it as a string there, or ' +
+      'false to keep the array if pg.types.setTypeParser parses it; true will be the default in pgcast 7.0.';
+    expect(await notesFor(both)).toEqual([note('arr_dom.films.moods (arr_dom.mood[])')]);
+    // without arr_none, the placeholder holds mood[], which the option changes
+    expect((await notesFor({ ...both, schemas: { arr_dom: all } }))[0])
+      .toMatch(/^Note: arr_dom\.films\.dmoods \(arr_dom\.moods\) and arr_dom\.films\.moods \(arr_dom\.mood\[\]\) are arrays/);
   });
 
   it('gives no note with true or false, or when no column would change', async () => {

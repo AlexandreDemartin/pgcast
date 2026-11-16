@@ -354,7 +354,7 @@ const tsForQueries = async (config: CompleteConfig, queryFn: (q: pg.QueryConfig)
     domainRootsOnce: Promise<DomainRoots>[] = [],
     domainRoots = () => domainRootsOnce[0] ??= domainRootsInDatabase(queryFn),
     domainsUnderDomains: string[] = [],
-    enumArraysNotAsText: string[] = [],
+    enumArraysNotAsText: [string, string | null][] = [],
     schemaNames = Object.keys(schemas),
     schemaData = (await Promise.all(
       schemaNames.map(async schema => {
@@ -428,7 +428,9 @@ const tsForQueries = async (config: CompleteConfig, queryFn: (q: pg.QueryConfig)
   warnAboutUniqueIndexesNotArbiters(uniqueIndexesNotArbiters, config);
   warnAboutDomainsNotByContext(domainsNotByContext, config);
   warnAboutDomainsUnderDomains(domainsUnderDomains, config);
-  warnAboutEnumArraysNotAsText(enumArraysNotAsText, config);
+  // a domain whose placeholder ends `any` stays `any` with the key (db.DomainInContext): no column of it is noted
+  warnAboutEnumArraysNotAsText(enumArraysNotAsText
+    .filter(([, customType]) => customType === null || customTypes[customType] !== 'any').map(([column]) => column), config);
 
   return { ts, customTypeSourceFiles };
 };

@@ -144,7 +144,8 @@ export const definitionForRelationInSchema = async (
   domainsNotByContext: string[] = [],  // an 'out' parameter too: what domainsTypedByContext would change
   domainRoots = () => domainRootsInDatabase(queryFn),
   domainsUnderDomains: string[] = [],  // an 'out' parameter too: what domainsTypedByContext would type over a domain
-  enumArraysNotAsText: string[] = [],  // an 'out' parameter too: what enumArraysTypedAsText would change
+  // an 'out' parameter too: what enumArraysTypedAsText would change, with a domain's placeholder, which may end `any`
+  enumArraysNotAsText: [column: string, customType: string | null][] = [],
 ) => {
   const
     rows = await columnsForRelation(rel, schemaName, queryFn),
@@ -202,8 +203,9 @@ export const definitionForRelationInSchema = async (
       enumArray = selectableType !== 'any' && udtName.charAt(0) === '_' && !hasOwn(ownEnums, udtName) &&
         hasOwn(ownEnums, udtName.slice(1));
     if (enumArray && config.enumArraysTypedAsText == null) {  // left out, or null from JSON
-      enumArraysNotAsText.push(`${schemaName}.${rel.name}.${column} (${domainName === null ?
-        `${udtSchema}.${udtName.slice(1)}[]` : `${domainSchema}.${domainName}`})`);
+      enumArraysNotAsText.push([`${schemaName}.${rel.name}.${column} (${domainName === null ?
+        `${udtSchema}.${udtName.slice(1)}[]` : `${domainSchema}.${domainName}`})`,
+      domainName === null ? null : transformCustomType(domainName, config)]);
     }
 
     const
