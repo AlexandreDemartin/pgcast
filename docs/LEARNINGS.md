@@ -73,6 +73,14 @@ Candidates for a check, a rule or a skill line.
 - #530: a 6.6.1 cell also tries the value as `pg` returns it through the column's old `Selectable` type (an interval typed `string` is an object at run time): the builder's grid and the docs both missed it.
 - #530: advice for one value differs by place: in `updateValues` the plain value is sent as a parameter, in a `sql` template a plain `Date` throws and needs `db.param()`; a shared advice line names its place.
 - #530: when a type change refuses calls that "worked", every shape whose own enumerable keys add up to one value (one character, one byte, one own field, one interval part) silently stored a wrong value under 6.6.1 (#503, #530): the replay grid holds a one-key variant of each refused built-in.
+- #536: once `[Unreleased]` becomes a release, its notes enter `changelog.xml` as escaped HTML, so feed-only checks (the paths check read `/Users/&lt;/code&gt;` as a machine's path) are first exercised by the release PR: run `docs:build` on a release branch early.
+- #537: the whole 6.7.0 section (~151,000 characters) exceeds GitHub's 125,000-character release body: the release notes are a subset (Security, Deprecated) plus links to the changelog page's anchors.
+- #532: a fix of a generic `where` needs a large synthetic schema in its grid: the cross-product TS2590 ("union too complex") shows only from a few dozen tables, never on the 3-table fixture.
+- #532: excess-property checks skip a generic indexed-access member of a union, so making each member a lookup by `T` turns the check off; the annotated form (`const w: s.WhereableForTable<K>`) keeps it.
+- #532: a mutant also checks that each characterisation line fails for the reason it claims: a bare `sql` value stayed refused under the fix because #493 refuses it too.
+- #532: a conflicting PR runs no `pull_request` workflow, so only CodeQL shows and it reads as "checks pass": the gate checks a CI run exists for the head SHA (`gh run list --commit <sha>`) and `mergeable` is not `CONFLICTING` (skill `ci-gate` § Pitfalls says it; a check could enforce it).
+- #532: after a mutant `test:types` run, every probe reads the mutant's declarations from `node_modules/.cache/pgcast` until `test:types` runs again on the restored source; a docs replay wrongly showed calls compiling.
+- #532: a claim like "keys still checked" on a generic intersection type is probed with a column of only one table, not only a key no table has: `WhereableForTable<K>` resolves to `A.Whereable & B.Whereable`, which takes either table's columns.
 
 ## Minors kept
 
