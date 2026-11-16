@@ -13,9 +13,10 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
   - Changed: `` sql`SELECT ${cols(new Date())} FROM films` `` ran as `SELECT  FROM films`, rows with no column; it now rejects.
   - Changed: `vals(Buffer.from('a'))` as a written value stored its byte's number, in a `sql` template and in `updateValues`: `'97'` in a text column, `97` in a number column, `\x3937` in `bytea`, `00:01:37` in an `interval`. It now rejects; for the bytes, write `vals([buf])` or `param(buf)`.
   - Changed: `vals()` of a `Buffer` in an `IN` list matched its bytes as numbers, `IN ($1, $2)` with `97, 98`; it now rejects.
+  - Changed: an empty typed array has no own key, so it is refused as other built-ins with none are: `` sql`SELECT ${cols(new Int32Array(0))} FROM films` `` ran as `SELECT  FROM films`, rows with no column, as `vals()` of one did; it now rejects.
   - Unchanged:
     - A built-in with own enumerable keys compiles to them, as a plain object does: an `Error` given `code`, `errno`, `syscall` and `path`, as Node's system errors are, is still a row of those columns.
-    - A typed array other than a `Buffer` that holds elements compiles to them in `vals()` (`IN ($1, $2)` for `new Int32Array([1, 2])`) and to its indexes in `cols()`. An empty one has no own key, so it throws, as other built-ins with none do.
+    - A typed array other than a `Buffer` that holds elements compiles to them in `vals()` (`IN ($1, $2)` for `new Int32Array([1, 2])`) and to its indexes in `cols()`.
     - A `Proxy` of a `Buffer` that holds bytes compiles as before, to its byte indexes and its bytes: it is no `ArrayBuffer` view, so only its prototype would tell it from a `Proxy` row, and neither check reads the prototype of a row with own keys.
     - Also as before: a class instance, a subclass of a built-in, a `PostgresInterval` (`vals()` of `{ hours: 2 }` is still `$1` with `2`), a built-in of another realm, and a primitive, which keeps its own message (#244).
     - A built-in row in an array of rows of `insert()` or `upsert()`, even of one row, is still spread into a plain object first (#543): a `Buffer` there gives its byte indexes as columns, and a `Date` none, a row of `DEFAULT`s beside other rows.

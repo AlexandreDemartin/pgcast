@@ -836,6 +836,14 @@ describe('cols and vals', () => {
       });
   });
 
+  it('cols and vals of an empty typed array throw, as it has no own key', () => {
+    // 6.6.1: `SELECT  FROM "users"`, which ran, rows with no column
+    expect({ cols: failure(() => one(cols(new Int32Array(0)))), vals: failure(() => one(vals(new Float64Array(0)))) })
+      .toEqual({
+        cols: { name: 'Error', message: builtinColsMessage('Int32Array') }, vals: { name: 'Error', message: builtinValsMessage('Float64Array') },
+      });
+  });
+
   it('cols and vals of a built-in throw before writing anything for it, and before reading its values', () => {
     const result = { text: '', values: [] };
     expect(failure(() => sql`SELECT ${param(1)}, ${vals(Buffer.from('a'))}`.compile(result))).toEqual({ name: 'Error', message: bufferValsMessage });
