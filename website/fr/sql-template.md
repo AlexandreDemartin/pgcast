@@ -1,5 +1,5 @@
 ---
-english: c3091755b813
+english: 3163c72734b9
 ---
 
 # Template SQL
@@ -316,7 +316,7 @@ Un objet est un Whereable de la table : chacune de ses propres clés énumérab
 Un objet interpolé qui n’est pas l’une des autres [interpolations](#interpolations) se compile en Whereable, objet simple ou non : une instance de classe `{ title }` donne `("title" = $1)`<!-- probe: db.sql`${new (class { title = 'x' })()}` -->, et une instance sans clé propre énumérable donne `TRUE`, même d’une classe qui étend un objet natif (`class Premiere extends Date {}`). Vérifiez à l’exécution ce qui atteint un `where`.
 :::
 
-Un objet natif lève une erreur à la compilation, avant toute requête, même avec des clés propres ajoutées (`Object.assign(new Date(0), { id: 1 })`) : `Date`, `Map`, `Set`, `WeakMap`, `WeakSet`, `WeakRef`, `FinalizationRegistry`, `RegExp`, `Promise`, `Error` et ses sous-types natifs (`TypeError`, `AggregateError`, …), `ArrayBuffer`, `SharedArrayBuffer`, un tableau typé, `Buffer`, `DataView`, les objets wrapper `Number`, `String`, `Boolean`, `BigInt` et `Symbol`, et, là où le runtime les fournit (Node 24), `SuppressedError`, `DisposableStack` et `AsyncDisposableStack` :
+Un objet natif lève une erreur à la compilation, avant toute requête, même avec des clés propres ajoutées (`Object.assign(new Date(0), { id: 1 })`) : `Date`, `Map`, `Set`, `WeakMap`, `WeakSet`, `WeakRef`, `FinalizationRegistry`, `RegExp`, `Promise`, `Error` et ses sous-types natifs (`TypeError`, `AggregateError`, …), `ArrayBuffer`, `SharedArrayBuffer`, un tableau typé, `Buffer`, `DataView`, les objets wrapper `Number`, `String`, `Boolean`, `BigInt` et `Symbol`, les objets `Intl` (`Intl.Collator`, `Intl.DateTimeFormat`, `Intl.NumberFormat`, `Intl.Locale`, …), et, là où le runtime les fournit, `SuppressedError`, `DisposableStack` et `AsyncDisposableStack` (Node 24) et les objets `Temporal` (Node 26 : `Temporal.PlainDate`, `Temporal.Instant`, `Temporal.ZonedDateTime`, …), que l’erreur nomme par leur constructeur (`PlainDate`) :
 
 > `` A built-in `…` has no meaning as a Whereable (a filter): it would compile to its own enumerable keys, and to `TRUE`, every row, when it has none. To compare with a value, give it as `db.param(…)`; to filter, give a plain object (`{ column: value }`); await a `Promise` first. ``<!-- message -->
 
@@ -330,7 +330,8 @@ Seuls les objets natifs du realm qui exécute pgcast lèvent une erreur, reconnu
 
 - un `Date` ou un itérateur d’un autre realm, comme `vm.runInNewContext('new Date(0)')`, donne `TRUE` ;
 - une instance d’une classe qui étend un objet natif garde ses propres clés : `new Frames(1)`, avec `class Frames extends Uint8Array {}`, donne `("0" = $1)` ;
-- un itérateur avec des clés propres les compile : un générateur auquel on a ajouté `{ id: 1 }`, ou une classe qui étend `Iterator` avec un champ `id = 1`, donne `("id" = $1)`.
+- un itérateur avec des clés propres les compile : un générateur auquel on a ajouté `{ id: 1 }`, ou une classe qui étend `Iterator` avec un champ `id = 1`, donne `("id" = $1)` ;
+- l’objet que renvoie `new Intl.Segmenter('en').segment(text)` donne `TRUE`, même si son itérateur lève une erreur ([#517](https://github.com/AlexandreDemartin/pgcast/issues/517)).
 
 ## `self` {#self}
 

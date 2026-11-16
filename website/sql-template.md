@@ -312,7 +312,7 @@ An object is a Whereable of the table: each own enumerable key a column, each va
 An interpolated object that is not one of the other [interpolations](#interpolations) compiles as a Whereable, plain or not: a class instance `{ title }` gives `("title" = $1)`<!-- probe: db.sql`${new (class { title = 'x' })()}` -->, and one with no own enumerable key gives `TRUE`, even of a class that extends a built-in (`class Premiere extends Date {}`). Check what reaches a `where` at run time.
 :::
 
-A built-in object throws while compiling, before any query, even with own keys added (`Object.assign(new Date(0), { id: 1 })`): `Date`, `Map`, `Set`, `WeakMap`, `WeakSet`, `WeakRef`, `FinalizationRegistry`, `RegExp`, `Promise`, `Error` and its native subtypes (`TypeError`, `AggregateError`, …), `ArrayBuffer`, `SharedArrayBuffer`, a typed array, `Buffer`, `DataView`, the boxes `Number`, `String`, `Boolean`, `BigInt` and `Symbol`, and, where the runtime has them (Node 24), `SuppressedError`, `DisposableStack` and `AsyncDisposableStack`:
+A built-in object throws while compiling, before any query, even with own keys added (`Object.assign(new Date(0), { id: 1 })`): `Date`, `Map`, `Set`, `WeakMap`, `WeakSet`, `WeakRef`, `FinalizationRegistry`, `RegExp`, `Promise`, `Error` and its native subtypes (`TypeError`, `AggregateError`, …), `ArrayBuffer`, `SharedArrayBuffer`, a typed array, `Buffer`, `DataView`, the boxes `Number`, `String`, `Boolean`, `BigInt` and `Symbol`, the `Intl` objects (`Intl.Collator`, `Intl.DateTimeFormat`, `Intl.NumberFormat`, `Intl.Locale`, …), and, where the runtime has them, `SuppressedError`, `DisposableStack` and `AsyncDisposableStack` (Node 24) and the `Temporal` ones (Node 26: `Temporal.PlainDate`, `Temporal.Instant`, `Temporal.ZonedDateTime`, …), which the error names by their constructor (`PlainDate`):
 
 > `` A built-in `…` has no meaning as a Whereable (a filter): it would compile to its own enumerable keys, and to `TRUE`, every row, when it has none. To compare with a value, give it as `db.param(…)`; to filter, give a plain object (`{ column: value }`); await a `Promise` first. ``<!-- message -->
 
@@ -326,7 +326,8 @@ Only the built-ins of the realm that runs pgcast throw, matched by their exact p
 
 - a `Date` or an iterator from another realm, such as `vm.runInNewContext('new Date(0)')`, gives `TRUE`;
 - an instance of a class that extends a built-in keeps its own keys: `new Frames(1)`, with `class Frames extends Uint8Array {}`, gives `("0" = $1)`;
-- an iterator with own keys compiles them: a generator given `{ id: 1 }`, or a class that extends `Iterator` with a field `id = 1`, gives `("id" = $1)`.
+- an iterator with own keys compiles them: a generator given `{ id: 1 }`, or a class that extends `Iterator` with a field `id = 1`, gives `("id" = $1)`;
+- the object that `new Intl.Segmenter('en').segment(text)` returns gives `TRUE`, though its iterator throws ([#517](https://github.com/AlexandreDemartin/pgcast/issues/517)).
 
 ## `self` {#self}
 
