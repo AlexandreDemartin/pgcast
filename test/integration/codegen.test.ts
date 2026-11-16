@@ -4043,6 +4043,16 @@ describe('the CLI with --check (#556)', () => {
     ]);
   });
 
+  it('ends with process.exit(1) on a failed query, with no note, as a run does: its config sets rejectOnQueryError: false', async () => {
+    const exited = new Error('process.exit() called');
+    const exit = vi.spyOn(process, 'exit').mockImplementation((() => { throw exited; }) as () => never);
+    const args = ['--check', JSON.stringify({ db: unreachable, outDir, warningListener: true, rejectOnQueryError: true })];
+    await expect(runCli(args, dir)).rejects.toBe(exited);
+    expect(exit.mock.calls).toEqual([[1]]);
+    expect(log.mock.calls).toEqual([['*** error 0 ***', expect.objectContaining({ code: 'ECONNREFUSED' })]]);
+    expect(existsSync(outDir)).toBe(false);
+  });
+
   // the export, for a script that calls generate() with a config built in code (#559)
   describe('check(), from zapatos/generate', () => {
     /** Its result, and each line it gave each listener, unless `listeners` is false, after asserting it wrote nothing. */
@@ -4113,9 +4123,36 @@ describe('the CLI with --check (#556)', () => {
       expect((await checked()).warnings[0]).toBe(`Missing: <out>/${schemaFile}`);
     });
 
-    it('rejects with the error of a failed query, given rejectOnQueryError, writing nothing', async () => {
-      await expect(checked({ db: unreachable, rejectOnQueryError: true })).rejects.toMatchObject({ code: 'ECONNREFUSED' });
-      expect(existsSync(outDir)).toBe(false);
+    describe('on a failed query', () => {
+      const exited = new Error('process.exit() called');
+
+      /** A check on a server that refuses every connection, process.exit mocked to throw: what it rejected with and did. */
+      const failedCheck = async (config: Config) => {
+        const exit = vi.spyOn(process, 'exit').mockImplementation((() => { throw exited; }) as () => never), warnings: string[] = [];
+        const rejection = await checkFiles({
+          outDir, schemas: { generate_check: all }, warningListener: line => void warnings.push(line), ...config, db: unreachable,
+        }).then(() => new Error('resolved'), (e: unknown) => e);
+        return { rejection, exits: exit.mock.calls, warnings, printed: log.mock.calls, outDir: existsSync(outDir) };
+      };
+
+      // no Zapatos 6.6.1 behaviour to keep: it rejects as 7.0's generate() will, with no note (#559)
+      it.each([
+        ['left out', {}],
+        ['null, from a JSON config', JSON.parse('{"rejectOnQueryError": null}') as Config],
+        ['true', { rejectOnQueryError: true }],
+      ])('rejects with the error, rejectOnQueryError %s: no exit, no note, nothing printed or written', async (_, config) => {
+        const run = await failedCheck(config);
+        expect(run.rejection).toMatchObject({ code: 'ECONNREFUSED' });
+        expect(run).toMatchObject({ exits: [], warnings: [], printed: [], outDir: false });
+      });
+
+      it('prints the error and exits with 1, with no note, given rejectOnQueryError: false, as generate() does', async () => {
+        const run = await failedCheck({ rejectOnQueryError: false });
+        expect(run.rejection).toBe(exited);
+        expect(run).toMatchObject({
+          exits: [[1]], warnings: [], printed: [['*** error 0 ***', expect.objectContaining({ code: 'ECONNREFUSED' })]], outDir: false,
+        });
+      });
     });
   });
 
