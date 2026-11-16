@@ -121,9 +121,11 @@ describe('PostgresInterval, the type intervalsTypedAsObjects writes', () => {
   test('refuses an object without toPostgres(), through which pg writes it', () => {
     // @ts-expect-error a plain object, which pg sends as JSON and Postgres refuses (22007)
     const plain: db.PostgresInterval = { days: 1 };
+    // @ts-expect-error toPostgres() alone missing
+    const noToPostgres: db.PostgresInterval = { days: 1, toISO: () => 'P0Y0M1DT0H0M0S' };
     // @ts-expect-error toISO() too, which every postgres-interval that pg 7 and 8 use has
     const noISO: db.PostgresInterval = { days: 1, toPostgres: () => '1 day' };
-    void [plain, noISO];
+    void [plain, noToPostgres, noISO];
   });
 });
 
