@@ -63,6 +63,8 @@ const variants: [string, Config][] = [
   ['domainsTypedByContext', { schemas: customTypesSchemas, domainsTypedByContext: true }],
   // typeEnumsAcrossSchemas's, but extra.type_zoo's c_enum_array in Selectable: any without it
   ['enumArraysTypedAsText', { schemas: customTypesSchemas, typeEnumsAcrossSchemas: true, enumArraysTypedAsText: true }],
+  // only extra.type_zoo's c_interval differs, in the four interfaces but JSONSelectable; the placeholders are the same
+  ['intervalsTypedAsObjects', { schemas: customTypesSchemas, intervalsTypedAsObjects: true }],
   ['columnOptions', {
     schemas: { public: only('users', 'accounts'), extra: only('articles') },
     columnOptions: {
@@ -114,13 +116,14 @@ const warningsOf = async (config: Config) => {
 };
 
 /**
- * The same, but the notes on enums, unique indexes, domains and arrays of an enum, which have their own tests
- * (§ typeEnumsAcrossSchemas, § enumOrder, § uniqueIndexConstraintsOnly, § domainsTypedByContext, § enumArraysTypedAsText).
+ * The same, but the notes on enums, unique indexes, domains, arrays of an enum and intervals, which have their own
+ * tests (§ typeEnumsAcrossSchemas, § enumOrder, § uniqueIndexConstraintsOnly, § domainsTypedByContext,
+ * § enumArraysTypedAsText, § intervalsTypedAsObjects).
  */
 const warningsFor = async (schemas: Schemas, config: Config = {}) =>
   (await warningsOf({ ...config, schemas })).filter(w => !w.includes('typeEnumsAcrossSchemas') &&
     !w.includes('enumOrder') && !w.includes('uniqueIndexConstraintsOnly') && !w.includes('domainsTypedByContext') &&
-    !w.includes('enumArraysTypedAsText'));
+    !w.includes('enumArraysTypedAsText') && !w.includes('intervalsTypedAsObjects'));
 
 /** Custom type placeholders, sorted by name: tsForConfig() inserts them in query completion order. */
 const customFiles = (files: Record<string, string>) =>
@@ -994,6 +997,58 @@ ${imports.map(line => `  ${line}\n`).join('')}  export type ${type};  // replace
     });
   });
 
+  describe('intervalsTypedAsObjects, compiled (#499)', () => {
+    const config = { schemas: { extra: only('type_zoo') } };
+
+    /** extra.type_zoo.c_interval: `asObjects` before what only the option lets through, `asText` before what only its absence does. */
+    const intervalProbe = (asObjects: string, asText: string) => `
+      import * as db from 'zapatos/db';
+      import type * as s from 'zapatos/schema';
+      declare const client: db.Queryable;
+      export const probe = async () => {
+        const [row] = await db.sql<s.extra.type_zoo.SQL, s.extra.type_zoo.Selectable[]>\`SELECT * FROM \${'extra.type_zoo'}\`.run(client);
+        const json = await db.selectExactlyOne('extra.type_zoo', { id: 1 }).run(client);
+        const read = row!.c_interval!;
+        // the shortcuts' JSON: the text, either way
+        json.c_interval satisfies string | null;
+        ${asObjects} Selectable: pg's object
+        row!.c_interval satisfies db.PostgresInterval | null;
+        ${asObjects} one of its parts
+        read.days satisfies number | undefined;
+        ${asText} the text, which pg returns only with a type parser of your own
+        row!.c_interval satisfies string | null;
+        // written back as it was read, either way: Postgres takes the object through toPostgres()
+        db.insert('extra.type_zoo', { c_interval: read });
+        db.update('extra.type_zoo', { c_interval: read }, { id: 1 });
+        db.select('extra.type_zoo', { c_interval: read });
+        // the text, either way
+        db.insert('extra.type_zoo', { c_interval: '1 day' });
+        // @ts-expect-error a plain object, which Postgres refuses (22007), either way
+        db.insert('extra.type_zoo', { c_interval: { days: 1 } });
+        // @ts-expect-error in an update too
+        db.update('extra.type_zoo', { c_interval: { days: 1 } }, { id: 1 });
+        // @ts-expect-error and in a filter
+        db.select('extra.type_zoo', { c_interval: { days: 1 } });
+      };`;
+
+    it('types Selectable as pg parses it, takes it back in a write, and refuses a plain object', async () => {
+      expect(await probeErrors({ ...config, intervalsTypedAsObjects: true }, intervalProbe('//', '// @ts-expect-error')))
+        .toEqual([]);
+    });
+
+    it.each([undefined, false])('is the text in all five, as in Zapatos 6.6.1 (intervalsTypedAsObjects: %s)', async key => {
+      const keyed = { ...config, ...key === undefined ? {} : { intervalsTypedAsObjects: key } };
+      expect(await probeErrors(keyed, intervalProbe('// @ts-expect-error', '//'))).toEqual([]);
+    });
+
+    it('each refusal of one probe is an unused directive in the other', async () => {
+      const both = intervalProbe('// @ts-expect-error', '// @ts-expect-error');
+      const unused = "probe.ts TS2578 Unused '@ts-expect-error' directive.";
+      expect(await probeErrors({ ...config, intervalsTypedAsObjects: true }, both)).toEqual(Array(2).fill(unused));
+      expect(await probeErrors(config, both)).toEqual([unused]);
+    });
+  });
+
   it('holds no orphan file', () => {
     const expected = variants.flatMap(([name]) =>
       withoutCustomTypes.includes(name) ? [`${name}.d.ts`] : [`${name}.custom.d.ts`, `${name}.d.ts`]);
@@ -1739,6 +1794,245 @@ describe('enumArraysTypedAsText', () => {
     void right;
     // @ts-expect-error a boolean
     const wrong: Config = { enumArraysTypedAsText: 'yes' };
+    void wrong;
+  });
+});
+
+describe('intervalsTypedAsObjects', () => {
+  // a schema of its own, committed to this file's database: no other test configures it
+  beforeAll(() => t.pool.query(`
+    CREATE SCHEMA iv;
+    CREATE DOMAIN iv.span AS interval;
+    -- a domain over a domain, and an array of a domain: any, but with domainsTypedByContext (#484)
+    CREATE DOMAIN iv.vip_span AS iv.span;
+    CREATE TABLE iv.runs (id int PRIMARY KEY, runtime interval, breaks interval[], span iv.span, vip iv.vip_span, spans iv.span[]);
+    -- a domain over interval[], and a domain over an array of a domain
+    CREATE DOMAIN iv.span_list AS interval[];
+    CREATE DOMAIN iv.span_set AS iv.span[];
+    -- an array of a domain over interval[], and a domain over one: any, even with domainsTypedByContext
+    CREATE DOMAIN iv.list_set AS iv.span_list[];
+    CREATE TABLE iv.lists (list iv.span_list, set iv.span_set, lists iv.span_list[], list_set iv.list_set);
+    CREATE TABLE iv.gaps (gap interval);
+    CREATE TABLE iv.quiet (id int PRIMARY KEY, label text);
+  `));
+  afterAll(() => t.pool.query('DROP SCHEMA iv CASCADE'));
+
+  const iv = { schemas: { iv: all }, schemaJSDoc: false, unprefixedSchema: 'iv' };
+  const on = { ...iv, intervalsTypedAsObjects: true };
+  const notesFor = async (config: Config) => {
+    const warnings: string[] = [];
+    await tsForConfig(finaliseConfig({ ...config, ...quiet, warningListener: s => warnings.push(s), db: db() }), noDebug);
+    return warnings.filter(w => w.includes('intervalsTypedAsObjects'));
+  };
+  /** The line of `column` in each interface of `table`: Selectable, JSONSelectable, Whereable, Insertable, Updatable. */
+  const linesOf = (schema: string, table: string, column: string) =>
+    tableBlock(schema, table).split('\n').map(line => line.trim()).filter(line => new RegExp(`^${column}\\??: `).test(line));
+  /** The five lines of a nullable column with no default, given its Selectable type and its type in each other context. */
+  const nullable = (column: string, selectable: string, json: string, input: string) => {
+    const where = `${input} | db.Parameter<${input}> | db.SQLFragment | db.ParentColumn`,
+      write = `${input} | db.Parameter<${input}> | null | db.DefaultType | db.SQLFragment`;
+    return [
+      `${column}: ${selectable} | null;`,
+      `${column}: ${json} | null;`,
+      `${column}?: ${where} | db.SQLFragment<any, ${where}>;`,
+      `${column}?: ${write};`,
+      `${column}?: ${write} | db.SQLFragment<any, ${write}>;`,
+    ];
+  };
+  const placeholder = (name: string, type: string) =>
+    `${type.startsWith('db.') ? `  import type * as db from 'zapatos/db';\n` : ''}  export type ${name} = ${type};`;
+  const object = 'db.PostgresInterval', input = '(string | db.PostgresInterval)';
+  const inContext = (custom: string, generated: string) => (type: string) => `db.DomainInContext<${custom}, ${generated}, ${type}>`;
+
+  it.each([undefined, false])('is the text in all five by default, as in Zapatos 6.6.1 (intervalsTypedAsObjects: %s)', async key => {
+    const { ts: schema, customTypeSourceFiles: files } = await codegen({ ...iv, ...key === undefined ? {} : { intervalsTypedAsObjects: key } });
+    expect(linesOf(schema, 'runs', 'runtime')).toEqual(nullable('runtime', 'string', 'string', 'string'));
+    expect(linesOf(schema, 'runs', 'breaks')).toEqual(nullable('breaks', 'string[]', 'string[]', 'string[]'));
+    expect(linesOf(schema, 'runs', 'span')).toEqual(nullable('span', 'c.PgSpan', 'c.PgSpan', 'c.PgSpan'));
+    expect(files.PgSpan).toContain(placeholder('PgSpan', 'string'));
+  });
+
+  it('types Selectable as pg parses it, and a write takes that back; the JSON stays the text', async () => {
+    const { ts: schema, customTypeSourceFiles: files } = await codegen(on);
+    expect(linesOf(schema, 'runs', 'runtime')).toEqual(nullable('runtime', object, 'string', input));
+    expect(linesOf(schema, 'runs', 'breaks')).toEqual(nullable('breaks', `${object}[]`, 'string[]', `${input}[]`));
+    // a domain over one: its placeholder, which as generated holds what pg returns
+    expect(linesOf(schema, 'runs', 'span')).toEqual(nullable('span', 'c.PgSpan', 'c.PgSpan', 'c.PgSpan'));
+    expect(files.PgSpan).toContain(placeholder('PgSpan', object));
+    // any, as without the option
+    expect(linesOf(schema, 'runs', 'vip')).toEqual(nullable('vip', 'c.PgVip_span', 'c.PgVip_span', 'c.PgVip_span'));
+    expect(linesOf(schema, 'runs', 'spans')).toEqual(nullable('spans', 'c.Pg_span', 'c.Pg_span', 'c.Pg_span'));
+  });
+
+  it('types a domain over one by context with domainsTypedByContext, and one under other domains by its base type', async () => {
+    const { ts: schema } = await codegen({ ...on, domainsTypedByContext: true });
+    const span = inContext('c.PgSpan', object), vip = inContext('c.PgVip_span', 'any'), spans = inContext('c.Pg_span', 'any');
+    expect(linesOf(schema, 'runs', 'span')).toEqual(nullable('span', 'c.PgSpan', span('string'), span(input)));
+    expect(linesOf(schema, 'runs', 'vip')).toEqual(nullable('vip', vip(object), vip('string'), vip(input)));
+    // pg returns an array of a domain as its text
+    expect(linesOf(schema, 'runs', 'spans')).toEqual(nullable('spans', spans('string'), spans('string[]'), spans(`${input}[]`)));
+  });
+
+  it('leaves a domain over one alike in every context with domainsTypedByContext alone', async () => {
+    const { ts: schema } = await codegen({ ...iv, domainsTypedByContext: true });
+    const vip = inContext('c.PgVip_span', 'any'), spans = inContext('c.Pg_span', 'any');
+    expect(linesOf(schema, 'runs', 'span')).toEqual(nullable('span', 'c.PgSpan', 'c.PgSpan', 'c.PgSpan'));
+    expect(linesOf(schema, 'runs', 'vip')).toEqual(nullable('vip', vip('string'), vip('string'), vip('string')));
+    expect(linesOf(schema, 'runs', 'spans')).toEqual(nullable('spans', spans('string'), spans('string[]'), spans('string[]')));
+  });
+
+  const note = (list: string, one = false) => `Note: ${list} ${one ? 'is' : 'are'} of interval or of a type that wraps it ` +
+    `in arrays or domains: as generated, ${one ? 'it is typed as its' : 'they are typed as their'} ` +
+    `text, though pg's default type parser returns an interval from a query of your own as an object, a PostgresInterval. ` +
+    `Set intervalsTypedAsObjects: true to type ${one ? 'it' : 'them'} as pg parses ${one ? 'it' : 'them'}; it will be the ` +
+    `default in pgcast 7.0. Set it to false to keep the text, if a type parser of yours returns it.`;
+
+  it('notes each column it would change, once per run, when left out', async () => {
+    // interval, an array of it, and a domain over either
+    expect(await notesFor(iv)).toEqual([note('iv.gaps.gap (interval), iv.lists.list (iv.span_list), ' +
+      'iv.runs.breaks (interval[]), iv.runs.runtime (interval) and iv.runs.span (iv.span)')]);
+    // left out, or null from JSON
+    expect(await notesFor({ ...iv, intervalsTypedAsObjects: null as unknown as boolean, schemas: { iv: only('gaps') } }))
+      .toEqual([note('iv.gaps.gap (interval)', true)]);
+    // under other domains too, which only domainsTypedByContext types by their base type: an array of a domain, a domain
+    // over a domain, a domain over an array of a domain
+    expect(await notesFor({ ...iv, domainsTypedByContext: true, schemas: { iv: only('runs', 'lists') } })).toEqual([
+      note('iv.lists.list (iv.span_list), iv.lists.set (iv.span_set), iv.runs.breaks (interval[]), iv.runs.runtime (interval), ' +
+        'iv.runs.span (iv.span), iv.runs.spans (iv.span[]) and iv.runs.vip (iv.vip_span)')]);
+  });
+
+  it('leaves out an array of a domain over interval[], or a domain over one, whose types it never changes', async () => {
+    for (const byContext of [false, true]) {
+      const keyed = (key?: boolean) => codegen({ ...iv, domainsTypedByContext: byContext, ...key === undefined ? {} : { intervalsTypedAsObjects: key } });
+      const types = ({ ts: schema, customTypeSourceFiles: files }: Awaited<ReturnType<typeof codegen>>) =>
+        [linesOf(schema, 'lists', 'lists'), linesOf(schema, 'lists', 'list_set'), files.Pg_span_list, files.PgList_set];
+      const absent = types(await keyed());
+      expect(types(await keyed(true))).toEqual(absent);
+      expect(types(await keyed(false))).toEqual(absent);
+      expect((await notesFor({ ...iv, domainsTypedByContext: byContext })).join()).not.toMatch(/iv\.lists\.(lists|list_set) /);
+    }
+  });
+
+  it('gives no note with true or false, or when no column would change', async () => {
+    expect(await notesFor(on)).toEqual([]);
+    expect(await notesFor({ ...iv, intervalsTypedAsObjects: false })).toEqual([]);
+    expect(await notesFor({ ...iv, schemas: { iv: only('quiet') } })).toEqual([]);
+  });
+
+  describe('a type of yours named interval', () => {
+    // an enum, a composite and a domain over text, each named interval, next to pg_catalog's interval and its array
+    beforeAll(() => t.pool.query(`
+      CREATE SCHEMA iv_enum;
+      CREATE TYPE iv_enum."interval" AS ENUM ('short', 'long');
+      CREATE DOMAIN iv_enum.enum_wrap AS iv_enum."interval";
+      CREATE DOMAIN iv_enum.enum_wrap2 AS iv_enum.enum_wrap;
+      CREATE TABLE iv_enum.cuts (id int PRIMARY KEY, a iv_enum."interval", b iv_enum."interval"[], w2 iv_enum.enum_wrap2,
+        c pg_catalog.interval, d pg_catalog.interval[]);
+      CREATE SCHEMA iv_domain;
+      CREATE DOMAIN iv_domain."interval" AS text;
+      CREATE DOMAIN iv_domain.text_wrap AS iv_domain."interval";
+      CREATE TABLE iv_domain.takes (id int PRIMARY KEY, a iv_domain."interval", b iv_domain."interval"[], w iv_domain.text_wrap,
+        x iv_enum."interval", c pg_catalog.interval, d pg_catalog.interval[]);
+      CREATE SCHEMA iv_row;
+      CREATE TABLE iv_row."interval" (n int);
+      CREATE TABLE iv_row.reels (id int PRIMARY KEY, a iv_row."interval", b iv_row."interval"[], c pg_catalog.interval);
+    `));
+    afterAll(() => t.pool.query('DROP SCHEMA iv_enum, iv_domain, iv_row CASCADE'));
+
+    const named = { schemas: { iv_enum: all, iv_domain: all, iv_row: all }, schemaJSDoc: false };
+    const alike = (column: string, type: string) => nullable(column, type, type, type);
+
+    it.each([false, true])('is typed as without the key, and pg_catalog\'s by the key (domainsTypedByContext: %s)', async byContext => {
+      for (const key of [undefined, false, true]) {
+        const { ts: schema, customTypeSourceFiles: files } =
+          await codegen({ ...named, domainsTypedByContext: byContext, ...key === undefined ? {} : { intervalsTypedAsObjects: key } });
+        // by its name, as text, as in Zapatos 6.6.1, whatever the key
+        expect(linesOf(schema, 'cuts', 'a')).toEqual(alike('a', 'string'));
+        expect(linesOf(schema, 'cuts', 'b')).toEqual(alike('b', 'string[]'));
+        expect(linesOf(schema, 'cuts', 'w2'))
+          .toEqual(alike('w2', byContext ? 'db.DomainInContext<c.PgEnum_wrap2, any, string>' : 'c.PgEnum_wrap2'));
+        expect(linesOf(schema, 'takes', 'a')).toEqual(alike('a', 'c.PgInterval'));
+        expect(linesOf(schema, 'takes', 'b')).toEqual(alike('b', 'string[]'));
+        expect(linesOf(schema, 'takes', 'w')).toEqual(alike('w', 'c.PgText_wrap'));
+        expect(linesOf(schema, 'takes', 'x')).toEqual(alike('x', 'string'));
+        expect(linesOf(schema, 'reels', 'a')).toEqual(alike('a', 'string'));
+        expect(linesOf(schema, 'reels', 'b')).toEqual(alike('b', 'string[]'));
+        expect([files.PgEnum_wrap2, files.PgInterval, files.PgText_wrap]).toEqual([
+          expect.stringContaining(placeholder('PgEnum_wrap2', 'any')), expect.stringContaining(placeholder('PgInterval', 'string')),
+          expect.stringContaining(placeholder('PgText_wrap', 'string')),
+        ]);
+        // pg_catalog's, by the key
+        for (const table of ['cuts', 'takes', 'reels']) {
+          expect(linesOf(schema, table, 'c')).toEqual(key ? nullable('c', object, 'string', input) : alike('c', 'string'));
+        }
+        for (const table of ['cuts', 'takes']) {
+          expect(linesOf(schema, table, 'd'))
+            .toEqual(key ? nullable('d', `${object}[]`, 'string[]', `${input}[]`) : alike('d', 'string[]'));
+        }
+      }
+    });
+
+    it.each([false, true])('is left out of the note, which names pg_catalog\'s (domainsTypedByContext: %s)', async byContext => {
+      expect(await notesFor({ ...named, domainsTypedByContext: byContext })).toEqual([note('iv_domain.takes.c (interval), ' +
+        'iv_domain.takes.d (interval[]), iv_enum.cuts.c (interval), iv_enum.cuts.d (interval[]) and iv_row.reels.c (interval)')]);
+      for (const key of [false, true]) {
+        expect(await notesFor({ ...named, domainsTypedByContext: byContext, intervalsTypedAsObjects: key })).toEqual([]);
+      }
+      // nor named by the note of typeEnumsAcrossSchemas, whatever the key
+      for (const key of [undefined, false, true]) {
+        const keyed = { ...named, domainsTypedByContext: byContext, ...key === undefined ? {} : { intervalsTypedAsObjects: key } };
+        expect((await warningsOf(keyed)).filter(w => w.includes('takes.x'))).toEqual([]);
+      }
+    });
+  });
+
+  it('types what pg, the shortcuts and Postgres give: an object from pg, the text as JSON', async () => {
+    const written = await runtime.insert('iv.runs' as any, {
+      id: 1, runtime: '1 day 02:00:00', breaks: ['01:00:00'], span: '3 mons', vip: '1 year', spans: ['00:05:00'],
+    }).run(t.client) as any;
+    // the shortcuts' JSON, at the top level and in a lateral
+    const text = { id: 1, runtime: '1 day 02:00:00', breaks: ['01:00:00'], span: '3 mons', vip: '1 year', spans: ['00:05:00'] };
+    expect(written).toEqual(text);
+    const withLateral = await runtime.selectExactlyOne('iv.runs' as any, { id: 1 } as any, {
+      lateral: { again: runtime.selectExactlyOne('iv.runs' as any, { id: runtime.parent('id' as any) } as any) },
+    } as any).run(t.client) as any;
+    expect(withLateral.again).toEqual(text);
+    // pg's own parsing: an object of each part that isn't zero, with toPostgres() and toISO(); an array of a domain as text
+    const { rows: [fromPg] } = await t.client.query('SELECT runtime, breaks, span, vip, spans FROM iv.runs');
+    const parts = (v: any) => ({ ...v, toPostgres: typeof v.toPostgres, toISO: typeof v.toISO });
+    expect({ runtime: parts(fromPg.runtime), breaks: fromPg.breaks.map(parts), span: parts(fromPg.span), vip: parts(fromPg.vip),
+      spans: fromPg.spans }).toEqual({
+      runtime: { days: 1, hours: 2, toPostgres: 'function', toISO: 'function' },
+      breaks: [{ hours: 1, toPostgres: 'function', toISO: 'function' }],
+      span: { months: 3, toPostgres: 'function', toISO: 'function' },
+      vip: { years: 1, toPostgres: 'function', toISO: 'function' },
+      spans: '{00:05:00}',
+    });
+    // written back as it was read
+    await runtime.update('iv.runs' as any, { runtime: fromPg.span, breaks: [fromPg.runtime] } as any, { id: 1 } as any).run(t.client);
+    const { rows: [stored] } = await t.client.query('SELECT runtime::text, breaks::text FROM iv.runs');
+    expect(stored).toEqual({ runtime: '3 mons', breaks: '{"1 day 02:00:00"}' });
+    // a plain object, sent as JSON, is no interval to Postgres 17 and later: each key is a unit with no value (Postgres
+    // commit 617f9b7d4); earlier ones skip those and read its number as seconds. Last, as the error aborts the transaction
+    const { rows: [{ version }] } = await t.client.query("SELECT current_setting('server_version_num')::int AS version");
+    const plain = runtime.insert('iv.runs' as any, [{ id: 2, runtime: { days: 1 } }, { id: 3, runtime: { minutes: 15 } }] as any)
+      .run(t.client);
+    if (version >= 170000) await expect(plain).rejects.toMatchObject({ code: '22007' });
+    else expect((await plain as any[]).map(row => row.runtime)).toEqual(['00:00:01', '00:00:15']);
+  });
+
+  it('leaves the output as it was without the option, or with false', async () => {
+    const { ts: absent } = await codegen(main);
+    expect((await codegen({ ...main, intervalsTypedAsObjects: false })).ts).toBe(absent);
+    expect(absent).toBe(readFileSync(join(generatedDir, 'zapatos/schema.d.ts'), 'utf8'));
+  });
+
+  it('is optional in Config, read as false when absent', () => {
+    expect(finaliseConfig({}).intervalsTypedAsObjects).toBeUndefined();
+    const right: Config = { intervalsTypedAsObjects: true };
+    void right;
+    // @ts-expect-error a boolean
+    const wrong: Config = { intervalsTypedAsObjects: 'yes' };
     void wrong;
   });
 });
@@ -2555,7 +2849,8 @@ describe('typeEnumsAcrossSchemas', () => {
       !w.includes('enumOrder') &&  // § enumOrder
       !w.includes('uniqueIndexConstraintsOnly') &&  // § uniqueIndexConstraintsOnly
       !w.includes('domainsTypedByContext') &&  // § domainsTypedByContext
-      !w.includes('enumArraysTypedAsText'));  // § enumArraysTypedAsText
+      !w.includes('enumArraysTypedAsText') &&  // § enumArraysTypedAsText
+      !w.includes('intervalsTypedAsObjects'));  // § intervalsTypedAsObjects
   };
 
   it('is off by default: an enum of another schema is an `any` custom type', async () => {
@@ -2682,7 +2977,8 @@ describe('enumOrder', () => {
       !w.includes('typeEnumsAcrossSchemas') &&  // § typeEnumsAcrossSchemas
       !w.includes('uniqueIndexConstraintsOnly') &&  // § uniqueIndexConstraintsOnly
       !w.includes('domainsTypedByContext') &&  // § domainsTypedByContext
-      !w.includes('enumArraysTypedAsText'));  // § enumArraysTypedAsText
+      !w.includes('enumArraysTypedAsText') &&  // § enumArraysTypedAsText
+      !w.includes('intervalsTypedAsObjects'));  // § intervalsTypedAsObjects
   };
 
   it('is off by default: labels in alphabetical order, every.<enum> included', async () => {
@@ -2842,7 +3138,7 @@ describe('include entries that match no relation', () => {
     expect(await warningsFor({ public: all, extra: { include: '*', exclude: ['no_such_table'] } })).toEqual([]);
   });
 
-  it('warns, of main and the snapshot variants, only about no_such_table of include-exclude-lists, and the enums, unique indexes, domains and enum arrays notes', async () => {
+  it('warns, of main and the snapshot variants, only about no_such_table of include-exclude-lists, and the enums, unique indexes, domains, enum arrays and intervals notes', async () => {
     const enumsNote = 'Note: extra.type_zoo.c_enum_array (public.mood[]) and public.products.status (extra.status) ' +
       'have a type of another schema, ' +
       'which is looked up by name in the schema of their relation: an enum becomes an `any` custom type, or the enum of ' +
@@ -2866,21 +3162,27 @@ describe('include entries that match no relation', () => {
     const enumArraysNote = 'Note: extra.type_zoo.c_enum_array (public.mood[]) is an array of an enum, which pg returns ' +
       'as its text, such as \'{a,b}\', though Selectable types it as an array. Set enumArraysTypedAsText: true to type it ' +
       'as a string there, or false to keep the array if pg.types.setTypeParser parses it; true will be the default in pgcast 7.0.';
+    const intervalsNote = 'Note: extra.type_zoo.c_interval (interval) is of interval or of a type that wraps it in arrays ' +
+      'or domains: as generated, it is typed as its text, though pg\'s default type parser ' +
+      'returns an interval from a query of your own as an object, a PostgresInterval. Set intervalsTypedAsObjects: true to ' +
+      'type it as pg parses it; it will be the default in pgcast 7.0. Set it to false to keep the text, if a type parser of ' +
+      'yours returns it.';
     const expected: Record<string, string[]> = {
       main: [enumsNote, bothOrderNote, uniqueNote('extra.articles.shared_name_idx, public.account_totals.account_totals_owner_key, ' +
-        'public.products.products_status_sku_key and public.products.products_title_lower_key'), domainsNote],
+        'public.products.products_status_sku_key and public.products.products_title_lower_key'), domainsNote, intervalsNote],
       'unprefixedSchema-null': [bothOrderNote, articlesNote],
       'schemaJSDoc-false': [orderNote('mood', 'enum public.mood')],
-      'customTypesTransform-PgMy_type': [enumsNote, bothOrderNote, productsNote, domainsNote],
-      'customTypesTransform-my_type': [enumsNote, bothOrderNote, productsNote, domainsNote],
-      'customTypesTransform-PgMyType': [enumsNote, bothOrderNote, productsNote, domainsNote],
-      'customTypesTransform-function': [enumsNote, bothOrderNote, productsNote, domainsNote],
-      typeEnumsAcrossSchemas: [bothOrderNote, productsNote, domainsNote, enumArraysNote],
-      'enumOrder-declared': [productsNote, domainsNote, enumArraysNote],
-      'moduleNames-pgcast': [enumsNote, bothOrderNote, productsNote, domainsNote],
-      uniqueIndexConstraintsOnly: [enumsNote, bothOrderNote, domainsNote],
-      domainsTypedByContext: [enumsNote, bothOrderNote, productsNote],
-      enumArraysTypedAsText: [bothOrderNote, productsNote, domainsNote],
+      'customTypesTransform-PgMy_type': [enumsNote, bothOrderNote, productsNote, domainsNote, intervalsNote],
+      'customTypesTransform-my_type': [enumsNote, bothOrderNote, productsNote, domainsNote, intervalsNote],
+      'customTypesTransform-PgMyType': [enumsNote, bothOrderNote, productsNote, domainsNote, intervalsNote],
+      'customTypesTransform-function': [enumsNote, bothOrderNote, productsNote, domainsNote, intervalsNote],
+      typeEnumsAcrossSchemas: [bothOrderNote, productsNote, domainsNote, enumArraysNote, intervalsNote],
+      'enumOrder-declared': [productsNote, domainsNote, enumArraysNote, intervalsNote],
+      'moduleNames-pgcast': [enumsNote, bothOrderNote, productsNote, domainsNote, intervalsNote],
+      uniqueIndexConstraintsOnly: [enumsNote, bothOrderNote, domainsNote, intervalsNote],
+      domainsTypedByContext: [enumsNote, bothOrderNote, productsNote, intervalsNote],
+      enumArraysTypedAsText: [bothOrderNote, productsNote, domainsNote, intervalsNote],
+      intervalsTypedAsObjects: [enumsNote, bothOrderNote, productsNote, domainsNote],
       columnOptions: [bothOrderNote, articlesNote],
       'include-exclude-lists': [unmatched('no_such_table', 'public'), bothOrderNote, articlesNote],
       'exclude-star': [bothOrderNote],  // exclude: '*' still generates the enums

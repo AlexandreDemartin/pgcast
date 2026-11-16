@@ -24,8 +24,8 @@ const en = {
   code: 'EN',  // the language switcher's (theme/LanguageSwitch.vue)
   lang: 'en-GB',
   ogLocale: 'en_GB',
-  description: 'Zero-abstraction Postgres for TypeScript: types cast from your database schema.',
-  socialAlt: 'pgcast. Your types, cast from your database.',
+  description: 'The Postgres you know, with the full power of TypeScript: zero abstraction, queries in Postgres’s natural vocabulary, types read from your schema.',
+  socialAlt: 'pgcast. The Postgres you know, with the full power of TypeScript.',
   // config.ts
   search: 'Search',
   searchDocs: 'Search the docs',
@@ -175,8 +175,8 @@ const fr: Words = {
   code: 'FR',
   lang: 'fr-FR',
   ogLocale: 'fr_FR',
-  description: 'Postgres sans abstraction pour TypeScript : des types castés depuis le schéma de votre base de données.',
-  socialAlt: 'pgcast. Vos types, castés depuis votre base de données.',
+  description: 'Le Postgres que vous connaissez, avec toute la puissance de TypeScript : zéro abstraction, des requêtes dans le vocabulaire naturel de Postgres, des types tirés de votre schéma.',
+  socialAlt: 'pgcast. Le Postgres que vous connaissez, avec toute la puissance de TypeScript.',
   search: 'Rechercher',
   searchDocs: 'Rechercher dans la doc',
   editLink: 'Modifier cette page sur GitHub',

@@ -1,6 +1,6 @@
 # pgcast
 
-**Zero-abstraction Postgres for TypeScript: your types, cast from your database.**
+**The Postgres you know, with the full power of TypeScript.**
 
 Maintained by [Alexandre Demartin](https://github.com/AlexandreDemartin)
 
@@ -97,6 +97,7 @@ npx zapatos        # or: npx pgcast
 | `uniqueIndexConstraintsOnly` (generator): a relation's `UniqueIndex`, the names `constraint()` takes, lists only the index of each of its `UNIQUE` and `PRIMARY KEY` constraints, valid, not `DEFERRABLE` nor `WITHOUT OVERLAPS` ([generator](https://pgcast.dev/generator#generate.uniqueIndexConstraintsOnly)), rather than every unique index, some of which `ON CONFLICT ON CONSTRAINT` refuses | a note through `warningListener` | 6.7.0 |
 | `domainsTypedByContext` (generator): a domain over `int8`, `numeric`, `bytea`, `money` or a date, or over an array of one, is typed by context, as its base type is, while its placeholder holds what the generator wrote ([generator](https://pgcast.dev/generator#generate.domainsTypedByContext)), rather than as `pg` returns it in all five interfaces; a domain over a domain, or an array of a domain, by the base type of its innermost domain, rather than as `any` | a note through `warningListener` | 6.7.0 |
 | `enumArraysTypedAsText` (generator): an array of an enum is a `string` in `Selectable`, the text `pg` returns from a `sql` query, `'{writer,editor}'` ([generator](https://pgcast.dev/generator#generate.enumArraysTypedAsText)), rather than an array; `false` keeps the array, for a parser set with `pg.types.setTypeParser` | a note through `warningListener`, the key left out | 6.7.0 |
+| `intervalsTypedAsObjects` (generator): an `interval` is typed in `Selectable` as `pg`'s default type parser returns it, a `db.PostgresInterval`, which a write takes back ([generator](https://pgcast.dev/generator#generate.intervalsTypedAsObjects)), rather than as its text; `false` keeps the text, for a type parser of your own | a note through `warningListener` | 6.7.0 |
 
 Everything else: [CHANGELOG.md](CHANGELOG.md); what the characterisation of 6.6.1 found: [docs/CHARACTERISATION-REPORT.md](docs/CHARACTERISATION-REPORT.md).
 

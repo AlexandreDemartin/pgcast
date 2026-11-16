@@ -405,7 +405,7 @@ A behaviour of Zapatos 6.6.1 that code may rely on, but that pgcast would change
 
 One opt-in has no warning and no default in 7.0: [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow), since 6.6.1's reading of `selectExactlyOne()`, at least one row, is one Zapatos documents.
 
-The generator has its own: [`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas), [`enumOrder`](/generator#generate.enumOrder), [`rejectOnQueryError`](/generator#generate.rejectOnQueryError), [`uniqueIndexConstraintsOnly`](/generator#generate.uniqueIndexConstraintsOnly), [`domainsTypedByContext`](/generator#generate.domainsTypedByContext) and [`enumArraysTypedAsText`](/generator#generate.enumArraysTypedAsText), whose old paths are notes through [`warningListener`](/generator#generate.warningListener), once per run, rather than a `DeprecationWarning`; they will be the defaults in 7.0 too.
+The generator has its own: [`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas), [`enumOrder`](/generator#generate.enumOrder), [`rejectOnQueryError`](/generator#generate.rejectOnQueryError), [`uniqueIndexConstraintsOnly`](/generator#generate.uniqueIndexConstraintsOnly), [`domainsTypedByContext`](/generator#generate.domainsTypedByContext), [`enumArraysTypedAsText`](/generator#generate.enumArraysTypedAsText) and [`intervalsTypedAsObjects`](/generator#generate.intervalsTypedAsObjects), whose old paths are notes through [`warningListener`](/generator#generate.warningListener), once per run, rather than a `DeprecationWarning`; they will be the defaults in 7.0 too.
 
 Each warning is a Node.js `DeprecationWarning`, emitted once per process for each code, when the shortcut is called (`PGCAST_DEP003`: when `transaction()` resolves; `PGCAST_DEP004`: when `.run()` gets the result; `PGCAST_DEP005`: when `transaction()` is called, before its `START TRANSACTION`; `PGCAST_DEP007`: when `transaction()` is called, before its callback), and only when the old behaviour is used. Its message names the option. Node prints it to `stderr`:
 
@@ -447,6 +447,7 @@ process.on('warning', (warning: Error & { code?: string }) => {
 - With the generator's [`customJSONParsingForLargeNumbers`](/generator#generate.customJSONParsingForLargeNumbers), `int8` and `numeric` are `number | Int8String` and `number | NumericString` in a `JSONSelectable` ([`enableCustomJSONParsingForLargeNumbers()`](#enableCustomJSONParsingForLargeNumbers)).
 - The shortcuts return `JSONSelectable`s. A `Selectable` is what `pg` returns for a plain `SELECT` of the row.
 - A domain over one of these types takes its placeholder's type, the `Selectable` one, in every interface, unless the generator's [`domainsTypedByContext`](/generator#generate.domainsTypedByContext) is on ([`DomainInContext`](#DomainInContext)).
+- An `interval` is a `string` in every interface, unless the generator's [`intervalsTypedAsObjects`](/generator#generate.intervalsTypedAsObjects) is on: then [`PostgresInterval`](#PostgresInterval) in a `Selectable`, and `string | PostgresInterval` in a write.
 
 Each type checks the shape of a string, not its value: `'2030-13-45'` is a `DateString`.
 
@@ -471,6 +472,22 @@ The type that the generator's [`domainsTypedByContext`](/generator#generate.doma
 - `DomainInContext<number | db.Int8String, db.Int8String, number>` is `number | db.Int8String`: an edited placeholder keeps its type, in every context.
 - An `any` stays `any`, and an `any[]` stays `any[]`, such as a placeholder Zapatos 6.6.1 wrote over `int8[]` with no import. A placeholder edited to the same type, `` `${number}` `` for `db.Int8String`, counts as left as generated.
 - `DomainInContext<any, any, number>` is `number`: a domain over a domain, whose placeholder the generator wrote as `any`. Edited to `unknown`, it stays `unknown`.
+
+### `PostgresInterval` {#PostgresInterval}
+
+```ts
+interface PostgresInterval {
+  years?: number; months?: number; days?: number; hours?: number;
+  minutes?: number; seconds?: number; milliseconds?: number;
+  toPostgres(): string;
+  toISO(): string;
+}
+```
+
+An `interval` as `pg`'s default type parser returns it, which the generator's [`intervalsTypedAsObjects`](/generator#generate.intervalsTypedAsObjects) writes in `Selectable`: each part that isn't zero, `{ minutes: 15 }` for `'00:15:00'`, and `{}` for a zero interval. `toPostgres()` gives the text `pg` writes back, `'15 minutes'`; `toISO()`, ISO 8601, `'P0Y0M0DT0H15M0S'`.
+
+- It is the shape of `postgres-interval`'s `PostgresInterval`, which `pg` 7 and 8 bring through `pg-types`, written out: pgcast doesn't depend on that package.
+- A plain object isn't one: without `toPostgres()`, `pg` sends it as JSON. Postgres 17 and later refuse it (22007), and Postgres 16 and earlier store something else: `00:00:15` for `{ minutes: 15 }`.
 
 ## JSON {#json}
 
