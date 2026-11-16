@@ -1640,6 +1640,73 @@ describe('intervalsTypedAsObjects', () => {
     expect(await notesFor({ ...iv, schemas: { iv: only('quiet') } })).toEqual([]);
   });
 
+  describe('a type of yours named interval', () => {
+    // an enum, a composite and a domain over text, each named interval, next to pg_catalog's interval and its array
+    beforeAll(() => t.pool.query(`
+      CREATE SCHEMA iv_enum;
+      CREATE TYPE iv_enum."interval" AS ENUM ('short', 'long');
+      CREATE DOMAIN iv_enum.enum_wrap AS iv_enum."interval";
+      CREATE DOMAIN iv_enum.enum_wrap2 AS iv_enum.enum_wrap;
+      CREATE TABLE iv_enum.cuts (id int PRIMARY KEY, a iv_enum."interval", b iv_enum."interval"[], w2 iv_enum.enum_wrap2,
+        c pg_catalog.interval, d pg_catalog.interval[]);
+      CREATE SCHEMA iv_domain;
+      CREATE DOMAIN iv_domain."interval" AS text;
+      CREATE DOMAIN iv_domain.text_wrap AS iv_domain."interval";
+      CREATE TABLE iv_domain.takes (id int PRIMARY KEY, a iv_domain."interval", b iv_domain."interval"[], w iv_domain.text_wrap,
+        x iv_enum."interval", c pg_catalog.interval, d pg_catalog.interval[]);
+      CREATE SCHEMA iv_row;
+      CREATE TABLE iv_row."interval" (n int);
+      CREATE TABLE iv_row.reels (id int PRIMARY KEY, a iv_row."interval", b iv_row."interval"[], c pg_catalog.interval);
+    `));
+    afterAll(() => t.pool.query('DROP SCHEMA iv_enum, iv_domain, iv_row CASCADE'));
+
+    const named = { schemas: { iv_enum: all, iv_domain: all, iv_row: all }, schemaJSDoc: false };
+    const alike = (column: string, type: string) => nullable(column, type, type, type);
+
+    it.each([false, true])('is typed as without the key, and pg_catalog\'s by the key (domainsTypedByContext: %s)', async byContext => {
+      for (const key of [undefined, false, true]) {
+        const { ts: schema, customTypeSourceFiles: files } =
+          await codegen({ ...named, domainsTypedByContext: byContext, ...key === undefined ? {} : { intervalsTypedAsObjects: key } });
+        // by its name, as text, as in Zapatos 6.6.1, whatever the key
+        expect(linesOf(schema, 'cuts', 'a')).toEqual(alike('a', 'string'));
+        expect(linesOf(schema, 'cuts', 'b')).toEqual(alike('b', 'string[]'));
+        expect(linesOf(schema, 'cuts', 'w2'))
+          .toEqual(alike('w2', byContext ? 'db.DomainInContext<c.PgEnum_wrap2, any, string>' : 'c.PgEnum_wrap2'));
+        expect(linesOf(schema, 'takes', 'a')).toEqual(alike('a', 'c.PgInterval'));
+        expect(linesOf(schema, 'takes', 'b')).toEqual(alike('b', 'string[]'));
+        expect(linesOf(schema, 'takes', 'w')).toEqual(alike('w', 'c.PgText_wrap'));
+        expect(linesOf(schema, 'takes', 'x')).toEqual(alike('x', 'string'));
+        expect(linesOf(schema, 'reels', 'a')).toEqual(alike('a', 'string'));
+        expect(linesOf(schema, 'reels', 'b')).toEqual(alike('b', 'string[]'));
+        expect([files.PgEnum_wrap2, files.PgInterval, files.PgText_wrap]).toEqual([
+          expect.stringContaining(placeholder('PgEnum_wrap2', 'any')), expect.stringContaining(placeholder('PgInterval', 'string')),
+          expect.stringContaining(placeholder('PgText_wrap', 'string')),
+        ]);
+        // pg_catalog's, by the key
+        for (const table of ['cuts', 'takes', 'reels']) {
+          expect(linesOf(schema, table, 'c')).toEqual(key ? nullable('c', object, 'string', input) : alike('c', 'string'));
+        }
+        for (const table of ['cuts', 'takes']) {
+          expect(linesOf(schema, table, 'd'))
+            .toEqual(key ? nullable('d', `${object}[]`, 'string[]', `${input}[]`) : alike('d', 'string[]'));
+        }
+      }
+    });
+
+    it.each([false, true])('is left out of the note, which names pg_catalog\'s (domainsTypedByContext: %s)', async byContext => {
+      expect(await notesFor({ ...named, domainsTypedByContext: byContext })).toEqual([note('iv_domain.takes.c (interval), ' +
+        'iv_domain.takes.d (interval[]), iv_enum.cuts.c (interval), iv_enum.cuts.d (interval[]) and iv_row.reels.c (interval)')]);
+      for (const key of [false, true]) {
+        expect(await notesFor({ ...named, domainsTypedByContext: byContext, intervalsTypedAsObjects: key })).toEqual([]);
+      }
+      // nor named by the note of typeEnumsAcrossSchemas, whatever the key
+      for (const key of [undefined, false, true]) {
+        const keyed = { ...named, domainsTypedByContext: byContext, ...key === undefined ? {} : { intervalsTypedAsObjects: key } };
+        expect((await warningsOf(keyed)).filter(w => w.includes('takes.x'))).toEqual([]);
+      }
+    });
+  });
+
   it('types what pg, the shortcuts and Postgres give: an object from pg, the text as JSON', async () => {
     const written = await runtime.insert('iv.runs' as any, {
       id: 1, runtime: '1 day 02:00:00', breaks: ['01:00:00'], span: '3 mons', vip: '1 year', spans: ['00:05:00'],
