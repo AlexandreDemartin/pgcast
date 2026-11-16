@@ -115,6 +115,9 @@ Candidates for a check, a rule or a skill line.
 - #546: a fix that moves a cheap guard ahead of an expensive step gets a test spying on that step for the refused input, or a reorder mutant survives; and a CHANGELOG `Unchanged:` sub-bullet holds no behaviour change (a check could flag "throws" or "now" there).
 - #546: `builtinObjects()` holds only non-empty typed arrays, so a claim about empty ones needs its own test; and `git pull` reporting "up to date" is no proof the branch holds master: check `git merge-base --is-ancestor origin/master HEAD`.
 - #547: `prepack` builds into an existing `dist/` without removing stale output, so 6.7.0's tarball shipped `dist/generate/enumLabel.{js,d.ts}`, whose source went in #395: publish from a clean `dist/` (`rm -rf dist` first, or a fresh `npm ci` and build).
+- #551: when a disclosure stays quiet, the contents of intermediate commits leak as much as their messages: check `git log -p origin/master..HEAD` before the first push, not only the final diff; an unpushed branch may still be rebuilt from master then.
+- #551: a test that bounds the time of synchronous code hangs instead of failing when it regresses (Vitest's timeout fires only once the work returns): size the input so the slow version still ends within tens of seconds, or give the job a `timeout-minutes`.
+- #551: two regexes are compared by their full match arrays (`""` versus `undefined` captures), on every string up to length 7 over a small alphabet plus random long inputs, not only by what is built from them.
 
 ## Minors kept
 
@@ -137,4 +140,4 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #541 (form): `scripts/bench-types.mjs` header, "each later call costs 12 where it cost 72": shape-dependent (about 21 against 77 for mixed one- or two-key calls).
 - #546 (form): `website/fr/sql-template.md`, "doté de propres clés énumérables" next to "sans clé propre énumérable".
 - #545 (form): `test/helpers/builtinObjects.ts` header, "but `Segments`, which has none (#517), a namespace object by its path": the inserted clause garbles the sentence.
-
+- #551 (form): `src/db/customJSON.ts` comment keeps "O(n²)" next to the regex; describes the mechanism only.
