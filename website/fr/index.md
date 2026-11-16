@@ -1,5 +1,5 @@
 ---
-english: 07dd060dd810
+english: f77050e4cc58
 layout: home
 markdownStyles: false
 title: pgcast
@@ -14,7 +14,7 @@ description: "Le Postgres que vous maîtrisez, avec la sécurité de TypeScript.
 
 <h1>Le Postgres que vous maîtrisez, avec la sécurité de TypeScript<span class="op">::</span></h1>
 
-pgcast lit votre schéma et en tire les types. Vous écrivez vos requêtes dans le vocabulaire de Postgres, chaque raccourci produit un SQL que vous pouvez lire et prévoir, et TypeScript attrape les erreurs avant toute exécution. Pas d’ORM, pas de modèles, pas d’état caché.
+Aucune couche entre vous et Postgres : vous écrivez vos requêtes dans son vocabulaire, chaque raccourci produit un SQL propre, que vous pouvez lire et prévoir, et le template `sql` est toujours là. pgcast lit votre schéma et en tire les types, pour que TypeScript attrape les erreurs avant toute exécution. Pas d’ORM, pas de modèles, pas d’état caché.
 {.lede}
 
 <div class="ctas">
