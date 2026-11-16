@@ -363,6 +363,54 @@ describe('upsert', () => {
     db.upsert('users', row, 'email', { updateValues: { settings: db.vals(unknown) } });
   });
 
+  test('updateValues refuses cols() and vals() of a Date or a Buffer, which compile their own keys (#514)', () => {
+    // a Date has no own key: ROW(…, ), 42601; a Buffer compiles its indexes, "0", "1" (42703), or its bytes, one
+    // parameter each: 42601 but for one byte, whose number is stored, `97` for Buffer.from('a'), under 6.6.1 too
+    const date = new Date();
+    // @ts-expect-error cols() of a Date, on a timestamptz column
+    db.upsert('users', row, 'email', { updateValues: { created_at: db.cols(date) } });
+    // @ts-expect-error vals() of a Date, on a timestamptz column
+    db.upsert('users', row, 'email', { updateValues: { created_at: db.vals(date) } });
+    // @ts-expect-error vals() of a Date, on a date column
+    db.upsert('accounts', {} as s.accounts.Insertable, 'id', { updateValues: { opened_on: db.vals(date) } });
+    class Premiere extends Date { }
+    // @ts-expect-error vals() of a subclass of Date
+    db.upsert('users', row, 'email', { updateValues: { created_at: db.vals(new Premiere()) } });
+    const zoo = { c_text: 'a' };
+    // @ts-expect-error cols() of a Buffer, on a bytea column
+    db.upsert('extra.type_zoo', zoo, 'id', { updateValues: { c_bytea: db.cols(Buffer.from('a')) } });
+    // @ts-expect-error vals() of a one-byte Buffer, on a bytea column: it stored the bytes of '97'
+    db.upsert('extra.type_zoo', zoo, 'id', { updateValues: { c_bytea: db.vals(Buffer.from('a')) } });
+    // @ts-expect-error vals() of an empty Buffer
+    db.upsert('extra.type_zoo', zoo, 'id', { updateValues: { c_bytea: db.vals(Buffer.alloc(0)) } });
+    // @ts-expect-error a generic forwarder of a Date
+    const forward = <V extends Date>(v: V) => db.upsert('users', row, 'email', { updateValues: { created_at: db.vals(v) } });
+    const built = { created_at: db.vals(date) };
+    // @ts-expect-error an updateValues built apart
+    db.upsert('users', row, 'email', { updateValues: built });
+    void forward;
+  });
+
+  test('updateValues still takes a Date or a Buffer as a value, in param(), and vals() of an argument typed any', () => {
+    const q = db.upsert('users', row, 'email', { updateValues: { created_at: new Date() } });
+    expectTypeOf(q.run(pool)).resolves.toEqualTypeOf<s.users.JSONSelectable & db.UpsertAction>();
+    expectTypeOf(q.run(pool)).resolves.not.toBeAny();
+    db.upsert('users', row, 'email', { updateValues: { created_at: db.param(new Date()) } });
+    const zoo = { c_text: 'a' };
+    const z = db.upsert('extra.type_zoo', zoo, 'id', { updateValues: { c_bytea: Buffer.from('a') } });
+    expectTypeOf(z.run(pool)).resolves.toEqualTypeOf<s.extra.type_zoo.JSONSelectable & db.UpsertAction>();
+    expectTypeOf(z.run(pool)).resolves.not.toBeAny();
+    db.upsert('extra.type_zoo', zoo, 'id', { updateValues: { c_bytea: db.param(Buffer.from('a')) } });
+    // JSON.parse() gives any, as in #503: still taken, on the columns whose writes take a Date or a Buffer too
+    const parsed = JSON.parse('["2020-01-01"]');
+    db.upsert('users', row, 'email', { updateValues: { created_at: db.vals(parsed) } });
+    db.upsert('users', row, 'email', { updateValues: { created_at: db.cols(parsed) } });
+    db.upsert('extra.type_zoo', zoo, 'id', { updateValues: { c_bytea: db.vals(parsed) } });
+    const unknown = null as unknown;
+    // @ts-expect-error vals() of an argument typed unknown, refused by 6.6.1 too
+    db.upsert('users', row, 'email', { updateValues: { created_at: db.vals(unknown) } });
+  });
+
   test('characterization: updateValues takes cols() and vals() of a primitive on a column typed any, and of a Date', () => {
     // a zapatos/custom placeholder left as generated is any, so the whole slot is any and refuses nothing
     db.upsert('extra.type_zoo', { c_text: 'a' }, 'id', { updateValues: { c_bit: db.cols('x'), c_point: db.vals(1) } });
