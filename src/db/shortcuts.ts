@@ -193,6 +193,21 @@ function updateValuesKeys(updateValues: { [k: string]: any }, updated: string[])
   return keys.filter(k => updateValues[k] !== undefined);
 }
 
+// the value of obj[k] (upsert()'s updateValues for a column, or its updateValues option), read through getters,
+// prototypes and a Proxy's `get`, as in 6.6.1, except a key of Object.prototype that neither obj nor a prototype of
+// its own has: there, `valueOf` or `hasOwnProperty` is a function, which threw, `__proto__` is Object.prototype, and
+// any other key was added there by other code, not by the caller; the chain is walked only when the value read is the
+// one Object.prototype gives (the receiver covers `__proto__`), so a Proxy answering through `get` alone keeps its value
+function callerValue(obj: any, k: string): any {
+  const value = obj[k];
+  if (value === undefined || !Object.prototype.hasOwnProperty.call(Object.prototype, k) ||
+    value !== Reflect.get(Object.prototype, k, obj)) return value;
+  for (let o: object | null = obj; o !== null && o !== Object.prototype; o = Object.getPrototypeOf(o)) {
+    if (Object.prototype.hasOwnProperty.call(o, k)) return value;
+  }
+  return undefined;
+}
+
 
 /* === insert === */
 
@@ -499,10 +514,10 @@ export const upsert: UpsertSignatures = function (
     insertColsSQL = cols(firstRow),
     insertValuesSQL = mapWithSeparator(completedValues, sql`, `, v => sql`(${vals(v)})`),
     colNames = Object.keys(firstRow) as Column[],
-    updateValues = options?.updateValues ?? {},
+    updateValues = options == null ? {} : callerValue(options, 'updateValues') ?? {},
     conflictColumns = Array.isArray(conflictTarget) ? conflictTarget : [],  // a constraint's are unknown here
     overwritesMissingKey = specifiedUpdateColumns == null && Array.isArray(values) && colNames.some(c =>
-      updateValues[c] === undefined &&  // as below: otherwise, c is set from EXCLUDED
+      callerValue(updateValues, c) === undefined &&  // as below: otherwise, c is set from EXCLUDED
       !conflictColumns.includes(c) &&  // on conflict, EXCLUDED.c equals the existing value
       values.some(v => !Object.prototype.hasOwnProperty.call(v ?? {}, c))),  // a null row misses every key
     updateColumns = [...new Set(  // deduplicate the keys here
@@ -513,7 +528,7 @@ export const upsert: UpsertSignatures = function (
       sql<string>`ON CONSTRAINT ${conflictTarget.value}`,
     updateColsSQL = mapWithSeparator(updateColumns, sql`, `, c => c),
     updateValuesSQL = mapWithSeparator(updateColumns, sql`, `, c =>
-      updateValues[c] !== undefined ? updateValueSQL(updateValues[c]) :
+      callerValue(updateValues, c) !== undefined ? updateValueSQL(callerValue(updateValues, c)) :
         (noNullUpdateColumns === all || noNullUpdateColumns.includes(c)) ? sql`CASE WHEN EXCLUDED.${c} IS NULL THEN ${table}.${c} ELSE EXCLUDED.${c} END` :
           sql`EXCLUDED.${c}`),
     returningSQL = SQLForColumnsOfTable(options?.returning, table, returningNull),
