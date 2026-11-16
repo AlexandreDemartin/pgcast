@@ -31,7 +31,7 @@ Returns a [`SQLFragment`](#SQLFragment): the literal parts as you wrote them, ea
 
 `RunResult` is not checked against the SQL: it is your word for what comes back. The shortcuts set it for you.
 
-Written inline as a value of a shortcut's `where`, or of `update()`'s values, a fragment takes its `Constraint` from every table and view with a column of that name: TypeScript infers it before it knows the table. Where their types differ, the valid fragment fails to compile (TS2322): an `id` that is an `int4` here and a `uuid` there; in `update()`, a view of `films`, whose `title` is nullable, makes `` { title: db.sql`upper(${db.self})` } `` fail. Give it a type argument, `` db.sql<db.SQL>`upper(${db.self})` ``, or declare it first.
+Written inline as a value of a shortcut's `where`, or of `update()`'s values, a fragment takes its `Constraint` from every table and view with a column of that name: TypeScript infers it before it knows the table. Where their types differ, the valid fragment fails to compile (TS2322): an `id` that is an `int4` here and a `uuid` there, or an enum here and another enum there; in `update()`, a view of `films`, whose `title` is nullable, makes `` { title: db.sql`upper(${db.self})` } `` fail. Give it a type argument, `` db.sql<db.SQL>`upper(${db.self})` ``, or declare it first.
 
 A name outside `Interpolations` does not compile:
 
