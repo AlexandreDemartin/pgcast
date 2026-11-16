@@ -328,7 +328,7 @@ Only the built-ins listed above throw, those of the realm that runs pgcast, matc
 - an instance of a class that extends a built-in keeps its own keys: `new Frames(1)`, with `class Frames extends Uint8Array {}`, gives `("0" = $1)`;
 - an iterator with own keys compiles them: a generator given `{ id: 1 }`, or a class that extends `Iterator` with a field `id = 1`, gives `("id" = $1)`;
 - the object that `new Intl.Segmenter('en').segment(text)` returns gives `TRUE`, though its iterator throws ([#517](https://github.com/AlexandreDemartin/pgcast/issues/517));
-- a `Temporal` or `Intl` object of a polyfill gives `TRUE` when the polyfill is installed on `globalThis` after `zapatos/db` is imported, or imported without installing it (`import { Temporal } from '@js-temporal/polyfill'`), as `zapatos/db` reads the prototypes when it loads; installed before, it throws;
+- a `Temporal` or `Intl` object of a polyfill gives `TRUE` when the polyfill is installed on `globalThis` after `zapatos/db` is imported, or imported without installing it (`import { Temporal } from '@js-temporal/polyfill'`), as `zapatos/db` reads the prototypes when it loads; installed before, it throws, and the native one it replaces, where the runtime has one, gives `TRUE`;
 - a namespace object, such as `Math`, `JSON`, `Intl` or `Temporal.Now`, gives `TRUE` ([#523](https://github.com/AlexandreDemartin/pgcast/issues/523)).
 
 ## `self` {#self}
