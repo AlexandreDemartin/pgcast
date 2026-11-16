@@ -53,6 +53,7 @@ On the fixture database (Postgres 17), with the built runtime and scratch protot
 | Users who review no article, `not(exists(…))` | `(NOT (EXISTS (SELECT 1 FROM "extra"."articles" WHERE ("reviewer_id" = "users"."id"))))` | Ada, Cyd |
 | Same, `not(isInSelect(…, 'reviewer_id'))` | `NOT ("id" IN (SELECT "reviewer_id" FROM "extra"."articles"))` | **none**: one `reviewer_id` is `NULL` |
 | B, in a hand-written `sql` query | — | throws: "The 'parent' table alias has no meaning here" |
+| C without `parent`, in a `lateral` subquery over `extra.articles` | — | throws: the same |
 | C, hostile `parent` and `alias` | `FROM "users" AS "r"" --" WHERE ("manager_id" = "x""; DROP TABLE users; --"."id")` | 42P01, one statement |
 
 ## Market standard
@@ -68,7 +69,7 @@ None of them infers the outer table from where the condition sits.
 - **Security**: values stay parameters; `table` and `column` are typed identifiers, and `parent` and `alias` go through the string branch of `compileExpression`, as `select()`'s `alias` does (replay above).
 - **6.6.1 compatibility**: additions only; `parent()` keeps its meaning everywhere it compiles today.
 - **The principles**: explicit, as Zapatos is about its client and its transactions: the condition names the table it refers to, and its SQL does not depend on where it sits; it works in a `sql` query; no `core.ts` change, so #562 stays `normal`.
-- **Reversible**: if the repeated table proves a burden in use, B can come later as the default of a missing `parent`, in its own note, since it touches `core.ts`. Calls written for C compile the same.
+- **Reversible**: if the repeated table proves a burden in use, B can come later as the default of a missing `parent`, in its own note, since it touches `core.ts`. Calls written for C compile the same: one with `parent` keeps its own mark (replayed on B's prototype); one without compiles only if it has no `parent()`.
 
 ### What #562 builds
 
@@ -91,18 +92,18 @@ isInSelect<T extends Table, C extends keyof SelectableForTable<T>>(
 
 - **Order**: table, then the `Whereable` (`all` for every row, as `select()` takes it), then the column, as `upsert()` puts its conflict target after its values, then options. This replaces the (table, column, where) sketch of #53 and #562. A caller of the corpus's `IN (SELECT …)` helper swaps two arguments.
 - **SQL**: `EXISTS (SELECT 1 FROM <table>[ AS <alias>][ WHERE <where>])` and `<self> IN (SELECT <column> FROM <table>[ AS <alias>][ WHERE <where>])`. With `all` there is no `WHERE`; `{}` gives `WHERE TRUE`, as in `select()`.
-- **`parent`**: sets the subquery's `parentTable` mark, so `parent('id')` in its `where` compiles to `"users"."id"`. It names the outer `FROM` item as the outer query names it: its alias if it has one, otherwise its table (`'extra.articles'` gives `"extra"."articles"."id"`), as `lateral` does. Without `parent`, the mark is inherited as for any fragment: in a `lateral` subquery `parent()` is the lateral's parent, and at the top level it throws, as today.
+- **`parent`**: sets the subquery's `parentTable` mark, so `parent('id')` in its `where` compiles to `"users"."id"`. It names the outer `FROM` item as the outer query names it: its alias if it has one, otherwise its table (`'extra.articles'` gives `"extra"."articles"."id"`), as `lateral` does. Without `parent`, the subquery drops the mark it would inherit (the override, below): `parent()` in its `where` throws, as at the top level, even inside a `lateral` subquery; an uncorrelated `exists('users', all)` still compiles. So no call depends on where it sits, and B could later fill only that throwing case. Decided under the owner's delegation.
 - **`alias`**: `AS <alias>` after the table, as `select()`'s `alias` writes it. The subquery's own name is its `alias`, else the last identifier of `table`. When the last identifier of `parent` is that name, both unquoted as `compileExpression` writes them (`'users'` and `'"users"'` are one name), the condition is refused: Postgres would resolve `parent` to the subquery's own table, and the replay shows the wrong rows, silently. The refusal is a fragment that throws as it compiles, so `run()` rejects before any query, as the conditions' `refused()` does. The error names both and asks for another alias.
-- **`self`** has no meaning in the subquery's `where`. The subquery fragment compiles it with no current column, so `self` throws as it does in `select()`'s `where`. This is done on the inner fragment, by a `compile` that drops the column, as `select()` overrides `compile` for `selectExactlyOneChecksForSecondRow`, so a `copy()` of the condition keeps it. Otherwise the outer key, unqualified inside the subquery, would resolve to an inner column.
+- **`self`** has no meaning in the subquery's `where`: it throws there, as in `select()`'s `where`. Otherwise the outer key, unqualified inside the subquery, would resolve to an inner column.
+- **The override**: the inner fragment's `compile` calls the original with neither column nor inherited mark, `nested(result, undefined, undefined)`; its own `parentTable`, set by `parent`, still wins. It overrides `compile` as `select()` does for `selectExactlyOneChecksForSecondRow`, so a `copy()` of the condition keeps it.
 - **Types**: `exists()` has the constraint `never`, so it fits under any key, in `and()`, `or()` and `not()`, or as the `where` itself. The docs show `and()`. `EXISTS` is never `NULL`: `boolean`. `isInSelect()` is typed on the subquery column's `Selectable` type, `null` excluded as `isDistinctFrom()` excludes it, and gives `boolean | null`. Its `C` is a `keyof SelectableForTable<T>`: `ColumnForTable<T>` is a lookup, which cannot index it (TS2536).
 - **No `isNotInSelect()` and no `notExists()`** (no synonym): the anti-join is `not(exists(…))`. The JSDoc of `isInSelect()` says that `not()` of it matches no row once the subquery returns a `NULL` (replay above).
-- **Tests** (issue #562, **Done when**): the SQL of each line of § Replays, frozen; real execution; the injection matrix on `table`, `column`, `parent`, `alias` and the `where` values; the alias refusal, `alias: 'users'` and `parent: '"users"'` included; `self` refused; `copy()` keeping `parent`; types positive and negative; `bench:types`.
+- **Tests** (issue #562, **Done when**): the SQL of each line of § Replays, frozen; real execution; the injection matrix on `table`, `column`, `parent`, `alias` and the `where` values; the alias refusal, `alias: 'users'` and `parent: '"users"'` included; `self` refused; `parent()` refused without `parent`, in a `lateral` too; `copy()` keeping `parent`; types positive and negative; `bench:types`.
 
 ## Risks
 
 - **`parent('id')` is not checked against the outer table**, as in `lateral`: a wrong column is Postgres's 42703, a wrong `parent` its 42P01, both before any row.
 - **The alias rule compares names, not relations**: `parent: 'public.users'` over `extra.users` is refused, though Postgres resolves `"public"."users"."id"` to the outer table (replayed); an alias settles it. The bare `"users"."id"` there is the inner table (replayed: no row).
-- **An inherited `parent` in a `lateral`** over the same table as the subquery is not refused: the rule needs `parent` named. The same holds for `lateral` today, whose docs ask for an alias.
 
 ## Sources
 
