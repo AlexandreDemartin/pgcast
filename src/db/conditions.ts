@@ -17,10 +17,13 @@ import {
   self,
   vals,
   Default,
+  all,
+  raw,
+  AllType,
 } from './core';
 
 import { mapWithSeparator } from './utils';
-import type { Whereable } from 'zapatos/schema';
+import type { Whereable, Table, Column, WhereableForTable, SelectableForTable } from 'zapatos/schema';
 
 const
   defaultInCondition = '`db.Default` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To set a column to its default in an UPDATE, give `db.Default` as the value itself: `{ n: db.Default }`.',
@@ -140,6 +143,64 @@ export const arrayContains = <T>(a: T[] | ParentColumn) => sql<SQL, boolean | nu
 export const arrayContainedIn = <T>(a: T[] | ParentColumn) => sql<SQL, boolean | null, T>`${self} <@ ${conditionalParam(a)}`;
 /** `"col" && $1`, typed on the element, as in Zapatos 6.6.1. On an `int4[]` column: `arrayOverlaps<number[]>([[1, 2]])`, or `` sql`${self} && ${param([1, 2], 'int4[]')}` ``. */
 export const arrayOverlaps = <T>(a: T[] | ParentColumn) => sql<SQL, boolean | null, T>`${self} && ${conditionalParam(a)}`;
+
+/* === subqueries === */
+
+// the last identifier of a name, as Postgres reads the text compileExpression writes, which ends with a quoted
+// part: `""` undoubled, and a `U&` part's escapes decoded (no `UESCAPE` follows one there)
+const lastIdentifier = (name: string) => {
+  const
+    parts = sql`${name}`.compile().text.match(/(?:[Uu]&)?"(?:[^"]|"")*"|[^".\s]+/g) ?? [],
+    last = parts[parts.length - 1] ?? '',
+    unicode = /^[Uu]&/.test(last),
+    unquoted = last.slice(unicode ? 3 : 1, -1).replace(/""/g, '"');
+  return !unicode ? unquoted : unquoted.replace(/\\(?:\\|([0-9A-Fa-f]{4})|\+([0-9A-Fa-f]{6}))/g, (escape, four, six) =>
+    escape === '\\\\' ? '\\' : parseInt(four ?? six, 16) > 0x10ffff ? escape : String.fromCodePoint(parseInt(four ?? six, 16)));
+};
+
+// `FROM <table>[ AS <alias>][ WHERE <where>]`, compiled with neither the column (`self` throws) nor the mark it would
+// inherit (`parent()` throws without `parent`), so that its SQL does not depend on where it sits; compile is
+// overridden as select() does, so a copy() of the condition, which shares its expressions, keeps it. When `parent`
+// names the subquery's own table, Postgres reads `parent()` as a column of the subquery's row, the wrong rows with
+// no error: refused as the query compiles
+const subquery = (fn: string, head: SQL, table: string, where: SQL | AllType, options: { parent?: string; alias?: string } = {}) => {
+  const
+    { parent, alias } = options,
+    own = alias ?? table;
+  if (typeof parent === 'string' && typeof own === 'string' && lastIdentifier(parent) === lastIdentifier(own)) {
+    return refused(`\`${fn}()\` was given \`parent: '${parent}'\`, which names "${lastIdentifier(own)}", the subquery's own name, so Postgres would read \`parent()\` as a column of the subquery's row: give the subquery another name with the \`alias\` option.`);
+  }
+  const
+    query = sql`${head} FROM ${table}${alias === undefined ? [] : sql` AS ${alias}`}${where === all ? [] : sql` WHERE ${where}`}`,
+    nestedCompile = query.compile;
+  query.compile = result => nestedCompile(result, undefined, undefined);
+  if (parent !== undefined) query.parentTable = parent;
+  return query;
+};
+
+/**
+ * `EXISTS (SELECT 1 FROM <table> WHERE <where>)`: some row of `table` matches `where`. In `where`, `parent('id')`
+ * is the outer row's column, `"<parent>"."id"`, once `parent` names the outer table. Never `NULL`; it fits under any
+ * key, in `and()`, `or()` and `not()`, or as the whole `where`. The anti-join is `not(exists(…))`.
+ * @param table The subquery's table
+ * @param where A Whereable or `sql` fragment on `table`, or `all` for no `WHERE`
+ * @param options `parent`, the outer table as the outer query names it (its alias, if any); `alias`, `AS <alias>`
+ * after `table`, needed when `parent` names it
+ */
+export const exists = <T extends Table>(table: T, where: WhereableForTable<T> | SQLFragment<any> | AllType, options?: { parent?: string; alias?: string }) =>
+  sql<SQL, boolean, never>`EXISTS (${subquery('exists', raw('SELECT 1'), table, where, options)})`;
+
+/**
+ * `"col" IN (SELECT <column> FROM <table> WHERE <where>)`, as a Whereable value, typed on `column`'s type, `null`
+ * aside. Under `not()`, a `NULL` from the subquery makes it match no row, as Postgres reads `NOT IN`: for the
+ * anti-join, write `not(exists(…))`.
+ * @param table The subquery's table
+ * @param where A Whereable or `sql` fragment on `table`, or `all` for no `WHERE`
+ * @param column The column of `table` the subquery selects
+ * @param options `parent` and `alias`, as in `exists()`
+ */
+export const isInSelect = <T extends Table, C extends keyof SelectableForTable<T>>(table: T, where: WhereableForTable<T> | SQLFragment<any> | AllType, column: C, options?: { parent?: string; alias?: string }) =>
+  sql<SQL, boolean | null, Exclude<SelectableForTable<T>[C], null>>`${self} IN (${subquery('isInSelect', sql`SELECT ${column as Column}`, table, where, options)})`;
 
 // things that aren't genuinely conditions
 type PluralisingIntervalUnit = 'microsecond' | 'millisecond' | 'second' | 'minute' | 'hour' | 'day' | 'week' | 'month' | 'year' | 'decade';

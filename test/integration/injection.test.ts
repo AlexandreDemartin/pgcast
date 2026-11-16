@@ -1257,3 +1257,138 @@ describe('a list that is not an array in isIn() and isNotIn()', () => {
     }).toEqual({ isIn: [1, 3], isInEmpty: [], isInFrozen: [2], isNotIn: [2, 3], isNotInEmpty: [1, 2, 3] });
   });
 });
+
+describe('exists() and isInSelect()', () => {
+  const { exists, isInSelect } = db.conditions;
+
+  it('no hostile table, column, parent or alias runs SQL of its own', async () => {
+    // compiled text: test/unit/injection.test.ts; rows are given as their number; with no value, each query goes
+    // through the simple protocol, which would run a second statement
+    const rows = (q: db.SQLFragment<any[]>) => ({ run: async (client: pg.ClientBase) => `${(await q.run(client)).length} rows` });
+    expect(await identifierOutcomes({
+      dquote: 'a"b', squote: "a'b", semicolon: 'a;b', dashes: 'a--b', comment: 'a/*b', dollar: 'a$1b',
+      backslash: 'a\\b', nul: 'a\0b', dot: 'a.b',
+      closes: `a"; ${update}; --`,
+      escapedCloses: 'a"" OR TRUE OR ""b', qualifiedEscaped: 's.a"" OR TRUE OR ""b', escapedDot: 'a"."b',
+      escapedOdd: 'a"""b',
+      prequoted: '"a"', prequotedEscaped: '"a"" OR TRUE OR ""b"', prequotedEmpty: '""', lone: '"',
+      prequotedCloses: `"a"; ${update}; --"`,
+      mixedEscaped: '"s".a$1."b"" OR TRUE OR ""c"', unicodeEscaped: '"s".U&"a\\0022"" OR TRUE OR ""\\0022b"',
+      unicodeCloses: '"s".U&"a\\" OR TRUE OR \\"b"', uescape: `"s".U&"a" UESCAPE '!' || "b"`,
+    }, input => ({
+      table: rows(db.select('users', exists(input as any, all))),
+      column: rows(db.select('users', { id: isInSelect('users', all, input as any) })),
+      parent: rows(db.select('users', exists('users', { manager_id: db.parent('id') }, { parent: input, alias: 'r' }))),
+      alias: rows(db.select('users', exists('users', all, { alias: input }))),
+    }))).toMatchInlineSnapshot(`
+      {
+        "backslash alias": "3 rows",
+        "backslash column": "42703",
+        "backslash parent": "42P01",
+        "backslash table": "42P01",
+        "closes alias": "3 rows",
+        "closes column": "42703",
+        "closes parent": "42P01",
+        "closes table": "42P01",
+        "comment alias": "3 rows",
+        "comment column": "42703",
+        "comment parent": "42P01",
+        "comment table": "42P01",
+        "dashes alias": "3 rows",
+        "dashes column": "42703",
+        "dashes parent": "42P01",
+        "dashes table": "42P01",
+        "dollar alias": "3 rows",
+        "dollar column": "42703",
+        "dollar parent": "42P01",
+        "dollar table": "42P01",
+        "dot alias": "42601",
+        "dot column": "42P01",
+        "dot parent": "42P01",
+        "dot table": "42P01",
+        "dquote alias": "3 rows",
+        "dquote column": "42703",
+        "dquote parent": "42P01",
+        "dquote table": "42P01",
+        "escapedCloses alias": "3 rows",
+        "escapedCloses column": "42703",
+        "escapedCloses parent": "42P01",
+        "escapedCloses table": "42P01",
+        "escapedDot alias": "3 rows",
+        "escapedDot column": "42703",
+        "escapedDot parent": "42P01",
+        "escapedDot table": "42P01",
+        "escapedOdd alias": "3 rows",
+        "escapedOdd column": "42703",
+        "escapedOdd parent": "42P01",
+        "escapedOdd table": "42P01",
+        "lone alias": "3 rows",
+        "lone column": "42703",
+        "lone parent": "42P01",
+        "lone table": "42P01",
+        "mixedEscaped alias": "42601",
+        "mixedEscaped column": "42P01",
+        "mixedEscaped parent": "0A000",
+        "mixedEscaped table": "0A000",
+        "nul alias": "08P01",
+        "nul column": "08P01",
+        "nul parent": "08P01",
+        "nul table": "08P01",
+        "prequoted alias": "3 rows",
+        "prequoted column": "42703",
+        "prequoted parent": "42P01",
+        "prequoted table": "42P01",
+        "prequotedCloses alias": "3 rows",
+        "prequotedCloses column": "42703",
+        "prequotedCloses parent": "42P01",
+        "prequotedCloses table": "42P01",
+        "prequotedEmpty alias": "3 rows",
+        "prequotedEmpty column": "42703",
+        "prequotedEmpty parent": "42P01",
+        "prequotedEmpty table": "42P01",
+        "prequotedEscaped alias": "3 rows",
+        "prequotedEscaped column": "42703",
+        "prequotedEscaped parent": "42P01",
+        "prequotedEscaped table": "42P01",
+        "qualifiedEscaped alias": "42601",
+        "qualifiedEscaped column": "42P01",
+        "qualifiedEscaped parent": "42P01",
+        "qualifiedEscaped table": "42P01",
+        "semicolon alias": "3 rows",
+        "semicolon column": "42703",
+        "semicolon parent": "42P01",
+        "semicolon table": "42P01",
+        "squote alias": "3 rows",
+        "squote column": "42703",
+        "squote parent": "42P01",
+        "squote table": "42P01",
+        "uescape alias": "42601",
+        "uescape column": "42P01",
+        "uescape parent": "42P01",
+        "uescape table": "42P01",
+        "unicodeCloses alias": "42601",
+        "unicodeCloses column": "42P01",
+        "unicodeCloses parent": "42P01",
+        "unicodeCloses table": "42P01",
+        "unicodeEscaped alias": "42601",
+        "unicodeEscaped column": "42P01",
+        "unicodeEscaped parent": "42P01",
+        "unicodeEscaped table": "42P01",
+      }
+    `);
+  });
+
+  it('a hostile parent and alias together are one statement, which Postgres refuses (note 006 § Replays)', async () => {
+    const q = db.select('users', exists('users', { manager_id: db.parent('id') }, { parent: `x"; ${update}; --`, alias: 'r" --' }));
+    expect(q.compile().values).toEqual([]);
+    expect(await pgError(t.client, () => q.run(t.client))).toEqual({ code: '42P01', message: `missing FROM-clause entry for table "x"; ${update}; --"` });
+    expect(await adaName()).toBe('Ada');
+  });
+
+  it('a hostile value of the inner where is sent as a parameter', async () => {
+    const q = db.select('users', exists('extra.articles', { author_id: db.parent('id'), body: `x'; ${update}; --` }, { parent: 'users' }));
+    expect(q.compile().values).toEqual([`x'; ${update}; --`]);
+    expect(await q.run(t.client)).toEqual([]);
+    expect(await adaName()).toBe('Ada');
+  });
+});
