@@ -197,13 +197,17 @@ function updateValuesKeys(updateValues: { [k: string]: any }, updated: string[])
 // none when obj is null or undefined, as options left out), read through getters, prototypes and a Proxy's `get`, as
 // in 6.6.1, except a key of Object.prototype that neither obj nor a prototype of its own has: there, `valueOf` or
 // `hasOwnProperty` is a function, which threw, `__proto__` is Object.prototype, and any other key was added there by
-// other code, not by the caller; the chain is walked only when the value read is the one Object.prototype gives (the
-// receiver covers `__proto__`), so a Proxy answering through `get` alone keeps its value; each read of an option
-// calls it once, so a getter or a Proxy is read as often as before
+// other code, not by the caller; the chain is walked when the value read is the one Object.prototype holds (the
+// receiver covers `__proto__`), or when Object.prototype has the key as any other getter, whose value may be new on
+// each read; so a Proxy answering through `get` alone keeps another value; each read of an option calls it once, so
+// a getter or a Proxy is read as often as before
 function callerValue(obj: any, k: string): any {
-  const value = obj?.[k];
-  if (value === undefined || !Object.prototype.hasOwnProperty.call(Object.prototype, k) ||
-    value !== Reflect.get(Object.prototype, k, obj)) return value;
+  const
+    value = obj?.[k],
+    held = Object.getOwnPropertyDescriptor(Object.prototype, k);
+  if (value === undefined || held === undefined) return value;
+  if (k === '__proto__' ? value !== Reflect.get(Object.prototype, k, obj) :
+    Object.prototype.hasOwnProperty.call(held, 'value') && value !== held.value) return value;
   for (let o: object | null = obj; o !== null && o !== Object.prototype; o = Object.getPrototypeOf(o)) {
     if (Object.prototype.hasOwnProperty.call(o, k)) return value;
   }
