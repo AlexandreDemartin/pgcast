@@ -459,13 +459,16 @@ describe('upsert', () => {
     void two; void every; void issue;
   });
 
-  test('characterization: over every table, updateValues takes any, and cols() and vals() of any, which 6.6.1 refused (#533)', () => {
-    // 6.6.1 refused each (TS2769); with strict off, it also takes null and undefined, which 6.6.1 refused and this strict program cannot show
+  test('characterization: over every table, updateValues takes any, which 6.6.1 refused (#533)', () => {
+    // 6.6.1 refused each (TS2769); with strict off, it also takes null and undefined, which 6.6.1 refused and this strict program cannot show.
+    // cols() and vals() of any are refused there, as by 6.6.1, since the lookup resolves through T's constraint (#538)
     const anyV = JSON.parse('1');
     const every = <T extends s.Table>(t: T, r: s.InsertableForTable<T>, c: s.ColumnForTable<T>) => {
       db.upsert(t, r, c, { updateValues: { created_at: anyV } });
       db.upsert(t, r, c, { updateValues: { created_at: JSON.parse('1') } });
+      // @ts-expect-error cols() of any, refused as by 6.6.1
       db.upsert(t, r, c, { updateValues: { created_at: db.cols(anyV) } });
+      // @ts-expect-error vals() of any, refused as by 6.6.1
       db.upsert(t, r, c, { updateValues: { created_at: db.vals(anyV) } });
       // @ts-expect-error a number, refused as by 6.6.1
       db.upsert(t, r, c, { updateValues: { created_at: 1 } });
