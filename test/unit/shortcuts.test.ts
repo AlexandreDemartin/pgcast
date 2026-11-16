@@ -2741,6 +2741,20 @@ describe('a shortcut option added to Object.prototype by something else is no op
     expect(withPrototypeKey(key, NaN, () => build().compile())).toEqual(compiled);
   });
 
+  it('a setter alone on Object.prototype gives no value, so what the caller\'s object answers is read through the same traps', () => {
+    // a key that Object.prototype has with no getter reads as undefined, so any other value is the caller's
+    const counts: Record<string, number> = {};
+    Object.defineProperty(Object.prototype, 'returning', { set() { }, configurable: true });
+    let text: string;
+    try {
+      text = db.deletes('users', { email: 'e@x.org' }, counting(counts, {}, { returning: ['display_name'] }) as any).compile().text;
+    } finally { delete (Object.prototype as any).returning; }
+    expect({ text, counts }).toEqual({
+      text: 'DELETE FROM "users" WHERE ("email" = $1) RETURNING jsonb_build_object($2::text, "display_name") AS result',
+      counts: { 'get:returning': 1, 'get:extras': 1 },
+    });
+  });
+
   it('with a getter on Object.prototype, an option of the caller\'s own prototype or object is read without it', () => {
     const counts = { answering: {} as Record<string, number>, owning: {} as Record<string, number> };
     class Returning { get returning() { return ['mood']; } }
