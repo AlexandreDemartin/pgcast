@@ -1067,19 +1067,16 @@ describe('surprises, frozen as they are', () => {
     ]) expect(schema).not.toContain(comment);
   });
 
-  it('src/db type-checks against the stub schema of src/typings, not against a generated one', () => {
-    // test/generated/tsconfig.json, with 'zapatos/db' read from the sources instead of their declarations
+  it('src/db type-checks against the stub schema of src/typings, and against a generated one', () => {
+    // test/generated/tsconfig.json, with 'zapatos/db' read from the sources instead of their declarations; upsert()
+    // gave TS7053 and TS2345 here until its options were read through callerValue() (#550, #552)
     const root = fileURLToPath(new URL('../..', import.meta.url));
     const configPath = join(generatedDir, 'tsconfig.json');
     const { config } = ts.readConfigFile(configPath, ts.sys.readFile);
     const { options, fileNames } = ts.parseJsonConfigFileContent(config, ts.sys, generatedDir);
     const program = ts.createProgram(fileNames, { ...options, paths: { 'zapatos/db': [join(root, 'src/db')] } });
     const errors = ts.getPreEmitDiagnostics(program).map(d => `${relative(root, d.file!.fileName)} TS${d.code}`);
-    expect([...new Set(errors)]).toMatchInlineSnapshot(`
-      [
-        "src/db/shortcuts.ts TS2345",
-      ]
-    `);
+    expect([...new Set(errors)]).toEqual([]);
   });
 });
 

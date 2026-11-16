@@ -193,13 +193,15 @@ function updateValuesKeys(updateValues: { [k: string]: any }, updated: string[])
   return keys.filter(k => updateValues[k] !== undefined);
 }
 
-// the value of obj[k] (upsert()'s updateValues for a column, or its updateValues option), read through getters,
-// prototypes and a Proxy's `get`, as in 6.6.1, except a key of Object.prototype that neither obj nor a prototype of
-// its own has: there, `valueOf` or `hasOwnProperty` is a function, which threw, `__proto__` is Object.prototype, and
-// any other key was added there by other code, not by the caller; the chain is walked only when the value read is the
-// one Object.prototype gives (the receiver covers `__proto__`), so a Proxy answering through `get` alone keeps its value
+// the value of obj[k] (a shortcut's option, a key of an order or lock item, upsert()'s updateValues for a column;
+// none when obj is null or undefined, as options left out), read through getters, prototypes and a Proxy's `get`, as
+// in 6.6.1, except a key of Object.prototype that neither obj nor a prototype of its own has: there, `valueOf` or
+// `hasOwnProperty` is a function, which threw, `__proto__` is Object.prototype, and any other key was added there by
+// other code, not by the caller; the chain is walked only when the value read is the one Object.prototype gives (the
+// receiver covers `__proto__`), so a Proxy answering through `get` alone keeps its value; each read of an option
+// calls it once, so a getter or a Proxy is read as often as before
 function callerValue(obj: any, k: string): any {
-  const value = obj[k];
+  const value = obj?.[k];
   if (value === undefined || !Object.prototype.hasOwnProperty.call(Object.prototype, k) ||
     value !== Reflect.get(Object.prototype, k, obj)) return value;
   for (let o: object | null = obj; o !== null && o !== Object.prototype; o = Object.getPrototypeOf(o)) {
@@ -283,8 +285,8 @@ export const insert: InsertSignatures = function (
       valuesSQL = Array.isArray(completedValues) ?
         mapWithSeparator(completedValues as Insertable[], sql`, `, v => sql`(${vals(v)})`) :
         sql`(${vals(completedValues)})`,
-      returningSQL = SQLForColumnsOfTable(options?.returning, table, returningNull),
-      extrasSQL = SQLForExtras(options?.extras);
+      returningSQL = SQLForColumnsOfTable(callerValue(options, 'returning'), table, returningNull),
+      extrasSQL = SQLForExtras(callerValue(options, 'extras'));
 
     // a null row on its own, or a primitive row anywhere, fails in compile(), in cols() or vals(), so run() rejects;
     // so does a built-in row completeKeysWithDefaultValue leaves, unless no row has a key
@@ -496,10 +498,10 @@ export const upsert: UpsertSignatures = function (
   if (typeof conflictTarget === 'string') conflictTarget = [conflictTarget];  // now either Column[] or Constraint
   values = undefinedAsMissing(values, false);
 
-  let noNullUpdateColumns = options?.noNullUpdateColumns ?? [];
+  let noNullUpdateColumns = callerValue(options, 'noNullUpdateColumns') ?? [];
   if (noNullUpdateColumns !== all && !Array.isArray(noNullUpdateColumns)) noNullUpdateColumns = [noNullUpdateColumns];
 
-  let specifiedUpdateColumns = options?.updateColumns;
+  let specifiedUpdateColumns = callerValue(options, 'updateColumns');
   if (specifiedUpdateColumns && !Array.isArray(specifiedUpdateColumns)) specifiedUpdateColumns = [specifiedUpdateColumns];
 
   const completedValues = Array.isArray(values) ? completeKeysWithDefaultValue(values, Default) : [values];
@@ -531,9 +533,9 @@ export const upsert: UpsertSignatures = function (
       callerValue(updateValues, c) !== undefined ? updateValueSQL(callerValue(updateValues, c)) :
         (noNullUpdateColumns === all || noNullUpdateColumns.includes(c)) ? sql`CASE WHEN EXCLUDED.${c} IS NULL THEN ${table}.${c} ELSE EXCLUDED.${c} END` :
           sql`EXCLUDED.${c}`),
-    returningSQL = SQLForColumnsOfTable(options?.returning, table, returningNull),
-    extrasSQL = SQLForExtras(options?.extras),
-    suppressReport = options?.reportAction === 'suppress';
+    returningSQL = SQLForColumnsOfTable(callerValue(options, 'returning'), table, returningNull),
+    extrasSQL = SQLForExtras(callerValue(options, 'extras')),
+    suppressReport = callerValue(options, 'reportAction') === 'suppress';
 
   if (colNames.length === 0) throw new Error(nothingToInsert);
 
@@ -606,8 +608,8 @@ export const update: UpdateSignatures = function (
   // more info: https://www.postgresql-archive.org/Possible-regression-in-UPDATE-SET-lt-column-list-gt-lt-row-expression-gt-with-just-one-single-column0-td5989074.html
 
   const
-    returningSQL = SQLForColumnsOfTable(options?.returning, table, returningNull),
-    extrasSQL = SQLForExtras(options?.extras),
+    returningSQL = SQLForColumnsOfTable(callerValue(options, 'returning'), table, returningNull),
+    extrasSQL = SQLForExtras(callerValue(options, 'extras')),
     query = sql`UPDATE ${table} SET (${cols(values)}) = ROW(${vals(values)}) WHERE ${where} RETURNING ${returningSQL}${extrasSQL} AS result`;
 
   query.runResultTransform = (qr) => qr.rows.map(r => r.result);
@@ -638,8 +640,8 @@ export const deletes: DeleteSignatures = function (
 ): SQLFragment {
 
   const
-    returningSQL = SQLForColumnsOfTable(options?.returning, table, returningNull),
-    extrasSQL = SQLForExtras(options?.extras),
+    returningSQL = SQLForColumnsOfTable(callerValue(options, 'returning'), table, returningNull),
+    extrasSQL = SQLForExtras(callerValue(options, 'extras')),
     query = sql`DELETE FROM ${table} WHERE ${where} RETURNING ${returningSQL}${extrasSQL} AS result`;
 
   query.runResultTransform = (qr) => qr.rows.map(r => r.result);
@@ -862,7 +864,7 @@ export const select: SelectSignatures = function (
   // built (`Object.keys(null)`, `null.copy`); this throws as it compiles, so run() rejects before any query, and so
   // does a copy nested in a lateral, which shares its expressions
   const
-    givenLateral: any = options.lateral,
+    givenLateral: any = callerValue(options, 'lateral'),
     nullKey = givenLateral && !(givenLateral instanceof SQLFragment) ? Object.keys(givenLateral).sort().find(k => givenLateral[k] == null) : undefined,
     lateralRefusal = givenLateral === null ? '`lateral: null` has no meaning: for no lateral join, leave `lateral` out; to join, give it a `select()`, `selectOne()` or `count()` query, or an object of them.' :
       nullKey !== undefined ? `The \`lateral\` key '${nullKey}' is \`${givenLateral[nullKey]}\`, not a query: leave the key out, or give it a \`select()\`, \`selectOne()\` or \`count()\` query.` :
@@ -873,11 +875,14 @@ export const select: SelectSignatures = function (
 
   const
     limit1 = mode === SelectResultMode.One || mode === SelectResultMode.ExactlyOne,
+    // the copy keeps own enumerable keys only, as in 6.6.1: an option of a prototype is none in selectOne()
     allOptions = limit1 ? { ...options, limit: 1 } : options,
-    alias = allOptions.alias || table,
-    { distinct, groupBy, having, lateral, columns, extras } = allOptions,
-    lock = allOptions.lock == null || Array.isArray(allOptions.lock) ? allOptions.lock : [allOptions.lock],
-    order = allOptions.order == null || Array.isArray(allOptions.order) ? allOptions.order : [allOptions.order],
+    alias = callerValue(allOptions, 'alias') || table,
+    distinct = callerValue(allOptions, 'distinct'), groupBy = callerValue(allOptions, 'groupBy'),
+    having = callerValue(allOptions, 'having'), lateral = callerValue(allOptions, 'lateral'),
+    columns = callerValue(allOptions, 'columns'), extras = callerValue(allOptions, 'extras'),
+    lock = callerValue(allOptions, 'lock') == null || Array.isArray(callerValue(allOptions, 'lock')) ? callerValue(allOptions, 'lock') : [callerValue(allOptions, 'lock')],
+    order = callerValue(allOptions, 'order') == null || Array.isArray(callerValue(allOptions, 'order')) ? callerValue(allOptions, 'order') : [callerValue(allOptions, 'order')],
     tableAliasSQL = alias === table ? [] : sql<string>` AS ${alias}`,
     distinctSQL = !distinct ? [] : sql` DISTINCT${distinct instanceof SQLFragment || typeof distinct === 'string' ? sql` ON (${distinct})` :
       Array.isArray(distinct) ? sql` ON (${cols(distinct)})` : []}`,
@@ -897,21 +902,21 @@ export const select: SelectSignatures = function (
     orderSQL = order === undefined ? [] :
       order === null ? refusedSQL(orderNull) :
       sql` ORDER BY ${mapWithSeparator(order as OrderSpecForTable<Table>[], sql`, `, o => {  // `as` clause is required when TS not strict
-        if (!['ASC', 'DESC'].includes(o.direction)) throw new Error(`Direction must be ASC/DESC, not '${o.direction}'`);
-        if (o.nulls && !['FIRST', 'LAST'].includes(o.nulls)) throw new Error(`Nulls must be FIRST/LAST/undefined, not '${o.nulls}'`);
-        return sql`${o.by} ${raw(o.direction)}${o.nulls ? sql` NULLS ${raw(o.nulls)}` : []}`;
+        if (!['ASC', 'DESC'].includes(callerValue(o, 'direction'))) throw new Error(`Direction must be ASC/DESC, not '${callerValue(o, 'direction')}'`);
+        if (callerValue(o, 'nulls') && !['FIRST', 'LAST'].includes(callerValue(o, 'nulls'))) throw new Error(`Nulls must be FIRST/LAST/undefined, not '${callerValue(o, 'nulls')}'`);
+        return sql`${callerValue(o, 'by')} ${raw(callerValue(o, 'direction'))}${callerValue(o, 'nulls') ? sql` NULLS ${raw(callerValue(o, 'nulls'))}` : []}`;
       })}`,
     limitSQL = (limit: number | undefined) => limit === undefined ? [] :
-      allOptions.withTies ? sql` FETCH FIRST ${param(limit)} ROWS WITH TIES` :
+      callerValue(allOptions, 'withTies') ? sql` FETCH FIRST ${param(limit)} ROWS WITH TIES` :
         sql` LIMIT ${param(limit)}`,  // compatibility with pg pre-10.5; and fewer bytes!
-    offsetSQL = allOptions.offset === undefined ? [] : sql` OFFSET ${param(allOptions.offset)}`,  // pg is lax about OFFSET following FETCH, and we exploit that
+    offsetSQL = callerValue(allOptions, 'offset') === undefined ? [] : sql` OFFSET ${param(callerValue(allOptions, 'offset'))}`,  // pg is lax about OFFSET following FETCH, and we exploit that
     lockSQL = lock === undefined ? [] : lock === null ? refusedSQL(lockNull) : (lock as SelectLockingOptions<string>[]).map(lock => {  // `as` clause is required when TS not strict
-      if (!['UPDATE', 'NO KEY UPDATE', 'SHARE', 'KEY SHARE'].includes(lock.for)) throw new Error(`Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not '${lock.for}'`);
-      if (lock.wait && !['NOWAIT', 'SKIP LOCKED'].includes(lock.wait)) throw new Error(`Lock wait must be NOWAIT/SKIP LOCKED/undefined, not '${lock.wait}'`);
+      if (!['UPDATE', 'NO KEY UPDATE', 'SHARE', 'KEY SHARE'].includes(callerValue(lock, 'for'))) throw new Error(`Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not '${callerValue(lock, 'for')}'`);
+      if (callerValue(lock, 'wait') && !['NOWAIT', 'SKIP LOCKED'].includes(callerValue(lock, 'wait'))) throw new Error(`Lock wait must be NOWAIT/SKIP LOCKED/undefined, not '${callerValue(lock, 'wait')}'`);
       const
-        ofTables = lock.of === undefined || Array.isArray(lock.of) ? lock.of : [lock.of],
+        ofTables = callerValue(lock, 'of') === undefined || Array.isArray(callerValue(lock, 'of')) ? callerValue(lock, 'of') : [callerValue(lock, 'of')],
         ofClause = ofTables === undefined ? [] : sql` OF ${mapWithSeparator(ofTables as Table[], sql`, `, t => t)}`;  // `as` clause is required when TS not strict
-      return sql` FOR ${raw(lock.for)}${ofClause}${lock.wait ? sql` ${raw(lock.wait)}` : []}`;
+      return sql` FOR ${raw(callerValue(lock, 'for'))}${ofClause}${callerValue(lock, 'wait') ? sql` ${raw(callerValue(lock, 'wait'))}` : []}`;
     }),
     lateralSQL = lateral === undefined ? [] :
       lateral instanceof SQLFragment ? (() => {
@@ -925,7 +930,7 @@ export const select: SelectSignatures = function (
 
   const
     rowsSQL = (limit: number | undefined) => sql<SQL, any>`SELECT${distinctSQL} ${allColsSQL} AS result FROM ${table}${tableAliasSQL}${lateralSQL}${whereSQL}${groupBySQL}${havingSQL}${orderSQL}${limitSQL(limit)}${offsetSQL}${lockSQL}`,
-    rowsQuery = rowsSQL(allOptions.limit),
+    rowsQuery = rowsSQL(callerValue(allOptions, 'limit')),
     query = mode !== SelectResultMode.Many ? rowsQuery :
       // we need the aggregate to sit in a sub-SELECT in order to keep ORDER and LIMIT working as usual
       sql<SQL, any>`SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (${rowsQuery}) AS ${SQLForAlias('sq_', alias)}`,
@@ -1101,7 +1106,7 @@ const numericAggregate = (
 ): SQLFragment<number> => {
   const
     query = select(table, where, options, SelectResultMode.Numeric, aggregate),
-    { columns, lateral } = options ?? {},  // `null` options are none, as in select()
+    columns = callerValue(options, 'columns'), lateral = callerValue(options, 'lateral'),  // `null` options are none, as in select()
     columnsRefusal =
       !columns ? (aggregate === 'count' ? undefined : `${aggregate}() needs one column to aggregate: pass columns: ['column']`) :
         typeof columns !== 'object' && typeof columns !== 'function' ? `${aggregate}() takes columns as an array, not ${typeof columns}: pass columns: ['column']${aggregate === 'count' ? ' (leave columns out for count(*))' : ''}` :
