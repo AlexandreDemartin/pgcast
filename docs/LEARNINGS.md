@@ -141,6 +141,7 @@ Candidates for a check, a rule or a skill line.
 - #553: a CHANGELOG line taken from a review ("no longer throws", "master reset it") can describe master's unreleased state: replay it on the last release before writing it.
 - #553: a speed fix that changes no SQL is proved by interleaved runs in the PR body, run a second time in reversed order to cancel the order effect.
 - #554: a CHANGELOG headline about "several rows" was narrower than the runs: a single row in an array also listed an inherited key on 6.6.1 and 6.7.1 (`[{ title }]` compiled to `("mood", "title")`); an advisory names "rows given as an array".
+- #555: `guard.mjs` blocks `npm publish` but not a `git push` of a `v*` tag, which now starts `release.yml`: the `npm` environment's required reviewer (the owner) is the gate; a guard rule refusing a `v*` tag push, with its test, could follow.
 
 ## Minors kept
 

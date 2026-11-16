@@ -6,6 +6,9 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 
 ## [Unreleased]
 
+### Added
+- Releases publish from CI with npm trusted publishing, on a pushed tag `v<version>`, each with a provenance attestation that ties the tarball to its commit and workflow run (`.github/workflows/release.yml`). CI pins every action by commit SHA and keeps no git credentials after checkout.
+
 ## [6.7.2] - 2026-11-16
 
 ### Security
