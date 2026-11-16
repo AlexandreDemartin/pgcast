@@ -1613,6 +1613,78 @@ describe('a built-in object as a Whereable', () => {
       !Object.keys(samples).includes(tag(x))).map(tag)).toEqual([]);
   });
 
+  it('throws for each object a method of the built-ins test\'s values hands out, unless it is a plain value', () => {
+    // an object with no constructor, global or namespaced, escapes the walk above: `Intl.Segmenter`'s segment() gave
+    // one (#517). Each method and getter on each value's prototype chain, and each function of `Intl`, is called with
+    // () and ('id'): an object it hands out is a plain object, an array or a null-prototype object, or it throws, with
+    // a value of its kind in the built-ins test
+    const
+      samples = builtinObjects(),
+      plainPrototypes: unknown[] = [Object.prototype, Array.prototype, null],
+      handedOut: [string, object][] = [],
+      call = (from: string, f: (...args: unknown[]) => unknown, self: unknown) => {
+        for (const args of [[], ['id']]) {
+          let x: unknown;
+          try { x = f.apply(self, args); } catch { continue; }
+          if (typeof x !== 'object' || x === null || plainPrototypes.includes(Object.getPrototypeOf(x))) continue;
+          if (x instanceof Promise) x.catch(() => {});  // an async generator's throw('id') rejects
+          handedOut.push([from, x]);
+        }
+      },
+      outcome = (x: object) => {
+        try {
+          sql`SELECT 1 WHERE ${x}`.compile();
+          return 'compiles';
+        } catch (err) {
+          return /^A built-in `([^`]*)` has no meaning as a Whereable/.exec((err as Error).message)?.[1] ?? (err as Error).message;
+        }
+      };
+    // a namespace object's prototype is Object.prototype: its functions are no methods of a value
+    for (const [name, x] of Object.entries(samples).filter(([, x]) => Object.getPrototypeOf(x) !== Object.prototype))
+      for (let p = Object.getPrototypeOf(x); p !== null && p !== Object.prototype; p = Object.getPrototypeOf(p))
+        for (const key of Reflect.ownKeys(p)) {
+          const { value, get } = Object.getOwnPropertyDescriptor(p, key)!;
+          if (key !== 'constructor') for (const f of [value, get].filter(f => typeof f === 'function')) call(`${name}.${String(key)}`, f, x);
+        }
+    for (const key of Object.getOwnPropertyNames(Intl)) {
+      const f = (Intl as any)[key];
+      if (typeof f === 'function') call(`Intl.${key}`, f, Intl);
+    }
+    const outcomes = handedOut.map(([from, x]) => [from, outcome(x)]);
+    expect(outcomes.map(([, name]) => name)).toEqual(expect.arrayContaining(['Map Iterator', 'Promise', 'ArrayBuffer', 'Locale']));
+    expect(outcomes.filter(([, name]) => !Object.keys(samples).includes(name))).toEqual([]);
+  });
+
+  it('throws for the Segments object that Intl.Segmenter\'s segment() returns, named Segments, and keeps what it hands out', () => {
+    // its prototype, ECMA-402's %IntlSegmentsPrototype%, inherits Object.prototype and has no constructor of its own:
+    // 6.6.1 compiled it to TRUE, every row (#517). `containing()` gives a plain object, compiled to its keys; one of
+    // another realm compiles as before, as any built-in of another realm
+    const
+      // ES2022: not in the lib's ES2019 types
+      Segmenter = (Intl as any).Segmenter as new (locale: string) => { segment(s: string): { containing(i: number): object } },
+      segments = new Segmenter('en').segment('Metropolis'),
+      outcome = (x: object) => {
+        try {
+          return sql`DELETE FROM ${'users'} WHERE ${x}`.compile().text;
+        } catch (err) {
+          return `throws: ${/^A built-in `([^`]*)` has no meaning as a Whereable/.exec((err as Error).message)?.[1] ?? (err as Error).message}`;
+        }
+      };
+    expect(Object.fromEntries(Object.entries({
+      segments,
+      emptySegments: new Segmenter('en').segment(''),
+      madeFromItsPrototype: Object.create(Object.getPrototypeOf(segments)),
+      otherRealm: runInNewContext("new Intl.Segmenter('en').segment('Metropolis')"),
+      segment: segments.containing(0),
+    }).map(([name, x]) => [name, outcome(x as object)]))).toEqual({
+      segments: 'throws: Segments',
+      emptySegments: 'throws: Segments',
+      madeFromItsPrototype: 'throws: Segments',
+      otherRealm: 'DELETE FROM "users" WHERE TRUE',
+      segment: 'DELETE FROM "users" WHERE ("index" = $1 AND "input" = $2 AND "segment" = $3)',
+    });
+  });
+
   it('a host or ECMA-402 iterator throws too, through the prototype chain, and a host object compiles as before', () => {
     // not ECMA-262: URLSearchParams' and Headers' iterators are host objects (#416 kept those out), Intl.Segmenter's
     // is ECMA-402, and each inherits %IteratorPrototype%
