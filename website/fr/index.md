@@ -1,5 +1,5 @@
 ---
-english: a258e153105c
+english: 4996a69be376
 layout: home
 markdownStyles: false
 title: pgcast
@@ -14,7 +14,7 @@ description: "Le Postgres que vous connaissez, avec toute la puissance de TypeSc
 
 <h1><span class="half">Le Postgres que vous connaissez,</span> <span class="half">avec toute la puissance de TypeScript<span class="op">::</span></span></h1>
 
-<strong>Aucune couche entre vous et Postgres</strong> : vous écrivez vos requêtes dans son vocabulaire naturel, et chaque raccourci produit un SQL propre, que vous pouvez lire et prévoir. Quand un raccourci ne suffit pas, vous écrivez le SQL vous-même dans un template `sql`. pgcast lit votre schéma, en tire les types et les porte <strong>jusqu’au résultat de chaque requête, jointures comprises</strong> : l’autocomplétion vous guide, et TypeScript attrape les erreurs avant que la requête parte.<br>
+<strong>Aucune couche entre vous et Postgres</strong> : vous écrivez vos requêtes dans son vocabulaire naturel, et pgcast porte les types tirés de votre schéma <strong>jusqu’au résultat de chaque requête</strong>.<br>
 Pas d’ORM, pas de modèles, pas d’état caché.
 {.lede}
 
