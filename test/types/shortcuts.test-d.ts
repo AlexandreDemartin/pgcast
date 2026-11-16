@@ -459,6 +459,20 @@ describe('upsert', () => {
     void two; void every; void issue;
   });
 
+  test('characterization: over every table, updateValues takes any, and cols() and vals() of any, which 6.6.1 refused (#533)', () => {
+    // 6.6.1 refused each (TS2769); with strict off, it also takes null and undefined, which 6.6.1 refused and this strict program cannot show
+    const anyV = JSON.parse('1');
+    const every = <T extends s.Table>(t: T, r: s.InsertableForTable<T>, c: s.ColumnForTable<T>) => {
+      db.upsert(t, r, c, { updateValues: { created_at: anyV } });
+      db.upsert(t, r, c, { updateValues: { created_at: JSON.parse('1') } });
+      db.upsert(t, r, c, { updateValues: { created_at: db.cols(anyV) } });
+      db.upsert(t, r, c, { updateValues: { created_at: db.vals(anyV) } });
+      // @ts-expect-error a number, refused as by 6.6.1
+      db.upsert(t, r, c, { updateValues: { created_at: 1 } });
+    };
+    void every;
+  });
+
   test('updateValues in a function generic over the table refuses what a concrete table refuses (#533)', () => {
     const date = new Date();
     const one = <T extends 'users'>(t: T, r: s.InsertableForTable<T>, c: s.ColumnForTable<T>) => {
