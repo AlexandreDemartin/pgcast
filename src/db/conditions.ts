@@ -110,6 +110,38 @@ export const isIn = <T>(a: readonly T[]) => !Array.isArray(a) ? notAnArray('isIn
  */
 export const isNotIn = <T>(a: readonly T[]) => !Array.isArray(a) ? notAnArray('isNotIn', a) : a.length > 0 ? sql<SQL, boolean | null, T>`${self} NOT IN (${vals(a)})` : sql`true`;
 
+const isWrapper = (x: unknown) => x === Default || x === self || x instanceof SQLFragment || x instanceof Parameter ||
+  x instanceof ParentColumn || x instanceof DangerousRawString || x instanceof ColumnNames || x instanceof ColumnValues;
+
+// one array parameter holds plain values: pg would send a Parameter or a fragment as JSON, and read an array item
+// as more items, so that a jsonb column matched no row, with no error
+const anyArray = (a: unknown) => {
+  if (!Array.isArray(a)) {
+    return isWrapper(a) ?
+      refused('`eqAny()` takes an array of values, not `db.param()` of one nor a `sql` fragment: write `eqAny(values)`; for SQL, write a `sql` fragment with `db.self` in place of the condition.') :
+      notAnArray('eqAny', a);
+  }
+  const i = a.findIndex(x => Array.isArray(x) || isWrapper(x));
+  return i < 0 ? param(a, false) : refused(Array.isArray(a[i]) ?
+    '`eqAny()` sends its array as one parameter, which reads an array item as more items: on an array column, use `isIn()`; on a `jsonb` column, give the item as JSON text, `JSON.stringify(item)`.' :
+    '`eqAny()` sends its array as one parameter, so each item is a plain value, not `db.param()`, a `sql` fragment nor `db.parent()`: give the value itself, or use `isIn()`, which takes those.');
+};
+
+// parent() fixes no T, which the Whereable would then infer from the same key of every table (#493): `never` fits any
+interface EqAnySignatures {
+  (a: ParentColumn): SQLFragment<boolean | null, never>;
+  <T>(a: readonly T[]): SQLFragment<boolean | null, T>;
+}
+
+/**
+ * `"col" = ANY($1)`, the whole array one parameter: one query text for any length, where `isIn()` writes
+ * `IN ($1, $2, …)`. An empty array matches no row. `parent('col')`, an array column of a `lateral`'s parent row,
+ * gives `"col" = ANY("parent"."col")`. Anything else, or an item that is an array or a `Parameter`, throws as the query compiles.
+ * @param a An array of values, or `parent()`
+ */
+export const eqAny: EqAnySignatures = (a: readonly unknown[] | ParentColumn) =>
+  sql<SQL, boolean | null>`${self} = ANY(${a instanceof ParentColumn ? a : anyArray(a)})`;
+
 /**
  * Join conditions with `OR`: `or(a, b)` compiles to `(a OR b)`, and `or()` to `FALSE`, so that
  * it matches no row. Zapatos 6.6.1 wrote `()`, which Postgres refuses. Its operands need no

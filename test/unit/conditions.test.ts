@@ -7,6 +7,7 @@
 import { describe, expect, it } from 'vitest';
 import * as db from '../../src/db';
 import { sql, param, parent, raw, cols, vals, self, Default, conditions as dc } from '../../src/db';
+import { resetConfig } from '../helpers/config';
 
 /** The compiled `{ text, values }` of `{ col: condition }`, nested under a parent table for parent(); values raw. */
 const show = (condition: db.SQL) => sql`${{ col: condition }}`.copy({ parentTable: 'p' }).compile();
@@ -25,6 +26,7 @@ describe('conditions', () => {
         "between",
         "betweenSymmetric",
         "eq",
+        "eqAny",
         "fromNow",
         "gt",
         "gte",
@@ -459,6 +461,90 @@ describe('conditions', () => {
     `);
   });
 
+  it('eqAny: the array is one parameter, the same text for any length, the empty array included', () => {
+    const thousand = Array.from({ length: 1000 }, (_, i) => i);
+    expect({
+      eqAny: show(dc.eqAny([1, 2, 3])), eqAnyEmpty: show(dc.eqAny([])), eqAnyParent: show(dc.eqAny(parent('scores'))),
+      eqAnyParentSelf: show(dc.eqAny(parent())), eqAnyItems: show(dc.eqAny(['a', null, new Date(0), { a: 1 }, BigInt(2)])),
+    }).toMatchInlineSnapshot(`
+      {
+        "eqAny": {
+          "text": "(("col" = ANY($1)))",
+          "values": [
+            [
+              1,
+              2,
+              3,
+            ],
+          ],
+        },
+        "eqAnyEmpty": {
+          "text": "(("col" = ANY($1)))",
+          "values": [
+            [],
+          ],
+        },
+        "eqAnyItems": {
+          "text": "(("col" = ANY($1)))",
+          "values": [
+            [
+              "a",
+              null,
+              1970-01-01T00:00:00.000Z,
+              {
+                "a": 1,
+              },
+              2n,
+            ],
+          ],
+        },
+        "eqAnyParent": {
+          "text": "(("col" = ANY("p"."scores")))",
+          "values": [],
+        },
+        "eqAnyParentSelf": {
+          "text": "(("col" = ANY("p"."col")))",
+          "values": [],
+        },
+      }
+    `);
+    const many = show(dc.eqAny(thousand));
+    expect(many.text).toBe(show(dc.eqAny([1])).text);
+    expect(many.values).toEqual([thousand]);
+  });
+
+  it('eqAny sends its array as an array under castArrayParamsToJson, where a fragment with param() sends JSON', () => {
+    db.setConfig({ castArrayParamsToJson: true });
+    try {
+      expect({
+        eqAny: show(dc.eqAny([1, 2])), fragment: show(sql`${self} = ANY(${param([1, 2])})`),
+      }).toMatchInlineSnapshot(`
+        {
+          "eqAny": {
+            "text": "(("col" = ANY($1)))",
+            "values": [
+              [
+                1,
+                2,
+              ],
+            ],
+          },
+          "fragment": {
+            "text": "(("col" = ANY(CAST($1 AS "json"))))",
+            "values": [
+              "[1,2]",
+            ],
+          },
+        }
+      `);
+    } finally { resetConfig(); }
+  });
+
+  it('a copy of eqAny compiles the same', () => {
+    const condition = dc.eqAny([1, 2]);
+    expect(sql`${{ col: condition.copy() }}`.compile()).toEqual(sql`${{ col: condition }}`.compile());
+  });
+
   it('fromNow, now, add, subtract', () => {
     expect({
       fromNow: dc.fromNow(3).compile(), fromNowUnit: dc.fromNow(-1.5, 'hours').compile(), now: dc.now.compile(),
@@ -525,7 +611,46 @@ describe('Default, self, raw, cols and vals as the value of a condition', () => 
   };
 
   it('covers every condition of db.conditions', () => {
-    expect([...Object.keys(one), ...Object.keys(two), ...Object.keys(lists), ...noValue].sort()).toEqual(Object.keys(dc).sort());
+    expect([...Object.keys(one), ...Object.keys(two), ...Object.keys(lists), 'eqAny', ...noValue].sort()).toEqual(Object.keys(dc).sort());
+  });
+
+  it('eqAny given an item one array parameter cannot hold throws when compiled, not when called, saying what to do', () => {
+    // pg sends a Parameter or a fragment as JSON, and reads an array item as more items: no row, with no error
+    const items = { Default, self, raw: raw("'Ada'"), cols: cols('Ada'), vals: vals('Ada'), param: param('Ada'),
+      fragment: sql`'Ada'`, parent: parent('id'), array: ['Ada'], nested: [[1, 2]] };
+    expect(Object.fromEntries(Object.entries(items).map(([name, item]) => [name, thrown(dc.eqAny(['Bob', item]))])))
+      .toMatchInlineSnapshot(`
+        {
+          "Default": "\`eqAny()\` sends its array as one parameter, so each item is a plain value, not \`db.param()\`, a \`sql\` fragment nor \`db.parent()\`: give the value itself, or use \`isIn()\`, which takes those.",
+          "array": "\`eqAny()\` sends its array as one parameter, which reads an array item as more items: on an array column, use \`isIn()\`; on a \`jsonb\` column, give the item as JSON text, \`JSON.stringify(item)\`.",
+          "cols": "\`eqAny()\` sends its array as one parameter, so each item is a plain value, not \`db.param()\`, a \`sql\` fragment nor \`db.parent()\`: give the value itself, or use \`isIn()\`, which takes those.",
+          "fragment": "\`eqAny()\` sends its array as one parameter, so each item is a plain value, not \`db.param()\`, a \`sql\` fragment nor \`db.parent()\`: give the value itself, or use \`isIn()\`, which takes those.",
+          "nested": "\`eqAny()\` sends its array as one parameter, which reads an array item as more items: on an array column, use \`isIn()\`; on a \`jsonb\` column, give the item as JSON text, \`JSON.stringify(item)\`.",
+          "param": "\`eqAny()\` sends its array as one parameter, so each item is a plain value, not \`db.param()\`, a \`sql\` fragment nor \`db.parent()\`: give the value itself, or use \`isIn()\`, which takes those.",
+          "parent": "\`eqAny()\` sends its array as one parameter, so each item is a plain value, not \`db.param()\`, a \`sql\` fragment nor \`db.parent()\`: give the value itself, or use \`isIn()\`, which takes those.",
+          "raw": "\`eqAny()\` sends its array as one parameter, so each item is a plain value, not \`db.param()\`, a \`sql\` fragment nor \`db.parent()\`: give the value itself, or use \`isIn()\`, which takes those.",
+          "self": "\`eqAny()\` sends its array as one parameter, so each item is a plain value, not \`db.param()\`, a \`sql\` fragment nor \`db.parent()\`: give the value itself, or use \`isIn()\`, which takes those.",
+          "vals": "\`eqAny()\` sends its array as one parameter, so each item is a plain value, not \`db.param()\`, a \`sql\` fragment nor \`db.parent()\`: give the value itself, or use \`isIn()\`, which takes those.",
+        }
+      `);
+  });
+
+  it('eqAny given a list that is not an array throws when compiled, saying what to do', () => {
+    const lists = { Set: new Set([1]), string: '5', number: 5, null: null, undefined, Default,
+      param: param([1]), fragment: sql`ARRAY[1]`, raw: raw("'{1}'") };
+    expect(Object.fromEntries(Object.entries(lists).map(([name, x]) => [name, thrown(dc.eqAny(x as any))]))).toMatchInlineSnapshot(`
+      {
+        "Default": "\`eqAny()\` takes an array of values, not \`db.param()\` of one nor a \`sql\` fragment: write \`eqAny(values)\`; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
+        "Set": "\`eqAny()\` takes an array, not \`Set\`: make one with \`eqAny([...values])\`, or \`Array.from(values)\` for an array-like object.",
+        "fragment": "\`eqAny()\` takes an array of values, not \`db.param()\` of one nor a \`sql\` fragment: write \`eqAny(values)\`; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
+        "null": "\`eqAny()\` takes an array, not \`null\`: for one value, write \`eqAny([value])\`.",
+        "number": "\`eqAny()\` takes an array, not \`number\`: for one value, write \`eqAny([value])\`.",
+        "param": "\`eqAny()\` takes an array of values, not \`db.param()\` of one nor a \`sql\` fragment: write \`eqAny(values)\`; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
+        "raw": "\`eqAny()\` takes an array of values, not \`db.param()\` of one nor a \`sql\` fragment: write \`eqAny(values)\`; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
+        "string": "\`eqAny()\` takes an array, not \`string\`: for one value, write \`eqAny([value])\`.",
+        "undefined": "\`eqAny()\` takes an array, not \`undefined\`: for one value, write \`eqAny([value])\`.",
+      }
+    `);
   });
 
   it('a condition given Default or self throws when compiled, not when called', () => {

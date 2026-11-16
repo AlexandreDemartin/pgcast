@@ -276,6 +276,37 @@ describe('identifiers', () => {
       }
     `);
   });
+
+  it('the column of parent() in eqAny, quoted as a Whereable value quotes it', () => {
+    // the same name inside `= ANY(…)`: no new interpolated input
+    expect(matrix(v => sql`WHERE ${{ owner_id: db.conditions.eqAny(db.parent(v)) }}`.copy({ parentTable: 'users' }))).toMatchInlineSnapshot(`
+      {
+        "backslash": "WHERE (("owner_id" = ANY("users"."a\\b")))",
+        "comment": "WHERE (("owner_id" = ANY("users"."a/*b")))",
+        "dashes": "WHERE (("owner_id" = ANY("users"."a--b")))",
+        "dollar": "WHERE (("owner_id" = ANY("users"."a$1b")))",
+        "dot": "WHERE (("owner_id" = ANY("users"."a"."b")))",
+        "dquote": "WHERE (("owner_id" = ANY("users"."a""b")))",
+        "escapedCloses": "WHERE (("owner_id" = ANY("users"."a"" OR TRUE OR ""b")))",
+        "escapedDot": "WHERE (("owner_id" = ANY("users"."a"".""b")))",
+        "escapedNul": "WHERE (("owner_id" = ANY("users"."a""""<NUL>""""b")))",
+        "escapedOdd": "WHERE (("owner_id" = ANY("users"."a""""""b")))",
+        "lone": "WHERE (("owner_id" = ANY("users"."""")))",
+        "mixedEscaped": "WHERE (("owner_id" = ANY("users"."s".a$1."b"" OR TRUE OR ""c")))",
+        "nul": "WHERE (("owner_id" = ANY("users"."a<NUL>b")))",
+        "prequoted": "WHERE (("owner_id" = ANY("users"."a")))",
+        "prequotedCloses": "WHERE (("owner_id" = ANY("users"."""a"" OR TRUE OR ""b""")))",
+        "prequotedEmpty": "WHERE (("owner_id" = ANY("users"."""")))",
+        "prequotedEscaped": "WHERE (("owner_id" = ANY("users"."a"" OR TRUE OR ""b")))",
+        "qualifiedEscaped": "WHERE (("owner_id" = ANY("users"."s"."a"" OR TRUE OR ""b")))",
+        "semicolon": "WHERE (("owner_id" = ANY("users"."a;b")))",
+        "squote": "WHERE (("owner_id" = ANY("users"."a'b")))",
+        "uescape": "WHERE (("owner_id" = ANY("users"."""s"""."U&""a"" UESCAPE '!' || ""b""")))",
+        "unicodeCloses": "WHERE (("owner_id" = ANY("users"."""s"""."U&""a\\"" OR TRUE OR \\""b""")))",
+        "unicodeEscaped": "WHERE (("owner_id" = ANY("users"."s".U&"a\\0022"" OR TRUE OR ""\\0022b")))",
+      }
+    `);
+  });
 });
 
 describe('values stay parameters', () => {
@@ -286,6 +317,17 @@ describe('values stay parameters', () => {
       const extras = db.select('users', all, { extras: { [input]: sql`1` } } as any).compile();
       expect(extras.values).toEqual([input]);
       expect(db.conditions.fromNow(1, input as any).compile()).toEqual({ text: 'now() + $1', values: [`1 ${input}`] });
+    }
+  });
+
+  it('the items of eqAny are one array parameter, whatever they hold and whatever the configuration', () => {
+    const items = Object.values(hostile);
+    for (const config of [{}, { castArrayParamsToJson: true }, { castObjectParamsToJson: true }]) {
+      db.setConfig(config);
+      try {
+        expect(sql`WHERE ${{ display_name: db.conditions.eqAny(items) }}`.compile())
+          .toEqual({ text: 'WHERE (("display_name" = ANY($1)))', values: [items] });
+      } finally { resetConfig(); }
     }
   });
 });
@@ -1954,10 +1996,11 @@ describe('a built-in object as a Whereable', () => {
   });
 });
 
-describe('a list that is not an array in isIn() and isNotIn()', () => {
+describe('a list that is not an array in isIn(), isNotIn() and eqAny()', () => {
   // 6.6.1 read `a.length`: an iterable has none, so isNotIn() compiled to `true`, every row, and isIn() to
-  // `false`; an array-like or a string gave its keys' values, null and undefined a TypeError at the call (#235)
-  const lists = { isIn: db.conditions.isIn, isNotIn: db.conditions.isNotIn };
+  // `false`; an array-like or a string gave its keys' values, null and undefined a TypeError at the call (#235).
+  // eqAny() sent it as its one parameter, which pg writes as '{}' for a Set: no row, with no error
+  const lists = { isIn: db.conditions.isIn, isNotIn: db.conditions.isNotIn, eqAny: db.conditions.eqAny };
   const entryPoints: Record<string, (c: db.SQL) => db.SQLFragment<any, any>> = {
     deletes: c => db.deletes('users', { id: c }),
     select: c => db.select('users', { id: c }),
@@ -1975,7 +2018,7 @@ describe('a list that is not an array in isIn() and isNotIn()', () => {
     `\`${fn}()\` takes an array, not \`${kind}\`: for one value, write \`${fn}([value])\`.` :
     `\`${fn}()\` takes an array, not \`${kind}\`: make one with \`${fn}([...values])\`, or \`Array.from(values)\` for an array-like object.`;
 
-  it('throws for each kind, in isIn() and isNotIn(), through deletes, select and update, nested in and(), or() and not(), and copied', () => {
+  it('throws for each kind, in isIn(), isNotIn() and eqAny(), through deletes, select and update, nested in and(), or() and not(), and copied', () => {
     const outcomes: string[] = [];
     for (const [fn, list] of Object.entries(lists))
       for (const [entryPoint, build] of Object.entries(entryPoints))
