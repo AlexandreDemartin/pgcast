@@ -1804,6 +1804,107 @@ describe('a built-in object as a Whereable', () => {
       ...Temporal && { Temporal: 'A built-in `Temporal`', 'Temporal.Now': 'A built-in `Temporal.Now`' },
     });
   });
+
+  // the Segments prototype is read from a Segmenter the first time a filter's prototype has no constructor of its
+  // own, then kept (#517): each test loads `zapatos/db` afresh, with `Intl.Segmenter` deleted or a stand-in
+  const
+    // ES2022: not in the lib's ES2019 types
+    NativeSegmenter = (Intl as any).Segmenter as new (locale?: string) => { segment(s: string): object },
+    withSegmenter = async <T>(standIn: unknown, run: (core: typeof db) => T): Promise<T> => {
+      const descriptor = Object.getOwnPropertyDescriptor(Intl, 'Segmenter')!;
+      vi.resetModules();
+      try {
+        const core = await import('../../src/db');
+        if (standIn === undefined) delete (Intl as any).Segmenter;
+        else Object.defineProperty(Intl, 'Segmenter', { ...descriptor, value: standIn });
+        return run(core);
+      } finally {
+        Object.defineProperty(Intl, 'Segmenter', descriptor);
+        vi.resetModules();
+      }
+    },
+    where = (core: typeof db, x: object) => {
+      try { return core.sql`SELECT 1 WHERE ${x}`.compile().text; }
+      catch (err) { return (err as Error).message.split(' has no meaning')[0]; }
+    },
+    // its prototype has no constructor of its own, as the Segments one, and no enumerable key: TRUE in 6.6.1
+    unnamedPrototype = () => Object.create({ title: 'Metropolis' });
+
+  it('leaves Segments out, and loads, where the runtime lacks Intl.Segmenter', async () => {
+    const segments = new NativeSegmenter('en').segment('Metropolis');
+    expect(await withSegmenter(undefined, core => ({
+      segments: where(core, segments),
+      unnamedPrototype: where(core, unnamedPrototype()),
+      plain: where(core, { id: 1 }),
+      collator: where(core, new Intl.Collator('en')),
+    }))).toEqual({
+      // left out, it compiles as in 6.6.1
+      segments: 'SELECT 1 WHERE TRUE',
+      unnamedPrototype: 'SELECT 1 WHERE TRUE',
+      plain: 'SELECT 1 WHERE ("id" = $1)',
+      collator: 'A built-in `Collator`',
+    });
+  });
+
+  it('reads the Segments prototype once, and never for a plain object, an array\'s items or a class instance', async () => {
+    const
+      made: string[] = [],
+      Counted = class extends NativeSegmenter { constructor(locale?: string) { made.push(locale ?? 'default'); super(locale); } },
+      segments = new NativeSegmenter('en').segment('Metropolis');
+    expect(await withSegmenter(Counted, core => {
+      const before = {
+        empty: where(core, {}),
+        plain: where(core, { id: 1 }),
+        nullPrototype: where(core, Object.create(null)),
+        arrayOfPlain: where(core, [{ id: 1 }]),
+        classInstance: where(core, new (class Film { id = 1; })()),
+        date: where(core, new Date(0)),
+      };
+      return {
+        before, madeBefore: made.length,
+        segments: where(core, segments),
+        again: where(core, segments),
+        unnamedPrototype: where(core, unnamedPrototype()),
+        madeAfter: made.length,
+      };
+    })).toEqual({
+      before: {
+        empty: 'SELECT 1 WHERE TRUE',
+        plain: 'SELECT 1 WHERE ("id" = $1)',
+        nullPrototype: 'SELECT 1 WHERE TRUE',
+        arrayOfPlain: 'SELECT 1 WHERE ("id" = $1)',
+        classInstance: 'SELECT 1 WHERE ("id" = $1)',
+        date: 'A built-in `Date`',
+      },
+      madeBefore: 0,
+      segments: 'A built-in `Segments`',
+      again: 'A built-in `Segments`',
+      unnamedPrototype: 'SELECT 1 WHERE TRUE',
+      madeAfter: 1,
+    });
+  });
+
+  it('a stand-in Segmenter whose segment() throws or gives a plain object refuses nothing', async () => {
+    // a polyfill installed on `globalThis` before the first filter that needs it: neither its error nor a plain
+    // object's prototype reaches a query, which compiles as in 6.6.1
+    const
+      throwing = class { segment(): object { throw new Error('no break iterator data'); } },
+      plain = class { segment() { return {}; } },
+      outcomes = (core: typeof db) => ({
+        unnamedPrototype: where(core, unnamedPrototype()),
+        empty: where(core, {}),
+        plain: where(core, { id: 1 }),
+      }),
+      before = {
+        unnamedPrototype: 'SELECT 1 WHERE TRUE',
+        empty: 'SELECT 1 WHERE TRUE',
+        plain: 'SELECT 1 WHERE ("id" = $1)',
+      };
+    expect({
+      throwing: await withSegmenter(throwing, outcomes),
+      plain: await withSegmenter(plain, outcomes),
+    }).toEqual({ throwing: before, plain: before });
+  });
 });
 
 describe('a list that is not an array in isIn() and isNotIn()', () => {
