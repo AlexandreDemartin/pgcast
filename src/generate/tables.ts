@@ -17,7 +17,9 @@ import { jsdocText, stringLiteral, tsIdentifier } from './quote';
 const tsOwnTypes = new Set('any bigint boolean never number object string symbol undefined unknown'.split(' '));
 const hasOwn = (o: object, key: string) => Object.prototype.hasOwnProperty.call(o, key);
 const contexts = ['Selectable', 'JSONSelectable', 'Whereable', 'Insertable', 'Updatable'] as const;
-const isInterval = (pgType: string | undefined) => pgType === 'interval' || pgType === '_interval';
+// pg_catalog's interval or its array: a type of yours of that name is typed by its name, as in 6.6.1, whatever the key
+const isInterval = (type: { schema: string; name: string } | undefined) =>
+  type?.schema === 'pg_catalog' && (type.name === 'interval' || type.name === '_interval');
 
 
 export interface Relation {
@@ -196,7 +198,7 @@ export const definitionForRelationInSchema = async (
     // an interval, an array of one or a domain over either, whose placeholder holds what pg returns, as generated; under
     // another domain, or in an array of a domain, only where domainsTypedByContext types it by its base type
     if (config.intervalsTypedAsObjects == null &&  // left out, or null from JSON: false is a choice, a parser of your own
-      (isInterval(udtName) || (config.domainsTypedByContext ?? false) && isInterval(rootOf(row)?.name))) {
+      (isInterval({ schema: udtSchema, name: udtName }) || (config.domainsTypedByContext ?? false) && isInterval(rootOf(row)))) {
       const type = domainName !== null ? `${domainSchema}.${domainName}` : udtName === 'interval' ? udtName :
         udtName === '_interval' ? 'interval[]' : `${udtSchema}.${udtName.slice(1)}[]`;
       intervalsAsText.push(`${schemaName}.${rel.name}.${column} (${type})`);
