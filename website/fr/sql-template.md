@@ -1,5 +1,5 @@
 ---
-english: a3582a6c6140
+english: 52d71a656838
 ---
 
 # Template SQL
@@ -241,7 +241,7 @@ Comme valeur de filtre, et comme valeur dans `vals({…})` (donc dans une écrit
 
 > `` `db.cols()` takes an object or an array, not `string`: for one column, write `db.cols([name])`; for a row of `insert()`, `upsert()` or `update()`, give an object. ``<!-- message -->
 
-Le type accepte une telle valeur, comme celui de Zapatos 6.6.1, pour qu’un helper générique (`<T>(row: T) => db.cols(row)`) compile toujours. Dans `updateValues` d’[`upsert()`](/fr/insert#upsert-options), il refuse une valeur primitive (`null` et `undefined` seulement avec `strictNullChecks`), ainsi qu’un `Date`, un `Buffer` ou un [`PostgresInterval`](/fr/runtime-config#PostgresInterval). Zapatos 6.6.1 compilait les indices des caractères d’une chaîne, `cols('title')` en `"0", "1", "2", "3", "4"`, toute autre valeur primitive en rien, et levait une `TypeError` sur `null`.
+Le type accepte une telle valeur, comme celui de Zapatos 6.6.1, pour qu’un helper générique (`<T>(row: T) => db.cols(row)`) compile toujours. Dans `updateValues` d’[`upsert()`](/fr/insert#upsert-options), il refuse une valeur primitive (`null` et `undefined` seulement avec `strictNullChecks`), ainsi qu’un `Date`, un `Buffer` ou un [`PostgresInterval`](/fr/runtime-config#PostgresInterval), sauf si la colonne est typée `any`, comme l’est un placeholder de `zapatos/custom` laissé tel que généré. Zapatos 6.6.1 compilait les indices des caractères d’une chaîne, `cols('title')` en `"0", "1", "2", "3", "4"`, toute autre valeur primitive en rien, et levait une `TypeError` sur `null`.
 
 Un `Date`, un `Buffer` ou un autre objet natif est un objet, et se compile donc en ses propres clés, comme avec Zapatos 6.6.1 : un `Date` n’en a aucune et ne donne rien, un `Buffer` donne ses indices, `"0", "1"`<!-- probe: db.sql`${db.cols(Buffer.from('ab'))}` --> pour deux octets. Pour une seule valeur, passez `db.param(value)`.
 
