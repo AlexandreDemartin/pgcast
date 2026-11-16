@@ -21,5 +21,5 @@
   <text class="display" x="76" y="488" font-size="80" letter-spacing="-2" fill="#12202b">TypeScript<tspan class="mono" font-weight="700" letter-spacing="-4.8" fill="#0a6b63">::</tspan></text>
   <rect x="80" y="530" width="1040" height="1" fill="#d9e0e5"/>
   <text class="mono" x="80" y="580" font-size="24" font-weight="500" fill="#566673">pgcast.dev</text>
-  <text class="body" x="1120" y="580" font-size="24" text-anchor="end" fill="#566673">No ORM, no models, no hidden state.</text>
+  <text class="body" x="1120" y="580" font-size="24" text-anchor="end" fill="#566673">No ORM, no models, no hidden state: you stay in full control.</text>
 </svg>

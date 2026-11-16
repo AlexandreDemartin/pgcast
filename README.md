@@ -11,7 +11,7 @@ Maintained by [Alexandre Demartin](https://github.com/AlexandreDemartin)
 
 ## Why pgcast
 
-- **Postgres is the source of the types.** The codegen reads the catalog and writes them; none is written by hand. No ORM, no models, no hidden state.
+- **Postgres is the source of the types.** The codegen reads the catalog and writes them; none is written by hand. No ORM, no models, no hidden state: you stay in full control.
 - **SQL you can read.** Each shortcut compiles to one predictable query, and the `sql` template is always there: the SQL you write is the SQL that runs.
 - **Values are parameters, and names cannot break out.** Every value is sent as `$1`, `$2`, …; a table, column or key that may come from outside is quoted with its `"` doubled.
 - **A drop-in for Zapatos.** Same module names, same API, the old behaviour by default wherever code may rely on it ([what differs](#what-differs-from-zapatos-661)): switch without touching an import.
