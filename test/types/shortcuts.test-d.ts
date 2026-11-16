@@ -518,20 +518,39 @@ describe('upsert', () => {
     void one;
   });
 
-  test('characterization: in a function generic over the table, updateValues refuses param() of a string literal on an enum or time column, which 6.6.1 took (#538)', () => {
-    // the literal widens to string, so param() gives Parameter<string>; a const assertion or a type argument keeps it
-    const one = <T extends 'users'>(t: T, r: s.InsertableForTable<T>, c: s.ColumnForTable<T>) => {
-      // @ts-expect-error param() of an enum label, until #538
-      db.upsert(t, r, c, { updateValues: { mood: db.param('sad') } });
+  test('updateValues takes param() of a string literal on a column of literals, as 6.6.1 does (#538)', () => {
+    // an enum, a time, a timetz and an int8 domain typed Int8String: in a function generic over the table, and over
+    // every table, the literal widened to string, so param() gave Parameter<string>
+    const users = <T extends 'users'>(t: T, r: s.InsertableForTable<T>, c: s.ColumnForTable<T>) => {
+      db.upsert(t, [r], c, { updateValues: { mood: db.param('sad') } });
       db.upsert(t, r, c, { updateValues: { mood: db.param('sad' as const) } });
       db.upsert(t, r, c, { updateValues: { mood: db.param<s.mood>('sad') } });
+      return db.upsert(t, r, c, { updateValues: { mood: db.param('sad') } });
     };
+    const q = users('users', row, 'email');
+    expectTypeOf(q.run(pool)).resolves.toEqualTypeOf<s.users.JSONSelectable & db.UpsertAction>();
+    expectTypeOf(q.run(pool)).resolves.not.toBeAny();
     const zoo = <T extends 'extra.type_zoo'>(t: T, r: s.InsertableForTable<T>, c: s.ColumnForTable<T>) => {
-      // @ts-expect-error param() of a time string, until #538
       db.upsert(t, r, c, { updateValues: { c_time: db.param('12:00:00') } });
-      db.upsert(t, r, c, { updateValues: { c_time: db.param('12:00:00' as const) } });
+      db.upsert(t, r, c, { updateValues: { c_timetz: db.param('12:00:00+00') } });
+      db.upsert(t, r, c, { updateValues: { c_int8_domain: db.param('1') } });
+      db.upsert(t, [r], c, { updateValues: { c_time: db.param('12:00:00'), c_timetz: db.param('12:00:00+00') } });
     };
-    void one; void zoo;
+    const two = <T extends 'extra.type_zoo' | 'users'>(t: T, r: s.InsertableForTable<T>, c: s.ColumnForTable<T>) => {
+      db.upsert(t, r, c, { updateValues: { mood: db.param('sad') } });
+      db.upsert(t, r, c, { updateValues: { c_time: db.param('12:00:00') } });
+      db.upsert(t, r, c, { updateValues: { c_timetz: db.param('12:00:00+00') } });
+      db.upsert(t, r, c, { updateValues: { c_int8_domain: db.param('1') } });
+    };
+    void zoo; void two;
+    const every = null! as s.Table, everyRow = null! as s.InsertableForTable<s.Table>, everyColumn = null! as s.ColumnForTable<s.Table>;
+    const all = db.upsert(every, everyRow, everyColumn, { updateValues: { mood: db.param('sad') } });
+    expectTypeOf(all).toEqualTypeOf(db.upsert(every, everyRow, everyColumn, { updateValues: { mood: db.param<s.mood>('sad') } }));
+    expectTypeOf(all).not.toBeAny();
+    db.upsert(every, everyRow, everyColumn, { updateValues: { c_time: db.param('12:00:00') } });
+    db.upsert(every, everyRow, everyColumn, { updateValues: { c_timetz: db.param('12:00:00+00') } });
+    db.upsert(every, everyRow, everyColumn, { updateValues: { c_int8_domain: db.param('1') } });
+    db.upsert(every, [everyRow], everyColumn, { updateValues: { mood: db.param('sad') } });
   });
 
   test('upsertRequiresSameKeys: an optional boolean of Config and setConfig', () => {

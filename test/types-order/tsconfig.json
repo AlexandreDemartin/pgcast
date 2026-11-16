@@ -1,0 +1,12 @@
+{
+  // Type tests of updateValues whose result depends on what the program checks first (`npm run test:types`,
+  // with tsc): a program of its own, its one test file first, so that no other test resolves the slot's types
+  // before it does (#538). Otherwise as ../types/tsconfig.json.
+  "extends": "../generated/tsconfig.json",
+  "files": ["./updateValues.ts"],
+  "include": ["../generated/zapatos/**/*"],
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "bundler"
+  }
+}
