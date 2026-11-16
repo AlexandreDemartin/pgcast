@@ -4,12 +4,13 @@
 // keyed by the name its error gives. Each has no own enumerable key, or only index keys,
 // so Zapatos 6.6.1 compiled it to TRUE (every row) or to ("0" = $1 …); one with own keys
 // added throws too, except an iterator. An Intl or a Temporal object goes by its constructor's
-// name (`Collator`, `PlainDate`). A subclass instance is not one of them, and
+// name (`Collator`, `PlainDate`), a namespace object by its path (`Math`, `Temporal.Now`, #523),
+// which is the namespace itself, not a fresh value. A subclass instance is not one of them, and
 // compiles as in 6.6.1, except a subclass of Iterator with no own key (#426).
-// test/unit/injection.test.ts compiles them, and checks the list against the global constructors of a bare vm
-// context and the iterators their values hand out; test/integration/injection.test.ts runs them.
+// test/unit/injection.test.ts compiles them, and checks the list against the global constructors and namespaces
+// of a bare vm context and the iterators their values hand out; test/integration/injection.test.ts runs them.
 
-/** A fresh value of each refused built-in object, keyed by the name its error gives. */
+/** A value of each refused built-in object, fresh but for a namespace, keyed by the name its error gives. */
 export const builtinObjects = (): Record<string, object> => {
   const
     Float16Array = (globalThis as any).Float16Array,  // Node 24 and later
@@ -96,5 +97,12 @@ export const builtinObjects = (): Record<string, object> => {
       PlainYearMonth: Temporal.PlainYearMonth.from('2026-11'),
       ZonedDateTime: Temporal.ZonedDateTime.from('2026-11-15T20:30[UTC]'),
     },
+    // namespace objects: Object.prototype is their prototype, and their functions are no enumerable keys
+    Math,
+    JSON,
+    Reflect,
+    Atomics,
+    Intl: intl,
+    ...Temporal && { Temporal, 'Temporal.Now': Temporal.Now },
   };
 };

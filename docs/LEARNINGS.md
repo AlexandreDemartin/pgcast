@@ -59,9 +59,20 @@ Candidates for a check, a rule or a skill line.
 - #511: the walk of every global constructor of a bare `vm` context found a real gap on CI's Node 26 leg on its first ready run (`Temporal`, fixed by #521): a list a later Node can outgrow is generated from the runtime, not written by hand.
 - #511: a kept entry keyed by path, with a namespace fallback, lets the list shrink as `core.ts` grows; a whole-namespace entry (`Intl`) would have hidden #521's refusals from the walk.
 - #511: `npm run lint` covers `src/`, `scripts/` and `website/`, not `test/`, so a test-only PR's style goes unchecked.
+- #527: a mutant matching by `Symbol.toStringTag` is the cheap proof of "refused by identity": `Object.create(Math)` inherits the tag and gets refused.
+- #527: anything `core.ts` reads at load gets a test that loads `zapatos/db` with that global deleted or replaced: `Math`/`JSON`/`Reflect` read as bare names made a missing one crash the load.
+- #527: no CI lane runs Node 22 with `--harmony-temporal`, so builders prove that runtime by hand (#515, #523); only `lts/*` covers `Temporal` in CI.
+- #527: a PR's "Market" versions are checked against `npm view <pkg> version` when written (Slonik 47 cited, 49 current).
+- #527: a built-in `core.ts` captures at load is read through `globalThis` with a fallback, never as a bare name; checkable by `no-restricted-globals` at module scope in `src/db/*.ts`, or a test loading the module with each captured global deleted (`vi.resetModules()` plus a dynamic import; `pg` stays cached, so only pgcast's modules are tested).
 - #522: `check:agents` fails during a conflicted merge: `git ls-files src/*.ts` lists each unmerged file once per stage, so the deprecations check counts each "Set <key>:" message three times; it passes once the resolution is staged.
 - #522: merging two opt-ins that touch the same lists is cleanest by putting each side's whole block back from `git show <side>:<file>`: diff3 interleaves the shared lines of two new blocks.
 - #522: a claim that Postgres refuses a value is run on the oldest Postgres of CI (14), not only the local 17: interval input got stricter in 17 (commit 617f9b7d4), and 14/16 store `{ days: 1 }` sent as JSON as one second; with no older Postgres installed, the 14 and 16 legs are the only run of that branch, so the PR is marked ready early for them.
+- #532: a fix of a generic `where` needs a large synthetic schema in its grid: the cross-product TS2590 ("union too complex") shows only from a few dozen tables, never on the 3-table fixture.
+- #532: excess-property checks skip a generic indexed-access member of a union, so making each member a lookup by `T` turns the check off; the annotated form (`const w: s.WhereableForTable<K>`) keeps it.
+- #532: a mutant also checks that each characterisation line fails for the reason it claims: a bare `sql` value stayed refused under the fix because #493 refuses it too.
+- #532: a conflicting PR runs no `pull_request` workflow, so only CodeQL shows and it reads as "checks pass": the gate checks a CI run exists for the head SHA (`gh run list --commit <sha>`) and `mergeable` is not `CONFLICTING` (skill `ci-gate` § Pitfalls says it; a check could enforce it).
+- #532: after a mutant `test:types` run, every probe reads the mutant's declarations from `node_modules/.cache/pgcast` until `test:types` runs again on the restored source; a docs replay wrongly showed calls compiling.
+- #532: a claim like "keys still checked" on a generic intersection type is probed with a column of only one table, not only a key no table has: `WhereableForTable<K>` resolves to `A.Whereable & B.Whereable`, which takes either table's columns.
 
 ## Minors kept
 
