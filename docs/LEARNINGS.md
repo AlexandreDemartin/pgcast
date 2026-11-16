@@ -142,6 +142,18 @@ Candidates for a check, a rule or a skill line.
 - #553: a speed fix that changes no SQL is proved by interleaved runs in the PR body, run a second time in reversed order to cancel the order effect.
 - #554: a CHANGELOG headline about "several rows" was narrower than the runs: a single row in an array also listed an inherited key on 6.6.1 and 6.7.1 (`[{ title }]` compiled to `("mood", "title")`); an advisory names "rows given as an array".
 - #555: `guard.mjs` blocks `npm publish` but not a `git push` of a `v*` tag, which now starts `release.yml`: the `npm` environment's required reviewer (the owner) is the gate; a guard rule refusing a `v*` tag push, with its test, could follow.
+- #558: a guard comparing a value with what `Object.prototype` holds cannot simply switch to the descriptor's `value`: `__proto__` is an accessor; data and accessor properties are told apart, each tested (an accessor answering a new value per read, `__proto__`).
+- #558: replacing `o.x` with a null-tolerant helper (`obj?.[k]`) changes how a null item fails, from a `TypeError` to the validation message: replay `null` and `undefined` items of each array option (`order`, `lock`), not only `null` options.
+- #558: when a refactor keeps read counts on purpose, list the reads that feed `raw()` and say whether the check and the value come from the same read.
+- #558: a key added to `Object.prototype` switches guards on or off as well as filling options (`lateral: null` triggered `select()`'s refusal); only one mutant per read site showed those routes had no test.
+- #558: a fix for one route of a shared helper changes its other routes too (`callerValue()` → `upsert()` `updateValues` columns, shipped in 6.7.2): probe each caller of a changed helper before writing the CHANGELOG.
+- #558: a review item whose Expected only documents the head's behaviour has no test red on the head: its proof is red against master's runtime; a fix brief says so per item.
+- #558: with `Object.prototype.value` set, `Object.defineProperty` reads it off its descriptor argument and throws "Invalid property descriptor": a test defines its getter first.
+- #558: a rule "the value read is the one X holds" needs `Object.is`, not `!==`: `NaN` never matches and the guard fails open for exactly that value; an `Object.is` mutant probes whether the tests tell them apart.
+- #558: a property descriptor with no own `value` is not always a getter, it can be setter-only: a branch meaning "may answer anew on each read" tests `held.get`.
+- #558: a red run is checked for failing test names before it counts: a parse error in the test file gives "no tests", not a red test.
+- #558: a guard that branches on a descriptor's shape (`value`, `get`, `set`) gets a row per combination, `{ get, set }` included, or a mutant reading the other field survives.
+- #558: while a setter is defined on `Object.prototype`, `C.prototype[k] = x` runs it and defines nothing: a harness builds prototype holders with `Object.defineProperty`.
 - #557: a CLI argument accepted in several positions is replayed on 6.6.1 in each position: `--check` first fails as JSON, after the JSON argument 6.6.1 ignores it, generates and exits 0.
 - #557: a file written only under a condition (`custom/index.d.ts`, with a custom type) gets a case where the condition is false, or a mutant that drops it survives.
 - #557: an exit code set by the process wrapper (`cli.ts`) is outside every in-process test; when it is the feature's promise, one test runs the CLI as a child process.
@@ -179,6 +191,11 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #548 (form): `src/db/shortcuts.ts` `insert()` JSDoc, "no own enumerable key (a `Date`, a `Map`…) beside a row with keys": a `Buffer` row alone in an array now rejects too.
 - #548 (form): `CHANGELOG.md` #543 line, "counts as one in `upsert()`": reads as "one row"; "counts as a row with no key".
 - #553 (form): `CHANGELOG.md` #549 line, "compiled to `("rating") VALUES (DEFAULT)` and wrote a row of defaults": true for `insert()` only; to fix in the 6.7.2 version PR.
+- #558 (defect): `src/db/shortcuts.ts` `raw(callerValue(o, 'direction'))` (and `nulls`, `for`, `wait`): `raw()` gets a second read, not the checked one, as on 6.6.1; a getter answering `'ASC'` then other SQL passes; read once, its own issue.
+- #558 (form): `src/db/shortcuts.ts` `callerValue(obj: any, k: string): any` makes ~50 internal option reads `any` (a misspelt key type-checks; R46's TS2345 hidden, not fixed); an internal generic signature keeps the checks.
+- #558 (defect): `website/switching.md` § Find the calls whose result changes has no row for #549, #550 or #552, though skill `backward-compat` asks for one per changed result.
+- #558 (defect): `test/unit/shortcuts.test.ts` `a getter on Object.prototype is no option either: %s` has no `{ get, set }` row: the mutant `held.set !== undefined` in `callerValue()` survives.
+- #558 (form): `src/db/shortcuts.ts` JSDoc of `callerValue()`: "a Proxy answering through `get` alone keeps another value" reads as holding with a getter there too; "the one Object.prototype holds" hides `Object.is`.
 - #557 (form): `src/generate/cliConfig.ts` `cliArgs()`: a bare `--` (pnpm passes it on: `pnpm run gen -- --check`) is refused as `Unknown flag --`; skipping it only accepts more.
 - #557 (defect): `check()` is not exported from `zapatos/generate`: a script that calls `generate()` with a config built in code cannot check; follow-up issue under #52.
 - #557 (form): `website/first-query.md` "Run `npx pgcast` again after each migration" and `website/install.md` `::: warning Stale schema`: a link to `/generator#check`, EN and FR.
