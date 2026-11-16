@@ -3,8 +3,8 @@
   "extends": "../tsconfig.json",
   "include": ["../src/**/*", "./**/*"],
   // codegen output: compiled by ./generated/tsconfig.json, or not at all (edge snapshot);
-  // type tests: compiled by ./types/tsconfig.json and ./types-opt-in/tsconfig.json, against the generated schema
-  "exclude": ["./generated", "./__snapshots__", "./types", "./types-opt-in"],
+  // type tests: compiled by ./types/tsconfig.json, ./types-opt-in/tsconfig.json and ./types-order/tsconfig.json, against the generated schema
+  "exclude": ["./generated", "./__snapshots__", "./types", "./types-opt-in", "./types-order"],
   "compilerOptions": {
     "noEmit": true,
     "rootDir": "..",
