@@ -128,11 +128,12 @@ const anyArray = (a: unknown) => {
   const
     i = a.findIndex(x => Array.isArray(x) || notAValue(x) !== undefined),
     item = a[i],
-    name = notAValue(item),
-    inIsIn = item instanceof Parameter || item instanceof SQLFragment || item instanceof ParentColumn;
+    name = notAValue(item);
   return i < 0 ? param(a, false) : refused(name === undefined ?
     '`eqAny()` sends its array as one parameter, which reads an array item as more items: on an array column, use `isIn()`; on a `jsonb` column, give the item as JSON text, `JSON.stringify(item)`.' :
-    `\`eqAny()\` sends its array as one parameter, so each item is a plain value, not ${name}: ${inIsIn ? 'give the value itself, or use `isIn()`, which takes it' : 'give a value'}.`);
+    item instanceof Parameter || item instanceof SQLFragment || item instanceof ParentColumn ?
+      `\`eqAny()\` sends its array as one parameter, so each item is a plain value, not ${name}: give the value itself, or use \`isIn()\`, which takes it.` :
+      `\`eqAny()\` sends its array as one parameter, so each item is a plain value, not ${name}: give a value.`);
 };
 
 // parent() fixes no T, which the Whereable would then infer from the same key of every table (#493): `never` fits any
