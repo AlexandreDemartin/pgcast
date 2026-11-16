@@ -1547,6 +1547,10 @@ describe('intervalsTypedAsObjects', () => {
     -- a domain over a domain, and an array of a domain: any, but with domainsTypedByContext (#484)
     CREATE DOMAIN iv.vip_span AS iv.span;
     CREATE TABLE iv.runs (id int PRIMARY KEY, runtime interval, breaks interval[], span iv.span, vip iv.vip_span, spans iv.span[]);
+    -- a domain over interval[], and a domain over an array of a domain
+    CREATE DOMAIN iv.span_list AS interval[];
+    CREATE DOMAIN iv.span_set AS iv.span[];
+    CREATE TABLE iv.lists (list iv.span_list, set iv.span_set);
     CREATE TABLE iv.gaps (gap interval);
     CREATE TABLE iv.quiet (id int PRIMARY KEY, label text);
   `));
@@ -1616,22 +1620,24 @@ describe('intervalsTypedAsObjects', () => {
     expect(linesOf(schema, 'runs', 'spans')).toEqual(nullable('spans', spans('string'), spans('string[]'), spans('string[]')));
   });
 
-  const note = (list: string, one = false) => `Note: ${list} ${one ? 'is' : 'are'} of interval, an array of it, a domain ` +
-    `over one of these, or an array of such a domain: as generated, ${one ? 'it is typed as its' : 'they are typed as their'} ` +
+  const note = (list: string, one = false) => `Note: ${list} ${one ? 'is' : 'are'} of interval or of a type that wraps it ` +
+    `in arrays or domains: as generated, ${one ? 'it is typed as its' : 'they are typed as their'} ` +
     `text, though pg's default type parser returns an interval from a query of your own as an object, a PostgresInterval. ` +
     `Set intervalsTypedAsObjects: true to type ${one ? 'it' : 'them'} as pg parses ${one ? 'it' : 'them'}; it will be the ` +
     `default in pgcast 7.0. Set it to false to keep the text, if a type parser of yours returns it.`;
 
   it('notes each column it would change, once per run, when left out', async () => {
-    expect(await notesFor(iv)).toEqual([note('iv.gaps.gap (interval), iv.runs.breaks (interval[]), ' +
-      'iv.runs.runtime (interval) and iv.runs.span (iv.span)')]);
+    // interval, an array of it, and a domain over either
+    expect(await notesFor(iv)).toEqual([note('iv.gaps.gap (interval), iv.lists.list (iv.span_list), ' +
+      'iv.runs.breaks (interval[]), iv.runs.runtime (interval) and iv.runs.span (iv.span)')]);
     // left out, or null from JSON
     expect(await notesFor({ ...iv, intervalsTypedAsObjects: null as unknown as boolean, schemas: { iv: only('gaps') } }))
       .toEqual([note('iv.gaps.gap (interval)', true)]);
-    // under other domains too, which only domainsTypedByContext types by their base type
-    expect(await notesFor({ ...iv, domainsTypedByContext: true, schemas: { iv: only('runs') } })).toEqual([
-      note('iv.runs.breaks (interval[]), iv.runs.runtime (interval), iv.runs.span (iv.span), iv.runs.spans (iv.span[]) ' +
-        'and iv.runs.vip (iv.vip_span)')]);
+    // under other domains too, which only domainsTypedByContext types by their base type: an array of a domain, a domain
+    // over a domain, a domain over an array of a domain
+    expect(await notesFor({ ...iv, domainsTypedByContext: true, schemas: { iv: only('runs', 'lists') } })).toEqual([
+      note('iv.lists.list (iv.span_list), iv.lists.set (iv.span_set), iv.runs.breaks (interval[]), iv.runs.runtime (interval), ' +
+        'iv.runs.span (iv.span), iv.runs.spans (iv.span[]) and iv.runs.vip (iv.vip_span)')]);
   });
 
   it('gives no note with true or false, or when no column would change', async () => {
@@ -2874,8 +2880,8 @@ describe('include entries that match no relation', () => {
       'such as int8 or date: as generated, its placeholder types it in all five interfaces as pg returns it, though a ' +
       'write takes more and, except for money, the shortcuts\' JSON gives another type. Set domainsTypedByContext: true to type it ' +
       'by context while its placeholder holds what the generator wrote for it; it will be the default in pgcast 7.0.';
-    const intervalsNote = 'Note: extra.type_zoo.c_interval (interval) is of interval, an array of it, a domain over one ' +
-      'of these, or an array of such a domain: as generated, it is typed as its text, though pg\'s default type parser ' +
+    const intervalsNote = 'Note: extra.type_zoo.c_interval (interval) is of interval or of a type that wraps it in arrays ' +
+      'or domains: as generated, it is typed as its text, though pg\'s default type parser ' +
       'returns an interval from a query of your own as an object, a PostgresInterval. Set intervalsTypedAsObjects: true to ' +
       'type it as pg parses it; it will be the default in pgcast 7.0. Set it to false to keep the text, if a type parser of ' +
       'yours returns it.';

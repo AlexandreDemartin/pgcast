@@ -232,8 +232,8 @@ const warnAboutIntervalsAsText = (columns: string[], config: CompleteConfig) => 
     them = one ? 'it' : 'them',
     list = one ? sorted[0] : sorted.slice(0, -1).join(', ') + ' and ' + sorted[sorted.length - 1];
 
-  warn(`Note: ${list} ${one ? 'is' : 'are'} of interval, an array of it, a domain over one of these, or an array of such ` +
-    `a domain: as generated, ${one ? 'it is typed as its' : 'they are typed as their'} text, though pg's default type ` +
+  warn(`Note: ${list} ${one ? 'is' : 'are'} of interval or of a type that wraps it in arrays or domains: as generated, ` +
+    `${one ? 'it is typed as its' : 'they are typed as their'} text, though pg's default type ` +
     `parser returns an interval from a query of your own as an object, a PostgresInterval. Set intervalsTypedAsObjects: ` +
     `true to type ${them} as pg parses ${them}; it will be the default in pgcast 7.0. Set it to false to keep the text, ` +
     `if a type parser of yours returns it.`);
