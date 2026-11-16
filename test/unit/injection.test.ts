@@ -1821,7 +1821,7 @@ describe('cols and vals given a built-in', () => {
   // a Buffer now throws, with its own keys too, before any of them reaches the text; a built-in with own
   // enumerable keys still compiles to them, quoted as a plain object's are (#529)
   const
-    bufferColsThrows = 'throws: `db.cols()` takes an object or an array, not a `Buffer`, whose byte indexes would compile as names, `"0", "1"`: for one column, write `db.cols([name])`; for a row of `insert()`, `upsert()` or `update()`, give a plain object.',
+    bufferColsThrows = 'throws: `db.cols()` takes an object or an array, not a `Buffer`, whose byte indexes would compile as names, one per byte: for one column, write `db.cols([name])`; for a row of `insert()`, `upsert()` or `update()`, give a plain object.',
     bufferValsThrows = 'throws: `db.vals()` takes an object or an array, not a `Buffer`, whose bytes would compile as values, one parameter per byte: for one value, write `db.vals([value])`; for a row of `insert()`, `upsert()` or `update()`, give a plain object.',
     builds = (wrap: (key: string) => object): Record<string, [(v: any) => db.SQLFragment<any, any>, string]> => ({
       cols: [v => sql`SELECT ${cols(wrap(v))} FROM ${'users'}`, bufferColsThrows],

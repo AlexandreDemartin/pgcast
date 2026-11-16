@@ -782,7 +782,7 @@ describe('cols and vals', () => {
   const
     builtinColsMessage = (name: string) => `\`db.cols()\` takes an object or an array, not a built-in \`${name}\` with no own enumerable key, which would compile to nothing: for one column, write \`db.cols([name])\`; for a row of \`insert()\`, \`upsert()\` or \`update()\`, give a plain object.`,
     builtinValsMessage = (name: string) => `\`db.vals()\` takes an object or an array, not a built-in \`${name}\` with no own enumerable key, which would compile to nothing: for one value, write \`db.vals([value])\`; for a row of \`insert()\`, \`upsert()\` or \`update()\`, give a plain object.`,
-    bufferColsMessage = '`db.cols()` takes an object or an array, not a `Buffer`, whose byte indexes would compile as names, `"0", "1"`: for one column, write `db.cols([name])`; for a row of `insert()`, `upsert()` or `update()`, give a plain object.',
+    bufferColsMessage = '`db.cols()` takes an object or an array, not a `Buffer`, whose byte indexes would compile as names, one per byte: for one column, write `db.cols([name])`; for a row of `insert()`, `upsert()` or `update()`, give a plain object.',
     bufferValsMessage = '`db.vals()` takes an object or an array, not a `Buffer`, whose bytes would compile as values, one parameter per byte: for one value, write `db.vals([value])`; for a row of `insert()`, `upsert()` or `update()`, give a plain object.';
 
   it('cols and vals of a built-in with no own enumerable key, or of a Buffer, throw, in a sql template, a nested fragment, an IN list, a lateral subquery and updateValues, and cols in groupBy and count() columns', () => {

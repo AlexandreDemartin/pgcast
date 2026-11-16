@@ -1894,7 +1894,7 @@ describe('a null or primitive row in insert(), upsert() and update()', () => {
 describe('a built-in row in insert(), upsert() and update()', () => {
   const
     row = { email: 'a@x.org', display_name: 'A' },
-    bufferColsMessage = '`db.cols()` takes an object or an array, not a `Buffer`, whose byte indexes would compile as names, `"0", "1"`: for one column, write `db.cols([name])`; for a row of `insert()`, `upsert()` or `update()`, give a plain object.';
+    bufferColsMessage = '`db.cols()` takes an object or an array, not a `Buffer`, whose byte indexes would compile as names, one per byte: for one column, write `db.cols([name])`; for a row of `insert()`, `upsert()` or `update()`, give a plain object.';
 
   it('a single Buffer row rejects run(), with no query sent', async () => {
     const queryable = { query: vi.fn() } as any, outcomes: Record<string, string> = {};
