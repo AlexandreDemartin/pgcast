@@ -6,6 +6,12 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 
 ## [Unreleased]
 
+### Security
+- `upsert()` no longer takes an update value from a key of `Object.prototype` that neither `updateValues` nor a prototype of its own has. For an inserted column with no key in `updateValues`, on Zapatos 6.6.1 and pgcast 6.7.1:
+  - `valueOf`, `toString` or `hasOwnProperty` threw "Alien object while interpolating SQL"; a `__proto__` column was set to `TRUE` on 6.6.1, to `'{}'` (`Object.prototype`) on 6.7.1. Each is now set from `EXCLUDED`, as any other column.
+  - A key that something else put on `Object.prototype` (`Object.prototype.role = 'admin'`) overwrote the inserted value on conflict; it is now set from `EXCLUDED`.
+  - Unchanged: a class instance, a getter, an `Object.create()` value or a `Proxy` as `updateValues`, read as often and through the same traps; a `constructor` column beside a class instance, which still throws, as does `valueOf` beside an object from another realm. A polluted key still joins the columns of a multi-row `insert()` or `upsert()`, and the options object is still read through its prototype.
+
 ## [6.7.1] - 2026-11-16
 
 ### Security
@@ -14,7 +20,6 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
   - `zapatos/db` reads that prototype from a `new Intl.Segmenter()` the first time a filter's prototype has no constructor of its own, not as it loads, which would cost each process about 7 ms, and keeps it only if it inherits `Object.prototype` directly, as `%IntlSegmentsPrototype%` does; a runtime without `Intl.Segmenter`, or a stand-in whose `segment()` hands out an iterator, leaves it out, so an iterator with own keys still compiles them.
   - The type refused it (TS2345).
   - Unchanged: what it hands out (`containing(0)`, a plain object, compiles to its keys, `("index" = $1 AND "input" = $2 AND "segment" = $3)`; its iterator already threw, #426), a `Segments` of another realm (`TRUE`), and the SQL of every other call.
-- `upsert()` takes an update value only from `updateValues` and its own prototypes, never from `Object.prototype`. A column inserted as `valueOf`, `toString`, `constructor`, `hasOwnProperty` or `__proto__` threw "Alien object while interpolating SQL" unless `updateValues` named it, and now is set from `EXCLUDED`; a key that something else put on `Object.prototype` (`Object.prototype.role = 'admin'`) no longer overwrites the inserted value on conflict. A class instance or an `Object.create()` value, its getters and inherited keys, is read as before.
 
 ### Fixed
 - `cols()` and `vals()` of a built-in object with no own enumerable key, or of a `Buffer`, throw while compiling, so `.run()` rejects with a plain `Error` before any query, on a pool or a client (#529). Zapatos 6.6.1 compiled each as an object of its own keys: a `Date`, a `Map` or a `Promise` to nothing, and a `Buffer` to its byte indexes as names and its bytes as values, one parameter per byte.

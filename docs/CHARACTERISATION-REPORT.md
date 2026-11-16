@@ -110,7 +110,7 @@ The three that matter most:
 | R43 | codegen | A two-dimensional array (`int[][]`) is typed as one-dimensional. | `types/schema › two dimensions (accounts.grid int[][]) are typed as one` | breaking | leave: Postgres does not enforce the number of dimensions | — |
 | R44 | codegen | A view has an `Insertable` where every column is optional and nullable. | `types/schema › a view (active_users) has an Insertable, every column optional and nullable` | breaking | **documented**, PR #342, `website/catalog-types.md` § What the generator doesn't read: Postgres makes the columns of a view nullable | — |
 | R45 | codegen | A composite (`users.home`) is an `any` placeholder. | `` types/schema › a composite (users.home) is an `any` placeholder `` | breaking | leave: that is what the `zapatos/custom` placeholders are for | — |
-| R46 | types | `src/db` compiles only against the stub schema; against a generated schema, the body of `upsert` gives TS2345 (and TS7053, until `updateValues` was read through `updateValueOf()`). | `integration/codegen › src/db type-checks against the stub schema of src/typings, not against a generated one` | non-breaking | leave: a consumer compiles the declarations, which pass | — |
+| R46 | types | `src/db` compiles only against the stub schema; against a generated schema, the body of `upsert` gives TS2345 (`noNullUpdateColumns.includes(c)`). | `integration/codegen › src/db type-checks against the stub schema of src/typings, not against a generated one` | non-breaking | leave: a consumer compiles the declarations, which pass | — |
 
 ## Codegen
 

@@ -247,6 +247,22 @@ describe('upsert', () => {
     }
   });
 
+  it('updateValues: any other key is read as in 6.6.1, through a Proxy, a getter or a class prototype', () => {
+    // a Proxy is read through its `get` trap alone
+    const trap = new Proxy({}, { get: (_, k) => k === 'mood' ? param('trap') : undefined });
+    expect(db.upsert('users', { ...ada, mood: 'ok' }, 'email', { updateValues: trap } as any).compile())
+      .toMatchObject({ text: expect.stringContaining('ROW(EXCLUDED."email", EXCLUDED."display_name", $4)'), values: ['Ada L.', 'ada@example.com', 'ok', 'trap'] });
+    // a getter is read as often as in 6.6.1: the value sent is its second read
+    let reads = 0;
+    class Count { get mood() { return param(++reads); } }
+    expect(db.upsert('users', { ...ada, mood: 'ok' }, 'email', { updateValues: new Count() } as any).compile().values)
+      .toEqual(['Ada L.', 'ada@example.com', 'ok', 2]);
+    // a class instance has the `constructor` of its own prototype: a `constructor` column still throws
+    class Patch { }
+    expect(() => db.upsert('users', { email: 'e@x.org', constructor: 1 } as any, 'email', { updateValues: new Patch() } as any).compile())
+      .toThrow('Alien object while interpolating SQL');
+  });
+
   it('updateValues: a plain value is a parameter, sent as update() sends it', () => {
     expect(db.upsert('users', ada, 'email', { updateValues: { mood: 'happy' } }).compile()).toMatchInlineSnapshot(`
       {
