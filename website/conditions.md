@@ -429,7 +429,7 @@ When the subquery reads the outer query's table, give it an alias. Here, the cre
 
 </CastPanel>
 
-Without the alias, `"crew"."id"` would be the subquery's own row: written by hand, `NOT EXISTS (SELECT 1 FROM crew WHERE mentor_id = crew.id)` gives every member of the crew, as no one mentors themself, with no error. So when `parent` names the subquery's own name, its alias or else its table, the condition throws as the query compiles, and `run()` rejects before any query:
+Without the alias, `"crew"."id"` would be the subquery's own row: written by hand, `NOT EXISTS (SELECT 1 FROM crew WHERE mentor_id = crew.id)` gives every member of the crew, as no one mentors themself, with no error. So when `parent` names the subquery's own name, its alias or else its table, as Postgres reads a name (its first 63 bytes), the condition throws as the query compiles, and `run()` rejects before any query:
 
 > `` `exists()` was given `parent: 'crew'`, which names "crew", the subquery's own name, so Postgres would read `parent()` as a column of the subquery's row: give the subquery another name with the `alias` option. ``<!-- message -->
 

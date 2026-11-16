@@ -1,5 +1,5 @@
 ---
-english: db1c4d5143a7
+english: c31045ed332e
 ---
 
 # Conditions {#db-conditions}
@@ -433,7 +433,7 @@ Quand la sous-requête lit la table de la requête extérieure, donnez-lui un al
 
 </CastPanel>
 
-Sans l’alias, `"crew"."id"` serait la ligne même de la sous-requête : écrite à la main, `NOT EXISTS (SELECT 1 FROM crew WHERE mentor_id = crew.id)` renvoie toute l’équipe, puisque personne n’est son propre mentor, sans aucune erreur. C’est pourquoi, quand `parent` donne le nom même de la sous-requête, son alias ou à défaut sa table, la condition lève une erreur à la compilation de la requête, et `run()` est rejetée avant toute requête :
+Sans l’alias, `"crew"."id"` serait la ligne même de la sous-requête : écrite à la main, `NOT EXISTS (SELECT 1 FROM crew WHERE mentor_id = crew.id)` renvoie toute l’équipe, puisque personne n’est son propre mentor, sans aucune erreur. C’est pourquoi, quand `parent` donne le nom même de la sous-requête, son alias ou à défaut sa table, à la façon dont Postgres lit un nom (ses 63 premiers octets), la condition lève une erreur à la compilation de la requête, et `run()` est rejetée avant toute requête :
 
 > `` `exists()` was given `parent: 'crew'`, which names "crew", the subquery's own name, so Postgres would read `parent()` as a column of the subquery's row: give the subquery another name with the `alias` option. ``<!-- message -->
 
