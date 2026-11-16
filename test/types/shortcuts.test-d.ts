@@ -747,14 +747,16 @@ describe('a function generic over the table', () => {
     void inPlace;
   });
 
-  test('a Whereable typed first type-checks in each shortcut, and its keys are still checked (#518)', () => {
+  test('a Whereable typed first type-checks in each shortcut, refuses a key that no table has, and passes a column that only one has (#518)', () => {
     const byId = <K extends 'users' | 'products'>(table: K) => {
       const where: s.WhereableForTable<K> = { id: 1 };
       // @ts-expect-error a key that no table has
       const typo: s.WhereableForTable<K> = { id: 1, nope: 2 };
       // @ts-expect-error a value of another type
       const wrong: s.WhereableForTable<K> = { id: 'x' };
-      void [typo, wrong];
+      // only products has sku, so Postgres refuses it on users (42703)
+      const oneTable: s.WhereableForTable<K> = { sku: 'x' };
+      void [typo, wrong, db.select(table, oneTable)];
       void [db.selectOne(table, where), db.selectExactlyOne(table, where), db.count(table, where), db.deletes(table, where)];
       void [db.update(table, {}, where), db.select(table, db.all, { groupBy: 'id', having: where })];
       return db.select(table, where);
