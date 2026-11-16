@@ -6,6 +6,19 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 
 ## [Unreleased]
 
+### Fixed
+- `cols()` and `vals()` of a built-in object with no own enumerable key, or of a `Buffer`, throw while compiling, so `.run()` rejects with a plain `Error` before any query, on a pool or a client (#529). Zapatos 6.6.1 compiled each as an object of its own keys: a `Date`, a `Map` or a `Promise` to nothing, and a `Buffer` to its byte indexes as names and its bytes as values, one parameter per byte.
+  - Refused: each built-in that a `Whereable` refuses (#170) when it has no own enumerable key, a `Proxy` of one included, and a `Buffer`, empty or not, even with keys added. This applies in a `sql` template, a nested fragment, a `lateral` subquery, `upsert()` `updateValues`, and a single row of `insert()`, `upsert()` or `update()`. There, a built-in row with no key already threw "nothing to insert" or "nothing to update" at the call, and still does.
+  - The error says what to do: `` `db.cols()` takes an object or an array, not a built-in `Date` with no own enumerable key, which would compile to nothing: for one column, write `db.cols([name])`; for a row of `insert()`, `upsert()` or `update()`, give a plain object. ``. For a `Buffer` in `vals()` it reads `` `db.vals()` takes an object or an array, not a `Buffer`, whose bytes would compile as values, one parameter per byte: … ``.
+  - Changed: `` sql`SELECT ${cols(new Date())} FROM films` `` ran as `SELECT  FROM films`, rows with no column; it now rejects.
+  - Changed: `vals(Buffer.from('a'))` as a written value stored its byte's number, in a `sql` template and in `updateValues`: `'97'` in a text column, `97` in a number column, `\x3937` in `bytea`, `00:01:37` in an `interval`. It now rejects; for the bytes, write `vals([buf])` or `param(buf)`.
+  - Changed: `vals()` of a `Buffer` in an `IN` list matched its bytes as numbers, `IN ($1, $2)` with `97, 98`; it now rejects.
+  - Unchanged:
+    - A built-in with own enumerable keys compiles to them, as a plain object does: an `Error` given `code`, `errno`, `syscall` and `path`, as Node's system errors are, is still a row of those columns.
+    - A typed array other than a `Buffer` compiles to its elements in `vals()` (`IN ($1, $2)` for `new Int32Array([1, 2])`) and to its indexes in `cols()`.
+    - Also as before: a class instance, a subclass of a built-in, a `PostgresInterval` (`vals()` of `{ hours: 2 }` is still `$1` with `2`), a built-in of another realm, and a primitive, which keeps its own message (#244).
+    - A built-in row among several rows of `insert()` or `upsert()` is still spread into a plain object first, so a `Date` there becomes a row of `DEFAULT`s (#543).
+
 ## [6.7.0] - 2026-11-16
 
 ### Security
