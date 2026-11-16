@@ -2590,6 +2590,21 @@ describe('a shortcut option added to Object.prototype by something else is no op
     expect(() => withPrototypeKey(key, v, () => db.select('users', all, options as any).compile())).toThrow(message);
   });
 
+  // the reads that refuse a value with no meaning, before the query: what Object.prototype holds is no value there either
+  it.each([
+    ['select(): lateral null', 'lateral', () => null, () => db.select('users', all), selectMany(plain.text)],
+    ['count(): two columns', 'columns', () => ['email', 'display_name'], () => db.count('users', all), 'SELECT count(*) AS result FROM "users"'],
+    ['count(): a lateral query', 'lateral', () => db.selectOne('accounts', all), () => db.count('users', all), 'SELECT count(*) AS result FROM "users"'],
+  ])('%s', (_, key, v, build, text) => {
+    const given = v();
+    expect(withPrototypeKey(key, given, () => build().compile())).toEqual({ text, values: [] });
+  });
+
+  it('sum(): the columns of Object.prototype are none, so it still needs its own', () => {
+    expect(() => withPrototypeKey('columns', ['id'], () => db.sum('users', all, {}).compile()))
+      .toThrow('sum() needs one column to aggregate: pass columns: [\'column\']');
+  });
+
   /** A Proxy over `target` that counts each trap by name and key, and answers `answers`' keys through `get` alone. */
   const counting = (counts: Record<string, number>, target: object, answers: Record<string, unknown> = {}) =>
     new Proxy(target, Object.fromEntries(['get', 'has', 'ownKeys', 'getOwnPropertyDescriptor', 'getPrototypeOf'].map(trap =>
