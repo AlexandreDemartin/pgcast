@@ -371,6 +371,9 @@ const
 // `Temporal` constructors (Node 26; Node 22 with `--harmony-temporal`, whose `TimeZone` and `Calendar`, dropped
 // from the proposal, are left out) and the `Intl` ones (`DurationFormat` from Node 23). ECMAScript built-ins and
 // ECMA-402's `Intl` only, no host object (`URL`, `Blob`).
+// A namespace object (`Math`, `JSON`, `Reflect`, `Atomics`, `Intl`, and `Temporal` and `Temporal.Now` where the
+// runtime has them) is matched by identity, as its prototype is `Object.prototype`, a plain object's, and its
+// functions are no enumerable keys, and named by its path; `console` and `WebAssembly` are host APIs.
 // An iterator or a generator, sync or async, is matched by %IteratorPrototype% or %AsyncIteratorPrototype% on its
 // chain, as each generator function has its own prototype, and only with no own enumerable key, so that a class
 // that extends `Iterator` with fields stays a filter, and one without is refused. So is a host iterator
@@ -390,6 +393,10 @@ const
     temporal?.Duration, temporal?.Instant, temporal?.PlainDate, temporal?.PlainDateTime, temporal?.PlainMonthDay,
     temporal?.PlainTime, temporal?.PlainYearMonth, temporal?.ZonedDateTime,
   ].filter(Boolean).map(builtin => builtin.prototype)),
+  builtinNamespaces = new Map<unknown, string>(Object.entries({
+    Math, JSON, Reflect, Atomics: (globalThis as any).Atomics, Intl: intl,
+    Temporal: temporal, 'Temporal.Now': temporal?.Now,
+  }).filter(([, namespace]) => namespace).map(([path, namespace]) => [namespace, path])),
   typedArrayPrototype = Object.getPrototypeOf(Uint8Array.prototype),
   // transpiled below ES2018, `async function* () {}` is a plain function, with no `.prototype` to read: then
   // %AsyncIteratorPrototype% is left out, rather than `zapatos/db` throwing as it loads
@@ -404,14 +411,14 @@ const isIterator = (x: object) =>
 
 const isBuiltin = (x: object) => {
   const prototype = Object.getPrototypeOf(x);
-  return builtinPrototypes.has(prototype) || (prototype !== null && Object.getPrototypeOf(prototype) === typedArrayPrototype) ||
-    isIterator(x);
+  return builtinNamespaces.has(x) || builtinPrototypes.has(prototype) ||
+    (prototype !== null && Object.getPrototypeOf(prototype) === typedArrayPrototype) || isIterator(x);
 };
 
 // an iterator's constructor gives no name (`''` for a generator's, `Object` before Node 22, which has no `Iterator`):
 // its tag does, `Array Iterator`, `Generator`
-const builtinName = (x: object): string => isIterator(x) ? Object.prototype.toString.call(x).slice(8, -1) :
-  Object.getPrototypeOf(x).constructor.name;
+const builtinName = (x: object): string => builtinNamespaces.get(x) ??
+  (isIterator(x) ? Object.prototype.toString.call(x).slice(8, -1) : Object.getPrototypeOf(x).constructor.name);
 
 // raw(), cols() and vals() as a filter value, or in vals({…}) (so as a write value): Zapatos 6.6.1 sent them as JSON;
 // compiling raw() there as SQL would turn a caller's raw(input), a parameter until now, into an injection, so they throw
