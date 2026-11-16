@@ -3,9 +3,11 @@
 // One value of each built-in object that compileExpression refuses as a Whereable (#170),
 // keyed by the name its error gives. Each has no own enumerable key, or only index keys,
 // so Zapatos 6.6.1 compiled it to TRUE (every row) or to ("0" = $1 …); one with own keys
-// added throws too, except an iterator. A subclass instance is not one of them, and
+// added throws too, except an iterator. An Intl or a Temporal object goes by its constructor's
+// name (`Collator`, `PlainDate`). A subclass instance is not one of them, and
 // compiles as in 6.6.1, except a subclass of Iterator with no own key (#426).
-// test/unit/injection.test.ts compiles them, test/integration/injection.test.ts runs them.
+// test/unit/injection.test.ts compiles them, and checks the list against the global constructors of a bare vm
+// context and the iterators their values hand out; test/integration/injection.test.ts runs them.
 
 /** A fresh value of each refused built-in object, keyed by the name its error gives. */
 export const builtinObjects = (): Record<string, object> => {
@@ -17,7 +19,9 @@ export const builtinObjects = (): Record<string, object> => {
     FinalizationRegistry = (globalThis as any).FinalizationRegistry,  // ES2021: not in the lib's ES2019 types
     DisposableStack = (globalThis as any).DisposableStack,  // Node 24 and later
     AsyncDisposableStack = (globalThis as any).AsyncDisposableStack,  // Node 24 and later
-    Iterator = (globalThis as any).Iterator;  // Node 22 and later
+    Iterator = (globalThis as any).Iterator,  // Node 22 and later
+    intl = Intl as any,  // ECMA-402: past the lib's ES2019 types
+    Temporal = (globalThis as any).Temporal;  // Node 26 and later; Node 22 with --harmony-temporal
   return {
     Date: new Date(0),
     Map: new Map([['id', 1]]),
@@ -40,10 +44,18 @@ export const builtinObjects = (): Record<string, object> => {
     ArrayBuffer: new ArrayBuffer(1),
     SharedArrayBuffer: new SharedArrayBuffer(1),
     DataView: new DataView(new ArrayBuffer(1)),
+    Int8Array: new Int8Array(1),
     Uint8Array: new Uint8Array(1),
+    Uint8ClampedArray: new Uint8ClampedArray(1),
+    Int16Array: new Int16Array(1),
+    Uint16Array: new Uint16Array(1),
+    Int32Array: new Int32Array(1),
+    Uint32Array: new Uint32Array(1),
+    Float32Array: new Float32Array(1),
     Float64Array: new Float64Array(2),
     Buffer: Buffer.from('id'),
     BigInt64Array: new BigInt64Array(1),
+    BigUint64Array: new BigUint64Array(1),
     ...Float16Array && { Float16Array: new Float16Array(1) },
     Number: new Number(1),
     String: new String('id'),
@@ -64,5 +76,25 @@ export const builtinObjects = (): Record<string, object> => {
     },
     ...DisposableStack && { DisposableStack: new DisposableStack() },
     ...AsyncDisposableStack && { AsyncDisposableStack: new AsyncDisposableStack() },
+    Collator: new intl.Collator('en'),
+    DateTimeFormat: new intl.DateTimeFormat('en'),
+    DisplayNames: new intl.DisplayNames('en', { type: 'region' }),
+    ...intl.DurationFormat && { DurationFormat: new intl.DurationFormat('en') },  // Node 23 and later
+    ListFormat: new intl.ListFormat('en'),
+    Locale: new intl.Locale('en'),
+    NumberFormat: new intl.NumberFormat('en'),
+    PluralRules: new intl.PluralRules('en'),
+    RelativeTimeFormat: new intl.RelativeTimeFormat('en'),
+    Segmenter: new intl.Segmenter('en'),
+    ...Temporal && {
+      Duration: Temporal.Duration.from('PT1H'),
+      Instant: Temporal.Instant.fromEpochMilliseconds(0),
+      PlainDate: Temporal.PlainDate.from('2026-11-15'),
+      PlainDateTime: Temporal.PlainDateTime.from('2026-11-15T20:30'),
+      PlainMonthDay: Temporal.PlainMonthDay.from('11-15'),
+      PlainTime: Temporal.PlainTime.from('20:30'),
+      PlainYearMonth: Temporal.PlainYearMonth.from('2026-11'),
+      ZonedDateTime: Temporal.ZonedDateTime.from('2026-11-15T20:30[UTC]'),
+    },
   };
 };

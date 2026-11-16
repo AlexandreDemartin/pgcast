@@ -1,5 +1,5 @@
 ---
-english: c67fecab799b
+english: 0977f05de97f
 ---
 
 # Template SQL
@@ -35,7 +35,7 @@ Renvoie un [`SQLFragment`](#SQLFragment) : les parties littérales telles que v
 
 `RunResult` n’est pas confronté au SQL : c’est vous qui affirmez ce qui revient. Les raccourcis le fixent pour vous.
 
-Écrit en ligne comme valeur du `where` d’un raccourci, ou des valeurs d’`update()`, un fragment tire son `Constraint` de chaque table et vue qui a une colonne de ce nom : TypeScript l’infère avant de connaître la table. Là où leurs types diffèrent, un fragment pourtant valide ne compile pas (TS2322) : un `id` qui est un `int4` ici et un `uuid` là ; dans `update()`, une vue de `films`, dont le `title` peut être `NULL`, fait échouer `` { title: db.sql`upper(${db.self})` } ``. Donnez-lui un argument de type, `` db.sql<db.SQL>`upper(${db.self})` ``, ou déclarez-le d’abord.
+Écrit en ligne comme valeur du `where` d’un raccourci, ou des valeurs d’`update()`, un fragment tire son `Constraint` de chaque table et vue qui a une colonne de ce nom : TypeScript l’infère avant de connaître la table. Là où leurs types diffèrent, un fragment pourtant valide ne compile pas (TS2322) : un `id` qui est un `int4` ici et un `uuid` là, ou un enum ici et un autre enum là ; dans `update()`, une vue de `films`, dont le `title` peut être `NULL`, fait échouer `` { title: db.sql`upper(${db.self})` } ``. Donnez-lui un argument de type, `` db.sql<db.SQL>`upper(${db.self})` ``, ou déclarez-le d’abord.
 
 Un nom hors d’`Interpolations` ne compile pas :
 
@@ -316,7 +316,7 @@ Un objet est un Whereable de la table : chacune de ses propres clés énumérab
 Un objet interpolé qui n’est pas l’une des autres [interpolations](#interpolations) se compile en Whereable, objet simple ou non : une instance de classe `{ title }` donne `("title" = $1)`<!-- probe: db.sql`${new (class { title = 'x' })()}` -->, et une instance sans clé propre énumérable donne `TRUE`, même d’une classe qui étend un objet natif (`class Premiere extends Date {}`). Vérifiez à l’exécution ce qui atteint un `where`.
 :::
 
-Un objet natif lève une erreur à la compilation, avant toute requête, même avec des clés propres ajoutées (`Object.assign(new Date(0), { id: 1 })`) : `Date`, `Map`, `Set`, `WeakMap`, `WeakSet`, `WeakRef`, `FinalizationRegistry`, `RegExp`, `Promise`, `Error` et ses sous-types natifs (`TypeError`, `AggregateError`, …), `ArrayBuffer`, `SharedArrayBuffer`, un tableau typé, `Buffer`, `DataView`, les objets wrapper `Number`, `String`, `Boolean`, `BigInt` et `Symbol`, et, là où le runtime les fournit (Node 24), `SuppressedError`, `DisposableStack` et `AsyncDisposableStack` :
+Un objet natif lève une erreur à la compilation, avant toute requête, même avec des clés propres ajoutées (`Object.assign(new Date(0), { id: 1 })`) : `Date`, `Map`, `Set`, `WeakMap`, `WeakSet`, `WeakRef`, `FinalizationRegistry`, `RegExp`, `Promise`, `Error` et ses sous-types natifs (`TypeError`, `AggregateError`, …), `ArrayBuffer`, `SharedArrayBuffer`, un tableau typé, `Buffer`, `DataView`, les objets wrapper `Number`, `String`, `Boolean`, `BigInt` et `Symbol`, les objets `Intl` (`Intl.Collator`, `Intl.DateTimeFormat`, `Intl.NumberFormat`, `Intl.Locale`, …), et, là où le runtime les fournit, `SuppressedError`, `DisposableStack` et `AsyncDisposableStack` (Node 24) et les objets `Temporal` (Node 26 : `Temporal.PlainDate`, `Temporal.Instant`, `Temporal.ZonedDateTime`, …), que l’erreur nomme par leur constructeur (`PlainDate`) :
 
 > `` A built-in `…` has no meaning as a Whereable (a filter): it would compile to its own enumerable keys, and to `TRUE`, every row, when it has none. To compare with a value, give it as `db.param(…)`; to filter, give a plain object (`{ column: value }`); await a `Promise` first. ``<!-- message -->
 
@@ -326,11 +326,14 @@ Un itérateur ou un générateur, synchrone ou asynchrone, sans clé propre énu
 
 Le type refuse la plupart d’entre eux (TS2345), sauf là où une colonne partage l’un de leurs membres : `db.deletes('actors', new Error('x'))` passe la vérification de types, puisque `actors` a une colonne `name`.
 
-Seuls les objets natifs du realm qui exécute pgcast lèvent une erreur, reconnus à leur prototype exact, ou, pour un itérateur, au prototype des itérateurs dans sa chaîne. Comme dans Zapatos 6.6.1 :
+Seuls les objets natifs listés ci-dessus lèvent une erreur, ceux du realm qui exécute pgcast, reconnus à leur prototype exact, ou, pour un itérateur, au prototype des itérateurs dans sa chaîne. Le reste se compile comme dans Zapatos 6.6.1 :
 
 - un `Date` ou un itérateur d’un autre realm, comme `vm.runInNewContext('new Date(0)')`, donne `TRUE` ;
 - une instance d’une classe qui étend un objet natif garde ses propres clés : `new Frames(1)`, avec `class Frames extends Uint8Array {}`, donne `("0" = $1)` ;
-- un itérateur avec des clés propres les compile : un générateur auquel on a ajouté `{ id: 1 }`, ou une classe qui étend `Iterator` avec un champ `id = 1`, donne `("id" = $1)`.
+- un itérateur avec des clés propres les compile : un générateur auquel on a ajouté `{ id: 1 }`, ou une classe qui étend `Iterator` avec un champ `id = 1`, donne `("id" = $1)` ;
+- l’objet que renvoie `new Intl.Segmenter('en').segment(text)` donne `TRUE`, même si son itérateur lève une erreur ([#517](https://github.com/AlexandreDemartin/pgcast/issues/517)) ;
+- un objet `Temporal` ou `Intl` d’un polyfill donne `TRUE` quand le polyfill est installé sur `globalThis` après l’import de `zapatos/db`, ou importé sans être installé (`import { Temporal } from '@js-temporal/polyfill'`), puisque `zapatos/db` lit les prototypes à son chargement ; s’il est installé avant, l’objet lève une erreur, et un objet du `Temporal` ou de l’`Intl` natif que le polyfill remplace, là où le runtime en a un, donne `TRUE` ;
+- un objet qui sert d’espace de noms, comme `Math`, `JSON`, `Intl` ou `Temporal.Now`, donne `TRUE` ([#523](https://github.com/AlexandreDemartin/pgcast/issues/523)).
 
 ## `self` {#self}
 

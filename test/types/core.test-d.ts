@@ -8,6 +8,7 @@
 import { describe, expectTypeOf, test } from 'vitest';
 import * as db from 'zapatos/db';
 import type * as s from 'zapatos/schema';
+import type * as pg from 'pg';
 
 const c = db.conditions;
 declare const pool: db.Queryable;
@@ -27,6 +28,111 @@ describe('sql<Interpolations, RunResult, Constraint>', () => {
     db.sql<s.users.SQL>`SELECT ${'nope'} FROM ${'users'}`;
     // @ts-expect-error 'accounts' is not the users table
     db.sql<s.users.SQL>`SELECT * FROM ${'accounts'}`;
+  });
+
+  // characterization: users.id and products.id are a number, transfers.id a string, accounts.id an int8. A
+  // shortcut reads the key's contextual type across every table, and a bare template infers its Constraint from
+  // that union, so the valid call is refused (TS2322), as in Zapatos 6.6.1. Any type argument leaves Constraint
+  // `never`, which fits the column (R36, #493)
+  test('characterization: a bare template is refused as the value of a column whose name other tables type otherwise, and passes with a type argument (#493)', () => {
+    const two = 'users' as 'users' | 'products', three = 'users' as 'users' | 'products' | 'transfers';
+    // @ts-expect-error valid at run time
+    db.select('users', { id: db.sql`${db.self} IS NULL` });
+    // @ts-expect-error valid at run time
+    db.select('accounts', { id: db.sql`${db.self} IS NULL` });
+    // @ts-expect-error valid at run time
+    db.select('transfers', { id: db.sql`${db.self} IS NULL` });
+    // @ts-expect-error valid at run time
+    db.selectOne('users', { id: db.sql`${db.self} IS NULL` });
+    // @ts-expect-error valid at run time
+    db.count('users', { id: db.sql`${db.self} IS NULL` });
+    // @ts-expect-error valid at run time
+    db.deletes('users', { id: db.sql`${db.self} IS NULL` });
+    // @ts-expect-error valid at run time
+    db.update('users', { display_name: 'Ada' }, { id: db.sql`${db.self} IS NULL` });
+    // @ts-expect-error valid at run time
+    db.update('products', { id: db.sql`${db.self} + 1` }, { id: 1 });
+    // @ts-expect-error valid at run time
+    db.select(two, { id: db.sql`${db.self} IS NULL` });
+    // @ts-expect-error valid at run time
+    db.select(three, { id: db.sql`${db.self} IS NULL` });
+    // the workaround the docs give: a type argument
+    expectTypeOf(db.select('users', { id: db.sql<s.users.SQL>`${db.self} IS NULL` })).toEqualTypeOf<db.SQLFragment<s.users.JSONSelectable[]>>();
+    expectTypeOf(db.select('users', { id: db.sql<s.users.SQL>`${db.self} IS NULL` })).not.toBeAny();
+    expectTypeOf(db.select('accounts', { id: db.sql<s.accounts.SQL>`${db.self} IS NULL` })).toEqualTypeOf<db.SQLFragment<s.accounts.JSONSelectable[]>>();
+    expectTypeOf(db.select('transfers', { id: db.sql<s.transfers.SQL>`${db.self} IS NULL` })).toEqualTypeOf<db.SQLFragment<s.transfers.JSONSelectable[]>>();
+    expectTypeOf(db.selectOne('users', { id: db.sql<s.users.SQL>`${db.self} IS NULL` })).toEqualTypeOf<db.SQLFragment<s.users.JSONSelectable | undefined>>();
+    expectTypeOf(db.count('users', { id: db.sql<s.users.SQL>`${db.self} IS NULL` })).toEqualTypeOf<db.SQLFragment<number>>();
+    expectTypeOf(db.deletes('users', { id: db.sql<s.users.SQL>`${db.self} IS NULL` })).toEqualTypeOf<db.SQLFragment<s.users.JSONSelectable[]>>();
+    expectTypeOf(db.update('users', { display_name: 'Ada' }, { id: db.sql<s.users.SQL>`${db.self} IS NULL` })).toEqualTypeOf<db.SQLFragment<s.users.JSONSelectable[]>>();
+    expectTypeOf(db.update('products', { id: db.sql<s.products.SQL>`${db.self} + 1` }, { id: 1 })).toEqualTypeOf<db.SQLFragment<s.products.JSONSelectable[]>>();
+    expectTypeOf(db.select(two, { id: db.sql<db.SQL>`${db.self} IS NULL` })).toEqualTypeOf<db.SQLFragment<(s.users.JSONSelectable | s.products.JSONSelectable)[]>>();
+    expectTypeOf(db.select(three, { id: db.sql<db.SQL>`${db.self} IS NULL` })).toEqualTypeOf<db.SQLFragment<(s.users.JSONSelectable | s.products.JSONSelectable | s.transfers.JSONSelectable)[]>>();
+    // or a template built apart
+    const isNull = db.sql`${db.self} IS NULL`;
+    expectTypeOf(isNull).toEqualTypeOf<db.SQLFragment<any[], never>>();
+    db.select('users', { id: isNull });
+    db.select('users', { id: db.sql<db.SQL, any, number>`${db.self} IS NULL` });
+  });
+
+  test('a template whose Constraint is given is checked against the column (#493)', () => {
+    // @ts-expect-error a string Constraint on an int column (users.id)
+    db.select('users', { id: db.sql<db.SQL, any, string>`${db.self} IS NULL` });
+    // @ts-expect-error a string on an int column
+    db.select('users', { id: '1' });
+    // @ts-expect-error Parameter<string> on an int column
+    db.select('users', { id: db.param('1') });
+    // @ts-expect-error a number is no SQL interpolation
+    db.sql`SELECT ${5}`;
+    // @ts-expect-error nor in a template typed by its table
+    db.sql<s.users.SQL>`SELECT ${5}`;
+  });
+
+  test('a template with three type arguments, its wrappers and typeof sql keep their types (#493)', () => {
+    // a caller's condition, as conditions.ts writes eq(): its Constraint is inferred from the column (#181)
+    const myEq = <T>(a: T) => db.sql<db.SQL, boolean | null, T>`${db.self} = ${db.param(a)}`;
+    expectTypeOf(myEq(1)).toEqualTypeOf<db.SQLFragment<boolean | null, number>>();
+    db.select('users', { mood: myEq('happy'), id: myEq(1) });
+    db.select('users', { mood: c.eq('happy') });
+    // @ts-expect-error 'angry' is not a mood
+    db.select('users', { mood: myEq('angry') });
+    expectTypeOf<ReturnType<typeof db.sql>>().toEqualTypeOf<db.SQLFragment<unknown, unknown>>();
+    expectTypeOf<Parameters<typeof db.sql>>().toEqualTypeOf<never>();  // as in Zapatos 6.6.1: NoInfer<unknown> in a rest
+    const plain: (literals: TemplateStringsArray, ...expressions: db.SQL[]) => db.SQLFragment<number> = db.sql;
+    expectTypeOf(plain`SELECT 1`).toEqualTypeOf<db.SQLFragment<number>>();
+  });
+
+  // sql has one generic signature, as in Zapatos 6.6.1: an overload would erase its type parameters in a generic
+  // higher-order function (the last overload's, to `unknown`), and make a value written to 6.6.1's signature
+  // no longer fit `typeof db.sql` (review of #520)
+  test('a generic higher-order function over sql keeps its type parameters, as in Zapatos 6.6.1 (#493)', () => {
+    const traced = <A extends unknown[], R>(f: (...a: A) => R): (...a: A) => R => (...a) => f(...a);
+    const tsql = traced(db.sql);
+    expectTypeOf(tsql`SELECT 1`).toEqualTypeOf<db.SQLFragment<any[], never>>();
+    expectTypeOf(tsql`SELECT 1`.run(pool)).resolves.toEqualTypeOf<any[]>();
+    expectTypeOf(tsql<db.SQL, number>`SELECT 1`).toEqualTypeOf<db.SQLFragment<number, never>>();
+    expectTypeOf(tsql<db.SQL, boolean | null, number>`${db.self} = 1`).toEqualTypeOf<db.SQLFragment<boolean | null, number>>();
+    // @ts-expect-error a number is no SQL interpolation, through the wrapper too
+    tsql`SELECT ${5}`;
+    const literals = null as unknown as TemplateStringsArray;
+    expectTypeOf(Promise.resolve(literals).then(db.sql)).toEqualTypeOf<Promise<db.SQLFragment<any[], never>>>();
+    // @ts-expect-error map() passes the index, a number, as an interpolation
+    [literals].map(db.sql);
+  });
+
+  test('a value written to the signature of Zapatos 6.6.1 is a typeof sql (#493)', () => {
+    // the NoInfer of Zapatos 6.6.1's declarations, which zapatos/db does not export
+    type NI<T> = [T][T extends any ? 0 : never];
+    function mySql<Interpolations = db.SQL, RunResult = pg.QueryResult['rows'], Constraint = never>(
+      literals: TemplateStringsArray, ...expressions: NI<Interpolations>[]
+    ): db.SQLFragment<RunResult, Constraint> {
+      return db.sql<Interpolations, RunResult, Constraint>(literals, ...expressions);
+    }
+    const sql2: typeof db.sql = mySql;
+    // its parameters typed by the context, under noImplicitAny
+    const sql3: typeof db.sql = (literals, ...expressions) => db.sql(literals, ...expressions);
+    expectTypeOf(sql2`SELECT 1`).toEqualTypeOf<db.SQLFragment<any[], never>>();
+    expectTypeOf(sql3<db.SQL, number>`SELECT 1`).toEqualTypeOf<db.SQLFragment<number, never>>();
   });
 });
 
