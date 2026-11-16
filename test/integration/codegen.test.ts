@@ -1568,8 +1568,13 @@ describe('enumArraysTypedAsText', () => {
     CREATE TABLE arr_box.films (id int PRIMARY KEY, moods arr.mood[], own arr_box.mood[]);
     CREATE SCHEMA arr_solo;
     CREATE TABLE arr_solo.films (id int PRIMARY KEY, moods arr.mood[]);
+    -- enums named like built-ins: an array of the built-in is no array of an enum, the enum's own array is
+    CREATE SCHEMA arr_edge;
+    CREATE TYPE arr_edge.int4 AS ENUM ('x', 'y');
+    CREATE TYPE arr_edge.text AS ENUM ('p');
+    CREATE TABLE arr_edge.films (id int PRIMARY KEY, nums int4[], words text[], own arr_edge.int4[]);
   `));
-  afterAll(() => t.pool.query('DROP SCHEMA arr, arr_box, arr_solo CASCADE'));
+  afterAll(() => t.pool.query('DROP SCHEMA arr, arr_box, arr_solo, arr_edge CASCADE'));
 
   const config = { schemas: { arr: all, arr_box: all, arr_solo: all }, schemaJSDoc: false, unprefixedSchema: 'arr' };
   const on = { ...config, enumArraysTypedAsText: true };
@@ -1640,6 +1645,24 @@ describe('enumArraysTypedAsText', () => {
     // an any custom type without typeEnumsAcrossSchemas
     expect(tableBlock(typed.ts, 'arr_solo')).toBe(tableBlock(off.ts, 'arr_solo'));
     expect(readsOf(tableBlock(typed.ts, 'arr_solo'), 'films', 'moods')).toEqual(['moods: c.Pg_mood | null;', 'moods: c.Pg_mood | null;']);
+  });
+
+  it('leaves an array of a built-in as it was, though its relation\'s schema has an enum of the built-in\'s name', async () => {
+    const edge = { schemas: { arr_edge: all }, schemaJSDoc: false };
+    for (const given of [{}, { typeEnumsAcrossSchemas: true }, { unprefixedSchema: null }, { domainsTypedByContext: true }]) {
+      const off = (await codegen({ ...edge, ...given })).ts, typed = (await codegen({ ...edge, ...given, enumArraysTypedAsText: true })).ts;
+      for (const column of ['id', 'nums', 'words']) {
+        expect(linesOf(tableBlock(typed, 'arr_edge'), 'films', column)).toEqual(linesOf(tableBlock(off, 'arr_edge'), 'films', column));
+      }
+      expect(readsOf(tableBlock(typed, 'arr_edge'), 'films', 'nums')).toEqual(['nums: number[] | null;', 'nums: number[] | null;']);
+      expect(readsOf(tableBlock(typed, 'arr_edge'), 'films', 'words')).toEqual(['words: string[] | null;', 'words: string[] | null;']);
+      // the enum's own array, typed number[] by the built-in's name as in Zapatos 6.6.1, is the text pg returns
+      expect(readsOf(tableBlock(typed, 'arr_edge'), 'films', 'own')).toEqual(['own: string | null;', 'own: number[] | null;']);
+      expect(await notesFor({ ...edge, ...given })).toEqual(['Note: arr_edge.films.own (arr_edge.int4[]) is an array of an ' +
+        'enum, which pg returns as its text, such as \'{a,b}\', though Selectable types it as an array. Set ' +
+        'enumArraysTypedAsText: true to type it as a string there, or false to keep the array if pg.types.setTypeParser ' +
+        'parses it; true will be the default in pgcast 7.0.']);
+    }
   });
 
   it('notes each column it would change, once per run, with the option left out', async () => {
