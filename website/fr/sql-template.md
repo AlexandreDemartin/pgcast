@@ -1,5 +1,5 @@
 ---
-english: afd6319d97b2
+english: 0977f05de97f
 ---
 
 # Template SQL
@@ -35,7 +35,7 @@ Renvoie un [`SQLFragment`](#SQLFragment) : les parties littérales telles que v
 
 `RunResult` n’est pas confronté au SQL : c’est vous qui affirmez ce qui revient. Les raccourcis le fixent pour vous.
 
-Écrit en ligne comme valeur du `where` d’un raccourci, ou des valeurs d’`update()`, un fragment tire son `Constraint` de chaque table et vue qui a une colonne de ce nom : TypeScript l’infère avant de connaître la table. Là où leurs types diffèrent, un fragment pourtant valide ne compile pas (TS2322) : un `id` qui est un `int4` ici et un `uuid` là ; dans `update()`, une vue de `films`, dont le `title` peut être `NULL`, fait échouer `` { title: db.sql`upper(${db.self})` } ``. Donnez-lui un argument de type, `` db.sql<db.SQL>`upper(${db.self})` ``, ou déclarez-le d’abord.
+Écrit en ligne comme valeur du `where` d’un raccourci, ou des valeurs d’`update()`, un fragment tire son `Constraint` de chaque table et vue qui a une colonne de ce nom : TypeScript l’infère avant de connaître la table. Là où leurs types diffèrent, un fragment pourtant valide ne compile pas (TS2322) : un `id` qui est un `int4` ici et un `uuid` là, ou un enum ici et un autre enum là ; dans `update()`, une vue de `films`, dont le `title` peut être `NULL`, fait échouer `` { title: db.sql`upper(${db.self})` } ``. Donnez-lui un argument de type, `` db.sql<db.SQL>`upper(${db.self})` ``, ou déclarez-le d’abord.
 
 Un nom hors d’`Interpolations` ne compile pas :
 
