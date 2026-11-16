@@ -540,9 +540,11 @@ describe('conditions', () => {
     } finally { resetConfig(); }
   });
 
-  it('a copy of eqAny compiles the same', () => {
+  it('a copy of eqAny compiles the same, and still refuses what eqAny refuses', () => {
     const condition = dc.eqAny([1, 2]);
     expect(sql`${{ col: condition.copy() }}`.compile()).toEqual(sql`${{ col: condition }}`.compile());
+    expect(() => show(dc.eqAny(['Bob', param('Ada')]).copy())).toThrow('so each item is a plain value, not `db.param()`');
+    expect(() => show(dc.eqAny(new Set([1]) as any).copy())).toThrow('takes an array, not `Set`');
   });
 
   it('fromNow, now, add, subtract', () => {
