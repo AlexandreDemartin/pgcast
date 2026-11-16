@@ -175,7 +175,7 @@ const fr: Words = {
   code: 'FR',
   lang: 'fr-FR',
   ogLocale: 'fr_FR',
-  description: 'Le Postgres que vous maîtrisez, avec toute la puissance de TypeScript : zéro abstraction, des requêtes dans le vocabulaire naturel de Postgres, des types tirés de votre schéma.',
+  description: 'Le Postgres que vous connaissez, avec toute la puissance de TypeScript : zéro abstraction, des requêtes dans le vocabulaire naturel de Postgres, des types tirés de votre schéma.',
   socialAlt: 'pgcast. Le Postgres que vous connaissez, avec toute la puissance de TypeScript.',
   search: 'Rechercher',
   searchDocs: 'Rechercher dans la doc',

@@ -567,6 +567,8 @@ svg.icon { width: 16px; height: 16px; flex: none; }
 }
 @media (hover: hover) and (pointer: fine) { .landing .eyebrow a:hover { text-decoration-color: currentColor; } }
 .landing .hero h1 { font-size: var(--hero-line); margin: 0 0 20px; letter-spacing: -.025em; text-wrap: balance; }
+/* each half of the line, so it breaks after the comma where both fit, and within a half only where one does not */
+.landing .hero h1 .half { display: inline-block; }
 .landing .hero h1 .op { font-family: var(--font-mono); color: var(--accent); font-weight: 700; letter-spacing: -.06em; }
 .landing .lede { font-size: 1.18rem; color: var(--muted); max-width: 58ch; margin: 0 0 28px; }
 .landing .ctas { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 0; }
@@ -574,7 +576,7 @@ svg.icon { width: 16px; height: 16px; flex: none; }
 .landing .InstallLine { margin: 16px 0 0; max-width: 512px; }
 @media (min-width: 1024px) {
   .landing .hero {
-    --hero-top: 80px; --hero-line: clamp(3rem, 5vw, 4.25rem);
+    --hero-top: 80px; --hero-line: clamp(3rem, 5vw, 3.875rem);
     display: flex; flex-wrap: wrap; align-items: center; column-gap: 16px; padding-bottom: 64px;
   }
   .landing .hero :is(h1, .lede) { flex: 0 0 100%; }
