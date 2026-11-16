@@ -775,6 +775,66 @@ describe('a function generic over columns or extras', () => {
   });
 });
 
+describe('a function generic over the table', () => {
+  test('characterization: a Whereable written in place is refused (TS2353), as in Zapatos 6.6.1 (#518)', () => {
+    // while K is generic, TypeScript checks the object's keys against SQLFragment alone
+    const inPlace = <K extends 'users' | 'products'>(table: K) => {
+      // @ts-expect-error select(): 'id' does not exist in type 'SQLFragment<any, never>'
+      db.select(table, { id: 1 });
+      // @ts-expect-error selectOne()
+      db.selectOne(table, { id: 1 });
+      // @ts-expect-error selectExactlyOne()
+      db.selectExactlyOne(table, { id: 1 });
+      // @ts-expect-error count()
+      db.count(table, { id: 1 });
+      // @ts-expect-error deletes()
+      db.deletes(table, { id: 1 });
+      // @ts-expect-error update(), its where
+      db.update(table, {}, { id: 1 });
+      // @ts-expect-error having
+      db.select(table, db.all, { groupBy: 'id', having: { id: 1 } });
+      // @ts-expect-error a sql value, with its type argument (a bare one is #493's)
+      db.select(table, { id: db.sql<db.SQL>`${db.self} = 1` });
+      // @ts-expect-error over a single table too
+      (<L extends 'users'>(t: L) => db.select(t, { id: 1 }));
+    };
+    void inPlace;
+  });
+
+  test('a Whereable typed first type-checks in each shortcut, refuses a key that no table has, and passes a column that only one has (#518)', () => {
+    const byId = <K extends 'users' | 'products'>(table: K) => {
+      const where: s.WhereableForTable<K> = { id: 1 };
+      // @ts-expect-error a key that no table has
+      const typo: s.WhereableForTable<K> = { id: 1, nope: 2 };
+      // @ts-expect-error a value of another type
+      const wrong: s.WhereableForTable<K> = { id: 'x' };
+      // only products has sku, so Postgres refuses it on users (42703)
+      const oneTable: s.WhereableForTable<K> = { sku: 'x' };
+      void [typo, wrong, db.select(table, oneTable)];
+      void [db.selectOne(table, where), db.selectExactlyOne(table, where), db.count(table, where), db.deletes(table, where)];
+      void [db.update(table, {}, where), db.select(table, db.all, { groupBy: 'id', having: where })];
+      return db.select(table, where);
+    };
+    const q = byId('users');
+    expectTypeOf<Run<typeof q>>().toEqualTypeOf<s.users.JSONSelectable[]>();
+    expectTypeOf<Run<typeof q>>().not.toBeAny();
+  });
+
+  test('a forwarder over WhereableForTable<T> and typeof select type-check, as in Zapatos 6.6.1 (#518)', () => {
+    const forward = <T extends s.Table>(table: T, where: s.WhereableForTable<T> | db.SQLFragment<any> | db.AllType) =>
+      db.select(table, where);
+    const forwardCount = <T extends s.Table>(table: T, where: s.WhereableForTable<T>) => db.count(table, where);
+    const q = forward('users', { id: 1 });
+    expectTypeOf<Run<typeof q>>().toEqualTypeOf<s.users.JSONSelectable[]>();
+    expectTypeOf<Run<typeof q>>().not.toBeAny();
+    expectTypeOf(forwardCount('products', { id: 1 })).toEqualTypeOf<db.SQLFragment<number>>();
+    // @ts-expect-error a key that the table lacks, at the call site
+    forward('users', { nope: 1 });
+    const select: typeof db.select = db.select;
+    void select;
+  });
+});
+
 describe('truncate', () => {
   test('undefined; refuses an option that is not a keyword', () => {
     expectTypeOf(db.truncate('users', 'RESTART IDENTITY', 'CASCADE').run(pool)).resolves.toEqualTypeOf<undefined>();

@@ -1,5 +1,5 @@
 ---
-english: 89ac2e463d23
+english: fd1712873656
 ---
 
 # Lectures {#select-and-the-aggregates}
@@ -17,6 +17,7 @@ Construit un seul `SELECT` des lignes de `table` qui correspondent à `where`. R
 
 - `table` : une table du schéma généré.
 - `where` : un `Whereable`, un objet de colonnes et de leurs valeurs ou [conditions](/fr/conditions), ses clés dans l’ordre alphabétique, jointes par `AND` dans une seule paire de parenthèses, une condition ou une valeur `sql` dans la sienne (`("id" = $1 AND ("studio_id" > $2) AND "title" = $3)`<!-- probe: db.select('films', { title: 'x', id: 1000, studio_id: db.conditions.gt(1000) }) -->) ; un fragment [`sql`](/fr/sql-template#sql), écrit tel quel ; ou [`db.all`](/fr/sql-template#all), pour aucun `WHERE`.
+  - Dans une fonction générique sur la table, `<K extends 'films' | 'studios'>(table: K)`, chaque raccourci refuse un objet écrit en ligne comme `where` (TS2353, qui nomme `SQLFragment`), comme dans Zapatos 6.6.1 : tant que `K` est générique, TypeScript ne vérifie les clés de l’objet que par rapport à `SQLFragment`. Typez d’abord l’objet, `const where: s.WhereableForTable<K> = { id: 1 }`, puis passez `where` : le code compile, et une clé qu’aucune table n’a reste refusée. Une colonne qu’une seule des tables de `K` possède passe aussi : `{ title: 'x' }` compile, et sur `studios`, qui n’a pas de `title`, Postgres refuse la requête (42703).
 - `options` : les [options](#options) ci-dessous, toutes facultatives.
 - `mode` et `aggregate` : ce que passent `selectOne()`, `count()` et les autres ; voir [`SelectResultMode`](#SelectResultMode).
 
