@@ -1,5 +1,5 @@
 ---
-english: ae24fb17390b
+english: d3e40667e826
 ---
 
 # Template SQL
@@ -247,7 +247,7 @@ Un objet natif sans clé propre énumérable (un `Date`, une `Map`, une `Promise
 
 > `` `db.cols()` takes an object or an array, not a built-in `…` with no own enumerable key, which would compile to nothing: for one column, write `db.cols([name])`; for a row of `insert()`, `upsert()` or `update()`, give a plain object. ``<!-- message -->
 
-Zapatos 6.6.1 compilait un tel objet natif en rien : `` db.sql`SELECT ${db.cols(new Date())} FROM films` `` s’exécutait donc sous la forme `SELECT  FROM films` et renvoyait des lignes sans colonne. Il compilait un `Buffer` en indices de ses octets, `"0", "1"` pour deux octets. Un objet natif doté de ses propres clés énumérables se compile toujours en ces clés, comme un objet simple. Une `Error` dotée de `code` et de `path`, comme le sont les erreurs système de Node, donne `"code", "path"`<!-- probe: db.sql`${db.cols(Object.assign(new Error('x'), { code: 'ENOENT', path: 'films.csv' }))}` -->. Un tableau typé autre qu’un `Buffer` se compile en ses indices, sauf s’il est vide et n’a donc aucune clé propre ; une instance de classe, une sous-classe d’un objet natif et un objet natif d’un autre realm se compilent en leurs propres clés. Dans un tableau de lignes d’`insert()` ou d’`upsert()`, même d’une seule ligne, une ligne qui est un objet natif passe d’abord par un spread dans un objet simple : un `Buffer` y donne les indices de ses octets comme colonnes, et un `Date` aucune, soit une ligne de `DEFAULT` à côté d’autres lignes ([#543](https://github.com/AlexandreDemartin/pgcast/issues/543)). Pour une seule valeur, passez `db.param(value)`.
+Zapatos 6.6.1 compilait un tel objet natif en rien : `` db.sql`SELECT ${db.cols(new Date())} FROM films` `` s’exécutait donc sous la forme `SELECT  FROM films` et renvoyait des lignes sans colonne. Il compilait un `Buffer` en indices de ses octets, `"0", "1"` pour deux octets. Un objet natif doté de ses propres clés énumérables se compile toujours en ces clés, comme un objet simple. Une `Error` dotée de `code` et de `path`, comme le sont les erreurs système de Node, donne `"code", "path"`<!-- probe: db.sql`${db.cols(Object.assign(new Error('x'), { code: 'ENOENT', path: 'films.csv' }))}` -->. Un tableau typé autre qu’un `Buffer` se compile en ses indices, sauf s’il est vide et n’a donc aucune clé propre ; une instance de classe, une sous-classe d’un objet natif et un objet natif d’un autre realm se compilent en leurs propres clés. Une ligne qui est un objet natif parmi les lignes d’`insert()` ou d’`upsert()` est refusée de la même façon ([`insert()`](/fr/insert#insert)). Pour une seule valeur, passez `db.param(value)`.
 
 ### `ColumnNames` {#ColumnNames}
 

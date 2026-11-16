@@ -6,6 +6,13 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 
 ## [Unreleased]
 
+### Fixed
+- A `Buffer` row, or a built-in row with no own enumerable key, among the rows of `insert()` or `upsert()` throws while compiling, as a single row has since #529, so `.run()` rejects with a plain `Error` before any query (#543). Zapatos 6.6.1 copied each row into a plain object before compiling it.
+  - Changed: `` insert('films', [{ title: 'Ink' }, new Date()]) `` compiled to `VALUES ($1), (DEFAULT)` and wrote a row of defaults; it now rejects with the message of `vals()`, `` `db.vals()` takes an object or an array, not a built-in `Date` with no own enumerable key, … ``, or that of `cols()` for the first row.
+  - Changed: a `Buffer` row gave its byte indexes as columns, `("0")` for one byte, which Postgres refused unless the table has them (42703); it now rejects, alone in an array too. Its bytes are no longer listed: beside a row, a 10 MB `Buffer` took 16 s in `insert()` and ran out of memory in `upsert()`; on its own, it took about a second in `insert()` and `update()`, and 18 s in `upsert()`, before throwing. It now throws in under a millisecond.
+  - Changed: with `undefinedMeansMissing`, a `Buffer` row with an `undefined` own key was rebuilt into a plain object of its bytes, so `update()` compiled `SET ("0") = ROW($1)`; it now rejects too.
+  - Unchanged: these are rows, as before: a built-in row with own enumerable keys other than a `Buffer`, a typed array with elements other than a `Buffer`, a class instance, a subclass of a built-in, and a `Proxy` row, unless it wraps a built-in with no own enumerable key (`new Proxy(new Date(), {})`, now refused as that built-in is). A row with no key alone, or beside only rows with none, still throws "nothing to insert" at the call; with `undefinedMeansMissing`, an empty `Buffer` whose own keys are all `undefined` counts as one in `upsert()`, and throws "nothing to update" at the call in `update()`.
+
 ## [6.7.1] - 2026-11-16
 
 ### Security
