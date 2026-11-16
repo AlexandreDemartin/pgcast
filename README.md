@@ -7,7 +7,7 @@ Maintained by [Alexandre Demartin](https://github.com/AlexandreDemartin)
 [![CI](https://github.com/AlexandreDemartin/pgcast/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/AlexandreDemartin/pgcast/actions/workflows/ci.yml)
 [![Licence: MIT](https://img.shields.io/badge/licence-MIT-blue.svg)](LICENCE)
 
-> **Status:** 6.6.2 is Zapatos 6.6.1 with its security holes closed. 6.7.0, in progress, adds opt-ins for the surprises that code may rely on. On npm as [`@pgcast/pgcast`](https://www.npmjs.com/package/@pgcast/pgcast).
+> **Status:** 6.7.0 is on npm as [`@pgcast/pgcast`](https://www.npmjs.com/package/@pgcast/pgcast). 6.6.2 closed the security holes of Zapatos 6.6.1; 6.7.0 adds opt-ins for the surprises that code may rely on, and pgcast's own module names.
 
 ## Why pgcast
 
