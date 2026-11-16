@@ -1922,6 +1922,44 @@ describe('a null or primitive row in insert(), upsert() and update()', () => {
   });
 });
 
+// 6.6.1 compiled a built-in row as an object of its own enumerable keys: a Buffer's byte indexes, `("0")`, which
+// Postgres refused (42703); one with no key threw nothing to insert or update at the call, as it still does (#529)
+describe('a built-in row in insert(), upsert() and update()', () => {
+  const
+    row = { email: 'a@x.org', display_name: 'A' },
+    bufferColsMessage = '`db.cols()` takes an object or an array, not a `Buffer`, whose byte indexes would compile as names, one per byte: for one column, write `db.cols([name])`; for a row of `insert()`, `upsert()` or `update()`, give a plain object.';
+
+  it('a single Buffer row rejects run(), with no query sent', async () => {
+    const queryable = { query: vi.fn() } as any, outcomes: Record<string, string> = {};
+    for (const [name, build] of Object.entries({
+      insert: () => db.insert('users', Buffer.from('a') as any),
+      upsert: () => db.upsert('users', Buffer.from('a') as any, 'email'),
+      update: () => db.update('users', Buffer.from('a') as any, { id: 1 }),
+    })) outcomes[name] = await build().run(queryable).then(() => 'ran', (err: Error) => err.message);
+    expect(outcomes).toEqual({ insert: bufferColsMessage, upsert: bufferColsMessage, update: bufferColsMessage });
+    expect(queryable.query).not.toHaveBeenCalled();
+  });
+
+  it('a built-in row with own enumerable keys compiles as a plain object of them, as in 6.6.1', () => {
+    // a Node system error holds code, errno, syscall and path as its own keys: a row for a table of those columns
+    const x = Object.assign(new Error('ENOENT'), row);
+    expect({
+      insert: db.insert('users', x).compile(), upsert: db.upsert('users', x, 'email').compile(),
+      update: db.update('users', x, { id: 1 }).compile(),
+    }).toEqual({
+      insert: db.insert('users', { ...row }).compile(), upsert: db.upsert('users', { ...row }, 'email').compile(),
+      update: db.update('users', { ...row }, { id: 1 }).compile(),
+    });
+  });
+
+  it('characterization: a built-in row among several is spread before cols() and vals() see it, a row of defaults (#543)', () => {
+    expect(db.insert('users', [row, new Date(0) as any]).compile()).toEqual({
+      text: 'INSERT INTO "users" ("display_name", "email") VALUES ($1, $2), (DEFAULT, DEFAULT) RETURNING to_jsonb("users".*) AS result',
+      values: ['A', 'a@x.org'],
+    });
+  });
+});
+
 // 6.6.1 threw a TypeError at the call, from Object.keys(null) or reading `copy` of null (#341)
 describe('lateral: null, or a lateral key whose query is null or undefined', () => {
   const

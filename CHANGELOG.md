@@ -6,6 +6,8 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 
 ## [Unreleased]
 
+## [6.7.1] - 2026-11-16
+
 ### Security
 - The `Segments` object that an `Intl.Segmenter`'s `segment()` returns, interpolated as a `Whereable`, throws while compiling, so `.run()` rejects with a plain `Error` before any query, as the built-ins of #170 do: `` db.deletes('films', new Intl.Segmenter('en').segment('Metropolis') as any) `` compiled to `DELETE FROM "films" WHERE TRUE …` and deleted every row, on Zapatos 6.6.1 and pgcast 6.7.0 (#517).
   - Its prototype, ECMA-402's `%IntlSegmentsPrototype%`, has no constructor, so the error names it by its ECMA-402 name, `` A built-in `Segments` ``; an object made from that prototype with `Object.create()` throws too.
@@ -13,6 +15,21 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
   - The type refused it (TS2345).
   - Unchanged: what it hands out (`containing(0)`, a plain object, compiles to its keys, `("index" = $1 AND "input" = $2 AND "segment" = $3)`; its iterator already threw, #426), a `Segments` of another realm (`TRUE`), and the SQL of every other call.
 - `upsert()` takes an update value only from `updateValues` and its own prototypes, never from `Object.prototype`. A column inserted as `valueOf`, `toString`, `constructor`, `hasOwnProperty` or `__proto__` threw "Alien object while interpolating SQL" unless `updateValues` named it, and now is set from `EXCLUDED`; a key that something else put on `Object.prototype` (`Object.prototype.role = 'admin'`) no longer overwrites the inserted value on conflict. A class instance or an `Object.create()` value, its getters and inherited keys, is read as before.
+
+### Fixed
+- `cols()` and `vals()` of a built-in object with no own enumerable key, or of a `Buffer`, throw while compiling, so `.run()` rejects with a plain `Error` before any query, on a pool or a client (#529). Zapatos 6.6.1 compiled each as an object of its own keys: a `Date`, a `Map` or a `Promise` to nothing, and a `Buffer` to its byte indexes as names and its bytes as values, one parameter per byte.
+  - Refused: each built-in that a `Whereable` refuses (#170) when it has no own enumerable key, a `Proxy` of one included, and a `Buffer`, empty or not, even with keys added. This applies in a `sql` template, a nested fragment, a `lateral` subquery, `upsert()` `updateValues`, `select()` `groupBy`, `count()` `columns`, and a row given to `insert()`, `upsert()` or `update()` on its own, not in an array. There, a built-in row with no key already threw "nothing to insert" or "nothing to update" at the call, and still does. In `groupBy` and `count()` `columns`, Postgres refused each before: `GROUP BY )` (42601) and `count()` (42809) for one with no key, `"0"` (42703) for a `Buffer`.
+  - The error says what to do: `` `db.cols()` takes an object or an array, not a built-in `Date` with no own enumerable key, which would compile to nothing: for one column, write `db.cols([name])`; for a row of `insert()`, `upsert()` or `update()`, give a plain object. ``. For a `Buffer` in `vals()` it reads `` `db.vals()` takes an object or an array, not a `Buffer`, whose bytes would compile as values, one parameter per byte: … ``.
+  - Changed: `` sql`SELECT ${cols(new Date())} FROM films` `` ran as `SELECT  FROM films`, rows with no column; it now rejects.
+  - Changed: `vals(Buffer.from('a'))` as a written value stored its byte's number, in a `sql` template and in `updateValues`: `'97'` in a text column, `97` in a number column, `\x3937` in `bytea`, `00:01:37` in an `interval`. It now rejects; for the bytes, write `vals([buf])` or `param(buf)`.
+  - Changed: `vals()` of a `Buffer` in an `IN` list matched its bytes as numbers, `IN ($1, $2)` with `97, 98`; it now rejects.
+  - Changed: an empty typed array has no own key, so it is refused as other built-ins with none are: `` sql`SELECT ${cols(new Int32Array(0))} FROM films` `` ran as `SELECT  FROM films`, rows with no column, as `vals()` of one did; it now rejects.
+  - Unchanged:
+    - A built-in with own enumerable keys compiles to them, as a plain object does: an `Error` given `code`, `errno`, `syscall` and `path`, as Node's system errors are, is still a row of those columns.
+    - A typed array other than a `Buffer` that holds elements compiles to them in `vals()` (`IN ($1, $2)` for `new Int32Array([1, 2])`) and to its indexes in `cols()`.
+    - A `Proxy` of a `Buffer` that holds bytes compiles as before, to its byte indexes and its bytes: it is no `ArrayBuffer` view, so only its prototype would tell it from a `Proxy` row, and neither check reads the prototype of a row with own keys.
+    - Also as before: a class instance, a subclass of a built-in, a `PostgresInterval` (`vals()` of `{ hours: 2 }` is still `$1` with `2`), a built-in of another realm, and a primitive, which keeps its own message (#244).
+    - A built-in row in an array of rows of `insert()` or `upsert()`, even of one row, is still spread into a plain object first (#543): a `Buffer` there gives its byte indexes as columns, and a `Date` none, a row of `DEFAULT`s beside other rows.
 
 ## [6.7.0] - 2026-11-16
 

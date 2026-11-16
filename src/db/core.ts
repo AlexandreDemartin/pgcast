@@ -252,7 +252,9 @@ export class ColumnNames<T> { declare readonly [wrapper]: 'cols'; constructor(pu
  * `vals({…})`, so as a write value, it throws, and the type refuses it, as for
  * `raw()`; Zapatos 6.6.1 sent it as JSON. `null`, a string or another primitive
  * throws while compiling; Zapatos 6.6.1 compiled a string's character indexes,
- * `cols('id')` to `"0", "1"`, and threw a `TypeError` on `null`.
+ * `cols('id')` to `"0", "1"`, and threw a `TypeError` on `null`. So do a
+ * built-in object with no own enumerable key (a `Date`, a `Map`), which
+ * Zapatos 6.6.1 compiled to nothing, and a `Buffer`, to its byte indexes.
  */
 export function cols<T>(x: T) { return new ColumnNames<T>(x); }
 
@@ -278,7 +280,9 @@ export class ColumnValues<T> { declare readonly [wrapper]: 'vals'; constructor(p
  * are still sent as JSON. As a filter value `vals(x)` throws, and the type
  * refuses it as a value, as for `raw()`. `null`, a string or another primitive throws while
  * compiling; Zapatos 6.6.1 sent a string's characters, `vals('id')` as `$1, $2`,
- * and threw a `TypeError` on `null`.
+ * and threw a `TypeError` on `null`. So do a built-in object with no own
+ * enumerable key (a `Date`, a `Map`), which Zapatos 6.6.1 compiled to nothing,
+ * and a `Buffer`, to one parameter per byte (`Buffer.from('a')` was sent as `97`).
  */
 export function vals<T>(x: T) { return new ColumnValues<T>(x); }
 
@@ -452,6 +456,21 @@ const isNotObject = (x: unknown) => x === null || (typeof x !== 'object' && type
 const notAnObject = (fn: 'cols' | 'vals', x: unknown) => fn === 'cols' ?
   `\`db.cols()\` takes an object or an array, not \`${x === null ? 'null' : typeof x}\`: for one column, write \`db.cols([name])\`; for a row of \`insert()\`, \`upsert()\` or \`update()\`, give an object.` :
   `\`db.vals()\` takes an object or an array, not \`${x === null ? 'null' : typeof x}\`: for one value, write \`db.vals([value])\`; for a row of \`insert()\`, \`upsert()\` or \`update()\`, give an object.`;
+
+// cols() and vals() of a built-in with no own enumerable key: Zapatos 6.6.1 compiled it to nothing, `SELECT  FROM r`
+// (which Postgres runs, rows with no column) or `ROW()` (42601); of a `Buffer`, to its byte indexes as names and its
+// bytes as values, so that a one-byte `Buffer` was stored as `97`. Both throw. A built-in with own enumerable keys
+// still compiles to them, as a plain object does, and so does a typed array other than a `Buffer` that holds
+// elements, which are its keys. A `Buffer` throws even with keys added, before its keys, one per byte, are listed; `ArrayBuffer.isView()`
+// reads no prototype, so a `Proxy` row with own keys has none read, as on master. A `Proxy` of a `Buffer` is no view,
+// and compiles as before unless it has no key
+const isRefusedBuffer = (x: object) => ArrayBuffer.isView(x) && Buffer.isBuffer(x) && isBuiltin(x);
+const isKeylessBuiltin = (x: object, keys: readonly unknown[]) => keys.length === 0 && isBuiltin(x);
+const refusedBuiltin = (fn: 'cols' | 'vals', x: object) =>
+  !Buffer.isBuffer(x) && fn === 'cols' ? `\`db.cols()\` takes an object or an array, not a built-in \`${builtinName(x)}\` with no own enumerable key, which would compile to nothing: for one column, write \`db.cols([name])\`; for a row of \`insert()\`, \`upsert()\` or \`update()\`, give a plain object.` :
+    !Buffer.isBuffer(x) ? `\`db.vals()\` takes an object or an array, not a built-in \`${builtinName(x)}\` with no own enumerable key, which would compile to nothing: for one value, write \`db.vals([value])\`; for a row of \`insert()\`, \`upsert()\` or \`update()\`, give a plain object.` :
+      fn === 'cols' ? '`db.cols()` takes an object or an array, not a `Buffer`, whose byte indexes would compile as names, one per byte: for one column, write `db.cols([name])`; for a row of `insert()`, `upsert()` or `update()`, give a plain object.' :
+        '`db.vals()` takes an object or an array, not a `Buffer`, whose bytes would compile as values, one parameter per byte: for one value, write `db.vals([value])`; for a row of `insert()`, `upsert()` or `update()`, give a plain object.';
 
 export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never> {
   protected constraint?: Constraint;
@@ -672,8 +691,10 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
       // a ColumnNames-wrapped object -> quoted names in a repeatable order
       // OR a ColumnNames-wrapped array -> quoted array values
       if (isNotObject(expression.value)) throw new Error(notAnObject('cols', expression.value));
+      if (isRefusedBuffer(expression.value)) throw new Error(refusedBuiltin('cols', expression.value));
       const columnNames = Array.isArray(expression.value) ? expression.value :
         Object.keys(expression.value).sort();
+      if (!Array.isArray(expression.value) && isKeylessBuiltin(expression.value, columnNames)) throw new Error(refusedBuiltin('cols', expression.value));
 
       for (let i = 0, len = columnNames.length; i < len; i++) {
         if (i > 0) result.text += ', ';
@@ -703,9 +724,10 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
         }
 
       } else {
-        const
-          columnNames = <Column[]>Object.keys(expression.value).sort(),
-          columnValues = columnNames.map(k => (<any>expression.value)[k]);
+        if (isRefusedBuffer(expression.value)) throw new Error(refusedBuiltin('vals', expression.value));
+        const columnNames = <Column[]>Object.keys(expression.value).sort();
+        if (isKeylessBuiltin(expression.value, columnNames)) throw new Error(refusedBuiltin('vals', expression.value));
+        const columnValues = columnNames.map(k => (<any>expression.value)[k]);
 
         for (let i = 0, len = columnValues.length; i < len; i++) {
           const
