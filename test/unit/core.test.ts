@@ -5,9 +5,12 @@
 // produces them. Execution: test/integration/core.test.ts.
 // Hostile inputs are the subject of step 1.4 (test/unit/injection.test.ts).
 
+import { isDeepStrictEqual } from 'node:util';
+import { runInNewContext } from 'node:vm';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as db from '../../src/db';
 import { sql, param, raw, cols, vals, parent, self, Default } from '../../src/db';
+import { builtinObjects } from '../helpers/builtinObjects';
 import { resetConfig } from '../helpers/config';
 
 /** Compiles one interpolated expression on its own. */
@@ -770,6 +773,161 @@ describe('cols and vals', () => {
   it('vals() of an array holding cols(null) still sends it as JSON, as in 6.6.1', () => {
     // a wrapper in an array outside a filter is a JSON parameter (#259), so cols(null) is never compiled there
     expect(one(vals([cols(null)]))).toEqual({ text: '$1', values: [{ value: null }] });
+  });
+
+  // 6.6.1 compiled a built-in as an object of its own enumerable keys: with none, to nothing (`SELECT  FROM users`,
+  // which Postgres runs, or `ROW()`); a Buffer to its byte indexes as names and its bytes as values, so that a
+  // one-byte Buffer was stored as `97`. Both now throw (#529). A built-in with own enumerable keys, a typed array's
+  // indexes included, still compiles to them, as a plain object does
+  const
+    builtinColsMessage = (name: string) => `\`db.cols()\` takes an object or an array, not a built-in \`${name}\` with no own enumerable key, which would compile to nothing: for one column, write \`db.cols([name])\`; for a row of \`insert()\`, \`upsert()\` or \`update()\`, give a plain object.`,
+    builtinValsMessage = (name: string) => `\`db.vals()\` takes an object or an array, not a built-in \`${name}\` with no own enumerable key, which would compile to nothing: for one value, write \`db.vals([value])\`; for a row of \`insert()\`, \`upsert()\` or \`update()\`, give a plain object.`,
+    bufferColsMessage = '`db.cols()` takes an object or an array, not a `Buffer`, whose byte indexes would compile as names, one per byte: for one column, write `db.cols([name])`; for a row of `insert()`, `upsert()` or `update()`, give a plain object.',
+    bufferValsMessage = '`db.vals()` takes an object or an array, not a `Buffer`, whose bytes would compile as values, one parameter per byte: for one value, write `db.vals([value])`; for a row of `insert()`, `upsert()` or `update()`, give a plain object.';
+
+  it('cols and vals of a built-in with no own enumerable key, or of a Buffer, throw, in a sql template, a nested fragment, an IN list, a lateral subquery and updateValues, and cols in groupBy and count() columns', () => {
+    const outcomes: string[] = [];
+    for (const [name, x] of Object.entries(builtinObjects()))
+      for (const [fn, wrap] of [['cols', cols], ['vals', vals]] as const) {
+        const
+          message = Buffer.isBuffer(x) ? (fn === 'cols' ? bufferColsMessage : bufferValsMessage) :
+            Object.keys(x).length > 0 ? undefined :
+              fn === 'cols' ? builtinColsMessage(name) : builtinValsMessage(name),
+          places = {
+            template: () => sql`SELECT ${wrap(x)}`.compile(),
+            nested: () => sql`SELECT ${sql`(${wrap(x)})`}`.compile(),
+            inList: () => sql`SELECT 1 WHERE ${'id'} IN (${wrap(x)})`.compile(),
+            lateral: () => db.select('users', db.all, { lateral: { n: sql`SELECT ${wrap(x)}` } }).compile(),
+            updateValues: () => db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { display_name: wrap(x as any) } }).compile(),
+            // both hand an object to cols(): 6.6.1 compiled `GROUP BY ` and `count()` for a Date
+            ...fn === 'cols' && {
+              groupBy: () => db.select('users', db.all, { groupBy: x as any }).compile(),
+              count: () => db.count('users', db.all, { columns: x as any }).compile(),
+            },
+          };
+        for (const [place, f] of Object.entries(places)) {
+          const outcome = failure(f);
+          if (JSON.stringify(outcome) !== JSON.stringify(message === undefined ? 'compiled' : { name: 'Error', message }))
+            outcomes.push(`${fn} ${name} ${place}: ${JSON.stringify(outcome)}`);
+        }
+        // one with own enumerable keys compiles as a plain object of them does
+        if (message === undefined && !isDeepStrictEqual(one(wrap(x)), one(wrap({ ...x }))))
+          outcomes.push(`${fn} ${name}: ${one(wrap(x)).text}`);
+      }
+    expect(outcomes).toEqual([]);
+  });
+
+  it('cols of a Date, and vals of a one-byte Buffer, throw, saying what to do', () => {
+    // 6.6.1: `SELECT  FROM "users"`, which ran; `UPDATE "users" SET "display_name" = $1` with 97, stored as '97'
+    expect(failure(() => sql`SELECT ${cols(new Date(0))} FROM ${'users'}`.compile()))
+      .toEqual({ name: 'Error', message: builtinColsMessage('Date') });
+    expect(failure(() => sql`UPDATE ${'users'} SET ${'display_name'} = ${vals(Buffer.from('a'))}`.compile()))
+      .toEqual({ name: 'Error', message: bufferValsMessage });
+    expect(failure(() => sql`SELECT ${cols(Buffer.from('ab'))} FROM ${'users'}`.compile()))
+      .toEqual({ name: 'Error', message: bufferColsMessage });
+  });
+
+  it('cols and vals of a Buffer throw even with own keys added, and of an empty Buffer as of a Buffer', () => {
+    const x = Object.assign(Buffer.from('a'), { display_name: 'A' });
+    expect({ cols: failure(() => one(cols(x))), vals: failure(() => one(vals(x))), empty: failure(() => one(vals(Buffer.alloc(0)))) })
+      .toEqual({
+        cols: { name: 'Error', message: bufferColsMessage }, vals: { name: 'Error', message: bufferValsMessage },
+        empty: { name: 'Error', message: bufferValsMessage },
+      });
+  });
+
+  it('cols and vals of an empty typed array throw, as it has no own key', () => {
+    // 6.6.1: `SELECT  FROM "users"`, which ran, rows with no column
+    expect({ cols: failure(() => one(cols(new Int32Array(0)))), vals: failure(() => one(vals(new Float64Array(0)))) })
+      .toEqual({
+        cols: { name: 'Error', message: builtinColsMessage('Int32Array') }, vals: { name: 'Error', message: builtinValsMessage('Float64Array') },
+      });
+  });
+
+  it('cols and vals of a Buffer throw before its keys, one per byte, are listed', () => {
+    // Object.keys() of a 10 MB Buffer lists 10 million indexes: master took seconds to compile one
+    const x = Buffer.from('ab'), keys = vi.spyOn(Object, 'keys');
+    try {
+      expect({ cols: failure(() => one(cols(x))), vals: failure(() => one(vals(x))) })
+        .toEqual({ cols: { name: 'Error', message: bufferColsMessage }, vals: { name: 'Error', message: bufferValsMessage } });
+      expect(keys.mock.calls.filter(([arg]) => arg === x)).toEqual([]);
+    } finally {
+      keys.mockRestore();
+    }
+  });
+
+  it('cols and vals of a built-in throw before writing anything for it, and before reading its values', () => {
+    const result = { text: '', values: [] };
+    expect(failure(() => sql`SELECT ${param(1)}, ${vals(Buffer.from('a'))}`.compile(result))).toEqual({ name: 'Error', message: bufferValsMessage });
+    expect(result).toEqual({ text: 'SELECT $1, ', values: [1] });
+  });
+
+  it('rejects run() on a built-in with no own enumerable key or a Buffer, in a sql template, a row of insert(), upsert() and update(), and updateValues, with no query sent', async () => {
+    const queryable = { query: vi.fn() } as any;
+    const queries = {
+      selectCols: sql`SELECT ${cols(new Date(0))} FROM ${'users'}`,
+      updateVals: sql`UPDATE ${'users'} SET ${'display_name'} = ${vals(Buffer.from('a'))} WHERE ${'id'} = 1`,
+      inList: sql`SELECT ${'id'} FROM ${'users'} WHERE ${'id'} IN (${vals(Buffer.from('ab'))})`,
+      iterator: sql`SELECT ${cols(new Set(['id']).values())} FROM ${'users'}`,
+      insert: db.insert('users', Buffer.from('a') as any),
+      upsert: db.upsert('users', Buffer.from('a') as any, 'email'),
+      update: db.update('users', Buffer.from('a') as any, { id: 1 }),
+      updateValues: db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { display_name: vals(new Map() as any) } }),
+    };
+    const outcomes: Record<string, string> = {};
+    for (const [name, q] of Object.entries(queries))
+      outcomes[name] = await q.run(queryable).then(() => 'ran', (err: Error) => err.message);
+    expect(outcomes).toEqual({
+      selectCols: builtinColsMessage('Date'), updateVals: bufferValsMessage, inList: bufferValsMessage,
+      iterator: builtinColsMessage('Set Iterator'), insert: bufferColsMessage, upsert: bufferColsMessage,
+      update: bufferColsMessage, updateValues: builtinValsMessage('Map'),
+    });
+    expect(queryable.query).not.toHaveBeenCalled();
+  });
+
+  it('cols and vals of a built-in with own enumerable keys, a subclass, a class instance, a Proxy of an object or a built-in of another realm compile as before', () => {
+    // as in 6.6.1: a Node system error is an Error with own enumerable keys, which a row of insert() may hold
+    class Stamp extends Date {}
+    class Interval { hours = 2; toPostgres() { return '2 hours'; } }
+    const
+      systemError = Object.assign(new Error('ENOENT'), { errno: -2, code: 'ENOENT', syscall: 'open', path: 'films.csv' }),
+      dated = Object.assign(new Date(0), { display_name: 'A' }),
+      mapped = Object.assign(new Map(), { display_name: 'A' });
+    expect({
+      systemErrorCols: one(cols(systemError)).text, systemErrorVals: one(vals(systemError)),
+      dated: one(vals(dated)), mapped: one(cols(mapped)).text,
+      typedArray: one(vals(new Int32Array([1, 2]))), typedArrayCols: one(cols(new Int32Array([1, 2]))).text,
+      subclass: one(cols(new Stamp(0))).text, interval: one(vals(new Interval())),
+      proxy: one(cols(new Proxy({ display_name: 'A' }, {}))).text, realm: one(cols(runInNewContext('new Date(0)'))).text,
+      // no ArrayBuffer view, so told from a Proxy row only by its prototype, which a row with own keys never has read
+      proxyBuffer: one(cols(new Proxy(Buffer.from('a'), {}))).text,
+    }).toEqual({
+      systemErrorCols: '"code", "errno", "path", "syscall"', systemErrorVals: { text: '$1, $2, $3, $4', values: ['ENOENT', -2, 'films.csv', 'open'] },
+      dated: { text: '$1', values: ['A'] }, mapped: '"display_name"',
+      typedArray: { text: '$1, $2', values: [1, 2] }, typedArrayCols: '"0", "1"',
+      subclass: '', interval: { text: '$1', values: [2] },
+      proxy: '"display_name"', realm: '', proxyBuffer: '"0"',
+    });
+  });
+
+  it('cols and vals of a Proxy of a built-in with no own key throw, as the Proxy hands on its prototype', () => {
+    expect(failure(() => one(cols(new Proxy(new Date(0), {}))))).toEqual({ name: 'Error', message: builtinColsMessage('Date') });
+  });
+
+  it('a row with own keys behind a Proxy has its prototype read no more than on master: never, in a row of insert(), upsert() and update(), and in cols() and vals()', () => {
+    // isBuiltin() reads the prototype, which a Proxy's getPrototypeOf trap sees: only a row with no own key reaches it
+    let reads = 0;
+    const row = () => new Proxy({ email: 'a@b', display_name: 'A' }, { getPrototypeOf: (target) => { reads++; return Reflect.getPrototypeOf(target); } });
+    db.insert('users', row()).compile();
+    db.upsert('users', row(), 'email').compile();
+    db.update('users', row(), { id: 1 }).compile();
+    sql`SELECT ${cols(row())}, ${vals(row())}`.compile();
+    expect(reads).toBe(0);
+  });
+
+  it('a primitive keeps its own message, a String box with its characters its keys', () => {
+    expect({ primitive: failure(() => one(cols('id'))), box: one(vals(new String('id'))) })
+      .toEqual({ primitive: { name: 'Error', message: colsMessage('string') }, box: { text: '$1, $2', values: ['i', 'd'] } });
   });
 });
 
