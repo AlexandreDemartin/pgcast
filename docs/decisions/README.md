@@ -9,3 +9,4 @@ One note per ambiguous decision: context, options, proposed choice, then validat
 | [003](./003-fixes-and-deprecation.md) | Breaking fixes: fix, or deprecate | accepted (2026-11-12), revised after audit |
 | [004](./004-documentation-site.md) | The documentation site | accepted (2026-11-12) |
 | [005](./005-playground.md) | A playground in the browser | proposed (2026-11-13) |
+| [006](./006-subquery-conditions.md) | How `exists()` and `isInSelect()` refer to the outer query | accepted (2026-11-16), under the owner's delegation |
