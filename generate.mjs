@@ -1,6 +1,7 @@
 import mod from "./generate.js";
 
 export default mod;
+export const check = mod.check;
 export const crossSchemaTypesForAllTables = mod.crossSchemaTypesForAllTables;
 export const crossSchemaTypesForSchemas = mod.crossSchemaTypesForSchemas;
 export const crossTableTypesForTables = mod.crossTableTypesForTables;

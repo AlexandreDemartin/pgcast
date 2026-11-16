@@ -165,6 +165,12 @@ Candidates for a check, a rule or a skill line.
 - #567: a "reversible" or "compiles the same later" claim is replayed: one call relying on the default, run under the future option.
 - #567: a decision note's claims stay true across a fix round only if one harness replays them all and a script greps each SQL string of the note in its output.
 - #567: a replay row that runs SQL as written, with no helper, says so in the row itself.
+- #560: a new public function starts on the target behaviour of a pending deprecation, not on the deprecated default it would have to leave later (`check()` rejects by default, as 7.0's `generate()` will).
+- #560: in an extending tsconfig, `compilerOptions.paths` replaces the base's map: an entry added to `test/types/tsconfig.json` repeats the inherited ones.
+- #560: a probe database created by a short `node -e` is dropped by a concurrent `npm test` once its pid dies: create, use and drop it in one long-lived process.
+- #560: `zapatos/generate` has no counterpart of `website/check-reference.mjs`, so a new generate export's docs entry is not enforced by the build.
+- #560: a default set for one caller of a shared internal path is tested through each caller (the CLI too): the "default moved into `staleFiles()`" mutant died only by the CLI's test.
+- #560: in French, a query as the subject makes a possessive ambiguous (« sa promesse » read as the query's).
 
 ## Minors kept
 
@@ -201,3 +207,4 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #557 (form): `website/first-query.md` "Run `npx pgcast` again after each migration" and `website/install.md` `::: warning Stale schema`: a link to `/generator#check`, EN and FR.
 - #567 (form): `docs/decisions/README.md` lists 005 as "proposed (2026-11-13)", while the note says it was accepted that day.
 - #567 (form): note 006 types `isInSelect()` on the subquery column's `Selectable`, so an int4 key over an int8 column (`Int8String`) is refused though Postgres compares them, as `eq()` does.
+

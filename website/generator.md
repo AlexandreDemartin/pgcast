@@ -81,7 +81,28 @@ Run the generator without --check to write them.
 - `schema.d.ts` and, when there is a custom type, `custom/index.d.ts`, which each run then writes again, are compared byte for byte. A placeholder counts only when it is missing: it is yours to edit ([The files it writes](#the-files-it-writes)).
 - `outDir`, `outExt` and [`moduleNames`](#generate.moduleNames) name the files, as for a run: `src/pgcast/schema.ts` with `".ts"` and `"pgcast"`.
 - The notes of a run come first, through [`warningListener`](#generate.warningListener), but for the placeholders it would write. A failed query ends it with code 1, as it ends a run.
-- Only the CLI has it: `zapatos/generate` exports no function for it.
+
+`check()`, from `zapatos/generate`, runs the same check from code, for a script that builds its config there:
+
+```ts
+import { check, type Config } from 'zapatos/generate';
+
+check(config: Config): Promise<boolean>
+```
+
+```ts twoslash
+import { check } from 'zapatos/generate';
+// ---cut---
+const upToDate = await check({
+  db: { connectionString: process.env.DATABASE_URL },
+  outDir: './src',
+});
+if (!upToDate) process.exitCode = 1;
+```
+
+- It takes the config of [`generate()`](#generate), and resolves to `true` when every file matches. The exit code is yours to set.
+- It prints only through the listeners: a line per file that differs or is missing through [`warningListener`](#generate.warningListener), so with `console.log` by default; `The generated files in src/zapatos are up to date.` through [`progressListener`](#generate.progressListener). Not the CLI's last line, `Run the generator without --check to write them.`
+- A failed query rejects it with the error, before writing anything and with no note: unlike `generate()`, only [`rejectOnQueryError: false`](#generate.rejectOnQueryError) ends the process.
 
 ## `generate()` {#generate}
 
@@ -366,9 +387,9 @@ import type * as s from 'pgcast/schema';
 
 `boolean`, or left out; an opt-in. What a failed query does: a refused connection, a wrong password, a query Postgres refuses.
 
-- Left out, or `null`: as in Zapatos 6.6.1, the generator prints `*** error <n> ***` and the error with `console.log`, then ends the process with `process.exit(1)`; in between, it notes the option through [`warningListener`](#generate.warningListener). From 7.0, left out means `true` ([Versions](/versions)).
-- `false`: the same exit, with no note. It stays in 7.0 and 8.0: the exit is [the CLI](#cli)'s own path, and the CLI sets `false` over its config file and its argument.
-- `true`: rejects `generate()` with that error, as `pg` gives it, and prints nothing:
+- Left out, or `null`: as in Zapatos 6.6.1, the generator prints `*** error <n> ***` and the error with `console.log`, then ends the process with `process.exit(1)`; in between, it notes the option through [`warningListener`](#generate.warningListener). From 7.0, left out means `true` ([Versions](/versions)). [`check()`](#check), which Zapatos 6.6.1 doesn't have, reads it as `true` already, with no note.
+- `false`: the same exit, with no note, from `generate()` and `check()` alike. It stays in 7.0 and 8.0: the exit is [the CLI](#cli)'s own path, and the CLI sets `false` over its config file and its argument.
+- `true`: rejects `generate()` or `check()` with that error, as `pg` gives it, and prints nothing:
 
 ```ts twoslash
 import { generate } from 'zapatos/generate';
@@ -499,7 +520,7 @@ ALTER TABLE screenings ADD COLUMN intermission interval;
 
 ### `progressListener` {#generate.progressListener}
 
-`boolean`, or in `generate()` a function `(s: string) => void`; default `false`. `true` prints each step with `console.log`; a function gets each line.
+`boolean`, or in `generate()` a function `(s: string) => void`; default `false`. `true` prints each step with `console.log`; a function gets each line. From [`check()`](#check), one line: `The generated files in src/zapatos are up to date.`
 
 ```txt
 (Re)creating schema folder: src/zapatos/schema.d.ts
@@ -552,8 +573,10 @@ Writing custom types file: src/zapatos/custom/index.d.ts
 - `Note: unknown flag --chek ignored: the only flag is --check, before or after the JSON argument.`
   - from [the CLI](#cli), before generating or checking, for each argument after `config` that starts with `--` and is not `--check`;
 - `Note: a query failed, so generate() ends the process with process.exit(1), and its promise never settles (PGCAST_DEP006). Set rejectOnQueryError: true to reject with the error instead; it will be the default in pgcast 7.0.`
-  - without [`rejectOnQueryError`](#generate.rejectOnQueryError), when a query fails, after the error and just before the exit;
-- the [old layout warning](#the-old-layout-warning).
+  - from `generate()` without [`rejectOnQueryError`](#generate.rejectOnQueryError), when a query fails, after the error and just before the exit;
+- the [old layout warning](#the-old-layout-warning);
+- `Out of date: src/zapatos/schema.d.ts` and `Missing: src/zapatos/custom/PgSeat_label.d.ts`
+  - from [`check()`](#check), for each file that differs or is missing, after the notes of a run.
 
 ### `debugListener` {#generate.debugListener}
 
