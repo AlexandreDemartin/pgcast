@@ -1113,6 +1113,57 @@ describe('a built-in object as a filter', () => {
   });
 });
 
+describe('a built-in object in cols() and vals()', () => {
+  it('rejects run() before any query for one with no own enumerable key or a Buffer, through sql, insert, update and updateValues', async () => {
+    // 6.6.1 ran SELECT  FROM users for a Date, or stored a one-byte Buffer as '97' (#529)
+    const
+      outcomes: Record<string, string> = {},
+      query = vi.spyOn(t.client, 'query');
+    try {
+      for (const [name, x] of Object.entries(builtinObjects())) {
+        if (!Buffer.isBuffer(x) && Object.keys(x).length > 0) continue;  // own keys: compiled as before
+        const queries = {
+          selectCols: sql`SELECT ${db.cols(x)} FROM ${'users'}`,
+          updateVals: sql`UPDATE ${'users'} SET ${'display_name'} = ${vals(x)} WHERE ${'id'} = 1`,
+          insert: db.insert('users', x as any),
+          update: db.update('users', x as any, { id: 1 }),
+          updateValues: db.upsert('users', { email: 'a@b.org', display_name: 'injected' }, 'email', { updateValues: { display_name: vals(x as any) } }),
+        };
+        for (const [where, q] of Object.entries(queries)) {
+          let outcome: string;
+          try {
+            outcome = await q.run(t.client).then(() => 'ran', (err: { code?: string, message: string }) =>
+              /^`db\.(cols|vals)\(\)` takes an object or an array, not a /.test(err.message) ? 'throws' : err.code ?? err.message);
+          } catch (err) {
+            outcome = `throws at the call: ${(err as Error).message}`;  // nothing to insert or update, as before
+          }
+          outcomes[`${name} ${where}`] = outcome;
+        }
+      }
+      expect(query).not.toHaveBeenCalled();
+    } finally {
+      query.mockRestore();
+    }
+    expect(Object.entries(outcomes).filter(([, outcome]) => outcome !== 'throws' && !outcome.startsWith('throws at the call: nothing to'))).toEqual([]);
+    expect(await adaName()).toBe('Ada');
+  });
+
+  it('a one-byte Buffer as a value rejects, and the row keeps its value', async () => {
+    // 6.6.1: UPDATE users SET display_name = $1 with 97, and Ada's name became '97'
+    await expect(sql`UPDATE ${'users'} SET ${'display_name'} = ${vals(Buffer.from('a'))} WHERE ${'id'} = 1`.run(t.client))
+      .rejects.toThrow('`db.vals()` takes an object or an array, not a `Buffer`');
+    expect(await adaName()).toBe('Ada');
+  });
+
+  it('a Date given a hostile own key stays one column name, as a plain object of it does', async () => {
+    const key = `x"; UPDATE users SET display_name = 'injected'; --`;  // under 63 bytes, which Postgres keeps of a name
+    const x = Object.assign(new Date(0), { [key]: 'injected' });
+    expect(await pgError(t.client, () => sql`UPDATE ${'users'} SET (${db.cols(x)}) = ROW(${vals(x)}) WHERE ${'id'} = 1`.run(t.client)))
+      .toEqual({ code: '42703', message: `column "${key}" of relation "users" does not exist` });
+    expect(await adaName()).toBe('Ada');
+  });
+});
+
 describe('a list that is not an array in isIn() and isNotIn()', () => {
   it('rejects run() before any query, through deletes, select and update, nested in and(), or() and not(), and copied', async () => {
     // 6.6.1 ran DELETE … WHERE ((true)) for isNotIn(new Set([1, 2])), every row (#235)
