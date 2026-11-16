@@ -11,9 +11,10 @@ import { fileURLToPath } from 'node:url';
 const
   dist = fileURLToPath(new URL('.vitepress/dist/', import.meta.url)),
   checkout = fileURLToPath(new URL('..', import.meta.url)).replace(/[\\/]$/, ''),
-  // with a name after it: `/home/` alone, as a page may write it, is no machine's; a drive is a capital letter with a
-  // folder after it (`C:\Users\…`), so that minified code such as Monaco's `e:/[+` is not one
-  absolute = /(?<![\w/.])(?:\/(?:home|Users|runner)\/|[A-Z]:[\\/](?=[\w.-]+[\\/]))[^\s"'`<>()]+/g,
+  // with a name after it: `/home/` alone, as a page may write it, is no machine's, escaped too (`/home/&lt;`, in the
+  // changelog feed); a drive is a capital letter with a folder after it (`C:\Users\…`), so that minified code such as
+  // Monaco's `e:/[+` is not one
+  absolute = /(?<![\w/.])(?:\/(?:home|Users|runner)\/|[A-Z]:[\\/](?=[\w.-]+[\\/]))[^\s"'`<>()&]+/g,
   // @types/node's example of `process.env`, in the hover of `process.env`; the home folders of PGlite's own file system,
   // in memory, in the playground's Postgres
   allowed = new Set(['/Users/maciej', '/home/web_user', '/home/postgres', '/home/postgres/.pgpass']),
