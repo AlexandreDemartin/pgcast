@@ -260,11 +260,12 @@ Run the file, and it prints the new row:
   tagline: null,
   studio_id: 1002,
   release_year: 2024,
+  title_search: "'ferri':3 'night':2 'orkesund':5",
   runtime_minutes: 117
 }
 ```
 
-The columns you left out took their defaults: the new `id` from its sequence, `genres` as `[]`, `tagline` as `null`. On a freshly loaded docs schema, the first film you add gets the `id` 1, as the seeded films start at 1000; each run after that adds it again, with the next `id`.
+The columns you left out took their defaults: the new `id` from its sequence, `genres` as `[]`, `tagline` as `null`. `title_search`, a generated column, holds the title's words, stemmed, for [full-text search](/conditions#full-text). On a freshly loaded docs schema, the first film you add gets the `id` 1, as the seeded films start at 1000; each run after that adds it again, with the next `id`.
 
 A `NOT NULL` column with no default can't be left out. Forget the running time, and TypeScript says so before Postgres can:
 

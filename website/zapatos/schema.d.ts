@@ -425,6 +425,12 @@ declare module 'zapatos/schema' {
       * - `NOT NULL`, no default
       */
       title: string;
+      /**
+      * **films.title_search**
+      * - `tsvector` in database
+      * - Generated column
+      */
+      title_search: c.PgTsvector | null;
     }
     export interface JSONSelectable {
       /**
@@ -469,6 +475,12 @@ declare module 'zapatos/schema' {
       * - `NOT NULL`, no default
       */
       title: string;
+      /**
+      * **films.title_search**
+      * - `tsvector` in database
+      * - Generated column
+      */
+      title_search: c.PgTsvector | null;
     }
     export interface Whereable {
       /**
@@ -513,6 +525,12 @@ declare module 'zapatos/schema' {
       * - `NOT NULL`, no default
       */
       title?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+      /**
+      * **films.title_search**
+      * - `tsvector` in database
+      * - Generated column
+      */
+      title_search?: c.PgTsvector | db.Parameter<c.PgTsvector> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgTsvector | db.Parameter<c.PgTsvector> | db.SQLFragment | db.ParentColumn>;
     }
     export interface Insertable {
       /**

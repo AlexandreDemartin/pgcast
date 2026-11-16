@@ -1,5 +1,5 @@
 ---
-english: c31045ed332e
+english: 42b2738ed6a3
 ---
 
 # Conditions {#db-conditions}
@@ -23,8 +23,8 @@ Chaque membre est un fragment [`sql`](/fr/sql-template#sql) écrit autour de [`d
 
 - **Où** : comme valeur d’un Whereable, donc dans le `where` de [`select()`](/fr/select#select), [`count()`](/fr/select#count), [`update()`](/fr/insert#update) et [`deletes()`](/fr/insert#deletes), le `having` de `select()`, et un Whereable dans un template `sql`. Ailleurs, `self` n’a pas de colonne : `` db.sql`SELECT ${db.conditions.isNull}` `` lève "The 'self' column alias has no meaning here"<!-- message --> à la compilation.
   - [`and()`](#conditions.and), [`or()`](#conditions.or) et [`not()`](#conditions.not) prennent aussi des Whereables, et peuvent donc former tout un `where` ; [`now`](#conditions.now), [`fromNow()`](#conditions.fromNow) et [`exists()`](#conditions.exists) ne contiennent pas de `self`, et vont partout.
-- **Valeurs** : chaque valeur est un paramètre, `$1`, sauf un [`Parameter`](/fr/sql-template#Parameter), gardé tel quel avec son cast ; un fragment `sql`, écrit comme son SQL ; et [`parent()`](/fr/sql-template#parent), la colonne de la requête parente dans une sous-requête `lateral`, ou dans le `where` d’[`exists()`](#conditions.exists) et d’[`isInSelect()`](#conditions.isInSelect), dont l’option `parent` nomme cette table. `Default`, `self`, `raw()`, `cols()` et `vals()` lèvent une erreur : [Les valeurs qu’une condition refuse](#refused-values). [`eqAny()`](#conditions.eqAny) envoie son tableau en un seul paramètre de valeurs simples : un élément qui est l’un d’eux lève une erreur, et à la place du tableau, `eqAny()` ne prend que `parent()`.
-- **Type** : une condition est un `SQLFragment` dont le second argument de type, `T`, est le type de la valeur à laquelle elle compare (sa `Constraint`, [`sql`](/fr/sql-template#sql)) ; le Whereable vérifie `T` contre le type de la colonne. Les huit tests, `now` et `fromNow()` n’ont pas de `T`, et passent sur n’importe quelle colonne.
+- **Valeurs** : chaque valeur est un paramètre, `$1`, sauf un [`Parameter`](/fr/sql-template#Parameter), gardé tel quel avec son cast ; un fragment `sql`, écrit comme son SQL ; et [`parent()`](/fr/sql-template#parent), la colonne de la requête parente dans une sous-requête `lateral`, ou dans le `where` d’[`exists()`](#conditions.exists) et d’[`isInSelect()`](#conditions.isInSelect), dont l’option `parent` nomme cette table. `Default`, `self`, `raw()`, `cols()` et `vals()` lèvent une erreur : [Les valeurs qu’une condition refuse](#refused-values). [`eqAny()`](#conditions.eqAny) envoie son tableau en un seul paramètre de valeurs simples : un élément qui est l’un d’eux lève une erreur, et à la place du tableau, `eqAny()` ne prend que `parent()`. [`websearchToTsquery()`](#conditions.websearchToTsquery) prend deux valeurs simples : `Default`, `self`, `raw()`, `cols()`, `vals()`, un `Parameter`, un fragment ou `parent()` y lève une erreur.
+- **Type** : une condition est un `SQLFragment` dont le second argument de type, `T`, est le type de la valeur à laquelle elle compare (sa `Constraint`, [`sql`](/fr/sql-template#sql)) ; le Whereable vérifie `T` contre le type de la colonne. Les huit tests, `now` et `fromNow()` n’ont pas de `T`, et passent sur n’importe quelle colonne ; le `T` de [`websearchToTsquery()`](#conditions.websearchToTsquery) est un type que seule une colonne typée `any` accepte, comme l’est une colonne `tsvector`.
   - Un Whereable est aussi une expression : interpolé dans une liste `SELECT`, `{ runtime_minutes: add(10) }` est la durée de chaque film plus dix, `(("runtime_minutes" + $1))`<!-- probe: db.sql`${{ runtime_minutes: db.conditions.add(10) }}` -->. Le type laisse donc passer, comme valeur d’un Whereable, ce qui n’est pas un test : [`add()`](#conditions.add), [`subtract()`](#conditions.subtract), [`now`](#conditions.now) et [`fromNow()`](#conditions.fromNow), que Postgres refuse seuls dans un `where` (42804).
 
 Une valeur d’un autre type ne compile pas :
@@ -465,6 +465,66 @@ db.select('actors', { name: db.conditions.isInSelect('roles', db.all, 'actor_id'
 - **Sous `not()`**, elle ne trouve aucune ligne dès que la sous-requête renvoie un `NULL`, vu la façon dont Postgres lit `NOT IN` : `{ id: not(isInSelect('crew', db.all, 'mentor_id')) }` ne trouve personne, car un `mentor_id` est `NULL`. Pour l’anti-jointure, écrivez `not(exists(…))` (voir plus haut).
 - **Comme `where` entier**, hors d’une clé, elle n’a pas de colonne : le type l’y refuse, seule, sous `not()` ou dans `and()` (TS2345), et en code non typé, elle lève "The 'self' column alias has no meaning here".
 
+## Recherche plein texte : `websearchToTsquery()` {#full-text}
+
+Une recherche sur une colonne `tsvector` : les mots d’un texte, tels qu’une configuration de recherche plein texte les racinise. La colonne `films.title_search` du schéma de la doc est une colonne générée, `to_tsvector('english', title)`, que Postgres tient à jour, avec un index GIN ([la doc de Postgres](https://www.postgresql.org/docs/current/textsearch-tables.html)).
+
+<CastPanel example="conditions_websearchToTsquery">
+
+<<< ../examples/conditions_websearchToTsquery.ts{ts twoslash}
+
+</CastPanel>
+
+### `websearchToTsquery()` {#conditions.websearchToTsquery}
+
+```ts
+db.conditions.websearchToTsquery<T = TsvectorColumn>(config: string, query: string): SQLFragment<boolean | null, T>
+```
+
+`"col" @@ websearch_to_tsquery(CAST($1 AS "regconfig"), $2)`<!-- probe: db.sql`${{ col: db.conditions.websearchToTsquery('english', 'lanterns') }}` -->, la configuration et la requête en deux paramètres. Postgres lit la requête comme le fait un champ de recherche et ne lève jamais d’erreur de syntaxe : il prend donc telle quelle la saisie d’un utilisateur. Sur `title_search` :
+
+| Requête | Postgres lit | Correspond à |
+|---|---|---|
+| `lanterns` | `'lantern'`, la racine | A Lantern for Edith |
+| `salt orchard` | `'salt' & 'orchard'`, chaque mot | The Salt Orchard |
+| `"orchard salt"` | `'orchard' <-> 'salt'`, la phrase dans cet ordre | aucun |
+| `salt or lantern` | `'salt' \| 'lantern'` | The Salt Orchard, A Lantern for Edith |
+| `-salt orchard` | `!'salt' & 'orchard'` | aucun |
+| `salt & lantern`, `salt \| lantern` | `'salt' & 'lantern'` : `&` et `\|` ne sont pas des opérateurs | aucun |
+| `lant:*` | `'lant'` : pas de préfixe | aucun |
+| `the` | aucun mot, rien qu’un terme courant : Postgres envoie un avis | aucun |
+
+- **La configuration** : nommez celle qui a construit le vecteur de la colonne, car la requête doit avoir les mêmes racines : `websearchToTsquery('simple', 'lanterns')` cherche `'lanterns'`, que `title_search` ne contient pas. Sans elle, Postgres prendrait `default_text_search_config`, un réglage du serveur ou de la session : la condition la nomme donc toujours. Postgres la cherche dans le `search_path` (`'pg_catalog.english'` marche aussi), et une configuration qu’il ne connaît pas donne l’erreur 42704, « <span lang="en">text search configuration "klingon" does not exist</span> ». Une configuration à vous, construite sur `unaccent` par exemple, est un nom comme un autre.
+- **`NULL`** : un vecteur `NULL` donne `NULL`, donc la ligne ne correspond ni à la condition ni à son [`not()`](#conditions.not).
+- **Type** : son `T` est [`TsvectorColumn`](#conditions.TsvectorColumn), que seule une colonne typée `any` accepte : une colonne `tsvector`, par son placeholder `PgTsvector` laissé tel que généré ([Types personnalisés](/fr/custom-types)). Une colonne `text` ne compile pas : Postgres lirait `text @@ tsquery`, et construirait le vecteur avec `default_text_search_config`, pas avec la configuration donnée. Une fois le placeholder modifié, donnez son type, `websearchToTsquery<PgTsvector>(…)`, ou pour une `string`, `db.conditions.websearchToTsquery<string>('english', 'lanterns')`<!-- tsc: db.select('films', { title_search: … }) -->.
+
+```ts twoslash
+// @errors: 2322
+import * as db from 'zapatos/db';
+// ---cut---
+db.select('films', { title: db.conditions.websearchToTsquery('english', 'lanterns') });
+```
+
+- **Les autres parseurs** : `to_tsquery()` lit `&`, `|`, `!` et les préfixes, `lant:*`, et lève une erreur de syntaxe sur un `&` isolé saisi par un utilisateur : il n’a donc pas de condition dédiée. Écrivez un fragment `sql`, la configuration castée en `regconfig`, `"title_search" @@ to_tsquery(CAST($1 AS "regconfig"), $2)`<!-- probe: db.sql`${{ title_search: db.sql`${db.self} @@ to_tsquery(${db.param('english', 'regconfig')}, ${db.param('lant:*')})` }}` --> :
+
+```ts twoslash
+import * as db from 'zapatos/db';
+// ---cut---
+db.select('films', { title_search: db.sql`${db.self} @@ to_tsquery(${db.param('english', 'regconfig')}, ${db.param('lant:*')})` });
+```
+
+`Default`, `self`, `raw()`, `cols()`, `vals()`, un `Parameter`, un fragment `sql` ou `parent()` comme configuration ou comme requête ne compile pas (TS2345). En code non typé, la condition lève une erreur à la compilation de la requête, avec un message qui nomme la valeur :
+
+> `` `websearchToTsquery()` sends its configuration and its query as parameters: give the query as a string, not `db.param()`; for SQL, write a `sql` fragment with `db.self` in place of the condition. ``<!-- message -->
+
+### `TsvectorColumn` {#conditions.TsvectorColumn}
+
+```ts
+interface TsvectorColumn
+```
+
+Le `T` par défaut de [`websearchToTsquery()`](#conditions.websearchToTsquery) : un type que seule une colonne typée `any` accepte. Il n’existe que dans le type, sans valeur.
+
 ## Dates et heures {#dates}
 
 [`after()`](#conditions.after) et [`before()`](#conditions.before) comparent à une valeur : un `Date`, une chaîne ISO 8601 avec son décalage (`'2030-03-01T20:00:00Z'`, un `TimestampTzString` ; le type refuse une autre forme comme `'2030-03-02'`, TS2322), ou l’un des deux fragments ci-dessous. `pg` envoie un `Date` comme une chaîne dans le fuseau horaire local, avec son décalage : sur une colonne `timestamptz`, le même instant. Sur une colonne `date`, Postgres garde le jour local et laisse tomber l’heure : `eq(new Date(2030, 2, 1, 23, 30))` correspond à `2030-03-01`, et `lt()` du même `Date`, non.
@@ -546,7 +606,7 @@ Le type ne vérifie pas un fragment : un `int4` sur une colonne `timestamptz` p
 
 ## Les valeurs qu’une condition refuse {#refused-values}
 
-`Default`, `self`, `raw()`, `cols()` et `vals()` n’ont pas de sens comme valeur d’une condition. Le type les refuse (TS2322, ou TS2345 là où la condition borne son argument : un motif, la seconde borne d’un intervalle, une condition de tableau, `add()`, `subtract()` ; TS2769 comme liste d’`eqAny()`).
+`Default`, `self`, `raw()`, `cols()` et `vals()` n’ont pas de sens comme valeur d’une condition. Le type les refuse (TS2322, ou TS2345 là où la condition borne son argument : un motif, la seconde borne d’un intervalle, une condition de tableau, `add()`, `subtract()`, `websearchToTsquery()` ; TS2769 comme liste d’`eqAny()`).
 
 À l’exécution, c’est la compilation de la condition qui lève l’erreur, pas son appel : `run()` est donc rejetée avec une simple `Error` avant toute requête.
 
@@ -562,6 +622,7 @@ Zapatos 6.6.1 envoyait `Default` et `self` comme les chaînes `'Symbol(DEFAULT)'
 | `` `db.raw()`, `db.cols()` and `db.vals()` have no meaning as a value in a Whereable (a filter), nor in `isIn()`: to compare with SQL, use a `sql` fragment value, where `db.self` stands for the column; to compare with a value, give the value itself, or `db.param()`. ``<!-- message --> | `raw()`, `cols()` ou `vals()` dans `isIn()` ou `isNotIn()` |
 | `` `eqAny()` takes an array of values, not `db.Default`: write `eqAny(values)`; for SQL, write a `sql` fragment with `db.self` in place of the condition. ``<!-- message --> | `Default` comme liste d’[`eqAny()`](#conditions.eqAny) ; `self`, `raw()`, `cols()`, `vals()`, un `Parameter` ou un fragment `sql` au même endroit reçoit le même message, qui le nomme |
 | `` `eqAny()` sends its array as one parameter, so each item is a plain value, not `db.Default`: give a value. ``<!-- message --> | `Default` comme élément d’`eqAny()` ; `self`, `raw()`, `cols()` ou `vals()` au même endroit reçoit le même message, qui le nomme |
+| `` `websearchToTsquery()` sends its configuration and its query as parameters: give the configuration as a string, not `db.Default`; for SQL, write a `sql` fragment with `db.self` in place of the condition. ``<!-- message --> | `Default` comme configuration de [`websearchToTsquery()`](#conditions.websearchToTsquery) ; comme requête, le message dit `query` ; `self`, `raw()`, `cols()`, `vals()`, un `Parameter`, un fragment `sql` ou `parent()` reçoit le même message, qui le nomme |
 | `The 'self' column alias has no meaning here`<!-- message --> | une condition où `self` n’a pas de colonne : dans un template `sql` hors d’un Whereable, dans le `updateValues` d’`upsert()`, dans le `where` d’`exists()` ou d’`isInSelect()`, et `isInSelect()` hors d’une clé |
 | `The 'parent' table alias has no meaning here`<!-- message --> | `parent()` dans une condition hors d’une sous-requête `lateral`, ou dans le `where` d’`exists()` ou d’`isInSelect()` sans `parent` |
 

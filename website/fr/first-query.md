@@ -1,5 +1,5 @@
 ---
-english: 89707293e31e
+english: 2246e8006422
 ---
 
 # Première requête
@@ -264,11 +264,12 @@ Exécutez le fichier, et il affiche la nouvelle ligne :
   tagline: null,
   studio_id: 1002,
   release_year: 2024,
+  title_search: "'ferri':3 'night':2 'orkesund':5",
   runtime_minutes: 117
 }
 ```
 
-Les colonnes que vous avez omises ont pris leur valeur par défaut : le nouvel `id` depuis sa séquence, `genres` à `[]`, `tagline` à `null`. Sur un schéma de la doc fraîchement chargé, le premier film que vous ajoutez reçoit l’`id` 1, car les films chargés par le seed commencent à 1000 ; chaque exécution suivante l’ajoute de nouveau, avec l’`id` suivant.
+Les colonnes que vous avez omises ont pris leur valeur par défaut : le nouvel `id` depuis sa séquence, `genres` à `[]`, `tagline` à `null`. `title_search`, une colonne générée, contient les mots du titre, racinisés, pour la [recherche plein texte](/fr/conditions#full-text). Sur un schéma de la doc fraîchement chargé, le premier film que vous ajoutez reçoit l’`id` 1, car les films chargés par le seed commencent à 1000 ; chaque exécution suivante l’ajoute de nouveau, avec l’`id` suivant.
 
 Une colonne `NOT NULL` sans valeur par défaut ne peut pas être omise. Oubliez la durée, et TypeScript le signale avant que Postgres ne le puisse :
 
