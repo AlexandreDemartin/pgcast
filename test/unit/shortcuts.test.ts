@@ -2011,6 +2011,16 @@ describe('a built-in row among several in insert() and upsert()', () => {
     expect(queryable.query).not.toHaveBeenCalled();
   });
 
+  it('with undefinedMeansMissing, an empty Buffer row whose own keys are undefined still throws nothing to update or insert at the call', () => {
+    // as on master, where undefinedAsMissing rebuilt it into `{}`
+    db.setConfig({ undefinedMeansMissing: true });
+    const x = () => Object.assign(Buffer.alloc(0), { email: undefined }) as any;
+    expect(() => db.update('users', x(), { id: 1 })).toThrow('nothing to update: an Updatable needs at least one column');
+    for (const values of [x(), [x()], [x(), x()], [new Date(0), x()]]) {
+      expect(() => db.upsert('users', values, 'email')).toThrow(nothingToInsert);
+    }
+  });
+
   it('a row with no own key alone in an array, or only such rows, still throws nothing to insert at the call', () => {
     for (const values of [[new Date(0)], [new Date(0), new Map()], [Buffer.alloc(0)], [new Date(0), {}]]) {
       expect(() => db.insert('users', values as any)).toThrow(nothingToInsert);

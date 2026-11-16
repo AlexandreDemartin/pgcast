@@ -200,8 +200,16 @@ function updateValuesKeys(updateValues: { [k: string]: any }, updated: string[])
 // so say so before any query, as update() does
 const nothingToInsert = 'nothing to insert: an Insertable needs at least one column; for a row of defaults only, write INSERT ... DEFAULT VALUES in a sql template';
 
-// a Buffer's bytes are its keys, so one with bytes has keys, which are not listed: one per byte, a long one took seconds
-const hasOwnKey = (row: object) => (isRefusedBuffer(row) && (row as Buffer).length > 0) || Object.keys(row).length > 0;
+// a Buffer's bytes are its keys, so one with bytes has keys, which are not listed: one per byte, a long one took seconds;
+// undefinedAsMissing leaves a Buffer as it is, so for update() and upsert() (`undefinedIsMissing`), with
+// undefinedMeansMissing, an empty one's undefined keys are left out here, as from the `{}` it rebuilt one into before
+// #543: "nothing to update" or "nothing to insert" is still thrown at the call
+const hasOwnKey = (row: object, undefinedIsMissing = false) => {
+  if (!isRefusedBuffer(row)) return Object.keys(row).length > 0;
+  if ((row as Buffer).length > 0) return true;
+  return undefinedIsMissing && (getConfig().undefinedMeansMissing ?? false) ?
+    Object.values(row).some(v => v !== undefined) : Object.keys(row).length > 0;
+};
 
 interface InsertSignatures {
   <T extends Table, C extends ColumnsOption<T>, E extends ExtrasOption<T>>(
@@ -264,7 +272,7 @@ export const insert: InsertSignatures = function (
 
     // a null row on its own, or a primitive row anywhere, fails in compile(), in cols() or vals(), so run() rejects;
     // so does a built-in row completeKeysWithDefaultValue leaves, unless no row has a key
-    if (firstRow != null && !anyPrimitive && !(Array.isArray(completedValues) ? completedValues : [firstRow]).some(hasOwnKey)) throw new Error(nothingToInsert);
+    if (firstRow != null && !anyPrimitive && !(Array.isArray(completedValues) ? completedValues : [firstRow]).some(row => hasOwnKey(row))) throw new Error(nothingToInsert);
     query = sql`INSERT INTO ${table} (${colsSQL}) VALUES ${valuesSQL} RETURNING ${returningSQL}${extrasSQL} AS result`;
   }
 
@@ -467,6 +475,7 @@ export const upsert: UpsertSignatures = function (
   // punt a null or primitive row, alone or among others, or a Buffer row alone, to plain insert too, whose cols() or
   // vals() refuse it as the query compiles; a null row among others is read as `{}`, as insert reads it
   if (Array.isArray(values) && values.some(isPrimitive)) return insert(table, values);
+  if (!Array.isArray(values) && isRefusedBuffer(values) && !hasOwnKey(values, true)) throw new Error(nothingToInsert);
   if (!Array.isArray(values) && (values == null || isPrimitive(values) || isRefusedBuffer(values))) return insert(table, values);
   if (typeof conflictTarget === 'string') conflictTarget = [conflictTarget];  // now either Column[] or Constraint
   values = undefinedAsMissing(values, false);
@@ -478,8 +487,12 @@ export const upsert: UpsertSignatures = function (
   if (specifiedUpdateColumns && !Array.isArray(specifiedUpdateColumns)) specifiedUpdateColumns = [specifiedUpdateColumns];
 
   const completedValues = Array.isArray(values) ? completeKeysWithDefaultValue(values, Default) : [values];
-  // so is a built-in row among others, which completeKeysWithDefaultValue leaves as it is, where it copies the others
-  if (Array.isArray(values) && completedValues.some((row, i) => row === (values as Insertable[])[i])) return insert(table, values);
+  // so is a built-in row among others, which completeKeysWithDefaultValue leaves as it is, where it copies the others;
+  // an empty Buffer's undefined keys are left out first, as for one row (with no Buffer, insert() counts the same keys)
+  if (Array.isArray(values) && completedValues.some((row, i) => row === (values as Insertable[])[i])) {
+    if (completedValues.some(isRefusedBuffer) && !completedValues.some(row => hasOwnKey(row, true))) throw new Error(nothingToInsert);
+    return insert(table, values);
+  }
   const
     firstRow = completedValues[0],
     insertColsSQL = cols(firstRow),
@@ -571,7 +584,7 @@ export const update: UpdateSignatures = function (
   values = undefinedAsMissing(values, false);
   // `SET () = ROW()` is a syntax error in Postgres, so say so before any query; a null or primitive row fails in
   // compile(), in cols(), so run() rejects
-  if (values != null && !isPrimitive(values) && !hasOwnKey(values)) throw new Error('nothing to update: an Updatable needs at least one column');
+  if (values != null && !isPrimitive(values) && !hasOwnKey(values, true)) throw new Error('nothing to update: an Updatable needs at least one column');
 
   // note: the ROW() constructor below is required in Postgres 10+ if we're updating a single column
   // more info: https://www.postgresql-archive.org/Possible-regression-in-UPDATE-SET-lt-column-list-gt-lt-row-expression-gt-with-just-one-single-column0-td5989074.html
