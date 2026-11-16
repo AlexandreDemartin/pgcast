@@ -233,8 +233,9 @@ interface InsertSignatures {
  * them, throw before any query (for a row of defaults, `DEFAULT VALUES` in a
  * `sql` template). A `null` row given on its own, not in an array, or a
  * primitive row (a string, a number…) throws as the query compiles, so `run()`
- * rejects before any query, and so does a `Buffer` row or a built-in row with
- * no own enumerable key (a `Date`, a `Map`…) beside a row with keys, which
+ * rejects before any query, and so does a `Buffer` row with bytes or keys,
+ * alone in an array too, or a built-in row with no own enumerable key (a
+ * `Date`, a `Map`…) beside a row with keys, which
  * `upsert()` refuses too; a `null` row in an array gives `DEFAULT` for each
  * column of the others. An `undefined` value is sent as `NULL`, and emits a `DeprecationWarning`
  * (`PGCAST_DEP002`), once; with the `undefinedMeansMissing` config option (the
