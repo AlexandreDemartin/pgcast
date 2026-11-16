@@ -95,6 +95,7 @@ Candidates for a check, a rule or a skill line.
 - #541: an order-dependent type test needs a `tsc` program with a fixed `files` order; `AGENTS.md`'s `test:types` row and skill `type-tests` should name the programs `test:types` runs (`test/types-opt-in`, `test/types-order`).
 - #541: merging #539 left `bench:types` at +4.4 % without refreshing the baseline, and #541's update absorbed it: a PR that moves the bench refreshes the baseline, or says how much of a change is inherited.
 - #537: a merge of master into a release branch puts master's new unreleased lines straight into the release section when its bodies are untouched; a sorted comparison of master's `[Unreleased]` against the release section checks nothing went astray.
+- #544: a release leaves implicit "in progress" phrases ("those 6.7 still brings") that a grep for "in progress" or "not on npm" misses; grep "still|yet|until" next to the version number too.
 
 ## Minors kept
 

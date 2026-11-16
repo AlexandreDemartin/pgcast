@@ -68,13 +68,9 @@ Then set `"moduleNames": "pgcast"` in `pgcastconfig.json`, the generator's confi
 
 Yarn 2 and later need a version range in an alias, and Yarn 1 and bun before 1.4 write none without one: hence the `@^6.7`, the first release with `moduleNames`.
 
-::: info Coming
-6.7.0 isn't on npm yet: 6.6.2 reads only `zapatosconfig.json`, ignores `moduleNames` and writes `zapatos/`, and the yarn and bun commands find no version. Until then, install under the `zapatos` alias ([the milestone](https://github.com/AlexandreDemartin/pgcast/milestone/1)).
-:::
-
 ### Under the `zapatos` alias
 
-For a project switching from Zapatos, whose imports stay `zapatos/*`, and for a new one until 6.7.0:
+For a project switching from Zapatos, whose imports stay `zapatos/*`:
 
 ::: code-group
 

@@ -1,5 +1,5 @@
 ---
-english: 062a04037b46
+english: 5fd4c17aa9d8
 ---
 
 # Installation
@@ -72,13 +72,9 @@ Indiquez ensuite `"moduleNames": "pgcast"` dans `pgcastconfig.json`, le fichier 
 
 Yarn 2 et les versions suivantes exigent une plage de versions dans un alias, et Yarn 1 et bun avant 1.4 n’en écrivent aucune sans elle : d’où le `@^6.7`, la première version qui a `moduleNames`.
 
-::: info À venir
-La 6.7.0 n’est pas encore sur npm : la 6.6.2 ne lit que `zapatosconfig.json`, ignore `moduleNames` et écrit `zapatos/`, et les commandes yarn et bun ne trouvent aucune version. D’ici là, installez-le sous l’alias `zapatos` ([le jalon](https://github.com/AlexandreDemartin/pgcast/milestone/1)).
-:::
-
 ### Sous l’alias `zapatos` {#under-the-zapatos-alias}
 
-Pour un projet qui vient de Zapatos, dont les imports restent `zapatos/*`, et pour un nouveau projet jusqu’à la 6.7.0 :
+Pour un projet qui vient de Zapatos, dont les imports restent `zapatos/*` :
 
 ::: code-group
 

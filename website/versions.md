@@ -12,7 +12,7 @@ The module names are still `zapatos/db` and `zapatos/schema`, and the generated 
 The numbers follow [SemVer](https://semver.org/), read from the side of a project on 6.6.1:
 
 - A patch fixes: 6.6.2 closes the security holes that pgcast's characterisation of 6.6.1 found.
-- A minor adds: 6.7.0 brings the opt-ins below, with fixes and new features.
+- A minor adds: 6.7.0, on npm as [`@pgcast/pgcast`](https://www.npmjs.com/package/@pgcast/pgcast), brings the opt-ins below, with fixes and new features.
 - Only a major may change a result that working code can rely on, so a range such as `^6.6.2` never brings one of those.
 
 Zapatos broke things in its majors too, each at once: 1.0 renamed the transaction types, 2.0 made the last argument of `upsert()` an options object, 6.0 put the schema in the names of tables and enums outside `public`. Each came with notes on what to rewrite.
@@ -81,17 +81,13 @@ Where `undefined` meant "clear it", `null` says so under either setting, and nev
 
 ## 7.0 and 8.0
 
-7.0 turns on by default the opt-ins that decision 003 lists: `upsertRequiresSameKeys`, `undefinedMeansMissing`, `transactionRequiresCommit`, `aggregatesTypedByColumn`, `transactionRequiresIdleClient`, `transactionRequiresSatisfyingLevel` and those 6.7 still brings, except `selectExactlyOneChecksForSecondRow`, which stays off.
+7.0 turns on by default the opt-ins that decision 003 lists: `upsertRequiresSameKeys`, `undefinedMeansMissing`, `transactionRequiresCommit`, `aggregatesTypedByColumn`, `transactionRequiresIdleClient`, `transactionRequiresSatisfyingLevel` and the generator's (below), except `selectExactlyOneChecksForSecondRow`, which stays off.
 
 Decision 003 makes that the whole of 7.0's break, and the warnings announce it, so a project that has turned every option on, and sees no `PGCAST_DEP` warning nor generator note, has nothing to change. The old behaviours go in 8.0, except three, which stay: `rejectOnQueryError: false`, `enumArraysTypedAsText: false` and `intervalsTypedAsObjects: false` (below).
 
 The generator gets opt-ins of its own in 6.7: [`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas), which types an enum of another schema by its labels, [`enumOrder`](/generator#generate.enumOrder), which keeps an enum's labels in their declared order, [`rejectOnQueryError`](/generator#generate.rejectOnQueryError), which rejects `generate()` on a failed query rather than end the process, [`uniqueIndexConstraintsOnly`](/generator#generate.uniqueIndexConstraintsOnly), which lists in `UniqueIndex` only the names `ON CONFLICT ON CONSTRAINT` takes, [`domainsTypedByContext`](/generator#generate.domainsTypedByContext), which types a domain over `bigint`, `numeric`, `bytea`, `money` or a date, or over an array of one, by context, as its base type is, and a domain over a domain or an array of a domain, `any` without it, by the base type of its innermost domain, [`enumArraysTypedAsText`](/generator#generate.enumArraysTypedAsText), which types an array of an enum as the text `pg` returns in `Selectable`, and [`intervalsTypedAsObjects`](/generator#generate.intervalsTypedAsObjects), which types an `interval` in `Selectable` as `pg` parses it.
 
 Their warnings are notes through [`warningListener`](/generator#generate.warningListener), not a `DeprecationWarning`, and come only when your schema has something they would change, once per run: `typeEnumsAcrossSchemas`'s names each column, `enumOrder`'s each enum, `uniqueIndexConstraintsOnly`'s each unique index, `domainsTypedByContext`'s, `enumArraysTypedAsText`'s and `intervalsTypedAsObjects`'s each column. `enumArraysTypedAsText: false` keeps the array with no note, in 7.0 and 8.0 alike, for a project that parses it with `pg.types.setTypeParser`; only the key left out switches in 7.0. `rejectOnQueryError`'s, `PGCAST_DEP006`, comes when a query fails, just before the process ends; never from the CLI, which always exits. In 7.0, `generate()` without the option rejects; `false` keeps the exit with no note, in 7.0 and 8.0 alike, since the exit is the CLI's own path. `intervalsTypedAsObjects: false` stays too, with no note, for a type parser of your own that returns an interval's text.
-
-::: info Coming
-6.6.2 is on npm, as [`@pgcast/pgcast`](https://www.npmjs.com/package/@pgcast/pgcast); 6.7.0, which brings the opt-ins, is in progress: [its milestone](https://github.com/AlexandreDemartin/pgcast/milestone/1).
-:::
 
 ## Further reading
 
