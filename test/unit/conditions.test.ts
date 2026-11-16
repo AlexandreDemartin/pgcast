@@ -825,6 +825,31 @@ describe('Default, self, raw, cols and vals as the value of a condition', () => 
     });
   });
 
+  it('jsonbContains given what JSON.stringify throws on throws when compiled, not when called', () => {
+    // as the other refusals, so that run() rejects before any query, rather than select() throwing as it builds the query
+    const circular: Record<string, unknown> = {};
+    circular.me = circular;
+    const head = '`jsonbContains()` sends its value as JSON text, so it takes a JSON value';
+    const built = {
+      bigint: () => dc.jsonbContains(BigInt(1) as any), nested: () => dc.jsonbContains({ n: [BigInt(1)] } as any),
+      circular: () => dc.jsonbContains(circular as any), toJSON: () => dc.jsonbContains({ toJSON() { throw new Error('no film'); } } as any),
+    };
+    const conditions = Object.fromEntries(Object.entries(built).map(([name, build]) => [name, build()]));
+    expect(Object.fromEntries(Object.entries(conditions).map(([name, condition]) => [name, thrown(condition).split('\n')[0]]))).toEqual({
+      bigint: `${head}, not a \`bigint\`: \`JSON.stringify\` would throw. Give it as a number or a string.`,
+      nested: `${head}, not a \`bigint\` at item 0: \`JSON.stringify\` would throw. Give it as a number or a string.`,
+      circular: `${head}: \`JSON.stringify\` threw "Converting circular structure to JSON`,
+      toJSON: `${head}: \`JSON.stringify\` threw "no film". Give a JSON value.`,
+    });
+  });
+
+  it('jsonbContains reads its value once, as it is called', () => {
+    let reads = 0;
+    const condition = dc.jsonbContains({ get format() { reads++; return '35mm'; } });
+    show(condition); show(condition.copy());
+    expect({ reads, values: show(condition).values }).toEqual({ reads: 1, values: ['{"format":"35mm"}'] });
+  });
+
   it('jsonbContains given null, a key holding null and an empty key still sends them', () => {
     expect([null, { format: null }, { '': 1 }, [null]].map(x => show(dc.jsonbContains(x)).values))
       .toEqual([['null'], ['{"format":null}'], ['{"":1}'], ['[null]']]);

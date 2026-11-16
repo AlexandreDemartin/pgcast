@@ -419,6 +419,11 @@ describe('jsonbContains: the value sent as jsonb', () => {
     await expect(ids('users', { settings: dc.jsonbContains(param({ theme: 'dark' }) as any) })).rejects.toThrow('so it takes a JSON value, not `db.param()`');
   });
 
+  it('a bigint rejects before any query, as an int8 parsed as a BigInt, typed any, would', async () => {
+    const parsed: any = { owner: BigInt(1) };
+    await expect(ids('users', { settings: dc.jsonbContains(parsed) })).rejects.toThrow('not a `bigint` at key `owner`');
+  });
+
   it('a key holding undefined rejects before any query, so an update() changes no row', async () => {
     // JSON.stringify would leave the key out: {} is contained in every object, and every user was renamed
     const filter: { theme?: string } = { theme: undefined };
