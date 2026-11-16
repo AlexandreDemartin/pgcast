@@ -1,5 +1,5 @@
 ---
-english: fccc2751fb3f
+english: 9acbeea2e620
 ---
 
 # Assistants IA
@@ -167,9 +167,13 @@ Avec `.compile()` à la place de `.run(pool)`, `console.log()` affiche le même 
 
 `.compile()` n’envoie rien : vous pouvez donc l’appeler sans risque sur un `insert()` ou un `deletes()` aussi.
 
-::: info À venir
-`npx pgcast --check` dira si `schema.d.ts` correspond toujours à la base, sans l’écrire, une fois [#52](https://github.com/AlexandreDemartin/pgcast/issues/52) livrée : une vérification de plus à lancer avant de dire qu’un changement est fini.
-:::
+### Vérifier les types générés {#check-the-generated-types}
+
+```sh
+npx pgcast --check
+```
+
+La commande se termine avec le code 1, en nommant chaque fichier, quand les fichiers générés ne correspondent plus à la base, et n’écrit rien : lancez `npx pgcast`, puis relancez la vérification de types ([`--check`](/fr/generator#check)). Une vérification de plus à lancer avant de dire qu’un changement est fini.
 
 ## Voir aussi {#see-also}
 

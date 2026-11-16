@@ -163,9 +163,13 @@ With `.compile()` in place of `.run(pool)`, `console.log()` prints the same SQL 
 
 `.compile()` sends nothing, so it is safe on an `insert()` or a `deletes()` too.
 
-::: info Coming
-`npx pgcast --check` will say whether `schema.d.ts` still matches the database, without writing it, once [#52](https://github.com/AlexandreDemartin/pgcast/issues/52) lands: one more check to run before calling a change done.
-:::
+### Check the generated types
+
+```sh
+npx pgcast --check
+```
+
+It exits with code 1, naming each file, when the generated files no longer match the database, and writes nothing: run `npx pgcast`, then the type check again ([`--check`](/generator#check)). One more check to run before calling a change done.
 
 ## See also
 
