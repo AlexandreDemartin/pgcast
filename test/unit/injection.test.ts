@@ -1923,6 +1923,35 @@ describe('a built-in object as a Whereable', () => {
       segments: 'SELECT 1 WHERE TRUE',
     });
   });
+
+  it('a polyfill\'s Segments throws only with a prototype like ECMA-402\'s, and the Segmenter of the first read decides', async () => {
+    // a class-based polyfill keeps its state in a WeakMap, and its prototype has a `constructor` of its own, so the
+    // gate never reaches it; one built from an object literal is refused, if its Segmenter is the one read
+    const
+      states = new WeakMap<object, string>(),
+      ClassSegments = class { constructor(input: string) { states.set(this, input); } containing() { return undefined; } },
+      classBased = class { segment(s: string) { return new ClassSegments(s); } },
+      literalPrototype = { containing() { return undefined; } },
+      literal = class { segment() { return Object.create(literalPrototype); } },
+      native = new NativeSegmenter('en').segment('Metropolis'),
+      outcomes = (core: typeof db) => ({
+        polyfill: where(core, new (Intl as any).Segmenter('en').segment('Metropolis')),
+        native: where(core, native),
+      });
+    expect({
+      classBased: await withSegmenter(classBased, outcomes),
+      literal: await withSegmenter(literal, outcomes),
+      literalAfterTheRead: await withSegmenter(NativeSegmenter, core => {
+        const first = where(core, native);
+        Object.defineProperty(Intl, 'Segmenter', { ...Object.getOwnPropertyDescriptor(Intl, 'Segmenter'), value: literal });
+        return { native: first, polyfill: where(core, new (Intl as any).Segmenter('en').segment('Metropolis')) };
+      }),
+    }).toEqual({
+      classBased: { polyfill: 'SELECT 1 WHERE TRUE', native: 'SELECT 1 WHERE TRUE' },
+      literal: { polyfill: 'A built-in `Segments`', native: 'SELECT 1 WHERE TRUE' },
+      literalAfterTheRead: { native: 'A built-in `Segments`', polyfill: 'SELECT 1 WHERE TRUE' },
+    });
+  });
 });
 
 describe('a list that is not an array in isIn() and isNotIn()', () => {

@@ -1,5 +1,5 @@
 ---
-english: 2d6133cfe639
+english: c1faab17cd02
 ---
 
 # Template SQL
@@ -334,7 +334,8 @@ Seuls les objets natifs listés ci-dessus lèvent une erreur, ceux du realm qui 
 - un `Date`, un itérateur ou un espace de noms d’un autre realm, comme `vm.runInNewContext('new Date(0)')` ou `vm.runInNewContext('Math')`, donne `TRUE` ;
 - une instance d’une classe qui étend un objet natif garde ses propres clés : `new Frames(1)`, avec `class Frames extends Uint8Array {}`, donne `("0" = $1)` ;
 - un itérateur avec des clés propres les compile : un générateur auquel on a ajouté `{ id: 1 }`, ou une classe qui étend `Iterator` avec un champ `id = 1`, donne `("id" = $1)` ;
-- un objet `Temporal` ou `Intl` d’un polyfill donne `TRUE` quand le polyfill est installé sur `globalThis` après l’import de `zapatos/db`, ou importé sans être installé (`import { Temporal } from '@js-temporal/polyfill'`), puisque `zapatos/db` lit les prototypes et les espaces de noms à son chargement, et le prototype de `Segments` dans l’`Intl.Segmenter` présent la première fois qu’un filtre a un prototype sans constructeur propre ; s’il est installé avant, l’objet lève une erreur, et un objet du `Temporal` ou de l’`Intl` natif que le polyfill remplace, là où le runtime en a un, donne `TRUE` ;
+- un objet `Temporal` ou `Intl` d’un polyfill, autre qu’un `Segments`, donne `TRUE` quand le polyfill est installé sur `globalThis` après l’import de `zapatos/db`, ou importé sans être installé (`import { Temporal } from '@js-temporal/polyfill'`), puisque `zapatos/db` lit les prototypes et les espaces de noms à son chargement ; s’il est installé avant, l’objet lève une erreur, et un objet du `Temporal` ou de l’`Intl` natif que le polyfill remplace, là où le runtime en a un, donne `TRUE` ;
+- le `Segments` d’un polyfill donne `TRUE`, sauf si son prototype n’a pas de `constructor` propre et hérite directement d’`Object.prototype`, comme celui d’ECMA-402, ce qui exclut un polyfill fondé sur une classe. `zapatos/db` lit ce prototype dans l’`Intl.Segmenter` présent la première fois qu’un filtre a un prototype sans `constructor` propre (jamais celui d’un objet simple, d’un tableau ou d’une instance de classe), et non à son chargement : si un tel polyfill est installé avant ce moment, son `Segments` lève une erreur, et le `Segments` natif donne `TRUE`, comme sous un polyfill fondé sur une classe ; s’il est installé après, son `Segments` donne `TRUE`, et le `Segments` natif lève une erreur ;
 - un objet créé à partir d’un espace de noms, `Object.create(Math)`, ou placé derrière un `Proxy`, `new Proxy(Math, {})`, donne `TRUE`.
 
 ## `self` {#self}
