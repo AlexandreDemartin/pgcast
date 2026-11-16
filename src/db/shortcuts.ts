@@ -186,6 +186,16 @@ function updateValuesKeys(updateValues: { [k: string]: any }, updated: string[])
   return keys.filter(k => updateValues[k] !== undefined);
 }
 
+// the value of upsert()'s updateValues for an inserted column, read through getters and prototypes as in 6.6.1, but
+// not from Object.prototype itself: there, `valueOf` or `constructor` is a function, which threw, and any other key
+// was put there by something else (prototype pollution)
+function updateValueOf(updateValues: { [k: string]: any }, c: string): unknown {
+  for (let o: object | null = updateValues; o !== null && o !== Object.prototype; o = Object.getPrototypeOf(o)) {
+    if (Object.prototype.hasOwnProperty.call(o, c)) return updateValues[c];
+  }
+  return undefined;
+}
+
 
 /* === insert === */
 
@@ -473,7 +483,7 @@ export const upsert: UpsertSignatures = function (
     updateValues = options?.updateValues ?? {},
     conflictColumns = Array.isArray(conflictTarget) ? conflictTarget : [],  // a constraint's are unknown here
     overwritesMissingKey = specifiedUpdateColumns == null && Array.isArray(values) && colNames.some(c =>
-      updateValues[c] === undefined &&  // as below: otherwise, c is set from EXCLUDED
+      updateValueOf(updateValues, c) === undefined &&  // as below: otherwise, c is set from EXCLUDED
       !conflictColumns.includes(c) &&  // on conflict, EXCLUDED.c equals the existing value
       values.some(v => !Object.prototype.hasOwnProperty.call(v ?? {}, c))),  // a null row misses every key
     updateColumns = [...new Set(  // deduplicate the keys here
@@ -483,10 +493,12 @@ export const upsert: UpsertSignatures = function (
       sql`(${mapWithSeparator(conflictTarget, sql`, `, c => c)})` :
       sql<string>`ON CONSTRAINT ${conflictTarget.value}`,
     updateColsSQL = mapWithSeparator(updateColumns, sql`, `, c => c),
-    updateValuesSQL = mapWithSeparator(updateColumns, sql`, `, c =>
-      updateValues[c] !== undefined ? updateValueSQL(updateValues[c]) :
+    updateValuesSQL = mapWithSeparator(updateColumns, sql`, `, c => {
+      const value = updateValueOf(updateValues, c);
+      return value !== undefined ? updateValueSQL(value as any) :
         (noNullUpdateColumns === all || noNullUpdateColumns.includes(c)) ? sql`CASE WHEN EXCLUDED.${c} IS NULL THEN ${table}.${c} ELSE EXCLUDED.${c} END` :
-          sql`EXCLUDED.${c}`),
+          sql`EXCLUDED.${c}`;
+    }),
     returningSQL = SQLForColumnsOfTable(options?.returning, table, returningNull),
     extrasSQL = SQLForExtras(options?.extras),
     suppressReport = options?.reportAction === 'suppress';

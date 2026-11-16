@@ -12,6 +12,7 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
   - `zapatos/db` reads that prototype from a `new Intl.Segmenter()` the first time a filter's prototype has no constructor of its own, not as it loads, which would cost each process about 7 ms, and keeps it only if it inherits `Object.prototype` directly, as `%IntlSegmentsPrototype%` does; a runtime without `Intl.Segmenter`, or a stand-in whose `segment()` hands out an iterator, leaves it out, so an iterator with own keys still compiles them.
   - The type refused it (TS2345).
   - Unchanged: what it hands out (`containing(0)`, a plain object, compiles to its keys, `("index" = $1 AND "input" = $2 AND "segment" = $3)`; its iterator already threw, #426), a `Segments` of another realm (`TRUE`), and the SQL of every other call.
+- `upsert()` takes an update value only from `updateValues` and its own prototypes, never from `Object.prototype`. A column inserted as `valueOf`, `toString`, `constructor`, `hasOwnProperty` or `__proto__` threw "Alien object while interpolating SQL" unless `updateValues` named it, and now is set from `EXCLUDED`; a key that something else put on `Object.prototype` (`Object.prototype.role = 'admin'`) no longer overwrites the inserted value on conflict. A class instance or an `Object.create()` value, its getters and inherited keys, is read as before.
 
 ## [6.7.0] - 2026-11-16
 

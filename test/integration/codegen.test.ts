@@ -1077,7 +1077,6 @@ describe('surprises, frozen as they are', () => {
     const errors = ts.getPreEmitDiagnostics(program).map(d => `${relative(root, d.file!.fileName)} TS${d.code}`);
     expect([...new Set(errors)]).toMatchInlineSnapshot(`
       [
-        "src/db/shortcuts.ts TS7053",
         "src/db/shortcuts.ts TS2345",
       ]
     `);
