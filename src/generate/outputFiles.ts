@@ -57,12 +57,11 @@ export const warnAfterOutput = (suppliedConfig: Config, config: CompleteConfig) 
 };
 
 /**
- * Compare the files `generate()` would write with those on disk, writing nothing: print each that differs or is
- * missing, or one line when none is. A placeholder counts only when missing: it is yours to edit.
- * @param suppliedConfig An object approximately matching `zapatosconfig.json`.
- * @returns `true` when the files on disk are up to date.
+ * Compare the files `generate()` would write with those on disk, writing nothing, after the notes of a run: resolve to
+ * their folder and a line per file that differs or is missing. A placeholder counts only when missing: it is yours to
+ * edit. `check()` and the CLI's `--check` print them, each in its own way.
  */
-export const check = async (suppliedConfig: Config) => {
+export const staleFiles = async (suppliedConfig: Config) => {
   const
     config = finaliseConfig(suppliedConfig),
     debug = config.debugListener === true ? console.log :
@@ -78,17 +77,11 @@ export const check = async (suppliedConfig: Config) => {
     missingPlaceholders = placeholders
       .filter(file => !fs.existsSync(file.path))
       .map(file => `Missing: ${file.path}`)
-      .sort(),  // tsForConfig() adds them in the order its queries complete
-    lines = [...stale, ...missingPlaceholders];
+      .sort();  // tsForConfig() adds them in the order its queries complete
 
   warnAfterOutput(suppliedConfig, config);
-
-  if (lines.length === 0) {
-    console.log(`The generated files in ${folderTargetPath} are up to date.`);
-    return true;
-  }
-
-  for (const line of lines) console.log(line);
-  console.log(`Run the generator without --check to write ${lines.length === 1 ? 'it' : 'them'}.`);
-  return false;
+  return { folderTargetPath, lines: [...stale, ...missingPlaceholders] };
 };
+
+/** The line that says the files in `folderTargetPath` are up to date. */
+export const upToDate = (folderTargetPath: string) => `The generated files in ${folderTargetPath} are up to date.`;

@@ -21,7 +21,8 @@ import ts from 'typescript';
 import * as pg from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, inject, it, vi, type MockInstance } from 'vitest';
 import {
-  definitionForRelationInSchema, enumDataForSchema, finaliseConfig, generate, relationsInSchema, tsForConfig, type Config,
+  check as checkFiles, definitionForRelationInSchema, enumDataForSchema, finaliseConfig, generate, relationsInSchema, tsForConfig,
+  type Config,
 } from '../../src/generate';
 import * as runtime from '../../src/db';
 import { cliConfig, runCli } from '../../src/generate/cliConfig';
@@ -4037,6 +4038,119 @@ describe('the CLI with --check (#556)', () => {
       `Missing: <out>/${schemaFile}`, `Missing: <out>/${indexFile}`, `Missing: <out>/${placeholderFile}`,
       'Run the generator without --check to write them.',
     ]);
+  });
+
+  it('ends with process.exit(1) on a failed query, with no note, as a run does: its config sets rejectOnQueryError: false', async () => {
+    const exited = new Error('process.exit() called');
+    const exit = vi.spyOn(process, 'exit').mockImplementation((() => { throw exited; }) as () => never);
+    const args = ['--check', JSON.stringify({ db: unreachable, outDir, warningListener: true, rejectOnQueryError: true })];
+    await expect(runCli(args, dir)).rejects.toBe(exited);
+    expect(exit.mock.calls).toEqual([[1]]);
+    expect(log.mock.calls).toEqual([['*** error 0 ***', expect.objectContaining({ code: 'ECONNREFUSED' })]]);
+    expect(existsSync(outDir)).toBe(false);
+  });
+
+  // the export, for a script that calls generate() with a config built in code (#559)
+  describe('check(), from zapatos/generate', () => {
+    /** Its result, and each line it gave each listener, unless `listeners` is false, after asserting it wrote nothing. */
+    const checked = async (config: Config = {}, listeners = true) => {
+      const before = tree(), progress: string[] = [], warnings: string[] = [], out = (line: string) => line.split(outDir).join('<out>');
+      const result = await checkFiles({
+        db: db(), outDir, schemas: { generate_check: all },
+        ...listeners ? { progressListener: line => progress.push(out(line)), warningListener: line => warnings.push(out(line)) } : {},
+        ...config,
+      });
+      expect(tree()).toEqual(before);
+      const bigintNote = (line: string) => line.startsWith('Note: this database has bigint');  // once per process
+      return { result, progress, warnings: warnings.filter(line => !bigintNote(line)), printed: printed().filter(line => !bigintNote(line)) };
+    };
+
+    it('resolves to true when the files are up to date, with one line through progressListener', async () => {
+      await generated();
+      expect(await checked()).toEqual({ result: true, progress: [upToDate], warnings: [], printed: [] });
+    });
+
+    it('resolves to false once the database has a column schema.d.ts lacks, naming it through warningListener', async () => {
+      await generated();
+      await t.pool.query('ALTER TABLE generate_check.scenes ADD COLUMN runtime_minutes int');
+      try {
+        expect(await checked()).toEqual({ result: false, progress: [], warnings: [`Out of date: <out>/${schemaFile}`], printed: [] });
+      } finally {
+        await t.pool.query('ALTER TABLE generate_check.scenes DROP COLUMN runtime_minutes');
+      }
+    });
+
+    it('resolves to false when a placeholder is missing, and true when it was edited: it is yours', async () => {
+      await generated();
+      writeFileSync(join(outDir, placeholderFile), 'declare module \'zapatos/custom\' { export type PgScene_title = `scene-${number}`; }\n');
+      expect((await checked()).result).toBe(true);
+      rmSync(join(outDir, placeholderFile));
+      expect(await checked()).toEqual({ result: false, progress: [], warnings: [`Missing: <out>/${placeholderFile}`], printed: [] });
+    });
+
+    it('names every file before the first run, after the notes of a run, and gives no hint of the CLI', async () => {
+      const schemas = { generate_check: { include: ['scenes', 'no_such_table'] } } as unknown as Schemas;
+      const { result, warnings } = await checked({ schemas });
+      expect(result).toBe(false);
+      expect(warnings).toEqual([
+        expect.stringMatching(/^Note: the include entry "no_such_table" of schema "generate_check" matches no relation there/),
+        expect.stringMatching(/^Note: the schemas rule of "generate_check" has no exclude/),
+        `Missing: <out>/${schemaFile}`, `Missing: <out>/${indexFile}`, `Missing: <out>/${placeholderFile}`,
+      ]);
+      expect(existsSync(outDir)).toBe(false);
+    });
+
+    it('prints with the default listeners what is stale, through console.log, and nothing when up to date', async () => {
+      expect(await checked({}, false)).toEqual({
+        result: false, progress: [], warnings: [],
+        printed: [`Missing: <out>/${schemaFile}`, `Missing: <out>/${indexFile}`, `Missing: <out>/${placeholderFile}`],
+      });
+      await generated();
+      expect(await checked({}, false)).toEqual({ result: true, progress: [], warnings: [], printed: [] });
+      expect(await checked({ progressListener: true, warningListener: false }, false)).toEqual({
+        result: true, progress: [], warnings: [], printed: [upToDate],
+      });
+    });
+
+    it('compares the files of outExt, and of moduleNames', async () => {
+      await generated({ outExt: '.ts', moduleNames: 'pgcast' });
+      expect(await checked({ outExt: '.ts', moduleNames: 'pgcast' })).toEqual({
+        result: true, progress: ['The generated files in <out>/pgcast are up to date.'], warnings: [], printed: [],
+      });
+      expect((await checked()).warnings[0]).toBe(`Missing: <out>/${schemaFile}`);
+    });
+
+    describe('on a failed query', () => {
+      const exited = new Error('process.exit() called');
+
+      /** A check on a server that refuses every connection, process.exit mocked to throw: what it rejected with and did. */
+      const failedCheck = async (config: Config) => {
+        const exit = vi.spyOn(process, 'exit').mockImplementation((() => { throw exited; }) as () => never), warnings: string[] = [];
+        const rejection = await checkFiles({
+          outDir, schemas: { generate_check: all }, warningListener: line => void warnings.push(line), ...config, db: unreachable,
+        }).then(() => new Error('resolved'), (e: unknown) => e);
+        return { rejection, exits: exit.mock.calls, warnings, printed: log.mock.calls, outDir: existsSync(outDir) };
+      };
+
+      // no Zapatos 6.6.1 behaviour to keep: it rejects as 7.0's generate() will, with no note (#559)
+      it.each([
+        ['left out', {}],
+        ['null, from a JSON config', JSON.parse('{"rejectOnQueryError": null}') as Config],
+        ['true', { rejectOnQueryError: true }],
+      ])('rejects with the error, rejectOnQueryError %s: no exit, no note, nothing printed or written', async (_, config) => {
+        const run = await failedCheck(config);
+        expect(run.rejection).toMatchObject({ code: 'ECONNREFUSED' });
+        expect(run).toMatchObject({ exits: [], warnings: [], printed: [], outDir: false });
+      });
+
+      it('prints the error and exits with 1, with no note, given rejectOnQueryError: false, as generate() does', async () => {
+        const run = await failedCheck({ rejectOnQueryError: false });
+        expect(run.rejection).toBe(exited);
+        expect(run).toMatchObject({
+          exits: [[1]], warnings: [], printed: [['*** error 0 ***', expect.objectContaining({ code: 'ECONNREFUSED' })]], outDir: false,
+        });
+      });
+    });
   });
 
   // cli.ts as npm runs it, in a child process, built by tsc with the build's tsconfig: its exit code is the check's

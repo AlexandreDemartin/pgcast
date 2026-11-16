@@ -44,7 +44,7 @@ user code ──► src/db/ (runtime: sql``, shortcuts, conditions, transactions
 
 - `src/generate/`: the codegen (CLI `pgcast`, alias `zapatos`).
   - `cli.ts` runs the CLI; `cliConfig.ts` reads its arguments (`--check`), `pgcastconfig.json` else `zapatosconfig.json`, and/or a JSON argument, and interpolates `{{ENV_VAR}}`; `config.ts` holds the config and its defaults, `schemaRules.ts` checks its `schemas` rules.
-  - `write.ts` (`generate()`) writes `zapatos/schema.d.ts` and the `zapatos/custom/` placeholders, each under `header.ts`'s header; `outputFiles.ts` builds them in memory, and its `check()` (`--check`) compares them with the disk.
+  - `write.ts` (`generate()`) writes `zapatos/schema.d.ts` and the `zapatos/custom/` placeholders, each under `header.ts`'s header, and its `check()` compares them with the disk, as `--check` does; `outputFiles.ts` builds them in memory, and its `staleFiles()` names those that differ, for both.
   - `tsOutput.ts` assembles the `zapatos/schema` module (namespaces per schema, aggregate types, `*ForTable<T>` lookups, version canary); `moduleNames.ts` picks `zapatos/*` or `pgcast/*`.
   - `tables.ts` introspects relations, columns, unique indexes and comments, then produces `Selectable`, `JSONSelectable`, `Whereable`, `Insertable`, `Updatable` per table; `quote.ts` writes a Postgres name or a text into the output.
   - `enums.ts` and `pgTypes.ts` map Postgres types to TS (by context: Selectable, Insertable, etc.), `enumOrder.ts` reads an enum's declared order, `domainRoots.ts` the base type under a domain; `legacy.ts` prints the migration warning for the old "srcMode".
