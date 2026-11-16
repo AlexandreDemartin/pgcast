@@ -459,9 +459,16 @@ describe('type surprises', () => {
   test('updateValues takes raw(), cols(x) and vals(x) where 6.6.1 took them, and keeps the type of param(x)', () => {
     // compiled as in a sql template (test/integration/core.test.ts, "raw() in a fragment value, or in the updateValues
     // of upsert, is SQL"); each where 6.6.1 took it as the column's Parameter<V>: raw() if V takes a string, cols(x)
-    // and vals(x) of V
+    // and vals(x) of V, but for a primitive x (#503)
     db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { display_name: db.raw(`"users"."display_name" || '!'`), settings: db.raw(`'{}'`), tags: db.cols(['users.tags']) } });
-    db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { manager_id: db.vals(1), mood: db.vals('ok'), created_at: db.vals('2020-01-01T12:00:00Z') } });
+    // vals() of a primitive always threw while compiling since #244, so the type refuses it (#503): here a number,
+    // an enum label and a timestamp string, which 6.6.1 took
+    // @ts-expect-error vals() of a number
+    db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { manager_id: db.vals(1) } });
+    // @ts-expect-error vals() of an enum label
+    db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { mood: db.vals('ok') } });
+    // @ts-expect-error vals() of a timestamp string
+    db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { created_at: db.vals('2020-01-01T12:00:00Z') } });
     // param(x) keeps its literal type, as in 6.6.1: a wider member would widen it to string
     db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { mood: db.param('ok'), created_at: db.param('2020-01-01T12:00:00Z') } });
     db.upsert('accounts', {} as s.accounts.Insertable, 'id', { updateValues: { opened_on: db.param('2020-01-01'), lifetime_ops: db.param('1') } });

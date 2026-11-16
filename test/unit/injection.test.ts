@@ -1477,6 +1477,21 @@ describe('a built-in object as a Whereable', () => {
     }
   });
 
+  it('a subclass of an Intl or a Temporal constructor compiles as before, where the runtime has it', () => {
+    // Temporal from Node 26, or Node 22 with --harmony-temporal; 6.6.1 compiled an instance with no own enumerable key to TRUE
+    const
+      Temporal = (globalThis as any).Temporal,
+      FilmCollator = class extends ((Intl as any).Collator as new (locale: string) => object) {},
+      kept: Record<string, object> = {
+        Collator: new FilmCollator('en'),
+        ...Temporal && {
+          PlainDate: new (class Premiere extends (Temporal.PlainDate as new (y: number, m: number, d: number) => object) {})(2026, 11, 15),
+        },
+      };
+    for (const [name, x] of Object.entries(kept))
+      expect(sql`DELETE FROM ${'users'} WHERE ${x}`.compile(), name).toEqual({ text: 'DELETE FROM "users" WHERE TRUE', values: [] });
+  });
+
   it('throws for each ECMA-262 global constructor the runtime has, or keeps it for a reason', () => {
     // the hand-written list missed built-ins three times (#250, #416, #426): an object with each one's
     // prototype is refused, on each Node of the CI matrix, unless kept below
