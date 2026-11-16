@@ -571,6 +571,11 @@ svg.icon { width: 16px; height: 16px; flex: none; }
 .landing .hero h1 .half { display: inline-block; }
 .landing .hero h1 .op { font-family: var(--font-mono); color: var(--accent); font-weight: 700; letter-spacing: -.06em; }
 .landing .lede { font-size: 1.18rem; color: var(--muted); max-width: 58ch; margin: 0 0 28px; }
+/* the lede's key phrases, in the text's own colour over its muted one: no accent, no bold */
+.landing .lede strong {
+  color: var(--fg); font-weight: 500; padding: 0 .08em; -webkit-box-decoration-break: clone; box-decoration-break: clone;
+  background: linear-gradient(transparent 62%, color-mix(in srgb, var(--accent) 30%, transparent) 62%);
+}
 .landing .ctas { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 0; }
 .landing .ctas p { display: contents; }
 .landing .InstallLine { margin: 16px 0 0; max-width: 512px; }
