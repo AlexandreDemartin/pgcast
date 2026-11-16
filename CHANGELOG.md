@@ -6,6 +6,13 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 
 ## [Unreleased]
 
+### Security
+- The `Segments` object that an `Intl.Segmenter`'s `segment()` returns, interpolated as a `Whereable`, throws while compiling, so `.run()` rejects with a plain `Error` before any query, as the built-ins of #170 do: `` db.deletes('films', new Intl.Segmenter('en').segment('Metropolis') as any) `` compiled to `DELETE FROM "films" WHERE TRUE …` and deleted every row, on Zapatos 6.6.1 and pgcast 6.7.0 (#517).
+  - Its prototype, ECMA-402's `%IntlSegmentsPrototype%`, has no constructor, so the error names it by its ECMA-402 name, `` A built-in `Segments` ``; an object made from that prototype with `Object.create()` throws too.
+  - `zapatos/db` reads that prototype from a `new Intl.Segmenter()` the first time a filter's prototype has no constructor of its own, not as it loads, which would cost each process about 7 ms; a runtime without `Intl.Segmenter` leaves it out.
+  - The type refused it (TS2345).
+  - Unchanged: what it hands out (`containing(0)`, a plain object, compiles to its keys, `("index" = $1 AND "input" = $2 AND "segment" = $3)`; its iterator already threw, #426), a `Segments` of another realm (`TRUE`), and the SQL of every other call.
+
 ## [6.7.0] - 2026-11-16
 
 ### Security
