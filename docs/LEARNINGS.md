@@ -183,6 +183,12 @@ Candidates for a check, a rule or a skill line.
 - #569: a parameter typed as a class with only optional members (`ParentColumn`: `value?`, `[wrapper]?`) is a weak type that `{}` and `param('id')` pass: probe a refusal by shape with `{}` and a `Parameter` of a column name.
 - #569: a CHANGELOG line of a feature PR merged after a version PR lands silently under the new release: the PR that lands second places it on purpose.
 - #569: `check-prose.mjs` matches a quoted message against the template literal only when each `${…}` stands for one word: a message whose advice changes inside the template (a ternary) is split into whole templates.
+- #571: destructuring `const { all } = db` widens `all` to `symbol`, which a `where` parameter refuses (TS2345): import `all` instead.
+- #571: a string `compileExpression` writes as is always ends with a quoted part, so a name read from compiled text never ends unquoted.
+- #571: a name check standing in for how Postgres resolves names normalises them as Postgres does: undouble `""`, decode `U&`, and truncate to 63 bytes (NAMEDATALEN).
+- #571: before the docs say a misuse throws, check whether the type already refuses it: freeze that refusal as a negative and say "does not compile" first.
+- #571: git can auto-merge an `[Unreleased]` CHANGELOG entry under the new release heading after a release, with no conflict: after every master merge, `git diff origin/master -- CHANGELOG.md`.
+- #571: a bare `U&"…"` given as `parent` compiles as one quoted literal name; only a dotted name whose `U&` part follows a quoted part (`"public".U&"…"`) reaches the decoding, so a test row needs that shape.
 
 ## Minors kept
 
