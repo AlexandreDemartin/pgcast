@@ -326,7 +326,9 @@ interface UpsertOptions<
   UC extends UpdateColumns<T> | undefined,
   RA extends UpsertReportAction | undefined,
 > extends ReturningOptionsForTable<T, C, E> {
-  updateValues?: UpdateValuesForTable<T>;
+  // while T is a type parameter, TypeScript relates no object to a type mapped over it, but it checks a lookup by T
+  // against T's tables on write: so 6.6.1's own type first, then the mapped type looked up per table (#533)
+  updateValues?: UpdatableForTable<T> | { [K in Table]: UpdateValuesForTable<K> }[T];
   updateColumns?: UC;
   noNullUpdateColumns?: ColumnForTable<T> | ColumnForTable<T>[] | typeof all;
   /**
