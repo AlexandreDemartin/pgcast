@@ -1699,6 +1699,39 @@ describe('a built-in object as a Whereable', () => {
       vi.resetModules();
     }
   });
+
+  it('loads where the runtime lacks Math, JSON or Reflect, and still refuses the other namespaces', async () => {
+    // a namespace the runtime lacks is left out (#523): read as a bare name, it threw a ReferenceError as
+    // `zapatos/db` loaded, where 6.6.1 loaded. `pg` is already loaded in this worker: in a fresh process with no
+    // `JSON`, `pg-types` throws first, on 6.6.1 too, so `JSON` here stands for pgcast's own modules
+    const
+      missing = ['Math', 'JSON', 'Reflect'],
+      descriptors = missing.map(name => [name, Object.getOwnPropertyDescriptor(globalThis, name)!] as const),
+      Temporal = (globalThis as any).Temporal;  // Node 26 and later; Node 22 with --harmony-temporal
+    let loaded: typeof db | Error;
+    vi.resetModules();
+    for (const name of missing) delete (globalThis as any)[name];
+    try {
+      loaded = await import('../../src/db').catch((err: Error) => err);
+    } finally {
+      for (const [name, descriptor] of descriptors) Object.defineProperty(globalThis, name, descriptor);
+      vi.resetModules();
+    }
+    expect(loaded instanceof Error ? `${loaded.name}: ${loaded.message}` : 'loads').toBe('loads');
+    const
+      core = loaded as typeof db,
+      where = (x: object) => {
+        try { return core.sql`SELECT 1 WHERE ${x}`.compile().text; }
+        catch (err) { return (err as Error).message.split(' has no meaning')[0]; }
+      },
+      namespaces = { Math, JSON, Reflect, Atomics, Intl, ...Temporal && { Temporal, 'Temporal.Now': Temporal.Now } };
+    expect(Object.fromEntries(Object.entries(namespaces).map(([path, x]) => [path, where(x)]))).toEqual({
+      // left out, they compile as in 6.6.1
+      Math: 'SELECT 1 WHERE TRUE', JSON: 'SELECT 1 WHERE TRUE', Reflect: 'SELECT 1 WHERE TRUE',
+      Atomics: 'A built-in `Atomics`', Intl: 'A built-in `Intl`',
+      ...Temporal && { Temporal: 'A built-in `Temporal`', 'Temporal.Now': 'A built-in `Temporal.Now`' },
+    });
+  });
 });
 
 describe('a list that is not an array in isIn() and isNotIn()', () => {
