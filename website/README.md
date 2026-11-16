@@ -257,7 +257,7 @@ The build compares each French page with its English page, by VitePress's own pa
 
   | Franglais | |
   |---|---|
-  | to cast, a cast (`::type`), the tagline | caster, un cast ; « Vos types, castés depuis votre base de données » |
+  | to cast, a cast (`::type`) | caster, un cast ; « les types sont castés depuis votre schéma » |
   | parse, log, wrapper object, range type, keyset pagination, an HTTP route handler | parser, logger, les logs, objet wrapper, type range, pagination keyset, un handler |
 - **Headings**: in the infinitive where the English gives an order (`## Book inside a larger transaction` → `## Réserver dans une transaction plus large`), so a reference to a heading reads as the heading.
 - **Links**: to the French site's own files where it has them (`/fr/llms.txt`, `/fr/llms-full.txt`); a fenced block, copied as it is, keeps its English URLs.
