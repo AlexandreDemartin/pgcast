@@ -115,6 +115,13 @@ Candidates for a check, a rule or a skill line.
 - #546: a fix that moves a cheap guard ahead of an expensive step gets a test spying on that step for the refused input, or a reorder mutant survives; and a CHANGELOG `Unchanged:` sub-bullet holds no behaviour change (a check could flag "throws" or "now" there).
 - #546: `builtinObjects()` holds only non-empty typed arrays, so a claim about empty ones needs its own test; and `git pull` reporting "up to date" is no proof the branch holds master: check `git merge-base --is-ancestor origin/master HEAD`.
 - #547: `prepack` builds into an existing `dist/` without removing stale output, so 6.7.0's tarball shipped `dist/generate/enumLabel.{js,d.ts}`, whose source went in #395: publish from a clean `dist/` (`rm -rf dist` first, or a fresh `npm ci` and build).
+- #550: a fix published with neutral wording before its advisory covers the CHANGELOG, code comments and test values too, not only the PR title and body; the branch history stays visible on the PR, so the wording is neutral from the first commit; the line moves under `### Security` in the version PR, when the advisory goes out.
+- #550: testing whether an object "has" a key with `hasOwnProperty` along the chain skips a `Proxy`'s `get` trap: compare the value read with `Reflect.get(Object.prototype, c, obj)` and walk the chain only when they are the same; a fix of an inherited value at one level (`updateValues[c]`) is replayed one level up too (`options.updateValues`).
+- #550: a claim that something is read "as in 6.6.1" (read counts, traps) is measured against the 6.6.1 dist, not master, which had already added reads (#83, #401).
+- #550: a test that freezes a read count needs a case where 6.6.1 and 6.7.1 differ (an own getter); a class getter in one row reads the same on both and catches no wrong "as on 6.7.1" claim.
+- #550: a builder brief says "per item: the red test commit, then the fix commit", not "one commit per item", which conflicts with the red-test-first rule.
+- #550: a guard comparing a value read with the one `Object.prototype` gives assumes a property returns the same value on every read; an accessor need not, and the comparison calls it again: compare with the property descriptor's `value`.
+- #550: in zsh, `git show $rev:src/…` applies the `:s` history modifier to `$rev`; write `"${rev}:path"` in scripts that loop over revisions.
 
 ## Minors kept
 
