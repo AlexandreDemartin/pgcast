@@ -86,12 +86,13 @@ export const completeKeysWithDefaultValue = <T extends object>(objs: T[], defaul
   // a string gave its character indexes as keys, a number none), a Buffer, before its keys, one per byte, are listed,
   // and a built-in with no own enumerable key, whose prototype is read only once its spread is found empty, so that a
   // row with keys has none read (Zapatos 6.6.1 spread both into a row of defaults, or of "0", "1" columns, #543);
-  // null and undefined are read as {}, as in Zapatos 6.6.1. The union has no prototype, so that its keys are the rows'
-  // own keys, as cols() lists one row's: none that Object.prototype was given, and a row's own `__proto__` (from
-  // JSON.parse) is one of them, where `{}` took it as its prototype and listed that prototype's keys; the rows
-  // returned are plain objects, as before
-  const unionKeys = Object.assign(Object.create(null), ...objs.filter(o => !isPrimitive(o) && !isRefusedBuffer(o)));
-  for (const k in unionKeys) unionKeys[k] = defaultValue;
+  // null and undefined are read as {}, as in Zapatos 6.6.1. The keys are gathered into an object with no prototype,
+  // so that they are the rows' own keys, as cols() lists one row's: none that Object.prototype was given, and a row's
+  // own `__proto__` (from JSON.parse) is one of them, where `{}` took it as its prototype and listed that prototype's
+  // keys. The defaults are a plain object, as before, which V8 spreads as fast: spread from one with no prototype,
+  // each row took several times as long
+  const unionKeys = Object.fromEntries(Object.keys(Object.assign(Object.create(null),
+    ...objs.filter(o => !isPrimitive(o) && !isRefusedBuffer(o)))).map(k => [k, defaultValue]));
   return objs.map(o => {
     if (isPrimitive(o) || isRefusedBuffer(o)) return o;
     const own = { ...o };
