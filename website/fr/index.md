@@ -1,10 +1,10 @@
 ---
-english: 4996a69be376
+english: 9deff10d61ff
 layout: home
 markdownStyles: false
 title: pgcast
 titleTemplate: Postgres sans abstraction pour TypeScript
-description: "Le Postgres que vous connaissez, avec toute la puissance de TypeScript. pgcast lit votre schéma et en tire les types ; chaque requête est un SQL que vous pouvez lire et prévoir. Pas d’ORM, pas de modèles, pas d’état caché."
+description: "Le Postgres que vous connaissez, avec toute la puissance de TypeScript. pgcast lit votre schéma et en tire les types ; chaque requête est un SQL que vous pouvez lire et prévoir. Pas d’ORM, pas de modèles, pas d’état caché : vous gardez la main."
 ---
 
 <main class="landing">
@@ -15,7 +15,7 @@ description: "Le Postgres que vous connaissez, avec toute la puissance de TypeSc
 <h1><span class="half">Le Postgres que vous connaissez,</span> <span class="half">avec toute la puissance de TypeScript<span class="op">::</span></span></h1>
 
 <span class="keep"><strong>Aucune couche entre vous et Postgres</strong> :</span> vous écrivez vos requêtes dans son vocabulaire naturel, et pgcast porte les types tirés de votre schéma <strong>jusqu’au résultat de chaque requête</strong>.<br>
-Pas d’ORM, pas de modèles, pas d’état caché.
+Pas d’ORM, pas de modèles, pas d’état caché : vous gardez la main.
 {.lede}
 
 <div class="ctas">
