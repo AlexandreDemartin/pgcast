@@ -342,6 +342,7 @@ With [`castArrayParamsToJson`](/runtime-config#Config.castArrayParamsToJson) on,
 
 ```ts
 db.conditions.jsonbContains(a: JSONValue): SQLFragment<boolean | null, JSONValue>
+db.conditions.jsonbContains<T>(a: JSONValue): SQLFragment<boolean | null, T>
 ```
 
 `"col" @> CAST($1 AS "jsonb")`<!-- probe: db.sql`${{ col: db.conditions.jsonbContains({ format: '35mm' }) }}` -->: the column's JSON contains the value, as Postgres reads [containment](https://www.postgresql.org/docs/current/datatype-json.html#JSON-CONTAINMENT). The value goes as its JSON text, `JSON.stringify(a)`, so you need not write `JSON.stringify` yourself.
@@ -356,7 +357,8 @@ db.conditions.jsonbContains(a: JSONValue): SQLFragment<boolean | null, JSONValue
 - **A string, a number, `null`**: JSON values too, the string sent as `"35mm"`, `null` as JSON's `null`. Each matches that value, or an array that holds it at its top level: `details` is an object, so `jsonbContains('35mm')` finds no film. A bare `` db.sql`${db.self} @> ${db.param(x, 'jsonb')}` `` sends a string as text, and an array as a Postgres array unless `castArrayParamsToJson` is on: Postgres refuses both (22P02).
 - **[`castObjectParamsToJson`](/runtime-config#Config.castObjectParamsToJson)** and **[`castArrayParamsToJson`](/runtime-config#Config.castArrayParamsToJson)** change nothing: `"details" @> CAST($1 AS "jsonb")`<!-- probe: (db.setConfig({ castObjectParamsToJson: true, castArrayParamsToJson: true }), db.sql`${{ details: db.conditions.jsonbContains({ format: '35mm' }) }}`) -->, the value already JSON text.
 - **What JSON lacks** throws as the query compiles, at any depth, the message naming its key: `undefined`, a function or a symbol, which `JSON.stringify` leaves out of an object (so `{ format: undefined }` would be `{}`, every film) and writes as `null` in an array; a `bigint`, which it throws on; a circular value. The type refuses them, but not in a value typed `{ format?: string }`, which may hold `undefined` unless `exactOptionalPropertyTypes` is on, nor in one typed `any`.
-- **Type**: the value is a `JSONValue`, and so is the condition's `T`: a `jsonb` column takes it, a `text` or `integer` one refuses it (TS2322). A `json` column passes, both being `JSONValue`, and Postgres refuses it (42883, `operator does not exist: json @> jsonb`). A value typed by an `interface` is refused (TS2345), as in an `insert()` on a `jsonb` column: give it a `type` alias.
+- **Type**: the value is a `JSONValue`, and so is the condition's `T`: a `jsonb` column takes it, a `text` or `integer` one refuses it (TS2322). A `json` column passes, both being `JSONValue`, and Postgres refuses it (42883, `operator does not exist: json @> jsonb`). A value typed by an `interface` is refused (TS2769), as in an `insert()` on a `jsonb` column: give it a `type` alias.
+- **A `jsonb` domain whose placeholder you narrowed** ([A `jsonb` domain](/custom-types#a-jsonb-domain)) refuses the condition's `JSONValue` (TS2322): name the placeholder, `jsonbContains<PgProjection>({ format: '35mm' })`, and the condition has its type. The value is still any JSON value, `{ format: 'VHS' }` too: containment takes some of the keys, so the value is not checked against the placeholder. A `text` column refuses that condition too (TS2322).
 
 A `Parameter`, a `sql` fragment or `parent()` throws as the query compiles, at any depth, as `Default`, `self`, `raw()`, `cols()` and `vals()` do, and the type refuses each: `JSON.stringify` would send its fields, which match no row, with no error.
 
@@ -569,7 +571,7 @@ The type does not check a fragment: an `int4` on a `timestamptz` column type-che
 
 ## Values a condition refuses {#refused-values}
 
-`Default`, `self`, `raw()`, `cols()` and `vals()` have no meaning as the value of a condition. The type refuses them (TS2322, or TS2345 where the condition bounds its argument: a pattern, a range's second bound, an array condition, `add()`, `subtract()`, `jsonbContains()`; TS2769 as the list of `eqAny()`).
+`Default`, `self`, `raw()`, `cols()` and `vals()` have no meaning as the value of a condition. The type refuses them (TS2322, or TS2345 where the condition bounds its argument: a pattern, a range's second bound, an array condition, `add()`, `subtract()`; TS2769 as the list of `eqAny()` and the value of `jsonbContains()`).
 
 At run time, calling the condition does not throw, compiling it does, so `run()` rejects with a plain `Error` before any query.
 

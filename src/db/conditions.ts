@@ -191,15 +191,24 @@ const jsonbParam = (a: unknown) => {
   }
 };
 
+// a jsonb domain whose zapatos/custom placeholder is narrowed fits no JSONValue: its type, given as T, is the condition's,
+// and is never inferred from the value, which would let a string through on a text column; a value it contains need
+// not hold every key the placeholder requires, so the value stays a JSONValue
+interface JsonbContainsSignatures {
+  (a: JSONValue): SQLFragment<boolean | null, JSONValue>;
+  <T>(a: JSONValue): SQLFragment<boolean | null, T>;
+}
+
 /**
  * `"col" @> CAST($1 AS "jsonb")`, on a `jsonb` column: its JSON contains the value's. The value is sent as JSON text,
  * `JSON.stringify(a)`, whatever `castObjectParamsToJson` and `castArrayParamsToJson`, so a string is a JSON string and
  * `null` the JSON `null`. A `json` column passes the type, and Postgres refuses it (42883). As the query compiles, what
  * JSON lacks throws, at any depth (`undefined`, a function, a symbol, a `bigint`, a circular value), and so do
  * `db.param()`, `db.parent()`, a `sql` fragment, `db.Default`, `db.self`, `db.raw()`, `db.cols()` and `db.vals()`.
+ * On a `jsonb` domain whose `zapatos/custom` placeholder is narrowed, name its type: `jsonbContains<PgProjection>(a)`.
  * @param a A JSON value
  */
-export const jsonbContains = (a: JSONValue) => sql<SQL, boolean | null, JSONValue>`${self} @> ${jsonbParam(a)}`;
+export const jsonbContains: JsonbContainsSignatures = (a: JSONValue) => sql<SQL, boolean | null>`${self} @> ${jsonbParam(a)}`;
 
 /**
  * Join conditions with `OR`: `or(a, b)` compiles to `(a OR b)`, and `or()` to `FALSE`, so that

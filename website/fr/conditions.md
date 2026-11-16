@@ -346,6 +346,7 @@ Avec [`castArrayParamsToJson`](/fr/runtime-config#Config.castArrayParamsToJson) 
 
 ```ts
 db.conditions.jsonbContains(a: JSONValue): SQLFragment<boolean | null, JSONValue>
+db.conditions.jsonbContains<T>(a: JSONValue): SQLFragment<boolean | null, T>
 ```
 
 `"col" @> CAST($1 AS "jsonb")`<!-- probe: db.sql`${{ col: db.conditions.jsonbContains({ format: '35mm' }) }}` --> : le JSON de la colonne contient la valeur, au sens de l’[inclusion](https://www.postgresql.org/docs/current/datatype-json.html#JSON-CONTAINMENT) de Postgres. La valeur est envoyée sous forme de texte JSON, `JSON.stringify(a)` : vous n’avez pas à écrire `JSON.stringify` vous-même.
@@ -360,7 +361,8 @@ db.conditions.jsonbContains(a: JSONValue): SQLFragment<boolean | null, JSONValue
 - **Une chaîne, un nombre, `null`** : ce sont aussi des valeurs JSON, la chaîne envoyée comme `"35mm"`, `null` comme le `null` de JSON. Chacun correspond à cette valeur, ou à un tableau qui la contient à son premier niveau : `details` est un objet, donc `jsonbContains('35mm')` ne trouve aucun film. Un simple `` db.sql`${db.self} @> ${db.param(x, 'jsonb')}` `` envoie une chaîne comme du texte, et un tableau comme un tableau Postgres sauf si `castArrayParamsToJson` est activé : Postgres refuse les deux (22P02).
 - **[`castObjectParamsToJson`](/fr/runtime-config#Config.castObjectParamsToJson)** et **[`castArrayParamsToJson`](/fr/runtime-config#Config.castArrayParamsToJson)** ne changent rien : `"details" @> CAST($1 AS "jsonb")`<!-- probe: (db.setConfig({ castObjectParamsToJson: true, castArrayParamsToJson: true }), db.sql`${{ details: db.conditions.jsonbContains({ format: '35mm' }) }}`) -->, la valeur étant déjà du texte JSON.
 - **Ce que JSON n’a pas** lève une erreur à la compilation de la requête, à toute profondeur, et le message nomme sa clé : `undefined`, une fonction ou un symbole, que `JSON.stringify` omet d’un objet (`{ format: undefined }` vaudrait donc `{}`, tous les films) et écrit `null` dans un tableau ; un `bigint`, sur lequel il lève une erreur ; une valeur circulaire. Le type les refuse, mais pas dans une valeur typée `{ format?: string }`, qui peut contenir `undefined` sauf si `exactOptionalPropertyTypes` est activé, ni dans une valeur typée `any`.
-- **Type** : la valeur est une `JSONValue`, et le `T` de la condition aussi : une colonne `jsonb` l’accepte, une colonne `text` ou `integer` la refuse (TS2322). Une colonne `json` passe, les deux étant des `JSONValue`, et Postgres la refuse (42883, `operator does not exist: json @> jsonb`). Une valeur typée par une `interface` est refusée (TS2345), comme dans un `insert()` sur une colonne `jsonb` : donnez-lui un alias `type`.
+- **Type** : la valeur est une `JSONValue`, et le `T` de la condition aussi : une colonne `jsonb` l’accepte, une colonne `text` ou `integer` la refuse (TS2322). Une colonne `json` passe, les deux étant des `JSONValue`, et Postgres la refuse (42883, `operator does not exist: json @> jsonb`). Une valeur typée par une `interface` est refusée (TS2769), comme dans un `insert()` sur une colonne `jsonb` : donnez-lui un alias `type`.
+- **Un domaine `jsonb` dont vous avez affiné le placeholder** ([Un domaine `jsonb`](/fr/custom-types#a-jsonb-domain)) refuse la `JSONValue` de la condition (TS2322) : nommez le placeholder, `jsonbContains<PgProjection>({ format: '35mm' })`, et la condition prend son type. La valeur reste n’importe quelle valeur JSON, `{ format: 'VHS' }` aussi : l’inclusion ne prend qu’une partie des clés, donc la valeur n’est pas vérifiée contre le placeholder. Une colonne `text` refuse aussi cette condition (TS2322).
 
 Un `Parameter`, un fragment `sql` ou `parent()` lève une erreur à la compilation de la requête, à toute profondeur, comme `Default`, `self`, `raw()`, `cols()` et `vals()`, et le type refuse chacun d’eux : `JSON.stringify` enverrait ses champs, qui ne correspondent à aucune ligne, sans erreur.
 
@@ -573,7 +575,7 @@ Le type ne vérifie pas un fragment : un `int4` sur une colonne `timestamptz` p
 
 ## Les valeurs qu’une condition refuse {#refused-values}
 
-`Default`, `self`, `raw()`, `cols()` et `vals()` n’ont pas de sens comme valeur d’une condition. Le type les refuse (TS2322, ou TS2345 là où la condition borne son argument : un motif, la seconde borne d’un intervalle, une condition de tableau, `add()`, `subtract()`, `jsonbContains()` ; TS2769 comme liste d’`eqAny()`).
+`Default`, `self`, `raw()`, `cols()` et `vals()` n’ont pas de sens comme valeur d’une condition. Le type les refuse (TS2322, ou TS2345 là où la condition borne son argument : un motif, la seconde borne d’un intervalle, une condition de tableau, `add()`, `subtract()` ; TS2769 comme liste d’`eqAny()` et comme valeur de `jsonbContains()`).
 
 À l’exécution, c’est la compilation de la condition qui lève l’erreur, pas son appel : `run()` est donc rejetée avec une simple `Error` avant toute requête.
 
