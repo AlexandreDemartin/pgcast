@@ -7,7 +7,9 @@
 // What is compared is the bench minus its floor (bench/tsconfig.floor.json: same options, no code),
 // so that TypeScript's libs and @types/node, which do not depend on pgcast, do not dilute the threshold.
 // A fixed part remains: checking the .d.ts of the generated schema and of src/db, whatever the queries,
-// is about 47 % of the net Types and 16 % of the net Instantiations.
+// is about 52 % of the net Types and 13 % of the net Instantiations. Another is paid by the first upsert() with
+// updateValues, which resolves the updateValues type of every table through T's constraint (#538): about 4,750
+// Instantiations at the fixture's 17 tables, 9,200 at 49; each later call costs 12 where it cost 72.
 import {spawnSync} from 'node:child_process';
 import {readFileSync, writeFileSync} from 'node:fs';
 import {createRequire} from 'node:module';
