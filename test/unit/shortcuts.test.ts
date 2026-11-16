@@ -292,6 +292,29 @@ describe('upsert', () => {
       .toThrow('Alien object while interpolating SQL');
   });
 
+  it('updateValues: a __proto__ column takes no update value from a prototype, but an own __proto__ key or a Proxy\'s', () => {
+    // `__proto__` is a getter of Object.prototype that answers each object's own prototype
+    const
+      row = () => JSON.parse('{ "email": "e@x.org", "__proto__": 1 }'),
+      fromExcluded = 'DO UPDATE SET ("email", "__proto__") = ROW(EXCLUDED."email", EXCLUDED."__proto__")';
+    class Patch { }
+    for (const updateValues of [{}, Object.create({ mood: param('x') }), new Patch()])
+      expect(db.upsert('users', row(), 'email', { updateValues } as any).compile().text).toContain(fromExcluded);
+    expect(db.upsert('users', row(), 'email', { updateValues: JSON.parse('{ "__proto__": "own" }') } as any).compile())
+      .toMatchObject({ text: expect.stringContaining('DO UPDATE SET ("email", "__proto__") = ROW(EXCLUDED."email", $3)'), values: [1, 'e@x.org', 'own'] });
+    // a Proxy answering through `get` alone keeps its value, read through the same traps as on 6.7.2
+    const counts: Record<string, number> = {}, count = (name: string) => { counts[name] = (counts[name] ?? 0) + 1; };
+    const trap = new Proxy({}, {
+      get: (_, k) => (count(`get:${String(k)}`), k === '__proto__' ? param('trap') : undefined),
+      getOwnPropertyDescriptor: (t, k) => (count(`getOwnPropertyDescriptor:${String(k)}`), Reflect.getOwnPropertyDescriptor(t, k)),
+      getPrototypeOf: t => (count('getPrototypeOf'), Reflect.getPrototypeOf(t)),
+      ownKeys: t => (count('ownKeys'), Reflect.ownKeys(t)),
+    });
+    expect(db.upsert('users', row(), 'email', { updateValues: trap } as any).compile())
+      .toMatchObject({ text: expect.stringContaining('DO UPDATE SET ("email", "__proto__") = ROW(EXCLUDED."email", $3)'), values: [1, 'e@x.org', 'trap'] });
+    expect(counts).toEqual({ ownKeys: 1, 'get:email': 1, 'get:__proto__': 2, getPrototypeOf: 2 });
+  });
+
   it('updateValues: a plain value is a parameter, sent as update() sends it', () => {
     expect(db.upsert('users', ada, 'email', { updateValues: { mood: 'happy' } }).compile()).toMatchInlineSnapshot(`
       {
@@ -2659,6 +2682,53 @@ describe('a shortcut option added to Object.prototype by something else is no op
       ...readAsBefore,
       order: { ...readAsBefore.order, 'getOwnPropertyDescriptor:nulls': 2, getPrototypeOf: 2 },
       lock: { ...readAsBefore.lock, 'getOwnPropertyDescriptor:wait': 2, 'getOwnPropertyDescriptor:of': 2, getPrototypeOf: 4 },
+    });
+  });
+
+  /** Run `f` with a getter `key` on Object.prototype, as other code would define one, deleted after it; with its reads. */
+  const withPrototypeGetter = <T>(key: string, make: () => unknown, f: () => T) => {
+    let reads = 0;
+    Object.defineProperty(Object.prototype, key, { get: () => (reads++, make()), configurable: true });
+    try { return { result: f(), reads }; } finally { delete (Object.prototype as any)[key]; }
+  };
+
+  // a getter answers anew on each read, so its value is no sign of where it came from: with no own key on the caller's
+  // object or its prototypes, it is Object.prototype's, read once per read of the option
+  it.each([
+    ['deletes(): returning', 'returning', () => ['email'], () => db.deletes('users', { email: 'e@x.org' }, {}),
+      { text: 'DELETE FROM "users" WHERE ("email" = $1) RETURNING to_jsonb("users".*) AS result', values: ['e@x.org'] }, 1],
+    ['upsert(): updateValues', 'updateValues', () => ({ display_name: 'X' }), () => db.upsert('users', row, 'email', {}),
+      { text: 'INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("email", "display_name") = ROW(EXCLUDED."email", EXCLUDED."display_name")' + upsertReturning, values: ['E', 'e@x.org'] }, 1],
+    ['select(): order', 'order', () => ({ by: 'email', direction: 'DESC' }), () => db.select('users', all, {}),
+      { text: selectMany(plain.text), values: [] }, 2],
+    ['select(): an order item\'s nulls', 'nulls', () => 'FIRST', () => db.select('users', all, { order: { by: 'email', direction: 'ASC' } }),
+      { text: selectMany(`${plain.text} ORDER BY "email" ASC`), values: [] }, 2],
+  ])('a getter on Object.prototype is no option either: %s', (_, key, make, build, compiled, reads) => {
+    expect(withPrototypeGetter(key, make, () => build().compile())).toEqual({ result: compiled, reads });
+  });
+
+  it('with a getter on Object.prototype, an option of the caller\'s own prototype or object is read without it', () => {
+    const counts = { answering: {} as Record<string, number>, owning: {} as Record<string, number> };
+    class Returning { get returning() { return ['mood']; } }
+    const deleted = (options: any) => db.deletes('users', { email: 'e@x.org' }, options).compile().text;
+    expect(withPrototypeGetter('returning', () => ['email'], () => ({
+      created: deleted(Object.create({ returning: ['display_name'] })),
+      classed: deleted(new Returning()),
+      owning: deleted(counting(counts.owning, { returning: ['display_name'] })),
+      // a Proxy answering through `get` alone owns no key, so what it answers is none
+      answering: deleted(counting(counts.answering, {}, { returning: ['display_name'] })),
+    }))).toEqual({
+      result: {
+        created: 'DELETE FROM "users" WHERE ("email" = $1) RETURNING jsonb_build_object($2::text, "display_name") AS result',
+        classed: 'DELETE FROM "users" WHERE ("email" = $1) RETURNING jsonb_build_object($2::text, "mood") AS result',
+        owning: 'DELETE FROM "users" WHERE ("email" = $1) RETURNING jsonb_build_object($2::text, "display_name") AS result',
+        answering: 'DELETE FROM "users" WHERE ("email" = $1) RETURNING to_jsonb("users".*) AS result',
+      },
+      reads: 0,
+    });
+    expect(counts).toEqual({
+      owning: { 'get:returning': 1, 'getOwnPropertyDescriptor:returning': 1, 'get:extras': 1 },
+      answering: { 'get:returning': 1, 'getOwnPropertyDescriptor:returning': 1, getPrototypeOf: 1, 'get:extras': 1 },
     });
   });
 
