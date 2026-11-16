@@ -158,7 +158,7 @@ const warnAboutEnumsAcrossSchemas = (columns: string[], config: CompleteConfig) 
 
 /**
  * Without `uniqueIndexConstraintsOnly`, note the unique indexes it would leave out of `UniqueIndex`, once per run:
- * `constraint()` takes them, and `ON CONFLICT ON CONSTRAINT` refuses them.
+ * `constraint()` takes them, and `ON CONFLICT ON CONSTRAINT` refuses them, with `DO NOTHING` too but for a `WITHOUT OVERLAPS` key.
  */
 const warnAboutUniqueIndexesNotArbiters = (indexes: string[], config: CompleteConfig) => {
   if (indexes.length === 0) return;
@@ -171,7 +171,8 @@ const warnAboutUniqueIndexesNotArbiters = (indexes: string[], config: CompleteCo
 
   warn(`Note: UniqueIndex lists ${list}, ${one ? 'a unique index' : 'unique indexes'} of no UNIQUE or PRIMARY KEY ` +
     `constraint, of a DEFERRABLE or WITHOUT OVERLAPS one, or not yet valid: db.constraint() takes ${one ? 'it' : 'them'}, and ` +
-    `Postgres refuses ${one ? 'it' : 'them'} in ON CONFLICT ON CONSTRAINT ... DO UPDATE. ` +
+    `Postgres refuses ${one ? 'it' : 'them'} in ON CONFLICT ON CONSTRAINT ... DO UPDATE, ` +
+    'and in ... DO NOTHING except a WITHOUT OVERLAPS key. ' +
     `Set uniqueIndexConstraintsOnly: true to leave ${one ? 'it' : 'them'} out; it will be the default in pgcast 7.0.`);
 };
 

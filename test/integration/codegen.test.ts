@@ -1179,7 +1179,7 @@ describe('uniqueIndexConstraintsOnly', () => {
   });
 
   it('keeps each name that ON CONFLICT ON CONSTRAINT takes, and only them, as Postgres answers', async () => {
-    const answers: Record<string, string | null> = {};
+    const answers: Record<string, string | null> = {}, nothing: Record<string, string | null> = {};
     const off = await uniqueIndexes(arb);
     // a row, since Postgres refuses a deferrable arbiter only once it inserts one
     const rows: Record<string, string> = {
@@ -1188,15 +1188,16 @@ describe('uniqueIndexConstraintsOnly', () => {
     };
     for (const [rel, type] of Object.entries(off)) {
       for (const name of type === 'never' ? [] : type.slice(1, -1).split("' | '")) {
-        await t.client.query('SAVEPOINT arbiter');
-        try {
-          await t.client.query(`INSERT INTO arb.${rel} ${rows[rel] ?? '(id) VALUES (1)'} ` +
-            `ON CONFLICT ON CONSTRAINT ${name} DO UPDATE SET id = EXCLUDED.id`);
-          answers[name] = null;
-        } catch (e) {
-          answers[name] = (e as pg.DatabaseError).code!;
+        for (const [into, action] of [[answers, 'DO UPDATE SET id = EXCLUDED.id'], [nothing, 'DO NOTHING']] as const) {
+          await t.client.query('SAVEPOINT arbiter');
+          try {
+            await t.client.query(`INSERT INTO arb.${rel} ${rows[rel] ?? '(id) VALUES (1)'} ON CONFLICT ON CONSTRAINT ${name} ${action}`);
+            into[name] = null;
+          } catch (e) {
+            into[name] = (e as pg.DatabaseError).code!;
+          }
+          await t.client.query('ROLLBACK TO SAVEPOINT arbiter');
         }
-        await t.client.query('ROLLBACK TO SAVEPOINT arbiter');
       }
     }
     expect(answers).toEqual({
@@ -1215,6 +1216,8 @@ describe('uniqueIndexConstraintsOnly', () => {
       ...version >= 150000 ? { nnd_id_key: null } : {},
       ...version >= 180000 ? { spans_pkey: '42809' } : {},  // ON CONFLICT DO UPDATE not supported with exclusion constraints
     });
+    // DO NOTHING refuses each of them with the same code, and takes a WITHOUT OVERLAPS key, as any exclusion constraint
+    expect(nothing).toEqual({ ...answers, ...version >= 180000 ? { spans_pkey: null } : {} });
     const on = Object.values(await uniqueIndexes({ ...arb, uniqueIndexConstraintsOnly: true }))
       .flatMap(type => type === 'never' ? [] : type.slice(1, -1).split("' | '"));
     expect(on.sort()).toEqual(Object.keys(answers).filter(name => answers[name] === null).sort());
@@ -1236,13 +1239,15 @@ describe('uniqueIndexConstraintsOnly', () => {
       'arb.items.items_slug_live_idx' + (version >= 180000 ? ', arb.items.items_title_lower_idx and arb.spans.spans_pkey' :
         ' and arb.items.items_title_lower_idx') +
       ', unique indexes of no UNIQUE or PRIMARY KEY constraint, of a DEFERRABLE or WITHOUT OVERLAPS one, or not yet valid: ' +
-      'db.constraint() takes them, and Postgres refuses them in ON CONFLICT ON CONSTRAINT ... DO UPDATE. ' +
+      'db.constraint() takes them, and Postgres refuses them in ON CONFLICT ON CONSTRAINT ... DO UPDATE, and in ' +
+      '... DO NOTHING except a WITHOUT OVERLAPS key. ' +
       'Set uniqueIndexConstraintsOnly: true to leave them out; it will be the default in pgcast 7.0.',
     ]);
     expect(await notesFor({ schemas: { extra: only('articles') } })).toEqual([
       'Note: UniqueIndex lists extra.articles.shared_name_idx, a unique index of no UNIQUE or PRIMARY KEY constraint, ' +
       'of a DEFERRABLE or WITHOUT OVERLAPS one, or not yet valid: db.constraint() takes it, and Postgres refuses it in ' +
-      'ON CONFLICT ON CONSTRAINT ... DO UPDATE. Set uniqueIndexConstraintsOnly: true to leave it out; ' +
+      'ON CONFLICT ON CONSTRAINT ... DO UPDATE, and in ... DO NOTHING except a WITHOUT OVERLAPS key. ' +
+      'Set uniqueIndexConstraintsOnly: true to leave it out; ' +
       'it will be the default in pgcast 7.0.',
     ]);
   });
@@ -2803,7 +2808,8 @@ describe('include entries that match no relation', () => {
     const uniqueNote = (list: string, one = false) => `Note: UniqueIndex lists ${list}, ` +
       `${one ? 'a unique index' : 'unique indexes'} of no UNIQUE or PRIMARY KEY constraint, of a DEFERRABLE or ` +
       `WITHOUT OVERLAPS one, or not yet valid: db.constraint() takes ${one ? 'it' : 'them'}, and Postgres refuses ${one ? 'it' : 'them'} ` +
-      `in ON CONFLICT ON CONSTRAINT ... DO UPDATE. Set uniqueIndexConstraintsOnly: true to leave ${one ? 'it' : 'them'} ` +
+      'in ON CONFLICT ON CONSTRAINT ... DO UPDATE, and in ... DO NOTHING except a WITHOUT OVERLAPS key. ' +
+      `Set uniqueIndexConstraintsOnly: true to leave ${one ? 'it' : 'them'} ` +
       'out; it will be the default in pgcast 7.0.';
     const articlesNote = uniqueNote('extra.articles.shared_name_idx', true);
     const productsNote = uniqueNote('public.products.products_status_sku_key and public.products.products_title_lower_key');
