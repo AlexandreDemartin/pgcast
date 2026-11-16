@@ -215,6 +215,83 @@ describe('upsert', () => {
     `);
   });
 
+  it('updateValues: a key that only Object.prototype has is no update value', () => {
+    // 6.6.1 read updateValues[c] for each column inserted, so `valueOf` found Object.prototype's function and threw
+    const columns = ['valueOf', 'toString', 'constructor', 'hasOwnProperty', '__proto__'];
+    for (const c of columns) {
+      const q = db.upsert('users', { email: 'e@x.org', [c]: 1 } as any, 'email').compile();
+      expect(q.text).toContain(`DO UPDATE SET ("email", "${c}") = ROW(EXCLUDED."email", EXCLUDED."${c}")`);
+      expect([...q.values].sort()).toEqual([1, 'e@x.org']);  // the inserted columns are sorted
+    }
+    // the same on a null-prototype updateValues, and when updateValues names the column
+    expect(db.upsert('users', { email: 'e@x.org', valueOf: 1 } as any, 'email', { updateValues: Object.create(null) }).compile().text)
+      .toContain('DO UPDATE SET ("email", "valueOf") = ROW(EXCLUDED."email", EXCLUDED."valueOf")');
+    expect(db.upsert('users', { email: 'e@x.org', valueOf: 1 } as any, 'email', { updateValues: { valueOf: 2 } } as any).compile())
+      .toMatchObject({ text: expect.stringContaining('DO UPDATE SET ("email", "valueOf") = ROW(EXCLUDED."email", $3)'), values: ['e@x.org', 1, 2] });
+  });
+
+  it('updateValues: a key added to Object.prototype by something else is no update value', () => {
+    const proto = Object.prototype as any;
+    proto.mood = 'calm';
+    try {
+      expect(db.upsert('users', { ...ada, mood: 'ok' }, 'email').compile()).toMatchObject({
+        text: expect.stringContaining('DO UPDATE SET ("email", "display_name", "mood") = ROW(EXCLUDED."email", EXCLUDED."display_name", EXCLUDED."mood")'),
+        values: ['Ada L.', 'ada@example.com', 'ok'],
+      });
+      // a class's own prototype, or one given to Object.create(), is still read, as in 6.6.1
+      class Patch { get mood() { return param('kept'); } }
+      for (const updateValues of [new Patch(), Object.create({ mood: param('kept') })])
+        expect(db.upsert('users', { ...ada, mood: 'ok' }, 'email', { updateValues } as any).compile().values)
+          .toEqual(['Ada L.', 'ada@example.com', 'ok', 'kept']);
+    } finally {
+      delete proto.mood;
+    }
+  });
+
+  it('updateValues: an updateValues added to Object.prototype by something else is no update value', () => {
+    const proto = Object.prototype as any;
+    proto.updateValues = { mood: 'calm' };
+    try {
+      expect(db.upsert('users', { email: 'e@x.org' }, 'email', { returning: ['email'] }).compile().text)
+        .toContain('DO UPDATE SET ("email") = ROW(EXCLUDED."email")');
+      expect(db.upsert('users', { email: 'e@x.org' }, 'email', { updateColumns: ['email'] }).compile().text)
+        .toContain('DO UPDATE SET ("email") = ROW(EXCLUDED."email")');
+      // one given to Object.create() is still read, as in 6.6.1
+      expect(db.upsert('users', { email: 'e@x.org' }, 'email', Object.create({ updateValues: { mood: param('kept') } })).compile())
+        .toMatchObject({ text: expect.stringContaining('DO UPDATE SET ("email", "mood") = ROW(EXCLUDED."email", $2)'), values: ['e@x.org', 'kept'] });
+    } finally {
+      delete proto.updateValues;
+    }
+  });
+
+  it('updateValues: any other key is read as on 6.7.1, through a Proxy, a getter or a class prototype', () => {
+    // a Proxy is read through its `get` trap alone
+    const trap = new Proxy({}, { get: (_, k) => k === 'mood' ? param('trap') : undefined });
+    expect(db.upsert('users', { ...ada, mood: 'ok' }, 'email', { updateValues: trap } as any).compile())
+      .toMatchObject({ text: expect.stringContaining('ROW(EXCLUDED."email", EXCLUDED."display_name", $4)'), values: ['Ada L.', 'ada@example.com', 'ok', 'trap'] });
+    // even for a key that Object.prototype has too
+    const answering = (key: string, value: unknown) => new Proxy({}, { get: (_, k) => k === key ? value : undefined });
+    expect(db.upsert('users', { email: 'e@x.org', valueOf: 1 } as any, 'email', { updateValues: answering('valueOf', param('trap')) } as any).compile())
+      .toMatchObject({ text: expect.stringContaining('DO UPDATE SET ("email", "valueOf") = ROW(EXCLUDED."email", $3)'), values: ['e@x.org', 1, 'trap'] });
+    expect(db.upsert('users', { email: 'e@x.org', constructor: 1 } as any, 'email', { updateValues: answering('constructor', sql`DEFAULT`) } as any).compile().text)
+      .toContain('DO UPDATE SET ("email", "constructor") = ROW(EXCLUDED."email", DEFAULT)');
+    expect(db.upsert('users', JSON.parse('{ "email": "e@x.org", "__proto__": 1 }'), 'email', { updateValues: answering('__proto__', param('trap')) } as any).compile().text)
+      .toContain('DO UPDATE SET ("email", "__proto__") = ROW(EXCLUDED."email", $3)');
+    // a getter is read as often as on 6.7.1: in one row, a class getter's value sent is its second read, as on 6.6.1;
+    // an own getter's is its third, as #401 checks own keys once more (6.6.1 sent its second)
+    let reads = 0;
+    class Count { get mood() { return param(++reads); } }
+    expect(db.upsert('users', { ...ada, mood: 'ok' }, 'email', { updateValues: new Count() } as any).compile().values)
+      .toEqual(['Ada L.', 'ada@example.com', 'ok', 2]);
+    let ownReads = 0;
+    expect(db.upsert('users', { ...ada, mood: 'ok' }, 'email', { updateValues: { get mood() { return param(++ownReads); } } } as any).compile().values)
+      .toEqual(['Ada L.', 'ada@example.com', 'ok', 3]);
+    // a class instance has the `constructor` of its own prototype: a `constructor` column still throws
+    class Patch { }
+    expect(() => db.upsert('users', { email: 'e@x.org', constructor: 1 } as any, 'email', { updateValues: new Patch() } as any).compile())
+      .toThrow('Alien object while interpolating SQL');
+  });
+
   it('updateValues: a plain value is a parameter, sent as update() sends it', () => {
     expect(db.upsert('users', ada, 'email', { updateValues: { mood: 'happy' } }).compile()).toMatchInlineSnapshot(`
       {
