@@ -89,6 +89,11 @@ Candidates for a check, a rule or a skill line.
 - #539: a characterisation over every table (`<T extends s.Table>`) holds a refused line beside the taken ones, to show its boundary: only `{}` and `any`-typed values get through there.
 - #539: a clause listing the column kinds a type gap hits comes from a probe over every value-type shape of the fixture's `extra.type_zoo`, not a hand-picked list: `timetz` and a template-literal domain were missed twice (the PR and #538).
 - #539: since #134's brands, "6.6.1's type" (`UpdatableForTable<T>`) no longer means 6.6.1's behaviour: a revert to an old type name is replayed against what the name now resolves to, and a decision that drops machinery counts the cells it re-admits as well as those it refuses.
+- #541: indexing a mapped type over a concrete key union by a generic `T` is rewritten by TypeScript into a type mapped over `T` (microsoft/TypeScript#47109); a key-remapped mapped type (`[K in Table as K]`) is not, so `T` resolves through its constraint.
+- #541: on TS 5.9, `param<T>()`'s inference picks between the column's `V` and a brand type by creation order; a brand written as a subtype of `V` (`V & { … }`) always loses to `V`, so a literal stays a literal.
+- #541: the bench measures a small program, so a fixed per-program cost reads as +47 %; the PR measures the fixed part (+4,756 instantiations at 17 tables, +9,204 at 49) and the per-call part (12 against 72) separately.
+- #541: an order-dependent type test needs a `tsc` program with a fixed `files` order; `AGENTS.md`'s `test:types` row and skill `type-tests` should name the programs `test:types` runs (`test/types-opt-in`, `test/types-order`).
+- #541: merging #539 left `bench:types` at +4.4 % without refreshing the baseline, and #541's update absorbed it: a PR that moves the bench refreshes the baseline, or says how much of a change is inherited.
 
 ## Minors kept
 
@@ -106,3 +111,6 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #530 (form): `CHANGELOG.md` #503 entry, "The exception is `vals()` of one character": with the default config the interval is typed `string`, so #503 is what refuses `vals(row.c_interval)`, which stored 2 seconds under 6.6.1; the entry could point to it.
 - #539 (form): `test/types/shortcuts.test-d.ts`, `const two = <T extends 'users' | 'active_users'>`: `{ created_at: date }` is refused by Postgres on `active_users` (42703); a comment would mark it a characterisation.
 - #539 (form): `test/types-opt-in/updateValues.ts`: extra blank line at the end of the file.
+- #541 (defect): `test/types/shortcuts.test-d.ts`, over every table: `param(anyV)`, taken by master on TS 5.9 `strict`, is now refused (as 6.6.1); no `@ts-expect-error` freezes it, and the PR body says "`any` itself is still taken".
+- #541 (form): `AGENTS.md` `test:types` row and skill `type-tests`: the plain-`tsc` programs `test/types-opt-in` and `test/types-order` are not named.
+- #541 (form): `scripts/bench-types.mjs` header, "each later call costs 12 where it cost 72": shape-dependent (about 21 against 77 for mixed one- or two-key calls).
