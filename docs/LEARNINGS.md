@@ -8,7 +8,16 @@ What the agents returned during the chapter and what waits for its end. Written 
 ## Learnings
 
 Candidates for a check, a rule or a skill line.
+- #516: the type tests target ES2019, so a `1n` literal fills a `@ts-expect-error` with its own TS2737 and the negative freezes nothing; write `null as unknown as bigint`.
+- #516: BSD `sed` has no `\|` alternation: a sed meant to strip `@ts-expect-error` directives matched nothing and the run looked green; use `sed -E` or `awk`, and check the stripped file changed.
+- #516: `tsc -p test` type-checks the runtime tests against the stub schema, so a change to the `updateValues` types shows only in `test:types`.
+- #516: on a column typed `any`, the whole `updateValues` slot is `any`, so no narrowing of its members refuses anything there (frozen by a characterisation test).
+- #516: a grid that says a narrowing "refuses only what throws" crosses each form with an argument typed `any` and `unknown`: `any` is assignable to everything but `never`, so a narrowing that resolves to `never` refuses untyped callers (`JSON.parse`, `req.body`) that worked under 6.6.1.
+- #516: accepting `any` where a narrowing collapses to `never` also brings back `null` and `undefined` with `strict` off, since they widen to `any`: a claim about `null` names `strictNullChecks`.
+- #516: a fallback type in public declarations (a non-exported `unique symbol`, `class` or `interface`) goes through a consumer declaration-emit probe (`tsc --declaration` on a file exporting an inferred value of the slot), not only a checking grid: TS2527 otherwise (skill `backward-compat` § Types); a grep of `dist/**/*.d.ts` for a non-exported `unique symbol` used in an exported type is a cheaper check.
 
 ## Minors kept
 
 Minor review defects, each tagged `form` or `defect` (skill `review-comments`), taken up by the end-of-chapter review.
+- #516 (form): `website/switching.md` § Compile, "Give the value itself, sent as a parameter": for `{ title: db.cols('title') }` the advice could also name `db.cols([name])`.
+- #516 (form): `test/types-opt-in/tsconfig.json`, "Type tests of an option declared in ConfigTypes": the program now also holds a declaration-emit test.
