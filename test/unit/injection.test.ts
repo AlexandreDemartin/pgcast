@@ -1724,7 +1724,7 @@ describe('a built-in object as a Whereable', () => {
         try { return core.sql`SELECT 1 WHERE ${x}`.compile().text; }
         catch (err) { return (err as Error).message.split(' has no meaning')[0]; }
       },
-      namespaces = { Math, JSON, Reflect, Atomics, Intl, ...Temporal && { Temporal, 'Temporal.Now': Temporal.Now } };
+      namespaces: Record<string, object> = { Math, JSON, Reflect, Atomics, Intl, ...Temporal && { Temporal, 'Temporal.Now': Temporal.Now } };
     expect(Object.fromEntries(Object.entries(namespaces).map(([path, x]) => [path, where(x)]))).toEqual({
       // left out, they compile as in 6.6.1
       Math: 'SELECT 1 WHERE TRUE', JSON: 'SELECT 1 WHERE TRUE', Reflect: 'SELECT 1 WHERE TRUE',
