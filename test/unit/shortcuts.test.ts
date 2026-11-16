@@ -2613,6 +2613,18 @@ describe('a shortcut option added to Object.prototype by something else is no op
     expect(() => withPrototypeKey(key, v, () => db.select('users', all, options as any).compile())).toThrow(message);
   });
 
+  // with no key on Object.prototype: 6.6.1 and 6.7.2 read `null.direction` or `undefined.for` there, a TypeError
+  it.each([
+    ['order', null, 'Direction must be ASC/DESC, not \'undefined\''],
+    ['order', undefined, 'Direction must be ASC/DESC, not \'undefined\''],
+    ['lock', null, 'Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not \'undefined\''],
+    ['lock', undefined, 'Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not \'undefined\''],
+  ])('select(): %s: [%s] throws at the call as an item without its keys', (key, item, message) => {
+    const call = () => db.select('users', all, { [key]: [item] } as any);
+    expect(call).toThrow(message);
+    expect(call).not.toThrow(TypeError);
+  });
+
   // the reads that refuse a value with no meaning, before the query: what Object.prototype holds is no value there either
   it.each([
     ['select(): lateral null', 'lateral', () => null, () => db.select('users', all), selectMany(plain.text)],
