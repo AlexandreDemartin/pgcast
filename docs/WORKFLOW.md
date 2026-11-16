@@ -70,7 +70,13 @@ flowchart LR
 
 When the Epic's last step is merged: a review of the whole merged range, then a method PR that judges each line of [LEARNINGS.md](LEARNINGS.md) and closes the Epic (skill `run-step` § End of chapter).
 
+## Releases
+
+- The owner bumps the version (`npm version`, which runs every check) in a PR, merges it, then pushes its tag `v<version>`.
+- The tag starts [release.yml](../.github/workflows/release.yml): it checks that the tag names `package.json`'s version on a commit of master, then publishes with npm trusted publishing (OIDC, no token) and a provenance attestation. The `npm` environment accepts only `v*` tags.
+- Once, on npmjs.com, package settings › Trusted publishing: repository `AlexandreDemartin/pgcast`, workflow `release.yml`, environment `npm`. Then: Publishing access › "Require two-factor authentication and disallow tokens", and revoke the token of `~/.npmrc`.
+
 ## Later
 
-- release-please for pgcast's npm versions, once releases start.
+- release-please for pgcast's version PRs.
 - Native stacked PRs, once `gh stack` stops rebasing and forcing branches.

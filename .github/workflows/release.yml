@@ -1,0 +1,44 @@
+name: Release
+
+# Publishes @pgcast/pgcast to npm on a pushed tag `v<version>`, with npm trusted publishing: npm trusts this workflow
+# through OIDC, so no npm token is stored anywhere, and each version carries a provenance attestation of this run.
+# Set up once on npmjs.com, package settings › Trusted publishing: repository AlexandreDemartin/pgcast, workflow
+# release.yml, environment npm. The `npm` environment accepts only tags `v*` (docs/WORKFLOW.md § Releases).
+on:
+  push:
+    tags: ['v*']
+
+permissions: {}
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write  # the OIDC token npm exchanges for a one-time publish token
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0  # to check that the tag is on master
+      # Trusted publishing needs npm 11.5.1 or later, which Node 24 ships.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.x
+          registry-url: https://registry.npmjs.org
+      - name: The tag names package.json's version, on a commit of master
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version="v$(node -p 'require("./package.json").version')"
+          [ "$TAG" = "$version" ] || { echo "Tag $TAG, but package.json says $version"; exit 1; }
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/master || { echo "$TAG is not on master"; exit 1; }
+          npm --version
+      # No dependency's install script runs beside the OIDC token; `prepack` (ours) builds before the tarball is made.
+      - run: npm ci --ignore-scripts
+      - run: npm publish --provenance

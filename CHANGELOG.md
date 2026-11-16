@@ -13,6 +13,9 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
   - The type refused it (TS2345).
   - Unchanged: what it hands out (`containing(0)`, a plain object, compiles to its keys, `("index" = $1 AND "input" = $2 AND "segment" = $3)`; its iterator already threw, #426), a `Segments` of another realm (`TRUE`), and the SQL of every other call.
 
+### Added
+- Releases publish from CI with npm trusted publishing, on a pushed tag `v<version>`, each with a provenance attestation that ties the tarball to its commit and workflow run (`.github/workflows/release.yml`). CI pins every action by commit SHA and keeps no git credentials after checkout.
+
 ## [6.7.0] - 2026-11-16
 
 ### Security
