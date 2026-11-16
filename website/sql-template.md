@@ -237,7 +237,7 @@ As a filter value, and as a value in `vals({…})` (so in a write), `cols()` thr
 
 > `` `db.cols()` takes an object or an array, not `string`: for one column, write `db.cols([name])`; for a row of `insert()`, `upsert()` or `update()`, give an object. ``<!-- message -->
 
-The type takes it, as Zapatos 6.6.1's did, so that a generic helper (`<T>(row: T) => db.cols(row)`) still compiles. In [`upsert()`](/insert#upsert-options) `updateValues`, it refuses a primitive. Zapatos 6.6.1 compiled a string's character indexes, `cols('title')` to `"0", "1", "2", "3", "4"`, any other primitive to nothing, and threw a `TypeError` on `null`.
+The type takes it, as Zapatos 6.6.1's did, so that a generic helper (`<T>(row: T) => db.cols(row)`) still compiles. In [`upsert()`](/insert#upsert-options) `updateValues`, it refuses a primitive (`null` and `undefined` only with `strictNullChecks`). Zapatos 6.6.1 compiled a string's character indexes, `cols('title')` to `"0", "1", "2", "3", "4"`, any other primitive to nothing, and threw a `TypeError` on `null`.
 
 ### `ColumnNames` {#ColumnNames}
 
