@@ -306,10 +306,11 @@ type UpdateColumns<T extends Table> = ColumnForTable<T> | ColumnForTable<T>[];
 // No more: a wider member (raw() on an int column, cols() of any) would widen the inferred type of param(x) beside
 // it, so that param('1') or param('2020-01-01') no longer fit their column
 type ParameterValue<X> = X extends Parameter<infer V> ? V : never;
-// Where V holds only primitives, a type no value has, which an argument typed any still fits, as under 6.6.1
-declare const noValue: unique symbol;
+// Where V holds only primitives, a type no value has, which an argument typed any still fits, as under 6.6.1.
+// An object type, not a unique symbol: a consumer's .d.ts can write it out, where it cannot name an unexported symbol
+type NoValue = { readonly 'pgcast: no value': never };
 type WrappedValue<X, W = Exclude<ParameterValue<X>, string | number | boolean | bigint | symbol | null | undefined>> =
-  [W] extends [never] ? typeof noValue : W;
+  [W] extends [never] ? NoValue : W;
 type UpdateValuesForTable<T extends Table, U = UpdatableForTable<T>> = {
   [K in keyof U]: U[K] | ColumnValues<WrappedValue<U[K]>> | ColumnNames<WrappedValue<U[K]>> |
     (string extends ParameterValue<U[K]> ? DangerousRawString : never)
