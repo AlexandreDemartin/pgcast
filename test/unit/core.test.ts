@@ -844,6 +844,18 @@ describe('cols and vals', () => {
       });
   });
 
+  it('cols and vals of a Buffer throw before its keys, one per byte, are listed', () => {
+    // Object.keys() of a 10 MB Buffer lists 10 million indexes: master took seconds to compile one
+    const x = Buffer.from('ab'), keys = vi.spyOn(Object, 'keys');
+    try {
+      expect({ cols: failure(() => one(cols(x))), vals: failure(() => one(vals(x))) })
+        .toEqual({ cols: { name: 'Error', message: bufferColsMessage }, vals: { name: 'Error', message: bufferValsMessage } });
+      expect(keys.mock.calls.filter(([arg]) => arg === x)).toEqual([]);
+    } finally {
+      keys.mockRestore();
+    }
+  });
+
   it('cols and vals of a built-in throw before writing anything for it, and before reading its values', () => {
     const result = { text: '', values: [] };
     expect(failure(() => sql`SELECT ${param(1)}, ${vals(Buffer.from('a'))}`.compile(result))).toEqual({ name: 'Error', message: bufferValsMessage });
