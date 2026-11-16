@@ -218,6 +218,26 @@ const warnAboutDomainsUnderDomains = (columns: string[], config: CompleteConfig)
 };
 
 /**
+ * With `intervalsTypedAsObjects` left out, note the columns it would type otherwise, once per run: an interval is typed
+ * as its text, though pg parses it into an object for a query of your own. `false` keeps the text with no note.
+ */
+const warnAboutIntervalsAsText = (columns: string[], config: CompleteConfig) => {
+  if (columns.length === 0) return;
+
+  const
+    warn = config.warningListener === true ? console.log : config.warningListener || (() => void 0),
+    sorted = [...columns].sort(),
+    one = sorted.length === 1,
+    them = one ? 'it' : 'them',
+    list = one ? sorted[0] : sorted.slice(0, -1).join(', ') + ' and ' + sorted[sorted.length - 1];
+
+  warn(`Note: ${list} ${one ? 'is' : 'are'} of interval, an array of it, or a domain over either: as generated, ` +
+    `${one ? 'it is' : 'they are'} typed as its text, though pg's default type parser returns an interval from a query ` +
+    `of your own as an object, a PostgresInterval. Set intervalsTypedAsObjects: true to type ${them} as pg parses ` +
+    `${them}; it will be the default in pgcast 7.0. Set it to false to keep the text, if a type parser of yours returns it.`);
+};
+
+/**
  * Warn about each `include` entry that names no relation of its schema: it generates nothing.
  * `information_schema.tables` lists only the tables and views the connecting role has a privilege on.
  */
@@ -333,6 +353,7 @@ const tsForQueries = async (config: CompleteConfig, queryFn: (q: pg.QueryConfig)
     domainRootsOnce: Promise<DomainRoots>[] = [],
     domainRoots = () => domainRootsOnce[0] ??= domainRootsInDatabase(queryFn),
     domainsUnderDomains: string[] = [],
+    intervalsAsText: string[] = [],
     schemaNames = Object.keys(schemas),
     schemaData = (await Promise.all(
       schemaNames.map(async schema => {
@@ -353,7 +374,7 @@ const tsForQueries = async (config: CompleteConfig, queryFn: (q: pg.QueryConfig)
           tableDefs = await Promise.all(tables.map(async table =>
             definitionForRelationInSchema(table, schema, enums, customTypes, config, queryFn, customTypeOrigins,
               enumsForSchema, columnsTypedByEnumName, customTypeImports, uniqueIndexesNotArbiters, domainsNotByContext,
-              domainRoots, domainsUnderDomains))),
+              domainRoots, domainsUnderDomains, intervalsAsText))),
           schemaIsUnprefixed = schema === config.unprefixedSchema,
           none = '/* (none) */',
           schemaDef = `/* === schema: ${jsdocText(schema)} === */\n` +
@@ -406,6 +427,7 @@ const tsForQueries = async (config: CompleteConfig, queryFn: (q: pg.QueryConfig)
   warnAboutUniqueIndexesNotArbiters(uniqueIndexesNotArbiters, config);
   warnAboutDomainsNotByContext(domainsNotByContext, config);
   warnAboutDomainsUnderDomains(domainsUnderDomains, config);
+  warnAboutIntervalsAsText(intervalsAsText, config);
 
   return { ts, customTypeSourceFiles };
 };

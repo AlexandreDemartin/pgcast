@@ -17,6 +17,7 @@ import { jsdocText, stringLiteral, tsIdentifier } from './quote';
 const tsOwnTypes = new Set('any bigint boolean never number object string symbol undefined unknown'.split(' '));
 const hasOwn = (o: object, key: string) => Object.prototype.hasOwnProperty.call(o, key);
 const contexts = ['Selectable', 'JSONSelectable', 'Whereable', 'Insertable', 'Updatable'] as const;
+const isInterval = (pgType: string | undefined) => pgType === 'interval' || pgType === '_interval';
 
 
 export interface Relation {
@@ -144,6 +145,7 @@ export const definitionForRelationInSchema = async (
   domainsNotByContext: string[] = [],  // an 'out' parameter too: what domainsTypedByContext would change
   domainRoots = () => domainRootsInDatabase(queryFn),
   domainsUnderDomains: string[] = [],  // an 'out' parameter too: what domainsTypedByContext would type over a domain
+  intervalsAsText: string[] = [],  // an 'out' parameter too: what intervalsTypedAsObjects would change
 ) => {
   const
     rows = await columnsForRelation(rel, schemaName, queryFn),
@@ -186,6 +188,15 @@ export const definitionForRelationInSchema = async (
       whereableType = tsTypeForPgType(udtName, typeEnums, 'Whereable', config, inlineEnums),
       insertableType = tsTypeForPgType(udtName, typeEnums, 'Insertable', config, inlineEnums),
       updatableType = tsTypeForPgType(udtName, typeEnums, 'Updatable', config, inlineEnums);
+
+    // an interval, an array of one or a domain over either, whose placeholder holds what pg returns, as generated; under
+    // another domain, or in an array of a domain, only where domainsTypedByContext types it by its base type
+    if (config.intervalsTypedAsObjects == null &&  // left out, or null from JSON: false is a choice, a parser of your own
+      (isInterval(udtName) || (config.domainsTypedByContext ?? false) && isInterval(rootOf(row)?.name))) {
+      const type = domainName !== null ? `${domainSchema}.${domainName}` : udtName === 'interval' ? udtName :
+        udtName === '_interval' ? 'interval[]' : `${udtSchema}.${udtName.slice(1)}[]`;
+      intervalsAsText.push(`${schemaName}.${rel.name}.${column} (${type})`);
+    }
 
     if (!typeEnumsAcrossSchemas && acrossSchemas &&
       tsTypeForPgType(udtName, otherEnums[udtSchema], 'Selectable', config, true) !== selectableType) {

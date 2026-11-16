@@ -61,6 +61,8 @@ const variants: [string, Config][] = [
   ['uniqueIndexConstraintsOnly', { ...main, uniqueIndexConstraintsOnly: true }],
   // only extra.type_zoo's c_int8_domain differs, in the four interfaces but Selectable; the placeholders are the same
   ['domainsTypedByContext', { schemas: customTypesSchemas, domainsTypedByContext: true }],
+  // only extra.type_zoo's c_interval differs, in the four interfaces but JSONSelectable; the placeholders are the same
+  ['intervalsTypedAsObjects', { schemas: customTypesSchemas, intervalsTypedAsObjects: true }],
   ['columnOptions', {
     schemas: { public: only('users', 'accounts'), extra: only('articles') },
     columnOptions: {
@@ -112,12 +114,13 @@ const warningsOf = async (config: Config) => {
 };
 
 /**
- * The same, but the notes on enums, unique indexes and domains, which have their own tests (§ typeEnumsAcrossSchemas,
- * § enumOrder, § uniqueIndexConstraintsOnly, § domainsTypedByContext).
+ * The same, but the notes on enums, unique indexes, domains and intervals, which have their own tests
+ * (§ typeEnumsAcrossSchemas, § enumOrder, § uniqueIndexConstraintsOnly, § domainsTypedByContext, § intervalsTypedAsObjects).
  */
 const warningsFor = async (schemas: Schemas, config: Config = {}) =>
   (await warningsOf({ ...config, schemas })).filter(w => !w.includes('typeEnumsAcrossSchemas') &&
-    !w.includes('enumOrder') && !w.includes('uniqueIndexConstraintsOnly') && !w.includes('domainsTypedByContext'));
+    !w.includes('enumOrder') && !w.includes('uniqueIndexConstraintsOnly') && !w.includes('domainsTypedByContext') &&
+    !w.includes('intervalsTypedAsObjects'));
 
 /** Custom type placeholders, sorted by name: tsForConfig() inserts them in query completion order. */
 const customFiles = (files: Record<string, string>) =>
@@ -970,8 +973,8 @@ ${imports.map(line => `  ${line}\n`).join('')}  export type ${type};  // replace
     });
 
     it.each([undefined, false])('is the text in all five, as in Zapatos 6.6.1 (intervalsTypedAsObjects: %s)', async key => {
-      expect(await probeErrors({ ...config, intervalsTypedAsObjects: key }, intervalProbe('// @ts-expect-error', '//')))
-        .toEqual([]);
+      const keyed = { ...config, ...key === undefined ? {} : { intervalsTypedAsObjects: key } };
+      expect(await probeErrors(keyed, intervalProbe('// @ts-expect-error', '//'))).toEqual([]);
     });
 
     it('each refusal of one probe is an unused directive in the other', async () => {
@@ -1572,7 +1575,7 @@ describe('intervalsTypedAsObjects', () => {
   const inContext = (custom: string, generated: string) => (type: string) => `db.DomainInContext<${custom}, ${generated}, ${type}>`;
 
   it.each([undefined, false])('is the text in all five by default, as in Zapatos 6.6.1 (intervalsTypedAsObjects: %s)', async key => {
-    const { ts: schema, customTypeSourceFiles: files } = await codegen({ ...iv, intervalsTypedAsObjects: key });
+    const { ts: schema, customTypeSourceFiles: files } = await codegen({ ...iv, ...key === undefined ? {} : { intervalsTypedAsObjects: key } });
     expect(linesOf(schema, 'runs', 'runtime')).toEqual(nullable('runtime', 'string', 'string', 'string'));
     expect(linesOf(schema, 'runs', 'breaks')).toEqual(nullable('breaks', 'string[]', 'string[]', 'string[]'));
     expect(linesOf(schema, 'runs', 'span')).toEqual(nullable('span', 'c.PgSpan', 'c.PgSpan', 'c.PgSpan'));
@@ -2490,7 +2493,8 @@ describe('typeEnumsAcrossSchemas', () => {
     return warnings.filter(w => !w.startsWith('Note: this database has bigint') &&  // once per process
       !w.includes('enumOrder') &&  // § enumOrder
       !w.includes('uniqueIndexConstraintsOnly') &&  // § uniqueIndexConstraintsOnly
-      !w.includes('domainsTypedByContext'));  // § domainsTypedByContext
+      !w.includes('domainsTypedByContext') &&  // § domainsTypedByContext
+      !w.includes('intervalsTypedAsObjects'));  // § intervalsTypedAsObjects
   };
 
   it('is off by default: an enum of another schema is an `any` custom type', async () => {
@@ -2616,7 +2620,8 @@ describe('enumOrder', () => {
     return warnings.filter(w => !w.startsWith('Note: this database has bigint') &&  // once per process
       !w.includes('typeEnumsAcrossSchemas') &&  // § typeEnumsAcrossSchemas
       !w.includes('uniqueIndexConstraintsOnly') &&  // § uniqueIndexConstraintsOnly
-      !w.includes('domainsTypedByContext'));  // § domainsTypedByContext
+      !w.includes('domainsTypedByContext') &&  // § domainsTypedByContext
+      !w.includes('intervalsTypedAsObjects'));  // § intervalsTypedAsObjects
   };
 
   it('is off by default: labels in alphabetical order, every.<enum> included', async () => {
@@ -2776,7 +2781,7 @@ describe('include entries that match no relation', () => {
     expect(await warningsFor({ public: all, extra: { include: '*', exclude: ['no_such_table'] } })).toEqual([]);
   });
 
-  it('warns, of main and the snapshot variants, only about no_such_table of include-exclude-lists, and the enums, unique indexes and domains notes', async () => {
+  it('warns, of main and the snapshot variants, only about no_such_table of include-exclude-lists, and the enums, unique indexes, domains and intervals notes', async () => {
     const enumsNote = 'Note: extra.type_zoo.c_enum_array (public.mood[]) and public.products.status (extra.status) ' +
       'have a type of another schema, ' +
       'which is looked up by name in the schema of their relation: an enum becomes an `any` custom type, or the enum of ' +
@@ -2796,20 +2801,25 @@ describe('include entries that match no relation', () => {
       'such as int8 or date: as generated, its placeholder types it in all five interfaces as pg returns it, though a ' +
       'write takes more and, except for money, the shortcuts\' JSON gives another type. Set domainsTypedByContext: true to type it ' +
       'by context while its placeholder holds what the generator wrote for it; it will be the default in pgcast 7.0.';
+    const intervalsNote = 'Note: extra.type_zoo.c_interval (interval) is of interval, an array of it, or a domain over ' +
+      'either: as generated, it is typed as its text, though pg\'s default type parser returns an interval from a query of ' +
+      'your own as an object, a PostgresInterval. Set intervalsTypedAsObjects: true to type it as pg parses it; it will be ' +
+      'the default in pgcast 7.0. Set it to false to keep the text, if a type parser of yours returns it.';
     const expected: Record<string, string[]> = {
       main: [enumsNote, bothOrderNote, uniqueNote('extra.articles.shared_name_idx, public.account_totals.account_totals_owner_key, ' +
-        'public.products.products_status_sku_key and public.products.products_title_lower_key'), domainsNote],
+        'public.products.products_status_sku_key and public.products.products_title_lower_key'), domainsNote, intervalsNote],
       'unprefixedSchema-null': [bothOrderNote, articlesNote],
       'schemaJSDoc-false': [orderNote('mood', 'enum public.mood')],
-      'customTypesTransform-PgMy_type': [enumsNote, bothOrderNote, productsNote, domainsNote],
-      'customTypesTransform-my_type': [enumsNote, bothOrderNote, productsNote, domainsNote],
-      'customTypesTransform-PgMyType': [enumsNote, bothOrderNote, productsNote, domainsNote],
-      'customTypesTransform-function': [enumsNote, bothOrderNote, productsNote, domainsNote],
-      typeEnumsAcrossSchemas: [bothOrderNote, productsNote, domainsNote],
-      'enumOrder-declared': [productsNote, domainsNote],
-      'moduleNames-pgcast': [enumsNote, bothOrderNote, productsNote, domainsNote],
-      uniqueIndexConstraintsOnly: [enumsNote, bothOrderNote, domainsNote],
-      domainsTypedByContext: [enumsNote, bothOrderNote, productsNote],
+      'customTypesTransform-PgMy_type': [enumsNote, bothOrderNote, productsNote, domainsNote, intervalsNote],
+      'customTypesTransform-my_type': [enumsNote, bothOrderNote, productsNote, domainsNote, intervalsNote],
+      'customTypesTransform-PgMyType': [enumsNote, bothOrderNote, productsNote, domainsNote, intervalsNote],
+      'customTypesTransform-function': [enumsNote, bothOrderNote, productsNote, domainsNote, intervalsNote],
+      typeEnumsAcrossSchemas: [bothOrderNote, productsNote, domainsNote, intervalsNote],
+      'enumOrder-declared': [productsNote, domainsNote, intervalsNote],
+      'moduleNames-pgcast': [enumsNote, bothOrderNote, productsNote, domainsNote, intervalsNote],
+      uniqueIndexConstraintsOnly: [enumsNote, bothOrderNote, domainsNote, intervalsNote],
+      domainsTypedByContext: [enumsNote, bothOrderNote, productsNote, intervalsNote],
+      intervalsTypedAsObjects: [enumsNote, bothOrderNote, productsNote, domainsNote],
       columnOptions: [bothOrderNote, articlesNote],
       'include-exclude-lists': [unmatched('no_such_table', 'public'), bothOrderNote, articlesNote],
       'exclude-star': [bothOrderNote],  // exclude: '*' still generates the enums

@@ -69,7 +69,9 @@ const baseTsTypeForBasePgType = (pgType: string, enums: EnumData, context: TypeC
     case "tstzrange":  // ditto
     case "daterange":  // ditto
       return 'db.DateRangeString';
-    case 'interval':  // format depends on IntervalStyle, hence only string-typed
+    case 'interval':  // format depends on IntervalStyle, hence only string-typed; but pg parses it, into an object
+      return !config.intervalsTypedAsObjects || context === 'JSONSelectable' ? 'string' :
+        context === 'Selectable' ? 'db.PostgresInterval' : '(string | db.PostgresInterval)';
     case 'bpchar':
     case 'char':
     case 'varchar':
