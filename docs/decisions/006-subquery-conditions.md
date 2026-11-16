@@ -105,6 +105,7 @@ isInSelect<T extends Table, C extends keyof SelectableForTable<T>>(
 
 - **`parent('id')` is not checked against the outer table**, as in `lateral`: a wrong column is Postgres's 42703, a wrong `parent` its 42P01, both before any row.
 - **The alias rule compares names, not relations**: `parent: 'public.users'` over `extra.users` is refused, though Postgres resolves `"public"."users"."id"` to the outer table (replayed); an alias settles it. The bare `"users"."id"` there is the inner table (replayed: no row).
+- **A name the inner table lacks resolves to the outer row**, silently, as in a `lateral`'s `Whereable` today. Typed calls refuse it; an untyped one (JavaScript, `as any`) does not. `{ manager_id: isInSelect('extra.articles', all, 'manager_id') }` compiles to `"manager_id" IN (SELECT "manager_id" FROM "extra"."articles")` and returns Bob and Cyd, not Postgres's 42703; an inner key `display_name: 'Bob'` filters on the outer user (replayed). A JavaScript caller gets wrong rows, no error.
 
 ## Sources
 
