@@ -158,19 +158,45 @@ export const eqAny: EqAnySignatures = (a: readonly unknown[] | ParentColumn) =>
 
 /* === jsonb === */
 
+// what JSON.stringify would not write as it is, for jsonbContains()'s messages; undefined for a JSON value
+const notJSON = (x: unknown) =>
+  x === undefined ? '`undefined`' : typeof x === 'function' ? 'a function' : typeof x === 'bigint' ? 'a `bigint`' :
+    notAValue(x) ?? (typeof x === 'symbol' ? 'a symbol' : undefined);
+
 // the value goes as JSON text: pg alone sends a string as text and an array as '{1,2}', which the cast to jsonb refuses
-// (22P02), and JSON.stringify would send a wrapper's fields, which match no row, with no error
+// (22P02); JSON.stringify would leave out a key holding undefined, a function or a symbol, so that { a: undefined }
+// matched every row, write them as null in an array, and a wrapper as its fields, which match no row, with no error
 const jsonbParam = (a: unknown) => {
   const name = notAValue(a);
-  return name === undefined ? param(JSON.stringify(a), 'jsonb') :
-    refused(`\`jsonbContains()\` sends its value as JSON text, so it takes a JSON value, not ${name}: give a value; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.`);
+  if (name !== undefined) return refused(`\`jsonbContains()\` sends its value as JSON text, so it takes a JSON value, not ${name}: give a value; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.`);
+  let refusal: string | undefined, top = true;
+  try {
+    const text = JSON.stringify(a, function (this: unknown, key, x: unknown) {
+      const what = refusal === undefined ? notJSON(x) : undefined;
+      if (what !== undefined) {
+        const
+          inArray = Array.isArray(this),
+          at = top ? '' : inArray ? ` at item ${key}` : ` at key \`${key}\``,
+          effect = typeof x === 'bigint' ? 'throw' : typeof x === 'object' ? 'write its fields' :
+            top ? 'write nothing' : inArray ? 'write `null` in its place' : 'leave the key out, and the value match more rows',
+          advice = typeof x === 'bigint' ? 'Give it as a number or a string' : top || inArray ? 'Give a JSON value' : 'Give a JSON value, or leave the key out';
+        refusal = `\`jsonbContains()\` sends its value as JSON text, so it takes a JSON value, not ${what}${at}: \`JSON.stringify\` would ${effect}. ${advice}.`;
+      }
+      top = false;
+      return refusal === undefined ? x : null;
+    });
+    return refusal === undefined ? param(text, 'jsonb') : refused(refusal);
+  } catch (err) {
+    return refused(`\`jsonbContains()\` sends its value as JSON text, so it takes a JSON value: \`JSON.stringify\` threw "${(err as Error).message}". Give a JSON value.`);
+  }
 };
 
 /**
  * `"col" @> CAST($1 AS "jsonb")`, on a `jsonb` column: its JSON contains the value's. The value is sent as JSON text,
  * `JSON.stringify(a)`, whatever `castObjectParamsToJson` and `castArrayParamsToJson`, so a string is a JSON string and
- * `null` the JSON `null`. A `json` column passes the type, and Postgres refuses it (42883). `db.param()`, `db.parent()`,
- * a `sql` fragment, `db.Default`, `db.self`, `db.raw()`, `db.cols()` and `db.vals()` throw as the query compiles.
+ * `null` the JSON `null`. A `json` column passes the type, and Postgres refuses it (42883). As the query compiles, what
+ * JSON lacks throws, at any depth (`undefined`, a function, a symbol, a `bigint`, a circular value), and so do
+ * `db.param()`, `db.parent()`, a `sql` fragment, `db.Default`, `db.self`, `db.raw()`, `db.cols()` and `db.vals()`.
  * @param a A JSON value
  */
 export const jsonbContains = (a: JSONValue) => sql<SQL, boolean | null, JSONValue>`${self} @> ${jsonbParam(a)}`;
