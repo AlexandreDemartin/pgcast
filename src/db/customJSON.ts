@@ -24,7 +24,9 @@ function parseJSONWithLargeNumbersAsStrings(str: string) {
   });
 }
 
-const numRe = /^(-?)(0|[1-9][0-9]*?)(0*)([.](0*)([0-9]*?)0*)?([eE]([-+]?)0*([0-9]+))?$/;
+// Each captured run of digits ends on a non-zero digit, so the zeros after it match only one way: linear time
+// (a lazy `[0-9]*?` before `0*` backtracks in O(n²)).
+const numRe = /^(-?)(0|[1-9](?:[0-9]*[1-9])?)(0*)([.](0*)((?:[0-9]*[1-9])?)0*)?([eE]([-+]?)0*([0-9]+))?$/;
 
 /**
  * Transform a valid numeric string (any length and precision) into a format 

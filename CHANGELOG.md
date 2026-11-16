@@ -6,6 +6,10 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 
 ## [Unreleased]
 
+### Fixed
+- With `enableCustomJSONParsingForLargeNumbers()`, a long `json` or `jsonb` number is checked in time linear in its length. On Zapatos 6.6.1 and pgcast up to 6.7.1, some long numbers took time quadratic in their number of digits.
+  - Unchanged: what each number parses to.
+
 ## [6.7.1] - 2026-11-16
 
 ### Security
