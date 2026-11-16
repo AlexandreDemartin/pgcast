@@ -7,11 +7,12 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 ## [Unreleased]
 
 ### Fixed
-- `upsert()` takes no update value from a key that only `Object.prototype` has: an inserted column with no key in `updateValues`, nor on a prototype of its own, is set from `EXCLUDED`, as any other column.
+- `upsert()` takes no update value from a key that only `Object.prototype` has: an inserted column with no key in `updateValues`, nor on a prototype of its own, is set from `EXCLUDED`, as any other column; and an options object with no `updateValues`, nor a prototype of its own that has one, has none.
   - Changed: a column named `valueOf`, `toString`, `hasOwnProperty` or `constructor` threw "Alien object while interpolating SQL", on Zapatos 6.6.1 and pgcast 6.7.1; it is now set from `EXCLUDED`.
   - Changed: a `__proto__` column was set to `TRUE` on 6.6.1, to `'{}'` (`Object.prototype`) on 6.7.1; it is now set from `EXCLUDED`.
   - Changed: a key added to `Object.prototype` (`Object.prototype.mood = 'calm'`) was the update value of that column on conflict: on 6.6.1 compiled as a column name, `ROW(…, "calm")`, on 6.7.1 sent as a parameter and stored in place of the inserted value; it is now set from `EXCLUDED`.
-  - Unchanged: a class instance, a getter, an `Object.create()` value or a `Proxy` as `updateValues`, read as often and through the same traps; a `constructor` column beside a class instance, which still throws, as does `valueOf` beside an object from another realm. A key added to `Object.prototype` still joins the columns of a multi-row `insert()` or `upsert()`, as `DEFAULT`, and the options object is still read through its prototype.
+  - Changed: an `updateValues` added to `Object.prototype` (`Object.prototype.updateValues = { mood: 'calm' }`) was the `updateValues` of every `upsert()` given an options object without one (`{ returning: ['email'] }`): on 6.6.1 its values compiled as column names, `ROW(…, "calm")`, on 6.7.1 they were sent as parameters and stored; there is now none, so `mood` is set from `EXCLUDED` when the row inserts it, and left out of the update otherwise.
+  - Unchanged: a class instance, a getter, an `Object.create()` value or a `Proxy` as `updateValues`, read as often and through the same traps; a `constructor` column beside a class instance, which still throws, as does `valueOf` beside an object from another realm. A key added to `Object.prototype` still joins the columns of a multi-row `insert()` or `upsert()`, as `DEFAULT`, and the other options are still read through the prototype of the options object (#552).
 
 ## [6.7.1] - 2026-11-16
 
