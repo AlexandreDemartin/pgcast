@@ -1,13 +1,13 @@
 // Copyright (C) 2026 Alexandre Demartin
 //
 // The config the CLI reads (src/generate/cliConfig.ts): pgcastconfig.json first, then zapatosconfig.json,
-// then none; with both, a note through warningListener (#368). No database.
+// then none; with both, a note through warningListener (#368); and its arguments (#556). No database.
 
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cliConfig } from '../../src/generate/cliConfig';
+import { cliArgs, cliConfig, runCli } from '../../src/generate/cliConfig';
 
 let dir: string;
 let log: ReturnType<typeof vi.spyOn>;
@@ -120,5 +120,49 @@ describe('cliConfig()', () => {
     expect(() => cliConfig('{"outDir": "{{PGCAST_UNSET}}"}', dir)).toThrow(new Error(
       'If present, the argument to Zapatos must be valid JSON, and all referenced environment variables must exist: ' +
       'Environment variable \'PGCAST_UNSET\' is not set'));
+  });
+});
+
+// the CLI's arguments (#556): --check anywhere, then the first other argument as the JSON, as Zapatos 6.6.1 reads
+// process.argv[2]; a later one ignored, as there, a flag among them returned to be noted
+describe('cliArgs()', () => {
+  it('takes the JSON argument alone, or none, as Zapatos 6.6.1 does', () => {
+    expect(cliArgs([])).toEqual({ check: false, argsJSON: undefined, ignoredFlags: [] });
+    expect(cliArgs(['{"outDir": "./src"}'])).toEqual({ check: false, argsJSON: '{"outDir": "./src"}', ignoredFlags: [] });
+    expect(cliArgs(['{"outDir": "./src"}', '{"outDir": "./lib"}']))
+      .toEqual({ check: false, argsJSON: '{"outDir": "./src"}', ignoredFlags: [] });
+    expect(cliArgs(['', '{}'])).toEqual({ check: false, argsJSON: '', ignoredFlags: [] });  // an empty first argument fails as JSON, as there
+  });
+
+  it('takes --check before or after the JSON argument, or alone', () => {
+    expect(cliArgs(['--check'])).toEqual({ check: true, argsJSON: undefined, ignoredFlags: [] });
+    expect(cliArgs(['--check', '{"outDir": "./src"}'])).toEqual({ check: true, argsJSON: '{"outDir": "./src"}', ignoredFlags: [] });
+    expect(cliArgs(['{"outDir": "./src"}', '--check'])).toEqual({ check: true, argsJSON: '{"outDir": "./src"}', ignoredFlags: [] });
+  });
+
+  it('refuses any other flag in the JSON argument\'s place, where Zapatos 6.6.1 failed on it as JSON', async () => {
+    const refusal = (flag: string) => new Error(`Unknown flag ${flag}: the only flag is --check, beside the JSON argument`);
+    expect(() => cliArgs(['--chek'])).toThrow(refusal('--chek'));
+    expect(() => cliArgs(['--chek', '{}'])).toThrow(refusal('--chek'));
+    expect(() => cliArgs(['--check', '--help'])).toThrow(refusal('--help'));
+    expect(() => cliArgs(['--check', '--help', '{}'])).toThrow(refusal('--help'));
+    expect(() => cliArgs(['--check=true'])).toThrow(refusal('--check=true'));
+    // before reading any config: an unreachable server and a broken config file are never reached
+    write('pgcastconfig.json', '{,}');
+    await expect(runCli(['--chek', '{"db": {"connectionString": "postgres://nobody@127.0.0.1:1/none"}}'], dir))
+      .rejects.toThrow(refusal('--chek'));
+  });
+
+  it('ignores any other flag after the JSON argument, as Zapatos 6.6.1 does, and returns it to be noted', () => {
+    expect(cliArgs(['{}', '--chek'])).toEqual({ check: false, argsJSON: '{}', ignoredFlags: ['--chek'] });
+    expect(cliArgs(['--check', '{}', '--help', 'later', '--check=true']))
+      .toEqual({ check: true, argsJSON: '{}', ignoredFlags: ['--help', '--check=true'] });
+    expect(cliArgs(['{}', '--check', '--chek'])).toEqual({ check: true, argsJSON: '{}', ignoredFlags: ['--chek'] });
+  });
+
+  it('keeps a single dash for the JSON argument, which then fails as JSON, as in Zapatos 6.6.1', () => {
+    expect(cliArgs(['-h'])).toEqual({ check: false, argsJSON: '-h', ignoredFlags: [] });
+    expect(() => cliConfig(cliArgs(['-h']).argsJSON, dir))
+      .toThrow(/^If present, the argument to Zapatos must be valid JSON, and all referenced environment variables must exist: /);
   });
 });

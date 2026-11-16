@@ -154,6 +154,11 @@ Candidates for a check, a rule or a skill line.
 - #558: a red run is checked for failing test names before it counts: a parse error in the test file gives "no tests", not a red test.
 - #558: a guard that branches on a descriptor's shape (`value`, `get`, `set`) gets a row per combination, `{ get, set }` included, or a mutant reading the other field survives.
 - #558: while a setter is defined on `Object.prototype`, `C.prototype[k] = x` runs it and defines nothing: a harness builds prototype holders with `Object.defineProperty`.
+- #557: a CLI argument accepted in several positions is replayed on 6.6.1 in each position: `--check` first fails as JSON, after the JSON argument 6.6.1 ignores it, generates and exits 0.
+- #557: a file written only under a condition (`custom/index.d.ts`, with a custom type) gets a case where the condition is false, or a mutant that drops it survives.
+- #557: an exit code set by the process wrapper (`cli.ts`) is outside every in-process test; when it is the feature's promise, one test runs the CLI as a child process.
+- #557: a new CLI flag needs its line in `switching.md` § Go back, as a new config key does.
+- #557: to compare two builds' CLIs byte for byte, run both with `db.max: 1` (placeholder order) and mask the dist line numbers in stack headers.
 
 ## Minors kept
 
@@ -185,3 +190,6 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #558 (defect): `website/switching.md` § Find the calls whose result changes has no row for #549, #550 or #552, though skill `backward-compat` asks for one per changed result.
 - #558 (defect): `test/unit/shortcuts.test.ts` `a getter on Object.prototype is no option either: %s` has no `{ get, set }` row: the mutant `held.set !== undefined` in `callerValue()` survives.
 - #558 (form): `src/db/shortcuts.ts` JSDoc of `callerValue()`: "a Proxy answering through `get` alone keeps another value" reads as holding with a getter there too; "the one Object.prototype holds" hides `Object.is`.
+- #557 (form): `src/generate/cliConfig.ts` `cliArgs()`: a bare `--` (pnpm passes it on: `pnpm run gen -- --check`) is refused as `Unknown flag --`; skipping it only accepts more.
+- #557 (defect): `check()` is not exported from `zapatos/generate`: a script that calls `generate()` with a config built in code cannot check; follow-up issue under #52.
+- #557 (form): `website/first-query.md` "Run `npx pgcast` again after each migration" and `website/install.md` `::: warning Stale schema`: a link to `/generator#check`, EN and FR.
