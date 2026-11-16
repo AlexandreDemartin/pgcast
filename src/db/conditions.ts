@@ -4,6 +4,7 @@ Copyright (C) 2020 - 2023 George MacKerron
 Released under the MIT licence: see LICENCE file
 */
 
+import type { JSONValue } from './core';
 import {
   SQLFragment,
   ParentColumn,
@@ -151,6 +152,25 @@ interface EqAnySignatures {
  */
 export const eqAny: EqAnySignatures = (a: readonly unknown[] | ParentColumn) =>
   sql<SQL, boolean | null>`${self} = ANY(${a instanceof ParentColumn ? a : anyArray(a)})`;
+
+/* === jsonb === */
+
+// the value goes as JSON text: pg alone sends a string as text and an array as '{1,2}', which the cast to jsonb refuses
+// (22P02), and JSON.stringify would send a wrapper's fields, which match no row, with no error
+const jsonbParam = (a: unknown) => {
+  const name = notAValue(a);
+  return name === undefined ? param(JSON.stringify(a), 'jsonb') :
+    refused(`\`jsonbContains()\` sends its value as JSON text, so it takes a JSON value, not ${name}: give a value; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.`);
+};
+
+/**
+ * `"col" @> CAST($1 AS "jsonb")`, on a `jsonb` column: its JSON contains the value's. The value is sent as JSON text,
+ * `JSON.stringify(a)`, whatever `castObjectParamsToJson` and `castArrayParamsToJson`, so a string is a JSON string and
+ * `null` the JSON `null`. A `json` column passes the type, and Postgres refuses it (42883). `db.param()`, `db.parent()`,
+ * a `sql` fragment, `db.Default`, `db.self`, `db.raw()`, `db.cols()` and `db.vals()` throw as the query compiles.
+ * @param a A JSON value
+ */
+export const jsonbContains = (a: JSONValue) => sql<SQL, boolean | null, JSONValue>`${self} @> ${jsonbParam(a)}`;
 
 /**
  * Join conditions with `OR`: `or(a, b)` compiles to `(a OR b)`, and `or()` to `FALSE`, so that

@@ -345,6 +345,81 @@ describe('eqAny: one array parameter', () => {
   });
 });
 
+describe('jsonbContains: the value sent as jsonb', () => {
+  // users.settings: 1 {"theme":"dark"}, 2 {}, 3 {}; events.payload: {"user": 1}, {"user": 2}, NULL
+  const cases: [string, db.SQL, number[]][] = [
+    ['an object', { settings: dc.jsonbContains({ theme: 'dark' }) }, [1]],
+    ['another value of the key', { settings: dc.jsonbContains({ theme: 'light' }) }, []],
+    ['{} is contained in every object', { settings: dc.jsonbContains({}) }, [1, 2, 3]],
+    ['under not()', { settings: dc.not(dc.jsonbContains({ theme: 'dark' })) }, [2, 3]],
+  ];
+
+  it.each(cases)('%s', async (_name, where, expected) => {
+    expect(await ids('users', where)).toEqual(expected);
+  });
+
+  it('a nullable column: its NULL rows never match', async () => {
+    expect(await sql`SELECT ${'kind'} FROM ${'events'} WHERE ${{ payload: dc.jsonbContains({ user: 2 }) }}`.run(t.client)).toEqual([{ kind: 'login' }]);
+    expect(await sql`SELECT ${'kind'} FROM ${'events'} WHERE ${{ payload: dc.not(dc.jsonbContains({ user: 2 })) }}`.run(t.client)).toEqual([{ kind: 'signup' }]);
+  });
+
+  describe('a string, a number, an array and null', () => {
+    const
+      stored = { object: { edition: 'first', tags: ['x', 'y'], n: 1 }, array: ['x', 1, null], string: 'x', number: 1, null: null },
+      // each value, what it matches among the rows above (an array contains a scalar it holds, as Postgres reads @>)
+      values: [string, db.JSONValue, string[]][] = [
+        ['a string', 'x', ['array', 'string']],
+        ['a number', 1, ['array', 'number']],
+        ['an array', ['x'], ['array']],
+        ['null, the JSON null', null, ['array', 'null']],
+        ['an object, nested', { tags: ['y'] }, ['object']],
+      ];
+    const rows = async () => {
+      // each stored as its JSON text, as an insert() of a string or an array would hit the 22P02 below
+      const inserted = await db.insert('extra.type_zoo', [...Object.values(stored).map(v => JSON.stringify(v)), db.sql`NULL`]
+        .map(c_jsonb => ({ c_jsonb })), { returning: ['id'] }).run(t.client);
+      return Object.fromEntries([...Object.keys(stored), 'sqlNull'].map((k, i) => [inserted[i]!.id, k]));
+    };
+
+    it.each(values)('%s: the rows whose JSON contains it, SQL NULL never', async (_name, value, expected) => {
+      const byId = await rows();
+      expect((await ids('extra.type_zoo', { c_jsonb: dc.jsonbContains(value) })).map(id => byId[id])).toEqual(expected);
+    });
+
+    it.each(values)('%s: Postgres receives JSON text of that type, whatever the configuration', async (_name, value) => {
+      const received = [];
+      for (const config of [{}, { castObjectParamsToJson: true }, { castArrayParamsToJson: true }]) {
+        db.setConfig(config);
+        const { values: sent } = sql`${{ c_jsonb: dc.jsonbContains(value) }}`.compile();
+        received.push((await t.client.query('SELECT jsonb_typeof(CAST($1 AS "jsonb")) AS type, CAST($1 AS "jsonb") AS json', sent)).rows[0]);
+        resetConfig();
+      }
+      const type = value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value;
+      expect(received).toEqual(Array(3).fill({ type, json: value }));
+    });
+
+    it('where a bare param() cast to jsonb sends a string as text and an array as a Postgres array: 22P02', async () => {
+      for (const value of ['x', ['x']])
+        expect(await pgError(t.client, () => ids('extra.type_zoo', { c_jsonb: sql`${db.self} @> ${param(value, 'jsonb')}` })))
+          .toEqual({ code: '22P02', message: 'invalid input syntax for type json' });
+    });
+  });
+
+  it('the same rows under castObjectParamsToJson and castArrayParamsToJson', async () => {
+    db.setConfig({ castObjectParamsToJson: true, castArrayParamsToJson: true });
+    expect(await ids('users', { settings: dc.jsonbContains({ theme: 'dark' }) })).toEqual([1]);
+  });
+
+  it('characterization: a json column passes the type, and Postgres refuses it, 42883', async () => {
+    expect(await pgError(t.client, () => ids('extra.type_zoo', { c_json: dc.jsonbContains({}) })))
+      .toEqual({ code: '42883', message: 'operator does not exist: json @> jsonb' });
+  });
+
+  it('a wrapper rejects before any query', async () => {
+    await expect(ids('users', { settings: dc.jsonbContains(param({ theme: 'dark' }) as any) })).rejects.toThrow('so it takes a JSON value, not `db.param()`');
+  });
+});
+
 describe('add, subtract (in an update)', () => {
   it('add and subtract a number', async () => {
     expect(await db.update('accounts', { balance: dc.add(10), lifetime_ops: dc.subtract(1) }, { id: 3 },

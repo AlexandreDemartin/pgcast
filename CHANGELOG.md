@@ -7,6 +7,7 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 ## [Unreleased]
 
 ### Added
+- `db.conditions.jsonbContains()`: `"col" @> CAST($1 AS "jsonb")`, on a `jsonb` column, its value sent as its JSON text, `JSON.stringify(value)`, under every configuration, where `pg` alone sends a string as text and an array as a Postgres array, both refused once cast (22P02) (#564). A string is a JSON string, `null` JSON's `null`; a key holding `undefined` is left out, as `JSON.stringify` does. The value is typed `JSONValue`, and so is the condition, so a `text`, `integer` or `jsonb[]` column refuses it; a `json` column passes the type, and Postgres refuses it (42883). `Default`, `self`, `param()`, `parent()`, a `sql` fragment, `raw()`, `cols()` or `vals()` as the value throws while compiling, naming it.
 - `db.conditions.eqAny()`: `"col" = ANY($1)`, the whole array one parameter, so one query text for any length, where `isIn()` writes `IN ($1, $2, …)`, one per length, and past the 65,535 parameters a query can hold (#563). An empty array matches no row, with the same SQL; `parent('col')`, an array column of a `lateral`'s parent row, gives `= ANY("parent"."col")`; under `castArrayParamsToJson` the array is still sent as an array. A list that is not an array throws while compiling, as in `isIn()`, and so does an item that is an array, a `Parameter`, a `sql` fragment or `parent()`, which `pg` would send as more items or as JSON, or `Default`, `self`, `raw()`, `cols()` or `vals()`; each message names the value it refuses.
 
 ## [6.8.0] - 2026-11-16

@@ -43,6 +43,7 @@ describe('conditions', () => {
         "isNull",
         "isTrue",
         "isUnknown",
+        "jsonbContains",
         "like",
         "lt",
         "lte",
@@ -547,6 +548,123 @@ describe('conditions', () => {
     expect(() => show(dc.eqAny(new Set([1]) as any).copy())).toThrow('takes an array, not `Set`');
   });
 
+  it('jsonbContains: the value is one jsonb parameter, as JSON text, whatever its kind', () => {
+    // pg alone would send a string as text and an array as '{1,2}', which the cast to jsonb refuses (22P02)
+    expect({
+      object: show(dc.jsonbContains({ theme: 'dark', tags: ['a'] })), string: show(dc.jsonbContains('dark')),
+      number: show(dc.jsonbContains(1.5)), array: show(dc.jsonbContains([1, 'a', null])), null: show(dc.jsonbContains(null)),
+      boolean: show(dc.jsonbContains(false)), empty: show(dc.jsonbContains({})),
+    }).toMatchInlineSnapshot(`
+      {
+        "array": {
+          "text": "(("col" @> CAST($1 AS "jsonb")))",
+          "values": [
+            "[1,"a",null]",
+          ],
+        },
+        "boolean": {
+          "text": "(("col" @> CAST($1 AS "jsonb")))",
+          "values": [
+            "false",
+          ],
+        },
+        "empty": {
+          "text": "(("col" @> CAST($1 AS "jsonb")))",
+          "values": [
+            "{}",
+          ],
+        },
+        "null": {
+          "text": "(("col" @> CAST($1 AS "jsonb")))",
+          "values": [
+            "null",
+          ],
+        },
+        "number": {
+          "text": "(("col" @> CAST($1 AS "jsonb")))",
+          "values": [
+            "1.5",
+          ],
+        },
+        "object": {
+          "text": "(("col" @> CAST($1 AS "jsonb")))",
+          "values": [
+            "{"theme":"dark","tags":["a"]}",
+          ],
+        },
+        "string": {
+          "text": "(("col" @> CAST($1 AS "jsonb")))",
+          "values": [
+            ""dark"",
+          ],
+        },
+      }
+    `);
+  });
+
+  it('jsonbContains writes the same under castObjectParamsToJson and castArrayParamsToJson, where a bare param() changes', () => {
+    const value = { theme: 'dark' }, list = ['dark'];
+    const bare = () => ({ object: show(sql`${self} @> ${param(value, 'jsonb')}`), array: show(sql`${self} @> ${param(list, 'jsonb')}`) });
+    const before = { object: show(dc.jsonbContains(value)), array: show(dc.jsonbContains(list)) }, bareBefore = bare();
+    for (const config of [{ castObjectParamsToJson: true }, { castArrayParamsToJson: true }]) {
+      db.setConfig(config);
+      try {
+        expect({ object: show(dc.jsonbContains(value)), array: show(dc.jsonbContains(list)) }).toEqual(before);
+      } finally { resetConfig(); }
+    }
+    db.setConfig({ castObjectParamsToJson: true, castArrayParamsToJson: true });
+    try {
+      expect({ before: bareBefore, after: bare() }).toMatchInlineSnapshot(`
+        {
+          "after": {
+            "array": {
+              "text": "(("col" @> CAST($1 AS "jsonb")))",
+              "values": [
+                "["dark"]",
+              ],
+            },
+            "object": {
+              "text": "(("col" @> CAST($1 AS "jsonb")))",
+              "values": [
+                "{"theme":"dark"}",
+              ],
+            },
+          },
+          "before": {
+            "array": {
+              "text": "(("col" @> CAST($1 AS "jsonb")))",
+              "values": [
+                [
+                  "dark",
+                ],
+              ],
+            },
+            "object": {
+              "text": "(("col" @> CAST($1 AS "jsonb")))",
+              "values": [
+                {
+                  "theme": "dark",
+                },
+              ],
+            },
+          },
+        }
+      `);
+    } finally { resetConfig(); }
+  });
+
+  it('jsonbContains reads its value once, at the call', () => {
+    const value: { theme: string; size?: number } = { theme: 'dark' }, condition = dc.jsonbContains(value);
+    value.size = 2;
+    expect(show(condition).values).toEqual(['{"theme":"dark"}']);
+  });
+
+  it('a copy of jsonbContains compiles the same, and still refuses what jsonbContains refuses', () => {
+    const condition = dc.jsonbContains({ theme: 'dark' });
+    expect(sql`${{ col: condition.copy() }}`.compile()).toEqual(sql`${{ col: condition }}`.compile());
+    expect(() => show(dc.jsonbContains(param({ theme: 'dark' }) as any).copy())).toThrow('so it takes a JSON value, not `db.param()`');
+  });
+
   it('fromNow, now, add, subtract', () => {
     expect({
       fromNow: dc.fromNow(3).compile(), fromNowUnit: dc.fromNow(-1.5, 'hours').compile(), now: dc.now.compile(),
@@ -613,7 +731,7 @@ describe('Default, self, raw, cols and vals as the value of a condition', () => 
   };
 
   it('covers every condition of db.conditions', () => {
-    expect([...Object.keys(one), ...Object.keys(two), ...Object.keys(lists), 'eqAny', ...noValue].sort()).toEqual(Object.keys(dc).sort());
+    expect([...Object.keys(one), ...Object.keys(two), ...Object.keys(lists), 'eqAny', 'jsonbContains', ...noValue].sort()).toEqual(Object.keys(dc).sort());
   });
 
   it('eqAny given an item one array parameter cannot hold throws when compiled, not when called, saying what to do', () => {
@@ -656,6 +774,30 @@ describe('Default, self, raw, cols and vals as the value of a condition', () => 
         "vals": "\`eqAny()\` takes an array of values, not \`db.vals()\`: write \`eqAny(values)\`; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
       }
     `);
+  });
+
+  it('jsonbContains given a wrapper throws when compiled, not when called, saying what to do', () => {
+    // JSON.stringify would send their fields, '{"value":…}', and match no row, with no error
+    const values = { Default, self, raw: raw("'{}'"), cols: cols(['a']), vals: vals(['a']), param: param({ a: 1 }),
+      fragment: sql`'{}'::jsonb`, parent: parent('settings') };
+    expect(Object.fromEntries(Object.entries(values).map(([name, x]) => [name, thrown(dc.jsonbContains(x as any))])))
+      .toMatchInlineSnapshot(`
+        {
+          "Default": "\`jsonbContains()\` sends its value as JSON text, so it takes a JSON value, not \`db.Default\`: give a value; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
+          "cols": "\`jsonbContains()\` sends its value as JSON text, so it takes a JSON value, not \`db.cols()\`: give a value; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
+          "fragment": "\`jsonbContains()\` sends its value as JSON text, so it takes a JSON value, not a \`sql\` fragment: give a value; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
+          "param": "\`jsonbContains()\` sends its value as JSON text, so it takes a JSON value, not \`db.param()\`: give a value; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
+          "parent": "\`jsonbContains()\` sends its value as JSON text, so it takes a JSON value, not \`db.parent()\`: give a value; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
+          "raw": "\`jsonbContains()\` sends its value as JSON text, so it takes a JSON value, not \`db.raw()\`: give a value; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
+          "self": "\`jsonbContains()\` sends its value as JSON text, so it takes a JSON value, not \`db.self\`: give a value; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
+          "vals": "\`jsonbContains()\` sends its value as JSON text, so it takes a JSON value, not \`db.vals()\`: give a value; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
+        }
+      `);
+  });
+
+  it('jsonbContains given what JSON.stringify cannot write: undefined is NULL, a bigint throws at the call', () => {
+    expect(show(dc.jsonbContains(undefined as any))).toEqual({ text: '(("col" @> CAST($1 AS "jsonb")))', values: [undefined] });
+    expect(() => dc.jsonbContains(BigInt(1) as any)).toThrow('Do not know how to serialize a BigInt');
   });
 
   it('a condition given Default or self throws when compiled, not when called', () => {

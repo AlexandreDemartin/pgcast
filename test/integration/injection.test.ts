@@ -524,6 +524,19 @@ describe('a Parameter in a Whereable, in isIn or in vals', () => {
     expect(await q.run(t.client)).toEqual([{ id: 2 }]);
     expect(await adaName()).toBe('Ada');
   });
+
+  it('a hostile value of jsonbContains stays one jsonb parameter: it matches the JSON it is, and runs nothing', async () => {
+    // a NUL is left out: Postgres refuses \u0000 in jsonb (22P05)
+    const hostile = [`'}'::jsonb OR TRUE; ${update}; --`, `"}]; ${update}; --`, `$1`, `\\`, `/*`];
+    const values = [...hostile, Object.fromEntries(hostile.map(v => [v, v])), hostile];
+    for (const value of values) {
+      await sql`UPDATE ${'users'} SET ${'settings'} = ${param(JSON.stringify(value))}::jsonb WHERE ${'id'} = 3`.run(t.client);
+      const q = sql`SELECT ${'id'} FROM ${'users'} WHERE ${{ settings: db.conditions.jsonbContains(value) }}`;
+      expect(q.compile()).toEqual({ text: 'SELECT "id" FROM "users" WHERE (("settings" @> CAST($1 AS "jsonb")))', values: [JSON.stringify(value)] });
+      expect(await q.run(t.client)).toEqual([{ id: 3 }]);
+    }
+    expect(await adaName()).toBe('Ada');
+  });
 });
 
 describe('without parameters (simple protocol)', () => {

@@ -62,3 +62,72 @@ describe('eqAny()', () => {
     db.select('users', { id: c.eqAny([db.param(1)]), display_name: c.eqAny([db.sql`'Ada'`]), email: c.eqAny([db.parent('email')]) });
   });
 });
+
+describe('jsonbContains()', () => {
+  test('takes a JSON value, and gives a condition on JSONValue that a jsonb column takes', () => {
+    expectTypeOf(c.jsonbContains({ theme: 'dark' })).toEqualTypeOf<db.SQLFragment<boolean | null, db.JSONValue>>();
+    expectTypeOf(c.jsonbContains({ theme: 'dark' })).not.toBeAny();
+    expectTypeOf(db.select('users', { settings: c.jsonbContains({ theme: 'dark', sizes: [1, 2], nested: { a: null } }) }).run)
+      .returns.resolves.not.toBeAny();
+    db.select('users', { settings: c.jsonbContains('dark') });
+    db.select('users', { settings: c.jsonbContains(1) });
+    db.select('users', { settings: c.jsonbContains(true) });
+    db.select('users', { settings: c.jsonbContains(null) });
+    db.select('users', { settings: c.jsonbContains(['dark']) });
+    db.select('users', { settings: c.jsonbContains({}) });
+    db.select('users', { settings: c.not(c.jsonbContains({ theme: 'dark' })) });
+    db.select('events', { payload: c.jsonbContains({ user: 1 }) });
+    db.select('extra.type_zoo', { c_jsonb: c.jsonbContains([{ a: 1 }]) });
+    const fromJSON: db.JSONValue = JSON.parse('{"theme":"dark"}');
+    db.select('users', { settings: c.jsonbContains(fromJSON) });
+  });
+
+  test('refuses a column of another type', () => {
+    // @ts-expect-error a text column
+    db.select('users', { display_name: c.jsonbContains('Ada') });
+    // @ts-expect-error an int column
+    db.select('users', { id: c.jsonbContains(1) });
+    // @ts-expect-error a jsonb[] column
+    db.select('extra.type_zoo', { c_jsonb_array: c.jsonbContains([{ a: 1 }]) });
+    // @ts-expect-error a text[] column
+    db.select('extra.type_zoo', { c_text_array: c.jsonbContains(['a']) });
+    // @ts-expect-error a bool column
+    db.select('extra.type_zoo', { c_bool: c.jsonbContains(true) });
+  });
+
+  test('refuses what is no JSON value', () => {
+    // @ts-expect-error a Date, which JSON.stringify writes as a string
+    db.select('users', { settings: c.jsonbContains(new Date()) });
+    // @ts-expect-error a bigint, which JSON.stringify refuses
+    db.select('users', { settings: c.jsonbContains(BigInt(1)) });
+    // @ts-expect-error undefined, sent as NULL
+    db.select('users', { settings: c.jsonbContains(undefined) });
+    // @ts-expect-error a key holding undefined, which JSON.stringify leaves out
+    db.select('users', { settings: c.jsonbContains({ theme: undefined }) });
+    // @ts-expect-error a function
+    db.select('users', { settings: c.jsonbContains(() => 1) });
+  });
+
+  test('refuses Default, self, param(), parent(), a sql fragment, raw(), cols() and vals()', () => {
+    // @ts-expect-error Default
+    db.select('users', { settings: c.jsonbContains(db.Default) });
+    // @ts-expect-error self
+    db.select('users', { settings: c.jsonbContains(db.self) });
+    // @ts-expect-error param()
+    db.select('users', { settings: c.jsonbContains(db.param({ theme: 'dark' })) });
+    // @ts-expect-error parent()
+    db.select('users', { settings: c.jsonbContains(db.parent('settings')) });
+    // @ts-expect-error a sql fragment
+    db.select('users', { settings: c.jsonbContains(db.sql`'{}'`) });
+    // @ts-expect-error raw()
+    db.select('users', { settings: c.jsonbContains(db.raw("'{}'")) });
+    // @ts-expect-error cols()
+    db.select('users', { settings: c.jsonbContains(db.cols(['a'])) });
+    // @ts-expect-error vals()
+    db.select('users', { settings: c.jsonbContains(db.vals(['a'])) });
+  });
+
+  test('characterization: a json column passes the type, both being JSONValue, and Postgres refuses it (42883)', () => {
+    db.select('extra.type_zoo', { c_json: c.jsonbContains({}) });
+  });
+});
