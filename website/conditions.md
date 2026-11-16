@@ -18,7 +18,7 @@ Each member is a [`sql`](/sql-template#sql) fragment written around [`db.self`](
 </CastPanel>
 
 - **Where**: as a Whereable value, so in the `where` of [`select()`](/select#select), [`count()`](/select#count), [`update()`](/insert#update) and [`deletes()`](/insert#deletes), the `having` of `select()`, and a Whereable in a `sql` template. Elsewhere `self` has no column: `` db.sql`SELECT ${db.conditions.isNull}` `` throws "The 'self' column alias has no meaning here"<!-- message --> as it compiles.
-  - [`and()`](#conditions.and), [`or()`](#conditions.or) and [`not()`](#conditions.not) also take Whereables, so they can be a whole `where`; [`now`](#conditions.now) and [`fromNow()`](#conditions.fromNow) hold no `self`, and go anywhere.
+  - [`and()`](#conditions.and), [`or()`](#conditions.or) and [`not()`](#conditions.not) also take Whereables, so they can be a whole `where`; [`now`](#conditions.now), [`fromNow()`](#conditions.fromNow) and [`exists()`](#conditions.exists) hold no `self`, and go anywhere.
 - **Values**: each value is a parameter, `$1`, except a [`Parameter`](/sql-template#Parameter), kept as it is with its cast; a `sql` fragment, written as its SQL; and [`parent()`](/sql-template#parent), the parent query's column in a `lateral` subquery. `Default`, `self`, `raw()`, `cols()` and `vals()` throw: [Values a condition refuses](#refused-values).
 - **Type**: a condition is a `SQLFragment` whose second type argument, `T`, is the type of the value it compares with (its `Constraint`, [`sql`](/sql-template#sql)); the Whereable checks `T` against the column's type. The eight tests, `now` and `fromNow()` have no `T`, and pass on any column.
   - A Whereable is also an expression: interpolated in a `SELECT` list, `{ runtime_minutes: add(10) }` is each film's runtime plus ten, `(("runtime_minutes" + $1))`<!-- probe: db.sql`${{ runtime_minutes: db.conditions.add(10) }}` -->. So the type lets through, as a Whereable value, what is no test: [`add()`](#conditions.add), [`subtract()`](#conditions.subtract), [`now`](#conditions.now) and [`fromNow()`](#conditions.fromNow), which Postgres refuses alone in a `where` (42804).
@@ -364,6 +364,72 @@ On `release_year`, `` not(db.sql`${db.self} = 1974 OR ${db.self} = 1991`) `` wri
 
 Zapatos 6.6.1 wrote `(NOT "release_year" = 1974 OR "release_year" = 1991)`, which Postgres reads `(NOT "release_year" = 1974) OR "release_year" = 1991`: the 1991 film too. Only a condition with a bare `AND` or `OR` at its top level changes rows; any other gains one pair of parentheses.
 
+## Subqueries: `exists()`, `isInSelect()` {#subqueries}
+
+Each writes a subquery on a table, filtered by a Whereable or a `sql` fragment of that table, or [`all`](/sql-template#all) for no `WHERE`; `{}` gives `WHERE TRUE`, as in [`select()`](/select#select). The type checks the Whereable's keys and values against the subquery's table.
+
+<CastPanel example="conditions_exists">
+
+<<< ./examples/conditions_exists.ts{ts twoslash}
+
+</CastPanel>
+
+- **The outer row**: in the subquery's `where`, [`parent('id')`](/sql-template#parent) is a column of the outer query's row, `"films"."id"`<!-- probe: db.conditions.exists('roles', { film_id: db.parent('id') }, { parent: 'films' }) -->, once the `parent` option names its table, as the outer query names it: its alias if it has one. Nothing checks that column: a wrong one is Postgres's 42703, a wrong table its 42P01, before any row.
+- **The same SQL wherever it sits**: in a `sql` query, in `deletes()`, `extras` or a `lateral` subquery. Without `parent`, `parent()` in the subquery throws "The 'parent' table alias has no meaning here", inside a `lateral` too, and `self` has no meaning there either.
+
+| Option | SQL it adds | Effect on the type |
+|---|---|---|
+| `parent` | the table of `parent()`: `"films"."id"`<!-- probe: db.conditions.exists('roles', { film_id: db.parent('id') }, { parent: 'films' }) --> | none |
+| `alias` | `AS "mentees"`<!-- probe: db.conditions.exists('crew', db.all, { alias: 'mentees' }) --> after the table | none |
+
+### `exists()` {#conditions.exists}
+
+```ts
+db.conditions.exists<T extends Table>(table: T, where: WhereableForTable<T> | SQLFragment<any> | AllType, options?: { parent?: string; alias?: string })
+```
+
+`EXISTS (SELECT 1 FROM "roles" WHERE ("film_id" = "films"."id"))`<!-- probe: db.conditions.exists('roles', { film_id: db.parent('id') }, { parent: 'films' }) -->: some row of the table matches. It is never `NULL`, and holds no `self`, so it goes anywhere: as the whole `where`, in `and()`, `or()` and `not()`, or under any key. The anti-join is `not(exists(…))`.
+
+When the subquery reads the outer query's table, give it an alias. Here, the crew who mentor no one:
+
+<CastPanel example="conditions_exists_alias">
+
+<<< ./examples/conditions_exists_alias.ts{ts twoslash}
+
+</CastPanel>
+
+Without the alias, `"crew"."id"` would be the subquery's own row: written by hand, `NOT EXISTS (SELECT 1 FROM crew WHERE mentor_id = crew.id)` gives every member of the crew, as no one mentors themself, with no error. So when `parent` names the subquery's own name, its alias or else its table, the condition throws as the query compiles, and `run()` rejects before any query:
+
+> `` `exists()` was given `parent: 'crew'`, which names "crew", the subquery's own name, so Postgres would read `parent()` as a column of the subquery's row: give the subquery another name with the `alias` option. ``<!-- message -->
+
+Names compare as Postgres reads them: `'crew'`, `'"crew"'` and `'public.crew'` are one name. The check compares names, not tables, so `parent: 'public.crew'` over a `crew` table of another schema is refused too, though Postgres would tell the two apart: an alias settles it.
+
+### `isInSelect()` {#conditions.isInSelect}
+
+```ts
+db.conditions.isInSelect<T extends Table, C extends keyof SelectableForTable<T>>(table: T, where: WhereableForTable<T> | SQLFragment<any> | AllType, column: C, options?: { parent?: string; alias?: string })
+```
+
+`"col" IN (SELECT "actor_id" FROM "roles")`<!-- probe: db.sql`${{ col: db.conditions.isInSelect('roles', db.all, 'actor_id') }}` -->, as a Whereable value: the key's column is on the left. Its `T` is the type of `column`, `null` aside, which the Whereable checks against the key's column. `parent` and `alias` work as in [`exists()`](#conditions.exists). The actors with top billing in some film:
+
+<CastPanel example="conditions_isInSelect">
+
+<<< ./examples/conditions_isInSelect.ts{ts twoslash}
+
+</CastPanel>
+
+A column of another type does not compile:
+
+```ts twoslash
+// @errors: 2322
+import * as db from 'zapatos/db';
+// ---cut---
+db.select('actors', { name: db.conditions.isInSelect('roles', db.all, 'actor_id') });
+```
+
+- **`not()` of it** matches no row once the subquery gives a `NULL`, as Postgres reads `NOT IN`: `{ id: not(isInSelect('crew', db.all, 'mentor_id')) }` finds no one, as one `mentor_id` is `NULL`. For the anti-join, write `not(exists(…))`, above.
+- **As the whole `where`**, outside a key, it has no column: it throws "The 'self' column alias has no meaning here".
+
 ## Dates and times {#dates}
 
 [`after()`](#conditions.after) and [`before()`](#conditions.before) compare with a value: a `Date`, an ISO 8601 string with its offset (`'2030-03-01T20:00:00Z'`, a `TimestampTzString`; the type refuses another form such as `'2030-03-02'`, TS2322), or one of the two fragments below. `pg` sends a `Date` as a string in the local time zone, with its offset: on a `timestamptz` column, the same instant. On a `date` column, Postgres keeps the local day and drops the time: `eq(new Date(2030, 2, 1, 23, 30))` matches `2030-03-01`, and `lt()` of it does not.
@@ -459,7 +525,7 @@ Zapatos 6.6.1 sent `Default` and `self` as the strings `'Symbol(DEFAULT)'` and `
 | `` `db.Default` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. `DEFAULT` is for INSERT and UPDATE values. ``<!-- message --> | `Default` in `isIn()` or `isNotIn()` |
 | `` `db.self` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: compare with a value, or use it in a `sql` fragment value, where it stands for the column. ``<!-- message --> | `self` in `isIn()` or `isNotIn()` |
 | `` `db.raw()`, `db.cols()` and `db.vals()` have no meaning as a value in a Whereable (a filter), nor in `isIn()`: to compare with SQL, use a `sql` fragment value, where `db.self` stands for the column; to compare with a value, give the value itself, or `db.param()`. ``<!-- message --> | `raw()`, `cols()` or `vals()` in `isIn()` or `isNotIn()` |
-| `The 'self' column alias has no meaning here`<!-- message --> | a condition where `self` has no column: in a `sql` template outside a Whereable, in `upsert()`'s `updateValues` |
-| `The 'parent' table alias has no meaning here`<!-- message --> | `parent()` in a condition outside a `lateral` subquery |
+| `The 'self' column alias has no meaning here`<!-- message --> | a condition where `self` has no column: in a `sql` template outside a Whereable, in `upsert()`'s `updateValues`, in the `where` of `exists()` or `isInSelect()`, and `isInSelect()` outside a key |
+| `The 'parent' table alias has no meaning here`<!-- message --> | `parent()` in a condition outside a `lateral` subquery, or in the `where` of `exists()` or `isInSelect()` without `parent` |
 
 A comparison with SQL is a `sql` fragment value, `` { title: db.sql`${db.self} = ${db.raw("'x'")}` } ``: [Raw SQL](/raw-sql).
