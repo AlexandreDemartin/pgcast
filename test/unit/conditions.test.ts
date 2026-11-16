@@ -45,6 +45,7 @@ describe('conditions', () => {
         "isNull",
         "isTrue",
         "isUnknown",
+        "jsonbContains",
         "like",
         "lt",
         "lte",
@@ -549,6 +550,123 @@ describe('conditions', () => {
     expect(() => show(dc.eqAny(new Set([1]) as any).copy())).toThrow('takes an array, not `Set`');
   });
 
+  it('jsonbContains: the value is one jsonb parameter, as JSON text, whatever its kind', () => {
+    // pg alone would send a string as text and an array as '{1,2}', which the cast to jsonb refuses (22P02)
+    expect({
+      object: show(dc.jsonbContains({ theme: 'dark', tags: ['a'] })), string: show(dc.jsonbContains('dark')),
+      number: show(dc.jsonbContains(1.5)), array: show(dc.jsonbContains([1, 'a', null])), null: show(dc.jsonbContains(null)),
+      boolean: show(dc.jsonbContains(false)), empty: show(dc.jsonbContains({})),
+    }).toMatchInlineSnapshot(`
+      {
+        "array": {
+          "text": "(("col" @> CAST($1 AS "jsonb")))",
+          "values": [
+            "[1,"a",null]",
+          ],
+        },
+        "boolean": {
+          "text": "(("col" @> CAST($1 AS "jsonb")))",
+          "values": [
+            "false",
+          ],
+        },
+        "empty": {
+          "text": "(("col" @> CAST($1 AS "jsonb")))",
+          "values": [
+            "{}",
+          ],
+        },
+        "null": {
+          "text": "(("col" @> CAST($1 AS "jsonb")))",
+          "values": [
+            "null",
+          ],
+        },
+        "number": {
+          "text": "(("col" @> CAST($1 AS "jsonb")))",
+          "values": [
+            "1.5",
+          ],
+        },
+        "object": {
+          "text": "(("col" @> CAST($1 AS "jsonb")))",
+          "values": [
+            "{"theme":"dark","tags":["a"]}",
+          ],
+        },
+        "string": {
+          "text": "(("col" @> CAST($1 AS "jsonb")))",
+          "values": [
+            ""dark"",
+          ],
+        },
+      }
+    `);
+  });
+
+  it('jsonbContains writes the same under castObjectParamsToJson and castArrayParamsToJson, where a bare param() changes', () => {
+    const value = { theme: 'dark' }, list = ['dark'];
+    const bare = () => ({ object: show(sql`${self} @> ${param(value, 'jsonb')}`), array: show(sql`${self} @> ${param(list, 'jsonb')}`) });
+    const before = { object: show(dc.jsonbContains(value)), array: show(dc.jsonbContains(list)) }, bareBefore = bare();
+    for (const config of [{ castObjectParamsToJson: true }, { castArrayParamsToJson: true }]) {
+      db.setConfig(config);
+      try {
+        expect({ object: show(dc.jsonbContains(value)), array: show(dc.jsonbContains(list)) }).toEqual(before);
+      } finally { resetConfig(); }
+    }
+    db.setConfig({ castObjectParamsToJson: true, castArrayParamsToJson: true });
+    try {
+      expect({ before: bareBefore, after: bare() }).toMatchInlineSnapshot(`
+        {
+          "after": {
+            "array": {
+              "text": "(("col" @> CAST($1 AS "jsonb")))",
+              "values": [
+                "["dark"]",
+              ],
+            },
+            "object": {
+              "text": "(("col" @> CAST($1 AS "jsonb")))",
+              "values": [
+                "{"theme":"dark"}",
+              ],
+            },
+          },
+          "before": {
+            "array": {
+              "text": "(("col" @> CAST($1 AS "jsonb")))",
+              "values": [
+                [
+                  "dark",
+                ],
+              ],
+            },
+            "object": {
+              "text": "(("col" @> CAST($1 AS "jsonb")))",
+              "values": [
+                {
+                  "theme": "dark",
+                },
+              ],
+            },
+          },
+        }
+      `);
+    } finally { resetConfig(); }
+  });
+
+  it('jsonbContains reads its value once, at the call', () => {
+    const value: { theme: string; size?: number } = { theme: 'dark' }, condition = dc.jsonbContains(value);
+    value.size = 2;
+    expect(show(condition).values).toEqual(['{"theme":"dark"}']);
+  });
+
+  it('a copy of jsonbContains compiles the same, and still refuses what jsonbContains refuses', () => {
+    const condition = dc.jsonbContains({ theme: 'dark' });
+    expect(sql`${{ col: condition.copy() }}`.compile()).toEqual(sql`${{ col: condition }}`.compile());
+    expect(() => show(dc.jsonbContains(param({ theme: 'dark' }) as any).copy())).toThrow('so it takes a JSON value, not `db.param()`');
+  });
+
   it('fromNow, now, add, subtract', () => {
     expect({
       fromNow: dc.fromNow(3).compile(), fromNowUnit: dc.fromNow(-1.5, 'hours').compile(), now: dc.now.compile(),
@@ -617,7 +735,7 @@ describe('Default, self, raw, cols and vals as the value of a condition', () => 
   };
 
   it('covers every condition of db.conditions', () => {
-    expect([...Object.keys(one), ...Object.keys(two), ...Object.keys(lists), 'eqAny', ...noValue, ...subqueries].sort()).toEqual(Object.keys(dc).sort());
+    expect([...Object.keys(one), ...Object.keys(two), ...Object.keys(lists), 'eqAny', 'jsonbContains', ...noValue, ...subqueries].sort()).toEqual(Object.keys(dc).sort());
   });
 
   it('eqAny given an item one array parameter cannot hold throws when compiled, not when called, saying what to do', () => {
@@ -660,6 +778,81 @@ describe('Default, self, raw, cols and vals as the value of a condition', () => 
         "vals": "\`eqAny()\` takes an array of values, not \`db.vals()\`: write \`eqAny(values)\`; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
       }
     `);
+  });
+
+  it('jsonbContains given a wrapper throws when compiled, not when called, saying what to do', () => {
+    // JSON.stringify would send their fields, '{"value":…}', and match no row, with no error
+    const values = { Default, self, raw: raw("'{}'"), cols: cols(['a']), vals: vals(['a']), param: param({ a: 1 }),
+      fragment: sql`'{}'::jsonb`, parent: parent('settings') };
+    expect(Object.fromEntries(Object.entries(values).map(([name, x]) => [name, thrown(dc.jsonbContains(x as any))])))
+      .toMatchInlineSnapshot(`
+        {
+          "Default": "\`jsonbContains()\` sends its value as JSON text, so it takes a JSON value, not \`db.Default\`: give a value; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
+          "cols": "\`jsonbContains()\` sends its value as JSON text, so it takes a JSON value, not \`db.cols()\`: give a value; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
+          "fragment": "\`jsonbContains()\` sends its value as JSON text, so it takes a JSON value, not a \`sql\` fragment: give a value; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
+          "param": "\`jsonbContains()\` sends its value as JSON text, so it takes a JSON value, not \`db.param()\`: give a value; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
+          "parent": "\`jsonbContains()\` sends its value as JSON text, so it takes a JSON value, not \`db.parent()\`: give a value; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
+          "raw": "\`jsonbContains()\` sends its value as JSON text, so it takes a JSON value, not \`db.raw()\`: give a value; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
+          "self": "\`jsonbContains()\` sends its value as JSON text, so it takes a JSON value, not \`db.self\`: give a value; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
+          "vals": "\`jsonbContains()\` sends its value as JSON text, so it takes a JSON value, not \`db.vals()\`: give a value; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
+        }
+      `);
+  });
+
+  it('jsonbContains given what JSON lacks, at any depth, throws when compiled, not when called, naming its key', () => {
+    // JSON.stringify leaves out a key holding undefined, a function or a symbol, so that { format: undefined } was {},
+    // every row; it writes them as null in an array, and a wrapper as its fields
+    const head = '`jsonbContains()` sends its value as JSON text, so it takes a JSON value, not',
+      dropped = '`JSON.stringify` would leave the key out, and the value match more rows. Give a JSON value, or leave the key out.',
+      nulled = '`JSON.stringify` would write `null` in its place. Give a JSON value.';
+    const values = {
+      key: { format: undefined }, nested: { a: [{ b: undefined }] }, item: [1, undefined], top: undefined,
+      fn: { f: () => 1 }, symbol: [Symbol('x')], Default: { d: Default }, self: [self],
+      param: { p: param(1) }, fragment: [sql`1`], parent: { p: parent('settings') },
+    };
+    expect(Object.fromEntries(Object.entries(values).map(([name, x]) => [name, thrown(dc.jsonbContains(x as any))]))).toEqual({
+      key: `${head} \`undefined\` at key \`format\`: ${dropped}`,
+      nested: `${head} \`undefined\` at key \`b\`: ${dropped}`,
+      item: `${head} \`undefined\` at item 1: ${nulled}`,
+      top: `${head} \`undefined\`: \`JSON.stringify\` would write nothing. Give a JSON value.`,
+      fn: `${head} a function at key \`f\`: ${dropped}`,
+      symbol: `${head} a symbol at item 0: ${nulled}`,
+      Default: `${head} \`db.Default\` at key \`d\`: ${dropped}`,
+      self: `${head} \`db.self\` at item 0: ${nulled}`,
+      param: `${head} \`db.param()\` at key \`p\`: \`JSON.stringify\` would write its fields. Give a JSON value, or leave the key out.`,
+      fragment: `${head} a \`sql\` fragment at item 0: \`JSON.stringify\` would write its fields. Give a JSON value.`,
+      parent: `${head} \`db.parent()\` at key \`p\`: \`JSON.stringify\` would write its fields. Give a JSON value, or leave the key out.`,
+    });
+  });
+
+  it('jsonbContains given what JSON.stringify throws on throws when compiled, not when called', () => {
+    // as the other refusals, so that run() rejects before any query, rather than select() throwing as it builds the query
+    const circular: Record<string, unknown> = {};
+    circular.me = circular;
+    const head = '`jsonbContains()` sends its value as JSON text, so it takes a JSON value';
+    const built = {
+      bigint: () => dc.jsonbContains(BigInt(1) as any), nested: () => dc.jsonbContains({ n: [BigInt(1)] } as any),
+      circular: () => dc.jsonbContains(circular as any), toJSON: () => dc.jsonbContains({ toJSON() { throw new Error('no film'); } } as any),
+    };
+    const conditions = Object.fromEntries(Object.entries(built).map(([name, build]) => [name, build()]));
+    expect(Object.fromEntries(Object.entries(conditions).map(([name, condition]) => [name, thrown(condition).split('\n')[0]]))).toEqual({
+      bigint: `${head}, not a \`bigint\`: \`JSON.stringify\` would throw. Give it as a number or a string.`,
+      nested: `${head}, not a \`bigint\` at item 0: \`JSON.stringify\` would throw. Give it as a number or a string.`,
+      circular: `${head}: \`JSON.stringify\` threw "Converting circular structure to JSON`,
+      toJSON: `${head}: \`JSON.stringify\` threw "no film". Give a JSON value.`,
+    });
+  });
+
+  it('jsonbContains reads its value once, as it is called', () => {
+    let reads = 0;
+    const condition = dc.jsonbContains({ get format() { reads++; return '35mm'; } });
+    show(condition); show(condition.copy());
+    expect({ reads, values: show(condition).values }).toEqual({ reads: 1, values: ['{"format":"35mm"}'] });
+  });
+
+  it('jsonbContains given null, a key holding null and an empty key still sends them', () => {
+    expect([null, { format: null }, { '': 1 }, [null]].map(x => show(dc.jsonbContains(x)).values))
+      .toEqual([['null'], ['{"format":null}'], ['{"":1}'], ['[null]']]);
   });
 
   it('a condition given Default or self throws when compiled, not when called', () => {

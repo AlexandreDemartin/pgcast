@@ -330,6 +330,18 @@ describe('values stay parameters', () => {
       } finally { resetConfig(); }
     }
   });
+
+  it('the value of jsonbContains is one jsonb parameter, its JSON text, hostile keys and strings included, whatever the configuration', () => {
+    const values = [...Object.values(hostile), Object.fromEntries(Object.values(hostile).map(v => [v, v])), Object.values(hostile)];
+    for (const config of [{}, { castArrayParamsToJson: true }, { castObjectParamsToJson: true }]) {
+      db.setConfig(config);
+      try {
+        for (const value of values)
+          expect(sql`WHERE ${{ settings: db.conditions.jsonbContains(value) }}`.compile())
+            .toEqual({ text: 'WHERE (("settings" @> CAST($1 AS "jsonb")))', values: [JSON.stringify(value)] });
+      } finally { resetConfig(); }
+    }
+  });
 });
 
 describe('raw, cols and vals as a filter value', () => {
