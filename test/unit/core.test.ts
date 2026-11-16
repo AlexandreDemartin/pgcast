@@ -785,7 +785,7 @@ describe('cols and vals', () => {
     bufferColsMessage = '`db.cols()` takes an object or an array, not a `Buffer`, whose byte indexes would compile as names, `"0", "1"`: for one column, write `db.cols([name])`; for a row of `insert()`, `upsert()` or `update()`, give a plain object.',
     bufferValsMessage = '`db.vals()` takes an object or an array, not a `Buffer`, whose bytes would compile as values, one parameter per byte: for one value, write `db.vals([value])`; for a row of `insert()`, `upsert()` or `update()`, give a plain object.';
 
-  it('cols and vals of a built-in with no own enumerable key, or of a Buffer, throw, in a sql template, a nested fragment, an IN list, a lateral subquery and updateValues', () => {
+  it('cols and vals of a built-in with no own enumerable key, or of a Buffer, throw, in a sql template, a nested fragment, an IN list, a lateral subquery and updateValues, and cols in groupBy and count() columns', () => {
     const outcomes: string[] = [];
     for (const [name, x] of Object.entries(builtinObjects()))
       for (const [fn, wrap] of [['cols', cols], ['vals', vals]] as const) {
@@ -799,6 +799,11 @@ describe('cols and vals', () => {
             inList: () => sql`SELECT 1 WHERE ${'id'} IN (${wrap(x)})`.compile(),
             lateral: () => db.select('users', db.all, { lateral: { n: sql`SELECT ${wrap(x)}` } }).compile(),
             updateValues: () => db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { display_name: wrap(x as any) } }).compile(),
+            // both hand an object to cols(): 6.6.1 compiled `GROUP BY ` and `count()` for a Date
+            ...fn === 'cols' && {
+              groupBy: () => db.select('users', db.all, { groupBy: x as any }).compile(),
+              count: () => db.count('users', db.all, { columns: x as any }).compile(),
+            },
           };
         for (const [place, f] of Object.entries(places)) {
           const outcome = failure(f);
