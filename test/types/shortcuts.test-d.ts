@@ -518,8 +518,9 @@ describe('upsert', () => {
     void one;
   });
 
-  test('characterization: in a function generic over the table, updateValues refuses param() of a string literal on an enum or time column, which 6.6.1 took (#538)', () => {
-    // the literal widens to string, so param() gives Parameter<string>; a const assertion or a type argument keeps it
+  test('characterization: in a function generic over the table, updateValues refuses param() of a string literal on a column typed only by string or template literals, which 6.6.1 took (#538)', () => {
+    // an enum, time, timetz, a domain typed Int8String: the literal widens to string, so param() gives Parameter<string>;
+    // a const assertion or a type argument keeps it. A union with number or Date (int8, date, timestamp) takes it
     const one = <T extends 'users'>(t: T, r: s.InsertableForTable<T>, c: s.ColumnForTable<T>) => {
       // @ts-expect-error param() of an enum label, until #538
       db.upsert(t, r, c, { updateValues: { mood: db.param('sad') } });
@@ -530,6 +531,13 @@ describe('upsert', () => {
       // @ts-expect-error param() of a time string, until #538
       db.upsert(t, r, c, { updateValues: { c_time: db.param('12:00:00') } });
       db.upsert(t, r, c, { updateValues: { c_time: db.param('12:00:00' as const) } });
+      // @ts-expect-error param() of a timetz string, until #538
+      db.upsert(t, r, c, { updateValues: { c_timetz: db.param('12:00:00+00') } });
+      db.upsert(t, r, c, { updateValues: { c_timetz: db.param('12:00:00+00' as const) } });
+      // @ts-expect-error param() of a domain typed Int8String, until #538
+      db.upsert(t, r, c, { updateValues: { c_int8_domain: db.param('1') } });
+      db.upsert(t, r, c, { updateValues: { c_int8_domain: db.param('1' as const) } });
+      db.upsert(t, r, c, { updateValues: { c_int8: db.param('1') } });
     };
     void one; void zoo;
   });
