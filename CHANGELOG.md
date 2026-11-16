@@ -7,7 +7,7 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 ## [Unreleased]
 
 ### Added
-- `db.conditions.eqAny()`: `"col" = ANY($1)`, the whole array one parameter, so one query text for any length, where `isIn()` writes `IN ($1, $2, …)`, one per length, and past the 65,535 parameters a query can hold (#563). An empty array matches no row, with the same SQL; `parent('col')`, an array column of a `lateral`'s parent row, gives `= ANY("parent"."col")`; under `castArrayParamsToJson` the array is still sent as an array. A list that is not an array throws while compiling, as in `isIn()`, and so does an item that is an array, a `Parameter`, a `sql` fragment or `parent()`, which `pg` would send as more items or as JSON.
+- `db.conditions.eqAny()`: `"col" = ANY($1)`, the whole array one parameter, so one query text for any length, where `isIn()` writes `IN ($1, $2, …)`, one per length, and past the 65,535 parameters a query can hold (#563). An empty array matches no row, with the same SQL; `parent('col')`, an array column of a `lateral`'s parent row, gives `= ANY("parent"."col")`; under `castArrayParamsToJson` the array is still sent as an array. A list that is not an array throws while compiling, as in `isIn()`, and so does an item that is an array, a `Parameter`, a `sql` fragment or `parent()`, which `pg` would send as more items or as JSON, or `Default`, `self`, `raw()`, `cols()` or `vals()`; each message names the value it refuses.
 
 ## [6.8.0] - 2026-11-16
 

@@ -19,7 +19,7 @@ Each member is a [`sql`](/sql-template#sql) fragment written around [`db.self`](
 
 - **Where**: as a Whereable value, so in the `where` of [`select()`](/select#select), [`count()`](/select#count), [`update()`](/insert#update) and [`deletes()`](/insert#deletes), the `having` of `select()`, and a Whereable in a `sql` template. Elsewhere `self` has no column: `` db.sql`SELECT ${db.conditions.isNull}` `` throws "The 'self' column alias has no meaning here"<!-- message --> as it compiles.
   - [`and()`](#conditions.and), [`or()`](#conditions.or) and [`not()`](#conditions.not) also take Whereables, so they can be a whole `where`; [`now`](#conditions.now) and [`fromNow()`](#conditions.fromNow) hold no `self`, and go anywhere.
-- **Values**: each value is a parameter, `$1`, except a [`Parameter`](/sql-template#Parameter), kept as it is with its cast; a `sql` fragment, written as its SQL; and [`parent()`](/sql-template#parent), the parent query's column in a `lateral` subquery. `Default`, `self`, `raw()`, `cols()` and `vals()` throw: [Values a condition refuses](#refused-values).
+- **Values**: each value is a parameter, `$1`, except a [`Parameter`](/sql-template#Parameter), kept as it is with its cast; a `sql` fragment, written as its SQL; and [`parent()`](/sql-template#parent), the parent query's column in a `lateral` subquery. `Default`, `self`, `raw()`, `cols()` and `vals()` throw: [Values a condition refuses](#refused-values). [`eqAny()`](#conditions.eqAny) sends its array as one parameter of plain values: an item that is any of these throws, and in place of the array it takes `parent()` alone.
 - **Type**: a condition is a `SQLFragment` whose second type argument, `T`, is the type of the value it compares with (its `Constraint`, [`sql`](/sql-template#sql)); the Whereable checks `T` against the column's type. The eight tests, `now` and `fromNow()` have no `T`, and pass on any column.
   - A Whereable is also an expression: interpolated in a `SELECT` list, `{ runtime_minutes: add(10) }` is each film's runtime plus ten, `(("runtime_minutes" + $1))`<!-- probe: db.sql`${{ runtime_minutes: db.conditions.add(10) }}` -->. So the type lets through, as a Whereable value, what is no test: [`add()`](#conditions.add), [`subtract()`](#conditions.subtract), [`now`](#conditions.now) and [`fromNow()`](#conditions.fromNow), which Postgres refuses alone in a `where` (42804).
 
@@ -264,7 +264,8 @@ Zapatos 6.6.1 read the list's `length`. A `Set` or an iterator has none, so `isI
 ### `eqAny()` {#conditions.eqAny}
 
 ```ts
-db.conditions.eqAny<T>(a: readonly T[] | ParentColumn)
+db.conditions.eqAny(a: ParentColumn): SQLFragment<boolean | null, never>
+db.conditions.eqAny<T>(a: readonly T[]): SQLFragment<boolean | null, T>
 ```
 
 `"col" = ANY($1)`<!-- probe: db.sql`${{ col: db.conditions.eqAny([1, 2]) }}` -->, the whole array one parameter. Where `isIn()` writes one text per length, `IN ($1, $2, …)`, this is one text for any length, so one [`prepared()`](/sql-template#prepared) statement serves them all, and it takes more items than the 65,535 parameters a query can hold ([Batches](/batches)).
@@ -278,14 +279,16 @@ db.conditions.eqAny<T>(a: readonly T[] | ParentColumn)
 - **Empty array**: no row, as Postgres reads `= ANY('{}')`, with the same SQL.
 - **`null` items** never match, and under [`not()`](#conditions.not) one makes it match no row, as `NOT IN` does; the type refuses `null` there with `strictNullChecks` on.
 - **Items**: Postgres reads the parameter as an array of the column's type, so each item is what [`eq()`](#conditions.eq) takes there: an enum's label, a `Date` ([Dates and times](#dates)), an `int8` as a string or a `bigint`. On a `jsonb` column, an object is sent as JSON, and a string is JSON text: `'"x"'` for the string `x`, `JSON.stringify([1, 2])` for an array.
-- **[`parent()`](/sql-template#parent)**: an array column of the parent row, in a `lateral` subquery. A film's tags that are among its genres, `{ tag: eqAny(db.parent('genres')) }`, give `= ANY("films"."genres")`<!-- probe: db.select('films', db.all, { lateral: { tags: db.select('tags', { tag: db.conditions.eqAny(db.parent('genres')) }) } }) -->, where `isIn([db.parent('genres')])` compares the tag with the whole array.
+- **[`parent()`](/sql-template#parent)**: an array column of the parent row, in a `lateral` subquery. A film's tags that are among its genres, `{ tag: eqAny(db.parent('genres')) }`, give `= ANY("films"."genres")`<!-- probe: db.select('films', db.all, { lateral: { tags: db.select('tags', { tag: db.conditions.eqAny(db.parent('genres')) }) } }) -->, where `isIn([db.parent('genres')])` compares the tag with the whole array, which Postgres refuses (42883, `operator does not exist: text = text[]`).
 - **[`castArrayParamsToJson`](/runtime-config#Config.castArrayParamsToJson)** on, the array is still sent as an array, `= ANY($1)`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${{ col: db.conditions.eqAny([1, 2]) }}`) -->: a `sql` fragment with `db.param(ids)` becomes `= ANY(CAST($1 AS "json"))`, which Postgres refuses (42809).
 
-A list that is not an array throws as the query compiles, as in `isIn()`. So does an item that one array parameter cannot hold: `pg` would send a `Parameter` or a fragment as JSON, and read an array item as more items, with no error.
+A list that is not an array throws as the query compiles, as in `isIn()`. So does an item that one array parameter cannot hold: `pg` would send a `Parameter` or a fragment as JSON, and read an array item as more items, with no error. The message names the item, a `sql` fragment or `db.parent()` in place of `db.param()`:
 
-> `` `eqAny()` sends its array as one parameter, so each item is a plain value, not `db.param()`, a `sql` fragment nor `db.parent()`: give the value itself, or use `isIn()`, which takes those. ``<!-- message -->
+> `` `eqAny()` sends its array as one parameter, so each item is a plain value, not `db.param()`: give the value itself, or use `isIn()`, which takes it. ``<!-- message -->
 
 > `` `eqAny()` sends its array as one parameter, which reads an array item as more items: on an array column, use `isIn()`; on a `jsonb` column, give the item as JSON text, `JSON.stringify(item)`. ``<!-- message -->
+
+`Default`, `self`, `raw()`, `cols()` and `vals()` throw too, as an item or as the list: [Values a condition refuses](#refused-values).
 
 The type takes a `Parameter`, a fragment or `parent()` as an item, as the Whereable does in `isIn()`.
 
@@ -473,7 +476,7 @@ The type does not check a fragment: an `int4` on a `timestamptz` column type-che
 
 ## Values a condition refuses {#refused-values}
 
-`Default`, `self`, `raw()`, `cols()` and `vals()` have no meaning as the value of a condition. The type refuses them (TS2322, or TS2345 where the condition bounds its argument: a pattern, a range's second bound, an array condition, `add()`, `subtract()`).
+`Default`, `self`, `raw()`, `cols()` and `vals()` have no meaning as the value of a condition. The type refuses them (TS2322, or TS2345 where the condition bounds its argument: a pattern, a range's second bound, an array condition, `add()`, `subtract()`; TS2769 as the list of `eqAny()`).
 
 At run time, calling the condition does not throw, compiling it does, so `run()` rejects with a plain `Error` before any query.
 
@@ -487,6 +490,8 @@ Zapatos 6.6.1 sent `Default` and `self` as the strings `'Symbol(DEFAULT)'` and `
 | `` `db.Default` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. `DEFAULT` is for INSERT and UPDATE values. ``<!-- message --> | `Default` in `isIn()` or `isNotIn()` |
 | `` `db.self` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: compare with a value, or use it in a `sql` fragment value, where it stands for the column. ``<!-- message --> | `self` in `isIn()` or `isNotIn()` |
 | `` `db.raw()`, `db.cols()` and `db.vals()` have no meaning as a value in a Whereable (a filter), nor in `isIn()`: to compare with SQL, use a `sql` fragment value, where `db.self` stands for the column; to compare with a value, give the value itself, or `db.param()`. ``<!-- message --> | `raw()`, `cols()` or `vals()` in `isIn()` or `isNotIn()` |
+| `` `eqAny()` takes an array of values, not `db.Default`: write `eqAny(values)`; for SQL, write a `sql` fragment with `db.self` in place of the condition. ``<!-- message --> | `Default` as the list of [`eqAny()`](#conditions.eqAny); `self`, `raw()`, `cols()`, `vals()`, a `Parameter` or a `sql` fragment there gets the same message, naming it |
+| `` `eqAny()` sends its array as one parameter, so each item is a plain value, not `db.Default`: give a value. ``<!-- message --> | `Default` as an item of `eqAny()`; `self`, `raw()`, `cols()` or `vals()` there gets the same message, naming it |
 | `The 'self' column alias has no meaning here`<!-- message --> | a condition where `self` has no column: in a `sql` template outside a Whereable, in `upsert()`'s `updateValues` |
 | `The 'parent' table alias has no meaning here`<!-- message --> | `parent()` in a condition outside a `lateral` subquery |
 
