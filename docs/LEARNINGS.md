@@ -103,6 +103,17 @@ Candidates for a check, a rule or a skill line.
 - #545: a check that reads a prototype from whatever global is present also checks the shape of what it read (it inherits `Object.prototype` directly), not only how it is reached; otherwise any stand-in widens what gets refused.
 - #545: a security gate matching by prototype shape gets a stand-in matrix test (class-shaped, literal-shaped, iterator, null-prototype; installed before and after the first read) compared against master's output, so anything newly refused shows as a diff: two blockers came from a heuristic checked only against the real built-in.
 - #544: a release leaves implicit "in progress" phrases ("those 6.7 still brings") that a grep for "in progress" or "not on npm" misses; grep "still|yet|until" next to the version number too.
+- #529: a replay that inserts into a `serial` table calls `setval` inside each case: sequences are not rolled back with the savepoint, so ids drift between runtimes and show up as false diffs.
+- #546: Postgres keeps the first 63 bytes of a name, so a hostile identifier longer than that shows truncated in a 42703 message: keep test payloads under 63 bytes.
+- #546: a test that builds its shortcut queries outside its `try` can be red for the wrong reason ("nothing to insert" throws at the call): build each query inside the loop that catches.
+- #546: `JSON.stringify` cannot compare compiled values holding a `BigInt64Array`'s bigints; `util.isDeepStrictEqual` can.
+- #546: when a decision narrows a rule, each "unchanged" claim of the CHANGELOG and docs is checked against the narrowing's edges (empty, a single row in an array, a non-enumerable own key): twice the plain wording was wider than the code.
+- #546: a guard on a per-row path runs its cheap discriminating test first (`keys.length`) and the prototype walk after, keeping `Proxy` traps and lazy initialisations (#545's `Segmenter`) off every row.
+- #546: `Buffer.isBuffer` is an `instanceof`, which fires a `Proxy`'s `getPrototypeOf` trap; `ArrayBuffer.isView` reads no prototype and goes first on a per-row path.
+- #546: a review's suggested French wording can contradict the glossary of `website/README.md`; the glossary wins.
+- #546: `insert('users', hugeBuffer)` still spends ~1.5 s in `shortcuts.ts` listing the row's keys before `core.ts` throws: #543's subject.
+- #546: a fix that moves a cheap guard ahead of an expensive step gets a test spying on that step for the refused input, or a reorder mutant survives; and a CHANGELOG `Unchanged:` sub-bullet holds no behaviour change (a check could flag "throws" or "now" there).
+- #546: `builtinObjects()` holds only non-empty typed arrays, so a claim about empty ones needs its own test; and `git pull` reporting "up to date" is no proof the branch holds master: check `git merge-base --is-ancestor origin/master HEAD`.
 
 ## Minors kept
 
@@ -123,4 +134,5 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #541 (defect): `test/types/shortcuts.test-d.ts`, over every table: `param(anyV)`, taken by master on TS 5.9 `strict`, is now refused (as 6.6.1); no `@ts-expect-error` freezes it, and the PR body says "`any` itself is still taken".
 - #541 (form): `AGENTS.md` `test:types` row and skill `type-tests`: the plain-`tsc` programs `test/types-opt-in` and `test/types-order` are not named.
 - #541 (form): `scripts/bench-types.mjs` header, "each later call costs 12 where it cost 72": shape-dependent (about 21 against 77 for mixed one- or two-key calls).
+- #546 (form): `website/fr/sql-template.md`, "doté de propres clés énumérables" next to "sans clé propre énumérable".
 - #545 (form): `test/helpers/builtinObjects.ts` header, "but `Segments`, which has none (#517), a namespace object by its path": the inserted clause garbles the sentence.

@@ -2037,6 +2037,45 @@ describe('a list that is not an array in isIn() and isNotIn()', () => {
   });
 });
 
+describe('cols and vals given a built-in', () => {
+  // a Buffer now throws, with its own keys too, before any of them reaches the text; a built-in with own
+  // enumerable keys still compiles to them, quoted as a plain object's are (#529)
+  const
+    bufferColsThrows = 'throws: `db.cols()` takes an object or an array, not a `Buffer`, whose byte indexes would compile as names, one per byte: for one column, write `db.cols([name])`; for a row of `insert()`, `upsert()` or `update()`, give a plain object.',
+    bufferValsThrows = 'throws: `db.vals()` takes an object or an array, not a `Buffer`, whose bytes would compile as values, one parameter per byte: for one value, write `db.vals([value])`; for a row of `insert()`, `upsert()` or `update()`, give a plain object.',
+    builds = (wrap: (key: string) => object): Record<string, [(v: any) => db.SQLFragment<any, any>, string]> => ({
+      cols: [v => sql`SELECT ${cols(wrap(v))} FROM ${'users'}`, bufferColsThrows],
+      vals: [v => sql`SELECT ${'id'} FROM ${'users'} WHERE ${'display_name'} IN (${vals(wrap(v))})`, bufferValsThrows],
+      insert: [v => db.insert('users', wrap(v) as any), bufferColsThrows],
+      upsert: [v => db.upsert('users', wrap(v) as any, 'email'), bufferColsThrows],
+      update: [v => db.update('users', wrap(v) as any, { id: 1 }), bufferColsThrows],
+      updateValuesCols: [v => db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { display_name: cols(wrap(v)) } }), bufferColsThrows],
+      updateValuesVals: [v => db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { display_name: vals(wrap(v)) } }), bufferValsThrows],
+      lateral: [v => db.select('users', all, { lateral: { n: sql`SELECT ${cols(wrap(v))}` } }), bufferColsThrows],
+    });
+
+  it('a Buffer given a hostile own key throws, in a sql template and through the shortcuts, and none of it reaches the text', () => {
+    const outcomes: string[] = [];
+    for (const [name, [build, expected]] of Object.entries(builds(v => Object.assign(Buffer.from('a'), { [v]: 1 }))))
+      for (const [input, outcome] of Object.entries(matrix(build)))
+        if (outcome !== expected) outcomes.push(`${name} ${input}: ${outcome}`);
+    expect(outcomes).toEqual([]);
+  });
+
+  it('a Date given a hostile own key compiles to the text a plain object of that key gives', () => {
+    const
+      dated = builds(v => Object.assign(new Date(0), { [v]: 1 })),
+      plain = builds(v => ({ [v]: 1 })),
+      outcomes: string[] = [];
+    for (const name of Object.keys(dated)) {
+      const [got, want] = [matrix(dated[name]![0]), matrix(plain[name]![0])];
+      for (const input of Object.keys(hostile))
+        if (got[input] !== want[input] || got[input]!.startsWith('throws')) outcomes.push(`${name} ${input}: ${got[input]}`);
+    }
+    expect(outcomes).toEqual([]);
+  });
+});
+
 describe('cols and vals given a string', () => {
   it('a hostile string in cols() or vals() throws, in a sql template and through the shortcuts, and none of it reaches the text', () => {
     // 6.6.1 compiled the string's character indexes as names ("0", "1"…) and its characters as parameters,
