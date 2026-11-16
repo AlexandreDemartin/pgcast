@@ -1,5 +1,5 @@
 ---
-english: ae3daa205a26
+english: 7494aa0299af
 ---
 
 # Configuration
@@ -491,7 +491,7 @@ interface PostgresInterval {
 Un `interval` tel que le renvoie le parser de types par défaut de `pg`, qu’écrit dans `Selectable` l’option [`intervalsTypedAsObjects`](/fr/generator#generate.intervalsTypedAsObjects) du générateur : chaque partie non nulle, `{ minutes: 15 }` pour `'00:15:00'`, et `{}` pour un `interval` nul. `toPostgres()` donne le texte que `pg` envoie dans une écriture, `'15 minutes'` ; `toISO()`, sa forme ISO 8601, `'P0Y0M0DT0H15M0S'`.
 
 - C’est la forme du `PostgresInterval` de `postgres-interval`, que `pg` 7 et 8 apportent via `pg-types`, écrite en toutes lettres : pgcast ne dépend pas de ce paquet.
-- Un simple objet n’en est pas un : sans `toPostgres()`, `pg` l’envoie en JSON, et Postgres le refuse (22007).
+- Un simple objet n’en est pas un : sans `toPostgres()`, `pg` l’envoie en JSON. Postgres le refuse à partir de sa version 17 (22007) ; jusqu’à la 16, il stocke autre chose : `00:00:15` pour `{ minutes: 15 }`.
 
 ## JSON {#json}
 

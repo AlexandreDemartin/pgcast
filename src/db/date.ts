@@ -136,7 +136,8 @@ export const toString: ToString = function (d: Date | null, stringTypeTz: 'times
  * An `interval` as `pg`'s default type parser returns it, an instance of `postgres-interval`'s `PostgresInterval`:
  * each part that isn't zero, such as `{ days: 1, hours: 2 }`, or `{}`. It reads the text of the default
  * `IntervalStyle`, `postgres`, only: under another, its parts are missing. `pg` writes it back through
- * `toPostgres()`; a plain object, which it sends as JSON, Postgres refuses.
+ * `toPostgres()`. A plain object it sends as JSON: Postgres 17 and later refuse it (22007), and earlier ones
+ * store something else, one second for `{ days: 1 }`.
  */
 export interface PostgresInterval {
   years?: number;

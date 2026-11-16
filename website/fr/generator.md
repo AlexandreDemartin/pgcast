@@ -1,5 +1,5 @@
 ---
-english: 74e0e7b844ba
+english: 40504ada35f7
 ---
 
 # Générateur
@@ -472,7 +472,7 @@ ALTER TABLE screenings ADD COLUMN intermission interval;
 
 - Omis, ou `null` : comme dans Zapatos 6.6.1, le texte dans les cinq interfaces, et une note via [`warningListener`](#generate.warningListener) nomme chaque colonne que `true` changerait. À partir de la 7.0, l’option omise vaut `true` ([Versions](/fr/versions)).
 - `false` : le texte, sans note. Cette valeur reste en 7.0 et en 8.0, pour un parser de types à vous qui renvoie le texte : `pg.types.setTypeParser(1186, v => v)` pour `interval`, et `1187` aussi pour `interval[]`, dont `pg` garde sinon son propre parser.
-- `true` : un `PostgresInterval` dans `Selectable`, un tableau de `PostgresInterval` pour un `interval[]`. Une écriture en reprend un, puisque `pg` l’envoie via son `toPostgres()` ; `insert()` refuse toujours un simple objet comme `{ minutes: 15 }` (TS2769), que Postgres refuse aussi (22007).
+- `true` : un `PostgresInterval` dans `Selectable`, un tableau de `PostgresInterval` pour un `interval[]`. Une écriture en reprend un, puisque `pg` l’envoie via son `toPostgres()` ; `insert()` refuse toujours un simple objet comme `{ minutes: 15 }` (TS2769) : Postgres le refuse aussi à partir de sa version 17 (22007), et le stocke comme `00:00:15` jusqu’à la 16.
 - `pg` ne lit que l’`IntervalStyle` par défaut, `postgres` : sous `iso_8601`, `sql_standard` ou `postgres_verbose`, son objet revient avec des parties manquantes, souvent `{}`, quoi que dise le type. Les raccourcis donnent le texte, dans ce style.
 - Un domaine sur l’un d’eux suit la même règle : un nouveau placeholder contient `db.PostgresInterval`, et avec [`domainsTypedByContext`](#generate.domainsTypedByContext) sa colonne est typée selon le contexte, comme l’est un domaine sur `date`. Un domaine sur un tel domaine prend `PostgresInterval` dans `Selectable` avec `domainsTypedByContext` ; un tableau d’un domaine y reste `string`, le texte que renvoie `pg`. Un placeholder écrit auparavant contient `string`, et le générateur ne le réécrit jamais.
 

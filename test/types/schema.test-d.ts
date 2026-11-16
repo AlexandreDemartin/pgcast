@@ -119,7 +119,7 @@ describe('PostgresInterval, the type intervalsTypedAsObjects writes', () => {
   });
 
   test('refuses an object without toPostgres(), through which pg writes it', () => {
-    // @ts-expect-error a plain object, which pg sends as JSON and Postgres refuses (22007)
+    // @ts-expect-error a plain object, which pg sends as JSON: Postgres 17 and later refuse it (22007), earlier ones store one second
     const plain: db.PostgresInterval = { days: 1 };
     // @ts-expect-error toPostgres() alone missing
     const noToPostgres: db.PostgresInterval = { days: 1, toISO: () => 'P0Y0M1DT0H0M0S' };
