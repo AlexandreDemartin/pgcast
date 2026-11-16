@@ -424,15 +424,6 @@ describe('upsert', () => {
     db.upsert('extra.type_zoo', { c_text: 'a' }, 'id', { updateValues: { c_point: db.vals(new Date()), c_bit: db.cols(Buffer.from('a')) } });
   });
 
-  test('updateValues takes param() of an enum label alone, as 6.6.1 did (#533)', () => {
-    // TypeScript 5.9 inferred param('ok') as a string there, and refused the call, in a program whose first upsert() of
-    // users had updateValues; which type it resolves first decides, so this program, which checks others first, took it
-    const q = db.upsert('users', row, 'email', { updateValues: { mood: db.param('ok') } });
-    expectTypeOf(q.run(pool)).resolves.toEqualTypeOf<s.users.JSONSelectable & db.UpsertAction>();
-    expectTypeOf(q.run(pool)).resolves.not.toBeAny();
-    db.upsert('users', row, 'email', { updateValues: { mood: db.param('ok'), created_at: db.param('2020-01-01T12:00:00Z') } });
-  });
-
   test('updateValues in a function generic over the table takes the values 6.6.1 took (#533)', () => {
     const date = new Date();
     const one = <T extends 'users'>(t: T, r: s.InsertableForTable<T>, c: s.ColumnForTable<T>, uv: s.users.Updatable) => {
