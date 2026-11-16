@@ -67,6 +67,12 @@ Candidates for a check, a rule or a skill line.
 - #522: `check:agents` fails during a conflicted merge: `git ls-files src/*.ts` lists each unmerged file once per stage, so the deprecations check counts each "Set <key>:" message three times; it passes once the resolution is staged.
 - #522: merging two opt-ins that touch the same lists is cleanest by putting each side's whole block back from `git show <side>:<file>`: diff3 interleaves the shared lines of two new blocks.
 - #522: a claim that Postgres refuses a value is run on the oldest Postgres of CI (14), not only the local 17: interval input got stricter in 17 (commit 617f9b7d4), and 14/16 store `{ days: 1 }` sent as JSON as one second; with no older Postgres installed, the 14 and 16 legs are the only run of that branch, so the PR is marked ready early for them.
+- #530: on 6.6.1 a plain `Date` or `Buffer` in `updateValues` compiled as a filter (`TRUE`, `("0" = $2)`): advice that must hold on 6.6.1 names `db.param()`.
+- #530: the French site writes « un `Date` » (masculine), a choice the glossary does not record, so a new French line easily gets it wrong.
+- #530: one "except" clause covering several kinds of value lists each that stored a value, identical to the CHANGELOG's list: `switching.md` dropped a case the CHANGELOG had (as in #503).
+- #530: a 6.6.1 cell also tries the value as `pg` returns it through the column's old `Selectable` type (an interval typed `string` is an object at run time): the builder's grid and the docs both missed it.
+- #530: advice for one value differs by place: in `updateValues` the plain value is sent as a parameter, in a `sql` template a plain `Date` throws and needs `db.param()`; a shared advice line names its place.
+- #530: when a type change refuses calls that "worked", every shape whose own enumerable keys add up to one value (one character, one byte, one own field, one interval part) silently stored a wrong value under 6.6.1 (#503, #530): the replay grid holds a one-key variant of each refused built-in.
 - #536: once `[Unreleased]` becomes a release, its notes enter `changelog.xml` as escaped HTML, so feed-only checks (the paths check read `/Users/&lt;/code&gt;` as a machine's path) are first exercised by the release PR: run `docs:build` on a release branch early.
 - #537: the whole 6.7.0 section (~151,000 characters) exceeds GitHub's 125,000-character release body: the release notes are a subset (Security, Deprecated) plus links to the changelog page's anchors.
 - #532: a fix of a generic `where` needs a large synthetic schema in its grid: the cross-product TS2590 ("union too complex") shows only from a few dozen tables, never on the 3-table fixture.
@@ -89,4 +95,4 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #519 (defect): `CHANGELOG.md` enumArraysTypedAsText line and `website/generator.md`: an array of another schema's enum named like a built-in (`box.int4[]`) is typed `number[]` without `typeEnumsAcrossSchemas`, `string` under the key; not named, not frozen by a test.
 - #516 (form): `website/switching.md` § Compile, "Give the value itself, sent as a parameter": for `{ title: db.cols('title') }` the advice could also name `db.cols([name])`.
 - #516 (form): `test/types-opt-in/tsconfig.json`, "Type tests of an option declared in ConfigTypes": the program now also holds a declaration-emit test.
-
+- #530 (form): `CHANGELOG.md` #503 entry, "The exception is `vals()` of one character": with the default config the interval is typed `string`, so #503 is what refuses `vals(row.c_interval)`, which stored 2 seconds under 6.6.1; the entry could point to it.
