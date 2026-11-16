@@ -81,6 +81,14 @@ Candidates for a check, a rule or a skill line.
 - #532: a conflicting PR runs no `pull_request` workflow, so only CodeQL shows and it reads as "checks pass": the gate checks a CI run exists for the head SHA (`gh run list --commit <sha>`) and `mergeable` is not `CONFLICTING` (skill `ci-gate` § Pitfalls says it; a check could enforce it).
 - #532: after a mutant `test:types` run, every probe reads the mutant's declarations from `node_modules/.cache/pgcast` until `test:types` runs again on the restored source; a docs replay wrongly showed calls compiling.
 - #532: a claim like "keys still checked" on a generic intersection type is probed with a column of only one table, not only a key no table has: `WhereableForTable<K>` resolves to `A.Whereable & B.Whereable`, which takes either table's columns.
+- #539: a union of 6.6.1's lookup with a lookup of the mapped type per table (`UpdatableForTable<T> | { [K in Table]: UpdateValuesForTable<K> }[T]`) restores generic bodies without TS2590 at 49 tables; a union with the generic mapped type itself breaks the excess check over a union of tables.
+- #539: on TS 5.9, inferring `param('ok')` against the mapped `updateValues` depends on the order the program resolves types: a cell red in a small probe can be green in `test/types`, so its red test needs a program of its own (#538).
+- #539: a replay grid for a value slot holds a `param()` of a string literal on an enum column and on a template-literal column (`TimeString`), in every context, generic ones included: `param(date)` and `param(1)` never test literal widening.
+- #539: a stacked PR is re-merged onto its base's final head before review (`git merge-base --is-ancestor origin/<base> origin/<head>`), or the review diffs against a stale base.
+- #539: a mutant that leaves an alias unused fails the declaration emit on `noUnusedLocals` (TS6196) before any test runs: keep the alias used (an export) so the mutant reaches the tests.
+- #539: a characterisation over every table (`<T extends s.Table>`) holds a refused line beside the taken ones, to show its boundary: only `{}` and `any`-typed values get through there.
+- #539: a clause listing the column kinds a type gap hits comes from a probe over every value-type shape of the fixture's `extra.type_zoo`, not a hand-picked list: `timetz` and a template-literal domain were missed twice (the PR and #538).
+- #539: since #134's brands, "6.6.1's type" (`UpdatableForTable<T>`) no longer means 6.6.1's behaviour: a revert to an old type name is replayed against what the name now resolves to, and a decision that drops machinery counts the cells it re-admits as well as those it refuses.
 
 ## Minors kept
 
@@ -96,3 +104,5 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #516 (form): `website/switching.md` § Compile, "Give the value itself, sent as a parameter": for `{ title: db.cols('title') }` the advice could also name `db.cols([name])`.
 - #516 (form): `test/types-opt-in/tsconfig.json`, "Type tests of an option declared in ConfigTypes": the program now also holds a declaration-emit test.
 - #530 (form): `CHANGELOG.md` #503 entry, "The exception is `vals()` of one character": with the default config the interval is typed `string`, so #503 is what refuses `vals(row.c_interval)`, which stored 2 seconds under 6.6.1; the entry could point to it.
+- #539 (form): `test/types/shortcuts.test-d.ts`, `const two = <T extends 'users' | 'active_users'>`: `{ created_at: date }` is refused by Postgres on `active_users` (42703); a comment would mark it a characterisation.
+- #539 (form): `test/types-opt-in/updateValues.ts`: extra blank line at the end of the file.
