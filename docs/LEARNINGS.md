@@ -171,6 +171,18 @@ Candidates for a check, a rule or a skill line.
 - #560: `zapatos/generate` has no counterpart of `website/check-reference.mjs`, so a new generate export's docs entry is not enforced by the build.
 - #560: a default set for one caller of a shared internal path is tested through each caller (the CLI too): the "default moved into `staleFiles()`" mutant died only by the CLI's test.
 - #560: in French, a query as the subject makes a possessive ambiguous (« sa promesse » read as the query's).
+- #568: when a fix replaces `!==` with `Object.is`, the release entry names the `NaN` path the older release let through, and the replay grid has `NaN` as a value and as a constant getter.
+- #568: a proof row listing several calls is replayed for each: `FOR UPDATE` on an aggregate gives 0A000 in any transaction, unlike `select()`'s 25006 when read-only.
+- #568: a claim reworded in `SECURITY.md` may live on the docs site too, in both languages: `git grep` both wordings.
+- #568: a claim that a version range "compared" something is replayed on each version of the range: 6.6.2 to 6.7.1 did not compare at all.
+- #569: in the fixture, `public.email` is a domain over `ext.citext` with `ext` off the search_path, so `eq()`, `isIn()` and `eqAny()` on `email` compare case-sensitively: a test assuming otherwise fails for that reason.
+- #569: a condition that takes only `parent()` gets its `T` inferred from every table's key of that name (#493); an overload returning `never` avoids it.
+- #569: refusing `Parameter` and `ParentColumn` by type shape also refuses plain JSON objects (`{}`, `{ value: x }`), their brand keys being optional.
+- #569: `pg` writes a nested JS array inside an array parameter as more dimensions: on a `jsonb` column `= ANY` then matches no row, with no error.
+- #569: a bench that never calls the new function reports +0.0 % without measuring it: compare N calls with its nearest sibling (`isIn()`), or add a call to `bench/`.
+- #569: a parameter typed as a class with only optional members (`ParentColumn`: `value?`, `[wrapper]?`) is a weak type that `{}` and `param('id')` pass: probe a refusal by shape with `{}` and a `Parameter` of a column name.
+- #569: a CHANGELOG line of a feature PR merged after a version PR lands silently under the new release: the PR that lands second places it on purpose.
+- #569: `check-prose.mjs` matches a quoted message against the template literal only when each `${…}` stands for one word: a message whose advice changes inside the template (a ternary) is split into whole templates.
 
 ## Minors kept
 

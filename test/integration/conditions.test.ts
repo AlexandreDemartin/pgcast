@@ -264,6 +264,87 @@ describe('on arrays (accounts)', () => {
   });
 });
 
+describe('eqAny: one array parameter', () => {
+  // users: 1 Ada (happy, settings {"theme":"dark"}), 2 Bob (ok, manager 1), 3 Cyd (sad, manager 1)
+  const cases: [string, db.SQL, number[]][] = [
+    ['ids', { id: dc.eqAny([1, 3]) }, [1, 3]],
+    ['the empty array matches no row', { id: dc.eqAny([]) }, []],
+    ['an enum', { mood: dc.eqAny(['ok', 'sad']) }, [2, 3]],
+    ['a domain', { email: dc.eqAny(['Ada@Example.com', 'cyd@example.com']) }, [1, 3]],
+    ['a null item matches no row', { manager_id: dc.eqAny([null as unknown as number]) }, []],
+    ['a null item beside a value', { manager_id: dc.eqAny([1, null as unknown as number]) }, [2, 3]],
+    // as NOT IN: `NOT (NULL = ANY(…))` and `NOT (2 = ANY('{1,NULL}'))` are NULL, never true
+    ['under not(), a null item matches no row', { manager_id: dc.not(dc.eqAny([2, null as unknown as number])) }, []],
+    ['under not(), the empty array matches every row', { id: dc.not(dc.eqAny([])) }, [1, 2, 3]],
+    ['jsonb: an object item', { settings: dc.eqAny([{ theme: 'dark' }]) }, [1]],
+    ['jsonb: a string item is JSON text', { settings: dc.eqAny(['{}']) }, [2, 3]],
+    ['70,000 items, past the 65,535 parameters of IN', { id: dc.eqAny(Array.from({ length: 70000 }, (_, i) => i + 1)) }, [1, 2, 3]],
+  ];
+
+  it.each(cases)('%s', async (_name, where, expected) => {
+    expect(await ids('users', where)).toEqual(expected);
+  });
+
+  it('an enum label that is not one: 22P02', async () => {
+    expect(await pgError(t.client, () => ids('users', { mood: dc.eqAny(['nope' as 'ok']) })))
+      .toEqual({ code: '22P02', message: 'invalid input value for enum mood: "nope"' });
+  });
+
+  it('jsonb: an array or a string value goes as JSON text, as the refusal of an array item says', async () => {
+    await sql`UPDATE ${'users'} SET ${'settings'} = CASE ${'id'} WHEN 2 THEN '[1, 2]'::jsonb ELSE '"x"' END
+      WHERE ${'id'} IN (2, 3)`.run(t.client);
+    expect(await ids('users', { settings: dc.eqAny([JSON.stringify([1, 2]), JSON.stringify('x')]) })).toEqual([2, 3]);
+    await expect(ids('users', { settings: dc.eqAny([[1, 2]]) })).rejects.toThrow('`eqAny()` sends its array as one parameter, which reads an array item as more items');
+  });
+
+  it('an array column: isIn(), as the refusal of an array item says', async () => {
+    // `"scores" = ANY($1)` would be 42704, could not find array type for data type integer[]
+    expect(await ids('accounts', { scores: dc.isIn([[1, 2, 3], [7]]) })).toEqual([1, 3]);
+  });
+
+  it('a Date: the instant on a timestamptz, the local day on a date, as eq()', async () => {
+    const { id } = await db.insert('extra.type_zoo', { c_timestamptz: '2025-06-01T12:00:00Z', c_date: '2025-06-01' },
+      { returning: ['id'] }).run(t.client);
+    expect({
+      timestamptz: await ids('extra.type_zoo', { id, c_timestamptz: dc.eqAny([new Date('2025-06-01T12:00:00Z')]) }),
+      timestamptzMissed: await ids('extra.type_zoo', { id, c_timestamptz: dc.eqAny([new Date('2025-06-01T12:00:00.001Z')]) }),
+      date: await ids('extra.type_zoo', { id, c_date: dc.eqAny([new Date(2025, 5, 1, 23, 30)]) }),
+    }).toEqual({ timestamptz: [id], timestamptzMissed: [], date: [id] });
+  });
+
+  it('int8 as a string or a bigint, and a domain over int4', async () => {
+    expect(await ids('accounts', { lifetime_ops: dc.eqAny(['9007199254740993', BigInt(1)]) })).toEqual([1, 3]);
+    expect(await ids('accounts', { overdraft_limit: dc.eqAny([100, 5]) })).toEqual([1]);
+  });
+
+  it('one prepared statement for any length, where isIn() writes one text per length', async () => {
+    const byId = (where: db.SQL, name: string) => sql`SELECT ${'id'} FROM ${'users'} WHERE ${where} ORDER BY ${'id'}`.prepared(name);
+    expect((await byId({ id: dc.eqAny([1]) }, 'pgcast_test_eq_any').run(t.client)).map(r => r.id)).toEqual([1]);
+    expect((await byId({ id: dc.eqAny([2, 3]) }, 'pgcast_test_eq_any').run(t.client)).map(r => r.id)).toEqual([2, 3]);
+    await byId({ id: dc.isIn([1]) }, 'pgcast_test_is_in').run(t.client);
+    await expect(byId({ id: dc.isIn([2, 3]) }, 'pgcast_test_is_in').run(t.client)).rejects.toThrow(`Prepared statements must be unique - 'pgcast_test_is_in'`);
+  });
+
+  it('the same under castArrayParamsToJson', async () => {
+    db.setConfig({ castArrayParamsToJson: true });
+    expect(await ids('users', { id: dc.eqAny([1, 3]) })).toEqual([1, 3]);
+  });
+
+  it('parent(): an array column of the parent row, in a lateral', async () => {
+    // accounts.scores: 1 {1,2,3}, 2 {}, 3 {7}
+    expect(await db.select('accounts', db.all, {
+      columns: ['id'], order: { by: 'id', direction: 'ASC' },
+      lateral: { users: db.select('users', { id: dc.eqAny(db.parent('scores')) }, { columns: ['id'], order: { by: 'id', direction: 'ASC' } }) },
+    }).run(t.client)).toEqual([
+      { id: 1, users: [{ id: 1 }, { id: 2 }, { id: 3 }] }, { id: 2, users: [] }, { id: 3, users: [] },
+    ]);
+  });
+
+  it('a list that is not an array rejects before any query', async () => {
+    await expect(ids('users', { id: dc.eqAny(new Set([1]) as unknown as number[]) })).rejects.toThrow('`eqAny()` takes an array, not `Set`');
+  });
+});
+
 describe('add, subtract (in an update)', () => {
   it('add and subtract a number', async () => {
     expect(await db.update('accounts', { balance: dc.add(10), lifetime_ops: dc.subtract(1) }, { id: 3 },
