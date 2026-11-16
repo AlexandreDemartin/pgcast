@@ -82,11 +82,24 @@ export const mapWithSeparator = <TIn, TSep, TOut>(
  * @param defaultValue The default value to assign to missing keys for each object
  */
 export const completeKeysWithDefaultValue = <T extends object>(objs: T[], defaultValue: any): T[] => {
-  // a primitive is left as it is, for cols() or vals() to refuse as the query compiles: spread, a string gave its
-  // character indexes as keys, a number none; null and undefined are read as {}, as in Zapatos 6.6.1
-  const unionKeys = Object.assign({}, ...objs.filter(o => !isPrimitive(o)));
+  // a row cols() or vals() refuse is left as it is, for them to refuse as the query compiles: a primitive (spread,
+  // a string gave its character indexes as keys, a number none), a Buffer, before its keys, one per byte, are listed,
+  // and a built-in with no own enumerable key, whose prototype is read only once its spread is found empty, so that a
+  // row with keys has none read (Zapatos 6.6.1 spread both into a row of defaults, or of "0", "1" columns, #543);
+  // null and undefined are read as {}, as in Zapatos 6.6.1
+  const unionKeys = Object.assign({}, ...objs.filter(o => !isPrimitive(o) && !isRefusedBuffer(o)));
   for (const k in unionKeys) unionKeys[k] = defaultValue;
-  return objs.map(o => isPrimitive(o) ? o : ({ ...unionKeys, ...o }));
+  return objs.map(o => {
+    if (isPrimitive(o) || isRefusedBuffer(o)) return o;
+    const own = { ...o };
+    return o != null && !hasKey(own) && isBuiltin(o) ? o : { ...unionKeys, ...own };
+  });
+};
+
+// for a plain object, which has no enumerable key on its chain unless Object.prototype was given one
+const hasKey = (x: object) => {
+  for (const _ in x) return true;
+  return false;
 };
 
 /**

@@ -1945,7 +1945,7 @@ describe('a built-in row among several in insert() and upsert()', () => {
       return values;
     },
     message = (fn: 'cols' | 'vals', name: string, x: object) =>
-      Buffer.isBuffer(x) ? bufferMessage(fn) : builtinMessage(fn, name === 'Proxy(Date)' ? 'Date' : name);
+      Buffer.isBuffer(x) ? bufferMessage(fn) : builtinMessage(fn, ({ 'Int32Array(0)': 'Int32Array', 'Proxy(Date)': 'Date' } as Record<string, string>)[name] ?? name);
 
   /** `.run(q).catch(h)` outside an async step: a throw at the call is not a rejection. */
   const outcome = (build: () => db.SQLFragment<any, any>, queryable: any) => {
