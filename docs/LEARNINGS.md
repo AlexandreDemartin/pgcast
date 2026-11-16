@@ -45,6 +45,9 @@ Candidates for a check, a rule or a skill line.
 - #519: a note on a domain column waits for the placeholder's final text, known only once every relation is read (#42's last-wins; a schema with no enum of that name gives `any`): filter in `tsForQueries` on the shared `customTypes`.
 - #519: under load from parallel worktrees the 5 s Vitest timeout fails different, unrelated tests on each full run: rerun the failing files alone.
 - #519: two "would change" notes in a row (#484, #519) listed columns the option did not change: a test helper could diff the output with the key off and on and compare the changed columns with the note's list.
+- #511: the walk of every global constructor of a bare `vm` context found a real gap on CI's Node 26 leg on its first ready run (`Temporal`, fixed by #521): a list a later Node can outgrow is generated from the runtime, not written by hand.
+- #511: a kept entry keyed by path, with a namespace fallback, lets the list shrink as `core.ts` grows; a whole-namespace entry (`Intl`) would have hidden #521's refusals from the walk.
+- #511: `npm run lint` covers `src/`, `scripts/` and `website/`, not `test/`, so a test-only PR's style goes unchecked.
 
 ## Minors kept
 

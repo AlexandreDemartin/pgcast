@@ -1492,36 +1492,71 @@ describe('a built-in object as a Whereable', () => {
       expect(sql`DELETE FROM ${'users'} WHERE ${x}`.compile(), name).toEqual({ text: 'DELETE FROM "users" WHERE TRUE', values: [] });
   });
 
-  it('throws for each ECMA-262 global constructor the runtime has, or keeps it for a reason', () => {
-    // the hand-written list missed built-ins three times (#250, #416, #426): an object with each one's
-    // prototype is refused, on each Node of the CI matrix, unless kept below
+  // every global constructor of a bare vm context, and of its namespaces (`Intl.Collator`): the runtime's own list, on
+  // each Node of the CI matrix, where a hand-written one missed built-ins three times (#250, #416, #426). A global
+  // with no `prototype` (`parseInt`, `Proxy`, whose proxy compiles as its target) makes no instance to refuse
+  const
+    globalConstructors: string[] = [...runInNewContext(`
+      const isConstructor = x => typeof x === 'function' && Object.prototype.hasOwnProperty.call(x, 'prototype');
+      Object.getOwnPropertyNames(globalThis).flatMap(name => {
+        const x = Object.getOwnPropertyDescriptor(globalThis, name).value;
+        return isConstructor(x) ? [name] : typeof x !== 'object' || x === null || x === globalThis ? [] :
+          Object.getOwnPropertyNames(x)
+            .filter(key => isConstructor(Object.getOwnPropertyDescriptor(x, key).value)).map(key => name + '.' + key);
+      })`)],
+    // by its path, or its namespace's
+    keptConstructors = new Map(Object.entries({
+      Object: 'a plain object is the filter itself',
+      Array: 'an array compiles as its items; Object.create(Array.prototype) is no array',
+      Function: 'a function is no object here, and throws as an alien value',
+      WebAssembly: 'a host API; core.ts: "no host object (`URL`, `Blob`)"',
+      // Node 22 with --harmony-temporal only
+      'Temporal.TimeZone': 'core.ts: "`TimeZone` and `Calendar`, dropped from the proposal, are left out"',
+      'Temporal.Calendar': 'core.ts: "`TimeZone` and `Calendar`, dropped from the proposal, are left out"',
+    })),
+    keptReason = (path: string) => keptConstructors.get(path) ?? keptConstructors.get(path.split('.')[0]),
+    inThisRealm = (path: string) => path.split('.').reduce((x: any, key) => x?.[key], globalThis);
+
+  it('throws for each global constructor of a bare vm context, or keeps it for a reason', () => {
+    // an object with each one's prototype, as Object.create() gives it
+    const outcome = (path: string) => {
+      const C = inThisRealm(path), kept = keptReason(path);
+      if (typeof C !== 'function') return 'not in this realm';
+      try {
+        const text = sql`SELECT 1 WHERE ${Object.create(C.prototype)}`.compile().text;
+        return kept ? (text === 'SELECT 1 WHERE TRUE' ? 'kept' : `kept, but compiles: ${text}`) : `compiles: ${text}`;
+      } catch (err) {
+        const message = (err as Error).message;
+        return !message.startsWith(`A built-in \`${C.name}\` has no meaning as a Whereable`) ? message : kept ? 'kept, but throws' : 'throws';
+      }
+    };
+    expect(globalConstructors).toEqual(expect.arrayContaining(['Date', 'Map', 'Uint8Array', 'Intl.Collator']));
+    expect(globalConstructors.map(path => [path, outcome(path)])
+      .filter(([path, x]) => x !== (keptReason(path) ? 'kept' : 'throws'))).toEqual([]);
+  });
+
+  it('gives the built-ins test a value of each global constructor the walk refuses', () => {
+    // so that test/integration/injection.test.ts runs each one too
+    const names = Object.keys(builtinObjects());
+    expect(globalConstructors.filter(path => !keptReason(path) && !names.includes(inThisRealm(path)?.name))).toEqual([]);
+  });
+
+  it('finds each iterator the values of the built-ins test hand out through the prototype chain, with a value of its kind', () => {
+    // an iterator has no global constructor for the walk: core.ts finds it by %IteratorPrototype% or
+    // %AsyncIteratorPrototype% on its chain, the first read from [].values(), which is Iterator.prototype where the
+    // runtime has it (Node 22 and later)
     const
-      constructors = [
-        'AggregateError', 'Array', 'ArrayBuffer', 'AsyncDisposableStack', 'BigInt', 'BigInt64Array', 'BigUint64Array',
-        'Boolean', 'DataView', 'Date', 'DisposableStack', 'Error', 'EvalError', 'FinalizationRegistry', 'Float16Array',
-        'Float32Array', 'Float64Array', 'Function', 'Int8Array', 'Int16Array', 'Int32Array', 'Iterator', 'Map', 'Number',
-        'Object', 'Promise', 'Proxy', 'RangeError', 'ReferenceError', 'RegExp', 'Set', 'SharedArrayBuffer', 'String',
-        'SuppressedError', 'Symbol', 'SyntaxError', 'TypeError', 'Uint8Array', 'Uint8ClampedArray', 'Uint16Array',
-        'Uint32Array', 'URIError', 'WeakMap', 'WeakRef', 'WeakSet',
-      ],
-      kept: Record<string, string> = {
-        Object: 'a plain object is the filter itself',
-        Array: 'an array compiles as its items; Object.create(Array.prototype) is no array',
-        Function: 'a function is no object here, and throws as an alien value',
-        Proxy: 'it has no prototype, and a proxy compiles as its target',
-      },
-      outcome = (name: string) => {
-        const C = (globalThis as any)[name];
-        if (kept[name]) return C.prototype === undefined ? 'kept' :
-          sql`SELECT 1 WHERE ${Object.create(C.prototype)}`.compile().text === 'SELECT 1 WHERE TRUE' ? 'kept' : 'kept, but no longer TRUE';
-        try {
-          return `compiles: ${sql`SELECT 1 WHERE ${Object.create(C.prototype)}`.compile().text}`;
-        } catch (err) {
-          return (err as Error).message.startsWith(`A built-in \`${name}\` has no meaning as a Whereable`) ? 'throws' : (err as Error).message;
-        }
-      };
-    expect(constructors.filter(name => name in globalThis).map(name => [name, outcome(name)])
-      .filter(([name, x]) => x !== (kept[name] ? 'kept' : 'throws'))).toEqual([]);
+      Iterator = (globalThis as any).Iterator as { prototype: object } | undefined,
+      iteratorPrototype = Object.getPrototypeOf(Object.getPrototypeOf([][Symbol.iterator]())),
+      asyncIteratorPrototype = Object.getPrototypeOf(Object.getPrototypeOf(async function* () {}).prototype),
+      samples = builtinObjects(),
+      tag = (x: object) => Object.prototype.toString.call(x).slice(8, -1),
+      handedOut = Object.values(samples).flatMap(x => ['values', 'keys', 'entries', Symbol.iterator, Symbol.asyncIterator]
+        .map(key => (x as any)[key]).filter(f => typeof f === 'function' && f.length === 0).map(f => f.call(x) as object));
+    if (Iterator) expect(iteratorPrototype).toBe(Iterator.prototype);
+    expect(handedOut.map(tag)).toEqual(expect.arrayContaining(['Array Iterator', 'Map Iterator', 'Set Iterator', 'String Iterator']));
+    expect(handedOut.filter(x => !(iteratorPrototype.isPrototypeOf(x) || asyncIteratorPrototype.isPrototypeOf(x)) ||
+      !Object.keys(samples).includes(tag(x))).map(tag)).toEqual([]);
   });
 
   it('a host or ECMA-402 iterator throws too, through the prototype chain, and a host object compiles as before', () => {
