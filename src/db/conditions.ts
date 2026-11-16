@@ -189,15 +189,22 @@ export const arrayOverlaps = <T>(a: T[] | ParentColumn) => sql<SQL, boolean | nu
 /* === subqueries === */
 
 // the last identifier of a name, as Postgres reads the text compileExpression writes, which ends with a quoted
-// part: `""` undoubled, and a `U&` part's escapes decoded (no `UESCAPE` follows one there)
+// part: `""` undoubled, a `U&` part's escapes decoded (no `UESCAPE` follows one there), then cut to its first 63
+// bytes in UTF-8, at a character's end, as Postgres truncates a name (NAMEDATALEN)
 const lastIdentifier = (name: string) => {
   const
     parts = sql`${name}`.compile().text.match(/(?:[Uu]&)?"(?:[^"]|"")*"|[^".\s]+/g) ?? [],
     last = parts[parts.length - 1] ?? '',
     unicode = /^[Uu]&/.test(last),
-    unquoted = last.slice(unicode ? 3 : 1, -1).replace(/""/g, '"');
-  return !unicode ? unquoted : unquoted.replace(/\\(?:\\|([0-9A-Fa-f]{4})|\+([0-9A-Fa-f]{6}))/g, (escape, four, six) =>
-    escape === '\\\\' ? '\\' : parseInt(four ?? six, 16) > 0x10ffff ? escape : String.fromCodePoint(parseInt(four ?? six, 16)));
+    unquoted = last.slice(unicode ? 3 : 1, -1).replace(/""/g, '"'),
+    decoded = !unicode ? unquoted : unquoted.replace(/\\(?:\\|([0-9A-Fa-f]{4})|\+([0-9A-Fa-f]{6}))/g, (escape, four, six) =>
+      escape === '\\\\' ? '\\' : parseInt(four ?? six, 16) > 0x10ffff ? escape : String.fromCodePoint(parseInt(four ?? six, 16)));
+  let bytes = 0, end = 0;
+  for (const c of decoded) {
+    if ((bytes += Buffer.byteLength(c)) > 63) break;
+    end += c.length;
+  }
+  return decoded.slice(0, end);
 };
 
 // `FROM <table>[ AS <alias>][ WHERE <where>]`, compiled with neither the column (`self` throws) nor the mark it would
