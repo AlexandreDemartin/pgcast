@@ -852,6 +852,7 @@ describe('exists() and isInSelect()', () => {
       quotedCase: refusal('Users'),
       aliasQuotedCase: refusal('users', 'users', 'Users'),
       escapedQuote: refusal('a"b', 'a"b'),
+      unicodePastMax: refusal('"s".U&"\\+110000"'),
     }).toEqual({
       unicode: ownName('exists', '"public".U&"\\0075sers"', 'users'),
       unicodeLower: ownName('exists', '"public".u&"user\\+000073"', 'users'),
@@ -860,6 +861,8 @@ describe('exists() and isInSelect()', () => {
       quotedCase: 'compiled',
       aliasQuotedCase: 'compiled',
       escapedQuote: ownName('exists', 'a"b', 'a"b'),
+      // past U+10FFFF, no character: the escape is kept as it is, and Postgres refuses the name, not the call
+      unicodePastMax: 'compiled',
     });
   });
 
