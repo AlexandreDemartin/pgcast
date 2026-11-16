@@ -332,8 +332,8 @@ Seuls les objets natifs listés ci-dessus lèvent une erreur, ceux du realm qui 
 - une instance d’une classe qui étend un objet natif garde ses propres clés : `new Frames(1)`, avec `class Frames extends Uint8Array {}`, donne `("0" = $1)` ;
 - un itérateur avec des clés propres les compile : un générateur auquel on a ajouté `{ id: 1 }`, ou une classe qui étend `Iterator` avec un champ `id = 1`, donne `("id" = $1)` ;
 - l’objet que renvoie `new Intl.Segmenter('en').segment(text)` donne `TRUE`, même si son itérateur lève une erreur ([#517](https://github.com/AlexandreDemartin/pgcast/issues/517)) ;
-- un objet `Temporal` ou `Intl` d’un polyfill donne `TRUE` quand le polyfill est installé sur `globalThis` après l’import de `zapatos/db`, ou importé sans être installé (`import { Temporal } from '@js-temporal/polyfill'`), puisque `zapatos/db` lit les prototypes à son chargement ; installé avant, il lève une erreur ;
-- un objet espace de noms, comme `Math`, `JSON`, `Intl` ou `Temporal.Now`, donne `TRUE` ([#523](https://github.com/AlexandreDemartin/pgcast/issues/523)).
+- un objet `Temporal` ou `Intl` d’un polyfill donne `TRUE` quand le polyfill est installé sur `globalThis` après l’import de `zapatos/db`, ou importé sans être installé (`import { Temporal } from '@js-temporal/polyfill'`), puisque `zapatos/db` lit les prototypes à son chargement ; s’il est installé avant, l’objet lève une erreur ;
+- un objet qui sert d’espace de noms, comme `Math`, `JSON`, `Intl` ou `Temporal.Now`, donne `TRUE` ([#523](https://github.com/AlexandreDemartin/pgcast/issues/523)).
 
 ## `self` {#self}
 
