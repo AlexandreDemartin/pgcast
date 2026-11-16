@@ -3,7 +3,8 @@ name: Release
 # Publishes @pgcast/pgcast to npm on a pushed tag `v<version>`, with npm trusted publishing: npm trusts this workflow
 # through OIDC, so no npm token is stored anywhere, and each version carries a provenance attestation of this run.
 # Set up once on npmjs.com, package settings › Trusted publishing: repository AlexandreDemartin/pgcast, workflow
-# release.yml, environment npm. The `npm` environment accepts only tags `v*` (docs/WORKFLOW.md § Releases).
+# release.yml, environment npm. The `npm` environment accepts only tags `v*` and waits for the owner's approval, so
+# publishing stays the owner's act (docs/WORKFLOW.md § Releases).
 on:
   push:
     tags: ['v*']

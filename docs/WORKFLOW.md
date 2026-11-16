@@ -73,8 +73,12 @@ When the Epic's last step is merged: a review of the whole merged range, then a 
 ## Releases
 
 - The owner bumps the version (`npm version`, which runs every check) in a PR, merges it, then pushes its tag `v<version>`.
-- The tag starts [release.yml](../.github/workflows/release.yml): it checks that the tag names `package.json`'s version on a commit of master, then publishes with npm trusted publishing (OIDC, no token) and a provenance attestation. The `npm` environment accepts only `v*` tags.
-- Once, on npmjs.com, package settings › Trusted publishing: repository `AlexandreDemartin/pgcast`, workflow `release.yml`, environment `npm`. Then: Publishing access › "Require two-factor authentication and disallow tokens", and revoke the token of `~/.npmrc`.
+- The tag starts [release.yml](../.github/workflows/release.yml): it checks that the tag names `package.json`'s version on a commit of master, then publishes with npm trusted publishing (OIDC, no token) and a provenance attestation.
+- Publishing stays the owner's act: the tag only queues a deployment to the GitHub environment `npm`, which waits for the owner's approval before the job runs. An agent never pushes a `v*` tag (`AGENTS.md` § Stop points).
+- Once, in this order, the owner's settings:
+  1. On GitHub, Settings › Environments › `npm`: Required reviewers, the owner; Deployment branches and tags, the tags `v*` only.
+  2. On npmjs.com, package settings › Trusted publishing: repository `AlexandreDemartin/pgcast`, workflow `release.yml`, environment `npm`. Then Publishing access › "Require two-factor authentication and disallow tokens", and revoke the token of `~/.npmrc`.
+- Until both are set, the job fails at `npm publish` without publishing anything; with the npm side alone, a tag would publish with no approval.
 
 ## Later
 
