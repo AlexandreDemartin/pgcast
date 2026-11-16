@@ -1613,6 +1613,78 @@ describe('a built-in object as a Whereable', () => {
       !Object.keys(samples).includes(tag(x))).map(tag)).toEqual([]);
   });
 
+  it('throws for each object a method of the built-ins test\'s values hands out, unless it is a plain value', () => {
+    // an object with no constructor, global or namespaced, escapes the walk above: `Intl.Segmenter`'s segment() gave
+    // one (#517). Each method and getter on each value's prototype chain, and each function of `Intl`, is called with
+    // () and ('id'): an object it hands out is a plain object, an array or a null-prototype object, or it throws, with
+    // a value of its kind in the built-ins test
+    const
+      samples = builtinObjects(),
+      plainPrototypes: unknown[] = [Object.prototype, Array.prototype, null],
+      handedOut: [string, object][] = [],
+      call = (from: string, f: (...args: unknown[]) => unknown, self: unknown) => {
+        for (const args of [[], ['id']]) {
+          let x: unknown;
+          try { x = f.apply(self, args); } catch { continue; }
+          if (typeof x !== 'object' || x === null || plainPrototypes.includes(Object.getPrototypeOf(x))) continue;
+          if (x instanceof Promise) x.catch(() => {});  // an async generator's throw('id') rejects
+          handedOut.push([from, x]);
+        }
+      },
+      outcome = (x: object) => {
+        try {
+          sql`SELECT 1 WHERE ${x}`.compile();
+          return 'compiles';
+        } catch (err) {
+          return /^A built-in `([^`]*)` has no meaning as a Whereable/.exec((err as Error).message)?.[1] ?? (err as Error).message;
+        }
+      };
+    // a namespace object's prototype is Object.prototype: its functions are no methods of a value
+    for (const [name, x] of Object.entries(samples).filter(([, x]) => Object.getPrototypeOf(x) !== Object.prototype))
+      for (let p = Object.getPrototypeOf(x); p !== null && p !== Object.prototype; p = Object.getPrototypeOf(p))
+        for (const key of Reflect.ownKeys(p)) {
+          const { value, get } = Object.getOwnPropertyDescriptor(p, key)!;
+          if (key !== 'constructor') for (const f of [value, get].filter(f => typeof f === 'function')) call(`${name}.${String(key)}`, f, x);
+        }
+    for (const key of Object.getOwnPropertyNames(Intl)) {
+      const f = (Intl as any)[key];
+      if (typeof f === 'function') call(`Intl.${key}`, f, Intl);
+    }
+    const outcomes = handedOut.map(([from, x]) => [from, outcome(x)]);
+    expect(outcomes.map(([, name]) => name)).toEqual(expect.arrayContaining(['Map Iterator', 'Promise', 'ArrayBuffer', 'Locale']));
+    expect(outcomes.filter(([, name]) => !Object.keys(samples).includes(name))).toEqual([]);
+  });
+
+  it('throws for the Segments object that Intl.Segmenter\'s segment() returns, named Segments, and keeps what it hands out', () => {
+    // its prototype, ECMA-402's %IntlSegmentsPrototype%, inherits Object.prototype and has no constructor of its own:
+    // 6.6.1 compiled it to TRUE, every row (#517). `containing()` gives a plain object, compiled to its keys; one of
+    // another realm compiles as before, as any built-in of another realm
+    const
+      // ES2022: not in the lib's ES2019 types
+      Segmenter = (Intl as any).Segmenter as new (locale: string) => { segment(s: string): { containing(i: number): object } },
+      segments = new Segmenter('en').segment('Metropolis'),
+      outcome = (x: object) => {
+        try {
+          return sql`DELETE FROM ${'users'} WHERE ${x}`.compile().text;
+        } catch (err) {
+          return `throws: ${/^A built-in `([^`]*)` has no meaning as a Whereable/.exec((err as Error).message)?.[1] ?? (err as Error).message}`;
+        }
+      };
+    expect(Object.fromEntries(Object.entries({
+      segments,
+      emptySegments: new Segmenter('en').segment(''),
+      madeFromItsPrototype: Object.create(Object.getPrototypeOf(segments)),
+      otherRealm: runInNewContext("new Intl.Segmenter('en').segment('Metropolis')"),
+      segment: segments.containing(0),
+    }).map(([name, x]) => [name, outcome(x as object)]))).toEqual({
+      segments: 'throws: Segments',
+      emptySegments: 'throws: Segments',
+      madeFromItsPrototype: 'throws: Segments',
+      otherRealm: 'DELETE FROM "users" WHERE TRUE',
+      segment: 'DELETE FROM "users" WHERE ("index" = $1 AND "input" = $2 AND "segment" = $3)',
+    });
+  });
+
   it('a host or ECMA-402 iterator throws too, through the prototype chain, and a host object compiles as before', () => {
     // not ECMA-262: URLSearchParams' and Headers' iterators are host objects (#416 kept those out), Intl.Segmenter's
     // is ECMA-402, and each inherits %IteratorPrototype%
@@ -1730,6 +1802,154 @@ describe('a built-in object as a Whereable', () => {
       Math: 'SELECT 1 WHERE TRUE', JSON: 'SELECT 1 WHERE TRUE', Reflect: 'SELECT 1 WHERE TRUE',
       Atomics: 'A built-in `Atomics`', Intl: 'A built-in `Intl`',
       ...Temporal && { Temporal: 'A built-in `Temporal`', 'Temporal.Now': 'A built-in `Temporal.Now`' },
+    });
+  });
+
+  // the Segments prototype is read from a Segmenter the first time a filter's prototype has no constructor of its
+  // own, then kept (#517): each test loads `zapatos/db` afresh, with `Intl.Segmenter` deleted or a stand-in
+  const
+    // ES2022: not in the lib's ES2019 types
+    NativeSegmenter = (Intl as any).Segmenter as new (locale?: string) => { segment(s: string): object },
+    withSegmenter = async <T>(standIn: unknown, run: (core: typeof db) => T): Promise<T> => {
+      const descriptor = Object.getOwnPropertyDescriptor(Intl, 'Segmenter')!;
+      vi.resetModules();
+      try {
+        const core = await import('../../src/db');
+        if (standIn === undefined) delete (Intl as any).Segmenter;
+        else Object.defineProperty(Intl, 'Segmenter', { ...descriptor, value: standIn });
+        return run(core);
+      } finally {
+        Object.defineProperty(Intl, 'Segmenter', descriptor);
+        vi.resetModules();
+      }
+    },
+    where = (core: typeof db, x: object) => {
+      try { return core.sql`SELECT 1 WHERE ${x}`.compile().text; }
+      catch (err) { return (err as Error).message.split(' has no meaning')[0]; }
+    },
+    // its prototype has no constructor of its own, as the Segments one, and no enumerable key: TRUE in 6.6.1
+    unnamedPrototype = () => Object.create({ title: 'Metropolis' });
+
+  it('leaves Segments out, and loads, where the runtime lacks Intl.Segmenter', async () => {
+    const segments = new NativeSegmenter('en').segment('Metropolis');
+    expect(await withSegmenter(undefined, core => ({
+      segments: where(core, segments),
+      unnamedPrototype: where(core, unnamedPrototype()),
+      plain: where(core, { id: 1 }),
+      collator: where(core, new Intl.Collator('en')),
+    }))).toEqual({
+      // left out, it compiles as in 6.6.1
+      segments: 'SELECT 1 WHERE TRUE',
+      unnamedPrototype: 'SELECT 1 WHERE TRUE',
+      plain: 'SELECT 1 WHERE ("id" = $1)',
+      collator: 'A built-in `Collator`',
+    });
+  });
+
+  it('reads the Segments prototype once, and never for a plain object, an array\'s items or a class instance', async () => {
+    const
+      made: string[] = [],
+      Counted = class extends NativeSegmenter { constructor(locale?: string) { made.push(locale ?? 'default'); super(locale); } },
+      segments = new NativeSegmenter('en').segment('Metropolis');
+    expect(await withSegmenter(Counted, core => {
+      const before = {
+        empty: where(core, {}),
+        plain: where(core, { id: 1 }),
+        nullPrototype: where(core, Object.create(null)),
+        arrayOfPlain: where(core, [{ id: 1 }]),
+        classInstance: where(core, new (class Film { id = 1; })()),
+        date: where(core, new Date(0)),
+      };
+      return {
+        before, madeBefore: made.length,
+        segments: where(core, segments),
+        again: where(core, segments),
+        unnamedPrototype: where(core, unnamedPrototype()),
+        madeAfter: made.length,
+      };
+    })).toEqual({
+      before: {
+        empty: 'SELECT 1 WHERE TRUE',
+        plain: 'SELECT 1 WHERE ("id" = $1)',
+        nullPrototype: 'SELECT 1 WHERE TRUE',
+        arrayOfPlain: 'SELECT 1 WHERE ("id" = $1)',
+        classInstance: 'SELECT 1 WHERE ("id" = $1)',
+        date: 'A built-in `Date`',
+      },
+      madeBefore: 0,
+      segments: 'A built-in `Segments`',
+      again: 'A built-in `Segments`',
+      unnamedPrototype: 'SELECT 1 WHERE TRUE',
+      madeAfter: 1,
+    });
+  });
+
+  it('a stand-in Segmenter whose segment() throws or gives a plain object refuses nothing', async () => {
+    // a polyfill installed on `globalThis` before the first filter that needs it: neither its error nor a plain
+    // object's prototype reaches a query, which compiles as in 6.6.1
+    const
+      throwing = class { segment(): object { throw new Error('no break iterator data'); } },
+      plain = class { segment() { return {}; } },
+      outcomes = (core: typeof db) => ({
+        unnamedPrototype: where(core, unnamedPrototype()),
+        empty: where(core, {}),
+        plain: where(core, { id: 1 }),
+      }),
+      before = {
+        unnamedPrototype: 'SELECT 1 WHERE TRUE',
+        empty: 'SELECT 1 WHERE TRUE',
+        plain: 'SELECT 1 WHERE ("id" = $1)',
+      };
+    expect({
+      throwing: await withSegmenter(throwing, outcomes),
+      plain: await withSegmenter(plain, outcomes),
+    }).toEqual({ throwing: before, plain: before });
+  });
+
+  it('a stand-in Segmenter whose segment() gives an iterator refuses no iterator with own keys', async () => {
+    // %IntlSegmentsPrototype% inherits Object.prototype directly; an array iterator's prototype does not, so the one
+    // read is left out, and an iterator given `{ id: 1 }` compiles its keys, as in 6.6.1 (#517)
+    const
+      iterating = class { segment(s: string) { return [...s][Symbol.iterator](); } },
+      segments = new NativeSegmenter('en').segment('Metropolis');
+    expect(await withSegmenter(iterating, core => ({
+      iteratorWithKey: where(core, Object.assign([1][Symbol.iterator](), { id: 1 })),
+      iterator: where(core, [1][Symbol.iterator]()),
+      segments: where(core, segments),
+    }))).toEqual({
+      iteratorWithKey: 'SELECT 1 WHERE ("id" = $1)',
+      iterator: 'A built-in `Array Iterator`',
+      // the Segmenter present at the first filter that reads it decides it
+      segments: 'SELECT 1 WHERE TRUE',
+    });
+  });
+
+  it('a polyfill\'s Segments throws only with a prototype like ECMA-402\'s, and the Segmenter of the first read decides', async () => {
+    // a class-based polyfill keeps its state in a WeakMap, and its prototype has a `constructor` of its own, so the
+    // gate never reaches it; one built from an object literal is refused, if its Segmenter is the one read
+    const
+      states = new WeakMap<object, string>(),
+      ClassSegments = class { constructor(input: string) { states.set(this, input); } containing() { return undefined; } },
+      classBased = class { segment(s: string) { return new ClassSegments(s); } },
+      literalPrototype = { containing() { return undefined; } },
+      literal = class { segment() { return Object.create(literalPrototype); } },
+      native = new NativeSegmenter('en').segment('Metropolis'),
+      outcomes = (core: typeof db) => ({
+        polyfill: where(core, new (Intl as any).Segmenter('en').segment('Metropolis')),
+        native: where(core, native),
+      });
+    expect({
+      classBased: await withSegmenter(classBased, outcomes),
+      literal: await withSegmenter(literal, outcomes),
+      literalAfterTheRead: await withSegmenter(NativeSegmenter, core => {
+        const first = where(core, native);
+        Object.defineProperty(Intl, 'Segmenter', { ...Object.getOwnPropertyDescriptor(Intl, 'Segmenter'), value: literal });
+        return { native: first, polyfill: where(core, new (Intl as any).Segmenter('en').segment('Metropolis')) };
+      }),
+    }).toEqual({
+      classBased: { polyfill: 'SELECT 1 WHERE TRUE', native: 'SELECT 1 WHERE TRUE' },
+      literal: { polyfill: 'A built-in `Segments`', native: 'SELECT 1 WHERE TRUE' },
+      literalAfterTheRead: { native: 'A built-in `Segments`', polyfill: 'SELECT 1 WHERE TRUE' },
     });
   });
 });

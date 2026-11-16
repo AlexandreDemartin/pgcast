@@ -95,6 +95,13 @@ Candidates for a check, a rule or a skill line.
 - #541: an order-dependent type test needs a `tsc` program with a fixed `files` order; `AGENTS.md`'s `test:types` row and skill `type-tests` should name the programs `test:types` runs (`test/types-opt-in`, `test/types-order`).
 - #541: merging #539 left `bench:types` at +4.4 % without refreshing the baseline, and #541's update absorbed it: a PR that moves the bench refreshes the baseline, or says how much of a change is inherited.
 - #537: a merge of master into a release branch puts master's new unreleased lines straight into the release section when its bodies are untouched; a sorted comparison of master's `[Unreleased]` against the release section checks nothing went astray.
+- #517: making an `Intl` object at load is not free (7–8 ms for a `Segmenter`, against 3.7 ms for loading `zapatos/db`), unlike reading a `.prototype`: a prototype captured from an instance is measured before it is read at load, else read on first need and memoised.
+- #517: a walk of what built-in values hand out finds objects with no constructor (`Segments`), which a walk of constructors cannot; about 60 ms per run.
+- #545: a load-time fallback is proved in a freshly loaded module with the global replaced (`vi.resetModules()`); a counting stand-in also proves a memo and a gate.
+- #545: a claim that a polyfill or stand-in is refused is checked against a real polyfill's shape, not only an invented stand-in: `@formatjs/intl-segmenter`'s `Segments` is a class instance with its state in a WeakMap and escapes a no-own-`constructor` gate.
+- #545: a hot-path bench compares master and branch in the same process, interleaved: separate processes showed a 3–5 % gap that the same-process run puts within noise.
+- #545: a check that reads a prototype from whatever global is present also checks the shape of what it read (it inherits `Object.prototype` directly), not only how it is reached; otherwise any stand-in widens what gets refused.
+- #545: a security gate matching by prototype shape gets a stand-in matrix test (class-shaped, literal-shaped, iterator, null-prototype; installed before and after the first read) compared against master's output, so anything newly refused shows as a diff: two blockers came from a heuristic checked only against the real built-in.
 - #544: a release leaves implicit "in progress" phrases ("those 6.7 still brings") that a grep for "in progress" or "not on npm" misses; grep "still|yet|until" next to the version number too.
 - #529: a replay that inserts into a `serial` table calls `setval` inside each case: sequences are not rolled back with the savepoint, so ids drift between runtimes and show up as false diffs.
 - #546: Postgres keeps the first 63 bytes of a name, so a hostile identifier longer than that shows truncated in a 42703 message: keep test payloads under 63 bytes.
@@ -128,3 +135,4 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #541 (form): `AGENTS.md` `test:types` row and skill `type-tests`: the plain-`tsc` programs `test/types-opt-in` and `test/types-order` are not named.
 - #541 (form): `scripts/bench-types.mjs` header, "each later call costs 12 where it cost 72": shape-dependent (about 21 against 77 for mixed one- or two-key calls).
 - #546 (form): `website/fr/sql-template.md`, "doté de propres clés énumérables" next to "sans clé propre énumérable".
+- #545 (form): `test/helpers/builtinObjects.ts` header, "but `Segments`, which has none (#517), a namespace object by its path": the inserted clause garbles the sentence.
