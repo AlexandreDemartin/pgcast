@@ -411,11 +411,10 @@ describe('upsert', () => {
     db.upsert('users', row, 'email', { updateValues: { created_at: db.vals(unknown) } });
   });
 
-  test('characterization: updateValues takes cols() and vals() of a primitive on a column typed any, and of a Date', () => {
-    // a zapatos/custom placeholder left as generated is any, so the whole slot is any and refuses nothing
+  test('characterization: updateValues takes cols() and vals() of a primitive on a column typed any', () => {
+    // a zapatos/custom placeholder left as generated is any, so the whole slot is any and refuses nothing.
+    // Its vals(new Date()) line went in #514, which refuses it: it compiled to `ROW(…, )`, 42601
     db.upsert('extra.type_zoo', { c_text: 'a' }, 'id', { updateValues: { c_bit: db.cols('x'), c_point: db.vals(1) } });
-    // a Date is an object: vals(new Date()) compiles to `ROW(…, )`, which Postgres refuses (42601), as under 6.6.1
-    db.upsert('users', row, 'email', { updateValues: { created_at: db.vals(new Date()) } });
   });
 
   test('upsertRequiresSameKeys: an optional boolean of Config and setConfig', () => {
