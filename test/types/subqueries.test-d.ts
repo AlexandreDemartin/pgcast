@@ -76,4 +76,13 @@ describe('isInSelect()', () => {
     // @ts-expect-error a text subquery column under an enum key (a mood under a text key passes: a mood is a string)
     db.select('users', { mood: isInSelect('users', all, 'display_name') });
   });
+
+  test('refuses to be the whole where, outside a key, alone or under not()', () => {
+    // @ts-expect-error outside a key it has no column: its constraint, number, is not never
+    db.select('users', isInSelect('users', all, 'id'));
+    // @ts-expect-error not() keeps the constraint
+    db.select('users', not(isInSelect('users', all, 'id')));
+    // @ts-expect-error in and() too
+    db.select('users', and(isInSelect('users', all, 'id')));
+  });
 });
