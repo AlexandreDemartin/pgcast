@@ -1,5 +1,5 @@
 ---
-english: 84e3121f2ea8
+english: 621d5e52d81d
 ---
 
 # Venir de Zapatos
@@ -96,6 +96,7 @@ Pour comparer avec du SQL, donnez un fragment `sql` comme valeur, `db.self` pour
 - [`DangerousRawString`](/fr/sql-template#DangerousRawString), [`ColumnNames`](/fr/sql-template#ColumnNames) et [`ColumnValues`](/fr/sql-template#ColumnValues) ne correspondent plus à un simple `{ value }`, ni l’un à l’autre : `const r: db.DangerousRawString = { value: 'x' }` échoue (2741). Créez-les avec `db.raw()`, `db.cols()` et `db.vals()`.
 - Comme valeur insérée ou mise à jour de `insert()`, `update()` ou `upsert()` (pas dans `updateValues`), le type les refuse aussi, et ils lèvent une erreur avant toute requête ([`insert()`](/fr/insert#insert)).
 - Dans `updateValues` d’[`upsert()`](/fr/insert#upsert-options), `db.cols()` ou `db.vals()` d’une chaîne ou d’une autre valeur primitive, `{ title: db.cols('title') }` : le type le refuse (2769). Il lève une erreur à la compilation de la requête, et avec Zapatos 6.6.1, Postgres le refusait (42703, 42601), sauf `vals()` d’un seul caractère. Donnez la valeur elle-même, envoyée comme paramètre, ou un fragment `sql`.
+- Dans `updateValues` aussi, `db.cols()` ou `db.vals()` d’un `Date` ou d’un `Buffer`, `{ booked_at: db.vals(new Date()) }`, et avec [`intervalsTypedAsObjects`](/fr/generator#generate.intervalsTypedAsObjects) d’un [`PostgresInterval`](/fr/runtime-config#PostgresInterval) : le type le refuse (2769). Avec Zapatos 6.6.1, Postgres le refusait (42601, 42703), sauf `vals()` d’un `Buffer` d’un seul octet, qui stockait le nombre de cet octet, `97` pour `Buffer.from('a')`. Passez `db.param(value)`.
 - Un range sélectionné peut désormais valoir `'empty'`, puisque Postgres écrit ainsi un range vide ([`RangeString`](/fr/runtime-config#RangeString)) : il n’est donc plus assignable à un type qui commence par un crochet, `` `[${string}` | `(${string}` `` (2322). Vérifiez d’abord ce cas, `if (range !== 'empty')` ; dans un type, écrivez `Exclude<db.DateRangeString, 'empty'>`.
 
 ## 4. Trouver les appels dont le résultat change {#find-the-calls-whose-result-changes}

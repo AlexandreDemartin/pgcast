@@ -1,5 +1,5 @@
 ---
-english: 0977f05de97f
+english: a3582a6c6140
 ---
 
 # Template SQL
@@ -241,7 +241,9 @@ Comme valeur de filtre, et comme valeur dans `vals({…})` (donc dans une écrit
 
 > `` `db.cols()` takes an object or an array, not `string`: for one column, write `db.cols([name])`; for a row of `insert()`, `upsert()` or `update()`, give an object. ``<!-- message -->
 
-Le type accepte une telle valeur, comme celui de Zapatos 6.6.1, pour qu’un helper générique (`<T>(row: T) => db.cols(row)`) compile toujours. Dans `updateValues` d’[`upsert()`](/fr/insert#upsert-options), il refuse une valeur primitive (`null` et `undefined` seulement avec `strictNullChecks`). Zapatos 6.6.1 compilait les indices des caractères d’une chaîne, `cols('title')` en `"0", "1", "2", "3", "4"`, toute autre valeur primitive en rien, et levait une `TypeError` sur `null`.
+Le type accepte une telle valeur, comme celui de Zapatos 6.6.1, pour qu’un helper générique (`<T>(row: T) => db.cols(row)`) compile toujours. Dans `updateValues` d’[`upsert()`](/fr/insert#upsert-options), il refuse une valeur primitive (`null` et `undefined` seulement avec `strictNullChecks`), ainsi qu’un `Date`, un `Buffer` ou un [`PostgresInterval`](/fr/runtime-config#PostgresInterval). Zapatos 6.6.1 compilait les indices des caractères d’une chaîne, `cols('title')` en `"0", "1", "2", "3", "4"`, toute autre valeur primitive en rien, et levait une `TypeError` sur `null`.
+
+Un `Date`, un `Buffer` ou un autre objet natif est un objet, et se compile donc en ses propres clés, comme avec Zapatos 6.6.1 : un `Date` n’en a aucune et ne donne rien, un `Buffer` donne ses indices, `"0", "1"`<!-- probe: db.sql`${db.cols(Buffer.from('ab'))}` --> pour deux octets. Pour une seule valeur, passez `db.param(value)`.
 
 ### `ColumnNames` {#ColumnNames}
 
@@ -276,6 +278,7 @@ Une liste de valeurs séparées par des virgules. Chaque valeur se compile comme
   - `self` "`` `db.self` has no meaning as a value in a Whereable (a filter), nor in `isIn()`… ``<!-- message -->" ;
   - `raw()`, `cols()` et `vals()`, comme le dit [`raw()`](#raw).
 - Employé lui-même comme valeur de filtre, ou comme valeur dans `vals({…})`, `vals()` lève une erreur, comme [`raw()`](#raw).
+- Un `Date`, un `Buffer` ou un autre objet natif se compile en objet, comme dans [`cols()`](#cols) et avec Zapatos 6.6.1 : un `Date` en rien, un `Buffer` en un paramètre par octet, `$1, $2`<!-- probe: db.sql`${db.vals(Buffer.from('ab'))}` --> pour deux, si bien qu’un seul octet est stocké sous la forme de son nombre, `97` pour `Buffer.from('a')`. Pour une seule valeur, passez `db.param(value)`.
 - `null`, une chaîne ou une autre valeur primitive lève une erreur à la compilation, comme dans [`cols()`](#cols) : "`` `db.vals()` takes an object or an array, not `string`: for one value, write `db.vals([value])`; for a row of `insert()`, `upsert()` or `update()`, give an object. ``<!-- message -->". Zapatos 6.6.1 envoyait les caractères d’une chaîne, `vals('id')` en `$1, $2` avec `'i'`, `'d'` : dans une liste `IN`, `vals('5')` trouvait les lignes égales à `'5'`, un cas désormais rejeté, comme avec [`isIn('5')`](/fr/conditions#conditions.isIn).
 - `insert()`, `upsert()` et `update()` compilent leurs valeurs avec `vals({…})`, hors d’une requête imbriquée : `parent()`, `raw()`, `cols()` et `vals()` y lèvent une erreur, avant toute requête.
 - Zapatos 6.6.1 enveloppait un `Parameter`, `Default` et `parent()` dans un second paramètre au sein d’un tableau : `'{"value":…}'`, `'Symbol(DEFAULT)'`, `'{"value":"id"}'` ; et `parent()`, `raw()`, `cols()` et `vals()` au sein d’un objet, que les écritures stockaient sur une colonne texte ou `jsonb`.
