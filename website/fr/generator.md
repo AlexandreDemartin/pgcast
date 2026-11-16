@@ -1,5 +1,5 @@
 ---
-english: 7edbfa7f186d
+english: bc3b14bc4960
 ---
 
 # Générateur
@@ -85,7 +85,28 @@ Run the generator without --check to write them.
 - `schema.d.ts` et, quand il y a un type personnalisé, `custom/index.d.ts`, que chaque exécution réécrit alors, sont comparés octet par octet. Un placeholder ne compte que s’il manque : il est à vous, à modifier vous-même ([Les fichiers qu’il écrit](#the-files-it-writes)).
 - `outDir`, `outExt` et [`moduleNames`](#generate.moduleNames) nomment les fichiers, comme pour une exécution : `src/pgcast/schema.ts` avec `".ts"` et `"pgcast"`.
 - Les notes d’une exécution viennent d’abord, via [`warningListener`](#generate.warningListener), sauf celles sur les placeholders qu’elle écrirait. Une requête qui échoue l’arrête avec le code 1, comme elle arrête une exécution.
-- Seule la CLI le propose : `zapatos/generate` n’exporte aucune fonction pour cela.
+
+`check()`, de `zapatos/generate`, lance la même vérification depuis le code, pour un script qui y construit sa config :
+
+```ts
+import { check, type Config } from 'zapatos/generate';
+
+check(config: Config): Promise<boolean>
+```
+
+```ts twoslash
+import { check } from 'zapatos/generate';
+// ---cut---
+const upToDate = await check({
+  db: { connectionString: process.env.DATABASE_URL },
+  outDir: './src',
+});
+if (!upToDate) process.exitCode = 1;
+```
+
+- Elle prend la config de [`generate()`](#generate), et se résout avec `true` quand chaque fichier correspond. Le code de sortie, c’est à vous de le fixer.
+- Elle n’affiche que par les écouteurs : une ligne par fichier qui diffère ou manque via [`warningListener`](#generate.warningListener), donc avec `console.log` par défaut ; `The generated files in src/zapatos are up to date.` via [`progressListener`](#generate.progressListener). Pas la dernière ligne de la CLI, `Run the generator without --check to write them.`
+- Une requête qui échoue arrête le processus, comme elle arrête `generate()` ; avec [`rejectOnQueryError`](#generate.rejectOnQueryError), sa promesse est rejetée avec l’erreur.
 
 ## `generate()` {#generate}
 
@@ -503,7 +524,7 @@ ALTER TABLE screenings ADD COLUMN intermission interval;
 
 ### `progressListener` {#generate.progressListener}
 
-`boolean`, ou dans `generate()` une fonction `(s: string) => void` ; par défaut `false`. `true` affiche chaque étape avec `console.log` ; une fonction reçoit chaque ligne.
+`boolean`, ou dans `generate()` une fonction `(s: string) => void` ; par défaut `false`. `true` affiche chaque étape avec `console.log` ; une fonction reçoit chaque ligne. Depuis [`check()`](#check), une ligne : `The generated files in src/zapatos are up to date.`
 
 ```txt
 (Re)creating schema folder: src/zapatos/schema.d.ts
@@ -557,7 +578,9 @@ Writing custom types file: src/zapatos/custom/index.d.ts
   - depuis [la CLI](#cli), avant de générer ou de vérifier, pour chaque argument après `config` qui commence par `--` et n’est pas `--check` ;
 - `Note: a query failed, so generate() ends the process with process.exit(1), and its promise never settles (PGCAST_DEP006). Set rejectOnQueryError: true to reject with the error instead; it will be the default in pgcast 7.0.`
   - sans [`rejectOnQueryError`](#generate.rejectOnQueryError), quand une requête échoue, après l’erreur et juste avant l’arrêt ;
-- l’[avertissement sur l’ancienne arborescence](#the-old-layout-warning).
+- l’[avertissement sur l’ancienne arborescence](#the-old-layout-warning) ;
+- `Out of date: src/zapatos/schema.d.ts` et `Missing: src/zapatos/custom/PgSeat_label.d.ts`
+  - depuis [`check()`](#check), pour chaque fichier qui diffère ou manque, après les notes d’une exécution.
 
 ### `debugListener` {#generate.debugListener}
 
