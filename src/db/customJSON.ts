@@ -24,8 +24,8 @@ function parseJSONWithLargeNumbersAsStrings(str: string) {
   });
 }
 
-// Each captured run of digits ends on a non-zero digit, so the zeros after it match only one way: linear time
-// (a lazy `[0-9]*?` before `0*` backtracks in O(n²)).
+// Each captured run of digits ends on a non-zero digit, unless `0` or empty, so the zeros after it match only one way:
+// linear time (a lazy `[0-9]*?` before `0*` backtracks in O(n²)).
 const numRe = /^(-?)(0|[1-9](?:[0-9]*[1-9])?)(0*)([.](0*)((?:[0-9]*[1-9])?)0*)?([eE]([-+]?)0*([0-9]+))?$/;
 
 /**
