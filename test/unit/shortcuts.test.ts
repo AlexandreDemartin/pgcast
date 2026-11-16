@@ -252,6 +252,14 @@ describe('upsert', () => {
     const trap = new Proxy({}, { get: (_, k) => k === 'mood' ? param('trap') : undefined });
     expect(db.upsert('users', { ...ada, mood: 'ok' }, 'email', { updateValues: trap } as any).compile())
       .toMatchObject({ text: expect.stringContaining('ROW(EXCLUDED."email", EXCLUDED."display_name", $4)'), values: ['Ada L.', 'ada@example.com', 'ok', 'trap'] });
+    // even for a key that Object.prototype has too
+    const answering = (key: string, value: unknown) => new Proxy({}, { get: (_, k) => k === key ? value : undefined });
+    expect(db.upsert('users', { email: 'e@x.org', valueOf: 1 } as any, 'email', { updateValues: answering('valueOf', param('trap')) } as any).compile())
+      .toMatchObject({ text: expect.stringContaining('DO UPDATE SET ("email", "valueOf") = ROW(EXCLUDED."email", $3)'), values: ['e@x.org', 1, 'trap'] });
+    expect(db.upsert('users', { email: 'e@x.org', constructor: 1 } as any, 'email', { updateValues: answering('constructor', sql`DEFAULT`) } as any).compile().text)
+      .toContain('DO UPDATE SET ("email", "constructor") = ROW(EXCLUDED."email", DEFAULT)');
+    expect(db.upsert('users', JSON.parse('{ "email": "e@x.org", "__proto__": 1 }'), 'email', { updateValues: answering('__proto__', param('trap')) } as any).compile().text)
+      .toContain('DO UPDATE SET ("email", "__proto__") = ROW(EXCLUDED."email", $3)');
     // a getter is read as often as in 6.6.1: the value sent is its second read
     let reads = 0;
     class Count { get mood() { return param(++reads); } }
