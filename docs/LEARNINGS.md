@@ -94,6 +94,7 @@ Candidates for a check, a rule or a skill line.
 - #541: the bench measures a small program, so a fixed per-program cost reads as +47 %; the PR measures the fixed part (+4,756 instantiations at 17 tables, +9,204 at 49) and the per-call part (12 against 72) separately.
 - #541: an order-dependent type test needs a `tsc` program with a fixed `files` order; `AGENTS.md`'s `test:types` row and skill `type-tests` should name the programs `test:types` runs (`test/types-opt-in`, `test/types-order`).
 - #541: merging #539 left `bench:types` at +4.4 % without refreshing the baseline, and #541's update absorbed it: a PR that moves the bench refreshes the baseline, or says how much of a change is inherited.
+- #537: a merge of master into a release branch puts master's new unreleased lines straight into the release section when its bodies are untouched; a sorted comparison of master's `[Unreleased]` against the release section checks nothing went astray.
 
 ## Minors kept
 
@@ -114,3 +115,4 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #541 (defect): `test/types/shortcuts.test-d.ts`, over every table: `param(anyV)`, taken by master on TS 5.9 `strict`, is now refused (as 6.6.1); no `@ts-expect-error` freezes it, and the PR body says "`any` itself is still taken".
 - #541 (form): `AGENTS.md` `test:types` row and skill `type-tests`: the plain-`tsc` programs `test/types-opt-in` and `test/types-order` are not named.
 - #541 (form): `scripts/bench-types.mjs` header, "each later call costs 12 where it cost 72": shape-dependent (about 21 against 77 for mixed one- or two-key calls).
+
