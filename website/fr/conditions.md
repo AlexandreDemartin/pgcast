@@ -1,5 +1,5 @@
 ---
-english: 3cdaae4aa95e
+english: 0c3e1fb0665a
 ---
 
 # Conditions {#db-conditions}
@@ -221,7 +221,7 @@ Ainsi `like('Lantern')` ne trouve aucun titre, et `reMatch('Lantern')` trouve `A
 
 ## Les listes {#lists}
 
-Chacune prend un tableau de valeurs du type de la colonne, `<T>(a: readonly T[])`, compilé comme le compilerait [`vals()`](/fr/sql-template#vals) : un paramètre par élément.
+`isIn()` et `isNotIn()` prennent un tableau de valeurs du type de la colonne, `<T>(a: readonly T[])`, compilé comme le compilerait [`vals()`](/fr/sql-template#vals) : un paramètre par élément. [`eqAny()`](#conditions.eqAny) envoie le tableau entier comme un seul paramètre.
 
 <CastPanel example="conditions_isIn">
 
@@ -264,6 +264,34 @@ Zapatos 6.6.1 lisait la `length` de la liste. Un `Set` ou un itérateur n’en a
 <<< ../examples/conditions_isNotIn.ts{ts twoslash}
 
 </CastPanel>
+
+### `eqAny()` {#conditions.eqAny}
+
+```ts
+db.conditions.eqAny<T>(a: readonly T[] | ParentColumn)
+```
+
+`"col" = ANY($1)`<!-- probe: db.sql`${{ col: db.conditions.eqAny([1, 2]) }}` -->, le tableau entier en un seul paramètre. Là où `isIn()` écrit un texte par longueur, `IN ($1, $2, …)`, `eqAny()` écrit un seul texte pour toutes les longueurs : une seule requête préparée avec [`prepared()`](/fr/sql-template#prepared) les sert toutes, et `eqAny()` prend plus d’éléments que les 65 535 paramètres qu’une requête peut contenir ([Batches](/fr/batches)).
+
+<CastPanel example="conditions_eqAny">
+
+<<< ../examples/conditions_eqAny.ts{ts twoslash}
+
+</CastPanel>
+
+- **Tableau vide** : aucune ligne, vu la façon dont Postgres lit `= ANY('{}')`, avec le même SQL.
+- **Les éléments `null`** ne correspondent à rien, et sous [`not()`](#conditions.not) un seul suffit pour que la condition ne trouve aucune ligne, comme `NOT IN` ; avec `strictNullChecks` activé, le type y refuse `null`.
+- **Les éléments** : Postgres lit le paramètre comme un tableau du type de la colonne, donc chaque élément est ce que [`eq()`](#conditions.eq) y prend : le label d’un enum, un `Date` ([Dates et heures](#dates)), un `int8` en chaîne ou en `bigint`. Sur une colonne `jsonb`, un objet est envoyé en JSON, et une chaîne est du texte JSON : `'"x"'` pour la chaîne `x`, `JSON.stringify([1, 2])` pour un tableau.
+- **[`parent()`](/fr/sql-template#parent)** : une colonne tableau de la ligne parente, dans une sous-requête `lateral`. Les tags d’un film qui sont parmi ses genres, `{ tag: eqAny(db.parent('genres')) }`, donnent `= ANY("films"."genres")`<!-- probe: db.select('films', db.all, { lateral: { tags: db.select('tags', { tag: db.conditions.eqAny(db.parent('genres')) }) } }) -->, là où `isIn([db.parent('genres')])` compare le tag au tableau entier.
+- **[`castArrayParamsToJson`](/fr/runtime-config#Config.castArrayParamsToJson)** activé, le tableau reste envoyé comme un tableau, `= ANY($1)`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${{ col: db.conditions.eqAny([1, 2]) }}`) --> : un fragment `sql` avec `db.param(ids)` devient `= ANY(CAST($1 AS "json"))`, que Postgres refuse (42809).
+
+Une liste qui n’est pas un tableau lève une erreur à la compilation de la requête, comme dans `isIn()`. Il en va de même pour un élément qu’un seul paramètre tableau ne peut pas contenir : `pg` enverrait un `Parameter` ou un fragment en JSON, et lirait un élément qui est un tableau comme plusieurs éléments, sans erreur.
+
+> `` `eqAny()` sends its array as one parameter, so each item is a plain value, not `db.param()`, a `sql` fragment nor `db.parent()`: give the value itself, or use `isIn()`, which takes those. ``<!-- message -->
+
+> `` `eqAny()` sends its array as one parameter, which reads an array item as more items: on an array column, use `isIn()`; on a `jsonb` column, give the item as JSON text, `JSON.stringify(item)`. ``<!-- message -->
+
+Le type accepte un `Parameter`, un fragment ou `parent()` comme élément, comme le Whereable le fait dans `isIn()`.
 
 ## Les tableaux {#arrays}
 

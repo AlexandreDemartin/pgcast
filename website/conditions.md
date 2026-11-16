@@ -217,7 +217,7 @@ So `like('Lantern')` matches no title, and `reMatch('Lantern')` matches `A Lante
 
 ## Lists {#lists}
 
-Each takes an array of values of the column's type, `<T>(a: readonly T[])`, compiled as [`vals()`](/sql-template#vals) of it: one parameter per item.
+`isIn()` and `isNotIn()` take an array of values of the column's type, `<T>(a: readonly T[])`, compiled as [`vals()`](/sql-template#vals) of it: one parameter per item. [`eqAny()`](#conditions.eqAny) sends the whole array as one parameter.
 
 <CastPanel example="conditions_isIn">
 
@@ -260,6 +260,34 @@ Zapatos 6.6.1 read the list's `length`. A `Set` or an iterator has none, so `isI
 <<< ./examples/conditions_isNotIn.ts{ts twoslash}
 
 </CastPanel>
+
+### `eqAny()` {#conditions.eqAny}
+
+```ts
+db.conditions.eqAny<T>(a: readonly T[] | ParentColumn)
+```
+
+`"col" = ANY($1)`<!-- probe: db.sql`${{ col: db.conditions.eqAny([1, 2]) }}` -->, the whole array one parameter. Where `isIn()` writes one text per length, `IN ($1, $2, …)`, this is one text for any length, so one [`prepared()`](/sql-template#prepared) statement serves them all, and it takes more items than the 65,535 parameters a query can hold ([Batches](/batches)).
+
+<CastPanel example="conditions_eqAny">
+
+<<< ./examples/conditions_eqAny.ts{ts twoslash}
+
+</CastPanel>
+
+- **Empty array**: no row, as Postgres reads `= ANY('{}')`, with the same SQL.
+- **`null` items** never match, and under [`not()`](#conditions.not) one makes it match no row, as `NOT IN` does; the type refuses `null` there with `strictNullChecks` on.
+- **Items**: Postgres reads the parameter as an array of the column's type, so each item is what [`eq()`](#conditions.eq) takes there: an enum's label, a `Date` ([Dates and times](#dates)), an `int8` as a string or a `bigint`. On a `jsonb` column, an object is sent as JSON, and a string is JSON text: `'"x"'` for the string `x`, `JSON.stringify([1, 2])` for an array.
+- **[`parent()`](/sql-template#parent)**: an array column of the parent row, in a `lateral` subquery. A film's tags that are among its genres, `{ tag: eqAny(db.parent('genres')) }`, give `= ANY("films"."genres")`<!-- probe: db.select('films', db.all, { lateral: { tags: db.select('tags', { tag: db.conditions.eqAny(db.parent('genres')) }) } }) -->, where `isIn([db.parent('genres')])` compares the tag with the whole array.
+- **[`castArrayParamsToJson`](/runtime-config#Config.castArrayParamsToJson)** on, the array is still sent as an array, `= ANY($1)`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${{ col: db.conditions.eqAny([1, 2]) }}`) -->: a `sql` fragment with `db.param(ids)` becomes `= ANY(CAST($1 AS "json"))`, which Postgres refuses (42809).
+
+A list that is not an array throws as the query compiles, as in `isIn()`. So does an item that one array parameter cannot hold: `pg` would send a `Parameter` or a fragment as JSON, and read an array item as more items, with no error.
+
+> `` `eqAny()` sends its array as one parameter, so each item is a plain value, not `db.param()`, a `sql` fragment nor `db.parent()`: give the value itself, or use `isIn()`, which takes those. ``<!-- message -->
+
+> `` `eqAny()` sends its array as one parameter, which reads an array item as more items: on an array column, use `isIn()`; on a `jsonb` column, give the item as JSON text, `JSON.stringify(item)`. ``<!-- message -->
+
+The type takes a `Parameter`, a fragment or `parent()` as an item, as the Whereable does in `isIn()`.
 
 ## Arrays {#arrays}
 
