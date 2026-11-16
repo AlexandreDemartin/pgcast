@@ -1149,6 +1149,33 @@ describe('a built-in object in cols() and vals()', () => {
     expect(await adaName()).toBe('Ada');
   });
 
+  it('rejects run() before any query for one among the rows of insert() and upsert(), and writes no row', async () => {
+    // 6.6.1 inserted a row of DEFAULTs for a Date beside a row, and a Buffer's bytes as columns "0", "1" (#543)
+    const
+      row = { email: 'b@x.org', display_name: 'B' },
+      users = async () => (await t.client.query('SELECT count(*)::int AS n FROM users')).rows[0].n,
+      before = await users(),
+      outcomes: Record<string, string> = {},
+      query = vi.spyOn(t.client, 'query');
+    try {
+      for (const [name, x] of Object.entries(builtinObjects())) {
+        if (!Buffer.isBuffer(x) && Object.keys(x).length > 0) continue;  // own keys: a row, as before
+        const queries = {
+          insert: db.insert('users', [row, x as any]),
+          upsert: db.upsert('users', [x as any, row], 'email'),
+        };
+        for (const [where, q] of Object.entries(queries))
+          outcomes[`${name} ${where}`] = await q.run(t.client).then(() => 'ran', (err: { code?: string, message: string }) =>
+            /^`db\.(cols|vals)\(\)` takes an object or an array, not a /.test(err.message) ? 'throws' : err.code ?? err.message);
+      }
+      expect(query).not.toHaveBeenCalled();
+    } finally {
+      query.mockRestore();
+    }
+    expect(Object.entries(outcomes).filter(([, outcome]) => outcome !== 'throws')).toEqual([]);
+    expect(await users()).toBe(before);
+  });
+
   it('a one-byte Buffer as a value rejects, and the row keeps its value', async () => {
     // 6.6.1: UPDATE users SET display_name = $1 with 97, and Ada's name became '97'
     await expect(sql`UPDATE ${'users'} SET ${'display_name'} = ${vals(Buffer.from('a'))} WHERE ${'id'} = 1`.run(t.client))

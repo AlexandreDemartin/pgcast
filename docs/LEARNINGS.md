@@ -115,6 +115,32 @@ Candidates for a check, a rule or a skill line.
 - #546: a fix that moves a cheap guard ahead of an expensive step gets a test spying on that step for the refused input, or a reorder mutant survives; and a CHANGELOG `Unchanged:` sub-bullet holds no behaviour change (a check could flag "throws" or "now" there).
 - #546: `builtinObjects()` holds only non-empty typed arrays, so a claim about empty ones needs its own test; and `git pull` reporting "up to date" is no proof the branch holds master: check `git merge-base --is-ancestor origin/master HEAD`.
 - #547: `prepack` builds into an existing `dist/` without removing stale output, so 6.7.0's tarball shipped `dist/generate/enumLabel.{js,d.ts}`, whose source went in #395: publish from a clean `dist/` (`rm -rf dist` first, or a fresh `npm ci` and build).
+- #550: a fix published with neutral wording before its advisory covers the CHANGELOG, code comments and test values too, not only the PR title and body; the branch history stays visible on the PR, so the wording is neutral from the first commit; the line moves under `### Security` in the version PR, when the advisory goes out.
+- #550: testing whether an object "has" a key with `hasOwnProperty` along the chain skips a `Proxy`'s `get` trap: compare the value read with `Reflect.get(Object.prototype, c, obj)` and walk the chain only when they are the same; a fix of an inherited value at one level (`updateValues[c]`) is replayed one level up too (`options.updateValues`).
+- #550: a claim that something is read "as in 6.6.1" (read counts, traps) is measured against the 6.6.1 dist, not master, which had already added reads (#83, #401).
+- #550: a test that freezes a read count needs a case where 6.6.1 and 6.7.1 differ (an own getter); a class getter in one row reads the same on both and catches no wrong "as on 6.7.1" claim.
+- #550: a builder brief says "per item: the red test commit, then the fix commit", not "one commit per item", which conflicts with the red-test-first rule.
+- #550: a guard comparing a value read with the one `Object.prototype` gives assumes a property returns the same value on every read; an accessor need not, and the comparison calls it again: compare with the property descriptor's `value`.
+- #550: in zsh, `git show $rev:src/…` applies the `:s` history modifier to `$rev`; write `"${rev}:path"` in scripts that loop over revisions.
+- #551: when a disclosure stays quiet, the contents of intermediate commits leak as much as their messages: check `git log -p origin/master..HEAD` before the first push, not only the final diff; an unpushed branch may still be rebuilt from master then.
+- #551: a test that bounds the time of synchronous code hangs instead of failing when it regresses (Vitest's timeout fires only once the work returns): size the input so the slow version still ends within tens of seconds, or give the job a `timeout-minutes`.
+- #551: two regexes are compared by their full match arrays (`""` versus `undefined` captures), on every string up to length 7 over a small alphabet plus random long inputs, not only by what is built from them.
+- #543: a `Proxy` check costs no extra traps when it reuses the spread `completeKeysWithDefaultValue` already makes; an extra `Object.keys` per row would add trap calls.
+- #543: a 10 MB `Buffer` as a row cost master 0.9–18 s, or ran out of memory in `upsert([plain, x])`, before anything refused it: a refusal that lists keys first is no refusal for a large built-in.
+- #548: `upsert()` and `insert()` give different trap counts (7 against 6 `getOwnPropertyDescriptor` for two keys: `upsert()` also calls `hasOwnProperty`): measure before writing a trap-count test's expected values.
+- #548: an "Unchanged:" list carries the same conditions as the list of what changes: one test (`refused()`) contradicted it; a grep of the refused values against the "Unchanged" nouns catches it before review.
+- #548: when a check moves from "keys listed after a rebuild" to "this type is kept as it is", replay the empty-with-an-`undefined`-key variant with `undefinedMeansMissing` on: the one shape where the old rebuild gave "nothing to …" at the call.
+- #548: once a helper gets an optional second parameter, a bare `.some(fn)` or `.map(fn)` passes the index into it; Vitest does not type-check, so only `tsc` caught it.
+- #548: diffing a fix round's grid against the previous head's isolates the round to exactly the cases it targets (here 4).
+- #548: an "Unchanged" sentence is checked with a probe per noun in it, and a "behaves as X does" claim by comparing X and `Proxy(X)` route by route; reading the sentence missed `Proxy(Date)` and a `Buffer` with keys in round 1.
+- #553: on a plain object `for…in` meets own keys before inherited ones, so `for (const k in x) return hasOwnProperty(x, k)` tells in one step whether an object has an own key, without listing them.
+- #553: a union target of `{}` can be given a new prototype by `Object.assign` copying a row's own `__proto__` (from `JSON.parse`); `Object.create(null)` avoids it.
+- #553: a trap-count check that skips the case with a key added to `Object.prototype` misses how two fixes interact: after #550, master read the row once more for that key, which #553 no longer does.
+- #553: in V8 an `Object.create(null)` object is in dictionary mode, and spreading or copying it on a hot path is several times slower than from a literal: gather keys into it, then build the object you copy with `Object.fromEntries`.
+- #553: a `Proxy` trap-count grid needs a `Proxy` row with no own keys: some branches (`hasKey` false, then `isBuiltin`) run only for such a row.
+- #553: a CHANGELOG line taken from a review ("no longer throws", "master reset it") can describe master's unreleased state: replay it on the last release before writing it.
+- #553: a speed fix that changes no SQL is proved by interleaved runs in the PR body, run a second time in reversed order to cancel the order effect.
+- #554: a CHANGELOG headline about "several rows" was narrower than the runs: a single row in an array also listed an inherited key on 6.6.1 and 6.7.1 (`[{ title }]` compiled to `("mood", "title")`); an advisory names "rows given as an array".
 
 ## Minors kept
 
@@ -137,4 +163,8 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #541 (form): `scripts/bench-types.mjs` header, "each later call costs 12 where it cost 72": shape-dependent (about 21 against 77 for mixed one- or two-key calls).
 - #546 (form): `website/fr/sql-template.md`, "doté de propres clés énumérables" next to "sans clé propre énumérable".
 - #545 (form): `test/helpers/builtinObjects.ts` header, "but `Segments`, which has none (#517), a namespace object by its path": the inserted clause garbles the sentence.
+- #551 (form): `src/db/customJSON.ts` comment keeps "O(n²)" next to the regex; describes the mechanism only.
+- #548 (form): `src/db/shortcuts.ts` `insert()` JSDoc, "no own enumerable key (a `Date`, a `Map`…) beside a row with keys": a `Buffer` row alone in an array now rejects too.
+- #548 (form): `CHANGELOG.md` #543 line, "counts as one in `upsert()`": reads as "one row"; "counts as a row with no key".
+- #553 (form): `CHANGELOG.md` #549 line, "compiled to `("rating") VALUES (DEFAULT)` and wrote a row of defaults": true for `insert()` only; to fix in the 6.7.2 version PR.
 
