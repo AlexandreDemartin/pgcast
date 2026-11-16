@@ -373,7 +373,8 @@ const
 // ECMA-402's `Intl` only, no host object (`URL`, `Blob`).
 // A namespace object (`Math`, `JSON`, `Reflect`, `Atomics`, `Intl`, and `Temporal` and `Temporal.Now` where the
 // runtime has them) is matched by identity, as its prototype is `Object.prototype`, a plain object's, and its
-// functions are no enumerable keys, and named by its path; `console` and `WebAssembly` are host APIs.
+// functions are no enumerable keys, and named by its path. Each is read from `globalThis`, so that a runtime
+// without one still loads `zapatos/db`; `console` and `WebAssembly` are host APIs.
 // An iterator or a generator, sync or async, is matched by %IteratorPrototype% or %AsyncIteratorPrototype% on its
 // chain, as each generator function has its own prototype, and only with no own enumerable key, so that a class
 // that extends `Iterator` with fields stays a filter, and one without is refused. So is a host iterator
@@ -394,8 +395,8 @@ const
     temporal?.PlainTime, temporal?.PlainYearMonth, temporal?.ZonedDateTime,
   ].filter(Boolean).map(builtin => builtin.prototype)),
   builtinNamespaces = new Map<unknown, string>(Object.entries({
-    Math, JSON, Reflect, Atomics: (globalThis as any).Atomics, Intl: intl,
-    Temporal: temporal, 'Temporal.Now': temporal?.Now,
+    Math: (globalThis as any).Math, JSON: (globalThis as any).JSON, Reflect: (globalThis as any).Reflect,
+    Atomics: (globalThis as any).Atomics, Intl: intl, Temporal: temporal, 'Temporal.Now': temporal?.Now,
   }).filter(([, namespace]) => namespace).map(([path, namespace]) => [namespace, path])),
   typedArrayPrototype = Object.getPrototypeOf(Uint8Array.prototype),
   // transpiled below ES2018, `async function* () {}` is a plain function, with no `.prototype` to read: then
