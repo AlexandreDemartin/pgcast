@@ -367,13 +367,17 @@ const
 // `Uint8Array.prototype`, `Float64Array.prototype`…, and not a subclass's (`Buffer` is listed for this reason).
 // `AggregateError`, `WeakRef`, `FinalizationRegistry` (ES2021, past the lib's ES2019 types), `SuppressedError`,
 // `DisposableStack`, `AsyncDisposableStack` (Node 24) and `SharedArrayBuffer` (which a runtime may leave out) are
-// read from `globalThis`, where the runtime has them, as are the boxes `BigInt` (ES2020) and `Symbol`. ECMAScript
-// built-ins only, no host object (`URL`, `Blob`).
+// read from `globalThis`, where the runtime has them, as are the boxes `BigInt` (ES2020) and `Symbol`, the eight
+// `Temporal` constructors (Node 26; Node 22 with `--harmony-temporal`, whose `TimeZone` and `Calendar`, dropped
+// from the proposal, are left out) and the `Intl` ones (`DurationFormat` from Node 23). ECMAScript built-ins and
+// ECMA-402's `Intl` only, no host object (`URL`, `Blob`).
 // An iterator or a generator, sync or async, is matched by %IteratorPrototype% or %AsyncIteratorPrototype% on its
 // chain, as each generator function has its own prototype, and only with no own enumerable key, so that a class
 // that extends `Iterator` with fields stays a filter, and one without is refused. So is a host iterator
 // (`URLSearchParams`'s), which inherits them too
 const
+  intl = (globalThis as any).Intl,
+  temporal = (globalThis as any).Temporal,
   builtinPrototypes = new Set<unknown>([
     Date, Map, Set, WeakMap, WeakSet, RegExp, Promise, ArrayBuffer, DataView, Buffer, Number, String, Boolean,
     Error, EvalError, RangeError, ReferenceError, SyntaxError, TypeError, URIError,
@@ -381,6 +385,10 @@ const
     (globalThis as any).WeakRef, (globalThis as any).FinalizationRegistry, (globalThis as any).SharedArrayBuffer,
     (globalThis as any).DisposableStack, (globalThis as any).AsyncDisposableStack,
     (globalThis as any).BigInt, (globalThis as any).Symbol,
+    intl?.Collator, intl?.DateTimeFormat, intl?.DisplayNames, intl?.DurationFormat, intl?.ListFormat, intl?.Locale,
+    intl?.NumberFormat, intl?.PluralRules, intl?.RelativeTimeFormat, intl?.Segmenter,
+    temporal?.Duration, temporal?.Instant, temporal?.PlainDate, temporal?.PlainDateTime, temporal?.PlainMonthDay,
+    temporal?.PlainTime, temporal?.PlainYearMonth, temporal?.ZonedDateTime,
   ].filter(Boolean).map(builtin => builtin.prototype)),
   typedArrayPrototype = Object.getPrototypeOf(Uint8Array.prototype),
   // transpiled below ES2018, `async function* () {}` is a plain function, with no `.prototype` to read: then

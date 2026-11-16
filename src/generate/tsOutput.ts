@@ -158,7 +158,7 @@ const warnAboutEnumsAcrossSchemas = (columns: string[], config: CompleteConfig) 
 
 /**
  * Without `uniqueIndexConstraintsOnly`, note the unique indexes it would leave out of `UniqueIndex`, once per run:
- * `constraint()` takes them, and `ON CONFLICT ON CONSTRAINT` refuses them.
+ * `constraint()` takes them, and `ON CONFLICT ON CONSTRAINT` refuses them, with `DO NOTHING` too but for a `WITHOUT OVERLAPS` key.
  */
 const warnAboutUniqueIndexesNotArbiters = (indexes: string[], config: CompleteConfig) => {
   if (indexes.length === 0) return;
@@ -171,7 +171,8 @@ const warnAboutUniqueIndexesNotArbiters = (indexes: string[], config: CompleteCo
 
   warn(`Note: UniqueIndex lists ${list}, ${one ? 'a unique index' : 'unique indexes'} of no UNIQUE or PRIMARY KEY ` +
     `constraint, of a DEFERRABLE or WITHOUT OVERLAPS one, or not yet valid: db.constraint() takes ${one ? 'it' : 'them'}, and ` +
-    `Postgres refuses ${one ? 'it' : 'them'} in ON CONFLICT ON CONSTRAINT ... DO UPDATE. ` +
+    `Postgres refuses ${one ? 'it' : 'them'} in ON CONFLICT ON CONSTRAINT ... DO UPDATE, ` +
+    'and in ... DO NOTHING except a WITHOUT OVERLAPS key. ' +
     `Set uniqueIndexConstraintsOnly: true to leave ${one ? 'it' : 'them'} out; it will be the default in pgcast 7.0.`);
 };
 
@@ -215,6 +216,26 @@ const warnAboutDomainsUnderDomains = (columns: string[], config: CompleteConfig)
     `domain: as generated, ${one ? 'its placeholder types it' : 'their placeholders type them'} as \`any\`. ` +
     `Set domainsTypedByContext: true to type ${them} by the base type of the innermost domain while ` +
     `${one ? 'its placeholder holds' : 'their placeholders hold'} \`any\`; it will be the default in pgcast 7.0.`);
+};
+
+/**
+ * With `enumArraysTypedAsText` left out, note the columns it would type as a string in `Selectable`, once per run:
+ * `false` keeps the array with no note, for a project that parses it with `pg.types.setTypeParser`.
+ */
+const warnAboutEnumArraysNotAsText = (columns: string[], config: CompleteConfig) => {
+  if (columns.length === 0) return;
+
+  const
+    warn = config.warningListener === true ? console.log : config.warningListener || (() => void 0),
+    sorted = [...columns].sort(),
+    one = sorted.length === 1,
+    them = one ? 'it' : 'them',
+    list = one ? sorted[0] : sorted.slice(0, -1).join(', ') + ' and ' + sorted[sorted.length - 1];
+
+  warn(`Note: ${list} ${one ? 'is an array' : 'are arrays'} of an enum, which pg returns as ${one ? 'its' : 'their'} ` +
+    `text, such as '{a,b}', though Selectable types ${them} as ${one ? 'an array' : 'arrays'}. ` +
+    `Set enumArraysTypedAsText: true to type ${them} as ${one ? 'a string' : 'strings'} there, or false to keep ` +
+    `the ${one ? 'array' : 'arrays'} if pg.types.setTypeParser parses ${them}; true will be the default in pgcast 7.0.`);
 };
 
 /**
@@ -333,6 +354,7 @@ const tsForQueries = async (config: CompleteConfig, queryFn: (q: pg.QueryConfig)
     domainRootsOnce: Promise<DomainRoots>[] = [],
     domainRoots = () => domainRootsOnce[0] ??= domainRootsInDatabase(queryFn),
     domainsUnderDomains: string[] = [],
+    enumArraysNotAsText: [string, string | null][] = [],
     schemaNames = Object.keys(schemas),
     schemaData = (await Promise.all(
       schemaNames.map(async schema => {
@@ -353,7 +375,7 @@ const tsForQueries = async (config: CompleteConfig, queryFn: (q: pg.QueryConfig)
           tableDefs = await Promise.all(tables.map(async table =>
             definitionForRelationInSchema(table, schema, enums, customTypes, config, queryFn, customTypeOrigins,
               enumsForSchema, columnsTypedByEnumName, customTypeImports, uniqueIndexesNotArbiters, domainsNotByContext,
-              domainRoots, domainsUnderDomains))),
+              domainRoots, domainsUnderDomains, enumArraysNotAsText))),
           schemaIsUnprefixed = schema === config.unprefixedSchema,
           none = '/* (none) */',
           schemaDef = `/* === schema: ${jsdocText(schema)} === */\n` +
@@ -406,6 +428,9 @@ const tsForQueries = async (config: CompleteConfig, queryFn: (q: pg.QueryConfig)
   warnAboutUniqueIndexesNotArbiters(uniqueIndexesNotArbiters, config);
   warnAboutDomainsNotByContext(domainsNotByContext, config);
   warnAboutDomainsUnderDomains(domainsUnderDomains, config);
+  // a domain whose placeholder ends `any` stays `any` with the key (db.DomainInContext): no column of it is noted
+  warnAboutEnumArraysNotAsText(enumArraysNotAsText
+    .filter(([, customType]) => customType === null || customTypes[customType] !== 'any').map(([column]) => column), config);
 
   return { ts, customTypeSourceFiles };
 };

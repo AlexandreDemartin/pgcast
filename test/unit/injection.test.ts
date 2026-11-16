@@ -1477,6 +1477,21 @@ describe('a built-in object as a Whereable', () => {
     }
   });
 
+  it('a subclass of an Intl or a Temporal constructor compiles as before, where the runtime has it', () => {
+    // Temporal from Node 26, or Node 22 with --harmony-temporal; 6.6.1 compiled an instance with no own enumerable key to TRUE
+    const
+      Temporal = (globalThis as any).Temporal,
+      FilmCollator = class extends ((Intl as any).Collator as new (locale: string) => object) {},
+      kept: Record<string, object> = {
+        Collator: new FilmCollator('en'),
+        ...Temporal && {
+          PlainDate: new (class Premiere extends (Temporal.PlainDate as new (y: number, m: number, d: number) => object) {})(2026, 11, 15),
+        },
+      };
+    for (const [name, x] of Object.entries(kept))
+      expect(sql`DELETE FROM ${'users'} WHERE ${x}`.compile(), name).toEqual({ text: 'DELETE FROM "users" WHERE TRUE', values: [] });
+  });
+
   // every global constructor of a bare vm context, and of its namespaces (`Intl.Collator`): the runtime's own list, on
   // each Node of the CI matrix, where a hand-written one missed built-ins three times (#250, #416, #426). A global
   // with no `prototype` (`parseInt`, `Proxy`, whose proxy compiles as its target) makes no instance to refuse
