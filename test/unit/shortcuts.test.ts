@@ -214,6 +214,39 @@ describe('upsert', () => {
     `);
   });
 
+  it('updateValues: a key that only Object.prototype has is no update value', () => {
+    // 6.6.1 read updateValues[c] for each column inserted, so `valueOf` found Object.prototype's function and threw
+    const columns = ['valueOf', 'toString', 'constructor', 'hasOwnProperty', '__proto__'];
+    for (const c of columns) {
+      const q = db.upsert('users', { email: 'e@x.org', [c]: 1 } as any, 'email').compile();
+      expect(q.text).toContain(`DO UPDATE SET ("email", "${c}") = ROW(EXCLUDED."email", EXCLUDED."${c}")`);
+      expect([...q.values].sort()).toEqual([1, 'e@x.org']);  // the inserted columns are sorted
+    }
+    // the same on a null-prototype updateValues, and when updateValues names the column
+    expect(db.upsert('users', { email: 'e@x.org', valueOf: 1 } as any, 'email', { updateValues: Object.create(null) }).compile().text)
+      .toContain('DO UPDATE SET ("email", "valueOf") = ROW(EXCLUDED."email", EXCLUDED."valueOf")');
+    expect(db.upsert('users', { email: 'e@x.org', valueOf: 1 } as any, 'email', { updateValues: { valueOf: 2 } } as any).compile())
+      .toMatchObject({ text: expect.stringContaining('DO UPDATE SET ("email", "valueOf") = ROW(EXCLUDED."email", $3)'), values: ['e@x.org', 1, 2] });
+  });
+
+  it('updateValues: a key added to Object.prototype by something else is no update value', () => {
+    const proto = Object.prototype as any;
+    proto.mood = 'polluted';
+    try {
+      expect(db.upsert('users', { ...ada, mood: 'ok' }, 'email').compile()).toMatchObject({
+        text: expect.stringContaining('DO UPDATE SET ("email", "display_name", "mood") = ROW(EXCLUDED."email", EXCLUDED."display_name", EXCLUDED."mood")'),
+        values: ['Ada L.', 'ada@example.com', 'ok'],
+      });
+      // a class's own prototype, or one given to Object.create(), is still read, as in 6.6.1
+      class Patch { get mood() { return param('kept'); } }
+      for (const updateValues of [new Patch(), Object.create({ mood: param('kept') })])
+        expect(db.upsert('users', { ...ada, mood: 'ok' }, 'email', { updateValues } as any).compile().values)
+          .toEqual(['Ada L.', 'ada@example.com', 'ok', 'kept']);
+    } finally {
+      delete proto.mood;
+    }
+  });
+
   it('updateValues: a plain value is a parameter, sent as update() sends it', () => {
     expect(db.upsert('users', ada, 'email', { updateValues: { mood: 'happy' } }).compile()).toMatchInlineSnapshot(`
       {
