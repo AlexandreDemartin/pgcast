@@ -114,7 +114,8 @@ const tagChange = (value: string, tags: { name: string }[], tagsBefore: { name: 
   return 'changed';
 };
 
-describe('the JSDoc of a column comment, against TypeScript', () => {
+// TypeScript parses thousands of JSDoc per test: 4.7 s on CI, near the 5 s default (#525).
+describe('the JSDoc of a column comment, against TypeScript', { timeout: 30_000 }, () => {
   it.each(shapes)('keeps master\'s JSDoc for a comment with no tag, and keeps the tags of one whose tag lines move, in %s schema', async (_, schema) => {
     const
       texts = comments(),

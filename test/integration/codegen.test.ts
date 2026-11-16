@@ -151,7 +151,8 @@ describe('tsForConfig()', () => {
   });
 });
 
-describe('variant snapshots', () => {
+// Each test here runs one to three tsc compiles: 5.6 s on CI and 12.8 s locally under load, past the 5 s default (#525).
+describe('variant snapshots', { timeout: 30_000 }, () => {
   const snapshotPath = fileURLToPath(new URL(snapshotDir, import.meta.url));
   let declarationDir: string;
 
