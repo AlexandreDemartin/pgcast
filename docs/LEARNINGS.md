@@ -61,6 +61,7 @@ Candidates for a check, a rule or a skill line.
 - #511: `npm run lint` covers `src/`, `scripts/` and `website/`, not `test/`, so a test-only PR's style goes unchecked.
 - #522: `check:agents` fails during a conflicted merge: `git ls-files src/*.ts` lists each unmerged file once per stage, so the deprecations check counts each "Set <key>:" message three times; it passes once the resolution is staged.
 - #522: merging two opt-ins that touch the same lists is cleanest by putting each side's whole block back from `git show <side>:<file>`: diff3 interleaves the shared lines of two new blocks.
+- #522: a claim that Postgres refuses a value is run on the oldest Postgres of CI (14), not only the local 17: interval input got stricter in 17 (commit 617f9b7d4), and 14/16 store `{ days: 1 }` sent as JSON as one second; with no older Postgres installed, the 14 and 16 legs are the only run of that branch, so the PR is marked ready early for them.
 
 ## Minors kept
 
