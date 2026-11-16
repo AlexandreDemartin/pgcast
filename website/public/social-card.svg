@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
   <!-- The social card, og:image (.vitepress/meta.ts), in the art direction's light theme
        (docs/design/art-direction.md). Rendered to social-card.png by render-images.mjs, which loads the fonts. -->
-  <title>pgcast. The Postgres you know, with the safety of TypeScript.</title>
+  <title>pgcast. The Postgres you know, with the full power of TypeScript.</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@800&amp;family=Inter:wght@400&amp;family=JetBrains+Mono:wght@500;700&amp;display=block');
     @font-face { font-family: 'Saira Wordmark'; font-weight: 700; src: url('fonts/saira-wordmark.woff2') format('woff2'); }
@@ -17,7 +17,7 @@
   <path transform="translate(168.1 80) scale(0.171875)" fill="#0a6b63" fill-rule="evenodd" d="M48 0h160a48 48 0 0 1 48 48v160a48 48 0 0 1-48 48h-160a48 48 0 0 1-48-48v-160a48 48 0 0 1 48-48ZM48 48h32a8 8 0 0 1 8 8v32a8 8 0 0 1-8 8h-32a8 8 0 0 1-8-8v-32a8 8 0 0 1 8-8ZM176 48h32a8 8 0 0 1 8 8v32a8 8 0 0 1-8 8h-32a8 8 0 0 1-8-8v-32a8 8 0 0 1 8-8ZM48 160h32a8 8 0 0 1 8 8v32a8 8 0 0 1-8 8h-32a8 8 0 0 1-8-8v-32a8 8 0 0 1 8-8ZM176 160h32a8 8 0 0 1 8 8v32a8 8 0 0 1-8 8h-32a8 8 0 0 1-8-8v-32a8 8 0 0 1 8-8Z"/>
   <text class="wordmark" x="218.4" y="124" font-size="63.95" letter-spacing="2.56" fill="#12202b">CAST</text>
   <text class="display" x="76" y="312" font-size="80" letter-spacing="-2" fill="#12202b">The Postgres you know,</text>
-  <text class="display" x="76" y="400" font-size="80" letter-spacing="-2" fill="#12202b">with the safety of</text>
+  <text class="display" x="76" y="400" font-size="80" letter-spacing="-2" fill="#12202b">with the full power of</text>
   <text class="display" x="76" y="488" font-size="80" letter-spacing="-2" fill="#12202b">TypeScript<tspan class="mono" font-weight="700" letter-spacing="-4.8" fill="#0a6b63">::</tspan></text>
   <rect x="80" y="530" width="1040" height="1" fill="#d9e0e5"/>
   <text class="mono" x="80" y="580" font-size="24" font-weight="500" fill="#566673">pgcast.dev</text>

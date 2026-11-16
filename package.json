@@ -1,7 +1,7 @@
 {
   "name": "@pgcast/pgcast",
   "version": "6.6.2",
-  "description": "The Postgres you know, with the safety of TypeScript: zero abstraction, queries in Postgres's natural vocabulary, types read from your schema.",
+  "description": "The Postgres you know, with the full power of TypeScript: zero abstraction, queries in Postgres's natural vocabulary, types read from your schema.",
   "homepage": "https://pgcast.dev/",
   "repository": {
     "type": "git",

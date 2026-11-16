@@ -1,6 +1,6 @@
 # pgcast
 
-**The Postgres you know, with the safety of TypeScript.**
+**The Postgres you know, with the full power of TypeScript.**
 
 Maintained by [Alexandre Demartin](https://github.com/AlexandreDemartin)
 
