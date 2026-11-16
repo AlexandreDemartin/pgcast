@@ -36,23 +36,24 @@ Set aside:
 
 ## Replays
 
-On the fixture database (Postgres 17), with the built runtime and scratch prototypes of A, B (on a patched `core.ts`) and C. `users`: Ada (1), Bob (2, managed by 1), Cyd (3, managed by 1). `extra.articles`: (author 1, reviewer 2, 'Notes on the engine'), (author 2, no reviewer, 'Draft'). The `select()` wrapper (`jsonb_agg`, `columns: ['display_name']`) is left out below.
+On the fixture database (Postgres 17.3), by one scratch harness: the built runtime, prototypes of A and C, and B on a patched copy of the built `core.js`. Rows marked *hand-written* run their SQL as written, with no helper; every other row is a call's output. `users`: Ada (1), Bob (2, managed by 1), Cyd (3, managed by 1). `extra.articles`: (author 1, reviewer 2, 'Notes on the engine'), (author 2, no reviewer, 'Draft'). The `select()` wrapper (`jsonb_agg`, `columns: ['display_name']`) is left out below.
 
 | Query | SQL of the `WHERE` | Rows |
 |---|---|---|
 | Users with an article whose body starts with 'Notes', A | `EXISTS (SELECT 1 FROM "extra"."articles" WHERE (("author_id" = "users"."id") AND ("body" LIKE $2)))` | Ada |
 | Same, B and C | `EXISTS (SELECT 1 FROM "extra"."articles" WHERE ("author_id" = "users"."id" AND ("body" LIKE $2)))` | Ada |
 | Same, `isInSelect()` | `(("id" IN (SELECT "author_id" FROM "extra"."articles" WHERE (("body" LIKE $2)))))` | Ada |
-| Users with at least one article, B and C | `EXISTS (SELECT 1 FROM "extra"."articles" WHERE ("author_id" = "users"."id"))` | Ada, Bob |
+| Users with at least one article, A | `EXISTS (SELECT 1 FROM "extra"."articles" WHERE (("author_id" = "users"."id")))` | Ada, Bob |
+| Same, B and C | `EXISTS (SELECT 1 FROM "extra"."articles" WHERE ("author_id" = "users"."id"))` | Ada, Bob |
 | Same, `isInSelect('extra.articles', all, 'author_id')` | `(("id" IN (SELECT "author_id" FROM "extra"."articles")))` | Ada, Bob |
-| Users who manage someone, no alias | `EXISTS (SELECT 1 FROM "users" WHERE "manager_id" = "users"."id")` | **none**: `"users"` is the inner table |
-| Same, inner table `public.users` | `EXISTS (SELECT 1 FROM "public"."users" WHERE …)` | **none** |
+| Users who manage someone, *hand-written*, no alias | `EXISTS (SELECT 1 FROM "users" WHERE "manager_id" = "users"."id")` | **none**: `"users"` is the inner table |
+| Same, *hand-written*, inner table `public.users` | `EXISTS (SELECT 1 FROM "public"."users" WHERE "manager_id" = "users"."id")` | **none** |
 | Same, C, no alias, over `users` or `public.users`, or with `parent: '"users"'` | — | throws: another alias asked for |
 | Same, C, `alias: 'reports'` | `EXISTS (SELECT 1 FROM "users" AS "reports" WHERE ("manager_id" = "users"."id"))` | Ada |
 | Users with at least one article, C, `alias: 'users'` | — | throws: another alias asked for |
-| Users who review no article, `not(exists(…))` | `(NOT (EXISTS (SELECT 1 FROM "extra"."articles" WHERE ("reviewer_id" = "users"."id"))))` | Ada, Cyd |
-| Same, `not(isInSelect(…, 'reviewer_id'))` | `NOT ("id" IN (SELECT "reviewer_id" FROM "extra"."articles"))` | **none**: one `reviewer_id` is `NULL` |
-| B, in a hand-written `sql` query | — | throws: "The 'parent' table alias has no meaning here" |
+| Users who review no article, C, `not(exists(…))` | `(NOT (EXISTS (SELECT 1 FROM "extra"."articles" WHERE ("reviewer_id" = "users"."id"))))` | Ada, Cyd |
+| Same, `{ id: not(isInSelect('extra.articles', all, 'reviewer_id')) }` | `(((NOT ("id" IN (SELECT "reviewer_id" FROM "extra"."articles")))))` | **none**: one `reviewer_id` is `NULL` |
+| B, in a `sql` template query | — | throws: "The 'parent' table alias has no meaning here" |
 | C without `parent`, in a `lateral` subquery over `extra.articles` | — | throws: the same |
 | C, hostile `parent` and `alias` | `FROM "users" AS "r"" --" WHERE ("manager_id" = "x""; DROP TABLE users; --"."id")` | 42P01, one statement |
 
@@ -96,9 +97,9 @@ isInSelect<T extends Table, C extends keyof SelectableForTable<T>>(
 - **`alias`**: `AS <alias>` after the table, as `select()`'s `alias` writes it. The subquery's own name is its `alias`, else the last identifier of `table`. When the last identifier of `parent` is that name, both unquoted as `compileExpression` writes them (`'users'` and `'"users"'` are one name), the condition is refused: Postgres would resolve `parent` to the subquery's own table, and the replay shows the wrong rows, silently. The refusal is a fragment that throws as it compiles, so `run()` rejects before any query, as the conditions' `refused()` does. The error names both and asks for another alias.
 - **`self`** has no meaning in the subquery's `where`: it throws there, as in `select()`'s `where`. Otherwise the outer key, unqualified inside the subquery, would resolve to an inner column.
 - **The override**: the inner fragment's `compile` calls the original with neither column nor inherited mark, `nested(result, undefined, undefined)`; its own `parentTable`, set by `parent`, still wins. It overrides `compile` as `select()` does for `selectExactlyOneChecksForSecondRow`, so a `copy()` of the condition keeps it.
-- **Types**: `exists()` has the constraint `never`, so it fits under any key, in `and()`, `or()` and `not()`, or as the `where` itself. The docs show `and()`. `EXISTS` is never `NULL`: `boolean`. `isInSelect()` is typed on the subquery column's `Selectable` type, `null` excluded as `isDistinctFrom()` excludes it, and gives `boolean | null`. Its `C` is a `keyof SelectableForTable<T>`: `ColumnForTable<T>` is a lookup, which cannot index it (TS2536).
+- **Types**: `exists()` has the constraint `never`, so it fits under any key, in `and()`, `or()` and `not()`, or as the `where` itself. The docs show `and()`. `EXISTS` is never `NULL`: `boolean`. `isInSelect()` goes under a key, its `self`: as the `where` itself, `not(isInSelect(…))` throws on `self`. `isInSelect()` is typed on the subquery column's `Selectable` type, `null` excluded as `isDistinctFrom()` excludes it, and gives `boolean | null`. Its `C` is a `keyof SelectableForTable<T>`: `ColumnForTable<T>` is a lookup, which cannot index it (TS2536).
 - **No `isNotInSelect()` and no `notExists()`** (no synonym): the anti-join is `not(exists(…))`. The JSDoc of `isInSelect()` says that `not()` of it matches no row once the subquery returns a `NULL` (replay above).
-- **Tests** (issue #562, **Done when**): the SQL of each line of § Replays, frozen; real execution; the injection matrix on `table`, `column`, `parent`, `alias` and the `where` values; the alias refusal, `alias: 'users'` and `parent: '"users"'` included; `self` refused; `parent()` refused without `parent`, in a `lateral` too; `copy()` keeping `parent`; types positive and negative; `bench:types`.
+- **Tests** (issue #562, **Done when**): the SQL or the refusal of each C and `isInSelect()` row of § Replays, frozen; real execution; the injection matrix on `table`, `column`, `parent`, `alias` and the `where` values; the alias refusal, `alias: 'users'` and `parent: '"users"'` included; `self` refused; `parent()` refused without `parent`, in a `lateral` too; `copy()` keeping `parent`; types positive and negative; `bench:types`.
 
 ## Risks
 
