@@ -186,11 +186,11 @@ function updateValuesKeys(updateValues: { [k: string]: any }, updated: string[])
   return keys.filter(k => updateValues[k] !== undefined);
 }
 
-// the value of obj[k] (upsert()'s updateValues for a column, or its updateValues option), read as in 6.6.1 (getters,
-// prototypes, a Proxy's `get`), except a key of Object.prototype that neither obj nor a prototype of its own has: there,
-// `valueOf` or `hasOwnProperty` is a function, which threw, `__proto__` is Object.prototype, and any other key was added
-// there by other code, not by the caller; the chain is walked only when the value read is the one Object.prototype
-// gives (the receiver covers `__proto__`), so a Proxy answering through `get` alone keeps its value
+// the value of obj[k] (upsert()'s updateValues for a column, or its updateValues option), read through getters,
+// prototypes and a Proxy's `get`, as in 6.6.1, except a key of Object.prototype that neither obj nor a prototype of
+// its own has: there, `valueOf` or `hasOwnProperty` is a function, which threw, `__proto__` is Object.prototype, and
+// any other key was added there by other code, not by the caller; the chain is walked only when the value read is the
+// one Object.prototype gives (the receiver covers `__proto__`), so a Proxy answering through `get` alone keeps its value
 function callerValue(obj: any, k: string): any {
   const value = obj[k];
   if (value === undefined || !Object.prototype.hasOwnProperty.call(Object.prototype, k) ||
