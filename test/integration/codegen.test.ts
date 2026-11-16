@@ -1550,7 +1550,9 @@ describe('intervalsTypedAsObjects', () => {
     -- a domain over interval[], and a domain over an array of a domain
     CREATE DOMAIN iv.span_list AS interval[];
     CREATE DOMAIN iv.span_set AS iv.span[];
-    CREATE TABLE iv.lists (list iv.span_list, set iv.span_set);
+    -- an array of a domain over interval[], and a domain over one: any, even with domainsTypedByContext
+    CREATE DOMAIN iv.list_set AS iv.span_list[];
+    CREATE TABLE iv.lists (list iv.span_list, set iv.span_set, lists iv.span_list[], list_set iv.list_set);
     CREATE TABLE iv.gaps (gap interval);
     CREATE TABLE iv.quiet (id int PRIMARY KEY, label text);
   `));
@@ -1638,6 +1640,18 @@ describe('intervalsTypedAsObjects', () => {
     expect(await notesFor({ ...iv, domainsTypedByContext: true, schemas: { iv: only('runs', 'lists') } })).toEqual([
       note('iv.lists.list (iv.span_list), iv.lists.set (iv.span_set), iv.runs.breaks (interval[]), iv.runs.runtime (interval), ' +
         'iv.runs.span (iv.span), iv.runs.spans (iv.span[]) and iv.runs.vip (iv.vip_span)')]);
+  });
+
+  it('leaves out an array of a domain over interval[], or a domain over one, whose types it never changes', async () => {
+    for (const byContext of [false, true]) {
+      const keyed = (key?: boolean) => codegen({ ...iv, domainsTypedByContext: byContext, ...key === undefined ? {} : { intervalsTypedAsObjects: key } });
+      const types = ({ ts: schema, customTypeSourceFiles: files }: Awaited<ReturnType<typeof codegen>>) =>
+        [linesOf(schema, 'lists', 'lists'), linesOf(schema, 'lists', 'list_set'), files.Pg_span_list, files.PgList_set];
+      const absent = types(await keyed());
+      expect(types(await keyed(true))).toEqual(absent);
+      expect(types(await keyed(false))).toEqual(absent);
+      expect((await notesFor({ ...iv, domainsTypedByContext: byContext })).join()).not.toMatch(/iv\.lists\.(lists|list_set) /);
+    }
   });
 
   it('gives no note with true or false, or when no column would change', async () => {
