@@ -2730,6 +2730,17 @@ describe('a shortcut option added to Object.prototype by something else is no op
     });
   });
 
+  // NaN is not `===` itself, yet the NaN read is the one Object.prototype holds; the caller's own NaN is still read
+  it.each([
+    ['select(): limit', 'limit', () => db.select('users', all, {}), { text: selectMany(plain.text), values: [] }],
+    ['select(): offset', 'offset', () => db.select('users', all, {}), { text: selectMany(plain.text), values: [] }],
+    ['upsert(): a column of updateValues', 'mood', () => db.upsert('users', { email: 'e@x.org', mood: 'ok' }, 'email', { updateValues: {} }),
+      { text: 'INSERT INTO "users" ("email", "mood") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("email", "mood") = ROW(EXCLUDED."email", EXCLUDED."mood")' + upsertReturning, values: ['e@x.org', 'ok'] }],
+    ['select(): an own limit', 'limit', () => db.select('users', all, { limit: NaN }), { text: selectMany(`${plain.text} LIMIT $1`), values: [NaN] }],
+  ])('a NaN on Object.prototype is no option either: %s', (_, key, build, compiled) => {
+    expect(withPrototypeKey(key, NaN, () => build().compile())).toEqual(compiled);
+  });
+
   it('with a getter on Object.prototype, an option of the caller\'s own prototype or object is read without it', () => {
     const counts = { answering: {} as Record<string, number>, owning: {} as Record<string, number> };
     class Returning { get returning() { return ['mood']; } }
