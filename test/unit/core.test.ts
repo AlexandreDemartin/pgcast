@@ -874,17 +874,30 @@ describe('cols and vals', () => {
       typedArray: one(vals(new Int32Array([1, 2]))), typedArrayCols: one(cols(new Int32Array([1, 2]))).text,
       subclass: one(cols(new Stamp(0))).text, interval: one(vals(new Interval())),
       proxy: one(cols(new Proxy({ display_name: 'A' }, {}))).text, realm: one(cols(runInNewContext('new Date(0)'))).text,
+      // no ArrayBuffer view, so told from a Proxy row only by its prototype, which a row with own keys never has read
+      proxyBuffer: one(cols(new Proxy(Buffer.from('a'), {}))).text,
     }).toEqual({
       systemErrorCols: '"code", "errno", "path", "syscall"', systemErrorVals: { text: '$1, $2, $3, $4', values: ['ENOENT', -2, 'films.csv', 'open'] },
       dated: { text: '$1', values: ['A'] }, mapped: '"display_name"',
       typedArray: { text: '$1, $2', values: [1, 2] }, typedArrayCols: '"0", "1"',
       subclass: '', interval: { text: '$1', values: [2] },
-      proxy: '"display_name"', realm: '',
+      proxy: '"display_name"', realm: '', proxyBuffer: '"0"',
     });
   });
 
   it('cols and vals of a Proxy of a built-in with no own key throw, as the Proxy hands on its prototype', () => {
     expect(failure(() => one(cols(new Proxy(new Date(0), {}))))).toEqual({ name: 'Error', message: builtinColsMessage('Date') });
+  });
+
+  it('a row with own keys behind a Proxy has its prototype read no more than on master: never, in a row of insert(), upsert() and update(), and in cols() and vals()', () => {
+    // isBuiltin() reads the prototype, which a Proxy's getPrototypeOf trap sees: only a row with no own key reaches it
+    let reads = 0;
+    const row = () => new Proxy({ email: 'a@b', display_name: 'A' }, { getPrototypeOf: (target) => { reads++; return Reflect.getPrototypeOf(target); } });
+    db.insert('users', row()).compile();
+    db.upsert('users', row(), 'email').compile();
+    db.update('users', row(), { id: 1 }).compile();
+    sql`SELECT ${cols(row())}, ${vals(row())}`.compile();
+    expect(reads).toBe(0);
   });
 
   it('a primitive keeps its own message, a String box with its characters its keys', () => {

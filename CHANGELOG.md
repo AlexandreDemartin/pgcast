@@ -16,6 +16,7 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
   - Unchanged:
     - A built-in with own enumerable keys compiles to them, as a plain object does: an `Error` given `code`, `errno`, `syscall` and `path`, as Node's system errors are, is still a row of those columns.
     - A typed array other than a `Buffer` compiles to its elements in `vals()` (`IN ($1, $2)` for `new Int32Array([1, 2])`) and to its indexes in `cols()`.
+    - A `Proxy` of a `Buffer` that holds bytes compiles as before, to its byte indexes and its bytes: it is no `ArrayBuffer` view, so only its prototype would tell it from a `Proxy` row, and neither check reads the prototype of a row with own keys.
     - Also as before: a class instance, a subclass of a built-in, a `PostgresInterval` (`vals()` of `{ hours: 2 }` is still `$1` with `2`), a built-in of another realm, and a primitive, which keeps its own message (#244).
     - A built-in row among several rows of `insert()` or `upsert()` is still spread into a plain object first, so a `Date` there becomes a row of `DEFAULT`s (#543).
 

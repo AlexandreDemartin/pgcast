@@ -441,8 +441,11 @@ const notAnObject = (fn: 'cols' | 'vals', x: unknown) => fn === 'cols' ?
 // (which Postgres runs, rows with no column) or `ROW()` (42601); of a `Buffer`, to its byte indexes as names and its
 // bytes as values, so that a one-byte `Buffer` was stored as `97`. Both throw. A built-in with own enumerable keys
 // still compiles to them, as a plain object does, and so does a typed array other than a `Buffer`, whose elements
-// are its keys; a `Buffer` throws even with keys added
-const isRefusedBuiltin = (x: object, keys: readonly unknown[]) => isBuiltin(x) && (keys.length === 0 || Buffer.isBuffer(x));
+// are its keys. A `Buffer` throws even with keys added, before its keys, one per byte, are listed; `ArrayBuffer.isView()`
+// reads no prototype, so a `Proxy` row with own keys has none read, as on master. A `Proxy` of a `Buffer` is no view,
+// and compiles as before unless it has no key
+const isRefusedBuffer = (x: object) => ArrayBuffer.isView(x) && Buffer.isBuffer(x) && isBuiltin(x);
+const isKeylessBuiltin = (x: object, keys: readonly unknown[]) => keys.length === 0 && isBuiltin(x);
 const refusedBuiltin = (fn: 'cols' | 'vals', x: object) =>
   !Buffer.isBuffer(x) && fn === 'cols' ? `\`db.cols()\` takes an object or an array, not a built-in \`${builtinName(x)}\` with no own enumerable key, which would compile to nothing: for one column, write \`db.cols([name])\`; for a row of \`insert()\`, \`upsert()\` or \`update()\`, give a plain object.` :
     !Buffer.isBuffer(x) ? `\`db.vals()\` takes an object or an array, not a built-in \`${builtinName(x)}\` with no own enumerable key, which would compile to nothing: for one value, write \`db.vals([value])\`; for a row of \`insert()\`, \`upsert()\` or \`update()\`, give a plain object.` :
@@ -668,9 +671,10 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
       // a ColumnNames-wrapped object -> quoted names in a repeatable order
       // OR a ColumnNames-wrapped array -> quoted array values
       if (isNotObject(expression.value)) throw new Error(notAnObject('cols', expression.value));
+      if (isRefusedBuffer(expression.value)) throw new Error(refusedBuiltin('cols', expression.value));
       const columnNames = Array.isArray(expression.value) ? expression.value :
         Object.keys(expression.value).sort();
-      if (!Array.isArray(expression.value) && isRefusedBuiltin(expression.value, columnNames)) throw new Error(refusedBuiltin('cols', expression.value));
+      if (!Array.isArray(expression.value) && isKeylessBuiltin(expression.value, columnNames)) throw new Error(refusedBuiltin('cols', expression.value));
 
       for (let i = 0, len = columnNames.length; i < len; i++) {
         if (i > 0) result.text += ', ';
@@ -700,9 +704,9 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
         }
 
       } else {
-        const
-          columnNames = <Column[]>Object.keys(expression.value).sort();
-        if (isRefusedBuiltin(expression.value, columnNames)) throw new Error(refusedBuiltin('vals', expression.value));
+        if (isRefusedBuffer(expression.value)) throw new Error(refusedBuiltin('vals', expression.value));
+        const columnNames = <Column[]>Object.keys(expression.value).sort();
+        if (isKeylessBuiltin(expression.value, columnNames)) throw new Error(refusedBuiltin('vals', expression.value));
         const columnValues = columnNames.map(k => (<any>expression.value)[k]);
 
         for (let i = 0, len = columnValues.length; i < len; i++) {
