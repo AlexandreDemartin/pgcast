@@ -516,6 +516,14 @@ describe('a Parameter in a Whereable, in isIn or in vals', () => {
     expect(await db.select('users', { display_name: param(`Ada' OR '1' = '1`) }).run(t.client)).toEqual([]);
     expect(await db.select('users', { display_name: db.conditions.isIn([param(`Ada' OR '1' = '1`)]) }).run(t.client)).toEqual([]);
   });
+
+  it('hostile items of eqAny stay one array parameter: they match the names they are, and run nothing', async () => {
+    const items = [`Ada' OR '1' = '1`, `Ada"}; ${update}; --`, `{Ada}`, `Ada\\`, 'Ada,Bob', 'Bob'];
+    const q = sql`SELECT ${'id'} FROM ${'users'} WHERE ${{ display_name: db.conditions.eqAny(items) }}`;
+    expect(q.compile()).toEqual({ text: 'SELECT "id" FROM "users" WHERE (("display_name" = ANY($1)))', values: [items] });
+    expect(await q.run(t.client)).toEqual([{ id: 2 }]);
+    expect(await adaName()).toBe('Ada');
+  });
 });
 
 describe('without parameters (simple protocol)', () => {
@@ -658,6 +666,22 @@ describe('without parameters (simple protocol)', () => {
       {
         "code": "42703",
         "message": "column users.id"))); UPDATE users SET display_name = 'injected' WHERE id = 1 does not exist",
+      }
+    `);
+  });
+
+  it('a `"` in the column of parent() in eqAny stays in one column name, which does not exist', async () => {
+    // compiled as a Whereable value of parent() is; Postgres truncates the name to 63 bytes in its message
+    const column = `scores"))); ${update}; --`;
+    const q = sql`SELECT (SELECT count(*) FROM ${'users'} WHERE ${{ id: db.conditions.eqAny(db.parent(column)) }}) AS n FROM ${'accounts'}`
+      .copy({ parentTable: 'accounts' });
+    const { text, values } = q.compile();
+    expect(text).toBe(`SELECT (SELECT count(*) FROM "users" WHERE (("id" = ANY("accounts"."scores""))); ${update}; --")))) AS n FROM "accounts"`);
+    expect(values).toEqual([]);
+    expect(await pgError(t.client, () => q.run(t.client))).toMatchInlineSnapshot(`
+      {
+        "code": "42703",
+        "message": "column accounts.scores"))); UPDATE users SET display_name = 'injected' WHERE id does not exist",
       }
     `);
   });
@@ -1192,14 +1216,14 @@ describe('a built-in object in cols() and vals()', () => {
   });
 });
 
-describe('a list that is not an array in isIn() and isNotIn()', () => {
+describe('a list that is not an array in isIn(), isNotIn() and eqAny()', () => {
   it('rejects run() before any query, through deletes, select and update, nested in and(), or() and not(), and copied', async () => {
     // 6.6.1 ran DELETE … WHERE ((true)) for isNotIn(new Set([1, 2])), every row (#235)
     const
       outcomes: Record<string, string> = {},
       query = vi.spyOn(t.client, 'query');
     try {
-      for (const [fn, list] of Object.entries({ isIn: db.conditions.isIn, isNotIn: db.conditions.isNotIn }))
+      for (const [fn, list] of Object.entries({ isIn: db.conditions.isIn, isNotIn: db.conditions.isNotIn, eqAny: db.conditions.eqAny }))
         for (const [kind, x] of Object.entries(nonArrayLists())) {
           let c: db.SQL;
           // 6.6.1 read null.length at the call
