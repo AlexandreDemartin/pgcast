@@ -1,6 +1,6 @@
 # pgcast
 
-**Zero-abstraction Postgres for TypeScript: your types, cast from your database.**
+**The Postgres you know, with the full power of TypeScript.**
 
 Maintained by [Alexandre Demartin](https://github.com/AlexandreDemartin)
 
