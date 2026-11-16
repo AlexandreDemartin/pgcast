@@ -165,6 +165,10 @@ Candidates for a check, a rule or a skill line.
 - #560: `zapatos/generate` has no counterpart of `website/check-reference.mjs`, so a new generate export's docs entry is not enforced by the build.
 - #560: a default set for one caller of a shared internal path is tested through each caller (the CLI too): the "default moved into `staleFiles()`" mutant died only by the CLI's test.
 - #560: in French, a query as the subject makes a possessive ambiguous (« sa promesse » read as the query's).
+- #568: when a fix replaces `!==` with `Object.is`, the release entry names the `NaN` path the older release let through, and the replay grid has `NaN` as a value and as a constant getter.
+- #568: a proof row listing several calls is replayed for each: `FOR UPDATE` on an aggregate gives 0A000 in any transaction, unlike `select()`'s 25006 when read-only.
+- #568: a claim reworded in `SECURITY.md` may live on the docs site too, in both languages: `git grep` both wordings.
+- #568: a claim that a version range "compared" something is replayed on each version of the range: 6.6.2 to 6.7.1 did not compare at all.
 
 ## Minors kept
 
