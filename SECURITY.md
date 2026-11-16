@@ -4,7 +4,7 @@
 
 | Version | Supported |
 |---|---|
-| The latest 6.x minor of `pgcast` | yes: fixes ship as a patch release |
+| The latest 6.x minor of `pgcast` | yes: fixes ship in the next release, a patch, or a minor when master already holds features (SemVer) |
 | Older `pgcast` versions | no: upgrade to the latest minor, a drop-in |
 | `zapatos` (Zapatos itself) | not maintained here; a flaw that pgcast shares is reported here, and its fix offered upstream |
 
@@ -17,7 +17,7 @@
 ## What to expect
 
 - An acknowledgement within a week.
-- A fix with its tests, in a patch release, and a GitHub security advisory with a CVE.
+- A fix with its tests, in the next release (a patch, or a minor when master already holds features), and a GitHub security advisory with a CVE.
 - Coordinated disclosure: the advisory is published once the fixed version is out, on a date agreed with you.
 - Credit in the advisory and in the `Security` section of [CHANGELOG.md](CHANGELOG.md), unless you would rather not be named.
 
