@@ -195,9 +195,12 @@ export const definitionForRelationInSchema = async (
       columnsTypedByEnumName.push(`${schemaName}.${rel.name}.${column} (${udtSchema}.${isArray ? udtName.slice(1) + '[]' : udtName})`);
     }
 
-    // pg has no parser for the array type of an enum, whose OID is the database's own: it returns its text, '{a,b}'
-    const enumArray = selectableType !== 'any' && udtName.charAt(0) === '_' && !hasOwn(typeEnums, udtName) &&
-      hasOwn(typeEnums, udtName.slice(1));
+    // pg has no parser for the array type of an enum, whose OID is the database's own: it returns its text, '{a,b}'.
+    // The enum is looked up in the schema of its type, which a built-in's array names too (pg_catalog)
+    const
+      ownEnums = acrossSchemas ? otherEnums[udtSchema] : enums,
+      enumArray = selectableType !== 'any' && udtName.charAt(0) === '_' && !hasOwn(ownEnums, udtName) &&
+        hasOwn(ownEnums, udtName.slice(1));
     if (enumArray && config.enumArraysTypedAsText == null) {  // left out, or null from JSON
       enumArraysNotAsText.push(`${schemaName}.${rel.name}.${column} (${domainName === null ?
         `${udtSchema}.${udtName.slice(1)}[]` : `${domainSchema}.${domainName}`})`);
