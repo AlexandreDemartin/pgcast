@@ -1,13 +1,13 @@
 // Copyright (C) 2026 Alexandre Demartin
 //
 // The config the CLI reads (src/generate/cliConfig.ts): pgcastconfig.json first, then zapatosconfig.json,
-// then none; with both, a note through warningListener (#368). No database.
+// then none; with both, a note through warningListener (#368); and its arguments (#556). No database.
 
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cliConfig } from '../../src/generate/cliConfig';
+import { cliArgs, cliConfig, runCli } from '../../src/generate/cliConfig';
 
 let dir: string;
 let log: ReturnType<typeof vi.spyOn>;
@@ -120,5 +120,40 @@ describe('cliConfig()', () => {
     expect(() => cliConfig('{"outDir": "{{PGCAST_UNSET}}"}', dir)).toThrow(new Error(
       'If present, the argument to Zapatos must be valid JSON, and all referenced environment variables must exist: ' +
       'Environment variable \'PGCAST_UNSET\' is not set'));
+  });
+});
+
+// the CLI's arguments (#556): --check anywhere, then the first other argument as the JSON, as Zapatos 6.6.1 reads
+// process.argv[2]; a later one ignored, as there
+describe('cliArgs()', () => {
+  it('takes the JSON argument alone, or none, as Zapatos 6.6.1 does', () => {
+    expect(cliArgs([])).toEqual({ check: false, argsJSON: undefined });
+    expect(cliArgs(['{"outDir": "./src"}'])).toEqual({ check: false, argsJSON: '{"outDir": "./src"}' });
+    expect(cliArgs(['{"outDir": "./src"}', '{"outDir": "./lib"}'])).toEqual({ check: false, argsJSON: '{"outDir": "./src"}' });
+    expect(cliArgs(['', '{}'])).toEqual({ check: false, argsJSON: '' });  // an empty first argument fails as JSON, as there
+  });
+
+  it('takes --check before or after the JSON argument, or alone', () => {
+    expect(cliArgs(['--check'])).toEqual({ check: true, argsJSON: undefined });
+    expect(cliArgs(['--check', '{"outDir": "./src"}'])).toEqual({ check: true, argsJSON: '{"outDir": "./src"}' });
+    expect(cliArgs(['{"outDir": "./src"}', '--check'])).toEqual({ check: true, argsJSON: '{"outDir": "./src"}' });
+  });
+
+  it('refuses any other flag, before or after the JSON argument, so a misspelt --check never writes', async () => {
+    const refusal = (flag: string) => new Error(`Unknown flag ${flag}: the only flag is --check, beside the JSON argument`);
+    expect(() => cliArgs(['--chek'])).toThrow(refusal('--chek'));
+    expect(() => cliArgs(['{}', '--chek'])).toThrow(refusal('--chek'));
+    expect(() => cliArgs(['--check', '--help'])).toThrow(refusal('--help'));
+    expect(() => cliArgs(['--check=true'])).toThrow(refusal('--check=true'));
+    // before reading any config: an unreachable server and a broken config file are never reached
+    write('pgcastconfig.json', '{,}');
+    await expect(runCli(['{"db": {"connectionString": "postgres://nobody@127.0.0.1:1/none"}}', '--chek'], dir))
+      .rejects.toThrow(refusal('--chek'));
+  });
+
+  it('keeps a single dash for the JSON argument, which then fails as JSON, as in Zapatos 6.6.1', () => {
+    expect(cliArgs(['-h'])).toEqual({ check: false, argsJSON: '-h' });
+    expect(() => cliConfig(cliArgs(['-h']).argsJSON, dir))
+      .toThrow(/^If present, the argument to Zapatos must be valid JSON, and all referenced environment variables must exist: /);
   });
 });

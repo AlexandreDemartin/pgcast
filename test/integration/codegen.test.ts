@@ -4,25 +4,26 @@
 // produces today, surprises included (they are fixed in chapter 2, not here).
 //   * tsForConfig(): one frozen file per configuration, in test/__snapshots__/codegen/;
 //   * generate(): the files written to disk for the main configuration, frozen in
-//     test/generated/, which `npm run typecheck` compiles (test/generated/tsconfig.json).
+//     test/generated/, which `npm run typecheck` compiles (test/generated/tsconfig.json);
+//   * the CLI with --check: those files compared with the disk, nothing written.
 // Update after an intended change: `npx vitest run -u test/integration/codegen.test.ts`.
 // -u never deletes a file: a stale snapshot is removed by hand (the orphan test names it).
 // Without rejectOnQueryError, tsForConfig() calls process.exit(1) on a failed query: a test that causes one
 // mocks process.exit (§ generate() on a failed query).
 
 import { randomBytes } from 'node:crypto';
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import * as pg from 'pg';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, inject, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, inject, it, vi, type MockInstance } from 'vitest';
 import {
   definitionForRelationInSchema, enumDataForSchema, finaliseConfig, generate, relationsInSchema, tsForConfig, type Config,
 } from '../../src/generate';
 import * as runtime from '../../src/db';
-import { cliConfig } from '../../src/generate/cliConfig';
+import { cliConfig, runCli } from '../../src/generate/cliConfig';
 import { createDatabase, dropDatabase, urlForDatabase, withAdminClient } from '../helpers/databases';
 import { useTestDatabase } from '../helpers/db';
 import { pgError } from '../helpers/pgError';
@@ -3868,6 +3869,148 @@ declare module 'pgcast/custom' {
     void wrong;
     await expect(codegenWithoutQueries({ ...scenes, moduleNames: 'pgcats' as 'pgcast' })).rejects
       .toThrow(`moduleNames must be 'zapatos' (the default) or 'pgcast', not 'pgcats'`);
+  });
+});
+
+describe('the CLI with --check (#556)', () => {
+  // a schema of its own, committed to this file's database: a domain gives a placeholder and custom/index.d.ts
+  beforeAll(() => t.pool.query(`
+    CREATE SCHEMA generate_check;
+    CREATE DOMAIN generate_check.scene_title AS text;
+    CREATE TABLE generate_check.scenes (id int PRIMARY KEY, title generate_check.scene_title);
+  `));
+  afterAll(() => t.pool.query('DROP SCHEMA generate_check CASCADE'));
+
+  let dir: string, outDir: string, log: MockInstance<typeof console.log>;
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'pgcast-check-'));  // the folder the CLI runs in: no config file
+    outDir = join(dir, 'src');
+    vi.stubEnv('PGCAST_CHECK_URL', db().connectionString);  // never in an argument
+    log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+  });
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+  });
+
+  const
+    json = (config: Config = {}) => JSON.stringify({
+      db: { connectionString: '{{PGCAST_CHECK_URL}}' }, outDir, schemas: { generate_check: all }, warningListener: false,
+      ...config,
+    }),
+    schemaFile = 'zapatos/schema.d.ts',
+    indexFile = 'zapatos/custom/index.d.ts',
+    placeholderFile = 'zapatos/custom/PgScene_title.d.ts',
+    upToDate = 'The generated files in <out>/zapatos are up to date.',
+    printed = () => log.mock.calls.map(args => args.join(' ').split(outDir).join('<out>')),
+    // every file and folder under outDir, with its content and mtime
+    tree = () => existsSync(outDir) ? readdirSync(outDir, { recursive: true }).map(String).sort().map(f => {
+      const path = join(outDir, f), stat = statSync(path);
+      return [f, stat.mtimeMs, stat.isFile() ? readFileSync(path, 'utf8') : 'folder'];
+    }) : 'no outDir';
+
+  /** The files written, each given an old mtime, so that a rewrite in the same millisecond still shows. */
+  const generated = async (config: Config = {}) => {
+    expect(await runCli([json(config)], dir)).toBe(0);
+    for (const f of readdirSync(outDir, { recursive: true })) utimesSync(join(outDir, String(f)), 1e6, 1e6);
+    log.mockClear();
+  };
+
+  /** A check's exit code and what it printed, after asserting it wrote nothing. */
+  const check = async (args = ['--check', json()]) => {
+    const before = tree();
+    const code = await runCli(args, dir);
+    expect(tree()).toEqual(before);
+    return { code, printed: printed() };
+  };
+
+  it('without --check, writes the files and exits with 0, as generate() does', async () => {
+    expect(await runCli([json()], dir)).toBe(0);
+    expect(files(outDir)).toEqual([placeholderFile, indexFile, schemaFile]);
+    expect(printed()).toEqual([]);
+  });
+
+  it('exits with 0 when the files are up to date, with --check before or after the JSON argument', async () => {
+    await generated();
+    expect(await check()).toEqual({ code: 0, printed: [upToDate] });
+    expect(await check([json(), '--check'])).toEqual({ code: 0, printed: [upToDate, upToDate] });
+  });
+
+  it('exits with 1 and names schema.d.ts when it was edited or deleted', async () => {
+    await generated();
+    writeFileSync(join(outDir, schemaFile), readFileSync(join(outDir, schemaFile), 'utf8') + '\n');
+    expect(await check()).toEqual({
+      code: 1, printed: [`Out of date: <out>/${schemaFile}`, 'Run the generator without --check to write it.'],
+    });
+    log.mockClear();
+    rmSync(join(outDir, schemaFile));
+    expect(await check()).toEqual({
+      code: 1, printed: [`Missing: <out>/${schemaFile}`, 'Run the generator without --check to write it.'],
+    });
+  });
+
+  it('exits with 1 and names schema.d.ts once the database has a column it lacks', async () => {
+    await generated();
+    await t.pool.query('ALTER TABLE generate_check.scenes ADD COLUMN runtime_minutes int');
+    try {
+      expect(await check()).toEqual({
+        code: 1, printed: [`Out of date: <out>/${schemaFile}`, 'Run the generator without --check to write it.'],
+      });
+    } finally {
+      await t.pool.query('ALTER TABLE generate_check.scenes DROP COLUMN runtime_minutes');
+    }
+  });
+
+  it('exits with 1 and names custom/index.d.ts when it was edited: each run writes it again', async () => {
+    await generated();
+    writeFileSync(join(outDir, indexFile), '// edited\n');
+    expect(await check()).toEqual({
+      code: 1, printed: [`Out of date: <out>/${indexFile}`, 'Run the generator without --check to write it.'],
+    });
+  });
+
+  it('exits with 1 and names a placeholder only when it is missing: an edited one is yours', async () => {
+    await generated();
+    writeFileSync(join(outDir, placeholderFile), 'declare module \'zapatos/custom\' { export type PgScene_title = `scene-${number}`; }\n');
+    expect(await check()).toEqual({ code: 0, printed: [upToDate] });
+    log.mockClear();
+    rmSync(join(outDir, placeholderFile));
+    expect(await check()).toEqual({
+      code: 1, printed: [`Missing: <out>/${placeholderFile}`, 'Run the generator without --check to write it.'],
+    });
+  });
+
+  it('exits with 1 and names every file before the first run, creating no folder', async () => {
+    expect(await check()).toEqual({
+      code: 1,
+      printed: [
+        `Missing: <out>/${schemaFile}`, `Missing: <out>/${indexFile}`, `Missing: <out>/${placeholderFile}`,
+        'Run the generator without --check to write them.',
+      ],
+    });
+    expect(existsSync(outDir)).toBe(false);
+  });
+
+  it('compares the files of outExt, and of moduleNames', async () => {
+    await generated({ outExt: '.ts', moduleNames: 'pgcast' });
+    expect(await check(['--check', json({ outExt: '.ts', moduleNames: 'pgcast' })]))
+      .toEqual({ code: 0, printed: ['The generated files in <out>/pgcast are up to date.'] });
+    log.mockClear();
+    expect((await check()).printed[0]).toBe(`Missing: <out>/${schemaFile}`);
+  });
+
+  it('prints the notes a run prints through warningListener, before its result, but no placeholder it would write', async () => {
+    // a rule with no exclude, noted after a run's writes; an include entry that matches nothing, noted while reading
+    const schemas = { generate_check: { include: ['scenes', 'no_such_table'] } } as unknown as Config['schemas'];
+    const { code, printed: lines } = await check(['--check', json({ warningListener: true, schemas })]);
+    expect(code).toBe(1);
+    expect(lines.filter(line => !line.startsWith('Note: this database has bigint'))).toEqual([
+      expect.stringMatching(/^Note: the include entry "no_such_table" of schema "generate_check" matches no relation there/),
+      expect.stringMatching(/^Note: the schemas rule of "generate_check" has no exclude/),
+      `Missing: <out>/${schemaFile}`, `Missing: <out>/${indexFile}`, `Missing: <out>/${placeholderFile}`,
+      'Run the generator without --check to write them.',
+    ]);
   });
 });
 
