@@ -345,6 +345,77 @@ describe('eqAny: one array parameter', () => {
   });
 });
 
+describe('websearchToTsquery on a tsvector column', () => {
+  // products.search is to_tsvector('simple', coalesce(title, '')): 1 'T-shirt small', 2 'T-shirt medium', 3 no title, ''
+  const { websearchToTsquery: search, not } = dc;
+  const cases: [string, db.SQL, number[]][] = [
+    ['a word', { search: search('simple', 'shirt') }, [1, 2]],
+    ['two words, both', { search: search('simple', 'shirt small') }, [1]],
+    ['or', { search: search('simple', 'small or medium') }, [1, 2]],
+    ['-word, without it', { search: search('simple', 'shirt -small') }, [2]],
+    ['a quoted phrase, in order', { search: search('simple', '"shirt medium"') }, [2]],
+    ['a quoted phrase, out of order', { search: search('simple', '"medium shirt"') }, []],
+    ['a hyphenated word, as the vector splits it', { search: search('simple', 't-shirt') }, [1, 2]],
+    ['the configuration\'s stems: simple keeps shirts', { search: search('simple', 'shirts') }, []],
+    ['the configuration\'s stems: english reads shirts as shirt', { search: search('english', 'shirts') }, [1, 2]],
+    ['under not(), the rows without it, the empty vector included', { search: not(search('simple', 'small')) }, [2, 3]],
+  ];
+
+  it.each(cases)('%s', async (_name, where, expected) => {
+    expect(await ids('products', where)).toEqual(expected);
+  });
+
+  it('runs in select(), with the same SQL', async () => {
+    const q = db.select('products' as any, { search: search('english', 'medium') }, { columns: ['id'] });
+    expect(q.compile().text).toContain('WHERE (("search" @@ websearch_to_tsquery(CAST($2 AS "regconfig"), $3)))');
+    expect(await q.run(t.client)).toEqual([{ id: 2 }]);
+  });
+
+  it('tsquery operators and quotes are no syntax error: Postgres reads them as a search box would', async () => {
+    // & and | are not operators here, so | is no OR; :* is no prefix; a lone quote or punctuation leaves no word
+    const rows = async (query: string) => {
+      const [{ q }] = (await t.client.query<{ q: string }>(`SELECT websearch_to_tsquery('simple', $1)::text AS q`, [query])).rows;
+      return { tsquery: q, ids: await ids('products', { search: search('simple', query) }) };
+    };
+    expect({
+      and: await rows('small & medium'), pipe: await rows('small | medium'), prefix: await rows('smal:*'),
+      squotes: await rows(`'small'`), dquote: await rows('"'), punctuation: await rows('!('),
+    }).toEqual({
+      and: { tsquery: `'small' & 'medium'`, ids: [] },
+      pipe: { tsquery: `'small' & 'medium'`, ids: [] },
+      prefix: { tsquery: `'smal'`, ids: [] },
+      squotes: { tsquery: `'small'`, ids: [1] },
+      dquote: { tsquery: '', ids: [] },
+      punctuation: { tsquery: '', ids: [] },
+    });
+  });
+
+  it('a query of stop words alone matches no row, and Postgres sends a NOTICE', async () => {
+    const notices: string[] = [];
+    const listener = (n: { message?: string | undefined }) => notices.push(n.message ?? '');
+    t.client.on('notice', listener);
+    try {
+      expect(await ids('products', { search: search('english', 'the') })).toEqual([]);
+    } finally {
+      t.client.off('notice', listener);
+    }
+    expect(new Set(notices)).toEqual(new Set(['text-search query contains only stop words or doesn\'t contain lexemes, ignored']));
+  });
+
+  it('an unknown configuration: 42704', async () => {
+    expect(await pgError(t.client, () => ids('products', { search: search('klingon', 'shirt') })))
+      .toEqual({ code: '42704', message: 'text search configuration "klingon" does not exist' });
+  });
+
+  it('a NULL vector gives NULL: not() leaves the row out too', async () => {
+    const { id } = await db.insert('extra.type_zoo' as any, { c_text: 'no vector' }, { returning: ['id'] }).run(t.client) as { id: number };
+    expect({
+      search: await ids('extra.type_zoo', { id, c_tsvector: search('simple', 'vector') }),
+      not: await ids('extra.type_zoo', { id, c_tsvector: not(search('simple', 'vector')) }),
+    }).toEqual({ search: [], not: [] });
+  });
+});
+
 describe('add, subtract (in an update)', () => {
   it('add and subtract a number', async () => {
     expect(await db.update('accounts', { balance: dc.add(10), lifetime_ops: dc.subtract(1) }, { id: 3 },

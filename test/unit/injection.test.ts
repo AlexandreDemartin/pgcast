@@ -330,6 +330,18 @@ describe('values stay parameters', () => {
       } finally { resetConfig(); }
     }
   });
+
+  it('the configuration and the query of websearchToTsquery are two parameters, whatever they hold and whatever the configuration', () => {
+    // the cast to regconfig is a constant of the code
+    for (const config of [{}, { castArrayParamsToJson: true }, { castObjectParamsToJson: true }]) {
+      db.setConfig(config);
+      try {
+        for (const input of Object.values(hostile))
+          expect(sql`WHERE ${{ search: db.conditions.websearchToTsquery(input, input) }}`.compile())
+            .toEqual({ text: 'WHERE (("search" @@ websearch_to_tsquery(CAST($1 AS "regconfig"), $2)))', values: [input, input] });
+      } finally { resetConfig(); }
+    }
+  });
 });
 
 describe('raw, cols and vals as a filter value', () => {
