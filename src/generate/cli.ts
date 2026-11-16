@@ -7,10 +7,10 @@ Copyright (C) 2020 - 2023 George MacKerron
 Released under the MIT licence: see LICENCE file
 */
 
-import { generate } from ".";
-import { cliConfig } from './cliConfig';
+import { runCli } from './cliConfig';
 
 
 void (async () => {
-  await generate(cliConfig(process.argv[2]));
+  const exitCode = await runCli(process.argv.slice(2));
+  if (exitCode !== 0) process.exitCode = exitCode;  // --check, on a file out of date
 })();

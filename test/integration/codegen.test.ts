@@ -4002,7 +4002,7 @@ describe('the CLI with --check (#556)', () => {
 
   it('prints the notes a run prints through warningListener, before its result, but no placeholder it would write', async () => {
     // a rule with no exclude, noted after a run's writes; an include entry that matches nothing, noted while reading
-    const schemas = { generate_check: { include: ['scenes', 'no_such_table'] } } as unknown as Config['schemas'];
+    const schemas = { generate_check: { include: ['scenes', 'no_such_table'] } } as unknown as Schemas;
     const { code, printed: lines } = await check(['--check', json({ warningListener: true, schemas })]);
     expect(code).toBe(1);
     expect(lines.filter(line => !line.startsWith('Note: this database has bigint'))).toEqual([

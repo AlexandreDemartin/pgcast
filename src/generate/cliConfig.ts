@@ -9,6 +9,8 @@ Released under the MIT licence: see LICENCE file
 import * as fs from 'fs';
 import * as path from 'path';
 import { finaliseConfig, type Config } from './config';
+import { check } from './outputFiles';
+import { generate } from './write';
 
 // kept out of zapatos/generate's exports, like moduleNames.ts; moved here from cli.ts, to be tested
 
@@ -69,4 +71,25 @@ export const cliConfig = (argsJSON = '{}', dir = '.') => {
   }
 
   return config;
+};
+
+/**
+ * The CLI's arguments: `--check` anywhere, and the JSON argument, the first other one, as Zapatos 6.6.1 reads
+ * `process.argv[2]`; any later one is ignored, as there. Any other flag throws, so a misspelt `--check` never writes.
+ */
+export const cliArgs = (args: string[]) => {
+  const unknown = args.find(arg => arg.startsWith('--') && arg !== '--check');
+  if (unknown !== undefined) throw new Error(`Unknown flag ${unknown}: the only flag is --check, beside the JSON argument`);
+
+  return { check: args.includes('--check'), argsJSON: args.find(arg => arg !== '--check') };
+};
+
+/** Run the CLI on its arguments in `dir`: `generate()`, or with `--check` `check()`. Resolve to its exit code. */
+export const runCli = async (args: string[], dir = '.') => {
+  const { check: checkOnly, argsJSON } = cliArgs(args), config = cliConfig(argsJSON, dir);
+  if (!checkOnly) {
+    await generate(config);
+    return 0;
+  }
+  return await check(config) ? 0 : 1;
 };
