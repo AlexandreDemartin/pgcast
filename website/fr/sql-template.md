@@ -1,5 +1,5 @@
 ---
-english: d3e40667e826
+english: d4c499a959d3
 ---
 
 # Template SQL
@@ -367,7 +367,7 @@ type SelfType = typeof self
 db.parent<T extends Column | undefined = Column | undefined>(x?: T): ParentColumn<T>
 ```
 
-Une colonne de la table de la requête parente, dans une sous-requête donnée à `lateral` ([Jointures](/fr/lateral)) : `"<parent table or alias>"."<column>"`.
+Une colonne de la table de la requête parente, dans une sous-requête donnée à `lateral` ([Jointures](/fr/lateral)), ou dans le `where` d’[`exists()`](/fr/conditions#conditions.exists) et d’[`isInSelect()`](/fr/conditions#conditions.isInSelect), dont l’option `parent` nomme cette table : `"<parent table or alias>"."<column>"`.
 
 <CastPanel example="sql_parent">
 
@@ -378,7 +378,7 @@ Une colonne de la table de la requête parente, dans une sous-requête donnée �
 - Sans colonne, la colonne du filtre où il se trouve : `{ film_id: db.parent() }`, dans un `lateral` de `roles`, donne `("film_id" = "roles"."film_id")`<!-- probe: db.select('roles', db.all, { lateral: { film: db.selectOne('films', { film_id: db.parent() }) } }) -->. Sans filtre, il lève une erreur avant d’écrire quoi que ce soit : "`db.parent()` with no column has no meaning here: name the column, `db.parent('id')`…"<!-- message -->. Zapatos 6.6.1 écrivait la table et son `.`, puis levait « <span lang="en">Alien object while interpolating SQL: undefined</span> ».
 - Il fonctionne comme valeur d’un Whereable, dans un fragment `sql`, dans `eq()` et dans `vals([…])`, donc dans `isIn()` : `{ film_id: isIn([db.parent()]) }` donne `(("film_id" IN ("roles"."film_id")))`<!-- probe: db.select('roles', db.all, { lateral: { film: db.selectOne('films', { film_id: db.conditions.isIn([db.parent()]) }) } }) -->. Dans `vals([…])`, Zapatos 6.6.1 l’envoyait en JSON : `isIn([parent('id')])` comparait avec `'{"value":"id"}'`.
 - Dans `vals({…})` aussi, où, sans colonne, il prend la colonne de sa clé : `` db.sql`SELECT ${db.vals({ name: db.parent() })} AS result` ``, dans un `lateral` de `studios`, donne `SELECT "studios"."name" AS result`<!-- probe: db.select('studios', db.all, { lateral: { n: db.sql`SELECT ${db.vals({ name: db.parent() })} AS result` } }) -->. Zapatos 6.6.1 l’y envoyait en JSON aussi.
-- Hors d’une requête imbriquée, il lève "The 'parent' table alias has no meaning here"<!-- message -->, si bien que `run()` est rejetée avant toute requête. De même pour toute valeur d’`insert()`, d’`upsert()` ou d’`update()`, là où Zapatos 6.6.1 stockait `{"value":"id"}` sur une colonne texte.
+- Hors d’une requête imbriquée, il lève "The 'parent' table alias has no meaning here"<!-- message -->, si bien que `run()` est rejetée avant toute requête. De même pour toute valeur d’`insert()`, d’`upsert()` ou d’`update()`, là où Zapatos 6.6.1 stockait `{"value":"id"}` sur une colonne texte, et pour le `where` d’`exists()` ou d’`isInSelect()` sans `parent`, même à l’intérieur d’un `lateral`.
 
 ### `ParentColumn` {#ParentColumn}
 
@@ -478,7 +478,7 @@ Ce que renvoient `sql` et chaque raccourci : une requête, ou une partie de req
 | [`prepared(name?)`](#prepared) | en fait une requête préparée |
 | [`copy(override?)`](#copy) | une copie superficielle, certaines propriétés remplacées |
 | `noop`, `noopResult` | fixés par `insert()` et `upsert()` quand ils reçoivent `[]` : `run()` n’envoie rien et se résout en `noopResult` |
-| `parentTable` | fixé sur une sous-requête `lateral` par sa parente, pour [`parent()`](#parent) |
+| `parentTable` | fixé sur une sous-requête `lateral` par sa parente, et sur la sous-requête d’`exists()` et d’`isInSelect()` par leur option `parent`, pour [`parent()`](#parent) |
 | `preparedName` | fixé par `prepared()` |
 | `compileExpression()` | utilisé par `compile()`, interne |
 

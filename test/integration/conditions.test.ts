@@ -6,9 +6,9 @@
 //   accounts.scores: 1 {1,2,3}, 2 {}, 3 {7}; accounts.flags: 1 {t,f}, 2 NULL, 3 {}
 //   extra.type_zoo (inserted below): T true, F false, N null
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as db from '../../src/db';
-import { sql, param, conditions as dc } from '../../src/db';
+import { sql, param, all, parent, conditions as dc } from '../../src/db';
 import { resetConfig } from '../helpers/config';
 import { useTestDatabase } from '../helpers/db';
 import { pgError } from '../helpers/pgError';
@@ -483,5 +483,136 @@ describe('characterization: conditions the type accepts and Postgres refuses, as
     const q = db.insert('accounts', { owner_id: 1, balance: dc.add(1) });
     expect(q.compile().text).toMatch(/^INSERT INTO "accounts" \("balance", "owner_id"\) VALUES \("balance" \+ \$1, \$2\)/);
     expect(await pgError(t.client, () => q.run(t.client))).toEqual({ code: '42703', message: 'column "balance" does not exist' });
+  });
+});
+
+describe('exists() and isInSelect() (note 006 § Replays)', () => {
+  // extra.articles: (author 1, reviewer 2, 'Notes on the engine'), (author 2, no reviewer, 'Draft')
+  const { exists, isInSelect, like, not, and } = dc;
+  const names = async (where: db.SQL) =>
+    (await db.select('users', where as any, { columns: ['display_name'], order: { by: 'id', direction: 'ASC' } }).run(t.client))
+      .map(u => u.display_name);
+  /** What `run()` rejects with, after checking that no query reached the client. */
+  const rejectsBeforeAnyQuery = async (q: db.SQLFragment<any>) => {
+    const query = vi.spyOn(t.client, 'query');
+    try {
+      const err = await q.run(t.client).then(() => undefined, (e: Error) => e.message);
+      expect(query).not.toHaveBeenCalled();
+      return err;
+    } finally {
+      query.mockRestore();
+    }
+  };
+
+  it('users with an article whose body starts with Notes, and users with at least one article', async () => {
+    expect({
+      exists: await names(exists('extra.articles', { author_id: parent('id'), body: like('Notes%') }, { parent: 'users' })),
+      isInSelect: await names({ id: isInSelect('extra.articles', { body: like('Notes%') }, 'author_id') }),
+      existsAny: await names(exists('extra.articles', { author_id: parent('id') }, { parent: 'users' })),
+      isInSelectAll: await names({ id: isInSelect('extra.articles', all, 'author_id') }),
+      isInSelectEmpty: await names({ id: isInSelect('extra.articles', {}, 'author_id') }),
+    }).toEqual({
+      exists: ['Ada'], isInSelect: ['Ada'],
+      existsAny: ['Ada', 'Bob'], isInSelectAll: ['Ada', 'Bob'], isInSelectEmpty: ['Ada', 'Bob'],
+    });
+  });
+
+  it('users who manage someone: by hand, the bare name is the inner table; exists() refuses it, and an alias settles it', async () => {
+    const byHand = async (text: string) => (await t.client.query(text)).rows.map(r => r.display_name);
+    expect(await byHand('SELECT display_name FROM "users" WHERE EXISTS (SELECT 1 FROM "users" WHERE "manager_id" = "users"."id") ORDER BY id')).toEqual([]);
+    expect(await byHand('SELECT display_name FROM "users" WHERE EXISTS (SELECT 1 FROM "public"."users" WHERE "manager_id" = "users"."id") ORDER BY id')).toEqual([]);
+    const select = (where: db.SQL) => db.select('users', where as any, { columns: ['display_name'] });
+    expect(new Set([
+      await rejectsBeforeAnyQuery(select(exists('users', { manager_id: parent('id') }, { parent: 'users' }))),
+      await rejectsBeforeAnyQuery(select(exists('public.users', { manager_id: parent('id') }, { parent: 'users' }))),
+      await rejectsBeforeAnyQuery(select(exists('users', { manager_id: parent('id') }, { parent: '"users"' }))),
+      await rejectsBeforeAnyQuery(select(exists('extra.articles', { author_id: parent('id') }, { parent: 'users', alias: 'users' }))),
+    ])).toEqual(new Set([
+      "`exists()` was given `parent: 'users'`, which names \"users\", the subquery's own name, so Postgres would read `parent()` as a column of the subquery's row: give the subquery another name with the `alias` option.",
+      "`exists()` was given `parent: '\"users\"'`, which names \"users\", the subquery's own name, so Postgres would read `parent()` as a column of the subquery's row: give the subquery another name with the `alias` option.",
+    ]));
+    expect(await names(exists('users', { manager_id: parent('id') }, { parent: 'users', alias: 'reports' }))).toEqual(['Ada']);
+    expect(await names(exists('extra.articles', { author_id: parent('id') }, { parent: 'users', alias: 'a' }))).toEqual(['Ada', 'Bob']);
+  });
+
+  it('names past 63 bytes: Postgres reads each as its first 63, cut at a character\'s end, so exists() refuses two that meet there', async () => {
+    const r = (n: number) => 'r'.repeat(n);
+    const byHand = async (outer: string, inner: string) => (await t.client.query(
+      `SELECT display_name FROM "users" AS ${outer} WHERE EXISTS (SELECT 1 FROM "users" AS ${inner} WHERE "manager_id" = ${outer}."id") ORDER BY id`,
+    )).rows.map(row => row.display_name);
+    expect({
+      within63: await byHand(`"${r(62)}a"`, `"${r(62)}b"`),
+      past63: await byHand(`"${r(63)}a"`, `"${r(63)}b"`),
+      past63Bytes: await byHand(`"${r(62)}é"`, `"${r(62)}è"`),
+      unicodePast63: await byHand(`U&"${r(63)}\\0061"`, `"${r(63)}b"`),
+    }).toEqual({ within63: ['Ada'], past63: [], past63Bytes: [], unicodePast63: [] });
+    const refused = (p: string, name: string) =>
+      `\`exists()\` was given \`parent: '${p}'\`, which names "${name}", the subquery's own name, so Postgres would read \`parent()\` as a column of the subquery's row: give the subquery another name with the \`alias\` option.`;
+    const select = (outer: string, inner: string) => db.select('users', exists('users', { manager_id: parent('id') }, { parent: outer, alias: inner }) as any,
+      { columns: ['display_name'], alias: outer, order: { by: 'id', direction: 'ASC' } });
+    expect({
+      within63: (await select(`${r(62)}a`, `${r(62)}b`).run(t.client)).map(u => u.display_name),
+      past63: await rejectsBeforeAnyQuery(select(`${r(63)}a`, `${r(63)}b`)),
+      past63Bytes: await rejectsBeforeAnyQuery(select(`${r(62)}é`, `${r(62)}è`)),
+    }).toEqual({ within63: ['Ada'], past63: refused(`${r(63)}a`, r(63)), past63Bytes: refused(`${r(62)}é`, r(62)) });
+  });
+
+  it('users who review no article: not(exists()) finds them, not(isInSelect()) finds none, as a NULL reviewer_id makes NOT IN match nothing', async () => {
+    expect(await names(not(exists('extra.articles', { reviewer_id: parent('id') }, { parent: 'users' })))).toEqual(['Ada', 'Cyd']);
+    expect(await names({ id: not(isInSelect('extra.articles', all, 'reviewer_id')) })).toEqual([]);
+  });
+
+  it('runs the same in a sql query, deletes(), and(), extras and under any key', async () => {
+    const e = () => exists('extra.articles', { author_id: parent('id') }, { parent: 'users' });
+    const inSql = await sql`SELECT ${'display_name'} FROM ${'users'} WHERE ${e()} ORDER BY ${'id'}`.run(t.client);
+    expect(inSql.map(u => u.display_name)).toEqual(['Ada', 'Bob']);
+    expect(await names(and({ mood: 'happy' }, e()))).toEqual(['Ada']);
+    expect(await names({ display_name: e() })).toEqual(['Ada', 'Bob']);
+    expect(await names(e().copy())).toEqual(['Ada', 'Bob']);
+    const extras = await db.select('users', all, { columns: ['display_name'], extras: { has_article: e() }, order: { by: 'id', direction: 'ASC' } }).run(t.client);
+    expect(extras.map(u => [u.display_name, u.has_article])).toEqual([['Ada', true], ['Bob', true], ['Cyd', false]]);
+    const deleted = await db.deletes('extra.articles', exists('users', { id: parent('reviewer_id') }, { parent: 'extra.articles' }), { returning: ['body'] }).run(t.client);
+    expect(deleted.map(a => a.body)).toEqual(['Notes on the engine']);
+  });
+
+  it('in a lateral: parent() without parent rejects before any query; with parent, or uncorrelated, it runs', async () => {
+    // each user's articles, with the lateral's parent() (users) and the subquery's (extra.articles) in one where
+    const lateral = (sub: db.SQLFragment<any>) => db.select('users', all, {
+      columns: ['display_name'], order: { by: 'id', direction: 'ASC' },
+      lateral: { a: db.select('extra.articles', and({ author_id: parent('id') }, sub), { columns: ['id'] }) },
+    });
+    expect(await rejectsBeforeAnyQuery(lateral(exists('users', { id: parent('author_id'), manager_id: dc.isNotNull }))))
+      .toBe("The 'parent' table alias has no meaning here");
+    expect(await rejectsBeforeAnyQuery(db.select('users', exists('extra.articles', { author_id: parent('id') }), { columns: ['display_name'] })))
+      .toBe("The 'parent' table alias has no meaning here");
+    // Bob, who has a manager, wrote 'Draft'; Ada wrote the other
+    const correlated = await lateral(exists('users', { id: parent('author_id'), manager_id: dc.isNotNull }, { parent: 'extra.articles' })).run(t.client);
+    expect(correlated.map(u => u.a.length)).toEqual([0, 1, 0]);
+    const uncorrelated = await lateral(exists('users', all)).run(t.client);
+    expect(uncorrelated.map(u => u.a.length)).toEqual([1, 1, 0]);
+  });
+
+  it('a parent() column or table that does not exist is Postgres\'s error, before any row', async () => {
+    expect(await pgError(t.client, () => names(exists('extra.articles', { author_id: parent('nope') }, { parent: 'users' }))))
+      .toEqual({ code: '42703', message: 'column users.nope does not exist' });
+    expect(await pgError(t.client, () => names(exists('extra.articles', { author_id: parent('id') }, { parent: 'nope' }))))
+      .toEqual({ code: '42P01', message: 'missing FROM-clause entry for table "nope"' });
+  });
+
+  it('the name check compares names, not relations: public.users over extra.users is refused, an alias settles it', async () => {
+    // note 006 § Risks: Postgres resolves "public"."users"."id" to the outer table, the bare "users"."id" to the inner one
+    await t.client.query('CREATE TABLE extra.users (id int PRIMARY KEY, manager_id int); INSERT INTO extra.users VALUES (1, NULL), (2, 1)');
+    expect(await rejectsBeforeAnyQuery(db.select('users', exists('extra.users' as any, { manager_id: parent('id') }, { parent: 'public.users' }))))
+      .toMatch(/^`exists\(\)` was given `parent: 'public\.users'`, which names "users"/);
+    expect(await names(exists('extra.users' as any, { manager_id: parent('id') }, { parent: 'public.users', alias: 'e' }))).toEqual(['Ada']);
+    const byHand = async (column: string) => (await t.client.query(
+      `SELECT display_name FROM public.users WHERE EXISTS (SELECT 1 FROM extra.users WHERE manager_id = ${column}) ORDER BY id`)).rows.map(r => r.display_name);
+    expect({ qualified: await byHand('"public"."users"."id"'), bare: await byHand('"users"."id"') }).toEqual({ qualified: ['Ada'], bare: [] });
+  });
+
+  it('characterization: past the type, a name the inner table lacks resolves to the outer row, with no error', async () => {
+    // note 006 § Risks: typed calls refuse both; extra.articles has no manager_id and no display_name
+    expect(await names({ manager_id: isInSelect('extra.articles', all, 'manager_id' as any) })).toEqual(['Bob', 'Cyd']);
+    expect(await names(exists('extra.articles', { author_id: parent('id'), display_name: 'Bob' } as any, { parent: 'users' }))).toEqual(['Bob']);
   });
 });

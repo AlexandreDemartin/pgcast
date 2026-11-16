@@ -1,5 +1,5 @@
 ---
-english: 7caad0a3b700
+english: c31045ed332e
 ---
 
 # Conditions {#db-conditions}
@@ -22,8 +22,8 @@ Chaque membre est un fragment [`sql`](/fr/sql-template#sql) écrit autour de [`d
 </CastPanel>
 
 - **Où** : comme valeur d’un Whereable, donc dans le `where` de [`select()`](/fr/select#select), [`count()`](/fr/select#count), [`update()`](/fr/insert#update) et [`deletes()`](/fr/insert#deletes), le `having` de `select()`, et un Whereable dans un template `sql`. Ailleurs, `self` n’a pas de colonne : `` db.sql`SELECT ${db.conditions.isNull}` `` lève "The 'self' column alias has no meaning here"<!-- message --> à la compilation.
-  - [`and()`](#conditions.and), [`or()`](#conditions.or) et [`not()`](#conditions.not) prennent aussi des Whereables, et peuvent donc former tout un `where` ; [`now`](#conditions.now) et [`fromNow()`](#conditions.fromNow) ne contiennent pas de `self`, et vont partout.
-- **Valeurs** : chaque valeur est un paramètre, `$1`, sauf un [`Parameter`](/fr/sql-template#Parameter), gardé tel quel avec son cast ; un fragment `sql`, écrit comme son SQL ; et [`parent()`](/fr/sql-template#parent), la colonne de la requête parente dans une sous-requête `lateral`. `Default`, `self`, `raw()`, `cols()` et `vals()` lèvent une erreur : [Les valeurs qu’une condition refuse](#refused-values). [`eqAny()`](#conditions.eqAny) envoie son tableau en un seul paramètre de valeurs simples : un élément qui est l’un d’eux lève une erreur, et à la place du tableau, `eqAny()` ne prend que `parent()`.
+  - [`and()`](#conditions.and), [`or()`](#conditions.or) et [`not()`](#conditions.not) prennent aussi des Whereables, et peuvent donc former tout un `where` ; [`now`](#conditions.now), [`fromNow()`](#conditions.fromNow) et [`exists()`](#conditions.exists) ne contiennent pas de `self`, et vont partout.
+- **Valeurs** : chaque valeur est un paramètre, `$1`, sauf un [`Parameter`](/fr/sql-template#Parameter), gardé tel quel avec son cast ; un fragment `sql`, écrit comme son SQL ; et [`parent()`](/fr/sql-template#parent), la colonne de la requête parente dans une sous-requête `lateral`, ou dans le `where` d’[`exists()`](#conditions.exists) et d’[`isInSelect()`](#conditions.isInSelect), dont l’option `parent` nomme cette table. `Default`, `self`, `raw()`, `cols()` et `vals()` lèvent une erreur : [Les valeurs qu’une condition refuse](#refused-values). [`eqAny()`](#conditions.eqAny) envoie son tableau en un seul paramètre de valeurs simples : un élément qui est l’un d’eux lève une erreur, et à la place du tableau, `eqAny()` ne prend que `parent()`.
   - [`jsonbContains()`](#conditions.jsonbContains) ne prend qu’une valeur JSON : un `Parameter`, un fragment ou `parent()` y lève aussi une erreur.
 - **Type** : une condition est un `SQLFragment` dont le second argument de type, `T`, est le type de la valeur à laquelle elle compare (sa `Constraint`, [`sql`](/fr/sql-template#sql)) ; le Whereable vérifie `T` contre le type de la colonne. Les huit tests, `now` et `fromNow()` n’ont pas de `T`, et passent sur n’importe quelle colonne.
   - Un Whereable est aussi une expression : interpolé dans une liste `SELECT`, `{ runtime_minutes: add(10) }` est la durée de chaque film plus dix, `(("runtime_minutes" + $1))`<!-- probe: db.sql`${{ runtime_minutes: db.conditions.add(10) }}` -->. Le type laisse donc passer, comme valeur d’un Whereable, ce qui n’est pas un test : [`add()`](#conditions.add), [`subtract()`](#conditions.subtract), [`now`](#conditions.now) et [`fromNow()`](#conditions.fromNow), que Postgres refuse seuls dans un `where` (42804).
@@ -426,6 +426,72 @@ Sur `release_year`, `` not(db.sql`${db.self} = 1974 OR ${db.self} = 1991`) `` é
 
 Zapatos 6.6.1 écrivait `(NOT "release_year" = 1974 OR "release_year" = 1991)`, que Postgres lit `(NOT "release_year" = 1974) OR "release_year" = 1991` : le film de 1991 aussi. Seule une condition avec un `AND` ou un `OR` nu à son niveau supérieur trouve d’autres lignes ; toute autre gagne une paire de parenthèses.
 
+## Sous-requêtes : `exists()`, `isInSelect()` {#subqueries}
+
+Chacune écrit une sous-requête sur une table, filtrée par un Whereable ou un fragment `sql` de cette table, ou par [`all`](/fr/sql-template#all) pour n’avoir aucun `WHERE` ; `{}` donne `WHERE TRUE`, comme dans [`select()`](/fr/select#select). Le type vérifie les clés et les valeurs du Whereable par rapport à la table de la sous-requête.
+
+<CastPanel example="conditions_exists">
+
+<<< ../examples/conditions_exists.ts{ts twoslash}
+
+</CastPanel>
+
+- **La ligne extérieure** : dans le `where` de la sous-requête, [`parent('id')`](/fr/sql-template#parent) est une colonne de la ligne de la requête extérieure, `"films"."id"`<!-- probe: db.conditions.exists('roles', { film_id: db.parent('id') }, { parent: 'films' }) -->, dès que l’option `parent` nomme sa table comme la requête extérieure la nomme : son alias si elle en a un. Rien ne vérifie cette colonne : une mauvaise colonne donne l’erreur 42703 de Postgres, une mauvaise table son erreur 42P01, avant toute ligne.
+- **Le même SQL où qu’elle soit** : dans une requête `sql`, dans `deletes()`, dans `extras` ou dans une sous-requête `lateral`. Sans `parent`, `parent()` dans la sous-requête lève "The 'parent' table alias has no meaning here", même à l’intérieur d’un `lateral`, et `self` n’y a pas de sens non plus.
+
+| Option | SQL ajouté | Effet sur le type |
+|---|---|---|
+| `parent` | la table de `parent()` : `"films"."id"`<!-- probe: db.conditions.exists('roles', { film_id: db.parent('id') }, { parent: 'films' }) --> | aucun |
+| `alias` | `AS "mentees"`<!-- probe: db.conditions.exists('crew', db.all, { alias: 'mentees' }) --> après la table | aucun |
+
+### `exists()` {#conditions.exists}
+
+```ts
+db.conditions.exists<T extends Table>(table: T, where: WhereableForTable<T> | SQLFragment<any> | AllType, options?: { parent?: string; alias?: string })
+```
+
+`EXISTS (SELECT 1 FROM "roles" WHERE ("film_id" = "films"."id"))`<!-- probe: db.conditions.exists('roles', { film_id: db.parent('id') }, { parent: 'films' }) --> : au moins une ligne de la table correspond. Elle n’est jamais `NULL` et ne contient pas de `self`, donc elle va partout : comme `where` entier, dans `and()`, `or()` et `not()`, ou sous n’importe quelle clé. L’anti-jointure s’écrit `not(exists(…))`.
+
+Quand la sous-requête lit la table de la requête extérieure, donnez-lui un alias. Ici, les membres de l’équipe qui ne sont mentors de personne :
+
+<CastPanel example="conditions_exists_alias">
+
+<<< ../examples/conditions_exists_alias.ts{ts twoslash}
+
+</CastPanel>
+
+Sans l’alias, `"crew"."id"` serait la ligne même de la sous-requête : écrite à la main, `NOT EXISTS (SELECT 1 FROM crew WHERE mentor_id = crew.id)` renvoie toute l’équipe, puisque personne n’est son propre mentor, sans aucune erreur. C’est pourquoi, quand `parent` donne le nom même de la sous-requête, son alias ou à défaut sa table, à la façon dont Postgres lit un nom (ses 63 premiers octets), la condition lève une erreur à la compilation de la requête, et `run()` est rejetée avant toute requête :
+
+> `` `exists()` was given `parent: 'crew'`, which names "crew", the subquery's own name, so Postgres would read `parent()` as a column of the subquery's row: give the subquery another name with the `alias` option. ``<!-- message -->
+
+Les noms se comparent comme Postgres les lit : `'crew'`, `'"crew"'` et `'public.crew'` ne font qu’un seul nom. La vérification compare des noms, pas des tables : `parent: 'public.crew'` sur une table `crew` d’un autre schéma est donc refusé aussi, alors que Postgres distinguerait les deux. Un alias règle la question.
+
+### `isInSelect()` {#conditions.isInSelect}
+
+```ts
+db.conditions.isInSelect<T extends Table, C extends keyof SelectableForTable<T>>(table: T, where: WhereableForTable<T> | SQLFragment<any> | AllType, column: C, options?: { parent?: string; alias?: string })
+```
+
+`"col" IN (SELECT "actor_id" FROM "roles")`<!-- probe: db.sql`${{ col: db.conditions.isInSelect('roles', db.all, 'actor_id') }}` -->, comme valeur d’un Whereable : la colonne de la clé est à gauche. Son `T` est le type de `column`, sans `null`, que le Whereable vérifie par rapport à la colonne de la clé. `parent` et `alias` fonctionnent comme dans [`exists()`](#conditions.exists). Les acteurs en tête d’affiche d’au moins un film :
+
+<CastPanel example="conditions_isInSelect">
+
+<<< ../examples/conditions_isInSelect.ts{ts twoslash}
+
+</CastPanel>
+
+Une colonne d’un autre type ne compile pas :
+
+```ts twoslash
+// @errors: 2322
+import * as db from 'zapatos/db';
+// ---cut---
+db.select('actors', { name: db.conditions.isInSelect('roles', db.all, 'actor_id') });
+```
+
+- **Sous `not()`**, elle ne trouve aucune ligne dès que la sous-requête renvoie un `NULL`, vu la façon dont Postgres lit `NOT IN` : `{ id: not(isInSelect('crew', db.all, 'mentor_id')) }` ne trouve personne, car un `mentor_id` est `NULL`. Pour l’anti-jointure, écrivez `not(exists(…))` (voir plus haut).
+- **Comme `where` entier**, hors d’une clé, elle n’a pas de colonne : le type l’y refuse, seule, sous `not()` ou dans `and()` (TS2345), et en code non typé, elle lève "The 'self' column alias has no meaning here".
+
 ## Dates et heures {#dates}
 
 [`after()`](#conditions.after) et [`before()`](#conditions.before) comparent à une valeur : un `Date`, une chaîne ISO 8601 avec son décalage (`'2030-03-01T20:00:00Z'`, un `TimestampTzString` ; le type refuse une autre forme comme `'2030-03-02'`, TS2322), ou l’un des deux fragments ci-dessous. `pg` envoie un `Date` comme une chaîne dans le fuseau horaire local, avec son décalage : sur une colonne `timestamptz`, le même instant. Sur une colonne `date`, Postgres garde le jour local et laisse tomber l’heure : `eq(new Date(2030, 2, 1, 23, 30))` correspond à `2030-03-01`, et `lt()` du même `Date`, non.
@@ -524,7 +590,7 @@ Zapatos 6.6.1 envoyait `Default` et `self` comme les chaînes `'Symbol(DEFAULT)'
 | `` `jsonbContains()` sends its value as JSON text, so it takes a JSON value, not `db.Default`: give a value; for SQL, write a `sql` fragment with `db.self` in place of the condition. ``<!-- message --> | `Default` comme valeur de [`jsonbContains()`](#conditions.jsonbContains) ; `self`, `raw()`, `cols()`, `vals()`, un `Parameter`, un fragment `sql` ou `parent()` au même endroit reçoit le même message, qui le nomme |
 | `` `eqAny()` takes an array of values, not `db.Default`: write `eqAny(values)`; for SQL, write a `sql` fragment with `db.self` in place of the condition. ``<!-- message --> | `Default` comme liste d’[`eqAny()`](#conditions.eqAny) ; `self`, `raw()`, `cols()`, `vals()`, un `Parameter` ou un fragment `sql` au même endroit reçoit le même message, qui le nomme |
 | `` `eqAny()` sends its array as one parameter, so each item is a plain value, not `db.Default`: give a value. ``<!-- message --> | `Default` comme élément d’`eqAny()` ; `self`, `raw()`, `cols()` ou `vals()` au même endroit reçoit le même message, qui le nomme |
-| `The 'self' column alias has no meaning here`<!-- message --> | une condition où `self` n’a pas de colonne : dans un template `sql` hors d’un Whereable, dans le `updateValues` d’`upsert()` |
-| `The 'parent' table alias has no meaning here`<!-- message --> | `parent()` dans une condition hors d’une sous-requête `lateral` |
+| `The 'self' column alias has no meaning here`<!-- message --> | une condition où `self` n’a pas de colonne : dans un template `sql` hors d’un Whereable, dans le `updateValues` d’`upsert()`, dans le `where` d’`exists()` ou d’`isInSelect()`, et `isInSelect()` hors d’une clé |
+| `The 'parent' table alias has no meaning here`<!-- message --> | `parent()` dans une condition hors d’une sous-requête `lateral`, ou dans le `where` d’`exists()` ou d’`isInSelect()` sans `parent` |
 
 Une comparaison avec du SQL est une valeur en fragment `sql`, `` { title: db.sql`${db.self} = ${db.raw("'x'")}` } `` : [SQL brut](/fr/raw-sql).
