@@ -2096,6 +2096,91 @@ describe('a built-in row among several in insert() and upsert()', () => {
   });
 });
 
+describe('the columns of several rows in insert() and upsert(): their own keys only', () => {
+  const
+    a = { email: 'a@x.org', display_name: 'A' },
+    b = { email: 'b@x.org', display_name: 'B' },
+    returning = ' RETURNING to_jsonb("users".*) AS result',
+    upsertReturning = ` RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result`,
+    onConflict = ' ON CONFLICT ("email") DO UPDATE SET ("email", "display_name") = ROW(EXCLUDED."email", EXCLUDED."display_name")';
+
+  /** Run `f` with a key added to `Object.prototype` by other code, deleted after it. */
+  const withPrototypeKey = <T>(f: () => T): T => {
+    const proto = Object.prototype as any;
+    proto.nickname = 'x';
+    try { return f(); } finally { delete proto.nickname; }
+  };
+
+  it('a key added to Object.prototype is no column, as for one row, with undefinedMeansMissing and upsertRequiresSameKeys off and on', () => {
+    // Zapatos 6.6.1 and master listed it with the rows' keys: ("display_name", "email", "nickname"), DEFAULT in each row
+    const compiled: Record<string, unknown> = {}, expected: Record<string, unknown> = {};
+    for (const undefinedMeansMissing of [false, true]) for (const upsertRequiresSameKeys of [false, true]) {
+      db.setConfig({ undefinedMeansMissing, upsertRequiresSameKeys });
+      const config = `${undefinedMeansMissing ? 'undefinedMeansMissing' : ''} ${upsertRequiresSameKeys ? 'upsertRequiresSameKeys' : ''}`;
+      withPrototypeKey(() => {
+        compiled[`insert two ${config}`] = db.insert('users', [a, b]).compile();
+        compiled[`insert one in an array ${config}`] = db.insert('users', [a]).compile();
+        compiled[`insert a key one row has ${config}`] = db.insert('users', [{ ...a, mood: 'happy' }, b]).compile();
+        compiled[`insert an undefined value ${config}`] = db.insert('users', [{ ...a, mood: undefined }, b]).compile();
+        compiled[`insert a null row ${config}`] = db.insert('users', [a, null as any]).compile();
+        compiled[`upsert two ${config}`] = db.upsert('users', [a, b], 'email').compile();
+        compiled[`upsert one in an array ${config}`] = db.upsert('users', [a], 'email').compile();
+      });
+      Object.assign(expected, {
+        [`insert two ${config}`]: { text: `INSERT INTO "users" ("display_name", "email") VALUES ($1, $2), ($3, $4)${returning}`, values: ['A', 'a@x.org', 'B', 'b@x.org'] },
+        [`insert one in an array ${config}`]: { text: `INSERT INTO "users" ("display_name", "email") VALUES ($1, $2)${returning}`, values: ['A', 'a@x.org'] },
+        [`insert a key one row has ${config}`]: { text: `INSERT INTO "users" ("display_name", "email", "mood") VALUES ($1, $2, $3), ($4, $5, DEFAULT)${returning}`, values: ['A', 'a@x.org', 'happy', 'B', 'b@x.org'] },
+        [`insert an undefined value ${config}`]: undefinedMeansMissing ?
+          { text: `INSERT INTO "users" ("display_name", "email", "mood") VALUES ($1, $2, DEFAULT), ($3, $4, DEFAULT)${returning}`, values: ['A', 'a@x.org', 'B', 'b@x.org'] } :
+          { text: `INSERT INTO "users" ("display_name", "email", "mood") VALUES ($1, $2, $3), ($4, $5, DEFAULT)${returning}`, values: ['A', 'a@x.org', undefined, 'B', 'b@x.org'] },  // sent as NULL
+        [`insert a null row ${config}`]: { text: `INSERT INTO "users" ("display_name", "email") VALUES ($1, $2), (DEFAULT, DEFAULT)${returning}`, values: ['A', 'a@x.org'] },
+        [`upsert two ${config}`]: { text: `INSERT INTO "users" ("display_name", "email") VALUES ($1, $2), ($3, $4)${onConflict}${upsertReturning}`, values: ['A', 'a@x.org', 'B', 'b@x.org'] },
+        [`upsert one in an array ${config}`]: { text: `INSERT INTO "users" ("display_name", "email") VALUES ($1, $2)${onConflict}${upsertReturning}`, values: ['A', 'a@x.org'] },
+      });
+    }
+    expect(compiled).toEqual(expected);
+  });
+
+  it('a built-in row with no own key beside a row still throws while compiling with a key added to Object.prototype', () => {
+    // master compiled it as a row of defaults, (DEFAULT, DEFAULT, DEFAULT), as Zapatos 6.6.1 did
+    const
+      refused = (fn: 'cols' | 'vals') => `\`db.${fn}()\` takes an object or an array, not a built-in \`Date\` with no own enumerable key`,
+      outcomes: Record<string, string> = {};
+    withPrototypeKey(() => {
+      for (const [order, values] of [['after', [a, new Date(0)]], ['before', [new Date(0), a]]] as const) {
+        for (const [fn, build] of Object.entries({
+          insert: () => db.insert('users', values as any), upsert: () => db.upsert('users', values as any, 'email'),
+        })) {
+          try { build().compile(); outcomes[`${fn} ${order}`] = 'compiled'; } catch (err) { outcomes[`${fn} ${order}`] = (err as Error).message.slice(0, refused('cols').length); }
+        }
+      }
+    });
+    expect(outcomes).toEqual({
+      'insert after': refused('vals'), 'upsert after': refused('vals'), 'insert before': refused('cols'), 'upsert before': refused('cols'),
+    });
+  });
+
+  it('an own __proto__ key, from JSON.parse, is a column of each row, as for one row, and its value gives none', () => {
+    // master listed the keys of its value as columns, ("display_name", "email", "mood"), and gave its row one value
+    // more than the others, which Postgres refused (42601)
+    const rows = JSON.parse('[{ "email": "a@x.org", "display_name": "A" }, { "email": "b@x.org", "display_name": "B", "__proto__": { "mood": "happy" } }]');
+    expect(db.insert('users', rows).compile()).toEqual({
+      text: `INSERT INTO "users" ("__proto__", "display_name", "email") VALUES (DEFAULT, $1, $2), ($3, $4, $5)${returning}`,
+      values: ['A', 'a@x.org', { mood: 'happy' }, 'B', 'b@x.org'],
+    });
+    expect(db.insert('users', rows[1]).compile().text).toBe(`INSERT INTO "users" ("__proto__", "display_name", "email") VALUES ($1, $2, $3)${returning}`);
+  });
+
+  it('an inherited key, a null-prototype row and a class instance give their own enumerable keys, as in Zapatos 6.6.1', () => {
+    class Member { email = 'c@x.org'; display_name = 'C'; get mood() { return 'happy' as const; } }
+    const rows = [Object.assign(Object.create({ mood: 'happy' }), a), Object.assign(Object.create(null), { ...b, mood: 'sad' }), new Member()];
+    expect(db.insert('users', rows).compile()).toEqual({
+      text: `INSERT INTO "users" ("display_name", "email", "mood") VALUES ($1, $2, DEFAULT), ($3, $4, $5), ($6, $7, DEFAULT)${returning}`,
+      values: ['A', 'a@x.org', 'B', 'b@x.org', 'sad', 'C', 'c@x.org'],
+    });
+  });
+});
+
 // 6.6.1 threw a TypeError at the call, from Object.keys(null) or reading `copy` of null (#341)
 describe('lateral: null, or a lateral key whose query is null or undefined', () => {
   const
