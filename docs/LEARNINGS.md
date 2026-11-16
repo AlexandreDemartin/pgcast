@@ -159,12 +159,22 @@ Candidates for a check, a rule or a skill line.
 - #557: an exit code set by the process wrapper (`cli.ts`) is outside every in-process test; when it is the feature's promise, one test runs the CLI as a child process.
 - #557: a new CLI flag needs its line in `switching.md` § Go back, as a new config key does.
 - #557: to compare two builds' CLIs byte for byte, run both with `db.max: 1` (placeholder order) and mask the dist line numbers in stack headers.
+- #567: a self-correlated subquery without an alias returns no rows, silently, and so does a schema-qualified inner table of the same name; `lateral` has the same trap.
+- #567: a generic signature written in a decision note is compiled before the note is accepted (`SelectableForTable<T>[C]` with `C extends ColumnForTable<T>` fails TS2536; `C extends keyof SelectableForTable<T>` compiles).
+- #567: a refusal rule for an ambiguous name compares names as Postgres resolves them: the FROM item's alias, else the table's last part, unquoted; the caller's raw strings miss `alias === parent` and pre-quoted names.
+- #567: a "reversible" or "compiles the same later" claim is replayed: one call relying on the default, run under the future option.
+- #567: a decision note's claims stay true across a fix round only if one harness replays them all and a script greps each SQL string of the note in its output.
+- #567: a replay row that runs SQL as written, with no helper, says so in the row itself.
 - #560: a new public function starts on the target behaviour of a pending deprecation, not on the deprecated default it would have to leave later (`check()` rejects by default, as 7.0's `generate()` will).
 - #560: in an extending tsconfig, `compilerOptions.paths` replaces the base's map: an entry added to `test/types/tsconfig.json` repeats the inherited ones.
 - #560: a probe database created by a short `node -e` is dropped by a concurrent `npm test` once its pid dies: create, use and drop it in one long-lived process.
 - #560: `zapatos/generate` has no counterpart of `website/check-reference.mjs`, so a new generate export's docs entry is not enforced by the build.
 - #560: a default set for one caller of a shared internal path is tested through each caller (the CLI too): the "default moved into `staleFiles()`" mutant died only by the CLI's test.
 - #560: in French, a query as the subject makes a possessive ambiguous (« sa promesse » read as the query's).
+- #568: when a fix replaces `!==` with `Object.is`, the release entry names the `NaN` path the older release let through, and the replay grid has `NaN` as a value and as a constant getter.
+- #568: a proof row listing several calls is replayed for each: `FOR UPDATE` on an aggregate gives 0A000 in any transaction, unlike `select()`'s 25006 when read-only.
+- #568: a claim reworded in `SECURITY.md` may live on the docs site too, in both languages: `git grep` both wordings.
+- #568: a claim that a version range "compared" something is replayed on each version of the range: 6.6.2 to 6.7.1 did not compare at all.
 
 ## Minors kept
 
@@ -199,4 +209,6 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #557 (form): `src/generate/cliConfig.ts` `cliArgs()`: a bare `--` (pnpm passes it on: `pnpm run gen -- --check`) is refused as `Unknown flag --`; skipping it only accepts more.
 - #557 (defect): `check()` is not exported from `zapatos/generate`: a script that calls `generate()` with a config built in code cannot check; follow-up issue under #52.
 - #557 (form): `website/first-query.md` "Run `npx pgcast` again after each migration" and `website/install.md` `::: warning Stale schema`: a link to `/generator#check`, EN and FR.
+- #567 (form): `docs/decisions/README.md` lists 005 as "proposed (2026-11-13)", while the note says it was accepted that day.
+- #567 (form): note 006 types `isInSelect()` on the subquery column's `Selectable`, so an int4 key over an int8 column (`Int8String`) is refused though Postgres compares them, as `eq()` does.
 

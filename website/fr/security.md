@@ -1,5 +1,5 @@
 ---
-english: ad28a2a5731d
+english: 904afe9abf81
 ---
 
 # Sécurité
@@ -134,7 +134,7 @@ Si vous pensez avoir trouvé une faille dans pgcast (le SQL qu’il compile à p
 
 Donnez l’appel, le SQL que donne son `.compile()`, et ce que contrôle un attaquant ; une faille que pgcast partage avec Zapatos se signale ici aussi.
 
-Vous aurez une réponse sous une semaine. La correction sort dans une version corrective, avec un avis de sécurité GitHub et son CVE, publié à une date convenue avec vous, et vous êtes crédité dans l’avis et dans le CHANGELOG, sauf si vous préférez ne pas être nommé.
+Vous aurez une réponse sous une semaine. La correction sort dans la version suivante, une version corrective ou une mineure si elle suit de nouvelles fonctionnalités, avec un avis de sécurité GitHub et son CVE, publié à une date convenue avec vous, et vous êtes crédité dans l’avis et dans le CHANGELOG, sauf si vous préférez ne pas être nommé.
 
 Ce qui entre dans le périmètre, et quelles versions sont prises en charge : [SECURITY.md](https://github.com/AlexandreDemartin/pgcast/blob/master/SECURITY.md).
 
