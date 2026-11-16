@@ -3931,6 +3931,23 @@ describe('the CLI with --check (#556)', () => {
     expect(printed()).toEqual([]);
   });
 
+  it('ignores an unknown flag after the JSON argument, as Zapatos 6.6.1 does, with a note through warningListener', async () => {
+    const
+      note = (flag: string) => `Note: unknown flag ${flag} ignored: the only flag is --check, before or after the JSON argument.`,
+      notes = () => printed().filter(line => line.startsWith('Note: unknown flag'));
+    expect(await runCli([json({ warningListener: true }), '--chek'], dir)).toBe(0);
+    expect(files(outDir)).toEqual([placeholderFile, indexFile, schemaFile]);
+    expect(notes()).toEqual([note('--chek')]);
+    log.mockClear();
+    for (const f of readdirSync(outDir, { recursive: true })) utimesSync(join(outDir, String(f)), 1e6, 1e6);
+    // with --check too, before or after it: a check, each flag noted before its result; warningListener: false silences them
+    const { code, printed: lines } = await check(['--check', json({ warningListener: true }), '--help', '--chek']);
+    expect([code, lines.filter(line => !line.startsWith('Note: this database has bigint'))])
+      .toEqual([0, [note('--help'), note('--chek'), upToDate]]);
+    log.mockClear();
+    expect(await check([json(), '--check', '--chek'])).toEqual({ code: 0, printed: [upToDate] });
+  });
+
   it('exits with 0 when the files are up to date, with --check before or after the JSON argument', async () => {
     await generated();
     expect(await check()).toEqual({ code: 0, printed: [upToDate] });
