@@ -1,5 +1,5 @@
 ---
-english: 84ad71370dbf
+english: 7edbfa7f186d
 ---
 
 # Générateur
@@ -23,7 +23,7 @@ Le même programme sous deux noms : `pgcast`, et `zapatos`, comme dans Zapatos 
   - Une clé donnée ici remplace toute la valeur du fichier, donc `'{"db": {"application_name": "codegen"}}'` écarte le `connectionString` du fichier.
   - Les variables du fichier sont substituées avant la fusion : une variable qu’il nomme doit être définie même quand l’argument remplace sa clé, sinon la CLI s’arrête avec `Environment variable 'NAME' is not set`.
 - Dans chaque chaîne des deux, à toute profondeur, les variables d’environnement sont substituées ([Variables d’environnement](#environment-variables)).
-- Un seul flag, `--check`, avant ou après `config`. Tout autre argument qui commence par `--` l’arrête avec le code 1 avant qu’elle lise la config, et Node affiche `Unknown flag --help: the only flag is --check, beside the JSON argument` et sa pile. Zapatos 6.6.1 lisait un tel flag comme l’argument JSON, ou l’ignorait après celui-ci.
+- Un seul flag, `--check`, avant ou après `config`. Tout autre argument qui commence par `--`, à la place de `config`, l’arrête avec le code 1 avant qu’elle lise la config, et Node affiche `Unknown flag --help: the only flag is --check, beside the JSON argument` et sa pile ; Zapatos 6.6.1 le lisait comme l’argument JSON, et échouait. Après `config`, un tel argument est ignoré, comme dans Zapatos 6.6.1, avec une [note](#generate.warningListener) : un `npx pgcast '{}' --chek` mal orthographié génère.
 - Parmi les autres arguments, le premier est `config` ; les suivants sont ignorés.
 - Les chemins sont relatifs au dossier où vous le lancez : `outDir`, et donc le dossier `zapatos`.
 
@@ -82,7 +82,7 @@ Missing: src/zapatos/custom/PgSeat_label.d.ts
 Run the generator without --check to write them.
 ```
 
-- `schema.d.ts` et `custom/index.d.ts`, que chaque exécution réécrit, sont comparés octet par octet. Un placeholder ne compte que s’il manque : il est à vous, à modifier vous-même ([Les fichiers qu’il écrit](#the-files-it-writes)).
+- `schema.d.ts` et, quand il y a un type personnalisé, `custom/index.d.ts`, que chaque exécution réécrit alors, sont comparés octet par octet. Un placeholder ne compte que s’il manque : il est à vous, à modifier vous-même ([Les fichiers qu’il écrit](#the-files-it-writes)).
 - `outDir`, `outExt` et [`moduleNames`](#generate.moduleNames) nomment les fichiers, comme pour une exécution : `src/pgcast/schema.ts` avec `".ts"` et `"pgcast"`.
 - Les notes d’une exécution viennent d’abord, via [`warningListener`](#generate.warningListener), sauf celles sur les placeholders qu’elle écrirait. Une requête qui échoue l’arrête avec le code 1, comme elle arrête une exécution.
 - Seule la CLI le propose : `zapatos/generate` n’exporte aucune fonction pour cela.
@@ -553,6 +553,8 @@ Writing custom types file: src/zapatos/custom/index.d.ts
   - de même, avec `"zapatos"` et un `pgcast/schema.d.ts` ;
 - `Note: pgcastconfig.json and zapatosconfig.json are both here, and only pgcastconfig.json is read. Move any option you still need from zapatosconfig.json into pgcastconfig.json, then delete zapatosconfig.json.`
   - depuis [la CLI](#cli), avant de générer, quand le dossier où elle tourne contient les deux fichiers ;
+- `Note: unknown flag --chek ignored: the only flag is --check, before or after the JSON argument.`
+  - depuis [la CLI](#cli), avant de générer ou de vérifier, pour chaque argument après `config` qui commence par `--` et n’est pas `--check` ;
 - `Note: a query failed, so generate() ends the process with process.exit(1), and its promise never settles (PGCAST_DEP006). Set rejectOnQueryError: true to reject with the error instead; it will be the default in pgcast 7.0.`
   - sans [`rejectOnQueryError`](#generate.rejectOnQueryError), quand une requête échoue, après l’erreur et juste avant l’arrêt ;
 - l’[avertissement sur l’ancienne arborescence](#the-old-layout-warning).

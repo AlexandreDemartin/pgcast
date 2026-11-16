@@ -7,7 +7,7 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 ## [Unreleased]
 
 ### Added
-- `npx pgcast --check` (or `npx zapatos --check`), before or after the JSON argument, compares the files the generator would write with yours, and writes nothing: it exits with code 1, naming each file that differs or is missing, else prints that they are up to date (#556). `schema.d.ts` and `custom/index.d.ts` are compared byte for byte; a placeholder counts only when it is missing.
+- `npx pgcast --check` (or `npx zapatos --check`), before or after the JSON argument, compares the files the generator would write with yours, and writes nothing: it exits with code 1, naming each file that differs or is missing, else prints that they are up to date (#556). `schema.d.ts` and, when there is a custom type, `custom/index.d.ts` are compared byte for byte; a placeholder counts only when it is missing.
   - Changed: another argument starting with `--`, in the JSON argument's place, stops the CLI with code 1 before it reads the config, `Unknown flag --chek: the only flag is --check, beside the JSON argument`; Zapatos 6.6.1 and pgcast 6.7.2 read it as the JSON argument, which failed. After the JSON argument, one is still ignored, `npx pgcast '{}' --chek` generating, now with a note through `warningListener`: `Note: unknown flag --chek ignored: the only flag is --check, before or after the JSON argument.`
   - Changed: `generate()` lists the custom types by their own keys, so a key that other code added to `Object.prototype` no longer gets a placeholder file of its own in `custom/`, holding its value.
   - Unchanged: without a flag, the CLI's output, files and exit code.
