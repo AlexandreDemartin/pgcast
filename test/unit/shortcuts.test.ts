@@ -2256,6 +2256,51 @@ describe('the columns of several rows in insert() and upsert(): their own keys o
       values: ['A', 'a@x.org', 'B', 'b@x.org', 'sad', 'C', 'c@x.org'],
     });
   });
+
+  it('rows with no own key alone in an array still throw nothing to insert at the call with a key added to Object.prototype', () => {
+    // master compiled them to ("nickname") VALUES (DEFAULT), as Zapatos 6.6.1 did
+    withPrototypeKey(() => {
+      for (const values of [[{}], [new Date(0)], [{}, {}], [new Map()]]) {
+        expect(() => db.insert('users', values as any)).toThrow(nothingToInsert);
+        expect(() => db.upsert('users', values as any, 'email')).toThrow(nothingToInsert);
+      }
+    });
+  });
+
+  it('a Proxy row, with own keys or none, has its traps called as without a key added to Object.prototype', () => {
+    // master, with the key, skipped the prototype read of a Proxy row with no own key, and read one more own key in upsert()
+    const traps = (withKey: boolean) => {
+      const counts: Record<string, Record<string, number> | string> = {};
+      const builds = {
+        'insert, no own key, after a row': (p: (x: object) => object) => db.insert('users', [a, p({})] as any),
+        'insert, no own key, alone': (p: (x: object) => object) => db.insert('users', [p({})] as any),
+        'upsert, no own key, after a row': (p: (x: object) => object) => db.upsert('users', [a, p({})] as any, 'email'),
+        'insert, own keys, after a row': (p: (x: object) => object) => db.insert('users', [a, p({ ...b })] as any),
+        'upsert, own keys, first': (p: (x: object) => object) => db.upsert('users', [p({ ...a }), b] as any, 'email'),
+        'upsert, own keys, alone': (p: (x: object) => object) => db.upsert('users', [p({ ...a })] as any, 'email'),
+      };
+      for (const [name, build] of Object.entries(builds)) {
+        const
+          count: Record<string, number> = {},
+          handler = Object.fromEntries(['getPrototypeOf', 'ownKeys', 'getOwnPropertyDescriptor', 'get', 'has'].map(trap =>
+            [trap, (...args: any[]) => { count[trap] = (count[trap] ?? 0) + 1; return (Reflect as any)[trap](...args); }])),
+          run = () => { try { build(x => new Proxy(x, handler)).compile(); } catch (err) { counts[`${name} throws`] = (err as Error).message; } };
+        if (withKey) withPrototypeKey(run); else run();
+        counts[name] = count;
+      }
+      return counts;
+    };
+    expect(traps(true)).toEqual(traps(false));
+    expect(traps(true)).toEqual({
+      'insert, no own key, after a row': { getPrototypeOf: 3, ownKeys: 3 },
+      'insert, no own key, alone': { getPrototypeOf: 3, ownKeys: 3 },
+      'insert, no own key, alone throws': nothingToInsert,
+      'upsert, no own key, after a row': { getPrototypeOf: 3, ownKeys: 3, getOwnPropertyDescriptor: 1 },
+      'insert, own keys, after a row': { ownKeys: 3, getOwnPropertyDescriptor: 6, get: 6 },
+      'upsert, own keys, first': { ownKeys: 3, getOwnPropertyDescriptor: 7, get: 6 },
+      'upsert, own keys, alone': { ownKeys: 3, getOwnPropertyDescriptor: 7, get: 6 },
+    });
+  });
 });
 
 // 6.6.1 threw a TypeError at the call, from Object.keys(null) or reading `copy` of null (#341)
