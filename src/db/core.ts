@@ -381,9 +381,9 @@ const
 // (`URLSearchParams`'s), which inherits them too.
 // The `Segments` object that `Intl.Segmenter`'s `segment()` returns has no constructor to read a prototype from
 // (ECMA-402's %IntlSegmentsPrototype%), so its prototype is read from one, the first time a filter's prototype has
-// no `constructor` of its own: making a Segmenter costs about 7 ms, twice what loading `zapatos/db` does, and a
-// plain object, an array or a class instance never pays it. A runtime without `Intl.Segmenter`, or a stand-in whose
-// `segment()` throws, leaves it out; one whose `segment()` gives a plain object matches nothing, as
+// no `constructor` of its own: making a Segmenter as `zapatos/db` loads would cost every process about 7 ms, and
+// a plain object, an array or a class instance never pays it. A runtime without `Intl.Segmenter`, or a stand-in
+// whose `segment()` throws, leaves it out; one whose `segment()` gives a plain object matches nothing, as
 // `Object.prototype` has a `constructor`
 const
   intl = (globalThis as any).Intl,
