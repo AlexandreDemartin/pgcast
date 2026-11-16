@@ -5,6 +5,7 @@
 
 import { describe, expectTypeOf, test } from 'vitest';
 import * as db from 'zapatos/db';
+import type { PgPreferences } from 'zapatos/custom';
 
 const c = db.conditions;
 
@@ -129,5 +130,27 @@ describe('jsonbContains()', () => {
 
   test('characterization: a json column passes the type, both being JSONValue, and Postgres refuses it (42883)', () => {
     db.select('extra.type_zoo', { c_json: c.jsonbContains({}) });
+  });
+});
+
+describe('jsonbContains() on a jsonb domain whose placeholder is narrowed', () => {
+  // extra.type_zoo.c_jsonb_domain, of the domain preferences: its placeholder is an interface with a required key
+  // (./custom/PgPreferences.d.ts), so JSONValue does not fit it, and a value it contains need not hold every key
+  test('takes the column type as its type argument, and any JSON value', () => {
+    expectTypeOf(c.jsonbContains<PgPreferences>({ sizes: [1] })).toEqualTypeOf<db.SQLFragment<boolean | null, PgPreferences>>();
+    expectTypeOf(c.jsonbContains<PgPreferences>({ sizes: [1] })).not.toBeAny();
+    db.select('extra.type_zoo', { c_jsonb_domain: c.jsonbContains<PgPreferences>({ theme: 'dark' }) });
+    db.select('extra.type_zoo', { c_jsonb_domain: c.jsonbContains<PgPreferences>({ sizes: [1] }) });
+    db.select('extra.type_zoo', { c_jsonb_domain: c.not(c.jsonbContains<PgPreferences>({ theme: 'dark' })) });
+    db.update('extra.type_zoo', { c_bool: true }, { c_jsonb_domain: c.jsonbContains<PgPreferences>({ theme: 'dark' }) });
+  });
+
+  test('refuses it without the type argument, and the type argument on another column', () => {
+    // @ts-expect-error the condition's JSONValue, wider than the placeholder
+    db.select('extra.type_zoo', { c_jsonb_domain: c.jsonbContains({ theme: 'dark' }) });
+    // @ts-expect-error a text column, the type argument naming another column's type
+    db.select('users', { display_name: c.jsonbContains<PgPreferences>({ theme: 'dark' }) });
+    // @ts-expect-error a Date, no JSON value, with the type argument too
+    db.select('extra.type_zoo', { c_jsonb_domain: c.jsonbContains<PgPreferences>(new Date()) });
   });
 });
