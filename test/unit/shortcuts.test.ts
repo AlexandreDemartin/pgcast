@@ -292,6 +292,29 @@ describe('upsert', () => {
       .toThrow('Alien object while interpolating SQL');
   });
 
+  it('updateValues: a __proto__ column takes no update value from a prototype, but an own __proto__ key or a Proxy\'s', () => {
+    // `__proto__` is a getter of Object.prototype that answers each object's own prototype
+    const
+      row = () => JSON.parse('{ "email": "e@x.org", "__proto__": 1 }'),
+      fromExcluded = 'DO UPDATE SET ("email", "__proto__") = ROW(EXCLUDED."email", EXCLUDED."__proto__")';
+    class Patch { }
+    for (const updateValues of [{}, Object.create({ mood: param('x') }), new Patch()])
+      expect(db.upsert('users', row(), 'email', { updateValues } as any).compile().text).toContain(fromExcluded);
+    expect(db.upsert('users', row(), 'email', { updateValues: JSON.parse('{ "__proto__": "own" }') } as any).compile())
+      .toMatchObject({ text: expect.stringContaining('DO UPDATE SET ("email", "__proto__") = ROW(EXCLUDED."email", $3)'), values: [1, 'e@x.org', 'own'] });
+    // a Proxy answering through `get` alone keeps its value, read through the same traps as on 6.7.2
+    const counts: Record<string, number> = {}, count = (name: string) => { counts[name] = (counts[name] ?? 0) + 1; };
+    const trap = new Proxy({}, {
+      get: (_, k) => (count(`get:${String(k)}`), k === '__proto__' ? param('trap') : undefined),
+      getOwnPropertyDescriptor: (t, k) => (count(`getOwnPropertyDescriptor:${String(k)}`), Reflect.getOwnPropertyDescriptor(t, k)),
+      getPrototypeOf: t => (count('getPrototypeOf'), Reflect.getPrototypeOf(t)),
+      ownKeys: t => (count('ownKeys'), Reflect.ownKeys(t)),
+    });
+    expect(db.upsert('users', row(), 'email', { updateValues: trap } as any).compile())
+      .toMatchObject({ text: expect.stringContaining('DO UPDATE SET ("email", "__proto__") = ROW(EXCLUDED."email", $3)'), values: [1, 'e@x.org', 'trap'] });
+    expect(counts).toEqual({ ownKeys: 1, 'get:email': 1, 'get:__proto__': 2, getPrototypeOf: 2 });
+  });
+
   it('updateValues: a plain value is a parameter, sent as update() sends it', () => {
     expect(db.upsert('users', ada, 'email', { updateValues: { mood: 'happy' } }).compile()).toMatchInlineSnapshot(`
       {
@@ -2467,5 +2490,319 @@ describe('null as options, or as an options key', () => {
       text: 'SELECT coalesce(jsonb_agg(result), \'[]\') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users" LIMIT $1 OFFSET $2) AS "sq_users"',
       values: [null, null],
     });
+  });
+});
+
+// an option is what the caller wrote: Zapatos 6.6.1 and 6.7.2 read each one with `options?.x`, destructuring or
+// `allOptions.x`, so a key that other code added to Object.prototype was an option of every call given an options
+// object without it; each row compiles as the call without that option (#552)
+describe('a shortcut option added to Object.prototype by something else is no option', () => {
+  const
+    row = { email: 'e@x.org', display_name: 'E' },
+    upsertReturning = ` RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result`,
+    selectMany = (inner: string) => `SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (${inner}) AS "sq_users"`,
+    plain = { text: 'SELECT to_jsonb("users".*) AS result FROM "users"', values: [] },
+    tied = { text: 'SELECT to_jsonb("users".*) AS result FROM "users" ORDER BY "email" ASC LIMIT $1', values: [1] };
+
+  /** Run `f` with `Object.prototype[key]` set to `value`, as other code would, deleted after it. */
+  const withPrototypeKey = <T>(key: string, value: unknown, f: () => T): T => {
+    const proto = Object.prototype as any;
+    proto[key] = value;
+    try { return f(); } finally { delete proto[key]; }
+  };
+
+  // each option's value, built before it is set on Object.prototype
+  const value: Record<string, () => unknown> = {
+    returning: () => ['email'],
+    extras: () => ({ n: sql`1` }),
+    updateColumns: () => ['email'],
+    noNullUpdateColumns: () => ['display_name'],
+    reportAction: () => 'suppress',
+    columns: () => ['email'],
+    lateral: () => ({ n: db.count('accounts', all) }),
+    alias: () => 'u',
+    order: () => ({ by: 'email', direction: 'DESC' }),
+    limit: () => 1,
+    offset: () => 1,
+    withTies: () => true,
+    distinct: () => true,
+    groupBy: () => 'email',
+    having: () => sql`false`,
+    lock: () => ({ for: 'UPDATE' }),
+  };
+  // the options the caller wrote beside the key: withTies needs a limit and an order
+  const given = (key: string): any => key === 'withTies' ? { limit: 1, order: { by: 'email', direction: 'ASC' } } : {};
+
+  const compiledWithKey = (key: string, build: (options: any) => db.SQLFragment<any, any>) => {
+    const v = value[key](), options = given(key);
+    return withPrototypeKey(key, v, () => build(options).compile());
+  };
+
+  it.each(['returning', 'extras'])('insert(): %s', key => {
+    expect(compiledWithKey(key, o => db.insert('users', { email: 'e@x.org' }, o))).toEqual({
+      text: 'INSERT INTO "users" ("email") VALUES ($1) RETURNING to_jsonb("users".*) AS result',
+      values: ['e@x.org'],
+    });
+  });
+
+  it.each(['returning', 'extras', 'updateColumns', 'noNullUpdateColumns', 'reportAction'])('upsert(): %s', key => {
+    expect(compiledWithKey(key, o => db.upsert('users', row, 'email', o))).toEqual({
+      text: 'INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("email", "display_name") = ROW(EXCLUDED."email", EXCLUDED."display_name")' + upsertReturning,
+      values: ['E', 'e@x.org'],
+    });
+  });
+
+  it.each(['returning', 'extras'])('update(): %s', key => {
+    expect(compiledWithKey(key, o => db.update('users', { display_name: 'E' }, { email: 'e@x.org' }, o))).toEqual({
+      text: 'UPDATE "users" SET ("display_name") = ROW($1) WHERE ("email" = $2) RETURNING to_jsonb("users".*) AS result',
+      values: ['E', 'e@x.org'],
+    });
+  });
+
+  it.each(['returning', 'extras'])('deletes(): %s', key => {
+    expect(compiledWithKey(key, o => db.deletes('users', { email: 'e@x.org' }, o))).toEqual({
+      text: 'DELETE FROM "users" WHERE ("email" = $1) RETURNING to_jsonb("users".*) AS result',
+      values: ['e@x.org'],
+    });
+  });
+
+  const selectKeys = ['columns', 'extras', 'lateral', 'alias', 'order', 'limit', 'offset', 'withTies', 'distinct', 'groupBy', 'having', 'lock'];
+
+  it.each(selectKeys)('select(): %s', key => {
+    const expected = key === 'withTies' ? tied : plain;
+    expect(compiledWithKey(key, o => db.select('users', all, o))).toEqual({ text: selectMany(expected.text), values: expected.values });
+  });
+
+  // limit is left out: the copy selectOne() and selectExactlyOne() read their options from owns `limit: 1`
+  it.each(selectKeys.filter(k => k !== 'limit'))('selectOne(): %s', key => {
+    expect(compiledWithKey(key, o => db.selectOne('users', all, o)))
+      .toEqual(key === 'withTies' ? tied : { text: `${plain.text} LIMIT $1`, values: [1] });
+  });
+
+  it.each(selectKeys.filter(k => k !== 'limit'))('selectExactlyOne(): %s', key => {
+    expect(compiledWithKey(key, o => db.selectExactlyOne('users', all, o)))
+      .toEqual(key === 'withTies' ? tied : { text: `${plain.text} LIMIT $1`, values: [1] });
+  });
+
+  const aggregateKeys = ['lateral', 'alias', 'order', 'limit', 'offset', 'distinct', 'groupBy', 'having', 'lock'];
+
+  it.each(['columns', ...aggregateKeys])('count(): %s', key => {
+    expect(compiledWithKey(key, o => db.count('users', all, o))).toEqual({ text: 'SELECT count(*) AS result FROM "users"', values: [] });
+  });
+
+  it.each(aggregateKeys)('sum(): %s', key => {
+    expect(withPrototypeKey(key, value[key](), () => db.sum('users', all, { columns: ['id'] }).compile()))
+      .toEqual({ text: 'SELECT sum("id") AS result FROM "users"', values: [] });
+  });
+
+  // the keys of an order or a lock item are the caller's too
+  it.each([
+    ['nulls', 'FIRST', { order: { by: 'email', direction: 'ASC' } }, ' ORDER BY "email" ASC'],
+    ['wait', 'NOWAIT', { lock: { for: 'UPDATE' } }, ' FOR UPDATE'],
+    ['of', 'users', { lock: { for: 'UPDATE' } }, ' FOR UPDATE'],
+  ])('select(): an item\'s %s', (key, v, options, clause) => {
+    expect(withPrototypeKey(key, v, () => db.select('users', all, options as any).compile()))
+      .toEqual({ text: selectMany(`${plain.text}${clause}`), values: [] });
+  });
+
+  it.each([
+    ['direction', 'ASC', { order: { by: 'email' } }, 'Direction must be ASC/DESC, not \'undefined\''],
+    ['by', 'email', { order: { direction: 'ASC' } }, 'Alien object while interpolating SQL: undefined'],
+    ['for', 'UPDATE', { lock: {} }, 'Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not \'undefined\''],
+  ])('select(): an item without its %s throws as without the key', (key, v, options, message) => {
+    expect(() => withPrototypeKey(key, v, () => db.select('users', all, options as any).compile())).toThrow(message);
+  });
+
+  // with no key on Object.prototype: 6.6.1 and 6.7.2 read `null.direction` or `undefined.for` there, a TypeError
+  it.each([
+    ['order', null, 'Direction must be ASC/DESC, not \'undefined\''],
+    ['order', undefined, 'Direction must be ASC/DESC, not \'undefined\''],
+    ['lock', null, 'Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not \'undefined\''],
+    ['lock', undefined, 'Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not \'undefined\''],
+  ])('select(): %s: [%s] throws at the call as an item without its keys', (key, item, message) => {
+    const call = () => db.select('users', all, { [key]: [item] } as any);
+    expect(call).toThrow(message);
+    expect(call).not.toThrow(TypeError);
+  });
+
+  // the reads that refuse a value with no meaning, before the query: what Object.prototype holds is no value there either
+  it.each([
+    ['select(): lateral null', 'lateral', () => null, () => db.select('users', all), selectMany(plain.text)],
+    ['count(): two columns', 'columns', () => ['email', 'display_name'], () => db.count('users', all), 'SELECT count(*) AS result FROM "users"'],
+    ['count(): a lateral query', 'lateral', () => db.selectOne('accounts', all), () => db.count('users', all), 'SELECT count(*) AS result FROM "users"'],
+  ])('%s', (_, key, v, build, text) => {
+    const given = v();
+    expect(withPrototypeKey(key, given, () => build().compile())).toEqual({ text, values: [] });
+  });
+
+  it('sum(): the columns of Object.prototype are none, so it still needs its own', () => {
+    expect(() => withPrototypeKey('columns', ['id'], () => db.sum('users', all, {}).compile()))
+      .toThrow('sum() needs one column to aggregate: pass columns: [\'column\']');
+  });
+
+  /** A Proxy over `target` that counts each trap by name and key, and answers `answers`' keys through `get` alone. */
+  const counting = (counts: Record<string, number>, target: object, answers: Record<string, unknown> = {}) =>
+    new Proxy(target, Object.fromEntries(['get', 'has', 'ownKeys', 'getOwnPropertyDescriptor', 'getPrototypeOf'].map(trap =>
+      [trap, (...args: any[]) => {
+        const name = trap === 'ownKeys' || trap === 'getPrototypeOf' ? trap : `${trap}:${String(args[1])}`;
+        counts[name] = (counts[name] ?? 0) + 1;
+        return trap === 'get' && Object.prototype.hasOwnProperty.call(answers, args[1]) ? answers[args[1]] : (Reflect as any)[trap](...args);
+      }])));
+
+  /** A select() and an upsert() of a Proxy, a class getter and an own getter, with their traps and reads counted. */
+  const readCounted = () => {
+    const options: Record<string, number> = {}, order: Record<string, number> = {}, lock: Record<string, number> = {}, writes: Record<string, number> = {};
+    const selected = db.select('users', all, counting(options, {
+      order: counting(order, { by: 'email', direction: 'ASC' }),
+      lock: counting(lock, { for: 'UPDATE' }),
+    }) as any).compile();
+    const upserted = db.upsert('users', row, 'email', counting(writes, {}, { returning: ['email'], updateColumns: ['email'] }) as any).compile();
+    let reads = 0;
+    class Locked { get lock() { reads++; return { for: 'SHARE' }; } }
+    const ownReads = { n: 0 };
+    const locked = db.select('users', all, new Locked() as any).compile().text;
+    const ordered = db.select('users', all, { get order() { ownReads.n++; return { by: 'email', direction: 'DESC' }; } } as any).compile().text;
+    return { selected, upserted, options, order, lock, writes, reads, ownReads: ownReads.n, locked, ordered };
+  };
+  const readAsBefore = {
+    selected: { text: selectMany(`${plain.text} ORDER BY "email" ASC FOR UPDATE`), values: [] },
+    upserted: {
+      text: 'INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("email") = ROW(EXCLUDED."email") RETURNING jsonb_build_object($3::text, "email") || jsonb_build_object(\'$action\', CASE xmax WHEN 0 THEN \'INSERT\' ELSE \'UPDATE\' END) AS result',
+      values: ['E', 'e@x.org', 'email'],
+    },
+    // lateral is read once for its refusal, once for the query
+    options: { 'get:lateral': 2, 'get:alias': 1, 'get:distinct': 1, 'get:groupBy': 1, 'get:having': 1, 'get:columns': 1, 'get:extras': 1, 'get:lock': 3, 'get:order': 3, 'get:offset': 1, 'get:limit': 1 },
+    order: { 'get:direction': 2, 'get:nulls': 2, 'get:by': 1 },
+    lock: { 'get:for': 2, 'get:wait': 2, 'get:of': 2 },
+    writes: { 'get:noNullUpdateColumns': 1, 'get:updateColumns': 1, 'get:updateValues': 1, 'get:returning': 1, 'get:extras': 1, 'get:reportAction': 1 },
+    reads: 3,
+    ownReads: 3,
+    locked: selectMany(`${plain.text} FOR SHARE`),
+    ordered: selectMany(`${plain.text} ORDER BY "email" DESC`),
+  };
+
+  it('a Proxy and a getter are read as before, as often and through the same traps', () => {
+    expect(readCounted()).toEqual(readAsBefore);
+  });
+
+  it('a Proxy and a getter are read as before with another value of each key on Object.prototype', () => {
+    // what the caller's object answers wins, through the same traps; a key it lacks reads as none, and only then are
+    // its prototypes looked up
+    const keys = { order: { by: 'id', direction: 'DESC' }, lock: { for: 'KEY SHARE' }, returning: ['id'], updateColumns: ['id'], nulls: 'LAST', wait: 'NOWAIT', of: 'accounts' };
+    const withKeys = Object.entries(keys).reduceRight<typeof readCounted>((f, [k, v]) => () => withPrototypeKey(k, v, f), readCounted);
+    expect(withKeys()).toEqual({
+      ...readAsBefore,
+      order: { ...readAsBefore.order, 'getOwnPropertyDescriptor:nulls': 2, getPrototypeOf: 2 },
+      lock: { ...readAsBefore.lock, 'getOwnPropertyDescriptor:wait': 2, 'getOwnPropertyDescriptor:of': 2, getPrototypeOf: 4 },
+    });
+  });
+
+  /** Run `f` with a getter `key` on Object.prototype, as other code would define one, deleted after it; with its reads. */
+  const withPrototypeGetter = <T>(key: string, make: () => unknown, f: () => T) => {
+    let reads = 0;
+    Object.defineProperty(Object.prototype, key, { get: () => (reads++, make()), configurable: true });
+    try { return { result: f(), reads }; } finally { delete (Object.prototype as any)[key]; }
+  };
+
+  // a getter answers anew on each read, so its value is no sign of where it came from: with no own key on the caller's
+  // object or its prototypes, it is Object.prototype's, read once per read of the option
+  it.each([
+    ['deletes(): returning', 'returning', () => ['email'], () => db.deletes('users', { email: 'e@x.org' }, {}),
+      { text: 'DELETE FROM "users" WHERE ("email" = $1) RETURNING to_jsonb("users".*) AS result', values: ['e@x.org'] }, 1],
+    ['upsert(): updateValues', 'updateValues', () => ({ display_name: 'X' }), () => db.upsert('users', row, 'email', {}),
+      { text: 'INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("email", "display_name") = ROW(EXCLUDED."email", EXCLUDED."display_name")' + upsertReturning, values: ['E', 'e@x.org'] }, 1],
+    ['upsert(): a column of updateValues', 'mood', () => param('X'), () => db.upsert('users', { email: 'e@x.org', mood: 'ok' }, 'email', { updateValues: {} }),
+      { text: 'INSERT INTO "users" ("email", "mood") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("email", "mood") = ROW(EXCLUDED."email", EXCLUDED."mood")' + upsertReturning, values: ['e@x.org', 'ok'] }, 1],
+    ['select(): order', 'order', () => ({ by: 'email', direction: 'DESC' }), () => db.select('users', all, {}),
+      { text: selectMany(plain.text), values: [] }, 2],
+    ['select(): an order item\'s nulls', 'nulls', () => 'FIRST', () => db.select('users', all, { order: { by: 'email', direction: 'ASC' } }),
+      { text: selectMany(`${plain.text} ORDER BY "email" ASC`), values: [] }, 2],
+  ])('a getter on Object.prototype is no option either: %s', (_, key, make, build, compiled, reads) => {
+    expect(withPrototypeGetter(key, make, () => build().compile())).toEqual({ result: compiled, reads });
+  });
+
+  it('a getter on Object.prototype is no option beside a value key there too', () => {
+    // a property descriptor inherits from Object.prototype, so only an own `value` tells a data key from a getter
+    expect(withPrototypeGetter('returning', () => ['email'], () =>
+      withPrototypeKey('value', ['email'], () => db.deletes('users', { email: 'e@x.org' }, {}).compile()))).toEqual({
+      result: { text: 'DELETE FROM "users" WHERE ("email" = $1) RETURNING to_jsonb("users".*) AS result', values: ['e@x.org'] },
+      reads: 1,
+    });
+  });
+
+  // NaN is not `===` itself, yet the NaN read is the one Object.prototype holds; the caller's own NaN is still read
+  it.each([
+    ['select(): limit', 'limit', () => db.select('users', all, {}), { text: selectMany(plain.text), values: [] }],
+    ['select(): offset', 'offset', () => db.select('users', all, {}), { text: selectMany(plain.text), values: [] }],
+    ['upsert(): a column of updateValues', 'mood', () => db.upsert('users', { email: 'e@x.org', mood: 'ok' }, 'email', { updateValues: {} }),
+      { text: 'INSERT INTO "users" ("email", "mood") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("email", "mood") = ROW(EXCLUDED."email", EXCLUDED."mood")' + upsertReturning, values: ['e@x.org', 'ok'] }],
+    ['select(): an own limit', 'limit', () => db.select('users', all, { limit: NaN }), { text: selectMany(`${plain.text} LIMIT $1`), values: [NaN] }],
+  ])('a NaN on Object.prototype is no option either: %s', (_, key, build, compiled) => {
+    expect(withPrototypeKey(key, NaN, () => build().compile())).toEqual(compiled);
+  });
+
+  it('a setter alone on Object.prototype gives no value, so what the caller\'s object answers is read through the same traps', () => {
+    // a key that Object.prototype has with no getter reads as undefined, so any other value is the caller's
+    const counts: Record<string, number> = {};
+    Object.defineProperty(Object.prototype, 'returning', { set() { }, configurable: true });
+    let text: string;
+    try {
+      text = db.deletes('users', { email: 'e@x.org' }, counting(counts, {}, { returning: ['display_name'] }) as any).compile().text;
+    } finally { delete (Object.prototype as any).returning; }
+    expect({ text, counts }).toEqual({
+      text: 'DELETE FROM "users" WHERE ("email" = $1) RETURNING jsonb_build_object($2::text, "display_name") AS result',
+      counts: { 'get:returning': 1, 'get:extras': 1 },
+    });
+  });
+
+  it('with a getter on Object.prototype, an option of the caller\'s own prototype or object is read without it', () => {
+    const counts = { answering: {} as Record<string, number>, owning: {} as Record<string, number> };
+    class Returning { get returning() { return ['mood']; } }
+    const deleted = (options: any) => db.deletes('users', { email: 'e@x.org' }, options).compile().text;
+    expect(withPrototypeGetter('returning', () => ['email'], () => ({
+      created: deleted(Object.create({ returning: ['display_name'] })),
+      classed: deleted(new Returning()),
+      owning: deleted(counting(counts.owning, { returning: ['display_name'] })),
+      // a Proxy answering through `get` alone owns no key, so what it answers is none
+      answering: deleted(counting(counts.answering, {}, { returning: ['display_name'] })),
+    }))).toEqual({
+      result: {
+        created: 'DELETE FROM "users" WHERE ("email" = $1) RETURNING jsonb_build_object($2::text, "display_name") AS result',
+        classed: 'DELETE FROM "users" WHERE ("email" = $1) RETURNING jsonb_build_object($2::text, "mood") AS result',
+        owning: 'DELETE FROM "users" WHERE ("email" = $1) RETURNING jsonb_build_object($2::text, "display_name") AS result',
+        answering: 'DELETE FROM "users" WHERE ("email" = $1) RETURNING to_jsonb("users".*) AS result',
+      },
+      reads: 0,
+    });
+    expect(counts).toEqual({
+      owning: { 'get:returning': 1, 'getOwnPropertyDescriptor:returning': 1, 'get:extras': 1 },
+      answering: { 'get:returning': 1, 'getOwnPropertyDescriptor:returning': 1, getPrototypeOf: 1, 'get:extras': 1 },
+    });
+  });
+
+  class Opts { }
+  (Opts.prototype as any).columns = ['email'];
+  const prototypeOptions = () => ({
+    selected: db.select('users', all, new Opts() as any).compile().text,
+    created: db.select('users', all, Object.create({ columns: ['email'] })).compile().text,
+    upserted: db.upsert('users', row, 'email', Object.create({ reportAction: 'suppress' })).compile().text,
+    // their copy of the options keeps own keys only, as Zapatos 6.6.1's did
+    one: db.selectOne('users', all, new Opts() as any).compile().text,
+    exactlyOne: db.selectExactlyOne('users', all, Object.create({ columns: ['email'] })).compile().text,
+  });
+  const prototypeOptionsRead = {
+    selected: selectMany('SELECT jsonb_build_object($1::text, "email") AS result FROM "users"'),
+    created: selectMany('SELECT jsonb_build_object($1::text, "email") AS result FROM "users"'),
+    upserted: 'INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("email", "display_name") = ROW(EXCLUDED."email", EXCLUDED."display_name") RETURNING to_jsonb("users".*) AS result',
+    one: `${plain.text} LIMIT $1`,
+    exactlyOne: `${plain.text} LIMIT $1`,
+  };
+
+  it('an option on a class or an Object.create() prototype is still read, but by selectOne() and selectExactlyOne()', () => {
+    expect(prototypeOptions()).toEqual(prototypeOptionsRead);
+  });
+
+  it('an option on a class or an Object.create() prototype is still read with the same value on Object.prototype', () => {
+    expect(withPrototypeKey('columns', (Opts.prototype as any).columns, prototypeOptions)).toEqual(prototypeOptionsRead);
   });
 });
