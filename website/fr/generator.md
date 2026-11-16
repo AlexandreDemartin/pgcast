@@ -1,5 +1,5 @@
 ---
-english: 1617910416fd
+english: 75079b14641d
 ---
 
 # Générateur
@@ -436,10 +436,11 @@ ALTER TABLE seat_bookings ADD COLUMN vip_ticket vip_ticket_no, ADD COLUMN ticket
 
 ### `enumArraysTypedAsText` {#generate.enumArraysTypedAsText}
 
-`boolean`, ou omis ; un opt-in. Le type `Selectable` d’une colonne dont le type est un tableau d’un enum, ou un domaine sur un tel tableau. Postgres donne au type d’un tel tableau un numéro propre à chaque base, donc `pg` n’a pas de parser pour lui : une ligne de `pg`, comme celle d’une requête [`sql`](/fr/sql-template), contient le texte du tableau, tandis que le JSON des raccourcis contient le tableau. Supposons qu’un membre de l’équipe puisse occuper d’autres postes :
+`boolean`, ou omis ; un opt-in. Le type `Selectable` d’une colonne dont le type est un tableau d’un enum, ou un domaine sur un tel tableau. Postgres donne au type d’un tel tableau un numéro propre à chaque base, donc `pg` n’a pas de parser pour lui : une ligne de `pg`, comme celle d’une requête [`sql`](/fr/sql-template), contient le texte du tableau, tandis que le JSON des raccourcis contient le tableau. Supposons qu’un membre de l’équipe puisse occuper d’autres postes, et garde ceux qu’il a déjà occupés dans un domaine sur le tableau :
 
 ```sql
-ALTER TABLE crew ADD COLUMN other_jobs crew_job[] NOT NULL DEFAULT '{}';
+CREATE DOMAIN job_list AS crew_job[];
+ALTER TABLE crew ADD COLUMN other_jobs crew_job[] NOT NULL DEFAULT '{}', ADD COLUMN past_jobs job_list;
 ```
 
 | `crew.other_jobs` | omis, ou `false` | `true` |
@@ -451,7 +452,7 @@ ALTER TABLE crew ADD COLUMN other_jobs crew_job[] NOT NULL DEFAULT '{}';
 - Omis, ou `null` : le tableau, comme dans Zapatos 6.6.1, et le générateur signale via [`warningListener`](#generate.warningListener) chaque colonne que `true` changerait. À partir de la 7.0, l’option omise vaut `true` ([Versions](/fr/versions)).
 - `false` : le tableau, sans note, en 7.0 et après : le bon type pour un projet qui le parse avec `pg.types.setTypeParser`, en lui donnant l’OID du type du tableau (`SELECT 'crew_job[]'::regtype::oid`) et le parser de `text[]`, `pg.types.getTypeParser(1009)`.
 - `true` : `string`, le texte que renvoie `pg`. Les écritures prennent toujours un tableau, donc le texte d’une ligne de `sql` ne se réécrit pas tel quel : `insert()` et `update()` le refusent (TS2769, TS2322), alors que Postgres l’accepterait.
-- Un domaine sur un tel tableau prend `db.DomainInContext<c.PgJob_list, crew_job[], string>` dans `Selectable` ([`DomainInContext`](/fr/runtime-config#DomainInContext)) : `string` tant que son placeholder contient ce que le générateur y a écrit, et un placeholder que vous modifiez garde son type. Ses autres interfaces et son placeholder ne changent pas.
+- Un domaine sur un tel tableau, comme `crew.past_jobs`, prend `db.DomainInContext<c.PgJob_list, crew_job[], string>` dans `Selectable` ([`DomainInContext`](/fr/runtime-config#DomainInContext)) : `string` tant que son placeholder contient ce que le générateur y a écrit, et un placeholder que vous modifiez garde son type. Ses autres interfaces et son placeholder ne changent pas.
 - Un tableau d’un enum d’un autre schéma, typé par ses labels avec [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas), ou sinon comme l’enum du même nom dans le schéma de la relation, est lui aussi un `string` dans `Selectable`. Sans l’un ni l’autre, c’est un placeholder `any`, et il le reste. Un tableau d’un domaine sur un enum relève de [`domainsTypedByContext`](#generate.domainsTypedByContext).
 
 ### `progressListener` {#generate.progressListener}

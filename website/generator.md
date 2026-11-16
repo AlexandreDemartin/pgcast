@@ -432,10 +432,11 @@ ALTER TABLE seat_bookings ADD COLUMN vip_ticket vip_ticket_no, ADD COLUMN ticket
 
 ### `enumArraysTypedAsText` {#generate.enumArraysTypedAsText}
 
-`boolean`, or left out; an opt-in. The `Selectable` type of a column whose type is an array of an enum, or a domain over one. Postgres numbers such an array's type afresh in each database, so `pg` has no parser for it: a row from `pg`, such as a [`sql`](/sql-template) query's, holds the array's text, while the shortcuts' JSON holds the array. Say a crew member can do other jobs:
+`boolean`, or left out; an opt-in. The `Selectable` type of a column whose type is an array of an enum, or a domain over one. Postgres numbers such an array's type afresh in each database, so `pg` has no parser for it: a row from `pg`, such as a [`sql`](/sql-template) query's, holds the array's text, while the shortcuts' JSON holds the array. Say a crew member can do other jobs, and keeps those done before in a domain over the array:
 
 ```sql
-ALTER TABLE crew ADD COLUMN other_jobs crew_job[] NOT NULL DEFAULT '{}';
+CREATE DOMAIN job_list AS crew_job[];
+ALTER TABLE crew ADD COLUMN other_jobs crew_job[] NOT NULL DEFAULT '{}', ADD COLUMN past_jobs job_list;
 ```
 
 | `crew.other_jobs` | left out, or `false` | `true` |
@@ -447,7 +448,7 @@ ALTER TABLE crew ADD COLUMN other_jobs crew_job[] NOT NULL DEFAULT '{}';
 - Left out, or `null`: the array, as in Zapatos 6.6.1, and the generator notes through [`warningListener`](#generate.warningListener) each column `true` would change. From 7.0, left out means `true` ([Versions](/versions)).
 - `false`: the array, with no note, in 7.0 and after: the right type for a project that parses it with `pg.types.setTypeParser`, given the array type's OID (`SELECT 'crew_job[]'::regtype::oid`) and the parser of `text[]`, `pg.types.getTypeParser(1009)`.
 - `true`: `string`, the text `pg` returns. The writes still take an array, so a `sql` row's text isn't written back as it is: `insert()` and `update()` refuse it (TS2769, TS2322), though Postgres would take it.
-- A domain over such an array takes `db.DomainInContext<c.PgJob_list, crew_job[], string>` in `Selectable` ([`DomainInContext`](/runtime-config#DomainInContext)): `string` while its placeholder holds what the generator wrote, and a placeholder you edit keeps its type. Its other interfaces and its placeholder don't change.
+- A domain over such an array, as `crew.past_jobs`, takes `db.DomainInContext<c.PgJob_list, crew_job[], string>` in `Selectable` ([`DomainInContext`](/runtime-config#DomainInContext)): `string` while its placeholder holds what the generator wrote, and a placeholder you edit keeps its type. Its other interfaces and its placeholder don't change.
 - An array of an enum of another schema, typed by its labels with [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas) or else as the enum of the same name in the relation's schema, is a `string` in `Selectable` too. Without either, it's an `any` placeholder, and stays one. An array of a domain over an enum is [`domainsTypedByContext`](#generate.domainsTypedByContext)'s.
 
 ### `progressListener` {#generate.progressListener}
