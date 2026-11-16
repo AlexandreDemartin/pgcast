@@ -1477,6 +1477,31 @@ describe('a built-in object as a Whereable', () => {
     }
   });
 
+  it('names a namespace object by its path', () => {
+    const Temporal = (globalThis as any).Temporal;  // Node 26 and later; Node 22 with --harmony-temporal
+    expect(() => sql`DELETE FROM ${'users'} WHERE ${Math as any}`.compile()).toThrowErrorMatchingInlineSnapshot(`[Error: A built-in \`Math\` has no meaning as a Whereable (a filter): it would compile to its own enumerable keys, and to \`TRUE\`, every row, when it has none. To compare with a value, give it as \`db.param(…)\`; to filter, give a plain object (\`{ column: value }\`); await a \`Promise\` first.]`);
+    if (Temporal) expect(() => db.deletes('users', Temporal.Now).compile())
+      .toThrow('A built-in `Temporal.Now` has no meaning as a Whereable (a filter)');
+  });
+
+  it('a namespace object made from one, behind a Proxy or of another realm compiles as before', () => {
+    // only the namespaces of the realm that runs pgcast are refused, by identity (#523); 6.6.1 compiled each of these
+    // to its own enumerable keys, as it does still, a plain object's too
+    const kept: Record<string, object> = {
+      created: Object.create(Math),
+      proxy: new Proxy(Math, {}),
+      otherRealm: runInNewContext('Math'),
+      plainWithMathKey: { max: 1 },
+    };
+    expect(Object.fromEntries(Object.entries(kept).map(([name, x]) => [name, sql`DELETE FROM ${'users'} WHERE ${x}`.compile()])))
+      .toEqual({
+        created: { text: 'DELETE FROM "users" WHERE TRUE', values: [] },
+        proxy: { text: 'DELETE FROM "users" WHERE TRUE', values: [] },
+        otherRealm: { text: 'DELETE FROM "users" WHERE TRUE', values: [] },
+        plainWithMathKey: { text: 'DELETE FROM "users" WHERE ("max" = $1)', values: [1] },
+      });
+  });
+
   it('a subclass of an Intl or a Temporal constructor compiles as before, where the runtime has it', () => {
     // Temporal from Node 26, or Node 22 with --harmony-temporal; 6.6.1 compiled an instance with no own enumerable key to TRUE
     const
@@ -1504,17 +1529,27 @@ describe('a built-in object as a Whereable', () => {
           Object.getOwnPropertyNames(x)
             .filter(key => isConstructor(Object.getOwnPropertyDescriptor(x, key).value)).map(key => name + '.' + key);
       })`)],
+    // and every namespace object, a global that is an object and no function (`Math`, `Intl`), and each one inside
+    // them (`Temporal.Now`), whose prototype is Object.prototype, as a plain object's (#523)
+    globalNamespaces: string[] = [...runInNewContext(`
+      const isNamespace = x => typeof x === 'object' && x !== null && x !== globalThis;
+      Object.getOwnPropertyNames(globalThis).flatMap(name => {
+        const x = Object.getOwnPropertyDescriptor(globalThis, name).value;
+        return !isNamespace(x) ? [] : [name, ...Object.getOwnPropertyNames(x)
+          .filter(key => isNamespace(Object.getOwnPropertyDescriptor(x, key).value)).map(key => name + '.' + key)];
+      })`)],
     // by its path, or its namespace's
-    keptConstructors = new Map(Object.entries({
+    keptBuiltins = new Map(Object.entries({
       Object: 'a plain object is the filter itself',
       Array: 'an array compiles as its items; Object.create(Array.prototype) is no array',
       Function: 'a function is no object here, and throws as an alien value',
       WebAssembly: 'a host API; core.ts: "no host object (`URL`, `Blob`)"',
+      console: 'a host API (the WHATWG Console), which V8 puts in every context',
       // Node 22 with --harmony-temporal only
       'Temporal.TimeZone': 'core.ts: "`TimeZone` and `Calendar`, dropped from the proposal, are left out"',
       'Temporal.Calendar': 'core.ts: "`TimeZone` and `Calendar`, dropped from the proposal, are left out"',
     })),
-    keptReason = (path: string) => keptConstructors.get(path) ?? keptConstructors.get(path.split('.')[0]),
+    keptReason = (path: string) => keptBuiltins.get(path) ?? keptBuiltins.get(path.split('.')[0]),
     inThisRealm = (path: string) => path.split('.').reduce((x: any, key) => x?.[key], globalThis);
 
   it('throws for each global constructor of a bare vm context, or keeps it for a reason', () => {
@@ -1535,10 +1570,29 @@ describe('a built-in object as a Whereable', () => {
       .filter(([path, x]) => x !== (keptReason(path) ? 'kept' : 'throws'))).toEqual([]);
   });
 
-  it('gives the built-ins test a value of each global constructor the walk refuses', () => {
+  it('throws for each namespace object of a bare vm context, named by its path, or keeps it for a reason', () => {
+    // its functions are no enumerable keys: 6.6.1 compiled `Math` or `Temporal.Now` to TRUE, every row
+    const outcome = (path: string) => {
+      const x = inThisRealm(path), kept = keptReason(path);
+      if (typeof x !== 'object' || x === null) return 'not in this realm';
+      try {
+        const text = sql`SELECT 1 WHERE ${x}`.compile().text;
+        return kept ? 'kept' : `compiles: ${text}`;
+      } catch (err) {
+        const message = (err as Error).message;
+        return !message.startsWith(`A built-in \`${path}\` has no meaning as a Whereable`) ? message : kept ? 'kept, but throws' : 'throws';
+      }
+    };
+    expect(globalNamespaces).toEqual(expect.arrayContaining(['JSON', 'Math', 'Reflect', 'Atomics', 'Intl']));
+    expect(globalNamespaces.map(path => [path, outcome(path)])
+      .filter(([path, x]) => x !== (keptReason(path) ? 'kept' : 'throws'))).toEqual([]);
+  });
+
+  it('gives the built-ins test a value of each global constructor and namespace object the walk refuses', () => {
     // so that test/integration/injection.test.ts runs each one too
     const names = Object.keys(builtinObjects());
     expect(globalConstructors.filter(path => !keptReason(path) && !names.includes(inThisRealm(path)?.name))).toEqual([]);
+    expect(globalNamespaces.filter(path => !keptReason(path) && !names.includes(path))).toEqual([]);
   });
 
   it('finds each iterator the values of the built-ins test hand out through the prototype chain, with a value of its kind', () => {
