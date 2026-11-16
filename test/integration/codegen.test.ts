@@ -2012,9 +2012,13 @@ describe('intervalsTypedAsObjects', () => {
     await runtime.update('iv.runs' as any, { runtime: fromPg.span, breaks: [fromPg.runtime] } as any, { id: 1 } as any).run(t.client);
     const { rows: [stored] } = await t.client.query('SELECT runtime::text, breaks::text FROM iv.runs');
     expect(stored).toEqual({ runtime: '3 mons', breaks: '{"1 day 02:00:00"}' });
-    // a plain object is no interval to Postgres; last, as the error aborts the transaction
-    await expect(runtime.insert('iv.runs' as any, { id: 2, runtime: { days: 1 } } as any).run(t.client))
-      .rejects.toMatchObject({ code: '22007' });
+    // a plain object, sent as JSON, is no interval to Postgres 17 and later: each key is a unit with no value (Postgres
+    // commit 617f9b7d4); earlier ones skip those and read its number as seconds. Last, as the error aborts the transaction
+    const { rows: [{ version }] } = await t.client.query("SELECT current_setting('server_version_num')::int AS version");
+    const plain = runtime.insert('iv.runs' as any, [{ id: 2, runtime: { days: 1 } }, { id: 3, runtime: { minutes: 15 } }] as any)
+      .run(t.client);
+    if (version >= 170000) await expect(plain).rejects.toMatchObject({ code: '22007' });
+    else expect((await plain as any[]).map(row => row.runtime)).toEqual(['00:00:01', '00:00:15']);
   });
 
   it('leaves the output as it was without the option, or with false', async () => {
