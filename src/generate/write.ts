@@ -54,7 +54,8 @@ export const generate = async (suppliedConfig: Config) => {
 /**
  * Compare the files `generate()` would write with those on disk, writing nothing, as the CLI's `--check` does: each
  * that differs or is missing goes to `warningListener` (`Out of date: <path>`, `Missing: <path>`); none, one line to
- * `progressListener`. A placeholder counts only when missing: it is yours to edit.
+ * `progressListener`. A placeholder counts only when missing: it is yours to edit. A failed query rejects with its
+ * error, `rejectOnQueryError` left out included; only `rejectOnQueryError: false` ends the process, as in `generate()`.
  * @param suppliedConfig An object approximately matching `zapatosconfig.json`.
  * @returns `true` when the files on disk are up to date.
  */
@@ -66,7 +67,9 @@ export const check = async (suppliedConfig: Config) => {
     warn = config.warningListener === true ? console.log :
       config.warningListener || (() => void 0),
 
-    { folderTargetPath, lines } = await staleFiles(suppliedConfig);
+    // no exit of Zapatos 6.6.1 to keep, so no note of it: it rejects, as generate() will by default in 7.0
+    rejectOnQueryError = suppliedConfig.rejectOnQueryError ?? true,  // left out, or null from JSON
+    { folderTargetPath, lines } = await staleFiles({ ...suppliedConfig, rejectOnQueryError });
 
   if (lines.length === 0) log(upToDate(folderTargetPath));
   for (const line of lines) warn(line);
