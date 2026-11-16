@@ -1509,8 +1509,10 @@ describe('a built-in object as a Whereable', () => {
       Object: 'a plain object is the filter itself',
       Array: 'an array compiles as its items; Object.create(Array.prototype) is no array',
       Function: 'a function is no object here, and throws as an alien value',
-      Intl: 'ECMA-402, not ECMA-262: core.ts refuses ECMAScript built-ins only (an Intl.Segmenter iterator through the chain)',
-      WebAssembly: 'a host API, as URL is',
+      WebAssembly: 'a host API; core.ts: "no host object (`URL`, `Blob`)"',
+      // Node 22 with --harmony-temporal only
+      'Temporal.TimeZone': 'core.ts: "`TimeZone` and `Calendar`, dropped from the proposal, are left out"',
+      'Temporal.Calendar': 'core.ts: "`TimeZone` and `Calendar`, dropped from the proposal, are left out"',
     })),
     keptReason = (path: string) => keptConstructors.get(path) ?? keptConstructors.get(path.split('.')[0]),
     inThisRealm = (path: string) => path.split('.').reduce((x: any, key) => x?.[key], globalThis);
