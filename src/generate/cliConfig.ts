@@ -75,18 +75,30 @@ export const cliConfig = (argsJSON = '{}', dir = '.') => {
 
 /**
  * The CLI's arguments: `--check` anywhere, and the JSON argument, the first other one, as Zapatos 6.6.1 reads
- * `process.argv[2]`; any later one is ignored, as there. Any other flag throws, so a misspelt `--check` never writes.
+ * `process.argv[2]`; any later one is ignored, as there, and each flag among them returned, to be noted. A flag in
+ * the JSON argument's place throws, where 6.6.1 failed on it as JSON.
  */
 export const cliArgs = (args: string[]) => {
-  const unknown = args.find(arg => arg.startsWith('--') && arg !== '--check');
-  if (unknown !== undefined) throw new Error(`Unknown flag ${unknown}: the only flag is --check, beside the JSON argument`);
+  const [argsJSON, ...later] = args.filter(arg => arg !== '--check');
+  if (argsJSON?.startsWith('--')) throw new Error(`Unknown flag ${argsJSON}: the only flag is --check, beside the JSON argument`);
 
-  return { check: args.includes('--check'), argsJSON: args.find(arg => arg !== '--check') };
+  return { check: args.includes('--check'), argsJSON, ignoredFlags: later.filter(arg => arg.startsWith('--')) };
 };
 
-/** Run the CLI on its arguments in `dir`: `generate()`, or with `--check` `check()`. Resolve to its exit code. */
+/**
+ * Run the CLI on its arguments in `dir`: `generate()`, or with `--check` `check()`, after a note through
+ * `warningListener` for each flag it ignores. Resolve to its exit code.
+ */
 export const runCli = async (args: string[], dir = '.') => {
-  const { check: checkOnly, argsJSON } = cliArgs(args), config = cliConfig(argsJSON, dir);
+  const { check: checkOnly, argsJSON, ignoredFlags } = cliArgs(args), config = cliConfig(argsJSON, dir);
+  if (ignoredFlags.length > 0) {
+    const
+      { warningListener } = finaliseConfig(config),
+      warn = warningListener === true ? console.log : warningListener || (() => void 0);
+
+    for (const flag of ignoredFlags) warn(`Note: unknown flag ${flag} ignored: the only flag is --check, before or after the JSON argument.`);
+  }
+
   if (!checkOnly) {
     await generate(config);
     return 0;
