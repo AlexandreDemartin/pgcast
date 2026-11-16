@@ -572,8 +572,11 @@ svg.icon { width: 16px; height: 16px; flex: none; }
 .landing .hero h1 .op { font-family: var(--font-mono); color: var(--accent); font-weight: 700; letter-spacing: -.06em; }
 .landing .lede { font-size: 1.18rem; color: var(--muted); max-width: 58ch; margin: 0 0 28px; }
 /* the lede's key phrases, in the text's own colour over its muted one: no accent, no bold */
+.landing .lede .keep { white-space: nowrap; }  /* a French phrase and its spaced colon */
+/* under 360px a phrase may not fit a line: it wraps, its band cloned on each line */
+@media (max-width: 359px) { .landing .lede :is(.keep, strong) { white-space: normal; -webkit-box-decoration-break: clone; box-decoration-break: clone; } }
 .landing .lede strong {
-  color: var(--fg); font-weight: 500; padding: 0 .08em; -webkit-box-decoration-break: clone; box-decoration-break: clone;
+  color: var(--fg); font-weight: 500; padding: 0 .08em; white-space: nowrap;  /* a phrase on one line, its band unbroken */
   background: linear-gradient(transparent 62%, color-mix(in srgb, var(--accent) 30%, transparent) 62%);
 }
 .landing .ctas { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 0; }

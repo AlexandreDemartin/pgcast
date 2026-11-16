@@ -521,9 +521,9 @@ describe('upsert', () => {
     void one;
   });
 
-  test('updateValues takes param() of a string literal on a column of literals, as 6.6.1 does (#538)', () => {
-    // an enum, a time, a timetz and an int8 domain typed Int8String: in a function generic over the table, and over
-    // every table, the literal widened to string, so param() gave Parameter<string>
+  test('updateValues takes param() of a string literal on a column typed only by string or template literals, as 6.6.1 does (#538)', () => {
+    // an enum, time, timetz, a domain typed Int8String: in a function generic over the table, and over every table,
+    // the literal widened to string, so param() gave Parameter<string>. A union with number or Date (int8) took it
     const users = <T extends 'users'>(t: T, r: s.InsertableForTable<T>, c: s.ColumnForTable<T>) => {
       db.upsert(t, [r], c, { updateValues: { mood: db.param('sad') } });
       db.upsert(t, r, c, { updateValues: { mood: db.param('sad' as const) } });
@@ -535,8 +535,12 @@ describe('upsert', () => {
     expectTypeOf(q.run(pool)).resolves.not.toBeAny();
     const zoo = <T extends 'extra.type_zoo'>(t: T, r: s.InsertableForTable<T>, c: s.ColumnForTable<T>) => {
       db.upsert(t, r, c, { updateValues: { c_time: db.param('12:00:00') } });
+      db.upsert(t, r, c, { updateValues: { c_time: db.param('12:00:00' as const) } });
       db.upsert(t, r, c, { updateValues: { c_timetz: db.param('12:00:00+00') } });
+      db.upsert(t, r, c, { updateValues: { c_timetz: db.param('12:00:00+00' as const) } });
       db.upsert(t, r, c, { updateValues: { c_int8_domain: db.param('1') } });
+      db.upsert(t, r, c, { updateValues: { c_int8_domain: db.param('1' as const) } });
+      db.upsert(t, r, c, { updateValues: { c_int8: db.param('1') } });
       db.upsert(t, [r], c, { updateValues: { c_time: db.param('12:00:00'), c_timetz: db.param('12:00:00+00') } });
     };
     const two = <T extends 'extra.type_zoo' | 'users'>(t: T, r: s.InsertableForTable<T>, c: s.ColumnForTable<T>) => {

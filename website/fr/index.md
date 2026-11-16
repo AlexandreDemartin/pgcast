@@ -14,7 +14,7 @@ description: "Le Postgres que vous connaissez, avec toute la puissance de TypeSc
 
 <h1><span class="half">Le Postgres que vous connaissez,</span> <span class="half">avec toute la puissance de TypeScript<span class="op">::</span></span></h1>
 
-<strong>Aucune couche entre vous et Postgres</strong> : vous écrivez vos requêtes dans son vocabulaire naturel, et pgcast porte les types tirés de votre schéma <strong>jusqu’au résultat de chaque requête</strong>.<br>
+<span class="keep"><strong>Aucune couche entre vous et Postgres</strong> :</span> vous écrivez vos requêtes dans son vocabulaire naturel, et pgcast porte les types tirés de votre schéma <strong>jusqu’au résultat de chaque requête</strong>.<br>
 Pas d’ORM, pas de modèles, pas d’état caché.
 {.lede}
 
