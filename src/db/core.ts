@@ -378,7 +378,13 @@ const
 // An iterator or a generator, sync or async, is matched by %IteratorPrototype% or %AsyncIteratorPrototype% on its
 // chain, as each generator function has its own prototype, and only with no own enumerable key, so that a class
 // that extends `Iterator` with fields stays a filter, and one without is refused. So is a host iterator
-// (`URLSearchParams`'s), which inherits them too
+// (`URLSearchParams`'s), which inherits them too.
+// The `Segments` object that `Intl.Segmenter`'s `segment()` returns has no constructor to read a prototype from
+// (ECMA-402's %IntlSegmentsPrototype%), so its prototype is read from one, the first time a filter's prototype has
+// no `constructor` of its own: making a Segmenter as `zapatos/db` loads would cost every process about 7 ms, and
+// a plain object, an array or a class instance never pays it. It is kept only if it inherits `Object.prototype`
+// directly, as %IntlSegmentsPrototype% does: a runtime without `Intl.Segmenter`, or a stand-in whose `segment()`
+// throws or gives a plain object or an iterator, leaves it out, so that an iterator with own keys stays a filter
 const
   intl = (globalThis as any).Intl,
   temporal = (globalThis as any).Temporal,
@@ -407,19 +413,33 @@ const
     asyncGeneratorPrototype && Object.getPrototypeOf(asyncGeneratorPrototype),
   ].filter(Boolean);
 
+let segmentsPrototype: object | null | undefined;
+const isSegments = (prototype: object | null) => {
+  if (prototype === null || Object.prototype.hasOwnProperty.call(prototype, 'constructor')) return false;
+  if (segmentsPrototype === undefined) {
+    try {
+      const read = Object.getPrototypeOf(new intl.Segmenter().segment(''));
+      segmentsPrototype = Object.getPrototypeOf(read) === Object.prototype ? read : null;
+    } catch { segmentsPrototype = null; }
+  }
+  return prototype === segmentsPrototype;
+};
+
 const isIterator = (x: object) =>
   iteratorPrototypes.some(prototype => Object.prototype.isPrototypeOf.call(prototype, x)) && Object.keys(x).length === 0;
 
 const isBuiltin = (x: object) => {
   const prototype = Object.getPrototypeOf(x);
   return builtinNamespaces.has(x) || builtinPrototypes.has(prototype) ||
-    (prototype !== null && Object.getPrototypeOf(prototype) === typedArrayPrototype) || isIterator(x);
+    (prototype !== null && Object.getPrototypeOf(prototype) === typedArrayPrototype) || isIterator(x) ||
+    isSegments(prototype);
 };
 
 // an iterator's constructor gives no name (`''` for a generator's, `Object` before Node 22, which has no `Iterator`):
-// its tag does, `Array Iterator`, `Generator`
+// its tag does, `Array Iterator`, `Generator`; `Segments` has neither, and would read `Object`
 const builtinName = (x: object): string => builtinNamespaces.get(x) ??
-  (isIterator(x) ? Object.prototype.toString.call(x).slice(8, -1) : Object.getPrototypeOf(x).constructor.name);
+  (isIterator(x) ? Object.prototype.toString.call(x).slice(8, -1) :
+    isSegments(Object.getPrototypeOf(x)) ? 'Segments' : Object.getPrototypeOf(x).constructor.name);
 
 // raw(), cols() and vals() as a filter value, or in vals({…}) (so as a write value): Zapatos 6.6.1 sent them as JSON;
 // compiling raw() there as SQL would turn a caller's raw(input), a parameter until now, into an injection, so they throw
