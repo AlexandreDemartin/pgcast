@@ -147,6 +147,12 @@ Candidates for a check, a rule or a skill line.
 - #557: an exit code set by the process wrapper (`cli.ts`) is outside every in-process test; when it is the feature's promise, one test runs the CLI as a child process.
 - #557: a new CLI flag needs its line in `switching.md` § Go back, as a new config key does.
 - #557: to compare two builds' CLIs byte for byte, run both with `db.max: 1` (placeholder order) and mask the dist line numbers in stack headers.
+- #560: a new public function starts on the target behaviour of a pending deprecation, not on the deprecated default it would have to leave later (`check()` rejects by default, as 7.0's `generate()` will).
+- #560: in an extending tsconfig, `compilerOptions.paths` replaces the base's map: an entry added to `test/types/tsconfig.json` repeats the inherited ones.
+- #560: a probe database created by a short `node -e` is dropped by a concurrent `npm test` once its pid dies: create, use and drop it in one long-lived process.
+- #560: `zapatos/generate` has no counterpart of `website/check-reference.mjs`, so a new generate export's docs entry is not enforced by the build.
+- #560: a default set for one caller of a shared internal path is tested through each caller (the CLI too): the "default moved into `staleFiles()`" mutant died only by the CLI's test.
+- #560: in French, a query as the subject makes a possessive ambiguous (« sa promesse » read as the query's).
 
 ## Minors kept
 
@@ -176,3 +182,4 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #557 (form): `src/generate/cliConfig.ts` `cliArgs()`: a bare `--` (pnpm passes it on: `pnpm run gen -- --check`) is refused as `Unknown flag --`; skipping it only accepts more.
 - #557 (defect): `check()` is not exported from `zapatos/generate`: a script that calls `generate()` with a config built in code cannot check; follow-up issue under #52.
 - #557 (form): `website/first-query.md` "Run `npx pgcast` again after each migration" and `website/install.md` `::: warning Stale schema`: a link to `/generator#check`, EN and FR.
+
