@@ -504,6 +504,22 @@ describe('upsert', () => {
     void one;
   });
 
+  test('characterization: in a function generic over the table, updateValues refuses param() of a string literal on an enum or time column, which 6.6.1 took (#538)', () => {
+    // the literal widens to string, so param() gives Parameter<string>; a const assertion or a type argument keeps it
+    const one = <T extends 'users'>(t: T, r: s.InsertableForTable<T>, c: s.ColumnForTable<T>) => {
+      // @ts-expect-error param() of an enum label, until #538
+      db.upsert(t, r, c, { updateValues: { mood: db.param('sad') } });
+      db.upsert(t, r, c, { updateValues: { mood: db.param('sad' as const) } });
+      db.upsert(t, r, c, { updateValues: { mood: db.param<s.mood>('sad') } });
+    };
+    const zoo = <T extends 'extra.type_zoo'>(t: T, r: s.InsertableForTable<T>, c: s.ColumnForTable<T>) => {
+      // @ts-expect-error param() of a time string, until #538
+      db.upsert(t, r, c, { updateValues: { c_time: db.param('12:00:00') } });
+      db.upsert(t, r, c, { updateValues: { c_time: db.param('12:00:00' as const) } });
+    };
+    void one; void zoo;
+  });
+
   test('upsertRequiresSameKeys: an optional boolean of Config and setConfig', () => {
     db.setConfig({ upsertRequiresSameKeys: true });
     expectTypeOf(db.getConfig().upsertRequiresSameKeys).toEqualTypeOf<boolean | undefined>();
