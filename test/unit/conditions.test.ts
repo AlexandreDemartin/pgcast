@@ -863,6 +863,23 @@ describe('exists() and isInSelect()', () => {
     });
   });
 
+  it('names compare as Postgres truncates them: the first 63 bytes, cut at a character\'s end', () => {
+    const r = (n: number) => 'r'.repeat(n);
+    const refusal = (p: string, alias: string) => thrown(() => exists('users', { manager_id: parent('id') }, { parent: p, alias }));
+    expect({
+      past63: refusal(`${r(63)}a`, `${r(63)}b`),
+      // é and è are 2 bytes each: 62 + 2 is past 63, so Postgres keeps the 62 r's of each, though each is 63 characters
+      past63Bytes: refusal(`${r(62)}é`, `${r(62)}è`),
+      unicodePast63: refusal(`"public".U&"${r(63)}\\0061"`, `${r(63)}b`),
+      within63: refusal(`${r(62)}a`, `${r(62)}b`),
+    }).toEqual({
+      past63: ownName('exists', `${r(63)}a`, r(63)),
+      past63Bytes: ownName('exists', `${r(62)}é`, r(62)),
+      unicodePast63: ownName('exists', `"public".U&"${r(63)}\\0061"`, r(63)),
+      within63: 'compiled',
+    });
+  });
+
   it('the name check stays fast on a long run of doubled quotes', () => {
     const name = `${'a""'.repeat(100_000)}"`;
     expect(exists('users', db.all, { parent: name }).compile().text).toBe('EXISTS (SELECT 1 FROM "users")');

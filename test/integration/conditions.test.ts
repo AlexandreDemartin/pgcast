@@ -460,6 +460,28 @@ describe('exists() and isInSelect() (note 006 § Replays)', () => {
     expect(await names(exists('extra.articles', { author_id: parent('id') }, { parent: 'users', alias: 'a' }))).toEqual(['Ada', 'Bob']);
   });
 
+  it('names past 63 bytes: Postgres reads each as its first 63, cut at a character\'s end, so exists() refuses two that meet there', async () => {
+    const r = (n: number) => 'r'.repeat(n);
+    const byHand = async (outer: string, inner: string) => (await t.client.query(
+      `SELECT display_name FROM "users" AS ${outer} WHERE EXISTS (SELECT 1 FROM "users" AS ${inner} WHERE "manager_id" = ${outer}."id") ORDER BY id`,
+    )).rows.map(row => row.display_name);
+    expect({
+      within63: await byHand(`"${r(62)}a"`, `"${r(62)}b"`),
+      past63: await byHand(`"${r(63)}a"`, `"${r(63)}b"`),
+      past63Bytes: await byHand(`"${r(62)}é"`, `"${r(62)}è"`),
+      unicodePast63: await byHand(`U&"${r(63)}\\0061"`, `"${r(63)}b"`),
+    }).toEqual({ within63: ['Ada'], past63: [], past63Bytes: [], unicodePast63: [] });
+    const refused = (p: string, name: string) =>
+      `\`exists()\` was given \`parent: '${p}'\`, which names "${name}", the subquery's own name, so Postgres would read \`parent()\` as a column of the subquery's row: give the subquery another name with the \`alias\` option.`;
+    const select = (outer: string, inner: string) => db.select('users', exists('users', { manager_id: parent('id') }, { parent: outer, alias: inner }) as any,
+      { columns: ['display_name'], alias: outer, order: { by: 'id', direction: 'ASC' } });
+    expect({
+      within63: (await select(`${r(62)}a`, `${r(62)}b`).run(t.client)).map(u => u.display_name),
+      past63: await rejectsBeforeAnyQuery(select(`${r(63)}a`, `${r(63)}b`)),
+      past63Bytes: await rejectsBeforeAnyQuery(select(`${r(62)}é`, `${r(62)}è`)),
+    }).toEqual({ within63: ['Ada'], past63: refused(`${r(63)}a`, r(63)), past63Bytes: refused(`${r(62)}é`, r(62)) });
+  });
+
   it('users who review no article: not(exists()) finds them, not(isInSelect()) finds none, as a NULL reviewer_id makes NOT IN match nothing', async () => {
     expect(await names(not(exists('extra.articles', { reviewer_id: parent('id') }, { parent: 'users' })))).toEqual(['Ada', 'Cyd']);
     expect(await names({ id: not(isInSelect('extra.articles', all, 'reviewer_id')) })).toEqual([]);
