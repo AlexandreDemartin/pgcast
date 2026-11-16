@@ -376,6 +376,12 @@ describe('upsert', () => {
     class Premiere extends Date { }
     // @ts-expect-error vals() of a subclass of Date
     db.upsert('users', row, 'email', { updateValues: { created_at: db.vals(new Premiere()) } });
+    // a Date with one own enumerable field compiles to `ROW(…, $2)` and stores that field, under 6.6.1 too
+    class Stamp extends Date { iso = '2021-06-01T00:00:00Z'; }
+    // @ts-expect-error vals() of a subclass of Date with a field of its own
+    db.upsert('users', row, 'email', { updateValues: { created_at: db.vals(new Stamp()) } });
+    // @ts-expect-error vals() of a Date given a field
+    db.upsert('users', row, 'email', { updateValues: { created_at: db.vals(Object.assign(date, { iso: '2021-06-01T00:00:00Z' })) } });
     const zoo = { c_text: 'a' };
     // @ts-expect-error cols() of a Buffer, on a bytea column
     db.upsert('extra.type_zoo', zoo, 'id', { updateValues: { c_bytea: db.cols(Buffer.from('a')) } });
@@ -411,10 +417,11 @@ describe('upsert', () => {
     db.upsert('users', row, 'email', { updateValues: { created_at: db.vals(unknown) } });
   });
 
-  test('characterization: updateValues takes cols() and vals() of a primitive on a column typed any', () => {
-    // a zapatos/custom placeholder left as generated is any, so the whole slot is any and refuses nothing.
-    // Its vals(new Date()) line went in #514, which refuses it: it compiled to `ROW(…, )`, 42601
+  test('characterization: updateValues takes cols() and vals() of a primitive or a Date on a column typed any', () => {
+    // a zapatos/custom placeholder left as generated is any, so the whole slot is any and refuses nothing, #514's
+    // Date and Buffer too: vals(new Date()) compiles to `ROW(…, )`, 42601, as under 6.6.1
     db.upsert('extra.type_zoo', { c_text: 'a' }, 'id', { updateValues: { c_bit: db.cols('x'), c_point: db.vals(1) } });
+    db.upsert('extra.type_zoo', { c_text: 'a' }, 'id', { updateValues: { c_point: db.vals(new Date()), c_bit: db.cols(Buffer.from('a')) } });
   });
 
   test('upsertRequiresSameKeys: an optional boolean of Config and setConfig', () => {
