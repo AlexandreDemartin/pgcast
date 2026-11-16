@@ -6,7 +6,7 @@ Released under the MIT licence: see LICENCE file
 
 import * as fs from 'fs';
 import { finaliseConfig, Config } from './config';
-import { outputFiles, warnAfterOutput } from './outputFiles';
+import { outputFiles, staleFiles, upToDate, warnAfterOutput } from './outputFiles';
 
 
 /**
@@ -49,4 +49,26 @@ export const generate = async (suppliedConfig: Config) => {
   }
 
   warnAfterOutput(suppliedConfig, config);
+};
+
+/**
+ * Compare the files `generate()` would write with those on disk, writing nothing, as the CLI's `--check` does: each
+ * that differs or is missing goes to `warningListener` (`Out of date: <path>`, `Missing: <path>`); none, one line to
+ * `progressListener`. A placeholder counts only when missing: it is yours to edit.
+ * @param suppliedConfig An object approximately matching `zapatosconfig.json`.
+ * @returns `true` when the files on disk are up to date.
+ */
+export const check = async (suppliedConfig: Config) => {
+  const
+    config = finaliseConfig(suppliedConfig),
+    log = config.progressListener === true ? console.log :
+      config.progressListener || (() => void 0),
+    warn = config.warningListener === true ? console.log :
+      config.warningListener || (() => void 0),
+
+    { folderTargetPath, lines } = await staleFiles(suppliedConfig);
+
+  if (lines.length === 0) log(upToDate(folderTargetPath));
+  for (const line of lines) warn(line);
+  return lines.length === 0;
 };

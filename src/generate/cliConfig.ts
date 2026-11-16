@@ -9,7 +9,7 @@ Released under the MIT licence: see LICENCE file
 import * as fs from 'fs';
 import * as path from 'path';
 import { finaliseConfig, type Config } from './config';
-import { check } from './outputFiles';
+import { staleFiles, upToDate } from './outputFiles';
 import { generate } from './write';
 
 // kept out of zapatos/generate's exports, like moduleNames.ts; moved here from cli.ts, to be tested
@@ -86,7 +86,7 @@ export const cliArgs = (args: string[]) => {
 };
 
 /**
- * Run the CLI on its arguments in `dir`: `generate()`, or with `--check` `check()`, after a note through
+ * Run the CLI on its arguments in `dir`: `generate()`, or with `--check` the comparison of `check()`, after a note through
  * `warningListener` for each flag it ignores. Resolve to its exit code.
  */
 export const runCli = async (args: string[], dir = '.') => {
@@ -103,5 +103,14 @@ export const runCli = async (args: string[], dir = '.') => {
     await generate(config);
     return 0;
   }
-  return await check(config) ? 0 : 1;
+
+  // what check() compares, printed whatever the listeners say, with how to write the files
+  const { folderTargetPath, lines } = await staleFiles(config);
+  if (lines.length === 0) {
+    console.log(upToDate(folderTargetPath));
+    return 0;
+  }
+  for (const line of lines) console.log(line);
+  console.log(`Run the generator without --check to write ${lines.length === 1 ? 'it' : 'them'}.`);
+  return 1;
 };
