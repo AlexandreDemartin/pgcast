@@ -1,5 +1,5 @@
 ---
-english: fccc2751fb3f
+english: 1d34a2412122
 ---
 
 # Assistants IA
@@ -129,7 +129,7 @@ npx tsc --noEmit
 Ou le script de votre projet, avec `npm run`. Une colonne que l’assistant a inventée le fait échouer, tout comme une chaîne venue d’une requête HTTP utilisée comme nom :
 
 ```ts twoslash
-// @errors: 2353 2345
+// @errors: 2353 2769
 import * as db from 'zapatos/db';
 // ---cut---
 declare const sort: string;  // from the request

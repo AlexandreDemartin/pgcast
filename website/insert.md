@@ -213,7 +213,7 @@ db.update(table, values, where, options?)
 Update the rows that match, and return them. The arguments come in the order of the SQL: `SET`, then `WHERE`.
 
 - `table`: a table of the schema.
-- `values`: an `Updatable`, with at least one key. A `sql` fragment is written as SQL, where `db.self` is the column, and so is a condition such as [`conditions.add()`](/conditions#conditions.add); written inline, it may need a type argument ([`Constraint`](/sql-template#type-arguments)). `raw()`, `cols()`, `vals()` and `parent()` throw, as for [`insert()`](#insert). An `undefined` value is `NULL` ([An `undefined` value](#undefined-values)).
+- `values`: an `Updatable`, with at least one key. A `sql` fragment is written as SQL, where `db.self` is the column, and so is a condition such as [`conditions.add()`](/conditions#conditions.add). `raw()`, `cols()`, `vals()` and `parent()` throw, as for [`insert()`](#insert). An `undefined` value is `NULL` ([An `undefined` value](#undefined-values)).
 - `where`: a `Whereable`, or a `sql` fragment ([Conditions](/conditions)).
 - `options`: `returning` and `extras`, as for [`insert()`](#insert-options).
 

@@ -125,7 +125,7 @@ npx tsc --noEmit
 Or your project's own script, through `npm run`. A column the assistant made up fails, and so does a string from a request used as a name:
 
 ```ts twoslash
-// @errors: 2353 2345
+// @errors: 2353 2769
 import * as db from 'zapatos/db';
 // ---cut---
 declare const sort: string;  // from the request

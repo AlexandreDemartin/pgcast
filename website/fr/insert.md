@@ -1,5 +1,5 @@
 ---
-english: fe1a18f1e32f
+english: d8606df1eae1
 ---
 
 # Écritures
@@ -217,7 +217,7 @@ db.update(table, values, where, options?)
 Met à jour les lignes qui correspondent, et les renvoie. Les arguments viennent dans l’ordre du SQL : `SET`, puis `WHERE`.
 
 - `table` : une table du schéma.
-- `values` : un `Updatable`, avec au moins une clé. Un fragment `sql` est écrit comme SQL, où `db.self` est la colonne, de même qu’une condition comme [`conditions.add()`](/fr/conditions#conditions.add) ; écrit en ligne, ce fragment peut demander un argument de type ([`Constraint`](/fr/sql-template#type-arguments)). `raw()`, `cols()`, `vals()` et `parent()` lèvent une erreur, comme pour [`insert()`](#insert). Une valeur `undefined` est `NULL` ([Une valeur `undefined`](#undefined-values)).
+- `values` : un `Updatable`, avec au moins une clé. Un fragment `sql` est écrit comme SQL, où `db.self` est la colonne, de même qu’une condition comme [`conditions.add()`](/fr/conditions#conditions.add). `raw()`, `cols()`, `vals()` et `parent()` lèvent une erreur, comme pour [`insert()`](#insert). Une valeur `undefined` est `NULL` ([Une valeur `undefined`](#undefined-values)).
 - `where` : un `Whereable`, ou un fragment `sql` ([Conditions](/fr/conditions)).
 - `options` : `returning` et `extras`, comme pour [`insert()`](#insert-options).
 

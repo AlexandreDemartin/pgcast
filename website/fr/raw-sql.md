@@ -1,5 +1,5 @@
 ---
-english: 9c0059eb7dcb
+english: ea0bc9cfb1cb
 ---
 
 # SQL brut
@@ -32,7 +32,7 @@ Quand aucun raccourci n’écrit la requête dont vous avez besoin (une jointure
 Un nom que le type ne connaît pas ne compile pas : une requête qui nomme `screenings` demande `s.screenings.SQL` dans son premier argument de type.
 
 ```ts twoslash
-// @errors: 2345
+// @errors: 2769
 import * as db from 'zapatos/db';
 import type * as s from 'zapatos/schema';
 // ---cut---
@@ -68,7 +68,7 @@ Une valeur venue d’un appelant (un formulaire, une URL, une ligne lue ailleurs
 Une chaîne seule entre `${…}` est un nom, pas une valeur, donc le type la refuse :
 
 ```ts twoslash
-// @errors: 2345
+// @errors: 2769
 import * as db from 'zapatos/db';
 import type * as s from 'zapatos/schema';
 // ---cut---
