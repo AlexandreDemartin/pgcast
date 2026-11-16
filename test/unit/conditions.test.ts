@@ -621,34 +621,37 @@ describe('Default, self, raw, cols and vals as the value of a condition', () => 
     expect(Object.fromEntries(Object.entries(items).map(([name, item]) => [name, thrown(dc.eqAny(['Bob', item]))])))
       .toMatchInlineSnapshot(`
         {
-          "Default": "\`eqAny()\` sends its array as one parameter, so each item is a plain value, not \`db.param()\`, a \`sql\` fragment nor \`db.parent()\`: give the value itself, or use \`isIn()\`, which takes those.",
+          "Default": "\`eqAny()\` sends its array as one parameter, so each item is a plain value, not \`db.Default\`: give a value.",
           "array": "\`eqAny()\` sends its array as one parameter, which reads an array item as more items: on an array column, use \`isIn()\`; on a \`jsonb\` column, give the item as JSON text, \`JSON.stringify(item)\`.",
-          "cols": "\`eqAny()\` sends its array as one parameter, so each item is a plain value, not \`db.param()\`, a \`sql\` fragment nor \`db.parent()\`: give the value itself, or use \`isIn()\`, which takes those.",
-          "fragment": "\`eqAny()\` sends its array as one parameter, so each item is a plain value, not \`db.param()\`, a \`sql\` fragment nor \`db.parent()\`: give the value itself, or use \`isIn()\`, which takes those.",
+          "cols": "\`eqAny()\` sends its array as one parameter, so each item is a plain value, not \`db.cols()\`: give a value.",
+          "fragment": "\`eqAny()\` sends its array as one parameter, so each item is a plain value, not a \`sql\` fragment: give the value itself, or use \`isIn()\`, which takes it.",
           "nested": "\`eqAny()\` sends its array as one parameter, which reads an array item as more items: on an array column, use \`isIn()\`; on a \`jsonb\` column, give the item as JSON text, \`JSON.stringify(item)\`.",
-          "param": "\`eqAny()\` sends its array as one parameter, so each item is a plain value, not \`db.param()\`, a \`sql\` fragment nor \`db.parent()\`: give the value itself, or use \`isIn()\`, which takes those.",
-          "parent": "\`eqAny()\` sends its array as one parameter, so each item is a plain value, not \`db.param()\`, a \`sql\` fragment nor \`db.parent()\`: give the value itself, or use \`isIn()\`, which takes those.",
-          "raw": "\`eqAny()\` sends its array as one parameter, so each item is a plain value, not \`db.param()\`, a \`sql\` fragment nor \`db.parent()\`: give the value itself, or use \`isIn()\`, which takes those.",
-          "self": "\`eqAny()\` sends its array as one parameter, so each item is a plain value, not \`db.param()\`, a \`sql\` fragment nor \`db.parent()\`: give the value itself, or use \`isIn()\`, which takes those.",
-          "vals": "\`eqAny()\` sends its array as one parameter, so each item is a plain value, not \`db.param()\`, a \`sql\` fragment nor \`db.parent()\`: give the value itself, or use \`isIn()\`, which takes those.",
+          "param": "\`eqAny()\` sends its array as one parameter, so each item is a plain value, not \`db.param()\`: give the value itself, or use \`isIn()\`, which takes it.",
+          "parent": "\`eqAny()\` sends its array as one parameter, so each item is a plain value, not \`db.parent()\`: give the value itself, or use \`isIn()\`, which takes it.",
+          "raw": "\`eqAny()\` sends its array as one parameter, so each item is a plain value, not \`db.raw()\`: give a value.",
+          "self": "\`eqAny()\` sends its array as one parameter, so each item is a plain value, not \`db.self\`: give a value.",
+          "vals": "\`eqAny()\` sends its array as one parameter, so each item is a plain value, not \`db.vals()\`: give a value.",
         }
       `);
   });
 
   it('eqAny given a list that is not an array throws when compiled, saying what to do', () => {
-    const lists = { Set: new Set([1]), string: '5', number: 5, null: null, undefined, Default,
-      param: param([1]), fragment: sql`ARRAY[1]`, raw: raw("'{1}'") };
+    const lists = { Set: new Set([1]), string: '5', number: 5, null: null, undefined, Default, self,
+      param: param([1]), fragment: sql`ARRAY[1]`, raw: raw("'{1}'"), cols: cols(['id']), vals: vals([1]) };
     expect(Object.fromEntries(Object.entries(lists).map(([name, x]) => [name, thrown(dc.eqAny(x as any))]))).toMatchInlineSnapshot(`
       {
-        "Default": "\`eqAny()\` takes an array of values, not \`db.param()\` of one nor a \`sql\` fragment: write \`eqAny(values)\`; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
+        "Default": "\`eqAny()\` takes an array of values, not \`db.Default\`: write \`eqAny(values)\`; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
         "Set": "\`eqAny()\` takes an array, not \`Set\`: make one with \`eqAny([...values])\`, or \`Array.from(values)\` for an array-like object.",
-        "fragment": "\`eqAny()\` takes an array of values, not \`db.param()\` of one nor a \`sql\` fragment: write \`eqAny(values)\`; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
+        "cols": "\`eqAny()\` takes an array of values, not \`db.cols()\`: write \`eqAny(values)\`; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
+        "fragment": "\`eqAny()\` takes an array of values, not a \`sql\` fragment: write \`eqAny(values)\`; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
         "null": "\`eqAny()\` takes an array, not \`null\`: for one value, write \`eqAny([value])\`.",
         "number": "\`eqAny()\` takes an array, not \`number\`: for one value, write \`eqAny([value])\`.",
-        "param": "\`eqAny()\` takes an array of values, not \`db.param()\` of one nor a \`sql\` fragment: write \`eqAny(values)\`; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
-        "raw": "\`eqAny()\` takes an array of values, not \`db.param()\` of one nor a \`sql\` fragment: write \`eqAny(values)\`; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
+        "param": "\`eqAny()\` takes an array of values, not \`db.param()\`: write \`eqAny(values)\`; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
+        "raw": "\`eqAny()\` takes an array of values, not \`db.raw()\`: write \`eqAny(values)\`; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
+        "self": "\`eqAny()\` takes an array of values, not \`db.self\`: write \`eqAny(values)\`; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
         "string": "\`eqAny()\` takes an array, not \`string\`: for one value, write \`eqAny([value])\`.",
         "undefined": "\`eqAny()\` takes an array, not \`undefined\`: for one value, write \`eqAny([value])\`.",
+        "vals": "\`eqAny()\` takes an array of values, not \`db.vals()\`: write \`eqAny(values)\`; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
       }
     `);
   });
