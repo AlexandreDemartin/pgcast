@@ -196,9 +196,12 @@ export const definitionForRelationInSchema = async (
       updatableType = tsTypeForPgType(udtName, typeEnums, 'Updatable', udtConfig, inlineEnums);
 
     // an interval, an array of one or a domain over either, whose placeholder holds what pg returns, as generated; under
-    // another domain, or in an array of a domain, only where domainsTypedByContext types it by its base type
+    // another domain, or in an array of a domain, only where domainsTypedByContext types it by its base type, read as
+    // below: an array of a domain over interval[] is then no type it knows
+    const base = rootOf(row);
     if (config.intervalsTypedAsObjects == null &&  // left out, or null from JSON: false is a choice, a parser of your own
-      (isInterval({ schema: udtSchema, name: udtName }) || (config.domainsTypedByContext ?? false) && isInterval(rootOf(row)))) {
+      (isInterval({ schema: udtSchema, name: udtName }) || (config.domainsTypedByContext ?? false) &&
+        isInterval(base && { schema: base.schema, name: (base.isArray ? '_' : '') + base.name }))) {
       const type = domainName !== null ? `${domainSchema}.${domainName}` : udtName === 'interval' ? udtName :
         udtName === '_interval' ? 'interval[]' : `${udtSchema}.${udtName.slice(1)}[]`;
       intervalsAsText.push(`${schemaName}.${rel.name}.${column} (${type})`);
