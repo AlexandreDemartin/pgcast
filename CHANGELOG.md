@@ -6,6 +6,9 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 
 ## [Unreleased]
 
+### Added
+- `db.conditions.eqAny()`: `"col" = ANY($1)`, the whole array one parameter, so one query text for any length, where `isIn()` writes `IN ($1, $2, …)`, one per length, and past the 65,535 parameters a query can hold (#563). An empty array matches no row, with the same SQL; `parent('col')`, an array column of a `lateral`'s parent row, gives `= ANY("parent"."col")`; under `castArrayParamsToJson` the array is still sent as an array. A list that is not an array throws while compiling, as in `isIn()`, and so does an item that is an array, a `Parameter`, a `sql` fragment or `parent()`, which `pg` would send as more items or as JSON.
+
 ## [6.8.0] - 2026-11-16
 
 ### Security
@@ -24,7 +27,6 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
   - Unchanged: without a flag, the CLI's output, files and exit code.
 - `check()`, from `zapatos/generate`, runs the check of `--check` from code, for a script that calls `generate()` with a config built there (#559): given the same `Config`, it writes nothing, and resolves to `true` when the files are up to date, else `false`. It prints only through the listeners: each file that differs or is missing through `warningListener`, the line that says they are up to date through `progressListener`. A failed query rejects it with the error, with no note, `rejectOnQueryError` left out included: only `rejectOnQueryError: false` ends the process, as in `generate()`.
   - Unchanged: the CLI's output, files and exit code, with `--check` or without.
-- `db.conditions.eqAny()`: `"col" = ANY($1)`, the whole array one parameter, so one query text for any length, where `isIn()` writes `IN ($1, $2, …)`, one per length, and past the 65,535 parameters a query can hold (#563). An empty array matches no row, with the same SQL; `parent('col')`, an array column of a `lateral`'s parent row, gives `= ANY("parent"."col")`; under `castArrayParamsToJson` the array is still sent as an array. A list that is not an array throws while compiling, as in `isIn()`, and so does an item that is an array, a `Parameter`, a `sql` fragment or `parent()`, which `pg` would send as more items or as JSON.
 - Releases publish from CI with npm trusted publishing, on a pushed tag `v<version>`, each with a provenance attestation that ties the tarball to its commit and workflow run (`.github/workflows/release.yml`). CI pins every action by commit SHA and keeps no git credentials after checkout.
 
 ## [6.7.2] - 2026-11-16
