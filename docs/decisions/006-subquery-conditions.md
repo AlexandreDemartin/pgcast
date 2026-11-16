@@ -70,7 +70,7 @@ None of them infers the outer table from where the condition sits.
 
 ### What #562 builds
 
-In `src/db/conditions.ts`, with nothing changed in `core.ts`:
+In `src/db/conditions.ts`, with nothing changed in `core.ts` (signatures compiled against the fixture's generated schema):
 
 ```ts
 exists<T extends Table>(
@@ -79,7 +79,7 @@ exists<T extends Table>(
   options?: { parent?: string; alias?: string },
 ): SQLFragment<boolean, never>
 
-isInSelect<T extends Table, C extends ColumnForTable<T>>(
+isInSelect<T extends Table, C extends keyof SelectableForTable<T>>(
   table: T,
   where: WhereableForTable<T> | SQLFragment<any> | AllType,
   column: C,
@@ -92,7 +92,7 @@ isInSelect<T extends Table, C extends ColumnForTable<T>>(
 - **`parent`**: sets the subquery's `parentTable` mark, so `parent('id')` in its `where` compiles to `"users"."id"`. It names the outer `FROM` item as the outer query names it: its alias if it has one, otherwise its table (`'extra.articles'` gives `"extra"."articles"."id"`), as `lateral` does. Without `parent`, the mark is inherited as for any fragment: in a `lateral` subquery `parent()` is the lateral's parent, and at the top level it throws, as today.
 - **`alias`**: `AS <alias>` after the table, as `select()`'s `alias` writes it. When `parent` and `table` end with the same name (`users`, `public.users`) and no `alias` is given, the condition is refused. The refusal is a fragment that throws as it compiles, so `run()` rejects before any query, as the conditions' `refused()` does. The error names both and asks for an alias. Without it, the replay shows the wrong rows, silently.
 - **`self`** has no meaning in the subquery's `where`. The subquery fragment compiles it with no current column, so `self` throws as it does in `select()`'s `where`. This is done on the inner fragment, by a `compile` that drops the column, as `select()` overrides `compile` for `selectExactlyOneChecksForSecondRow`, so a `copy()` of the condition keeps it. Otherwise the outer key, unqualified inside the subquery, would resolve to an inner column.
-- **Types**: `exists()` has the constraint `never`, so it fits under any key, in `and()`, `or()` and `not()`, or as the `where` itself. The docs show `and()`. `EXISTS` is never `NULL`: `boolean`. `isInSelect()` is typed on the subquery column's `Selectable` type, `null` excluded as `isDistinctFrom()` excludes it, and gives `boolean | null`.
+- **Types**: `exists()` has the constraint `never`, so it fits under any key, in `and()`, `or()` and `not()`, or as the `where` itself. The docs show `and()`. `EXISTS` is never `NULL`: `boolean`. `isInSelect()` is typed on the subquery column's `Selectable` type, `null` excluded as `isDistinctFrom()` excludes it, and gives `boolean | null`. Its `C` is a `keyof SelectableForTable<T>`: `ColumnForTable<T>` is a lookup, which cannot index it (TS2536).
 - **No `isNotInSelect()` and no `notExists()`** (no synonym): the anti-join is `not(exists(…))`. The JSDoc of `isInSelect()` says that `not()` of it matches no row once the subquery returns a `NULL` (replay above).
 - **Tests** (issue #562, **Done when**): the SQL of each line of § Replays, frozen; real execution; the injection matrix on `table`, `column`, `parent`, `alias` and the `where` values; the alias refusal; `self` refused; `copy()` keeping `parent`; types positive and negative; `bench:types`.
 
