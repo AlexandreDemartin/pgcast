@@ -3873,13 +3873,16 @@ declare module 'pgcast/custom' {
 });
 
 describe('the CLI with --check (#556)', () => {
-  // a schema of its own, committed to this file's database: a domain gives a placeholder and custom/index.d.ts
+  // schemas of their own, committed to this file's database: a domain gives a placeholder and custom/index.d.ts;
+  // generate_check_plain has no custom type, so neither
   beforeAll(() => t.pool.query(`
     CREATE SCHEMA generate_check;
     CREATE DOMAIN generate_check.scene_title AS text;
     CREATE TABLE generate_check.scenes (id int PRIMARY KEY, title generate_check.scene_title);
+    CREATE SCHEMA generate_check_plain;
+    CREATE TABLE generate_check_plain.takes (id int PRIMARY KEY, number int);
   `));
-  afterAll(() => t.pool.query('DROP SCHEMA generate_check CASCADE'));
+  afterAll(() => t.pool.query('DROP SCHEMA generate_check, generate_check_plain CASCADE'));
 
   let dir: string, outDir: string, log: MockInstance<typeof console.log>;
   beforeEach(() => {
@@ -3996,6 +3999,14 @@ describe('the CLI with --check (#556)', () => {
     expect(await check()).toEqual({
       code: 1, printed: [`Missing: <out>/${placeholderFile}`, 'Run the generator without --check to write it.'],
     });
+  });
+
+  it('exits with 0 on a schema with no custom type, comparing no custom/index.d.ts, which no run writes', async () => {
+    const plain = { schemas: { generate_check_plain: all } };
+    await generated(plain);
+    expect(files(outDir)).toEqual([schemaFile]);
+    expect(await check(['--check', json(plain)])).toEqual({ code: 0, printed: [upToDate] });
+    expect(existsSync(join(outDir, 'zapatos/custom'))).toBe(false);
   });
 
   it('exits with 1 and names every file before the first run, creating no folder', async () => {
