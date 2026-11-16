@@ -7,6 +7,8 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 ## [Unreleased]
 
 ### Fixed
+- With `enableCustomJSONParsingForLargeNumbers()`, a long `json` or `jsonb` number is checked in time linear in its length. On Zapatos 6.6.1 and pgcast up to 6.7.1, some long numbers took time quadratic in their number of digits.
+  - Unchanged: what each number parses to.
 - A `Buffer` row, or a built-in row with no own enumerable key, among the rows of `insert()` or `upsert()` throws while compiling, as a single row has since #529, so `.run()` rejects with a plain `Error` before any query (#543). Zapatos 6.6.1 copied each row into a plain object before compiling it.
   - Changed: `` insert('films', [{ title: 'Ink' }, new Date()]) `` compiled to `VALUES ($1), (DEFAULT)` and wrote a row of defaults; it now rejects with the message of `vals()`, `` `db.vals()` takes an object or an array, not a built-in `Date` with no own enumerable key, … ``, or that of `cols()` for the first row.
   - Changed: a `Buffer` row gave its byte indexes as columns, `("0")` for one byte, which Postgres refused unless the table has them (42703); it now rejects, alone in an array too. Its bytes are no longer listed: beside a row, a 10 MB `Buffer` took 16 s in `insert()` and ran out of memory in `upsert()`; on its own, it took about a second in `insert()` and `update()`, and 18 s in `upsert()`, before throwing. It now throws in under a millisecond.
