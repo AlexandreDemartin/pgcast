@@ -105,3 +105,86 @@ export const isPOJO = (x: any) =>
   x !== null &&
   x.constructor === Object &&
   x.toString() === '[object Object]';
+
+// built-in objects that are no filter, by their exact prototype, so that a class instance never is one, even of
+// a class that extends a built-in. Zapatos 6.6.1 compiled them as Whereables of their own keys: none (`TRUE`,
+// every row), or indexes (`"0" = $1`). A typed array's prototype is one whose own prototype is %TypedArray%'s:
+// `Uint8Array.prototype`, `Float64Array.prototype`…, and not a subclass's (`Buffer` is listed for this reason).
+// `AggregateError`, `WeakRef`, `FinalizationRegistry` (ES2021, past the lib's ES2019 types), `SuppressedError`,
+// `DisposableStack`, `AsyncDisposableStack` (Node 24) and `SharedArrayBuffer` (which a runtime may leave out) are
+// read from `globalThis`, where the runtime has them, as are the boxes `BigInt` (ES2020) and `Symbol`, the eight
+// `Temporal` constructors (Node 26; Node 22 with `--harmony-temporal`, whose `TimeZone` and `Calendar`, dropped
+// from the proposal, are left out) and the `Intl` ones (`DurationFormat` from Node 23). ECMAScript built-ins and
+// ECMA-402's `Intl` only, no host object (`URL`, `Blob`).
+// A namespace object (`Math`, `JSON`, `Reflect`, `Atomics`, `Intl`, and `Temporal` and `Temporal.Now` where the
+// runtime has them) is matched by identity, as its prototype is `Object.prototype`, a plain object's, and its
+// functions are no enumerable keys, and named by its path. Each is read from `globalThis`, so that a runtime
+// without one still loads `zapatos/db`; `console` and `WebAssembly` are host APIs.
+// An iterator or a generator, sync or async, is matched by %IteratorPrototype% or %AsyncIteratorPrototype% on its
+// chain, as each generator function has its own prototype, and only with no own enumerable key, so that a class
+// that extends `Iterator` with fields stays a filter, and one without is refused. So is a host iterator
+// (`URLSearchParams`'s), which inherits them too.
+// The `Segments` object that `Intl.Segmenter`'s `segment()` returns has no constructor to read a prototype from
+// (ECMA-402's %IntlSegmentsPrototype%), so its prototype is read from one, the first time a filter's prototype has
+// no `constructor` of its own: making a Segmenter as `zapatos/db` loads would cost every process about 7 ms, and
+// a plain object, an array or a class instance never pays it. It is kept only if it inherits `Object.prototype`
+// directly, as %IntlSegmentsPrototype% does: a runtime without `Intl.Segmenter`, or a stand-in whose `segment()`
+// throws or gives a plain object or an iterator, leaves it out, so that an iterator with own keys stays a filter
+const
+  intl = (globalThis as any).Intl,
+  temporal = (globalThis as any).Temporal,
+  builtinPrototypes = new Set<unknown>([
+    Date, Map, Set, WeakMap, WeakSet, RegExp, Promise, ArrayBuffer, DataView, Buffer, Number, String, Boolean,
+    Error, EvalError, RangeError, ReferenceError, SyntaxError, TypeError, URIError,
+    (globalThis as any).AggregateError, (globalThis as any).SuppressedError,
+    (globalThis as any).WeakRef, (globalThis as any).FinalizationRegistry, (globalThis as any).SharedArrayBuffer,
+    (globalThis as any).DisposableStack, (globalThis as any).AsyncDisposableStack,
+    (globalThis as any).BigInt, (globalThis as any).Symbol,
+    intl?.Collator, intl?.DateTimeFormat, intl?.DisplayNames, intl?.DurationFormat, intl?.ListFormat, intl?.Locale,
+    intl?.NumberFormat, intl?.PluralRules, intl?.RelativeTimeFormat, intl?.Segmenter,
+    temporal?.Duration, temporal?.Instant, temporal?.PlainDate, temporal?.PlainDateTime, temporal?.PlainMonthDay,
+    temporal?.PlainTime, temporal?.PlainYearMonth, temporal?.ZonedDateTime,
+  ].filter(Boolean).map(builtin => builtin.prototype)),
+  builtinNamespaces = new Map<unknown, string>(Object.entries({
+    Math: (globalThis as any).Math, JSON: (globalThis as any).JSON, Reflect: (globalThis as any).Reflect,
+    Atomics: (globalThis as any).Atomics, Intl: intl, Temporal: temporal, 'Temporal.Now': temporal?.Now,
+  }).filter(([, namespace]) => namespace).map(([path, namespace]) => [namespace, path])),
+  typedArrayPrototype = Object.getPrototypeOf(Uint8Array.prototype),
+  // transpiled below ES2018, `async function* () {}` is a plain function, with no `.prototype` to read: then
+  // %AsyncIteratorPrototype% is left out, rather than `zapatos/db` throwing as it loads
+  asyncGeneratorPrototype = Object.getPrototypeOf(async function* () {}).prototype,
+  iteratorPrototypes = [
+    Object.getPrototypeOf(Object.getPrototypeOf([][Symbol.iterator]())),
+    asyncGeneratorPrototype && Object.getPrototypeOf(asyncGeneratorPrototype),
+  ].filter(Boolean);
+
+let segmentsPrototype: object | null | undefined;
+const isSegments = (prototype: object | null) => {
+  if (prototype === null || Object.prototype.hasOwnProperty.call(prototype, 'constructor')) return false;
+  if (segmentsPrototype === undefined) {
+    try {
+      const read = Object.getPrototypeOf(new intl.Segmenter().segment(''));
+      segmentsPrototype = Object.getPrototypeOf(read) === Object.prototype ? read : null;
+    } catch { segmentsPrototype = null; }
+  }
+  return prototype === segmentsPrototype;
+};
+
+const isIterator = (x: object) =>
+  iteratorPrototypes.some(prototype => Object.prototype.isPrototypeOf.call(prototype, x)) && Object.keys(x).length === 0;
+
+export const isBuiltin = (x: object) => {
+  const prototype = Object.getPrototypeOf(x);
+  return builtinNamespaces.has(x) || builtinPrototypes.has(prototype) ||
+    (prototype !== null && Object.getPrototypeOf(prototype) === typedArrayPrototype) || isIterator(x) ||
+    isSegments(prototype);
+};
+
+// an iterator's constructor gives no name (`''` for a generator's, `Object` before Node 22, which has no `Iterator`):
+// its tag does, `Array Iterator`, `Generator`; `Segments` has neither, and would read `Object`
+export const builtinName = (x: object): string => builtinNamespaces.get(x) ??
+  (isIterator(x) ? Object.prototype.toString.call(x).slice(8, -1) :
+    isSegments(Object.getPrototypeOf(x)) ? 'Segments' : Object.getPrototypeOf(x).constructor.name);
+
+export const isRefusedBuffer = (x: object) => ArrayBuffer.isView(x) && Buffer.isBuffer(x) && isBuiltin(x);
+export const isKeylessBuiltin = (x: object, keys: readonly unknown[]) => keys.length === 0 && isBuiltin(x);
