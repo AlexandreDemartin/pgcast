@@ -6,6 +6,15 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 
 ## [Unreleased]
 
+## [6.7.1] - 2026-11-16
+
+### Security
+- The `Segments` object that an `Intl.Segmenter`'s `segment()` returns, interpolated as a `Whereable`, throws while compiling, so `.run()` rejects with a plain `Error` before any query, as the built-ins of #170 do: `` db.deletes('films', new Intl.Segmenter('en').segment('Metropolis') as any) `` compiled to `DELETE FROM "films" WHERE TRUE …` and deleted every row, on Zapatos 6.6.1 and pgcast 6.7.0 (#517).
+  - Its prototype, ECMA-402's `%IntlSegmentsPrototype%`, has no constructor, so the error names it by its ECMA-402 name, `` A built-in `Segments` ``; an object made from that prototype with `Object.create()` throws too.
+  - `zapatos/db` reads that prototype from a `new Intl.Segmenter()` the first time a filter's prototype has no constructor of its own, not as it loads, which would cost each process about 7 ms, and keeps it only if it inherits `Object.prototype` directly, as `%IntlSegmentsPrototype%` does; a runtime without `Intl.Segmenter`, or a stand-in whose `segment()` hands out an iterator, leaves it out, so an iterator with own keys still compiles them.
+  - The type refused it (TS2345).
+  - Unchanged: what it hands out (`containing(0)`, a plain object, compiles to its keys, `("index" = $1 AND "input" = $2 AND "segment" = $3)`; its iterator already threw, #426), a `Segments` of another realm (`TRUE`), and the SQL of every other call.
+
 ### Fixed
 - `cols()` and `vals()` of a built-in object with no own enumerable key, or of a `Buffer`, throw while compiling, so `.run()` rejects with a plain `Error` before any query, on a pool or a client (#529). Zapatos 6.6.1 compiled each as an object of its own keys: a `Date`, a `Map` or a `Promise` to nothing, and a `Buffer` to its byte indexes as names and its bytes as values, one parameter per byte.
   - Refused: each built-in that a `Whereable` refuses (#170) when it has no own enumerable key, a `Proxy` of one included, and a `Buffer`, empty or not, even with keys added. This applies in a `sql` template, a nested fragment, a `lateral` subquery, `upsert()` `updateValues`, `select()` `groupBy`, `count()` `columns`, and a row given to `insert()`, `upsert()` or `update()` on its own, not in an array. There, a built-in row with no key already threw "nothing to insert" or "nothing to update" at the call, and still does. In `groupBy` and `count()` `columns`, Postgres refused each before: `GROUP BY )` (42601) and `count()` (42809) for one with no key, `"0"` (42703) for a `Buffer`.
@@ -20,12 +29,6 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
     - A `Proxy` of a `Buffer` that holds bytes compiles as before, to its byte indexes and its bytes: it is no `ArrayBuffer` view, so only its prototype would tell it from a `Proxy` row, and neither check reads the prototype of a row with own keys.
     - Also as before: a class instance, a subclass of a built-in, a `PostgresInterval` (`vals()` of `{ hours: 2 }` is still `$1` with `2`), a built-in of another realm, and a primitive, which keeps its own message (#244).
     - A built-in row in an array of rows of `insert()` or `upsert()`, even of one row, is still spread into a plain object first (#543): a `Buffer` there gives its byte indexes as columns, and a `Date` none, a row of `DEFAULT`s beside other rows.
-### Security
-- The `Segments` object that an `Intl.Segmenter`'s `segment()` returns, interpolated as a `Whereable`, throws while compiling, so `.run()` rejects with a plain `Error` before any query, as the built-ins of #170 do: `` db.deletes('films', new Intl.Segmenter('en').segment('Metropolis') as any) `` compiled to `DELETE FROM "films" WHERE TRUE …` and deleted every row, on Zapatos 6.6.1 and pgcast 6.7.0 (#517).
-  - Its prototype, ECMA-402's `%IntlSegmentsPrototype%`, has no constructor, so the error names it by its ECMA-402 name, `` A built-in `Segments` ``; an object made from that prototype with `Object.create()` throws too.
-  - `zapatos/db` reads that prototype from a `new Intl.Segmenter()` the first time a filter's prototype has no constructor of its own, not as it loads, which would cost each process about 7 ms, and keeps it only if it inherits `Object.prototype` directly, as `%IntlSegmentsPrototype%` does; a runtime without `Intl.Segmenter`, or a stand-in whose `segment()` hands out an iterator, leaves it out, so an iterator with own keys still compiles them.
-  - The type refused it (TS2345).
-  - Unchanged: what it hands out (`containing(0)`, a plain object, compiles to its keys, `("index" = $1 AND "input" = $2 AND "segment" = $3)`; its iterator already threw, #426), a `Segments` of another realm (`TRUE`), and the SQL of every other call.
 
 ## [6.7.0] - 2026-11-16
 
