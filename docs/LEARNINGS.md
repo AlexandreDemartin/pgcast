@@ -59,6 +59,8 @@ Candidates for a check, a rule or a skill line.
 - #511: the walk of every global constructor of a bare `vm` context found a real gap on CI's Node 26 leg on its first ready run (`Temporal`, fixed by #521): a list a later Node can outgrow is generated from the runtime, not written by hand.
 - #511: a kept entry keyed by path, with a namespace fallback, lets the list shrink as `core.ts` grows; a whole-namespace entry (`Intl`) would have hidden #521's refusals from the walk.
 - #511: `npm run lint` covers `src/`, `scripts/` and `website/`, not `test/`, so a test-only PR's style goes unchecked.
+- #522: `check:agents` fails during a conflicted merge: `git ls-files src/*.ts` lists each unmerged file once per stage, so the deprecations check counts each "Set <key>:" message three times; it passes once the resolution is staged.
+- #522: merging two opt-ins that touch the same lists is cleanest by putting each side's whole block back from `git show <side>:<file>`: diff3 interleaves the shared lines of two new blocks.
 
 ## Minors kept
 
