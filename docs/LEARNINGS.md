@@ -142,6 +142,11 @@ Candidates for a check, a rule or a skill line.
 - #553: a speed fix that changes no SQL is proved by interleaved runs in the PR body, run a second time in reversed order to cancel the order effect.
 - #554: a CHANGELOG headline about "several rows" was narrower than the runs: a single row in an array also listed an inherited key on 6.6.1 and 6.7.1 (`[{ title }]` compiled to `("mood", "title")`); an advisory names "rows given as an array".
 - #555: `guard.mjs` blocks `npm publish` but not a `git push` of a `v*` tag, which now starts `release.yml`: the `npm` environment's required reviewer (the owner) is the gate; a guard rule refusing a `v*` tag push, with its test, could follow.
+- #557: a CLI argument accepted in several positions is replayed on 6.6.1 in each position: `--check` first fails as JSON, after the JSON argument 6.6.1 ignores it, generates and exits 0.
+- #557: a file written only under a condition (`custom/index.d.ts`, with a custom type) gets a case where the condition is false, or a mutant that drops it survives.
+- #557: an exit code set by the process wrapper (`cli.ts`) is outside every in-process test; when it is the feature's promise, one test runs the CLI as a child process.
+- #557: a new CLI flag needs its line in `switching.md` § Go back, as a new config key does.
+- #557: to compare two builds' CLIs byte for byte, run both with `db.max: 1` (placeholder order) and mask the dist line numbers in stack headers.
 
 ## Minors kept
 
@@ -168,4 +173,6 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #548 (form): `src/db/shortcuts.ts` `insert()` JSDoc, "no own enumerable key (a `Date`, a `Map`…) beside a row with keys": a `Buffer` row alone in an array now rejects too.
 - #548 (form): `CHANGELOG.md` #543 line, "counts as one in `upsert()`": reads as "one row"; "counts as a row with no key".
 - #553 (form): `CHANGELOG.md` #549 line, "compiled to `("rating") VALUES (DEFAULT)` and wrote a row of defaults": true for `insert()` only; to fix in the 6.7.2 version PR.
-
+- #557 (form): `src/generate/cliConfig.ts` `cliArgs()`: a bare `--` (pnpm passes it on: `pnpm run gen -- --check`) is refused as `Unknown flag --`; skipping it only accepts more.
+- #557 (defect): `check()` is not exported from `zapatos/generate`: a script that calls `generate()` with a config built in code cannot check; follow-up issue under #52.
+- #557 (form): `website/first-query.md` "Run `npx pgcast` again after each migration" and `website/install.md` `::: warning Stale schema`: a link to `/generator#check`, EN and FR.
