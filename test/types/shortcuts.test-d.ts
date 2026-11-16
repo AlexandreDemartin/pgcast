@@ -424,6 +424,95 @@ describe('upsert', () => {
     db.upsert('extra.type_zoo', { c_text: 'a' }, 'id', { updateValues: { c_point: db.vals(new Date()), c_bit: db.cols(Buffer.from('a')) } });
   });
 
+  test('updateValues takes param() of an enum label alone, as 6.6.1 did (#533)', () => {
+    // TypeScript 5.9 inferred param('ok') as a string there, and refused the call, in a program whose first upsert() of
+    // users had updateValues; which type it resolves first decides, so this program, which checks others first, took it
+    const q = db.upsert('users', row, 'email', { updateValues: { mood: db.param('ok') } });
+    expectTypeOf(q.run(pool)).resolves.toEqualTypeOf<s.users.JSONSelectable & db.UpsertAction>();
+    expectTypeOf(q.run(pool)).resolves.not.toBeAny();
+    db.upsert('users', row, 'email', { updateValues: { mood: db.param('ok'), created_at: db.param('2020-01-01T12:00:00Z') } });
+  });
+
+  test('updateValues in a function generic over the table takes the values 6.6.1 took (#533)', () => {
+    const date = new Date();
+    const one = <T extends 'users'>(t: T, r: s.InsertableForTable<T>, c: s.ColumnForTable<T>, uv: s.users.Updatable) => {
+      db.upsert(t, r, c, { updateValues: { created_at: '2020-01-01T00:00:00Z' } });
+      db.upsert(t, r, c, { updateValues: { created_at: db.Default } });
+      db.upsert(t, r, c, { updateValues: { created_at: db.sql`now()` } });
+      db.upsert(t, r, c, { updateValues: { created_at: db.param(date) } });
+      db.upsert(t, r, c, { updateValues: { mood: 'happy', manager_id: null } });
+      db.upsert(t, r, c, { updateValues: {} });
+      db.upsert(t, r, c, { updateValues: uv });
+      const built = { created_at: date };
+      db.upsert(t, r, c, { updateValues: built });
+      db.upsert(t, r, c, { updateValues: { display_name: db.raw(`upper('a')`), settings: db.vals({ a: 1 }) } });
+      db.upsert(t, r, c, { updateValues: { created_at: JSON.parse('"2020-01-01T00:00:00Z"') } });
+      db.upsert(t, [r], c, { updateValues: { created_at: date } });
+      return db.upsert(t, r, c, { updateValues: { created_at: date } });
+    };
+    const q = one('users', row, 'email', {});
+    expectTypeOf(q.run(pool)).resolves.toEqualTypeOf<s.users.JSONSelectable & db.UpsertAction>();
+    expectTypeOf(q.run(pool)).resolves.not.toBeAny();
+    const two = <T extends 'users' | 'active_users'>(t: T, r: s.InsertableForTable<T>, c: s.ColumnForTable<T>) => {
+      db.upsert(t, r, c, { updateValues: { created_at: date } });
+      db.upsert(t, r, c, { updateValues: { created_at: '2020-01-01T00:00:00Z', mood: 'happy' } });
+      db.upsert(t, r, c, { updateValues: { created_at: db.Default } });
+      db.upsert(t, r, c, { updateValues: { display_name: db.raw(`upper('a')`) } });
+    };
+    const every = <T extends s.Table>(t: T, r: s.InsertableForTable<T>, c: s.ColumnForTable<T>) => {
+      db.upsert(t, r, c, { updateValues: {} });
+    };
+    const users = { email: 'a@b', display_name: 'A' };
+    const issue = <T extends 'users'>(t: T, date: Date) =>
+      db.upsert(t, users, 'email', { updateValues: { created_at: date } });
+    void two; void every; void issue;
+  });
+
+  test('updateValues in a function generic over the table refuses what a concrete table refuses (#533)', () => {
+    const date = new Date();
+    const one = <T extends 'users'>(t: T, r: s.InsertableForTable<T>, c: s.ColumnForTable<T>) => {
+      // @ts-expect-error an unknown key
+      db.upsert(t, r, c, { updateValues: { nope: 1 } });
+      // @ts-expect-error a number, on a timestamptz column
+      db.upsert(t, r, c, { updateValues: { created_at: 1 } });
+      // @ts-expect-error null, on a NOT NULL column
+      db.upsert(t, r, c, { updateValues: { created_at: null } });
+      // @ts-expect-error a label the enum lacks
+      db.upsert(t, r, c, { updateValues: { mood: 'glad' } });
+      // @ts-expect-error a value typed unknown
+      db.upsert(t, r, c, { updateValues: null as unknown });
+      // @ts-expect-error raw(), on a timestamptz column, whose value type takes no string
+      db.upsert(t, r, c, { updateValues: { created_at: db.raw('now()') } });
+      // @ts-expect-error raw(), on an int column
+      db.upsert(t, r, c, { updateValues: { manager_id: db.raw('1') } });
+      // @ts-expect-error cols() of a string, which throws while compiling (#503); 6.6.1 took it here, its wrappers being structural
+      db.upsert(t, r, c, { updateValues: { display_name: db.cols('display_name') } });
+      // @ts-expect-error cols() of a Date, which compiles its own keys (#514)
+      db.upsert(t, r, c, { updateValues: { created_at: db.cols(date) } });
+      // @ts-expect-error vals() of a Date
+      db.upsert(t, r, c, { updateValues: { created_at: db.vals(date) } });
+    };
+    const two = <T extends 'users' | 'active_users'>(t: T, r: s.InsertableForTable<T>, c: s.ColumnForTable<T>) => {
+      // @ts-expect-error an unknown key
+      db.upsert(t, r, c, { updateValues: { nope: 1 } });
+      // @ts-expect-error cols() of a string
+      db.upsert(t, r, c, { updateValues: { display_name: db.cols('display_name') } });
+    };
+    void one; void two;
+  });
+
+  test('characterization: in a function generic over the table, updateValues takes an unknown key beside a known one; typed first, it is refused', () => {
+    // 6.6.1 refused it: its updateValues was the lookup alone, whose excess-property check a union skips (#533)
+    const date = new Date();
+    const one = <T extends 'users'>(t: T, r: s.InsertableForTable<T>, c: s.ColumnForTable<T>) => {
+      db.upsert(t, r, c, { updateValues: { created_at: date, nope: 1 } });
+      // @ts-expect-error typed first, the unknown key is refused
+      const uv: s.UpdatableForTable<T> = { created_at: date, nope: 1 };
+      db.upsert(t, r, c, { updateValues: uv });
+    };
+    void one;
+  });
+
   test('upsertRequiresSameKeys: an optional boolean of Config and setConfig', () => {
     db.setConfig({ upsertRequiresSameKeys: true });
     expectTypeOf(db.getConfig().upsertRequiresSameKeys).toEqualTypeOf<boolean | undefined>();
