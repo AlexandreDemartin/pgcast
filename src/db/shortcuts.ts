@@ -207,7 +207,7 @@ function callerValue(obj: any, k: string): any {
     held = Object.getOwnPropertyDescriptor(Object.prototype, k);
   if (value === undefined || held === undefined) return value;
   if (k === '__proto__' ? value !== Reflect.get(Object.prototype, k, obj) :
-    Object.prototype.hasOwnProperty.call(held, 'value') && value !== held.value) return value;
+    Object.prototype.hasOwnProperty.call(held, 'value') && !Object.is(value, held.value)) return value;
   for (let o: object | null = obj; o !== null && o !== Object.prototype; o = Object.getPrototypeOf(o)) {
     if (Object.prototype.hasOwnProperty.call(o, k)) return value;
   }
