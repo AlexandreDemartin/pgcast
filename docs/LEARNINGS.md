@@ -140,6 +140,7 @@ Candidates for a check, a rule or a skill line.
 - #553: a `Proxy` trap-count grid needs a `Proxy` row with no own keys: some branches (`hasKey` false, then `isBuiltin`) run only for such a row.
 - #553: a CHANGELOG line taken from a review ("no longer throws", "master reset it") can describe master's unreleased state: replay it on the last release before writing it.
 - #553: a speed fix that changes no SQL is proved by interleaved runs in the PR body, run a second time in reversed order to cancel the order effect.
+- #554: a CHANGELOG headline about "several rows" was narrower than the runs: a single row in an array also listed an inherited key on 6.6.1 and 6.7.1 (`[{ title }]` compiled to `("mood", "title")`); an advisory names "rows given as an array".
 
 ## Minors kept
 
@@ -166,3 +167,4 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #548 (form): `src/db/shortcuts.ts` `insert()` JSDoc, "no own enumerable key (a `Date`, a `Map`…) beside a row with keys": a `Buffer` row alone in an array now rejects too.
 - #548 (form): `CHANGELOG.md` #543 line, "counts as one in `upsert()`": reads as "one row"; "counts as a row with no key".
 - #553 (form): `CHANGELOG.md` #549 line, "compiled to `("rating") VALUES (DEFAULT)` and wrote a row of defaults": true for `insert()` only; to fix in the 6.7.2 version PR.
+
