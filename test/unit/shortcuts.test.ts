@@ -7,6 +7,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as db from '../../src/db';
 import { sql, param, parent, Default, all, conditions as dc } from '../../src/db';
+import { builtinObjects } from '../helpers/builtinObjects';
 import { resetConfig } from '../helpers/config';
 
 afterEach(resetConfig);
@@ -1996,11 +1997,179 @@ describe('a built-in row in insert(), upsert() and update()', () => {
     });
   });
 
-  it('characterization: a built-in row among several is spread before cols() and vals() see it, a row of defaults (#543)', () => {
-    expect(db.insert('users', [row, new Date(0) as any]).compile()).toEqual({
-      text: 'INSERT INTO "users" ("display_name", "email") VALUES ($1, $2), (DEFAULT, DEFAULT) RETURNING to_jsonb("users".*) AS result',
-      values: ['A', 'a@x.org'],
+});
+
+// 6.6.1 spread a built-in row among several into a plain object before cols() and vals() saw it: one with no own
+// key became a row of DEFAULTs, which ran, and a Buffer its byte indexes as columns (42703). Both now throw while
+// compiling, with the messages of a single row, cols()'s for the first row and vals()'s for a later one (#543)
+describe('a built-in row among several in insert() and upsert()', () => {
+  afterEach(() => { vi.restoreAllMocks(); });
+  const
+    row = { email: 'a@x.org', display_name: 'A' },
+    builtinMessage = (fn: 'cols' | 'vals', name: string) => fn === 'cols' ?
+      `\`db.cols()\` takes an object or an array, not a built-in \`${name}\` with no own enumerable key, which would compile to nothing: for one column, write \`db.cols([name])\`; for a row of \`insert()\`, \`upsert()\` or \`update()\`, give a plain object.` :
+      `\`db.vals()\` takes an object or an array, not a built-in \`${name}\` with no own enumerable key, which would compile to nothing: for one value, write \`db.vals([value])\`; for a row of \`insert()\`, \`upsert()\` or \`update()\`, give a plain object.`,
+    bufferMessage = (fn: 'cols' | 'vals') => fn === 'cols' ?
+      '`db.cols()` takes an object or an array, not a `Buffer`, whose byte indexes would compile as names, one per byte: for one column, write `db.cols([name])`; for a row of `insert()`, `upsert()` or `update()`, give a plain object.' :
+      '`db.vals()` takes an object or an array, not a `Buffer`, whose bytes would compile as values, one parameter per byte: for one value, write `db.vals([value])`; for a row of `insert()`, `upsert()` or `update()`, give a plain object.',
+    // each built-in cols() and vals() refuse: one with no own enumerable key, or a Buffer, even with keys added
+    refused = (): Record<string, object> => {
+      const values: Record<string, object> = {
+        ...Object.fromEntries(Object.entries(builtinObjects()).filter(([, x]) => Buffer.isBuffer(x) || Object.keys(x).length === 0)),
+        'Buffer(0)': Buffer.alloc(0), 'Buffer with keys': Object.assign(Buffer.from('a'), row),
+        'Int32Array(0)': new Int32Array(0), 'Proxy(Date)': new Proxy(new Date(0), {}),
+      };
+      return values;
+    },
+    message = (fn: 'cols' | 'vals', name: string, x: object) =>
+      Buffer.isBuffer(x) ? bufferMessage(fn) : builtinMessage(fn, ({ 'Int32Array(0)': 'Int32Array', 'Proxy(Date)': 'Date' } as Record<string, string>)[name] ?? name);
+
+  /** `.run(q).catch(h)` outside an async step: a throw at the call is not a rejection. */
+  const outcome = (build: () => db.SQLFragment<any, any>, queryable: any) => {
+    try {
+      return build().run(queryable).then(() => 'ran', (err: Error) => err.message);
+    } catch (err) {
+      return Promise.resolve(`throws at the call: ${(err as Error).message}`);
+    }
+  };
+
+  it('rejects run(), with no query sent, beside a plain row, before or after it, with undefinedMeansMissing off and on', async () => {
+    // with undefinedMeansMissing, a row with an undefined value makes undefinedAsMissing rebuild every row
+    const queryable = { query: vi.fn() } as any, outcomes: Record<string, string> = {}, expected: Record<string, string> = {};
+    for (const undefinedMeansMissing of [false, true]) {
+      db.setConfig({ undefinedMeansMissing });
+      const plain = undefinedMeansMissing ? { ...row, mood: undefined } : row;
+      for (const [name, x] of Object.entries(refused())) for (const [order, values] of [['after', [plain, x]], ['before', [x, plain]]] as const) {
+        const key = `${name} ${order} ${undefinedMeansMissing ? 'undefinedMeansMissing' : ''}`;
+        outcomes[`insert ${key}`] = await outcome(() => db.insert('users', values as any), queryable);
+        outcomes[`upsert ${key}`] = await outcome(() => db.upsert('users', values as any, 'email'), queryable);
+        for (const fn of ['insert', 'upsert']) expected[`${fn} ${key}`] = message(order === 'after' ? 'vals' : 'cols', name, x);
+      }
+    }
+    expect(outcomes).toEqual(expected);
+    expect(queryable.query).not.toHaveBeenCalled();
+  });
+
+  it('a Buffer row alone in an array, or beside another, rejects run(), with no query sent', async () => {
+    // 6.6.1: INSERT INTO "users" ("0") VALUES ($1) with 97
+    const queryable = { query: vi.fn() } as any, outcomes: Record<string, string> = {};
+    for (const [name, values] of Object.entries({ alone: [Buffer.from('a')], twice: [Buffer.from('a'), Buffer.from('b')] })) {
+      outcomes[`insert ${name}`] = await outcome(() => db.insert('users', values as any), queryable);
+      outcomes[`upsert ${name}`] = await outcome(() => db.upsert('users', values as any, 'email'), queryable);
+    }
+    expect(outcomes).toEqual({
+      'insert alone': bufferMessage('cols'), 'upsert alone': bufferMessage('cols'),
+      'insert twice': bufferMessage('cols'), 'upsert twice': bufferMessage('cols'),
     });
+    expect(queryable.query).not.toHaveBeenCalled();
+  });
+
+  it('a Date row beside a plain row throws while compiling, saying what to do', () => {
+    // 6.6.1: INSERT INTO "users" ("display_name", "email") VALUES ($1, $2), (DEFAULT, DEFAULT), which ran
+    expect(() => db.insert('users', [row, new Date(0) as any]).compile()).toThrow(builtinMessage('vals', 'Date'));
+    expect(() => db.upsert('users', [new Map() as any, row], 'email').compile()).toThrow(builtinMessage('cols', 'Map'));
+  });
+
+  it('with undefinedMeansMissing, a Buffer row with an undefined own key rejects run(), alone and beside a row', async () => {
+    // undefinedAsMissing rebuilt it into a plain object of its bytes: master compiled SET ("0") = ROW($1) with 97
+    db.setConfig({ undefinedMeansMissing: true });
+    const
+      queryable = { query: vi.fn() } as any,
+      x = () => Object.assign(Buffer.from('a'), { mood: undefined }) as any,
+      outcomes = {
+        insert: await outcome(() => db.insert('users', x()), queryable),
+        upsert: await outcome(() => db.upsert('users', x(), 'email'), queryable),
+        update: await outcome(() => db.update('users', x(), { id: 1 }), queryable),
+        insertBeside: await outcome(() => db.insert('users', [row, x()]), queryable),
+      };
+    expect(outcomes).toEqual({
+      insert: bufferMessage('cols'), upsert: bufferMessage('cols'), update: bufferMessage('cols'), insertBeside: bufferMessage('vals'),
+    });
+    expect(queryable.query).not.toHaveBeenCalled();
+  });
+
+  it('with undefinedMeansMissing, an empty Buffer row whose own keys are undefined still throws nothing to update or insert at the call', () => {
+    // as on master, where undefinedAsMissing rebuilt it into `{}`
+    db.setConfig({ undefinedMeansMissing: true });
+    const x = () => Object.assign(Buffer.alloc(0), { email: undefined }) as any;
+    expect(() => db.update('users', x(), { id: 1 })).toThrow('nothing to update: an Updatable needs at least one column');
+    for (const values of [x(), [x()], [x(), x()], [new Date(0), x()]]) {
+      expect(() => db.upsert('users', values, 'email')).toThrow(nothingToInsert);
+    }
+  });
+
+  it('a row with no own key alone in an array, or only such rows, still throws nothing to insert at the call', () => {
+    for (const values of [[new Date(0)], [new Date(0), new Map()], [Buffer.alloc(0)], [new Date(0), {}]]) {
+      expect(() => db.insert('users', values as any)).toThrow(nothingToInsert);
+      expect(() => db.upsert('users', values as any, 'email')).toThrow(nothingToInsert);
+    }
+  });
+
+  it('a built-in with own keys, a typed array with elements, a Proxy, a class instance and a subclass among rows compile as in 6.6.1', () => {
+    class Film {}
+    class Premiere extends Date {}
+    const
+      insertSQL = (columns: string, rows: string) => `INSERT INTO "users" (${columns}) VALUES ${rows} RETURNING to_jsonb("users".*) AS result`,
+      compiled = (x: unknown) => db.insert('users', [row, x as any]).compile();
+    expect({
+      dated: compiled(Object.assign(new Date(0), { email: 'b@x.org' })),
+      systemError: compiled(Object.assign(new Error('ENOENT'), { code: 'ENOENT' })),
+      typedArray: compiled(new Int32Array([7])),
+      proxy: compiled(new Proxy({ email: 'b@x.org' }, {})),
+      proxyBuffer: compiled(new Proxy(Buffer.from('a'), {})),
+      classInstance: compiled(new Film()),
+      noPrototype: compiled(Object.create(null)),
+      subclass: compiled(new Premiere(0)),
+    }).toEqual({
+      dated: { text: insertSQL('"display_name", "email"', '($1, $2), (DEFAULT, $3)'), values: ['A', 'a@x.org', 'b@x.org'] },
+      systemError: { text: insertSQL('"code", "display_name", "email"', '(DEFAULT, $1, $2), ($3, DEFAULT, DEFAULT)'), values: ['A', 'a@x.org', 'ENOENT'] },
+      typedArray: { text: insertSQL('"0", "display_name", "email"', '(DEFAULT, $1, $2), ($3, DEFAULT, DEFAULT)'), values: ['A', 'a@x.org', 7] },
+      proxy: { text: insertSQL('"display_name", "email"', '($1, $2), (DEFAULT, $3)'), values: ['A', 'a@x.org', 'b@x.org'] },
+      proxyBuffer: { text: insertSQL('"0", "display_name", "email"', '(DEFAULT, $1, $2), ($3, DEFAULT, DEFAULT)'), values: ['A', 'a@x.org', 97] },
+      classInstance: { text: insertSQL('"display_name", "email"', '($1, $2), (DEFAULT, DEFAULT)'), values: ['A', 'a@x.org'] },
+      noPrototype: { text: insertSQL('"display_name", "email"', '($1, $2), (DEFAULT, DEFAULT)'), values: ['A', 'a@x.org'] },
+      subclass: { text: insertSQL('"display_name", "email"', '($1, $2), (DEFAULT, DEFAULT)'), values: ['A', 'a@x.org'] },
+    });
+  });
+
+  it('a Proxy row with own keys among rows has its traps called as often as on master, and its prototype never read', () => {
+    // isBuiltin() reads the prototype, which a Proxy's getPrototypeOf trap sees: only a row with no own key reaches it
+    const counts: Record<string, Record<string, number>> = {};
+    for (const route of ['insert', 'upsert'] as const) {
+      const
+        count: Record<string, number> = counts[route] = {},
+        handler = Object.fromEntries(['getPrototypeOf', 'ownKeys', 'getOwnPropertyDescriptor', 'get', 'has'].map(trap =>
+          [trap, (...args: any[]) => { count[trap] = (count[trap] ?? 0) + 1; return (Reflect as any)[trap](...args); }])),
+        values = [row, new Proxy({ email: 'b@x.org', display_name: 'B' }, handler)];
+      (route === 'insert' ? db.insert('users', values) : db.upsert('users', values, 'email')).compile();
+    }
+    // as on master: undefinedAsMissing, then completeKeysWithDefaultValue's union and spread list each own key, and
+    // upsert() checks one key with hasOwnProperty
+    expect(counts).toEqual({
+      insert: { ownKeys: 3, getOwnPropertyDescriptor: 6, get: 6 },
+      upsert: { ownKeys: 3, getOwnPropertyDescriptor: 7, get: 6 },
+    });
+  });
+
+  it('a Buffer row never has its keys or values listed, alone or beside a row, in insert(), upsert() and update()', () => {
+    // master listed each byte's index: a 10 MB Buffer took about a second, 16 s beside a row, and upsert() ran out of memory
+    const
+      x = Buffer.alloc(1000),
+      listed = ['keys', 'values', 'entries'].map(fn => vi.spyOn(Object, fn as 'keys')),
+      builds = {
+        insert: () => db.insert('users', x as any), insertBeside: () => db.insert('users', [row, x as any]),
+        upsert: () => db.upsert('users', x as any, 'email'), upsertBeside: () => db.upsert('users', [row, x as any], 'email'),
+        update: () => db.update('users', x as any, { id: 1 }),
+      },
+      outcomes: Record<string, string> = {};
+    for (const [name, build] of Object.entries(builds)) {
+      try { build().compile(); outcomes[name] = 'compiled'; } catch (err) { outcomes[name] = (err as Error).message; }
+    }
+    expect(outcomes).toEqual({
+      insert: bufferMessage('cols'), insertBeside: bufferMessage('vals'),
+      upsert: bufferMessage('cols'), upsertBeside: bufferMessage('vals'), update: bufferMessage('cols'),
+    });
+    expect(listed.flatMap(spy => spy.mock.calls.filter(([arg]) => arg === x))).toEqual([]);
   });
 });
 
