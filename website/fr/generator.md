@@ -1,5 +1,5 @@
 ---
-english: 75079b14641d
+english: 40504ada35f7
 ---
 
 # Générateur
@@ -112,6 +112,7 @@ Toutes les options sont facultatives. Une option donnée remplace entièrement s
 | [`uniqueIndexConstraintsOnly`](#generate.uniqueIndexConstraintsOnly) | `false` | les noms de l’`UniqueIndex` de chaque relation |
 | [`domainsTypedByContext`](#generate.domainsTypedByContext) | `false` | le type d’un domaine sur `bigint`, `numeric`, `bytea`, `money` ou une date, ou sur un tableau de l’un d’eux, hors de `Selectable`, et d’un domaine sur un domaine ou d’un tableau d’un domaine |
 | [`enumArraysTypedAsText`](#generate.enumArraysTypedAsText) | aucune : un tableau, avec une note | le type `Selectable` d’un tableau d’un enum |
+| [`intervalsTypedAsObjects`](#generate.intervalsTypedAsObjects) | aucune : le texte, avec une note | le type d’un `interval` dans `Selectable` et dans une écriture |
 | [`progressListener`](#generate.progressListener) | `false` | où chaque étape est signalée |
 | [`warningListener`](#generate.warningListener) | `true` | où vont les avertissements |
 | [`debugListener`](#generate.debugListener) | `false` | où vont chaque requête et son résultat |
@@ -455,6 +456,26 @@ ALTER TABLE crew ADD COLUMN other_jobs crew_job[] NOT NULL DEFAULT '{}', ADD COL
 - Un domaine sur un tel tableau, comme `crew.past_jobs`, prend `db.DomainInContext<c.PgJob_list, crew_job[], string>` dans `Selectable` ([`DomainInContext`](/fr/runtime-config#DomainInContext)) : `string` tant que son placeholder contient ce que le générateur y a écrit, et un placeholder que vous modifiez garde son type. Ses autres interfaces et son placeholder ne changent pas.
 - Un tableau d’un enum d’un autre schéma, typé par ses labels avec [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas), ou sinon comme l’enum du même nom dans le schéma de la relation, est lui aussi un `string` dans `Selectable`. Sans l’un ni l’autre, c’est un placeholder `any`, et il le reste. Un tableau d’un domaine sur un enum relève de [`domainsTypedByContext`](#generate.domainsTypedByContext).
 
+### `intervalsTypedAsObjects` {#generate.intervalsTypedAsObjects}
+
+`boolean`, ou omis ; un opt-in. Le type d’une colonne `interval`, d’un `interval[]`, et d’un domaine sur l’un ou l’autre. Le parser de types par défaut de `pg` renvoie un `interval` sous forme d’objet de ses parties, un [`PostgresInterval`](/fr/runtime-config#PostgresInterval) ; le JSON des raccourcis en donne le texte. Disons qu’une séance a un entracte :
+
+```sql
+ALTER TABLE screenings ADD COLUMN intermission interval;
+```
+
+| `screenings.intermission`, `'15 minutes'` | omis, ou `false` | `true` |
+|---|---|---|
+| `Selectable`, une ligne venant de `pg` | `string`, bien que `pg` renvoie `{ minutes: 15 }` | `PostgresInterval` |
+| `JSONSelectable`, une ligne venant des raccourcis | `string` : `'00:15:00'` | la même chose |
+| `Whereable`, `Insertable`, `Updatable` | `string` | `string \| PostgresInterval` |
+
+- Omis, ou `null` : comme dans Zapatos 6.6.1, le texte dans les cinq interfaces, et une note via [`warningListener`](#generate.warningListener) nomme chaque colonne que `true` changerait. À partir de la 7.0, l’option omise vaut `true` ([Versions](/fr/versions)).
+- `false` : le texte, sans note. Cette valeur reste en 7.0 et en 8.0, pour un parser de types à vous qui renvoie le texte : `pg.types.setTypeParser(1186, v => v)` pour `interval`, et `1187` aussi pour `interval[]`, dont `pg` garde sinon son propre parser.
+- `true` : un `PostgresInterval` dans `Selectable`, un tableau de `PostgresInterval` pour un `interval[]`. Une écriture en reprend un, puisque `pg` l’envoie via son `toPostgres()` ; `insert()` refuse toujours un simple objet comme `{ minutes: 15 }` (TS2769) : Postgres le refuse aussi à partir de sa version 17 (22007), et le stocke comme `00:00:15` jusqu’à la 16.
+- `pg` ne lit que l’`IntervalStyle` par défaut, `postgres` : sous `iso_8601`, `sql_standard` ou `postgres_verbose`, son objet revient avec des parties manquantes, souvent `{}`, quoi que dise le type. Les raccourcis donnent le texte, dans ce style.
+- Un domaine sur l’un d’eux suit la même règle : un nouveau placeholder contient `db.PostgresInterval`, et avec [`domainsTypedByContext`](#generate.domainsTypedByContext) sa colonne est typée selon le contexte, comme l’est un domaine sur `date`. Un domaine sur un tel domaine prend `PostgresInterval` dans `Selectable` avec `domainsTypedByContext` ; un tableau d’un domaine y reste `string`, le texte que renvoie `pg`. Un placeholder écrit auparavant contient `string`, et le générateur ne le réécrit jamais.
+
 ### `progressListener` {#generate.progressListener}
 
 `boolean`, ou dans `generate()` une fonction `(s: string) => void` ; par défaut `false`. `true` affiche chaque étape avec `console.log` ; une fonction reçoit chaque ligne.
@@ -499,6 +520,8 @@ Writing custom types file: src/zapatos/custom/index.d.ts
   - une fois par exécution, sans [`domainsTypedByContext`](#generate.domainsTypedByContext), quand une colonne générée a un tel type, sur un type de base que le générateur sait traduire ; s’il n’y en a qu’une, sous la forme `public.seat_bookings.vip_ticket (public.vip_ticket_no) has a domain over a domain, or an array of a domain` ;
 - `Note: public.crew.other_jobs (public.crew_job[]) is an array of an enum, which pg returns as its text, such as '{a,b}', though Selectable types it as an array. Set enumArraysTypedAsText: true to type it as a string there, or false to keep the array if pg.types.setTypeParser parses it; true will be the default in pgcast 7.0.`
   - une fois par exécution, avec [`enumArraysTypedAsText`](#generate.enumArraysTypedAsText) omis, quand une colonne générée a un tel type ; s’il y en a plusieurs, sous la forme `public.crew.other_jobs (public.crew_job[]) and public.crew.past_jobs (public.job_list) are arrays of an enum` ;
+- `Note: public.screenings.intermission (interval) is of interval or of a type that wraps it in arrays or domains: as generated, it is typed as its text, though pg's default type parser returns an interval from a query of your own as an object, a PostgresInterval. Set intervalsTypedAsObjects: true to type it as pg parses it; it will be the default in pgcast 7.0. Set it to false to keep the text, if a type parser of yours returns it.`
+  - une fois par exécution, avec [`intervalsTypedAsObjects`](#generate.intervalsTypedAsObjects) omis, quand une colonne générée est de type `interval` ou `interval[]` ou d’un domaine sur l’un ou l’autre, et, avec `domainsTypedByContext`, aussi de tout type qui enveloppe `interval` dans des domaines et au plus un tableau, comme un domaine sur un tel domaine ou un tableau d’un domaine sur `interval` ; s’il y en a plusieurs, sous la forme `… and public.screenings.intermission (interval) are of interval` ;
 - `Note: src/zapatos/schema.d.ts is here too, generated with moduleNames: 'zapatos'. It declares 'zapatos/schema', as src/pgcast/schema.d.ts does, and TypeScript merges the two: types can loosen, silently under skipLibCheck. Delete the folder src/zapatos, once any placeholder you edited there is moved to src/pgcast/custom.`
   - après l’écriture, avec [`moduleNames`](#generate.moduleNames) à `"pgcast"`, quand `outDir` contient un `zapatos/schema.d.ts` ; un dossier sans son `schema.d.ts` n’est pas signalé ;
 - `Note: src/pgcast/schema.d.ts is here too, generated with moduleNames: 'pgcast'. Its import of 'pgcast/db' fails to compile without skipLibCheck. Delete the folder src/pgcast, once any placeholder you edited there is moved to src/zapatos/custom.`

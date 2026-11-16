@@ -41,6 +41,8 @@ export interface OptionalConfig {
   domainsTypedByContext?: boolean;  // a domain over int8, numeric, bytea, money or a date, or an array of one, is typed by context, as its base type is, while its placeholder holds what the generator wrote; a domain over a domain, or an array of a domain, by its innermost base type
   // optional too; read it with ?? false, and with == null for the note (left out, or null from JSON); deprecated: true in 7.0
   enumArraysTypedAsText?: boolean;  // an array of an enum, or a domain over one, is string in Selectable: pg returns it as its text; false keeps the array, for a parser set with pg.types.setTypeParser
+  // optional too; read it with ?? false, and with == null for the note (left out, or null from JSON); deprecated: true in 7.0, false kept
+  intervalsTypedAsObjects?: boolean;  // an interval is typed in Selectable as pg's default type parser returns it, a db.PostgresInterval, which a write takes back
 }
 
 interface SchemaRules {

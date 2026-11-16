@@ -17,6 +17,9 @@ import { jsdocText, stringLiteral, tsIdentifier } from './quote';
 const tsOwnTypes = new Set('any bigint boolean never number object string symbol undefined unknown'.split(' '));
 const hasOwn = (o: object, key: string) => Object.prototype.hasOwnProperty.call(o, key);
 const contexts = ['Selectable', 'JSONSelectable', 'Whereable', 'Insertable', 'Updatable'] as const;
+// pg_catalog's interval or its array: a type of yours of that name is typed by its name, as in 6.6.1, whatever the key
+const isInterval = (type: { schema: string; name: string } | undefined) =>
+  type?.schema === 'pg_catalog' && (type.name === 'interval' || type.name === '_interval');
 
 
 export interface Relation {
@@ -146,6 +149,7 @@ export const definitionForRelationInSchema = async (
   domainsUnderDomains: string[] = [],  // an 'out' parameter too: what domainsTypedByContext would type over a domain
   // an 'out' parameter too: what enumArraysTypedAsText would change, with a domain's placeholder, which may end `any`
   enumArraysNotAsText: [column: string, customType: string | null][] = [],
+  intervalsAsText: string[] = [],  // an 'out' parameter too: what intervalsTypedAsObjects would change
 ) => {
   const
     rows = await columnsForRelation(rel, schemaName, queryFn),
@@ -161,6 +165,9 @@ export const definitionForRelationInSchema = async (
     isAny = (row: any) => tsTypeForPgType(row.udtName, inlineIn(row.udtSchema) ? otherEnums[row.udtSchema] : enums,
       'Selectable', config, inlineIn(row.udtSchema)) === 'any',
     roots: DomainRoots = rows.some(isAny) ? await domainRoots() : {},
+    // intervalsTypedAsObjects types pg_catalog's interval only
+    textIntervals = config.intervalsTypedAsObjects ? { ...config, intervalsTypedAsObjects: false } : config,
+    configIn = (schema: string) => schema === 'pg_catalog' ? config : textIntervals,
     rootIn = (schema: string, name: string): DomainRoots[string] | undefined => roots[JSON.stringify([schema, name])],
     // a domain over a domain over an array of a domain has that array as its root, which has a root of its own
     rootOf = (row: any) => {
@@ -182,16 +189,29 @@ export const definitionForRelationInSchema = async (
       // with typeEnumsAcrossSchemas, an enum is looked up in the schema of its type; otherwise by name, in this one
       acrossSchemas = udtSchema !== schemaName,
       inlineEnums = typeEnumsAcrossSchemas && acrossSchemas,
-      typeEnums = inlineEnums ? otherEnums[udtSchema] : enums;
+      typeEnums = inlineEnums ? otherEnums[udtSchema] : enums,
+      udtConfig = configIn(udtSchema);
     let
-      selectableType = tsTypeForPgType(udtName, typeEnums, 'Selectable', config, inlineEnums),
-      JSONSelectableType = tsTypeForPgType(udtName, typeEnums, 'JSONSelectable', config, inlineEnums),
-      whereableType = tsTypeForPgType(udtName, typeEnums, 'Whereable', config, inlineEnums),
-      insertableType = tsTypeForPgType(udtName, typeEnums, 'Insertable', config, inlineEnums),
-      updatableType = tsTypeForPgType(udtName, typeEnums, 'Updatable', config, inlineEnums);
+      selectableType = tsTypeForPgType(udtName, typeEnums, 'Selectable', udtConfig, inlineEnums),
+      JSONSelectableType = tsTypeForPgType(udtName, typeEnums, 'JSONSelectable', udtConfig, inlineEnums),
+      whereableType = tsTypeForPgType(udtName, typeEnums, 'Whereable', udtConfig, inlineEnums),
+      insertableType = tsTypeForPgType(udtName, typeEnums, 'Insertable', udtConfig, inlineEnums),
+      updatableType = tsTypeForPgType(udtName, typeEnums, 'Updatable', udtConfig, inlineEnums);
+
+    // an interval, an array of one or a domain over either, whose placeholder holds what pg returns, as generated; under
+    // another domain, or in an array of a domain, only where domainsTypedByContext types it by its base type, read as
+    // below: an array of a domain over interval[] is then no type it knows
+    const base = rootOf(row);
+    if (config.intervalsTypedAsObjects == null &&  // left out, or null from JSON: false is a choice, a parser of your own
+      (isInterval({ schema: udtSchema, name: udtName }) || (config.domainsTypedByContext ?? false) &&
+        isInterval(base && { schema: base.schema, name: (base.isArray ? '_' : '') + base.name }))) {
+      const type = domainName !== null ? `${domainSchema}.${domainName}` : udtName === 'interval' ? udtName :
+        udtName === '_interval' ? 'interval[]' : `${udtSchema}.${udtName.slice(1)}[]`;
+      intervalsAsText.push(`${schemaName}.${rel.name}.${column} (${type})`);
+    }
 
     if (!typeEnumsAcrossSchemas && acrossSchemas &&
-      tsTypeForPgType(udtName, otherEnums[udtSchema], 'Selectable', config, true) !== selectableType) {
+      tsTypeForPgType(udtName, otherEnums[udtSchema], 'Selectable', udtConfig, true) !== selectableType) {
       const isArray = udtName.charAt(0) === '_' && !Object.prototype.hasOwnProperty.call(otherEnums[udtSchema], udtName);
       columnsTypedByEnumName.push(`${schemaName}.${rel.name}.${column} (${udtSchema}.${isArray ? udtName.slice(1) + '[]' : udtName})`);
     }
@@ -273,7 +293,8 @@ export const definitionForRelationInSchema = async (
         root = rootOf(row),
         inlineRoot = root !== undefined && root.schema !== schemaName,
         rootTypes = root && contexts.map(context => context === 'Selectable' && root.isArray ? 'string' :
-          tsTypeForPgType((root.isArray ? '_' : '') + root.name, inlineRoot ? rootEnums[root.schema] : enums, context, config, inlineRoot)),
+          tsTypeForPgType((root.isArray ? '_' : '') + root.name, inlineRoot ? rootEnums[root.schema] : enums, context, configIn(root.schema),
+            inlineRoot)),
         underDomains = rootTypes && rootTypes[1] !== 'any' ? rootTypes : undefined,
         byContext = domainName !== null && selectableType !== 'any' &&
           [JSONSelectableType, whereableType, insertableType, updatableType].some(type => type !== selectableType),

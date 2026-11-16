@@ -100,6 +100,35 @@ describe('domain (users.email, accounts.overdraft_limit, users.tags)', () => {
   });
 });
 
+describe('interval (extra.type_zoo.c_interval), without intervalsTypedAsObjects', () => {
+  test('characterization: the text in all five, though pg parses it into an object for a query of your own', () => {
+    expectTypeOf<s.extra.type_zoo.Selectable['c_interval']>().toEqualTypeOf<string | null>();
+    expectTypeOf<s.extra.type_zoo.JSONSelectable['c_interval']>().toEqualTypeOf<string | null>();
+    expectTypeOf<s.extra.type_zoo.Whereable['c_interval']>().toEqualTypeOf<Where<string> | undefined>();
+    expectTypeOf<s.extra.type_zoo.Insertable['c_interval']>()
+      .toEqualTypeOf<string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment | undefined>();
+  });
+});
+
+describe('PostgresInterval, the type intervalsTypedAsObjects writes', () => {
+  test('holds the parts of an interval, each optional, as pg leaves out a part that is zero', () => {
+    const zero: db.PostgresInterval = { toPostgres: () => '0', toISO: () => 'P0Y0M0DT0H0M0S' };
+    expectTypeOf(zero.days).toEqualTypeOf<number | undefined>();
+    expectTypeOf(zero.milliseconds).toEqualTypeOf<number | undefined>();
+    expectTypeOf(zero.toPostgres()).toEqualTypeOf<string>();
+  });
+
+  test('refuses an object without toPostgres(), through which pg writes it', () => {
+    // @ts-expect-error a plain object, which pg sends as JSON: Postgres 17 and later refuse it (22007), earlier ones store one second
+    const plain: db.PostgresInterval = { days: 1 };
+    // @ts-expect-error toPostgres() alone missing
+    const noToPostgres: db.PostgresInterval = { days: 1, toISO: () => 'P0Y0M1DT0H0M0S' };
+    // @ts-expect-error toISO() too, which every postgres-interval that pg 7 and 8 use has
+    const noISO: db.PostgresInterval = { days: 1, toPostgres: () => '1 day' };
+    void [plain, noToPostgres, noISO];
+  });
+});
+
 describe('DomainInContext, the type domainsTypedByContext writes', () => {
   test('a placeholder that holds what the generator wrote takes the type of the context', () => {
     expectTypeOf<db.DomainInContext<db.Int8String, db.Int8String, number>>().toEqualTypeOf<number>();

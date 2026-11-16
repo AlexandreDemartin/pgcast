@@ -28,6 +28,15 @@ Candidates for a check, a rule or a skill line.
 - #513: under heavy machine load a few codegen variant-snapshot tests time out at their 5 s default, even on reruns; a third run once the load dropped was green.
 - #512: a Done when that names one mutant for every row is checked against each shape before the issue is written: a primitive's property reads `undefined` and a stored `null` is reset to the default, so neither goes red on a plain direct read.
 - #512: `getConfig()` returns `{ minMs: undefined, maxMs: undefined }` for a truthy primitive `transactionRetryDelay` (`100`), where 6.6.1 returned `100`; nothing throws, value only.
+- #522: a new variant snapshot is not on disk until the first run writes it, so its "compiles" test fails once: run the file twice before reading a red.
+- #522: `it.each([undefined, false])` passed into `Config` fails `typecheck` under `exactOptionalPropertyTypes`; spread the key conditionally instead.
+- #522: a structural type that a value must satisfy to be written (`toPostgres()`) needs a negative case per required member: a mutant making one optional went uncaught while another member was still required.
+- #522: a codegen branch keyed on a built-in type's bare name (`'interval'`, `'_interval'`, `root.name`) without `pg_catalog` came up in two sibling PRs (#519, #522): any new branch on a built-in name checks the schema and is tested against an enum, a composite and a domain of that name in a user schema (candidate for skill `codegen-output`, and a grep check for `=== '<builtin>'` in `src/generate/`).
+- #522: docs that promise "doesn't compile" for something in a `.d.ts` (placeholders, generated schema) say what happens under `skipLibCheck`: nothing, and the type becomes `any`.
+- #522: a note's lead-in that names the kinds of column it lists is checked against every kind its listing code admits, under each option that widens the list (`domainsTypedByContext`): one probe column per kind in the note's test, the lead-in asserted word for word (missed twice in #522).
+- #522: three rounds because the code that picks a note's columns and the code that types them are separate: each opt-in with a note gets one test over a set of shapes asserting the note's list equals the columns whose lines or placeholders differ between the key `true` and left out (placeholders counted: a domain over `interval` changes only there).
+- #522: domain roots compose (domain over array over domain): the listing condition reads the root exactly as the typing does, or the two drift.
+- #522: a probe column added to a fixture table broke a runtime test comparing exact rows (`toEqual`); a separate table avoids it.
 - #521: `vitest run --execArgv=--harmony-temporal` passes a V8 flag to the forks, and `npx -y -p node@26 node node_modules/vitest/vitest.mjs run` runs the suites on a Node not installed: a built-in of a later Node can be tested locally.
 - #521: Vitest hides `console.log` from a passing test, so a probe writes its output to a file.
 - #521: an unquoted heredoc in zsh runs the backticks inside it; quote the heredoc for anything written as Markdown.
@@ -50,10 +59,15 @@ Candidates for a check, a rule or a skill line.
 - #511: the walk of every global constructor of a bare `vm` context found a real gap on CI's Node 26 leg on its first ready run (`Temporal`, fixed by #521): a list a later Node can outgrow is generated from the runtime, not written by hand.
 - #511: a kept entry keyed by path, with a namespace fallback, lets the list shrink as `core.ts` grows; a whole-namespace entry (`Intl`) would have hidden #521's refusals from the walk.
 - #511: `npm run lint` covers `src/`, `scripts/` and `website/`, not `test/`, so a test-only PR's style goes unchecked.
+- #522: `check:agents` fails during a conflicted merge: `git ls-files src/*.ts` lists each unmerged file once per stage, so the deprecations check counts each "Set <key>:" message three times; it passes once the resolution is staged.
+- #522: merging two opt-ins that touch the same lists is cleanest by putting each side's whole block back from `git show <side>:<file>`: diff3 interleaves the shared lines of two new blocks.
+- #522: a claim that Postgres refuses a value is run on the oldest Postgres of CI (14), not only the local 17: interval input got stricter in 17 (commit 617f9b7d4), and 14/16 store `{ days: 1 }` sent as JSON as one second; with no older Postgres installed, the 14 and 16 legs are the only run of that branch, so the PR is marked ready early for them.
 
 ## Minors kept
 
 Minor review defects, each tagged `form` or `defect` (skill `review-comments`), taken up by the end-of-chapter review.
+- #522 (form): `website/versions.md` § opt-ins list, "which types an `interval` in `Selectable` as `pg` parses it": three "and"s end the list (FR too).
+- #522 (form): `src/generate/tables.ts`, `rootOf(row)` computed for the note and again for the typing, each rebuilding `(isArray ? '_' : '') + name`: one shared value would keep them from drifting.
 - #520 (defect): `test/types/core.test-d.ts` › `characterization: a bare template is refused`: the enum case the docs name is pinned only by a scratch probe; the fixture has a single enum column type.
 - #520 (form): `CHANGELOG.md` Changed line of #493, "whose name another table's column of another enum has": hard to parse.
 - #521 (form): `website/sql-template.md` § built-ins, "which the error names by their constructor (`PlainDate`)": `Intl` objects are named the same way (`Collator`); FR too.
