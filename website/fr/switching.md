@@ -1,5 +1,5 @@
 ---
-english: 55c96068a502
+english: cbda88c123f6
 ---
 
 # Venir de Zapatos
@@ -294,6 +294,7 @@ npm install zapatos@6.6.1
 - D’abord, retirez de `setConfig()` les options que la `Config` de Zapatos 6.6.1 n’a pas (2353) : `upsertRequiresSameKeys`, `undefinedMeansMissing`, `transactionRequiresCommit`, `transactionRequiresIdleClient`, `transactionRequiresSatisfyingLevel`, `selectExactlyOneChecksForSecondRow` et `aggregatesTypedByColumn`.
 - Avec [`moduleNames`](/fr/generator#generate.moduleNames) à `"pgcast"`, lancez aussi `npm uninstall pgcast` : les deux paquets ont une commande `zapatos`. Vos imports `pgcast/…` ne se résolvent alors plus, et la 6.6.1 écrit `zapatos/` mais laisse `pgcast/` en place. Remettez donc chaque import en `zapatos/…`, déplacez les placeholders que vous avez modifiés dans `zapatos/custom/`, leur `declare module 'pgcast/custom'` renommé en `'zapatos/custom'`, et supprimez `pgcast/`.
 - Renommez un `pgcastconfig.json` en `zapatosconfig.json` : la CLI de Zapatos 6.6.1 ne lit aucun autre fichier.
+- Retirez [`--check`](/fr/generator#check) de vos scripts : la CLI de Zapatos 6.6.1 le lit comme son argument JSON, et s’arrête avec le code 1.
 - Régénérez avec Zapatos 6.6.1. Il ignore `typeEnumsAcrossSchemas`, `enumOrder`, `uniqueIndexConstraintsOnly`, `domainsTypedByContext`, `enumArraysTypedAsText`, `intervalsTypedAsObjects` et `moduleNames` dans `zapatosconfig.json`, et réécrit les types `any`, les labels triés, les lignes de commentaire sans préfixe, chaque index unique dans `UniqueIndex`, tout nom d’`UniqueIndex` emprunté, le placeholder de chaque domaine dans les cinq interfaces, un tableau d’un enum comme un tableau dans `Selectable` et chaque `interval` comme une chaîne ; un placeholder qu’il trouve contenant `db.PostgresInterval` reste, bien que le `db` de Zapatos 6.6.1 n’ait pas ce type : le placeholder ne compile pas sans `skipLibCheck` (TS2694), et sous `skipLibCheck`, la colonne vaut `any`, sans bruit. Écrivez-y `string`. Son `generate()` ne connaît pas non plus `rejectOnQueryError` : TypeScript le refuse dans un littéral d’objet (2353), et à l’exécution une requête qui échoue arrête de nouveau le processus.
 - Chaque changement de [Trouver les appels dont le résultat change](#find-the-calls-whose-result-changes) s’exécute comme avant, sauf celui du `jsonb`, qui ne trouve de nouveau rien.
 

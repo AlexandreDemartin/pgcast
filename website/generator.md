@@ -6,11 +6,11 @@ The generator reads your database's catalog and writes the types of `zapatos/sch
 ## The CLI {#cli}
 
 ```sh
-npx pgcast [config]
-npx zapatos [config]
+npx pgcast [--check] [config]
+npx zapatos [--check] [config]
 ```
 
-The same program under two names: `pgcast`, and `zapatos`, as in Zapatos 6.6.1. It reads the config, then runs [`generate()`](#generate) with it.
+The same program under two names: `pgcast`, and `zapatos`, as in Zapatos 6.6.1. It reads the config, then runs [`generate()`](#generate) with it, or with [`--check`](#check) compares what it would write with your files.
 
 - The config file: read from the folder you run it in, if it is there; never from a parent folder. Without one, the config is `{}`.
   - `zapatosconfig.json`, as in Zapatos 6.6.1.
@@ -19,7 +19,8 @@ The same program under two names: `pgcast`, and `zapatos`, as in Zapatos 6.6.1. 
   - A key given here replaces the file's whole value, so `'{"db": {"application_name": "codegen"}}'` drops the file's `connectionString`.
   - The file's variables are filled in before the merge: one it names must be set even when the argument replaces its key, or the CLI stops with `Environment variable 'NAME' is not set`.
 - Each string in both, at any depth, has its environment variables filled in ([Environment variables](#environment-variables)).
-- There are no flags: `--help` is read as the JSON argument, and fails. Any argument after the first is ignored.
+- One flag, `--check`, before or after `config`. Any other argument starting with `--` stops it with code 1 before it reads the config, Node printing `Unknown flag --help: the only flag is --check, beside the JSON argument` and its stack. Zapatos 6.6.1 read such a flag as the JSON argument, or ignored it after one.
+- Of the other arguments, the first is `config`; any later one is ignored.
 - Paths are relative to the folder you run it in: `outDir`, and so the `zapatos` folder.
 
 ::: code-group
@@ -43,7 +44,7 @@ Then it ends with the cause:
 
 | Cause | Ending |
 |---|---|
-| not valid JSON | `JSON.parse`'s message, which depends on the input and on Node: on Node 22, `Unexpected end of JSON input` for an empty file, `No number after minus sign in JSON at position 1 (line 1 column 2)` for `--help`, `Expected double-quoted property name in JSON at position 15 (line 1 column 16)` for a trailing comma |
+| not valid JSON | `JSON.parse`'s message, which depends on the input and on Node: on Node 22, `Unexpected end of JSON input` for an empty file, `No number after minus sign in JSON at position 1 (line 1 column 2)` for `-h`, `Expected double-quoted property name in JSON at position 15 (line 1 column 16)` for a trailing comma |
 | a variable is not set | `Environment variable 'DATABASE_URL' is not set` |
 
 A query that fails, the connection included, ends it with code 1, after `*** error <n> ***` and the error, as in Zapatos 6.6.1: it sets [`rejectOnQueryError`](#generate.rejectOnQueryError) to `false` over the file and the argument.
@@ -57,6 +58,30 @@ A query that fails, the connection included, ends it with code 1, after `*** err
 - In values only, at any depth of objects and arrays; never in keys: <code v-pre>"schemas": { "{{SCHEMA}}": … }</code> is a schema named <code v-pre>{{SCHEMA}}</code>. Numbers and booleans pass through.
 - A variable set to the empty string counts as set, and gives `""`.
 - Only the CLI does this, for the file and for its argument. [`generate()`](#generate) takes its config as it is: read `process.env` yourself.
+
+### `--check` {#check}
+
+```sh
+npx pgcast --check
+```
+
+It reads the catalog as a run does, builds the files in memory, and compares them with yours. It writes nothing, not even a folder: for CI, after your migrations, or before you call a change done.
+
+| Exit | When | It prints |
+|---|---|---|
+| 0 | every file matches | `The generated files in src/zapatos are up to date.` |
+| 1 | a file differs or is missing | a line per file, then how to write them |
+
+```txt
+Out of date: src/zapatos/schema.d.ts
+Missing: src/zapatos/custom/PgSeat_label.d.ts
+Run the generator without --check to write them.
+```
+
+- `schema.d.ts` and `custom/index.d.ts`, which each run writes again, are compared byte for byte. A placeholder counts only when it is missing: it is yours to edit ([The files it writes](#the-files-it-writes)).
+- `outDir`, `outExt` and [`moduleNames`](#generate.moduleNames) name the files, as for a run: `src/pgcast/schema.ts` with `".ts"` and `"pgcast"`.
+- The notes of a run come first, through [`warningListener`](#generate.warningListener), but for the placeholders it would write. A failed query ends it with code 1, as it ends a run.
+- Only the CLI has it: `zapatos/generate` exports no function for it.
 
 ## `generate()` {#generate}
 

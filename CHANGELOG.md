@@ -7,6 +7,10 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 ## [Unreleased]
 
 ### Added
+- `npx pgcast --check` (or `npx zapatos --check`), before or after the JSON argument, compares the files the generator would write with yours, and writes nothing: it exits with code 1, naming each file that differs or is missing, else prints that they are up to date (#556). `schema.d.ts` and `custom/index.d.ts` are compared byte for byte; a placeholder counts only when it is missing.
+  - Changed: any other argument starting with `--` stops the CLI with code 1 before it reads the config, `Unknown flag --chek: the only flag is --check, beside the JSON argument`. Zapatos 6.6.1 and pgcast 6.7.2 read one as the JSON argument, which failed, and ignored one after it: `npx pgcast '{}' --chek` generated.
+  - Changed: `generate()` lists the custom types by their own keys, so a key that other code added to `Object.prototype` no longer gets a placeholder file of its own in `custom/`, holding its value.
+  - Unchanged: without a flag, the CLI's output, files and exit code.
 - Releases publish from CI with npm trusted publishing, on a pushed tag `v<version>`, each with a provenance attestation that ties the tarball to its commit and workflow run (`.github/workflows/release.yml`). CI pins every action by commit SHA and keeps no git credentials after checkout.
 
 ## [6.7.2] - 2026-11-16
