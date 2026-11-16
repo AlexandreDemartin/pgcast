@@ -299,6 +299,77 @@ describe('upsert', () => {
     db.upsert('users', [row], k);
   });
 
+  test('updateValues refuses cols() and vals() of a primitive, which throw while compiling (#503)', () => {
+    // since #244, cols() and vals() of a primitive throw while compiling, so run() rejects (test/unit/core.test.ts,
+    // "updateValuesCols"); under 6.6.1, Postgres refused the SQL (42703, 42601), but for vals() of one character
+    // @ts-expect-error cols() of a string, on a text column: it compiled to "0", "1"…
+    db.upsert('users', row, 'email', { updateValues: { display_name: db.cols('display_name') } });
+    // @ts-expect-error vals() of a string, on a text column
+    db.upsert('users', row, 'email', { updateValues: { display_name: db.vals('x') } });
+    // @ts-expect-error cols() of a number, on an int column: it compiled to nothing, `ROW(…, )`
+    db.upsert('users', row, 'email', { updateValues: { manager_id: db.cols(1) } });
+    // @ts-expect-error vals() of a number, on an int column
+    db.upsert('users', row, 'email', { updateValues: { manager_id: db.vals(1) } });
+    // @ts-expect-error vals() of an enum label
+    db.upsert('users', row, 'email', { updateValues: { mood: db.vals('ok') } });
+    // @ts-expect-error cols() of a string, on jsonb, whose type also takes objects and arrays
+    db.upsert('users', row, 'email', { updateValues: { settings: db.cols('x') } });
+    // @ts-expect-error vals(null), on jsonb
+    db.upsert('users', row, 'email', { updateValues: { settings: db.vals(null) } });
+    // @ts-expect-error vals() of a boolean, on jsonb
+    db.upsert('users', row, 'email', { updateValues: { settings: db.vals(true) } });
+    // @ts-expect-error vals() of a string, on int8
+    db.upsert('accounts', {} as s.accounts.Insertable, 'id', { updateValues: { lifetime_ops: db.vals('1') } });
+    const big = null as unknown as bigint;  // no 1n literal: the tests target ES2019
+    // @ts-expect-error vals() of a bigint, on int8
+    db.upsert('accounts', {} as s.accounts.Insertable, 'id', { updateValues: { lifetime_ops: db.vals(big) } });
+    const name: string = 'display_name';
+    // @ts-expect-error cols() of a string held in a variable
+    db.upsert('users', row, 'email', { updateValues: { display_name: db.cols(name) } });
+    const either = null as unknown as string | string[];
+    // @ts-expect-error vals() of a value that may be a string, on jsonb
+    db.upsert('users', row, 'email', { updateValues: { settings: db.vals(either) } });
+    const built = { display_name: db.cols('display_name') };
+    // @ts-expect-error an updateValues built apart
+    db.upsert('users', row, 'email', { updateValues: built });
+  });
+
+  test('updateValues still takes cols() and vals() of an object or an array, and raw(), where 6.6.1 took them', () => {
+    const q = db.upsert('users', row, 'email', { updateValues: { settings: db.vals({ a: 1 }) } });
+    expectTypeOf(q.run(pool)).resolves.toEqualTypeOf<s.users.JSONSelectable & db.UpsertAction>();
+    expectTypeOf(q.run(pool)).resolves.not.toBeAny();
+    db.upsert('users', row, 'email', { updateValues: { settings: db.vals([1]) } });
+    db.upsert('users', row, 'email', { updateValues: { settings: db.cols({ a: 1 }) } });
+    db.upsert('users', row, 'email', { updateValues: { tags: db.cols(['users.tags']) } });
+    db.upsert('users', row, 'email', { updateValues: { tags: db.vals(['a']) } });
+    db.upsert('users', row, 'email', { updateValues: { display_name: db.raw(`upper('a')`), settings: db.raw(`'{}'`) } });
+    // param(x) keeps its literal type beside them
+    db.upsert('accounts', {} as s.accounts.Insertable, 'id', { updateValues: { opened_on: db.param('2020-01-01'), lifetime_ops: db.param('1') } });
+  });
+
+  test('updateValues takes cols() and vals() of an argument typed any, as 6.6.1 did, and refuses one typed unknown', () => {
+    // JSON.parse() gives any, which may hold an array at run time: vals(['Ada']) stores 'Ada', under 6.6.1 too
+    const parsed = JSON.parse('["Ada"]');
+    const q = db.upsert('users', row, 'email', { updateValues: { display_name: db.vals(parsed) } });
+    expectTypeOf(q.run(pool)).resolves.toEqualTypeOf<s.users.JSONSelectable & db.UpsertAction>();
+    expectTypeOf(q.run(pool)).resolves.not.toBeAny();
+    db.upsert('users', row, 'email', { updateValues: { display_name: db.cols(parsed) } });
+    db.upsert('users', row, 'email', { updateValues: { manager_id: db.vals(parsed) } });
+    db.upsert('users', row, 'email', { updateValues: { mood: db.param('ok'), settings: db.vals(parsed) } });
+    const unknown = null as unknown;
+    // @ts-expect-error vals() of an argument typed unknown, refused by 6.6.1 too
+    db.upsert('users', row, 'email', { updateValues: { display_name: db.vals(unknown) } });
+    // @ts-expect-error the same, on jsonb
+    db.upsert('users', row, 'email', { updateValues: { settings: db.vals(unknown) } });
+  });
+
+  test('characterization: updateValues takes cols() and vals() of a primitive on a column typed any, and of a Date', () => {
+    // a zapatos/custom placeholder left as generated is any, so the whole slot is any and refuses nothing
+    db.upsert('extra.type_zoo', { c_text: 'a' }, 'id', { updateValues: { c_bit: db.cols('x'), c_point: db.vals(1) } });
+    // a Date is an object: vals(new Date()) compiles to `ROW(…, )`, which Postgres refuses (42601), as under 6.6.1
+    db.upsert('users', row, 'email', { updateValues: { created_at: db.vals(new Date()) } });
+  });
+
   test('upsertRequiresSameKeys: an optional boolean of Config and setConfig', () => {
     db.setConfig({ upsertRequiresSameKeys: true });
     expectTypeOf(db.getConfig().upsertRequiresSameKeys).toEqualTypeOf<boolean | undefined>();

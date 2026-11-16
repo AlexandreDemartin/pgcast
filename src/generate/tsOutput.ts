@@ -219,6 +219,26 @@ const warnAboutDomainsUnderDomains = (columns: string[], config: CompleteConfig)
 };
 
 /**
+ * With `enumArraysTypedAsText` left out, note the columns it would type as a string in `Selectable`, once per run:
+ * `false` keeps the array with no note, for a project that parses it with `pg.types.setTypeParser`.
+ */
+const warnAboutEnumArraysNotAsText = (columns: string[], config: CompleteConfig) => {
+  if (columns.length === 0) return;
+
+  const
+    warn = config.warningListener === true ? console.log : config.warningListener || (() => void 0),
+    sorted = [...columns].sort(),
+    one = sorted.length === 1,
+    them = one ? 'it' : 'them',
+    list = one ? sorted[0] : sorted.slice(0, -1).join(', ') + ' and ' + sorted[sorted.length - 1];
+
+  warn(`Note: ${list} ${one ? 'is an array' : 'are arrays'} of an enum, which pg returns as ${one ? 'its' : 'their'} ` +
+    `text, such as '{a,b}', though Selectable types ${them} as ${one ? 'an array' : 'arrays'}. ` +
+    `Set enumArraysTypedAsText: true to type ${them} as ${one ? 'a string' : 'strings'} there, or false to keep ` +
+    `the ${one ? 'array' : 'arrays'} if pg.types.setTypeParser parses ${them}; true will be the default in pgcast 7.0.`);
+};
+
+/**
  * With `intervalsTypedAsObjects` left out, note the columns it would type otherwise, once per run: an interval is typed
  * as its text, though pg parses it into an object for a query of your own. `false` keeps the text with no note.
  */
@@ -355,6 +375,7 @@ const tsForQueries = async (config: CompleteConfig, queryFn: (q: pg.QueryConfig)
     domainRootsOnce: Promise<DomainRoots>[] = [],
     domainRoots = () => domainRootsOnce[0] ??= domainRootsInDatabase(queryFn),
     domainsUnderDomains: string[] = [],
+    enumArraysNotAsText: [string, string | null][] = [],
     intervalsAsText: string[] = [],
     schemaNames = Object.keys(schemas),
     schemaData = (await Promise.all(
@@ -376,7 +397,7 @@ const tsForQueries = async (config: CompleteConfig, queryFn: (q: pg.QueryConfig)
           tableDefs = await Promise.all(tables.map(async table =>
             definitionForRelationInSchema(table, schema, enums, customTypes, config, queryFn, customTypeOrigins,
               enumsForSchema, columnsTypedByEnumName, customTypeImports, uniqueIndexesNotArbiters, domainsNotByContext,
-              domainRoots, domainsUnderDomains, intervalsAsText))),
+              domainRoots, domainsUnderDomains, enumArraysNotAsText, intervalsAsText))),
           schemaIsUnprefixed = schema === config.unprefixedSchema,
           none = '/* (none) */',
           schemaDef = `/* === schema: ${jsdocText(schema)} === */\n` +
@@ -429,6 +450,9 @@ const tsForQueries = async (config: CompleteConfig, queryFn: (q: pg.QueryConfig)
   warnAboutUniqueIndexesNotArbiters(uniqueIndexesNotArbiters, config);
   warnAboutDomainsNotByContext(domainsNotByContext, config);
   warnAboutDomainsUnderDomains(domainsUnderDomains, config);
+  // a domain whose placeholder ends `any` stays `any` with the key (db.DomainInContext): no column of it is noted
+  warnAboutEnumArraysNotAsText(enumArraysNotAsText
+    .filter(([, customType]) => customType === null || customTypes[customType] !== 'any').map(([column]) => column), config);
   warnAboutIntervalsAsText(intervalsAsText, config);
 
   return { ts, customTypeSourceFiles };
