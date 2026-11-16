@@ -247,6 +247,22 @@ describe('upsert', () => {
     }
   });
 
+  it('updateValues: an updateValues added to Object.prototype by something else is no update value', () => {
+    const proto = Object.prototype as any;
+    proto.updateValues = { mood: 'calm' };
+    try {
+      expect(db.upsert('users', { email: 'e@x.org' }, 'email', { returning: ['email'] }).compile().text)
+        .toContain('DO UPDATE SET ("email") = ROW(EXCLUDED."email")');
+      expect(db.upsert('users', { email: 'e@x.org' }, 'email', { updateColumns: ['email'] }).compile().text)
+        .toContain('DO UPDATE SET ("email") = ROW(EXCLUDED."email")');
+      // one given to Object.create() is still read, as in 6.6.1
+      expect(db.upsert('users', { email: 'e@x.org' }, 'email', Object.create({ updateValues: { mood: param('kept') } })).compile())
+        .toMatchObject({ text: expect.stringContaining('DO UPDATE SET ("email", "mood") = ROW(EXCLUDED."email", $2)'), values: ['e@x.org', 'kept'] });
+    } finally {
+      delete proto.updateValues;
+    }
+  });
+
   it('updateValues: any other key is read as in 6.6.1, through a Proxy, a getter or a class prototype', () => {
     // a Proxy is read through its `get` trap alone
     const trap = new Proxy({}, { get: (_, k) => k === 'mood' ? param('trap') : undefined });
