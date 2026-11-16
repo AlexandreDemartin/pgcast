@@ -463,7 +463,7 @@ db.select('actors', { name: db.conditions.isInSelect('roles', db.all, 'actor_id'
 ```
 
 - **Sous `not()`**, elle ne trouve aucune ligne dès que la sous-requête renvoie un `NULL`, vu la façon dont Postgres lit `NOT IN` : `{ id: not(isInSelect('crew', db.all, 'mentor_id')) }` ne trouve personne, car un `mentor_id` est `NULL`. Pour l’anti-jointure, écrivez `not(exists(…))` (voir plus haut).
-- **Comme `where` entier**, hors d’une clé, elle n’a pas de colonne : elle lève "The 'self' column alias has no meaning here".
+- **Comme `where` entier**, hors d’une clé, elle n’a pas de colonne : le type l’y refuse, seule, sous `not()` ou dans `and()` (TS2345), et en code non typé, elle lève "The 'self' column alias has no meaning here".
 
 ## Dates et heures {#dates}
 
