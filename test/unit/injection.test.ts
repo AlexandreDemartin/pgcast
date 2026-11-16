@@ -2448,3 +2448,176 @@ describe('transaction', () => {
     expect(queryable.query).not.toHaveBeenCalled();
   });
 });
+
+describe('exists() and isInSelect()', () => {
+  // table and column are typed identifiers, parent and alias strings: each goes through the string branch of
+  // compileExpression, as select()'s table and alias do; what each achieves once run: test/integration/injection.test.ts
+  const { exists, isInSelect } = db.conditions;
+
+  it('the table of exists() and isInSelect() is quoted as a table name', () => {
+    expect(matrix(v => exists(v, all))).toMatchInlineSnapshot(`
+      {
+        "backslash": "EXISTS (SELECT 1 FROM "a\\b")",
+        "comment": "EXISTS (SELECT 1 FROM "a/*b")",
+        "dashes": "EXISTS (SELECT 1 FROM "a--b")",
+        "dollar": "EXISTS (SELECT 1 FROM "a$1b")",
+        "dot": "EXISTS (SELECT 1 FROM "a"."b")",
+        "dquote": "EXISTS (SELECT 1 FROM "a""b")",
+        "escapedCloses": "EXISTS (SELECT 1 FROM "a"" OR TRUE OR ""b")",
+        "escapedDot": "EXISTS (SELECT 1 FROM "a"".""b")",
+        "escapedNul": "EXISTS (SELECT 1 FROM "a""""<NUL>""""b")",
+        "escapedOdd": "EXISTS (SELECT 1 FROM "a""""""b")",
+        "lone": "EXISTS (SELECT 1 FROM """")",
+        "mixedEscaped": "EXISTS (SELECT 1 FROM "s".a$1."b"" OR TRUE OR ""c")",
+        "nul": "EXISTS (SELECT 1 FROM "a<NUL>b")",
+        "prequoted": "EXISTS (SELECT 1 FROM "a")",
+        "prequotedCloses": "EXISTS (SELECT 1 FROM """a"" OR TRUE OR ""b""")",
+        "prequotedEmpty": "EXISTS (SELECT 1 FROM """")",
+        "prequotedEscaped": "EXISTS (SELECT 1 FROM "a"" OR TRUE OR ""b")",
+        "qualifiedEscaped": "EXISTS (SELECT 1 FROM "s"."a"" OR TRUE OR ""b")",
+        "semicolon": "EXISTS (SELECT 1 FROM "a;b")",
+        "squote": "EXISTS (SELECT 1 FROM "a'b")",
+        "uescape": "EXISTS (SELECT 1 FROM """s"""."U&""a"" UESCAPE '!' || ""b""")",
+        "unicodeCloses": "EXISTS (SELECT 1 FROM """s"""."U&""a\\"" OR TRUE OR \\""b""")",
+        "unicodeEscaped": "EXISTS (SELECT 1 FROM "s".U&"a\\0022"" OR TRUE OR ""\\0022b")",
+      }
+    `);
+    expect(new Set(Object.entries(hostile).map(([, v]) => sql`${{ id: isInSelect(v as any, all, 'id') }}`.compile().text.replace(/^\(\("id" IN \(SELECT "id" FROM (.*)\)\)\)$/, '$1'))))
+      .toEqual(new Set(Object.values(matrix(v => exists(v, all))).map(text => text.replace(/^EXISTS \(SELECT 1 FROM (.*)\)$/, '$1').replace(/<NUL>/g, '\0'))));
+  });
+
+  it('the column of isInSelect() is quoted as a column name', () => {
+    expect(matrix(v => sql`${{ id: isInSelect('users', all, v) }}`)).toMatchInlineSnapshot(`
+      {
+        "backslash": "(("id" IN (SELECT "a\\b" FROM "users")))",
+        "comment": "(("id" IN (SELECT "a/*b" FROM "users")))",
+        "dashes": "(("id" IN (SELECT "a--b" FROM "users")))",
+        "dollar": "(("id" IN (SELECT "a$1b" FROM "users")))",
+        "dot": "(("id" IN (SELECT "a"."b" FROM "users")))",
+        "dquote": "(("id" IN (SELECT "a""b" FROM "users")))",
+        "escapedCloses": "(("id" IN (SELECT "a"" OR TRUE OR ""b" FROM "users")))",
+        "escapedDot": "(("id" IN (SELECT "a"".""b" FROM "users")))",
+        "escapedNul": "(("id" IN (SELECT "a""""<NUL>""""b" FROM "users")))",
+        "escapedOdd": "(("id" IN (SELECT "a""""""b" FROM "users")))",
+        "lone": "(("id" IN (SELECT """" FROM "users")))",
+        "mixedEscaped": "(("id" IN (SELECT "s".a$1."b"" OR TRUE OR ""c" FROM "users")))",
+        "nul": "(("id" IN (SELECT "a<NUL>b" FROM "users")))",
+        "prequoted": "(("id" IN (SELECT "a" FROM "users")))",
+        "prequotedCloses": "(("id" IN (SELECT """a"" OR TRUE OR ""b""" FROM "users")))",
+        "prequotedEmpty": "(("id" IN (SELECT """" FROM "users")))",
+        "prequotedEscaped": "(("id" IN (SELECT "a"" OR TRUE OR ""b" FROM "users")))",
+        "qualifiedEscaped": "(("id" IN (SELECT "s"."a"" OR TRUE OR ""b" FROM "users")))",
+        "semicolon": "(("id" IN (SELECT "a;b" FROM "users")))",
+        "squote": "(("id" IN (SELECT "a'b" FROM "users")))",
+        "uescape": "(("id" IN (SELECT """s"""."U&""a"" UESCAPE '!' || ""b""" FROM "users")))",
+        "unicodeCloses": "(("id" IN (SELECT """s"""."U&""a\\"" OR TRUE OR \\""b""" FROM "users")))",
+        "unicodeEscaped": "(("id" IN (SELECT "s".U&"a\\0022"" OR TRUE OR ""\\0022b" FROM "users")))",
+      }
+    `);
+  });
+
+  it('parent is quoted as select()\'s alias is, before the column of parent()', () => {
+    expect(matrix(v => exists('users', { manager_id: db.parent('id') }, { parent: v, alias: 'r' }))).toMatchInlineSnapshot(`
+      {
+        "backslash": "EXISTS (SELECT 1 FROM "users" AS "r" WHERE ("manager_id" = "a\\b"."id"))",
+        "comment": "EXISTS (SELECT 1 FROM "users" AS "r" WHERE ("manager_id" = "a/*b"."id"))",
+        "dashes": "EXISTS (SELECT 1 FROM "users" AS "r" WHERE ("manager_id" = "a--b"."id"))",
+        "dollar": "EXISTS (SELECT 1 FROM "users" AS "r" WHERE ("manager_id" = "a$1b"."id"))",
+        "dot": "EXISTS (SELECT 1 FROM "users" AS "r" WHERE ("manager_id" = "a"."b"."id"))",
+        "dquote": "EXISTS (SELECT 1 FROM "users" AS "r" WHERE ("manager_id" = "a""b"."id"))",
+        "escapedCloses": "EXISTS (SELECT 1 FROM "users" AS "r" WHERE ("manager_id" = "a"" OR TRUE OR ""b"."id"))",
+        "escapedDot": "EXISTS (SELECT 1 FROM "users" AS "r" WHERE ("manager_id" = "a"".""b"."id"))",
+        "escapedNul": "EXISTS (SELECT 1 FROM "users" AS "r" WHERE ("manager_id" = "a""""<NUL>""""b"."id"))",
+        "escapedOdd": "EXISTS (SELECT 1 FROM "users" AS "r" WHERE ("manager_id" = "a""""""b"."id"))",
+        "lone": "EXISTS (SELECT 1 FROM "users" AS "r" WHERE ("manager_id" = """"."id"))",
+        "mixedEscaped": "EXISTS (SELECT 1 FROM "users" AS "r" WHERE ("manager_id" = "s".a$1."b"" OR TRUE OR ""c"."id"))",
+        "nul": "EXISTS (SELECT 1 FROM "users" AS "r" WHERE ("manager_id" = "a<NUL>b"."id"))",
+        "prequoted": "EXISTS (SELECT 1 FROM "users" AS "r" WHERE ("manager_id" = "a"."id"))",
+        "prequotedCloses": "EXISTS (SELECT 1 FROM "users" AS "r" WHERE ("manager_id" = """a"" OR TRUE OR ""b"""."id"))",
+        "prequotedEmpty": "EXISTS (SELECT 1 FROM "users" AS "r" WHERE ("manager_id" = """"."id"))",
+        "prequotedEscaped": "EXISTS (SELECT 1 FROM "users" AS "r" WHERE ("manager_id" = "a"" OR TRUE OR ""b"."id"))",
+        "qualifiedEscaped": "EXISTS (SELECT 1 FROM "users" AS "r" WHERE ("manager_id" = "s"."a"" OR TRUE OR ""b"."id"))",
+        "semicolon": "EXISTS (SELECT 1 FROM "users" AS "r" WHERE ("manager_id" = "a;b"."id"))",
+        "squote": "EXISTS (SELECT 1 FROM "users" AS "r" WHERE ("manager_id" = "a'b"."id"))",
+        "uescape": "EXISTS (SELECT 1 FROM "users" AS "r" WHERE ("manager_id" = """s"""."U&""a"" UESCAPE '!' || ""b"""."id"))",
+        "unicodeCloses": "EXISTS (SELECT 1 FROM "users" AS "r" WHERE ("manager_id" = """s"""."U&""a\\"" OR TRUE OR \\""b"""."id"))",
+        "unicodeEscaped": "EXISTS (SELECT 1 FROM "users" AS "r" WHERE ("manager_id" = "s".U&"a\\0022"" OR TRUE OR ""\\0022b"."id"))",
+      }
+    `);
+  });
+
+  it('alias is quoted as select()\'s alias is', () => {
+    expect(matrix(v => exists('users', all, { alias: v }))).toMatchInlineSnapshot(`
+      {
+        "backslash": "EXISTS (SELECT 1 FROM "users" AS "a\\b")",
+        "comment": "EXISTS (SELECT 1 FROM "users" AS "a/*b")",
+        "dashes": "EXISTS (SELECT 1 FROM "users" AS "a--b")",
+        "dollar": "EXISTS (SELECT 1 FROM "users" AS "a$1b")",
+        "dot": "EXISTS (SELECT 1 FROM "users" AS "a"."b")",
+        "dquote": "EXISTS (SELECT 1 FROM "users" AS "a""b")",
+        "escapedCloses": "EXISTS (SELECT 1 FROM "users" AS "a"" OR TRUE OR ""b")",
+        "escapedDot": "EXISTS (SELECT 1 FROM "users" AS "a"".""b")",
+        "escapedNul": "EXISTS (SELECT 1 FROM "users" AS "a""""<NUL>""""b")",
+        "escapedOdd": "EXISTS (SELECT 1 FROM "users" AS "a""""""b")",
+        "lone": "EXISTS (SELECT 1 FROM "users" AS """")",
+        "mixedEscaped": "EXISTS (SELECT 1 FROM "users" AS "s".a$1."b"" OR TRUE OR ""c")",
+        "nul": "EXISTS (SELECT 1 FROM "users" AS "a<NUL>b")",
+        "prequoted": "EXISTS (SELECT 1 FROM "users" AS "a")",
+        "prequotedCloses": "EXISTS (SELECT 1 FROM "users" AS """a"" OR TRUE OR ""b""")",
+        "prequotedEmpty": "EXISTS (SELECT 1 FROM "users" AS """")",
+        "prequotedEscaped": "EXISTS (SELECT 1 FROM "users" AS "a"" OR TRUE OR ""b")",
+        "qualifiedEscaped": "EXISTS (SELECT 1 FROM "users" AS "s"."a"" OR TRUE OR ""b")",
+        "semicolon": "EXISTS (SELECT 1 FROM "users" AS "a;b")",
+        "squote": "EXISTS (SELECT 1 FROM "users" AS "a'b")",
+        "uescape": "EXISTS (SELECT 1 FROM "users" AS """s"""."U&""a"" UESCAPE '!' || ""b""")",
+        "unicodeCloses": "EXISTS (SELECT 1 FROM "users" AS """s"""."U&""a\\"" OR TRUE OR \\""b""")",
+        "unicodeEscaped": "EXISTS (SELECT 1 FROM "users" AS "s".U&"a\\0022"" OR TRUE OR ""\\0022b")",
+      }
+    `);
+  });
+
+  it('a hostile parent and alias together stay two names (note 006 § Replays)', () => {
+    expect(exists('users', { manager_id: db.parent('id') }, { parent: 'x"; DROP TABLE users; --', alias: 'r" --' }).compile())
+      .toEqual({ text: 'EXISTS (SELECT 1 FROM "users" AS "r"" --" WHERE ("manager_id" = "x""; DROP TABLE users; --"."id"))', values: [] });
+  });
+
+  it('the name check reads the compiled name, and a hostile one that matches the subquery\'s is refused', () => {
+    // each hostile parent over a table of the same name: refused when Postgres would read one name
+    expect(Object.fromEntries(Object.entries(hostile).map(([name, v]) => [name, visible(String(compiled(() => exists(v as any, all, { parent: v }))))])))
+      .toMatchInlineSnapshot(`
+        {
+          "backslash": "throws: \`exists()\` was given \`parent: 'a\\b'\`, which names "a\\b", the subquery's own name, so Postgres would read \`parent()\` as a column of the subquery's row: give the subquery another name with the \`alias\` option.",
+          "comment": "throws: \`exists()\` was given \`parent: 'a/*b'\`, which names "a/*b", the subquery's own name, so Postgres would read \`parent()\` as a column of the subquery's row: give the subquery another name with the \`alias\` option.",
+          "dashes": "throws: \`exists()\` was given \`parent: 'a--b'\`, which names "a--b", the subquery's own name, so Postgres would read \`parent()\` as a column of the subquery's row: give the subquery another name with the \`alias\` option.",
+          "dollar": "throws: \`exists()\` was given \`parent: 'a$1b'\`, which names "a$1b", the subquery's own name, so Postgres would read \`parent()\` as a column of the subquery's row: give the subquery another name with the \`alias\` option.",
+          "dot": "throws: \`exists()\` was given \`parent: 'a.b'\`, which names "b", the subquery's own name, so Postgres would read \`parent()\` as a column of the subquery's row: give the subquery another name with the \`alias\` option.",
+          "dquote": "throws: \`exists()\` was given \`parent: 'a"b'\`, which names "a"b", the subquery's own name, so Postgres would read \`parent()\` as a column of the subquery's row: give the subquery another name with the \`alias\` option.",
+          "escapedCloses": "throws: \`exists()\` was given \`parent: 'a"" OR TRUE OR ""b'\`, which names "a" OR TRUE OR "b", the subquery's own name, so Postgres would read \`parent()\` as a column of the subquery's row: give the subquery another name with the \`alias\` option.",
+          "escapedDot": "throws: \`exists()\` was given \`parent: 'a"."b'\`, which names "a"."b", the subquery's own name, so Postgres would read \`parent()\` as a column of the subquery's row: give the subquery another name with the \`alias\` option.",
+          "escapedNul": "throws: \`exists()\` was given \`parent: 'a""<NUL>""b'\`, which names "a""<NUL>""b", the subquery's own name, so Postgres would read \`parent()\` as a column of the subquery's row: give the subquery another name with the \`alias\` option.",
+          "escapedOdd": "throws: \`exists()\` was given \`parent: 'a"""b'\`, which names "a"""b", the subquery's own name, so Postgres would read \`parent()\` as a column of the subquery's row: give the subquery another name with the \`alias\` option.",
+          "lone": "throws: \`exists()\` was given \`parent: '"'\`, which names """, the subquery's own name, so Postgres would read \`parent()\` as a column of the subquery's row: give the subquery another name with the \`alias\` option.",
+          "mixedEscaped": "throws: \`exists()\` was given \`parent: '"s".a$1."b"" OR TRUE OR ""c"'\`, which names "b" OR TRUE OR "c", the subquery's own name, so Postgres would read \`parent()\` as a column of the subquery's row: give the subquery another name with the \`alias\` option.",
+          "nul": "throws: \`exists()\` was given \`parent: 'a<NUL>b'\`, which names "a<NUL>b", the subquery's own name, so Postgres would read \`parent()\` as a column of the subquery's row: give the subquery another name with the \`alias\` option.",
+          "prequoted": "throws: \`exists()\` was given \`parent: '"a"'\`, which names "a", the subquery's own name, so Postgres would read \`parent()\` as a column of the subquery's row: give the subquery another name with the \`alias\` option.",
+          "prequotedCloses": "throws: \`exists()\` was given \`parent: '"a" OR TRUE OR "b"'\`, which names ""a" OR TRUE OR "b"", the subquery's own name, so Postgres would read \`parent()\` as a column of the subquery's row: give the subquery another name with the \`alias\` option.",
+          "prequotedEmpty": "throws: \`exists()\` was given \`parent: '""'\`, which names """, the subquery's own name, so Postgres would read \`parent()\` as a column of the subquery's row: give the subquery another name with the \`alias\` option.",
+          "prequotedEscaped": "throws: \`exists()\` was given \`parent: '"a"" OR TRUE OR ""b"'\`, which names "a" OR TRUE OR "b", the subquery's own name, so Postgres would read \`parent()\` as a column of the subquery's row: give the subquery another name with the \`alias\` option.",
+          "qualifiedEscaped": "throws: \`exists()\` was given \`parent: 's.a"" OR TRUE OR ""b'\`, which names "a" OR TRUE OR "b", the subquery's own name, so Postgres would read \`parent()\` as a column of the subquery's row: give the subquery another name with the \`alias\` option.",
+          "semicolon": "throws: \`exists()\` was given \`parent: 'a;b'\`, which names "a;b", the subquery's own name, so Postgres would read \`parent()\` as a column of the subquery's row: give the subquery another name with the \`alias\` option.",
+          "squote": "throws: \`exists()\` was given \`parent: 'a'b'\`, which names "a'b", the subquery's own name, so Postgres would read \`parent()\` as a column of the subquery's row: give the subquery another name with the \`alias\` option.",
+          "uescape": "throws: \`exists()\` was given \`parent: '"s".U&"a" UESCAPE '!' || "b"'\`, which names "U&"a" UESCAPE '!' || "b"", the subquery's own name, so Postgres would read \`parent()\` as a column of the subquery's row: give the subquery another name with the \`alias\` option.",
+          "unicodeCloses": "throws: \`exists()\` was given \`parent: '"s".U&"a\\" OR TRUE OR \\"b"'\`, which names "U&"a\\" OR TRUE OR \\"b"", the subquery's own name, so Postgres would read \`parent()\` as a column of the subquery's row: give the subquery another name with the \`alias\` option.",
+          "unicodeEscaped": "throws: \`exists()\` was given \`parent: '"s".U&"a\\0022"" OR TRUE OR ""\\0022b"'\`, which names "a"" OR TRUE OR ""b", the subquery's own name, so Postgres would read \`parent()\` as a column of the subquery's row: give the subquery another name with the \`alias\` option.",
+        }
+      `);
+  });
+
+  it('a value of the inner where stays a parameter', () => {
+    for (const input of Object.values(hostile)) {
+      expect(exists('users', { display_name: input }).compile()).toEqual({ text: 'EXISTS (SELECT 1 FROM "users" WHERE ("display_name" = $1))', values: [input] });
+      expect(sql`${{ id: isInSelect('users', { display_name: db.conditions.like(input) }, 'id') }}`.compile())
+        .toEqual({ text: '(("id" IN (SELECT "id" FROM "users" WHERE (("display_name" LIKE $1)))))', values: [input] });
+    }
+  });
+});

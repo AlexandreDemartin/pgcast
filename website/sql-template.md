@@ -363,7 +363,7 @@ type SelfType = typeof self
 db.parent<T extends Column | undefined = Column | undefined>(x?: T): ParentColumn<T>
 ```
 
-A column of the parent query's table, in a subquery given to `lateral` ([Joins](/lateral)): `"<parent table or alias>"."<column>"`.
+A column of the parent query's table, in a subquery given to `lateral` ([Joins](/lateral)), or in the `where` of [`exists()`](/conditions#conditions.exists) and [`isInSelect()`](/conditions#conditions.isInSelect), whose `parent` option names that table: `"<parent table or alias>"."<column>"`.
 
 <CastPanel example="sql_parent">
 
@@ -374,7 +374,7 @@ A column of the parent query's table, in a subquery given to `lateral` ([Joins](
 - Without a column, the column of the filter it sits in: `{ film_id: db.parent() }`, in a `lateral` of `roles`, gives `("film_id" = "roles"."film_id")`<!-- probe: db.select('roles', db.all, { lateral: { film: db.selectOne('films', { film_id: db.parent() }) } }) -->. With no filter, it throws before writing anything: "`db.parent()` with no column has no meaning here: name the column, `db.parent('id')`…"<!-- message -->. Zapatos 6.6.1 wrote the table and its `.`, then threw "Alien object while interpolating SQL: undefined".
 - It works as a Whereable value, in a `sql` fragment, in `eq()` and in `vals([…])`, so in `isIn()`: `{ film_id: isIn([db.parent()]) }` gives `(("film_id" IN ("roles"."film_id")))`<!-- probe: db.select('roles', db.all, { lateral: { film: db.selectOne('films', { film_id: db.conditions.isIn([db.parent()]) }) } }) -->. In `vals([…])`, Zapatos 6.6.1 sent it as JSON: `isIn([parent('id')])` compared with `'{"value":"id"}'`.
 - In `vals({…})` too, where without a column it takes the column of its key: `` db.sql`SELECT ${db.vals({ name: db.parent() })} AS result` ``, in a `lateral` of `studios`, gives `SELECT "studios"."name" AS result`<!-- probe: db.select('studios', db.all, { lateral: { n: db.sql`SELECT ${db.vals({ name: db.parent() })} AS result` } }) -->. Zapatos 6.6.1 sent it there as JSON too.
-- Outside a nested query, it throws "The 'parent' table alias has no meaning here"<!-- message -->, so `run()` rejects before any query. So does every `insert()`, `upsert()` or `update()` value, where Zapatos 6.6.1 stored `{"value":"id"}` on a text column.
+- Outside a nested query, it throws "The 'parent' table alias has no meaning here"<!-- message -->, so `run()` rejects before any query. So does every `insert()`, `upsert()` or `update()` value, where Zapatos 6.6.1 stored `{"value":"id"}` on a text column, and the `where` of `exists()` or `isInSelect()` without `parent`, inside a `lateral` too.
 
 ### `ParentColumn` {#ParentColumn}
 
@@ -474,7 +474,7 @@ What `sql` and every shortcut return: a query, or part of one, not yet compiled.
 | [`prepared(name?)`](#prepared) | makes it a prepared statement |
 | [`copy(override?)`](#copy) | a shallow copy, some properties replaced |
 | `noop`, `noopResult` | set by `insert()` and `upsert()` given `[]`: `run()` sends nothing and resolves to `noopResult` |
-| `parentTable` | set on a `lateral` subquery by its parent, for [`parent()`](#parent) |
+| `parentTable` | set on a `lateral` subquery by its parent, and on the subquery of `exists()` and `isInSelect()` by their `parent` option, for [`parent()`](#parent) |
 | `preparedName` | set by `prepared()` |
 | `compileExpression()` | used by `compile()`, internal |
 

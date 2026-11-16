@@ -27,6 +27,7 @@ describe('conditions', () => {
         "betweenSymmetric",
         "eq",
         "eqAny",
+        "exists",
         "fromNow",
         "gt",
         "gte",
@@ -34,6 +35,7 @@ describe('conditions', () => {
         "isDistinctFrom",
         "isFalse",
         "isIn",
+        "isInSelect",
         "isNotDistinctFrom",
         "isNotFalse",
         "isNotIn",
@@ -602,6 +604,8 @@ describe('Default, self, raw, cols and vals as the value of a condition', () => 
   const lists: Record<string, (a: any[]) => db.SQLFragment<any, any>> = { isIn: dc.isIn, isNotIn: dc.isNotIn };
   const noValue = ['isNull', 'isNotNull', 'isTrue', 'isNotTrue', 'isFalse', 'isNotFalse', 'isUnknown', 'isNotUnknown',
     'and', 'or', 'not', 'fromNow', 'now'];
+  // these take a table and a Whereable, not a value: below, exists() and isInSelect()
+  const subqueries = ['exists', 'isInSelect'];
 
   /** What compiling `{ col: condition }` throws, or 'compiled'; building the condition must not throw. */
   const thrown = (condition: db.SQL) => {
@@ -613,7 +617,7 @@ describe('Default, self, raw, cols and vals as the value of a condition', () => 
   };
 
   it('covers every condition of db.conditions', () => {
-    expect([...Object.keys(one), ...Object.keys(two), ...Object.keys(lists), 'eqAny', ...noValue].sort()).toEqual(Object.keys(dc).sort());
+    expect([...Object.keys(one), ...Object.keys(two), ...Object.keys(lists), 'eqAny', ...noValue, ...subqueries].sort()).toEqual(Object.keys(dc).sort());
   });
 
   it('eqAny given an item one array parameter cannot hold throws when compiled, not when called, saying what to do', () => {
@@ -746,5 +750,174 @@ describe('Default, self, raw, cols and vals as the value of a condition', () => 
         "values": [],
       }
     `);
+  });
+});
+
+describe('exists() and isInSelect()', () => {
+  // the expected SQL is note 006 § Replays (docs/decisions/006-subquery-conditions.md): the `WHERE` of a
+  // select() of users, columns ['display_name'], so that the condition's values start at $2
+  const { exists, isInSelect } = dc;
+  const where = (condition: db.SQL) => {
+    const { text, values } = db.select('users', condition as any, { columns: ['display_name'] }).compile();
+    return { where: /^SELECT coalesce\(jsonb_agg\(result\), '\[\]'\) AS result FROM \(SELECT jsonb_build_object\(\$1::text, "display_name"\) AS result FROM "users" WHERE (.*)\) AS "sq_users"$/.exec(text)?.[1] ?? text, values };
+  };
+  const thrown = (build: () => db.SQL) => {
+    try { where(build()); return 'compiled'; } catch (err) { return (err as Error).message; }
+  };
+  const ownName = (fn: string, parent: string, name: string) =>
+    `\`${fn}()\` was given \`parent: '${parent}'\`, which names "${name}", the subquery's own name, so Postgres would read \`parent()\` as a column of the subquery's row: give the subquery another name with the \`alias\` option.`;
+
+  it('exists() with parent: the outer row\'s column, qualified by parent', () => {
+    expect(where(exists('extra.articles', { author_id: parent('id'), body: dc.like('Notes%') }, { parent: 'users' }))).toEqual({
+      where: 'EXISTS (SELECT 1 FROM "extra"."articles" WHERE ("author_id" = "users"."id" AND ("body" LIKE $2)))',
+      values: ['display_name', 'Notes%'],
+    });
+    expect(where(exists('extra.articles', { author_id: parent('id') }, { parent: 'users' }))).toEqual({
+      where: 'EXISTS (SELECT 1 FROM "extra"."articles" WHERE ("author_id" = "users"."id"))',
+      values: ['display_name'],
+    });
+  });
+
+  it('isInSelect(): the key\'s column IN the subquery\'s column', () => {
+    expect(where({ id: isInSelect('extra.articles', { body: dc.like('Notes%') }, 'author_id') })).toEqual({
+      where: '(("id" IN (SELECT "author_id" FROM "extra"."articles" WHERE (("body" LIKE $2)))))',
+      values: ['display_name', 'Notes%'],
+    });
+  });
+
+  it('all gives no WHERE, {} gives WHERE TRUE, as in select()', () => {
+    expect(where({ id: isInSelect('extra.articles', db.all, 'author_id') }).where).toBe('(("id" IN (SELECT "author_id" FROM "extra"."articles")))');
+    expect(where({ id: isInSelect('extra.articles', {}, 'author_id') }).where).toBe('(("id" IN (SELECT "author_id" FROM "extra"."articles" WHERE TRUE)))');
+    expect(exists('users', db.all).compile()).toEqual({ text: 'EXISTS (SELECT 1 FROM "users")', values: [] });
+    expect(exists('users', {}).compile().text).toBe('EXISTS (SELECT 1 FROM "users" WHERE TRUE)');
+  });
+
+  it('a sql fragment as the where, written as given', () => {
+    expect(exists('extra.articles', sql`${'author_id'} = ${parent('id')} AND ${'reviewer_id'} IS NULL`, { parent: 'users' }).compile().text)
+      .toBe('EXISTS (SELECT 1 FROM "extra"."articles" WHERE "author_id" = "users"."id" AND "reviewer_id" IS NULL)');
+  });
+
+  it('alias: AS <alias> after the table, and parent may then name the same table', () => {
+    expect(where(exists('users', { manager_id: parent('id') }, { parent: 'users', alias: 'reports' })).where)
+      .toBe('EXISTS (SELECT 1 FROM "users" AS "reports" WHERE ("manager_id" = "users"."id"))');
+    expect(where({ id: isInSelect('users', { mood: 'sad' }, 'manager_id', { alias: 'reports' }) }).where)
+      .toBe('(("id" IN (SELECT "manager_id" FROM "users" AS "reports" WHERE ("mood" = $2))))');
+  });
+
+  it('the anti-join: not(exists(…)), and not() of isInSelect() under a key', () => {
+    expect(where(dc.not(exists('extra.articles', { reviewer_id: parent('id') }, { parent: 'users' }))).where)
+      .toBe('(NOT (EXISTS (SELECT 1 FROM "extra"."articles" WHERE ("reviewer_id" = "users"."id"))))');
+    expect(where({ id: dc.not(isInSelect('extra.articles', db.all, 'reviewer_id')) }).where)
+      .toBe('(((NOT ("id" IN (SELECT "reviewer_id" FROM "extra"."articles")))))');
+  });
+
+  it('exists() fits under any key, in and() and or(), and in a sql template, where its SQL is the same', () => {
+    const e = exists('extra.articles', { author_id: parent('id') }, { parent: 'users' });
+    const subquery = 'EXISTS (SELECT 1 FROM "extra"."articles" WHERE ("author_id" = "users"."id"))';
+    expect(where({ display_name: e }).where).toBe(`((${subquery}))`);
+    expect(where(dc.and({ mood: 'happy' }, e))).toEqual({ where: `((("mood" = $2)) AND (${subquery}))`, values: ['display_name', 'happy'] });
+    expect(where(dc.or({ id: isInSelect('extra.articles', db.all, 'author_id') }, e)).where)
+      .toBe(`((("id" IN (SELECT "author_id" FROM "extra"."articles"))) OR ${subquery})`);
+    expect(sql`SELECT 1 FROM ${'users'} WHERE ${e}`.compile().text).toBe(`SELECT 1 FROM "users" WHERE ${subquery}`);
+  });
+
+  it('a name that parent shares with the subquery\'s own is refused as the query compiles, not at the call', () => {
+    // Postgres would read `"users"."id"` as the inner row's: no row, no error (note 006 § Replays)
+    const refusals = {
+      'users over users': () => exists('users', { manager_id: parent('id') }, { parent: 'users' }),
+      'users over public.users': () => exists('public.users', { manager_id: parent('id') }, { parent: 'users' }),
+      '"users" over users': () => exists('users', { manager_id: parent('id') }, { parent: '"users"' }),
+      'public.users over extra.users': () => exists('extra.users' as any, { manager_id: parent('id') }, { parent: 'public.users' }),
+      'users over extra.articles AS users': () => exists('extra.articles', { author_id: parent('id') }, { parent: 'users', alias: 'users' }),
+      'isInSelect, users over users': () => isInSelect('users', { manager_id: parent('id') }, 'id', { parent: 'users' }),
+    };
+    for (const build of Object.values(refusals)) expect(build).not.toThrow();
+    expect(Object.fromEntries(Object.entries(refusals).map(([name, build]) => [name, thrown(() => ({ id: build() }))]))).toEqual({
+      'users over users': ownName('exists', 'users', 'users'),
+      'users over public.users': ownName('exists', 'users', 'users'),
+      '"users" over users': ownName('exists', '"users"', 'users'),
+      'public.users over extra.users': ownName('exists', 'public.users', 'users'),
+      'users over extra.articles AS users': ownName('exists', 'users', 'users'),
+      'isInSelect, users over users': ownName('isInSelect', 'users', 'users'),
+    });
+  });
+
+  it('names compare as Postgres reads them: a U& part decoded, case kept in quotes', () => {
+    const refusal = (p: string, table = 'users', alias?: string) =>
+      thrown(() => exists(table as any, { manager_id: parent('id') }, alias === undefined ? { parent: p } : { parent: p, alias }));
+    expect({
+      unicode: refusal('"public".U&"\\0075sers"'),
+      unicodeLower: refusal('"public".u&"user\\+000073"'),
+      unicodeBackslash: refusal('"s".U&"a\\\\b"', 'a\\b'),
+      quotedCase: refusal('Users'),
+      aliasQuotedCase: refusal('users', 'users', 'Users'),
+      escapedQuote: refusal('a"b', 'a"b'),
+      unicodePastMax: refusal('"s".U&"\\+110000"'),
+    }).toEqual({
+      unicode: ownName('exists', '"public".U&"\\0075sers"', 'users'),
+      unicodeLower: ownName('exists', '"public".u&"user\\+000073"', 'users'),
+      unicodeBackslash: ownName('exists', '"s".U&"a\\\\b"', 'a\\b'),
+      // `"Users"` is another name than `"users"`: Postgres reads it as such
+      quotedCase: 'compiled',
+      aliasQuotedCase: 'compiled',
+      escapedQuote: ownName('exists', 'a"b', 'a"b'),
+      // past U+10FFFF, no character: the escape is kept as it is, and Postgres refuses the name, not the call
+      unicodePastMax: 'compiled',
+    });
+  });
+
+  it('names compare as Postgres truncates them: the first 63 bytes, cut at a character\'s end', () => {
+    const r = (n: number) => 'r'.repeat(n);
+    const refusal = (p: string, alias: string) => thrown(() => exists('users', { manager_id: parent('id') }, { parent: p, alias }));
+    expect({
+      past63: refusal(`${r(63)}a`, `${r(63)}b`),
+      // é and è are 2 bytes each: 62 + 2 is past 63, so Postgres keeps the 62 r's of each, though each is 63 characters
+      past63Bytes: refusal(`${r(62)}é`, `${r(62)}è`),
+      unicodePast63: refusal(`"public".U&"${r(63)}\\0061"`, `${r(63)}b`),
+      within63: refusal(`${r(62)}a`, `${r(62)}b`),
+    }).toEqual({
+      past63: ownName('exists', `${r(63)}a`, r(63)),
+      past63Bytes: ownName('exists', `${r(62)}é`, r(62)),
+      unicodePast63: ownName('exists', `"public".U&"${r(63)}\\0061"`, r(63)),
+      within63: 'compiled',
+    });
+  });
+
+  it('the name check stays fast on a long run of doubled quotes', () => {
+    const name = `${'a""'.repeat(100_000)}"`;
+    expect(exists('users', db.all, { parent: name }).compile().text).toBe('EXISTS (SELECT 1 FROM "users")');
+  });
+
+  it('without parent, parent() throws, at the top level and in a lateral, which hands no mark down', () => {
+    const noMark = "The 'parent' table alias has no meaning here";
+    expect(thrown(() => exists('extra.articles', { author_id: parent('id') }))).toBe(noMark);
+    expect(thrown(() => db.select('users', db.all, {
+      lateral: { a: db.select('extra.articles', exists('users', { id: parent('author_id') }), { columns: ['id'] }) },
+    }))).toBe(noMark);
+    // uncorrelated, it compiles anywhere
+    expect(db.select('users', db.all, { lateral: { a: db.select('extra.articles', exists('users', db.all)) } }).compile().text)
+      .toContain('FROM "extra"."articles" WHERE EXISTS (SELECT 1 FROM "users")) AS "sq_extra.articles"');
+  });
+
+  it('with parent, in a lateral, the subquery\'s own mark wins over the lateral\'s', () => {
+    const q = db.select('users', db.all, {
+      lateral: { a: db.select('extra.articles', exists('users', { id: parent('reviewer_id') }, { parent: 'extra.articles' }), { columns: ['id'] }) },
+    });
+    expect(q.compile().text).toContain('FROM "extra"."articles" WHERE EXISTS (SELECT 1 FROM "users" WHERE ("id" = "extra"."articles"."reviewer_id"))) AS "sq_extra.articles"');
+  });
+
+  it('self has no meaning in the subquery\'s where, nor isInSelect() as the whole where', () => {
+    const noColumn = "The 'self' column alias has no meaning here";
+    expect(thrown(() => ({ id: exists('extra.articles', sql`${'author_id'} = ${self}`, { parent: 'users' }) }))).toBe(noColumn);
+    expect(thrown(() => ({ id: isInSelect('extra.articles', { author_id: dc.eq(1) }, 'author_id') }))).toBe('compiled');
+    expect(thrown(() => dc.not(isInSelect('extra.articles', db.all, 'reviewer_id')))).toBe(noColumn);
+  });
+
+  it('copy() of the condition keeps parent, and drops the inherited mark', () => {
+    const e = exists('extra.articles', { author_id: parent('id') }, { parent: 'users' });
+    expect(e.copy().compile().text).toBe('EXISTS (SELECT 1 FROM "extra"."articles" WHERE ("author_id" = "users"."id"))');
+    expect(e.copy({ parentTable: 'films' }).compile().text).toBe('EXISTS (SELECT 1 FROM "extra"."articles" WHERE ("author_id" = "users"."id"))');
+    expect(() => exists('extra.articles', { author_id: parent('id') }).copy({ parentTable: 'users' }).compile())
+      .toThrow("The 'parent' table alias has no meaning here");
   });
 });
