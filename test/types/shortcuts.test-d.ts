@@ -347,6 +347,22 @@ describe('upsert', () => {
     db.upsert('accounts', {} as s.accounts.Insertable, 'id', { updateValues: { opened_on: db.param('2020-01-01'), lifetime_ops: db.param('1') } });
   });
 
+  test('updateValues takes cols() and vals() of an argument typed any, as 6.6.1 did, and refuses one typed unknown', () => {
+    // JSON.parse() gives any, which may hold an array at run time: vals(['Ada']) stores 'Ada', under 6.6.1 too
+    const parsed = JSON.parse('["Ada"]');
+    const q = db.upsert('users', row, 'email', { updateValues: { display_name: db.vals(parsed) } });
+    expectTypeOf(q.run(pool)).resolves.toEqualTypeOf<s.users.JSONSelectable & db.UpsertAction>();
+    expectTypeOf(q.run(pool)).resolves.not.toBeAny();
+    db.upsert('users', row, 'email', { updateValues: { display_name: db.cols(parsed) } });
+    db.upsert('users', row, 'email', { updateValues: { manager_id: db.vals(parsed) } });
+    db.upsert('users', row, 'email', { updateValues: { mood: db.param('ok'), settings: db.vals(parsed) } });
+    const unknown = null as unknown;
+    // @ts-expect-error vals() of an argument typed unknown, refused by 6.6.1 too
+    db.upsert('users', row, 'email', { updateValues: { display_name: db.vals(unknown) } });
+    // @ts-expect-error the same, on jsonb
+    db.upsert('users', row, 'email', { updateValues: { settings: db.vals(unknown) } });
+  });
+
   test('characterization: updateValues takes cols() and vals() of a primitive on a column typed any, and of a Date', () => {
     // a zapatos/custom placeholder left as generated is any, so the whole slot is any and refuses nothing
     db.upsert('extra.type_zoo', { c_text: 'a' }, 'id', { updateValues: { c_bit: db.cols('x'), c_point: db.vals(1) } });
