@@ -44,9 +44,6 @@ export default defineConfig(
         "skipComments": true,
       }],
       "no-unused-vars": "off",
-      // an overload signature redeclares its function (`sql`), and tsc reports a real redeclaration: off, as in
-      // typescript-eslint's eslint-recommended
-      "no-redeclare": "off",
       "@typescript-eslint/no-unused-vars": ["warn", {
         "varsIgnorePattern": "^_",
       }],
