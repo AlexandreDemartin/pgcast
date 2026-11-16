@@ -1,5 +1,5 @@
 ---
-english: 52d71a656838
+english: 71d5bbf364e0
 ---
 
 # Template SQL
@@ -319,24 +319,24 @@ Un objet est un Whereable de la table : chacune de ses propres clés énumérab
 Un objet interpolé qui n’est pas l’une des autres [interpolations](#interpolations) se compile en Whereable, objet simple ou non : une instance de classe `{ title }` donne `("title" = $1)`<!-- probe: db.sql`${new (class { title = 'x' })()}` -->, et une instance sans clé propre énumérable donne `TRUE`, même d’une classe qui étend un objet natif (`class Premiere extends Date {}`). Vérifiez à l’exécution ce qui atteint un `where`.
 :::
 
-Un objet natif lève une erreur à la compilation, avant toute requête, même avec des clés propres ajoutées (`Object.assign(new Date(0), { id: 1 })`) : `Date`, `Map`, `Set`, `WeakMap`, `WeakSet`, `WeakRef`, `FinalizationRegistry`, `RegExp`, `Promise`, `Error` et ses sous-types natifs (`TypeError`, `AggregateError`, …), `ArrayBuffer`, `SharedArrayBuffer`, un tableau typé, `Buffer`, `DataView`, les objets wrapper `Number`, `String`, `Boolean`, `BigInt` et `Symbol`, les objets `Intl` (`Intl.Collator`, `Intl.DateTimeFormat`, `Intl.NumberFormat`, `Intl.Locale`, …), et, là où le runtime les fournit, `SuppressedError`, `DisposableStack` et `AsyncDisposableStack` (Node 24) et les objets `Temporal` (Node 26 : `Temporal.PlainDate`, `Temporal.Instant`, `Temporal.ZonedDateTime`, …), que l’erreur nomme par leur constructeur (`PlainDate`) :
+Un objet natif lève une erreur à la compilation, avant toute requête, même avec des clés propres ajoutées (`Object.assign(new Date(0), { id: 1 })`) : `Date`, `Map`, `Set`, `WeakMap`, `WeakSet`, `WeakRef`, `FinalizationRegistry`, `RegExp`, `Promise`, `Error` et ses sous-types natifs (`TypeError`, `AggregateError`, …), `ArrayBuffer`, `SharedArrayBuffer`, un tableau typé, `Buffer`, `DataView`, les objets wrapper `Number`, `String`, `Boolean`, `BigInt` et `Symbol`, les objets `Intl` (`Intl.Collator`, `Intl.DateTimeFormat`, `Intl.NumberFormat`, `Intl.Locale`, …), et, là où le runtime les fournit, `SuppressedError`, `DisposableStack` et `AsyncDisposableStack` (Node 24) et les objets `Temporal` (Node 26 : `Temporal.PlainDate`, `Temporal.Instant`, `Temporal.ZonedDateTime`, …), que l’erreur nomme par leur constructeur (`PlainDate`), et les espaces de noms `Math`, `JSON`, `Reflect`, `Atomics`, `Intl` et, là où le runtime les fournit, `Temporal` et `Temporal.Now`, qu’elle nomme par leur chemin (`Temporal.Now`) :
 
 > `` A built-in `…` has no meaning as a Whereable (a filter): it would compile to its own enumerable keys, and to `TRUE`, every row, when it has none. To compare with a value, give it as `db.param(…)`; to filter, give a plain object (`{ column: value }`); await a `Promise` first. ``<!-- message -->
 
-Zapatos 6.6.1 le compilait en Whereable de ses propres clés : `TRUE` pour la plupart, si bien que `` db.sql`DELETE FROM ${'films'} WHERE ${new Date()}` `` donnait `DELETE FROM "films" WHERE TRUE` et supprimait toutes les lignes ; `("0" = $1 …)` pour un tableau typé. Un objet hôte (`URL`, `Blob`, `Headers`, `AbortController`) n’est pas refusé : il se compile en Whereable de ses propres clés, comme une instance de classe, donc `TRUE` quand il n’en a aucune.
+Zapatos 6.6.1 le compilait en Whereable de ses propres clés : `TRUE` pour la plupart, si bien que `` db.sql`DELETE FROM ${'films'} WHERE ${new Date()}` `` donnait `DELETE FROM "films" WHERE TRUE` et supprimait toutes les lignes, tout comme `db.deletes('films', Temporal.Now as any)`, écrit à la place de `Temporal.Now.plainDateISO()` ; `("0" = $1 …)` pour un tableau typé. Un objet hôte (`URL`, `Blob`, `Headers`, `AbortController`) ou un espace de noms hôte (`console`, `WebAssembly`) n’est pas refusé : il se compile en Whereable de ses propres clés, comme une instance de classe, donc `TRUE` quand il n’en a aucune.
 
 Un itérateur ou un générateur, synchrone ou asynchrone, sans clé propre énumérable lève aussi une erreur, qui le nomme par son étiquette (`Set Iterator`, `Generator`) : le `.values()` d’un `Set`, le `.entries()` d’une `Map`, `(function* () {})()`, `Iterator.from(…)`, un itérateur hôte comme `new URLSearchParams().entries()` ou `new Headers().entries()` (un objet `Headers` lui-même n’est pas refusé), un itérateur ECMA-402 comme celui d’`Intl.Segmenter`, et une instance d’une classe qui étend `Iterator` sans clé propre énumérable. Chacun a `%IteratorPrototype%` ou `%AsyncIteratorPrototype%` dans sa chaîne de prototypes. Zapatos 6.6.1 compilait `` db.deletes('films', ids.values() as any) ``, pour un `Set` d’identifiants, en `DELETE FROM "films" WHERE TRUE …` : pour filtrer sur les identifiants, donnez `{ id: db.conditions.isIn([...ids]) }`.
 
 Le type refuse la plupart d’entre eux (TS2345), sauf là où une colonne partage l’un de leurs membres : `db.deletes('actors', new Error('x'))` passe la vérification de types, puisque `actors` a une colonne `name`.
 
-Seuls les objets natifs listés ci-dessus lèvent une erreur, ceux du realm qui exécute pgcast, reconnus à leur prototype exact, ou, pour un itérateur, au prototype des itérateurs dans sa chaîne. Le reste se compile comme dans Zapatos 6.6.1 :
+Seuls les objets natifs listés ci-dessus lèvent une erreur, ceux du realm qui exécute pgcast, reconnus à leur prototype exact, ou, pour un itérateur, au prototype des itérateurs dans sa chaîne, et, pour un espace de noms, à son identité. Le reste se compile comme dans Zapatos 6.6.1 :
 
-- un `Date` ou un itérateur d’un autre realm, comme `vm.runInNewContext('new Date(0)')`, donne `TRUE` ;
+- un `Date`, un itérateur ou un espace de noms d’un autre realm, comme `vm.runInNewContext('new Date(0)')` ou `vm.runInNewContext('Math')`, donne `TRUE` ;
 - une instance d’une classe qui étend un objet natif garde ses propres clés : `new Frames(1)`, avec `class Frames extends Uint8Array {}`, donne `("0" = $1)` ;
 - un itérateur avec des clés propres les compile : un générateur auquel on a ajouté `{ id: 1 }`, ou une classe qui étend `Iterator` avec un champ `id = 1`, donne `("id" = $1)` ;
 - l’objet que renvoie `new Intl.Segmenter('en').segment(text)` donne `TRUE`, même si son itérateur lève une erreur ([#517](https://github.com/AlexandreDemartin/pgcast/issues/517)) ;
-- un objet `Temporal` ou `Intl` d’un polyfill donne `TRUE` quand le polyfill est installé sur `globalThis` après l’import de `zapatos/db`, ou importé sans être installé (`import { Temporal } from '@js-temporal/polyfill'`), puisque `zapatos/db` lit les prototypes à son chargement ; s’il est installé avant, l’objet lève une erreur, et un objet du `Temporal` ou de l’`Intl` natif que le polyfill remplace, là où le runtime en a un, donne `TRUE` ;
-- un objet qui sert d’espace de noms, comme `Math`, `JSON`, `Intl` ou `Temporal.Now`, donne `TRUE` ([#523](https://github.com/AlexandreDemartin/pgcast/issues/523)).
+- un objet `Temporal` ou `Intl` d’un polyfill donne `TRUE` quand le polyfill est installé sur `globalThis` après l’import de `zapatos/db`, ou importé sans être installé (`import { Temporal } from '@js-temporal/polyfill'`), puisque `zapatos/db` lit les prototypes et les espaces de noms à son chargement ; s’il est installé avant, l’objet lève une erreur, et un objet du `Temporal` ou de l’`Intl` natif que le polyfill remplace, là où le runtime en a un, donne `TRUE` ;
+- un objet créé à partir d’un espace de noms, `Object.create(Math)`, ou placé derrière un `Proxy`, `new Proxy(Math, {})`, donne `TRUE`.
 
 ## `self` {#self}
 
