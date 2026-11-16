@@ -11,6 +11,7 @@
 // Without rejectOnQueryError, tsForConfig() calls process.exit(1) on a failed query: a test that causes one
 // mocks process.exit (§ generate() on a failed query).
 
+import { execFileSync, spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -4039,6 +4040,34 @@ describe('the CLI with --check (#556)', () => {
       `Missing: <out>/${schemaFile}`, `Missing: <out>/${indexFile}`, `Missing: <out>/${placeholderFile}`,
       'Run the generator without --check to write them.',
     ]);
+  });
+
+  // cli.ts as npm runs it, in a child process, built by tsc with the build's tsconfig: its exit code is the check's
+  describe('the built CLI', () => {
+    const root = fileURLToPath(new URL('../..', import.meta.url));
+    let build: string;
+    beforeAll(() => {
+      build = mkdtempSync(join(tmpdir(), 'pgcast-cli-build-'));
+      execFileSync(process.execPath, [join(root, 'node_modules/typescript/bin/tsc'), '-p', root, '--outDir', build, '--declaration', 'false']);
+    });
+    afterAll(() => rmSync(build, { recursive: true, force: true }));
+
+    /** The CLI's exit code and output; the URL reaches it through the environment, never an argument (#67). */
+    const run = (...args: string[]) => {
+      const { status, stdout, stderr } = spawnSync(process.execPath, [join(build, 'generate/cli.js'), ...args], {
+        cwd: dir, encoding: 'utf8', env: { ...process.env, NODE_PATH: join(root, 'node_modules') },  // pg, from outside the repo
+      });
+      return { status, stdout: stdout.split(outDir).join('<out>'), stderr };
+    };
+
+    it('exits with 1 on a stale schema, and 0 when up to date or after writing', () => {
+      expect(run(json())).toEqual({ status: 0, stdout: '', stderr: '' });
+      expect(run('--check', json())).toEqual({ status: 0, stdout: `${upToDate}\n`, stderr: '' });
+      writeFileSync(join(outDir, schemaFile), readFileSync(join(outDir, schemaFile), 'utf8') + '\n');
+      expect(run(json(), '--check')).toEqual({
+        status: 1, stdout: `Out of date: <out>/${schemaFile}\nRun the generator without --check to write it.\n`, stderr: '',
+      });
+    }, 30_000);
   });
 });
 
