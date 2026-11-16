@@ -369,7 +369,7 @@ const
 // `DisposableStack`, `AsyncDisposableStack` (Node 24) and `SharedArrayBuffer` (which a runtime may leave out) are
 // read from `globalThis`, where the runtime has them, as are the boxes `BigInt` (ES2020) and `Symbol`, the eight
 // `Temporal` constructors (Node 26; Node 22 with `--harmony-temporal`, whose `TimeZone` and `Calendar`, dropped
-// from the proposal, are left out) and the `Intl` ones (`DurationFormat` from Node 26). ECMAScript built-ins and
+// from the proposal, are left out) and the `Intl` ones (`DurationFormat` from Node 23). ECMAScript built-ins and
 // ECMA-402's `Intl` only, no host object (`URL`, `Blob`).
 // An iterator or a generator, sync or async, is matched by %IteratorPrototype% or %AsyncIteratorPrototype% on its
 // chain, as each generator function has its own prototype, and only with no own enumerable key, so that a class

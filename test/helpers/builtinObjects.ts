@@ -70,7 +70,7 @@ export const builtinObjects = (): Record<string, object> => {
     Collator: new intl.Collator('en'),
     DateTimeFormat: new intl.DateTimeFormat('en'),
     DisplayNames: new intl.DisplayNames('en', { type: 'region' }),
-    ...intl.DurationFormat && { DurationFormat: new intl.DurationFormat('en') },  // Node 26 and later
+    ...intl.DurationFormat && { DurationFormat: new intl.DurationFormat('en') },  // Node 23 and later
     ListFormat: new intl.ListFormat('en'),
     Locale: new intl.Locale('en'),
     NumberFormat: new intl.NumberFormat('en'),
