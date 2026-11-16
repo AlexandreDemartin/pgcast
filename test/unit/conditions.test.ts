@@ -799,9 +799,35 @@ describe('Default, self, raw, cols and vals as the value of a condition', () => 
       `);
   });
 
-  it('jsonbContains given what JSON.stringify cannot write: undefined is NULL, a bigint throws at the call', () => {
-    expect(show(dc.jsonbContains(undefined as any))).toEqual({ text: '(("col" @> CAST($1 AS "jsonb")))', values: [undefined] });
-    expect(() => dc.jsonbContains(BigInt(1) as any)).toThrow('Do not know how to serialize a BigInt');
+  it('jsonbContains given what JSON lacks, at any depth, throws when compiled, not when called, naming its key', () => {
+    // JSON.stringify leaves out a key holding undefined, a function or a symbol, so that { format: undefined } was {},
+    // every row; it writes them as null in an array, and a wrapper as its fields
+    const head = '`jsonbContains()` sends its value as JSON text, so it takes a JSON value, not',
+      dropped = '`JSON.stringify` would leave the key out, and the value match more rows. Give a JSON value, or leave the key out.',
+      nulled = '`JSON.stringify` would write `null` in its place. Give a JSON value.';
+    const values = {
+      key: { format: undefined }, nested: { a: [{ b: undefined }] }, item: [1, undefined], top: undefined,
+      fn: { f: () => 1 }, symbol: [Symbol('x')], Default: { d: Default }, self: [self],
+      param: { p: param(1) }, fragment: [sql`1`], parent: { p: parent('settings') },
+    };
+    expect(Object.fromEntries(Object.entries(values).map(([name, x]) => [name, thrown(dc.jsonbContains(x as any))]))).toEqual({
+      key: `${head} \`undefined\` at key \`format\`: ${dropped}`,
+      nested: `${head} \`undefined\` at key \`b\`: ${dropped}`,
+      item: `${head} \`undefined\` at item 1: ${nulled}`,
+      top: `${head} \`undefined\`: \`JSON.stringify\` would write nothing. Give a JSON value.`,
+      fn: `${head} a function at key \`f\`: ${dropped}`,
+      symbol: `${head} a symbol at item 0: ${nulled}`,
+      Default: `${head} \`db.Default\` at key \`d\`: ${dropped}`,
+      self: `${head} \`db.self\` at item 0: ${nulled}`,
+      param: `${head} \`db.param()\` at key \`p\`: \`JSON.stringify\` would write its fields. Give a JSON value, or leave the key out.`,
+      fragment: `${head} a \`sql\` fragment at item 0: \`JSON.stringify\` would write its fields. Give a JSON value.`,
+      parent: `${head} \`db.parent()\` at key \`p\`: \`JSON.stringify\` would write its fields. Give a JSON value, or leave the key out.`,
+    });
+  });
+
+  it('jsonbContains given null, a key holding null and an empty key still sends them', () => {
+    expect([null, { format: null }, { '': 1 }, [null]].map(x => show(dc.jsonbContains(x)).values))
+      .toEqual([['null'], ['{"format":null}'], ['{"":1}'], ['[null]']]);
   });
 
   it('a condition given Default or self throws when compiled, not when called', () => {

@@ -418,6 +418,14 @@ describe('jsonbContains: the value sent as jsonb', () => {
   it('a wrapper rejects before any query', async () => {
     await expect(ids('users', { settings: dc.jsonbContains(param({ theme: 'dark' }) as any) })).rejects.toThrow('so it takes a JSON value, not `db.param()`');
   });
+
+  it('a key holding undefined rejects before any query, so an update() changes no row', async () => {
+    // JSON.stringify would leave the key out: {} is contained in every object, and every user was renamed
+    const filter: { theme?: string } = { theme: undefined };
+    await expect(db.update('users', { display_name: 'Gone' }, { settings: dc.jsonbContains(filter as db.JSONValue) }).run(t.client))
+      .rejects.toThrow('not `undefined` at key `theme`');
+    expect(await db.count('users', { display_name: 'Gone' }).run(t.client)).toBe(0);
+  });
 });
 
 describe('add, subtract (in an update)', () => {
