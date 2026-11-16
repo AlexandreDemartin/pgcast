@@ -1,5 +1,5 @@
 ---
-english: 511db59c48b8
+english: e6af5b6d7849
 ---
 
 # Venir de Zapatos
@@ -275,6 +275,8 @@ La note d’[`uniqueIndexConstraintsOnly`](/fr/generator#generate.uniqueIndexCon
 
 La note de [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext) nomme chaque colonne d’un domaine sur `bigint`, `numeric`, `bytea`, `money` ou une date, ou sur un tableau de l’un d’eux, que son placeholder, tel que généré, type dans les cinq interfaces telle que `pg` la renvoie. Un placeholder écrit par Zapatos 6.6.1 sur `bigint` ou `numeric` n’a pas d’import, donc sa colonne vaut `any`, même avec l’option : ajoutez d’abord l’import ([Quand un placeholder ne compile pas](/fr/custom-types#when-a-placeholder-does-not-compile)). Activez l’option et régénérez : un placeholder laissé tel que généré type désormais sa colonne selon le contexte, et `tsc` montre le code qui prenait le JSON des raccourcis pour le type du placeholder, un `Date` pour une date ou une chaîne pour un `bigint`. Un placeholder que vous avez modifié garde son type, comme avant. La seconde note de l’option nomme chaque colonne d’un domaine sur un domaine, ou d’un tableau d’un domaine, que son placeholder type comme `any` : une fois activée, l’option les type par le type de base du domaine le plus intérieur, et `tsc` montre le code qui y écrivait une valeur d’un autre type.
 
+La note d’[`intervalsTypedAsObjects`](/fr/generator#generate.intervalsTypedAsObjects) nomme chaque colonne de type `interval` ou `interval[]`, ou d’un domaine sur l’un ou l’autre, que le générateur type par son texte, bien que `pg` renvoie un objet pour une requête à vous. Activez-le et régénérez : `tsc` montre le code qui lisait une telle colonne depuis une requête `sql` comme une chaîne, ce qui ne marchait qu’avec un parser de types à vous. Si vous en avez réglé un, `pg.types.setTypeParser(1186, …)`, écrivez plutôt `false`, qui garde le texte sans note, en 7.0 aussi.
+
 La note de [`rejectOnQueryError`](/fr/generator#generate.rejectOnQueryError) vient d’un script qui appelle `generate()`, quand une requête échoue, jamais de `npx zapatos`, qui s’arrête toujours. Activez-le là où le script attend `generate()` avec `await`, et relisez ce que fait son `catch` : une connexion refusée y arrive désormais, et un script qui logge l’erreur puis continue se termine avec le code 0, pas 1.
 
 ## Revenir en arrière {#go-back}
@@ -286,7 +288,7 @@ npm install zapatos@6.6.1
 - D’abord, retirez de `setConfig()` les options que la `Config` de Zapatos 6.6.1 n’a pas (2353) : `upsertRequiresSameKeys`, `undefinedMeansMissing`, `transactionRequiresCommit`, `transactionRequiresIdleClient`, `transactionRequiresSatisfyingLevel`, `selectExactlyOneChecksForSecondRow` et `aggregatesTypedByColumn`.
 - Avec [`moduleNames`](/fr/generator#generate.moduleNames) à `"pgcast"`, lancez aussi `npm uninstall pgcast` : les deux paquets ont une commande `zapatos`. Vos imports `pgcast/…` ne se résolvent alors plus, et la 6.6.1 écrit `zapatos/` mais laisse `pgcast/` en place. Remettez donc chaque import en `zapatos/…`, déplacez les placeholders que vous avez modifiés dans `zapatos/custom/`, leur `declare module 'pgcast/custom'` renommé en `'zapatos/custom'`, et supprimez `pgcast/`.
 - Renommez un `pgcastconfig.json` en `zapatosconfig.json` : la CLI de Zapatos 6.6.1 ne lit aucun autre fichier.
-- Régénérez avec Zapatos 6.6.1. Il ignore `typeEnumsAcrossSchemas`, `enumOrder`, `uniqueIndexConstraintsOnly`, `domainsTypedByContext` et `moduleNames` dans `zapatosconfig.json`, et réécrit les types `any`, les labels triés, les lignes de commentaire sans préfixe, chaque index unique dans `UniqueIndex`, tout nom d’`UniqueIndex` emprunté et le placeholder de chaque domaine dans les cinq interfaces. Son `generate()` ne connaît pas non plus `rejectOnQueryError` : TypeScript le refuse dans un littéral d’objet (2353), et à l’exécution une requête qui échoue arrête de nouveau le processus.
+- Régénérez avec Zapatos 6.6.1. Il ignore `typeEnumsAcrossSchemas`, `enumOrder`, `uniqueIndexConstraintsOnly`, `domainsTypedByContext`, `intervalsTypedAsObjects` et `moduleNames` dans `zapatosconfig.json`, et réécrit les types `any`, les labels triés, les lignes de commentaire sans préfixe, chaque index unique dans `UniqueIndex`, tout nom d’`UniqueIndex` emprunté, le placeholder de chaque domaine dans les cinq interfaces et chaque `interval` comme une chaîne ; un placeholder qu’il trouve contenant `db.PostgresInterval` reste, et ne compile pas, puisque le `db` de Zapatos 6.6.1 n’a pas ce type : écrivez-y `string`. Son `generate()` ne connaît pas non plus `rejectOnQueryError` : TypeScript le refuse dans un littéral d’objet (2353), et à l’exécution une requête qui échoue arrête de nouveau le processus.
 - Chaque changement de [Trouver les appels dont le résultat change](#find-the-calls-whose-result-changes) s’exécute comme avant, sauf celui du `jsonb`, qui ne trouve de nouveau rien.
 
 ::: warning Sécurité

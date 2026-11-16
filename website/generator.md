@@ -107,6 +107,7 @@ Every option is optional. Each one given replaces its default whole: `schemas` w
 | [`rejectOnQueryError`](#generate.rejectOnQueryError) | none: exits, with a note | whether a failed query rejects, or ends the process |
 | [`uniqueIndexConstraintsOnly`](#generate.uniqueIndexConstraintsOnly) | `false` | the names in each relation's `UniqueIndex` |
 | [`domainsTypedByContext`](#generate.domainsTypedByContext) | `false` | the type of a domain over `bigint`, `numeric`, `bytea`, `money` or a date, or over an array of one, outside `Selectable`, and of a domain over a domain or an array of a domain |
+| [`intervalsTypedAsObjects`](#generate.intervalsTypedAsObjects) | none: the text, with a note | the type of an `interval` in `Selectable` and in a write |
 | [`progressListener`](#generate.progressListener) | `false` | where each step is reported |
 | [`warningListener`](#generate.warningListener) | `true` | where warnings go |
 | [`debugListener`](#generate.debugListener) | `false` | where each query and its result go |
@@ -429,6 +430,26 @@ ALTER TABLE seat_bookings ADD COLUMN vip_ticket vip_ticket_no, ADD COLUMN ticket
 - A placeholder you edit keeps its type in all five, `unknown` included. One you edit to `any` counts as left as generated: write `unknown`, or leave the option off, to keep such a column untyped.
 - `false` notes, through [`warningListener`](#generate.warningListener), each such column, in a note of its own.
 
+### `intervalsTypedAsObjects` {#generate.intervalsTypedAsObjects}
+
+`boolean`, or left out; an opt-in. The type of an `interval` column, of an `interval[]`, and of a domain over either. `pg`'s default type parser returns an interval as an object of its parts, a [`PostgresInterval`](/runtime-config#PostgresInterval); the shortcuts' JSON gives its text. Say a screening has an intermission:
+
+```sql
+ALTER TABLE screenings ADD COLUMN intermission interval;
+```
+
+| `screenings.intermission`, `'15 minutes'` | left out, or `false` | `true` |
+|---|---|---|
+| `Selectable`, a row from `pg` | `string`, though `pg` returns `{ minutes: 15 }` | `PostgresInterval` |
+| `JSONSelectable`, a row from the shortcuts | `string`: `'00:15:00'` | the same |
+| `Whereable`, `Insertable`, `Updatable` | `string` | `string \| PostgresInterval` |
+
+- Left out, or `null`: as in Zapatos 6.6.1, the text in all five interfaces, and a note through [`warningListener`](#generate.warningListener) names each column `true` would change. From 7.0, left out means `true` ([Versions](/versions)).
+- `false`: the text, with no note. It stays in 7.0 and 8.0, for a type parser of your own that returns the text: `pg.types.setTypeParser(1186, v => v)` for `interval`, and `1187` too for `interval[]`, whose own parser `pg` keeps otherwise.
+- `true`: a `PostgresInterval` in `Selectable`, an array of them for an `interval[]`. A write takes one back, as `pg` sends it through its `toPostgres()`; `insert()` still refuses a plain object such as `{ minutes: 15 }` (TS2769), as Postgres refuses it (22007).
+- `pg` reads the default `IntervalStyle`, `postgres`, only: under `iso_8601`, `sql_standard` or `postgres_verbose`, its object comes back with parts missing, often `{}`, whatever the type says. The shortcuts give the text, in that style.
+- A domain over one follows: a new placeholder holds `db.PostgresInterval`, and with [`domainsTypedByContext`](#generate.domainsTypedByContext) its column is typed by context, as a domain over `date` is. A domain over such a domain takes `PostgresInterval` in `Selectable` with `domainsTypedByContext`; an array of a domain stays `string` there, the text `pg` returns. A placeholder written before holds `string`, and the generator never rewrites it.
+
 ### `progressListener` {#generate.progressListener}
 
 `boolean`, or in `generate()` a function `(s: string) => void`; default `false`. `true` prints each step with `console.log`; a function gets each line.
@@ -471,6 +492,8 @@ Writing custom types file: src/zapatos/custom/index.d.ts
   - once per run, without [`domainsTypedByContext`](#generate.domainsTypedByContext), when a generated column has such a domain; several as `public.screenings.premiere (public.premiere_day) and public.seat_bookings.ticket (public.ticket_no) have domains over a type typed by context`;
 - `` Note: public.seat_bookings.tickets (public.ticket_no[]) and public.seat_bookings.vip_ticket (public.vip_ticket_no) have domains over a domain, or arrays of a domain: as generated, their placeholders type them as `any`. Set domainsTypedByContext: true to type them by the base type of the innermost domain while their placeholders hold `any`; it will be the default in pgcast 7.0. ``
   - once per run, without [`domainsTypedByContext`](#generate.domainsTypedByContext), when a generated column has such a type, over a base type the generator maps; one as `public.seat_bookings.vip_ticket (public.vip_ticket_no) has a domain over a domain, or an array of a domain`;
+- `Note: public.screenings.intermission (interval) is of interval, an array of it, or a domain over either: as generated, it is typed as its text, though pg's default type parser returns an interval from a query of your own as an object, a PostgresInterval. Set intervalsTypedAsObjects: true to type it as pg parses it; it will be the default in pgcast 7.0. Set it to false to keep the text, if a type parser of yours returns it.`
+  - once per run, with [`intervalsTypedAsObjects`](#generate.intervalsTypedAsObjects) left out, when a generated column is of `interval`, `interval[]` or a domain over either, and, with `domainsTypedByContext`, under other domains too; several as `… and public.screenings.intermission (interval) are of interval`;
 - `Note: src/zapatos/schema.d.ts is here too, generated with moduleNames: 'zapatos'. It declares 'zapatos/schema', as src/pgcast/schema.d.ts does, and TypeScript merges the two: types can loosen, silently under skipLibCheck. Delete the folder src/zapatos, once any placeholder you edited there is moved to src/pgcast/custom.`
   - after writing, with [`moduleNames`](#generate.moduleNames) `"pgcast"`, when `outDir` holds a `zapatos/schema.d.ts`; a folder without its `schema.d.ts` is not noted;
 - `Note: src/pgcast/schema.d.ts is here too, generated with moduleNames: 'pgcast'. Its import of 'pgcast/db' fails to compile without skipLibCheck. Delete the folder src/pgcast, once any placeholder you edited there is moved to src/zapatos/custom.`
