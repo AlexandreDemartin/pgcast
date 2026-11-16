@@ -326,7 +326,7 @@ Un itérateur ou un générateur, synchrone ou asynchrone, sans clé propre énu
 
 Le type refuse la plupart d’entre eux (TS2345), sauf là où une colonne partage l’un de leurs membres : `db.deletes('actors', new Error('x'))` passe la vérification de types, puisque `actors` a une colonne `name`.
 
-Seuls les objets natifs du realm qui exécute pgcast lèvent une erreur, reconnus à leur prototype exact, ou, pour un itérateur, au prototype des itérateurs dans sa chaîne. Comme dans Zapatos 6.6.1 :
+Seuls les objets natifs listés ci-dessus lèvent une erreur, ceux du realm qui exécute pgcast, reconnus à leur prototype exact, ou, pour un itérateur, au prototype des itérateurs dans sa chaîne. Le reste se compile comme dans Zapatos 6.6.1 :
 
 - un `Date` ou un itérateur d’un autre realm, comme `vm.runInNewContext('new Date(0)')`, donne `TRUE` ;
 - une instance d’une classe qui étend un objet natif garde ses propres clés : `new Frames(1)`, avec `class Frames extends Uint8Array {}`, donne `("0" = $1)` ;

@@ -322,7 +322,7 @@ An iterator or a generator with no own enumerable key throws too, sync or async,
 
 The type refuses most of them (TS2345), not where a column shares one of their members: `db.deletes('actors', new Error('x'))` type-checks, since `actors` has a `name` column.
 
-Only the built-ins of the realm that runs pgcast throw, matched by their exact prototype, or an iterator's on its chain. As in Zapatos 6.6.1:
+Only the built-ins listed above throw, those of the realm that runs pgcast, matched by their exact prototype, or an iterator's on its chain. Anything else compiles as in Zapatos 6.6.1:
 
 - a `Date` or an iterator from another realm, such as `vm.runInNewContext('new Date(0)')`, gives `TRUE`;
 - an instance of a class that extends a built-in keeps its own keys: `new Frames(1)`, with `class Frames extends Uint8Array {}`, gives `("0" = $1)`;
