@@ -1122,20 +1122,21 @@ describe('a built-in object in cols() and vals()', () => {
     try {
       for (const [name, x] of Object.entries(builtinObjects())) {
         if (!Buffer.isBuffer(x) && Object.keys(x).length > 0) continue;  // own keys: compiled as before
-        const queries = {
-          selectCols: sql`SELECT ${db.cols(x)} FROM ${'users'}`,
-          updateVals: sql`UPDATE ${'users'} SET ${'display_name'} = ${vals(x)} WHERE ${'id'} = 1`,
-          insert: db.insert('users', x as any),
-          update: db.update('users', x as any, { id: 1 }),
-          updateValues: db.upsert('users', { email: 'a@b.org', display_name: 'injected' }, 'email', { updateValues: { display_name: vals(x as any) } }),
+        // built at the call: a row with no own key throws nothing to insert or update there, as before
+        const queries: Record<string, () => db.SQLFragment<any, any>> = {
+          selectCols: () => sql`SELECT ${db.cols(x)} FROM ${'users'}`,
+          updateVals: () => sql`UPDATE ${'users'} SET ${'display_name'} = ${vals(x)} WHERE ${'id'} = 1`,
+          insert: () => db.insert('users', x as any),
+          update: () => db.update('users', x as any, { id: 1 }),
+          updateValues: () => db.upsert('users', { email: 'a@b.org', display_name: 'injected' }, 'email', { updateValues: { display_name: vals(x as any) } }),
         };
-        for (const [where, q] of Object.entries(queries)) {
+        for (const [where, build] of Object.entries(queries)) {
           let outcome: string;
           try {
-            outcome = await q.run(t.client).then(() => 'ran', (err: { code?: string, message: string }) =>
+            outcome = await build().run(t.client).then(() => 'ran', (err: { code?: string, message: string }) =>
               /^`db\.(cols|vals)\(\)` takes an object or an array, not a /.test(err.message) ? 'throws' : err.code ?? err.message);
           } catch (err) {
-            outcome = `throws at the call: ${(err as Error).message}`;  // nothing to insert or update, as before
+            outcome = `throws at the call: ${(err as Error).message}`;
           }
           outcomes[`${name} ${where}`] = outcome;
         }
