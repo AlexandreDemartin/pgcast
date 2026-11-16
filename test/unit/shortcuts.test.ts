@@ -2719,6 +2719,15 @@ describe('a shortcut option added to Object.prototype by something else is no op
     expect(withPrototypeGetter(key, make, () => build().compile())).toEqual({ result: compiled, reads });
   });
 
+  it('a getter on Object.prototype is no option beside a value key there too', () => {
+    // a property descriptor inherits from Object.prototype, so only an own `value` tells a data key from a getter
+    expect(withPrototypeGetter('returning', () => ['email'], () =>
+      withPrototypeKey('value', ['email'], () => db.deletes('users', { email: 'e@x.org' }, {}).compile()))).toEqual({
+      result: { text: 'DELETE FROM "users" WHERE ("email" = $1) RETURNING to_jsonb("users".*) AS result', values: ['e@x.org'] },
+      reads: 1,
+    });
+  });
+
   it('with a getter on Object.prototype, an option of the caller\'s own prototype or object is read without it', () => {
     const counts = { answering: {} as Record<string, number>, owning: {} as Record<string, number> };
     class Returning { get returning() { return ['mood']; } }
