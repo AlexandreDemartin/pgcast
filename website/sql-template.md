@@ -31,7 +31,7 @@ Returns a [`SQLFragment`](#SQLFragment): the literal parts as you wrote them, ea
 
 `RunResult` is not checked against the SQL: it is your word for what comes back. The shortcuts set it for you.
 
-Written inline as a value of a shortcut's `where`, or of `update()`'s values, a fragment takes its `Constraint` from every table and view with a column of that name: TypeScript infers it before it knows the table. Where their types differ, the valid fragment fails to compile (TS2322): an `id` that is an `int4` here and a `uuid` there; in `update()`, a view of `films`, whose `title` is nullable, makes `` { title: db.sql`upper(${db.self})` } `` fail. Give it a type argument, `` db.sql<db.SQL>`upper(${db.self})` ``, or declare it first.
+Written inline as a value of a shortcut's `where`, or of `update()`'s values, a fragment takes its `Constraint` from every table and view with a column of that name: TypeScript infers it before it knows the table. Where their types differ, the valid fragment fails to compile (TS2322): an `id` that is an `int4` here and a `uuid` there, or an enum here and another enum there; in `update()`, a view of `films`, whose `title` is nullable, makes `` { title: db.sql`upper(${db.self})` } `` fail. Give it a type argument, `` db.sql<db.SQL>`upper(${db.self})` ``, or declare it first.
 
 A name outside `Interpolations` does not compile:
 
@@ -237,7 +237,7 @@ As a filter value, and as a value in `vals({…})` (so in a write), `cols()` thr
 
 > `` `db.cols()` takes an object or an array, not `string`: for one column, write `db.cols([name])`; for a row of `insert()`, `upsert()` or `update()`, give an object. ``<!-- message -->
 
-The type takes it, as Zapatos 6.6.1's did, so that a generic helper (`<T>(row: T) => db.cols(row)`) still compiles. Zapatos 6.6.1 compiled a string's character indexes, `cols('title')` to `"0", "1", "2", "3", "4"`, any other primitive to nothing, and threw a `TypeError` on `null`.
+The type takes it, as Zapatos 6.6.1's did, so that a generic helper (`<T>(row: T) => db.cols(row)`) still compiles. In [`upsert()`](/insert#upsert-options) `updateValues`, it refuses a primitive (`null` and `undefined` only with `strictNullChecks`). Zapatos 6.6.1 compiled a string's character indexes, `cols('title')` to `"0", "1", "2", "3", "4"`, any other primitive to nothing, and threw a `TypeError` on `null`.
 
 ### `ColumnNames` {#ColumnNames}
 
@@ -312,7 +312,7 @@ An object is a Whereable of the table: each own enumerable key a column, each va
 An interpolated object that is not one of the other [interpolations](#interpolations) compiles as a Whereable, plain or not: a class instance `{ title }` gives `("title" = $1)`<!-- probe: db.sql`${new (class { title = 'x' })()}` -->, and one with no own enumerable key gives `TRUE`, even of a class that extends a built-in (`class Premiere extends Date {}`). Check what reaches a `where` at run time.
 :::
 
-A built-in object throws while compiling, before any query, even with own keys added (`Object.assign(new Date(0), { id: 1 })`): `Date`, `Map`, `Set`, `WeakMap`, `WeakSet`, `WeakRef`, `FinalizationRegistry`, `RegExp`, `Promise`, `Error` and its native subtypes (`TypeError`, `AggregateError`, …), `ArrayBuffer`, `SharedArrayBuffer`, a typed array, `Buffer`, `DataView`, the boxes `Number`, `String`, `Boolean`, `BigInt` and `Symbol`, and, where the runtime has them (Node 24), `SuppressedError`, `DisposableStack` and `AsyncDisposableStack`:
+A built-in object throws while compiling, before any query, even with own keys added (`Object.assign(new Date(0), { id: 1 })`): `Date`, `Map`, `Set`, `WeakMap`, `WeakSet`, `WeakRef`, `FinalizationRegistry`, `RegExp`, `Promise`, `Error` and its native subtypes (`TypeError`, `AggregateError`, …), `ArrayBuffer`, `SharedArrayBuffer`, a typed array, `Buffer`, `DataView`, the boxes `Number`, `String`, `Boolean`, `BigInt` and `Symbol`, the `Intl` objects (`Intl.Collator`, `Intl.DateTimeFormat`, `Intl.NumberFormat`, `Intl.Locale`, …), and, where the runtime has them, `SuppressedError`, `DisposableStack` and `AsyncDisposableStack` (Node 24) and the `Temporal` ones (Node 26: `Temporal.PlainDate`, `Temporal.Instant`, `Temporal.ZonedDateTime`, …), which the error names by their constructor (`PlainDate`):
 
 > `` A built-in `…` has no meaning as a Whereable (a filter): it would compile to its own enumerable keys, and to `TRUE`, every row, when it has none. To compare with a value, give it as `db.param(…)`; to filter, give a plain object (`{ column: value }`); await a `Promise` first. ``<!-- message -->
 
@@ -322,11 +322,14 @@ An iterator or a generator with no own enumerable key throws too, sync or async,
 
 The type refuses most of them (TS2345), not where a column shares one of their members: `db.deletes('actors', new Error('x'))` type-checks, since `actors` has a `name` column.
 
-Only the built-ins of the realm that runs pgcast throw, matched by their exact prototype, or an iterator's on its chain. As in Zapatos 6.6.1:
+Only the built-ins listed above throw, those of the realm that runs pgcast, matched by their exact prototype, or an iterator's on its chain. Anything else compiles as in Zapatos 6.6.1:
 
 - a `Date` or an iterator from another realm, such as `vm.runInNewContext('new Date(0)')`, gives `TRUE`;
 - an instance of a class that extends a built-in keeps its own keys: `new Frames(1)`, with `class Frames extends Uint8Array {}`, gives `("0" = $1)`;
-- an iterator with own keys compiles them: a generator given `{ id: 1 }`, or a class that extends `Iterator` with a field `id = 1`, gives `("id" = $1)`.
+- an iterator with own keys compiles them: a generator given `{ id: 1 }`, or a class that extends `Iterator` with a field `id = 1`, gives `("id" = $1)`;
+- the object that `new Intl.Segmenter('en').segment(text)` returns gives `TRUE`, though its iterator throws ([#517](https://github.com/AlexandreDemartin/pgcast/issues/517));
+- a `Temporal` or `Intl` object of a polyfill gives `TRUE` when the polyfill is installed on `globalThis` after `zapatos/db` is imported, or imported without installing it (`import { Temporal } from '@js-temporal/polyfill'`), as `zapatos/db` reads the prototypes when it loads; installed before, it throws, and the native one it replaces, where the runtime has one, gives `TRUE`;
+- a namespace object, such as `Math`, `JSON`, `Intl` or `Temporal.Now`, gives `TRUE` ([#523](https://github.com/AlexandreDemartin/pgcast/issues/523)).
 
 ## `self` {#self}
 
