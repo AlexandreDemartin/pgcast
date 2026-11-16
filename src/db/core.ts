@@ -332,7 +332,23 @@ export type Queryable = pg.ClientBase | pg.Pool;
  * `null` throws, before writing anything: interpolate `param(null)` for a `NULL`
  * value. Zapatos 6.6.1 threw a `TypeError` there; `null` as a `Whereable` or
  * `vals()` value is still a `NULL` parameter.
+ *
+ * The third, `Constraint`, is the column value a fragment stands for (`eq()`
+ * gives it). Left out, it is `never`, so a bare template is the value of any
+ * column. Zapatos 6.6.1 inferred it from the expected type, which a shortcut
+ * reads across every table's column of that name: where their types differ, it
+ * refused the template.
  */
+export function sql<
+  Interpolations = SQL,
+  RunResult = pg.QueryResult['rows'],
+>(literals: TemplateStringsArray, ...expressions: NoInfer<Interpolations>[]): SQLFragment<RunResult>;
+/** `sql` with its three type arguments: see the signature above. */
+export function sql<
+  Interpolations = SQL,
+  RunResult = pg.QueryResult['rows'],
+  Constraint = never,
+>(literals: TemplateStringsArray, ...expressions: NoInfer<Interpolations>[]): SQLFragment<RunResult, Constraint>;
 export function sql<
   Interpolations = SQL,
   RunResult = pg.QueryResult['rows'],

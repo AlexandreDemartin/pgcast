@@ -76,7 +76,8 @@ describe('sql<Interpolations, RunResult, Constraint>', () => {
     // @ts-expect-error 'angry' is not a mood
     db.select('users', { mood: myEq('angry') });
     expectTypeOf<ReturnType<typeof db.sql>>().toEqualTypeOf<db.SQLFragment<unknown, unknown>>();
-    expectTypeOf<Parameters<typeof db.sql>>().toEqualTypeOf<never>();  // as in Zapatos 6.6.1: NoInfer<unknown> in a rest
+    // `never` in Zapatos 6.6.1, whose one generic signature failed the conditional; now the last overload's parameters
+    expectTypeOf<Parameters<typeof db.sql>>().toEqualTypeOf<[literals: TemplateStringsArray, ...expressions: unknown[]]>();
     const plain: (literals: TemplateStringsArray, ...expressions: db.SQL[]) => db.SQLFragment<number> = db.sql;
     expectTypeOf(plain`SELECT 1`).toEqualTypeOf<db.SQLFragment<number>>();
   });
@@ -529,11 +530,11 @@ describe('type surprises', () => {
     db.select('accounts', { scores: c.arrayContains<number[]>([[1]]) });
   });
 
-  test('characterization: an inline sql`${self} …` in a Whereable is refused', () => {
-    // characterization: inferred from the context before T is fixed, Constraint takes the
-    // union of every table's `id` type; a fragment declared first, or sql<db.SQL>, passes
-    // @ts-expect-error valid at run time
+  test('an inline sql`${self} …` in a Whereable, or as an update() value, is accepted (R36, #493)', () => {
+    // Zapatos 6.6.1 inferred Constraint from the context before T is fixed: the union of every table's `id`
+    // type, and of users.display_name with active_users' nullable one; it now stays `never`
     db.select('users', { id: db.sql`${db.self} = 1` });
+    db.update('users', { display_name: db.sql`upper(${db.self})` }, { id: 1 });
     const frag = db.sql`${db.self} = 1`;
     db.select('users', { id: frag });
     db.select('users', { id: db.sql<db.SQL>`${db.self} = 1` });
