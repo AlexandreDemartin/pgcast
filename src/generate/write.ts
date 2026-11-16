@@ -5,13 +5,8 @@ Released under the MIT licence: see LICENCE file
 */
 
 import * as fs from 'fs';
-import * as path from 'path';
 import { finaliseConfig, Config } from './config';
-import * as legacy from './legacy';
-import { moduleNamesOf, warnAboutOtherModuleNames } from './moduleNames';
-import { warnAboutSchemaRules } from './schemaRules';
-import { tsForConfig } from './tsOutput';
-import { header } from './header';
+import { outputFiles, warnAfterOutput } from './outputFiles';
 
 
 /**
@@ -28,48 +23,30 @@ export const generate = async (suppliedConfig: Config) => {
     debug = config.debugListener === true ? console.log :
       config.debugListener || (() => void 0),
 
-    { ts, customTypeSourceFiles } = await tsForConfig(config, debug),
+    { folderTargetPath, customFolderTargetPath, schema, customTypesIndex, placeholders } = await outputFiles(config, debug);
 
-    folderName = moduleNamesOf(config),
-    schemaName = 'schema' + config.outExt,
-    customFolderName = 'custom',
-    customTypesIndexName = 'index' + config.outExt,
-    customTypesIndexContent = header() + `
-// this empty declaration appears to fix relative imports in other custom type files
-declare module '${folderName}/custom' { }
-`,
-
-    folderTargetPath = path.join(config.outDir, folderName),
-    schemaTargetPath = path.join(folderTargetPath, schemaName),
-    customFolderTargetPath = path.join(folderTargetPath, customFolderName),
-    customTypesIndexTargetPath = path.join(customFolderTargetPath, customTypesIndexName);
-
-  log(`(Re)creating schema folder: ${schemaTargetPath}`);
+  log(`(Re)creating schema folder: ${schema.path}`);
   fs.mkdirSync(folderTargetPath, { recursive: true });
 
-  log(`Writing generated schema: ${schemaTargetPath}`);
-  fs.writeFileSync(schemaTargetPath, ts, { flag: 'w' });
+  log(`Writing generated schema: ${schema.path}`);
+  fs.writeFileSync(schema.path, schema.content, { flag: 'w' });
 
-  if (Object.keys(customTypeSourceFiles).length > 0) {
+  if (customTypesIndex) {
     fs.mkdirSync(customFolderTargetPath, { recursive: true });
 
-    for (const customTypeFileName in customTypeSourceFiles) {
-      const customTypeFilePath = path.join(customFolderTargetPath, customTypeFileName + config.outExt);
-      if (fs.existsSync(customTypeFilePath)) {
-        log(`Custom type or domain declaration file already exists: ${customTypeFilePath}`);
+    for (const placeholder of placeholders) {
+      if (fs.existsSync(placeholder.path)) {
+        log(`Custom type or domain declaration file already exists: ${placeholder.path}`);
 
       } else {
-        warn(`Writing new custom type or domain placeholder file: ${customTypeFilePath}`);
-        const customTypeFileContent = customTypeSourceFiles[customTypeFileName];
-        fs.writeFileSync(customTypeFilePath, customTypeFileContent, { flag: 'w' });
+        warn(`Writing new custom type or domain placeholder file: ${placeholder.path}`);
+        fs.writeFileSync(placeholder.path, placeholder.content, { flag: 'w' });
       }
     }
 
-    log(`Writing custom types file: ${customTypesIndexTargetPath}`);
-    fs.writeFileSync(customTypesIndexTargetPath, customTypesIndexContent, { flag: 'w' });
+    log(`Writing custom types file: ${customTypesIndex.path}`);
+    fs.writeFileSync(customTypesIndex.path, customTypesIndex.content, { flag: 'w' });
   }
 
-  warnAboutOtherModuleNames(config);
-  warnAboutSchemaRules(suppliedConfig, config);
-  legacy.srcWarning(config);
+  warnAfterOutput(suppliedConfig, config);
 };
