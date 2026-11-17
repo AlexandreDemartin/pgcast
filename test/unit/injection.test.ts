@@ -412,6 +412,33 @@ describe('db.all as a filter value', () => {
   });
 });
 
+describe('an item one array parameter cannot hold, in an array condition', () => {
+  it('beside a hostile key or hostile items, at any depth, throws, and no text is returned', () => {
+    // 6.6.1 sent Default and self as '{"Symbol(DEFAULT)"}', a wrapper, a Parameter, parent() or a fragment as its
+    // JSON; raw(input) there never reached the text, and still does not: the refusal comes first (#636)
+    const
+      c = db.conditions,
+      give = 'give a value.',
+      sqlAdvice = 'give the value itself; for SQL, write a `sql` fragment with `db.self` in place of the condition.',
+      says = (fn: string, name: string, advice: string) =>
+        `throws: \`${fn}()\` sends its array as one parameter, so each item is a plain value, not ${name}: ${advice}`,
+      builds = {
+        DefaultKey: [(v: string) => sql`WHERE ${{ [v]: c.arrayContains([v, db.Default as any]) }}`, says('arrayContains', '`db.Default`', give)],
+        selfNested: [(v: string) => sql`WHERE ${{ [v]: c.arrayOverlaps([[v], [db.self as any]]) }}`, says('arrayOverlaps', '`db.self`', give)],
+        rawInput: [(v: string) => sql`WHERE ${{ tags: c.arrayContainedIn([db.raw(v) as any]) }}`, says('arrayContainedIn', '`db.raw()`', give)],
+        colsInput: [(v: string) => sql`WHERE ${{ [v]: c.arrayContains([cols([v]) as any]) }}`, says('arrayContains', '`db.cols()`', give)],
+        valsInput: [(v: string) => sql`WHERE ${{ [v]: c.arrayContains([vals([v]) as any]) }}`, says('arrayContains', '`db.vals()`', give)],
+        paramInput: [(v: string) => sql`WHERE ${{ [v]: c.arrayContains([param(v) as any]) }}`, says('arrayContains', '`db.param()`', sqlAdvice)],
+        fragmentInput: [(v: string) => sql`WHERE ${{ [v]: c.arrayContains([sql`${v}` as any]) }}`, says('arrayContains', 'a `sql` fragment', sqlAdvice)],
+        parentInput: [(v: string) => db.select('users', db.all, { lateral: { n: db.count('accounts', { [v]: c.arrayOverlaps([db.parent(v) as any]) } as any) } }),
+          says('arrayOverlaps', '`db.parent()`', sqlAdvice)],
+        deletesNot: [(v: string) => db.deletes('users', { [v]: c.not(c.arrayContains([v, db.Default as any])) } as any), says('arrayContains', '`db.Default`', give)],
+      } as const;
+    expect(Object.fromEntries(Object.entries(builds).map(([name, [build]]) => [name, new Set(Object.values(matrix(build)))])))
+      .toEqual(Object.fromEntries(Object.entries(builds).map(([name, [, message]]) => [name, new Set([visible(message)])])));
+  });
+});
+
 describe('raw, cols and vals as a write value', () => {
   it('raw(input) as an insert(), upsert() or update() value, or in vals({…}), throws, and is never written into the text', () => {
     // 6.6.1 sent it as JSON, so raw(input) there was a parameter by accident; compiling it as SQL would make
