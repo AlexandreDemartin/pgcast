@@ -139,7 +139,7 @@ function quoteIfIllegalIdentifier(identifier: string) {
 // Every key of a Whereable is optional, so a string passed as one when a column shares the name of a String member
 // its type fits (`search` typed any, `length` a number), and with it any name in the table's SQL (#670). A string has
 // an iterator, a Whereable none, and no column is a symbol. In SQLExpression, a union, so that no `keyof` changes;
-// `undefined`, not `never`, so that a homomorphic mapped type over it (`Readonly`, `Omit`) fits it too, under
+// `undefined`, not `never`, so that an object stating its iterator undefined stays a Whereable, under
 // exactOptionalPropertyTypes. Not in WhereableForTable (its `keyof` would change), nor on the shortcuts' `where`,
 // where it refused a generic `{ ...where, id }` (#674)
 const notIterable = '{ [Symbol.iterator]?: undefined }';

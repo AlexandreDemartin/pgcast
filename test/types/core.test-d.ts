@@ -51,14 +51,17 @@ describe('sql<Interpolations, RunResult, Constraint>', () => {
     const w = { sku: 'a' } as s.products.Whereable, every = w as s.Whereable;
     expectTypeOf(db.sql<s.products.SQL>`${w}`).toEqualTypeOf<db.SQLFragment<any[], never>>();
     expectTypeOf(db.sql`${every}`).toEqualTypeOf<db.SQLFragment<any[], never>>();
+    // an object whose iterator is undefined is still a Whereable: the guard is undefined, not never
+    const iterUndefined = { sku: 'a', [Symbol.iterator]: undefined };
+    expectTypeOf(db.sql<s.products.SQL>`${iterUndefined}`).toEqualTypeOf<db.SQLFragment<any[], never>>();
     // a variable that shares no key with it is still refused
     const titel = { titel: 'a' };
     // @ts-expect-error 'titel' is not a column of products
     db.sql<s.products.SQL>`${titel}`;
   });
 
-  // the guard is in the generated lookup and each table's SQL, not in db.SQL: there, it refused a generic
-  // `${{ ...w, id: 1 }}` on TypeScript 4.1 (review of #676)
+  // the guard is in each table's SQL, not in db.SQL: there, it refused a generic `${{ ...w, id: 1 }}` on
+  // TypeScript 4.1 (review of #676)
   test('characterization: db.SQL, and a Whereable given as sql\'s own type argument, still take any string (#674)', () => {
     expectTypeOf(db.sql`${'serach'}`).toEqualTypeOf<db.SQLFragment<any[], never>>();
     expectTypeOf(db.sql<s.products.Whereable>`${'serach'}`).toEqualTypeOf<db.SQLFragment<any[], never>>();
