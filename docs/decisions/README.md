@@ -12,3 +12,4 @@ One note per ambiguous decision: context, options, proposed choice, then validat
 | [006](./006-subquery-conditions.md) | How `exists()` and `isInSelect()` refer to the outer query | accepted (2026-11-16), under the owner's delegation |
 | [007](./007-related.md) | Laterals on foreign keys: `related()`, `relatedMany()` and references to a lateral's result | accepted (2026-11-17), by delegation: not built in the core |
 | [008](./008-domains-jsonb-validators.md) | Domains typed by their values, typed `jsonb`, and validators | accepted (2026-11-17), by delegation: `domainsTypedAsUnions` only; no `jsonb` mechanism, no validators package |
+| [009](./009-functions.md) | Postgres functions: signatures, `fn()` and set-returning functions | accepted (2026-11-17), by delegation: not built in the core; `sql` documented |
