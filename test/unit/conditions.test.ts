@@ -1459,8 +1459,8 @@ describe('an exists() or isInSelect() option added to Object.prototype by someth
     }).toEqual({ exists: users, isInSelect: authors });
   });
 
-  // `alias` is read as select() reads it, `callerValue(allOptions, 'alias') || table`, with no `AS` when it is the
-  // table, and `parent` with the same `||`: `alias: null` compiled `AS ${null}`, which threw (#618)
+  // `alias` and `parent` are read with select()'s `||`, so a `null` or `''` one is none; an alias given, the table's own
+  // name included, writes its `AS`: `alias: null` compiled `AS ${null}`, which threw (#618)
   it('a null alias or parent is none, as select() reads its alias: own, from a getter, or a Proxy\'s get', () => {
     const
       counts: Record<string, number> = {},
@@ -1480,8 +1480,30 @@ describe('an exists() or isInSelect() option added to Object.prototype by someth
       counts,
     }).toEqual({
       alias: users, parent: users, both: users, isInSelect: authors, correlated, ownName, noMark,
-      getter: users, proxy: users, empty: users, table: users,
+      getter: users, proxy: users, empty: users, table: { text: 'EXISTS (SELECT 1 FROM "users" AS "users")', values: [] },
       counts: { 'get:parent': 1, 'get:alias': 1 },
+    });
+  });
+
+  // the type takes a string: an array compiled as the name it holds, so `alias: ['users']` passed the own-name check
+  it('a truthy alias or parent that is no string is refused as the query compiles', () => {
+    const
+      alias = (fn: string, what: string) => `\`${fn}()\` takes its \`alias\` option as a string, not ${what}: give the subquery's name, or leave the option out.`,
+      parentOf = (what: string) => `\`exists()\` takes its \`parent\` option as a string, not ${what}: give the outer table's name as the outer query names it, or leave the option out.`;
+    expect({
+      aliasArray: compiled(() => exists('extra.articles', { author_id: parent('id') }, { parent: 'users', alias: ['users'] } as any)),
+      aliasFragment: compiled(() => exists('users', db.all, { alias: sql`"users"` } as any)),
+      aliasNumber: compiled(() => exists('users', db.all, { alias: 1 } as any)),
+      aliasTrue: compiled(() => exists('users', db.all, { alias: true } as any)),
+      isInSelect: compiled(() => sql`${{ id: isInSelect('extra.articles', db.all, 'author_id', { alias: ['a'] } as any) }}`),
+      parentArray: compiled(() => exists('extra.articles', { author_id: parent('id') }, { parent: ['users'] } as any)),
+      parentFragment: compiled(() => exists('extra.articles', { author_id: parent('id') }, { parent: sql`"users"` } as any)),
+      parentTrue: compiled(() => exists('extra.articles', db.all, { parent: true } as any)),
+    }).toEqual({
+      aliasArray: alias('exists', 'an array'), aliasFragment: alias('exists', 'a `sql` fragment'),
+      aliasNumber: alias('exists', 'a `number`'), aliasTrue: alias('exists', 'a `boolean`'),
+      isInSelect: alias('isInSelect', 'an array'),
+      parentArray: parentOf('an array'), parentFragment: parentOf('a `sql` fragment'), parentTrue: parentOf('a `boolean`'),
     });
   });
 
