@@ -407,6 +407,11 @@ Candidates for a check, a rule or a skill line.
 - #676: a mutant run while another part of the fix is in place can pass for the wrong reason: rerun each mutant against the final shape.
 - #676: a fixture with an accidental hole can hide that the library's own sources rely on it: "type-checks against a generated one" goes red when it closes.
 - #676: run a type fix's forwarder grid on TS 4.1.6, 5.9 and 7: a guard in `db.SQLExpression` broke a generic `` db.sql`${{ ...w, id }}` `` on 4.1.6 only.
+- #680: what a declaration degrades to depends on the TypeScript version and on whether the reader has its own ambient module: replay on 4.1.6 and in a reader without one before writing it down.
+- #680: quote a maintainer's comment through to its conclusion, and read the closing comment of each linked issue.
+- #680: with project references, tsserver checks a reader against the referenced projects' sources, not their `.d.ts`: a docs claim about the editor needs its own tsserver probe.
+- #680: two copies of the runtime turn the other copy's `Default` into a `$1` = `null`: an insert writes NULL with no error.
+- #680: in zsh, an unquoted `grep --include=*.ts` fails as "no matches found" and silently zeroes a count: quote the pattern.
 - #677: rate the risk by where the change lands: a refusal added inside `compileExpression` is `high`, even when no SQL changes; only a message on a path that already threw stays `normal`.
 - #677: `upsert()` `updateValues` is compiled with no current column, so a refusal in `core.ts` that waits for `currentColumn` never reaches it.
 - #677: a message's advice gets the same proof as a code path: run what it says, where it says it, on Postgres (42703 in a `VALUES` list, 42702 in `updateValues`).
