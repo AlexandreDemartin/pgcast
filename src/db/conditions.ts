@@ -288,12 +288,21 @@ const notAValueIn = (a: unknown[]) => {
   }
   return undefined;
 };
+// the array is walked as the query compiles, when pg reads it, so that an item pushed after the call throws too; the
+// fragment around its parameter compiles as the parameter alone
 const arrayParam = (fn: string, a: unknown) => {
-  const item = Array.isArray(a) ? notAValueIn(a) : undefined;
-  return item === undefined ? conditionalParam(a) : refused(item === all ? allInCondition :
-    item instanceof Parameter || item instanceof SQLFragment || item instanceof ParentColumn ?
-      `\`${fn}()\` sends its array as one parameter, so each item is a plain value, not ${notAValue(item)}: give the value itself; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.` :
-      `\`${fn}()\` sends its array as one parameter, so each item is a plain value, not ${notAValue(item)}: give a value.`);
+  if (!Array.isArray(a)) return conditionalParam(a);
+  const fragment = sql`${param(a)}`, compile = fragment.compile;
+  return Object.assign(fragment, {
+    compile: (...args: Parameters<typeof compile>) => {
+      const item = notAValueIn(a);
+      if (item === undefined) return compile(...args);
+      throw new Error(item === all ? allInCondition :
+        item instanceof Parameter || item instanceof SQLFragment || item instanceof ParentColumn ?
+          `\`${fn}()\` sends its array as one parameter, so each item is a plain value, not ${notAValue(item)}: give the value itself; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.` :
+          `\`${fn}()\` sends its array as one parameter, so each item is a plain value, not ${notAValue(item)}: give a value.`);
+    },
+  });
 };
 
 /**
