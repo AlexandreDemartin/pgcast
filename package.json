@@ -54,7 +54,10 @@
     "typescript",
     "sql",
     "codegen",
-    "zapatos"
+    "zapatos",
+    "pg",
+    "node-postgres",
+    "type-safety"
   ],
   "author": "Alexandre Demartin (https://github.com/AlexandreDemartin)",
   "contributors": [
