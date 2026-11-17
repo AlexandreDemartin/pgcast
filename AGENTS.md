@@ -83,7 +83,7 @@ A task is **done** only if `lint`, `typecheck`, `test` and `test:types` pass.
 
 - The method on one page: [docs/WORKFLOW.md](docs/WORKFLOW.md). AI tooling and skill map: [.agents/README.md](.agents/README.md). Before a subject, read the skill it names.
 - Steps: the sub-issues of the Epics, one at a time, read with `gh issue view <n> --repo AlexandreDemartin/pgcast`; each issue carries **Files** and **Risk** (`.github/ISSUE_TEMPLATE/task.md`). Orchestrated by the skill `run-step`, with the agents `builder`, `branch-reviewer` and `chores`. Earlier history: [docs/HISTORY.md](docs/HISTORY.md).
-- Plan comment and PR proofs: skill `plan-and-proofs`; review comments: skill `review-comments` (the agent `branch-reviewer` relies on the user skill `branch-review`).
+- Plan comment and PR proofs: skill `plan-and-proofs`; review comments: skill `review-comments`.
 - CI: skill `ci-gate`; merge by risk (Ship / Show / Ask), squashed, closing its issue: skill `merge-gate`.
 - Deciding alone or asking: skill `decision-philosophy`. Size, splitting, titles, branches and commits: skill `pr-shape`; code, JSDoc, errors and the docs voice: skill `code-style`.
 
