@@ -17,7 +17,7 @@ db.select('films', db.all, { lateral: {
 
 What the code gives today:
 
-- **The runtime has no schema.** `zapatos/schema` is declarations only (`declare module 'zapatos/schema'`), and `src/db` imports nothing else from the generator. Zapatos did this on purpose in 4.0: its commit "Generating ambient zapatos/schema and zapatos/custom declarations", and the warning `legacy.ts` still prints, "ZAPATOS NO LONGER COPIES ITS SOURCE TO YOUR SOURCE TREE". To write `"id" = "films"."studio_id"`, `related('studios')` needs `studio_id` and `id` at run time, and only the catalog knows them. #627, as written, puts the keys into `zapatos/schema`, where only the compiler can read them.
+- **The runtime has no schema.** `zapatos/schema` is declarations only (`declare module 'zapatos/schema'`), and `src/db` imports nothing else from the generator. Zapatos did this on purpose in 3.0: its commit "Generating ambient zapatos/schema and zapatos/custom declarations", and the warning `legacy.ts` still prints, "ZAPATOS NO LONGER COPIES ITS SOURCE TO YOUR SOURCE TREE". To write `"id" = "films"."studio_id"`, `related('studios')` needs `studio_id` and `id` at run time, and only the catalog knows them. #627, as written, puts the keys into `zapatos/schema`, where only the compiler can read them.
 - **`parent('c')`** compiles to `<parentTable>."c"`. `lateral` sets the `parentTable` mark: `lateral[k].copy({ parentTable: alias })` (`select()`, `src/db/shortcuts.ts`).
 - **A `Whereable` compiles its keys sorted** (`Object.keys(…).sort()`, `src/db/core.ts`). So `{ seat: …, screening_id: … }` writes `"screening_id"` first, whatever order the caller used.
 - **In a `lateral`, `selectOne()` and `selectExactlyOne()` compile to the same SQL** (`LIMIT 1`). They differ only by type: `| undefined` or not. Nested, `selectExactlyOne()` checks nothing, and a missing row comes back as `null` (`website/lateral.md`).
@@ -52,7 +52,7 @@ All four options compile to the same SQL, the hand-written lateral's: they diffe
 | **The caller writes** | `related(fk.films.studios)`, `fk` imported from a generated `zapatos/foreignKeys.ts` | `related('studios')`, after `db.setConfig({ foreignKeys })` | `related('studios')` | `selectExactlyOne('studios', { id: db.parent<s.films.Column>('studio_id') })` |
 | **How the parent table is known** | the value names it; the SQL's parent is still the outer query's `parentTable` mark | through context, as #625 | at run time, from the mark: an alias hides the table | the type argument, which the caller writes |
 | **Compile cost** | measured below: about +2 points over the same queries written by hand | the mark alone, about +13 points (#625), plus a lookup by pair of tables | the same as B | none |
-| **What it adds** | the first generated runtime file since Zapatos 4: its module format (CJS, ESM, TypeScript) and `outExt`, `--check`, the docs schema, and an import in every file that joins | global state that changes what a call compiles; one registry for every database (#68) | a hidden query and a cache | nothing |
+| **What it adds** | the first generated runtime file since Zapatos 3.0: its module format (CJS, ESM, TypeScript) and `outExt`, `--check`, the docs schema, and an import in every file that joins | global state that changes what a call compiles; one registry for every database (#68) | a hidden query and a cache | nothing |
 | **The philosophy** | allowed (principle 5 writes `.ts` files), and needs nothing from `core.ts` | refused: hidden state, a registry (skill `zero-abstraction`) | refused: an implicit query, a cache | — |
 
 **The SQL**, compiled by the built runtime from the hand-written calls. A related call that builds the same `Whereable` and calls `select()` gives the same SQL, byte for byte (the `select()` wrapper of the outer query left out):
@@ -79,7 +79,7 @@ So A costs about 45 Instantiations per call over the hand-written lateral, +2.0 
 
 **Choice: D.** Nothing is built in the core: no `related()`, no `relatedMany()`, no foreign-key metadata (#627, #628 and #629 crossed out).
 
-- **The one option inside the philosophy, A, costs more than it saves.** Each call would save its column names and the choice of shortcut, on SQL that stays the same. In exchange, the generator would write a runtime file again, which Zapatos 4 stopped doing, and each file that joins would import it.
+- **The one option inside the philosophy, A, costs more than it saves.** Each call would save its column names and the choice of shortcut, on SQL that stays the same. In exchange, the generator would write a runtime file again, which Zapatos 3.0 stopped doing, and each file that joins would import it.
 - **What the call saves is already mostly there.** 91 % of the corpus's `parent()` calls carry `parent<T.Column>`, which refuses a column of another table (#625). 88 % of its many-to-one laterals already pick the right shortcut. The other 34 are a type each, never the SQL: the docs say how to choose (`website/lateral.md`).
 - **A covers half the corpus at best**: a single-column join to `id` or from it, 648 of 1,080, fewer once the 18 % with a condition beside the join are out. A join on other columns, a condition beside it, or a key from a variable still needs the hand-written form.
 - **Small is beautiful**: a core helper must pay for itself in the core. A needs nothing from `core.ts` nor from `src/db`'s internals, so it fits a separate package (principle 4). The package that #55 plans for generated runtime code (validators) is where a generated key would go, if real use asks for one.
@@ -130,7 +130,7 @@ So A costs about 45 Instantiations per call over the hand-written lateral, +2.0 
 
 ## Sources
 
-- Zapatos: [docs](https://jawj.github.io/zapatos/), § `lateral`, § Limitations ("we need to manually specify selectExactlyOne…", "there's no check that your joins make sense"), § What's next ("make use of foreign key relationships…"); its 4.0 commits, `git log upstream/master`.
+- Zapatos: [docs](https://jawj.github.io/zapatos/), § `lateral`, § Limitations ("we need to manually specify selectExactlyOne…", "there's no check that your joins make sense"), § What's next ("make use of foreign key relationships…"); its 3.0 commits (`38e4ff2`, before `3.0.0`), `git log upstream/master`, and its docs changelog § 3.0.
 - Postgres: [`pg_constraint`](https://www.postgresql.org/docs/current/catalog-pg-constraint.html) (`conkey`, `confkey`, `convalidated`, `condeferrable`, `conperiod`); [row security](https://www.postgresql.org/docs/current/ddl-rowsecurity.html).
 - PostgREST: [resource embedding](https://docs.postgrest.org/en/stable/references/api/resource_embedding.html), [schema cache](https://docs.postgrest.org/en/stable/references/schema_cache.html), [errors](https://docs.postgrest.org/en/stable/references/errors.html) (PGRST201).
 - Kysely: [relations](https://kysely.dev/docs/recipes/relations) (`jsonObjectFrom`, `jsonArrayFrom`).
