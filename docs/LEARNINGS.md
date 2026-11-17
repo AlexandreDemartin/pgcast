@@ -351,6 +351,12 @@ Candidates for a check, a rule or a skill line.
 - #645: `refusedSQL()` in `shortcuts.ts` makes a shortcut throw while compiling, so a new message keeps the error at `.run()`, not at the call.
 - #645: Vitest's `toThrow('…')` checks that the message contains the string, not the error's class: when a fix changes the class (`TypeError` to `Error`), assert `{ name, message }`.
 - #645: in zsh, `git show $REF:test/x.ts` applies the `:t` history modifier to `$REF`: quote it, `"$REF:path"` or `${REF}:path`.
+- #653: `db.param(x, cast)` takes the catalog's type name and quotes it: `'int'` fails (42704), `'int4'` and `'int4[]'` work.
+- #653: in a `bench:types` prototype the unprefixed schema sits at module level, not in a namespace; anchor an insertion on `/* --- aggregate types --- */`.
+- #653: before recording that a helper needs a `zapatos/schema` export that `src/db` reads (a canary increment), probe an augmentation of `zapatos/db` from a separate generated module file; note 007's TS2305 covers only the script `schema.d.ts`.
+- #653: probe a claim about overload resolution with an untyped parameter on a pair with no text candidate (`int`/`bigint`: 42725), and on overloads a `DEFAULT` gives one arity.
+- #653: a note that hands a need to a later feature quotes that feature's own scope first (#21: static `sql` only).
+- #653: a prototype that emits into the shared `node_modules/.cache/pgcast` leaves stale `.d.ts` files behind: delete them after.
 
 ## Minors kept
 
@@ -405,3 +411,4 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 
 - #645 (form): `src/db/shortcuts.ts` `allAsWriteFilter`: one clause for the reader who reached it by accident ("check the value that is missing") would complete the advice.
 - #645 (form): `website/sql-template.md` § all (EN and FR): the bullet repeats the message it quotes; keep only "`{}` and `` db.sql`TRUE` `` do:" before the quote.
+
