@@ -214,6 +214,9 @@ Candidates for a check, a rule or a skill line.
 - #575: a Postgres error the docs promise past the type (22023 for `vars` that is no object) needs its own integration test, or a refactor that defaults it away (`?? {}`) passes the suite.
 - #575: retyping a French conflict resolution drops the U+00A0 spaces: take the conflict's own text, or re-add them and check by byte.
 - #575: a shared helper's advice for the argument as a whole fits each caller's contract (an object for `vars`); the nested advice can stay shared.
+- #576: `insert`, `upsert`, `update`, `truncate`, `toDate` and `toString` re-exported with `declaration: true` give TS4023 since Zapatos 6.6.1 (unexported `XSignatures`, `ToDate`, `ToString`): skill `code-style`'s "An `XSignatures` interface for overloads" needs "exported, or written inline" for any function a consumer may re-export (#577).
+- #576: a declaration-emit test listing its re-exports by name covers only what existed: an object rest (`export const { ...all } = ns`) makes tsc write out every member.
+- #576: to probe a consumer on TS 4.1, use `@types/node@14` and `@types/pg@8.6` with `skipLibCheck`: current `@types/node` does not parse under 4.1.
 
 ## Minors kept
 
@@ -255,3 +258,4 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #573 (form): `test/unit/conditions.test.ts` `one SQL wherever it sits`: no `update()`, no `.copy()` of a refused wrapper.
 - #573 (defect): `website/conditions.md` § full-text (and FR), "one it does not know is its 42704": on Postgres 14 a dotted configuration whose schema is missing gives 3F000.
 - #575 (form): `website/conditions.md` § `jsonbPathExists()`: no line on `jsonb_path_exists_tz` for a path comparing datetimes across time zones (0A000).
+
