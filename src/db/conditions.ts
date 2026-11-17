@@ -114,12 +114,13 @@ export const isIn = <T>(a: readonly T[]) => !Array.isArray(a) ? notAnArray('isIn
  */
 export const isNotIn = <T>(a: readonly T[]) => !Array.isArray(a) ? notAnArray('isNotIn', a) : a.length > 0 ? sql<SQL, boolean | null, T>`${self} NOT IN (${vals(a)})` : sql`true`;
 
-// what eqAny() calls each value that is no plain value, for its messages; undefined for a plain value
+// what eqAny() calls each value that is no plain value, for its messages; undefined for a plain value; pg would send
+// db.all, as Default and self, as its String(), 'Symbol(all)'
 const notAValue = (x: unknown) =>
-  x === Default ? '`db.Default`' : x === self ? '`db.self`' : x instanceof Parameter ? '`db.param()`' :
-    x instanceof ParentColumn ? '`db.parent()`' : x instanceof DangerousRawString ? '`db.raw()`' :
-      x instanceof ColumnNames ? '`db.cols()`' : x instanceof ColumnValues ? '`db.vals()`' :
-        x instanceof SQLFragment ? 'a `sql` fragment' : undefined;
+  x === Default ? '`db.Default`' : x === self ? '`db.self`' : x === all ? '`db.all`' :
+    x instanceof Parameter ? '`db.param()`' : x instanceof ParentColumn ? '`db.parent()`' :
+      x instanceof DangerousRawString ? '`db.raw()`' : x instanceof ColumnNames ? '`db.cols()`' :
+        x instanceof ColumnValues ? '`db.vals()`' : x instanceof SQLFragment ? 'a `sql` fragment' : undefined;
 
 // one array parameter holds plain values: pg would send a Parameter or a fragment as JSON, and read an array item
 // as more items, so that a jsonb column matched no row, with no error
@@ -147,7 +148,7 @@ const anyArray = (a: unknown) => {
  * `"col" = ANY($1)`, the whole array one parameter: one query text for any length, where `isIn()` writes
  * `IN ($1, $2, …)`. An empty array matches no row. `parent('col')`, an array column of a `lateral`'s parent row,
  * gives `"col" = ANY("parent"."col")`. Anything else throws as the query compiles, and so does an item that is an array,
- * `db.param()`, a `sql` fragment, `db.parent()`, `db.Default`, `db.self`, `db.raw()`, `db.cols()` or `db.vals()`.
+ * `db.param()`, a `sql` fragment, `db.parent()`, `db.Default`, `db.self`, `db.all`, `db.raw()`, `db.cols()` or `db.vals()`.
  * @param a An array of values, or `parent()`
  */
 export const eqAny: {
@@ -219,11 +220,14 @@ export const jsonbContains: {
   <T>(a: JSONValue): SQLFragment<boolean | null, T>;
 } = (a: JSONValue) => sql<SQL, boolean | null>`${self} @> ${jsonbParam(a, 'jsonbContains', 'value', 'leave the key out, and the value match more rows', 'Give a JSON value, or leave the key out')}`;
 
+// what a value that is no string is, for the messages of jsonbPathExists() and websearchToTsquery()
+const notAString = (x: unknown) => notJSON(x) ??
+  (x === null ? '`null`' : Array.isArray(x) ? 'an array' : typeof x === 'object' ? 'an object' : `a \`${typeof x}\``);
+
 // the path goes as text, cast to jsonpath, so that Postgres parses it: pg would send anything else as JSON or as its
 // String(), which Postgres could read as another path
 const jsonpathParam = (path: unknown) => typeof path === 'string' ? param(path, 'jsonpath') :
-  refused(`\`jsonbPathExists()\` takes its path as a string, not ${notJSON(path) ??
-    (path === null ? '`null`' : Array.isArray(path) ? 'an array' : typeof path === 'object' ? 'an object' : `a \`${typeof path}\``)}: write the path as a string, and each value it compares with as a variable, \`jsonbPathExists(path, { name: value })\`.`);
+  refused(`\`jsonbPathExists()\` takes its path as a string, not ${notAString(path)}: write the path as a string, and each value it compares with as a variable, \`jsonbPathExists(path, { name: value })\`.`);
 
 // as jsonbContains()'s signatures, T given for a narrowed jsonb domain, never inferred, and written in place
 /**
@@ -349,11 +353,13 @@ declare const tsvector: unique symbol;
  */
 export interface TsvectorColumn { readonly [tsvector]: true }
 
-// a value as a parameter: pg would send a Parameter or a fragment as JSON, Default and self as their names
+// a string as a parameter: pg would send a Parameter, a fragment or an object as JSON, Default, self and all as their
+// names, an array as '{"a","b"}', whose words Postgres reads, and undefined as NULL, which matches no row
 const searchParam = (which: string, x: unknown, cast?: string) => {
   const name = notAValue(x);
-  return name === undefined ? param(x, cast) :
-    refused(`\`websearchToTsquery()\` sends its configuration and its query as parameters: give the ${which} as a string, not ${name}; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.`);
+  return typeof x === 'string' ? param(x, cast) : name !== undefined ?
+    refused(`\`websearchToTsquery()\` sends its configuration and its query as parameters: give the ${which} as a string, not ${name}; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.`) :
+    refused(`\`websearchToTsquery()\` takes its ${which} as a string, not ${notAString(x)}: give it as a string, \`websearchToTsquery('english', 'salt orchard')\`.`);
 };
 
 /**
@@ -362,8 +368,9 @@ const searchParam = (which: string, x: unknown, cast?: string) => {
  * user's input as it is (https://www.postgresql.org/docs/current/textsearch-controls.html). Name the configuration
  * that built the column's vector: its stems are the ones that match. The type takes a column typed `any`, as the
  * `PgTsvector` placeholder is generated; once you edit it, name it: `websearchToTsquery<PgTsvector>(…)`.
- * @param config A text search configuration, such as `'english'`, sent as a parameter
- * @param query The search, sent as a parameter
+ * @param config A text search configuration, such as `'english'`, sent as a parameter: anything but a string throws as
+ * the query compiles
+ * @param query The search, a string sent as a parameter, as `config`
  */
 // `NoInfer<T>` of ./utils, written out: a library's declarations could not name it, zapatos/db not exporting it (TS2742)
 export const websearchToTsquery = <T = TsvectorColumn>(config: string, query: string) =>
