@@ -1,5 +1,5 @@
 ---
-english: f152b2e95918
+english: 2696a9c60546
 description: "Passez de Zapatos 6.6.1 à pgcast : changez une ligne de package.json et régénérez ; tsc et les avertissements de pgcast montrent les rares appels qui changent."
 ---
 
@@ -178,6 +178,20 @@ Cherchez dans votre code la première colonne de chaque tableau ci-dessous. Chaq
 |---|---|---|---|
 | Un nom (une colonne, une table, une clé de `lateral`, un `alias`) ou un cast de `param()` qui injecte du SQL, ou contient un commentaire entre ses parties entre guillemets : un [`order`](/fr/select#select) de `{ by: 'release_year" DESC, "title', … }` | `ORDER BY "release_year" DESC, "title" ASC` | `ORDER BY "release_year"" DESC, ""title" ASC`<!-- probe: db.select('films', db.all, { order: { by: 'release_year" DESC, "title', direction: 'ASC' } }) -->, un seul nom : 42703 | un nom par chaîne : `order: [{ by: 'release_year', direction: 'DESC' }, { by: 'title', direction: 'ASC' }]` |
 | Un [`lock`](/fr/select#lock), une option de [`truncate()`](/fr/insert#truncate), un niveau d’isolation, ou un `aggregate` qui n’est pas un nom de fonction | écrit tel quel dans le SQL | lève une erreur avant toute requête | une valeur que le type accepte ; pour l’`aggregate`, un nom de fonction (`sum`, `my_schema.my_agg`) |
+
+</div>
+
+### Clés propres {#own-keys}
+
+À partir de la 6.7.2, pgcast ne prend les colonnes d’un tableau de lignes et les valeurs de mise à jour d’`upsert()` que dans leurs clés propres, et à partir de la 6.8.0 les options des raccourcis aussi. Une clé qu’un autre code ajoute à `Object.prototype` n’est donc plus une colonne, une valeur de mise à jour ni une option : la section [Les corrections par version](/fr/security#fixes-by-release) dit ce qu’elle faisait. Aucun code ne devrait compter sur une telle clé ; sans elle, seuls ces appels changent :
+
+<div class="stack">
+
+| Votre code | Zapatos 6.6.1 | pgcast | Que faire |
+|---|---|---|---|
+| Une colonne nommée `constructor`, `valueOf`, `toString` ou `hasOwnProperty` dans une ligne d’[`upsert()`](/fr/insert#upsert), que `updateValues` ne nomme pas | lève une erreur à la compilation, "Alien object while interpolating SQL: …"<!-- message -->, donc `.run()` est rejetée | à partir de la 6.7.2, prend sa valeur dans `EXCLUDED` en cas de conflit, comme toute autre colonne | rien |
+| Une colonne nommée `__proto__`, clé propre telle que `JSON.parse` la donne : dans une ligne d’`upsert()`, que `updateValues` ne nomme pas ; dans un tableau de lignes donné à `insert()` ou `upsert()` | `upsert()` lui donne la valeur `TRUE` en cas de conflit ; dans un tableau, les clés de sa valeur sont aussi des colonnes, et une ligne qui ne l’a pas fait refuser la requête par Postgres (42601) | à partir de la 6.7.2, prend sa valeur dans `EXCLUDED` ; dans un tableau, une colonne à part entière, `DEFAULT` dans une ligne qui ne l’a pas | rien |
+| Un élément d’[`order`](/fr/select#select) ou de [`lock`](/fr/select#lock) qui vaut `null` ou `undefined`, en passant outre le type : `select('films', db.all, { order: [null] })` | une `TypeError` à l’appel, « <span lang="en">Cannot read properties of null</span> » | à partir de la 6.8.0, une `Error` à l’appel, comme pour un élément sans `direction` ni `for` : "Direction must be ASC/DESC, not 'undefined'"<!-- message --> | rien, sauf si votre code y attend une `TypeError` |
 
 </div>
 

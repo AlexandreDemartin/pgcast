@@ -180,6 +180,20 @@ Look through your code for the first column of each table below. Each change in 
 
 </div>
 
+### Own keys
+
+From 6.7.2, pgcast takes the columns of an array of rows and `upsert()`'s update values from own keys only, and from 6.8.0 the shortcuts' options too. So a key that other code adds to `Object.prototype` is no longer a column, an update value or an option: [Fixes by release](/security#fixes-by-release) says what it did. No code should rely on such a key; without one, only these calls change:
+
+<div class="stack">
+
+| Your code | Zapatos 6.6.1 | pgcast | What to do |
+|---|---|---|---|
+| A column named `constructor`, `valueOf`, `toString` or `hasOwnProperty` in an [`upsert()`](/insert#upsert) row, which `updateValues` doesn't name | throws while compiling, "Alien object while interpolating SQL: …"<!-- message -->, so `.run()` rejects | from 6.7.2, set from `EXCLUDED` on conflict, as any other column | nothing |
+| A column named `__proto__`, an own key as `JSON.parse` gives it: in an `upsert()` row, which `updateValues` doesn't name; in an array of rows given to `insert()` or `upsert()` | `upsert()` sets it to `TRUE` on conflict; in an array, the keys of its value are columns too, and a row without it makes Postgres refuse the query (42601) | from 6.7.2, set from `EXCLUDED`; in an array, a column of its own, `DEFAULT` in a row without it | nothing |
+| An [`order`](/select#select) or [`lock`](/select#lock) item that is `null` or `undefined`, past the type: `select('films', db.all, { order: [null] })` | a `TypeError` at the call, "Cannot read properties of null" | from 6.8.0, an `Error` at the call, as for an item without `direction` or `for`: "Direction must be ASC/DESC, not 'undefined'"<!-- message --> | nothing, unless you test for a `TypeError` there |
+
+</div>
+
 ### SQL that changes, rows that don't
 
 The text and values of `.compile()` change beyond these rows, where the rows returned don't:

@@ -242,6 +242,7 @@ Candidates for a check, a rule or a skill line.
 - #596: `check-prose.mjs` matches each interpolation of a quoted message with `\S+?`: a quoted message needs a one-word value (`` `undefined` ``, not "an array").
 - #596: from Postgres 16, `regconfigin` reports a missing schema in a qualified name as the configuration missing (42704); 14 and 15 raise 3F000 from `LookupExplicitNamespace`.
 - #596: in zsh, `git show $B:website/x.md` applies `:w` as a modifier to `$B`: write `"${B}:path"`.
+- #600: the guard hook blocks the Write tool on any file named `db.mjs`, scratch included: name probe scripts otherwise.
 
 ## Minors kept
 
@@ -285,3 +286,4 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #575 (form): `website/conditions.md` § `jsonbPathExists()`: no line on `jsonb_path_exists_tz` for a path comparing datetimes across time zones (0A000).
 - #598 (form): `src/db/conditions.ts` `callerValue(options, 'parent')` makes `parent` and `alias` `any` (a misspelt key type-checks), as #558's kept minor.
 - #596 (form): `src/db/conditions.ts` JSDoc of `jsonbContains()` and `website/conditions.md` (FR) list `Default`, `self`, `raw()`, `cols()`, `vals()` but not `all`, which now gets the wrapper message.
+- #600 (form): `website/switching.md` has no row for `order: null` / `lock: null` (Zapatos 6.6.1: a `TypeError` at the call; pgcast from 6.7.1: refused while compiling, `.run()` rejects).
