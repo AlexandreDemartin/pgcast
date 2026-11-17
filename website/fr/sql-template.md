@@ -1,5 +1,5 @@
 ---
-english: 41dacafc9fd0
+english: 7f3730458cd2
 ---
 
 # Template SQL
@@ -596,6 +596,8 @@ withCTEs<Q extends SQLFragment<any, any>>(ctes: { [name: string]: SQLFragment<an
 - **`selectExactlyOne()`** : avec [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), le résultat demande toujours une deuxième ligne, `LIMIT $1`<!-- probe: (db.setConfig({ selectExactlyOneChecksForSecondRow: true }), db.withCTEs({ a: db.sql`SELECT 1` }, db.selectExactlyOne('films', db.all))) --> avec `2`, et il est rejeté s’il en trouve une, comme le raccourci seul. Imbriqué dans une autre requête, il garde `LIMIT 1`.
 - **Un seul `WITH`** : la requête ne peut pas commencer par son propre `WITH`, un résultat de `withCTEs()` ou un fragment `sql`, ni être un [`truncate()`](/fr/insert#truncate) : Postgres refuse le texte (42601). Mettez toutes les CTE dans un seul appel.
 - **Requête préparée** : jamais, pas plus que les CTE et la requête qu’il imbrique, `{}` compris, car un [nom](#prepared) désigne un seul texte. Appelez `prepared()` sur le résultat. Sur une liste construite à l’exécution, un même nom couvrirait un texte par liste : donnez à chaque texte son propre nom, ou ne préparez pas la requête.
+
+Pas à pas, avec un `insert()` comme CTE : [Placer une CTE avant un raccourci](/fr/raw-sql#put-a-cte-before-a-shortcut).
 
 ## `RunResultForSQLFragment` {#RunResultForSQLFragment}
 
