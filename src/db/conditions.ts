@@ -148,7 +148,7 @@ const anyArray = (a: unknown) => {
  * `"col" = ANY($1)`, the whole array one parameter: one query text for any length, where `isIn()` writes
  * `IN ($1, $2, …)`. An empty array matches no row. `parent('col')`, an array column of a `lateral`'s parent row,
  * gives `"col" = ANY("parent"."col")`. Anything else throws as the query compiles, and so does an item that is an array,
- * `db.param()`, a `sql` fragment, `db.parent()`, `db.Default`, `db.self`, `db.raw()`, `db.cols()` or `db.vals()`.
+ * `db.param()`, a `sql` fragment, `db.parent()`, `db.Default`, `db.self`, `db.all`, `db.raw()`, `db.cols()` or `db.vals()`.
  * @param a An array of values, or `parent()`
  */
 export const eqAny: {
@@ -368,8 +368,9 @@ const searchParam = (which: string, x: unknown, cast?: string) => {
  * user's input as it is (https://www.postgresql.org/docs/current/textsearch-controls.html). Name the configuration
  * that built the column's vector: its stems are the ones that match. The type takes a column typed `any`, as the
  * `PgTsvector` placeholder is generated; once you edit it, name it: `websearchToTsquery<PgTsvector>(…)`.
- * @param config A text search configuration, such as `'english'`, sent as a parameter
- * @param query The search, sent as a parameter
+ * @param config A text search configuration, such as `'english'`, sent as a parameter: anything but a string throws as
+ * the query compiles
+ * @param query The search, a string sent as a parameter, as `config`
  */
 // `NoInfer<T>` of ./utils, written out: a library's declarations could not name it, zapatos/db not exporting it (TS2742)
 export const websearchToTsquery = <T = TsvectorColumn>(config: string, query: string) =>
