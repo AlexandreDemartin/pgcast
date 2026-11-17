@@ -357,6 +357,12 @@ Candidates for a check, a rule or a skill line.
 - #653: probe a claim about overload resolution with an untyped parameter on a pair with no text candidate (`int`/`bigint`: 42725), and on overloads a `DEFAULT` gives one arity.
 - #653: a note that hands a need to a later feature quotes that feature's own scope first (#21: static `sql` only).
 - #653: a prototype that emits into the shared `node_modules/.cache/pgcast` leaves stale `.d.ts` files behind: delete them after.
+- #648: `codegen()` in the test helpers overrides `db`; a test that needs its own connection options calls `tsForConfig(finaliseConfig(...))` directly.
+- #648: comparing two generator runs needs the queries sorted with their sequence numbers removed, and the once-per-process bigint note filtered out.
+- #648: a mutant the whole-text match makes equivalent (`contype = 'c'`) is kept as the note's stated rule, and said so in the PR.
+- #648: compile every new import a placeholder writes under each `customTypesTransform` variant, with `skipLibCheck: false`: `'my_type'` gives the import the placeholder's own name (TS2440), which the build hides.
+- #651: a placeholder may share its namespace's name (`union_self`) and compile; only an import of the type itself clashes, so the rule matches the base type (`name` or `name[]`), not the names alone.
+- #651: a fix found while building one path (#648's unions) belongs in the shared writer (`sourceFilesForCustomTypes()`), which then drops the first special case.
 
 ## Minors kept
 

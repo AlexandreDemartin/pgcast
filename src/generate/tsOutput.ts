@@ -12,6 +12,7 @@ import { enumOrderOf, enumOrdersForSchema, enumsOutOfOrder, warnAboutEnumOrder }
 import type { EnumOrders } from './enumOrder';
 import { domainRootsInDatabase } from './domainRoots';
 import type { DomainRoots } from './domainRoots';
+import { domainUnionsInDatabase, unionTypesForDomains, warnAboutPlaceholdersOnDisk } from './domainUnions';
 import { header } from './header';
 import { moduleNamesOf } from './moduleNames';
 import { jsdocText, tsIdentifier } from './quote';
@@ -62,15 +63,23 @@ const zapatosSchemaShim = `\n// pgcast/db's declarations import 'zapatos/schema'
 
 const sourceFilesForCustomTypes = (customTypes: CustomTypes, names: string, schemaImports: Record<string, string | null>) =>
   Object.fromEntries(Object.entries(customTypes)
-    .map(([name, baseType]) => [
-      name,
-      customTypeHeader + declareModule(`${names}/custom`,
-        // 6.6.1 imported db for db.JSONValue alone: db.Int8String and the others failed to compile
-        (baseType.startsWith('db.') ? `import type * as db from '${names}/db';\n` : ``) +
-        (schemaImports[name] ? `import type { ${schemaImports[name]} } from '${names}/schema';\n` : ``) +
-        `export type ${name} = ${baseType};  // replace with your custom type or interface as desired`
-      )
-    ]));
+    .map(([name, baseType]) => {
+      const
+        imported = schemaImports[name],
+        // a placeholder of the enum's or the union's own name (customTypesTransform 'my_type') cannot import it by that
+        // name: TS2440; its namespace's name, it can
+        sameName = imported === name && (baseType === name || baseType === `${name}[]`),
+        type = sameName ? `import('${names}/schema').${baseType}` : baseType;
+      return [
+        name,
+        customTypeHeader + declareModule(`${names}/custom`,
+          // 6.6.1 imported db for db.JSONValue alone: db.Int8String and the others failed to compile
+          (baseType.startsWith('db.') ? `import type * as db from '${names}/db';\n` : ``) +
+          (imported && !sameName ? `import type { ${imported} } from '${names}/schema';\n` : ``) +
+          `export type ${name} = ${type};  // replace with your custom type or interface as desired`
+        )
+      ];
+    }));
 
 /**
  * Warn about each custom type name that stands for more than one Postgres type: they share one
@@ -275,11 +284,11 @@ const warnAboutUnmatchedIncludes = (unmatched: { schema: string; name: string }[
   }
 };
 
-interface NamedInTS { kind: 'schema' | 'relation' | 'enum'; name: string; label: string }
+interface NamedInTS { kind: 'schema' | 'relation' | 'enum' | 'domain'; name: string; label: string }
 interface IdentifierGroup { as: 'namespace' | 'type'; names: NamedInTS[] }
 
 /**
- * Warn about each TypeScript name that two schemas, relations or enums of one scope take (`odd table` and
+ * Warn about each TypeScript name that two schemas, relations, enums or unions of one scope take (`odd table` and
  * `odd_table`): their declarations clash. The schemas share the top level with the relations of `unprefixedSchema`.
  */
 const warnAboutSharedIdentifiers = (groups: IdentifierGroup[], config: CompleteConfig) => {
@@ -380,6 +389,7 @@ const tsForQueries = async (config: CompleteConfig, queryFn: (q: pg.QueryConfig)
     enumArraysNotAsText: [string, string | null][] = [],
     intervalsAsText: string[] = [],
     schemaNames = Object.keys(schemas),
+    unions = config.domainsTypedAsUnions ?? false ? await domainUnionsInDatabase(schemaNames, queryFn) : [],
     schemaData = (await Promise.all(
       schemaNames.map(async schema => {
         const
@@ -401,12 +411,15 @@ const tsForQueries = async (config: CompleteConfig, queryFn: (q: pg.QueryConfig)
               enumsForSchema, columnsTypedByEnumName, customTypeImports, uniqueIndexesNotArbiters, domainsNotByContext,
               domainRoots, domainsUnderDomains, enumArraysNotAsText, intervalsAsText))),
           schemaIsUnprefixed = schema === config.unprefixedSchema,
+          schemaUnions = unions.filter(union => union.schema === schema),
           none = '/* (none) */',
           schemaDef = `/* === schema: ${jsdocText(schema)} === */\n` +
             (schemaIsUnprefixed ? '' : `\nexport namespace ${tsIdentifier(schema, 'namespace')} {\n`) +
             indentAll(schemaIsUnprefixed ? 0 : 2,
               `\n/* --- enums --- */\n` +
               (enumTypesForEnumData(enums) || none) +
+              (config.domainsTypedAsUnions ?? false ? `\n\n/* --- domains --- */\n` +
+                (unionTypesForDomains(schemaUnions, schemaIsUnprefixed ? '' : `${schema}.`, config.schemaJSDoc) || none) : '') +
               `\n\n/* --- tables --- */\n` +
               (tableDefs.join('\n') || none) +
               `\n\n/* --- aggregate types --- */\n` +
@@ -417,10 +430,11 @@ const tsForQueries = async (config: CompleteConfig, queryFn: (q: pg.QueryConfig)
             (schemaIsUnprefixed ? '' : `}\n`);
 
         const
-          named = (kind: 'relation' | 'enum', name: string): NamedInTS => ({ kind, name, label: `"${schema}"."${name}"` }),
+          named = (kind: 'relation' | 'enum' | 'domain', name: string): NamedInTS => ({ kind, name, label: `"${schema}"."${name}"` }),
           relationNames = tables.map(rel => named('relation', rel.name)),
           // the relations of unprefixedSchema are at the top level, with the schemas' namespaces
-          identifierGroups: IdentifierGroup[] = [{ as: 'type', names: Object.keys(enums).map(name => named('enum', name)) },
+          identifierGroups: IdentifierGroup[] = [{ as: 'type', names: [...Object.keys(enums).map(name => named('enum', name)),
+            ...schemaUnions.map(union => named('domain', union.name))] },
             ...schemaIsUnprefixed ? [] : [{ as: 'namespace' as const, names: relationNames }]],
           topLevelNames = schemaIsUnprefixed ? relationNames : [];
         return { schemaDef, tables, unmatched, outOfOrder, identifierGroups, topLevelNames };
@@ -429,6 +443,18 @@ const tsForQueries = async (config: CompleteConfig, queryFn: (q: pg.QueryConfig)
     schemaDefs = schemaData.map(r => r.schemaDef),
     schemaTables = schemaData.map(r => r.tables),
     allTables = ([] as Relation[]).concat(...schemaTables),
+    // a placeholder names a union while that domain is the only type of the run that takes its name (#42)
+    unionPlaceholders = unions.flatMap(({ schema, name }) => {
+      const placeholder = Object.keys(customTypeOrigins).find(custom =>
+        Object.keys(customTypeOrigins[custom]).includes(`"${schema}"."${name}"`));
+      if (placeholder === undefined || Object.keys(customTypeOrigins[placeholder]).length > 1) return [];
+      const
+        type = tsIdentifier(name, 'type'), namespace = tsIdentifier(schema, 'namespace'),
+        union = schema === config.unprefixedSchema ? type : `${namespace}.${type}`;
+      customTypeImports[placeholder] = schema === config.unprefixedSchema ? type : namespace;
+      customTypes[placeholder] = union;
+      return [[placeholder, `${schema}.${name}`, union] as const];
+    }),
     hasCustomTypes = Object.keys(customTypes).length > 0,
     ts = header() + declareModule(`${names}/schema`,
       `\nimport type * as db from '${names}/db';\n` +
@@ -447,6 +473,7 @@ const tsForQueries = async (config: CompleteConfig, queryFn: (q: pg.QueryConfig)
     ...schemaNames.map(schema => ({ kind: 'schema' as const, name: schema, label: `"${schema}"` })),
     ...schemaData.flatMap(r => r.topLevelNames)] }], config);
   warnAboutSharedCustomTypeNames(customTypeOrigins, config);
+  warnAboutPlaceholdersOnDisk(unionPlaceholders, customTypeSourceFiles, config);
   warnAboutEnumsAcrossSchemas(columnsTypedByEnumName, config);
   warnAboutEnumOrder(schemaData.flatMap(r => r.outOfOrder), config);
   warnAboutUniqueIndexesNotArbiters(uniqueIndexesNotArbiters, config);

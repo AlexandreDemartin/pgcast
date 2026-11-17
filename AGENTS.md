@@ -47,7 +47,7 @@ user code ──► src/db/ (runtime: sql``, shortcuts, conditions, transactions
   - `write.ts` (`generate()`) writes `zapatos/schema.d.ts` and the `zapatos/custom/` placeholders, each under `header.ts`'s header, and its `check()` compares them with the disk, as `--check` does; `outputFiles.ts` builds them in memory, and its `staleFiles()` names those that differ, for both.
   - `tsOutput.ts` assembles the `zapatos/schema` module (namespaces per schema, aggregate types, `*ForTable<T>` lookups, version canary); `moduleNames.ts` picks `zapatos/*` or `pgcast/*`.
   - `tables.ts` introspects relations, columns, unique indexes and comments, then produces `Selectable`, `JSONSelectable`, `Whereable`, `Insertable`, `Updatable` per table; `quote.ts` writes a Postgres name or a text into the output.
-  - `enums.ts` and `pgTypes.ts` map Postgres types to TS (by context: Selectable, Insertable, etc.), `enumOrder.ts` reads an enum's declared order, `domainRoots.ts` the base type under a domain; `legacy.ts` prints the migration warning for the old "srcMode".
+  - `enums.ts` and `pgTypes.ts` map Postgres types to TS (by context: Selectable, Insertable, etc.), `enumOrder.ts` reads an enum's declared order, `domainRoots.ts` the base type under a domain, `domainUnions.ts` the values a domain's `CHECK` lists (`domainsTypedAsUnions`); `legacy.ts` prints the migration warning for the old "srcMode".
   - Each module is listed here (`npm run check:agents`); those outside `index.ts`'s `export *` stay out of `zapatos/generate`.
 - `src/db/`: the runtime (import `zapatos/db`).
   - `core.ts`: ⚠️ **sensitive zone**: `sql`, `SQLFragment`, compilation and escaping (`param`, `raw`, `cols`, `vals`, `parent`, `self`, `Default`).
