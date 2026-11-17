@@ -1172,6 +1172,7 @@ describe('shortcut options', () => {
       ['an array whose own toString() answers other SQL, with no replace()', log => Object.assign(['u'], { toString: logged(log, 'toString', attack) }), twice('"u"', '"sq_x""; DELETE FROM users; --"'), ['toString']],
       ['an array whose own toString() answers x", then v, with no replace()', log => Object.assign(['u'], { toString: logged(log, 'toString', 'x"', 'v') }), twice('"u"', '"sq_x"""'), ['toString']],
       ['an array holding a"b', () => ['a"b'], twice('"a""b"', '"sq_a""b"'), []],
+      ['a class instance whose toString() answers x", with no replace()', log => new (class { toString() { log.push('toString'); return 'x"'; } })(), twice('TRUE', '"sq_x"""'), ['toString']],
       ['an array whose Symbol.toPrimitive answers x" to the hint string', log => Object.assign(['u'], { [Symbol.toPrimitive]: (hint: string) => { log.push(`toPrimitive(${hint})`); return hint === 'string' ? 'x"' : 'u'; } }), twice('"u"', '"sq_x"""'), ['toPrimitive(string)']],
       // as before
       ['a string', () => 'u', twice('"u"', '"sq_u"'), []],
