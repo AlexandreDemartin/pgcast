@@ -1,5 +1,5 @@
 ---
-english: f939eb778b78
+english: d99a7d2e0cc9
 description: "Passez de Zapatos 6.6.1 à pgcast : changez une ligne de package.json et régénérez ; tsc et les avertissements de pgcast montrent les rares appels qui changent."
 ---
 
@@ -100,6 +100,7 @@ Pour comparer avec du SQL, donnez un fragment `sql` comme valeur, `db.self` pour
 - Dans `updateValues` d’[`upsert()`](/fr/insert#upsert-options), `db.cols()` ou `db.vals()` d’une chaîne ou d’une autre valeur primitive, `{ title: db.cols('title') }` : le type le refuse (2769). Il lève une erreur à la compilation de la requête, et avec Zapatos 6.6.1, Postgres le refusait (42703, 42601), sauf `vals()` d’un seul caractère. Donnez la valeur elle-même, envoyée comme paramètre, ou un fragment `sql`.
 - Dans `updateValues` aussi, `db.cols()` ou `db.vals()` d’un `Date` ou d’un `Buffer`, `{ booked_at: db.vals(new Date()) }`, et avec [`intervalsTypedAsObjects`](/fr/generator#generate.intervalsTypedAsObjects) d’un [`PostgresInterval`](/fr/runtime-config#PostgresInterval) : le type le refuse (2769). Un `Date` sans clé propre énumérable et un `Buffer` lèvent aussi une erreur à la compilation, ici et dans tout appel à [`cols()`](/fr/sql-template#cols) ou [`vals()`](/fr/sql-template#vals) ; un `Date` doté de champs propres et un intervalle se compilent comme avant. Avec Zapatos 6.6.1, Postgres le refusait (42601, 42703), sauf `vals()` d’un `Buffer` d’un seul octet, qui stockait le nombre de cet octet, `97` pour `Buffer.from('a')` ; d’un `Date` doté d’un seul champ propre, qui stockait ce champ ; et d’un intervalle tel que `pg` le parse, d’une seule partie, qui stockait son nombre comme des secondes, `{ hours: 2 }` en 2 secondes. Donnez la valeur elle-même, envoyée comme paramètre.
 - Un range sélectionné peut désormais valoir `'empty'`, puisque Postgres écrit ainsi un range vide ([`RangeString`](/fr/runtime-config#RangeString)) : il n’est donc plus assignable à un type qui commence par un crochet, `` `[${string}` | `(${string}` `` (2322). Vérifiez d’abord ce cas, `if (range !== 'empty')` ; dans un type, écrivez `Exclude<db.DateRangeString, 'empty'>`.
+- Une fois le schéma régénéré, une table dont une colonne porte le nom d’un membre de `String`, d’un type auquel ce membre correspond (`search` typée `any`, comme l’est un `tsvector`, ou `length` un nombre), n’accepte plus n’importe quelle chaîne comme nom dans son type `SQL` (2345) : `` db.sql<s.films.SQL>`${'titel'}` ``. Zapatos 6.6.1 acceptait la chaîne comme un nom, `"titel"`, que Postgres refuse quand aucune colonne ne le porte (42703). Le `where` de ses raccourcis en accepte toujours une, `db.select('films', 'titel')` ([#674](https://github.com/AlexandreDemartin/pgcast/issues/674)). Pour un nom connu seulement à l’exécution, vérifiez-le, puis typez-le comme le `Column` de la table.
 
 ## 4. Trouver les appels dont le résultat change {#find-the-calls-whose-result-changes}
 

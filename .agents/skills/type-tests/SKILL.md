@@ -28,7 +28,7 @@ In a test, the docs or the CHANGELOG, it is probed, not read from the declaratio
 - on a value built at run time and on wider types (`Record<string, string>`, `object`): excess keys are checked only in a fresh literal, and a built-in that shares a member with a column (`name`, `size`) passes the weak-type check;
 - on each compiler it names, by a real install: 5.9 and 7.0 infer literals differently (the type tests run on 5.9 only), TS 7 prints only the last overload's error, the declarations need 5.7 for a full check; the error code (TS2322 or TS2345) depends on the signature's form;
 - on the `any` placeholders of `zapatos/custom` (`extra.type_zoo`) and an array of one: they are the typed callers a fix changes, and `0 extends (1 & T)` does not see `any[]`; a type "left as generated" is checked by identity (`(<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2)`), not two-way assignability (#112, #484, #487);
-- in a scratch probe outside a dot folder (`tsc` skips them), with the `paths` of `website/tsconfig.json` (`@types/*` before `node_modules/*`), on the docs schema for a `sql` interpolation: the fixture's `products` table lets `SQLForTable` take any string.
+- in a scratch probe outside a dot folder (`tsc` skips them), with the `paths` of `website/tsconfig.json` (`@types/*` before `node_modules/*`), on the docs schema for a `sql` interpolation; a claim that a string is refused, on a table whose column is named like a `String` member (the fixture's `products.search`): its own `SQL` refuses it since #670; its shortcuts' `where`, `db.SQL` and `and()`, `or()`, `not()` still take it (#674).
 
 ## Compile cost
 
