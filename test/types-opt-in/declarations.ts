@@ -25,14 +25,15 @@ export const userWithAggregates = (id: number) => db.selectOne('users', { id }, 
 export const firstEventOfUser = (id: number) => db.selectOne('users', { id }, { lateral: db.min('events', db.all, { columns: ['occurred_on'] }) });
 
 // every function and value of zapatos/db and of db.conditions re-exported, as a wrapper module does: each type must be
-// one a .d.ts can name (TS4023 otherwise), so a type that names an unexported interface is written inline
+// one a .d.ts can name (TS4023 otherwise), so a type that names an unexported interface is written inline. Left out:
+// insert, upsert, update, truncate, toDate and toString, whose types have named an unexported interface since
+// Zapatos 6.6.1 (InsertSignatures, ToDate…)
 export const {
   mapWithSeparator, getConfig, setConfig, Default, self, all, toBuffer, Parameter, DangerousRawString, ColumnNames,
-  ColumnValues, ParentColumn, SQLFragment, strict, param, raw, cols, vals, parent, sql, toDate, toString,
-  isDatabaseError, insert, Constraint, doNothing, upsert, update, deletes, truncate, SelectResultMode,
-  NotExactlyOneError, select, selectOne, selectExactlyOne, count, sum, avg, min, max, constraint, IsolationLevel,
-  transaction, serializable, repeatableRead, readCommitted, serializableRO, repeatableReadRO, readCommittedRO,
-  serializableRODeferrable, enableCustomJSONParsingForLargeNumbers,
+  ColumnValues, ParentColumn, SQLFragment, strict, param, raw, cols, vals, parent, sql, isDatabaseError, Constraint,
+  doNothing, deletes, SelectResultMode, NotExactlyOneError, select, selectOne, selectExactlyOne, count, sum, avg, min,
+  max, constraint, IsolationLevel, transaction, serializable, repeatableRead, readCommitted, serializableRO,
+  repeatableReadRO, readCommittedRO, serializableRODeferrable, enableCustomJSONParsingForLargeNumbers,
 } = db;
 export const {
   isNull, isNotNull, isTrue, isNotTrue, isFalse, isNotFalse, isUnknown, isNotUnknown, isDistinctFrom,
