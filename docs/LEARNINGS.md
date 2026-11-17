@@ -227,6 +227,13 @@ Candidates for a check, a rule or a skill line.
 - #581: `skipLibCheck` hides a type removed from a path already-emitted `.d.ts` files name: no TS2694, the type silently becomes `any`; only a downstream negative shows it (TS2578), so a removal probe needs a downstream `@ts-expect-error`.
 - #581: TS 4.1 cannot parse instantiation expressions (`db.sql<I>`, 4.7+): one such line gives TS1005 and silences that probe file's other cases; TS 7 reports TS2742 as TS2883 and needs `rootDir` with `outDir`.
 - #581: Vitest's typecheck reports no error on an import line outside a `test()`: a deleted export becomes a silent `any`, so a test of a kept export needs `not.toBeAny()` or a negative to go red.
+- #583: TS 5.9 and 7 emit a type-only exported `unique symbol` key as a bare `[wrapper]`, with no error, so the `.d.ts` breaks downstream (TS2304), which `check-declarations.mjs` misses (#582).
+- #583: a spread or a mapped type over a class instance writes out its symbol-keyed members, so a non-exported `unique symbol` brand on a public class is reachable by a consumer's emit (TS4023).
+- #583: an interface turned into a type alias passes as `Record<string, unknown>` (implicit index signature), and the `(<X>() => X extends A ? 1 : 2)` identity cannot tell them apart: a `Record<string, unknown>` assignability control does.
+- #583: TS 4.1's emitted `.d.ts` for a value can change with what else is in the program: a master-vs-branch emit diff compiles the same set of files on both sides.
+- #583: `toEqualTypeOf` cannot tell an interface from an alias or inline object of the same shape: to keep a public type an interface, assign it to `Record<string, unknown>` under `@ts-expect-error`.
+- #583: to compare a branch's type with master's unexported one, install master's tarball under a second package name in the same program and reach the type through an exported one (an indexed access).
+- #583: a TS4023 sweep walks every public entry point: `zapatos/generate` has `SchemaRules` and `ColumnOptions` unexported.
 
 ## Minors kept
 
