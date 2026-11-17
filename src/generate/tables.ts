@@ -377,6 +377,9 @@ export const definitionForRelationInSchema = async (
  * ${jsdocLines(`**${schemaPrefix}${rel.name}**`, ' ')}
  * - ${friendlyRelType} in database
  */` : ``,
+    // SQLExpression's Whereable refuses a primitive: every key of a Whereable is optional, so a string passed as one
+    // when a column shares the name of a String member its type fits (`search` typed any, `length` a number), and
+    // the table's SQL took any string (#670). A string has an iterator, a Whereable none, and no column is a symbol
     tableDef = `${tableComment}
 export namespace ${tsIdentifier(rel.name, 'namespace')} {
   export type Table = ${stringLiteral(schemaPrefix + rel.name)};
@@ -400,7 +403,7 @@ export namespace ${tsIdentifier(rel.name, 'namespace')} {
         'never'};
   export type Column = keyof Selectable;
   export type OnlyCols<T extends readonly Column[]> = Pick<Selectable, T[number]>;
-  export type SQLExpression = Table | db.ColumnNames<Updatable | (keyof Updatable)[]> | db.ColumnValues<Updatable> | Whereable | Column | db.ParentColumn | db.GenericSQLExpression;
+  export type SQLExpression = Table | db.ColumnNames<Updatable | (keyof Updatable)[]> | db.ColumnValues<Updatable> | (Whereable & { [Symbol.iterator]?: never }) | Column | db.ParentColumn | db.GenericSQLExpression;
   export type SQL = SQLExpression | SQLExpression[];
 }`;
   return tableDef;
