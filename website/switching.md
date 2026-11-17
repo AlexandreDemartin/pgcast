@@ -57,10 +57,11 @@ bun add zapatos@npm:@pgcast/pgcast@^6
 npx zapatos
 ```
 
-pgcast's generator is Zapatos 6.6.1's, with two fixes to what it writes. A `git diff` on your `zapatos/` folder shows nothing, unless:
+pgcast's generator is Zapatos 6.6.1's, with three fixes to what it writes. A `git diff` on your `zapatos/` folder shows nothing, unless:
 
 - a column comment runs over several lines: each line now starts with ` * `;
-- a table has a plain index named like another schema's unique index: its `UniqueIndex` no longer borrows that name.
+- a table has a plain index named like another schema's unique index: its `UniqueIndex` no longer borrows that name;
+- a table has an `Insertable`: each of its columns takes `db.SQLFragment<any>`, a `sql` fragment whose result is typed, where 6.6.1 wrote `db.SQLFragment`.
 
 ## 3. Compile {#compile}
 
