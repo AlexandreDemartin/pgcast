@@ -1,5 +1,5 @@
 ---
-english: 33adbd164d2e
+english: d11a288350e0
 description: "Un type que le générateur ne sait pas traduire, comme point, et chaque domaine vous arrivent en placeholder dans zapatos/custom, que vous remplissez vous-même."
 ---
 
@@ -266,6 +266,7 @@ Le placeholder d’un domaine contient le nom TypeScript de son type de base, et
 
 - Un enum hors de [`unprefixedSchema`](/fr/generator#generate.unprefixedSchema) est dans l’espace de noms de son schéma : le placeholder importe cet espace de noms, `import type { archive } from 'zapatos/schema';`, et contient `archive.format`. Un placeholder écrit auparavant contient `format` : ajoutez cet import et remplacez `format` par `archive.format`, car `import type { format }` y donne TS2305.
 - Un enum dont le nom contient une majuscule ou est l’un des types propres à TypeScript (`"Date"`, `string`) ne reçoit toujours aucun import, comme dans Zapatos 6.6.1 : ce nom peut être celui d’un type global, qui compile.
+- Un placeholder qui prend le nom même de son enum ne peut pas l’importer sous ce nom : avec [`customTypesTransform`](/fr/generator#generate.customTypesTransform) à `'my_type'`, ou à une fonction qui garde le nom, `genre`, le placeholder d’une colonne de `films` du domaine `catalogue.genre` sur l’enum `genre`, le nomme sans import, `export type genre = import('zapatos/schema').genre;`. Zapatos 6.6.1 écrivait `genre`, TS2456 (`Type alias 'genre' circularly references itself.`), et pgcast de la 6.7.0 à la 6.9.0 l’importait en plus, TS2440 (`Import declaration conflicts with local declaration of 'genre'.`) : écrivez ce type dans un placeholder écrit auparavant, ou supprimez-le et relancez la génération ([#649](https://github.com/AlexandreDemartin/pgcast/issues/649)).
 - Un domaine sur `genre` qu’utilise aussi une table du schéma `archive`, quand `archive` a son propre `genre`, ne reçoit pas d’import non plus, comme dans Zapatos 6.6.1. Sans [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas), chaque table lit `genre` dans son propre schéma, et un seul placeholder ne peut pas importer les deux : importez celui sur lequel porte le domaine.
 - Un domaine sur `genre` qu’utilise aussi une table d’un schéma sans `genre` reçoit `any`, sans import, quel que soit l’ordre dans lequel les tables sont lues, sauf si un autre type du même nom partage le placeholder ([#42](https://github.com/AlexandreDemartin/pgcast/issues/42)). Cette table ne trouve aucun `genre` dans son propre schéma ; Zapatos 6.6.1 écrivait `genre` ou `any`, selon la table lue en dernier ([#455](https://github.com/AlexandreDemartin/pgcast/issues/455)). Avec [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas), le domaine reçoit les labels.
 
