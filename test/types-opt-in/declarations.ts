@@ -5,6 +5,7 @@
 // every type these functions return must have a name a .d.ts can write (TS4023 otherwise).
 
 import * as db from 'zapatos/db';
+import * as gen from 'zapatos/generate';
 import type * as s from 'zapatos/schema';
 
 export const accountCount = () => db.count('accounts', db.all);
@@ -41,3 +42,10 @@ export const lockOf = <A extends string>(options: db.SelectOptionsForTable<'user
 export const orderOf = (options: db.SelectOptionsForTable<'users', undefined, undefined, undefined, never>) => options.order;
 export const orderOfTable = <T extends s.Table>(options: db.SelectOptionsForTable<T, undefined, undefined, undefined, never>) =>
   options.order;
+
+// forwarders that write out the types of the schemas and columnOptions options of zapatos/generate's Config, and every
+// value of zapatos/generate re-exported through an object rest (TS4023 or TS2742 if a type names one zapatos/generate
+// does not export, #584)
+export const schemasOf = (config: gen.Config) => config.schemas;
+export const columnOptionsOf = (config: gen.Config) => config.columnOptions;
+export const { ...generateValues } = gen;
