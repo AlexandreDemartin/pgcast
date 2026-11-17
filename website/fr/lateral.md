@@ -1,5 +1,5 @@
 ---
-english: 504e586f74cf
+english: 771b408acd94
 description: "Récupérez des lignes avec celles qui s’y rattachent, en une requête et un résultat typé : un film avec sa distribution, un membre de l’équipe avec son mentor."
 ---
 
@@ -34,7 +34,12 @@ Chaque film a un studio : `studio_id` est `NOT NULL REFERENCES studios(id)`, do
 
 - Les jointures suivent l’ordre trié de leurs clés, quel que soit l’ordre dans lequel vous les écrivez.
 - Sur une clé étrangère nullable, imbriquez [`selectOne()`](/fr/select#selectOne) : la clé contient la ligne ou `null`, comme le mentor plus bas.
-- Dans un lateral, `selectExactlyOne()` ne vérifie rien : une ligne manquante donne `null` et aucune erreur, bien que son type n’ait pas de `null` ([`selectExactlyOne()`](/fr/select#selectExactlyOne)). Réservez-le à une clé étrangère `NOT NULL`.
+- Dans un lateral, `selectExactlyOne()` ne vérifie rien : une ligne manquante donne `null` et aucune erreur, bien que son type n’ait pas de `null` ([`selectExactlyOne()`](/fr/select#selectExactlyOne)). Réservez-le à une clé étrangère qui exclut la ligne manquante, et imbriquez `selectOne()` sinon :
+  - ses colonnes `NOT NULL` ;
+  - validée : une clé ajoutée `NOT VALID` laisse sans vérification les lignes déjà là, donc l’une d’elles peut ne pointer vers aucune ligne ;
+  - pas `DEFERRABLE` : une clé différée n’est vérifiée qu’au `COMMIT`, donc d’ici là la transaction peut contenir une ligne qui ne pointe vers aucune ;
+  - sa table cible sans sécurité niveau ligne : la vérification de la clé contourne les politiques, votre requête non, donc une politique peut cacher la ligne.
+- Il n’y a pas de `related()` qui déduirait la jointure de la clé étrangère : il économiserait un type, jamais une ligne de code ni le SQL ([décision 007](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/007-related.md)).
 
 ## Passer par une table de jointure {#go-through-a-join-table}
 
@@ -107,6 +112,31 @@ Chaque cinéma, et l’autre cinéma le plus proche : de nouveau une table join
 - `km` est un `number` parce que le fragment le dit : `db.sql<s.cinemas.SQL, number>`.
 - [`ne(db.parent('id'))`](/fr/conditions#conditions.ne) exclut le cinéma lui-même.
 - Pour les trois plus proches, imbriquez `select()` avec [`limit: 3`](/fr/select#order-limit-offset-and-withties) : `nearest` devient un tableau.
+
+## Filtrer, trier et grouper par un lateral {#filter-sort-and-group-by-a-lateral}
+
+Chaque clé de `lateral` est jointe à la requête comme une table, `"lateral_<key>"`, d’une seule colonne, `result`. Un fragment `sql` la nomme dans le `where`, l’`order` ou le `groupBy` de la requête qui l’entoure :
+
+<CastPanel example="lateral_result">
+
+<<< ../examples/lateral_result.ts{ts twoslash}
+
+</CastPanel>
+
+- `WHERE "lateral_castSize".result >= $3`<!-- probe: examples/lateral_result.ts --> et `ORDER BY "lateral_castSize".result DESC`<!-- probe: examples/lateral_result.ts --> lisent le nombre de rôles de chaque film.
+- Mettez le nom entre guillemets doubles, comme le fait pgcast : sans eux, Postgres le passe en minuscules, `lateral_castsize`, et refuse la requête (42P01). Un `"` dans une clé est doublé, `"lateral_a""b"`<!-- probe: db.select('films', db.all, { lateral: { 'a"b': db.count('roles', { film_id: db.parent('id') }) } }) -->.
+- `result` est le résultat de la sous-requête : un nombre pour `count()`, du `jsonb` pour les autres. Lisez un champ avec `->>`, comme dans `ORDER BY "lateral_studio".result->>'name' ASC`<!-- probe: db.select('films', db.all, { columns: ['title'], lateral: { studio: db.selectExactlyOne('studios', { id: db.parent('studio_id') }, { columns: ['name'] }) }, order: { by: db.sql`"lateral_studio".result->>'name'`, direction: 'ASC' } }) -->.
+
+Avec un `groupBy`, le résultat de chaque lateral figure aussi dans la ligne : groupez donc par lui également, sinon Postgres refuse la requête (42803). Donnez les deux dans un seul fragment, typé pour que ses colonnes soient vérifiées :
+
+<CastPanel example="lateral_result_group">
+
+<<< ../examples/lateral_result_group.ts{ts twoslash}
+
+</CastPanel>
+
+- `GROUP BY "studio_id", "lateral_studio".result`<!-- probe: examples/lateral_result_group.ts --> : chaque studio une seule fois, avec son nom et son nombre de films.
+- `db.sql<s.films.SQL>` refuse `${'name'}`, une colonne de `studios`. Un tableau de colonnes ne peut pas contenir le fragment : [`groupBy`](/fr/select#groupby-and-having) prend une colonne, un tableau de colonnes ou un seul fragment.
 
 ## Vérifier la colonne parente {#check-the-parent-column}
 
