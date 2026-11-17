@@ -378,6 +378,7 @@ const tsForQueries = async (config: CompleteConfig, queryFn: (q: pg.QueryConfig)
     customTypes: CustomTypes = Object.create(null),
     customTypeOrigins: CustomTypeOrigins = Object.create(null),
     customTypeImports: Record<string, string | null> = Object.create(null),
+    customTypeHolders = Object.create(null),
     enumsBySchema: Record<string, Promise<EnumOrders>> = Object.create(null),
     enumOrdersFor = (schema: string) => enumsBySchema[schema] ??= enumOrdersForSchema(schema, queryFn),
     enumsForSchema = async (schema: string) => (await enumOrdersFor(schema))[enumOrder],
@@ -410,7 +411,7 @@ const tsForQueries = async (config: CompleteConfig, queryFn: (q: pg.QueryConfig)
           tableDefs = await Promise.all(tables.map(async table =>
             definitionForRelationInSchema(table, schema, enums, customTypes, config, queryFn, customTypeOrigins,
               enumsForSchema, columnsTypedByEnumName, customTypeImports, uniqueIndexesNotArbiters, domainsNotByContext,
-              domainRoots, domainsUnderDomains, enumArraysNotAsText, intervalsAsText))),
+              domainRoots, domainsUnderDomains, enumArraysNotAsText, intervalsAsText, customTypeHolders))),
           schemaIsUnprefixed = schema === config.unprefixedSchema,
           schemaUnions = unions.filter(union => union.schema === schema),
           none = '/* (none) */',
