@@ -1671,6 +1671,14 @@ describe('select', () => {
   ] as const)('%s.%s answering %j, then %j, is read once and gives what was checked', (option, key, first, later, result, log) => {
     expect(twoFaced(option, key, first, later)).toEqual({ result, log });
   });
+
+  // a falsy nulls or wait, past the type, is none, as on Zapatos 6.6.1: no NULLS, no wait keyword
+  it.each(['', 0, null].flatMap(value => [
+    ['order', { by: 'email', direction: 'ASC', nulls: value }, ' ORDER BY "email" ASC'],
+    ['lock', { for: 'UPDATE', wait: value }, ' FOR UPDATE'],
+  ] as const))('%s item %j compiles as without that key', (option, item, clause) => {
+    expect(db.select('users', all, { [option]: item } as any).compile()).toEqual(ordered(clause));
+  });
 });
 
 describe('selectOne, selectExactlyOne', () => {
