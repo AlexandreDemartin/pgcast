@@ -112,7 +112,7 @@ E costs 315 Instantiations over D, 52 per call, +2.0 points; filtered by `Extrac
 | **The caller writes** | ``groupBy: db.sql<s.films.SQL>`${'studio_id'}, "lateral_rating".result` ``, or, as the corpus does, a string cast to a column type in an array, `'lateral_rating.result'` | `order: { by: db.lateralResult('studio'), … }`, a typo refused | the same, any key accepted | ``groupBy: ['studio_id', db.sql`"lateral_rating".result`]`` |
 | **SQL** | `GROUP BY "studio_id", "lateral_rating".result`; the cast, `GROUP BY "studio_id", "lateral_rating"."result"`; both run | `ORDER BY "lateral_studio".result ASC` | the same | `GROUP BY "studio_id", "lateral_rating".result`; today the fragment compiles to `"[object Object]"`, so Postgres refuses it (42703) and the type refuses it too |
 | **Compile cost** (measured) | +0 | +1,037 Instantiations (+6.6 points), paid by every `select()`, with no reference written; it still lets a reference through when the query has no `lateral` | +0 | +0 Instantiations, +1 Type |
-| **What it saves** | — : the typed fragment still checks its columns (`${'display_name'}` under `accounts` refused, probed) | the hand-spelled alias, and a typo found before Postgres's 42P01 | the hand-spelled alias | the 4 casts: the array form, its columns checked one by one |
+| **What it saves** | nothing; the typed fragment already checks its columns (`${'display_name'}` under `accounts` refused, probed) | the hand-spelled alias, and a typo found before Postgres's 42P01 | the hand-spelled alias | the 4 casts: the array form, its columns checked one by one |
 
 **Choice: R0.** Nothing is built, and #630 is crossed out. The docs (#631) name `"lateral_<key>".result` and its quoting, with the typed fragment for `groupBy`.
 
@@ -127,8 +127,13 @@ E costs 315 Instantiations over D, 52 per call, +2.0 points; filtered by `Extrac
 
 - **#627, #628, #629** (keys, `related()`, `relatedMany()`): crossed out, pointing here.
 - **#630** (`groupBy` mixing columns and fragments): crossed out, pointing to § 3.
-- **#631**: re-scoped to the docs that follow from this note. `website/lateral.md`, EN and FR, shows the hand-written lateral on a foreign key, `parent<T.Column>`, how to choose `selectExactlyOne()`, and the reference to a lateral's result. `website/catalog-types.md`, EN and FR, stops promising that #54 will read foreign keys (its § Reading more and its `selectExactlyOne()` paragraph).
-- **R38** (`docs/CHARACTERISATION-REPORT.md`) stays "leave". Its pointer goes to this note and `parent<T.Column>`, not to `related()`.
+- **#631**: re-scoped to what the docs lack. What `website/lateral.md` already shows stays where it is: the `NOT NULL` rule, the self-reference's `alias`, § Check the parent column. Its **Files** carry each promise the cut leaves:
+  - `website/lateral.md`, EN and FR: the rest of the `selectExactlyOne()` rule (a key `convalidated`, not `DEFERRABLE`, its target without row-level security); a lateral's result, `"lateral_<key>".result`, in `order`, in `groupBy` as a typed fragment, and in a `where` fragment; one line on why there is no `related()`.
+  - `website/catalog-types.md`, EN and FR: § Reading more drops foreign keys; the `selectExactlyOne()` paragraph on `films.studio_id` points to that rule, not to #54.
+  - `website/why.md`, EN and FR, § Coming, and `README.md`'s goal: foreign-key joins leave what is coming. Their typed form is there today: the lateral, with `parent<T.Column>`.
+  - `README.md`'s roadmap: "foreign keys" leaves chapter 2's list.
+  - R38 (`docs/CHARACTERISATION-REPORT.md`) stays "leave": its `related()` clause (#628, #629) goes, and `parent<T.Column>` stays its answer.
+- **#54**: its planned PRs 3 to 6 crossed out, and 7 renamed after #631.
 
 ## Risks
 
