@@ -1,5 +1,5 @@
 ---
-english: 9acbeea2e620
+english: 94944c1bd554
 ---
 
 # Assistants IA
@@ -173,7 +173,7 @@ Avec `.compile()` à la place de `.run(pool)`, `console.log()` affiche le même 
 npx pgcast --check
 ```
 
-La commande se termine avec le code 1, en nommant chaque fichier, quand les fichiers générés ne correspondent plus à la base, et n’écrit rien : lancez `npx pgcast`, puis relancez la vérification de types ([`--check`](/fr/generator#check)). Une vérification de plus à lancer avant de dire qu’un changement est fini.
+À partir de la 6.8.0, la commande se termine avec le code 1, en nommant chaque fichier, quand les fichiers générés ne correspondent plus à la base, et n’écrit rien : lancez `npx pgcast`, puis relancez la vérification de types ([`--check`](/fr/generator#check)). Une vérification de plus à lancer avant de dire qu’un changement est fini.
 
 ## Voir aussi {#see-also}
 

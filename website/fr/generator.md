@@ -1,5 +1,5 @@
 ---
-english: 64b65b78c440
+english: e7db865f14c7
 ---
 
 # Générateur
@@ -23,7 +23,7 @@ Le même programme sous deux noms : `pgcast`, et `zapatos`, comme dans Zapatos 
   - Une clé donnée ici remplace toute la valeur du fichier, donc `'{"db": {"application_name": "codegen"}}'` écarte le `connectionString` du fichier.
   - Les variables du fichier sont substituées avant la fusion : une variable qu’il nomme doit être définie même quand l’argument remplace sa clé, sinon la CLI s’arrête avec `Environment variable 'NAME' is not set`.
 - Dans chaque chaîne des deux, à toute profondeur, les variables d’environnement sont substituées ([Variables d’environnement](#environment-variables)).
-- Un seul flag, `--check`, avant ou après `config`. Tout autre argument qui commence par `--`, à la place de `config`, l’arrête avec le code 1 avant qu’elle lise la config, et Node affiche `Unknown flag --help: the only flag is --check, beside the JSON argument` et sa pile ; Zapatos 6.6.1 le lisait comme l’argument JSON, et échouait. Après `config`, un tel argument est ignoré, comme dans Zapatos 6.6.1, avec une [note](#generate.warningListener) : un `npx pgcast '{}' --chek` mal orthographié génère.
+- À partir de la 6.8.0, un seul flag, `--check`, avant ou après `config`. Tout autre argument qui commence par `--`, à la place de `config`, l’arrête avec le code 1 avant qu’elle lise la config, et Node affiche `Unknown flag --help: the only flag is --check, beside the JSON argument` et sa pile ; Zapatos 6.6.1 le lisait comme l’argument JSON, et échouait. Après `config`, un tel argument est ignoré, comme dans Zapatos 6.6.1, avec une [note](#generate.warningListener) : un `npx pgcast '{}' --chek` mal orthographié génère.
 - Parmi les autres arguments, le premier est `config` ; les suivants sont ignorés.
 - Les chemins sont relatifs au dossier où vous le lancez : `outDir`, et donc le dossier `zapatos`.
 
@@ -69,7 +69,7 @@ Une requête qui échoue, connexion comprise, l’arrête avec le code 1, après
 npx pgcast --check
 ```
 
-Il lit le catalogue comme le fait une exécution, construit les fichiers en mémoire, et les compare avec les vôtres. Il n’écrit rien, pas même un dossier : pour la CI, après vos migrations, ou avant de dire qu’un changement est fini.
+À partir de la 6.8.0. Il lit le catalogue comme le fait une exécution, construit les fichiers en mémoire, et les compare avec les vôtres. Il n’écrit rien, pas même un dossier : pour la CI, après vos migrations, ou avant de dire qu’un changement est fini.
 
 | Code de sortie | Quand | Ce qu’il affiche |
 |---|---|---|

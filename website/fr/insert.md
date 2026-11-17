@@ -1,5 +1,5 @@
 ---
-english: 37572f751f37
+english: d4c68d7022f5
 ---
 
 # Écritures
@@ -207,7 +207,7 @@ Un tableau vide, pour le `updateColumns` d’`upsert()` : une ligne en conflit 
 
 ## `UpsertOptions` {#UpsertOptions}
 
-`UpsertOptions<T, C, E, UC, RA>` : les `options` d’`upsert()`, le [`ReturningOptionsForTable`](#ReturningOptionsForTable) avec `updateValues`, `updateColumns`, `noNullUpdateColumns` et `reportAction` ([Options](#upsert-options)). `UC` est le type d’`updateColumns` et `RA` celui de `reportAction` (`undefined` pour une option non donnée).
+À partir de la 6.9.0. `UpsertOptions<T, C, E, UC, RA>` : les `options` d’`upsert()`, le [`ReturningOptionsForTable`](#ReturningOptionsForTable) avec `updateValues`, `updateColumns`, `noNullUpdateColumns` et `reportAction` ([Options](#upsert-options)). `UC` est le type d’`updateColumns` et `RA` celui de `reportAction` (`undefined` pour une option non donnée).
 
 ## `UpsertReturnableForTable` {#UpsertReturnableForTable}
 

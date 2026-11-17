@@ -270,7 +270,7 @@ db.conditions.eqAny(a: ParentColumn): SQLFragment<boolean | null, never>
 db.conditions.eqAny<T>(a: readonly T[]): SQLFragment<boolean | null, T>
 ```
 
-`"col" = ANY($1)`<!-- probe: db.sql`${{ col: db.conditions.eqAny([1, 2]) }}` -->, the whole array one parameter. Where `isIn()` writes one text per length, `IN ($1, $2, …)`, this is one text for any length, so one [`prepared()`](/sql-template#prepared) statement serves them all, and it takes more items than the 65,535 parameters a query can hold ([Batches](/batches)).
+From 6.9.0. `"col" = ANY($1)`<!-- probe: db.sql`${{ col: db.conditions.eqAny([1, 2]) }}` -->, the whole array one parameter. Where `isIn()` writes one text per length, `IN ($1, $2, …)`, this is one text for any length, so one [`prepared()`](/sql-template#prepared) statement serves them all, and it takes more items than the 65,535 parameters a query can hold ([Batches](/batches)).
 
 <CastPanel example="conditions_eqAny">
 
@@ -338,6 +338,8 @@ With [`castArrayParamsToJson`](/runtime-config#Config.castArrayParamsToJson) on,
 `"col" && $1`<!-- probe: db.sql`${{ col: db.conditions.arrayOverlaps(['x']) }}` -->: they share at least one element.
 
 ## jsonb {#jsonb}
+
+From 6.9.0, two conditions on a `jsonb` column: its JSON contains a value, or a path finds an item in it.
 
 ### `jsonbContains()` {#conditions.jsonbContains}
 
@@ -454,7 +456,7 @@ Zapatos 6.6.1 wrote `(NOT "release_year" = 1974 OR "release_year" = 1991)`, whic
 
 ## Subqueries: `exists()`, `isInSelect()` {#subqueries}
 
-Each writes a subquery on a table, filtered by a Whereable or a `sql` fragment of that table, or [`all`](/sql-template#all) for no `WHERE`; `{}` gives `WHERE TRUE`, as in [`select()`](/select#select). The type checks the Whereable's keys and values against the subquery's table.
+From 6.9.0. Each writes a subquery on a table, filtered by a Whereable or a `sql` fragment of that table, or [`all`](/sql-template#all) for no `WHERE`; `{}` gives `WHERE TRUE`, as in [`select()`](/select#select). The type checks the Whereable's keys and values against the subquery's table.
 
 <CastPanel example="conditions_exists">
 
@@ -520,7 +522,7 @@ db.select('actors', { name: db.conditions.isInSelect('roles', db.all, 'actor_id'
 
 ## Full-text search: `websearchToTsquery()` {#full-text}
 
-A search on a `tsvector` column: the words of a text, as a text search configuration stems them. The docs schema's `films.title_search` is a generated column, `to_tsvector('english', title)`, which Postgres keeps up to date, with a GIN index ([Postgres's docs](https://www.postgresql.org/docs/current/textsearch-tables.html)).
+From 6.9.0. A search on a `tsvector` column: the words of a text, as a text search configuration stems them. The docs schema's `films.title_search` is a generated column, `to_tsvector('english', title)`, which Postgres keeps up to date, with a GIN index ([Postgres's docs](https://www.postgresql.org/docs/current/textsearch-tables.html)).
 
 <CastPanel example="conditions_websearchToTsquery">
 
@@ -547,7 +549,7 @@ db.conditions.websearchToTsquery<T = TsvectorColumn>(config: string, query: stri
 | `lant:*` | `'lant'`: no prefix | none |
 | `the` | no word, only a stop word: Postgres sends a NOTICE | none |
 
-- **The configuration**: name the one that built the column's vector, whose stems the query's must be: `websearchToTsquery('simple', 'lanterns')` looks for `'lanterns'`, which `title_search` does not hold. Left out, Postgres would take `default_text_search_config`, a setting of the server or the session, so the condition always names it. Postgres looks it up on the `search_path` (`'pg_catalog.english'` works too), and one it does not know is its 42704, `text search configuration "klingon" does not exist`. A configuration of your own, built on `unaccent` for one, is a name like any other.
+- **The configuration**: name the one that built the column's vector, whose stems the query's must be: `websearchToTsquery('simple', 'lanterns')` looks for `'lanterns'`, which `title_search` does not hold. Left out, Postgres would take `default_text_search_config`, a setting of the server or the session, so the condition always names it. Postgres looks it up on the `search_path` (`'pg_catalog.english'` works too), and one it does not know is its 42704, `text search configuration "klingon" does not exist`; on Postgres 15 and earlier, a name whose schema does not exist, `'nowhere.english'`, is its 3F000, `schema "nowhere" does not exist`. A configuration of your own, built on `unaccent` for one, is a name like any other.
 - **`NULL`**: a `NULL` vector gives `NULL`, so neither the condition nor [`not()`](#conditions.not) of it matches the row.
 - **Type**: its `T` is [`TsvectorColumn`](#conditions.TsvectorColumn), which only a column typed `any` takes: a `tsvector` column, through its `PgTsvector` placeholder left as generated ([Custom types](/custom-types)). A `text` column does not compile, nor a `varchar`, a `citext` or a domain over one, all typed `string`: Postgres would read `text @@ tsquery`, and build the vector with `default_text_search_config`, not with the configuration given. Every other column typed `any` passes: a domain over a domain over `text`, as generated without [`domainsTypedByContext`](/generator#generate.domainsTypedByContext), runs that `text @@ tsquery` with no error; an `xml` column, Postgres refuses (42883). Once you edit the placeholder, give its type, `websearchToTsquery<PgTsvector>(…)`, or for a `string`, `db.conditions.websearchToTsquery<string>('english', 'lanterns')`<!-- tsc: db.select('films', { title_search: … }) -->.
 

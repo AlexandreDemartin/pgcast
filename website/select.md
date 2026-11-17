@@ -441,7 +441,7 @@ interface OrderSpecForTable<T extends Table> {
 }
 ```
 
-One item of [`order`](#order-limit-offset-and-withties): `by`, then `direction`, then `NULLS` and `nulls` if given, `"title" DESC NULLS LAST`.
+From 6.9.0. One item of [`order`](#order-limit-offset-and-withties): `by`, then `direction`, then `NULLS` and `nulls` if given, `"title" DESC NULLS LAST`.
 
 ### `ColumnsOption` {#ColumnsOption}
 

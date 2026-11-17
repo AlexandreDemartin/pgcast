@@ -169,7 +169,7 @@ With `.compile()` in place of `.run(pool)`, `console.log()` prints the same SQL 
 npx pgcast --check
 ```
 
-It exits with code 1, naming each file, when the generated files no longer match the database, and writes nothing: run `npx pgcast`, then the type check again ([`--check`](/generator#check)). One more check to run before calling a change done.
+From 6.8.0, it exits with code 1, naming each file, when the generated files no longer match the database, and writes nothing: run `npx pgcast`, then the type check again ([`--check`](/generator#check)). One more check to run before calling a change done.
 
 ## See also
 
