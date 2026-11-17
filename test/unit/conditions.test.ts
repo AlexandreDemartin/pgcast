@@ -1204,7 +1204,8 @@ describe('Default, self, raw, cols and vals as the value of a condition', () => 
       });
 
     it('alone, beside a value, or nested, throws when compiled, not when called, naming the condition', () => {
-      const shapes = (item: unknown) => [[item], ['Bob', item], [item, 'Bob'], [['Bob'], [item]], [[[item]]]];
+      // [['Bob', item]]: a nested array is read past its first item
+      const shapes = (item: unknown) => [[item], ['Bob', item], [item, 'Bob'], [['Bob'], [item]], [[[item]]], [['Bob', item]]];
       expect(Object.fromEntries(Object.entries(arrays).map(([fn, f]) => [fn, Object.fromEntries(Object.entries(items)
         .map(([name, item]) => [name, [...new Set(shapes(item).map(a => thrown(f(a as any))))].join(' | ')]))])))
         .toEqual(Object.fromEntries(Object.keys(arrays).map(fn => [fn, expected(fn)])));
