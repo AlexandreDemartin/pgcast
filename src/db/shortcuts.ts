@@ -1254,13 +1254,14 @@ export const max: TypedByColumn extends true ? ColumnAggregateSignatures : Numer
 /* === withCTEs === */
 
 // a prepared fragment writes its name into whatever compiles it, so one name would cover two texts, the fragment
-// alone and with the WITH, which pg refuses ("Prepared statements must be unique"): nested, an unprepared copy.
-// A no-op (an insert() or upsert() of no row) is a query of no row, from no table: its own text, which runs if
-// forced, is refused on a GENERATED ALWAYS column and on a view (428C9)
+// alone and with the WITH, which pg refuses ("Prepared statements must be unique"): nested, an unprepared copy,
+// made at the call, so that a prepared() on the fragment afterwards stays its own. A no-op (an insert() or upsert()
+// of no row) is a query of no row, from no table: its own text, which runs if forced, is refused on a GENERATED
+// ALWAYS column and on a view (428C9)
 const inWith = <F>(fragment: F) =>
   !(fragment instanceof SQLFragment) ? fragment :
     fragment.noop ? sql`SELECT NULL::jsonb AS result WHERE false` :
-      fragment.preparedName != null ? Object.assign(fragment.copy(), { preparedName: undefined }) : fragment;
+      Object.assign(fragment.copy(), { preparedName: undefined });
 
 /**
  * Put CTEs before a query, keeping its result:
@@ -1275,8 +1276,9 @@ const inWith = <F>(fragment: F) =>
  * A no-op `query` or CTE (an `insert()` or `upsert()` of no row) is written
  * `SELECT NULL::jsonb AS result WHERE false`, and the result is no no-op, so
  * the CTEs run. A `selectExactlyOne()` that checks for a second row still does
- * at the top level. The result is not prepared, whatever `query` is: call
- * `prepared()` on it.
+ * at the top level. The result is never prepared, whatever `query` is, even
+ * by a `prepared()` called on `query` or a CTE afterwards: call `prepared()`
+ * on it.
  * @param ctes The CTEs, keyed by name: a shortcut or a `sql` fragment each
  * @param query The main query
  */
