@@ -281,6 +281,14 @@ Candidates for a check, a rule or a skill line.
 - #570: the issue's premise was wrong for the array conditions: they do not throw while compiling; `{}` runs as the empty array on 6.6.1 and master, the rest are Postgres errors.
 - #570: `bench:types` drifts on master with no type change (15,697 against a 15,649 baseline).
 - #609: a `<!-- tsc -->` mark on a docs code span lets `docs:build` freeze that a type still accepts what the page says it takes.
+- #610: with no parameter, Postgres parses the whole multi-statement string first, so an injected `sq_` name runs only when the alias's `AS` compiles to valid SQL (an array or a fragment, never a plain object).
+- #610: a mutant adding a second conversion is caught only by a conversion log or a `toString()` answering anew, never by a steady one.
+- #610: a `Changed:` line naming inputs by how they convert covers every kind of value converting that way; what the value does elsewhere (`compileExpression` reads an object as a Whereable) decides the outcome: replay once per kind of value.
+- #610: "returns its rows where it ran the SQL" holds only with no parameter; a nested query (`lateral`, `extras`) always carries `$1`, so the old code rejected rather than ran.
+- #610: when a check regex excludes a class of characters (`[^"\0]`), each character of it sends the input down the other branch: take a changelog clause's or a grid's cases from that class, not from the example in hand (`"` covered, NUL missed).
+- #610: a probe payload in a nested position closes every parenthesis it opens, or Postgres refuses it at `;` and the guard under test is never exercised.
+- #610: a claim that a nesting "has a parameter" is checked against every way of nesting: a `lateral` map adds `$n`, a single `lateral` query (`lateral_passthru`) does not; run `compile().values.length` per shape before writing it.
+- #610: a changelog clause about "a parameter" in nested forms lists each nested form on its own (`lateral` map, single `lateral`, `extras`, `sql` template): only some carry a key.
 
 ## Minors kept
 

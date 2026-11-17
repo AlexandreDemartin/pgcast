@@ -135,10 +135,12 @@ const quotedIdentifier = /^"(?:[^"\0]|"")+"$/;
 
 // an alias of our own (`"lateral_<key>"`, `"sq_<alias>"`) is one identifier, not split on `.`; a `"` is
 // doubled as quote_ident does, so it cannot close its quotes, unless the alias already compiled to one
-// quoted identifier (`a""b`), which is written as before
+// quoted identifier (`a""b`), which is written as before. A select() alias that is no string (an array, a fragment) is
+// converted once, toString() first, as Zapatos 6.6.1 converted it, and that string is checked and written: its own
+// replace() is never called
 function SQLForAlias(prefix: string, name: string) {
-  const quoted = `"${prefix}${name}"`;
-  return raw(quotedIdentifier.test(quoted) ? quoted : `"${prefix}${name.replace(/"/g, '""')}"`);
+  const text = `${name}`, quoted = `"${prefix}${text}"`;
+  return raw(quotedIdentifier.test(quoted) ? quoted : `"${prefix}${text.replace(/"/g, '""')}"`);
 }
 
 function SQLForExtras<T extends Table>(extras: ExtrasOption<T>) {
