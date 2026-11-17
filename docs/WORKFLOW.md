@@ -78,7 +78,7 @@ Each release goes in this order; the tag and the deployment stay the owner's (`A
    - a range review of every PR merged since the last pass;
    - an audit of `npm pack` (files, README, `package.json` fields) and of the docs site: each feature's "From x.y.z." in EN and FR, no current-version number in the README or the docs;
    - a fix for each finding, merged before the version PR.
-2. **The version PR**, by hand, reviewed like any PR and merged by the session (model: #568):
+2. **The version PR**, by hand, reviewed like any PR and merged by the session (models: #624, and #568 for one that also carries an advisory):
    - `version` in `package.json`, in both root entries of `package-lock.json` and in the `..` entry of `website/package-lock.json`;
    - `CHANGELOG.md`: `## [Unreleased]` becomes `## [x.y.z] - <date>`, under a new empty `## [Unreleased]`.
 3. **The owner** pushes the tag `v<version>` on the version commit, approves the `npm` deployment, then creates the GitHub release from its changelog section.

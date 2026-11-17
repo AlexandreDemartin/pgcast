@@ -374,6 +374,9 @@ Candidates for a check, a rule or a skill line.
 - #658: a fix that copies a row only when one kind of value is present changes how often that row alone is read: a read-count test needs a row with the triggering value as well as one without.
 - #658: `undefinedAsMissing()` has its own return for the default config (`PGCAST_DEP002`): a change to what it returns needs a case under the default as well as the opt-in (M7).
 - #658: an `undefined` value stays `undefined` in `compile().values` (pg sends it as NULL): a frozen expectation says `undefined`, not `null`.
+- 6.10.0 pass: a PR branched before another that rewrites the same unreleased CHANGELOG entry can bring the old text back when squashed (#647 after #645); after a merge of master into a branch, check `git diff <base>..<merge> -- CHANGELOG.md` for lines added back.
+- 6.10.0 pass: a PR that extends a refusal (#647 after #638) extends #638's `switching.md` row too, with 6.6.1's outcome.
+- 6.10.0 pass: the `check-changelog` script does not catch an entry written twice; the range review does.
 
 ## Minors kept
 
