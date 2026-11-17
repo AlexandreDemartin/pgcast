@@ -70,19 +70,26 @@ export const unionTypesForDomains = (unions: DomainUnion[], schemaPrefix: string
 
 /**
  * Note each placeholder on disk whose text is not what this run writes naming its union, in the order of the unions:
- * it still types its columns.
+ * it still types its columns. One that names the union with an import that `zapatos/schema` also declares as a type of
+ * the placeholder's own name, as 6.10.0 wrote it (`importing`), names it already, and fails to compile (TS2440).
  */
 export const warnAboutPlaceholdersOnDisk = (placeholders: (readonly [name: string, domain: string, union: string])[],
-  files: Record<string, string>, config: CompleteConfig) => {
+  files: Record<string, string>, config: CompleteConfig, importing: Record<string, string> = {}) => {
   const
     warn = config.warningListener === true ? console.log : config.warningListener || (() => void 0),
     names = moduleNamesOf(config);
 
   for (const [name, domain, union] of placeholders) {
     const file = path.join(config.outDir, names, 'custom', name + config.outExt);
-    if (!fs.existsSync(file) || fs.readFileSync(file, 'utf8') === files[name]) continue;
+    if (!fs.existsSync(file)) continue;
+    const text = fs.readFileSync(file, 'utf8');
+    if (text === files[name]) continue;
     warn(`Note: ${domain} is typed by the values of its CHECK as ${union} in ${names}/schema (domainsTypedAsUnions), ` +
-      `but its placeholder ${file}, written before, still types its columns. To type them by the database, delete it: ` +
-      `the next run writes it naming the union.`);
+      (text === importing[name] ?
+        `and its placeholder ${file}, written before, names it too, but imports ${name} from ${names}/schema, which ` +
+        `also declares a type of that name, the placeholder's own: it fails to compile (TS2440). Delete it: ` +
+        `the next run writes it naming the union with no import.` :
+        `but its placeholder ${file}, written before, still types its columns. To type them by the database, delete it: ` +
+        `the next run writes it naming the union.`));
   }
 };

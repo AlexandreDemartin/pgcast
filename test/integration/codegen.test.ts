@@ -761,9 +761,11 @@ ${imports.map(line => `  ${line}\n`).join('')}  export type ${type};  // replace
         read: Record<string, Record<string, { type: string; imports: string | null }>> = {};
       for (const order of orders(relations)) {
         // shared across the relations, as tsForConfig shares them
-        const customTypes = Object.create(null), origins = Object.create(null), customTypeImports = Object.create(null);
+        const customTypes = Object.create(null), origins = Object.create(null), customTypeImports = Object.create(null),
+          holders = Object.create(null);
         for (const { rel, schema, enums } of order) await definitionForRelationInSchema(
-          rel, schema, await enums, customTypes, complete, q, origins, undefined, undefined, customTypeImports);
+          rel, schema, await enums, customTypes, complete, q, origins, undefined, undefined, customTypeImports,
+          undefined, undefined, undefined, undefined, undefined, undefined, holders);
         read[order.map(r => `${r.schema}.${r.rel.name}`).join(', ')] = Object.fromEntries(names.map(name =>
           [name, { type: customTypes[name], imports: customTypeImports[name] || null }]));
       }
@@ -864,6 +866,63 @@ ${imports.map(line => `  ${line}\n`).join('')}  export type ${type};  // replace
           expect.soft(files.genre).toBe(placeholder('zapatos', [], `genre = import('zapatos/schema').genre`));
           expect.soft(files.mood).toBe(placeholder('zapatos', [], `mood = import('zapatos/schema').mood[]`));
         });
+    });
+
+    // a placeholder named as its domain's schema imports that namespace, and with it an enum or a union of
+    // unprefixedSchema of that name, which the placeholder's own name conflicts with: TS2440
+    describe('a placeholder named as the namespace it would import, beside a type of unprefixedSchema of that name', () => {
+      beforeAll(() => t.pool.query(`
+        CREATE SCHEMA tone_self;
+        CREATE TYPE tone_self.mood AS ENUM ('calm', 'loud');
+        CREATE DOMAIN tone_self.tone_self AS tone_self.mood;
+        CREATE TABLE tone_self.tracks (id int PRIMARY KEY, t tone_self.tone_self);
+        CREATE SCHEMA tone_open;
+        CREATE TYPE tone_open.tone_self AS ENUM ('warm');
+        CREATE TABLE tone_open.rooms (id int PRIMARY KEY, t tone_open.tone_self);
+        -- a union of that name, whose placeholder tone_self.tone_self holds, as it sorts last (#42)
+        CREATE SCHEMA tone_plain;
+        CREATE DOMAIN tone_plain.tone_self AS text CHECK (VALUE IN ('warm'));
+        CREATE TABLE tone_plain.rooms (id int PRIMARY KEY, t tone_plain.tone_self);
+      `));
+      afterAll(() => t.pool.query('DROP SCHEMA tone_self, tone_open, tone_plain CASCADE'));
+
+      const probe = `
+        import type * as s from 'zapatos/schema';
+        import { expectTypeOf } from 'expect-type';
+        expectTypeOf<s.tone_self.tracks.Selectable['t']>().toEqualTypeOf<'calm' | 'loud' | null>();
+        expectTypeOf<s.tone_self>().toEqualTypeOf<'warm'>();`;
+
+      it.each([
+        ['an enum', 'tone_open', false], ['a union', 'tone_plain', true],
+      ] as const)('compiles beside %s, with no lib check skipped', async (_, unprefixedSchema, domainsTypedAsUnions) => {
+        for (const customTypesTransform of ['my_type' as const, (name: string) => name]) {
+          const config = { schemas: { [unprefixedSchema]: all, tone_self: all }, unprefixedSchema, domainsTypedAsUnions,
+            customTypesTransform };
+          expect.soft(await probeErrors(config, probe, { skipLibCheck: false })).toEqual([]);
+          expect.soft((await codegen(config)).customTypeSourceFiles.tone_self)
+            .toBe(placeholder('zapatos', [], `tone_self = import('zapatos/schema').tone_self.mood`));
+        }
+      });
+
+      // zapatos/schema declares these at its top level whatever the database
+      it.each(['Table', 'SQLForTable', 'schemaVersionCanary'])('compiles beside zapatos/schema\'s own %s', async name => {
+        const q = `"${name}"`;
+        await t.pool.query(`CREATE SCHEMA ${q}; CREATE TYPE ${q}.kind AS ENUM ('k'); CREATE DOMAIN ${q}.${q} AS ${q}.kind;
+          CREATE TABLE ${q}.rows (id int PRIMARY KEY, k ${q}.${q});`);
+        try {
+          const config = { schemas: { [name]: all }, customTypesTransform: 'my_type' as const };
+          expect.soft(await probeErrors(config, `
+            import type * as s from 'zapatos/schema';
+            export const k: s.${name}.rows.Selectable['k'] = 'k';
+            // @ts-expect-error not a label of kind
+            export const no: s.${name}.rows.Selectable['k'] = 'no';
+          `, { skipLibCheck: false })).toEqual([]);
+          expect.soft((await codegen(config)).customTypeSourceFiles[name])
+            .toBe(placeholder('zapatos', [], `${name} = import('zapatos/schema').${name}.kind`));
+        } finally {
+          await t.pool.query(`DROP SCHEMA ${q} CASCADE`);
+        }
+      });
     });
 
     // with typeEnumsAcrossSchemas off, each relation reads `genre` in its own schema: an import would type one
@@ -974,24 +1033,111 @@ ${imports.map(line => `  ${line}\n`).join('')}  export type ${type};  // replace
         });
     });
 
-    // two domains named code_d, each over an enum, which placeholder_reels_a reads as `mood` and `any`: one
-    // placeholder (#42), which 6.6.1 gave the column read last, by name
-    it('leaves two types of one name in one relation as 6.6.1 wrote them', async () => {
-      await t.pool.query(`
+    // two types of one name share one placeholder (#42): the type of the column read last holds it, by schema, then
+    // relation, then column, with the text that type alone gives it. In one relation, that is 6.6.1's winner
+    describe('a placeholder that two types of one name share', () => {
+      beforeAll(() => t.pool.query(`
         CREATE SCHEMA placeholder_reels_a;
         CREATE SCHEMA placeholder_reels_b;
+        CREATE SCHEMA placeholder_reels_m;
         CREATE TYPE placeholder_reels_a.mood AS ENUM ('tense');
         CREATE TYPE placeholder_reels_b.feel AS ENUM ('calm');
         CREATE DOMAIN placeholder_reels_a.code_d AS placeholder_reels_a.mood;
         CREATE DOMAIN placeholder_reels_b.code_d AS placeholder_reels_b.feel;
         CREATE TABLE placeholder_reels_a.mixed (a placeholder_reels_b.code_d, b placeholder_reels_a.code_d);
-      `);
-      try {
-        const { customTypeSourceFiles: files } = await codegen({ schemas: { placeholder_reels_a: all } });
-        expect(files.PgCode_d).toBe(placeholder('zapatos', [], 'PgCode_d = mood'));
-      } finally {
-        await t.pool.query('DROP SCHEMA placeholder_reels_a, placeholder_reels_b CASCADE');
-      }
+        CREATE DOMAIN placeholder_reels_a.reel_no AS integer;
+        CREATE DOMAIN placeholder_reels_b.reel_no AS text;
+        CREATE TABLE placeholder_reels_a.numbered (a placeholder_reels_b.reel_no, b placeholder_reels_a.reel_no);
+        CREATE DOMAIN placeholder_reels_a.reel_id AS integer;
+        CREATE DOMAIN placeholder_reels_b.reel_id AS text;
+        CREATE TABLE placeholder_reels_a.labelled (a placeholder_reels_a.reel_id, b placeholder_reels_b.reel_id);
+        CREATE DOMAIN placeholder_reels_m.cut_no AS integer;
+        CREATE DOMAIN placeholder_reels_m."Cut_no" AS text;
+        CREATE TABLE placeholder_reels_m.cuts (a placeholder_reels_m.cut_no, b placeholder_reels_m."Cut_no");
+        -- a domain over an enum that a relation of a schema with no enum of that name reads too, and another type
+        CREATE SCHEMA placeholder_hues_a;
+        CREATE SCHEMA placeholder_hues_z;
+        CREATE SCHEMA placeholder_hues_m;
+        CREATE TYPE placeholder_hues_z.hue AS ENUM ('red');
+        CREATE DOMAIN placeholder_hues_z.hue_d AS placeholder_hues_z.hue;
+        CREATE DOMAIN placeholder_hues_m.hue_d AS text;
+        CREATE TABLE placeholder_hues_z.prints (a placeholder_hues_z.hue_d);
+        CREATE TABLE placeholder_hues_a.prints (a placeholder_hues_z.hue_d);
+        CREATE TABLE placeholder_hues_m.prints (a placeholder_hues_m.hue_d);
+      `));
+      afterAll(() => t.pool.query(`DROP SCHEMA placeholder_reels_a, placeholder_reels_b, placeholder_reels_m,
+        placeholder_hues_a, placeholder_hues_z, placeholder_hues_m CASCADE`));
+
+      const only = (schema: string, ...include: string[]) => ({ schemas: { [schema]: { include, exclude: [] } } });
+
+      it('gives one relation\'s placeholder to the type of its column read last, as 6.6.1 did', async () => {
+        const files = async (schema: string, table: string) => (await codegen(only(schema, table))).customTypeSourceFiles;
+        expect.soft((await files('placeholder_reels_a', 'numbered')).PgReel_no)
+          .toBe(placeholder('zapatos', [], 'PgReel_no = number'));
+        expect.soft((await files('placeholder_reels_a', 'labelled')).PgReel_id)
+          .toBe(placeholder('zapatos', [], 'PgReel_id = string'));
+        // names that differ only in case, one placeholder under PgMy_type
+        expect.soft((await files('placeholder_reels_m', 'cuts')).PgCut_no).toBe(placeholder('zapatos', [], 'PgCut_no = string'));
+      });
+
+      // 6.6.1 wrote `mood`, with no import: TS2304, and the column `any` under skipLibCheck
+      it('writes what the type of that column alone writes, with its import', async () => {
+        const config = only('placeholder_reels_a', 'mixed');
+        expect((await codegen(config)).customTypeSourceFiles.PgCode_d).toBe(placeholder('zapatos',
+          ["import type { placeholder_reels_a } from 'zapatos/schema';"], 'PgCode_d = placeholder_reels_a.mood'));
+        expect(await probeErrors(config, `
+          import type * as s from 'zapatos/schema';
+          export const tense: s.placeholder_reels_a.mixed.Selectable['b'] = 'tense';
+          // @ts-expect-error not a label of placeholder_reels_a.mood
+          export const calm: s.placeholder_reels_a.mixed.Selectable['b'] = 'calm';
+        `, { skipLibCheck: false })).toEqual([]);
+      });
+
+      // placeholder_hues_z.prints holds it, last by schema; its type is `any` from placeholder_hues_a, which has no hue
+      it('reads each type by its own columns, in whichever order the relations are read', async () => {
+        expectInEveryOrder(await placeholdersInEveryOrder(['placeholder_hues_a', 'placeholder_hues_z', 'placeholder_hues_m'],
+          {}, ['PgHue_d']), 6, { PgHue_d: { type: 'any', imports: null } });
+      });
+    });
+
+    // a domain over an enum and a domain over text of one name (#42): the type whose "schema"."name" sorts last holds
+    // the placeholder, with its import, in whichever order the relations are read
+    describe('a placeholder that a domain over an enum shares with a type of another schema', () => {
+      beforeAll(() => t.pool.query(`
+        CREATE SCHEMA placeholder_moods;
+        CREATE DOMAIN placeholder_moods.tone_d AS text CHECK (VALUE IN ('warm'));
+        CREATE TABLE placeholder_moods.tones (t placeholder_moods.tone_d);
+        CREATE SCHEMA placeholder_tone;
+        CREATE TYPE placeholder_tone.mood AS ENUM ('calm', 'loud');
+        CREATE DOMAIN placeholder_tone.tone_d AS placeholder_tone.mood;
+        CREATE TABLE placeholder_tone.tracks (t placeholder_tone.tone_d);
+      `));
+      afterAll(() => t.pool.query('DROP SCHEMA placeholder_moods, placeholder_tone CASCADE'));
+
+      const both = ['placeholder_moods', 'placeholder_tone'];
+
+      it.each<[string | null, string, string]>([
+        [null, 'placeholder_tone.mood', 'placeholder_tone'],
+        ['placeholder_moods', 'placeholder_tone.mood', 'placeholder_tone'],
+        ['placeholder_tone', 'mood', 'mood'],
+      ])('holds the enum, with its import, in whichever order the relations are read, unprefixedSchema %s',
+        async (unprefixedSchema, type, imports) => {
+          expectInEveryOrder(await placeholdersInEveryOrder(both, { unprefixedSchema }, ['PgTone_d']), 2,
+            { PgTone_d: { type, imports } });
+        });
+
+      it.each([false, true])('compiles with no lib check skipped, the schemas in both orders, domainsTypedAsUnions %s',
+        async domainsTypedAsUnions => {
+          for (const order of [both, [...both].reverse()]) {
+            const schemas = Object.fromEntries(order.map(schema => [schema, all]));
+            expect.soft(await probeErrors({ schemas, domainsTypedAsUnions }, `
+              import type * as s from 'zapatos/schema';
+              export const calm: s.placeholder_tone.tracks.Selectable['t'] = 'calm';
+              // @ts-expect-error not a label of placeholder_tone.mood
+              export const warm: s.placeholder_tone.tracks.Selectable['t'] = 'warm';
+            `, { skipLibCheck: false }), order.join(', ')).toEqual([]);
+          }
+        });
     });
 
     // with typeEnumsAcrossSchemas, the relation of the enum's schema names it `string`, TypeScript's own type, and
@@ -2194,8 +2340,14 @@ describe('domainsTypedAsUnions', () => {
     CREATE TABLE union_clash.prints (id int PRIMARY KEY, format union_clash.odd_format);
     CREATE SCHEMA union_user;
     CREATE TABLE union_user.loans (id int PRIMARY KEY, format unions.book_format);
+    CREATE SCHEMA union_top;
+    CREATE TYPE union_top.union_mark AS ENUM ('top');
+    CREATE TABLE union_top.marks (id int PRIMARY KEY, mark union_top.union_mark);
+    CREATE SCHEMA union_mark;
+    CREATE DOMAIN union_mark.union_mark AS text CHECK (VALUE IN ('stamp'));
+    CREATE TABLE union_mark.stamps (id int PRIMARY KEY, mark union_mark.union_mark);
   `));
-  afterAll(() => t.pool.query('DROP SCHEMA union_a, union_b, union_clash, union_user CASCADE'));
+  afterAll(() => t.pool.query('DROP SCHEMA union_a, union_b, union_clash, union_user, union_top, union_mark CASCADE'));
 
   const unionsOnly = { schemas: { unions: all }, unprefixedSchema: 'unions' };
   const on = { ...unionsOnly, domainsTypedAsUnions: true };
@@ -2292,8 +2444,8 @@ export type cover = 'matt' | 'gloss';`);
       const both = { schemas: { union_a: all, union_b: all }, unprefixedSchema: null, outDir };
       const offFiles = (await codegen(both)).customTypeSourceFiles;
       const { ts: schema, customTypeSourceFiles: files } = await codegen({ ...both, domainsTypedAsUnions: true });
-      // last wins, as without the key: either base type, never the union
-      expect([offFiles.PgCut, files.PgCut].map(f => /PgCut = (string|number);/.test(f))).toEqual([true, true]);
+      // union_b's, which sorts last, as without the key: its base type, never the union
+      expect([offFiles.PgCut, files.PgCut].map(f => /PgCut = number;/.test(f))).toEqual([true, true]);
       expect(files.PgCut).not.toContain('import type');
       expect(schema).toContain(`export type cut = 'rough' | 'final';`);  // declared all the same
       // with a placeholder on disk that names no union: no note of this key
@@ -2359,6 +2511,31 @@ export type cover = 'matt' | 'gloss';`);
       expect(await checkFiles({ ...unionsOnly, ...quiet, warningListener: s => checked.push(s), db: db(), outDir,
         domainsTypedAsUnions: true })).toBe(true);
       expect(checked).toEqual(warnings);
+    });
+
+    // 6.10.0 imported union_mark's namespace, and with it union_top's enum union_mark, under the placeholder's name
+    it('is noted as failing to compile when it imports a type of its own name, as 6.10.0 wrote it', async () => {
+      const marks = { schemas: { union_top: all, union_mark: all }, unprefixedSchema: 'union_top',
+        customTypesTransform: 'my_type' as const, domainsTypedAsUnions: true };
+      const file = join(outDir, 'zapatos/custom/union_mark.d.ts');
+      mkdirSync(join(outDir, 'zapatos/custom'), { recursive: true });
+      writeFileSync(file, `/*
+** Please edit this file as needed **
+It's been generated by Zapatos as a custom type definition placeholder, and won't be overwritten
+*/
+
+declare module 'zapatos/custom' {
+  import type { union_mark } from 'zapatos/schema';
+  export type union_mark = union_mark.union_mark;  // replace with your custom type or interface as desired
+}
+`);
+      expect(notesOf(await run(marks))).toEqual([`Note: union_mark.union_mark is typed by the values of its CHECK as ` +
+        `union_mark.union_mark in zapatos/schema (domainsTypedAsUnions), and its placeholder ${file}, written before, ` +
+        `names it too, but imports union_mark from zapatos/schema, which also declares a type of that name, the ` +
+        `placeholder's own: it fails to compile (TS2440). Delete it: the next run writes it naming the union with no import.`]);
+      rmSync(file);
+      expect(notesOf(await run(marks))).toEqual([]);
+      expect(onDisk('union_mark')).toContain(`  export type union_mark = import('zapatos/schema').union_mark.union_mark;  //`);
     });
 
     it('is rewritten naming the union once deleted, and then never noted', async () => {
