@@ -1,5 +1,5 @@
 ---
-english: c668c5261585
+english: 2dda4c3eca8d
 description: "db.conditions regroupe les tests, comparaisons et opérateurs à donner comme valeur d’une clé d’un Whereable, chacun avec le SQL qu’il écrit et ses valeurs."
 ---
 
@@ -335,7 +335,7 @@ Avec [`castArrayParamsToJson`](/fr/runtime-config#Config.castArrayParamsToJson) 
 
 Comme dans Zapatos 6.6.1, le type accepte aussi `{}`, `{ value: … }` et `db.param()` d’un nom de colonne, qui passent pour un `ParentColumn`, dont tous les membres sont optionnels ([#570](https://github.com/AlexandreDemartin/pgcast/issues/570)). `{}` est envoyé en `'{}'`, le tableau vide : `arrayContains({})`<!-- tsc: db.select('films', { genres: db.conditions.… }) --> trouve chaque ligne dont le tableau n’est pas `NULL`, `arrayContainedIn({})` les tableaux vides, et `arrayOverlaps({})` aucune ligne. Postgres refuse `{ value: 'title' }` et `db.param('title')` (22P02, `malformed array literal`), et, avec [`castObjectParamsToJson`](/fr/runtime-config#Config.castObjectParamsToJson) activé, `{}` et `{ value: … }` aussi (42883).
 
-Le tableau est un seul paramètre, donc chaque élément, à toute profondeur, est une valeur simple, comme dans [`eqAny()`](#conditions.eqAny) : `Default`, `self`, `all`, `raw()`, `cols()`, `vals()`, un `Parameter`, un fragment `sql` ou `parent()` lève une erreur à la compilation de la requête ([valeurs refusées](#refused-values)). Le type refuse chacun, sauf `parent()` et un fragment comme seuls éléments, `arrayContains([db.parent('id')])`<!-- tsc: db.select('films', { genres: db.conditions.… }) -->. Zapatos 6.6.1 envoyait `Default` et `self` en `'{"Symbol(DEFAULT)"}'`, les autres en leur JSON : aucune ligne, les tableaux vides avec `arrayContainedIn()`, chaque ligne sous `not()`, 22P02 sur un `int4[]`. Pour du SQL, écrivez la valeur en fragment `sql` ci-dessus.
+Le tableau est un seul paramètre, donc chaque élément, à toute profondeur, est une valeur simple, comme dans [`eqAny()`](#conditions.eqAny) : `Default`, `self`, `all`, `raw()`, `cols()`, `vals()`, un `Parameter`, un fragment `sql` ou `parent()` lève une erreur à la compilation de la requête ([valeurs refusées](#refused-values)). Le type refuse chacun, sauf `parent()` et un fragment comme seuls éléments, `arrayContains([db.parent('id')])`<!-- tsc: db.select('films', { genres: db.conditions.… }) -->. Zapatos 6.6.1 envoyait `Default` en `'{"Symbol(DEFAULT)"}'` et `self` en `'{"Symbol(self)"}'`, les autres en leur JSON : aucune ligne, les tableaux vides avec `arrayContainedIn()`, chaque ligne sous `not()`, 22P02 sur un `int4[]`. Pour du SQL, écrivez la valeur en fragment `sql` ci-dessus.
 
 ### `arrayContains()` {#conditions.arrayContains}
 
