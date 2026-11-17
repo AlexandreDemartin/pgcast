@@ -49,8 +49,8 @@ describe('runtime imports', () => {
   it.each([
     ['./core', true], ['fs', true], ['node:fs/promises', true], ['node:test', true], ['pg', true], ['pg/lib/utils', true],
     ['json-custom-numbers', true], ['typescript', false], ['@types/pg', false], ['pg-format', false], [null, false],
-  ] as const)('%s may be required: %s', (specifier, allowed) => {
-    expect(allowedSpecifier(specifier)).toBe(allowed);
+  ] as const)('%s may be required: %s', (specifier, expected) => {
+    expect(allowedSpecifier(specifier)).toBe(expected);
   });
 
   it.each(modules)('%s requires only built-ins, its own files, dependencies and pg', file => {
