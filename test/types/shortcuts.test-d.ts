@@ -173,7 +173,9 @@ describe('select', () => {
       .resolves.toEqualTypeOf<Pick<s.extra.spools.JSONSelectable, 'id'>[]>();
   });
 
-  // and(), or() and not() take the Whereable of every table, which names no table to check (#674)
+  // left by design (#674): and(), or() and not() take the Whereable of every table, which names no table to look the
+  // guard up by; `Whereable & NotIterable` refused `and(Object.assign({}, w, { id: 1 }))` in a generic forwarder, and
+  // `and({ ...w, id: 1 })` on TypeScript 4.1
   test('characterization: and(), or() and not() still take any string (#674)', () => {
     const c = db.conditions;
     expectTypeOf(c.and('serach')).not.toBeAny();

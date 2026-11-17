@@ -184,7 +184,7 @@ describe('on booleans (extra.type_zoo)', () => {
     const rows = await db.insert('extra.type_zoo', [
       { c_varchar: 'T', c_bool: true }, { c_varchar: 'F', c_bool: false }, { c_varchar: 'N', c_bool: null },
     ], { returning: ['id', 'c_varchar'] }).run(t.client);
-    label = Object.fromEntries(rows.map((r: { id: number; c_varchar: string }) => [r.id, r.c_varchar]));
+    label = Object.fromEntries(rows.map(r => [r.id, r.c_varchar]));
   });
 
   const cases: [string, db.SQLFragment<any>, string[]][] = [
@@ -570,7 +570,7 @@ describe('jsonbPathExists: the path and its variables bound', () => {
       ];
       // each stored as its JSON text, as in jsonbContains's tests above
       const inserted = await db.insert('extra.type_zoo', stored.map(v => ({ c_jsonb: JSON.stringify(v) })), { returning: ['id'] }).run(t.client);
-      const order: number[] = inserted.map((r: { id: unknown }) => Number(r.id));
+      const order: number[] = inserted.map(r => Number(r.id));
       return (where: db.SQL) => ids('extra.type_zoo', where).then(found => found.map(id => order.indexOf(id)));
     };
 

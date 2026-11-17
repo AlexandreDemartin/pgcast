@@ -140,8 +140,8 @@ function quoteIfIllegalIdentifier(identifier: string) {
 // its type fits (`search` typed any, `length` a number), and with it any name in the table's SQL (#670). A string has
 // an iterator, a Whereable none, and no column is a symbol. In SQLExpression, a union, so that no `keyof` changes;
 // `undefined`, not `never`, so that an object stating its iterator undefined stays a Whereable, under
-// exactOptionalPropertyTypes. Not in WhereableForTable (its `keyof` would change), nor on the shortcuts' `where`,
-// where it refused a generic `{ ...where, id }` (#674)
+// exactOptionalPropertyTypes. Not in WhereableForTable (its `keyof` would change); the shortcuts' parameters take it
+// from a lookup of their own in zapatos/db (#674)
 const notIterable = '{ [Symbol.iterator]?: undefined }';
 
 export const definitionForRelationInSchema = async (

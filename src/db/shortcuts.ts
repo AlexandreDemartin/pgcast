@@ -55,6 +55,15 @@ import { getConfig, ConfigTypes } from './config';
 import type { PostgresInterval } from './date';
 
 
+// A string has an iterator, a row none: a column named like a String member, of a type that member fits (`search`
+// typed any, `length` a number), made any string a Whereable, an Updatable or an all-optional Insertable (#674).
+// Looked up per table, so that a generic forwarder's `{ ...where, id }` still relates to it table by table, where
+// `WhereableForTable<T> & NotIterable` refused it; not exported, nor in the generated lookups, whose keys stay as they were
+type NotIterable = { [Symbol.iterator]?: undefined };
+type WhereableArg<T extends Table> = { [K in Table]: WhereableForTable<K> & NotIterable }[T];
+type UpdatableArg<T extends Table> = { [K in Table]: UpdatableForTable<K> & NotIterable }[T];
+type InsertableArg<T extends Table> = { [K in Table]: InsertableForTable<K> & NotIterable }[T];
+
 export type JSONOnlyColsForTable<T extends Table, C extends readonly any[] /* `ColumnForTable<T>[]` gives errors here for reasons I haven't got to the bottom of */> =
   Pick<JSONSelectableForTable<T>, C[number]>;
 
@@ -266,13 +275,13 @@ const hasOwnKey = (row: object, undefinedIsMissing = false) => {
 export const insert: {
   <T extends Table, C extends ColumnsOption<T>, E extends ExtrasOption<T>>(
     table: T,
-    values: InsertableForTable<T>,
+    values: InsertableArg<T>,
     options?: ReturningOptionsForTable<T, C, E>
   ): SQLFragment<ReturningTypeForTable<T, C, E>>;
 
   <T extends Table, C extends ColumnsOption<T>, E extends ExtrasOption<T>>(
     table: T,
-    values: InsertableForTable<T>[],
+    values: InsertableArg<T>[],
     options?: ReturningOptionsForTable<T, C, E>
   ): SQLFragment<ReturningTypeForTable<T, C, E>[]>;
 } = function (
@@ -484,7 +493,7 @@ export const upsert: {
     RA extends UpsertReportAction | undefined
   >(
     table: T,
-    values: InsertableForTable<T>,
+    values: InsertableArg<T>,
     conflictTarget: UpsertConflictTargetForTable<T>,
     options?: UpsertOptions<T, C, E, UC, RA>
   ): SQLFragment<UpsertReturnableForTable<T, C, E, RA> | (UC extends never[] ? undefined : never)>;
@@ -496,7 +505,7 @@ export const upsert: {
     RA extends UpsertReportAction | undefined
   >(
     table: T,
-    values: InsertableForTable<T>[],
+    values: InsertableArg<T>[],
     conflictTarget: UpsertConflictTargetForTable<T>,
     options?: UpsertOptions<T, C, E, UC, RA>
   ): SQLFragment<UpsertReturnableForTable<T, C, E, RA>[]>;
@@ -606,8 +615,8 @@ export const upsert: {
 export const update: {
   <T extends Table, C extends ColumnsOption<T>, E extends ExtrasOption<T>>(
     table: T,
-    values: UpdatableForTable<T>,
-    where: WhereableForTable<T> | SQLFragment<any>,
+    values: UpdatableArg<T>,
+    where: WhereableArg<T> | SQLFragment<any>,
     options?: ReturningOptionsForTable<T, C, E>
   ): SQLFragment<ReturningTypeForTable<T, C, E>[]>;
 } = function (
@@ -640,7 +649,7 @@ export const update: {
 export interface DeleteSignatures {
   <T extends Table, C extends ColumnsOption<T>, E extends ExtrasOption<T>>(
     table: T,
-    where: WhereableForTable<T> | SQLFragment<any>,
+    where: WhereableArg<T> | SQLFragment<any>,
     options?: ReturningOptionsForTable<T, C, E>
   ): SQLFragment<ReturningTypeForTable<T, C, E>[]>;
 }
@@ -742,7 +751,7 @@ export interface SelectOptionsForTable<
   columns?: C;
   extras?: E;
   groupBy?: ColumnForTable<T> | ColumnForTable<T>[] | SQLFragment<any>;
-  having?: WhereableForTable<T> | SQLFragment<any>;
+  having?: WhereableArg<T> | SQLFragment<any>;
   lateral?: L;
   alias?: A;
   lock?: SelectLockingOptions<NoInfer<A>> | SelectLockingOptions<NoInfer<A>>[];
@@ -764,7 +773,7 @@ type PassingThroughFragment<RunResult, L> = 0 extends 1 & L ? SQLFragment<RunRes
 interface PassingThroughSignatures<M extends SelectResultMode> {
   <T extends Table, C extends ColumnsOption<T>, L extends LateralOption<C, E>, E extends ExtrasOption<T>, A extends string>(
     table: T,
-    where: WhereableForTable<T> | SQLFragment<any> | AllType,
+    where: WhereableArg<T> | SQLFragment<any> | AllType,
     options?: SelectOptionsForTable<T, C, L, E, A>,
   ): PassingThroughFragment<FullSelectReturnTypeForTable<T, C, L, E, M>, L>;
 }
@@ -808,7 +817,7 @@ export interface SelectSignatures {
     M extends SelectResultMode = SelectResultMode.Many
   >(
     table: T,
-    where: WhereableForTable<T> | SQLFragment<any> | AllType,
+    where: WhereableArg<T> | SQLFragment<any> | AllType,
     options?: SelectOptionsForTable<T, C, L, E, A>,
     mode?: M,
     aggregate?: string,
@@ -1015,7 +1024,7 @@ export interface SelectOneSignatures extends ByColumn<PassingThroughSignatures<S
     A extends string,
   >(
     table: T,
-    where: WhereableForTable<T> | SQLFragment<any> | AllType,
+    where: WhereableArg<T> | SQLFragment<any> | AllType,
     options?: SelectOptionsForTable<T, C, L, E, A>,
   ): SQLFragment<FullSelectReturnTypeForTable<T, C, L, E, SelectResultMode.One>>;
 }> { }
@@ -1058,7 +1067,7 @@ export interface SelectExactlyOneSignatures extends ByColumn<PassingThroughSigna
     A extends string,
   >(
     table: T,
-    where: WhereableForTable<T> | SQLFragment<any> | AllType,
+    where: WhereableArg<T> | SQLFragment<any> | AllType,
     options?: SelectOptionsForTable<T, C, L, E, A>,
   ): SQLFragment<FullSelectReturnTypeForTable<T, C, L, E, SelectResultMode.ExactlyOne>>;
 }> { }
@@ -1100,7 +1109,7 @@ export interface NumericAggregateSignatures {
     A extends string,
   >(
     table: T,
-    where: WhereableForTable<T> | SQLFragment<any> | AllType,
+    where: WhereableArg<T> | SQLFragment<any> | AllType,
     options?: SelectOptionsForTable<T, C, L, E, A>,
   ): SQLFragment<number>;
 }
@@ -1112,7 +1121,7 @@ type ColumnValueOrNull<S, C> = C extends readonly (keyof S)[] ? S[C[number]] | n
 export interface NullableNumericAggregateSignatures {
   <T extends Table, C extends ColumnsOption<T>, L extends LateralOption<C, E>, E extends ExtrasOption<T>, A extends string>(
     table: T,
-    where: WhereableForTable<T> | SQLFragment<any> | AllType,
+    where: WhereableArg<T> | SQLFragment<any> | AllType,
     options?: SelectOptionsForTable<T, C, L, E, A>,
   ): SQLFragment<number | null>;
 }
@@ -1120,7 +1129,7 @@ export interface NullableNumericAggregateSignatures {
 export interface ColumnAggregateSignatures {
   <T extends Table, C extends ColumnsOption<T>, L extends LateralOption<C, E>, E extends ExtrasOption<T>, A extends string>(
     table: T,
-    where: WhereableForTable<T> | SQLFragment<any> | AllType,
+    where: WhereableArg<T> | SQLFragment<any> | AllType,
     options?: SelectOptionsForTable<T, C, L, E, A>,
   ): ColumnAggregateFragment<ColumnValueOrNull<SelectableForTable<T>, C>, ColumnValueOrNull<JSONSelectableForTable<T>, C>>;
 }
