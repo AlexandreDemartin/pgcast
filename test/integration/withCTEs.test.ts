@@ -38,9 +38,9 @@ describe('withCTEs', () => {
   });
 
   it('an empty insert() as the main query still runs its data-modifying CTE', async () => {
-    const gone = sql`DELETE FROM ${'accounts'} WHERE ${'owner_id'} = ${param(2)} RETURNING 1`;
-    expect(await db.withCTEs({ gone }, db.insert('accounts', [])).run(t.client)).toEqual([]);
-    expect(await db.count('accounts', { owner_id: 2 }).run(t.client)).toBe(0);
+    const renamed = sql`UPDATE ${'users'} SET ${'display_name'} = ${param('Robert')} WHERE ${'id'} = ${param(2)} RETURNING 1`;
+    expect(await db.withCTEs({ renamed }, db.insert('accounts', [])).run(t.client)).toEqual([]);
+    expect(await db.selectExactlyOne('users', { id: 2 }, { columns: ['display_name'] }).run(t.client)).toEqual({ display_name: 'Robert' });
   });
 
   it('an insert() as a CTE runs, and the main query sees the table as it was before the statement', async () => {

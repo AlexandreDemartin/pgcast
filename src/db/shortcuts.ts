@@ -1244,3 +1244,37 @@ export const min: TypedByColumn extends true ? ColumnAggregateSignatures : Numer
 export const max: TypedByColumn extends true ? ColumnAggregateSignatures : NumericAggregateSignatures = function (table, where, options?) {
   return numericAggregate(table, where, options, 'max');
 };
+
+
+/* === withCTEs === */
+
+// a prepared fragment writes its name into whatever compiles it, so one name would cover two texts, the fragment
+// alone and with the WITH, which pg refuses ("Prepared statements must be unique"): nested, an unprepared copy
+const unprepared = <F>(fragment: F) =>
+  fragment instanceof SQLFragment && fragment.preparedName != null ? fragment.copy({ preparedName: undefined }) : fragment;
+
+/**
+ * Put CTEs before a query, keeping its result:
+ * `WITH "recent" AS (…), "rich" AS (…) <query>`, the CTEs in the object's
+ * order (as `Object.keys` gives it: an integer key comes first), so that each
+ * may read those before it. With no CTE, it gives `query` itself, so a list
+ * built at run time needs no branch. Each key is one name, its `"` doubled,
+ * never split on `.`.
+ *
+ * The result is a copy of `query`: it resolves to what `query` does, and is
+ * written in parentheses as an `extras` or `insert()` value where `query` is.
+ * It runs even if `query` is a no-op (an `insert()` of no row), so its CTEs
+ * run. It is not prepared, whatever `query` is: call `prepared()` on it.
+ * @param ctes The CTEs, keyed by name: a shortcut or a `sql` fragment each
+ * @param query The main query
+ */
+export const withCTEs = <Q extends SQLFragment<any, any>>(ctes: { [name: string]: SQLFragment<any, any> }, query: Q): Q => {
+  const entries = Object.entries(ctes);
+  if (entries.length === 0) return query;
+  return query.copy({
+    literals: ['WITH ', ' ', ''],
+    expressions: [mapWithSeparator(entries, sql`, `, ([name, cte]) => sql`${SQLForAlias('', name)} AS (${unprepared(cte)})`), unprepared(query)],
+    preparedName: undefined,
+    noop: false,
+  }) as Q;
+};

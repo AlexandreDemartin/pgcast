@@ -1212,7 +1212,33 @@ describe('shortcut options', () => {
     // the hostile names across two CTEs: neither closes the other's quotes
     expect(db.withCTEs({ [`a'b`]: sql`SELECT 1`, [`c" AS (SELECT 2), "d`]: sql`SELECT 3` }, sql`SELECT 4`).compile().text)
       .toBe(`WITH "a'b" AS (SELECT 1), "c"" AS (SELECT 2), ""d" AS (SELECT 3) SELECT 4`);
-    expect(matrix(v => db.withCTEs({ [v]: sql`SELECT 1` }, sql`SELECT 2`))).toMatchInlineSnapshot();
+    expect(matrix(v => db.withCTEs({ [v]: sql`SELECT 1` }, sql`SELECT 2`))).toMatchInlineSnapshot(`
+      {
+        "backslash": "WITH "a\\b" AS (SELECT 1) SELECT 2",
+        "comment": "WITH "a/*b" AS (SELECT 1) SELECT 2",
+        "dashes": "WITH "a--b" AS (SELECT 1) SELECT 2",
+        "dollar": "WITH "a$1b" AS (SELECT 1) SELECT 2",
+        "dot": "WITH "a.b" AS (SELECT 1) SELECT 2",
+        "dquote": "WITH "a""b" AS (SELECT 1) SELECT 2",
+        "escapedCloses": "WITH "a"" OR TRUE OR ""b" AS (SELECT 1) SELECT 2",
+        "escapedDot": "WITH "a"".""b" AS (SELECT 1) SELECT 2",
+        "escapedNul": "WITH "a""""<NUL>""""b" AS (SELECT 1) SELECT 2",
+        "escapedOdd": "WITH "a""""""b" AS (SELECT 1) SELECT 2",
+        "lone": "WITH """" AS (SELECT 1) SELECT 2",
+        "mixedEscaped": "WITH """s"".a$1.""b"""" OR TRUE OR """"c""" AS (SELECT 1) SELECT 2",
+        "nul": "WITH "a<NUL>b" AS (SELECT 1) SELECT 2",
+        "prequoted": "WITH """a""" AS (SELECT 1) SELECT 2",
+        "prequotedCloses": "WITH """a"" OR TRUE OR ""b""" AS (SELECT 1) SELECT 2",
+        "prequotedEmpty": "WITH """" AS (SELECT 1) SELECT 2",
+        "prequotedEscaped": "WITH """a"""" OR TRUE OR """"b""" AS (SELECT 1) SELECT 2",
+        "qualifiedEscaped": "WITH "s.a"" OR TRUE OR ""b" AS (SELECT 1) SELECT 2",
+        "semicolon": "WITH "a;b" AS (SELECT 1) SELECT 2",
+        "squote": "WITH "a'b" AS (SELECT 1) SELECT 2",
+        "uescape": "WITH """s"".U&""a"" UESCAPE '!' || ""b""" AS (SELECT 1) SELECT 2",
+        "unicodeCloses": "WITH """s"".U&""a\\"" OR TRUE OR \\""b""" AS (SELECT 1) SELECT 2",
+        "unicodeEscaped": "WITH """s"".U&""a\\0022"""" OR TRUE OR """"\\0022b""" AS (SELECT 1) SELECT 2",
+      }
+    `);
   });
 
   describe('the alias is converted to a string once, so "sq_<alias>" is written from the string checked', () => {
