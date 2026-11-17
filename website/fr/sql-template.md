@@ -604,6 +604,8 @@ withCTEs<Q extends SQLFragment<any, any>>(ctes: { [name: string]: SQLFragment<an
 - **Un seul `WITH`** : la requête ne peut pas commencer par son propre `WITH`, un résultat de `withCTEs()` ou un fragment `sql`, ni être un [`truncate()`](/fr/insert#truncate) : Postgres refuse le texte (42601). Mettez toutes les CTE dans un seul appel.
 - **Requête préparée** : jamais, pas plus que les CTE et la requête qu’il imbrique, `{}` compris, car un [nom](#prepared) désigne un seul texte. Appelez `prepared()` sur le résultat. Sur une liste construite à l’exécution, un même nom couvrirait un texte par liste : donnez à chaque texte son propre nom, ou ne préparez pas la requête.
 
+Pas à pas, avec un `insert()` comme CTE : [Placer une CTE avant un raccourci](/fr/raw-sql#put-a-cte-before-a-shortcut).
+
 ## `RunResultForSQLFragment` {#RunResultForSQLFragment}
 
 ```ts

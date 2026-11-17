@@ -83,6 +83,101 @@ describe('select', () => {
     db.select('users', db.all, { groupBy: 'nope' });
   });
 
+  // products.search, a tsvector typed any, shares its name with String's search(): a string passes as a
+  // products.Whereable, as in Zapatos 6.6.1 (#670). The table's SQL refuses it, so order.by does
+  test('refuses a string as a name of a table with a column named like a String member (#670)', () => {
+    const c = db.conditions;
+    expectTypeOf(db.select('products', { search: db.sql`${db.self} @@ 'salt'` })).toEqualTypeOf<db.SQLFragment<s.products.JSONSelectable[]>>();
+    expectTypeOf(db.select('products', c.and({ sku: 'a' }, c.not({ title: 'b' })))).toEqualTypeOf<db.SQLFragment<s.products.JSONSelectable[]>>();
+    expectTypeOf(db.count('products', db.all, { groupBy: 'sku', having: { sku: 'a' } } as const)).not.toBeAny();
+    expectTypeOf(db.select('products', db.all, { order: { by: 'sku', direction: 'ASC' } })).not.toBeAny();
+    // @ts-expect-error 'serach' is not a column of products (order.by, a SQLForTable)
+    db.select('products', db.all, { order: { by: 'serach', direction: 'ASC' } });
+    // a variable that shares no key with it is still refused
+    const titel = { titel: 'a' };
+    // @ts-expect-error 'titel' is not a column of products
+    db.select('products', titel);
+    // an object whose iterator is undefined, or any, is still a Whereable: it compiles to its own keys
+    const iterUndefined = { sku: 'a', [Symbol.iterator]: undefined }, iterAny = { sku: 'a', [Symbol.iterator]: null as any };
+    expectTypeOf(db.select('products', iterUndefined)).toEqualTypeOf<db.SQLFragment<s.products.JSONSelectable[]>>();
+    expectTypeOf(db.select('products', iterAny)).toEqualTypeOf<db.SQLFragment<s.products.JSONSelectable[]>>();
+  });
+
+  // A guard on the where of the shortcuts refused a generic forwarder that spreads it and adds a key (#674)
+  test('characterization: the where of a shortcut or a condition still takes any string (#674)', () => {
+    const c = db.conditions;
+    const str = 'sku' as string, so = new String('sku');
+    expectTypeOf(db.select('products', 'serach')).not.toBeAny();
+    expectTypeOf(db.selectOne('products', 'serach')).not.toBeAny();
+    expectTypeOf(db.selectExactlyOne('products', 'serach')).not.toBeAny();
+    expectTypeOf(db.count('products', 'serach')).not.toBeAny();
+    expectTypeOf(db.sum('products', 'serach', { columns: ['price_cents'] })).not.toBeAny();
+    expectTypeOf(db.update('products', { sku: 'a' }, 'serach')).not.toBeAny();
+    expectTypeOf(db.deletes('products', 'serach')).not.toBeAny();
+    expectTypeOf(db.select('products', db.all, { groupBy: 'sku', having: 'serach' })).not.toBeAny();
+    expectTypeOf(c.exists('products', 'serach')).not.toBeAny();
+    expectTypeOf(c.isInSelect('products', 'serach', 'id')).not.toBeAny();
+    expectTypeOf(db.select('products', str)).not.toBeAny();
+    expectTypeOf(db.select('products', so)).not.toBeAny();
+  });
+
+  // and(), or() and not() take the Whereable of every table, which names no table to check (#674)
+  test('characterization: and(), or() and not() still take any string (#674)', () => {
+    const c = db.conditions;
+    expectTypeOf(c.and('serach')).not.toBeAny();
+    expectTypeOf(c.or({ sku: 'a' }, 'serach')).not.toBeAny();
+    expectTypeOf(c.not('serach')).not.toBeAny();
+  });
+
+  test('a generic forwarder over the where of a shortcut or a condition still compiles (#670)', () => {
+    const forward = <T extends s.Table>(table: T, where: s.WhereableForTable<T>) =>
+      [db.select(table, where), db.selectOne(table, where), db.count(table, where), db.deletes(table, where),
+        db.conditions.exists(table, where)];
+    forward('products', { sku: 'a' });
+    const any = (...where: s.Whereable[]) => [db.conditions.and(...where), db.conditions.or(...where), db.conditions.not(where[0]!)];
+    any({ sku: 'a' });
+  });
+
+  // a helper that adds a key of its own to the caller's Whereable (a soft delete) compiles under Zapatos 6.6.1;
+  // a guard on the shortcut's parameter refused it, a generic intersection sharing no key with the guard (review of #676)
+  test('a generic forwarder that adds a key to the Whereable it is given still compiles (#670)', () => {
+    const c = db.conditions;
+    type W<T extends s.Table> = s.WhereableForTable<T>;
+    const forwarders = [
+      <T extends s.Table>(t: T, w: W<T>) => db.select(t, { ...w, id: c.isNotNull }),
+      <T extends s.Table>(t: T, w: W<T>) => db.select(t, { ...w, deleted_at: null }),
+      <T extends 'products' | 'users'>(t: T, w: W<T>) => db.select(t, { ...w, id: 1 }),
+      <T extends 'products'>(t: T, w: W<T>) => db.select(t, { ...w, id: 1 }),
+      <T extends s.Table>(t: T, w: W<T>) => db.selectOne(t, { ...w, id: 1 }),
+      <T extends s.Table>(t: T, w: W<T>) => db.count(t, { ...w, id: c.gt(0) }),
+      <T extends s.Table>(t: T, w: W<T>) => db.deletes(t, { ...w, id: 1 }),
+      <T extends s.Table>(t: T, w: W<T>) => db.update(t, {} as s.UpdatableForTable<T>, { ...w, id: 1 }),
+      <T extends s.Table>(t: T, w: W<T>) => db.select(t, db.all, { having: { ...w, id: 1 } }),
+      <T extends s.Table>(t: T, w: W<T>) => db.sql<s.SQLForTable<T>>`${{ ...w, id: 1 }}`,
+      <T extends s.Table>(t: T, w: W<T>) => db.sql`${{ ...w, id: 1 }}`,
+      <T extends s.Table>(t: T, w: W<T>) => c.and({ ...w, id: 1 }),
+      <T extends s.Table>(t: T, w: W<T>) => c.or(w, { ...w, id: 1 }),
+      <T extends s.Table>(t: T, w: W<T>) => c.not({ ...w, id: 1 }),
+      <T extends s.Table>(t: T, w: W<T>) => c.exists(t, { ...w, id: 1 }),
+      <T extends s.Table>(t: T, w: W<T>, extra: { id?: number }) => db.select(t, { ...w, ...extra }),
+      <T extends s.Table>(t: T, w: W<T>, extra: W<T>) => db.select(t, { ...w, ...extra }),
+      <T extends s.Table>(t: T, w: W<T>) => db.select(t, Object.assign({}, w, { id: 1 })),
+      <T extends s.Table>(t: T, w: W<T>) => db.select(t, { ...w, id: 1 } as W<T>),
+      <T extends s.Table>(t: T, w: W<T> & { id?: number }) => db.select(t, w),
+      <T extends s.Table>(t: T, w: Omit<W<T>, 'id'>) => db.select(t, w),
+      <T extends s.Table>(t: T, w: Omit<W<T>, 'id'>) => db.select(t, { ...w, id: 1 }),
+      <T extends s.Table>(t: T, w: Readonly<W<T>>) => db.select(t, w),
+      <T extends s.Table>(t: T, w: Partial<W<T>>) => db.select(t, w),
+      <T extends s.Table>(t: T, ws: W<T>[]) => db.select(t, c.and(...ws)),
+      <P extends s.products.Whereable>(w: P) => db.select('products', { ...w, sku: 'a' }),
+      <P extends s.products.Whereable>(w: P & { sku?: string }) => db.select('products', w),
+      <A extends s.Whereable>(w: A) => db.sql`${{ ...w, id: 1 }}`,
+      (w: Omit<s.products.Whereable, 'id'>) => db.select('products', { ...w, id: 1 }),
+      (w: s.products.Whereable & { foo?: string }) => db.select('products', w),
+    ];
+    expectTypeOf(forwarders).not.toBeAny();
+  });
+
   test('lock.of accepts the alias', () => {
     const q = db.select('users', db.all, { alias: 'u', lock: { for: 'UPDATE', of: 'u' } });
     expectTypeOf<Run<typeof q>>().toEqualTypeOf<s.users.JSONSelectable[]>();

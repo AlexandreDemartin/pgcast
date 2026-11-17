@@ -136,6 +136,14 @@ function quoteIfIllegalIdentifier(identifier: string) {
   return identifier.match(/^[a-zA-Z_$][0-9a-zA-Z_$]*$/) ? identifier : stringLiteral(identifier, '"');
 }
 
+// Every key of a Whereable is optional, so a string passes as one when a column shares the name of a String member
+// its type fits (`search` typed any, `length` a number), and with it any name in the table's SQL (#670). A string has
+// an iterator, a Whereable none, and no column is a symbol. In SQLExpression, a union, so that no `keyof` changes;
+// `undefined`, not `never`, so that an object stating its iterator undefined stays a Whereable, under
+// exactOptionalPropertyTypes. Not in WhereableForTable (its `keyof` would change), nor on the shortcuts' `where`,
+// where it refused a generic `{ ...where, id }` (#674)
+const notIterable = '{ [Symbol.iterator]?: undefined }';
+
 export const definitionForRelationInSchema = async (
   rel: Relation,
   schemaName: string,
@@ -396,6 +404,7 @@ export const definitionForRelationInSchema = async (
  * ${jsdocLines(`**${schemaPrefix}${rel.name}**`, ' ')}
  * - ${friendlyRelType} in database
  */` : ``,
+    // SQLExpression's Whereable refuses a primitive (notIterable, above)
     tableDef = `${tableComment}
 export namespace ${tsIdentifier(rel.name, 'namespace')} {
   export type Table = ${stringLiteral(schemaPrefix + rel.name)};
@@ -419,7 +428,7 @@ export namespace ${tsIdentifier(rel.name, 'namespace')} {
         'never'};
   export type Column = keyof Selectable;
   export type OnlyCols<T extends readonly Column[]> = Pick<Selectable, T[number]>;
-  export type SQLExpression = Table | db.ColumnNames<Updatable | (keyof Updatable)[]> | db.ColumnValues<Updatable> | Whereable | Column | db.ParentColumn | db.GenericSQLExpression;
+  export type SQLExpression = Table | db.ColumnNames<Updatable | (keyof Updatable)[]> | db.ColumnValues<Updatable> | (Whereable & ${notIterable}) | Column | db.ParentColumn | db.GenericSQLExpression;
   export type SQL = SQLExpression | SQLExpression[];
 }`;
   return tableDef;

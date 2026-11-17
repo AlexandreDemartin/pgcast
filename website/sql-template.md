@@ -600,6 +600,8 @@ From 6.11.0. Puts CTEs before a query and keeps its result: with `recent` a `sql
 - **One `WITH`**: the query cannot start with a `WITH` of its own, a `withCTEs()` result or a `sql` fragment, nor be a [`truncate()`](/insert#truncate): Postgres refuses the text (42601). Put all the CTEs in one call.
 - **Prepared**: never, nor are the CTEs and the query it nests, `{}` included, as a [name](#prepared) stands for one text. Call `prepared()` on the result. Over a list built at run time, one name would cover a text per list: name each text apart, or leave it unprepared.
 
+Step by step, with an `insert()` as a CTE: [Put a CTE before a shortcut](/raw-sql#put-a-cte-before-a-shortcut).
+
 ## `RunResultForSQLFragment` {#RunResultForSQLFragment}
 
 ```ts

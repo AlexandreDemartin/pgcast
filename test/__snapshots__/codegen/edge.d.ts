@@ -77,7 +77,7 @@ declare module 'zapatos/schema' {
       export type UniqueIndex = 'class_pkey';
       export type Column = keyof Selectable;
       export type OnlyCols<T extends readonly Column[]> = Pick<Selectable, T[number]>;
-      export type SQLExpression = Table | db.ColumnNames<Updatable | (keyof Updatable)[]> | db.ColumnValues<Updatable> | Whereable | Column | db.ParentColumn | db.GenericSQLExpression;
+      export type SQLExpression = Table | db.ColumnNames<Updatable | (keyof Updatable)[]> | db.ColumnValues<Updatable> | (Whereable & { [Symbol.iterator]?: undefined }) | Column | db.ParentColumn | db.GenericSQLExpression;
       export type SQL = SQLExpression | SQLExpression[];
     }
   
@@ -230,7 +230,7 @@ declare module 'zapatos/schema' {
       export type UniqueIndex = 'odd table_pkey';
       export type Column = keyof Selectable;
       export type OnlyCols<T extends readonly Column[]> = Pick<Selectable, T[number]>;
-      export type SQLExpression = Table | db.ColumnNames<Updatable | (keyof Updatable)[]> | db.ColumnValues<Updatable> | Whereable | Column | db.ParentColumn | db.GenericSQLExpression;
+      export type SQLExpression = Table | db.ColumnNames<Updatable | (keyof Updatable)[]> | db.ColumnValues<Updatable> | (Whereable & { [Symbol.iterator]?: undefined }) | Column | db.ParentColumn | db.GenericSQLExpression;
       export type SQL = SQLExpression | SQLExpression[];
     }
   

@@ -108,7 +108,7 @@ declare module 'zapatos/schema' {
     export type UniqueIndex = 'account_totals_owner_key';
     export type Column = keyof Selectable;
     export type OnlyCols<T extends readonly Column[]> = Pick<Selectable, T[number]>;
-    export type SQLExpression = Table | db.ColumnNames<Updatable | (keyof Updatable)[]> | db.ColumnValues<Updatable> | Whereable | Column | db.ParentColumn | db.GenericSQLExpression;
+    export type SQLExpression = Table | db.ColumnNames<Updatable | (keyof Updatable)[]> | db.ColumnValues<Updatable> | (Whereable & { [Symbol.iterator]?: undefined }) | Column | db.ParentColumn | db.GenericSQLExpression;
     export type SQL = SQLExpression | SQLExpression[];
   }
 
@@ -431,7 +431,7 @@ declare module 'zapatos/schema' {
     export type UniqueIndex = 'accounts_pkey';
     export type Column = keyof Selectable;
     export type OnlyCols<T extends readonly Column[]> = Pick<Selectable, T[number]>;
-    export type SQLExpression = Table | db.ColumnNames<Updatable | (keyof Updatable)[]> | db.ColumnValues<Updatable> | Whereable | Column | db.ParentColumn | db.GenericSQLExpression;
+    export type SQLExpression = Table | db.ColumnNames<Updatable | (keyof Updatable)[]> | db.ColumnValues<Updatable> | (Whereable & { [Symbol.iterator]?: undefined }) | Column | db.ParentColumn | db.GenericSQLExpression;
     export type SQL = SQLExpression | SQLExpression[];
   }
 
@@ -584,7 +584,7 @@ declare module 'zapatos/schema' {
     export type UniqueIndex = never;
     export type Column = keyof Selectable;
     export type OnlyCols<T extends readonly Column[]> = Pick<Selectable, T[number]>;
-    export type SQLExpression = Table | db.ColumnNames<Updatable | (keyof Updatable)[]> | db.ColumnValues<Updatable> | Whereable | Column | db.ParentColumn | db.GenericSQLExpression;
+    export type SQLExpression = Table | db.ColumnNames<Updatable | (keyof Updatable)[]> | db.ColumnValues<Updatable> | (Whereable & { [Symbol.iterator]?: undefined }) | Column | db.ParentColumn | db.GenericSQLExpression;
     export type SQL = SQLExpression | SQLExpression[];
   }
 
@@ -737,7 +737,7 @@ declare module 'zapatos/schema' {
     export type UniqueIndex = 'events_pkey';
     export type Column = keyof Selectable;
     export type OnlyCols<T extends readonly Column[]> = Pick<Selectable, T[number]>;
-    export type SQLExpression = Table | db.ColumnNames<Updatable | (keyof Updatable)[]> | db.ColumnValues<Updatable> | Whereable | Column | db.ParentColumn | db.GenericSQLExpression;
+    export type SQLExpression = Table | db.ColumnNames<Updatable | (keyof Updatable)[]> | db.ColumnValues<Updatable> | (Whereable & { [Symbol.iterator]?: undefined }) | Column | db.ParentColumn | db.GenericSQLExpression;
     export type SQL = SQLExpression | SQLExpression[];
   }
 
@@ -880,7 +880,7 @@ declare module 'zapatos/schema' {
     export type UniqueIndex = 'events_2025_pkey';
     export type Column = keyof Selectable;
     export type OnlyCols<T extends readonly Column[]> = Pick<Selectable, T[number]>;
-    export type SQLExpression = Table | db.ColumnNames<Updatable | (keyof Updatable)[]> | db.ColumnValues<Updatable> | Whereable | Column | db.ParentColumn | db.GenericSQLExpression;
+    export type SQLExpression = Table | db.ColumnNames<Updatable | (keyof Updatable)[]> | db.ColumnValues<Updatable> | (Whereable & { [Symbol.iterator]?: undefined }) | Column | db.ParentColumn | db.GenericSQLExpression;
     export type SQL = SQLExpression | SQLExpression[];
   }
 
@@ -1023,7 +1023,7 @@ declare module 'zapatos/schema' {
     export type UniqueIndex = 'events_2026_pkey';
     export type Column = keyof Selectable;
     export type OnlyCols<T extends readonly Column[]> = Pick<Selectable, T[number]>;
-    export type SQLExpression = Table | db.ColumnNames<Updatable | (keyof Updatable)[]> | db.ColumnValues<Updatable> | Whereable | Column | db.ParentColumn | db.GenericSQLExpression;
+    export type SQLExpression = Table | db.ColumnNames<Updatable | (keyof Updatable)[]> | db.ColumnValues<Updatable> | (Whereable & { [Symbol.iterator]?: undefined }) | Column | db.ParentColumn | db.GenericSQLExpression;
     export type SQL = SQLExpression | SQLExpression[];
   }
 
@@ -1166,7 +1166,7 @@ declare module 'zapatos/schema' {
     export type UniqueIndex = 'events_default_pkey';
     export type Column = keyof Selectable;
     export type OnlyCols<T extends readonly Column[]> = Pick<Selectable, T[number]>;
-    export type SQLExpression = Table | db.ColumnNames<Updatable | (keyof Updatable)[]> | db.ColumnValues<Updatable> | Whereable | Column | db.ParentColumn | db.GenericSQLExpression;
+    export type SQLExpression = Table | db.ColumnNames<Updatable | (keyof Updatable)[]> | db.ColumnValues<Updatable> | (Whereable & { [Symbol.iterator]?: undefined }) | Column | db.ParentColumn | db.GenericSQLExpression;
     export type SQL = SQLExpression | SQLExpression[];
   }
 
@@ -1339,7 +1339,7 @@ declare module 'zapatos/schema' {
     export type UniqueIndex = 'memberships_pkey';
     export type Column = keyof Selectable;
     export type OnlyCols<T extends readonly Column[]> = Pick<Selectable, T[number]>;
-    export type SQLExpression = Table | db.ColumnNames<Updatable | (keyof Updatable)[]> | db.ColumnValues<Updatable> | Whereable | Column | db.ParentColumn | db.GenericSQLExpression;
+    export type SQLExpression = Table | db.ColumnNames<Updatable | (keyof Updatable)[]> | db.ColumnValues<Updatable> | (Whereable & { [Symbol.iterator]?: undefined }) | Column | db.ParentColumn | db.GenericSQLExpression;
     export type SQL = SQLExpression | SQLExpression[];
   }
 
@@ -1512,7 +1512,7 @@ declare module 'zapatos/schema' {
     export type UniqueIndex = 'OrderLines_pkey';
     export type Column = keyof Selectable;
     export type OnlyCols<T extends readonly Column[]> = Pick<Selectable, T[number]>;
-    export type SQLExpression = Table | db.ColumnNames<Updatable | (keyof Updatable)[]> | db.ColumnValues<Updatable> | Whereable | Column | db.ParentColumn | db.GenericSQLExpression;
+    export type SQLExpression = Table | db.ColumnNames<Updatable | (keyof Updatable)[]> | db.ColumnValues<Updatable> | (Whereable & { [Symbol.iterator]?: undefined }) | Column | db.ParentColumn | db.GenericSQLExpression;
     export type SQL = SQLExpression | SQLExpression[];
   }
 
@@ -1685,7 +1685,7 @@ declare module 'zapatos/schema' {
     export type UniqueIndex = 'orgs_pkey';
     export type Column = keyof Selectable;
     export type OnlyCols<T extends readonly Column[]> = Pick<Selectable, T[number]>;
-    export type SQLExpression = Table | db.ColumnNames<Updatable | (keyof Updatable)[]> | db.ColumnValues<Updatable> | Whereable | Column | db.ParentColumn | db.GenericSQLExpression;
+    export type SQLExpression = Table | db.ColumnNames<Updatable | (keyof Updatable)[]> | db.ColumnValues<Updatable> | (Whereable & { [Symbol.iterator]?: undefined }) | Column | db.ParentColumn | db.GenericSQLExpression;
     export type SQL = SQLExpression | SQLExpression[];
   }
 
@@ -2014,7 +2014,7 @@ declare module 'zapatos/schema' {
     export type UniqueIndex = 'products_pkey' | 'products_sku_variant_key' | 'products_status_sku_key' | 'products_title_lower_key';
     export type Column = keyof Selectable;
     export type OnlyCols<T extends readonly Column[]> = Pick<Selectable, T[number]>;
-    export type SQLExpression = Table | db.ColumnNames<Updatable | (keyof Updatable)[]> | db.ColumnValues<Updatable> | Whereable | Column | db.ParentColumn | db.GenericSQLExpression;
+    export type SQLExpression = Table | db.ColumnNames<Updatable | (keyof Updatable)[]> | db.ColumnValues<Updatable> | (Whereable & { [Symbol.iterator]?: undefined }) | Column | db.ParentColumn | db.GenericSQLExpression;
     export type SQL = SQLExpression | SQLExpression[];
   }
 
@@ -2307,7 +2307,7 @@ declare module 'zapatos/schema' {
     export type UniqueIndex = 'transfers_pkey';
     export type Column = keyof Selectable;
     export type OnlyCols<T extends readonly Column[]> = Pick<Selectable, T[number]>;
-    export type SQLExpression = Table | db.ColumnNames<Updatable | (keyof Updatable)[]> | db.ColumnValues<Updatable> | Whereable | Column | db.ParentColumn | db.GenericSQLExpression;
+    export type SQLExpression = Table | db.ColumnNames<Updatable | (keyof Updatable)[]> | db.ColumnValues<Updatable> | (Whereable & { [Symbol.iterator]?: undefined }) | Column | db.ParentColumn | db.GenericSQLExpression;
     export type SQL = SQLExpression | SQLExpression[];
   }
 
@@ -2603,7 +2603,7 @@ declare module 'zapatos/schema' {
     export type UniqueIndex = 'users_email_key' | 'users_pkey';
     export type Column = keyof Selectable;
     export type OnlyCols<T extends readonly Column[]> = Pick<Selectable, T[number]>;
-    export type SQLExpression = Table | db.ColumnNames<Updatable | (keyof Updatable)[]> | db.ColumnValues<Updatable> | Whereable | Column | db.ParentColumn | db.GenericSQLExpression;
+    export type SQLExpression = Table | db.ColumnNames<Updatable | (keyof Updatable)[]> | db.ColumnValues<Updatable> | (Whereable & { [Symbol.iterator]?: undefined }) | Column | db.ParentColumn | db.GenericSQLExpression;
     export type SQL = SQLExpression | SQLExpression[];
   }
 
@@ -2716,7 +2716,7 @@ declare module 'zapatos/schema' {
       export type UniqueIndex = never;
       export type Column = keyof Selectable;
       export type OnlyCols<T extends readonly Column[]> = Pick<Selectable, T[number]>;
-      export type SQLExpression = Table | db.ColumnNames<Updatable | (keyof Updatable)[]> | db.ColumnValues<Updatable> | Whereable | Column | db.ParentColumn | db.GenericSQLExpression;
+      export type SQLExpression = Table | db.ColumnNames<Updatable | (keyof Updatable)[]> | db.ColumnValues<Updatable> | (Whereable & { [Symbol.iterator]?: undefined }) | Column | db.ParentColumn | db.GenericSQLExpression;
       export type SQL = SQLExpression | SQLExpression[];
     }
   
@@ -2877,7 +2877,7 @@ declare module 'zapatos/schema' {
       export type UniqueIndex = 'articles_pkey' | 'shared_name_idx';
       export type Column = keyof Selectable;
       export type OnlyCols<T extends readonly Column[]> = Pick<Selectable, T[number]>;
-      export type SQLExpression = Table | db.ColumnNames<Updatable | (keyof Updatable)[]> | db.ColumnValues<Updatable> | Whereable | Column | db.ParentColumn | db.GenericSQLExpression;
+      export type SQLExpression = Table | db.ColumnNames<Updatable | (keyof Updatable)[]> | db.ColumnValues<Updatable> | (Whereable & { [Symbol.iterator]?: undefined }) | Column | db.ParentColumn | db.GenericSQLExpression;
       export type SQL = SQLExpression | SQLExpression[];
     }
   
@@ -2926,7 +2926,7 @@ declare module 'zapatos/schema' {
       export type UniqueIndex = never;
       export type Column = keyof Selectable;
       export type OnlyCols<T extends readonly Column[]> = Pick<Selectable, T[number]>;
-      export type SQLExpression = Table | db.ColumnNames<Updatable | (keyof Updatable)[]> | db.ColumnValues<Updatable> | Whereable | Column | db.ParentColumn | db.GenericSQLExpression;
+      export type SQLExpression = Table | db.ColumnNames<Updatable | (keyof Updatable)[]> | db.ColumnValues<Updatable> | (Whereable & { [Symbol.iterator]?: undefined }) | Column | db.ParentColumn | db.GenericSQLExpression;
       export type SQL = SQLExpression | SQLExpression[];
     }
   
@@ -4197,7 +4197,7 @@ declare module 'zapatos/schema' {
       export type UniqueIndex = 'type_zoo_pkey';
       export type Column = keyof Selectable;
       export type OnlyCols<T extends readonly Column[]> = Pick<Selectable, T[number]>;
-      export type SQLExpression = Table | db.ColumnNames<Updatable | (keyof Updatable)[]> | db.ColumnValues<Updatable> | Whereable | Column | db.ParentColumn | db.GenericSQLExpression;
+      export type SQLExpression = Table | db.ColumnNames<Updatable | (keyof Updatable)[]> | db.ColumnValues<Updatable> | (Whereable & { [Symbol.iterator]?: undefined }) | Column | db.ParentColumn | db.GenericSQLExpression;
       export type SQL = SQLExpression | SQLExpression[];
     }
   
