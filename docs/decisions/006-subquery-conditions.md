@@ -67,7 +67,7 @@ None of them infers the outer table from where the condition sits.
 
 ## Choice: C
 
-- **Security**: values stay parameters; `table` and `column` are typed identifiers, and `parent` and `alias` go through the string branch of `compileExpression`, as `select()`'s `alias` does (replay above).
+- **Security**: values stay parameters; `table` and `column` are typed identifiers, and `parent` and `alias` go through the string branch of `compileExpression`, as `select()`'s `alias` does (replay above); they are read as the shortcuts read their options (`callerValue()`, #552), so a key only `Object.prototype` has is none, and so are `null` options (#590).
 - **6.6.1 compatibility**: additions only; `parent()` keeps its meaning everywhere it compiles today.
 - **The principles**: explicit, as Zapatos is about its client and its transactions: the condition names the table it refers to, and its SQL does not depend on where it sits; it works in a `sql` query; no `core.ts` change, so #562 stays `normal`.
 - **Reversible**: if the repeated table proves a burden in use, B can come later as the default of a missing `parent`, in its own note, since it touches `core.ts`. Calls written for C compile the same: one with `parent` keeps its own mark (replayed on B's prototype); one without compiles only if it has no `parent()`.
