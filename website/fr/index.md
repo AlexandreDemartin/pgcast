@@ -1,9 +1,9 @@
 ---
-english: 9deff10d61ff
+english: 5cc61af5b1e0
 layout: home
 markdownStyles: false
 title: pgcast
-titleTemplate: Postgres sans abstraction pour TypeScript
+titleTemplate: Le Postgres que vous connaissez, avec toute la puissance de TypeScript
 description: "Le Postgres que vous connaissez, avec toute la puissance de TypeScript. pgcast lit votre schéma et en tire les types ; chaque requête est un SQL que vous pouvez lire et prévoir. Pas d’ORM, pas de modèles, pas d’état caché : vous gardez la main."
 ---
 
