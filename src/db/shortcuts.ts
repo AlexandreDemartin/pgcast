@@ -232,20 +232,8 @@ const hasOwnKey = (row: object, undefinedIsMissing = false) => {
     Object.values(row).some(v => v !== undefined) : Object.keys(row).length > 0;
 };
 
-interface InsertSignatures {
-  <T extends Table, C extends ColumnsOption<T>, E extends ExtrasOption<T>>(
-    table: T,
-    values: InsertableForTable<T>,
-    options?: ReturningOptionsForTable<T, C, E>
-  ): SQLFragment<ReturningTypeForTable<T, C, E>>;
-
-  <T extends Table, C extends ColumnsOption<T>, E extends ExtrasOption<T>>(
-    table: T,
-    values: InsertableForTable<T>[],
-    options?: ReturningOptionsForTable<T, C, E>
-  ): SQLFragment<ReturningTypeForTable<T, C, E>[]>;
-}
-
+// the signatures of insert(), upsert(), update() and truncate() are written in place, not as an unexported interface,
+// so that a package built with `declaration: true` can re-export them (TS4023)
 /**
  * Generate an `INSERT` query `SQLFragment`.
  * @param table The table into which to insert
@@ -267,7 +255,19 @@ interface InsertSignatures {
  * `run()` rejects before any query, unless `values` is an empty array, a no-op
  * (a row with no key throws first, at the call)
  */
-export const insert: InsertSignatures = function (
+export const insert: {
+  <T extends Table, C extends ColumnsOption<T>, E extends ExtrasOption<T>>(
+    table: T,
+    values: InsertableForTable<T>,
+    options?: ReturningOptionsForTable<T, C, E>
+  ): SQLFragment<ReturningTypeForTable<T, C, E>>;
+
+  <T extends Table, C extends ColumnsOption<T>, E extends ExtrasOption<T>>(
+    table: T,
+    values: InsertableForTable<T>[],
+    options?: ReturningOptionsForTable<T, C, E>
+  ): SQLFragment<ReturningTypeForTable<T, C, E>[]>;
+} = function (
   table: Table,
   values: Insertable | Insertable[],
   options?: ReturningOptionsForTable<Table, ColumnsOption<Table>, ExtrasOption<Table>>
@@ -364,7 +364,11 @@ type UpdateValuesForTable<T extends Table, U = UpdatableForTable<T>> = {
     (string extends ParameterValue<U[K]> ? DangerousRawString : never)
 };
 
-interface UpsertOptions<
+/**
+ * The `options` of `upsert()`: `returning` and `extras`, as for `insert()`, with `updateValues`, `updateColumns`,
+ * `noNullUpdateColumns` and `reportAction`.
+ */
+export interface UpsertOptions<
   T extends Table,
   C extends ColumnsOption<T>,
   E extends ExtrasOption<T>,
@@ -390,32 +394,6 @@ interface UpsertOptions<
    * partition itself.
    */
   reportAction?: RA;
-}
-
-interface UpsertSignatures {
-  <T extends Table,
-    C extends ColumnsOption<T>,
-    E extends ExtrasOption<T>,
-    UC extends UpdateColumns<T> | undefined,
-    RA extends UpsertReportAction | undefined
-  >(
-    table: T,
-    values: InsertableForTable<T>,
-    conflictTarget: UpsertConflictTargetForTable<T>,
-    options?: UpsertOptions<T, C, E, UC, RA>
-  ): SQLFragment<UpsertReturnableForTable<T, C, E, RA> | (UC extends never[] ? undefined : never)>;
-
-  <T extends Table,
-    C extends ColumnsOption<T>,
-    E extends ExtrasOption<T>,
-    UC extends UpdateColumns<T> | undefined,
-    RA extends UpsertReportAction | undefined
-  >(
-    table: T,
-    values: InsertableForTable<T>[],
-    conflictTarget: UpsertConflictTargetForTable<T>,
-    options?: UpsertOptions<T, C, E, UC, RA>
-  ): SQLFragment<UpsertReturnableForTable<T, C, E, RA>[]>;
 }
 
 export const doNothing = [];
@@ -486,7 +464,31 @@ const updateValueSQL = (value: any) => compiledAsIs(value) ? value : param(value
  * adds no `"votes"` to `DO UPDATE SET`, and with `updateColumns: doNothing`
  * and nothing else, the SQL is `DO NOTHING`.
  */
-export const upsert: UpsertSignatures = function (
+export const upsert: {
+  <T extends Table,
+    C extends ColumnsOption<T>,
+    E extends ExtrasOption<T>,
+    UC extends UpdateColumns<T> | undefined,
+    RA extends UpsertReportAction | undefined
+  >(
+    table: T,
+    values: InsertableForTable<T>,
+    conflictTarget: UpsertConflictTargetForTable<T>,
+    options?: UpsertOptions<T, C, E, UC, RA>
+  ): SQLFragment<UpsertReturnableForTable<T, C, E, RA> | (UC extends never[] ? undefined : never)>;
+
+  <T extends Table,
+    C extends ColumnsOption<T>,
+    E extends ExtrasOption<T>,
+    UC extends UpdateColumns<T> | undefined,
+    RA extends UpsertReportAction | undefined
+  >(
+    table: T,
+    values: InsertableForTable<T>[],
+    conflictTarget: UpsertConflictTargetForTable<T>,
+    options?: UpsertOptions<T, C, E, UC, RA>
+  ): SQLFragment<UpsertReturnableForTable<T, C, E, RA>[]>;
+} = function (
   table: Table,
   values: Insertable | Insertable[],
   conflictTarget: Column | Column[] | Constraint<Table>,
@@ -574,15 +576,6 @@ export const upsert: UpsertSignatures = function (
 
 /* === update === */
 
-interface UpdateSignatures {
-  <T extends Table, C extends ColumnsOption<T>, E extends ExtrasOption<T>>(
-    table: T,
-    values: UpdatableForTable<T>,
-    where: WhereableForTable<T> | SQLFragment<any>,
-    options?: ReturningOptionsForTable<T, C, E>
-  ): SQLFragment<ReturningTypeForTable<T, C, E>[]>;
-}
-
 /**
  * Generate an `UPDATE` query `SQLFragment`.
  * @param table The table to update
@@ -596,7 +589,14 @@ interface UpdateSignatures {
  * @param where A `Whereable` (or `SQLFragment`) defining which rows to update
  * @param options Optionally, `returning` and `extras`, as for `insert`
  */
-export const update: UpdateSignatures = function (
+export const update: {
+  <T extends Table, C extends ColumnsOption<T>, E extends ExtrasOption<T>>(
+    table: T,
+    values: UpdatableForTable<T>,
+    where: WhereableForTable<T> | SQLFragment<any>,
+    options?: ReturningOptionsForTable<T, C, E>
+  ): SQLFragment<ReturningTypeForTable<T, C, E>[]>;
+} = function (
   table: Table,
   values: Updatable,
   where: Whereable | SQLFragment<any>,
@@ -658,13 +658,6 @@ export const deletes: DeleteSignatures = function (
 type TruncateIdentityOpts = 'CONTINUE IDENTITY' | 'RESTART IDENTITY';
 type TruncateForeignKeyOpts = 'RESTRICT' | 'CASCADE';
 
-interface TruncateSignatures {
-  (table: Table | Table[]): SQLFragment<undefined>;
-  (table: Table | Table[], optId: TruncateIdentityOpts): SQLFragment<undefined>;
-  (table: Table | Table[], optFK: TruncateForeignKeyOpts): SQLFragment<undefined>;
-  (table: Table | Table[], optId: TruncateIdentityOpts, optFK: TruncateForeignKeyOpts): SQLFragment<undefined>;
-}
-
 /**
  * Generate a `TRUNCATE` query `SQLFragment`, whose `run()` resolves `undefined`.
  * @param table The table (or array thereof) to truncate
@@ -672,7 +665,12 @@ interface TruncateSignatures {
  * 'RESTRICT'/'CASCADE', in that order; another order throws as the query
  * compiles, so `run()` rejects before any query is sent
  */
-export const truncate: TruncateSignatures = function (
+export const truncate: {
+  (table: Table | Table[]): SQLFragment<undefined>;
+  (table: Table | Table[], optId: TruncateIdentityOpts): SQLFragment<undefined>;
+  (table: Table | Table[], optFK: TruncateForeignKeyOpts): SQLFragment<undefined>;
+  (table: Table | Table[], optId: TruncateIdentityOpts, optFK: TruncateForeignKeyOpts): SQLFragment<undefined>;
+} = function (
   table: Table | Table[],
   ...opts: string[]
 ): SQLFragment<undefined> {
