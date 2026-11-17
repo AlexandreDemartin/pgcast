@@ -909,6 +909,27 @@ describe('Default, self, raw, cols and vals as the value of a condition', () => 
       `);
   });
 
+  it('db.all as the value of eqAny, websearchToTsquery, jsonbContains or jsonbPathExists throws when compiled, naming it', () => {
+    // pg would send it as its String(), 'Symbol(all)': no row, or every row under not(), with no error
+    const all = db.all as any;
+    const conditions = {
+      eqAnyItem: dc.eqAny(['Bob', all]), eqAnyList: dc.eqAny(all),
+      searchConfig: dc.websearchToTsquery(all, 'salt'), searchQuery: dc.websearchToTsquery('english', all),
+      jsonbContains: dc.jsonbContains(all), jsonbContainsKey: dc.jsonbContains({ a: all }),
+      jsonbPathExistsPath: dc.jsonbPathExists(all), jsonbPathExistsVars: dc.jsonbPathExists('$', all),
+    };
+    expect(Object.fromEntries(Object.entries(conditions).map(([name, condition]) => [name, thrown(condition)]))).toEqual({
+      eqAnyItem: '`eqAny()` sends its array as one parameter, so each item is a plain value, not `db.all`: give a value.',
+      eqAnyList: '`eqAny()` takes an array of values, not `db.all`: write `eqAny(values)`; for SQL, write a `sql` fragment with `db.self` in place of the condition.',
+      searchConfig: '`websearchToTsquery()` sends its configuration and its query as parameters: give the configuration as a string, not `db.all`; for SQL, write a `sql` fragment with `db.self` in place of the condition.',
+      searchQuery: '`websearchToTsquery()` sends its configuration and its query as parameters: give the query as a string, not `db.all`; for SQL, write a `sql` fragment with `db.self` in place of the condition.',
+      jsonbContains: '`jsonbContains()` sends its value as JSON text, so it takes a JSON value, not `db.all`: give a value; for SQL, write a `sql` fragment with `db.self` in place of the condition.',
+      jsonbContainsKey: '`jsonbContains()` sends its value as JSON text, so it takes a JSON value, not `db.all` at key `a`: `JSON.stringify` would leave the key out, and the value match more rows. Give a JSON value, or leave the key out.',
+      jsonbPathExistsPath: '`jsonbPathExists()` takes its path as a string, not `db.all`: write the path as a string, and each value it compares with as a variable, `jsonbPathExists(path, { name: value })`.',
+      jsonbPathExistsVars: '`jsonbPathExists()` sends its variables as JSON text, so it takes an object of JSON values, not `db.all`: give an object; for SQL, write a `sql` fragment with `db.self` in place of the condition.',
+    });
+  });
+
   it('websearchToTsquery given anything but a value as the configuration or the query throws when compiled, not when called', () => {
     // a plain value goes as a parameter; pg would send a Parameter or a fragment as JSON, and Default or self as their names
     const values = { Default, self, raw: raw("'english'"), cols: cols('english'), vals: vals('english'), param: param('english'),
@@ -935,25 +956,22 @@ describe('Default, self, raw, cols and vals as the value of a condition', () => 
         "vals query": "\`websearchToTsquery()\` sends its configuration and its query as parameters: give the query as a string, not \`db.vals()\`; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
       }
     `);
-    expect({ number: show(dc.websearchToTsquery('english', 42 as any)), null: show(dc.websearchToTsquery('english', null as any)) })
-      .toMatchInlineSnapshot(`
-        {
-          "null": {
-            "text": "(("col" @@ websearch_to_tsquery(CAST($1 AS "regconfig"), $2)))",
-            "values": [
-              "english",
-              null,
-            ],
-          },
-          "number": {
-            "text": "(("col" @@ websearch_to_tsquery(CAST($1 AS "regconfig"), $2)))",
-            "values": [
-              "english",
-              42,
-            ],
-          },
-        }
-      `);
+  });
+
+  it('websearchToTsquery given a configuration or a query that is no string throws when compiled, not when called', () => {
+    // pg would send an array as '{"salt","orchard"}', which Postgres reads as its words, undefined as NULL, no row
+    // with no error, and a number as its text
+    const values = { array: ['salt', 'orchard'], undefined, null: null, number: 42, boolean: true, object: {},
+      function: () => 'salt', symbol: Symbol('salt'), bigint: BigInt(1) };
+    const takes = (which: string, what: string) =>
+      `\`websearchToTsquery()\` takes its ${which} as a string, not ${what}: give it as a string, \`websearchToTsquery('english', 'salt orchard')\`.`;
+    const what = { array: 'an array', undefined: '`undefined`', null: '`null`', number: 'a `number`', boolean: 'a `boolean`',
+      object: 'an object', function: 'a function', symbol: 'a symbol', bigint: 'a `bigint`' };
+    expect(Object.fromEntries(Object.entries(values).flatMap(([name, x]) => [
+      [`${name} config`, thrown(dc.websearchToTsquery(x as any, 'salt'))], [`${name} query`, thrown(dc.websearchToTsquery('english', x as any))],
+    ]))).toEqual(Object.fromEntries(Object.entries(what).flatMap(([name, w]) => [
+      [`${name} config`, takes('configuration', w)], [`${name} query`, takes('query', w)],
+    ])));
   });
 
   it('eqAny given a list that is not an array throws when compiled, saying what to do', () => {

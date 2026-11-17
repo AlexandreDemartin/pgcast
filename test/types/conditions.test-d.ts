@@ -54,6 +54,8 @@ describe('eqAny()', () => {
     db.select('users', { display_name: c.eqAny([db.cols('Ada')]) });
     // @ts-expect-error vals()
     db.select('users', { id: c.eqAny([db.vals(1)]) });
+    // @ts-expect-error all
+    db.select('users', { display_name: c.eqAny([db.all]) });
   });
 
   test('characterization: a Parameter, a sql fragment or parent() item passes the type, and throws as the query compiles', () => {
@@ -122,6 +124,10 @@ describe('websearchToTsquery()', () => {
     c.websearchToTsquery('english', db.parent('title'));
     // @ts-expect-error Default as the configuration
     c.websearchToTsquery(db.Default, 'salt');
+    // @ts-expect-error all as the configuration
+    c.websearchToTsquery(db.all, 'salt');
+    // @ts-expect-error an array as the query
+    c.websearchToTsquery('english', ['salt', 'orchard']);
   });
 });
 
@@ -175,6 +181,8 @@ describe('jsonbContains()', () => {
     db.select('users', { settings: c.jsonbContains(db.Default) });
     // @ts-expect-error self
     db.select('users', { settings: c.jsonbContains(db.self) });
+    // @ts-expect-error all
+    db.select('users', { settings: c.jsonbContains(db.all) });
     // @ts-expect-error param()
     db.select('users', { settings: c.jsonbContains(db.param({ theme: 'dark' })) });
     // @ts-expect-error parent()
