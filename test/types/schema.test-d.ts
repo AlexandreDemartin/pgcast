@@ -301,6 +301,31 @@ describe('*ForTable<T> lookups', () => {
     expectTypeOf<s.UniqueIndexForTable<'transfers'>>().toEqualTypeOf<'transfers_pkey'>();
   });
 
+  // the keys of a lookup are the table's columns, as under Zapatos 6.6.1: a column map, a key given back as a Column,
+  // a key interpolated as a name (verify of #676)
+  test("WhereableForTable's keys are the columns of the table's Whereable (#670)", () => {
+    expectTypeOf<keyof s.WhereableForTable<'users'>>().toEqualTypeOf<keyof s.users.Whereable>();
+    const labels: Record<keyof s.WhereableForTable<'users'>, string> = {
+      created_at: 'Created', display_name: 'Name', email: 'Email', home: 'Home', id: 'Id', manager_id: 'Manager',
+      mood: 'Mood', settings: 'Settings', tags: 'Tags',
+    };
+    const keys = <T extends s.Table>(w: s.WhereableForTable<T>) => Object.keys(w) as (keyof s.WhereableForTable<T>)[];
+    type Flags<T extends s.Table> = { [K in keyof s.WhereableForTable<T>]: boolean };
+    const uses = [
+      labels,
+      (w: s.WhereableForTable<'users'>): s.users.Column | undefined => keys<'users'>(w)[0],
+      (k: keyof s.WhereableForTable<'users'>) => db.sql<s.users.SQL>`${k}`,
+      (k: keyof s.WhereableForTable<'users'>): s.users.Column => k,
+      (k: keyof s.WhereableForTable<'users'>): string => k,
+      (f: Record<s.users.Column, boolean>): Flags<'users'> => f,
+      <T extends s.Table>(t: T, k: keyof s.WhereableForTable<T>) => db.select(t, db.all, { columns: [k as any] }),
+      (k: Extract<keyof s.WhereableForTable<'users'>, string>) => db.sql<s.users.SQL>`${k}`,
+      (w: s.WhereableForTable<'users'>) => { for (const k in w) { const kk: string = k; void kk; } },
+      (w: s.WhereableForTable<'users'>) => Object.entries(w).map(([k]) => k as s.users.Column),
+    ];
+    expectTypeOf(uses).not.toBeAny();
+  });
+
   test("an exhaustive Record over a table's unique indexes takes only its own", () => {
     const messages: Record<s.UniqueIndexForTable<'transfers'>, string> = { transfers_pkey: 'a transfer of that id exists' };
     const borrowed: Record<s.UniqueIndexForTable<'transfers'>, string> = {

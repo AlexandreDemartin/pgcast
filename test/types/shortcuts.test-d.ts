@@ -116,6 +116,15 @@ describe('select', () => {
     const titel = { titel: 'a' };
     // @ts-expect-error 'titel' is not a column of products
     db.select('products', titel);
+    const str = 'sku' as string, so = new String('sku');
+    // @ts-expect-error a string typed string is no Whereable
+    db.select('products', str);
+    // @ts-expect-error a String object is no Whereable
+    db.select('products', so);
+    // an object whose iterator is undefined, or any, is still a Whereable: it compiles to its own keys
+    const iterUndefined = { sku: 'a', [Symbol.iterator]: undefined }, iterAny = { sku: 'a', [Symbol.iterator]: null as any };
+    expectTypeOf(db.select('products', iterUndefined)).toEqualTypeOf<db.SQLFragment<s.products.JSONSelectable[]>>();
+    expectTypeOf(db.select('products', iterAny)).toEqualTypeOf<db.SQLFragment<s.products.JSONSelectable[]>>();
   });
 
   // and(), or() and not() take the Whereable of every table, which names no table to check (#674)
