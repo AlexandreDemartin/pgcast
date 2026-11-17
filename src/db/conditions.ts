@@ -140,12 +140,9 @@ const anyArray = (a: unknown) => {
       `\`eqAny()\` sends its array as one parameter, so each item is a plain value, not ${name}: give a value.`);
 };
 
-// parent() fixes no T, which the Whereable would then infer from the same key of every table (#493): `never` fits any
-interface EqAnySignatures {
-  (a: ParentColumn): SQLFragment<boolean | null, never>;
-  <T>(a: readonly T[]): SQLFragment<boolean | null, T>;
-}
-
+// parent() fixes no T, which the Whereable would then infer from the same key of every table (#493): `never` fits any;
+// the signatures are written in place, not as an interface, so that a package built with `declaration: true` can
+// re-export the condition (TS4023) with no type name more in db.conditions
 /**
  * `"col" = ANY($1)`, the whole array one parameter: one query text for any length, where `isIn()` writes
  * `IN ($1, $2, …)`. An empty array matches no row. `parent('col')`, an array column of a `lateral`'s parent row,
@@ -153,7 +150,10 @@ interface EqAnySignatures {
  * `db.param()`, a `sql` fragment, `db.parent()`, `db.Default`, `db.self`, `db.raw()`, `db.cols()` or `db.vals()`.
  * @param a An array of values, or `parent()`
  */
-export const eqAny: EqAnySignatures = (a: readonly unknown[] | ParentColumn) =>
+export const eqAny: {
+  (a: ParentColumn): SQLFragment<boolean | null, never>;
+  <T>(a: readonly T[]): SQLFragment<boolean | null, T>;
+} = (a: readonly unknown[] | ParentColumn) =>
   sql<SQL, boolean | null>`${self} = ANY(${a instanceof ParentColumn ? a : anyArray(a)})`;
 
 /* === jsonb === */
@@ -204,12 +204,7 @@ const jsonbParam = (a: unknown, fn: string, arg: string, keyOut: string, keyAdvi
 
 // a jsonb domain whose zapatos/custom placeholder is narrowed fits no JSONValue: its type, given as T, is the condition's,
 // and is never inferred from the value, which would let a string through on a text column; a value it contains need
-// not hold every key the placeholder requires, so the value stays a JSONValue
-interface JsonbContainsSignatures {
-  (a: JSONValue): SQLFragment<boolean | null, JSONValue>;
-  <T>(a: JSONValue): SQLFragment<boolean | null, T>;
-}
-
+// not hold every key the placeholder requires, so the value stays a JSONValue; written in place, as eqAny()'s
 /**
  * `"col" @> CAST($1 AS "jsonb")`, on a `jsonb` column: its JSON contains the value's. The value is sent as JSON text,
  * `JSON.stringify(a)`, whatever `castObjectParamsToJson` and `castArrayParamsToJson`, so a string is a JSON string and
@@ -219,7 +214,10 @@ interface JsonbContainsSignatures {
  * On a `jsonb` domain whose `zapatos/custom` placeholder is narrowed, name its type: `jsonbContains<PgProjection>(a)`.
  * @param a A JSON value
  */
-export const jsonbContains: JsonbContainsSignatures = (a: JSONValue) => sql<SQL, boolean | null>`${self} @> ${jsonbParam(a, 'jsonbContains', 'value', 'leave the key out, and the value match more rows', 'Give a JSON value, or leave the key out')}`;
+export const jsonbContains: {
+  (a: JSONValue): SQLFragment<boolean | null, JSONValue>;
+  <T>(a: JSONValue): SQLFragment<boolean | null, T>;
+} = (a: JSONValue) => sql<SQL, boolean | null>`${self} @> ${jsonbParam(a, 'jsonbContains', 'value', 'leave the key out, and the value match more rows', 'Give a JSON value, or leave the key out')}`;
 
 // the path goes as text, cast to jsonpath, so that Postgres parses it: pg would send anything else as JSON or as its
 // String(), which Postgres could read as another path
@@ -227,9 +225,7 @@ const jsonpathParam = (path: unknown) => typeof path === 'string' ? param(path, 
   refused(`\`jsonbPathExists()\` takes its path as a string, not ${notJSON(path) ??
     (path === null ? '`null`' : Array.isArray(path) ? 'an array' : typeof path === 'object' ? 'an object' : `a \`${typeof path}\``)}: write the path as a string, and each value it compares with as a variable, \`jsonbPathExists(path, { name: value })\`.`);
 
-// as jsonbContains()'s signatures, T given for a narrowed jsonb domain, never inferred; written in place, not as an
-// interface, so that a package built with `declaration: true` can re-export the condition (TS4023) with no type name
-// more in db.conditions
+// as jsonbContains()'s signatures, T given for a narrowed jsonb domain, never inferred, and written in place
 /**
  * `jsonb_path_exists("col", CAST($1 AS "jsonpath"), CAST($2 AS "jsonb"))`, on a `jsonb` column: the SQL/JSON path
  * finds an item in the column's JSON. The path is one parameter, and its variables another: each `$name` of the path is
