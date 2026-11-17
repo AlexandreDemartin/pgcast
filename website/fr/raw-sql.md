@@ -1,5 +1,5 @@
 ---
-english: bacb66c8a0df
+english: b60105918664
 description: "Quand aucun raccourci n’écrit la requête dont vous avez besoin, écrivez-la dans le template sql, et gardez hors de son texte toute valeur venue de l’extérieur."
 ---
 
@@ -264,6 +264,38 @@ Une sous-requête écrite à la main peut aller dans le `lateral` d’un raccour
 - Hors d’un `lateral`, `parent()` lève l’erreur "The 'parent' table alias has no meaning here"<!-- message -->, donc la promesse de [`run()`](/fr/sql-template#run) est rejetée avant toute requête.
 
 Les jointures par `lateral`, pas à pas : [Jointures](/fr/lateral).
+
+## Placer une CTE avant un raccourci {#put-a-cte-before-a-shortcut}
+
+[`db.withCTEs()`](/fr/sql-template#withCTEs) place des CTE avant un raccourci, ou n’importe quel fragment, et garde son résultat : ici un nombre, comme le donne `count()`.
+
+<CastPanel example="raw_sql_ctes">
+
+<<< ../examples/raw_sql_ctes.ts{ts twoslash}
+
+</CastPanel>
+
+- Chaque clé nomme une CTE, écrite comme un seul nom entre guillemets : `"recent"`<!-- probe: examples/raw_sql_ctes.ts -->. Nommez-la en minuscules, comme le littéral la lit : une clé `Recent` donne `"Recent"`<!-- probe: db.withCTEs({ Recent: db.sql`SELECT 1` }, db.sql`SELECT 2`) -->, que `FROM Recent` ne trouve pas (42P01).
+- Les CTE viennent dans l’ordre de l’objet, si bien que chacune peut lire celles qui la précèdent. Une CTE qui en lit une suivante est refusée (42P01) ; une clé entière vient en premier, comme `Object.keys` la donne.
+- `withCTEs({}, query)` donne `query` elle-même, son propre SQL. Une liste de CTE construite à l’exécution n’a besoin d’aucune branche pour le cas vide, là où un `WITH` que `sql` écrit sur une liste vide est refusé (42601).
+- Écrivez le nom d’une CTE et ses colonnes dans le littéral, `SELECT id FROM recent`, comme les noms propres à la requête : aucun type ne les connaît, et `db.raw()` d’une constante n’en vérifierait pas davantage.
+- Nommez une CTE autrement que vos tables. `WITH "films" AS (…)` avant `select('films', …)` lit les lignes de la CTE, typées comme celles de la table, et une colonne qui manque à la CTE est refusée (42703).
+
+Un raccourci d’écriture peut aussi être une CTE. Il s’exécute, et la requête principale voit chaque table telle qu’elle était avant l’instruction :
+
+<CastPanel example="raw_sql_ctes_insert">
+
+<<< ../examples/raw_sql_ctes_insert.ts{ts twoslash}
+
+</CastPanel>
+
+- `tagsBefore` vaut `0` sur le schéma de la doc : le tag n’est là qu’une fois l’instruction exécutée. Pour lire les lignes insérées, lisez la CTE, ``db.sql`SELECT result FROM added` ``, chaque ligne en JSON dans `result`, comme le raccourci la renvoie.
+- Postgres n’exécute une CTE qui modifie des données qu’au niveau supérieur. Imbriquée, dans un `lateral` par exemple, elle est refusée (0A000).
+- Un `insert()` vide comme requête principale envoie quand même la requête, si bien que ses CTE s’exécutent, et se résout en `[]`.
+
+Imbriqué, `withCTEs()` va là où irait sa requête : entre parenthèses comme valeur d’`extras` ou d’`insert()`, comme sous-requête dans un `lateral`. Un `selectExactlyOne()` imbriqué garde `LIMIT $1`<!-- probe: db.withCTEs({ r: db.sql`SELECT 1` }, db.selectExactlyOne('films', db.all)) --> avec `1`, comme le fait une [`copy()`](/fr/sql-template#copy), même avec [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow). Sans ligne, il est rejeté avec `NotExactlyOneError`, dont la `.query` est le raccourci, sans le `WITH`.
+
+`withCTEs()` n’écrit ni `RECURSIVE` ni `MATERIALIZED` : écrivez un tel `WITH` en `sql`, avec sa requête principale. Le résultat n’est jamais une requête préparée, quelle que soit la requête d’origine, pour qu’un même nom ne désigne jamais deux textes : appelez [`prepared()`](/fr/sql-template#prepared) sur le résultat.
 
 ## Vérifier le SQL avant de l’exécuter {#check-the-sql-before-you-run-it}
 

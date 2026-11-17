@@ -1,5 +1,5 @@
 ---
-english: 149fb003c33e
+english: cef41797418e
 ---
 
 # Template SQL
@@ -593,6 +593,8 @@ withCTEs<Q extends SQLFragment<any, any>>(ctes: { [name: string]: SQLFragment<an
 - **Aucune CTE** : `withCTEs({}, query)` donne `query` elle-même, si bien qu’une liste construite à l’exécution n’a besoin d’aucune branche.
 - **Le résultat** : une [`copy()`](#copy) de `query`, de son type. Il se résout en ce que donne `query`, imbriqué dans un `lateral` ou dans `extras` aussi, et s’écrit entre parenthèses comme valeur d’`extras` ou d’`insert()` là où `query` l’est. Il s’exécute même quand `query` ne fait rien, un `insert()` sans ligne : ses CTE s’exécutent donc aussi.
 - **Requête préparée** : jamais, pas plus que les CTE et la requête qu’il imbrique, car un [nom](#prepared) désigne un seul texte. Appelez `prepared()` sur le résultat.
+
+Pas à pas, avec un `insert()` comme CTE : [Placer une CTE avant un raccourci](/fr/raw-sql#put-a-cte-before-a-shortcut).
 
 ## `RunResultForSQLFragment` {#RunResultForSQLFragment}
 

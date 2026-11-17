@@ -101,7 +101,7 @@ These docs are the latest addition. Every example compiles against the library a
 What stays is everything you import. The module names are still `zapatos/db` and `zapatos/schema`, the API is Zapatos's, and so is the behaviour, but for the fixes: installed under the `zapatos` alias, pgcast needs no change to your imports ([Switch from Zapatos](/switching)).
 
 ::: info Coming
-The aim is Zapatos going the last mile: the conditions Postgres offers, CTEs and raw SQL, each with a typed form, so that real code never falls back on `db.raw`, a hand-written row type or a cast. Foreign-key joins have theirs today: a [lateral](/lateral), its parent column checked by `db.parent<s.films.Column>('id')`. A function stays a `sql` fragment, its result's type written by hand ([Call a Postgres function](/raw-sql#call-a-postgres-function)). Each comes under the same rules, and the [roadmap](https://github.com/AlexandreDemartin/pgcast#roadmap) gives their order.
+The aim is Zapatos going the last mile: the conditions Postgres offers and raw SQL, each with a typed form, so that real code never falls back on `db.raw`, a hand-written row type or a cast. Foreign-key joins have theirs today: a [lateral](/lateral), its parent column checked by `db.parent<s.films.Column>('id')`. A function stays a `sql` fragment, its result's type written by hand ([Call a Postgres function](/raw-sql#call-a-postgres-function)), and a CTE goes before a shortcut through `db.withCTEs()` ([Put a CTE before a shortcut](/raw-sql#put-a-cte-before-a-shortcut)). Each comes under the same rules, and the [roadmap](https://github.com/AlexandreDemartin/pgcast#roadmap) gives their order.
 :::
 
 ## What pgcast will not do

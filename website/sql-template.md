@@ -590,6 +590,8 @@ From 6.11.0. Puts CTEs before a query and keeps its result: with `recent` a `sql
 - **The result**: a [`copy()`](#copy) of `query`, of its type. It resolves to what `query` does, nested in a `lateral` or `extras` too, and is written in parentheses as an `extras` or `insert()` value where `query` is. It runs even when `query` is a no-op, an `insert()` of no row, so its CTEs run.
 - **Prepared**: never, nor are the CTEs and the query it nests, as a [name](#prepared) stands for one text. Call `prepared()` on the result.
 
+Step by step, with an `insert()` as a CTE: [Put a CTE before a shortcut](/raw-sql#put-a-cte-before-a-shortcut).
+
 ## `RunResultForSQLFragment` {#RunResultForSQLFragment}
 
 ```ts
