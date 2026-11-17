@@ -2008,6 +2008,7 @@ describe('a built-in object as a Whereable', () => {
     vi.resetModules();
     try {
       const core = await import('../../src/db/core');
+      // @ts-expect-error an iterator is no Whereable, to the type too since #670
       expect(() => core.sql`DELETE FROM ${'users'} WHERE ${[1].values()}`.compile())
         .toThrow('A built-in `Array Iterator` has no meaning as a Whereable (a filter)');
       // left out, an async generator compiles as in 6.6.1

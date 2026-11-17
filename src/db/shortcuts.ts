@@ -535,7 +535,7 @@ export const upsert: {
       values.some(v => !Object.prototype.hasOwnProperty.call(v ?? {}, c))),  // a null row misses every key
     updateColumns = [...new Set(  // deduplicate the keys here
       [...specifiedUpdateColumns as string[] ?? colNames, ...updateValuesKeys(updateValues, specifiedUpdateColumns as string[] ?? colNames)]
-    )],
+    )] as Column[],
     conflictTargetSQL = Array.isArray(conflictTarget) ?
       sql`(${mapWithSeparator(conflictTarget, sql`, `, c => c)})` :
       sql<string>`ON CONSTRAINT ${conflictTarget.value}`,
@@ -600,7 +600,7 @@ export const update: {
   <T extends Table, C extends ColumnsOption<T>, E extends ExtrasOption<T>>(
     table: T,
     values: UpdatableForTable<T>,
-    where: WhereableForTable<T> | SQLFragment<any>,
+    where: (WhereableForTable<T> & NotIterable) | SQLFragment<any>,
     options?: ReturningOptionsForTable<T, C, E>
   ): SQLFragment<ReturningTypeForTable<T, C, E>[]>;
 } = function (
@@ -633,7 +633,7 @@ export const update: {
 export interface DeleteSignatures {
   <T extends Table, C extends ColumnsOption<T>, E extends ExtrasOption<T>>(
     table: T,
-    where: WhereableForTable<T> | SQLFragment<any>,
+    where: (WhereableForTable<T> & NotIterable) | SQLFragment<any>,
     options?: ReturningOptionsForTable<T, C, E>
   ): SQLFragment<ReturningTypeForTable<T, C, E>[]>;
 }
@@ -714,6 +714,9 @@ type Unprefixed<S extends string> = S extends `${infer _}.${infer Rest}` ? Rest 
 // as in core.ts, for the lock option of SelectOptionsForTable
 type NoInfer<T> = [T][T extends any ? 0 : never];
 
+// as in core.ts: a `where` that refuses a string (#670)
+type NotIterable = { [Symbol.iterator]?: never };
+
 export interface SelectLockingOptions<A extends string> {
   for: 'UPDATE' | 'NO KEY UPDATE' | 'SHARE' | 'KEY SHARE';
   of?: Unprefixed<Table> | A | (Unprefixed<Table> | A)[];
@@ -735,7 +738,7 @@ export interface SelectOptionsForTable<
   columns?: C;
   extras?: E;
   groupBy?: ColumnForTable<T> | ColumnForTable<T>[] | SQLFragment<any>;
-  having?: WhereableForTable<T> | SQLFragment<any>;
+  having?: (WhereableForTable<T> & NotIterable) | SQLFragment<any>;
   lateral?: L;
   alias?: A;
   lock?: SelectLockingOptions<NoInfer<A>> | SelectLockingOptions<NoInfer<A>>[];
@@ -757,7 +760,7 @@ type PassingThroughFragment<RunResult, L> = 0 extends 1 & L ? SQLFragment<RunRes
 interface PassingThroughSignatures<M extends SelectResultMode> {
   <T extends Table, C extends ColumnsOption<T>, L extends LateralOption<C, E>, E extends ExtrasOption<T>, A extends string>(
     table: T,
-    where: WhereableForTable<T> | SQLFragment<any> | AllType,
+    where: (WhereableForTable<T> & NotIterable) | SQLFragment<any> | AllType,
     options?: SelectOptionsForTable<T, C, L, E, A>,
   ): PassingThroughFragment<FullSelectReturnTypeForTable<T, C, L, E, M>, L>;
 }
@@ -801,7 +804,7 @@ export interface SelectSignatures {
     M extends SelectResultMode = SelectResultMode.Many
   >(
     table: T,
-    where: WhereableForTable<T> | SQLFragment<any> | AllType,
+    where: (WhereableForTable<T> & NotIterable) | SQLFragment<any> | AllType,
     options?: SelectOptionsForTable<T, C, L, E, A>,
     mode?: M,
     aggregate?: string,
@@ -901,7 +904,7 @@ export const select: SelectSignatures = function (
     lock = callerValue(allOptions, 'lock') == null || Array.isArray(callerValue(allOptions, 'lock')) ? callerValue(allOptions, 'lock') : [callerValue(allOptions, 'lock')],
     order = callerValue(allOptions, 'order') == null || Array.isArray(callerValue(allOptions, 'order')) ? callerValue(allOptions, 'order') : [callerValue(allOptions, 'order')],
     tableAliasSQL = alias === table ? [] : sql<string>` AS ${alias}`,
-    distinctSQL = !distinct ? [] : sql` DISTINCT${distinct instanceof SQLFragment || typeof distinct === 'string' ? sql` ON (${distinct})` :
+    distinctSQL = !distinct ? [] : sql` DISTINCT${distinct instanceof SQLFragment || typeof distinct === 'string' ? sql` ON (${distinct as Column | SQLFragment})` :
       Array.isArray(distinct) ? sql` ON (${cols(distinct)})` : []}`,
     colsSQL = lateral instanceof SQLFragment ? [] :
       mode === SelectResultMode.Numeric ?
@@ -914,7 +917,7 @@ export const select: SelectSignatures = function (
           Object.keys(lateral).sort(), sql`, `, k => sql`${param(k)}::text, ${SQLForAlias('lateral_', k)}.result`)})`,
     allColsSQL = sql`${colsSQL}${colsExtraSQL}${colsLateralSQL}`,
     whereSQL = where === all ? [] : sql` WHERE ${where}`,
-    groupBySQL = !groupBy ? [] : sql` GROUP BY ${groupBy instanceof SQLFragment || typeof groupBy === 'string' ? groupBy : cols(groupBy)}`,
+    groupBySQL = !groupBy ? [] : sql` GROUP BY ${groupBy instanceof SQLFragment || typeof groupBy === 'string' ? groupBy as Column | SQLFragment : cols(groupBy)}`,
     havingSQL = !having ? [] : sql` HAVING ${having}`,
     orderSQL = order === undefined ? [] :
       order === null ? refusedSQL(orderNull) :
@@ -1007,7 +1010,7 @@ export interface SelectOneSignatures extends ByColumn<PassingThroughSignatures<S
     A extends string,
   >(
     table: T,
-    where: WhereableForTable<T> | SQLFragment<any> | AllType,
+    where: (WhereableForTable<T> & NotIterable) | SQLFragment<any> | AllType,
     options?: SelectOptionsForTable<T, C, L, E, A>,
   ): SQLFragment<FullSelectReturnTypeForTable<T, C, L, E, SelectResultMode.One>>;
 }> { }
@@ -1050,7 +1053,7 @@ export interface SelectExactlyOneSignatures extends ByColumn<PassingThroughSigna
     A extends string,
   >(
     table: T,
-    where: WhereableForTable<T> | SQLFragment<any> | AllType,
+    where: (WhereableForTable<T> & NotIterable) | SQLFragment<any> | AllType,
     options?: SelectOptionsForTable<T, C, L, E, A>,
   ): SQLFragment<FullSelectReturnTypeForTable<T, C, L, E, SelectResultMode.ExactlyOne>>;
 }> { }
@@ -1092,7 +1095,7 @@ export interface NumericAggregateSignatures {
     A extends string,
   >(
     table: T,
-    where: WhereableForTable<T> | SQLFragment<any> | AllType,
+    where: (WhereableForTable<T> & NotIterable) | SQLFragment<any> | AllType,
     options?: SelectOptionsForTable<T, C, L, E, A>,
   ): SQLFragment<number>;
 }
@@ -1104,7 +1107,7 @@ type ColumnValueOrNull<S, C> = C extends readonly (keyof S)[] ? S[C[number]] | n
 export interface NullableNumericAggregateSignatures {
   <T extends Table, C extends ColumnsOption<T>, L extends LateralOption<C, E>, E extends ExtrasOption<T>, A extends string>(
     table: T,
-    where: WhereableForTable<T> | SQLFragment<any> | AllType,
+    where: (WhereableForTable<T> & NotIterable) | SQLFragment<any> | AllType,
     options?: SelectOptionsForTable<T, C, L, E, A>,
   ): SQLFragment<number | null>;
 }
@@ -1112,7 +1115,7 @@ export interface NullableNumericAggregateSignatures {
 export interface ColumnAggregateSignatures {
   <T extends Table, C extends ColumnsOption<T>, L extends LateralOption<C, E>, E extends ExtrasOption<T>, A extends string>(
     table: T,
-    where: WhereableForTable<T> | SQLFragment<any> | AllType,
+    where: (WhereableForTable<T> & NotIterable) | SQLFragment<any> | AllType,
     options?: SelectOptionsForTable<T, C, L, E, A>,
   ): ColumnAggregateFragment<ColumnValueOrNull<SelectableForTable<T>, C>, ColumnValueOrNull<JSONSelectableForTable<T>, C>>;
 }
