@@ -379,6 +379,12 @@ const
   selfInWhereable = '`db.self` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: compare with a value, or use it in a `sql` fragment value, where it stands for the column.',
   allInWhereable = '`db.all` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: leave the key out, or compare with a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.',
   wrapperInWhereable = '`db.raw()`, `db.cols()` and `db.vals()` have no meaning as a value in a Whereable (a filter), nor in `isIn()`: to compare with SQL, use a `sql` fragment value, where `db.self` stands for the column; to compare with a value, give the value itself, or `db.param()`.',
+  // vals([…]) items where a key set the current column: a filter's (isIn(), a fragment value of a Whereable) or a
+  // write's (a fragment value of vals({…}), so of insert(), upsert() and update()), which compile cannot tell apart
+  defaultInVals = '`db.Default` has no meaning as an item of `vals([…])` in a column\'s value, in a filter (as `isIn()` writes it) or in a `sql` fragment value of `vals({…})`, so of `insert()`, `upsert()` or `update()`: in a filter, leave the key out, or compare with a value; in a write, give `db.Default` as the value itself, `{ column: db.Default }`.',
+  selfInVals = '`db.self` has no meaning as an item of `vals([…])` in a column\'s value, in a filter (as `isIn()` writes it) or in a `sql` fragment value of `vals({…})`, so of `insert()`, `upsert()` or `update()`: give a value; in a filter or in `update()`, write `db.self` in a `sql` fragment value, outside `vals([…])`, where it stands for the column.',
+  allInVals = '`db.all` has no meaning as an item of `vals([…])` in a column\'s value, in a filter (as `isIn()` writes it) or in a `sql` fragment value of `vals({…})`, so of `insert()`, `upsert()` or `update()`: in a filter, leave the key out, or compare with a value; in a write, give a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.',
+  wrapperInVals = '`db.raw()`, `db.cols()` and `db.vals()` have no meaning as an item of `vals([…])` in a column\'s value, in a filter (as `isIn()` writes it) or in a `sql` fragment value of `vals({…})`, so of `insert()`, `upsert()` or `update()`: for SQL, write it in a `sql` fragment value, outside `vals([…])` (in a filter or in `update()`, `db.self` there stands for the column); for a value, give the value itself, or `db.param()`.',
   wrapperAsValue = '`db.raw()`, `db.cols()` and `db.vals()` have no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value: to write SQL, use a `sql` fragment value (in `update()`, `db.self` there stands for the column); to write a value, give the value itself, or `db.param()`.',
   nullInterpolated = 'Interpolating `null` has no meaning in SQL: for a `NULL` value, interpolate `db.param(null)`; to filter on `NULL`, use `{ column: db.conditions.isNull }`; to match every row, give `db.all` as the whole filter of `select()` and its kin.',
   parentWithoutColumn = "`db.parent()` with no column has no meaning here: name the column, `db.parent('id')`, or give it as the value of a Whereable or `vals({…})` key, whose column it then takes.",
@@ -648,11 +654,12 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
         for (let i = 0, len = values.length; i < len; i++) {
           const value = values[i];
           if (i > 0) result.text += ', ';
-          // a set currentColumn means we are in a Whereable (`isIn`), where there is no default, and `self` and `all` are no values
-          if (value === Default && currentColumn) throw new Error(defaultInWhereable);
-          if (value === self && currentColumn) throw new Error(selfInWhereable);
-          if (value === all && currentColumn) throw new Error(allInWhereable);
-          if (isWrapper(value) && currentColumn) throw new Error(wrapperInWhereable);
+          // a set currentColumn means a column's value, a filter's or a write's (see defaultInVals), where `Default`,
+          // `self`, `all` and the wrappers are refused
+          if (value === Default && currentColumn) throw new Error(defaultInVals);
+          if (value === self && currentColumn) throw new Error(selfInVals);
+          if (value === all && currentColumn) throw new Error(allInVals);
+          if (isWrapper(value) && currentColumn) throw new Error(wrapperInVals);
           if (value instanceof SQLFragment ||
             value instanceof Parameter ||
             value === Default) this.compileExpression(value, result, parentTable);

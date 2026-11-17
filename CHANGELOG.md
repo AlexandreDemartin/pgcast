@@ -6,6 +6,10 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 
 ## [Unreleased]
 
+### Changed
+- `Default`, `self`, `db.all`, `raw()`, `cols()` and `vals()` as an item of `vals([…])` with a current column throw a message that names both places where that can be, and says what to write in each (#660). The two places are a filter (`isIn()`, `isNotIn()`, a fragment value of a Whereable) and a write (a `sql` fragment value of `vals({…})`, so of `insert()`, `upsert()` or `update()`). `` insert('films', { title: sql`${vals([db.all])}` }) `` used to say "no meaning as a value in a Whereable (a filter) … leave the key out", although it holds no filter. Compiling cannot tell the two places apart, so the message names both: "`db.all` has no meaning as an item of `vals([…])` in a column's value, in a filter (as `isIn()` writes it) or in a `sql` fragment value of `vals({…})`, so of `insert()`, `upsert()` or `update()`: …".
+  - Unchanged: what throws, what compiles, and its SQL. The messages for a Whereable value (`{ title: db.all }`) and for an object in `upsert()` `updateValues`, which compiles as a Whereable, also stay the same.
+
 ## [6.10.0] - 2026-11-17
 
 ### Added

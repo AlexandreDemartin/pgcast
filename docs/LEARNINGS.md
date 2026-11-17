@@ -385,6 +385,9 @@ Candidates for a check, a rule or a skill line.
 - #668: before calling a corpus helper's replacement "one line", read what its calls pass: every call passed a run-time CTE list that can be empty, the case the helper exists for.
 - #668: a column named like a `String` member whose type a string fits makes any string a `Whereable` (#670): probe "is refused" claims against such a table too (the fixture's `products`).
 - #668: test a "one line" claim on the corpus's real call shape (a run-time list that can be empty), not on the simplest example: it flipped note 010 from W0 to W1.
+- #666: the pages and tests that quote an error message reach beyond an issue's Files: `git grep` the message before changing it (4 test files and 4 pages quoted it).
+- #666: `currentColumn` is set by a filter's key and by a write's `vals({…})` key alike, so a message thrown under it cannot tell the two apart without a new mechanism; it names both.
+- #666: run each error message's advice at every position that reaches it, not only the throw: `db.self` advised for a write fails in `insert()` and an `upsert()` row (42703) and runs only in `update()` and a filter.
 
 ## Minors kept
 

@@ -1145,9 +1145,9 @@ describe('Default, self, raw, cols and vals as the value of a condition', () => 
 
   it('isIn and isNotIn given db.all throw when compiled', () => {
     // 6.6.1 sent 'Symbol(all)': no row on a text column, every row with isNotIn(), 22P02 on the others (#633);
-    // the message is the Whereable's, as for self, since the list compiles as vals([…]) within a filter
+    // the message is that of vals([…]) within a column's value, as for self, since the list compiles as one (#660)
     expect(new Set(Object.values(lists).flatMap(f => [thrown(f([db.all])), thrown(f(['Ada', db.all]))]))).toEqual(new Set([
-      '`db.all` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: leave the key out, or compare with a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.',
+      '`db.all` has no meaning as an item of `vals([…])` in a column\'s value, in a filter (as `isIn()` writes it) or in a `sql` fragment value of `vals({…})`, so of `insert()`, `upsert()` or `update()`: in a filter, leave the key out, or compare with a value; in a write, give a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.',
     ]));
   });
 
@@ -1261,13 +1261,13 @@ describe('Default, self, raw, cols and vals as the value of a condition', () => 
   it('isIn and isNotIn given Default or self throw when compiled', () => {
     expect(Object.fromEntries(Object.entries(lists).flatMap(([name, f]) =>
       [[`${name}Default`, thrown(f(['Ada', Default]))], [`${name}Self`, thrown(f(['Ada', self]))]]))).toMatchInlineSnapshot(`
-      {
-        "isInDefault": "\`db.Default\` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. \`DEFAULT\` is for INSERT and UPDATE values.",
-        "isInSelf": "\`db.self\` has no meaning as a value in a Whereable (a filter), nor in \`isIn()\`: compare with a value, or use it in a \`sql\` fragment value, where it stands for the column.",
-        "isNotInDefault": "\`db.Default\` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. \`DEFAULT\` is for INSERT and UPDATE values.",
-        "isNotInSelf": "\`db.self\` has no meaning as a value in a Whereable (a filter), nor in \`isIn()\`: compare with a value, or use it in a \`sql\` fragment value, where it stands for the column.",
-      }
-    `);
+        {
+          "isInDefault": "\`db.Default\` has no meaning as an item of \`vals([…])\` in a column's value, in a filter (as \`isIn()\` writes it) or in a \`sql\` fragment value of \`vals({…})\`, so of \`insert()\`, \`upsert()\` or \`update()\`: in a filter, leave the key out, or compare with a value; in a write, give \`db.Default\` as the value itself, \`{ column: db.Default }\`.",
+          "isInSelf": "\`db.self\` has no meaning as an item of \`vals([…])\` in a column's value, in a filter (as \`isIn()\` writes it) or in a \`sql\` fragment value of \`vals({…})\`, so of \`insert()\`, \`upsert()\` or \`update()\`: give a value; in a filter or in \`update()\`, write \`db.self\` in a \`sql\` fragment value, outside \`vals([…])\`, where it stands for the column.",
+          "isNotInDefault": "\`db.Default\` has no meaning as an item of \`vals([…])\` in a column's value, in a filter (as \`isIn()\` writes it) or in a \`sql\` fragment value of \`vals({…})\`, so of \`insert()\`, \`upsert()\` or \`update()\`: in a filter, leave the key out, or compare with a value; in a write, give \`db.Default\` as the value itself, \`{ column: db.Default }\`.",
+          "isNotInSelf": "\`db.self\` has no meaning as an item of \`vals([…])\` in a column's value, in a filter (as \`isIn()\` writes it) or in a \`sql\` fragment value of \`vals({…})\`, so of \`insert()\`, \`upsert()\` or \`update()\`: give a value; in a filter or in \`update()\`, write \`db.self\` in a \`sql\` fragment value, outside \`vals([…])\`, where it stands for the column.",
+        }
+      `);
   });
 
   it('a condition given raw, cols or vals throws when compiled, not when called', () => {
@@ -1291,7 +1291,7 @@ describe('Default, self, raw, cols and vals as the value of a condition', () => 
     expect(new Set(Object.values(lists).flatMap(f => [raw("'Ada'"), cols('Ada'), vals('Ada')].map(v => thrown(f(['Ada', v]))))))
       .toMatchInlineSnapshot(`
         Set {
-          "\`db.raw()\`, \`db.cols()\` and \`db.vals()\` have no meaning as a value in a Whereable (a filter), nor in \`isIn()\`: to compare with SQL, use a \`sql\` fragment value, where \`db.self\` stands for the column; to compare with a value, give the value itself, or \`db.param()\`.",
+          "\`db.raw()\`, \`db.cols()\` and \`db.vals()\` have no meaning as an item of \`vals([…])\` in a column's value, in a filter (as \`isIn()\` writes it) or in a \`sql\` fragment value of \`vals({…})\`, so of \`insert()\`, \`upsert()\` or \`update()\`: for SQL, write it in a \`sql\` fragment value, outside \`vals([…])\` (in a filter or in \`update()\`, \`db.self\` there stands for the column); for a value, give the value itself, or \`db.param()\`.",
         }
       `);
   });

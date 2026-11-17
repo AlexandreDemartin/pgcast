@@ -153,9 +153,13 @@ The string, written into the SQL as it is: for syntax a parameter cannot stand f
 Whatever reaches `raw()` runs as SQL. Never give it a caller's text; a value is a [`param()`](#param). How to keep hand-written SQL safe: [Raw SQL](/raw-sql).
 :::
 
-As a filter value, `raw()` throws while compiling, and so do `cols()` and `vals()`. As a Whereable value, in `isIn()` / `isNotIn()`, and in `vals([…])` within a filter:
+As a filter value, `raw()` throws while compiling, and so do `cols()` and `vals()`. As a Whereable value:
 
 > `` `db.raw()`, `db.cols()` and `db.vals()` have no meaning as a value in a Whereable (a filter), nor in `isIn()`: to compare with SQL, use a `sql` fragment value, where `db.self` stands for the column; to compare with a value, give the value itself, or `db.param()`. ``<!-- message -->
+
+In `isIn()` / `isNotIn()`, and as an item of `vals([…])` with a current column, a filter's or a write's ([`vals()`](#vals)):
+
+> `` `db.raw()`, `db.cols()` and `db.vals()` have no meaning as an item of `vals([…])` in a column's value, in a filter (as `isIn()` writes it) or in a `sql` fragment value of `vals({…})`, so of `insert()`, `upsert()` or `update()`: for SQL, write it in a `sql` fragment value, outside `vals([…])` (in a filter or in `update()`, `db.self` there stands for the column); for a value, give the value itself, or `db.param()`. ``<!-- message -->
 
 As the value of `eq()`, `add()` and the other [conditions](/conditions):
 
@@ -266,17 +270,17 @@ A comma-separated list of values. Each value compiles as follows.
 | a plain value | a parameter, `$1` | a parameter, `$1` |
 | a `Parameter` | as it is, with its cast | as it is, with its cast |
 | a `sql` fragment | its SQL, with its key as the current column (so [`self`](#self) works) | its SQL |
-| `Default` | `DEFAULT` | `DEFAULT`; throws in a filter |
+| `Default` | `DEFAULT` | `DEFAULT`; throws with a current column |
 | `parent(c?)` | the [parent column](#parent), without `c` the column of its key; throws outside a nested query | the [parent column](#parent) |
-| `raw()`, `cols()`, `vals()` | throw | throw in a filter; a parameter outside one |
-| `self`, `all` | a parameter | throws in a filter; a parameter outside one |
+| `raw()`, `cols()`, `vals()` | throw | throw with a current column; a parameter without one |
+| `self`, `all` | a parameter | throws with a current column; a parameter without one |
 
 - An object's values come in the order of its sorted keys, as `cols()` lists them.
 - In a template typed by table, its keys are not checked against the table, as [`cols()`](#cols) explains.
-- "In a filter" is wherever `vals([…])` has a current column: in `isIn()` and `isNotIn()`, and in a fragment value of a Whereable or of `vals({…})`. There:
-  - `Default` throws "`` `db.Default` has no meaning in a Whereable (a filter)… ``<!-- message -->";
-  - `self` "`` `db.self` has no meaning as a value in a Whereable (a filter), nor in `isIn()`… ``<!-- message -->";
-  - `all` "`` `db.all` has no meaning as a value in a Whereable (a filter), nor in `isIn()`… ``<!-- message -->";
+- `vals([…])` has a current column where a key gives it one: a filter's, in `isIn()` and `isNotIn()` and in a fragment value of a Whereable, or a write's, in a fragment value of `vals({…})`, as in the rows of `insert()` and `upsert()` and the values of `update()`. Compiling cannot tell the two apart, so each message names both:
+  - `Default` throws "`` `db.Default` has no meaning as an item of `vals([…])` in a column's value… ``<!-- message -->";
+  - `self` "`` `db.self` has no meaning as an item of `vals([…])` in a column's value… ``<!-- message -->";
+  - `all` "`` `db.all` has no meaning as an item of `vals([…])` in a column's value… ``<!-- message -->";
   - `raw()`, `cols()` and `vals()` as [`raw()`](#raw) says.
 - As a filter value itself, or a value in `vals({…})`, `vals()` throws, as [`raw()`](#raw) does.
 - A built-in with no own enumerable key, or a `Buffer`, throws while compiling, as in [`cols()`](#cols): "`` `db.vals()` takes an object or an array, not a `Buffer`, whose bytes would compile as values, one parameter per byte: for one value, write `db.vals([value])`; for a row of `insert()`, `upsert()` or `update()`, give a plain object. ``<!-- message -->". Zapatos 6.6.1 compiled a `Date` to nothing. It compiled a `Buffer` to one parameter per byte, so a single byte was stored as its number (`'97'` in a text column for `Buffer.from('a')`), and in an `IN` list the bytes matched as numbers. A built-in with own enumerable keys still compiles to their values. A typed array other than a `Buffer` compiles to its elements, `$1, $2`<!-- probe: db.sql`${db.vals(new Int32Array([1, 2]))}` --> for `new Int32Array([1, 2])`, unless it is empty and so has no own key. A `Uint8Array` meant as bytes compiles to its elements too, `vals(new TextEncoder().encode('a'))` to `$1`<!-- probe: db.sql`${db.vals(new TextEncoder().encode('a'))}` --> with `97`: in an `IN` list its elements are as often the numbers meant, so only a `Buffer`, Node's type for bytes, is refused. For one value, write `db.vals([value])` or `db.param(value)`.
@@ -349,8 +353,10 @@ The current column, in a Whereable's fragment value: `` { runtime_minutes: db.sq
 
 - Where there is no current column, it throws: "The 'self' column alias has no meaning here"<!-- message -->.
 - As a filter value it throws: it is the column, not a value to compare with it. Zapatos 6.6.1 sent it as the string `'Symbol(self)'`.
-  - As a Whereable value, in `isIn()` / `isNotIn()` and in `vals([…])` within a filter: "`` `db.self` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: compare with a value, or use it in a `sql` fragment value, where it stands for the column. ``<!-- message -->"
+  - As a Whereable value: "`` `db.self` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: compare with a value, or use it in a `sql` fragment value, where it stands for the column. ``<!-- message -->"
+  - In `isIn()` / `isNotIn()`, and in `vals([…])` within a filter ([`vals()`](#vals)): "`` `db.self` has no meaning as an item of `vals([…])` in a column's value, in a filter (as `isIn()` writes it) or in a `sql` fragment value of `vals({…})`, so of `insert()`, `upsert()` or `update()`: give a value; in a filter or in `update()`, write `db.self` in a `sql` fragment value, outside `vals([…])`, where it stands for the column. ``<!-- message -->"
   - As the value of `eq()`, `add()` and the other conditions: "`` `db.self` has no meaning as the value of `eq()`, `add()` and the other conditions: it is already the column on the left. To compare the column with itself, write a `sql` fragment with `db.self` on both sides. ``<!-- message -->"
+- In `vals([…])` within a write's fragment value, a fragment value of `vals({…})` as in `insert()`, `upsert()` and `update()`, it throws the message of `isIn()` above while compiling.
 
 ### `SelfType` {#SelfType}
 
@@ -400,8 +406,10 @@ The keyword `DEFAULT`: a column's default, in an `INSERT` or `UPDATE` value, alo
 </CastPanel>
 
 - In a filter it throws while compiling.
-  - As a Whereable value ([above](#whereable)), in `isIn()` / `isNotIn()`, and in `vals([…])` with a current column ([`vals()`](#vals)): "`` `db.Default` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. `DEFAULT` is for INSERT and UPDATE values. ``<!-- message -->"
+  - As a Whereable value ([above](#whereable)): "`` `db.Default` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. `DEFAULT` is for INSERT and UPDATE values. ``<!-- message -->"
+  - In `isIn()` / `isNotIn()`, and in `vals([…])` within a filter ([`vals()`](#vals)): "`` `db.Default` has no meaning as an item of `vals([…])` in a column's value, in a filter (as `isIn()` writes it) or in a `sql` fragment value of `vals({…})`, so of `insert()`, `upsert()` or `update()`: in a filter, leave the key out, or compare with a value; in a write, give `db.Default` as the value itself, `{ column: db.Default }`. ``<!-- message -->"
   - As the value of `eq()`, `add()` and the other conditions: "`` `db.Default` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To set a column to its default in an UPDATE, give `db.Default` as the value itself: `{ n: db.Default }`. ``<!-- message -->"
+- In `vals([…])` within a write's fragment value, a fragment value of `vals({…})` as in `insert()`, `upsert()` and `update()`, it throws the message of `isIn()` above while compiling.
 - For `add()` and `subtract()`, set the column itself: `{ booked_at: db.Default }`.
 - Zapatos 6.6.1 sent it as the string `'Symbol(DEFAULT)'` in all of these, and in `vals([…])`, where it is now `DEFAULT`.
 
@@ -456,8 +464,10 @@ The `where` of `select()`, `count()` and the other selects that matches every ro
 - As the `where` of `deletes()` or `update()` it throws while compiling, and the type refuses it: a filter that falls back to `db.all` for a read never deletes or updates every row. `{}` and `` db.sql`TRUE` `` do: "`` `db.all` has no meaning as the filter of `deletes()` or `update()`: it is the filter of `select()` and its kin, refused in a write so that a filter that falls back to it for a read never deletes or updates every row. To delete or update every row on purpose, give db.sql`TRUE` as the filter. ``<!-- message -->"
 
 - As a filter value it throws while compiling, and the type refuses it: it is a whole filter, not a value to compare with. Zapatos 6.6.1 sent it as the string `'Symbol(all)'`, so `deletes('films', { title: db.conditions.isNotIn([db.all]) })` deleted every film with a title.
-  - As a Whereable value ([above](#whereable)), in `isIn()` / `isNotIn()`, and in `vals([…])` with a current column ([`vals()`](#vals)): "`` `db.all` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: leave the key out, or compare with a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`. ``<!-- message -->"
+  - As a Whereable value ([above](#whereable)): "`` `db.all` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: leave the key out, or compare with a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`. ``<!-- message -->"
+  - In `isIn()` / `isNotIn()`, and in `vals([…])` within a filter ([`vals()`](#vals)): "`` `db.all` has no meaning as an item of `vals([…])` in a column's value, in a filter (as `isIn()` writes it) or in a `sql` fragment value of `vals({…})`, so of `insert()`, `upsert()` or `update()`: in a filter, leave the key out, or compare with a value; in a write, give a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`. ``<!-- message -->"
   - As the value of `eq()`, `add()` and the other conditions, and in the array of an array condition: "`` `db.all` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`. ``<!-- message -->"
+- In `vals([…])` within a write's fragment value, a fragment value of `vals({…})` as in `insert()`, `upsert()` and `update()`, it throws the message of `isIn()` above while compiling.
 
 ### `AllType` {#AllType}
 
