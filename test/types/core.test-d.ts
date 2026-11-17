@@ -655,6 +655,10 @@ describe('type surprises', () => {
     db.insert('accounts', { owner_id: 1, balance: c.add(1) });
     // characterization: "c_bool" IS TRUE in VALUES, which Postgres refuses (42703), as an untyped sql`${db.self} IS TRUE`
     expectTypeOf(db.insert('extra.type_zoo', { c_bool: c.isTrue })).not.toBeAny();
+    // characterization: and(), or() and not() over them or over a Whereable, the same (42703); not(eq()) keeps a constraint
+    expectTypeOf(db.insert('extra.type_zoo', { c_bool: c.not({ c_bool: true }) })).not.toBeAny();
+    // @ts-expect-error not() over eq() carries eq()'s constraint
+    db.insert('extra.type_zoo', { c_bool: c.not(c.eq(true)) });
     expectTypeOf(db.insert('users', { email: 'a@b', display_name: 'A', created_at: c.now })).not.toBeAny();
   });
 

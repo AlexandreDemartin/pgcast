@@ -5,7 +5,7 @@
 // Surprises are frozen with a `characterization:` comment, not fixed.
 
 import { describe, expectTypeOf, test } from 'vitest';
-import type * as db from 'zapatos/db';
+import * as db from 'zapatos/db';
 import type * as s from 'zapatos/schema';
 
 type Where<V> = V | db.Parameter<V> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, V | db.Parameter<V> | db.SQLFragment | db.ParentColumn>;
@@ -19,6 +19,15 @@ describe('nullable column (users.manager_id)', () => {
   test('Insertable is optional and accepts null and DEFAULT', () => {
     expectTypeOf<s.users.Insertable['manager_id']>()
       .toEqualTypeOf<number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment<any> | undefined>();
+  });
+
+  test('characterization: a fragment read back from an Insertable runs to any, not rows (#654)', () => {
+    const row = {} as s.users.Insertable, pool = {} as db.Queryable;
+    // Insertable's fragment is SQLFragment<any>, so that a typed fragment is an insert() value; type its rows to read them
+    if (row.manager_id instanceof db.SQLFragment) {
+      expectTypeOf(row.manager_id.run(pool)).toEqualTypeOf<Promise<any>>();
+      expectTypeOf(row.manager_id.run(pool).then((r: number[]) => r.length)).toEqualTypeOf<Promise<number>>();
+    }
   });
 
   test('Whereable leaves null out', () => {
