@@ -23,7 +23,7 @@ import {
   AllType,
 } from './core';
 
-import { mapWithSeparator, NoInfer } from './utils';
+import { mapWithSeparator } from './utils';
 import type { Whereable, Table, Column, WhereableForTable, SelectableForTable } from 'zapatos/schema';
 
 const
@@ -331,8 +331,9 @@ const searchParam = (which: string, x: unknown, cast?: string) => {
  * @param config A text search configuration, such as `'english'`, sent as a parameter
  * @param query The search, sent as a parameter
  */
+// `NoInfer<T>` of ./utils, written out: a library's declarations could not name it, zapatos/db not exporting it (TS2742)
 export const websearchToTsquery = <T = TsvectorColumn>(config: string, query: string) =>
-  sql<SQL, boolean | null, NoInfer<T>>`${self} @@ websearch_to_tsquery(${searchParam('configuration', config, 'regconfig')}, ${searchParam('query', query)})`;
+  sql<SQL, boolean | null, [T][T extends any ? 0 : never]>`${self} @@ websearch_to_tsquery(${searchParam('configuration', config, 'regconfig')}, ${searchParam('query', query)})`;
 
 // things that aren't genuinely conditions
 type PluralisingIntervalUnit = 'microsecond' | 'millisecond' | 'second' | 'minute' | 'hour' | 'day' | 'week' | 'month' | 'year' | 'decade';
