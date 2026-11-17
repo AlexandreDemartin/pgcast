@@ -37,10 +37,33 @@ describe('withCTEs', () => {
       .toEqual({ code: '42P01', message: 'relation "reports" does not exist' });
   });
 
-  it('an empty insert() as the main query still runs its data-modifying CTE', async () => {
-    const renamed = sql`UPDATE ${'users'} SET ${'display_name'} = ${param('Robert')} WHERE ${'id'} = ${param(2)} RETURNING 1`;
-    expect(await db.withCTEs({ renamed }, db.insert('accounts', [])).run(t.client)).toEqual([]);
-    expect(await db.selectExactlyOne('users', { id: 2 }, { columns: ['display_name'] }).run(t.client)).toEqual({ display_name: 'Robert' });
+  it('an empty insert() or upsert() as the main query runs its data-modifying CTE, whatever its table', async () => {
+    // insert()'s own no-op text, INSERT INTO … SELECT null WHERE false, is refused on users (id GENERATED ALWAYS, 428C9) and on a view
+    const queries = {
+      users: db.insert('users', []), active_users: db.insert('active_users' as any, []), accounts: db.insert('accounts', []),
+      upsert: db.upsert('users', [], 'email'),
+    };
+    for (const [name, query] of Object.entries(queries)) {
+      const renamed = sql`UPDATE ${'users'} SET ${'display_name'} = ${param(`Bob ${name}`)} WHERE ${'id'} = ${param(2)} RETURNING 1`;
+      expect(await db.withCTEs({ renamed }, query).run(t.client)).toEqual([]);
+      expect(await db.selectExactlyOne('users', { id: 2 }, { columns: ['display_name'] }).run(t.client)).toEqual({ display_name: `Bob ${name}` });
+    }
+  });
+
+  it('an empty insert() as a CTE gives no row, on a table that refuses insert()\'s own no-op text', async () => {
+    expect(await db.withCTEs({ added: db.insert('users', []) }, sql`SELECT count(*)::int AS n FROM added`).run(t.client)).toEqual([{ n: 0 }]);
+  });
+
+  it('selectExactlyOne() with selectExactlyOneChecksForSecondRow: a second row rejects at the top level, as alone', async () => {
+    db.setConfig({ selectExactlyOneChecksForSecondRow: true });
+    for (const ctes of [{ reports }, {}]) {
+      const err = await db.withCTEs(ctes, db.selectExactlyOne('users', all)).run(t.client).catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(db.NotExactlyOneError);
+      expect((err as Error).message).toMatch(/^One result expected but more returned/);
+    }
+    // nested, one row per parent row, as the shortcut nested
+    expect(await db.selectOne('users', { id: 1 }, { columns: ['id'], lateral: { account: db.withCTEs({ reports }, db.selectExactlyOne('accounts', { owner_id: parent('id') }, { columns: ['owner_id'] })) } }).run(t.client))
+      .toEqual({ id: 1, account: { owner_id: 1 } });
   });
 
   it('an insert() as a CTE runs, and the main query sees the table as it was before the statement', async () => {
