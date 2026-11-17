@@ -320,6 +320,17 @@ Candidates for a check, a rule or a skill line.
 - #638: a "walked once" guard (`seen`) is proven only by a cycle that does not go through the root, which sits in `seen` before the walk starts.
 - #638: a mutant that loops forever in a synchronous walk is not stopped by Vitest's `testTimeout`, and `alarm` on `npx` kills only `npx`: kill the vitest node process and its worker by PID.
 - #638: killing vitest's main process leaves a hung fork worker (`vitest/dist/workers/forks.js`) spinning, reparented to PID 1: find it with `ps -axo pid,ppid,%cpu,command` and kill it by PID; `pkill -f "vitest run"` misses it.
+- #635: count a corpus pattern with its type arguments (`parent<T.Column>(`), ideally by AST: #625's grep for `parent(` found 114 of 1,255 calls.
+- #635: an issue's corpus claim ("under `@ts-ignore`", "about a thousand") is recounted before a note cites it.
+- #635: a gain from inferring a shortcut is measured against the project's own generated `schema.d.ts` (12 % of many-to-one laterals chose differently from the nullability), not claimed.
+- #635: a runtime helper fed by the schema needs a runtime value: `zapatos/schema` holds only declarations, so check where a design's data lives at run time before planning its PRs.
+- #635: date a Zapatos change by where its commit falls against the version commits in `git log upstream/master`, not by the version its warning is remembered in (ambient declarations: 3.0, not 4.0).
+- #635: before counting a cast as a workaround for code that cannot run, compile the cast form: a dotted string in a column slot splits into a qualified name and runs.
+- #635: the cheapest type shape beat the obvious one sixfold: plain indexing of declared maps cost +2.0 points where `Extract` over a union or a generic join argument cost +11.6, and the generic also let an extra property through.
+- #635: an ambient `declare module 'x'` in a script file hides the real module `x` instead of extending it: generated types cannot be added to `zapatos/db` that way (TS2305).
+- #635: the guard refuses `git merge --no-edit`: give the merge message with `-m`, its Co-Authored-By line included.
+- #639: with `groupBy`, every lateral's result is in the select list, so Postgres refuses the query (42803) unless `groupBy` names it: why real code writes `${col}, "lateral_x".result`.
+- #639: to probe row-level security as a superuser without creating a role, `SET LOCAL ROLE pg_read_all_data` in the probe database: predefined, no RLS bypass, SELECT already granted.
 
 ## Minors kept
 
@@ -369,4 +380,4 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 
 - #606 (form): `scripts/check-declarations-floor.mjs` leaves `pg-types` (`^2.2.0` from `@types/pg@8.6.6`) unpinned.
 - #621 (form): `src/db/conditions.ts` `callerValue(options, 'parent') || undefined`: `|| undefined` is an equivalent mutant (core reads `parentTable` by truthiness).
-
+- #639 (form): `.agents/skills/code-style/SKILL.md` § Further than Zapatos still lists "laterals typed by foreign keys" first on Zapatos's roadmap; after decision 007, say what pgcast gives instead (`parent<T.Column>`).

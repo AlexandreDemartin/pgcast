@@ -72,7 +72,7 @@ For views, pgcast keeps to what Postgres states, as Zapatos did: a nullability t
 - An `interval` is its text in all five interfaces, though `pg` parses it into an object, a [`PostgresInterval`](/runtime-config#PostgresInterval), for a query of your own, unless [`intervalsTypedAsObjects`](/generator#generate.intervalsTypedAsObjects) is on. Set it to `false` if a type parser of yours returns the text.
 
 ::: info Coming
-Reading more of the catalog, each as an opt-in: foreign keys, for laterals that know their join ([#54](https://github.com/AlexandreDemartin/pgcast/issues/54)); a domain's `CHECK (VALUE = ANY (ARRAY[…]))` as a union of its values ([#55](https://github.com/AlexandreDemartin/pgcast/issues/55)); and, as a separate tool, the result types of hand-written SQL ([#62](https://github.com/AlexandreDemartin/pgcast/issues/62)).
+Reading more of the catalog, each as an opt-in: a domain's `CHECK (VALUE = ANY (ARRAY[…]))` as a union of its values ([#55](https://github.com/AlexandreDemartin/pgcast/issues/55)); and, as a separate tool, the result types of hand-written SQL ([#62](https://github.com/AlexandreDemartin/pgcast/issues/62)).
 :::
 
 ## One column, five types
@@ -150,7 +150,7 @@ Three things in that type are worth a closer look:
 - **`hours` is a `number` because you said so.** A `sql` fragment's type is its second type argument, here `number`, and pgcast doesn't parse your SQL to check it ([Type arguments](/sql-template#type-arguments)). `year`, a column, takes its type from the schema.
 - **`roles` is a `number`**, the type of `count()`, though Postgres counts in `int8`: like Zapatos, pgcast assumes no count comes near `Number.MAX_SAFE_INTEGER`.
 
-Here `studio` is never missing, as `films.studio_id` is `NOT NULL REFERENCES studios`; but the generator doesn't read foreign keys, so say so yourself with `selectExactlyOne()`, and `studio` loses its `| null`. Zapatos's docs list this among their limitations, and [#54](https://github.com/AlexandreDemartin/pgcast/issues/54) plans to read it from the catalog.
+Here `studio` is never missing, as `films.studio_id` is `NOT NULL REFERENCES studios`; but the generator doesn't read foreign keys, so say so yourself with `selectExactlyOne()`, and `studio` loses its `| null`. Zapatos's docs list this among their limitations; [Add the row it points to](/lateral#add-the-row-it-points-to) says when a key rules the missing row out.
 
 All of this needs `strictNullChecks`, or `strict`. Without it, `columns`, `extras`, `lateral` and `returning` leave the type at the table's full `JSONSelectable`, and `films[0].studio` doesn't compile ([`select()` options](/select#options)).
 

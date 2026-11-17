@@ -1,5 +1,5 @@
 ---
-english: 55d4f91fbf46
+english: ac756ffebd30
 ---
 
 # Le catalogue
@@ -76,7 +76,7 @@ Pour les vues, pgcast s’en tient à ce que Postgres déclare, comme Zapatos :
 - Un `interval` est typé par son texte dans les cinq interfaces, bien que `pg` le parse en objet, un [`PostgresInterval`](/fr/runtime-config#PostgresInterval), pour une requête à vous, sauf si [`intervalsTypedAsObjects`](/fr/generator#generate.intervalsTypedAsObjects) est activé. Mettez-le à `false` si un parser de types à vous renvoie le texte.
 
 ::: info À venir
-Lire davantage du catalogue, chaque fois en opt-in : les clés étrangères, pour des laterals qui connaissent leur jointure ([#54](https://github.com/AlexandreDemartin/pgcast/issues/54)) ; le `CHECK (VALUE = ANY (ARRAY[…]))` d’un domaine comme union de ses valeurs ([#55](https://github.com/AlexandreDemartin/pgcast/issues/55)) ; et, comme outil à part, les types de résultat du SQL écrit à la main ([#62](https://github.com/AlexandreDemartin/pgcast/issues/62)).
+Lire davantage du catalogue, chaque fois en opt-in : le `CHECK (VALUE = ANY (ARRAY[…]))` d’un domaine comme union de ses valeurs ([#55](https://github.com/AlexandreDemartin/pgcast/issues/55)) ; et, comme outil à part, les types de résultat du SQL écrit à la main ([#62](https://github.com/AlexandreDemartin/pgcast/issues/62)).
 :::
 
 ## Une colonne, cinq types {#one-column-five-types}
@@ -154,7 +154,7 @@ Trois choses dans ce type méritent qu’on s’y arrête :
 - **`hours` est un `number` parce que vous l’avez dit.** Le type d’un fragment `sql` est son second argument de type, ici `number`, et pgcast ne parse pas votre SQL pour le vérifier ([Arguments de type](/fr/sql-template#type-arguments)). `year`, une colonne, prend son type du schéma.
 - **`roles` est un `number`**, le type de `count()`, bien que Postgres compte en `int8` : comme Zapatos, pgcast suppose qu’aucun compte n’approche `Number.MAX_SAFE_INTEGER`.
 
-Ici `studio` ne manque jamais, puisque `films.studio_id` est `NOT NULL REFERENCES studios` ; mais le générateur ne lit pas les clés étrangères, alors dites-le vous-même avec `selectExactlyOne()`, et `studio` perd son `| null`. La doc de Zapatos range ce point parmi ses limites, et [#54](https://github.com/AlexandreDemartin/pgcast/issues/54) prévoit de le lire dans le catalogue.
+Ici `studio` ne manque jamais, puisque `films.studio_id` est `NOT NULL REFERENCES studios` ; mais le générateur ne lit pas les clés étrangères, alors dites-le vous-même avec `selectExactlyOne()`, et `studio` perd son `| null`. La doc de Zapatos range ce point parmi ses limites ; [Ajouter la ligne vers laquelle elle pointe](/fr/lateral#add-the-row-it-points-to) dit quand une clé exclut la ligne manquante.
 
 Tout cela demande `strictNullChecks`, ou `strict`. Sans cette option, `columns`, `extras`, `lateral` et `returning` laissent le type au `JSONSelectable` complet de la table, et `films[0].studio` ne compile pas ([Options de `select()`](/fr/select#options)).
 
