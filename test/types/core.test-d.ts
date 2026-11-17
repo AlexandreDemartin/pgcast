@@ -391,7 +391,20 @@ describe('type surprises', () => {
     db.select('accounts', { scores: c.arrayContains(db.parent('scores')) });
     const p: db.ParentColumn = db.parent('id');
     const q: db.ParentColumn = db.param('id' as const);
+    // a Parameter is still a ParentColumn, as in Zapatos 6.6.1: param(undefined) fits a text column through it
+    db.select('users', { display_name: db.param(undefined) });
     expectTypeOf([n, p, q]).not.toBeAny();
+  });
+
+  test('keyof a wrapper class gives its public members alone, as in Zapatos 6.6.1', () => {
+    // the tag is private, so a spread or a mapped type never writes it out in a consumer's declarations (#582)
+    expectTypeOf<keyof db.Parameter<number>>().toEqualTypeOf<'value' | 'cast'>();
+    expectTypeOf<keyof db.DangerousRawString>().toEqualTypeOf<'value'>();
+    expectTypeOf<keyof db.ColumnNames<string[]>>().toEqualTypeOf<'value'>();
+    expectTypeOf<keyof db.ColumnValues<string[]>>().toEqualTypeOf<'value'>();
+    expectTypeOf<keyof db.ParentColumn<'id'>>().toEqualTypeOf<'value'>();
+    expectTypeOf({ ...db.raw('x') }).toEqualTypeOf<{ value: string }>();
+    expectTypeOf({ ...db.param(1) }).toEqualTypeOf<{ value: number; cast?: boolean | string }>();
   });
 
   test('cols(x) and vals(x) of any value are still accepted in a sql template', () => {

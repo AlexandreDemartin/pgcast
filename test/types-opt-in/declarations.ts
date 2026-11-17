@@ -43,6 +43,18 @@ export const orderOf = (options: db.SelectOptionsForTable<'users', undefined, un
 export const orderOfTable = <T extends s.Table>(options: db.SelectOptionsForTable<T, undefined, undefined, undefined, never>) =>
   options.order;
 
+// spreads of raw(), param(), cols(), vals() and parent(), in a variable, a function and a method, and an object rest of
+// a Parameter: each writes out their members, as on Zapatos 6.6.1 (TS4023, TS4058 or TS4053 if one names their tag,
+// #582). Not covered, documented: the members of a TsvectorColumn, or of min() and max() typed by column, which name
+// an unexported symbol (test/unit/declarationEmit.test.ts)
+export const wrapperSpreads = {
+  raw: { ...db.raw('x') }, param: { ...db.param(1), cast: 'int4' }, cols: { ...db.cols(['id']) },
+  vals: { ...db.vals({ id: 1 }) }, parent: { ...db.parent('id') },
+};
+export function rawSpread() { return { ...db.raw('x') }; }
+export class Spreads { parent() { return { ...db.parent('id') }; } }
+export const restOf = (x: db.Parameter<string>) => { const { cast, ...rest } = x; return rest; };
+
 // forwarders that write out the types of the schemas and columnOptions options of zapatos/generate's Config, and every
 // value of zapatos/generate re-exported through an object rest (TS4023 or TS2742 if a type names one zapatos/generate
 // does not export, #584)

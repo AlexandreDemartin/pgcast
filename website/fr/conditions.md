@@ -1,5 +1,5 @@
 ---
-english: 890489bce501
+english: 0dee3b1f4d03
 description: "db.conditions regroupe les tests, comparaisons et opérateurs à donner comme valeur d’une clé d’un Whereable, chacun avec le SQL qu’il écrit et ses valeurs."
 ---
 
@@ -594,7 +594,7 @@ Il en va de même pour toute autre valeur qui n’est pas une chaîne, que `pg` 
 interface TsvectorColumn
 ```
 
-Le `T` par défaut de [`websearchToTsquery()`](#conditions.websearchToTsquery) : un type que seule une colonne typée `any` accepte. Il n’existe que dans le type, sans valeur.
+Le `T` par défaut de [`websearchToTsquery()`](#conditions.websearchToTsquery) : un type que seule une colonne typée `any` accepte. Il n’existe que dans le type, sans valeur. Un projet compilé avec `declaration: true` l’écrit dans son `.d.ts` sous ce nom, mais pas un spread d’une valeur de ce type, dont les membres nomment un symbole que `zapatos/db` n’exporte pas : TS4023.
 
 ## Dates et heures {#dates}
 

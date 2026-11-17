@@ -1,5 +1,5 @@
 ---
-english: d6fe654b8e3d
+english: 1776abb08caa
 ---
 
 # Lectures {#select-and-the-aggregates}
@@ -542,4 +542,4 @@ La signature d’appel de `count()`, `sum()`, `avg()`, `min()` et `max()` : `ta
 interface ColumnAggregateFragment<RunResult, NestedResult> extends SQLFragment<RunResult>
 ```
 
-À partir de la 6.7.0. Ce que renvoient `min()` et `max()` avec `aggregatesTypedByColumn` déclaré : `.run()` donne `RunResult`, le type `Selectable` de la colonne ou `null` ; imbriqué dans un `lateral`, ou donné comme valeur d’`extras`, il est typé `NestedResult`, son type `JSONSelectable` ou `null`, comme le lit [`RunResultForSQLFragment`](/fr/sql-template#RunResultForSQLFragment). Si une de vos fonctions en renvoie un, dans un projet compilé avec `declaration: true`, son `.d.ts` l’écrit sous ce nom.
+À partir de la 6.7.0. Ce que renvoient `min()` et `max()` avec `aggregatesTypedByColumn` déclaré : `.run()` donne `RunResult`, le type `Selectable` de la colonne ou `null` ; imbriqué dans un `lateral`, ou donné comme valeur d’`extras`, il est typé `NestedResult`, son type `JSONSelectable` ou `null`, comme le lit [`RunResultForSQLFragment`](/fr/sql-template#RunResultForSQLFragment). Si une de vos fonctions en renvoie un, dans un projet compilé avec `declaration: true`, son `.d.ts` l’écrit sous ce nom, mais pas un spread de ce fragment (`{ ...db.min(…) }`), dont les membres nomment un symbole que `zapatos/db` n’exporte pas : TS4023.

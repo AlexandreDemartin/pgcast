@@ -349,7 +349,9 @@ export const isInSelect = <T extends Table, C extends keyof SelectableForTable<T
 declare const tsvector: unique symbol;
 /**
  * What `websearchToTsquery()` compares with: a type no column takes but one typed `any`, as a `tsvector` column
- * is through its `PgTsvector` placeholder, left as generated. It exists only in the type.
+ * is through its `PgTsvector` placeholder, left as generated. It exists only in the type. Its members name a symbol
+ * `zapatos/db` does not export, so a package built with `declaration: true` cannot write them out (TS4023 on a
+ * spread of one); it can name the type itself.
  */
 export interface TsvectorColumn { readonly [tsvector]: true }
 

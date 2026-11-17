@@ -67,7 +67,9 @@ declare const nestedResult: unique symbol;
 /**
  * A `min()` or `max()` typed by its column, with `aggregatesTypedByColumn`
  * declared in `ConfigTypes`: `run()` gives `RunResult`, and nested in a
- * `lateral` or as an `extras` value it comes back as JSON, `NestedResult`.
+ * `lateral` or as an `extras` value it comes back as JSON, `NestedResult`. Its own members name a symbol
+ * `zapatos/db` does not export, so a package built with `declaration: true` cannot write them out (TS4023 on a
+ * spread of `min()`); it can name the type itself, as a function returning `min()` does.
  */
 export interface ColumnAggregateFragment<RunResult, NestedResult> extends SQLFragment<RunResult> { [nestedResult]: NestedResult }
 
