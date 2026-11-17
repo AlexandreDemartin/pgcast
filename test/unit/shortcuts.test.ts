@@ -2907,3 +2907,157 @@ describe('a shortcut option added to Object.prototype by something else is no op
     expect(withPrototypeKey('columns', (Opts.prototype as any).columns, prototypeOptions)).toEqual(prototypeOptionsRead);
   });
 });
+
+describe('a shortcut as an insert(), upsert() or update() value, a scalar subquery (#656)', () => {
+  // 6.6.1 wrote it bare, `VALUES (SELECT …)` and `ROW(SELECT …)`, which Postgres refuses (42601), as in extras (#262)
+  const
+    ada = { display_name: 'Ada', email: 'ada@example.com' },
+    action = `jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END)`,
+    ordered = { columns: ['balance'], order: { by: 'balance', direction: 'ASC' } } as const;
+
+  // each read shortcut and its query, from its first placeholder `n`, and its values
+  const shortcuts: [string, () => db.SQLFragment<any>, (n: number) => string, unknown[]][] = [
+    ['select', () => db.select('accounts', all, ordered),
+      n => `SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT jsonb_build_object($${n}::text, "balance") AS result FROM "accounts" ORDER BY "balance" ASC) AS "sq_accounts"`, ['balance']],
+    ['selectOne', () => db.selectOne('accounts', all, ordered),
+      n => `SELECT jsonb_build_object($${n}::text, "balance") AS result FROM "accounts" ORDER BY "balance" ASC LIMIT $${n + 1}`, ['balance', 1]],
+    ['selectExactlyOne', () => db.selectExactlyOne('accounts', all, ordered),
+      n => `SELECT jsonb_build_object($${n}::text, "balance") AS result FROM "accounts" ORDER BY "balance" ASC LIMIT $${n + 1}`, ['balance', 1]],
+    ['count', () => db.count('accounts', all), () => 'SELECT count(*) AS result FROM "accounts"', []],
+    ['sum', () => db.sum('accounts', all, { columns: ['balance'] }), () => 'SELECT sum("balance") AS result FROM "accounts"', []],
+    ['avg', () => db.avg('accounts', all, { columns: ['ratio'] }), () => 'SELECT avg("ratio") AS result FROM "accounts"', []],
+    ['min', () => db.min('accounts', all, { columns: ['balance'] }), () => 'SELECT min("balance") AS result FROM "accounts"', []],
+    ['max', () => db.max('accounts', { owner_id: 1 }, { columns: ['balance'] }),
+      n => `SELECT max("balance") AS result FROM "accounts" WHERE ("owner_id" = $${n})`, [1]],
+    ['a copy of count', () => db.count('accounts', all).copy(), () => 'SELECT count(*) AS result FROM "accounts"', []],
+  ];
+
+  it.each(shortcuts)('%s, as an insert() value', (_name, q, inner, values) => {
+    expect(db.insert('users', { ...ada, manager_id: q() }).compile()).toEqual({
+      text: `INSERT INTO "users" ("display_name", "email", "manager_id") VALUES ($1, $2, (${inner(3)})) RETURNING to_jsonb("users".*) AS result`,
+      values: ['Ada', 'ada@example.com', ...values],
+    });
+  });
+
+  it.each(shortcuts)('%s, as a value of the first of several insert() rows, the other taking DEFAULT', (_name, q, inner, values) => {
+    const n = 3 + values.length;
+    expect(db.insert('users', [{ ...ada, manager_id: q() }, { display_name: 'Bob', email: 'bob@example.com' }]).compile()).toEqual({
+      text: `INSERT INTO "users" ("display_name", "email", "manager_id") VALUES ($1, $2, (${inner(3)})), ($${n}, $${n + 1}, DEFAULT) RETURNING to_jsonb("users".*) AS result`,
+      values: ['Ada', 'ada@example.com', ...values, 'Bob', 'bob@example.com'],
+    });
+  });
+
+  it.each(shortcuts)('%s, as an upsert() value', (_name, q, inner, values) => {
+    expect(db.upsert('users', { ...ada, manager_id: q() }, 'email').compile()).toEqual({
+      text: `INSERT INTO "users" ("display_name", "email", "manager_id") VALUES ($1, $2, (${inner(3)})) ON CONFLICT ("email") DO UPDATE SET ("display_name", "email", "manager_id") = ROW(EXCLUDED."display_name", EXCLUDED."email", EXCLUDED."manager_id") RETURNING to_jsonb("users".*) || ${action} AS result`,
+      values: ['Ada', 'ada@example.com', ...values],
+    });
+  });
+
+  it.each(shortcuts)('%s, as a value of several upsert() rows', (_name, q, inner, values) => {
+    const n = 3 + values.length;
+    expect(db.upsert('users', [{ ...ada, manager_id: q() }, { display_name: 'Bob', email: 'bob@example.com', manager_id: 1 }], 'email').compile()).toEqual({
+      text: `INSERT INTO "users" ("display_name", "email", "manager_id") VALUES ($1, $2, (${inner(3)})), ($${n}, $${n + 1}, $${n + 2}) ON CONFLICT ("email") DO UPDATE SET ("display_name", "email", "manager_id") = ROW(EXCLUDED."display_name", EXCLUDED."email", EXCLUDED."manager_id") RETURNING to_jsonb("users".*) || ${action} AS result`,
+      values: ['Ada', 'ada@example.com', ...values, 'Bob', 'bob@example.com', 1],
+    });
+  });
+
+  it.each(shortcuts)('%s, as an upsert() updateValues value', (_name, q, inner, values) => {
+    expect(db.upsert('users', ada, 'email', { updateValues: { manager_id: q() } }).compile()).toEqual({
+      text: `INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("display_name", "email", "manager_id") = ROW(EXCLUDED."display_name", EXCLUDED."email", (${inner(3)})) RETURNING to_jsonb("users".*) || ${action} AS result`,
+      values: ['Ada', 'ada@example.com', ...values],
+    });
+  });
+
+  it.each(shortcuts)('%s, as an update() value', (_name, q, inner, values) => {
+    expect(db.update('users', { manager_id: q() }, { id: 2 }).compile()).toEqual({
+      text: `UPDATE "users" SET ("manager_id") = ROW((${inner(1)})) WHERE ("id" = $${1 + values.length}) RETURNING to_jsonb("users".*) AS result`,
+      values: [...values, 2],
+    });
+  });
+
+  it('without undefinedMeansMissing, beside an undefined value, which pg sends as NULL', () => {
+    expect(db.insert('users', { ...ada, manager_id: db.count('accounts', all), mood: undefined }).compile()).toEqual({
+      text: 'INSERT INTO "users" ("display_name", "email", "manager_id", "mood") VALUES ($1, $2, (SELECT count(*) AS result FROM "accounts"), $3) RETURNING to_jsonb("users".*) AS result',
+      values: ['Ada', 'ada@example.com', undefined],
+    });
+    expect(db.update('users', { manager_id: db.count('accounts', all), mood: undefined }, { id: 2 }).compile()).toEqual({
+      text: 'UPDATE "users" SET ("manager_id", "mood") = ROW((SELECT count(*) AS result FROM "accounts"), $1) WHERE ("id" = $2) RETURNING to_jsonb("users".*) AS result',
+      values: [undefined, 2],
+    });
+  });
+
+  it('with undefinedMeansMissing, beside an undefined value', () => {
+    db.setConfig({ undefinedMeansMissing: true });
+    expect(db.insert('users', { ...ada, manager_id: db.count('accounts', all), mood: undefined }).compile().text)
+      .toBe('INSERT INTO "users" ("display_name", "email", "manager_id", "mood") VALUES ($1, $2, (SELECT count(*) AS result FROM "accounts"), DEFAULT) RETURNING to_jsonb("users".*) AS result');
+    expect(db.update('users', { manager_id: db.count('accounts', all), mood: undefined }, { id: 2 }).compile().text)
+      .toBe('UPDATE "users" SET ("manager_id") = ROW((SELECT count(*) AS result FROM "accounts")) WHERE ("id" = $1) RETURNING to_jsonb("users".*) AS result');
+  });
+
+  it('selectExactlyOne keeps LIMIT 1 there, with selectExactlyOneChecksForSecondRow', () => {
+    db.setConfig({ selectExactlyOneChecksForSecondRow: true });
+    expect(db.update('users', { settings: db.selectExactlyOne('accounts', all, ordered) }, { id: 2 }).compile()).toEqual({
+      text: 'UPDATE "users" SET ("settings") = ROW((SELECT jsonb_build_object($1::text, "balance") AS result FROM "accounts" ORDER BY "balance" ASC LIMIT $2)) WHERE ("id" = $3) RETURNING to_jsonb("users".*) AS result',
+      values: ['balance', 1, 2],
+    });
+  });
+
+  it('db.self in the shortcut is still the column, and parent() still throws', () => {
+    expect(db.update('users', { manager_id: db.max('users', sql`${'id'} < ${db.self}`, { columns: ['id'] }) }, { id: 3 }).compile().text)
+      .toBe('UPDATE "users" SET ("manager_id") = ROW((SELECT max("id") AS result FROM "users" WHERE "id" < "manager_id")) WHERE ("id" = $1) RETURNING to_jsonb("users".*) AS result');
+    expect(failure(() => db.insert('users', { ...ada, manager_id: db.count('accounts', { owner_id: parent('id') }) }).compile()))
+      .toEqual({ name: 'Error', message: `The 'parent' table alias has no meaning here` });
+  });
+
+  it('beside the returning, extras and updateColumns of the write', () => {
+    expect(db.update('users', { manager_id: db.count('accounts', all) }, { id: 2 }, { returning: ['id'], extras: { n: db.count('accounts', all) } }).compile()).toEqual({
+      text: 'UPDATE "users" SET ("manager_id") = ROW((SELECT count(*) AS result FROM "accounts")) WHERE ("id" = $1) RETURNING jsonb_build_object($2::text, "id") || jsonb_build_object($3::text, (SELECT count(*) AS result FROM "accounts")) AS result',
+      values: [2, 'id', 'n'],
+    });
+    expect(db.upsert('users', { ...ada, manager_id: db.count('accounts', all) }, 'email', { updateColumns: ['manager_id'], updateValues: { mood: db.selectOne('users', { id: 1 }, { columns: ['mood'] }) } }).compile()).toEqual({
+      text: `INSERT INTO "users" ("display_name", "email", "manager_id") VALUES ($1, $2, (SELECT count(*) AS result FROM "accounts")) ON CONFLICT ("email") DO UPDATE SET ("manager_id", "mood") = ROW(EXCLUDED."manager_id", (SELECT jsonb_build_object($3::text, "mood") AS result FROM "users" WHERE ("id" = $4) LIMIT $5)) RETURNING to_jsonb("users".*) || ${action} AS result`,
+      values: ['Ada', 'ada@example.com', 'mood', 1, 1],
+    });
+  });
+
+  it('unchanged: a shortcut in a sql fragment, a caller\'s vals(), a write shortcut', () => {
+    const n = db.count('accounts', all), o = { manager_id: n };
+    expect(db.insert('users', { ...ada, manager_id: sql`(${n})` }).compile().text)
+      .toBe('INSERT INTO "users" ("display_name", "email", "manager_id") VALUES ($1, $2, (SELECT count(*) AS result FROM "accounts")) RETURNING to_jsonb("users".*) AS result');
+    expect(db.update('users', { manager_id: sql`${n} + 1` }, { id: 2 }).compile().text)
+      .toBe('UPDATE "users" SET ("manager_id") = ROW(SELECT count(*) AS result FROM "accounts" + 1) WHERE ("id" = $1) RETURNING to_jsonb("users".*) AS result');
+    expect(db.upsert('users', ada, 'email', { updateValues: { manager_id: sql`${n} + 1` } }).compile().text)
+      .toContain('ROW(EXCLUDED."display_name", EXCLUDED."email", SELECT count(*) AS result FROM "accounts" + 1)');
+    // Zapatos 6.6.1 ran these, a bare subquery
+    expect(sql`SELECT ${'id'} FROM ${'users'} WHERE ${'id'} IN (${db.vals(o)})`.compile().text)
+      .toBe('SELECT "id" FROM "users" WHERE "id" IN (SELECT count(*) AS result FROM "accounts")');
+    expect(sql`INSERT INTO ${'users'} (${db.cols(o)}) ${db.vals(o)}`.compile().text)
+      .toBe('INSERT INTO "users" ("manager_id") SELECT count(*) AS result FROM "accounts"');
+    // a write runs in a subquery neither bare nor in parentheses (42601): only in a WITH
+    expect(db.update('users', { settings: db.deletes('accounts', { id: 1 }) }, { id: 2 }).compile().text)
+      .toBe('UPDATE "users" SET ("settings") = ROW(DELETE FROM "accounts" WHERE ("id" = $1) RETURNING to_jsonb("accounts".*) AS result) WHERE ("id" = $2) RETURNING to_jsonb("users".*) AS result');
+  });
+
+  it('a row with no shortcut is read as often as before: twice alone, three times among others; a lone row with one once, as in 6.6.1', () => {
+    // the parentheses are found in the read pgcast already makes of a lone row, and on its own copies of several rows;
+    // a lone row that holds a shortcut is copied from that read, so its getter is read once, where master read it twice
+    const reads: Record<string, number> = {};
+    const row = (key: string, extra = {}) => ({ ...ada, ...extra, get mood() { reads[key] = (reads[key] ?? 0) + 1; return 'ok'; } });
+    db.insert('users', row('insert')).compile();
+    db.update('users', row('update'), { id: 2 }).compile();
+    db.upsert('users', row('upsert'), 'email').compile();
+    db.insert('users', [row('insert rows'), ada]).compile();
+    db.upsert('users', [row('upsert rows'), { ...ada, mood: 'sad' }], 'email').compile();
+    const query = { manager_id: db.count('accounts', all) };
+    db.insert('users', row('insert, a shortcut', query)).compile();
+    db.update('users', row('update, a shortcut', query), { id: 2 }).compile();
+    db.upsert('users', row('upsert, a shortcut', query), 'email').compile();
+    db.insert('users', [row('insert rows, a shortcut', query), ada]).compile();
+    db.upsert('users', [row('upsert rows, a shortcut', query), { ...ada, mood: 'sad' }], 'email').compile();
+    expect(reads).toEqual({
+      insert: 2, update: 2, upsert: 2, 'insert rows': 3, 'upsert rows': 3,
+      'insert, a shortcut': 1, 'update, a shortcut': 1, 'upsert, a shortcut': 1, 'insert rows, a shortcut': 3, 'upsert rows, a shortcut': 3,
+    });
+  });
+});

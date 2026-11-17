@@ -252,9 +252,17 @@ describe('insert', () => {
     expectTypeOf(one.run(pool)).resolves.toEqualTypeOf<s.users.JSONSelectable>();
     expectTypeOf(many.run(pool)).resolves.toEqualTypeOf<s.users.JSONSelectable[]>();
     expectTypeOf(one.run(pool)).resolves.not.toBeAny();
-    // characterization: a shortcut as it is compiles to VALUES (SELECT …), which Postgres refuses (42601), as
-    // db.select() as a value and any shortcut as an update() value already did; in parentheses, as count above, it runs
-    expectTypeOf(db.insert('users', { email: 'a@b', manager_id: db.count('users', db.all), display_name: 'A' })).not.toBeAny();
+  });
+
+  test('takes a shortcut as a value, which compiles in parentheses (#656)', () => {
+    const
+      count = db.count('users', db.all),
+      inserted = db.insert('users', { email: 'a@b', manager_id: count, display_name: 'A' }),
+      upserted = db.upsert('users', { email: 'a@b', manager_id: count, display_name: 'A' }, 'email', { updateValues: { manager_id: count } }),
+      updated = db.update('users', { manager_id: count, settings: db.selectOne('users', { id: 1 }) }, { id: 2 });
+    expectTypeOf(inserted.run(pool)).resolves.toEqualTypeOf<s.users.JSONSelectable>();
+    expectTypeOf(upserted.run(pool)).resolves.toEqualTypeOf<s.users.JSONSelectable & db.UpsertAction>();
+    expectTypeOf(updated.run(pool)).resolves.toEqualTypeOf<s.users.JSONSelectable[]>();
   });
 
   test('refuses a fragment that carries a constraint', () => {

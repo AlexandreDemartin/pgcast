@@ -1475,3 +1475,62 @@ describe('null as options, or as an options key', () => {
     expect(await scalar(`SELECT display_name AS v FROM users WHERE id = 1`)).toBe('Ada');
   });
 });
+
+describe('a shortcut as an insert(), upsert() or update() value, a scalar subquery (#656)', () => {
+  // 6.6.1 wrote it bare, `VALUES (SELECT …)` and `ROW(SELECT …)`, which Postgres refuses (42601)
+  const
+    owner = sql`${'owner_id'} = ${'users'}.${'id'}`,
+    ordered = { columns: ['balance'], order: { by: 'balance', direction: 'ASC' } } as const,
+    zoo = 'extra.type_zoo' as any;
+
+  it('stores what it gives in extras: an aggregate its value, a select its JSON', async () => {
+    const row = await run(db.insert(zoo, {
+      c_int8: db.count('accounts', all),
+      c_numeric: db.sum('accounts', all, { columns: ['balance'] }),
+      c_float8: db.avg('accounts', all, { columns: ['ratio'] }),
+      c_varchar: db.min('users', all, { columns: ['display_name'] }),
+      c_int4: db.max('users', all, { columns: ['id'] }).copy(),
+      c_jsonb: db.select('accounts', { owner_id: 1 }, ordered),
+      c_json: db.selectOne('accounts', { owner_id: 1 }, ordered),
+      c_text: db.selectOne('accounts', { owner_id: 1 }, ordered),
+      c_jsonb_domain: db.selectExactlyOne('accounts', { owner_id: 999 }, ordered),
+    }));
+    const maxId = await scalar('SELECT max(id) AS v FROM users');
+    expect(row).toMatchObject({
+      c_int8: 3, c_numeric: 1520.5, c_float8: 0.875, c_varchar: 'Ada', c_int4: maxId,
+      c_jsonb: [{ balance: 20 }, { balance: 1500.5 }],
+      c_json: { balance: 20 },
+      // a text column takes the JSON's text
+      c_text: '{"balance": 20.00}',
+      // no row gives NULL: selectExactlyOne() does not throw there
+      c_jsonb_domain: null,
+    });
+  });
+
+  it('several rows, upsert() values and updateValues, update(), correlated with the row updated', async () => {
+    const rows = await run(db.insert(zoo, [{ c_int8: db.count('accounts', all) }, { c_text: 'x' }]));
+    expect(rows.map((r: any) => [r.c_int8, r.c_text])).toEqual([[3, null], [null, 'x']]);
+    expect(await run(db.upsert('users', { email: 'new@example.com', display_name: 'New', manager_id: db.min('users', all, { columns: ['id'] }) }, 'email')))
+      .toMatchObject({ email: 'new@example.com', manager_id: await scalar('SELECT min(id) AS v FROM users'), $action: 'INSERT' });
+    expect(await run(db.upsert('users', { email: 'bob@example.com', display_name: 'Bob' }, 'email', { updateValues: { manager_id: db.count('accounts', owner) } })))
+      .toMatchObject({ display_name: 'Bob', manager_id: 1, $action: 'UPDATE' });
+    const updated = await run(db.update('users', { settings: db.select('accounts', owner, ordered) }, sql`TRUE`, { returning: ['display_name', 'settings'] }));
+    expect(sortBy(updated, 'display_name')).toEqual([
+      { display_name: 'Ada', settings: [{ balance: 20 }, { balance: 1500.5 }] },
+      { display_name: 'Bob', settings: [{ balance: 0 }] },
+      { display_name: 'Cyd', settings: [] },
+      { display_name: 'New', settings: [] },
+    ]);
+  });
+
+  it('more than one row is refused there, as in extras (21000)', async () => {
+    expect((await fails(db.update('users', { manager_id: db.count('accounts', all, { groupBy: 'owner_id' }) }, { id: 3 }))).code).toBe('21000');
+  });
+
+  it('unchanged: a shortcut in parentheses in a sql fragment runs, bare in one and a write shortcut are refused (42601)', async () => {
+    expect(await run(db.update('users', { manager_id: sql`(${db.count('accounts', all)})` }, { display_name: 'Cyd' }, { returning: ['manager_id'] })))
+      .toEqual([{ manager_id: 3 }]);
+    expect((await fails(db.update('users', { manager_id: sql`${db.count('accounts', all)} + 1` }, { display_name: 'Cyd' }))).code).toBe('42601');
+    expect((await fails(db.update('users', { settings: db.deletes('accounts', { owner_id: 2 }) }, { display_name: 'Cyd' }))).code).toBe('42601');
+  });
+});
