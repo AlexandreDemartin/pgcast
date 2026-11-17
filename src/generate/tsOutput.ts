@@ -440,10 +440,14 @@ const tsForQueries = async (config: CompleteConfig, queryFn: (q: pg.QueryConfig)
       const placeholder = Object.keys(customTypeOrigins).find(custom =>
         Object.keys(customTypeOrigins[custom]).includes(`"${schema}"."${name}"`));
       if (placeholder === undefined || Object.keys(customTypeOrigins[placeholder]).length > 1) return [];
-      const type = tsIdentifier(name, 'type'), namespace = tsIdentifier(schema, 'namespace');
-      customTypeImports[placeholder] = schema === config.unprefixedSchema ? type : namespace;
-      customTypes[placeholder] = schema === config.unprefixedSchema ? type : `${namespace}.${type}`;
-      return [[placeholder, `${schema}.${name}`, customTypes[placeholder]] as const];
+      const
+        type = tsIdentifier(name, 'type'), namespace = tsIdentifier(schema, 'namespace'),
+        union = schema === config.unprefixedSchema ? type : `${namespace}.${type}`,
+        // a placeholder of the union's own name (customTypesTransform 'my_type') cannot import it by that name: TS2440
+        sameName = placeholder === type && schema === config.unprefixedSchema;
+      customTypeImports[placeholder] = sameName ? '' : schema === config.unprefixedSchema ? type : namespace;
+      customTypes[placeholder] = sameName ? `import('${names}/schema').${type}` : union;
+      return [[placeholder, `${schema}.${name}`, union] as const];
     }),
     hasCustomTypes = Object.keys(customTypes).length > 0,
     ts = header() + declareModule(`${names}/schema`,

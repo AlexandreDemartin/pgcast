@@ -1147,6 +1147,11 @@ ${imports.map(line => `  ${line}\n`).join('')}  export type ${type};  // replace
       it.each([['my_type', 'my_type' as const], ['a function that keeps the name', (name: string) => name]])(
         'compiles with customTypesTransform %s, with no lib check skipped', async (_, customTypesTransform) => {
           expect(await probeErrors({ ...sameName, customTypesTransform }, probe, { skipLibCheck: false })).toEqual([]);
+          const { customTypeSourceFiles: files } = await codegen({ ...sameName, customTypesTransform });
+          expect(files.book_format).toContain(`  export type book_format = import('zapatos/schema').book_format;  //`);
+          expect(files.book_format).not.toContain('import type');
+          expect(files.union_self).toContain(
+            `  import type { union_self } from 'zapatos/schema';\n  export type union_self = union_self.union_self;`);
         });
     });
   });
