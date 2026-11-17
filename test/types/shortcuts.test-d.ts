@@ -241,6 +241,24 @@ describe('insert', () => {
     // @ts-expect-error price_with_vat_cents is generated
     db.insert('products', { sku: 'x', price_cents: 1, price_with_vat_cents: 1 });
   });
+
+  test('takes a fragment whose result is typed as a value (#654)', () => {
+    const
+      text = db.sql<s.users.SQL, string>`'A'`,
+      int = db.sql<s.users.SQL, number>`1`,
+      one = db.insert('users', { email: 'a@b', display_name: text, manager_id: int }),
+      many = db.insert('users', [{ email: 'a@b', display_name: text, manager_id: db.count('users', db.all) }]);
+    expectTypeOf(one.run(pool)).resolves.toEqualTypeOf<s.users.JSONSelectable>();
+    expectTypeOf(many.run(pool)).resolves.toEqualTypeOf<s.users.JSONSelectable[]>();
+    expectTypeOf(one.run(pool)).resolves.not.toBeAny();
+    db.insert('users', { email: 'a@b', display_name: db.selectExactlyOne('users', { id: 1 }, { columns: ['display_name'] }) });
+  });
+
+  test('refuses a fragment that carries a constraint', () => {
+    const constrained = db.sql<s.users.SQL, string, number>`'A'`;
+    // @ts-expect-error the Insertable slot takes a fragment's result, not its constraint
+    db.insert('users', { email: 'a@b', display_name: constrained });
+  });
 });
 
 describe('upsert', () => {
@@ -250,6 +268,16 @@ describe('upsert', () => {
     const q = db.upsert('users', row, 'email');
     expectTypeOf(q.run(pool)).resolves.toEqualTypeOf<s.users.JSONSelectable & db.UpsertAction>();
     expectTypeOf(q.run(pool)).resolves.not.toBeAny();
+  });
+
+  test('takes a fragment whose result is typed as a value (#654)', () => {
+    const
+      text = db.sql<s.users.SQL, string>`'A'`,
+      one = db.upsert('users', { email: 'a@b', display_name: text, manager_id: db.count('users', db.all) }, 'email'),
+      many = db.upsert('users', [{ email: 'a@b', display_name: text }], 'email');
+    expectTypeOf(one.run(pool)).resolves.toEqualTypeOf<s.users.JSONSelectable & db.UpsertAction>();
+    expectTypeOf(many.run(pool)).resolves.toEqualTypeOf<(s.users.JSONSelectable & db.UpsertAction)[]>();
+    expectTypeOf(one.run(pool)).resolves.not.toBeAny();
   });
 
   test("reportAction: 'suppress' drops $action", () => {
