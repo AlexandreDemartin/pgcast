@@ -832,6 +832,40 @@ ${imports.map(line => `  ${line}\n`).join('')}  export type ${type};  // replace
       expect.soft(files.PgGenres_d).toBe(placeholder('zapatos', [schema], 'PgGenres_d = placeholder_imports.genre[]'));
     });
 
+    // a placeholder that takes its enum's name cannot import it by that name (TS2440), as a union's cannot
+    describe('a placeholder named as the enum it would import', () => {
+      beforeAll(() => t.pool.query(`
+        CREATE SCHEMA enum_self;
+        CREATE SCHEMA enum_self_d;
+        CREATE TYPE enum_self.genre AS ENUM ('comedy', 'drama');
+        CREATE TYPE enum_self.mood AS ENUM ('tense', 'calm');
+        CREATE DOMAIN enum_self_d.genre AS enum_self.genre;
+        CREATE DOMAIN enum_self_d.mood AS enum_self.mood[];
+        CREATE TABLE enum_self.films (id int PRIMARY KEY, genre enum_self_d.genre, moods enum_self_d.mood);
+      `));
+      afterAll(() => t.pool.query('DROP SCHEMA enum_self, enum_self_d CASCADE'));
+
+      const sameName = { schemas: { enum_self: all }, unprefixedSchema: 'enum_self' };
+      const probe = `
+        import * as db from 'zapatos/db';
+        import type * as s from 'zapatos/schema';
+        import { expectTypeOf } from 'expect-type';
+        expectTypeOf<s.films.Selectable['genre']>().toEqualTypeOf<'comedy' | 'drama' | null>();
+        expectTypeOf<s.films.Selectable['moods']>().toEqualTypeOf<('tense' | 'calm')[] | null>();
+        // @ts-expect-error not a label of genre
+        db.insert('films', { id: 1, genre: 'western' });
+        // @ts-expect-error not an array of labels of mood
+        db.insert('films', { id: 1, moods: ['meh'] });`;
+
+      it.each([['my_type', 'my_type' as const], ['a function that keeps the name', (name: string) => name]])(
+        'compiles with customTypesTransform %s, with no lib check skipped', async (_, customTypesTransform) => {
+          expect.soft(await probeErrors({ ...sameName, customTypesTransform }, probe, { skipLibCheck: false })).toEqual([]);
+          const { customTypeSourceFiles: files } = await codegen({ ...sameName, customTypesTransform });
+          expect.soft(files.genre).toBe(placeholder('zapatos', [], `genre = import('zapatos/schema').genre`));
+          expect.soft(files.mood).toBe(placeholder('zapatos', [], `mood = import('zapatos/schema').mood[]`));
+        });
+    });
+
     // with typeEnumsAcrossSchemas off, each relation reads `genre` in its own schema: an import would type one
     // of them with the other's labels, and its text would hang on which relation is read last
     describe('a domain whose relations would import different enums', () => {
