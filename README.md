@@ -8,7 +8,7 @@ Maintained by [Alexandre Demartin](https://github.com/AlexandreDemartin)
 [![CI](https://github.com/AlexandreDemartin/pgcast/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/AlexandreDemartin/pgcast/actions/workflows/ci.yml)
 [![Licence: MIT](https://img.shields.io/badge/licence-MIT-blue.svg)](https://github.com/AlexandreDemartin/pgcast/blob/master/LICENCE)
 
-> **Status:** published on npm as [`@pgcast/pgcast`](https://www.npmjs.com/package/@pgcast/pgcast), each release and its security fixes in the [changelog](https://pgcast.dev/changelog). 6.6.2 closed the security holes of Zapatos 6.6.1; 6.7.0 added opt-ins for the surprises that code may rely on, and pgcast's own module names.
+> **Status:** published on npm as [`@pgcast/pgcast`](https://www.npmjs.com/package/@pgcast/pgcast), each release and its security fixes in the [changelog](https://pgcast.dev/changelog). 6.6.2 and the releases after it closed security holes of Zapatos 6.6.1, each with its advisory ([fixes by release](https://pgcast.dev/security#fixes-by-release)); 6.7.0 added opt-ins for the surprises that code may rely on, and pgcast's own module names.
 
 ## Why pgcast
 
@@ -80,7 +80,7 @@ npx zapatos        # or: npx pgcast
 
 ## What differs from Zapatos 6.6.1
 
-- **Security (6.6.2).** A string can no longer close its quotes as a table or column name, a `Whereable` key, a `lateral` key or alias, or the cast of `param()`; plain `updateValues` of `upsert()` are parameters; lock, `truncate()`, isolation and aggregate keywords are checked before any query. The few 6.6.1 calls that relied on this, and their migration, are listed under `Security` in the [changelog](https://pgcast.dev/changelog#6.6.2-security).
+- **Security.** From 6.6.2, a string can no longer close its quotes as a table or column name, a `Whereable` key, a `lateral` key or alias, or the cast of `param()`; plain `updateValues` of `upsert()` are parameters; lock, `truncate()`, isolation and aggregate keywords are checked before any query. The few 6.6.1 calls that relied on this, and their migration, are listed under `Security` in the [changelog](https://pgcast.dev/changelog#6.6.2-security). Later releases closed more holes that Zapatos 6.6.1 shares, each with its advisory: [fixes by release](https://pgcast.dev/security#fixes-by-release).
 - **Fixes.** A call that Postgres already refused throws a helpful error first, such as `update()` with no columns, and a result that contradicts the function's name, type or docs changes, such as `not()`, which now negates its whole condition: each is listed under `Fixed` in the [changelog](https://pgcast.dev/changelog).
 - **Opt-ins**, for surprises that code may rely on. Each is off by default; the old path emits a `DeprecationWarning` once per process, with a code to search for, except `selectExactlyOneChecksForSecondRow`'s, which stays opt-in for good, and the generator's, which note through `warningListener` ([decision 003](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/003-fixes-and-deprecation.md)).
 

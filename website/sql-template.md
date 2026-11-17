@@ -474,7 +474,7 @@ What `sql` and every shortcut return: a query, or part of one, not yet compiled.
 | [`prepared(name?)`](#prepared) | makes it a prepared statement |
 | [`copy(override?)`](#copy) | a shallow copy, some properties replaced |
 | `noop`, `noopResult` | set by `insert()` and `upsert()` given `[]`: `run()` sends nothing and resolves to `noopResult` |
-| `parentTable` | set on a `lateral` subquery by its parent, and on the subquery of `exists()` and `isInSelect()` by their `parent` option, for [`parent()`](#parent) |
+| `parentTable` | set on a `lateral` subquery by its parent, and, from 6.9.0, on the subquery of `exists()` and `isInSelect()` by their `parent` option, for [`parent()`](#parent) |
 | `preparedName` | set by `prepared()` |
 | `compileExpression()` | used by `compile()`, internal |
 
