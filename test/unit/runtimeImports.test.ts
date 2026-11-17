@@ -1,8 +1,9 @@
 // Copyright (C) 2026 Alexandre Demartin
 //
 // What the published code loads at run time (#592): each module of src/db and src/generate, emitted as
-// `npm run build` emits it, requires only Node's built-ins, its own files, `dependencies` and the peers
-// that are not optional: typescript is optional, for the types alone. No database.
+// `npm run build` emits it, requires only Node's built-ins, its own files, `dependencies` and the required
+// peers that serve the run time, `pg`: `typescript` and `@types/pg` serve the types alone, so that a project
+// without them still runs. No database.
 
 import * as fs from 'fs';
 import { builtinModules } from 'module';
@@ -16,10 +17,11 @@ const
   { options } = ts.convertCompilerOptionsFromJson(
     ts.readConfigFile(path.join(root, 'tsconfig.json'), ts.sys.readFile).config.compilerOptions, root),
   optional = (name: string) => pkg.peerDependenciesMeta?.[name]?.optional === true,
+  typesOnly = (name: string) => name === 'typescript' || name.startsWith('@types/'),
   allowed = new Set([
     ...builtinModules,
     ...Object.keys(pkg.dependencies ?? {}),
-    ...Object.keys(pkg.peerDependencies ?? {}).filter(name => !optional(name)),
+    ...Object.keys(pkg.peerDependencies ?? {}).filter(name => !optional(name) && !typesOnly(name)),
   ]),
   modules = ['src/db', 'src/generate'].flatMap(dir =>
     fs.readdirSync(path.join(root, dir)).filter(f => f.endsWith('.ts')).map(f => `${dir}/${f}`));
@@ -41,13 +43,12 @@ describe('runtime imports', () => {
     expect(requires('src/db/customJSON.ts')).toContain('json-custom-numbers');
   });
 
-  it.each(modules)('%s requires only built-ins, its own files, dependencies and required peers', file => {
+  it.each(modules)('%s requires only built-ins, its own files, dependencies and pg', file => {
     const refused = requires(file).filter(s => s === null || !(s.startsWith('.') || allowed.has(packageOf(s))));
     expect(refused).toEqual([]);
   });
 
-  it('keeps pg and @types/pg required peers, typescript an optional one', () => {
-    expect(['pg', '@types/pg'].filter(name => !(name in pkg.peerDependencies) || optional(name))).toEqual([]);
-    expect('typescript' in pkg.peerDependencies && optional('typescript')).toBe(true);
+  it('keeps pg, @types/pg and typescript required peers, as in Zapatos 6.6.1', () => {
+    expect(['pg', '@types/pg', 'typescript'].filter(name => !(name in pkg.peerDependencies) || optional(name))).toEqual([]);
   });
 });
