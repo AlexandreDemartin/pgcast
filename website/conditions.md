@@ -472,6 +472,8 @@ From 6.9.0. Each writes a subquery on a table, filtered by a Whereable or a `sql
 | `parent` | the table of `parent()`: `"films"."id"`<!-- probe: db.conditions.exists('roles', { film_id: db.parent('id') }, { parent: 'films' }) --> | none |
 | `alias` | `AS "mentees"`<!-- probe: db.conditions.exists('crew', db.all, { alias: 'mentees' }) --> after the table | none |
 
+A `null` that gets past the type, from JavaScript or JSON: `null` options are none, as in the [shortcuts](/select#errors), so `exists('crew', db.all, null)` writes `EXISTS (SELECT 1 FROM "crew")`<!-- probe: db.conditions.exists('crew', db.all, null) -->.
+
 ### `exists()` {#conditions.exists}
 
 ```ts

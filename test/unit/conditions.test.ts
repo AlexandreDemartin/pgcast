@@ -1381,3 +1381,125 @@ describe('exists() and isInSelect()', () => {
       .toThrow("The 'parent' table alias has no meaning here");
   });
 });
+
+// an option is what the caller wrote, as in the shortcuts (#552): `{ parent, alias } = options` took a key that other
+// code added to Object.prototype as an option of every call given none, or an options object without it (#590)
+describe('an exists() or isInSelect() option added to Object.prototype by something else is no option', () => {
+  const { exists, isInSelect } = dc;
+  const noMark = "The 'parent' table alias has no meaning here";
+  const compiled = (build: () => db.SQLFragment<any, any>) => {
+    try { const { text, values } = build().compile(); return { text, values }; } catch (err) { return (err as Error).message; }
+  };
+
+  /** Run `f` with `Object.prototype[key]` set to `value`, as other code would, deleted after it. */
+  const withPrototypeKey = <T>(key: string, value: unknown, f: () => T): T => {
+    const proto = Object.prototype as any;
+    proto[key] = value;
+    try { return f(); } finally { delete proto[key]; }
+  };
+
+  /** Run `f` with a getter `key` on Object.prototype, and a setter if `set`, as other code would define them, deleted after it; with its reads. */
+  const withPrototypeGetter = <T>(key: string, value: unknown, f: () => T, set = false) => {
+    let reads = 0;
+    Object.defineProperty(Object.prototype, key, { get: () => (reads++, value), ...set && { set() { } }, configurable: true });
+    try { return { result: f(), reads }; } finally { delete (Object.prototype as any)[key]; }
+  };
+
+  /** A Proxy over `target` that counts each trap by name and key, and answers `answers`' keys through `get` alone. */
+  const counting = (counts: Record<string, number>, target: object, answers: Record<string, unknown> = {}) =>
+    new Proxy(target, Object.fromEntries(['get', 'has', 'ownKeys', 'getOwnPropertyDescriptor', 'getPrototypeOf'].map(trap =>
+      [trap, (...args: any[]) => {
+        const name = trap === 'ownKeys' || trap === 'getPrototypeOf' ? trap : `${trap}:${String(args[1])}`;
+        counts[name] = (counts[name] ?? 0) + 1;
+        return trap === 'get' && Object.prototype.hasOwnProperty.call(answers, args[1]) ? answers[args[1]] : (Reflect as any)[trap](...args);
+      }])));
+
+  const
+    users = { text: 'EXISTS (SELECT 1 FROM "users")', values: [] },
+    authors = { text: '(("id" IN (SELECT "author_id" FROM "extra"."articles")))', values: [] },
+    managers = { text: '(("id" IN (SELECT "manager_id" FROM "users")))', values: [] },
+    correlated = { text: 'EXISTS (SELECT 1 FROM "extra"."articles" WHERE ("author_id" = "users"."id"))', values: [] };
+
+  // each row compiles as the call without that key on Object.prototype; with options left out, none is read
+  const rows: [string, string, unknown, () => db.SQLFragment<any, any>, unknown, number][] = [
+    ['alias: exists(), no options', 'alias', 'x', () => exists('users', db.all), users, 0],
+    ['alias: exists(), {}', 'alias', 'x', () => exists('users', db.all, {}), users, 1],
+    ['alias: exists(), its own parent', 'alias', 'x', () => exists('extra.articles', { author_id: parent('id') }, { parent: 'users' }), correlated, 1],
+    ['alias: isInSelect(), no options', 'alias', 'x', () => sql`${{ id: isInSelect('extra.articles', db.all, 'author_id') }}`, authors, 0],
+    ['alias: an own __proto__ key from JSON.parse', 'alias', 'x', () => exists('users', db.all, JSON.parse('{"__proto__":{"alias":"r"}}')), users, 1],
+    ['parent: an uncorrelated parent() still throws', 'parent', 'users', () => exists('extra.articles', { author_id: parent('id') }), noMark, 0],
+    ['parent: an uncorrelated parent() still throws, {}', 'parent', 'users', () => exists('extra.articles', { author_id: parent('id') }, {}), noMark, 1],
+    ['parent: exists() over the same table is no refusal', 'parent', 'users', () => exists('users', db.all), users, 0],
+    ['parent: isInSelect() over the same table is no refusal', 'parent', 'users', () => sql`${{ id: isInSelect('users', db.all, 'manager_id', {}) }}`, managers, 1],
+  ];
+
+  it.each(rows)('a value on Object.prototype is no option: %s', (_, key, value, build, expected) => {
+    expect(withPrototypeKey(key, value, () => compiled(build))).toEqual(expected);
+  });
+
+  // a getter answers anew on each read, so its value is no sign of where it came from; it is read once per options object,
+  // and a setter beside it changes nothing
+  it.each(rows)('a getter on Object.prototype is no option either: %s', (_, key, value, build, expected, reads) => {
+    expect({
+      get: withPrototypeGetter(key, value, () => compiled(build)),
+      getAndSet: withPrototypeGetter(key, value, () => compiled(build), true),
+    }).toEqual({ get: { result: expected, reads }, getAndSet: { result: expected, reads } });
+  });
+
+  // NaN is not `===` itself, yet the NaN read is the one Object.prototype holds; a `parent` of NaN, a falsy mark,
+  // changes nothing in the SQL, so only `alias` shows it
+  it.each(rows.filter(([, key]) => key === 'alias'))('a NaN on Object.prototype is no option either: %s', (_, key, __, build, expected) => {
+    expect(withPrototypeKey(key, NaN, () => compiled(build))).toEqual(expected);
+  });
+
+  it('null options are none, as in select()', () => {
+    expect({
+      exists: compiled(() => exists('users', db.all, null as any)),
+      isInSelect: compiled(() => sql`${{ id: isInSelect('extra.articles', db.all, 'author_id', null as any) }}`),
+    }).toEqual({ exists: users, isInSelect: authors });
+  });
+
+  it('options are read as before, as often and through the same traps, with no such key on Object.prototype', () => {
+    const counts = { own: {} as Record<string, number>, answering: {} as Record<string, number>, empty: {} as Record<string, number> };
+    expect({
+      own: compiled(() => exists('extra.articles', { author_id: parent('id') }, counting(counts.own, { parent: 'users', alias: 'a' }))),
+      answering: compiled(() => exists('extra.articles', { author_id: parent('id') }, counting(counts.answering, {}, { parent: 'users', alias: 'a' }))),
+      empty: compiled(() => exists('users', db.all, counting(counts.empty, {}))),
+      counts,
+    }).toEqual({
+      own: { text: 'EXISTS (SELECT 1 FROM "extra"."articles" AS "a" WHERE ("author_id" = "users"."id"))', values: [] },
+      answering: { text: 'EXISTS (SELECT 1 FROM "extra"."articles" AS "a" WHERE ("author_id" = "users"."id"))', values: [] },
+      empty: users,
+      counts: {
+        own: { 'get:parent': 1, 'get:alias': 1 },
+        answering: { 'get:parent': 1, 'get:alias': 1 },
+        empty: { 'get:parent': 1, 'get:alias': 1 },
+      },
+    });
+  });
+
+  it('a setter alone on Object.prototype gives no value, so what the caller\'s object answers is read through the same traps', () => {
+    const counts: Record<string, number> = {};
+    Object.defineProperty(Object.prototype, 'alias', { set() { }, configurable: true });
+    let result: unknown;
+    try {
+      result = compiled(() => exists('users', db.all, counting(counts, {}, { alias: 'reports' })));
+    } finally { delete (Object.prototype as any).alias; }
+    expect({ result, counts }).toEqual({
+      result: { text: 'EXISTS (SELECT 1 FROM "users" AS "reports")', values: [] },
+      counts: { 'get:parent': 1, 'get:alias': 1 },
+    });
+  });
+
+  it('an option of the caller\'s own object, a class getter or a prototype is still read with a key on Object.prototype', () => {
+    class Aliased { get alias() { return 'reports'; } }
+    const reports = { text: 'EXISTS (SELECT 1 FROM "users" AS "reports")', values: [] };
+    expect(withPrototypeKey('alias', 'x', () => ({
+      own: compiled(() => exists('users', db.all, { alias: 'reports' })),
+      classed: compiled(() => exists('users', db.all, new Aliased() as any)),
+      created: compiled(() => exists('users', db.all, Object.create({ alias: 'reports' }))),
+      literal: compiled(() => exists('users', db.all, { __proto__: { alias: 'reports' } } as any)),
+      same: compiled(() => exists('users', db.all, { alias: 'x' })),
+    }))).toEqual({ own: reports, classed: reports, created: reports, literal: reports, same: { text: 'EXISTS (SELECT 1 FROM "users" AS "x")', values: [] } });
+  });
+});

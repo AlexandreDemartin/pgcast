@@ -1,5 +1,5 @@
 ---
-english: 7edf5af075bf
+english: 1b128936d41c
 description: "db.conditions regroupe les tests, comparaisons et opérateurs à donner comme valeur d’une clé d’un Whereable, chacun avec le SQL qu’il écrit et ses valeurs."
 ---
 
@@ -476,6 +476,8 @@ Zapatos 6.6.1 écrivait `(NOT "release_year" = 1974 OR "release_year" = 1991)`, 
 |---|---|---|
 | `parent` | la table de `parent()` : `"films"."id"`<!-- probe: db.conditions.exists('roles', { film_id: db.parent('id') }, { parent: 'films' }) --> | aucun |
 | `alias` | `AS "mentees"`<!-- probe: db.conditions.exists('crew', db.all, { alias: 'mentees' }) --> après la table | aucun |
+
+Un `null` qui passe le type, en JavaScript ou dans du JSON : des options `null` reviennent à n’en passer aucune, comme dans les [raccourcis](/fr/select#errors), si bien que `exists('crew', db.all, null)` écrit `EXISTS (SELECT 1 FROM "crew")`<!-- probe: db.conditions.exists('crew', db.all, null) -->.
 
 ### `exists()` {#conditions.exists}
 
