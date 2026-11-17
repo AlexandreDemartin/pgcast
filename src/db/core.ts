@@ -321,14 +321,9 @@ export interface ParentColumn<T extends Column | undefined = Column | undefined>
 export function parent<T extends Column | undefined = Column | undefined>(x?: T) { return new ParentColumn<T>(x); }
 
 
-// a Whereable that refuses a primitive: every key of a Whereable is optional, so a string passed as one when a column
-// shares the name of a String member its type fits (`search` typed any, `length` a number), and with it any SQL (#670).
-// A string has an iterator, a Whereable none, and no column is a symbol. Not exported, so written out in full
-type NotIterable = { [Symbol.iterator]?: never };
-
 // ColumnNames and ColumnValues of any value: a `Parameter` accepted them in a `sql` template before the tag above
 export type GenericSQLExpression = SQLFragment<any, any> | Parameter | DefaultType | DangerousRawString | SelfType | ColumnNames<any> | ColumnValues<any>;
-export type SQLExpression = Table | ColumnNames<Updatable | (keyof Updatable)[]> | ColumnValues<Updatable | any[]> | (Whereable & NotIterable) | Column | ParentColumn | GenericSQLExpression;
+export type SQLExpression = Table | ColumnNames<Updatable | (keyof Updatable)[]> | ColumnValues<Updatable | any[]> | Whereable | Column | ParentColumn | GenericSQLExpression;
 export type SQL = SQLExpression | SQLExpression[];
 
 export type Queryable = pg.ClientBase | pg.Pool;

@@ -108,12 +108,6 @@ describe('select', () => {
     db.select('products', db.all, { order: { by: 'serach', direction: 'ASC' } });
     // @ts-expect-error a string is no Whereable (having)
     db.select('products', db.all, { groupBy: 'sku', having: 'serach' });
-    // @ts-expect-error a string is no Whereable (and)
-    c.and('serach');
-    // @ts-expect-error a string is no Whereable (or)
-    c.or({ sku: 'a' }, 'serach');
-    // @ts-expect-error a string is no Whereable (not)
-    c.not('serach');
     // @ts-expect-error a string is no Whereable (exists)
     c.exists('products', 'serach');
     // @ts-expect-error a string is no Whereable (isInSelect)
@@ -122,6 +116,14 @@ describe('select', () => {
     const titel = { titel: 'a' };
     // @ts-expect-error 'titel' is not a column of products
     db.select('products', titel);
+  });
+
+  // and(), or() and not() take the Whereable of every table, which names no table to check (#674)
+  test('characterization: and(), or() and not() still take any string (#674)', () => {
+    const c = db.conditions;
+    expectTypeOf(c.and('serach')).not.toBeAny();
+    expectTypeOf(c.or({ sku: 'a' }, 'serach')).not.toBeAny();
+    expectTypeOf(c.not('serach')).not.toBeAny();
   });
 
   test('a generic forwarder over the where of a shortcut or a condition still compiles (#670)', () => {

@@ -289,7 +289,11 @@ describe('*ForTable<T> lookups', () => {
     expectTypeOf<s.JSONSelectableForTable<'extra.articles'>>().toEqualTypeOf<s.extra.articles.JSONSelectable>();
     expectTypeOf<s.InsertableForTable<'accounts'>>().toEqualTypeOf<s.accounts.Insertable>();
     expectTypeOf<s.UpdatableForTable<'accounts'>>().toEqualTypeOf<s.accounts.Updatable>();
-    expectTypeOf<s.WhereableForTable<'users'>>().toEqualTypeOf<s.users.Whereable>();
+    // with a guard that a string fails, so that a column named like a String member makes no string a Whereable (#670);
+    // a Whereable passes as one, and the reverse
+    expectTypeOf<s.WhereableForTable<'users'>>().toEqualTypeOf<s.users.Whereable & { [Symbol.iterator]?: undefined }>();
+    expectTypeOf<s.users.Whereable>().toMatchTypeOf<s.WhereableForTable<'users'>>();
+    expectTypeOf<s.WhereableForTable<'users'>>().toMatchTypeOf<s.users.Whereable>();
     expectTypeOf<s.ColumnForTable<'users'>>().toEqualTypeOf<keyof s.users.Selectable>();
     expectTypeOf<s.UniqueIndexForTable<'users'>>().toEqualTypeOf<'users_email_key' | 'users_pkey'>();
     // shared_name_idx: unique on extra.articles, a plain index on public.transfers

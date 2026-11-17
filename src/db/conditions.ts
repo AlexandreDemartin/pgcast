@@ -26,9 +26,6 @@ import {
 import { callerValue, mapWithSeparator } from './utils';
 import type { Whereable, Table, Column, WhereableForTable, SelectableForTable } from 'zapatos/schema';
 
-// as in core.ts: a Whereable that refuses a string (#670)
-type NotIterable = { [Symbol.iterator]?: never };
-
 const
   defaultInCondition = '`db.Default` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To set a column to its default in an UPDATE, give `db.Default` as the value itself: `{ n: db.Default }`.',
   selfInCondition = '`db.self` has no meaning as the value of `eq()`, `add()` and the other conditions: it is already the column on the left. To compare the column with itself, write a `sql` fragment with `db.self` on both sides.',
@@ -259,7 +256,7 @@ export const jsonbPathExists: {
  * parentheses of their own: `AND` binds tighter than `OR`.
  * @param conditions `SQLFragment`s (other conditions, or `sql` using `self`) or `Whereable`s
  */
-export const or = <T>(...conditions: (SQLFragment<any, T> | (Whereable & NotIterable))[]) =>
+export const or = <T>(...conditions: (SQLFragment<any, T> | Whereable)[]) =>
   conditions.length > 0 ? sql<SQL, boolean | null, T>`(${mapWithSeparator(conditions, sql` OR `, c => c)})` : sql<SQL, boolean | null, T>`FALSE`;
 /**
  * Join conditions with `AND`, each in its own parentheses: `` and(sql`a OR b`, c) `` compiles to
@@ -267,7 +264,7 @@ export const or = <T>(...conditions: (SQLFragment<any, T> | (Whereable & NotIter
  * does. Zapatos 6.6.1 wrote `(a OR b AND c)`, which reads `a OR (b AND c)`, and `()` for `and()`.
  * @param conditions `SQLFragment`s (other conditions, or `sql` using `self`) or `Whereable`s
  */
-export const and = <T>(...conditions: (SQLFragment<any, T> | (Whereable & NotIterable))[]) =>
+export const and = <T>(...conditions: (SQLFragment<any, T> | Whereable)[]) =>
   conditions.length > 0 ? sql<SQL, boolean | null, T>`(${mapWithSeparator(conditions, sql` AND `, c => sql`(${c})`)})` : sql<SQL, boolean | null, T>`TRUE`;
 /**
  * Negate a condition, all of it: `` not(sql`a OR b`) `` compiles to `(NOT (a OR b))`, and
@@ -275,7 +272,7 @@ export const and = <T>(...conditions: (SQLFragment<any, T> | (Whereable & NotIte
  * `(NOT a) OR b`.
  * @param condition A `SQLFragment` (another condition, or `sql` using `self`) or a `Whereable`
  */
-export const not = <T>(condition: SQLFragment<any, T> | (Whereable & NotIterable)) => sql<SQL, boolean | null, T>`(NOT (${condition}))`;
+export const not = <T>(condition: SQLFragment<any, T> | Whereable) => sql<SQL, boolean | null, T>`(NOT (${condition}))`;
 
 // the first item, at any depth as the typed form nests (`arrayContains<number[]>([[1]])`), that is no plain value: pg
 // sent db.all, Default and self as '{"Symbol(all)"}', and a wrapper, a Parameter, parent() or a fragment as its JSON;
@@ -377,7 +374,7 @@ const subquery = (fn: string, head: SQL, table: string, where: SQL | AllType, op
  * @param options `parent`, the outer table as the outer query names it (its alias, if any); `alias`, `AS <alias>`
  * after `table`, needed when `parent` names it; `null` is none, and one that is no string throws as the query compiles
  */
-export const exists = <T extends Table>(table: T, where: (WhereableForTable<T> & NotIterable) | SQLFragment<any> | AllType, options?: { parent?: string; alias?: string }) =>
+export const exists = <T extends Table>(table: T, where: WhereableForTable<T> | SQLFragment<any> | AllType, options?: { parent?: string; alias?: string }) =>
   sql<SQL, boolean, never>`EXISTS (${subquery('exists', raw('SELECT 1'), table, where, options)})`;
 
 /**
@@ -389,7 +386,7 @@ export const exists = <T extends Table>(table: T, where: (WhereableForTable<T> &
  * @param column The column of `table` the subquery selects
  * @param options `parent` and `alias`, as in `exists()`; `null` is none
  */
-export const isInSelect = <T extends Table, C extends keyof SelectableForTable<T>>(table: T, where: (WhereableForTable<T> & NotIterable) | SQLFragment<any> | AllType, column: C, options?: { parent?: string; alias?: string }) =>
+export const isInSelect = <T extends Table, C extends keyof SelectableForTable<T>>(table: T, where: WhereableForTable<T> | SQLFragment<any> | AllType, column: C, options?: { parent?: string; alias?: string }) =>
   sql<SQL, boolean | null, Exclude<SelectableForTable<T>[C], null>>`${self} IN (${subquery('isInSelect', sql`SELECT ${column as Column}`, table, where, options)})`;
 
 /* === full-text search === */

@@ -47,8 +47,6 @@ describe('sql<Interpolations, RunResult, Constraint>', () => {
     db.sql<s.products.SQL>`SELECT ${name} FROM ${'products'}`;
     // @ts-expect-error 'serach' is not a column, through SQLForTable
     db.sql<s.SQLForTable<'products'>>`SELECT ${'serach'}`;
-    // @ts-expect-error 'serach' is no column of any table, under the default db.SQL
-    db.sql`SELECT ${'serach'}`;
     // a Whereable variable, of products or of every table, still passes
     const w = { sku: 'a' } as s.products.Whereable, every = w as s.Whereable;
     expectTypeOf(db.sql<s.products.SQL>`${w}`).toEqualTypeOf<db.SQLFragment<any[], never>>();
@@ -59,7 +57,10 @@ describe('sql<Interpolations, RunResult, Constraint>', () => {
     db.sql<s.products.SQL>`${titel}`;
   });
 
-  test('characterization: a Whereable given as sql\'s own type argument still takes any string (#674)', () => {
+  // the guard is in the generated lookup and each table's SQL, not in db.SQL: there, it refused a generic
+  // `${{ ...w, id: 1 }}` on TypeScript 4.1 (review of #676)
+  test('characterization: db.SQL, and a Whereable given as sql\'s own type argument, still take any string (#674)', () => {
+    expectTypeOf(db.sql`${'serach'}`).toEqualTypeOf<db.SQLFragment<any[], never>>();
     expectTypeOf(db.sql<s.products.Whereable>`${'serach'}`).toEqualTypeOf<db.SQLFragment<any[], never>>();
   });
 

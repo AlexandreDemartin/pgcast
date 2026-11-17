@@ -136,6 +136,13 @@ function quoteIfIllegalIdentifier(identifier: string) {
   return identifier.match(/^[a-zA-Z_$][0-9a-zA-Z_$]*$/) ? identifier : stringLiteral(identifier, '"');
 }
 
+// Every key of a Whereable is optional, so a string passed as one when a column shares the name of a String member
+// its type fits (`search` typed any, `length` a number), and with it any name, in the table's SQL and as the where
+// of its shortcuts (#670). A string has an iterator, a Whereable none, and no column is a symbol. It goes in the
+// lookup, not on the shortcuts' parameters, so that a generic `{ ...where, id }` still fits; `undefined`, not
+// `never`, so that a homomorphic mapped type over it (`Readonly`, `Omit`) does too, under exactOptionalPropertyTypes
+const notIterable = '{ [Symbol.iterator]?: undefined }';
+
 export const definitionForRelationInSchema = async (
   rel: Relation,
   schemaName: string,
@@ -377,9 +384,7 @@ export const definitionForRelationInSchema = async (
  * ${jsdocLines(`**${schemaPrefix}${rel.name}**`, ' ')}
  * - ${friendlyRelType} in database
  */` : ``,
-    // SQLExpression's Whereable refuses a primitive: every key of a Whereable is optional, so a string passed as one
-    // when a column shares the name of a String member its type fits (`search` typed any, `length` a number), and
-    // the table's SQL took any string (#670). A string has an iterator, a Whereable none, and no column is a symbol
+    // SQLExpression's Whereable refuses a primitive, as WhereableForTable's does (notIterable, above)
     tableDef = `${tableComment}
 export namespace ${tsIdentifier(rel.name, 'namespace')} {
   export type Table = ${stringLiteral(schemaPrefix + rel.name)};
@@ -403,7 +408,7 @@ export namespace ${tsIdentifier(rel.name, 'namespace')} {
         'never'};
   export type Column = keyof Selectable;
   export type OnlyCols<T extends readonly Column[]> = Pick<Selectable, T[number]>;
-  export type SQLExpression = Table | db.ColumnNames<Updatable | (keyof Updatable)[]> | db.ColumnValues<Updatable> | (Whereable & { [Symbol.iterator]?: never }) | Column | db.ParentColumn | db.GenericSQLExpression;
+  export type SQLExpression = Table | db.ColumnNames<Updatable | (keyof Updatable)[]> | db.ColumnValues<Updatable> | (Whereable & ${notIterable}) | Column | db.ParentColumn | db.GenericSQLExpression;
   export type SQL = SQLExpression | SQLExpression[];
 }`;
   return tableDef;
@@ -448,7 +453,7 @@ export type AllTablesAndViews = ${tableMappedArray(tables, 'Table')};`;
 export const crossSchemaTypesForAllTables = (allTables: Relation[], unprefixedSchema: string | null) =>
   ['Selectable', 'JSONSelectable', 'Whereable', 'Insertable', 'Updatable', 'UniqueIndex', 'Column', 'SQL'].map(thingable => `
 export type ${thingable}ForTable<T extends Table> = ${allTables.length === 0 ? 'any' : `{${allTables.map(rel => `
-  ${stringLiteral((rel.schema === unprefixedSchema ? '' : `${rel.schema}.`) + rel.name, '"')}: ${rel.schema === unprefixedSchema ? '' : `${tsIdentifier(rel.schema, 'namespace')}.`}${tsIdentifier(rel.name, 'namespace')}.${thingable};`).join('')}
+  ${stringLiteral((rel.schema === unprefixedSchema ? '' : `${rel.schema}.`) + rel.name, '"')}: ${rel.schema === unprefixedSchema ? '' : `${tsIdentifier(rel.schema, 'namespace')}.`}${tsIdentifier(rel.name, 'namespace')}.${thingable}${thingable === 'Whereable' ? ` & ${notIterable}` : ''};`).join('')}
 }[T]`};
 `).join('');
 
