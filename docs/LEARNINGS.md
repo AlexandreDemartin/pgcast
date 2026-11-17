@@ -331,6 +331,13 @@ Candidates for a check, a rule or a skill line.
 - #635: the guard refuses `git merge --no-edit`: give the merge message with `-m`, its Co-Authored-By line included.
 - #639: with `groupBy`, every lateral's result is in the select list, so Postgres refuses the query (42803) unless `groupBy` names it: why real code writes `${col}, "lateral_x".result`.
 - #639: to probe row-level security as a superuser without creating a role, `SET LOCAL ROLE pg_read_all_data` in the probe database: predefined, no RLS bypass, SELECT already granted.
+- #647: a `seen`-check mutant on an iterative walk can loop forever without filling the stack: test a cycle whose walk grows the stack, so the mutant fails on its own (`RangeError: Invalid array length`), or kill the worker process itself.
+- #647: `check-prose.mjs` matches a `<!-- message -->` quote against single literals: a message meant for the docs is written as one template, not a template joined to a ternary.
+- #647: a shape matrix for a walk over nested arrays puts the refused item after a plain one inside a nested array (`[['ok', bad]]`): a head-only walk survived every first-item shape.
+- #647: when a PR widens a refusal an unreleased CHANGELOG entry describes, grep that entry for every clause stating the old limit, not only the one naming the issue.
+- #647: a refusal decided at the call misses an array changed after it: walk caller data where the fragment compiles.
+- #647: overriding `compile` on one fragment (the `refused()` technique) moves a check from the call to compile time inside `conditions.ts`, with no `core.ts` change.
+- #647: a string mutant through `String.replace` changes only the first occurrence: when the line also exists elsewhere (`eqAny()` and `arrayParam`), anchor the pattern on its context.
 - #646: count a schema pattern through `pg_get_constraintdef()` on a database dump, not by reading migrations, which create and drop in up/down pairs.
 - #646: Postgres stores `VALUE IN (…)` as `VALUE = ANY (ARRAY[…])`, a one-value `IN` as `=`: a reader of `CHECK` text matches the stored forms, replayed on the server.
 - #646: `pg_get_constraintdef()` and `pg_get_expr()` write string literals by the reading session's `standard_conforming_strings`: off, a backslash comes back doubled with no `E` prefix; replay any catalog SQL text with it off.
@@ -398,6 +405,7 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #606 (form): `scripts/check-declarations-floor.mjs` leaves `pg-types` (`^2.2.0` from `@types/pg@8.6.6`) unpinned.
 - #621 (form): `src/db/conditions.ts` `callerValue(options, 'parent') || undefined`: `|| undefined` is an equivalent mutant (core reads `parentTable` by truthiness).
 - #639 (form): `.agents/skills/code-style/SKILL.md` § Further than Zapatos still lists "laterals typed by foreign keys" first on Zapatos's roadmap; after decision 007, say what pgcast gives instead (`parent<T.Column>`).
+- #647 (form): #638's `db.all` refusal in `isIn()` and a Whereable value is decided where `core.ts` compiles, but an array given to `isIn()` and changed after the call is read then too: check whether the same "changed after the call" gap exists there.
 
 - #645 (form): `src/db/shortcuts.ts` `allAsWriteFilter`: one clause for the reader who reached it by accident ("check the value that is missing") would complete the advice.
 - #645 (form): `website/sql-template.md` § all (EN and FR): the bullet repeats the message it quotes; keep only "`{}` and `` db.sql`TRUE` `` do:" before the quote.

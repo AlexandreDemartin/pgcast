@@ -274,27 +274,47 @@ export const and = <T>(...conditions: (SQLFragment<any, T> | Whereable)[]) =>
  */
 export const not = <T>(condition: SQLFragment<any, T> | Whereable) => sql<SQL, boolean | null, T>`(NOT (${condition}))`;
 
-// an array holding db.all at any depth, as the typed form nests (`arrayContains<number[]>([[1]])`): pg sent it as
-// '{"Symbol(all)"}'; each array is walked once, from a stack of its own, so neither a cyclic nor a deeply nested one
-// overflows the call stack, and either goes on as a parameter
-const holdsAll = (a: unknown[]) => {
+// the first item, at any depth as the typed form nests (`arrayContains<number[]>([[1]])`), that is no plain value: pg
+// sent db.all, Default and self as '{"Symbol(all)"}', and a wrapper, a Parameter, parent() or a fragment as its JSON;
+// each array is walked once, from a stack of its own, so neither a cyclic nor a deeply nested one overflows the call
+// stack, and either goes on as a parameter
+const notAValueIn = (a: unknown[]) => {
   const seen = new Set<unknown[]>([a]), todo = [a];
   for (let next = todo.pop(); next; next = todo.pop()) {
     for (const x of next) {
-      if (x === all) return true;
+      if (notAValue(x) !== undefined) return x;
       if (Array.isArray(x) && !seen.has(x)) { seen.add(x); todo.push(x); }
     }
   }
-  return false;
+  return undefined;
 };
-const arrayParam = (a: unknown) => Array.isArray(a) && holdsAll(a) ? refused(allInCondition) : conditionalParam(a);
+// the array is walked as the query compiles, when pg reads it, so that an item pushed after the call throws too; the
+// fragment around its parameter compiles as the parameter alone
+const arrayParam = (fn: string, a: unknown) => {
+  if (!Array.isArray(a)) return conditionalParam(a);
+  const fragment = sql`${param(a)}`, compile = fragment.compile;
+  return Object.assign(fragment, {
+    compile: (...args: Parameters<typeof compile>) => {
+      const item = notAValueIn(a);
+      if (item === undefined) return compile(...args);
+      throw new Error(item === all ? allInCondition :
+        item instanceof Parameter || item instanceof SQLFragment || item instanceof ParentColumn ?
+          `\`${fn}()\` sends its array as one parameter, so each item is a plain value, not ${notAValue(item)}: give the value itself; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.` :
+          `\`${fn}()\` sends its array as one parameter, so each item is a plain value, not ${notAValue(item)}: give a value.`);
+    },
+  });
+};
 
-/** `"col" @> $1`, typed on the element, as in Zapatos 6.6.1. On an `int4[]` column: `arrayContains<number[]>([[1]])`, or `` sql`${self} @> ${param([1], 'int4[]')}` ``. */
-export const arrayContains = <T>(a: T[] | ParentColumn) => sql<SQL, boolean | null, T>`${self} @> ${arrayParam(a)}`;
-/** `"col" <@ $1`, typed on the element, as in Zapatos 6.6.1. On an `int4[]` column: `arrayContainedIn<number[]>([[1, 2]])`, or `` sql`${self} <@ ${param([1, 2], 'int4[]')}` ``. */
-export const arrayContainedIn = <T>(a: T[] | ParentColumn) => sql<SQL, boolean | null, T>`${self} <@ ${arrayParam(a)}`;
-/** `"col" && $1`, typed on the element, as in Zapatos 6.6.1. On an `int4[]` column: `arrayOverlaps<number[]>([[1, 2]])`, or `` sql`${self} && ${param([1, 2], 'int4[]')}` ``. */
-export const arrayOverlaps = <T>(a: T[] | ParentColumn) => sql<SQL, boolean | null, T>`${self} && ${arrayParam(a)}`;
+/**
+ * `"col" @> $1`, typed on the element, as in Zapatos 6.6.1. On an `int4[]` column: `arrayContains<number[]>([[1]])`,
+ * or `` sql`${self} @> ${param([1], 'int4[]')}` ``. An item, at any depth, that is `db.Default`, `db.self`, `db.all`,
+ * `db.raw()`, `db.cols()`, `db.vals()`, `db.param()`, `db.parent()` or a `sql` fragment throws as the query compiles.
+ */
+export const arrayContains = <T>(a: T[] | ParentColumn) => sql<SQL, boolean | null, T>`${self} @> ${arrayParam('arrayContains', a)}`;
+/** `"col" <@ $1`, typed on the element, as in Zapatos 6.6.1. On an `int4[]` column: `arrayContainedIn<number[]>([[1, 2]])`, or `` sql`${self} <@ ${param([1, 2], 'int4[]')}` ``. Refuses the items `arrayContains()` refuses. */
+export const arrayContainedIn = <T>(a: T[] | ParentColumn) => sql<SQL, boolean | null, T>`${self} <@ ${arrayParam('arrayContainedIn', a)}`;
+/** `"col" && $1`, typed on the element, as in Zapatos 6.6.1. On an `int4[]` column: `arrayOverlaps<number[]>([[1, 2]])`, or `` sql`${self} && ${param([1, 2], 'int4[]')}` ``. Refuses the items `arrayContains()` refuses. */
+export const arrayOverlaps = <T>(a: T[] | ParentColumn) => sql<SQL, boolean | null, T>`${self} && ${arrayParam('arrayOverlaps', a)}`;
 
 /* === subqueries === */
 
