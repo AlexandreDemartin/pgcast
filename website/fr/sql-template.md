@@ -1,5 +1,5 @@
 ---
-english: 149fb003c33e
+english: 41dacafc9fd0
 ---
 
 # Template SQL
@@ -589,10 +589,13 @@ withCTEs<Q extends SQLFragment<any, any>>(ctes: { [name: string]: SQLFragment<an
 À partir de la 6.11.0. Place des CTE avant une requête et garde son résultat : avec `recent` un fragment `sql` qui sélectionne les films d’après 1990, `db.withCTEs({ recent }, db.count('films', …))` donne `WITH "recent" AS (SELECT "id" FROM "films" WHERE "release_year" > $1) SELECT count(*) AS result FROM "films"`<!-- probe: db.withCTEs({ recent: db.sql`SELECT ${'id'} FROM ${'films'} WHERE ${'release_year'} > ${db.param(1990)}` }, db.count('films', db.sql`${'id'} IN (SELECT id FROM recent)`)) --> et se résout en un nombre.
 
 - **Ordre** : celui de l’objet, si bien qu’une CTE lit celles qui la précèdent ; une clé entière vient en premier, comme `Object.keys` la donne.
-- **Noms** : chaque clé est un seul nom, ses `"` doublés, jamais coupé sur `.` : `'a.b'` donne `"a.b"`<!-- probe: db.withCTEs({ 'a.b': db.sql`SELECT 1` }, db.sql`SELECT 2`) -->.
-- **Aucune CTE** : `withCTEs({}, query)` donne `query` elle-même, si bien qu’une liste construite à l’exécution n’a besoin d’aucune branche.
-- **Le résultat** : une [`copy()`](#copy) de `query`, de son type. Il se résout en ce que donne `query`, imbriqué dans un `lateral` ou dans `extras` aussi, et s’écrit entre parenthèses comme valeur d’`extras` ou d’`insert()` là où `query` l’est. Il s’exécute même quand `query` ne fait rien, un `insert()` sans ligne : ses CTE s’exécutent donc aussi.
-- **Requête préparée** : jamais, pas plus que les CTE et la requête qu’il imbrique, car un [nom](#prepared) désigne un seul texte. Appelez `prepared()` sur le résultat.
+- **Noms** : chaque clé est un seul nom, jamais coupé sur `.`, écrit entre guillemets comme un [identifiant](#identifiers) : `'a.b'` donne `"a.b"`<!-- probe: db.withCTEs({ 'a.b': db.sql`SELECT 1` }, db.sql`SELECT 2`) -->, un `"` est doublé, et une clé déjà échappée à la main est gardée telle quelle, si bien que `'a""b'` et `'a"b'` nomment toutes deux la CTE `a"b`, ce que Postgres refuse (42712).
+- **Aucune CTE** : `withCTEs({}, query)` donne une copie de `query`, son propre SQL, si bien qu’une liste construite à l’exécution n’a besoin d’aucune branche.
+- **Le résultat** : une [`copy()`](#copy) de `query`, de son type. Il se résout en ce que donne `query`, imbriqué dans un `lateral` ou dans `extras` aussi, et s’écrit entre parenthèses comme valeur d’`extras` ou d’`insert()` là où `query` l’est.
+- **Sans effet** : un `insert()` ou un `upsert()` sans ligne, comme requête ou comme CTE, s’écrit `SELECT NULL::jsonb AS result WHERE false`<!-- probe: db.withCTEs({ a: db.sql`SELECT 1` }, db.insert('films', [])) -->, une requête sans ligne sur n’importe quelle table, et le résultat n’est pas sans effet : ses CTE s’exécutent donc ; comme requête, elle se résout en `[]`.
+- **`selectExactlyOne()`** : avec [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), le résultat demande toujours une deuxième ligne, `LIMIT $1`<!-- probe: (db.setConfig({ selectExactlyOneChecksForSecondRow: true }), db.withCTEs({ a: db.sql`SELECT 1` }, db.selectExactlyOne('films', db.all))) --> avec `2`, et il est rejeté s’il en trouve une, comme le raccourci seul. Imbriqué dans une autre requête, il garde `LIMIT 1`.
+- **Un seul `WITH`** : la requête ne peut pas commencer par un `WITH` à elle, un résultat de `withCTEs()` ou un fragment `sql`, ni être un [`truncate()`](/fr/insert#truncate) : Postgres refuse le texte (42601). Mettez toutes les CTE dans un seul appel.
+- **Requête préparée** : jamais, pas plus que les CTE et la requête qu’il imbrique, `{}` compris, car un [nom](#prepared) désigne un seul texte. Appelez `prepared()` sur le résultat. Sur une liste construite à l’exécution, un même nom couvrirait un texte par liste : donnez à chaque texte son propre nom, ou ne préparez pas la requête.
 
 ## `RunResultForSQLFragment` {#RunResultForSQLFragment}
 
