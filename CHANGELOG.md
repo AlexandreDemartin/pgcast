@@ -6,6 +6,10 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 
 ## [Unreleased]
 
+### Fixed
+- A new `zapatos/custom` placeholder that two types of one name share ([#42](https://github.com/AlexandreDemartin/pgcast/issues/42)) no longer hangs on which relation the generator reads last: the type whose `"schema"."name"` sorts last holds it, with the text and import it would get alone, in whichever order the relations are read (#661). A domain `tone.tone` over the enum `tone.mood` beside a domain `public.tone` over `text`, both `PgTone`, got `mood` with no import or `string`, from run to run, on Zapatos 6.6.1 and pgcast up to 6.10.0; `mood` failed to compile (TS2304), and typed the column `any` under `skipLibCheck`. It now gets `import type { tone } from 'zapatos/schema';` and `tone.mood`, in every run. Two such types in one relation, which took the column read last, take the one that sorts last too: a domain of another schema over an enum the relation's schema lacks gets `any`, where 6.6.1 wrote the other domain's `mood` with no import, `any` under `skipLibCheck` too. The losing type's columns are still typed by that placeholder, as the note says. `schema.d.ts` is unchanged, a placeholder of one type is unchanged, and one already on disk is never rewritten.
+- A new `zapatos/custom` placeholder named as its domain's schema, which imports that schema's namespace, names its type with no import when an enum or a union of `unprefixedSchema` takes that name too, under `customTypesTransform` `'my_type'` or a function that keeps the name: `export type tone = import('zapatos/schema').tone.mood;` for a domain `tone.tone` over the enum `tone.mood` (#661). pgcast up to 6.10.0 wrote `import type { tone } from 'zapatos/schema';`, which brings that type as well, so the placeholder's own name conflicted with it (TS2440); under `skipLibCheck` the column was typed all the same. Zapatos 6.6.1 wrote `mood` with no import (TS2304, and `any` under `skipLibCheck`). A placeholder whose namespace import names no such type keeps it.
+
 ## [6.10.0] - 2026-11-17
 
 ### Added
