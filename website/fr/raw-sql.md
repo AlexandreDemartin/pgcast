@@ -1,5 +1,5 @@
 ---
-english: bacb66c8a0df
+english: 87ac2ca3a1f6
 description: "Quand aucun raccourci n’écrit la requête dont vous avez besoin, écrivez-la dans le template sql, et gardez hors de son texte toute valeur venue de l’extérieur."
 ---
 
@@ -26,7 +26,7 @@ Quand aucun raccourci n’écrit la requête dont vous avez besoin (une jointure
 
 </CastPanel>
 
-- Un nom interpolé est mis entre guillemets, `"films"`<!-- probe: examples/raw_sql_join.ts -->, et vérifié d’après le premier argument de type : ici `Tables`, le type `SQL` de chaque table que nomme la requête. Qualifiez une colonne en écrivant `${'films'}.${'title'}` : le type connaît les colonnes de chaque table, pas `'films.title'`.
+- Un nom interpolé est mis entre guillemets, `"films"`<!-- probe: examples/raw_sql_join.ts -->, et vérifié d’après le premier argument de type : ici `Tables`, le type `SQL` de chaque table que nomme la requête. Qualifiez une colonne en écrivant `${'films'}.${'title'}` : le type connaît les colonnes de chaque table, pas `'films.title'`, à moins de nommer la paire ([Qualifier une colonne par son alias](#qualify-a-column-by-its-alias)).
 - Le second argument de type est ce que vous affirmez de ce qui revient : rien ne le confronte au SQL. Les lignes arrivent telles que `pg` les parse, comme un `Selectable` les décrit (un `Date` pour un `timestamptz`), et non comme le JSON du `JSONSelectable` des raccourcis. Un `count(*)` est un `bigint`, que `pg` donne sous forme de chaîne : `'4'`.
 - Les mots-clés restent dans le texte. Le SQL que vous écrivez vous-même n’y risque rien ; seul ce qui vient de l’extérieur demande les étapes ci-dessous.
 
@@ -264,6 +264,44 @@ Une sous-requête écrite à la main peut aller dans le `lateral` d’un raccour
 - Hors d’un `lateral`, `parent()` lève l’erreur "The 'parent' table alias has no meaning here"<!-- message -->, donc la promesse de [`run()`](/fr/sql-template#run) est rejetée avant toute requête.
 
 Les jointures par `lateral`, pas à pas : [Jointures](/fr/lateral).
+
+## Qualifier une colonne par son alias {#qualify-a-column-by-its-alias}
+
+Une table jointe à elle-même a besoin d’un alias pour l’un de ses côtés, sinon Postgres la refuse (42712). Nommez l’alias dans le premier argument de type de `sql`, en paire avec les colonnes de la table, et chaque `${'alias.column'}` est vérifié :
+
+<CastPanel example="raw_sql_alias">
+
+<<< ../examples/raw_sql_alias.ts{ts twoslash}
+
+</CastPanel>
+
+- Une chaîne interpolée est découpée sur les `.`, chaque partie mise entre guillemets : `${'mentors.name'}` donne `"mentors"."name"`<!-- probe: examples/raw_sql_alias.ts -->. Le nom même de la table forme une paire de la même façon, `` `crew.${s.crew.Column}` ``.
+- L’alias reste nu dans le texte, `"crew" AS mentors`<!-- probe: examples/raw_sql_alias.ts --> : `${'mentors'}` n’est ni une table ni une colonne de l’argument de type.
+- Wilhelmina Strand n’a pas de mentor, donc le `JOIN` l’écarte : trois lignes.
+
+Une colonne que `crew` n’a pas, ou un alias que l’argument de type ne nomme pas, ne compile pas :
+
+```ts twoslash
+// @errors: 2345
+import * as db from 'zapatos/db';
+import type * as s from 'zapatos/schema';
+type CrewAndMentors = s.crew.SQL | `crew.${s.crew.Column}` | `mentors.${s.crew.Column}`;
+// ---cut---
+db.sql<CrewAndMentors>`SELECT ${'mentors.title'} FROM ${'crew'} AS mentors`;
+db.sql<CrewAndMentors>`SELECT ${'mentor.name'} FROM ${'crew'} AS mentors`;
+```
+
+Le type vérifie la paire, pas la requête ; Postgres vérifie le reste à l’exécution :
+
+- Écrivez l’alias en minuscules : sans guillemets, `AS Mentors` est `mentors` pour Postgres, donc `${'Mentors.name'}`, mis entre guillemets, donne 42P01.
+- Une fois qu’une table a un alias, son propre nom ne qualifie plus ses colonnes : 42P01.
+- Rien ne vérifie le `FROM` : un alias qu’il ne définit pas donne 42P01.
+- Une colonne dont le nom contient un `.` entre dans la paire, mais `${'mentors.a.b'}` donne `"mentors"."a"."b"`<!-- probe: db.sql`${'mentors.a.b'}` --> (42P01) : seule la chaîne entre guillemets s’exécute, `${'"mentors"."a.b"'}`, nommée telle quelle dans l’argument de type.
+- La paire n’est vérifiée que tant que le `SQL` de la table refuse une chaîne nue : une colonne nommée comme un membre de `String`, d’un type auquel ce membre correspond (`any`), laisse passer n’importe quelle chaîne, comme pour une colonne nue ([#670](https://github.com/AlexandreDemartin/pgcast/issues/670)).
+
+L’[`alias`](/fr/select#alias) d’un raccourci n’a besoin de rien de tout cela : ses colonnes et les clés de son Whereable se rapportent à l’alias, et `db.parent()` atteint la requête extérieure. Un fragment `where` ou `extras` qui nomme l’alias prend le même argument de type : `"member"."mentor_id" IS NULL`<!-- probe: db.select('crew', db.sql`${'member.mentor_id'} IS NULL`, { alias: 'member' }) -->.
+
+Il n’y a pas de helper d’alias : l’argument de type vérifie déjà la paire, sans nouvel export ([décision 010](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/010-aliases-and-with.md#3-qualified-column-names)).
 
 ## Vérifier le SQL avant de l’exécuter {#check-the-sql-before-you-run-it}
 
