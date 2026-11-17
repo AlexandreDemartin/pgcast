@@ -1,5 +1,5 @@
 ---
-english: dd84a50e3afe
+english: a66f3ab4d235
 ---
 
 # Template SQL
@@ -362,9 +362,9 @@ La colonne courante, dans un fragment donné en valeur d’un Whereable : `` { 
   - Dans `isIn()` / `isNotIn()`, et dans `vals([…])` au sein d’un filtre ([`vals()`](#vals)) : "`` `db.self` has no meaning as an item of `vals([…])` in a column's value, in a filter (as `isIn()` writes it) or in a `sql` fragment value of `vals({…})`, so of `insert()`, `upsert()` or `update()`: give a value; in a filter or in `update()`, write `db.self` in a `sql` fragment value, outside `vals([…])`, where it stands for the column. ``<!-- message -->"
   - Comme valeur de `eq()`, `add()` et des autres conditions : "`` `db.self` has no meaning as the value of `eq()`, `add()` and the other conditions: it is already the column on the left. To compare the column with itself, write a `sql` fragment with `db.self` on both sides. ``<!-- message -->"
 - Dans `vals([…])` au sein d’un fragment donné en valeur d’une écriture, soit en valeur de `vals({…})`, comme dans `insert()`, `upsert()` et `update()`, il lève à la compilation le message d’`isIn()` ci-dessus.
-- Comme valeur écrite, il lève une erreur à la compilation, là où Zapatos 6.6.1 stockait `'Symbol(self)'`, et le type le refuse :
-  - Dans `vals({…})`, donc comme valeur d’`insert()`, d’`upsert()` ou d’`update()`, `updateValues` compris : "`` `db.self` has no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value: give a value; in `update()`, write `db.self` in a `sql` fragment value, where it stands for the column. ``<!-- message -->"
-  - Dans `vals([…])` hors de la valeur d’une colonne, dans un template `sql` que vous écrivez ou dans `updateValues` : "`` `db.self` has no meaning as an item of `vals([…])` outside a column's value, as in a `sql` template of your own or in `upsert()` `updateValues`: give a value, or name the column. ``<!-- message -->"
+- Comme valeur écrite, il lève une erreur à la compilation, là où Zapatos 6.6.1 envoyait ou stockait `'Symbol(self)'`. Le type le refuse comme valeur d’`insert()`, d’`upsert()` ou d’`update()`, `updateValues` compris, sauf sur une colonne typée `any` ; un `vals()` dans un template `sql` que vous écrivez l’accepte :
+  - Dans `vals({…})`, donc comme valeur d’`insert()`, d’`upsert()` ou d’`update()`, `updateValues` compris : "`` `db.self` has no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value: give a value; in `update()`, write `db.self` in a `sql` fragment value, where it stands for the column; in `upsert()` `updateValues`, to read a column, write it after its table, db.sql`${table}.${column}`, or after `EXCLUDED` for the row proposed. ``<!-- message -->"
+  - Dans `vals([…])` hors de la valeur d’une colonne, dans un template `sql` que vous écrivez ou dans `updateValues` : "`` `db.self` has no meaning as an item of `vals([…])` outside a column's value, as in a `sql` template of your own or in `upsert()` `updateValues`: give a value; in `updateValues`, to read a column, write it after its table, db.sql`${table}.${column}`, or after `EXCLUDED` for the row proposed. ``<!-- message -->"
 
 ### `SelfType` {#SelfType}
 
@@ -476,7 +476,7 @@ Le `where` de `select()`, de `count()` et des autres lectures qui correspond à 
   - Dans `isIn()` / `isNotIn()`, et dans `vals([…])` au sein d’un filtre ([`vals()`](#vals)) : "`` `db.all` has no meaning as an item of `vals([…])` in a column's value, in a filter (as `isIn()` writes it) or in a `sql` fragment value of `vals({…})`, so of `insert()`, `upsert()` or `update()`: in a filter, leave the key out, or compare with a value; in a write, give a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`. ``<!-- message -->"
   - Comme valeur de `eq()`, `add()` et des autres conditions, et dans le tableau d’une condition de tableau : "`` `db.all` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`. ``<!-- message -->"
 - Dans `vals([…])` au sein d’un fragment donné en valeur d’une écriture, soit en valeur de `vals({…})`, comme dans `insert()`, `upsert()` et `update()`, il lève à la compilation le message d’`isIn()` ci-dessus.
-- Comme valeur écrite, il lève une erreur à la compilation, là où Zapatos 6.6.1 stockait `'Symbol(all)'`, et le type le refuse :
+- Comme valeur écrite, il lève une erreur à la compilation, là où Zapatos 6.6.1 envoyait ou stockait `'Symbol(all)'`. Le type le refuse comme valeur d’`insert()`, d’`upsert()` ou d’`update()`, `updateValues` compris, sauf sur une colonne typée `any` ; un `vals()` dans un template `sql` que vous écrivez l’accepte :
   - Dans `vals({…})`, donc comme valeur d’`insert()`, d’`upsert()` ou d’`update()`, `updateValues` compris : "`` `db.all` has no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value: give a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`. ``<!-- message -->"
   - Dans `vals([…])` hors de la valeur d’une colonne, dans un template `sql` que vous écrivez ou dans `updateValues` : "`` `db.all` has no meaning as an item of `vals([…])` outside a column's value, as in a `sql` template of your own or in `upsert()` `updateValues`: give a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`. ``<!-- message -->"
 
