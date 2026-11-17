@@ -105,4 +105,15 @@ describe('withCTEs', () => {
     expect(await query.run(t.client)).toBe(3);
     expect(await result.run(t.client)).toBe(1);
   });
+
+  it('a query prepared after the call keeps its name to its own text, and the result runs unprepared', async () => {
+    const
+      tag = randomBytes(4).toString('hex'),
+      query = db.count('accounts', all),
+      result = db.withCTEs({ accounts: sql`SELECT 1` }, query);
+    query.prepared(`pgcast_ctes_late_${tag}`);
+    expect(await query.run(t.client)).toBe(3);
+    expect(await result.run(t.client)).toBe(1);
+    expect(await query.run(t.client)).toBe(3);
+  });
 });

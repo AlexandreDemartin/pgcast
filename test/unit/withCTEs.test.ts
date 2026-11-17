@@ -156,4 +156,13 @@ describe('withCTEs', () => {
     expect(db.withCTEs({}, query).prepared('accounts_count_none').compile().name).toBe('accounts_count_none');
     expect(query.compile().name).toBe('accounts_count');
   });
+
+  it('is not prepared by a prepared() called on the query or a CTE after the call', () => {
+    const query = db.count('accounts', all), cte = sql`SELECT 1`;
+    const result = db.withCTEs({ recent: cte }, query), none = db.withCTEs({}, query);
+    query.prepared('accounts_count_late');
+    cte.prepared('one_late');
+    expect(result.compile()).toEqual({ text: 'WITH "recent" AS (SELECT 1) SELECT count(*) AS result FROM "accounts"', values: [] });
+    expect(none.compile()).toEqual({ text: 'SELECT count(*) AS result FROM "accounts"', values: [] });
+  });
 });
