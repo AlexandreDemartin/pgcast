@@ -311,6 +311,15 @@ Candidates for a check, a rule or a skill line.
 - #632: each "Unchanged:" path a CHANGELOG or docs line states needs a test that freezes it, or a later PR changing that path leaves the line stale with every test green.
 - #632: `docs:build` exists only in `website/package.json`: `npm run docs:build` at the root fails with "Missing script", as #301 found for `docs:translated`.
 - #632: never chain `docs:translated` after a scripted edit of a French page in one command: a missed match (the U+00A0 before `:` and `;`) still marks the page translated.
+- #635: count a corpus pattern with its type arguments (`parent<T.Column>(`), ideally by AST: #625's grep for `parent(` found 114 of 1,255 calls.
+- #635: an issue's corpus claim ("under `@ts-ignore`", "about a thousand") is recounted before a note cites it.
+- #635: a gain from inferring a shortcut is measured against the project's own generated `schema.d.ts` (12 % of many-to-one laterals chose differently from the nullability), not claimed.
+- #635: a runtime helper fed by the schema needs a runtime value: `zapatos/schema` holds only declarations, so check where a design's data lives at run time before planning its PRs.
+- #635: date a Zapatos change by where its commit falls against the version commits in `git log upstream/master`, not by the version its warning is remembered in (ambient declarations: 3.0, not 4.0).
+- #635: before counting a cast as a workaround for code that cannot run, compile the cast form: a dotted string in a column slot splits into a qualified name and runs.
+- #635: the cheapest type shape beat the obvious one sixfold: plain indexing of declared maps cost +2.0 points where `Extract` over a union or a generic join argument cost +11.6, and the generic also let an extra property through.
+- #635: an ambient `declare module 'x'` in a script file hides the real module `x` instead of extending it: generated types cannot be added to `zapatos/db` that way (TS2305).
+- #635: the guard refuses `git merge --no-edit`: give the merge message with `-m`, its Co-Authored-By line included.
 
 ## Minors kept
 
