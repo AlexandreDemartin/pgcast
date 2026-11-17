@@ -6,7 +6,7 @@
 // without them still runs. No database.
 
 import * as fs from 'fs';
-import { builtinModules } from 'module';
+import { isBuiltin } from 'module';
 import * as path from 'path';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
@@ -19,7 +19,6 @@ const
   optional = (name: string) => pkg.peerDependenciesMeta?.[name]?.optional === true,
   typesOnly = (name: string) => name === 'typescript' || name.startsWith('@types/'),
   allowed = new Set([
-    ...builtinModules,
     ...Object.keys(pkg.dependencies ?? {}),
     ...Object.keys(pkg.peerDependencies ?? {}).filter(name => !optional(name) && !typesOnly(name)),
   ]),
@@ -33,9 +32,12 @@ const requires = (file: string) => {
   return [...js.matchAll(/\brequire\(([^)]*)\)/g)].map(m => /^\s*(['"])([^'"]+)\1\s*$/.exec(m[1])?.[2] ?? null);
 };
 
-/** The package a bare specifier names: `pg` for `pg/lib/x`, `@scope/name` for `@scope/name/x`, `fs` for `node:fs`. */
-const packageOf = (specifier: string) =>
-  specifier.replace(/^node:/, '').split('/').slice(0, specifier.startsWith('@') ? 2 : 1).join('/');
+/** The package a bare specifier names: `pg` for `pg/lib/x`, `@scope/name` for `@scope/name/x`. */
+const packageOf = (specifier: string) => specifier.split('/').slice(0, specifier.startsWith('@') ? 2 : 1).join('/');
+
+/** Whether the published code may require `specifier`: its own file, a built-in (`node:test` has no bare name), or an allowed package. */
+const allowedSpecifier = (specifier: string | null) =>
+  specifier !== null && (specifier.startsWith('.') || isBuiltin(specifier) || allowed.has(packageOf(specifier)));
 
 describe('runtime imports', () => {
   it('reads the modules and what they require', () => {
@@ -44,9 +46,15 @@ describe('runtime imports', () => {
     expect(requires('src/db/customJSON.ts')).toContain('json-custom-numbers');
   });
 
+  it.each([
+    ['./core', true], ['fs', true], ['node:fs/promises', true], ['node:test', true], ['pg', true], ['pg/lib/utils', true],
+    ['json-custom-numbers', true], ['typescript', false], ['@types/pg', false], ['pg-format', false], [null, false],
+  ] as const)('%s may be required: %s', (specifier, allowed) => {
+    expect(allowedSpecifier(specifier)).toBe(allowed);
+  });
+
   it.each(modules)('%s requires only built-ins, its own files, dependencies and pg', file => {
-    const refused = requires(file).filter(s => s === null || !(s.startsWith('.') || allowed.has(packageOf(s))));
-    expect(refused).toEqual([]);
+    expect(requires(file).filter(s => !allowedSpecifier(s))).toEqual([]);
   });
 
   it('keeps pg, @types/pg and typescript required peers, as in Zapatos 6.6.1', () => {
