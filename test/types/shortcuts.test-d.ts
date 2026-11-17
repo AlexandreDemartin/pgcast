@@ -83,6 +83,54 @@ describe('select', () => {
     db.select('users', db.all, { groupBy: 'nope' });
   });
 
+  // products.search, a tsvector typed any, shares its name with String's search(): a string passed as a
+  // products.Whereable, so as the where of every shortcut and condition, as in Zapatos 6.6.1 (#670)
+  test('refuses a string as the where of a table with a column named like a String member (#670)', () => {
+    const c = db.conditions;
+    expectTypeOf(db.select('products', { search: db.sql`${db.self} @@ 'salt'` })).toEqualTypeOf<db.SQLFragment<s.products.JSONSelectable[]>>();
+    expectTypeOf(db.select('products', c.and({ sku: 'a' }, c.not({ title: 'b' })))).toEqualTypeOf<db.SQLFragment<s.products.JSONSelectable[]>>();
+    expectTypeOf(db.count('products', db.all, { groupBy: 'sku', having: { sku: 'a' } } as const)).not.toBeAny();
+    // @ts-expect-error a string is no Whereable (select)
+    db.select('products', 'serach');
+    // @ts-expect-error a string is no Whereable (selectOne)
+    db.selectOne('products', 'serach');
+    // @ts-expect-error a string is no Whereable (selectExactlyOne)
+    db.selectExactlyOne('products', 'serach');
+    // @ts-expect-error a string is no Whereable (count)
+    db.count('products', 'serach');
+    // @ts-expect-error a string is no Whereable (sum)
+    db.sum('products', 'serach', { columns: ['price_cents'] });
+    // @ts-expect-error a string is no Whereable (update)
+    db.update('products', { sku: 'a' }, 'serach');
+    // @ts-expect-error a string is no Whereable (deletes)
+    db.deletes('products', 'serach');
+    // @ts-expect-error a string is no Whereable (having)
+    db.select('products', db.all, { groupBy: 'sku', having: 'serach' });
+    // @ts-expect-error a string is no Whereable (and)
+    c.and('serach');
+    // @ts-expect-error a string is no Whereable (or)
+    c.or({ sku: 'a' }, 'serach');
+    // @ts-expect-error a string is no Whereable (not)
+    c.not('serach');
+    // @ts-expect-error a string is no Whereable (exists)
+    c.exists('products', 'serach');
+    // @ts-expect-error a string is no Whereable (isInSelect)
+    c.isInSelect('products', 'serach', 'id');
+    // a variable that shares no key with it is still refused
+    const titel = { titel: 'a' };
+    // @ts-expect-error 'titel' is not a column of products
+    db.select('products', titel);
+  });
+
+  test('a generic forwarder over the where of a shortcut or a condition still compiles (#670)', () => {
+    const forward = <T extends s.Table>(table: T, where: s.WhereableForTable<T>) =>
+      [db.select(table, where), db.selectOne(table, where), db.count(table, where), db.deletes(table, where),
+        db.conditions.exists(table, where)];
+    forward('products', { sku: 'a' });
+    const any = (...where: s.Whereable[]) => [db.conditions.and(...where), db.conditions.or(...where), db.conditions.not(where[0]!)];
+    any({ sku: 'a' });
+  });
+
   test('lock.of accepts the alias', () => {
     const q = db.select('users', db.all, { alias: 'u', lock: { for: 'UPDATE', of: 'u' } });
     expectTypeOf<Run<typeof q>>().toEqualTypeOf<s.users.JSONSelectable[]>();

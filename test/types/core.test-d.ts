@@ -30,6 +30,44 @@ describe('sql<Interpolations, RunResult, Constraint>', () => {
     db.sql<s.users.SQL>`SELECT * FROM ${'accounts'}`;
   });
 
+  // products.search, a tsvector typed any, shares its name with String's search(): a string passed as a
+  // products.Whereable, so the table's SQL took any string, as in Zapatos 6.6.1 (#670)
+  test('a table with a column named like a String member still checks its names (#670)', () => {
+    const q = db.sql<s.products.SQL>`SELECT ${'search'}, ${['sku', 'title']} FROM ${'products'} WHERE ${{ search: db.sql`${db.self} @@ 'salt'` }}`;
+    expectTypeOf(q).toEqualTypeOf<db.SQLFragment<any[], never>>();
+    expectTypeOf(db.sql<s.products.SQL>`${[{ sku: 'a' }, 'sku', db.sql`x`]}`).toEqualTypeOf<db.SQLFragment<any[], never>>();
+    expectTypeOf(db.sql<s.SQLForTable<'products'>>`${'search'}`).toEqualTypeOf<db.SQLFragment<any[], never>>();
+    expectTypeOf(db.sql`${'search'} ${{ search: 1 }}`).toEqualTypeOf<db.SQLFragment<any[], never>>();
+    const name = 'sku' as string;
+    // @ts-expect-error 'serach' is not a column of products
+    db.sql<s.products.SQL>`SELECT ${'serach'} FROM ${'products'}`;
+    // @ts-expect-error 'serach' is not a column of products, in an array
+    db.sql<s.products.SQL>`SELECT ${['sku', 'serach']} FROM ${'products'}`;
+    // @ts-expect-error a string typed string is no name of products
+    db.sql<s.products.SQL>`SELECT ${name} FROM ${'products'}`;
+    // @ts-expect-error 'serach' is not a column, through SQLForTable
+    db.sql<s.SQLForTable<'products'>>`SELECT ${'serach'}`;
+    // @ts-expect-error 'serach' is no column of any table, under the default db.SQL
+    db.sql`SELECT ${'serach'}`;
+    // a Whereable variable, of products or of every table, still passes
+    const w = { sku: 'a' } as s.products.Whereable, every = w as s.Whereable;
+    expectTypeOf(db.sql<s.products.SQL>`${w}`).toEqualTypeOf<db.SQLFragment<any[], never>>();
+    expectTypeOf(db.sql`${every}`).toEqualTypeOf<db.SQLFragment<any[], never>>();
+    // a variable that shares no key with it is still refused
+    const titel = { titel: 'a' };
+    // @ts-expect-error 'titel' is not a column of products
+    db.sql<s.products.SQL>`${titel}`;
+  });
+
+  test('characterization: a Whereable given as sql\'s own type argument still takes any string (#674)', () => {
+    expectTypeOf(db.sql<s.products.Whereable>`${'serach'}`).toEqualTypeOf<db.SQLFragment<any[], never>>();
+  });
+
+  test('a generic forwarder over a table\'s SQL and Whereable still compiles (#670)', () => {
+    const forward = <T extends s.Table>(w: s.WhereableForTable<T>) => db.sql<s.SQLForTable<T>>`WHERE ${w}`;
+    expectTypeOf(forward<'products'>({ sku: 'a' })).toEqualTypeOf<db.SQLFragment<any[], never>>();
+  });
+
   // characterization: users.id and products.id are a number, transfers.id a string, accounts.id an int8. A
   // shortcut reads the key's contextual type across every table, and a bare template infers its Constraint from
   // that union, so the valid call is refused (TS2322), as in Zapatos 6.6.1. Any type argument leaves Constraint
