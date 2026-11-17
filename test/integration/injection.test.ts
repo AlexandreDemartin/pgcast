@@ -214,6 +214,17 @@ describe('with parameters (extended protocol)', () => {
     expect(await db.select('my""table' as any, all).run(t.client)).toEqual([{ 'my"col': 1 }]);
   });
 
+  it('a withCTEs() key that closes its quotes names one CTE, and the query stays one statement', async () => {
+    // no parameter, so the simple protocol, which would run a second statement; the main query reads the
+    // CTE by the whole key, as a string interpolated in sql quotes it, and pg answers one result
+    for (const key of ['x" AS (SELECT 1); DROP TABLE users; --', `x" AS (SELECT 1); ${update}; --`]) {
+      const q = db.withCTEs({ [key]: sql`SELECT 7 AS n` }, sql`SELECT n FROM ${key}`);
+      expect(q.compile().values).toEqual([]);
+      expect(await q.run(t.client)).toEqual([{ n: 7 }]);
+      expect(await adaName()).toBe('Ada');
+    }
+  });
+
   it('a lateral key that closes its quotes stays one alias, and is still the key of the result', async () => {
     // 6.6.1: `"lateral_x" ON true) AS "sq_users"; …; --".result` in the select list, a syntax error
     const key = `x" ON true) AS "sq_users"; ${update}; --`;

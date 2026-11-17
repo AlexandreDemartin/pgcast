@@ -86,6 +86,11 @@ export const numbered: (pool: db.Queryable) => Promise<number[]> = names;
 // @ts-expect-error a table the schema does not have
 export const films = (pool: db.Queryable) => db.select('films', db.all).run(pool);
 
+const reports = db.sql<s.users.SQL>\`SELECT \${'id'} FROM \${'users'} WHERE \${'manager_id'} = \${db.param(1)}\`;
+export const counted: (pool: db.Queryable) => Promise<number> = pool => db.withCTEs({ reports }, db.count('users', db.all)).run(pool);
+// @ts-expect-error withCTEs() keeps count()'s number
+export const countedText: (pool: db.Queryable) => Promise<string> = pool => db.withCTEs({ reports }, db.count('users', db.all)).run(pool);
+
 export const user: s.users.Insertable = { email: 'ada@example.com', display_name: 'Ada' };
 // @ts-expect-error display_name is NOT NULL with no default
 export const nameless: s.users.Insertable = { email: 'ada@example.com' };

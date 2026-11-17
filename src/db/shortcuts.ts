@@ -156,6 +156,9 @@ function SQLForAlias(prefix: string, name: string) {
 // bare, which Postgres refuses (42601): in extras, in jsonb_build_object() (#262), and as an insert(), upsert() or
 // update() value, in VALUES and ROW() (#656). A sql fragment is the caller's SQL, written as given
 const isQuery = (x: unknown) => x instanceof SQLFragment && x['parenthesisedInExtras'];
+// the LIMIT 2 form of a selectExactlyOne() that checks for a second row, which withCTEs() writes at the top level too
+const secondRowQuery = Symbol('secondRowQuery');
+type SecondRowChecked = { [secondRowQuery]?: SQLFragment<any, any> };
 const asScalar = <X>(x: X) => isQuery(x) ? sql`(${x as SQLFragment<any>})` : x;
 // a row of entries, a query among its values in parentheses
 const withScalarQueries = (entries: [string, unknown][]) => Object.fromEntries(entries.map(([k, v]) => [k, asScalar(v)]));
@@ -965,6 +968,7 @@ export const select: SelectSignatures = function (
     // where a second row would duplicate the parent row; the `LIMIT 2` form takes the properties
     // a caller may have set on the query since (those `copy()` carries over)
     const topLevelQuery = rowsSQL(2), nestedCompile = query.compile;
+    (query as SecondRowChecked)[secondRowQuery] = topLevelQuery;
     query.compile = (result, parentTable, currentColumn) => {
       if (result) return nestedCompile(result, parentTable, currentColumn);
       const { parentTable: queryParentTable, preparedName, noop } = query;
@@ -1243,4 +1247,56 @@ export const min: TypedByColumn extends true ? ColumnAggregateSignatures : Numer
  */
 export const max: TypedByColumn extends true ? ColumnAggregateSignatures : NumericAggregateSignatures = function (table, where, options?) {
   return numericAggregate(table, where, options, 'max');
+};
+
+
+
+/* === withCTEs === */
+
+// a prepared fragment writes its name into whatever compiles it, so one name would cover two texts, the fragment
+// alone and with the WITH, which pg refuses ("Prepared statements must be unique"): nested, an unprepared copy,
+// made at the call, so that a prepared() on the fragment afterwards stays its own. A no-op (an insert() or upsert()
+// of no row) is a query of no row, from no table: its own text, which runs if forced, is refused on a GENERATED
+// ALWAYS column and on a view (428C9)
+const inWith = <F>(fragment: F) =>
+  !(fragment instanceof SQLFragment) ? fragment :
+    fragment.noop ? sql`SELECT NULL::jsonb AS result WHERE false` :
+      Object.assign(fragment.copy(), { preparedName: undefined });
+
+/**
+ * Put CTEs before a query, keeping its result:
+ * `WITH "recent" AS (…), "rich" AS (…) <query>`, the CTEs in the object's
+ * order (as `Object.keys` gives it: an integer key comes first), so that each
+ * may read those before it. With no CTE, a copy of `query`, its own SQL, so a
+ * list built at run time needs no branch. Each key is one name, as a
+ * `lateral` key is: its `"` doubled, never split on `.`.
+ *
+ * The result is a copy of `query`: it resolves to what `query` does, and is
+ * written in parentheses as an `extras` or `insert()` value where `query` is.
+ * A no-op `query` or CTE (an `insert()` or `upsert()` of no row) is written
+ * `SELECT NULL::jsonb AS result WHERE false`, and the result is no no-op, so
+ * the CTEs run. A `selectExactlyOne()` that checks for a second row still does
+ * at the top level. The result is never prepared, whatever `query` is, even
+ * by a `prepared()` called on `query` or a CTE afterwards: call `prepared()`
+ * on it.
+ * @param ctes The CTEs, keyed by name: a shortcut or a `sql` fragment each
+ * @param query The main query
+ */
+export const withCTEs = <Q extends SQLFragment<any, any>>(ctes: { [name: string]: SQLFragment<any, any> }, query: Q): Q => {
+  const
+    entries = Object.entries(ctes),
+    withClause = (main: SQLFragment<any, any>) =>
+      sql`WITH ${mapWithSeparator(entries, sql`, `, ([name, cte]) => sql`${SQLForAlias('', name)} AS (${inWith(cte)})`)} ${inWith(main)}`,
+    result = Object.assign(entries.length === 0 ? query.copy() as Q :
+      query.copy({ literals: ['', ''], expressions: [withClause(query)], noop: false }) as Q, { preparedName: undefined }),
+    topLevelQuery = (query as SecondRowChecked)[secondRowQuery];
+
+  if (topLevelQuery) {
+    // compiled on its own, the LIMIT 2 form, as select() compiles it; nested, LIMIT 1
+    const nestedCompile = result.compile;
+    result.compile = (compiled, parentTable, currentColumn) => compiled ? nestedCompile(compiled, parentTable, currentColumn) :
+      Object.assign(entries.length === 0 ? topLevelQuery.copy() : withClause(topLevelQuery), { parentTable: result.parentTable, preparedName: result.preparedName })
+        .compile(undefined, parentTable, currentColumn);
+  }
+  return result;
 };

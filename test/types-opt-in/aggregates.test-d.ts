@@ -124,6 +124,18 @@ describe('with aggregatesTypedByColumn declared', () => {
     db.min('events', db.all, { columns: ['occurred_on'] }).copy().run(pool).then((n): number => n);
   });
 
+  test('after withCTEs(): the column\'s value at top level, its JSON type nested, as without', async () => {
+    const recent = db.sql`SELECT 1`, earliest = db.withCTEs({ recent }, db.min('events', db.all, { columns: ['occurred_on'] }));
+    expectTypeOf(earliest.run(pool)).resolves.toEqualTypeOf<Date | null>();
+    const user = await db.selectExactlyOne('users', db.all, { extras: { e: earliest }, lateral: { l: earliest } }).run(pool);
+    expectTypeOf(user.e).toEqualTypeOf<db.DateString | null>();
+    expectTypeOf(user.l).toEqualTypeOf<db.DateString | null>();
+    expectTypeOf(db.selectOne('users', db.all, { lateral: earliest }).run(pool)).resolves.toEqualTypeOf<Date | null | undefined>();
+    expectTypeOf(db.select('users', db.all, { lateral: earliest }).run(pool)).resolves.toEqualTypeOf<(db.DateString | null)[]>();
+    // @ts-expect-error nested, the min of a date comes back as JSON, a string, not a Date
+    expectTypeOf(user.l).toEqualTypeOf<Date | null>();
+  });
+
   test('calls that compile under 6.6.1 still compile, and throw at run time', () => {
     expectTypeOf(db.max('accounts', db.all)).not.toBeAny();
     expectTypeOf(db.min('accounts', db.all, { columns: ['balance', 'ratio'] })).not.toBeAny();
