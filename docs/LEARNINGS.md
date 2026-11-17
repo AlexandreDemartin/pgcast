@@ -299,6 +299,9 @@ Candidates for a check, a rule or a skill line.
 - #615: "every error keeps its code and first line" needs a sweep of every class pair under each `exactOptionalPropertyTypes` and `strict` setting: TS2375 replaces TS2322 on the first line only with the option on and a target with optional members.
 - #615: a "writes it by this name" doc clause is checked with the named form and the spread in separate probe files: a TS4023 blocks the whole file's `.d.ts`.
 - #615: the stripped test trees never assign a `ParentColumn` or a `Parameter<undefined>` to a `Parameter`, so a "first lines unchanged" claim needs a full pairs probe.
+- #621: a `null` `parent` already compiled as none (core reads a falsy `parentTable` as no mark), so only `alias` was broken and the `parent` tests needed mutants to prove anything.
+- #621: an `AS` the caller wrote is not neutral even when it repeats the table's name: an unaliased `FROM` item also answers to its schema-qualified name, so a correlated `"public"."users"."col"` binds to the inner row; check "omitting AS changes nothing" with a fragment naming the outer table qualified.
+- #621: a mutant changing two lines proves only that both together are needed: mutate each line alone.
 
 ## Minors kept
 
@@ -347,4 +350,4 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #605 (form): `website/install.md` (FR) Requirements: two bullets in a row about TypeScript.
 
 - #606 (form): `scripts/check-declarations-floor.mjs` leaves `pg-types` (`^2.2.0` from `@types/pg@8.6.6`) unpinned.
-
+- #621 (form): `src/db/conditions.ts` `callerValue(options, 'parent') || undefined`: `|| undefined` is an equivalent mutant (core reads `parentTable` by truthiness).
