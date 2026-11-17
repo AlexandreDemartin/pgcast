@@ -78,9 +78,13 @@ describe('websearchToTsquery()', () => {
     db.select('products', { search: c.websearchToTsquery(config, query) });
   });
 
-  test('refuses a column of another type: text, an int, jsonb, an enum, a timestamptz', () => {
+  test('refuses a column of another type: text, citext, a domain over citext, an int, jsonb, an enum, a timestamptz', () => {
     // @ts-expect-error a text column: Postgres would run `text @@ tsquery` with the default configuration
     db.select('products', { title: c.websearchToTsquery('simple', 'shirt') });
+    // @ts-expect-error a citext column, typed string
+    db.select('extra.type_zoo', { c_citext: c.websearchToTsquery('simple', 'shirt') });
+    // @ts-expect-error a domain over citext, its placeholder string as generated
+    db.select('users', { email: c.websearchToTsquery('simple', 'ada') });
     // @ts-expect-error an int column
     db.select('users', { id: c.websearchToTsquery('simple', 'ada') });
     // @ts-expect-error a jsonb column
@@ -89,6 +93,10 @@ describe('websearchToTsquery()', () => {
     db.select('users', { mood: c.websearchToTsquery('simple', 'happy') });
     // @ts-expect-error a timestamptz column
     db.select('users', { created_at: c.websearchToTsquery('simple', 'today') });
+  });
+
+  test('characterization: takes any column typed any, an xml column too, which Postgres refuses (42883)', () => {
+    db.select('extra.type_zoo', { c_xml: c.websearchToTsquery('simple', 'shirt') });
   });
 
   test('takes the type it is given, for a project that edited its PgTsvector placeholder', () => {

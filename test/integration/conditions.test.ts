@@ -414,6 +414,18 @@ describe('websearchToTsquery on a tsvector column', () => {
       not: await ids('extra.type_zoo', { id, c_tsvector: not(search('simple', 'vector')) }),
     }).toEqual({ search: [], not: [] });
   });
+
+  it('characterization: a text-like column, untyped, is no error: Postgres builds its vector with default_text_search_config', async () => {
+    // users.email, a domain over citext: the type refuses it, being string; a column typed any would pass
+    const config = (await t.client.query<{ c: string }>(`SELECT current_setting('default_text_search_config') AS c`)).rows[0]!.c;
+    expect({ config, ids: await ids('users', { email: search('simple', 'bob@example.com') }) })
+      .toEqual({ config: 'pg_catalog.english', ids: [2] });
+  });
+
+  it('characterization: an xml column, typed any, passes the type, and Postgres refuses it, 42883', async () => {
+    expect(await pgError(t.client, () => ids('extra.type_zoo', { c_xml: search('simple', 'vector') })))
+      .toEqual({ code: '42883', message: 'operator does not exist: xml @@ tsquery' });
+  });
 });
 
 describe('jsonbContains: the value sent as jsonb', () => {
