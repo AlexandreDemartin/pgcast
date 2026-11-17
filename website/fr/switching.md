@@ -1,5 +1,5 @@
 ---
-english: 2696a9c60546
+english: 0785e25fb8dd
 description: "Passez de Zapatos 6.6.1 à pgcast : changez une ligne de package.json et régénérez ; tsc et les avertissements de pgcast montrent les rares appels qui changent."
 ---
 
@@ -49,7 +49,7 @@ bun add zapatos@npm:@pgcast/pgcast@^6
 :::
 
 - `package.json` indique maintenant `"zapatos": "npm:@pgcast/pgcast@^…"`, et `node_modules/zapatos` contient pgcast.
-- Rien d’autre à ajouter : les peer dependencies de pgcast sont celles de Zapatos 6.6.1, `pg`, `@types/pg` et TypeScript 4.1 ou plus récent.
+- Les peer dependencies de pgcast sont celles de Zapatos 6.6.1, `pg`, `@types/pg` et TypeScript 4.1 ou plus récent, à ceci près que TypeScript y est optionnel : npm et pnpm ne l’installent plus pour vous. Absent de vos `devDependencies` ? Ajoutez-le : `npm install --save-dev typescript`.
 - Pas sous le simple nom `@pgcast/pgcast` : vos imports `zapatos/*` ne se résoudraient plus ([Installation](/fr/install#add-the-package), § Pourquoi l’alias).
 
 ## 2. Régénérer le schéma {#regenerate-the-schema}

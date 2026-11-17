@@ -8,6 +8,7 @@ From 6.7.0, you install pgcast under its own name and import `pgcast/db`. A proj
 - Postgres. The test suite runs against 14, 16 and 18.
 - Node, and `pg` (node-postgres), with `@types/pg` for TypeScript.
 - TypeScript 5.7 or later. `@types/pg` brings in `@types/node` and `pg-protocol`, whose types now need it; so does [`toBuffer()`](/runtime-config#toBuffer)'s, `Buffer<ArrayBuffer>`, as in Zapatos 6.6.1.
+- TypeScript in your own `devDependencies`: pgcast's peer dependency on it is optional, so npm, pnpm and Yarn don't install it for you.
 
 ### On an older TypeScript
 
@@ -44,22 +45,22 @@ npm install --save-dev --save-exact @types/node@ts4.1
 
 ```sh [npm]
 npm install pgcast@npm:@pgcast/pgcast pg
-npm install --save-dev @types/pg
+npm install --save-dev typescript @types/pg
 ```
 
 ```sh [pnpm]
 pnpm add pgcast@npm:@pgcast/pgcast pg
-pnpm add -D @types/pg
+pnpm add -D typescript @types/pg
 ```
 
 ```sh [yarn]
 yarn add pgcast@npm:@pgcast/pgcast@^6.7 pg
-yarn add -D @types/pg
+yarn add -D typescript @types/pg
 ```
 
 ```sh [bun]
 bun add pgcast@npm:@pgcast/pgcast@^6.7 pg
-bun add -d @types/pg
+bun add -d typescript @types/pg
 ```
 
 :::
@@ -76,22 +77,22 @@ For a project switching from Zapatos, whose imports stay `zapatos/*`:
 
 ```sh [npm]
 npm install zapatos@npm:@pgcast/pgcast pg
-npm install --save-dev @types/pg
+npm install --save-dev typescript @types/pg
 ```
 
 ```sh [pnpm]
 pnpm add zapatos@npm:@pgcast/pgcast pg
-pnpm add -D @types/pg
+pnpm add -D typescript @types/pg
 ```
 
 ```sh [yarn]
 yarn add zapatos@npm:@pgcast/pgcast@^6 pg
-yarn add -D @types/pg
+yarn add -D typescript @types/pg
 ```
 
 ```sh [bun]
 bun add zapatos@npm:@pgcast/pgcast@^6 pg
-bun add -d @types/pg
+bun add -d typescript @types/pg
 ```
 
 :::

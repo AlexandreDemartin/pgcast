@@ -73,7 +73,7 @@ npm install zapatos@npm:@pgcast/pgcast
 npx zapatos        # or: npx pgcast
 ```
 
-- `pg`, `@types/pg` and TypeScript 4.1 or later are peer dependencies, as in Zapatos; `zapatosconfig.json` is read as before.
+- `pg`, `@types/pg` and TypeScript 4.1 or later are peer dependencies, as in Zapatos, except that TypeScript is optional: list it in your `devDependencies`. `zapatosconfig.json` is read as before.
 - pnpm, yarn and bun: `pnpm add zapatos@npm:@pgcast/pgcast`, `yarn add zapatos@npm:@pgcast/pgcast@^6`, `bun add zapatos@npm:@pgcast/pgcast@^6` (Yarn 2 and later need the range).
 - From 6.7.0, a new project installs pgcast under its own name, `npm install pgcast@npm:@pgcast/pgcast` (`pnpm add pgcast@npm:@pgcast/pgcast`, `yarn add pgcast@npm:@pgcast/pgcast@^6.7`, `bun add pgcast@npm:@pgcast/pgcast@^6.7`), sets the generator's [`moduleNames: 'pgcast'`](https://pgcast.dev/generator#generate.moduleNames) in `pgcastconfig.json`, and imports `pgcast/db` and `pgcast/schema` ([decision 002](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/002-module-names.md)). 6.6.2 ignores the option and the file. Installed as plain `@pgcast/pgcast`, neither name resolves.
 - From 6.8.0, `npx pgcast --check` compares the files the generator would write with yours and writes nothing, for CI: it exits with code 1 if one differs or is missing ([`--check`](https://pgcast.dev/generator#check)).
