@@ -611,6 +611,38 @@ describe('a Parameter in a Whereable, in isIn or in vals', () => {
     }
     expect(await adaName()).toBe('Ada');
   });
+
+  it('hostile variables of jsonbPathExists, names and values, stay one jsonb parameter: they match the JSON they are, and run nothing', async () => {
+    // a NUL is left out: Postgres refuses \u0000 in jsonb (22P05); a name is quoted in the path as a jsonpath string
+    const hostile = [`'}' OR TRUE; ${update}; --`, `"}]; ${update}; --`, '$1', '\\', '/*', '$', '@', ')', '$"x") || (@ == @'];
+    for (const value of hostile) {
+      await sql`UPDATE ${'users'} SET ${'settings'} = ${param(JSON.stringify({ t: value }))}::jsonb WHERE ${'id'} = 3`.run(t.client);
+      const path = `$.t ? (@ == $${JSON.stringify(value)})`;
+      const q = sql`SELECT ${'id'} FROM ${'users'} WHERE ${{ settings: db.conditions.jsonbPathExists(path, { [value]: value }) }}`;
+      expect(q.compile()).toEqual({
+        text: 'SELECT "id" FROM "users" WHERE ((jsonb_path_exists("settings", CAST($1 AS "jsonpath"), CAST($2 AS "jsonb"))))',
+        values: [path, JSON.stringify({ [value]: value })],
+      });
+      expect(await q.run(t.client)).toEqual([{ id: 3 }]);
+    }
+    expect(await adaName()).toBe('Ada');
+  });
+
+  it('a hostile path of jsonbPathExists stays one jsonpath parameter: Postgres parses it as a path, and runs nothing', async () => {
+    const statement = `'; ${update}; --`;
+    await sql`UPDATE ${'users'} SET ${'settings'} = ${param(JSON.stringify({ t: statement }))}::jsonb WHERE ${'id'} = 3`.run(t.client);
+    // SQL inside a jsonpath string is that string: it matches the row that holds it
+    const inString = db.conditions.jsonbPathExists(`$.t ? (@ == ${JSON.stringify(statement)})`);
+    expect(await sql`SELECT ${'id'} FROM ${'users'} WHERE ${{ settings: inString }}`.run(t.client)).toEqual([{ id: 3 }]);
+    expect(await adaName()).toBe('Ada');
+    // outside one, it is no path: Postgres's own syntax error, from the one statement sent
+    for (const path of [`$') OR TRUE; ${update}; --`, `$.t ? (@ == 1)); ${update}; --`]) {
+      const q = sql`SELECT ${'id'} FROM ${'users'} WHERE ${{ settings: db.conditions.jsonbPathExists(path) }}`;
+      expect(q.compile().values).toEqual([path, '{}']);
+      expect((await pgError(t.client, () => q.run(t.client))).code).toBe('42601');
+      expect(await adaName()).toBe('Ada');
+    }
+  });
 });
 
 describe('without parameters (simple protocol)', () => {

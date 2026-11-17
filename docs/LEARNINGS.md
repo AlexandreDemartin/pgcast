@@ -207,6 +207,13 @@ Candidates for a check, a rule or a skill line.
 - #573: the `paths` mapping into `node_modules/.cache` hides TS2742: a declaration-emit test here catches only TS4023 unless the emitted text is checked (`scripts/check-declarations.mjs`).
 - #573: a review's example of what slips through is probed against the generator's real mapping: `citext` and domains over known types are `string`, not `any`.
 - #573: Postgres 16 changed the error of reg* inputs (`regconfig`, `regtype`…) for a dotted name whose schema is missing: 3F000 before 16, 42704 from 16; a SQLSTATE snapshot of such a name splits on `server_version_num`.
+- #575: `jsonb_path_exists` has no planner support function and no GIN operator class, so only `@?` and `@>` are indexable: check `pg_proc.prosupport` and `pg_amop` before claiming index use.
+- #575: a predicate path such as `$.a == 2` always yields one item (its boolean) under `jsonb_path_exists`, so every row matches.
+- #575: `check-reference.mjs` lists the members of `export * as conditions`, so an exported signatures interface needs a reference entry: write the type inline instead.
+- #575: an index claim about a function is checked against an expression index on the call, not only `pg_proc.prosupport` and `pg_amop`: pgcast's unnamed statements are planned with their parameters bound, so `CAST($1 AS "jsonpath")` folds and matches such an index.
+- #575: a Postgres error the docs promise past the type (22023 for `vars` that is no object) needs its own integration test, or a refactor that defaults it away (`?? {}`) passes the suite.
+- #575: retyping a French conflict resolution drops the U+00A0 spaces: take the conflict's own text, or re-add them and check by byte.
+- #575: a shared helper's advice for the argument as a whole fits each caller's contract (an object for `vars`); the nested advice can stay shared.
 
 ## Minors kept
 
@@ -247,3 +254,4 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #573 (form): `website/conditions.md` § full-text, `websearchToTsquery<PgTsvector>(…)`: not where `PgTsvector` comes from (`zapatos/custom`); FR and JSDoc likewise.
 - #573 (form): `test/unit/conditions.test.ts` `one SQL wherever it sits`: no `update()`, no `.copy()` of a refused wrapper.
 - #573 (defect): `website/conditions.md` § full-text (and FR), "one it does not know is its 42704": on Postgres 14 a dotted configuration whose schema is missing gives 3F000.
+- #575 (form): `website/conditions.md` § `jsonbPathExists()`: no line on `jsonb_path_exists_tz` for a path comparing datetimes across time zones (0A000).

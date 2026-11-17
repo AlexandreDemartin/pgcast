@@ -215,3 +215,82 @@ describe('jsonbContains() on a jsonb domain whose placeholder is narrowed', () =
     db.select('extra.type_zoo', { c_jsonb_domain: c.jsonbContains<PgPreferences>(new Date()) });
   });
 });
+
+describe('jsonbPathExists()', () => {
+  test('takes a path and an object of variables, and gives a condition on JSONValue that a jsonb column takes', () => {
+    expectTypeOf(c.jsonbPathExists('$.theme ? (@ == $theme)', { theme: 'dark' })).toEqualTypeOf<db.SQLFragment<boolean | null, db.JSONValue>>();
+    expectTypeOf(c.jsonbPathExists('$.theme')).not.toBeAny();
+    expectTypeOf(db.select('users', { settings: c.jsonbPathExists('$.theme ? (@ == $theme)', { theme: 'dark' }) }).run)
+      .returns.resolves.not.toBeAny();
+    expectTypeOf<Parameters<typeof c.jsonbPathExists>>().toEqualTypeOf<[path: string, vars?: db.JSONObject]>();
+    db.select('users', { settings: c.jsonbPathExists('$.theme') });
+    db.select('users', { settings: c.jsonbPathExists('$.theme', undefined) });
+    db.select('users', { settings: c.jsonbPathExists('$ ? (@.n < $n && @.tags == $tags)', { n: 1, tags: ['a', null], o: { b: false } }) });
+    db.select('users', { settings: c.not(c.jsonbPathExists('$.theme')) });
+    db.select('events', { payload: c.jsonbPathExists('$.user ? (@ == $user)', { user: 1 }) });
+    const path: string = '$.theme', fromJSON: db.JSONObject = JSON.parse('{"theme":"dark"}');
+    db.select('users', { settings: c.jsonbPathExists(path, fromJSON) });
+  });
+
+  test('refuses a column of another type', () => {
+    // @ts-expect-error a text column
+    db.select('users', { display_name: c.jsonbPathExists('$') });
+    // @ts-expect-error an int column
+    db.select('users', { id: c.jsonbPathExists('$') });
+    // @ts-expect-error a jsonb[] column
+    db.select('extra.type_zoo', { c_jsonb_array: c.jsonbPathExists('$') });
+    // @ts-expect-error a text[] column
+    db.select('extra.type_zoo', { c_text_array: c.jsonbPathExists('$') });
+  });
+
+  test('refuses a path that is no string, and variables that are no object of JSON values', () => {
+    // @ts-expect-error no path
+    db.select('users', { settings: c.jsonbPathExists() });
+    // @ts-expect-error a number as the path
+    db.select('users', { settings: c.jsonbPathExists(1) });
+    // @ts-expect-error param() as the path
+    db.select('users', { settings: c.jsonbPathExists(db.param('$')) });
+    // @ts-expect-error a sql fragment as the path
+    db.select('users', { settings: c.jsonbPathExists(db.sql`'$'`) });
+    // @ts-expect-error parent() as the path
+    db.select('users', { settings: c.jsonbPathExists(db.parent('display_name')) });
+    // @ts-expect-error an array as the variables, which Postgres refuses (22023)
+    db.select('users', { settings: c.jsonbPathExists('$', ['dark']) });
+    // @ts-expect-error a string as the variables
+    db.select('users', { settings: c.jsonbPathExists('$', 'dark') });
+    // @ts-expect-error null as the variables
+    db.select('users', { settings: c.jsonbPathExists('$', null) });
+    // @ts-expect-error a variable holding undefined, which JSON.stringify leaves out
+    db.select('users', { settings: c.jsonbPathExists('$', { theme: undefined }) });
+    // @ts-expect-error a variable holding a Date
+    db.select('users', { settings: c.jsonbPathExists('$', { day: new Date() }) });
+    // @ts-expect-error a variable holding a bigint
+    db.select('users', { settings: c.jsonbPathExists('$', { n: BigInt(1) }) });
+    // @ts-expect-error param() as the variables
+    db.select('users', { settings: c.jsonbPathExists('$', db.param({ theme: 'dark' })) });
+    // @ts-expect-error a variable holding param()
+    db.select('users', { settings: c.jsonbPathExists('$', { theme: db.param('dark') }) });
+  });
+
+  test('characterization: a json column passes the type, both being JSONValue, and Postgres refuses it (42883)', () => {
+    db.select('extra.type_zoo', { c_json: c.jsonbPathExists('$') });
+  });
+});
+
+describe('jsonbPathExists() on a jsonb domain whose placeholder is narrowed', () => {
+  test('takes the column type as its type argument', () => {
+    expectTypeOf(c.jsonbPathExists<PgPreferences>('$.theme')).toEqualTypeOf<db.SQLFragment<boolean | null, PgPreferences>>();
+    expectTypeOf(c.jsonbPathExists<PgPreferences>('$.theme')).not.toBeAny();
+    db.select('extra.type_zoo', { c_jsonb_domain: c.jsonbPathExists<PgPreferences>('$.theme ? (@ == $theme)', { theme: 'dark' }) });
+    db.update('extra.type_zoo', { c_bool: true }, { c_jsonb_domain: c.not(c.jsonbPathExists<PgPreferences>('$.sizes')) });
+  });
+
+  test('refuses it without the type argument, and the type argument on another column', () => {
+    // @ts-expect-error the condition's JSONValue, wider than the placeholder
+    db.select('extra.type_zoo', { c_jsonb_domain: c.jsonbPathExists('$.theme') });
+    // @ts-expect-error a text column, the type argument naming another column's type
+    db.select('users', { display_name: c.jsonbPathExists<PgPreferences>('$.theme') });
+    // @ts-expect-error an array as the variables, with the type argument too
+    db.select('extra.type_zoo', { c_jsonb_domain: c.jsonbPathExists<PgPreferences>('$', ['dark']) });
+  });
+});

@@ -354,6 +354,22 @@ describe('values stay parameters', () => {
       } finally { resetConfig(); }
     }
   });
+
+  it('the path and variables of jsonbPathExists are two parameters, hostile paths, names and values included, whatever the configuration', () => {
+    const strings = [...Object.values(hostile), '$', '@', ')', '$"a)" ? (@ == 1)', "') OR TRUE --"];
+    for (const config of [{}, { castArrayParamsToJson: true }, { castObjectParamsToJson: true }]) {
+      db.setConfig(config);
+      try {
+        for (const s of strings) {
+          const vars = { [s]: s, list: [s], nested: { [s]: [s] } };
+          expect(sql`WHERE ${{ settings: db.conditions.jsonbPathExists(s, vars) }}`.compile()).toEqual({
+            text: 'WHERE ((jsonb_path_exists("settings", CAST($1 AS "jsonpath"), CAST($2 AS "jsonb"))))',
+            values: [s, JSON.stringify(vars)],
+          });
+        }
+      } finally { resetConfig(); }
+    }
+  });
 });
 
 describe('raw, cols and vals as a filter value', () => {
