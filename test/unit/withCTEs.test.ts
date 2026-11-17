@@ -37,10 +37,16 @@ describe('withCTEs', () => {
       .toBe('WITH "2" AS (SELECT 2), "b" AS (SELECT 1), "a" AS (SELECT 3) SELECT 4');
   });
 
-  it('with no CTE, gives the query itself, a map built at run time included', () => {
+  it('with no CTE, gives a copy of the query, its own SQL, a map built at run time included', () => {
     const query = db.selectOne('users', all), ctes: { [name: string]: db.SQLFragment } = {};
-    expect(db.withCTEs({}, query)).toBe(query);
-    expect(db.withCTEs(ctes, query)).toBe(query);
+    for (const result of [db.withCTEs({}, query), db.withCTEs(ctes, query)]) {
+      expect(result).not.toBe(query);
+      expect(result.compile()).toEqual(query.compile());
+      expect(result.runResultTransform).toBe(query.runResultTransform);
+    }
+    // an empty insert() stays a no-op, which sends nothing
+    const empty = db.withCTEs({}, db.insert('users', []));
+    expect([empty.noop, empty.noopResult, empty.compile().text]).toEqual([true, [], `/* marked no-op: won't hit DB unless forced -> */ INSERT INTO "users" SELECT null WHERE false`]);
     ctes.recent = recent;
     expect(db.withCTEs(ctes, query).compile().text).toBe(`${recentSQL} SELECT to_jsonb("users".*) AS result FROM "users" LIMIT $2`);
   });
@@ -54,23 +60,35 @@ describe('withCTEs', () => {
       count: before(db.count('users', all)),
       insert: before(db.insert('users', { email: 'eve@example.com', display_name: 'Eve' })),
       emptyInsert: before(db.insert('users', [])),
+      emptyUpsert: before(db.upsert('users', [], 'email')),
     }).toEqual({
       select: { text: `${recentSQL} SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users") AS "sq_users"`, values: [1] },
       selectOne: { text: `${recentSQL} SELECT to_jsonb("users".*) AS result FROM "users" LIMIT $2`, values: [1, 1] },
       selectExactlyOne: { text: `${recentSQL} SELECT to_jsonb("users".*) AS result FROM "users" LIMIT $2`, values: [1, 1] },
       count: { text: `${recentSQL} SELECT count(*) AS result FROM "users"`, values: [1] },
       insert: { text: `${recentSQL} INSERT INTO "users" ("display_name", "email") VALUES ($2, $3) RETURNING to_jsonb("users".*) AS result`, values: [1, 'Eve', 'eve@example.com'] },
-      // the empty insert() keeps its own mark, inside the text; the result is no no-op, so its CTEs run
-      emptyInsert: { text: `${recentSQL} /* marked no-op: won't hit DB unless forced -> */ INSERT INTO "users" SELECT null WHERE false`, values: [1] },
+      // a no-op, an insert() or upsert() of no row, gives no row, from no table: the result is no no-op, so its CTEs run
+      emptyInsert: { text: `${recentSQL} SELECT NULL::jsonb AS result WHERE false`, values: [1] },
+      emptyUpsert: { text: `${recentSQL} SELECT NULL::jsonb AS result WHERE false`, values: [1] },
     });
   });
 
-  it('selectExactlyOne() keeps LIMIT 1 with selectExactlyOneChecksForSecondRow, as nested', () => {
+  it('a no-op as a CTE gives no row, a result column of none', () => {
+    expect(db.withCTEs({ added: db.insert('users', []) }, sql`SELECT count(*) FROM added`).compile())
+      .toEqual({ text: 'WITH "added" AS (SELECT NULL::jsonb AS result WHERE false) SELECT count(*) FROM added', values: [] });
+  });
+
+  it('selectExactlyOne() asks for a second row at the top level with selectExactlyOneChecksForSecondRow, as alone', () => {
     db.setConfig({ selectExactlyOneChecksForSecondRow: true });
-    expect(db.withCTEs({ recent }, db.selectExactlyOne('users', all)).compile()).toEqual({
+    const one = db.selectExactlyOne('users', all);
+    expect(db.withCTEs({ recent }, one).compile()).toEqual({
       text: `${recentSQL} SELECT to_jsonb("users".*) AS result FROM "users" LIMIT $2`,
-      values: [1, 1],
+      values: [1, 2],
     });
+    expect(db.withCTEs({}, one).compile()).toEqual({ text: 'SELECT to_jsonb("users".*) AS result FROM "users" LIMIT $1', values: [2] });
+    // nested, LIMIT 1, as the shortcut nested; prepared on request, the name goes with the top-level text
+    expect(db.select('accounts', all, { lateral: { u: db.withCTEs({ recent }, one) } }).compile().values).toEqual(['u', 1, 1]);
+    expect(db.withCTEs({ recent }, one).prepared('one_with').compile()).toMatchObject({ values: [1, 2], name: 'one_with' });
   });
 
   it('a write shortcut as a CTE', () => {
@@ -133,7 +151,9 @@ describe('withCTEs', () => {
     expect(query.compile()).toEqual({ text: 'SELECT count(*) AS result FROM "accounts"', values: [], name: 'accounts_count' });
     // prepared on request, under its own name
     expect(result.prepared('accounts_count_with').compile().name).toBe('accounts_count_with');
-    // with no CTE, the query itself, its name with it
-    expect(db.withCTEs({}, query).compile().name).toBe('accounts_count');
+    // with no CTE, an unprepared copy too, so prepared() on it never renames the caller's query
+    expect(db.withCTEs({}, query).compile()).toEqual({ text: 'SELECT count(*) AS result FROM "accounts"', values: [] });
+    expect(db.withCTEs({}, query).prepared('accounts_count_none').compile().name).toBe('accounts_count_none');
+    expect(query.compile().name).toBe('accounts_count');
   });
 });
