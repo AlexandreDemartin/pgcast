@@ -92,7 +92,7 @@ describe('withCTEs', () => {
       values: [1, 'display_name', 1, 'x@example.com'],
     });
     // a sql fragment as the main query is written as given, as the fragment itself is
-    expect(db.select('users', all, { extras: { n: db.withCTEs({ recent }, sql`SELECT 1`) } }).compile().text)
+    expect(db.select('users', all, { extras: { n: db.withCTEs({ recent }, sql`SELECT 1`) as db.SQLFragment<any> } }).compile().text)
       .toContain(`jsonb_build_object($1::text, ${recentSQL.replace('$1', '$2')} SELECT 1)`);
   });
 

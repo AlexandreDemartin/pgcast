@@ -1251,7 +1251,7 @@ export const max: TypedByColumn extends true ? ColumnAggregateSignatures : Numer
 // a prepared fragment writes its name into whatever compiles it, so one name would cover two texts, the fragment
 // alone and with the WITH, which pg refuses ("Prepared statements must be unique"): nested, an unprepared copy
 const unprepared = <F>(fragment: F) =>
-  fragment instanceof SQLFragment && fragment.preparedName != null ? fragment.copy({ preparedName: undefined }) : fragment;
+  fragment instanceof SQLFragment && fragment.preparedName != null ? Object.assign(fragment.copy(), { preparedName: undefined }) : fragment;
 
 /**
  * Put CTEs before a query, keeping its result:
@@ -1271,10 +1271,9 @@ const unprepared = <F>(fragment: F) =>
 export const withCTEs = <Q extends SQLFragment<any, any>>(ctes: { [name: string]: SQLFragment<any, any> }, query: Q): Q => {
   const entries = Object.entries(ctes);
   if (entries.length === 0) return query;
-  return query.copy({
+  return Object.assign(query.copy({
     literals: ['WITH ', ' ', ''],
     expressions: [mapWithSeparator(entries, sql`, `, ([name, cte]) => sql`${SQLForAlias('', name)} AS (${unprepared(cte)})`), unprepared(query)],
-    preparedName: undefined,
     noop: false,
-  }) as Q;
+  }) as Q, { preparedName: undefined });
 };
