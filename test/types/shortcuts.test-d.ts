@@ -98,6 +98,9 @@ describe('select', () => {
     const orderBy = (o: db.OrderSpecForTable<'users'>) => o;
     // @ts-expect-error 'UP' is not ASC / DESC (a value typed by OrderSpecForTable)
     orderBy({ by: 'id', direction: 'UP' });
+    // @ts-expect-error an interface has no implicit index signature (an object type alias would pass)
+    const asRecord: Record<string, unknown> = null as unknown as Exclude<NonNullable<Order>, unknown[]>;
+    void asRecord;
   });
 });
 
