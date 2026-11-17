@@ -304,16 +304,16 @@ const lastIdentifier = (name: string) => {
 // inherit (`parent()` throws without `parent`), so that its SQL does not depend on where it sits; compile is
 // overridden as select() does, so a copy() of the condition, which shares its expressions, keeps it. When `parent`
 // names the subquery's own table, Postgres reads `parent()` as a column of the subquery's row, the wrong rows with
-// no error: refused as the query compiles
+// no error: refused as the query compiles. The options are read as select() reads its alias: `null` options, and a
+// `null` or `''` option, are none, and no `AS` when the alias is the table (#618)
 const subquery = (fn: string, head: SQL, table: string, where: SQL | AllType, options?: { parent?: string; alias?: string }) => {
   const
-    parent = callerValue(options, 'parent'), alias = callerValue(options, 'alias'),  // `null` options are none, as in select()
-    own = alias ?? table;
-  if (typeof parent === 'string' && typeof own === 'string' && lastIdentifier(parent) === lastIdentifier(own)) {
-    return refused(`\`${fn}()\` was given \`parent: '${parent}'\`, which names "${lastIdentifier(own)}", the subquery's own name, so Postgres would read \`parent()\` as a column of the subquery's row: give the subquery another name with the \`alias\` option.`);
+    parent = callerValue(options, 'parent') || undefined, alias = callerValue(options, 'alias') || table;
+  if (typeof parent === 'string' && typeof alias === 'string' && lastIdentifier(parent) === lastIdentifier(alias)) {
+    return refused(`\`${fn}()\` was given \`parent: '${parent}'\`, which names "${lastIdentifier(alias)}", the subquery's own name, so Postgres would read \`parent()\` as a column of the subquery's row: give the subquery another name with the \`alias\` option.`);
   }
   const
-    query = sql`${head} FROM ${table}${alias === undefined ? [] : sql` AS ${alias}`}${where === all ? [] : sql` WHERE ${where}`}`,
+    query = sql`${head} FROM ${table}${alias === table ? [] : sql` AS ${alias}`}${where === all ? [] : sql` WHERE ${where}`}`,
     nestedCompile = query.compile;
   query.compile = result => nestedCompile(result, undefined, undefined);
   if (parent !== undefined) query.parentTable = parent;
