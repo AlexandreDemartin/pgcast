@@ -205,6 +205,10 @@ Un tableau vide, pour le `updateColumns` d’`upsert()` : une ligne en conflit 
 
 `{ $action: 'INSERT' | 'UPDATE' }`, ajouté à chaque résultat d’`upsert()` : `'INSERT'` pour une nouvelle ligne, `'UPDATE'` pour une ligne mise à jour, lu dans le `xmax` de la ligne. `reportAction: 'suppress'` l’ôte du SQL et du type ; une table partitionnée peut en avoir besoin, car Postgres ne lit pas de `xmax` dans une partition dont les colonnes sont aux mêmes positions que celles de la table ([Options](#upsert-options)).
 
+## `UpsertOptions` {#UpsertOptions}
+
+`UpsertOptions<T, C, E, UC, RA>` : les `options` d’`upsert()`, le [`ReturningOptionsForTable`](#ReturningOptionsForTable) avec `updateValues`, `updateColumns`, `noNullUpdateColumns` et `reportAction` ([Options](#upsert-options)). `UC` est le type d’`updateColumns` et `RA` celui de `reportAction` (`undefined` pour une option non donnée).
+
 ## `UpsertReturnableForTable` {#UpsertReturnableForTable}
 
 `UpsertReturnableForTable<T, C, E, RA>` : une ligne de ce que renvoie `upsert()`, le [`ReturningTypeForTable`](#ReturningTypeForTable) avec [`UpsertAction`](#UpsertAction), sauf si `RA`, le `reportAction`, vaut `'suppress'` : `db.UpsertReturnableForTable<'ratings', undefined, undefined, undefined>` est `ratings.JSONSelectable & UpsertAction`. Il n’ajoute pas l’`undefined` de `updateColumns: []` ([`doNothing`](#doNothing)). Il a besoin de `strictNullChecks` : sans lui, c’est le `JSONSelectable` entier avec `UpsertAction`, quels que soient `C`, `E` et `RA`.
