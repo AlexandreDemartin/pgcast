@@ -994,6 +994,46 @@ ${imports.map(line => `  ${line}\n`).join('')}  export type ${type};  // replace
       }
     });
 
+    // a domain over an enum and a domain over text of one name (#42): the type whose "schema"."name" sorts last holds
+    // the placeholder, with its import, in whichever order the relations are read
+    describe('a placeholder that a domain over an enum shares with a type of another schema', () => {
+      beforeAll(() => t.pool.query(`
+        CREATE SCHEMA placeholder_moods;
+        CREATE DOMAIN placeholder_moods.tone_d AS text CHECK (VALUE IN ('warm'));
+        CREATE TABLE placeholder_moods.tones (t placeholder_moods.tone_d);
+        CREATE SCHEMA placeholder_tone;
+        CREATE TYPE placeholder_tone.mood AS ENUM ('calm', 'loud');
+        CREATE DOMAIN placeholder_tone.tone_d AS placeholder_tone.mood;
+        CREATE TABLE placeholder_tone.tracks (t placeholder_tone.tone_d);
+      `));
+      afterAll(() => t.pool.query('DROP SCHEMA placeholder_moods, placeholder_tone CASCADE'));
+
+      const both = ['placeholder_moods', 'placeholder_tone'];
+
+      it.each<[string | null, string, string]>([
+        [null, 'placeholder_tone.mood', 'placeholder_tone'],
+        ['placeholder_moods', 'placeholder_tone.mood', 'placeholder_tone'],
+        ['placeholder_tone', 'mood', 'mood'],
+      ])('holds the enum, with its import, in whichever order the relations are read, unprefixedSchema %s',
+        async (unprefixedSchema, type, imports) => {
+          expectInEveryOrder(await placeholdersInEveryOrder(both, { unprefixedSchema }, ['PgTone_d']), 2,
+            { PgTone_d: { type, imports } });
+        });
+
+      it.each([false, true])('compiles with no lib check skipped, the schemas in both orders, domainsTypedAsUnions %s',
+        async domainsTypedAsUnions => {
+          for (const order of [both, [...both].reverse()]) {
+            const schemas = Object.fromEntries(order.map(schema => [schema, all]));
+            expect.soft(await probeErrors({ schemas, domainsTypedAsUnions }, `
+              import type * as s from 'zapatos/schema';
+              export const calm: s.placeholder_tone.tracks.Selectable['t'] = 'calm';
+              // @ts-expect-error not a label of placeholder_tone.mood
+              export const warm: s.placeholder_tone.tracks.Selectable['t'] = 'warm';
+            `, { skipLibCheck: false }), order.join(', ')).toEqual([]);
+          }
+        });
+    });
+
     // with typeEnumsAcrossSchemas, the relation of the enum's schema names it `string`, TypeScript's own type, and
     // imports nothing, as the relation that writes its labels out: their text differs, not their import
     describe('a domain over an enum that may name a global type, used by a relation of another schema', () => {
