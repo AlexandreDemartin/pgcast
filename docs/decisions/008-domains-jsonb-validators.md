@@ -44,7 +44,7 @@ Two projects of real usage (skill `consumer-usage`; no project named, examples i
 | placeholders of those domains, as on disk | **none over `text` left as generated.** Over `text`: 186 of 193 import a type generated from the project's API specification, 5 write the union by hand, 2 another type. Over `jsonb`: 95 of 101 import such a type, 4 write a structure, 2 are as generated |
 | what keeps a placeholder honest | in one project, a test reads each domain's `pg_get_constraintdef()`, takes its values with a regexp and compares them with the specification's enum; in the other, nothing: each migration writes the values, and the API specification writes them again |
 | app code naming a placeholder's type, in one project | 21 names (13 `jsonb`, 6 value domains, 2 gone); the rest reach the type through the row types |
-| `COMMENT ON` | in the dump, 30 tables of 266, no type nor domain; the other project comments every table (a test refuses one without) and every domain it creates |
+| `COMMENT ON` | in the dump, 15 tables of 266, no type nor domain; the other project comments every table (a test refuses one without) and every domain it creates |
 | validation libraries | Zod in about 600 files, `ajv` in 38, Valibot, Yup, io-ts, TypeBox and Joi in none. No Zod schema is typed against a generated row type (`ZodType<s.….Insertable>`, `satisfies`: 0); 17 `z.enum()`, each over values written inline |
 
 ## 1. A domain whose `CHECK` lists its values
