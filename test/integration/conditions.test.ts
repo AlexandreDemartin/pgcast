@@ -875,3 +875,32 @@ describe('exists() and isInSelect() (note 006 § Replays)', () => {
     expect(await names(exists('extra.articles', { author_id: parent('id'), display_name: 'Bob' } as any, { parent: 'users' }))).toEqual(['Bob']);
   });
 });
+
+describe('db.all as the value of a condition', () => {
+  // 6.6.1 sent it as 'Symbol(all)', which no kind nor name equals: ne() deleted every event, not(eq()) renamed every
+  // user, and a number got 22P02 (#619)
+  const message = '`db.all` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To match every row, give `db.all` as the whole filter of a shortcut: `select(table, db.all)`.';
+  const rejectsBeforeAnyQuery = async (q: db.SQLFragment<any>) => {
+    const query = vi.spyOn(t.client, 'query');
+    try {
+      const err = await q.run(t.client).then(() => undefined, (e: Error) => e.message);
+      expect(query).not.toHaveBeenCalled();
+      return err;
+    } finally {
+      query.mockRestore();
+    }
+  };
+
+  it('rejects before any query, so deletes() and update() change no row', async () => {
+    const events = await db.count('events', all).run(t.client);
+    expect(events).toBeGreaterThan(0);
+    expect({
+      deletesNe: await rejectsBeforeAnyQuery(db.deletes('events', { kind: dc.ne(all as any) })),
+      updateNotEq: await rejectsBeforeAnyQuery(db.update('users', { display_name: 'Gone' }, { display_name: dc.not(dc.eq(all as any)) })),
+      updateAdd: await rejectsBeforeAnyQuery(db.update('accounts', { lifetime_ops: dc.add(all as any) }, { id: 1 })),
+      selectBetween: await rejectsBeforeAnyQuery(db.select('users', { id: dc.between(1, all as any) })),
+    }).toEqual({ deletesNe: message, updateNotEq: message, updateAdd: message, selectBetween: message });
+    expect(await db.count('events', all).run(t.client)).toBe(events);
+    expect(await db.count('users', { display_name: 'Gone' }).run(t.client)).toBe(0);
+  });
+});

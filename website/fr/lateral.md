@@ -1,5 +1,5 @@
 ---
-english: 99ebeb13c283
+english: 504e586f74cf
 description: "Récupérez des lignes avec celles qui s’y rattachent, en une requête et un résultat typé : un film avec sa distribution, un membre de l’équipe avec son mentor."
 ---
 
@@ -108,10 +108,30 @@ Chaque cinéma, et l’autre cinéma le plus proche : de nouveau une table join
 - [`ne(db.parent('id'))`](/fr/conditions#conditions.ne) exclut le cinéma lui-même.
 - Pour les trois plus proches, imbriquez `select()` avec [`limit: 3`](/fr/select#order-limit-offset-and-withties) : `nearest` devient un tableau.
 
+## Vérifier la colonne parente {#check-the-parent-column}
+
+`db.parent()` accepte une colonne de n’importe quelle table, donc une jointure sur la mauvaise colonne compile. Postgres refuse une colonne que le parent n’a pas : `db.parent('billing')` sous `films` échoue avec 42703, « <span lang="en">column films.billing does not exist</span> ». Donnez les colonnes du parent comme argument de type, `db.parent<s.films.Column>('id')`, et le type vérifie que le nom en fait partie :
+
+```ts twoslash
+import * as db from 'zapatos/db';
+import type * as s from 'zapatos/schema';
+// ---cut---
+db.select('films', db.all, {
+  lateral: { cast: db.select('roles', { film_id: db.parent<s.films.Column>('id') }) },
+});
+db.select('films', db.all, {
+  // @ts-expect-error billing is a column of roles, not of films (TS2345)
+  lateral: { cast: db.select('roles', { film_id: db.parent<s.films.Column>('billing') }) },
+});
+```
+
+- Il vérifie la table que vous nommez, pas la requête qui l’entoure : `db.parent<s.studios.Column>('id')` sous `films` compile aussi.
+- Le type ne la vérifie pas sans qu’on le lui demande : la sous-requête est construite, et typée, avant la requête qui l’entoure, donc son type ne connaît pas la table parente. La vérifier ralentirait chaque compilation, et refuserait du code qui s’exécute.
+
 ## À surveiller {#watch-for}
 
 - **`strictNullChecks`** : sans lui (ou `strict`), `columns`, `extras` et `lateral` laissent au type la ligne entière, et il ne refuse rien ([Strict](/fr/select#options)).
-- **Une jointure non vérifiée** : `db.parent()` accepte une colonne de n’importe quelle table, donc une jointure sur la mauvaise colonne compile. Postgres refuse une colonne que le parent n’a pas : `db.parent('billing')` sous `films` échoue avec 42703, « <span lang="en">column films.billing does not exist</span> ».
+- **Une jointure non vérifiée** : `db.parent()` accepte une colonne de n’importe quelle table, sauf si vous nommez la table ([Vérifier la colonne parente](#check-the-parent-column)).
 - **[`withTies`](/fr/select#order-limit-offset-and-withties) dans un `selectOne()` imbriqué** : il écrit `FETCH FIRST $2 ROWS WITH TIES`<!-- probe: db.select('films', db.all, { lateral: { lead: db.selectOne('roles', { film_id: db.parent('id') }, { order: { by: 'billing', direction: 'ASC' }, withTies: true }) } }) -->, qui garde toutes les lignes ex æquo : sous un `select()` extérieur, la ligne parente revient une fois par ligne ex æquo ; sous `selectOne()` ou `selectExactlyOne()`, elle revient une fois, avec l’une des lignes ex æquo, mais avec [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), `selectExactlyOne()` est rejetée avec une `NotExactlyOneError`. Dans un `select()` imbriqué, les ex æquo restent dans le tableau. Comme `lateral` de `count()`, chaque ex æquo est compté : 6 pour deux films de trois rôles ex æquo chacun. Dans un `lateral`, inchangé depuis Zapatos 6.6.1, et conservé : c’est le SQL que demande `withTies` ([#164](https://github.com/AlexandreDemartin/pgcast/issues/164#issuecomment-6883146644)). Comme valeur d’`extras`, un ex æquo fait refuser la requête par Postgres (21000) : « <span lang="en">more than one row returned by a subquery used as an expression</span> » ; Zapatos 6.6.1 refusait tout raccourci comme valeur d’`extras` (42601), ex æquo ou non.
 - **Un `lock`** : sans `of`, `FOR UPDATE`<!-- probe: db.select('films', db.all, { lock: { for: 'UPDATE' } }) --> atteint les sous-requêtes, et Postgres refuse la requête (0A000) : « <span lang="en">FOR UPDATE is not allowed with aggregate functions</span> » sous `select()` ou `count()`, « <span lang="en">FOR UPDATE cannot be applied to the nullable side of an outer join</span> » sous `selectOne()`. Nommez la table ([`lock`](/fr/select#lock)) :
 
