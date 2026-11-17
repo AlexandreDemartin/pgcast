@@ -1,5 +1,5 @@
 ---
-english: 1ca6603d3484
+english: 0f73ef1c453a
 ---
 
 # Template SQL
@@ -157,9 +157,13 @@ La chaîne, écrite telle quelle dans le SQL : pour une syntaxe qu’un paramè
 Tout ce qui atteint `raw()` s’exécute comme du SQL. Ne lui donnez jamais le texte d’un appelant ; une valeur est un [`param()`](#param). Pour écrire du SQL à la main sans risque : [SQL brut](/fr/raw-sql).
 :::
 
-Comme valeur de filtre, `raw()` lève une erreur à la compilation, tout comme `cols()` et `vals()`. Comme valeur d’un Whereable, dans `isIn()` / `isNotIn()`, et dans `vals([…])` au sein d’un filtre :
+Comme valeur de filtre, `raw()` lève une erreur à la compilation, tout comme `cols()` et `vals()`. Comme valeur d’un Whereable :
 
 > `` `db.raw()`, `db.cols()` and `db.vals()` have no meaning as a value in a Whereable (a filter), nor in `isIn()`: to compare with SQL, use a `sql` fragment value, where `db.self` stands for the column; to compare with a value, give the value itself, or `db.param()`. ``<!-- message -->
+
+Dans `isIn()` / `isNotIn()`, et comme élément de `vals([…])` avec une colonne courante, celle d’un filtre ou d’une écriture ([`vals()`](#vals)) :
+
+> `` `db.raw()`, `db.cols()` and `db.vals()` have no meaning as an item of `vals([…])` in a column's value, in a filter (as `isIn()` writes it) or in a `sql` fragment value of `insert()`, `upsert()` or `update()`: for SQL, write it in a `sql` fragment value, outside `vals([…])` (`db.self` there stands for the column); for a value, give the value itself, or `db.param()`. ``<!-- message -->
 
 Comme valeur de `eq()`, `add()` et des autres [conditions](/fr/conditions) :
 
@@ -270,17 +274,17 @@ Une liste de valeurs séparées par des virgules. Chaque valeur se compile comme
 | une valeur simple | un paramètre, `$1` | un paramètre, `$1` |
 | un `Parameter` | tel quel, avec son cast | tel quel, avec son cast |
 | un fragment `sql` | son SQL, avec sa clé comme colonne courante (donc [`self`](#self) fonctionne) | son SQL |
-| `Default` | `DEFAULT` | `DEFAULT` ; lève une erreur dans un filtre |
+| `Default` | `DEFAULT` | `DEFAULT` ; lève une erreur avec une colonne courante |
 | `parent(c?)` | la [colonne parente](#parent), sans `c` la colonne de sa clé ; lève une erreur hors d’une requête imbriquée | la [colonne parente](#parent) |
-| `raw()`, `cols()`, `vals()` | lèvent une erreur | lèvent une erreur dans un filtre ; un paramètre hors d’un filtre |
-| `self`, `all` | un paramètre | lève une erreur dans un filtre ; un paramètre hors d’un filtre |
+| `raw()`, `cols()`, `vals()` | lèvent une erreur | lèvent une erreur avec une colonne courante ; un paramètre sans colonne courante |
+| `self`, `all` | un paramètre | lève une erreur avec une colonne courante ; un paramètre sans colonne courante |
 
 - Les valeurs d’un objet viennent dans l’ordre de ses clés triées, comme `cols()` les liste.
 - Dans un template typé par table, ses clés ne sont pas vérifiées par rapport à la table, comme l’explique [`cols()`](#cols).
-- « Dans un filtre », c’est partout où `vals([…])` a une colonne courante : dans `isIn()` et `isNotIn()`, et dans un fragment donné en valeur d’un Whereable ou de `vals({…})`. Là :
-  - `Default` lève "`` `db.Default` has no meaning in a Whereable (a filter)… ``<!-- message -->" ;
-  - `self` "`` `db.self` has no meaning as a value in a Whereable (a filter), nor in `isIn()`… ``<!-- message -->" ;
-  - `all` "`` `db.all` has no meaning as a value in a Whereable (a filter), nor in `isIn()`… ``<!-- message -->" ;
+- `vals([…])` a une colonne courante là où une clé la lui donne : celle d’un filtre, dans `isIn()` et `isNotIn()` et dans un fragment donné en valeur d’un Whereable, ou celle d’une écriture, dans un fragment donné en valeur de `vals({…})`, comme dans les lignes d’`insert()` et d’`upsert()` et les valeurs d’`update()`. La compilation ne distingue pas les deux, donc chaque message nomme les deux :
+  - `Default` lève "`` `db.Default` has no meaning as an item of `vals([…])` in a column's value… ``<!-- message -->" ;
+  - `self` "`` `db.self` has no meaning as an item of `vals([…])` in a column's value… ``<!-- message -->" ;
+  - `all` "`` `db.all` has no meaning as an item of `vals([…])` in a column's value… ``<!-- message -->" ;
   - `raw()`, `cols()` et `vals()`, comme le dit [`raw()`](#raw).
 - Employé lui-même comme valeur de filtre, ou comme valeur dans `vals({…})`, `vals()` lève une erreur, comme [`raw()`](#raw).
 - Un objet natif sans clé propre énumérable, ou un `Buffer`, lève une erreur à la compilation, comme dans [`cols()`](#cols) : "`` `db.vals()` takes an object or an array, not a `Buffer`, whose bytes would compile as values, one parameter per byte: for one value, write `db.vals([value])`; for a row of `insert()`, `upsert()` or `update()`, give a plain object. ``<!-- message -->". Zapatos 6.6.1 compilait un `Date` en rien. Il compilait un `Buffer` en un paramètre par octet, si bien qu’un seul octet était stocké sous la forme de son nombre (`'97'` dans une colonne texte pour `Buffer.from('a')`), et que dans une liste `IN`, les octets étaient comparés comme des nombres. Un objet natif doté de ses propres clés énumérables se compile toujours en leurs valeurs. Un tableau typé autre qu’un `Buffer` se compile en ses éléments, `$1, $2`<!-- probe: db.sql`${db.vals(new Int32Array([1, 2]))}` --> pour `new Int32Array([1, 2])`, sauf s’il est vide et n’a donc aucune clé propre. Un `Uint8Array` qui représente des octets se compile lui aussi en ses éléments, `vals(new TextEncoder().encode('a'))` en `$1`<!-- probe: db.sql`${db.vals(new TextEncoder().encode('a'))}` --> avec `97` : dans une liste `IN`, ses éléments sont tout aussi souvent les nombres voulus, si bien que seul un `Buffer`, le type de Node pour des octets, est refusé. Pour une seule valeur, écrivez `db.vals([value])` ou `db.param(value)`.
@@ -353,7 +357,8 @@ La colonne courante, dans un fragment donné en valeur d’un Whereable : `` { 
 
 - Là où il n’y a pas de colonne courante, il lève une erreur : "The 'self' column alias has no meaning here"<!-- message -->.
 - Comme valeur de filtre, il lève une erreur : c’est la colonne, pas une valeur à lui comparer. Zapatos 6.6.1 l’envoyait comme la chaîne `'Symbol(self)'`.
-  - Comme valeur d’un Whereable, dans `isIn()` / `isNotIn()` et dans `vals([…])` au sein d’un filtre : "`` `db.self` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: compare with a value, or use it in a `sql` fragment value, where it stands for the column. ``<!-- message -->"
+  - Comme valeur d’un Whereable : "`` `db.self` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: compare with a value, or use it in a `sql` fragment value, where it stands for the column. ``<!-- message -->"
+  - Dans `isIn()` / `isNotIn()`, et dans `vals([…])` avec une colonne courante, celle d’un filtre ou d’une écriture ([`vals()`](#vals)) : "`` `db.self` has no meaning as an item of `vals([…])` in a column's value, in a filter (as `isIn()` writes it) or in a `sql` fragment value of `insert()`, `upsert()` or `update()`: give a value, or write `db.self` in a `sql` fragment value, outside `vals([…])`, where it stands for the column. ``<!-- message -->"
   - Comme valeur de `eq()`, `add()` et des autres conditions : "`` `db.self` has no meaning as the value of `eq()`, `add()` and the other conditions: it is already the column on the left. To compare the column with itself, write a `sql` fragment with `db.self` on both sides. ``<!-- message -->"
 
 ### `SelfType` {#SelfType}
@@ -404,7 +409,8 @@ Le mot-clé `DEFAULT` : la valeur par défaut d’une colonne, dans une valeur 
 </CastPanel>
 
 - Dans un filtre, il lève une erreur à la compilation.
-  - Comme valeur d’un Whereable ([plus haut](#whereable)), dans `isIn()` / `isNotIn()`, et dans `vals([…])` avec une colonne courante ([`vals()`](#vals)) : "`` `db.Default` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. `DEFAULT` is for INSERT and UPDATE values. ``<!-- message -->"
+  - Comme valeur d’un Whereable ([plus haut](#whereable)) : "`` `db.Default` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. `DEFAULT` is for INSERT and UPDATE values. ``<!-- message -->"
+  - Dans `isIn()` / `isNotIn()`, et dans `vals([…])` avec une colonne courante, celle d’un filtre ou d’une écriture ([`vals()`](#vals)) : "`` `db.Default` has no meaning as an item of `vals([…])` in a column's value, in a filter (as `isIn()` writes it) or in a `sql` fragment value of `insert()`, `upsert()` or `update()`: in a filter, leave the key out, or compare with a value; in a write, give `db.Default` as the value itself, `{ column: db.Default }`. ``<!-- message -->"
   - Comme valeur de `eq()`, `add()` et des autres conditions : "`` `db.Default` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To set a column to its default in an UPDATE, give `db.Default` as the value itself: `{ n: db.Default }`. ``<!-- message -->"
 - Pour `add()` et `subtract()`, affectez-le à la colonne elle-même : `{ booked_at: db.Default }`.
 - Zapatos 6.6.1 l’envoyait comme la chaîne `'Symbol(DEFAULT)'` dans tous ces cas, et dans `vals([…])`, où il est maintenant `DEFAULT`.
@@ -460,7 +466,8 @@ Le `where` de `select()`, de `count()` et des autres lectures qui correspond à 
 - Comme `where` de `deletes()` ou d’`update()`, il lève une erreur à la compilation, et le type le refuse : un filtre qui se rabat sur `db.all` pour une lecture ne supprime ni ne modifie jamais toutes les lignes. `{}` et `` db.sql`TRUE` `` le font : "`` `db.all` has no meaning as the filter of `deletes()` or `update()`: it is the filter of `select()` and its kin, refused in a write so that a filter that falls back to it for a read never deletes or updates every row. To delete or update every row on purpose, give db.sql`TRUE` as the filter. ``<!-- message -->"
 
 - Comme valeur de filtre, il lève une erreur à la compilation, et le type le refuse : c’est un filtre entier, pas une valeur à comparer. Zapatos 6.6.1 l’envoyait comme la chaîne `'Symbol(all)'`, si bien que `deletes('films', { title: db.conditions.isNotIn([db.all]) })` supprimait tout film qui a un titre.
-  - Comme valeur d’un Whereable ([plus haut](#whereable)), dans `isIn()` / `isNotIn()`, et dans `vals([…])` avec une colonne courante ([`vals()`](#vals)) : "`` `db.all` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: leave the key out, or compare with a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`. ``<!-- message -->"
+  - Comme valeur d’un Whereable ([plus haut](#whereable)) : "`` `db.all` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: leave the key out, or compare with a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`. ``<!-- message -->"
+  - Dans `isIn()` / `isNotIn()`, et dans `vals([…])` avec une colonne courante, celle d’un filtre ou d’une écriture ([`vals()`](#vals)) : "`` `db.all` has no meaning as an item of `vals([…])` in a column's value, in a filter (as `isIn()` writes it) or in a `sql` fragment value of `insert()`, `upsert()` or `update()`: in a filter, leave the key out, or compare with a value; in a write, give a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`. ``<!-- message -->"
   - Comme valeur de `eq()`, `add()` et des autres conditions, et dans le tableau d’une condition de tableau : "`` `db.all` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`. ``<!-- message -->"
 
 ### `AllType` {#AllType}
