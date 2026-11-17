@@ -173,7 +173,7 @@ Every option is optional. Each one given replaces its default whole: `schemas` w
 
 ### `schemas` {#generate.schemas}
 
-`{ [schema]: { include, exclude } }`, each of `include` and `exclude` `"*"` or an array of relation names. The schemas to generate, and which relations of each: tables, views, materialised views and foreign tables.
+[`SchemaRules`](#SchemaRules), `{ [schema]: { include, exclude } }`, each of `include` and `exclude` `"*"` or an array of relation names. The schemas to generate, and which relations of each: tables, views, materialised views and foreign tables.
 
 Both keys are required by the type: in `generate()`, a rule without one fails to compile (TS2741). In the JSON, or in untyped JavaScript, a key left out or set to `null` takes the default rule's value, `"include": "*"` or `"exclude": []`, and the generator notes it, through [`warningListener`](#generate.warningListener); Zapatos 6.6.1 stopped where it read the missing key, with `TypeError: Cannot read properties of undefined (reading 'indexOf')` ([#301](https://github.com/AlexandreDemartin/pgcast/issues/301)). A string other than `"*"`, which the type refuses too (TS2322), is read as a one-name list, `"films"` as `["films"]`, and noted the same way; Zapatos 6.6.1 also matched each relation whose name is part of it, `film` for `"films"` ([#442](https://github.com/AlexandreDemartin/pgcast/issues/442)).
 
@@ -226,7 +226,7 @@ Its SQL is [`select()`](/select#select)'s, with the name quoted part by part: `t
 
 ### `columnOptions` {#generate.columnOptions}
 
-`{ [table]: { [column]: { insert?, update? } } }`. Changes the `Insertable` and `Updatable` types of a column, as a trigger that fills it would need; nothing else changes, at run time neither.
+[`ColumnOptions`](#ColumnOptions), `{ [table]: { [column]: { insert?, update? } } }`. Changes the `Insertable` and `Updatable` types of a column, as a trigger that fills it would need; nothing else changes, at run time neither.
 
 ::: code-group
 
@@ -617,6 +617,38 @@ ORDER BY i.indexname
 ```
 
 The result is `pg`'s whole `Result` object: after `rows` come `fields`, its column types, and about seventy lines of `pg`'s own type parsers, the same for every query.
+
+## Types {#types}
+
+The types of two options, from `zapatos/generate`, for a function of yours that takes or returns them.
+
+### `SchemaRules` {#SchemaRules}
+
+```ts
+interface SchemaRules {
+  [schema: string]: {
+    include: '*' | string[];
+    exclude: '*' | string[];
+  };
+}
+```
+
+From 6.9.0. The type of [`schemas`](#generate.schemas): by schema, the relations to generate.
+
+### `ColumnOptions` {#ColumnOptions}
+
+```ts
+interface ColumnOptions {
+  [k: string]: {  // table name or "*"
+    [k: string]: {  // column name
+      insert?: 'auto' | 'excluded' | 'optional';
+      update?: 'auto' | 'excluded';
+    };
+  };
+}
+```
+
+From 6.9.0. The type of [`columnOptions`](#generate.columnOptions): by table, then by column, how `Insertable` and `Updatable` type it.
 
 ## The files it writes {#the-files-it-writes}
 
