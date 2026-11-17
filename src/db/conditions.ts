@@ -114,12 +114,13 @@ export const isIn = <T>(a: readonly T[]) => !Array.isArray(a) ? notAnArray('isIn
  */
 export const isNotIn = <T>(a: readonly T[]) => !Array.isArray(a) ? notAnArray('isNotIn', a) : a.length > 0 ? sql<SQL, boolean | null, T>`${self} NOT IN (${vals(a)})` : sql`true`;
 
-// what eqAny() calls each value that is no plain value, for its messages; undefined for a plain value
+// what eqAny() calls each value that is no plain value, for its messages; undefined for a plain value; pg would send
+// db.all, as Default and self, as its String(), 'Symbol(all)'
 const notAValue = (x: unknown) =>
-  x === Default ? '`db.Default`' : x === self ? '`db.self`' : x instanceof Parameter ? '`db.param()`' :
-    x instanceof ParentColumn ? '`db.parent()`' : x instanceof DangerousRawString ? '`db.raw()`' :
-      x instanceof ColumnNames ? '`db.cols()`' : x instanceof ColumnValues ? '`db.vals()`' :
-        x instanceof SQLFragment ? 'a `sql` fragment' : undefined;
+  x === Default ? '`db.Default`' : x === self ? '`db.self`' : x === all ? '`db.all`' :
+    x instanceof Parameter ? '`db.param()`' : x instanceof ParentColumn ? '`db.parent()`' :
+      x instanceof DangerousRawString ? '`db.raw()`' : x instanceof ColumnNames ? '`db.cols()`' :
+        x instanceof ColumnValues ? '`db.vals()`' : x instanceof SQLFragment ? 'a `sql` fragment' : undefined;
 
 // one array parameter holds plain values: pg would send a Parameter or a fragment as JSON, and read an array item
 // as more items, so that a jsonb column matched no row, with no error
