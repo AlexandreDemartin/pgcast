@@ -414,6 +414,14 @@ describe('websearchToTsquery on a tsvector column', () => {
       .toEqual({ code: '42704', message: 'text search configuration "klingon" does not exist' });
   });
 
+  it('an unknown schema in a dotted configuration: 3F000 before Postgres 16, 42704 from 16', async () => {
+    // from 16, regconfig's input reports its errors softly, and the schema it lacks as the configuration it lacks
+    const { rows: [{ version }] } = await t.client.query("SELECT current_setting('server_version_num')::int AS version");
+    expect(await pgError(t.client, () => ids('products', { search: search('nosuch.english', 'shirt') }))).toEqual(version >= 160000 ?
+      { code: '42704', message: 'text search configuration "nosuch.english" does not exist' } :
+      { code: '3F000', message: 'schema "nosuch" does not exist' });
+  });
+
   it('a query that is no string rejects before any query, so an update() changes no row', async () => {
     // pg would send ['shirt'] as '{"shirt"}', which Postgres reads as the word shirt: both shirts
     await expect(db.update('products', { price_cents: 0 }, { search: search('simple', ['shirt'] as any) }).run(t.client))
