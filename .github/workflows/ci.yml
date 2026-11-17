@@ -136,8 +136,9 @@ jobs:
 
   typescript-4-1:
     # The floor of the typescript peer (>=4.1): every .d.ts the package ships parses with TypeScript 4.1.6, and a consumer
-    # on it compiles against them and the committed test/generated/ schema, with skipLibCheck (website/install.md). The
-    # script fetches TypeScript 4.1.6 and its @types into node_modules/.cache, never a dependency; no Postgres.
+    # on it compiles against them and the committed test/generated/ schema, with skipLibCheck (website/install.md), and
+    # their lib check finds no error but Buffer<ArrayBuffer>. The script fetches TypeScript 4.1.6 and its pinned @types
+    # into node_modules/.cache, never a dependency; no Postgres.
     needs: changes
     if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
