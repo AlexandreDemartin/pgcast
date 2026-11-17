@@ -62,7 +62,7 @@ description: 'What the skill does. USE FOR: … DO NOT USE FOR: …'
 | Agent | Mission |
 |---|---|
 | `builder` | Builds a step (an issue): plan comment, code, draft PR that closes it; or fixes the blocking items of a review, started afresh |
-| `branch-reviewer` | Senior read-only review (user skill `branch-review` + pgcast lenses), returned in Conventional Comments; `verify` mode |
+| `branch-reviewer` | Senior read-only review at `high` effort with the pgcast lenses, returned in Conventional Comments; `verify` mode |
 | `chores` | Mechanical work on sonnet: merge from below, CI rerun, regeneration; stops at the first choice |
 
 Ritual of a step: skill `run-step`; on one page for a human: [docs/WORKFLOW.md](../docs/WORKFLOW.md).

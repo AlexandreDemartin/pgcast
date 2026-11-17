@@ -11,7 +11,6 @@ import {checkReport} from './check-report.mjs';
 
 const skillsDirectory = '.agents/skills';
 const agentsDirectory = '.claude/agents';
-const userLevelSkills = new Set(['branch-review']);  // lives in the user's ~/.claude, not in this repository
 const maxDescriptionLength = 350;
 const maxLines = 150;  // hard limits of a skill or an agent (.agents/README.md § Writing a skill); the budget is ~100 lines
 const maxWords = 1800;  // and ~1,200 words
@@ -77,7 +76,7 @@ const citingFiles = [
 ].filter(existsSync);
 for (const path of citingFiles) {
   for (const [, cited] of readFileSync(path, 'utf8').matchAll(/skills? `([a-z0-9-]+)`/g)) {
-    if (!skills.includes(cited) && !userLevelSkills.has(cited)) errors.push(`${path}: cites unknown skill '${cited}'`);
+    if (!skills.includes(cited)) errors.push(`${path}: cites unknown skill '${cited}'`);
   }
 }
 
