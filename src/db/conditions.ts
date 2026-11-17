@@ -167,10 +167,13 @@ const notJSON = (x: unknown) =>
 // the value goes as JSON text: pg alone sends a string as text and an array as '{1,2}', which the cast to jsonb refuses
 // (22P02); JSON.stringify would leave out a key holding undefined, a function or a symbol, so that { a: undefined }
 // matched every row, write them as null in an array, and a wrapper as its fields, which match no row, with no error;
-// `keyOut` and `keyAdvice` say what a key left out of an object would do, and what to do instead
-const jsonbParam = (a: unknown, fn: string, arg: string, keyOut = 'leave the key out', keyAdvice = 'Give a JSON value') => {
-  const name = notAValue(a);
-  if (name !== undefined) return refused(`\`${fn}()\` sends its ${arg} as JSON text, so it takes a JSON value, not ${name}: give a value; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.`);
+// `keyOut` and `keyAdvice` say what a key left out of an object would do, and what to do instead; `object`, that the
+// argument as a whole is an object, which Postgres requires of jsonb_path_exists()'s vars (22023)
+const jsonbParam = (a: unknown, fn: string, arg: string, keyOut: string, keyAdvice: string, object = false) => {
+  const
+    name = notAValue(a),
+    takes = object ? 'an object of JSON values' : 'a JSON value';
+  if (name !== undefined) return refused(`\`${fn}()\` sends its ${arg} as JSON text, so it takes ${takes}, not ${name}: give ${object ? 'an object' : 'a value'}; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.`);
   let refusal: string | undefined, top = true;
   try {
     const text = JSON.stringify(a, function (this: unknown, key, x: unknown) {
@@ -181,15 +184,16 @@ const jsonbParam = (a: unknown, fn: string, arg: string, keyOut = 'leave the key
           at = top ? '' : inArray ? ` at item ${key}` : ` at key \`${key}\``,
           effect = typeof x === 'bigint' ? 'throw' : typeof x === 'object' ? 'write its fields' :
             top ? 'write nothing' : inArray ? 'write `null` in its place' : keyOut,
-          advice = typeof x === 'bigint' ? 'Give it as a number or a string' : top || inArray ? 'Give a JSON value' : keyAdvice;
-        refusal = `\`${fn}()\` sends its ${arg} as JSON text, so it takes a JSON value, not ${what}${at}: \`JSON.stringify\` would ${effect}. ${advice}.`;
+          advice = top && object ? `Give ${takes}` : typeof x === 'bigint' ? 'Give it as a number or a string' :
+            top || inArray ? 'Give a JSON value' : keyAdvice;
+        refusal = `\`${fn}()\` sends its ${arg} as JSON text, so it takes ${takes}, not ${what}${at}: \`JSON.stringify\` would ${effect}. ${advice}.`;
       }
       top = false;
       return refusal === undefined ? x : null;
     });
     return refusal === undefined ? param(text, 'jsonb') : refused(refusal);
   } catch (err) {
-    return refused(`\`${fn}()\` sends its ${arg} as JSON text, so it takes a JSON value: \`JSON.stringify\` threw "${(err as Error).message}". Give a JSON value.`);
+    return refused(`\`${fn}()\` sends its ${arg} as JSON text, so it takes ${takes}: \`JSON.stringify\` threw "${(err as Error).message}". Give ${takes}.`);
   }
 };
 
@@ -215,7 +219,7 @@ export const jsonbContains: JsonbContainsSignatures = (a: JSONValue) => sql<SQL,
 // the path goes as text, cast to jsonpath, so that Postgres parses it: pg would send anything else as JSON or as its
 // String(), which Postgres could read as another path
 const jsonpathParam = (path: unknown) => typeof path === 'string' ? param(path, 'jsonpath') :
-  refused(`\`jsonbPathExists()\` takes its path as a string, not ${notAValue(path) ??
+  refused(`\`jsonbPathExists()\` takes its path as a string, not ${notJSON(path) ??
     (path === null ? '`null`' : Array.isArray(path) ? 'an array' : typeof path === 'object' ? 'an object' : `a \`${typeof path}\``)}: write the path as a string, and each value it compares with as a variable, \`jsonbPathExists(path, { name: value })\`.`);
 
 // as jsonbContains()'s signatures, T given for a narrowed jsonb domain, never inferred; written in place, not as an
@@ -236,7 +240,7 @@ export const jsonbPathExists: {
   (path: string, vars?: JSONObject): SQLFragment<boolean | null, JSONValue>;
   <T>(path: string, vars?: JSONObject): SQLFragment<boolean | null, T>;
 } = (path: string, vars: JSONObject = {}) =>
-  sql<SQL, boolean | null>`jsonb_path_exists(${self}, ${jsonpathParam(path)}, ${jsonbParam(vars, 'jsonbPathExists', 'variables')})`;
+  sql<SQL, boolean | null>`jsonb_path_exists(${self}, ${jsonpathParam(path)}, ${jsonbParam(vars, 'jsonbPathExists', 'variables', 'leave the key out', 'Give a JSON value', true)})`;
 
 /**
  * Join conditions with `OR`: `or(a, b)` compiles to `(a OR b)`, and `or()` to `FALSE`, so that
