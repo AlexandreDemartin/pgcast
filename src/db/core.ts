@@ -7,7 +7,7 @@ Released under the MIT licence: see LICENCE file
 import type * as pg from 'pg';
 
 import { getConfig, SQLQuery } from './config';
-import { builtinName, identifier, isBuiltin, isKeylessBuiltin, isPOJO, isRefusedBuffer, NoInfer, space } from './utils';
+import { builtinName, identifier, isBuiltin, isKeylessBuiltin, isPOJO, isRefusedBuffer, space } from './utils';
 
 import type {
   Updatable,
@@ -313,6 +313,10 @@ export type SQLExpression = Table | ColumnNames<Updatable | (keyof Updatable)[]>
 export type SQL = SQLExpression | SQLExpression[];
 
 export type Queryable = pg.ClientBase | pg.Pool;
+
+// NoInfer of ./utils, declared here and not exported: a library's declarations that write sql's type out cannot name
+// ./utils, which zapatos/db does not export (TS2742), and they write this alias out in full
+type NoInfer<T> = [T][T extends any ? 0 : never];  // https://github.com/Microsoft/TypeScript/issues/14829
 
 
 // === SQL tagged template strings ===

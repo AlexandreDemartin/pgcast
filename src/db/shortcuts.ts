@@ -45,7 +45,6 @@ import {
   isPrimitive,
   isRefusedBuffer,
   mapWithSeparator,
-  NoInfer,
   space,
   warnOnce,
 } from './utils';
@@ -701,6 +700,9 @@ interface OrderSpecForTable<T extends Table> {
 }
 
 type Unprefixed<S extends string> = S extends `${infer _}.${infer Rest}` ? Rest : S;
+
+// as in core.ts, for the lock option of SelectOptionsForTable
+type NoInfer<T> = [T][T extends any ? 0 : never];
 
 export interface SelectLockingOptions<A extends string> {
   for: 'UPDATE' | 'NO KEY UPDATE' | 'SHARE' | 'KEY SHARE';

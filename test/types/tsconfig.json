@@ -2,7 +2,7 @@
   // Type tests (`npm run test:types`), compiled as a consumer project compiles: against the
   // fixture's generated schema (../generated/zapatos, ambient 'zapatos/schema' and 'zapatos/custom')
   // and the declarations of src/db and src/generate that `npm run test:types` emits first ('zapatos/db',
-  // 'zapatos/generate').
+  // 'zapatos/generate', and 'zapatos/dist/db/utils', the inner module as the package holds it: ./utils.test-d.ts).
   "extends": "../generated/tsconfig.json",
   "include": ["../generated/zapatos/**/*", "./**/*"],
   // ./custom/PgPreferences.d.ts narrows it, as a consumer project does
@@ -12,7 +12,8 @@
     "moduleResolution": "bundler",
     "paths": {
       "zapatos/db": ["../../node_modules/.cache/pgcast/db"],
-      "zapatos/generate": ["../../node_modules/.cache/pgcast/generate"]
+      "zapatos/generate": ["../../node_modules/.cache/pgcast/generate"],
+      "zapatos/dist/db/utils": ["../../node_modules/.cache/pgcast/db/utils"]
     }
   }
 }
