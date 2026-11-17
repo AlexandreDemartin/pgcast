@@ -331,6 +331,15 @@ Candidates for a check, a rule or a skill line.
 - #635: the guard refuses `git merge --no-edit`: give the merge message with `-m`, its Co-Authored-By line included.
 - #639: with `groupBy`, every lateral's result is in the select list, so Postgres refuses the query (42803) unless `groupBy` names it: why real code writes `${col}, "lateral_x".result`.
 - #639: to probe row-level security as a superuser without creating a role, `SET LOCAL ROLE pg_read_all_data` in the probe database: predefined, no RLS bypass, SELECT already granted.
+- #646: count a schema pattern through `pg_get_constraintdef()` on a database dump, not by reading migrations, which create and drop in up/down pairs.
+- #646: Postgres stores `VALUE IN (…)` as `VALUE = ANY (ARRAY[…])`, a one-value `IN` as `=`: a reader of `CHECK` text matches the stored forms, replayed on the server.
+- #646: `pg_get_constraintdef()` and `pg_get_expr()` write string literals by the reading session's `standard_conforming_strings`: off, a backslash comes back doubled with no `E` prefix; replay any catalog SQL text with it off.
+- #646: before saying a placeholder file is unused, check shared placeholder names (#42: two types, one file).
+- #646: from Postgres 17, a domain's `NOT NULL` is a `pg_constraint` row (`contype = 'n'`): filter on `contype` when counting a domain's `CHECK`s.
+- #646: a generated type that replaces a placeholder can keep its name by re-exporting it from the placeholder: weigh the option that keeps app code compiling.
+- #646: measure every option's compile cost rather than infer it: U3 was recorded as +0 and costs +75 / +48, as the union in the queries carries the cost, not where it is declared.
+- #646: before deciding what wins over a placeholder, read how the existing keys treat an edited one (`domainsTypedByContext`, `enumArraysTypedAsText`): that precedent settled the choice.
+- #646: split a reviewer's corpus figure by what the decision touches: 13 of the 21 app names were `jsonb` placeholders § 1 never changes.
 
 ## Minors kept
 
@@ -381,3 +390,4 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #606 (form): `scripts/check-declarations-floor.mjs` leaves `pg-types` (`^2.2.0` from `@types/pg@8.6.6`) unpinned.
 - #621 (form): `src/db/conditions.ts` `callerValue(options, 'parent') || undefined`: `|| undefined` is an equivalent mutant (core reads `parentTable` by truthiness).
 - #639 (form): `.agents/skills/code-style/SKILL.md` § Further than Zapatos still lists "laterals typed by foreign keys" first on Zapatos's roadmap; after decision 007, say what pgcast gives instead (`parent<T.Column>`).
+
