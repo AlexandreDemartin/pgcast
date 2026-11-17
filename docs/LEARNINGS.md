@@ -206,6 +206,7 @@ Candidates for a check, a rule or a skill line.
 - #573: a brand that "only an `any` column takes" admits every placeholder left as generated (`citext`, domains, extension types): probe such a claim on the fixture's `any` placeholders.
 - #573: the `paths` mapping into `node_modules/.cache` hides TS2742: a declaration-emit test here catches only TS4023 unless the emitted text is checked (`scripts/check-declarations.mjs`).
 - #573: a review's example of what slips through is probed against the generator's real mapping: `citext` and domains over known types are `string`, not `any`.
+- #573: Postgres 16 changed the error of reg* inputs (`regconfig`, `regtype`…) for a dotted name whose schema is missing: 3F000 before 16, 42704 from 16; a SQLSTATE snapshot of such a name splits on `server_version_num`.
 
 ## Minors kept
 
@@ -245,3 +246,4 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #572 (form): `website/conditions.md` § jsonb, "A value typed by an `interface` is refused (TS2345)": a `readonly string[]` and a class instance are too, `['a'] as const` passes.
 - #573 (form): `website/conditions.md` § full-text, `websearchToTsquery<PgTsvector>(…)`: not where `PgTsvector` comes from (`zapatos/custom`); FR and JSDoc likewise.
 - #573 (form): `test/unit/conditions.test.ts` `one SQL wherever it sits`: no `update()`, no `.copy()` of a refused wrapper.
+- #573 (defect): `website/conditions.md` § full-text (and FR), "one it does not know is its 42704": on Postgres 14 a dotted configuration whose schema is missing gives 3F000.
