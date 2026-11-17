@@ -23,7 +23,7 @@ import {
   AllType,
 } from './core';
 
-import { mapWithSeparator } from './utils';
+import { callerValue, mapWithSeparator } from './utils';
 import type { Whereable, Table, Column, WhereableForTable, SelectableForTable } from 'zapatos/schema';
 
 const
@@ -301,9 +301,9 @@ const lastIdentifier = (name: string) => {
 // overridden as select() does, so a copy() of the condition, which shares its expressions, keeps it. When `parent`
 // names the subquery's own table, Postgres reads `parent()` as a column of the subquery's row, the wrong rows with
 // no error: refused as the query compiles
-const subquery = (fn: string, head: SQL, table: string, where: SQL | AllType, options: { parent?: string; alias?: string } = {}) => {
+const subquery = (fn: string, head: SQL, table: string, where: SQL | AllType, options?: { parent?: string; alias?: string }) => {
   const
-    { parent, alias } = options,
+    parent = callerValue(options, 'parent'), alias = callerValue(options, 'alias'),  // `null` options are none, as in select()
     own = alias ?? table;
   if (typeof parent === 'string' && typeof own === 'string' && lastIdentifier(parent) === lastIdentifier(own)) {
     return refused(`\`${fn}()\` was given \`parent: '${parent}'\`, which names "${lastIdentifier(own)}", the subquery's own name, so Postgres would read \`parent()\` as a column of the subquery's row: give the subquery another name with the \`alias\` option.`);
@@ -323,7 +323,7 @@ const subquery = (fn: string, head: SQL, table: string, where: SQL | AllType, op
  * @param table The subquery's table
  * @param where A Whereable or `sql` fragment on `table`, or `all` for no `WHERE`
  * @param options `parent`, the outer table as the outer query names it (its alias, if any); `alias`, `AS <alias>`
- * after `table`, needed when `parent` names it
+ * after `table`, needed when `parent` names it; `null` is none
  */
 export const exists = <T extends Table>(table: T, where: WhereableForTable<T> | SQLFragment<any> | AllType, options?: { parent?: string; alias?: string }) =>
   sql<SQL, boolean, never>`EXISTS (${subquery('exists', raw('SELECT 1'), table, where, options)})`;
@@ -335,7 +335,7 @@ export const exists = <T extends Table>(table: T, where: WhereableForTable<T> | 
  * @param table The subquery's table
  * @param where A Whereable or `sql` fragment on `table`, or `all` for no `WHERE`
  * @param column The column of `table` the subquery selects
- * @param options `parent` and `alias`, as in `exists()`
+ * @param options `parent` and `alias`, as in `exists()`; `null` is none
  */
 export const isInSelect = <T extends Table, C extends keyof SelectableForTable<T>>(table: T, where: WhereableForTable<T> | SQLFragment<any> | AllType, column: C, options?: { parent?: string; alias?: string }) =>
   sql<SQL, boolean | null, Exclude<SelectableForTable<T>[C], null>>`${self} IN (${subquery('isInSelect', sql`SELECT ${column as Column}`, table, where, options)})`;
