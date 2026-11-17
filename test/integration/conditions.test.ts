@@ -343,6 +343,13 @@ describe('eqAny: one array parameter', () => {
   it('a list that is not an array rejects before any query', async () => {
     await expect(ids('users', { id: dc.eqAny(new Set([1]) as unknown as number[]) })).rejects.toThrow('`eqAny()` takes an array, not `Set`');
   });
+
+  it('db.all as an item rejects before any query, so an update() changes no row', async () => {
+    // pg would send it as 'Symbol(all)', which no name equals: under not(), every user
+    await expect(db.update('users', { display_name: 'Gone' }, { display_name: dc.not(dc.eqAny([db.all as any])) }).run(t.client))
+      .rejects.toThrow('not `db.all`: give a value.');
+    expect(await db.count('users', { display_name: 'Gone' }).run(t.client)).toBe(0);
+  });
 });
 
 describe('websearchToTsquery on a tsvector column', () => {

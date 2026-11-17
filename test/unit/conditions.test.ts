@@ -909,6 +909,27 @@ describe('Default, self, raw, cols and vals as the value of a condition', () => 
       `);
   });
 
+  it('db.all as the value of eqAny, websearchToTsquery, jsonbContains or jsonbPathExists throws when compiled, naming it', () => {
+    // pg would send it as its String(), 'Symbol(all)': no row, or every row under not(), with no error
+    const all = db.all as any;
+    const conditions = {
+      eqAnyItem: dc.eqAny(['Bob', all]), eqAnyList: dc.eqAny(all),
+      searchConfig: dc.websearchToTsquery(all, 'salt'), searchQuery: dc.websearchToTsquery('english', all),
+      jsonbContains: dc.jsonbContains(all), jsonbContainsKey: dc.jsonbContains({ a: all }),
+      jsonbPathExistsPath: dc.jsonbPathExists(all), jsonbPathExistsVars: dc.jsonbPathExists('$', all),
+    };
+    expect(Object.fromEntries(Object.entries(conditions).map(([name, condition]) => [name, thrown(condition)]))).toEqual({
+      eqAnyItem: '`eqAny()` sends its array as one parameter, so each item is a plain value, not `db.all`: give a value.',
+      eqAnyList: '`eqAny()` takes an array of values, not `db.all`: write `eqAny(values)`; for SQL, write a `sql` fragment with `db.self` in place of the condition.',
+      searchConfig: '`websearchToTsquery()` sends its configuration and its query as parameters: give the configuration as a string, not `db.all`; for SQL, write a `sql` fragment with `db.self` in place of the condition.',
+      searchQuery: '`websearchToTsquery()` sends its configuration and its query as parameters: give the query as a string, not `db.all`; for SQL, write a `sql` fragment with `db.self` in place of the condition.',
+      jsonbContains: '`jsonbContains()` sends its value as JSON text, so it takes a JSON value, not `db.all`: give a value; for SQL, write a `sql` fragment with `db.self` in place of the condition.',
+      jsonbContainsKey: '`jsonbContains()` sends its value as JSON text, so it takes a JSON value, not `db.all` at key `a`: `JSON.stringify` would leave the key out, and the value match more rows. Give a JSON value, or leave the key out.',
+      jsonbPathExistsPath: '`jsonbPathExists()` takes its path as a string, not `db.all`: write the path as a string, and each value it compares with as a variable, `jsonbPathExists(path, { name: value })`.',
+      jsonbPathExistsVars: '`jsonbPathExists()` sends its variables as JSON text, so it takes an object of JSON values, not `db.all`: give an object; for SQL, write a `sql` fragment with `db.self` in place of the condition.',
+    });
+  });
+
   it('websearchToTsquery given anything but a value as the configuration or the query throws when compiled, not when called', () => {
     // a plain value goes as a parameter; pg would send a Parameter or a fragment as JSON, and Default or self as their names
     const values = { Default, self, raw: raw("'english'"), cols: cols('english'), vals: vals('english'), param: param('english'),
