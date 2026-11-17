@@ -1,5 +1,5 @@
 ---
-english: 7f3730458cd2
+english: 460ecaf4e4e9
 ---
 
 # Template SQL
@@ -185,7 +185,7 @@ db.sql<s.films.SQL>`SELECT * FROM ${'films'} WHERE ${{ title: db.raw("'x'") }}`;
 
 - Pour comparer avec du SQL : un fragment en valeur, `` { title: db.sql`${db.self} = ${db.raw("'x'")}` } ``.
 - Zapatos 6.6.1 les y envoyait comme un seul paramètre, en JSON (`'{"value":…}'`) : aucune ligne sur une colonne texte ou `jsonb`, toutes les lignes avec `ne()` et `isNotIn()`, une erreur (22P02) sur les autres types ; comme valeur d’écriture, une colonne texte ou `jsonb` la stockait.
-- Hors d’un filtre, `vals([db.raw('x')])` reste un paramètre, son wrapper en JSON : `'{"value":"x"}'`, qu’une colonne texte stocke tel quel ; dans les `updateValues` d’`upsert()`, `raw()` est du SQL ([`upsert()`](/fr/insert#upsert)).
+- Hors de la valeur d’une colonne, dans un template `sql` que vous écrivez ou dans les `updateValues` d’`upsert()`, `vals([db.raw('x')])` lève aussi une erreur, là où Zapatos 6.6.1 envoyait le wrapper en JSON, `'{"value":"x"}'`, qu’une colonne texte stockait : "`` `db.raw()`, `db.cols()` and `db.vals()` have no meaning as an item of `vals([…])` outside a column's value, as in a `sql` template of your own or in `upsert()` `updateValues`: for SQL, write it outside `vals([…])` (in `updateValues`, as the value itself); for a value, give the value itself, or `db.param()`. ``<!-- message -->". Dans `updateValues`, `raw()` lui-même est du SQL ([`upsert()`](/fr/insert#upsert)).
 
 ### `DangerousRawString` {#DangerousRawString}
 
@@ -276,8 +276,8 @@ Une liste de valeurs séparées par des virgules. Chaque valeur se compile comme
 | un fragment `sql` | son SQL, avec sa clé comme colonne courante (donc [`self`](#self) fonctionne) | son SQL |
 | `Default` | `DEFAULT` | `DEFAULT` ; lève une erreur avec une colonne courante |
 | `parent(c?)` | la [colonne parente](#parent), sans `c` la colonne de sa clé ; lève une erreur hors d’une requête imbriquée | la [colonne parente](#parent) |
-| `raw()`, `cols()`, `vals()` | lèvent une erreur | lèvent une erreur avec une colonne courante ; un paramètre sans colonne courante |
-| `self`, `all` | un paramètre | lève une erreur avec une colonne courante ; un paramètre sans colonne courante |
+| `raw()`, `cols()`, `vals()` | lèvent une erreur | lèvent une erreur |
+| `self`, `all` | lèvent une erreur | lèvent une erreur |
 
 - Les valeurs d’un objet viennent dans l’ordre de ses clés triées, comme `cols()` les liste.
 - Dans un template typé par table, ses clés ne sont pas vérifiées par rapport à la table, comme l’explique [`cols()`](#cols).
@@ -286,10 +286,11 @@ Une liste de valeurs séparées par des virgules. Chaque valeur se compile comme
   - `self` "`` `db.self` has no meaning as an item of `vals([…])` in a column's value… ``<!-- message -->" ;
   - `all` "`` `db.all` has no meaning as an item of `vals([…])` in a column's value… ``<!-- message -->" ;
   - `raw()`, `cols()` et `vals()`, comme le dit [`raw()`](#raw).
+- Sans colonne courante, dans un template `sql` que vous écrivez ou dans les `updateValues` d’`upsert()`, `Default` donne `DEFAULT`, et `self`, `all`, `raw()`, `cols()` et `vals()` lèvent une erreur, avec les messages que donnent [`self`](#self), [`all`](#all) et [`raw()`](#raw). Zapatos 6.6.1 les envoyait comme `'Symbol(self)'`, `'Symbol(all)'` et en JSON.
 - Employé lui-même comme valeur de filtre, ou comme valeur dans `vals({…})`, `vals()` lève une erreur, comme [`raw()`](#raw).
 - Un objet natif sans clé propre énumérable, ou un `Buffer`, lève une erreur à la compilation, comme dans [`cols()`](#cols) : "`` `db.vals()` takes an object or an array, not a `Buffer`, whose bytes would compile as values, one parameter per byte: for one value, write `db.vals([value])`; for a row of `insert()`, `upsert()` or `update()`, give a plain object. ``<!-- message -->". Zapatos 6.6.1 compilait un `Date` en rien. Il compilait un `Buffer` en un paramètre par octet, si bien qu’un seul octet était stocké sous la forme de son nombre (`'97'` dans une colonne texte pour `Buffer.from('a')`), et que dans une liste `IN`, les octets étaient comparés comme des nombres. Un objet natif doté de ses propres clés énumérables se compile toujours en leurs valeurs. Un tableau typé autre qu’un `Buffer` se compile en ses éléments, `$1, $2`<!-- probe: db.sql`${db.vals(new Int32Array([1, 2]))}` --> pour `new Int32Array([1, 2])`, sauf s’il est vide et n’a donc aucune clé propre. Un `Uint8Array` qui représente des octets se compile lui aussi en ses éléments, `vals(new TextEncoder().encode('a'))` en `$1`<!-- probe: db.sql`${db.vals(new TextEncoder().encode('a'))}` --> avec `97` : dans une liste `IN`, ses éléments sont tout aussi souvent les nombres voulus, si bien que seul un `Buffer`, le type de Node pour des octets, est refusé. Pour une seule valeur, écrivez `db.vals([value])` ou `db.param(value)`.
 - `null`, une chaîne ou une autre valeur primitive lève une erreur à la compilation, comme dans [`cols()`](#cols) : "`` `db.vals()` takes an object or an array, not `string`: for one value, write `db.vals([value])`; for a row of `insert()`, `upsert()` or `update()`, give an object. ``<!-- message -->". Zapatos 6.6.1 envoyait les caractères d’une chaîne, `vals('id')` en `$1, $2` avec `'i'`, `'d'` : dans une liste `IN`, `vals('5')` trouvait les lignes égales à `'5'`, un cas désormais rejeté, comme avec [`isIn('5')`](/fr/conditions#conditions.isIn).
-- `insert()`, `upsert()` et `update()` compilent leurs valeurs avec `vals({…})`, hors d’une requête imbriquée : `parent()`, `raw()`, `cols()` et `vals()` y lèvent une erreur, avant toute requête.
+- `insert()`, `upsert()` et `update()` compilent leurs valeurs avec `vals({…})`, hors d’une requête imbriquée : `parent()`, `raw()`, `cols()`, `vals()`, `self` et `all` y lèvent une erreur, avant toute requête.
 - Zapatos 6.6.1 enveloppait un `Parameter`, `Default` et `parent()` dans un second paramètre au sein d’un tableau : `'{"value":…}'`, `'Symbol(DEFAULT)'`, `'{"value":"id"}'` ; et `parent()`, `raw()`, `cols()` et `vals()` au sein d’un objet, que les écritures stockaient sur une colonne texte ou `jsonb`.
 
 ### `ColumnValues` {#ColumnValues}
@@ -361,6 +362,9 @@ La colonne courante, dans un fragment donné en valeur d’un Whereable : `` { 
   - Dans `isIn()` / `isNotIn()`, et dans `vals([…])` au sein d’un filtre ([`vals()`](#vals)) : "`` `db.self` has no meaning as an item of `vals([…])` in a column's value, in a filter (as `isIn()` writes it) or in a `sql` fragment value of `vals({…})`, so of `insert()`, `upsert()` or `update()`: give a value; in a filter or in `update()`, write `db.self` in a `sql` fragment value, outside `vals([…])`, where it stands for the column. ``<!-- message -->"
   - Comme valeur de `eq()`, `add()` et des autres conditions : "`` `db.self` has no meaning as the value of `eq()`, `add()` and the other conditions: it is already the column on the left. To compare the column with itself, write a `sql` fragment with `db.self` on both sides. ``<!-- message -->"
 - Dans `vals([…])` au sein d’un fragment donné en valeur d’une écriture, soit en valeur de `vals({…})`, comme dans `insert()`, `upsert()` et `update()`, il lève à la compilation le message d’`isIn()` ci-dessus.
+- Comme valeur écrite, il lève une erreur à la compilation, là où Zapatos 6.6.1 envoyait ou stockait `'Symbol(self)'`. Le type le refuse comme valeur d’`insert()`, d’`upsert()` ou d’`update()`, `updateValues` compris, sauf sur une colonne typée `any` ; un `vals()` dans un template `sql` que vous écrivez l’accepte :
+  - Dans `vals({…})`, donc comme valeur d’`insert()`, d’`upsert()` ou d’`update()`, `updateValues` compris : "`` `db.self` has no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value: give a value; in `update()`, write `db.self` in a `sql` fragment value, where it stands for the column; in `upsert()` `updateValues`, to read a column, qualify it with its table, `table.column`, or with `EXCLUDED` for the row proposed, `EXCLUDED.column`. ``<!-- message -->"
+  - Dans `vals([…])` hors de la valeur d’une colonne, dans un template `sql` que vous écrivez ou dans `updateValues` : "`` `db.self` has no meaning as an item of `vals([…])` outside a column's value, as in a `sql` template of your own or in `upsert()` `updateValues`: give a value; in `updateValues`, to read a column, qualify it with its table, `table.column`, or with `EXCLUDED` for the row proposed, `EXCLUDED.column`. ``<!-- message -->"
 
 ### `SelfType` {#SelfType}
 
@@ -472,6 +476,9 @@ Le `where` de `select()`, de `count()` et des autres lectures qui correspond à 
   - Dans `isIn()` / `isNotIn()`, et dans `vals([…])` au sein d’un filtre ([`vals()`](#vals)) : "`` `db.all` has no meaning as an item of `vals([…])` in a column's value, in a filter (as `isIn()` writes it) or in a `sql` fragment value of `vals({…})`, so of `insert()`, `upsert()` or `update()`: in a filter, leave the key out, or compare with a value; in a write, give a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`. ``<!-- message -->"
   - Comme valeur de `eq()`, `add()` et des autres conditions, et dans le tableau d’une condition de tableau : "`` `db.all` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`. ``<!-- message -->"
 - Dans `vals([…])` au sein d’un fragment donné en valeur d’une écriture, soit en valeur de `vals({…})`, comme dans `insert()`, `upsert()` et `update()`, il lève à la compilation le message d’`isIn()` ci-dessus.
+- Comme valeur écrite, il lève une erreur à la compilation, là où Zapatos 6.6.1 envoyait ou stockait `'Symbol(all)'`. Le type le refuse comme valeur d’`insert()`, d’`upsert()` ou d’`update()`, `updateValues` compris, sauf sur une colonne typée `any` ; un `vals()` dans un template `sql` que vous écrivez l’accepte :
+  - Dans `vals({…})`, donc comme valeur d’`insert()`, d’`upsert()` ou d’`update()`, `updateValues` compris : "`` `db.all` has no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value: give a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`. ``<!-- message -->"
+  - Dans `vals([…])` hors de la valeur d’une colonne, dans un template `sql` que vous écrivez ou dans `updateValues` : "`` `db.all` has no meaning as an item of `vals([…])` outside a column's value, as in a `sql` template of your own or in `upsert()` `updateValues`: give a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`. ``<!-- message -->"
 
 ### `AllType` {#AllType}
 

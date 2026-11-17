@@ -379,7 +379,7 @@ describe('upsert', () => {
       parent: set(parent('id')), self: set(db.self), all: set(all),
     }).toMatchInlineSnapshot(`
       {
-        "all": "throws: Alien object while interpolating SQL: Symbol(all)",
+        "all": "throws: \`db.all\` has no meaning as a value in \`vals({…})\`, so as an \`insert()\`, \`upsert()\` or \`update()\` value: give a value. To match every row, give \`db.all\` as the whole filter of \`select()\` and its kin: \`select(table, db.all)\`.",
         "cast": [
           "("mood") = ROW(CAST($3 AS "mood"))",
           [
@@ -405,7 +405,7 @@ describe('upsert', () => {
           "("mood") = ROW(now())",
           [],
         ],
-        "self": "throws: The 'self' column alias has no meaning here",
+        "self": "throws: \`db.self\` has no meaning as a value in \`vals({…})\`, so as an \`insert()\`, \`upsert()\` or \`update()\` value: give a value; in \`update()\`, write \`db.self\` in a \`sql\` fragment value, where it stands for the column; in \`upsert()\` \`updateValues\`, to read a column, qualify it with its table, \`table.column\`, or with \`EXCLUDED\` for the row proposed, \`EXCLUDED.column\`.",
         "vals": [
           "("mood") = ROW($3)",
           [
@@ -3059,5 +3059,60 @@ describe('a shortcut as an insert(), upsert() or update() value, a scalar subque
       insert: 2, update: 2, upsert: 2, 'insert rows': 3, 'upsert rows': 3,
       'insert, a shortcut': 1, 'update, a shortcut': 1, 'upsert, a shortcut': 1, 'insert rows, a shortcut': 3, 'upsert rows, a shortcut': 3,
     });
+  });
+});
+
+describe('db.all, self, Default, raw(), a Parameter and parent() in every write position (#665)', () => {
+  // 6.6.1 sent each but a fragment as a parameter in most of these, so a text column stored 'Symbol(all)',
+  // 'Symbol(self)' or '{"value":…}'; until #665 pgcast still did for all and self as a value, and in vals([…]) with no
+  // current column: an updateValues fragment or vals([…]), a template of your own
+  const messages: Record<string, string> = {
+    allAsValue: '`db.all` has no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value: give a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.',
+    selfAsValue: '`db.self` has no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value: give a value; in `update()`, write `db.self` in a `sql` fragment value, where it stands for the column; in `upsert()` `updateValues`, to read a column, qualify it with its table, `table.column`, or with `EXCLUDED` for the row proposed, `EXCLUDED.column`.',
+    wrapperAsValue: '`db.raw()`, `db.cols()` and `db.vals()` have no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value: to write SQL, use a `sql` fragment value (in `update()`, `db.self` there stands for the column); to write a value, give the value itself, or `db.param()`.',
+    allInVals: '`db.all` has no meaning as an item of `vals([…])` in a column\'s value, in a filter (as `isIn()` writes it) or in a `sql` fragment value of `vals({…})`, so of `insert()`, `upsert()` or `update()`: in a filter, leave the key out, or compare with a value; in a write, give a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.',
+    selfInVals: '`db.self` has no meaning as an item of `vals([…])` in a column\'s value, in a filter (as `isIn()` writes it) or in a `sql` fragment value of `vals({…})`, so of `insert()`, `upsert()` or `update()`: give a value; in a filter or in `update()`, write `db.self` in a `sql` fragment value, outside `vals([…])`, where it stands for the column.',
+    defaultInVals: '`db.Default` has no meaning as an item of `vals([…])` in a column\'s value, in a filter (as `isIn()` writes it) or in a `sql` fragment value of `vals({…})`, so of `insert()`, `upsert()` or `update()`: in a filter, leave the key out, or compare with a value; in a write, give `db.Default` as the value itself, `{ column: db.Default }`.',
+    wrapperInVals: '`db.raw()`, `db.cols()` and `db.vals()` have no meaning as an item of `vals([…])` in a column\'s value, in a filter (as `isIn()` writes it) or in a `sql` fragment value of `vals({…})`, so of `insert()`, `upsert()` or `update()`: for SQL, write it in a `sql` fragment value, outside `vals([…])` (in a filter or in `update()`, `db.self` there stands for the column); for a value, give the value itself, or `db.param()`.',
+    allInBareVals: '`db.all` has no meaning as an item of `vals([…])` outside a column\'s value, as in a `sql` template of your own or in `upsert()` `updateValues`: give a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.',
+    selfInBareVals: '`db.self` has no meaning as an item of `vals([…])` outside a column\'s value, as in a `sql` template of your own or in `upsert()` `updateValues`: give a value; in `updateValues`, to read a column, qualify it with its table, `table.column`, or with `EXCLUDED` for the row proposed, `EXCLUDED.column`.',
+    wrapperInBareVals: '`db.raw()`, `db.cols()` and `db.vals()` have no meaning as an item of `vals([…])` outside a column\'s value, as in a `sql` template of your own or in `upsert()` `updateValues`: for SQL, write it outside `vals([…])` (in `updateValues`, as the value itself); for a value, give the value itself, or `db.param()`.',
+    parent: 'The \'parent\' table alias has no meaning here',
+  };
+  /** 'compiled', or the name of the message `f` throws. */
+  const outcome = (f: () => db.SQLFragment<any>) => {
+    try { f().compile(); return 'compiled'; } catch (err) {
+      return Object.keys(messages).find(name => messages[name] === (err as Error).message) ?? (err as Error).message;
+    }
+  };
+  const
+    values = { all, self: db.self, Default, raw: db.raw("'r'"), param: param('p'), parent: parent('id') } as Record<string, any>,
+    email = 'ada@example.com',
+    positions: Record<string, (v: any) => db.SQLFragment<any>> = {
+      insert: v => db.insert('users', { email, display_name: v }),
+      insertRows: v => db.insert('users', [{ email, display_name: v }, { email, display_name: 'B' }]),
+      insertFragment: v => db.insert('users', { email, display_name: sql`${db.vals([v])}` }),
+      upsert: v => db.upsert('users', { email, display_name: v }, 'email'),
+      upsertFragment: v => db.upsert('users', { email, display_name: sql`${db.vals([v])}` }, 'email'),
+      updateValues: v => db.upsert('users', { email, display_name: 'A' }, 'email', { updateValues: { display_name: v } }),
+      updateValuesFragment: v => db.upsert('users', { email, display_name: 'A' }, 'email', { updateValues: { display_name: sql`${db.vals([v])}` as any } }),
+      updateValuesVals: v => db.upsert('users', { email, display_name: 'A' }, 'email', { updateValues: { display_name: db.vals([v]) as any } }),
+      update: v => db.update('users', { display_name: v }, { id: 1 }),
+      updateFragment: v => db.update('users', { display_name: sql`${db.vals([v])}` }, { id: 1 }),
+      template: v => sql`INSERT INTO "users" ("display_name") VALUES (${db.vals([v])})`,
+    };
+
+  it('all, self and the wrappers throw in each while compiling; Default, a Parameter and a fragment compile', () => {
+    const
+      asValue = { all: 'allAsValue', self: 'selfAsValue', Default: 'compiled', raw: 'wrapperAsValue', param: 'compiled', parent: 'parent' },
+      inVals = { all: 'allInVals', self: 'selfInVals', Default: 'defaultInVals', raw: 'wrapperInVals', param: 'compiled', parent: 'parent' },
+      inBareVals = { all: 'allInBareVals', self: 'selfInBareVals', Default: 'compiled', raw: 'wrapperInBareVals', param: 'compiled', parent: 'parent' };
+    expect(Object.fromEntries(Object.entries(positions).map(([position, build]) =>
+      [position, Object.fromEntries(Object.entries(values).map(([name, value]) => [name, outcome(() => build(value))]))])))
+      .toEqual({
+        insert: asValue, insertRows: asValue, insertFragment: inVals, upsert: asValue, upsertFragment: inVals,
+        updateValues: { ...asValue, raw: 'compiled' }, updateValuesFragment: inBareVals, updateValuesVals: inBareVals,
+        update: asValue, updateFragment: inVals, template: inBareVals,
+      });
   });
 });
