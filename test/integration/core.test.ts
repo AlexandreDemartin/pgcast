@@ -320,7 +320,7 @@ describe('Whereable', () => {
   it('a Default value rejects run() with an Error that says what to do', async () => {
     // 6.6.1 sent 'Symbol(DEFAULT)': no row on a text column, 22P02 on the others; this Error has no code
     await expect(ids({ display_name: Default })).rejects.toThrowErrorMatchingInlineSnapshot(`[Error: \`db.Default\` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. \`DEFAULT\` is for INSERT and UPDATE values.]`);
-    await expect(ids({ id: c.isIn([Default]) })).rejects.toThrowErrorMatchingInlineSnapshot(`[Error: \`db.Default\` has no meaning as an item of \`vals([…])\` in a column's value, in a filter (as \`isIn()\` writes it) or in a \`sql\` fragment value of \`insert()\`, \`upsert()\` or \`update()\`: in a filter, leave the key out, or compare with a value; in a write, give \`db.Default\` as the value itself, \`{ column: db.Default }\`.]`);
+    await expect(ids({ id: c.isIn([Default]) })).rejects.toThrowErrorMatchingInlineSnapshot(`[Error: \`db.Default\` has no meaning as an item of \`vals([…])\` in a column's value, in a filter (as \`isIn()\` writes it) or in a \`sql\` fragment value of \`vals({…})\`, so of \`insert()\`, \`upsert()\` or \`update()\`: in a filter, leave the key out, or compare with a value; in a write, give \`db.Default\` as the value itself, \`{ column: db.Default }\`.]`);
     await expect(ids({ id: Default })).rejects.not.toHaveProperty('code');
   });
 
@@ -367,7 +367,7 @@ describe('Whereable', () => {
     const asCondition = '`db.raw()`, `db.cols()` and `db.vals()` have no meaning as the value of `eq()`, `add()` and the other conditions: for SQL, write a `sql` fragment with `db.self` in place of the condition; for a value, give the value itself, or `db.param()`.';
     // in isIn() / isNotIn() and in a write's fragment value, the item is in vals([…]) within a column's value (#660)
     const
-      inVals = '`db.raw()`, `db.cols()` and `db.vals()` have no meaning as an item of `vals([…])` in a column\'s value, in a filter (as `isIn()` writes it) or in a `sql` fragment value of `insert()`, `upsert()` or `update()`: for SQL, write it in a `sql` fragment value, outside `vals([…])` (`db.self` there stands for the column); for a value, give the value itself, or `db.param()`.',
+      inVals = '`db.raw()`, `db.cols()` and `db.vals()` have no meaning as an item of `vals([…])` in a column\'s value, in a filter (as `isIn()` writes it) or in a `sql` fragment value of `vals({…})`, so of `insert()`, `upsert()` or `update()`: for SQL, write it in a `sql` fragment value, outside `vals([…])` (in a filter or in `update()`, `db.self` there stands for the column); for a value, give the value itself, or `db.param()`.',
       viaVals = ['isInRaw', 'isNotInRaw', 'isInCols', 'deletesIsNotIn', 'valsInFragment'];
     expect(inWhereable).toEqual(Object.fromEntries(Object.keys(inWhereable).map(k => [k, viaVals.includes(k) ? inVals : inFilter])));
     expect(inCondition).toEqual(Object.fromEntries(Object.keys(inCondition).map(k => [k, asCondition])));
@@ -544,8 +544,8 @@ describe('Whereable', () => {
         "eqDefault": "\`db.Default\` has no meaning as the value of \`eq()\`, \`add()\` and the other conditions: compare with a value. To set a column to its default in an UPDATE, give \`db.Default\` as the value itself: \`{ n: db.Default }\`.",
         "eqSelf": "\`db.self\` has no meaning as the value of \`eq()\`, \`add()\` and the other conditions: it is already the column on the left. To compare the column with itself, write a \`sql\` fragment with \`db.self\` on both sides.",
         "idEqDefault": "\`db.Default\` has no meaning as the value of \`eq()\`, \`add()\` and the other conditions: compare with a value. To set a column to its default in an UPDATE, give \`db.Default\` as the value itself: \`{ n: db.Default }\`.",
-        "isInSelf": "\`db.self\` has no meaning as an item of \`vals([…])\` in a column's value, in a filter (as \`isIn()\` writes it) or in a \`sql\` fragment value of \`insert()\`, \`upsert()\` or \`update()\`: give a value, or write \`db.self\` in a \`sql\` fragment value, outside \`vals([…])\`, where it stands for the column.",
-        "isNotInSelf": "\`db.self\` has no meaning as an item of \`vals([…])\` in a column's value, in a filter (as \`isIn()\` writes it) or in a \`sql\` fragment value of \`insert()\`, \`upsert()\` or \`update()\`: give a value, or write \`db.self\` in a \`sql\` fragment value, outside \`vals([…])\`, where it stands for the column.",
+        "isInSelf": "\`db.self\` has no meaning as an item of \`vals([…])\` in a column's value, in a filter (as \`isIn()\` writes it) or in a \`sql\` fragment value of \`vals({…})\`, so of \`insert()\`, \`upsert()\` or \`update()\`: give a value; in a filter or in \`update()\`, write \`db.self\` in a \`sql\` fragment value, outside \`vals([…])\`, where it stands for the column.",
+        "isNotInSelf": "\`db.self\` has no meaning as an item of \`vals([…])\` in a column's value, in a filter (as \`isIn()\` writes it) or in a \`sql\` fragment value of \`vals({…})\`, so of \`insert()\`, \`upsert()\` or \`update()\`: give a value; in a filter or in \`update()\`, write \`db.self\` in a \`sql\` fragment value, outside \`vals([…])\`, where it stands for the column.",
         "lateralEqDefault": "\`db.Default\` has no meaning as the value of \`eq()\`, \`add()\` and the other conditions: compare with a value. To set a column to its default in an UPDATE, give \`db.Default\` as the value itself: \`{ n: db.Default }\`.",
         "lateralSelf": "\`db.self\` has no meaning as a value in a Whereable (a filter), nor in \`isIn()\`: compare with a value, or use it in a \`sql\` fragment value, where it stands for the column.",
         "neDefault": "\`db.Default\` has no meaning as the value of \`eq()\`, \`add()\` and the other conditions: compare with a value. To set a column to its default in an UPDATE, give \`db.Default\` as the value itself: \`{ n: db.Default }\`.",
@@ -571,7 +571,7 @@ describe('Whereable', () => {
     };
     const
       inWhereable = '`db.all` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: leave the key out, or compare with a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.',
-      inVals = '`db.all` has no meaning as an item of `vals([…])` in a column\'s value, in a filter (as `isIn()` writes it) or in a `sql` fragment value of `insert()`, `upsert()` or `update()`: in a filter, leave the key out, or compare with a value; in a write, give a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.',
+      inVals = '`db.all` has no meaning as an item of `vals([…])` in a column\'s value, in a filter (as `isIn()` writes it) or in a `sql` fragment value of `vals({…})`, so of `insert()`, `upsert()` or `update()`: in a filter, leave the key out, or compare with a value; in a write, give a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.',
       inCondition = '`db.all` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.',
       all = db.all as any;
     expect({

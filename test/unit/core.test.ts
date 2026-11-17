@@ -501,7 +501,7 @@ describe('cols and vals', () => {
   });
 
   it('vals of an array throws on Default in a Whereable: a filter has no default', () => {
-    expect(() => one({ id: db.conditions.isIn([1, Default]) })).toThrowErrorMatchingInlineSnapshot(`[Error: \`db.Default\` has no meaning as an item of \`vals([…])\` in a column's value, in a filter (as \`isIn()\` writes it) or in a \`sql\` fragment value of \`insert()\`, \`upsert()\` or \`update()\`: in a filter, leave the key out, or compare with a value; in a write, give \`db.Default\` as the value itself, \`{ column: db.Default }\`.]`);
+    expect(() => one({ id: db.conditions.isIn([1, Default]) })).toThrowErrorMatchingInlineSnapshot(`[Error: \`db.Default\` has no meaning as an item of \`vals([…])\` in a column's value, in a filter (as \`isIn()\` writes it) or in a \`sql\` fragment value of \`vals({…})\`, so of \`insert()\`, \`upsert()\` or \`update()\`: in a filter, leave the key out, or compare with a value; in a write, give \`db.Default\` as the value itself, \`{ column: db.Default }\`.]`);
   });
 
   it('vals of an array throws on raw, cols and vals within a column\'s value, a filter\'s or a write\'s: they are no values', () => {
@@ -513,7 +513,7 @@ describe('cols and vals', () => {
       () => one(vals({ role: sql`${vals([value])}` })),
     ].map(thrown)))).toMatchInlineSnapshot(`
       Set {
-        "\`db.raw()\`, \`db.cols()\` and \`db.vals()\` have no meaning as an item of \`vals([…])\` in a column's value, in a filter (as \`isIn()\` writes it) or in a \`sql\` fragment value of \`insert()\`, \`upsert()\` or \`update()\`: for SQL, write it in a \`sql\` fragment value, outside \`vals([…])\` (\`db.self\` there stands for the column); for a value, give the value itself, or \`db.param()\`.",
+        "\`db.raw()\`, \`db.cols()\` and \`db.vals()\` have no meaning as an item of \`vals([…])\` in a column's value, in a filter (as \`isIn()\` writes it) or in a \`sql\` fragment value of \`vals({…})\`, so of \`insert()\`, \`upsert()\` or \`update()\`: for SQL, write it in a \`sql\` fragment value, outside \`vals([…])\` (in a filter or in \`update()\`, \`db.self\` there stands for the column); for a value, give the value itself, or \`db.param()\`.",
       }
     `);
   });
@@ -600,8 +600,8 @@ describe('cols and vals', () => {
 
   it('vals of an array throws on self within a column\'s value, a filter\'s or a write\'s: self is the column, not a value', () => {
     // 6.6.1 sent 'Symbol(self)'; so does vals([self]) in a fragment value of vals of an object, as for Default
-    expect(() => one({ display_name: db.conditions.isIn(['Ada', self]) })).toThrowErrorMatchingInlineSnapshot(`[Error: \`db.self\` has no meaning as an item of \`vals([…])\` in a column's value, in a filter (as \`isIn()\` writes it) or in a \`sql\` fragment value of \`insert()\`, \`upsert()\` or \`update()\`: give a value, or write \`db.self\` in a \`sql\` fragment value, outside \`vals([…])\`, where it stands for the column.]`);
-    expect(() => one(vals({ role: sql`${vals([self])}` }))).toThrowErrorMatchingInlineSnapshot(`[Error: \`db.self\` has no meaning as an item of \`vals([…])\` in a column's value, in a filter (as \`isIn()\` writes it) or in a \`sql\` fragment value of \`insert()\`, \`upsert()\` or \`update()\`: give a value, or write \`db.self\` in a \`sql\` fragment value, outside \`vals([…])\`, where it stands for the column.]`);
+    expect(() => one({ display_name: db.conditions.isIn(['Ada', self]) })).toThrowErrorMatchingInlineSnapshot(`[Error: \`db.self\` has no meaning as an item of \`vals([…])\` in a column's value, in a filter (as \`isIn()\` writes it) or in a \`sql\` fragment value of \`vals({…})\`, so of \`insert()\`, \`upsert()\` or \`update()\`: give a value; in a filter or in \`update()\`, write \`db.self\` in a \`sql\` fragment value, outside \`vals([…])\`, where it stands for the column.]`);
+    expect(() => one(vals({ role: sql`${vals([self])}` }))).toThrowErrorMatchingInlineSnapshot(`[Error: \`db.self\` has no meaning as an item of \`vals([…])\` in a column's value, in a filter (as \`isIn()\` writes it) or in a \`sql\` fragment value of \`vals({…})\`, so of \`insert()\`, \`upsert()\` or \`update()\`: give a value; in a filter or in \`update()\`, write \`db.self\` in a \`sql\` fragment value, outside \`vals([…])\`, where it stands for the column.]`);
   });
 
   it('characterization: outside a filter, vals([self]), vals({ a: self }), param(self) and param(Default) are parameters', () => {
@@ -640,7 +640,7 @@ describe('cols and vals', () => {
 
   it('vals of an array throws on Default in a fragment value of vals of an object, whose key sets the current column', () => {
     // the fragment is compiled with its key as the current column, as in a Whereable; 6.6.1 sent 'Symbol(DEFAULT)'
-    expect(() => one(vals({ role: sql`${vals([Default])}` }))).toThrowErrorMatchingInlineSnapshot(`[Error: \`db.Default\` has no meaning as an item of \`vals([…])\` in a column's value, in a filter (as \`isIn()\` writes it) or in a \`sql\` fragment value of \`insert()\`, \`upsert()\` or \`update()\`: in a filter, leave the key out, or compare with a value; in a write, give \`db.Default\` as the value itself, \`{ column: db.Default }\`.]`);
+    expect(() => one(vals({ role: sql`${vals([Default])}` }))).toThrowErrorMatchingInlineSnapshot(`[Error: \`db.Default\` has no meaning as an item of \`vals([…])\` in a column's value, in a filter (as \`isIn()\` writes it) or in a \`sql\` fragment value of \`vals({…})\`, so of \`insert()\`, \`upsert()\` or \`update()\`: in a filter, leave the key out, or compare with a value; in a write, give \`db.Default\` as the value itself, \`{ column: db.Default }\`.]`);
   });
 
   // 6.6.1 compiled a primitive as the object it boxes to: a string to its character indexes as names ("0", "1")
@@ -1075,7 +1075,7 @@ describe('Whereable', () => {
 describe('db.all', () => {
   const
     allInWhereable = '`db.all` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: leave the key out, or compare with a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.',
-    allInVals = '`db.all` has no meaning as an item of `vals([…])` in a column\'s value, in a filter (as `isIn()` writes it) or in a `sql` fragment value of `insert()`, `upsert()` or `update()`: in a filter, leave the key out, or compare with a value; in a write, give a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.';
+    allInVals = '`db.all` has no meaning as an item of `vals([…])` in a column\'s value, in a filter (as `isIn()` writes it) or in a `sql` fragment value of `vals({…})`, so of `insert()`, `upsert()` or `update()`: in a filter, leave the key out, or compare with a value; in a write, give a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.';
 
   it('as a Whereable value, in isIn() or isNotIn(), or in vals([…]) within a column\'s value, throws as the query compiles', () => {
     // 6.6.1 sent 'Symbol(all)': no row on a text column, every row with isNotIn(), 22P02 on the others (#633)
@@ -1138,12 +1138,12 @@ describe('Default, self, all, raw(), cols() and vals() in vals([…]) within a c
   // a filter's key (isIn(), a fragment value of a Whereable) and a write's key (a fragment value of vals({…}), so of
   // insert(), upsert() and update()) both set the current column, so these messages name both places
   const
-    where = 'as an item of `vals([…])` in a column\'s value, in a filter (as `isIn()` writes it) or in a `sql` fragment value of `insert()`, `upsert()` or `update()`',
+    where = 'as an item of `vals([…])` in a column\'s value, in a filter (as `isIn()` writes it) or in a `sql` fragment value of `vals({…})`, so of `insert()`, `upsert()` or `update()`',
     inVals = {
       Default: `\`db.Default\` has no meaning ${where}: in a filter, leave the key out, or compare with a value; in a write, give \`db.Default\` as the value itself, \`{ column: db.Default }\`.`,
-      self: `\`db.self\` has no meaning ${where}: give a value, or write \`db.self\` in a \`sql\` fragment value, outside \`vals([…])\`, where it stands for the column.`,
+      self: `\`db.self\` has no meaning ${where}: give a value; in a filter or in \`update()\`, write \`db.self\` in a \`sql\` fragment value, outside \`vals([…])\`, where it stands for the column.`,
       all: `\`db.all\` has no meaning ${where}: in a filter, leave the key out, or compare with a value; in a write, give a value. To match every row, give \`db.all\` as the whole filter of \`select()\` and its kin: \`select(table, db.all)\`.`,
-      wrapper: `\`db.raw()\`, \`db.cols()\` and \`db.vals()\` have no meaning ${where}: for SQL, write it in a \`sql\` fragment value, outside \`vals([…])\` (\`db.self\` there stands for the column); for a value, give the value itself, or \`db.param()\`.`,
+      wrapper: `\`db.raw()\`, \`db.cols()\` and \`db.vals()\` have no meaning ${where}: for SQL, write it in a \`sql\` fragment value, outside \`vals([…])\` (in a filter or in \`update()\`, \`db.self\` there stands for the column); for a value, give the value itself, or \`db.param()\`.`,
     },
     // the Whereable branch is always a filter: its messages stay
     inWhereable = {
