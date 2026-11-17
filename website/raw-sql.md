@@ -25,7 +25,7 @@ Write the SQL as you would in `psql`, but put each table and column name between
 
 </CastPanel>
 
-- An interpolated name is quoted, `"films"`<!-- probe: examples/raw_sql_join.ts -->, and checked against the first type argument: here `Tables`, the `SQL` type of each table the query names. Qualify a column as `${'films'}.${'title'}`: the type knows each table's columns, not `'films.title'`.
+- An interpolated name is quoted, `"films"`<!-- probe: examples/raw_sql_join.ts -->, and checked against the first type argument: here `Tables`, the `SQL` type of each table the query names. Qualify a column as `${'films'}.${'title'}`: the type knows each table's columns, not `'films.title'`, unless you name the pair ([Qualify a column by its alias](#qualify-a-column-by-its-alias)).
 - The second type argument is your word for what comes back: nothing checks it against the SQL. The rows come as `pg` parses them, as a `Selectable` describes them (a `Date` for a `timestamptz`), not as the JSON of the shortcuts' `JSONSelectable`. A `count(*)` is a `bigint`, which `pg` gives as a string: `'4'`.
 - Keywords stay in the text. SQL you write yourself is safe there; only what comes from outside needs the steps below.
 
@@ -263,6 +263,44 @@ A hand-written subquery can go in a shortcut's `lateral`, where [`db.parent()`](
 - Outside a `lateral`, `parent()` throws "The 'parent' table alias has no meaning here"<!-- message -->, so [`run()`](/sql-template#run) rejects before any query.
 
 Joins through `lateral`, step by step: [Joins](/lateral).
+
+## Qualify a column by its alias
+
+A table joined to itself needs an alias for one side, or Postgres refuses it (42712). Name the alias in `sql`'s first type argument, as a pair with the table's columns, and each `${'alias.column'}` is checked:
+
+<CastPanel example="raw_sql_alias">
+
+<<< ./examples/raw_sql_alias.ts{ts twoslash}
+
+</CastPanel>
+
+- An interpolated string is split on `.`, each part quoted: `${'mentors.name'}` is `"mentors"."name"`<!-- probe: examples/raw_sql_alias.ts -->. A table's own name pairs the same way, `` `crew.${s.crew.Column}` ``.
+- The alias stays bare in the text, `"crew" AS mentors`<!-- probe: examples/raw_sql_alias.ts -->: `${'mentors'}` is neither a table nor a column of the type argument.
+- Wilhelmina Strand has no mentor, so the `JOIN` leaves her out: three rows.
+
+A column `crew` lacks, or an alias the type argument doesn't name, fails to compile:
+
+```ts twoslash
+// @errors: 2345
+import * as db from 'zapatos/db';
+import type * as s from 'zapatos/schema';
+type CrewAndMentors = s.crew.SQL | `crew.${s.crew.Column}` | `mentors.${s.crew.Column}`;
+// ---cut---
+db.sql<CrewAndMentors>`SELECT ${'mentors.title'} FROM ${'crew'} AS mentors`;
+db.sql<CrewAndMentors>`SELECT ${'mentor.name'} FROM ${'crew'} AS mentors`;
+```
+
+The type checks the pair, not the query; Postgres checks the rest when it runs:
+
+- Write the alias in lower case: unquoted, `AS Mentors` is `mentors` to Postgres, so `${'Mentors.name'}`, quoted, is 42P01.
+- Once a table has an alias, its own name no longer qualifies its columns: 42P01.
+- Nothing checks the `FROM`: an alias it doesn't define is 42P01.
+- A column whose name holds a `.` fits the pair, yet `${'mentors.a.b'}` is `"mentors"."a"."b"`<!-- probe: db.sql`${'mentors.a.b'}` --> (42P01): only the quoted string runs, `${'"mentors"."a.b"'}`, named as it is in the type argument.
+- The pair is checked only while the table's `SQL` refuses a bare string: a column named like a member of `String`, of a type that member fits (`any`), lets any string through, as it does a bare column ([#670](https://github.com/AlexandreDemartin/pgcast/issues/670)).
+
+A shortcut's [`alias`](/select#alias) needs none of this: its columns and Whereable keys resolve to the alias, and `db.parent()` reaches the outer query. A `where` or `extras` fragment that names the alias takes the same type argument: `"member"."mentor_id" IS NULL`<!-- probe: db.select('crew', db.sql`${'member.mentor_id'} IS NULL`, { alias: 'member' }) -->.
+
+There is no alias helper: the type argument already checks the pair, with no new export ([decision 010](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/010-aliases-and-with.md#3-qualified-column-names)).
 
 ## Put a CTE before a shortcut
 

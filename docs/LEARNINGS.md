@@ -388,6 +388,14 @@ Candidates for a check, a rule or a skill line.
 - #666: the pages and tests that quote an error message reach beyond an issue's Files: `git grep` the message before changing it (4 test files and 4 pages quoted it).
 - #666: `currentColumn` is set by a filter's key and by a write's `vals({…})` key alike, so a message thrown under it cannot tell the two apart without a new mechanism; it names both.
 - #666: run each error message's advice at every position that reaches it, not only the throw: `db.self` advised for a write fails in `insert()` and an `upsert()` row (42703) and runs only in `update()` and a filter.
+- #669: an order fix can turn an intermittent failure into a permanent one (a hidden TS2440): rerun the reviewer's grid on the branch, not only the issue's case.
+- #669: skill `codegen-output`'s "shared state, no new out-parameter" gave first an order by type that changed a compiling winner; when the order needs data per column, a new out-parameter written down under Decided alone beats bending the order.
+- #669: to keep 6.6.1's winner within one relation, use the position Postgres returns the column at, not its name compared in JavaScript.
+- #669: heavy grid `tsc` jobs beside `npm test` cause 5 s codegen timeouts: run them one after the other.
+- #669: replay a determinism fix on the cases whose old winner was already fixed and compiled (two types in one relation, ordered by column), not only on those that varied.
+- #669: the note on placeholders on disk compares a file's full text, so any fix to a placeholder's text makes it fire for files an earlier version wrote: check that listener message each time.
+- #667: `check:floor` type-checks the fixture's schema, not the docs schema: to check a docs type form on TS 4.1.6, copy `website/zapatos` into a scratch consumer and link check:floor's cached TypeScript into it.
+- #667: a scripted edit of a French page cannot match « : » by its ASCII text (U+00A0 before the colon): anchor on the line's start instead.
 
 ## Minors kept
 
