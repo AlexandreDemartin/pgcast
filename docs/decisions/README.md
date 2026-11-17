@@ -13,4 +13,4 @@ One note per ambiguous decision: context, options, proposed choice, then validat
 | [007](./007-related.md) | Laterals on foreign keys: `related()`, `relatedMany()` and references to a lateral's result | accepted (2026-11-17), by delegation: not built in the core |
 | [008](./008-domains-jsonb-validators.md) | Domains typed by their values, typed `jsonb`, and validators | accepted (2026-11-17), by delegation: `domainsTypedAsUnions` only; no `jsonb` mechanism, no validators package |
 | [009](./009-functions.md) | Postgres functions: signatures, `fn()` and set-returning functions | accepted (2026-11-17), by delegation: not built in the core; `sql` documented |
-| [010](./010-aliases-and-with.md) | Table aliases and `with()`: qualified column names and CTEs before a shortcut | accepted (2026-11-17), by delegation: not built in the core; `sql` and its type argument documented |
+| [010](./010-aliases-and-with.md) | Table aliases and `withCTEs()`: qualified column names and CTEs before a shortcut | accepted (2026-11-17), by delegation: `withCTEs()` for CTEs; no alias helper, `sql`'s type argument documented |
