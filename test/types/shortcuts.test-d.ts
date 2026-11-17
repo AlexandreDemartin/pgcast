@@ -241,6 +241,27 @@ describe('insert', () => {
     // @ts-expect-error price_with_vat_cents is generated
     db.insert('products', { sku: 'x', price_cents: 1, price_with_vat_cents: 1 });
   });
+
+  test('takes a fragment whose result is typed as a value (#654)', () => {
+    const
+      text = db.sql<s.users.SQL, string>`'A'`,
+      int = db.sql<s.users.SQL, number>`1`,
+      count = db.sql<s.users.SQL, number>`(${db.count('users', db.all)})`,
+      one = db.insert('users', { email: 'a@b', display_name: text, manager_id: int }),
+      many = db.insert('users', [{ email: 'a@b', display_name: text, manager_id: count }]);
+    expectTypeOf(one.run(pool)).resolves.toEqualTypeOf<s.users.JSONSelectable>();
+    expectTypeOf(many.run(pool)).resolves.toEqualTypeOf<s.users.JSONSelectable[]>();
+    expectTypeOf(one.run(pool)).resolves.not.toBeAny();
+    // characterization: a shortcut as it is compiles to VALUES (SELECT …), which Postgres refuses (42601), as
+    // db.select() as a value and any shortcut as an update() value already did; in parentheses, as count above, it runs
+    expectTypeOf(db.insert('users', { email: 'a@b', manager_id: db.count('users', db.all), display_name: 'A' })).not.toBeAny();
+  });
+
+  test('refuses a fragment that carries a constraint', () => {
+    const constrained = db.sql<s.users.SQL, string, number>`'A'`;
+    // @ts-expect-error the Insertable slot takes a fragment's result, not its constraint
+    db.insert('users', { email: 'a@b', display_name: constrained });
+  });
 });
 
 describe('upsert', () => {
@@ -250,6 +271,17 @@ describe('upsert', () => {
     const q = db.upsert('users', row, 'email');
     expectTypeOf(q.run(pool)).resolves.toEqualTypeOf<s.users.JSONSelectable & db.UpsertAction>();
     expectTypeOf(q.run(pool)).resolves.not.toBeAny();
+  });
+
+  test('takes a fragment whose result is typed as a value (#654)', () => {
+    const
+      text = db.sql<s.users.SQL, string>`'A'`,
+      count = db.sql<s.users.SQL, number>`(${db.count('users', db.all)})`,
+      one = db.upsert('users', { email: 'a@b', display_name: text, manager_id: count }, 'email'),
+      many = db.upsert('users', [{ email: 'a@b', display_name: text }], 'email');
+    expectTypeOf(one.run(pool)).resolves.toEqualTypeOf<s.users.JSONSelectable & db.UpsertAction>();
+    expectTypeOf(many.run(pool)).resolves.toEqualTypeOf<(s.users.JSONSelectable & db.UpsertAction)[]>();
+    expectTypeOf(one.run(pool)).resolves.not.toBeAny();
   });
 
   test("reportAction: 'suppress' drops $action", () => {

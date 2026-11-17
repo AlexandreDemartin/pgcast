@@ -1,5 +1,5 @@
 ---
-english: d8fd73a95a9e
+english: 4352abc21df6
 description: "Passez de Zapatos 6.6.1 à pgcast : changez une ligne de package.json et régénérez ; tsc et les avertissements de pgcast montrent les rares appels qui changent."
 ---
 
@@ -58,10 +58,11 @@ bun add zapatos@npm:@pgcast/pgcast@^6
 npx zapatos
 ```
 
-Le générateur de pgcast est celui de Zapatos 6.6.1, avec deux corrections dans ce qu’il écrit. Un `git diff` sur votre dossier `zapatos/` ne montre rien, sauf si :
+Le générateur de pgcast est celui de Zapatos 6.6.1, avec trois corrections dans ce qu’il écrit. Un `git diff` sur votre dossier `zapatos/` ne montre rien, sauf si :
 
 - un commentaire de colonne s’étend sur plusieurs lignes : chaque ligne commence maintenant par ` * ` ;
-- une table a un index simple nommé comme l’index unique d’un autre schéma : son `UniqueIndex` n’emprunte plus ce nom.
+- une table a un index simple nommé comme l’index unique d’un autre schéma : son `UniqueIndex` n’emprunte plus ce nom ;
+- une table a un `Insertable` : chacune de ses colonnes prend `db.SQLFragment<any>`, un fragment `sql` dont le résultat est typé, là où la 6.6.1 écrivait `db.SQLFragment`.
 
 ## 3. Compiler {#compile}
 

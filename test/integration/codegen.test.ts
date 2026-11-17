@@ -1533,12 +1533,13 @@ describe('domainsTypedByContext', () => {
   /** The five lines of a nullable column with no default, given its Selectable type and its type in each other context. */
   const nullable = (column: string, selectable: string, json: string, input: string) => {
     const where = `${input} | db.Parameter<${input}> | db.SQLFragment | db.ParentColumn`,
+      insert = `${input} | db.Parameter<${input}> | null | db.DefaultType | db.SQLFragment<any>`,
       write = `${input} | db.Parameter<${input}> | null | db.DefaultType | db.SQLFragment`;
     return [
       `${column}: ${selectable} | null;`,
       `${column}: ${json} | null;`,
       `${column}?: ${where} | db.SQLFragment<any, ${where}>;`,
-      `${column}?: ${write};`,
+      `${column}?: ${insert};`,
       `${column}?: ${write} | db.SQLFragment<any, ${write}>;`,
     ];
   };
@@ -1550,7 +1551,7 @@ describe('domainsTypedByContext', () => {
       'no: c.PgTicket_no;',
       'no?: c.PgTicket_no | db.Parameter<c.PgTicket_no> | db.SQLFragment | db.ParentColumn | ' +
         'db.SQLFragment<any, c.PgTicket_no | db.Parameter<c.PgTicket_no> | db.SQLFragment | db.ParentColumn>;',
-      'no: c.PgTicket_no | db.Parameter<c.PgTicket_no> | db.SQLFragment;',
+      'no: c.PgTicket_no | db.Parameter<c.PgTicket_no> | db.SQLFragment<any>;',
       'no?: c.PgTicket_no | db.Parameter<c.PgTicket_no> | db.SQLFragment | ' +
         'db.SQLFragment<any, c.PgTicket_no | db.Parameter<c.PgTicket_no> | db.SQLFragment>;',
     ]);
@@ -1567,7 +1568,7 @@ describe('domainsTypedByContext', () => {
       `no: ${no('number')};`,
       `no?: ${noInput} | db.Parameter<${noInput}> | db.SQLFragment | db.ParentColumn | ` +
         `db.SQLFragment<any, ${noInput} | db.Parameter<${noInput}> | db.SQLFragment | db.ParentColumn>;`,
-      `no: ${noInput} | db.Parameter<${noInput}> | db.SQLFragment;`,
+      `no: ${noInput} | db.Parameter<${noInput}> | db.SQLFragment<any>;`,
       `no?: ${noInput} | db.Parameter<${noInput}> | db.SQLFragment | db.SQLFragment<any, ${noInput} | db.Parameter<${noInput}> | db.SQLFragment>;`,
     ]);
     const cases: [string, string, string, string, string][] = [
@@ -1606,7 +1607,7 @@ describe('domainsTypedByContext', () => {
         `premium: ${premium('number')};`,
         `premium?: ${premiumInput} | db.Parameter<${premiumInput}> | db.SQLFragment | db.ParentColumn | ` +
           `db.SQLFragment<any, ${premiumInput} | db.Parameter<${premiumInput}> | db.SQLFragment | db.ParentColumn>;`,
-        `premium: ${premiumInput} | db.Parameter<${premiumInput}> | db.SQLFragment;`,
+        `premium: ${premiumInput} | db.Parameter<${premiumInput}> | db.SQLFragment<any>;`,
         `premium?: ${premiumInput} | db.Parameter<${premiumInput}> | db.SQLFragment | ` +
           `db.SQLFragment<any, ${premiumInput} | db.Parameter<${premiumInput}> | db.SQLFragment>;`,
       ]);
@@ -1792,12 +1793,13 @@ describe('enumArraysTypedAsText', () => {
   /** The five lines of a nullable column with no default, given its Selectable type and its type in each other context. */
   const nullable = (column: string, selectable: string, other: string) => {
     const where = `${other} | db.Parameter<${other}> | db.SQLFragment | db.ParentColumn`,
+      insert = `${other} | db.Parameter<${other}> | null | db.DefaultType | db.SQLFragment<any>`,
       write = `${other} | db.Parameter<${other}> | null | db.DefaultType | db.SQLFragment`;
     return [
       `${column}: ${selectable} | null;`,
       `${column}: ${other} | null;`,
       `${column}?: ${where} | db.SQLFragment<any, ${where}>;`,
-      `${column}?: ${write};`,
+      `${column}?: ${insert};`,
       `${column}?: ${write} | db.SQLFragment<any, ${write}>;`,
     ];
   };
@@ -1967,12 +1969,13 @@ describe('intervalsTypedAsObjects', () => {
   /** The five lines of a nullable column with no default, given its Selectable type and its type in each other context. */
   const nullable = (column: string, selectable: string, json: string, input: string) => {
     const where = `${input} | db.Parameter<${input}> | db.SQLFragment | db.ParentColumn`,
+      insert = `${input} | db.Parameter<${input}> | null | db.DefaultType | db.SQLFragment<any>`,
       write = `${input} | db.Parameter<${input}> | null | db.DefaultType | db.SQLFragment`;
     return [
       `${column}: ${selectable} | null;`,
       `${column}: ${json} | null;`,
       `${column}?: ${where} | db.SQLFragment<any, ${where}>;`,
-      `${column}?: ${write};`,
+      `${column}?: ${insert};`,
       `${column}?: ${write} | db.SQLFragment<any, ${write}>;`,
     ];
   };
@@ -3802,9 +3805,11 @@ describe('names that Object.prototype also has', () => {
 
     /** The same, written out for nullable columns with no default, `[column, TS type]`, sorted by name. */
     const writables = (columns: [string, string][], updatable = columns) => {
-      const writable = (type: string) => `${type} | db.Parameter<${type}> | null | db.DefaultType | db.SQLFragment`;
+      const
+        insertable = (type: string) => `${type} | db.Parameter<${type}> | null | db.DefaultType | db.SQLFragment<any>`,
+        writable = (type: string) => `${type} | db.Parameter<${type}> | null | db.DefaultType | db.SQLFragment`;
       return [
-        ['export interface Insertable {', ...columns.map(([column, type]) => `      ${column}?: ${writable(type)};`), '    }'],
+        ['export interface Insertable {', ...columns.map(([column, type]) => `      ${column}?: ${insertable(type)};`), '    }'],
         ['export interface Updatable {', ...updatable.map(([column, type]) =>
           `      ${column}?: ${writable(type)} | db.SQLFragment<any, ${writable(type)}>;`), '    }'],
       ].map(lines => lines.join('\n'));

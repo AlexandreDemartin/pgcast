@@ -225,61 +225,61 @@ declare module 'zapatos/schema' {
       * - `numeric` in database
       * - `NOT NULL`, default: `0`
       */
-      balance?: (number | db.NumericString) | db.Parameter<(number | db.NumericString)> | db.DefaultType | db.SQLFragment;
+      balance?: (number | db.NumericString) | db.Parameter<(number | db.NumericString)> | db.DefaultType | db.SQLFragment<any>;
       /**
       * **accounts.flags**
       * - `_bool` in database
       * - Nullable, no default
       */
-      flags?: boolean[] | db.Parameter<boolean[]> | null | db.DefaultType | db.SQLFragment;
+      flags?: boolean[] | db.Parameter<boolean[]> | null | db.DefaultType | db.SQLFragment<any>;
       /**
       * **accounts.grid**
       * - `_int4` in database
       * - Nullable, no default
       */
-      grid?: number[] | db.Parameter<number[]> | null | db.DefaultType | db.SQLFragment;
+      grid?: number[] | db.Parameter<number[]> | null | db.DefaultType | db.SQLFragment<any>;
       /**
       * **accounts.id**
       * - `int8` in database
       * - `NOT NULL`, identity column
       */
-      id?: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.DefaultType | db.SQLFragment;
+      id?: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.DefaultType | db.SQLFragment<any>;
       /**
       * **accounts.lifetime_ops**
       * - `int8` in database
       * - `NOT NULL`, default: `0`
       */
-      lifetime_ops?: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.DefaultType | db.SQLFragment;
+      lifetime_ops?: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.DefaultType | db.SQLFragment<any>;
       /**
       * **accounts.opened_on**
       * - `date` in database
       * - `NOT NULL`, default: `CURRENT_DATE`
       */
-      opened_on?: (db.DateString | Date) | db.Parameter<(db.DateString | Date)> | db.DefaultType | db.SQLFragment;
+      opened_on?: (db.DateString | Date) | db.Parameter<(db.DateString | Date)> | db.DefaultType | db.SQLFragment<any>;
       /**
       * **accounts.overdraft_limit**
       * - `positive_int` (base type: `int4`) in database
       * - Nullable, no default
       */
-      overdraft_limit?: c.PgPositive_int | db.Parameter<c.PgPositive_int> | null | db.DefaultType | db.SQLFragment;
+      overdraft_limit?: c.PgPositive_int | db.Parameter<c.PgPositive_int> | null | db.DefaultType | db.SQLFragment<any>;
       /**
       * **accounts.owner_id**
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      owner_id: number | db.Parameter<number> | db.SQLFragment;
+      owner_id: number | db.Parameter<number> | db.SQLFragment<any>;
       /**
       * **accounts.ratio**
       * - `float8` in database
       * - Nullable, no default
       */
-      ratio?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment;
+      ratio?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment<any>;
       /**
       * **accounts.scores**
       * - `_int4` in database
       * - `NOT NULL`, default: `'{}'::integer[]`
       */
-      scores?: number[] | db.Parameter<number[]> | db.DefaultType | db.SQLFragment;
+      scores?: number[] | db.Parameter<number[]> | db.DefaultType | db.SQLFragment<any>;
     }
     export interface Updatable {
       /**
@@ -539,25 +539,25 @@ declare module 'zapatos/schema' {
       * - `timestamptz` in database
       * - `NOT NULL`, default: `now()`
       */
-      created_at?: (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.DefaultType | db.SQLFragment;
+      created_at?: (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.DefaultType | db.SQLFragment<any>;
       /**
       * **users.display_name**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      display_name: string | db.Parameter<string> | db.SQLFragment;
+      display_name: string | db.Parameter<string> | db.SQLFragment<any>;
       /**
       * **users.email**
       * - `email` (base type: `citext`) in database
       * - `NOT NULL`, no default
       */
-      email: c.PgEmail | db.Parameter<c.PgEmail> | db.SQLFragment;
+      email: c.PgEmail | db.Parameter<c.PgEmail> | db.SQLFragment<any>;
       /**
       * **users.home**
       * - `address` in database
       * - Nullable, no default
       */
-      home?: c.PgAddress | db.Parameter<c.PgAddress> | null | db.DefaultType | db.SQLFragment;
+      home?: c.PgAddress | db.Parameter<c.PgAddress> | null | db.DefaultType | db.SQLFragment<any>;
       /**
       * **users.manager_id**
       *
@@ -566,25 +566,25 @@ declare module 'zapatos/schema' {
       * - `int4` in database
       * - Nullable, no default
       */
-      manager_id?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment;
+      manager_id?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment<any>;
       /**
       * **users.mood**
       * - `mood` in database
       * - Nullable, no default
       */
-      mood?: mood | db.Parameter<mood> | null | db.DefaultType | db.SQLFragment;
+      mood?: mood | db.Parameter<mood> | null | db.DefaultType | db.SQLFragment<any>;
       /**
       * **users.settings**
       * - `jsonb` in database
       * - `NOT NULL`, default: `'{}'::jsonb`
       */
-      settings?: db.JSONValue | db.Parameter<db.JSONValue> | db.DefaultType | db.SQLFragment;
+      settings?: db.JSONValue | db.Parameter<db.JSONValue> | db.DefaultType | db.SQLFragment<any>;
       /**
       * **users.tags**
       * - `tag_list` (base type: `_text`) in database
       * - Nullable, no default
       */
-      tags?: c.PgTag_list | db.Parameter<c.PgTag_list> | null | db.DefaultType | db.SQLFragment;
+      tags?: c.PgTag_list | db.Parameter<c.PgTag_list> | null | db.DefaultType | db.SQLFragment<any>;
     }
     export interface Updatable {
       /**
@@ -867,25 +867,25 @@ declare module 'zapatos/schema' {
         * - `int4` in database
         * - `NOT NULL`, no default
         */
-        author_id: number | db.Parameter<number> | db.SQLFragment;
+        author_id: number | db.Parameter<number> | db.SQLFragment<any>;
         /**
         * **extra.articles.body**
         * - `text` in database
         * - `NOT NULL`, no default
         */
-        body: string | db.Parameter<string> | db.SQLFragment;
+        body: string | db.Parameter<string> | db.SQLFragment<any>;
         /**
         * **extra.articles.reviewer_id**
         * - `int4` in database
         * - Nullable, no default
         */
-        reviewer_id?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment;
+        reviewer_id?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment<any>;
         /**
         * **extra.articles.status**
         * - `status` in database
         * - `NOT NULL`, default: `'draft'::extra.status`
         */
-        status?: status | db.Parameter<status> | db.DefaultType | db.SQLFragment;
+        status?: status | db.Parameter<status> | db.DefaultType | db.SQLFragment<any>;
       }
       export interface Updatable {
         /**

@@ -1,5 +1,5 @@
 ---
-english: 75b216e741dd
+english: 258982c26127
 ---
 
 # Générateur
@@ -250,7 +250,7 @@ Son SQL est celui de [`select()`](/fr/select#select), avec le nom entre guilleme
 |---|---|
 | `"insert": "auto"`, `"update": "auto"` | aucun : ce que dit le catalogue, les valeurs par défaut |
 | `"insert": "excluded"` | la clé quitte `Insertable` : `db.insert('films', { …, tagline: 'x' })` ne compile pas (TS2769) |
-| `"insert": "optional"` | la clé est facultative dans `Insertable`, son type inchangé : `title?: string \| db.Parameter<string> \| db.SQLFragment` |
+| `"insert": "optional"` | la clé est facultative dans `Insertable`, son type inchangé : `title?: string \| db.Parameter<string> \| db.SQLFragment<any>` |
 | `"update": "excluded"` | la clé quitte `Updatable` : `db.update('seat_bookings', { booked_at: … }, …)` ne compile pas (TS2353) |
 
 - La table est nommée comme la nomme son type `Table` : `films`, `archive.screenings`, et `public.films` quand [`unprefixedSchema`](#generate.unprefixedSchema) vaut `null`. `"films"` ne s’applique qu’à `public.films`.

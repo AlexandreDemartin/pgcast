@@ -64,7 +64,7 @@ declare module 'zapatos/schema' {
         * - `int4` in database
         * - `NOT NULL`, no default
         */
-        id: number | db.Parameter<number> | db.SQLFragment;
+        id: number | db.Parameter<number> | db.SQLFragment<any>;
       }
       export interface Updatable {
         /**
@@ -177,19 +177,19 @@ declare module 'zapatos/schema' {
         * - `text` in database
         * - Nullable, default: `'*\/'::text`
         */
-        "*/"?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment;
+        "*/"?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment<any>;
         /**
         * **edge.odd table.class**
         * - `text` in database
         * - Nullable, no default
         */
-        class?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment;
+        class?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment<any>;
         /**
         * **edge.odd table.id**
         * - `int4` in database
         * - `NOT NULL`, no default
         */
-        id: number | db.Parameter<number> | db.SQLFragment;
+        id: number | db.Parameter<number> | db.SQLFragment<any>;
         /**
         * **edge.odd table.light**
         *
@@ -197,7 +197,7 @@ declare module 'zapatos/schema' {
         * - `traffic-light` in database
         * - Nullable, no default
         */
-        light?: traffic_light | db.Parameter<traffic_light> | null | db.DefaultType | db.SQLFragment;
+        light?: traffic_light | db.Parameter<traffic_light> | null | db.DefaultType | db.SQLFragment<any>;
       }
       export interface Updatable {
         /**

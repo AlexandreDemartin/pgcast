@@ -1,5 +1,5 @@
 ---
-english: 7e67dc2c2bf6
+english: 419dcfca38f2
 ---
 
 # Le catalogue
@@ -162,7 +162,7 @@ Tout cela demande `strictNullChecks`, ou `strict`. Sans cette option, `columns`,
 
 ## Ce que pgcast a gardé, et ce qu’il change {#what-pgcast-kept-and-what-it-changes}
 
-Le générateur est celui de Zapatos 6.6.1, son canary de version toujours à 104 ([`SchemaVersionCanary`](/fr/runtime-config#SchemaVersionCanary)). Ses corrections changent `schema.d.ts` là où celui de 6.6.1 se trompait : l’`UniqueIndex` d’une table ne liste que ses propres index uniques, et chaque ligne d’un commentaire de colonne sur plusieurs lignes reçoit son `*` ([changelog](/fr/changelog)).
+Le générateur est celui de Zapatos 6.6.1, son canary de version toujours à 104 ([`SchemaVersionCanary`](/fr/runtime-config#SchemaVersionCanary)). Ses corrections changent `schema.d.ts` là où celui de 6.6.1 se trompait : l’`UniqueIndex` d’une table ne liste que ses propres index uniques, chaque ligne d’un commentaire de colonne sur plusieurs lignes reçoit son `*`, et chaque colonne d’un `Insertable` prend `db.SQLFragment<any>`, un fragment `sql` dont le résultat est typé, là où la 6.6.1 écrivait `db.SQLFragment` ([changelog](/fr/changelog)).
 
 Les changements qu’apporte pgcast sont dans le runtime, pas dans les types générés. [`raw()`](/fr/sql-template#raw), [`cols()`](/fr/sql-template#cols) et [`vals()`](/fr/sql-template#vals) ne passent plus la vérification de types comme valeur d’un `Whereable`, d’un `Insertable` ou d’un `Updatable`, là où 6.6.1 les prenait pour un `Parameter`, un objet de même forme (`{ value }`).
 

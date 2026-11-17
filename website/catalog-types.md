@@ -158,7 +158,7 @@ All of this needs `strictNullChecks`, or `strict`. Without it, `columns`, `extra
 
 ## What pgcast kept, and what it changes
 
-The generator is Zapatos 6.6.1's, its version canary still at 104 ([`SchemaVersionCanary`](/runtime-config#SchemaVersionCanary)). Its fixes change `schema.d.ts` where 6.6.1's was wrong: a table's `UniqueIndex` lists only its own unique indexes, and each line of a multi-line column comment gets its `*` ([changelog](/changelog)).
+The generator is Zapatos 6.6.1's, its version canary still at 104 ([`SchemaVersionCanary`](/runtime-config#SchemaVersionCanary)). Its fixes change `schema.d.ts` where 6.6.1's was wrong: a table's `UniqueIndex` lists only its own unique indexes, each line of a multi-line column comment gets its `*`, and each column of an `Insertable` takes `db.SQLFragment<any>`, a `sql` fragment whose result is typed, where 6.6.1 wrote `db.SQLFragment` ([changelog](/changelog)).
 
 What pgcast changes on the way in is in the run-time library, not in the generated types. [`raw()`](/sql-template#raw), [`cols()`](/sql-template#cols) and [`vals()`](/sql-template#vals) no longer type-check as a value of a `Whereable`, `Insertable` or `Updatable`, where 6.6.1 took them for a `Parameter`, an object of the same shape (`{ value }`).
 
