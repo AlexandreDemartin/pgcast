@@ -76,7 +76,7 @@ async function filmCards(queryable: db.Queryable) {
 
 ### `order`, `limit`, `offset` and `withTies`
 
-- `order`: one `{ by, direction, nulls? }` or an array of them, in that order. `by` is a column or any SQL of the table, its `SQL` type: a `sql` fragment (`` db.sql`array_length(${'genres'}, 1)` ``), [`db.parent()`](/sql-template#parent); `direction` is `'ASC'` or `'DESC'`; `nulls`, `'FIRST'` or `'LAST'`.
+- `order`: one [`OrderSpecForTable`](#OrderSpecForTable), `{ by, direction, nulls? }`, or an array of them, in that order. `by` is a column or any SQL of the table, its `SQL` type: a `sql` fragment (`` db.sql`array_length(${'genres'}, 1)` ``), [`db.parent()`](/sql-template#parent); `direction` is `'ASC'` or `'DESC'`; `nulls`, `'FIRST'` or `'LAST'`.
 - `limit` and `offset`: numbers, sent as parameters.
 - `withTies: true`, with `limit` and `order`: also the rows that tie with the last one on the `order`. Without `limit` it adds nothing; without `order`, Postgres refuses the query (42601).
 
@@ -430,6 +430,18 @@ interface SelectLockingOptions<A extends string> {
 ```
 
 One locking clause of [`lock`](#lock). `of` takes a table name without its schema, or the query's `alias` (`A`).
+
+### `OrderSpecForTable` {#OrderSpecForTable}
+
+```ts
+interface OrderSpecForTable<T extends Table> {
+  by: SQLForTable<T>;
+  direction: 'ASC' | 'DESC';
+  nulls?: 'FIRST' | 'LAST';
+}
+```
+
+One item of [`order`](#order-limit-offset-and-withties): `by`, then `direction`, then `NULLS` and `nulls` if given, `"title" DESC NULLS LAST`.
 
 ### `ColumnsOption` {#ColumnsOption}
 

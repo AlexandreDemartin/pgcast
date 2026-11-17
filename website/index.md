@@ -2,7 +2,7 @@
 layout: home
 markdownStyles: false
 title: pgcast
-titleTemplate: Zero-abstraction Postgres for TypeScript
+titleTemplate: The Postgres you know, with the full power of TypeScript
 description: "The Postgres you know, with the full power of TypeScript. pgcast reads your schema and writes the types; each query is SQL you can read and predict. No ORM, no models, no hidden state: you stay in full control."
 ---
 

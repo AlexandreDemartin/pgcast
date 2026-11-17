@@ -693,7 +693,8 @@ export const truncate: {
 
 /* === select === */
 
-interface OrderSpecForTable<T extends Table> {
+/** One item of `select()`'s `order`: `by`, then `direction`, then `NULLS <nulls>` if given (`"title" DESC NULLS LAST`). */
+export interface OrderSpecForTable<T extends Table> {
   by: SQLForTable<T>;
   direction: 'ASC' | 'DESC';
   nulls?: 'FIRST' | 'LAST';
