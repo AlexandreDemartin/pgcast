@@ -323,7 +323,7 @@ export const arrayOverlaps = <T>(a: T[] | ParentColumn) => sql<SQL, boolean | nu
 // bytes in UTF-8, at a character's end, as Postgres truncates a name (NAMEDATALEN)
 const lastIdentifier = (name: string) => {
   const
-    parts = sql`${name as Table}`.compile().text.match(/(?:[Uu]&)?"(?:[^"]|"")*"|[^".\s]+/g) ?? [],
+    parts = sql`${name}`.compile().text.match(/(?:[Uu]&)?"(?:[^"]|"")*"|[^".\s]+/g) ?? [],
     last = parts[parts.length - 1] ?? '',
     unicode = /^[Uu]&/.test(last),
     unquoted = last.slice(unicode ? 3 : 1, -1).replace(/""/g, '"'),
@@ -358,7 +358,7 @@ const subquery = (fn: string, head: SQL, table: string, where: SQL | AllType, op
     return refused(`\`${fn}()\` was given \`parent: '${parent}'\`, which names "${lastIdentifier(alias)}", the subquery's own name, so Postgres would read \`parent()\` as a column of the subquery's row: give the subquery another name with the \`alias\` option.`);
   }
   const
-    query = sql`${head} FROM ${table as Table}${given === undefined ? [] : sql` AS ${alias as Table}`}${where === all ? [] : sql` WHERE ${where}`}`,
+    query = sql`${head} FROM ${table}${given === undefined ? [] : sql` AS ${alias}`}${where === all ? [] : sql` WHERE ${where}`}`,
     nestedCompile = query.compile;
   query.compile = result => nestedCompile(result, undefined, undefined);
   if (parent !== undefined) query.parentTable = parent;

@@ -745,9 +745,9 @@ declare module 'zapatos/schema' {
   }[T];
 
   export type WhereableForTable<T extends Table> = {
-    "public.OrderLines": public.OrderLines.Whereable & { [Symbol.iterator]?: undefined };
-    "public.users": public.users.Whereable & { [Symbol.iterator]?: undefined };
-    "extra.articles": extra.articles.Whereable & { [Symbol.iterator]?: undefined };
+    "public.OrderLines": public.OrderLines.Whereable;
+    "public.users": public.users.Whereable;
+    "extra.articles": extra.articles.Whereable;
   }[T];
 
   export type InsertableForTable<T extends Table> = {

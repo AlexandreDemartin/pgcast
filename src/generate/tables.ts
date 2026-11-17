@@ -137,10 +137,11 @@ function quoteIfIllegalIdentifier(identifier: string) {
 }
 
 // Every key of a Whereable is optional, so a string passed as one when a column shares the name of a String member
-// its type fits (`search` typed any, `length` a number), and with it any name, in the table's SQL and as the where
-// of its shortcuts (#670). A string has an iterator, a Whereable none, and no column is a symbol. It goes in the
-// lookup, not on the shortcuts' parameters, so that a generic `{ ...where, id }` still fits; `undefined`, not
-// `never`, so that a homomorphic mapped type over it (`Readonly`, `Omit`) does too, under exactOptionalPropertyTypes
+// its type fits (`search` typed any, `length` a number), and with it any name in the table's SQL (#670). A string has
+// an iterator, a Whereable none, and no column is a symbol. In SQLExpression, a union, so that no `keyof` changes;
+// `undefined`, not `never`, so that a homomorphic mapped type over it (`Readonly`, `Omit`) fits it too, under
+// exactOptionalPropertyTypes. Not in WhereableForTable (its `keyof` would change), nor on the shortcuts' `where`,
+// where it refused a generic `{ ...where, id }` (#674)
 const notIterable = '{ [Symbol.iterator]?: undefined }';
 
 export const definitionForRelationInSchema = async (
@@ -403,7 +404,7 @@ export const definitionForRelationInSchema = async (
  * ${jsdocLines(`**${schemaPrefix}${rel.name}**`, ' ')}
  * - ${friendlyRelType} in database
  */` : ``,
-    // SQLExpression's Whereable refuses a primitive, as WhereableForTable's does (notIterable, above)
+    // SQLExpression's Whereable refuses a primitive (notIterable, above)
     tableDef = `${tableComment}
 export namespace ${tsIdentifier(rel.name, 'namespace')} {
   export type Table = ${stringLiteral(schemaPrefix + rel.name)};
@@ -472,7 +473,7 @@ export type AllTablesAndViews = ${tableMappedArray(tables, 'Table')};`;
 export const crossSchemaTypesForAllTables = (allTables: Relation[], unprefixedSchema: string | null) =>
   ['Selectable', 'JSONSelectable', 'Whereable', 'Insertable', 'Updatable', 'UniqueIndex', 'Column', 'SQL'].map(thingable => `
 export type ${thingable}ForTable<T extends Table> = ${allTables.length === 0 ? 'any' : `{${allTables.map(rel => `
-  ${stringLiteral((rel.schema === unprefixedSchema ? '' : `${rel.schema}.`) + rel.name, '"')}: ${rel.schema === unprefixedSchema ? '' : `${tsIdentifier(rel.schema, 'namespace')}.`}${tsIdentifier(rel.name, 'namespace')}.${thingable}${thingable === 'Whereable' ? ` & ${notIterable}` : ''};`).join('')}
+  ${stringLiteral((rel.schema === unprefixedSchema ? '' : `${rel.schema}.`) + rel.name, '"')}: ${rel.schema === unprefixedSchema ? '' : `${tsIdentifier(rel.schema, 'namespace')}.`}${tsIdentifier(rel.name, 'namespace')}.${thingable};`).join('')}
 }[T]`};
 `).join('');
 

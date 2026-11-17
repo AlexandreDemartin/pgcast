@@ -626,7 +626,7 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
       // with no column and no current column, throw before the table is written (Zapatos 6.6.1 wrote `"t".` first)
       const column = expression.value ?? currentColumn;
       if (column == null) throw new Error(parentWithoutColumn);
-      this.compileExpression(parentTable as Table, result);
+      this.compileExpression(parentTable, result);
       result.text += '.';
       this.compileExpression(column, result);
 
@@ -641,7 +641,7 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
 
       for (let i = 0, len = columnNames.length; i < len; i++) {
         if (i > 0) result.text += ', ';
-        this.compileExpression(String(columnNames[i]) as Column, result);
+        this.compileExpression(String(columnNames[i]), result);
       }
 
     } else if (expression instanceof ColumnValues) {

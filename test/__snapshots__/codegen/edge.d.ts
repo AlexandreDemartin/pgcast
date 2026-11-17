@@ -286,8 +286,8 @@ declare module 'zapatos/schema' {
   }[T];
 
   export type WhereableForTable<T extends Table> = {
-    "edge.class": edge.class_.Whereable & { [Symbol.iterator]?: undefined };
-    "edge.odd table": edge.odd_table.Whereable & { [Symbol.iterator]?: undefined };
+    "edge.class": edge.class_.Whereable;
+    "edge.odd table": edge.odd_table.Whereable;
   }[T];
 
   export type InsertableForTable<T extends Table> = {

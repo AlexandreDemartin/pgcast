@@ -1089,10 +1089,10 @@ declare module 'zapatos/schema' {
   }[T];
 
   export type WhereableForTable<T extends Table> = {
-    "users": users.Whereable & { [Symbol.iterator]?: undefined };
-    "unions.books": unions.books.Whereable & { [Symbol.iterator]?: undefined };
-    "unions.ebooks": unions.ebooks.Whereable & { [Symbol.iterator]?: undefined };
-    "unions.formats_in_use": unions.formats_in_use.Whereable & { [Symbol.iterator]?: undefined };
+    "users": users.Whereable;
+    "unions.books": unions.books.Whereable;
+    "unions.ebooks": unions.ebooks.Whereable;
+    "unions.formats_in_use": unions.formats_in_use.Whereable;
   }[T];
 
   export type InsertableForTable<T extends Table> = {

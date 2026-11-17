@@ -4283,23 +4283,23 @@ declare module 'zapatos/schema' {
   }[T];
 
   export type WhereableForTable<T extends Table> = {
-    "account_totals": account_totals.Whereable & { [Symbol.iterator]?: undefined };
-    "accounts": accounts.Whereable & { [Symbol.iterator]?: undefined };
-    "active_users": active_users.Whereable & { [Symbol.iterator]?: undefined };
-    "events": events.Whereable & { [Symbol.iterator]?: undefined };
-    "events_2025": events_2025.Whereable & { [Symbol.iterator]?: undefined };
-    "events_2026": events_2026.Whereable & { [Symbol.iterator]?: undefined };
-    "events_default": events_default.Whereable & { [Symbol.iterator]?: undefined };
-    "memberships": memberships.Whereable & { [Symbol.iterator]?: undefined };
-    "OrderLines": OrderLines.Whereable & { [Symbol.iterator]?: undefined };
-    "orgs": orgs.Whereable & { [Symbol.iterator]?: undefined };
-    "products": products.Whereable & { [Symbol.iterator]?: undefined };
-    "transfers": transfers.Whereable & { [Symbol.iterator]?: undefined };
-    "users": users.Whereable & { [Symbol.iterator]?: undefined };
-    "extra.article_authors": extra.article_authors.Whereable & { [Symbol.iterator]?: undefined };
-    "extra.articles": extra.articles.Whereable & { [Symbol.iterator]?: undefined };
-    "extra.imported_lines": extra.imported_lines.Whereable & { [Symbol.iterator]?: undefined };
-    "extra.type_zoo": extra.type_zoo.Whereable & { [Symbol.iterator]?: undefined };
+    "account_totals": account_totals.Whereable;
+    "accounts": accounts.Whereable;
+    "active_users": active_users.Whereable;
+    "events": events.Whereable;
+    "events_2025": events_2025.Whereable;
+    "events_2026": events_2026.Whereable;
+    "events_default": events_default.Whereable;
+    "memberships": memberships.Whereable;
+    "OrderLines": OrderLines.Whereable;
+    "orgs": orgs.Whereable;
+    "products": products.Whereable;
+    "transfers": transfers.Whereable;
+    "users": users.Whereable;
+    "extra.article_authors": extra.article_authors.Whereable;
+    "extra.articles": extra.articles.Whereable;
+    "extra.imported_lines": extra.imported_lines.Whereable;
+    "extra.type_zoo": extra.type_zoo.Whereable;
   }[T];
 
   export type InsertableForTable<T extends Table> = {

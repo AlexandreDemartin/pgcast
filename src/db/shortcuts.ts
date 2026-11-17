@@ -535,7 +535,7 @@ export const upsert: {
       values.some(v => !Object.prototype.hasOwnProperty.call(v ?? {}, c))),  // a null row misses every key
     updateColumns = [...new Set(  // deduplicate the keys here
       [...specifiedUpdateColumns as string[] ?? colNames, ...updateValuesKeys(updateValues, specifiedUpdateColumns as string[] ?? colNames)]
-    )] as Column[],
+    )],
     conflictTargetSQL = Array.isArray(conflictTarget) ?
       sql`(${mapWithSeparator(conflictTarget, sql`, `, c => c)})` :
       sql<string>`ON CONSTRAINT ${conflictTarget.value}`,
@@ -901,7 +901,7 @@ export const select: SelectSignatures = function (
     lock = callerValue(allOptions, 'lock') == null || Array.isArray(callerValue(allOptions, 'lock')) ? callerValue(allOptions, 'lock') : [callerValue(allOptions, 'lock')],
     order = callerValue(allOptions, 'order') == null || Array.isArray(callerValue(allOptions, 'order')) ? callerValue(allOptions, 'order') : [callerValue(allOptions, 'order')],
     tableAliasSQL = alias === table ? [] : sql<string>` AS ${alias}`,
-    distinctSQL = !distinct ? [] : sql` DISTINCT${distinct instanceof SQLFragment || typeof distinct === 'string' ? sql` ON (${distinct as Column | SQLFragment})` :
+    distinctSQL = !distinct ? [] : sql` DISTINCT${distinct instanceof SQLFragment || typeof distinct === 'string' ? sql` ON (${distinct})` :
       Array.isArray(distinct) ? sql` ON (${cols(distinct)})` : []}`,
     colsSQL = lateral instanceof SQLFragment ? [] :
       mode === SelectResultMode.Numeric ?
@@ -914,7 +914,7 @@ export const select: SelectSignatures = function (
           Object.keys(lateral).sort(), sql`, `, k => sql`${param(k)}::text, ${SQLForAlias('lateral_', k)}.result`)})`,
     allColsSQL = sql`${colsSQL}${colsExtraSQL}${colsLateralSQL}`,
     whereSQL = where === all ? [] : sql` WHERE ${where}`,
-    groupBySQL = !groupBy ? [] : sql` GROUP BY ${groupBy instanceof SQLFragment || typeof groupBy === 'string' ? groupBy as Column | SQLFragment : cols(groupBy)}`,
+    groupBySQL = !groupBy ? [] : sql` GROUP BY ${groupBy instanceof SQLFragment || typeof groupBy === 'string' ? groupBy : cols(groupBy)}`,
     havingSQL = !having ? [] : sql` HAVING ${having}`,
     orderSQL = order === undefined ? [] :
       order === null ? refusedSQL(orderNull) :

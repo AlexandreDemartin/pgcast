@@ -83,48 +83,42 @@ describe('select', () => {
     db.select('users', db.all, { groupBy: 'nope' });
   });
 
-  // products.search, a tsvector typed any, shares its name with String's search(): a string passed as a
-  // products.Whereable, so as the where of every shortcut and condition, as in Zapatos 6.6.1 (#670)
-  test('refuses a string as the where of a table with a column named like a String member (#670)', () => {
+  // products.search, a tsvector typed any, shares its name with String's search(): a string passes as a
+  // products.Whereable, as in Zapatos 6.6.1 (#670). The table's SQL refuses it, so order.by does
+  test('refuses a string as a name of a table with a column named like a String member (#670)', () => {
     const c = db.conditions;
     expectTypeOf(db.select('products', { search: db.sql`${db.self} @@ 'salt'` })).toEqualTypeOf<db.SQLFragment<s.products.JSONSelectable[]>>();
     expectTypeOf(db.select('products', c.and({ sku: 'a' }, c.not({ title: 'b' })))).toEqualTypeOf<db.SQLFragment<s.products.JSONSelectable[]>>();
     expectTypeOf(db.count('products', db.all, { groupBy: 'sku', having: { sku: 'a' } } as const)).not.toBeAny();
-    // @ts-expect-error a string is no Whereable (select)
-    db.select('products', 'serach');
-    // @ts-expect-error a string is no Whereable (selectOne)
-    db.selectOne('products', 'serach');
-    // @ts-expect-error a string is no Whereable (selectExactlyOne)
-    db.selectExactlyOne('products', 'serach');
-    // @ts-expect-error a string is no Whereable (count)
-    db.count('products', 'serach');
-    // @ts-expect-error a string is no Whereable (sum)
-    db.sum('products', 'serach', { columns: ['price_cents'] });
-    // @ts-expect-error a string is no Whereable (update)
-    db.update('products', { sku: 'a' }, 'serach');
-    // @ts-expect-error a string is no Whereable (deletes)
-    db.deletes('products', 'serach');
+    expectTypeOf(db.select('products', db.all, { order: { by: 'sku', direction: 'ASC' } })).not.toBeAny();
     // @ts-expect-error 'serach' is not a column of products (order.by, a SQLForTable)
     db.select('products', db.all, { order: { by: 'serach', direction: 'ASC' } });
-    // @ts-expect-error a string is no Whereable (having)
-    db.select('products', db.all, { groupBy: 'sku', having: 'serach' });
-    // @ts-expect-error a string is no Whereable (exists)
-    c.exists('products', 'serach');
-    // @ts-expect-error a string is no Whereable (isInSelect)
-    c.isInSelect('products', 'serach', 'id');
     // a variable that shares no key with it is still refused
     const titel = { titel: 'a' };
     // @ts-expect-error 'titel' is not a column of products
     db.select('products', titel);
-    const str = 'sku' as string, so = new String('sku');
-    // @ts-expect-error a string typed string is no Whereable
-    db.select('products', str);
-    // @ts-expect-error a String object is no Whereable
-    db.select('products', so);
     // an object whose iterator is undefined, or any, is still a Whereable: it compiles to its own keys
     const iterUndefined = { sku: 'a', [Symbol.iterator]: undefined }, iterAny = { sku: 'a', [Symbol.iterator]: null as any };
     expectTypeOf(db.select('products', iterUndefined)).toEqualTypeOf<db.SQLFragment<s.products.JSONSelectable[]>>();
     expectTypeOf(db.select('products', iterAny)).toEqualTypeOf<db.SQLFragment<s.products.JSONSelectable[]>>();
+  });
+
+  // A guard on the where of the shortcuts refused a generic forwarder that spreads it and adds a key (#674)
+  test('characterization: the where of a shortcut or a condition still takes any string (#674)', () => {
+    const c = db.conditions;
+    const str = 'sku' as string, so = new String('sku');
+    expectTypeOf(db.select('products', 'serach')).not.toBeAny();
+    expectTypeOf(db.selectOne('products', 'serach')).not.toBeAny();
+    expectTypeOf(db.selectExactlyOne('products', 'serach')).not.toBeAny();
+    expectTypeOf(db.count('products', 'serach')).not.toBeAny();
+    expectTypeOf(db.sum('products', 'serach', { columns: ['price_cents'] })).not.toBeAny();
+    expectTypeOf(db.update('products', { sku: 'a' }, 'serach')).not.toBeAny();
+    expectTypeOf(db.deletes('products', 'serach')).not.toBeAny();
+    expectTypeOf(db.select('products', db.all, { groupBy: 'sku', having: 'serach' })).not.toBeAny();
+    expectTypeOf(c.exists('products', 'serach')).not.toBeAny();
+    expectTypeOf(c.isInSelect('products', 'serach', 'id')).not.toBeAny();
+    expectTypeOf(db.select('products', str)).not.toBeAny();
+    expectTypeOf(db.select('products', so)).not.toBeAny();
   });
 
   // and(), or() and not() take the Whereable of every table, which names no table to check (#674)
