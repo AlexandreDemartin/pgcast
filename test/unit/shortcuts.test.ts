@@ -2976,6 +2976,17 @@ describe('a shortcut as an insert(), upsert() or update() value, a scalar subque
     });
   });
 
+  it('without undefinedMeansMissing, beside an undefined value, which pg sends as NULL', () => {
+    expect(db.insert('users', { ...ada, manager_id: db.count('accounts', all), mood: undefined }).compile()).toEqual({
+      text: 'INSERT INTO "users" ("display_name", "email", "manager_id", "mood") VALUES ($1, $2, (SELECT count(*) AS result FROM "accounts"), $3) RETURNING to_jsonb("users".*) AS result',
+      values: ['Ada', 'ada@example.com', undefined],
+    });
+    expect(db.update('users', { manager_id: db.count('accounts', all), mood: undefined }, { id: 2 }).compile()).toEqual({
+      text: 'UPDATE "users" SET ("manager_id", "mood") = ROW((SELECT count(*) AS result FROM "accounts"), $1) WHERE ("id" = $2) RETURNING to_jsonb("users".*) AS result',
+      values: [undefined, 2],
+    });
+  });
+
   it('with undefinedMeansMissing, beside an undefined value', () => {
     db.setConfig({ undefinedMeansMissing: true });
     expect(db.insert('users', { ...ada, manager_id: db.count('accounts', all), mood: undefined }).compile().text)
@@ -3028,15 +3039,25 @@ describe('a shortcut as an insert(), upsert() or update() value, a scalar subque
       .toBe('UPDATE "users" SET ("settings") = ROW(DELETE FROM "accounts" WHERE ("id" = $1) RETURNING to_jsonb("accounts".*) AS result) WHERE ("id" = $2) RETURNING to_jsonb("users".*) AS result');
   });
 
-  it('a row is read as often as before, its getter included: twice alone, three times among others', () => {
-    // the parentheses are found in the read pgcast already makes of a lone row, and on its own copies of several rows
+  it('a row with no shortcut is read as often as before: twice alone, three times among others; a lone row with one once, as in 6.6.1', () => {
+    // the parentheses are found in the read pgcast already makes of a lone row, and on its own copies of several rows;
+    // a lone row that holds a shortcut is copied from that read, so its getter is read once, where master read it twice
     const reads: Record<string, number> = {};
-    const row = (key: string) => ({ ...ada, get mood() { reads[key] = (reads[key] ?? 0) + 1; return 'ok'; } });
+    const row = (key: string, extra = {}) => ({ ...ada, ...extra, get mood() { reads[key] = (reads[key] ?? 0) + 1; return 'ok'; } });
     db.insert('users', row('insert')).compile();
     db.update('users', row('update'), { id: 2 }).compile();
     db.upsert('users', row('upsert'), 'email').compile();
     db.insert('users', [row('insert rows'), ada]).compile();
     db.upsert('users', [row('upsert rows'), { ...ada, mood: 'sad' }], 'email').compile();
-    expect(reads).toEqual({ insert: 2, update: 2, upsert: 2, 'insert rows': 3, 'upsert rows': 3 });
+    const query = { manager_id: db.count('accounts', all) };
+    db.insert('users', row('insert, a shortcut', query)).compile();
+    db.update('users', row('update, a shortcut', query), { id: 2 }).compile();
+    db.upsert('users', row('upsert, a shortcut', query), 'email').compile();
+    db.insert('users', [row('insert rows, a shortcut', query), ada]).compile();
+    db.upsert('users', [row('upsert rows, a shortcut', query), { ...ada, mood: 'sad' }], 'email').compile();
+    expect(reads).toEqual({
+      insert: 2, update: 2, upsert: 2, 'insert rows': 3, 'upsert rows': 3,
+      'insert, a shortcut': 1, 'update, a shortcut': 1, 'upsert, a shortcut': 1, 'insert rows, a shortcut': 3, 'upsert rows, a shortcut': 3,
+    });
   });
 });
