@@ -413,6 +413,30 @@ describe('db.all as a filter value', () => {
   });
 });
 
+describe('db.all and self as a write value, or in vals([…]) with no current column', () => {
+  it('beside a hostile key or hostile items, in insert(), upsert(), update() and updateValues, throws, and no text is returned', () => {
+    // 6.6.1 and pgcast until #665 sent 'Symbol(all)' and 'Symbol(self)' as a parameter; the refusal comes before
+    // any text is returned, whatever the key or the other items hold (#665)
+    const
+      all = db.all as any, self = db.self as any,
+      allAsValue = 'throws: `db.all` has no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value: give a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.',
+      selfAsValue = 'throws: `db.self` has no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value: give a value; in `update()`, write `db.self` in a `sql` fragment value, where it stands for the column.',
+      allInBareVals = 'throws: `db.all` has no meaning as an item of `vals([…])` outside a column\'s value, as in a `sql` template of your own or in `upsert()` `updateValues`: give a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.',
+      wrapperInBareVals = 'throws: `db.raw()`, `db.cols()` and `db.vals()` have no meaning as an item of `vals([…])` outside a column\'s value, as in a `sql` template of your own or in `upsert()` `updateValues`: for SQL, write it outside `vals([…])` (in `updateValues`, as the value itself); for a value, give the value itself, or `db.param()`.',
+      builds = {
+        insertKey: [(v: string) => db.insert('users', { email: v, [v]: all } as any), allAsValue],
+        insertRowsKey: [(v: string) => db.insert('users', [{ email: v }, { email: v, [v]: self }] as any), selfAsValue],
+        upsertKey: [(v: string) => db.upsert('users', { email: v, [v]: all } as any, 'email'), allAsValue],
+        updateKey: [(v: string) => db.update('users', { display_name: v, [v]: self } as any, { id: 1 }), selfAsValue],
+        updateValuesKey: [(v: string) => db.upsert('users', { email: v }, 'email', { updateValues: { [v]: all } as any }), allAsValue],
+        updateValuesItems: [(v: string) => db.upsert('users', { email: v }, 'email', { updateValues: { [v]: sql`${db.vals([v, all])}` } as any }), allInBareVals],
+        templateItems: [(v: string) => sql`INSERT INTO ${v} VALUES (${db.vals([v, db.raw(v)])})`, wrapperInBareVals],
+      } as const;
+    expect(Object.fromEntries(Object.entries(builds).map(([name, [build]]) => [name, new Set(Object.values(matrix(build)))])))
+      .toEqual(Object.fromEntries(Object.entries(builds).map(([name, [, message]]) => [name, new Set([visible(message)])])));
+  });
+});
+
 describe('an item one array parameter cannot hold, in an array condition', () => {
   it('beside a hostile key or hostile items, at any depth, throws, and no text is returned', () => {
     // 6.6.1 sent Default and self as '{"Symbol(DEFAULT)"}', a wrapper, a Parameter, parent() or a fragment as its

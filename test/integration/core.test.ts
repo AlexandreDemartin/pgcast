@@ -250,6 +250,32 @@ describe('Default, self, parent, cols, vals', () => {
     const accounts = await sql`INSERT INTO ${'accounts'} (${'owner_id'}, ${'balance'}) VALUES (${vals([3, Default])}) RETURNING ${'balance'}`.run(t.client);
     expect(accounts).toEqual([{ balance: '0.00' }]);
   });
+
+  it('db.all, self and raw() as a write value, or in vals([…]) with no current column, reject run() before any query', async () => {
+    // 6.6.1 and pgcast until #665 stored 'Symbol(all)', 'Symbol(self)' or '{"value":"\'Cy\'"}' as Bob's name (#665)
+    const queries: unknown[] = [];
+    db.setConfig({ queryListener: query => queries.push(query) });
+    const
+      a = db.all as any, s = self as any, bob = { email: 'bob@example.com', display_name: 'Bob' },
+      rejected = (q: db.SQLFragment<any>) => q.run(t.client).then(() => 'ran', (e: Error) => 'code' in e ? e : e.message.slice(0, 40));
+    expect({
+      insert: await rejected(db.insert('users', { email: 'new@example.com', display_name: a })),
+      upsert: await rejected(db.upsert('users', { ...bob, display_name: s }, 'email')),
+      update: await rejected(db.update('users', { display_name: a }, { id: 2 })),
+      updateValues: await rejected(db.upsert('users', bob, 'email', { updateValues: { display_name: s } })),
+      updateValuesFragment: await rejected(db.upsert('users', bob, 'email', { updateValues: { display_name: sql`${vals([a])}` as any } })),
+      updateValuesVals: await rejected(db.upsert('users', bob, 'email', { updateValues: { display_name: vals([raw("'Cy'")]) as any } })),
+      template: await rejected(sql`UPDATE ${'users'} SET ${'display_name'} = ${vals([s])} WHERE ${{ id: 2 }}`),
+    }).toEqual({
+      insert: '`db.all` has no meaning as a value in `v', upsert: '`db.self` has no meaning as a value in `',
+      update: '`db.all` has no meaning as a value in `v', updateValues: '`db.self` has no meaning as a value in `',
+      updateValuesFragment: '`db.all` has no meaning as an item of `va', updateValuesVals: '`db.raw()`, `db.cols()` and `db.vals()` ha',
+      template: '`db.self` has no meaning as an item of `v',
+    });
+    expect(queries).toEqual([]);
+    expect(await sql`SELECT ${'display_name'} FROM ${'users'} ORDER BY ${'id'}`.run(t.client))
+      .toEqual([{ display_name: 'Ada' }, { display_name: 'Bob' }, { display_name: 'Cyd' }]);
+  });
 });
 
 describe('Whereable', () => {

@@ -518,28 +518,13 @@ describe('cols and vals', () => {
     `);
   });
 
-  it('characterization: outside a filter, raw, cols and vals in vals of an array are parameters', () => {
-    // characterization: pg sends them as JSON ('{"value":"now()"}'); left as they are by #108
-    expect(one(vals([raw('now()'), cols(['a']), vals([1])]))).toMatchInlineSnapshot(`
-      {
-        "text": "$1, $2, $3",
-        "values": [
-          DangerousRawString {
-            "value": "now()",
-          },
-          ColumnNames {
-            "value": [
-              "a",
-            ],
-          },
-          ColumnValues {
-            "value": [
-              1,
-            ],
-          },
-        ],
-      }
-    `);
+  it('vals of an array throws on raw, cols and vals outside a column\'s value too: a template\'s, an updateValues\'', () => {
+    // 6.6.1 and pgcast until #665 sent them as JSON: `{"value":"now()"}` stored in a text column, left by #108
+    const wrapperInBareVals = '`db.raw()`, `db.cols()` and `db.vals()` have no meaning as an item of `vals([…])` outside a column\'s value, as in a `sql` template of your own or in `upsert()` `updateValues`: for SQL, write it outside `vals([…])` (in `updateValues`, as the value itself); for a value, give the value itself, or `db.param()`.';
+    expect(new Set([raw('now()'), cols(['a']), vals([1])].flatMap(value => [
+      () => one(vals([1, value])),
+      () => sql`INSERT INTO "users" ("display_name") VALUES (${vals([value])})`.compile(),
+    ].map(thrown)))).toEqual(new Set([wrapperInBareVals]));
   });
 
   it('vals of an array compiles parent() as the parent column, as a Whereable value does', () => {
@@ -604,38 +589,21 @@ describe('cols and vals', () => {
     expect(() => one(vals({ role: sql`${vals([self])}` }))).toThrowErrorMatchingInlineSnapshot(`[Error: \`db.self\` has no meaning as an item of \`vals([…])\` in a column's value, in a filter (as \`isIn()\` writes it) or in a \`sql\` fragment value of \`vals({…})\`, so of \`insert()\`, \`upsert()\` or \`update()\`: give a value; in a filter or in \`update()\`, write \`db.self\` in a \`sql\` fragment value, outside \`vals([…])\`, where it stands for the column.]`);
   });
 
-  it('characterization: outside a filter, vals([self]), vals({ a: self }), param(self) and param(Default) are parameters', () => {
-    // characterization: pg sends 'Symbol(self)' and 'Symbol(DEFAULT)'; left as they are by #106
-    expect({
-      vals: one(vals([self])), valsObject: one(vals({ a: self })), param: one(param(self)), paramDefault: one(param(Default)),
-    }).toMatchInlineSnapshot(`
-      {
-        "param": {
-          "text": "$1",
-          "values": [
-            Symbol(self),
-          ],
-        },
-        "paramDefault": {
-          "text": "$1",
-          "values": [
-            Symbol(DEFAULT),
-          ],
-        },
-        "vals": {
-          "text": "$1",
-          "values": [
-            Symbol(self),
-          ],
-        },
-        "valsObject": {
-          "text": "$1",
-          "values": [
-            Symbol(self),
-          ],
-        },
-      }
-    `);
+  it('vals([self]) and vals({ a: self }) throw outside a filter too, so as a write value', () => {
+    // 6.6.1 and pgcast until #665 sent 'Symbol(self)', stored in a text column; left by #106
+    expect({ vals: thrown(() => one(vals([self]))), valsObject: thrown(() => one(vals({ a: self }))) }).toEqual({
+      vals: '`db.self` has no meaning as an item of `vals([…])` outside a column\'s value, as in a `sql` template of your own or in `upsert()` `updateValues`, where no column is current: give a value, or name the column.',
+      valsObject: '`db.self` has no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value: give a value; in `update()`, write `db.self` in a `sql` fragment value, where it stands for the column.',
+    });
+  });
+
+  it('characterization: param(self), param(Default) and, outside a column\'s value, vals([Default]) are kept', () => {
+    // param() is a parameter the caller asked for: pg sends 'Symbol(self)' and 'Symbol(DEFAULT)'; vals([Default])
+    // with no current column is `DEFAULT`, as in a query that inserts by hand (#106, #665)
+    expect({ param: one(param(self)), paramDefault: one(param(Default)), valsDefault: one(vals([1, Default])) }).toEqual({
+      param: { text: '$1', values: [self] }, paramDefault: { text: '$1', values: [Default] },
+      valsDefault: { text: '$1, DEFAULT', values: [1] },
+    });
   });
 
   it('vals of an array throws on Default in a fragment value of vals of an object, whose key sets the current column', () => {
@@ -1097,12 +1065,17 @@ describe('db.all', () => {
       .toEqual(Object.fromEntries(Object.keys(builds).map(name => [name, viaVals.includes(name) ? allInVals : allInWhereable])));
   });
 
-  it('characterization: outside a filter, vals([all]), vals({ a: all }), an insert() value and param(all) are parameters', () => {
-    // characterization: pg sends 'Symbol(all)', as for self there; left as they are by #633
+  it('outside a filter, vals([all]), vals({ a: all }) and an insert() value throw too; param(all) is kept', () => {
+    // 6.6.1 and pgcast until #665 sent 'Symbol(all)', stored in a text column; left by #633. param() is a
+    // parameter the caller asked for
+    const
+      allInBareVals = '`db.all` has no meaning as an item of `vals([…])` outside a column\'s value, as in a `sql` template of your own or in `upsert()` `updateValues`: give a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.',
+      allAsValue = '`db.all` has no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value: give a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.';
     expect({
-      vals: one(vals([db.all])).values, valsObject: one(vals({ a: db.all })).values, param: one(param(db.all)).values,
-      insert: db.insert('users', { email: 'a@b', display_name: db.all as any }).compile().values,
-    }).toEqual({ vals: [db.all], valsObject: [db.all], param: [db.all], insert: [db.all, 'a@b'] });
+      vals: thrown(() => one(vals([db.all]))), valsObject: thrown(() => one(vals({ a: db.all }))),
+      insert: thrown(() => db.insert('users', { email: 'a@b', display_name: db.all as any }).compile()),
+      param: one(param(db.all)).values,
+    }).toEqual({ vals: allInBareVals, valsObject: allAsValue, insert: allAsValue, param: [db.all] });
   });
 
   it('as the whole filter of `select()` and its kin, or of exists() and isInSelect(), still means every row: no WHERE', () => {
