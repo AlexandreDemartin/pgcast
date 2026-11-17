@@ -1136,6 +1136,13 @@ describe('Default, self, raw, cols and vals as the value of a condition', () => 
     `);
   });
 
+  it('a condition given db.all throws when compiled, not when called', () => {
+    // 6.6.1 sent 'Symbol(all)': no row on a text column, every row with ne(), 22P02 on the others (#619)
+    expect(messages(db.all)).toEqual(new Set([
+      '`db.all` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To match every row, give `db.all` as the whole filter of a shortcut: `select(table, db.all)`.',
+    ]));
+  });
+
   it('isIn and isNotIn given Default or self throw when compiled', () => {
     expect(Object.fromEntries(Object.entries(lists).flatMap(([name, f]) =>
       [[`${name}Default`, thrown(f(['Ada', Default]))], [`${name}Self`, thrown(f(['Ada', self]))]]))).toMatchInlineSnapshot(`
