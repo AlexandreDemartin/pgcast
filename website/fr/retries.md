@@ -1,5 +1,6 @@
 ---
-english: c529f7e481d9
+english: 01fe07e4fe62
+description: "Réservez des places sous SERIALIZABLE, pour que deux requêtes HTTP simultanées n’enfreignent pas une règle, et laissez pgcast relancer la transaction refusée."
 ---
 
 # Retries

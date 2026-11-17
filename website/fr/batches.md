@@ -1,5 +1,6 @@
 ---
-english: e70ecd02d18e
+english: 610a348f86d0
+description: "Écrivez beaucoup de lignes d’un coup : découpez-les sous la limite de paramètres, ignorez celles déjà là, additionnez des comptes, ne récupérez que l’utile."
 ---
 
 # Batches

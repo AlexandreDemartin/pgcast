@@ -1,3 +1,7 @@
+---
+description: "Book seats at a screening under SERIALIZABLE, so two requests at once can't break a rule, and let pgcast run the transaction again when Postgres refuses one."
+---
+
 # Retries
 
 Book seats at a screening under `SERIALIZABLE`, so that two requests at once can't break a rule, and let pgcast run the transaction again when Postgres refuses one. Then what goes in the callback and what stays out of it, and how to test a retry. It assumes the basics of the [tutorial](/tutorial).

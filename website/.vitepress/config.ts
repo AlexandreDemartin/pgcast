@@ -9,7 +9,7 @@ import { calloutIcons } from './callouts.ts';
 import { codeGroupLogos } from './codeGroups.ts';
 import { changelogPage, dateChangelog, writeChangelogFeed } from './changelog.ts';
 import { host, writeLlmsFiles } from './llms.ts';
-import { describePage, pageHead, repo } from './meta.ts';
+import { describePage, pageHead, repo, sitemapAlternates } from './meta.ts';
 import { outlineIn } from './outline.ts';
 import { playgroundVite } from './playground/build.ts';
 import { checkPlaygroundLinks, linkCastPanels } from './playgroundLinks.ts';
@@ -97,7 +97,8 @@ export default defineConfig({
   locales: { root: locale('en'), fr: locale('fr') },  // English at the root, French under /fr/ (words.ts)
   base: '/',  // GitHub Pages, at the domain's root: https://pgcast.dev/
   cleanUrls: true,
-  sitemap: { hostname: 'https://pgcast.dev' },  // sitemap.xml, named by public/robots.txt
+  // sitemap.xml, named by public/robots.txt; its alternates by the codes of each page's `hreflang` (meta.ts)
+  sitemap: { hostname: 'https://pgcast.dev', transformItems: sitemapAlternates },
   lastUpdated: true,  // from git, so docs.yml and ci.yml check out the whole history; sitemap.xml's `lastmod` too
   transformPageData: (pageData, context) => {
     describePage(pageData, context);  // meta.ts

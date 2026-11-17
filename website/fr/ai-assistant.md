@@ -1,5 +1,6 @@
 ---
 english: 94944c1bd554
+description: "Donnez à un assistant qui écrit vos requêtes cette doc, votre schéma généré et un court fichier de règles, pour qu’il les écrive à la manière de pgcast."
 ---
 
 # Assistants IA

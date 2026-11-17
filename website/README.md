@@ -168,10 +168,11 @@ A "Coming" page has no `.md` file, so it is in neither; nor are the templates an
 
 `.vitepress/meta.ts` gives each page's `<head>`:
 
-- `description`: the front matter's, or else the lede as plain text, cut after the last whole sentence within 160 characters (the first sentence whatever its length). A "Coming" page takes the site's.
-- A canonical URL on `https://pgcast.dev/`, Open Graph and a Twitter card, with the one social image, `public/social-card.png`; on the home, a JSON-LD `SoftwareSourceCode`.
+- `description`: the front matter's, or else the lede as plain text, cut after the last whole sentence within 160 characters. A "Coming" page takes its language's (`words.ts`). The build fails on a description over 160 characters, naming the page: a lede whose first sentence is longer needs a front-matter `description`, one or two whole sentences that say what the page holds, in plain text, written for each language.
+- A canonical URL on `https://pgcast.dev/`, Open Graph (`og:locale` and `og:locale:alternate`) and a Twitter card, with its language's social image, `public/social-card.png` or `social-card-fr.png`; on each home, a JSON-LD `SoftwareSourceCode` with its `inLanguage`.
+- Its page in each language, `hreflang` `en`, `fr` and `x-default` (the English page), the same codes as `sitemap.xml`'s.
 
-`sitemap.xml` gives each page's `lastmod`, and the page its "Last updated", from git: CI checks out the whole history. The favicons, the Apple touch icon and the social card are drawn in SVG in `public/`; after changing one, `npm run docs:images` renders the PNG and ICO with headless Chrome (`CHROME=<path>` off macOS), to commit with it.
+`sitemap.xml` gives each page's `lastmod`, and the page its "Last updated", from git: CI checks out the whole history. The favicons, the Apple touch icon and the social cards are drawn in SVG in `public/` (`social-card-fr.svg` is `social-card.svg` with its French text); after changing one, `npm run docs:images` renders the PNG and ICO with headless Chrome (`CHROME=<path>` off macOS), to commit with it.
 
 ### Screenshots for a PR
 

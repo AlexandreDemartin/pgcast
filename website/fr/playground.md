@@ -1,6 +1,7 @@
 ---
-english: 6e1ed77c9a97
+english: de21a2156d8f
 aside: false  # the panel takes the rail's width: code lines are long
+description: "Modifiez une requête sur le schéma de la doc et voyez, à la saisie, le SQL qu’écrit pgcast et le type du résultat ; Exécuter montre la réponse de Postgres."
 ---
 
 <script setup>

@@ -1,5 +1,6 @@
 ---
 aside: false  # the panel takes the rail's width: code lines are long
+description: "Edit a query on the docs schema and see, as you type, the SQL pgcast writes and the type of its result; press Run to see what Postgres answers."
 ---
 
 <script setup>
