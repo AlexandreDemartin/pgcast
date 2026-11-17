@@ -1495,16 +1495,16 @@ declare module 'zapatos/schema' {
   }[T];
 
   export type WhereableForTable<T extends Table> = {
-    "actors": actors.Whereable & { [Symbol.iterator]?: undefined };
-    "cinemas": cinemas.Whereable & { [Symbol.iterator]?: undefined };
-    "crew": crew.Whereable & { [Symbol.iterator]?: undefined };
-    "films": films.Whereable & { [Symbol.iterator]?: undefined };
-    "ratings": ratings.Whereable & { [Symbol.iterator]?: undefined };
-    "roles": roles.Whereable & { [Symbol.iterator]?: undefined };
-    "screenings": screenings.Whereable & { [Symbol.iterator]?: undefined };
-    "seat_bookings": seat_bookings.Whereable & { [Symbol.iterator]?: undefined };
-    "studios": studios.Whereable & { [Symbol.iterator]?: undefined };
-    "tags": tags.Whereable & { [Symbol.iterator]?: undefined };
+    "actors": actors.Whereable;
+    "cinemas": cinemas.Whereable;
+    "crew": crew.Whereable;
+    "films": films.Whereable;
+    "ratings": ratings.Whereable;
+    "roles": roles.Whereable;
+    "screenings": screenings.Whereable;
+    "seat_bookings": seat_bookings.Whereable;
+    "studios": studios.Whereable;
+    "tags": tags.Whereable;
   }[T];
 
   export type InsertableForTable<T extends Table> = {
