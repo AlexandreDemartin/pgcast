@@ -48,7 +48,7 @@ bun add zapatos@npm:@pgcast/pgcast@^6
 :::
 
 - `package.json` now reads `"zapatos": "npm:@pgcast/pgcast@^…"`, and `node_modules/zapatos` holds pgcast.
-- pgcast's peer dependencies are Zapatos 6.6.1's, `pg`, `@types/pg` and TypeScript 4.1 or later, except that TypeScript is optional: npm and pnpm no longer install it for you. Not in your `devDependencies`? Add it: `npm install --save-dev typescript`.
+- Nothing else to add: pgcast's peer dependencies are Zapatos 6.6.1's, `pg`, `@types/pg` and TypeScript 4.1 or later.
 - Not as plain `@pgcast/pgcast`: your `zapatos/*` imports would no longer resolve ([Install](/install#add-the-package), § Why the alias).
 
 ## 2. Regenerate the schema {#regenerate-the-schema}
