@@ -6,6 +6,8 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 
 ## [Unreleased]
 
+## [6.10.0] - 2026-11-17
+
 ### Added
 - The generator's `domainsTypedAsUnions` option (`"domainsTypedAsUnions": true` in `zapatosconfig.json`, `false` by default, optional in `Config`): a domain over `text` whose `CHECK` lists its values, `CHECK (VALUE IN ('U', 'PG', '12'))`, is declared as their union in its schema's namespace, after the enums, with the tuple `every.<name>` in the `CHECK`'s order, and a new placeholder names it, `import type { certificate } from 'zapatos/schema';` and `export type PgCertificate = certificate;` (#641, decision note 008). Columns keep `c.PgCertificate` in all five interfaces, so `insert('films', { certificate: '12A' })` fails to compile (TS2769), where Postgres refused it with 23514. The values are read again on every run, in one query; under `schemaJSDoc`, the union's JSDoc gives its `COMMENT ON DOMAIN`.
   - Read: one valid `CHECK` stored as `VALUE = ANY (ARRAY['…'::text, …])` or `VALUE = '…'::text`, beside a `NOT NULL` or another `CHECK`. Left out, with the placeholder as without the key: `NULL` among the values, a domain over `varchar`, `char`, `citext` or another domain, `NOT VALID`, an `OR`, two `CHECK`s of the form, a value holding a backslash under `standard_conforming_strings = off`, a domain of a schema the run does not generate, an array of the domain.
