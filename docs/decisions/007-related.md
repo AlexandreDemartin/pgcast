@@ -2,7 +2,7 @@
 
 - **Status**: accepted (2026-11-17), by delegation from the owner: each choice below is decided under the philosophy, and carries its own status.
 - **Scope**: feature [#54](https://github.com/AlexandreDemartin/pgcast/issues/54), its planned PRs 3 to 7 ([#627](https://github.com/AlexandreDemartin/pgcast/issues/627) to [#631](https://github.com/AlexandreDemartin/pgcast/issues/631)), and the rule for typed references that [#57](https://github.com/AlexandreDemartin/pgcast/issues/57) reuses.
-- **In short**: `related()` and `relatedMany()` are **not built in the core**. With the key's columns read from the catalog, the runtime needs a generated runtime module (A). With the columns written in the call and checked against declared keys (E), it needs none, but each call saves a type, never a line nor the SQL, for two public helpers and a `zapatos/schema` export that `src/db` would read, a canary increment. What #54 keeps: `groupBy` takes an array that mixes columns and fragments, and the docs complete what `website/lateral.md` shows of a lateral on a foreign key, written by hand.
+- **In short**: `related()` and `relatedMany()` are **not built in the core**. With the key's columns read from the catalog, the runtime needs a generated runtime module (A). With the columns written in the call and checked against declared keys (E), it needs none, but each call saves a type, never a line nor the SQL, for two public helpers and a `zapatos/schema` export that `src/db` would read, a canary increment. What #54 keeps: the docs complete what `website/lateral.md` shows of a lateral on a foreign key, written by hand, and name a lateral's result in `order`, `groupBy` and a `where` fragment, which run today.
 
 ## Context
 
@@ -107,14 +107,17 @@ E costs 315 Instantiations over D, 52 per call, +2.0 points; filtered by `Extrac
 
 **Status**: accepted (2026-11-17), by delegation.
 
-| | R1. A reference checked against the `lateral` keys | R2. A reference helper, unchecked | R3. No helper; `groupBy` mixes columns and fragments |
-|---|---|---|---|
-| **The caller writes** | `order: { by: db.lateralResult('studio'), … }`, a typo refused | the same, any key accepted | ``groupBy: ['studio_id', db.sql`"lateral_rating".result`]`` |
-| **SQL** | `ORDER BY "lateral_studio".result ASC` | the same | `GROUP BY "studio_id", "lateral_rating".result`; today the fragment compiles to `"[object Object]"`, so Postgres refuses it (42703) and the type refuses it too |
-| **Compile cost** (measured) | +1,037 Instantiations (+6.6 points), paid by every `select()`, with no reference written; it still lets a reference through when the query has no `lateral` | +0 | +0 Instantiations, +1 Type |
-| **What it saves** | the hand-spelled alias, and a typo found before Postgres's 42P01 | the hand-spelled alias | the 4 casts |
+| | R0. Nothing changes | R1. A reference checked against the `lateral` keys | R2. A reference helper, unchecked | R3. No helper; `groupBy` mixes columns and fragments |
+|---|---|---|---|---|
+| **The caller writes** | ``groupBy: db.sql<s.films.SQL>`${'studio_id'}, "lateral_rating".result` ``, or, as the corpus does, a string cast to a column type in an array, `'lateral_rating.result'` | `order: { by: db.lateralResult('studio'), … }`, a typo refused | the same, any key accepted | ``groupBy: ['studio_id', db.sql`"lateral_rating".result`]`` |
+| **SQL** | `GROUP BY "studio_id", "lateral_rating".result`; the cast, `GROUP BY "studio_id", "lateral_rating"."result"`; both run | `ORDER BY "lateral_studio".result ASC` | the same | `GROUP BY "studio_id", "lateral_rating".result`; today the fragment compiles to `"[object Object]"`, so Postgres refuses it (42703) and the type refuses it too |
+| **Compile cost** (measured) | +0 | +1,037 Instantiations (+6.6 points), paid by every `select()`, with no reference written; it still lets a reference through when the query has no `lateral` | +0 | +0 Instantiations, +1 Type |
+| **What it saves** | — : the typed fragment still checks its columns (`${'display_name'}` under `accounts` refused, probed) | the hand-spelled alias, and a typo found before Postgres's 42P01 | the hand-spelled alias | the 4 casts: the array form, its columns checked one by one |
 
-**Choice: R3.** #630 becomes "Allow groupBy to mix columns and SQL fragments" (a widened type, and SQL for what Postgres refused); the docs name `"lateral_<key>".result` and its quoting.
+**Choice: R0.** Nothing is built, and #630 is crossed out. The docs (#631) name `"lateral_<key>".result` and its quoting, with the typed fragment for `groupBy`.
+
+- **R0 runs today, in both forms the corpus writes.** 7 of its 11 `groupBy`s on a lateral's result give a lone fragment. The 4 casts compile to `"lateral_rating"."result"` and run: a type workaround, not broken SQL.
+- **R3 would add the array form**, for 4 casts in one project, through a `high` PR that widens a public option type for good. A typed fragment, `db.sql<s.films.SQL>`, already checks the columns beside the reference. What R3 fixes at run time, a fragment in an array compiled to `"[object Object]"`, is reachable only past the type, and Postgres refuses it (42703).
 
 - R1 pays 6.6 points on every query for a typo that Postgres reports before any row, and it puts the enclosing query's options into contextual typing, the mechanism #625 set aside.
 - R2 would be a synonym for a fragment that already works and is already typed in `order`, `groupBy` and `extras` (skill `zero-abstraction`, § Naming).
@@ -123,7 +126,7 @@ E costs 315 Instantiations over D, 52 per call, +2.0 points; filtered by `Extrac
 ## What changes in the plan
 
 - **#627, #628, #629** (keys, `related()`, `relatedMany()`): crossed out, pointing here.
-- **#630**: re-scoped to R3, from master; it widens a public option type, so it keeps its lens `types`.
+- **#630** (`groupBy` mixing columns and fragments): crossed out, pointing to § 3.
 - **#631**: re-scoped to the docs that follow from this note. `website/lateral.md`, EN and FR, shows the hand-written lateral on a foreign key, `parent<T.Column>`, how to choose `selectExactlyOne()`, and the reference to a lateral's result. `website/catalog-types.md`, EN and FR, stops promising that #54 will read foreign keys (its § Reading more and its `selectExactlyOne()` paragraph).
 - **R38** (`docs/CHARACTERISATION-REPORT.md`) stays "leave". Its pointer goes to this note and `parent<T.Column>`, not to `related()`.
 
