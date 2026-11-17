@@ -590,6 +590,20 @@ describe('type surprises', () => {
     db.select('accounts', { scores: c.arrayContains<number[]>([[1]]) });
   });
 
+  test('characterization: {}, { value } and param() of a column name pass an array condition as its ParentColumn', () => {
+    // characterization (#570): ParentColumn's members are all optional, so these fit it, as in Zapatos 6.6.1. {} and
+    // { value: undefined } run as the empty array ('{}'); { value: 'id' } and param('id') are refused by Postgres (22P02),
+    // and under castObjectParamsToJson the objects too (42883). Telling param('id') apart takes a second type parameter,
+    // which refuses `<P extends db.ParentColumn>(p: P) => arrayOverlaps(p)`, a call 6.6.1 compiles and runs with parent()
+    db.select('accounts', { scores: c.arrayContains({}) });
+    db.select('accounts', { scores: c.arrayContainedIn({ value: undefined }) });
+    db.select('accounts', { scores: c.arrayOverlaps({ value: 'id' }) });
+    db.select('accounts', { scores: c.arrayContains(db.param('id')) });
+    expectTypeOf(c.arrayOverlaps(db.param('id'))).toEqualTypeOf<db.SQLFragment<boolean | null, unknown>>();
+    // @ts-expect-error a Parameter of an array is no ParentColumn
+    db.select('accounts', { scores: c.arrayContains(db.param([1])) });
+  });
+
   test('characterization: an inline sql`${self} …` in a Whereable is refused', () => {
     // characterization: inferred from the context before T is fixed, Constraint takes the
     // union of every table's `id` type; a fragment declared first, or sql<db.SQL>, passes
