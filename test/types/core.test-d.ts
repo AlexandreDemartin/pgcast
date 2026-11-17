@@ -536,6 +536,22 @@ describe('type surprises', () => {
     db.select('users', { id: c.ne(db.Default) });
   });
 
+  test('all in a condition is refused, as Default is', () => {
+    // the runtime throws on each while compiling (#619); 6.6.1 sent it as a string, 'Symbol(all)'
+    // @ts-expect-error all is no value of a text column, in eq()
+    db.select('users', { display_name: c.eq(db.all) });
+    // @ts-expect-error nor in ne(), on an int column
+    db.deletes('users', { id: c.ne(db.all) });
+    // @ts-expect-error nor as a range's bound
+    db.select('users', { id: c.between(1, db.all) });
+    // @ts-expect-error nor as a pattern
+    db.select('users', { display_name: c.like(db.all) });
+    // @ts-expect-error nor in add()
+    db.update('accounts', { lifetime_ops: c.add(db.all) }, { id: 1 });
+    // @ts-expect-error nor in an array condition
+    db.select('accounts', { scores: c.arrayContains(db.all) });
+  });
+
   test('updateValues takes a plain value of the column, sent as a parameter', () => {
     // (test/integration/shortcuts.test.ts, "updateValues: a plain value is stored as it is")
     db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { display_name: 'x', mood: 'happy', manager_id: null } });
