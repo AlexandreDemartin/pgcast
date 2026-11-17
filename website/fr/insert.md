@@ -1,5 +1,5 @@
 ---
-english: a3249c412dfd
+english: 37572f751f37
 ---
 
 # Écritures
@@ -204,6 +204,10 @@ Un tableau vide, pour le `updateColumns` d’`upsert()` : une ligne en conflit 
 ## `UpsertAction` {#UpsertAction}
 
 `{ $action: 'INSERT' | 'UPDATE' }`, ajouté à chaque résultat d’`upsert()` : `'INSERT'` pour une nouvelle ligne, `'UPDATE'` pour une ligne mise à jour, lu dans le `xmax` de la ligne. `reportAction: 'suppress'` l’ôte du SQL et du type ; une table partitionnée peut en avoir besoin, car Postgres ne lit pas de `xmax` dans une partition dont les colonnes sont aux mêmes positions que celles de la table ([Options](#upsert-options)).
+
+## `UpsertOptions` {#UpsertOptions}
+
+`UpsertOptions<T, C, E, UC, RA>` : les `options` d’`upsert()`, le [`ReturningOptionsForTable`](#ReturningOptionsForTable) avec `updateValues`, `updateColumns`, `noNullUpdateColumns` et `reportAction` ([Options](#upsert-options)). `UC` est le type d’`updateColumns` et `RA` celui de `reportAction` (`undefined` pour une option non donnée).
 
 ## `UpsertReturnableForTable` {#UpsertReturnableForTable}
 

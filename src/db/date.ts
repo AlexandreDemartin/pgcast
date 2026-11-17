@@ -43,11 +43,8 @@ export type TimestampTzString = `${TimestampString}${TzSuffix}`;
 
 type TzLocalOrUTC = 'UTC' | 'local';
 
-interface ToDate {
-  <D extends null | TimestampTzString>(d: D, tzInterpretation?: undefined): D extends null ? null : Date;
-  <D extends null | TimestampString | DateString>(d: D, tzInterpretation: TzLocalOrUTC): D extends null ? null : Date;
-}
-
+// the signatures of toDate() and toString() are written in place, not as an unexported interface, so that a package
+// built with `declaration: true` can re-export them (TS4023)
 /**
  * Convert a `TimestampTzString`, `TimestampString` or `DateString` to a
  * JavaScript `Date`. For `TimestampString` and `DateString`, you must specify
@@ -66,7 +63,10 @@ interface ToDate {
  * `"UTC"` if the input is to be interpreted as UTC or `"local"` if it is to be
  * interpreted in the JavaScript environment's local time
  */
-export const toDate: ToDate = function (d: string, tzInterpretation?: TzLocalOrUTC | undefined) {
+export const toDate: {
+  <D extends null | TimestampTzString>(d: D, tzInterpretation?: undefined): D extends null ? null : Date;
+  <D extends null | TimestampString | DateString>(d: D, tzInterpretation: TzLocalOrUTC): D extends null ? null : Date;
+} = function (d: string, tzInterpretation?: TzLocalOrUTC | undefined) {
   let dateMatch;
   if (d === null) return null;
   switch (tzInterpretation) {
@@ -84,17 +84,6 @@ export const toDate: ToDate = function (d: string, tzInterpretation?: TzLocalOrU
   }
 };
 
-interface ToString {
-  <D extends Date | null, T extends 'timestamptz' | `${'timestamp' | 'date'}:${TzLocalOrUTC}`>(d: D, stringTypeTz: T):
-    D extends null ? null : {
-      'timestamptz': TimestampTzString;
-      'timestamp:UTC': TimestampString;
-      'timestamp:local': TimestampString;
-      'date:UTC': DateString;
-      'date:local': DateString;
-    }[T];
-}
-
 /**
  * Convert a JavaScript `Date` to a `TimestampTzString`, `TimestampString` or
  * `DateString`.
@@ -110,7 +99,16 @@ interface ToString {
  * and (except for `timestamptz`) whether to express in UTC or local time. For
  * example: `"timestamptz"`, `"timestamp:local"` or `"date:UTC"`.
  */
-export const toString: ToString = function (d: Date | null, stringTypeTz: 'timestamptz' | `${'timestamp' | 'date'}:${TzLocalOrUTC}`): any {
+export const toString: {
+  <D extends Date | null, T extends 'timestamptz' | `${'timestamp' | 'date'}:${TzLocalOrUTC}`>(d: D, stringTypeTz: T):
+    D extends null ? null : {
+      'timestamptz': TimestampTzString;
+      'timestamp:UTC': TimestampString;
+      'timestamp:local': TimestampString;
+      'date:UTC': DateString;
+      'date:local': DateString;
+    }[T];
+} = function (d: Date | null, stringTypeTz: 'timestamptz' | `${'timestamp' | 'date'}:${TzLocalOrUTC}`): any {
   if (d === null) return null;
   if (stringTypeTz === 'timestamptz') return d.toISOString();
 

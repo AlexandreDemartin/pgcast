@@ -201,6 +201,10 @@ An empty array, for the `updateColumns` of `upsert()`: a row that conflicts is l
 
 `{ $action: 'INSERT' | 'UPDATE' }`, added to each result of `upsert()`: `'INSERT'` for a new row, `'UPDATE'` for an updated one, read from the row's `xmax`. `reportAction: 'suppress'` leaves it out of the SQL and of the type; a partitioned table can need it, as Postgres reads no `xmax` in a partition whose columns sit where the table's do ([Options](#upsert-options)).
 
+## `UpsertOptions` {#UpsertOptions}
+
+`UpsertOptions<T, C, E, UC, RA>`: the `options` of `upsert()`, the [`ReturningOptionsForTable`](#ReturningOptionsForTable) with `updateValues`, `updateColumns`, `noNullUpdateColumns` and `reportAction` ([Options](#upsert-options)). `UC` is the type of `updateColumns` and `RA` that of `reportAction` (`undefined` for an option not given).
+
 ## `UpsertReturnableForTable` {#UpsertReturnableForTable}
 
 `UpsertReturnableForTable<T, C, E, RA>`: one row of what `upsert()` returns, the [`ReturningTypeForTable`](#ReturningTypeForTable) with [`UpsertAction`](#UpsertAction), unless `RA`, the `reportAction`, is `'suppress'`: `db.UpsertReturnableForTable<'ratings', undefined, undefined, undefined>` is `ratings.JSONSelectable & UpsertAction`. It does not add the `undefined` of `updateColumns: []` ([`doNothing`](#doNothing)). It needs `strictNullChecks`: without it, it is the whole `JSONSelectable` with `UpsertAction`, whatever `C`, `E` and `RA`.
