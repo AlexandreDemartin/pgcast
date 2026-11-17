@@ -1,5 +1,5 @@
 ---
-english: 27c2b01d493d
+english: 1ca6603d3484
 ---
 
 # Template SQL
@@ -457,7 +457,7 @@ db.all
 
 Le `where` de `select()`, de `count()` et des autres lectures qui correspond à toutes les lignes : `db.select('films', db.all)` n’écrit pas de `WHERE` ([`select()`](/fr/select#select)). Ce n’est pas une interpolation : dans `sql`, le type le refuse, et il lève l’erreur `Alien object while interpolating SQL: Symbol(all)`<!-- message -->. Zapatos 6.6.1 levait une `TypeError`, « Cannot convert a Symbol value to a string », là et comme `where` de `deletes()` ou d’`update()`.
 
-- Comme `where` de `deletes()` ou d’`update()`, il lève une erreur à la compilation, et le type le refuse : un filtre qui se rabat sur `db.all` pour une lecture ne supprime ni ne modifie jamais toutes les lignes. `{}` et `` db.sql`TRUE` `` le font : "`` `db.all` has no meaning as the filter of `deletes()` or `update()`: it is the filter of `select()` and its kin, which writes no `WHERE`. To delete or update every row on purpose, give db.sql`TRUE` as the filter. ``<!-- message -->"
+- Comme `where` de `deletes()` ou d’`update()`, il lève une erreur à la compilation, et le type le refuse : un filtre qui se rabat sur `db.all` pour une lecture ne supprime ni ne modifie jamais toutes les lignes. `{}` et `` db.sql`TRUE` `` le font : "`` `db.all` has no meaning as the filter of `deletes()` or `update()`: it is the filter of `select()` and its kin, refused in a write so that a filter that falls back to it for a read never deletes or updates every row. To delete or update every row on purpose, give db.sql`TRUE` as the filter. ``<!-- message -->"
 
 - Comme valeur de filtre, il lève une erreur à la compilation, et le type le refuse : c’est un filtre entier, pas une valeur à comparer. Zapatos 6.6.1 l’envoyait comme la chaîne `'Symbol(all)'`, si bien que `deletes('films', { title: db.conditions.isNotIn([db.all]) })` supprimait tout film qui a un titre.
   - Comme valeur d’un Whereable ([plus haut](#whereable)), dans `isIn()` / `isNotIn()`, et dans `vals([…])` avec une colonne courante ([`vals()`](#vals)) : "`` `db.all` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: leave the key out, or compare with a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`. ``<!-- message -->"
