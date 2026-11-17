@@ -1,5 +1,5 @@
 ---
-english: 9cc3c8afff00
+english: df4fb3dbf410
 ---
 
 # Générateur
@@ -159,6 +159,7 @@ Toutes les options sont facultatives. Une option donnée remplace entièrement s
 | [`domainsTypedByContext`](#generate.domainsTypedByContext) | `false` | le type d’un domaine sur `bigint`, `numeric`, `bytea`, `money` ou une date, ou sur un tableau de l’un d’eux, hors de `Selectable`, et d’un domaine sur un domaine ou d’un tableau d’un domaine |
 | [`enumArraysTypedAsText`](#generate.enumArraysTypedAsText) | aucune : un tableau, avec une note | le type `Selectable` d’un tableau d’un enum |
 | [`intervalsTypedAsObjects`](#generate.intervalsTypedAsObjects) | aucune : le texte, avec une note | le type d’un `interval` dans `Selectable` et dans une écriture |
+| [`domainsTypedAsUnions`](#generate.domainsTypedAsUnions) | `false` | le type d’un domaine sur `text` dont le `CHECK` liste les valeurs |
 | [`progressListener`](#generate.progressListener) | `false` | où chaque étape est signalée |
 | [`warningListener`](#generate.warningListener) | `true` | où vont les avertissements |
 | [`debugListener`](#generate.debugListener) | `false` | où vont chaque requête et son résultat |
@@ -522,6 +523,28 @@ ALTER TABLE screenings ADD COLUMN intermission interval;
 - `pg` ne lit que l’`IntervalStyle` par défaut, `postgres` : sous `iso_8601`, `sql_standard` ou `postgres_verbose`, son objet revient avec des parties manquantes, souvent `{}`, quoi que dise le type. Les raccourcis donnent le texte, dans ce style.
 - Un domaine sur l’un d’eux suit la même règle : un nouveau placeholder contient `db.PostgresInterval`, et avec [`domainsTypedByContext`](#generate.domainsTypedByContext) sa colonne est typée selon le contexte, comme l’est un domaine sur `date`. Un domaine sur un tel domaine prend `PostgresInterval` dans `Selectable` avec `domainsTypedByContext` ; un tableau d’un domaine y reste `string`, le texte que renvoie `pg`. Un placeholder écrit auparavant contient `string`, et le générateur ne le réécrit jamais.
 
+### `domainsTypedAsUnions` {#generate.domainsTypedAsUnions}
+
+`boolean`, par défaut `false` ; un opt-in, à partir de la 6.10.0. Un domaine sur `text` dont le `CHECK` liste les valeurs est typé par elles : le générateur déclare leur union dans le schéma du domaine, après ses enums, avec le tuple `every.<name>` dans l’ordre du `CHECK`, et un nouveau placeholder la nomme ([Un domaine de valeurs](/fr/custom-types#a-domain-of-values)). Disons qu’un film a une classification :
+
+```sql
+CREATE DOMAIN certificate AS text CHECK (VALUE IN ('U', 'PG', '12', '15', '18'));
+ALTER TABLE films ADD COLUMN certificate certificate;
+```
+
+| `films.certificate` | `false` | `true` |
+|---|---|---|
+| `zapatos/schema` | rien | `certificate`, `'U' \| 'PG' \| '12' \| '15' \| '18'`, et `every.certificate` |
+| un nouveau `PgCertificate.d.ts` | `string` | `certificate`, importé de `zapatos/schema` |
+| les cinq interfaces | `c.PgCertificate` | la même chose : `insert()` refuse `certificate: '12A'` (TS2769) |
+
+- Lu : un `CHECK` que Postgres stocke sous la forme `VALUE = ANY (ARRAY['U'::text, …])`, que donnent `VALUE IN ('U', 'PG')` comme `VALUE = ANY (ARRAY['U', 'PG'])`, ou `VALUE = 'U'::text`, que donne `VALUE IN ('U')` ; valide ; à côté d’un `NOT NULL` ou d’un autre `CHECK`, qui ne font que restreindre les valeurs. Une apostrophe, un antislash, un saut de ligne ou `''` est une valeur comme une autre ; une valeur écrite deux fois figure une seule fois dans l’union.
+- Laissés de côté, leur placeholder comme avec `false` : `NULL` parmi les valeurs, qui laisse passer n’importe quelle valeur ; un domaine sur `varchar`, `char`, `citext` ou un autre domaine ; un `CHECK` ajouté `NOT VALID` ; `VALUE = 'U' OR VALUE = 'PG'` ; deux `CHECK` de cette forme ; avec `standard_conforming_strings` désactivé pour la base ou le rôle, une valeur qui contient un antislash, que Postgres écrit alors doublé ; un domaine d’un schéma que l’exécution ne génère pas ; un tableau du domaine.
+- Un placeholder sur le disque est à vous, et le générateur ne le réécrit jamais : un placeholder écrit avant, ou modifié, continue de typer les colonnes, et une [note](#generate.warningListener) le nomme à chaque exécution tant que son texte n’est pas celui qu’écrirait l’exécution. Supprimez-le, et l’exécution suivante l’écrit en nommant l’union. [`--check`](#check) ne le compte que s’il manque, comme tout placeholder.
+- Deux types de même nom partagent un placeholder ([#42](https://github.com/AlexandreDemartin/pgcast/issues/42)) : il ne nomme l’union que tant que le domaine est le seul type de l’exécution à prendre ce nom, et contient sinon son type de base. L’union est déclarée malgré tout.
+- Avec [`schemaJSDoc`](#generate.schemaJSDoc), la JSDoc de l’union donne son nom, `Domain in database`, et son `COMMENT ON DOMAIN`.
+- Le SQL des requêtes ne change pas. Avec `false`, la sortie non plus, et le générateur ne lit aucune contrainte de domaine. L’option reste désactivée en 7.0 : un placeholder qui contient le type de base est la façon dont Zapatos type un domaine ([décision 008](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/008-domains-jsonb-validators.md)).
+
 ### `progressListener` {#generate.progressListener}
 
 `boolean`, ou dans `generate()` une fonction `(s: string) => void` ; par défaut `false`. `true` affiche chaque étape avec `console.log` ; une fonction reçoit chaque ligne. Depuis [`check()`](#check), une ligne : `The generated files in src/zapatos are up to date.`
@@ -542,11 +565,13 @@ Writing custom types file: src/zapatos/custom/index.d.ts
 - `Note: custom types "archive"."notes" and "public"."notes" are both named PgNotes in TypeScript, so they share one type and one placeholder file, src/zapatos/custom/PgNotes.d.ts. To type them apart, rename one of them in the database.`
   - une fois par exécution pour chaque nom que partagent deux types Postgres ([`customTypesTransform`](#generate.customTypesTransform)) ; quand leurs noms diffèrent, il ajoute qu’une fonction `customTypesTransform` peut les distinguer ;
 - `Note: relations "public"."film notes" and "public"."film_notes" are both named film_notes in TypeScript, so their declarations clash. To type them apart, rename one of them in the database.`
-  - une fois par exécution pour chaque nom TypeScript que prennent deux schémas, relations ou enums d’une même portée ;
+  - une fois par exécution pour chaque nom TypeScript que prennent deux schémas, relations ou enums d’une même portée, et avec [`domainsTypedAsUnions`](#generate.domainsTypedAsUnions) les unions de domaines, à côté des enums : `domain "public"."odd_format" and enum "public"."odd format"` ;
 - `Note: custom types "public"."SEAT_LABEL" (PgSEAT_LABEL) and "public"."seat_label" (PgSeat_label) have TypeScript names that differ only in case: on a case-insensitive file system, the default on macOS and Windows, PgSEAT_LABEL.d.ts and PgSeat_label.d.ts are one placeholder file in src/zapatos/custom, which declares only one of those names. To type them apart, rename one of them in the database, or give customTypesTransform a function that keeps their names apart.`
   - une fois par exécution pour des noms qui ne diffèrent que par la casse, quel que soit le système de fichiers, avant la note ci-dessus pour chacun de ces noms que partagent deux types Postgres ;
 - `Note: custom type "public"."index" (index) has the placeholder file index.d.ts in src/zapatos/custom, the file of the custom types' index: the generator writes the index over it on every run, so index is never declared. To declare it, rename it in the database, or give customTypesTransform a function that names it otherwise.`
   - une fois par exécution pour les noms dont le placeholder est `custom/index.d.ts` : `index` et, sur un système de fichiers insensible à la casse, un nom qui n’en diffère que par la casse (`Index`, `INDEX`), après la note ci-dessus pour ces noms ;
+- `Note: public.certificate is typed by the values of its CHECK as certificate in zapatos/schema (domainsTypedAsUnions), but its placeholder src/zapatos/custom/PgCertificate.d.ts, written before, still types its columns. To type them by the database, delete it: the next run writes it naming the union.`
+  - une fois par exécution pour chaque placeholder sur le disque, avec [`domainsTypedAsUnions`](#generate.domainsTypedAsUnions), que l’exécution écrirait en nommant une union, tant que son texte diffère de celui qu’elle écrit, dans l’ordre des domaines, après les notes sur les noms partagés ; depuis [`check()`](#check) aussi ;
 - `Note: the include entry "Films" of schema "public" matches no relation there, so it generates nothing. Check its spelling and case, that the relation is in schema "public", and that the database role has a privilege on it: include names tables, views, materialised views and foreign tables.`
   - une fois par exécution pour chaque entrée d’une liste [`include`](#generate.schemas) que son schéma n’a pas ;
 - `Note: the schemas rule of "public" has no exclude, so it takes "exclude": [], as the default rule does. Write the key in the rule to silence this note.`

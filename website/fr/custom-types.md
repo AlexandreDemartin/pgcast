@@ -1,5 +1,5 @@
 ---
-english: 986dad0fd46c
+english: 33adbd164d2e
 description: "Un type que le générateur ne sait pas traduire, comme point, et chaque domaine vous arrivent en placeholder dans zapatos/custom, que vous remplissez vous-même."
 ---
 
@@ -119,7 +119,7 @@ const here: c.PgPoint = '(0.5,1)';
 
 ## Typer un domaine {#type-a-domain}
 
-Un domaine a aussi son placeholder, qui contient le type `Selectable` de son type de base au lieu de `any` : le type que renvoie `pg`. Ce seul type sert les cinq interfaces, `JSONSelectable` compris, sauf si le domaine porte sur un type typé selon le contexte et que [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext) est activé ([plus bas](#when-a-placeholder-does-not-compile)). Un domaine sur un autre domaine, ou un tableau d’un domaine, reçoit `any`, que cette option type par le type de base de son domaine le plus intérieur. `seat_label` est un `TEXT` avec un `CHECK`, donc `src/zapatos/custom/PgSeat_label.d.ts` contient `string`, qui est juste pour chacune :
+Un domaine a aussi son placeholder, qui contient le type `Selectable` de son type de base au lieu de `any` : le type que renvoie `pg`, ou l’union de ses valeurs ([plus bas](#a-domain-of-values)). Ce seul type sert les cinq interfaces, `JSONSelectable` compris, sauf si le domaine porte sur un type typé selon le contexte et que [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext) est activé ([plus bas](#when-a-placeholder-does-not-compile)). Un domaine sur un autre domaine, ou un tableau d’un domaine, reçoit `any`, que cette option type par le type de base de son domaine le plus intérieur. `seat_label` est un `TEXT` avec un `CHECK`, donc `src/zapatos/custom/PgSeat_label.d.ts` contient `string`, qui est juste pour chacune :
 
 ::: code-group
 
@@ -164,6 +164,56 @@ export async function bookSeat(pool: pg.Pool, screening_id: number, seat: string
 - Une `string` venue d’un formulaire ne convient plus (TS2322 dans une ligne typée, TS2769 dans l’appel) : vérifiez-la d’abord, avec le motif du `CHECK`, dans un type guard, comme le fait `src/seats.ts`.
 - Cette doc garde `PgSeat_label` tel que généré, `string`.
 
+### Un domaine de valeurs {#a-domain-of-values}
+
+Un domaine sur `text` dont le `CHECK` liste les valeurs peut être typé par elles. Disons qu’un film a une classification :
+
+```sql
+CREATE DOMAIN certificate AS text CHECK (VALUE IN ('U', 'PG', '12', '15', '18'));
+COMMENT ON DOMAIN certificate IS 'Who may see the film';
+ALTER TABLE films ADD COLUMN certificate certificate;
+```
+
+Activez [`domainsTypedAsUnions`](/fr/generator#generate.domainsTypedAsUnions), et le générateur lit les valeurs à chaque génération, déclare leur union dans `zapatos/schema` comme il déclare les labels d’un enum, et écrit le placeholder qui la nomme :
+
+::: code-group
+
+```ts [src/zapatos/schema.d.ts]
+/**
+ * **certificate**
+ * - Domain in database
+ *
+ * Who may see the film
+ */
+export type certificate = 'U' | 'PG' | '12' | '15' | '18';
+export namespace every {
+  export type certificate = ['U', 'PG', '12', '15', '18'];
+}
+```
+
+```ts [src/zapatos/custom/PgCertificate.d.ts]
+declare module 'zapatos/custom' {
+  import type { certificate } from 'zapatos/schema';
+  export type PgCertificate = certificate;  // replace with your custom type or interface as desired
+}
+```
+
+:::
+
+`films.certificate` reste `c.PgCertificate` dans les cinq interfaces, désormais `'U' | 'PG' | '12' | '15' | '18'`. Une classification que le `CHECK` refuse ne compile plus, là où Postgres la refusait à l’exécution, avec 23514, `value for domain certificate violates check constraint "certificate_check"` :
+
+```ts
+await db.insert('films', {
+  studio_id: 1, title: 'The Lantern', release_year: 2024, runtime_minutes: 98,
+  certificate: '12A',  // TS2769; TS2322 in a row typed s.films.Insertable
+}).run(pool);
+```
+
+- Le SQL ne change pas : `'12'` part toujours en paramètre, et Postgres le vérifie toujours.
+- Ajoutez une valeur au `CHECK`, lancez le générateur, et l’union la contient : le placeholder ne fait que la nommer.
+- Un placeholder déjà sur le disque, écrit avant l’option ou modifié, continue de typer la colonne : le générateur ne le réécrit jamais, et le signale à chaque génération. Supprimez-le, et la génération suivante l’écrit en nommant l’union. Un type plus étroit ou « branded » reste à vous de l’y écrire : `certificate & { readonly __brand: 'Certificate' }`.
+- Ce qu’il lit, et ce qu’il laisse de côté, comme `varchar`, `NULL` parmi les valeurs ou un `CHECK` ajouté `NOT VALID` : [`domainsTypedAsUnions`](/fr/generator#generate.domainsTypedAsUnions).
+
 ### Un domaine `jsonb` {#a-jsonb-domain}
 
 Un domaine est aussi le moyen de donner une forme à une colonne `jsonb`. Supposons qu’un cinéma ait une colonne `screen`, d’un domaine sur `jsonb` :
@@ -200,7 +250,7 @@ Custom type or domain declaration file already exists: src/zapatos/custom/PgSeat
 ```
 
 - Versionnez `zapatos/custom/` avec votre code : les fichiers que vous avez complétés sont à vous.
-- Le placeholder ne suit pas la base. Recréez un domaine sur un autre type, et modifiez son fichier ; ou supprimez le fichier, et la génération suivante en écrit un neuf.
+- Le placeholder ne suit pas la base, sauf s’il nomme une [union de valeurs](#a-domain-of-values). Recréez un domaine sur un autre type, et modifiez son fichier ; ou supprimez le fichier, et la génération suivante en écrit un neuf.
 - Rien n’est supprimé : renommez ou supprimez un domaine, et son ancien placeholder reste jusqu’à ce que vous le supprimiez.
 - Une colonne tableau est un type personnalisé à part entière : `point[]` reçoit `Pg_point.d.ts`, `any`, et `seat_label[]` reçoit `Pg_seat_label.d.ts`, `any` aussi.
 - Deux domaines de même nom dans deux schémas partagent un seul placeholder ([#42](https://github.com/AlexandreDemartin/pgcast/issues/42)).

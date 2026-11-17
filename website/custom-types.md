@@ -114,7 +114,7 @@ const here: c.PgPoint = '(0.5,1)';
 
 ## Type a domain
 
-A domain gets a placeholder too, which holds its base type's `Selectable` type instead of `any`: the type `pg` returns. That one type serves all five interfaces, `JSONSelectable` included, unless the domain is over a type typed by context and [`domainsTypedByContext`](/generator#generate.domainsTypedByContext) is on ([below](#when-a-placeholder-does-not-compile)). A domain over another domain, or an array of a domain, gets `any`, which that option types by the base type of its innermost domain. `seat_label` is a `TEXT` with a `CHECK`, so `src/zapatos/custom/PgSeat_label.d.ts` holds `string`, right in each:
+A domain gets a placeholder too, which holds its base type's `Selectable` type instead of `any`: the type `pg` returns, or the union of its values ([below](#a-domain-of-values)). That one type serves all five interfaces, `JSONSelectable` included, unless the domain is over a type typed by context and [`domainsTypedByContext`](/generator#generate.domainsTypedByContext) is on ([below](#when-a-placeholder-does-not-compile)). A domain over another domain, or an array of a domain, gets `any`, which that option types by the base type of its innermost domain. `seat_label` is a `TEXT` with a `CHECK`, so `src/zapatos/custom/PgSeat_label.d.ts` holds `string`, right in each:
 
 ::: code-group
 
@@ -159,6 +159,56 @@ export async function bookSeat(pool: pg.Pool, screening_id: number, seat: string
 - A `string` from a form no longer fits (TS2322 in a typed row, TS2769 in the call): check it first, with the `CHECK`'s pattern, in a type guard, as `src/seats.ts` does.
 - These docs keep `PgSeat_label` as generated, `string`.
 
+### A domain of values
+
+A domain over `text` whose `CHECK` lists its values can be typed by them. Say a film has a certificate:
+
+```sql
+CREATE DOMAIN certificate AS text CHECK (VALUE IN ('U', 'PG', '12', '15', '18'));
+COMMENT ON DOMAIN certificate IS 'Who may see the film';
+ALTER TABLE films ADD COLUMN certificate certificate;
+```
+
+Turn on [`domainsTypedAsUnions`](/generator#generate.domainsTypedAsUnions), and the generator reads the values on every run, declares their union in `zapatos/schema` as an enum's labels are, and writes the placeholder naming it:
+
+::: code-group
+
+```ts [src/zapatos/schema.d.ts]
+/**
+ * **certificate**
+ * - Domain in database
+ *
+ * Who may see the film
+ */
+export type certificate = 'U' | 'PG' | '12' | '15' | '18';
+export namespace every {
+  export type certificate = ['U', 'PG', '12', '15', '18'];
+}
+```
+
+```ts [src/zapatos/custom/PgCertificate.d.ts]
+declare module 'zapatos/custom' {
+  import type { certificate } from 'zapatos/schema';
+  export type PgCertificate = certificate;  // replace with your custom type or interface as desired
+}
+```
+
+:::
+
+`films.certificate` stays `c.PgCertificate` in all five interfaces, now `'U' | 'PG' | '12' | '15' | '18'`. A certificate the `CHECK` refuses no longer compiles, where Postgres refused it at run time, with 23514, `value for domain certificate violates check constraint "certificate_check"`:
+
+```ts
+await db.insert('films', {
+  studio_id: 1, title: 'The Lantern', release_year: 2024, runtime_minutes: 98,
+  certificate: '12A',  // TS2769; TS2322 in a row typed s.films.Insertable
+}).run(pool);
+```
+
+- The SQL doesn't change: `'12'` is still sent as a parameter, and Postgres still checks it.
+- Add a value to the `CHECK`, run the generator, and the union has it: the placeholder only names it.
+- A placeholder already on disk, written before the option or edited, keeps typing the column: the generator never rewrites it, and notes it on each run. Delete it, and the next run writes it naming the union. A narrower or branded type stays yours to write there: `certificate & { readonly __brand: 'Certificate' }`.
+- What it reads, and what it leaves out, such as `varchar`, `NULL` among the values or a `CHECK` added `NOT VALID`: [`domainsTypedAsUnions`](/generator#generate.domainsTypedAsUnions).
+
 ### A `jsonb` domain
 
 A domain is also how to give a `jsonb` column a shape. Say a cinema has a `screen` column, of a domain over `jsonb`:
@@ -195,7 +245,7 @@ Custom type or domain declaration file already exists: src/zapatos/custom/PgSeat
 ```
 
 - Commit `zapatos/custom/` with your code: the placeholders you filled in are yours.
-- The placeholder does not follow the database. Recreate a domain over another type, and edit its placeholder; or delete the file, and the next run writes a fresh one.
+- The placeholder does not follow the database, unless it names a [union of values](#a-domain-of-values). Recreate a domain over another type, and edit its placeholder; or delete the file, and the next run writes a fresh one.
 - Nothing is deleted: rename or drop a domain, and its old placeholder stays until you delete it.
 - An array column is a custom type of its own: `point[]` gets `Pg_point.d.ts`, `any`, and `seat_label[]` gets `Pg_seat_label.d.ts`, `any` too.
 - Two domains of the same name in two schemas share one placeholder ([#42](https://github.com/AlexandreDemartin/pgcast/issues/42)).

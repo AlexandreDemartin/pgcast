@@ -1,5 +1,5 @@
 ---
-english: df342873cdbf
+english: 28b3ccf242c7
 ---
 
 # Pourquoi pgcast
@@ -94,7 +94,7 @@ Les corrections de sécurité sont venues d’abord, toutes dans la 6.6.2 ([Séc
 
 Les opt-ins qui avertissent, [`undefinedMeansMissing`](/fr/runtime-config#Config.undefinedMeansMissing), [`upsertRequiresSameKeys`](/fr/runtime-config#Config.upsertRequiresSameKeys), [`transactionRequiresCommit`](/fr/runtime-config#Config.transactionRequiresCommit), [`aggregatesTypedByColumn`](/fr/runtime-config#Config.aggregatesTypedByColumn), [`transactionRequiresIdleClient`](/fr/runtime-config#Config.transactionRequiresIdleClient) et [`transactionRequiresSatisfyingLevel`](/fr/runtime-config#Config.transactionRequiresSatisfyingLevel), ainsi que [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas), [`enumOrder`](/fr/generator#generate.enumOrder), [`rejectOnQueryError`](/fr/generator#generate.rejectOnQueryError), [`uniqueIndexConstraintsOnly`](/fr/generator#generate.uniqueIndexConstraintsOnly), [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext), [`enumArraysTypedAsText`](/fr/generator#generate.enumArraysTypedAsText) et [`intervalsTypedAsObjects`](/fr/generator#generate.intervalsTypedAsObjects) du générateur, deviennent les valeurs par défaut dans la 7.0, et leurs anciens chemins disparaissent dans la 8.0, sauf `rejectOnQueryError: false`, dont l’arrêt est le propre chemin de la CLI, `enumArraysTypedAsText: false`, le tableau que donne votre propre parser, et `intervalsTypedAsObjects: false`, pour un parser de types à vous : tous trois restent.
 
-[`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), qui n’avertit jamais, reste désactivé. Jusqu’à la 7.0, la 6.x remplace Zapatos 6.6.1 sans autre changement ([Versions](/fr/versions)).
+[`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow) et le [`domainsTypedAsUnions`](/fr/generator#generate.domainsTypedAsUnions) du générateur, qui n’avertissent jamais, restent désactivés. Jusqu’à la 7.0, la 6.x remplace Zapatos 6.6.1 sans autre changement ([Versions](/fr/versions)).
 
 Zapatos 6.6.1 n’avait pas de suite de tests à lui (les tests de son premier utilisateur exerçaient « <span lang="en">most of the code base at least a little</span> ») ; sa CI faisait le lint et le build. Sa feuille de route en jugeait une « <span lang="en">kind of indispensable</span> », une qui teste « <span lang="en">not just returned values but also inferred types</span> ».
 
