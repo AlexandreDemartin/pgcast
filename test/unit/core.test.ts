@@ -1130,6 +1130,54 @@ describe('db.all', () => {
   });
 });
 
+describe('Default, self, all, raw(), cols() and vals() in vals([…]) within a column\'s value (#660)', () => {
+  // a filter's key (isIn(), a fragment value of a Whereable) and a write's key (a fragment value of vals({…}), so of
+  // insert(), upsert() and update()) both set the current column, so these messages name both places
+  const
+    where = 'as an item of `vals([…])` in a column\'s value, in a filter (as `isIn()` writes it) or in a `sql` fragment value of `insert()`, `upsert()` or `update()`',
+    inVals = {
+      Default: `\`db.Default\` has no meaning ${where}: in a filter, leave the key out, or compare with a value; in a write, give \`db.Default\` as the value itself, \`{ column: db.Default }\`.`,
+      self: `\`db.self\` has no meaning ${where}: give a value, or write \`db.self\` in a \`sql\` fragment value, outside \`vals([…])\`, where it stands for the column.`,
+      all: `\`db.all\` has no meaning ${where}: in a filter, leave the key out, or compare with a value; in a write, give a value. To match every row, give \`db.all\` as the whole filter of \`select()\` and its kin: \`select(table, db.all)\`.`,
+      wrapper: `\`db.raw()\`, \`db.cols()\` and \`db.vals()\` have no meaning ${where}: for SQL, write it in a \`sql\` fragment value, outside \`vals([…])\` (\`db.self\` there stands for the column); for a value, give the value itself, or \`db.param()\`.`,
+    },
+    // the Whereable branch is always a filter: its messages stay
+    inWhereable = {
+      Default: '`db.Default` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. `DEFAULT` is for INSERT and UPDATE values.',
+      self: '`db.self` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: compare with a value, or use it in a `sql` fragment value, where it stands for the column.',
+      all: '`db.all` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: leave the key out, or compare with a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.',
+      wrapper: '`db.raw()`, `db.cols()` and `db.vals()` have no meaning as a value in a Whereable (a filter), nor in `isIn()`: to compare with SQL, use a `sql` fragment value, where `db.self` stands for the column; to compare with a value, give the value itself, or `db.param()`.',
+    },
+    values = { Default, self, all: db.all, raw: raw('1'), cols: cols(['x']), vals: vals(['x']) } as Record<string, any>,
+    kind = (name: string) => name === 'raw' || name === 'cols' || name === 'vals' ? 'wrapper' : name as keyof typeof inVals;
+
+  it.each(Object.keys(values))('%s in vals([…]) names a filter and a write, in each', name => {
+    const v = values[name];
+    expect({
+      isIn: thrown(() => db.select('users', { display_name: db.conditions.isIn(['Ada', v]) }).compile()),
+      isNotIn: thrown(() => db.deletes('users', { display_name: db.conditions.isNotIn([v]) }).compile()),
+      whereableFragment: thrown(() => db.select('users', { display_name: sql`${self} IN (${vals([v])})` }).compile()),
+      insert: thrown(() => db.insert('users', { email: 'a@b', display_name: sql`${vals([v])}` }).compile()),
+      insertRows: thrown(() => db.insert('users', [{ email: 'a@b', display_name: 'A' }, { email: 'c@d', display_name: sql`${vals([v])}` }]).compile()),
+      update: thrown(() => db.update('users', { tags: sql`ARRAY[${vals([v])}]` }, { id: 1 }).compile()),
+      upsert: thrown(() => db.upsert('users', { email: 'a@b', display_name: sql`${vals([v])}` }, 'email').compile()),
+      filterInWrite: thrown(() => db.insert('users', { email: 'a@b', display_name: sql`(SELECT ${'display_name'} FROM ${'users'} WHERE ${{ id: db.conditions.isIn([v]) }})` }).compile()),
+    }).toEqual({
+      isIn: inVals[kind(name)], isNotIn: inVals[kind(name)], whereableFragment: inVals[kind(name)], insert: inVals[kind(name)],
+      insertRows: inVals[kind(name)], update: inVals[kind(name)], upsert: inVals[kind(name)], filterInWrite: inVals[kind(name)],
+    });
+  });
+
+  it.each(Object.keys(values))('%s as a Whereable value keeps the filter message, upsert() updateValues objects included', name => {
+    // an object in updateValues is compiled as a Whereable, as in Zapatos 6.6.1
+    const v = values[name];
+    expect({
+      whereable: thrown(() => db.select('users', { display_name: v }).compile()),
+      upsertObject: thrown(() => db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { settings: { theme: v } as any } }).compile()),
+    }).toEqual({ whereable: inWhereable[kind(name)], upsertObject: inWhereable[kind(name)] });
+  });
+});
+
 describe('errors', () => {
   it('refuses the global object (`self` instead of `db.self`)', () => {
     expect(() => one(globalThis as any)).toThrowErrorMatchingInlineSnapshot(`[Error: Did you use \`self\` (the global object) where you meant \`db.self\` (the Zapatos value)? The global object cannot be embedded in a query.]`);
