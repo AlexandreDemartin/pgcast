@@ -1665,7 +1665,9 @@ describe('select', () => {
     ['lock', 'wait', 'NOWAIT', 'NOWAIT; SELECT 1', ordered(' FOR UPDATE NOWAIT'), ['for', 'wait', 'of', 'of']],
     // refused on its first read, the key is the last one read, and the message names that read
     ['order', 'direction', 'UP', 'ASC', 'throws: Direction must be ASC/DESC, not \'UP\'', ['direction']],
+    ['order', 'nulls', 'NEVER', 'LAST', 'throws: Nulls must be FIRST/LAST/undefined, not \'NEVER\'', ['direction', 'nulls']],
     ['lock', 'for', 'FOR', 'UPDATE', 'throws: Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not \'FOR\'', ['for']],
+    ['lock', 'wait', 'LATER', 'NOWAIT', 'throws: Lock wait must be NOWAIT/SKIP LOCKED/undefined, not \'LATER\'', ['for', 'wait']],
   ] as const)('%s.%s answering %j, then %j, is read once and gives what was checked', (option, key, first, later, result, log) => {
     expect(twoFaced(option, key, first, later)).toEqual({ result, log });
   });
