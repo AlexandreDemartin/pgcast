@@ -251,6 +251,11 @@ Candidates for a check, a rule or a skill line.
 - #601: a count claim worded "once fewer" hides that the drop follows the read count: replay the key set and the key absent.
 - #601: a loop over several attack rows in one integration test stops at the first failing row: show each row red with a copy of the test keeping only that row.
 - #601: a two-faced getter test is valid for as many reads as the slowest runtime makes before `raw()` (4 for `nulls`/`wait` on master), or the old check refuses it and the test stays green on the code it should catch.
+- #605: a `Changed:` sub-bullet telling users what to add is the sign a change breaks a working setup: check it before calling a change non-breaking (the optional `typescript` peer, deferred to 7.0).
+- #605: npm flags a devDependency that is also an optional peer of a production dependency `devOptional`, so `--omit=dev` alone keeps it; a type-only peer change needs a "TypeScript present, `@types/*` absent" case, where a silent `any` showed.
+- #605: `typescript`'s `latest` is 7 now; Yarn and Bun rewrite a range a project already declares when you `add` it again (npm and pnpm keep it): replay a docs install command on a project that already lists the package, with each package manager.
+- #605: a test listing a folder's modules recurses, matching what `tsconfig` builds and `files` ships.
+- #605: a harness that reverts with `git checkout -- . && git clean -fdq src` wipes uncommitted work: commit before running it.
 
 ## Minors kept
 
@@ -295,4 +300,5 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #598 (form): `src/db/conditions.ts` `callerValue(options, 'parent')` makes `parent` and `alias` `any` (a misspelt key type-checks), as #558's kept minor.
 - #596 (form): `src/db/conditions.ts` JSDoc of `jsonbContains()` and `website/conditions.md` (FR) list `Default`, `self`, `raw()`, `cols()`, `vals()` but not `all`, which now gets the wrapper message.
 - #600 (form): `website/switching.md` has no row for `order: null` / `lock: null` (Zapatos 6.6.1: a `TypeError` at the call; pgcast from 6.7.1: refused while compiling, `.run()` rejects).
-
+- #605 (form): `test/unit/runtimeImports.test.ts` reads emitted JS with a regex (a string `"require(pg)"` is a false red; `createRequire(__filename)(…)` passes); a syntax-tree walk would be exact.
+- #605 (form): `website/install.md` (FR) Requirements: two bullets in a row about TypeScript.
