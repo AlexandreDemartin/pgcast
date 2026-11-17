@@ -73,7 +73,7 @@ All five options compile to the same SQL, the hand-written lateral's: they diffe
 
 So A costs 276 Instantiations over D, 46 per call, +1.8 points for the 6: the types are not the obstacle. (A first count, 16,623 against 16,308, held a seventh call, the refused one, and a baseline of untyped `parent()`.) Its result types check out, an ambiguous key is refused, and neither collapses to `any` (probed). It checks a key's columns, not that the key leaves the parent table: `related(fk.memberships.orgs)` under `select('accounts', …)` compiles, and joins on `"accounts"."org_country"` and `"accounts"."org_code"`: 42703, or the wrong rows when the outer table has columns of those names (probed).
 
-E costs 315 Instantiations over D, 52 per call, +2.0 points; filtered by `Extract`, 1,819 (+11.6 points). It refuses each negative probed: a nullable key's `| undefined` read as a row, a column that is not the key's (`{ id: 'id' }`), a pair of tables with no key, half a composite key, an extra column beside the key, a one-to-many join given to `related()`. Of two keys between the same tables, the columns pick one, so there is no `fk` error. Like `parent<s.films.Column>`, it checks the parent it names, not the outer query: `related('accounts', 'users', { id: 'owner_id' })` under `select('users', …)` compiles.
+E costs 315 Instantiations over D, 52 per call, +2.0 points; filtered by `Extract`, 1,819 (+11.6 points). It refuses each negative probed: a nullable key's result read as a row that is always there, a column that is not the key's (`{ id: 'id' }`), a pair of tables with no key, half a composite key, an extra column beside the key, a one-to-many join given to `related()`. Of two keys between the same tables, the columns pick one, so there is no `fk` error. Like `parent<s.films.Column>`, it checks the parent it names, not the outer query: `related('accounts', 'users', { id: 'owner_id' })` under `select('users', …)` compiles.
 
 **Market standard**:
 
@@ -84,7 +84,7 @@ E costs 315 Instantiations over D, 52 per call, +2.0 points; filtered by `Extrac
 **Choice: D.** Nothing is built in the core: no `related()`, no `relatedMany()`, no foreign-key metadata (#627, #628 and #629 crossed out). E replaces A as the design a revival would follow.
 
 - **E, the better of the two options inside the philosophy, still costs more than it saves.** It needs no runtime file, and its compile cost is A's. Each call saves a type, never the SQL nor a line: `related('accounts', 'users', { id: 'owner_id' })` is about as long as `selectExactlyOne('users', { id: parent<s.accounts.Column>('owner_id') })`. That type picks the shortcut from the key, where 34 of the corpus's 288 typed many-to-one laterals pick the other one (11 type a `null` away, 23 add a needless `| undefined`), and refuses a join column that is not the key's (§ Risks). In exchange, the core keeps two public helpers forever, and `src/db` reads a `zapatos/schema` export for the first time since the fork: the default output changes and the canary goes up, so every consumer regenerates.
-- **A saves the same type and the parent's name**, for a generated runtime file, which Zapatos 3.0 stopped writing, imported in every file that joins.
+- **A saves the same type, and the names of the parent and of the columns**, for a generated runtime file, which Zapatos 3.0 stopped writing, imported in every file that joins.
 - **What the call saves is already mostly there.** 91 % of the corpus's `parent()` calls carry `parent<T.Column>`, which refuses a column of another table (#625). 88 % of its many-to-one laterals already pick the right shortcut. The other 34 are a type each, never the SQL: the docs say how to choose (`website/lateral.md`).
 - **A or E covers half the corpus at best**: a single-column join to `id` or from it, 648 of 1,080, fewer once the 18 % with a condition beside the join are out. A join on other columns, a condition beside it, or a key from a variable still needs the hand-written form.
 - **Small is beautiful**: a core helper must pay for itself in the core. E's helpers need nothing from `core.ts` nor from `src/db`'s internals, so they fit a separate package (principle 4), over keys the generator declares opt-in: nothing in `src/db` reads them, so the default output and the canary stay.
@@ -137,7 +137,7 @@ E costs 315 Instantiations over D, 52 per call, +2.0 points; filtered by `Extrac
 
 ## Risks
 
-- **The corpus is two projects.** A third that joins on keys alone, with few options, would save more per call. That changes the gain of A, not its runtime file.
+- **The corpus is two projects.** A third that joins on keys alone, with few options, would save more per call. That changes the gain of E, not its schema export and its canary.
 - **The 11 `selectExactlyOne()` on a nullable column** stay possible: a type with no `null` over a `null`. The docs rule, not a helper, is what guards them.
 - **A wrong `parent()` column of the right table** (`parent<s.films.Column>('id')` for `studio_id`) still compiles and joins the wrong rows. A or E would rule it out for a key's columns, not for a key of another table under the outer query (§ 1); D leaves both to review and to tests that run the query.
 
