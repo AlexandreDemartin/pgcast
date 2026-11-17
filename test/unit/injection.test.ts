@@ -707,6 +707,7 @@ describe('shortcut arguments', () => {
       ['a valueOf() answering count, a toString() a;b, as in 6.6.1', log => ({ toString: answering(log, 'toString', 'a;b'), valueOf: answering(log, 'valueOf', 'count') }), twice('count'), ['valueOf']],
       ['a valueOf() answering sum, a toString() count, as before', log => ({ toString: answering(log, 'toString', 'count'), valueOf: answering(log, 'valueOf', 'sum') }), twice('sum'), ['valueOf']],
       ['a toString() answering count each time', log => ({ toString: answering(log, 'toString', 'count') }), twice('count'), ['toString']],
+      ['a function whose toString() answers count, then other SQL', log => Object.assign(() => {}, { toString: answering(log, 'toString', 'count', attack) }), twice('count'), ['toString']],
       ['a String object, as before', () => new String('count'), twice('count'), []],
       ['an array, as before', () => ['count'], twice('count'), []],
       ['a symbol, as before', () => Symbol('count'), 'throws: Cannot convert a Symbol value to a string', []],
