@@ -1,5 +1,5 @@
 ---
-english: 28b3ccf242c7
+english: e43de42805ab
 ---
 
 # Pourquoi pgcast
@@ -105,7 +105,7 @@ Cette doc est l’ajout le plus récent. Chaque exemple compile contre la biblio
 Ce qui reste, c’est tout ce que vous importez. Les modules s’appellent toujours `zapatos/db` et `zapatos/schema`, l’API est celle de Zapatos, et le comportement aussi, aux corrections près : installé sous l’alias `zapatos`, pgcast ne demande aucun changement de vos imports ([Venir de Zapatos](/fr/switching)).
 
 ::: info À venir
-Le but est que Zapatos fasse le dernier kilomètre : les conditions qu’offre Postgres, les CTE, les fonctions et le SQL brut, chacun avec une forme typée, pour que du vrai code ne se rabatte jamais sur `db.raw`, un type de ligne écrit à la main ou un cast. Les jointures par clé étrangère ont déjà la leur : un [lateral](/fr/lateral), sa colonne parente vérifiée par `db.parent<s.films.Column>('id')`. Chacun arrive sous les mêmes règles, et la [feuille de route](https://github.com/AlexandreDemartin/pgcast#roadmap) donne leur ordre.
+Le but est que Zapatos fasse le dernier kilomètre : les conditions qu’offre Postgres, les CTE et le SQL brut, chacun avec une forme typée, pour que du vrai code ne se rabatte jamais sur `db.raw`, un type de ligne écrit à la main ou un cast. Les jointures par clé étrangère ont déjà la leur : un [lateral](/fr/lateral), sa colonne parente vérifiée par `db.parent<s.films.Column>('id')`. Une fonction reste un fragment `sql`, le type de son résultat écrit à la main ([Appeler une fonction Postgres](/fr/raw-sql#call-a-postgres-function)). Chacun arrive sous les mêmes règles, et la [feuille de route](https://github.com/AlexandreDemartin/pgcast#roadmap) donne leur ordre.
 :::
 
 ## Ce que pgcast ne fera pas {#what-pgcast-will-not-do}

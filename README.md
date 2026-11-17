@@ -17,7 +17,7 @@ Maintained by [Alexandre Demartin](https://github.com/AlexandreDemartin)
 - **Values are parameters, and names cannot break out.** Every value is sent as `$1`, `$2`, …; a table, column or key that may come from outside is quoted with its `"` doubled.
 - **A drop-in for Zapatos.** Same module names, same API, the old behaviour by default wherever code may rely on it ([what differs](#what-differs-from-zapatos-661)): switch without touching an import.
 
-The goal is Zapatos going the last mile. The conditions Postgres offers, CTEs, functions and raw SQL each get a typed form, so that real code never has to fall back on `db.raw`, hand-written row types or casts. Foreign-key joins have theirs: a [lateral](https://pgcast.dev/lateral), its parent column checked by `db.parent<s.films.Column>('id')`.
+The goal is Zapatos going the last mile. The conditions Postgres offers, CTEs and raw SQL each get a typed form, so that real code never has to fall back on `db.raw`, hand-written row types or casts. Foreign-key joins have theirs: a [lateral](https://pgcast.dev/lateral), its parent column checked by `db.parent<s.films.Column>('id')`. A function stays a `sql` fragment, its result's type written by hand ([Call a Postgres function](https://pgcast.dev/raw-sql#call-a-postgres-function)).
 
 ## At a glance
 
@@ -121,7 +121,7 @@ pgcast's documentation, in English and French: <https://pgcast.dev/>, built from
 The plan lives in GitHub issues: one [epic](https://github.com/AlexandreDemartin/pgcast/issues?q=label%3A%22type%3A%20epic%22) per chapter, one sub-issue per step, each closed by its pull request. Steps come in order of how much of the last mile they cover, their value for their risk, and what they depend on.
 
 1. Done: [Fix what the characterisation found](https://github.com/AlexandreDemartin/pgcast/issues/18): the surprises of 6.6.1, fixed outright, behind an opt-in, or documented.
-2. [Type the schema and the conditions real code writes by hand](https://github.com/AlexandreDemartin/pgcast/issues/19): `--check`, conditions, domains, functions, CTEs.
+2. [Type the schema and the conditions real code writes by hand](https://github.com/AlexandreDemartin/pgcast/issues/19): `--check`, conditions, domains, CTEs.
 3. [Run on any driver, with savepoints, RLS context and cursors](https://github.com/AlexandreDemartin/pgcast/issues/20).
 4. [Infer the types of raw SQL](https://github.com/AlexandreDemartin/pgcast/issues/21).
 5. Done: [Give pgcast its own documentation](https://github.com/AlexandreDemartin/pgcast/issues/85), alongside the others: a site in the spirit of Zapatos's docs, then docs that move with the code.
