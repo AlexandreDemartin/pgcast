@@ -377,6 +377,17 @@ Candidates for a check, a rule or a skill line.
 - 6.10.0 pass: a PR branched before another that rewrites the same unreleased CHANGELOG entry can bring the old text back when squashed (#647 after #645); after a merge of master into a branch, check `git diff <base>..<merge> -- CHANGELOG.md` for lines added back.
 - 6.10.0 pass: a PR that extends a refusal (#647 after #638) extends #638's `switching.md` row too, with 6.6.1's outcome.
 - 6.10.0 pass: the `check-changelog` script does not catch an entry written twice; the range review does.
+- #668: `gen-esm-wrapper` silently leaves out of `db.mjs` an export that is not a valid identifier: a reserved-word export (`with`) exists only in CJS.
+- #668: a scratch worktree whose `node_modules` is a symlink shares `node_modules/.cache/pgcast`: `bench:types` there overwrites the real declarations.
+- #668: `sql`'s type argument takes template literal types, so a qualified pair `` `alias.${Column}` `` needs no API.
+- #668: count what each call names, not where it sits: the corpus's raw names "for CTEs" were mostly a CTE's columns (45), not its name (11).
+- #668: compile a type pattern meant for the docs or a note with check:floor's TS 4.1.6 too: the docs build uses 5.9 and cannot catch `Awaited` (4.5).
+- #668: before calling a corpus helper's replacement "one line", read what its calls pass: every call passed a run-time CTE list that can be empty, the case the helper exists for.
+- #668: a column named like a `String` member whose type a string fits makes any string a `Whereable` (#670): probe "is refused" claims against such a table too (the fixture's `products`).
+- #668: test a "one line" claim on the corpus's real call shape (a run-time list that can be empty), not on the simplest example: it flipped note 010 from W0 to W1.
+- #666: the pages and tests that quote an error message reach beyond an issue's Files: `git grep` the message before changing it (4 test files and 4 pages quoted it).
+- #666: `currentColumn` is set by a filter's key and by a write's `vals({…})` key alike, so a message thrown under it cannot tell the two apart without a new mechanism; it names both.
+- #666: run each error message's advice at every position that reaches it, not only the throw: `db.self` advised for a write fails in `insert()` and an `upsert()` row (42703) and runs only in `update()` and a filter.
 
 ## Minors kept
 
