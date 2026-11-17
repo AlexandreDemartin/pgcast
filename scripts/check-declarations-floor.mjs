@@ -4,8 +4,9 @@
 // its `typescript` peer allows. Each `.d.ts` that `npm pack` lists must parse with TypeScript 4.1 (`skipLibCheck` skips
 // checking a declaration, never parsing it: since 6.7.0 an `import { type X }` line stopped 4.1 to 4.4, #603), and a
 // consumer on 4.1 compiles against them and the fixture's generated schema, with `skipLibCheck` as website/install.md
-// asks below 5.7. TypeScript 4.1.6 and the `@types` made for it are fetched once into node_modules/.cache/pgcast-ts41,
-// never a dependency. With a directory argument, it checks that unpacked package instead (a release's `package/`).
+// asks below 5.7. TypeScript 4.1.6 and the `@types` made for it, with `pg-protocol`, which `@types/pg` asks for as `*`,
+// are pinned and fetched once into node_modules/.cache/pgcast-ts41, never a dependency. With a directory argument, it
+// checks that unpacked package instead (a release's `package/`).
 import {spawnSync} from 'node:child_process';
 import {cpSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
 import {createRequire} from 'node:module';
@@ -15,7 +16,7 @@ import {fileURLToPath} from 'node:url';
 const
   root = fileURLToPath(new URL('..', import.meta.url)),
   floor = '4.1',
-  tools = {'typescript': '4.1.6', '@types/node': '14.18.63', '@types/pg': '8.6.6'},
+  tools = {'typescript': '4.1.6', '@types/node': '14.18.63', '@types/pg': '8.6.6', 'pg-protocol': '1.16.1'},
   cache = join(root, 'node_modules/.cache/pgcast-ts41'),
   pkg = join(cache, 'node_modules/zapatos'),
   consumer = join(cache, 'consumer'),
