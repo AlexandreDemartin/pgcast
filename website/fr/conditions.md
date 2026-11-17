@@ -1,5 +1,5 @@
 ---
-english: f63c44dfc72c
+english: 36ad0e54eaf6
 ---
 
 # Conditions {#db-conditions}
@@ -553,7 +553,7 @@ db.conditions.websearchToTsquery<T = TsvectorColumn>(config: string, query: stri
 | `lant:*` | `'lant'` : pas de préfixe | aucun |
 | `the` | aucun mot, rien qu’un terme courant : Postgres envoie un avis | aucun |
 
-- **La configuration** : nommez celle qui a construit le vecteur de la colonne, car la requête doit avoir les mêmes racines : `websearchToTsquery('simple', 'lanterns')` cherche `'lanterns'`, que `title_search` ne contient pas. Sans elle, Postgres prendrait `default_text_search_config`, un réglage du serveur ou de la session : la condition la nomme donc toujours. Postgres la cherche dans le `search_path` (`'pg_catalog.english'` marche aussi), et une configuration qu’il ne connaît pas donne l’erreur 42704, « <span lang="en">text search configuration "klingon" does not exist</span> ». Une configuration à vous, construite sur `unaccent` par exemple, est un nom comme un autre.
+- **La configuration** : nommez celle qui a construit le vecteur de la colonne, car la requête doit avoir les mêmes racines : `websearchToTsquery('simple', 'lanterns')` cherche `'lanterns'`, que `title_search` ne contient pas. Sans elle, Postgres prendrait `default_text_search_config`, un réglage du serveur ou de la session : la condition la nomme donc toujours. Postgres la cherche dans le `search_path` (`'pg_catalog.english'` marche aussi), et une configuration qu’il ne connaît pas donne l’erreur 42704, « <span lang="en">text search configuration "klingon" does not exist</span> » ; jusqu’à Postgres 15, un nom dont le schéma n’existe pas, `'nowhere.english'`, donne l’erreur 3F000, « <span lang="en">schema "nowhere" does not exist</span> ». Une configuration à vous, construite sur `unaccent` par exemple, est un nom comme un autre.
 - **`NULL`** : un vecteur `NULL` donne `NULL`, donc la ligne ne correspond ni à la condition ni à son [`not()`](#conditions.not).
 - **Type** : son `T` est [`TsvectorColumn`](#conditions.TsvectorColumn), que seule une colonne typée `any` accepte : une colonne `tsvector`, par son placeholder `PgTsvector` laissé tel que généré ([Types personnalisés](/fr/custom-types)). Une colonne `text` ne compile pas, ni une `varchar`, une `citext` ou un domaine sur l’un de ces types, tous typés `string` : Postgres lirait `text @@ tsquery`, et construirait le vecteur avec `default_text_search_config`, pas avec la configuration donnée. Toute autre colonne typée `any` passe : un domaine sur un domaine sur `text`, tel que généré sans [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext), exécute ce `text @@ tsquery` sans erreur ; une colonne `xml`, Postgres la refuse (42883). Une fois le placeholder modifié, donnez son type, `websearchToTsquery<PgTsvector>(…)`, ou pour une `string`, `db.conditions.websearchToTsquery<string>('english', 'lanterns')`<!-- tsc: db.select('films', { title_search: … }) -->.
 
