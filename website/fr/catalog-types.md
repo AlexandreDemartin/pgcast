@@ -1,5 +1,5 @@
 ---
-english: ac756ffebd30
+english: 7e67dc2c2bf6
 ---
 
 # Le catalogue
@@ -32,6 +32,7 @@ Quand vous lancez `npx pgcast`, le générateur pose à ces tables quelques ques
 | son `COMMENT ON COLUMN` | `pg_description` | la JSDoc que votre éditeur affiche pour la colonne, avec son type Postgres et sa valeur par défaut |
 | chaque enum et ses labels | `pg_enum` | une union de chaînes, et le tuple `every.<name>` |
 | chaque index unique, et la contrainte à laquelle il appartient | `pg_indexes`, `pg_namespace`, `pg_class`, `pg_index`, `pg_constraint` | `UniqueIndex`, les noms qu’accepte [`constraint()`](/fr/insert#constraint) |
+| avec [`domainsTypedAsUnions`](/fr/generator#generate.domainsTypedAsUnions), chaque domaine sur `text`, son `CHECK` et son `COMMENT ON DOMAIN` | `pg_type`, `pg_constraint`, `pg_description` | l’union des valeurs que liste le `CHECK`, et le tuple `every.<name>` |
 
 Pour voir les requêtes elles-mêmes, réglez [`debugListener`](/fr/generator#generate.debugListener). Un domaine, comme `seat_label`, et un type que le générateur ne sait pas traduire, comme `point`, reçoivent chacun un placeholder dans `zapatos/custom/`, à vous de le remplir ([Types personnalisés](/fr/custom-types)).
 
@@ -39,7 +40,7 @@ Et ce que le catalogue ne voit pas, comme une colonne qu’un trigger remplit, v
 
 ### Ce que le générateur ne lit pas {#what-the-generator-doesn-t-read}
 
-Le générateur lit les noms, les types, la nullabilité et les valeurs par défaut. Postgres garde aussi chaque clé étrangère et chaque contrainte `CHECK`, dans `pg_constraint`, mais Zapatos 6.6.1 n’a jamais lu cette table, ni le SQL à l’intérieur des vues et des fonctions. pgcast ne la lit que pour distinguer un index unique qu’accepte `ON CONFLICT ON CONSTRAINT` d’un index que cette clause refuse ([`uniqueIndexConstraintsOnly`](/fr/generator#generate.uniqueIndexConstraintsOnly)).
+Le générateur lit les noms, les types, la nullabilité et les valeurs par défaut. Postgres garde aussi chaque clé étrangère et chaque contrainte `CHECK`, dans `pg_constraint`, mais Zapatos 6.6.1 n’a jamais lu cette table, ni le SQL à l’intérieur des vues et des fonctions. pgcast la lit pour distinguer un index unique qu’accepte `ON CONFLICT ON CONSTRAINT` d’un index que cette clause refuse ([`uniqueIndexConstraintsOnly`](/fr/generator#generate.uniqueIndexConstraintsOnly)), et, avec [`domainsTypedAsUnions`](/fr/generator#generate.domainsTypedAsUnions), les valeurs que liste le `CHECK` d’un domaine.
 
 Ainsi `ratings.stars`, `CHECK (stars BETWEEN 1 AND 5)`, est un `number` ; un `seat_label` qui respecte `'^[A-Z][0-9]{1,2}$'` est une `string` ; et rien ne dit à TypeScript que `films.studio_id` pointe vers un studio.
 
@@ -73,10 +74,11 @@ Pour les vues, pgcast s’en tient à ce que Postgres déclare, comme Zapatos :
 - Un domaine sur `int8`, `numeric`, `bytea`, `money` ou une date, ou sur un tableau de l’un d’eux, est typé dans les cinq interfaces par son placeholder, qui, tel que généré, contient ce que renvoie `pg`, sauf si [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext) est activé.
 - Un domaine sur un domaine, ou un tableau d’un domaine, vaut `any`, le type de son placeholder tel que généré, sauf si [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext) est activé.
 - Un tableau d’un enum est un tableau dans `Selectable`, bien que `pg` renvoie son texte, `'{writer,editor}'`, sauf si [`enumArraysTypedAsText`](/fr/generator#generate.enumArraysTypedAsText) est activé.
+- Un domaine sur `text` dont le `CHECK` liste les valeurs, `CHECK (VALUE IN ('U', 'PG', '12'))`, est une `string`, le type de son placeholder tel que généré, sauf si [`domainsTypedAsUnions`](/fr/generator#generate.domainsTypedAsUnions) est activé.
 - Un `interval` est typé par son texte dans les cinq interfaces, bien que `pg` le parse en objet, un [`PostgresInterval`](/fr/runtime-config#PostgresInterval), pour une requête à vous, sauf si [`intervalsTypedAsObjects`](/fr/generator#generate.intervalsTypedAsObjects) est activé. Mettez-le à `false` si un parser de types à vous renvoie le texte.
 
 ::: info À venir
-Lire davantage du catalogue, chaque fois en opt-in : le `CHECK (VALUE = ANY (ARRAY[…]))` d’un domaine comme union de ses valeurs ([#55](https://github.com/AlexandreDemartin/pgcast/issues/55)) ; et, comme outil à part, les types de résultat du SQL écrit à la main ([#62](https://github.com/AlexandreDemartin/pgcast/issues/62)).
+Lire davantage du catalogue, comme outil à part : les types de résultat du SQL écrit à la main ([#62](https://github.com/AlexandreDemartin/pgcast/issues/62)).
 :::
 
 ## Une colonne, cinq types {#one-column-five-types}
@@ -164,7 +166,7 @@ Le générateur est celui de Zapatos 6.6.1, son canary de version toujours à 10
 
 Les changements qu’apporte pgcast sont dans le runtime, pas dans les types générés. [`raw()`](/fr/sql-template#raw), [`cols()`](/fr/sql-template#cols) et [`vals()`](/fr/sql-template#vals) ne passent plus la vérification de types comme valeur d’un `Whereable`, d’un `Insertable` ou d’un `Updatable`, là où 6.6.1 les prenait pour un `Parameter`, un objet de même forme (`{ value }`).
 
-Et une valeur `undefined` peut signifier une clé absente, avec [`undefinedMeansMissing`](/fr/runtime-config#Config.undefinedMeansMissing) ([Une valeur `undefined`](/fr/insert#undefined-values)). Les changements de la sortie elle-même viennent de la même façon, chacun comme une correction ou un opt-in à part : tant que [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas), [`enumOrder`](/fr/generator#generate.enumOrder), [`uniqueIndexConstraintsOnly`](/fr/generator#generate.uniqueIndexConstraintsOnly) et [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext) sont désactivés, et [`enumArraysTypedAsText`](/fr/generator#generate.enumArraysTypedAsText) et [`intervalsTypedAsObjects`](/fr/generator#generate.intervalsTypedAsObjects) omis ou à `false`, le reste de `schema.d.ts` est celui de la 6.6.1 ([Versions](/fr/versions)).
+Et une valeur `undefined` peut signifier une clé absente, avec [`undefinedMeansMissing`](/fr/runtime-config#Config.undefinedMeansMissing) ([Une valeur `undefined`](/fr/insert#undefined-values)). Les changements de la sortie elle-même viennent de la même façon, chacun comme une correction ou un opt-in à part : tant que [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas), [`enumOrder`](/fr/generator#generate.enumOrder), [`uniqueIndexConstraintsOnly`](/fr/generator#generate.uniqueIndexConstraintsOnly), [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext) et [`domainsTypedAsUnions`](/fr/generator#generate.domainsTypedAsUnions) sont désactivés, et [`enumArraysTypedAsText`](/fr/generator#generate.enumArraysTypedAsText) et [`intervalsTypedAsObjects`](/fr/generator#generate.intervalsTypedAsObjects) omis ou à `false`, le reste de `schema.d.ts` est celui de la 6.6.1 ([Versions](/fr/versions)).
 
 Ce que pgcast refuse, c’est une seconde source de vérité : une classe modèle, un schéma écrit en TypeScript, un type déclaré à côté de la table qu’il décrit. La base a le dernier mot, et le prix est une habitude : relancez le générateur après chaque migration, et laissez TypeScript vous signaler les requêtes qui ne collent plus ([Première requête](/fr/first-query#when-the-schema-changes)).
 

@@ -43,6 +43,8 @@ export interface OptionalConfig {
   enumArraysTypedAsText?: boolean;  // an array of an enum, or a domain over one, is string in Selectable: pg returns it as its text; false keeps the array, for a parser set with pg.types.setTypeParser
   // optional too; read it with ?? false, and with == null for the note (left out, or null from JSON); deprecated: true in 7.0, false kept
   intervalsTypedAsObjects?: boolean;  // an interval is typed in Selectable as pg's default type parser returns it, a db.PostgresInterval, which a write takes back
+  // optional too; read it with ?? false
+  domainsTypedAsUnions?: boolean;  // a domain over text whose valid CHECK lists its values is declared as their union, which a new placeholder names
 }
 
 /** The type of `schemas`: by schema, the relations to generate. */
