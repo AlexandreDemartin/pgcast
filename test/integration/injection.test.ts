@@ -1104,6 +1104,26 @@ describe('without parameters (simple protocol)', () => {
       .toThrow(`Aggregate must be a function name (e.g. sum, or my_schema.my_agg), not '${aggregate}'`);
   });
 
+  it.each<[string, () => unknown, number | string]>([
+    // pgcast up to 6.8.0 checked toString()'s answer, then wrote valueOf()'s at each compile, and the UPDATE ran (#602);
+    // toString() answers count to as many calls as those runtimes made before the run's compile: two
+    ['a toString() that answers anew', () => {
+      let calls = 0;
+      return { toString: () => calls++ < 2 ? 'count' : `count(*) FROM users; ${update}; SELECT count` };
+    }, 3],
+    ['a valueOf() that answers other SQL than toString()', () => ({ toString: () => 'count', valueOf: () => `count(*) FROM users; ${update}; SELECT count` }),
+      `rejects: Aggregate must be a function name (e.g. sum, or my_schema.my_agg), not 'count(*) FROM users; ${update}; SELECT count'`],
+    ['a Symbol.toPrimitive that answers by hint', () => ({ [Symbol.toPrimitive]: (hint: string) => hint === 'string' ? 'count' : `count(*) FROM users; ${update}; SELECT count` }),
+      `rejects: Aggregate must be a function name (e.g. sum, or my_schema.my_agg), not 'count(*) FROM users; ${update}; SELECT count'`],
+  ])('the aggregate of select() is converted to a string once, so %s runs the name checked, or nothing', async (_, make, expected) => {
+    const outcome = await (async () => {
+      const q = db.select('users', all, {}, db.SelectResultMode.Numeric, make() as any);
+      q.compile();  // as a caller logging the query does, before the run's own compile
+      return q.run(t.client);
+    })().catch((e: Error) => `rejects: ${e.message}`);
+    expect({ outcome, ada: await adaName() }).toEqual({ outcome: expected, ada: 'Ada' });
+  });
+
   it('a schema-qualified aggregate runs', async () => {
     expect(await db.select('users', all, {}, db.SelectResultMode.Numeric, 'pg_catalog.count').run(t.client)).toBe(3);
   });
