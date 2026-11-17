@@ -85,6 +85,25 @@ CREATE TABLE tags
 ALTER TABLE films ADD COLUMN title_search TSVECTOR GENERATED ALWAYS AS (to_tsvector('english', title)) STORED;
 CREATE INDEX films_title_search_idx ON films USING gin (title_search);
 
+-- Functions, called with sql in raw-sql.md § Call a Postgres function; the generator reads none of them
+CREATE FUNCTION film_label(title TEXT, year INTEGER) RETURNS TEXT
+  LANGUAGE sql IMMUTABLE AS $$ SELECT title || ' (' || year || ')' $$;
+
+-- Overloaded at one arity: a studio's films by its id, or by its name
+CREATE FUNCTION films_of(studio_id INTEGER) RETURNS SETOF films
+  LANGUAGE sql STABLE AS $$ SELECT * FROM films WHERE films.studio_id = films_of.studio_id ORDER BY release_year $$;
+CREATE FUNCTION films_of(studio_name TEXT) RETURNS SETOF films
+  LANGUAGE sql STABLE AS $$
+    SELECT films.* FROM films JOIN studios ON studios.id = films.studio_id
+    WHERE studios.name = studio_name ORDER BY release_year $$;
+
+CREATE FUNCTION total_runtime(VARIADIC film_ids INTEGER[]) RETURNS BIGINT
+  LANGUAGE sql STABLE AS $$ SELECT sum(runtime_minutes) FROM films WHERE id = ANY(film_ids) $$;
+
+CREATE FUNCTION screening_span(film_id INTEGER, OUT first_at TIMESTAMPTZ, OUT last_at TIMESTAMPTZ)
+  LANGUAGE sql STABLE AS $$
+    SELECT min(starts_at), max(starts_at) FROM screenings WHERE screenings.film_id = screening_span.film_id $$;
+
 INSERT INTO studios (id, name) VALUES
   (1000, 'Larkspur Pictures')
 , (1001, 'Greyhaven Studios')

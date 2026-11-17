@@ -1,5 +1,5 @@
 ---
-english: 5508974c2fa4
+english: bacb66c8a0df
 description: "Quand aucun raccourci n’écrit la requête dont vous avez besoin, écrivez-la dans le template sql, et gardez hors de son texte toute valeur venue de l’extérieur."
 ---
 
@@ -127,6 +127,80 @@ Postgres donne un type à un paramètre d’après sa place. Comparé à une col
 - Avec [`castObjectParamsToJson`](/fr/runtime-config#Config.castObjectParamsToJson) activé, un objet simple est envoyé en JSON quel que soit son cast, casté vers le type écrit.
 
 Toutes les formes du cast : [`param()`](/fr/sql-template#param).
+
+## Appeler une fonction Postgres {#call-a-postgres-function}
+
+Un appel est du SQL comme un autre : le nom de la fonction dans le texte, chaque colonne entre `${…}`, chaque valeur en `db.param()`. pgcast ne lit aucune fonction dans le catalogue : c’est à vous d’écrire le type du résultat :
+
+<CastPanel example="raw_sql_function">
+
+<<< ../examples/raw_sql_function.ts{ts twoslash}
+
+</CastPanel>
+
+- `${'title'}` est une colonne de la table du raccourci, `film_label("title", "release_year")`<!-- probe: examples/raw_sql_function.ts -->, vérifiée d’après `s.films.SQL`. Une valeur venue de l’extérieur est un [`db.param()`](/fr/sql-template#param) ; la notation nommée fonctionne aussi, `film_label(year => ${db.param(year)}, title => ${db.param(title)})`.
+- Typez le résultat `| null` : aucune fonction ne promet une valeur. Celle-ci donne `NULL` pour un argument `NULL`, et une fonction `STRICT` le donne toujours.
+- Le nom reste dans le texte : un nom en casse mixte y garde donc ses guillemets, `"filmCount"(…)`. Sans eux, Postgres cherche `filmcount`, et n’en trouve aucune (42883).
+
+Ce qui revient dépend de l’endroit où l’appel s’exécute. Dans un raccourci (`extras`, un `lateral`), sa valeur passe par JSON, comme celle d’une colonne dans un `JSONSelectable` ([pourquoi](/fr/catalog-types#why-the-shortcuts-return-json)) ; exécuté seul, `pg` la parse, comme la décrit un `Selectable` :
+
+| Postgres donne | Dans un raccourci | Exécuté seul, ``sql`SELECT …` `` |
+|---|---|---|
+| un `int8` | un nombre | une chaîne |
+| un `timestamptz` | une chaîne, `'2030-03-01T19:30:00+00:00'` en UTC | un `Date` |
+| deux paramètres `OUT` | un objet, `{ first_at, last_at }` | le texte de l’enregistrement, `'("2030-03-01 19:30:00+00",…)'` en UTC ; `SELECT * FROM` l’appel donne ses colonnes |
+
+### Choisir une surcharge {#pick-an-overload}
+
+`films_of()` renvoie les films d’un studio, `SETOF films` : elle va donc dans le `FROM`, ses lignes en `Selectable[]`. Elle prend l’id du studio ou son nom :
+
+<CastPanel example="raw_sql_function_overload">
+
+<<< ../examples/raw_sql_function_overload.ts{ts twoslash}
+
+</CastPanel>
+
+- `pg` envoie chaque valeur sans type, et Postgres lit un paramètre sans type comme `unknown`. Parmi les fonctions de l’arité de l’appel, il en choisit une qui prend une chaîne : sans cast, `films_of($1)`<!-- probe: db.sql`films_of(${db.param(1000)})` --> avec `1000` cherche un studio nommé `'1000'`, et ne trouve aucun film.
+- `db.param(studioId, 'int4')` écrit `CAST($1 AS "int4")`<!-- probe: examples/raw_sql_function_overload.ts -->, et Postgres appelle celle qui prend un `integer`. Le cast prend le nom du catalogue : `'int'` donne `"int"`, un type qui n’existe pas (42704). Nommer l’argument la choisit aussi : `films_of(studio_id => ${db.param(studioId)})`.
+- Une colonne a déjà un type : `films_of("studios"."id")`<!-- probe: examples/raw_sql_function_lateral.ts --> choisit celle qui prend un `integer`, sans cast ([plus bas](#return-rows-into-a-shortcut)).
+
+La règle que suit Postgres pour un paramètre sans type, selon les fonctions de ce nom et de cette arité :
+
+| Les candidates | Postgres |
+|---|---|
+| l’une prend une chaîne (`text`) | l’appelle |
+| aucune, mais l’une prend le type préféré de sa catégorie : `float8` à côté de `int` | l’appelle |
+| toute autre paire : `int` et `bigint`, `int` et `numeric`, `boolean` et `int` | refuse l’appel, 42725 `function … is not unique` : castez le paramètre |
+| `g(x int)` et `g(x int, y int DEFAULT 0)`, que sa valeur par défaut laisse appeler avec un seul argument | refuse `g($1)`, avec ou sans cast (42725) ; `g($1, $2)` appelle la seconde |
+| une fonction polymorphe, `first_genre(a anyarray)` | refuse l’appel, 42804 `could not determine polymorphic type` : castez-le, `db.param(genres, 'text[]')` |
+
+### Passer un tableau à `VARIADIC` {#pass-an-array-to-variadic}
+
+`total_runtime()` prend un nombre quelconque d’ids de films, `VARIADIC film_ids INTEGER[]`. Passez le tableau avec le mot-clé :
+
+<CastPanel example="raw_sql_function_variadic">
+
+<<< ../examples/raw_sql_function_variadic.ts{ts twoslash}
+
+</CastPanel>
+
+- Le tableau est un seul paramètre, `VARIADIC $1`<!-- probe: examples/raw_sql_function_variadic.ts -->, si bien que la requête est la même quelle que soit sa longueur, `[]` compris (une somme sans ligne : `null`).
+- Sans le mot-clé, Postgres lit le tableau comme le premier entier, et le refuse (22P02). Des valeurs une à une, `total_runtime($1, $2)`, se passent du mot-clé.
+
+### Renvoyer des lignes dans un raccourci {#return-rows-into-a-shortcut}
+
+Une fonction qui renvoie des lignes va dans un `lateral`, ses lignes réunies en une seule valeur :
+
+<CastPanel example="raw_sql_function_lateral">
+
+<<< ../examples/raw_sql_function_lateral.ts{ts twoslash}
+
+</CastPanel>
+
+- `jsonb_agg(to_jsonb(f) ORDER BY …)` fait des lignes un seul tableau JSON, typé `s.films.JSONSelectable[] | null` : `null` pour un studio sans film.
+- Jamais dans `extras` : là, l’appel donne à la requête extérieure une ligne par ligne qu’il renvoie. Un studio qui a deux films revient deux fois, et un studio sans film disparaît.
+
+pgcast n’a pas de `fn()` et ne génère la signature d’aucune fonction : le code réel appelle peu de fonctions, la plupart sans argument, et un helper ne saurait ni écrire `VARIADIC` ni choisir une surcharge parmi celles d’une même arité ([décision 009](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/009-functions.md)).
 
 ## Choisir le SQL à l’exécution parmi vos propres constantes {#choose-sql-at-run-time-from-your-own-constants}
 

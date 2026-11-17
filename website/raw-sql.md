@@ -127,6 +127,80 @@ Postgres gives a parameter a type from where it stands. Compared with a column, 
 
 Every form of the cast: [`param()`](/sql-template#param).
 
+## Call a Postgres function
+
+A call is SQL like any other: the function's name in the text, each column between `${…}`, each value a `db.param()`. pgcast reads no function from the catalog, so the result's type is yours to write:
+
+<CastPanel example="raw_sql_function">
+
+<<< ./examples/raw_sql_function.ts{ts twoslash}
+
+</CastPanel>
+
+- `${'title'}` is a column of the shortcut's table, `film_label("title", "release_year")`<!-- probe: examples/raw_sql_function.ts -->, checked against `s.films.SQL`. A value from outside is a [`db.param()`](/sql-template#param); named notation works too, `film_label(year => ${db.param(year)}, title => ${db.param(title)})`.
+- Type the result `| null`: no function promises a value. This one gives `NULL` for a `NULL` argument, and a `STRICT` function always does.
+- The name stays in the text, so a mixed-case one keeps its quotes there, `"filmCount"(…)`: unquoted, Postgres looks for `filmcount`, and finds none (42883).
+
+What comes back depends on where the call runs. In a shortcut (`extras`, a `lateral`) its value goes through JSON, as a column's does in a `JSONSelectable` ([why](/catalog-types#why-the-shortcuts-return-json)); run on its own, `pg` parses it, as a `Selectable` describes it:
+
+| Postgres gives | In a shortcut | Run on its own, ``sql`SELECT …` `` |
+|---|---|---|
+| an `int8` | a number | a string |
+| a `timestamptz` | a string, `'2030-03-01T19:30:00+00:00'` in UTC | a `Date` |
+| two `OUT` parameters | an object, `{ first_at, last_at }` | the record's text, `'("2030-03-01 19:30:00+00",…)'` in UTC; `SELECT * FROM` the call gives its columns |
+
+### Pick an overload
+
+`films_of()` returns a studio's films, `SETOF films`, so it goes in `FROM`, its rows a `Selectable[]`. It takes the studio's id or its name:
+
+<CastPanel example="raw_sql_function_overload">
+
+<<< ./examples/raw_sql_function_overload.ts{ts twoslash}
+
+</CastPanel>
+
+- `pg` sends every value untyped, and Postgres reads an untyped parameter as `unknown`. Among the functions of the call's arity, it picks one that takes a string: uncast, `films_of($1)`<!-- probe: db.sql`films_of(${db.param(1000)})` --> with `1000` looks for a studio named `'1000'`, and finds no film.
+- `db.param(studioId, 'int4')` writes `CAST($1 AS "int4")`<!-- probe: examples/raw_sql_function_overload.ts -->, and Postgres calls the `integer` one. The cast takes the catalog's name: `'int'` gives `"int"`, a type that does not exist (42704). Naming the argument picks it too: `films_of(studio_id => ${db.param(studioId)})`.
+- A column has a type already: `films_of("studios"."id")`<!-- probe: examples/raw_sql_function_lateral.ts --> picks the `integer` one with no cast ([below](#return-rows-into-a-shortcut)).
+
+The rule Postgres follows for an untyped parameter, by the functions of that name and arity:
+
+| The candidates | Postgres |
+|---|---|
+| one takes a string (`text`) | calls it |
+| none does, one takes its category's preferred type: `float8` beside `int` | calls it |
+| any other pair: `int` and `bigint`, `int` and `numeric`, `boolean` and `int` | refuses the call, 42725 `function … is not unique`: cast the parameter |
+| `g(x int)` and `g(x int, y int DEFAULT 0)`, which its default lets take one argument | refuses `g($1)`, cast or not (42725); `g($1, $2)` calls the second |
+| a polymorphic one, `first_genre(a anyarray)` | refuses the call, 42804 `could not determine polymorphic type`: cast it, `db.param(genres, 'text[]')` |
+
+### Pass an array to `VARIADIC`
+
+`total_runtime()` takes any number of film ids, `VARIADIC film_ids INTEGER[]`. Pass the array with the keyword:
+
+<CastPanel example="raw_sql_function_variadic">
+
+<<< ./examples/raw_sql_function_variadic.ts{ts twoslash}
+
+</CastPanel>
+
+- The array is one parameter, `VARIADIC $1`<!-- probe: examples/raw_sql_function_variadic.ts -->, so the query is the same for any length, `[]` included (a sum of no rows: `null`).
+- Without the keyword, Postgres reads the array as the first integer, and refuses it (22P02). Values one by one, `total_runtime($1, $2)`, need no keyword.
+
+### Return rows into a shortcut
+
+A function that returns rows goes in a `lateral`, its rows gathered into one value:
+
+<CastPanel example="raw_sql_function_lateral">
+
+<<< ./examples/raw_sql_function_lateral.ts{ts twoslash}
+
+</CastPanel>
+
+- `jsonb_agg(to_jsonb(f) ORDER BY …)` makes one JSON array of the rows, typed `s.films.JSONSelectable[] | null`: `null` for a studio with no film.
+- Never in `extras`: there, the call gives the outer query one row per row it returns. A studio with two films comes back twice, and one with none is gone.
+
+pgcast has no `fn()` and generates no function's signature: calls in real code are few, most take no argument, and a helper could neither write `VARIADIC` nor pick an overload of one arity ([decision 009](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/009-functions.md)).
+
 ## Choose SQL at run time from your own constants
 
 Some choices are syntax, not values: a sort direction, the column to sort on. A parameter can't stand for them, so map the caller's choice to one you wrote:
