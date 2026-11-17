@@ -386,6 +386,35 @@ describe('array bounds in a cast', () => {
   });
 });
 
+describe('db.all as a filter value', () => {
+  afterEach(resetConfig);
+
+  it('beside a hostile key or hostile items, deletes() and update() reject with a plain Error before any query', async () => {
+    // 6.6.1 sent 'Symbol(all)': isNotIn() deleted every user with a name, whatever the key (#633)
+    const sent: unknown[] = [];
+    db.setConfig({ queryListener: q => { sent.push(q); } });
+    const inputs = ['display_name', 'a"b', `display_name" IS NOT NULL; ${update}; --`, "a'); DELETE FROM users; --", 'a/*b', 'a$1b', 'a\\b'];
+    const c = db.conditions, a = all as any;
+    for (const input of inputs) {
+      const queries = {
+        deletesIsNotIn: db.deletes('users', { [input]: c.isNotIn([input, a]) } as any),
+        deletesValue: db.deletes('users', { [input]: a } as any),
+        updateIsIn: db.update('users', { display_name: 'injected' }, { [input]: c.isIn([a]) } as any),
+        updateArray: db.update('users', { display_name: 'injected' }, { [input]: c.arrayOverlaps([input, a]) } as any),
+      };
+      for (const [where, q] of Object.entries(queries)) {
+        const err = await q.run(t.client).then(() => 'resolved', (e: unknown) => e);
+        expect({ input, where, class: (err as Error).constructor, code: (err as { code?: string }).code })
+          .toEqual({ input, where, class: Error, code: undefined });
+        expect((err as Error).message).toMatch(/^`db\.all` has no meaning as /);
+      }
+    }
+    expect(sent).toEqual([]);
+    expect(await adaName()).toBe('Ada');
+    expect(await db.count('users', all).run(t.client)).toBe(3);
+  });
+});
+
 describe('a cast that leaves a part of its name empty', () => {
   afterEach(resetConfig);
 

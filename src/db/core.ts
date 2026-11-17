@@ -45,7 +45,13 @@ export const self = Symbol('self');
 export type SelfType = typeof self;
 
 /**
- * Signals all rows are to be returned (without filtering via a `WHERE` clause)
+ * Signals all rows are to be returned (without filtering via a `WHERE` clause).
+ * As a `Whereable` value, in `isIn` or `isNotIn`, in `vals([…])` within a
+ * filter or a fragment value of `vals({…})`, so of `insert()`, `upsert()` or
+ * `update()`, as the value of `eq()` and the other conditions, or in the
+ * array of `arrayContains()`, `arrayContainedIn()` or `arrayOverlaps()`, it
+ * throws: it is a whole filter, not a value to compare with. Zapatos 6.6.1
+ * sent it as the string `'Symbol(all)'`.
  */
 export const all = Symbol('all');
 export type AllType = typeof all;
@@ -371,6 +377,7 @@ const quotedName = new RegExp(`^"(?:[^"\\0]|"")+"(?:${space}\\.${space}(?:${iden
 const
   defaultInWhereable = '`db.Default` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. `DEFAULT` is for INSERT and UPDATE values.',
   selfInWhereable = '`db.self` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: compare with a value, or use it in a `sql` fragment value, where it stands for the column.',
+  allInWhereable = '`db.all` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: leave the key out, or compare with a value. To match every row, give `db.all` as the whole filter of a shortcut: `select(table, db.all)`.',
   wrapperInWhereable = '`db.raw()`, `db.cols()` and `db.vals()` have no meaning as a value in a Whereable (a filter), nor in `isIn()`: to compare with SQL, use a `sql` fragment value, where `db.self` stands for the column; to compare with a value, give the value itself, or `db.param()`.',
   wrapperAsValue = '`db.raw()`, `db.cols()` and `db.vals()` have no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value: to write SQL, use a `sql` fragment value (in `update()`, `db.self` there stands for the column); to write a value, give the value itself, or `db.param()`.',
   nullInterpolated = 'Interpolating `null` has no meaning in SQL: for a `NULL` value, interpolate `db.param(null)`; to filter on `NULL`, use `{ column: db.conditions.isNull }`; to match every row, give a shortcut `db.all` as its filter.',
@@ -641,9 +648,10 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
         for (let i = 0, len = values.length; i < len; i++) {
           const value = values[i];
           if (i > 0) result.text += ', ';
-          // a set currentColumn means we are in a Whereable (`isIn`), where there is no default, and `self` is no value
+          // a set currentColumn means we are in a Whereable (`isIn`), where there is no default, and `self` and `all` are no values
           if (value === Default && currentColumn) throw new Error(defaultInWhereable);
           if (value === self && currentColumn) throw new Error(selfInWhereable);
+          if (value === all && currentColumn) throw new Error(allInWhereable);
           if (isWrapper(value) && currentColumn) throw new Error(wrapperInWhereable);
           if (value instanceof SQLFragment ||
             value instanceof Parameter ||
@@ -700,6 +708,7 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
             // a Parameter is compiled as it is, with its cast; Zapatos 6.6.1 wrapped it in another one
             if (columnValue === Default) throw new Error(defaultInWhereable);
             if (columnValue === self) throw new Error(selfInWhereable);
+            if (columnValue === all) throw new Error(allInWhereable);
             if (isWrapper(columnValue)) throw new Error(wrapperInWhereable);
             this.compileExpression(columnName, result);
             result.text += ` = `;

@@ -311,6 +311,15 @@ Candidates for a check, a rule or a skill line.
 - #632: each "Unchanged:" path a CHANGELOG or docs line states needs a test that freezes it, or a later PR changing that path leaves the line stale with every test green.
 - #632: `docs:build` exists only in `website/package.json`: `npm run docs:build` at the root fails with "Missing script", as #301 found for `docs:translated`.
 - #632: never chain `docs:translated` after a scripted edit of a French page in one command: a missed match (the U+00A0 before `:` and `;`) still marks the page translated.
+- #638: `vitest -u` on the red commit fills an empty inline snapshot from master's output: a quick way to freeze a "must not change" path before the fix.
+- #638: a scratch tsconfig extending `test/generated/tsconfig.json` probes "the type already refuses" from the scratchpad, with `--rootDir /`.
+- #638: the npm package is `@pgcast/pgcast`: `npm pack pgcast@<v>` is a 404.
+- #638: a refusal in `vals([…])` keyed on `currentColumn` also fires in a fragment value of `vals({…})`, so in `insert()` and `update()` values: check any "Unchanged" or "outside a filter" claim with `` insert(t, { c: sql`${vals([x])}` }) ``.
+- #638: when a value starts to throw in a slot, grep the docs for the rows listing its siblings in that slot (`` `Default`, `self` ``), not only the issue's Files.
+- #638: a refusal walk over caller data is iterative (an explicit stack), or a deeply nested value throws `RangeError` at the call.
+- #638: a "walked once" guard (`seen`) is proven only by a cycle that does not go through the root, which sits in `seen` before the walk starts.
+- #638: a mutant that loops forever in a synchronous walk is not stopped by Vitest's `testTimeout`, and `alarm` on `npx` kills only `npx`: kill the vitest node process and its worker by PID.
+- #638: killing vitest's main process leaves a hung fork worker (`vitest/dist/workers/forks.js`) spinning, reparented to PID 1: find it with `ps -axo pid,ppid,%cpu,command` and kill it by PID; `pkill -f "vitest run"` misses it.
 - #635: count a corpus pattern with its type arguments (`parent<T.Column>(`), ideally by AST: #625's grep for `parent(` found 114 of 1,255 calls.
 - #635: an issue's corpus claim ("under `@ts-ignore`", "about a thousand") is recounted before a note cites it.
 - #635: a gain from inferring a shortcut is measured against the project's own generated `schema.d.ts` (12 % of many-to-one laterals chose differently from the nullability), not claimed.

@@ -556,6 +556,45 @@ describe('Whereable', () => {
     expect(await db.count('events', db.all).run(t.client)).toBe(3);
   });
 
+  it('db.all as a value, in isIn or isNotIn, or in an array condition\'s array, rejects run() before any query', async () => {
+    // 6.6.1 sent 'Symbol(all)': no row on a text column, isNotIn() deleted every event, arrayContainedIn() matched
+    // Bob's empty tags, 22P02 on an int4 or int4[] column (#633); as a whole filter it still means every row
+    const queries: unknown[] = [];
+    db.setConfig({ queryListener: query => queries.push(query) });
+    const rejected = async (query: Promise<unknown>) => {
+      const err = await query.then(() => undefined, (e: unknown) => e) as Error | undefined;
+      return err instanceof Error && !('code' in err) ? err.message : err;
+    };
+    const
+      inWhereable = '`db.all` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: leave the key out, or compare with a value. To match every row, give `db.all` as the whole filter of a shortcut: `select(table, db.all)`.',
+      inCondition = '`db.all` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To match every row, give `db.all` as the whole filter of a shortcut: `select(table, db.all)`.',
+      all = db.all as any;
+    expect({
+      value: await rejected(ids({ display_name: all })),
+      intValue: await rejected(ids({ id: all })),
+      notValue: await rejected(ids(c.not({ display_name: all }))),
+      isIn: await rejected(ids({ display_name: c.isIn([all]) })),
+      deletesIsNotIn: await rejected(db.deletes('events', { kind: c.isNotIn([all]) }).run(t.client)),
+      updateWhere: await rejected(db.update('users', { display_name: 'Gone' }, { display_name: all }).run(t.client)),
+      lateral: await rejected(db.select('users', db.all, { lateral: { n: db.count('accounts', { owner_id: all }) } }).run(t.client)),
+      upsertObject: await rejected(db.upsert('users', { email: 'bob@example.com', display_name: 'Bob' }, 'email', {
+        updateValues: { settings: { theme: all } as any },
+      }).run(t.client)),
+      arrayContains: await rejected(ids({ tags: c.arrayContains([all]) })),
+      arrayContainedIn: await rejected(ids({ tags: c.arrayContainedIn([all]) })),
+      notArrayOverlaps: await rejected(ids({ tags: c.not(c.arrayOverlaps([all])) })),
+      intArrayNested: await rejected(db.select('accounts', { scores: c.arrayContains<number[]>([[all]]) }).run(t.client)),
+    }).toEqual({
+      value: inWhereable, intValue: inWhereable, notValue: inWhereable, isIn: inWhereable, deletesIsNotIn: inWhereable,
+      updateWhere: inWhereable, lateral: inWhereable, upsertObject: inWhereable,
+      arrayContains: inCondition, arrayContainedIn: inCondition, notArrayOverlaps: inCondition, intArrayNested: inCondition,
+    });
+    expect(queries).toEqual([]);
+    expect(await db.count('events', db.all).run(t.client)).toBe(3);
+    expect(await db.count('users', { display_name: 'Gone' }).run(t.client)).toBe(0);
+    expect((await db.select('users', db.all, { columns: ['id'], lateral: { n: db.count('accounts', db.all) } }).run(t.client)).length).toBe(3);
+  });
+
   it('self in a fragment value is still the column', async () => {
     expect(await ids({ display_name: sql`${self} = ${self}`, id: sql`${self} > 1` })).toEqual([{ id: 2 }, { id: 3 }]);
   });

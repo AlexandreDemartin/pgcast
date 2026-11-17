@@ -1,5 +1,5 @@
 ---
-english: 27d2b98b0f76
+english: 043ff74268d6
 ---
 
 # Template SQL
@@ -273,13 +273,14 @@ Une liste de valeurs séparées par des virgules. Chaque valeur se compile comme
 | `Default` | `DEFAULT` | `DEFAULT` ; lève une erreur dans un filtre |
 | `parent(c?)` | la [colonne parente](#parent), sans `c` la colonne de sa clé ; lève une erreur hors d’une requête imbriquée | la [colonne parente](#parent) |
 | `raw()`, `cols()`, `vals()` | lèvent une erreur | lèvent une erreur dans un filtre ; un paramètre hors d’un filtre |
-| `self` | un paramètre | lève une erreur dans un filtre ; un paramètre hors d’un filtre |
+| `self`, `all` | un paramètre | lève une erreur dans un filtre ; un paramètre hors d’un filtre |
 
 - Les valeurs d’un objet viennent dans l’ordre de ses clés triées, comme `cols()` les liste.
 - Dans un template typé par table, ses clés ne sont pas vérifiées par rapport à la table, comme l’explique [`cols()`](#cols).
 - « Dans un filtre », c’est partout où `vals([…])` a une colonne courante : dans `isIn()` et `isNotIn()`, et dans un fragment donné en valeur d’un Whereable ou de `vals({…})`. Là :
   - `Default` lève "`` `db.Default` has no meaning in a Whereable (a filter)… ``<!-- message -->" ;
   - `self` "`` `db.self` has no meaning as a value in a Whereable (a filter), nor in `isIn()`… ``<!-- message -->" ;
+  - `all` "`` `db.all` has no meaning as a value in a Whereable (a filter), nor in `isIn()`… ``<!-- message -->" ;
   - `raw()`, `cols()` et `vals()`, comme le dit [`raw()`](#raw).
 - Employé lui-même comme valeur de filtre, ou comme valeur dans `vals({…})`, `vals()` lève une erreur, comme [`raw()`](#raw).
 - Un objet natif sans clé propre énumérable, ou un `Buffer`, lève une erreur à la compilation, comme dans [`cols()`](#cols) : "`` `db.vals()` takes an object or an array, not a `Buffer`, whose bytes would compile as values, one parameter per byte: for one value, write `db.vals([value])`; for a row of `insert()`, `upsert()` or `update()`, give a plain object. ``<!-- message -->". Zapatos 6.6.1 compilait un `Date` en rien. Il compilait un `Buffer` en un paramètre par octet, si bien qu’un seul octet était stocké sous la forme de son nombre (`'97'` dans une colonne texte pour `Buffer.from('a')`), et que dans une liste `IN`, les octets étaient comparés comme des nombres. Un objet natif doté de ses propres clés énumérables se compile toujours en leurs valeurs. Un tableau typé autre qu’un `Buffer` se compile en ses éléments, `$1, $2`<!-- probe: db.sql`${db.vals(new Int32Array([1, 2]))}` --> pour `new Int32Array([1, 2])`, sauf s’il est vide et n’a donc aucune clé propre. Un `Uint8Array` qui représente des octets se compile lui aussi en ses éléments, `vals(new TextEncoder().encode('a'))` en `$1`<!-- probe: db.sql`${db.vals(new TextEncoder().encode('a'))}` --> avec `97` : dans une liste `IN`, ses éléments sont tout aussi souvent les nombres voulus, si bien que seul un `Buffer`, le type de Node pour des octets, est refusé. Pour une seule valeur, écrivez `db.vals([value])` ou `db.param(value)`.
@@ -312,7 +313,7 @@ Un objet est un Whereable de la table : chacune de ses propres clés énumérab
 | un fragment `sql` | `(…)`, compilé avec la clé comme colonne courante : [`self`](#self) est la colonne |
 | une [condition](/fr/conditions) | de même : une condition est un fragment, `like('The%')` |
 | `parent(c?)` | `("studio_id" = "studios"."id")`<!-- probe: db.select('studios', db.all, { lateral: { films: db.select('films', { studio_id: db.parent('id') }) } }) -->, dans une sous-requête `lateral` |
-| `Default`, `self` | lève une erreur |
+| `Default`, `self`, `all` | lève une erreur |
 | `raw()`, `cols()`, `vals()` | lève une erreur ([`raw()`](#raw)) |
 
 - `null` est aussi un paramètre, et `= NULL` ne correspond à aucune ligne : utilisez [`conditions.isNull`](/fr/conditions#conditions.isNull). De même pour `undefined`, envoyé comme `NULL`, avec [`undefinedMeansMissing`](/fr/runtime-config#Config.undefinedMeansMissing) ou sans : `{ tagline: undefined }` donne `("tagline" = $1)`<!-- probe: db.sql`${{ tagline: undefined }}` -->, donc aucune ligne : omettre la clé élargirait le filtre.
@@ -455,6 +456,10 @@ db.all
 ```
 
 Le `where` de `select()`, de `count()` et des autres lectures qui correspond à toutes les lignes : `db.select('films', db.all)` n’écrit pas de `WHERE` ([`select()`](/fr/select#select)). Ce n’est pas une interpolation : dans `sql`, le type le refuse, et il lève une erreur.
+
+- Comme valeur de filtre, il lève une erreur à la compilation, et le type le refuse : c’est un filtre entier, pas une valeur à comparer. Zapatos 6.6.1 l’envoyait comme la chaîne `'Symbol(all)'`, si bien que `deletes('films', { title: db.conditions.isNotIn([db.all]) })` supprimait tout film qui a un titre.
+  - Comme valeur d’un Whereable ([plus haut](#whereable)), dans `isIn()` / `isNotIn()`, et dans `vals([…])` avec une colonne courante ([`vals()`](#vals)) : "`` `db.all` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: leave the key out, or compare with a value. To match every row, give `db.all` as the whole filter of a shortcut: `select(table, db.all)`. ``<!-- message -->"
+  - Comme valeur de `eq()`, `add()` et des autres conditions, et dans le tableau d’une condition de tableau : "`` `db.all` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To match every row, give `db.all` as the whole filter of a shortcut: `select(table, db.all)`. ``<!-- message -->"
 
 ### `AllType` {#AllType}
 
