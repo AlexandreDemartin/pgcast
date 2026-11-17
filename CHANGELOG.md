@@ -21,7 +21,7 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 - `OrderSpecForTable<T>`, the type of one item of `select()`'s `order`, is exported, so that a package's declarations can name it (#580).
 
 ### Changed
-- `typescript` is an optional peer dependency (`peerDependenciesMeta`), its range unchanged, `>=4.1` (#592). Nothing at run time loads it, the CLI included. npm 7+ and pnpm no longer install it in a project that does not list it: with npm 11, the `node_modules` of pgcast and `pg` alone goes from 34 MiB to 4.4 MiB on disk. Listed as a dev dependency, it is left out by `npm install --omit=dev --omit=optional` and `pnpm install --prod`; `npm install --omit=dev` alone still installs it, as before. `pg` and `@types/pg` stay required peers: a project on npm that lists `typescript` but not `@types/pg` still gets `@types/pg`, and pgcast's types with it.
+- `typescript` is an optional peer dependency (`peerDependenciesMeta`), its range unchanged, `>=4.1` (#592). Nothing at run time loads it, the CLI included. npm and pnpm no longer install it in a project that does not list it: with npm 11, the `node_modules` of pgcast and `pg` alone goes from 34 MiB to 4.4 MiB on disk. Listed as a dev dependency, it is left out by `npm install --omit=dev --omit=optional` and `pnpm install --prod`; `npm install --omit=dev` alone still installs it, as before. `pg` and `@types/pg` stay required peers: a project on npm that lists `typescript` but not `@types/pg` still gets `@types/pg`, and pgcast's types with it.
   - Changed: a project that runs `tsc` without listing `typescript`, which npm and pnpm installed for it, gets none; it adds it, `npm install --save-dev typescript`.
 
 ### Fixed
