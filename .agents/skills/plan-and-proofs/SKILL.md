@@ -9,13 +9,11 @@ Each step leaves a trace the owner can read: the plan before the code, the proof
 
 ## The plan comment
 
-Explore, then plan, then code, then commit. The plan depends on the issue's **Risk** (skill `run-step` § Risk):
+Explore, then plan, then code, then commit. The plan follows the issue's **Risk** (skill `run-step` § Risk):
 
-| Risk | Plan |
-|---|---|
-| `low` | none |
-| `normal` | posted on the issue, then the builder goes on |
-| `high` | posted on the issue, then the builder **stops** and reports its link; the orchestrator checks it against the issue's **What**, **Done when** and **Files**, then resumes the builder |
+- `low`: none.
+- `normal`: posted on the issue, then the builder goes on.
+- `high`: posted on the issue, then the builder **stops** and reports its link; the orchestrator checks it against the issue's **What**, **Done when** and **Files**, then resumes the builder.
 
 - Posted with `gh issue comment <n> --repo AlexandreDemartin/pgcast --body-file <file>`, in English, ≤ ~30 lines.
 - Sections, as bullets: **Approach** · **Files** · **Tests first** (each test and what it proves) · **SQL before / after** (when the SQL changes) · **Risks** · **Decided-alone candidates**.
