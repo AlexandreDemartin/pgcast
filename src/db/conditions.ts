@@ -29,18 +29,20 @@ import type { Whereable, Table, Column, WhereableForTable, SelectableForTable } 
 const
   defaultInCondition = '`db.Default` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To set a column to its default in an UPDATE, give `db.Default` as the value itself: `{ n: db.Default }`.',
   selfInCondition = '`db.self` has no meaning as the value of `eq()`, `add()` and the other conditions: it is already the column on the left. To compare the column with itself, write a `sql` fragment with `db.self` on both sides.',
+  allInCondition = '`db.all` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To match every row, give `db.all` as the whole filter of a shortcut: `select(table, db.all)`.',
   wrapperInCondition = '`db.raw()`, `db.cols()` and `db.vals()` have no meaning as the value of `eq()`, `add()` and the other conditions: for SQL, write a `sql` fragment with `db.self` in place of the condition; for a value, give the value itself, or `db.param()`.';
 
 // a fragment that throws when compiled, so that `run()` rejects before any query, as for `Default` in a
-// Whereable, rather than the condition throwing while the query is built; 6.6.1 sent 'Symbol(DEFAULT)', and
-// raw(), cols() and vals() as JSON
+// Whereable, rather than the condition throwing while the query is built; 6.6.1 sent 'Symbol(DEFAULT)' and
+// 'Symbol(all)', and raw(), cols() and vals() as JSON
 const refused = (message: string) => Object.assign(sql``, { compile: () => { throw new Error(message); } });
 
 const conditionalParam = (a: any) =>
   a === Default ? refused(defaultInCondition) :
     a === self ? refused(selfInCondition) :
-      a instanceof DangerousRawString || a instanceof ColumnNames || a instanceof ColumnValues ? refused(wrapperInCondition) :
-        a instanceof SQLFragment || a instanceof ParentColumn || a instanceof Parameter ? a : param(a);
+      a === all ? refused(allInCondition) :
+        a instanceof DangerousRawString || a instanceof ColumnNames || a instanceof ColumnValues ? refused(wrapperInCondition) :
+          a instanceof SQLFragment || a instanceof ParentColumn || a instanceof Parameter ? a : param(a);
 
 export const isNull = sql<SQL, boolean>`${self} IS NULL`;
 export const isNotNull = sql<SQL, boolean>`${self} IS NOT NULL`;

@@ -305,6 +305,12 @@ Candidates for a check, a rule or a skill line.
 - #634: an `@errors` twoslash block cannot prove a line it accepts (it matches error codes only); a compiling block with `@ts-expect-error` checks both directions.
 - #634: to prove the docs build catches a refusal that goes away, mutate and run `npx vitepress build`: `docs:build` fails first on `check-translations`, which proves nothing about the block.
 - #625: a type check pushed from the outer query into a subquery (a lateral's `parent()`) costs +47.7 % on `bench:types`: a subquery's argument types never reach its return type, so only contextual typing can carry the parent table, at a cost on every Whereable property.
+- #632: classify by decision 003 before starting: a type test passing on master that refuses the value is the proof "the type already refuses", which makes the change a Fix, whatever the issue said.
+- #632: a pg client emits `error` when its probe database is dropped WITH (FORCE): without `client.on('error')` the replay script dies silently; tarballs unpacked in the scratchpad need `NODE_PATH` to find `pg`.
+- #632: a SQLSTATE given "on the others" for a nonsense value must be checked on a `date` or `timestamptz` column: date and time types reject bad input with 22007, not 22P02; `bytea` takes the text and matches no row.
+- #632: each "Unchanged:" path a CHANGELOG or docs line states needs a test that freezes it, or a later PR changing that path leaves the line stale with every test green.
+- #632: `docs:build` exists only in `website/package.json`: `npm run docs:build` at the root fails with "Missing script", as #301 found for `docs:translated`.
+- #632: never chain `docs:translated` after a scripted edit of a French page in one command: a missed match (the U+00A0 before `:` and `;`) still marks the page translated.
 
 ## Minors kept
 

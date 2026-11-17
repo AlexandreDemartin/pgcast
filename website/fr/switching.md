@@ -1,5 +1,5 @@
 ---
-english: 2696a9c60546
+english: e76aa75e61fd
 description: "Passez de Zapatos 6.6.1 à pgcast : changez une ligne de package.json et régénérez ; tsc et les avertissements de pgcast montrent les rares appels qui changent."
 ---
 
@@ -116,6 +116,7 @@ Cherchez dans votre code la première colonne de chaque tableau ci-dessous. Chaq
 | [`and()`](/fr/conditions#conditions.and) d’un fragment avec un `OR` nu et un autre opérande : `` and(db.sql`${'id'} = 1000 OR ${'id'} = 1001`, { studio_id: 1001 }) `` | `a OR (b AND c)`, donc aussi le film 1000 | `((a OR b) AND (c))`<!-- probe: db.conditions.and(db.sql`a OR b`, db.sql`c`) --> | pour les anciennes lignes, un seul fragment : `` db.sql`${'id'} = 1000 OR (${'id'} = 1001 AND ${'studio_id'} = ${db.param(1001)})` `` |
 | [`and()`](/fr/conditions#conditions.and) de fragments qui coupent une expression : `` and(db.sql`${'release_year'} BETWEEN 1970`, db.sql`2000`) `` | `(a BETWEEN 1970 AND 2000)`, les films 1000 et 1001 | `((a BETWEEN 1970) AND (2000))`<!-- probe: db.conditions.and(db.sql`a BETWEEN 1970`, db.sql`2000`) -->, que Postgres refuse (42601) | une seule condition : `{ release_year: db.conditions.between(1970, 2000) }` |
 | `groupBy` qui reçoit un `and()` ou un `or()` sans argument : `count('films', db.all, { groupBy: db.conditions.and() })` | `GROUP BY ()`, l’ensemble de regroupement vide : 4 | `GROUP BY TRUE`<!-- probe: db.count('films', db.all, { groupBy: db.conditions.and() }) -->, que Postgres refuse (42601), `GROUP BY FALSE` pour `or()` | omettez `groupBy` : 4 |
+| [`db.all`](/fr/sql-template#all) comme valeur d’une condition : `deletes('films', { title: db.conditions.ne(db.all) })` | `'Symbol(all)'`, donc tout film qui a un titre est supprimé | refusé par `tsc`, sauf sur une colonne typée `any`, et lève une erreur à la compilation de la requête | pour les mêmes lignes, `{ title: db.conditions.isNotNull }` ; sinon, une valeur à comparer |
 
 </div>
 
