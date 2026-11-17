@@ -1,5 +1,5 @@
 ---
-english: cc566bd7c6c9
+english: cd5fe5cc3246
 layout: home
 markdownStyles: false
 title: pgcast
@@ -24,7 +24,7 @@ Pas d’ORM, pas de modèles, pas d’état caché : vous gardez la main.
 
 </div>
 
-<InstallLine :commands="['npm install pgcast@npm:@pgcast/pgcast pg', 'pnpm add pgcast@npm:@pgcast/pgcast pg', 'yarn add pgcast@npm:@pgcast/pgcast@^6.7 pg', 'bun add pgcast@npm:@pgcast/pgcast@^6.7 pg']" />
+<InstallLine :commands="['npm install pgcast@npm:@pgcast/pgcast', 'pnpm add pgcast@npm:@pgcast/pgcast', 'yarn add pgcast@npm:@pgcast/pgcast@^6.7', 'bun add pgcast@npm:@pgcast/pgcast@^6.7']" />
 </section>
 
 <CastPanel example="home">
