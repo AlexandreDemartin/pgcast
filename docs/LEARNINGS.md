@@ -388,6 +388,8 @@ Candidates for a check, a rule or a skill line.
 - #666: the pages and tests that quote an error message reach beyond an issue's Files: `git grep` the message before changing it (4 test files and 4 pages quoted it).
 - #666: `currentColumn` is set by a filter's key and by a write's `vals({…})` key alike, so a message thrown under it cannot tell the two apart without a new mechanism; it names both.
 - #666: run each error message's advice at every position that reaches it, not only the throw: `db.self` advised for a write fails in `insert()` and an `upsert()` row (42703) and runs only in `update()` and a filter.
+- #667: `check:floor` type-checks the fixture's schema, not the docs schema: to check a docs type form on TS 4.1.6, copy `website/zapatos` into a scratch consumer and link check:floor's cached TypeScript into it.
+- #667: a scripted edit of a French page cannot match « : » by its ASCII text (U+00A0 before the colon): anchor on the line's start instead.
 
 ## Minors kept
 
