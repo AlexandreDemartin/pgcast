@@ -1167,6 +1167,7 @@ describe('shortcut options', () => {
       ['an array whose own toString() answers x" and replace() other SQL', log => Object.assign(['u'], { toString: logged(log, 'toString', 'x"'), replace: () => attack }), twice('"u"', '"sq_x"""'), ['toString']],
       ['an array whose own non-enumerable toString() and replace() answer so', log => Object.defineProperties(['u'], { toString: { value: logged(log, 'toString', 'x"') }, replace: { value: () => attack } }), twice('"u"', '"sq_x"""'), ['toString']],
       ['a fragment whose own toString() and replace() answer so', log => Object.assign(sql`u`, { toString: logged(log, 'toString', 'x"'), replace: () => attack }), twice('u', '"sq_x"""'), ['toString']],
+      ['an array whose own toString() answers a<NUL>b and replace() other SQL', log => Object.assign(['u'], { toString: logged(log, 'toString', 'a\0b'), replace: () => attack }), twice('"u"', '"sq_a\0b"'), ['toString']],
       ['a class instance whose toString() and replace() answer so', log => new (class { toString() { log.push('toString'); return 'x"'; } replace() { return attack; } })(), twice('TRUE', '"sq_x"""'), ['toString']],
       // pgcast 6.6.2 to 6.8.0 threw `TypeError: name.replace is not a function`
       ['an array whose own toString() answers other SQL, with no replace()', log => Object.assign(['u'], { toString: logged(log, 'toString', attack) }), twice('"u"', '"sq_x""; DELETE FROM users; --"'), ['toString']],
