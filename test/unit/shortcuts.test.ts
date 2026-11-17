@@ -1640,6 +1640,35 @@ describe('select', () => {
       { for: 'KEY SHARE' },
     ] }).compile().text).toMatchInlineSnapshot(`"SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("u".*) AS result FROM "users" AS "u" FOR NO KEY UPDATE OF "u" NOWAIT FOR SHARE OF "u" SKIP LOCKED FOR KEY SHARE) AS "sq_u""`);
   });
+
+  /** An `order` or `lock` item whose keys are getters that log each read; `key` answers `first`, then `later`. */
+  const twoFaced = (option: 'order' | 'lock', key: string, first: string, later: string) => {
+    const
+      log: string[] = [],
+      given: Record<string, unknown> = { ...option === 'order' ? { by: 'email', direction: 'ASC', nulls: undefined } : { for: 'UPDATE', wait: undefined, of: undefined }, [key]: first };
+    let reads = 0;
+    const item = Object.defineProperties({}, Object.fromEntries(Object.keys(given).map(k => [k, {
+      get: () => (log.push(k), k === key && reads++ > 0 ? later : given[k]), enumerable: true,
+    }])));
+    let result: unknown;
+    try { result = db.select('users', all, { [option]: item } as any).compile(); } catch (err) { result = `throws: ${(err as Error).message}`; }
+    return { result, log };
+  };
+  const ordered = (clause: string) => ({ text: `SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users"${clause}) AS "sq_users"`, values: [] });
+
+  // a getter may answer anew on each read: each key goes into the SQL, or the message, as its one read was checked;
+  // Zapatos 6.6.1 read direction and nulls again for raw(), pgcast 6.6.2 to 6.8.0 for, wait, direction and nulls (#586)
+  it.each([
+    ['order', 'direction', 'ASC', 'ASC, (SELECT 1)', ordered(' ORDER BY "email" ASC'), ['direction', 'nulls', 'by']],
+    ['order', 'nulls', 'FIRST', 'FIRST, (SELECT 1)', ordered(' ORDER BY "email" ASC NULLS FIRST'), ['direction', 'nulls', 'by']],
+    ['lock', 'for', 'UPDATE', 'UPDATE; SELECT 1', ordered(' FOR UPDATE'), ['for', 'wait', 'of', 'of']],
+    ['lock', 'wait', 'NOWAIT', 'NOWAIT; SELECT 1', ordered(' FOR UPDATE NOWAIT'), ['for', 'wait', 'of', 'of']],
+    // refused on its first read, the key is the last one read, and the message names that read
+    ['order', 'direction', 'UP', 'ASC', 'throws: Direction must be ASC/DESC, not \'UP\'', ['direction']],
+    ['lock', 'for', 'FOR', 'UPDATE', 'throws: Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not \'FOR\'', ['for']],
+  ] as const)('%s.%s answering %j, then %j, is read once and gives what was checked', (option, key, first, later, result, log) => {
+    expect(twoFaced(option, key, first, later)).toEqual({ result, log });
+  });
 });
 
 describe('selectOne, selectExactlyOne', () => {
@@ -2672,8 +2701,9 @@ describe('a shortcut option added to Object.prototype by something else is no op
     },
     // lateral is read once for its refusal, once for the query
     options: { 'get:lateral': 2, 'get:alias': 1, 'get:distinct': 1, 'get:groupBy': 1, 'get:having': 1, 'get:columns': 1, 'get:extras': 1, 'get:lock': 3, 'get:order': 3, 'get:offset': 1, 'get:limit': 1 },
-    order: { 'get:direction': 2, 'get:nulls': 2, 'get:by': 1 },
-    lock: { 'get:for': 2, 'get:wait': 2, 'get:of': 2 },
+    // an item's direction, nulls, for and wait are read once, so raw() gets the value checked (#586)
+    order: { 'get:direction': 1, 'get:nulls': 1, 'get:by': 1 },
+    lock: { 'get:for': 1, 'get:wait': 1, 'get:of': 2 },
     writes: { 'get:noNullUpdateColumns': 1, 'get:updateColumns': 1, 'get:updateValues': 1, 'get:returning': 1, 'get:extras': 1, 'get:reportAction': 1 },
     reads: 3,
     ownReads: 3,
@@ -2692,20 +2722,20 @@ describe('a shortcut option added to Object.prototype by something else is no op
     const withKeys = Object.entries(keys).reduceRight<typeof readCounted>((f, [k, v]) => () => withPrototypeKey(k, v, f), readCounted);
     expect(withKeys()).toEqual({
       ...readAsBefore,
-      order: { ...readAsBefore.order, 'getOwnPropertyDescriptor:nulls': 2, getPrototypeOf: 2 },
-      lock: { ...readAsBefore.lock, 'getOwnPropertyDescriptor:wait': 2, 'getOwnPropertyDescriptor:of': 2, getPrototypeOf: 4 },
+      order: { ...readAsBefore.order, 'getOwnPropertyDescriptor:nulls': 1, getPrototypeOf: 1 },
+      lock: { ...readAsBefore.lock, 'getOwnPropertyDescriptor:wait': 1, 'getOwnPropertyDescriptor:of': 2, getPrototypeOf: 3 },
     });
   });
 
-  /** Run `f` with a getter `key` on Object.prototype, as other code would define one, deleted after it; with its reads. */
-  const withPrototypeGetter = <T>(key: string, make: () => unknown, f: () => T) => {
+  /** Run `f` with a getter `key` on Object.prototype, and a setter if `set`, as other code would define them, deleted after it; with its reads. */
+  const withPrototypeGetter = <T>(key: string, make: () => unknown, f: () => T, set = false) => {
     let reads = 0;
-    Object.defineProperty(Object.prototype, key, { get: () => (reads++, make()), configurable: true });
+    Object.defineProperty(Object.prototype, key, { get: () => (reads++, make()), ...set && { set() { } }, configurable: true });
     try { return { result: f(), reads }; } finally { delete (Object.prototype as any)[key]; }
   };
 
   // a getter answers anew on each read, so its value is no sign of where it came from: with no own key on the caller's
-  // object or its prototypes, it is Object.prototype's, read once per read of the option
+  // object or its prototypes, it is Object.prototype's, read once per read of the option; a setter beside it changes nothing
   it.each([
     ['deletes(): returning', 'returning', () => ['email'], () => db.deletes('users', { email: 'e@x.org' }, {}),
       { text: 'DELETE FROM "users" WHERE ("email" = $1) RETURNING to_jsonb("users".*) AS result', values: ['e@x.org'] }, 1],
@@ -2716,9 +2746,12 @@ describe('a shortcut option added to Object.prototype by something else is no op
     ['select(): order', 'order', () => ({ by: 'email', direction: 'DESC' }), () => db.select('users', all, {}),
       { text: selectMany(plain.text), values: [] }, 2],
     ['select(): an order item\'s nulls', 'nulls', () => 'FIRST', () => db.select('users', all, { order: { by: 'email', direction: 'ASC' } }),
-      { text: selectMany(`${plain.text} ORDER BY "email" ASC`), values: [] }, 2],
+      { text: selectMany(`${plain.text} ORDER BY "email" ASC`), values: [] }, 1],
   ])('a getter on Object.prototype is no option either: %s', (_, key, make, build, compiled, reads) => {
-    expect(withPrototypeGetter(key, make, () => build().compile())).toEqual({ result: compiled, reads });
+    expect({
+      get: withPrototypeGetter(key, make, () => build().compile()),
+      getAndSet: withPrototypeGetter(key, make, () => build().compile(), true),
+    }).toEqual({ get: { result: compiled, reads }, getAndSet: { result: compiled, reads } });
   });
 
   it('a getter on Object.prototype is no option beside a value key there too', () => {
