@@ -291,9 +291,9 @@ const notAValueIn = (a: unknown[]) => {
 const arrayParam = (fn: string, a: unknown) => {
   const item = Array.isArray(a) ? notAValueIn(a) : undefined;
   return item === undefined ? conditionalParam(a) : refused(item === all ? allInCondition :
-    `\`${fn}()\` sends its array as one parameter, so each item is a plain value, not ${notAValue(item)}: ` +
-    (item instanceof Parameter || item instanceof SQLFragment || item instanceof ParentColumn ?
-      'give the value itself; for SQL, write a `sql` fragment with `db.self` in place of the condition.' : 'give a value.'));
+    item instanceof Parameter || item instanceof SQLFragment || item instanceof ParentColumn ?
+      `\`${fn}()\` sends its array as one parameter, so each item is a plain value, not ${notAValue(item)}: give the value itself; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.` :
+      `\`${fn}()\` sends its array as one parameter, so each item is a plain value, not ${notAValue(item)}: give a value.`);
 };
 
 /**
