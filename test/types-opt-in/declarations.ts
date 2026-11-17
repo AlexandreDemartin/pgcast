@@ -25,20 +25,10 @@ export const userWithAggregates = (id: number) => db.selectOne('users', { id }, 
 export const firstEventOfUser = (id: number) => db.selectOne('users', { id }, { lateral: db.min('events', db.all, { columns: ['occurred_on'] }) });
 
 // every function and value of zapatos/db and of db.conditions re-exported, as a wrapper module does: each type must be
-// one a .d.ts can name (TS4023 otherwise), so a type that names an unexported interface is written inline. Left out:
-// insert, upsert, update, truncate, toDate and toString, whose types have named an unexported interface since
-// Zapatos 6.6.1 (InsertSignatures, ToDate…)
-export const {
-  mapWithSeparator, getConfig, setConfig, Default, self, all, toBuffer, Parameter, DangerousRawString, ColumnNames,
-  ColumnValues, ParentColumn, SQLFragment, strict, param, raw, cols, vals, parent, sql, isDatabaseError, Constraint,
-  doNothing, deletes, SelectResultMode, NotExactlyOneError, select, selectOne, selectExactlyOne, count, sum, avg, min,
-  max, constraint, IsolationLevel, transaction, serializable, repeatableRead, readCommitted, serializableRO,
-  repeatableReadRO, readCommittedRO, serializableRODeferrable, enableCustomJSONParsingForLargeNumbers,
-} = db;
-export const {
-  isNull, isNotNull, isTrue, isNotTrue, isFalse, isNotFalse, isUnknown, isNotUnknown, isDistinctFrom,
-  isNotDistinctFrom, eq, ne, gt, gte, lt, lte, between, betweenSymmetric, notBetween, notBetweenSymmetric, like,
-  notLike, ilike, notIlike, similarTo, notSimilarTo, reMatch, reImatch, notReMatch, notReImatch, isIn, isNotIn, eqAny,
-  jsonbContains, jsonbPathExists, or, and, not, arrayContains, arrayContainedIn, arrayOverlaps, exists, isInSelect,
-  websearchToTsquery, fromNow, after, before, now, add, subtract,
-} = db.conditions;
+// one a .d.ts can name (TS4023 otherwise), so a type that names an unexported interface is written inline. An object
+// rest writes out every member, so an export added later is covered with no edit here. `sql` is re-exported by name:
+// a rest writes out its signature, which names NoInfer of ./utils (TS2742 in a consumer, #578)
+const { conditions, sql, ...values } = db;
+export const dbValues = values;
+export { sql };
+export const { ...allConditions } = conditions;
