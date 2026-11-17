@@ -956,25 +956,22 @@ describe('Default, self, raw, cols and vals as the value of a condition', () => 
         "vals query": "\`websearchToTsquery()\` sends its configuration and its query as parameters: give the query as a string, not \`db.vals()\`; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
       }
     `);
-    expect({ number: show(dc.websearchToTsquery('english', 42 as any)), null: show(dc.websearchToTsquery('english', null as any)) })
-      .toMatchInlineSnapshot(`
-        {
-          "null": {
-            "text": "(("col" @@ websearch_to_tsquery(CAST($1 AS "regconfig"), $2)))",
-            "values": [
-              "english",
-              null,
-            ],
-          },
-          "number": {
-            "text": "(("col" @@ websearch_to_tsquery(CAST($1 AS "regconfig"), $2)))",
-            "values": [
-              "english",
-              42,
-            ],
-          },
-        }
-      `);
+  });
+
+  it('websearchToTsquery given a configuration or a query that is no string throws when compiled, not when called', () => {
+    // pg would send an array as '{"salt","orchard"}', which Postgres reads as its words, undefined as NULL, no row
+    // with no error, and a number as its text
+    const values = { array: ['salt', 'orchard'], undefined, null: null, number: 42, boolean: true, object: {},
+      function: () => 'salt', symbol: Symbol('salt'), bigint: BigInt(1) };
+    const takes = (which: string, what: string) =>
+      `\`websearchToTsquery()\` takes its ${which} as a string, not ${what}: give it as a string, \`websearchToTsquery('english', 'salt orchard')\`.`;
+    const what = { array: 'an array', undefined: '`undefined`', null: '`null`', number: 'a `number`', boolean: 'a `boolean`',
+      object: 'an object', function: 'a function', symbol: 'a symbol', bigint: 'a `bigint`' };
+    expect(Object.fromEntries(Object.entries(values).flatMap(([name, x]) => [
+      [`${name} config`, thrown(dc.websearchToTsquery(x as any, 'salt'))], [`${name} query`, thrown(dc.websearchToTsquery('english', x as any))],
+    ]))).toEqual(Object.fromEntries(Object.entries(what).flatMap(([name, w]) => [
+      [`${name} config`, takes('configuration', w)], [`${name} query`, takes('query', w)],
+    ])));
   });
 
   it('eqAny given a list that is not an array throws when compiled, saying what to do', () => {

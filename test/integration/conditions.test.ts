@@ -414,6 +414,13 @@ describe('websearchToTsquery on a tsvector column', () => {
       .toEqual({ code: '42704', message: 'text search configuration "klingon" does not exist' });
   });
 
+  it('a query that is no string rejects before any query, so an update() changes no row', async () => {
+    // pg would send ['shirt'] as '{"shirt"}', which Postgres reads as the word shirt: both shirts
+    await expect(db.update('products', { price_cents: 0 }, { search: search('simple', ['shirt'] as any) }).run(t.client))
+      .rejects.toThrow('`websearchToTsquery()` takes its query as a string, not an array');
+    expect(await db.count('products', { price_cents: 0 }).run(t.client)).toBe(0);
+  });
+
   it('a NULL vector gives NULL: not() leaves the row out too', async () => {
     const { id } = await db.insert('extra.type_zoo' as any, { c_text: 'no vector' }, { returning: ['id'] }).run(t.client) as { id: number };
     expect({
