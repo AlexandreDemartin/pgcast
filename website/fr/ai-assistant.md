@@ -1,5 +1,5 @@
 ---
-english: 94944c1bd554
+english: 1989daa92ea6
 description: "Donnez à un assistant qui écrit vos requêtes cette doc, votre schéma généré et un court fichier de règles, pour qu’il les écrive à la manière de pgcast."
 ---
 
@@ -100,7 +100,7 @@ Placez-le là où votre assistant lit ses instructions :
 | un skill Claude | `.claude/skills/pgcast/SKILL.md` | un front matter avec une `description` |
 
 - Claude Code ne lit `AGENTS.md` que si le projet n’a ni `CLAUDE.md`, ni `.claude/CLAUDE.md`, ni `CLAUDE.local.md`. S’il en a un, il ne lit `AGENTS.md` que si ce fichier l’importe, avec une ligne `@AGENTS.md` ([la doc de Claude Code](https://code.claude.com/docs/en/memory#agents-md)).
-- Pour les deux derniers, la `description` dit quand les règles s’appliquent : l’assistant la lit et charge les règles quand une tâche en a besoin. Une règle Cursor avec des `globs` serait au contraire jointe dès qu’un fichier correspondant est dans le contexte, quelle que soit sa `description` ([la doc de Cursor](https://cursor.com/docs/context/rules)).
+- Pour les deux derniers, la `description` dit quand les règles s’appliquent : l’assistant la lit et charge les règles quand une tâche en a besoin. Une règle Cursor avec des `globs` serait au contraire jointe dès qu’un fichier correspondant est dans le contexte, quelle que soit sa `description` ([la doc de Cursor](https://cursor.com/docs/rules)).
 
 ::: code-group
 

@@ -1,5 +1,5 @@
 ---
-english: de21a2156d8f
+english: 86fea58a34b5
 aside: false  # the panel takes the rail's width: code lines are long
 description: "Modifiez une requête sur le schéma de la doc et voyez, à la saisie, le SQL qu’écrit pgcast et le type du résultat ; Exécuter montre la réponse de Postgres."
 ---
@@ -20,6 +20,8 @@ Modifiez une requête sur le schéma de la doc et voyez, pendant la saisie, le S
 
 </CastPanel>
 </Playground>
+
+Le playground exécute le code le plus récent de pgcast : il peut déjà contenir ce qu’apportera la [prochaine version](/fr/changelog#unreleased).
 
 ## Ce qui tourne ici {#what-runs-here}
 

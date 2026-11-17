@@ -1,5 +1,5 @@
 ---
-english: 904afe9abf81
+english: 021b3931b885
 ---
 
 # Sécurité
@@ -94,6 +94,18 @@ La caractérisation de Zapatos 6.6.1 a trouvé sept façons pour la chaîne d’
 </div>
 
 Zapatos 6.6.1 vérifiait déjà `order.direction` et `order.nulls`. Chaque faille, ce qu’elle laissait passer et le test qui la fige : le [rapport de caractérisation](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/CHARACTERISATION-REPORT.md#security) ; le SQL avant et après : [le changelog](/fr/changelog#6.6.2-security).
+
+### Les corrections par version {#fixes-by-release}
+
+Chaque faille ci-dessous existe aussi dans Zapatos 6.6.1, et dans pgcast jusqu’à la version qui l’a corrigée. Chaque ligne renvoie à son avis de sécurité GitHub et à sa section du changelog, qui donne les appels et le SQL avant et après :
+
+- **6.8.0** : une clé qu’un autre code a ajoutée à `Object.prototype` n’est plus une option des raccourcis, alors qu’elle choisissait les colonnes qu’un appel renvoie ou qu’`upsert()` met à jour, ou ajoutait un tri ou un verrou de ligne ([GHSA-rrjr-843p-m3hp](https://github.com/AlexandreDemartin/pgcast/security/advisories/GHSA-rrjr-843p-m3hp), [§ Security](/fr/changelog#6.8.0-security)).
+- **6.7.2** : une telle clé ne donne plus sa valeur à une colonne dans `upsert()`, et ne s’ajoute plus aux colonnes de lignes données en tableau ([GHSA-fcm2-3rf6-q6jj](https://github.com/AlexandreDemartin/pgcast/security/advisories/GHSA-fcm2-3rf6-q6jj)) ; avec `enableCustomJSONParsingForLargeNumbers()`, un long nombre stocké dans une ligne ne bloque plus le processus Node chaque fois que la ligne est lue ([GHSA-xr8m-qp54-979j](https://github.com/AlexandreDemartin/pgcast/security/advisories/GHSA-xr8m-qp54-979j), [§ Security](/fr/changelog#6.7.2-security)).
+- **6.7.1** : l’objet `Segments` d’un `Intl.Segmenter`, comme filtre, lève une erreur, alors qu’il correspondait à toutes les lignes de `deletes()` et `update()` ([GHSA-m7f9-7xxc-gp2q](https://github.com/AlexandreDemartin/pgcast/security/advisories/GHSA-m7f9-7xxc-gp2q), [§ Security](/fr/changelog#6.7.1-security)).
+- **6.7.0** : un objet natif comme filtre, un `Date` par exemple, lève une erreur, alors qu’il correspondait à toutes les lignes ([GHSA-hp6h-7j87-fpgj](https://github.com/AlexandreDemartin/pgcast/security/advisories/GHSA-hp6h-7j87-fpgj)) ; de même pour `isIn()` et `isNotIn()` avec une liste qui n’est pas un tableau, alors que `isNotIn()` d’un `Set` correspondait à toutes les lignes ([GHSA-v79f-vppq-2pr4](https://github.com/AlexandreDemartin/pgcast/security/advisories/GHSA-v79f-vppq-2pr4)), et `parent()`, `raw()`, `cols()` ou `vals()` comme valeur à écrire, alors qu’elle était stockée en JSON ([§ Security](/fr/changelog#6.7.0-security)).
+- **6.6.2** : les sept failles du tableau ci-dessus ([GHSA-2vqm-6cmp-w46m](https://github.com/AlexandreDemartin/pgcast/security/advisories/GHSA-2vqm-6cmp-w46m), qui vise Zapatos 6.6.1, [§ Security](/fr/changelog#6.6.2-security)).
+
+Une correction sort dans une nouvelle version, jamais dans une plus ancienne : seule la dernière mineure est prise en charge ([`SECURITY.md`](https://github.com/AlexandreDemartin/pgcast/blob/master/SECURITY.md#supported-versions)). Restez donc à jour en passant à la dernière version, qui remplace la vôtre sans autre changement. `npm audit` et Dependabot signalent un avis de sécurité une fois que GitHub l’a examiné et ajouté à sa base, la GitHub Advisory Database ; d’ici là, il est dans cette liste et dans les [avis](https://github.com/AlexandreDemartin/pgcast/security/advisories) du dépôt.
 
 ## Ce contre quoi pgcast ne peut rien {#what-pgcast-can-t-guard-against}
 

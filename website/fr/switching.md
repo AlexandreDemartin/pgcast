@@ -1,5 +1,5 @@
 ---
-english: ed59b45517c8
+english: f152b2e95918
 description: "Passez de Zapatos 6.6.1 à pgcast : changez une ligne de package.json et régénérez ; tsc et les avertissements de pgcast montrent les rares appels qui changent."
 ---
 
@@ -304,7 +304,7 @@ Le code écrit, ou laissé tel quel, en comptant sur les corrections de pgcast r
 
 `db.deletes('roles', { character: db.conditions.isNotIn([db.param('The ferryman')]) })` supprime 11 rôles sous pgcast, et les 12 sous Zapatos 6.6.1.
 
-Les failles du [§ Security de la 6.6.2](/fr/changelog#6.6.2-security) sont de nouveau ouvertes : un nom, un `lock`, un `aggregate`, une simple valeur dans `updateValues` ou un cast de `param()` peuvent injecter du SQL ([Sécurité](/fr/security)).
+Les failles fermées par les corrections de sécurité de chaque version sont de nouveau ouvertes ([Les corrections par version](/fr/security#fixes-by-release)) : la chaîne d’un appelant peut injecter du SQL, un filtre peut correspondre à toutes les lignes, et une clé qu’un autre code a ajoutée à `Object.prototype` peut changer une requête.
 :::
 
 ## Voir aussi {#see-also}

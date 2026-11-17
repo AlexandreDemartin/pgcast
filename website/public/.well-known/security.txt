@@ -1,0 +1,6 @@
+# pgcast: report a vulnerability privately, never in a public issue.
+Contact: https://github.com/AlexandreDemartin/pgcast/security/advisories/new
+Expires: 2027-11-16T00:00:00.000Z
+Policy: https://pgcast.dev/security#report-a-flaw
+Preferred-Languages: en, fr
+Canonical: https://pgcast.dev/.well-known/security.txt

@@ -303,7 +303,7 @@ Code written or left as it is against pgcast's fixes gets Zapatos 6.6.1's result
 
 `db.deletes('roles', { character: db.conditions.isNotIn([db.param('The ferryman')]) })` deletes 11 roles under pgcast, and all 12 under Zapatos 6.6.1.
 
-The holes of [6.6.2's § Security](/changelog#6.6.2-security) are open again: a name, a `lock`, an `aggregate`, a plain value in `updateValues` or a `param()` cast can splice SQL ([Security](/security)).
+The holes that each release's security fixes closed are open again ([Fixes by release](/security#fixes-by-release)): a caller's string can splice SQL, a filter can match every row, and a key that other code added to `Object.prototype` can change a query.
 :::
 
 ## See also
