@@ -289,6 +289,16 @@ Candidates for a check, a rule or a skill line.
 - #610: a probe payload in a nested position closes every parenthesis it opens, or Postgres refuses it at `;` and the guard under test is never exercised.
 - #610: a claim that a nesting "has a parameter" is checked against every way of nesting: a `lateral` map adds `$n`, a single `lateral` query (`lateral_passthru`) does not; run `compile().values.length` per shape before writing it.
 - #610: a changelog clause about "a parameter" in nested forms lists each nested form on its own (`lateral` map, single `lateral`, `extras`, `sql` template): only some carry a key.
+- #615: `@ts-expect-error` does not suppress declaration-emit diagnostics (TS4023): an emit limit is frozen only through the compiler API (`test/unit/declarationEmit.test.ts`).
+- #615: TS 5.9 writes `keyof X` and mapped types by reference unless nested in an inferred object type; only then does a silent `symbol | …` widening show.
+- #615: a private tag's type is dropped from the emitted `.d.ts`: it guards nominally but cannot carry a type to `infer`.
+- #615: TS 5.9 and 7 write a mapped type of a class out in full when inferred through a generic call, and an object rest too: an unexported symbol-keyed member breaks those forms on every compiler.
+- #615: TypeScript merges two installed copies of a package with the same name and version: a "two copies" probe changes one copy's version.
+- #615: declarations copied outside any folder whose ancestor holds `node_modules` lose `pg` (TS2307), its types silently `any`: keep a probe's declarations under the consumer's tree.
+- #615: the guard refuses a bare `git merge`; a merge needs `-m "<subject>" -m "Co-Authored-By: …"`, which a fix brief asking for a merge can spell out.
+- #615: "every error keeps its code and first line" needs a sweep of every class pair under each `exactOptionalPropertyTypes` and `strict` setting: TS2375 replaces TS2322 on the first line only with the option on and a target with optional members.
+- #615: a "writes it by this name" doc clause is checked with the named form and the spread in separate probe files: a TS4023 blocks the whole file's `.d.ts`.
+- #615: the stripped test trees never assign a `ParentColumn` or a `Parameter<undefined>` to a `Parameter`, so a "first lines unchanged" claim needs a full pairs probe.
 
 ## Minors kept
 
