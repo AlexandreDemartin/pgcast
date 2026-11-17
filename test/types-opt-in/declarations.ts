@@ -26,9 +26,11 @@ export const firstEventOfUser = (id: number) => db.selectOne('users', { id }, { 
 
 // every function and value of zapatos/db and of db.conditions re-exported, as a wrapper module does: each type must be
 // one a .d.ts can name (TS4023 otherwise), so a type that names an unexported interface is written inline. An object
-// rest writes out every member, so an export added later is covered with no edit here. `sql` is re-exported by name:
-// a rest writes out its signature, which names NoInfer of ./utils (TS2742 in a consumer, #578)
-const { conditions, sql, ...values } = db;
+// rest writes out every member, so an export added later is covered with no edit here
+const { conditions, ...values } = db;
 export const dbValues = values;
-export { sql };
 export const { ...allConditions } = conditions;
+
+// a generic forwarder writes out the type of select()'s lock option, where the alias is still `A` (TS2742 if that type
+// names one a consumer cannot import, #578)
+export const lockOf = <A extends string>(options: db.SelectOptionsForTable<'users', undefined, undefined, undefined, A>) => options.lock;
