@@ -19,7 +19,7 @@ Each member is a [`sql`](/sql-template#sql) fragment written around [`db.self`](
 
 - **Where**: as a Whereable value, so in the `where` of [`select()`](/select#select), [`count()`](/select#count), [`update()`](/insert#update) and [`deletes()`](/insert#deletes), the `having` of `select()`, and a Whereable in a `sql` template. Elsewhere `self` has no column: `` db.sql`SELECT ${db.conditions.isNull}` `` throws "The 'self' column alias has no meaning here"<!-- message --> as it compiles.
   - [`and()`](#conditions.and), [`or()`](#conditions.or) and [`not()`](#conditions.not) also take Whereables, so they can be a whole `where`; [`now`](#conditions.now), [`fromNow()`](#conditions.fromNow) and [`exists()`](#conditions.exists) hold no `self`, and go anywhere.
-- **Values**: each value is a parameter, `$1`, except a [`Parameter`](/sql-template#Parameter), kept as it is with its cast; a `sql` fragment, written as its SQL; and [`parent()`](/sql-template#parent), the parent query's column in a `lateral` subquery, or in the `where` of [`exists()`](#conditions.exists) and [`isInSelect()`](#conditions.isInSelect), whose `parent` option names that table. `Default`, `self`, `raw()`, `cols()` and `vals()` throw: [Values a condition refuses](#refused-values). [`eqAny()`](#conditions.eqAny) sends its array as one parameter of plain values: an item that is any of these, or `all`, throws, and in place of the array it takes `parent()` alone.
+- **Values**: each value is a parameter, `$1`, except a [`Parameter`](/sql-template#Parameter), kept as it is with its cast; a `sql` fragment, written as its SQL; and [`parent()`](/sql-template#parent), the parent query's column in a `lateral` subquery, or in the `where` of [`exists()`](#conditions.exists) and [`isInSelect()`](#conditions.isInSelect), whose `parent` option names that table. `Default`, `self`, `raw()`, `cols()` and `vals()` throw, and so does `all`, but in `isIn()` and `isNotIn()`: [Values a condition refuses](#refused-values). [`eqAny()`](#conditions.eqAny) sends its array as one parameter of plain values: an item that is any of these, or `all`, throws, and in place of the array it takes `parent()` alone.
   - [`jsonbContains()`](#conditions.jsonbContains) takes a JSON value alone, and [`jsonbPathExists()`](#conditions.jsonbPathExists) a string as its path and an object of JSON values as its variables: a `Parameter`, a fragment or `parent()` throws there too.
   - [`websearchToTsquery()`](#conditions.websearchToTsquery) takes two strings: any of these, `all`, a `Parameter`, a fragment, `parent()` or any other value that is no string throws.
 - **Type**: a condition is a `SQLFragment` whose second type argument, `T`, is the type of the value it compares with (its `Constraint`, [`sql`](/sql-template#sql)); the Whereable checks `T` against the column's type. The eight tests, `now` and `fromNow()` have no `T`, and pass on any column; the `T` of [`websearchToTsquery()`](#conditions.websearchToTsquery) is a type only a column typed `any` takes, as a `tsvector` column is.
@@ -236,6 +236,7 @@ An item compiles as in `vals([…])` within a filter:
 | a `sql` fragment | its SQL |
 | `parent(c?)` | the parent column, in a `lateral` subquery: `IN ("films"."id")`<!-- probe: db.select('films', db.all, { lateral: { cast: db.select('roles', { film_id: db.conditions.isIn([db.parent('id')]) }) } }) --> |
 | `Default`, `self`, `raw()`, `cols()`, `vals()` | throws ([Values a condition refuses](#refused-values)) |
+| `all`, which the type refuses | a parameter, `'Symbol(all)'`, as in Zapatos 6.6.1: no row on a text column, every row with `isNotIn()`, 22P02 on the others |
 
 Zapatos 6.6.1 sent a `Parameter` and `parent()` there as one more parameter, as JSON (`'{"value":"x","cast":"text"}'`, `'{"value":"id"}'`), so `isIn()` found nothing and `isNotIn()` matched every row on a text column.
 
@@ -672,16 +673,17 @@ The type does not check a fragment: an `int4` on a `timestamptz` column type-che
 
 ## Values a condition refuses {#refused-values}
 
-`Default`, `self`, `raw()`, `cols()` and `vals()` have no meaning as the value of a condition. The type refuses them (TS2322, or TS2345 where the condition bounds its argument: a pattern, a range's second bound, an array condition, `add()`, `subtract()`, `websearchToTsquery()`; TS2769 as the list of `eqAny()`, the value of `jsonbContains()` and the path or variables of `jsonbPathExists()`).
+`Default`, `self`, `all`, `raw()`, `cols()` and `vals()` have no meaning as the value of a condition. The type refuses them (TS2322, or TS2345 where the condition bounds its argument: a pattern, a range's second bound, an array condition, `add()`, `subtract()`, `websearchToTsquery()`; TS2769 as the list of `eqAny()`, the value of `jsonbContains()` and the path or variables of `jsonbPathExists()`).
 
 At run time, calling the condition does not throw, compiling it does, so `run()` rejects with a plain `Error` before any query.
 
-Zapatos 6.6.1 sent `Default` and `self` as the strings `'Symbol(DEFAULT)'` and `'Symbol(self)'`, and `raw()`, `cols()` and `vals()` as JSON, `'{"value":…}'`: no row on a text column, every row with `ne()` or `isNotIn()`, 22P02 or 22007 on the others. Why a `raw()` value is not SQL: [Security](/security).
+Zapatos 6.6.1 sent `Default`, `self` and `all` as the strings `'Symbol(DEFAULT)'`, `'Symbol(self)'` and `'Symbol(all)'`, and `raw()`, `cols()` and `vals()` as JSON, `'{"value":…}'`: no row on a text column, every row with `ne()` or `isNotIn()`, 22P02 or 22007 on the others. Why a `raw()` value is not SQL: [Security](/security).
 
 | Message | When |
 |---|---|
 | `` `db.Default` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To set a column to its default in an UPDATE, give `db.Default` as the value itself: `{ n: db.Default }`. ``<!-- message --> | `Default` as the value of a comparison, a range, a pattern, an array condition, `add()` or `subtract()` |
 | `` `db.self` has no meaning as the value of `eq()`, `add()` and the other conditions: it is already the column on the left. To compare the column with itself, write a `sql` fragment with `db.self` on both sides. ``<!-- message --> | `self` there |
+| `` `db.all` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To match every row, give `db.all` as the whole filter of a shortcut: `select(table, db.all)`. ``<!-- message --> | `all` there |
 | `` `db.raw()`, `db.cols()` and `db.vals()` have no meaning as the value of `eq()`, `add()` and the other conditions: for SQL, write a `sql` fragment with `db.self` in place of the condition; for a value, give the value itself, or `db.param()`. ``<!-- message --> | `raw()`, `cols()` or `vals()` there |
 | `` `db.Default` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. `DEFAULT` is for INSERT and UPDATE values. ``<!-- message --> | `Default` in `isIn()` or `isNotIn()` |
 | `` `db.self` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: compare with a value, or use it in a `sql` fragment value, where it stands for the column. ``<!-- message --> | `self` in `isIn()` or `isNotIn()` |
