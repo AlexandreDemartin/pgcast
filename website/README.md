@@ -164,6 +164,8 @@ A "Coming" page has no `.md` file, so it is in neither; nor are the templates an
 
 `public/robots.txt`, copied to the root as it is, lets every crawler in, assistants' included, and names `sitemap.xml`, which VitePress writes from the config's `sitemap`.
 
+`public/.well-known/security.txt` ([RFC 9116](https://www.rfc-editor.org/rfc/rfc9116)) names the private report form and `/security#report-a-flaw`, as `SECURITY.md` does. Its `Expires` stays under a year ahead: renew it before that date passes. A dot-directory reaches GitHub Pages only because `docs.yml` uploads the build with `include-hidden-files: true`.
+
 ### For search engines
 
 `.vitepress/meta.ts` gives each page's `<head>`:
