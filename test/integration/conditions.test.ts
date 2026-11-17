@@ -904,3 +904,56 @@ describe('db.all as the value of a condition', () => {
     expect(await db.count('users', { display_name: 'Gone' }).run(t.client)).toBe(0);
   });
 });
+
+describe('an item one array parameter cannot hold, in an array condition', () => {
+  // 6.6.1 sent Default and self as '{"Symbol(DEFAULT)"}', and a wrapper, a Parameter, parent() or a fragment as its
+  // JSON: under not(), update() renamed every user with tags, and an int4[] got 22P02 (#636)
+  const
+    sqlAdvice = 'give the value itself; for SQL, write a `sql` fragment with `db.self` in place of the condition.',
+    says = (fn: string, name: string, advice = 'give a value.') =>
+      [Error, undefined, `\`${fn}()\` sends its array as one parameter, so each item is a plain value, not ${name}: ${advice}`],
+    rejectsBeforeAnyQuery = async (q: db.SQLFragment<any>) => {
+      const query = vi.spyOn(t.client, 'query');
+      try {
+        const err = await q.run(t.client).then(() => undefined, (e: Error) => [e.constructor, (e as { code?: string }).code, e.message]);
+        expect(query).not.toHaveBeenCalled();
+        return err;
+      } finally {
+        query.mockRestore();
+      }
+    },
+    any = (x: unknown) => x as any;
+
+  it('rejects run() with a plain Error before any query, so update() and deletes() change no row', async () => {
+    expect({
+      updateNotDefault: await rejectsBeforeAnyQuery(db.update('users', { display_name: 'Gone' }, { tags: dc.not(dc.arrayContains([any(db.Default)])) })),
+      updateNotSelf: await rejectsBeforeAnyQuery(db.update('users', { display_name: 'Gone' }, { tags: dc.not(dc.arrayOverlaps(['new', any(db.self)])) })),
+      deletesRaw: await rejectsBeforeAnyQuery(db.deletes('users', { tags: dc.not(dc.arrayContainedIn([any(db.raw("'admin'"))])) })),
+      selectCols: await rejectsBeforeAnyQuery(db.select('accounts', { scores: dc.arrayContains([any(db.cols(['id']))]) })),
+      selectVals: await rejectsBeforeAnyQuery(db.select('accounts', { scores: dc.arrayContains([any(db.vals([1]))]) })),
+      selectParamNested: await rejectsBeforeAnyQuery(db.select('accounts', { scores: dc.arrayContains<number[]>([[any(param(1))]]) })),
+      selectFragment: await rejectsBeforeAnyQuery(db.select('accounts', { scores: dc.arrayContains([sql`1`]) })),
+      lateralParent: await rejectsBeforeAnyQuery(db.select('users', db.all, {
+        lateral: { n: db.count('accounts', { scores: dc.arrayOverlaps([parent('id')]) }) },
+      })),
+    }).toEqual({
+      updateNotDefault: says('arrayContains', '`db.Default`'),
+      updateNotSelf: says('arrayOverlaps', '`db.self`'),
+      deletesRaw: says('arrayContainedIn', '`db.raw()`'),
+      selectCols: says('arrayContains', '`db.cols()`'),
+      selectVals: says('arrayContains', '`db.vals()`'),
+      selectParamNested: says('arrayContains', '`db.param()`', sqlAdvice),
+      selectFragment: says('arrayContains', 'a `sql` fragment', sqlAdvice),
+      lateralParent: says('arrayOverlaps', '`db.parent()`', sqlAdvice),
+    });
+    expect(await db.count('users', { display_name: 'Gone' }).run(t.client)).toBe(0);
+    expect(await db.count('users', all).run(t.client)).toBe(3);
+  });
+
+  it('a plain array still runs, nested in the typed form on an int4[] too', async () => {
+    expect({
+      tags: await ids('users', { tags: dc.arrayOverlaps(['new', 'admin']) }),
+      scores: await ids('accounts', { scores: dc.arrayContains<number[]>([[1]]) }),
+    }).toEqual({ tags: [1, 3], scores: [1] });
+  });
+});

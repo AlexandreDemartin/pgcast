@@ -1185,9 +1185,77 @@ describe('Default, self, raw, cols and vals as the value of a condition', () => 
     expect(thrown(dc.arrayContainedIn(deepAll as any))).toBe('`db.all` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.');
   });
 
-  it('characterization: an array condition given an array holding Default or self sends it as a parameter', () => {
-    // characterization: pg sends '{"Symbol(DEFAULT)"}'; left as it is by #633, until #636
-    expect([dc.arrayContains([Default] as any), dc.arrayOverlaps([self] as any)].map(f => show(f).values)).toEqual([[[Default]], [[self]]]);
+  describe('an array condition given an item one array parameter cannot hold', () => {
+    // 6.6.1 sent Default and self as '{"Symbol(DEFAULT)"}', and a wrapper, a Parameter, parent() or a fragment as its
+    // JSON: no row on a text[], every row under not(), 22P02 on an int4[] (#636); the messages are eqAny()'s
+    const
+      arrays = { arrayContains: dc.arrayContains, arrayContainedIn: dc.arrayContainedIn, arrayOverlaps: dc.arrayOverlaps },
+      items = { Default, self, raw: raw("'Ada'"), cols: cols('Ada'), vals: vals('Ada'), param: param('Ada'),
+        fragment: sql`'Ada'`, parent: parent('id') },
+      expected = (fn: string) => ({
+        Default: `\`${fn}()\` sends its array as one parameter, so each item is a plain value, not \`db.Default\`: give a value.`,
+        self: `\`${fn}()\` sends its array as one parameter, so each item is a plain value, not \`db.self\`: give a value.`,
+        raw: `\`${fn}()\` sends its array as one parameter, so each item is a plain value, not \`db.raw()\`: give a value.`,
+        cols: `\`${fn}()\` sends its array as one parameter, so each item is a plain value, not \`db.cols()\`: give a value.`,
+        vals: `\`${fn}()\` sends its array as one parameter, so each item is a plain value, not \`db.vals()\`: give a value.`,
+        param: `\`${fn}()\` sends its array as one parameter, so each item is a plain value, not \`db.param()\`: give the value itself; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.`,
+        fragment: `\`${fn}()\` sends its array as one parameter, so each item is a plain value, not a \`sql\` fragment: give the value itself; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.`,
+        parent: `\`${fn}()\` sends its array as one parameter, so each item is a plain value, not \`db.parent()\`: give the value itself; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.`,
+      });
+
+    it('alone, beside a value, or nested, throws when compiled, not when called, naming the condition', () => {
+      // [['Bob', item]]: a nested array is read past its first item
+      const shapes = (item: unknown) => [[item], ['Bob', item], [item, 'Bob'], [['Bob'], [item]], [[[item]]], [['Bob', item]]];
+      expect(Object.fromEntries(Object.entries(arrays).map(([fn, f]) => [fn, Object.fromEntries(Object.entries(items)
+        .map(([name, item]) => [name, [...new Set(shapes(item).map(a => thrown(f(a as any))))].join(' | ')]))])))
+        .toEqual(Object.fromEntries(Object.keys(arrays).map(fn => [fn, expected(fn)])));
+    });
+
+    it('in a cyclic array, or one nested 20,000 deep, is built at the call and throws as it compiles', () => {
+      // the walk of #633 skips an array it has seen, and keeps its own stack
+      const cyclic: unknown[] = ['x', [Default]];
+      cyclic.push(cyclic);
+      (cyclic[1] as unknown[]).push(cyclic);
+      let deep: unknown[] = [param('x')];
+      for (let i = 0; i < 20_000; i++) deep = [deep];
+      expect([thrown(dc.arrayOverlaps(cyclic as any)), thrown(dc.arrayContains(deep as any))]).toEqual([
+        expected('arrayOverlaps').Default, expected('arrayContains').param,
+      ]);
+    });
+
+    it('in a copy, still throws', () => {
+      expect(thrown(dc.arrayContainedIn([1, self] as any).copy())).toBe(expected('arrayContainedIn').self);
+    });
+
+    it('in an array changed after the call, throws as it compiles; an array cleared of it compiles', () => {
+      // the array is read as the query compiles, as pg reads it: a walk at the call let a later push() through
+      const withDefault: unknown[] = ['x'], withAll: unknown[] = ['x'], cleared: unknown[] = ['x', Default];
+      const conditions = [dc.arrayContains(withDefault as any), dc.arrayOverlaps(withAll as any), dc.arrayContainedIn(cleared as any)];
+      withDefault.push([Default]);
+      withAll.push(db.all);
+      cleared.pop();
+      expect(conditions.map(c => thrown(c))).toEqual([
+        expected('arrayContains').Default,
+        '`db.all` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.',
+        'compiled',
+      ]);
+      expect(show(conditions[2])).toEqual({ text: '(("col" <@ $1))', values: [['x']] });
+    });
+
+    it('first in the walk wins: db.all keeps its message beside another, and the outer array is read first', () => {
+      expect([
+        thrown(dc.arrayContains([db.all, Default] as any)), thrown(dc.arrayContains([[db.all], Default] as any)),
+        thrown(dc.arrayContains([Default, db.all] as any)),
+      ]).toEqual([
+        '`db.all` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.',
+        expected('arrayContains').Default, expected('arrayContains').Default,
+      ]);
+    });
+
+    it('a plain item, a nested array, null, a Date, a Buffer or an object stays in the one parameter', () => {
+      const a = [1, 'x', null, new Date(0), Buffer.from('a'), { a: [1] }, [[2]], true];
+      expect(show(dc.arrayContains(a as any))).toEqual({ text: '(("col" @> $1))', values: [a] });
+    });
   });
 
   it('isIn and isNotIn given Default or self throw when compiled', () => {

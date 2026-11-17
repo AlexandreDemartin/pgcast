@@ -572,6 +572,39 @@ describe('type surprises', () => {
     db.select('accounts', { scores: c.arrayContains<number[]>([[db.all]]) });
   });
 
+  test('Default, self, a wrapper or a Parameter as an item of an array condition is refused', () => {
+    // the runtime throws on each while compiling (#636); 6.6.1 sent each in the array parameter, '{"Symbol(DEFAULT)"}'
+    // or its JSON
+    // @ts-expect-error Default is no item of an int4[] column's array
+    db.select('accounts', { scores: c.arrayContains([db.Default]) });
+    // @ts-expect-error nor self, in arrayContainedIn
+    db.select('accounts', { scores: c.arrayContainedIn([1, db.self]) });
+    // @ts-expect-error nor raw(), in arrayOverlaps
+    db.select('accounts', { scores: c.arrayOverlaps([db.raw('1')]) });
+    // @ts-expect-error nor cols()
+    db.select('accounts', { scores: c.arrayContains([db.cols(['scores'])]) });
+    // @ts-expect-error nor vals()
+    db.select('accounts', { scores: c.arrayContains([db.vals([1])]) });
+    // @ts-expect-error nor a Parameter
+    db.select('accounts', { scores: c.arrayContains([db.param(1)]) });
+    // @ts-expect-error nor nested, in the typed form
+    db.select('accounts', { scores: c.arrayContains<number[]>([[db.Default]]) });
+    // @ts-expect-error nor on a text[] domain column
+    db.select('users', { tags: c.arrayOverlaps(['a', db.Default]) });
+  });
+
+  test('parent() or a fragment as the only items of an array condition passes the type, which the runtime refuses', () => {
+    // T infers as the item alone, which the Whereable's fragment takes; the runtime throws on each while compiling
+    // (#636), where 6.6.1 sent its JSON in the array parameter: 22P02 on an int4[], a string no row holds on a text[]
+    db.select('accounts', { scores: c.arrayContains([db.parent('id')]) });
+    db.select('accounts', { scores: c.arrayContains([db.sql`1`]) });
+    db.select('users', { tags: c.arrayContainedIn([db.sql`'b'`]) });
+    // @ts-expect-error beside a value, T is no element of the column
+    db.select('accounts', { scores: c.arrayOverlaps([1, db.parent('id')]) });
+    // @ts-expect-error nor beside a string, on a text[] domain column
+    db.select('users', { tags: c.arrayContainedIn(['a', db.sql`'b'`]) });
+  });
+
   test('updateValues takes a plain value of the column, sent as a parameter', () => {
     // (test/integration/shortcuts.test.ts, "updateValues: a plain value is stored as it is")
     db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { display_name: 'x', mood: 'happy', manager_id: null } });
