@@ -113,8 +113,8 @@ So the tools whose query object is an instance carry the database's type on it (
 
 - **#68**, retitled as #56 was: "Document one database per project (decision 011: no module per database)".
 - **Its planned PRs** ("Generate one schema module per database, as an opt-in", "Let the db functions take their types from one of several schema modules"): crossed out, pointing here.
-- **"Document several databases"** becomes a docs task: `website/generator.md`, EN and FR, § Several databases: a project per database, each with its config, its `outDir` and a `tsconfig.json` that includes its own schema only; `--check` per project; the two failures of § Context, shown as TypeScript, the error and the type side by side, and the boundary typed by hand; the client chosen at `.run()`, as always; a query across databases out of scope; one line on why there is no module per database.
-- **#19**, the chapter's epic: its line 7 names the docs task, pointing here.
+- **"Document several databases"** becomes a docs task, [#679](https://github.com/AlexandreDemartin/pgcast/issues/679), milestone 6.11.0: `website/generator.md`, EN and FR, § Several databases: a project per database, each with its config, its `outDir` and a `tsconfig.json` that includes its own schema only; `--check` per project; the two failures of § Context, shown as TypeScript, the error and the type side by side, and the boundary typed by hand; the client chosen at `.run()`, as always; a query across databases out of scope; one line on why there is no module per database.
+- **#19**, the chapter's epic: its line 7 names the docs task, pointing here; #68 takes milestone 6.11.0.
 - **#58**: its order line, "PRs 3 and 4 come after #68 (one schema module per database), whose module names they import", is dropped: no module name is added here, so the adapters import `pgcast/db` or `zapatos/db`, as note 002 names them.
 
 ## Risks
