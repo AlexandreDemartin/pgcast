@@ -1,5 +1,5 @@
 ---
-english: 5fd4c17aa9d8
+english: 9cee25d5bbdb
 ---
 
 # Installation
@@ -12,6 +12,27 @@ english: 5fd4c17aa9d8
 - Postgres. La suite de tests tourne sur les versions 14, 16 et 18.
 - Node, et `pg` (node-postgres), avec `@types/pg` pour TypeScript.
 - TypeScript 5.7 ou plus récent. `@types/pg` installe aussi `@types/node` et `pg-protocol`, dont les types en ont désormais besoin ; c’est aussi le cas du type de [`toBuffer()`](/fr/runtime-config#toBuffer), `Buffer<ArrayBuffer>`, comme dans Zapatos 6.6.1.
+- TypeScript dans vos propres `devDependencies`, ce qui fixe la version avec laquelle vous compilez : Yarn n’installe pas pour vous la peer dependency de pgcast sur TypeScript. Un projet qui n’a pas encore `typescript` l’ajoute :
+
+::: code-group
+
+```sh [npm]
+npm install --save-dev typescript
+```
+
+```sh [pnpm]
+pnpm add -D typescript
+```
+
+```sh [yarn]
+yarn add -D typescript
+```
+
+```sh [bun]
+bun add -d typescript
+```
+
+:::
 
 ### Sur un TypeScript plus ancien {#on-an-older-typescript}
 
