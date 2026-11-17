@@ -21,6 +21,7 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 
 ### Fixed
 - `insert()`, `upsert()`, `update()`, `truncate()`, `toDate()` and `toString()` re-exported by a package built with `declaration: true` (`export const { insert } = db;`) emit their declarations (#577). Since Zapatos 6.6.1, each type named an interface that `zapatos/db` does not export (`InsertSignatures`, `ToDate`…), and tsc failed with TS4023. The signatures are now written in place, the same type: every call that compiled still compiles, with the same type and the same errors, at the same places; a message that prints the function itself writes out its signatures where it named `InsertSignatures`.
+- A package built with `declaration: true` whose declarations write out the type of `sql` (an object rest of `zapatos/db`, `<I>() => db.sql<I>`) or of the `lock` option of `SelectOptionsForTable` with a generic alias emits them (#578). Since Zapatos 6.6.1, both named `NoInfer` of an inner module, which `zapatos/db` does not export: tsc failed with TS2742 under `NodeNext` resolution, and under `node10` wrote `import("zapatos/dist/db/utils").NoInfer<A>`, which the package still provides. The types are the same, and so are every call's type, every error message and the quick info; a package's declarations now write `[A][A extends any ? 0 : never]`.
 
 ## [6.8.0] - 2026-11-16
 
