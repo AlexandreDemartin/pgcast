@@ -377,6 +377,9 @@ Candidates for a check, a rule or a skill line.
 - 6.10.0 pass: a PR branched before another that rewrites the same unreleased CHANGELOG entry can bring the old text back when squashed (#647 after #645); after a merge of master into a branch, check `git diff <base>..<merge> -- CHANGELOG.md` for lines added back.
 - 6.10.0 pass: a PR that extends a refusal (#647 after #638) extends #638's `switching.md` row too, with 6.6.1's outcome.
 - 6.10.0 pass: the `check-changelog` script does not catch an entry written twice; the range review does.
+- #666: the pages and tests that quote an error message reach beyond an issue's Files: `git grep` the message before changing it (4 test files and 4 pages quoted it).
+- #666: `currentColumn` is set by a filter's key and by a write's `vals({…})` key alike, so a message thrown under it cannot tell the two apart without a new mechanism; it names both.
+- #666: run each error message's advice at every position that reaches it, not only the throw: `db.self` advised for a write fails in `insert()` and an `upsert()` row (42703) and runs only in `update()` and a filter.
 
 ## Minors kept
 
