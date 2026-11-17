@@ -363,6 +363,7 @@ Candidates for a check, a rule or a skill line.
 - #648: compile every new import a placeholder writes under each `customTypesTransform` variant, with `skipLibCheck: false`: `'my_type'` gives the import the placeholder's own name (TS2440), which the build hides.
 - #651: a placeholder may share its namespace's name (`union_self`) and compile; only an import of the type itself clashes, so the rule matches the base type (`name` or `name[]`), not the names alone.
 - #651: a fix found while building one path (#648's unions) belongs in the shared writer (`sourceFilesForCustomTypes()`), which then drops the first special case.
+- #657: a function's `timestamptz` or record text follows the session's time zone, as a column's does: label a docs value "in UTC".
 
 ## Minors kept
 
