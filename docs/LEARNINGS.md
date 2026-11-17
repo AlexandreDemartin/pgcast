@@ -357,6 +357,10 @@ Candidates for a check, a rule or a skill line.
 - #648: compile every new import a placeholder writes under each `customTypesTransform` variant, with `skipLibCheck: false`: `'my_type'` gives the import the placeholder's own name (TS2440), which the build hides.
 - #651: a placeholder may share its namespace's name (`union_self`) and compile; only an import of the type itself clashes, so the rule matches the base type (`name` or `name[]`), not the names alone.
 - #651: a fix found while building one path (#648's unions) belongs in the shared writer (`sourceFilesForCustomTypes()`), which then drops the first special case.
+- #655: a generic argument turned to `any` in a union slot widens what goes in, but narrows what comes out: after `instanceof`, `run()` resolves to `any` (TS7006 on an unannotated callback); a compat grid uses the value it reads back.
+- #655: when the default output changes, search the docs for lines saying it equals 6.6.1's (`switching.md` § Regenerate, `catalog-types.md` § What pgcast kept), in both languages.
+- #655: a slot that takes `SQLFragment<boolean, never>` also takes `not()`, `and()` and `or()` of a Whereable (they infer `T = never`): a grid of conditions includes the combinators.
+- #655: probe in Postgres what an issue says becomes valid, not only in `tsc`: a shortcut as an insert value gives 42601 (#656).
 
 ## Minors kept
 
