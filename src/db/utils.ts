@@ -33,7 +33,8 @@ export const
 // other key was added there by other code, not by the caller; the chain is walked when the value read is the one
 // Object.prototype holds (the receiver covers `__proto__`), or when Object.prototype has the key as any other getter,
 // whose value may be new on each read; so a Proxy answering through `get` alone keeps another value; each read of an
-// option calls it once, so a getter or a Proxy is read as often as before
+// option calls it once, so a getter or a Proxy is read as often as before, except an order item's direction and nulls
+// and a lock item's for and wait, which select() now reads once each (#586)
 export function callerValue(obj: any, k: string): any {
   const
     value = obj?.[k],

@@ -1077,6 +1077,27 @@ describe('without parameters (simple protocol)', () => {
       .toThrow(`Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not 'UPDATE) AS x; ${update}; SELECT (1'`);
   });
 
+  it('lock.for, lock.wait, order.direction and order.nulls are read once, so a getter that answers anew runs the value checked', async () => {
+    // pgcast 6.6.2 to 6.8.0 read them again for the SQL (Zapatos 6.6.1, direction and nulls), and the UPDATE ran (#586);
+    // wait and nulls answer the value checked to as many reads as those runtimes made before raw(): three
+    const later = (first: string, valid = 1) => {
+      let reads = 0;
+      return () => reads++ < valid ? first : `${first}) AS x; ${update}; SELECT (1`;
+    };
+    const lockFor = later('UPDATE'), wait = later('NOWAIT', 3), direction = later('ASC'), nulls = later('FIRST', 3);
+    for (const [options, clause] of [
+      [{ lock: { get for() { return lockFor(); } } }, ' FOR UPDATE'],
+      [{ lock: { for: 'UPDATE', get wait() { return wait(); } } }, ' FOR UPDATE NOWAIT'],
+      [{ order: { by: 'id', get direction() { return direction(); } } }, ' ORDER BY "id" ASC'],
+      [{ order: { by: 'id', direction: 'ASC', get nulls() { return nulls(); } } }, ' ORDER BY "id" ASC NULLS FIRST'],
+    ] as const) {
+      const q = db.select('users', all, options as any);
+      expect(q.compile()).toEqual({ text: `SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) AS result FROM "users"${clause}) AS "sq_users"`, values: [] });
+      expect((await q.run(t.client)).map(u => u.id).sort()).toEqual([1, 2, 3]);
+      expect(await adaName()).toBe('Ada');
+    }
+  });
+
   it('the aggregate of select() is checked before any query', () => {
     const aggregate = `count(*) FROM users; ${update}; SELECT count`;
     expect(() => db.select('users', all, {}, db.SelectResultMode.Numeric, aggregate))
