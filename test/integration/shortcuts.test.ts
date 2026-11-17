@@ -1501,7 +1501,7 @@ describe('a shortcut as an insert(), upsert() or update() value, a scalar subque
       c_jsonb: [{ balance: 20 }, { balance: 1500.5 }],
       c_json: { balance: 20 },
       // a text column takes the JSON's text
-      c_text: '{"balance": 20}',
+      c_text: '{"balance": 20.00}',
       // no row gives NULL: selectExactlyOne() does not throw there
       c_jsonb_domain: null,
     });
@@ -1512,13 +1512,14 @@ describe('a shortcut as an insert(), upsert() or update() value, a scalar subque
     expect(rows.map((r: any) => [r.c_int8, r.c_text])).toEqual([[3, null], [null, 'x']]);
     expect(await run(db.upsert('users', { email: 'new@example.com', display_name: 'New', manager_id: db.min('users', all, { columns: ['id'] }) }, 'email')))
       .toMatchObject({ email: 'new@example.com', manager_id: await scalar('SELECT min(id) AS v FROM users'), $action: 'INSERT' });
-    expect(await run(db.upsert('users', { email: 'bob@example.com', display_name: 'Bob' }, 'email', { updateValues: { settings: db.count('accounts', owner) } })))
-      .toMatchObject({ display_name: 'Bob', settings: 1, $action: 'UPDATE' });
+    expect(await run(db.upsert('users', { email: 'bob@example.com', display_name: 'Bob' }, 'email', { updateValues: { manager_id: db.count('accounts', owner) } })))
+      .toMatchObject({ display_name: 'Bob', manager_id: 1, $action: 'UPDATE' });
     const updated = await run(db.update('users', { settings: db.select('accounts', owner, ordered) }, sql`TRUE`, { returning: ['display_name', 'settings'] }));
     expect(sortBy(updated, 'display_name')).toEqual([
       { display_name: 'Ada', settings: [{ balance: 20 }, { balance: 1500.5 }] },
       { display_name: 'Bob', settings: [{ balance: 0 }] },
       { display_name: 'Cyd', settings: [] },
+      { display_name: 'New', settings: [] },
     ]);
   });
 
