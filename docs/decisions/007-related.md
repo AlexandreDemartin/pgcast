@@ -50,7 +50,7 @@ All four options compile to the same SQL, the hand-written lateral's: they diffe
 | | A. A generated value, passed to each call | B. A registry set once | C. Read from the catalog at run time | D. Written in the call, as today |
 |---|---|---|---|---|
 | **The caller writes** | `related(fk.films.studios)`, `fk` imported from a generated `zapatos/foreignKeys.ts` | `related('studios')`, after `db.setConfig({ foreignKeys })` | `related('studios')` | `selectExactlyOne('studios', { id: db.parent<s.films.Column>('studio_id') })` |
-| **How the parent table is known** | the value names it; the SQL's parent is still the outer query's `parentTable` mark | through context, as #625 | at run time, from the mark: an alias hides the table | the type argument, which the caller writes |
+| **How the parent table is known** | the value names the key's table, which nothing checks against the outer query; the SQL's parent is the outer query's `parentTable` mark | through context, as #625 | at run time, from the mark: an alias hides the table | the type argument, which the caller writes |
 | **Compile cost** | measured below: about +2 points over the same queries written by hand | the mark alone, about +13 points (#625), plus a lookup by pair of tables | the same as B | none |
 | **What it adds** | the first generated runtime file since Zapatos 3.0: its module format (CJS, ESM, TypeScript) and `outExt`, `--check`, the docs schema, and an import in every file that joins | a registry on top of A's runtime file, as `foreignKeys` is the same generated value; one registry for every database (#68); and contextual typing, for `related()` to learn its parent's table | a hidden query and a cache | nothing |
 | **The philosophy** | allowed (principle 5 writes `.ts` files), and needs nothing from `core.ts` | refused: no global registry (skill `zero-abstraction`), and the cost of contextual typing (#625) | refused: an implicit query, a cache | — |
@@ -69,7 +69,7 @@ All four options compile to the same SQL, the hand-written lateral's: they diffe
 | A: `related()` and `relatedMany()` over a generated `as const` value, 7 calls on the fixture (nested, composite, two keys) | 16,623 (+6.2 %) | 7,797 (+8.4 %) |
 | the same 7 queries by hand | 16,308 (+4.2 %) | 7,539 (+4.8 %) |
 
-So A costs about 45 Instantiations per call over the hand-written lateral, +2.0 points for the 7: the types are not the obstacle. Its result types check out, an ambiguous key is refused, and neither collapses to `any` (probed).
+So A costs about 45 Instantiations per call over the hand-written lateral, +2.0 points for the 7: the types are not the obstacle. Its result types check out, an ambiguous key is refused, and neither collapses to `any` (probed). It checks a key's columns, not that the key leaves the parent table: `related(fk.memberships.orgs)` under `select('accounts', …)` compiles, and joins on `"accounts"."org_country"` and `"accounts"."org_code"`: 42703, or the wrong rows when the outer table has columns of those names (probed).
 
 **Market standard**:
 
@@ -126,7 +126,7 @@ So A costs about 45 Instantiations per call over the hand-written lateral, +2.0 
 
 - **The corpus is two projects.** A third that joins on keys alone, with few options, would save more per call. That changes the gain of A, not its runtime file.
 - **The 11 `selectExactlyOne()` on a nullable column** stay possible: a type with no `null` over a `null`. The docs rule, not a helper, is what guards them.
-- **A wrong `parent()` column of the right table** (`parent<s.films.Column>('id')` for `studio_id`) still compiles and joins the wrong rows. A would have ruled it out for keys; D leaves it to review and to tests that run the query.
+- **A wrong `parent()` column of the right table** (`parent<s.films.Column>('id')` for `studio_id`) still compiles and joins the wrong rows. A would rule it out for a key's own columns, not for a key of another table under the outer query (§ 1); D leaves both to review and to tests that run the query.
 
 ## Sources
 
