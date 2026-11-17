@@ -95,7 +95,7 @@ Put it where your assistant reads its instructions:
 | a Claude skill | `.claude/skills/pgcast/SKILL.md` | front matter with a `description` |
 
 - Claude Code reads `AGENTS.md` only when the project has no `CLAUDE.md`, `.claude/CLAUDE.md` or `CLAUDE.local.md`. With one, it reads `AGENTS.md` only if that file imports it, with a line `@AGENTS.md` ([Claude Code's docs](https://code.claude.com/docs/en/memory#agents-md)).
-- For the last two, the `description` says when the rules apply: the assistant reads it and pulls the rules in when a task needs them. A Cursor rule with `globs` would instead be attached whenever a matching file is in context, whatever its `description` ([Cursor's docs](https://cursor.com/docs/context/rules)).
+- For the last two, the `description` says when the rules apply: the assistant reads it and pulls the rules in when a task needs them. A Cursor rule with `globs` would instead be attached whenever a matching file is in context, whatever its `description` ([Cursor's docs](https://cursor.com/docs/rules)).
 
 ::: code-group
 
