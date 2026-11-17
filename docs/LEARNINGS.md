@@ -394,6 +394,14 @@ Candidates for a check, a rule or a skill line.
 - #673: a `select()` override on a fragment's own `compile()` is lost by any copy: a wrapper that keeps top-level behaviour needs the top-level form handed to it.
 - #673: `to_jsonb("t".*)` never fails on a missing column: a "refused (42703)" claim holds only for a column the query names.
 - #673: under `exactOptionalPropertyTypes`, `copy()` cannot clear a property; `Object.assign` after the copy does.
+- #669: an order fix can turn an intermittent failure into a permanent one (a hidden TS2440): rerun the reviewer's grid on the branch, not only the issue's case.
+- #669: skill `codegen-output`'s "shared state, no new out-parameter" gave first an order by type that changed a compiling winner; when the order needs data per column, a new out-parameter written down under Decided alone beats bending the order.
+- #669: to keep 6.6.1's winner within one relation, use the position Postgres returns the column at, not its name compared in JavaScript.
+- #669: heavy grid `tsc` jobs beside `npm test` cause 5 s codegen timeouts: run them one after the other.
+- #669: replay a determinism fix on the cases whose old winner was already fixed and compiled (two types in one relation, ordered by column), not only on those that varied.
+- #669: the note on placeholders on disk compares a file's full text, so any fix to a placeholder's text makes it fire for files an earlier version wrote: check that listener message each time.
+- #667: `check:floor` type-checks the fixture's schema, not the docs schema: to check a docs type form on TS 4.1.6, copy `website/zapatos` into a scratch consumer and link check:floor's cached TypeScript into it.
+- #667: a scripted edit of a French page cannot match « : » by its ASCII text (U+00A0 before the colon): anchor on the line's start instead.
 
 ## Minors kept
 
