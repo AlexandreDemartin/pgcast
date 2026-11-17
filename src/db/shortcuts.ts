@@ -151,17 +151,20 @@ function SQLForAlias(prefix: string, name: string) {
   return raw(quotedIdentifier.test(quoted) ? quoted : `"${prefix}${text.replace(/"/g, '""')}"`);
 }
 
+// the queries select() returns (so selectOne(), selectExactlyOne(), count() and the other aggregates), and their
+// copies, are written in parentheses where they stand for a value, a scalar subquery, where Zapatos 6.6.1 wrote them
+// bare, which Postgres refuses (42601): in extras, in jsonb_build_object() (#262), and as an insert(), upsert() or
+// update() value, in VALUES and ROW() (#656). A sql fragment is the caller's SQL, written as given
+const isQuery = (x: unknown) => x instanceof SQLFragment && x['parenthesisedInExtras'];
+const asScalar = <X>(x: X) => isQuery(x) ? sql`(${x as SQLFragment<any>})` : x;
+// a row of entries, a query among its values in parentheses
+const withScalarQueries = (entries: [string, unknown][]) => Object.fromEntries(entries.map(([k, v]) => [k, asScalar(v)]));
+
 function SQLForExtras<T extends Table>(extras: ExtrasOption<T>) {
   return extras === undefined ? [] :
     extras === null ? refusedSQL(extrasNull) :
     sql` || jsonb_build_object(${mapWithSeparator(
-      Object.keys(extras), sql`, `, k => {
-        const extra = extras[k];
-        // the queries select() returns (so selectOne(), selectExactlyOne(), count() and the other aggregates), and
-        // their copies, are written in parentheses, a scalar subquery, where Zapatos 6.6.1 wrote them bare in
-        // jsonb_build_object(), which Postgres refuses (42601). A sql fragment is the caller's SQL, written as given
-        return sql`${param(k)}::text, ${extra instanceof SQLFragment && extra['parenthesisedInExtras'] ? sql`(${extra})` : extra}`;
-      })})`;
+      Object.keys(extras), sql`, `, k => sql`${param(k)}::text, ${asScalar(extras[k])}`)})`;
 }
 
 
@@ -172,22 +175,31 @@ const undefinedWarning = 'An undefined value in insert(), update() or upsert() i
 // key goes (update, upsert, whose missing keys then take DEFAULT, and the rules of upsertRequiresSameKeys);
 // a null row, which an untyped caller may pass among others, is read as `{}`, as completeKeysWithDefaultValue reads it,
 // and a primitive one, a Buffer (its values, one per byte, unlisted) and a built-in with no own enumerable key are
-// kept as they are, for cols() or vals() to refuse
+// kept as they are, for cols() or vals() to refuse. A lone row's values are read once here, as before, and a query
+// among them is written in parentheses, in a copy (several rows: see completedRows)
 function undefinedAsMissing<V extends object>(values: V, toDefault: boolean): V {
-  const rows: object[] = (Array.isArray(values) ? values : [values]).map(row => row ?? {});
-  if (!rows.some(row => !isRefusedBuffer(row) && Object.values(row).includes(undefined))) return values;
+  const
+    rows: object[] = (Array.isArray(values) ? values : [values]).map(row => row ?? {}),
+    lone = Array.isArray(values) || isRefusedBuffer(rows[0]) ? undefined : Object.entries(rows[0]),
+    asGiven = lone?.some(([, v]) => isQuery(v)) ? withScalarQueries(lone) as V : values;
+  if (!(lone ? lone.some(([, v]) => v === undefined) : rows.some(row => !isRefusedBuffer(row) && Object.values(row).includes(undefined)))) return asGiven;
   if (!(getConfig().undefinedMeansMissing ?? false)) {
     warnOnce('PGCAST_DEP002', undefinedWarning);
-    return values;
+    return asGiven;
   }
   const kept = rows.map(row => {
     if (isPrimitive(row) || isRefusedBuffer(row)) return row;
     const entries = Object.entries(row);
     return entries.length === 0 && isBuiltin(row) ? row : Object.fromEntries(entries.flatMap(([k, v]) =>
-      v !== undefined ? [[k, v]] : toDefault ? [[k, Default]] : []));
+      v !== undefined ? [[k, asScalar(v)]] : toDefault ? [[k, Default]] : []));
   });
   return (Array.isArray(values) ? kept : kept[0]) as V;
 }
+
+// several rows, their keys completed with DEFAULT, in copies, where a query among the values is written in parentheses;
+// a row completeKeysWithDefaultValue leaves as it is (a primitive, a Buffer, a built-in with no own key) holds none
+const completedRows = <R extends object>(rows: R[]) => completeKeysWithDefaultValue(rows, Default).map((row, i) =>
+  row !== rows[i] && Object.values(row).some(isQuery) ? withScalarQueries(Object.entries(row)) as R : row);
 
 // the keys of upsert()'s updateValues that join the update: an undefined one is set from EXCLUDED, as in 6.6.1,
 // so if no row inserts its column, an existing row takes the column DEFAULT; with undefinedMeansMissing, it is a
@@ -238,7 +250,10 @@ const hasOwnKey = (row: object, undefinedIsMissing = false) => {
  * column of the others. An `undefined` value is sent as `NULL`, and emits a `DeprecationWarning`
  * (`PGCAST_DEP002`), once; with the `undefinedMeansMissing` config option (the
  * default in 7.0), it sends `DEFAULT`, as a key missing from one of several
- * rows does: `{ title: undefined }` gives `VALUES (DEFAULT)`.
+ * rows does: `{ title: undefined }` gives `VALUES (DEFAULT)`. A shortcut's
+ * query (`count()`, `selectOne()`…) or its `copy()` is written in parentheses,
+ * a scalar subquery, and stores what it gives in `extras`:
+ * `VALUES ((SELECT count(*) AS result FROM "films"))`.
  * @param options Optionally, `returning` (an array of columns) and `extras`;
  * `null` is none, and either set to `null` throws as the query compiles, so
  * `run()` rejects before any query, unless `values` is an empty array, a no-op
@@ -271,7 +286,7 @@ export const insert: {
   } else {
     values = undefinedAsMissing(values, true);
     const
-      completedValues = Array.isArray(values) ? completeKeysWithDefaultValue(values, Default) : values,
+      completedValues = Array.isArray(values) ? completedRows(values) : values,
       firstRow = Array.isArray(completedValues) ? completedValues[0] : completedValues,
       anyPrimitive = Array.isArray(completedValues) ? completedValues.some(isPrimitive) : isPrimitive(firstRow),
       colsSQL = cols(firstRow),
@@ -402,14 +417,14 @@ const compiledAsIs = (value: any, inObject = false): boolean =>
       typeof value === 'object' && value !== null && [Object.prototype, null].includes(Object.getPrototypeOf(value)) &&
       Object.values(value).some(item => compiledAsIs(item, true)));
 
-const updateValueSQL = (value: any) => compiledAsIs(value) ? value : param(value);
+const updateValueSQL = (value: any) => compiledAsIs(value) ? asScalar(value) : param(value);
 
 /**
  * Generate an 'upsert' (`INSERT ... ON CONFLICT ...`) query `SQLFragment`.
  * @param table The table to update or insert into
  * @param values An `Insertable` of values (or an array thereof) to be inserted 
  * or updated; as for `insert`, they need at least one column, or it throws
- * before any query
+ * before any query, and a shortcut's query is written in parentheses
  * @param conflictTarget A `UNIQUE`-indexed column (or array thereof) or a 
  * `UNIQUE` index (wrapped in `db.constraint(...)`) that determines whether we
  * get an `UPDATE` (when there's a matching existing value) or an `INSERT`
@@ -419,7 +434,8 @@ const updateValueSQL = (value: any) => compiledAsIs(value) ? value : param(value
  * `noNullUpdateColumns` and `updateValues` (see documentation), and
  * `returning` and `extras`, as for `insert`. A plain value
  * in `updateValues` is sent as a parameter: `{ mood: 'happy' }` gives
- * `ROW(..., $n)`. To read a column there, use a fragment, which is written as
+ * `ROW(..., $n)`, and a shortcut's query in parentheses, as for `insert`.
+ * To read a column there, use a fragment, which is written as
  * it is: ``{ name: db.sql`${'users'}.${'name'}` }`` gives `ROW(..., "users"."name")`.
  * An `updateColumns` array that is empty at run time, with no `updateValues`
  * key (with `undefinedMeansMissing`, a key set to `undefined` is none), gives
@@ -499,7 +515,7 @@ export const upsert: {
   let specifiedUpdateColumns = callerValue(options, 'updateColumns');
   if (specifiedUpdateColumns && !Array.isArray(specifiedUpdateColumns)) specifiedUpdateColumns = [specifiedUpdateColumns];
 
-  const completedValues = Array.isArray(values) ? completeKeysWithDefaultValue(values, Default) : [values];
+  const completedValues = Array.isArray(values) ? completedRows(values) : [values];
   // so is a built-in row among others, which completeKeysWithDefaultValue leaves as it is, where it copies the others;
   // an empty Buffer's undefined keys are left out first, as for one row (with no Buffer, insert() counts the same keys)
   if (Array.isArray(values) && completedValues.some((row, i) => row === (values as Insertable[])[i])) {
@@ -574,7 +590,8 @@ export const upsert: {
  * column to `NULL`, and emits a `DeprecationWarning` (`PGCAST_DEP002`), once;
  * with the `undefinedMeansMissing` config option (the default in 7.0), it is
  * left out, as `JSON.stringify` leaves it out, and does not count:
- * `{ name: 'A', isLiving: undefined }` gives `SET ("name") = ROW($1)`.
+ * `{ name: 'A', isLiving: undefined }` gives `SET ("name") = ROW($1)`. A
+ * shortcut's query is written in parentheses, as for `insert`.
  * @param where A `Whereable` (or `SQLFragment`) defining which rows to update
  * (`db.all` throws: to touch every row, give `` sql`TRUE` ``)
  * @param options Optionally, `returning` and `extras`, as for `insert`
