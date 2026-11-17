@@ -1,5 +1,5 @@
 ---
-english: 07f410dea0ee
+english: d6fe654b8e3d
 ---
 
 # Lectures {#select-and-the-aggregates}
@@ -445,7 +445,7 @@ interface OrderSpecForTable<T extends Table> {
 }
 ```
 
-Un élément d’[`order`](#order-limit-offset-and-withties) : `by`, puis `direction`, puis `NULLS` et `nulls` s’il est donné, `"title" DESC NULLS LAST`.
+À partir de la 6.9.0. Un élément d’[`order`](#order-limit-offset-and-withties) : `by`, puis `direction`, puis `NULLS` et `nulls` s’il est donné, `"title" DESC NULLS LAST`.
 
 ### `ColumnsOption` {#ColumnsOption}
 

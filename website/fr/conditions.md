@@ -1,5 +1,5 @@
 ---
-english: d998e163260c
+english: f63c44dfc72c
 ---
 
 # Conditions {#db-conditions}
@@ -274,7 +274,7 @@ db.conditions.eqAny(a: ParentColumn): SQLFragment<boolean | null, never>
 db.conditions.eqAny<T>(a: readonly T[]): SQLFragment<boolean | null, T>
 ```
 
-`"col" = ANY($1)`<!-- probe: db.sql`${{ col: db.conditions.eqAny([1, 2]) }}` -->, le tableau entier en un seul paramètre. Là où `isIn()` écrit un texte par longueur, `IN ($1, $2, …)`, `eqAny()` écrit un seul texte pour toutes les longueurs : une seule requête préparée avec [`prepared()`](/fr/sql-template#prepared) les sert toutes, et `eqAny()` prend plus d’éléments que les 65 535 paramètres qu’une requête peut contenir ([Batches](/fr/batches)).
+À partir de la 6.9.0. `"col" = ANY($1)`<!-- probe: db.sql`${{ col: db.conditions.eqAny([1, 2]) }}` -->, le tableau entier en un seul paramètre. Là où `isIn()` écrit un texte par longueur, `IN ($1, $2, …)`, `eqAny()` écrit un seul texte pour toutes les longueurs : une seule requête préparée avec [`prepared()`](/fr/sql-template#prepared) les sert toutes, et `eqAny()` prend plus d’éléments que les 65 535 paramètres qu’une requête peut contenir ([Batches](/fr/batches)).
 
 <CastPanel example="conditions_eqAny">
 
@@ -342,6 +342,8 @@ Avec [`castArrayParamsToJson`](/fr/runtime-config#Config.castArrayParamsToJson) 
 `"col" && $1`<!-- probe: db.sql`${{ col: db.conditions.arrayOverlaps(['x']) }}` --> : la colonne et la valeur ont au moins un élément en commun.
 
 ## jsonb {#jsonb}
+
+À partir de la 6.9.0, deux conditions sur une colonne `jsonb` : son JSON contient une valeur, ou un chemin y trouve un élément.
 
 ### `jsonbContains()` {#conditions.jsonbContains}
 
@@ -458,7 +460,7 @@ Zapatos 6.6.1 écrivait `(NOT "release_year" = 1974 OR "release_year" = 1991)`, 
 
 ## Sous-requêtes : `exists()`, `isInSelect()` {#subqueries}
 
-Chacune écrit une sous-requête sur une table, filtrée par un Whereable ou un fragment `sql` de cette table, ou par [`all`](/fr/sql-template#all) pour n’avoir aucun `WHERE` ; `{}` donne `WHERE TRUE`, comme dans [`select()`](/fr/select#select). Le type vérifie les clés et les valeurs du Whereable par rapport à la table de la sous-requête.
+À partir de la 6.9.0. Chacune écrit une sous-requête sur une table, filtrée par un Whereable ou un fragment `sql` de cette table, ou par [`all`](/fr/sql-template#all) pour n’avoir aucun `WHERE` ; `{}` donne `WHERE TRUE`, comme dans [`select()`](/fr/select#select). Le type vérifie les clés et les valeurs du Whereable par rapport à la table de la sous-requête.
 
 <CastPanel example="conditions_exists">
 
@@ -524,7 +526,7 @@ db.select('actors', { name: db.conditions.isInSelect('roles', db.all, 'actor_id'
 
 ## Recherche plein texte : `websearchToTsquery()` {#full-text}
 
-Une recherche sur une colonne `tsvector` : les mots d’un texte, tels qu’une configuration de recherche plein texte les racinise. La colonne `films.title_search` du schéma de la doc est une colonne générée, `to_tsvector('english', title)`, que Postgres tient à jour, avec un index GIN ([la doc de Postgres](https://www.postgresql.org/docs/current/textsearch-tables.html)).
+À partir de la 6.9.0. Une recherche sur une colonne `tsvector` : les mots d’un texte, tels qu’une configuration de recherche plein texte les racinise. La colonne `films.title_search` du schéma de la doc est une colonne générée, `to_tsvector('english', title)`, que Postgres tient à jour, avec un index GIN ([la doc de Postgres](https://www.postgresql.org/docs/current/textsearch-tables.html)).
 
 <CastPanel example="conditions_websearchToTsquery">
 

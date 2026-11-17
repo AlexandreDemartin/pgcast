@@ -270,7 +270,7 @@ db.conditions.eqAny(a: ParentColumn): SQLFragment<boolean | null, never>
 db.conditions.eqAny<T>(a: readonly T[]): SQLFragment<boolean | null, T>
 ```
 
-`"col" = ANY($1)`<!-- probe: db.sql`${{ col: db.conditions.eqAny([1, 2]) }}` -->, the whole array one parameter. Where `isIn()` writes one text per length, `IN ($1, $2, …)`, this is one text for any length, so one [`prepared()`](/sql-template#prepared) statement serves them all, and it takes more items than the 65,535 parameters a query can hold ([Batches](/batches)).
+From 6.9.0. `"col" = ANY($1)`<!-- probe: db.sql`${{ col: db.conditions.eqAny([1, 2]) }}` -->, the whole array one parameter. Where `isIn()` writes one text per length, `IN ($1, $2, …)`, this is one text for any length, so one [`prepared()`](/sql-template#prepared) statement serves them all, and it takes more items than the 65,535 parameters a query can hold ([Batches](/batches)).
 
 <CastPanel example="conditions_eqAny">
 
@@ -338,6 +338,8 @@ With [`castArrayParamsToJson`](/runtime-config#Config.castArrayParamsToJson) on,
 `"col" && $1`<!-- probe: db.sql`${{ col: db.conditions.arrayOverlaps(['x']) }}` -->: they share at least one element.
 
 ## jsonb {#jsonb}
+
+From 6.9.0, two conditions on a `jsonb` column: its JSON contains a value, or a path finds an item in it.
 
 ### `jsonbContains()` {#conditions.jsonbContains}
 
@@ -454,7 +456,7 @@ Zapatos 6.6.1 wrote `(NOT "release_year" = 1974 OR "release_year" = 1991)`, whic
 
 ## Subqueries: `exists()`, `isInSelect()` {#subqueries}
 
-Each writes a subquery on a table, filtered by a Whereable or a `sql` fragment of that table, or [`all`](/sql-template#all) for no `WHERE`; `{}` gives `WHERE TRUE`, as in [`select()`](/select#select). The type checks the Whereable's keys and values against the subquery's table.
+From 6.9.0. Each writes a subquery on a table, filtered by a Whereable or a `sql` fragment of that table, or [`all`](/sql-template#all) for no `WHERE`; `{}` gives `WHERE TRUE`, as in [`select()`](/select#select). The type checks the Whereable's keys and values against the subquery's table.
 
 <CastPanel example="conditions_exists">
 
@@ -520,7 +522,7 @@ db.select('actors', { name: db.conditions.isInSelect('roles', db.all, 'actor_id'
 
 ## Full-text search: `websearchToTsquery()` {#full-text}
 
-A search on a `tsvector` column: the words of a text, as a text search configuration stems them. The docs schema's `films.title_search` is a generated column, `to_tsvector('english', title)`, which Postgres keeps up to date, with a GIN index ([Postgres's docs](https://www.postgresql.org/docs/current/textsearch-tables.html)).
+From 6.9.0. A search on a `tsvector` column: the words of a text, as a text search configuration stems them. The docs schema's `films.title_search` is a generated column, `to_tsvector('english', title)`, which Postgres keeps up to date, with a GIN index ([Postgres's docs](https://www.postgresql.org/docs/current/textsearch-tables.html)).
 
 <CastPanel example="conditions_websearchToTsquery">
 

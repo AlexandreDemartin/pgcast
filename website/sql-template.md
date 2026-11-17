@@ -363,7 +363,7 @@ type SelfType = typeof self
 db.parent<T extends Column | undefined = Column | undefined>(x?: T): ParentColumn<T>
 ```
 
-A column of the parent query's table, in a subquery given to `lateral` ([Joins](/lateral)), or in the `where` of [`exists()`](/conditions#conditions.exists) and [`isInSelect()`](/conditions#conditions.isInSelect), whose `parent` option names that table: `"<parent table or alias>"."<column>"`.
+A column of the parent query's table, in a subquery given to `lateral` ([Joins](/lateral)), or, from 6.9.0, in the `where` of [`exists()`](/conditions#conditions.exists) and [`isInSelect()`](/conditions#conditions.isInSelect), whose `parent` option names that table: `"<parent table or alias>"."<column>"`.
 
 <CastPanel example="sql_parent">
 

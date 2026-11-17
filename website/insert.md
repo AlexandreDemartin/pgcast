@@ -203,7 +203,7 @@ An empty array, for the `updateColumns` of `upsert()`: a row that conflicts is l
 
 ## `UpsertOptions` {#UpsertOptions}
 
-`UpsertOptions<T, C, E, UC, RA>`: the `options` of `upsert()`, the [`ReturningOptionsForTable`](#ReturningOptionsForTable) with `updateValues`, `updateColumns`, `noNullUpdateColumns` and `reportAction` ([Options](#upsert-options)). `UC` is the type of `updateColumns` and `RA` that of `reportAction` (`undefined` for an option not given).
+From 6.9.0. `UpsertOptions<T, C, E, UC, RA>`: the `options` of `upsert()`, the [`ReturningOptionsForTable`](#ReturningOptionsForTable) with `updateValues`, `updateColumns`, `noNullUpdateColumns` and `reportAction` ([Options](#upsert-options)). `UC` is the type of `updateColumns` and `RA` that of `reportAction` (`undefined` for an option not given).
 
 ## `UpsertReturnableForTable` {#UpsertReturnableForTable}
 

@@ -1,5 +1,5 @@
 ---
-english: d4c499a959d3
+english: e3aba21dd3d9
 ---
 
 # Template SQL
@@ -367,7 +367,7 @@ type SelfType = typeof self
 db.parent<T extends Column | undefined = Column | undefined>(x?: T): ParentColumn<T>
 ```
 
-Une colonne de la table de la requête parente, dans une sous-requête donnée à `lateral` ([Jointures](/fr/lateral)), ou dans le `where` d’[`exists()`](/fr/conditions#conditions.exists) et d’[`isInSelect()`](/fr/conditions#conditions.isInSelect), dont l’option `parent` nomme cette table : `"<parent table or alias>"."<column>"`.
+Une colonne de la table de la requête parente, dans une sous-requête donnée à `lateral` ([Jointures](/fr/lateral)), ou, à partir de la 6.9.0, dans le `where` d’[`exists()`](/fr/conditions#conditions.exists) et d’[`isInSelect()`](/fr/conditions#conditions.isInSelect), dont l’option `parent` nomme cette table : `"<parent table or alias>"."<column>"`.
 
 <CastPanel example="sql_parent">
 
