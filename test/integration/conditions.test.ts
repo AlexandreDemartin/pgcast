@@ -434,6 +434,105 @@ describe('jsonbContains: the value sent as jsonb', () => {
   });
 });
 
+describe('jsonbPathExists: the path and its variables bound', () => {
+  // users.settings: 1 {"theme":"dark"}, 2 {}, 3 {}; events.payload: {"user": 1}, {"user": 2}, NULL
+  const cases: [string, db.SQL, number[]][] = [
+    ['a variable', { settings: dc.jsonbPathExists('$.theme ? (@ == $theme)', { theme: 'dark' }) }, [1]],
+    ['another value of the variable', { settings: dc.jsonbPathExists('$.theme ? (@ == $theme)', { theme: 'light' }) }, []],
+    ['no variables: a key that exists', { settings: dc.jsonbPathExists('$.theme') }, [1]],
+    ['the root, in every row', { settings: dc.jsonbPathExists('$') }, [1, 2, 3]],
+    ['under not()', { settings: dc.not(dc.jsonbPathExists('$.theme ? (@ == $theme)', { theme: 'dark' })) }, [2, 3]],
+    ['lax, the default mode: a row lacking the key finds no item', { settings: dc.jsonbPathExists('lax $.theme') }, [1]],
+    ['strict, in a filter: a row lacking the key finds no item', { settings: dc.jsonbPathExists('strict $ ? (@.theme == $theme)', { theme: 'dark' }) }, [1]],
+  ];
+
+  it.each(cases)('%s', async (_name, where, expected) => {
+    expect(await ids('users', where)).toEqual(expected);
+  });
+
+  it('a nullable column: its NULL rows never match', async () => {
+    const kinds = (where: db.SQL) => sql`SELECT ${'kind'} FROM ${'events'} WHERE ${where}`.run(t.client).then(rs => rs.map(r => r.kind));
+    expect(await kinds({ payload: dc.jsonbPathExists('$.user ? (@ == $user)', { user: 2 }) })).toEqual(['login']);
+    expect(await kinds({ payload: dc.not(dc.jsonbPathExists('$.user ? (@ == $user)', { user: 2 }) ) })).toEqual(['signup']);
+  });
+
+  describe('variables of each JSON type, on extra.type_zoo', () => {
+    const rows = async () => {
+      const stored = [
+        { title: 'The Salt Orchard', year: 1974, prizes: ['Golden Gull'], cut: { format: '35mm' } },
+        { title: 'Small Hours', year: 2019, prizes: [] },
+        { title: 'It\'s "quoted" (and $1 @ \\)', year: 2008, prizes: 'Golden Gull' },
+      ];
+      // each stored as its JSON text, as in jsonbContains's tests above
+      const inserted = await db.insert('extra.type_zoo', stored.map(v => ({ c_jsonb: JSON.stringify(v) })), { returning: ['id'] }).run(t.client);
+      const order: number[] = inserted.map((r: { id: unknown }) => Number(r.id));
+      return (where: db.SQL) => ids('extra.type_zoo', where).then(found => found.map(id => order.indexOf(id)));
+    };
+
+    it('a string, a number, an object, an array item, and a name that needs quoting', async () => {
+      const found = await rows();
+      expect({
+        string: await found({ c_jsonb: dc.jsonbPathExists('$.prizes[*] ? (@ == $prize)', { prize: 'Golden Gull' }) }),
+        number: await found({ c_jsonb: dc.jsonbPathExists('$ ? (@.year < $before)', { before: 2000 }) }),
+        numberAsString: await found({ c_jsonb: dc.jsonbPathExists('$ ? (@.year < $before)', { before: '2000' }) }),
+        nested: await found({ c_jsonb: dc.jsonbPathExists('$.cut ? (@.format == $cut.format)', { cut: { format: '35mm' } }) }),
+        quoted: await found({ c_jsonb: dc.jsonbPathExists('$.title ? (@ == $"a title")', { 'a title': 'It\'s "quoted" (and $1 @ \\)' }) }),
+      }).toEqual({ string: [0, 2], number: [0], numberAsString: [], nested: [0], quoted: [2] });
+    });
+
+    it('lax unwraps a value where an array is expected; strict raises on it, 22039', async () => {
+      const found = await rows();
+      expect(await found({ c_jsonb: dc.jsonbPathExists('lax $.prizes[*] ? (@ == $prize)', { prize: 'Golden Gull' }) })).toEqual([0, 2]);
+      expect(await pgError(t.client, () => found({ c_jsonb: dc.jsonbPathExists('strict $.prizes[*] ? (@ == $prize)', { prize: 'Golden Gull' }) })))
+        .toEqual({ code: '22039', message: 'jsonpath wildcard array accessor can only be applied to an array' });
+    });
+  });
+
+  it('strict, outside a filter: Postgres raises on a row lacking the key, 2203A', async () => {
+    expect(await pgError(t.client, () => ids('users', { settings: dc.jsonbPathExists('strict $.theme') })))
+      .toEqual({ code: '2203A', message: 'JSON object does not contain key "theme"' });
+  });
+
+  it('an invalid path fails in Postgres, with its own error, 42601', async () => {
+    expect(await pgError(t.client, () => ids('users', { settings: dc.jsonbPathExists('$.prizes[*') })))
+      .toEqual({ code: '42601', message: 'syntax error at end of jsonpath input' });
+  });
+
+  it('a variable the path names and vars lacks fails in Postgres, 42704', async () => {
+    expect(await pgError(t.client, () => ids('users', { settings: dc.jsonbPathExists('$.theme ? (@ == $theme)') })))
+      .toEqual({ code: '42704', message: 'could not find jsonpath variable "theme"' });
+  });
+
+  it('characterization: a predicate path always gives an item, its boolean, so every row matches', async () => {
+    // Postgres's docs: jsonb_path_exists is "useful only with SQL-standard JSON path expressions"
+    expect(await ids('users', { settings: dc.jsonbPathExists('$.theme == $theme', { theme: 'light' }) })).toEqual([1, 2, 3]);
+  });
+
+  it('a jsonb domain, its placeholder narrowed in the type tests', async () => {
+    const row = await db.insert('extra.type_zoo', { c_jsonb_domain: JSON.stringify({ theme: 'dark' }) as any }, { returning: ['id'] }).run(t.client);
+    expect(await ids('extra.type_zoo', { c_jsonb_domain: dc.jsonbPathExists('$.theme ? (@ == $theme)', { theme: 'dark' }) })).toEqual([row.id]);
+  });
+
+  it('the same rows under castObjectParamsToJson and castArrayParamsToJson', async () => {
+    db.setConfig({ castObjectParamsToJson: true, castArrayParamsToJson: true });
+    expect(await ids('users', { settings: dc.jsonbPathExists('$.theme ? (@ == $theme)', { theme: 'dark' }) })).toEqual([1]);
+  });
+
+  it('characterization: a json column passes the type, and Postgres refuses it, 42883', async () => {
+    expect(await pgError(t.client, () => ids('extra.type_zoo', { c_json: dc.jsonbPathExists('$') })))
+      .toEqual({ code: '42883', message: 'function jsonb_path_exists(json, jsonpath, jsonb) does not exist' });
+  });
+
+  it('a path that is no string, or a key holding undefined, rejects before any query, so an update() changes no row', async () => {
+    await expect(ids('users', { settings: dc.jsonbPathExists(param('$.theme') as any) })).rejects.toThrow('takes its path as a string, not `db.param()`');
+    // JSON.stringify would leave the key out, and Postgres raise 42704
+    const vars: { theme?: string | undefined } = { theme: undefined };
+    await expect(db.update('users', { display_name: 'Gone' }, { settings: dc.jsonbPathExists('$.theme ? (@ == $theme)', vars as db.JSONObject) }).run(t.client))
+      .rejects.toThrow('not `undefined` at key `theme`');
+    expect(await db.count('users', { display_name: 'Gone' }).run(t.client)).toBe(0);
+  });
+});
+
 describe('add, subtract (in an update)', () => {
   it('add and subtract a number', async () => {
     expect(await db.update('accounts', { balance: dc.add(10), lifetime_ops: dc.subtract(1) }, { id: 3 },

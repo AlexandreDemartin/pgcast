@@ -25,3 +25,6 @@ export const userWithAggregates = (id: number) => db.selectOne('users', { id }, 
 export const firstEventOfUser = (id: number) => db.selectOne('users', { id }, { lateral: db.min('events', db.all, { columns: ['occurred_on'] }) });
 
 export const { count, sum, avg, min, max, selectOne, selectExactlyOne } = db;
+
+// a condition re-exported, as a library of shared conditions does: its signatures interface must be exported too
+export const { jsonbPathExists } = db.conditions;

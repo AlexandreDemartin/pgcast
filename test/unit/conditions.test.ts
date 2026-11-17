@@ -46,6 +46,7 @@ describe('conditions', () => {
         "isTrue",
         "isUnknown",
         "jsonbContains",
+        "jsonbPathExists",
         "like",
         "lt",
         "lte",
@@ -667,6 +668,63 @@ describe('conditions', () => {
     expect(() => show(dc.jsonbContains(param({ theme: 'dark' }) as any).copy())).toThrow('so it takes a JSON value, not `db.param()`');
   });
 
+  it('jsonbPathExists: the path is one jsonpath parameter, the variables one jsonb parameter, as JSON text', () => {
+    expect({
+      vars: show(dc.jsonbPathExists('$.prizes[*] ? (@ == $prize)', { prize: 'Golden Gull' })),
+      none: show(dc.jsonbPathExists('$.format')),
+      undefined: show(dc.jsonbPathExists('$.format', undefined)),
+      nested: show(dc.jsonbPathExists('$ ? (@.year < $range.to && @.tags == $tags)', { range: { to: 2000 }, tags: ['a', null], n: 1.5, b: false, z: null })),
+    }).toMatchInlineSnapshot(`
+      {
+        "nested": {
+          "text": "((jsonb_path_exists("col", CAST($1 AS "jsonpath"), CAST($2 AS "jsonb"))))",
+          "values": [
+            "$ ? (@.year < $range.to && @.tags == $tags)",
+            "{"range":{"to":2000},"tags":["a",null],"n":1.5,"b":false,"z":null}",
+          ],
+        },
+        "none": {
+          "text": "((jsonb_path_exists("col", CAST($1 AS "jsonpath"), CAST($2 AS "jsonb"))))",
+          "values": [
+            "$.format",
+            "{}",
+          ],
+        },
+        "undefined": {
+          "text": "((jsonb_path_exists("col", CAST($1 AS "jsonpath"), CAST($2 AS "jsonb"))))",
+          "values": [
+            "$.format",
+            "{}",
+          ],
+        },
+        "vars": {
+          "text": "((jsonb_path_exists("col", CAST($1 AS "jsonpath"), CAST($2 AS "jsonb"))))",
+          "values": [
+            "$.prizes[*] ? (@ == $prize)",
+            "{"prize":"Golden Gull"}",
+          ],
+        },
+      }
+    `);
+  });
+
+  it('jsonbPathExists writes the same under castObjectParamsToJson and castArrayParamsToJson', () => {
+    const condition = () => show(dc.jsonbPathExists('$.tags ? (@ == $tags)', { tags: ['a'] }));
+    const before = condition();
+    for (const config of [{ castObjectParamsToJson: true }, { castArrayParamsToJson: true }]) {
+      db.setConfig(config);
+      try { expect(condition()).toEqual(before); } finally { resetConfig(); }
+    }
+  });
+
+  it('jsonbPathExists reads its variables once, at the call, and a copy compiles the same', () => {
+    const vars: Record<string, string> = { format: '35mm' }, condition = dc.jsonbPathExists('$.format ? (@ == $format)', vars);
+    vars.format = 'VHS';
+    expect(show(condition).values).toEqual(['$.format ? (@ == $format)', '{"format":"35mm"}']);
+    expect(sql`${{ col: condition.copy() }}`.compile()).toEqual(sql`${{ col: condition }}`.compile());
+    expect(() => show(dc.jsonbPathExists(param('$') as any).copy())).toThrow('takes its path as a string, not `db.param()`');
+  });
+
   it('fromNow, now, add, subtract', () => {
     expect({
       fromNow: dc.fromNow(3).compile(), fromNowUnit: dc.fromNow(-1.5, 'hours').compile(), now: dc.now.compile(),
@@ -735,7 +793,7 @@ describe('Default, self, raw, cols and vals as the value of a condition', () => 
   };
 
   it('covers every condition of db.conditions', () => {
-    expect([...Object.keys(one), ...Object.keys(two), ...Object.keys(lists), 'eqAny', 'jsonbContains', ...noValue, ...subqueries].sort()).toEqual(Object.keys(dc).sort());
+    expect([...Object.keys(one), ...Object.keys(two), ...Object.keys(lists), 'eqAny', 'jsonbContains', 'jsonbPathExists', ...noValue, ...subqueries].sort()).toEqual(Object.keys(dc).sort());
   });
 
   it('eqAny given an item one array parameter cannot hold throws when compiled, not when called, saying what to do', () => {
@@ -853,6 +911,46 @@ describe('Default, self, raw, cols and vals as the value of a condition', () => 
   it('jsonbContains given null, a key holding null and an empty key still sends them', () => {
     expect([null, { format: null }, { '': 1 }, [null]].map(x => show(dc.jsonbContains(x)).values))
       .toEqual([['null'], ['{"format":null}'], ['{"":1}'], ['[null]']]);
+  });
+
+  it('jsonbPathExists given a path that is no string throws when compiled, not when called, saying what to do', () => {
+    // pg would send a wrapper as JSON, a number as its text, which Postgres reads as a path, and Default as 'Symbol(DEFAULT)'
+    const paths = { number: 1, null: null, object: { a: 1 }, array: ['$'], Default, self, raw: raw("'$'"), param: param('$'), fragment: sql`'$'`, parent: parent('path') };
+    expect(Object.fromEntries(Object.entries(paths).map(([name, x]) => [name, thrown(dc.jsonbPathExists(x as any))]))).toMatchInlineSnapshot(`
+      {
+        "Default": "\`jsonbPathExists()\` takes its path as a string, not \`db.Default\`: write the path as a string, and each value it compares with as a variable, \`jsonbPathExists(path, { name: value })\`.",
+        "array": "\`jsonbPathExists()\` takes its path as a string, not an array: write the path as a string, and each value it compares with as a variable, \`jsonbPathExists(path, { name: value })\`.",
+        "fragment": "\`jsonbPathExists()\` takes its path as a string, not a \`sql\` fragment: write the path as a string, and each value it compares with as a variable, \`jsonbPathExists(path, { name: value })\`.",
+        "null": "\`jsonbPathExists()\` takes its path as a string, not \`null\`: write the path as a string, and each value it compares with as a variable, \`jsonbPathExists(path, { name: value })\`.",
+        "number": "\`jsonbPathExists()\` takes its path as a string, not a \`number\`: write the path as a string, and each value it compares with as a variable, \`jsonbPathExists(path, { name: value })\`.",
+        "object": "\`jsonbPathExists()\` takes its path as a string, not an object: write the path as a string, and each value it compares with as a variable, \`jsonbPathExists(path, { name: value })\`.",
+        "param": "\`jsonbPathExists()\` takes its path as a string, not \`db.param()\`: write the path as a string, and each value it compares with as a variable, \`jsonbPathExists(path, { name: value })\`.",
+        "parent": "\`jsonbPathExists()\` takes its path as a string, not \`db.parent()\`: write the path as a string, and each value it compares with as a variable, \`jsonbPathExists(path, { name: value })\`.",
+        "raw": "\`jsonbPathExists()\` takes its path as a string, not \`db.raw()\`: write the path as a string, and each value it compares with as a variable, \`jsonbPathExists(path, { name: value })\`.",
+        "self": "\`jsonbPathExists()\` takes its path as a string, not \`db.self\`: write the path as a string, and each value it compares with as a variable, \`jsonbPathExists(path, { name: value })\`.",
+      }
+    `);
+  });
+
+  it('jsonbPathExists given variables JSON lacks, at any depth, or a wrapper, throws when compiled, not when called, naming its key', () => {
+    // JSON.stringify would leave out { prize: undefined }, and Postgres raise 42704, could not find jsonpath variable
+    const head = '`jsonbPathExists()` sends its variables as JSON text, so it takes a JSON value, not',
+      dropped = '`JSON.stringify` would leave the key out. Give a JSON value.';
+    const circular: Record<string, unknown> = {};
+    circular.me = circular;
+    const vars = {
+      key: { prize: undefined }, nested: { a: [{ b: () => 1 }] }, bigint: { n: BigInt(1) }, param: param({ a: 1 }),
+      inner: { p: param(1) }, Default: { d: Default }, circular,
+    };
+    expect(Object.fromEntries(Object.entries(vars).map(([name, x]) => [name, thrown(dc.jsonbPathExists('$', x as any)).split('\n')[0]]))).toEqual({
+      key: `${head} \`undefined\` at key \`prize\`: ${dropped}`,
+      nested: `${head} a function at key \`b\`: ${dropped}`,
+      bigint: `${head} a \`bigint\` at key \`n\`: \`JSON.stringify\` would throw. Give it as a number or a string.`,
+      param: `${head} \`db.param()\`: give a value; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.`,
+      inner: `${head} \`db.param()\` at key \`p\`: \`JSON.stringify\` would write its fields. Give a JSON value.`,
+      Default: `${head} \`db.Default\` at key \`d\`: ${dropped}`,
+      circular: '`jsonbPathExists()` sends its variables as JSON text, so it takes a JSON value: `JSON.stringify` threw "Converting circular structure to JSON',
+    });
   });
 
   it('a condition given Default or self throws when compiled, not when called', () => {
