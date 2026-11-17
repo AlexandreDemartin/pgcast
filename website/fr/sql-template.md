@@ -1,5 +1,5 @@
 ---
-english: e3aba21dd3d9
+english: 27d2b98b0f76
 ---
 
 # Template SQL
@@ -478,7 +478,7 @@ Ce que renvoient `sql` et chaque raccourci : une requête, ou une partie de req
 | [`prepared(name?)`](#prepared) | en fait une requête préparée |
 | [`copy(override?)`](#copy) | une copie superficielle, certaines propriétés remplacées |
 | `noop`, `noopResult` | fixés par `insert()` et `upsert()` quand ils reçoivent `[]` : `run()` n’envoie rien et se résout en `noopResult` |
-| `parentTable` | fixé sur une sous-requête `lateral` par sa parente, et sur la sous-requête d’`exists()` et d’`isInSelect()` par leur option `parent`, pour [`parent()`](#parent) |
+| `parentTable` | fixé sur une sous-requête `lateral` par sa parente, et, à partir de la 6.9.0, sur la sous-requête d’`exists()` et d’`isInSelect()` par leur option `parent`, pour [`parent()`](#parent) |
 | `preparedName` | fixé par `prepared()` |
 | `compileExpression()` | utilisé par `compile()`, interne |
 
