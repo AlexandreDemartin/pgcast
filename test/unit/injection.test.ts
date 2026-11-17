@@ -710,14 +710,18 @@ describe('shortcut arguments', () => {
       ['a String object, as before', () => new String('count'), twice('count'), []],
       ['an array, as before', () => ['count'], twice('count'), []],
       ['a symbol, as before', () => Symbol('count'), 'throws: Cannot convert a Symbol value to a string', []],
+      // .run() rejected with these up to 6.8.0, raised by the compile; select() now throws them, as the query is built
+      ['a valueOf() throwing', log => ({ toString: answering(log, 'toString', 'count'), valueOf: answering(log, 'valueOf', () => { throw new Error('valueOf'); }) }), 'throws: valueOf', ['valueOf']],
+      ['a Symbol.toPrimitive throwing to the hint default', log => ({ [Symbol.toPrimitive]: (hint: string) => { log.push(`toPrimitive(${hint})`); if (hint === 'default') throw new Error('default hint'); return 'count'; } }), 'throws: default hint', ['toPrimitive(default)']],
+      ['a valueOf() answering a symbol', log => ({ toString: answering(log, 'toString', 'count'), valueOf: () => { log.push('valueOf'); return Symbol('count'); } }), 'throws: Cannot convert a Symbol value to a string', ['valueOf']],
     ])('%s', (_, make, expected, conversions) => {
       const log: string[] = [];
-      let result: string[] | string;
+      let result: string[] | string, q: db.SQLFragment<any, any> | undefined;
       try {
-        const q = db.select('users', all, {}, db.SelectResultMode.Numeric, make(log) as any);
+        q = db.select('users', all, {}, db.SelectResultMode.Numeric, make(log) as any);
         result = [q.compile().text, q.compile().text];
       } catch (e) {
-        result = `throws: ${(e as Error).message}`;
+        result = `${q ? 'compile ' : ''}throws: ${(e as Error).message}`;  // `throws` alone: as the query is built
       }
       expect({ result, log }).toEqual({ result: expected, log: conversions });
     });
