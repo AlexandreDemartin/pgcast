@@ -51,7 +51,7 @@ All four options compile to the same SQL, the hand-written lateral's: they diffe
 |---|---|---|---|---|
 | **The caller writes** | `related(fk.films.studios)`, `fk` imported from a generated `zapatos/foreignKeys.ts` | `related('studios')`, after `db.setConfig({ foreignKeys })` | `related('studios')` | `selectExactlyOne('studios', { id: db.parent<s.films.Column>('studio_id') })` |
 | **How the parent table is known** | the value names the key's table, which nothing checks against the outer query; the SQL's parent is the outer query's `parentTable` mark | through context, as #625 | at run time, from the mark: an alias hides the table | the type argument, which the caller writes |
-| **Compile cost** | measured below: about +2 points over the same queries written by hand | the mark alone, about +13 points (#625), plus a lookup by pair of tables | the same as B | none |
+| **Compile cost** | measured below: +1.8 points over the same 6 laterals by hand | the mark alone, about +13 points (#625), plus a lookup by pair of tables | the same as B | none |
 | **What it adds** | the first generated runtime file since Zapatos 3.0: its module format (CJS, ESM, TypeScript) and `outExt`, `--check`, the docs schema, and an import in every file that joins | a registry on top of A's runtime file, as `foreignKeys` is the same generated value; one registry for every database (#68); and contextual typing, for `related()` to learn its parent's table | a hidden query and a cache | nothing |
 | **The philosophy** | allowed (principle 5 writes `.ts` files), and needs nothing from `core.ts` | refused: no global registry (skill `zero-abstraction`), and the cost of contextual typing (#625) | refused: an implicit query, a cache | — |
 
@@ -62,14 +62,14 @@ All four options compile to the same SQL, the hand-written lateral's: they diffe
 | many-to-one, `films.studio_id NOT NULL` | `selectExactlyOne('studios', { id: parent('studio_id') }, { columns: ['name'] })` | `LEFT JOIN LATERAL (SELECT jsonb_build_object($3::text, "name") AS result FROM "studios" WHERE ("id" = "films"."studio_id") LIMIT $4) AS "lateral_studio" ON true` |
 | one-to-many, `roles.film_id` | `select('roles', { film_id: parent('id') }, { columns: ['character'], order: { by: 'billing', direction: 'ASC' } })` | `LEFT JOIN LATERAL (SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT jsonb_build_object($3::text, "character") AS result FROM "roles" WHERE ("film_id" = "films"."id") ORDER BY "billing" ASC) AS "sq_roles") AS "lateral_cast" ON true` |
 
-**Measured** (`npm run bench:types`, prototypes never committed; master is 15,824 Instantiations, +1.1 % on the baseline):
+**Measured** (`npm run bench:types`, prototypes never committed). Master is 15,824 Instantiations and 7,433 Types, +1.1 % and +3.3 % on the baseline. Each prototype adds the same 6 laterals on the fixture: nested, a composite key, a self-reference, two keys between the same tables.
 
 | Prototype | Instantiations | Types |
 |---|---|---|
-| A: `related()` and `relatedMany()` over a generated `as const` value, 7 calls on the fixture (nested, composite, two keys) | 16,623 (+6.2 %) | 7,797 (+8.4 %) |
-| the same 7 queries by hand | 16,308 (+4.2 %) | 7,539 (+4.8 %) |
+| D: the 6 laterals by hand, with `parent<T.Column>` | 16,281 (+4.0 %) | 7,551 (+5.0 %) |
+| A: `related()` and `relatedMany()` over a generated `as const` value | 16,557 (+5.8 %) | 7,790 (+8.3 %) |
 
-So A costs about 45 Instantiations per call over the hand-written lateral, +2.0 points for the 7: the types are not the obstacle. Its result types check out, an ambiguous key is refused, and neither collapses to `any` (probed). It checks a key's columns, not that the key leaves the parent table: `related(fk.memberships.orgs)` under `select('accounts', …)` compiles, and joins on `"accounts"."org_country"` and `"accounts"."org_code"`: 42703, or the wrong rows when the outer table has columns of those names (probed).
+So A costs 276 Instantiations over D, 46 per call, +1.8 points for the 6: the types are not the obstacle. (A first count, 16,623 against 16,308, held a seventh call, the refused one, and a baseline of untyped `parent()`.) Its result types check out, an ambiguous key is refused, and neither collapses to `any` (probed). It checks a key's columns, not that the key leaves the parent table: `related(fk.memberships.orgs)` under `select('accounts', …)` compiles, and joins on `"accounts"."org_country"` and `"accounts"."org_code"`: 42703, or the wrong rows when the outer table has columns of those names (probed).
 
 **Market standard**:
 
