@@ -80,7 +80,7 @@ Say `films` had a `certificate` column, of `CREATE DOMAIN certificate AS text CH
 
 So a query pays about 4 Instantiations per slot for the union, wherever it is declared: U1, U3 and U4 cost the same, to one Type. The declarations cost about 2.4 Types per value, once, as enums of the same labels would; U4's placeholder adds nothing measurable. The corpus's API types already declare those unions, which its placeholders import.
 
-**Market standard**: no generator reads a `CHECK`.
+**Market standard**: none of these four reads a `CHECK`.
 
 - **Kanel** declares a domain as its base type (`domainsGenerator.ts`: `typeMap[domainDetails.innerType]`), with its comment; **kanel-zod** as its base schema, `z.string()` (`processDomain.ts`).
 - **kysely-codegen** generates types for domains by default (`--no-domains` skips them); its README says nothing of a `CHECK`.
@@ -130,7 +130,7 @@ So a query pays about 4 Instantiations per slot for the union, wherever it is de
 **Choice: J0. Nothing is built, and #642 is crossed out.**
 
 - Zapatos documents it ("Say, for example, that you have a Postgres jsonb column on which you want to impose a particular structure"), pgcast's docs show it, and the corpus has adopted it, 256 columns to 9 plain ones.
-- J1 is a type declared by hand, only moved into the database, where Postgres checks nothing of it (principle 1). Kanel's `@type` and kysely-codegen's `overrides` (`"users.settings": "{ theme: 'dark' }"`) do this, outside the database for the latter.
+- J1 is a type declared by hand, only moved into the database, where Postgres checks nothing of it (principle 1). Kanel's `@type` and kysely-codegen's `overrides` (`{"columns": {"users.settings": "{ theme: 'dark' }"}}`) do this, outside the database for the latter.
 - J2 is the only one where the database knows the shape; it needs an extension the corpus does not use, and a converter that belongs in a separate package if ever.
 
 ## 4. Validators in a separate package
@@ -147,7 +147,7 @@ So a query pays about 4 Instantiations per slot for the union, wherever it is de
 **Choice: V0. #643 is crossed out.**
 
 - **No need in the corpus.** It validates with Zod, at its API's edge, against types of its API specification; none of its Zod schemas is typed against a table's row type. A row that breaks a `CHECK`, a `NOT NULL` or a domain is refused by Postgres, in the same round trip.
-- **The market has one**: `kanel-zod` writes Zod schemas from the catalog, and gives a domain `z.string()` and a `jsonb` `z.unknown()`. A project that wants them has them today.
+- **The market has one**: `kanel-zod` writes Zod schemas from the catalog, and gives a domain `z.string()` and a `jsonb` `z.unknown()`. A project that wants them has them today, by running Kanel and kanel-zod's hook beside pgcast.
 - **The cost is all fixed**: the model #52 left out, a second package to publish and keep in step with Zod, for no call the corpus would make ("Small is beautiful").
 - **For a revival**: V1, Zod first (the corpus uses Zod and no Valibot), named `@pgcast/zod`, a CLI beside `pgcast` that writes one `.ts` file; it reads the catalog through a model `zapatos/generate` would export, built in the PR that needs it, as #52's comment says. Its layout and its publication are then the owner's (`AGENTS.md` § Stop points). It comes back as a revision of this note, if real use asks.
 
