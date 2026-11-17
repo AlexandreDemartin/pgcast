@@ -4,6 +4,7 @@ Copyright (C) 2020 - 2023 George MacKerron
 Released under the MIT licence: see LICENCE file
 */
 
+import type { JSONValue } from './core';
 import {
   SQLFragment,
   ParentColumn,
@@ -154,6 +155,60 @@ interface EqAnySignatures {
  */
 export const eqAny: EqAnySignatures = (a: readonly unknown[] | ParentColumn) =>
   sql<SQL, boolean | null>`${self} = ANY(${a instanceof ParentColumn ? a : anyArray(a)})`;
+
+/* === jsonb === */
+
+// what JSON.stringify would not write as it is, for jsonbContains()'s messages; undefined for a JSON value
+const notJSON = (x: unknown) =>
+  x === undefined ? '`undefined`' : typeof x === 'function' ? 'a function' : typeof x === 'bigint' ? 'a `bigint`' :
+    notAValue(x) ?? (typeof x === 'symbol' ? 'a symbol' : undefined);
+
+// the value goes as JSON text: pg alone sends a string as text and an array as '{1,2}', which the cast to jsonb refuses
+// (22P02); JSON.stringify would leave out a key holding undefined, a function or a symbol, so that { a: undefined }
+// matched every row, write them as null in an array, and a wrapper as its fields, which match no row, with no error
+const jsonbParam = (a: unknown) => {
+  const name = notAValue(a);
+  if (name !== undefined) return refused(`\`jsonbContains()\` sends its value as JSON text, so it takes a JSON value, not ${name}: give a value; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.`);
+  let refusal: string | undefined, top = true;
+  try {
+    const text = JSON.stringify(a, function (this: unknown, key, x: unknown) {
+      const what = refusal === undefined ? notJSON(x) : undefined;
+      if (what !== undefined) {
+        const
+          inArray = Array.isArray(this),
+          at = top ? '' : inArray ? ` at item ${key}` : ` at key \`${key}\``,
+          effect = typeof x === 'bigint' ? 'throw' : typeof x === 'object' ? 'write its fields' :
+            top ? 'write nothing' : inArray ? 'write `null` in its place' : 'leave the key out, and the value match more rows',
+          advice = typeof x === 'bigint' ? 'Give it as a number or a string' : top || inArray ? 'Give a JSON value' : 'Give a JSON value, or leave the key out';
+        refusal = `\`jsonbContains()\` sends its value as JSON text, so it takes a JSON value, not ${what}${at}: \`JSON.stringify\` would ${effect}. ${advice}.`;
+      }
+      top = false;
+      return refusal === undefined ? x : null;
+    });
+    return refusal === undefined ? param(text, 'jsonb') : refused(refusal);
+  } catch (err) {
+    return refused(`\`jsonbContains()\` sends its value as JSON text, so it takes a JSON value: \`JSON.stringify\` threw "${(err as Error).message}". Give a JSON value.`);
+  }
+};
+
+// a jsonb domain whose zapatos/custom placeholder is narrowed fits no JSONValue: its type, given as T, is the condition's,
+// and is never inferred from the value, which would let a string through on a text column; a value it contains need
+// not hold every key the placeholder requires, so the value stays a JSONValue
+interface JsonbContainsSignatures {
+  (a: JSONValue): SQLFragment<boolean | null, JSONValue>;
+  <T>(a: JSONValue): SQLFragment<boolean | null, T>;
+}
+
+/**
+ * `"col" @> CAST($1 AS "jsonb")`, on a `jsonb` column: its JSON contains the value's. The value is sent as JSON text,
+ * `JSON.stringify(a)`, whatever `castObjectParamsToJson` and `castArrayParamsToJson`, so a string is a JSON string and
+ * `null` the JSON `null`. A `json` column passes the type, and Postgres refuses it (42883). As the query compiles, what
+ * JSON lacks throws, at any depth (`undefined`, a function, a symbol, a `bigint`, a circular value), and so do
+ * `db.param()`, `db.parent()`, a `sql` fragment, `db.Default`, `db.self`, `db.raw()`, `db.cols()` and `db.vals()`.
+ * On a `jsonb` domain whose `zapatos/custom` placeholder is narrowed, name its type: `jsonbContains<PgProjection>(a)`.
+ * @param a A JSON value
+ */
+export const jsonbContains: JsonbContainsSignatures = (a: JSONValue) => sql<SQL, boolean | null>`${self} @> ${jsonbParam(a)}`;
 
 /**
  * Join conditions with `OR`: `or(a, b)` compiles to `(a OR b)`, and `or()` to `FALSE`, so that

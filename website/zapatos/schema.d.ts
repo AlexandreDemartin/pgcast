@@ -384,6 +384,14 @@ declare module 'zapatos/schema' {
     export type Table = 'films';
     export interface Selectable {
       /**
+      * **films.details**
+      *
+      * The print and the prizes, as JSON
+      * - `jsonb` in database
+      * - `NOT NULL`, default: `'{}'::jsonb`
+      */
+      details: db.JSONValue;
+      /**
       * **films.genres**
       * - `_text` in database
       * - `NOT NULL`, default: `'{}'::text[]`
@@ -433,6 +441,14 @@ declare module 'zapatos/schema' {
       title_search: c.PgTsvector | null;
     }
     export interface JSONSelectable {
+      /**
+      * **films.details**
+      *
+      * The print and the prizes, as JSON
+      * - `jsonb` in database
+      * - `NOT NULL`, default: `'{}'::jsonb`
+      */
+      details: db.JSONValue;
       /**
       * **films.genres**
       * - `_text` in database
@@ -484,6 +500,14 @@ declare module 'zapatos/schema' {
     }
     export interface Whereable {
       /**
+      * **films.details**
+      *
+      * The print and the prizes, as JSON
+      * - `jsonb` in database
+      * - `NOT NULL`, default: `'{}'::jsonb`
+      */
+      details?: db.JSONValue | db.Parameter<db.JSONValue> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, db.JSONValue | db.Parameter<db.JSONValue> | db.SQLFragment | db.ParentColumn>;
+      /**
       * **films.genres**
       * - `_text` in database
       * - `NOT NULL`, default: `'{}'::text[]`
@@ -534,6 +558,14 @@ declare module 'zapatos/schema' {
     }
     export interface Insertable {
       /**
+      * **films.details**
+      *
+      * The print and the prizes, as JSON
+      * - `jsonb` in database
+      * - `NOT NULL`, default: `'{}'::jsonb`
+      */
+      details?: db.JSONValue | db.Parameter<db.JSONValue> | db.DefaultType | db.SQLFragment;
+      /**
       * **films.genres**
       * - `_text` in database
       * - `NOT NULL`, default: `'{}'::text[]`
@@ -577,6 +609,14 @@ declare module 'zapatos/schema' {
       title: string | db.Parameter<string> | db.SQLFragment;
     }
     export interface Updatable {
+      /**
+      * **films.details**
+      *
+      * The print and the prizes, as JSON
+      * - `jsonb` in database
+      * - `NOT NULL`, default: `'{}'::jsonb`
+      */
+      details?: db.JSONValue | db.Parameter<db.JSONValue> | db.DefaultType | db.SQLFragment | db.SQLFragment<any, db.JSONValue | db.Parameter<db.JSONValue> | db.DefaultType | db.SQLFragment>;
       /**
       * **films.genres**
       * - `_text` in database

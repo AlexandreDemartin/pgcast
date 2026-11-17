@@ -15,7 +15,10 @@ CREATE TABLE films
 , release_year INTEGER NOT NULL
 , runtime_minutes INTEGER NOT NULL
 , tagline TEXT
-, genres TEXT[] NOT NULL DEFAULT '{}' );
+, genres TEXT[] NOT NULL DEFAULT '{}'
+, details JSONB NOT NULL DEFAULT '{}' );
+
+COMMENT ON COLUMN films.details IS 'The print and the prizes, as JSON';
 
 CREATE TABLE actors
 ( id SERIAL PRIMARY KEY
@@ -87,11 +90,11 @@ INSERT INTO studios (id, name) VALUES
 , (1001, 'Greyhaven Studios')
 , (1002, 'Ninefold Films');
 
-INSERT INTO films (id, studio_id, title, release_year, runtime_minutes, tagline, genres) VALUES
-  (1000, 1000, 'The Salt Orchard', 1974, 112, 'Some harvests take a lifetime.', '{drama}')
-, (1001, 1001, 'A Lantern for Edith', 1991, 98, NULL, '{drama,romance}')
-, (1002, 1000, 'The Cartographer''s Silence', 2008, 131, 'Every map leaves something out.', '{mystery,thriller}')
-, (1003, 1002, 'Small Hours at Calder Bay', 2019, 104, NULL, '{}');
+INSERT INTO films (id, studio_id, title, release_year, runtime_minutes, tagline, genres, details) VALUES
+  (1000, 1000, 'The Salt Orchard', 1974, 112, 'Some harvests take a lifetime.', '{drama}', '{"format": "35mm", "prizes": ["Golden Gull"]}')
+, (1001, 1001, 'A Lantern for Edith', 1991, 98, NULL, '{drama,romance}', '{"format": "35mm", "prizes": []}')
+, (1002, 1000, 'The Cartographer''s Silence', 2008, 131, 'Every map leaves something out.', '{mystery,thriller}', '{"format": "digital", "prizes": ["Golden Gull", "Silver Heron"]}')
+, (1003, 1002, 'Small Hours at Calder Bay', 2019, 104, NULL, '{}', '{"format": "digital"}');
 
 INSERT INTO actors (id, name) VALUES
   (1000, 'Odile Marchetti')

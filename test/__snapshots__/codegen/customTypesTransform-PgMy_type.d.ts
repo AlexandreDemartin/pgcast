@@ -820,6 +820,12 @@ declare module 'zapatos/schema' {
         */
         c_jsonb_array: db.JSONValue[] | null;
         /**
+        * **extra.type_zoo.c_jsonb_domain**
+        * - `preferences` (base type: `jsonb`) in database
+        * - Nullable, no default
+        */
+        c_jsonb_domain: c.PgPreferences | null;
+        /**
         * **extra.type_zoo.c_macaddr**
         * - `macaddr` in database
         * - Nullable, no default
@@ -1067,6 +1073,12 @@ declare module 'zapatos/schema' {
         * - Nullable, no default
         */
         c_jsonb_array: db.JSONValue[] | null;
+        /**
+        * **extra.type_zoo.c_jsonb_domain**
+        * - `preferences` (base type: `jsonb`) in database
+        * - Nullable, no default
+        */
+        c_jsonb_domain: c.PgPreferences | null;
         /**
         * **extra.type_zoo.c_macaddr**
         * - `macaddr` in database
@@ -1316,6 +1328,12 @@ declare module 'zapatos/schema' {
         */
         c_jsonb_array?: db.JSONValue[] | db.Parameter<db.JSONValue[]> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, db.JSONValue[] | db.Parameter<db.JSONValue[]> | db.SQLFragment | db.ParentColumn>;
         /**
+        * **extra.type_zoo.c_jsonb_domain**
+        * - `preferences` (base type: `jsonb`) in database
+        * - Nullable, no default
+        */
+        c_jsonb_domain?: c.PgPreferences | db.Parameter<c.PgPreferences> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, c.PgPreferences | db.Parameter<c.PgPreferences> | db.SQLFragment | db.ParentColumn>;
+        /**
         * **extra.type_zoo.c_macaddr**
         * - `macaddr` in database
         * - Nullable, no default
@@ -1564,6 +1582,12 @@ declare module 'zapatos/schema' {
         */
         c_jsonb_array?: db.JSONValue[] | db.Parameter<db.JSONValue[]> | null | db.DefaultType | db.SQLFragment;
         /**
+        * **extra.type_zoo.c_jsonb_domain**
+        * - `preferences` (base type: `jsonb`) in database
+        * - Nullable, no default
+        */
+        c_jsonb_domain?: c.PgPreferences | db.Parameter<c.PgPreferences> | null | db.DefaultType | db.SQLFragment;
+        /**
         * **extra.type_zoo.c_macaddr**
         * - `macaddr` in database
         * - Nullable, no default
@@ -1805,6 +1829,12 @@ declare module 'zapatos/schema' {
         * - Nullable, no default
         */
         c_jsonb_array?: db.JSONValue[] | db.Parameter<db.JSONValue[]> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, db.JSONValue[] | db.Parameter<db.JSONValue[]> | null | db.DefaultType | db.SQLFragment>;
+        /**
+        * **extra.type_zoo.c_jsonb_domain**
+        * - `preferences` (base type: `jsonb`) in database
+        * - Nullable, no default
+        */
+        c_jsonb_domain?: c.PgPreferences | db.Parameter<c.PgPreferences> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgPreferences | db.Parameter<c.PgPreferences> | null | db.DefaultType | db.SQLFragment>;
         /**
         * **extra.type_zoo.c_macaddr**
         * - `macaddr` in database

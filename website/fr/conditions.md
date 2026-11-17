@@ -1,5 +1,5 @@
 ---
-english: 42b2738ed6a3
+english: 4483c8067390
 ---
 
 # Conditions {#db-conditions}
@@ -23,7 +23,9 @@ Chaque membre est un fragment [`sql`](/fr/sql-template#sql) écrit autour de [`d
 
 - **Où** : comme valeur d’un Whereable, donc dans le `where` de [`select()`](/fr/select#select), [`count()`](/fr/select#count), [`update()`](/fr/insert#update) et [`deletes()`](/fr/insert#deletes), le `having` de `select()`, et un Whereable dans un template `sql`. Ailleurs, `self` n’a pas de colonne : `` db.sql`SELECT ${db.conditions.isNull}` `` lève "The 'self' column alias has no meaning here"<!-- message --> à la compilation.
   - [`and()`](#conditions.and), [`or()`](#conditions.or) et [`not()`](#conditions.not) prennent aussi des Whereables, et peuvent donc former tout un `where` ; [`now`](#conditions.now), [`fromNow()`](#conditions.fromNow) et [`exists()`](#conditions.exists) ne contiennent pas de `self`, et vont partout.
-- **Valeurs** : chaque valeur est un paramètre, `$1`, sauf un [`Parameter`](/fr/sql-template#Parameter), gardé tel quel avec son cast ; un fragment `sql`, écrit comme son SQL ; et [`parent()`](/fr/sql-template#parent), la colonne de la requête parente dans une sous-requête `lateral`, ou dans le `where` d’[`exists()`](#conditions.exists) et d’[`isInSelect()`](#conditions.isInSelect), dont l’option `parent` nomme cette table. `Default`, `self`, `raw()`, `cols()` et `vals()` lèvent une erreur : [Les valeurs qu’une condition refuse](#refused-values). [`eqAny()`](#conditions.eqAny) envoie son tableau en un seul paramètre de valeurs simples : un élément qui est l’un d’eux lève une erreur, et à la place du tableau, `eqAny()` ne prend que `parent()`. [`websearchToTsquery()`](#conditions.websearchToTsquery) prend deux valeurs simples : `Default`, `self`, `raw()`, `cols()`, `vals()`, un `Parameter`, un fragment ou `parent()` y lève une erreur.
+- **Valeurs** : chaque valeur est un paramètre, `$1`, sauf un [`Parameter`](/fr/sql-template#Parameter), gardé tel quel avec son cast ; un fragment `sql`, écrit comme son SQL ; et [`parent()`](/fr/sql-template#parent), la colonne de la requête parente dans une sous-requête `lateral`, ou dans le `where` d’[`exists()`](#conditions.exists) et d’[`isInSelect()`](#conditions.isInSelect), dont l’option `parent` nomme cette table. `Default`, `self`, `raw()`, `cols()` et `vals()` lèvent une erreur : [Les valeurs qu’une condition refuse](#refused-values). [`eqAny()`](#conditions.eqAny) envoie son tableau en un seul paramètre de valeurs simples : un élément qui est l’un d’eux lève une erreur, et à la place du tableau, `eqAny()` ne prend que `parent()`.
+  - [`jsonbContains()`](#conditions.jsonbContains) ne prend qu’une valeur JSON : un `Parameter`, un fragment ou `parent()` y lève aussi une erreur.
+  - [`websearchToTsquery()`](#conditions.websearchToTsquery) prend deux valeurs simples : `Default`, `self`, `raw()`, `cols()`, `vals()`, un `Parameter`, un fragment ou `parent()` y lève une erreur.
 - **Type** : une condition est un `SQLFragment` dont le second argument de type, `T`, est le type de la valeur à laquelle elle compare (sa `Constraint`, [`sql`](/fr/sql-template#sql)) ; le Whereable vérifie `T` contre le type de la colonne. Les huit tests, `now` et `fromNow()` n’ont pas de `T`, et passent sur n’importe quelle colonne ; le `T` de [`websearchToTsquery()`](#conditions.websearchToTsquery) est un type que seule une colonne typée `any` accepte, comme l’est une colonne `tsvector`.
   - Un Whereable est aussi une expression : interpolé dans une liste `SELECT`, `{ runtime_minutes: add(10) }` est la durée de chaque film plus dix, `(("runtime_minutes" + $1))`<!-- probe: db.sql`${{ runtime_minutes: db.conditions.add(10) }}` -->. Le type laisse donc passer, comme valeur d’un Whereable, ce qui n’est pas un test : [`add()`](#conditions.add), [`subtract()`](#conditions.subtract), [`now`](#conditions.now) et [`fromNow()`](#conditions.fromNow), que Postgres refuse seuls dans un `where` (42804).
 
@@ -339,6 +341,34 @@ Avec [`castArrayParamsToJson`](/fr/runtime-config#Config.castArrayParamsToJson) 
 
 `"col" && $1`<!-- probe: db.sql`${{ col: db.conditions.arrayOverlaps(['x']) }}` --> : la colonne et la valeur ont au moins un élément en commun.
 
+## jsonb {#jsonb}
+
+### `jsonbContains()` {#conditions.jsonbContains}
+
+```ts
+db.conditions.jsonbContains(a: JSONValue): SQLFragment<boolean | null, JSONValue>
+db.conditions.jsonbContains<T>(a: JSONValue): SQLFragment<boolean | null, T>
+```
+
+`"col" @> CAST($1 AS "jsonb")`<!-- probe: db.sql`${{ col: db.conditions.jsonbContains({ format: '35mm' }) }}` --> : le JSON de la colonne contient la valeur, au sens de l’[inclusion](https://www.postgresql.org/docs/current/datatype-json.html#JSON-CONTAINMENT) de Postgres. La valeur est envoyée sous forme de texte JSON, `JSON.stringify(a)` : vous n’avez pas à écrire `JSON.stringify` vous-même.
+
+<CastPanel example="conditions_jsonbContains">
+
+<<< ../examples/conditions_jsonbContains.ts{ts twoslash}
+
+</CastPanel>
+
+- **Les objets et les tableaux** sont comparés niveau par niveau, à partir du premier : `{ prizes: ['Golden Gull'] }` trouve les films dont `prizes` contient cette chaîne, parmi d’autres prix, et `{ format: '35mm' }` une clé `format` au premier niveau, jamais une clé imbriquée plus bas, comme dans `{ "cut": { "format": "35mm" } }`. `{}` est contenu dans tout objet, donc trouve tous les films.
+- **Une chaîne, un nombre, `null`** : ce sont aussi des valeurs JSON, la chaîne envoyée comme `"35mm"`, `null` comme le `null` de JSON. Chacun correspond à cette valeur, ou à un tableau qui la contient à son premier niveau : `details` est un objet, donc `jsonbContains('35mm')` ne trouve aucun film. Un simple `` db.sql`${db.self} @> ${db.param(x, 'jsonb')}` `` envoie une chaîne comme du texte, et un tableau comme un tableau Postgres sauf si `castArrayParamsToJson` est activé : Postgres refuse les deux (22P02).
+- **[`castObjectParamsToJson`](/fr/runtime-config#Config.castObjectParamsToJson)** et **[`castArrayParamsToJson`](/fr/runtime-config#Config.castArrayParamsToJson)** ne changent rien : `"details" @> CAST($1 AS "jsonb")`<!-- probe: (db.setConfig({ castObjectParamsToJson: true, castArrayParamsToJson: true }), db.sql`${{ details: db.conditions.jsonbContains({ format: '35mm' }) }}`) -->, la valeur étant déjà du texte JSON.
+- **Ce que JSON n’a pas** lève une erreur à la compilation de la requête, à toute profondeur, et le message nomme sa clé : `undefined`, une fonction ou un symbole, que `JSON.stringify` omet dans un objet (`{ format: undefined }` vaudrait donc `{}`, tous les films) et remplace par `null` dans un tableau ; un `bigint`, sur lequel il lève une erreur ; une valeur circulaire. Le type les refuse, mais pas dans une valeur typée `{ format?: string }`, qui peut contenir `undefined` sauf si `exactOptionalPropertyTypes` est activé, ni dans une valeur typée `any`.
+- **Type** : la valeur est une `JSONValue`, et le `T` de la condition aussi : une colonne `jsonb` l’accepte, une colonne `text` ou `integer` la refuse (TS2322). Une colonne `json` passe, les deux étant des `JSONValue`, et Postgres la refuse (42883, `operator does not exist: json @> jsonb`). Une valeur typée par une `interface` est refusée (TS2769), comme dans un `insert()` sur une colonne `jsonb` : donnez-lui un alias `type`.
+- **Un domaine `jsonb` dont vous avez affiné le placeholder** ([Un domaine `jsonb`](/fr/custom-types#a-jsonb-domain)) refuse la `JSONValue` de la condition (TS2322) : nommez le placeholder, `jsonbContains<PgProjection>({ format: '35mm' })`, et la condition prend son type. La valeur reste n’importe quelle valeur JSON, `{ format: 'VHS' }` aussi, sans être vérifiée contre le placeholder : une valeur contenue peut n’avoir qu’une partie des clés du placeholder. Une colonne `text` refuse aussi cette condition (TS2322).
+
+Un `Parameter`, un fragment `sql` ou `parent()` lève une erreur à la compilation de la requête, à toute profondeur, comme `Default`, `self`, `raw()`, `cols()` et `vals()`, et le type refuse chacun d’eux : `JSON.stringify` enverrait ses champs, qui ne correspondent à aucune ligne, sans erreur.
+
+> `` `jsonbContains()` sends its value as JSON text, so it takes a JSON value, not `db.param()`: give a value; for SQL, write a `sql` fragment with `db.self` in place of the condition. ``<!-- message -->
+
 ## Combiner : `and()`, `or()`, `not()` {#combining}
 
 Chacune prend des conditions ou des Whereables, un Whereable compilé avec ses propres clés. Comme valeur d’un Whereable, `self` atteint les conditions à l’intérieur : `{ release_year: or(lt(1980), gt(2010)) }` donne `((("release_year" < $1 OR "release_year" > $2)))`<!-- probe: db.sql`${{ release_year: db.conditions.or(db.conditions.lt(1980), db.conditions.gt(2010)) }}` -->. Comme `where` entier, elles prennent des Whereables :
@@ -606,7 +636,7 @@ Le type ne vérifie pas un fragment : un `int4` sur une colonne `timestamptz` p
 
 ## Les valeurs qu’une condition refuse {#refused-values}
 
-`Default`, `self`, `raw()`, `cols()` et `vals()` n’ont pas de sens comme valeur d’une condition. Le type les refuse (TS2322, ou TS2345 là où la condition borne son argument : un motif, la seconde borne d’un intervalle, une condition de tableau, `add()`, `subtract()`, `websearchToTsquery()` ; TS2769 comme liste d’`eqAny()`).
+`Default`, `self`, `raw()`, `cols()` et `vals()` n’ont pas de sens comme valeur d’une condition. Le type les refuse (TS2322, ou TS2345 là où la condition borne son argument : un motif, la seconde borne d’un intervalle, une condition de tableau, `add()`, `subtract()`, `websearchToTsquery()` ; TS2769 comme liste d’`eqAny()` et comme valeur de `jsonbContains()`).
 
 À l’exécution, c’est la compilation de la condition qui lève l’erreur, pas son appel : `run()` est donc rejetée avec une simple `Error` avant toute requête.
 
@@ -620,6 +650,7 @@ Zapatos 6.6.1 envoyait `Default` et `self` comme les chaînes `'Symbol(DEFAULT)'
 | `` `db.Default` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. `DEFAULT` is for INSERT and UPDATE values. ``<!-- message --> | `Default` dans `isIn()` ou `isNotIn()` |
 | `` `db.self` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: compare with a value, or use it in a `sql` fragment value, where it stands for the column. ``<!-- message --> | `self` dans `isIn()` ou `isNotIn()` |
 | `` `db.raw()`, `db.cols()` and `db.vals()` have no meaning as a value in a Whereable (a filter), nor in `isIn()`: to compare with SQL, use a `sql` fragment value, where `db.self` stands for the column; to compare with a value, give the value itself, or `db.param()`. ``<!-- message --> | `raw()`, `cols()` ou `vals()` dans `isIn()` ou `isNotIn()` |
+| `` `jsonbContains()` sends its value as JSON text, so it takes a JSON value, not `db.Default`: give a value; for SQL, write a `sql` fragment with `db.self` in place of the condition. ``<!-- message --> | `Default` comme valeur de [`jsonbContains()`](#conditions.jsonbContains) ; `self`, `raw()`, `cols()`, `vals()`, un `Parameter`, un fragment `sql` ou `parent()` au même endroit reçoit le même message, qui le nomme |
 | `` `eqAny()` takes an array of values, not `db.Default`: write `eqAny(values)`; for SQL, write a `sql` fragment with `db.self` in place of the condition. ``<!-- message --> | `Default` comme liste d’[`eqAny()`](#conditions.eqAny) ; `self`, `raw()`, `cols()`, `vals()`, un `Parameter` ou un fragment `sql` au même endroit reçoit le même message, qui le nomme |
 | `` `eqAny()` sends its array as one parameter, so each item is a plain value, not `db.Default`: give a value. ``<!-- message --> | `Default` comme élément d’`eqAny()` ; `self`, `raw()`, `cols()` ou `vals()` au même endroit reçoit le même message, qui le nomme |
 | `` `websearchToTsquery()` sends its configuration and its query as parameters: give the configuration as a string, not `db.Default`; for SQL, write a `sql` fragment with `db.self` in place of the condition. ``<!-- message --> | `Default` comme configuration de [`websearchToTsquery()`](#conditions.websearchToTsquery) ; comme requête, le message dit `query` ; `self`, `raw()`, `cols()`, `vals()`, un `Parameter`, un fragment `sql` ou `parent()` reçoit le même message, qui le nomme |

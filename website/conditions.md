@@ -19,7 +19,9 @@ Each member is a [`sql`](/sql-template#sql) fragment written around [`db.self`](
 
 - **Where**: as a Whereable value, so in the `where` of [`select()`](/select#select), [`count()`](/select#count), [`update()`](/insert#update) and [`deletes()`](/insert#deletes), the `having` of `select()`, and a Whereable in a `sql` template. Elsewhere `self` has no column: `` db.sql`SELECT ${db.conditions.isNull}` `` throws "The 'self' column alias has no meaning here"<!-- message --> as it compiles.
   - [`and()`](#conditions.and), [`or()`](#conditions.or) and [`not()`](#conditions.not) also take Whereables, so they can be a whole `where`; [`now`](#conditions.now), [`fromNow()`](#conditions.fromNow) and [`exists()`](#conditions.exists) hold no `self`, and go anywhere.
-- **Values**: each value is a parameter, `$1`, except a [`Parameter`](/sql-template#Parameter), kept as it is with its cast; a `sql` fragment, written as its SQL; and [`parent()`](/sql-template#parent), the parent query's column in a `lateral` subquery, or in the `where` of [`exists()`](#conditions.exists) and [`isInSelect()`](#conditions.isInSelect), whose `parent` option names that table. `Default`, `self`, `raw()`, `cols()` and `vals()` throw: [Values a condition refuses](#refused-values). [`eqAny()`](#conditions.eqAny) sends its array as one parameter of plain values: an item that is any of these throws, and in place of the array it takes `parent()` alone. [`websearchToTsquery()`](#conditions.websearchToTsquery) takes two plain values: any of these, a `Parameter`, a fragment or `parent()` throws.
+- **Values**: each value is a parameter, `$1`, except a [`Parameter`](/sql-template#Parameter), kept as it is with its cast; a `sql` fragment, written as its SQL; and [`parent()`](/sql-template#parent), the parent query's column in a `lateral` subquery, or in the `where` of [`exists()`](#conditions.exists) and [`isInSelect()`](#conditions.isInSelect), whose `parent` option names that table. `Default`, `self`, `raw()`, `cols()` and `vals()` throw: [Values a condition refuses](#refused-values). [`eqAny()`](#conditions.eqAny) sends its array as one parameter of plain values: an item that is any of these throws, and in place of the array it takes `parent()` alone.
+  - [`jsonbContains()`](#conditions.jsonbContains) takes a JSON value alone: a `Parameter`, a fragment or `parent()` throws there too.
+  - [`websearchToTsquery()`](#conditions.websearchToTsquery) takes two plain values: any of these, a `Parameter`, a fragment or `parent()` throws.
 - **Type**: a condition is a `SQLFragment` whose second type argument, `T`, is the type of the value it compares with (its `Constraint`, [`sql`](/sql-template#sql)); the Whereable checks `T` against the column's type. The eight tests, `now` and `fromNow()` have no `T`, and pass on any column; the `T` of [`websearchToTsquery()`](#conditions.websearchToTsquery) is a type only a column typed `any` takes, as a `tsvector` column is.
   - A Whereable is also an expression: interpolated in a `SELECT` list, `{ runtime_minutes: add(10) }` is each film's runtime plus ten, `(("runtime_minutes" + $1))`<!-- probe: db.sql`${{ runtime_minutes: db.conditions.add(10) }}` -->. So the type lets through, as a Whereable value, what is no test: [`add()`](#conditions.add), [`subtract()`](#conditions.subtract), [`now`](#conditions.now) and [`fromNow()`](#conditions.fromNow), which Postgres refuses alone in a `where` (42804).
 
@@ -335,6 +337,34 @@ With [`castArrayParamsToJson`](/runtime-config#Config.castArrayParamsToJson) on,
 
 `"col" && $1`<!-- probe: db.sql`${{ col: db.conditions.arrayOverlaps(['x']) }}` -->: they share at least one element.
 
+## jsonb {#jsonb}
+
+### `jsonbContains()` {#conditions.jsonbContains}
+
+```ts
+db.conditions.jsonbContains(a: JSONValue): SQLFragment<boolean | null, JSONValue>
+db.conditions.jsonbContains<T>(a: JSONValue): SQLFragment<boolean | null, T>
+```
+
+`"col" @> CAST($1 AS "jsonb")`<!-- probe: db.sql`${{ col: db.conditions.jsonbContains({ format: '35mm' }) }}` -->: the column's JSON contains the value, as Postgres reads [containment](https://www.postgresql.org/docs/current/datatype-json.html#JSON-CONTAINMENT). The value goes as its JSON text, `JSON.stringify(a)`, so you need not write `JSON.stringify` yourself.
+
+<CastPanel example="conditions_jsonbContains">
+
+<<< ./examples/conditions_jsonbContains.ts{ts twoslash}
+
+</CastPanel>
+
+- **Objects and arrays** are compared level by level, from the top: `{ prizes: ['Golden Gull'] }` finds the films whose `prizes` hold that string, among other prizes, and `{ format: '35mm' }` a `format` key at the top, never one nested deeper, as in `{ "cut": { "format": "35mm" } }`. `{}` is contained in every object, so every film.
+- **A string, a number, `null`**: JSON values too, the string sent as `"35mm"`, `null` as JSON's `null`. Each matches that value, or an array that holds it at its top level: `details` is an object, so `jsonbContains('35mm')` finds no film. A bare `` db.sql`${db.self} @> ${db.param(x, 'jsonb')}` `` sends a string as text, and an array as a Postgres array unless `castArrayParamsToJson` is on: Postgres refuses both (22P02).
+- **[`castObjectParamsToJson`](/runtime-config#Config.castObjectParamsToJson)** and **[`castArrayParamsToJson`](/runtime-config#Config.castArrayParamsToJson)** change nothing: `"details" @> CAST($1 AS "jsonb")`<!-- probe: (db.setConfig({ castObjectParamsToJson: true, castArrayParamsToJson: true }), db.sql`${{ details: db.conditions.jsonbContains({ format: '35mm' }) }}`) -->, the value already JSON text.
+- **What JSON lacks** throws as the query compiles, at any depth, the message naming its key: `undefined`, a function or a symbol, which `JSON.stringify` leaves out of an object (so `{ format: undefined }` would be `{}`, every film) and writes as `null` in an array; a `bigint`, which it throws on; a circular value. The type refuses them, but not in a value typed `{ format?: string }`, which may hold `undefined` unless `exactOptionalPropertyTypes` is on, nor in one typed `any`.
+- **Type**: the value is a `JSONValue`, and so is the condition's `T`: a `jsonb` column takes it, a `text` or `integer` one refuses it (TS2322). A `json` column passes, both being `JSONValue`, and Postgres refuses it (42883, `operator does not exist: json @> jsonb`). A value typed by an `interface` is refused (TS2769), as in an `insert()` on a `jsonb` column: give it a `type` alias.
+- **A `jsonb` domain whose placeholder you narrowed** ([A `jsonb` domain](/custom-types#a-jsonb-domain)) refuses the condition's `JSONValue` (TS2322): name the placeholder, `jsonbContains<PgProjection>({ format: '35mm' })`, and the condition has its type. The value is still any JSON value, `{ format: 'VHS' }` too, not checked against the placeholder: a contained value may hold only some of its keys. A `text` column refuses that condition too (TS2322).
+
+A `Parameter`, a `sql` fragment or `parent()` throws as the query compiles, at any depth, as `Default`, `self`, `raw()`, `cols()` and `vals()` do, and the type refuses each: `JSON.stringify` would send its fields, which match no row, with no error.
+
+> `` `jsonbContains()` sends its value as JSON text, so it takes a JSON value, not `db.param()`: give a value; for SQL, write a `sql` fragment with `db.self` in place of the condition. ``<!-- message -->
+
 ## Combining: `and()`, `or()`, `not()` {#combining}
 
 Each takes conditions or Whereables, a Whereable compiled with its own keys. As a Whereable value, `self` reaches the conditions inside: `{ release_year: or(lt(1980), gt(2010)) }` gives `((("release_year" < $1 OR "release_year" > $2)))`<!-- probe: db.sql`${{ release_year: db.conditions.or(db.conditions.lt(1980), db.conditions.gt(2010)) }}` -->. As a whole `where`, they take Whereables:
@@ -602,7 +632,7 @@ The type does not check a fragment: an `int4` on a `timestamptz` column type-che
 
 ## Values a condition refuses {#refused-values}
 
-`Default`, `self`, `raw()`, `cols()` and `vals()` have no meaning as the value of a condition. The type refuses them (TS2322, or TS2345 where the condition bounds its argument: a pattern, a range's second bound, an array condition, `add()`, `subtract()`, `websearchToTsquery()`; TS2769 as the list of `eqAny()`).
+`Default`, `self`, `raw()`, `cols()` and `vals()` have no meaning as the value of a condition. The type refuses them (TS2322, or TS2345 where the condition bounds its argument: a pattern, a range's second bound, an array condition, `add()`, `subtract()`, `websearchToTsquery()`; TS2769 as the list of `eqAny()` and the value of `jsonbContains()`).
 
 At run time, calling the condition does not throw, compiling it does, so `run()` rejects with a plain `Error` before any query.
 
@@ -616,6 +646,7 @@ Zapatos 6.6.1 sent `Default` and `self` as the strings `'Symbol(DEFAULT)'` and `
 | `` `db.Default` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. `DEFAULT` is for INSERT and UPDATE values. ``<!-- message --> | `Default` in `isIn()` or `isNotIn()` |
 | `` `db.self` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: compare with a value, or use it in a `sql` fragment value, where it stands for the column. ``<!-- message --> | `self` in `isIn()` or `isNotIn()` |
 | `` `db.raw()`, `db.cols()` and `db.vals()` have no meaning as a value in a Whereable (a filter), nor in `isIn()`: to compare with SQL, use a `sql` fragment value, where `db.self` stands for the column; to compare with a value, give the value itself, or `db.param()`. ``<!-- message --> | `raw()`, `cols()` or `vals()` in `isIn()` or `isNotIn()` |
+| `` `jsonbContains()` sends its value as JSON text, so it takes a JSON value, not `db.Default`: give a value; for SQL, write a `sql` fragment with `db.self` in place of the condition. ``<!-- message --> | `Default` as the value of [`jsonbContains()`](#conditions.jsonbContains); `self`, `raw()`, `cols()`, `vals()`, a `Parameter`, a `sql` fragment or `parent()` there gets the same message, naming it |
 | `` `eqAny()` takes an array of values, not `db.Default`: write `eqAny(values)`; for SQL, write a `sql` fragment with `db.self` in place of the condition. ``<!-- message --> | `Default` as the list of [`eqAny()`](#conditions.eqAny); `self`, `raw()`, `cols()`, `vals()`, a `Parameter` or a `sql` fragment there gets the same message, naming it |
 | `` `eqAny()` sends its array as one parameter, so each item is a plain value, not `db.Default`: give a value. ``<!-- message --> | `Default` as an item of `eqAny()`; `self`, `raw()`, `cols()` or `vals()` there gets the same message, naming it |
 | `` `websearchToTsquery()` sends its configuration and its query as parameters: give the configuration as a string, not `db.Default`; for SQL, write a `sql` fragment with `db.self` in place of the condition. ``<!-- message --> | `Default` as the configuration of [`websearchToTsquery()`](#conditions.websearchToTsquery); as the query, the message says `query`; `self`, `raw()`, `cols()`, `vals()`, a `Parameter`, a `sql` fragment or `parent()` gets the same message, naming it |

@@ -5,6 +5,8 @@
   // 'zapatos/generate').
   "extends": "../generated/tsconfig.json",
   "include": ["../generated/zapatos/**/*", "./**/*"],
+  // ./custom/PgPreferences.d.ts narrows it, as a consumer project does
+  "exclude": ["../generated/zapatos/custom/PgPreferences.d.ts"],
   "compilerOptions": {
     "module": "ESNext",
     "moduleResolution": "bundler",
