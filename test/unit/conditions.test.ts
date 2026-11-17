@@ -1169,6 +1169,10 @@ describe('Default, self, raw, cols and vals as the value of a condition', () => 
     cyclicAll.push(cyclicAll);
     (cyclicAll[1] as unknown[]).push(cyclicAll);
     expect(show(dc.arrayContains(cyclic as any))).toEqual({ text: '(("col" @> $1))', values: [cyclic] });
+    // a cycle that does not go through the root, which is in the walk's set from the start
+    const inner: unknown[] = [];
+    inner.push(inner);
+    expect(show(dc.arrayContains(['x', inner] as any))).toEqual({ text: '(("col" @> $1))', values: [['x', inner]] });
     expect(thrown(dc.arrayOverlaps(cyclicAll as any))).toBe('`db.all` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To match every row, give `db.all` as the whole filter of a shortcut: `select(table, db.all)`.');
   });
 
