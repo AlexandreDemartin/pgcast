@@ -879,7 +879,7 @@ describe('exists() and isInSelect() (note 006 § Replays)', () => {
 describe('db.all as the value of a condition', () => {
   // 6.6.1 sent it as 'Symbol(all)', which no kind nor name equals: ne() deleted every event, not(eq()) renamed every
   // user, and a number got 22P02 (#619)
-  const message = '`db.all` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To match every row, give `db.all` as the whole filter of a shortcut: `select(table, db.all)`.';
+  const message = '`db.all` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.';
   const rejectsBeforeAnyQuery = async (q: db.SQLFragment<any>) => {
     const query = vi.spyOn(t.client, 'query');
     try {

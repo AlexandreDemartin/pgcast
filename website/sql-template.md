@@ -451,11 +451,13 @@ Maps `arr` with `cb`, `separator` between each two results; `[]` for no items. A
 db.all
 ```
 
-The `where` of `select()`, `count()` and the other selects that matches every row: `db.select('films', db.all)` writes no `WHERE` ([`select()`](/select#select)). It is not an interpolation: in `sql`, the type refuses it, and it throws.
+The `where` of `select()`, `count()` and the other selects that matches every row: `db.select('films', db.all)` writes no `WHERE` ([`select()`](/select#select)). It is not an interpolation: in `sql`, the type refuses it, and it throws `Alien object while interpolating SQL: Symbol(all)`<!-- message -->. Zapatos 6.6.1 threw a `TypeError`, "Cannot convert a Symbol value to a string", there and as the `where` of `deletes()` or `update()`.
+
+- As the `where` of `deletes()` or `update()` it throws while compiling, and the type refuses it: a filter that falls back to `db.all` for a read never deletes or updates every row. `{}` and `` db.sql`TRUE` `` do: "`` `db.all` has no meaning as the filter of `deletes()` or `update()`: it is the filter of `select()` and its kin, refused in a write so that a filter that falls back to it for a read never deletes or updates every row. To delete or update every row on purpose, give db.sql`TRUE` as the filter. ``<!-- message -->"
 
 - As a filter value it throws while compiling, and the type refuses it: it is a whole filter, not a value to compare with. Zapatos 6.6.1 sent it as the string `'Symbol(all)'`, so `deletes('films', { title: db.conditions.isNotIn([db.all]) })` deleted every film with a title.
-  - As a Whereable value ([above](#whereable)), in `isIn()` / `isNotIn()`, and in `vals([…])` with a current column ([`vals()`](#vals)): "`` `db.all` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: leave the key out, or compare with a value. To match every row, give `db.all` as the whole filter of a shortcut: `select(table, db.all)`. ``<!-- message -->"
-  - As the value of `eq()`, `add()` and the other conditions, and in the array of an array condition: "`` `db.all` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To match every row, give `db.all` as the whole filter of a shortcut: `select(table, db.all)`. ``<!-- message -->"
+  - As a Whereable value ([above](#whereable)), in `isIn()` / `isNotIn()`, and in `vals([…])` with a current column ([`vals()`](#vals)): "`` `db.all` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: leave the key out, or compare with a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`. ``<!-- message -->"
+  - As the value of `eq()`, `add()` and the other conditions, and in the array of an array condition: "`` `db.all` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`. ``<!-- message -->"
 
 ### `AllType` {#AllType}
 

@@ -377,10 +377,10 @@ const quotedName = new RegExp(`^"(?:[^"\\0]|"")+"(?:${space}\\.${space}(?:${iden
 const
   defaultInWhereable = '`db.Default` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. `DEFAULT` is for INSERT and UPDATE values.',
   selfInWhereable = '`db.self` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: compare with a value, or use it in a `sql` fragment value, where it stands for the column.',
-  allInWhereable = '`db.all` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: leave the key out, or compare with a value. To match every row, give `db.all` as the whole filter of a shortcut: `select(table, db.all)`.',
+  allInWhereable = '`db.all` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: leave the key out, or compare with a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.',
   wrapperInWhereable = '`db.raw()`, `db.cols()` and `db.vals()` have no meaning as a value in a Whereable (a filter), nor in `isIn()`: to compare with SQL, use a `sql` fragment value, where `db.self` stands for the column; to compare with a value, give the value itself, or `db.param()`.',
   wrapperAsValue = '`db.raw()`, `db.cols()` and `db.vals()` have no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value: to write SQL, use a `sql` fragment value (in `update()`, `db.self` there stands for the column); to write a value, give the value itself, or `db.param()`.',
-  nullInterpolated = 'Interpolating `null` has no meaning in SQL: for a `NULL` value, interpolate `db.param(null)`; to filter on `NULL`, use `{ column: db.conditions.isNull }`; to match every row, give a shortcut `db.all` as its filter.',
+  nullInterpolated = 'Interpolating `null` has no meaning in SQL: for a `NULL` value, interpolate `db.param(null)`; to filter on `NULL`, use `{ column: db.conditions.isNull }`; to match every row, give `db.all` as the whole filter of `select()` and its kin.',
   parentWithoutColumn = "`db.parent()` with no column has no meaning here: name the column, `db.parent('id')`, or give it as the value of a Whereable or `vals({…})` key, whose column it then takes.",
   builtinWhereable = (name: string) => `A built-in \`${name}\` has no meaning as a Whereable (a filter): it would compile to its own enumerable keys, and to \`TRUE\`, every row, when it has none. To compare with a value, give it as \`db.param(…)\`; to filter, give a plain object (\`{ column: value }\`); await a \`Promise\` first.`;
 
@@ -724,7 +724,8 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
       }
 
     } else {
-      throw new Error(`Alien object while interpolating SQL: ${expression}`);
+      // String() prints a symbol (`Symbol(all)`), which a template literal cannot convert: 6.6.1 threw a TypeError
+      throw new Error(`Alien object while interpolating SQL: ${String(expression)}`);
     }
   };
 }

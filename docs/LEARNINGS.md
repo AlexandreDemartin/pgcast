@@ -340,6 +340,10 @@ Candidates for a check, a rule or a skill line.
 - #646: measure every option's compile cost rather than infer it: U3 was recorded as +0 and costs +75 / +48, as the union in the queries carries the cost, not where it is declared.
 - #646: before deciding what wins over a placeholder, read how the existing keys treat an edited one (`domainsTypedByContext`, `enumArraysTypedAsText`): that precedent settled the choice.
 - #646: split a reviewer's corpus figure by what the decision touches: 13 of the 21 app names were `jsonb` placeholders § 1 never changes.
+- #645: when a message changes, grep the old text too, not only its stable prefix: a test had frozen the old `TypeError` text ("Cannot convert a Symbol value to a string") for `db.all` in `updateValues`.
+- #645: `refusedSQL()` in `shortcuts.ts` makes a shortcut throw while compiling, so a new message keeps the error at `.run()`, not at the call.
+- #645: Vitest's `toThrow('…')` checks that the message contains the string, not the error's class: when a fix changes the class (`TypeError` to `Error`), assert `{ name, message }`.
+- #645: in zsh, `git show $REF:test/x.ts` applies the `:t` history modifier to `$REF`: quote it, `"$REF:path"` or `${REF}:path`.
 
 ## Minors kept
 
@@ -391,3 +395,5 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #621 (form): `src/db/conditions.ts` `callerValue(options, 'parent') || undefined`: `|| undefined` is an equivalent mutant (core reads `parentTable` by truthiness).
 - #639 (form): `.agents/skills/code-style/SKILL.md` § Further than Zapatos still lists "laterals typed by foreign keys" first on Zapatos's roadmap; after decision 007, say what pgcast gives instead (`parent<T.Column>`).
 
+- #645 (form): `src/db/shortcuts.ts` `allAsWriteFilter`: one clause for the reader who reached it by accident ("check the value that is missing") would complete the advice.
+- #645 (form): `website/sql-template.md` § all (EN and FR): the bullet repeats the message it quotes; keep only "`{}` and `` db.sql`TRUE` `` do:" before the quote.

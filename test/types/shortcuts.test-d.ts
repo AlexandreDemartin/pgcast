@@ -701,6 +701,15 @@ describe('update, deletes', () => {
     db.deletes('orgs', new Error('x'));
     db.sql<s.orgs.SQL>`DELETE FROM ${'orgs'} WHERE ${new Error('x')}`;
   });
+
+  test('db.all as the where: refused, sql`TRUE` taken (#637)', () => {
+    // @ts-expect-error db.all is the filter of select() and its kin only
+    db.deletes('users', db.all);
+    // @ts-expect-error nor update()'s
+    db.update('users', { display_name: 'B' }, db.all);
+    expectTypeOf(db.deletes('users', db.sql`TRUE`).run(pool)).resolves.toEqualTypeOf<s.users.JSONSelectable[]>();
+    expectTypeOf(db.update('users', { display_name: 'B' }, db.sql`TRUE`).run(pool)).resolves.toEqualTypeOf<s.users.JSONSelectable[]>();
+  });
 });
 
 describe('parent() as a write value', () => {
