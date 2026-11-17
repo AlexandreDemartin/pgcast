@@ -600,6 +600,20 @@ describe('deletes', () => {
     expect(await run(db.deletes('memberships', sql`${'role'} = ${param('nobody')}`))).toEqual([]);
     expect(await scalar('SELECT count(*)::int AS v FROM memberships')).toBe(1);
   });
+
+  it('db.all as the filter of deletes() or update() rejects before any query; sql`TRUE`, as its message advises, reaches every row (#637)', async () => {
+    const
+      allAsWriteFilter = '`db.all` has no meaning as the filter of `deletes()` or `update()`: it is the filter of `select()` and its kin, which writes no `WHERE`. To delete or update every row on purpose, give db.sql`TRUE` as the filter.',
+      writes = { deletes: db.deletes('memberships', db.all as any), update: db.update('memberships', { role: 'owner' }, db.all as any) },
+      rows = await scalar('SELECT count(*)::int AS v FROM memberships');
+    expect(rows).toBeGreaterThan(1);
+    expect(await writeOutcomes(writes)).toEqual(everyOutcome(writes, allAsWriteFilter));
+    expect(await scalar('SELECT count(*)::int AS v FROM memberships')).toBe(rows);
+    expect(await run(db.update('memberships', { role: 'owner' }, sql`TRUE`))).toHaveLength(rows);
+    expect(await scalar(`SELECT count(*)::int AS v FROM memberships WHERE role = 'owner'`)).toBe(rows);
+    expect(await run(db.deletes('memberships', sql`TRUE`))).toHaveLength(rows);
+    expect(await scalar('SELECT count(*)::int AS v FROM memberships')).toBe(0);
+  });
 });
 
 describe('truncate', () => {

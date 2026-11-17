@@ -12,7 +12,9 @@ import { resetConfig } from '../helpers/config';
 
 afterEach(resetConfig);
 
-const nothingToInsert = 'nothing to insert: an Insertable needs at least one column; for a row of defaults only, write INSERT ... DEFAULT VALUES in a sql template';
+const
+  nothingToInsert = 'nothing to insert: an Insertable needs at least one column; for a row of defaults only, write INSERT ... DEFAULT VALUES in a sql template',
+  allAsWriteFilter = '`db.all` has no meaning as the filter of `deletes()` or `update()`: it is the filter of `select()` and its kin, which writes no `WHERE`. To delete or update every row on purpose, give db.sql`TRUE` as the filter.';
 
 describe('insert', () => {
   it('one row: columns in sorted key order, RETURNING to_jsonb', () => {
@@ -1272,6 +1274,27 @@ describe('update', () => {
       .toThrow('nothing to update: an Updatable needs at least one column');
   });
 
+  it('db.all as the filter throws as the query compiles, nested too, and run() rejects with no query sent (#637)', async () => {
+    // the type refuses it; master threw "TypeError: Cannot convert a Symbol value to a string"
+    const
+      query = db.update('accounts', { balance: 10 }, all as any),  // building does not throw
+      queryable = { query: vi.fn() } as any;
+    expect(() => query.compile()).toThrow(allAsWriteFilter);
+    expect(() => sql`WITH u AS (${query}) SELECT 1`.compile()).toThrow(allAsWriteFilter);
+    await expect(query.run(queryable)).rejects.toThrow(allAsWriteFilter);
+    expect(queryable.query).not.toHaveBeenCalled();
+    // with nothing to set, the call throws first, as before
+    expect(() => db.update('accounts', {}, all as any)).toThrow('nothing to update: an Updatable needs at least one column');
+  });
+
+  it('sql`TRUE`, as the db.all message advises, and {} as the filter: WHERE TRUE, every row', () => {
+    const text = 'UPDATE "accounts" SET ("balance") = ROW($1) WHERE TRUE RETURNING to_jsonb("accounts".*) AS result';
+    expect({
+      fragment: db.update('accounts', { balance: 10 }, sql`TRUE`).compile(),
+      empty: db.update('accounts', { balance: 10 }, {}).compile(),
+    }).toEqual({ fragment: { text, values: [10] }, empty: { text, values: [10] } });
+  });
+
   it('an undefined value: set to NULL without undefinedMeansMissing, left out with it', () => {
     // without it (deprecated, PGCAST_DEP002), the key is kept and the column set to NULL
     const q = () => db.update('users', { mood: 'ok', manager_id: undefined }, { id: 2 }).compile();
@@ -1319,6 +1342,27 @@ describe('deletes', () => {
           ],
         }
       `);
+  });
+
+  it('db.all as the filter throws as the query compiles, nested too, and run() rejects with no query sent (#637)', async () => {
+    // the type refuses it; master threw "TypeError: Cannot convert a Symbol value to a string"
+    const
+      query = db.deletes('memberships', all as any),  // building does not throw
+      queryable = { query: vi.fn() } as any;
+    expect(() => query.compile()).toThrow(allAsWriteFilter);
+    expect(() => sql`WITH d AS (${query}) SELECT 1`.compile()).toThrow(allAsWriteFilter);
+    await expect(query.run(queryable)).rejects.toThrow(allAsWriteFilter);
+    expect(queryable.query).not.toHaveBeenCalled();
+  });
+
+  it('sql`TRUE`, as the db.all message advises, and {} as the filter: WHERE TRUE, every row', () => {
+    expect({
+      fragment: db.deletes('memberships', sql`TRUE`).compile(),
+      empty: db.deletes('memberships', {}).compile(),
+    }).toEqual({
+      fragment: { text: 'DELETE FROM "memberships" WHERE TRUE RETURNING to_jsonb("memberships".*) AS result', values: [] },
+      empty: { text: 'DELETE FROM "memberships" WHERE TRUE RETURNING to_jsonb("memberships".*) AS result', values: [] },
+    });
   });
 });
 

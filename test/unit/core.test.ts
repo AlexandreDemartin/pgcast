@@ -27,7 +27,7 @@ const failure = (f: () => unknown) => {
 };
 
 const
-  nullMessage = 'Interpolating `null` has no meaning in SQL: for a `NULL` value, interpolate `db.param(null)`; to filter on `NULL`, use `{ column: db.conditions.isNull }`; to match every row, give a shortcut `db.all` as its filter.',
+  nullMessage = 'Interpolating `null` has no meaning in SQL: for a `NULL` value, interpolate `db.param(null)`; to filter on `NULL`, use `{ column: db.conditions.isNull }`; to match every row, give `db.all` as the whole filter of `select()` and its kin.',
   parentMessage = "`db.parent()` with no column has no meaning here: name the column, `db.parent('id')`, or give it as the value of a Whereable or `vals({…})` key, whose column it then takes.";
 
 afterEach(resetConfig);
@@ -1073,7 +1073,7 @@ describe('Whereable', () => {
 });
 
 describe('db.all', () => {
-  const allInWhereable = '`db.all` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: leave the key out, or compare with a value. To match every row, give `db.all` as the whole filter of a shortcut: `select(table, db.all)`.';
+  const allInWhereable = '`db.all` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: leave the key out, or compare with a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.';
 
   it('as a Whereable value, in isIn() or isNotIn(), or in vals([…]) within a filter, throws as the query compiles', () => {
     // 6.6.1 sent 'Symbol(all)': no row on a text column, every row with isNotIn(), 22P02 on the others (#633)
@@ -1139,6 +1139,21 @@ describe('errors', () => {
     expect(() => one(42 as any)).toThrowErrorMatchingInlineSnapshot(`[Error: Alien object while interpolating SQL: 42]`);
     expect(() => one(true as any)).toThrowErrorMatchingInlineSnapshot(`[Error: Alien object while interpolating SQL: true]`);
     expect(() => one(undefined as any)).toThrowErrorMatchingInlineSnapshot(`[Error: Alien object while interpolating SQL: undefined]`);
+  });
+
+  it('names a symbol in the alien value message, db.all included, where it threw a TypeError (#637)', () => {
+    // 6.6.1 and master threw "TypeError: Cannot convert a Symbol value to a string" from inside the message
+    expect({
+      symbol: failure(() => one(Symbol('mood') as any)),
+      unnamed: failure(() => one(Symbol() as any)),
+      all: failure(() => one(db.all as any)),
+      having: failure(() => db.select('users', db.all, { groupBy: 'id', having: db.all as any }).compile()),
+    }).toEqual({
+      symbol: { name: 'Error', message: 'Alien object while interpolating SQL: Symbol(mood)' },
+      unnamed: { name: 'Error', message: 'Alien object while interpolating SQL: Symbol()' },
+      all: { name: 'Error', message: 'Alien object while interpolating SQL: Symbol(all)' },
+      having: { name: 'Error', message: 'Alien object while interpolating SQL: Symbol(all)' },
+    });
   });
 
   it('refuses null with an Error that says what to give instead', () => {
