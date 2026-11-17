@@ -576,6 +576,20 @@ A new fragment on the same literals and expressions. It keeps `runResultTransfor
 
 A copy compiles as the fragment does nested in another, so a copy of `selectExactlyOne()` keeps `LIMIT $1`<!-- probe: (db.setConfig({ selectExactlyOneChecksForSecondRow: true }), db.selectExactlyOne('films', db.all).copy()) --> with `1`, even with [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow): it rejects on no row, never on a second one. `lateral` gives a copy of each subquery its parent's `parentTable`.
 
+## `withCTEs()` {#withCTEs}
+
+```ts
+withCTEs<Q extends SQLFragment<any, any>>(ctes: { [name: string]: SQLFragment<any, any> }, query: Q): Q
+```
+
+From 6.11.0. Puts CTEs before a query and keeps its result: with `recent` a `sql` fragment that selects films after 1990, `db.withCTEs({ recent }, db.count('films', …))` gives `WITH "recent" AS (SELECT "id" FROM "films" WHERE "release_year" > $1) SELECT count(*) AS result FROM "films"`<!-- probe: db.withCTEs({ recent: db.sql`SELECT ${'id'} FROM ${'films'} WHERE ${'release_year'} > ${db.param(1990)}` }, db.count('films', db.sql`${'id'} IN (SELECT id FROM recent)`)) --> and resolves to a number.
+
+- **Order**: the object's, so a CTE reads those before it; an integer key comes first, as `Object.keys` gives it.
+- **Names**: each key is one name, its `"` doubled, never split on `.`: `'a.b'` gives `"a.b"`<!-- probe: db.withCTEs({ 'a.b': db.sql`SELECT 1` }, db.sql`SELECT 2`) -->.
+- **No CTE**: `withCTEs({}, query)` gives `query` itself, so a list built at run time needs no branch.
+- **The result**: a [`copy()`](#copy) of `query`, of its type. It resolves to what `query` does, nested in a `lateral` or `extras` too, and is written in parentheses as an `extras` or `insert()` value where `query` is. It runs even when `query` is a no-op, an `insert()` of no row, so its CTEs run.
+- **Prepared**: never, nor are the CTEs and the query it nests, as a [name](#prepared) stands for one text. Call `prepared()` on the result.
+
 ## `RunResultForSQLFragment` {#RunResultForSQLFragment}
 
 ```ts
