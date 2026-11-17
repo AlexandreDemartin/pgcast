@@ -1054,12 +1054,16 @@ describe('Default, self, raw, cols and vals as the value of a condition', () => 
 
   it('jsonbPathExists given a path that is no string throws when compiled, not when called, saying what to do', () => {
     // pg would send a wrapper as JSON, a number as its text, which Postgres reads as a path, and Default as 'Symbol(DEFAULT)'
-    const paths = { number: 1, null: null, object: { a: 1 }, array: ['$'], Default, self, raw: raw("'$'"), param: param('$'), fragment: sql`'$'`, parent: parent('path') };
+    const paths = {
+      number: 1, null: null, object: { a: 1 }, array: ['$'], undefined, function: () => '$', symbol: Symbol('$'),
+      Default, self, raw: raw("'$'"), param: param('$'), fragment: sql`'$'`, parent: parent('path'),
+    };
     expect(Object.fromEntries(Object.entries(paths).map(([name, x]) => [name, thrown(dc.jsonbPathExists(x as any))]))).toMatchInlineSnapshot(`
       {
         "Default": "\`jsonbPathExists()\` takes its path as a string, not \`db.Default\`: write the path as a string, and each value it compares with as a variable, \`jsonbPathExists(path, { name: value })\`.",
         "array": "\`jsonbPathExists()\` takes its path as a string, not an array: write the path as a string, and each value it compares with as a variable, \`jsonbPathExists(path, { name: value })\`.",
         "fragment": "\`jsonbPathExists()\` takes its path as a string, not a \`sql\` fragment: write the path as a string, and each value it compares with as a variable, \`jsonbPathExists(path, { name: value })\`.",
+        "function": "\`jsonbPathExists()\` takes its path as a string, not a function: write the path as a string, and each value it compares with as a variable, \`jsonbPathExists(path, { name: value })\`.",
         "null": "\`jsonbPathExists()\` takes its path as a string, not \`null\`: write the path as a string, and each value it compares with as a variable, \`jsonbPathExists(path, { name: value })\`.",
         "number": "\`jsonbPathExists()\` takes its path as a string, not a \`number\`: write the path as a string, and each value it compares with as a variable, \`jsonbPathExists(path, { name: value })\`.",
         "object": "\`jsonbPathExists()\` takes its path as a string, not an object: write the path as a string, and each value it compares with as a variable, \`jsonbPathExists(path, { name: value })\`.",
@@ -1067,29 +1071,37 @@ describe('Default, self, raw, cols and vals as the value of a condition', () => 
         "parent": "\`jsonbPathExists()\` takes its path as a string, not \`db.parent()\`: write the path as a string, and each value it compares with as a variable, \`jsonbPathExists(path, { name: value })\`.",
         "raw": "\`jsonbPathExists()\` takes its path as a string, not \`db.raw()\`: write the path as a string, and each value it compares with as a variable, \`jsonbPathExists(path, { name: value })\`.",
         "self": "\`jsonbPathExists()\` takes its path as a string, not \`db.self\`: write the path as a string, and each value it compares with as a variable, \`jsonbPathExists(path, { name: value })\`.",
+        "symbol": "\`jsonbPathExists()\` takes its path as a string, not a symbol: write the path as a string, and each value it compares with as a variable, \`jsonbPathExists(path, { name: value })\`.",
+        "undefined": "\`jsonbPathExists()\` takes its path as a string, not \`undefined\`: write the path as a string, and each value it compares with as a variable, \`jsonbPathExists(path, { name: value })\`.",
       }
     `);
   });
 
   it('jsonbPathExists given variables JSON lacks, at any depth, or a wrapper, throws when compiled, not when called, naming its key', () => {
-    // JSON.stringify would leave out { prize: undefined }, and Postgres raise 42704, could not find jsonpath variable
-    const head = '`jsonbPathExists()` sends its variables as JSON text, so it takes a JSON value, not',
-      dropped = '`JSON.stringify` would leave the key out. Give a JSON value.';
+    // JSON.stringify would leave out { prize: undefined }, and Postgres raise 42704, could not find jsonpath variable;
+    // vars as a whole is an object, so the advice for it never names a JSON value, which Postgres refuses (22023)
+    const head = '`jsonbPathExists()` sends its variables as JSON text, so it takes an object of JSON values, not',
+      dropped = '`JSON.stringify` would leave the key out. Give a JSON value.',
+      whole = 'Give an object of JSON values.';
     const circular: Record<string, unknown> = {};
     circular.me = circular;
     const vars = {
       key: { prize: undefined }, nested: { a: [{ b: () => 1 }] }, bigint: { n: BigInt(1) }, param: param({ a: 1 }),
-      inner: { p: param(1) }, Default: { d: Default }, circular,
+      inner: { p: param(1) }, Default: { d: Default }, circular, function: () => 1, symbol: Symbol('vars'), bigintWhole: BigInt(1),
     };
     expect(Object.fromEntries(Object.entries(vars).map(([name, x]) => [name, thrown(dc.jsonbPathExists('$', x as any)).split('\n')[0]]))).toEqual({
       key: `${head} \`undefined\` at key \`prize\`: ${dropped}`,
       nested: `${head} a function at key \`b\`: ${dropped}`,
       bigint: `${head} a \`bigint\` at key \`n\`: \`JSON.stringify\` would throw. Give it as a number or a string.`,
-      param: `${head} \`db.param()\`: give a value; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.`,
+      param: `${head} \`db.param()\`: give an object; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.`,
       inner: `${head} \`db.param()\` at key \`p\`: \`JSON.stringify\` would write its fields. Give a JSON value.`,
       Default: `${head} \`db.Default\` at key \`d\`: ${dropped}`,
-      circular: '`jsonbPathExists()` sends its variables as JSON text, so it takes a JSON value: `JSON.stringify` threw "Converting circular structure to JSON',
+      circular: '`jsonbPathExists()` sends its variables as JSON text, so it takes an object of JSON values: `JSON.stringify` threw "Converting circular structure to JSON',
+      function: `${head} a function: \`JSON.stringify\` would write nothing. ${whole}`,
+      symbol: `${head} a symbol: \`JSON.stringify\` would write nothing. ${whole}`,
+      bigintWhole: `${head} a \`bigint\`: \`JSON.stringify\` would throw. ${whole}`,
     });
+    expect(thrown(dc.jsonbPathExists('$', circular as any))).toMatch(/\. Give an object of JSON values\.$/);
   });
 
   it('a condition given Default or self throws when compiled, not when called', () => {
