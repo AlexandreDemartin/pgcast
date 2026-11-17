@@ -368,6 +368,12 @@ Candidates for a check, a rule or a skill line.
 - #655: a slot that takes `SQLFragment<boolean, never>` also takes `not()`, `and()` and `or()` of a Whereable (they infer `T = never`): a grid of conditions includes the combinators.
 - #655: probe in Postgres what an issue says becomes valid, not only in `tsc`: a shortcut as an insert value gives 42601 (#656).
 - #657: a function's `timestamptz` or record text follows the session's time zone, as a column's does: label a docs value "in UTC".
+- #658: a per-row copy that keeps `core.ts` out would add a getter read per row; fold the detection into a read the code already makes, and freeze the count with a read-count test and its mutant.
+- #658: a fix found while building another PR may make that PR's unreleased CHANGELOG line and type-test comment stale (#655's "write the parentheses by hand").
+- #658: a caller's `vals({…})` with one key can sit where a bare subquery is valid (`IN (…)`, `INSERT … SELECT`): parenthesising needs the shortcut's mark, never a rule in `vals()`.
+- #658: a fix that copies a row only when one kind of value is present changes how often that row alone is read: a read-count test needs a row with the triggering value as well as one without.
+- #658: `undefinedAsMissing()` has its own return for the default config (`PGCAST_DEP002`): a change to what it returns needs a case under the default as well as the opt-in (M7).
+- #658: an `undefined` value stays `undefined` in `compile().values` (pg sends it as NULL): a frozen expectation says `undefined`, not `null`.
 
 ## Minors kept
 
