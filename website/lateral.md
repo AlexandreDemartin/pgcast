@@ -103,10 +103,31 @@ Each cinema, and the nearest other one: a self-join again, with the distance as 
 - [`ne(db.parent('id'))`](/conditions#conditions.ne) leaves the cinema itself out.
 - For the three nearest, nest `select()` with [`limit: 3`](/select#order-limit-offset-and-withties): `nearest` becomes an array.
 
+## Check the parent column
+
+`db.parent()` takes a column of any table, so a join on the wrong column compiles. Postgres refuses a column the parent doesn't have: `db.parent('billing')` under `films` fails with 42703, "column films.billing does not exist". Give the parent's columns as a type argument, `db.parent<s.films.Column>('id')`, and the type checks the name against them:
+
+```ts twoslash
+import * as db from 'zapatos/db';
+import type * as s from 'zapatos/schema';
+// ---cut---
+db.select('films', db.all, {
+  lateral: { cast: db.select('roles', { film_id: db.parent<s.films.Column>('id') }) },
+});
+db.select('films', db.all, {
+  // @ts-expect-error billing is a column of roles, not of films (TS2345)
+  lateral: { cast: db.select('roles', { film_id: db.parent<s.films.Column>('billing') }) },
+});
+```
+
+- It checks the table you name, not the query around it: `db.parent<s.studios.Column>('id')` under `films` compiles too.
+- The type doesn't check it unasked: the subquery is built, and typed, before the query around it, so its type doesn't know the parent table. A prototype that gave it the parent table cost 47.7 % more type instantiations on the compile benchmark, and refused code that runs, such as `db.parent()` with no column in a `lateral` ([#625](https://github.com/AlexandreDemartin/pgcast/issues/625)).
+- To come: `related()`, which reads the join from the foreign key in the catalog, so it cannot name a wrong column ([#628](https://github.com/AlexandreDemartin/pgcast/issues/628), [#629](https://github.com/AlexandreDemartin/pgcast/issues/629)).
+
 ## Watch for
 
 - **`strictNullChecks`**: without it (or `strict`), `columns`, `extras` and `lateral` leave the type as the full row, and it refuses nothing ([Strict](/select#options)).
-- **An unchecked join**: `db.parent()` takes a column of any table, so a join on the wrong column compiles. Postgres refuses a column the parent doesn't have: `db.parent('billing')` under `films` fails with 42703, "column films.billing does not exist".
+- **An unchecked join**: `db.parent()` takes a column of any table, unless you name the table ([Check the parent column](#check-the-parent-column)).
 - **[`withTies`](/select#order-limit-offset-and-withties) in a nested `selectOne()`**: it writes `FETCH FIRST $2 ROWS WITH TIES`<!-- probe: db.select('films', db.all, { lateral: { lead: db.selectOne('roles', { film_id: db.parent('id') }, { order: { by: 'billing', direction: 'ASC' }, withTies: true }) } }) -->, which keeps every tied row: under an outer `select()`, the parent row comes back once per tie; under `selectOne()` or `selectExactlyOne()`, with one of them, though with [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow) `selectExactlyOne()` rejects with `NotExactlyOneError`. In a nested `select()`, the ties stay in the array. As a `lateral` of `count()`, each tie is counted: 6 for two films of three tied roles each. In a `lateral`, unchanged from Zapatos 6.6.1, and kept: it is the SQL `withTies` asks for ([#164](https://github.com/AlexandreDemartin/pgcast/issues/164#issuecomment-6883146644)). As an `extras` value, a tie makes Postgres refuse the query (21000): "more than one row returned by a subquery used as an expression"; Zapatos 6.6.1 refused every shortcut as an `extras` value (42601), tie or not.
 - **A `lock`**: without `of`, `FOR UPDATE`<!-- probe: db.select('films', db.all, { lock: { for: 'UPDATE' } }) --> reaches the subqueries, and Postgres refuses the query (0A000): "FOR UPDATE is not allowed with aggregate functions" under `select()` or `count()`, "FOR UPDATE cannot be applied to the nullable side of an outer join" under `selectOne()`. Name the table ([`lock`](/select#lock)):
 
