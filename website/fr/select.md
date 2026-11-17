@@ -1,5 +1,5 @@
 ---
-english: fd1712873656
+english: 07f410dea0ee
 ---
 
 # Lectures {#select-and-the-aggregates}
@@ -80,7 +80,7 @@ async function filmCards(queryable: db.Queryable) {
 
 ### `order`, `limit`, `offset` et `withTies` {#order-limit-offset-and-withties}
 
-- `order` : un `{ by, direction, nulls? }` ou un tableau de ceux-ci, dans cet ordre. `by` est une colonne ou tout SQL de la table, son type `SQL` : un fragment `sql` (`` db.sql`array_length(${'genres'}, 1)` ``), [`db.parent()`](/fr/sql-template#parent) ; `direction` vaut `'ASC'` ou `'DESC'` ; `nulls`, `'FIRST'` ou `'LAST'`.
+- `order` : un [`OrderSpecForTable`](#OrderSpecForTable), `{ by, direction, nulls? }`, ou un tableau de ceux-ci, dans cet ordre. `by` est une colonne ou tout SQL de la table, son type `SQL` : un fragment `sql` (`` db.sql`array_length(${'genres'}, 1)` ``), [`db.parent()`](/fr/sql-template#parent) ; `direction` vaut `'ASC'` ou `'DESC'` ; `nulls`, `'FIRST'` ou `'LAST'`.
 - `limit` et `offset` : des nombres, envoyés comme paramètres.
 - `withTies: true`, avec `limit` et `order` : aussi les lignes ex æquo avec la dernière sur l’`order`. Sans `limit`, il n’ajoute rien ; sans `order`, Postgres refuse la requête (42601).
 
@@ -434,6 +434,18 @@ interface SelectLockingOptions<A extends string> {
 ```
 
 Une clause de verrouillage de [`lock`](#lock). `of` prend un nom de table sans son schéma, ou l’`alias` de la requête (`A`).
+
+### `OrderSpecForTable` {#OrderSpecForTable}
+
+```ts
+interface OrderSpecForTable<T extends Table> {
+  by: SQLForTable<T>;
+  direction: 'ASC' | 'DESC';
+  nulls?: 'FIRST' | 'LAST';
+}
+```
+
+Un élément d’[`order`](#order-limit-offset-and-withties) : `by`, puis `direction`, puis `NULLS` et `nulls` s’il est donné, `"title" DESC NULLS LAST`.
 
 ### `ColumnsOption` {#ColumnsOption}
 
