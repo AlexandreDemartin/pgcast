@@ -866,6 +866,43 @@ ${imports.map(line => `  ${line}\n`).join('')}  export type ${type};  // replace
         });
     });
 
+    // a placeholder named as its domain's schema imports that namespace, and with it an enum or a union of
+    // unprefixedSchema of that name, which the placeholder's own name conflicts with: TS2440
+    describe('a placeholder named as the namespace it would import, beside a type of unprefixedSchema of that name', () => {
+      beforeAll(() => t.pool.query(`
+        CREATE SCHEMA tone_self;
+        CREATE TYPE tone_self.mood AS ENUM ('calm', 'loud');
+        CREATE DOMAIN tone_self.tone_self AS tone_self.mood;
+        CREATE TABLE tone_self.tracks (id int PRIMARY KEY, t tone_self.tone_self);
+        CREATE SCHEMA tone_open;
+        CREATE TYPE tone_open.tone_self AS ENUM ('warm');
+        CREATE TABLE tone_open.rooms (id int PRIMARY KEY, t tone_open.tone_self);
+        -- a union of that name, whose placeholder tone_self.tone_self holds, as it sorts last (#42)
+        CREATE SCHEMA tone_plain;
+        CREATE DOMAIN tone_plain.tone_self AS text CHECK (VALUE IN ('warm'));
+        CREATE TABLE tone_plain.rooms (id int PRIMARY KEY, t tone_plain.tone_self);
+      `));
+      afterAll(() => t.pool.query('DROP SCHEMA tone_self, tone_open, tone_plain CASCADE'));
+
+      const probe = `
+        import type * as s from 'zapatos/schema';
+        import { expectTypeOf } from 'expect-type';
+        expectTypeOf<s.tone_self.tracks.Selectable['t']>().toEqualTypeOf<'calm' | 'loud' | null>();
+        expectTypeOf<s.tone_self>().toEqualTypeOf<'warm'>();`;
+
+      it.each([
+        ['an enum', 'tone_open', false], ['a union', 'tone_plain', true],
+      ] as const)('compiles beside %s, with no lib check skipped', async (_, unprefixedSchema, domainsTypedAsUnions) => {
+        for (const customTypesTransform of ['my_type' as const, (name: string) => name]) {
+          const config = { schemas: { [unprefixedSchema]: all, tone_self: all }, unprefixedSchema, domainsTypedAsUnions,
+            customTypesTransform };
+          expect.soft(await probeErrors(config, probe, { skipLibCheck: false })).toEqual([]);
+          expect.soft((await codegen(config)).customTypeSourceFiles.tone_self)
+            .toBe(placeholder('zapatos', [], `tone_self = import('zapatos/schema').tone_self.mood`));
+        }
+      });
+    });
+
     // with typeEnumsAcrossSchemas off, each relation reads `genre` in its own schema: an import would type one
     // of them with the other's labels, and its text would hang on which relation is read last
     describe('a domain whose relations would import different enums', () => {
