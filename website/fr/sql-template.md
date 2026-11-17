@@ -1,5 +1,5 @@
 ---
-english: b9a508de269a
+english: 41dacafc9fd0
 ---
 
 # Template SQL
@@ -579,6 +579,23 @@ fragment.copy(override?: { literals?, expressions?, parentTable?, preparedName?,
 Un nouveau fragment sur les mêmes littéraux et expressions. Il garde `runResultTransform`, `parentTable`, `preparedName`, `noop` et `noopResult`, sauf ceux que donne `override`. Un raccourci copié se résout donc en ce que donne le raccourci, comme le dit son type : `count('films', all).copy().run(pool)` donne `4` sur le schéma de la doc, là où Zapatos 6.6.1 donnait à la copie la transformation par défaut, donc les lignes : `[{ result: '4' }]`.
 
 Une copie se compile comme le fragment imbriqué dans un autre : une copie de `selectExactlyOne()` garde donc `LIMIT $1`<!-- probe: (db.setConfig({ selectExactlyOneChecksForSecondRow: true }), db.selectExactlyOne('films', db.all).copy()) --> avec `1`, même avec [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow) : elle est rejetée quand aucune ligne ne vient, jamais sur une deuxième. `lateral` donne à la copie de chaque sous-requête le `parentTable` de son parent.
+
+## `withCTEs()` {#withCTEs}
+
+```ts
+withCTEs<Q extends SQLFragment<any, any>>(ctes: { [name: string]: SQLFragment<any, any> }, query: Q): Q
+```
+
+À partir de la 6.11.0. Place des CTE avant une requête et garde son résultat : avec `recent` un fragment `sql` qui sélectionne les films d’après 1990, `db.withCTEs({ recent }, db.count('films', …))` donne `WITH "recent" AS (SELECT "id" FROM "films" WHERE "release_year" > $1) SELECT count(*) AS result FROM "films"`<!-- probe: db.withCTEs({ recent: db.sql`SELECT ${'id'} FROM ${'films'} WHERE ${'release_year'} > ${db.param(1990)}` }, db.count('films', db.sql`${'id'} IN (SELECT id FROM recent)`)) --> et se résout en un nombre.
+
+- **Ordre** : celui de l’objet, si bien qu’une CTE lit celles qui la précèdent ; une clé entière vient en premier, comme `Object.keys` la donne.
+- **Noms** : chaque clé est un seul nom, jamais coupé sur `.`, écrit entre guillemets comme un [identifiant](#identifiers) : `'a.b'` donne `"a.b"`<!-- probe: db.withCTEs({ 'a.b': db.sql`SELECT 1` }, db.sql`SELECT 2`) -->, un `"` est doublé, et une clé déjà échappée à la main est gardée telle quelle, si bien que `'a""b'` et `'a"b'` nomment toutes deux la CTE `a"b`, ce que Postgres refuse (42712).
+- **Aucune CTE** : `withCTEs({}, query)` donne une copie de `query`, son propre SQL, si bien qu’une liste construite à l’exécution n’a besoin d’aucune branche.
+- **Le résultat** : une [`copy()`](#copy) de `query`, de son type. Il se résout en ce que donne `query`, imbriqué dans un `lateral` ou dans `extras` aussi, et s’écrit entre parenthèses comme valeur d’`extras` ou d’`insert()` là où `query` l’est.
+- **Sans effet** : un `insert()` ou un `upsert()` sans ligne, comme requête ou comme CTE, s’écrit `SELECT NULL::jsonb AS result WHERE false`<!-- probe: db.withCTEs({ a: db.sql`SELECT 1` }, db.insert('films', [])) -->, une requête sans ligne sur n’importe quelle table, et le résultat n’est pas sans effet : ses CTE s’exécutent donc ; comme requête, elle se résout en `[]`.
+- **`selectExactlyOne()`** : avec [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), le résultat demande toujours une deuxième ligne, `LIMIT $1`<!-- probe: (db.setConfig({ selectExactlyOneChecksForSecondRow: true }), db.withCTEs({ a: db.sql`SELECT 1` }, db.selectExactlyOne('films', db.all))) --> avec `2`, et il est rejeté s’il en trouve une, comme le raccourci seul. Imbriqué dans une autre requête, il garde `LIMIT 1`.
+- **Un seul `WITH`** : la requête ne peut pas commencer par son propre `WITH`, un résultat de `withCTEs()` ou un fragment `sql`, ni être un [`truncate()`](/fr/insert#truncate) : Postgres refuse le texte (42601). Mettez toutes les CTE dans un seul appel.
+- **Requête préparée** : jamais, pas plus que les CTE et la requête qu’il imbrique, `{}` compris, car un [nom](#prepared) désigne un seul texte. Appelez `prepared()` sur le résultat. Sur une liste construite à l’exécution, un même nom couvrirait un texte par liste : donnez à chaque texte son propre nom, ou ne préparez pas la requête.
 
 ## `RunResultForSQLFragment` {#RunResultForSQLFragment}
 

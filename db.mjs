@@ -53,3 +53,4 @@ export const truncate = mod.truncate;
 export const update = mod.update;
 export const upsert = mod.upsert;
 export const vals = mod.vals;
+export const withCTEs = mod.withCTEs;

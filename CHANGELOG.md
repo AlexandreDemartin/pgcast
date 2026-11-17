@@ -6,6 +6,14 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 
 ## [Unreleased]
 
+### Added
+- `db.withCTEs(ctes, query)` puts CTEs before a query and keeps its result: `` db.withCTEs({ recent }, db.count('films', …)) `` gives `WITH "recent" AS (…) SELECT count(*) AS result FROM "films" …` and resolves to a number, as `count()` does (#671, decision note 010). The CTEs come in the object's order, so each reads those before it, an integer key first, as `Object.keys` gives it; each key is one name, never split on `.`, quoted as an interpolated name is, so a key escaped by hand (`a""b`) is kept. With no CTE, `withCTEs({}, query)` gives a copy of `query`, its own SQL, so a list built at run time needs no branch, where a `WITH` that `sql` writes over an empty list is refused (42601).
+  - The result is a copy of `query`, of its type: it resolves to what `query` does, nested in a `lateral` or `extras` too, and is written in parentheses as an `extras` or `insert()` value where `query` is. A `selectExactlyOne()` under `selectExactlyOneChecksForSecondRow` still rejects on a second row at the top level.
+  - An `insert()` or `upsert()` of no row, as the query or as a CTE, is written `SELECT NULL::jsonb AS result WHERE false`, which any table takes, where its own text is refused on a `GENERATED ALWAYS` column or a view (428C9); the result is no no-op, so its CTEs run, and the query resolves to `[]`.
+  - The result is never prepared, nor are the CTEs and the query it nests, `{}` included, so one name never covers two texts: call `prepared()` on the result, and name each text of a list built at run time apart.
+  - The query cannot start with a `WITH` of its own, nor be a `truncate()` (42601): put all the CTEs in one call.
+  - Not named `with`, a reserved word that `db.mjs` could not export. `RECURSIVE` and `MATERIALIZED` are written with `sql`.
+
 ### Changed
 - `Default`, `self`, `db.all`, `raw()`, `cols()` and `vals()` as an item of `vals([…])` with a current column throw a message that names both places where that can be, and says what to write in each (#660). The two places are a filter (`isIn()`, `isNotIn()`, a fragment value of a Whereable) and a write (a `sql` fragment value of `vals({…})`, so of `insert()`, `upsert()` or `update()`). `` insert('films', { title: sql`${vals([db.all])}` }) `` used to say "no meaning as a value in a Whereable (a filter) … leave the key out", although it holds no filter. Compiling cannot tell the two places apart, so the message names both: "`db.all` has no meaning as an item of `vals([…])` in a column's value, in a filter (as `isIn()` writes it) or in a `sql` fragment value of `vals({…})`, so of `insert()`, `upsert()` or `update()`: …".
   - Unchanged: what throws, what compiles, and its SQL. The messages for a Whereable value (`{ title: db.all }`) and for an object in `upsert()` `updateValues`, which compiles as a Whereable, also stay the same.

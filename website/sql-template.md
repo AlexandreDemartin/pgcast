@@ -576,6 +576,23 @@ A new fragment on the same literals and expressions. It keeps `runResultTransfor
 
 A copy compiles as the fragment does nested in another, so a copy of `selectExactlyOne()` keeps `LIMIT $1`<!-- probe: (db.setConfig({ selectExactlyOneChecksForSecondRow: true }), db.selectExactlyOne('films', db.all).copy()) --> with `1`, even with [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow): it rejects on no row, never on a second one. `lateral` gives a copy of each subquery its parent's `parentTable`.
 
+## `withCTEs()` {#withCTEs}
+
+```ts
+withCTEs<Q extends SQLFragment<any, any>>(ctes: { [name: string]: SQLFragment<any, any> }, query: Q): Q
+```
+
+From 6.11.0. Puts CTEs before a query and keeps its result: with `recent` a `sql` fragment that selects films after 1990, `db.withCTEs({ recent }, db.count('films', …))` gives `WITH "recent" AS (SELECT "id" FROM "films" WHERE "release_year" > $1) SELECT count(*) AS result FROM "films"`<!-- probe: db.withCTEs({ recent: db.sql`SELECT ${'id'} FROM ${'films'} WHERE ${'release_year'} > ${db.param(1990)}` }, db.count('films', db.sql`${'id'} IN (SELECT id FROM recent)`)) --> and resolves to a number.
+
+- **Order**: the object's, so a CTE reads those before it; an integer key comes first, as `Object.keys` gives it.
+- **Names**: each key is one name, never split on `.`, quoted as an [identifier](#identifiers) is: `'a.b'` gives `"a.b"`<!-- probe: db.withCTEs({ 'a.b': db.sql`SELECT 1` }, db.sql`SELECT 2`) -->, a `"` is doubled, and a key escaped by hand is kept, so `'a""b'` and `'a"b'` both name the CTE `a"b`, which Postgres refuses (42712).
+- **No CTE**: `withCTEs({}, query)` gives a copy of `query`, its own SQL, so a list built at run time needs no branch.
+- **The result**: a [`copy()`](#copy) of `query`, of its type. It resolves to what `query` does, nested in a `lateral` or `extras` too, and is written in parentheses as an `extras` or `insert()` value where `query` is.
+- **A no-op**: an `insert()` or `upsert()` of no row, as the query or as a CTE, is written `SELECT NULL::jsonb AS result WHERE false`<!-- probe: db.withCTEs({ a: db.sql`SELECT 1` }, db.insert('films', [])) -->, a query of no row on any table, and the result is not a no-op, so its CTEs run; as the query, it resolves to `[]`.
+- **`selectExactlyOne()`**: with [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow), the result still asks for a second row, `LIMIT $1`<!-- probe: (db.setConfig({ selectExactlyOneChecksForSecondRow: true }), db.withCTEs({ a: db.sql`SELECT 1` }, db.selectExactlyOne('films', db.all))) --> with `2`, and rejects on one, as the shortcut alone does. Nested in another query, it keeps `LIMIT 1`.
+- **One `WITH`**: the query cannot start with a `WITH` of its own, a `withCTEs()` result or a `sql` fragment, nor be a [`truncate()`](/insert#truncate): Postgres refuses the text (42601). Put all the CTEs in one call.
+- **Prepared**: never, nor are the CTEs and the query it nests, `{}` included, as a [name](#prepared) stands for one text. Call `prepared()` on the result. Over a list built at run time, one name would cover a text per list: name each text apart, or leave it unprepared.
+
 ## `RunResultForSQLFragment` {#RunResultForSQLFragment}
 
 ```ts
