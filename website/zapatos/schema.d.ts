@@ -81,13 +81,13 @@ declare module 'zapatos/schema' {
       * - `int4` in database
       * - `NOT NULL`, default: `nextval('actors_id_seq'::regclass)`
       */
-      id?: number | db.Parameter<number> | db.DefaultType | db.SQLFragment;
+      id?: number | db.Parameter<number> | db.DefaultType | db.SQLFragment<any>;
       /**
       * **actors.name**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      name: string | db.Parameter<string> | db.SQLFragment;
+      name: string | db.Parameter<string> | db.SQLFragment<any>;
     }
     export interface Updatable {
       /**
@@ -188,7 +188,7 @@ declare module 'zapatos/schema' {
       * - `int4` in database
       * - `NOT NULL`, default: `nextval('cinemas_id_seq'::regclass)`
       */
-      id?: number | db.Parameter<number> | db.DefaultType | db.SQLFragment;
+      id?: number | db.Parameter<number> | db.DefaultType | db.SQLFragment<any>;
       /**
       * **cinemas.location**
       *
@@ -196,13 +196,13 @@ declare module 'zapatos/schema' {
       * - `point` in database
       * - `NOT NULL`, no default
       */
-      location: c.PgPoint | db.Parameter<c.PgPoint> | db.SQLFragment;
+      location: c.PgPoint | db.Parameter<c.PgPoint> | db.SQLFragment<any>;
       /**
       * **cinemas.name**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      name: string | db.Parameter<string> | db.SQLFragment;
+      name: string | db.Parameter<string> | db.SQLFragment<any>;
     }
     export interface Updatable {
       /**
@@ -323,25 +323,25 @@ declare module 'zapatos/schema' {
       * - `int4` in database
       * - `NOT NULL`, default: `nextval('crew_id_seq'::regclass)`
       */
-      id?: number | db.Parameter<number> | db.DefaultType | db.SQLFragment;
+      id?: number | db.Parameter<number> | db.DefaultType | db.SQLFragment<any>;
       /**
       * **crew.job**
       * - `crew_job` in database
       * - `NOT NULL`, no default
       */
-      job: crew_job | db.Parameter<crew_job> | db.SQLFragment;
+      job: crew_job | db.Parameter<crew_job> | db.SQLFragment<any>;
       /**
       * **crew.mentor_id**
       * - `int4` in database
       * - Nullable, no default
       */
-      mentor_id?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment;
+      mentor_id?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment<any>;
       /**
       * **crew.name**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      name: string | db.Parameter<string> | db.SQLFragment;
+      name: string | db.Parameter<string> | db.SQLFragment<any>;
     }
     export interface Updatable {
       /**
@@ -564,49 +564,49 @@ declare module 'zapatos/schema' {
       * - `jsonb` in database
       * - `NOT NULL`, default: `'{}'::jsonb`
       */
-      details?: db.JSONValue | db.Parameter<db.JSONValue> | db.DefaultType | db.SQLFragment;
+      details?: db.JSONValue | db.Parameter<db.JSONValue> | db.DefaultType | db.SQLFragment<any>;
       /**
       * **films.genres**
       * - `_text` in database
       * - `NOT NULL`, default: `'{}'::text[]`
       */
-      genres?: string[] | db.Parameter<string[]> | db.DefaultType | db.SQLFragment;
+      genres?: string[] | db.Parameter<string[]> | db.DefaultType | db.SQLFragment<any>;
       /**
       * **films.id**
       * - `int4` in database
       * - `NOT NULL`, default: `nextval('films_id_seq'::regclass)`
       */
-      id?: number | db.Parameter<number> | db.DefaultType | db.SQLFragment;
+      id?: number | db.Parameter<number> | db.DefaultType | db.SQLFragment<any>;
       /**
       * **films.release_year**
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      release_year: number | db.Parameter<number> | db.SQLFragment;
+      release_year: number | db.Parameter<number> | db.SQLFragment<any>;
       /**
       * **films.runtime_minutes**
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      runtime_minutes: number | db.Parameter<number> | db.SQLFragment;
+      runtime_minutes: number | db.Parameter<number> | db.SQLFragment<any>;
       /**
       * **films.studio_id**
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      studio_id: number | db.Parameter<number> | db.SQLFragment;
+      studio_id: number | db.Parameter<number> | db.SQLFragment<any>;
       /**
       * **films.tagline**
       * - `text` in database
       * - Nullable, no default
       */
-      tagline?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment;
+      tagline?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment<any>;
       /**
       * **films.title**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      title: string | db.Parameter<string> | db.SQLFragment;
+      title: string | db.Parameter<string> | db.SQLFragment<any>;
     }
     export interface Updatable {
       /**
@@ -739,19 +739,19 @@ declare module 'zapatos/schema' {
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      film_id: number | db.Parameter<number> | db.SQLFragment;
+      film_id: number | db.Parameter<number> | db.SQLFragment<any>;
       /**
       * **ratings.stars**
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      stars: number | db.Parameter<number> | db.SQLFragment;
+      stars: number | db.Parameter<number> | db.SQLFragment<any>;
       /**
       * **ratings.votes**
       * - `int4` in database
       * - `NOT NULL`, default: `1`
       */
-      votes?: number | db.Parameter<number> | db.DefaultType | db.SQLFragment;
+      votes?: number | db.Parameter<number> | db.DefaultType | db.SQLFragment<any>;
     }
     export interface Updatable {
       /**
@@ -876,7 +876,7 @@ declare module 'zapatos/schema' {
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      actor_id: number | db.Parameter<number> | db.SQLFragment;
+      actor_id: number | db.Parameter<number> | db.SQLFragment<any>;
       /**
       * **roles.billing**
       *
@@ -884,19 +884,19 @@ declare module 'zapatos/schema' {
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      billing: number | db.Parameter<number> | db.SQLFragment;
+      billing: number | db.Parameter<number> | db.SQLFragment<any>;
       /**
       * **roles.character**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      character: string | db.Parameter<string> | db.SQLFragment;
+      character: string | db.Parameter<string> | db.SQLFragment<any>;
       /**
       * **roles.film_id**
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      film_id: number | db.Parameter<number> | db.SQLFragment;
+      film_id: number | db.Parameter<number> | db.SQLFragment<any>;
     }
     export interface Updatable {
       /**
@@ -1047,25 +1047,25 @@ declare module 'zapatos/schema' {
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      cinema_id: number | db.Parameter<number> | db.SQLFragment;
+      cinema_id: number | db.Parameter<number> | db.SQLFragment<any>;
       /**
       * **screenings.film_id**
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      film_id: number | db.Parameter<number> | db.SQLFragment;
+      film_id: number | db.Parameter<number> | db.SQLFragment<any>;
       /**
       * **screenings.id**
       * - `int4` in database
       * - `NOT NULL`, default: `nextval('screenings_id_seq'::regclass)`
       */
-      id?: number | db.Parameter<number> | db.DefaultType | db.SQLFragment;
+      id?: number | db.Parameter<number> | db.DefaultType | db.SQLFragment<any>;
       /**
       * **screenings.starts_at**
       * - `timestamptz` in database
       * - `NOT NULL`, no default
       */
-      starts_at: (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.SQLFragment;
+      starts_at: (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.SQLFragment<any>;
       /**
       * **screenings.subtitled**
       *
@@ -1073,7 +1073,7 @@ declare module 'zapatos/schema' {
       * - `bool` in database
       * - Nullable, no default
       */
-      subtitled?: boolean | db.Parameter<boolean> | null | db.DefaultType | db.SQLFragment;
+      subtitled?: boolean | db.Parameter<boolean> | null | db.DefaultType | db.SQLFragment<any>;
     }
     export interface Updatable {
       /**
@@ -1206,25 +1206,25 @@ declare module 'zapatos/schema' {
       * - `timestamptz` in database
       * - `NOT NULL`, default: `now()`
       */
-      booked_at?: (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.DefaultType | db.SQLFragment;
+      booked_at?: (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.DefaultType | db.SQLFragment<any>;
       /**
       * **seat_bookings.customer**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      customer: string | db.Parameter<string> | db.SQLFragment;
+      customer: string | db.Parameter<string> | db.SQLFragment<any>;
       /**
       * **seat_bookings.screening_id**
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      screening_id: number | db.Parameter<number> | db.SQLFragment;
+      screening_id: number | db.Parameter<number> | db.SQLFragment<any>;
       /**
       * **seat_bookings.seat**
       * - `seat_label` (base type: `text`) in database
       * - `NOT NULL`, no default
       */
-      seat: c.PgSeat_label | db.Parameter<c.PgSeat_label> | db.SQLFragment;
+      seat: c.PgSeat_label | db.Parameter<c.PgSeat_label> | db.SQLFragment<any>;
     }
     export interface Updatable {
       /**
@@ -1313,13 +1313,13 @@ declare module 'zapatos/schema' {
       * - `int4` in database
       * - `NOT NULL`, default: `nextval('studios_id_seq'::regclass)`
       */
-      id?: number | db.Parameter<number> | db.DefaultType | db.SQLFragment;
+      id?: number | db.Parameter<number> | db.DefaultType | db.SQLFragment<any>;
       /**
       * **studios.name**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      name: string | db.Parameter<string> | db.SQLFragment;
+      name: string | db.Parameter<string> | db.SQLFragment<any>;
     }
     export interface Updatable {
       /**
@@ -1396,13 +1396,13 @@ declare module 'zapatos/schema' {
       * - `int4` in database
       * - `NOT NULL`, no default
       */
-      film_id: number | db.Parameter<number> | db.SQLFragment;
+      film_id: number | db.Parameter<number> | db.SQLFragment<any>;
       /**
       * **tags.tag**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      tag: string | db.Parameter<string> | db.SQLFragment;
+      tag: string | db.Parameter<string> | db.SQLFragment<any>;
     }
     export interface Updatable {
       /**
