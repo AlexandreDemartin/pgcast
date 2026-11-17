@@ -47,11 +47,11 @@ export type SelfType = typeof self;
 /**
  * Signals all rows are to be returned (without filtering via a `WHERE` clause).
  * As a `Whereable` value, in `isIn` or `isNotIn`, in `vals([…])` within a
- * filter or a fragment value of `insert()` or `update()`, as the value of
- * `eq()` and the other conditions, or in the array of `arrayContains()`,
- * `arrayContainedIn()` or `arrayOverlaps()`, it throws: it is a whole filter,
- * not a value to compare with. Zapatos 6.6.1 sent it as the string
- * `'Symbol(all)'`.
+ * filter or a fragment value of `vals({…})`, so of `insert()`, `upsert()` or
+ * `update()`, as the value of `eq()` and the other conditions, or in the
+ * array of `arrayContains()`, `arrayContainedIn()` or `arrayOverlaps()`, it
+ * throws: it is a whole filter, not a value to compare with. Zapatos 6.6.1
+ * sent it as the string `'Symbol(all)'`.
  */
 export const all = Symbol('all');
 export type AllType = typeof all;
