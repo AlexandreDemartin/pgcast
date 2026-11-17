@@ -103,22 +103,74 @@ describe('select', () => {
     expectTypeOf(db.select('products', iterAny)).toEqualTypeOf<db.SQLFragment<s.products.JSONSelectable[]>>();
   });
 
-  // A guard on the where of the shortcuts refused a generic forwarder that spreads it and adds a key (#674)
-  test('characterization: the where of a shortcut or a condition still takes any string (#674)', () => {
+  // A string has an iterator, a row none: each shortcut takes the Whereable, Updatable or Insertable of its table
+  // with `{ [Symbol.iterator]?: undefined }`, looked up per table, so that a column named like a String member of a
+  // type that member fits (products.search, typed any; extra.spools.length, a number) lets no string through (#674)
+  test('refuses a string as the where of a shortcut or a condition, or as a row to write (#674)', () => {
     const c = db.conditions;
-    const str = 'sku' as string, so = new String('sku');
-    expectTypeOf(db.select('products', 'serach')).not.toBeAny();
-    expectTypeOf(db.selectOne('products', 'serach')).not.toBeAny();
-    expectTypeOf(db.selectExactlyOne('products', 'serach')).not.toBeAny();
-    expectTypeOf(db.count('products', 'serach')).not.toBeAny();
-    expectTypeOf(db.sum('products', 'serach', { columns: ['price_cents'] })).not.toBeAny();
-    expectTypeOf(db.update('products', { sku: 'a' }, 'serach')).not.toBeAny();
-    expectTypeOf(db.deletes('products', 'serach')).not.toBeAny();
-    expectTypeOf(db.select('products', db.all, { groupBy: 'sku', having: 'serach' })).not.toBeAny();
-    expectTypeOf(c.exists('products', 'serach')).not.toBeAny();
-    expectTypeOf(c.isInSelect('products', 'serach', 'id')).not.toBeAny();
-    expectTypeOf(db.select('products', str)).not.toBeAny();
-    expectTypeOf(db.select('products', so)).not.toBeAny();
+    const str = 'sku' as string, so = new String('sku'), tl = 'sku' as `s${string}`, two = 'products' as 'products' | 'users';
+    // @ts-expect-error a string is no Whereable of products (select)
+    db.select('products', 'serach');
+    // @ts-expect-error a string is no Whereable of products (selectOne)
+    db.selectOne('products', 'serach');
+    // @ts-expect-error a string is no Whereable of products (selectExactlyOne)
+    db.selectExactlyOne('products', 'serach');
+    // @ts-expect-error a string is no Whereable of products (count)
+    db.count('products', 'serach');
+    // @ts-expect-error a string is no Whereable of products (sum)
+    db.sum('products', 'serach', { columns: ['price_cents'] });
+    // @ts-expect-error a string is no Whereable of products (update)
+    db.update('products', { sku: 'a' }, 'serach');
+    // @ts-expect-error a string is no Whereable of products (deletes)
+    db.deletes('products', 'serach');
+    // @ts-expect-error a string is no Whereable of products (having)
+    db.select('products', db.all, { groupBy: 'sku', having: 'serach' });
+    // @ts-expect-error a string is no Whereable of products (exists)
+    c.exists('products', 'serach');
+    // @ts-expect-error a string is no Whereable of products (isInSelect)
+    c.isInSelect('products', 'serach', 'id');
+    // @ts-expect-error a value typed string is no Whereable of products
+    db.select('products', str);
+    // @ts-expect-error a String object is no Whereable of products
+    db.select('products', so);
+    // @ts-expect-error a template literal type is no Whereable of products
+    db.select('products', tl);
+    // @ts-expect-error a string is no Whereable of products or users
+    db.select(two, 'serach');
+    // @ts-expect-error a string is no Whereable of extra.spools
+    db.select('extra.spools', 'serach');
+    // @ts-expect-error a string is no Updatable of extra.spools
+    db.update('extra.spools', 'serach', { id: 1 });
+    // @ts-expect-error a String object is no Updatable of extra.spools
+    db.update('extra.spools', so, { id: 1 });
+    // @ts-expect-error an array is no Updatable of extra.spools
+    db.update('extra.spools', ['a'], { id: 1 });
+    // @ts-expect-error a string is no Insertable of extra.spools
+    db.insert('extra.spools', 'serach');
+    // @ts-expect-error a String object is no Insertable of extra.spools
+    db.insert('extra.spools', so);
+    // @ts-expect-error an array of strings is no array of Insertables of extra.spools
+    db.insert('extra.spools', ['serach']);
+    // @ts-expect-error a string is no Insertable of extra.spools (upsert)
+    db.upsert('extra.spools', 'serach', 'id');
+    // a row of extra.spools, and its length, still pass
+    expectTypeOf(db.select('extra.spools', { length: 3 })).toEqualTypeOf<db.SQLFragment<s.extra.spools.JSONSelectable[]>>();
+    expectTypeOf(db.update('extra.spools', { length: 3 }, { length: 2 })).toEqualTypeOf<db.SQLFragment<s.extra.spools.JSONSelectable[]>>();
+    expectTypeOf(db.insert('extra.spools', {})).toEqualTypeOf<db.SQLFragment<s.extra.spools.JSONSelectable>>();
+    expectTypeOf(db.upsert('extra.spools', { length: 3 }, 'id').run(pool)).resolves.not.toBeAny();
+  });
+
+  // an array has a length, a number, so an array of rows fitted the one-row overload of extra.spools, and its result
+  // was typed as one row; the guard sends it to the array overload, as on any other table (#674)
+  test('an array of rows takes the array overload of insert() and upsert(), with a column named length (#674)', () => {
+    expectTypeOf(db.insert('extra.spools', [{ length: 1 }, {}])).toEqualTypeOf<db.SQLFragment<s.extra.spools.JSONSelectable[]>>();
+    expectTypeOf(db.insert('extra.spools', [])).toEqualTypeOf<db.SQLFragment<s.extra.spools.JSONSelectable[]>>();
+    expectTypeOf(db.insert('extra.spools', [{ length: 1 }])).toEqualTypeOf<db.SQLFragment<s.extra.spools.JSONSelectable[]>>();
+    expectTypeOf(db.upsert('extra.spools', [{ length: 1 }, {}], 'id').run(pool)).resolves.not.toBeAny();
+    expectTypeOf(db.insert('extra.spools', [{ length: 1 }], { returning: ['id'] }).run(pool))
+      .resolves.toEqualTypeOf<Pick<s.extra.spools.JSONSelectable, 'id'>[]>();
+    expectTypeOf(db.upsert('extra.spools', [{ length: 1 }], 'id', { returning: ['id'], reportAction: 'suppress' }).run(pool))
+      .resolves.toEqualTypeOf<Pick<s.extra.spools.JSONSelectable, 'id'>[]>();
   });
 
   // and(), or() and not() take the Whereable of every table, which names no table to check (#674)
@@ -174,8 +226,52 @@ describe('select', () => {
       <A extends s.Whereable>(w: A) => db.sql`${{ ...w, id: 1 }}`,
       (w: Omit<s.products.Whereable, 'id'>) => db.select('products', { ...w, id: 1 }),
       (w: s.products.Whereable & { foo?: string }) => db.select('products', w),
+      <T extends s.Table>(t: T, w: W<T> & { id?: number }) => c.exists(t, w),
+      <T extends s.Table>(t: T, w: W<T>) => db.deletes(t, Object.assign({}, w, { id: 1 })),
+      <T extends s.Table>(t: T, w: W<T>) => { const x = { ...w, id: 1 }; return db.update(t, {} as s.UpdatableForTable<T>, x); },
+      <T extends s.Table>(t: T, w: W<T>) => db.select(t, db.all, { having: Object.assign({}, w, { id: 1 }) }),
+      <T extends s.Table>(t: T, w: Readonly<W<T>>) => db.deletes(t, w),
+      <T extends s.Table>(t: T, w: Omit<W<T>, 'id'>) => c.isInSelect(t, w, 'id' as keyof s.SelectableForTable<T>),
     ];
     expectTypeOf(forwarders).not.toBeAny();
+  });
+
+  // the same guard on a row to write, looked up per table, keeps a forwarder that spreads the caller's row (#674)
+  test('a generic forwarder over a row to write still compiles (#674)', () => {
+    type U<T extends s.Table> = s.UpdatableForTable<T>;
+    type I<T extends s.Table> = s.InsertableForTable<T>;
+    type W<T extends s.Table> = s.WhereableForTable<T>;
+    const forwarders = [
+      <T extends s.Table>(t: T, v: U<T>, w: W<T>) => db.update(t, v, w),
+      <T extends s.Table>(t: T, v: U<T>, w: W<T>) => db.update(t, { ...v, updated_at: db.sql`now()` }, w),
+      <T extends s.Table>(t: T, v: U<T>, w: W<T>) => db.update(t, Object.assign({}, v, { id: 1 }), w),
+      <T extends s.Table>(t: T, v: U<T> & { id?: number }, w: W<T>) => db.update(t, v, w),
+      <T extends s.Table>(t: T, v: U<T>) => db.update(t, { ...v }, db.sql`TRUE`),
+      <T extends s.Table>(t: T, v: I<T>) => db.insert(t, v),
+      <T extends s.Table>(t: T, v: I<T>) => db.insert(t, { ...v, created_at: db.sql`now()` }),
+      <T extends s.Table>(t: T, v: I<T>[]) => db.insert(t, v),
+      <T extends s.Table>(t: T, v: I<T>) => db.insert(t, [v, { ...v }]),
+      <T extends s.Table>(t: T, v: I<T>, k: s.ColumnForTable<T>) => db.upsert(t, { ...v, id: 1 }, k),
+      <T extends s.Table>(t: T, v: I<T>, k: s.ColumnForTable<T>, u: U<T>) => db.upsert(t, v, k, { updateValues: { ...u, id: 1 } }),
+      <T extends s.Table>(t: T, v: Omit<I<T>, 'id'>) => db.insert(t, v as I<T>),
+      <T extends s.Table>(t: T, v: Partial<I<T>>) => db.insert(t, v as I<T>),
+      <V extends s.products.Updatable>(v: V) => db.update('products', { ...v, sku: 'a' }, { id: 1 }),
+      <V extends s.products.Insertable>(v: V) => db.insert('products', { ...v, sku: 'a' }),
+    ];
+    expectTypeOf(forwarders).not.toBeAny();
+  });
+
+  // the guard is in the parameters, not in a public type: the keys of each stay master's (#674)
+  test('the keys of the having option and of the lookups are unchanged (#674)', () => {
+    type Having<T extends s.Table> = NonNullable<db.SelectOptionsForTable<T, undefined, undefined, undefined, never>['having']>;
+    type Values = NonNullable<db.UpsertOptions<'products', undefined, undefined, undefined, undefined>['updateValues']>;
+    expectTypeOf<keyof Having<'products'>>().toEqualTypeOf<keyof (s.products.Whereable | db.SQLFragment<any>)>();
+    expectTypeOf<keyof Values>().toEqualTypeOf<keyof s.products.Updatable>();
+    expectTypeOf<keyof s.WhereableForTable<'extra.spools'>>().toEqualTypeOf<keyof s.extra.spools.Whereable>();
+    expectTypeOf<keyof s.InsertableForTable<'extra.spools'>>().toEqualTypeOf<keyof s.extra.spools.Insertable>();
+    const toHaving = <T extends s.Table>(h: s.WhereableForTable<T> | db.SQLFragment<any>): Having<T> => h;
+    const fromHaving = <T extends s.Table>(h: Having<T>): s.WhereableForTable<T> | db.SQLFragment<any> => h;
+    expectTypeOf([toHaving, fromHaving]).not.toBeAny();
   });
 
   test('lock.of accepts the alias', () => {
