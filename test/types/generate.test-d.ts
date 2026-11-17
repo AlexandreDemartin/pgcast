@@ -1,10 +1,11 @@
 // Copyright (C) 2026 Alexandre Demartin
 //
 // The declared type of check() (src/generate/write.ts), as a script imports it from zapatos/generate: it takes the
-// Config of generate() and resolves to a boolean, the files being up to date (#559).
+// Config of generate() and resolves to a boolean, the files being up to date (#559). And the types of two options,
+// exported under their names so that a package's declarations can write them out (#584).
 
 import { describe, expectTypeOf, test } from 'vitest';
-import { check, generate, type Config } from 'zapatos/generate';
+import { check, generate, type ColumnOptions, type Config, type OptionalConfig, type SchemaRules } from 'zapatos/generate';
 
 describe('check()', () => {
   test('takes the Config of generate() and resolves to a boolean', () => {
@@ -24,5 +25,25 @@ describe('check()', () => {
     void check({ warningListener: (lines: string[]) => void lines });
     // @ts-expect-error it resolves to a boolean, not the files that differ
     void (await check({})).length;
+  });
+});
+
+describe('SchemaRules and ColumnOptions', () => {
+  test('are the types of the schemas and columnOptions options', () => {
+    expectTypeOf<SchemaRules>().toEqualTypeOf<OptionalConfig['schemas']>();
+    expectTypeOf<SchemaRules>().not.toBeAny();
+    expectTypeOf<ColumnOptions>().toEqualTypeOf<OptionalConfig['columnOptions']>();
+    expectTypeOf<ColumnOptions>().not.toBeAny();
+    const
+      schemas: SchemaRules = { public: { include: '*', exclude: ['events'] } },
+      columnOptions: ColumnOptions = { '*': { created_at: { insert: 'excluded', update: 'excluded' } } };
+    expectTypeOf(generate).toBeCallableWith({ schemas, columnOptions });
+  });
+
+  test('refuse what the options refuse', () => {
+    // @ts-expect-error a rule takes both include and exclude
+    void ({ public: { include: '*' } } satisfies SchemaRules);
+    // @ts-expect-error insert is 'auto', 'excluded' or 'optional'
+    void ({ users: { id: { insert: 'never' } } } satisfies ColumnOptions);
   });
 });

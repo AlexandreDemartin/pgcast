@@ -1,5 +1,5 @@
 ---
-english: e7db865f14c7
+english: 9cc3c8afff00
 ---
 
 # Générateur
@@ -177,7 +177,7 @@ Toutes les options sont facultatives. Une option donnée remplace entièrement s
 
 ### `schemas` {#generate.schemas}
 
-`{ [schema]: { include, exclude } }`, `include` et `exclude` valant chacun `"*"` ou un tableau de noms de relations. Les schémas à générer, et quelles relations de chacun : tables, vues, vues matérialisées et tables distantes.
+[`SchemaRules`](#SchemaRules), `{ [schema]: { include, exclude } }`, `include` et `exclude` valant chacun `"*"` ou un tableau de noms de relations. Les schémas à générer, et quelles relations de chacun : tables, vues, vues matérialisées et tables distantes.
 
 Le type exige les deux clés : dans `generate()`, une règle sans l’une d’elles ne compile pas (TS2741). Dans le JSON, ou en JavaScript non typé, une clé omise ou mise à `null` prend la valeur de la règle par défaut, `"include": "*"` ou `"exclude": []`, et le générateur le signale via [`warningListener`](#generate.warningListener) ; Zapatos 6.6.1 s’arrêtait là où il lisait la clé manquante, avec `TypeError: Cannot read properties of undefined (reading 'indexOf')` ([#301](https://github.com/AlexandreDemartin/pgcast/issues/301)). Une chaîne autre que `"*"`, que le type refuse aussi (TS2322), est lue comme une liste d’un seul nom, `"films"` comme `["films"]`, et signalée de la même façon ; dans Zapatos 6.6.1, chaque relation dont le nom fait partie de la chaîne y correspondait aussi, `film` pour `"films"` ([#442](https://github.com/AlexandreDemartin/pgcast/issues/442)).
 
@@ -230,7 +230,7 @@ Son SQL est celui de [`select()`](/fr/select#select), avec le nom entre guilleme
 
 ### `columnOptions` {#generate.columnOptions}
 
-`{ [table]: { [column]: { insert?, update? } } }`. Change les types `Insertable` et `Updatable` d’une colonne, comme l’exigerait un trigger qui la remplit ; rien d’autre ne change, à l’exécution non plus.
+[`ColumnOptions`](#ColumnOptions), `{ [table]: { [column]: { insert?, update? } } }`. Change les types `Insertable` et `Updatable` d’une colonne, comme l’exigerait un trigger qui la remplit ; rien d’autre ne change, à l’exécution non plus.
 
 ::: code-group
 
@@ -621,6 +621,38 @@ ORDER BY i.indexname
 ```
 
 Le résultat est l’objet `Result` entier de `pg` : après `rows` viennent `fields`, les types de ses colonnes, et environ soixante-dix lignes consacrées aux parsers de types internes de `pg`, les mêmes pour chaque requête.
+
+## Types {#types}
+
+Les types de deux options, tirés de `zapatos/generate`, pour une fonction à vous qui les prend ou les renvoie.
+
+### `SchemaRules` {#SchemaRules}
+
+```ts
+interface SchemaRules {
+  [schema: string]: {
+    include: '*' | string[];
+    exclude: '*' | string[];
+  };
+}
+```
+
+À partir de la 6.9.0. Le type de [`schemas`](#generate.schemas) : par schéma, les relations à générer.
+
+### `ColumnOptions` {#ColumnOptions}
+
+```ts
+interface ColumnOptions {
+  [k: string]: {  // table name or "*"
+    [k: string]: {  // column name
+      insert?: 'auto' | 'excluded' | 'optional';
+      update?: 'auto' | 'excluded';
+    };
+  };
+}
+```
+
+À partir de la 6.9.0. Le type de [`columnOptions`](#generate.columnOptions) : par table, puis par colonne, comment `Insertable` et `Updatable` la typent.
 
 ## Les fichiers qu’il écrit {#the-files-it-writes}
 

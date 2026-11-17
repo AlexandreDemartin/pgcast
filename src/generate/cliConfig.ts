@@ -8,7 +8,8 @@ Released under the MIT licence: see LICENCE file
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { finaliseConfig, type Config } from './config';
+import { finaliseConfig } from './config';
+import type { Config } from './config';
 import { staleFiles, upToDate } from './outputFiles';
 import { generate } from './write';
 
