@@ -1,5 +1,5 @@
 ---
-english: 45e42756ec24
+english: 043ff74268d6
 ---
 
 # Template SQL
@@ -313,7 +313,7 @@ Un objet est un Whereable de la table : chacune de ses propres clés énumérab
 | un fragment `sql` | `(…)`, compilé avec la clé comme colonne courante : [`self`](#self) est la colonne |
 | une [condition](/fr/conditions) | de même : une condition est un fragment, `like('The%')` |
 | `parent(c?)` | `("studio_id" = "studios"."id")`<!-- probe: db.select('studios', db.all, { lateral: { films: db.select('films', { studio_id: db.parent('id') }) } }) -->, dans une sous-requête `lateral` |
-| `Default`, `self` | lève une erreur |
+| `Default`, `self`, `all` | lève une erreur |
 | `raw()`, `cols()`, `vals()` | lève une erreur ([`raw()`](#raw)) |
 
 - `null` est aussi un paramètre, et `= NULL` ne correspond à aucune ligne : utilisez [`conditions.isNull`](/fr/conditions#conditions.isNull). De même pour `undefined`, envoyé comme `NULL`, avec [`undefinedMeansMissing`](/fr/runtime-config#Config.undefinedMeansMissing) ou sans : `{ tagline: undefined }` donne `("tagline" = $1)`<!-- probe: db.sql`${{ tagline: undefined }}` -->, donc aucune ligne : omettre la clé élargirait le filtre.

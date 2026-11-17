@@ -309,7 +309,7 @@ An object is a Whereable of the table: each own enumerable key a column, each va
 | a `sql` fragment | `(…)`, compiled with the key as the current column: [`self`](#self) is the column |
 | a [condition](/conditions) | the same: a condition is a fragment, `like('The%')` |
 | `parent(c?)` | `("studio_id" = "studios"."id")`<!-- probe: db.select('studios', db.all, { lateral: { films: db.select('films', { studio_id: db.parent('id') }) } }) -->, in a `lateral` subquery |
-| `Default`, `self` | throws |
+| `Default`, `self`, `all` | throws |
 | `raw()`, `cols()`, `vals()` | throws ([`raw()`](#raw)) |
 
 - `null` is a parameter too, and `= NULL` matches no row: use [`conditions.isNull`](/conditions#conditions.isNull). So is `undefined`, sent as `NULL`, with [`undefinedMeansMissing`](/runtime-config#Config.undefinedMeansMissing) or without: `{ tagline: undefined }` gives `("tagline" = $1)`<!-- probe: db.sql`${{ tagline: undefined }}` -->, and no row: leaving the key out would widen the filter.
