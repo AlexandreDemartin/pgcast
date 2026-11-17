@@ -87,6 +87,18 @@ describe('select', () => {
     const q = db.select('users', db.all, { alias: 'u', lock: { for: 'UPDATE', of: 'u' } });
     expectTypeOf<Run<typeof q>>().toEqualTypeOf<s.users.JSONSelectable[]>();
   });
+
+  test('order is typed by OrderSpecForTable, which zapatos/db exports (#580)', () => {
+    type Order = db.SelectOptionsForTable<'users', undefined, undefined, undefined, never>['order'];
+    expectTypeOf<Order>().toEqualTypeOf<db.OrderSpecForTable<'users'> | db.OrderSpecForTable<'users'>[] | undefined>();
+    expectTypeOf<db.OrderSpecForTable<'users'>>().not.toBeAny();
+    expectTypeOf<db.OrderSpecForTable<'users'>['by']>().toEqualTypeOf<s.users.SQL>();
+    const spec: db.OrderSpecForTable<'users'> = { by: 'display_name', direction: 'DESC', nulls: 'LAST' };
+    db.select('users', db.all, { order: [spec] });
+    const orderBy = (o: db.OrderSpecForTable<'users'>) => o;
+    // @ts-expect-error 'UP' is not ASC / DESC (a value typed by OrderSpecForTable)
+    orderBy({ by: 'id', direction: 'UP' });
+  });
 });
 
 describe('selectOne, selectExactlyOne, count', () => {
