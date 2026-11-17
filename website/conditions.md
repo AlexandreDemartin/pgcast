@@ -236,7 +236,7 @@ An item compiles as in `vals([…])` within a filter:
 | a `sql` fragment | its SQL |
 | `parent(c?)` | the parent column, in a `lateral` subquery: `IN ("films"."id")`<!-- probe: db.select('films', db.all, { lateral: { cast: db.select('roles', { film_id: db.conditions.isIn([db.parent('id')]) }) } }) --> |
 | `Default`, `self`, `raw()`, `cols()`, `vals()` | throws ([Values a condition refuses](#refused-values)) |
-| `all`, which the type refuses | a parameter, `'Symbol(all)'`, as in Zapatos 6.6.1: no row on a text column, every row with `isNotIn()`, 22P02 on the others |
+| `all`, which the type refuses | a parameter, `'Symbol(all)'`, as in Zapatos 6.6.1: no row on a text column, every row with `isNotIn()`, 22P02 or 22007 on the others |
 
 Zapatos 6.6.1 sent a `Parameter` and `parent()` there as one more parameter, as JSON (`'{"value":"x","cast":"text"}'`, `'{"value":"id"}'`), so `isIn()` found nothing and `isNotIn()` matched every row on a text column.
 

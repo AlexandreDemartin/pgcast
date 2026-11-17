@@ -1,5 +1,5 @@
 ---
-english: 3e8f935109d2
+english: 51a8936ffd55
 description: "db.conditions regroupe les tests, comparaisons et opérateurs à donner comme valeur d’une clé d’un Whereable, chacun avec le SQL qu’il écrit et ses valeurs."
 ---
 
@@ -241,7 +241,7 @@ Un élément compile comme dans `vals([…])` au sein d’un filtre :
 | un fragment `sql` | son SQL |
 | `parent(c?)` | la colonne parente, dans une sous-requête `lateral` : `IN ("films"."id")`<!-- probe: db.select('films', db.all, { lateral: { cast: db.select('roles', { film_id: db.conditions.isIn([db.parent('id')]) }) } }) --> |
 | `Default`, `self`, `raw()`, `cols()`, `vals()` | lève une erreur ([Les valeurs qu’une condition refuse](#refused-values)) |
-| `all`, que le type refuse | un paramètre, `'Symbol(all)'`, comme dans Zapatos 6.6.1 : aucune ligne sur une colonne de texte, chaque ligne avec `isNotIn()`, 22P02 sur les autres |
+| `all`, que le type refuse | un paramètre, `'Symbol(all)'`, comme dans Zapatos 6.6.1 : aucune ligne sur une colonne de texte, chaque ligne avec `isNotIn()`, 22P02 ou 22007 sur les autres |
 
 Zapatos 6.6.1 y envoyait un `Parameter` et `parent()` comme un paramètre de plus, en JSON (`'{"value":"x","cast":"text"}'`, `'{"value":"id"}'`), si bien que `isIn()` ne trouvait rien et que `isNotIn()` trouvait chaque ligne sur une colonne de texte.
 
