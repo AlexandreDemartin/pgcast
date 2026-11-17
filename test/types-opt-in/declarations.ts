@@ -5,6 +5,7 @@
 // every type these functions return must have a name a .d.ts can write (TS4023 otherwise).
 
 import * as db from 'zapatos/db';
+import type * as s from 'zapatos/schema';
 
 export const accountCount = () => db.count('accounts', db.all);
 export const totalBalance = () => db.sum('accounts', db.all, { columns: ['balance'] });
@@ -34,3 +35,9 @@ export const { ...allConditions } = conditions;
 // a generic forwarder writes out the type of select()'s lock option, where the alias is still `A` (TS2742 if that type
 // names one a consumer cannot import, #578)
 export const lockOf = <A extends string>(options: db.SelectOptionsForTable<'users', undefined, undefined, undefined, A>) => options.lock;
+
+// forwarders that write out the type of select()'s order option, for one table and for any (TS4023 if that type names
+// one zapatos/db does not export, #580)
+export const orderOf = (options: db.SelectOptionsForTable<'users', undefined, undefined, undefined, never>) => options.order;
+export const orderOfTable = <T extends s.Table>(options: db.SelectOptionsForTable<T, undefined, undefined, undefined, never>) =>
+  options.order;
