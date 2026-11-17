@@ -136,7 +136,7 @@ function quoteIfIllegalIdentifier(identifier: string) {
   return identifier.match(/^[a-zA-Z_$][0-9a-zA-Z_$]*$/) ? identifier : stringLiteral(identifier, '"');
 }
 
-// Every key of a Whereable is optional, so a string passed as one when a column shares the name of a String member
+// Every key of a Whereable is optional, so a string passes as one when a column shares the name of a String member
 // its type fits (`search` typed any, `length` a number), and with it any name in the table's SQL (#670). A string has
 // an iterator, a Whereable none, and no column is a symbol. In SQLExpression, a union, so that no `keyof` changes;
 // `undefined`, not `never`, so that an object stating its iterator undefined stays a Whereable, under
