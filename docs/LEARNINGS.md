@@ -234,6 +234,10 @@ Candidates for a check, a rule or a skill line.
 - #583: `toEqualTypeOf` cannot tell an interface from an alias or inline object of the same shape: to keep a public type an interface, assign it to `Record<string, unknown>` under `@ts-expect-error`.
 - #583: to compare a branch's type with master's unexported one, install master's tarball under a second package name in the same program and reach the type through an exported one (an indexed access).
 - #583: a TS4023 sweep walks every public entry point: `zapatos/generate` has `SchemaRules` and `ColumnOptions` unexported.
+- #596: untyped `eq(db.all)`, `isIn([db.all])` and the other `conditionalParam()`/`vals()` callers still send `'Symbol(all)'`, as Zapatos 6.6.1 did: a follow-up, opt-in under decision 003.
+- #596: `check-prose.mjs` matches each interpolation of a quoted message with `\S+?`: a quoted message needs a one-word value (`` `undefined` ``, not "an array").
+- #596: from Postgres 16, `regconfigin` reports a missing schema in a qualified name as the configuration missing (42704); 14 and 15 raise 3F000 from `LookupExplicitNamespace`.
+- #596: in zsh, `git show $B:website/x.md` applies `:w` as a modifier to `$B`: write `"${B}:path"`.
 
 ## Minors kept
 
@@ -275,4 +279,4 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #573 (form): `test/unit/conditions.test.ts` `one SQL wherever it sits`: no `update()`, no `.copy()` of a refused wrapper.
 - #573 (defect): `website/conditions.md` § full-text (and FR), "one it does not know is its 42704": on Postgres 14 a dotted configuration whose schema is missing gives 3F000.
 - #575 (form): `website/conditions.md` § `jsonbPathExists()`: no line on `jsonb_path_exists_tz` for a path comparing datetimes across time zones (0A000).
-
+- #596 (form): `src/db/conditions.ts` JSDoc of `jsonbContains()` and `website/conditions.md` (FR) list `Default`, `self`, `raw()`, `cols()`, `vals()` but not `all`, which now gets the wrapper message.
