@@ -1172,6 +1172,15 @@ describe('Default, self, raw, cols and vals as the value of a condition', () => 
     expect(thrown(dc.arrayOverlaps(cyclicAll as any))).toBe('`db.all` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To match every row, give `db.all` as the whole filter of a shortcut: `select(table, db.all)`.');
   });
 
+  it('an array condition given an array nested 20,000 deep is built, and refuses db.all in it as it compiles', () => {
+    // a recursive walk overflowed the stack at the call (RangeError), where master built it and pg's own recursion
+    // failed at .run(); the failure falls as the query compiles, or at .run() without db.all, as on master (#633)
+    let deep: unknown[] = ['x'], deepAll: unknown[] = [db.all];
+    for (let i = 0; i < 20_000; i++) [deep, deepAll] = [[deep], [deepAll]];
+    expect(show(dc.arrayContains(deep as any))).toEqual({ text: '(("col" @> $1))', values: [deep] });
+    expect(thrown(dc.arrayContainedIn(deepAll as any))).toBe('`db.all` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To match every row, give `db.all` as the whole filter of a shortcut: `select(table, db.all)`.');
+  });
+
   it('characterization: an array condition given an array holding Default or self sends it as a parameter', () => {
     // characterization: pg sends '{"Symbol(DEFAULT)"}'; left as it is by #633, until #636
     expect([dc.arrayContains([Default] as any), dc.arrayOverlaps([self] as any)].map(f => show(f).values)).toEqual([[[Default]], [[self]]]);
