@@ -61,9 +61,24 @@ describe('eqAny()', () => {
   test('characterization: a Parameter, a sql fragment or parent() item passes the type, and throws as the query compiles', () => {
     // characterization: the Whereable takes each of them as a value (isIn() compiles them), so the item type does too;
     // one array parameter cannot hold them (test/unit/conditions.test.ts). A type that refuses Parameter and parent()
-    // by their shape would refuse the jsonb items {} and { value: 1 } too
+    // by their shape would refuse the jsonb items {} and { value: 1 } too, and a check on T, by their tag, a forwarder
+    // `<T extends number>(ids: readonly T[]) => eqAny(ids)`, T being deferred there (#570)
     db.select('users', { settings: c.eqAny([{}, { value: 1 }]) });
     db.select('users', { id: c.eqAny([db.param(1)]), display_name: c.eqAny([db.sql`'Ada'`]), email: c.eqAny([db.parent('email')]) });
+  });
+
+  test('characterization: {}, { value } and param() of a column name pass as the ParentColumn, and throw as the query compiles', () => {
+    // characterization (#570): ParentColumn's members are all optional, so these fit it, and take the overload of
+    // parent(); eqAny() throws on each as the query compiles (test/unit/conditions.test.ts), before any query, and runs
+    // an array typed `object`. Refusing them takes a conditional type on that overload, for about 10 % more
+    // instantiations per eqAny(parent()) call
+    expectTypeOf(c.eqAny({})).toEqualTypeOf<db.SQLFragment<boolean | null, never>>();
+    expectTypeOf(c.eqAny(db.param('id'))).toEqualTypeOf<db.SQLFragment<boolean | null, never>>();
+    db.select('users', { id: c.eqAny({}), display_name: c.eqAny({ value: 'id' }), email: c.eqAny(db.param('id')) });
+    const lookalike: object = [1, 2];
+    db.select('users', { id: c.eqAny(lookalike) });
+    // @ts-expect-error a Parameter of a string that is no column name is no ParentColumn
+    db.select('users', { id: c.eqAny(db.param('Ada')) });
   });
 });
 

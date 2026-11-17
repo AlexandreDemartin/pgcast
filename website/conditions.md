@@ -292,7 +292,10 @@ A list that is not an array throws as the query compiles, as in `isIn()`. So doe
 
 `Default`, `self`, `all`, `raw()`, `cols()` and `vals()` throw too, as an item or as the list: [Values a condition refuses](#refused-values).
 
-The type takes a `Parameter`, a fragment or `parent()` as an item, as the Whereable does in `isIn()`.
+The type takes more than that, and each of these throws as the query compiles, before any query ([#570](https://github.com/AlexandreDemartin/pgcast/issues/570)):
+
+- **Items**: a `Parameter`, a fragment or `parent()`, as the Whereable does in `isIn()`.
+- **The list**: `{}`, `{ value: 'title' }` and `db.param()` of a column's name, `db.param('title')`, pass as a `ParentColumn`, whose members are all optional. `eqAny({})`<!-- tsc: db.select('films', { id: db.conditions.… }) --> throws as a list that is not an array, `eqAny(db.param('title'))`<!-- tsc: db.select('films', { id: db.conditions.… }) --> as `db.param()` does.
 
 ## Arrays {#arrays}
 
@@ -323,7 +326,9 @@ Or write a `sql` fragment value, where `db.self` is the column, and cast its par
 
 </CastPanel>
 
-With [`castArrayParamsToJson`](/runtime-config#Config.castArrayParamsToJson) on, a condition sends its array as `CAST($1 AS "json")`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${{ genres: db.conditions.arrayContains(['drama']) }}`) -->, an array of arrays too, which Postgres refuses (42883: `text[] @> json`). The condition's type refuses a `Parameter` (TS2345), but in the fragment, the cast given to `param()` wins over the option ([#36](https://github.com/AlexandreDemartin/pgcast/issues/36)): it runs either way.
+With [`castArrayParamsToJson`](/runtime-config#Config.castArrayParamsToJson) on, a condition sends its array as `CAST($1 AS "json")`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${{ genres: db.conditions.arrayContains(['drama']) }}`) -->, an array of arrays too, which Postgres refuses (42883: `text[] @> json`). The condition's type refuses a `Parameter` of an array (TS2345), but in the fragment, the cast given to `param()` wins over the option ([#36](https://github.com/AlexandreDemartin/pgcast/issues/36)): it runs either way.
+
+As in Zapatos 6.6.1, the type also takes `{}`, `{ value: … }` and `db.param()` of a column's name, which pass as a `ParentColumn`, whose members are all optional ([#570](https://github.com/AlexandreDemartin/pgcast/issues/570)). `{}` is sent as `'{}'`, the empty array: `arrayContains({})`<!-- tsc: db.select('films', { genres: db.conditions.… }) --> matches every row whose array is not `NULL`, `arrayContainedIn({})` the empty arrays, and `arrayOverlaps({})` no row. Postgres refuses `{ value: 'title' }` and `db.param('title')` (22P02, `malformed array literal`), and under [`castObjectParamsToJson`](/runtime-config#Config.castObjectParamsToJson), `{}` and `{ value: … }` too (42883).
 
 ### `arrayContains()` {#conditions.arrayContains}
 
