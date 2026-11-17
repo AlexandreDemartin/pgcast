@@ -8,7 +8,8 @@ Released under the MIT licence: see LICENCE file
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { finaliseConfig, type CompleteConfig, type Config } from './config';
+import { finaliseConfig } from './config';
+import type { CompleteConfig, Config } from './config';
 import * as legacy from './legacy';
 import { moduleNamesOf, warnAboutOtherModuleNames } from './moduleNames';
 import { warnAboutSchemaRules } from './schemaRules';

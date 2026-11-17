@@ -8,10 +8,15 @@ import * as pg from 'pg';
 import { tsTypeForPgType } from './pgTypes';
 import type { EnumData } from './enums';
 import { enumOrderOf, enumOrdersForSchema } from './enumOrder';
-import { domainRootsInDatabase, type DomainRoots } from './domainRoots';
+import { domainRootsInDatabase } from './domainRoots';
 import type { CustomTypes, CustomTypeOrigins } from './tsOutput';
 import { CompleteConfig } from './config';
 import { jsdocText, stringLiteral, tsIdentifier } from './quote';
+
+// DomainRoots of ./domainRoots, declared here and not exported: a library's declarations that write the type of
+// definitionForRelationInSchema() out cannot name ./domainRoots, which zapatos/generate does not export (TS2742), and
+// they write this alias out in full
+type DomainRoots = Record<string, { schema: string; name: string; isArray: boolean }>;
 
 // TypeScript's own types that an enum may be named after: a placeholder naming one compiles without an import
 const tsOwnTypes = new Set('any bigint boolean never number object string symbol undefined unknown'.split(' '));
@@ -145,7 +150,7 @@ export const definitionForRelationInSchema = async (
   customTypeImports: Record<string, string | null> = Object.create(null),
   uniqueIndexesNotArbiters: string[] = [],  // an 'out' parameter too: what uniqueIndexConstraintsOnly would leave out
   domainsNotByContext: string[] = [],  // an 'out' parameter too: what domainsTypedByContext would change
-  domainRoots = () => domainRootsInDatabase(queryFn),
+  domainRoots: () => Promise<DomainRoots> = () => domainRootsInDatabase(queryFn),
   domainsUnderDomains: string[] = [],  // an 'out' parameter too: what domainsTypedByContext would type over a domain
   // an 'out' parameter too: what enumArraysTypedAsText would change, with a domain's placeholder, which may end `any`
   enumArraysNotAsText: [column: string, customType: string | null][] = [],

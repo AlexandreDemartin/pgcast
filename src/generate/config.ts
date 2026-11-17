@@ -45,7 +45,8 @@ export interface OptionalConfig {
   intervalsTypedAsObjects?: boolean;  // an interval is typed in Selectable as pg's default type parser returns it, a db.PostgresInterval, which a write takes back
 }
 
-interface SchemaRules {
+/** The type of `schemas`: by schema, the relations to generate. */
+export interface SchemaRules {
   [schema: string]: {
     /**
      * `'*'`, or the names of the relations to generate, case included. A name the schema doesn't have
@@ -56,7 +57,8 @@ interface SchemaRules {
   };
 }
 
-interface ColumnOptions {
+/** The type of `columnOptions`: by table, then by column, how `Insertable` and `Updatable` type it. */
+export interface ColumnOptions {
   [k: string]: {  // table name or "*"
     [k: string]: {  // column name
       insert?: 'auto' | 'excluded' | 'optional';

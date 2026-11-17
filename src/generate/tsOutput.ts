@@ -8,8 +8,10 @@ import * as path from 'path';
 import * as pg from 'pg';
 
 import { enumTypesForEnumData } from './enums';
-import { enumOrderOf, enumOrdersForSchema, enumsOutOfOrder, warnAboutEnumOrder, type EnumOrders } from './enumOrder';
-import { domainRootsInDatabase, type DomainRoots } from './domainRoots';
+import { enumOrderOf, enumOrdersForSchema, enumsOutOfOrder, warnAboutEnumOrder } from './enumOrder';
+import type { EnumOrders } from './enumOrder';
+import { domainRootsInDatabase } from './domainRoots';
+import type { DomainRoots } from './domainRoots';
 import { header } from './header';
 import { moduleNamesOf } from './moduleNames';
 import { jsdocText, tsIdentifier } from './quote';
