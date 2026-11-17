@@ -975,8 +975,9 @@ ${imports.map(line => `  ${line}\n`).join('')}  export type ${type};  // replace
     });
 
     // two domains named code_d, each over an enum, which placeholder_reels_a reads as `mood` and `any`: one
-    // placeholder (#42), which 6.6.1 gave the column read last, by name
-    it('leaves two types of one name in one relation as 6.6.1 wrote them', async () => {
+    // placeholder (#42), held by placeholder_reels_b's, which sorts last. 6.6.1 gave it the column read last, `mood`
+    // with no import: TS2304, and `any` under skipLibCheck
+    it('gives two types of one name in one relation the one that sorts last', async () => {
       await t.pool.query(`
         CREATE SCHEMA placeholder_reels_a;
         CREATE SCHEMA placeholder_reels_b;
@@ -988,7 +989,7 @@ ${imports.map(line => `  ${line}\n`).join('')}  export type ${type};  // replace
       `);
       try {
         const { customTypeSourceFiles: files } = await codegen({ schemas: { placeholder_reels_a: all } });
-        expect(files.PgCode_d).toBe(placeholder('zapatos', [], 'PgCode_d = mood'));
+        expect(files.PgCode_d).toBe(placeholder('zapatos', [], 'PgCode_d = any'));
       } finally {
         await t.pool.query('DROP SCHEMA placeholder_reels_a, placeholder_reels_b CASCADE');
       }
@@ -2332,8 +2333,8 @@ export type cover = 'matt' | 'gloss';`);
       const both = { schemas: { union_a: all, union_b: all }, unprefixedSchema: null, outDir };
       const offFiles = (await codegen(both)).customTypeSourceFiles;
       const { ts: schema, customTypeSourceFiles: files } = await codegen({ ...both, domainsTypedAsUnions: true });
-      // last wins, as without the key: either base type, never the union
-      expect([offFiles.PgCut, files.PgCut].map(f => /PgCut = (string|number);/.test(f))).toEqual([true, true]);
+      // union_b's, which sorts last, as without the key: its base type, never the union
+      expect([offFiles.PgCut, files.PgCut].map(f => /PgCut = number;/.test(f))).toEqual([true, true]);
       expect(files.PgCut).not.toContain('import type');
       expect(schema).toContain(`export type cut = 'rough' | 'final';`);  // declared all the same
       // with a placeholder on disk that names no union: no note of this key

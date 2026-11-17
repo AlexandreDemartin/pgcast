@@ -260,6 +260,15 @@ export const definitionForRelationInSchema = async (
         customType: string = domainName ?? udtName,
         prefixedCustomType = transformCustomType(customType, config),
         origins = customTypeOrigins[prefixedCustomType] ??= {},
+        qualifiedType = `"${domainName === null ? udtSchema : domainSchema}"."${customType}"`,
+        // a placeholder that two types of one name share (#42) holds the one whose "schema"."name" sorts last, as that
+        // type alone gives it, in whichever order the relations are read: one that sorts first never writes it, and
+        // one that sorts after it reads nothing it wrote
+        last = Object.keys(origins).sort().pop() ?? qualifiedType,
+        sortsFirst = qualifiedType < last,
+        afresh = qualifiedType > last,
+        ownType = afresh ? undefined : customTypes[prefixedCustomType],
+        ownImport = afresh ? undefined : customTypeImports[prefixedCustomType],
         // an enum of this schema, by name, is not in scope in a placeholder: it imports the enum or its namespace;
         // a name that may be a global type (`Date`, `string`) compiles as it is, as in 6.6.1
         enumName = selectableType.replace(/\[\]$/, ''),
@@ -268,20 +277,16 @@ export const definitionForRelationInSchema = async (
         namespace = tsIdentifier(schemaName, 'namespace'),
         imported = importsEnum ? (schemaPrefix ? namespace : enumName) : '',
         // relations that would import differently keep 6.6.1's text, with no import, in whichever order they are read
-        agrees = (customTypeImports[prefixedCustomType] ?? imported) === imported,
+        agrees = (ownImport ?? imported) === imported,
         hasEnum = hasOwn(typeEnums, udtName) || udtName.charAt(0) === '_' && hasOwn(typeEnums, udtName.slice(1)),
         // with typeEnumsAcrossSchemas, every relation reads the enum in its own schema: the labels that one of them
         // writes out type them all, and a relation that names the enum never replaces them
         labelled = inlineEnums && hasEnum,
         // without it, a relation of a schema with no enum of that name reads the type as `any`: that text wins, in
-        // whichever order the relations are read; a placeholder that two types of one name share (#42) keeps 6.6.1's
-        // last-wins
-        qualifiedType = `"${domainName === null ? udtSchema : domainSchema}"."${customType}"`,
-        keepsText = !inlineEnums && hasEnum && customTypes[prefixedCustomType] === 'any' &&
-          Object.keys(origins).every(type => type === qualifiedType);
+        // whichever order the relations are read
+        keepsText = !inlineEnums && hasEnum && ownType === 'any';
 
-      if (!keepsText && (labelled || customTypeImports[prefixedCustomType] !== null)) {
-        // two origins: the last one seen wins
+      if (!sortsFirst && !keepsText && (labelled || ownImport !== null)) {
         customTypes[prefixedCustomType] = agrees && importsEnum && schemaPrefix ? `${namespace}.${selectableType}` : selectableType;
         customTypeImports[prefixedCustomType] = labelled ? null : agrees ? imported : '';
       }
