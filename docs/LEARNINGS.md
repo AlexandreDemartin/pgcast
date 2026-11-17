@@ -302,6 +302,9 @@ Candidates for a check, a rule or a skill line.
 - #621: a `null` `parent` already compiled as none (core reads a falsy `parentTable` as no mark), so only `alias` was broken and the `parent` tests needed mutants to prove anything.
 - #621: an `AS` the caller wrote is not neutral even when it repeats the table's name: an unaliased `FROM` item also answers to its schema-qualified name, so a correlated `"public"."users"."col"` binds to the inner row; check "omitting AS changes nothing" with a fragment naming the outer table qualified.
 - #621: a mutant changing two lines proves only that both together are needed: mutate each line alone.
+- #634: an `@errors` twoslash block cannot prove a line it accepts (it matches error codes only); a compiling block with `@ts-expect-error` checks both directions.
+- #634: to prove the docs build catches a refusal that goes away, mutate and run `npx vitepress build`: `docs:build` fails first on `check-translations`, which proves nothing about the block.
+- #625: a type check pushed from the outer query into a subquery (a lateral's `parent()`) costs +47.7 % on `bench:types`: a subquery's argument types never reach its return type, so only contextual typing can carry the parent table, at a cost on every Whereable property.
 - #632: classify by decision 003 before starting: a type test passing on master that refuses the value is the proof "the type already refuses", which makes the change a Fix, whatever the issue said.
 - #632: a pg client emits `error` when its probe database is dropped WITH (FORCE): without `client.on('error')` the replay script dies silently; tarballs unpacked in the scratchpad need `NODE_PATH` to find `pg`.
 - #632: a SQLSTATE given "on the others" for a nonsense value must be checked on a `date` or `timestamptz` column: date and time types reject bad input with 22007, not 22P02; `bytea` takes the text and matches no row.
