@@ -1,5 +1,5 @@
 ---
-english: a3249c412dfd
+english: 37572f751f37
 ---
 
 # Écritures
