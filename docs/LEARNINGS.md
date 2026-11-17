@@ -269,6 +269,13 @@ Candidates for a check, a rule or a skill line.
 - #607: moving a conversion from compile to build time moves every throw it can raise: probe a throwing `valueOf()` and `Symbol.toPrimitive` (hint `default`) with `.run(pool).catch(h)` outside any `async`.
 - #607: when an issue or PR states "Zapatos 6.6.1 refused it", replay each conversion path of the value separately (the method alone, `replace()` alone, both).
 - #607: a log of conversions alone does not show whether an error was raised when the query was built or when it was compiled: tag compile-time throws in the shared `it.each`.
+- #606: on TS 4.1 a declaration naming a missing 5.x type as a constraint (`NoInfer<Table>`) still refuses a wrong table; only a result type such as `Awaited<…>` turns `any`: a floor consumer needs a negative on a result type as well as on an argument.
+- #606: `dist/db/core.d.ts` emits `Buffer<ArrayBuffer>` (dev `@types/node` 20), so `skipLibCheck: false` is impossible on TS < 5.7 with the matching `@types/node`, as install.md says.
+- #606: skill `pr-shape`'s branch types have no `ci`; a CI branch is `chore/…`.
+- #606: under `skipLibCheck`, a name a `.d.ts` uses that the compiler does not know (`Awaited` below 4.5) becomes `any` silently: a floor check runs a lib check limited to the package's own files, with a short list of allowed diagnostics.
+- #606: "pinned tools" for a compatibility check include transitive dependencies declared `*` (`@types/pg` → `pg-protocol`), or an upstream release turns CI red with nothing changed.
+- #606: `ts.parseJsonConfigFileContent` without the config file path resolves `types` from the current directory, so a check inside the repository picks up the repository's own `@types`.
+- #606: the compiler names files reached through an import by their real path: compare with `realpathSync`.
 
 ## Minors kept
 
@@ -316,3 +323,4 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #605 (form): `test/unit/runtimeImports.test.ts` reads emitted JS with a regex (a string `"require(pg)"` is a false red; `createRequire(__filename)(…)` passes); a syntax-tree walk would be exact.
 - #605 (form): `website/install.md` (FR) Requirements: two bullets in a row about TypeScript.
 
+- #606 (form): `scripts/check-declarations-floor.mjs` leaves `pg-types` (`^2.2.0` from `@types/pg@8.6.6`) unpinned.
