@@ -1,5 +1,5 @@
 ---
-english: 1b128936d41c
+english: 890489bce501
 description: "db.conditions regroupe les tests, comparaisons et opérateurs à donner comme valeur d’une clé d’un Whereable, chacun avec le SQL qu’il écrit et ses valeurs."
 ---
 
@@ -297,7 +297,10 @@ Une liste qui n’est pas un tableau lève une erreur à la compilation de la re
 
 `Default`, `self`, `all`, `raw()`, `cols()` et `vals()` lèvent aussi une erreur, comme élément ou comme liste : [Les valeurs qu’une condition refuse](#refused-values).
 
-Le type accepte un `Parameter`, un fragment ou `parent()` comme élément, comme le Whereable le fait dans `isIn()`.
+Le type en accepte davantage, et chacune de ces valeurs lève une erreur à la compilation de la requête, avant toute requête ([#570](https://github.com/AlexandreDemartin/pgcast/issues/570)) :
+
+- **Éléments** : un `Parameter`, un fragment ou `parent()`, comme le Whereable le fait dans `isIn()`.
+- **La liste** : `{}`, `{ value: 'title' }` et `db.param()` d’un nom de colonne, `db.param('title')`, passent pour un `ParentColumn`, dont tous les membres sont optionnels. `eqAny({})`<!-- tsc: db.select('films', { id: db.conditions.… }) --> lève l’erreur d’une liste qui n’est pas un tableau, `eqAny(db.param('title'))`<!-- tsc: db.select('films', { id: db.conditions.… }) --> celle de `db.param()`.
 
 ## Les tableaux {#arrays}
 
@@ -328,7 +331,9 @@ Ou écrivez une valeur en fragment `sql`, où `db.self` est la colonne, et caste
 
 </CastPanel>
 
-Avec [`castArrayParamsToJson`](/fr/runtime-config#Config.castArrayParamsToJson) activé, une condition envoie son tableau en `CAST($1 AS "json")`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${{ genres: db.conditions.arrayContains(['drama']) }}`) -->, un tableau de tableaux aussi, que Postgres refuse (42883 : `text[] @> json`). Le type de la condition refuse un `Parameter` (TS2345), mais dans le fragment, le cast donné à `param()` l’emporte sur l’option ([#36](https://github.com/AlexandreDemartin/pgcast/issues/36)) : il s’exécute dans les deux cas.
+Avec [`castArrayParamsToJson`](/fr/runtime-config#Config.castArrayParamsToJson) activé, une condition envoie son tableau en `CAST($1 AS "json")`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${{ genres: db.conditions.arrayContains(['drama']) }}`) -->, un tableau de tableaux aussi, que Postgres refuse (42883 : `text[] @> json`). Le type de la condition refuse un `Parameter` d’un tableau (TS2345), mais dans le fragment, le cast donné à `param()` l’emporte sur l’option ([#36](https://github.com/AlexandreDemartin/pgcast/issues/36)) : il s’exécute dans les deux cas.
+
+Comme dans Zapatos 6.6.1, le type accepte aussi `{}`, `{ value: … }` et `db.param()` d’un nom de colonne, qui passent pour un `ParentColumn`, dont tous les membres sont optionnels ([#570](https://github.com/AlexandreDemartin/pgcast/issues/570)). `{}` est envoyé en `'{}'`, le tableau vide : `arrayContains({})`<!-- tsc: db.select('films', { genres: db.conditions.… }) --> trouve chaque ligne dont le tableau n’est pas `NULL`, `arrayContainedIn({})` les tableaux vides, et `arrayOverlaps({})` aucune ligne. Postgres refuse `{ value: 'title' }` et `db.param('title')` (22P02, `malformed array literal`), et, avec [`castObjectParamsToJson`](/fr/runtime-config#Config.castObjectParamsToJson) activé, `{}` et `{ value: … }` aussi (42883).
 
 ### `arrayContains()` {#conditions.arrayContains}
 

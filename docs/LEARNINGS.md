@@ -276,6 +276,11 @@ Candidates for a check, a rule or a skill line.
 - #606: "pinned tools" for a compatibility check include transitive dependencies declared `*` (`@types/pg` → `pg-protocol`), or an upstream release turns CI red with nothing changed.
 - #606: `ts.parseJsonConfigFileContent` without the config file path resolves `types` from the current directory, so a check inside the repository picks up the repository's own `@types`.
 - #606: the compiler names files reached through an import by their real path: compare with `realpathSync`.
+- #570: a union of functions stays callable only if each overload's type parameters match the other member's: adding `P extends X` to one makes `isIn | eqAny` uncallable (TS2349).
+- #570: a type check on a generic parameter (`T & Check<T>`) refuses every generic forwarder, even a constrained one, the conditional staying deferred.
+- #570: the issue's premise was wrong for the array conditions: they do not throw while compiling; `{}` runs as the empty array on 6.6.1 and master, the rest are Postgres errors.
+- #570: `bench:types` drifts on master with no type change (15,697 against a 15,649 baseline).
+- #609: a `<!-- tsc -->` mark on a docs code span lets `docs:build` freeze that a type still accepts what the page says it takes.
 
 ## Minors kept
 
@@ -324,3 +329,4 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #605 (form): `website/install.md` (FR) Requirements: two bullets in a row about TypeScript.
 
 - #606 (form): `scripts/check-declarations-floor.mjs` leaves `pg-types` (`^2.2.0` from `@types/pg@8.6.6`) unpinned.
+
