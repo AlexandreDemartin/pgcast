@@ -129,7 +129,7 @@ const
 // `db.all` as the filter of a write, past the type, which leaves it out so that a read's "every row" never reaches a
 // write by accident; Zapatos 6.6.1 threw a TypeError from the "Alien object" message
 const
-  allAsWriteFilter = '`db.all` has no meaning as the filter of `deletes()` or `update()`: it is the filter of `select()` and its kin, which writes no `WHERE`. To delete or update every row on purpose, give db.sql`TRUE` as the filter.',
+  allAsWriteFilter = '`db.all` has no meaning as the filter of `deletes()` or `update()`: it is the filter of `select()` and its kin, refused in a write so that a filter that falls back to it for a read never deletes or updates every row. To delete or update every row on purpose, give db.sql`TRUE` as the filter.',
   writeFilter = (where: Whereable | SQLFragment<any>) => (where as unknown) === all ? refusedSQL(allAsWriteFilter) : where;
 
 function SQLForColumnsOfTable(columns: readonly Column[] | undefined, table: Table, nullMessage: string) {
@@ -576,6 +576,7 @@ export const upsert: {
  * left out, as `JSON.stringify` leaves it out, and does not count:
  * `{ name: 'A', isLiving: undefined }` gives `SET ("name") = ROW($1)`.
  * @param where A `Whereable` (or `SQLFragment`) defining which rows to update
+ * (`db.all` throws: to touch every row, give `` sql`TRUE` ``)
  * @param options Optionally, `returning` and `extras`, as for `insert`
  */
 export const update: {
@@ -624,6 +625,7 @@ export interface DeleteSignatures {
  * Generate an `DELETE` query `SQLFragment` (plain 'delete' is a reserved word)
  * @param table The table to delete from
  * @param where A `Whereable` (or `SQLFragment`) defining which rows to delete
+ * (`db.all` throws: to touch every row, give `` sql`TRUE` ``)
  * @param options Optionally, `returning` and `extras`, as for `insert`
  */
 export const deletes: DeleteSignatures = function (
