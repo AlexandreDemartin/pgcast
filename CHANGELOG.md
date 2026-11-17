@@ -20,7 +20,7 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 - `UpsertOptions<T, C, E, UC, RA>`, the type of `upsert()`'s `options`, is exported, so that a package's declarations can name it when they re-export `upsert()` (#577).
 
 ### Fixed
-- `insert()`, `upsert()`, `update()`, `truncate()`, `toDate()` and `toString()` re-exported by a package built with `declaration: true` (`export const { insert } = db;`) emit their declarations (#577). Since Zapatos 6.6.1, each type named an interface that `zapatos/db` does not export (`InsertSignatures`, `ToDate`…), and tsc failed with TS4023. The signatures are now written in place, the same type: every call that compiled still compiles, with the same type and the same errors.
+- `insert()`, `upsert()`, `update()`, `truncate()`, `toDate()` and `toString()` re-exported by a package built with `declaration: true` (`export const { insert } = db;`) emit their declarations (#577). Since Zapatos 6.6.1, each type named an interface that `zapatos/db` does not export (`InsertSignatures`, `ToDate`…), and tsc failed with TS4023. The signatures are now written in place, the same type: every call that compiled still compiles, with the same type and the same errors, at the same places; a message that prints the function itself writes out its signatures where it named `InsertSignatures`.
 
 ## [6.8.0] - 2026-11-16
 
