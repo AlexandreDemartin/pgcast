@@ -113,7 +113,7 @@ So a query pays about 4 Instantiations per slot for the union, wherever it is de
 | **Generated** | — | the union's JSDoc: `**certificate**`, `- Domain in database`, then `Who may see the film`, through `jsdocText()` | the same on each namespace and enum |
 | **Default output** | — | unchanged: the union is new output | unchanged without the key |
 
-**Choice: C1.** The union's JSDoc is new text, so its comment costs no key and no change elsewhere; one project of the corpus comments every domain it creates. R53 stays "leave" for the rest: a table's comment would show on the hover of a namespace (`s.films`), which no query reaches, and a key for that is surface for little (`AGENTS.md`: "Small is beautiful"). Kanel writes a domain's comment (`domainsGenerator.ts`); PostgREST gives a column's comment as its OpenAPI `description`. Reversible as an opt-in, if asked.
+**Choice: C1.** The union's JSDoc is new text, so its comment costs no key and no change elsewhere; one project of the corpus comments every domain it creates. R53 stays "leave" for the rest. A table's comment would show on the hover of a namespace (`s.films`), which no query reaches. An enum's would show where a column of it hovers to its alias, but the corpus comments no enum: the dump's 4 have no comment, the other project declares none. A key for either is surface for little (`AGENTS.md`: "Small is beautiful"). Kanel writes a domain's comment (`domainsGenerator.ts`); PostgREST gives a column's comment as its OpenAPI `description`. Reversible as an opt-in, if asked.
 
 ## 3. Typing a `jsonb` column
 
