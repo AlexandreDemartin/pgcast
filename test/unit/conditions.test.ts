@@ -1380,10 +1380,10 @@ describe('an exists() or isInSelect() option added to Object.prototype by someth
     try { return f(); } finally { delete proto[key]; }
   };
 
-  /** Run `f` with a getter `key` on Object.prototype, as other code would define one, deleted after it; with its reads. */
-  const withPrototypeGetter = <T>(key: string, value: unknown, f: () => T) => {
+  /** Run `f` with a getter `key` on Object.prototype, and a setter if `set`, as other code would define them, deleted after it; with its reads. */
+  const withPrototypeGetter = <T>(key: string, value: unknown, f: () => T, set = false) => {
     let reads = 0;
-    Object.defineProperty(Object.prototype, key, { get: () => (reads++, value), configurable: true });
+    Object.defineProperty(Object.prototype, key, { get: () => (reads++, value), ...set && { set() { } }, configurable: true });
     try { return { result: f(), reads }; } finally { delete (Object.prototype as any)[key]; }
   };
 
@@ -1419,9 +1419,13 @@ describe('an exists() or isInSelect() option added to Object.prototype by someth
     expect(withPrototypeKey(key, value, () => compiled(build))).toEqual(expected);
   });
 
-  // a getter answers anew on each read, so its value is no sign of where it came from; it is read once per options object
+  // a getter answers anew on each read, so its value is no sign of where it came from; it is read once per options object,
+  // and a setter beside it changes nothing
   it.each(rows)('a getter on Object.prototype is no option either: %s', (_, key, value, build, expected, reads) => {
-    expect(withPrototypeGetter(key, value, () => compiled(build))).toEqual({ result: expected, reads });
+    expect({
+      get: withPrototypeGetter(key, value, () => compiled(build)),
+      getAndSet: withPrototypeGetter(key, value, () => compiled(build), true),
+    }).toEqual({ get: { result: expected, reads }, getAndSet: { result: expected, reads } });
   });
 
   // NaN is not `===` itself, yet the NaN read is the one Object.prototype holds; a `parent` of NaN, a falsy mark,
