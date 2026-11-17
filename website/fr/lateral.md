@@ -1,5 +1,5 @@
 ---
-english: 048f4d07bc5d
+english: 504e586f74cf
 description: "Récupérez des lignes avec celles qui s’y rattachent, en une requête et un résultat typé : un film avec sa distribution, un membre de l’équipe avec son mentor."
 ---
 
@@ -126,8 +126,7 @@ db.select('films', db.all, {
 ```
 
 - Il vérifie la table que vous nommez, pas la requête qui l’entoure : `db.parent<s.studios.Column>('id')` sous `films` compile aussi.
-- Le type ne la vérifie pas sans qu’on le lui demande : la sous-requête est construite, et typée, avant la requête qui l’entoure, donc son type ne connaît pas la table parente. Un prototype qui lui donnait la table parente coûtait 47,7 % d’instanciations de types en plus sur le benchmark de compilation, et refusait du code qui s’exécute, comme `db.parent()` sans colonne dans un `lateral` ([#625](https://github.com/AlexandreDemartin/pgcast/issues/625)).
-- À venir : `related()`, qui lit la jointure dans la clé étrangère du catalogue, et ne peut donc pas nommer une mauvaise colonne ([#628](https://github.com/AlexandreDemartin/pgcast/issues/628), [#629](https://github.com/AlexandreDemartin/pgcast/issues/629)).
+- Le type ne la vérifie pas sans qu’on le lui demande : la sous-requête est construite, et typée, avant la requête qui l’entoure, donc son type ne connaît pas la table parente. La vérifier ralentirait chaque compilation, et refuserait du code qui s’exécute.
 
 ## À surveiller {#watch-for}
 

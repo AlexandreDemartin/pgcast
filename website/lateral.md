@@ -121,8 +121,7 @@ db.select('films', db.all, {
 ```
 
 - It checks the table you name, not the query around it: `db.parent<s.studios.Column>('id')` under `films` compiles too.
-- The type doesn't check it unasked: the subquery is built, and typed, before the query around it, so its type doesn't know the parent table. A prototype that gave it the parent table cost 47.7 % more type instantiations on the compile benchmark, and refused code that runs, such as `db.parent()` with no column in a `lateral` ([#625](https://github.com/AlexandreDemartin/pgcast/issues/625)).
-- To come: `related()`, which reads the join from the foreign key in the catalog, so it cannot name a wrong column ([#628](https://github.com/AlexandreDemartin/pgcast/issues/628), [#629](https://github.com/AlexandreDemartin/pgcast/issues/629)).
+- The type doesn't check it unasked: the subquery is built, and typed, before the query around it, so its type doesn't know the parent table. Checking it would slow every compile, and refuse code that runs.
 
 ## Watch for
 
