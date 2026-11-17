@@ -1459,6 +1459,32 @@ describe('an exists() or isInSelect() option added to Object.prototype by someth
     }).toEqual({ exists: users, isInSelect: authors });
   });
 
+  // `alias` is read as select() reads it, `callerValue(allOptions, 'alias') || table`, with no `AS` when it is the
+  // table, and `parent` with the same `||`: `alias: null` compiled `AS ${null}`, which threw (#618)
+  it('a null alias or parent is none, as select() reads its alias: own, from a getter, or a Proxy\'s get', () => {
+    const
+      counts: Record<string, number> = {},
+      ownName = "`exists()` was given `parent: 'users'`, which names \"users\", the subquery's own name, so Postgres would read `parent()` as a column of the subquery's row: give the subquery another name with the `alias` option.";
+    expect({
+      alias: compiled(() => exists('users', db.all, { alias: null } as any)),
+      parent: compiled(() => exists('users', db.all, { parent: null } as any)),
+      both: compiled(() => exists('users', db.all, { parent: null, alias: null } as any)),
+      isInSelect: compiled(() => sql`${{ id: isInSelect('extra.articles', db.all, 'author_id', { parent: null, alias: null } as any) }}`),
+      correlated: compiled(() => exists('extra.articles', { author_id: parent('id') }, { parent: 'users', alias: null } as any)),
+      ownName: compiled(() => exists('users', { manager_id: parent('id') }, { parent: 'users', alias: null } as any)),
+      noMark: compiled(() => exists('extra.articles', { author_id: parent('id') }, { parent: null, alias: null } as any)),
+      getter: compiled(() => exists('users', db.all, { get parent() { return null; }, get alias() { return null; } } as any)),
+      proxy: compiled(() => exists('users', db.all, counting(counts, {}, { parent: null, alias: null }))),
+      empty: compiled(() => exists('users', db.all, { alias: '' })),
+      table: compiled(() => exists('users', db.all, { alias: 'users' })),
+      counts,
+    }).toEqual({
+      alias: users, parent: users, both: users, isInSelect: authors, correlated, ownName, noMark,
+      getter: users, proxy: users, empty: users, table: users,
+      counts: { 'get:parent': 1, 'get:alias': 1 },
+    });
+  });
+
   it('options are read as before, as often and through the same traps, with no such key on Object.prototype', () => {
     const counts = { own: {} as Record<string, number>, answering: {} as Record<string, number>, empty: {} as Record<string, number> };
     expect({

@@ -761,6 +761,23 @@ describe('exists() and isInSelect() (note 006 § Replays)', () => {
     expect(await names(exists('extra.articles', { author_id: parent('id') }, { parent: 'users', alias: 'a' }))).toEqual(['Ada', 'Bob']);
   });
 
+  it('a null alias or parent runs as without the key, as select() reads its alias (#618)', async () => {
+    const
+      outcome = (where: db.SQL) => names(where).catch((err: Error) => err.message),
+      answering = new Proxy({}, { get: (target, k) => k === 'parent' ? 'users' : k === 'alias' ? null : Reflect.get(target, k) });
+    expect({
+      alias: await outcome(exists('extra.articles', { author_id: parent('id') }, { parent: 'users', alias: null } as any)),
+      both: await outcome(exists('users', all, { parent: null, alias: null } as any)),
+      isInSelect: await outcome({ id: isInSelect('extra.articles', all, 'author_id', { parent: null, alias: null } as any) }),
+      getter: await outcome({ id: isInSelect('extra.articles', all, 'author_id', { get parent() { return null; }, get alias() { return null; } } as any) }),
+      proxy: await outcome(exists('extra.articles', { author_id: parent('id') }, answering)),
+      noMark: await rejectsBeforeAnyQuery(db.select('users', exists('extra.articles', { author_id: parent('id') }, { parent: null } as any))),
+    }).toEqual({
+      alias: ['Ada', 'Bob'], both: ['Ada', 'Bob', 'Cyd'], isInSelect: ['Ada', 'Bob'], getter: ['Ada', 'Bob'], proxy: ['Ada', 'Bob'],
+      noMark: "The 'parent' table alias has no meaning here",
+    });
+  });
+
   it('names past 63 bytes: Postgres reads each as its first 63, cut at a character\'s end, so exists() refuses two that meet there', async () => {
     const r = (n: number) => 'r'.repeat(n);
     const byHand = async (outer: string, inner: string) => (await t.client.query(
