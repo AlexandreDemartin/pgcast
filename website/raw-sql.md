@@ -314,9 +314,9 @@ There is no alias helper: the type argument already checks the pair, with no new
 
 - Each key names a CTE, written as one quoted name: `"recent"`<!-- probe: examples/raw_sql_ctes.ts -->. Name it in lower case, as the literal reads it: a key `Recent` is `"Recent"`<!-- probe: db.withCTEs({ Recent: db.sql`SELECT 1` }, db.sql`SELECT 2`) -->, which `FROM Recent` does not find (42P01).
 - The CTEs come in the object's order, so each can read those before it. One that reads a later one is refused (42P01); an integer key comes first, as `Object.keys` gives it.
-- `withCTEs({}, query)` gives `query` itself, its own SQL. A list of CTEs built at run time needs no branch for the empty case, where a `WITH` that `sql` writes over an empty list is refused (42601).
+- `withCTEs({}, query)` gives a copy of `query`, its own SQL. A list of CTEs built at run time needs no branch for the empty case, where a `WITH` that `sql` writes over an empty list is refused (42601).
 - Write a CTE's name and its columns in the literal, `SELECT id FROM recent`, as the query's own names: no type knows them, and `db.raw()` of a constant would check no more.
-- Name a CTE apart from your tables. `WITH "films" AS (…)` before `select('films', …)` reads the CTE's rows, typed as the table's, and a column the CTE lacks is refused (42703).
+- Name a CTE apart from your tables. `WITH "films" AS (…)` before `select('films', …)` reads the CTE's rows, typed as the table's. A column the CTE lacks is missing from the rows, though the type has it, and is refused (42703) only where the query names it: in `columns`, a Whereable or `order`.
 
 A write shortcut can be a CTE too. It runs, and the main query sees each table as it was before the statement:
 
@@ -328,11 +328,15 @@ A write shortcut can be a CTE too. It runs, and the main query sees each table a
 
 - `tagsBefore` is `0` on the docs schema: the tag is there once the statement has run. To read the inserted rows, read the CTE, ``db.sql`SELECT result FROM added` ``, each row as JSON in `result`, as the shortcut returns it.
 - Postgres runs a data-modifying CTE only at the top level. Nested, in a `lateral` for one, it is refused (0A000).
-- An empty `insert()` as the main query still sends the query, so its CTEs run, and resolves to `[]`.
+- An `insert()` or `upsert()` of no row, as the main query or as a CTE, is written `SELECT NULL::jsonb AS result WHERE false`<!-- probe: db.withCTEs({ a: db.sql`SELECT 1` }, db.insert('films', [])) -->, which no table refuses: the CTEs run, and the main query resolves to `[]`.
 
-Nested, `withCTEs()` goes where its query would: in parentheses as an `extras` or `insert()` value, as a subquery in a `lateral`. A nested `selectExactlyOne()` keeps `LIMIT $1`<!-- probe: db.withCTEs({ r: db.sql`SELECT 1` }, db.selectExactlyOne('films', db.all)) --> with `1`, as a [`copy()`](/sql-template#copy) does, even with [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow). With no row, it rejects with `NotExactlyOneError`, whose `.query` is the shortcut, without the `WITH`.
+Nested, `withCTEs()` goes where its query would: in parentheses as an `extras` or `insert()` value, as a subquery in a `lateral`.
 
-`withCTEs()` writes neither `RECURSIVE` nor `MATERIALIZED`: write such a `WITH` in `sql`, with its main query. The result is never a prepared statement, whatever the query was, so that one name never stands for two texts: call [`prepared()`](/sql-template#prepared) on the result.
+A `selectExactlyOne()` as the query keeps its checks. With [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow), at the top level, it still asks for a second row, `LIMIT $1`<!-- probe: (db.setConfig({ selectExactlyOneChecksForSecondRow: true }), db.withCTEs({ r: db.sql`SELECT 1` }, db.selectExactlyOne('films', db.all))) --> with `2`, and rejects on one; nested in another query, it keeps `LIMIT 1`, as a [`copy()`](/sql-template#copy) does. With no row, it rejects with `NotExactlyOneError`, whose `.query` is the shortcut, without the `WITH`.
+
+`withCTEs()` writes neither `RECURSIVE` nor `MATERIALIZED`: write such a `WITH` in `sql`, with its main query. Put all the CTEs in one call: a query that already starts with a `WITH`, a `withCTEs()` result for one, is refused (42601).
+
+The result is never a prepared statement, whatever the query was, `{}` included, so that one name never stands for two texts: call [`prepared()`](/sql-template#prepared) on the result. A list built at run time gives a text per list: name each apart.
 
 ## Check the SQL before you run it
 

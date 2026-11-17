@@ -1,5 +1,5 @@
 ---
-english: 87ac2ca3a1f6
+english: cafe671d3339
 description: "Quand aucun raccourci n’écrit la requête dont vous avez besoin, écrivez-la dans le template sql, et gardez hors de son texte toute valeur venue de l’extérieur."
 ---
 
@@ -315,9 +315,9 @@ Il n’y a pas de helper d’alias : l’argument de type vérifie déjà la pa
 
 - Chaque clé nomme une CTE, écrite comme un seul nom entre guillemets : `"recent"`<!-- probe: examples/raw_sql_ctes.ts -->. Nommez-la en minuscules, comme le littéral la lit : une clé `Recent` donne `"Recent"`<!-- probe: db.withCTEs({ Recent: db.sql`SELECT 1` }, db.sql`SELECT 2`) -->, que `FROM Recent` ne trouve pas (42P01).
 - Les CTE viennent dans l’ordre de l’objet, si bien que chacune peut lire celles qui la précèdent. Une CTE qui en lit une suivante est refusée (42P01) ; une clé entière vient en premier, comme `Object.keys` la donne.
-- `withCTEs({}, query)` donne `query` elle-même, son propre SQL. Une liste de CTE construite à l’exécution n’a besoin d’aucune branche pour le cas vide, là où un `WITH` que `sql` écrit sur une liste vide est refusé (42601).
+- `withCTEs({}, query)` donne une copie de `query`, son propre SQL. Une liste de CTE construite à l’exécution n’a besoin d’aucune branche pour le cas vide, là où un `WITH` que `sql` écrit sur une liste vide est refusé (42601).
 - Écrivez le nom d’une CTE et ses colonnes dans le littéral, `SELECT id FROM recent`, comme les noms propres à la requête : aucun type ne les connaît, et `db.raw()` d’une constante n’en vérifierait pas davantage.
-- Nommez une CTE autrement que vos tables. `WITH "films" AS (…)` avant `select('films', …)` lit les lignes de la CTE, typées comme celles de la table, et une colonne qui manque à la CTE est refusée (42703).
+- Nommez une CTE autrement que vos tables. `WITH "films" AS (…)` avant `select('films', …)` lit les lignes de la CTE, typées comme celles de la table. Une colonne absente de la CTE est absente des lignes, bien que le type la prévoie, et n’est refusée (42703) que là où la requête la nomme : dans `columns`, un Whereable ou `order`.
 
 Un raccourci d’écriture peut aussi être une CTE. Il s’exécute, et la requête principale voit chaque table telle qu’elle était avant l’instruction :
 
@@ -328,12 +328,16 @@ Un raccourci d’écriture peut aussi être une CTE. Il s’exécute, et la requ
 </CastPanel>
 
 - `tagsBefore` vaut `0` sur le schéma de la doc : le tag n’est là qu’une fois l’instruction exécutée. Pour lire les lignes insérées, lisez la CTE, ``db.sql`SELECT result FROM added` ``, chaque ligne en JSON dans `result`, comme le raccourci la renvoie.
-- Postgres n’exécute une CTE qui modifie des données qu’au niveau supérieur. Imbriquée, dans un `lateral` par exemple, elle est refusée (0A000).
-- Un `insert()` vide comme requête principale envoie quand même la requête, si bien que ses CTE s’exécutent, et se résout en `[]`.
+- Postgres n’exécute une CTE qui modifie des données qu’au premier niveau. Imbriquée, dans un `lateral` par exemple, elle est refusée (0A000).
+- Un `insert()` ou un `upsert()` sans ligne, comme requête principale ou comme CTE, s’écrit `SELECT NULL::jsonb AS result WHERE false`<!-- probe: db.withCTEs({ a: db.sql`SELECT 1` }, db.insert('films', [])) -->, qu’aucune table ne refuse : les CTE s’exécutent, et la requête principale se résout en `[]`.
 
-Imbriqué, `withCTEs()` va là où irait sa requête : entre parenthèses comme valeur d’`extras` ou d’`insert()`, comme sous-requête dans un `lateral`. Un `selectExactlyOne()` imbriqué garde `LIMIT $1`<!-- probe: db.withCTEs({ r: db.sql`SELECT 1` }, db.selectExactlyOne('films', db.all)) --> avec `1`, comme le fait une [`copy()`](/fr/sql-template#copy), même avec [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow). Sans ligne, il est rejeté avec `NotExactlyOneError`, dont la `.query` est le raccourci, sans le `WITH`.
+Imbriqué, `withCTEs()` va là où irait sa requête : entre parenthèses comme valeur d’`extras` ou d’`insert()`, comme sous-requête dans un `lateral`.
 
-`withCTEs()` n’écrit ni `RECURSIVE` ni `MATERIALIZED` : écrivez un tel `WITH` en `sql`, avec sa requête principale. Le résultat n’est jamais une requête préparée, quelle que soit la requête d’origine, pour qu’un même nom ne désigne jamais deux textes : appelez [`prepared()`](/fr/sql-template#prepared) sur le résultat.
+Un `selectExactlyOne()` comme requête garde ses vérifications. Avec [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), au premier niveau, il demande toujours une deuxième ligne, `LIMIT $1`<!-- probe: (db.setConfig({ selectExactlyOneChecksForSecondRow: true }), db.withCTEs({ r: db.sql`SELECT 1` }, db.selectExactlyOne('films', db.all))) --> avec `2`, et il est rejeté s’il en trouve une ; imbriqué dans une autre requête, il garde `LIMIT 1`, comme le fait une [`copy()`](/fr/sql-template#copy). Sans ligne, il est rejeté avec `NotExactlyOneError`, dont la `.query` est le raccourci, sans le `WITH`.
+
+`withCTEs()` n’écrit ni `RECURSIVE` ni `MATERIALIZED` : écrivez un tel `WITH` en `sql`, avec sa requête principale. Mettez toutes les CTE dans un seul appel : une requête qui commence déjà par un `WITH`, un résultat de `withCTEs()` par exemple, est refusée (42601).
+
+Le résultat n’est jamais une requête préparée, quelle que soit la requête d’origine, `{}` compris, pour qu’un même nom ne désigne jamais deux textes : appelez [`prepared()`](/fr/sql-template#prepared) sur le résultat. Une liste construite à l’exécution donne un texte par liste : donnez à chacun son propre nom.
 
 ## Vérifier le SQL avant de l’exécuter {#check-the-sql-before-you-run-it}
 
