@@ -1139,7 +1139,7 @@ describe('Default, self, raw, cols and vals as the value of a condition', () => 
   it('a condition given db.all throws when compiled, not when called', () => {
     // 6.6.1 sent 'Symbol(all)': no row on a text column, every row with ne(), 22P02 on the others (#619)
     expect(messages(db.all)).toEqual(new Set([
-      '`db.all` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To match every row, give `db.all` as the whole filter of a shortcut: `select(table, db.all)`.',
+      '`db.all` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.',
     ]));
   });
 
@@ -1147,7 +1147,7 @@ describe('Default, self, raw, cols and vals as the value of a condition', () => 
     // 6.6.1 sent 'Symbol(all)': no row on a text column, every row with isNotIn(), 22P02 on the others (#633);
     // the message is the Whereable's, as for self, since the list compiles as vals([…]) within a filter
     expect(new Set(Object.values(lists).flatMap(f => [thrown(f([db.all])), thrown(f(['Ada', db.all]))]))).toEqual(new Set([
-      '`db.all` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: leave the key out, or compare with a value. To match every row, give `db.all` as the whole filter of a shortcut: `select(table, db.all)`.',
+      '`db.all` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: leave the key out, or compare with a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.',
     ]));
   });
 
@@ -1157,7 +1157,7 @@ describe('Default, self, raw, cols and vals as the value of a condition', () => 
     const arrays = { arrayContains: dc.arrayContains, arrayContainedIn: dc.arrayContainedIn, arrayOverlaps: dc.arrayOverlaps };
     expect(new Set(Object.values(arrays).flatMap(f => [[db.all], ['x', db.all], [['x'], [db.all]], [[[db.all]]]].map(a => thrown(f(a as any))))))
       .toEqual(new Set([
-        '`db.all` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To match every row, give `db.all` as the whole filter of a shortcut: `select(table, db.all)`.',
+        '`db.all` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.',
       ]));
   });
 
@@ -1173,7 +1173,7 @@ describe('Default, self, raw, cols and vals as the value of a condition', () => 
     const inner: unknown[] = [];
     inner.push(inner);
     expect(show(dc.arrayContains(['x', inner] as any))).toEqual({ text: '(("col" @> $1))', values: [['x', inner]] });
-    expect(thrown(dc.arrayOverlaps(cyclicAll as any))).toBe('`db.all` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To match every row, give `db.all` as the whole filter of a shortcut: `select(table, db.all)`.');
+    expect(thrown(dc.arrayOverlaps(cyclicAll as any))).toBe('`db.all` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.');
   });
 
   it('an array condition given an array nested 20,000 deep is built, and refuses db.all in it as it compiles', () => {
@@ -1182,7 +1182,7 @@ describe('Default, self, raw, cols and vals as the value of a condition', () => 
     let deep: unknown[] = ['x'], deepAll: unknown[] = [db.all];
     for (let i = 0; i < 20_000; i++) [deep, deepAll] = [[deep], [deepAll]];
     expect(show(dc.arrayContains(deep as any))).toEqual({ text: '(("col" @> $1))', values: [deep] });
-    expect(thrown(dc.arrayContainedIn(deepAll as any))).toBe('`db.all` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To match every row, give `db.all` as the whole filter of a shortcut: `select(table, db.all)`.');
+    expect(thrown(dc.arrayContainedIn(deepAll as any))).toBe('`db.all` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.');
   });
 
   describe('an array condition given an item one array parameter cannot hold', () => {

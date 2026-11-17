@@ -394,8 +394,8 @@ describe('db.all as a filter value', () => {
     const
       c = db.conditions,
       all = db.all as any,
-      inWhereable = 'throws: `db.all` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: leave the key out, or compare with a value. To match every row, give `db.all` as the whole filter of a shortcut: `select(table, db.all)`.',
-      inCondition = 'throws: `db.all` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To match every row, give `db.all` as the whole filter of a shortcut: `select(table, db.all)`.',
+      inWhereable = 'throws: `db.all` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: leave the key out, or compare with a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.',
+      inCondition = 'throws: `db.all` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.',
       builds = {
         key: [(v: string) => sql`WHERE ${{ [v]: all }}`, inWhereable],
         keyInAnd: [(v: string) => sql`WHERE ${c.and({ id: 1 }, { [v]: all })}`, inWhereable],

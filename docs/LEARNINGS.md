@@ -338,6 +338,10 @@ Candidates for a check, a rule or a skill line.
 - #647: a refusal decided at the call misses an array changed after it: walk caller data where the fragment compiles.
 - #647: overriding `compile` on one fragment (the `refused()` technique) moves a check from the call to compile time inside `conditions.ts`, with no `core.ts` change.
 - #647: a string mutant through `String.replace` changes only the first occurrence: when the line also exists elsewhere (`eqAny()` and `arrayParam`), anchor the pattern on its context.
+- #645: when a message changes, grep the old text too, not only its stable prefix: a test had frozen the old `TypeError` text ("Cannot convert a Symbol value to a string") for `db.all` in `updateValues`.
+- #645: `refusedSQL()` in `shortcuts.ts` makes a shortcut throw while compiling, so a new message keeps the error at `.run()`, not at the call.
+- #645: Vitest's `toThrow('…')` checks that the message contains the string, not the error's class: when a fix changes the class (`TypeError` to `Error`), assert `{ name, message }`.
+- #645: in zsh, `git show $REF:test/x.ts` applies the `:t` history modifier to `$REF`: quote it, `"$REF:path"` or `${REF}:path`.
 
 ## Minors kept
 
@@ -389,3 +393,5 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #621 (form): `src/db/conditions.ts` `callerValue(options, 'parent') || undefined`: `|| undefined` is an equivalent mutant (core reads `parentTable` by truthiness).
 - #639 (form): `.agents/skills/code-style/SKILL.md` § Further than Zapatos still lists "laterals typed by foreign keys" first on Zapatos's roadmap; after decision 007, say what pgcast gives instead (`parent<T.Column>`).
 - #647 (form): #638's `db.all` refusal in `isIn()` and a Whereable value is decided where `core.ts` compiles, but an array given to `isIn()` and changed after the call is read then too: check whether the same "changed after the call" gap exists there.
+- #645 (form): `src/db/shortcuts.ts` `allAsWriteFilter`: one clause for the reader who reached it by accident ("check the value that is missing") would complete the advice.
+- #645 (form): `website/sql-template.md` § all (EN and FR): the bullet repeats the message it quotes; keep only "`{}` and `` db.sql`TRUE` `` do:" before the quote.
