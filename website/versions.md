@@ -12,8 +12,10 @@ The module names are still `zapatos/db` and `zapatos/schema`, and the generated 
 The numbers follow [SemVer](https://semver.org/), read from the side of a project on 6.6.1:
 
 - A patch fixes: 6.6.2 closes the security holes that pgcast's characterisation of 6.6.1 found.
-- A minor adds: 6.7.0, on npm as [`@pgcast/pgcast`](https://www.npmjs.com/package/@pgcast/pgcast), brings the opt-ins below, with fixes and new features.
+- A minor adds: 6.7.0 brings the opt-ins below, with fixes and new features.
 - Only a major may change a result that working code can rely on, so a range such as `^6.6.2` never brings one of those.
+
+Each release, its security fixes included: the [changelog](/changelog); the latest: [`@pgcast/pgcast` on npm](https://www.npmjs.com/package/@pgcast/pgcast).
 
 Zapatos broke things in its majors too, each at once: 1.0 renamed the transaction types, 2.0 made the last argument of `upsert()` an options object, 6.0 put the schema in the names of tables and enums outside `public`. Each came with notes on what to rewrite.
 
