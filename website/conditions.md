@@ -589,7 +589,7 @@ So does any other value that is no string, which `pg` would send as its text or 
 interface TsvectorColumn
 ```
 
-The `T` of [`websearchToTsquery()`](#conditions.websearchToTsquery) unless given: a type that only a column typed `any` takes. It exists only in the type, with no value.
+The `T` of [`websearchToTsquery()`](#conditions.websearchToTsquery) unless given: a type that only a column typed `any` takes. It exists only in the type, with no value. A project built with `declaration: true` writes it in its `.d.ts` by this name, but not a spread of one, whose members name a symbol `zapatos/db` does not export: TS4023.
 
 ## Dates and times {#dates}
 
