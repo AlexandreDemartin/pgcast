@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { defaultHoverInfoProcessor, transformerTwoslash } from '@shikijs/vitepress-twoslash';
-import { defineConfig, type DefaultTheme, type HeadConfig, type LocaleConfig } from 'vitepress';
+import { defineConfig, type DefaultTheme, type HeadConfig, type LocaleConfig, type SiteConfig } from 'vitepress';
 import { checkLinks, keepLinkHashes, labelPermalinks } from './anchors.ts';
 import { calloutIcons } from './callouts.ts';
 import { codeGroupLogos } from './codeGroups.ts';
@@ -48,6 +48,19 @@ const
     document.documentElement.dataset.wordmark = '';
   }
 } catch {}`;
+
+/**
+ * The 404 page's script, before its first paint: GitHub Pages serves `install.html` at `/install`, and its 404 page at
+ * `/install/`, so a path that ends in `/` and names a page without it goes there, its query and hash kept. Any other
+ * path stays on the 404 page. A directory's page, `/fr/`, is served with its slash and never reaches it.
+ */
+function slashless({ pages, site }: SiteConfig) {
+  const paths = pages.filter(page => !/(^|\/)index\.md$/.test(page)).map(page => site.base + page.replace(/\.md$/, ''));
+  return `try {
+  var pages = ${JSON.stringify(paths)}, path = location.pathname.slice(0, -1);
+  if (location.pathname.slice(-1) === '/' && pages.indexOf(path) >= 0) location.replace(path + location.search + location.hash);
+} catch {}`;
+}
 
 /**
  * A language's part of the config (README.md § Languages): its words, and its nav and sidebar from the outline in that
@@ -103,7 +116,9 @@ export default defineConfig({
     describePage(pageData, context);  // meta.ts
     dateChangelog(pageData);
   },
-  transformHead: pageHead,
+  // the 404 page gets no metadata (meta.ts), but the script that drops a trailing slash
+  transformHead: context =>
+    context.pageData.isNotFound ? [['script', {}, slashless(context.siteConfig)]] : pageHead(context),
   srcExclude: ['README.md', 'templates/**'],  // for whoever writes the site, not pages of it
   buildEnd: async config => {
     await writeLlmsFiles(config);  // llms.txt and llms-full.txt, for assistants
