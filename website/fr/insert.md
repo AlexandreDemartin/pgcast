@@ -1,5 +1,5 @@
 ---
-english: 4695f76ce062
+english: 8d6d3f525d2c
 ---
 
 # Écritures
@@ -107,7 +107,7 @@ Chaque SQL remplace le `DO UPDATE SET …` de l’upsert simple, sur `ratings` (
 - `updateValues` est un seul jeu de valeurs pour toutes les lignes mises à jour. Ses clés sont toujours mises à jour, même quand `updateColumns` les omet, ou vaut `doNothing` (le SQL est alors `DO UPDATE SET`<!-- probe: db.upsert('ratings', { film_id: 1000, stars: 5 }, ['film_id', 'stars'], { updateColumns: db.doNothing, updateValues: { votes: 1 } }) -->, pas `DO NOTHING`) ; avec `undefinedMeansMissing`, une clé à `undefined` n’est pas mise à jour ([Une valeur `undefined`](#undefined-values)).
 - Dans `updateValues`, une valeur simple est un paramètre. Une valeur qui contient un fragment, `param()`, `raw()`, `cols()`, `vals()`, `parent()`, `Default` ou `self`, à n’importe quelle profondeur de ses tableaux et objets simples, est compilée comme dans un template `sql` ; un raccourci de lecture est écrit entre parenthèses, comme dans [`insert()`](/fr/insert#insert).
 - Pour y lire une colonne, nommez la table pour la ligne existante, `${'ratings'}.${'votes'}`, ou `EXCLUDED` pour la nouvelle, `` db.sql`EXCLUDED.${'votes'}` ``.
-- Là, `db.self`, ou un fragment ou une condition qui l’utilise (`` db.sql`${db.self} + 1` ``, [`conditions.add()`](/fr/conditions#conditions.add)), lève "The 'self' column alias has no meaning here"<!-- message -->, comme dans Zapatos 6.6.1 ; `db.parent()`, seul ou dans un fragment, lève "The 'parent' table alias has no meaning here"<!-- message -->.
+- Là, un fragment ou une condition qui utilise `db.self` (`` db.sql`${db.self} + 1` ``, [`conditions.add()`](/fr/conditions#conditions.add)) lève "The 'self' column alias has no meaning here"<!-- message -->, comme dans Zapatos 6.6.1 ; `db.self` ou `db.all` seul, ou dans un `vals([…])`, lève une erreur à la compilation ([`self`](/fr/sql-template#self), [`all`](/fr/sql-template#all)) ; `db.parent()`, seul ou dans un fragment, lève "The 'parent' table alias has no meaning here"<!-- message -->.
 
 ::: warning Sécurité
 Zapatos 6.6.1 écrivait une chaîne simple de `updateValues` comme un identifiant : `{ tagline: 'happy' }` mettait `"happy"` dans le `ROW(…)`, et une chaîne venue d’un utilisateur pouvait lire d’autres colonnes ou d’autres tables.
