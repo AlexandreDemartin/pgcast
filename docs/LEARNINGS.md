@@ -355,6 +355,8 @@ Candidates for a check, a rule or a skill line.
 - #648: comparing two generator runs needs the queries sorted with their sequence numbers removed, and the once-per-process bigint note filtered out.
 - #648: a mutant the whole-text match makes equivalent (`contype = 'c'`) is kept as the note's stated rule, and said so in the PR.
 - #648: compile every new import a placeholder writes under each `customTypesTransform` variant, with `skipLibCheck: false`: `'my_type'` gives the import the placeholder's own name (TS2440), which the build hides.
+- #651: a placeholder may share its namespace's name (`union_self`) and compile; only an import of the type itself clashes, so the rule matches the base type (`name` or `name[]`), not the names alone.
+- #651: a fix found while building one path (#648's unions) belongs in the shared writer (`sourceFilesForCustomTypes()`), which then drops the first special case.
 
 ## Minors kept
 
