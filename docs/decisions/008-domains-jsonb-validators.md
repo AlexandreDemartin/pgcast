@@ -2,7 +2,7 @@
 
 - **Status**: accepted (2026-11-17), by delegation from the owner: each choice below is decided under the philosophy, and carries its own status.
 - **Scope**: feature [#55](https://github.com/AlexandreDemartin/pgcast/issues/55), its planned PRs 2 to 5 ([#641](https://github.com/AlexandreDemartin/pgcast/issues/641) to [#644](https://github.com/AlexandreDemartin/pgcast/issues/644)), and R53 of `docs/CHARACTERISATION-REPORT.md`.
-- **In short**: one PR is built. With `domainsTypedAsUnions: true`, a domain over `text` whose `CHECK` lists its values is typed as their union, declared in `zapatos/schema` as an enum is, and the union wins over its placeholder, which a note then names as no longer read. Its `COMMENT ON DOMAIN` becomes the union's JSDoc; the other ignored comments stay ignored. Typed `jsonb` needs nothing new: Zapatos's domain and its placeholder already do it, and the corpus types 256 columns that way. The validators package is not built: nothing in the corpus validates against a table's row type.
+- **In short**: one PR is built. With `domainsTypedAsUnions: true`, a domain over `text` whose `CHECK` lists its values is typed as their union, declared in `zapatos/schema` as an enum is, and a new placeholder names that union, as a placeholder over an enum imports it; one already on disk stays the user's, and a note names it. Its `COMMENT ON DOMAIN` becomes the union's JSDoc; the other ignored comments stay ignored. Typed `jsonb` needs nothing new: Zapatos's domain and its placeholder already do it, and the corpus types 256 columns that way. The validators package is not built: nothing in the corpus validates against a table's row type.
 
 ## Context
 
@@ -53,15 +53,19 @@ Two projects of real usage (skill `consumer-usage`; no project named, examples i
 
 Say `films` had a `certificate` column, of `CREATE DOMAIN certificate AS text CHECK (VALUE IN ('U', 'PG', '12', '15', '18'))`, commented `'Who may see the film'`.
 
-| | U0. Nothing changes | U1. The union in `zapatos/schema`, over the placeholder | U2. The union only while the placeholder is as generated | U3. The union written into a new placeholder |
-|---|---|---|---|---|
-| **Generated** | `custom/PgCertificate.d.ts`: `export type PgCertificate = string;`; `films.Selectable`: `certificate: c.PgCertificate` | in the schema's namespace, beside its enums, with a JSDoc: `export type certificate = 'U' \| 'PG' \| '12' \| '15' \| '18';` and `every.certificate`, the tuple; `films.*`: `certificate: certificate` in all five; no placeholder | `certificate: db.DomainInContext<c.PgCertificate, string, certificate>` in each, and U1's declaration | `custom/PgCertificate.d.ts`: `export type PgCertificate = 'U' \| 'PG' \| …;` the first time only |
-| **Which wins over a placeholder edited by hand** | the placeholder | the database. A note, once per run, names each such domain whose placeholder file is still on disk, as no longer read | the placeholder, silently | the placeholder, which is never rewritten |
-| **Follows the database** | no | on every run | only once its placeholder is deleted: none of the corpus's 193 is as generated | no: the next migration leaves it stale |
-| **Compile cost** (measured below) | +0 | +75 Instantiations (+0.5 point) | +131 (+0.8 point) | +0 |
-| **Default output, canary** | — | unchanged without the key; `src/db` reads nothing new, so no canary increment | the same | a new placeholder's text changes without a key: a change to the default output |
+| | U0. Nothing changes | U1. The union in `zapatos/schema`, over the placeholder | U2. The union only while the placeholder is as generated | U3. The values written into a new placeholder | U4. The union in `zapatos/schema`, named by a new placeholder |
+|---|---|---|---|---|---|
+| **Generated** | `custom/PgCertificate.d.ts`: `export type PgCertificate = string;`; `films.Selectable`: `certificate: c.PgCertificate` | in the schema's namespace, beside its enums, with a JSDoc: `export type certificate = 'U' \| 'PG' \| '12' \| '15' \| '18';` and `every.certificate`, the tuple; `films.*`: `certificate: certificate` in all five; no placeholder | `certificate: db.DomainInContext<c.PgCertificate, string, certificate>` in each, and U1's declaration | `custom/PgCertificate.d.ts`: `export type PgCertificate = 'U' \| 'PG' \| …;` | U1's declaration; `custom/PgCertificate.d.ts`: `import type { certificate } from 'zapatos/schema';` and `export type PgCertificate = certificate;`; `films.*`: `certificate: c.PgCertificate`, as today |
+| **Which wins over a placeholder edited by hand** | the placeholder | the database. A note, once per run, names each such domain whose placeholder file is still on disk, as no longer read | the placeholder, silently | the placeholder | the placeholder. A note, once per run, names each one on disk that the run would write otherwise |
+| **Follows the database** | no | on every run | only while its placeholder is as generated: none of the corpus's 193 is | no: the next migration leaves the values stale | on every run, through a placeholder it writes; one already on disk once deleted, as all the corpus's 193 are |
+| **App code naming `c.PgCertificate`** (6 names of such domains in one project) | compiles | compiles while the file is on disk, with the file's type, not the column's; deleted, as the note asks, it fails | compiles | compiles | compiles, and is the column's type |
+| **A branded or narrower type written by hand** | in the placeholder | nowhere | in the placeholder | in the placeholder | in the placeholder: `certificate & { readonly checked: unique symbol }` |
+| **Compile cost** (measured below) | +0 | +75 Instantiations, +49 Types | +131, +67 | +75, +48 | +75, +49 |
+| **Default output, canary** | — | unchanged without the key; `src/db` reads nothing new, so no canary increment | the same | the same | the same |
 
 **What it saves**: `db.insert('films', { certificate: '12A', … })` fails to compile, where today Postgres refuses it at run time with 23514, `value for domain certificate violates check constraint "certificate_check"`. The SQL does not change: no shortcut reads the type.
+
+**U0 with an enum**: `CREATE TYPE certificate AS ENUM (…)` is typed as its union today, by Zapatos. Projects take a `CHECK` domain because an enum's value cannot be dropped: "Existing values cannot be removed from an enum type, nor can the sort ordering of such values be changed, short of dropping and re-creating the enum type" (Postgres docs § Enumerated Types), and `ALTER TYPE … DROP VALUE` fails with 0A000 (replayed on 17.3), where a domain's `CHECK` is dropped and added again in one transaction, which checks the rows. The dump has 4 enums on 12 columns, beside 188 such domains on 309; the other project, none. Moving to enums is a migration of every such column, and loses that.
 
 **Measured** (`npm run bench:types`, prototypes over `test/generated` never committed). Master is 15,824 Instantiations and 7,433 Types, +1.1 % and +3.3 % on the baseline. Each prototype types `events.kind`, which the bench writes, filters with `isIn()` and `isNotIn()` and reads, in `events` and its 3 partitions: 20 column slots.
 
@@ -70,9 +74,11 @@ Say `films` had a `certificate` column, of `CREATE DOMAIN certificate AS text CH
 | the column of a domain with its placeholder, `c.PgEvent_kind = string` (today, like for like) | 15,824 (+0) | 7,433 (+0) |
 | U1 | 15,899 (+75) | 7,482 (+49) |
 | U2 | 15,955 (+131) | 7,500 (+67) |
+| U3, the values in the placeholder, nothing in `zapatos/schema` | 15,899 (+75) | 7,481 (+48) |
+| U4, U1's declaration and a placeholder that names it | 15,899 (+75) | 7,482 (+49) |
 | U1, plus 188 unions of 926 values that nothing uses, the corpus's count | 15,899 (+75) | 9,710 (+2,277); 9,521 without the `every` tuples |
 
-So a query pays about 4 Instantiations per slot for U1, and the declarations about 2.4 Types per value, once, as enums of the same labels would. The corpus's API types already declare those unions, which its placeholders import.
+So a query pays about 4 Instantiations per slot for the union, wherever it is declared: U1, U3 and U4 cost the same, to one Type. The declarations cost about 2.4 Types per value, once, as enums of the same labels would; U4's placeholder adds nothing measurable. The corpus's API types already declare those unions, which its placeholders import.
 
 **Market standard**: no generator reads a `CHECK`.
 
@@ -80,15 +86,19 @@ So a query pays about 4 Instantiations per slot for U1, and the declarations abo
 - **kysely-codegen** generates types for domains by default (`--no-domains` skips them); its README says nothing of a `CHECK`.
 - **PostgREST**'s OpenAPI `enum` comes from `pg_enum` of the column's base type (`SchemaCache.hs`), never from a `CHECK`.
 
-**Choice: U1**, under `domainsTypedAsUnions: true` (`OptionalConfig`, read `?? false`; the name follows `enumArraysTypedAsText` and `intervalsTypedAsObjects`).
+**Choice: U4**, under `domainsTypedAsUnions: true` (`OptionalConfig`, read `?? false`; the name follows `enumArraysTypedAsText` and `intervalsTypedAsObjects`).
 
-- **The database is the source of truth** (principle 1): the union follows each migration, and a placeholder edited by hand no longer outranks it. That is what the key asks for; without it, nothing changes, the queries included.
-- **The drift a test or nothing guards today becomes a compile error**: an API type that has a value the database lacks fails where it is written into a row, and one the database added fails where a row is read into the API type.
-- **U2 keeps today's silent drift** for every placeholder already edited, all of the corpus's, and costs more. **U3** is stale by the next migration and changes the default output.
+- **The database decides what pgcast writes** (principle 1): the union is read again on every run, and the placeholder only names it, so it never goes stale, unlike U3's values. Without the key, nothing changes, the queries included.
+- **A placeholder stays the user's**, as Zapatos writes in its header ("Please edit this file as needed", "won't be overwritten") and as pgcast's keys already treat it: `domainsTypedByContext` and `enumArraysTypedAsText` keep an edited placeholder's type, and `intervalsTypedAsObjects` changes only what a new placeholder holds. U1 would be the first key to bypass a file whose header asks for edits.
+- **The column keeps `c.PgCertificate`**, the reading Zapatos documents for a domain: app code naming it keeps compiling, and means the column's type, where under U1 it means the file's until the file is deleted, then fails; a branded or narrower type stays possible, which U1 loses.
+- **What U1 does better**: it types the corpus's columns as soon as the key is on. Under U4 the corpus's 193 placeholders, all edited, keep typing them until deleted, one `rm` and a run; the note names each, and U1's note asked for the same deletion.
+- **The drift a test or nothing guards today becomes a compile error** once a placeholder names the union: an API type that has a value the database lacks fails where it is written into a row, and one the database added fails where a row is read into the API type.
+- **U2** follows only a placeholder left as generated, none in the corpus, for +131 Instantiations and a `db.DomainInContext` per column; U4's note names such a placeholder instead. **U3** is stale by the next migration, for the same cost as U4.
+- **The mechanism exists**: a placeholder over an enum imports it today (`customTypeImports`, `tables.ts`); U4 declares the union and points that path to it.
 - **Read, and only that** (each case replayed above): the domain's base type is `pg_catalog.text`; one of its `CHECK`s is stored as `CHECK ((VALUE = ANY (ARRAY['…'::text, …])))` or `CHECK ((VALUE = '…'::text))`, matched whole, every element a quoted string; it is `convalidated`. Another `CHECK` beside it only narrows the values, so the union stays true; two of this form keep the placeholder. `NULL`, `varchar`, `char`, `citext`, a domain over a domain, `NOT VALID` and an `OR` keep their placeholder. Values are unquoted (`''` to `'`) and kept in the `CHECK`'s order, a duplicate once.
 - **One query per run**, sorted by schema, name and constraint, and only with the key: off, the queries are master's.
-- **Where the union goes**: the domain's schema declares it, as `tsIdentifier(name, 'type')`, with its `every` tuple, in a `/* --- domains --- */` section after the enums, `/* (none) */` when empty; under `schemaJSDoc`, a JSDoc gives its name, "Domain in database" and its `COMMENT ON DOMAIN` (§ 2). A domain and an enum cannot share a name in one schema (`pg_type`). A column whose domain is of another schema gets the values inline, as `typeEnumsAcrossSchemas` writes an enum's. Its column JSDoc keeps "`certificate` (base type: `text`) in database".
-- **The placeholder**: none is written for such a domain. One on disk stays, as nothing is ever deleted, and a note names it: "Note: certificate is typed by the values of its CHECK (domainsTypedAsUnions), so its placeholder zapatos/custom/PgCertificate.d.ts is no longer read. Delete it, and import the union from zapatos/schema." `--check` ignores it: a placeholder is the user's. Code that imports `c.PgCertificate` compiles while the file is there.
+- **Where the union goes**: the domain's schema declares it, as `tsIdentifier(name, 'type')`, with its `every` tuple, in a `/* --- domains --- */` section after the enums, `/* (none) */` when empty; under `schemaJSDoc`, a JSDoc gives its name, "Domain in database" and its `COMMENT ON DOMAIN` (§ 2). A domain and an enum cannot share a name in one schema (`pg_type`). Columns keep `c.PgCertificate` in all five interfaces, and their JSDoc "`certificate` (base type: `text`) in database". A domain whose schema the run does not generate has no union declared, and keeps master's placeholder.
+- **The placeholder**: a missing one is written naming the union, `import type { certificate } from 'zapatos/schema';` and `export type PgCertificate = certificate;`, through the domain schema's namespace under `schemaPrefix`, as a placeholder over an enum imports it. One on disk is never rewritten, as in Zapatos; a note, once per run, names each one whose text is not what this run would write, compared exactly, the placeholders' header being fixed: "Note: certificate is typed by the values of its CHECK as certificate in zapatos/schema (domainsTypedAsUnions), but its placeholder zapatos/custom/PgCertificate.d.ts, written before, still types its columns. To type them by the database, delete it: the next run writes it naming the union." `--check` ignores it: a placeholder is the user's.
 - **Arrays of such a domain keep their placeholder** in PR 2. Typed, their `Selectable` would be `string`, the text `pg` returns, and the other four the union's array, as `enumArraysTypedAsText` types an enum's array, with its note. That is a follow-up if real use asks (44 columns in the corpus); `domainsTypedByContext` already types them by `text`.
 
 ## 2. The `COMMENT ON` the generator ignores (R53)
@@ -150,7 +160,7 @@ So a query pays about 4 Instantiations per slot for U1, and the declarations abo
 ## Risks
 
 - **`pg_get_constraintdef()`'s text is read with a regexp**, replayed here on Postgres 17.3 only. A form it does not match keeps the placeholder, never a wrong union; the fixture freezes each form of the table above, on the 14, 16 and 18 that CI runs.
-- **The union wins over a placeholder edited by hand**, which may have held a narrower or branded type. The key is the user's consent, and the note names each file.
+- **A placeholder on disk keeps typing its columns** until the user deletes it: for the corpus, whose 193 are all edited, the key alone changes no column. The note names each file. One kept on purpose, a branded type, is named on every run; a way to quiet it waits for real use: none of the corpus's 193 brands.
 - **The corpus is two projects**, one of them read in a dump. A project with `varchar` domains, or arrays of them, gets less from PR 2 until a follow-up.
 
 ## Sources
