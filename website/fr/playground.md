@@ -1,5 +1,5 @@
 ---
-english: 6e1ed77c9a97
+english: 80f352b0c7b1
 aside: false  # the panel takes the rail's width: code lines are long
 ---
 
@@ -19,6 +19,8 @@ Modifiez une requête sur le schéma de la doc et voyez, pendant la saisie, le S
 
 </CastPanel>
 </Playground>
+
+Le playground exécute le code le plus récent de pgcast : il peut déjà contenir ce qu’apportera la [prochaine version](/fr/changelog#unreleased).
 
 ## Ce qui tourne ici {#what-runs-here}
 

@@ -6,7 +6,7 @@ Maintained by [Alexandre Demartin](https://github.com/AlexandreDemartin)
 
 [![npm](https://img.shields.io/npm/v/@pgcast/pgcast.svg)](https://www.npmjs.com/package/@pgcast/pgcast)
 [![CI](https://github.com/AlexandreDemartin/pgcast/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/AlexandreDemartin/pgcast/actions/workflows/ci.yml)
-[![Licence: MIT](https://img.shields.io/badge/licence-MIT-blue.svg)](LICENCE)
+[![Licence: MIT](https://img.shields.io/badge/licence-MIT-blue.svg)](https://github.com/AlexandreDemartin/pgcast/blob/master/LICENCE)
 
 > **Status:** published on npm as [`@pgcast/pgcast`](https://www.npmjs.com/package/@pgcast/pgcast), each release and its security fixes in the [changelog](https://pgcast.dev/changelog). 6.6.2 closed the security holes of Zapatos 6.6.1; 6.7.0 added opt-ins for the surprises that code may rely on, and pgcast's own module names.
 
@@ -75,13 +75,14 @@ npx zapatos        # or: npx pgcast
 
 - `pg`, `@types/pg` and TypeScript 4.1 or later are peer dependencies, as in Zapatos; `zapatosconfig.json` is read as before.
 - pnpm, yarn and bun: `pnpm add zapatos@npm:@pgcast/pgcast`, `yarn add zapatos@npm:@pgcast/pgcast@^6`, `bun add zapatos@npm:@pgcast/pgcast@^6` (Yarn 2 and later need the range).
-- From 6.7.0, a new project installs pgcast under its own name, `npm install pgcast@npm:@pgcast/pgcast` (`pnpm add pgcast@npm:@pgcast/pgcast`, `yarn add pgcast@npm:@pgcast/pgcast@^6.7`, `bun add pgcast@npm:@pgcast/pgcast@^6.7`), sets the generator's [`moduleNames: 'pgcast'`](https://pgcast.dev/generator#generate.moduleNames) in `pgcastconfig.json`, and imports `pgcast/db` and `pgcast/schema` ([decision 002](docs/decisions/002-module-names.md)). 6.6.2 ignores the option and the file. Installed as plain `@pgcast/pgcast`, neither name resolves.
+- From 6.7.0, a new project installs pgcast under its own name, `npm install pgcast@npm:@pgcast/pgcast` (`pnpm add pgcast@npm:@pgcast/pgcast`, `yarn add pgcast@npm:@pgcast/pgcast@^6.7`, `bun add pgcast@npm:@pgcast/pgcast@^6.7`), sets the generator's [`moduleNames: 'pgcast'`](https://pgcast.dev/generator#generate.moduleNames) in `pgcastconfig.json`, and imports `pgcast/db` and `pgcast/schema` ([decision 002](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/002-module-names.md)). 6.6.2 ignores the option and the file. Installed as plain `@pgcast/pgcast`, neither name resolves.
+- From 6.8.0, `npx pgcast --check` compares the files the generator would write with yours and writes nothing, for CI: it exits with code 1 if one differs or is missing ([`--check`](https://pgcast.dev/generator#check)).
 
 ## What differs from Zapatos 6.6.1
 
-- **Security (6.6.2).** A string can no longer close its quotes as a table or column name, a `Whereable` key, a `lateral` key or alias, or the cast of `param()`; plain `updateValues` of `upsert()` are parameters; lock, `truncate()`, isolation and aggregate keywords are checked before any query. The few 6.6.1 calls that relied on this, and their migration, are listed under `Security` in the [changelog](CHANGELOG.md).
-- **Fixes.** A call that Postgres already refused throws a helpful error first, such as `update()` with no columns, and a result that contradicts the function's name, type or docs changes, such as `not()`, which now negates its whole condition: each is listed under `Fixed` in the [changelog](CHANGELOG.md).
-- **Opt-ins**, for surprises that code may rely on. Each is off by default; the old path emits a `DeprecationWarning` once per process, with a code to search for, except `selectExactlyOneChecksForSecondRow`'s, which stays opt-in for good, and the generator's, which note through `warningListener` ([decision 003](docs/decisions/003-fixes-and-deprecation.md)).
+- **Security (6.6.2).** A string can no longer close its quotes as a table or column name, a `Whereable` key, a `lateral` key or alias, or the cast of `param()`; plain `updateValues` of `upsert()` are parameters; lock, `truncate()`, isolation and aggregate keywords are checked before any query. The few 6.6.1 calls that relied on this, and their migration, are listed under `Security` in the [changelog](https://pgcast.dev/changelog#6.6.2-security).
+- **Fixes.** A call that Postgres already refused throws a helpful error first, such as `update()` with no columns, and a result that contradicts the function's name, type or docs changes, such as `not()`, which now negates its whole condition: each is listed under `Fixed` in the [changelog](https://pgcast.dev/changelog).
+- **Opt-ins**, for surprises that code may rely on. Each is off by default; the old path emits a `DeprecationWarning` once per process, with a code to search for, except `selectExactlyOneChecksForSecondRow`'s, which stays opt-in for good, and the generator's, which note through `warningListener` ([decision 003](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/003-fixes-and-deprecation.md)).
 
 | Option | Warning | Release |
 |---|---|---|
@@ -100,29 +101,29 @@ npx zapatos        # or: npx pgcast
 | `enumArraysTypedAsText` (generator): an array of an enum is a `string` in `Selectable`, the text `pg` returns from a `sql` query, `'{writer,editor}'` ([generator](https://pgcast.dev/generator#generate.enumArraysTypedAsText)), rather than an array; `false` keeps the array, for a parser set with `pg.types.setTypeParser` | a note through `warningListener`, the key left out | 6.7.0 |
 | `intervalsTypedAsObjects` (generator): an `interval` is typed in `Selectable` as `pg`'s default type parser returns it, a `db.PostgresInterval`, which a write takes back ([generator](https://pgcast.dev/generator#generate.intervalsTypedAsObjects)), rather than as its text; `false` keeps the text, for a type parser of your own | a note through `warningListener` | 6.7.0 |
 
-Everything else: [CHANGELOG.md](CHANGELOG.md); what the characterisation of 6.6.1 found: [docs/CHARACTERISATION-REPORT.md](docs/CHARACTERISATION-REPORT.md).
+Everything else: the [changelog](https://pgcast.dev/changelog); what the characterisation of 6.6.1 found: [its report](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/CHARACTERISATION-REPORT.md).
 
 ## Versions
 
 - pgcast continues Zapatos's version numbers: 6.6.2 follows Zapatos 6.6.1.
 - **6.x** is a drop-in replacement for Zapatos 6.6.1: the opt-ins stay off.
-- **7.0** switches the opt-in defaults of [decision 003](docs/decisions/003-fixes-and-deprecation.md), except `selectExactlyOneChecksForSecondRow`, which stays opt-in for good; the warnings announce it.
-- **8.0** removes the old paths, except `selectExactlyOneChecksForSecondRow`'s and an old value asked for by choice: `rejectOnQueryError: false` stays.
+- **7.0** switches the opt-in defaults of [decision 003](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/003-fixes-and-deprecation.md), except `selectExactlyOneChecksForSecondRow`, which stays opt-in for good; the warnings announce it.
+- **8.0** removes the old paths, except `selectExactlyOneChecksForSecondRow`'s and three old values asked for by choice, which stay: `rejectOnQueryError: false`, `enumArraysTypedAsText: false` and `intervalsTypedAsObjects: false` ([Versions](https://pgcast.dev/versions#_7-0-and-8-0)).
 - Releases follow the [milestones](https://github.com/AlexandreDemartin/pgcast/milestones).
 
 ## Documentation
 
-pgcast's documentation: <https://pgcast.dev/>, built from `master` ([Epic #85](https://github.com/AlexandreDemartin/pgcast/issues/85)). Its pages are still being written; until each is, the [Zapatos documentation](https://jawj.github.io/zapatos/) applies wherever pgcast does not differ (above, and the changelog).
+pgcast's documentation, in English and French: <https://pgcast.dev/>, built from `master`. A tutorial, how-to guides, explanations, and a reference with an entry for every export of `zapatos/db` and every option; a project on Zapatos starts at [Switch from Zapatos](https://pgcast.dev/switching).
 
 ## Roadmap
 
-The plan lives in GitHub issues: one epic per chapter, one sub-issue per step, each closed by its pull request. Steps come in order of how much of the last mile they cover, their value for their risk, and what they depend on.
+The plan lives in GitHub issues: one [epic](https://github.com/AlexandreDemartin/pgcast/issues?q=label%3A%22type%3A%20epic%22) per chapter, one sub-issue per step, each closed by its pull request. Steps come in order of how much of the last mile they cover, their value for their risk, and what they depend on.
 
-1. [Fix what the characterisation found](https://github.com/AlexandreDemartin/pgcast/issues/18): the surprises of 6.6.1, fixed outright, behind an opt-in, or documented.
+1. Done: [Fix what the characterisation found](https://github.com/AlexandreDemartin/pgcast/issues/18): the surprises of 6.6.1, fixed outright, behind an opt-in, or documented.
 2. [Type the schema and the conditions real code writes by hand](https://github.com/AlexandreDemartin/pgcast/issues/19): `--check`, conditions, foreign keys, domains, functions, CTEs.
 3. [Run on any driver, with savepoints, RLS context and cursors](https://github.com/AlexandreDemartin/pgcast/issues/20).
 4. [Infer the types of raw SQL](https://github.com/AlexandreDemartin/pgcast/issues/21).
-5. [Give pgcast its own documentation](https://github.com/AlexandreDemartin/pgcast/issues/85), alongside the others: a site in the spirit of George's docs, then docs that move with the code.
+5. Done: [Give pgcast its own documentation](https://github.com/AlexandreDemartin/pgcast/issues/85), alongside the others: a site in the spirit of Zapatos's docs, then docs that move with the code.
 
 ## Relationship with Zapatos
 
@@ -132,8 +133,8 @@ The plan lives in GitHub issues: one epic per chapter, one sub-issue per step, e
 
 ## Contributing and security
 
-- How to contribute: [CONTRIBUTING.md](CONTRIBUTING.md).
-- To report a vulnerability, never a public issue: [SECURITY.md](SECURITY.md).
+- How to contribute: [CONTRIBUTING.md](https://github.com/AlexandreDemartin/pgcast/blob/master/CONTRIBUTING.md).
+- To report a vulnerability, never a public issue: [Report a flaw](https://pgcast.dev/security#report-a-flaw).
 
 ## Development
 
@@ -142,8 +143,8 @@ npm ci
 npm run lint && npm run typecheck && npm test && npm run test:types && npm run build
 ```
 
-Contributor and agent guidelines: [AGENTS.md](AGENTS.md).
+Contributor and agent guidelines: [AGENTS.md](https://github.com/AlexandreDemartin/pgcast/blob/master/AGENTS.md).
 
 ## Licence
 
-MIT. Copyright © 2020 - 2025 George MacKerron (Zapatos); fork copyright © 2026 Alexandre Demartin. See [LICENCE](LICENCE).
+MIT. Copyright © 2020 - 2025 George MacKerron (Zapatos); fork copyright © 2026 Alexandre Demartin. See [LICENCE](https://github.com/AlexandreDemartin/pgcast/blob/master/LICENCE).
