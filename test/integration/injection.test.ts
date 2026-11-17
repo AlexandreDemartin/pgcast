@@ -130,7 +130,12 @@ describe('values are data', () => {
         }
         await t.client.query('ROLLBACK TO SAVEPOINT pgcast_search');
       }
-    expect(outcomes).toMatchInlineSnapshot(`
+    // `a.b` names schema `a`, which does not exist: 3F000 before Postgres 16; from 16, whose regconfig input reports
+    // its errors softly, the configuration that does not exist, 42704
+    const { 'dot config': dotConfig, ...others } = outcomes;
+    const { rows: [{ version }] } = await t.client.query("SELECT current_setting('server_version_num')::int AS version");
+    expect(dotConfig).toBe(version >= 160000 ? '42704' : '3F000');
+    expect(others).toMatchInlineSnapshot(`
       {
         "backslash config": "42704",
         "backslash query": [],
@@ -147,7 +152,6 @@ describe('values are data', () => {
         "dashes query": [],
         "dollar config": "42704",
         "dollar query": [],
-        "dot config": "42704",
         "dot query": [],
         "dquote config": "42704",
         "dquote query": [],
