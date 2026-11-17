@@ -44,7 +44,7 @@ About half of them can't be fixed without changing a result that is valid today 
 
 A fix can still stop a call that only worked through the bug. 6.6.2's escaping fixes are an example: a column name such as `id" AS "x` used to close its quotes and add an alias, and now names a column that doesn't exist. The changelog lists every such call, with what to write instead.
 
-One opt-in will stay off for good. [`selectExactlyOne()`](/select#selectExactlyOne) asks Postgres for one row only, so it means "at least one", and Zapatos's own docs nest it in a `lateral`, where looking for a second row would duplicate the parent row.
+Two opt-ins will stay off for good: `selectExactlyOneChecksForSecondRow`, below, and the generator's [`domainsTypedAsUnions`](#_7-0-and-8-0). [`selectExactlyOne()`](/select#selectExactlyOne) asks Postgres for one row only, so it means "at least one", and Zapatos's own docs nest it in a `lateral`, where looking for a second row would duplicate the parent row.
 
 Its option, [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow), looks for a second row only in a query run on its own, never in one nested in another, never warns, and never becomes the default.
 

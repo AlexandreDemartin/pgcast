@@ -108,8 +108,8 @@ Everything else: the [changelog](https://pgcast.dev/changelog); what the charact
 
 - pgcast continues Zapatos's version numbers: 6.6.2 follows Zapatos 6.6.1.
 - **6.x** is a drop-in replacement for Zapatos 6.6.1: the opt-ins stay off.
-- **7.0** switches the opt-in defaults of [decision 003](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/003-fixes-and-deprecation.md), except `selectExactlyOneChecksForSecondRow`, which stays opt-in for good; the warnings announce it.
-- **8.0** removes the old paths, except `selectExactlyOneChecksForSecondRow`'s and three old values asked for by choice, which stay: `rejectOnQueryError: false`, `enumArraysTypedAsText: false` and `intervalsTypedAsObjects: false` ([Versions](https://pgcast.dev/versions#_7-0-and-8-0)).
+- **7.0** switches the opt-in defaults of [decision 003](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/003-fixes-and-deprecation.md), except `selectExactlyOneChecksForSecondRow` and the generator's `domainsTypedAsUnions`, which stay opt-in for good; the warnings announce it.
+- **8.0** removes the old paths, except those of `selectExactlyOneChecksForSecondRow` and `domainsTypedAsUnions`, and three old values asked for by choice, which stay: `rejectOnQueryError: false`, `enumArraysTypedAsText: false` and `intervalsTypedAsObjects: false` ([Versions](https://pgcast.dev/versions#_7-0-and-8-0)).
 - Releases follow the [milestones](https://github.com/AlexandreDemartin/pgcast/milestones).
 
 ## Documentation

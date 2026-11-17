@@ -1,5 +1,5 @@
 ---
-english: d09bb886186b
+english: b98155b6b89b
 description: "Pourquoi pgcast prolonge les versions de Zapatos, quand une correction peut changer ce que reçoit votre code, et ce que demande un avertissement PGCAST_DEP00n."
 ---
 
@@ -45,7 +45,7 @@ Environ la moitié ne peuvent pas être corrigées sans changer un résultat val
 
 Une correction peut tout de même casser un appel qui ne marchait que grâce au bug. Les corrections d’échappement de 6.6.2 en sont un exemple : un nom de colonne comme `id" AS "x` fermait ses guillemets et ajoutait un alias, et désigne maintenant une colonne qui n’existe pas. Le changelog liste chacun de ces appels, avec ce qu’il faut écrire à la place.
 
-Un opt-in restera désactivé pour de bon. [`selectExactlyOne()`](/fr/select#selectExactlyOne) ne demande qu’une ligne à Postgres, donc il veut dire « au moins une », et la doc de Zapatos elle-même l’imbrique dans un `lateral`, où chercher une deuxième ligne dupliquerait la ligne parente.
+Deux opt-ins resteront désactivés pour de bon : `selectExactlyOneChecksForSecondRow`, ci-dessous, et [`domainsTypedAsUnions`](#_7-0-and-8-0), l’option du générateur. [`selectExactlyOne()`](/fr/select#selectExactlyOne) ne demande qu’une ligne à Postgres, donc il veut dire « au moins une », et la doc de Zapatos elle-même l’imbrique dans un `lateral`, où chercher une deuxième ligne dupliquerait la ligne parente.
 
 Son option, [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), ne cherche une deuxième ligne que dans une requête exécutée seule, jamais dans une requête imbriquée dans une autre, n’avertit jamais, et ne devient jamais la valeur par défaut.
 
