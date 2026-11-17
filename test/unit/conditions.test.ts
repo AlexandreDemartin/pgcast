@@ -1143,6 +1143,12 @@ describe('Default, self, raw, cols and vals as the value of a condition', () => 
     ]));
   });
 
+  it('characterization: db.all as an item of isIn() or isNotIn(), and as a Whereable value, is a parameter', () => {
+    // characterization: pg sends 'Symbol(all)', as 6.6.1 did; left as it is by #619, until #633
+    expect(Object.values(lists).map(f => show(f([db.all])).values)).toEqual([[db.all], [db.all]]);
+    expect(sql`${{ title: db.all }}`.compile().values).toEqual([db.all]);
+  });
+
   it('isIn and isNotIn given Default or self throw when compiled', () => {
     expect(Object.fromEntries(Object.entries(lists).flatMap(([name, f]) =>
       [[`${name}Default`, thrown(f(['Ada', Default]))], [`${name}Self`, thrown(f(['Ada', self]))]]))).toMatchInlineSnapshot(`
