@@ -263,6 +263,12 @@ Candidates for a check, a rule or a skill line.
 - #605: `typescript`'s `latest` is 7 now; Yarn and Bun rewrite a range a project already declares when you `add` it again (npm and pnpm keep it): replay a docs install command on a project that already lists the package, with each package manager.
 - #605: a test listing a folder's modules recurses, matching what `tsconfig` builds and `files` ships.
 - #605: a harness that reverts with `git checkout -- . && git clean -fdq src` wipes uncommitted work: commit before running it.
+- #607: `RegExp.test()` and `+=` convert with different hints (`string`, `default`): a check-then-write route is beaten by a steady `toString()`/`valueOf()` split, not only by a value that answers anew.
+- #607: a probe reads the row before `ROLLBACK TO SAVEPOINT`: a rollback inside the `catch` hid an `UPDATE` that had run.
+- #607: when a caller's object reaches an identifier slot, replay every shape `compileExpression` accepts (string, fragment, array, Whereable): an array compiles to valid identifiers, a Whereable to `(…)` that Postgres refuses after `AS`.
+- #607: moving a conversion from compile to build time moves every throw it can raise: probe a throwing `valueOf()` and `Symbol.toPrimitive` (hint `default`) with `.run(pool).catch(h)` outside any `async`.
+- #607: when an issue or PR states "Zapatos 6.6.1 refused it", replay each conversion path of the value separately (the method alone, `replace()` alone, both).
+- #607: a log of conversions alone does not show whether an error was raised when the query was built or when it was compiled: tag compile-time throws in the shared `it.each`.
 
 ## Minors kept
 
@@ -309,3 +315,4 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #600 (form): `website/switching.md` has no row for `order: null` / `lock: null` (Zapatos 6.6.1: a `TypeError` at the call; pgcast from 6.7.1: refused while compiling, `.run()` rejects).
 - #605 (form): `test/unit/runtimeImports.test.ts` reads emitted JS with a regex (a string `"require(pg)"` is a false red; `createRequire(__filename)(…)` passes); a syntax-tree walk would be exact.
 - #605 (form): `website/install.md` (FR) Requirements: two bullets in a row about TypeScript.
+
