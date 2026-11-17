@@ -1,5 +1,5 @@
 ---
-english: 30a3fcb9c86c
+english: 013d1ce48838
 ---
 
 # Versions
@@ -15,9 +15,11 @@ Les modules s’appellent toujours `zapatos/db` et `zapatos/schema`, et le sché
 
 Les numéros suivent [SemVer](https://semver.org/), lu du point de vue d’un projet en 6.6.1 :
 
-- Une version corrective corrige : 6.6.2 ferme les failles de sécurité que la caractérisation de 6.6.1 par pgcast a trouvées.
-- Une mineure ajoute : la 6.7.0 apporte les opt-ins ci-dessous, avec des corrections et de nouvelles fonctionnalités ; la 6.8.0, sur npm sous le nom [`@pgcast/pgcast`](https://www.npmjs.com/package/@pgcast/pgcast), apporte [`--check`](/fr/generator#check) et `check()`, ainsi qu’[une correction de sécurité](/fr/changelog#6.8.0-security).
+- Une version corrective corrige : la 6.6.2 ferme les failles de sécurité que la caractérisation de 6.6.1 par pgcast a trouvées.
+- Une mineure ajoute : la 6.7.0 apporte les opt-ins ci-dessous, avec des corrections et de nouvelles fonctionnalités.
 - Seule une majeure peut changer un résultat sur lequel du code qui fonctionne peut compter, donc une plage comme `^6.6.2` n’en apporte jamais.
+
+Chaque version, ses corrections de sécurité comprises : le [changelog](/fr/changelog) ; la dernière : [`@pgcast/pgcast` sur npm](https://www.npmjs.com/package/@pgcast/pgcast).
 
 Zapatos cassait aussi des choses dans ses majeures, chaque fois d’un coup : 1.0 a renommé les types de transaction, 2.0 a fait du dernier argument d’`upsert()` un objet d’options, 6.0 a mis le schéma dans les noms des tables et des enums hors de `public`. Chacune était accompagnée de notes sur ce qu’il fallait réécrire.
 

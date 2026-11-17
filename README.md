@@ -4,10 +4,11 @@
 
 Maintained by [Alexandre Demartin](https://github.com/AlexandreDemartin)
 
+[![npm](https://img.shields.io/npm/v/@pgcast/pgcast.svg)](https://www.npmjs.com/package/@pgcast/pgcast)
 [![CI](https://github.com/AlexandreDemartin/pgcast/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/AlexandreDemartin/pgcast/actions/workflows/ci.yml)
 [![Licence: MIT](https://img.shields.io/badge/licence-MIT-blue.svg)](LICENCE)
 
-> **Status:** 6.8.0 is on npm as [`@pgcast/pgcast`](https://www.npmjs.com/package/@pgcast/pgcast). 6.6.2 closed the security holes of Zapatos 6.6.1; 6.7.0 added opt-ins for the surprises that code may rely on, and pgcast's own module names; 6.8.0 adds [`npx pgcast --check`](https://pgcast.dev/generator#check) and `check()`, and [a security fix](https://pgcast.dev/changelog#6.8.0-security).
+> **Status:** published on npm as [`@pgcast/pgcast`](https://www.npmjs.com/package/@pgcast/pgcast), each release and its security fixes in the [changelog](https://pgcast.dev/changelog). 6.6.2 closed the security holes of Zapatos 6.6.1; 6.7.0 added opt-ins for the surprises that code may rely on, and pgcast's own module names.
 
 ## Why pgcast
 
