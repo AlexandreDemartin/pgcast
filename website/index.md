@@ -23,7 +23,7 @@ No ORM, no models, no hidden state: you stay in full control.
 
 </div>
 
-<InstallLine :commands="['npm install zapatos@npm:@pgcast/pgcast', 'pnpm add zapatos@npm:@pgcast/pgcast', 'yarn add zapatos@npm:@pgcast/pgcast@^6', 'bun add zapatos@npm:@pgcast/pgcast@^6']" />
+<InstallLine :commands="['npm install pgcast@npm:@pgcast/pgcast pg', 'pnpm add pgcast@npm:@pgcast/pgcast pg', 'yarn add pgcast@npm:@pgcast/pgcast@^6.7 pg', 'bun add pgcast@npm:@pgcast/pgcast@^6.7 pg']" />
 </section>
 
 <CastPanel example="home">
