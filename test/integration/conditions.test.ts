@@ -761,6 +761,39 @@ describe('exists() and isInSelect() (note 006 § Replays)', () => {
     expect(await names(exists('extra.articles', { author_id: parent('id') }, { parent: 'users', alias: 'a' }))).toEqual(['Ada', 'Bob']);
   });
 
+  it('a null alias or parent runs as without the key, as select() reads its alias (#618)', async () => {
+    const
+      outcome = (where: db.SQL) => names(where).catch((err: Error) => err.message),
+      answering = new Proxy({}, { get: (target, k) => k === 'parent' ? 'users' : k === 'alias' ? null : Reflect.get(target, k) });
+    expect({
+      alias: await outcome(exists('extra.articles', { author_id: parent('id') }, { parent: 'users', alias: null } as any)),
+      both: await outcome(exists('users', all, { parent: null, alias: null } as any)),
+      isInSelect: await outcome({ id: isInSelect('extra.articles', all, 'author_id', { parent: null, alias: null } as any) }),
+      getter: await outcome({ id: isInSelect('extra.articles', all, 'author_id', { get parent() { return null; }, get alias() { return null; } } as any) }),
+      proxy: await outcome(exists('extra.articles', { author_id: parent('id') }, answering)),
+      noMark: await rejectsBeforeAnyQuery(db.select('users', exists('extra.articles', { author_id: parent('id') }, { parent: null } as any))),
+    }).toEqual({
+      alias: ['Ada', 'Bob'], both: ['Ada', 'Bob', 'Cyd'], isInSelect: ['Ada', 'Bob'], getter: ['Ada', 'Bob'], proxy: ['Ada', 'Bob'],
+      noMark: "The 'parent' table alias has no meaning here",
+    });
+  });
+
+  it('an alias that is the table\'s name still writes its AS, so the where binds as the caller wrote it (#618)', async () => {
+    // unaliased, the subquery's "users" would answer to "public"."users" too, and hide the outer row
+    const managers = exists('users', sql`"manager_id" = "public"."users"."id"`, { alias: 'users' });
+    expect({
+      text: managers.compile().text,
+      managers: await names(managers),
+      aliasArray: await rejectsBeforeAnyQuery(db.select('users', exists('extra.articles', { author_id: parent('id') }, { parent: 'users', alias: ['users'] } as any))),
+      parentArray: await rejectsBeforeAnyQuery(db.select('users', exists('extra.articles', { author_id: parent('id') }, { parent: ['users'] } as any))),
+    }).toEqual({
+      text: 'EXISTS (SELECT 1 FROM "users" AS "users" WHERE "manager_id" = "public"."users"."id")',
+      managers: ['Ada'],
+      aliasArray: "`exists()` takes its `alias` option as a string, not an array: give the subquery's name, or leave the option out.",
+      parentArray: "`exists()` takes its `parent` option as a string, not an array: give the outer table's name as the outer query names it, or leave the option out.",
+    });
+  });
+
   it('names past 63 bytes: Postgres reads each as its first 63, cut at a character\'s end, so exists() refuses two that meet there', async () => {
     const r = (n: number) => 'r'.repeat(n);
     const byHand = async (outer: string, inner: string) => (await t.client.query(

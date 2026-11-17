@@ -1459,6 +1459,54 @@ describe('an exists() or isInSelect() option added to Object.prototype by someth
     }).toEqual({ exists: users, isInSelect: authors });
   });
 
+  // `alias` and `parent` are read with select()'s `||`, so a `null` or `''` one is none; an alias given, the table's own
+  // name included, writes its `AS`: `alias: null` compiled `AS ${null}`, which threw (#618)
+  it('a null alias or parent is none, as select() reads its alias: own, from a getter, or a Proxy\'s get', () => {
+    const
+      counts: Record<string, number> = {},
+      ownName = "`exists()` was given `parent: 'users'`, which names \"users\", the subquery's own name, so Postgres would read `parent()` as a column of the subquery's row: give the subquery another name with the `alias` option.";
+    expect({
+      alias: compiled(() => exists('users', db.all, { alias: null } as any)),
+      parent: compiled(() => exists('users', db.all, { parent: null } as any)),
+      both: compiled(() => exists('users', db.all, { parent: null, alias: null } as any)),
+      isInSelect: compiled(() => sql`${{ id: isInSelect('extra.articles', db.all, 'author_id', { parent: null, alias: null } as any) }}`),
+      correlated: compiled(() => exists('extra.articles', { author_id: parent('id') }, { parent: 'users', alias: null } as any)),
+      ownName: compiled(() => exists('users', { manager_id: parent('id') }, { parent: 'users', alias: null } as any)),
+      noMark: compiled(() => exists('extra.articles', { author_id: parent('id') }, { parent: null, alias: null } as any)),
+      getter: compiled(() => exists('users', db.all, { get parent() { return null; }, get alias() { return null; } } as any)),
+      proxy: compiled(() => exists('users', db.all, counting(counts, {}, { parent: null, alias: null }))),
+      empty: compiled(() => exists('users', db.all, { alias: '' })),
+      table: compiled(() => exists('users', db.all, { alias: 'users' })),
+      counts,
+    }).toEqual({
+      alias: users, parent: users, both: users, isInSelect: authors, correlated, ownName, noMark,
+      getter: users, proxy: users, empty: users, table: { text: 'EXISTS (SELECT 1 FROM "users" AS "users")', values: [] },
+      counts: { 'get:parent': 1, 'get:alias': 1 },
+    });
+  });
+
+  // the type takes a string: an array compiled as the name it holds, so `alias: ['users']` passed the own-name check
+  it('a truthy alias or parent that is no string is refused as the query compiles', () => {
+    const
+      alias = (fn: string, what: string) => `\`${fn}()\` takes its \`alias\` option as a string, not ${what}: give the subquery's name, or leave the option out.`,
+      parentOf = (what: string) => `\`exists()\` takes its \`parent\` option as a string, not ${what}: give the outer table's name as the outer query names it, or leave the option out.`;
+    expect({
+      aliasArray: compiled(() => exists('extra.articles', { author_id: parent('id') }, { parent: 'users', alias: ['users'] } as any)),
+      aliasFragment: compiled(() => exists('users', db.all, { alias: sql`"users"` } as any)),
+      aliasNumber: compiled(() => exists('users', db.all, { alias: 1 } as any)),
+      aliasTrue: compiled(() => exists('users', db.all, { alias: true } as any)),
+      isInSelect: compiled(() => sql`${{ id: isInSelect('extra.articles', db.all, 'author_id', { alias: ['a'] } as any) }}`),
+      parentArray: compiled(() => exists('extra.articles', { author_id: parent('id') }, { parent: ['users'] } as any)),
+      parentFragment: compiled(() => exists('extra.articles', { author_id: parent('id') }, { parent: sql`"users"` } as any)),
+      parentTrue: compiled(() => exists('extra.articles', db.all, { parent: true } as any)),
+    }).toEqual({
+      aliasArray: alias('exists', 'an array'), aliasFragment: alias('exists', 'a `sql` fragment'),
+      aliasNumber: alias('exists', 'a `number`'), aliasTrue: alias('exists', 'a `boolean`'),
+      isInSelect: alias('isInSelect', 'an array'),
+      parentArray: parentOf('an array'), parentFragment: parentOf('a `sql` fragment'), parentTrue: parentOf('a `boolean`'),
+    });
+  });
+
   it('options are read as before, as often and through the same traps, with no such key on Object.prototype', () => {
     const counts = { own: {} as Record<string, number>, answering: {} as Record<string, number>, empty: {} as Record<string, number> };
     expect({

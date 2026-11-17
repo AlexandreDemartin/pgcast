@@ -304,16 +304,24 @@ const lastIdentifier = (name: string) => {
 // inherit (`parent()` throws without `parent`), so that its SQL does not depend on where it sits; compile is
 // overridden as select() does, so a copy() of the condition, which shares its expressions, keeps it. When `parent`
 // names the subquery's own table, Postgres reads `parent()` as a column of the subquery's row, the wrong rows with
-// no error: refused as the query compiles
+// no error: refused as the query compiles. The options are read with select()'s `||`: `null` options, and a `null` or
+// `''` option, are none (#618). An alias given writes its `AS`, the table's name included: unaliased, the table also
+// answers to its schema-qualified name. A `parent` or `alias` that is no string, which would compile as the name an
+// array holds, past the own-name check, is refused
 const subquery = (fn: string, head: SQL, table: string, where: SQL | AllType, options?: { parent?: string; alias?: string }) => {
   const
-    parent = callerValue(options, 'parent'), alias = callerValue(options, 'alias'),  // `null` options are none, as in select()
-    own = alias ?? table;
-  if (typeof parent === 'string' && typeof own === 'string' && lastIdentifier(parent) === lastIdentifier(own)) {
-    return refused(`\`${fn}()\` was given \`parent: '${parent}'\`, which names "${lastIdentifier(own)}", the subquery's own name, so Postgres would read \`parent()\` as a column of the subquery's row: give the subquery another name with the \`alias\` option.`);
+    parent = callerValue(options, 'parent') || undefined, given = callerValue(options, 'alias') || undefined,
+    notString = (key: string, x: unknown, give: string) => typeof x === 'string' || x === undefined ? undefined :
+      refused(`\`${fn}()\` takes its \`${key}\` option as a string, not ${notAString(x)}: give ${give}, or leave the option out.`);
+  const refusal = notString('parent', parent, "the outer table's name as the outer query names it") ??
+    notString('alias', given, "the subquery's name");
+  if (refusal !== undefined) return refusal;
+  const alias: string = given ?? table;
+  if (parent !== undefined && lastIdentifier(parent) === lastIdentifier(alias)) {
+    return refused(`\`${fn}()\` was given \`parent: '${parent}'\`, which names "${lastIdentifier(alias)}", the subquery's own name, so Postgres would read \`parent()\` as a column of the subquery's row: give the subquery another name with the \`alias\` option.`);
   }
   const
-    query = sql`${head} FROM ${table}${alias === undefined ? [] : sql` AS ${alias}`}${where === all ? [] : sql` WHERE ${where}`}`,
+    query = sql`${head} FROM ${table}${given === undefined ? [] : sql` AS ${alias}`}${where === all ? [] : sql` WHERE ${where}`}`,
     nestedCompile = query.compile;
   query.compile = result => nestedCompile(result, undefined, undefined);
   if (parent !== undefined) query.parentTable = parent;
@@ -327,7 +335,7 @@ const subquery = (fn: string, head: SQL, table: string, where: SQL | AllType, op
  * @param table The subquery's table
  * @param where A Whereable or `sql` fragment on `table`, or `all` for no `WHERE`
  * @param options `parent`, the outer table as the outer query names it (its alias, if any); `alias`, `AS <alias>`
- * after `table`, needed when `parent` names it; `null` is none
+ * after `table`, needed when `parent` names it; `null` is none, and one that is no string throws as the query compiles
  */
 export const exists = <T extends Table>(table: T, where: WhereableForTable<T> | SQLFragment<any> | AllType, options?: { parent?: string; alias?: string }) =>
   sql<SQL, boolean, never>`EXISTS (${subquery('exists', raw('SELECT 1'), table, where, options)})`;
