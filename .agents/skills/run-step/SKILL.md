@@ -72,6 +72,8 @@ The plan: skill `plan-and-proofs`; the comments: skill `review-comments`; the ga
 An agent knows only what its brief says.
 
 - **`builder`**: the issue number, the decisions taken with the user; to resume at `high`, "plan checked" and any correction; to fix, the PR, its branch and the blocking items (`file:line`, expected fix).
+  - Started as the typed `builder`; only if the harness answers "Agent type 'builder' not found", a general-purpose agent told to read `.claude/agents/builder.md` first.
+  - Effort: the session's, and `effort: high` for a `high` step (plan and build) and for a round of fixes, the re-run of a failure the review found (Anthropic, "Optimizing for cost and intelligence").
 - **`branch-reviewer`**: the PR, the **Risk** and its blockers, the lens (`sql`, `types`, `codegen`, `compat`) if the issue has one; in `verify` mode, the blocking items and the range of the fix commits.
 - Never the expected conclusion: a reviewer fed the hypothesis confirms it.
 - **Agents in parallel**: each its worktree (§ Ritual rules) and its own scratch folder per round, named after its PR, where the reviewer's harness stays for the fix round.

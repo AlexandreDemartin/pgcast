@@ -9,12 +9,7 @@ Zapatos was committed straight to `master`: **one Zapatos commit is one pgcast P
 
 ## Size and scope
 
-Measured on the 212 Zapatos commits that touch `src/`:
-
-| | median | p75 | p90 |
-|---|---|---|---|
-| lines changed in `src/` | 14 | 42 | 84 |
-| files | 1 | — | 4 |
+Measured on the 212 Zapatos commits that touch `src/`: a median of 14 lines changed in `src/` (p75 42, p90 84), in 1 file (p90 4).
 
 - **One PR = one visible change**, described in one sentence. Never mix a fix, a feature and a refactor.
 - **`src/`: ~100 lines changed at most per PR** (Zapatos's p90). Beyond that, split into independent PRs, each useful on its own.
@@ -25,18 +20,16 @@ Measured on the 212 Zapatos commits that touch `src/`:
 
 ## Splitting like Zapatos
 
-Dependent steps make a stack of PRs (§ Stacking); otherwise, separate PRs. How Zapatos's history split them:
+Dependent steps make a stack of PRs (§ Stacking); otherwise, separate PRs. The moves of Zapatos's history (`git log upstream/master`):
 
-| Move | Example from `git log upstream/master` | In pgcast |
-|---|---|---|
-| A feature grows by steps: one case, then the others, then the generalisation | "Added returning option to insert shortcut" → … → "Returning (and now also extras) options for insert/upsert/update/deletes" | One PR per step, each useful on its own, the simplest case first. |
-| Runtime and codegen apart (22 mixed commits out of 154) | "Direct lateral subquery support" (`db`); "add support for schema generation for materialized views" (`gen`) | One `src/generate` PR, then one `src/db` PR that uses it. Never both, except a format change that ties them (canary). |
-| Docs follow the code (5 mixed commits out of 154) | "Updated docs for returning/extras and 2.0" | Each feature PR carries its docs page in `website/` (skill `code-style` § Docs voice), its `CHANGELOG.md` line and its JSDoc; a "Document …" PR only for a guide that spans a series. |
-| Fixing along the way | "Direct lateral subquery support" then "Fixed type inference for lateral direct subqueries" | A defect found after merge: a small "Fix …" PR, never mixed into what follows. |
-| Dependencies apart | "Updated dependencies" | One PR for dependency updates, with no code. |
-| Small, frequent versions (94 version commits) | "6.4.1", "6.4.2", one fix each | A version as soon as a useful change is merged. Publication remains a stop point. |
-| Big exploratory work on a branch | "Started work on multi schema support" → … → "Multi-schema updates" | First a decision note, then a series of small PRs. Never a giant PR. |
-| The reason in the title when it is not obvious | "… to count(*) rather than count(alias.*) for performance reasons" | A short reason at the end of the title, if it helps. |
+- **A feature grows by steps**: one case, then the others, then the generalisation; one PR per step, each useful on its own, the simplest case first.
+- **Runtime and codegen apart** (22 mixed commits out of 154): one `src/generate` PR, then one `src/db` PR that uses it. Never both, except a format change that ties them (canary).
+- **Docs follow the code** (5 mixed commits out of 154): each feature PR carries its docs page in `website/` (skill `code-style` § Docs voice), its `CHANGELOG.md` line and its JSDoc; a "Document …" PR only for a guide that spans a series.
+- **Fixing along the way**: a defect found after merge is a small "Fix …" PR, never mixed into what follows.
+- **Dependencies apart**: one PR for dependency updates, with no code.
+- **Small, frequent versions** (94 version commits, "6.4.1", "6.4.2", one fix each): a version as soon as a useful change is merged. Publication remains a stop point.
+- **Big exploratory work**: first a decision note, then a series of small PRs. Never a giant PR.
+- **The reason in the title** when it is not obvious, short, at the end: "… to count(*) rather than count(alias.*) for performance reasons".
 
 Example for step ③ (foreign keys), each of 1 to 4 with its docs page:
 
@@ -50,12 +43,9 @@ Example for step ③ (foreign keys), each of 1 to 4 with its docs page:
 
 Sources: GitHub docs "Stack code changes in pull requests", Thoughtworks Radar (*Caution*), Graphite, cubic (2026).
 
-| Stack | Do not stack |
-|---|---|
-| Steps of the **same feature** that depend on each other (PR 2 needs PR 1's code), when waiting for the bottom would block: #54, FK metadata → `related()` → `relatedMany()`. | **Independent** changes, like most fixes of Epic #18: separate PRs to `master`. |
-| Each layer is a PR the size of a Zapatos commit, readable on its own. | A PR that stands on its own; a stack as "an excuse to write one enormous change" (Thoughtworks). |
-| **3 layers at most**, each ≤ ~250 lines and 25 files (Graphite's warning threshold). | A layer that makes no sense without the one above: split it again. |
-
+- **Stack** the steps of the **same feature** that depend on each other (PR 2 needs PR 1's code), when waiting for the bottom would block: #54, FK metadata → `related()` → `relatedMany()`. **Do not stack** independent changes, like most fixes of Epic #18, nor a PR that stands on its own: separate PRs to `master`.
+- Each layer is a PR the size of a Zapatos commit, readable on its own; never a stack as "an excuse to write one enormous change" (Thoughtworks).
+- **3 layers at most**, each ≤ ~250 lines and 25 files (Graphite's warning threshold); a layer that makes no sense without the one above is split again.
 - **No rewriting** (`guard.mjs`): layer N starts from branch N-1 and its PR targets it (`--base <branch N-1>`); a fix from below goes up by a merge of `origin/<branch N-1>` (§ Commits) into each layer above, bottom to top (agent `chores`).
 - **No `gh stack sync` nor `gh stack push`**: they rebase and force each branch.
 - **Splitting a pushed PR**: new branches from `origin/master`, `git cherry-pick` of its commits, the old PR closed with a pointer.
