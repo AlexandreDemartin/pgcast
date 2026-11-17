@@ -682,6 +682,60 @@ describe('shortcut arguments', () => {
       .toBe(db.select('users', all).compile().text);
   });
 
+  describe('the aggregate is converted to a string once, as raw() converts it, so raw() writes the name checked', () => {
+    // RegExp.test() converts it toString() first, and each compile, as raw() writes it, valueOf() first: pgcast up to
+    // 6.8.0 checked the one and wrote the other (#602). A method answers its n-th call with answers[n], the last after
+    const attack = 'count(*) FROM users; DELETE FROM users; SELECT count';
+    const answering = (log: string[], method: string, ...answers: Array<string | (() => string)>) => {
+      let calls = 0;
+      return () => {
+        log.push(method);
+        const answer = answers[Math.min(calls++, answers.length - 1)]!;
+        return typeof answer === 'function' ? answer() : answer;
+      };
+    };
+    const twice = (name: string) => Array(2).fill(`SELECT ${name}(*) AS result FROM "users"`);
+    const refused = (name: string) => `throws: Aggregate must be a function name (e.g. sum, or my_schema.my_agg), not '${name}'`;
+
+    it.each<[string, (log: string[]) => unknown, string[] | string, string[]]>([
+      ['a toString() answering count, then other SQL', log => ({ toString: answering(log, 'toString', 'count', attack) }), twice('count'), ['toString']],
+      ['a toString() answering count to two calls, then other SQL', log => ({ toString: answering(log, 'toString', 'count', 'count', attack) }), twice('count'), ['toString']],
+      ['a toString() answering a;b, then count', log => ({ toString: answering(log, 'toString', 'a;b', 'count') }), refused('a;b'), ['toString']],
+      ['a toString() throwing from its second call', log => ({ toString: answering(log, 'toString', 'count', () => { throw new Error('second call'); }) }), twice('count'), ['toString']],
+      ['a valueOf() answering other SQL than toString()', log => ({ toString: answering(log, 'toString', 'count'), valueOf: answering(log, 'valueOf', attack) }), refused(attack), ['valueOf']],
+      ['a Symbol.toPrimitive answering count to the hint string, other SQL to default', log => ({ [Symbol.toPrimitive]: (hint: string) => { log.push(`toPrimitive(${hint})`); return hint === 'string' ? 'count' : attack; } }), refused(attack), ['toPrimitive(default)']],
+      ['a valueOf() answering count, a toString() a;b, as in 6.6.1', log => ({ toString: answering(log, 'toString', 'a;b'), valueOf: answering(log, 'valueOf', 'count') }), twice('count'), ['valueOf']],
+      ['a valueOf() answering sum, a toString() count, as before', log => ({ toString: answering(log, 'toString', 'count'), valueOf: answering(log, 'valueOf', 'sum') }), twice('sum'), ['valueOf']],
+      ['a toString() answering count each time', log => ({ toString: answering(log, 'toString', 'count') }), twice('count'), ['toString']],
+      ['a function whose toString() answers count, then other SQL', log => Object.assign(() => {}, { toString: answering(log, 'toString', 'count', attack) }), twice('count'), ['toString']],
+      ['a String object, as before', () => new String('count'), twice('count'), []],
+      ['an array, as before', () => ['count'], twice('count'), []],
+      ['a symbol, as before', () => Symbol('count'), 'throws: Cannot convert a Symbol value to a string', []],
+      // .run() rejected with these up to 6.8.0, raised by the compile; select() now throws them, as the query is built
+      ['a valueOf() throwing', log => ({ toString: answering(log, 'toString', 'count'), valueOf: answering(log, 'valueOf', () => { throw new Error('valueOf'); }) }), 'throws: valueOf', ['valueOf']],
+      ['a Symbol.toPrimitive throwing to the hint default', log => ({ [Symbol.toPrimitive]: (hint: string) => { log.push(`toPrimitive(${hint})`); if (hint === 'default') throw new Error('default hint'); return 'count'; } }), 'throws: default hint', ['toPrimitive(default)']],
+      ['a valueOf() answering a symbol', log => ({ toString: answering(log, 'toString', 'count'), valueOf: () => { log.push('valueOf'); return Symbol('count'); } }), 'throws: Cannot convert a Symbol value to a string', ['valueOf']],
+    ])('%s', (_, make, expected, conversions) => {
+      const log: string[] = [];
+      let result: string[] | string, q: db.SQLFragment<any, any> | undefined;
+      try {
+        q = db.select('users', all, {}, db.SelectResultMode.Numeric, make(log) as any);
+        result = [q.compile().text, q.compile().text];
+      } catch (e) {
+        result = `${q ? 'compile ' : ''}throws: ${(e as Error).message}`;  // `throws` alone: as the query is built
+      }
+      expect({ result, log }).toEqual({ result: expected, log: conversions });
+    });
+
+    it('outside Numeric mode, the aggregate is never converted, as before', () => {
+      const log: string[] = [];
+      const aggregate = { toString: answering(log, 'toString', 'a;b'), valueOf: answering(log, 'valueOf', 'a;b') };
+      for (const value of [aggregate, Symbol('count')])
+        expect(db.select('users', all, {}, db.SelectResultMode.Many, value as any).compile().text).toBe(db.select('users', all).compile().text);
+      expect(log).toEqual([]);
+    });
+  });
+
   it('an aggregate that is not a function name throws', () => {
     const numeric = (aggregate: any) => () => db.select('users', all, {}, db.SelectResultMode.Numeric, aggregate);
     for (const aggregate of ['', '1count', '$a', 'a.b.c.d', 'a.', '.a', 'a..b', 'a. .b', 'U&""', 'U& "a"', '&"a"', '""', '"a', 'a"', '"a"b"', '"a\0b"', 'count(*) FROM users; SELECT count', 'a b', 'a\nb', 'count\n;'])

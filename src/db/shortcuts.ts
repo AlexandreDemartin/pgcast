@@ -841,6 +841,9 @@ export const select: SelectSignatures = function (
   aggregate: string = 'count',
 ) {
 
+  // converted to a string once, as raw() converts it (valueOf() first, as in 6.6.1), so that raw() writes the name
+  // checked: test() would convert it toString() first, and each compile again, and an object may answer otherwise
+  if (mode === SelectResultMode.Numeric) aggregate = '' + aggregate;
   if (mode === SelectResultMode.Numeric && !functionName.test(aggregate)) throw new Error(`Aggregate must be a function name (e.g. sum, or my_schema.my_agg), not '${aggregate}'`);
   // `null` options, from JavaScript, are none, as Zapatos 6.6.1's selectOne(), selectExactlyOne() and writes read them
   options ??= {};
