@@ -217,6 +217,10 @@ Candidates for a check, a rule or a skill line.
 - #576: `insert`, `upsert`, `update`, `truncate`, `toDate` and `toString` re-exported with `declaration: true` give TS4023 since Zapatos 6.6.1 (unexported `XSignatures`, `ToDate`, `ToString`): skill `code-style`'s "An `XSignatures` interface for overloads" needs "exported, or written inline" for any function a consumer may re-export (#577).
 - #576: a declaration-emit test listing its re-exports by name covers only what existed: an object rest (`export const { ...all } = ns`) makes tsc write out every member.
 - #576: to probe a consumer on TS 4.1, use `@types/node@14` and `@types/pg@8.6` with `skipLibCheck`: current `@types/node` does not parse under 4.1.
+- #579: skill `code-style`'s "An `XSignatures` interface for overloads, then `export const x: XSignatures` (`insert`, `update`, `select`)" no longer holds: an exported interface (`select`, `deletes`) or signatures written in place on the `const` (`insert`, `eqAny`), never an unexported one, which a consumer's re-export cannot name (TS4023).
+- #579: inlining an outer interface brings up the names inside it (`UpsertOptions` surfaced once `UpsertSignatures` was gone): re-run the emit after each inline.
+- #579: diff the whole tsc output in an `@ts-expect-error` sweep, not only the `file(line,col)` lines: overload diagnostics carry their messages on continuation lines.
+- #579: an interface turned into an inline type changes every message and quick info that prints the value's own type: check a "same errors" claim with the function used as a value (`.map(fn)`, a property access, an assignment to a function type), not only the `@ts-expect-error` sweep.
 
 ## Minors kept
 
