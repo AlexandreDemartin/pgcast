@@ -1,3 +1,7 @@
+---
+description: "When no shortcut writes the query you need, write it in the sql template, and keep every value that comes from outside out of its text."
+---
+
 # Raw SQL
 
 When no shortcut writes the query you need (a join, a window function, an `INSERT … SELECT`), write it in the `sql` template, and keep every value that comes from outside out of its text. You already know the shortcuts from the [tutorial](/tutorial); every interpolation is in [SQL template](/sql-template).

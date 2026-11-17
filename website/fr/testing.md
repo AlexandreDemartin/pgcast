@@ -1,5 +1,6 @@
 ---
-english: aef7a3ccf090
+english: 68579145a8e5
+description: "Trois façons de tester vos requêtes pgcast : contre un vrai Postgres, test annulé ; sur la requête compilée ; sur un faux résultat typé d’après le schéma."
 ---
 
 # Tests

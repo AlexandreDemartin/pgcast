@@ -1,5 +1,6 @@
 ---
 english: 99ebeb13c283
+description: "Récupérez des lignes avec celles qui s’y rattachent, en une requête et un résultat typé : un film avec sa distribution, un membre de l’équipe avec son mentor."
 ---
 
 # Jointures

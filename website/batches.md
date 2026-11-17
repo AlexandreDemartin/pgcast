@@ -1,3 +1,7 @@
+---
+description: "Write many rows at once: split them under Postgres's parameter limit, skip the ones already there, add up counts, and get back only what you need."
+---
+
 # Batches
 
 Write many rows at once: split them under Postgres's parameter limit, skip the ones already there, add up counts, keep rows with different keys from erasing what's stored, and get back only what you need. It assumes you know [`insert()` and `upsert()`](/insert).

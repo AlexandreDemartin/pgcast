@@ -25,6 +25,7 @@ const en = {
   lang: 'en-GB',
   ogLocale: 'en_GB',
   description: 'The Postgres you know, with the full power of TypeScript: zero abstraction, queries in Postgres’s natural vocabulary, types read from your schema.',
+  socialCard: 'social-card.png',  // og:image (meta.ts), from public/social-card.svg
   socialAlt: 'pgcast. The Postgres you know, with the full power of TypeScript.',
   // config.ts
   search: 'Search',
@@ -175,7 +176,8 @@ const fr: Words = {
   code: 'FR',
   lang: 'fr-FR',
   ogLocale: 'fr_FR',
-  description: 'Le Postgres que vous connaissez, avec toute la puissance de TypeScript : zéro abstraction, des requêtes dans le vocabulaire naturel de Postgres, des types tirés de votre schéma.',
+  description: 'Le Postgres que vous connaissez, avec toute la puissance de TypeScript : zéro abstraction, des requêtes dans la langue de Postgres, des types tirés du schéma.',
+  socialCard: 'social-card-fr.png',  // from public/social-card-fr.svg, the same card in French
   socialAlt: 'pgcast. Le Postgres que vous connaissez, avec toute la puissance de TypeScript.',
   search: 'Rechercher',
   searchDocs: 'Rechercher dans la doc',

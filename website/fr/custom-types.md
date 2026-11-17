@@ -1,5 +1,6 @@
 ---
 english: 986dad0fd46c
+description: "Un type que le générateur ne sait pas traduire, comme point, et chaque domaine vous arrivent en placeholder dans zapatos/custom, que vous remplissez vous-même."
 ---
 
 # Types personnalisés

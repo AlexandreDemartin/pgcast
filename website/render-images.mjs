@@ -1,8 +1,8 @@
 // Copyright (C) 2026 Alexandre Demartin
 // The site's raster images, rendered from their SVG sources in public/ by headless Chrome (`CHROME`, or its macOS
-// path), which loads the social card's fonts: social-card.png, 1200×630; apple-touch-icon.png, 180×180; favicon.ico,
-// favicon.svg in its light theme at 16, 32 and 48px. Not part of the build: run `npm run docs:images` after changing a
-// source, and commit what it writes.
+// path), which loads the social cards' fonts: social-card.png and social-card-fr.png, its French text, 1200×630;
+// apple-touch-icon.png, 180×180; favicon.ico, favicon.svg in its light theme at 16, 32 and 48px. Not part of the build:
+// run `npm run docs:images` after changing a source, and commit what it writes.
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -55,7 +55,7 @@ function ico(images) {
 }
 
 try {
-  writeFileSync(join(pub, 'social-card.png'), render('social-card.svg', 1200, 630));
+  for (const card of ['social-card', 'social-card-fr']) writeFileSync(join(pub, `${card}.png`), render(`${card}.svg`, 1200, 630));
   writeFileSync(join(pub, 'apple-touch-icon.png'), render('apple-touch-icon.svg', 180, 180));
   writeFileSync(join(pub, 'favicon.ico'), ico([16, 32, 48].map(size => ({ size, data: render('favicon.svg', size, size) }))));
 } finally {
