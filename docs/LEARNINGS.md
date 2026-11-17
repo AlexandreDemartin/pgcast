@@ -402,6 +402,11 @@ Candidates for a check, a rule or a skill line.
 - #669: the note on placeholders on disk compares a file's full text, so any fix to a placeholder's text makes it fire for files an earlier version wrote: check that listener message each time.
 - #667: `check:floor` type-checks the fixture's schema, not the docs schema: to check a docs type form on TS 4.1.6, copy `website/zapatos` into a scratch consumer and link check:floor's cached TypeScript into it.
 - #667: a scripted edit of a French page cannot match « : » by its ASCII text (U+00A0 before the colon): anchor on the line's start instead.
+- #676: a weak guard (`& { [Symbol.iterator]?: never | undefined }`) on a shortcut's parameter refuses a generic `{ ...where, id }`: a forwarder test needs a spread plus a key, not only the bare forward.
+- #676: a guard in a public lookup (`WhereableForTable<T>`) changes its `keyof`: freeze `keyof` of each public type a fix touches.
+- #676: a mutant run while another part of the fix is in place can pass for the wrong reason: rerun each mutant against the final shape.
+- #676: a fixture with an accidental hole can hide that the library's own sources rely on it: "type-checks against a generated one" goes red when it closes.
+- #676: run a type fix's forwarder grid on TS 4.1.6, 5.9 and 7: a guard in `db.SQLExpression` broke a generic `` db.sql`${{ ...w, id }}` `` on 4.1.6 only.
 
 ## Minors kept
 
