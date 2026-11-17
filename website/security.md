@@ -91,6 +91,18 @@ The characterisation of Zapatos 6.6.1 found seven ways for a caller's string to 
 
 Zapatos 6.6.1 already checked `order.direction` and `order.nulls`. Each hole, what it let through and the test that pins it: the [characterisation report](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/CHARACTERISATION-REPORT.md#security); the SQL before and after: [the changelog](/changelog#6.6.2-security).
 
+### Fixes by release
+
+Each flaw below is Zapatos 6.6.1's too, and pgcast's up to the release that fixed it. Each line links its GitHub security advisory and its changelog section, which gives the calls and the SQL before and after:
+
+- **6.8.0**: a key that other code added to `Object.prototype` is no longer an option of the shortcuts, where it chose the columns a call returns or `upsert()` updates, or added an order or a row lock ([GHSA-rrjr-843p-m3hp](https://github.com/AlexandreDemartin/pgcast/security/advisories/GHSA-rrjr-843p-m3hp), [§ Security](/changelog#6.8.0-security)).
+- **6.7.2**: such a key no longer sets a column in `upsert()`, nor joins the columns of rows given as an array ([GHSA-fcm2-3rf6-q6jj](https://github.com/AlexandreDemartin/pgcast/security/advisories/GHSA-fcm2-3rf6-q6jj)); with `enableCustomJSONParsingForLargeNumbers()`, a long number stored in a row no longer blocks the Node process each time the row is read ([GHSA-xr8m-qp54-979j](https://github.com/AlexandreDemartin/pgcast/security/advisories/GHSA-xr8m-qp54-979j), [§ Security](/changelog#6.7.2-security)).
+- **6.7.1**: the `Segments` object of an `Intl.Segmenter`, as a filter, throws, where it matched every row of `deletes()` and `update()` ([GHSA-m7f9-7xxc-gp2q](https://github.com/AlexandreDemartin/pgcast/security/advisories/GHSA-m7f9-7xxc-gp2q), [§ Security](/changelog#6.7.1-security)).
+- **6.7.0**: a built-in object as a filter, such as a `Date`, throws, where it matched every row ([GHSA-hp6h-7j87-fpgj](https://github.com/AlexandreDemartin/pgcast/security/advisories/GHSA-hp6h-7j87-fpgj)); so do `isIn()` and `isNotIn()` given a list that is not an array, where `isNotIn()` of a `Set` matched every row ([GHSA-v79f-vppq-2pr4](https://github.com/AlexandreDemartin/pgcast/security/advisories/GHSA-v79f-vppq-2pr4)), and `parent()`, `raw()`, `cols()` or `vals()` as a value to write, where it was stored as JSON ([§ Security](/changelog#6.7.0-security)).
+- **6.6.2**: the seven holes of the table above ([GHSA-2vqm-6cmp-w46m](https://github.com/AlexandreDemartin/pgcast/security/advisories/GHSA-2vqm-6cmp-w46m), filed against Zapatos 6.6.1, [§ Security](/changelog#6.6.2-security)).
+
+A fix ships in a new release, never in an older one: only the latest minor is supported ([`SECURITY.md`](https://github.com/AlexandreDemartin/pgcast/blob/master/SECURITY.md#supported-versions)), so keep current by upgrading to the latest release, a drop-in. `npm audit` and Dependabot report an advisory once GitHub has reviewed it into its Advisory Database; until then, it is in this list and on the repository's [advisories](https://github.com/AlexandreDemartin/pgcast/security/advisories).
+
 ## What pgcast can't guard against
 
 pgcast keeps a caller's input from becoming code; it can't tell whether the SQL does what you meant. In the three cases below the SQL is valid, and does the wrong thing.

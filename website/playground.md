@@ -19,6 +19,8 @@ Edit a query on the docs schema and watch, as you type, the SQL that pgcast writ
 </CastPanel>
 </Playground>
 
+The playground runs pgcast's latest code, so it may already hold what the [next release](/changelog#unreleased) brings.
+
 ## What runs here
 
 - **The types**: TypeScript 5.9.3, the compiler of these docs, in Monaco, the editor of VS Code. Hover a name to see its type; an error is underlined as you type.
