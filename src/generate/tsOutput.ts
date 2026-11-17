@@ -63,15 +63,23 @@ const zapatosSchemaShim = `\n// pgcast/db's declarations import 'zapatos/schema'
 
 const sourceFilesForCustomTypes = (customTypes: CustomTypes, names: string, schemaImports: Record<string, string | null>) =>
   Object.fromEntries(Object.entries(customTypes)
-    .map(([name, baseType]) => [
-      name,
-      customTypeHeader + declareModule(`${names}/custom`,
-        // 6.6.1 imported db for db.JSONValue alone: db.Int8String and the others failed to compile
-        (baseType.startsWith('db.') ? `import type * as db from '${names}/db';\n` : ``) +
-        (schemaImports[name] ? `import type { ${schemaImports[name]} } from '${names}/schema';\n` : ``) +
-        `export type ${name} = ${baseType};  // replace with your custom type or interface as desired`
-      )
-    ]));
+    .map(([name, baseType]) => {
+      const
+        imported = schemaImports[name],
+        // a placeholder of the enum's or the union's own name (customTypesTransform 'my_type') cannot import it by that
+        // name: TS2440; its namespace's name, it can
+        sameName = imported === name && (baseType === name || baseType === `${name}[]`),
+        type = sameName ? `import('${names}/schema').${baseType}` : baseType;
+      return [
+        name,
+        customTypeHeader + declareModule(`${names}/custom`,
+          // 6.6.1 imported db for db.JSONValue alone: db.Int8String and the others failed to compile
+          (baseType.startsWith('db.') ? `import type * as db from '${names}/db';\n` : ``) +
+          (imported && !sameName ? `import type { ${imported} } from '${names}/schema';\n` : ``) +
+          `export type ${name} = ${type};  // replace with your custom type or interface as desired`
+        )
+      ];
+    }));
 
 /**
  * Warn about each custom type name that stands for more than one Postgres type: they share one
@@ -442,11 +450,9 @@ const tsForQueries = async (config: CompleteConfig, queryFn: (q: pg.QueryConfig)
       if (placeholder === undefined || Object.keys(customTypeOrigins[placeholder]).length > 1) return [];
       const
         type = tsIdentifier(name, 'type'), namespace = tsIdentifier(schema, 'namespace'),
-        union = schema === config.unprefixedSchema ? type : `${namespace}.${type}`,
-        // a placeholder of the union's own name (customTypesTransform 'my_type') cannot import it by that name: TS2440
-        sameName = placeholder === type && schema === config.unprefixedSchema;
-      customTypeImports[placeholder] = sameName ? '' : schema === config.unprefixedSchema ? type : namespace;
-      customTypes[placeholder] = sameName ? `import('${names}/schema').${type}` : union;
+        union = schema === config.unprefixedSchema ? type : `${namespace}.${type}`;
+      customTypeImports[placeholder] = schema === config.unprefixedSchema ? type : namespace;
+      customTypes[placeholder] = union;
       return [[placeholder, `${schema}.${name}`, union] as const];
     }),
     hasCustomTypes = Object.keys(customTypes).length > 0,
