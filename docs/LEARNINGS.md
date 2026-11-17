@@ -249,6 +249,15 @@ Candidates for a check, a rule or a skill line.
 - #603: `skipLibCheck` does not skip parsing: a package whose TS floor is below 4.5 parses every shipped `.d.ts` with its oldest TypeScript (`ts.createSourceFile(...).parseDiagnostics`); 6.7.0–6.8.0 shipped a `zapatos/generate` TS 4.1–4.4 could not read.
 - #603: a lint rule over the source (`no-restricted-syntax` on inline `type` specifiers) catches a `.d.ts` syntax regression before any emit, in files no export reaches yet; it complements #604's parse check.
 - #603: `codegen.test.ts`'s 5 s timeout trips under machine load: watch it in CI.
+- #600: the guard hook blocks the Write tool on any file named `db.mjs`, scratch included: name probe scripts otherwise.
+- #601: a message mutant needs a row refused on its first read for each key: a row whose first read is valid never reaches the message.
+- #601: a two-faced value reaching `raw()` was replayed with a run, not only compiled text: a balanced-parenthesis payload ran a second statement through the simple protocol when the query had no parameter.
+- #601: "`raw()` gets the value checked" means converting it to a string once, not only reading it once: `RegExp.test`, a template literal and `text +=` each call `toString()`; an `includes` check passes only plain strings.
+- #601: a fix moving a repeated read into a `const` rewrites the falsy tests: the mutant `x != null` shows whether a set falsy value (`''`, `0`, `null`) is covered.
+- #601: to replay a trap-count claim about keys on `Object.prototype`, put each of the item's keys there, own ones included, equal to the prototype's value.
+- #601: a count claim worded "once fewer" hides that the drop follows the read count: replay the key set and the key absent.
+- #601: a loop over several attack rows in one integration test stops at the first failing row: show each row red with a copy of the test keeping only that row.
+- #601: a two-faced getter test is valid for as many reads as the slowest runtime makes before `raw()` (4 for `nulls`/`wait` on master), or the old check refuses it and the test stays green on the code it should catch.
 
 ## Minors kept
 
@@ -292,4 +301,5 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #575 (form): `website/conditions.md` § `jsonbPathExists()`: no line on `jsonb_path_exists_tz` for a path comparing datetimes across time zones (0A000).
 - #598 (form): `src/db/conditions.ts` `callerValue(options, 'parent')` makes `parent` and `alias` `any` (a misspelt key type-checks), as #558's kept minor.
 - #596 (form): `src/db/conditions.ts` JSDoc of `jsonbContains()` and `website/conditions.md` (FR) list `Default`, `self`, `raw()`, `cols()`, `vals()` but not `all`, which now gets the wrapper message.
+- #600 (form): `website/switching.md` has no row for `order: null` / `lock: null` (Zapatos 6.6.1: a `TypeError` at the call; pgcast from 6.7.1: refused while compiling, `.run()` rejects).
 
