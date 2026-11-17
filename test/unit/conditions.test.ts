@@ -1236,7 +1236,7 @@ describe('Default, self, raw, cols and vals as the value of a condition', () => 
       cleared.pop();
       expect(conditions.map(c => thrown(c))).toEqual([
         expected('arrayContains').Default,
-        '`db.all` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To match every row, give `db.all` as the whole filter of a shortcut: `select(table, db.all)`.',
+        '`db.all` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.',
         'compiled',
       ]);
       expect(show(conditions[2])).toEqual({ text: '(("col" <@ $1))', values: [['x']] });
@@ -1247,7 +1247,7 @@ describe('Default, self, raw, cols and vals as the value of a condition', () => 
         thrown(dc.arrayContains([db.all, Default] as any)), thrown(dc.arrayContains([[db.all], Default] as any)),
         thrown(dc.arrayContains([Default, db.all] as any)),
       ]).toEqual([
-        '`db.all` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To match every row, give `db.all` as the whole filter of a shortcut: `select(table, db.all)`.',
+        '`db.all` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.',
         expected('arrayContains').Default, expected('arrayContains').Default,
       ]);
     });
