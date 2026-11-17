@@ -1143,10 +1143,38 @@ describe('Default, self, raw, cols and vals as the value of a condition', () => 
     ]));
   });
 
-  it('characterization: db.all as an item of isIn() or isNotIn(), and as a Whereable value, is a parameter', () => {
-    // characterization: pg sends 'Symbol(all)', as 6.6.1 did; left as it is by #619, until #633
-    expect(Object.values(lists).map(f => show(f([db.all])).values)).toEqual([[db.all], [db.all]]);
-    expect(sql`${{ title: db.all }}`.compile().values).toEqual([db.all]);
+  it('isIn and isNotIn given db.all throw when compiled', () => {
+    // 6.6.1 sent 'Symbol(all)': no row on a text column, every row with isNotIn(), 22P02 on the others (#633);
+    // the message is the Whereable's, as for self, since the list compiles as vals([…]) within a filter
+    expect(new Set(Object.values(lists).flatMap(f => [thrown(f([db.all])), thrown(f(['Ada', db.all]))]))).toEqual(new Set([
+      '`db.all` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: leave the key out, or compare with a value. To match every row, give `db.all` as the whole filter of a shortcut: `select(table, db.all)`.',
+    ]));
+  });
+
+  it('an array condition given an array holding db.all, at any depth, throws when compiled, not when called', () => {
+    // 6.6.1 sent it as '{"Symbol(all)"}': no row, the empty arrays with arrayContainedIn(), 22P02 on an int4[] (#633);
+    // the typed form on an int4[] column nests, arrayContains<number[]>([[1]])
+    const arrays = { arrayContains: dc.arrayContains, arrayContainedIn: dc.arrayContainedIn, arrayOverlaps: dc.arrayOverlaps };
+    expect(new Set(Object.values(arrays).flatMap(f => [[db.all], ['x', db.all], [['x'], [db.all]], [[[db.all]]]].map(a => thrown(f(a as any))))))
+      .toEqual(new Set([
+        '`db.all` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To match every row, give `db.all` as the whole filter of a shortcut: `select(table, db.all)`.',
+      ]));
+  });
+
+  it('an array condition given a cyclic array is built, and refuses db.all in it as it compiles', () => {
+    // the walk for db.all skips an array it has seen, so the call never overflows the stack; without db.all, the
+    // array is a parameter, as on master, which pg cannot send (RangeError); with it, compiling throws (#633)
+    const cyclic: unknown[] = ['x'], cyclicAll: unknown[] = ['x', [db.all]];
+    cyclic.push(cyclic);
+    cyclicAll.push(cyclicAll);
+    (cyclicAll[1] as unknown[]).push(cyclicAll);
+    expect(show(dc.arrayContains(cyclic as any))).toEqual({ text: '(("col" @> $1))', values: [cyclic] });
+    expect(thrown(dc.arrayOverlaps(cyclicAll as any))).toBe('`db.all` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To match every row, give `db.all` as the whole filter of a shortcut: `select(table, db.all)`.');
+  });
+
+  it('characterization: an array condition given an array holding Default or self sends it as a parameter', () => {
+    // characterization: pg sends '{"Symbol(DEFAULT)"}'; left as it is by #633, until #636
+    expect([dc.arrayContains([Default] as any), dc.arrayOverlaps([self] as any)].map(f => show(f).values)).toEqual([[[Default]], [[self]]]);
   });
 
   it('isIn and isNotIn given Default or self throw when compiled', () => {

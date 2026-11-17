@@ -387,6 +387,31 @@ describe('raw, cols and vals as a filter value', () => {
   });
 });
 
+describe('db.all as a filter value', () => {
+  it('beside a hostile key or hostile items, as a Whereable value, in isIn, isNotIn or an array condition, throws, and no text is returned', () => {
+    // 6.6.1 sent 'Symbol(all)' as a parameter; the refusal comes before any text is returned, whatever the key
+    // or the other items hold (#633)
+    const
+      c = db.conditions,
+      all = db.all as any,
+      inWhereable = 'throws: `db.all` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: leave the key out, or compare with a value. To match every row, give `db.all` as the whole filter of a shortcut: `select(table, db.all)`.',
+      inCondition = 'throws: `db.all` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To match every row, give `db.all` as the whole filter of a shortcut: `select(table, db.all)`.',
+      builds = {
+        key: [(v: string) => sql`WHERE ${{ [v]: all }}`, inWhereable],
+        keyInAnd: [(v: string) => sql`WHERE ${c.and({ id: 1 }, { [v]: all })}`, inWhereable],
+        keyInLateral: [(v: string) => db.select('users', db.all, { lateral: { n: db.count('accounts', { [v]: all } as any) } }), inWhereable],
+        isInKey: [(v: string) => sql`WHERE ${{ [v]: c.isIn([all]) }}`, inWhereable],
+        isInItems: [(v: string) => sql`WHERE ${{ display_name: c.isIn([v, all]) }}`, inWhereable],
+        deletesIsNotIn: [(v: string) => db.deletes('users', { [v]: c.isNotIn([v, all]) } as any), inWhereable],
+        updateWhere: [(v: string) => db.update('users', { display_name: v }, { [v]: all } as any), inWhereable],
+        arrayContains: [(v: string) => sql`WHERE ${{ [v]: c.arrayContains([v, all]) }}`, inCondition],
+        arrayOverlapsNested: [(v: string) => sql`WHERE ${{ [v]: c.arrayOverlaps([[v], [all]]) }}`, inCondition],
+      } as const;
+    expect(Object.fromEntries(Object.entries(builds).map(([name, [build]]) => [name, new Set(Object.values(matrix(build)))])))
+      .toEqual(Object.fromEntries(Object.entries(builds).map(([name, [, message]]) => [name, new Set([visible(message)])])));
+  });
+});
+
 describe('raw, cols and vals as a write value', () => {
   it('raw(input) as an insert(), upsert() or update() value, or in vals({…}), throws, and is never written into the text', () => {
     // 6.6.1 sent it as JSON, so raw(input) there was a parameter by accident; compiling it as SQL would make

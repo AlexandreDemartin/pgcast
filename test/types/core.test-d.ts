@@ -552,6 +552,26 @@ describe('type surprises', () => {
     db.select('accounts', { scores: c.arrayContains(db.all) });
   });
 
+  test('all as a Whereable value, in isIn, or in an array condition\'s array, is refused', () => {
+    // the runtime throws on each while compiling (#633); 6.6.1 sent it as a string, 'Symbol(all)'
+    // @ts-expect-error all is no value of a text column
+    db.select('users', { display_name: db.all });
+    // @ts-expect-error nor of an int column, in the where of update()
+    db.update('users', { mood: 'ok' }, { id: db.all });
+    // @ts-expect-error nor an item of isIn
+    db.select('users', { display_name: c.isIn([db.all]) });
+    // @ts-expect-error nor of isNotIn, in deletes()
+    db.deletes('users', { display_name: c.isNotIn(['Ada', db.all]) });
+    // @ts-expect-error nor an item of arrayContains
+    db.select('accounts', { scores: c.arrayContains([db.all]) });
+    // @ts-expect-error nor of arrayContainedIn
+    db.select('accounts', { scores: c.arrayContainedIn([db.all]) });
+    // @ts-expect-error nor of arrayOverlaps
+    db.select('accounts', { scores: c.arrayOverlaps([db.all]) });
+    // @ts-expect-error nor nested, in the typed form
+    db.select('accounts', { scores: c.arrayContains<number[]>([[db.all]]) });
+  });
+
   test('updateValues takes a plain value of the column, sent as a parameter', () => {
     // (test/integration/shortcuts.test.ts, "updateValues: a plain value is stored as it is")
     db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { display_name: 'x', mood: 'happy', manager_id: null } });

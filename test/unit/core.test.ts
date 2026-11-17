@@ -1072,6 +1072,64 @@ describe('Whereable', () => {
   });
 });
 
+describe('db.all', () => {
+  const allInWhereable = '`db.all` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: leave the key out, or compare with a value. To match every row, give `db.all` as the whole filter of a shortcut: `select(table, db.all)`.';
+
+  it('as a Whereable value, in isIn() or isNotIn(), or in vals([…]) within a filter, throws as the query compiles', () => {
+    // 6.6.1 sent 'Symbol(all)': no row on a text column, every row with isNotIn(), 22P02 on the others (#633)
+    const builds = {
+      value: () => one({ display_name: db.all }),
+      beside: () => one({ id: 1, display_name: db.all }),
+      and: () => one(db.conditions.and({ id: 1 }, { display_name: db.all })),
+      not: () => one(db.conditions.not({ display_name: db.all })),
+      lateral: () => db.select('users', db.all, { lateral: { n: db.count('accounts', { owner_id: db.all }) } }).compile(),
+      isIn: () => one({ display_name: db.conditions.isIn([db.all]) }),
+      isNotIn: () => one({ display_name: db.conditions.isNotIn(['Ada', db.all]) }),
+      deletes: () => db.deletes('users', { display_name: db.conditions.isNotIn([db.all]) }).compile(),
+      valsInFragment: () => one(vals({ role: sql`${vals([db.all])}` })),
+      upsertObject: () => db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { updateValues: { settings: { theme: db.all } as any } }).compile(),
+    };
+    expect(Object.fromEntries(Object.entries(builds).map(([name, f]) => [name, thrown(f)])))
+      .toEqual(Object.fromEntries(Object.keys(builds).map(name => [name, allInWhereable])));
+  });
+
+  it('characterization: outside a filter, vals([all]), vals({ a: all }), an insert() value and param(all) are parameters', () => {
+    // characterization: pg sends 'Symbol(all)', as for self there; left as they are by #633
+    expect({
+      vals: one(vals([db.all])).values, valsObject: one(vals({ a: db.all })).values, param: one(param(db.all)).values,
+      insert: db.insert('users', { email: 'a@b', display_name: db.all as any }).compile().values,
+    }).toEqual({ vals: [db.all], valsObject: [db.all], param: [db.all], insert: [db.all, 'a@b'] });
+  });
+
+  it('as the whole filter of a shortcut, or of exists() and isInSelect(), still means every row: no WHERE', () => {
+    // each compiles as on master before #633, which refuses db.all only as a value
+    const c = db.conditions;
+    expect({
+      select: db.select('users', db.all, { columns: ['id'] }).compile().text,
+      selectDefault: db.select('users', undefined as any, { columns: ['id'] }).compile().text,
+      selectOne: db.selectOne('users', db.all, { columns: ['id'] }).compile().text,
+      count: db.count('users', db.all).compile().text,
+      sum: db.sum('accounts', db.all, { columns: ['balance'] }).compile().text,
+      lateral: db.select('users', db.all, { columns: ['id'], lateral: { n: db.count('accounts', db.all) } }).compile().text,
+      exists: one({ id: c.exists('accounts', db.all) }).text,
+      isInSelect: one({ id: c.isInSelect('accounts', db.all, 'owner_id') }).text,
+      noNullUpdateColumns: db.upsert('users', { email: 'a@b', display_name: 'A' }, 'email', { noNullUpdateColumns: db.all }).compile().text,
+    }).toMatchInlineSnapshot(`
+      {
+        "count": "SELECT count(*) AS result FROM "users"",
+        "exists": "((EXISTS (SELECT 1 FROM "accounts")))",
+        "isInSelect": "(("id" IN (SELECT "owner_id" FROM "accounts")))",
+        "lateral": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT jsonb_build_object($1::text, "id") || jsonb_build_object($2::text, "lateral_n".result) AS result FROM "users" LEFT JOIN LATERAL (SELECT count(*) AS result FROM "accounts") AS "lateral_n" ON true) AS "sq_users"",
+        "noNullUpdateColumns": "INSERT INTO "users" ("display_name", "email") VALUES ($1, $2) ON CONFLICT ("email") DO UPDATE SET ("email", "display_name") = ROW(CASE WHEN EXCLUDED."email" IS NULL THEN "users"."email" ELSE EXCLUDED."email" END, CASE WHEN EXCLUDED."display_name" IS NULL THEN "users"."display_name" ELSE EXCLUDED."display_name" END) RETURNING to_jsonb("users".*) || jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END) AS result",
+        "select": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT jsonb_build_object($1::text, "id") AS result FROM "users") AS "sq_users"",
+        "selectDefault": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT jsonb_build_object($1::text, "id") AS result FROM "users") AS "sq_users"",
+        "selectOne": "SELECT jsonb_build_object($1::text, "id") AS result FROM "users" LIMIT $2",
+        "sum": "SELECT sum("balance") AS result FROM "accounts"",
+      }
+    `);
+  });
+});
+
 describe('errors', () => {
   it('refuses the global object (`self` instead of `db.self`)', () => {
     expect(() => one(globalThis as any)).toThrowErrorMatchingInlineSnapshot(`[Error: Did you use \`self\` (the global object) where you meant \`db.self\` (the Zapatos value)? The global object cannot be embedded in a query.]`);
