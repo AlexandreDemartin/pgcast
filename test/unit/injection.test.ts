@@ -1204,6 +1204,17 @@ describe('shortcut options', () => {
     expect(db.select('users', all, { alias } as any).compile().text).toContain(`AS "sq_${alias.replace(/"/g, '""')}"`);
   });
 
+  it('a withCTEs() key is one identifier, as a lateral key is: `"` is doubled, `.` does not split', () => {
+    const name = (key: string) => db.withCTEs({ [key]: sql`SELECT 1` }, sql`SELECT 2`).compile().text;
+    expect(name('x" AS (SELECT 1); DROP TABLE users; --')).toBe('WITH "x"" AS (SELECT 1); DROP TABLE users; --" AS (SELECT 1) SELECT 2');
+    expect(name('"q"')).toBe('WITH """q""" AS (SELECT 1) SELECT 2');
+    expect(name('a.b')).toBe('WITH "a.b" AS (SELECT 1) SELECT 2');
+    // the hostile names across two CTEs: neither closes the other's quotes
+    expect(db.withCTEs({ [`a'b`]: sql`SELECT 1`, [`c" AS (SELECT 2), "d`]: sql`SELECT 3` }, sql`SELECT 4`).compile().text)
+      .toBe(`WITH "a'b" AS (SELECT 1), "c"" AS (SELECT 2), ""d" AS (SELECT 3) SELECT 4`);
+    expect(matrix(v => db.withCTEs({ [v]: sql`SELECT 1` }, sql`SELECT 2`))).toMatchInlineSnapshot();
+  });
+
   describe('the alias is converted to a string once, so "sq_<alias>" is written from the string checked', () => {
     // SQLForAlias() checked `"sq_${alias}"`, then wrote alias.replace(…): on anything but a string, the caller's own
     // method, or a TypeError without one (#608). The alias's other places are compiled as given, a fragment as its SQL
