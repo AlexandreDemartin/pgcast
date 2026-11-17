@@ -137,31 +137,31 @@ declare module 'zapatos/schema' {
         * - `int4` in database
         * - `NOT NULL`, no default
         */
-        "Product Id": number | db.Parameter<number> | db.SQLFragment;
+        "Product Id": number | db.Parameter<number> | db.SQLFragment<any>;
         /**
         * **public.OrderLines.lineNo**
         * - `int4` in database
         * - `NOT NULL`, no default
         */
-        lineNo: number | db.Parameter<number> | db.SQLFragment;
+        lineNo: number | db.Parameter<number> | db.SQLFragment<any>;
         /**
         * **public.OrderLines.orderId**
         * - `int8` in database
         * - `NOT NULL`, no default
         */
-        orderId: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment;
+        orderId: (number | db.Int8String | bigint) | db.Parameter<(number | db.Int8String | bigint)> | db.SQLFragment<any>;
         /**
         * **public.OrderLines.select**
         * - `text` in database
         * - Nullable, no default
         */
-        select?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment;
+        select?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment<any>;
         /**
         * **public.OrderLines.unit-price**
         * - `numeric` in database
         * - `NOT NULL`, no default
         */
-        "unit-price": (number | db.NumericString) | db.Parameter<(number | db.NumericString)> | db.SQLFragment;
+        "unit-price": (number | db.NumericString) | db.Parameter<(number | db.NumericString)> | db.SQLFragment<any>;
       }
       export interface Updatable {
         /**
@@ -391,25 +391,25 @@ declare module 'zapatos/schema' {
         * - `timestamptz` in database
         * - `NOT NULL`, default: `now()`
         */
-        created_at?: (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.DefaultType | db.SQLFragment;
+        created_at?: (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.DefaultType | db.SQLFragment<any>;
         /**
         * **public.users.display_name**
         * - `text` in database
         * - `NOT NULL`, no default
         */
-        display_name: string | db.Parameter<string> | db.SQLFragment;
+        display_name: string | db.Parameter<string> | db.SQLFragment<any>;
         /**
         * **public.users.email**
         * - `email` (base type: `citext`) in database
         * - `NOT NULL`, no default
         */
-        email: c.PgEmail | db.Parameter<c.PgEmail> | db.SQLFragment;
+        email: c.PgEmail | db.Parameter<c.PgEmail> | db.SQLFragment<any>;
         /**
         * **public.users.home**
         * - `address` in database
         * - Nullable, no default
         */
-        home?: c.PgAddress | db.Parameter<c.PgAddress> | null | db.DefaultType | db.SQLFragment;
+        home?: c.PgAddress | db.Parameter<c.PgAddress> | null | db.DefaultType | db.SQLFragment<any>;
         /**
         * **public.users.manager_id**
         *
@@ -418,25 +418,25 @@ declare module 'zapatos/schema' {
         * - `int4` in database
         * - Nullable, no default
         */
-        manager_id?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment;
+        manager_id?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment<any>;
         /**
         * **public.users.mood**
         * - `mood` in database
         * - Nullable, no default
         */
-        mood?: mood | db.Parameter<mood> | null | db.DefaultType | db.SQLFragment;
+        mood?: mood | db.Parameter<mood> | null | db.DefaultType | db.SQLFragment<any>;
         /**
         * **public.users.settings**
         * - `jsonb` in database
         * - `NOT NULL`, default: `'{}'::jsonb`
         */
-        settings?: db.JSONValue | db.Parameter<db.JSONValue> | db.DefaultType | db.SQLFragment;
+        settings?: db.JSONValue | db.Parameter<db.JSONValue> | db.DefaultType | db.SQLFragment<any>;
         /**
         * **public.users.tags**
         * - `tag_list` (base type: `_text`) in database
         * - Nullable, no default
         */
-        tags?: c.PgTag_list | db.Parameter<c.PgTag_list> | null | db.DefaultType | db.SQLFragment;
+        tags?: c.PgTag_list | db.Parameter<c.PgTag_list> | null | db.DefaultType | db.SQLFragment<any>;
       }
       export interface Updatable {
         /**
@@ -638,25 +638,25 @@ declare module 'zapatos/schema' {
         * - `int4` in database
         * - `NOT NULL`, no default
         */
-        author_id: number | db.Parameter<number> | db.SQLFragment;
+        author_id: number | db.Parameter<number> | db.SQLFragment<any>;
         /**
         * **extra.articles.body**
         * - `text` in database
         * - `NOT NULL`, no default
         */
-        body: string | db.Parameter<string> | db.SQLFragment;
+        body: string | db.Parameter<string> | db.SQLFragment<any>;
         /**
         * **extra.articles.reviewer_id**
         * - `int4` in database
         * - Nullable, no default
         */
-        reviewer_id?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment;
+        reviewer_id?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment<any>;
         /**
         * **extra.articles.status**
         * - `status` in database
         * - `NOT NULL`, default: `'draft'::extra.status`
         */
-        status?: status | db.Parameter<status> | db.DefaultType | db.SQLFragment;
+        status?: status | db.Parameter<status> | db.DefaultType | db.SQLFragment<any>;
       }
       export interface Updatable {
         /**

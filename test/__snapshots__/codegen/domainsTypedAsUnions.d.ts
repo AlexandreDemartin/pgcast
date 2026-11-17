@@ -219,25 +219,25 @@ declare module 'zapatos/schema' {
       * - `timestamptz` in database
       * - `NOT NULL`, default: `now()`
       */
-      created_at?: (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.DefaultType | db.SQLFragment;
+      created_at?: (db.TimestampTzString | Date) | db.Parameter<(db.TimestampTzString | Date)> | db.DefaultType | db.SQLFragment<any>;
       /**
       * **users.display_name**
       * - `text` in database
       * - `NOT NULL`, no default
       */
-      display_name: string | db.Parameter<string> | db.SQLFragment;
+      display_name: string | db.Parameter<string> | db.SQLFragment<any>;
       /**
       * **users.email**
       * - `email` (base type: `citext`) in database
       * - `NOT NULL`, no default
       */
-      email: c.PgEmail | db.Parameter<c.PgEmail> | db.SQLFragment;
+      email: c.PgEmail | db.Parameter<c.PgEmail> | db.SQLFragment<any>;
       /**
       * **users.home**
       * - `address` in database
       * - Nullable, no default
       */
-      home?: c.PgAddress | db.Parameter<c.PgAddress> | null | db.DefaultType | db.SQLFragment;
+      home?: c.PgAddress | db.Parameter<c.PgAddress> | null | db.DefaultType | db.SQLFragment<any>;
       /**
       * **users.manager_id**
       *
@@ -246,25 +246,25 @@ declare module 'zapatos/schema' {
       * - `int4` in database
       * - Nullable, no default
       */
-      manager_id?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment;
+      manager_id?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment<any>;
       /**
       * **users.mood**
       * - `mood` in database
       * - Nullable, no default
       */
-      mood?: mood | db.Parameter<mood> | null | db.DefaultType | db.SQLFragment;
+      mood?: mood | db.Parameter<mood> | null | db.DefaultType | db.SQLFragment<any>;
       /**
       * **users.settings**
       * - `jsonb` in database
       * - `NOT NULL`, default: `'{}'::jsonb`
       */
-      settings?: db.JSONValue | db.Parameter<db.JSONValue> | db.DefaultType | db.SQLFragment;
+      settings?: db.JSONValue | db.Parameter<db.JSONValue> | db.DefaultType | db.SQLFragment<any>;
       /**
       * **users.tags**
       * - `tag_list` (base type: `_text`) in database
       * - Nullable, no default
       */
-      tags?: c.PgTag_list | db.Parameter<c.PgTag_list> | null | db.DefaultType | db.SQLFragment;
+      tags?: c.PgTag_list | db.Parameter<c.PgTag_list> | null | db.DefaultType | db.SQLFragment<any>;
     }
     export interface Updatable {
       /**
@@ -710,97 +710,97 @@ declare module 'zapatos/schema' {
         * - `any_case_format` (base type: `citext`) in database
         * - Nullable, no default
         */
-        any_case_format?: c.PgAny_case_format | db.Parameter<c.PgAny_case_format> | null | db.DefaultType | db.SQLFragment;
+        any_case_format?: c.PgAny_case_format | db.Parameter<c.PgAny_case_format> | null | db.DefaultType | db.SQLFragment<any>;
         /**
         * **unions.books.cover**
         * - `cover` (base type: `text`) in database
         * - Nullable, no default
         */
-        cover?: c.PgCover | db.Parameter<c.PgCover> | null | db.DefaultType | db.SQLFragment;
+        cover?: c.PgCover | db.Parameter<c.PgCover> | null | db.DefaultType | db.SQLFragment<any>;
         /**
         * **unions.books.digital_format**
         * - `digital_format` (base type: `book_format`) in database
         * - Nullable, no default
         */
-        digital_format?: c.PgDigital_format | db.Parameter<c.PgDigital_format> | null | db.DefaultType | db.SQLFragment;
+        digital_format?: c.PgDigital_format | db.Parameter<c.PgDigital_format> | null | db.DefaultType | db.SQLFragment<any>;
         /**
         * **unions.books.edition**
         * - `edition` (base type: `text`) in database
         * - Nullable, default: `'first'::text`
         */
-        edition?: c.PgEdition | db.Parameter<c.PgEdition> | null | db.DefaultType | db.SQLFragment;
+        edition?: c.PgEdition | db.Parameter<c.PgEdition> | null | db.DefaultType | db.SQLFragment<any>;
         /**
         * **unions.books.either**
         * - `either` (base type: `text`) in database
         * - Nullable, no default
         */
-        either?: c.PgEither | db.Parameter<c.PgEither> | null | db.DefaultType | db.SQLFragment;
+        either?: c.PgEither | db.Parameter<c.PgEither> | null | db.DefaultType | db.SQLFragment<any>;
         /**
         * **unions.books.format**
         * - `book_format` (base type: `text`) in database
         * - `NOT NULL`, no default
         */
-        format: c.PgBook_format | db.Parameter<c.PgBook_format> | db.SQLFragment;
+        format: c.PgBook_format | db.Parameter<c.PgBook_format> | db.SQLFragment<any>;
         /**
         * **unions.books.formats**
         * - `_book_format` in database
         * - Nullable, no default
         */
-        formats?: c.Pg_book_format | db.Parameter<c.Pg_book_format> | null | db.DefaultType | db.SQLFragment;
+        formats?: c.Pg_book_format | db.Parameter<c.Pg_book_format> | null | db.DefaultType | db.SQLFragment<any>;
         /**
         * **unions.books.free_text**
         * - `free_text` (base type: `text`) in database
         * - Nullable, no default
         */
-        free_text?: c.PgFree_text | db.Parameter<c.PgFree_text> | null | db.DefaultType | db.SQLFragment;
+        free_text?: c.PgFree_text | db.Parameter<c.PgFree_text> | null | db.DefaultType | db.SQLFragment<any>;
         /**
         * **unions.books.id**
         * - `int4` in database
         * - `NOT NULL`, no default
         */
-        id: number | db.Parameter<number> | db.SQLFragment;
+        id: number | db.Parameter<number> | db.SQLFragment<any>;
         /**
         * **unions.books.padded_format**
         * - `padded_format` (base type: `bpchar`) in database
         * - Nullable, no default
         */
-        padded_format?: c.PgPadded_format | db.Parameter<c.PgPadded_format> | null | db.DefaultType | db.SQLFragment;
+        padded_format?: c.PgPadded_format | db.Parameter<c.PgPadded_format> | null | db.DefaultType | db.SQLFragment<any>;
         /**
         * **unions.books.quirk**
         * - `quirk` (base type: `text`) in database
         * - Nullable, no default
         */
-        quirk?: c.PgQuirk | db.Parameter<c.PgQuirk> | null | db.DefaultType | db.SQLFragment;
+        quirk?: c.PgQuirk | db.Parameter<c.PgQuirk> | null | db.DefaultType | db.SQLFragment<any>;
         /**
         * **unions.books.shelf**
         * - `shelf` (base type: `text`) in database
         * - `NOT NULL`, no default
         */
-        shelf: c.PgShelf | db.Parameter<c.PgShelf> | db.SQLFragment;
+        shelf: c.PgShelf | db.Parameter<c.PgShelf> | db.SQLFragment<any>;
         /**
         * **unions.books.short_format**
         * - `short_format` (base type: `varchar`) in database
         * - Nullable, no default
         */
-        short_format?: c.PgShort_format | db.Parameter<c.PgShort_format> | null | db.DefaultType | db.SQLFragment;
+        short_format?: c.PgShort_format | db.Parameter<c.PgShort_format> | null | db.DefaultType | db.SQLFragment<any>;
         /**
         * **unions.books.twice**
         * - `twice` (base type: `text`) in database
         * - Nullable, no default
         */
-        twice?: c.PgTwice | db.Parameter<c.PgTwice> | null | db.DefaultType | db.SQLFragment;
+        twice?: c.PgTwice | db.Parameter<c.PgTwice> | null | db.DefaultType | db.SQLFragment<any>;
         /**
         * **unions.books.unchecked**
         * - `unchecked` (base type: `text`) in database
         * - Nullable, no default
         */
-        unchecked?: c.PgUnchecked | db.Parameter<c.PgUnchecked> | null | db.DefaultType | db.SQLFragment;
+        unchecked?: c.PgUnchecked | db.Parameter<c.PgUnchecked> | null | db.DefaultType | db.SQLFragment<any>;
         /**
         * **unions.books.with_null**
         * - `with_null` (base type: `text`) in database
         * - Nullable, no default
         */
-        with_null?: c.PgWith_null | db.Parameter<c.PgWith_null> | null | db.DefaultType | db.SQLFragment;
+        with_null?: c.PgWith_null | db.Parameter<c.PgWith_null> | null | db.DefaultType | db.SQLFragment<any>;
       }
       export interface Updatable {
         /**
@@ -961,13 +961,13 @@ declare module 'zapatos/schema' {
         * - `book_format` (base type: `text`) in database
         * - Nullable, no default
         */
-        format?: c.PgBook_format | db.Parameter<c.PgBook_format> | null | db.DefaultType | db.SQLFragment;
+        format?: c.PgBook_format | db.Parameter<c.PgBook_format> | null | db.DefaultType | db.SQLFragment<any>;
         /**
         * **unions.ebooks.id**
         * - `int4` in database
         * - Nullable, no default
         */
-        id?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment;
+        id?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment<any>;
       }
       export interface Updatable {
         /**

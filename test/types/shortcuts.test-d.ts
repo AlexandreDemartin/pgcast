@@ -246,12 +246,15 @@ describe('insert', () => {
     const
       text = db.sql<s.users.SQL, string>`'A'`,
       int = db.sql<s.users.SQL, number>`1`,
+      count = db.sql<s.users.SQL, number>`(${db.count('users', db.all)})`,
       one = db.insert('users', { email: 'a@b', display_name: text, manager_id: int }),
-      many = db.insert('users', [{ email: 'a@b', display_name: text, manager_id: db.count('users', db.all) }]);
+      many = db.insert('users', [{ email: 'a@b', display_name: text, manager_id: count }]);
     expectTypeOf(one.run(pool)).resolves.toEqualTypeOf<s.users.JSONSelectable>();
     expectTypeOf(many.run(pool)).resolves.toEqualTypeOf<s.users.JSONSelectable[]>();
     expectTypeOf(one.run(pool)).resolves.not.toBeAny();
-    db.insert('users', { email: 'a@b', display_name: db.selectExactlyOne('users', { id: 1 }, { columns: ['display_name'] }) });
+    // characterization: a shortcut as it is compiles to VALUES (SELECT …), which Postgres refuses (42601), as
+    // db.select() as a value and any shortcut as an update() value already did; in parentheses, as count above, it runs
+    expectTypeOf(db.insert('users', { email: 'a@b', manager_id: db.count('users', db.all), display_name: 'A' })).not.toBeAny();
   });
 
   test('refuses a fragment that carries a constraint', () => {
@@ -273,7 +276,8 @@ describe('upsert', () => {
   test('takes a fragment whose result is typed as a value (#654)', () => {
     const
       text = db.sql<s.users.SQL, string>`'A'`,
-      one = db.upsert('users', { email: 'a@b', display_name: text, manager_id: db.count('users', db.all) }, 'email'),
+      count = db.sql<s.users.SQL, number>`(${db.count('users', db.all)})`,
+      one = db.upsert('users', { email: 'a@b', display_name: text, manager_id: count }, 'email'),
       many = db.upsert('users', [{ email: 'a@b', display_name: text }], 'email');
     expectTypeOf(one.run(pool)).resolves.toEqualTypeOf<s.users.JSONSelectable & db.UpsertAction>();
     expectTypeOf(many.run(pool)).resolves.toEqualTypeOf<(s.users.JSONSelectable & db.UpsertAction)[]>();

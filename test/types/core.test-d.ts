@@ -649,13 +649,12 @@ describe('type surprises', () => {
     expectTypeOf(c.subtract(new Date())).toEqualTypeOf<db.SQLFragment<number, Date>>();
   });
 
-  test('add() and the boolean tests are refused as insert() values, which Postgres refuses too (42703); now is accepted', () => {
-    // Insertable takes a SQLFragment with no constraint and rows as its RunResult: add() has a constraint and a
-    // non-rows RunResult; a boolean test has a non-rows RunResult
+  test('add() is refused as an insert() value, which Postgres refuses too (42703); now and the boolean tests are accepted', () => {
+    // Insertable takes a SQLFragment with no constraint, whatever its RunResult (#654): add() has a constraint
     // @ts-expect-error add() as an insert() value ("balance" + $1 in VALUES)
     db.insert('accounts', { owner_id: 1, balance: c.add(1) });
-    // @ts-expect-error isTrue as an insert() value
-    db.insert('extra.type_zoo', { c_bool: c.isTrue });
+    // characterization: "c_bool" IS TRUE in VALUES, which Postgres refuses (42703), as an untyped sql`${db.self} IS TRUE`
+    expectTypeOf(db.insert('extra.type_zoo', { c_bool: c.isTrue })).not.toBeAny();
     expectTypeOf(db.insert('users', { email: 'a@b', display_name: 'A', created_at: c.now })).not.toBeAny();
   });
 
