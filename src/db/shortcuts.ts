@@ -900,7 +900,7 @@ export const select: SelectSignatures = function (
         sql` LIMIT ${param(limit)}`,  // compatibility with pg pre-10.5; and fewer bytes!
     offsetSQL = callerValue(allOptions, 'offset') === undefined ? [] : sql` OFFSET ${param(callerValue(allOptions, 'offset'))}`,  // pg is lax about OFFSET following FETCH, and we exploit that
     lockSQL = lock === undefined ? [] : lock === null ? refusedSQL(lockNull) : (lock as SelectLockingOptions<string>[]).map(lock => {  // `as` clause is required when TS not strict
-      const strength = callerValue(lock, 'for');  // each key read once, as an order item's
+      const strength = callerValue(lock, 'for');  // for and wait read once each, as an order item's keys
       if (!['UPDATE', 'NO KEY UPDATE', 'SHARE', 'KEY SHARE'].includes(strength)) throw new Error(`Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not '${strength}'`);
       const wait = callerValue(lock, 'wait');
       if (wait && !['NOWAIT', 'SKIP LOCKED'].includes(wait)) throw new Error(`Lock wait must be NOWAIT/SKIP LOCKED/undefined, not '${wait}'`);
