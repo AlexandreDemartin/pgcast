@@ -104,6 +104,8 @@ describe('select', () => {
     db.update('products', { sku: 'a' }, 'serach');
     // @ts-expect-error a string is no Whereable (deletes)
     db.deletes('products', 'serach');
+    // @ts-expect-error 'serach' is not a column of products (order.by, a SQLForTable)
+    db.select('products', db.all, { order: { by: 'serach', direction: 'ASC' } });
     // @ts-expect-error a string is no Whereable (having)
     db.select('products', db.all, { groupBy: 'sku', having: 'serach' });
     // @ts-expect-error a string is no Whereable (and)
