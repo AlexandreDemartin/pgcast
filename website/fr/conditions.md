@@ -1,5 +1,5 @@
 ---
-english: db45dfb94f49
+english: 231dcc7b8c2f
 ---
 
 # Conditions {#db-conditions}
@@ -24,7 +24,7 @@ Chaque membre est un fragment [`sql`](/fr/sql-template#sql) écrit autour de [`d
 - **Où** : comme valeur d’un Whereable, donc dans le `where` de [`select()`](/fr/select#select), [`count()`](/fr/select#count), [`update()`](/fr/insert#update) et [`deletes()`](/fr/insert#deletes), le `having` de `select()`, et un Whereable dans un template `sql`. Ailleurs, `self` n’a pas de colonne : `` db.sql`SELECT ${db.conditions.isNull}` `` lève "The 'self' column alias has no meaning here"<!-- message --> à la compilation.
   - [`and()`](#conditions.and), [`or()`](#conditions.or) et [`not()`](#conditions.not) prennent aussi des Whereables, et peuvent donc former tout un `where` ; [`now`](#conditions.now), [`fromNow()`](#conditions.fromNow) et [`exists()`](#conditions.exists) ne contiennent pas de `self`, et vont partout.
 - **Valeurs** : chaque valeur est un paramètre, `$1`, sauf un [`Parameter`](/fr/sql-template#Parameter), gardé tel quel avec son cast ; un fragment `sql`, écrit comme son SQL ; et [`parent()`](/fr/sql-template#parent), la colonne de la requête parente dans une sous-requête `lateral`, ou dans le `where` d’[`exists()`](#conditions.exists) et d’[`isInSelect()`](#conditions.isInSelect), dont l’option `parent` nomme cette table. `Default`, `self`, `raw()`, `cols()` et `vals()` lèvent une erreur : [Les valeurs qu’une condition refuse](#refused-values). [`eqAny()`](#conditions.eqAny) envoie son tableau en un seul paramètre de valeurs simples : un élément qui est l’un d’eux lève une erreur, et à la place du tableau, `eqAny()` ne prend que `parent()`.
-  - [`jsonbContains()`](#conditions.jsonbContains) ne prend qu’une valeur JSON : un `Parameter`, un fragment ou `parent()` y lève aussi une erreur.
+  - [`jsonbContains()`](#conditions.jsonbContains) ne prend qu’une valeur JSON, et [`jsonbPathExists()`](#conditions.jsonbPathExists) une chaîne comme chemin et des valeurs JSON comme variables : un `Parameter`, un fragment ou `parent()` y lève aussi une erreur.
 - **Type** : une condition est un `SQLFragment` dont le second argument de type, `T`, est le type de la valeur à laquelle elle compare (sa `Constraint`, [`sql`](/fr/sql-template#sql)) ; le Whereable vérifie `T` contre le type de la colonne. Les huit tests, `now` et `fromNow()` n’ont pas de `T`, et passent sur n’importe quelle colonne.
   - Un Whereable est aussi une expression : interpolé dans une liste `SELECT`, `{ runtime_minutes: add(10) }` est la durée de chaque film plus dix, `(("runtime_minutes" + $1))`<!-- probe: db.sql`${{ runtime_minutes: db.conditions.add(10) }}` -->. Le type laisse donc passer, comme valeur d’un Whereable, ce qui n’est pas un test : [`add()`](#conditions.add), [`subtract()`](#conditions.subtract), [`now`](#conditions.now) et [`fromNow()`](#conditions.fromNow), que Postgres refuse seuls dans un `where` (42804).
 
@@ -368,6 +368,33 @@ Un `Parameter`, un fragment `sql` ou `parent()` lève une erreur à la compilati
 
 > `` `jsonbContains()` sends its value as JSON text, so it takes a JSON value, not `db.param()`: give a value; for SQL, write a `sql` fragment with `db.self` in place of the condition. ``<!-- message -->
 
+### `jsonbPathExists()` {#conditions.jsonbPathExists}
+
+```ts
+db.conditions.jsonbPathExists(path: string, vars?: JSONObject): SQLFragment<boolean | null, JSONValue>
+db.conditions.jsonbPathExists<T>(path: string, vars?: JSONObject): SQLFragment<boolean | null, T>
+```
+
+`jsonb_path_exists("col", CAST($1 AS "jsonpath"), CAST($2 AS "jsonb"))`<!-- probe: db.sql`${{ col: db.conditions.jsonbPathExists('$.prizes[*] ? (@ == $prize)', { prize: 'Golden Gull' }) }}` --> : le [chemin SQL/JSON](https://www.postgresql.org/docs/current/functions-json.html#FUNCTIONS-SQLJSON-PATH) trouve au moins un élément dans le JSON de la colonne. Le chemin est un paramètre, ses variables un autre : chaque `$name` du chemin est une clé de `vars`, dont la valeur est envoyée sous forme de texte JSON, si bien qu’une valeur à laquelle vous comparez n’entre jamais dans le chemin.
+
+<CastPanel example="conditions_jsonbPathExists">
+
+<<< ../examples/conditions_jsonbPathExists.ts{ts twoslash}
+
+</CastPanel>
+
+- **Variables** : `{ prefix: 'Silver' }` donne à `$prefix` la chaîne JSON `"Silver"`, et un nombre reste un nombre, si bien que `'2000'` n’est égal à aucune année. Un nom qui n’est pas un simple identifiant se met entre guillemets dans le chemin : `$"print format"` lit `{ 'print format': 'digital' }`. Omis, `vars` vaut `{}`, avec le même SQL. Une variable nommée par le chemin mais absente de `vars` fait échouer la requête dans Postgres (42704, `could not find jsonpath variable "prize"`).
+- **Pas dans le chemin** : une valeur écrite dans le texte du chemin est lue comme du chemin. `` `$.prizes[*] ? (@ == "${prize}")` ``, avec le prix `Golden" || @ != "`, trouve tous les films qui ont un prix.
+- **`lax` et `strict`** : en mode `lax`, celui par défaut, un film sans `prizes` ne donne aucun élément pour `$.prizes[*]`. En mode `strict`, `strict $.prizes` fait échouer toute la requête sur un tel film (2203A, `JSON object does not contain key "prizes"`) ; dans un filtre, `strict $ ? (@.prizes.size() > 1)`, ce film est ignoré. pgcast ne passe pas d’argument `silent` : la valeur par défaut de Postgres s’applique, et ces erreurs sont levées.
+- **Un chemin, pas un prédicat** : `$.format == "VHS"` est un prédicat, dont l’unique élément est son booléen, `false` compris : tous les films correspondent. Écrivez un filtre : `$.format ? (@ == $format)`.
+- **Un chemin invalide** échoue dans Postgres (42601) : `$.prizes[*` donne `syntax error at end of jsonpath input`.
+- **Pas d’index** : aucun index GIN ne prend en charge `jsonb_path_exists()`, donc Postgres parcourt toute la table. Les deux classes d’opérateurs de `jsonb` prennent en charge `@>`, [`jsonbContains()`](#conditions.jsonbContains), et `@?`, qui ne prend pas de variables : pour un chemin fixe sur une colonne indexée, écrivez `` db.sql`${db.self} @? ${db.param(path, 'jsonpath')}` ``, `(("details" @? CAST($1 AS "jsonpath")))`<!-- probe: db.sql`${{ details: db.sql`${db.self} @? ${db.param('$.format', 'jsonpath')}` }}` -->.
+- **[`castObjectParamsToJson`](/fr/runtime-config#Config.castObjectParamsToJson)** et **[`castArrayParamsToJson`](/fr/runtime-config#Config.castArrayParamsToJson)** ne changent rien : `jsonb_path_exists("details", CAST($1 AS "jsonpath"), CAST($2 AS "jsonb"))`<!-- probe: (db.setConfig({ castObjectParamsToJson: true, castArrayParamsToJson: true }), db.sql`${{ details: db.conditions.jsonbPathExists('$.format ? (@ == $format)', { format: '35mm' }) }}`) -->.
+- **Ce que JSON n’a pas** dans `vars` lève une erreur à la compilation de la requête, à toute profondeur, et le message nomme sa clé, comme dans [`jsonbContains()`](#conditions.jsonbContains) : `{ prize: undefined }` omettrait `$prize`. Un chemin qui n’est pas une chaîne aussi. Le type refuse les deux, mais pas une valeur typée `{ prize?: string }`, qui peut contenir `undefined` sauf si `exactOptionalPropertyTypes` est activé, ni une valeur typée `any`.
+- **Type** : `path` est une `string`, et `vars` un `JSONObject`, un objet de valeurs JSON : un tableau, une chaîne ou `null` y est refusé (TS2769), comme Postgres le refuserait (22023, `"vars" argument is not an object`), de même qu’une valeur typée par une `interface` : donnez-lui un alias `type`. Le `T` de la condition est `JSONValue`, comme pour `jsonbContains()` : une colonne `jsonb` l’accepte, une colonne `text` ou `integer` la refuse (TS2322). Une colonne `json` passe, et Postgres la refuse (42883, `function jsonb_path_exists(json, jsonpath, jsonb) does not exist`). Sur un domaine `jsonb` dont vous avez affiné le placeholder, nommez-le : `jsonbPathExists<PgProjection>('$.format')`.
+
+> `` `jsonbPathExists()` takes its path as a string, not `db.param()`: write the path as a string, and each value it compares with as a variable, `jsonbPathExists(path, { name: value })`. ``<!-- message -->
+
 ## Combiner : `and()`, `or()`, `not()` {#combining}
 
 Chacune prend des conditions ou des Whereables, un Whereable compilé avec ses propres clés. Comme valeur d’un Whereable, `self` atteint les conditions à l’intérieur : `{ release_year: or(lt(1980), gt(2010)) }` donne `((("release_year" < $1 OR "release_year" > $2)))`<!-- probe: db.sql`${{ release_year: db.conditions.or(db.conditions.lt(1980), db.conditions.gt(2010)) }}` -->. Comme `where` entier, elles prennent des Whereables :
@@ -575,7 +602,7 @@ Le type ne vérifie pas un fragment : un `int4` sur une colonne `timestamptz` p
 
 ## Les valeurs qu’une condition refuse {#refused-values}
 
-`Default`, `self`, `raw()`, `cols()` et `vals()` n’ont pas de sens comme valeur d’une condition. Le type les refuse (TS2322, ou TS2345 là où la condition borne son argument : un motif, la seconde borne d’un intervalle, une condition de tableau, `add()`, `subtract()` ; TS2769 comme liste d’`eqAny()` et comme valeur de `jsonbContains()`).
+`Default`, `self`, `raw()`, `cols()` et `vals()` n’ont pas de sens comme valeur d’une condition. Le type les refuse (TS2322, ou TS2345 là où la condition borne son argument : un motif, la seconde borne d’un intervalle, une condition de tableau, `add()`, `subtract()` ; TS2769 comme liste d’`eqAny()`, comme valeur de `jsonbContains()` et comme chemin ou variables de `jsonbPathExists()`).
 
 À l’exécution, c’est la compilation de la condition qui lève l’erreur, pas son appel : `run()` est donc rejetée avec une simple `Error` avant toute requête.
 
@@ -589,7 +616,8 @@ Zapatos 6.6.1 envoyait `Default` et `self` comme les chaînes `'Symbol(DEFAULT)'
 | `` `db.Default` has no meaning in a Whereable (a filter): leave the key out, or compare with a value. `DEFAULT` is for INSERT and UPDATE values. ``<!-- message --> | `Default` dans `isIn()` ou `isNotIn()` |
 | `` `db.self` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: compare with a value, or use it in a `sql` fragment value, where it stands for the column. ``<!-- message --> | `self` dans `isIn()` ou `isNotIn()` |
 | `` `db.raw()`, `db.cols()` and `db.vals()` have no meaning as a value in a Whereable (a filter), nor in `isIn()`: to compare with SQL, use a `sql` fragment value, where `db.self` stands for the column; to compare with a value, give the value itself, or `db.param()`. ``<!-- message --> | `raw()`, `cols()` ou `vals()` dans `isIn()` ou `isNotIn()` |
-| `` `jsonbContains()` sends its value as JSON text, so it takes a JSON value, not `db.Default`: give a value; for SQL, write a `sql` fragment with `db.self` in place of the condition. ``<!-- message --> | `Default` comme valeur de [`jsonbContains()`](#conditions.jsonbContains) ; `self`, `raw()`, `cols()`, `vals()`, un `Parameter`, un fragment `sql` ou `parent()` au même endroit reçoit le même message, qui le nomme |
+| `` `jsonbContains()` sends its value as JSON text, so it takes a JSON value, not `db.Default`: give a value; for SQL, write a `sql` fragment with `db.self` in place of the condition. ``<!-- message --> | `Default` comme valeur de [`jsonbContains()`](#conditions.jsonbContains) ; `self`, `raw()`, `cols()`, `vals()`, un `Parameter`, un fragment `sql` ou `parent()` au même endroit reçoit le même message, qui le nomme ; comme variables de [`jsonbPathExists()`](#conditions.jsonbPathExists), le même message nomme `jsonbPathExists()` et ses variables |
+| `` `jsonbPathExists()` takes its path as a string, not `db.Default`: write the path as a string, and each value it compares with as a variable, `jsonbPathExists(path, { name: value })`. ``<!-- message --> | `Default` comme chemin de [`jsonbPathExists()`](#conditions.jsonbPathExists) ; `self`, `raw()`, `cols()`, `vals()`, un `Parameter`, un fragment `sql`, `parent()` ou toute valeur qui n’est pas une chaîne au même endroit reçoit le même message, qui le nomme |
 | `` `eqAny()` takes an array of values, not `db.Default`: write `eqAny(values)`; for SQL, write a `sql` fragment with `db.self` in place of the condition. ``<!-- message --> | `Default` comme liste d’[`eqAny()`](#conditions.eqAny) ; `self`, `raw()`, `cols()`, `vals()`, un `Parameter` ou un fragment `sql` au même endroit reçoit le même message, qui le nomme |
 | `` `eqAny()` sends its array as one parameter, so each item is a plain value, not `db.Default`: give a value. ``<!-- message --> | `Default` comme élément d’`eqAny()` ; `self`, `raw()`, `cols()` ou `vals()` au même endroit reçoit le même message, qui le nomme |
 | `The 'self' column alias has no meaning here`<!-- message --> | une condition où `self` n’a pas de colonne : dans un template `sql` hors d’un Whereable, dans le `updateValues` d’`upsert()`, dans le `where` d’`exists()` ou d’`isInSelect()`, et `isInSelect()` hors d’une clé |

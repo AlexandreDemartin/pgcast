@@ -26,5 +26,5 @@ export const firstEventOfUser = (id: number) => db.selectOne('users', { id }, { 
 
 export const { count, sum, avg, min, max, selectOne, selectExactlyOne } = db;
 
-// a condition re-exported, as a library of shared conditions does: its signatures interface must be exported too
+// a condition re-exported, as a library of shared conditions does: its type must be one a .d.ts can name (TS4023)
 export const { jsonbPathExists } = db.conditions;

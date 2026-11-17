@@ -218,13 +218,9 @@ const jsonpathParam = (path: unknown) => typeof path === 'string' ? param(path, 
   refused(`\`jsonbPathExists()\` takes its path as a string, not ${notAValue(path) ??
     (path === null ? '`null`' : Array.isArray(path) ? 'an array' : typeof path === 'object' ? 'an object' : `a \`${typeof path}\``)}: write the path as a string, and each value it compares with as a variable, \`jsonbPathExists(path, { name: value })\`.`);
 
-// as jsonbContains()'s: T is given for a narrowed jsonb domain, never inferred; exported, so that a package built with
-// `declaration: true` can name it when it re-exports the condition (TS4023)
-export interface JsonbPathExistsSignatures {
-  (path: string, vars?: JSONObject): SQLFragment<boolean | null, JSONValue>;
-  <T>(path: string, vars?: JSONObject): SQLFragment<boolean | null, T>;
-}
-
+// as jsonbContains()'s signatures, T given for a narrowed jsonb domain, never inferred; written in place, not as an
+// interface, so that a package built with `declaration: true` can re-export the condition (TS4023) with no type name
+// more in db.conditions
 /**
  * `jsonb_path_exists("col", CAST($1 AS "jsonpath"), CAST($2 AS "jsonb"))`, on a `jsonb` column: the SQL/JSON path
  * finds an item in the column's JSON. The path is one parameter, and its variables another: each `$name` of the path is
@@ -236,7 +232,10 @@ export interface JsonbPathExistsSignatures {
  * @param path A SQL/JSON path: `'$.prizes[*] ? (@ == $prize)'`
  * @param vars The path's variables, an object: `{ prize: 'Golden Gull' }`
  */
-export const jsonbPathExists: JsonbPathExistsSignatures = (path: string, vars: JSONObject = {}) =>
+export const jsonbPathExists: {
+  (path: string, vars?: JSONObject): SQLFragment<boolean | null, JSONValue>;
+  <T>(path: string, vars?: JSONObject): SQLFragment<boolean | null, T>;
+} = (path: string, vars: JSONObject = {}) =>
   sql<SQL, boolean | null>`jsonb_path_exists(${self}, ${jsonpathParam(path)}, ${jsonbParam(vars, 'jsonbPathExists', 'variables')})`;
 
 /**
