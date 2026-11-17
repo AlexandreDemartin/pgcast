@@ -1227,6 +1227,21 @@ describe('Default, self, raw, cols and vals as the value of a condition', () => 
       expect(thrown(dc.arrayContainedIn([1, self] as any).copy())).toBe(expected('arrayContainedIn').self);
     });
 
+    it('in an array changed after the call, throws as it compiles; an array cleared of it compiles', () => {
+      // the array is read as the query compiles, as pg reads it: a walk at the call let a later push() through
+      const withDefault: unknown[] = ['x'], withAll: unknown[] = ['x'], cleared: unknown[] = ['x', Default];
+      const conditions = [dc.arrayContains(withDefault as any), dc.arrayOverlaps(withAll as any), dc.arrayContainedIn(cleared as any)];
+      withDefault.push([Default]);
+      withAll.push(db.all);
+      cleared.pop();
+      expect(conditions.map(c => thrown(c))).toEqual([
+        expected('arrayContains').Default,
+        '`db.all` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To match every row, give `db.all` as the whole filter of a shortcut: `select(table, db.all)`.',
+        'compiled',
+      ]);
+      expect(show(conditions[2])).toEqual({ text: '(("col" <@ $1))', values: [['x']] });
+    });
+
     it('first in the walk wins: db.all keeps its message beside another, and the outer array is read first', () => {
       expect([
         thrown(dc.arrayContains([db.all, Default] as any)), thrown(dc.arrayContains([[db.all], Default] as any)),
