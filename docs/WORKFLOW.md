@@ -72,7 +72,18 @@ When the Epic's last step is merged: a review of the whole merged range, then a 
 
 ## Releases
 
-- The owner bumps the version (`npm version`, which runs every check) in a PR, merges it, then pushes its tag `v<version>`.
+Each release goes in this order; the tag and the deployment stay the owner's (`AGENTS.md` § Stop points).
+
+1. **The pre-release pass**, before every publication:
+   - a range review of every PR merged since the last pass;
+   - an audit of `npm pack` (files, README, `package.json` fields) and of the docs site: each feature's "From x.y.z." in EN and FR, no current-version number in the README or the docs;
+   - a fix for each finding, merged before the version PR.
+2. **The version PR**, by hand, reviewed like any PR and merged by the session (model: #568):
+   - `version` in `package.json`, in both root entries of `package-lock.json` and in the `..` entry of `website/package-lock.json`;
+   - `CHANGELOG.md`: `## [Unreleased]` becomes `## [x.y.z] - <date>`, under a new empty `## [Unreleased]`.
+3. **The owner** pushes the tag `v<version>` on the version commit, approves the `npm` deployment, then creates the GitHub release from its changelog section.
+4. **The session** checks the registry (version, `latest`, provenance), closes the milestone, and lists the existing advisories before publishing one, so none is published twice.
+
 - The tag starts [release.yml](../.github/workflows/release.yml): it checks that the tag names `package.json`'s version on a commit of master, then publishes with npm trusted publishing (OIDC, no token) and a provenance attestation.
 - Publishing stays the owner's act: the tag only queues a deployment to the GitHub environment `npm`, which waits for the owner's approval before the job runs. An agent never pushes a `v*` tag (`AGENTS.md` § Stop points).
 - Once, in this order, the owner's settings:
