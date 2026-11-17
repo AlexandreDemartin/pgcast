@@ -60,6 +60,12 @@ export default defineConfig(
         },
       }],
       "@stylistic/semi": ["error", "always"],
+      // pgcast's own: tsc copies an import into the `.d.ts` it ships as written, and TypeScript 4.1 to 4.4 cannot parse
+      // `import { type X }` there (TS1005), `skipLibCheck` or not (#584).
+      "no-restricted-syntax": ["error", {
+        "selector": "ImportSpecifier[importKind='type'], ExportSpecifier[exportKind='type']",
+        "message": "Write `import type { … }` (or `export type { … }`) apart from the values: tsc copies this line into the shipped `.d.ts`, and TypeScript 4.1 to 4.4 cannot parse `{ type X }` there (TS1005).",
+      }],
     },
   },
   // The scripts and the docs site's code, outside the library: ES modules, with the recommended rules only, and Node's
