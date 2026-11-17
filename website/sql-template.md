@@ -269,13 +269,14 @@ A comma-separated list of values. Each value compiles as follows.
 | `Default` | `DEFAULT` | `DEFAULT`; throws in a filter |
 | `parent(c?)` | the [parent column](#parent), without `c` the column of its key; throws outside a nested query | the [parent column](#parent) |
 | `raw()`, `cols()`, `vals()` | throw | throw in a filter; a parameter outside one |
-| `self` | a parameter | throws in a filter; a parameter outside one |
+| `self`, `all` | a parameter | throws in a filter; a parameter outside one |
 
 - An object's values come in the order of its sorted keys, as `cols()` lists them.
 - In a template typed by table, its keys are not checked against the table, as [`cols()`](#cols) explains.
 - "In a filter" is wherever `vals([…])` has a current column: in `isIn()` and `isNotIn()`, and in a fragment value of a Whereable or of `vals({…})`. There:
   - `Default` throws "`` `db.Default` has no meaning in a Whereable (a filter)… ``<!-- message -->";
   - `self` "`` `db.self` has no meaning as a value in a Whereable (a filter), nor in `isIn()`… ``<!-- message -->";
+  - `all` "`` `db.all` has no meaning as a value in a Whereable (a filter), nor in `isIn()`… ``<!-- message -->";
   - `raw()`, `cols()` and `vals()` as [`raw()`](#raw) says.
 - As a filter value itself, or a value in `vals({…})`, `vals()` throws, as [`raw()`](#raw) does.
 - A built-in with no own enumerable key, or a `Buffer`, throws while compiling, as in [`cols()`](#cols): "`` `db.vals()` takes an object or an array, not a `Buffer`, whose bytes would compile as values, one parameter per byte: for one value, write `db.vals([value])`; for a row of `insert()`, `upsert()` or `update()`, give a plain object. ``<!-- message -->". Zapatos 6.6.1 compiled a `Date` to nothing. It compiled a `Buffer` to one parameter per byte, so a single byte was stored as its number (`'97'` in a text column for `Buffer.from('a')`), and in an `IN` list the bytes matched as numbers. A built-in with own enumerable keys still compiles to their values. A typed array other than a `Buffer` compiles to its elements, `$1, $2`<!-- probe: db.sql`${db.vals(new Int32Array([1, 2]))}` --> for `new Int32Array([1, 2])`, unless it is empty and so has no own key. A `Uint8Array` meant as bytes compiles to its elements too, `vals(new TextEncoder().encode('a'))` to `$1`<!-- probe: db.sql`${db.vals(new TextEncoder().encode('a'))}` --> with `97`: in an `IN` list its elements are as often the numbers meant, so only a `Buffer`, Node's type for bytes, is refused. For one value, write `db.vals([value])` or `db.param(value)`.
@@ -451,6 +452,10 @@ db.all
 ```
 
 The `where` of `select()`, `count()` and the other selects that matches every row: `db.select('films', db.all)` writes no `WHERE` ([`select()`](/select#select)). It is not an interpolation: in `sql`, the type refuses it, and it throws.
+
+- As a filter value it throws while compiling, and the type refuses it: it is a whole filter, not a value to compare with. Zapatos 6.6.1 sent it as the string `'Symbol(all)'`, so `deletes('films', { title: db.conditions.isNotIn([db.all]) })` deleted every film with a title.
+  - As a Whereable value ([above](#whereable)), in `isIn()` / `isNotIn()`, and in `vals([…])` with a current column ([`vals()`](#vals)): "`` `db.all` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: leave the key out, or compare with a value. To match every row, give `db.all` as the whole filter of a shortcut: `select(table, db.all)`. ``<!-- message -->"
+  - As the value of `eq()`, `add()` and the other conditions, and in the array of an array condition: "`` `db.all` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To match every row, give `db.all` as the whole filter of a shortcut: `select(table, db.all)`. ``<!-- message -->"
 
 ### `AllType` {#AllType}
 
