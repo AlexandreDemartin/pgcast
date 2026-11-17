@@ -279,9 +279,11 @@ export const not = <T>(condition: SQLFragment<any, T> | Whereable) => sql<SQL, b
 // overflows the call stack, and either goes on as a parameter
 const holdsAll = (a: unknown[]) => {
   const seen = new Set<unknown[]>([a]), todo = [a];
-  for (let next = todo.pop(); next; next = todo.pop()) for (const x of next) {
-    if (x === all) return true;
-    if (Array.isArray(x) && !seen.has(x)) { seen.add(x); todo.push(x); }
+  for (let next = todo.pop(); next; next = todo.pop()) {
+    for (const x of next) {
+      if (x === all) return true;
+      if (Array.isArray(x) && !seen.has(x)) { seen.add(x); todo.push(x); }
+    }
   }
   return false;
 };
