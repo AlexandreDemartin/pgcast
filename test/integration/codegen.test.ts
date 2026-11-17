@@ -1122,6 +1122,33 @@ ${imports.map(line => `  ${line}\n`).join('')}  export type ${type};  // replace
       const written = { PgBook_format: (await codegen(config)).customTypeSourceFiles.PgBook_format };
       expect(await probeErrors(on, unionProbe('// @ts-expect-error'), {}, written)).toEqual(Array(7).fill(unused));
     });
+
+    // a placeholder that takes the union's name cannot import it by that name (TS2440); its namespace's name, it can
+    describe('a placeholder named as what it would import', () => {
+      beforeAll(() => t.pool.query(`
+        CREATE SCHEMA union_self;
+        CREATE DOMAIN union_self.union_self AS text CHECK (VALUE IN ('same'));
+        CREATE TABLE union_self.mirrors (id int PRIMARY KEY, kind union_self.union_self);
+      `));
+      afterAll(() => t.pool.query('DROP SCHEMA union_self CASCADE'));
+
+      const sameName = { schemas: { unions: all, union_self: all }, unprefixedSchema: 'unions', domainsTypedAsUnions: true };
+      const probe = `
+        import * as db from 'zapatos/db';
+        import type * as s from 'zapatos/schema';
+        import { expectTypeOf } from 'expect-type';
+        expectTypeOf<s.books.Selectable['format']>().toEqualTypeOf<'hardback' | 'paperback' | 'ebook'>();
+        expectTypeOf<s.union_self.mirrors.Selectable['kind']>().toEqualTypeOf<'same' | null>();
+        // @ts-expect-error not a value of its CHECK
+        db.insert('books', { id: 1, format: 'zzz', shelf: 'top' });
+        // @ts-expect-error not a value of its CHECK
+        db.insert('union_self.mirrors', { id: 1, kind: 'zzz' });`;
+
+      it.each([['my_type', 'my_type' as const], ['a function that keeps the name', (name: string) => name]])(
+        'compiles with customTypesTransform %s, with no lib check skipped', async (_, customTypesTransform) => {
+          expect(await probeErrors({ ...sameName, customTypesTransform }, probe, { skipLibCheck: false })).toEqual([]);
+        });
+    });
   });
 
   it('holds no orphan file', () => {
