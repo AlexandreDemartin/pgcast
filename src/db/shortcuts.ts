@@ -31,6 +31,7 @@ import {
   raw,
   param,
   Default,
+  self,
   Parameter,
   DangerousRawString,
   ColumnNames,
@@ -420,7 +421,10 @@ const compiledAsIs = (value: any, inObject = false): boolean =>
       typeof value === 'object' && value !== null && [Object.prototype, null].includes(Object.getPrototypeOf(value)) &&
       Object.values(value).some(item => compiledAsIs(item, true)));
 
-const updateValueSQL = (value: any) => compiledAsIs(value) ? asScalar(value) : param(value);
+// `all` or `self` alone throws as in the other writes, through vals({…}), where it threw a message that said nothing
+// to write: "Alien object" (a TypeError under 6.6.1) or "The 'self' column alias has no meaning here"
+const updateValueSQL = (value: any, column: string) =>
+  value === all || value === self ? vals({ [column]: value }) : compiledAsIs(value) ? asScalar(value) : param(value);
 
 /**
  * Generate an 'upsert' (`INSERT ... ON CONFLICT ...`) query `SQLFragment`.
@@ -544,7 +548,7 @@ export const upsert: {
       sql<string>`ON CONSTRAINT ${conflictTarget.value}`,
     updateColsSQL = mapWithSeparator(updateColumns, sql`, `, c => c),
     updateValuesSQL = mapWithSeparator(updateColumns, sql`, `, c =>
-      callerValue(updateValues, c) !== undefined ? updateValueSQL(callerValue(updateValues, c)) :
+      callerValue(updateValues, c) !== undefined ? updateValueSQL(callerValue(updateValues, c), c) :
         (noNullUpdateColumns === all || noNullUpdateColumns.includes(c)) ? sql`CASE WHEN EXCLUDED.${c} IS NULL THEN ${table}.${c} ELSE EXCLUDED.${c} END` :
           sql`EXCLUDED.${c}`),
     returningSQL = SQLForColumnsOfTable(callerValue(options, 'returning'), table, returningNull),

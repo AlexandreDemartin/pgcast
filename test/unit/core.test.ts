@@ -592,7 +592,7 @@ describe('cols and vals', () => {
   it('vals([self]) and vals({ a: self }) throw outside a filter too, so as a write value', () => {
     // 6.6.1 and pgcast until #665 sent 'Symbol(self)', stored in a text column; left by #106
     expect({ vals: thrown(() => one(vals([self]))), valsObject: thrown(() => one(vals({ a: self }))) }).toEqual({
-      vals: '`db.self` has no meaning as an item of `vals([…])` outside a column\'s value, as in a `sql` template of your own or in `upsert()` `updateValues`, where no column is current: give a value, or name the column.',
+      vals: '`db.self` has no meaning as an item of `vals([…])` outside a column\'s value, as in a `sql` template of your own or in `upsert()` `updateValues`: give a value, or name the column.',
       valsObject: '`db.self` has no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value: give a value; in `update()`, write `db.self` in a `sql` fragment value, where it stands for the column.',
     });
   });
@@ -738,9 +738,9 @@ describe('cols and vals', () => {
     expect(result).toEqual({ text: 'SELECT $1, ', values: [1] });
   });
 
-  it('vals() of an array holding cols(null) still sends it as JSON, as in 6.6.1', () => {
-    // a wrapper in an array outside a filter is a JSON parameter (#259), so cols(null) is never compiled there
-    expect(one(vals([cols(null)]))).toEqual({ text: '$1', values: [{ value: null }] });
+  it('vals() of an array holding cols(null) throws as for any wrapper there, before cols(null) is compiled', () => {
+    // a wrapper in an array outside a filter was a JSON parameter (#259), as in 6.6.1; it throws since #665
+    expect(thrown(() => one(vals([cols(null)])))).toMatch(/^`db\.raw\(\)`, `db\.cols\(\)` and `db\.vals\(\)` have no meaning as an item of `vals\(\[…\]\)` outside a column's value/);
   });
 
   // 6.6.1 compiled a built-in as an object of its own enumerable keys: with none, to nothing (`SELECT  FROM users`,

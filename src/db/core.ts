@@ -38,20 +38,21 @@ export type DefaultType = typeof Default;
  * Compiles to the current column name within a `Whereable`, in a fragment value:
  * `` { n: sql`${self} > 0` } `` gives `("n" > 0)`. As a `Whereable` value, in
  * `isIn`, or as the value of `eq()` and the other conditions, it throws: it is
- * the column, not a value to compare it with. Zapatos 6.6.1 sent it as the
- * string `'Symbol(self)'`.
+ * the column, not a value to compare it with. So it does in `vals([…])` and as
+ * a value in `vals({…})`, so of `insert()`, `upsert()` or `update()`. Zapatos
+ * 6.6.1 sent it as the string `'Symbol(self)'`.
  */
 export const self = Symbol('self');
 export type SelfType = typeof self;
 
 /**
  * Signals all rows are to be returned (without filtering via a `WHERE` clause).
- * As a `Whereable` value, in `isIn` or `isNotIn`, in `vals([…])` within a
- * filter or a fragment value of `vals({…})`, so of `insert()`, `upsert()` or
- * `update()`, as the value of `eq()` and the other conditions, or in the
- * array of `arrayContains()`, `arrayContainedIn()` or `arrayOverlaps()`, it
- * throws: it is a whole filter, not a value to compare with. Zapatos 6.6.1
- * sent it as the string `'Symbol(all)'`.
+ * As a `Whereable` value, in `isIn` or `isNotIn`, in `vals([…])`, as a value
+ * in `vals({…})`, so of `insert()`, `upsert()` or `update()`, as the value of
+ * `eq()` and the other conditions, or in the array of `arrayContains()`,
+ * `arrayContainedIn()` or `arrayOverlaps()`, it throws: it is a whole filter,
+ * not a value to compare with. Zapatos 6.6.1 sent it as the string
+ * `'Symbol(all)'`.
  */
 export const all = Symbol('all');
 export type AllType = typeof all;
@@ -385,12 +386,18 @@ const
   selfInVals = '`db.self` has no meaning as an item of `vals([…])` in a column\'s value, in a filter (as `isIn()` writes it) or in a `sql` fragment value of `vals({…})`, so of `insert()`, `upsert()` or `update()`: give a value; in a filter or in `update()`, write `db.self` in a `sql` fragment value, outside `vals([…])`, where it stands for the column.',
   allInVals = '`db.all` has no meaning as an item of `vals([…])` in a column\'s value, in a filter (as `isIn()` writes it) or in a `sql` fragment value of `vals({…})`, so of `insert()`, `upsert()` or `update()`: in a filter, leave the key out, or compare with a value; in a write, give a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.',
   wrapperInVals = '`db.raw()`, `db.cols()` and `db.vals()` have no meaning as an item of `vals([…])` in a column\'s value, in a filter (as `isIn()` writes it) or in a `sql` fragment value of `vals({…})`, so of `insert()`, `upsert()` or `update()`: for SQL, write it in a `sql` fragment value, outside `vals([…])` (in a filter or in `update()`, `db.self` there stands for the column); for a value, give the value itself, or `db.param()`.',
+  // vals([…]) items with no current column: a `sql` template's, or upsert()'s updateValues', compiled as one
+  allInBareVals = '`db.all` has no meaning as an item of `vals([…])` outside a column\'s value, as in a `sql` template of your own or in `upsert()` `updateValues`: give a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.',
+  selfInBareVals = '`db.self` has no meaning as an item of `vals([…])` outside a column\'s value, as in a `sql` template of your own or in `upsert()` `updateValues`: give a value, or name the column.',
+  wrapperInBareVals = '`db.raw()`, `db.cols()` and `db.vals()` have no meaning as an item of `vals([…])` outside a column\'s value, as in a `sql` template of your own or in `upsert()` `updateValues`: for SQL, write it outside `vals([…])` (in `updateValues`, as the value itself); for a value, give the value itself, or `db.param()`.',
   wrapperAsValue = '`db.raw()`, `db.cols()` and `db.vals()` have no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value: to write SQL, use a `sql` fragment value (in `update()`, `db.self` there stands for the column); to write a value, give the value itself, or `db.param()`.',
+  allAsValue = '`db.all` has no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value: give a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.',
+  selfAsValue = '`db.self` has no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value: give a value; in `update()`, write `db.self` in a `sql` fragment value, where it stands for the column.',
   nullInterpolated = 'Interpolating `null` has no meaning in SQL: for a `NULL` value, interpolate `db.param(null)`; to filter on `NULL`, use `{ column: db.conditions.isNull }`; to match every row, give `db.all` as the whole filter of `select()` and its kin.',
   parentWithoutColumn = "`db.parent()` with no column has no meaning here: name the column, `db.parent('id')`, or give it as the value of a Whereable or `vals({…})` key, whose column it then takes.",
   builtinWhereable = (name: string) => `A built-in \`${name}\` has no meaning as a Whereable (a filter): it would compile to its own enumerable keys, and to \`TRUE\`, every row, when it has none. To compare with a value, give it as \`db.param(…)\`; to filter, give a plain object (\`{ column: value }\`); await a \`Promise\` first.`;
 
-// raw(), cols() and vals() as a filter value, or in vals({…}) (so as a write value): Zapatos 6.6.1 sent them as JSON;
+// raw(), cols() and vals() as a filter value, in vals([…]) or in vals({…}) (so as a write value): Zapatos 6.6.1 sent them as JSON;
 // compiling raw() there as SQL would turn a caller's raw(input), a parameter until now, into an injection, so they throw
 const isWrapper = (x: unknown) => x instanceof DangerousRawString || x instanceof ColumnNames || x instanceof ColumnValues;
 
@@ -655,11 +662,13 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
           const value = values[i];
           if (i > 0) result.text += ', ';
           // a set currentColumn means a column's value, a filter's or a write's (see defaultInVals), where `Default`,
-          // `self`, `all` and the wrappers are refused
+          // `self`, `all` and the wrappers are refused; with none (a template, updateValues), `self`, `all` and the
+          // wrappers too, which Zapatos 6.6.1 sent as 'Symbol(all)' or JSON, but `Default` is `DEFAULT`, as when
+          // inserting by hand
           if (value === Default && currentColumn) throw new Error(defaultInVals);
-          if (value === self && currentColumn) throw new Error(selfInVals);
-          if (value === all && currentColumn) throw new Error(allInVals);
-          if (isWrapper(value) && currentColumn) throw new Error(wrapperInVals);
+          if (value === self) throw new Error(currentColumn ? selfInVals : selfInBareVals);
+          if (value === all) throw new Error(currentColumn ? allInVals : allInBareVals);
+          if (isWrapper(value)) throw new Error(currentColumn ? wrapperInVals : wrapperInBareVals);
           if (value instanceof SQLFragment ||
             value instanceof Parameter ||
             value === Default) this.compileExpression(value, result, parentTable);
@@ -679,9 +688,12 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
             columnName = columnNames[i],
             columnValue = columnValues[i];
           if (i > 0) result.text += ', ';
-          // raw(), cols() and vals() are no values here, the writes of insert(), upsert() and update() included;
-          // parent() is the parent column, as in vals([…]), and throws outside a nested query, as every write is
+          // raw(), cols(), vals(), `all` and `self` are no values here, the writes of insert(), upsert() and update()
+          // included, where Zapatos 6.6.1 sent them as JSON or 'Symbol(all)'; parent() is the parent column, as in
+          // vals([…]), and throws outside a nested query, as every write is
           if (isWrapper(columnValue)) throw new Error(wrapperAsValue);
+          if (columnValue === all) throw new Error(allAsValue);
+          if (columnValue === self) throw new Error(selfAsValue);
           if (columnValue instanceof SQLFragment ||
             columnValue instanceof Parameter ||
             columnValue instanceof ParentColumn ||
