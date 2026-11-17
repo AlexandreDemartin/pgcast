@@ -887,21 +887,27 @@ export const select: SelectSignatures = function (
     orderSQL = order === undefined ? [] :
       order === null ? refusedSQL(orderNull) :
       sql` ORDER BY ${mapWithSeparator(order as OrderSpecForTable<Table>[], sql`, `, o => {  // `as` clause is required when TS not strict
-        if (!['ASC', 'DESC'].includes(callerValue(o, 'direction'))) throw new Error(`Direction must be ASC/DESC, not '${callerValue(o, 'direction')}'`);
-        if (callerValue(o, 'nulls') && !['FIRST', 'LAST'].includes(callerValue(o, 'nulls'))) throw new Error(`Nulls must be FIRST/LAST/undefined, not '${callerValue(o, 'nulls')}'`);
-        return sql`${callerValue(o, 'by')} ${raw(callerValue(o, 'direction'))}${callerValue(o, 'nulls') ? sql` NULLS ${raw(callerValue(o, 'nulls'))}` : []}`;
+        // each key is read once, and checked before the next is read: a getter may answer anew, so raw() and the
+        // message get the read that was checked
+        const direction = callerValue(o, 'direction');
+        if (!['ASC', 'DESC'].includes(direction)) throw new Error(`Direction must be ASC/DESC, not '${direction}'`);
+        const nulls = callerValue(o, 'nulls');
+        if (nulls && !['FIRST', 'LAST'].includes(nulls)) throw new Error(`Nulls must be FIRST/LAST/undefined, not '${nulls}'`);
+        return sql`${callerValue(o, 'by')} ${raw(direction)}${nulls ? sql` NULLS ${raw(nulls)}` : []}`;
       })}`,
     limitSQL = (limit: number | undefined) => limit === undefined ? [] :
       callerValue(allOptions, 'withTies') ? sql` FETCH FIRST ${param(limit)} ROWS WITH TIES` :
         sql` LIMIT ${param(limit)}`,  // compatibility with pg pre-10.5; and fewer bytes!
     offsetSQL = callerValue(allOptions, 'offset') === undefined ? [] : sql` OFFSET ${param(callerValue(allOptions, 'offset'))}`,  // pg is lax about OFFSET following FETCH, and we exploit that
     lockSQL = lock === undefined ? [] : lock === null ? refusedSQL(lockNull) : (lock as SelectLockingOptions<string>[]).map(lock => {  // `as` clause is required when TS not strict
-      if (!['UPDATE', 'NO KEY UPDATE', 'SHARE', 'KEY SHARE'].includes(callerValue(lock, 'for'))) throw new Error(`Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not '${callerValue(lock, 'for')}'`);
-      if (callerValue(lock, 'wait') && !['NOWAIT', 'SKIP LOCKED'].includes(callerValue(lock, 'wait'))) throw new Error(`Lock wait must be NOWAIT/SKIP LOCKED/undefined, not '${callerValue(lock, 'wait')}'`);
+      const strength = callerValue(lock, 'for');  // for and wait read once each, as an order item's keys
+      if (!['UPDATE', 'NO KEY UPDATE', 'SHARE', 'KEY SHARE'].includes(strength)) throw new Error(`Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not '${strength}'`);
+      const wait = callerValue(lock, 'wait');
+      if (wait && !['NOWAIT', 'SKIP LOCKED'].includes(wait)) throw new Error(`Lock wait must be NOWAIT/SKIP LOCKED/undefined, not '${wait}'`);
       const
         ofTables = callerValue(lock, 'of') === undefined || Array.isArray(callerValue(lock, 'of')) ? callerValue(lock, 'of') : [callerValue(lock, 'of')],
         ofClause = ofTables === undefined ? [] : sql` OF ${mapWithSeparator(ofTables as Table[], sql`, `, t => t)}`;  // `as` clause is required when TS not strict
-      return sql` FOR ${raw(callerValue(lock, 'for'))}${ofClause}${callerValue(lock, 'wait') ? sql` ${raw(callerValue(lock, 'wait'))}` : []}`;
+      return sql` FOR ${raw(strength)}${ofClause}${wait ? sql` ${raw(wait)}` : []}`;
     }),
     lateralSQL = lateral === undefined ? [] :
       lateral instanceof SQLFragment ? (() => {
