@@ -231,7 +231,8 @@ const jsonpathParam = (path: unknown) => typeof path === 'string' ? param(path, 
  * a key of `vars`, sent as JSON text, `JSON.stringify(vars)`, and `{}` when left out, so a value never goes into the
  * path. Postgres raises the path's errors: 42601 for an invalid path, 2203A for a `strict` path on a row that lacks its
  * key, 42704 for a variable `vars` lacks. As the query compiles, a path that is no string throws, and so does what JSON
- * lacks in `vars`, at any depth, as in `jsonbContains()`. No index serves the function, where a GIN index serves `@>`.
+ * lacks in `vars`, at any depth, as in `jsonbContains()`. No GIN index serves the function, where one serves `@>`; an
+ * expression index on the call, its path and `vars` fixed, serves that call.
  * On a `jsonb` domain whose `zapatos/custom` placeholder is narrowed, name its type: `jsonbPathExists<PgProjection>(…)`.
  * @param path A SQL/JSON path: `'$.prizes[*] ? (@ == $prize)'`
  * @param vars The path's variables, an object: `{ prize: 'Golden Gull' }`
