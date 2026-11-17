@@ -407,6 +407,11 @@ Candidates for a check, a rule or a skill line.
 - #676: a mutant run while another part of the fix is in place can pass for the wrong reason: rerun each mutant against the final shape.
 - #676: a fixture with an accidental hole can hide that the library's own sources rely on it: "type-checks against a generated one" goes red when it closes.
 - #676: run a type fix's forwarder grid on TS 4.1.6, 5.9 and 7: a guard in `db.SQLExpression` broke a generic `` db.sql`${{ ...w, id }}` `` on 4.1.6 only.
+- #677: rate the risk by where the change lands: a refusal added inside `compileExpression` is `high`, even when no SQL changes; only a message on a path that already threw stays `normal`.
+- #677: `upsert()` `updateValues` is compiled with no current column, so a refusal in `core.ts` that waits for `currentColumn` never reaches it.
+- #677: a message's advice gets the same proof as a code path: run what it says, where it says it, on Postgres (42703 in a `VALUES` list, 42702 in `updateValues`).
+- #677: a docs sentence "the type refuses it" is compiled for each position it covers, a hand-written `sql` template and an `any` column included.
+- #677: a message that quotes `` sql`${…}` `` fails lint's `no-template-curly-in-string` and the docs check: write the advice as plain SQL.
 
 ## Minors kept
 
