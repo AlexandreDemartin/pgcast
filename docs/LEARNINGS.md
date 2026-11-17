@@ -320,6 +320,8 @@ Candidates for a check, a rule or a skill line.
 - #635: the cheapest type shape beat the obvious one sixfold: plain indexing of declared maps cost +2.0 points where `Extract` over a union or a generic join argument cost +11.6, and the generic also let an extra property through.
 - #635: an ambient `declare module 'x'` in a script file hides the real module `x` instead of extending it: generated types cannot be added to `zapatos/db` that way (TS2305).
 - #635: the guard refuses `git merge --no-edit`: give the merge message with `-m`, its Co-Authored-By line included.
+- #639: with `groupBy`, every lateral's result is in the select list, so Postgres refuses the query (42803) unless `groupBy` names it: why real code writes `${col}, "lateral_x".result`.
+- #639: to probe row-level security as a superuser without creating a role, `SET LOCAL ROLE pg_read_all_data` in the probe database: predefined, no RLS bypass, SELECT already granted.
 
 ## Minors kept
 
@@ -369,4 +371,4 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 
 - #606 (form): `scripts/check-declarations-floor.mjs` leaves `pg-types` (`^2.2.0` from `@types/pg@8.6.6`) unpinned.
 - #621 (form): `src/db/conditions.ts` `callerValue(options, 'parent') || undefined`: `|| undefined` is an equivalent mutant (core reads `parentTable` by truthiness).
-
+- #639 (form): `.agents/skills/code-style/SKILL.md` § Further than Zapatos still lists "laterals typed by foreign keys" first on Zapatos's roadmap; after decision 007, say what pgcast gives instead (`parent<T.Column>`).

@@ -29,7 +29,12 @@ Each film has one studio: `studio_id` is `NOT NULL REFERENCES studios(id)`, so t
 
 - The joins come in the sorted order of their keys, whatever order you write them in.
 - On a nullable foreign key, nest [`selectOne()`](/select#selectOne): the key holds the row or `null`, as the mentor below.
-- In a lateral, `selectExactlyOne()` checks nothing: a missing row gives `null` and no error, though its type has no `null` ([`selectExactlyOne()`](/select#selectExactlyOne)). Keep it for a `NOT NULL` foreign key.
+- In a lateral, `selectExactlyOne()` checks nothing: a missing row gives `null` and no error, though its type has no `null` ([`selectExactlyOne()`](/select#selectExactlyOne)). Keep it for a foreign key that rules the missing row out, and nest `selectOne()` otherwise:
+  - its columns `NOT NULL`;
+  - validated: a key added `NOT VALID` leaves the rows already there unchecked, so one may point at no row;
+  - not `DEFERRABLE`: a deferred key is checked at `COMMIT`, so until then the transaction can hold a row that points at none;
+  - its target without row-level security: the key's check bypasses the policies, your query does not, so a policy can hide the row.
+- There is no `related()` to read the join from the foreign key: it would save a type, never a line nor the SQL ([decision 007](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/007-related.md)).
 
 ## Go through a join table
 
@@ -102,6 +107,31 @@ Each cinema, and the nearest other one: a self-join again, with the distance as 
 - `km` is a `number` because the fragment says so: `db.sql<s.cinemas.SQL, number>`.
 - [`ne(db.parent('id'))`](/conditions#conditions.ne) leaves the cinema itself out.
 - For the three nearest, nest `select()` with [`limit: 3`](/select#order-limit-offset-and-withties): `nearest` becomes an array.
+
+## Filter, sort and group by a lateral
+
+Each `lateral` key joins as a table of the query, `"lateral_<key>"`, with one column, `result`. A `sql` fragment names it in the `where`, the `order` or the `groupBy` of the query around it:
+
+<CastPanel example="lateral_result">
+
+<<< ./examples/lateral_result.ts{ts twoslash}
+
+</CastPanel>
+
+- `WHERE "lateral_castSize".result >= $3`<!-- probe: examples/lateral_result.ts --> and `ORDER BY "lateral_castSize".result DESC`<!-- probe: examples/lateral_result.ts --> read each film's count of roles.
+- Quote the name as pgcast does: unquoted, Postgres folds it to `lateral_castsize`, and refuses the query (42P01). A `"` in a key is doubled, `"lateral_a""b"`<!-- probe: db.select('films', db.all, { lateral: { 'a"b': db.count('roles', { film_id: db.parent('id') }) } }) -->.
+- `result` is the subquery's: a number for `count()`, `jsonb` for the others. Read a field with `->>`, as in `ORDER BY "lateral_studio".result->>'name' ASC`<!-- probe: db.select('films', db.all, { columns: ['title'], lateral: { studio: db.selectExactlyOne('studios', { id: db.parent('studio_id') }, { columns: ['name'] }) }, order: { by: db.sql`"lateral_studio".result->>'name'`, direction: 'ASC' } }) -->.
+
+With a `groupBy`, each lateral's result is in the row too, so group by it as well: Postgres refuses the query otherwise (42803). Give both in one fragment, typed so that its columns are checked:
+
+<CastPanel example="lateral_result_group">
+
+<<< ./examples/lateral_result_group.ts{ts twoslash}
+
+</CastPanel>
+
+- `GROUP BY "studio_id", "lateral_studio".result`<!-- probe: examples/lateral_result_group.ts -->: each studio once, with its name and its number of films.
+- `db.sql<s.films.SQL>` refuses `${'name'}`, a column of `studios`. An array of columns can't hold the fragment: [`groupBy`](/select#groupby-and-having) takes a column, an array of columns, or one fragment.
 
 ## Check the parent column
 
