@@ -118,7 +118,7 @@ describe('declarations a consumer emits for raw(), param(), cols(), vals() and p
 };
 export declare const paramSpread: {
     value: number;
-    cast?: string | boolean | undefined;
+    cast?: boolean | string | undefined;
 };
 export declare const colsSpread: {
     value: string[];
