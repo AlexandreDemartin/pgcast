@@ -134,6 +134,25 @@ jobs:
       - run: npx -p typescript@7.0.2 tsc --version
       - run: npx -p typescript@7.0.2 tsc -p test/generated
 
+  typescript-4-1:
+    # The floor of the typescript peer (>=4.1): every .d.ts the package ships parses with TypeScript 4.1.6, and a consumer
+    # on it compiles against them and the committed test/generated/ schema, with skipLibCheck (website/install.md). The
+    # script fetches TypeScript 4.1.6 and its @types into node_modules/.cache, never a dependency; no Postgres.
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm run check:floor
+
   docs:
     # The docs site, a package of its own (decision 004): its build fails on a dead link or a type error in an example.
     # It installs the built library (`file:..`), so the root is built first. docs.yml deploys it from master.
@@ -199,13 +218,13 @@ jobs:
   ci-passed:
     # The one check master requires: it stays stable when the matrix changes, and passes when docs-only skips the rest.
     name: CI passed
-    needs: [changes, build, bench-types, typescript-7, docs]
+    needs: [changes, build, bench-types, typescript-7, typescript-4-1, docs]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Every job passed, or was skipped on purpose
         env:
-          RESULTS: ${{ needs.changes.result }} ${{ needs.build.result }} ${{ needs.bench-types.result }} ${{ needs.typescript-7.result }} ${{ needs.docs.result }}
+          RESULTS: ${{ needs.changes.result }} ${{ needs.build.result }} ${{ needs.bench-types.result }} ${{ needs.typescript-7.result }} ${{ needs.typescript-4-1.result }} ${{ needs.docs.result }}
         run: |
           for result in $RESULTS; do
             case "$result" in
