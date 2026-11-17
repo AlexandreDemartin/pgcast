@@ -2,7 +2,7 @@
 
 - **Status**: accepted (2026-11-17), by delegation from the owner: each choice below is decided under the philosophy, and carries its own status.
 - **Scope**: feature [#54](https://github.com/AlexandreDemartin/pgcast/issues/54), its planned PRs 3 to 7 ([#627](https://github.com/AlexandreDemartin/pgcast/issues/627) to [#631](https://github.com/AlexandreDemartin/pgcast/issues/631)), and the rule for typed references that [#57](https://github.com/AlexandreDemartin/pgcast/issues/57) reuses.
-- **In short**: `related()` and `relatedMany()` are **not built in the core**. The runtime cannot know a foreign key's columns without a generated runtime module, which costs more than the one line each call would save. What #54 keeps: `groupBy` takes an array that mixes columns and fragments, and the docs show how to write a lateral on a foreign key by hand.
+- **In short**: `related()` and `relatedMany()` are **not built in the core**. The runtime cannot know a foreign key's columns without a generated runtime module, which costs more than the one line each call would save. What #54 keeps: `groupBy` takes an array that mixes columns and fragments, and the docs complete what `website/lateral.md` shows of a lateral on a foreign key, written by hand.
 
 ## Context
 
