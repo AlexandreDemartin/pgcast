@@ -278,6 +278,60 @@ CREATE TABLE edge.class (
 COMMENT ON TABLE edge."odd table" IS 'Comment that closes a JSDoc block: */ and keeps going';
 COMMENT ON COLUMN edge."odd table".light IS 'Column comment with */ inside';
 
+-- ---------------------------------------------------------------- unions: domains typed by their values
+
+-- Each form of decision note 008 § 1, read by domainsTypedAsUnions or left out. No configuration of main reads
+-- this schema, so the default snapshots stay as they are.
+CREATE SCHEMA unions;
+
+-- read: stored as CHECK ((VALUE = ANY (ARRAY['hardback'::text, …]))), whether written IN or = ANY
+CREATE DOMAIN unions.book_format AS text CHECK (VALUE IN ('hardback', 'paperback', 'ebook'));
+CREATE DOMAIN unions.cover AS text CHECK (VALUE = ANY (ARRAY['matt', 'gloss']));
+-- read: one value, stored as CHECK ((VALUE = 'first'::text))
+CREATE DOMAIN unions.edition AS text CHECK (VALUE IN ('first'));
+-- read: a quote, a backslash, a line break, '' and a duplicate, kept once
+CREATE DOMAIN unions.quirk AS text CHECK (VALUE IN ('it''s', 'back\slash', E'two\nlines', '', 'it''s'));
+-- read: NOT NULL, a pg_constraint row of its own from Postgres 17, and another CHECK beside, which only narrows
+CREATE DOMAIN unions.shelf AS text NOT NULL CHECK (VALUE IN ('top', 'middle', 'bottom')) CHECK (length(VALUE) > 3);
+
+-- left out: NULL lets anything through, other base types, a domain over a domain, NOT VALID, an OR, two of the form
+CREATE DOMAIN unions.with_null AS text CHECK (VALUE IN ('hardback', NULL));
+CREATE DOMAIN unions.short_format AS varchar(20) CHECK (VALUE IN ('hardback', 'ebook'));
+CREATE DOMAIN unions.padded_format AS char(10) CHECK (VALUE IN ('hardback', 'ebook'));
+CREATE DOMAIN unions.any_case_format AS ext.citext CHECK (VALUE IN ('hardback', 'ebook'));
+CREATE DOMAIN unions.digital_format AS unions.book_format CHECK (VALUE IN ('ebook'));
+CREATE DOMAIN unions.unchecked AS text;
+ALTER DOMAIN unions.unchecked ADD CONSTRAINT unchecked_check CHECK (VALUE IN ('new')) NOT VALID;
+CREATE DOMAIN unions.either AS text CHECK (VALUE = 'hardback' OR VALUE = 'ebook');
+CREATE DOMAIN unions.twice AS text CHECK (VALUE IN ('hardback', 'ebook')) CHECK (VALUE IN ('ebook', 'audio'));
+CREATE DOMAIN unions.free_text AS text;
+
+COMMENT ON DOMAIN unions.book_format IS 'How a book is printed';
+COMMENT ON DOMAIN unions.cover IS 'Finish of the cover, */ closed
+on two lines';
+
+CREATE TABLE unions.books (
+  id int PRIMARY KEY,
+  format unions.book_format NOT NULL,
+  cover unions.cover,
+  edition unions.edition DEFAULT 'first',
+  quirk unions.quirk,
+  shelf unions.shelf,
+  formats unions.book_format[],  -- an array of the domain keeps its placeholder
+  with_null unions.with_null,
+  short_format unions.short_format,
+  padded_format unions.padded_format,
+  any_case_format unions.any_case_format,
+  digital_format unions.digital_format,
+  unchecked unions.unchecked,
+  either unions.either,
+  twice unions.twice,
+  free_text unions.free_text
+);
+
+CREATE VIEW unions.ebooks AS SELECT id, format FROM unions.books WHERE format = 'ebook';
+CREATE MATERIALIZED VIEW unions.formats_in_use AS SELECT DISTINCT format FROM unions.books;
+
 -- ---------------------------------------------------------------- seed
 
 INSERT INTO public.users (email, display_name, mood, manager_id, home, settings, tags) VALUES

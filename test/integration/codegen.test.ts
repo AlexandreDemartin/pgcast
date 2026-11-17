@@ -68,6 +68,9 @@ const variants: [string, Config][] = [
   ['enumArraysTypedAsText', { schemas: customTypesSchemas, typeEnumsAcrossSchemas: true, enumArraysTypedAsText: true }],
   // only extra.type_zoo's c_interval differs, in the four interfaces but JSONSelectable; the placeholders are the same
   ['intervalsTypedAsObjects', { schemas: customTypesSchemas, intervalsTypedAsObjects: true }],
+  // the fixture's schema unions, which only this variant reads, beside public.users: a domains section in each schema,
+  // the unions of unions.book_format, cover, edition, quirk and shelf, and their placeholders naming them
+  ['domainsTypedAsUnions', { schemas: { public: only('users'), unions: all }, domainsTypedAsUnions: true }],
   ['columnOptions', {
     schemas: { public: only('users', 'accounts'), extra: only('articles') },
     columnOptions: {
@@ -1054,6 +1057,73 @@ ${imports.map(line => `  ${line}\n`).join('')}  export type ${type};  // replace
     });
   });
 
+  describe('domainsTypedAsUnions, compiled', () => {
+    const config = { schemas: { unions: all } };
+    const on = { ...config, domainsTypedAsUnions: true };
+
+    /** unions.books.format, of unions.book_format: `union` before what only its union refuses, in each context. */
+    const unionProbe = (union: string) => `
+      import * as db from 'zapatos/db';
+      import type * as s from 'zapatos/schema';
+      import { expectTypeOf } from 'expect-type';
+      declare const client: db.Queryable;
+      export const probe = async () => {
+        const row = await db.selectExactlyOne('unions.books', { id: 1 }).run(client);
+        const [read] = await db.sql<s.unions.books.SQL, s.unions.books.Selectable[]>\`SELECT * FROM \${'unions.books'}\`.run(client);
+        expectTypeOf(row.format).not.toBeAny();
+        expectTypeOf(read!.format).not.toBeAny();
+        for (const format of ['hardback', 'paperback', 'ebook'] as const) {
+          format satisfies s.unions.books.Selectable['format'];
+          format satisfies s.unions.books.JSONSelectable['format'];
+          db.select('unions.books', { format });
+          db.select('unions.books', { format: db.conditions.isIn([format]) });
+          db.insert('unions.books', { id: 1, format, shelf: 'top' });
+          db.update('unions.books', { format }, { id: 1 });
+        }
+        ${union} not a value of its CHECK: Selectable
+        'zzz' satisfies s.unions.books.Selectable['format'];
+        ${union} JSONSelectable
+        'zzz' satisfies s.unions.books.JSONSelectable['format'];
+        ${union} Whereable
+        db.select('unions.books', { format: 'zzz' });
+        ${union} Insertable
+        db.insert('unions.books', { id: 1, format: 'zzz', shelf: 'top' });
+        ${union} Updatable
+        db.update('unions.books', { format: 'zzz' }, { id: 1 });
+        ${union} in a view too
+        db.select('unions.ebooks', { format: 'zzz' });
+        ${union} and in a materialised view
+        'zzz' satisfies s.unions.formats_in_use.Selectable['format'];
+        return [row, read];
+      };`;
+
+    /** What only the key declares: the unions, and their values in the order of their CHECK. */
+    const declared = `
+      type Format = 'hardback' | 'paperback' | 'ebook';
+      expectTypeOf<s.unions.books.Selectable['format']>().toEqualTypeOf<Format>();
+      expectTypeOf<s.unions.books.JSONSelectable['format']>().toEqualTypeOf<Format>();
+      expectTypeOf<s.unions.book_format>().toEqualTypeOf<Format>();
+      expectTypeOf<s.unions.every.book_format>().toEqualTypeOf<['hardback', 'paperback', 'ebook']>();
+      expectTypeOf<s.unions.every.quirk>().toEqualTypeOf<["it's", 'back\\\\slash', 'two\\nlines', '']>();
+      expectTypeOf<s.unions.every.edition>().toEqualTypeOf<['first']>();
+      expectTypeOf<s.unions.every.shelf>().toEqualTypeOf<['top', 'middle', 'bottom']>();`;
+    const unused = "probe.ts TS2578 Unused '@ts-expect-error' directive.";
+
+    it('types a column by its union in all five, through its placeholder', async () => {
+      expect(await probeErrors(on, unionProbe('// @ts-expect-error') + declared)).toEqual([]);
+    });
+
+    it('types it as text without the key: each refusal is an unused directive', async () => {
+      expect(await probeErrors(config, unionProbe('//'))).toEqual([]);
+      expect(await probeErrors(config, unionProbe('// @ts-expect-error'))).toEqual(Array(7).fill(unused));
+    });
+
+    it('types it by a placeholder written before, kept on disk, with the key', async () => {
+      const written = { PgBook_format: (await codegen(config)).customTypeSourceFiles.PgBook_format };
+      expect(await probeErrors(on, unionProbe('// @ts-expect-error'), {}, written)).toEqual(Array(7).fill(unused));
+    });
+  });
+
   it('holds no orphan file', () => {
     const expected = variants.flatMap(([name]) =>
       withoutCustomTypes.includes(name) ? [`${name}.d.ts`] : [`${name}.custom.d.ts`, `${name}.d.ts`]);
@@ -2034,6 +2104,244 @@ describe('intervalsTypedAsObjects', () => {
     void right;
     // @ts-expect-error a boolean
     const wrong: Config = { intervalsTypedAsObjects: 'yes' };
+    void wrong;
+  });
+});
+
+describe('domainsTypedAsUnions', () => {
+  // the fixture's schema unions holds each form of decision note 008 § 1; these schemas, committed to this file's
+  // database, hold what no other test configures: #42's shared name, a TypeScript name shared with an enum, a domain
+  // of a schema the run does not generate
+  beforeAll(() => t.pool.query(`
+    CREATE SCHEMA union_a;
+    CREATE DOMAIN union_a.cut AS text CHECK (VALUE IN ('rough', 'final'));
+    CREATE TABLE union_a.reels (id int PRIMARY KEY, cut union_a.cut);
+    CREATE SCHEMA union_b;
+    CREATE DOMAIN union_b.cut AS integer CHECK (VALUE > 0);
+    CREATE TABLE union_b.takes (id int PRIMARY KEY, cut union_b.cut);
+    CREATE SCHEMA union_clash;
+    CREATE TYPE union_clash."odd format" AS ENUM ('wide');
+    CREATE DOMAIN union_clash.odd_format AS text CHECK (VALUE IN ('narrow'));
+    CREATE TABLE union_clash.prints (id int PRIMARY KEY, format union_clash.odd_format);
+    CREATE SCHEMA union_user;
+    CREATE TABLE union_user.loans (id int PRIMARY KEY, format unions.book_format);
+  `));
+  afterAll(() => t.pool.query('DROP SCHEMA union_a, union_b, union_clash, union_user CASCADE'));
+
+  const unionsOnly = { schemas: { unions: all }, unprefixedSchema: 'unions' };
+  const on = { ...unionsOnly, domainsTypedAsUnions: true };
+  const read = ['PgBook_format', 'PgCover', 'PgEdition', 'PgQuirk', 'PgShelf'];
+  const leftOut = ['PgAny_case_format', 'PgDigital_format', 'PgEither', 'PgFree_text', 'PgPadded_format', 'PgShort_format',
+    'PgTwice', 'PgUnchecked', 'PgWith_null', 'Pg_book_format'];
+  /** A placeholder that names `type`, imported as `imported` from zapatos/schema. */
+  const naming = (name: string, imported: string, type = imported) =>
+    `  import type { ${imported} } from 'zapatos/schema';\n  export type ${name} = ${type};`;
+  /** The domains section of the first schema of a generated file, less its margin. */
+  const domainsOf = (schema: string) => {
+    const start = schema.indexOf('/* --- domains --- */'), margin = start - schema.lastIndexOf('\n', start) - 1;
+    return schema.slice(start, schema.indexOf('/* --- tables --- */')).replace(new RegExp(`^ {${margin}}`, 'gm'), '').trimEnd();
+  };
+  const notesOf = (warnings: string[]) => warnings.filter(w => w.includes('domainsTypedAsUnions'));
+
+  it('reads each form of the CHECK of decision note 008, and leaves the others out', async () => {
+    const [{ ts: schema, customTypeSourceFiles: files }, off] =
+      [await codegen({ ...on, schemaJSDoc: false }), await codegen({ ...unionsOnly, schemaJSDoc: false })];
+    expect(domainsOf(schema)).toBe(`/* --- domains --- */
+
+export type book_format = 'hardback' | 'paperback' | 'ebook';
+export namespace every {
+  export type book_format = ['hardback', 'paperback', 'ebook'];
+}
+export type cover = 'matt' | 'gloss';
+export namespace every {
+  export type cover = ['matt', 'gloss'];
+}
+export type edition = 'first';
+export namespace every {
+  export type edition = ['first'];
+}
+export type quirk = 'it\\'s' | 'back\\\\slash' | 'two\\nlines' | '';
+export namespace every {
+  export type quirk = ['it\\'s', 'back\\\\slash', 'two\\nlines', ''];
+}
+export type shelf = 'top' | 'middle' | 'bottom';
+export namespace every {
+  export type shelf = ['top', 'middle', 'bottom'];
+}`);
+    expect(files.PgBook_format).toContain(naming('PgBook_format', 'book_format'));
+    expect(files.PgShelf).toContain(naming('PgShelf', 'shelf'));
+    // NULL, varchar, char, citext, a domain over a domain, NOT VALID, an OR, two of the form, none, an array of one
+    for (const name of leftOut) expect.soft(files[name], name).toBe(off.customTypeSourceFiles[name]);
+    // the columns keep their placeholder in all five interfaces: the file is the same, but the section
+    expect(schema.replace(/\n\n {2}\/\* --- domains --- \*\/\n[^]*?(?=\n\n {2}\/\* --- tables --- \*\/)/, '')).toBe(off.ts);
+  });
+
+  it('names the union through its schema\'s namespace in a prefixed schema', async () => {
+    const { ts: schema, customTypeSourceFiles: files } = await codegen({ schemas: { unions: all }, domainsTypedAsUnions: true });
+    expect(schema).toContain('\n    export type edition = \'first\';\n');
+    expect(files.PgEdition).toContain(naming('PgEdition', 'unions', 'unions.edition'));
+  });
+
+  it('gives the union a JSDoc, with its comment, under schemaJSDoc', async () => {
+    const { ts: schema } = await codegen(on);
+    expect(domainsOf(schema).split('export type book_format')[0]).toBe(`/* --- domains --- */
+
+/**
+ * **book_format**
+ * - Domain in database
+ *
+ * How a book is printed
+ */
+`);
+    expect(domainsOf(schema)).toContain(`
+/**
+ * **cover**
+ * - Domain in database
+ *
+ * Finish of the cover, *\\/ closed
+ * on two lines
+ */
+export type cover = 'matt' | 'gloss';`);
+    expect(domainsOf(schema)).toContain(`}\n/**\n * **edition**\n * - Domain in database\n */\nexport type edition = 'first';`);
+  });
+
+  it('keeps the placeholder of a domain whose value holds a backslash, with standard_conforming_strings off', async () => {
+    // pg_get_constraintdef() then writes 'back\\slash'::text for back\slash, with no E before the quote
+    const offStrings = { ...on, ...quiet, db: { ...db(), options: '-c standard_conforming_strings=off' } };
+    const [{ ts: schema, customTypeSourceFiles: files }, off] = [
+      await tsForConfig(finaliseConfig(offStrings), noDebug), await codegen(unionsOnly)];
+    expect(files.PgQuirk).toBe(off.customTypeSourceFiles.PgQuirk);
+    expect(domainsOf(schema)).not.toContain('quirk');
+    // the others are read as usual
+    expect(files.PgBook_format).toContain(naming('PgBook_format', 'book_format'));
+    expect(domainsOf(schema)).toContain(`export type book_format = 'hardback' | 'paperback' | 'ebook';`);
+  });
+
+  it('keeps master\'s placeholder of a name two types share (#42), with no note of the key', async () => {
+    const outDir = mkdtempSync(join(tmpdir(), 'pgcast-unions-shared-'));
+    try {
+      const both = { schemas: { union_a: all, union_b: all }, unprefixedSchema: null, outDir };
+      const offFiles = (await codegen(both)).customTypeSourceFiles;
+      const { ts: schema, customTypeSourceFiles: files } = await codegen({ ...both, domainsTypedAsUnions: true });
+      // last wins, as without the key: either base type, never the union
+      expect([offFiles.PgCut, files.PgCut].map(f => /PgCut = (string|number);/.test(f))).toEqual([true, true]);
+      expect(files.PgCut).not.toContain('import type');
+      expect(schema).toContain(`export type cut = 'rough' | 'final';`);  // declared all the same
+      // with a placeholder on disk that names no union: no note of this key
+      const warnings: string[] = [];
+      await generate({ ...both, ...quiet, warningListener: s => warnings.push(s), db: db() });
+      await generate({ ...both, ...quiet, warningListener: s => warnings.push(s), db: db(), domainsTypedAsUnions: true });
+      expect(notesOf(warnings)).toEqual([]);
+      expect(warnings.filter(w => w.includes('PgCut'))).not.toEqual([]);  // #42's own note
+      // union_a alone: the name is the domain's only, and its placeholder names the union
+      expect((await codegen({ ...both, schemas: { union_a: all }, domainsTypedAsUnions: true })).customTypeSourceFiles.PgCut)
+        .toContain(naming('PgCut', 'union_a', 'union_a.cut'));
+    } finally {
+      rmSync(outDir, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps master\'s placeholder of a domain whose schema the run does not generate', async () => {
+    const config = { schemas: { union_user: all } };
+    const { ts: schema, customTypeSourceFiles: files } = await codegen({ ...config, domainsTypedAsUnions: true });
+    expect(files.PgBook_format).toBe((await codegen(config)).customTypeSourceFiles.PgBook_format);
+    expect(domainsOf(schema)).toBe('/* --- domains --- */\n/* (none) */');
+  });
+
+  it('notes a domain and an enum that share a TypeScript name, as two enums', async () => {
+    const config = { schemas: { union_clash: all }, domainsTypedAsUnions: true };
+    expect((await warningsOf(config)).filter(w => w.includes('clash'))).toEqual([
+      'Note: domain "union_clash"."odd_format" and enum "union_clash"."odd format" are both named odd_format in ' +
+      'TypeScript, so their declarations clash. To type them apart, rename one of them in the database.',
+    ]);
+    expect((await warningsOf({ ...config, domainsTypedAsUnions: false })).filter(w => w.includes('clash'))).toEqual([]);
+  });
+
+  describe('a placeholder on disk', () => {
+    let outDir: string;
+    beforeEach(() => { outDir = mkdtempSync(join(tmpdir(), 'pgcast-unions-')); });
+    afterEach(() => rmSync(outDir, { recursive: true, force: true }));
+
+    const note = (domain: string, union: string, placeholder: string) => `Note: ${domain} is typed by the values of its ` +
+      `CHECK as ${union} in zapatos/schema (domainsTypedAsUnions), but its placeholder ` +
+      `${join(outDir, 'zapatos/custom', placeholder)}.d.ts, written before, still types its columns. To type them by the ` +
+      `database, delete it: the next run writes it naming the union.`;
+    const run = async (config: Config, gen: (config: Config) => Promise<unknown> = generate) => {
+      const warnings: string[] = [];
+      await gen({ ...unionsOnly, ...quiet, warningListener: s => warnings.push(s), db: db(), outDir, ...config });
+      return warnings;
+    };
+    const onDisk = (placeholder: string) => readFileSync(join(outDir, 'zapatos/custom', placeholder + '.d.ts'), 'utf8');
+
+    it('is kept, and named by a note, once per run, in the order of the domains, when it is not what the run writes', async () => {
+      await run({});
+      const written = Object.fromEntries(read.map(name => [name, onDisk(name)]));
+      const warnings = await run({ domainsTypedAsUnions: true });
+      expect(notesOf(warnings)).toEqual([
+        note('unions.book_format', 'book_format', 'PgBook_format'), note('unions.cover', 'cover', 'PgCover'),
+        note('unions.edition', 'edition', 'PgEdition'), note('unions.quirk', 'quirk', 'PgQuirk'),
+        note('unions.shelf', 'shelf', 'PgShelf'),
+      ]);
+      // after #42's notes, before those of other keys
+      expect(warnings.findIndex(w => w.includes('domainsTypedAsUnions'))).toBe(0);
+      expect(Object.fromEntries(read.map(name => [name, onDisk(name)]))).toEqual(written);
+      // check() and the CLI's --check give the note too, and count a placeholder only when missing
+      const checked: string[] = [];
+      expect(await checkFiles({ ...unionsOnly, ...quiet, warningListener: s => checked.push(s), db: db(), outDir,
+        domainsTypedAsUnions: true })).toBe(true);
+      expect(checked).toEqual(warnings);
+    });
+
+    it('is rewritten naming the union once deleted, and then never noted', async () => {
+      await run({});
+      rmSync(join(outDir, 'zapatos/custom/PgBook_format.d.ts'));
+      expect(notesOf(await run({ domainsTypedAsUnions: true }))).not.toContainEqual(note('unions.book_format', 'book_format', 'PgBook_format'));
+      expect(onDisk('PgBook_format')).toContain(naming('PgBook_format', 'book_format'));
+      expect(notesOf(await run({ domainsTypedAsUnions: true }))).toEqual([
+        note('unions.cover', 'cover', 'PgCover'), note('unions.edition', 'edition', 'PgEdition'),
+        note('unions.quirk', 'quirk', 'PgQuirk'), note('unions.shelf', 'shelf', 'PgShelf'),
+      ]);
+    });
+
+    it('gives no note without the key, nor when the placeholder is what the run writes', async () => {
+      await run({ domainsTypedAsUnions: true });
+      expect(notesOf(await run({ domainsTypedAsUnions: true }))).toEqual([]);
+      expect(notesOf(await run({}))).toEqual([]);
+      expect(notesOf(await run({ domainsTypedAsUnions: false }))).toEqual([]);
+    });
+  });
+
+  it('leaves the output, the queries and the notes as they were without the key, or with false', async () => {
+    const printed = async (config: Config) => {
+      const debug: string[] = [], warnings: string[] = [];
+      const output = await tsForConfig(finaliseConfig({ ...config, ...quiet, warningListener: s => warnings.push(s), db: db() }),
+        s => debug.push(s));
+      // relations are read concurrently: the queries in any order, each less its number
+      return { output, warnings: warnings.filter(w => !w.startsWith('Note: this database has bigint')), queries: debug.filter(s => s.startsWith('>>> query ')).map(s => s.replace(/^>>> query \d+/, '')).sort() };
+    };
+    for (const config of [unionsOnly, { schemas: { public: only('users'), unions: all } }, main]) {
+      const absent = await printed(config);
+      expect(await printed({ ...config, domainsTypedAsUnions: false })).toEqual(absent);
+      expect(absent.output.ts).not.toContain('/* --- domains --- */');
+      expect(absent.queries.join()).not.toContain('pg_constraint c ON c.contypid');
+    }
+    expect((await codegen(main)).ts).toBe(readFileSync(join(generatedDir, 'zapatos/schema.d.ts'), 'utf8'));
+  });
+
+  it('reads the domains in one query, of the run\'s schemas only', async () => {
+    const debug: string[] = [];
+    await tsForConfig(finaliseConfig({ ...on, ...quiet, db: db() }), s => debug.push(s));
+    const queries = debug.filter(s => s.startsWith('>>> query ') && s.includes('pg_constraint c ON c.contypid'));
+    expect(queries).toHaveLength(1);
+    expect(queries[0]).toContain('+ [["unions"]]');
+  });
+
+  it('is optional in Config, read as false when absent', () => {
+    expect(finaliseConfig({}).domainsTypedAsUnions).toBeUndefined();
+    const right: Config = { domainsTypedAsUnions: true };
+    void right;
+    // @ts-expect-error a boolean
+    const wrong: Config = { domainsTypedAsUnions: 'yes' };
     void wrong;
   });
 });
@@ -3184,6 +3492,10 @@ describe('include entries that match no relation', () => {
       domainsTypedByContext: [enumsNote, bothOrderNote, productsNote, intervalsNote],
       enumArraysTypedAsText: [bothOrderNote, productsNote, domainsNote, intervalsNote],
       intervalsTypedAsObjects: [enumsNote, bothOrderNote, productsNote, domainsNote],
+      domainsTypedAsUnions: [orderNote('mood', 'enum public.mood'), 'Note: unions.books.digital_format (unions.digital_format) ' +
+        'and unions.books.formats (unions.book_format[]) have domains over a domain, or arrays of a domain: as generated, ' +
+        'their placeholders type them as `any`. Set domainsTypedByContext: true to type them by the base type of the ' +
+        'innermost domain while their placeholders hold `any`; it will be the default in pgcast 7.0.'],
       columnOptions: [bothOrderNote, articlesNote],
       'include-exclude-lists': [unmatched('no_such_table', 'public'), bothOrderNote, articlesNote],
       'exclude-star': [bothOrderNote],  // exclude: '*' still generates the enums
