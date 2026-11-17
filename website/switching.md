@@ -1,3 +1,7 @@
+---
+description: "Move a project from Zapatos 6.6.1 to pgcast: change one line of package.json, regenerate, and let tsc and pgcast's warnings show you the few calls that change."
+---
+
 # Switch from Zapatos
 
 Move a project from Zapatos 6.6.1 to pgcast: change one line of `package.json`, regenerate, then let `tsc`, a look through your code and pgcast's warnings show you the few calls whose result changes. It assumes a project that already runs on Zapatos; for a new one, start at [Install](/install).

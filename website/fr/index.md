@@ -1,10 +1,10 @@
 ---
-english: cd5fe5cc3246
+english: d8ed4f06aed2
 layout: home
 markdownStyles: false
 title: pgcast
 titleTemplate: Le Postgres que vous connaissez, avec toute la puissance de TypeScript
-description: "Le Postgres que vous connaissez, avec toute la puissance de TypeScript. pgcast lit votre schéma et en tire les types ; chaque requête est un SQL que vous pouvez lire et prévoir. Pas d’ORM, pas de modèles, pas d’état caché : vous gardez la main."
+description: "Le Postgres que vous connaissez, avec toute la puissance de TypeScript. pgcast tire les types de votre schéma ; chaque requête est un SQL lisible et prévisible."
 ---
 
 <main class="landing">

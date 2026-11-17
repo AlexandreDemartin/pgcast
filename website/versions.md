@@ -1,3 +1,7 @@
+---
+description: "Why pgcast's version numbers carry on from Zapatos's, when a fix may change what your code gets back, and what a PGCAST_DEP00n warning asks of you."
+---
+
 # Versions
 
 Why pgcast's version numbers carry on from Zapatos's, how it decides whether a fix may change what your code gets back, and what a `PGCAST_DEP00n` warning is asking of you.

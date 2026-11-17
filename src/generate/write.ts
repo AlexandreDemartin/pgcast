@@ -55,7 +55,7 @@ export const generate = async (suppliedConfig: Config) => {
  * Compare the files `generate()` would write with those on disk, writing nothing, as the CLI's `--check` does: each
  * that differs or is missing goes to `warningListener` (`Out of date: <path>`, `Missing: <path>`); none, one line to
  * `progressListener`. A placeholder counts only when missing: it is yours to edit. A failed query rejects with its
- * error, `rejectOnQueryError` left out included; only `rejectOnQueryError: false` ends the process, as in `generate()`.
+ * error, `rejectOnQueryError` left out included: unlike `generate()`, only `rejectOnQueryError: false` ends the process.
  * @param suppliedConfig An object approximately matching `zapatosconfig.json`.
  * @returns `true` when the files on disk are up to date.
  */

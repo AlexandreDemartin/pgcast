@@ -1,3 +1,7 @@
+---
+description: "By the end of this page, you'll have generated a database's types, asked it for films and added one, with the SQL and the type of each query in front of you."
+---
+
 # First query
 
 By the end of this page, you'll have generated the types of a database, asked it for films and added one, with the SQL and the type of each query in front of you. It starts where [Install](/install) stops: pgcast and `pg` in your project.

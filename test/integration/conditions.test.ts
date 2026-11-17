@@ -343,6 +343,13 @@ describe('eqAny: one array parameter', () => {
   it('a list that is not an array rejects before any query', async () => {
     await expect(ids('users', { id: dc.eqAny(new Set([1]) as unknown as number[]) })).rejects.toThrow('`eqAny()` takes an array, not `Set`');
   });
+
+  it('db.all as an item rejects before any query, so an update() changes no row', async () => {
+    // pg would send it as 'Symbol(all)', which no name equals: under not(), every user
+    await expect(db.update('users', { display_name: 'Gone' }, { display_name: dc.not(dc.eqAny([db.all as any])) }).run(t.client))
+      .rejects.toThrow('not `db.all`: give a value.');
+    expect(await db.count('users', { display_name: 'Gone' }).run(t.client)).toBe(0);
+  });
 });
 
 describe('websearchToTsquery on a tsvector column', () => {
@@ -405,6 +412,21 @@ describe('websearchToTsquery on a tsvector column', () => {
   it('an unknown configuration: 42704', async () => {
     expect(await pgError(t.client, () => ids('products', { search: search('klingon', 'shirt') })))
       .toEqual({ code: '42704', message: 'text search configuration "klingon" does not exist' });
+  });
+
+  it('an unknown schema in a dotted configuration: 3F000 before Postgres 16, 42704 from 16', async () => {
+    // from 16, regconfig's input reports its errors softly, and the schema it lacks as the configuration it lacks
+    const { rows: [{ version }] } = await t.client.query("SELECT current_setting('server_version_num')::int AS version");
+    expect(await pgError(t.client, () => ids('products', { search: search('nosuch.english', 'shirt') }))).toEqual(version >= 160000 ?
+      { code: '42704', message: 'text search configuration "nosuch.english" does not exist' } :
+      { code: '3F000', message: 'schema "nosuch" does not exist' });
+  });
+
+  it('a query that is no string rejects before any query, so an update() changes no row', async () => {
+    // pg would send ['shirt'] as '{"shirt"}', which Postgres reads as the word shirt: both shirts
+    await expect(db.update('products', { price_cents: 0 }, { search: search('simple', ['shirt'] as any) }).run(t.client))
+      .rejects.toThrow('`websearchToTsquery()` takes its query as a string, not an array');
+    expect(await db.count('products', { price_cents: 0 }).run(t.client)).toBe(0);
   });
 
   it('a NULL vector gives NULL: not() leaves the row out too', async () => {

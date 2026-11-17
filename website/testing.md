@@ -1,3 +1,7 @@
+---
+description: "Three ways to test a function that runs pgcast queries: against a real Postgres, rolled back; on the query it compiles; on a fake result typed from the schema."
+---
+
 # Testing
 
 Three ways to test a function that runs pgcast queries, the most faithful first: against a real Postgres, each test rolled back; on the query it compiles, with no database; on a fake result typed from the schema. It assumes the basics of the [tutorial](/tutorial).
