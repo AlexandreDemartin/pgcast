@@ -1,5 +1,5 @@
 ---
-english: 15a7b1a86c53
+english: 45bbf28997fd
 ---
 
 # Transactions
@@ -408,7 +408,7 @@ Les autres sont levées quand `.compile()` compile la requête, donc `.run()` es
 | `upsert()` de lignes aux clés différentes, avec `upsertRequiresSameKeys` | l’appel lève | [Lignes aux clés différentes](/fr/insert#upsert-different-keys) |
 | `update()` sans colonne à fixer | l’appel lève | [`update()`](/fr/insert#update) |
 | `truncate()` avec une autre option | l’appel lève | [`truncate()`](/fr/insert#truncate) |
-| une interpolation qui n’a pas de sens en SQL : un nombre, `null`, `db.all`, l’objet global | `.run()` est rejetée | [Interpolations](/fr/sql-template#interpolations) |
+| une interpolation qui n’a pas de sens en SQL : un nombre, `null`, `db.all`, l’objet global ; `db.all` comme filtre de `deletes()` ou d’`update()` | `.run()` est rejetée | [Interpolations](/fr/sql-template#interpolations), [`all`](/fr/sql-template#all) |
 | `db.self` sans colonne ; `db.parent()` sans table parente, donc comme valeur d’`insert()`, d’`upsert()` ou d’`update()` | `.run()` est rejetée | [`self`](/fr/sql-template#self), [`parent()`](/fr/sql-template#parent) |
 | `count()` et les autres agrégats avec des `columns` sans colonne ou à plusieurs colonnes, ou sans `columns` du tout pour `sum()`, `avg()`, `min()` et `max()` ; ou une seule sous-requête comme `lateral` ; et donc une requête qui en imbrique un | `.run()` est rejetée | [`count()`](/fr/select#count) |
 | `db.Default`, `db.self`, `db.raw()`, `db.cols()` ou `db.vals()` comme valeur de filtre ; `db.all` comme valeur d’une condition ; `db.raw()`, `db.cols()` ou `db.vals()` comme valeur d’`insert()`, d’`upsert()` ou d’`update()`, ou dans tout `vals({…})` | `.run()` est rejetée | [Objets Whereable](/fr/sql-template#whereable), [Conditions](/fr/conditions), [`insert()`](/fr/insert#insert), [`vals()`](/fr/sql-template#vals) |

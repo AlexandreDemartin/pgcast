@@ -566,8 +566,8 @@ describe('Whereable', () => {
       return err instanceof Error && !('code' in err) ? err.message : err;
     };
     const
-      inWhereable = '`db.all` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: leave the key out, or compare with a value. To match every row, give `db.all` as the whole filter of a shortcut: `select(table, db.all)`.',
-      inCondition = '`db.all` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To match every row, give `db.all` as the whole filter of a shortcut: `select(table, db.all)`.',
+      inWhereable = '`db.all` has no meaning as a value in a Whereable (a filter), nor in `isIn()`: leave the key out, or compare with a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.',
+      inCondition = '`db.all` has no meaning as the value of `eq()`, `add()` and the other conditions: compare with a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.',
       all = db.all as any;
     expect({
       value: await rejected(ids({ display_name: all })),

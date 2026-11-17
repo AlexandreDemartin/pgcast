@@ -12,7 +12,19 @@ import { resetConfig } from '../helpers/config';
 
 afterEach(resetConfig);
 
-const nothingToInsert = 'nothing to insert: an Insertable needs at least one column; for a row of defaults only, write INSERT ... DEFAULT VALUES in a sql template';
+/** The class name and message of what calling `f` throws, or 'compiled'. */
+const failure = (f: () => unknown) => {
+  try { f(); return 'compiled'; } catch (err) { return { name: (err as Error).constructor.name, message: (err as Error).message }; }
+};
+
+/** The class name and message of the error `p` rejects with, or 'ran'. */
+const rejection = (p: Promise<unknown>) =>
+  p.then(() => 'ran', (err: Error) => ({ name: err.constructor.name, message: err.message }));
+
+const
+  nothingToInsert = 'nothing to insert: an Insertable needs at least one column; for a row of defaults only, write INSERT ... DEFAULT VALUES in a sql template',
+  allAsWriteFilter = '`db.all` has no meaning as the filter of `deletes()` or `update()`: it is the filter of `select()` and its kin, refused in a write so that a filter that falls back to it for a read never deletes or updates every row. To delete or update every row on purpose, give db.sql`TRUE` as the filter.',
+  refusedAll = { name: 'Error', message: allAsWriteFilter };
 
 describe('insert', () => {
   it('one row: columns in sorted key order, RETURNING to_jsonb', () => {
@@ -367,7 +379,7 @@ describe('upsert', () => {
       parent: set(parent('id')), self: set(db.self), all: set(all),
     }).toMatchInlineSnapshot(`
       {
-        "all": "throws: Cannot convert a Symbol value to a string",
+        "all": "throws: Alien object while interpolating SQL: Symbol(all)",
         "cast": [
           "("mood") = ROW(CAST($3 AS "mood"))",
           [
@@ -1272,6 +1284,29 @@ describe('update', () => {
       .toThrow('nothing to update: an Updatable needs at least one column');
   });
 
+  it('db.all as the filter throws as the query compiles, nested too, and run() rejects with no query sent (#637)', async () => {
+    // the type refuses it; master threw "TypeError: Cannot convert a Symbol value to a string"
+    const
+      query = db.update('accounts', { balance: 10 }, all as any),  // building does not throw
+      queryable = { query: vi.fn() } as any;
+    expect({
+      compile: failure(() => query.compile()),
+      nested: failure(() => sql`WITH u AS (${query}) SELECT 1`.compile()),
+      run: await rejection(query.run(queryable)),
+    }).toEqual({ compile: refusedAll, nested: refusedAll, run: refusedAll });
+    expect(queryable.query).not.toHaveBeenCalled();
+    // with nothing to set, the call throws first, as before
+    expect(() => db.update('accounts', {}, all as any)).toThrow('nothing to update: an Updatable needs at least one column');
+  });
+
+  it('sql`TRUE`, as the db.all message advises, and {} as the filter: WHERE TRUE, every row', () => {
+    const text = 'UPDATE "accounts" SET ("balance") = ROW($1) WHERE TRUE RETURNING to_jsonb("accounts".*) AS result';
+    expect({
+      fragment: db.update('accounts', { balance: 10 }, sql`TRUE`).compile(),
+      empty: db.update('accounts', { balance: 10 }, {}).compile(),
+    }).toEqual({ fragment: { text, values: [10] }, empty: { text, values: [10] } });
+  });
+
   it('an undefined value: set to NULL without undefinedMeansMissing, left out with it', () => {
     // without it (deprecated, PGCAST_DEP002), the key is kept and the column set to NULL
     const q = () => db.update('users', { mood: 'ok', manager_id: undefined }, { id: 2 }).compile();
@@ -1319,6 +1354,29 @@ describe('deletes', () => {
           ],
         }
       `);
+  });
+
+  it('db.all as the filter throws as the query compiles, nested too, and run() rejects with no query sent (#637)', async () => {
+    // the type refuses it; master threw "TypeError: Cannot convert a Symbol value to a string"
+    const
+      query = db.deletes('memberships', all as any),  // building does not throw
+      queryable = { query: vi.fn() } as any;
+    expect({
+      compile: failure(() => query.compile()),
+      nested: failure(() => sql`WITH d AS (${query}) SELECT 1`.compile()),
+      run: await rejection(query.run(queryable)),
+    }).toEqual({ compile: refusedAll, nested: refusedAll, run: refusedAll });
+    expect(queryable.query).not.toHaveBeenCalled();
+  });
+
+  it('sql`TRUE`, as the db.all message advises, and {} as the filter: WHERE TRUE, every row', () => {
+    expect({
+      fragment: db.deletes('memberships', sql`TRUE`).compile(),
+      empty: db.deletes('memberships', {}).compile(),
+    }).toEqual({
+      fragment: { text: 'DELETE FROM "memberships" WHERE TRUE RETURNING to_jsonb("memberships".*) AS result', values: [] },
+      empty: { text: 'DELETE FROM "memberships" WHERE TRUE RETURNING to_jsonb("memberships".*) AS result', values: [] },
+    });
   });
 });
 
