@@ -293,10 +293,12 @@ export const definitionForRelationInSchema = async (
         // whichever order the relations are read
         keepsText = !inlineEnums && hasEnum && ownType === 'any';
 
-      if (!keepsText && (labelled || ownImport !== null)) holder.byType[qualifiedType] = {
-        type: agrees && importsEnum && schemaPrefix ? `${namespace}.${selectableType}` : selectableType,
-        imports: labelled ? null : agrees ? imported : '',
-      };
+      if (!keepsText && (labelled || ownImport !== null)) {
+        holder.byType[qualifiedType] = {
+          type: agrees && importsEnum && schemaPrefix ? `${namespace}.${selectableType}` : selectableType,
+          imports: labelled ? null : agrees ? imported : '',
+        };
+      }
       if (holder.relation < relation || holder.relation === relation && holder.index <= index) {
         Object.assign(holder, { relation, index, type: qualifiedType });
       }
