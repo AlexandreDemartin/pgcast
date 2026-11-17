@@ -24,7 +24,8 @@ const
     ...Object.keys(pkg.peerDependencies ?? {}).filter(name => !optional(name) && !typesOnly(name)),
   ]),
   modules = ['src/db', 'src/generate'].flatMap(dir =>
-    fs.readdirSync(path.join(root, dir)).filter(f => f.endsWith('.ts')).map(f => `${dir}/${f}`));
+    fs.readdirSync(path.join(root, dir), { recursive: true, encoding: 'utf8' })
+      .filter(f => f.endsWith('.ts')).map(f => `${dir}/${f.split(path.sep).join('/')}`));
 
 /** The specifiers that a module's emitted JavaScript passes to `require()`, a non-literal one as `null`. */
 const requires = (file: string) => {
