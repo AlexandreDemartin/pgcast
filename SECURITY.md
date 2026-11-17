@@ -27,6 +27,7 @@
 |---|---|
 | SQL that `zapatos/db` compiles from caller input: values, table and column names, object keys, options | SQL you write yourself in `raw()`, which is written as is by design |
 | The codegen (`pgcast` / `zapatos` CLI) and the files it writes | Flaws in Postgres, `pg` (node-postgres) or TypeScript themselves |
+| | A value your own code builds to answer unlike plain data (a getter, a `Proxy`, an object with a crafted `toString()`, `valueOf()` or `replace()`): it is your code, not input, so what it causes is fixed as a bug, under `Fixed` in [CHANGELOG.md](CHANGELOG.md), with no advisory |
 | | The repository's dev tooling, which is not published |
 
 ## Threat model
