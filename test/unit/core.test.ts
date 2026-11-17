@@ -1101,7 +1101,7 @@ describe('db.all', () => {
     }).toEqual({ vals: [db.all], valsObject: [db.all], param: [db.all], insert: [db.all, 'a@b'] });
   });
 
-  it('as the whole filter of a shortcut, or of exists() and isInSelect(), still means every row: no WHERE', () => {
+  it('as the whole filter of `select()` and its kin, or of exists() and isInSelect(), still means every row: no WHERE', () => {
     // each compiles as on master before #633, which refuses db.all only as a value
     const c = db.conditions;
     expect({

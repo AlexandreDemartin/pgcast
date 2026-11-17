@@ -603,7 +603,7 @@ describe('deletes', () => {
 
   it('db.all as the filter of deletes() or update() rejects before any query; sql`TRUE`, as its message advises, reaches every row (#637)', async () => {
     const
-      allAsWriteFilter = '`db.all` has no meaning as the filter of `deletes()` or `update()`: it is the filter of `select()` and its kin, which writes no `WHERE`. To delete or update every row on purpose, give db.sql`TRUE` as the filter.',
+      allAsWriteFilter = '`db.all` has no meaning as the filter of `deletes()` or `update()`: it is the filter of `select()` and its kin, refused in a write so that a filter that falls back to it for a read never deletes or updates every row. To delete or update every row on purpose, give db.sql`TRUE` as the filter.',
       writes = { deletes: db.deletes('memberships', db.all as any), update: db.update('memberships', { role: 'owner' }, db.all as any) },
       rows = await scalar('SELECT count(*)::int AS v FROM memberships');
     expect(rows).toBeGreaterThan(1);
