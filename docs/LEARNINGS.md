@@ -198,6 +198,15 @@ Candidates for a check, a rule or a skill line.
 - #572: a narrowed placeholder is type-tested without a new program: an `exclude` of the generated file in the type-test tsconfig plus a file of its own.
 - #572: adding a fixture column moves about 22 codegen snapshots; the first `vitest -u` fails the cross-checks against `test/generated` until a second run.
 - #572: a red test freezing a refusal can fail `typecheck` under `exactOptionalPropertyTypes`: run `typecheck` before committing it.
+- #573: the `tsvector` placeholder is `any`, so a column constraint needs a brand, and the brand an interface: a `unique symbol` alias gives TS2527 in a consumer's declaration emit.
+- #573: a type parameter only in the return type is inferred from the Whereable's context, accepting every column: `NoInfer` (`utils.ts`) stops it.
+- #573: `regconfig` input folds an unquoted name to lower case and refuses a space (42602): an injection payload in the configuration needs lower case and no spaces to be named whole in 42704.
+- #573: in `websearch_to_tsquery`, `|` is not OR (only the word `or` is), and `:*` is dropped.
+- #573: a public signature naming a type the entry point does not export breaks a consumer's `declaration: true` build once they re-export the function (TS2742 for `utils`' `NoInfer`, TS4023 for an unexported interface): each new public function gets a destructured re-export line in `test/types-opt-in/declarations.ts`.
+- #573: a brand that "only an `any` column takes" admits every placeholder left as generated (`citext`, domains, extension types): probe such a claim on the fixture's `any` placeholders.
+- #573: the `paths` mapping into `node_modules/.cache` hides TS2742: a declaration-emit test here catches only TS4023 unless the emitted text is checked (`scripts/check-declarations.mjs`).
+- #573: a review's example of what slips through is probed against the generator's real mapping: `citext` and domains over known types are `string`, not `any`.
+- #573: Postgres 16 changed the error of reg* inputs (`regconfig`, `regtype`…) for a dotted name whose schema is missing: 3F000 before 16, 42704 from 16; a SQLSTATE snapshot of such a name splits on `server_version_num`.
 
 ## Minors kept
 
@@ -235,3 +244,6 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #567 (form): `docs/decisions/README.md` lists 005 as "proposed (2026-11-13)", while the note says it was accepted that day.
 - #567 (form): note 006 types `isInSelect()` on the subquery column's `Selectable`, so an int4 key over an int8 column (`Int8String`) is refused though Postgres compares them, as `eq()` does.
 - #572 (form): `website/conditions.md` § jsonb, "A value typed by an `interface` is refused (TS2345)": a `readonly string[]` and a class instance are too, `['a'] as const` passes.
+- #573 (form): `website/conditions.md` § full-text, `websearchToTsquery<PgTsvector>(…)`: not where `PgTsvector` comes from (`zapatos/custom`); FR and JSDoc likewise.
+- #573 (form): `test/unit/conditions.test.ts` `one SQL wherever it sits`: no `update()`, no `.copy()` of a refused wrapper.
+- #573 (defect): `website/conditions.md` § full-text (and FR), "one it does not know is its 42704": on Postgres 14 a dotted configuration whose schema is missing gives 3F000.

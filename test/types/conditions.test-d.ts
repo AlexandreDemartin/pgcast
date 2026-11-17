@@ -5,6 +5,7 @@
 
 import { describe, expectTypeOf, test } from 'vitest';
 import * as db from 'zapatos/db';
+import type * as s from 'zapatos/schema';
 import type { PgPreferences } from 'zapatos/custom';
 
 const c = db.conditions;
@@ -61,6 +62,66 @@ describe('eqAny()', () => {
     // by their shape would refuse the jsonb items {} and { value: 1 } too
     db.select('users', { settings: c.eqAny([{}, { value: 1 }]) });
     db.select('users', { id: c.eqAny([db.param(1)]), display_name: c.eqAny([db.sql`'Ada'`]), email: c.eqAny([db.parent('email')]) });
+  });
+});
+
+describe('websearchToTsquery()', () => {
+  test('gives a condition on a tsvector column, whose placeholder is any as generated', () => {
+    expectTypeOf(c.websearchToTsquery('english', 'salt')).toEqualTypeOf<db.SQLFragment<boolean | null, db.conditions.TsvectorColumn>>();
+    expectTypeOf(c.websearchToTsquery('english', 'salt')).not.toBeAny();
+    expectTypeOf(db.select('products', { search: c.websearchToTsquery('simple', 'shirt') }).run).returns.resolves.not.toBeAny();
+    db.select('products', { search: c.and(c.websearchToTsquery('simple', 'shirt'), c.isNotNull) });
+    db.select('products', { search: c.not(c.websearchToTsquery('simple', 'shirt')) });
+    db.count('extra.type_zoo', { c_tsvector: c.websearchToTsquery('simple', 'shirt') });
+    db.sql<s.products.SQL>`SELECT ${'id'} FROM ${'products'} WHERE ${{ search: c.websearchToTsquery('simple', 'shirt') }}`;
+    const config: string = 'english', query: string = 'salt';
+    db.select('products', { search: c.websearchToTsquery(config, query) });
+  });
+
+  test('refuses a column of another type: text, citext, a domain over citext, an int, jsonb, an enum, a timestamptz', () => {
+    // @ts-expect-error a text column: Postgres would run `text @@ tsquery` with the default configuration
+    db.select('products', { title: c.websearchToTsquery('simple', 'shirt') });
+    // @ts-expect-error a citext column, typed string
+    db.select('extra.type_zoo', { c_citext: c.websearchToTsquery('simple', 'shirt') });
+    // @ts-expect-error a domain over citext, its placeholder string as generated
+    db.select('users', { email: c.websearchToTsquery('simple', 'ada') });
+    // @ts-expect-error an int column
+    db.select('users', { id: c.websearchToTsquery('simple', 'ada') });
+    // @ts-expect-error a jsonb column
+    db.select('users', { settings: c.websearchToTsquery('simple', 'dark') });
+    // @ts-expect-error an enum column
+    db.select('users', { mood: c.websearchToTsquery('simple', 'happy') });
+    // @ts-expect-error a timestamptz column
+    db.select('users', { created_at: c.websearchToTsquery('simple', 'today') });
+  });
+
+  test('characterization: takes any column typed any, an xml column too, which Postgres refuses (42883)', () => {
+    db.select('extra.type_zoo', { c_xml: c.websearchToTsquery('simple', 'shirt') });
+  });
+
+  test('takes the type it is given, for a project that edited its PgTsvector placeholder', () => {
+    // an edited placeholder, `string`, types the column as a text column: the explicit T names it
+    expectTypeOf(c.websearchToTsquery<string>('english', 'salt')).toEqualTypeOf<db.SQLFragment<boolean | null, string>>();
+    db.select('products', { title: c.websearchToTsquery<string>('simple', 'shirt') });
+    // @ts-expect-error and() does not lend it the column's type
+    db.select('products', { title: c.and(c.websearchToTsquery('simple', 'shirt')) });
+  });
+
+  test('refuses a configuration or a query that is not a string', () => {
+    // @ts-expect-error no configuration
+    c.websearchToTsquery('salt');
+    // @ts-expect-error a number query
+    c.websearchToTsquery('english', 42);
+    // @ts-expect-error a null query
+    c.websearchToTsquery('english', null);
+    // @ts-expect-error a Parameter configuration
+    c.websearchToTsquery(db.param('english'), 'salt');
+    // @ts-expect-error a sql fragment query
+    c.websearchToTsquery('english', db.sql`'salt'`);
+    // @ts-expect-error parent() as the query
+    c.websearchToTsquery('english', db.parent('title'));
+    // @ts-expect-error Default as the configuration
+    c.websearchToTsquery(db.Default, 'salt');
   });
 });
 

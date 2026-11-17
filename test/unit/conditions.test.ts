@@ -64,6 +64,7 @@ describe('conditions', () => {
         "reMatch",
         "similarTo",
         "subtract",
+        "websearchToTsquery",
       ]
     `);
   });
@@ -550,6 +551,38 @@ describe('conditions', () => {
     expect(() => show(dc.eqAny(new Set([1]) as any).copy())).toThrow('takes an array, not `Set`');
   });
 
+  it('websearchToTsquery: the configuration and the query are two parameters, the configuration cast to regconfig', () => {
+    expect({
+      words: show(dc.websearchToTsquery('english', 'salt orchard')),
+      operators: show(dc.websearchToTsquery('simple', `"salt orchard" or -lantern & edi:* 'x'`)),
+      empty: show(dc.websearchToTsquery('', '')),
+    }).toMatchInlineSnapshot(`
+      {
+        "empty": {
+          "text": "(("col" @@ websearch_to_tsquery(CAST($1 AS "regconfig"), $2)))",
+          "values": [
+            "",
+            "",
+          ],
+        },
+        "operators": {
+          "text": "(("col" @@ websearch_to_tsquery(CAST($1 AS "regconfig"), $2)))",
+          "values": [
+            "simple",
+            ""salt orchard" or -lantern & edi:* 'x'",
+          ],
+        },
+        "words": {
+          "text": "(("col" @@ websearch_to_tsquery(CAST($1 AS "regconfig"), $2)))",
+          "values": [
+            "english",
+            "salt orchard",
+          ],
+        },
+      }
+    `);
+  });
+
   it('jsonbContains: the value is one jsonb parameter, as JSON text, whatever its kind', () => {
     // pg alone would send a string as text and an array as '{1,2}', which the cast to jsonb refuses (22P02)
     expect({
@@ -598,6 +631,64 @@ describe('conditions', () => {
           "text": "(("col" @> CAST($1 AS "jsonb")))",
           "values": [
             ""dark"",
+          ],
+        },
+      }
+    `);
+  });
+
+  it('websearchToTsquery: one SQL wherever it sits, in a select(), count(), deletes(), and(), not() and a sql template', () => {
+    const search = dc.websearchToTsquery('simple', 'shirt');
+    expect({
+      select: db.select('products', { search }, { columns: ['id'] }).compile(),
+      count: db.count('products', { search }).compile(),
+      deletes: db.deletes('products', { search }).compile(),
+      and: sql`${{ search: dc.and(search, dc.isNotNull) }}`.compile(),
+      not: sql`${{ search: dc.not(search) }}`.compile(),
+      template: sql<db.SQL>`SELECT 1 WHERE ${{ search }}`.compile(),
+    }).toMatchInlineSnapshot(`
+      {
+        "and": {
+          "text": "(((("search" @@ websearch_to_tsquery(CAST($1 AS "regconfig"), $2)) AND ("search" IS NOT NULL))))",
+          "values": [
+            "simple",
+            "shirt",
+          ],
+        },
+        "count": {
+          "text": "SELECT count(*) AS result FROM "products" WHERE (("search" @@ websearch_to_tsquery(CAST($1 AS "regconfig"), $2)))",
+          "values": [
+            "simple",
+            "shirt",
+          ],
+        },
+        "deletes": {
+          "text": "DELETE FROM "products" WHERE (("search" @@ websearch_to_tsquery(CAST($1 AS "regconfig"), $2))) RETURNING to_jsonb("products".*) AS result",
+          "values": [
+            "simple",
+            "shirt",
+          ],
+        },
+        "not": {
+          "text": "(((NOT ("search" @@ websearch_to_tsquery(CAST($1 AS "regconfig"), $2)))))",
+          "values": [
+            "simple",
+            "shirt",
+          ],
+        },
+        "select": {
+          "text": "SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT jsonb_build_object($1::text, "id") AS result FROM "products" WHERE (("search" @@ websearch_to_tsquery(CAST($2 AS "regconfig"), $3)))) AS "sq_products"",
+          "values": [
+            "id",
+            "simple",
+            "shirt",
+          ],
+        },
+        "template": {
+          "text": "SELECT 1 WHERE (("search" @@ websearch_to_tsquery(CAST($1 AS "regconfig"), $2)))",
+          "values": [
+            "simple",
+            "shirt",
           ],
         },
       }
@@ -735,7 +826,8 @@ describe('Default, self, raw, cols and vals as the value of a condition', () => 
   };
 
   it('covers every condition of db.conditions', () => {
-    expect([...Object.keys(one), ...Object.keys(two), ...Object.keys(lists), 'eqAny', 'jsonbContains', ...noValue, ...subqueries].sort()).toEqual(Object.keys(dc).sort());
+    expect([...Object.keys(one), ...Object.keys(two), ...Object.keys(lists), 'eqAny', 'jsonbContains', 'websearchToTsquery', ...noValue, ...subqueries].sort())
+      .toEqual(Object.keys(dc).sort());
   });
 
   it('eqAny given an item one array parameter cannot hold throws when compiled, not when called, saying what to do', () => {
@@ -755,6 +847,53 @@ describe('Default, self, raw, cols and vals as the value of a condition', () => 
           "raw": "\`eqAny()\` sends its array as one parameter, so each item is a plain value, not \`db.raw()\`: give a value.",
           "self": "\`eqAny()\` sends its array as one parameter, so each item is a plain value, not \`db.self\`: give a value.",
           "vals": "\`eqAny()\` sends its array as one parameter, so each item is a plain value, not \`db.vals()\`: give a value.",
+        }
+      `);
+  });
+
+  it('websearchToTsquery given anything but a value as the configuration or the query throws when compiled, not when called', () => {
+    // a plain value goes as a parameter; pg would send a Parameter or a fragment as JSON, and Default or self as their names
+    const values = { Default, self, raw: raw("'english'"), cols: cols('english'), vals: vals('english'), param: param('english'),
+      fragment: sql`'english'`, parent: parent('title') };
+    expect(Object.fromEntries(Object.entries(values).flatMap(([name, x]) => [
+      [`${name} config`, thrown(dc.websearchToTsquery(x as any, 'salt'))], [`${name} query`, thrown(dc.websearchToTsquery('english', x as any))],
+    ]))).toMatchInlineSnapshot(`
+      {
+        "Default config": "\`websearchToTsquery()\` sends its configuration and its query as parameters: give the configuration as a string, not \`db.Default\`; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
+        "Default query": "\`websearchToTsquery()\` sends its configuration and its query as parameters: give the query as a string, not \`db.Default\`; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
+        "cols config": "\`websearchToTsquery()\` sends its configuration and its query as parameters: give the configuration as a string, not \`db.cols()\`; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
+        "cols query": "\`websearchToTsquery()\` sends its configuration and its query as parameters: give the query as a string, not \`db.cols()\`; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
+        "fragment config": "\`websearchToTsquery()\` sends its configuration and its query as parameters: give the configuration as a string, not a \`sql\` fragment; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
+        "fragment query": "\`websearchToTsquery()\` sends its configuration and its query as parameters: give the query as a string, not a \`sql\` fragment; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
+        "param config": "\`websearchToTsquery()\` sends its configuration and its query as parameters: give the configuration as a string, not \`db.param()\`; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
+        "param query": "\`websearchToTsquery()\` sends its configuration and its query as parameters: give the query as a string, not \`db.param()\`; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
+        "parent config": "\`websearchToTsquery()\` sends its configuration and its query as parameters: give the configuration as a string, not \`db.parent()\`; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
+        "parent query": "\`websearchToTsquery()\` sends its configuration and its query as parameters: give the query as a string, not \`db.parent()\`; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
+        "raw config": "\`websearchToTsquery()\` sends its configuration and its query as parameters: give the configuration as a string, not \`db.raw()\`; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
+        "raw query": "\`websearchToTsquery()\` sends its configuration and its query as parameters: give the query as a string, not \`db.raw()\`; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
+        "self config": "\`websearchToTsquery()\` sends its configuration and its query as parameters: give the configuration as a string, not \`db.self\`; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
+        "self query": "\`websearchToTsquery()\` sends its configuration and its query as parameters: give the query as a string, not \`db.self\`; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
+        "vals config": "\`websearchToTsquery()\` sends its configuration and its query as parameters: give the configuration as a string, not \`db.vals()\`; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
+        "vals query": "\`websearchToTsquery()\` sends its configuration and its query as parameters: give the query as a string, not \`db.vals()\`; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
+      }
+    `);
+    expect({ number: show(dc.websearchToTsquery('english', 42 as any)), null: show(dc.websearchToTsquery('english', null as any)) })
+      .toMatchInlineSnapshot(`
+        {
+          "null": {
+            "text": "(("col" @@ websearch_to_tsquery(CAST($1 AS "regconfig"), $2)))",
+            "values": [
+              "english",
+              null,
+            ],
+          },
+          "number": {
+            "text": "(("col" @@ websearch_to_tsquery(CAST($1 AS "regconfig"), $2)))",
+            "values": [
+              "english",
+              42,
+            ],
+          },
         }
       `);
   });

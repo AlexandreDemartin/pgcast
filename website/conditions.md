@@ -21,7 +21,8 @@ Each member is a [`sql`](/sql-template#sql) fragment written around [`db.self`](
   - [`and()`](#conditions.and), [`or()`](#conditions.or) and [`not()`](#conditions.not) also take Whereables, so they can be a whole `where`; [`now`](#conditions.now), [`fromNow()`](#conditions.fromNow) and [`exists()`](#conditions.exists) hold no `self`, and go anywhere.
 - **Values**: each value is a parameter, `$1`, except a [`Parameter`](/sql-template#Parameter), kept as it is with its cast; a `sql` fragment, written as its SQL; and [`parent()`](/sql-template#parent), the parent query's column in a `lateral` subquery, or in the `where` of [`exists()`](#conditions.exists) and [`isInSelect()`](#conditions.isInSelect), whose `parent` option names that table. `Default`, `self`, `raw()`, `cols()` and `vals()` throw: [Values a condition refuses](#refused-values). [`eqAny()`](#conditions.eqAny) sends its array as one parameter of plain values: an item that is any of these throws, and in place of the array it takes `parent()` alone.
   - [`jsonbContains()`](#conditions.jsonbContains) takes a JSON value alone: a `Parameter`, a fragment or `parent()` throws there too.
-- **Type**: a condition is a `SQLFragment` whose second type argument, `T`, is the type of the value it compares with (its `Constraint`, [`sql`](/sql-template#sql)); the Whereable checks `T` against the column's type. The eight tests, `now` and `fromNow()` have no `T`, and pass on any column.
+  - [`websearchToTsquery()`](#conditions.websearchToTsquery) takes two plain values: any of these, a `Parameter`, a fragment or `parent()` throws.
+- **Type**: a condition is a `SQLFragment` whose second type argument, `T`, is the type of the value it compares with (its `Constraint`, [`sql`](/sql-template#sql)); the Whereable checks `T` against the column's type. The eight tests, `now` and `fromNow()` have no `T`, and pass on any column; the `T` of [`websearchToTsquery()`](#conditions.websearchToTsquery) is a type only a column typed `any` takes, as a `tsvector` column is.
   - A Whereable is also an expression: interpolated in a `SELECT` list, `{ runtime_minutes: add(10) }` is each film's runtime plus ten, `(("runtime_minutes" + $1))`<!-- probe: db.sql`${{ runtime_minutes: db.conditions.add(10) }}` -->. So the type lets through, as a Whereable value, what is no test: [`add()`](#conditions.add), [`subtract()`](#conditions.subtract), [`now`](#conditions.now) and [`fromNow()`](#conditions.fromNow), which Postgres refuses alone in a `where` (42804).
 
 A value of another type does not compile:
@@ -490,6 +491,66 @@ db.select('actors', { name: db.conditions.isInSelect('roles', db.all, 'actor_id'
 - **`not()` of it** matches no row once the subquery gives a `NULL`, as Postgres reads `NOT IN`: `{ id: not(isInSelect('crew', db.all, 'mentor_id')) }` finds no one, as one `mentor_id` is `NULL`. For the anti-join, write `not(exists(…))`, above.
 - **As the whole `where`**, outside a key, it has no column: the type refuses it there, alone, under `not()` or in `and()` (TS2345), and untyped code throws "The 'self' column alias has no meaning here".
 
+## Full-text search: `websearchToTsquery()` {#full-text}
+
+A search on a `tsvector` column: the words of a text, as a text search configuration stems them. The docs schema's `films.title_search` is a generated column, `to_tsvector('english', title)`, which Postgres keeps up to date, with a GIN index ([Postgres's docs](https://www.postgresql.org/docs/current/textsearch-tables.html)).
+
+<CastPanel example="conditions_websearchToTsquery">
+
+<<< ./examples/conditions_websearchToTsquery.ts{ts twoslash}
+
+</CastPanel>
+
+### `websearchToTsquery()` {#conditions.websearchToTsquery}
+
+```ts
+db.conditions.websearchToTsquery<T = TsvectorColumn>(config: string, query: string): SQLFragment<boolean | null, T>
+```
+
+`"col" @@ websearch_to_tsquery(CAST($1 AS "regconfig"), $2)`<!-- probe: db.sql`${{ col: db.conditions.websearchToTsquery('english', 'lanterns') }}` -->, the configuration and the query two parameters. Postgres reads the query as a search box does, and never raises a syntax error, so it takes what a user types as it is. On `title_search`:
+
+| Query | Postgres reads | Matches |
+|---|---|---|
+| `lanterns` | `'lantern'`, the stem | A Lantern for Edith |
+| `salt orchard` | `'salt' & 'orchard'`, each word | The Salt Orchard |
+| `"orchard salt"` | `'orchard' <-> 'salt'`, the phrase in that order | none |
+| `salt or lantern` | `'salt' \| 'lantern'` | The Salt Orchard, A Lantern for Edith |
+| `-salt orchard` | `!'salt' & 'orchard'` | none |
+| `salt & lantern`, `salt \| lantern` | `'salt' & 'lantern'`: `&` and `\|` are no operators | none |
+| `lant:*` | `'lant'`: no prefix | none |
+| `the` | no word, only a stop word: Postgres sends a NOTICE | none |
+
+- **The configuration**: name the one that built the column's vector, whose stems the query's must be: `websearchToTsquery('simple', 'lanterns')` looks for `'lanterns'`, which `title_search` does not hold. Left out, Postgres would take `default_text_search_config`, a setting of the server or the session, so the condition always names it. Postgres looks it up on the `search_path` (`'pg_catalog.english'` works too), and one it does not know is its 42704, `text search configuration "klingon" does not exist`. A configuration of your own, built on `unaccent` for one, is a name like any other.
+- **`NULL`**: a `NULL` vector gives `NULL`, so neither the condition nor [`not()`](#conditions.not) of it matches the row.
+- **Type**: its `T` is [`TsvectorColumn`](#conditions.TsvectorColumn), which only a column typed `any` takes: a `tsvector` column, through its `PgTsvector` placeholder left as generated ([Custom types](/custom-types)). A `text` column does not compile, nor a `varchar`, a `citext` or a domain over one, all typed `string`: Postgres would read `text @@ tsquery`, and build the vector with `default_text_search_config`, not with the configuration given. Every other column typed `any` passes: a domain over a domain over `text`, as generated without [`domainsTypedByContext`](/generator#generate.domainsTypedByContext), runs that `text @@ tsquery` with no error; an `xml` column, Postgres refuses (42883). Once you edit the placeholder, give its type, `websearchToTsquery<PgTsvector>(…)`, or for a `string`, `db.conditions.websearchToTsquery<string>('english', 'lanterns')`<!-- tsc: db.select('films', { title_search: … }) -->.
+
+```ts twoslash
+// @errors: 2322
+import * as db from 'zapatos/db';
+// ---cut---
+db.select('films', { title: db.conditions.websearchToTsquery('english', 'lanterns') });
+```
+
+- **Other parsers**: `to_tsquery()` reads `&`, `|`, `!` and prefixes, `lant:*`, and raises a syntax error on a user's stray `&`, so it has no condition of its own. Write a `sql` fragment, the configuration cast to `regconfig`, `"title_search" @@ to_tsquery(CAST($1 AS "regconfig"), $2)`<!-- probe: db.sql`${{ title_search: db.sql`${db.self} @@ to_tsquery(${db.param('english', 'regconfig')}, ${db.param('lant:*')})` }}` -->:
+
+```ts twoslash
+import * as db from 'zapatos/db';
+// ---cut---
+db.select('films', { title_search: db.sql`${db.self} @@ to_tsquery(${db.param('english', 'regconfig')}, ${db.param('lant:*')})` });
+```
+
+`Default`, `self`, `raw()`, `cols()`, `vals()`, a `Parameter`, a `sql` fragment or `parent()` as the configuration or the query does not compile (TS2345). Untyped, it throws as the query compiles, naming it:
+
+> `` `websearchToTsquery()` sends its configuration and its query as parameters: give the query as a string, not `db.param()`; for SQL, write a `sql` fragment with `db.self` in place of the condition. ``<!-- message -->
+
+### `TsvectorColumn` {#conditions.TsvectorColumn}
+
+```ts
+interface TsvectorColumn
+```
+
+The `T` of [`websearchToTsquery()`](#conditions.websearchToTsquery) unless given: a type that only a column typed `any` takes. It exists only in the type, with no value.
+
 ## Dates and times {#dates}
 
 [`after()`](#conditions.after) and [`before()`](#conditions.before) compare with a value: a `Date`, an ISO 8601 string with its offset (`'2030-03-01T20:00:00Z'`, a `TimestampTzString`; the type refuses another form such as `'2030-03-02'`, TS2322), or one of the two fragments below. `pg` sends a `Date` as a string in the local time zone, with its offset: on a `timestamptz` column, the same instant. On a `date` column, Postgres keeps the local day and drops the time: `eq(new Date(2030, 2, 1, 23, 30))` matches `2030-03-01`, and `lt()` of it does not.
@@ -571,7 +632,7 @@ The type does not check a fragment: an `int4` on a `timestamptz` column type-che
 
 ## Values a condition refuses {#refused-values}
 
-`Default`, `self`, `raw()`, `cols()` and `vals()` have no meaning as the value of a condition. The type refuses them (TS2322, or TS2345 where the condition bounds its argument: a pattern, a range's second bound, an array condition, `add()`, `subtract()`; TS2769 as the list of `eqAny()` and the value of `jsonbContains()`).
+`Default`, `self`, `raw()`, `cols()` and `vals()` have no meaning as the value of a condition. The type refuses them (TS2322, or TS2345 where the condition bounds its argument: a pattern, a range's second bound, an array condition, `add()`, `subtract()`, `websearchToTsquery()`; TS2769 as the list of `eqAny()` and the value of `jsonbContains()`).
 
 At run time, calling the condition does not throw, compiling it does, so `run()` rejects with a plain `Error` before any query.
 
@@ -588,6 +649,7 @@ Zapatos 6.6.1 sent `Default` and `self` as the strings `'Symbol(DEFAULT)'` and `
 | `` `jsonbContains()` sends its value as JSON text, so it takes a JSON value, not `db.Default`: give a value; for SQL, write a `sql` fragment with `db.self` in place of the condition. ``<!-- message --> | `Default` as the value of [`jsonbContains()`](#conditions.jsonbContains); `self`, `raw()`, `cols()`, `vals()`, a `Parameter`, a `sql` fragment or `parent()` there gets the same message, naming it |
 | `` `eqAny()` takes an array of values, not `db.Default`: write `eqAny(values)`; for SQL, write a `sql` fragment with `db.self` in place of the condition. ``<!-- message --> | `Default` as the list of [`eqAny()`](#conditions.eqAny); `self`, `raw()`, `cols()`, `vals()`, a `Parameter` or a `sql` fragment there gets the same message, naming it |
 | `` `eqAny()` sends its array as one parameter, so each item is a plain value, not `db.Default`: give a value. ``<!-- message --> | `Default` as an item of `eqAny()`; `self`, `raw()`, `cols()` or `vals()` there gets the same message, naming it |
+| `` `websearchToTsquery()` sends its configuration and its query as parameters: give the configuration as a string, not `db.Default`; for SQL, write a `sql` fragment with `db.self` in place of the condition. ``<!-- message --> | `Default` as the configuration of [`websearchToTsquery()`](#conditions.websearchToTsquery); as the query, the message says `query`; `self`, `raw()`, `cols()`, `vals()`, a `Parameter`, a `sql` fragment or `parent()` gets the same message, naming it |
 | `The 'self' column alias has no meaning here`<!-- message --> | a condition where `self` has no column: in a `sql` template outside a Whereable, in `upsert()`'s `updateValues`, in the `where` of `exists()` or `isInSelect()`, and `isInSelect()` outside a key |
 | `The 'parent' table alias has no meaning here`<!-- message --> | `parent()` in a condition outside a `lateral` subquery, or in the `where` of `exists()` or `isInSelect()` without `parent` |
 

@@ -306,6 +306,35 @@ export const exists = <T extends Table>(table: T, where: WhereableForTable<T> | 
 export const isInSelect = <T extends Table, C extends keyof SelectableForTable<T>>(table: T, where: WhereableForTable<T> | SQLFragment<any> | AllType, column: C, options?: { parent?: string; alias?: string }) =>
   sql<SQL, boolean | null, Exclude<SelectableForTable<T>[C], null>>`${self} IN (${subquery('isInSelect', sql`SELECT ${column as Column}`, table, where, options)})`;
 
+/* === full-text search === */
+
+declare const tsvector: unique symbol;
+/**
+ * What `websearchToTsquery()` compares with: a type no column takes but one typed `any`, as a `tsvector` column
+ * is through its `PgTsvector` placeholder, left as generated. It exists only in the type.
+ */
+export interface TsvectorColumn { readonly [tsvector]: true }
+
+// a value as a parameter: pg would send a Parameter or a fragment as JSON, Default and self as their names
+const searchParam = (which: string, x: unknown, cast?: string) => {
+  const name = notAValue(x);
+  return name === undefined ? param(x, cast) :
+    refused(`\`websearchToTsquery()\` sends its configuration and its query as parameters: give the ${which} as a string, not ${name}; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.`);
+};
+
+/**
+ * `"col" @@ websearch_to_tsquery(CAST($1 AS "regconfig"), $2)`, on a `tsvector` column: the query is read as a
+ * search box reads it, words, `"quoted phrases"`, `or` and `-word`, and never raises a syntax error, so it takes a
+ * user's input as it is (https://www.postgresql.org/docs/current/textsearch-controls.html). Name the configuration
+ * that built the column's vector: its stems are the ones that match. The type takes a column typed `any`, as the
+ * `PgTsvector` placeholder is generated; once you edit it, name it: `websearchToTsquery<PgTsvector>(…)`.
+ * @param config A text search configuration, such as `'english'`, sent as a parameter
+ * @param query The search, sent as a parameter
+ */
+// `NoInfer<T>` of ./utils, written out: a library's declarations could not name it, zapatos/db not exporting it (TS2742)
+export const websearchToTsquery = <T = TsvectorColumn>(config: string, query: string) =>
+  sql<SQL, boolean | null, [T][T extends any ? 0 : never]>`${self} @@ websearch_to_tsquery(${searchParam('configuration', config, 'regconfig')}, ${searchParam('query', query)})`;
+
 // things that aren't genuinely conditions
 type PluralisingIntervalUnit = 'microsecond' | 'millisecond' | 'second' | 'minute' | 'hour' | 'day' | 'week' | 'month' | 'year' | 'decade';
 type IntervalUnit = PluralisingIntervalUnit | `${PluralisingIntervalUnit}s` | 'century' | 'centuries' | 'millennium' | 'millennia';
