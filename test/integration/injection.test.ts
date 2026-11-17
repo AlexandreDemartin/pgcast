@@ -869,6 +869,20 @@ describe('without parameters (simple protocol)', () => {
     expect(await adaName()).toBe('Ada');
   });
 
+  it.each<[string, () => unknown]>([
+    // pgcast 6.6.2 to 6.8.0: `) AS "sq_x"; UPDATE …; --"`, which ran (Zapatos 6.6.1: `"sq_x""`, 42601)
+    ['an array whose own toString() answers x" and replace() an UPDATE', () => Object.assign(['u'], { toString: () => 'x"', replace: () => `x"; ${update}; --` })],
+    ['a fragment whose own toString() answers x" and replace() an UPDATE', () => Object.assign(sql`u`, { toString: () => 'x"', replace: () => `x"; ${update}; --` })],
+    // pgcast 6.6.2 to 6.8.0: `TypeError: name.replace is not a function` (Zapatos 6.6.1: the UPDATE ran)
+    ['an array whose own toString() answers an UPDATE, with no replace()', () => Object.assign(['u'], { toString: () => `x"; ${update}; --` })],
+  ])('the alias is converted to a string once, so %s stays one alias in "sq_<alias>"', async (_, make) => {
+    const outcome = await (async () => {
+      const q = db.select('users', all, { alias: make(), order: { by: 'id', direction: 'ASC' } } as any);
+      return (await q.run(t.client)).map((u: any) => u.id);
+    })().catch((e: Error) => `rejects: ${e.message}`);
+    expect({ outcome, ada: await adaName() }).toEqual({ outcome: [1, 2, 3], ada: 'Ada' });
+  });
+
   it('no hostile table name, alias or lateral key of select() runs SQL of its own', async () => {
     // compiled text: test/unit/injection.test.ts; rows are given as their number; a lateral key is
     // also a parameter, so its query goes through the extended protocol

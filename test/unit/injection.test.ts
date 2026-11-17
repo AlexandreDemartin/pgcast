@@ -1151,6 +1151,62 @@ describe('shortcut options', () => {
     expect(db.select('users', all, { alias } as any).compile().text).toContain(`AS "sq_${alias.replace(/"/g, '""')}"`);
   });
 
+  describe('the alias is converted to a string once, so "sq_<alias>" is written from the string checked', () => {
+    // SQLForAlias() checked `"sq_${alias}"`, then wrote alias.replace(…): on anything but a string, the caller's own
+    // method, or a TypeError without one (#608). The alias's other places are compiled as given, a fragment as its SQL
+    const attack = 'x"; DELETE FROM users; --';
+    const logged = (log: string[], method: string, ...answers: string[]) => {
+      let calls = 0;
+      return () => { log.push(method); return answers[Math.min(calls++, answers.length - 1)]!; };
+    };
+    const twice = (as: string, sq: string) =>
+      Array(2).fill(`SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb(${as}.*) AS result FROM "users" AS ${as}) AS ${sq}`);
+
+    it.each<[string, (log: string[]) => unknown, string[] | string, string[]]>([
+      // pgcast 6.6.2 to 6.8.0 wrote the answer of replace(), `"sq_x"; DELETE FROM users; --"`
+      ['an array whose own toString() answers x" and replace() other SQL', log => Object.assign(['u'], { toString: logged(log, 'toString', 'x"'), replace: () => attack }), twice('"u"', '"sq_x"""'), ['toString']],
+      ['an array whose own non-enumerable toString() and replace() answer so', log => Object.defineProperties(['u'], { toString: { value: logged(log, 'toString', 'x"') }, replace: { value: () => attack } }), twice('"u"', '"sq_x"""'), ['toString']],
+      ['a fragment whose own toString() and replace() answer so', log => Object.assign(sql`u`, { toString: logged(log, 'toString', 'x"'), replace: () => attack }), twice('u', '"sq_x"""'), ['toString']],
+      ['a class instance whose toString() and replace() answer so', log => new (class { toString() { log.push('toString'); return 'x"'; } replace() { return attack; } })(), twice('TRUE', '"sq_x"""'), ['toString']],
+      // pgcast 6.6.2 to 6.8.0 threw `TypeError: name.replace is not a function`
+      ['an array whose own toString() answers other SQL, with no replace()', log => Object.assign(['u'], { toString: logged(log, 'toString', attack) }), twice('"u"', '"sq_x""; DELETE FROM users; --"'), ['toString']],
+      ['an array whose own toString() answers x", then v, with no replace()', log => Object.assign(['u'], { toString: logged(log, 'toString', 'x"', 'v') }), twice('"u"', '"sq_x"""'), ['toString']],
+      ['an array holding a"b', () => ['a"b'], twice('"a""b"', '"sq_a""b"'), []],
+      ['an array whose Symbol.toPrimitive answers x" to the hint string', log => Object.assign(['u'], { [Symbol.toPrimitive]: (hint: string) => { log.push(`toPrimitive(${hint})`); return hint === 'string' ? 'x"' : 'u'; } }), twice('"u"', '"sq_x"""'), ['toPrimitive(string)']],
+      // as before
+      ['a string', () => 'u', twice('"u"', '"sq_u"'), []],
+      ['an array', () => ['u'], twice('"u"', '"sq_u"'), []],
+      ['an array of two names', () => ['a', 'b'], twice('"a""b"', '"sq_a,b"'), []],
+      ['an array whose own toString() answers v', log => Object.assign(['u'], { toString: logged(log, 'toString', 'v') }), twice('"u"', '"sq_v"'), ['toString']],
+      ['an array whose own valueOf() answers x", its toString() v', log => Object.assign(['u'], { valueOf: logged(log, 'valueOf', 'x"'), toString: logged(log, 'toString', 'v') }), twice('"u"', '"sq_v"'), ['toString']],
+      ['an array whose own toString() answers u, then x"', log => Object.assign(['u'], { toString: logged(log, 'toString', 'u', 'x"'), replace: () => attack }), twice('"u"', '"sq_u"'), ['toString']],
+      ['a fragment', () => sql`u`, twice('u', '"sq_[object Object]"'), []],
+      ['an array of a fragment', () => [sql`u`], twice('u', '"sq_[object Object]"'), []],
+      ['a symbol', () => Symbol('u'), 'throws: Cannot convert a Symbol value to a string', []],
+    ])('%s', (_, make, expected, conversions) => {
+      const log: string[] = [];
+      let result: string[] | string, q: db.SQLFragment<any, any> | undefined;
+      try {
+        q = db.select('users', all, { alias: make(log) } as any);
+        result = [q.compile().text, q.compile().text];
+      } catch (e) {
+        result = `${q ? 'compile ' : ''}throws: ${(e as Error).message}`;  // `throws` alone: as the query is built
+      }
+      expect({ result, log }).toEqual({ result: expected, log: conversions });
+    });
+
+    it('so it is, nested in a lateral or in extras, and beside a lateral naming it with parent()', () => {
+      const alias = () => Object.assign(['u'], { toString: () => 'x"', replace: () => attack }) as any;
+      const inner = `SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("u".*) AS result FROM "users" AS "u") AS "sq_x"""`;
+      expect(db.select('users', all, { lateral: { m: db.select('users', all, { alias: alias() }) } }).compile().text)
+        .toBe(`SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) || jsonb_build_object($1::text, "lateral_m".result) AS result FROM "users" LEFT JOIN LATERAL (${inner}) AS "lateral_m" ON true) AS "sq_users"`);
+      expect(db.select('users', all, { extras: { m: db.select('users', all, { alias: alias() }) } }).compile().text)
+        .toBe(`SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("users".*) || jsonb_build_object($1::text, (${inner})) AS result FROM "users") AS "sq_users"`);
+      expect(db.select('users', all, { alias: alias(), lateral: { a: db.selectOne('accounts', { owner_id: db.parent('id') }) } }).compile().text)
+        .toBe(`SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT to_jsonb("u".*) || jsonb_build_object($1::text, "lateral_a".result) AS result FROM "users" AS "u" LEFT JOIN LATERAL (SELECT to_jsonb("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "u"."id") LIMIT $2) AS "lateral_a" ON true) AS "sq_x"""`);
+    });
+  });
+
   it('order.direction and order.nulls are checked at run time', () => {
     expect(matrix(v => db.select('users', all, { order: { by: 'id', direction: v } } as any))).toMatchInlineSnapshot(`
       {
