@@ -586,6 +586,14 @@ describe('jsonbPathExists: the path and its variables bound', () => {
       .toEqual({ code: '42704', message: 'could not find jsonpath variable "theme"' });
   });
 
+  it.each([
+    ['null', null],
+    ['an array', ['dark']],
+  ])('vars that is %s, no object, fails in Postgres, 22023, even when the path names no variable', async (_, vars) => {
+    expect(await pgError(t.client, () => ids('users', { settings: dc.jsonbPathExists('$.theme', vars as any) })))
+      .toEqual({ code: '22023', message: '"vars" argument is not an object' });
+  });
+
   it('characterization: a predicate path always gives an item, its boolean, so every row matches', async () => {
     // Postgres's docs: jsonb_path_exists is "useful only with SQL-standard JSON path expressions"
     expect(await ids('users', { settings: dc.jsonbPathExists('$.theme == $theme', { theme: 'light' }) })).toEqual([1, 2, 3]);
