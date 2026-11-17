@@ -388,6 +388,12 @@ Candidates for a check, a rule or a skill line.
 - #666: the pages and tests that quote an error message reach beyond an issue's Files: `git grep` the message before changing it (4 test files and 4 pages quoted it).
 - #666: `currentColumn` is set by a filter's key and by a write's `vals({…})` key alike, so a message thrown under it cannot tell the two apart without a new mechanism; it names both.
 - #666: run each error message's advice at every position that reaches it, not only the throw: `db.self` advised for a write fails in `insert()` and an `upsert()` row (42703) and runs only in `update()` and a filter.
+- #673: an empty `insert()` sends `INSERT INTO t SELECT null WHERE false`, refused (428C9) on a `GENERATED ALWAYS` first column or a view: test any path that forces or wraps a no-op on the fixture's `users` or `active_users`, not `accounts`.
+- #673: a helper that returns its argument itself in an empty case shares its mutable state (`prepared()` sets `this.preparedName`): return a copy, and probe each docs claim on that path too.
+- #673: a fragment is mutable, so a guard on its state at the call (`preparedName != null`) misses a change made afterwards: copy it every time.
+- #673: a `select()` override on a fragment's own `compile()` is lost by any copy: a wrapper that keeps top-level behaviour needs the top-level form handed to it.
+- #673: `to_jsonb("t".*)` never fails on a missing column: a "refused (42703)" claim holds only for a column the query names.
+- #673: under `exactOptionalPropertyTypes`, `copy()` cannot clear a property; `Object.assign` after the copy does.
 - #669: an order fix can turn an intermittent failure into a permanent one (a hidden TS2440): rerun the reviewer's grid on the branch, not only the issue's case.
 - #669: skill `codegen-output`'s "shared state, no new out-parameter" gave first an order by type that changed a compiling winner; when the order needs data per column, a new out-parameter written down under Decided alone beats bending the order.
 - #669: to keep 6.6.1's winner within one relation, use the position Postgres returns the column at, not its name compared in JavaScript.
