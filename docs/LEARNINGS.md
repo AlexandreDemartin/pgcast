@@ -221,6 +221,12 @@ Candidates for a check, a rule or a skill line.
 - #579: inlining an outer interface brings up the names inside it (`UpsertOptions` surfaced once `UpsertSignatures` was gone): re-run the emit after each inline.
 - #579: diff the whole tsc output in an `@ts-expect-error` sweep, not only the `file(line,col)` lines: overload diagnostics carry their messages on continuation lines.
 - #579: an interface turned into an inline type changes every message and quick info that prints the value's own type: check a "same errors" claim with the function used as a value (`.map(fn)`, a property access, an assignment to a function type), not only the `@ts-expect-error` sweep.
+- #581: an unexported module-local type alias fixes TS2742 while keeping messages, quick info and cost: tsc writes it out only in the consumer's file; a type written inline is instantiated once per place (inline `lock` cost +4 instantiations per call).
+- #581: under `node10`, a consumer's emitted `.d.ts` silently names private paths (`zapatos/dist/db/utils`), so an internal export there cannot simply be deleted.
+- #581: moving a type alias under a `// ===` section comment drops that comment from the built `.js`: place the alias apart when the JavaScript must stay byte-identical.
+- #581: `skipLibCheck` hides a type removed from a path already-emitted `.d.ts` files name: no TS2694, the type silently becomes `any`; only a downstream negative shows it (TS2578), so a removal probe needs a downstream `@ts-expect-error`.
+- #581: TS 4.1 cannot parse instantiation expressions (`db.sql<I>`, 4.7+): one such line gives TS1005 and silences that probe file's other cases; TS 7 reports TS2742 as TS2883 and needs `rootDir` with `outDir`.
+- #581: Vitest's typecheck reports no error on an import line outside a `test()`: a deleted export becomes a silent `any`, so a test of a kept export needs `not.toBeAny()` or a negative to go red.
 
 ## Minors kept
 
