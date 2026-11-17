@@ -133,6 +133,46 @@ describe('select', () => {
     any({ sku: 'a' });
   });
 
+  // a helper that adds a key of its own to the caller's Whereable (a soft delete) compiles under Zapatos 6.6.1;
+  // a guard on the shortcut's parameter refused it, a generic intersection sharing no key with the guard (review of #676)
+  test('a generic forwarder that adds a key to the Whereable it is given still compiles (#670)', () => {
+    const c = db.conditions;
+    type W<T extends s.Table> = s.WhereableForTable<T>;
+    const forwarders = [
+      <T extends s.Table>(t: T, w: W<T>) => db.select(t, { ...w, id: c.isNotNull }),
+      <T extends s.Table>(t: T, w: W<T>) => db.select(t, { ...w, deleted_at: null }),
+      <T extends 'products' | 'users'>(t: T, w: W<T>) => db.select(t, { ...w, id: 1 }),
+      <T extends 'products'>(t: T, w: W<T>) => db.select(t, { ...w, id: 1 }),
+      <T extends s.Table>(t: T, w: W<T>) => db.selectOne(t, { ...w, id: 1 }),
+      <T extends s.Table>(t: T, w: W<T>) => db.count(t, { ...w, id: c.gt(0) }),
+      <T extends s.Table>(t: T, w: W<T>) => db.deletes(t, { ...w, id: 1 }),
+      <T extends s.Table>(t: T, w: W<T>) => db.update(t, {} as s.UpdatableForTable<T>, { ...w, id: 1 }),
+      <T extends s.Table>(t: T, w: W<T>) => db.select(t, db.all, { having: { ...w, id: 1 } }),
+      <T extends s.Table>(t: T, w: W<T>) => db.sql<s.SQLForTable<T>>`${{ ...w, id: 1 }}`,
+      <T extends s.Table>(t: T, w: W<T>) => db.sql`${{ ...w, id: 1 }}`,
+      <T extends s.Table>(t: T, w: W<T>) => c.and({ ...w, id: 1 }),
+      <T extends s.Table>(t: T, w: W<T>) => c.or(w, { ...w, id: 1 }),
+      <T extends s.Table>(t: T, w: W<T>) => c.not({ ...w, id: 1 }),
+      <T extends s.Table>(t: T, w: W<T>) => c.exists(t, { ...w, id: 1 }),
+      <T extends s.Table>(t: T, w: W<T>, extra: { id?: number }) => db.select(t, { ...w, ...extra }),
+      <T extends s.Table>(t: T, w: W<T>, extra: W<T>) => db.select(t, { ...w, ...extra }),
+      <T extends s.Table>(t: T, w: W<T>) => db.select(t, Object.assign({}, w, { id: 1 })),
+      <T extends s.Table>(t: T, w: W<T>) => db.select(t, { ...w, id: 1 } as W<T>),
+      <T extends s.Table>(t: T, w: W<T> & { id?: number }) => db.select(t, w),
+      <T extends s.Table>(t: T, w: Omit<W<T>, 'id'>) => db.select(t, w),
+      <T extends s.Table>(t: T, w: Omit<W<T>, 'id'>) => db.select(t, { ...w, id: 1 }),
+      <T extends s.Table>(t: T, w: Readonly<W<T>>) => db.select(t, w),
+      <T extends s.Table>(t: T, w: Partial<W<T>>) => db.select(t, w),
+      <T extends s.Table>(t: T, ws: W<T>[]) => db.select(t, c.and(...ws)),
+      <P extends s.products.Whereable>(w: P) => db.select('products', { ...w, sku: 'a' }),
+      <P extends s.products.Whereable>(w: P & { sku?: string }) => db.select('products', w),
+      <A extends s.Whereable>(w: A) => db.sql`${{ ...w, id: 1 }}`,
+      (w: Omit<s.products.Whereable, 'id'>) => db.select('products', { ...w, id: 1 }),
+      (w: s.products.Whereable & { foo?: string }) => db.select('products', w),
+    ];
+    expectTypeOf(forwarders).not.toBeAny();
+  });
+
   test('lock.of accepts the alias', () => {
     const q = db.select('users', db.all, { alias: 'u', lock: { for: 'UPDATE', of: 'u' } });
     expectTypeOf<Run<typeof q>>().toEqualTypeOf<s.users.JSONSelectable[]>();
