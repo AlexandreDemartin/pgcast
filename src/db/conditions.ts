@@ -173,7 +173,10 @@ const jsonbParam = (a: unknown, fn: string, arg: string, keyOut: string, keyAdvi
   const
     name = notAValue(a),
     takes = object ? 'an object of JSON values' : 'a JSON value';
-  if (name !== undefined) return refused(`\`${fn}()\` sends its ${arg} as JSON text, so it takes ${takes}, not ${name}: give ${object ? 'an object' : 'a value'}; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.`);
+  // each a whole literal, so that the docs can quote it (website/check-prose.mjs)
+  if (name !== undefined) return refused(object ?
+    `\`${fn}()\` sends its ${arg} as JSON text, so it takes an object of JSON values, not ${name}: give an object; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.` :
+    `\`${fn}()\` sends its ${arg} as JSON text, so it takes a JSON value, not ${name}: give a value; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.`);
   let refusal: string | undefined, top = true;
   try {
     const text = JSON.stringify(a, function (this: unknown, key, x: unknown) {
