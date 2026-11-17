@@ -242,6 +242,13 @@ Candidates for a check, a rule or a skill line.
 - #596: `check-prose.mjs` matches each interpolation of a quoted message with `\S+?`: a quoted message needs a one-word value (`` `undefined` ``, not "an array").
 - #596: from Postgres 16, `regconfigin` reports a missing schema in a qualified name as the configuration missing (42704); 14 and 15 raise 3F000 from `LookupExplicitNamespace`.
 - #596: in zsh, `git show $B:website/x.md` applies `:w` as a modifier to `$B`: write `"${B}:path"`.
+- #603: `import { type X }` in `src/` reaches the emitted `.d.ts` and stops TS 4.1 to 4.4 with TS1005, even with `skipLibCheck`; nothing in CI parses the declarations with TS < 4.5 (#604).
+- #603: an exported type alias in a module the index does not re-export gives TS2742 under NodeNext; an unexported one is written out.
+- #603: in `test/types-opt-in`, an emit error such as TS4023 makes tsc skip that file's `.d.ts`, so `check-declarations.mjs` passes on it: a second red shows only once the first is fixed.
+- #603: the `Record<string, unknown>` control cannot tell an interface from an alias when the type has an explicit index signature.
+- #603: `skipLibCheck` does not skip parsing: a package whose TS floor is below 4.5 parses every shipped `.d.ts` with its oldest TypeScript (`ts.createSourceFile(...).parseDiagnostics`); 6.7.0–6.8.0 shipped a `zapatos/generate` TS 4.1–4.4 could not read.
+- #603: a lint rule over the source (`no-restricted-syntax` on inline `type` specifiers) catches a `.d.ts` syntax regression before any emit, in files no export reaches yet; it complements #604's parse check.
+- #603: `codegen.test.ts`'s 5 s timeout trips under machine load: watch it in CI.
 
 ## Minors kept
 
@@ -285,3 +292,4 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #575 (form): `website/conditions.md` § `jsonbPathExists()`: no line on `jsonb_path_exists_tz` for a path comparing datetimes across time zones (0A000).
 - #598 (form): `src/db/conditions.ts` `callerValue(options, 'parent')` makes `parent` and `alias` `any` (a misspelt key type-checks), as #558's kept minor.
 - #596 (form): `src/db/conditions.ts` JSDoc of `jsonbContains()` and `website/conditions.md` (FR) list `Default`, `self`, `raw()`, `cols()`, `vals()` but not `all`, which now gets the wrapper message.
+
