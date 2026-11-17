@@ -1,5 +1,5 @@
 ---
-english: 07718861eae5
+english: 2cfbf4514ca2
 description: "Quand aucun raccourci n’écrit la requête dont vous avez besoin, écrivez-la dans le template sql, et gardez hors de son texte toute valeur venue de l’extérieur."
 ---
 
