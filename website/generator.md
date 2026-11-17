@@ -19,7 +19,7 @@ The same program under two names: `pgcast`, and `zapatos`, as in Zapatos 6.6.1. 
   - A key given here replaces the file's whole value, so `'{"db": {"application_name": "codegen"}}'` drops the file's `connectionString`.
   - The file's variables are filled in before the merge: one it names must be set even when the argument replaces its key, or the CLI stops with `Environment variable 'NAME' is not set`.
 - Each string in both, at any depth, has its environment variables filled in ([Environment variables](#environment-variables)).
-- One flag, `--check`, before or after `config`. Any other argument starting with `--`, in `config`'s place, stops it with code 1 before it reads the config, Node printing `Unknown flag --help: the only flag is --check, beside the JSON argument` and its stack; Zapatos 6.6.1 read it as the JSON argument, which failed. After `config`, one is ignored, as in Zapatos 6.6.1, with a [note](#generate.warningListener): a misspelt `npx pgcast '{}' --chek` generates.
+- From 6.8.0, one flag, `--check`, before or after `config`. Any other argument starting with `--`, in `config`'s place, stops it with code 1 before it reads the config, Node printing `Unknown flag --help: the only flag is --check, beside the JSON argument` and its stack; Zapatos 6.6.1 read it as the JSON argument, which failed. After `config`, one is ignored, as in Zapatos 6.6.1, with a [note](#generate.warningListener): a misspelt `npx pgcast '{}' --chek` generates.
 - Of the other arguments, the first is `config`; any later one is ignored.
 - Paths are relative to the folder you run it in: `outDir`, and so the `zapatos` folder.
 
@@ -65,7 +65,7 @@ A query that fails, the connection included, ends it with code 1, after `*** err
 npx pgcast --check
 ```
 
-It reads the catalog as a run does, builds the files in memory, and compares them with yours. It writes nothing, not even a folder: for CI, after your migrations, or before you call a change done.
+From 6.8.0. It reads the catalog as a run does, builds the files in memory, and compares them with yours. It writes nothing, not even a folder: for CI, after your migrations, or before you call a change done.
 
 | Exit | When | It prints |
 |---|---|---|
