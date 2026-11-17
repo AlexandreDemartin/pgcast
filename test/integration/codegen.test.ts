@@ -761,9 +761,11 @@ ${imports.map(line => `  ${line}\n`).join('')}  export type ${type};  // replace
         read: Record<string, Record<string, { type: string; imports: string | null }>> = {};
       for (const order of orders(relations)) {
         // shared across the relations, as tsForConfig shares them
-        const customTypes = Object.create(null), origins = Object.create(null), customTypeImports = Object.create(null);
+        const customTypes = Object.create(null), origins = Object.create(null), customTypeImports = Object.create(null),
+          holders = Object.create(null);
         for (const { rel, schema, enums } of order) await definitionForRelationInSchema(
-          rel, schema, await enums, customTypes, complete, q, origins, undefined, undefined, customTypeImports);
+          rel, schema, await enums, customTypes, complete, q, origins, undefined, undefined, customTypeImports,
+          undefined, undefined, undefined, undefined, undefined, undefined, holders);
         read[order.map(r => `${r.schema}.${r.rel.name}`).join(', ')] = Object.fromEntries(names.map(name =>
           [name, { type: customTypes[name], imports: customTypeImports[name] || null }]));
       }
@@ -1011,25 +1013,71 @@ ${imports.map(line => `  ${line}\n`).join('')}  export type ${type};  // replace
         });
     });
 
-    // two domains named code_d, each over an enum, which placeholder_reels_a reads as `mood` and `any`: one
-    // placeholder (#42), held by placeholder_reels_b's, which sorts last. 6.6.1 gave it the column read last, `mood`
-    // with no import: TS2304, and `any` under skipLibCheck
-    it('gives two types of one name in one relation the one that sorts last', async () => {
-      await t.pool.query(`
+    // two types of one name share one placeholder (#42): the type of the column read last holds it, by schema, then
+    // relation, then column, with the text that type alone gives it. In one relation, that is 6.6.1's winner
+    describe('a placeholder that two types of one name share', () => {
+      beforeAll(() => t.pool.query(`
         CREATE SCHEMA placeholder_reels_a;
         CREATE SCHEMA placeholder_reels_b;
+        CREATE SCHEMA placeholder_reels_m;
         CREATE TYPE placeholder_reels_a.mood AS ENUM ('tense');
         CREATE TYPE placeholder_reels_b.feel AS ENUM ('calm');
         CREATE DOMAIN placeholder_reels_a.code_d AS placeholder_reels_a.mood;
         CREATE DOMAIN placeholder_reels_b.code_d AS placeholder_reels_b.feel;
         CREATE TABLE placeholder_reels_a.mixed (a placeholder_reels_b.code_d, b placeholder_reels_a.code_d);
-      `);
-      try {
-        const { customTypeSourceFiles: files } = await codegen({ schemas: { placeholder_reels_a: all } });
-        expect(files.PgCode_d).toBe(placeholder('zapatos', [], 'PgCode_d = any'));
-      } finally {
-        await t.pool.query('DROP SCHEMA placeholder_reels_a, placeholder_reels_b CASCADE');
-      }
+        CREATE DOMAIN placeholder_reels_a.reel_no AS integer;
+        CREATE DOMAIN placeholder_reels_b.reel_no AS text;
+        CREATE TABLE placeholder_reels_a.numbered (a placeholder_reels_b.reel_no, b placeholder_reels_a.reel_no);
+        CREATE DOMAIN placeholder_reels_a.reel_id AS integer;
+        CREATE DOMAIN placeholder_reels_b.reel_id AS text;
+        CREATE TABLE placeholder_reels_a.labelled (a placeholder_reels_a.reel_id, b placeholder_reels_b.reel_id);
+        CREATE DOMAIN placeholder_reels_m.cut_no AS integer;
+        CREATE DOMAIN placeholder_reels_m."Cut_no" AS text;
+        CREATE TABLE placeholder_reels_m.cuts (a placeholder_reels_m.cut_no, b placeholder_reels_m."Cut_no");
+        -- a domain over an enum that a relation of a schema with no enum of that name reads too, and another type
+        CREATE SCHEMA placeholder_hues_a;
+        CREATE SCHEMA placeholder_hues_z;
+        CREATE SCHEMA placeholder_hues_m;
+        CREATE TYPE placeholder_hues_z.hue AS ENUM ('red');
+        CREATE DOMAIN placeholder_hues_z.hue_d AS placeholder_hues_z.hue;
+        CREATE DOMAIN placeholder_hues_m.hue_d AS text;
+        CREATE TABLE placeholder_hues_z.prints (a placeholder_hues_z.hue_d);
+        CREATE TABLE placeholder_hues_a.prints (a placeholder_hues_z.hue_d);
+        CREATE TABLE placeholder_hues_m.prints (a placeholder_hues_m.hue_d);
+      `));
+      afterAll(() => t.pool.query(`DROP SCHEMA placeholder_reels_a, placeholder_reels_b, placeholder_reels_m,
+        placeholder_hues_a, placeholder_hues_z, placeholder_hues_m CASCADE`));
+
+      const only = (schema: string, ...include: string[]) => ({ schemas: { [schema]: { include, exclude: [] } } });
+
+      it('gives one relation\'s placeholder to the type of its column read last, as 6.6.1 did', async () => {
+        const files = async (schema: string, table: string) => (await codegen(only(schema, table))).customTypeSourceFiles;
+        expect.soft((await files('placeholder_reels_a', 'numbered')).PgReel_no)
+          .toBe(placeholder('zapatos', [], 'PgReel_no = number'));
+        expect.soft((await files('placeholder_reels_a', 'labelled')).PgReel_id)
+          .toBe(placeholder('zapatos', [], 'PgReel_id = string'));
+        // names that differ only in case, one placeholder under PgMy_type
+        expect.soft((await files('placeholder_reels_m', 'cuts')).PgCut_no).toBe(placeholder('zapatos', [], 'PgCut_no = string'));
+      });
+
+      // 6.6.1 wrote `mood`, with no import: TS2304, and the column `any` under skipLibCheck
+      it('writes what the type of that column alone writes, with its import', async () => {
+        const config = only('placeholder_reels_a', 'mixed');
+        expect((await codegen(config)).customTypeSourceFiles.PgCode_d).toBe(placeholder('zapatos',
+          ["import type { placeholder_reels_a } from 'zapatos/schema';"], 'PgCode_d = placeholder_reels_a.mood'));
+        expect(await probeErrors(config, `
+          import type * as s from 'zapatos/schema';
+          export const tense: s.placeholder_reels_a.mixed.Selectable['b'] = 'tense';
+          // @ts-expect-error not a label of placeholder_reels_a.mood
+          export const calm: s.placeholder_reels_a.mixed.Selectable['b'] = 'calm';
+        `, { skipLibCheck: false })).toEqual([]);
+      });
+
+      // placeholder_hues_z.prints holds it, last by schema; its type is `any` from placeholder_hues_a, which has no hue
+      it('reads each type by its own columns, in whichever order the relations are read', async () => {
+        expectInEveryOrder(await placeholdersInEveryOrder(['placeholder_hues_a', 'placeholder_hues_z', 'placeholder_hues_m'],
+          {}, ['PgHue_d']), 6, { PgHue_d: { type: 'any', imports: null } });
+      });
     });
 
     // a domain over an enum and a domain over text of one name (#42): the type whose "schema"."name" sorts last holds
