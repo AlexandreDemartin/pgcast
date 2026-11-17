@@ -2,7 +2,7 @@
 
 - **Status**: accepted (2026-11-17), by delegation from the owner: each choice below is decided under the philosophy, and carries its own status.
 - **Scope**: feature [#54](https://github.com/AlexandreDemartin/pgcast/issues/54), its planned PRs 3 to 7 ([#627](https://github.com/AlexandreDemartin/pgcast/issues/627) to [#631](https://github.com/AlexandreDemartin/pgcast/issues/631)), and the rule for typed references that [#57](https://github.com/AlexandreDemartin/pgcast/issues/57) reuses.
-- **In short**: `related()` and `relatedMany()` are **not built in the core**. The runtime cannot know a foreign key's columns without a generated runtime module, which costs more than the one line each call would save. What #54 keeps: `groupBy` takes an array that mixes columns and fragments, and the docs complete what `website/lateral.md` shows of a lateral on a foreign key, written by hand.
+- **In short**: `related()` and `relatedMany()` are **not built in the core**. With the key's columns read from the catalog, the runtime needs a generated runtime module (A). With the columns written in the call and checked against declared keys (E), it needs none, but each call saves a type, never a line nor the SQL, for two public helpers and a `zapatos/schema` export that `src/db` would read, a canary increment. What #54 keeps: `groupBy` takes an array that mixes columns and fragments, and the docs complete what `website/lateral.md` shows of a lateral on a foreign key, written by hand.
 
 ## Context
 
@@ -45,15 +45,15 @@ Two projects of real usage, about 14,500 TypeScript files, read with a TypeScrip
 
 **Status**: accepted (2026-11-17), by delegation.
 
-All four options compile to the same SQL, the hand-written lateral's: they differ only in where the columns come from.
+All five options compile to the same SQL, the hand-written lateral's: they differ only in where the columns come from.
 
-| | A. A generated value, passed to each call | B. A registry set once | C. Read from the catalog at run time | D. Written in the call, as today |
-|---|---|---|---|---|
-| **The caller writes** | `related(fk.films.studios)`, `fk` imported from a generated `zapatos/foreignKeys.ts` | `related('studios')`, after `db.setConfig({ foreignKeys })` | `related('studios')` | `selectExactlyOne('studios', { id: db.parent<s.films.Column>('studio_id') })` |
-| **How the parent table is known** | the value names the key's table, which nothing checks against the outer query; the SQL's parent is the outer query's `parentTable` mark | through context, as #625 | at run time, from the mark: an alias hides the table | the type argument, which the caller writes |
-| **Compile cost** | measured below: +1.8 points over the same 6 laterals by hand | the mark alone, about +13 points (#625), plus a lookup by pair of tables | the same as B | none |
-| **What it adds** | the first generated runtime file since Zapatos 3.0: its module format (CJS, ESM, TypeScript) and `outExt`, `--check`, the docs schema, and an import in every file that joins | a registry on top of A's runtime file, as `foreignKeys` is the same generated value; one registry for every database (#68); and contextual typing, for `related()` to learn its parent's table | a hidden query and a cache | nothing |
-| **The philosophy** | allowed (principle 5 writes `.ts` files), and needs nothing from `core.ts` | refused: no global registry (skill `zero-abstraction`), and the cost of contextual typing (#625) | refused: an implicit query, a cache | — |
+| | A. A generated value, passed to each call | E. The join's columns in the call, checked against declared keys | B. A registry set once | C. Read from the catalog at run time | D. Written in the call, as today |
+|---|---|---|---|---|---|
+| **The caller writes** | `related(fk.films.studios)`, `fk` imported from a generated `zapatos/foreignKeys.ts` | `related('films', 'studios', { id: 'studio_id' })`, `relatedMany('films', 'roles', { film_id: 'id' })`; the keys declared in `zapatos/schema`, opt-in | `related('studios')`, after `db.setConfig({ foreignKeys })` | `related('studios')` | `selectExactlyOne('studios', { id: db.parent<s.films.Column>('studio_id') })` |
+| **How the parent table is known** | the value names the key's table, which nothing checks against the outer query; the SQL's parent is the outer query's `parentTable` mark | the call names it, as `parent<s.films.Column>` does, and nothing checks it against the outer query (probed); the SQL's parent is the mark | through context, as #625 | at run time, from the mark: an alias hides the table | the type argument, which the caller writes |
+| **Compile cost** | measured below: +1.8 points over the same 6 laterals by hand | measured below: +2.0 points, with the keys read by indexing alone | the mark alone, about +13 points (#625), plus a lookup by pair of tables | the same as B | none |
+| **What it adds** | the first generated runtime file since Zapatos 3.0: its module format (CJS, ESM, TypeScript) and `outExt`, `--check`, the docs schema, and an import in every file that joins | two public helpers; and the first `zapatos/schema` export that `src/db` reads since the fork. A schema without it breaks `zapatos/db`'s declarations, so the generator writes it even without the opt-in (a change to the default output), and the canary goes up, so every consumer regenerates (a stop point). Declaring the keys into `zapatos/db` from `schema.d.ts` instead hides that module (TS2305, probed) | a registry on top of A's runtime file, as `foreignKeys` is the same generated value; one registry for every database (#68); and contextual typing, for `related()` to learn its parent's table | a hidden query and a cache | nothing |
+| **The philosophy** | allowed (principle 5 writes `.ts` files), and needs nothing from `core.ts` | allowed: the keys from the catalog, the SQL from the call's own columns, no runtime file | refused: no global registry (skill `zero-abstraction`), and the cost of contextual typing (#625) | refused: an implicit query, a cache | — |
 
 **The SQL**, compiled by the built runtime from the hand-written calls. A related call that builds the same `Whereable` and calls `select()` gives the same SQL, byte for byte (the `select()` wrapper of the outer query left out):
 
@@ -68,8 +68,12 @@ All four options compile to the same SQL, the hand-written lateral's: they diffe
 |---|---|---|
 | D: the 6 laterals by hand, with `parent<T.Column>` | 16,281 (+4.0 %) | 7,551 (+5.0 %) |
 | A: `related()` and `relatedMany()` over a generated `as const` value | 16,557 (+5.8 %) | 7,790 (+8.3 %) |
+| E: `related()` and `relatedMany()` over two declared maps, one per direction, read by indexing alone | 16,596 (+6.1 %) | 7,844 (+9.1 %) |
+| E over one declared map, filtered by `Extract` | 18,100 (+15.7 %) | 8,123 (+12.9 %) |
 
 So A costs 276 Instantiations over D, 46 per call, +1.8 points for the 6: the types are not the obstacle. (A first count, 16,623 against 16,308, held a seventh call, the refused one, and a baseline of untyped `parent()`.) Its result types check out, an ambiguous key is refused, and neither collapses to `any` (probed). It checks a key's columns, not that the key leaves the parent table: `related(fk.memberships.orgs)` under `select('accounts', …)` compiles, and joins on `"accounts"."org_country"` and `"accounts"."org_code"`: 42703, or the wrong rows when the outer table has columns of those names (probed).
+
+E costs 315 Instantiations over D, 52 per call, +2.0 points; filtered by `Extract`, 1,819 (+11.6 points). It refuses each negative probed: a nullable key's `| undefined` read as a row, a column that is not the key's (`{ id: 'id' }`), a pair of tables with no key, half a composite key, an extra column beside the key, a one-to-many join given to `related()`. Of two keys between the same tables, the columns pick one, so there is no `fk` error. Like `parent<s.films.Column>`, it checks the parent it names, not the outer query: `related('accounts', 'users', { id: 'owner_id' })` under `select('users', …)` compiles.
 
 **Market standard**:
 
@@ -77,17 +81,18 @@ So A costs 276 Instantiations over D, 46 per call, +1.8 points for the 6: the ty
 - **Kysely** has no relations. You write the join, `jsonObjectFrom(eb.selectFrom('studios').select('name').whereRef('studios.id', '=', 'films.studio_id'))`, its columns checked against the tables in scope, its result `| null` whatever the key: option D.
 - **Drizzle**'s relational queries need relations declared in TypeScript (principle 2); **Prisma** is an ORM.
 
-**Choice: D.** Nothing is built in the core: no `related()`, no `relatedMany()`, no foreign-key metadata (#627, #628 and #629 crossed out).
+**Choice: D.** Nothing is built in the core: no `related()`, no `relatedMany()`, no foreign-key metadata (#627, #628 and #629 crossed out). E replaces A as the design a revival would follow.
 
-- **The one option inside the philosophy, A, costs more than it saves.** Each call would save its column names and the choice of shortcut, on SQL that stays the same. In exchange, the generator would write a runtime file again, which Zapatos 3.0 stopped doing, and each file that joins would import it.
+- **E, the better of the two options inside the philosophy, still costs more than it saves.** It needs no runtime file, and its compile cost is A's. Each call saves a type, never the SQL nor a line: `related('accounts', 'users', { id: 'owner_id' })` is about as long as `selectExactlyOne('users', { id: parent<s.accounts.Column>('owner_id') })`. That type picks the shortcut from the key, where 34 of the corpus's 288 typed many-to-one laterals pick the other one (11 type a `null` away, 23 add a needless `| undefined`), and refuses a join column that is not the key's (§ Risks). In exchange, the core keeps two public helpers forever, and `src/db` reads a `zapatos/schema` export for the first time since the fork: the default output changes and the canary goes up, so every consumer regenerates.
+- **A saves the same type and the parent's name**, for a generated runtime file, which Zapatos 3.0 stopped writing, imported in every file that joins.
 - **What the call saves is already mostly there.** 91 % of the corpus's `parent()` calls carry `parent<T.Column>`, which refuses a column of another table (#625). 88 % of its many-to-one laterals already pick the right shortcut. The other 34 are a type each, never the SQL: the docs say how to choose (`website/lateral.md`).
-- **A covers half the corpus at best**: a single-column join to `id` or from it, 648 of 1,080, fewer once the 18 % with a condition beside the join are out. A join on other columns, a condition beside it, or a key from a variable still needs the hand-written form.
-- **Small is beautiful**: a core helper must pay for itself in the core. A needs nothing from `core.ts` nor from `src/db`'s internals, so it fits a separate package (principle 4). The package that #55 plans for generated runtime code (validators) is where a generated key would go, if real use asks for one.
-- **Reversible**: A is written down below, with its SQL. It comes back as a revision of this note, opt-in, if that package exists, or if a consumer outside the corpus asks for it.
+- **A or E covers half the corpus at best**: a single-column join to `id` or from it, 648 of 1,080, fewer once the 18 % with a condition beside the join are out. A join on other columns, a condition beside it, or a key from a variable still needs the hand-written form.
+- **Small is beautiful**: a core helper must pay for itself in the core. E's helpers need nothing from `core.ts` nor from `src/db`'s internals, so they fit a separate package (principle 4), over keys the generator declares opt-in: nothing in `src/db` reads them, so the default output and the canary stay.
+- **Reversible**: E is written down above, with its measures. It comes back as a revision of this note, opt-in, if real use outside the corpus asks for it.
 
-## 2. The points #54 asks to decide first, for A
+## 2. The points #54 asks to decide first, for a revival
 
-**Status**: accepted (2026-11-17), by delegation, as the design A would follow. Nothing below is built while choice 1 stands.
+**Status**: accepted (2026-11-17), by delegation, as the design a revival would follow, written for A. Nothing below is built while choice 1 stands. Under E, three rows change: a composite key's pairs are written in the call, checked against the declared key; there is no `fk` error, as the columns pick the key; and the metadata is two maps declared in `zapatos/schema`, `ToOne` (with `exactlyOne` per pair of tables, true only if every key of the pair is) and `ToMany`, not `zapatos/foreignKeys.ts`.
 
 | Point | Decision for A | SQL, equal to the hand-written lateral's | Evidence and standard |
 |---|---|---|---|
@@ -126,7 +131,7 @@ So A costs 276 Instantiations over D, 46 per call, +1.8 points for the 6: the ty
 
 - **The corpus is two projects.** A third that joins on keys alone, with few options, would save more per call. That changes the gain of A, not its runtime file.
 - **The 11 `selectExactlyOne()` on a nullable column** stay possible: a type with no `null` over a `null`. The docs rule, not a helper, is what guards them.
-- **A wrong `parent()` column of the right table** (`parent<s.films.Column>('id')` for `studio_id`) still compiles and joins the wrong rows. A would rule it out for a key's own columns, not for a key of another table under the outer query (§ 1); D leaves both to review and to tests that run the query.
+- **A wrong `parent()` column of the right table** (`parent<s.films.Column>('id')` for `studio_id`) still compiles and joins the wrong rows. A or E would rule it out for a key's columns, not for a key of another table under the outer query (§ 1); D leaves both to review and to tests that run the query.
 
 ## Sources
 
