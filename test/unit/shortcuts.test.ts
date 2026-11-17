@@ -369,7 +369,7 @@ describe('upsert', () => {
       parent: set(parent('id')), self: set(db.self), all: set(all),
     }).toMatchInlineSnapshot(`
       {
-        "all": "throws: Cannot convert a Symbol value to a string",
+        "all": "throws: Alien object while interpolating SQL: Symbol(all)",
         "cast": [
           "("mood") = ROW(CAST($3 AS "mood"))",
           [
