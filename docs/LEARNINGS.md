@@ -344,6 +344,10 @@ Candidates for a check, a rule or a skill line.
 - #645: `refusedSQL()` in `shortcuts.ts` makes a shortcut throw while compiling, so a new message keeps the error at `.run()`, not at the call.
 - #645: Vitest's `toThrow('…')` checks that the message contains the string, not the error's class: when a fix changes the class (`TypeError` to `Error`), assert `{ name, message }`.
 - #645: in zsh, `git show $REF:test/x.ts` applies the `:t` history modifier to `$REF`: quote it, `"$REF:path"` or `${REF}:path`.
+- #648: `codegen()` in the test helpers overrides `db`; a test that needs its own connection options calls `tsForConfig(finaliseConfig(...))` directly.
+- #648: comparing two generator runs needs the queries sorted with their sequence numbers removed, and the once-per-process bigint note filtered out.
+- #648: a mutant the whole-text match makes equivalent (`contype = 'c'`) is kept as the note's stated rule, and said so in the PR.
+- #648: compile every new import a placeholder writes under each `customTypesTransform` variant, with `skipLibCheck: false`: `'my_type'` gives the import the placeholder's own name (TS2440), which the build hides.
 
 ## Minors kept
 
@@ -397,3 +401,4 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 
 - #645 (form): `src/db/shortcuts.ts` `allAsWriteFilter`: one clause for the reader who reached it by accident ("check the value that is missing") would complete the advice.
 - #645 (form): `website/sql-template.md` § all (EN and FR): the bullet repeats the message it quotes; keep only "`{}` and `` db.sql`TRUE` `` do:" before the quote.
+
