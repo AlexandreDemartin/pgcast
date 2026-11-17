@@ -278,6 +278,24 @@ describe('Default, self, parent, cols, vals', () => {
     expect(await sql`SELECT ${'display_name'} FROM ${'users'} ORDER BY ${'id'}`.run(t.client))
       .toEqual([{ display_name: 'Ada' }, { display_name: 'Bob' }, { display_name: 'Cyd' }]);
   });
+
+  it('what the messages of self as a write value say to write runs where each says it', async () => {
+    // a column named alone, as "name the column" once said, fails in both places the message names: 42703 in a
+    // VALUES list, 42702 (ambiguous with EXCLUDED's) in updateValues (#665)
+    const
+      robert = { email: 'bob@example.com', display_name: 'Robert' },
+      name = async (q: db.SQLFragment<any>) => ((await q.run(t.client)) as { display_name: string }).display_name;
+    expect({
+      updateValuesTable: await name(db.upsert('users', robert, 'email', { updateValues: { display_name: sql`${'users'}.${'display_name'}` } })),
+      updateValuesExcluded: await name(db.upsert('users', robert, 'email', { updateValues: { display_name: sql`upper(EXCLUDED.${'display_name'})` } })),
+      updateFragment: (await db.update('users', { display_name: sql`upper(${self})` }, { id: 2 }).run(t.client))[0].display_name,
+      templateValue: (await sql`INSERT INTO ${'users'} (${'email'}, ${'display_name'}) VALUES (${vals(['eve@example.com', 'Eve'])})
+        RETURNING ${'display_name'}`.run(t.client))[0].display_name,
+    }).toEqual({ updateValuesTable: 'Bob', updateValuesExcluded: 'ROBERT', updateFragment: 'ROBERT', templateValue: 'Eve' });
+    const named = await db.upsert('users', robert, 'email', { updateValues: { display_name: sql`${'display_name'}` } })
+      .run(t.client).then(() => 'ran', (e: { code?: string }) => e.code);
+    expect(named).toBe('42702');
+  });
 });
 
 describe('Whereable', () => {

@@ -388,11 +388,11 @@ const
   wrapperInVals = '`db.raw()`, `db.cols()` and `db.vals()` have no meaning as an item of `vals([…])` in a column\'s value, in a filter (as `isIn()` writes it) or in a `sql` fragment value of `vals({…})`, so of `insert()`, `upsert()` or `update()`: for SQL, write it in a `sql` fragment value, outside `vals([…])` (in a filter or in `update()`, `db.self` there stands for the column); for a value, give the value itself, or `db.param()`.',
   // vals([…]) items with no current column: a `sql` template's, or upsert()'s updateValues', compiled as one
   allInBareVals = '`db.all` has no meaning as an item of `vals([…])` outside a column\'s value, as in a `sql` template of your own or in `upsert()` `updateValues`: give a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.',
-  selfInBareVals = '`db.self` has no meaning as an item of `vals([…])` outside a column\'s value, as in a `sql` template of your own or in `upsert()` `updateValues`: give a value, or name the column.',
+  selfInBareVals = '`db.self` has no meaning as an item of `vals([…])` outside a column\'s value, as in a `sql` template of your own or in `upsert()` `updateValues`: give a value; in `updateValues`, to read a column, write it after its table, db.sql`${table}.${column}`, or after `EXCLUDED` for the row proposed.',
   wrapperInBareVals = '`db.raw()`, `db.cols()` and `db.vals()` have no meaning as an item of `vals([…])` outside a column\'s value, as in a `sql` template of your own or in `upsert()` `updateValues`: for SQL, write it outside `vals([…])` (in `updateValues`, as the value itself); for a value, give the value itself, or `db.param()`.',
   wrapperAsValue = '`db.raw()`, `db.cols()` and `db.vals()` have no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value: to write SQL, use a `sql` fragment value (in `update()`, `db.self` there stands for the column); to write a value, give the value itself, or `db.param()`.',
   allAsValue = '`db.all` has no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value: give a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.',
-  selfAsValue = '`db.self` has no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value: give a value; in `update()`, write `db.self` in a `sql` fragment value, where it stands for the column.',
+  selfAsValue = '`db.self` has no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value: give a value; in `update()`, write `db.self` in a `sql` fragment value, where it stands for the column; in `upsert()` `updateValues`, to read a column, write it after its table, db.sql`${table}.${column}`, or after `EXCLUDED` for the row proposed.',
   nullInterpolated = 'Interpolating `null` has no meaning in SQL: for a `NULL` value, interpolate `db.param(null)`; to filter on `NULL`, use `{ column: db.conditions.isNull }`; to match every row, give `db.all` as the whole filter of `select()` and its kin.',
   parentWithoutColumn = "`db.parent()` with no column has no meaning here: name the column, `db.parent('id')`, or give it as the value of a Whereable or `vals({…})` key, whose column it then takes.",
   builtinWhereable = (name: string) => `A built-in \`${name}\` has no meaning as a Whereable (a filter): it would compile to its own enumerable keys, and to \`TRUE\`, every row, when it has none. To compare with a value, give it as \`db.param(…)\`; to filter, give a plain object (\`{ column: value }\`); await a \`Promise\` first.`;
@@ -664,7 +664,8 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
           // a set currentColumn means a column's value, a filter's or a write's (see defaultInVals), where `Default`,
           // `self`, `all` and the wrappers are refused; with none (a template, updateValues), `self`, `all` and the
           // wrappers too, which Zapatos 6.6.1 sent as 'Symbol(all)' or JSON, but `Default` is `DEFAULT`, as when
-          // inserting by hand
+          // inserting by hand. An item is compiled with no column, so a fragment item that holds vals([…]) gets the
+          // message with none, `outside a column's value`, even within a filter's column value
           if (value === Default && currentColumn) throw new Error(defaultInVals);
           if (value === self) throw new Error(currentColumn ? selfInVals : selfInBareVals);
           if (value === all) throw new Error(currentColumn ? allInVals : allInBareVals);

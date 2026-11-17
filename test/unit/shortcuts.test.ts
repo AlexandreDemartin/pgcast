@@ -405,7 +405,7 @@ describe('upsert', () => {
           "("mood") = ROW(now())",
           [],
         ],
-        "self": "throws: \`db.self\` has no meaning as a value in \`vals({…})\`, so as an \`insert()\`, \`upsert()\` or \`update()\` value: give a value; in \`update()\`, write \`db.self\` in a \`sql\` fragment value, where it stands for the column.",
+        "self": "throws: \`db.self\` has no meaning as a value in \`vals({…})\`, so as an \`insert()\`, \`upsert()\` or \`update()\` value: give a value; in \`update()\`, write \`db.self\` in a \`sql\` fragment value, where it stands for the column; in \`upsert()\` \`updateValues\`, to read a column, write it after its table, db.sql\`\${table}.\${column}\`, or after \`EXCLUDED\` for the row proposed.",
         "vals": [
           "("mood") = ROW($3)",
           [
@@ -3068,14 +3068,14 @@ describe('db.all, self, Default, raw(), a Parameter and parent() in every write 
   // current column: an updateValues fragment or vals([…]), a template of your own
   const messages: Record<string, string> = {
     allAsValue: '`db.all` has no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value: give a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.',
-    selfAsValue: '`db.self` has no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value: give a value; in `update()`, write `db.self` in a `sql` fragment value, where it stands for the column.',
+    selfAsValue: '`db.self` has no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value: give a value; in `update()`, write `db.self` in a `sql` fragment value, where it stands for the column; in `upsert()` `updateValues`, to read a column, write it after its table, db.sql`${table}.${column}`, or after `EXCLUDED` for the row proposed.',
     wrapperAsValue: '`db.raw()`, `db.cols()` and `db.vals()` have no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value: to write SQL, use a `sql` fragment value (in `update()`, `db.self` there stands for the column); to write a value, give the value itself, or `db.param()`.',
     allInVals: '`db.all` has no meaning as an item of `vals([…])` in a column\'s value, in a filter (as `isIn()` writes it) or in a `sql` fragment value of `vals({…})`, so of `insert()`, `upsert()` or `update()`: in a filter, leave the key out, or compare with a value; in a write, give a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.',
     selfInVals: '`db.self` has no meaning as an item of `vals([…])` in a column\'s value, in a filter (as `isIn()` writes it) or in a `sql` fragment value of `vals({…})`, so of `insert()`, `upsert()` or `update()`: give a value; in a filter or in `update()`, write `db.self` in a `sql` fragment value, outside `vals([…])`, where it stands for the column.',
     defaultInVals: '`db.Default` has no meaning as an item of `vals([…])` in a column\'s value, in a filter (as `isIn()` writes it) or in a `sql` fragment value of `vals({…})`, so of `insert()`, `upsert()` or `update()`: in a filter, leave the key out, or compare with a value; in a write, give `db.Default` as the value itself, `{ column: db.Default }`.',
     wrapperInVals: '`db.raw()`, `db.cols()` and `db.vals()` have no meaning as an item of `vals([…])` in a column\'s value, in a filter (as `isIn()` writes it) or in a `sql` fragment value of `vals({…})`, so of `insert()`, `upsert()` or `update()`: for SQL, write it in a `sql` fragment value, outside `vals([…])` (in a filter or in `update()`, `db.self` there stands for the column); for a value, give the value itself, or `db.param()`.',
     allInBareVals: '`db.all` has no meaning as an item of `vals([…])` outside a column\'s value, as in a `sql` template of your own or in `upsert()` `updateValues`: give a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.',
-    selfInBareVals: '`db.self` has no meaning as an item of `vals([…])` outside a column\'s value, as in a `sql` template of your own or in `upsert()` `updateValues`: give a value, or name the column.',
+    selfInBareVals: '`db.self` has no meaning as an item of `vals([…])` outside a column\'s value, as in a `sql` template of your own or in `upsert()` `updateValues`: give a value; in `updateValues`, to read a column, write it after its table, db.sql`${table}.${column}`, or after `EXCLUDED` for the row proposed.',
     wrapperInBareVals: '`db.raw()`, `db.cols()` and `db.vals()` have no meaning as an item of `vals([…])` outside a column\'s value, as in a `sql` template of your own or in `upsert()` `updateValues`: for SQL, write it outside `vals([…])` (in `updateValues`, as the value itself); for a value, give the value itself, or `db.param()`.',
     parent: 'The \'parent\' table alias has no meaning here',
   };

@@ -592,8 +592,8 @@ describe('cols and vals', () => {
   it('vals([self]) and vals({ a: self }) throw outside a filter too, so as a write value', () => {
     // 6.6.1 and pgcast until #665 sent 'Symbol(self)', stored in a text column; left by #106
     expect({ vals: thrown(() => one(vals([self]))), valsObject: thrown(() => one(vals({ a: self }))) }).toEqual({
-      vals: '`db.self` has no meaning as an item of `vals([…])` outside a column\'s value, as in a `sql` template of your own or in `upsert()` `updateValues`: give a value, or name the column.',
-      valsObject: '`db.self` has no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value: give a value; in `update()`, write `db.self` in a `sql` fragment value, where it stands for the column.',
+      vals: '`db.self` has no meaning as an item of `vals([…])` outside a column\'s value, as in a `sql` template of your own or in `upsert()` `updateValues`: give a value; in `updateValues`, to read a column, write it after its table, db.sql`${table}.${column}`, or after `EXCLUDED` for the row proposed.',
+      valsObject: '`db.self` has no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value: give a value; in `update()`, write `db.self` in a `sql` fragment value, where it stands for the column; in `upsert()` `updateValues`, to read a column, write it after its table, db.sql`${table}.${column}`, or after `EXCLUDED` for the row proposed.',
     });
   });
 
