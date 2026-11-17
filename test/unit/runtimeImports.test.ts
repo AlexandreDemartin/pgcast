@@ -2,7 +2,7 @@
 //
 // What the published code loads at run time (#592): each module of src/db and src/generate, emitted as
 // `npm run build` emits it, requires only Node's built-ins, its own files, `dependencies` and the peers
-// that are not optional. No database.
+// that are not optional: typescript is optional, for the types alone. No database.
 
 import * as fs from 'fs';
 import { builtinModules } from 'module';
@@ -46,7 +46,8 @@ describe('runtime imports', () => {
     expect(refused).toEqual([]);
   });
 
-  it('keeps pg and @types/pg required peers', () => {
+  it('keeps pg and @types/pg required peers, typescript an optional one', () => {
     expect(['pg', '@types/pg'].filter(name => !(name in pkg.peerDependencies) || optional(name))).toEqual([]);
+    expect('typescript' in pkg.peerDependencies && optional('typescript')).toBe(true);
   });
 });
