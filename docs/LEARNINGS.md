@@ -263,6 +263,13 @@ Candidates for a check, a rule or a skill line.
 - #605: `typescript`'s `latest` is 7 now; Yarn and Bun rewrite a range a project already declares when you `add` it again (npm and pnpm keep it): replay a docs install command on a project that already lists the package, with each package manager.
 - #605: a test listing a folder's modules recurses, matching what `tsconfig` builds and `files` ships.
 - #605: a harness that reverts with `git checkout -- . && git clean -fdq src` wipes uncommitted work: commit before running it.
+- #606: on TS 4.1 a declaration naming a missing 5.x type as a constraint (`NoInfer<Table>`) still refuses a wrong table; only a result type such as `Awaited<…>` turns `any`: a floor consumer needs a negative on a result type as well as on an argument.
+- #606: `dist/db/core.d.ts` emits `Buffer<ArrayBuffer>` (dev `@types/node` 20), so `skipLibCheck: false` is impossible on TS < 5.7 with the matching `@types/node`, as install.md says.
+- #606: skill `pr-shape`'s branch types have no `ci`; a CI branch is `chore/…`.
+- #606: under `skipLibCheck`, a name a `.d.ts` uses that the compiler does not know (`Awaited` below 4.5) becomes `any` silently: a floor check runs a lib check limited to the package's own files, with a short list of allowed diagnostics.
+- #606: "pinned tools" for a compatibility check include transitive dependencies declared `*` (`@types/pg` → `pg-protocol`), or an upstream release turns CI red with nothing changed.
+- #606: `ts.parseJsonConfigFileContent` without the config file path resolves `types` from the current directory, so a check inside the repository picks up the repository's own `@types`.
+- #606: the compiler names files reached through an import by their real path: compare with `realpathSync`.
 
 ## Minors kept
 
@@ -309,3 +316,4 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #600 (form): `website/switching.md` has no row for `order: null` / `lock: null` (Zapatos 6.6.1: a `TypeError` at the call; pgcast from 6.7.1: refused while compiling, `.run()` rejects).
 - #605 (form): `test/unit/runtimeImports.test.ts` reads emitted JS with a regex (a string `"require(pg)"` is a false red; `createRequire(__filename)(…)` passes); a syntax-tree walk would be exact.
 - #605 (form): `website/install.md` (FR) Requirements: two bullets in a row about TypeScript.
+- #606 (form): `scripts/check-declarations-floor.mjs` leaves `pg-types` (`^2.2.0` from `@types/pg@8.6.6`) unpinned.
