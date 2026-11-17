@@ -25,6 +25,7 @@ export const userWithAggregates = (id: number) => db.selectOne('users', { id }, 
 export const firstEventOfUser = (id: number) => db.selectOne('users', { id }, { lateral: db.min('events', db.all, { columns: ['occurred_on'] }) });
 
 export const { count, sum, avg, min, max, selectOne, selectExactlyOne } = db;
+export const { websearchToTsquery } = db.conditions;
 
 // a condition re-exported, as a library of shared conditions does: its type must be one a .d.ts can name (TS4023)
 export const { jsonbPathExists } = db.conditions;

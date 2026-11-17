@@ -108,6 +108,80 @@ describe('values are data', () => {
     expect(outcomes).toEqual(Object.fromEntries(Object.keys(inputs).map(name => [name, name === 'nul' ? '22021' : 'stored'])));
   });
 
+  it('a hostile configuration or query of websearchToTsquery stays a parameter: a name Postgres looks up, or words it searches, and runs nothing', async () => {
+    // compiled text: test/unit/injection.test.ts; products.search holds 'T-shirt small', 'T-shirt medium' and ''
+    const inputs: Record<string, string> = {
+      dquote: 'a"b', squote: "a'b", semicolon: 'a;b', dashes: 'a--b', comment: 'a/*b', dollar: 'a$1b',
+      backslash: 'a\\b', nul: 'a\0b', dot: 'a.b', lone: '"', prequoted: '"simple"', qualified: 'pg_catalog.simple',
+      closes: `simple'); ${update}; --`, closesQuery: `shirt')) OR TRUE; ${update}; --`,
+    };
+    const outcomes: Record<string, unknown> = {};
+    for (const [name, input] of Object.entries(inputs))
+      for (const [where, condition] of Object.entries({
+        config: db.conditions.websearchToTsquery(input, 'shirt'), query: db.conditions.websearchToTsquery('simple', input),
+      })) {
+        await t.client.query('SAVEPOINT pgcast_search');
+        try {
+          const rows = await sql`SELECT ${'id'} FROM ${'products'} WHERE ${{ search: condition }} ORDER BY ${'id'}`.run(t.client);
+          // read before the savepoint goes: a second statement that ran shows here
+          outcomes[`${name} ${where}`] = await adaName() === 'Ada' ? rows.map(r => r.id) : 'injected';
+        } catch (err) {
+          outcomes[`${name} ${where}`] = (err as { code?: string }).code;
+        }
+        await t.client.query('ROLLBACK TO SAVEPOINT pgcast_search');
+      }
+    // `a.b` names schema `a`, which does not exist: 3F000 before Postgres 16; from 16, whose regconfig input reports
+    // its errors softly, the configuration that does not exist, 42704
+    const { 'dot config': dotConfig, ...others } = outcomes;
+    const { rows: [{ version }] } = await t.client.query("SELECT current_setting('server_version_num')::int AS version");
+    expect(dotConfig).toBe(version >= 160000 ? '42704' : '3F000');
+    expect(others).toMatchInlineSnapshot(`
+      {
+        "backslash config": "42704",
+        "backslash query": [],
+        "closes config": "42602",
+        "closes query": [],
+        "closesQuery config": "42602",
+        "closesQuery query": [
+          1,
+          2,
+        ],
+        "comment config": "42704",
+        "comment query": [],
+        "dashes config": "42704",
+        "dashes query": [],
+        "dollar config": "42704",
+        "dollar query": [],
+        "dot query": [],
+        "dquote config": "42704",
+        "dquote query": [],
+        "lone config": "42602",
+        "lone query": [],
+        "nul config": "22021",
+        "nul query": "22021",
+        "prequoted config": [
+          1,
+          2,
+        ],
+        "prequoted query": [],
+        "qualified config": [
+          1,
+          2,
+        ],
+        "qualified query": [],
+        "semicolon config": "42704",
+        "semicolon query": [],
+        "squote config": "42704",
+        "squote query": [],
+      }
+    `);
+    // a name with a space is 42602, invalid name syntax; without one, the whole payload is one name, which does not exist
+    const payload = `simple');delete/**/from/**/products;--`;  // lower case: Postgres folds an unquoted name
+    expect(await pgError(t.client, () => sql`SELECT 1 FROM ${'products'} WHERE ${{ search: db.conditions.websearchToTsquery(payload, 'shirt') }}`.run(t.client)))
+      .toEqual({ code: '42704', message: `text search configuration "${payload}" does not exist` });
+    expect((await t.client.query('SELECT count(*)::int AS n FROM products')).rows).toEqual([{ n: 3 }]);
+  });
+
   it('null stays a NULL parameter, beside a hostile key that stays one column name', async () => {
     expect(await sql`SELECT ${param(null)}::text AS v, ${{ display_name: null }} AS m FROM ${'users'} WHERE id = 1`.run(t.client)).toEqual([{ v: null, m: null }]);
     const key = `display_name" IS NULL OR TRUE OR "`;

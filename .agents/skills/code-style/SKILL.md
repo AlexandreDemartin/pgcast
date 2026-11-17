@@ -71,6 +71,7 @@ A new example in the docs, the README, a JSDoc, an issue or a PR uses pgcast's o
 |---|---|
 | Plain rows, `lateral` on a foreign key | `studios`, `films` (`studio_id`, `title`, `release_year`, `runtime_minutes`) |
 | Arrays (`TEXT[]`) | `films` (`genres`) |
+| Full-text search, a generated `tsvector` | `films` (`title_search`) |
 | Many-to-many | `actors`, `roles` (`film_id`, `actor_id`, `character`, `billing`) |
 | Self-reference, with `alias` | `crew` (`mentor_id`) |
 | `extras` with a `POINT` and a gist index | `cinemas` (nearest cinema) |

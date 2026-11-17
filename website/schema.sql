@@ -81,6 +81,10 @@ CREATE TABLE tags
 , tag TEXT NOT NULL
 , PRIMARY KEY (film_id, tag) );
 
+-- Full-text search on titles: a generated tsvector, which Postgres keeps up to date, with its GIN index
+ALTER TABLE films ADD COLUMN title_search TSVECTOR GENERATED ALWAYS AS (to_tsvector('english', title)) STORED;
+CREATE INDEX films_title_search_idx ON films USING gin (title_search);
+
 INSERT INTO studios (id, name) VALUES
   (1000, 'Larkspur Pictures')
 , (1001, 'Greyhaven Studios')

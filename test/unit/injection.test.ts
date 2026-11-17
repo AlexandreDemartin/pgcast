@@ -331,6 +331,18 @@ describe('values stay parameters', () => {
     }
   });
 
+  it('the configuration and the query of websearchToTsquery are two parameters, whatever they hold and whatever the configuration', () => {
+    // the cast to regconfig is a constant of the code
+    for (const config of [{}, { castArrayParamsToJson: true }, { castObjectParamsToJson: true }]) {
+      db.setConfig(config);
+      try {
+        for (const input of Object.values(hostile))
+          expect(sql`WHERE ${{ search: db.conditions.websearchToTsquery(input, input) }}`.compile())
+            .toEqual({ text: 'WHERE (("search" @@ websearch_to_tsquery(CAST($1 AS "regconfig"), $2)))', values: [input, input] });
+      } finally { resetConfig(); }
+    }
+  });
+
   it('the value of jsonbContains is one jsonb parameter, its JSON text, hostile keys and strings included, whatever the configuration', () => {
     const values = [...Object.values(hostile), Object.fromEntries(Object.values(hostile).map(v => [v, v])), Object.values(hostile)];
     for (const config of [{}, { castArrayParamsToJson: true }, { castObjectParamsToJson: true }]) {
