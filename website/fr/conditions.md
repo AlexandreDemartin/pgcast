@@ -1,5 +1,5 @@
 ---
-english: 843005e9040b
+english: 994962fa314f
 description: "db.conditions regroupe les tests, comparaisons et opérateurs à donner comme valeur d’une clé d’un Whereable, chacun avec le SQL qu’il écrit et ses valeurs."
 ---
 
@@ -260,6 +260,8 @@ db.conditions.ilikeAny<T extends string>(a: readonly T[]): SQLFragment<boolean |
 
 `isIn()` et `isNotIn()` prennent un tableau de valeurs du type de la colonne, `<T>(a: readonly T[])`, compilé comme le compilerait [`vals()`](/fr/sql-template#vals) : un paramètre par élément. [`eqAny()`](#conditions.eqAny) envoie le tableau entier comme un seul paramètre.
 
+Laquelle choisir : `eqAny()` pour une liste construite à l’exécution, car un seul texte de requête sert pour toute longueur, donc une seule requête préparée avec [`prepared()`](/fr/sql-template#prepared), sans limite de 65 535 paramètres ; `isIn()` pour une liste courte et fixe, ou qui contient un `Parameter` ou un fragment, que `eqAny()` refuse.
+
 <CastPanel example="conditions_isIn">
 
 <<< ../examples/conditions_isIn.ts{ts twoslash}
@@ -386,6 +388,19 @@ Le tableau est un seul paramètre, donc chaque élément, à toute profondeur, e
 ## jsonb {#jsonb}
 
 À partir de la 6.9.0, deux conditions sur une colonne `jsonb` : son JSON contient une valeur, ou un chemin y trouve un élément.
+
+Un test sur un champ du JSON est l’une d’elles, ou un fragment `sql` pour un motif :
+
+| Pour tester qu’un champ | Écrire | SQL |
+|---|---|---|
+| est égal à une valeur | `jsonbContains({ format: '35mm' })` | `"details" @> CAST($1 AS "jsonb")`<!-- probe: db.sql`${{ details: db.conditions.jsonbContains({ format: '35mm' }) }}` --> |
+| dépasse une valeur, ou commence par une valeur | `jsonbPathExists('$.reels ? (@ > $n)', { n: 10 })` | `jsonb_path_exists("details", CAST($1 AS "jsonpath"), CAST($2 AS "jsonb"))`<!-- probe: db.sql`${{ details: db.conditions.jsonbPathExists('$.reels ? (@ > $n)', { n: 10 }) }}` --> |
+| correspond à un motif saisi par un utilisateur | `` db.sql`${db.self}->>${db.param('format')} ILIKE ${db.param(pattern)}` `` | `"details"->>$1 ILIKE $2`<!-- probe: db.sql`${{ details: db.sql`${db.self}->>${db.param('format')} ILIKE ${db.param('%mm')}` }}` --> |
+
+- **L’égalité** compare des valeurs JSON : `{ reels: 10 }` ne correspond donc pas à la chaîne `"10"`, et un index GIN sur la colonne la sert, avec l’une ou l’autre classe d’opérateurs.
+- **Une comparaison d’ordre** se place dans le chemin, qui compare des nombres JSON : 9 bobines, c’est moins que 10. `starts with $p` prend aussi une variable.
+- **Un motif** issu de la saisie d’un utilisateur : la clé et le motif sont deux paramètres. Pas `like_regex` dans un chemin : son motif doit être un littéral du chemin, donc `$.format ? (@ like_regex $p)` échoue dans Postgres (42601), et la saisie devrait aller dans le texte du chemin.
+- **`->>` renvoie du texte**, donc une comparaison sur son résultat compare du texte : `` db.sql`${db.self}->>'reels' > ${db.param(10)}` `` trouve une copie de 9 bobines, car `'9'` est classé après `'10'`. Comparez plutôt dans le chemin, comme ci-dessus.
 
 ### `jsonbContains()` {#conditions.jsonbContains}
 
