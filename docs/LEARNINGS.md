@@ -191,6 +191,22 @@ Candidates for a check, a rule or a skill line.
 - #746 — A name-binding rule over imports compares the imported name (`ImportSpecifier.propertyName`) as well as the local one, and skips type-only imports: `import { raw as param }` compiles — branch-reviewer
 - #746 — A scanner of tagged templates reads the cooked strings (`head.text`, `literal.text`) the tag receives, not `getText()`: an escape such as `\x4c` makes a keyword appear only at run time — branch-reviewer
 - #746 — A binding rule pins `<ns>.sql` to exactly one level: a `head()` that walks down a property chain lets `db.x.sql` pass — builder
+- #751 — Vitest's type tests build incrementally (`node_modules/vitest/dist/tsconfig.tmp.tsbuildinfo`): a mutant worktree sharing `node_modules` shares it, and an unrelated red follows; delete it before each mutant run and before trusting such a red — builder
+- #751 — A mutant worktree links each `node_modules` entry but `.cache`, or its declaration emit overwrites the checkout's; a mutant script restores the source in a `finally` — builder
+- #751 — A "does not compile" claim on a generic helper names what fails: `<C>(pool: db.PoolLike<C>)` with its own callback compiles; passing on a callback typed with `C` does not — builder
+- #751 — A type parameter that infers nothing inside a generic body falls back to its constraint; check a forwarder's body with a constrained generic (`<C extends X>`), not only an unconstrained one — branch-reviewer
+- #751 — To tell an inferred type parameter from its constraint, use exact identity `(<X>() => X extends N ? 1 : 2) extends (<X>() => X extends C ? 1 : 2)`; two-way assignability cannot (compiles on 4.1.6 and 7.0.2) — branch-reviewer
+- #751 — Probe each union both mixed and all-foreign: a union of two other drivers' clients was accepted with pg's client type, and only a second union form showed it — builder
+- #751 — Once a fallback is detected one way, every type branching on it uses the same test; a second, structural test (the `connect` key) is where the next bug was — branch-reviewer
+- #751 — An explicit type argument turns off inference for every other type parameter, which takes its default; probe a signature whose safety depends on an inferred parameter with `fn<T>(…)` too — branch-reviewer
+- #751 — When an argument can be a pool or a marked client, test each runtime path against the callback's inferred isolation level — codex
+- #751 — A type parameter's constraint (`N extends { connect?: never }`) binds only the chosen type argument, not the value passed: put the restriction on the argument's type itself — codex
+- #751 — Replay a docs example across every supported `@types/pg` major: the union in the docs was refused with v8 typings and compiled with 7.14.3 — codex
+- #751 — Five verify rounds on one conditional-type design: each round's hunt found the next hole in a structural test; a design whose soundness rests on several conditional branches gets its hunt grid written before the first review, not after — orchestrator
+- #751 — A key test `'_zapatos' extends keyof N` passes any type with a string index signature; test the marker's own type, not only its key — codex
+- #751 — An explicit type argument is the caller's assertion, as a cast is: a type rule names it as such rather than chasing it with more conditional branches — orchestrator
+- #751 — A string index signature puts `_zapatos` in `keyof` even on a bare client; checking the property's type tells it from a marked client — codex
+- #751 — An optional marker lets TypeScript infer the marked type for a whole `outer ?? { query, release }` expression before any argument check sees it; such a hand-built client fails loudly at run time, so name it in the docs rather than chase it in the type — orchestrator
 - #744 plan — A `.d.ts` copied outside the checkout loses `pg`'s resolution (a TS2345 on 4.1 unrelated to the change): put a `node_modules` link beside such copies — builder
 - #744 plan — A probe log that prints strings without quotes shows `"2"` as `2`: use `JSON.stringify` for a value whose type matters — builder
 - #750 — Narrowing `SQLFragment`'s `Constraint` catches test helpers too: any helper a new branded fragment passes through takes `SQLFragment<any, any>` — builder
