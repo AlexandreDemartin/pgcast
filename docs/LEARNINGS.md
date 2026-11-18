@@ -57,6 +57,10 @@ Candidates for a check, a rule or a skill line.
 - #721 — "One more row than expected" was one more retry message: read the failing assertion before suspecting a double commit — builder
 - #721 — A promise of another transaction awaited inside a `transaction()` callback brings that transaction's error into the callback, and its 40001 is retried as the callback's own: an ordering in a test or user code stops on the other side's failure — branch-reviewer
 - #721 — A mutant that removes a test's ordering wait proves it only under the replay condition (13/30 red without the commit delay, 30/30 with it): run it with the slow-commit trick on — branch-reviewer
+- #722 — A replay of an argument after the JSON argument gives it an unreachable `connectionString`: with no config file, 6.6.1 falls back to the `PG*` variables and reaches a real Postgres — builder
+- #722 — An `it.each` title that interpolates an argument holding a URL puts it in the test names; `%#` keeps titles free of URLs — builder
+- #722 — A CLI replay sets `PGHOST`/`PGPORT` on a closed port as well as an unreachable `connectionString`: otherwise a result depends on the machine's local Postgres — branch-reviewer
+- #722 — A message kept "byte for byte" is reread against the new outputs beside it: a note true before a new flag ("the only flag is --check") can become false after it — orchestrator
 
 ## Minors kept
 
@@ -69,3 +73,4 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #708 — defect: `likeAny([])` infers `never` and compiles on an int column, which Postgres refuses with 42883 — branch-reviewer
 - #708 — form: `notAnArray` says "value" for `likeAny()`/`ilikeAny()` where `notAList` says "patterns" — branch-reviewer
 - #721 — form: #720's Done when asked for a replay on Postgres 14; only CI's leg covers it (the fix does not depend on the version) — branch-reviewer
+
