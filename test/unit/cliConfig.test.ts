@@ -173,7 +173,7 @@ describe('runCli()', () => {
     'Reads the config file of this folder, pgcastconfig.json else zapatosconfig.json, if there,',
     'then writes the types of zapatos/schema, read from the database.',
     '',
-    '  config      a JSON object merged over the file\'s config: \'{"outDir": "./src"}\'',
+    '  config      a JSON object merged over the file\'s config, key by key: \'{"outDir": "./src"}\'',
     '  --check     writes nothing, and exits with 1 if a file it would write differs or is missing',
     '  --help, -h  prints this usage',
     '',
