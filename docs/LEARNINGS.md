@@ -57,6 +57,22 @@ Candidates for a check, a rule or a skill line.
 - #721 — "One more row than expected" was one more retry message: read the failing assertion before suspecting a double commit — builder
 - #721 — A promise of another transaction awaited inside a `transaction()` callback brings that transaction's error into the callback, and its 40001 is retried as the callback's own: an ordering in a test or user code stops on the other side's failure — branch-reviewer
 - #721 — A mutant that removes a test's ordering wait proves it only under the replay condition (13/30 red without the commit delay, 30/30 with it): run it with the slow-commit trick on — branch-reviewer
+- #723 — An issue's **Files** is checked against `website/README.md` § Examples: an example that sends several queries brings a file in `website/examples/plain/` — builder
+- #727 — A mutant that drops the `RELEASE` after `ROLLBACK TO` passes a nesting test unless an outer level fails right after an inner one has failed — builder
+- #727 — On an aborted transaction `ROLLBACK TO` succeeds, so the only Postgres-level proof of "no `ROLLBACK TO` on 40P01" is that `COMMIT` answers `ROLLBACK` — builder
+- #727 — `check-prose.mjs` matches a SQL block against its probe's queries exactly: no comment at the end of a query line — builder
+- #727 — A claim that savepoints sharing one name stay balanced is tested by counting those still established (`RELEASE` in a loop until 3B001), at depth 2 or more, with the error caught one level above where it was raised — branch-reviewer
+- #727 — A nesting argument for a fixed name holds only if every exit pops exactly one savepoint: list the exits (resolve, reject, rethrow as is, a failing rollback) and check each before deciding — orchestrator
+- #727 — A `RELEASE` tried inside a probe savepoint, rolled back to on 3B001, counts the savepoints still established without aborting the transaction — builder
+- #727 — `check-prose` cannot match a number that changes from run to run: write `…` in the span — builder
+- #727 — A claim about what follows a caught 40001 is replayed with a real serialisation conflict between two transactions: `RAISE … USING ERRCODE = '40001'` does not doom a SERIALIZABLE transaction, so it hides a later refusal of the `COMMIT`; replay at REPEATABLE READ too — branch-reviewer
+- #727 — Before Postgres 17, `pg_stat_statements` tracks a utility statement by its text: an identifier that changes on every call (a savepoint name from a counter) takes an entry per call — orchestrator
+- #727 — Leftover savepoints are counted highest depth first: releasing `_1` also releases `_2` and `_3` — builder
+- #727 — A test where one client waits on another's lock rolls back the lock holder first in `finally`, or it hangs instead of failing — builder
+- #727 — A mutant script killed by SIGTERM never runs its `finally`, so the mutant stays in `src/`: restore with `git show HEAD:<path> > <path>` — builder
+- #727 — A per-client state kept in a `WeakMap` is keyed by identity: probe it with a `Proxy` of the client, `Object.create(client)` and a second copy of the library, each of which starts from scratch — branch-reviewer
+- #727 — A mutant harness keyed on exact source lines skips mutants silently after a re-indent: report "NOT APPLIED" before reading the counts — branch-reviewer
+- #727 — `Object.create(client)` is not a working pg client (pg writes its own state onto the derived object): a `Proxy` is the wrapper to test identity-keyed limits with — builder
 - #722 — A replay of an argument after the JSON argument gives it an unreachable `connectionString`: with no config file, 6.6.1 falls back to the `PG*` variables and reaches a real Postgres — builder
 - #722 — An `it.each` title that interpolates an argument holding a URL puts it in the test names; `%#` keeps titles free of URLs — builder
 - #722 — A CLI replay sets `PGHOST`/`PGPORT` on a closed port as well as an unreachable `connectionString`: otherwise a result depends on the machine's local Postgres — branch-reviewer

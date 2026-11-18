@@ -303,3 +303,65 @@ describe('the calls of Zapatos 6.6.1 keep their types (#696)', () => {
     void typed;
   });
 });
+
+// #723: savepoint() takes a transaction's client only, and gives its callback that client's own type, inferred from
+// the client alone (NoInfer), as transaction() infers its pool's
+describe('savepoint()', () => {
+  test('the callback gets the client given, at each level, and the result is what the callback resolves to', () => {
+    void db.serializable(pool, c => db.savepoint(c, async sp => { expectTypeOf(sp).toEqualTypeOf<db.TxnClientForSerializable>(); }));
+    void db.repeatableRead(pool, c => db.savepoint(c, async sp => { expectTypeOf(sp).toEqualTypeOf<db.TxnClientForRepeatableRead>(); }));
+    void db.readCommitted(pool, c => db.savepoint(c, async sp => { expectTypeOf(sp).toEqualTypeOf<db.TxnClientForReadCommitted>(); }));
+    void db.serializableRO(pool, c => db.savepoint(c, async sp => { expectTypeOf(sp).toEqualTypeOf<db.TxnClientForSerializableRO>(); }));
+    void db.repeatableReadRO(pool, c => db.savepoint(c, async sp => { expectTypeOf(sp).toEqualTypeOf<db.TxnClientForRepeatableReadRO>(); }));
+    void db.readCommittedRO(pool, c => db.savepoint(c, async sp => { expectTypeOf(sp).toEqualTypeOf<db.TxnClientForReadCommittedRO>(); }));
+    void db.serializableRODeferrable(pool, c => db.savepoint(c, async sp => { expectTypeOf(sp).toEqualTypeOf<db.TxnClientForSerializableRODeferrable>(); }));
+    expectTypeOf(db.savepoint(txn, async () => 1)).resolves.toEqualTypeOf<number>();
+    expectTypeOf(db.savepoint(txn, async () => 1)).resolves.not.toBeAny();
+    expectTypeOf(db.savepoint(txn, async sp => sp)).resolves.toEqualTypeOf<db.TxnClientForSerializable>();
+    expectTypeOf(db.serializable(pool, c => db.savepoint(c, () => db.select('users', db.all).run(c)))).resolves.toEqualTypeOf<s.JSONSelectableForTable<'users'>[]>();
+  });
+
+  test('nested, a TxnClientFor… function called inside, another driver’s client, a pg.PoolClient, forwarded and as a value', () => {
+    void db.savepoint(txn, sp => db.savepoint(sp, async inner => { expectTypeOf(inner).toEqualTypeOf<db.TxnClientForSerializable>(); }));
+    expectTypeOf(db.savepoint(txn, bookSeat)).resolves.toEqualTypeOf<number>();
+    expectTypeOf(db.savepoint(txn, sp => countBookings(sp))).resolves.toEqualTypeOf<number>();
+    expectTypeOf(db.repeatableRead(pool, c => db.savepoint(c, countBookings))).resolves.toEqualTypeOf<number>();
+    void db.serializable(other, c => db.savepoint(c, async sp => {
+      expectTypeOf(sp).toEqualTypeOf<TxnOther<db.IsolationLevel.Serializable>>();
+      expectTypeOf(sp.exec).toEqualTypeOf<OtherClient['exec']>();
+    }));
+    expectTypeOf(db.savepoint(plain, async sp => sp)).resolves.toEqualTypeOf<pg.PoolClient>();
+    expectTypeOf(db.savepoint(txnAny, async sp => sp)).resolves.toEqualTypeOf<db.TxnClient<db.IsolationLevel>>();
+    const forwarder = <C extends db.TxnClientForSerializable>(c: C) => db.savepoint(c, async sp => sp);
+    expectTypeOf(forwarder(txn)).resolves.toEqualTypeOf<db.TxnClientForSerializable>();
+    expectTypeOf([txn, txn].map(c => db.savepoint(c, bookSeat))).toEqualTypeOf<Promise<number>[]>();
+    expectTypeOf(db.savepoint(anyValue, async () => 1)).resolves.toEqualTypeOf<number>();
+  });
+
+  test('refuses what is no transaction client, a callback typed for a level not satisfied, and a callback that returns no promise', () => {
+    // @ts-expect-error a pg.Pool: no transaction is open on it
+    void db.savepoint(pool, async () => 1);
+    // @ts-expect-error a pg.Client is not a pg.PoolClient: it has no release()
+    void db.savepoint(client, async () => 1);
+    // @ts-expect-error a QueryableLike has no release()
+    void db.savepoint(queryableLike, async () => 1);
+    // @ts-expect-error a PoolLike is a pool
+    void db.savepoint(poolLike, async () => 1);
+    // @ts-expect-error another driver's pool
+    void db.savepoint(other, async () => 1);
+    // @ts-expect-error READ COMMITTED does not satisfy SERIALIZABLE
+    void db.savepoint(txnRC, bookSeat);
+    // @ts-expect-error the client of readCommitted() given to a callback typed for SERIALIZABLE
+    void db.readCommitted(pool, c => db.savepoint(c, bookSeat));
+    // @ts-expect-error an arrow annotated with the wrong level
+    void db.savepoint(txnRC, async (sp: db.TxnClientForSerializable) => sp);
+    // @ts-expect-error inside a map()
+    void [txnRC].map(c => db.savepoint(c, bookSeat));
+    // @ts-expect-error a TxnClient of any level does not satisfy SERIALIZABLE
+    void db.savepoint(txnAny, bookSeat);
+    // @ts-expect-error another driver's client is no TxnClientForRepeatableRead, which is a pg.PoolClient
+    void db.serializable(other, c => db.savepoint(c, countBookings));
+    // @ts-expect-error a callback that returns no promise
+    void db.savepoint(txn, () => 1);
+  });
+});
