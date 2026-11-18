@@ -2,7 +2,7 @@
 
 - **Status**: accepted (2026-11-18), decided alone under the owner's delegation: each choice below is decided under the philosophy, and carries its own status.
 - **Scope**: feature [#62](https://github.com/AlexandreDemartin/pgcast/issues/62), its step [#710](https://github.com/AlexandreDemartin/pgcast/issues/710) (this note) and its planned PRs; the chapter's epic [#21](https://github.com/AlexandreDemartin/pgcast/issues/21).
-- **In short**: **option A, in a separate package**, `@pgcast/typegen` (`tools/typegen/`, note [013](./013-package-model.md)). Opted-in queries are found by the row type they name, `Row<'name'>`; a condition written in place, a `Whereable` object literal or a call to `and()`, `or()` or `not()` with nothing opaque inside, is compiled into the text by `core.ts`, and any other fragment refuses the query; a `param()` is neutralised as `core.ts` compiles it; the query is described, never executed, by the extended protocol's Parse / Describe over `pg`; a result column is `NOT NULL` only where its origin column is proved so, down every inheritance child, and no guard word (an outer join, a grouping set, `MERGE`, `OLD`, `NEW`) sits in the text; the types land in a committed file that `--check` compares. The core, the default codegen output and the bench are unchanged; Epic #20 (drivers) is not needed.
+- **In short**: **option A, in a separate package**, `@pgcast/typegen` (`tools/typegen/`, note [013](./013-package-model.md)). Opted-in queries are found by the row type they name, `Row<'name'>`; a query's text is fully static, or its interpolations are `param()` calls and string literals, neutralised as `core.ts` compiles them, and any other interpolation refuses the query; the query is described, never executed, by the extended protocol's Parse / Describe over `pg`; a result column is `NOT NULL` only where its origin column is proved so, down every inheritance child, and no guard word (an outer join, a grouping set, `MERGE`, `OLD`, `NEW`) sits in the text; the types land in a committed file that `--check` compares. Compiling a condition written in place into the text is not accepted: § Deferred gives what it would need. The core, the default codegen output and the bench are unchanged; Epic #20 (drivers) is not needed.
 
 ## Context
 
@@ -25,8 +25,8 @@ Two projects of real usage (skill `consumer-usage`; no project named; counted wi
 | … with a type argument | 101 |
 | … with a row type (a second type argument) | **58** |
 | … of those, fully static text | 20 |
-| … with interpolations, each a `param()`, a string literal or a fragment after `WHERE`, `AND`, `OR`, `ON` or `HAVING` | 20 (7 of them `param()` and string literals only) |
-| … of those 13 with a fragment there, each fragment a condition that choice 3 compiles | 0 (their 16 fragments: 6 variables, 7 calls of the project's own helpers, 1 ternary, and 2 `Whereable` literals, each with something opaque inside) |
+| … with interpolations, each a `param()` or a string literal | 7 |
+| … with interpolations, each one of those or a fragment after `WHERE`, `AND`, `OR`, `ON` or `HAVING` | 13 more (16 fragments: 6 variables, 7 calls of the project's own helpers, 1 ternary, and 2 `Whereable` literals, each with something opaque inside) |
 | … with a fragment in the select list (`db.cols()`, a computed column) | 8 |
 | … with an outer join | 6 |
 | … with `UNION`, `INTERSECT` or `EXCEPT` | 3 |
@@ -34,7 +34,7 @@ Two projects of real usage (skill `consumer-usage`; no project named; counted wi
 | … holding one of choice 2's guard words, matched as it says | 6 (the outer joins) |
 | … with a `param()`, each cast-less | 12 (41 calls; one template holds 22) |
 
-So 27 of the 58 hand-written row types are within reach of option A as decided below: the 20 static ones and the 7 whose interpolations are `param()` and string literals only. The 13 whose fragments sit in a condition stay manual, as do the rest. The keyword scan is approximate (a fragment's position is read from the static text before it).
+So 27 of the 58 hand-written row types are within reach of option A as decided below: the 20 static ones and the 7 whose interpolations are `param()` and string literals only, each `sql` and `param` bound to its import as choice 3 requires. The 13 whose fragments sit in a condition stay manual, as do the rest; compiling a condition written in place would reach none of them (§ Deferred). The keyword scan is approximate (a fragment's position is read from the static text before it).
 
 ## Interfaces
 
@@ -52,7 +52,7 @@ The other routes are refused by the issue's constraints, and this note keeps tha
 
 ## Replays
 
-On the fixture database (`test/fixtures/schema.sql` and its rows, Postgres 17.3, `pg` 8.23.1, a probe database created and dropped `WITH (FORCE)` by one process), each text described by both interfaces: `PREPARE` in a rolled-back transaction, Describe inside `BEGIN READ ONLY` with `lock_timeout`. Then each is run, rolled back, to see its `NULL`s. Conditions and `param()` are compiled by master's `sql`. "Origin" is Describe's table and column, with that column's `attnotnull`; "truth" is whether a value can be `NULL`, from the query's form and its columns' `NOT NULL` (foreign keys not read), and no run contradicted it; "rule" is choice 2's verdict.
+On the fixture database (`test/fixtures/schema.sql` and its rows, Postgres 17.3, `pg` 8.23.1, a probe database created and dropped `WITH (FORCE)` by one process), each text described by both interfaces: `PREPARE` in a rolled-back transaction, Describe inside `BEGIN READ ONLY` with `lock_timeout`. Then each is run, rolled back, to see its `NULL`s. `param()` is compiled by master's `sql`, as are the conditions of § Deferred. "Origin" is Describe's table and column, with that column's `attnotnull`; "truth" is whether a value can be `NULL`, from the query's form and its columns' `NOT NULL` (foreign keys not read), and no run contradicted it; "rule" is choice 2's verdict.
 
 | Case | Text (abridged) | `PREPARE` result types | Describe: type, origin | Truth | Rule |
 |---|---|---|---|---|---|
@@ -77,11 +77,8 @@ On the fixture database (`test/fixtures/schema.sql` and its rows, Postgres 17.3,
 | A keyword the old lexer skipped | `SELECT a.balance, E'\'' AS q FROM users u LEFT JOIN accounts a …`; `SELECT a.balance AS b$x$ … LEFT JOIN … WHERE 'b$x$' <> ''` | `numeric`, `text`; `numeric` | `accounts.balance`, not null | `balance` `NULL` | nullable (`LEFT`, nothing skipped): `q` loose |
 | A keyword in lower case | `select id, balance from users u full join accounts a using (id)`; `… group by grouping sets ((owner_id), ())` | `bigint`, `numeric`; `integer`, `numeric` | `balance`, `owner_id` not null at their origin | `balance`, `owner_id` `NULL` | nullable (`full`, `grouping`): `id` loose |
 | A keyword in a literal | `SELECT u.id, u.display_name FROM users u WHERE u.display_name <> 'left'` | `integer`, `text` | both not null | not null | nullable (`left`): both loose |
-| A `Whereable` | `` sql`… WHERE ${{ display_name: 'Ann', mood: dc.isNotNull }}` `` → `WHERE ("display_name" = $1 AND ("mood" IS NOT NULL))`; `{ id: 3 }` → `WHERE ("id" = $1)` | `integer`, `text` for both, and for `WHERE TRUE` | the same two origins for each text | unchanged by the condition | the same |
-| `and()` | `` and({ owner_id: 1 }, sql`…`) `` → `WHERE ((("owner_id" = $1)) AND ("balance" > $2))`; `and()` → `WHERE TRUE` | `bigint`, `double precision` for both | the same origins | unchanged | the same |
-| A fragment past its condition | `` sql`SELECT owner_id FROM accounts WHERE ${sql`true GROUP BY ROLLUP (owner_id)`}` ``; the same with `` sql`true UNION ALL SELECT NULL::int` `` and `raw('true UNION ALL SELECT NULL')` | `integer` | as `WHERE $1`: `$1` `boolean`, `owner_id` from `accounts.owner_id`, not null | the run sends the fragment's own text: `owner_id` `NULL` | **refused** (not a condition choice 3 compiles); a boolean `$1` would be wrong |
-| … inside `or()`, `and()`, `not()` or a `Whereable` | `` or(sql`true) GROUP BY ROLLUP (owner_id`) `` → `WHERE (true) GROUP BY ROLLUP (owner_id)`; the same in `and()`, `not()` and a `Whereable`'s `sql` value; `` or(sql`true) UNION ALL SELECT (NULL::int`) `` | `integer` | the compiled text: `accounts.owner_id`, not null, under `ROLLUP`; origin 0 under `UNION` | `owner_id` `NULL` | nullable (`ROLLUP`; origin 0): exact. Described as `$1`, all 5 would be wrong |
-| A fragment in the select list | `` sql`SELECT ${db.cols(['id', 'email'])} FROM users` `` and `db.cols(['display_name'])` | `integer, email`; `text` | two columns, then one | the shape changes with the value | **refused** (not a condition): left manual |
+| A fragment past its condition | `` sql`SELECT owner_id FROM accounts WHERE ${sql`true GROUP BY ROLLUP (owner_id)`}` ``; the same with `` sql`true UNION ALL SELECT NULL::int` `` and `raw('true UNION ALL SELECT NULL')` | `integer` | as `WHERE $1`: `$1` `boolean`, `owner_id` from `accounts.owner_id`, not null | the run sends the fragment's own text: `owner_id` `NULL` | **refused** (neither a `param()` nor a string literal); a boolean `$1` would be wrong |
+| A fragment in the select list | `` sql`SELECT ${db.cols(['id', 'email'])} FROM users` `` and `db.cols(['display_name'])` | `integer, email`; `text` | two columns, then one | the shape changes with the value | **refused**: left manual |
 | Parameters | `WHERE id = $1 AND display_name LIKE $2 AND created_at > $3` | `integer`, `text`, `timestamp with time zone` | the same OIDs | — | read, not written (§ 3) |
 | … untyped, cast | `SELECT $1 AS x`; `SELECT $1::int8[] AS ids` | `text`; `bigint[]` | the same | — | the same |
 | `param(x, 'int4')` | `` sql`SELECT ${param(5, 'int4')} AS n` `` → `SELECT CAST($1 AS "int4") AS n`, under each setting; `param(undefined, 'int4')` compiles to the same text; `'int4[]'` → `CAST($1 AS "int4"[])` | — | `integer`; `integer[]`, origin 0 | — | neutralised as compiled |
@@ -91,11 +88,11 @@ On the fixture database (`test/fixtures/schema.sql` and its rows, Postgres 17.3,
 | No result | `UPDATE extra.spools SET label = $1 WHERE id = $2` | `NULL` | NoData | — | no row type |
 | Two statements | `SELECT 1; CREATE TABLE probe_710 ()` | `PREPARE` ran the `CREATE TABLE` | refused, nothing run | — | refused |
 
-What the replays show, over the table's 40 texts with a typed result and their 74 columns:
+What the replays show, over the table's 30 texts with a typed result and their 59 columns:
 
-- Describe's origin alone, the rule pgTyped and sqlc's database analyser apply, is **wrong** on 24 columns of 18 texts: a column `NOT NULL` at its origin comes back `NULL` (outer joins, `ROLLUP`, inheritance, foreign tables and partitions, `MERGE`, a fragment that closes more parentheses than it opens).
+- Describe's origin alone, the rule pgTyped and sqlc's database analyser apply, is **wrong** on 20 columns of 14 texts: a column `NOT NULL` at its origin comes back `NULL` (outer joins, `ROLLUP`, inheritance, foreign tables and partitions, `MERGE`).
 - This note's first reading (`attnotnull`, the six join and grouping words matched case-sensitively) was still wrong on 12 columns of 8 texts: inheritance, the foreign cases, `MERGE`, the two lower-case texts. A lexer that skips literals also misses the two texts of the row "A keyword the old lexer skipped".
-- With choice 2 as it stands, no column is wrong. 13 are loose, in 11 texts: nullable where the value never is, each narrowed by an override (choice 4). Of the first reading's texts, the 22 still in the table, 8 of their 44 columns are loose, in 7.
+- With choice 2 as it stands, no column is wrong. 13 are loose, in 11 texts: nullable where the value never is, each narrowed by an override (choice 4).
 - `PREPARE` alone gives no origin, so every column is nullable.
 
 Also replayed, outside the table: a scalar subquery, inner `USING` and `NATURAL` joins, an inner lateral, `CASE`, `UPDATE … FROM … RETURNING` and `MERGE … INSERT … RETURNING`. None is wrong; the last has its 3 columns loose.
@@ -106,11 +103,11 @@ Also replayed, outside the table: a scalar subquery, inner `USING` and `NATURAL`
 
 | | A. A tool beside the codegen | B. A SafeQL plugin | C. No inference, as today |
 |---|---|---|---|
-| **What it is** | `@pgcast/typegen`: finds opted-in `sql` templates, neutralises the dynamic fragments, describes each query, writes a committed `.ts` keyed by name | a package for SafeQL, an ESLint plugin ("It's a plugin, not an SQL library"): it checks the row type you write and suggests a fix | the row type written by hand, `sql`'s type argument (note 010) |
+| **What it is** | `@pgcast/typegen`: finds opted-in `sql` templates, neutralises each `param()`, describes each query, writes a committed `.ts` keyed by name | a package for SafeQL, an ESLint plugin ("It's a plugin, not an SQL library"): it checks the row type you write and suggests a fix | the row type written by hand, `sql`'s type argument (note 010) |
 | **The core** | unchanged; a peer on `@pgcast/pgcast` for `tsTypeForPgType()` | unchanged | unchanged |
 | **Dependencies for the user** | none new: `pg`, `typescript`, `@pgcast/pgcast` | SafeQL, ESLint, `postgres` (postgres.js, its connection) and `libpg-query` (1.8 MB unpacked, `npm view`) | none |
 | **Database** | at generation only, the generator's; compiling needs none (committed file) | at every lint run, or a "shadow database" built from migrations; no offline mode | none |
-| **Composed queries** | a condition written in place, with nothing opaque inside, is compiled into the text; any other fragment refuses the query | "Conditional fragment selection" ❌ in its own postgres.js matrix; `onExpression` may inline a string or skip the query | typed by hand, unchecked |
+| **Composed queries** | a `param()` or a string literal is compiled into the text as `core.ts` compiles it; any other interpolation refuses the query | "Conditional fragment selection" ❌ in its own postgres.js matrix; `onExpression` may inline a string or skip the query | typed by hand, unchecked |
 | **Nullability** | Describe's origin and a guard (choice 2) | its AST walk over libpg-query, `attnotnull` as fallback | as written |
 | **API stability** | pgcast's own | its plugin API is marked "EXPERIMENTAL" | — |
 | **Cost** | a package: a TypeScript-parser scan, a guard-word match, a Submittable, a writer, `--check`; maintained with the core's quality (note 013) | a package bound to an experimental API of another project, and its lint-time database | nothing; the 58 row types stay unchecked |
@@ -145,7 +142,7 @@ A result column is `NOT NULL` only when both hold; otherwise `T | null`:
   ```
 
   On Postgres 14 to 17, `attnotnull` alone proves nothing below a parent: a child can `DROP NOT NULL`, `ALTER TABLE ONLY parent … SET NOT NULL` leaves a child's `NULL` in place, and Postgres does not enforce `NOT NULL` on a foreign table or partition (§ Replays).
-- **No guard word.** The query's text after neutralisation, each condition in it as `core.ts` compiles it (choice 3), holds none of `LEFT`, `RIGHT`, `FULL`, `ROLLUP`, `CUBE`, `GROUPING`, `MERGE`, `OLD`, `NEW`. The match ignores case and skips nothing: literals, quoted identifiers and comments are read too. A word is cut where a Postgres identifier could not go on, `/(?<![a-z_])(left|right|full|rollup|cube|grouping|merge|old|new)(?![a-z0-9_$])/i`. A digit may come before it, since Postgres 14 reads `1LEFT` as `1` then `LEFT` ("Previously, query text like `123abc` would be interpreted as `123` followed by a separate token `abc`", [15.0 release notes](https://www.postgresql.org/docs/release/15.0/); 17.3 refuses it, "trailing junk after numeric literal").
+- **No guard word.** The query's text after neutralisation (choice 3) holds none of `LEFT`, `RIGHT`, `FULL`, `ROLLUP`, `CUBE`, `GROUPING`, `MERGE`, `OLD`, `NEW`. The match ignores case and skips nothing: literals, quoted identifiers and comments are read too. A word is cut where a Postgres identifier could not go on, `/(?<![a-z_])(left|right|full|rollup|cube|grouping|merge|old|new)(?![a-z0-9_$])/i`. A digit may come before it, since Postgres 14 reads `1LEFT` as `1` then `LEFT` ("Previously, query text like `123abc` would be interpreted as `123` followed by a separate token `abc`", [15.0 release notes](https://www.postgresql.org/docs/release/15.0/); 17.3 refuses it, "trailing junk after numeric literal").
   - `MERGE`: `WHEN NOT MATCHED BY SOURCE … RETURNING` null-extends the source with no join word (§ Replays).
   - `OLD` and `NEW`: Postgres 18's `RETURNING old.*` and `new.*`, where "typically old values will be `NULL` for an `INSERT`, and new values will be `NULL` for a `DELETE`" ([docs](https://www.postgresql.org/docs/18/dml-returning.html)); `RETURNING WITH (OLD AS o)` still holds the word. Not replayed here (17.3): the first PR replays them in CI's matrix, on Postgres 18.
 
@@ -159,12 +156,13 @@ The guard only removes proofs, never adds one: a word in a literal or a comment 
 |---|---|
 | **Opt-in and name** | the row type names the query: `` sql<s.films.SQL, Row<'films-by-studio'>[]>`…` ``, `Row` imported from the generated file; nothing in the SQL text (a marker in an alias, pgTyped's and SQLx's `AS "title!"`, would change the key `pg` returns) |
 | **Finding** | TypeScript's parser (`ts.createSourceFile`, no checker), over the files of the user's `tsconfig.json`: a tagged template whose tag is `sql` or a property `sql` (`` db.sql<…>`…` ``, a namespace import, as Zapatos's docs write it), and whose type argument holds `Row<'…'>` from the generated file anywhere (`Row<'…'>[]`, `NotNull<Row<'…'>, …>`). Two names in one type argument, or two templates of one name and different texts: an error |
+| **Binding** | the names the tool evaluates, `sql` and `param` (or `db` in `db.sql` and `db.param`), are pgcast's only if the file declares each once, as an import from pgcast's `db` module: a parameter, a local, a destructured name, a `catch` binding or an import from elsewhere of that name refuses the query. A `param` of one's own would otherwise be described as `$n` while the run sends its text (row "A fragment past its condition"). Replayed: 6 such forms refused, a named and a namespace import accepted; the corpus's 27 all pass |
 | **Neutralising** | per interpolation, by its syntax, as `core.ts` compiles it (the list below); a refusal names the template and the placeholder |
 | **Output** | one committed `.ts`, a plain module beside the schema (no `declare module`, so note 002's names are untouched): `export interface Queries { 'films-by-studio': { text: '…'; row: { … } } }` and `type Row<N extends keyof Queries>`. `text` is the neutralised text, readable in review, as a string literal type: a JSDoc cannot hold it, since a text may hold `*/` (skill `codegen-output`). It is written by `JSON.stringify`, U+2028 and U+2029 escaped, since TypeScript 4.1.6 ends a string at a raw one (TS1002); a text holding `*/`, `$$`, quotes, backticks and both separators reads back equal through the parser of 4.1.6 and 5.9.3 |
 | **Column types** | a column with an origin is the schema's own type, `s.films.Selectable['title']`, plus `\| null` where choice 2 says; any other through `tsTypeForPgType()`; `json`, `jsonb` and `json_agg` are `db.JSONValue`, never a shape the database does not state |
 | **Parameters** | not written: nothing would read them, since `sql` takes its interpolations untyped, and checking them would need a change to `core.ts` (a stop point) |
 | **`--check`** | without a database: each found template's neutralised text against the stored `text`, so a changed, new, renamed or removed query fails (an entry no template names is stale); with one, each query described again, so a schema change fails too. A renamed query not regenerated also fails to compile: `Row<'old-name'>` gives TS2344 (5.9.3 and 4.1.6) |
-| **What stays manual** | any fragment but a condition with nothing opaque inside (a variable, a helper's call, `raw()`, a `sql` template, `db.cols()`), wherever it sits, a shape inside `json`/`jsonb`, a loose column (choice 4), a query not opted in |
+| **What stays manual** | any interpolation but a `param()` or a string literal (a condition, a variable, a helper's call, `raw()`, a `sql` template, `db.cols()`), wherever it sits, a shape inside `json`/`jsonb`, a loose column (choice 4), a query not opted in |
 
 Each interpolation is neutralised as `core.ts` compiles it (§ Replays), which this note reads and does not change:
 
@@ -176,10 +174,9 @@ Each interpolation is neutralised as `core.ts` compiles it (§ Replays), which t
   - above 4 such parameters (16 Describes), it is refused: the hint gives each a cast, or `false`. In the corpus, 1 of the 12 templates with a `param()` is above it.
 - **A cast that is not a literal** (`param(x, t)`): refused, since the text changes with the value (`CAST($1 AS "int4")`, then `CAST($1 AS "text")`).
 - **A string literal**: the identifier `sql` compiles it to.
-- **A condition**: a `Whereable` object literal, or a call to `and()`, `or()` or `not()` imported from pgcast's `db` module (or read through its namespace, `db.conditions.and`), with nothing opaque inside. Each value, argument or interpolation inside is a literal, a `param()`, `self`, a condition of `db.conditions` (`dc.gt(0)`, `dc.isNull`), another such condition, or a `sql` template built of the same; no spread, no computed key. `core.ts` compiles it, each value as a cast-less `param()` (above), so the text described is the run's own and choice 2 reads it: a `sql` value that closes more parentheses than it opens reaches past `and()`'s, and is caught there (§ Replays). A refusal's hint gives a variable value as `param(x)`.
-- **Anything else** (a variable, `raw()`, a `sql` template, a ternary, another call): refused, and the query stays typed by hand. A boolean `$k` in its place would describe another text than the run's: after `WHERE $1`, `owner_id` is proved not null, and `` sql`true GROUP BY ROLLUP (owner_id)` `` returns it `NULL` (§ Replays).
+- **Any other interpolation** (a `Whereable`, a call to `and()`, `or()` or `not()`, a variable, `raw()`, a `sql` template, a ternary, another call): refused, and the query stays typed by hand; the refusal names the placeholder. A boolean `$k` in its place would describe another text than the run's: after `WHERE $1`, `owner_id` is proved not null, and `` sql`true GROUP BY ROLLUP (owner_id)` `` returns it `NULL` (§ Replays).
 
-**Measured** (`tsc --extendedDiagnostics`, the bench's options on the fixture's schema, net of an empty floor): 50 calls `` sql<s.users.SQL, R[]>`… ${whereable} … ${param(i)}` ``, each row of 5 columns read, cost **+2,007** Instantiations and +810 Types with hand-written interfaces; **+2,507** and +970 with a generated `Queries` (each entry its `text` and `row`) and `Row<'…'>`; +2,357 and +970 with `Queries['…']['row']` spelled out: about 10 Instantiations per call above today's. `bench:types` is unchanged: nothing in the core or the bench moves.
+**Measured** (`tsc --extendedDiagnostics`, the bench's options on the fixture's schema, net of an empty floor): 50 calls `` sql<s.users.SQL, R[]>`… ${whereable} … ${param(i)}` `` (the same calls in each variant: a row type does not depend on the interpolations), each row of 5 columns read, cost **+2,007** Instantiations and +810 Types with hand-written interfaces; **+2,507** and +970 with a generated `Queries` (each entry its `text` and `row`) and `Row<'…'>`; +2,357 and +970 with `Queries['…']['row']` spelled out: about 10 Instantiations per call above today's. `bench:types` is unchanged: nothing in the core or the bench moves.
 
 **TypeScript floor**: the generated file is interfaces, string-literal keys and one indexed-access alias, as the schema already is; on 4.1.6 it compiles, and a renamed key (TS2344), a nullable column read as `number` (TS2322), a misspelt column (TS2339) and another `text` (TS2322) are refused, as on 5.9.3. The tool itself reads TypeScript's parser of the user's install, which every version since 4.1 has; TypeScript 7's port has no JS API yet (note 001), so the tool runs on a `typescript` that has one (4.1 to 6).
 
@@ -190,24 +187,53 @@ Each interpolation is neutralised as `core.ts` compiles it (§ Replays), which t
 - A loose column (`COALESCE(x, 0)`, `count(*)`, a `UNION`, a view) is narrowed by the caller, in TypeScript, at the call site: `NotNull<Row<'films-by-studio'>, 'runtime_minutes'>`, a type the generated file exports, its key checked by `keyof`: probed on 5.9.3 and 4.1.6, a misspelt column gives TS2344 and the other columns keep `| null` (TS2322). Explicit, visible in review, and never sent to Postgres.
 - No override in the SQL text, and no config file of overrides: the reason sits where the query is.
 
+## Deferred: a condition written in place
+
+**Status**: not accepted. An idea kept with its replays; no planned PR carries it.
+
+The idea: compile a `Whereable` object literal, or a call to `and()`, `or()` or `not()`, written in place with nothing opaque inside, into the described text, each value as a cast-less `param()`, so choice 2 reads the text the run sends. It reaches none of the corpus's 58 row types (§ Corpus): their 16 condition fragments are variables, helpers' calls, a ternary, and 2 `Whereable` literals with something opaque inside.
+
+What the replays showed of it, compiled by master's `sql` on the fixture database (10 texts, 15 columns):
+
+| Case | Text (abridged) | `PREPARE` result types | Describe: type, origin | Truth | Rule |
+|---|---|---|---|---|---|
+| A `Whereable` | `` sql`… WHERE ${{ display_name: 'Ann', mood: dc.isNotNull }}` `` → `WHERE ("display_name" = $1 AND ("mood" IS NOT NULL))`; `{ id: 3 }` → `WHERE ("id" = $1)` | `integer`, `text` for both, and for `WHERE TRUE` | the same two origins for each text | unchanged by the condition | the same |
+| `and()` | `` and({ owner_id: 1 }, sql`…`) `` → `WHERE ((("owner_id" = $1)) AND ("balance" > $2))`; `and()` → `WHERE TRUE` | `bigint`, `double precision` for both | the same origins | unchanged | the same |
+| … inside `or()`, `and()`, `not()` or a `Whereable` | `` or(sql`true) GROUP BY ROLLUP (owner_id`) `` → `WHERE (true) GROUP BY ROLLUP (owner_id)`; the same in `and()`, `not()` and a `Whereable`'s `sql` value; `` or(sql`true) UNION ALL SELECT (NULL::int`) `` | `integer` | the compiled text: `accounts.owner_id`, not null, under `ROLLUP`; origin 0 under `UNION` | `owner_id` `NULL` | nullable (`ROLLUP`; origin 0): exact. Described as `$1`, all 5 would be wrong |
+
+Over these 15 columns, Describe's origin alone is wrong on 4, one per `ROLLUP` text; compiled into the text, none is wrong and none loose.
+
+Before a PR could accept it, each of these would need settling, each replayed on Postgres 17.3 with `pg` 8.23.1, every compile under the default settings and with both casts on, and 6 texts described and run:
+
+1. **Each name bound to pgcast's export.** A scan that matches `and`, `dc.and`, `self`, `param`, a nested `sql` tag or `db` by its text accepts a name of one's own. Replayed: a local `dc.and` returning `` sql`true GROUP BY ROLLUP (owner_id)` `` is accepted; the tool describes `WHERE ((("owner_id" = $1)))`, `owner_id` proved not null, while the run returns an `owner_id` `NULL`. Binding each name takes the checker (`getSymbolAtLocation`, `getAliasedSymbol`) over a `Program`, or a scope walk of the tool's own, wider than choice 3's two names.
+2. **Each literal compiled as written, with a rule per `db.conditions` export.** The tool's compile (every value a cast-less `param()`) differs from the run's, under the default settings and with both casts on:
+   - `eqAny`, `likeAny`, `ilikeAny`, `arrayContains`, `arrayContainedIn`, `arrayOverlaps`, `jsonbContains`, `jsonbPathExists` and `websearchToTsquery` throw on a `param()`, where the run compiles (`"owner_id" = ANY($1)`);
+   - `exists('accounts', …)` and `isInSelect('accounts', …, 'owner_id')` turn their names into `$n`: `SELECT $1 FROM $2`, refused by Parse (`42601`), where the run reads `"owner_id"` from `"accounts"`;
+   - under `castArrayParamsToJson`, `{ tags: ['a'] }` runs `CAST($1 AS "json")`, and the tool compiles `$1`;
+   - the limit of 4 counts every value, so `{ a: 1, b: 2, c: 3, d: 4, e: 5 }` (5 `$n`) is refused, though a string, a number or a boolean never takes the JSON cast: only a non-literal `param(x)`, or an array or object literal, can change form.
+3. **A plain key only.** `` { __proto__: sql`…` } `` is a property assignment to the parser, and accepted; JavaScript makes it the prototype, so the run sends the bare fragment, `WHERE true UNION ALL SELECT NULL::int` (origin 0, a `NULL` row), while a key-wise compile gives `WHERE ((true UNION ALL …))`, refused by Parse. A getter or a method runs code, and a shorthand is a variable: each would be refused too.
+4. **What counts as a literal, named.** `-1` is a unary expression, and `x as T`, `x!` and `x satisfies T` wrap any value, so none is a literal unless the rule says so; `new Date()` is a call; `db.Default` and `db.all` throw in a `Whereable`, and `parent()` outside a lateral. `isIn(ids)` with a variable array would be refused: `isIn([1, 2])` compiles `IN ($1, $2)`, `isIn([1, 2, 3])` `IN ($1, $2, $3)`, and `isIn([])` `false`, so the text follows the value.
+
+A PR that takes it up revises this section and replays each point at its first commit.
+
 ## What changes in the plan
 
 - **#62**, its planned PRs, each `high`, every lens, in `tools/typegen/` (note 013):
-  1. "Describe each fully static named sql query against the database" (the package, the scan, Parse / Describe, the nullability rule, the writer);
-  2. "Compile conditions written in place into named sql queries": deferred until a consumer needs it, since it reaches none of the corpus's 58 row types (§ Corpus);
-  3. "Fail --check when a named sql query is out of date" (offline, then with the database);
-  4. "Add NotNull to narrow a described column";
-  5. "Document typed raw SQL" (EN and FR, the TypeScript, the SQL and the type side by side).
+  1. "Describe each fully static named sql query against the database" (the package, the scan and its binding rule, `param()` and string literals neutralised, any other interpolation refused, Parse / Describe, the nullability rule, the writer);
+  2. "Fail --check when a named sql query is out of date" (offline, then with the database);
+  3. "Add NotNull to narrow a described column";
+  4. "Document typed raw SQL" (EN and FR, the TypeScript, the SQL and the type side by side).
+- No PR compiles a condition written in place: § Deferred holds the idea, unaccepted, and what a PR would first have to settle.
 - **#62's Order** and **#21's Order**: they no longer need ⑦ (Epic #20, drivers): types are found at generation time over `pg`, which the generator already uses.
 - **Note 001**'s TypeScript 6 / 7 reassessment: answered for this tool by § 3's floor; the core's toolchain is not touched.
 
 ## Risks
 
 - **The Submittable's connection methods** (`parse`, `describe`, `sync`, the `parameterDescription` event) are what pg-cursor uses, not a documented API of their own: a `pg` major could move them. The tool's peer is `pg >= 8.6.0`, against the core's `>= 7.18.2`: `pg` parses ParameterDescription only from `pg-protocol` 1.5.0, which 8.6.0 is the first to ask for (8.5.1 asks `^1.4.0`, and 1.4.0's parser has none; 7.18.2's `connection.js` has none either). It is tested at that floor and at the latest.
-- **Nullability is loose by design**: 13 of the replays' 74 columns need `NotNull`; the docs show it beside each case.
+- **Nullability is loose by design**: 13 of the replays' 59 columns need `NotNull`; the docs show it beside each case.
 - **A `NOT NULL` that does not hold**: Postgres 18 accepts `NOT NULL … NOT VALID`, which does not check old rows; the first PR replays what `attnotnull` says then, and proves only a validated constraint (`pg_constraint.convalidated`).
-- **The scan is syntactic**: a `sql` renamed on import (`import { sql as q }`), or a row type behind an alias, is not found; the query stays as typed by hand, and the docs say how a query is opted in. A condition is read as pgcast's only by its import, so a helper of one's own named `and` is refused, not compiled.
-- **Coverage**: 27 of the corpus's 58 row types, the static ones and those with `param()` and string literals only. A condition built in a variable or by a helper, the corpus's usual form, stays typed by hand: describing it as a boolean `$k` would type a text the run does not send (§ Replays), which principle 1 forbids.
+- **The scan is syntactic**: a `sql` renamed on import (`import { sql as q }`), or a row type behind an alias, is not found; the query stays as typed by hand, and the docs say how a query is opted in. A `sql` or `param` declared anywhere in the file but by its import refuses the query (choice 3's binding), even where that declaration does not reach the template.
+- **Coverage**: 27 of the corpus's 58 row types, the static ones and those with `param()` and string literals only. A condition, written in place, built in a variable or by a helper (the corpus's usual form), stays typed by hand: describing it as a boolean `$k` would type a text the run does not send (§ Replays), which principle 1 forbids.
 - **Replayed on Postgres 17.3 only**; Parse / Describe exists on every supported version, and the first PR runs CI's matrix (14 and later), with `OLD` and `NEW` on 18 and `1LEFT` on 14.
 
 ## Sources
