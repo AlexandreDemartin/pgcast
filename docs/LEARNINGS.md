@@ -130,6 +130,21 @@ Candidates for a check, a rule or a skill line.
 - #742 — A test of paths under `os.tmpdir()` strips the exact folder it made, not a pattern: `TMPDIR` comes from the environment, and `/\d+/` matches `/1000/` — branch-reviewer
 - #742 — A size-limit test needs a passing case at exactly the limit beside the failing one past it, or a `>` → `>=` mutant survives — branch-reviewer
 - #742 — A fixture sized to a limit is measured with the module's own counter before the test is written — builder
+- #738 — A rule that a name is "case-insensitive" says which folding: Postgres folds ASCII only, JavaScript's `toLowerCase()` folds Unicode — builder
+- #741 — A test's payload table spread over a shared set (`...hostile`) silently replaces keys of the same name; only `typecheck` (TS2783) caught it, not Vitest — builder
+- #741 — Under TypeScript 7, `moduleResolution: node` is removed (TS5108): the 4.1.6 / 5.9 / 7 grid needs its own tsconfig for 7 (`module: preserve`, `moduleResolution: bundler`) — builder
+- #741 — From TS 4.2 an optional property is assignable to a string index signature, even under `exactOptionalPropertyTypes` (4.1.6 refuses it): a "does not compile" claim for `string | undefined` needs an optional-property probe on each compiler — branch-reviewer
+- #741 — Postgres maps old setting names to new ones (`sort_mem` → `work_mem`): a check that two names are not "one setting" meets aliases beyond case — branch-reviewer
+- #741 — A function that reads a caller's object with `Object.entries` needs a row with an enumerable key on `Object.prototype`, or a `for…in` mutant survives — branch-reviewer
+- #741 — In zsh, `git show $B:src/x` parses `:s` as a history modifier: write `"${B}:src/x"` — branch-reviewer
+- #741 — A claim "from TypeScript X" needs a run on X itself: `npm pack typescript@X` into the scratch folder is enough — builder
+- #741 — A test row that catches no mutant is still kept when it backs a docs sentence; the report says it catches nothing — builder
+- #741 — A claim about what Postgres does with a setting's value is probed for every source of the setting (fresh, `SET`, `ALTER DATABASE`/`ROLE … SET`, `-c` in `options`): `set_config(name, NULL, …)` gives `RESET`'s value, which the last three change; a review's Expected reasoned from two sources lost that condition — branch-reviewer
+- #741 — "What `RESET` gives" is the one wording for a setting's default that holds for every source and for built-in and custom names alike — branch-reviewer
+- #741 — The translation mark (`english:` hash) follows the EN page: rerun `docs:translated` in each commit that changes the EN page, not once at the end — builder
+- #741 — `ALTER ROLE CURRENT_USER IN DATABASE <probe> SET …` gives a role-level case that goes away with the probe database's `DROP`, so the shared role is never touched — builder
+- #741 — When a fix splits a sentence in two, reread the second one's pronouns: "It keeps it … taken before it" gained a new antecedent — branch-reviewer
+- #741 — An orchestrator's Expected text that states a Postgres value carries the same "only when nothing else sets it" condition the review checks for: two rounds went to an Expected that lost it — branch-reviewer
 
 ## Minors kept
 
@@ -150,3 +165,4 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #728 — defect: `advisoryXactLock()`'s `instanceof pg.Pool` misses a `pg.native.Pool` and a pool of a second copy of `pg` (not run) — branch-reviewer
 - #730 — defect: three DEFERRABLE and isolation-level integration tests timed out at 5 s with other suites on the server, and passed alone (a flaky timeout to watch) — builder
 - #742 — check:agents does not check that a SKILL.md's `reference.md § X` names an existing heading, that a linked reference.md exists, that a reference.md is still named by its SKILL.md, nor other .md files in a skill folder; the README line "the core names each section with when to read it" relies on it — branch-reviewer
+- #741 — `website/transaction.md:398` and `src/db/transaction.ts:543` "a savepoint taken before it": "taken before the setting", as the FR « pris avant ce réglage » — branch-reviewer
