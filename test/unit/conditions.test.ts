@@ -1299,6 +1299,12 @@ describe('Default, self, raw, cols and vals as the value of a condition', () => 
     expect(show(condition)).toEqual({ text: '(("col" IN ($1)))', values: ['Ada'] });
   });
 
+  it('isIn given an empty list still compiles to false after the caller adds db.all', () => {
+    const items: (typeof db.all)[] = [], condition = dc.isIn(items);
+    items.push(db.all);
+    expect(show(condition)).toEqual({ text: '((false))', values: [] });
+  });
+
   it('an array condition given an array holding db.all, at any depth, throws when compiled, not when called', () => {
     // 6.6.1 sent it as '{"Symbol(all)"}': no row, the empty arrays with arrayContainedIn(), 22P02 on an int4[] (#633);
     // the typed form on an int4[] column nests, arrayContains<number[]>([[1]])
