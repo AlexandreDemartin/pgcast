@@ -105,7 +105,7 @@ describe('transaction() on a client that cannot tell its transaction status', ()
 // #696: a pool of another driver, no pg class and no `_connected`, typed with no cast (db.PoolLike)
 describe('transaction() on a pool that is not pg’s', () => {
   afterEach(() => {
-    db.setConfig({ transactionRetryDelay: undefined, transactionAttemptsMax: undefined, transactionRequiresCommit: false });
+    db.setConfig({ transactionRetryDelay: { minMs: 25, maxMs: 250 }, transactionAttemptsMax: 5, transactionRequiresCommit: false });
     vi.restoreAllMocks();
   });
 
