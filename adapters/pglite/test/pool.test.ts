@@ -154,4 +154,36 @@ describe('the difference README § How it differs lists', () => {
     } finally { c.release(); }
     expect((await u.pglite().query<{ n: number }>("SELECT count(*)::int AS n FROM orgs WHERE country = 'OW'")).rows[0].n).toBe(0);
   });
+
+  it('ends an open transaction of the adapter with PGlite\'s own transaction(), which commits its writes', async () => {
+    const left = async () => (await u.pglite().query<{ code: string }>("SELECT code FROM orgs WHERE country = 'PC' ORDER BY code")).rows.map(r => r.code);
+    try {
+      await expect(db.serializable(u.pool(), async c => {
+        await db.sql`INSERT INTO orgs VALUES ('PC', 'adapter', 'n')`.run(c);
+        await u.pglite().transaction(tx => tx.query("INSERT INTO orgs VALUES ('PC', 'own', 'n')"));
+        throw new Error('roll back');
+      })).rejects.toThrow('roll back');
+      expect(await left()).toEqual(['adapter', 'own']);
+    } finally { await u.pglite().query("DELETE FROM orgs WHERE country = 'PC'"); }
+  });
+
+  it('runs run(pool) inside an open transaction() of PGlite\'s own, where it sees its rows', async () => {
+    const seen = await u.pglite().transaction(async tx => {
+      await tx.query("INSERT INTO orgs VALUES ('PT', 'own', 'n')");
+      const n = await db.sql`SELECT count(*)::int AS n FROM orgs WHERE country = 'PT'`.run(u.pool());
+      await tx.rollback();
+      return n;
+    });
+    expect(seen).toEqual([{ n: 1 }]);
+    expect((await u.pglite().query<{ n: number }>("SELECT count(*)::int AS n FROM orgs WHERE country = 'PT'")).rows[0].n).toBe(0);
+  });
+
+  it('refuses serializable() inside an open transaction() of PGlite\'s own with 25001, and its ROLLBACK ends PGlite\'s', async () => {
+    const outcome = await u.pglite().transaction(async tx => {
+      await tx.query("INSERT INTO orgs VALUES ('PS', 'own', 'n')");
+      return db.serializable(u.pool(), c => db.sql`INSERT INTO orgs VALUES ('PS', 'adapter', 'n')`.run(c)).then(() => 'ran', (e: any) => e.code);
+    }).catch((e: any) => 'PGlite\'s transaction() rejected: ' + e.code);
+    expect(outcome).toBe('25001');
+    expect((await u.pglite().query<{ n: number }>("SELECT count(*)::int AS n FROM orgs WHERE country = 'PS'")).rows[0].n).toBe(0);
+  });
 });
