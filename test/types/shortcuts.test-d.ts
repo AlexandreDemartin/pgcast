@@ -160,9 +160,13 @@ describe('select', () => {
     expectTypeOf(db.upsert('extra.spools', { length: 3 }, 'id').run(pool)).resolves.not.toBeAny();
   });
 
-  // an array has a length, a number, so an array of rows fitted the one-row overload of extra.spools, and its result
-  // was typed as one row; the guard sends it to the array overload, as on any other table (#674)
+  // an array has a length, a number, so `[]`, an array held in a variable and one `as const` fitted the one-row overload
+  // of extra.spools, and their result was typed as one row (an inline `[{ length: 1 }, {}]` already took the array
+  // overload); the guard sends them to the array overload, as on any other table (#674)
   test('an array of rows takes the array overload of insert() and upsert(), with a column named length (#674)', () => {
+    const rows = [{ length: 1 }, {}];
+    expectTypeOf(db.insert('extra.spools', rows)).toEqualTypeOf<db.SQLFragment<s.extra.spools.JSONSelectable[]>>();
+    expectTypeOf(db.upsert('extra.spools', rows, 'id').run(pool)).resolves.toEqualTypeOf<(s.extra.spools.JSONSelectable & db.UpsertAction)[]>();
     expectTypeOf(db.insert('extra.spools', [{ length: 1 }, {}])).toEqualTypeOf<db.SQLFragment<s.extra.spools.JSONSelectable[]>>();
     expectTypeOf(db.insert('extra.spools', [])).toEqualTypeOf<db.SQLFragment<s.extra.spools.JSONSelectable[]>>();
     expectTypeOf(db.insert('extra.spools', [{ length: 1 }])).toEqualTypeOf<db.SQLFragment<s.extra.spools.JSONSelectable[]>>();
@@ -171,6 +175,19 @@ describe('select', () => {
       .resolves.toEqualTypeOf<Pick<s.extra.spools.JSONSelectable, 'id'>[]>();
     expectTypeOf(db.upsert('extra.spools', [{ length: 1 }], 'id', { returning: ['id'], reportAction: 'suppress' }).run(pool))
       .resolves.toEqualTypeOf<Pick<s.extra.spools.JSONSelectable, 'id'>[]>();
+  });
+
+  // a readonly array fits neither overload, as on any other table; it fitted the one-row overload of extra.spools,
+  // typed as one row, under Zapatos 6.6.1 (#674); #683 takes a readonly array on every table
+  test('a readonly array of rows is refused, as on any other table (#674)', () => {
+    const ro: readonly s.extra.spools.Insertable[] = [{ length: 1 }];
+    // @ts-expect-error a readonly array is no Insertable[] (2769)
+    db.insert('extra.spools', ro);
+    // @ts-expect-error a readonly array is no Insertable[] (2769)
+    db.upsert('extra.spools', ro, 'id');
+    const users: readonly s.users.Insertable[] = [];
+    // @ts-expect-error the same on a table with no column named like a member of String
+    db.insert('users', users);
   });
 
   // left by design (#674): and(), or() and not() take the Whereable of every table, which names no table to look the
