@@ -2,10 +2,10 @@
 //
 // The parameter table (README § What it writes): each value written through pg and through the adapter, in the
 // same query, is stored the same, read back as text, or refused with the same SQLSTATE, on a plain PGlite and on
-// one with parsers and serializers of its own.
+// one with parsers and serializers of its own; then on a plain one with Node west of UTC, by a half-hour offset.
 
 import { runInNewContext } from 'vm';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { refusal, shape, usePGlite, type Kind } from './helpers';
 
 const u = usePGlite(['plain', 'own']), kinds: Kind[] = ['plain', 'own'];
@@ -72,6 +72,8 @@ const cases: [string, string, unknown][] = [
   ['an array of objects to jsonb[]', into('c_jsonba'), [{ a: 1 }, null]],
   ['an array of a Buffer and NULL to bytea[]', into('c_byteaa'), [Buffer.from('dead', 'hex'), null]],
   ['an array of a Uint8Array to bytea[]', into('c_byteaa'), [new Uint8Array([0xbe, 0xef])]],
+  ['an array of a Buffer with a byte below 0x10 to bytea[]', into('c_byteaa'), [Buffer.from([0x01, 0xab])]],
+  ['an array with undefined to text[]', into('c_texta'), ['a', undefined]],
   ['an array of Dates to date[]', into('c_datea'), [new Date(2026, 5, 1)]],
   ['an array of Dates to timestamp[]', into('c_tsa'), [at]],
   ['a string to an enum', into('c_mood'), 'ok'],
@@ -108,6 +110,7 @@ const cases: [string, string, unknown][] = [
   ['a nested object with a Date to jsonb', into('c_jsonb'), { a: { b: [1, null, 'x'] }, d: at }],
   ['an object with a circular reference to jsonb', into('c_jsonb'), (() => { const o: Record<string, unknown> = {}; o.o = o; return o; })()],
   ['a toPostgres() that gives an array to text[]', into('c_texta'), { toPostgres: () => ['a', 'b'] }],
+  ['a toPostgres() that gives its own object to text', into('c_text'), (() => { const o = { toPostgres: () => o }; return o; })()],
 ];
 
 type Queryable = { query: (q: { text: string; values: any[]; name?: string }) => PromiseLike<{ rows: any[] }> };
@@ -136,5 +139,20 @@ describe.each(kinds)('on a %s PGlite, writes as pg writes:', kind => {
   it('several values, as IN ($1, $2)', async () => {
     const query = { text: select('2 IN ($1, $2)'), values: [1, 2] };
     expect((await u.pool(kind).query(query)).rows).toEqual((await u.t.pool.query(query)).rows);
+  });
+});
+
+// a Date's offset written negative, with its minutes
+describe('on a plain PGlite, with Node west of UTC by a half-hour offset, writes as pg writes:', () => {
+  const tz = process.env.TZ;
+  beforeAll(() => { process.env.TZ = 'America/St_Johns'; });
+  afterAll(() => { if (tz === undefined) delete process.env.TZ; else process.env.TZ = tz; });
+
+  it('runs west of UTC, by a half-hour offset', () => {
+    expect(new Date('2026-01-01T00:00:00Z').getTimezoneOffset()).toBe(210);
+  });
+
+  it.each(cases)('%s', async (_, text, value) => {
+    expect(await written(u.pool(), text, value)).toEqual(await written(u.t.pool, text, value));
   });
 });

@@ -236,9 +236,11 @@ describe('the PGlite', () => {
 });
 
 describe('asPool()', () => {
-  it('refuses a PGlite transaction, and an object with no execProtocol() and runExclusive()', async () => {
+  it('refuses a PGlite transaction, and an object with no execProtocol() or no runExclusive()', async () => {
     const message = new Error("asPool() needs a PGlite with execProtocol() and runExclusive(), to send each query as pg sends it on its one connection: give it the PGlite that PGlite.create() or new PGlite() returns, not a transaction's");
     await u.pglite().transaction(async tx => { expect(() => asPool(tx as never)).toThrow(message); });
     expect(() => asPool({} as never)).toThrow(message);
+    expect(() => asPool({ execProtocol: async () => ({ messages: [] }) } as never)).toThrow(message);
+    expect(() => asPool({ runExclusive: async () => undefined } as never)).toThrow(message);
   });
 });
