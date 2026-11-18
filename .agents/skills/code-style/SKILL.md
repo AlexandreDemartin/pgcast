@@ -44,7 +44,7 @@ const
   - "Did you use `self` (the global object) where you meant `db.self`…?" (`src/db/core.ts`);
   - "hint: check `.query.compile()` on this Error" (`src/db/shortcuts.ts`).
   - Its advice is run as written, on each call and each kind of value that throws it ("spread it" turned a string back into its characters, #235), at each position that reaches it and on Postgres (`db.self`, advised for a write, runs only in `update()` and a filter: #666, #677); a warning that fires in more cases is reread for each; advice that moves where a transaction begins says what it costs, probed with a read, a write and an insert of the same key (#486, #492).
-  - A message the docs quote is one template, each interpolation one word, so `check-prose.mjs` matches it; its advice is plain SQL, never `` sql`${…}` `` (lint's `no-template-curly-in-string`) (#569, #596, #647, #677).
+  - A message the docs quote is one template, each interpolation one word: `check-prose.mjs` then says only "is no message of zapatos/db", not that a ternary or a phrase in the template blocks the match (#569, #596, #647).
 
 ## Docs voice
 
