@@ -120,7 +120,25 @@ The SQL of the callback's query: [`count()`](/select#count).
 - The callback gets the pool's client, typed as the pool gives it and marked: a [`TxnClientLike`](#TxnClientLike) at that level. `taken` is a `number`, as on a `pg.Pool`.
 - `command` is read off the `COMMIT`, which Postgres answers with `ROLLBACK` after a query error that the callback caught ([The SQL it sends](#the-sql-it-sends)): a pool whose client gives no `command` does not compile. PGlite and postgres.js give it at run time, but PGlite's type makes it optional, `command?: string`, so a pool that forwards PGlite's result maps `command` to a `string`, as its adapter does ([Drivers](/drivers#pglite)).
 - A retry reads the error's `code` alone, so another driver's 40001 and 40P01 are retried too ([Retries](#retries)).
-- Passed to a nested call, the callback's client is passed through at run time, but the type takes only `pg`'s ([Passing a transaction through](#passing-a-transaction-through)): cast it, `txnClient as unknown as db.TxnClientForReadCommitted`<!-- tsc: export const nested = db.serializable({ connect: async () => ({ query: async () => ({ rows: [], command: 'COMMIT' }), release() {} }) }, txnClient => db.readCommitted(…, async inner => inner)); -->. Once cast, it is typed as a `pg.PoolClient`, which it is not: run only fragments on it, `.run(inner)` and the shortcuts. `inner.query('SELECT 1')`<!-- tsc: export const raw = db.serializable({ connect: async () => ({ query: async () => ({ rows: [], command: 'COMMIT' }), release() {} }) }, txnClient => db.readCommitted(txnClient as unknown as db.TxnClientForReadCommitted, async inner => …)); --> compiles, but the other driver's `query()` takes only the query object. Never give the nested call the pool: its client is a second transaction, and a pool of one connection, as PGlite's, waits for the first one's `release()` forever.
+- Passed to a nested call, the callback's client is passed through ([Passing a transaction through](#passing-a-transaction-through)), with no cast. The nested callback gets that same client, typed at the outer transaction's level, the one it runs at, where a `pg` client is typed at the nested call's own level, as in Zapatos 6.6.1. So a function that runs in its caller's transaction takes the client, typed with the driver's:
+
+  ```ts twoslash
+  import * as db from 'zapatos/db';
+  declare const showPool: db.PoolLike<ShowClient>;
+  // ---cut---
+  type ShowClient = {  // the client of your driver's pool
+    query: (query: db.SQLQuery) => Promise<{ rows: any[]; command: string }>;
+    release: () => void;
+  };
+
+  const countTaken = (txnClient: db.TxnClientLike<ShowClient, db.IsolationLevel.Serializable>) =>
+    db.serializable(txnClient, inner =>  // passed through: inner is txnClient
+      db.count('seat_bookings', { screening_id: 1000 }).run(inner));
+
+  const taken = await db.serializable(showPool, countTaken);
+  ```
+
+  A function generic over that client, `<C extends db.TxnClientLike<ShowClient, db.IsolationLevel>>(txnClient: C)`, or over the pool's, `<C>(pool: db.PoolLike<C>, …)`, does not compile (2345): name the driver's client, `db.TxnClientLike<ShowClient, …>` or `db.PoolLike<ShowClient>`. A client whose type declares no `_zapatos` does not compile either: outside a transaction, `transaction()` would take it for a pool. Never give the nested call the pool: its client is a second transaction, and a pool of one connection, as PGlite's, waits for the first one's `release()` forever.
 - A parameter that takes a `pg.Pool` or another driver's pool is typed `db.PoolLike`, which a `pg.Pool` is: `(pool: db.PoolLike) => db.serializable(pool, async txnClient => txnClient)`<!-- tsc: export const inAnyPool = …; -->. Typed as a union, `pg.Pool | typeof showPool`, it gives the callback the other driver's client, where `pg`'s is a `pg.PoolClient`.
 - The calls of Zapatos 6.6.1 keep their types, the callback's client included. Where TypeScript reads the first parameter as a type, it is also a `PoolLike`, and two paths move:
   - `Parameters<typeof db.serializable>[0]`, or the first parameter as an `infer` reads it: `.query('SELECT 1')` on it gives TS2339;
@@ -636,7 +654,7 @@ type TxnClientLike<C, T extends IsolationLevel> = C & {
 }
 ```
 
-The client of a [`PoolLike`](#PoolLike), `C`, as a [`transaction()`](#transaction) callback gets it: marked while the transaction runs, as a [`TxnClient`](#TxnClient) is, `_zapatos` optional in the type too. A nested call does not take it ([Another driver's pool](#another-drivers-pool)).
+The client of a [`PoolLike`](#PoolLike), `C`, as a [`transaction()`](#transaction) callback gets it: marked while the transaction runs, as a [`TxnClient`](#TxnClient) is, `_zapatos` optional in the type too. A nested call passes it through, and its callback gets it as given, at the outer transaction's level, the one it runs at; a `TxnClient` is typed at the nested call's own level ([Another driver's pool](#another-drivers-pool)).
 
 ## `isDatabaseError()` {#isDatabaseError}
 

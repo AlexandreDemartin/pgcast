@@ -1,5 +1,5 @@
 ---
-english: 14982bfbd8e7
+english: 7b67bbc71bb4
 ---
 
 # Transactions
@@ -124,7 +124,25 @@ Le SQL de la requête du callback : [`count()`](/fr/select#count).
 - Le callback reçoit le client du pool, typé tel que le pool le donne, et marqué : un [`TxnClientLike`](#TxnClientLike) de ce niveau. `taken` est un `number`, comme sur un `pg.Pool`.
 - `command` est lu sur le `COMMIT`, auquel Postgres répond par `ROLLBACK` après une erreur de requête que le callback a interceptée ([Le SQL envoyé](#the-sql-it-sends)) : un pool dont le client ne donne pas de `command` ne compile pas. PGlite et postgres.js le donnent à l’exécution, mais le type de PGlite le rend optionnel, `command?: string` : un pool qui transmet le résultat de PGlite convertit donc `command` en `string`, comme le fait son adaptateur ([Drivers](/fr/drivers#pglite)).
 - Un retry ne lit que le `code` de l’erreur : les 40001 et 40P01 d’un autre driver sont donc réessayés aussi ([Retries](#retries)).
-- Donné à un appel imbriqué, le client du callback est transmis à l’exécution, mais le type n’accepte que celui de `pg` ([Transmettre une transaction](#passing-a-transaction-through)) : castez-le, `txnClient as unknown as db.TxnClientForReadCommitted`<!-- tsc: export const nested = db.serializable({ connect: async () => ({ query: async () => ({ rows: [], command: 'COMMIT' }), release() {} }) }, txnClient => db.readCommitted(…, async inner => inner)); -->. Une fois casté, il est typé comme un `pg.PoolClient`, ce qu’il n’est pas : n’y exécutez que des fragments, `.run(inner)` et les raccourcis. `inner.query('SELECT 1')`<!-- tsc: export const raw = db.serializable({ connect: async () => ({ query: async () => ({ rows: [], command: 'COMMIT' }), release() {} }) }, txnClient => db.readCommitted(txnClient as unknown as db.TxnClientForReadCommitted, async inner => …)); --> compile, mais le `query()` de l’autre driver n’accepte que l’objet de requête. Ne donnez jamais le pool à l’appel imbriqué : son client est une seconde transaction, et un pool d’une seule connexion, comme celui de PGlite, attend indéfiniment le `release()` de la première.
+- Donné à un appel imbriqué, le client du callback est transmis ([Transmettre une transaction](#passing-a-transaction-through)), sans cast. Le callback imbriqué reçoit ce même client, typé au niveau de la transaction extérieure, celui auquel il s’exécute, alors qu’un client `pg` est typé au niveau propre de l’appel imbriqué, comme dans Zapatos 6.6.1. Une fonction qui s’exécute dans la transaction de son appelant accepte donc le client, typé avec celui du driver :
+
+  ```ts twoslash
+  import * as db from 'zapatos/db';
+  declare const showPool: db.PoolLike<ShowClient>;
+  // ---cut---
+  type ShowClient = {  // the client of your driver's pool
+    query: (query: db.SQLQuery) => Promise<{ rows: any[]; command: string }>;
+    release: () => void;
+  };
+
+  const countTaken = (txnClient: db.TxnClientLike<ShowClient, db.IsolationLevel.Serializable>) =>
+    db.serializable(txnClient, inner =>  // passed through: inner is txnClient
+      db.count('seat_bookings', { screening_id: 1000 }).run(inner));
+
+  const taken = await db.serializable(showPool, countTaken);
+  ```
+
+  Une fonction générique sur ce client, `<C extends db.TxnClientLike<ShowClient, db.IsolationLevel>>(txnClient: C)`, ou sur celui du pool, `<C>(pool: db.PoolLike<C>, …)`, ne compile pas (2345) : nommez le client du driver, `db.TxnClientLike<ShowClient, …>` ou `db.PoolLike<ShowClient>`. Un client dont le type ne déclare pas `_zapatos` ne compile pas non plus : hors d’une transaction, `transaction()` le prendrait pour un pool. Ne donnez jamais le pool à l’appel imbriqué : son client est une seconde transaction, et un pool d’une seule connexion, comme celui de PGlite, attend indéfiniment le `release()` de la première.
 - Un paramètre qui accepte un `pg.Pool` ou le pool d’un autre driver se type `db.PoolLike`, ce qu’est un `pg.Pool` : `(pool: db.PoolLike) => db.serializable(pool, async txnClient => txnClient)`<!-- tsc: export const inAnyPool = …; -->. Typé comme une union, `pg.Pool | typeof showPool`, il donne au callback le client de l’autre driver, alors que celui de `pg` est un `pg.PoolClient`.
 - Les appels de Zapatos 6.6.1 gardent leurs types, client du callback compris. Là où TypeScript lit le premier paramètre comme un type, c’est aussi un `PoolLike`, et deux chemins changent :
   - `Parameters<typeof db.serializable>[0]`, ou le premier paramètre tel qu’un `infer` le lit : `.query('SELECT 1')` dessus donne TS2339 ;
@@ -640,7 +658,7 @@ type TxnClientLike<C, T extends IsolationLevel> = C & {
 }
 ```
 
-Le client d’un [`PoolLike`](#PoolLike), `C`, tel que le reçoit le callback d’une [`transaction()`](#transaction) : marqué pendant que la transaction s’exécute, comme un [`TxnClient`](#TxnClient), `_zapatos` étant optionnel dans le type lui aussi. Un appel imbriqué ne l’accepte pas ([Le pool d’un autre driver](#another-drivers-pool)).
+Le client d’un [`PoolLike`](#PoolLike), `C`, tel que le reçoit le callback d’une [`transaction()`](#transaction) : marqué pendant que la transaction s’exécute, comme un [`TxnClient`](#TxnClient), `_zapatos` étant optionnel dans le type lui aussi. Un appel imbriqué le transmet, et son callback le reçoit tel quel, au niveau de la transaction extérieure, celui auquel il s’exécute ; un `TxnClient` est typé au niveau propre de l’appel imbriqué ([Le pool d’un autre driver](#another-drivers-pool)).
 
 ## `isDatabaseError()` {#isDatabaseError}
 
