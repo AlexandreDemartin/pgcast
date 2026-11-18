@@ -1601,14 +1601,26 @@ describe('advisoryXactLock()', () => {
     expect(await advisoryLocks()).toEqual([]);
   });
 
-  it('runs inside a BEGIN of yours, and is released at ROLLBACK TO a savepoint taken before it, not one taken after', async () => {
+  it('runs inside a BEGIN of yours, and is released at the ROLLBACK TO of a savepoint() taken before it, not one taken after', async () => {
     await db.advisoryXactLock(t.client, [1, 41]);  // the harness's client, inside its BEGIN
-    await t.client.query('SAVEPOINT before_lock');
-    await db.advisoryXactLock(t.client, [1, 42]);
-    expect(await advisoryLocks()).toEqual([{ classid: 1, objid: 41, objsubid: 2 }, { classid: 1, objid: 42, objsubid: 2 }]);
-    await t.client.query('ROLLBACK TO SAVEPOINT before_lock');
+    const failed = new Error('the unit of work failed');
+    const err = await db.savepoint(t.client, async sp => {
+      await db.advisoryXactLock(sp, [1, 42]);
+      expect(await advisoryLocks()).toEqual([{ classid: 1, objid: 41, objsubid: 2 }, { classid: 1, objid: 42, objsubid: 2 }]);
+      throw failed;
+    }).catch((e: unknown) => e);
+    expect(err).toBe(failed);
     expect(await advisoryLocks()).toEqual([{ classid: 1, objid: 41, objsubid: 2 }]);
     expect(await othersGet([1, 42])).toBe(true);
+  });
+
+  it('is kept past the RELEASE of a savepoint() that resolves, until the transaction ends', async () => {
+    await db.serializable(t.pool, async c => {
+      await db.savepoint(c, sp => db.advisoryXactLock(sp, [1, 43]));
+      expect(await advisoryLocks()).toEqual([{ classid: 1, objid: 43, objsubid: 2 }]);
+      expect(await othersGet([1, 43])).toBe(false);
+    });
+    expect(await advisoryLocks()).toEqual([]);
   });
 
   it('is released between two attempts of a transaction retried on 40001', async () => {
