@@ -2283,8 +2283,8 @@ describe('a list that is not an array in isIn(), isNotIn(), eqAny(), likeAny() a
   // 6.6.1 read `a.length`: an iterable has none, so isNotIn() compiled to `true`, every row, and isIn() to
   // `false`; an array-like or a string gave its keys' values, null and undefined a TypeError at the call (#235).
   // eqAny() sent it as its one parameter, which pg writes as '{}' for a Set: no row, with no error
-  const lists = { isIn: db.conditions.isIn, isNotIn: db.conditions.isNotIn, eqAny: db.conditions.eqAny,
-    likeAny: db.conditions.likeAny, ilikeAny: db.conditions.ilikeAny };
+  const lists: Record<string, (a: any) => db.SQLFragment<any, any>> = { isIn: db.conditions.isIn, isNotIn: db.conditions.isNotIn,
+    eqAny: db.conditions.eqAny, likeAny: db.conditions.likeAny, ilikeAny: db.conditions.ilikeAny };
   const entryPoints: Record<string, (c: db.SQL) => db.SQLFragment<any, any>> = {
     deletes: c => db.deletes('users', { id: c }),
     select: c => db.select('users', { id: c }),

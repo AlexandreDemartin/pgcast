@@ -1448,8 +1448,8 @@ describe('a list that is not an array in isIn(), isNotIn(), eqAny(), likeAny() a
       outcomes: Record<string, string> = {},
       query = vi.spyOn(t.client, 'query');
     try {
-      for (const [fn, list] of Object.entries({ isIn: db.conditions.isIn, isNotIn: db.conditions.isNotIn, eqAny: db.conditions.eqAny,
-        likeAny: db.conditions.likeAny, ilikeAny: db.conditions.ilikeAny }))
+      for (const [fn, list] of Object.entries<(a: any) => db.SQL>({ isIn: db.conditions.isIn, isNotIn: db.conditions.isNotIn,
+        eqAny: db.conditions.eqAny, likeAny: db.conditions.likeAny, ilikeAny: db.conditions.ilikeAny }))
         for (const [kind, x] of Object.entries(nonArrayLists())) {
           let c: db.SQL;
           // 6.6.1 read null.length at the call

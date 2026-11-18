@@ -99,9 +99,13 @@ describe('likeAny() and ilikeAny()', () => {
     db.select('users', { display_name: c.or(c.likeAny(['A%']), c.ilikeAny(['b%'])) });
   });
 
-  test('characterization: an enum column takes a pattern that is one of its labels, as like(), and Postgres refuses it (42883)', () => {
-    db.select('users', { mood: c.likeAny(['ok']), display_name: c.like('A%') });
+  test('refuse an enum column, even for a pattern that is one of its labels, which like() takes (Postgres refuses both, 42883)', () => {
+    // characterization: in a Whereable, the patterns widen to string, where like('ok') keeps its literal
     db.select('users', { mood: c.like('ok') });
+    // @ts-expect-error an enum column, a label as the pattern
+    db.select('users', { mood: c.likeAny(['ok']) });
+    // @ts-expect-error an enum column, a label as the pattern
+    db.select('users', { mood: c.ilikeAny(['ok']) });
   });
 
   test('refuse a number column, an item that is no string, one pattern, and a list that is not an array', () => {
@@ -109,8 +113,6 @@ describe('likeAny() and ilikeAny()', () => {
     db.select('users', { id: c.ilikeAny(['1%']) });
     // @ts-expect-error an int column, as like()
     db.select('users', { id: c.likeAny(['1%']) });
-    // @ts-expect-error a pattern that is no label of the enum, as like()
-    db.select('users', { mood: c.ilikeAny(['h%']) });
     // @ts-expect-error a number item
     db.select('users', { display_name: c.likeAny([1]) });
     // @ts-expect-error a null item, with strictNullChecks
