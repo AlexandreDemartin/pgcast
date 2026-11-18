@@ -79,6 +79,11 @@ Candidates for a check, a rule or a skill line.
 - #709/#712 — Two reviewers disagreed on the same race (0.5.13+ returning the row vs rejecting): a race claimed per version is probed with a count per order and per version before it is written — orchestrator
 - #709/#712 — A race probed by a reviewer is replayed with and without an `await` between the calls: one `await` flipped the outcome on every PGlite version, which is how two reviewers saw opposite results — builder
 - #709 — A race test that accepts two outcomes pairs with a mutant run on each CI version: the no-result branch is reached only on 0.5.0, so the lockfile leg alone lets that mutant pass — branch-reviewer
+- #729 — A cast-panel example must declare `declare const pool: pg.Pool;` (`playgroundLinks.ts`), so a panel cannot type its pool as another driver's: the adapter's types are compiled in a setup block above it — builder
+- #729 — The docs sidebar is `website/.vitepress/outline.ts`, not `config.ts`: an issue's **Files** names `outline.ts` for a new page — builder
+- #729 — A Twoslash `paths` entry pointing outside `website/` makes the docs build depend on that folder: CI's change detection (`ci.yml` `changes`) lists it as a docs input, or the break first shows on master's deploy — branch-reviewer
+- #729 — Before writing "throws on X", read what the guard tests and replay the neighbouring inputs: `asPool()` tests `transform.{column,value,row}.from`, not `transform` — branch-reviewer
+- #729 — A page that says "run on it as on a `pg.Pool`" is replayed on the error path too (`err.constraint` from `handle-errors.md`), not only on the result types — branch-reviewer
 
 ## Minors kept
 
@@ -93,3 +98,4 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #721 — form: #720's Done when asked for a replay on Postgres 14; only CI's leg covers it (the fix does not depend on the version) — branch-reviewer
 - #709 — form: `adapters/pglite/test/params.test.ts` has no row with a `getTime` that is not a Date (`{ getTime: () => 0, toPostgres: () => 'tp' }`), so `typeof v.getTime === 'function'` as `isDate` passes all 468 rows — branch-reviewer
 - #709 — defect: a real Date reprototyped to `Object.prototype` is not a Date for the PGlite adapter's `isDate` (written as JSON, where pg writes its time); contrived — branch-reviewer
+
