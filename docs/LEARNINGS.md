@@ -30,6 +30,12 @@ Candidates for a check, a rule or a skill line.
 - #701 — An issue number written into the docs is checked with `gh issue view <n>` on that number alone: a fix linked PGlite's adapter to #697 (postgres.js) — orchestrator
 - #701 — `NoInfer` on a callback's parameter also blocks a generic caller from forwarding a callback typed with the same type parameter; a helper type exported "so users can type a helper" gets a probe of that helper, generic over the parameter — branch-reviewer
 - #701 — A fix-round grid compares the whole `(cell, code)` list and the emitted `.d.ts` with 6.6.1's, not only the cells the review named — branch-reviewer
+- #708 — A `readonly T[]` parameter with `T extends string` widens to `string` inside a Whereable, while `like(a: T)` keeps the literal, which changes the type on enum columns: frozen as a negative rather than assumed — builder
+- #708 — `bench:types` run from a worktree whose `node_modules` is linked to another's overwrites that one's `node_modules/.cache/pgcast` declarations — builder
+- #708 — A brief that says "mark it ready" overrides the builder's rule only when the orchestrator means it; briefs name the exception explicitly — orchestrator
+- #708 — A list helper `<T extends string>(a: readonly T[])` widens array-literal items to `string` inside a Whereable, where `<T extends string>(a: T)` keeps the literal; its type tests include a column typed as a literal union or a template literal — branch-reviewer
+- #708 — A list helper whose `T` comes from the items infers `never` from a literal `[]`, which every Whereable accepts; for an operator Postgres types, `[]` is tested on a column of the wrong type — branch-reviewer
+- #708 — On a literal-union column, keeping the literals and refusing an enum label pull against each other: TypeScript cannot tell an enum from a `domainsTypedAsUnions` union — builder
 - #703 — `vi.resetModules()` reloads TypeScript sources only; the root's `db.js` shim loads `dist` through Node's CommonJS cache, which Vitest does not reset, so a once-per-process warning is tested on `src/db` — builder
 - #703 — A test that needs a fresh prepared statement on a pooled connection uses a text of its own: the connection handed out may already have prepared the same text — builder
 - #703 — A package's own scripts run tools from the root's install without listing them: npm puts every parent folder's `node_modules/.bin` on `PATH` — builder
@@ -50,4 +56,6 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #700 — form: `CHANGELOG.md` `<!-- tsc -->` mark proves the cast on `frag.run = …`, not on the spy or a library's re-export it is prescribed for; the re-export consumer's cast is compiled nowhere in the repo — branch-reviewer
 - #700 — defect: `QueryableLike` with `strict: false` still accepts a `query()` that requires more than `run()` sends (no `strictFunctionTypes`) — builder
 - #701 — defect: a helper generic over `db.PoolLike<C>` typing its callback `db.TxnClientLike<C, …>` gives TS2345 (filed in #702) — branch-reviewer
+- #708 — defect: `likeAny([])` infers `never` and compiles on an int column, which Postgres refuses with 42883 — branch-reviewer
+- #708 — form: `notAnArray` says "value" for `likeAny()`/`ilikeAny()` where `notAList` says "patterns" — branch-reviewer
 

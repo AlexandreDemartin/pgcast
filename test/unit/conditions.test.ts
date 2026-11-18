@@ -32,6 +32,7 @@ describe('conditions', () => {
         "gt",
         "gte",
         "ilike",
+        "ilikeAny",
         "isDistinctFrom",
         "isFalse",
         "isIn",
@@ -48,6 +49,7 @@ describe('conditions', () => {
         "jsonbContains",
         "jsonbPathExists",
         "like",
+        "likeAny",
         "lt",
         "lte",
         "ne",
@@ -552,6 +554,80 @@ describe('conditions', () => {
     expect(() => show(dc.eqAny(new Set([1]) as any).copy())).toThrow('takes an array, not `Set`');
   });
 
+  it('likeAny and ilikeAny: the patterns are one parameter, the same text for any length, the empty array included', () => {
+    const thousand = Array.from({ length: 1000 }, (_, i) => `%${i}`);
+    expect({
+      likeAny: show(dc.likeAny(['The %', '% Noir'])), ilikeAny: show(dc.ilikeAny(['%@film.org', '%@cast.io'])),
+      likeAnyEmpty: show(dc.likeAny([])), ilikeAnyEmpty: show(dc.ilikeAny([])),
+      ilikeAnyNull: show(dc.ilikeAny(['a%', null as unknown as string])),
+    }).toMatchInlineSnapshot(`
+      {
+        "ilikeAny": {
+          "text": "(("col" ILIKE ANY($1)))",
+          "values": [
+            [
+              "%@film.org",
+              "%@cast.io",
+            ],
+          ],
+        },
+        "ilikeAnyEmpty": {
+          "text": "(("col" ILIKE ANY($1)))",
+          "values": [
+            [],
+          ],
+        },
+        "ilikeAnyNull": {
+          "text": "(("col" ILIKE ANY($1)))",
+          "values": [
+            [
+              "a%",
+              null,
+            ],
+          ],
+        },
+        "likeAny": {
+          "text": "(("col" LIKE ANY($1)))",
+          "values": [
+            [
+              "The %",
+              "% Noir",
+            ],
+          ],
+        },
+        "likeAnyEmpty": {
+          "text": "(("col" LIKE ANY($1)))",
+          "values": [
+            [],
+          ],
+        },
+      }
+    `);
+    for (const f of [dc.likeAny, dc.ilikeAny]) {
+      const many = show(f(thousand));
+      expect(many.text).toBe(show(f(['a'])).text);
+      expect(many.values).toEqual([thousand]);
+    }
+  });
+
+  it('likeAny and ilikeAny send their array as an array under castArrayParamsToJson', () => {
+    db.setConfig({ castArrayParamsToJson: true });
+    try {
+      expect([show(dc.likeAny(['a%'])), show(dc.ilikeAny(['a%']))]).toEqual([
+        { text: '(("col" LIKE ANY($1)))', values: [['a%']] }, { text: '(("col" ILIKE ANY($1)))', values: [['a%']] },
+      ]);
+    } finally { resetConfig(); }
+  });
+
+  it('a copy of likeAny or ilikeAny compiles the same, and still refuses what it refuses', () => {
+    for (const [name, f] of Object.entries({ likeAny: dc.likeAny, ilikeAny: dc.ilikeAny })) {
+      const condition = f(['a%', 'b%']);
+      expect(sql`${{ col: condition.copy() }}`.compile()).toEqual(sql`${{ col: condition }}`.compile());
+      expect(() => show(f(['a%', param('b%') as any]).copy())).toThrow(`\`${name}()\` sends its array as one parameter, so each item is a pattern, a string, not \`db.param()\``);
+      expect(() => show(f(new Set(['a%']) as any).copy())).toThrow(`\`${name}()\` takes an array, not \`Set\``);
+    }
+  });
+
   it('websearchToTsquery: the configuration and the query are two parameters, the configuration cast to regconfig', () => {
     expect({
       words: show(dc.websearchToTsquery('english', 'salt orchard')),
@@ -884,7 +960,7 @@ describe('Default, self, raw, cols and vals as the value of a condition', () => 
   };
 
   it('covers every condition of db.conditions', () => {
-    expect([...Object.keys(one), ...Object.keys(two), ...Object.keys(lists), 'eqAny', 'jsonbContains', 'jsonbPathExists', 'websearchToTsquery', ...noValue, ...subqueries].sort())
+    expect([...Object.keys(one), ...Object.keys(two), ...Object.keys(lists), 'eqAny', 'likeAny', 'ilikeAny', 'jsonbContains', 'jsonbPathExists', 'websearchToTsquery', ...noValue, ...subqueries].sort())
       .toEqual(Object.keys(dc).sort());
   });
 
@@ -993,6 +1069,53 @@ describe('Default, self, raw, cols and vals as the value of a condition', () => 
         "vals": "\`eqAny()\` takes an array of values, not \`db.vals()\`: write \`eqAny(values)\`; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.",
       }
     `);
+  });
+
+  it('likeAny and ilikeAny given an item that is neither a string nor null throw when compiled, not when called, saying what to do', () => {
+    // pg would send a Parameter, a fragment or an object as JSON, Default, self and all as their names, a number as
+    // its text, and read an array item as more items: patterns no one wrote, with no error
+    const items = { Default, self, all: db.all, raw: raw("'a%'"), cols: cols('a%'), vals: vals('a%'), param: param('a%'),
+      fragment: sql`'a%'`, parent: parent('title'), array: ['a%'], number: 1, boolean: true, object: {}, date: new Date(0),
+      undefined, bigint: BigInt(1), function: () => 'a%', symbol: Symbol('a%') };
+    const what = { Default: '`db.Default`', self: '`db.self`', all: '`db.all`', raw: '`db.raw()`', cols: '`db.cols()`',
+      vals: '`db.vals()`', param: '`db.param()`', fragment: 'a `sql` fragment', parent: '`db.parent()`', array: 'an array',
+      number: 'a `number`', boolean: 'a `boolean`', object: 'an object', date: 'an object', undefined: '`undefined`',
+      bigint: 'a `bigint`', function: 'a function', symbol: 'a symbol' };
+    for (const [fn, f] of Object.entries({ likeAny: dc.likeAny, ilikeAny: dc.ilikeAny })) {
+      expect(Object.fromEntries(Object.entries(items).map(([name, item]) => [name, thrown(f(['a%', item as any]))])))
+        .toEqual(Object.fromEntries(Object.entries(what).map(([name, w]) =>
+          [name, `\`${fn}()\` sends its array as one parameter, so each item is a pattern, a string, not ${w}: give the pattern as a string.`])));
+      expect(thrown(f(['a%', null as unknown as string, 'b%']))).toBe('compiled');
+    }
+  });
+
+  it('characterization: likeAny and ilikeAny check their items when called, and send the array as it is when compiled', () => {
+    for (const [fn, f] of Object.entries({ likeAny: dc.likeAny, ilikeAny: dc.ilikeAny })) {
+      const later: unknown[] = ['a%'], fixed: unknown[] = ['a%', 1];
+      const [pushed, refused] = [f(later as string[]), f(fixed as string[])];
+      later.push(1);
+      fixed[1] = 'b%';
+      expect([show(pushed).values, thrown(refused)]).toEqual([[['a%', 1]],
+        `\`${fn}()\` sends its array as one parameter, so each item is a pattern, a string, not a \`number\`: give the pattern as a string.`]);
+    }
+  });
+
+  it('likeAny and ilikeAny given a list that is not an array throw when compiled, saying what to do, as eqAny does', () => {
+    const lists = { Set: new Set(['a%']), string: 'a%', null: null, undefined, Default, self, all: db.all,
+      param: param(['a%']), fragment: sql`ARRAY['a%']`, raw: raw("'{a%}'"), cols: cols(['a%']), vals: vals(['a%']),
+      parent: parent('title') };
+    const named = { Default: '`db.Default`', self: '`db.self`', all: '`db.all`', param: '`db.param()`', fragment: 'a `sql` fragment',
+      raw: '`db.raw()`', cols: '`db.cols()`', vals: '`db.vals()`', parent: '`db.parent()`' };
+    for (const [fn, f] of Object.entries({ likeAny: dc.likeAny, ilikeAny: dc.ilikeAny })) {
+      expect(Object.fromEntries(Object.entries(lists).map(([name, x]) => [name, thrown(f(x as any))]))).toEqual({
+        Set: `\`${fn}()\` takes an array, not \`Set\`: make one with \`${fn}([...values])\`, or \`Array.from(values)\` for an array-like object.`,
+        string: `\`${fn}()\` takes an array, not \`string\`: for one value, write \`${fn}([value])\`.`,
+        null: `\`${fn}()\` takes an array, not \`null\`: for one value, write \`${fn}([value])\`.`,
+        undefined: `\`${fn}()\` takes an array, not \`undefined\`: for one value, write \`${fn}([value])\`.`,
+        ...Object.fromEntries(Object.entries(named).map(([name, w]) =>
+          [name, `\`${fn}()\` takes an array of patterns, not ${w}: write \`${fn}(patterns)\`; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.`])),
+      });
+    }
   });
 
   it('jsonbContains given a wrapper throws when compiled, not when called, saying what to do', () => {

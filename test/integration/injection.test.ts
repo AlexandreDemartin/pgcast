@@ -639,6 +639,17 @@ describe('a Parameter in a Whereable, in isIn or in vals', () => {
     expect(await adaName()).toBe('Ada');
   });
 
+  it('hostile patterns of likeAny and ilikeAny stay one array parameter: each matches what it is, and none runs', async () => {
+    // without a wildcard, a pattern matches the string it is; a `\\` escapes the next character, as in like()
+    const patterns = [`Ada' OR '1' = '1`, `Ada"}; ${update}; --`, `{Ada}`, 'Ada,Bob', '$1', `%'; ${update}; --`, 'Bo\\b'];
+    for (const [fn, f] of Object.entries({ likeAny: db.conditions.likeAny, ilikeAny: db.conditions.ilikeAny })) {
+      const q = sql`SELECT ${'id'} FROM ${'users'} WHERE ${{ display_name: f(patterns) }}`;
+      expect(q.compile()).toEqual({ text: `SELECT "id" FROM "users" WHERE (("display_name" ${fn === 'likeAny' ? 'LIKE' : 'ILIKE'} ANY($1)))`, values: [patterns] });
+      expect(await q.run(t.client)).toEqual([{ id: 2 }]);
+    }
+    expect(await adaName()).toBe('Ada');
+  });
+
   it('a hostile value of jsonbContains stays one jsonb parameter: it matches the JSON it is, and runs nothing', async () => {
     // a NUL is left out: Postgres refuses \u0000 in jsonb (22P05)
     const hostile = [`'}'::jsonb OR TRUE; ${update}; --`, `"}]; ${update}; --`, `$1`, `\\`, `/*`];
@@ -1430,14 +1441,15 @@ describe('a built-in object in cols() and vals()', () => {
   });
 });
 
-describe('a list that is not an array in isIn(), isNotIn() and eqAny()', () => {
+describe('a list that is not an array in isIn(), isNotIn(), eqAny(), likeAny() and ilikeAny()', () => {
   it('rejects run() before any query, through deletes, select and update, nested in and(), or() and not(), and copied', async () => {
     // 6.6.1 ran DELETE … WHERE ((true)) for isNotIn(new Set([1, 2])), every row (#235)
     const
       outcomes: Record<string, string> = {},
       query = vi.spyOn(t.client, 'query');
     try {
-      for (const [fn, list] of Object.entries({ isIn: db.conditions.isIn, isNotIn: db.conditions.isNotIn, eqAny: db.conditions.eqAny }))
+      for (const [fn, list] of Object.entries<(a: any) => db.SQL>({ isIn: db.conditions.isIn, isNotIn: db.conditions.isNotIn,
+        eqAny: db.conditions.eqAny, likeAny: db.conditions.likeAny, ilikeAny: db.conditions.ilikeAny }))
         for (const [kind, x] of Object.entries(nonArrayLists())) {
           let c: db.SQL;
           // 6.6.1 read null.length at the call
