@@ -619,9 +619,10 @@ describe('the config transaction() reads', () => {
     { max: 2.5, attempts: 3 },
     { max: '3', attempts: 3 },  // from JavaScript
     { max: BigInt(3), attempts: 3 },  // from JavaScript
-  ])('keeps the attempts of a transactionAttemptsMax of $max, and counts them in its messages', async ({ max, attempts }) => {
+  ])('keeps the attempts of a transactionAttemptsMax of $max, and counts them in its messages and events', async ({ max, attempts }) => {
     const { messages } = listen();
-    db.setConfig({ transactionAttemptsMax: max as number });
+    const events: db.TransactionEvent[] = [];
+    db.setConfig({ transactionAttemptsMax: max as number, transactionEventListener: event => { events.push(event); } });
     let made = 0;
     const err = await db.serializable(t.pool, async c => {
       made++;
@@ -635,6 +636,13 @@ describe('the config transaction() reads', () => {
         `Retrying transaction, attempt ${i + 2} of ${attempts}`,
       ]).flat(),
       `Transaction rollback (code 40001) on attempt ${attempts} of ${attempts}, giving up`,
+    ]);
+    expect(events).toStrictEqual([
+      ...Array.from({ length: attempts - 1 }, (_, i) => [
+        { type: 'rollback', code: '40001', attempt: i + 1, maxAttempts: attempts, delayMs: 0 },
+        { type: 'retry', attempt: i + 2, maxAttempts: attempts },
+      ]).flat(),
+      { type: 'giveUp', code: '40001', attempt: attempts, maxAttempts: attempts },
     ]);
   });
 
