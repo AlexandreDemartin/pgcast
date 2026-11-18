@@ -178,8 +178,10 @@ let txnSeq = 0;
  * Given a `PoolLike` of another driver, the callback gets its client, a
  * `TxnClientLike`, released once the transaction ends. Passed to a nested
  * call, that client is passed through at run time, but the type takes only
- * `pg`'s: cast it (`as unknown as db.TxnClientForSerializable`), and never
- * give the nested call the pool, whose second client is another transaction.
+ * `pg`'s: cast it (`as unknown as db.TxnClientForSerializable`), then run
+ * only fragments on it, as the `pg` members the cast gives it are not its own,
+ * and never give the nested call the pool, whose second client is another
+ * transaction.
  * @param txnClientOrQueryable The `pg.Pool` from which to check out a client,
  * a plain client (`pg.Client`, `pg.native.Client` or a `pg.PoolClient`, used
  * as is and not released), an existing transaction client to be passed
