@@ -1,5 +1,5 @@
 ---
-english: ab28f956b994
+english: 906e235717ec
 description: "Ce que zapatos/db vous laisse régler à l’exécution : setConfig() et chaque option de Config, les écouteurs, les opt-ins et leurs codes d’avertissement."
 ---
 
@@ -83,7 +83,7 @@ interface Config {
   queryListener?(query: SQLQuery, txnId?: number): void;
   resultListener?(result: any, txnId?: number, elapsedMs?: number, query?: SQLQuery): void;
   transactionListener?(message: string, txnId?: number): void;
-  transactionEventListener?(event: TransactionEvent, txnId?: number): void;
+  transactionEventListener?: (event: TransactionEvent, txnId?: number) => void;
 }
 ```
 
@@ -340,7 +340,7 @@ Il n’est pas appelé pour une transaction commitée dès sa première tentativ
 ### `transactionEventListener` {#Config.transactionEventListener}
 
 ```ts
-transactionEventListener?(event: TransactionEvent, txnId?: number): void
+transactionEventListener?: (event: TransactionEvent, txnId?: number) => void
 ```
 
 À partir de la 6.12.0. Appelé par `transaction()` juste après [`transactionListener`](#Config.transactionListener), aux trois mêmes moments, avec un [`TransactionEvent`](#TransactionEvent) qui porte les nombres du message, et avec l’id de la transaction. Chaque écouteur est appelé s’il est réglé, que l’autre le soit ou non. Un log ou une métrique lit ainsi la nature de l’événement, le code et la tentative comme des champs, et non dans le texte :
@@ -357,7 +357,8 @@ db.setConfig({
 Sur un `40001` à la première de cinq tentatives, ce code affiche `{"txnId":0,"type":"rollback","code":"40001","attempt":1,"maxAttempts":5,"delayMs":97}`, `delayMs` étant l’attente tirée de [`transactionRetryDelay`](#Config.transactionRetryDelay), puis `{"txnId":0,"type":"retry","attempt":2,"maxAttempts":5}`.
 
 - Comme `transactionListener`, il n’est pas appelé pour une transaction commitée dès sa première tentative, ni pour toute autre erreur, ni par un `transaction()` qui reçoit le client d’une transaction et le transmet tel quel.
-- S’il lève une erreur, `transaction()` est rejetée avec cette erreur, comme quand `transactionListener` en lève une : une fois le `ROLLBACK` envoyé, et le client libéré. Une erreur qu’il lève à `retry` avec un `code` `40001` ou `40P01` compte comme l’échec de cette tentative, qui est réessayée.
+- S’il lève une erreur, `transaction()` est rejetée avec cette erreur, comme quand `transactionListener` en lève une : une fois le `ROLLBACK` envoyé, et le client libéré. Une erreur qu’il lève à `retry` avec un `code` `40001` ou `40P01` compte comme l’échec de cette tentative, qui est réessayée tant qu’il reste une tentative, comme tout `40001`.
+- C’est une propriété, là où les autres écouteurs sont des méthodes : un écouteur typé pour une partie des événements, qui lirait une clé que les autres n’ont pas, ne compile pas.
 - Zapatos 6.6.1 n’a pas cette option ([Revenir en arrière](/fr/switching#go-back)).
 
 ### Les ids de transaction {#transaction-ids}

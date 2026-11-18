@@ -78,7 +78,7 @@ interface Config {
   queryListener?(query: SQLQuery, txnId?: number): void;
   resultListener?(result: any, txnId?: number, elapsedMs?: number, query?: SQLQuery): void;
   transactionListener?(message: string, txnId?: number): void;
-  transactionEventListener?(event: TransactionEvent, txnId?: number): void;
+  transactionEventListener?: (event: TransactionEvent, txnId?: number) => void;
 }
 ```
 
@@ -335,10 +335,10 @@ It is not called for a transaction that commits on its first attempt, nor for an
 ### `transactionEventListener` {#Config.transactionEventListener}
 
 ```ts
-transactionEventListener?(event: TransactionEvent, txnId?: number): void
+transactionEventListener?: (event: TransactionEvent, txnId?: number) => void
 ```
 
-From 6.12.0. Called by `transaction()` right after [`transactionListener`](#Config.transactionListener), at the same three points, with a [`TransactionEvent`](#TransactionEvent) that holds the message's numbers and the transaction's id. Each listener is called if it is set, the other or not. So a log or a metric reads the kind of event, the code and the attempt as fields, not from the text:
+From 6.12.0. Called by `transaction()` right after [`transactionListener`](#Config.transactionListener), at the same three points, with a [`TransactionEvent`](#TransactionEvent) that holds the message's numbers, and the transaction's id after it. Each listener is called if it is set, the other or not. So a log or a metric reads the kind of event, the code and the attempt as fields, not from the text:
 
 ```ts twoslash
 import * as db from 'zapatos/db';
@@ -352,7 +352,8 @@ db.setConfig({
 On a `40001` at the first of five attempts, this prints `{"txnId":0,"type":"rollback","code":"40001","attempt":1,"maxAttempts":5,"delayMs":97}`, `delayMs` being the wait drawn from [`transactionRetryDelay`](#Config.transactionRetryDelay), then `{"txnId":0,"type":"retry","attempt":2,"maxAttempts":5}`.
 
 - As for `transactionListener`, it is not called for a transaction that commits on its first attempt, for any other error, or by a `transaction()` given the client of a transaction, which passes it through.
-- If it throws, `transaction()` rejects with its error, as when `transactionListener` throws: once `ROLLBACK` is sent, and the client is released. An error that it throws at `retry` with a `code` of `40001` or `40P01` counts as that attempt's failure, which is retried.
+- If it throws, `transaction()` rejects with its error, as when `transactionListener` throws: once `ROLLBACK` is sent, and the client is released. An error that it throws at `retry` with a `code` of `40001` or `40P01` counts as that attempt's failure, which is retried while an attempt is left, as any `40001`.
+- It is a property, where the other listeners are methods: a listener typed for some of the events, which would read a key the others lack, doesn't compile.
 - Zapatos 6.6.1 has no such option ([Go back](/switching#go-back)).
 
 ### Transaction ids {#transaction-ids}

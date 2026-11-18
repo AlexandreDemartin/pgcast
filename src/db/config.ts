@@ -19,7 +19,7 @@ export interface SQLQuery {
  * A listener that throws makes `transaction()` reject with its error, as a
  * throwing `transactionListener` does, once its `ROLLBACK` is sent; an error
  * whose `code` is 40001 or 40P01, thrown at `retry`, fails that attempt, which
- * is retried.
+ * is retried while an attempt is left, as any 40001.
  */
 export type TransactionEvent =
   | { type: 'rollback'; code: '40001' | '40P01'; attempt: number; maxAttempts: number; delayMs: number }
