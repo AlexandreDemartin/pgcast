@@ -1163,6 +1163,7 @@ describe('savepoint() (#723)', () => {
       await db.savepoint(c, async level1 => {
         await write(level1, '9 undone');
         await db.savepoint(level1, level2 => write(level2, '9 undone too'));
+        await writeThenFail(level1, '10 undone');  // its RELEASE after ROLLBACK TO lets level1's ROLLBACK TO undo 9
         throw failed;
       }).catch(() => undefined);
     });
@@ -1242,15 +1243,15 @@ describe('savepoint() (#723)', () => {
     }
   });
 
-  it('never retries on its own: in a raw BEGIN, a 40001 runs the callback once and leaves the transaction aborted', async () => {
+  it.each(['40001', '40P01'] as const)('never retries on its own: in a raw BEGIN, a %s runs the callback once and leaves the transaction aborted', async code => {
     const client = await t.pool.connect();
     try {
       await client.query('BEGIN');
       let runs = 0;
-      const err = await db.savepoint(client, async sp => { runs++; await raise(sp, '40001'); }).catch((e: unknown) => e);
-      expect(db.isDatabaseError(err, 'TransactionRollback_SerializationFailure')).toBe(true);
+      const err = await db.savepoint(client, async sp => { runs++; await raise(sp, code); }).catch((e: unknown) => e);
+      expect((err as { code?: string }).code).toBe(code);
       expect(runs).toBe(1);
-      expect((await client.query('COMMIT')).command).toBe('ROLLBACK');  // a caught 40001 cannot commit
+      expect((await client.query('COMMIT')).command).toBe('ROLLBACK');  // a caught 40001 or 40P01 cannot commit
     } finally {
       client.release();
     }
