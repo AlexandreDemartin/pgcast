@@ -21,8 +21,9 @@ The same program under two names: `pgcast`, and `zapatos`, as in Zapatos 6.6.1. 
   - The file's variables are filled in before the merge: one it names must be set even when the argument replaces its key, or the CLI stops with `Environment variable 'NAME' is not set`.
 - Each string in both, at any depth, has its environment variables filled in ([Environment variables](#environment-variables)).
 - From 6.8.0, one flag, `--check`, before or after `config`. From 6.12.0, `--help` or `-h` in `config`'s place prints the usage, which names the config files, `config`, the flags and this page, and exits with code 0, before it reads the config.
-- Any other argument starting with `--`, in `config`'s place, stops it with code 1 before it reads the config. From 6.12.0, it prints `Unknown flag --chek: the flags are --check, --help and -h` and the usage, on stderr; from 6.8.0, Node printed `Unknown flag --chek: the only flag is --check, beside the JSON argument` and its stack. Zapatos 6.6.1 read each of these, `-h` too, as the JSON argument, which failed.
-- After `config`, one is ignored, `--help` included, as in Zapatos 6.6.1, with a [note](#generate.warningListener): a misspelt `npx pgcast '{}' --chek` generates.
+- The CLI skips a bare `--` before or after `config`, without a note. For example, `pgcast -- --help` prints the usage.
+- An unrecognised flag starting with `--` in `config`'s place stops it with code 1 before it reads the config. From 6.12.0, it prints `Unknown flag --chek: the flags are --check, --help and -h` and the usage, on stderr; from 6.8.0, Node printed `Unknown flag --chek: the only flag is --check, beside the JSON argument` and its stack. Zapatos 6.6.1 read each of these, `-h` too, as the JSON argument, which failed.
+- After `config`, the CLI ignores unrecognised `--` flags and `--help`, as in Zapatos 6.6.1. It emits a [note](#generate.warningListener) for each. A misspelt `npx pgcast '{}' --chek` generates.
 - Of the other arguments, the first is `config`; any later one is ignored.
 - Paths are relative to the folder you run it in: `outDir`, and so the `zapatos` folder.
 
@@ -84,6 +85,8 @@ Run the generator without --check to write them.
 - `schema.d.ts` and, when there is a custom type, `custom/index.d.ts`, which each run then writes again, are compared byte for byte. A placeholder counts only when it is missing: it is yours to edit ([The files it writes](#the-files-it-writes)).
 - `outDir`, `outExt` and [`moduleNames`](#generate.moduleNames) name the files, as for a run: `src/pgcast/schema.ts` with `".ts"` and `"pgcast"`.
 - The notes of a run come first, through [`warningListener`](#generate.warningListener), but for the placeholders it would write. A failed query ends it with code 1, as it ends a run.
+
+### `check()` {#export-check}
 
 `check()`, from `zapatos/generate`, runs the same check from code, for a script that builds its config there:
 
@@ -391,7 +394,7 @@ import type * as s from 'pgcast/schema';
 
 `boolean`, or left out; an opt-in. What a failed query does: a refused connection, a wrong password, a query Postgres refuses.
 
-- Left out, or `null`: as in Zapatos 6.6.1, the generator prints `*** error <n> ***` and the error with `console.log`, then ends the process with `process.exit(1)`; in between, it notes the option through [`warningListener`](#generate.warningListener). From 7.0, left out means `true` ([Versions](/versions)). [`check()`](#check), which Zapatos 6.6.1 doesn't have, reads it as `true` already, with no note.
+- Left out, or `null`: as in Zapatos 6.6.1, the generator prints `*** error <n> ***` and the error with `console.log`, then ends the process with `process.exit(1)`; in between, it notes the option through [`warningListener`](#generate.warningListener). From 7.0, left out means `true` ([Versions](/versions)). [`check()`](#export-check), which Zapatos 6.6.1 doesn't have, reads it as `true` already, with no note.
 - `false`: the same exit, with no note, from `generate()` and `check()` alike. It stays in 7.0 and 8.0: the exit is [the CLI](#cli)'s own path, and the CLI sets `false` over its config file and its argument.
 - `true`: rejects `generate()` or `check()` with that error, as `pg` gives it, and prints nothing:
 
@@ -547,7 +550,7 @@ ALTER TABLE films ADD COLUMN certificate certificate;
 
 ### `progressListener` {#generate.progressListener}
 
-`boolean`, or in `generate()` a function `(s: string) => void`; default `false`. `true` prints each step with `console.log`; a function gets each line. From [`check()`](#check), one line: `The generated files in src/zapatos are up to date.`
+`boolean`, or in `generate()` a function `(s: string) => void`; default `false`. `true` prints each step with `console.log`; a function gets each line. From [`check()`](#export-check), one line: `The generated files in src/zapatos are up to date.`
 
 ```txt
 (Re)creating schema folder: src/zapatos/schema.d.ts
@@ -571,7 +574,7 @@ Writing custom types file: src/zapatos/custom/index.d.ts
 - `Note: custom type "public"."index" (index) has the placeholder file index.d.ts in src/zapatos/custom, the file of the custom types' index: the generator writes the index over it on every run, so index is never declared. To declare it, rename it in the database, or give customTypesTransform a function that names it otherwise.`
   - once per run for the names whose placeholder is `custom/index.d.ts`: `index`, and, on a case-insensitive file system, a name that differs from it only in case (`Index`, `INDEX`), after the note above for those;
 - `Note: public.certificate is typed by the values of its CHECK as certificate in zapatos/schema (domainsTypedAsUnions), but its placeholder src/zapatos/custom/PgCertificate.d.ts, written before, still types its columns. To type them by the database, delete it: the next run writes it naming the union.`
-  - once per run for each placeholder on disk, with [`domainsTypedAsUnions`](#generate.domainsTypedAsUnions), that the run would write naming a union, while its text differs from what the run writes, in the order of the domains, after the notes on shared names; from [`check()`](#check) too;
+  - once per run for each placeholder on disk, with [`domainsTypedAsUnions`](#generate.domainsTypedAsUnions), that the run would write naming a union, while its text differs from what the run writes, in the order of the domains, after the notes on shared names; from [`check()`](#export-check) too;
   - in its place, for such a placeholder that names the union already, with an import of its own name that `zapatos/schema` also declares as a type, as 6.10.0 wrote it under [`customTypesTransform`](#generate.customTypesTransform) `'my_type'` ([#661](https://github.com/AlexandreDemartin/pgcast/issues/661)): `Note: rating.rating is typed by the values of its CHECK as rating.rating in zapatos/schema (domainsTypedAsUnions), and its placeholder src/zapatos/custom/rating.d.ts, written before, names it too, but imports rating from zapatos/schema, which also declares a type of that name, the placeholder's own: it fails to compile (TS2440). Delete it: the next run writes it naming the union with no import.`;
 - `Note: the include entry "Films" of schema "public" matches no relation there, so it generates nothing. Check its spelling and case, that the relation is in schema "public", and that the database role has a privilege on it: include names tables, views, materialised views and foreign tables.`
   - once per run for each entry of an [`include`](#generate.schemas) list that its schema doesn't have;
@@ -606,7 +609,7 @@ Writing custom types file: src/zapatos/custom/index.d.ts
   - from `generate()` without [`rejectOnQueryError`](#generate.rejectOnQueryError), when a query fails, after the error and just before the exit;
 - the [old layout warning](#the-old-layout-warning);
 - `Out of date: src/zapatos/schema.d.ts` and `Missing: src/zapatos/custom/PgSeat_label.d.ts`
-  - from [`check()`](#check), for each file that differs or is missing, after the notes of a run.
+  - from [`check()`](#export-check), for each file that differs or is missing, after the notes of a run.
 
 ### `debugListener` {#generate.debugListener}
 

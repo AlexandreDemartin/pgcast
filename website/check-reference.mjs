@@ -1,5 +1,5 @@
 // Copyright (C) 2026 Alexandre Demartin
-// Fails the docs build when an export of zapatos/db, or an option of its `Config` or of the generator's, has neither an
+// Fails the docs build when an export of zapatos/db or zapatos/generate, or an option of either Config, has neither an
 // entry in a Reference page nor a line in reference-pending.json (README.md § The reference). The names are read with
 // TypeScript from the built library's declarations, as a user's project resolves them. Run by `npm run docs:build`.
 import { existsSync, readFileSync } from 'node:fs';
@@ -39,6 +39,28 @@ for (const [prefix, file] of [['Config', dbFile], ['generate', generateFile]]) {
   }
 }
 
+// These generator exports have no separate reference entry. List names so that a new export needs its own entry.
+const generatorExceptions = new Set([
+  // Config is the Options section, with an entry per key. These types split it into required, optional and finalised keys.
+  'Config', 'RequiredConfig', 'OptionalConfig', 'CompleteConfig',
+  // Fills in the config defaults for generate() and check().
+  'finaliseConfig',
+  // Legacy export kept for callers since 3adada2f removed the package version from the generated header.
+  'moduleRoot',
+  // Reading the catalogue and assembling the generated TypeScript, and the intermediate data those steps exchange.
+  'EnumData', 'enumDataForSchema', 'enumTypesForEnumData', 'tsTypeForPgType', 'Relation', 'relationsInSchema',
+  'definitionForRelationInSchema', 'crossTableTypesForTables', 'crossSchemaTypesForAllTables', 'crossSchemaTypesForSchemas',
+  'CustomTypes', 'CustomTypeOrigins', 'tsForConfig',
+]);
+// These entries had dedicated anchors before generator exports were checked. Keep their published links.
+const
+  existingGeneratorAnchors = new Set(['generate', 'SchemaRules', 'ColumnOptions']),
+  generatorAnchor = name => existingGeneratorAnchors.has(name) && !names.has(name) ? name : `export-${name}`;
+for (const symbol of exportsOf(generateFile)) {
+  if (generatorExceptions.has(symbol.name)) continue;
+  names.set(generatorAnchor(symbol.name), declaredIn(symbol));
+}
+
 /**
  * The names `text` anchors: each heading that ends in `{#name}`, other attributes allowed (`{#name .since}`), outside
  * fenced code and HTML comments.
@@ -61,6 +83,10 @@ function anchorsOf(text) {
   }
   return anchors;
 }
+
+// An undocumented cli() must fail even when the reference has a CLI section.
+if (anchorsOf('## The CLI {#cli}').includes(generatorAnchor('cli')))
+  throw new Error('check-reference.mjs: The CLI heading counted as an entry for cli()');
 
 // A self-check: a heading after a ```md block that shows a ```ts line is an entry.
 if (!anchorsOf(`${earlyCloser}## \`insert()\` {#insert}`).includes('insert'))
