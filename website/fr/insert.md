@@ -1,5 +1,5 @@
 ---
-english: 271fffaf73ac
+english: a03ab6181521
 ---
 
 # Écritures
@@ -23,7 +23,7 @@ db.insert(table, values, options?)
 Insère une ligne ou plusieurs, et les renvoie telles que Postgres les a stockées, valeurs par défaut et serials remplis.
 
 - `table` : une table du schéma.
-- `values` : un `Insertable`, ou un tableau de ceux-ci. Un fragment `sql` est écrit comme SQL (`` db.sql`now()` ``), `db.Default` comme `DEFAULT` ; une valeur `undefined` est `NULL` ([Une valeur `undefined`](#undefined-values)).
+- `values` : un `Insertable`, ou un tableau de ceux-ci, `readonly` ou non. Un fragment `sql` est écrit comme SQL (`` db.sql`now()` ``), `db.Default` comme `DEFAULT` ; une valeur `undefined` est `NULL` ([Une valeur `undefined`](#undefined-values)).
   - `raw()`, `cols()` et `vals()` ne sont pas des valeurs ici : ils lèvent une erreur à la compilation, avant toute requête ([`raw()`](/fr/sql-template#raw) donne le message), et le type de pgcast les refuse, là où celui de Zapatos 6.6.1 les acceptait. Pour du SQL, écrivez un fragment `sql` ; dans un tableau ou un objet `jsonb`, ils font partie de la valeur, envoyée en JSON.
   - `db.parent()` lève "The 'parent' table alias has no meaning here"<!-- message --> : un `INSERT` n’a pas de requête parente. Le type le refuse.
   - À partir de la 6.10.0, un raccourci de lecture, `select()`, `selectOne()`, `selectExactlyOne()`, `count()`, `sum()`, `avg()`, `min()` ou `max()`, ou une `.copy()` de l’un d’eux, est une sous-requête : il est écrit entre parenthèses, `VALUES ($1, $2, (SELECT count(*) AS result FROM "ratings"))`<!-- probe: db.insert('ratings', { film_id: 1, stars: 5, votes: db.count('ratings', db.all) }) -->, dans `upsert()` et `update()` aussi. Il stocke ce qu’il donne comme valeur d’[`extras`](/fr/select#extras) : un agrégat sa valeur, les autres leur JSON, si bien que `selectOne()` avec `columns: ['title']` stocke `{"title": "The Salt Orchard"}` dans une colonne `text`. Sans aucune ligne, `select()` stocke `[]` et `count()` `0` ; `selectOne()`, `selectExactlyOne()`, `sum()`, `avg()`, `min()` et `max()` stockent `NULL`, et `selectExactlyOne()` ne lève pas d’erreur. Zapatos 6.6.1 l’écrivait sans parenthèses, ce que Postgres refusait (42601). Un raccourci d’écriture y est refusé avec ou sans parenthèses (42601) : Postgres ne l’exécute que dans un `WITH`.
