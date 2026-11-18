@@ -2805,6 +2805,21 @@ describe('cursor()', () => {
     });
   });
 
+  // a value checked, then read again, would be written unchecked
+  it.each<[string, (read: () => number) => unknown]>([
+    ['a getter', read => ({ get batchSize() { return read() === 1 ? 5 : '1 FROM x; DROP TABLE users; --'; } })],
+    ['a Proxy', read => new Proxy({}, { get: (_, key) => key === 'batchSize' ? (read() === 1 ? 5 : `5 FROM x; ${update}; --`) : undefined })],
+  ])('reads batchSize once, from %s that gives a number first and SQL after', async (_, options) => {
+    let reads = 0;
+    const { sent } = await sentFor(options(() => ++reads));
+    expect(sent).toEqual([
+      { text: 'DECLARE pgcast_cursor_1 NO SCROLL CURSOR FOR SELECT 1', values: [] },
+      { text: 'FETCH FORWARD 5 FROM pgcast_cursor_1', values: [] },
+      { text: 'CLOSE pgcast_cursor_1', values: [] },
+    ]);
+    expect(reads).toBe(1);
+  });
+
   describe.each([
     ['the default configuration', {}],
     ['castArrayParamsToJson', { castArrayParamsToJson: true }],
