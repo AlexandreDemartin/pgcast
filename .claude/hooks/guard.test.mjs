@@ -32,6 +32,24 @@ test('refuses publishing', () => {
   }
 });
 
+test('refuses pushing a tag, which starts release.yml', () => {
+  for (const command of [
+    'git push origin v6.11.0',
+    'git push origin refs/tags/v6.11.0',
+    'git push origin tag v6.11.0',
+    'git push --tags',
+    'git push --follow-tags origin master',
+    'git push origin +v6.11.0',
+    'git -C x push origin v7.0.0',
+    'cd x && git push origin v6.11.0',
+  ]) {
+    assert.ok(bash(command), command);
+  }
+  for (const command of ['git push origin docs/19-method', 'git push -u origin fix/12-v2-names', 'git tag -l "v*"']) {
+    assert.equal(bash(command), undefined, command);
+  }
+});
+
 test('refuses a PR that does not name the fork', () => {
   assert.ok(bash('gh pr create --draft --base master --title x'));
   assert.ok(bash('gh pr create --repo jawj/zapatos --base master'));

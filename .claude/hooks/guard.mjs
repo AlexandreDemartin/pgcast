@@ -48,6 +48,16 @@ const commandRefusals = [
     reason: 'Publishing is a mandatory stop point: the user publishes (AGENTS.md § Stop points).',
   },
   {
+    // a pushed `v*` tag starts release.yml, which publishes once the owner approves its deployment
+    refuses: command => {
+      const [subcommand, ...words] = gitWordsOf(command);
+      return subcommand === 'push' &&
+        words.some(word => /^--(tags|follow-tags|mirror)$/.test(word) || word === 'tag' ||
+          /^[+:]?(refs\/tags\/|v\d)/.test(word));
+    },
+    reason: 'A pushed `v*` tag starts release.yml: the owner pushes it, after the version PR (AGENTS.md § Stop points, docs/WORKFLOW.md § Releases).',
+  },
+  {
     refuses: command => /^gh\s+pr\s+create\b/.test(command) && !new RegExp(`(--repo|-R)[ =]${fork}\\b`).test(command),
     reason: `A PR targets the fork only: \`gh pr create --repo ${fork} --base master …\`, never jawj/zapatos (agent builder § The PR).`,
   },
