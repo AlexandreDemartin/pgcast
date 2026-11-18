@@ -125,6 +125,11 @@ Candidates for a check, a rule or a skill line.
 - #740 — A pronoun in a race claim ("it books five") can carry a wrong subject: log each participant's result, not only the total, and reread the sentence against them — branch-reviewer
 - #740 — At SERIALIZABLE a unique violation becomes a 40001 only if the transaction had read the key: a real 40001 inside a savepoint takes a write skew, not a duplicate key — branch-reviewer
 - #740 — A reference passage copied into a guide drops its conditions; a guide that links the entry, one clause per rule, keeps them by construction — builder
+- #742 — A script with no exports needs its logic moved into a module before it can have "its own test": move it in a commit of its own, before the red tests, so the proof reads clearly — builder
+- #742 — A word-count limit test counts the frontmatter's words too — builder
+- #742 — A test of paths under `os.tmpdir()` strips the exact folder it made, not a pattern: `TMPDIR` comes from the environment, and `/\d+/` matches `/1000/` — branch-reviewer
+- #742 — A size-limit test needs a passing case at exactly the limit beside the failing one past it, or a `>` → `>=` mutant survives — branch-reviewer
+- #742 — A fixture sized to a limit is measured with the module's own counter before the test is written — builder
 
 ## Minors kept
 
@@ -144,4 +149,4 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #728 — form: `website/fr/transaction.md:351` "dont le callback est rejeté": a callback is not rejected, its promise is ("dont le callback échoue") — branch-reviewer
 - #728 — defect: `advisoryXactLock()`'s `instanceof pg.Pool` misses a `pg.native.Pool` and a pool of a second copy of `pg` (not run) — branch-reviewer
 - #730 — defect: three DEFERRABLE and isolation-level integration tests timed out at 5 s with other suites on the server, and passed alone (a flaky timeout to watch) — builder
-
+- #742 — check:agents does not check that a SKILL.md's `reference.md § X` names an existing heading, that a linked reference.md exists, that a reference.md is still named by its SKILL.md, nor other .md files in a skill folder; the README line "the core names each section with when to read it" relies on it — branch-reviewer
