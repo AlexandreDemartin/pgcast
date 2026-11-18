@@ -23,6 +23,16 @@ describe('shortcuts', () => {
     }).run(queryable),
   });
 
+  it('insert() sends 65,535 values, the most Postgres takes in one query, as pg does', async () => {
+    const rows = Array.from({ length: 65_535 / 3 }, (_, i) => ({ country: 'MX', code: String(i), name: 'n' }));
+    const inserted = async (q: db.QueryableLike) => {
+      try { return (await db.insert('orgs', rows).run(q)).length; }
+      finally { await db.deletes('orgs', { country: 'MX' }).run(q); }
+    };
+    expect(await inserted(u.pool())).toBe(await inserted(u.t.client));
+    expect(await inserted(u.pool())).toBe(21_845);
+  }, 30_000);
+
   it('insert(), upsert(), count() and select() with a lateral give what they give on pg', async () => {
     const viaAdapter = await scenario(u.pool(), 'PL');
     expect(shape(viaAdapter)).toEqual(shape(await scenario(u.t.client, 'PL')));
@@ -103,6 +113,33 @@ describe('prepared queries', () => {
     expect(await refused(u.pool())).toEqual(['ran', 'Prepared statements must be unique - \'taken\' was used for a different statement', '42601']);
   });
 
+  it('runs a query under an empty name unnamed, as pg does, never as the unnamed statement another query left', async () => {
+    const scenario = async (q: db.QueryableLike) => {
+      await db.sql`INSERT INTO orgs (country, code, name) VALUES ('EN', '5', 'five'), ('EN', '7', 'seven')`.run(q);
+      const pick = (code: string) => db.sql`SELECT code, name FROM orgs WHERE country = 'EN' AND code = ${db.param(code)}`.prepared('');
+      try {
+        return {
+          picked: await pick('5').run(q),
+          deleted: await db.sql`DELETE FROM orgs WHERE country = 'EN' AND code = ${db.param('5')} RETURNING code`.run(q),
+          again: await pick('7').run(q),
+          left: await db.sql`SELECT code FROM orgs WHERE country = 'EN'`.run(q),
+        };
+      } finally { await db.sql`DELETE FROM orgs WHERE country = 'EN'`.run(q); }
+    };
+    const viaAdapter = await scenario(u.pool());
+    expect(viaAdapter).toEqual(await scenario(u.t.client));
+    expect(viaAdapter).toEqual({ picked: [{ code: '5', name: 'five' }], deleted: [{ code: '5' }], again: [{ code: '7', name: 'seven' }], left: [{ code: '7' }] });
+  });
+
+  it('runs another text under an empty name, as pg does', async () => {
+    const both = async (q: { query: (q: any) => Promise<{ rows: any[] }> }) => [
+      (await q.query({ text: 'SELECT 1 AS a', values: [], name: '' })).rows,
+      (await q.query({ text: 'SELECT 2 AS a', values: [], name: '' })).rows,
+    ];
+    expect(await both(u.pool())).toEqual(await both(u.t.client));
+    expect(await both(u.pool())).toEqual([[{ a: 1 }], [{ a: 2 }]]);
+  });
+
   it('prepares a name once for queries sent at the same moment', async () => {
     const same = () => u.pool().query({ text: 'SELECT $1::int AS n', values: [6], name: 'at_once' });
     expect((await Promise.all([same(), same(), same()])).map(r => r.rows)).toEqual([[{ n: 6 }], [{ n: 6 }], [{ n: 6 }]]);
@@ -124,6 +161,31 @@ describe('prepared queries', () => {
     const viaAdapter = await after(u.pool());
     expect(viaAdapter).toBe(await after(u.t.client));
     expect(viaAdapter).toBe('26000');
+  });
+});
+
+describe('COPY FROM STDIN', () => {
+  // a PGlite of its own, which the COPY would stop if left unanswered
+  const copied = async (query: { text: string; values: any[]; name?: string }) => {
+    const pglite = await PGlite.create(), pool = asPool(pglite);
+    try {
+      await pool.query({ text: 'CREATE TABLE copied (a int)', values: [] });
+      return [await pool.query(query).then(() => 'ran', (e: any) => e.code), (await pool.query({ text: 'SELECT count(*)::int AS n FROM copied', values: [] })).rows];
+    } finally { await pglite.close(); }
+  };
+
+  it('is refused with 57014, as pg refuses it with no stream to send, and the next query runs', async () => {
+    const query = { text: 'COPY copied FROM STDIN', values: [] }, pg = await u.t.pool.connect();
+    try {
+      await pg.query('CREATE TEMP TABLE copied (a int)');
+      expect(await copied(query)).toEqual([await pg.query(query).then(() => 'ran', (e: any) => e.code), (await pg.query('SELECT count(*)::int AS n FROM copied')).rows]);
+    } finally { pg.release(); }
+    expect(await copied(query)).toEqual(['57014', [{ n: 0 }]]);
+  });
+
+  // pg's own next query waits forever there: Postgres ignores its Sync during the COPY, and so waits for another
+  it('is refused with 57014 under a name, by the extended protocol, and the next query runs', async () => {
+    expect(await copied({ text: 'COPY copied FROM STDIN', values: [], name: 'copy_in' })).toEqual(['57014', [{ n: 0 }]]);
   });
 });
 
@@ -154,6 +216,14 @@ describe('the PGlite', () => {
     await expect(pool.query({ text: 'SELECT 1', values: [] })).rejects.toThrow('PGlite is closed');
   });
 
+  // a query sent as close() begins: PGlite 0.5.13 runs it first; 0.5.0 and 0.5.5 close first, and give it no result
+  it('rejects a query it closes before running, or runs it', async () => {
+    const pglite = await PGlite.create(), pool = asPool(pglite);
+    const closed = pglite.close(), query = pool.query({ text: 'SELECT 1 AS a', values: [] }).then(r => r.rows, (e: Error) => e.message);
+    await closed;
+    expect([[{ a: 1 }], 'PGlite gave no result: was it closed while the query waited?']).toContainEqual(await query);
+  });
+
   it('is shared with its own queries, run at the same moment, which never land between the adapter\'s messages', async () => {
     const own = Array.from({ length: 20 }, (_, i) => u.pglite().query<{ n: number }>('SELECT $1::int AS n', [i]).then(r => r.rows[0].n));
     const adapter = Array.from({ length: 20 }, (_, i) => i % 2 ?
@@ -174,9 +244,11 @@ describe('the PGlite', () => {
 });
 
 describe('asPool()', () => {
-  it('refuses a PGlite transaction, and an object with no execProtocol() and runExclusive()', async () => {
+  it('refuses a PGlite transaction, and an object with no execProtocol() or no runExclusive()', async () => {
     const message = new Error("asPool() needs a PGlite with execProtocol() and runExclusive(), to send each query as pg sends it on its one connection: give it the PGlite that PGlite.create() or new PGlite() returns, not a transaction's");
     await u.pglite().transaction(async tx => { expect(() => asPool(tx as never)).toThrow(message); });
     expect(() => asPool({} as never)).toThrow(message);
+    expect(() => asPool({ execProtocol: async () => ({ messages: [] }) } as never)).toThrow(message);
+    expect(() => asPool({ runExclusive: async () => undefined } as never)).toThrow(message);
   });
 });

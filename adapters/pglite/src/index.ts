@@ -44,10 +44,14 @@ export interface PGlitePool {
 // (https://github.com/brianc/node-postgres/blob/pg%408.23.1/packages/pg/lib/utils.js), MIT licence,
 // Copyright (c) 2010 - 2021 Brian Carlson: see LICENCE file. Left out: pg.defaults.parseInputDatesAsUTC, false by default,
 // and the deprecation notice for an invalid Date, which is sent as pg sends it. Node's built-ins are left out too, so
-// that it runs in a page: util.types.isDate() is the tag check below, a Buffer an ArrayBuffer view, sent as its bytes.
+// that it runs in a page: util.types.isDate() is the getTime() check below, a Buffer an ArrayBuffer view, sent as its bytes.
+
+// a Date of any realm, whatever its Symbol.toStringTag: getTime() throws on anything else
+function isDate(v: unknown) {
+  try { Date.prototype.getTime.call(v); return true; } catch { return false; }
+}
 
 const
-  isDate = (v: unknown) => Object.prototype.toString.call(v) === '[object Date]',
   bytesOf = (v: ArrayBufferView) => new Uint8Array(v.buffer, v.byteOffset, v.byteLength),
   hexOf = (bytes: Uint8Array) => Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
 
@@ -148,17 +152,24 @@ const
   parseMessage = (name: string, text: string) => message('P', cstring(name), cstring(text), int16(0)),  // types left to Postgres
   describePortal = message('D', new Uint8Array([0x50]), cstring('')),
   executePortal = message('E', cstring(''), int32(0)),
-  sync = message('S');
+  sync = message('S'),
+  // pg's answer to a COPY FROM STDIN, sent ahead as there is no reply to wait for: Postgres ignores it after any other
+  // statement, and gives 57014 for the COPY, which would otherwise wait for its data and stop PGlite's Postgres
+  copyFail = message('f', cstring('No source stream defined'));
 
-// each value in text, or in binary for its bytes, as pg's Bind sends them; the columns all in text
+// each value in text, or in binary for its bytes, as pg's Bind sends them; the columns all in text. The parts go in
+// one array, as a spread of up to 65,535 values would pass the most arguments a call takes
 function bindMessage(name: string, values: (string | Uint8Array | null)[]) {
-  const formats: Uint8Array[] = [], parameters: Uint8Array[] = [];
+  const parts: Uint8Array[] = [cstring(''), cstring(name), int16(values.length)];
+  for (const value of values) parts.push(int16(value instanceof Uint8Array ? 1 : 0));
+  parts.push(int16(values.length));
   for (const value of values) {
     const bytes = typeof value === 'string' ? encoder.encode(value) : value;
-    formats.push(int16(value instanceof Uint8Array ? 1 : 0));
-    parameters.push(...bytes === null ? [int32(-1)] : [int32(bytes.length), bytes]);
+    if (bytes === null) parts.push(int32(-1));
+    else parts.push(int32(bytes.length), bytes);
   }
-  return message('B', cstring(''), cstring(name), int16(values.length), ...formats, int16(values.length), ...parameters, int16(0));
+  parts.push(int16(0));
+  return message('B', concat(parts));
 }
 
 /* === results, as pg reads them === */
@@ -223,13 +234,14 @@ export function asPool(pglite: PGliteLike): PGlitePool {
   if (typeof pglite?.execProtocol !== 'function' || typeof pglite.runExclusive !== 'function') throw new Error('asPool() needs a PGlite with execProtocol() and runExclusive(), to send each query as pg sends it on its one connection: give it the PGlite that PGlite.create() or new PGlite() returns, not a transaction\'s');
   const state = stateOf(pglite);
 
-  const run = async ({ text, values = [], name }: PGliteQuery): Promise<PGliteResult> => {
+  const run = async ({ text, values = [], name: given }: PGliteQuery): Promise<PGliteResult> => {
+    const name = given || undefined;  // an empty name is unnamed, as pg tests it for truth
     // PGlite's own query() says so, where execProtocol() of a closed PGlite throws a TypeError, or blocks on 0.5.5
     if (pglite.closed) throw new Error('PGlite is closed');
     await pglite.waitReady;
 
     // pg sends a query with no value and no name as a simple Query, which may hold several statements
-    if (values.length === 0 && name == null) return resultOf(await send(queryMessage(text)));
+    if (values.length === 0 && name == null) return resultOf(await send(concat([queryMessage(text), copyFail])));
 
     const parameters = values.map(v => prepareValue(v));
     return pglite.runExclusive(async () => {
@@ -242,15 +254,16 @@ export function asPool(pglite: PGliteLike): PGlitePool {
         state.prepared.set(name, text);
       }
       const parse = name == null ? [parseMessage('', text)] : [];
-      return resultOf((await pglite.execProtocol(concat([...parse, bindMessage(name ?? '', parameters), describePortal, executePortal, sync]))).messages);
+      return resultOf((await pglite.execProtocol(concat([...parse, bindMessage(name ?? '', parameters), describePortal, executePortal, copyFail, sync]))).messages);
     });
   };
 
   const send = async (bytes: Uint8Array) => (await pglite.runExclusive(() => pglite.execProtocol(bytes))).messages;
 
-  // several statements give an array of results, as with pg
+  // several statements give an array of results, as with pg; none, a PGlite closing as the query was sent (0.5.0, 0.5.5)
   const resultOf = (messages: Message[]) => {
     const results = resultsOf(messages);
+    if (results.length === 0) throw new Error('PGlite gave no result: was it closed while the query waited?');
     return results.length === 1 ? results[0] : results as unknown as PGliteResult;
   };
 
