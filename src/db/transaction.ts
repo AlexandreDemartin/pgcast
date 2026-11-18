@@ -605,12 +605,13 @@ const iteratedAfter = 'cursor() was iterated after its transaction ended, so its
  *
  * - Each non-empty batch goes through `query.runResultTransform`: a `select()`
  *   passed as is reads its one `jsonb_agg` row, so one batch, the whole array.
- * - A `break`, a `return` or a throw in the loop sends `CLOSE`, and a throw
- *   goes out as it is. A query of its own that rejects, or a client that `pg`
- *   reports aborted, sends no `CLOSE`, which Postgres would refuse (25P02):
- *   the error goes out unchanged, and `transaction()` retries a 40001 or
- *   40P01. A generator left unfinished leaves its cursor to `COMMIT` or
- *   `ROLLBACK`, and its number taken on this client.
+ * - A `break`, a `return`, a throw in the loop or a `runResultTransform` that
+ *   throws sends `CLOSE`, and a throw goes out as it is. A query of its own
+ *   that rejects, or a client that `pg` reports aborted (the status it last
+ *   received), sends no `CLOSE`, which Postgres would refuse (25P02): the
+ *   error goes out unchanged, and `transaction()` retries a 40001 or 40P01.
+ *   A generator left unfinished leaves its cursor to `COMMIT` or `ROLLBACK`,
+ *   and its number taken on this client.
  * - A prepared fragment runs unprepared: the `DECLARE`'s text changes with
  *   `<n>`, and `pg` refuses a second text under one name.
  * - A cursor whose own `FETCH` fails inside a `savepoint()` it was declared
