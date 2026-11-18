@@ -612,7 +612,9 @@ const iteratedAfter = 'cursor() was iterated after its transaction ended, so its
  *   error goes out unchanged, and `transaction()` retries a 40001 or 40P01.
  *   A `CLOSE` sent after a query of the loop failed, before `pg` received the
  *   status, or on a driver that reports none, gets 25P02, which is dropped:
- *   no 25P02 of `CLOSE`'s replaces the loop's error.
+ *   no 25P02 of `CLOSE`'s replaces the loop's error. A client that `pg`
+ *   reports outside a transaction block, after a `COMMIT` of yours, sends no
+ *   `CLOSE` either: its cursor went with the transaction.
  *   A generator left unfinished leaves its cursor to `COMMIT` or `ROLLBACK`,
  *   and its number taken on this client.
  * - A prepared fragment runs unprepared: the `DECLARE`'s text changes with
@@ -690,9 +692,10 @@ async function* cursorBatches<RunResult>(
 
   } finally {
     try {
+      const status = transactionStatus(txnClient as pg.ClientBase);  // I after a COMMIT of yours, whose cursors went with it (34000)
       // pg reads the status E at the ReadyForQuery after an ErrorResponse, often a chunk later, so a CLOSE can still go
       // out after a query of the loop failed: Postgres's 25P02 for it is dropped, or it would replace that query's error
-      if (declared && !rejected && !ended() && transactionStatus(txnClient as pg.ClientBase) !== 'E') await sql`CLOSE ${name}`.run(txnClient).catch((err: unknown) => {
+      if (declared && !rejected && !ended() && status !== 'E' && status !== 'I') await sql`CLOSE ${name}`.run(txnClient).catch((err: unknown) => {
         if (!isDatabaseError(err, 'InvalidTransactionState_InFailedSqlTransaction')) throw err;
       });
     } finally {
