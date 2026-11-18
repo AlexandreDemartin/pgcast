@@ -419,6 +419,12 @@ Candidates for a check, a rule or a skill line.
 - #677: a message that quotes `` sql`${…}` `` fails lint's `no-template-curly-in-string` and the docs check: write the advice as plain SQL.
 - #681: below TS 5.5, a declaration that names a table by module starts with `/// <reference path>` to its project's `schema.d.ts`, which joins the reader's compilation: replay a claim about types across projects with and without an `s` import in the writer.
 - #681: a docs table's cell holds the type the reader gets, one short example at most; the why goes in a bullet under it.
+- #682: a weak guard inside a lookup by table (`{ [K in Table]: X<K> & G }[T]`) keeps generic spread forwarders, where `X<T> & G` loses them: TypeScript relates `X<T>` to the lookup table by table.
+- #682: a union target with no table (`and()`, `db.SQL`) cannot take that lookup: there the guard fails `Object.assign` forwarders on 5.9 and 7, and spreads on 4.1.6.
+- #682: an inline array literal and a variable of the same type resolve to different overloads, and a `readonly` array to neither: test all three when a guard moves calls between overloads.
+- #682: an unexported lookup is spelled out per table in a consumer's emitted `.d.ts`: measure it on a schema of about 100 tables.
+- #682: probe `keyof Parameters<…>` and each member of an exported options type, not only the named lookups.
+- #682: a `{{` in inline code breaks the VitePress build (Vue reads a mustache), in `CHANGELOG.md` too: use `<code v-pre>` in pages.
 
 ## Minors kept
 
