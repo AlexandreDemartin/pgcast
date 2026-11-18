@@ -1,5 +1,5 @@
 ---
-english: 105c829ce849
+english: cb715aebf4ed
 ---
 
 # Transactions
@@ -467,7 +467,7 @@ Comment elle se termine :
 | le dernier batch est lu, ou la boucle fait `break` ou `return` | `CLOSE` | |
 | la boucle lève une erreur | `CLOSE` | l’erreur de la boucle sort, quoi que donne `CLOSE` |
 | le `runResultTransform` du fragment lève une erreur | `CLOSE` | son erreur sort |
-| une requête de la boucle échoue, sur `pg` | pas de `CLOSE`, que Postgres refuserait dans la transaction annulée (25P02) | l’erreur de cette requête sort. Un client qui n’indique aucun statut, celui d’un autre driver, envoie `CLOSE` : son 25P02 est ignoré quand la boucle a levé une erreur, mais rejette un `break` après une erreur que la boucle a interceptée |
+| une requête de la boucle échoue, sur `pg` | pas de `CLOSE`, que Postgres refuserait dans la transaction annulée (25P02) | l’erreur de cette requête sort. Ce statut est le dernier reçu par `pg`, et il peut arriver juste après l’erreur : un `CLOSE` peut alors encore partir, et son 25P02 est ignoré. Un client qui n’indique aucun statut, celui d’un autre driver, envoie `CLOSE` : son 25P02 est ignoré quand la boucle a levé une erreur, mais rejette un `break` après une erreur que la boucle a interceptée |
 | un `FETCH` échoue : une ligne dont le calcul échoue (22012), un 40001 détecté en cours de route | pas de `CLOSE` | son erreur sort inchangée ; `transaction()` réessaie un 40001 ou un 40P01, et la tentative suivante relit chaque batch |
 | le générateur est abandonné, ni terminé ni arrêté par `return()` | rien | Postgres ferme le curseur au `COMMIT` ou au `ROLLBACK` ; son numéro reste pris sur ce client |
 

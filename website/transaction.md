@@ -463,7 +463,7 @@ How it ends:
 | the last batch is read, or the loop `break`s or `return`s | `CLOSE` | |
 | the loop throws | `CLOSE` | the loop's error goes out, whatever `CLOSE` gives |
 | the fragment's `runResultTransform` throws | `CLOSE` | its error goes out |
-| a query of the loop fails, on `pg` | no `CLOSE`, which Postgres would refuse in the aborted transaction (25P02) | that query's error goes out. A client that reports no status, another driver's, sends `CLOSE`: its 25P02 is dropped when the loop threw, but rejects a `break` after an error the loop caught |
+| a query of the loop fails, on `pg` | no `CLOSE`, which Postgres would refuse in the aborted transaction (25P02) | that query's error goes out. The status is the last one `pg` received, which can come just after the error: a `CLOSE` can then still go out, and its 25P02 is dropped. A client that reports no status, another driver's, sends `CLOSE`: its 25P02 is dropped when the loop threw, but rejects a `break` after an error the loop caught |
 | a `FETCH` fails: a row whose computation fails (22012), a 40001 found mid-way | no `CLOSE` | its error goes out unchanged; `transaction()` retries a 40001 or 40P01, and the next attempt reads every batch again |
 | the generator is left, neither finished nor `return()`ed | nothing | Postgres closes the cursor at `COMMIT` or `ROLLBACK`; its number stays taken on that client |
 
