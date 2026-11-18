@@ -108,6 +108,25 @@ describe('likeAny() and ilikeAny()', () => {
     db.select('users', { mood: c.ilikeAny(['ok']) });
   });
 
+  test('type their patterns string on a column narrowed further, where like() keeps its literal: `as const` keeps them', () => {
+    // a Whereable's key as generated for a column whose placeholder is narrowed, PgEmail = `${string}@${string}`
+    type Email = `${string}@${string}`;
+    const where = (_: { email?: Email | db.Parameter<Email> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, Email | db.Parameter<Email> | db.SQLFragment | db.ParentColumn> }) => {};
+    where({ email: c.like('%@example.com') });
+    where({ email: c.likeAny(['%@example.com', '%@example.org'] as const) });
+    where({ email: c.ilikeAny(['%@example.com'] as const) });
+    // @ts-expect-error the patterns typed string, as an array not written `as const`
+    where({ email: c.likeAny(['%@example.com']) });
+    // @ts-expect-error the patterns typed string, as an array not written `as const`
+    where({ email: c.ilikeAny(['%@example.com']) });
+    // @ts-expect-error a pattern the narrowed type refuses, `as const` or not, as like() refuses it
+    where({ email: c.likeAny(['nobody'] as const) });
+    // @ts-expect-error a pattern the narrowed type refuses, as in likeAny()
+    where({ email: c.like('nobody') });
+    // characterization: on an enum column too, a label `as const` compiles, which Postgres refuses (42883), as like('ok')
+    db.select('users', { mood: c.likeAny(['ok'] as const) });
+  });
+
   test('refuse a number column, an item that is no string, one pattern, and a list that is not an array', () => {
     // @ts-expect-error an int column
     db.select('users', { id: c.ilikeAny(['1%']) });
