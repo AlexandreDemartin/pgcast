@@ -103,6 +103,33 @@ describe('prepared queries', () => {
     expect(await refused(u.pool())).toEqual(['ran', 'Prepared statements must be unique - \'taken\' was used for a different statement', '42601']);
   });
 
+  it('runs a query under an empty name unnamed, as pg does, never as the unnamed statement another query left', async () => {
+    const scenario = async (q: db.QueryableLike) => {
+      await db.sql`INSERT INTO orgs (country, code, name) VALUES ('EN', '5', 'five'), ('EN', '7', 'seven')`.run(q);
+      const pick = (code: string) => db.sql`SELECT code, name FROM orgs WHERE country = 'EN' AND code = ${db.param(code)}`.prepared('');
+      try {
+        return {
+          picked: await pick('5').run(q),
+          deleted: await db.sql`DELETE FROM orgs WHERE country = 'EN' AND code = ${db.param('5')} RETURNING code`.run(q),
+          again: await pick('7').run(q),
+          left: await db.sql`SELECT code FROM orgs WHERE country = 'EN'`.run(q),
+        };
+      } finally { await db.sql`DELETE FROM orgs WHERE country = 'EN'`.run(q); }
+    };
+    const viaAdapter = await scenario(u.pool());
+    expect(viaAdapter).toEqual(await scenario(u.t.client));
+    expect(viaAdapter).toEqual({ picked: [{ code: '5', name: 'five' }], deleted: [{ code: '5' }], again: [{ code: '7', name: 'seven' }], left: [{ code: '7' }] });
+  });
+
+  it('runs another text under an empty name, as pg does', async () => {
+    const both = async (q: { query: (q: any) => Promise<{ rows: any[] }> }) => [
+      (await q.query({ text: 'SELECT 1 AS a', values: [], name: '' })).rows,
+      (await q.query({ text: 'SELECT 2 AS a', values: [], name: '' })).rows,
+    ];
+    expect(await both(u.pool())).toEqual(await both(u.t.client));
+    expect(await both(u.pool())).toEqual([[{ a: 1 }], [{ a: 2 }]]);
+  });
+
   it('prepares a name once for queries sent at the same moment', async () => {
     const same = () => u.pool().query({ text: 'SELECT $1::int AS n', values: [6], name: 'at_once' });
     expect((await Promise.all([same(), same(), same()])).map(r => r.rows)).toEqual([[{ n: 6 }], [{ n: 6 }], [{ n: 6 }]]);
