@@ -29,6 +29,16 @@ describe('getConfig() and setConfig()', () => {
     // @ts-expect-error retries is no key of the config
     db.setConfig({}).retries;
   });
+
+  test('Config has the keys of Zapatos 6.6.1, then those pgcast adds', () => {
+    expectTypeOf<keyof db.Config>().toEqualTypeOf<
+      | 'transactionAttemptsMax' | 'transactionRetryDelay' | 'castArrayParamsToJson' | 'castObjectParamsToJson'
+      | 'queryListener' | 'resultListener' | 'transactionListener'
+      | 'upsertRequiresSameKeys' | 'undefinedMeansMissing' | 'transactionRequiresCommit' | 'transactionRequiresIdleClient'
+      | 'transactionRequiresSatisfyingLevel' | 'selectExactlyOneChecksForSecondRow' | 'aggregatesTypedByColumn'
+      | 'transactionEventListener'
+    >();
+  });
 });
 
 // #725: the events of transaction()'s retries, beside the messages of Zapatos 6.6.1's transactionListener
