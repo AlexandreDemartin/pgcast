@@ -162,11 +162,11 @@ describe('asPool()', () => {
     try { expect(() => asPool(reserved as unknown as PostgresJsSql)).toThrow(refused); } finally { reserved.release(); }
   });
 
-  it('refuses a sql whose transform renames columns or rows, which Selectable would not name', () => {
+  it('refuses a sql whose transform renames columns or rows, which Selectable would not name, or changes values, which raw rows skip', () => {
     const url = urlForDatabase(inject('pgcastDb')!.url, u.t.name);
-    for (const transform of [postgres.camel, { row: { from: (row: unknown) => row } }]) {
+    for (const transform of [postgres.camel, { row: { from: (row: unknown) => row } }, { value: { from: (value: unknown) => value } }]) {
       const sql = postgres(url, { transform });
-      expect(() => asPool(sql)).toThrow('asPool() needs a postgres.js sql with no column or row transform');
+      expect(() => asPool(sql)).toThrow('asPool() needs a postgres.js sql with no column, value or row transform');
       void sql.end();
     }
   });
