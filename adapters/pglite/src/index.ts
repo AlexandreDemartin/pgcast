@@ -37,10 +37,14 @@ export interface PGlitePool {
 // (https://github.com/brianc/node-postgres/blob/pg%408.23.1/packages/pg/lib/utils.js), MIT licence,
 // Copyright (c) 2010 - 2021 Brian Carlson: see LICENCE file. Left out: pg.defaults.parseInputDatesAsUTC, false by default,
 // and the deprecation notice for an invalid Date, which is sent as pg sends it. Node's built-ins are left out too, so
-// that it runs in a page: util.types.isDate() is the tag check below, a Buffer an ArrayBuffer view, sent as its bytes.
+// that it runs in a page: util.types.isDate() is the getTime() check below, a Buffer an ArrayBuffer view, sent as its bytes.
+
+// a Date of any realm, whatever its Symbol.toStringTag: getTime() throws on anything else
+function isDate(v: unknown) {
+  try { Date.prototype.getTime.call(v); return true; } catch { return false; }
+}
 
 const
-  isDate = (v: unknown) => Object.prototype.toString.call(v) === '[object Date]',
   bytesOf = (v: ArrayBufferView) => new Uint8Array(v.buffer, v.byteOffset, v.byteLength),
   hexOf = (bytes: Uint8Array) => Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
 
