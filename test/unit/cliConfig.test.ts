@@ -126,6 +126,11 @@ describe('cliConfig()', () => {
 // the CLI's arguments (#556): --check anywhere, then the first other argument as the JSON, as Zapatos 6.6.1 reads
 // process.argv[2]; a later one ignored, as there, a flag among them returned to be noted
 describe('cliArgs()', () => {
+  it('skips a bare -- forwarded by pnpm', () => {
+    expect(cliArgs(['--', '--check'])).toEqual({ check: true, argsJSON: undefined, ignoredFlags: [] });
+    expect(cliArgs(['{}', '--', '--chek'])).toEqual({ check: false, argsJSON: '{}', ignoredFlags: ['--chek'] });
+  });
+
   it('takes the JSON argument alone, or none, as Zapatos 6.6.1 does', () => {
     expect(cliArgs([])).toEqual({ check: false, argsJSON: undefined, ignoredFlags: [] });
     expect(cliArgs(['{"outDir": "./src"}'])).toEqual({ check: false, argsJSON: '{"outDir": "./src"}', ignoredFlags: [] });

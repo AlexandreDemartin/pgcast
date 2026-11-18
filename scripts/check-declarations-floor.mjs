@@ -6,7 +6,7 @@
 // consumer on 4.1 compiles against them and the fixture's generated schema, with `skipLibCheck` as website/install.md
 // asks below 5.7. A lib check of the package's own declarations then fails on any error but `Buffer<ArrayBuffer>`
 // (install.md): under `skipLibCheck`, a name 4.1 does not know (`Awaited`) becomes `any` and nothing fails. TypeScript
-// 4.1.6 and the `@types` made for it, with `pg-protocol`, which `@types/pg` asks for as `*`, are pinned and fetched once
+// 4.1.6 and the `@types` made for it, with `pg-protocol` and `pg-types`, which `@types/pg` asks for by range, are pinned and fetched once
 // into node_modules/.cache/pgcast-ts41, never a dependency. With a directory argument, it checks that unpacked package
 // instead (a release's `package/`).
 import {spawnSync} from 'node:child_process';
@@ -18,7 +18,7 @@ import {fileURLToPath} from 'node:url';
 const
   root = fileURLToPath(new URL('..', import.meta.url)),
   floor = '4.1',
-  tools = {'typescript': '4.1.6', '@types/node': '14.18.63', '@types/pg': '8.6.6', 'pg-protocol': '1.16.1'},
+  tools = {'typescript': '4.1.6', '@types/node': '14.18.63', '@types/pg': '8.6.6', 'pg-protocol': '1.16.1', 'pg-types': '2.2.0'},
   cache = join(root, 'node_modules/.cache/pgcast-ts41'),
   pkg = join(cache, 'node_modules/zapatos'),
   consumer = join(cache, 'consumer'),

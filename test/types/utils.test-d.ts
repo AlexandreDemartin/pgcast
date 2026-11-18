@@ -6,7 +6,7 @@
 // an `any` that lets every lock through. ./tsconfig.json maps the path to the declarations of src/db.
 
 import { describe, expectTypeOf, test } from 'vitest';
-import type { NoInfer } from 'zapatos/dist/db/utils';
+import { callerValue, type NoInfer } from 'zapatos/dist/db/utils';
 
 describe('NoInfer of zapatos/dist/db/utils', () => {
   test('is its argument, and T is not inferred from it', () => {
@@ -17,4 +17,11 @@ describe('NoInfer of zapatos/dist/db/utils', () => {
     // @ts-expect-error 'c' is not one of the options: T is inferred from them alone
     choose(['a', 'b'], 'c');
   });
+});
+
+test('callerValue reads a declared key and keeps its value type', () => {
+  const options = { alias: 'outer' };
+  expectTypeOf(callerValue(options, 'alias')).toEqualTypeOf<string | undefined>();
+  // @ts-expect-error the options have no such key
+  callerValue(options, 'alais');
 });

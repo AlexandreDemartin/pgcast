@@ -215,6 +215,9 @@ Candidates for a check, a rule or a skill line.
 - #754 — Probe a const-asserted literal both inline and through a variable before documenting whether an overload accepts it: the compiler treats them differently — codex
 - #754 — When replacing `jsonbPathExists(path, vars)` with `jsonb_path_exists_tz`, bind the same variables as its third SQL argument, or Postgres raises 42704 — codex
 - #754 — A docs claim about how TypeScript treats `as const` changes with the compiler (inline compiles from 5.4); cut such a claim rather than list versions — orchestrator
+- #755 — Compile an internal option reader against the generated fixture as well as the stub schema: only the fixture exposed the disjoint upsert column keys — codex
+- #755 — A reference check that matches an export by any heading of the same name passes on a colliding ordinary heading ("The CLI"); require an anchor dedicated to the export — codex
+- #755 — Probe both initial list lengths when a condition chooses its SQL at construction and reads its values at compilation: an `isIn([])` that later gets `db.all` compiles to `((false))` — codex
 
 ## Minors kept
 
