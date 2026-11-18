@@ -17,8 +17,8 @@ const t = useTestDatabase();
 afterEach(resetConfig);
 
 // runtime behaviour only: the types (stub schema here) are step 1.4's
-const run = (q: db.SQLFragment<any>): Promise<any> => q.run(t.client);
-const fails = (q: db.SQLFragment<any>) => pgError(t.client, () => q.run(t.client));
+const run = (q: db.SQLFragment<any, any>): Promise<any> => q.run(t.client);
+const fails = (q: db.SQLFragment<any, any>) => pgError(t.client, () => q.run(t.client));
 const scalar = async (text: string) => (await t.client.query(text)).rows[0].v;
 /** RETURNING without ORDER BY gives no order: rows sorted by `key` before comparing. */
 const sortBy = <R extends Record<string, any>>(rows: R[], key: keyof R) =>
