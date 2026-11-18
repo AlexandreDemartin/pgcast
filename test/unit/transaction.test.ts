@@ -931,6 +931,15 @@ describe('cursor()', () => {
     expect(sent.slice(1)).toEqual([fetch(2), close()]);
   });
 
+  it('sends no CLOSE when pg reports the client outside a transaction block, as after a COMMIT of yours', async () => {
+    const { sent, client } = cursorClient({ rows: rows(5), status: 'T' });
+    const batches = db.cursor(client, users, { batchSize: 2 });
+    await batches.next();
+    client.getTransactionStatus = () => 'I';
+    expect(await batches.return()).toEqual({ value: undefined, done: true });
+    expect(sent.slice(1)).toEqual([fetch(2)]);
+  });
+
   it('sends no CLOSE after a FETCH that rejects, rejects with its error unchanged, and frees the number', async () => {
     let fetches = 0;
     const failure = sqlError('22012');

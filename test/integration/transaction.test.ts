@@ -2243,6 +2243,18 @@ describe('cursor()', () => {
     expect(await notes()).toEqual([]);
   });
 
+  it('sends no CLOSE on a pg.PoolClient whose COMMIT of yours came before the generator’s return(): the cursor went with it', async () => {
+    const texts = sent(), client = await t.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const batches = db.cursor(client, series(3), { batchSize: 1 });
+      await batches.next();
+      await client.query('COMMIT');
+      expect(await batches.return()).toEqual({ value: undefined, done: true });
+    } finally { client.release(); }
+    expect(texts).toEqual(['DECLARE pgcast_cursor_1', 'FETCH FORWARD']);
+  });
+
   it('runs on a pg.PoolClient after a BEGIN of yours, which carries no mark, and refuses a generator iterated after transaction()', async () => {
     const client = await t.pool.connect();
     try {
