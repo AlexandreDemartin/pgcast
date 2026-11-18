@@ -1,5 +1,5 @@
 ---
-english: 0d2c7a829ab1
+english: 64f80e85a62f
 description: "Ne montrez à chaque client que ses propres réservations : une politique de sécurité niveau ligne lit un réglage, que setLocal() définit pour une transaction."
 ---
 
@@ -27,7 +27,7 @@ Dans un seul [`readCommitted()`](/fr/transaction#readCommitted), [`setLocal()`](
 
 <<< ../examples/plain/row_security_bookings.ts{ts twoslash}
 
-`bookings` contient les deux réservations d’Ada Quill, C4 et D2, et non la C5 de Felix Ambrose. Son type est `s.seat_bookings.JSONSelectable[]` (survolez-le), comme sans politique : une politique filtre les lignes, jamais les colonnes. La transaction envoie :
+`bookings` contient les deux réservations d’Ada Quill, C4 et D2, et non la C5 de Felix Ambrose. Son type est `seat_bookings.JSONSelectable[]` (survolez-le), comme sans politique : une politique filtre les lignes, jamais les colonnes. La transaction envoie :
 
 <!-- probe: db.readCommitted(pool, txnClient => db.setLocal(txnClient, { role: 'cinema_customer', 'app.customer': 'Ada Quill' })) -->
 ```sql
@@ -43,7 +43,7 @@ Les valeurs sont `['role', 'cinema_customer', 'app.customer', 'Ada Quill']`, cha
 
 Une politique ne s’applique jamais à un superutilisateur ni à un rôle doté de `BYPASSRLS`, même avec `FORCE ROW LEVEL SECURITY`, ni au propriétaire de la table sans cette option. La doc se connecte en superutilisateur, comme le fait l’insert ci-dessus, donc l’exemple définit aussi `role` : le reste de la transaction s’exécute en tant que `cinema_customer`, auquel la politique s’applique. Au `COMMIT`, le rôle redevient celui de la session.
 
-- Un rôle qui n’est pas superutilisateur ne peut définir `role` que sur un rôle dont il est membre : `GRANT cinema_customer TO <your app's role>`, sinon 42501.
+- Un rôle qui n’est pas superutilisateur ne peut définir `role` que sur un rôle dont il est membre : `GRANT cinema_customer TO <le rôle de votre app>`, sinon 42501.
 - Une app qui se connecte avec un rôle qui n’est ni propriétaire de la table, ni superutilisateur, ni doté de `BYPASSRLS` y est déjà soumise, et n’a besoin que d’`app.customer`.
 
 ## Pourquoi une seule transaction {#why-one-transaction}

@@ -1,6 +1,7 @@
 import * as db from 'zapatos/db';
 import type pg from 'pg';
 declare const pool: pg.Pool;
+declare const assert: { deepEqual(actual: unknown, expected: unknown): void };
 // ---cut---
 await db.insert('seat_bookings', [
   { screening_id: 1000, seat: 'C4', customer: 'Ada Quill' },
@@ -12,3 +13,4 @@ const bookings = await db.readCommitted(pool, async txnClient => {
   await db.setLocal(txnClient, { role: 'cinema_customer', 'app.customer': 'Ada Quill' });
   return db.select('seat_bookings', db.all).run(txnClient);
 });
+assert.deepEqual(bookings.map(booking => booking.seat), ['C4', 'D2']);

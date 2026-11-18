@@ -22,7 +22,7 @@ In one [`readCommitted()`](/transaction#readCommitted), [`setLocal()`](/transact
 
 <<< ./examples/plain/row_security_bookings.ts{ts twoslash}
 
-`bookings` holds Ada Quill's two bookings, C4 and D2, not Felix Ambrose's C5. Its type is `s.seat_bookings.JSONSelectable[]` (hover it), as without a policy: a policy filters rows, never columns. The transaction sends:
+`bookings` holds Ada Quill's two bookings, C4 and D2, not Felix Ambrose's C5. Its type is `seat_bookings.JSONSelectable[]` (hover it), as without a policy: a policy filters rows, never columns. The transaction sends:
 
 <!-- probe: db.readCommitted(pool, txnClient => db.setLocal(txnClient, { role: 'cinema_customer', 'app.customer': 'Ada Quill' })) -->
 ```sql
