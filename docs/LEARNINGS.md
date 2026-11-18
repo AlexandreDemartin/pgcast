@@ -104,6 +104,13 @@ Candidates for a check, a rule or a skill line.
 - #729 — A Twoslash `paths` entry pointing outside `website/` makes the docs build depend on that folder: CI's change detection (`ci.yml` `changes`) lists it as a docs input, or the break first shows on master's deploy — branch-reviewer
 - #729 — Before writing "throws on X", read what the guard tests and replay the neighbouring inputs: `asPool()` tests `transform.{column,value,row}.from`, not `transform` — branch-reviewer
 - #729 — A page that says "run on it as on a `pg.Pool`" is replayed on the error path too (`err.constraint` from `handle-errors.md`), not only on the result types — branch-reviewer
+- #724 — An issue that adds a `db` export names `db.mjs` in **Files**: it is tracked, though the build regenerates it — builder
+- #728 — An advisory lock taken as the first query of a REPEATABLE READ or SERIALIZABLE transaction takes the snapshot before its wait, so it sees none of what the holder committed: such an example runs under `readCommitted()` — builder
+- #728 — A mutant or base worktree with `node_modules` linked shares `node_modules/.cache/pgcast`: rerun `test:types` in the real worktree after it — builder
+- #728 — pg's `getTransactionStatus()` is the status of the last ReadyForQuery, not of the client's queue: a `BEGIN` not awaited still reads `I`, a `COMMIT` not awaited still reads `T`, so a check on it can refuse a valid pipelined call or pass one that runs outside the block — branch-reviewer
+- #728 — A lock waited on in the first statement of a REPEATABLE READ transaction leaves the snapshot from before the wait and a check-then-insert passes twice; at SERIALIZABLE, SSI turns the same race into a 40001 and a correct retry: a claim grouping the two levels is replayed per level — branch-reviewer
+- #728 — A refusal's advice is checked against each kind of input it fires on: "after a BEGIN of yours" does not work on a pool, whose `BEGIN` runs on another client — builder
+- #728 — A query error inside a savepoint releases the advisory transaction locks taken in it at once, before any `ROLLBACK TO`; locks taken before the savepoint stay — branch-reviewer
 
 ## Minors kept
 
@@ -119,4 +126,6 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 
 - #709 — form: `adapters/pglite/test/params.test.ts` has no row with a `getTime` that is not a Date (`{ getTime: () => 0, toPostgres: () => 'tp' }`), so `typeof v.getTime === 'function'` as `isDate` passes all 468 rows — branch-reviewer
 - #709 — defect: a real Date reprototyped to `Object.prototype` is not a Date for the PGlite adapter's `isDate` (written as JSON, where pg writes its time); contrived — branch-reviewer
-
+- #728 — form: `website/transaction.md:347` gives `ROLLBACK TO` as why a failed `savepoint()` releases an advisory lock taken in it; on 40001 / 40P01 none is sent, and Postgres releases the subtransaction's locks at the error itself — branch-reviewer
+- #728 — form: `website/fr/transaction.md:351` "dont le callback est rejeté": a callback is not rejected, its promise is ("dont le callback échoue") — branch-reviewer
+- #728 — defect: `advisoryXactLock()`'s `instanceof pg.Pool` misses a `pg.native.Pool` and a pool of a second copy of `pg` (not run) — branch-reviewer
