@@ -1458,6 +1458,63 @@ describe('savepoint() (#723)', () => {
     });
   });
 
+  describe('limitation: two at once on one client, nested in the order they are called', () => {
+    /** Starts two savepoints at once on a raw BEGIN, each writing its note then waiting; `order` ends them; then COMMIT. */
+    const twoAtOnce = async (order: (ends: { first(): Promise<unknown>; second(fail?: boolean): Promise<unknown> }) => Promise<void>) => {
+      const queries: string[] = [];
+      db.setConfig({ queryListener: q => { if (/SAVEPOINT/.test(q.text)) queries.push(q.text); } });
+      const client = await t.pool.connect();
+      try {
+        await client.query('BEGIN');
+        const gate = () => { let open!: () => void; return { wait: new Promise<void>(r => { open = r; }), open: () => open() }; };
+        const [g1, g2] = [gate(), gate()];
+        let failSecond = false;
+        const first = db.savepoint(client, async sp => { await write(sp, 'first'); await g1.wait; }).then(() => 'resolves', (e: { code?: string }) => e.code);
+        const second = db.savepoint(client, async sp => { await write(sp, 'second'); await g2.wait; if (failSecond) throw failed; })
+          .then(() => 'resolves', (e: { code?: string }) => e.code ?? (e === failed ? 'failed' : e));
+        const results: unknown[] = [];
+        await order({
+          first: async () => { g1.open(); results.push(await first); },
+          second: async (fail = false) => { failSecond = fail; g2.open(); results.push(await second); },
+        });
+        results.push((await client.query('COMMIT')).command);
+        return { results, queries, committed: await notes() };
+      } finally {
+        client.release();
+      }
+    };
+
+    it('the first, if it ends first, ends the second\'s savepoint: its RELEASE fails (3B001), and the transaction is aborted', async () => {
+      expect(await twoAtOnce(async ends => { await ends.first(); await ends.second(); })).toEqual({
+        results: ['resolves', '3B001', 'ROLLBACK'],
+        queries: [
+          'SAVEPOINT pgcast_savepoint_1', 'SAVEPOINT pgcast_savepoint_2', 'RELEASE SAVEPOINT pgcast_savepoint_1',
+          'RELEASE SAVEPOINT pgcast_savepoint_2', 'ROLLBACK TO SAVEPOINT pgcast_savepoint_2',
+        ],
+        committed: [],
+      });
+    });
+
+    it('the second, if it ends first, resolves on its own, and COMMIT saves both', async () => {
+      expect(await twoAtOnce(async ends => { await ends.second(); await ends.first(); })).toEqual({
+        results: ['resolves', 'resolves', 'COMMIT'],
+        queries: ['SAVEPOINT pgcast_savepoint_1', 'SAVEPOINT pgcast_savepoint_2', 'RELEASE SAVEPOINT pgcast_savepoint_2', 'RELEASE SAVEPOINT pgcast_savepoint_1'],
+        committed: ['first', 'second'],
+      });
+    });
+
+    it('a ROLLBACK TO of the second also undoes what the first wrote after the second\'s SAVEPOINT, though the first resolves', async () => {
+      expect(await twoAtOnce(async ends => { await ends.second(true); await ends.first(); })).toEqual({
+        results: ['failed', 'resolves', 'COMMIT'],
+        queries: [
+          'SAVEPOINT pgcast_savepoint_1', 'SAVEPOINT pgcast_savepoint_2', 'ROLLBACK TO SAVEPOINT pgcast_savepoint_2',
+          'RELEASE SAVEPOINT pgcast_savepoint_2', 'RELEASE SAVEPOINT pgcast_savepoint_1',
+        ],
+        committed: [],
+      });
+    });
+  });
+
   it('limitation: a 40001 thrown from JavaScript, caught, leaves the work of its savepoint in, unless an outer level rolls back', async () => {
     const notFromPostgres = Object.assign(new Error('not from Postgres'), { code: '40001' });
     const throwsIt = (c: db.TxnClientForSerializable, note: string) =>
