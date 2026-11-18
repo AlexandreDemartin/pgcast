@@ -14,6 +14,7 @@ import { sql, IsolationLevel } from '../../src/db';
 import { resetConfig } from '../helpers/config';
 import { useTestDatabase } from '../helpers/db';
 import { satisfies } from '../helpers/isolation';
+import { renamed } from '../helpers/savepoints';
 
 const t = useTestDatabase();
 
@@ -1163,7 +1164,7 @@ describe('savepoint() (#723)', () => {
       await db.savepoint(c, async level1 => {
         await write(level1, '9 undone');
         await db.savepoint(level1, level2 => write(level2, '9 undone too'));
-        await writeThenFail(level1, '10 undone');  // its RELEASE after ROLLBACK TO lets level1's ROLLBACK TO undo 9
+        await writeThenFail(level1, '10 undone');  // level1's ROLLBACK TO undoes 9 as well
         throw failed;
       }).catch(() => undefined);
     });
@@ -1211,9 +1212,9 @@ describe('savepoint() (#723)', () => {
     });
     expect(result).toBe('committed');
     expect(await notes()).toEqual(['after', 'outer']);
-    expect(queries.slice(2, 7)).toEqual([
-      'SAVEPOINT pgcast_savepoint', 'INSERT INTO "txn_probe" ("note") VALUES ($1)', expect.stringMatching(/^DO /),
-      'RELEASE SAVEPOINT pgcast_savepoint', 'ROLLBACK TO SAVEPOINT pgcast_savepoint',
+    expect(renamed(queries.slice(2, 8))).toEqual([
+      'SAVEPOINT sp1', 'INSERT INTO "txn_probe" ("note") VALUES ($1)', expect.stringMatching(/^DO /),
+      'RELEASE SAVEPOINT sp1', 'ROLLBACK TO SAVEPOINT sp1', 'RELEASE SAVEPOINT sp1',
     ]);
   });
 
@@ -1272,10 +1273,11 @@ describe('savepoint() (#723)', () => {
       expect(c._zapatos).toEqual({ isolationLevel: IsolationLevel.Serializable, txnId: seen[0][1] });
     });
     const txnId = seen[0][1];
-    expect(seen).toEqual([
-      'START TRANSACTION ISOLATION LEVEL SERIALIZABLE', 'SAVEPOINT pgcast_savepoint', 'INSERT INTO "txn_probe" ("note") VALUES ($1)',
-      'RELEASE SAVEPOINT pgcast_savepoint', 'COMMIT',
-    ].map(text => [text, txnId]));
+    expect(seen.map(([, id]) => id)).toEqual(seen.map(() => txnId));
+    expect(renamed(seen.map(([text]) => text))).toEqual([
+      'START TRANSACTION ISOLATION LEVEL SERIALIZABLE', 'SAVEPOINT sp1', 'INSERT INTO "txn_probe" ("note") VALUES ($1)',
+      'RELEASE SAVEPOINT sp1', 'COMMIT',
+    ]);
     expect(messages).toEqual([]);  // transactionListener gets nothing from a savepoint
   });
 
@@ -1286,9 +1288,9 @@ describe('savepoint() (#723)', () => {
       expect(inner).toBe(c);
       await write(inner, 'inner');
     })));
-    expect(queries).toEqual([
-      'START TRANSACTION ISOLATION LEVEL SERIALIZABLE', 'SAVEPOINT pgcast_savepoint', 'INSERT INTO "txn_probe" ("note") VALUES ($1)',
-      'RELEASE SAVEPOINT pgcast_savepoint', 'COMMIT',
+    expect(renamed(queries)).toEqual([
+      'START TRANSACTION ISOLATION LEVEL SERIALIZABLE', 'SAVEPOINT sp1', 'INSERT INTO "txn_probe" ("note") VALUES ($1)',
+      'RELEASE SAVEPOINT sp1', 'COMMIT',
     ]);
     expect(await notes()).toEqual(['inner']);
   });
@@ -1348,15 +1350,20 @@ describe('savepoint() (#723)', () => {
     expect(attempts).toBe(1);  // the 40001 was caught: no retry
   });
 
-  it('limitation: a 40001 thrown from JavaScript, caught, leaves its savepoint established, so an outer one\'s ROLLBACK TO stops at it', async () => {
+  it('limitation: a 40001 thrown from JavaScript, caught, leaves the work of its savepoint in, unless an outer level rolls back', async () => {
     const notFromPostgres = Object.assign(new Error('not from Postgres'), { code: '40001' });
+    const throwsIt = (c: db.TxnClientForSerializable, note: string) =>
+      db.savepoint(c, async sp => { await write(sp, note); throw notFromPostgres; }).catch(() => undefined);
     await db.serializable(t.pool, async c => {
+      await throwsIt(c, 'kept');
       await db.savepoint(c, async outer => {
-        await write(outer, 'survives');
-        await db.savepoint(outer, async () => { throw notFromPostgres; }).catch(() => undefined);
+        await throwsIt(outer, 'kept too');
+      });
+      await db.savepoint(c, async outer => {
+        await throwsIt(outer, 'undone');
         throw failed;
       }).catch(() => undefined);
     });
-    expect(await notes()).toEqual(['survives']);  // with the stack balanced, the outer ROLLBACK TO would undo it
+    expect(await notes()).toEqual(['kept', 'kept too']);
   });
 });

@@ -153,6 +153,7 @@ const attemptsMade = (max: number) => {
 };
 
 let txnSeq = 0;
+let savepointSeq = 0;  // names each savepoint() apart
 
 /**
  * Provide a database client to the callback, whose queries are then wrapped in 
@@ -377,24 +378,29 @@ export async function serializableRODeferrable<T, C = unknown>(txnClientOrQuerya
 /**
  * Run the callback inside a savepoint of the transaction `txnClient` is in,
  * and return a promise of what it resolves to. The callback gets that same
- * client. The SQL, the same on every call:
+ * client. The SQL, `<n>` a counter, the one part that changes between calls:
  *
- * `SAVEPOINT pgcast_savepoint`, the callback's queries, then
- * `RELEASE SAVEPOINT pgcast_savepoint`. If the callback or that `RELEASE`
- * rejects, `ROLLBACK TO SAVEPOINT pgcast_savepoint` and
- * `RELEASE SAVEPOINT pgcast_savepoint`, then it rejects with that error.
+ * `SAVEPOINT pgcast_savepoint_<n>`, the callback's queries, then
+ * `RELEASE SAVEPOINT pgcast_savepoint_<n>`. If the callback or that `RELEASE`
+ * rejects, `ROLLBACK TO SAVEPOINT pgcast_savepoint_<n>` and
+ * `RELEASE SAVEPOINT pgcast_savepoint_<n>`, then it rejects with that error;
+ * if one of these two rejects, it rejects with its error instead.
  *
  * - On 40001 or 40P01, it rejects at once, with no `ROLLBACK TO`: the
  *   transaction stays aborted, and `transaction()` retries the whole of its
  *   callback, this savepoint included. A savepoint never retries on its own.
  * - A callback that catches a query's error and returns gets 25P02 from
- *   `RELEASE`: its work is undone, and this rejects with that 25P02. So a 40001
- *   or 40P01 caught in the callback is not retried: let them out.
- * - Nested savepoints stack under the one name, as Postgres stacks them; the
- *   name is reserved, so don't use `pgcast_savepoint` yourself. `await` each:
- *   two at once on one client mix their stacks.
+ *   `RELEASE`: its work is undone, nested savepoints included, and this
+ *   rejects with that 25P02. So a 40001 or 40P01 caught in the callback is not
+ *   retried: the transaction goes on, and commits what it does outside this
+ *   savepoint. Let them out.
+ * - Each `ROLLBACK TO` and `RELEASE` also ends the savepoints established
+ *   after its own, so each level undoes its own work whatever an inner one
+ *   left. Don't name a savepoint of yours `pgcast_savepoint_<n>`. `await`
+ *   each: two at once on one client mix their work.
  * - Only the `code` is read, as `transaction()` reads it: a 40001 thrown from
- *   JavaScript, then caught, leaves the savepoint established.
+ *   JavaScript, then caught, leaves the work of its savepoint in, unless an
+ *   outer level rolls back.
  * - Outside a transaction block, Postgres refuses the `SAVEPOINT` (25P01): it
  *   rejects with that, and the callback is never called.
  * @param txnClient The client of a transaction: a `transaction()` callback's,
@@ -407,19 +413,25 @@ export async function savepoint<T, C extends TxnClient<IsolationLevel> | TxnClie
   callback: (client: NoInfer<C>) => Promise<T>
 ): Promise<T> {
 
-  await sql`SAVEPOINT pgcast_savepoint`.run(txnClient);
+  if (savepointSeq >= Number.MAX_SAFE_INTEGER - 1) savepointSeq = 0;  // wrap around
+
+  // a name of its own: ROLLBACK TO and RELEASE then also destroy any savepoint an inner level left established
+  // (the 40001 / 40P01 exit below cannot RELEASE its own), see https://www.postgresql.org/docs/current/sql-rollback-to.html
+  const name = raw(`pgcast_savepoint_${savepointSeq++}`);
+
+  await sql`SAVEPOINT ${name}`.run(txnClient);
   try {
     const result = await callback(txnClient as NoInfer<C>);
-    await sql`RELEASE SAVEPOINT pgcast_savepoint`.run(txnClient);
+    await sql`RELEASE SAVEPOINT ${name}`.run(txnClient);
     return result;
 
   } catch (err: any) {
     // rethrown as it is, so that the outer transaction() rolls back and retries: a thrown null or undefined is not one
     if (err != null && isDatabaseError(err, "TransactionRollback_SerializationFailure", "TransactionRollback_DeadlockDetected")) throw err;
 
-    // RELEASE after ROLLBACK TO, which leaves the savepoint established, so that an outer one's ROLLBACK TO undoes its own work
-    await sql`ROLLBACK TO SAVEPOINT pgcast_savepoint`.run(txnClient);
-    await sql`RELEASE SAVEPOINT pgcast_savepoint`.run(txnClient);
+    // RELEASE after ROLLBACK TO, which leaves the savepoint established; either one rejecting rejects with its own error
+    await sql`ROLLBACK TO SAVEPOINT ${name}`.run(txnClient);
+    await sql`RELEASE SAVEPOINT ${name}`.run(txnClient);
     throw err;
   }
 }
