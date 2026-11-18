@@ -17,6 +17,7 @@ declare function countFilms(txnClient: db.TxnClientForRepeatableReadRO): Promise
 declare function countTags(txnClient: db.TxnClientForReadCommittedRO): Promise<number>;
 declare function countSeatsAnyRO(txnClient: db.TxnClientForSerializableRO | db.TxnClientForSerializableRODeferrable): Promise<number>;
 declare function bookSeat(txnClient: db.TxnClientForSerializable): Promise<number>;
+declare function wrap<F extends (...args: any) => any>(impl?: F): F;
 
 describe('the client of a transaction', () => {
   test('the callback gets the client of its level', () => {
@@ -196,6 +197,8 @@ declare const bare: OtherClient;
 declare const withConnect: db.TxnClientLike<OtherClient & { connect: () => Promise<void> }, db.IsolationLevel.Serializable>;
 declare const atAnyLevel: db.TxnClientLike<Awaited<ReturnType<db.PoolLike['connect']>>, db.IsolationLevel>;
 declare function countUsers(txnClient: TxnOther<db.IsolationLevel.Serializable>): Promise<number>;
+type IndexedClient = OtherClient & { [key: string]: unknown };  // keyof holds every key, connect included
+declare const indexed: db.PoolLike<IndexedClient>;
 
 // #702: run time passes the client of another driver's transaction through a nested call; its callback gets that same
 // client, typed at the outer level it runs at, as savepoint() gives it, where a pg client gets its own level, as in 6.6.1
@@ -218,6 +221,12 @@ describe('a nested call on another driver’s client (#702)', () => {
     expectTypeOf(db.serializable(literal, c => db.readCommitted(c, async inner => inner))).resolves.toEqualTypeOf<db.TxnClientLike<LiteralClient, db.IsolationLevel.Serializable>>();
     // the client of a db.PoolLike at any level: exactly the fallback's members but connect, so told apart by that key
     expectTypeOf(db.serializable(atAnyLevel, async inner => inner)).resolves.toEqualTypeOf<typeof atAnyLevel>();
+  });
+
+  test('a client whose type has a string index signature gets itself, its query() taking no string', () => {
+    void db.serializable(indexed, c => db.readCommitted(c, async inner => { expectTypeOf(inner).toEqualTypeOf<db.TxnClientLike<IndexedClient, db.IsolationLevel.Serializable>>(); }));
+    // @ts-expect-error its query() takes pg's query object, not a string
+    void db.serializable(indexed, c => db.readCommitted(c, inner => inner.query('SELECT 1')));
   });
 
   test('a helper that takes the client, or a pool typed with its client, compiles', () => {
@@ -293,6 +302,17 @@ describe('the calls of Zapatos 6.6.1 keep their types (#696)', () => {
     void viaParameters;
     const mockImplementation = <F extends (...args: any) => any>(_: F, impl: (...args: Parameters<F>) => ReturnType<F>) => impl;
     void mockImplementation(db.serializable, async (_, callback) => callback(txn));
+  });
+
+  // #702: a function generic over any function infers the client given as any, as a Jest-shaped mock does
+  test('a shortcut given to a function generic over its type still refuses what is no queryable', () => {
+    const serializable = wrap(db.serializable);
+    // @ts-expect-error a string is no queryable, as in Zapatos 6.6.1
+    void serializable('not a pool', async () => 1);
+    const transaction = wrap(db.transaction);
+    // @ts-expect-error a string is no queryable, as in Zapatos 6.6.1
+    void transaction('not a pool', db.IsolationLevel.Serializable, async () => 1);
+    expectTypeOf(serializable(pool, async c => c)).resolves.toEqualTypeOf<db.TxnClientForSerializable>();
   });
 
   // #702: another driver's client is inferred from the first argument only when it has no connect(), which every pg value has
