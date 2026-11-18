@@ -931,6 +931,15 @@ describe('cursor()', () => {
     expect(sent.slice(1)).toEqual([fetch(2), close()]);
   });
 
+  it('rejects a break with any other error of CLOSE, and frees the number', async () => {
+    let closes = 0;
+    const failure = sqlError('57P01');
+    const { sent, client } = cursorClient({ rows: rows(5), status: 'T', fail: text => text.startsWith('CLOSE') && ++closes === 1 ? failure : undefined });
+    await expect((async () => { for await (const _ of db.cursor(client, users, { batchSize: 2 })) break; })()).rejects.toBe(failure);
+    await db.cursor(client, users, { batchSize: 2 }).next();
+    expect(sent.map(q => q.text.split(' ').slice(0, 2).join(' '))).toEqual(['DECLARE pgcast_cursor_1', 'FETCH FORWARD', close().text, 'DECLARE pgcast_cursor_1', 'FETCH FORWARD']);
+  });
+
   it('sends no CLOSE when pg reports the client outside a transaction block, as after a COMMIT of yours', async () => {
     const { sent, client } = cursorClient({ rows: rows(5), status: 'T' });
     const batches = db.cursor(client, users, { batchSize: 2 });
