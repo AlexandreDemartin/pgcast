@@ -4,6 +4,9 @@ Copyright (C) 2026 Alexandre Demartin
 Released under the MIT licence: see LICENCE file
 */
 
+import { types as utilTypes } from 'util';
+import { getTypeParser } from 'pg-types';
+
 /* === types === */
 
 // structural, so that neither pgcast nor postgres.js is imported: a postgres.js `Sql` of 3.4 or 4.x fits them
@@ -19,7 +22,7 @@ export interface PostgresJsSql extends Unsafe {
   options?: { transform?: { column?: { from?: unknown }; row?: { from?: unknown } } };
 }
 
-type RawResult = ArrayLike<(Uint8Array | null)[]> & { command?: string | null; columns?: { name: string; type: number }[] };
+type RawResult = ArrayLike<(Buffer | null)[]> & { command?: string | null; columns?: { name: string; type: number }[] };
 
 /** The query object pgcast's `run()` passes: `pg`'s. */
 export type PostgresJsQuery = { text: string; values: any[]; name?: string };
@@ -38,18 +41,131 @@ export interface PostgresJsPool {
   connect: () => Promise<PostgresJsClient>;
 }
 
+/* === values, as pg writes them === */
+
+// prepareValue() and the functions it calls are node-postgres's, from lib/utils.js of pg 8.23.1
+// (https://github.com/brianc/node-postgres/blob/pg%408.23.1/packages/pg/lib/utils.js), MIT licence,
+// Copyright (c) 2010 - 2021 Brian Carlson: see LICENCE file. Left out: pg.defaults.parseInputDatesAsUTC, false by default,
+// and the deprecation notice for an invalid Date, which is sent as pg sends it.
+
+function escapeElement(elementRepresentation: string) {
+  const escaped = elementRepresentation.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  return '"' + escaped + '"';
+}
+
+// a JS array as a Postgres array literal, with a comma, which a type such as box doesn't take as separator
+function arrayString(val: any[]): string {
+  let result = '{';
+  for (let i = 0; i < val.length; i++) {
+    if (i > 0) result += ',';
+    let item = val[i];
+    if (item == null) {
+      result += 'NULL';
+    } else if (Array.isArray(item)) {
+      result += arrayString(item);
+    } else if (ArrayBuffer.isView(item)) {
+      if (!(item instanceof Buffer)) item = Buffer.from(item.buffer, item.byteOffset, item.byteLength);
+      result += '\\\\x' + item.toString('hex');
+    } else {
+      result += escapeElement(prepareValue(item) as string);
+    }
+  }
+  return result + '}';
+}
+
+function prepareValue(val: any, seen?: unknown[]): string | Buffer | null {
+  if (val == null) return null;  // null and undefined are both null for Postgres
+  if (typeof val === 'object') {
+    if (val instanceof Buffer) return val;
+    if (ArrayBuffer.isView(val)) return Buffer.from(val.buffer, val.byteOffset, val.byteLength);
+    if (utilTypes.isDate(val)) return dateToString(val);
+    if (Array.isArray(val)) return arrayString(val);
+    return prepareObject(val, seen);
+  }
+  return val.toString();
+}
+
+function prepareObject(val: any, seen?: unknown[]): string | Buffer | null {
+  if (val && typeof val.toPostgres === 'function') {
+    seen = seen || [];
+    if (seen.indexOf(val) !== -1) throw new Error('circular reference detected while preparing "' + val + '" for query');
+    seen.push(val);
+    return prepareValue(val.toPostgres(prepareValue), seen);
+  }
+  return JSON.stringify(val);
+}
+
+const pad = (n: number, width: number) => String(n).padStart(width, '0');
+
+function dateToString(date: Date) {
+  let offset = -date.getTimezoneOffset(), year = date.getFullYear();
+  const isBCYear = year < 1;
+  if (isBCYear) year = Math.abs(year) + 1;  // negative years are 1 off their BC representation
+
+  let ret = pad(year, 4) + '-' + pad(date.getMonth() + 1, 2) + '-' + pad(date.getDate(), 2) + 'T' + pad(date.getHours(), 2) +
+    ':' + pad(date.getMinutes(), 2) + ':' + pad(date.getSeconds(), 2) + '.' + pad(date.getMilliseconds(), 3);
+
+  if (offset < 0) {
+    ret += '-';
+    offset *= -1;
+  } else {
+    ret += '+';
+  }
+  ret += pad(Math.floor(offset / 60), 2) + ':' + pad(offset % 60, 2);
+  if (isBCYear) ret += ' BC';
+  return ret;
+}
+
 /* === asPool === */
 
-const queryOn = (target: Unsafe) => async ({ text, values }: PostgresJsQuery): Promise<PostgresJsResult> => {
-  const result = await target.unsafe(text, values, {}) as unknown as any[] & { command: string };
-  return { rows: [...result], command: result.command };
-};
+// the type `unknown`: Postgres infers the parameter's type from the query, as for pg's untyped parameters (see
+// https://www.postgresql.org/docs/current/sql-prepare.html), and postgres.js sends the text as it is, having no
+// serializer for it; a Buffer goes as the hex text of bytea, pg sending it in binary
+const UNKNOWN = 705;
+
+// pg keeps the tag's first word (`START` for `START TRANSACTION`), with this pattern of its lib/result.js
+// (an empty query has none: null, as pg gives it, though pg types it string)
+const commandOf = (tag: string | null | undefined) => tag == null ? null as unknown as string : /^([A-Za-z]+)/.exec(tag)?.[1] ?? tag;
+
+// raw rows skip postgres.js's parsers, and its `types` option: each column is parsed by pg's own, by type oid
+function resultOf(raw: RawResult): PostgresJsResult {
+  const
+    columns = raw.columns ?? [],
+    parsers = columns.map(c => getTypeParser(c.type, 'text')),
+    rows = Array.from(raw, values => {
+      const row: Record<string, unknown> = {};
+      columns.forEach((c, i) => { const v = values[i]; row[c.name] = v == null ? null : parsers[i](v.toString('utf8')); });
+      return row;
+    });
+  return { rows, command: commandOf(raw.command) };
+}
 
 /**
- * Give pgcast's `run()` and `transaction()` a postgres.js `sql`.
- * @param sql The `sql` that `postgres()` returns: the adapter never configures nor ends it
+ * Give pgcast's `run()` and `transaction()` a postgres.js `sql`, whose values are read and written as `pg` reads and
+ * writes them, with `pg`'s parsers: `transaction()` runs its queries on a connection of `sql.reserve()`.
+ * `.prepared(name)` prepares the query, under a name postgres.js gives it.
+ * @param sql The `sql` that `postgres()` returns, with no column or row transform: the adapter never configures nor
+ * ends it
  */
 export function asPool(sql: PostgresJsSql): PostgresJsPool {
+  const transform = sql.options?.transform;
+  if (transform?.column?.from || transform?.row?.from) throw new Error('asPool() needs a postgres.js sql with no column or row transform: pgcast reads the columns under the names Postgres gives them. Give it a postgres() of its own, without `transform`');
+
+  const queryOn = (target: Unsafe) => async ({ text, values = [], name }: PostgresJsQuery): Promise<PostgresJsResult> => {
+    const
+      parameters = values.map(v => {
+        const value = prepareValue(v);
+        return value === null ? null : sql.typed(Buffer.isBuffer(value) ? '\\x' + value.toString('hex') : value, UNKNOWN);
+      }),
+      raw = await target.unsafe(text, parameters, name == null ? {} : { prepare: true, simple: false }).raw();
+
+    // several statements with no value give an array of results, as with pg
+    const results = raw as unknown as RawResult[];
+    return raw.command === undefined && raw.length > 0 && results[0]?.command !== undefined ?
+      results.map(resultOf) as unknown as PostgresJsResult :
+      resultOf(raw);
+  };
+
   return {
     query: queryOn(sql),
     connect: async () => {
