@@ -336,7 +336,9 @@ export type Queryable = pg.ClientBase | pg.Pool;
  * prepared fragment unprepared.
  */
 export interface QueryableLike {
-  query(query: SQLQuery): PromiseLike<{ rows: any[] }>;
+  // a property, not a method, so that its parameter is checked one way only (under strictFunctionTypes): a query()
+  // that needs more than run() sends, such as a name, is refused
+  query: (query: SQLQuery) => PromiseLike<{ rows: any[] }>;
 }
 
 // run()'s type, declared as a method is so that its parameter is checked both ways: a function typed for Queryable,

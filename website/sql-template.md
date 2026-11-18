@@ -642,7 +642,7 @@ A function that runs queries on a client of another driver too takes a [`Queryab
 
 ```ts
 interface QueryableLike {
-  query(query: SQLQuery): PromiseLike<{ rows: any[] }>
+  query: (query: SQLQuery) => PromiseLike<{ rows: any[] }>
 }
 ```
 

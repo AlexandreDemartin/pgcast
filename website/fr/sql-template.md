@@ -646,7 +646,7 @@ Une fonction qui exécute des requêtes aussi sur le client d’un autre driver 
 
 ```ts
 interface QueryableLike {
-  query(query: SQLQuery): PromiseLike<{ rows: any[] }>
+  query: (query: SQLQuery) => PromiseLike<{ rows: any[] }>
 }
 ```
 
