@@ -1,5 +1,5 @@
 ---
-english: 818e1f3795cd
+english: 083841a55ff1
 description: "db.conditions regroupe les tests, comparaisons et opérateurs à donner comme valeur d’une clé d’un Whereable, chacun avec le SQL qu’il écrit et ses valeurs."
 ---
 
@@ -26,6 +26,7 @@ Chaque membre est un fragment [`sql`](/fr/sql-template#sql) écrit autour de [`d
   - [`and()`](#conditions.and), [`or()`](#conditions.or) et [`not()`](#conditions.not) prennent aussi des Whereables, et peuvent donc former tout un `where` ; [`now`](#conditions.now), [`fromNow()`](#conditions.fromNow) et [`exists()`](#conditions.exists) ne contiennent pas de `self`, et vont partout.
 - **Valeurs** : chaque valeur est un paramètre, `$1`, sauf un [`Parameter`](/fr/sql-template#Parameter), gardé tel quel avec son cast ; un fragment `sql`, écrit comme son SQL ; et [`parent()`](/fr/sql-template#parent), la colonne de la requête parente dans une sous-requête `lateral`, ou dans le `where` d’[`exists()`](#conditions.exists) et d’[`isInSelect()`](#conditions.isInSelect), dont l’option `parent` nomme cette table. `Default`, `self`, `all`, `raw()`, `cols()` et `vals()` lèvent une erreur : [Les valeurs qu’une condition refuse](#refused-values). [`eqAny()`](#conditions.eqAny) et les [conditions de tableau](#arrays) envoient leur tableau en un seul paramètre de valeurs simples : un élément qui est l’un d’eux, un `Parameter`, un fragment ou `parent()` lève une erreur, à toute profondeur dans une condition de tableau, et à la place du tableau, `eqAny()` ne prend que `parent()`.
   - [`jsonbContains()`](#conditions.jsonbContains) ne prend qu’une valeur JSON, et [`jsonbPathExists()`](#conditions.jsonbPathExists) une chaîne comme chemin et un objet de valeurs JSON comme variables : un `Parameter`, un fragment ou `parent()` y lève aussi une erreur.
+  - [`likeAny()`](#conditions.likeAny) et [`ilikeAny()`](#conditions.ilikeAny) envoient leur tableau en un seul paramètre de motifs : un élément qui n’est ni une chaîne ni `null` lève une erreur, l’un d’eux compris, et `parent()` à la place du tableau aussi.
   - [`websearchToTsquery()`](#conditions.websearchToTsquery) prend deux chaînes : `Default`, `self`, `all`, `raw()`, `cols()`, `vals()`, un `Parameter`, un fragment, `parent()` ou toute autre valeur qui n’est pas une chaîne y lève une erreur.
 - **Type** : une condition est un `SQLFragment` dont le second argument de type, `T`, est le type de la valeur à laquelle elle compare (sa `Constraint`, [`sql`](/fr/sql-template#sql)) ; le Whereable vérifie `T` contre le type de la colonne. Les huit tests, `now` et `fromNow()` n’ont pas de `T`, et passent sur n’importe quelle colonne ; le `T` de [`websearchToTsquery()`](#conditions.websearchToTsquery) est un type que seule une colonne typée `any` accepte, comme l’est une colonne `tsvector`.
   - Un Whereable est aussi une expression : interpolé dans une liste `SELECT`, `{ runtime_minutes: add(10) }` est la durée de chaque film plus dix, `(("runtime_minutes" + $1))`<!-- probe: db.sql`${{ runtime_minutes: db.conditions.add(10) }}` -->. Le type laisse donc passer, comme valeur d’un Whereable, ce qui n’est pas un test : [`add()`](#conditions.add), [`subtract()`](#conditions.subtract), [`now`](#conditions.now) et [`fromNow()`](#conditions.fromNow), que Postgres refuse seuls dans un `where` (42804).
@@ -166,11 +167,11 @@ Chacune prend deux valeurs du type de la colonne, `<T>(a: T, b: T)`, chacune un 
 
 ## Les motifs {#patterns}
 
-Chacune prend un motif, `<T extends string>(a: T)`, donc seulement sur une colonne dont le type est une chaîne : sur `release_year`, le type les refuse (TS2322).
+Chacune prend un motif, `<T extends string>(a: T)`, donc seulement sur une colonne dont le type est une chaîne : sur `release_year`, le type les refuse (TS2322). [`likeAny()`](#conditions.likeAny) et [`ilikeAny()`](#conditions.ilikeAny) en prennent un tableau.
 
 | Famille | Syntaxe | Trouve |
 |---|---|---|
-| `like()`, `ilike()` | `%` n’importe quel texte, `_` un caractère | la valeur entière |
+| `like()`, `ilike()`, `likeAny()`, `ilikeAny()` | `%` n’importe quel texte, `_` un caractère, `\` échappe le suivant | la valeur entière |
 | `similarTo()` | les expressions régulières SQL de Postgres | la valeur entière |
 | `reMatch()`, `reImatch()` | les expressions régulières POSIX | n’importe quelle partie de la valeur |
 
@@ -197,6 +198,38 @@ Ainsi `like('Lantern')` ne trouve aucun titre, et `reMatch('Lantern')` trouve `A
 ### `notIlike()` {#conditions.notIlike}
 
 `"col" NOT ILIKE $1`<!-- probe: db.sql`${{ col: db.conditions.notIlike('x') }}` -->.
+
+### `likeAny()` {#conditions.likeAny}
+
+```ts
+db.conditions.likeAny<T extends string>(a: readonly T[]): SQLFragment<boolean | null, T>
+```
+
+À partir de la 6.12.0. `"col" LIKE ANY($1)`<!-- probe: db.sql`${{ col: db.conditions.likeAny(['x%', 'y%']) }}` --> : la colonne correspond à l’un des motifs, le tableau entier en un seul paramètre, comme dans [`eqAny()`](#conditions.eqAny). Là où `or(like('The %'), like('% Bay'))` écrit un paramètre par motif, et un texte par nombre de motifs, `likeAny()` écrit un seul texte quel que soit leur nombre.
+
+- **Tableau vide** : `false`, sur une colonne `NULL` aussi : aucune ligne, et toutes les lignes sous [`not()`](#conditions.not).
+- **Les éléments `null`** : Postgres en lit un comme un motif `NULL`, donc une ligne qu’aucun autre motif ne trouve donne `NULL`, et `not()` l’écarte aussi. Avec `strictNullChecks` activé, le type y refuse `null`.
+- **Négation** : `not(likeAny(patterns))`, que Postgres lit comme `NOT LIKE ALL` : les lignes qui ne correspondent à aucun d’eux.
+- **Caractères génériques** : `%`, `_` et `\` dans la saisie d’un utilisateur sont ceux du motif, comme dans [`like()`](#conditions.like) : échappez-les d’abord, `input.replace(/[\\%_]/g, '\\$&')`, sinon `'100%'` trouve tous les titres qui commencent par `100`.
+- **Colonnes** : une colonne dont le type est une chaîne. Sur une colonne `citext`, `LIKE` n’ignore la casse que si le schéma de l’extension est dans le `search_path`, comme avec `like()`.
+
+Une liste qui n’est pas un tableau lève une erreur à la compilation de la requête, comme dans `isIn()`, de même qu’un élément qui n’est ni une chaîne ni `null` : `pg` enverrait un nombre comme son texte, et un `Parameter`, un fragment ou un objet en JSON, des motifs que personne n’a écrits. Le message nomme l’élément :
+
+> `` `likeAny()` sends its array as one parameter, so each item is a pattern, a string, not `db.param()`: give the pattern as a string. ``<!-- message -->
+
+### `ilikeAny()` {#conditions.ilikeAny}
+
+```ts
+db.conditions.ilikeAny<T extends string>(a: readonly T[]): SQLFragment<boolean | null, T>
+```
+
+À partir de la 6.12.0. `"col" ILIKE ANY($1)`<!-- probe: db.sql`${{ col: db.conditions.ilikeAny(['x%', 'y%']) }}` --> : comme [`likeAny()`](#conditions.likeAny), sans tenir compte de la casse. Sa négation, `not(ilikeAny(patterns))`, est `NOT ILIKE ALL`.
+
+<CastPanel example="conditions_ilikeAny">
+
+<<< ../examples/conditions_ilikeAny.ts{ts twoslash}
+
+</CastPanel>
 
 ### `similarTo()` {#conditions.similarTo}
 
