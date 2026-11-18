@@ -1,5 +1,5 @@
 ---
-english: 9a7a61b5a0ad
+english: 0d2c7a829ab1
 description: "Ne montrez à chaque client que ses propres réservations : une politique de sécurité niveau ligne lit un réglage, que setLocal() définit pour une transaction."
 ---
 
@@ -19,7 +19,7 @@ ALTER TABLE seat_bookings ENABLE ROW LEVEL SECURITY;
 CREATE POLICY own_bookings ON seat_bookings USING (customer = current_setting('app.customer', true));
 ```
 
-Avec `true`, `current_setting()` renvoie `NULL` pour un nom qui n’est pas défini, là où il échouerait avec 42704. La politique est celle de Postgres : [Row Security Policies](https://www.postgresql.org/docs/current/ddl-rowsecurity.html).
+Avec `true`, `current_setting()` renvoie `NULL` pour un nom que cette connexion n’a jamais défini (`''` une fois qu’elle l’a défini, voir [les pièges](#avoid-the-pitfalls)), là où sans `true` il échouerait avec 42704. La politique est celle de Postgres : [Row Security Policies](https://www.postgresql.org/docs/current/ddl-rowsecurity.html).
 
 ## Lire en tant que client {#read-as-the-customer}
 
