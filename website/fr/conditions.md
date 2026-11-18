@@ -1,5 +1,5 @@
 ---
-english: 3eb9ee912217
+english: 818e1f3795cd
 description: "db.conditions regroupe les tests, comparaisons et opérateurs à donner comme valeur d’une clé d’un Whereable, chacun avec le SQL qu’il écrit et ses valeurs."
 ---
 
@@ -415,6 +415,8 @@ Chacune prend des conditions ou des Whereables, un Whereable compilé avec ses p
 <<< ../examples/conditions_or.ts{ts twoslash}
 
 </CastPanel>
+
+Elles prennent le Whereable de toutes les tables : dans un schéma où une colonne porte le nom d’un membre de `String`, d’un type auquel ce membre correspond (`length`, un nombre), elles acceptent donc n’importe quelle chaîne comme Whereable, à dessein : elles ne nomment aucune table par laquelle la vérifier, et une vérification à cet endroit refusait un `and({ ...where, id })` dans une fonction générique sous TypeScript 4.1 ([#674](https://github.com/AlexandreDemartin/pgcast/issues/674)). Le `where` d’un raccourci la refuse.
 
 ### `and()` {#conditions.and}
 

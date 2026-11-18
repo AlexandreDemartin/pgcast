@@ -1,5 +1,5 @@
 ---
-english: 2cfbf4514ca2
+english: 951472eae71c
 description: "Quand aucun raccourci n’écrit la requête dont vous avez besoin, écrivez-la dans le template sql, et gardez hors de son texte toute valeur venue de l’extérieur."
 ---
 
@@ -297,7 +297,7 @@ Le type vérifie la paire, pas la requête ; Postgres vérifie le reste à l’
 - Une fois qu’une table a un alias, son propre nom ne qualifie plus ses colonnes : 42P01.
 - Rien ne vérifie le `FROM` : un alias qu’il ne définit pas donne 42P01.
 - Une colonne dont le nom contient un `.` entre dans la paire, mais `${'mentors.a.b'}` donne `"mentors"."a"."b"`<!-- probe: db.sql`${'mentors.a.b'}` --> (42P01) : seule la chaîne entre guillemets s’exécute, `${'"mentors"."a.b"'}`, nommée telle quelle dans l’argument de type.
-- Un schéma généré par Zapatos 6.6.1 ou par pgcast jusqu’à la 6.10.0 ne vérifie la paire que tant que le `SQL` de la table refuse une chaîne nue : une colonne nommée comme un membre de `String`, d’un type auquel ce membre correspond (`search` typée `any`, `length` un nombre), laisse passer n’importe quelle chaîne, comme pour une colonne nue. Régénérez-le ([#670](https://github.com/AlexandreDemartin/pgcast/issues/670)).
+- Un schéma généré par Zapatos 6.6.1 ou par pgcast jusqu’à la 6.10.0 ne vérifie la paire que tant que le `SQL` de la table refuse une chaîne nue : une colonne nommée comme un membre de `String`, d’un type auquel ce membre correspond (`search` typée `any`, `length` un nombre), laisse passer n’importe quelle chaîne, comme pour une colonne nue. Régénérez-le ([#670](https://github.com/AlexandreDemartin/pgcast/issues/670)). Les raccourcis refusent une telle chaîne comme `where` ou comme ligne, quel que soit le schéma ; `db.SQL`, `and()`, `or()`, `not()` et un Whereable donné comme argument de type de `sql` l’acceptent toujours, à dessein ([#674](https://github.com/AlexandreDemartin/pgcast/issues/674)).
 
 L’[`alias`](/fr/select#alias) d’un raccourci n’a besoin de rien de tout cela : ses colonnes et les clés de son Whereable se rapportent à l’alias, et `db.parent()` atteint la requête extérieure. Un fragment `where` ou `extras` qui nomme l’alias prend le même argument de type : `"member"."mentor_id" IS NULL`<!-- probe: db.select('crew', db.sql`${'member.mentor_id'} IS NULL`, { alias: 'member' }) -->.
 

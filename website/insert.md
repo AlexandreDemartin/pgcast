@@ -206,6 +206,8 @@ An empty array, for the `updateColumns` of `upsert()`: a row that conflicts is l
 
 From 6.9.0. `UpsertOptions<T, C, E, UC, RA>`: the `options` of `upsert()`, the [`ReturningOptionsForTable`](#ReturningOptionsForTable) with `updateValues`, `updateColumns`, `noNullUpdateColumns` and `reportAction` ([Options](#upsert-options)). `UC` is the type of `updateColumns` and `RA` that of `reportAction` (`undefined` for an option not given).
 
+Its `updateValues` takes any string on a table with a column named like a member of `String`, of a type that member fits (`length`, a number), by design: the check that the values of `upsert()`, `insert()` and `update()` have would add a key to `UpsertOptions['updateValues']` ([#674](https://github.com/AlexandreDemartin/pgcast/issues/674)).
+
 ## `UpsertReturnableForTable` {#UpsertReturnableForTable}
 
 `UpsertReturnableForTable<T, C, E, RA>`: one row of what `upsert()` returns, the [`ReturningTypeForTable`](#ReturningTypeForTable) with [`UpsertAction`](#UpsertAction), unless `RA`, the `reportAction`, is `'suppress'`: `db.UpsertReturnableForTable<'ratings', undefined, undefined, undefined>` is `ratings.JSONSelectable & UpsertAction`. It does not add the `undefined` of `updateColumns: []` ([`doNothing`](#doNothing)). It needs `strictNullChecks`: without it, it is the whole `JSONSelectable` with `UpsertAction`, whatever `C`, `E` and `RA`.

@@ -411,6 +411,8 @@ Each takes conditions or Whereables, a Whereable compiled with its own keys. As 
 
 </CastPanel>
 
+They take the Whereable of every table, so in a schema with a column named like a member of `String`, of a type that member fits (`length`, a number), they take any string as one, by design: they name no table to check it by, and a check there refused a generic `and({ ...where, id })` on TypeScript 4.1 ([#674](https://github.com/AlexandreDemartin/pgcast/issues/674)). A shortcut's `where` refuses it.
+
 ### `and()` {#conditions.and}
 
 ```ts
