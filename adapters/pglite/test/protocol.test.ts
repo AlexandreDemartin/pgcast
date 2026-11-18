@@ -23,6 +23,16 @@ describe('shortcuts', () => {
     }).run(queryable),
   });
 
+  it('insert() sends 65,535 values, the most Postgres takes in one query, as pg does', async () => {
+    const rows = Array.from({ length: 65_535 / 3 }, (_, i) => ({ country: 'MX', code: String(i), name: 'n' }));
+    const inserted = async (q: db.QueryableLike) => {
+      try { return (await db.insert('orgs', rows, { returning: ['code'] }).run(q)).length; }
+      finally { await db.deletes('orgs', { country: 'MX' }).run(q); }
+    };
+    expect(await inserted(u.pool())).toBe(await inserted(u.t.client));
+    expect(await inserted(u.pool())).toBe(21_845);
+  });
+
   it('insert(), upsert(), count() and select() with a lateral give what they give on pg', async () => {
     const viaAdapter = await scenario(u.pool(), 'PL');
     expect(shape(viaAdapter)).toEqual(shape(await scenario(u.t.client, 'PL')));
