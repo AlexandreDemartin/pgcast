@@ -42,10 +42,30 @@ test('refuses pushing a tag, which starts release.yml', () => {
     'git push origin +v6.11.0',
     'git -C x push origin v7.0.0',
     'cd x && git push origin v6.11.0',
+    'git push origin HEAD:refs/tags/v7.0.0',
+    'git push origin master:refs/tags/v7.0.0',
+    'git push origin 3997b291:refs/tags/v7.0.0',
+    'git push origin HEAD:v7.0.0',
+    'git push origin "v6.11.0"',
+    "git push origin 'refs/tags/*'",
+    'git push origin "HEAD:refs/tags/v7.0.0"',
+    'git -c push.followTags=true push origin master',
+    'gh api repos/AlexandreDemartin/pgcast/git/refs -f ref=refs/tags/v7.0.0 -f sha=3997b291',
+    "gh api -X POST repos/AlexandreDemartin/pgcast/git/refs -f 'ref=refs/tags/v7.0.0' -f sha=3997b291",
   ]) {
     assert.ok(bash(command), command);
   }
-  for (const command of ['git push origin docs/19-method', 'git push -u origin fix/12-v2-names', 'git tag -l "v*"']) {
+  for (const command of [
+    'git push origin docs/19-method',
+    'git push -u origin fix/12-v2-names',
+    'git push origin chore/1-tags-ci',
+    'git push origin "docs/19-method"',
+    'git push',
+    'git tag -l "v*"',
+    'gh release view v6.10.0',
+    'gh api repos/AlexandreDemartin/pgcast/git/refs/tags/v6.10.0',
+    'git commit -m "never git push origin HEAD:refs/tags/v7.0.0"',
+  ]) {
     assert.equal(bash(command), undefined, command);
   }
 });
