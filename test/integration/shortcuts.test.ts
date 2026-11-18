@@ -94,6 +94,15 @@ describe('insert', () => {
     expect(await run(db.insert('users', []))).toEqual([]);
   });
 
+  // the type takes a readonly array (#683): the rows are read, never written, so a frozen array runs as any other
+  it('a frozen array of rows, with different keys and an undefined value, is inserted and left as it was (#683)', async () => {
+    db.setConfig({ undefinedMeansMissing: true });
+    const rows = Object.freeze([Object.freeze({ email: 'a@x.org', display_name: 'A' }), Object.freeze({ email: 'b@x.org', display_name: 'B', mood: undefined })]);
+    const inserted = await run(db.insert('users', rows, { returning: ['email', 'mood'] }));
+    expect(sortBy(inserted, 'email')).toEqual([{ email: 'a@x.org', mood: null }, { email: 'b@x.org', mood: null }]);
+    expect(rows).toEqual([{ email: 'a@x.org', display_name: 'A' }, { email: 'b@x.org', display_name: 'B', mood: undefined }]);
+  });
+
   it('no column at all throws before any query, where Postgres refused the SQL (#251)', async () => {
     // Zapatos 6.6.1 sent `() VALUES ()`, which .run() rejected with 42601
     expect((await pgError(t.client, () => run(sql`INSERT INTO ${'users'} () VALUES ()`))).code).toBe('42601');
@@ -171,6 +180,13 @@ describe('upsert', () => {
     ], 'email', { returning: ['id', 'email', 'display_name'] })), 'email');
     expect(updated).toEqual({ id: 1, email: 'ADA@example.com', display_name: 'Ada L.', $action: 'UPDATE' });
     expect(inserted).toEqual({ id: expect.any(Number), email: 'new@x.org', display_name: 'New', $action: 'INSERT' });
+  });
+
+  it('a frozen array of rows is upserted and left as it was (#683)', async () => {
+    const rows = Object.freeze([Object.freeze({ email: 'ADA@example.com', display_name: 'Ada L.' }), Object.freeze({ email: 'new@x.org', display_name: 'New' })]);
+    const upserted = await run(db.upsert('users', rows, 'email', { returning: ['email'] }));
+    expect(sortBy(upserted, 'email')).toEqual([{ email: 'ADA@example.com', $action: 'UPDATE' }, { email: 'new@x.org', $action: 'INSERT' }]);
+    expect(rows).toEqual([{ email: 'ADA@example.com', display_name: 'Ada L.' }, { email: 'new@x.org', display_name: 'New' }]);
   });
 
   it('characterization: the conflict column itself is rewritten', async () => {
