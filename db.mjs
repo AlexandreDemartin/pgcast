@@ -19,6 +19,7 @@ export const cols = mod.cols;
 export const conditions = mod.conditions;
 export const constraint = mod.constraint;
 export const count = mod.count;
+export const cursor = mod.cursor;
 export const deletes = mod.deletes;
 export const doNothing = mod.doNothing;
 export const enableCustomJSONParsingForLargeNumbers = mod.enableCustomJSONParsingForLargeNumbers;

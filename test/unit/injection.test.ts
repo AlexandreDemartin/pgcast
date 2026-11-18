@@ -2776,6 +2776,54 @@ describe('setLocal()', () => {
   });
 });
 
+// #743: cursor() writes two things of its own into the SQL text, the cursor's number and batchSize once checked; a
+// hostile size is refused before any query, and a value of the fragment stays its parameter. What Postgres makes of
+// them: test/integration/injection.test.ts
+describe('cursor()', () => {
+  afterEach(resetConfig);
+
+  const update = `UPDATE users SET display_name = 'injected' WHERE id = 1`;
+
+  /** The queries cursor() sends on a transaction's client whose FETCH returns no row, and its error, if any. */
+  const sentFor = async (options: unknown, query = sql<db.SQL, unknown[]>`SELECT 1`) => {
+    const sent: db.SQLQuery[] = [];
+    const client = { query: async (q: db.SQLQuery) => { sent.push({ text: q.text, values: q.values }); return { rows: [], command: q.text.split(' ')[0] }; }, release: () => undefined };
+    try { for await (const _ of db.cursor(client, query, options as { batchSize: number })) { /* no row */ } }
+    catch (err) { return { sent, message: (err as Error).message }; }
+    return { sent };
+  };
+
+  const sizes: Record<string, unknown> = {
+    statement: `1 FROM x; ${update}; --`, dropsTable: '1 FROM x; DROP TABLE users; --', exponent: '1e3', hex: '0x10', array: [1],
+    padded: ' 1', digits: '100', openComment: '1 /*', trailingNul: '1\0', object: { valueOf: () => 5, toString: () => `5 FROM x; ${update}; --` },
+    ...hostile,
+  };
+
+  it.each(Object.entries(sizes))('refuses %s as batchSize before any query', async (_, size) => {
+    expect(await sentFor({ batchSize: size })).toEqual({
+      sent: [], message: 'cursor() was given a batchSize that is not an integer from 1 to 2147483647, the rows each FETCH reads: give a number of rows, { batchSize: 100 }',
+    });
+  });
+
+  describe.each([
+    ['the default configuration', {}],
+    ['castArrayParamsToJson', { castArrayParamsToJson: true }],
+    ['castObjectParamsToJson', { castObjectParamsToJson: true }],
+    ['both', { castArrayParamsToJson: true, castObjectParamsToJson: true }],
+  ])('under %s', (_, config) => {
+    it.each(Object.entries(hostile))('sends %s in the fragment as its parameter, and only its own name and size as text', async (_name, payload) => {
+      db.setConfig(config);
+      expect(await sentFor({ batchSize: 2 }, sql<db.SQL, unknown[]>`SELECT ${param(payload)} AS v`)).toEqual({
+        sent: [
+          { text: 'DECLARE pgcast_cursor_1 NO SCROLL CURSOR FOR SELECT $1 AS v', values: [payload] },
+          { text: 'FETCH FORWARD 2 FROM pgcast_cursor_1', values: [] },
+          { text: 'CLOSE pgcast_cursor_1', values: [] },
+        ],
+      });
+    });
+  });
+});
+
 describe('exists() and isInSelect()', () => {
   // table and column are typed identifiers, parent and alias strings: each goes through the string branch of
   // compileExpression, as select()'s table and alias do; what each achieves once run: test/integration/injection.test.ts

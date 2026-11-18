@@ -1549,6 +1549,33 @@ describe('setLocal()', () => {
   });
 });
 
+// #743: cursor() on the harness's client, inside its BEGIN: a hostile batchSize is refused before any query, so Ada's
+// row and the users table stay; a hostile value of the fragment is read back as given
+describe('cursor()', () => {
+  const payloads: Record<string, string> = {
+    squote: "'", dquote: '"', semicolon: ';', dashes: '--', comment: '/*', dollar: '$1', backslash: '\\',
+    statement: `1 FROM x; ${update}; --`, dropsTable: '1 FROM x; DROP TABLE users; --', closesQuery: `'); ${update}; --`,
+  };
+
+  it.each(Object.entries(payloads))('refuses %s as batchSize before any query', async (_, payload) => {
+    const queries: db.SQLQuery[] = [];
+    db.setConfig({ queryListener: q => { queries.push(q); } });
+    try {
+      await expect(db.cursor(t.client, sql<db.SQL, unknown[]>`SELECT 1`, { batchSize: payload as unknown as number }).next()).rejects.toThrow(/^cursor\(\) was given a batchSize/);
+    } finally { resetConfig(); }
+    expect(queries).toEqual([]);
+    expect(await adaName()).toBe('Ada');
+    expect((await t.client.query("SELECT to_regclass('public.users') IS NOT NULL AS users")).rows).toEqual([{ users: true }]);
+  });
+
+  it.each(Object.entries(payloads))('reads %s in the fragment back as its value, one statement', async (_, payload) => {
+    const batches: unknown[] = [];
+    for await (const batch of db.cursor(t.client, sql<db.SQL, { v: string }[]>`SELECT ${param(payload)}::text AS v`, { batchSize: 2 })) batches.push(batch);
+    expect(batches).toEqual([[{ v: payload }]]);
+    expect(await adaName()).toBe('Ada');
+  });
+});
+
 describe('exists() and isInSelect()', () => {
   const { exists, isInSelect } = db.conditions;
 

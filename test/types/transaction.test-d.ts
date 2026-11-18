@@ -510,3 +510,87 @@ describe('setLocal()', () => {
     void db.setLocal(other, settings);
   });
 });
+
+// #743: the batch is the fragment's own RunResult, an array of rows; the client a transaction's
+describe('cursor()', () => {
+  const options = { batchSize: 100 };
+  type Users = s.users.Selectable[];
+
+  test('it yields the fragment’s RunResult, from an AsyncGenerator of it', () => {
+    const typed = db.sql<s.users.SQL, Users>`SELECT * FROM ${'users'}`;
+    expectTypeOf(db.cursor(txn, typed, options)).toEqualTypeOf<AsyncGenerator<Users, void, undefined>>();
+    void (async () => {
+      for await (const users of db.cursor(txn, typed, options)) { expectTypeOf(users).toEqualTypeOf<Users>(); expectTypeOf(users).not.toBeAny(); }
+      for await (const rows of db.cursor(txn, db.sql`SELECT 1`, options)) expectTypeOf(rows).toEqualTypeOf<any[]>();
+      for await (const users of db.cursor(txn, db.select('users', db.all), options)) {
+        expectTypeOf(users).toEqualTypeOf<s.users.JSONSelectable[]>();
+        expectTypeOf(users).not.toBeAny();
+      }
+      const ids = db.select('users', db.all, { columns: ['id', 'email'] });
+      for await (const users of db.cursor(txn, ids, options)) expectTypeOf(users).toEqualTypeOf<Awaited<ReturnType<typeof ids.run>>>();
+      for await (const names of db.cursor(txn, db.sql<db.SQL, readonly string[]>`SELECT 1`, options)) expectTypeOf(names).toEqualTypeOf<readonly string[]>();
+    })();
+  });
+
+  test('it takes the client of each shortcut, another driver’s, a pg.PoolClient', () => {
+    const typed = db.sql<s.users.SQL, Users>`SELECT * FROM ${'users'}`;
+    void db.transaction(pool, db.IsolationLevel.ReadCommitted, async c => { db.cursor(c, typed, options); });
+    void db.serializable(pool, async c => { db.cursor(c, typed, options); });
+    void db.readCommittedRO(pool, async c => { db.cursor(c, typed, options); });
+    void db.serializable(other, async c => { db.cursor(c, typed, options); });
+    void db.readCommitted(typedPool, async c => { db.cursor(c, typed, options); });
+    void db.cursor(txnRC, typed, options);
+    void db.cursor(txnAny, typed, options);
+    void db.cursor(plain, typed, options);
+  });
+
+  test('a generic forwarder and the function used as a value keep the batch type', () => {
+    const forward = <R extends readonly unknown[]>(q: db.SQLFragment<R, any>) => db.cursor(txn, q, { batchSize: 10 });
+    expectTypeOf(forward(db.sql<s.users.SQL, Users>`SELECT * FROM ${'users'}`)).toEqualTypeOf<AsyncGenerator<Users, void, undefined>>();
+    const all = [db.sql<s.users.SQL, Users>`SELECT * FROM ${'users'}`].map(q => db.cursor(txn, q, options));
+    expectTypeOf(all).toEqualTypeOf<AsyncGenerator<Users, void, undefined>[]>();
+    expectTypeOf<Parameters<typeof db.cursor>[2]>().toEqualTypeOf<{ readonly batchSize: number }>();
+  });
+
+  test('a query whose result is no array of rows, a query that is no fragment, or a wrong size do not compile', () => {
+    const typed = db.sql<s.users.SQL, Users>`SELECT * FROM ${'users'}`;
+    // @ts-expect-error selectOne(), whose result is one row or undefined
+    void db.cursor(txn, db.selectOne('users', db.all), options);
+    // @ts-expect-error selectExactlyOne(), whose result is one row
+    void db.cursor(txn, db.selectExactlyOne('users', db.all), options);
+    // @ts-expect-error count(), whose result is a number
+    void db.cursor(txn, db.count('users', db.all), options);
+    // @ts-expect-error a string
+    void db.cursor(txn, 'SELECT 1', options);
+    // @ts-expect-error a query object
+    void db.cursor(txn, { text: 'SELECT 1', values: [] }, options);
+    // @ts-expect-error no options
+    void db.cursor(txn, typed);
+    // @ts-expect-error no batchSize
+    void db.cursor(txn, typed, {});
+    // @ts-expect-error a string as batchSize
+    void db.cursor(txn, typed, { batchSize: '100' });
+  });
+
+  // their result is an array, so the type takes them; Postgres refuses each DECLARE (42601)
+  test('limitation: an insert() of rows, an update() and a deletes() compile, an insert() of one row does not', () => {
+    const row = { email: 'ada@example.com', display_name: 'Ada' };
+    void db.cursor(txn, db.insert('users', [row]), options);
+    void db.cursor(txn, db.update('users', { display_name: 'Ada' }, { id: 1 }), options);
+    void db.cursor(txn, db.deletes('users', { id: 1 }), options);
+    // @ts-expect-error an insert() of one row, whose result is one row
+    void db.cursor(txn, db.insert('users', row), options);
+  });
+
+  test('a client that is no transaction’s does not compile', () => {
+    const typed = db.sql<s.users.SQL, Users>`SELECT * FROM ${'users'}`;
+    // @ts-expect-error a pg.Pool, whose DECLARE would run outside any transaction
+    void db.cursor(pool, typed, options);
+    // @ts-expect-error a pg.Client
+    void db.cursor(client, typed, options);
+    // @ts-expect-error a QueryableLike
+    void db.cursor(queryableLike, typed, options);
+    // @ts-expect-error another driver's pool
+    void db.cursor(other, typed, options);
+  });
+});
