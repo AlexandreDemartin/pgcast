@@ -19,7 +19,7 @@ interface Unsafe {
 export interface PostgresJsSql extends Unsafe {
   reserve(): PromiseLike<Unsafe & { release(): void }>;
   typed(value: string | null, oid: number): unknown;
-  options?: { transform?: { column?: { from?: unknown }; row?: { from?: unknown } } };
+  options?: { transform?: { column?: { from?: unknown }; value?: { from?: unknown }; row?: { from?: unknown } } };
 }
 
 type RawResult = ArrayLike<(Buffer | null)[]> & { command?: string | null; columns?: { name: string; type: number }[] };
@@ -149,13 +149,13 @@ function resultOf(raw: RawResult): PostgresJsResult {
  * Give pgcast's `run()` and `transaction()` a postgres.js `sql`, whose values are read and written as `pg` reads and
  * writes them, with `pg`'s parsers: `transaction()` runs its queries on a connection of `sql.reserve()`.
  * `.prepared(name)` runs the query unprepared, as every query.
- * @param sql The `sql` that `postgres()` returns, with no column or row transform: the adapter never configures nor
- * ends it
+ * @param sql The `sql` that `postgres()` returns, with no column, value or row transform: the adapter never configures
+ * nor ends it
  */
 export function asPool(sql: PostgresJsSql): PostgresJsPool {
   if (typeof sql.reserve !== 'function') throw new Error('asPool() needs a postgres.js sql with reserve(), for transaction() to take a connection: give it the sql that postgres() returns, not a transaction\'s nor a reserved connection\'s');
   const transform = sql.options?.transform;
-  if (transform?.column?.from || transform?.row?.from) throw new Error('asPool() needs a postgres.js sql with no column or row transform: pgcast reads the columns under the names Postgres gives them. Give it a postgres() of its own, without `transform`');
+  if (transform?.column?.from || transform?.value?.from || transform?.row?.from) throw new Error('asPool() needs a postgres.js sql with no column, value or row transform: pgcast reads the columns under the names Postgres gives them, and their values with pg\'s parsers. Give it a postgres() of its own, without `transform`');
 
   const queryOn = (target: Unsafe) => async ({ text, values = [], name }: PostgresJsQuery): Promise<PostgresJsResult> => {
     const
