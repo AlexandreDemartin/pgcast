@@ -57,6 +57,10 @@ user code ──► src/db/ (runtime: sql``, shortcuts, conditions, transactions
   - `date.ts`, `customJSON.ts`, `pgErrors.ts`, `config.ts`, `canary.ts`, `utils.ts`.
 - `src/typings/zapatos/schema.ts`: a dummy schema used only to compile `src/db` (via `paths` in tsconfig).
 - `db.{js,mjs,d.ts}` and `generate.{js,mjs,d.ts}`: root shims. The `.mjs` files are **generated** by `gen-esm-wrapper` at build time.
+- `adapters/<driver>/`: the official extensions that run pgcast on another driver, each a package of its own, `@pgcast/adapter-<driver>` (`adapters/postgres-js/`). Decision [013](docs/decisions/013-package-model.md).
+  - Each has its own `package.json`, lockfile, `npm ci`, version, `CHANGELOG.md` and README; no npm workspaces.
+  - Its types fit the core's structurally (`QueryableLike`, `PoolLike`), with no import; a peer dependency on `@pgcast/pgcast`, with an explicit range, only to read the core's types or config.
+- `tools/<name>/`: later, the official tools in packages of their own (`@pgcast/typegen`), laid out as the adapters.
 
 ### Watch out: module names
 
@@ -77,7 +81,9 @@ The generated code and the runtime speak of `zapatos/schema`, `zapatos/db` and `
 | `npm run check:floor` | after `build`: every `.d.ts` that `npm pack` lists parses with TypeScript 4.1.6, the `typescript` peer's floor, a consumer on 4.1 compiles against them with `skipLibCheck`, and their lib check finds no error but `Buffer<ArrayBuffer>`; fetches 4.1.6 and its `@types` once into `node_modules/.cache`; a directory argument checks an unpacked package instead |
 | `npm run check:agents` | consistency of skills and agents, § Architecture against `src/`, a `CHANGELOG.md` § Deprecated line (any release) per deprecation message, no `CHANGELOG.md` entry written twice in a release, the summary of `docs/CHARACTERISATION-REPORT.md` recounted from its sections, tests of the `guard` hook and of these checks |
 
-A task is **done** only if `lint`, `typecheck`, `test` and `test:types` pass.
+An extension's checks run from its folder, after the root's `npm ci && npm run build`, whose install, helpers and `db.d.ts` its tests use: `npm ci`, `npm test`, `npm run test:types`, then `npm pack --dry-run`; its README § Development lists them.
+
+A task is **done** only if `lint`, `typecheck`, `test` and `test:types` pass, and an extension's own when it changes.
 
 ## Method
 
