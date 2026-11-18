@@ -22,7 +22,7 @@ afterAll(async () => { await typedSql?.end({ timeout: 1 }); });
 beforeAll(async () => {
   await u.t.pool.query(`CREATE TABLE written (k serial, c_text text, c_int8 int8, c_numeric numeric, c_bool bool,
     c_json json, c_jsonb jsonb, c_bytea bytea, c_date date, c_ts timestamp, c_tstz timestamptz, c_interval interval,
-    c_point point, c_int4a int4[], c_texta text[], c_jsonba jsonb[], c_datea date[], c_tsa timestamp[],
+    c_point point, c_int4a int4[], c_texta text[], c_jsonba jsonb[], c_byteaa bytea[], c_datea date[], c_tsa timestamp[],
     c_mood public.mood, c_mooda public.mood[], c_pref public.preferences, c_ticket public.ticket_no, c_tags public.tag_list)`);
 });
 
@@ -55,6 +55,9 @@ const cases: [string, string, unknown][] = [
   ['a string with an offset to timestamptz', into('c_tstz'), '2026-06-01 12:00:00+02'],
   ['a string with no offset to timestamptz', into('c_tstz'), '2026-06-01 12:00:00'],
   ['a Date at local midnight to date', into('c_date'), new Date(2026, 5, 1)],
+  ['a Date of 100 BC to timestamptz', into('c_tstz'), new Date('-000099-06-01T10:00:00.000Z')],
+  ['a Date of 100 BC to date', into('c_date'), new Date('-000099-06-01T10:00:00.000Z')],
+  ['a Date of the year 50 to timestamptz', into('c_tstz'), new Date('0050-06-01T10:00:00.000Z')],
   ['a string to date', into('c_date'), '2026-06-01'],
   ['a Buffer to bytea', into('c_bytea'), Buffer.from('deadbeef', 'hex')],
   ['a Uint8Array to bytea', into('c_bytea'), new Uint8Array([0xde, 0xad])],
@@ -74,6 +77,8 @@ const cases: [string, string, unknown][] = [
   ['an empty array to text[]', into('c_texta'), []],
   ['an array of two dimensions to text[]', into('c_texta'), [['a', 'b'], ['c', 'd']]],
   ['an array of objects to jsonb[]', into('c_jsonba'), [{ a: 1 }, null]],
+  ['an array of a Buffer and NULL to bytea[]', into('c_byteaa'), [Buffer.from('dead', 'hex'), null]],
+  ['an array of a Uint8Array to bytea[]', into('c_byteaa'), [new Uint8Array([0xbe, 0xef])]],
   ['an array of Dates to date[]', into('c_datea'), [new Date(2026, 5, 1)]],
   ['an array of Dates to timestamp[]', into('c_tsa'), [at]],
   ['a string to an enum', into('c_mood'), 'ok'],
