@@ -306,6 +306,12 @@ describe('the calls of Zapatos 6.6.1 keep their types (#696)', () => {
     void mockImplementation(db.serializable, async (_, callback) => callback(txn));
   });
 
+  // #702: a value typed never, as in a branch TypeScript has ruled out, infers the client given as never
+  test('a value typed never gives the callback the TxnClient… of its level', () => {
+    expectTypeOf(db.serializable(null as never, async c => c)).resolves.toEqualTypeOf<db.TxnClientForSerializable>();
+    expectTypeOf(db.transaction(null as never, db.IsolationLevel.ReadCommitted, async c => c)).resolves.toEqualTypeOf<db.TxnClient<db.IsolationSatisfying<db.IsolationLevel.ReadCommitted>>>();
+  });
+
   // #702: a function generic over any function infers the client given as any, as a Jest-shaped mock does
   test('a shortcut given to a function generic over its type still refuses what is no queryable', () => {
     const serializable = wrap(db.serializable);
