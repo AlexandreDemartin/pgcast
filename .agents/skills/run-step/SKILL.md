@@ -52,7 +52,7 @@ The issue is the agent's brief, from `.github/ISSUE_TEMPLATE/task.md`, in Englis
 | `normal` | tests, opt-in addition (condition, option, codegen emitter) | posted, the builder goes on | `branch-reviewer`; a fresh `builder` only for blockers; no verify | Show |
 | `high` | `core.ts` (compilation, escaping), `transaction.ts`, driver interface, existing public types, default codegen output | posted, the builder stops until checked | `branch-reviewer` with the subject's lens; fresh `builder`; verify | Ask |
 
-- The level follows the file the change lands in, found by `git grep`, not the issue's title: `{ col: self }` never passes through `conditions.ts`, so #106 was `high` from the start.
+- The level follows the file the change lands in, found by `git grep`, not the issue's title: `{ col: self }` never passes through `conditions.ts`, so #106 was `high` from the start. A refusal added inside `compileExpression` is `high` even when no SQL changes (#677).
 
 The plan: skill `plan-and-proofs`; the comments: skill `review-comments`; the gate: skill `merge-gate`.
 
@@ -71,7 +71,7 @@ The plan: skill `plan-and-proofs`; the comments: skill `review-comments`; the ga
 
 An agent knows only what its brief says.
 
-- **`builder`**: the issue number, the decisions taken with the user; to resume at `high`, "plan checked" and any correction; to fix, the PR, its branch and the blocking items (`file:line`, expected fix).
+- **`builder`**: the issue number, the decisions taken with the user; to resume at `high`, "plan checked" and any correction; to fix, the PR, its branch and the blocking items (`file:line`, expected fix), each a red test commit, then its fix commit (#550).
   - Started as the typed `builder`; only if the harness answers "Agent type 'builder' not found", a general-purpose agent told to read `.claude/agents/builder.md` first.
   - Effort: the session's, and `effort: high` for a `high` step (plan and build) and for a round of fixes, the re-run of a failure the review found (Anthropic, "Optimizing for cost and intelligence").
 - **`branch-reviewer`**: the PR, the **Risk** and its blockers, the lens (`sql`, `types`, `codegen`, `compat`) if the issue has one; in `verify` mode, the blocking items and the range of the fix commits.

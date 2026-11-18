@@ -208,9 +208,9 @@ jobs:
           npm run docs:schema
           git add --intent-to-add zapatos
           git diff --exit-code -- zapatos
-      - name: Each deprecation message of src/ has its CHANGELOG.md line
-        # check:agents runs it too; here it also covers a change to CHANGELOG.md alone
-        run: node scripts/check-deprecations.mjs
+      - name: Each deprecation message of src/ has its CHANGELOG.md line, and no entry is written twice
+        # check:agents runs them too; here they also cover a change to CHANGELOG.md alone
+        run: node scripts/check-deprecations.mjs && node scripts/check-changelog-entries.mjs
         working-directory: .
       - name: Every example runs against Postgres
         run: npm run docs:examples
