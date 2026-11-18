@@ -463,7 +463,8 @@ How it ends:
 | the last batch is read, or the loop `break`s or `return`s | `CLOSE` | |
 | the loop throws | `CLOSE` | the loop's error goes out, whatever `CLOSE` gives |
 | the fragment's `runResultTransform` throws | `CLOSE` | its error goes out |
-| a query of the loop fails, on `pg` | no `CLOSE`, which Postgres would refuse in the aborted transaction (25P02) | that query's error goes out. The status is the last one `pg` received, which can come just after the error: a `CLOSE` can then still go out, and its 25P02 is dropped. A client that reports no status, another driver's, sends `CLOSE`: its 25P02 is dropped when the loop threw, but rejects a `break` after an error the loop caught |
+| a query of the loop fails, on `pg` | no `CLOSE`, which Postgres would refuse in the aborted transaction (25P02) | that query's error goes out, and `transaction()` retries a 40001 or 40P01. The status is the last one `pg` received, which can come just after the error: a `CLOSE` can then still go out. A client that reports no status, another driver's, sends `CLOSE`. Either way its 25P02 is dropped, in a `for await` as in a `finally` that calls `return()`, and a `break` after an error the loop caught ends the loop |
+| `pg` reports the client outside a transaction block: a `COMMIT` of yours came before the loop ended | no `CLOSE`, which Postgres would refuse (34000) | the cursor went with the transaction |
 | a `FETCH` fails: a row whose computation fails (22012), a 40001 found mid-way | no `CLOSE` | its error goes out unchanged; `transaction()` retries a 40001 or 40P01, and the next attempt reads every batch again |
 | the generator is left, neither finished nor `return()`ed | nothing | Postgres closes the cursor at `COMMIT` or `ROLLBACK`; its number stays taken on that client |
 
@@ -472,7 +473,7 @@ How it ends:
 Two cases go wrong, by design:
 
 - A cursor declared before a [`savepoint()`](#savepoint) whose own `FETCH` fails inside it stays open after the `ROLLBACK TO`, unusable: the next `cursor()` on that client gets 42P03. Only a `next()` called by hand inside a savepoint gets there.
-- `transaction()` marks its client once for all its attempts, so a generator made in one attempt and read in the next is not refused: its `FETCH` gets 34000, its cursor gone with the `ROLLBACK`. Make it in the attempt that reads it.
+- `transaction()` marks its client once for all its attempts, so a generator that read a batch in one attempt and goes on in the next is not refused: its `FETCH` gets 34000, its cursor gone with the `ROLLBACK`. One made in an attempt and first read in the next sends its `DECLARE` then, and reads all its rows. Make it in the attempt that reads it.
 
 Postgres refuses before any row, and its error goes out as it is:
 

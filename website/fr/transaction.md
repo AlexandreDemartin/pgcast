@@ -1,5 +1,5 @@
 ---
-english: cb715aebf4ed
+english: 24dfef022415
 ---
 
 # Transactions
@@ -467,7 +467,8 @@ Comment elle se termine :
 | le dernier batch est lu, ou la boucle fait `break` ou `return` | `CLOSE` | |
 | la boucle lève une erreur | `CLOSE` | l’erreur de la boucle sort, quoi que donne `CLOSE` |
 | le `runResultTransform` du fragment lève une erreur | `CLOSE` | son erreur sort |
-| une requête de la boucle échoue, sur `pg` | pas de `CLOSE`, que Postgres refuserait dans la transaction annulée (25P02) | l’erreur de cette requête sort. Ce statut est le dernier reçu par `pg`, et il peut arriver juste après l’erreur : un `CLOSE` peut alors encore partir, et son 25P02 est ignoré. Un client qui n’indique aucun statut, celui d’un autre driver, envoie `CLOSE` : son 25P02 est ignoré quand la boucle a levé une erreur, mais rejette un `break` après une erreur que la boucle a interceptée |
+| une requête de la boucle échoue, sur `pg` | pas de `CLOSE`, que Postgres refuserait dans la transaction annulée (25P02) | l’erreur de cette requête sort, et `transaction()` réessaie un 40001 ou un 40P01. Ce statut est le dernier reçu par `pg`, et il peut arriver juste après l’erreur : un `CLOSE` peut alors encore partir. Un client qui n’indique aucun statut, celui d’un autre driver, envoie `CLOSE`. Dans les deux cas, son 25P02 est ignoré, dans un `for await` comme dans un `finally` qui appelle `return()`, et un `break` après une erreur que la boucle a interceptée termine la boucle |
+| `pg` indique que le client est hors d’un bloc de transaction : un `COMMIT` de votre part est passé avant la fin de la boucle | pas de `CLOSE`, que Postgres refuserait (34000) | le curseur est parti avec la transaction |
 | un `FETCH` échoue : une ligne dont le calcul échoue (22012), un 40001 détecté en cours de route | pas de `CLOSE` | son erreur sort inchangée ; `transaction()` réessaie un 40001 ou un 40P01, et la tentative suivante relit chaque batch |
 | le générateur est abandonné, ni terminé ni arrêté par `return()` | rien | Postgres ferme le curseur au `COMMIT` ou au `ROLLBACK` ; son numéro reste pris sur ce client |
 
@@ -476,7 +477,7 @@ Comment elle se termine :
 Deux cas tournent mal, à dessein :
 
 - Un curseur déclaré avant un [`savepoint()`](#savepoint), et dont le `FETCH` échoue à l’intérieur de celui-ci, reste ouvert après le `ROLLBACK TO`, inutilisable : le `cursor()` suivant sur ce client reçoit 42P03. Seul un `next()` appelé à la main dans un savepoint en arrive là.
-- `transaction()` marque son client une seule fois pour toutes ses tentatives : un générateur créé dans une tentative et lu dans la suivante n’est donc pas refusé, et son `FETCH` reçoit 34000, son curseur parti avec le `ROLLBACK`. Créez-le dans la tentative qui le lit.
+- `transaction()` marque son client une seule fois pour toutes ses tentatives : un générateur qui a lu un batch dans une tentative et continue dans la suivante n’est donc pas refusé, et son `FETCH` reçoit 34000, son curseur parti avec le `ROLLBACK`. Un générateur créé dans une tentative et lu pour la première fois dans la suivante envoie alors son `DECLARE`, et lit toutes ses lignes. Créez-le dans la tentative qui le lit.
 
 Postgres refuse avant toute ligne, et son erreur sort telle quelle :
 
