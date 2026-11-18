@@ -63,7 +63,7 @@ Sources: GitHub docs "Stack code changes in pull requests", Thoughtworks Radar (
 
 ## Branch
 
-- `<type>/<issue>-<slug>`, types `fix`, `feat`, `test`, `docs`, `chore` (CI included): `fix/26-upsert-update-values`.
+- `<type>/<issue>-<slug>`, types `fix`, `feat`, `test`, `docs`, `chore`: `fix/26-upsert-update-values`.
 - From an up-to-date `origin/master`, or from the layer below in a stack.
 
 ## Commits
