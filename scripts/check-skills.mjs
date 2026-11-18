@@ -1,11 +1,12 @@
 // Copyright (C) 2026 Alexandre Demartin
 // The checks of `npm run check:agents` on .agents/skills (.agents/README.md § Writing a skill): each SKILL.md's
-// frontmatter, its size, and the skills it cites.
+// frontmatter, and the size and citations of each SKILL.md and of the reference.md beside it, read in full when its
+// core names a case, so under the same limits.
 import {existsSync, readdirSync, readFileSync} from 'node:fs';
 import {join} from 'node:path';
 
 const maxDescriptionLength = 350;
-const maxLines = 150;  // hard limits of a skill or an agent; the budget is ~100 lines
+const maxLines = 150;  // hard limits of a skill, its reference or an agent; the budget is ~100 lines
 const maxWords = 1800;  // and ~1,200 words
 
 /** Lines and words as `wc -l` and `wc -w` count them. */
@@ -16,7 +17,7 @@ export function sizeOf(text) {
   };
 }
 
-/** One error per limit of a skill or an agent that `text` exceeds; empty if none. */
+/** One error per limit of a skill, its reference or an agent that `text` exceeds; empty if none. */
 export function sizeErrors(path, text) {
   const {lines, words} = sizeOf(text), errors = [];
   if (lines > maxLines) errors.push(`${path}: ${lines} lines, max ${maxLines}`);
@@ -53,6 +54,11 @@ export function checkSkills(directory) {
     }
     const text = readFileSync(path, 'utf8');
     files.push(path);
+    const reference = join(directory, skill, 'reference.md');
+    if (existsSync(reference)) {
+      files.push(reference);
+      errors.push(...sizeErrors(reference, readFileSync(reference, 'utf8')));
+    }
     const frontmatter = frontmatterOf(text);
     if (!frontmatter) {
       errors.push(`${path}: missing frontmatter`);
