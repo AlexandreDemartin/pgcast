@@ -11,6 +11,22 @@ export interface SQLQuery {
 }
 
 /**
+ * An event of `transaction()`'s retries, as `transactionEventListener` gets it,
+ * at each point where `transactionListener` gets its message, with the same
+ * numbers: `rollback` when an attempt failed with 40001 or 40P01 and another
+ * is left, before the wait of `delayMs`; `retry` when the next attempt starts,
+ * before its `START TRANSACTION`; `giveUp` when the last attempt failed.
+ * A listener that throws makes `transaction()` reject with its error, as a
+ * throwing `transactionListener` does, once its `ROLLBACK` is sent; an error
+ * whose `code` is 40001 or 40P01, thrown at `retry`, fails that attempt, which
+ * is retried.
+ */
+export type TransactionEvent =
+  | { type: 'rollback'; code: '40001' | '40P01'; attempt: number; maxAttempts: number; delayMs: number }
+  | { type: 'retry'; attempt: number; maxAttempts: number }
+  | { type: 'giveUp'; code: '40001' | '40P01'; attempt: number; maxAttempts: number };
+
+/**
  * The runtime configuration. A key added by pgcast is optional, so that a
  * `Config` written for Zapatos 6.6.1 still compiles; read it with `?? <default>`.
  */
@@ -29,6 +45,7 @@ export interface Config {
   queryListener?(query: SQLQuery, txnId?: number): void;
   resultListener?(result: any, txnId?: number, elapsedMs?: number, query?: SQLQuery): void;
   transactionListener?(message: string, txnId?: number): void;
+  transactionEventListener?(event: TransactionEvent, txnId?: number): void;  // called right after transactionListener, at its three points
 }
 export type NewConfig = Partial<Config>;
 

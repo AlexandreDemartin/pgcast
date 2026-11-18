@@ -106,7 +106,7 @@ describe('transaction() on a client that cannot tell its transaction status', ()
 describe('transaction() on a pool that is not pg’s', () => {
   afterEach(() => {
     db.setConfig({ transactionRetryDelay: { minMs: 25, maxMs: 250 }, transactionAttemptsMax: 5, transactionRequiresCommit: false });
-    db.setConfig({ transactionEventListener: undefined } as db.NewConfig);
+    db.setConfig({ transactionEventListener: undefined } as unknown as db.NewConfig);  // exactOptionalPropertyTypes refuses it
     vi.restoreAllMocks();
   });
 

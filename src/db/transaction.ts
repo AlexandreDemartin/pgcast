@@ -9,7 +9,7 @@ import { isDatabaseError } from './pgErrors';
 import { wait, warnOnce } from './utils';
 import { sql, raw } from './core';
 import { getConfig } from './config';
-import type { SQLQuery } from './config';
+import type { SQLQuery, TransactionEvent } from './config';
 import type { Queryable } from './core';
 
 
@@ -154,6 +154,8 @@ const attemptsMade = (max: number) => {
 
 let txnSeq = 0;
 
+type RetriedCode = Extract<TransactionEvent, { type: 'rollback' }>['code'];
+
 /**
  * Provide a database client to the callback, whose queries are then wrapped in 
  * a database transaction. The transaction is committed, retried, or rolled back
@@ -236,7 +238,7 @@ export async function transaction<T, M extends IsolationLevel, C = unknown>(
 
     const
       config = getConfig(),
-      { transactionListener } = config,
+      { transactionListener, transactionEventListener } = config,
       // the attempts the loop below makes, so that its messages count them: one for 0, a negative or NaN, three
       // for 2.5 (see https://github.com/AlexandreDemartin/pgcast/issues/179); Number() keeps '3' and 3n working
       maxAttempts = attemptsMade(config.transactionAttemptsMax),
@@ -245,7 +247,10 @@ export async function transaction<T, M extends IsolationLevel, C = unknown>(
     for (let attempt = 1; ; attempt++) {
       let result: T, commandTag: string | undefined;
       try {
-        if (attempt > 1 && transactionListener) transactionListener(`Retrying transaction, attempt ${attempt} of ${maxAttempts}`, txnId);
+        if (attempt > 1) {
+          if (transactionListener) transactionListener(`Retrying transaction, attempt ${attempt} of ${maxAttempts}`, txnId);
+          if (transactionEventListener) transactionEventListener({ type: 'retry', attempt, maxAttempts }, txnId);
+        }
 
         await sql`START TRANSACTION ISOLATION LEVEL ${raw(isolationLevel)}`.run(txnClient);
         result = await (callback as Callback<T, M>)(txnClient as TxnClient<IsolationSatisfying<M>>);
@@ -264,14 +269,24 @@ export async function transaction<T, M extends IsolationLevel, C = unknown>(
 
         // a thrown null or undefined is rethrown as it is (#179); isDatabaseError() gives false for it since #178
         if (err != null && isDatabaseError(err, "TransactionRollback_SerializationFailure", "TransactionRollback_DeadlockDetected")) {
+          // the listeners get the code as the message prints it, read once for both, where the message read it: a String
+          // object, which isDatabaseError() also matches, is given to the event as its text (see https://github.com/AlexandreDemartin/pgcast/issues/725)
           if (attempt < maxAttempts) {
             const delayBeforeRetry = Math.round(minMs + (maxMs - minMs) * Math.random());
-            if (transactionListener) transactionListener(`Transaction rollback (code ${err.code}) on attempt ${attempt} of ${maxAttempts}, retrying in ${delayBeforeRetry}ms`, txnId);
+            if (transactionListener || transactionEventListener) {
+              const code = `${err.code}` as RetriedCode;
+              if (transactionListener) transactionListener(`Transaction rollback (code ${code}) on attempt ${attempt} of ${maxAttempts}, retrying in ${delayBeforeRetry}ms`, txnId);
+              if (transactionEventListener) transactionEventListener({ type: 'rollback', code, attempt, maxAttempts, delayMs: delayBeforeRetry }, txnId);
+            }
             await wait(delayBeforeRetry);
             continue;
 
           } else {
-            if (transactionListener) transactionListener(`Transaction rollback (code ${err.code}) on attempt ${attempt} of ${maxAttempts}, giving up`, txnId);
+            if (transactionListener || transactionEventListener) {
+              const code = `${err.code}` as RetriedCode;
+              if (transactionListener) transactionListener(`Transaction rollback (code ${code}) on attempt ${attempt} of ${maxAttempts}, giving up`, txnId);
+              if (transactionEventListener) transactionEventListener({ type: 'giveUp', code, attempt, maxAttempts }, txnId);
+            }
             throw err;
           }
 
