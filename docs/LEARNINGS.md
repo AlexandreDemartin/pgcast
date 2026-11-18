@@ -209,6 +209,9 @@ Candidates for a check, a rule or a skill line.
 - #750 — A per-member check of a union sees only what subtype reduction leaves: `cond ? sql<SQL, any> : count()` is already `SQLFragment<any>`, so a negative test can refuse only a union whose members survive the reduction — branch-reviewer
 - #750 — Probe a wording a review prescribes for a type rule before it goes in: "contains a type parameter" was false for `SQLFragment<R[]>`, and a constrained `R` compiles on 5.9 and 7 but not on 4.1 — builder
 - #750 — When docs widen a claim to a new case, recheck the workaround next to it for that case: the cast to `SQLFragmentMap` stopped fitting `SQLFragment<R>` — branch-reviewer
+- #753 — A cursor guide's claims about a failed attempt depend on the plan (a sort evaluates a computed column before the first fetch) and on external writes surviving rollback; probe a retry that deletes a delivered row between attempts — codex
+- #753 — An index whose own write raises 40001 makes `transaction()` retry and the caller's `await` resolve; never write "the caller gets the error" for an error thrown in a retried callback — codex
+- #753 — Codex as builder and reviewer: its sandbox cannot write `.git`, so it lists commits in `commits.md` and the orchestrator commits them (`codex-commit.sh`), which keeps the leak-check and the push in one place — orchestrator
 
 ## Minors kept
 
@@ -233,3 +236,4 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #748 — cursor(): a `COMMIT` of yours that fails and is caught inside the loop leaves `T` for a moment, so a `break` can reject with CLOSE's 34000 (1/40 direct, 20/20 through a chunk-splitting proxy); drop CLOSE's 34000 too, or name the case in the `I` row of `website/transaction.md:467` — branch-reviewer
 - #748 — `website/transaction.md:466` (FR `:470`) "a `break` after an error the loop caught ends the loop": add that the transaction stays aborted, so `COMMIT` gets `ROLLBACK` (`PGCAST_DEP003`, or a rejection under `transactionRequiresCommit`), link to `:62` — branch-reviewer
 - #750 — website/select.md:265 (and FR :269): the cast shown, `l as db.SQLFragmentMap`, fits the map forwarder only; for a `db.SQLFragment<R>` forwarder the cast is `l as db.SQLFragment<any>` (TS2352 otherwise) — branch-reviewer
+
