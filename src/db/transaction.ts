@@ -539,9 +539,9 @@ export async function advisoryXactLock(
  * - `{}`: no query.
  *
  * Postgres keeps a setting until `COMMIT` or `ROLLBACK`, so an attempt that
- * `transaction()` retries never sees the last one's, and through a `RELEASE`;
- * a `ROLLBACK TO` a savepoint taken before it gives back the value from before
- * that savepoint. After the transaction, `current_setting(name, true)` reads
+ * `transaction()` retries never sees the last one's. It keeps it through a
+ * `RELEASE` too; a `ROLLBACK TO` a savepoint taken before it gives back the
+ * value from before that savepoint. After the transaction, `current_setting(name, true)` reads
  * `''` on that connection for a name of your own with no session value, not
  * `NULL`: a policy that casts it writes
  * `NULLIF(current_setting('app.tenant', true), '')::int`. Postgres checks each
