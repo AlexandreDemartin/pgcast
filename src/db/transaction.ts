@@ -373,3 +373,53 @@ export async function readCommittedRO<T, C = unknown>(txnClientOrQueryable: Quer
 export async function serializableRODeferrable<T, C = unknown>(txnClientOrQueryable: Queryable | TxnClientForSerializableRODeferrable | PoolLike<C>, callback: (client: TxnClientOf<NoInfer<C>, TxnClientForSerializableRODeferrable, IsolationSatisfying<IsolationLevel.SerializableRODeferrable>>) => Promise<T>) {
   return transaction(txnClientOrQueryable, IsolationLevel.SerializableRODeferrable, callback);
 }
+
+/**
+ * Run the callback inside a savepoint of the transaction `txnClient` is in,
+ * and return a promise of what it resolves to. The callback gets that same
+ * client. The SQL, the same on every call:
+ *
+ * `SAVEPOINT pgcast_savepoint`, the callback's queries, then
+ * `RELEASE SAVEPOINT pgcast_savepoint`. If the callback or that `RELEASE`
+ * rejects, `ROLLBACK TO SAVEPOINT pgcast_savepoint` and
+ * `RELEASE SAVEPOINT pgcast_savepoint`, then it rejects with that error.
+ *
+ * - On 40001 or 40P01, it rejects at once, with no `ROLLBACK TO`: the
+ *   transaction stays aborted, and `transaction()` retries the whole of its
+ *   callback, this savepoint included. A savepoint never retries on its own.
+ * - A callback that catches a query's error and returns gets 25P02 from
+ *   `RELEASE`: its work is undone, and this rejects with that 25P02. So a 40001
+ *   or 40P01 caught in the callback is not retried: let them out.
+ * - Nested savepoints stack under the one name, as Postgres stacks them; the
+ *   name is reserved, so don't use `pgcast_savepoint` yourself. `await` each:
+ *   two at once on one client mix their stacks.
+ * - Only the `code` is read, as `transaction()` reads it: a 40001 thrown from
+ *   JavaScript, then caught, leaves the savepoint established.
+ * - Outside a transaction block, Postgres refuses the `SAVEPOINT` (25P01): it
+ *   rejects with that, and the callback is never called.
+ * @param txnClient The client of a transaction: a `transaction()` callback's,
+ * of any driver, or a `pg.PoolClient` you sent `BEGIN` on
+ * @param callback A callback function that runs queries on the client provided
+ * to it
+ */
+export async function savepoint<T, C extends TxnClient<IsolationLevel> | TxnClientLike<PoolClientLike, IsolationLevel>>(
+  txnClient: C,
+  callback: (client: NoInfer<C>) => Promise<T>
+): Promise<T> {
+
+  await sql`SAVEPOINT pgcast_savepoint`.run(txnClient);
+  try {
+    const result = await callback(txnClient as NoInfer<C>);
+    await sql`RELEASE SAVEPOINT pgcast_savepoint`.run(txnClient);
+    return result;
+
+  } catch (err: any) {
+    // rethrown as it is, so that the outer transaction() rolls back and retries: a thrown null or undefined is not one
+    if (err != null && isDatabaseError(err, "TransactionRollback_SerializationFailure", "TransactionRollback_DeadlockDetected")) throw err;
+
+    // RELEASE after ROLLBACK TO, which leaves the savepoint established, so that an outer one's ROLLBACK TO undoes its own work
+    await sql`ROLLBACK TO SAVEPOINT pgcast_savepoint`.run(txnClient);
+    await sql`RELEASE SAVEPOINT pgcast_savepoint`.run(txnClient);
+    throw err;
+  }
+}
