@@ -1539,4 +1539,23 @@ describe('savepoint() (#723)', () => {
     });
     expect(await notes()).toEqual(['kept', 'kept too']);
   });
+
+  it('limitation: a Proxy of the client counts from 1 again: a 40001 of the inner savepoint, caught one level up, leaves the outer work in', async () => {
+    const names: string[] = [];
+    db.setConfig({ queryListener: q => { const [, name] = /^SAVEPOINT (\S+)$/.exec(q.text) ?? []; if (name) names.push(name); } });
+    let attempts = 0;
+    await db.serializable(t.pool, async c => {
+      attempts++;
+      await write(c, 'base');
+      const err = await db.savepoint(c, async outer => {
+        await write(outer, 'outer work');
+        await db.savepoint(new Proxy(outer, {}), inner => raise(inner, '40001')).catch(() => undefined);
+      }).catch((e: unknown) => e);
+      expect(db.isDatabaseError(err, 'InvalidTransactionState_InFailedSqlTransaction')).toBe(true);
+      await write(c, 'after');
+    });
+    expect(names).toEqual(['pgcast_savepoint_1', 'pgcast_savepoint_1']);  // the outer one's ROLLBACK TO goes back to the inner one
+    expect(await notes()).toEqual(['after', 'base', 'outer work']);
+    expect(attempts).toBe(1);
+  });
 });
