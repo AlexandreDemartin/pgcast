@@ -178,7 +178,18 @@ describe('the difference README § How it differs lists', () => {
     expect((await u.pglite().query<{ n: number }>("SELECT count(*)::int AS n FROM orgs WHERE country = 'PT'")).rows[0].n).toBe(0);
   });
 
-  it('refuses serializable() inside an open transaction() of PGlite\'s own with 25001, and its ROLLBACK ends PGlite\'s', async () => {
+  it('commits an open transaction() of PGlite\'s own with the COMMIT of a readCommitted() inside it', async () => {
+    try {
+      await u.pglite().transaction(async tx => {
+        await tx.query("INSERT INTO orgs VALUES ('PR', 'own', 'n')");
+        await db.readCommitted(u.pool(), c => db.sql`INSERT INTO orgs VALUES ('PR', 'adapter', 'n')`.run(c));
+        await tx.rollback();
+      });
+      expect((await u.pglite().query<{ code: string }>("SELECT code FROM orgs WHERE country = 'PR' ORDER BY code")).rows.map(r => r.code)).toEqual(['adapter', 'own']);
+    } finally { await u.pglite().query("DELETE FROM orgs WHERE country = 'PR'"); }
+  });
+
+  it('refuses serializable() inside an open transaction() of PGlite\'s own that ran a query, with 25001, and its ROLLBACK ends PGlite\'s', async () => {
     const outcome = await u.pglite().transaction(async tx => {
       await tx.query("INSERT INTO orgs VALUES ('PS', 'own', 'n')");
       return db.serializable(u.pool(), c => db.sql`INSERT INTO orgs VALUES ('PS', 'adapter', 'n')`.run(c)).then(() => 'ran', (e: any) => e.code);
