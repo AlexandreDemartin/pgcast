@@ -1,0 +1,7 @@
+{
+  // The package's tests, type-checked as the root's are (../../../test/tsconfig.json): against src/db and the stub
+  // schema of src/typings. The fit of asPool() to the core's declarations: ./types/tsconfig.json.
+  "extends": "../../../test/tsconfig.json",
+  "include": ["./**/*", "../src/**/*"],
+  "exclude": ["./types"]
+}
