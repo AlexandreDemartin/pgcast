@@ -37,13 +37,13 @@ await db.serializable(pool, async txn => {
 });
 ```
 
-- `asPool(sql)` never creates, configures nor ends `sql`: you do, as with a `pg.Pool`, which Zapatos "doesn't manage" for you either.
-- `run(pool)` runs each query with `sql.unsafe()`, on whichever connection postgres.js picks. `transaction()` and its shortcuts (`serializable()`…) take a connection with `sql.reserve()`, run `START TRANSACTION`, the callback and `COMMIT` on it, retry on a 40001 or a 40P01, and `release()` it at the end.
+- `asPool(sql)` never creates, configures nor ends `sql`: you do, as with a `pg.Pool`, which Zapatos "doesn't manage" for you either. It takes the `sql` that `postgres()` returns, and throws on a transaction's or a reserved connection's, which has no `reserve()`.
+- `run(pool)` runs each query with `sql.unsafe()`, unprepared, on whichever connection postgres.js picks. `transaction()` and its shortcuts (`serializable()`…) take a connection with `sql.reserve()`, run `START TRANSACTION`, the callback and `COMMIT` on it, retry on a 40001 or a 40P01, and `release()` it at the end.
 - postgres.js 4 is an ES module only: `import postgres from 'postgres'`, or, from CommonJS on Node 20.19 or 22.12 and later, `require('postgres').default`. The adapter is CommonJS and takes either major.
 
 ## What it reads
 
-Each column is parsed by its type with `pg`'s own parsers ([pg-types](https://github.com/brianc/node-pg-types) 2, which `pg` 8 uses), from the rows postgres.js gives raw. Its `types` option and its own parsers never reach pgcast's rows. Where postgres.js parses otherwise by default:
+Each column is parsed by its type with `pg`'s own parsers ([pg-types](https://github.com/brianc/node-pg-types) 2, which `pg` 8 uses), from the rows postgres.js gives raw. Its `types` option and its own parsers never reach pgcast's rows, nor would a value transform, which `asPool()` refuses. Where postgres.js parses otherwise by default:
 
 | Type | `pg`, and the adapter | postgres.js 3.4 | postgres.js 4.x |
 |---|---|---|---|
@@ -61,7 +61,7 @@ The others (`int2`, `int4`, `float8`, `int8` and `numeric` as strings, `bool`, `
 
 ## What it writes
 
-Each value is prepared as `pg` prepares it (its `prepareValue()`: a `Date` in local time with its offset, an array as an array literal, an object as JSON, `toPostgres()`, `undefined` as `NULL`), then sent with the type `unknown`, which Postgres infers from the query as it does for `pg`'s parameters. postgres.js writes each value for the type Postgres asks for instead, so by default:
+Each value is prepared as `pg` prepares it (its `prepareValue()`: a `Date` in local time with its offset, an array as an array literal, an object as JSON, `toPostgres()`, `undefined` as `NULL`), then sent with the type `unknown`, a `NULL` too, which Postgres infers from the query as it does for `pg`'s parameters. postgres.js writes each value for the type Postgres asks for instead, so by default:
 
 | Value | `pg`, and the adapter | postgres.js 3.4 | postgres.js 4.x |
 |---|---|---|---|
@@ -75,10 +75,11 @@ Each value is prepared as `pg` prepares it (its `prepareValue()`: a `Date` in lo
 ## How it differs from pg
 
 - **A Buffer for a column other than `bytea`** is stored as its hex text, `\x6869`, where `pg` sends its bytes: postgres.js can't send a binary value as `unknown`. pgcast's `Insertable` types a Buffer for a `bytea` column only.
-- **`.prepared(name)`** prepares the query (`prepare: true`), under a name postgres.js gives it: `name` is ignored.
+- **`.prepared(name)`** runs the query unprepared, as the others: postgres.js 4 runs a prepared statement again after an error, or once Postgres no longer has it (26000, after a `DEALLOCATE ALL`), with each value serialized for the type Postgres then gives, so JSON text would be stored as a JSON string, even where `pg` refuses it. `name` is ignored; several statements are refused, as by `pg`.
 - **A `BEGIN` run on the pool** is refused by postgres.js (`UNSAFE_TRANSACTION`), as the next query may go to another connection; `pg` runs it. Use `transaction()`.
 - **Errors** are postgres.js's `PostgresError`, unchanged: `code` is the SQLSTATE, as in `pg`, so `db.isDatabaseError()` and the retry of `transaction()` work; the other fields have postgres.js's names (`constraint_name`, `table_name`).
-- **A column or row `transform`** (`postgres.camel`) makes `asPool()` throw: pgcast reads the columns under the names Postgres gives them. Give pgcast a `postgres()` of its own.
+- **A column, value or row `transform`** (`postgres.camel`) makes `asPool()` throw: pgcast reads the columns under the names Postgres gives them, and their values with `pg`'s parsers. Give pgcast a `postgres()` of its own.
+- **A connection killed inside `transaction()`** (`pg_terminate_backend()`), on postgres.js 3.4 with `max: 1`: the next `transaction()` waits forever (3.4.0, 3.4.1, 3.4.5, 3.4.7) or the process crashes with an uncaught `TypeError` (the other 3.4 releases; `sql.begin()` crashes too, except on 3.4.6). These are postgres.js's own `reserve()` and `begin()`; 4.x recovers.
 - **`pg.types.setTypeParser()`** changes the adapter's parsing too when npm installs one `pg-types` for both.
 - **A nested transaction**: `transaction()` passes the client of a transaction given to it through, but TypeScript wants it cast to the level's `TxnClient…` (#696).
 
@@ -94,7 +95,7 @@ npm test                  # the tables above, through pg and through the adapter
 npm run test:types        # the tests, and asPool() against the root's db.d.ts
 ```
 
-CI runs them on postgres.js 3.4.0, the lockfile's version and 4.1.1, on Postgres 14 and 18.
+CI runs them on postgres.js 3.4.0, the lockfile's version, 4.0.0 and 4.1.1, on Postgres 14 and 18.
 
 ## Publishing
 
