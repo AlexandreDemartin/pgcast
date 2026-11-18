@@ -1,5 +1,5 @@
 ---
-english: 1ba2be8122a5
+english: 02624e04518e
 description: "Annulez une partie d’une transaction et gardez le reste : réservez les places libres parmi plusieurs, dans une seule transaction."
 ---
 
@@ -14,7 +14,7 @@ Une cliente demande les places F7, F8 et F9 de la séance 1000, et Hollis a déj
 
 <<< ../examples/plain/savepoints_seats.ts{ts twoslash}
 
-`result` vaut `{ booked: ['F7', 'F9'], taken: ['F8'] }`. Le client du callback, `spClient`, est le client qu’il a reçu, typé tel quel : dans `serializable()`, un [`TxnClientForSerializable`](/fr/transaction#TxnClientForSerializable) (survolez-le). La transaction envoie :
+`result` vaut `{ booked: ['F7', 'F9'], taken: ['F8'] }`, et `spClient` est `txnClient` lui-même (survolez-le). La transaction envoie :
 
 <!-- probe: db.serializable(pool, txnClient => db.savepoint(txnClient, async () => {}).then(() => db.savepoint(txnClient, async () => { throw new Error(); })).catch(() => {}).then(() => db.savepoint(txnClient, async () => {}))) -->
 ```sql
@@ -35,21 +35,18 @@ RELEASE SAVEPOINT pgcast_savepoint_1
 COMMIT
 ```
 
-Le `catch` ne garde que le 23505 : toute autre erreur remonte jusqu’à `serializable()`. Le SQL de la requête du callback : [`insert()`](/fr/insert#insert) ; chaque cas qu’envoie `savepoint()`, et le nom d’un savepoint placé dans un autre : [`savepoint()`](/fr/transaction#savepoint).
+Le SQL de la requête du callback : [`insert()`](/fr/insert#insert) ; chaque cas qu’envoie `savepoint()`, les clients qu’elle accepte, et le nom d’un savepoint placé dans un autre : [`savepoint()`](/fr/transaction#savepoint).
 
 ## Laisser un conflit relancer la transaction {#let-a-conflict-retry-the-transaction}
 
-Sur un 40001 ou un 40P01 dans le savepoint, `savepoint()` est rejetée avec cette erreur et n’envoie pas de `ROLLBACK TO`, donc la transaction reste en échec. Laissez-la remonter, comme le fait le `throw err` de l’exemple : `transaction()` annule la transaction et exécute de nouveau tout son callback, savepoint de chaque place compris ([Retries](/fr/retries)).
-
-Un savepoint ne réessaie jamais de lui-même : après un 40001 ou un 40P01, la transaction est en échec, et le retry demande une nouvelle transaction, avec un nouvel instantané.
+Le `catch` ne garde que le 23505 et relance toute autre erreur. Sur un 40001 ou un 40P01 que le callback du savepoint laisse remonter, `savepoint()` est rejetée avec cette erreur et la transaction reste en échec ([`savepoint()`](/fr/transaction#savepoint)), donc seule une nouvelle transaction peut la réessayer : relancée, l’erreur atteint `serializable()`, qui annule la transaction et exécute de nouveau tout son callback, savepoint de chaque place compris ([Retries](/fr/retries)).
 
 ## Éviter les pièges {#avoid-the-pitfalls}
 
-- Un seul savepoint à la fois sur un client : attendez chacun avec `await`. Deux en même temps s’imbriquent dans l’ordre de leurs appels : deux places réservées avec `Promise.all()` font rejeter la transaction avec 3B001, et rien n’est réservé.
-- N’interceptez pas l’erreur d’une requête dans le callback du savepoint : une fois son travail annulé, `savepoint()` est rejetée avec 25P02. Interceptez-la autour de `savepoint()`, comme le fait l’exemple.
-- Hors d’une transaction, Postgres refuse le `SAVEPOINT` avec 25P01, et le callback ne s’exécute jamais : appelez `savepoint()` sur le client d’une transaction.
-
-Une `transaction()` appelée avec le client du callback d’une `transaction()` n’est pas un savepoint : elle n’envoie rien, et son callback rejoint la transaction extérieure ([Transmettre une transaction](/fr/transaction#passing-a-transaction-through)).
+- Un seul savepoint à la fois sur un client : attendez chacun avec `await`, comme le fait la boucle ; deux places réservées en même temps, avec `Promise.all()`, font rejeter la transaction avec 3B001 ([`savepoint()`](/fr/transaction#savepoint)).
+- Interceptez l’erreur d’une requête autour de `savepoint()`, comme le fait l’exemple : si le callback l’intercepte et se termine, `savepoint()` est rejetée avec 25P02, donc un 40001 qu’il intercepte n’est pas réessayé à cet endroit ; avec le `catch` de l’exemple, la transaction est rejetée avec ce 25P02 ([`savepoint()`](/fr/transaction#savepoint)).
+- Appelez `savepoint()` sur le client d’une transaction : hors d’une transaction, Postgres refuse son `SAVEPOINT` avec 25P01 ([`savepoint()`](/fr/transaction#savepoint)).
+- Une `transaction()` appelée avec le client du callback n’est pas un savepoint : elle rejoint la transaction extérieure ([Transmettre une transaction](/fr/transaction#passing-a-transaction-through)).
 
 ## Voir aussi {#see-also}
 
