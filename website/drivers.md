@@ -135,18 +135,20 @@ A driver that ignores `name`, as this one does, runs a [`prepared()`](/sql-templ
 
 ### Parse like pg {#parse-like-pg}
 
-The SQL is the same on any driver, and the types describe what `pg` gives. A driver of your own reads each type as `pg` reads it, or its rows don't match their types, and nothing says so:
+The SQL is the same on any driver, and the types describe what `pg` gives ([Value types](/runtime-config#value-types)). A driver of your own reads each type as `pg` reads it, or its rows don't match their types, and nothing says so:
 
-| Type | `pg` gives | `Selectable` |
-|---|---|---|
-| `timestamptz`, `timestamp` | a `Date` | `Date` |
-| `date` | a `Date`, at local midnight | `Date` |
-| `int8` | a string | `db.Int8String` |
-| `numeric` | a string | `db.NumericString` |
-| `bytea` | a `Buffer` | `Buffer` |
-| `json`, `jsonb` | the parsed value | `db.JSONValue` |
+| Type | `pg` gives |
+|---|---|
+| `timestamptz`, `timestamp` | a `Date` |
+| `date` | a `Date`, at local midnight |
+| `int8` | a string |
+| `numeric` | a string |
+| `bytea` | a `Buffer` |
+| `json`, `jsonb` | the parsed value |
 
-Both adapters read each column with `pg`'s parsers ([pg-types](https://github.com/brianc/node-pg-types) 2), from the text their driver gives, and write each value as `pg` writes it. Where each driver alone reads otherwise: postgres.js's [What it reads](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters/postgres-js#what-it-reads), PGlite's [What it reads](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters/pglite#what-it-reads). Their source and their tests, which read each type through `pg` and through the adapter, are in [`adapters/`](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters).
+It writes each value as `pg` writes it too, or Postgres stores another value: `pg` sends a `Date` in local time, with its offset, where the wrapper above, given PGlite's own `query()`, sends it in UTC, so a `Date` at 05:00 on 1 March in Tokyo goes into a `date` as 28 February.
+
+Both adapters read each column with `pg`'s parsers ([pg-types](https://github.com/brianc/node-pg-types) 2), from the text their driver gives, and write each value as `pg` writes it. Where each driver alone reads and writes otherwise: postgres.js's [What it reads](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters/postgres-js#what-it-reads) and [What it writes](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters/postgres-js#what-it-writes), PGlite's [What it reads](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters/pglite#what-it-reads) and [What it writes](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters/pglite#what-it-writes). Their source and their tests, which read each type through `pg` and through the adapter, are in [`adapters/`](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters).
 
 ## A fake for tests
 
