@@ -57,6 +57,10 @@ Candidates for a check, a rule or a skill line.
 - #721 — "One more row than expected" was one more retry message: read the failing assertion before suspecting a double commit — builder
 - #721 — A promise of another transaction awaited inside a `transaction()` callback brings that transaction's error into the callback, and its 40001 is retried as the callback's own: an ordering in a test or user code stops on the other side's failure — branch-reviewer
 - #721 — A mutant that removes a test's ordering wait proves it only under the replay condition (13/30 red without the commit delay, 30/30 with it): run it with the slow-commit trick on — branch-reviewer
+- #722 — A replay of an argument after the JSON argument gives it an unreachable `connectionString`: with no config file, 6.6.1 falls back to the `PG*` variables and reaches a real Postgres — builder
+- #722 — An `it.each` title that interpolates an argument holding a URL puts it in the test names; `%#` keeps titles free of URLs — builder
+- #722 — A CLI replay sets `PGHOST`/`PGPORT` on a closed port as well as an unreachable `connectionString`: otherwise a result depends on the machine's local Postgres — branch-reviewer
+- #722 — A message kept "byte for byte" is reread against the new outputs beside it: a note true before a new flag ("the only flag is --check") can become false after it — orchestrator
 - #698 — Decision 005 and #698's body were partly wrong about PGlite's defaults (`int8` a number below 2^53, `date` off unless Node runs in UTC, infinity an Invalid Date until 0.5.16): a driver's defaults are replayed per version and time zone before an issue states them — builder
 - #698 — An unquoted `CREATE DATABASE` folds case: probe database names are lowercase, or the connection URL names a database that does not exist — builder
 - #698 — PGlite 0.5.5's `execProtocol()` after `close()` blocks the event loop, so a probe's own timer never fires: such a probe runs in the background and is killed by PID — builder
@@ -96,6 +100,7 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #708 — defect: `likeAny([])` infers `never` and compiles on an int column, which Postgres refuses with 42883 — branch-reviewer
 - #708 — form: `notAnArray` says "value" for `likeAny()`/`ilikeAny()` where `notAList` says "patterns" — branch-reviewer
 - #721 — form: #720's Done when asked for a replay on Postgres 14; only CI's leg covers it (the fix does not depend on the version) — branch-reviewer
+
 - #709 — form: `adapters/pglite/test/params.test.ts` has no row with a `getTime` that is not a Date (`{ getTime: () => 0, toPostgres: () => 'tp' }`), so `typeof v.getTime === 'function'` as `isDate` passes all 468 rows — branch-reviewer
 - #709 — defect: a real Date reprototyped to `Object.prototype` is not a Date for the PGlite adapter's `isDate` (written as JSON, where pg writes its time); contrived — branch-reviewer
 
