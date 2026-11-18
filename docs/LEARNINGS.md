@@ -49,6 +49,7 @@ Candidates for a check, a rule or a skill line.
 - #703 — When a driver can rerun a statement by itself (postgres.js 4 after 26000 or a bind error), the parity tests force that rerun (`DEALLOCATE ALL`, a value that fails at bind); steady-state runs never take that path — branch-reviewer
 - #715 — Second finding that no script checks a `<!-- tsc -->` mark in a site page (only `CHANGELOG.md`): the marks in `conditions.md` are never compiled, so skill `type-tests` § A claim about a type does not hold for pages yet — builder
 - #715 — A cast panel shows the type of the first top-level `const`; an example meant to name a type defines its helpers with `function` or goes in `examples/plain/` — builder
+- #714 — An issue's code sketch inside a `sql` template was wrong as written: a plain string interpolated there (`${'200'}`) is an identifier, not a value; a sketch is replayed exactly as written before it is copied — builder
 
 ## Minors kept
 

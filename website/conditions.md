@@ -255,6 +255,8 @@ From 6.12.0. `"col" ILIKE ANY($1)`<!-- probe: db.sql`${{ col: db.conditions.ilik
 
 `isIn()` and `isNotIn()` take an array of values of the column's type, `<T>(a: readonly T[])`, compiled as [`vals()`](/sql-template#vals) of it: one parameter per item. [`eqAny()`](#conditions.eqAny) sends the whole array as one parameter.
 
+Which one: `eqAny()` for a list built at run time, as one query text serves any length, so one [`prepared()`](/sql-template#prepared) statement, with no limit of 65,535 parameters; `isIn()` for a short fixed list, or one that holds a `Parameter` or a fragment, which `eqAny()` refuses.
+
 <CastPanel example="conditions_isIn">
 
 <<< ./examples/conditions_isIn.ts{ts twoslash}
@@ -381,6 +383,19 @@ The array is one parameter, so each item, at any depth, is a plain value, as in 
 ## jsonb {#jsonb}
 
 From 6.9.0, two conditions on a `jsonb` column: its JSON contains a value, or a path finds an item in it.
+
+A test on one field of the JSON is one of them, or a `sql` fragment for a pattern:
+
+| To test a field | Write | SQL |
+|---|---|---|
+| equals a value | `jsonbContains({ format: '35mm' })` | `"details" @> CAST($1 AS "jsonb")`<!-- probe: db.sql`${{ details: db.conditions.jsonbContains({ format: '35mm' }) }}` --> |
+| is over a value, or starts with one | `jsonbPathExists('$.reels ? (@ > $n)', { n: 10 })` | `jsonb_path_exists("details", CAST($1 AS "jsonpath"), CAST($2 AS "jsonb"))`<!-- probe: db.sql`${{ details: db.conditions.jsonbPathExists('$.reels ? (@ > $n)', { n: 10 }) }}` --> |
+| matches a pattern a user typed | `` db.sql`${db.self}->>${db.param('format')} ILIKE ${db.param(pattern)}` `` | `"details"->>$1 ILIKE $2`<!-- probe: db.sql`${{ details: db.sql`${db.self}->>${db.param('format')} ILIKE ${db.param('%mm')}` }}` --> |
+
+- **Equality** compares JSON values, so `{ reels: 10 }` does not match the string `"10"`, and a GIN index on the column serves it, with either operator class.
+- **An ordered comparison** goes in the path, which compares JSON numbers: 9 reels are fewer than 10. `starts with $p` takes a variable too.
+- **A pattern** from a user's input: the key and the pattern are two parameters. Not `like_regex` in a path: its pattern must be a literal of the path, so `$.format ? (@ like_regex $p)` fails in Postgres (42601), and the input would have to go into the path's text.
+- **`->>` returns text**, so a comparison on it compares text: `` db.sql`${db.self}->>'reels' > ${db.param(10)}` `` finds a print of 9 reels, as `'9'` sorts after `'10'`. Compare in the path instead, as above.
 
 ### `jsonbContains()` {#conditions.jsonbContains}
 
