@@ -1,5 +1,5 @@
 ---
-english: 083841a55ff1
+english: 843005e9040b
 description: "db.conditions regroupe les tests, comparaisons et opérateurs à donner comme valeur d’une clé d’un Whereable, chacun avec le SQL qu’il écrit et ses valeurs."
 ---
 
@@ -212,8 +212,9 @@ db.conditions.likeAny<T extends string>(a: readonly T[]): SQLFragment<boolean | 
 - **Négation** : `not(likeAny(patterns))`, que Postgres lit comme `NOT LIKE ALL` : les lignes qui ne correspondent à aucun d’eux.
 - **Caractères génériques** : `%`, `_` et `\` dans la saisie d’un utilisateur sont ceux du motif, comme dans [`like()`](#conditions.like) : échappez-les d’abord, `input.replace(/[\\%_]/g, '\\$&')`, sinon `'100%'` trouve tous les titres qui commencent par `100`.
 - **Colonnes** : une colonne dont le type est une chaîne. Sur une colonne `citext`, `LIKE` n’ignore la casse que si le schéma de l’extension est dans le `search_path`, comme avec `like()`.
+- **Types littéraux** : les motifs sont typés `string`, là où `like()` garde son littéral. Ainsi, sur une colonne au type plus étroit, une union produite par [`domainsTypedAsUnions`](/fr/generator#generate.domainsTypedAsUnions) ou un placeholder affiné en `` `${string}@${string}` ``, le type les refuse (TS2322) : écrivez le tableau `as const`, `likeAny(['%@example.com'] as const)`<!-- tsc: db.select('films', { title: db.conditions.… }) -->. Sur une colonne enum, un label passe alors le type, et Postgres le refuse (42883), comme avec `like()`.
 
-Une liste qui n’est pas un tableau lève une erreur à la compilation de la requête, comme dans `isIn()`, de même qu’un élément qui n’est ni une chaîne ni `null` : `pg` enverrait un nombre comme son texte, et un `Parameter`, un fragment ou un objet en JSON, des motifs que personne n’a écrits. Le message nomme l’élément :
+Une liste qui n’est pas un tableau lève une erreur à la compilation de la requête, comme dans `isIn()`, de même qu’un élément qui n’est ni une chaîne ni `null` à l’appel de `likeAny()` : `pg` enverrait un nombre comme son texte, et un `Parameter`, un fragment ou un objet en JSON, des motifs que personne n’a écrits. Un élément ajouté ensuite au tableau n’est pas vérifié. Le message nomme l’élément :
 
 > `` `likeAny()` sends its array as one parameter, so each item is a pattern, a string, not `db.param()`: give the pattern as a string. ``<!-- message -->
 
