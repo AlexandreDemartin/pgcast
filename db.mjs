@@ -12,6 +12,7 @@ export const Parameter = mod.Parameter;
 export const ParentColumn = mod.ParentColumn;
 export const SQLFragment = mod.SQLFragment;
 export const SelectResultMode = mod.SelectResultMode;
+export const advisoryXactLock = mod.advisoryXactLock;
 export const all = mod.all;
 export const avg = mod.avg;
 export const cols = mod.cols;

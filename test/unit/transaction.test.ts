@@ -10,6 +10,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as db from '../../src/db';
 import { IsolationLevel } from '../../src/db';
+import { resetConfig } from '../helpers/config';
 
 const native = vi.hoisted(() => {
   /** A connected pg.native.Client: it records the SQL it is sent, and has no release(). */
@@ -192,7 +193,7 @@ describe('transaction() on a pool that is not pg’s', () => {
 // #724: advisoryXactLock() on a client that logs what it is sent: the SQL of each key, and its two refusals, each
 // before any query
 describe('advisoryXactLock()', () => {
-  afterEach(() => { db.setConfig({ queryListener: undefined }); });
+  afterEach(resetConfig);
 
   type Key = bigint | readonly [number, number];
 

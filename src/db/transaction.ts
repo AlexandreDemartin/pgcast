@@ -7,7 +7,7 @@ Released under the MIT licence: see LICENCE file
 import * as pg from 'pg';
 import { isDatabaseError } from './pgErrors';
 import { wait, warnOnce } from './utils';
-import { sql, raw } from './core';
+import { sql, raw, param } from './core';
 import { getConfig } from './config';
 import type { SQLQuery } from './config';
 import type { Queryable } from './core';
@@ -372,4 +372,52 @@ export async function readCommittedRO<T, C = unknown>(txnClientOrQueryable: Quer
  */
 export async function serializableRODeferrable<T, C = unknown>(txnClientOrQueryable: Queryable | TxnClientForSerializableRODeferrable | PoolLike<C>, callback: (client: TxnClientOf<NoInfer<C>, TxnClientForSerializableRODeferrable, IsolationSatisfying<IsolationLevel.SerializableRODeferrable>>) => Promise<T>) {
   return transaction(txnClientOrQueryable, IsolationLevel.SerializableRODeferrable, callback);
+}
+
+/* === advisoryXactLock === */
+
+/**
+ * Take a transaction-level advisory lock on `key`, waiting while another
+ * transaction holds it, and resolve once it is held. Postgres releases it as
+ * the transaction ends, at `COMMIT` or `ROLLBACK`, or at a `ROLLBACK TO` a
+ * savepoint taken before it: so an attempt that `transaction()` retries never
+ * holds the lock of the one before. The SQL:
+ *
+ * - a `bigint`, `BigInt(42)`: `SELECT pg_advisory_xact_lock($1)`, with
+ *   `['42']`, its decimal string, as `pg` would send it;
+ * - two numbers, `[1, 42]`: `SELECT pg_advisory_xact_lock($1, $2)`, with
+ *   `[1, 42]`, a key space of its own: `BigInt(42)` and `[0, 42]` are two locks.
+ *
+ * Postgres checks the range: 22003 outside `bigint` or `integer`, 22P02 for a
+ * fraction or `NaN`. It runs, rather than returning a fragment, so that its type
+ * can ask for the client of a transaction, which a fragment's `run()` can't; in
+ * a query of yours, write `pg_advisory_xact_lock(${db.param(…)})` in `sql`.
+ *
+ * It rejects before any query when given a key that is neither a `bigint` nor
+ * an array of two numbers (Postgres takes no lock on a `NULL`), or a client that
+ * `pg` reports outside a transaction block, where Postgres would release the
+ * lock as soon as it is taken. That status is the last one `pg` received, so a
+ * client whose `COMMIT` of your own `BEGIN` just failed can still read as inside
+ * a block; one that reports no status (another driver, `pg` before 8.21) runs.
+ * @param txnClient The client of a transaction: a `transaction()` callback's,
+ * of any driver, or a `pg.PoolClient` you sent `BEGIN` on
+ * @param key A `bigint`, or a pair of 32-bit integers
+ */
+export async function advisoryXactLock(
+  txnClient: TxnClient<IsolationLevel> | TxnClientLike<PoolClientLike, IsolationLevel>,
+  key: bigint | readonly [number, number]
+): Promise<void> {
+
+  // the caller's key read once: its length, then each item
+  const
+    pair = typeof key !== 'bigint' && Array.isArray(key) && key.length === 2 ? [key[0], key[1]] : undefined,
+    query =
+      typeof key === 'bigint' ? sql`SELECT pg_advisory_xact_lock(${param(String(key))})` :
+        pair && typeof pair[0] === 'number' && typeof pair[1] === 'number' ? sql`SELECT pg_advisory_xact_lock(${param(pair[0])}, ${param(pair[1])})` :
+          undefined;
+
+  if (!query) throw new Error('advisoryXactLock() was given a key that is neither a bigint nor an array of two numbers, so Postgres would take no lock: give a bigint, BigInt(42), or a pair of integers, [1, 42]');
+  if (transactionStatus(txnClient as pg.ClientBase) === 'I') throw new Error('advisoryXactLock() was given a client outside a transaction block, so Postgres would release the lock as soon as it is taken: call it on the client of a transaction(), or after a BEGIN of yours');
+
+  await query.run(txnClient);
 }
