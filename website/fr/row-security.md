@@ -3,7 +3,7 @@ english: 0d2c7a829ab1
 description: "Ne montrez à chaque client que ses propres réservations : une politique de sécurité niveau ligne lit un réglage, que setLocal() définit pour une transaction."
 ---
 
-# Sécurité des lignes
+# Sécurité niveau ligne
 
 Ne montrez à chaque client que ses propres réservations : une politique de sécurité niveau ligne, la vôtre, lit un réglage, et `setLocal()` le définit pour le reste d’une transaction. Ensuite, pourquoi l’exemple définit un rôle, pourquoi un réglage dure une transaction, et ce qu’il faut éviter. La page suppose que vous connaissez [`transaction()`](/fr/transaction#transaction).
 {.lede}
