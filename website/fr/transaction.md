@@ -1,5 +1,5 @@
 ---
-english: 20a2db27feb6
+english: bcacca506adf
 ---
 
 # Transactions
@@ -143,7 +143,7 @@ Le SQL de la requête du callback : [`count()`](/fr/select#count).
   ```
 
   Une fonction générique sur ce client, `<C extends db.TxnClientLike<ShowClient, db.IsolationLevel>>(txnClient: C)`, ne compile pas (2345), pas plus qu’une fonction générique sur celui du pool, `<C>(pool: db.PoolLike<C>, …)` ou `<C extends ShowClient>`, qui transmet un callback typé avec `C` ou imbrique un appel sur le client de son callback : nommez le client du driver, `db.TxnClientLike<ShowClient, …>` ou `db.PoolLike<ShowClient>`. Un client dont le type ne déclare pas `_zapatos` ne compile pas non plus : hors d’une transaction, `transaction()` le prendrait pour un pool. Mais `_zapatos` est optionnel dans un `TxnClientLike` : `countTaken()` accepte donc aussi un `ShowClient` nu, et lève une erreur à l’exécution en appelant son `connect()`. Ne donnez à une telle fonction que le client d’une transaction. Ne donnez jamais le pool à l’appel imbriqué : son client est une seconde transaction, et un pool d’une seule connexion, comme celui de PGlite, attend indéfiniment le `release()` de la première.
-- Un paramètre qui accepte un `pg.Pool` ou le pool d’un autre driver se type `db.PoolLike`, ce qu’est un `pg.Pool` : `(pool: db.PoolLike) => db.serializable(pool, async txnClient => txnClient)`<!-- tsc: export const inAnyPool = …; -->. Typé comme une union, `pg.Pool | typeof showPool`, il donne au callback le client de l’autre driver, alors que celui de `pg` est un `pg.PoolClient`. L’appel ne compile pas si le type de l’argument est une union du client marqué d’un autre driver et d’un pool. Affinez ce type avant l’appel. Faites de même si l’union combine des types de clients que TypeScript distingue, comme dans `db.TxnClientForSerializable | db.TxnClientLike<ShowClient, …>` avec `@types/pg` 8.
+- Un paramètre qui accepte un `pg.Pool` ou le pool d’un autre driver se type `db.PoolLike`, ce qu’est un `pg.Pool` : `(pool: db.PoolLike) => db.serializable(pool, async txnClient => txnClient)`<!-- tsc: export const inAnyPool = …; -->. Typé comme une union, `pg.Pool | typeof showPool`, il donne au callback le client de l’autre driver, alors que celui de `pg` est un `pg.PoolClient`. L’appel ne compile pas si le type de l’argument est une union du client marqué d’un autre driver et d’un pool. Affinez ce type avant l’appel. Faites de même si l’union combine des types de clients que TypeScript distingue, comme dans `db.TxnClientForSerializable | db.TxnClientLike<ShowClient, …>`.
 - Les appels de Zapatos 6.6.1 gardent leurs types, client du callback compris. Là où TypeScript lit le premier paramètre comme un type, c’est aussi un `PoolLike`, et deux chemins changent :
   - `Parameters<typeof db.serializable>[0]`, ou le premier paramètre tel qu’un `infer` le lit : `.query('SELECT 1')` dessus donne TS2339 ;
   - une fonction fléchée donnée là où `typeof db.serializable` est attendu, `async (_, callback) => callback(txnClient)`, donne TS2345, et une fonction typée avec les paramètres de Zapatos 6.6.1 donne TS2322.
