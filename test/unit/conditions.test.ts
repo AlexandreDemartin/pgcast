@@ -1089,6 +1089,17 @@ describe('Default, self, raw, cols and vals as the value of a condition', () => 
     }
   });
 
+  it('characterization: likeAny and ilikeAny check their items when called, and send the array as it is when compiled', () => {
+    for (const [fn, f] of Object.entries({ likeAny: dc.likeAny, ilikeAny: dc.ilikeAny })) {
+      const later: unknown[] = ['a%'], fixed: unknown[] = ['a%', 1];
+      const [pushed, refused] = [f(later as string[]), f(fixed as string[])];
+      later.push(1);
+      fixed[1] = 'b%';
+      expect([show(pushed).values, thrown(refused)]).toEqual([[['a%', 1]],
+        `\`${fn}()\` sends its array as one parameter, so each item is a pattern, a string, not a \`number\`: give the pattern as a string.`]);
+    }
+  });
+
   it('likeAny and ilikeAny given a list that is not an array throw when compiled, saying what to do, as eqAny does', () => {
     const lists = { Set: new Set(['a%']), string: 'a%', null: null, undefined, Default, self, all: db.all,
       param: param(['a%']), fragment: sql`ARRAY['a%']`, raw: raw("'{a%}'"), cols: cols(['a%']), vals: vals(['a%']),
