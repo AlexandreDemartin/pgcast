@@ -43,17 +43,22 @@ for (const [prefix, file] of [['Config', dbFile], ['generate', generateFile]]) {
 const generatorExceptions = new Set([
   // Config is the Options section, with an entry per key. These types split it into required, optional and finalised keys.
   'Config', 'RequiredConfig', 'OptionalConfig', 'CompleteConfig',
-  // Steps of generate() and check(): locating the module and filling in config defaults.
-  'moduleRoot', 'finaliseConfig',
+  // Fills in the config defaults for generate() and check().
+  'finaliseConfig',
+  // Legacy export kept for callers since 3adada2f removed the package version from the generated header.
+  'moduleRoot',
   // Reading the catalogue and assembling the generated TypeScript, and the intermediate data those steps exchange.
   'EnumData', 'enumDataForSchema', 'enumTypesForEnumData', 'tsTypeForPgType', 'Relation', 'relationsInSchema',
   'definitionForRelationInSchema', 'crossTableTypesForTables', 'crossSchemaTypesForAllTables', 'crossSchemaTypesForSchemas',
   'CustomTypes', 'CustomTypeOrigins', 'tsForConfig',
 ]);
+// These entries had dedicated anchors before generator exports were checked. Keep their published links.
+const
+  existingGeneratorAnchors = new Set(['generate', 'SchemaRules', 'ColumnOptions']),
+  generatorAnchor = name => existingGeneratorAnchors.has(name) && !names.has(name) ? name : `export-${name}`;
 for (const symbol of exportsOf(generateFile)) {
   if (generatorExceptions.has(symbol.name)) continue;
-  const anchor = names.has(symbol.name) ? `generate.${symbol.name}` : symbol.name;
-  names.set(anchor, declaredIn(symbol));
+  names.set(generatorAnchor(symbol.name), declaredIn(symbol));
 }
 
 /**
@@ -78,6 +83,10 @@ function anchorsOf(text) {
   }
   return anchors;
 }
+
+// An undocumented cli() must fail even when the reference has a CLI section.
+if (anchorsOf('## The CLI {#cli}').includes(generatorAnchor('cli')))
+  throw new Error('check-reference.mjs: The CLI heading counted as an entry for cli()');
 
 // A self-check: a heading after a ```md block that shows a ```ts line is an entry.
 if (!anchorsOf(`${earlyCloser}## \`insert()\` {#insert}`).includes('insert'))
