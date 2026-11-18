@@ -52,6 +52,11 @@ Candidates for a check, a rule or a skill line.
 - #714 — An issue's code sketch inside a `sql` template was wrong as written: a plain string interpolated there (`${'200'}`) is an identifier, not a value; a sketch is replayed exactly as written before it is copied — builder
 - #719 — `guard.mjs` blocks a pushed `v*` tag but not an extension's `@pgcast/<name>@<version>`: a new tag pattern extends the guard in the same chapter (added to #718) — builder
 - #719 — The postgres.js adapter's 40001 retry test failed once on Postgres 14 with postgres.js 3.4.0 (one extra row), passed on rerun: filed — builder
+- #721 — A real-SSI test that runs the competing transaction with a 0 ms retry delay depends on how fast the server writes to disk: order the writes so the loser retries only after the winner's `COMMIT` has returned — builder, `adapters/postgres-js/test/pool.test.ts`
+- #721 — `commit_delay=<µs>&commit_siblings=0` in the test URL (postgres.js sends query parameters as startup parameters; superuser) recreates slow CI commits locally — builder
+- #721 — "One more row than expected" was one more retry message: read the failing assertion before suspecting a double commit — builder
+- #721 — A promise of another transaction awaited inside a `transaction()` callback brings that transaction's error into the callback, and its 40001 is retried as the callback's own: an ordering in a test or user code stops on the other side's failure — branch-reviewer
+- #721 — A mutant that removes a test's ordering wait proves it only under the replay condition (13/30 red without the commit delay, 30/30 with it): run it with the slow-commit trick on — branch-reviewer
 
 ## Minors kept
 
@@ -63,4 +68,4 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #701 — defect: a helper generic over `db.PoolLike<C>` typing its callback `db.TxnClientLike<C, …>` gives TS2345 (filed in #702) — branch-reviewer
 - #708 — defect: `likeAny([])` infers `never` and compiles on an int column, which Postgres refuses with 42883 — branch-reviewer
 - #708 — form: `notAnArray` says "value" for `likeAny()`/`ilikeAny()` where `notAList` says "patterns" — branch-reviewer
-
+- #721 — form: #720's Done when asked for a replay on Postgres 14; only CI's leg covers it (the fix does not depend on the version) — branch-reviewer
