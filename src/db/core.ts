@@ -329,6 +329,20 @@ export type SQL = SQLExpression | SQLExpression[];
 
 export type Queryable = pg.ClientBase | pg.Pool;
 
+/**
+ * What `run()` takes: a `pg` pool or client, or a client of any other driver
+ * whose `query()` takes `pg`'s query object, `{ text, values, name? }`, and
+ * resolves to the rows in `rows`. A driver that ignores `name` runs a
+ * prepared fragment unprepared.
+ */
+export interface QueryableLike {
+  query(query: SQLQuery): PromiseLike<{ rows: any[] }>;
+}
+
+// run()'s type, declared as a method is so that its parameter is checked both ways: a function typed for Queryable,
+// as in Zapatos 6.6.1, may still be assigned to run or override it; not exported, like NoInfer below
+type RunSignature<RunResult> = { bivariance(queryable: QueryableLike, force?: boolean): Promise<RunResult> }['bivariance'];
+
 // NoInfer of ./utils, declared here and not exported: a library's declarations that write sql's type out cannot name
 // ./utils, which zapatos/db does not export (TS2742), and they write this alias out in full
 type NoInfer<T> = [T][T extends any ? 0 : never];  // https://github.com/Microsoft/TypeScript/issues/14829
@@ -489,10 +503,11 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
    * and Postgres refuses it whole if one of them cannot run in a transaction block (`VACUUM`,
    * `CREATE INDEX CONCURRENTLY`: 25001). With a value, or prepared, Postgres refuses it (42601).
    * When it runs, the default `runResultTransform` gives `undefined`: `pg` returns an array of results.
-   * @param queryable A database client or pool
+   * @param queryable A database client or pool: a `Queryable`, or any `QueryableLike`,
+   * whose result `runResultTransform` gets as it comes
    * @param force If true, force this query to hit the DB even if it's marked as a no-op
    */
-  run = async (queryable: Queryable, force = false): Promise<RunResult> => {
+  run: RunSignature<RunResult> = async (queryable, force = false) => {
     const
       query = this.compile(),
       { queryListener, resultListener } = getConfig(),
@@ -505,7 +520,7 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
 
     if (!this.noop || force) {
       const qr = await queryable.query(query);
-      result = this.runResultTransform(qr);
+      result = this.runResultTransform(qr as pg.QueryResult);  // pg's result, or what another driver gives: `rows` at least
 
     } else {
       result = this.noopResult;
