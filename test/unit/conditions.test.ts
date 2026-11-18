@@ -714,12 +714,14 @@ describe('conditions', () => {
     `);
   });
 
-  it('websearchToTsquery: one SQL wherever it sits, in a select(), count(), deletes(), and(), not() and a sql template', () => {
+  it('websearchToTsquery: one SQL wherever it sits, in a select(), count(), deletes(), update(), copy(), and(), not() and a sql template', () => {
     const search = dc.websearchToTsquery('simple', 'shirt');
     expect({
       select: db.select('products', { search }, { columns: ['id'] }).compile(),
       count: db.count('products', { search }).compile(),
       deletes: db.deletes('products', { search }).compile(),
+      update: db.update('products', { title: 'Shirt' }, { search }).compile(),
+      copy: sql`${{ search: search.copy() }}`.compile(),
       and: sql`${{ search: dc.and(search, dc.isNotNull) }}`.compile(),
       not: sql`${{ search: dc.not(search) }}`.compile(),
       template: sql<db.SQL>`SELECT 1 WHERE ${{ search }}`.compile(),
@@ -727,6 +729,13 @@ describe('conditions', () => {
       {
         "and": {
           "text": "(((("search" @@ websearch_to_tsquery(CAST($1 AS "regconfig"), $2)) AND ("search" IS NOT NULL))))",
+          "values": [
+            "simple",
+            "shirt",
+          ],
+        },
+        "copy": {
+          "text": "(("search" @@ websearch_to_tsquery(CAST($1 AS "regconfig"), $2)))",
           "values": [
             "simple",
             "shirt",
@@ -764,6 +773,14 @@ describe('conditions', () => {
         "template": {
           "text": "SELECT 1 WHERE (("search" @@ websearch_to_tsquery(CAST($1 AS "regconfig"), $2)))",
           "values": [
+            "simple",
+            "shirt",
+          ],
+        },
+        "update": {
+          "text": "UPDATE "products" SET ("title") = ROW($1) WHERE (("search" @@ websearch_to_tsquery(CAST($2 AS "regconfig"), $3))) RETURNING to_jsonb("products".*) AS result",
+          "values": [
+            "Shirt",
             "simple",
             "shirt",
           ],
@@ -1272,6 +1289,14 @@ describe('Default, self, raw, cols and vals as the value of a condition', () => 
     expect(new Set(Object.values(lists).flatMap(f => [thrown(f([db.all])), thrown(f(['Ada', db.all]))]))).toEqual(new Set([
       '`db.all` has no meaning as an item of `vals([…])` in a column\'s value, in a filter (as `isIn()` writes it) or in a `sql` fragment value of `vals({…})`, so of `insert()`, `upsert()` or `update()`: in a filter, leave the key out, or compare with a value; in a write, give a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.',
     ]));
+  });
+
+  it('isIn checks a non-empty list as it compiles, after the caller adds or removes db.all', () => {
+    const items = ['Ada'] as (string | typeof db.all)[], condition = dc.isIn(items);
+    items.push(db.all);
+    expect(() => show(condition)).toThrow('`db.all` has no meaning as an item of `vals([…])`');
+    items.pop();
+    expect(show(condition)).toEqual({ text: '(("col" IN ($1)))', values: ['Ada'] });
   });
 
   it('an array condition given an array holding db.all, at any depth, throws when compiled, not when called', () => {
