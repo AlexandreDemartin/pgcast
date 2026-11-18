@@ -1,5 +1,5 @@
 ---
-english: 231247e0e4a8
+english: e08435bc36d8
 description: "Trois façons de tester vos requêtes pgcast : contre un vrai Postgres, test annulé ; sur la requête compilée ; sur un faux résultat typé d’après le schéma."
 ---
 
@@ -63,7 +63,7 @@ Chaque test tourne sur un seul client, dans un `BEGIN`, annulé ensuite : ce qu
 | `PREPARE`, ou une requête lancée avec [`prepared()`](/fr/sql-template#prepared) | gardé sur la connexion, pour le prochain test qui la reçoit du pool |
 | Un advisory lock de session, `pg_advisory_lock()` | toujours détenu par cette connexion |
 | Un advisory lock de transaction, [`advisoryXactLock()`](/fr/transaction#advisoryXactLock) | libéré |
-| Un réglage de [`setLocal()`](/fr/transaction#setLocal) | annulé ; `current_setting(name, true)` lit ensuite `''` sur cette connexion, et non `NULL` |
+| Un réglage de [`setLocal()`](/fr/transaction#setLocal) | annulé ; `current_setting(name, true)` lit ensuite `''` sur cette connexion pour un nom à vous sans valeur de session, et non `NULL` |
 
 Un id se lit donc, il ne s’écrit jamais en dur ; et un nom préparé désigne un seul texte dans tous les tests qui partagent le pool.
 
