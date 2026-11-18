@@ -207,8 +207,9 @@ From 6.12.0. `"col" LIKE ANY($1)`<!-- probe: db.sql`${{ col: db.conditions.likeA
 - **Negation**: `not(likeAny(patterns))`, which Postgres reads as `NOT LIKE ALL`: the rows that match none of them.
 - **Wildcards**: `%`, `_` and `\` in a user's input are the pattern's own, as in [`like()`](#conditions.like): escape them first, `input.replace(/[\\%_]/g, '\\$&')`, or `'100%'` matches every title that starts with `100`.
 - **Columns**: one whose type is a string. On a `citext` column, `LIKE` ignores case only when the extension's schema is on the `search_path`, as with `like()`.
+- **Literal types**: the patterns are typed `string`, where `like()` keeps its literal. So on a column typed narrower, a [`domainsTypedAsUnions`](/generator#generate.domainsTypedAsUnions) union or a placeholder narrowed to `` `${string}@${string}` ``, the type refuses them (TS2322): write the array `as const`, `likeAny(['%@example.com'] as const)`<!-- tsc: db.select('films', { title: db.conditions.… }) -->. On an enum column, a label then passes the type, and Postgres refuses it (42883), as with `like()`.
 
-A list that is not an array throws as the query compiles, as in `isIn()`, and so does an item that is neither a string nor `null`: `pg` would send a number as its text, and a `Parameter`, a fragment or an object as JSON, patterns no one wrote. The message names the item:
+A list that is not an array throws as the query compiles, as in `isIn()`, and so does an item that is neither a string nor `null` when `likeAny()` is called: `pg` would send a number as its text, and a `Parameter`, a fragment or an object as JSON, patterns no one wrote. An item added to the array afterwards goes unchecked. The message names the item:
 
 > `` `likeAny()` sends its array as one parameter, so each item is a pattern, a string, not `db.param()`: give the pattern as a string. ``<!-- message -->
 

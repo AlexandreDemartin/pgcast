@@ -175,8 +175,9 @@ const patternArray = (fn: string, a: unknown) => {
  * `"col" LIKE ANY($1)`: the column matches one of the patterns, the whole array one parameter, as in `eqAny()`. An
  * empty array gives `false`, on a `NULL` column too; a `null` item gives `NULL` where no pattern matches. The negation is
  * `not(likeAny(patterns))`, which Postgres reads as `NOT LIKE ALL`. `%`, `_` and `\` in a user's input are LIKE's
- * wildcards and escape, as in `like()`: escape them first. A list that is not an array, or an item that is no string,
- * throws as the query compiles.
+ * wildcards and escape, as in `like()`: escape them first. A list that is not an array, or an item that is no string
+ * when `likeAny()` is called, throws as the query compiles. The patterns are typed `string`: on a column typed narrower,
+ * write the array `as const`.
  * @param a An array of patterns
  */
 export const likeAny = <T extends string>(a: readonly T[]) => sql<SQL, boolean | null, T>`${self} LIKE ANY(${patternArray('likeAny', a)})`;
