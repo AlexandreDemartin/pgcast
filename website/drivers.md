@@ -54,6 +54,7 @@ Then run queries on `pool` as on a `pg.Pool`:
 - `starts_at` is a `Date`, as with `pg`: the adapter reads each column with `pg`'s parsers, never postgres.js's. So a `date` is a `Date` at local midnight, where postgres.js alone gives UTC midnight.
 - `asPool()` never creates, configures nor ends `sql`: you do, as with a `pg.Pool`. It throws on an `sql` with a `transform` (`postgres.camel`): give pgcast a `postgres()` of its own.
 - Each query runs through `sql.unsafe()`, unprepared, [`prepared()`](/sql-template#prepared) ones too: its name is ignored.
+- An error is postgres.js's `PostgresError`, not a `pg.DatabaseError`: `code` is the SQLSTATE, so [`isDatabaseError()`](/transaction#isDatabaseError) and the [retries](/retries) work, but its other fields have postgres.js's names (`constraint_name`, `table_name`).
 
 What it reads and writes, type by type, and how it differs from `pg`: [its README](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters/postgres-js#readme).
 
@@ -85,6 +86,7 @@ const pool = asPool(pglite);
 - A `bigint` comes as a string, as with `pg`, where PGlite's own `query()` gives a `number`, or a `bigint` beyond 2^53.
 - `asPool()` never creates nor closes the PGlite: you do.
 - [`prepared()`](/sql-template#prepared) parses its query once on that PGlite, as `pg` does once on a connection.
+- An error is PGlite's `DatabaseError`, not `pg`'s: it has `pg`'s fields (`code`, `constraint`…), so `isDatabaseError()` and the retries work.
 - PGlite has one connection, which the pool lends to one transaction at a time: [Transactions](#transactions).
 
 What it reads and writes, type by type, how it differs from `pg`, and what a page needs: [its README](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters/pglite#readme).

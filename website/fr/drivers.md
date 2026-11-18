@@ -54,7 +54,8 @@ Puis lancez vos requêtes sur `pool` comme sur un `pg.Pool` :
 
 - `starts_at` est un `Date`, comme avec `pg` : l’adaptateur lit chaque colonne avec les parsers de `pg`, jamais ceux de postgres.js. Une `date` est donc un `Date` à minuit, heure locale, là où postgres.js seul donne minuit UTC.
 - `asPool()` ne crée, ne configure ni ne ferme jamais `sql` : c’est à vous de le faire, comme avec un `pg.Pool`. Il lève une erreur sur un `sql` muni d’un `transform` (`postgres.camel`) : donnez à pgcast un `postgres()` à lui.
-- Chaque requête passe par `sql.unsafe()`, sans être préparée, celles de [`prepared()`](/fr/sql-template#prepared) aussi : leur nom est ignoré.
+- Chaque requête passe par `sql.unsafe()`, sans être préparée, celles de [`prepared()`](/fr/sql-template#prepared) aussi : leur nom est ignoré.
+- Une erreur est une `PostgresError` de postgres.js, pas une `pg.DatabaseError` : `code` est le SQLSTATE, donc [`isDatabaseError()`](/fr/transaction#isDatabaseError) et les [retries](/fr/retries) fonctionnent, mais ses autres champs portent les noms de postgres.js (`constraint_name`, `table_name`).
 
 Ce qu’il lit et écrit, type par type, et en quoi il diffère de `pg` : [son README](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters/postgres-js#readme).
 
@@ -86,6 +87,7 @@ const pool = asPool(pglite);
 - Un `bigint` arrive en chaîne, comme avec `pg`, là où le `query()` de PGlite lui-même donne un `number`, ou un `bigint` au-delà de 2^53.
 - `asPool()` ne crée ni ne ferme jamais le PGlite : c’est à vous de le faire.
 - [`prepared()`](/fr/sql-template#prepared) parse sa requête une fois sur ce PGlite, comme `pg` le fait une fois sur une connexion.
+- Une erreur est une `DatabaseError` de PGlite, pas celle de `pg` : elle a les champs de `pg` (`code`, `constraint`…), donc `isDatabaseError()` et les retries fonctionnent.
 - PGlite a une seule connexion, que le pool prête à une transaction à la fois : [Transactions](#transactions).
 
 Ce qu’il lit et écrit, type par type, en quoi il diffère de `pg`, et ce qu’il faut dans une page web : [son README](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters/pglite#readme).
