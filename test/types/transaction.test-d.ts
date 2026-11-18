@@ -239,7 +239,7 @@ describe('the calls of Zapatos 6.6.1 keep their types (#696)', () => {
     void mockImplementation(db.serializable, async (_, callback) => callback(txn));
   });
 
-  // the callback is no inference site for the pool's client: from it, a pg client's would be the callback's own
+  // the pool's client is inferred from the pool alone, never from the callback's own parameter (NoInfer), at each function
   test('a callback typed for a level the transaction does not satisfy is refused, by reference, annotated, forwarded or as a value', () => {
     expectTypeOf(db.serializable(pool, countBookings)).resolves.toEqualTypeOf<number>();
     // @ts-expect-error READ COMMITTED does not satisfy REPEATABLE READ
@@ -250,6 +250,26 @@ describe('the calls of Zapatos 6.6.1 keep their types (#696)', () => {
     void db.serializableRODeferrable(pool, countSeats);
     // @ts-expect-error READ COMMITTED, READ ONLY does not satisfy SERIALIZABLE
     void db.readCommittedRO(pool, bookSeat);
+    // @ts-expect-error REPEATABLE READ does not satisfy SERIALIZABLE, READ ONLY
+    void db.repeatableRead(pool, countSeats);
+    // @ts-expect-error SERIALIZABLE, READ ONLY does not satisfy SERIALIZABLE
+    void db.serializableRO(pool, bookSeat);
+    // @ts-expect-error a callback typed for another driver's client, given a pg pool: a pg client has no exec()
+    void db.serializable(pool, async (c: OtherClient) => c.exec('SELECT 1'));
+    // @ts-expect-error at repeatableRead()
+    void db.repeatableRead(pool, async (c: OtherClient) => c.exec('SELECT 1'));
+    // @ts-expect-error at readCommitted()
+    void db.readCommitted(pool, async (c: OtherClient) => c.exec('SELECT 1'));
+    // @ts-expect-error at serializableRO()
+    void db.serializableRO(pool, async (c: OtherClient) => c.exec('SELECT 1'));
+    // @ts-expect-error at repeatableReadRO()
+    void db.repeatableReadRO(pool, async (c: OtherClient) => c.exec('SELECT 1'));
+    // @ts-expect-error at readCommittedRO()
+    void db.readCommittedRO(pool, async (c: OtherClient) => c.exec('SELECT 1'));
+    // @ts-expect-error at serializableRODeferrable()
+    void db.serializableRODeferrable(pool, async (c: OtherClient) => c.exec('SELECT 1'));
+    // @ts-expect-error at transaction()
+    void db.transaction(pool, db.IsolationLevel.ReadCommitted, async (c: OtherClient) => c.exec('SELECT 1'));
     // @ts-expect-error transaction() at READ COMMITTED
     void db.transaction(pool, db.IsolationLevel.ReadCommitted, countBookings);
     // @ts-expect-error an arrow annotated with the wrong level
