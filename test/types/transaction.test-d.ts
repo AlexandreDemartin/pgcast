@@ -5,6 +5,7 @@
 import type * as pg from 'pg';
 import { describe, expectTypeOf, test } from 'vitest';
 import * as db from 'zapatos/db';
+import type * as s from 'zapatos/schema';
 import type { satisfying } from '../helpers/isolation';
 
 declare const pool: pg.Pool;
@@ -154,7 +155,7 @@ describe('a pool that is not pg’s', () => {
 
   test('the callback’s client runs a fragment, and has the pool client’s own members', () => {
     const run = db.serializable(other, c => db.select('users', db.all).run(c));
-    expectTypeOf(run).resolves.toEqualTypeOf<db.JSONSelectableForTable<'users'>[]>();
+    expectTypeOf(run).resolves.toEqualTypeOf<s.JSONSelectableForTable<'users'>[]>();
     expectTypeOf(run).resolves.not.toBeAny();
     void db.serializable(other, async c => {
       c.release();
