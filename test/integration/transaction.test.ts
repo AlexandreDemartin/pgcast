@@ -420,14 +420,14 @@ describe('transactionEventListener', () => {
     const log = listenBoth();
     db.setConfig({ transactionAttemptsMax: max });
     expect(await attempt([...fails])).toEqual({ outcome, attempts: fails.length + ('value' in outcome ? 1 : 0) });
-    expect(oneTxnId(log)).toEqual(expected);
+    expect(oneTxnId(log)).toStrictEqual(expected);
   });
 
   it.each(scenarios)('$name, set alone, gets the same events', async ({ fails, max, outcome, log: expected }) => {
     const log = listenBoth('events');
     db.setConfig({ transactionAttemptsMax: max });
     expect((await attempt([...fails])).outcome).toEqual(outcome);
-    expect(oneTxnId(log)).toEqual(expected.filter(([kind]) => kind === 'event'));
+    expect(oneTxnId(log)).toStrictEqual(expected.filter(([kind]) => kind === 'event'));
   });
 
   it('is not called on a first-attempt commit, nor on any other error', async () => {
@@ -446,7 +446,7 @@ describe('transactionEventListener', () => {
       await db.readCommitted(c, async inner => { if (attempts === 1) await raise(inner, '40001'); });
     });
     expect(attempts).toBe(2);
-    expect(oneTxnId(log)).toEqual(scenarios[0].log.slice(0, 4));
+    expect(oneTxnId(log)).toStrictEqual(scenarios[0].log.slice(0, 4));
   });
 
   // a listener that throws: transaction() rejects with its error, as a throwing transactionListener makes it reject
@@ -495,7 +495,7 @@ describe('transactionEventListener', () => {
       if (event.type === 'retry' && throws-- > 0) throw thrown;
     } });
     expect(await attempt(['40001'])).toEqual({ outcome: { value: 2 }, attempts: 2 });
-    expect(oneTxnId(log)).toEqual([
+    expect(oneTxnId(log)).toStrictEqual([
       ...scenarios[0].log.slice(0, listener === 'transactionListener' ? 3 : 4),
       ['message', 'Transaction rollback (code 40001) on attempt 2 of 5, retrying in 20ms', 'txnId'],
       ['event', { type: 'rollback', code: '40001', attempt: 2, maxAttempts: 5, delayMs: 20 }, 'txnId'],

@@ -173,7 +173,7 @@ describe('transaction() on a pool that is not pg’s', () => {
     expect(await db.serializable(pool, async c => { await db.sql`SELECT 1`.run(c); return 'done'; })).toBe('done');
     const txnId = events[0]?.[1];
     expect(typeof txnId).toBe('number');
-    expect(events).toEqual([
+    expect(events).toStrictEqual([
       [{ type: 'rollback', code: '40001', attempt: 1, maxAttempts: 5, delayMs: 0 }, txnId],
       [{ type: 'retry', attempt: 2, maxAttempts: 5 }, txnId],
     ]);
@@ -195,7 +195,7 @@ describe('transaction() on a pool that is not pg’s', () => {
     try {
       const pool = otherPool(text => text === 'SELECT 1' ? failure() : undefined);
       await expect(db.serializable(pool, c => db.sql`SELECT 1`.run(c))).rejects.toThrow('could not serialize access');
-      expect(logged).toEqual([
+      expect(logged).toStrictEqual([
         'Transaction rollback (code 40001) on attempt 1 of 2, retrying in 0ms',
         { type: 'rollback', code: '40001', attempt: 1, maxAttempts: 2, delayMs: 0 },
         'Retrying transaction, attempt 2 of 2',
