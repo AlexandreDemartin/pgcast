@@ -1071,7 +1071,8 @@ describe('db.all', () => {
     const
       allInBareVals = '`db.all` has no meaning as an item of `vals([…])` outside a column\'s value, as in a `sql` template of your own or in `upsert()` `updateValues`: give a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.',
       allAsValue = '`db.all` has no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value, nor in a `sql` template of your own (`VALUES (…)` or a filter\'s `IN (…)`): give a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.',
-      selfAsValue = '`db.self` has no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value, nor in a `sql` template of your own (`VALUES (…)` or a filter\'s `IN (…)`): give a value; in `update()`, write `db.self` in a `sql` fragment value, where it stands for the column; in `upsert()` `updateValues`, to read a column, qualify it with its table, `table.column`, or with `EXCLUDED` for the row proposed, `EXCLUDED.column`.';
+      selfAsValue = '`db.self` has no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value, nor in a `sql` template of your own (`VALUES (…)` or a filter\'s `IN (…)`): give a value; in `update()`, write `db.self` in a `sql` fragment value, where it stands for the column; in `upsert()` `updateValues`, to read a column, qualify it with its table, `table.column`, or with `EXCLUDED` for the row proposed, `EXCLUDED.column`.',
+      wrapperAsValue = '`db.raw()`, `db.cols()` and `db.vals()` have no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value, nor in a `sql` template of your own (`VALUES (…)` or a filter\'s `IN (…)`): to write SQL, use a `sql` fragment value (in `update()`, `db.self` there stands for the column); to write a value, give the value itself, or `db.param()`.';
     expect({
       vals: thrown(() => one(vals([db.all]))), valsObject: thrown(() => one(vals({ a: db.all }))),
       insert: thrown(() => db.insert('users', { email: 'a@b', display_name: db.all as any }).compile()),
@@ -1080,9 +1081,12 @@ describe('db.all', () => {
       valsInValues: thrown(() => sql`INSERT INTO ${'users'} (${db.cols({ email: db.all })}) VALUES (${vals({ email: db.all })})`.compile()),
       valsInFilter: thrown(() => sql`SELECT ${'id'} FROM ${'users'} WHERE ${'email'} IN (${vals({ email: db.all })})`.compile()),
       selfInFilter: thrown(() => sql`SELECT ${'id'} FROM ${'users'} WHERE ${'email'} IN (${vals({ email: db.self })})`.compile()),
+      rawInValues: thrown(() => sql`INSERT INTO ${'users'} (${db.cols({ email: 1 })}) VALUES (${vals({ email: db.raw("'x'") })})`.compile()),
+      rawInFilter: thrown(() => sql`SELECT ${'id'} FROM ${'users'} WHERE ${'email'} IN (${vals({ email: db.raw("'x'") })})`.compile()),
     }).toEqual({
       vals: allInBareVals, valsObject: allAsValue, insert: allAsValue, param: [db.all],
       valsInValues: allAsValue, valsInFilter: allAsValue, selfInFilter: selfAsValue,
+      rawInValues: wrapperAsValue, rawInFilter: wrapperAsValue,
     });
   });
 
