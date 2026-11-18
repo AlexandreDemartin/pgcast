@@ -124,14 +124,17 @@ const notAValue = (x: unknown) =>
       x instanceof DangerousRawString ? '`db.raw()`' : x instanceof ColumnNames ? '`db.cols()`' :
         x instanceof ColumnValues ? '`db.vals()`' : x instanceof SQLFragment ? 'a `sql` fragment' : undefined;
 
+// a list that is no array, for eqAny(), likeAny() and ilikeAny(); `noun`, one word, is what the array holds
+const notAList = (fn: string, noun: string, a: unknown) => {
+  const name = notAValue(a);
+  return name === undefined ? notAnArray(fn, a) :
+    refused(`\`${fn}()\` takes an array of ${noun}, not ${name}: write \`${fn}(${noun})\`; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.`);
+};
+
 // one array parameter holds plain values: pg would send a Parameter or a fragment as JSON, and read an array item
 // as more items, so that a jsonb column matched no row, with no error
 const anyArray = (a: unknown) => {
-  if (!Array.isArray(a)) {
-    const name = notAValue(a);
-    return name === undefined ? notAnArray('eqAny', a) :
-      refused(`\`eqAny()\` takes an array of values, not ${name}: write \`eqAny(values)\`; for SQL, write a \`sql\` fragment with \`db.self\` in place of the condition.`);
-  }
+  if (!Array.isArray(a)) return notAList('eqAny', 'values', a);
   const
     i = a.findIndex(x => Array.isArray(x) || notAValue(x) !== undefined),
     item = a[i],
@@ -158,6 +161,28 @@ export const eqAny: {
   <T>(a: readonly T[]): SQLFragment<boolean | null, T>;
 } = (a: readonly unknown[] | ParentColumn) =>
   sql<SQL, boolean | null>`${self} = ANY(${a instanceof ParentColumn ? a : anyArray(a)})`;
+
+// each item a string, or null, which Postgres reads as a NULL pattern: pg would send a number or a Date as its text,
+// a Parameter, a fragment or an object as JSON, and read an array item as more items, patterns no one wrote
+const patternArray = (fn: string, a: unknown) => {
+  if (!Array.isArray(a)) return notAList(fn, 'patterns', a);
+  const i = a.findIndex(x => typeof x !== 'string' && x !== null);
+  return i < 0 ? param(a, false) :
+    refused(`\`${fn}()\` sends its array as one parameter, so each item is a pattern, a string, not ${notAString(a[i])}: give the pattern as a string.`);
+};
+
+/**
+ * `"col" LIKE ANY($1)`: the column matches one of the patterns, the whole array one parameter, as in `eqAny()`. An
+ * empty array gives `false`, on a `NULL` column too; a `null` item gives `NULL` where no pattern matches. The negation is
+ * `not(likeAny(patterns))`, which Postgres reads as `NOT LIKE ALL`. `%`, `_` and `\` in a user's input are LIKE's
+ * wildcards and escape, as in `like()`: escape them first. A list that is not an array, or an item that is no string
+ * when `likeAny()` is called, throws as the query compiles. The patterns are typed `string`: on a column typed narrower,
+ * write the array `as const`.
+ * @param a An array of patterns
+ */
+export const likeAny = <T extends string>(a: readonly T[]) => sql<SQL, boolean | null, T>`${self} LIKE ANY(${patternArray('likeAny', a)})`;
+/** `"col" ILIKE ANY($1)`: as `likeAny()`, case-insensitive. The negation, `not(ilikeAny(patterns))`, is `NOT ILIKE ALL`. */
+export const ilikeAny = <T extends string>(a: readonly T[]) => sql<SQL, boolean | null, T>`${self} ILIKE ANY(${patternArray('ilikeAny', a)})`;
 
 /* === jsonb === */
 

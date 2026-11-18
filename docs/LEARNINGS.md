@@ -30,6 +30,12 @@ Candidates for a check, a rule or a skill line.
 - #701 — An issue number written into the docs is checked with `gh issue view <n>` on that number alone: a fix linked PGlite's adapter to #697 (postgres.js) — orchestrator
 - #701 — `NoInfer` on a callback's parameter also blocks a generic caller from forwarding a callback typed with the same type parameter; a helper type exported "so users can type a helper" gets a probe of that helper, generic over the parameter — branch-reviewer
 - #701 — A fix-round grid compares the whole `(cell, code)` list and the emitted `.d.ts` with 6.6.1's, not only the cells the review named — branch-reviewer
+- #708 — A `readonly T[]` parameter with `T extends string` widens to `string` inside a Whereable, while `like(a: T)` keeps the literal, which changes the type on enum columns: frozen as a negative rather than assumed — builder
+- #708 — `bench:types` run from a worktree whose `node_modules` is linked to another's overwrites that one's `node_modules/.cache/pgcast` declarations — builder
+- #708 — A brief that says "mark it ready" overrides the builder's rule only when the orchestrator means it; briefs name the exception explicitly — orchestrator
+- #708 — A list helper `<T extends string>(a: readonly T[])` widens array-literal items to `string` inside a Whereable, where `<T extends string>(a: T)` keeps the literal; its type tests include a column typed as a literal union or a template literal — branch-reviewer
+- #708 — A list helper whose `T` comes from the items infers `never` from a literal `[]`, which every Whereable accepts; for an operator Postgres types, `[]` is tested on a column of the wrong type — branch-reviewer
+- #708 — On a literal-union column, keeping the literals and refusing an enum label pull against each other: TypeScript cannot tell an enum from a `domainsTypedAsUnions` union — builder
 - #703 — `vi.resetModules()` reloads TypeScript sources only; the root's `db.js` shim loads `dist` through Node's CommonJS cache, which Vitest does not reset, so a once-per-process warning is tested on `src/db` — builder
 - #703 — A test that needs a fresh prepared statement on a pooled connection uses a text of its own: the connection handed out may already have prepared the same text — builder
 - #703 — A package's own scripts run tools from the root's install without listing them: npm puts every parent folder's `node_modules/.bin` on `PATH` — builder
@@ -41,6 +47,16 @@ Candidates for a check, a rule or a skill line.
 - #703 — A transform guard needs a row per transform key alone: `postgres.camel` sets both `column.from` and `value.from`, which hid a missing column guard — builder
 - #703 — A red test commit can pass `npm test` and still fail `test:types` (TS2379 under `exactOptionalPropertyTypes`); both run on the red commit — builder
 - #703 — When a driver can rerun a statement by itself (postgres.js 4 after 26000 or a bind error), the parity tests force that rerun (`DEALLOCATE ALL`, a value that fails at bind); steady-state runs never take that path — branch-reviewer
+- #715 — Second finding that no script checks a `<!-- tsc -->` mark in a site page (only `CHANGELOG.md`): the marks in `conditions.md` are never compiled, so skill `type-tests` § A claim about a type does not hold for pages yet — builder
+- #715 — A cast panel shows the type of the first top-level `const`; an example meant to name a type defines its helpers with `function` or goes in `examples/plain/` — builder
+- #714 — An issue's code sketch inside a `sql` template was wrong as written: a plain string interpolated there (`${'200'}`) is an identifier, not a value; a sketch is replayed exactly as written before it is copied — builder
+- #719 — `guard.mjs` blocks a pushed `v*` tag but not an extension's `@pgcast/<name>@<version>`: a new tag pattern extends the guard in the same chapter (added to #718) — builder
+- #719 — The postgres.js adapter's 40001 retry test failed once on Postgres 14 with postgres.js 3.4.0 (one extra row), passed on rerun: filed — builder
+- #721 — A real-SSI test that runs the competing transaction with a 0 ms retry delay depends on how fast the server writes to disk: order the writes so the loser retries only after the winner's `COMMIT` has returned — builder, `adapters/postgres-js/test/pool.test.ts`
+- #721 — `commit_delay=<µs>&commit_siblings=0` in the test URL (postgres.js sends query parameters as startup parameters; superuser) recreates slow CI commits locally — builder
+- #721 — "One more row than expected" was one more retry message: read the failing assertion before suspecting a double commit — builder
+- #721 — A promise of another transaction awaited inside a `transaction()` callback brings that transaction's error into the callback, and its 40001 is retried as the callback's own: an ordering in a test or user code stops on the other side's failure — branch-reviewer
+- #721 — A mutant that removes a test's ordering wait proves it only under the replay condition (13/30 red without the commit delay, 30/30 with it): run it with the slow-commit trick on — branch-reviewer
 
 ## Minors kept
 
@@ -50,4 +66,6 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #700 — form: `CHANGELOG.md` `<!-- tsc -->` mark proves the cast on `frag.run = …`, not on the spy or a library's re-export it is prescribed for; the re-export consumer's cast is compiled nowhere in the repo — branch-reviewer
 - #700 — defect: `QueryableLike` with `strict: false` still accepts a `query()` that requires more than `run()` sends (no `strictFunctionTypes`) — builder
 - #701 — defect: a helper generic over `db.PoolLike<C>` typing its callback `db.TxnClientLike<C, …>` gives TS2345 (filed in #702) — branch-reviewer
-
+- #708 — defect: `likeAny([])` infers `never` and compiles on an int column, which Postgres refuses with 42883 — branch-reviewer
+- #708 — form: `notAnArray` says "value" for `likeAny()`/`ilikeAny()` where `notAList` says "patterns" — branch-reviewer
+- #721 — form: #720's Done when asked for a replay on Postgres 14; only CI's leg covers it (the fix does not depend on the version) — branch-reviewer

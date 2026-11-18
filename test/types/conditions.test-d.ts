@@ -82,6 +82,92 @@ describe('eqAny()', () => {
   });
 });
 
+describe('likeAny() and ilikeAny()', () => {
+  test('take an array of patterns, as like() and ilike() take one, and give a condition on a text-like column', () => {
+    expectTypeOf(c.ilikeAny(['a%', 'b%'])).toEqualTypeOf<db.SQLFragment<boolean | null, 'a%' | 'b%'>>();
+    expectTypeOf(c.ilikeAny(['a%', 'b%'])).not.toBeAny();
+    expectTypeOf(c.likeAny(['a%'])).toEqualTypeOf<db.SQLFragment<boolean | null, 'a%'>>();
+    expectTypeOf(c.likeAny(['a%'])).not.toBeAny();
+    const patterns: readonly string[] = ['a%', 'b%'];
+    expectTypeOf(c.likeAny(patterns)).toEqualTypeOf<db.SQLFragment<boolean | null, string>>();
+    expectTypeOf(c.ilikeAny(patterns)).toEqualTypeOf<db.SQLFragment<boolean | null, string>>();
+    expectTypeOf(db.select('users', { display_name: c.ilikeAny(patterns), email: c.likeAny(['%@example.com']) }).run)
+      .returns.resolves.not.toBeAny();
+    db.select('extra.type_zoo', { c_text: c.likeAny(patterns), c_varchar: c.ilikeAny(['a%']), c_char: c.likeAny(['A_a%']), c_citext: c.ilikeAny(['a%']) });
+    db.select('users', { display_name: c.ilikeAny([]) });
+    db.select('users', { display_name: c.not(c.ilikeAny(patterns)) });
+    db.select('users', { display_name: c.or(c.likeAny(['A%']), c.ilikeAny(['b%'])) });
+  });
+
+  test('refuse an enum column, even for a pattern that is one of its labels, which like() takes (Postgres refuses both, 42883)', () => {
+    // characterization: in a Whereable, the patterns widen to string, where like('ok') keeps its literal
+    db.select('users', { mood: c.like('ok') });
+    // @ts-expect-error an enum column, a label as the pattern
+    db.select('users', { mood: c.likeAny(['ok']) });
+    // @ts-expect-error an enum column, a label as the pattern
+    db.select('users', { mood: c.ilikeAny(['ok']) });
+  });
+
+  test('type their patterns string on a column narrowed further, where like() keeps its literal: `as const` keeps them', () => {
+    // a Whereable's key as generated for a column whose placeholder is narrowed, PgEmail = `${string}@${string}`
+    type Email = `${string}@${string}`;
+    const where = (_: { email?: Email | db.Parameter<Email> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, Email | db.Parameter<Email> | db.SQLFragment | db.ParentColumn> }) => {};
+    where({ email: c.like('%@example.com') });
+    where({ email: c.likeAny(['%@example.com', '%@example.org'] as const) });
+    where({ email: c.ilikeAny(['%@example.com'] as const) });
+    // @ts-expect-error the patterns typed string, as an array not written `as const`
+    where({ email: c.likeAny(['%@example.com']) });
+    // @ts-expect-error the patterns typed string, as an array not written `as const`
+    where({ email: c.ilikeAny(['%@example.com']) });
+    // @ts-expect-error a pattern the narrowed type refuses, `as const` or not, as like() refuses it
+    where({ email: c.likeAny(['nobody'] as const) });
+    // @ts-expect-error a pattern the narrowed type refuses, as in likeAny()
+    where({ email: c.like('nobody') });
+    // characterization: on an enum column too, a label `as const` compiles, which Postgres refuses (42883), as like('ok')
+    db.select('users', { mood: c.likeAny(['ok'] as const) });
+  });
+
+  test('refuse a number column, an item that is no string, one pattern, and a list that is not an array', () => {
+    // @ts-expect-error an int column
+    db.select('users', { id: c.ilikeAny(['1%']) });
+    // @ts-expect-error an int column, as like()
+    db.select('users', { id: c.likeAny(['1%']) });
+    // @ts-expect-error a number item
+    db.select('users', { display_name: c.likeAny([1]) });
+    // @ts-expect-error a null item, with strictNullChecks
+    db.select('users', { display_name: c.ilikeAny(['a%', null]) });
+    // @ts-expect-error one pattern in place of the list
+    db.select('users', { display_name: c.ilikeAny('a%') });
+    // @ts-expect-error a Set
+    db.select('users', { display_name: c.likeAny(new Set(['a%'])) });
+    // @ts-expect-error a Parameter of the array
+    db.select('users', { display_name: c.ilikeAny(db.param(['a%'])) });
+    // @ts-expect-error parent(), which eqAny() takes
+    db.select('users', { display_name: c.ilikeAny(db.parent('tags')) });
+    // @ts-expect-error a sql fragment in place of the array
+    db.select('users', { display_name: c.likeAny(db.sql`ARRAY['a%']`) });
+  });
+
+  test('refuse Default, self, all, raw(), cols(), vals(), a Parameter and a fragment as items', () => {
+    // @ts-expect-error Default
+    db.select('users', { display_name: c.ilikeAny([db.Default]) });
+    // @ts-expect-error self
+    db.select('users', { display_name: c.ilikeAny([db.self]) });
+    // @ts-expect-error all
+    db.select('users', { display_name: c.likeAny([db.all]) });
+    // @ts-expect-error raw()
+    db.select('users', { display_name: c.likeAny([db.raw("'a%'")]) });
+    // @ts-expect-error cols()
+    db.select('users', { display_name: c.ilikeAny([db.cols('a%')]) });
+    // @ts-expect-error vals()
+    db.select('users', { display_name: c.ilikeAny([db.vals('a%')]) });
+    // @ts-expect-error a Parameter
+    db.select('users', { display_name: c.ilikeAny([db.param('a%')]) });
+    // @ts-expect-error a sql fragment
+    db.select('users', { display_name: c.likeAny([db.sql`'a%'`]) });
+  });
+});
+
 describe('websearchToTsquery()', () => {
   test('gives a condition on a tsvector column, whose placeholder is any as generated', () => {
     expectTypeOf(c.websearchToTsquery('english', 'salt')).toEqualTypeOf<db.SQLFragment<boolean | null, db.conditions.TsvectorColumn>>();
