@@ -1241,7 +1241,7 @@ describe('advisoryXactLock()', () => {
     const queries: db.SQLQuery[] = [];
     db.setConfig({ queryListener: q => { queries.push(q); } });
     await expect(db.advisoryXactLock(t.pool as never, [5, 4])).rejects.toThrow(
-      'advisoryXactLock() was given a pg.Pool, which runs each query on a client outside a transaction block, so Postgres would release the lock as soon as it is taken: call it on the client of a transaction(), or after a BEGIN of yours');
+      'advisoryXactLock() was given a pg.Pool, which runs each query on a client outside a transaction block, so Postgres would release the lock as soon as it is taken: call it on the client of a transaction(), or on a client of the pool after a BEGIN of yours');
     expect(queries).toEqual([]);
     expect(await advisoryLocks()).toEqual([]);
   });

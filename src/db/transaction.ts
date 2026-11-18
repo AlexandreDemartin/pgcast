@@ -418,7 +418,7 @@ export async function advisoryXactLock(
           undefined;
 
   if (!query) throw new Error('advisoryXactLock() was given a key that is neither a bigint nor an array of two numbers, so Postgres would take no lock: give a bigint, BigInt(42), or a pair of integers, [1, 42]');
-  if (txnClient instanceof pg.Pool) throw new Error('advisoryXactLock() was given a pg.Pool, which runs each query on a client outside a transaction block, so Postgres would release the lock as soon as it is taken: call it on the client of a transaction(), or after a BEGIN of yours');
+  if (txnClient instanceof pg.Pool) throw new Error('advisoryXactLock() was given a pg.Pool, which runs each query on a client outside a transaction block, so Postgres would release the lock as soon as it is taken: call it on the client of a transaction(), or on a client of the pool after a BEGIN of yours');
   if (transactionStatus(txnClient as pg.ClientBase) === 'I') throw new Error('advisoryXactLock() was given a client outside a transaction block, so Postgres would release the lock as soon as it is taken: call it on the client of a transaction(), or after a BEGIN of yours');
 
   await query.run(txnClient);
