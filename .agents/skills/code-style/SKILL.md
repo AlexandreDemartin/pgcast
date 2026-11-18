@@ -7,6 +7,8 @@ description: 'Code style of pgcast, in the patterns of Zapatos: code in src/, JS
 
 A change to pgcast reads like the rest of Zapatos: same patterns, vocabulary and visible SQL. Sources: [Zapatos's docs](https://jawj.github.io/zapatos/) and history (`git log upstream/master`). What pgcast refuses whatever the gain: `AGENTS.md` § What pgcast does not do.
 
+Cases that serve a minority of steps are in [reference.md](reference.md), read when this core names them.
+
 ## Zapatos's criteria
 
 - "No abstractions, no distractions: just your database, with type safety."
@@ -32,9 +34,9 @@ const
 - Section markers `/* === insert === */`.
 - A comment explains a Postgres oddity, with its link (the `ROW()` note of `update`).
 - Postgres vocabulary for names (`isDistinctFrom`, `arrayOverlaps`, `selectExactlyOne`); a reserved name is worked around (`deletes`).
-- A lookup keyed by caller input or a catalog name reads own keys only (`Object.prototype.hasOwnProperty.call`, as `hasOwn` in `src/generate/tables.ts`, or a `Map`; `Object.hasOwn` is past ES2019, TS2550): `constructor`, `toString`, `__proto__` and `caller` crashed or masked lookups (#48, #399, #405, #486); `Object.create(null)` changes every later inherited lookup, and escapes through an export.
 - Single quotes, semicolons, 2 spaces.
 - File header kept; a new file takes the same block, with the fork's copyright line (`AGENTS.md` § Working rules).
+- A lookup keyed by caller input or a catalog name: [reference.md](reference.md) § Lookups.
 
 ## JSDoc and errors
 
@@ -43,8 +45,7 @@ const
 - An error says what to do:
   - "Did you use `self` (the global object) where you meant `db.self`…?" (`src/db/core.ts`);
   - "hint: check `.query.compile()` on this Error" (`src/db/shortcuts.ts`).
-  - Its advice is run as written, on each call and kind of value that throws it ("spread it" split a string into characters, #235), at each position that reaches it and on Postgres (`db.self`, advised for a write, runs only in `update()` and a filter: #666, #677); a warning firing in more cases is reread for each; advice moving where a transaction begins says what it costs, probed by a read, a write and an insert of one key (#486, #492).
-  - A message the docs quote is one template, each interpolation one word: otherwise `check-prose.mjs` says only "is no message of zapatos/db", not that a ternary or a phrase in the template blocks the match (#569, #596, #647).
+  - Before writing or moving its advice, or a message the docs quote: [reference.md](reference.md) § Error messages.
 
 ## Docs voice
 
@@ -56,14 +57,7 @@ const
 
 A sentence anywhere (docs, CHANGELOG, JSDoc, issue, plan) states what a run showed (types: skill `type-tests` § A claim about a type; 6.6.1: skill `backward-compat` § Replay, do not reason).
 
-- **A run, not a reading**: the exact code the page shows (`${'films'}`, not `films`), as the call its sentence describes, on the docs schema (a probe write on a table nothing references, or a foreign key stops it); the outer call too (an outer `selectOne()` hides duplicated rows), a chain as the reader writes it, the CLI from `npm pack`. A claim from an issue, a brief, a review or an "Expected" (advice, a suggested guard) is a hypothesis until run; before the plan, search the tests that freeze the behaviour and the pages that state it (#51, #168, #501).
-- **At more than one value**: another size, isolation level or Postgres version (CI's oldest, 14, for a refusal or an error code: #522, #573), the empty result (`rows[0]`), a warm pool for a race, a realistic table for a plan (`EXPLAIN (ANALYZE)`), what node-postgres hands over (`date` as a `Date`, `POINT` as `{ x, y }`; `pg.DatabaseError` from pg 8.6, on its tarballs), in a time zone east of UTC (pg sends local time), with `extra_float_digits=0` in `db.options` (a `float4` then arrives rounded: order in SQL, #49), on data where the two readings differ; a "from Node N" claim, `typeof X` on each major before N (`npx -p node@<v>`, #521).
-- **At every position it covers**: each row of an array, line 1 and a later line, a `where` and an `update()`, one nesting past the named ones, each outer call (`select()`, `selectOne()`, `selectExactlyOne()` with and without its opt-in, `count()`), at `.run()` and nested in `lateral` or `extras`, a `vals({…})` in an `insert()` value and in a `sql` template you write (#164, #341, #420, #482, #484, #638, #686).
-- **"Every", "only", "never"** are searched for their exceptions (`git grep` the name); "takes only" gets a negative `tsc` probe, "cannot mean anything in SQL" a run in Postgres, "the catalog doesn't say" the catalog table (`pg_constraint`).
-- **A shortened rule keeps its condition**, or links it: a guide restating a reference, a docs bullet, a JSDoc, a merged note, a CHANGELOG headline and its "Unchanged" list, a later version's contract (decision 003's narrowest wording, both exceptions), a quote of Zapatos (its subject and surrounding clauses). Each carries every clause (an option such as `undefinedMeansMissing`, a mode, an exception on an open issue); a list of conditions has one test per clause (#164, #271, #402, #485).
-- **What changed is searched for**: after a change of behaviour, an added exception, a closed issue or dropped advice, `git grep` the old phrase and other wordings, the issue number, the message (a distinctive fragment of its old text, inline snapshots included), its SQLSTATE codes, the rows that list the value's siblings, across the repo (`website/` in both languages, `SECURITY.md`, JSDoc and messages in `src/`); then reread the sentence framing each hit (a list's lead-in, a page's general rules, "never", "always") (stale pages: #32, #96, #179, #251, #447, #492, #645, #655, #686).
-- **A CHANGELOG entry**: its `Changed:` and `Unchanged:` sub-bullets carry each other's conditions, an `Unchanged:` holds no behaviour change, each path it states (a Postgres error past the type too) is frozen by a test (#548, #575, #632); a `Changed:` telling users what to add marks a break (#605); an "except" lists each value (#530). A line from a review is replayed on the last release, not master (#553); an entry a later PR rewrote is reread clause by clause against the code (#686).
-- **What will move** is tied back: a known defect links its open issue, whose comment points at the line; no count of a list that grows ("the two opt-ins", a living report's tally).
+Before writing one, read [reference.md](reference.md) § Claims: a run, not a reading; more than one value; every position; "every", "only", "never"; a shortened rule; what changed; a CHANGELOG entry; what will move.
 
 ## Examples: the film's cast
 
@@ -90,8 +84,8 @@ A new example, wherever it is written, uses pgcast's own world (`website/schema.
 ## Further than Zapatos
 
 - Its roadmap first ([Zapatos's docs](https://jawj.github.io/zapatos/) § What's next): a real test suite, including on inferred types; then what it did not have (checked types, CI), without changing how it feels to use.
-- Its laterals typed by foreign keys and its written limits (§ lateral, Limitations) stay, as note 007 decides (choice D: a core helper saves a type, never a line nor the SQL; a revival is a revision of the note): `parent<T.Column>('c')` checks the column only, the docs show a lateral on each kind of key, and `selectExactlyOne` is written by hand when the FK is `NOT NULL`.
 - A new API passes for Zapatos's: same vocabulary, shape and visible SQL.
+- A change to laterals, `parent` or their written limits (note 007): [reference.md](reference.md) § Laterals.
 
 ## Checklist
 
