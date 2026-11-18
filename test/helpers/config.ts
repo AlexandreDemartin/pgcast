@@ -9,5 +9,5 @@ const defaults = getConfig();
 
 /** Restores the config as it was at import. setConfig() merges: the listeners must be unset explicitly. */
 export const resetConfig = () => {
-  setConfig({ queryListener: undefined, resultListener: undefined, transactionListener: undefined, ...defaults } as NewConfig);
+  setConfig({ queryListener: undefined, resultListener: undefined, transactionListener: undefined, transactionEventListener: undefined, ...defaults } as NewConfig);
 };

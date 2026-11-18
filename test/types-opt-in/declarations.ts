@@ -66,6 +66,9 @@ export const { ...generateValues } = gen;
 export const usersOn = (queryable: db.QueryableLike) => db.select('users', db.all).run(queryable);
 export const runOfUsers = db.select('users', db.all).run;
 
+// the event listener of the config, whose type names TransactionEvent (#725)
+export const transactionEventListenerOf = (config: db.Config) => config.transactionEventListener;
+
 // a transaction on a pool of another driver, whose result is the callback's client, and on a pool typed by
 // transaction()'s first parameter, as a library writes them: each type must be one a .d.ts can name (#696)
 type OtherClient = { query: (query: db.SQLQuery) => Promise<{ rows: any[]; command: string }>; release: () => void };

@@ -340,6 +340,171 @@ describe('transaction', () => {
   });
 });
 
+// #725: transactionEventListener gets an event at each point where transactionListener gets a message, right after it,
+// with the same numbers. Math.random is stubbed so that each retry delay differs from the one before: a second
+// draw for the event would not match the message's
+describe('transactionEventListener', () => {
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  type Logged = ['message', string, number | undefined] | ['event', db.TransactionEvent, number | undefined];
+
+  /** Records the calls of both listeners, or of the event listener alone, in order; delays of 10ms, then 20ms… */
+  const listenBoth = (which: 'both' | 'events' = 'both') => {
+    const log: Logged[] = [];
+    let draws = 0;
+    vi.spyOn(Math, 'random').mockImplementation(() => ++draws / 10);
+    db.setConfig({
+      transactionRetryDelay: { minMs: 0, maxMs: 100 },
+      transactionEventListener: (event, txnId) => { log.push(['event', event, txnId]); },
+    });
+    if (which === 'both') db.setConfig({ transactionListener: (message, txnId) => { log.push(['message', message, txnId]); } });
+    return log;
+  };
+
+  /** A serializable transaction whose attempt n raises fails[n - 1], if any; its outcome and attempts. */
+  const attempt = async (fails: ('40001' | '40P01')[]) => {
+    let attempts = 0;
+    const outcome = await db.serializable(t.pool, async c => {
+      const code = fails[attempts++];
+      if (code) await raise(c, code);
+      await write(c, `attempt ${attempts}`);
+      return attempts;
+    }).then(value => ({ value }), (error: unknown) => ({ code: (error as { code?: string }).code }));
+    return { outcome, attempts };
+  };
+
+  /** The log with its one txnId, checked to be a number, written as 'txnId'. */
+  const oneTxnId = (log: Logged[]) => {
+    const txnId = log[0]?.[2];
+    expect(typeof txnId).toBe('number');
+    return log.map(([kind, value, id]) => [kind, value, id === txnId ? 'txnId' : id]);
+  };
+
+  const scenarios = [
+    {
+      name: 'on 40001 twice, then a commit', fails: ['40001', '40001'] as const, max: 5, outcome: { value: 3 },
+      log: [
+        ['message', 'Transaction rollback (code 40001) on attempt 1 of 5, retrying in 10ms', 'txnId'],
+        ['event', { type: 'rollback', code: '40001', attempt: 1, maxAttempts: 5, delayMs: 10 }, 'txnId'],
+        ['message', 'Retrying transaction, attempt 2 of 5', 'txnId'],
+        ['event', { type: 'retry', attempt: 2, maxAttempts: 5 }, 'txnId'],
+        ['message', 'Transaction rollback (code 40001) on attempt 2 of 5, retrying in 20ms', 'txnId'],
+        ['event', { type: 'rollback', code: '40001', attempt: 2, maxAttempts: 5, delayMs: 20 }, 'txnId'],
+        ['message', 'Retrying transaction, attempt 3 of 5', 'txnId'],
+        ['event', { type: 'retry', attempt: 3, maxAttempts: 5 }, 'txnId'],
+      ],
+    },
+    {
+      name: 'on 40P01', fails: ['40P01'] as const, max: 5, outcome: { value: 2 },
+      log: [
+        ['message', 'Transaction rollback (code 40P01) on attempt 1 of 5, retrying in 10ms', 'txnId'],
+        ['event', { type: 'rollback', code: '40P01', attempt: 1, maxAttempts: 5, delayMs: 10 }, 'txnId'],
+        ['message', 'Retrying transaction, attempt 2 of 5', 'txnId'],
+        ['event', { type: 'retry', attempt: 2, maxAttempts: 5 }, 'txnId'],
+      ],
+    },
+    {
+      name: 'on giving up after transactionAttemptsMax', fails: ['40001', '40001'] as const, max: 2, outcome: { code: '40001' },
+      log: [
+        ['message', 'Transaction rollback (code 40001) on attempt 1 of 2, retrying in 10ms', 'txnId'],
+        ['event', { type: 'rollback', code: '40001', attempt: 1, maxAttempts: 2, delayMs: 10 }, 'txnId'],
+        ['message', 'Retrying transaction, attempt 2 of 2', 'txnId'],
+        ['event', { type: 'retry', attempt: 2, maxAttempts: 2 }, 'txnId'],
+        ['message', 'Transaction rollback (code 40001) on attempt 2 of 2, giving up', 'txnId'],
+        ['event', { type: 'giveUp', code: '40001', attempt: 2, maxAttempts: 2 }, 'txnId'],
+      ],
+    },
+  ];
+
+  it.each(scenarios)('$name, gets each event right after its message, with the same numbers and txnId', async ({ fails, max, outcome, log: expected }) => {
+    const log = listenBoth();
+    db.setConfig({ transactionAttemptsMax: max });
+    expect(await attempt([...fails])).toEqual({ outcome, attempts: fails.length + ('value' in outcome ? 1 : 0) });
+    expect(oneTxnId(log)).toEqual(expected);
+  });
+
+  it.each(scenarios)('$name, set alone, gets the same events', async ({ fails, max, outcome, log: expected }) => {
+    const log = listenBoth('events');
+    db.setConfig({ transactionAttemptsMax: max });
+    expect((await attempt([...fails])).outcome).toEqual(outcome);
+    expect(oneTxnId(log)).toEqual(expected.filter(([kind]) => kind === 'event'));
+  });
+
+  it('is not called on a first-attempt commit, nor on any other error', async () => {
+    const log = listenBoth();
+    expect(await attempt([])).toEqual({ outcome: { value: 1 }, attempts: 1 });
+    const err = await db.serializable(t.pool, c => raise(c, '23505')).catch((e: unknown) => e);
+    expect((err as { code: string }).code).toBe('23505');
+    expect(log).toEqual([]);
+  });
+
+  it('is not called from a transaction passed through: an inner 40001 gives the outer transaction\'s events alone', async () => {
+    const log = listenBoth();
+    let attempts = 0;
+    await db.serializable(t.pool, async c => {
+      attempts++;
+      await db.readCommitted(c, async inner => { if (attempts === 1) await raise(inner, '40001'); });
+    });
+    expect(attempts).toBe(2);
+    expect(oneTxnId(log)).toEqual(scenarios[0].log.slice(0, 4));
+  });
+
+  // a listener that throws: transaction() rejects with its error, as a throwing transactionListener makes it reject
+  // at that point; at rollback and giveUp, inside the catch, after its ROLLBACK; at retry, inside the try, so it sends
+  // ROLLBACK (outside any transaction, which Postgres answers with a warning) and rejects then
+  const sent = {
+    rollback: ['START TRANSACTION ISOLATION LEVEL SERIALIZABLE', 'DO', 'ROLLBACK'],
+    retry: ['START TRANSACTION ISOLATION LEVEL SERIALIZABLE', 'DO', 'ROLLBACK', 'ROLLBACK'],
+    giveUp: ['START TRANSACTION ISOLATION LEVEL SERIALIZABLE', 'DO', 'ROLLBACK', 'START TRANSACTION ISOLATION LEVEL SERIALIZABLE', 'DO', 'ROLLBACK'],
+  };
+  const messageType = (message: string) => message.startsWith('Retrying') ? 'retry' : message.endsWith('giving up') ? 'giveUp' : 'rollback';
+
+  it.each([
+    ...(['rollback', 'retry', 'giveUp'] as const).map(point => ({ point, listener: 'transactionListener' as const })),
+    ...(['rollback', 'retry', 'giveUp'] as const).map(point => ({ point, listener: 'transactionEventListener' as const })),
+  ])('a $listener that throws at $point: rejects with its error, after the same queries, and releases its client', async ({ point, listener }) => {
+    const thrown = new Error(`thrown at ${point}`);
+    const queries: string[] = [];
+    db.setConfig({
+      transactionAttemptsMax: 2,
+      transactionRetryDelay: { minMs: 0, maxMs: 0 },
+      queryListener: q => { queries.push(q.text.startsWith('DO ') ? 'DO' : q.text); },
+    });
+    if (listener === 'transactionListener') db.setConfig({ transactionListener: message => { if (messageType(message) === point) throw thrown; } });
+    else db.setConfig({ transactionEventListener: event => { if (event.type === point) throw thrown; } });
+    const checkedOut = () => t.pool.totalCount - t.pool.idleCount;
+    const before = checkedOut();
+    let attempts = 0;
+    const err = await db.serializable(t.pool, async c => { attempts++; await raise(c, '40001'); }).catch((e: unknown) => e);
+    expect(err).toBe(thrown);
+    expect(queries).toEqual(sent[point]);
+    expect(attempts).toBe(point === 'giveUp' ? 2 : 1);
+    expect(checkedOut()).toBe(before);
+  });
+
+  it.each(['transactionListener', 'transactionEventListener'] as const)('a %s that throws a 40001 at retry: the attempt is counted failed, and retried', async listener => {
+    const log = listenBoth();
+    const thrown = Object.assign(new Error('thrown at retry'), { code: '40001' });
+    let throws = 1;
+    if (listener === 'transactionListener') db.setConfig({ transactionListener: (message, txnId) => {
+      log.push(['message', message, txnId]);
+      if (messageType(message) === 'retry' && throws-- > 0) throw thrown;
+    } });
+    else db.setConfig({ transactionEventListener: (event, txnId) => {
+      log.push(['event', event, txnId]);
+      if (event.type === 'retry' && throws-- > 0) throw thrown;
+    } });
+    expect(await attempt(['40001'])).toEqual({ outcome: { value: 2 }, attempts: 2 });
+    expect(oneTxnId(log)).toEqual([
+      ...scenarios[0].log.slice(0, listener === 'transactionListener' ? 3 : 4),
+      ['message', 'Transaction rollback (code 40001) on attempt 2 of 5, retrying in 20ms', 'txnId'],
+      ['event', { type: 'rollback', code: '40001', attempt: 2, maxAttempts: 5, delayMs: 20 }, 'txnId'],
+      ['message', 'Retrying transaction, attempt 3 of 5', 'txnId'],
+      ['event', { type: 'retry', attempt: 3, maxAttempts: 5 }, 'txnId'],
+    ]);
+  });
+});
+
 // #246: setConfig() accepts undefined for any key (Partial<Config>); a key with a default then reads as
 // that default, and transaction() releases the client it checked out from the pool on every path
 describe('the config transaction() reads', () => {

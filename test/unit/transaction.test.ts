@@ -106,6 +106,7 @@ describe('transaction() on a client that cannot tell its transaction status', ()
 describe('transaction() on a pool that is not pg’s', () => {
   afterEach(() => {
     db.setConfig({ transactionRetryDelay: { minMs: 25, maxMs: 250 }, transactionAttemptsMax: 5, transactionRequiresCommit: false });
+    db.setConfig({ transactionEventListener: undefined } as db.NewConfig);
     vi.restoreAllMocks();
   });
 
@@ -160,6 +161,20 @@ describe('transaction() on a pool that is not pg’s', () => {
     expect(pool.sent).toEqual([
       'connect()', 'START TRANSACTION ISOLATION LEVEL SERIALIZABLE', 'SELECT 1', 'ROLLBACK',
       'START TRANSACTION ISOLATION LEVEL SERIALIZABLE', 'SELECT 1', 'ROLLBACK', 'release()',
+    ]);
+  });
+
+  it('retries on 40001 with the same events as on a pg pool (#725)', async () => {
+    const events: [db.TransactionEvent, number | undefined][] = [];
+    db.setConfig({ transactionRetryDelay: { minMs: 0, maxMs: 0 }, transactionEventListener: (event, txnId) => { events.push([event, txnId]); } });
+    let failures = 1;
+    const pool = otherPool(text => text === 'SELECT 1' && failures-- > 0 ? serializationFailure() : undefined);
+    expect(await db.serializable(pool, async c => { await db.sql`SELECT 1`.run(c); return 'done'; })).toBe('done');
+    const txnId = events[0]?.[1];
+    expect(typeof txnId).toBe('number');
+    expect(events).toEqual([
+      [{ type: 'rollback', code: '40001', attempt: 1, maxAttempts: 5, delayMs: 0 }, txnId],
+      [{ type: 'retry', attempt: 2, maxAttempts: 5 }, txnId],
     ]);
   });
 
