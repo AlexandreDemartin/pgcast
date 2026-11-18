@@ -2,7 +2,7 @@
 
 Run [pgcast](https://pgcast.dev/)'s queries and transactions on a [PGlite](https://pglite.dev/) 0.5.x, the Postgres that runs in Node or in a page. Values are read and written as `pg` reads and writes them, so the types pgcast generates from your schema hold: a `timestamptz` is a `Date`, a `bigint` a string, an `interval` an object.
 
-Version 0.1.0. MIT licence.
+Version 0.1.0 (its changes: [CHANGELOG.md](CHANGELOG.md)). MIT licence.
 
 ## Install
 
@@ -112,11 +112,12 @@ The owner publishes it, apart from pgcast, under its own version:
 npm ci && npm run build   # at the repository root
 cd adapters/pglite
 npm ci && npm test && npm run test:types && npm run check:browser
-npm pack --dry-run        # dist/, README.md, LICENCE, package.json
+npm pack --dry-run        # dist/, README.md, CHANGELOG.md, LICENCE, package.json
 npm publish --access public
+git tag @pgcast/adapter-pglite@0.1.0 && git push origin @pgcast/adapter-pglite@0.1.0
 ```
 
-`prepack` builds `dist/`. The first publish of a scoped package needs `--access public`.
+`prepack` builds `dist/`. The first publish of a scoped package needs `--access public`. The tag names the published commit, as `v<version>` names pgcast's.
 
 ## Licence
 
