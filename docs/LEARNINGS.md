@@ -417,6 +417,8 @@ Candidates for a check, a rule or a skill line.
 - #677: a message's advice gets the same proof as a code path: run what it says, where it says it, on Postgres (42703 in a `VALUES` list, 42702 in `updateValues`).
 - #677: a docs sentence "the type refuses it" is compiled for each position it covers, a hand-written `sql` template and an `any` column included.
 - #677: a message that quotes `` sql`${…}` `` fails lint's `no-template-curly-in-string` and the docs check: write the advice as plain SQL.
+- #681: below TS 5.5, a declaration that names a table by module starts with `/// <reference path>` to its project's `schema.d.ts`, which joins the reader's compilation: replay a claim about types across projects with and without an `s` import in the writer.
+- #681: a docs table's cell holds the type the reader gets, one short example at most; the why goes in a bullet under it.
 
 ## Minors kept
 
