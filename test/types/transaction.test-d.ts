@@ -117,6 +117,7 @@ type OtherClient = {
 type TxnOther<L extends db.IsolationLevel> = db.TxnClientLike<OtherClient, db.IsolationSatisfying<L>>;
 type Fails = OtherClient['query'];
 interface MyPool extends pg.Pool { extra: number }
+declare class AppPool extends pg.Pool { connect(): Promise<pg.PoolClient & { tag: 1 }> }
 interface MyClient extends pg.ClientBase { extra: number }
 declare const other: { connect: () => Promise<OtherClient> };
 declare const txn: db.TxnClientForSerializable;
@@ -125,6 +126,7 @@ declare const txnAny: db.TxnClient<db.IsolationLevel>;
 declare const clientBase: pg.ClientBase;
 declare const queryable: db.Queryable;
 declare const myPool: MyPool;
+declare const appPool: AppPool;
 declare const myClient: MyClient;
 declare const anyValue: any;
 declare const queryableLike: db.QueryableLike;
@@ -210,6 +212,12 @@ describe('the calls of Zapatos 6.6.1 keep their types (#696)', () => {
     expectTypeOf(db.serializable(myClient, async c => c)).resolves.toEqualTypeOf<db.TxnClientForSerializable>();
     expectTypeOf(db.serializable(anyValue, async c => c)).resolves.toEqualTypeOf<db.TxnClientForSerializable>();
     expectTypeOf(db.transaction(queryable, db.IsolationLevel.RepeatableReadRO, async c => c)).resolves.toEqualTypeOf<db.TxnClientForRepeatableReadRO>();
+  });
+
+  test('a pg.Pool subclass whose connect() gives a narrower client still gives the TxnClient… of its level', () => {
+    expectTypeOf(db.serializable(appPool, async c => c)).resolves.toEqualTypeOf<db.TxnClientForSerializable>();
+    // @ts-expect-error a TxnClientForSerializable has no tag, as in Zapatos 6.6.1
+    void db.serializable(appPool, async c => c.tag);
   });
 
   test('generic forwarders, explicit type arguments and values keep them', () => {
