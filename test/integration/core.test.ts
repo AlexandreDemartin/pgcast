@@ -257,8 +257,9 @@ describe('Default, self, parent, cols, vals', () => {
     db.setConfig({ queryListener: query => queries.push(query) });
     const
       a = db.all as any, s = self as any, bob = { email: 'bob@example.com', display_name: 'Bob' },
-      allAsValue = '`db.all` has no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value',
-      selfAsValue = '`db.self` has no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value',
+      where = ', nor in a `sql` template of your own (`VALUES (…)` or a filter\'s `IN (…)`)',
+      allAsValue = `\`db.all\` has no meaning as a value in \`vals({…})\`, so as an \`insert()\`, \`upsert()\` or \`update()\` value${where}`,
+      selfAsValue = `\`db.self\` has no meaning as a value in \`vals({…})\`, so as an \`insert()\`, \`upsert()\` or \`update()\` value${where}`,
       bareVals = 'has no meaning as an item of `vals([…])` outside a column\'s value, as in a `sql` template of your own or in `upsert()` `updateValues`',
       rejected = (q: db.SQLFragment<any>) => q.run(t.client).then(() => 'ran', (e: Error) => 'code' in e ? e : e.message.split(': ')[0]);
     expect({

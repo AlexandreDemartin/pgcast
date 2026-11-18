@@ -428,6 +428,10 @@ Candidates for a check, a rule or a skill line.
 - #684: to widen an overloaded parameter, add an overload and keep 6.6.1's last: `Parameters` and `ReturnType` read the last one, so derived types stay byte-identical (`readonly` in place broke `p.push()`).
 - #684: TS 7, and 5.9 with `--pretty false`, print only the last overload's error: check the message a wrong call gets once an overload is added.
 - #684: an `as const` array in a variable is a `readonly` tuple and resolves to other overloads than the inline form: test both, on 4.1.6 too.
+- #686: a squash that shortens an entry can leave a clause of a rejected option standing as a fact: read each Changed / Unchanged clause of a rewritten entry against the code.
+- #686: a refusal of a write value reaches every `vals({…})`, hand-written ones too: its `switching.md` row and its message name "a `sql` template of your own".
+- #686: after changing a message, `git grep` a distinctive fragment of its old text (strings and backtick-escaped inline snapshots), not only the constant's name.
+- #686: a review's claim about a compiler's output (`--pretty`, which overload it prints) is replayed on the merged head with the exact call shape before the docs follow it.
 
 ## Minors kept
 

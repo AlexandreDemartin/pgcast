@@ -1,5 +1,5 @@
 ---
-english: 9cee25d5bbdb
+english: b740b272da24
 ---
 
 # Installation
@@ -58,7 +58,7 @@ npm install --save-dev --save-exact @types/node@ts4.1
 ```
 
 ::: warning Schéma périmé
-`skipLibCheck` ignore aussi votre `schema.d.ts` généré. Après une mise à jour de pgcast, un schéma que vous n’avez pas régénéré n’échoue plus sur `schemaVersionCanary` ([Quand le schéma change](/fr/first-query#when-the-schema-changes)) : lancez `npx pgcast` à chaque fois.
+`skipLibCheck` ignore aussi votre `schema.d.ts` généré. Après une mise à jour de pgcast, un schéma que vous n’avez pas régénéré n’échoue plus sur `schemaVersionCanary` ([Quand le schéma change](/fr/first-query#when-the-schema-changes)) : lancez `npx pgcast` à chaque fois, et [`npx pgcast --check`](/fr/generator#check) en CI, qui échoue tant qu’un fichier généré est périmé.
 :::
 
 ## Ajouter le paquet {#add-the-package}

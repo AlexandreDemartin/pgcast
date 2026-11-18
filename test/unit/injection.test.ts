@@ -419,8 +419,8 @@ describe('db.all and self as a write value, or in vals([…]) with no current co
     // any text is returned, whatever the key or the other items hold (#665)
     const
       all = db.all as any, self = db.self as any,
-      allAsValue = 'throws: `db.all` has no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value: give a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.',
-      selfAsValue = 'throws: `db.self` has no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value: give a value; in `update()`, write `db.self` in a `sql` fragment value, where it stands for the column; in `upsert()` `updateValues`, to read a column, qualify it with its table, `table.column`, or with `EXCLUDED` for the row proposed, `EXCLUDED.column`.',
+      allAsValue = 'throws: `db.all` has no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value, nor in a `sql` template of your own (`VALUES (…)` or a filter\'s `IN (…)`): give a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.',
+      selfAsValue = 'throws: `db.self` has no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value, nor in a `sql` template of your own (`VALUES (…)` or a filter\'s `IN (…)`): give a value; in `update()`, write `db.self` in a `sql` fragment value, where it stands for the column; in `upsert()` `updateValues`, to read a column, qualify it with its table, `table.column`, or with `EXCLUDED` for the row proposed, `EXCLUDED.column`.',
       allInBareVals = 'throws: `db.all` has no meaning as an item of `vals([…])` outside a column\'s value, as in a `sql` template of your own or in `upsert()` `updateValues`: give a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.',
       wrapperInBareVals = 'throws: `db.raw()`, `db.cols()` and `db.vals()` have no meaning as an item of `vals([…])` outside a column\'s value, as in a `sql` template of your own or in `upsert()` `updateValues`: for SQL, write it outside `vals([…])` (in `updateValues`, as the value itself); for a value, give the value itself, or `db.param()`.',
       builds = {
@@ -468,7 +468,7 @@ describe('raw, cols and vals as a write value', () => {
   it('raw(input) as an insert(), upsert() or update() value, or in vals({…}), throws, and is never written into the text', () => {
     // 6.6.1 sent it as JSON, so raw(input) there was a parameter by accident; compiling it as SQL would make
     // it an injection, so it throws before any text is returned (#259)
-    const asValue = 'throws: `db.raw()`, `db.cols()` and `db.vals()` have no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value: to write SQL, use a `sql` fragment value (in `update()`, `db.self` there stands for the column); to write a value, give the value itself, or `db.param()`.';
+    const asValue = 'throws: `db.raw()`, `db.cols()` and `db.vals()` have no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value, nor in a `sql` template of your own (`VALUES (…)` or a filter\'s `IN (…)`): to write SQL, use a `sql` fragment value (in `update()`, `db.self` there stands for the column); to write a value, give the value itself, or `db.param()`.';
     const builds = {
       insert: (v: string) => db.insert('users', { email: 'x', display_name: db.raw(v) }),
       insertRows: (v: string) => db.insert('users', [{ email: 'x', display_name: 'X' }, { email: 'y', display_name: db.raw(v) }]),

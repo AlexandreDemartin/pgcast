@@ -25,7 +25,7 @@ const sortBy = <R extends Record<string, any>>(rows: R[], key: keyof R) =>
   [...rows].sort((a, b) => (a[key] < b[key] ? -1 : a[key] > b[key] ? 1 : 0));
 
 const
-  wrapperAsValue = '`db.raw()`, `db.cols()` and `db.vals()` have no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value: to write SQL, use a `sql` fragment value (in `update()`, `db.self` there stands for the column); to write a value, give the value itself, or `db.param()`.',
+  wrapperAsValue = '`db.raw()`, `db.cols()` and `db.vals()` have no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value, nor in a `sql` template of your own (`VALUES (…)` or a filter\'s `IN (…)`): to write SQL, use a `sql` fragment value (in `update()`, `db.self` there stands for the column); to write a value, give the value itself, or `db.param()`.',
   noParent = `The 'parent' table alias has no meaning here`,
   nothingToInsert = 'nothing to insert: an Insertable needs at least one column; for a row of defaults only, write INSERT ... DEFAULT VALUES in a sql template',
   wrappers = { raw: raw("upper('Ada')"), cols: cols('display_name'), colsArray: cols(['display_name']), vals: vals('Ada'), valsObject: vals({ theme: 'dark' }) };

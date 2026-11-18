@@ -54,7 +54,7 @@ npm install --save-dev --save-exact @types/node@ts4.1
 ```
 
 ::: warning Stale schema
-`skipLibCheck` skips your generated `schema.d.ts` too. After an upgrade of pgcast, a schema you haven't regenerated no longer fails on `schemaVersionCanary` ([When the schema changes](/first-query#when-the-schema-changes)): run `npx pgcast` each time.
+`skipLibCheck` skips your generated `schema.d.ts` too. After an upgrade of pgcast, a schema you haven't regenerated no longer fails on `schemaVersionCanary` ([When the schema changes](/first-query#when-the-schema-changes)): run `npx pgcast` each time, and [`npx pgcast --check`](/generator#check) in CI, which fails while a generated file is stale.
 :::
 
 ## Add the package
