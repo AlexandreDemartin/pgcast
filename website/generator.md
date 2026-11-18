@@ -782,8 +782,11 @@ An app that wires both, or another package of a monorepo, reads `films`'s emitte
 
 | The reader | TypeScript 5.5 and later | Before 5.5 |
 |---|---|---|
-| An app with no schema of its own | `any`: `const title: number = page.title` compiles; a misspelt column is still refused (TS2551) | the schema of each project whose declarations name it by module, with `/// <reference path>`: here `box_office`'s, so `page.title` is `box_office`'s `films.title`, and `page.studio.name` `unknown`; on 4.1, which names every table by module, both, [in one compilation](#both-in-one-compilation) |
-| A project with its own schema | its own table of that name: `page.id` a `string` in `box_office`; `unknown` for a table it lacks (`page.studio.name`); `any` when it is named by module | the other project's schema beside its own: [both in one compilation](#both-in-one-compilation). `films`, once it reads `box_office`'s `takings()`, has its own `'studios'` refused |
+| An app with no schema of its own | `any`: `const title: number = page.title` compiles | the schema a declaration pulls in, else `any`: here `page.title` is `box_office`'s `films.title` |
+| A project with its own schema | its own table of that name (`page.id` a `string` in `box_office`), `unknown` for a table it lacks, or `any` | as from 5.5, until a declaration pulls the other's schema in: then both, [in one compilation](#both-in-one-compilation), its own queries refused |
+
+- A misspelt column is still refused, TS2551.
+- Before 5.5, a declaration that names a table by module starts with `/// <reference path>` to its project's `schema.d.ts`, which joins the reader's compilation: here `box_office`'s `takings()` brings `box_office`'s, and 4.1, which names every table by module, brings `films`'s too. From 5.5 that line is gone, and a table named by module that the reader lacks is `any`.
 
 Without `skipLibCheck`, the reader's `.d.ts` errors say so: TS2307 on `zapatos/schema` with no schema, TS2344 or TS6200 with one. The way out is a type written out as plain TypeScript, never `s.films.JSONSelectable`:
 

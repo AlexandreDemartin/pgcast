@@ -1,5 +1,5 @@
 ---
-english: 4ac953e32eac
+english: f6c5d947a4e2
 ---
 
 # Générateur
@@ -786,8 +786,11 @@ Une app qui relie les deux, ou un autre paquet d’un monorepo, lit les déclara
 
 | Le lecteur | TypeScript 5.5 et plus récent | Avant 5.5 |
 |---|---|---|
-| Une app sans schéma propre | `any` : `const title: number = page.title` compile ; une colonne mal orthographiée reste refusée (TS2551) | le schéma de chaque projet dont les déclarations nomment cette table par le module, avec `/// <reference path>` : ici celui de `box_office`, donc `page.title` est le `films.title` de `box_office`, et `page.studio.name` est `unknown` ; sous 4.1, qui nomme chaque table par le module, les deux, [dans une même compilation](#both-in-one-compilation) |
-| Un projet qui a son propre schéma | sa propre table de ce nom : `page.id` est un `string` dans `box_office` ; `unknown` pour une table qu’il n’a pas (`page.studio.name`) ; `any` quand elle est nommée par le module | le schéma de l’autre projet à côté du sien : [les deux dans une même compilation](#both-in-one-compilation). `films`, dès qu’il lit le `takings()` de `box_office`, voit refuser son propre `'studios'` |
+| Une app sans schéma propre | `any` : `const title: number = page.title` compile | le schéma qu’une déclaration fait entrer, sinon `any` : ici, `page.title` est le `films.title` de `box_office` |
+| Un projet qui a son propre schéma | sa propre table de ce nom (`page.id` est un `string` dans `box_office`), `unknown` pour une table qu’il n’a pas, ou `any` | comme à partir de 5.5, jusqu’à ce qu’une déclaration fasse entrer le schéma de l’autre : alors les deux, [dans une même compilation](#both-in-one-compilation), et ses propres requêtes sont refusées |
+
+- Une colonne mal orthographiée reste refusée, TS2551.
+- Avant 5.5, une déclaration qui nomme une table par le module commence par `/// <reference path>` vers le `schema.d.ts` de son projet, qui entre dans la compilation du lecteur : ici, le `takings()` de `box_office` fait entrer celui de `box_office`, et 4.1, qui nomme chaque table par le module, fait entrer aussi celui de `films`. À partir de 5.5, cette ligne disparaît, et une table nommée par le module que le lecteur n’a pas est `any`.
 
 Sans `skipLibCheck`, les erreurs dans les `.d.ts` du lecteur le signalent : TS2307 sur `zapatos/schema` sans schéma, TS2344 ou TS6200 avec un schéma. La solution est un type écrit en TypeScript ordinaire, jamais `s.films.JSONSelectable` :
 
