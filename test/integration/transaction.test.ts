@@ -1306,6 +1306,48 @@ describe('savepoint() (#723)', () => {
     expect(await notes()).toEqual(['kept']);
   });
 
+  /** How many of the savepoints `names` are still established: each `RELEASE` tried in a savepoint of its own, rolled back to on 3B001. */
+  const established = async (c: db.TxnClientForSerializable, names: string[]) => {
+    let count = 0;
+    for (const name of new Set(names)) for (;;) {
+      await c.query('SAVEPOINT count_probe');
+      const released = await c.query(`RELEASE SAVEPOINT ${name}`).then(() => true, (err: { code?: string }) => {
+        expect(err.code).toBe('3B001');
+        return false;
+      });
+      if (!released) {
+        await c.query('ROLLBACK TO SAVEPOINT count_probe');
+        await c.query('RELEASE SAVEPOINT count_probe');
+        break;
+      }
+      count++;  // that RELEASE released count_probe too
+    }
+    return count;
+  };
+
+  it.each(['returns', 'rethrows'] as const)('a Postgres 40001 caught by the outer savepoint\'s callback, which %s: the outer work is undone, and no savepoint is left established', async how => {
+    const names: string[] = [];
+    db.setConfig({ transactionRequiresCommit: true, queryListener: q => { const [, name] = /^SAVEPOINT (\S+)$/.exec(q.text) ?? []; if (name) names.push(name); } });
+    const wrapped = new Error('wrapped');
+    let attempts = 0, left: number | undefined;
+    await db.serializable(t.pool, async c => {
+      attempts++;
+      await write(c, 'base');
+      const err = await db.savepoint(c, async outer => {
+        await write(outer, 'outer work');
+        await db.savepoint(outer, inner => raise(inner, '40001')).catch(() => { if (how === 'rethrows') throw wrapped; });
+      }).catch((e: unknown) => e);
+      if (how === 'rethrows') expect(err).toBe(wrapped);
+      else expect(db.isDatabaseError(err, 'InvalidTransactionState_InFailedSqlTransaction')).toBe(true);
+      await write(c, 'after');
+      left = await established(c, names);
+    });
+    expect(await notes()).toEqual(['after', 'base']);
+    expect(names).toHaveLength(2);
+    expect(left).toBe(0);
+    expect(attempts).toBe(1);  // the 40001 was caught: no retry
+  });
+
   it('limitation: a 40001 thrown from JavaScript, caught, leaves its savepoint established, so an outer one\'s ROLLBACK TO stops at it', async () => {
     const notFromPostgres = Object.assign(new Error('not from Postgres'), { code: '40001' });
     await db.serializable(t.pool, async c => {
