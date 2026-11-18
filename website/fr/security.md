@@ -1,5 +1,5 @@
 ---
-english: 46d60f0a03ca
+english: e9e8b37c8deb
 ---
 
 # Sécurité
@@ -109,7 +109,7 @@ Une correction sort dans une nouvelle version, jamais dans une plus ancienne : 
 
 ## Ce contre quoi pgcast ne peut rien {#what-pgcast-can-t-guard-against}
 
-pgcast empêche l’entrée d’un appelant de devenir du code ; il ne peut pas savoir si le SQL fait ce que vous vouliez. Dans les trois cas ci-dessous, le SQL est valide, et fait autre chose que prévu.
+pgcast empêche l’entrée d’un appelant de devenir du code ; il ne peut pas savoir si le SQL fait ce que vous vouliez. Dans les trois cas ci-dessous, le SQL est valide, et fait autre chose que prévu. pgcast ne vérifie pas non plus une politique de sécurité niveau ligne : la politique est celle de Postgres, et [`setLocal()`](/fr/transaction#setLocal) ne définit que ce qu’elle lit ([Sécurité des lignes](/fr/row-security)).
 
 ### La chaîne d’un appelant comme nom {#a-caller-s-string-as-a-name}
 

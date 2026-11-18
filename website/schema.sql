@@ -104,6 +104,18 @@ CREATE FUNCTION screening_span(film_id INTEGER, OUT first_at TIMESTAMPTZ, OUT la
   LANGUAGE sql STABLE AS $$
     SELECT min(starts_at), max(starts_at) FROM screenings WHERE screenings.film_id = screening_span.film_id $$;
 
+-- Row security, in row-security.md: a customer reads only their own bookings, once a transaction sets the role and
+-- app.customer with setLocal(). The examples connect as a superuser, whom no policy binds. A role is the server's, not
+-- the database's: a second run keeps it, as another run's (unique_violation, if it creates it at the same time).
+DO $$ BEGIN
+  CREATE ROLE cinema_customer NOLOGIN;
+EXCEPTION WHEN duplicate_object OR unique_violation THEN NULL;
+END $$;
+
+GRANT SELECT ON seat_bookings TO cinema_customer;
+ALTER TABLE seat_bookings ENABLE ROW LEVEL SECURITY;
+CREATE POLICY own_bookings ON seat_bookings USING (customer = current_setting('app.customer', true));
+
 INSERT INTO studios (id, name) VALUES
   (1000, 'Larkspur Pictures')
 , (1001, 'Greyhaven Studios')
