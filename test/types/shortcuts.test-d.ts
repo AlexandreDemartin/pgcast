@@ -436,6 +436,149 @@ describe('selectOne, selectExactlyOne, count', () => {
   });
 });
 
+declare const txn: db.TxnClientForSerializable;
+
+describe('selectRows', () => {
+  test('each row as select() types it: all columns, columns, extras, a lateral map, a selectOne() passed through, a view', () => {
+    const
+      all = db.selectRows('users', db.all), allSelected = db.select('users', db.all),
+      columns = db.selectRows('accounts', { owner_id: 1 }, { columns: ['id', 'balance'], order: { by: 'id', direction: 'ASC' } }),
+      columnsSelected = db.select('accounts', { owner_id: 1 }, { columns: ['id', 'balance'], order: { by: 'id', direction: 'ASC' } }),
+      extras = db.selectRows('users', db.all, { extras: { n: db.count('accounts', db.all), name: 'display_name' } }),
+      extrasSelected = db.select('users', db.all, { extras: { n: db.count('accounts', db.all), name: 'display_name' } }),
+      lateral = db.selectRows('users', db.all, { lateral: { accounts: db.select('accounts', { owner_id: db.parent('id') }), n: db.count('accounts', { owner_id: db.parent('id') }) } }),
+      lateralSelected = db.select('users', db.all, { lateral: { accounts: db.select('accounts', { owner_id: db.parent('id') }), n: db.count('accounts', { owner_id: db.parent('id') }) } }),
+      passed = db.selectRows('users', db.all, { lateral: db.selectOne('accounts', { owner_id: db.parent('id') }) }),
+      passedSelected = db.select('users', db.all, { lateral: db.selectOne('accounts', { owner_id: db.parent('id') }) }),
+      view = db.selectRows('active_users', db.all), viewSelected = db.select('active_users', db.all);
+    expectTypeOf<Run<typeof all>>().toEqualTypeOf<Run<typeof allSelected>>();
+    expectTypeOf<Run<typeof all>>().toEqualTypeOf<s.users.JSONSelectable[]>();
+    expectTypeOf<Run<typeof columns>>().toEqualTypeOf<Run<typeof columnsSelected>>();
+    expectTypeOf<Run<typeof extras>>().toEqualTypeOf<Run<typeof extrasSelected>>();
+    expectTypeOf<Run<typeof lateral>>().toEqualTypeOf<Run<typeof lateralSelected>>();
+    expectTypeOf<Run<typeof passed>>().toEqualTypeOf<Run<typeof passedSelected>>();
+    expectTypeOf<Run<typeof view>>().toEqualTypeOf<Run<typeof viewSelected>>();
+    expectTypeOf(columns.run(pool)).resolves.toEqualTypeOf<Run<typeof columnsSelected>>();
+    expectTypeOf(columns.run(pool)).resolves.not.toBeAny();
+    expectTypeOf(lateral.run(pool)).resolves.not.toBeAny();
+  });
+
+  test('each batch of cursor() is select()’s type for those rows', async () => {
+    const
+      options = { columns: ['id', 'display_name'], lateral: { accounts: db.select('accounts', { owner_id: db.parent('id') }) } } as const,
+      selected = db.select('users', db.all, options);
+    for await (const users of db.cursor(txn, db.selectRows('users', db.all, options), { batchSize: 100 })) {
+      expectTypeOf(users).toEqualTypeOf<Run<typeof selected>>();
+      expectTypeOf(users).not.toBeAny();
+    }
+    for await (const views of db.cursor(txn, db.selectRows('active_users', db.all), { batchSize: 100 })) {
+      expectTypeOf(views).toEqualTypeOf<s.active_users.JSONSelectable[]>();
+    }
+  });
+
+  test('a sql template, withCTEs() and cursor() take it; its type names RowsQuery', () => {
+    const rows = db.selectRows('users', db.all);
+    db.sql`SELECT count(*) FROM (${rows}) AS u`;
+    expectTypeOf(db.withCTEs({ owners: db.selectRows('accounts', db.all) }, rows)).toEqualTypeOf(rows);
+    db.cursor(txn, db.withCTEs({}, rows), { batchSize: 1 });
+    expectTypeOf(rows).toEqualTypeOf<db.SQLFragment<s.users.JSONSelectable[], db.RowsQuery>>();
+  });
+
+  test('refuses it where select() expects one value per parent row, and as a filter', () => {
+    const rows = db.selectRows('accounts', { owner_id: db.parent('id') });
+    // @ts-expect-error a rows query as a lateral key: the parent row would come back once per row
+    db.select('users', db.all, { lateral: { accounts: rows } });
+    // @ts-expect-error a rows query passed through as the lateral
+    db.select('users', db.all, { lateral: rows });
+    // @ts-expect-error a rows query as selectRows()'s own lateral key
+    db.selectRows('users', db.all, { lateral: { accounts: rows } });
+    // @ts-expect-error a rows query as an extras value: Postgres refuses it with more than one row (21000)
+    db.select('users', db.all, { extras: { accounts: rows } });
+    // @ts-expect-error a rows query as the where
+    db.select('users', rows);
+    // @ts-expect-error a rows query as a Whereable value, on a text column
+    db.select('users', { display_name: rows });
+    // @ts-expect-error a rows query as a Whereable value, on a jsonb column
+    db.select('extra.type_zoo', { c_jsonb: rows });
+    // @ts-expect-error a rows query in not(), as the where
+    db.select('users', db.conditions.not(rows));
+    // @ts-expect-error a rows query as having
+    db.select('users', db.all, { having: rows });
+    // @ts-expect-error a rows query as a plain SQLFragment
+    const plain: db.SQLFragment<any> = rows;
+    void plain;
+  });
+
+  test('takes it as order.by and as the Whereable value of a column typed any (home), which Postgres refuses', () => {
+    const rows = db.selectRows('accounts', db.all, { columns: ['id'] });
+    expectTypeOf(db.select('users', db.all, { order: { by: rows, direction: 'ASC' } })).toEqualTypeOf(db.select('users', db.all));
+    expectTypeOf(db.select('users', { home: rows })).toEqualTypeOf(db.select('users', db.all));
+  });
+
+  test('refuses a lateral typed number passed through, which comes as pg parses its column (#749); takes it under a key', () => {
+    const p = db.parent('id');
+    // @ts-expect-error count() passed through: pg gives its bigint as a string
+    db.selectRows('users', db.all, { lateral: db.count('accounts', { owner_id: p }) });
+    // @ts-expect-error sum() passed through: pg gives a numeric as a string
+    db.selectRows('users', db.all, { lateral: db.sum('accounts', { owner_id: p }, { columns: ['balance'] }) });
+    // @ts-expect-error avg() passed through: pg gives a numeric as a string
+    db.selectRows('users', db.all, { lateral: db.avg('accounts', { owner_id: p }, { columns: ['balance'] }) });
+    // @ts-expect-error min() of a number passed through, typed number but not by its column
+    db.selectRows('users', db.all, { lateral: db.min('accounts', { owner_id: p }, { columns: ['ratio'] }) });
+    // @ts-expect-error max() of an int8 passed through: pg gives it as a string
+    db.selectRows('users', db.all, { lateral: db.max('accounts', { owner_id: p }, { columns: ['lifetime_ops'] }) });
+    // @ts-expect-error min() of a date passed through: pg gives a Date
+    db.selectRows('users', db.all, { lateral: db.min('events', db.all, { columns: ['occurred_on'] }) });
+    // @ts-expect-error a sql template typed number: the type cannot tell it from count()
+    db.selectRows('users', db.all, { lateral: db.sql<db.SQL, number>`SELECT 7::int8 AS result` });
+    // @ts-expect-error a selectOne() passing a count() through, typed number | undefined
+    db.selectRows('users', db.all, { lateral: db.selectOne('accounts', { owner_id: p }, { lateral: db.count('events', db.all) }) });
+    // @ts-expect-error count() or select() by a condition: each member is checked, and count()'s is typed number
+    db.selectRows('users', db.all, { lateral: Math.random() > 0.5 ? db.count('accounts', { owner_id: p }) : db.select('accounts', { owner_id: p }, { columns: ['id'] }) });
+    // a sql template is typed as written: a string for an int8, a Date for a timestamptz, as pg parses them
+    const
+      int8 = db.selectRows('users', db.all, { lateral: db.sql<db.SQL, db.Int8String>`SELECT 7::int8 AS result` }),
+      at = db.selectRows('users', db.all, { lateral: db.sql<db.SQL, Date>`SELECT now() AS result` }),
+      keyed = db.selectRows('users', db.all, { columns: ['id'], lateral: { n: db.count('accounts', { owner_id: p }) } }),
+      keyedSelected = db.select('users', db.all, { columns: ['id'], lateral: { n: db.count('accounts', { owner_id: p }) } });
+    expectTypeOf(int8.run(pool)).resolves.toEqualTypeOf<db.Int8String[]>();
+    expectTypeOf(at.run(pool)).resolves.toEqualTypeOf<Date[]>();
+    expectTypeOf(at.run(pool)).resolves.not.toBeAny();
+    // under a lateral key, a count() is JSON, a number, as in select()
+    expectTypeOf<Run<typeof keyed>>().toEqualTypeOf<Run<typeof keyedSelected>>();
+    expectTypeOf<Run<typeof keyed>[number]['n']>().toEqualTypeOf<number>();
+  });
+
+  test('refuses a lateral whose type is a type parameter; a forwarder calls select() or casts', () => {
+    const forward = <L extends db.SQLFragmentMap>(l: L) =>
+      // @ts-expect-error the lateral's type is a type parameter, which the check of a lateral typed number cannot resolve
+      db.selectRows('users', db.all, { lateral: l });
+    const forwardSelect = <L extends db.SQLFragmentMap>(l: L) => db.select('users', db.all, { lateral: l });
+    const forwardCast = <L extends db.SQLFragmentMap>(l: L) => db.selectRows('users', db.all, { lateral: l as db.SQLFragmentMap });
+    void forward;
+    expectTypeOf(forwardSelect).returns.not.toBeAny();
+    expectTypeOf<Run<ReturnType<typeof forwardCast>>[number]>().toMatchTypeOf<s.users.JSONSelectable>();
+  });
+
+  test('a helper typed SQLFragment<R> refuses it; SQLFragment<R, any> takes it', () => {
+    const rows = db.selectRows('users', db.all, { columns: ['id'] });
+    const runAny = <R>(q: db.SQLFragment<R>) => q.run(pool);
+    const runRows = <R>(q: db.SQLFragment<R, any>) => q.run(pool);
+    // @ts-expect-error a helper typed the Zapatos way takes SQLFragment<R>, whose second type argument is never
+    runAny(rows);
+    expectTypeOf(runRows(rows)).resolves.toEqualTypeOf<Pick<s.users.JSONSelectable, 'id'>[]>();
+    expectTypeOf(runRows(rows)).resolves.not.toBeAny();
+    expectTypeOf(runRows(db.select('users', db.all))).resolves.toEqualTypeOf<s.users.JSONSelectable[]>();
+  });
+
+  test('refuses an unknown column or table', () => {
+    // @ts-expect-error an unknown column
+    db.selectRows('users', db.all, { columns: ['nope'] });
+    // @ts-expect-error an unknown table
+    db.selectRows('nope', db.all);
+  });
+});
+
 describe('insert', () => {
   test('one row: JSONSelectable; an array: JSONSelectable[]', () => {
     const one = db.insert('users', { email: 'a@b', display_name: 'A' });

@@ -18,6 +18,8 @@ Builds one `SELECT` of the rows of `table` that match `where`. It returns a [`SQ
 - `options`: the [options](#options) below, all optional.
 - `mode` and `aggregate`: what `selectOne()`, `count()` and the others pass; see [`SelectResultMode`](#SelectResultMode).
 
+For its rows one by one, as [`cursor()`](/transaction#cursor) reads them, the same query without `jsonb_agg`: [`selectRows()`](#selectRows).
+
 <CastPanel example="select">
 
 <<< ./examples/select.ts{ts twoslash}
@@ -231,6 +233,38 @@ class NotExactlyOneError extends Error {
 What `selectExactlyOne()`, the mode `ExactlyOne` of `select()`, rejects with when no row matches. Its `name` is `'NotExactlyOneError'`, its `message` "One result expected but none returned (hint: check `.query.compile()` on this Error)"<!-- message -->; with [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow), a second row gives "One result expected but more returned (hint: check `.query.compile()` on this Error)"<!-- message -->.
 
 Its `query` is the [`SQLFragment`](/sql-template#SQLFragment) that ran, or, for a [`.copy()`](/sql-template#copy), the one it was copied from: `err.query.compile()` gives its SQL and values. `err instanceof db.NotExactlyOneError` recognises it; catching it: [Tell a missing row from the others](/handle-errors#tell-a-missing-row-from-the-others).
+
+## `selectRows()` {#selectRows}
+
+```ts
+db.selectRows(table, where, options?)
+```
+
+From 6.12.0. The query [`select()`](#select) wraps in `jsonb_agg`, as a fragment of its own, one row per result: for [`cursor()`](/transaction#cursor), which runs exactly the fragment it is given, and so reads a `select()` as one row, its whole array. It takes `select()`'s `table`, `where` and [options](#options), and `.run(pool)` gives what `select()` gives, `[]` when none match.
+
+| Call | SQL |
+|---|---|
+| `db.selectRows('films', { studio_id: 1000 }, { columns: ['id', 'title'], order: { by: 'title', direction: 'ASC' } })` | `SELECT jsonb_build_object($1::text, "id", $2::text, "title") AS result FROM "films" WHERE ("studio_id" = $3) ORDER BY "title" ASC`<!-- probe: db.selectRows('films', { studio_id: 1000 }, { columns: ['id', 'title'], order: { by: 'title', direction: 'ASC' } }) --> |
+| `db.select(…)`, the same arguments | `SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (…) AS "sq_films"`<!-- probe: db.select('films', { studio_id: 1000 }, { columns: ['id', 'title'], order: { by: 'title', direction: 'ASC' } }) -->, the same query inside, with the same values |
+
+A studio's films, read 100 at a time:
+
+<<< ./examples/plain/cursor_select_rows.ts{ts twoslash}
+
+<!-- probe: db.readCommitted(pool, async txnClient => { for await (const _ of db.cursor(txnClient, db.selectRows('films', { studio_id: 1000 }, { columns: ['id', 'title'], order: { by: 'title', direction: 'ASC' } }), { batchSize: 100 })) { } }) -->
+```sql
+START TRANSACTION ISOLATION LEVEL READ COMMITTED
+DECLARE pgcast_cursor_1 NO SCROLL CURSOR FOR SELECT jsonb_build_object($1::text, "id", $2::text, "title") AS result FROM "films" WHERE ("studio_id" = $3) ORDER BY "title" ASC
+FETCH FORWARD 100 FROM pgcast_cursor_1
+-- the same FETCH again, until one returns no row
+CLOSE pgcast_cursor_1
+COMMIT
+```
+
+- Each row is typed as `select()` types it. A single `lateral` subquery is passed through as [`selectOne()`](#selectOne) passes it, as `pg` parses its column, and typed so: with [`aggregatesTypedByColumn`](#typed-by-column), a `min()` of a `date` is a `Date`, where `select()` gives its JSON string.
+- A `lateral` passed through and typed `number` does not compile: `count()`, `sum()`, `avg()`, and `min()` or `max()` unless typed by column, alone or in a union, `cond ? count() : select()`. The error is TS2322 on `lateral`, `… is not assignable to type 'undefined'.` Their type is `Number()`'s or JSON's, where `pg` gives a `bigint` or a `numeric` as a string and a `date` as a `Date` ([#749](https://github.com/AlexandreDemartin/pgcast/issues/749)). A `sql` template typed `number` is refused with them, as its type cannot be told from theirs. Under a `lateral` key, the value is JSON and its type holds: `` db.selectRows('studios', db.all, { lateral: { films: db.count('films', { studio_id: db.parent('id') }) } }) ``<!-- tsc -->. A `lateral` whose type is a type parameter, an object of subqueries included, or a fragment typed by an unconstrained one, `db.SQLFragment<R>`, does not compile either: `function f<L extends db.SQLFragmentMap>(l: L) { return db.selectRows('studios', db.all, { lateral: l }); }` gives TS2345. The forwarder can call `select()` or cast the map with `l as db.SQLFragmentMap`. For a `db.SQLFragment<R>`, use `l as db.SQLFragment<any>` (the map cast gives TS2352). Past the type, from JavaScript, `run()` gives `pg`'s value.
+- A `lock` locks each row as its batch is fetched, not before.
+- Nested, it is a set of rows, not one value. A `sql` template takes it, `` db.sql`SELECT count(*) FROM (${db.selectRows('films', db.all)}) AS f` ``<!-- tsc -->, and so do [`withCTEs()`](/sql-template#withCTEs) and `cursor()`. As a `lateral`, an `extras` value, a `where` or the Whereable value of a typed column, it does not compile: its type, a [`RowsQuery`](#RowsQuery), says so. Its type takes it as `order.by`, and as the Whereable value of a column typed `any`, where Postgres refuses it. Past the type, from JavaScript, a `lateral` key repeats the parent row once per row, and an `extras` value gets 21000 from Postgres.
 
 ## `count()` {#count}
 
@@ -520,6 +554,18 @@ The call signature of `selectOne()`: `table`, `where`, `options?`, with the mode
 ### `SelectExactlyOneSignatures` {#SelectExactlyOneSignatures}
 
 The call signature of `selectExactlyOne()`: `table`, `where`, `options?`, with the mode `ExactlyOne`. With `aggregatesTypedByColumn` declared, it returns a `ColumnAggregateFragment` in the same case as [`SelectOneSignatures`](#SelectOneSignatures): a function typed `SelectExactlyOneSignatures` then returns what `selectExactlyOne()` does.
+
+### `SelectRowsSignatures` {#SelectRowsSignatures}
+
+From 6.12.0. The call signature of `selectRows()`: `table`, `where`, `options?`, returning `SQLFragment<R[], RowsQuery>`, `R` the row as `selectOne()` types it.
+
+### `RowsQuery` {#RowsQuery}
+
+```ts
+interface RowsQuery
+```
+
+From 6.12.0. The second type argument of the fragment `selectRows()` returns, which marks a query of many rows: `lateral`, `extras` and a `where` take `SQLFragment<any>`, whose second argument is `never`, so they refuse it; a `sql` template, `withCTEs()` and `cursor()` take `SQLFragment<any, any>`. Write it to type a variable: `db.SQLFragment<s.films.JSONSelectable[], db.RowsQuery>`. A helper typed `db.SQLFragment<R>` or `db.SQLFragment<any>` refuses it too (TS2345); typed `db.SQLFragment<R, any>`, it takes both: `` const run = <R>(q: db.SQLFragment<R, any>) => q.run(pool); ``<!-- tsc: export … -->.
 
 ### `NumericAggregateSignatures` {#NumericAggregateSignatures}
 

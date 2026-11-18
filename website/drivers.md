@@ -7,6 +7,8 @@ description: "Run pgcast on pg, on postgres.js or PGlite through their adapters,
 Run pgcast's queries and transactions on `pg`, on postgres.js or PGlite through their adapters, or on a driver of your own: `run()` takes a [`QueryableLike`](/sql-template#QueryableLike), and `transaction()` a [`PoolLike`](/transaction#PoolLike), from 6.12.0. A query compiles to the same SQL on each, and resolves to the same type, as long as the driver reads values as `pg` reads them. You already know `.run()` from the [tutorial](/tutorial).
 {.lede}
 
+[`cursor()`](/cursors) reads batches through the transaction client’s `query()` on both the postgres.js and PGlite adapters.
+
 ## pg
 
 What the tutorial uses, and nothing to add: `.run()` takes a `pg.Pool` or a client, and [`transaction()`](/transaction#transaction) a pool or a client.

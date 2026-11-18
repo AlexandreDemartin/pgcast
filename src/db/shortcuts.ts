@@ -564,7 +564,7 @@ export const upsert: {
     insertColsSQL = cols(firstRow),
     insertValuesSQL = mapWithSeparator(completedValues, sql`, `, v => sql`(${vals(v)})`),
     colNames = Object.keys(firstRow) as Column[],
-    updateValues = options == null ? {} : callerValue(options, 'updateValues') ?? {},
+    updateValues: Record<string, unknown> = options == null ? {} : callerValue(options, 'updateValues') ?? {},
     conflictColumns = Array.isArray(conflictTarget) ? conflictTarget : [],  // a constraint's are unknown here
     overwritesMissingKey = specifiedUpdateColumns == null && Array.isArray(values) && colNames.some(c =>
       callerValue(updateValues, c) === undefined &&  // as below: otherwise, c is set from EXCLUDED
@@ -579,7 +579,7 @@ export const upsert: {
     updateColsSQL = mapWithSeparator(updateColumns, sql`, `, c => c),
     updateValuesSQL = mapWithSeparator(updateColumns, sql`, `, c =>
       callerValue(updateValues, c) !== undefined ? updateValueSQL(callerValue(updateValues, c), c) :
-        (noNullUpdateColumns === all || noNullUpdateColumns.includes(c)) ? sql`CASE WHEN EXCLUDED.${c} IS NULL THEN ${table}.${c} ELSE EXCLUDED.${c} END` :
+        (noNullUpdateColumns === all || noNullUpdateColumns.includes(c as Column)) ? sql`CASE WHEN EXCLUDED.${c} IS NULL THEN ${table}.${c} ELSE EXCLUDED.${c} END` :
           sql`EXCLUDED.${c}`),
     returningSQL = SQLForColumnsOfTable(callerValue(options, 'returning'), table, returningNull),
     extrasSQL = SQLForExtras(callerValue(options, 'extras')),
@@ -898,6 +898,9 @@ const functionName = new RegExp(`^${space}(?:${identifier})(?:${space}\\.${space
  * anything else, a `UESCAPE` clause included, throws. With
  * `columns: ['id']`, `'my_schema."MyAgg"'` gives
  * `SELECT my_schema."MyAgg"("id") AS result FROM "users"`.
+ *
+ * For its rows one by one, as `cursor()` reads them, the same query without
+ * `jsonb_agg`: `selectRows()`.
  */
 export const select: SelectSignatures = function (
   table: Table,
@@ -905,6 +908,19 @@ export const select: SelectSignatures = function (
   options: SelectOptionsForTable<Table, ColumnsOption<Table>, LateralOption<ColumnsOption<Table>, ExtrasOption<Table>>, ExtrasOption<Table>, any> = {},
   mode: SelectResultMode = SelectResultMode.Many,
   aggregate: string = 'count',
+) {
+  return selectQuery(table, where, options, mode, aggregate, false);
+};
+
+// the body of select(), and of selectRows(), which gives its rows query alone: `rows` is no mode, so that
+// SelectResultMode, which is exported, keeps its members
+function selectQuery(
+  table: Table,
+  where: Whereable | SQLFragment<any> | AllType,
+  options: SelectOptionsForTable<Table, ColumnsOption<Table>, LateralOption<ColumnsOption<Table>, ExtrasOption<Table>>, ExtrasOption<Table>, any>,
+  mode: SelectResultMode,
+  aggregate: string,
+  rows: boolean,
 ) {
 
   // converted to a string once, as raw() converts it (valueOf() first, as in 6.6.1), so that raw() writes the name
@@ -958,18 +974,18 @@ export const select: SelectSignatures = function (
       sql` ORDER BY ${mapWithSeparator(order as OrderSpecForTable<Table>[], sql`, `, o => {  // `as` clause is required when TS not strict
         // each key is read once, and checked before the next is read: a getter may answer anew, so raw() and the
         // message get the read that was checked
-        const direction = callerValue(o, 'direction');
+        const direction = callerValue(o, 'direction')!;
         if (!['ASC', 'DESC'].includes(direction)) throw new Error(`Direction must be ASC/DESC, not '${direction}'`);
         const nulls = callerValue(o, 'nulls');
         if (nulls && !['FIRST', 'LAST'].includes(nulls)) throw new Error(`Nulls must be FIRST/LAST/undefined, not '${nulls}'`);
-        return sql`${callerValue(o, 'by')} ${raw(direction)}${nulls ? sql` NULLS ${raw(nulls)}` : []}`;
+        return sql`${callerValue(o, 'by')!} ${raw(direction)}${nulls ? sql` NULLS ${raw(nulls)}` : []}`;
       })}`,
     limitSQL = (limit: number | undefined) => limit === undefined ? [] :
       callerValue(allOptions, 'withTies') ? sql` FETCH FIRST ${param(limit)} ROWS WITH TIES` :
         sql` LIMIT ${param(limit)}`,  // compatibility with pg pre-10.5; and fewer bytes!
     offsetSQL = callerValue(allOptions, 'offset') === undefined ? [] : sql` OFFSET ${param(callerValue(allOptions, 'offset'))}`,  // pg is lax about OFFSET following FETCH, and we exploit that
     lockSQL = lock === undefined ? [] : lock === null ? refusedSQL(lockNull) : (lock as SelectLockingOptions<string>[]).map(lock => {  // `as` clause is required when TS not strict
-      const strength = callerValue(lock, 'for');  // for and wait read once each, as an order item's keys
+      const strength = callerValue(lock, 'for')!;  // for and wait read once each, as an order item's keys
       if (!['UPDATE', 'NO KEY UPDATE', 'SHARE', 'KEY SHARE'].includes(strength)) throw new Error(`Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not '${strength}'`);
       const wait = callerValue(lock, 'wait');
       if (wait && !['NOWAIT', 'SKIP LOCKED'].includes(wait)) throw new Error(`Lock wait must be NOWAIT/SKIP LOCKED/undefined, not '${wait}'`);
@@ -991,7 +1007,7 @@ export const select: SelectSignatures = function (
   const
     rowsSQL = (limit: number | undefined) => sql<SQL, any>`SELECT${distinctSQL} ${allColsSQL} AS result FROM ${table}${tableAliasSQL}${lateralSQL}${whereSQL}${groupBySQL}${havingSQL}${orderSQL}${limitSQL(limit)}${offsetSQL}${lockSQL}`,
     rowsQuery = rowsSQL(callerValue(allOptions, 'limit')),
-    query = mode !== SelectResultMode.Many ? rowsQuery :
+    query = mode !== SelectResultMode.Many || rows ? rowsQuery :
       // we need the aggregate to sit in a sub-SELECT in order to keep ORDER and LIMIT working as usual
       sql<SQL, any>`SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (${rowsQuery}) AS ${SQLForAlias('sq_', alias)}`,
     checksSecondRow = mode === SelectResultMode.ExactlyOne && (getConfig().selectExactlyOneChecksForSecondRow ?? false);
@@ -1013,6 +1029,9 @@ export const select: SelectSignatures = function (
 
   query.runResultTransform =
 
+    // selectRows(): one result per row, as insert() of an array gives its rows
+    rows ? (qr) => qr.rows.map(r => r.result) :
+
     mode === SelectResultMode.Numeric ?
       // note: pg deliberately returns strings for int8 in case 64-bit numbers overflow
       // (see https://github.com/brianc/node-pg-types#use), but we assume our counts aren't that big;
@@ -1031,6 +1050,82 @@ export const select: SelectSignatures = function (
 
   query['parenthesisedInExtras'] = true;
   return query;
+}
+
+
+/* === selectRows === */
+
+declare const rowsQuery: unique symbol;
+
+/**
+ * The second type argument of the `SQLFragment` that `selectRows()` returns: a
+ * query of many rows, which `lateral`, `extras` and a `where` refuse, as they
+ * take `SQLFragment<any>`, and a `sql` template, `withCTEs()` and `cursor()`
+ * take, as `SQLFragment<any, any>`.
+ */
+export interface RowsQuery { readonly [rowsQuery]: true }
+
+// a single lateral passed through comes row by row as pg parses its column: a bigint or a numeric as a string, a date
+// as a Date. count(), sum(), avg(), and min() or max() unless typed by column, are typed number, as their own run()
+// gives them, through Number(), or nested, as JSON (#749): refused, with any fragment typed number, which the type
+// cannot tell from them. Nested under a lateral key, the value is JSON, and its type holds. Each member of a union
+// is checked (cond ? count() : select()), and `true extends`, as TS 4.1 resolves `[…] extends [never]` wrongly here
+type RowsNumberMember<L> = L extends ColumnAggregateFragment<any, any> ? never :
+  L extends SQLFragment<infer R, any> ?
+    (0 extends 1 & R ? never : [Exclude<R, null | undefined>] extends [never] ? never :
+      [Exclude<R, null | undefined>] extends [number] ? true : never) :
+  never;
+type RowsLateralOption<L> = 0 extends 1 & L ? unknown : true extends RowsNumberMember<L> ? { lateral?: never } : unknown;
+
+export interface SelectRowsSignatures {
+  <
+    T extends Table,
+    C extends ColumnsOption<T>,
+    L extends LateralOption<C, E>,
+    E extends ExtrasOption<T>,
+    A extends string = never,
+  >(
+    table: T,
+    where: WhereableArg<T> | SQLFragment<any> | AllType,
+    options?: SelectOptionsForTable<T, C, L, E, A> & RowsLateralOption<L>,
+  ): SQLFragment<SelectReturnTypeForTable<T, C, L, E, SelectResultMode.One>[], RowsQuery>;
+}
+
+/**
+ * Generate the query `select()` wraps in `jsonb_agg`, as a `SQLFragment` of
+ * its own, one row per result: for `cursor()`, which runs exactly the
+ * fragment it is given, and so reads a `select()` as its one `jsonb_agg` row.
+ * With `{ columns: ['id', 'title'], order: { by: 'title', direction: 'ASC' } }`:
+ * `SELECT jsonb_build_object($1::text, "id", $2::text, "title") AS result FROM "films" ORDER BY "title" ASC`,
+ * where `select()` sends
+ * `SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (…the same…) AS "sq_films"`.
+ *
+ * `run()` gives what `select()` gives, `[]` for no row, but for a single
+ * `lateral` subquery, whose result is passed through as `selectOne()` passes
+ * it, as `pg` parses its column, and typed so. One typed `number`, alone or in
+ * a union, does not compile: `count()`, `sum()`, `avg()`, and `min()` or
+ * `max()` unless typed by column (`aggregatesTypedByColumn`), since `pg` gives
+ * a `bigint` or a `numeric` as a string and a `date` as a `Date` (#749).
+ * Under a `lateral` key it is JSON, as in `select()`; past the type, from
+ * JavaScript, `pg`'s value.
+ * A `lateral` whose type is a type parameter, or a fragment typed by an
+ * unconstrained one, does not compile either: a function that forwards one
+ * calls `select()`, or casts.
+ *
+ * A query of many rows, it is typed so that a `lateral`, an `extras` value, a
+ * `where` and the `Whereable` value of a typed column refuse it; a `sql`
+ * template, `withCTEs()` and `cursor()` take it.
+ * @param table The table to select from
+ * @param where A `Whereable` or `SQLFragment` defining the rows to be selected,
+ * or `all`
+ * @param options Options object. See documentation for `select` for details.
+ */
+export const selectRows: SelectRowsSignatures = function (
+  table: Table,
+  where: Whereable | SQLFragment<any> | AllType = all,
+  options: SelectOptionsForTable<Table, ColumnsOption<Table>, LateralOption<ColumnsOption<Table>, ExtrasOption<Table>>, ExtrasOption<Table>, any> = {},
+) {
+  return selectQuery(table, where, options, SelectResultMode.Many, 'count', true);
 };
 
 

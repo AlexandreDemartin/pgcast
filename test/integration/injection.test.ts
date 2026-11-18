@@ -1027,6 +1027,34 @@ describe('without parameters (simple protocol)', () => {
     `);
   });
 
+  it('no hostile table name, alias or lateral key of selectRows() runs SQL of its own: each does what it does in select()', async () => {
+    const rows = (q: db.SQLFragment<any[], any>) => ({ run: async (client: pg.ClientBase) => `${(await q.run(client)).length} rows` });
+    const outcomes = await identifierOutcomes({
+      dquote: 'a"b', squote: "a'b", semicolon: 'a;b', dashes: 'a--b', comment: 'a/*b', dollar: 'a$1b',
+      backslash: 'a\\b', nul: 'a\0b', dot: 'a.b',
+      closes: `a"; ${update}; --`,
+      escapedCloses: 'a"" OR TRUE OR ""b', qualifiedEscaped: 's.a"" OR TRUE OR ""b', escapedDot: 'a"."b',
+      escapedOdd: 'a"""b',
+      prequoted: '"a"', prequotedEscaped: '"a"" OR TRUE OR ""b"', prequotedEmpty: '""', lone: '"',
+      prequotedCloses: `"a"; ${update}; --"`,
+      mixedEscaped: '"s".a$1."b"" OR TRUE OR ""c"', unicodeEscaped: '"s".U&"a\\0022"" OR TRUE OR ""\\0022b"',
+      unicodeCloses: '"s".U&"a\\" OR TRUE OR \\"b"', uescape: `"s".U&"a" UESCAPE '!' || "b"`,
+    }, input => {
+      const key = { lateral: { [input]: db.count('accounts', { owner_id: db.parent('id') }) } } as any;
+      return {
+        table: rows(db.select(input as any, all)), rowsTable: rows(db.selectRows(input as any, all)),
+        alias: rows(db.select('users', all, { alias: input } as any)), rowsAlias: rows(db.selectRows('users', all, { alias: input } as any)),
+        key: rows(db.select('users', all, key)), rowsKey: rows(db.selectRows('users', all, key)),
+      };
+    });
+    const names = [...new Set(Object.keys(outcomes).map(k => k.split(' ')[0]))];
+    expect(Object.values(outcomes)).not.toContain('injected');
+    for (const name of names) for (const place of ['table', 'alias', 'key']) {
+      const rowsPlace = `rows${place[0].toUpperCase()}${place.slice(1)}`;
+      expect(outcomes[`${name} ${rowsPlace}`], `${name} ${place}`).toBe(outcomes[`${name} ${place}`]);
+    }
+  });
+
   it('a pre-quoted string that closes its quotes stays one column name, which does not exist', async () => {
     // 6.6.1: written as is, as anything that starts and ends with `"`, so a second statement ran
     const column = `"display_name" FROM users; ${update}; SELECT "display_name"`;

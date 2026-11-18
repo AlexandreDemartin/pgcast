@@ -89,13 +89,13 @@ then writes the types of zapatos/schema, read from the database.
 Docs: https://pgcast.dev/generator#cli`;
 
 /**
- * The CLI's arguments: `--check` anywhere, and the JSON argument, the first other one, as Zapatos 6.6.1 reads
+ * The CLI's arguments: skip a bare `--` forwarded by pnpm, take `--check` anywhere, and the JSON argument, the first other one, as Zapatos 6.6.1 reads
  * `process.argv[2]`; any later one is ignored, as there, and each flag among them returned, to be noted. A flag in
  * the JSON argument's place, `-h` or one starting with `--`, where 6.6.1 failed on it as JSON, is returned instead.
  */
 export const cliArgs = (args: string[]) => {
   const
-    [first, ...later] = args.filter(arg => arg !== '--check'),
+    [first, ...later] = args.filter(arg => arg !== '--check' && arg !== '--'),
     flag = first === '-h' || first?.startsWith('--') ? first : undefined;
 
   return {

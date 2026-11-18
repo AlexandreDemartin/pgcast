@@ -1,5 +1,5 @@
 ---
-english: 148644507dbe
+english: 8896666cde08
 ---
 
 # Générateur
@@ -25,8 +25,9 @@ Le même programme sous deux noms : `pgcast`, et `zapatos`, comme dans Zapatos 
   - Les variables du fichier sont substituées avant la fusion : une variable qu’il nomme doit être définie même quand l’argument remplace sa clé, sinon la CLI s’arrête avec `Environment variable 'NAME' is not set`.
 - Dans chaque chaîne des deux, à toute profondeur, les variables d’environnement sont substituées ([Variables d’environnement](#environment-variables)).
 - À partir de la 6.8.0, un seul flag, `--check`, avant ou après `config`. À partir de la 6.12.0, `--help` ou `-h` à la place de `config` affiche l’aide, qui nomme les fichiers de configuration, `config`, les flags et cette page, et se termine avec le code 0, avant qu’elle lise la config.
-- Tout autre argument qui commence par `--`, à la place de `config`, l’arrête avec le code 1 avant qu’elle lise la config. À partir de la 6.12.0, elle affiche `Unknown flag --chek: the flags are --check, --help and -h` et l’aide, sur stderr ; à partir de la 6.8.0, Node affichait `Unknown flag --chek: the only flag is --check, beside the JSON argument` et sa pile. Zapatos 6.6.1 lisait chacun d’eux, `-h` aussi, comme l’argument JSON, et échouait.
-- Après `config`, un tel argument est ignoré, `--help` compris, comme dans Zapatos 6.6.1, avec une [note](#generate.warningListener) : un `npx pgcast '{}' --chek` mal orthographié génère.
+- Avant comme après `config`, la CLI ignore un `--` isolé sans émettre de note. Par exemple, `pgcast -- --help` affiche l’aide.
+- Si vous passez un flag inconnu commençant par `--` à la place de `config`, la CLI s’arrête avec le code 1 avant de lire la config. À partir de la 6.12.0, elle affiche sur stderr `Unknown flag --chek: the flags are --check, --help and -h` et l’aide. À partir de la 6.8.0, Node affichait `Unknown flag --chek: the only flag is --check, beside the JSON argument` et la trace de la pile d’appels. Zapatos 6.6.1 tentait de parser chacun de ces flags, y compris `-h`, comme l’argument JSON, ce qui échouait.
+- Après `config`, la CLI ignore les flags inconnus qui commencent par `--`, ainsi que `--help`, comme dans Zapatos 6.6.1. Elle émet une [note](#generate.warningListener) pour chacun. Ainsi, `npx pgcast '{}' --chek` génère les fichiers malgré la faute de frappe.
 - Parmi les autres arguments, le premier est `config` ; les suivants sont ignorés.
 - Les chemins sont relatifs au dossier où vous le lancez : `outDir`, et donc le dossier `zapatos`.
 
@@ -88,6 +89,8 @@ Run the generator without --check to write them.
 - `schema.d.ts` et, quand il y a un type personnalisé, `custom/index.d.ts`, que chaque exécution réécrit alors, sont comparés octet par octet. Un placeholder ne compte que s’il manque : il est à vous, à modifier vous-même ([Les fichiers qu’il écrit](#the-files-it-writes)).
 - `outDir`, `outExt` et [`moduleNames`](#generate.moduleNames) nomment les fichiers, comme pour une exécution : `src/pgcast/schema.ts` avec `".ts"` et `"pgcast"`.
 - Les notes d’une exécution viennent d’abord, via [`warningListener`](#generate.warningListener), sauf celles sur les placeholders qu’elle écrirait. Une requête qui échoue l’arrête avec le code 1, comme elle arrête une exécution.
+
+### `check()` {#export-check}
 
 `check()`, de `zapatos/generate`, lance la même vérification depuis le code, pour un script qui y construit sa config :
 
@@ -395,7 +398,7 @@ import type * as s from 'pgcast/schema';
 
 `boolean`, ou omis ; un opt-in. Ce que fait une requête qui échoue : une connexion refusée, un mauvais mot de passe, une requête que Postgres refuse.
 
-- Omis, ou `null` : comme dans Zapatos 6.6.1, le générateur affiche `*** error <n> ***` et l’erreur avec `console.log`, puis arrête le processus avec `process.exit(1)` ; entre les deux, il signale l’option via [`warningListener`](#generate.warningListener). À partir de la 7.0, l’option omise vaut `true` ([Versions](/fr/versions)). [`check()`](#check), que Zapatos 6.6.1 n’a pas, la traite déjà comme `true`, sans note.
+- Omis, ou `null` : comme dans Zapatos 6.6.1, le générateur affiche `*** error <n> ***` et l’erreur avec `console.log`, puis arrête le processus avec `process.exit(1)` ; entre les deux, il signale l’option via [`warningListener`](#generate.warningListener). À partir de la 7.0, l’option omise vaut `true` ([Versions](/fr/versions)). [`check()`](#export-check), que Zapatos 6.6.1 n’a pas, la traite déjà comme `true`, sans note.
 - `false` : le même arrêt, sans note, depuis `generate()` comme depuis `check()`. Cette valeur reste en 7.0 et en 8.0 : l’arrêt est le propre chemin de [la CLI](#cli), qui met `false` par-dessus son fichier de configuration et son argument.
 - `true` : la promesse de `generate()` ou de `check()` est rejetée avec cette erreur, telle que `pg` la donne, et rien n’est affiché :
 
@@ -551,7 +554,7 @@ ALTER TABLE films ADD COLUMN certificate certificate;
 
 ### `progressListener` {#generate.progressListener}
 
-`boolean`, ou dans `generate()` une fonction `(s: string) => void` ; par défaut `false`. `true` affiche chaque étape avec `console.log` ; une fonction reçoit chaque ligne. Depuis [`check()`](#check), une ligne : `The generated files in src/zapatos are up to date.`
+`boolean`, ou dans `generate()` une fonction `(s: string) => void` ; par défaut `false`. `true` affiche chaque étape avec `console.log` ; une fonction reçoit chaque ligne. Depuis [`check()`](#export-check), une ligne : `The generated files in src/zapatos are up to date.`
 
 ```txt
 (Re)creating schema folder: src/zapatos/schema.d.ts
@@ -575,7 +578,7 @@ Writing custom types file: src/zapatos/custom/index.d.ts
 - `Note: custom type "public"."index" (index) has the placeholder file index.d.ts in src/zapatos/custom, the file of the custom types' index: the generator writes the index over it on every run, so index is never declared. To declare it, rename it in the database, or give customTypesTransform a function that names it otherwise.`
   - une fois par exécution pour les noms dont le placeholder est `custom/index.d.ts` : `index` et, sur un système de fichiers insensible à la casse, un nom qui n’en diffère que par la casse (`Index`, `INDEX`), après la note ci-dessus pour ces noms ;
 - `Note: public.certificate is typed by the values of its CHECK as certificate in zapatos/schema (domainsTypedAsUnions), but its placeholder src/zapatos/custom/PgCertificate.d.ts, written before, still types its columns. To type them by the database, delete it: the next run writes it naming the union.`
-  - une fois par exécution pour chaque placeholder sur le disque, avec [`domainsTypedAsUnions`](#generate.domainsTypedAsUnions), que l’exécution écrirait en nommant une union, tant que son texte diffère de celui qu’elle écrit, dans l’ordre des domaines, après les notes sur les noms partagés ; depuis [`check()`](#check) aussi ;
+  - une fois par exécution pour chaque placeholder sur le disque, avec [`domainsTypedAsUnions`](#generate.domainsTypedAsUnions), que l’exécution écrirait en nommant une union, tant que son texte diffère de celui qu’elle écrit, dans l’ordre des domaines, après les notes sur les noms partagés ; depuis [`check()`](#export-check) aussi ;
   - à sa place, pour un tel placeholder qui nomme déjà l’union, avec un import de son propre nom que `zapatos/schema` déclare aussi comme type, tel que la 6.10.0 l’écrivait avec [`customTypesTransform`](#generate.customTypesTransform) à `'my_type'` ([#661](https://github.com/AlexandreDemartin/pgcast/issues/661)) : `Note: rating.rating is typed by the values of its CHECK as rating.rating in zapatos/schema (domainsTypedAsUnions), and its placeholder src/zapatos/custom/rating.d.ts, written before, names it too, but imports rating from zapatos/schema, which also declares a type of that name, the placeholder's own: it fails to compile (TS2440). Delete it: the next run writes it naming the union with no import.` ;
 - `Note: the include entry "Films" of schema "public" matches no relation there, so it generates nothing. Check its spelling and case, that the relation is in schema "public", and that the database role has a privilege on it: include names tables, views, materialised views and foreign tables.`
   - une fois par exécution pour chaque entrée d’une liste [`include`](#generate.schemas) que son schéma n’a pas ;
@@ -610,7 +613,7 @@ Writing custom types file: src/zapatos/custom/index.d.ts
   - depuis `generate()` sans [`rejectOnQueryError`](#generate.rejectOnQueryError), quand une requête échoue, après l’erreur et juste avant l’arrêt ;
 - l’[avertissement sur l’ancienne arborescence](#the-old-layout-warning) ;
 - `Out of date: src/zapatos/schema.d.ts` et `Missing: src/zapatos/custom/PgSeat_label.d.ts`
-  - depuis [`check()`](#check), pour chaque fichier qui diffère ou manque, après les notes d’une exécution.
+  - depuis [`check()`](#export-check), pour chaque fichier qui diffère ou manque, après les notes d’une exécution.
 
 ### `debugListener` {#generate.debugListener}
 
