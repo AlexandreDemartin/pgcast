@@ -1,5 +1,5 @@
 // Copyright (C) 2026 Alexandre Demartin
-// Fails the docs build when an export of zapatos/db, or an option of its `Config` or of the generator's, has neither an
+// Fails the docs build when an export of zapatos/db or zapatos/generate, or an option of either Config, has neither an
 // entry in a Reference page nor a line in reference-pending.json (README.md § The reference). The names are read with
 // TypeScript from the built library's declarations, as a user's project resolves them. Run by `npm run docs:build`.
 import { existsSync, readFileSync } from 'node:fs';
@@ -37,6 +37,23 @@ for (const [prefix, file] of [['Config', dbFile], ['generate', generateFile]]) {
   for (const option of checker.getPropertiesOfType(checker.getDeclaredTypeOfSymbol(target(config)))) {
     names.set(`${prefix}.${option.name}`, `${prefix}.*`);
   }
+}
+
+// These generator exports have no separate reference entry. List names so that a new export needs its own entry.
+const generatorExceptions = new Set([
+  // Config is the Options section, with an entry per key. These types split it into required, optional and finalised keys.
+  'Config', 'RequiredConfig', 'OptionalConfig', 'CompleteConfig',
+  // Steps of generate() and check(): locating the module and filling in config defaults.
+  'moduleRoot', 'finaliseConfig',
+  // Reading the catalogue and assembling the generated TypeScript, and the intermediate data those steps exchange.
+  'EnumData', 'enumDataForSchema', 'enumTypesForEnumData', 'tsTypeForPgType', 'Relation', 'relationsInSchema',
+  'definitionForRelationInSchema', 'crossTableTypesForTables', 'crossSchemaTypesForAllTables', 'crossSchemaTypesForSchemas',
+  'CustomTypes', 'CustomTypeOrigins', 'tsForConfig',
+]);
+for (const symbol of exportsOf(generateFile)) {
+  if (generatorExceptions.has(symbol.name)) continue;
+  const anchor = names.has(symbol.name) ? `generate.${symbol.name}` : symbol.name;
+  names.set(anchor, declaredIn(symbol));
 }
 
 /**
