@@ -2,7 +2,7 @@
 
 - **Status**: accepted (2026-11-18), decided alone under the owner's delegation: each choice below is decided under the philosophy, and carries its own status.
 - **Scope**: feature [#62](https://github.com/AlexandreDemartin/pgcast/issues/62), its step [#710](https://github.com/AlexandreDemartin/pgcast/issues/710) (this note) and its planned PRs; the chapter's epic [#21](https://github.com/AlexandreDemartin/pgcast/issues/21).
-- **In short**: **option A, in a separate package**, `@pgcast/typegen` (`tools/typegen/`, note [013](./013-package-model.md)). Opted-in queries are found by the row type they name, `Row<'name'>`; each dynamic fragment becomes a parameter that Postgres must type `boolean`, or the query is refused; the query is described, never executed, by the extended protocol's Parse / Describe over `pg`; a result column is `NOT NULL` only where its origin column is and no outer join or grouping set sits in the text; the types land in a committed file that `--check` compares. The core, the default codegen output and the bench are unchanged; Epic #20 (drivers) is not needed.
+- **In short**: **option A, in a separate package**, `@pgcast/typegen` (`tools/typegen/`, note [013](./013-package-model.md)). Opted-in queries are found by the row type they name, `Row<'name'>`; each dynamic fragment becomes a parameter that Postgres must type `boolean`, or the query is refused; the query is described, never executed, by the extended protocol's Parse / Describe over `pg`; a result column is `NOT NULL` only where its origin column is proved so, down every inheritance child, and no guard word (an outer join, a grouping set, `MERGE`, `OLD`, `NEW`) sits in the text; the types land in a committed file that `--check` compares. The core, the default codegen output and the bench are unchanged; Epic #20 (drivers) is not needed.
 
 ## Context
 
@@ -30,6 +30,7 @@ Two projects of real usage (skill `consumer-usage`; no project named; counted wi
 | … with an outer join | 6 |
 | … with `UNION`, `INTERSECT` or `EXCEPT` | 3 |
 | … with `ROLLUP`, `CUBE` or `GROUPING SETS` | 1 |
+| … holding one of choice 2's guard words, matched as it says | 6 (the outer joins) |
 
 So about 40 of the 58 hand-written row types are within reach of option A as decided below: the static ones, and those whose fragments sit in a condition; the rest stay manual. The keyword scan is approximate (a fragment's position is read from the static text before it).
 
@@ -49,7 +50,7 @@ The other routes are refused by the issue's constraints, and this note keeps tha
 
 ## Replays
 
-On the fixture database (`test/fixtures/schema.sql`, Postgres 17.3, a probe database created and dropped `WITH (FORCE)` by one process), each text described by both interfaces, never executed; conditions compiled by master's `sql`. "Origin" is Describe's table and column, with that column's `attnotnull`; "rule" is choice 2's verdict.
+On the fixture database (`test/fixtures/schema.sql` and its rows, Postgres 17.3, `pg` 8.23.1, a probe database created and dropped `WITH (FORCE)` by one process), each text described by both interfaces: `PREPARE` in a rolled-back transaction, Describe inside `BEGIN READ ONLY` with `lock_timeout`. Then each is run, rolled back, to see its `NULL`s. Conditions and `param()` are compiled by master's `sql`. "Origin" is Describe's table and column, with that column's `attnotnull`; "truth" is whether a value can be `NULL`, from the query's form and its columns' `NOT NULL` (foreign keys not read), and no run contradicted it; "rule" is choice 2's verdict.
 
 | Case | Text (abridged) | `PREPARE` result types | Describe: type, origin | Truth | Rule |
 |---|---|---|---|---|---|
@@ -62,10 +63,18 @@ On the fixture database (`test/fixtures/schema.sql`, Postgres 17.3, a probe data
 | `UNION` | `SELECT id, display_name AS label FROM users UNION SELECT id, body FROM extra.articles` | `integer`, `text` | origin 0 | both not null | nullable: loose |
 | CTE | `WITH rich AS (SELECT owner_id, balance FROM accounts) SELECT owner_id, balance FROM rich` | `integer`, `numeric` | through the CTE: `accounts.owner_id`, `accounts.balance`, not null | not null | exact |
 | `json_agg` | `SELECT u.id, (SELECT json_agg(a.*) FROM accounts a WHERE …) AS accounts FROM users u` | `integer`, `json` | `accounts`: `json`, origin 0 | `NULL` for a user with no account | `db.JSONValue \| null`: exact, the shape inside untyped |
-| Lateral, left | `… LEFT JOIN LATERAL (SELECT to_jsonb(a.*) AS result …) l ON true` | `integer`, `jsonb` | `result` origin 0 | nullable | exact |
+| Lateral, left | `… LEFT JOIN LATERAL (SELECT to_jsonb(a.*) AS result …) l ON true` | `integer`, `jsonb` | `id` from `users.id`, not null; `result` origin 0 | `result` nullable | all nullable (`LEFT`): `id` loose |
 | Lateral, cross | `… CROSS JOIN LATERAL (SELECT a.balance FROM accounts a …) l` | `integer`, `numeric` | through the lateral: `accounts.balance`, not null | not null | exact |
 | A view | `SELECT email, mood FROM active_users` | `email`, `mood` | `active_users.email`, a view column, `attnotnull` false; type `ext.citext` | `email` not null | nullable: loose |
 | `GROUP BY ROLLUP` | `SELECT owner_id, sum(balance) AS total FROM accounts GROUP BY ROLLUP (owner_id)` | `integer`, `numeric` | `accounts.owner_id` **not null** at its origin | `owner_id` `NULL` on the total row | nullable (`ROLLUP`): exact |
+| Inheritance | `SELECT x FROM par`, its child `chi` after `ALTER TABLE chi ALTER x DROP NOT NULL`; `SELECT x FROM par2` after `ALTER TABLE ONLY par2 ALTER x SET NOT NULL` over a child's `NULL` | `integer` | `par.x`, `par2.x`, **not null** at their origin | `NULL` from the child | not proved (a child's `x` is not `attnotnull`): exact |
+| Foreign table | `SELECT id, label FROM ft_nn` (file_fdw, `id int NOT NULL, label text NOT NULL`, a CSV line `1,`) | `integer`, `text` | `ft_nn.id`, `ft_nn.label`, **not null**, `relkind` `f` | `label` `NULL`: Postgres does not enforce `NOT NULL` on a foreign table | not proved (`f`): exact |
+| Foreign partition | `SELECT id, label FROM pt`, a foreign partition below; `pt2`, one two levels down | `integer`, `text` | `pt.label`, `pt2.label`, **not null**, `relkind` `p` | `label` `NULL` | not proved (a partition is `f`): exact |
+| Partitioned, plain partitions | `SELECT id, occurred_on, kind, payload FROM events` (three `r` partitions) | `bigint`, `date`, `text`, `jsonb` | `events.*`, `relkind` `p` | as the origins | proved: exact |
+| `MERGE … RETURNING` | `MERGE INTO tgt t USING src s ON … WHEN MATCHED THEN UPDATE … WHEN NOT MATCHED BY SOURCE THEN DELETE RETURNING t.label AS kept, s.id, s.label` | `text`, `integer`, `text` | `tgt.label`, `src.id`, `src.label`, **not null** | `s.id`, `s.label` `NULL` on the `DELETE` row | all nullable (`MERGE`): `kept` loose |
+| A keyword the old lexer skipped | `SELECT a.balance, E'\'' AS q FROM users u LEFT JOIN accounts a …`; `SELECT a.balance AS b$x$ … LEFT JOIN … WHERE 'b$x$' <> ''` | `numeric`, `text`; `numeric` | `accounts.balance`, not null | `balance` `NULL` | nullable (`LEFT`, nothing skipped): `q` loose |
+| A keyword in lower case | `select id, balance from users u full join accounts a using (id)`; `… group by grouping sets ((owner_id), ())` | `bigint`, `numeric`; `integer`, `numeric` | `balance`, `owner_id` not null at their origin | `balance`, `owner_id` `NULL` | nullable (`full`, `grouping`): `id` loose |
+| A keyword in a literal | `SELECT u.id, u.display_name FROM users u WHERE u.display_name <> 'left'` | `integer`, `text` | both not null | not null | nullable (`left`): both loose |
 | A `Whereable` | `` sql`… WHERE ${{ display_name: 'Ann', mood: dc.isNotNull }}` `` → `WHERE ("display_name" = $1 AND ("mood" IS NOT NULL))`; `{ id: 3 }` → `WHERE ("id" = $1)` | `integer`, `text` for both, and for `WHERE TRUE` | the same two origins for each text | unchanged by the condition | the same |
 | `and()` | `` and({ owner_id: 1 }, sql`…`) `` → `WHERE ((("owner_id" = $1)) AND ("balance" > $2))`; `and()` → `WHERE TRUE` | `bigint`, `double precision` for both | the same origins | unchanged | the same |
 | A fragment as a placeholder | `WHERE $1 AND u.id > $2`; `ON a.owner_id = u.id AND $1`; `SELECT ($1 AND u.id > 0) AS ok` | params `boolean, integer`; `boolean`; `boolean` | the select list's origins unchanged; `ok` origin 0 | — | accepted: each placeholder typed `boolean` |
@@ -77,7 +86,14 @@ On the fixture database (`test/fixtures/schema.sql`, Postgres 17.3, a probe data
 | No result | `UPDATE extra.spools SET label = $1 WHERE id = $2` | `NULL` | NoData | — | no row type |
 | Two statements | `SELECT 1; CREATE TABLE probe_710 ()` | `PREPARE` ran the `CREATE TABLE` | refused, nothing run | — | refused |
 
-What the replays show: Describe's origin alone, the rule pgTyped and sqlc's database analyser apply, is **wrong** on four cases (left, right and full joins, `ROLLUP`): a column `NOT NULL` at its origin comes back `NULL`. With choice 2's guard, no case is wrong; six are loose, 7 of the replays' 35 result columns nullable where the value never is, each narrowed by an override (choice 4). `PREPARE` alone gives no origin, so every column is nullable.
+What the replays show, over the table's 38 texts with a typed result and their 73 columns:
+
+- Describe's origin alone, the rule pgTyped and sqlc's database analyser apply, is **wrong** on 20 columns of 14 texts: a column `NOT NULL` at its origin comes back `NULL` (outer joins, `ROLLUP`, inheritance, foreign tables and partitions, `MERGE`).
+- This note's first reading (`attnotnull`, the six join and grouping words matched case-sensitively) was still wrong on 12 columns of 8 texts: inheritance, the foreign cases, `MERGE`, the two lower-case texts. A lexer that skips literals also misses the two texts of the row "A keyword the old lexer skipped".
+- With choice 2 as it stands, no column is wrong. 13 are loose, in 11 texts: nullable where the value never is, each narrowed by an override (choice 4). Of the first 25 texts, 8 of 48 columns are loose, in 7.
+- `PREPARE` alone gives no origin, so every column is nullable.
+
+Also replayed, outside the table: a scalar subquery, inner `USING` and `NATURAL` joins, an inner lateral, `CASE`, `UPDATE … FROM … RETURNING` and `MERGE … INSERT … RETURNING`. None is wrong; the last has its 3 columns loose.
 
 ## 1. Whether to build it, and where
 
@@ -92,7 +108,7 @@ What the replays show: Describe's origin alone, the rule pgTyped and sqlc's data
 | **Composed queries** | a fragment in a condition becomes a `boolean` parameter; anything else refuses the query | "Conditional fragment selection" ❌ in its own postgres.js matrix; `onExpression` may inline a string or skip the query | typed by hand, unchecked |
 | **Nullability** | Describe's origin and a guard (choice 2) | its AST walk over libpg-query, `attnotnull` as fallback | as written |
 | **API stability** | pgcast's own | its plugin API is marked "EXPERIMENTAL" | — |
-| **Cost** | a package: a TypeScript-parser scan, a SQL lexer, a Submittable, a writer, `--check`; maintained with the core's quality (note 013) | a package bound to an experimental API of another project, and its lint-time database | nothing; the 58 row types stay unchecked |
+| **Cost** | a package: a TypeScript-parser scan, a guard-word match, a Submittable, a writer, `--check`; maintained with the core's quality (note 013) | a package bound to an experimental API of another project, and its lint-time database | nothing; the 58 row types stay unchecked |
 
 **Choice: A**, in its own package.
 
@@ -108,10 +124,27 @@ What the replays show: Describe's origin alone, the rule pgTyped and sqlc's data
 
 A result column is `NOT NULL` only when both hold; otherwise `T | null`:
 
-- Describe gives it an origin, and that column's `attnotnull` is true;
-- the query's text, after neutralisation, holds none of the keywords `LEFT`, `RIGHT`, `FULL`, `ROLLUP`, `CUBE`, `GROUPING`, found by a lexer that skips literals (dollar quotes included), quoted identifiers and comments.
+- **The origin proves it.** Describe gives the column an origin, and that relation and every relation below it in `pg_inherits` is a table (`relkind` `r`) or a partitioned table (`p`) whose column of the same name is `attnotnull`. A view, a materialised view or a foreign table never proves. Replayed: proved for a plain table (`users`) and for `events`, whose partitions are all `r`; not proved under a foreign partition, even two levels down, or below an inheritance parent:
 
-The guard only removes proofs, never adds one: no guessed type (principle 1). What a parser would buy: libpg-query, as an optional peer, could tell an outer join's preserved side, which recovers 2 columns of the replays (`id` under `LEFT`, `balance` under `RIGHT`) and touches 6 of the corpus's 58 queries. Not worth a 1.8 MB optional peer and its own reading of the tree; it can come back as a revision of this note.
+  ```sql
+  WITH RECURSIVE tree (relid) AS (
+    SELECT $1::oid                                -- the origin's table OID
+    UNION
+    SELECT i.inhrelid FROM pg_inherits i JOIN tree t ON i.inhparent = t.relid
+  )
+  SELECT bool_and(c.relkind IN ('r', 'p') AND coalesce(a.attnotnull, false)) AS proved
+  FROM tree t
+  JOIN pg_class c ON c.oid = t.relid
+  LEFT JOIN pg_attribute a ON a.attrelid = t.relid AND NOT a.attisdropped
+    AND a.attname = (SELECT attname FROM pg_attribute WHERE attrelid = $1 AND attnum = $2)  -- $2: its attribute number
+  ```
+
+  On Postgres 14 to 17, `attnotnull` alone proves nothing below a parent: a child can `DROP NOT NULL`, `ALTER TABLE ONLY parent … SET NOT NULL` leaves a child's `NULL` in place, and Postgres does not enforce `NOT NULL` on a foreign table or partition (§ Replays).
+- **No guard word.** The query's text after neutralisation holds none of `LEFT`, `RIGHT`, `FULL`, `ROLLUP`, `CUBE`, `GROUPING`, `MERGE`, `OLD`, `NEW`. The match ignores case and skips nothing: literals, quoted identifiers and comments are read too. A word is cut where a Postgres identifier could not go on, `/(?<![a-z_])(left|right|full|rollup|cube|grouping|merge|old|new)(?![a-z0-9_$])/i`. A digit may come before it, since Postgres 14 reads `1LEFT` as `1` then `LEFT` ("Previously, query text like `123abc` would be interpreted as `123` followed by a separate token `abc`", [15.0 release notes](https://www.postgresql.org/docs/release/15.0/); 17.3 refuses it, "trailing junk after numeric literal").
+  - `MERGE`: `WHEN NOT MATCHED BY SOURCE … RETURNING` null-extends the source with no join word (§ Replays).
+  - `OLD` and `NEW`: Postgres 18's `RETURNING old.*` and `new.*`, where "typically old values will be `NULL` for an `INSERT`, and new values will be `NULL` for a `DELETE`" ([docs](https://www.postgresql.org/docs/18/dml-returning.html)); `RETURNING WITH (OLD AS o)` still holds the word. Not replayed here (17.3): the first PR replays them in CI's matrix, on Postgres 18.
+
+The guard only removes proofs, never adds one: a word in a literal or a comment (`'left'`) only loosens a column (§ Replays). No guessed type (principle 1). What a parser would buy: libpg-query, as an optional peer, could tell an outer join's preserved side, which recovers 3 columns of the replays (`id` under `LEFT JOIN` and under `LEFT JOIN LATERAL`, `balance` under `RIGHT JOIN`) and touches the 6 of the corpus's 58 queries that hold a guard word. Not worth a 1.8 MB optional peer and its own reading of the tree; it can come back as a revision of this note.
 
 ## 3. Naming, finding, writing, checking
 
@@ -153,10 +186,10 @@ The guard only removes proofs, never adds one: no guessed type (principle 1). Wh
 ## Risks
 
 - **The Submittable's connection methods** (`parse`, `describe`, `sync`, the `parameterDescription` event) are what pg-cursor uses, not a documented API of their own: a `pg` major could move them. The tool pins its `pg` range and tests it at its floor and latest.
-- **Nullability is loose by design**: 7 of the replays' 35 columns need `NotNull`; the docs show it beside each case.
+- **Nullability is loose by design**: 13 of the replays' 73 columns need `NotNull`; the docs show it beside each case.
 - **A `NOT NULL` that does not hold**: Postgres 18 accepts `NOT NULL … NOT VALID`, which does not check old rows; the first PR replays what `attnotnull` says then, and proves only a validated constraint (`pg_constraint.convalidated`).
 - **The scan is syntactic**: a `sql` renamed on import, or a row type behind an alias, is not found; the query stays as typed by hand, and the docs say how a query is opted in.
-- **Replayed on Postgres 17.3 only**; Parse / Describe exists on every supported version, and the first PR runs CI's matrix (14 and later).
+- **Replayed on Postgres 17.3 only**; Parse / Describe exists on every supported version, and the first PR runs CI's matrix (14 and later), with `OLD` and `NEW` on 18 and `1LEFT` on 14.
 
 ## Sources
 
