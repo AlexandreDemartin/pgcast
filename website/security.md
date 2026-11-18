@@ -105,7 +105,7 @@ A fix ships in a new release, never in an older one: only the latest minor is su
 
 ## What pgcast can't guard against
 
-pgcast keeps a caller's input from becoming code; it can't tell whether the SQL does what you meant. In the three cases below the SQL is valid, and does the wrong thing.
+pgcast keeps a caller's input from becoming code; it can't tell whether the SQL does what you meant. In the three cases below the SQL is valid, and does the wrong thing. Nor does it check a row-level security policy: the policy is Postgres's, and [`setLocal()`](/transaction#setLocal) only sets what it reads ([Row security](/row-security)).
 
 ### A caller's string as a name
 
