@@ -27,6 +27,7 @@ const groups: Group[] = [
     items: [
       { text: { en: 'Joins', fr: 'Jointures' }, link: '/lateral' },
       { text: { en: 'Pagination', fr: 'Pagination' }, link: '/paginate' },
+      { text: { en: 'Cursors<small class="since">6.12</small>', fr: 'Curseurs<small class="since">6.12</small>' }, link: '/cursors' },
       { text: { en: 'Batches', fr: 'Batches' }, link: '/batches' },
       { text: { en: 'Retries', fr: 'Retries' }, link: '/retries' },
       { text: { en: 'Savepoints<small class="since">6.12</small>', fr: 'Savepoints<small class="since">6.12</small>' }, link: '/savepoints' },

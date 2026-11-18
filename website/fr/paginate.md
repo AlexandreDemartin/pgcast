@@ -1,11 +1,13 @@
 ---
-english: 412a3a6b158e
+english: 27e100eb6957
 ---
 
 # Pagination
 
 Affichez une longue liste une page à la fois : ici les films, du plus récent au plus ancien, deux par page. La dernière section réunit les étapes dans un handler de requête HTTP. La page suppose les bases du [tutoriel](/fr/tutorial).
 {.lede}
+
+Ici, le curseur est un jeton de pagination pour la prochaine requête HTTP. Pour lire toute une table dans un seul processus, voir [Curseurs](/fr/cursors).
 
 <AtAGlance>
 

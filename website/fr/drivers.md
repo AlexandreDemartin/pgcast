@@ -1,5 +1,5 @@
 ---
-english: f6fba0e4c688
+english: b78c301dd697
 description: "Lancer pgcast sur pg, sur postgres.js ou PGlite via leurs adaptateurs, ou sur un driver à vous : le même SQL et les mêmes types sur chacun."
 ---
 
@@ -7,6 +7,8 @@ description: "Lancer pgcast sur pg, sur postgres.js ou PGlite via leurs adaptate
 
 Lancez les requêtes et les transactions de pgcast sur `pg`, sur postgres.js ou PGlite via leurs adaptateurs, ou sur un driver à vous : `run()` prend un [`QueryableLike`](/fr/sql-template#QueryableLike), et `transaction()` un [`PoolLike`](/fr/transaction#PoolLike), à partir de la 6.12.0. Une requête donne le même SQL sur chacun, et se résout au même type, tant que le driver lit les valeurs comme `pg` les lit. Vous connaissez déjà `.run()` grâce au [tutoriel](/fr/tutorial).
 {.lede}
+
+Avec les adaptateurs postgres.js et PGlite, [`cursor()`](/fr/cursors) lit les batchs en appelant la méthode `query()` du client de la transaction.
 
 ## pg {#pg}
 
