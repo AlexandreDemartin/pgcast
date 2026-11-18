@@ -39,7 +39,7 @@ await db.serializable(pool, async txn => {
 ```
 
 - `asPool(pglite)` never creates, configures nor closes the PGlite: you do, as with a `pg.Pool`, which Zapatos "doesn't manage" for you either. It takes the PGlite that `PGlite.create()` or `new PGlite()` returns, and throws on the `tx` of `pglite.transaction()`, which has no `execProtocol()`.
-- `run(pool)` sends each query as `pg` sends it, through `execProtocol()`: with no value, a simple `Query`, which may hold several statements; otherwise `Parse`, `Bind`, `Describe`, `Execute` and `Sync`. `.prepared(name)` parses the query once on that PGlite, as `pg` does once on a connection, whichever `asPool()` gave the pool.
+- `run(pool)` sends each query as `pg` sends it, through `execProtocol()`: with no value and no name, a simple `Query`, which may hold several statements; otherwise `Parse`, `Bind`, `Describe`, `Execute` and `Sync`. `.prepared(name)` parses the query once on that PGlite, as `pg` does once on a connection, whichever `asPool()` gave the pool; an empty name is no name, as in `pg`.
 - The pool has the PGlite's one connection. `transaction()` and its shortcuts (`serializable()`…) take it with `connect()`, in turn, run `START TRANSACTION`, the callback and `COMMIT` on it, retry on a 40001 or a 40P01, and `release()` it at the end. Meanwhile a query on the pool waits, as with a `pg.Pool` with `max: 1`.
 - In a page, the adapter imports no Node built-in, but `pg`'s parser for a `bytea` reads a global `Buffer` as it loads: set `globalThis.Buffer` (the `buffer` package's) in a module imported before the adapter.
 
