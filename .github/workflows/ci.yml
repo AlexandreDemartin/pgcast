@@ -327,7 +327,7 @@ jobs:
       - run: npm run test:types
       - name: The build bundles for a page, with no Node built-in
         run: npm run check:browser
-      - name: The package holds its build and LICENCE
+      - name: The package holds its build, README and LICENCE
         run: npm pack --dry-run
 
   ci-passed:
