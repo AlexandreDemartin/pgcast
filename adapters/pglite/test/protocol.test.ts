@@ -217,10 +217,12 @@ describe('the PGlite', () => {
     await expect(pool.query({ text: 'SELECT 1', values: [] })).rejects.toThrow('PGlite is closed');
   });
 
-  // a query sent as close() begins: PGlite 0.5.13 runs it first; 0.5.0 and 0.5.5 close first, and give it no result
-  it('rejects a query it closes before running, or runs it', async () => {
-    const pglite = await PGlite.create(), pool = asPool(pglite);
-    const closed = pglite.close(), query = pool.query({ text: 'SELECT 1 AS a', values: [] }).then(r => r.rows, (e: Error) => e.message);
+  // a query sent about when close() is called may run first or find PGlite closed, as PGlite's version and what runs
+  // between the two calls decide: the adapter gives its row, or rejects with "PGlite gave no result", never no rows
+  it.each(['close() then the query', 'the query then close()'])('rejects a query it closes before running, or runs it: %s', async order => {
+    const pglite = await PGlite.create(), pool = asPool(pglite), send = () => pool.query({ text: 'SELECT 1 AS a', values: [] }).then(r => r.rows, (e: Error) => e.message);
+    let query: Promise<unknown>, closed: Promise<void>;
+    if (order === 'close() then the query') { closed = pglite.close(); query = send(); } else { query = send(); closed = pglite.close(); }
     await closed;
     expect([[{ a: 1 }], 'PGlite gave no result: was it closed while the query waited?']).toContainEqual(await query);
   });
