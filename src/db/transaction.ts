@@ -196,9 +196,11 @@ type RetriedCode = Extract<TransactionEvent, { type: 'rollback' }>['code'];
  *
  * Given a `PoolLike` of another driver, the callback gets its client, a
  * `TxnClientLike`, released once the transaction ends. Passed to a nested
- * call, that client is passed through, and the nested callback gets it typed
- * as given, at the outer level it runs at. Never give the nested call the
- * pool, whose second client is another transaction.
+ * call, that client is passed through, normally typed at the outer level. If
+ * the client itself fits the `PoolLike` parameter, TypeScript types the callback's
+ * client at the nested call's level. At run time the usual outer-level check
+ * applies. Never give the nested call the pool, whose second client is another
+ * transaction.
  * @param txnClientOrQueryable The `pg.Pool` from which to check out a client,
  * a plain client (`pg.Client`, `pg.native.Client` or a `pg.PoolClient`, used
  * as is and not released), an existing transaction client to be passed
