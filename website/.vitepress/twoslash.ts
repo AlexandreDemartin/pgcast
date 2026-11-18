@@ -11,10 +11,19 @@ import type { MarkdownOptions } from 'vitepress';
 
 type Node = { tagName?: string; properties?: Record<string, unknown>; children?: Node[] };
 
-const custom = new URL('../zapatos/custom/', import.meta.url);
+const
+  custom = new URL('../zapatos/custom/', import.meta.url),
+  adapter = (name: string) => [fileURLToPath(new URL(`../../adapters/${name}/src/index.ts`, import.meta.url))];
 
 export const twoslashOptions: TwoslashOptions = {
   vfsRoot: dirname(fileURLToPath(new URL('../package.json', import.meta.url))),  // with no final slash: one hides errors
+  // the adapters (adapters/) from their source, as neither is installed here nor built in CI's docs job: drivers.md
+  compilerOptions: {
+    paths: {
+      '@pgcast/adapter-postgres-js': adapter('postgres-js'),
+      '@pgcast/adapter-pglite': adapter('pglite'),
+    },
+  },
   extraFiles: {
     'zapatos-schema.d.ts': readFileSync(new URL('../zapatos/schema.d.ts', import.meta.url), 'utf8'),
     // custom/ exists only once the schema has a type the generator leaves to the user

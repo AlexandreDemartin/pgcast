@@ -5,7 +5,7 @@ Tell what went wrong with a query, and answer it: a seat already booked, a scree
 
 ## Catch a refusal from Postgres
 
-When Postgres refuses a query, `.run()` rejects with node-postgres's `DatabaseError`, whose `code` is the SQLSTATE. Give it to [`isDatabaseError()`](/transaction#isDatabaseError) with the name of the refusal you expect, and let anything else through. Book seat C4 of screening 1002, which someone may have booked already:
+When Postgres refuses a query, `.run()` on `pg` rejects with node-postgres's `DatabaseError`, whose `code` is the SQLSTATE (another driver's error: [Drivers](/drivers)). Give it to [`isDatabaseError()`](/transaction#isDatabaseError) with the name of the refusal you expect, and let anything else through. Book seat C4 of screening 1002, which someone may have booked already:
 
 <CastPanel example="errors_seat_taken">
 

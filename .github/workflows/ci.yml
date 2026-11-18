@@ -28,8 +28,8 @@ jobs:
         # Markdown outside .agents/ and .claude/ needs no build: those two hold the agent method, which check:agents checks,
         # as it checks AGENTS.md § Architecture and recounts the summary of docs/CHARACTERISATION-REPORT.md.
         # The docs site builds on a change to website/ (its pages are Markdown too), to CHANGELOG.md, its /changelog page, to
-        # src/, which its examples use, to what builds the library it installs (the root package.json, package-lock.json,
-        # tsconfig.json), or to the workflows.
+        # src/, which its examples use, to adapters/*/src/, which its Drivers page compiles against, to what builds the library
+        # it installs (the root package.json, package-lock.json, tsconfig.json), or to the workflows.
         # A push to master always runs everything.
         env:
           EVENT: ${{ github.event_name }}
@@ -44,7 +44,7 @@ jobs:
               case "$file" in
                 '') ;;
                 website/*|CHANGELOG.md) docs=true ;;
-                src/*|package.json|package-lock.json|tsconfig.json|.github/workflows/*) code=true; docs=true ;;
+                src/*|adapters/*/src/*|package.json|package-lock.json|tsconfig.json|.github/workflows/*) code=true; docs=true ;;
                 .agents/*|.claude/*|AGENTS.md|docs/CHARACTERISATION-REPORT.md) code=true ;;
                 *.md) ;;
                 *) code=true ;;
@@ -269,19 +269,89 @@ jobs:
       - run: npm run build
       - run: npm test
       - run: npm run test:types
-      - name: The package holds its build, README and LICENCE
-        run: npm pack --dry-run
+      - name: The package holds each path of its files, main and types
+        run: |
+          npm pack --dry-run --json --ignore-scripts | node -e "
+            const packed = JSON.parse(require('fs').readFileSync(0, 'utf8'))[0].files.map(f => f.path);
+            const { files, main, types } = require('./package.json');
+            const missing = [...files, main, types].filter(f => !packed.some(p => p === f || p.startsWith(f + '/')));
+            console.log(packed.sort().join('\\n'));
+            if (missing.length > 0) { console.error('Not in the package: ' + missing.join(', ')); process.exit(1); }"
+
+  adapter-pglite:
+    # The PGlite adapter, a package of its own (adapters/pglite/): its tests read and write each type through pg on the
+    # fixture's database and through the adapter on a PGlite with the same fixture, with the root's install and helpers,
+    # so the root builds first; then its build is bundled for a page. On its peer's floor, the docs site's version and
+    # the lockfile's.
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres: [14, 18]
+        pglite: [0.5.0, 0.5.13, lockfile]
+    defaults:
+      run:
+        working-directory: adapters/pglite
+    services:
+      postgres:
+        image: postgres:${{ matrix.postgres }}
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: pgcast
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/pgcast
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22.x
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            adapters/pglite/package-lock.json
+      - run: npm ci && npm run build
+        working-directory: .
+      - run: npm ci
+      - name: PGlite ${{ matrix.pglite }}
+        if: matrix.pglite != 'lockfile'
+        env:
+          PGLITE: ${{ matrix.pglite }}
+        run: npm install --no-save "@electric-sql/pglite@$PGLITE"
+      - run: npm run build
+      - run: npm test
+      - run: npm run test:types
+      - name: The build bundles for a page, with no Node built-in
+        run: npm run check:browser
+      - name: The package holds each path of its files, main and types
+        run: |
+          npm pack --dry-run --json --ignore-scripts | node -e "
+            const packed = JSON.parse(require('fs').readFileSync(0, 'utf8'))[0].files.map(f => f.path);
+            const { files, main, types } = require('./package.json');
+            const missing = [...files, main, types].filter(f => !packed.some(p => p === f || p.startsWith(f + '/')));
+            console.log(packed.sort().join('\\n'));
+            if (missing.length > 0) { console.error('Not in the package: ' + missing.join(', ')); process.exit(1); }"
 
   ci-passed:
     # The one check master requires: it stays stable when the matrix changes, and passes when docs-only skips the rest.
     name: CI passed
-    needs: [changes, build, bench-types, typescript-7, typescript-4-1, docs, adapter-postgres-js]
+    needs: [changes, build, bench-types, typescript-7, typescript-4-1, docs, adapter-postgres-js, adapter-pglite]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Every job passed, or was skipped on purpose
         env:
-          RESULTS: ${{ needs.changes.result }} ${{ needs.build.result }} ${{ needs.bench-types.result }} ${{ needs.typescript-7.result }} ${{ needs.typescript-4-1.result }} ${{ needs.docs.result }} ${{ needs.adapter-postgres-js.result }}
+          RESULTS: ${{ needs.changes.result }} ${{ needs.build.result }} ${{ needs.bench-types.result }} ${{ needs.typescript-7.result }} ${{ needs.typescript-4-1.result }} ${{ needs.docs.result }} ${{ needs.adapter-postgres-js.result }} ${{ needs.adapter-pglite.result }}
         run: |
           for result in $RESULTS; do
             case "$result" in

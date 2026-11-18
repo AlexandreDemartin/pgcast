@@ -4493,11 +4493,12 @@ describe('the CLI with --check (#556)', () => {
     expect(printed()).toEqual([]);
   });
 
-  it('ignores an unknown flag after the JSON argument, as Zapatos 6.6.1 does, with a note through warningListener', async () => {
+  it('ignores a flag after the JSON argument, as Zapatos 6.6.1 does, with a note through warningListener', async () => {
     const
-      note = (flag: string) => `Note: unknown flag ${flag} ignored: the only flag is --check, before or after the JSON argument.`,
-      notes = () => printed().filter(line => line.startsWith('Note: unknown flag'));
-    expect(await runCli([json({ warningListener: true }), '--chek'], dir)).toBe(0);
+      note = (flag: string) => `Note: flag ${flag} ignored after the JSON argument: only --check may follow it.`,
+      notes = () => printed().filter(line => line.startsWith('Note: flag'));
+    // -h, a single dash, is ignored there without a note, as any later argument
+    expect(await runCli([json({ warningListener: true }), '--chek', '-h'], dir)).toBe(0);
     expect(files(outDir)).toEqual([placeholderFile, indexFile, schemaFile]);
     expect(notes()).toEqual([note('--chek')]);
     log.mockClear();
@@ -4738,6 +4739,42 @@ describe('the CLI with --check (#556)', () => {
       expect(run(json(), '--check')).toEqual({
         status: 1, stdout: `Out of date: <out>/${schemaFile}\nRun the generator without --check to write it.\n`, stderr: '',
       });
+    }, 30_000);
+
+    // without a flag, as Zapatos 6.6.1 runs it (#688): the output and exit code a --help must not change
+    it('reads the config file alone, with no argument, printing nothing', () => {
+      writeFileSync(join(dir, 'pgcastconfig.json'), json());
+      expect(run()).toEqual({ status: 0, stdout: '', stderr: '' });
+      expect(files(outDir)).toEqual([placeholderFile, indexFile, schemaFile]);
+      expect(run('--check')).toEqual({ status: 0, stdout: `${upToDate}\n`, stderr: '' });
+    }, 30_000);
+
+    it('stops on a config it cannot read with Node printing the error and its stack, exit 1', () => {
+      const stack = (message: string) => new RegExp(`\\nError: ${message}[^\\n]*\\n    at `);
+      const argument = run('{,}');
+      expect(argument).toMatchObject({ status: 1, stdout: '' });
+      expect(argument.stderr).toMatch(stack('If present, the argument to Zapatos must be valid JSON, and all referenced environment variables must exist: '));
+      // a single dash other than -h is still read as the JSON argument
+      expect(run('-x').stderr).toMatch(stack('If present, the argument to Zapatos must be valid JSON, '));
+      writeFileSync(join(dir, 'pgcastconfig.json'), '{,}');
+      const file = run();
+      expect(file).toMatchObject({ status: 1, stdout: '' });
+      expect(file.stderr).toMatch(stack('If present, pgcastconfig\\.json must be a valid JSON file, '));
+      expect(existsSync(outDir)).toBe(false);
+    }, 30_000);
+
+    // the usage's text is runCli()'s test (test/unit/cliConfig.test.ts); here, where it goes and the exit code (#688)
+    it('prints the usage on stdout for --help or -h, exit 0, and an unknown flag on stderr, exit 1, with no stack', () => {
+      writeFileSync(join(dir, 'pgcastconfig.json'), '{,}');  // never read
+      const help = run('--help');
+      expect(help).toMatchObject({ status: 0, stderr: '' });
+      expect(help.stdout).toMatch(/^Usage: pgcast \[--check\] \[config\]\n[^]*\nDocs: https:\/\/pgcast\.dev\/generator#cli\n$/);
+      expect(run('-h')).toEqual(help);
+      expect(run('--check', '--help', json())).toEqual(help);
+      expect(run('--chek', json())).toEqual({
+        status: 1, stdout: '', stderr: `Unknown flag --chek: the flags are --check, --help and -h\n${help.stdout}`,
+      });
+      expect(existsSync(outDir)).toBe(false);
     }, 30_000);
   });
 });

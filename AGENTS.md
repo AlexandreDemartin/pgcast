@@ -43,7 +43,7 @@ user code ──► src/db/ (runtime: sql``, shortcuts, conditions, transactions
 ```
 
 - `src/generate/`: the codegen (CLI `pgcast`, alias `zapatos`).
-  - `cli.ts` runs the CLI; `cliConfig.ts` reads its arguments (`--check`), `pgcastconfig.json` else `zapatosconfig.json`, and/or a JSON argument, and interpolates `{{ENV_VAR}}`; `config.ts` holds the config and its defaults, `schemaRules.ts` checks its `schemas` rules.
+  - `cli.ts` runs the CLI; `cliConfig.ts` reads its arguments (`--check`, `--help`), `pgcastconfig.json` else `zapatosconfig.json`, and/or a JSON argument, and interpolates `{{ENV_VAR}}`; `config.ts` holds the config and its defaults, `schemaRules.ts` checks its `schemas` rules.
   - `write.ts` (`generate()`) writes `zapatos/schema.d.ts` and the `zapatos/custom/` placeholders, each under `header.ts`'s header, and its `check()` compares them with the disk, as `--check` does; `outputFiles.ts` builds them in memory, and its `staleFiles()` names those that differ, for both.
   - `tsOutput.ts` assembles the `zapatos/schema` module (namespaces per schema, aggregate types, `*ForTable<T>` lookups, version canary); `moduleNames.ts` picks `zapatos/*` or `pgcast/*`.
   - `tables.ts` introspects relations, columns, unique indexes and comments, then produces `Selectable`, `JSONSelectable`, `Whereable`, `Insertable`, `Updatable` per table; `quote.ts` writes a Postgres name or a text into the output.
@@ -57,7 +57,7 @@ user code ──► src/db/ (runtime: sql``, shortcuts, conditions, transactions
   - `date.ts`, `customJSON.ts`, `pgErrors.ts`, `config.ts`, `canary.ts`, `utils.ts`.
 - `src/typings/zapatos/schema.ts`: a dummy schema used only to compile `src/db` (via `paths` in tsconfig).
 - `db.{js,mjs,d.ts}` and `generate.{js,mjs,d.ts}`: root shims. The `.mjs` files are **generated** by `gen-esm-wrapper` at build time.
-- `adapters/<driver>/`: the official extensions that run pgcast on another driver, each a package of its own, `@pgcast/adapter-<driver>` (`adapters/postgres-js/`). Decision [013](docs/decisions/013-package-model.md).
+- `adapters/<driver>/`: the official extensions that run pgcast on another driver, each a package of its own, `@pgcast/adapter-<driver>` (`adapters/postgres-js/`, `adapters/pglite/`). Decision [013](docs/decisions/013-package-model.md).
   - Each has its own `package.json`, lockfile, `npm ci`, version, `CHANGELOG.md` and README; no npm workspaces.
   - Its types fit the core's structurally (`QueryableLike`, `PoolLike`), with no import; a peer dependency on `@pgcast/pgcast`, with an explicit range, only to read the core's types or config.
 - `tools/<name>/`: later, the official tools in packages of their own (`@pgcast/typegen`), laid out as the adapters.
