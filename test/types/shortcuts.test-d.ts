@@ -509,6 +509,38 @@ describe('selectRows', () => {
     void plain;
   });
 
+  test('refuses a lateral typed number passed through, which comes as pg parses its column (#749); takes it under a key', () => {
+    const p = db.parent('id');
+    // @ts-expect-error count() passed through: pg gives its bigint as a string
+    db.selectRows('users', db.all, { lateral: db.count('accounts', { owner_id: p }) });
+    // @ts-expect-error sum() passed through: pg gives a numeric as a string
+    db.selectRows('users', db.all, { lateral: db.sum('accounts', { owner_id: p }, { columns: ['balance'] }) });
+    // @ts-expect-error avg() passed through: pg gives a numeric as a string
+    db.selectRows('users', db.all, { lateral: db.avg('accounts', { owner_id: p }, { columns: ['balance'] }) });
+    // @ts-expect-error min() of a number passed through, typed number but not by its column
+    db.selectRows('users', db.all, { lateral: db.min('accounts', { owner_id: p }, { columns: ['ratio'] }) });
+    // @ts-expect-error max() of an int8 passed through: pg gives it as a string
+    db.selectRows('users', db.all, { lateral: db.max('accounts', { owner_id: p }, { columns: ['lifetime_ops'] }) });
+    // @ts-expect-error min() of a date passed through: pg gives a Date
+    db.selectRows('users', db.all, { lateral: db.min('events', db.all, { columns: ['occurred_on'] }) });
+    // @ts-expect-error a sql template typed number: the type cannot tell it from count()
+    db.selectRows('users', db.all, { lateral: db.sql<db.SQL, number>`SELECT 7::int8 AS result` });
+    // @ts-expect-error a selectOne() passing a count() through, typed number | undefined
+    db.selectRows('users', db.all, { lateral: db.selectOne('accounts', { owner_id: p }, { lateral: db.count('events', db.all) }) });
+    // a sql template is typed as written: a string for an int8, a Date for a timestamptz, as pg parses them
+    const
+      int8 = db.selectRows('users', db.all, { lateral: db.sql<db.SQL, db.Int8String>`SELECT 7::int8 AS result` }),
+      at = db.selectRows('users', db.all, { lateral: db.sql<db.SQL, Date>`SELECT now() AS result` }),
+      keyed = db.selectRows('users', db.all, { columns: ['id'], lateral: { n: db.count('accounts', { owner_id: p }) } }),
+      keyedSelected = db.select('users', db.all, { columns: ['id'], lateral: { n: db.count('accounts', { owner_id: p }) } });
+    expectTypeOf(int8.run(pool)).resolves.toEqualTypeOf<db.Int8String[]>();
+    expectTypeOf(at.run(pool)).resolves.toEqualTypeOf<Date[]>();
+    expectTypeOf(at.run(pool)).resolves.not.toBeAny();
+    // under a lateral key, a count() is JSON, a number, as in select()
+    expectTypeOf<Run<typeof keyed>>().toEqualTypeOf<Run<typeof keyedSelected>>();
+    expectTypeOf<Run<typeof keyed>[number]['n']>().toEqualTypeOf<number>();
+  });
+
   test('refuses an unknown column or table', () => {
     // @ts-expect-error an unknown column
     db.selectRows('users', db.all, { columns: ['nope'] });

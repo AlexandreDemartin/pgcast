@@ -949,10 +949,33 @@ describe('selectRows', () => {
   });
 
   it('a count() passed through comes as pg parses its bigint, a string, as selectOne() passes it, where select() reads it from JSON', async () => {
-    const options = { lateral: db.count('accounts', { owner_id: parent('id') }), order: byId } as const;
+    // past the type, which refuses a lateral typed number (#749)
+    const options = { lateral: db.count('accounts', { owner_id: parent('id') }) as any, order: byId } as const;
     expect(await run(db.selectRows('users', all, options))).toEqual(['2', '1', '0']);
     expect(await run(db.selectOne('users', { id: 1 }, options))).toBe('2');
     expect(await run(db.select('users', all, options))).toEqual([2, 1, 0]);
+  });
+
+  it.each([{}, { aggregatesTypedByColumn: true }])('each lateral passed through comes as pg parses its column, under %j, where select() reads it from JSON', async config => {
+    db.setConfig(config);
+    const
+      p = parent('id'), firstEvent = new Date(2025, 5, 1), at = new Date('2025-06-01T12:00:00Z'),
+      // the lateral, what selectRows() gives for users 1, 2 and 3, and what select() gives
+      laterals: [string, db.SQLFragment<any>, unknown[], unknown[]][] = [
+        ['count()', db.count('accounts', { owner_id: p }), ['2', '1', '0'], [2, 1, 0]],
+        ['sum() of a numeric', db.sum('accounts', { owner_id: p }, { columns: ['balance'] }), ['1520.50', '0.00', null], [1520.5, 0, null]],
+        ['avg() of a numeric', db.avg('accounts', { owner_id: p }, { columns: ['balance'] }), ['760.2500000000000000', '0.00000000000000000000', null], [760.25, 0, null]],
+        ['min() of a float8', db.min('accounts', { owner_id: p }, { columns: ['ratio'] }), [0.5, 1.25, null], [0.5, 1.25, null]],
+        ['max() of an int8', db.max('accounts', { owner_id: p }, { columns: ['lifetime_ops'] }), ['9007199254740993', '1', null], [9007199254740992, 1, null]],
+        ['min() of a date', db.min('events', all, { columns: ['occurred_on'] }), [firstEvent, firstEvent, firstEvent], ['2025-06-01', '2025-06-01', '2025-06-01']],
+        ['a sql template of an int8', sql`SELECT 7::int8 AS result`, ['7', '7', '7'], [7, 7, 7]],
+        ['a sql template of a timestamptz', sql`SELECT ${param(at)}::timestamptz AS result`, [at, at, at], [expect.any(String), expect.any(String), expect.any(String)]],
+      ];
+    for (const [name, lateral, rows, selected] of laterals) {
+      const options = { lateral: lateral as any, order: byId };
+      expect([name, await run(db.selectRows('users', all, options))]).toEqual([name, rows]);
+      expect([name, await run(db.select('users', all, options))]).toEqual([name, selected]);
+    }
   });
 
   it('past the type, from JavaScript: a lateral key repeats the parent row once per row, and an extras value gets 21000', async () => {

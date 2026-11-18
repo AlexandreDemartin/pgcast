@@ -262,6 +262,7 @@ COMMIT
 ```
 
 - Each row is typed as `select()` types it. A single `lateral` subquery is passed through as [`selectOne()`](#selectOne) passes it, as `pg` parses its column, and typed so: with [`aggregatesTypedByColumn`](#typed-by-column), a `min()` of a `date` is a `Date`, where `select()` gives its JSON string.
+- A `lateral` passed through and typed `number` does not compile: `count()`, `sum()`, `avg()`, and `min()` or `max()` unless typed by column. Their type is `Number()`'s or JSON's, where `pg` gives a `bigint` or a `numeric` as a string and a `date` as a `Date` ([#749](https://github.com/AlexandreDemartin/pgcast/issues/749)). A `sql` template typed `number` is refused with them, as its type cannot be told from theirs. Under a `lateral` key, the value is JSON and its type holds: `` db.selectRows('studios', db.all, { lateral: { films: db.count('films', { studio_id: db.parent('id') }) } }) ``<!-- tsc -->. Past the type, from JavaScript, `run()` gives `pg`'s value.
 - A `lock` locks each row as its batch is fetched, not before.
 - Nested, it is a set of rows, not one value. A `sql` template takes it, `` db.sql`SELECT count(*) FROM (${db.selectRows('films', db.all)}) AS f` ``<!-- tsc -->, and so do [`withCTEs()`](/sql-template#withCTEs) and `cursor()`. As a `lateral`, an `extras` value or a `where`, it does not compile: its type, a [`RowsQuery`](#RowsQuery), says so. Past the type, from JavaScript, a `lateral` key repeats the parent row once per row, and an `extras` value gets 21000 from Postgres.
 

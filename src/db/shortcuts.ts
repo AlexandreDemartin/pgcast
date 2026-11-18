@@ -1065,6 +1065,17 @@ declare const rowsQuery: unique symbol;
  */
 export interface RowsQuery { readonly [rowsQuery]: true }
 
+// a single lateral passed through comes row by row as pg parses its column: a bigint or a numeric as a string, a date
+// as a Date. count(), sum(), avg(), and min() or max() unless typed by column, are typed number, as their own run()
+// gives them, through Number(), or nested, as JSON (#749): refused, with any fragment typed number, which the type
+// cannot tell from them. Nested under a lateral key, the value is JSON, and its type holds
+type RowsLateralOption<L> =
+  0 extends 1 & L ? unknown : [L] extends [ColumnAggregateFragment<any, any>] ? unknown :
+  [L] extends [SQLFragment<infer R, any>] ?
+    (0 extends 1 & R ? unknown : [Exclude<R, null | undefined>] extends [never] ? unknown :
+      [Exclude<R, null | undefined>] extends [number] ? { lateral?: never } : unknown) :
+  unknown;
+
 export interface SelectRowsSignatures {
   <
     T extends Table,
@@ -1075,7 +1086,7 @@ export interface SelectRowsSignatures {
   >(
     table: T,
     where: WhereableArg<T> | SQLFragment<any> | AllType,
-    options?: SelectOptionsForTable<T, C, L, E, A>,
+    options?: SelectOptionsForTable<T, C, L, E, A> & RowsLateralOption<L>,
   ): SQLFragment<SelectReturnTypeForTable<T, C, L, E, SelectResultMode.One>[], RowsQuery>;
 }
 
@@ -1090,9 +1101,15 @@ export interface SelectRowsSignatures {
  *
  * `run()` gives what `select()` gives, `[]` for no row, but for a single
  * `lateral` subquery, whose result is passed through as `selectOne()` passes
- * it, as `pg` parses its column. A query of many rows, it is typed so that
- * `lateral`, `extras` and a `where` refuse it; a `sql` template,
- * `withCTEs()` and `cursor()` take it.
+ * it, as `pg` parses its column, and typed so. One typed `number` does not
+ * compile: `count()`, `sum()`, `avg()`, and `min()` or `max()` unless typed by
+ * column (`aggregatesTypedByColumn`), since `pg` gives a `bigint` or a
+ * `numeric` as a string and a `date` as a `Date` (#749). Under a `lateral` key
+ * it is JSON, as in `select()`; past the type, from JavaScript, `pg`'s value.
+ *
+ * A query of many rows, it is typed so that a `lateral`, an `extras` value
+ * and a `where` refuse it; a `sql` template, `withCTEs()` and `cursor()` take
+ * it.
  * @param table The table to select from
  * @param where A `Whereable` or `SQLFragment` defining the rows to be selected,
  * or `all`
