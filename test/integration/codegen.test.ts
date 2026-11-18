@@ -4761,6 +4761,20 @@ describe('the CLI with --check (#556)', () => {
       expect(file.stderr).toMatch(stack('If present, pgcastconfig\\.json must be a valid JSON file, '));
       expect(existsSync(outDir)).toBe(false);
     }, 30_000);
+
+    // the usage's text is runCli()'s test (test/unit/cliConfig.test.ts); here, where it goes and the exit code (#688)
+    it('prints the usage on stdout for --help or -h, exit 0, and an unknown flag on stderr, exit 1, with no stack', () => {
+      writeFileSync(join(dir, 'pgcastconfig.json'), '{,}');  // never read
+      const help = run('--help');
+      expect(help).toMatchObject({ status: 0, stderr: '' });
+      expect(help.stdout).toMatch(/^Usage: pgcast \[--check\] \[config\]\n[^]*\nDocs: https:\/\/pgcast\.dev\/generator#cli\n$/);
+      expect(run('-h')).toEqual(help);
+      expect(run('--check', '--help', json())).toEqual(help);
+      expect(run('--chek', json())).toEqual({
+        status: 1, stdout: '', stderr: `Unknown flag --chek: the flags are --check, --help and -h\n${help.stdout}`,
+      });
+      expect(existsSync(outDir)).toBe(false);
+    }, 30_000);
   });
 });
 
