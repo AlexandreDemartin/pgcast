@@ -74,24 +74,54 @@ export const cliConfig = (argsJSON = '{}', dir = '.') => {
   return config;
 };
 
+/** What `--help` prints, and an unknown flag after its name. */
+export const usage = `Usage: pgcast [--check] [config]
+       zapatos [--check] [config]
+
+Reads the config file of this folder, pgcastconfig.json else zapatosconfig.json, if there,
+then writes the types of zapatos/schema, read from the database.
+
+  config      a JSON object merged over the file's config: '{"outDir": "./src"}'
+  --check     writes nothing, and exits with 1 if a file it would write differs or is missing
+  --help, -h  prints this usage
+
+{{NAME}} in a string of the config is replaced by the environment variable NAME.
+Docs: https://pgcast.dev/generator#cli`;
+
 /**
  * The CLI's arguments: `--check` anywhere, and the JSON argument, the first other one, as Zapatos 6.6.1 reads
  * `process.argv[2]`; any later one is ignored, as there, and each flag among them returned, to be noted. A flag in
- * the JSON argument's place throws, where 6.6.1 failed on it as JSON.
+ * the JSON argument's place, `-h` or one starting with `--`, where 6.6.1 failed on it as JSON, is returned instead.
  */
 export const cliArgs = (args: string[]) => {
-  const [argsJSON, ...later] = args.filter(arg => arg !== '--check');
-  if (argsJSON?.startsWith('--')) throw new Error(`Unknown flag ${argsJSON}: the only flag is --check, beside the JSON argument`);
+  const
+    [first, ...later] = args.filter(arg => arg !== '--check'),
+    flag = first === '-h' || first?.startsWith('--') ? first : undefined;
 
-  return { check: args.includes('--check'), argsJSON, ignoredFlags: later.filter(arg => arg.startsWith('--')) };
+  return {
+    check: args.includes('--check'), argsJSON: flag === undefined ? first : undefined, flag,
+    ignoredFlags: later.filter(arg => arg.startsWith('--')),
+  };
 };
 
 /**
  * Run the CLI on its arguments in `dir`: `generate()`, or with `--check` the comparison of `check()`, after a note through
- * `warningListener` for each flag it ignores. Resolve to its exit code.
+ * `warningListener` for each flag it ignores; or, before reading any config, the usage for `--help` and `-h`, on
+ * stderr after the flag's name for any other flag. Resolve to its exit code.
  */
 export const runCli = async (args: string[], dir = '.') => {
-  const { check: checkOnly, argsJSON, ignoredFlags } = cliArgs(args), config = cliConfig(argsJSON, dir);
+  const { check: checkOnly, argsJSON, flag, ignoredFlags } = cliArgs(args);
+  if (flag === '--help' || flag === '-h') {
+    console.log(usage);
+    return 0;
+  }
+  if (flag !== undefined) {
+    console.error(`Unknown flag ${flag}: the flags are --check, --help and -h`);
+    console.error(usage);
+    return 1;
+  }
+
+  const config = cliConfig(argsJSON, dir);
   if (ignoredFlags.length > 0) {
     const
       { warningListener } = finaliseConfig(config),
