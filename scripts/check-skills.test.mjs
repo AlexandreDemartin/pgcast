@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import {mkdirSync, mkdtempSync, rmSync, writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
-import {join} from 'node:path';
+import {join, sep} from 'node:path';
 import {after, test} from 'node:test';
 import {checkSkills} from './check-skills.mjs';
 
@@ -20,7 +20,11 @@ function plant(files = {}) {
   }
   return directory;
 }
-const errorsOf = files => checkSkills(plant(files)).errors.map(e => e.replace(/^.*?\/\d+\//, ''));
+/** The errors of `checkSkills()` on `plant(files)`, each path relative to the planted folder. */
+function errorsOf(files) {
+  const directory = plant(files);
+  return checkSkills(directory).errors.map(e => e.startsWith(directory + sep) ? e.slice(directory.length + 1) : e);
+}
 
 test('passes on the current tree', () => {
   assert.deepEqual(checkSkills('.agents/skills').errors, []);
