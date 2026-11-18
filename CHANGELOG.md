@@ -6,6 +6,8 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 
 ## [Unreleased]
 
+## [6.11.0] - 2026-11-18
+
 ### Added
 - `db.withCTEs(ctes, query)` puts CTEs before a query and keeps its result: `` db.withCTEs({ recent }, db.count('films', …)) `` gives `WITH "recent" AS (…) SELECT count(*) AS result FROM "films" …` and resolves to a number, as `count()` does (#671, decision note 010). The CTEs come in the object's order, so each reads those before it, an integer key first, as `Object.keys` gives it; each key is one name, never split on `.`, quoted as an interpolated name is, so a key escaped by hand (`a""b`) is kept. With no CTE, `withCTEs({}, query)` gives a copy of `query`, its own SQL, so a list built at run time needs no branch, where a `WITH` that `sql` writes over an empty list is refused (42601).
   - The result is a copy of `query`, of its type: it resolves to what `query` does, nested in a `lateral` or `extras` too, and is written in parentheses as an `extras` or `insert()` value where `query` is. A `selectExactlyOne()` under `selectExactlyOneChecksForSecondRow` still rejects on a second row at the top level.
