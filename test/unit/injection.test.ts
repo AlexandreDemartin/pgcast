@@ -2733,6 +2733,49 @@ describe('transaction', () => {
   });
 });
 
+// #738: setLocal() sends each name and each value as a parameter of set_config(), whatever the name, the value or the
+// configuration; what Postgres makes of them: test/integration/injection.test.ts
+describe('setLocal()', () => {
+  afterEach(resetConfig);
+
+  const update = `UPDATE users SET display_name = 'injected' WHERE id = 1`;
+  const payloads: Record<string, string> = {
+    bareSquote: "'", bareDquote: '"', bareSemicolon: ';', bareDashes: '--', bareComment: '/*', bareDollar: '$1', bareBackslash: '\\', bareNul: '\0',
+    closesCall: `app.x'); ${update}; --`, closesArguments: `app.x', 'y', false); ${update}; --`,
+    ...hostile,
+  };
+
+  /** The queries setLocal() sends on a transaction's client. */
+  const sentFor = async (settings: { readonly [name: string]: string }) => {
+    const sent: db.SQLQuery[] = [];
+    const client = { query: async (q: db.SQLQuery) => { sent.push({ text: q.text, values: q.values }); return { rows: [], command: 'SELECT' }; }, release: () => undefined };
+    await db.setLocal(client, settings);
+    return sent;
+  };
+
+  describe.each([
+    ['the default configuration', {}],
+    ['castArrayParamsToJson', { castArrayParamsToJson: true }],
+    ['castObjectParamsToJson', { castObjectParamsToJson: true }],
+    ['both', { castArrayParamsToJson: true, castObjectParamsToJson: true }],
+  ])('under %s', (_, config) => {
+    it.each(Object.entries(payloads))('sends %s as a name and as a value, each a parameter alone', async (_name, payload) => {
+      db.setConfig(config);
+      expect(await sentFor({ [payload]: 'v' })).toEqual([{ text: 'SELECT set_config($1, $2, true)', values: [payload, 'v'] }]);
+      expect(await sentFor({ 'app.x': payload })).toEqual([{ text: 'SELECT set_config($1, $2, true)', values: ['app.x', payload] }]);
+    });
+
+    // a literal opened in one setting and closed in the next, as a name and as a value
+    it('sends two settings that splice into each other as four parameters', async () => {
+      db.setConfig(config);
+      const opens = "app.a', 'x', true), set_config('app.b", closes = `', 'y', true); ${update}; --`;
+      expect(await sentFor({ [opens]: opens, [closes]: closes })).toEqual([
+        { text: 'SELECT set_config($1, $2, true), set_config($3, $4, true)', values: [opens, opens, closes, closes] },
+      ]);
+    });
+  });
+});
+
 describe('exists() and isInSelect()', () => {
   // table and column are typed identifiers, parent and alias strings: each goes through the string branch of
   // compileExpression, as select()'s table and alias do; what each achieves once run: test/integration/injection.test.ts

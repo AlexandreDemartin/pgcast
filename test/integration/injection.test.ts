@@ -1508,6 +1508,47 @@ describe('a list that is not an array in isIn(), isNotIn(), eqAny(), likeAny() a
   });
 });
 
+// #738: setLocal() on the harness's client, inside its BEGIN: a hostile name is one name to Postgres, which refuses it
+// whole, and a hostile value is stored as given; Ada's row is read before each savepoint goes
+describe('setLocal()', () => {
+  const payloads: Record<string, string> = {
+    squote: "'", dquote: '"', semicolon: ';', dashes: '--', comment: '/*', dollar: '$1', backslash: '\\', nul: 'a\0b',
+    closesCall: `app.x'); ${update}; --`, closesArguments: `app.x', 'y', false); ${update}; --`,
+    dropsTable: "app.x'); DROP TABLE users; --", dropsTableAfterArguments: "app.x', 'y', false); DROP TABLE users; --",
+  };
+
+  /** What setLocal() gives for `settings`, then `read` in the same savepoint: its result, or the error's code and message. */
+  const outcome = async (settings: { readonly [name: string]: string }, read: () => Promise<unknown>) => {
+    await t.client.query('SAVEPOINT pgcast_set_local');
+    try {
+      await db.setLocal(t.client, settings);
+      const result = await read();
+      if (await adaName() !== 'Ada') return 'injected';  // read before the savepoint goes
+      const { rows: [{ users }] } = await t.client.query("SELECT to_regclass('public.users') IS NOT NULL AS users");
+      return users ? result : 'dropped';
+    } catch (err) {
+      const { code, message } = err as { code?: string; message: string };
+      return { code, message };
+    } finally {
+      await t.client.query('ROLLBACK TO SAVEPOINT pgcast_set_local');
+    }
+  };
+
+  it.each(Object.entries(payloads))('refuses %s as a name, as one name Postgres does not know', async (_, payload) => {
+    const got = await outcome({ [payload]: 'v' }, async () => null);
+    if (payload.includes('\0')) expect(got).toMatchObject({ code: '22021' });
+    else if (payload.includes('.')) expect(got).toEqual({ code: '42602', message: `invalid configuration parameter name "${payload}"` });
+    else expect(got).toEqual({ code: '42704', message: `unrecognized configuration parameter "${payload}"` });
+  });
+
+  it.each(Object.entries(payloads))('stores %s as a value, read back as given', async (_, payload) => {
+    const got = await outcome({ 'app.x': payload }, async () =>
+      (await t.client.query<{ s: string }>("SELECT current_setting('app.x') AS s")).rows[0]!.s);
+    if (payload.includes('\0')) expect(got).toMatchObject({ code: '22021' });
+    else expect(got).toBe(payload);
+  });
+});
+
 describe('exists() and isInSelect()', () => {
   const { exists, isInSelect } = db.conditions;
 
