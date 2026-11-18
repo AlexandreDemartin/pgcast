@@ -98,6 +98,8 @@ const cases: [string, string, unknown][] = [
   ['a Buffer to jsonb', into('c_jsonb'), Buffer.from('{"a":1}')],
   ['a Uint8Array to text', into('c_text'), new Uint8Array([0x68, 0x69])],
   ['a Date of another realm to timestamp, as util.types.isDate() tells it', into('c_ts'), runInNewContext("new Date('2026-06-01T10:00:00.123Z')")],
+  ['a Date tagged otherwise to timestamp, as util.types.isDate() tells it', into('c_ts'), Object.assign(new Date(at.getTime()), { [Symbol.toStringTag]: 'Moment' })],
+  ['an object tagged Date, with toPostgres(), to text, as util.types.isDate() tells it', into('c_text'), { [Symbol.toStringTag]: 'Date', toPostgres: () => 'tp' }],
   ["'yes' to bool", into('c_bool'), 'yes'],
   ["'tr' to bool", into('c_bool'), 'tr'],
   ["'maybe' to bool", into('c_bool'), 'maybe'],
