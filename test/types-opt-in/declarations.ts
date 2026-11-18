@@ -26,6 +26,9 @@ export const userWithAggregates = (id: number) => db.selectOne('users', { id }, 
 
 export const firstEventOfUser = (id: number) => db.selectOne('users', { id }, { lateral: db.min('events', db.all, { columns: ['occurred_on'] }) });
 
+// a rows query, whose type names RowsQuery, its second type argument
+export const userRows = (since: Date) => db.selectRows('users', { created_at: db.conditions.gt(since) }, { lateral: db.min('events', db.all, { columns: ['occurred_on'] }) });
+
 // every function and value of zapatos/db and of db.conditions re-exported, as a wrapper module does: each type must be
 // one a .d.ts can name (TS4023 otherwise), so a type that names an unexported interface is written inline. An object
 // rest writes out every member, so an export added later is covered with no edit here

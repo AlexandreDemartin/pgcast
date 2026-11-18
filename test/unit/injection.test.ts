@@ -3011,3 +3011,44 @@ describe('exists() and isInSelect()', () => {
     }
   });
 });
+
+describe('selectRows()', () => {
+  it('writes each hostile identifier and keyword as select() writes it inside jsonb_agg, or throws as it throws', () => {
+    // select()'s matrices above freeze these texts; selectRows() is the query they wrap
+    const
+      sub = db.selectOne('accounts', { owner_id: db.parent('id') }),
+      builds: Record<string, (v: any) => [table: any, where: any, options?: any]> = {
+        table: v => [v, all],
+        columns: v => ['users', all, { columns: [v] }],
+        orderBy: v => ['users', all, { order: { by: v, direction: 'ASC' } }],
+        direction: v => ['users', all, { order: { by: 'id', direction: v } }],
+        nulls: v => ['users', all, { order: { by: 'id', direction: 'ASC', nulls: v } }],
+        extrasKey: v => ['users', all, { extras: { [v]: sql`1` } }],
+        lateralKey: v => ['users', all, { lateral: { [v]: sub } }],
+        alias: v => ['users', all, { alias: v }],
+        lockFor: v => ['users', all, { lock: { for: v } }],
+        lockWait: v => ['users', all, { lock: { for: 'UPDATE', wait: v } }],
+        lockOf: v => ['users', all, { lock: { for: 'UPDATE', of: v } }],
+        distinct: v => ['users', all, { distinct: v }],
+        groupBy: v => ['users', all, { groupBy: v }],
+        whereKey: v => ['users', { [v]: 1 }],
+      },
+      outcome = (build: () => db.SQLFragment<any, any>) => {
+        try { return build().compile(); } catch (err) { return `throws: ${(err as Error).message}`; }
+      };
+    for (const [place, build] of Object.entries(builds)) {
+      for (const [name, input] of Object.entries(hostile)) {
+        const
+          selected = outcome(() => db.select(...build(input))),
+          rows = outcome(() => db.selectRows(...build(input)));
+        if (typeof selected === 'string' || typeof rows === 'string') {
+          expect(rows, `${place} ${name}`).toBe(selected);
+          continue;
+        }
+        const prefix = `SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (${rows.text}) AS "sq_`;
+        expect(selected.text.startsWith(prefix) && /^(?:[^"]|"")*"$/.test(selected.text.slice(prefix.length)), `${place} ${name}`).toBe(true);
+        expect(rows.values, `${place} ${name}`).toEqual(selected.values);
+      }
+    }
+  });
+});

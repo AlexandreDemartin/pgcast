@@ -1,5 +1,5 @@
 ---
-english: 4d35c617d9be
+english: 0d53fc72891a
 ---
 
 # Lectures {#select-and-the-aggregates}
@@ -21,6 +21,8 @@ Construit un seul `SELECT` des lignes de `table` qui correspondent à `where`. R
   - Dans une fonction générique sur la table, `<K extends 'films' | 'studios'>(table: K)`, chaque raccourci refuse un objet écrit en ligne comme `where` (TS2353, qui nomme `SQLFragment`), comme dans Zapatos 6.6.1 : tant que `K` est générique, TypeScript ne vérifie les clés de l’objet que par rapport à `SQLFragment`. Typez d’abord l’objet, `const where: s.WhereableForTable<K> = { id: 1 }`, puis passez `where` : le code compile, et une clé qu’aucune table n’a reste refusée. Une colonne qu’une seule des tables de `K` possède passe aussi : `{ title: 'x' }` compile, et sur `studios`, qui n’a pas de `title`, Postgres refuse la requête (42703).
 - `options` : les [options](#options) ci-dessous, toutes facultatives.
 - `mode` et `aggregate` : ce que passent `selectOne()`, `count()` et les autres ; voir [`SelectResultMode`](#SelectResultMode).
+
+Pour ses lignes une à une, comme les lit [`cursor()`](/fr/transaction#cursor), la même requête sans `jsonb_agg` : [`selectRows()`](#selectRows).
 
 <CastPanel example="select">
 
@@ -235,6 +237,38 @@ class NotExactlyOneError extends Error {
 L’erreur avec laquelle `selectExactlyOne()`, le mode `ExactlyOne` de `select()`, est rejetée quand aucune ligne ne correspond. Son `name` est `'NotExactlyOneError'`, son `message` "One result expected but none returned (hint: check `.query.compile()` on this Error)"<!-- message --> ; avec [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), une seconde ligne donne "One result expected but more returned (hint: check `.query.compile()` on this Error)"<!-- message -->.
 
 Sa `query` est le [`SQLFragment`](/fr/sql-template#SQLFragment) exécuté ou, pour une [`.copy()`](/fr/sql-template#copy), celui dont elle est la copie : `err.query.compile()` donne son SQL et ses valeurs. `err instanceof db.NotExactlyOneError` la reconnaît ; pour l’intercepter : [Distinguer une ligne manquante des autres erreurs](/fr/handle-errors#tell-a-missing-row-from-the-others).
+
+## `selectRows()` {#selectRows}
+
+```ts
+db.selectRows(table, where, options?)
+```
+
+À partir de la 6.12.0. La requête que [`select()`](#select) enveloppe dans `jsonb_agg`, en fragment à part entière, une ligne par résultat : pour [`cursor()`](/fr/transaction#cursor), qui exécute exactement le fragment qu’on lui donne, et lit donc un `select()` comme une seule ligne, son tableau entier. Elle prend la `table`, le `where` et les [options](#options) de `select()`, et `.run(pool)` donne ce que donne `select()`, `[]` quand aucune ligne ne correspond.
+
+| Appel | SQL |
+|---|---|
+| `db.selectRows('films', { studio_id: 1000 }, { columns: ['id', 'title'], order: { by: 'title', direction: 'ASC' } })` | `SELECT jsonb_build_object($1::text, "id", $2::text, "title") AS result FROM "films" WHERE ("studio_id" = $3) ORDER BY "title" ASC`<!-- probe: db.selectRows('films', { studio_id: 1000 }, { columns: ['id', 'title'], order: { by: 'title', direction: 'ASC' } }) --> |
+| `db.select(…)`, avec les mêmes arguments | `SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (…) AS "sq_films"`<!-- probe: db.select('films', { studio_id: 1000 }, { columns: ['id', 'title'], order: { by: 'title', direction: 'ASC' } }) -->, la même requête à l’intérieur, avec les mêmes valeurs |
+
+Les films d’un studio, lus 100 à la fois :
+
+<<< ../examples/plain/cursor_select_rows.ts{ts twoslash}
+
+<!-- probe: db.readCommitted(pool, async txnClient => { for await (const _ of db.cursor(txnClient, db.selectRows('films', { studio_id: 1000 }, { columns: ['id', 'title'], order: { by: 'title', direction: 'ASC' } }), { batchSize: 100 })) { } }) -->
+```sql
+START TRANSACTION ISOLATION LEVEL READ COMMITTED
+DECLARE pgcast_cursor_1 NO SCROLL CURSOR FOR SELECT jsonb_build_object($1::text, "id", $2::text, "title") AS result FROM "films" WHERE ("studio_id" = $3) ORDER BY "title" ASC
+FETCH FORWARD 100 FROM pgcast_cursor_1
+-- the same FETCH again, until one returns no row
+CLOSE pgcast_cursor_1
+COMMIT
+```
+
+- Chaque ligne est typée comme `select()` la type. Une seule sous-requête `lateral` est transmise telle que [`selectOne()`](#selectOne) la transmet, comme `pg` parse sa colonne, et typée ainsi : avec [`aggregatesTypedByColumn`](#typed-by-column), un `min()` d’une `date` est un `Date`, là où `select()` donne sa chaîne JSON.
+- Un `lateral` transmis et typé `number` ne compile pas : `count()`, `sum()`, `avg()`, et `min()` ou `max()` sauf typés par colonne, seuls ou dans une union, `cond ? count() : select()`. L’erreur est TS2322 sur `lateral`, `… is not assignable to type 'undefined'.` Leur type est celui de `Number()` ou du JSON, là où `pg` donne un `bigint` ou un `numeric` en chaînes et une `date` en `Date` ([#749](https://github.com/AlexandreDemartin/pgcast/issues/749)). Un template `sql` typé `number` est refusé avec eux, car son type ne se distingue pas du leur. Sous une clé `lateral`, la valeur est du JSON et son type tient : `` db.selectRows('studios', db.all, { lateral: { films: db.count('films', { studio_id: db.parent('id') }) } }) ``<!-- tsc -->. Un `lateral` dont le type est un paramètre de type, objet de sous-requêtes compris, ou un fragment typé par un paramètre de type sans contrainte, `db.SQLFragment<R>`, ne compile pas non plus : `function f<L extends db.SQLFragmentMap>(l: L) { return db.selectRows('studios', db.all, { lateral: l }); }` donne TS2345. Une fonction qui le relaie ainsi appelle `select()`, ou caste, `{ lateral: l as db.SQLFragmentMap }`. Hors du type, en JavaScript, `run()` donne la valeur de `pg`.
+- Un `lock` verrouille chaque ligne quand son batch est lu, pas avant.
+- Imbriquée, c’est un ensemble de lignes, pas une valeur. Un template `sql` la prend, `` db.sql`SELECT count(*) FROM (${db.selectRows('films', db.all)}) AS f` ``<!-- tsc -->, de même que [`withCTEs()`](/fr/sql-template#withCTEs) et `cursor()`. Comme `lateral`, valeur d’`extras`, `where` ou valeur Whereable d’une colonne typée, elle ne compile pas : son type, un [`RowsQuery`](#RowsQuery), le dit. Son type la prend comme `order.by`, et comme valeur Whereable d’une colonne typée `any`, où Postgres la refuse. Hors du type, en JavaScript, une clé `lateral` répète la ligne parente une fois par ligne, et une valeur d’`extras` reçoit l’erreur 21000 de Postgres.
 
 ## `count()` {#count}
 
@@ -524,6 +558,18 @@ La signature d’appel de `selectOne()` : `table`, `where`, `options?`, avec le
 ### `SelectExactlyOneSignatures` {#SelectExactlyOneSignatures}
 
 La signature d’appel de `selectExactlyOne()` : `table`, `where`, `options?`, avec le mode `ExactlyOne`. Avec `aggregatesTypedByColumn` déclaré, elle renvoie un `ColumnAggregateFragment` dans le même cas que [`SelectOneSignatures`](#SelectOneSignatures) : une fonction typée `SelectExactlyOneSignatures` renvoie alors ce que renvoie `selectExactlyOne()`.
+
+### `SelectRowsSignatures` {#SelectRowsSignatures}
+
+À partir de la 6.12.0. La signature d’appel de `selectRows()` : `table`, `where`, `options?`, qui renvoie `SQLFragment<R[], RowsQuery>`, `R` étant la ligne telle que `selectOne()` la type.
+
+### `RowsQuery` {#RowsQuery}
+
+```ts
+interface RowsQuery
+```
+
+À partir de la 6.12.0. Le second argument de type du fragment que renvoie `selectRows()`, qui marque une requête de plusieurs lignes : `lateral`, `extras` et un `where` prennent `SQLFragment<any>`, dont le second argument est `never`, et la refusent donc ; un template `sql`, `withCTEs()` et `cursor()` prennent `SQLFragment<any, any>`. Écrivez-le pour typer une variable : `db.SQLFragment<s.films.JSONSelectable[], db.RowsQuery>`. Un helper typé `db.SQLFragment<R>` ou `db.SQLFragment<any>` refuse aussi ce fragment (TS2345) ; typé `db.SQLFragment<R, any>`, il prend les deux : `` const run = <R>(q: db.SQLFragment<R, any>) => q.run(pool); ``<!-- tsc: export … -->.
 
 ### `NumericAggregateSignatures` {#NumericAggregateSignatures}
 

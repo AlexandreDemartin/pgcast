@@ -1865,6 +1865,93 @@ describe('selectOne, selectExactlyOne', () => {
   });
 });
 
+describe('selectRows', () => {
+  it('is the query select() wraps in jsonb_agg, as a fragment of its own', () => {
+    expect(db.selectRows('users', all).compile()).toMatchInlineSnapshot(`
+      {
+        "text": "SELECT to_jsonb("users".*) AS result FROM "users"",
+        "values": [],
+      }
+    `);
+    expect(db.selectRows('users', { mood: 'ok' }, { columns: ['id', 'display_name'], order: { by: 'display_name', direction: 'ASC' }, limit: 50, offset: 10 }).compile()).toMatchInlineSnapshot(`
+      {
+        "text": "SELECT jsonb_build_object($1::text, "id", $2::text, "display_name") AS result FROM "users" WHERE ("mood" = $3) ORDER BY "display_name" ASC LIMIT $4 OFFSET $5",
+        "values": [
+          "id",
+          "display_name",
+          "ok",
+          50,
+          10,
+        ],
+      }
+    `);
+    expect(db.selectRows('accounts', { owner_id: 1 }, { lock: { for: 'UPDATE', wait: 'SKIP LOCKED' } }).compile()).toMatchInlineSnapshot(`
+      {
+        "text": "SELECT to_jsonb("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = $1) FOR UPDATE SKIP LOCKED",
+        "values": [
+          1,
+        ],
+      }
+    `);
+  });
+
+  // each select() text is `SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (` + selectRows()'s + `) AS "sq_<alias>"`
+  const cases: [string, Parameters<typeof db.select>[0], any, any?][] = [
+    ['db.all', 'users', all],
+    ['a Whereable', 'users', { mood: 'ok', manager_id: 1 }],
+    ['a sql filter', 'users', sql`${'id'} > ${param(1)}`],
+    ['columns', 'users', all, { columns: ['id', 'display_name'] }],
+    ['extras', 'users', all, { extras: { n: db.count('accounts', all), name: 'display_name', one: sql`1` } }],
+    ['a lateral map', 'users', all, { lateral: { accounts: db.select('accounts', { owner_id: parent('id') }), one: db.selectOne('accounts', { owner_id: parent('id') }), exactly: db.selectExactlyOne('accounts', { owner_id: parent('id') }), n: db.count('accounts', { owner_id: parent('id') }) } }],
+    ['a lateral passed through', 'users', all, { lateral: db.select('accounts', { owner_id: parent('id') }) }],
+    ['order', 'users', all, { order: [{ by: 'display_name', direction: 'ASC', nulls: 'LAST' }, { by: sql`lower(${'email'})`, direction: 'DESC' }] }],
+    ['limit and offset', 'users', all, { limit: 50, offset: 10 }],
+    ['withTies', 'users', all, { order: { by: 'mood', direction: 'ASC' }, limit: 2, withTies: true }],
+    ['distinct', 'users', all, { distinct: true }],
+    ['distinct on columns', 'users', all, { distinct: ['mood', 'manager_id'], order: { by: 'mood', direction: 'ASC' } }],
+    ['distinct on a fragment', 'users', all, { distinct: sql`lower(${'display_name'})` }],
+    ['groupBy and having', 'accounts', all, { columns: ['owner_id'], groupBy: 'owner_id', having: sql`count(*) > ${param(1)}` }],
+    ['alias', 'users', all, { alias: 'u', columns: ['id'] }],
+    ['an alias with a "', 'users', all, { alias: 'a"b' }],
+    ['lock', 'accounts', { owner_id: 1 }, { lock: { for: 'UPDATE', wait: 'SKIP LOCKED' } }],
+    ['locks of an alias and a table', 'users', all, { alias: 'u', lock: [{ for: 'SHARE', of: 'u' }, { for: 'UPDATE', of: ['accounts'], wait: 'NOWAIT' }] }],
+  ];
+  const aggregated = (rows: db.SQLQuery, alias: string) =>
+    ({ text: `SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (${rows.text}) AS "sq_${alias.replace(/"/g, '""')}"`, values: rows.values });
+
+  it.each(cases)('%s: select() sends the same query, in jsonb_agg', (_, table, where, options) => {
+    expect(db.select(table, where, options).compile()).toEqual(aggregated(db.selectRows(table, where, options).compile(), options?.alias ?? table));
+  });
+
+  it.each(cases)('%s, with selectExactlyOneChecksForSecondRow: select() sends the same query, in jsonb_agg', (_, table, where, options) => {
+    db.setConfig({ selectExactlyOneChecksForSecondRow: true });
+    expect(db.select(table, where, options).compile()).toEqual(aggregated(db.selectRows(table, where, options).compile(), options?.alias ?? table));
+  });
+
+  it('gives one result per row, [] for none, and so does a copy', () => {
+    const rows = db.selectRows('users', all), qr = (results: unknown[]) => ({ rows: results.map(result => ({ result })) }) as any;
+    expect(rows.runResultTransform(qr([{ id: 1 }, { id: 2 }]))).toEqual([{ id: 1 }, { id: 2 }]);
+    expect(rows.runResultTransform(qr([]))).toEqual([]);
+    expect(rows.copy().runResultTransform(qr([{ id: 1 }]))).toEqual([{ id: 1 }]);
+  });
+
+  it('prepared() and parentTable work as on any fragment', () => {
+    expect(db.selectRows('users', all).prepared('users_rows').compile()).toEqual({ text: 'SELECT to_jsonb("users".*) AS result FROM "users"', values: [], name: 'users_rows' });
+    expect(db.selectRows('accounts', { owner_id: parent('id') }).copy({ parentTable: 'users' }).compile().text)
+      .toBe('SELECT to_jsonb("accounts".*) AS result FROM "accounts" WHERE ("owner_id" = "users"."id")');
+  });
+
+  it('from JavaScript, a missing where is db.all and null options are none, as in select()', () => {
+    expect((db.selectRows as any)('users').compile()).toEqual(db.selectRows('users', all).compile());
+    expect(db.selectRows('users', all, null as any).compile()).toEqual(db.selectRows('users', all).compile());
+  });
+
+  it('adds no member to SelectResultMode', () => {
+    expect(Object.keys(db.SelectResultMode)).toEqual(['0', '1', '2', '3', 'Many', 'One', 'ExactlyOne', 'Numeric']);
+  });
+});
+
+
 describe('count, sum, avg, min, max', () => {
   it('count without columns: count(*)', () => {
     expect(db.count('users', all).compile()).toMatchInlineSnapshot(`

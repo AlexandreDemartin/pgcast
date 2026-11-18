@@ -17,8 +17,8 @@ const t = useTestDatabase();
 afterEach(resetConfig);
 
 // runtime behaviour only: the types (stub schema here) are step 1.4's
-const run = (q: db.SQLFragment<any>): Promise<any> => q.run(t.client);
-const fails = (q: db.SQLFragment<any>) => pgError(t.client, () => q.run(t.client));
+const run = (q: db.SQLFragment<any, any>): Promise<any> => q.run(t.client);
+const fails = (q: db.SQLFragment<any, any>) => pgError(t.client, () => q.run(t.client));
 const scalar = async (text: string) => (await t.client.query(text)).rows[0].v;
 /** RETURNING without ORDER BY gives no order: rows sorted by `key` before comparing. */
 const sortBy = <R extends Record<string, any>>(rows: R[], key: keyof R) =>
@@ -916,6 +916,82 @@ describe('select', () => {
     expect(await run(db.select('users', { id: 1 }, {
       columns: ['id'], lateral: { n: db.count('accounts', { owner_id: parent('id') }) }, lock: { for: 'UPDATE', of: 'users' },
     }))).toEqual([{ id: 1, n: 2 }]);
+  });
+});
+
+describe('selectRows', () => {
+  const byId = { by: 'id', direction: 'ASC' } as const;
+  const cases: [string, any, any, any?][] = [
+    ['db.all', 'users', all, { order: byId }],
+    ['a Whereable', 'users', { manager_id: 1 }, { order: byId }],
+    ['a sql filter', 'users', sql`${'id'} > ${param(1)}`, { order: byId }],
+    ['columns', 'users', all, { columns: ['id', 'display_name'], order: byId }],
+    ['extras', 'users', all, { columns: ['id'], extras: { n: db.count('accounts', all), name: 'display_name', upper: sql`upper(${'display_name'})` }, order: byId }],
+    ['a lateral map', 'users', all, { columns: ['id'], lateral: { accounts: db.select('accounts', { owner_id: parent('id') }, { columns: ['balance'], order: byId }), n: db.count('accounts', { owner_id: parent('id') }) }, order: byId }],
+    ['a select() passed through', 'users', all, { lateral: db.select('accounts', { owner_id: parent('id') }, { columns: ['id'], order: byId }), order: byId }],
+    ['a selectOne() passed through', 'users', all, { lateral: db.selectOne('accounts', { owner_id: parent('id') }, { columns: ['id'], order: byId }), order: byId }],
+    ['limit and offset', 'users', all, { order: byId, limit: 1, offset: 1 }],
+    ['withTies', 'accounts', all, { columns: ['owner_id'], order: { by: 'owner_id', direction: 'ASC' }, limit: 1, withTies: true }],
+    ['distinct', 'accounts', all, { columns: ['owner_id'], distinct: true }],  // no ORDER BY with DISTINCT but on its columns (42P10)
+    ['distinct on columns', 'accounts', all, { columns: ['owner_id'], distinct: ['owner_id'], order: { by: 'owner_id', direction: 'ASC' } }],
+    ['groupBy and having', 'accounts', all, { columns: ['owner_id'], groupBy: 'owner_id', having: sql`count(*) > ${param(1)}` }],
+    ['alias', 'users', all, { alias: 'u', columns: ['id'], order: { by: sql`${'u.id'}`, direction: 'DESC' } }],
+    ['lock', 'accounts', { owner_id: 1 }, { columns: ['id'], order: byId, lock: { for: 'UPDATE', wait: 'NOWAIT' } }],
+    ['no row', 'users', { id: -1 }],
+  ];
+
+  it.each(cases)('%s: run() gives what select() gives', async (_, table, where, options) => {
+    const
+      rows = await run(db.selectRows(table, where, options)), selected = await run(db.select(table, where, options)),
+      sorted = (r: unknown[]) => options?.order ? r : [...r].sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+    expect(sorted(rows)).toEqual(sorted(selected));
+    expect(rows.length > 0).toBe(where?.id !== -1);
+  });
+
+  it('a count() passed through comes as pg parses its bigint, a string, as selectOne() passes it, where select() reads it from JSON', async () => {
+    // past the type, which refuses a lateral typed number (#749)
+    const options = { lateral: db.count('accounts', { owner_id: parent('id') }) as any, order: byId } as const;
+    expect(await run(db.selectRows('users', all, options))).toEqual(['2', '1', '0']);
+    expect(await run(db.selectOne('users', { id: 1 }, options))).toBe('2');
+    expect(await run(db.select('users', all, options))).toEqual([2, 1, 0]);
+  });
+
+  it.each([{}, { aggregatesTypedByColumn: true }])('each lateral passed through comes as pg parses its column, under %j, where select() reads it from JSON', async config => {
+    db.setConfig(config);
+    const
+      p = parent('id'), firstEvent = new Date(2025, 5, 1), at = new Date('2025-06-01T12:00:00Z'),
+      // the lateral, what selectRows() gives for users 1, 2 and 3, and what select() gives
+      laterals: [string, db.SQLFragment<any>, unknown[], unknown[]][] = [
+        ['count()', db.count('accounts', { owner_id: p }), ['2', '1', '0'], [2, 1, 0]],
+        ['sum() of a numeric', db.sum('accounts', { owner_id: p }, { columns: ['balance'] }), ['1520.50', '0.00', null], [1520.5, 0, null]],
+        ['avg() of a numeric', db.avg('accounts', { owner_id: p }, { columns: ['balance'] }), ['760.2500000000000000', '0.00000000000000000000', null], [760.25, 0, null]],
+        ['min() of a float8', db.min('accounts', { owner_id: p }, { columns: ['ratio'] }), [0.5, 1.25, null], [0.5, 1.25, null]],
+        ['max() of an int8', db.max('accounts', { owner_id: p }, { columns: ['lifetime_ops'] }), ['9007199254740993', '1', null], [9007199254740992, 1, null]],
+        ['min() of a date', db.min('events', all, { columns: ['occurred_on'] }), [firstEvent, firstEvent, firstEvent], ['2025-06-01', '2025-06-01', '2025-06-01']],
+        ['a sql template of an int8', sql`SELECT 7::int8 AS result`, ['7', '7', '7'], [7, 7, 7]],
+        ['a sql template of a timestamptz', sql`SELECT ${param(at)}::timestamptz AS result`, [at, at, at], [expect.any(String), expect.any(String), expect.any(String)]],
+      ];
+    for (const [name, lateral, rows, selected] of laterals) {
+      const options = { lateral: lateral as any, order: byId };
+      expect([name, await run(db.selectRows('users', all, options))]).toEqual([name, rows]);
+      expect([name, await run(db.select('users', all, options))]).toEqual([name, selected]);
+    }
+  });
+
+  it('past the type, from JavaScript: a lateral key repeats the parent row once per row, and an extras value gets 21000', async () => {
+    const accounts = db.selectRows('accounts', { owner_id: parent('id') }, { columns: ['id'], order: byId });
+    expect(await run(db.select('users', { id: 1 }, { columns: ['id'], lateral: { accounts } as any }))).toEqual([{ id: 1, accounts: { id: 1 } }, { id: 1, accounts: { id: 2 } }]);
+    expect((await fails(db.select('users', { id: 1 }, { columns: ['id'], extras: { accounts: db.selectRows('accounts', all) } as any }))).code).toBe('21000');
+  });
+
+  it('as order.by, or the Whereable value of a column typed any, which its type takes, Postgres refuses it', async () => {
+    const accounts = db.selectRows('accounts', all, { columns: ['id'] });
+    expect((await fails(db.select('users', all, { order: { by: accounts, direction: 'ASC' } }))).code).toBe('42601');
+    expect((await fails(db.select('users', { home: accounts }))).code).toBe('42804');
+  });
+
+  it('nested in a sql template, it is a set of rows', async () => {
+    expect((await t.client.query(sql`SELECT count(*)::int AS n FROM (${db.selectRows('users', all)}) AS u`.compile())).rows).toEqual([{ n: 3 }]);
   });
 });
 

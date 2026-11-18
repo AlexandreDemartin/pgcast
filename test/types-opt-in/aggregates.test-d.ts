@@ -85,6 +85,51 @@ describe('with aggregatesTypedByColumn declared', () => {
     one.run(pool).then((d): db.DateString | null | undefined => d);
   });
 
+  test('passed through by selectRows(): each row typed as selectOne() types its row, not as select() does', () => {
+    const mapOfSelect = () => db.select('users', db.all, { columns: ['id'], lateral: { earliest: db.min('events', db.all, { columns: ['occurred_on'] }) } });
+    // selectRows() is select()'s query without jsonb_agg(): each row hands the passed-through column over as pg parses it
+    const earliest = db.min('events', db.all, { columns: ['occurred_on'] });
+    const rows = db.selectRows('users', db.all, { lateral: earliest });
+    expectTypeOf(rows.run(pool)).resolves.toEqualTypeOf<(Date | null)[]>();
+    const one = db.selectOne('users', db.all, { lateral: earliest });
+    expectTypeOf(rows.run(pool)).resolves.toEqualTypeOf<Exclude<Run<typeof one>, undefined>[]>();
+    expectTypeOf(db.selectRows('users', db.all, { lateral: db.max('accounts', db.all, { columns: ['balance'] }) }).run(pool))
+      .resolves.toEqualTypeOf<(db.NumericString | null)[]>();
+    expectTypeOf(rows.run(pool)).resolves.not.toBeAny();
+    // @ts-expect-error passed through selectRows(), a date comes as a Date, not the string select() gives
+    rows.run(pool).then((d): (db.DateString | null)[] => d);
+    // a lateral map is JSON, as in select()
+    const map = db.selectRows('users', db.all, { columns: ['id'], lateral: { earliest } });
+    expectTypeOf(map.run(pool)).resolves.toEqualTypeOf<Run<typeof map>>();
+    expectTypeOf<Run<typeof map>>().toEqualTypeOf<Run<ReturnType<typeof mapOfSelect>>>();
+    expectTypeOf<Run<typeof map>[number]['earliest']>().toEqualTypeOf<db.DateString | null>();
+  });
+
+  test('passed through by selectRows(): min() and max() typed by column; a lateral typed number refused (#749)', () => {
+    const p = db.parent('id');
+    expectTypeOf(db.selectRows('users', db.all, { lateral: db.min('accounts', { owner_id: p }, { columns: ['ratio'] }) }).run(pool))
+      .resolves.toEqualTypeOf<(number | null)[]>();
+    expectTypeOf(db.selectRows('users', db.all, { lateral: db.max('accounts', { owner_id: p }, { columns: ['lifetime_ops'] }) }).run(pool))
+      .resolves.toEqualTypeOf<(db.Int8String | null)[]>();
+    expectTypeOf(db.selectRows('users', db.all, { lateral: db.max('accounts', { owner_id: p }, { columns: ['opened_on'] }) }).run(pool))
+      .resolves.toEqualTypeOf<(Date | null)[]>();
+    // a selectOne() passing a typed min() through keeps its brand, and its column comes as pg parses it
+    expectTypeOf(db.selectRows('users', db.all, { lateral: db.selectOne('accounts', { owner_id: p }, { lateral: db.min('events', db.all, { columns: ['occurred_on'] }) }) }).run(pool))
+      .resolves.toEqualTypeOf<(Date | null)[]>();
+    expectTypeOf(db.selectRows('users', db.all, { lateral: db.sql<db.SQL, db.Int8String>`SELECT 7::int8 AS result` }).run(pool))
+      .resolves.toEqualTypeOf<db.Int8String[]>();
+    expectTypeOf(db.selectRows('users', db.all, { lateral: db.sql<db.SQL, Date>`SELECT now() AS result` }).run(pool))
+      .resolves.toEqualTypeOf<Date[]>();
+    // @ts-expect-error count() passed through: pg gives its bigint as a string
+    db.selectRows('users', db.all, { lateral: db.count('accounts', { owner_id: p }) });
+    // @ts-expect-error sum() passed through, typed number | null: pg gives a numeric as a string
+    db.selectRows('users', db.all, { lateral: db.sum('accounts', { owner_id: p }, { columns: ['balance'] }) });
+    // @ts-expect-error avg() passed through, typed number | null: pg gives a numeric as a string
+    db.selectRows('users', db.all, { lateral: db.avg('accounts', { owner_id: p }, { columns: ['balance'] }) });
+    // @ts-expect-error a sql template typed number: the type cannot tell it from count()
+    db.selectRows('users', db.all, { lateral: db.sql<db.SQL, number>`SELECT 7::int8 AS result` });
+  });
+
   test('passed through a selectOne() or selectExactlyOne() nested in a lateral or as an extra: the JSONSelectable type, or null', () => {
     // nested in turn, the passed-through column comes back as JSON, as a min() or max() nested directly does
     const earliest = db.min('events', db.all, { columns: ['occurred_on'] });

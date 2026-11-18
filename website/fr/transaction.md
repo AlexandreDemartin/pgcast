@@ -1,5 +1,5 @@
 ---
-english: 14982bfbd8e7
+english: cf6cce12fd8a
 ---
 
 # Transactions
@@ -429,7 +429,7 @@ db.cursor(txnClient, query, { batchSize })
 À partir de la 6.12.0. Lit les lignes de `query` par un curseur côté serveur, `batchSize` à la fois, et produit chaque batch tel que `query.run()` donnerait ces lignes. Elle renvoie un générateur asynchrone, pour `for await`, et n’envoie rien avant que le premier batch soit demandé ([`DECLARE`](https://www.postgresql.org/docs/current/sql-declare.html)).
 
 - `txnClient` : le client d’une transaction : un [`TxnClient`](#TxnClient), le [`TxnClientLike`](#TxnClientLike) du pool d’un autre driver, ou un `pg.PoolClient` sur lequel vous avez envoyé `BEGIN`. Un pool, un `pg.Client` ou un [`QueryableLike`](/fr/sql-template#QueryableLike) ne compile pas.
-- `query` : un fragment dont le résultat est un tableau de lignes : un template `sql`, typé `s.films.Selectable[]`, ou `any[]` par défaut, ou un [`select()`](/fr/select#select). Un batch a ce type, `readonly` compris. `selectOne()`, `selectExactlyOne()`, `count()` et les autres agrégats, dont le résultat n’est pas un tableau, ne compilent pas.
+- `query` : un fragment dont le résultat est un tableau de lignes : un template `sql`, typé `s.films.Selectable[]`, ou `any[]` par défaut, un [`select()`](/fr/select#select) ou un [`selectRows()`](/fr/select#selectRows). Un batch a ce type, `readonly` compris. `selectOne()`, `selectExactlyOne()`, `count()` et les autres agrégats, dont le résultat n’est pas un tableau, ne compilent pas.
 - `batchSize` : les lignes que lit chaque `FETCH`, un entier de 1 à 2147483647. Il n’y a pas de valeur par défaut : aucune taille ne convient à toutes les largeurs de ligne.
 
 Les films d’un studio, lus 100 à la fois :
@@ -448,7 +448,7 @@ CLOSE pgcast_cursor_1
 COMMIT
 ```
 
-- Après `CURSOR FOR` vient le texte du fragment lui-même, avec ses valeurs, comme un template `sql` imbrique un fragment. Un `select()` passé tel quel envoie sa requête `jsonb_agg` : il est donc lu en un seul batch, le tableau entier, comme le dit son type.
+- Après `CURSOR FOR` vient le texte du fragment lui-même, avec ses valeurs, comme un template `sql` imbrique un fragment. Un `select()` passé tel quel envoie sa requête `jsonb_agg` : il est donc lu en un seul batch, le tableau entier, comme le dit son type. Pour ses lignes une à une, typées comme `select()` les type, donnez [`selectRows()`](/fr/select#selectRows), la même requête sans `jsonb_agg`.
 - `pgcast_cursor_<n>` prend le plus petit numéro qu’aucun autre `cursor()` encore en cours sur ce client ne détient : des boucles imbriquées obtiennent 1, puis 2 ; une boucle après une autre obtient de nouveau 1 ; deux en même temps obtiennent deux noms. Ne donnez pas à l’un de vos curseurs un nom de la forme `pgcast_cursor_<n>`.
 - `NO SCROLL` : le curseur ne lit qu’en avant. Sans lui, savoir si Postgres peut lire en arrière dépendrait du plan. C’est aussi la forme qu’exige une requête `FOR UPDATE`, dont les lignes sont verrouillées à mesure que chaque batch est lu, pas avant.
 - Postgres n’accepte pas de paramètre dans `FETCH FORWARD` : la taille est donc écrite dans le SQL, une fois vérifiée.
