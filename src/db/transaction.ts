@@ -394,11 +394,12 @@ export async function serializableRODeferrable<T, C = unknown>(txnClientOrQuerya
  * a query of yours, write `pg_advisory_xact_lock(${db.param(…)})` in `sql`.
  *
  * It rejects before any query when given a key that is neither a `bigint` nor
- * an array of two numbers (Postgres takes no lock on a `NULL`), or a client that
- * `pg` reports outside a transaction block, where Postgres would release the
- * lock as soon as it is taken. That status is the last one `pg` received, so a
- * client whose `COMMIT` of your own `BEGIN` just failed can still read as inside
- * a block; one that reports no status (another driver, `pg` before 8.21) runs.
+ * an array of two numbers (Postgres takes no lock on a `NULL`), a `pg.Pool`, or
+ * a client that `pg` reports outside a transaction block, where Postgres would
+ * release the lock as soon as it is taken. That status is the one of the last
+ * query answered: a query not yet answered, such as a `BEGIN` you did not await,
+ * is not counted. A client that reports no status (another driver, `pg` before
+ * 8.21) runs.
  * @param txnClient The client of a transaction: a `transaction()` callback's,
  * of any driver, or a `pg.PoolClient` you sent `BEGIN` on
  * @param key A `bigint`, or a pair of 32-bit integers
@@ -417,6 +418,7 @@ export async function advisoryXactLock(
           undefined;
 
   if (!query) throw new Error('advisoryXactLock() was given a key that is neither a bigint nor an array of two numbers, so Postgres would take no lock: give a bigint, BigInt(42), or a pair of integers, [1, 42]');
+  if (txnClient instanceof pg.Pool) throw new Error('advisoryXactLock() was given a pg.Pool, which runs each query on a client outside a transaction block, so Postgres would release the lock as soon as it is taken: call it on the client of a transaction(), or after a BEGIN of yours');
   if (transactionStatus(txnClient as pg.ClientBase) === 'I') throw new Error('advisoryXactLock() was given a client outside a transaction block, so Postgres would release the lock as soon as it is taken: call it on the client of a transaction(), or after a BEGIN of yours');
 
   await query.run(txnClient);
