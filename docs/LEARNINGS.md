@@ -191,6 +191,24 @@ Candidates for a check, a rule or a skill line.
 - #746 — A name-binding rule over imports compares the imported name (`ImportSpecifier.propertyName`) as well as the local one, and skips type-only imports: `import { raw as param }` compiles — branch-reviewer
 - #746 — A scanner of tagged templates reads the cooked strings (`head.text`, `literal.text`) the tag receives, not `getText()`: an escape such as `\x4c` makes a keyword appear only at run time — branch-reviewer
 - #746 — A binding rule pins `<ns>.sql` to exactly one level: a `head()` that walks down a property chain lets `db.x.sql` pass — builder
+- #744 plan — A `.d.ts` copied outside the checkout loses `pg`'s resolution (a TS2345 on 4.1 unrelated to the change): put a `node_modules` link beside such copies — builder
+- #744 plan — A probe log that prints strings without quotes shows `"2"` as `2`: use `JSON.stringify` for a value whose type matters — builder
+- #750 — Narrowing `SQLFragment`'s `Constraint` catches test helpers too: any helper a new branded fragment passes through takes `SQLFragment<any, any>` — builder
+- #750 — `test/types-opt-in` is compiled by `tsc`, not Vitest, so its tests never show in the count: check it by breaking one assertion on purpose — builder
+- #750 — A mutant's `test:types` writes the shared `node_modules/.cache/pgcast` through the `node_modules` link: rerun it on the real source afterwards — builder
+- #750 — When a row type is borrowed from another mode, replay every kind of passed-through lateral under every config before validating it: the plan replayed `count()` and `min()` only, and `sum()`/`avg()` went to the docs wrong — branch-reviewer
+- #750 — A phantom brand in `SQLFragment`'s second type argument rejects the consumer's own `<R>(q: SQLFragment<R>)` helpers: put one in the type grid and give the `SQLFragment<R, any>` fix in the docs — branch-reviewer
+- #750 — When a shortcut's body moves behind a new function, a differential harness over the two built `dist/` trees (compile, runResultTransform, fields, every mode × option × config) is a cheap byte-for-byte proof: 45,360 cases in a second — branch-reviewer
+- #750 — An option-intersection refusal (`options?: X & Cond<L>`) does not disturb the inference of `L` on 4.1.6, 5.9 or 7: a cheap way to refuse one shape of an inferred option — builder
+- #750 — TS 4.1.6 gets `[G<L>] extends [never]` wrong when `G` is a distributive conditional (resolves as never when it is `true`); test "no member matched" as `true extends G<L>` — branch-reviewer
+- #750 — A refusal written as `[L] extends [SQLFragment<infer R>]` merges a union `L`'s members into one `R`; when the wrong type comes from one member, test each member with a distributive conditional — branch-reviewer
+- #750 — A type-level refusal by intersection (`options & X<L>`) refuses a generic forwarder whose `L` is a type parameter; a docs claim "stays accepted" names that condition — branch-reviewer
+- #750 — Run a type claim through the verifier's grid with your own `dist` swapped into its `paths`, plus a probe file with no `@ts-expect-error`: three compilers at once, and the exact error text to quote in the docs — builder
+- #750 — A grid copied from a removed worktree needs its `typeRoots` and `pg` paths pointed at a live `node_modules` — builder
+- #750 — When a union fails against a non-union type, TypeScript explains the first member in its internal type order, which varies by program and compiler; quote only the error's first line, never the line explaining one member — branch-reviewer
+- #750 — A per-member check of a union sees only what subtype reduction leaves: `cond ? sql<SQL, any> : count()` is already `SQLFragment<any>`, so a negative test can refuse only a union whose members survive the reduction — branch-reviewer
+- #750 — Probe a wording a review prescribes for a type rule before it goes in: "contains a type parameter" was false for `SQLFragment<R[]>`, and a constrained `R` compiles on 5.9 and 7 but not on 4.1 — builder
+- #750 — When docs widen a claim to a new case, recheck the workaround next to it for that case: the cast to `SQLFragmentMap` stopped fitting `SQLFragment<R>` — branch-reviewer
 
 ## Minors kept
 
@@ -214,4 +232,4 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #741 — `website/transaction.md:398` and `src/db/transaction.ts:543` "a savepoint taken before it": "taken before the setting", as the FR « pris avant ce réglage » — branch-reviewer
 - #748 — cursor(): a `COMMIT` of yours that fails and is caught inside the loop leaves `T` for a moment, so a `break` can reject with CLOSE's 34000 (1/40 direct, 20/20 through a chunk-splitting proxy); drop CLOSE's 34000 too, or name the case in the `I` row of `website/transaction.md:467` — branch-reviewer
 - #748 — `website/transaction.md:466` (FR `:470`) "a `break` after an error the loop caught ends the loop": add that the transaction stays aborted, so `COMMIT` gets `ROLLBACK` (`PGCAST_DEP003`, or a rejection under `transactionRequiresCommit`), link to `:62` — branch-reviewer
-
+- #750 — website/select.md:265 (and FR :269): the cast shown, `l as db.SQLFragmentMap`, fits the map forwarder only; for a `db.SQLFragment<R>` forwarder the cast is `l as db.SQLFragment<any>` (TS2352 otherwise) — branch-reviewer
