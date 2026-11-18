@@ -998,6 +998,8 @@ describe('QueryableLike: what run() takes (#695)', () => {
     q.run({ query: () => ({ rows: [] }) });
     // @ts-expect-error nothing to query
     q.run({});
+    // @ts-expect-error a query() that needs more than run() sends: a name, which an unprepared fragment has not
+    q.run({ query: async (query: { text: string; values: any[]; name: string }) => ({ rows: [query.name.toUpperCase()] }) });
     // @ts-expect-error transaction() still takes pg's pools and clients only: run time calls connect() (#696)
     void db.serializable(fake, async () => 1);
   });
