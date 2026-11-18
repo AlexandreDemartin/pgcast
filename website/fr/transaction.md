@@ -1,10 +1,10 @@
 ---
-english: 18d4deb83bbf
+english: d21069941bcb
 ---
 
 # Transactions
 
-`transaction()` et ses sept raccourcis, un par niveau d’isolation : le SQL qu’ils envoient, leurs retries et les types du client qu’ils donnent. Puis les erreurs : `isDatabaseError()` pour celles de Postgres, et celles que pgcast lève avant toute requête.
+`transaction()` et ses sept raccourcis, un par niveau d’isolation : le SQL qu’ils envoient, leurs retries et les types du client qu’ils donnent. `savepoint()`, pour une unité de travail qui peut échouer seule dans une transaction. Puis les erreurs : `isDatabaseError()` pour celles de Postgres, et celles que pgcast lève avant toute requête.
 {.lede}
 
 <AtAGlance>
@@ -62,7 +62,7 @@ Les deux `count()` s’exécutent sur `client`, hors de la transaction : après
 | `START TRANSACTION`, le callback ou `COMMIT` est rejeté | `ROLLBACK`<!-- probe: db.serializable(pool, async () => { throw new Error(); }) -->, puis un retry ou le rejet |
 
 - Ces trois-là s’exécutent sur le client de la transaction, comme les requêtes du callback. Chacune passe par [`queryListener`](/fr/runtime-config#Config.queryListener) et [`resultListener`](/fr/runtime-config#Config.resultListener) avec l’id de la transaction : un compteur à partir de 0, un par transaction ouverte, conservé d’une tentative à l’autre ; une transaction transmise garde celui de la transaction extérieure.
-- Pas de `SAVEPOINT` : une transaction dans une autre est la transaction extérieure ([Transmettre une transaction](#passing-a-transaction-through)).
+- Pas de `SAVEPOINT` : une transaction dans une autre est la transaction extérieure ([Transmettre une transaction](#passing-a-transaction-through)). Pour imbriquer une unité de travail qui peut échouer seule : [`savepoint()`](#savepoint).
 - Après une erreur de requête que le callback intercepte, Postgres répond au `COMMIT` par `ROLLBACK`, pas par une erreur, et rien n’est enregistré. `transaction()` se résout, comme dans Zapatos 6.6.1, et avertit une fois (`PGCAST_DEP003`) ; avec [`transactionRequiresCommit`](/fr/runtime-config#Config.transactionRequiresCommit), elle est rejetée.
 - Avec un client sur lequel vous avez envoyé `BEGIN`, elle termine votre transaction, à moins qu’avec [`transactionRequiresIdleClient`](/fr/runtime-config#Config.transactionRequiresIdleClient) elle ne soit rejetée avant ([Votre propre `BEGIN`](#your-own-begin)).
 
@@ -264,6 +264,56 @@ COMMIT
 ```
 
 Le SQL de chaque requête : [`count()`](/fr/select#count). Les autres raccourcis en lecture seule envoient la même chose, avec leur niveau ; dans [`readCommittedRO()`](#readCommittedRO), chaque requête lit son propre instantané, donc une réservation commitée entre les deux comptages figure dans le second.
+
+## `savepoint()` {#savepoint}
+
+```ts
+db.savepoint(txnClient, callback)
+```
+
+Exécute `callback` dans un savepoint de la transaction où se trouve `txnClient`. Elle renvoie une promesse de la valeur en laquelle `callback` se résout.
+
+- `txnClient` : le client d’une transaction : un [`TxnClient`](#TxnClient), le [`TxnClientLike`](#TxnClientLike) du pool d’un autre driver, ou un `pg.PoolClient` sur lequel vous avez envoyé `BEGIN`. Un pool, un `pg.Client` ou un [`QueryableLike`](/fr/sql-template#QueryableLike) ne compile pas.
+- `callback` : `async spClient => …`, qui reçoit ce même client, typé tel quel : dans `db.serializable()`, un [`TxnClientForSerializable`](#TxnClientForSerializable). Un callback typé pour un niveau que le client ne satisfait pas ne compile pas ([`IsolationSatisfying`](#IsolationSatisfying)).
+
+Une cliente réserve trois sièges et passe celui qui est déjà pris ; les autres sont réservés dans une seule transaction :
+
+<<< ../examples/plain/savepoint_seat.ts{ts twoslash}
+
+`booked` vaut `['K1', 'K3']`. Chaque siège envoie :
+
+<!-- probe: db.savepoint(pool, async () => {}).then(() => db.savepoint(pool, async () => { throw new Error(); })) -->
+```sql
+-- K1 and K3
+SAVEPOINT pgcast_savepoint_1
+-- the callback's insert()
+RELEASE SAVEPOINT pgcast_savepoint_1
+-- K2
+SAVEPOINT pgcast_savepoint_1
+-- the callback's insert(), which Postgres refuses with 23505
+ROLLBACK TO SAVEPOINT pgcast_savepoint_1
+RELEASE SAVEPOINT pgcast_savepoint_1
+```
+
+Le SQL de la requête du callback : [`insert()`](/fr/insert#insert).
+
+| Quand | SQL |
+|---|---|
+| avant le callback | `SAVEPOINT pgcast_savepoint_1`<!-- probe: db.savepoint(pool, async () => {}) --> |
+| le callback se résout | `RELEASE SAVEPOINT pgcast_savepoint_1`<!-- probe: db.savepoint(pool, async () => {}) --> |
+| le callback ou ce `RELEASE` est rejeté | `ROLLBACK TO SAVEPOINT pgcast_savepoint_1`<!-- probe: db.savepoint(pool, async () => { throw new Error(); }) -->, puis `RELEASE SAVEPOINT pgcast_savepoint_1`<!-- probe: db.savepoint(pool, async () => { throw new Error(); }) -->, puis elle est rejetée avec cette erreur |
+| ce `ROLLBACK TO` ou ce `RELEASE` est rejeté | rien de plus : elle est rejetée avec son erreur, à la place de la première, comme `transaction()` quand son `ROLLBACK` est rejeté |
+| elle est rejetée avec 40001 ou 40P01 | rien de plus : elle est rejetée avec cette erreur |
+
+- Le nom se termine par la profondeur du savepoint : `pgcast_savepoint_1` directement dans la transaction, `pgcast_savepoint_2` à l’intérieur de celui-ci, et ainsi de suite, le même texte à chaque appel à une même profondeur. `ROLLBACK TO` et `RELEASE` suppriment aussi tous les savepoints établis après le leur, donc les savepoints s’imbriquent : chaque échec annule le travail de son propre niveau, niveaux intérieurs compris, quoi qu’ils aient laissé. Ne donnez pas un tel nom à l’un de vos savepoints.
+- Sur 40001 ou 40P01, la transaction reste en échec : son `COMMIT` ne peut pas en enregistrer la moitié. `transaction()` l’annule et exécute de nouveau tout son callback, savepoint compris ([Retries](#retries)). Un savepoint ne réessaie jamais de lui-même : seule une nouvelle transaction obtient un nouvel instantané.
+- Un callback qui intercepte l’erreur d’une requête et se termine : Postgres refuse le `RELEASE` (25P02), donc `savepoint()` annule jusqu’au savepoint et est rejetée avec ce 25P02. Son travail est annulé, niveaux intérieurs compris, et la transaction peut continuer. Ainsi, un 40001 ou un 40P01 que le callback intercepte n’est pas réessayé à cet endroit. Après un 40P01, ou un 40001 sous `REPEATABLE READ`, le `COMMIT` de la transaction enregistre ce qu’elle a écrit hors de ce savepoint ; après un 40001 sous `SERIALIZABLE`, Postgres peut refuser une requête suivante ou le `COMMIT` avec un nouveau 40001, et `transaction()` réessaie alors celui-ci. Laissez-les remonter, et relancez-les autour de `savepoint()`, comme le fait l’exemple.
+- Les 40001 et 40P01 sont reconnus à leur `code`, comme dans [Retries](#retries). Une telle erreur levée depuis JavaScript, puis interceptée, ne reçoit pas de `ROLLBACK TO` : le travail de son savepoint reste en place, sauf si un niveau extérieur l’annule.
+- Hors d’un bloc de transaction, Postgres refuse le `SAVEPOINT` (25P01) : `savepoint()` est rejetée avec cette erreur, et n’appelle jamais le callback.
+- Un seul à la fois sur un client : attendez chacun avec `await`. Deux en même temps s’imbriquent dans l’ordre de leurs appels : le premier, s’il se termine en premier, supprime le savepoint du second, dont le `RELEASE` échoue alors (3B001), et la transaction passe en échec ; un `ROLLBACK TO` du second annule aussi ce que le premier a écrit après le `SAVEPOINT` du second. Non vérifié.
+- La profondeur est comptée par objet client, par chaque copie de pgcast installée : un objet wrapper ou un `Proxy` du client repart de 1, tout comme, avec deux copies, par exemple deux versions dans `node_modules`, un savepoint de l’une placé dans un savepoint de l’autre. Le savepoint intérieur prend alors le nom de l’extérieur, et son 40001 intercepté par le callback extérieur laisse en place le travail du niveau extérieur.
+- Ses requêtes passent par [`queryListener`](/fr/runtime-config#Config.queryListener) et [`resultListener`](/fr/runtime-config#Config.resultListener) avec l’id de la transaction ; [`transactionListener`](/fr/runtime-config#Config.transactionListener) n’en reçoit rien.
+- Une `transaction()` appelée avec le client du callback d’une `transaction()` est [transmise](#passing-a-transaction-through) : elle n’envoie pas de `SAVEPOINT`. Appelée avec un `pg.PoolClient` sur lequel vous avez envoyé `BEGIN`, elle ne l’est pas ([Votre propre `BEGIN`](#your-own-begin)).
 
 ## Types {#types}
 

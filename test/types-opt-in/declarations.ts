@@ -70,5 +70,6 @@ export const runOfUsers = db.select('users', db.all).run;
 // transaction()'s first parameter, as a library writes them: each type must be one a .d.ts can name (#696)
 type OtherClient = { query: (query: db.SQLQuery) => Promise<{ rows: any[]; command: string }>; release: () => void };
 export const clientOf = (pool: db.PoolLike<OtherClient>) => db.serializable(pool, async txnClient => txnClient);
+export const savepointClientOf = (pool: db.PoolLike<OtherClient>) => db.serializable(pool, txnClient => db.savepoint(txnClient, async spClient => spClient));  // #723
 export const anyPoolClientOf = (pool: db.PoolLike) => db.readCommitted(pool, async txnClient => txnClient);
 export const firstParameterOf = (queryable: Parameters<typeof db.serializable>[0]) => [queryable];

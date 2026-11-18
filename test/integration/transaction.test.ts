@@ -1124,3 +1124,438 @@ describe('the client of a transaction at another level', () => {
     expect(emitWarning).not.toHaveBeenCalled();
   });
 });
+
+describe('savepoint() (#723)', () => {
+  const failed = new Error('the unit of work failed');
+  /** Writes a note in a savepoint, then rejects with `failed`; resolves once the savepoint has rejected. */
+  const writeThenFail = (c: db.TxnClientForSerializable, note: string) =>
+    db.savepoint(c, async sp => { await write(sp, note); throw failed; }).catch((err: unknown) => { expect(err).toBe(failed); });
+
+  it('keeps the rows of a callback that resolves, undoes those of one that rejects, and the outer transaction commits', async () => {
+    const result = await db.serializable(t.pool, async c => {
+      await write(c, 'a outer');
+      const kept = await db.savepoint(c, async sp => { await write(sp, 'b kept'); return 'kept'; });
+      await writeThenFail(c, 'c undone');
+      await write(c, 'd outer');
+      return kept;
+    });
+    expect(result).toBe('kept');
+    expect(await notes()).toEqual(['a outer', 'b kept', 'd outer']);
+  });
+
+  it('three levels nested: each failure undoes only its own level', async () => {
+    await db.serializable(t.pool, async c => {
+      await write(c, '1');
+      await db.savepoint(c, async level1 => {
+        await write(level1, '2');
+        await db.savepoint(level1, async level2 => {
+          await write(level2, '3');
+          await writeThenFail(level2, '4 undone');
+          await write(level2, '5');
+        });
+        await db.savepoint(level1, async level2 => {
+          await write(level2, '6 undone');
+          await db.savepoint(level2, level3 => write(level3, '7 undone'));
+          throw failed;
+        }).catch(() => undefined);
+        await write(level1, '8');
+      });
+      await db.savepoint(c, async level1 => {
+        await write(level1, '9 undone');
+        await db.savepoint(level1, level2 => write(level2, '9 undone too'));
+        await writeThenFail(level1, '10 undone');  // level1's ROLLBACK TO undoes 9 as well
+        throw failed;
+      }).catch(() => undefined);
+    });
+    expect(await notes()).toEqual(['1', '2', '3', '5', '8']);
+  });
+
+  it.each(['40001', '40P01'] as const)('inside serializable(), a %s raised in the savepoint retries the whole callback, only the last attempt committed', async code => {
+    const { messages, txnIds } = listen();
+    let attempts = 0, savepointRuns = 0;
+    const result = await db.serializable(t.pool, async c => {
+      attempts++;
+      await write(c, `outer ${attempts}`);
+      return db.savepoint(c, async sp => {
+        savepointRuns++;
+        await write(sp, `savepoint ${attempts}`);
+        if (attempts < 3) await raise(sp, code);
+        return attempts;
+      });
+    });
+    expect(result).toBe(3);
+    expect(savepointRuns).toBe(3);  // once per attempt
+    expect(await notes()).toEqual(['outer 3', 'savepoint 3']);
+    expect(messages).toEqual([
+      `Transaction rollback (code ${code}) on attempt 1 of 5, retrying in 0ms`,
+      'Retrying transaction, attempt 2 of 5',
+      `Transaction rollback (code ${code}) on attempt 2 of 5, retrying in 0ms`,
+      'Retrying transaction, attempt 3 of 5',
+    ]);
+    expect(txnIds.size).toBe(1);
+  });
+
+  it('names each savepoint by its depth: a 40001 two deep, retried, starts again at 1 on the next attempt', async () => {
+    const { messages } = listen();
+    const names: string[] = [];
+    db.setConfig({ queryListener: q => { if (q.text.startsWith('SAVEPOINT ')) names.push(q.text); } });
+    let attempts = 0;
+    await db.serializable(t.pool, async c => {
+      attempts++;
+      await db.savepoint(c, outer => db.savepoint(outer, async inner => { if (attempts < 2) await raise(inner, '40001'); }));
+      await db.savepoint(c, async () => undefined);
+    });
+    expect(messages).toHaveLength(2);
+    expect(names).toEqual([
+      'SAVEPOINT pgcast_savepoint_1', 'SAVEPOINT pgcast_savepoint_2',
+      'SAVEPOINT pgcast_savepoint_1', 'SAVEPOINT pgcast_savepoint_2', 'SAVEPOINT pgcast_savepoint_1',
+    ]);
+  });
+
+  it('a callback that swallows a query error: rejects with 25P02 after ROLLBACK TO, and the outer transaction commits its own rows', async () => {
+    const queries: string[] = [];
+    db.setConfig({ transactionRequiresCommit: true, queryListener: q => queries.push(q.text) });
+    const result = await db.serializable(t.pool, async c => {
+      await write(c, 'outer');
+      const err = await db.savepoint(c, async sp => {
+        await write(sp, 'undone');
+        await raise(sp, '23505').catch(() => undefined);
+        return 'swallowed';
+      }).catch((e: unknown) => e);
+      expect(db.isDatabaseError(err, 'InvalidTransactionState_InFailedSqlTransaction')).toBe(true);
+      await write(c, 'after');
+      return 'committed';
+    });
+    expect(result).toBe('committed');
+    expect(await notes()).toEqual(['after', 'outer']);
+    expect(queries.slice(2, 8)).toEqual([
+      'SAVEPOINT pgcast_savepoint_1', 'INSERT INTO "txn_probe" ("note") VALUES ($1)', expect.stringMatching(/^DO /),
+      'RELEASE SAVEPOINT pgcast_savepoint_1', 'ROLLBACK TO SAVEPOINT pgcast_savepoint_1', 'RELEASE SAVEPOINT pgcast_savepoint_1',
+    ]);
+  });
+
+  it('a callback that swallows a 40001 loses the retry: the savepoint rejects with 25P02, which is not retried', async () => {
+    const { messages } = listen();
+    let attempts = 0;
+    const err = await db.serializable(t.pool, async c => {
+      attempts++;
+      await write(c, 'lost');
+      return db.savepoint(c, async sp => { await raise(sp, '40001').catch(() => undefined); });
+    }).catch((e: unknown) => e);
+    expect(db.isDatabaseError(err, 'InvalidTransactionState_InFailedSqlTransaction')).toBe(true);
+    expect(attempts).toBe(1);
+    expect(messages).toEqual([]);
+    expect(await notes()).toEqual([]);
+  });
+
+  it('outside a transaction block: rejects with 25P01, and never calls the callback', async () => {
+    const client = await t.pool.connect();
+    try {
+      const callback = vi.fn(async () => 'never');
+      const err = await db.savepoint(client, callback).catch((e: unknown) => e);
+      expect(db.isDatabaseError(err, 'InvalidTransactionState_NoActiveSqlTransaction')).toBe(true);
+      expect(callback).not.toHaveBeenCalled();
+    } finally {
+      client.release();
+    }
+  });
+
+  it.each(['40001', '40P01'] as const)('never retries on its own: in a raw BEGIN, a %s runs the callback once and leaves the transaction aborted', async code => {
+    const client = await t.pool.connect();
+    try {
+      await client.query('BEGIN');
+      let runs = 0;
+      const err = await db.savepoint(client, async sp => { runs++; await raise(sp, code); }).catch((e: unknown) => e);
+      expect((err as { code?: string }).code).toBe(code);
+      expect(runs).toBe(1);
+      expect((await client.query('COMMIT')).command).toBe('ROLLBACK');  // a caught 40001 or 40P01 cannot commit
+    } finally {
+      client.release();
+    }
+  });
+
+  it('gives the callback the same client, its _zapatos and txnId unchanged, and its queries carry that txnId', async () => {
+    const seen: [string, number | undefined][] = [];
+    const messages: string[] = [];
+    db.setConfig({ queryListener: (q, txnId) => seen.push([q.text, txnId]), transactionListener: m => messages.push(m) });
+    await db.serializable(t.pool, async c => {
+      const mark = c._zapatos;
+      await db.savepoint(c, async sp => {
+        expect(sp).toBe(c);
+        expect(sp._zapatos).toBe(mark);
+        await write(sp, 'x');
+      });
+      expect(c._zapatos).toBe(mark);
+      expect(c._zapatos).toEqual({ isolationLevel: IsolationLevel.Serializable, txnId: seen[0][1] });
+    });
+    const txnId = seen[0][1];
+    expect(seen.map(([, id]) => id)).toEqual(seen.map(() => txnId));
+    expect(seen.map(([text]) => text)).toEqual([
+      'START TRANSACTION ISOLATION LEVEL SERIALIZABLE', 'SAVEPOINT pgcast_savepoint_1', 'INSERT INTO "txn_probe" ("note") VALUES ($1)',
+      'RELEASE SAVEPOINT pgcast_savepoint_1', 'COMMIT',
+    ]);
+    expect(messages).toEqual([]);  // transactionListener gets nothing from a savepoint
+  });
+
+  it('a transaction() nested in the savepoint passes through', async () => {
+    const queries: string[] = [];
+    db.setConfig({ queryListener: q => queries.push(q.text) });
+    await db.serializable(t.pool, c => db.savepoint(c, sp => db.serializable(sp, async inner => {
+      expect(inner).toBe(c);
+      await write(inner, 'inner');
+    })));
+    expect(queries).toEqual([
+      'START TRANSACTION ISOLATION LEVEL SERIALIZABLE', 'SAVEPOINT pgcast_savepoint_1', 'INSERT INTO "txn_probe" ("note") VALUES ($1)',
+      'RELEASE SAVEPOINT pgcast_savepoint_1', 'COMMIT',
+    ]);
+    expect(await notes()).toEqual(['inner']);
+  });
+
+  it('with transactionRequiresCommit, an error caught around savepoint() commits the rest', async () => {
+    db.setConfig({ transactionRequiresCommit: true });
+    const result = await db.serializable(t.pool, async c => {
+      await write(c, 'kept');
+      await db.savepoint(c, async sp => { await write(sp, 'duplicate'); await raise(sp, '23505'); }).catch((err: unknown) => {
+        if (!db.isDatabaseError(err, 'IntegrityConstraintViolation_UniqueViolation')) throw err;
+      });
+      return 'committed';
+    });
+    expect(result).toBe('committed');
+    expect(await notes()).toEqual(['kept']);
+  });
+
+  /**
+   * How many of the savepoints `names` are still established: each `RELEASE` tried in a savepoint of its own, rolled
+   * back to on 3B001, the innermost name first, as releasing an outer one releases those inside it.
+   */
+  const established = async (c: db.TxnClientForSerializable, names: string[]) => {
+    let count = 0;
+    for (const name of [...new Set(names)].reverse()) for (;;) {
+      await c.query('SAVEPOINT count_probe');
+      const released = await c.query(`RELEASE SAVEPOINT ${name}`).then(() => true, (err: { code?: string }) => {
+        expect(err.code).toBe('3B001');
+        return false;
+      });
+      if (!released) {
+        await c.query('ROLLBACK TO SAVEPOINT count_probe');
+        await c.query('RELEASE SAVEPOINT count_probe');
+        break;
+      }
+      count++;  // that RELEASE released count_probe too
+    }
+    return count;
+  };
+
+  it.each(['returns', 'rethrows'] as const)('a Postgres 40001 caught by the outer savepoint\'s callback, which %s: the outer work is undone, and no savepoint is left established', async how => {
+    const names: string[] = [];
+    db.setConfig({ transactionRequiresCommit: true, queryListener: q => { const [, name] = /^SAVEPOINT (\S+)$/.exec(q.text) ?? []; if (name) names.push(name); } });
+    const wrapped = new Error('wrapped');
+    let attempts = 0, left: number | undefined;
+    await db.serializable(t.pool, async c => {
+      attempts++;
+      await write(c, 'base');
+      const err = await db.savepoint(c, async outer => {
+        await write(outer, 'outer work');
+        await db.savepoint(outer, inner => raise(inner, '40001')).catch(() => { if (how === 'rethrows') throw wrapped; });
+      }).catch((e: unknown) => e);
+      if (how === 'rethrows') expect(err).toBe(wrapped);
+      else expect(db.isDatabaseError(err, 'InvalidTransactionState_InFailedSqlTransaction')).toBe(true);
+      await write(c, 'after');
+      left = await established(c, names);
+    });
+    expect(await notes()).toEqual(['after', 'base']);
+    expect(names).toEqual(['pgcast_savepoint_1', 'pgcast_savepoint_2']);
+    expect(left).toBe(0);
+    expect(attempts).toBe(1);  // the 40001 was caught: no retry
+  });
+
+  describe('a real conflict, caught in the callback, which returns (not raise())', () => {
+    /** Runs `fn` with two clients of the pool, then `ROLLBACK` on each, a no-op once committed: c2 first, whose locks c1 may wait for. */
+    const twoClients = async <T>(fn: (c1: pg.PoolClient, c2: pg.PoolClient) => Promise<T>) => {
+      const c1 = await t.pool.connect(), c2 = await t.pool.connect();
+      try { return await fn(c1, c2); }
+      finally {
+        for (const c of [c2, c1]) { await c.query('ROLLBACK').catch(() => undefined); c.release(); }
+      }
+    };
+    /** A savepoint whose callback writes `note`, catches that write's error, notes its code, and returns. */
+    const swallowing = (c: pg.PoolClient | db.TxnClientForSerializable, steps: string[], query: string, values: string[]) =>
+      db.savepoint(c, async sp => { await sp.query(query, values).catch((e: { code?: string }) => { steps.push(`in the callback ${e.code}`); }); })
+        .then(() => 'savepoint resolves', (e: { code?: string }) => `savepoint rejects ${e.code}`);
+    /** The write skew of two SERIALIZABLE transactions: each reads a note, then the first inserts and commits. */
+    const skew = async (c1: pg.PoolClient, c2: db.Queryable) => {
+      await c1.query('BEGIN ISOLATION LEVEL SERIALIZABLE');
+      await c1.query(`SELECT note FROM txn_probe WHERE note = 'read by 1'`);
+      await c2.query(`SELECT note FROM txn_probe WHERE note = 'read by 2'`);
+      await c2.query(`INSERT INTO txn_probe (note) VALUES ('outside')`);
+      await c1.query(`INSERT INTO txn_probe (note) VALUES ('other')`);
+      await c1.query('COMMIT');
+    };
+
+    it('SERIALIZABLE, a write skew: 40001 in the savepoint, then Postgres refuses the COMMIT with 40001, and the write outside it is not saved', async () => {
+      const steps: string[] = [];
+      await twoClients(async (c1, c2) => {
+        await c2.query('BEGIN ISOLATION LEVEL SERIALIZABLE');
+        await skew(c1, c2);
+        steps.push(await swallowing(c2, steps, 'INSERT INTO txn_probe (note) VALUES ($1)', ['inside']));
+        steps.push(await c2.query('COMMIT').then(r => `COMMIT ${r.command}`, (e: { code?: string }) => `COMMIT rejects ${e.code}`));
+      });
+      expect(steps).toEqual(['in the callback 40001', 'savepoint rejects 25P02', 'COMMIT rejects 40001']);
+      expect(await notes()).toEqual(['other']);
+    });
+
+    it('inside serializable(), the same write skew: transaction() retries on the COMMIT\'s 40001, and the next attempt commits', async () => {
+      const { messages } = listen();
+      const steps: string[] = [];
+      let attempts = 0;
+      const result = await twoClients(c1 => db.serializable(t.pool, async c2 => {
+        attempts++;
+        if (attempts === 1) await skew(c1, c2);
+        else await write(c2, 'outside');
+        steps.push(await swallowing(c2, steps, 'INSERT INTO txn_probe (note) VALUES ($1)', ['inside']));
+        return attempts;
+      }));
+      expect(result).toBe(2);
+      expect(steps).toEqual(['in the callback 40001', 'savepoint rejects 25P02', 'savepoint resolves']);
+      expect(messages).toEqual(['Transaction rollback (code 40001) on attempt 1 of 5, retrying in 0ms', 'Retrying transaction, attempt 2 of 5']);
+      expect(await notes()).toEqual(['inside', 'other', 'outside']);
+    });
+
+    it('REPEATABLE READ, a concurrent update: 40001 in the savepoint, and the COMMIT saves the write outside it', async () => {
+      await write(t.pool, 'seed');
+      const steps: string[] = [];
+      await twoClients(async (c1, c2) => {
+        await c2.query('BEGIN ISOLATION LEVEL REPEATABLE READ');
+        await c2.query('SELECT note FROM txn_probe');
+        await c2.query(`INSERT INTO txn_probe (note) VALUES ('outside')`);
+        await c1.query(`UPDATE txn_probe SET note = 'updated by 1' WHERE note = 'seed'`);
+        steps.push(await swallowing(c2, steps, `UPDATE txn_probe SET note = $1 WHERE note = 'seed'`, ['updated by 2']));
+        steps.push(await c2.query('COMMIT').then(r => `COMMIT ${r.command}`, (e: { code?: string }) => `COMMIT rejects ${e.code}`));
+      });
+      expect(steps).toEqual(['in the callback 40001', 'savepoint rejects 25P02', 'COMMIT COMMIT']);
+      expect(await notes()).toEqual(['outside', 'updated by 1']);
+    });
+
+    it('a deadlock: 40P01 in the savepoint, and the COMMIT saves the write outside it', async () => {
+      await write(t.pool, 'a');
+      await write(t.pool, 'b');
+      const steps: string[] = [];
+      await twoClients(async (c1, c2) => {
+        await c1.query('BEGIN');
+        await c2.query('BEGIN');
+        await c1.query(`SET LOCAL deadlock_timeout = '10s'`);
+        await c2.query(`SET LOCAL deadlock_timeout = '10ms'`);  // c2 finds the deadlock, and is the one that fails
+        await c2.query(`UPDATE txn_probe SET note = 'a by 2' WHERE note = 'a'`);
+        await c1.query(`UPDATE txn_probe SET note = 'b by 1' WHERE note = 'b'`);
+        const waiting = c1.query(`UPDATE txn_probe SET note = 'a by 1' WHERE note = 'a'`).then(() => undefined, (e: unknown) => e);  // waits for c2's lock
+        steps.push(await swallowing(c2, steps, `UPDATE txn_probe SET note = $1 WHERE note = 'b'`, ['b by 2']));
+        steps.push(await c2.query('COMMIT').then(r => `COMMIT ${r.command}`, (e: { code?: string }) => `COMMIT rejects ${e.code}`));
+        expect(await waiting).toBeUndefined();
+        await c1.query('COMMIT');
+      });
+      expect(steps).toEqual(['in the callback 40P01', 'savepoint rejects 25P02', 'COMMIT COMMIT']);
+      expect(await notes()).toEqual(['a by 2', 'b by 1']);
+    });
+  });
+
+  describe('limitation: two at once on one client, nested in the order they are called', () => {
+    /** Starts two savepoints at once on a raw BEGIN, each writing its note then waiting; `order` ends them; then COMMIT. */
+    const twoAtOnce = async (order: (ends: { first(): Promise<unknown>; second(fail?: boolean): Promise<unknown> }) => Promise<void>) => {
+      const queries: string[] = [];
+      db.setConfig({ queryListener: q => { if (/SAVEPOINT/.test(q.text)) queries.push(q.text); } });
+      const client = await t.pool.connect();
+      try {
+        await client.query('BEGIN');
+        const gate = () => { let open!: () => void; return { wait: new Promise<void>(r => { open = r; }), open: () => open() }; };
+        const [g1, g2] = [gate(), gate()];
+        let failSecond = false;
+        const first = db.savepoint(client, async sp => { await write(sp, 'first'); await g1.wait; }).then(() => 'resolves', (e: { code?: string }) => e.code);
+        const second = db.savepoint(client, async sp => { await write(sp, 'second'); await g2.wait; if (failSecond) throw failed; })
+          .then(() => 'resolves', (e: { code?: string }) => e.code ?? (e === failed ? 'failed' : e));
+        const results: unknown[] = [];
+        await order({
+          first: async () => { g1.open(); results.push(await first); },
+          second: async (fail = false) => { failSecond = fail; g2.open(); results.push(await second); },
+        });
+        results.push((await client.query('COMMIT')).command);
+        await client.query('BEGIN');
+        await db.savepoint(client, async () => undefined);  // back at depth 1 on that client, whichever order they ended in
+        await client.query('ROLLBACK');
+        return { results, queries, committed: await notes() };
+      } finally {
+        client.release();
+      }
+    };
+
+    it('the first, if it ends first, ends the second\'s savepoint: its RELEASE fails (3B001), and the transaction is aborted', async () => {
+      expect(await twoAtOnce(async ends => { await ends.first(); await ends.second(); })).toEqual({
+        results: ['resolves', '3B001', 'ROLLBACK'],
+        queries: [
+          'SAVEPOINT pgcast_savepoint_1', 'SAVEPOINT pgcast_savepoint_2', 'RELEASE SAVEPOINT pgcast_savepoint_1',
+          'RELEASE SAVEPOINT pgcast_savepoint_2', 'ROLLBACK TO SAVEPOINT pgcast_savepoint_2',
+          'SAVEPOINT pgcast_savepoint_1', 'RELEASE SAVEPOINT pgcast_savepoint_1',
+        ],
+        committed: [],
+      });
+    });
+
+    it('the second, if it ends first, resolves on its own, and COMMIT saves both', async () => {
+      expect(await twoAtOnce(async ends => { await ends.second(); await ends.first(); })).toEqual({
+        results: ['resolves', 'resolves', 'COMMIT'],
+        queries: [
+          'SAVEPOINT pgcast_savepoint_1', 'SAVEPOINT pgcast_savepoint_2', 'RELEASE SAVEPOINT pgcast_savepoint_2', 'RELEASE SAVEPOINT pgcast_savepoint_1',
+          'SAVEPOINT pgcast_savepoint_1', 'RELEASE SAVEPOINT pgcast_savepoint_1',
+        ],
+        committed: ['first', 'second'],
+      });
+    });
+
+    it('a ROLLBACK TO of the second also undoes what the first wrote after the second\'s SAVEPOINT, though the first resolves', async () => {
+      expect(await twoAtOnce(async ends => { await ends.second(true); await ends.first(); })).toEqual({
+        results: ['failed', 'resolves', 'COMMIT'],
+        queries: [
+          'SAVEPOINT pgcast_savepoint_1', 'SAVEPOINT pgcast_savepoint_2', 'ROLLBACK TO SAVEPOINT pgcast_savepoint_2',
+          'RELEASE SAVEPOINT pgcast_savepoint_2', 'RELEASE SAVEPOINT pgcast_savepoint_1',
+          'SAVEPOINT pgcast_savepoint_1', 'RELEASE SAVEPOINT pgcast_savepoint_1',
+        ],
+        committed: [],
+      });
+    });
+  });
+
+  it('limitation: a 40001 thrown from JavaScript, caught, leaves the work of its savepoint in, unless an outer level rolls back', async () => {
+    const notFromPostgres = Object.assign(new Error('not from Postgres'), { code: '40001' });
+    const throwsIt = (c: db.TxnClientForSerializable, note: string) =>
+      db.savepoint(c, async sp => { await write(sp, note); throw notFromPostgres; }).catch(() => undefined);
+    await db.serializable(t.pool, async c => {
+      await throwsIt(c, 'kept');
+      await db.savepoint(c, async outer => {
+        await throwsIt(outer, 'kept too');
+      });
+      await db.savepoint(c, async outer => {
+        await throwsIt(outer, 'undone');
+        throw failed;
+      }).catch(() => undefined);
+    });
+    expect(await notes()).toEqual(['kept', 'kept too']);
+  });
+
+  it('limitation: a Proxy of the client counts from 1 again: a 40001 of the inner savepoint, caught one level up, leaves the outer work in', async () => {
+    const names: string[] = [];
+    db.setConfig({ queryListener: q => { const [, name] = /^SAVEPOINT (\S+)$/.exec(q.text) ?? []; if (name) names.push(name); } });
+    let attempts = 0;
+    await db.serializable(t.pool, async c => {
+      attempts++;
+      await write(c, 'base');
+      const err = await db.savepoint(c, async outer => {
+        await write(outer, 'outer work');
+        await db.savepoint(new Proxy(outer, {}), inner => raise(inner, '40001')).catch(() => undefined);
+      }).catch((e: unknown) => e);
+      expect(db.isDatabaseError(err, 'InvalidTransactionState_InFailedSqlTransaction')).toBe(true);
+      await write(c, 'after');
+    });
+    expect(names).toEqual(['pgcast_savepoint_1', 'pgcast_savepoint_1']);  // the outer one's ROLLBACK TO goes back to the inner one
+    expect(await notes()).toEqual(['after', 'base', 'outer work']);
+    expect(attempts).toBe(1);
+  });
+});

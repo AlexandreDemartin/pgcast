@@ -34,6 +34,7 @@ export const readCommitted = mod.readCommitted;
 export const readCommittedRO = mod.readCommittedRO;
 export const repeatableRead = mod.repeatableRead;
 export const repeatableReadRO = mod.repeatableReadRO;
+export const savepoint = mod.savepoint;
 export const select = mod.select;
 export const selectExactlyOne = mod.selectExactlyOne;
 export const selectOne = mod.selectOne;
