@@ -365,3 +365,63 @@ describe('savepoint()', () => {
     void db.savepoint(txn, () => 1);
   });
 });
+
+// #724: advisoryXactLock() takes the client of a transaction, of any driver, and a key that pg_advisory_xact_lock takes
+describe('advisoryXactLock()', () => {
+  test('it takes the client of each shortcut, another driver’s, a pg.PoolClient, and resolves to void', () => {
+    expectTypeOf(db.advisoryXactLock(txn, BigInt(42))).toEqualTypeOf<Promise<void>>();
+    expectTypeOf(db.advisoryXactLock(txn, BigInt(42))).resolves.not.toBeAny();
+    void db.transaction(pool, db.IsolationLevel.ReadCommitted, c => db.advisoryXactLock(c, BigInt(42)));
+    void db.serializable(pool, c => db.advisoryXactLock(c, BigInt(42)));
+    void db.repeatableRead(pool, c => db.advisoryXactLock(c, BigInt(42)));
+    void db.readCommitted(pool, c => db.advisoryXactLock(c, BigInt(42)));
+    void db.serializableRO(pool, c => db.advisoryXactLock(c, BigInt(42)));
+    void db.repeatableReadRO(pool, c => db.advisoryXactLock(c, BigInt(42)));
+    void db.readCommittedRO(pool, c => db.advisoryXactLock(c, BigInt(42)));
+    void db.serializableRODeferrable(pool, c => db.advisoryXactLock(c, BigInt(42)));
+    void db.serializable(other, c => db.advisoryXactLock(c, BigInt(42)));
+    void db.readCommitted(typedPool, c => db.advisoryXactLock(c, [1, 42]));
+    void db.serializable(literal, c => db.advisoryXactLock(c, [1, 42]));
+    void db.advisoryXactLock(txnRC, [1, 42]);
+    void db.advisoryXactLock(txnAny, [1, 42]);
+    void db.advisoryXactLock(plain, [1, 42]);
+  });
+
+  test('its key is a bigint, or a pair of numbers written inline, as const or in a readonly tuple', () => {
+    const asConst = [1, 42] as const, tuple: readonly [number, number] = [1, 42], mutable: [number, number] = [1, 42];
+    void db.advisoryXactLock(txn, BigInt(42));
+    void db.advisoryXactLock(txn, null as unknown as bigint);
+    void db.advisoryXactLock(txn, [1, 42]);
+    void db.advisoryXactLock(txn, asConst);
+    void db.advisoryXactLock(txn, tuple);
+    void db.advisoryXactLock(txn, mutable);
+    expectTypeOf<Parameters<typeof db.advisoryXactLock>[1]>().toEqualTypeOf<bigint | readonly [number, number]>();
+  });
+
+  test('a key of another type does not compile', () => {
+    const numbers: number[] = [1, 42];
+    // @ts-expect-error a number: a bigint is written BigInt(42)
+    void db.advisoryXactLock(txn, 42);
+    // @ts-expect-error a string
+    void db.advisoryXactLock(txn, '42');
+    // @ts-expect-error null, on which Postgres takes no lock
+    void db.advisoryXactLock(txn, null);
+    // @ts-expect-error a number[], whose length the type does not know
+    void db.advisoryXactLock(txn, numbers);
+    // @ts-expect-error one number
+    void db.advisoryXactLock(txn, [1]);
+    // @ts-expect-error three numbers
+    void db.advisoryXactLock(txn, [1, 2, 3]);
+  });
+
+  test('a client that is no transaction’s does not compile', () => {
+    // @ts-expect-error a pg.Pool, whose query would run on a client of its own, outside any transaction
+    void db.advisoryXactLock(pool, BigInt(42));
+    // @ts-expect-error a pg.Client
+    void db.advisoryXactLock(client, BigInt(42));
+    // @ts-expect-error a QueryableLike
+    void db.advisoryXactLock(queryableLike, BigInt(42));
+    // @ts-expect-error another driver's pool
+    void db.advisoryXactLock(other, BigInt(42));
+  });
+});
