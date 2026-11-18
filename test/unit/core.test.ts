@@ -593,7 +593,7 @@ describe('cols and vals', () => {
     // 6.6.1 and pgcast until #665 sent 'Symbol(self)', stored in a text column; left by #106
     expect({ vals: thrown(() => one(vals([self]))), valsObject: thrown(() => one(vals({ a: self }))) }).toEqual({
       vals: '`db.self` has no meaning as an item of `vals([…])` outside a column\'s value, as in a `sql` template of your own or in `upsert()` `updateValues`: give a value; in `updateValues`, to read a column, qualify it with its table, `table.column`, or with `EXCLUDED` for the row proposed, `EXCLUDED.column`.',
-      valsObject: '`db.self` has no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value: give a value; in `update()`, write `db.self` in a `sql` fragment value, where it stands for the column; in `upsert()` `updateValues`, to read a column, qualify it with its table, `table.column`, or with `EXCLUDED` for the row proposed, `EXCLUDED.column`.',
+      valsObject: '`db.self` has no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value, nor in a `sql` template of your own (`VALUES (…)` or a filter\'s `IN (…)`): give a value; in `update()`, write `db.self` in a `sql` fragment value, where it stands for the column; in `upsert()` `updateValues`, to read a column, qualify it with its table, `table.column`, or with `EXCLUDED` for the row proposed, `EXCLUDED.column`.',
     });
   });
 
@@ -1065,17 +1065,25 @@ describe('db.all', () => {
       .toEqual(Object.fromEntries(Object.keys(builds).map(name => [name, viaVals.includes(name) ? allInVals : allInWhereable])));
   });
 
-  it('outside a filter, vals([all]), vals({ a: all }) and an insert() value throw too; param(all) is kept', () => {
+  it('outside a filter, vals([all]), vals({ a: all }), in a template of your own too, and an insert() value throw; param(all) is kept', () => {
     // 6.6.1 and pgcast until #665 sent 'Symbol(all)', stored in a text column; left by #633. param() is a
     // parameter the caller asked for
     const
       allInBareVals = '`db.all` has no meaning as an item of `vals([…])` outside a column\'s value, as in a `sql` template of your own or in `upsert()` `updateValues`: give a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.',
-      allAsValue = '`db.all` has no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value: give a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.';
+      allAsValue = '`db.all` has no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value, nor in a `sql` template of your own (`VALUES (…)` or a filter\'s `IN (…)`): give a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.',
+      selfAsValue = '`db.self` has no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value, nor in a `sql` template of your own (`VALUES (…)` or a filter\'s `IN (…)`): give a value; in `update()`, write `db.self` in a `sql` fragment value, where it stands for the column; in `upsert()` `updateValues`, to read a column, qualify it with its table, `table.column`, or with `EXCLUDED` for the row proposed, `EXCLUDED.column`.';
     expect({
       vals: thrown(() => one(vals([db.all]))), valsObject: thrown(() => one(vals({ a: db.all }))),
       insert: thrown(() => db.insert('users', { email: 'a@b', display_name: db.all as any }).compile()),
       param: one(param(db.all)).values,
-    }).toEqual({ vals: allInBareVals, valsObject: allAsValue, insert: allAsValue, param: [db.all] });
+      // a vals({…}) of a query you write, as a write's VALUES and in a filter's IN (…)
+      valsInValues: thrown(() => sql`INSERT INTO ${'users'} (${db.cols({ email: db.all })}) VALUES (${vals({ email: db.all })})`.compile()),
+      valsInFilter: thrown(() => sql`SELECT ${'id'} FROM ${'users'} WHERE ${'email'} IN (${vals({ email: db.all })})`.compile()),
+      selfInFilter: thrown(() => sql`SELECT ${'id'} FROM ${'users'} WHERE ${'email'} IN (${vals({ email: db.self })})`.compile()),
+    }).toEqual({
+      vals: allInBareVals, valsObject: allAsValue, insert: allAsValue, param: [db.all],
+      valsInValues: allAsValue, valsInFilter: allAsValue, selfInFilter: selfAsValue,
+    });
   });
 
   it('as the whole filter of `select()` and its kin, or of exists() and isInSelect(), still means every row: no WHERE', () => {

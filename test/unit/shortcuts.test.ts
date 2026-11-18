@@ -379,7 +379,7 @@ describe('upsert', () => {
       parent: set(parent('id')), self: set(db.self), all: set(all),
     }).toMatchInlineSnapshot(`
       {
-        "all": "throws: \`db.all\` has no meaning as a value in \`vals({…})\`, so as an \`insert()\`, \`upsert()\` or \`update()\` value: give a value. To match every row, give \`db.all\` as the whole filter of \`select()\` and its kin: \`select(table, db.all)\`.",
+        "all": "throws: \`db.all\` has no meaning as a value in \`vals({…})\`, so as an \`insert()\`, \`upsert()\` or \`update()\` value, nor in a \`sql\` template of your own (\`VALUES (…)\` or a filter's \`IN (…)\`): give a value. To match every row, give \`db.all\` as the whole filter of \`select()\` and its kin: \`select(table, db.all)\`.",
         "cast": [
           "("mood") = ROW(CAST($3 AS "mood"))",
           [
@@ -405,7 +405,7 @@ describe('upsert', () => {
           "("mood") = ROW(now())",
           [],
         ],
-        "self": "throws: \`db.self\` has no meaning as a value in \`vals({…})\`, so as an \`insert()\`, \`upsert()\` or \`update()\` value: give a value; in \`update()\`, write \`db.self\` in a \`sql\` fragment value, where it stands for the column; in \`upsert()\` \`updateValues\`, to read a column, qualify it with its table, \`table.column\`, or with \`EXCLUDED\` for the row proposed, \`EXCLUDED.column\`.",
+        "self": "throws: \`db.self\` has no meaning as a value in \`vals({…})\`, so as an \`insert()\`, \`upsert()\` or \`update()\` value, nor in a \`sql\` template of your own (\`VALUES (…)\` or a filter's \`IN (…)\`): give a value; in \`update()\`, write \`db.self\` in a \`sql\` fragment value, where it stands for the column; in \`upsert()\` \`updateValues\`, to read a column, qualify it with its table, \`table.column\`, or with \`EXCLUDED\` for the row proposed, \`EXCLUDED.column\`.",
         "vals": [
           "("mood") = ROW($3)",
           [
@@ -3067,8 +3067,8 @@ describe('db.all, self, Default, raw(), a Parameter and parent() in every write 
   // 'Symbol(self)' or '{"value":…}'; until #665 pgcast still did for all and self as a value, and in vals([…]) with no
   // current column: an updateValues fragment or vals([…]), a template of your own
   const messages: Record<string, string> = {
-    allAsValue: '`db.all` has no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value: give a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.',
-    selfAsValue: '`db.self` has no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value: give a value; in `update()`, write `db.self` in a `sql` fragment value, where it stands for the column; in `upsert()` `updateValues`, to read a column, qualify it with its table, `table.column`, or with `EXCLUDED` for the row proposed, `EXCLUDED.column`.',
+    allAsValue: '`db.all` has no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value, nor in a `sql` template of your own (`VALUES (…)` or a filter\'s `IN (…)`): give a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.',
+    selfAsValue: '`db.self` has no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value, nor in a `sql` template of your own (`VALUES (…)` or a filter\'s `IN (…)`): give a value; in `update()`, write `db.self` in a `sql` fragment value, where it stands for the column; in `upsert()` `updateValues`, to read a column, qualify it with its table, `table.column`, or with `EXCLUDED` for the row proposed, `EXCLUDED.column`.',
     wrapperAsValue: '`db.raw()`, `db.cols()` and `db.vals()` have no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value: to write SQL, use a `sql` fragment value (in `update()`, `db.self` there stands for the column); to write a value, give the value itself, or `db.param()`.',
     allInVals: '`db.all` has no meaning as an item of `vals([…])` in a column\'s value, in a filter (as `isIn()` writes it) or in a `sql` fragment value of `vals({…})`, so of `insert()`, `upsert()` or `update()`: in a filter, leave the key out, or compare with a value; in a write, give a value. To match every row, give `db.all` as the whole filter of `select()` and its kin: `select(table, db.all)`.',
     selfInVals: '`db.self` has no meaning as an item of `vals([…])` in a column\'s value, in a filter (as `isIn()` writes it) or in a `sql` fragment value of `vals({…})`, so of `insert()`, `upsert()` or `update()`: give a value; in a filter or in `update()`, write `db.self` in a `sql` fragment value, outside `vals([…])`, where it stands for the column.',
