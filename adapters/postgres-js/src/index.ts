@@ -18,7 +18,7 @@ interface Unsafe {
 /** The `sql` of postgres.js (3.4 or 4.x), as `asPool()` uses it. */
 export interface PostgresJsSql extends Unsafe {
   reserve(): PromiseLike<Unsafe & { release(): void }>;
-  typed(value: string, oid: number): unknown;
+  typed(value: string | null, oid: number): unknown;
   options?: { transform?: { column?: { from?: unknown }; row?: { from?: unknown } } };
 }
 
@@ -118,10 +118,15 @@ function dateToString(date: Date) {
 
 /* === asPool === */
 
-// the type `unknown`: Postgres infers the parameter's type from the query, as for pg's untyped parameters (see
-// https://www.postgresql.org/docs/current/sql-prepare.html), and postgres.js sends the text as it is, having no
-// serializer for it; a Buffer goes as the hex text of bytea, pg sending it in binary
+// the type `unknown`, a NULL's too: Postgres infers the parameter's type from the query, as for pg's untyped
+// parameters (see https://www.postgresql.org/docs/current/sql-prepare.html), and postgres.js sends the text as it is,
+// having no serializer for it; a Buffer goes as the hex text of bytea, pg sending it in binary. One untyped parameter,
+// and postgres.js 4 asks Postgres for the types, then serializes each value for its type: JSON text twice
 const UNKNOWN = 705;
+
+// no statement is named, as pg names none for a query with no name: postgres.js 4 runs a named statement that Postgres
+// no longer has (26000, after a DEALLOCATE ALL) again, with each value serialized for the type Postgres then gives
+const unnamed = { prepare: false }, unnamedExtended = { prepare: false, simple: false };
 
 // pg keeps the tag's first word (`START` for `START TRANSACTION`), with this pattern of its lib/result.js
 // (an empty query has none: null, as pg gives it, though pg types it string)
@@ -143,7 +148,7 @@ function resultOf(raw: RawResult): PostgresJsResult {
 /**
  * Give pgcast's `run()` and `transaction()` a postgres.js `sql`, whose values are read and written as `pg` reads and
  * writes them, with `pg`'s parsers: `transaction()` runs its queries on a connection of `sql.reserve()`.
- * `.prepared(name)` prepares the query, under a name postgres.js gives it.
+ * `.prepared(name)` runs the query unprepared, as every query.
  * @param sql The `sql` that `postgres()` returns, with no column or row transform: the adapter never configures nor
  * ends it
  */
@@ -155,9 +160,9 @@ export function asPool(sql: PostgresJsSql): PostgresJsPool {
     const
       parameters = values.map(v => {
         const value = prepareValue(v);
-        return value === null ? null : sql.typed(Buffer.isBuffer(value) ? '\\x' + value.toString('hex') : value, UNKNOWN);
+        return sql.typed(value === null ? null : Buffer.isBuffer(value) ? '\\x' + value.toString('hex') : value, UNKNOWN);
       }),
-      raw = await target.unsafe(text, parameters, name == null ? {} : { prepare: true, simple: false }).raw();
+      raw = await target.unsafe(text, parameters, name == null ? unnamed : unnamedExtended).raw();
 
     // several statements with no value give an array of results, as with pg
     const results = raw as unknown as RawResult[];

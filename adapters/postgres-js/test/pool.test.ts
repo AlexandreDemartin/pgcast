@@ -60,7 +60,7 @@ describe('shortcuts', () => {
     expect(await u.pool.query(query)).toEqual(await u.t.pool.query(query).then(rs => (rs as unknown as any[]).map(r => ({ rows: r.rows, command: r.command }))));
   });
 
-  it('prepares a prepared query on its connection, and refuses it several statements, as pg does', async () => {
+  it('runs a prepared query unprepared, where pg prepares it, and refuses it several statements, as pg does', async () => {
     const prepared = async (pool: { connect: () => Promise<any> }, name: string) => {
       const c = await pool.connect(), count = { text: 'SELECT count(*)::int AS n FROM pg_prepared_statements WHERE NOT from_sql', values: [] };
       try {
@@ -71,7 +71,7 @@ describe('shortcuts', () => {
         return { added: after - before, refused };
       } finally { c.release(); }
     };
-    expect(await prepared(u.pool, 'via_adapter')).toEqual({ added: 1, refused: '42601' });
+    expect(await prepared(u.pool, 'via_adapter')).toEqual({ added: 0, refused: '42601' });
     expect(await prepared(u.t.pool, 'via_pg')).toEqual({ added: 1, refused: '42601' });
   });
 
