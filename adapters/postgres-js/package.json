@@ -37,7 +37,7 @@
     "build": "tsc",
     "prepack": "npm run build",
     "test": "vitest run",
-    "test:types": "tsc -p test"
+    "test:types": "tsc -p test && tsc -p test/types"
   },
   "dependencies": {
     "pg-types": "^2.2.0"
