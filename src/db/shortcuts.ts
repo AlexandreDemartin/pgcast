@@ -564,7 +564,7 @@ export const upsert: {
     insertColsSQL = cols(firstRow),
     insertValuesSQL = mapWithSeparator(completedValues, sql`, `, v => sql`(${vals(v)})`),
     colNames = Object.keys(firstRow) as Column[],
-    updateValues = options == null ? {} : callerValue(options, 'updateValues') ?? {},
+    updateValues: Record<string, unknown> = options == null ? {} : callerValue(options, 'updateValues') ?? {},
     conflictColumns = Array.isArray(conflictTarget) ? conflictTarget : [],  // a constraint's are unknown here
     overwritesMissingKey = specifiedUpdateColumns == null && Array.isArray(values) && colNames.some(c =>
       callerValue(updateValues, c) === undefined &&  // as below: otherwise, c is set from EXCLUDED
@@ -579,7 +579,7 @@ export const upsert: {
     updateColsSQL = mapWithSeparator(updateColumns, sql`, `, c => c),
     updateValuesSQL = mapWithSeparator(updateColumns, sql`, `, c =>
       callerValue(updateValues, c) !== undefined ? updateValueSQL(callerValue(updateValues, c), c) :
-        (noNullUpdateColumns === all || noNullUpdateColumns.includes(c)) ? sql`CASE WHEN EXCLUDED.${c} IS NULL THEN ${table}.${c} ELSE EXCLUDED.${c} END` :
+        (noNullUpdateColumns === all || noNullUpdateColumns.includes(c as Column)) ? sql`CASE WHEN EXCLUDED.${c} IS NULL THEN ${table}.${c} ELSE EXCLUDED.${c} END` :
           sql`EXCLUDED.${c}`),
     returningSQL = SQLForColumnsOfTable(callerValue(options, 'returning'), table, returningNull),
     extrasSQL = SQLForExtras(callerValue(options, 'extras')),
@@ -974,18 +974,18 @@ function selectQuery(
       sql` ORDER BY ${mapWithSeparator(order as OrderSpecForTable<Table>[], sql`, `, o => {  // `as` clause is required when TS not strict
         // each key is read once, and checked before the next is read: a getter may answer anew, so raw() and the
         // message get the read that was checked
-        const direction = callerValue(o, 'direction');
+        const direction = callerValue(o, 'direction')!;
         if (!['ASC', 'DESC'].includes(direction)) throw new Error(`Direction must be ASC/DESC, not '${direction}'`);
         const nulls = callerValue(o, 'nulls');
         if (nulls && !['FIRST', 'LAST'].includes(nulls)) throw new Error(`Nulls must be FIRST/LAST/undefined, not '${nulls}'`);
-        return sql`${callerValue(o, 'by')} ${raw(direction)}${nulls ? sql` NULLS ${raw(nulls)}` : []}`;
+        return sql`${callerValue(o, 'by')!} ${raw(direction)}${nulls ? sql` NULLS ${raw(nulls)}` : []}`;
       })}`,
     limitSQL = (limit: number | undefined) => limit === undefined ? [] :
       callerValue(allOptions, 'withTies') ? sql` FETCH FIRST ${param(limit)} ROWS WITH TIES` :
         sql` LIMIT ${param(limit)}`,  // compatibility with pg pre-10.5; and fewer bytes!
     offsetSQL = callerValue(allOptions, 'offset') === undefined ? [] : sql` OFFSET ${param(callerValue(allOptions, 'offset'))}`,  // pg is lax about OFFSET following FETCH, and we exploit that
     lockSQL = lock === undefined ? [] : lock === null ? refusedSQL(lockNull) : (lock as SelectLockingOptions<string>[]).map(lock => {  // `as` clause is required when TS not strict
-      const strength = callerValue(lock, 'for');  // for and wait read once each, as an order item's keys
+      const strength = callerValue(lock, 'for')!;  // for and wait read once each, as an order item's keys
       if (!['UPDATE', 'NO KEY UPDATE', 'SHARE', 'KEY SHARE'].includes(strength)) throw new Error(`Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not '${strength}'`);
       const wait = callerValue(lock, 'wait');
       if (wait && !['NOWAIT', 'SKIP LOCKED'].includes(wait)) throw new Error(`Lock wait must be NOWAIT/SKIP LOCKED/undefined, not '${wait}'`);
