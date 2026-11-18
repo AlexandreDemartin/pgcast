@@ -78,6 +78,7 @@ interface Config {
   queryListener?(query: SQLQuery, txnId?: number): void;
   resultListener?(result: any, txnId?: number, elapsedMs?: number, query?: SQLQuery): void;
   transactionListener?(message: string, txnId?: number): void;
+  transactionEventListener?(event: TransactionEvent, txnId?: number): void;
 }
 ```
 
@@ -101,6 +102,7 @@ The keys pgcast adds are optional, so a `Config` written for Zapatos 6.6.1 still
 | [`queryListener`](#Config.queryListener) | none | called with each query `run()` sends | at each `run()` |
 | [`resultListener`](#Config.resultListener) | none | called with each result `run()` gives | at each `run()` |
 | [`transactionListener`](#Config.transactionListener) | none | called when an attempt of `transaction()` fails with `40001` or `40P01`, and at each retry | at each `transaction()` |
+| [`transactionEventListener`](#Config.transactionEventListener) | none | called right after `transactionListener`, with a [`TransactionEvent`](#TransactionEvent) in place of the message | at each `transaction()` |
 
 </div>
 
@@ -122,7 +124,7 @@ How many times [`transaction()`](/transaction#transaction) runs its callback. Af
 transactionRetryDelay: { minMs: number; maxMs: number }  // default: { minMs: 25, maxMs: 250 }
 ```
 
-Before each retry, `transaction()` waits a whole number of milliseconds from `minMs` to `maxMs`, rounded from a uniform draw between them: `Math.round(minMs + (maxMs - minMs) * Math.random())`. So `minMs` and `maxMs` come up half as often as each value between them. [`transactionListener`](#Config.transactionListener) is told the wait.
+Before each retry, `transaction()` waits a whole number of milliseconds from `minMs` to `maxMs`, rounded from a uniform draw between them: `Math.round(minMs + (maxMs - minMs) * Math.random())`. So `minMs` and `maxMs` come up half as often as each value between them. [`transactionListener`](#Config.transactionListener) is told the wait, and [`transactionEventListener`](#Config.transactionEventListener) gets it as `delayMs`.
 
 ### `castArrayParamsToJson` {#Config.castArrayParamsToJson}
 
@@ -322,13 +324,36 @@ Called by `transaction()` when an attempt fails with `40001` or `40P01`, and aga
 
 | When | Message |
 |---|---|
-| an attempt failed, another is left | `` `Transaction rollback (code ${err.code}) on attempt ${attempt} of ${maxAttempts}, retrying in ${delayBeforeRetry}ms` ``<!-- message --> |
+| an attempt failed, another is left | `` `Transaction rollback (code ${code}) on attempt ${attempt} of ${maxAttempts}, retrying in ${delayBeforeRetry}ms` ``<!-- message --> |
 | the next attempt starts | `` `Retrying transaction, attempt ${attempt} of ${maxAttempts}` ``<!-- message --> |
-| the last attempt failed | `` `Transaction rollback (code ${err.code}) on attempt ${attempt} of ${maxAttempts}, giving up` ``<!-- message --> |
+| the last attempt failed | `` `Transaction rollback (code ${code}) on attempt ${attempt} of ${maxAttempts}, giving up` ``<!-- message --> |
 
 With `transactionAttemptsMax: 3` and `transactionRetryDelay: { minMs: 1, maxMs: 2 }`, a callback that fails with `40001` each time gives `Transaction rollback (code 40001) on attempt 1 of 3, retrying in 1ms`<!-- message -->, `Retrying transaction, attempt 2 of 3`<!-- message -->, then the same for attempt 2, and `Transaction rollback (code 40001) on attempt 3 of 3, giving up`<!-- message -->.
 
 It is not called for a transaction that commits on its first attempt, nor for any other error.
+
+### `transactionEventListener` {#Config.transactionEventListener}
+
+```ts
+transactionEventListener?(event: TransactionEvent, txnId?: number): void
+```
+
+From 6.12.0. Called by `transaction()` right after [`transactionListener`](#Config.transactionListener), at the same three points, with a [`TransactionEvent`](#TransactionEvent) that holds the message's numbers and the transaction's id. Each listener is called if it is set, the other or not. So a log or a metric reads the kind of event, the code and the attempt as fields, not from the text:
+
+```ts twoslash
+import * as db from 'zapatos/db';
+// ---cut---
+db.setConfig({
+  transactionEventListener: (event, txnId) =>
+    console.log(JSON.stringify({ txnId, ...event })),
+});
+```
+
+On a `40001` at the first of five attempts, this prints `{"txnId":0,"type":"rollback","code":"40001","attempt":1,"maxAttempts":5,"delayMs":97}`, `delayMs` being the wait drawn from [`transactionRetryDelay`](#Config.transactionRetryDelay), then `{"txnId":0,"type":"retry","attempt":2,"maxAttempts":5}`.
+
+- As for `transactionListener`, it is not called for a transaction that commits on its first attempt, for any other error, or by a `transaction()` given the client of a transaction, which passes it through.
+- If it throws, `transaction()` rejects with its error, as when `transactionListener` throws: once `ROLLBACK` is sent, and the client is released. An error that it throws at `retry` with a `code` of `40001` or `40P01` counts as that attempt's failure, which is retried.
+- Zapatos 6.6.1 has no such option ([Go back](/switching#go-back)).
 
 ### Transaction ids {#transaction-ids}
 
@@ -385,6 +410,27 @@ interface SQLQuery { text: string; values: any[]; name?: string }
 ```
 
 A compiled query, as `pg`'s `query()` takes it: what [`compile()`](/sql-template#compile) returns and the listeners get. `name` is set by [`prepared()`](/sql-template#prepared).
+
+## `TransactionEvent` {#TransactionEvent}
+
+```ts
+type TransactionEvent =
+  | { type: 'rollback'; code: '40001' | '40P01'; attempt: number; maxAttempts: number; delayMs: number }
+  | { type: 'retry'; attempt: number; maxAttempts: number }
+  | { type: 'giveUp'; code: '40001' | '40P01'; attempt: number; maxAttempts: number };
+```
+
+From 6.12.0. What [`transactionEventListener`](#Config.transactionEventListener) gets, one per message of [`transactionListener`](#Config.transactionListener):
+
+| `type` | When | Its message |
+|---|---|---|
+| `rollback` | an attempt failed, another is left: before the wait of `delayMs` | `` `Transaction rollback (code ${code}) on attempt ${attempt} of ${maxAttempts}, retrying in ${delayBeforeRetry}ms` ``<!-- message --> |
+| `retry` | the next attempt starts, before its `START TRANSACTION` | `` `Retrying transaction, attempt ${attempt} of ${maxAttempts}` ``<!-- message --> |
+| `giveUp` | the last attempt failed, before `transaction()` rejects | `` `Transaction rollback (code ${code}) on attempt ${attempt} of ${maxAttempts}, giving up` ``<!-- message --> |
+
+- `code` is the error's `code`, as the message prints it: a string, though `isDatabaseError()` also matches a `String` object.
+- `attempt` counts from 1. `maxAttempts` is the attempts `transaction()` makes, which the message counts too: `1` for a `transactionAttemptsMax` of `0`.
+- `type` narrows the event: `event.delayMs` compiles only after `event.type === 'rollback'`.
 
 ## Opt-ins and warnings
 
