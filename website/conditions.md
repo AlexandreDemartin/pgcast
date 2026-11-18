@@ -21,6 +21,7 @@ Each member is a [`sql`](/sql-template#sql) fragment written around [`db.self`](
   - [`and()`](#conditions.and), [`or()`](#conditions.or) and [`not()`](#conditions.not) also take Whereables, so they can be a whole `where`; [`now`](#conditions.now), [`fromNow()`](#conditions.fromNow) and [`exists()`](#conditions.exists) hold no `self`, and go anywhere.
 - **Values**: each value is a parameter, `$1`, except a [`Parameter`](/sql-template#Parameter), kept as it is with its cast; a `sql` fragment, written as its SQL; and [`parent()`](/sql-template#parent), the parent query's column in a `lateral` subquery, or in the `where` of [`exists()`](#conditions.exists) and [`isInSelect()`](#conditions.isInSelect), whose `parent` option names that table. `Default`, `self`, `all`, `raw()`, `cols()` and `vals()` throw: [Values a condition refuses](#refused-values). [`eqAny()`](#conditions.eqAny) and the [array conditions](#arrays) send their array as one parameter of plain values: an item that is any of these, a `Parameter`, a fragment or `parent()` throws, at any depth in an array condition, and in place of the array `eqAny()` takes `parent()` alone.
   - [`jsonbContains()`](#conditions.jsonbContains) takes a JSON value alone, and [`jsonbPathExists()`](#conditions.jsonbPathExists) a string as its path and an object of JSON values as its variables: a `Parameter`, a fragment or `parent()` throws there too.
+  - [`likeAny()`](#conditions.likeAny) and [`ilikeAny()`](#conditions.ilikeAny) send their array as one parameter of patterns: an item that is neither a string nor `null` throws, any of these included, and so does `parent()` in place of the array.
   - [`websearchToTsquery()`](#conditions.websearchToTsquery) takes two strings: any of these, `all`, a `Parameter`, a fragment, `parent()` or any other value that is no string throws.
 - **Type**: a condition is a `SQLFragment` whose second type argument, `T`, is the type of the value it compares with (its `Constraint`, [`sql`](/sql-template#sql)); the Whereable checks `T` against the column's type. The eight tests, `now` and `fromNow()` have no `T`, and pass on any column; the `T` of [`websearchToTsquery()`](#conditions.websearchToTsquery) is a type only a column typed `any` takes, as a `tsvector` column is.
   - A Whereable is also an expression: interpolated in a `SELECT` list, `{ runtime_minutes: add(10) }` is each film's runtime plus ten, `(("runtime_minutes" + $1))`<!-- probe: db.sql`${{ runtime_minutes: db.conditions.add(10) }}` -->. So the type lets through, as a Whereable value, what is no test: [`add()`](#conditions.add), [`subtract()`](#conditions.subtract), [`now`](#conditions.now) and [`fromNow()`](#conditions.fromNow), which Postgres refuses alone in a `where` (42804).
@@ -161,11 +162,11 @@ Each takes two values of the column's type, `<T>(a: T, b: T)`, each a parameter 
 
 ## Patterns {#patterns}
 
-Each takes one pattern, `<T extends string>(a: T)`, so only on a column whose type is a string: on `release_year`, the type refuses them (TS2322).
+Each takes one pattern, `<T extends string>(a: T)`, so only on a column whose type is a string: on `release_year`, the type refuses them (TS2322). [`likeAny()`](#conditions.likeAny) and [`ilikeAny()`](#conditions.ilikeAny) take an array of them.
 
 | Family | Syntax | Matches |
 |---|---|---|
-| `like()`, `ilike()` | `%` any text, `_` one character | the whole value |
+| `like()`, `ilike()`, `likeAny()`, `ilikeAny()` | `%` any text, `_` one character, `\` escapes the next | the whole value |
 | `similarTo()` | Postgres's SQL regular expressions | the whole value |
 | `reMatch()`, `reImatch()` | POSIX regular expressions | any part of the value |
 
@@ -192,6 +193,38 @@ So `like('Lantern')` matches no title, and `reMatch('Lantern')` matches `A Lante
 ### `notIlike()` {#conditions.notIlike}
 
 `"col" NOT ILIKE $1`<!-- probe: db.sql`${{ col: db.conditions.notIlike('x') }}` -->.
+
+### `likeAny()` {#conditions.likeAny}
+
+```ts
+db.conditions.likeAny<T extends string>(a: readonly T[]): SQLFragment<boolean | null, T>
+```
+
+From 6.12.0. `"col" LIKE ANY($1)`<!-- probe: db.sql`${{ col: db.conditions.likeAny(['x%', 'y%']) }}` -->: the column matches one of the patterns, the whole array one parameter, as in [`eqAny()`](#conditions.eqAny). Where `or(like('The %'), like('% Bay'))` writes one parameter per pattern, and one text per count, this is one text for any count.
+
+- **Empty array**: `false`, on a `NULL` column too: no row, and every row under [`not()`](#conditions.not).
+- **`null` items**: Postgres reads one as a `NULL` pattern, so a row no other pattern matches gives `NULL`, and `not()` leaves it out too. The type refuses `null` there with `strictNullChecks` on.
+- **Negation**: `not(likeAny(patterns))`, which Postgres reads as `NOT LIKE ALL`: the rows that match none of them.
+- **Wildcards**: `%`, `_` and `\` in a user's input are the pattern's own, as in [`like()`](#conditions.like): escape them first, `input.replace(/[\\%_]/g, '\\$&')`, or `'100%'` matches every title that starts with `100`.
+- **Columns**: one whose type is a string. On a `citext` column, `LIKE` ignores case only when the extension's schema is on the `search_path`, as with `like()`.
+
+A list that is not an array throws as the query compiles, as in `isIn()`, and so does an item that is neither a string nor `null`: `pg` would send a number as its text, and a `Parameter`, a fragment or an object as JSON, patterns no one wrote. The message names the item:
+
+> `` `likeAny()` sends its array as one parameter, so each item is a pattern, a string, not `db.param()`: give the pattern as a string. ``<!-- message -->
+
+### `ilikeAny()` {#conditions.ilikeAny}
+
+```ts
+db.conditions.ilikeAny<T extends string>(a: readonly T[]): SQLFragment<boolean | null, T>
+```
+
+From 6.12.0. `"col" ILIKE ANY($1)`<!-- probe: db.sql`${{ col: db.conditions.ilikeAny(['x%', 'y%']) }}` -->: as [`likeAny()`](#conditions.likeAny), ignoring case. Its negation, `not(ilikeAny(patterns))`, is `NOT ILIKE ALL`.
+
+<CastPanel example="conditions_ilikeAny">
+
+<<< ./examples/conditions_ilikeAny.ts{ts twoslash}
+
+</CastPanel>
 
 ### `similarTo()` {#conditions.similarTo}
 
