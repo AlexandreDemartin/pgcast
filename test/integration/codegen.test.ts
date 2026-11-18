@@ -4739,6 +4739,28 @@ describe('the CLI with --check (#556)', () => {
         status: 1, stdout: `Out of date: <out>/${schemaFile}\nRun the generator without --check to write it.\n`, stderr: '',
       });
     }, 30_000);
+
+    // without a flag, as Zapatos 6.6.1 runs it (#688): the output and exit code a --help must not change
+    it('reads the config file alone, with no argument, printing nothing', () => {
+      writeFileSync(join(dir, 'pgcastconfig.json'), json());
+      expect(run()).toEqual({ status: 0, stdout: '', stderr: '' });
+      expect(files(outDir)).toEqual([placeholderFile, indexFile, schemaFile]);
+      expect(run('--check')).toEqual({ status: 0, stdout: `${upToDate}\n`, stderr: '' });
+    }, 30_000);
+
+    it('stops on a config it cannot read with Node printing the error and its stack, exit 1', () => {
+      const stack = (message: string) => new RegExp(`\\nError: ${message}[^\\n]*\\n    at `);
+      const argument = run('{,}');
+      expect(argument).toMatchObject({ status: 1, stdout: '' });
+      expect(argument.stderr).toMatch(stack('If present, the argument to Zapatos must be valid JSON, and all referenced environment variables must exist: '));
+      // a single dash other than -h is still read as the JSON argument
+      expect(run('-x').stderr).toMatch(stack('If present, the argument to Zapatos must be valid JSON, '));
+      writeFileSync(join(dir, 'pgcastconfig.json'), '{,}');
+      const file = run();
+      expect(file).toMatchObject({ status: 1, stdout: '' });
+      expect(file.stderr).toMatch(stack('If present, pgcastconfig\\.json must be a valid JSON file, '));
+      expect(existsSync(outDir)).toBe(false);
+    }, 30_000);
   });
 });
 
