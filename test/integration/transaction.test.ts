@@ -2202,7 +2202,7 @@ describe('cursor()', () => {
     expect(errors).toEqual(['22012', '42P03']);
   });
 
-  it('limitation: a generator made in one attempt and iterated in the next gets 34000, its cursor gone with the ROLLBACK', async () => {
+  it('limitation: a generator that read a batch in one attempt and goes on in the next gets 34000, its cursor gone with the ROLLBACK', async () => {
     listen();
     let stale: AsyncGenerator<G[], void, undefined> | undefined;
     const err = await db.serializable(t.pool, async c => {
@@ -2214,6 +2214,21 @@ describe('cursor()', () => {
       await stale.next();
     }).catch((e: unknown) => e);
     expect(codeOf(err)).toBe('34000');
+  });
+
+  it('reads all the rows of a generator made in one attempt and first read in the next, which sends its DECLARE then', async () => {
+    listen();
+    const texts = sent();
+    let unstarted: AsyncGenerator<G[], void, undefined> | undefined;
+    const batches = await db.serializable(t.pool, async c => {
+      if (!unstarted) {
+        unstarted = db.cursor(c, series(3), { batchSize: 2 });
+        await raise(c, '40001');
+      }
+      return read(unstarted);
+    });
+    expect(batches).toEqual([gs(1, 2), gs(3)]);
+    expect(texts).toEqual(['START TRANSACTION', 'DO $$BEGIN', 'ROLLBACK', 'START TRANSACTION', 'DECLARE pgcast_cursor_1', 'FETCH FORWARD', 'FETCH FORWARD', 'FETCH FORWARD', 'CLOSE pgcast_cursor_1', 'COMMIT']);
   });
 
   it('reads all the rows of two loops at once on one client', async () => {

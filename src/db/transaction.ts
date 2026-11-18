@@ -629,8 +629,9 @@ const iteratedAfter = 'cursor() was iterated after its transaction ended, so its
  * `next()` rejects before any query when given a query that is not a
  * `SQLFragment`, a `batchSize` that is not an integer from 1 to 2147483647, or
  * when the `transaction()` it was called in has ended. It is the same
- * transaction through every attempt: a generator made in one attempt and
- * iterated in the next gets 34000, as its cursor went with the `ROLLBACK`.
+ * transaction through every attempt: a generator that read a batch in one
+ * attempt and goes on in the next gets 34000, as its cursor went with the
+ * `ROLLBACK`; one first read in the next attempt sends its `DECLARE` then.
  * @param txnClient The client of a transaction: a `transaction()` callback's,
  * of any driver, or a `pg.PoolClient` you sent `BEGIN` on
  * @param query A `SELECT` fragment whose result is an array of rows
