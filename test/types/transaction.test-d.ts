@@ -242,6 +242,8 @@ describe('a nested call on another driver’s client (#702)', () => {
     void db.serializable(bare, async () => 1);
     // @ts-expect-error a client with a connect() is neither a pool's client nor a PoolLike
     void db.serializable(withConnect, async () => 1);
+    // @ts-expect-error a client with no query() nor release(), though marked
+    void db.serializable(null as unknown as db.TxnClientLike<{ exec: (text: string) => Promise<void> }, db.IsolationLevel.Serializable>, async () => 1);
     // @ts-expect-error its query() takes pg's query object, not a string
     void db.serializable(other, c => db.readCommitted(c, inner => inner.query('SELECT 1')));
     // @ts-expect-error another driver's client is no TxnClientForRepeatableRead
@@ -312,7 +314,8 @@ describe('the calls of Zapatos 6.6.1 keep their types (#696)', () => {
     const transaction = wrap(db.transaction);
     // @ts-expect-error a string is no queryable, as in Zapatos 6.6.1
     void transaction('not a pool', db.IsolationLevel.Serializable, async () => 1);
-    expectTypeOf(serializable(pool, async c => c)).resolves.toEqualTypeOf<db.TxnClientForSerializable>();
+    // the wrapped type resolves to unknown, as in Zapatos 6.6.1, but its callback gets the client of its level
+    expectTypeOf(serializable(pool, async c => { expectTypeOf(c).toEqualTypeOf<db.TxnClientForSerializable>(); })).resolves.toEqualTypeOf<unknown>();
   });
 
   // #702: another driver's client is inferred from the first argument only when it has no connect(), which every pg value has

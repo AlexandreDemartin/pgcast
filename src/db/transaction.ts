@@ -106,11 +106,13 @@ type TxnClientOf<C, Pg, T extends IsolationLevel> = unknown extends C ? Pg : [C]
 // the client of another driver's transaction, given to a nested call, N: it has no connect(), which every pg value and
 // pool has, so these fail the constraint, or infer nothing, and N stays PassedLike (#702)
 type PassedLike = TxnClientLike<PoolClientLike, IsolationLevel> & { connect?: never };
-// a type that declares _zapatos, as TxnClientLike does: a bare client, outside any transaction, would be taken for a pool
-type Passed<N> = '_zapatos' extends keyof N ? N : never;
+// a type that declares _zapatos, as TxnClientLike does: a bare client, outside any transaction, would be taken for a pool;
+// never for any, inferred when a generic function takes a shortcut, which would make the whole parameter any
+type Passed<N> = 0 extends 1 & N ? never : '_zapatos' extends keyof N ? N : never;
 // the client a callback gets: N itself, at the outer level it runs at, as savepoint() gives it; Else when N is PassedLike,
-// told apart by its connect key
-type CallbackClient<N, Else> = 'connect' extends keyof N ? Else : N;
+// told apart by its connect key, or never or any; a string index signature puts connect in keyof N too
+type CallbackClient<N, Else> = [N] extends [never] ? Else : 0 extends 1 & N ? Else :
+  'connect' extends keyof N ? string extends keyof N ? N : Else : N;
 
 // the callback as the body of transaction() calls it: with the client of a PoolLike, which run time uses as a TxnClient
 type Callback<T, M extends IsolationLevel> = (client: TxnClient<IsolationSatisfying<M>>) => Promise<T>;
