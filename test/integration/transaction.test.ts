@@ -1369,6 +1369,95 @@ describe('savepoint() (#723)', () => {
     expect(attempts).toBe(1);  // the 40001 was caught: no retry
   });
 
+  describe('a real conflict, caught in the callback, which returns (not raise())', () => {
+    /** Runs `fn` with two clients of the pool, and ends both: `ROLLBACK` on each, a no-op once committed. */
+    const twoClients = async <T>(fn: (c1: pg.PoolClient, c2: pg.PoolClient) => Promise<T>) => {
+      const c1 = await t.pool.connect(), c2 = await t.pool.connect();
+      try { return await fn(c1, c2); }
+      finally {
+        for (const c of [c1, c2]) { await c.query('ROLLBACK').catch(() => undefined); c.release(); }
+      }
+    };
+    /** A savepoint whose callback writes `note`, catches that write's error, notes its code, and returns. */
+    const swallowing = (c: pg.PoolClient | db.TxnClientForSerializable, steps: string[], query: string, values: string[]) =>
+      db.savepoint(c, async sp => { await sp.query(query, values).catch((e: { code?: string }) => { steps.push(`in the callback ${e.code}`); }); })
+        .then(() => 'savepoint resolves', (e: { code?: string }) => `savepoint rejects ${e.code}`);
+    /** The write skew of two SERIALIZABLE transactions: each reads a note, then the first inserts and commits. */
+    const skew = async (c1: pg.PoolClient, c2: db.Queryable) => {
+      await c1.query('BEGIN ISOLATION LEVEL SERIALIZABLE');
+      await c1.query(`SELECT note FROM txn_probe WHERE note = 'read by 1'`);
+      await c2.query(`SELECT note FROM txn_probe WHERE note = 'read by 2'`);
+      await c2.query(`INSERT INTO txn_probe (note) VALUES ('outside')`);
+      await c1.query(`INSERT INTO txn_probe (note) VALUES ('other')`);
+      await c1.query('COMMIT');
+    };
+
+    it('SERIALIZABLE, a write skew: 40001 in the savepoint, then Postgres refuses the COMMIT with 40001, and the write outside it is not saved', async () => {
+      const steps: string[] = [];
+      await twoClients(async (c1, c2) => {
+        await c2.query('BEGIN ISOLATION LEVEL SERIALIZABLE');
+        await skew(c1, c2);
+        steps.push(await swallowing(c2, steps, 'INSERT INTO txn_probe (note) VALUES ($1)', ['inside']));
+        steps.push(await c2.query('COMMIT').then(r => `COMMIT ${r.command}`, (e: { code?: string }) => `COMMIT rejects ${e.code}`));
+      });
+      expect(steps).toEqual(['in the callback 40001', 'savepoint rejects 25P02', 'COMMIT rejects 40001']);
+      expect(await notes()).toEqual(['other']);
+    });
+
+    it('inside serializable(), the same write skew: transaction() retries on the COMMIT\'s 40001, and the next attempt commits', async () => {
+      const { messages } = listen();
+      const steps: string[] = [];
+      let attempts = 0;
+      const result = await twoClients(c1 => db.serializable(t.pool, async c2 => {
+        attempts++;
+        if (attempts === 1) await skew(c1, c2);
+        else await write(c2, 'outside');
+        steps.push(await swallowing(c2, steps, 'INSERT INTO txn_probe (note) VALUES ($1)', ['inside']));
+        return attempts;
+      }));
+      expect(result).toBe(2);
+      expect(steps).toEqual(['in the callback 40001', 'savepoint rejects 25P02', 'savepoint resolves']);
+      expect(messages).toEqual(['Transaction rollback (code 40001) on attempt 1 of 5, retrying in 0ms', 'Retrying transaction, attempt 2 of 5']);
+      expect(await notes()).toEqual(['inside', 'other', 'outside']);
+    });
+
+    it('REPEATABLE READ, a concurrent update: 40001 in the savepoint, and the COMMIT saves the write outside it', async () => {
+      await write(t.pool, 'seed');
+      const steps: string[] = [];
+      await twoClients(async (c1, c2) => {
+        await c2.query('BEGIN ISOLATION LEVEL REPEATABLE READ');
+        await c2.query('SELECT note FROM txn_probe');
+        await c2.query(`INSERT INTO txn_probe (note) VALUES ('outside')`);
+        await c1.query(`UPDATE txn_probe SET note = 'updated by 1' WHERE note = 'seed'`);
+        steps.push(await swallowing(c2, steps, `UPDATE txn_probe SET note = $1 WHERE note = 'seed'`, ['updated by 2']));
+        steps.push(await c2.query('COMMIT').then(r => `COMMIT ${r.command}`, (e: { code?: string }) => `COMMIT rejects ${e.code}`));
+      });
+      expect(steps).toEqual(['in the callback 40001', 'savepoint rejects 25P02', 'COMMIT COMMIT']);
+      expect(await notes()).toEqual(['outside', 'updated by 1']);
+    });
+
+    it('a deadlock: 40P01 in the savepoint, and the COMMIT saves the write outside it', async () => {
+      await write(t.pool, 'a');
+      await write(t.pool, 'b');
+      const steps: string[] = [];
+      await twoClients(async (c1, c2) => {
+        await c1.query('BEGIN');
+        await c2.query('BEGIN');
+        await c1.query(`SET LOCAL deadlock_timeout = '10s'`);
+        await c2.query(`SET LOCAL deadlock_timeout = '10ms'`);  // c2 finds the deadlock, and is the one that fails
+        await c2.query(`UPDATE txn_probe SET note = 'a by 2' WHERE note = 'a'`);
+        await c1.query(`UPDATE txn_probe SET note = 'b by 1' WHERE note = 'b'`);
+        const waiting = c1.query(`UPDATE txn_probe SET note = 'a by 1' WHERE note = 'a'`);  // waits for c2's lock
+        steps.push(await swallowing(c2, steps, `UPDATE txn_probe SET note = $1 WHERE note = 'b'`, ['b by 2']));
+        steps.push(await c2.query('COMMIT').then(r => `COMMIT ${r.command}`, (e: { code?: string }) => `COMMIT rejects ${e.code}`));
+        await waiting;
+        await c1.query('COMMIT');
+      });
+      expect(steps).toEqual(['in the callback 40P01', 'savepoint rejects 25P02', 'COMMIT COMMIT']);
+      expect(await notes()).toEqual(['a by 2', 'b by 1']);
+    });
+  });
+
   it('limitation: a 40001 thrown from JavaScript, caught, leaves the work of its savepoint in, unless an outer level rolls back', async () => {
     const notFromPostgres = Object.assign(new Error('not from Postgres'), { code: '40001' });
     const throwsIt = (c: db.TxnClientForSerializable, note: string) =>
