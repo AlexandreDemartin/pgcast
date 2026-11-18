@@ -239,6 +239,31 @@ describe('a nested call on another driver’s client (#702)', () => {
     void db.serializable(p1, c => db.readCommitted(c, inner => inner.query('SELECT 1')));
   });
 
+  test('a pool can start a transaction at the level of the nested call', () => {
+    type Client = Awaited<ReturnType<typeof p1.connect>>;
+    type Serial = db.TxnClientLike<Client, db.IsolationLevel.Serializable>;
+    // @ts-expect-error narrow the argument to the pool or the marked client first
+    const read = (source: typeof p1 | Serial) => db.readCommitted(source, async c => c._zapatos!.isolationLevel);
+    // @ts-expect-error the pool starts a READ COMMITTED transaction
+    const level: Promise<db.IsolationLevel.Serializable> = read(p1);
+    void level;
+    // @ts-expect-error an explicit client type cannot give a pool a SERIALIZABLE transaction
+    void db.readCommitted<number, Client, Serial>(p1, async (_: Serial) => 1);
+    const nested = (c: Serial) => db.readCommitted(c, async inner => inner._zapatos!.isolationLevel);
+    expectTypeOf(nested).returns.resolves.toEqualTypeOf<db.IsolationLevel.Serializable>();
+  });
+
+  test('a union of different drivers’ marked clients must be narrowed first', () => {
+    type Serial = db.TxnClientLike<OtherClient, db.IsolationLevel.Serializable>;
+    type Second = db.TxnClientLike<LiteralClient & { driver: 'second' }, db.IsolationLevel.Serializable>;
+    // @ts-expect-error the marked client could belong to pg
+    const fromPgOrOther = (c: db.TxnClientForSerializable | Serial) => db.serializable(c, async inner => inner);
+    // @ts-expect-error each driver has its own client type
+    const fromEitherDriver = (c: Serial | Second) => db.serializable(c, async inner => inner);
+    void fromPgOrOther;
+    void fromEitherDriver;
+  });
+
   test('a helper that takes the client, or a pool typed with its client, compiles', () => {
     const countTwice = (c: TxnOther<db.IsolationLevel.Serializable>) => db.serializable(c, inner => countUsers(inner));
     expectTypeOf(db.serializable(other, countTwice)).resolves.toEqualTypeOf<number>();
