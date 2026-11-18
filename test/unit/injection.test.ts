@@ -2740,7 +2740,7 @@ describe('setLocal()', () => {
 
   const update = `UPDATE users SET display_name = 'injected' WHERE id = 1`;
   const payloads: Record<string, string> = {
-    squote: "'", dquote: '"', semicolon: ';', dashes: '--', comment: '/*', dollar: '$1', backslash: '\\', nul: '\0',
+    bareSquote: "'", bareDquote: '"', bareSemicolon: ';', bareDashes: '--', bareComment: '/*', bareDollar: '$1', bareBackslash: '\\', bareNul: '\0',
     closesCall: `app.x'); ${update}; --`, closesArguments: `app.x', 'y', false); ${update}; --`,
     ...hostile,
   };

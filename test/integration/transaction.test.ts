@@ -1890,14 +1890,16 @@ describe('setLocal()', () => {
   });
 
   // a name of each row's own, never set on any connection of the pool before
-  it.each([['COMMIT', 'app.after_commit', async () => undefined], ['ROLLBACK', 'app.after_rollback', async () => { throw new Error('rolled back'); }]] as const)(
-    'leaves \'\' on that connection after %s, not NULL as before', async (_, name, end) => {
-      await ownClient(async client => {
-        expect(await setting(client, name)).toBeNull();
-        await db.readCommitted(client, async c => { await db.setLocal(c, { [name]: 'Ada Quill' }); await end(); }).catch(() => undefined);
-        expect(await setting(client, name)).toBe('');
-      });
+  it.each<[string, string, () => Promise<void>]>([
+    ['COMMIT', 'app.after_commit', async () => undefined],
+    ['ROLLBACK', 'app.after_rollback', async () => { throw new Error('rolled back'); }],
+  ])('leaves \'\' on that connection after %s, not NULL as before', async (_, name, end) => {
+    await ownClient(async client => {
+      expect(await setting(client, name)).toBeNull();
+      await db.readCommitted(client, async c => { await db.setLocal(c, { [name]: 'Ada Quill' }); await end(); }).catch(() => undefined);
+      expect(await setting(client, name)).toBe('');
     });
+  });
 
   it('gives back the session’s value of the same name at COMMIT', async () => {
     await ownClient(async client => {
