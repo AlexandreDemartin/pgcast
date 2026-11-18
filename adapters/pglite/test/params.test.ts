@@ -4,6 +4,7 @@
 // same query, is stored the same, read back as text, or refused with the same SQLSTATE, on a plain PGlite and on
 // one with parsers and serializers of its own.
 
+import { runInNewContext } from 'vm';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { refusal, shape, usePGlite, type Kind } from './helpers';
 
@@ -94,6 +95,7 @@ const cases: [string, string, unknown][] = [
   ['a Buffer to $1 alone', 'SELECT $1 AS t', Buffer.from('hi')],
   ['a Buffer to jsonb', into('c_jsonb'), Buffer.from('{"a":1}')],
   ['a Uint8Array to text', into('c_text'), new Uint8Array([0x68, 0x69])],
+  ['a Date of another realm to timestamptz, as util.types.isDate() tells it', into('c_tstz'), runInNewContext("new Date('2026-06-01T10:00:00.123Z')")],
   ["'yes' to bool", into('c_bool'), 'yes'],
   ["'tr' to bool", into('c_bool'), 'tr'],
   ["'maybe' to bool", into('c_bool'), 'maybe'],

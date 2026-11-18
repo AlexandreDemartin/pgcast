@@ -103,6 +103,13 @@ describe('prepared queries', () => {
     expect(await refused(u.pool())).toEqual(['ran', 'Prepared statements must be unique - \'taken\' was used for a different statement', '42601']);
   });
 
+  it('knows the names prepared on a PGlite through any of its pools', async () => {
+    const [a, b] = [asPool(u.pglite()), asPool(u.pglite())];
+    expect((await a.query({ text: 'SELECT 4 AS n', values: [], name: 'shared' })).rows).toEqual([{ n: 4 }]);
+    expect((await b.query({ text: 'SELECT 4 AS n', values: [], name: 'shared' })).rows).toEqual([{ n: 4 }]);
+    await expect(b.query({ text: 'SELECT 5 AS n', values: [], name: 'shared' })).rejects.toThrow('Prepared statements must be unique');
+  });
+
   it('gives 26000 for a prepared query after DEALLOCATE ALL, as pg does', async () => {
     const after = async (q: { query: (q: any) => Promise<unknown> }) => {
       await q.query({ text: 'SELECT 3 AS t', values: [], name: 'dropped' });
