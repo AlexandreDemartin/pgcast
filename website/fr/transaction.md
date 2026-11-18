@@ -1,5 +1,5 @@
 ---
-english: bcba41c07026
+english: b568402235d9
 ---
 
 # Transactions
@@ -280,38 +280,39 @@ Une cliente réserve trois sièges et passe celui qui est déjà pris ; les aut
 
 <<< ../examples/plain/savepoint_seat.ts{ts twoslash}
 
-`booked` vaut `['K1', 'K3']`. Chaque siège envoie :
+`booked` vaut `['K1', 'K3']`. Chaque siège envoie, `…` étant un nombre qui lui est propre :
 
 <!-- probe: db.savepoint(pool, async () => {}).then(() => db.savepoint(pool, async () => { throw new Error(); })) -->
 ```sql
 -- K1 and K3
-SAVEPOINT pgcast_savepoint
+SAVEPOINT pgcast_savepoint_…
 -- the callback's insert()
-RELEASE SAVEPOINT pgcast_savepoint
+RELEASE SAVEPOINT pgcast_savepoint_…
 -- K2
-SAVEPOINT pgcast_savepoint
+SAVEPOINT pgcast_savepoint_…
 -- the callback's insert(), which Postgres refuses with 23505
-ROLLBACK TO SAVEPOINT pgcast_savepoint
-RELEASE SAVEPOINT pgcast_savepoint
+ROLLBACK TO SAVEPOINT pgcast_savepoint_…
+RELEASE SAVEPOINT pgcast_savepoint_…
 ```
 
 Le SQL de la requête du callback : [`insert()`](/fr/insert#insert).
 
 | Quand | SQL |
 |---|---|
-| avant le callback | `SAVEPOINT pgcast_savepoint`<!-- probe: db.savepoint(pool, async () => {}) --> |
-| le callback se résout | `RELEASE SAVEPOINT pgcast_savepoint`<!-- probe: db.savepoint(pool, async () => {}) --> |
-| le callback ou ce `RELEASE` est rejeté | `ROLLBACK TO SAVEPOINT pgcast_savepoint`<!-- probe: db.savepoint(pool, async () => { throw new Error(); }) -->, puis `RELEASE SAVEPOINT pgcast_savepoint`<!-- probe: db.savepoint(pool, async () => { throw new Error(); }) -->, puis elle est rejetée avec cette erreur |
+| avant le callback | `SAVEPOINT pgcast_savepoint_…`<!-- probe: db.savepoint(pool, async () => {}) --> |
+| le callback se résout | `RELEASE SAVEPOINT pgcast_savepoint_…`<!-- probe: db.savepoint(pool, async () => {}) --> |
+| le callback ou ce `RELEASE` est rejeté | `ROLLBACK TO SAVEPOINT pgcast_savepoint_…`<!-- probe: db.savepoint(pool, async () => { throw new Error(); }) -->, puis `RELEASE SAVEPOINT pgcast_savepoint_…`<!-- probe: db.savepoint(pool, async () => { throw new Error(); }) -->, puis elle est rejetée avec cette erreur |
+| ce `ROLLBACK TO` ou ce `RELEASE` est rejeté | rien de plus : elle est rejetée avec son erreur, à la place de la première, comme `transaction()` quand son `ROLLBACK` est rejeté |
 | elle est rejetée avec 40001 ou 40P01 | rien de plus : elle est rejetée avec cette erreur |
 
-- Un seul nom à chaque appel, donc le SQL est toujours le même. Postgres empile les savepoints d’un même nom, et `ROLLBACK TO` et `RELEASE` agissent sur le dernier : ils s’imbriquent, et chaque échec n’annule que son propre niveau. N’écrivez pas votre propre `SAVEPOINT pgcast_savepoint` dans le callback : il rejoint cette pile.
+- Chaque appel nomme son savepoint `pgcast_savepoint_` suivi d’un nombre, un de plus à chaque appel : c’est la seule partie du SQL qui change. `ROLLBACK TO` et `RELEASE` suppriment aussi tous les savepoints établis après le leur, donc les savepoints s’imbriquent : chaque échec annule le travail de son propre niveau, niveaux intérieurs compris, quoi qu’ils aient laissé. Ne donnez pas un tel nom à l’un de vos savepoints.
 - Sur 40001 ou 40P01, la transaction reste en échec : son `COMMIT` ne peut pas en enregistrer la moitié. `transaction()` l’annule et exécute de nouveau tout son callback, savepoint compris ([Retries](#retries)). Un savepoint ne réessaie jamais de lui-même : seule une nouvelle transaction obtient un nouvel instantané.
-- Un callback qui intercepte l’erreur d’une requête et se termine : Postgres refuse le `RELEASE` (25P02), donc `savepoint()` annule jusqu’au savepoint et est rejetée avec ce 25P02. Son travail est annulé, et la transaction peut continuer. Ainsi, un 40001 ou un 40P01 que le callback intercepte n’est pas réessayé : laissez-les remonter, et relancez-les autour de `savepoint()`, comme le fait l’exemple.
-- Les 40001 et 40P01 sont reconnus à leur `code`, comme dans [Retries](#retries). Une telle erreur levée depuis JavaScript, puis interceptée, laisse son savepoint établi, si bien que le `ROLLBACK TO` d’un savepoint extérieur n’annule que jusqu’à lui.
+- Un callback qui intercepte l’erreur d’une requête et se termine : Postgres refuse le `RELEASE` (25P02), donc `savepoint()` annule jusqu’au savepoint et est rejetée avec ce 25P02. Son travail est annulé, niveaux intérieurs compris, et la transaction peut continuer. Ainsi, un 40001 ou un 40P01 que le callback intercepte n’est pas réessayé : le `COMMIT` de la transaction enregistre ce qu’elle a écrit hors de ce savepoint. Après un conflit sous `SERIALIZABLE`, Postgres peut refuser une écriture suivante avec un nouveau 40001. Laissez-les remonter, et relancez-les autour de `savepoint()`, comme le fait l’exemple.
+- Les 40001 et 40P01 sont reconnus à leur `code`, comme dans [Retries](#retries). Une telle erreur levée depuis JavaScript, puis interceptée, ne reçoit pas de `ROLLBACK TO` : le travail de son savepoint reste en place, sauf si un niveau extérieur l’annule.
 - Hors d’un bloc de transaction, Postgres refuse le `SAVEPOINT` (25P01) : `savepoint()` est rejetée avec cette erreur, et n’appelle jamais le callback.
-- Un seul à la fois sur un client : attendez chacun avec `await`. Deux en même temps s’entremêlent sur sa connexion, et aucun nom ne peut séparer leurs piles. Non vérifié.
+- Un seul à la fois sur un client : attendez chacun avec `await`. Deux en même temps s’entremêlent sur sa connexion : le `ROLLBACK TO` ou le `RELEASE` de l’un supprime le savepoint de l’autre, dont le `ROLLBACK TO` ou le `RELEASE` échoue alors (3B001), et la transaction passe en échec. Non vérifié.
 - Ses requêtes passent par [`queryListener`](/fr/runtime-config#Config.queryListener) et [`resultListener`](/fr/runtime-config#Config.resultListener) avec l’id de la transaction ; [`transactionListener`](/fr/runtime-config#Config.transactionListener) n’en reçoit rien.
-- Une `transaction()` à l’intérieur est [transmise](#passing-a-transaction-through) : elle n’envoie pas de `SAVEPOINT`.
+- Une `transaction()` appelée avec le client du callback d’une `transaction()` est [transmise](#passing-a-transaction-through) : elle n’envoie pas de `SAVEPOINT`. Appelée avec un `pg.PoolClient` sur lequel vous avez envoyé `BEGIN`, elle ne l’est pas ([Votre propre `BEGIN`](#your-own-begin)).
 
 ## Types {#types}
 

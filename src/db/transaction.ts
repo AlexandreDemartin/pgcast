@@ -397,7 +397,7 @@ export async function serializableRODeferrable<T, C = unknown>(txnClientOrQuerya
  * - Each `ROLLBACK TO` and `RELEASE` also ends the savepoints established
  *   after its own, so each level undoes its own work whatever an inner one
  *   left. Don't name a savepoint of yours `pgcast_savepoint_<n>`. `await`
- *   each: two at once on one client mix their work.
+ *   each: two at once on one client end each other's savepoints.
  * - Only the `code` is read, as `transaction()` reads it: a 40001 thrown from
  *   JavaScript, then caught, leaves the work of its savepoint in, unless an
  *   outer level rolls back.
