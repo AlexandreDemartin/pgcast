@@ -617,6 +617,24 @@ describe('setLocal()', () => {
     expect(sent).toEqual([{ text: 'SELECT set_config($1, $2, true)', values: ['app.customer', 'Ada Quill'] }]);
   });
 
+  it('sends only the object’s own keys: one made enumerable on Object.prototype is not sent', async () => {
+    const proto = Object.prototype as Record<string, unknown>, { sent, client } = settingClient('T');
+    proto.role = 'postgres';
+    try {
+      await db.setLocal(client, { 'app.customer': 'Ada Quill' });
+    } finally {
+      delete proto.role;
+    }
+    expect(sent).toEqual([{ text: 'SELECT set_config($1, $2, true)', values: ['app.customer', 'Ada Quill'] }]);
+  });
+
+  it('drops a Symbol key and a non-enumerable one: nothing is sent for them, and nothing thrown', async () => {
+    const settings = Object.defineProperty({ [Symbol('app.screening')]: '1002', 'app.customer': 'Ada Quill' }, 'role', { value: 'postgres', enumerable: false });
+    const { sent, client } = settingClient('T');
+    await db.setLocal(client, settings);
+    expect(sent).toEqual([{ text: 'SELECT set_config($1, $2, true)', values: ['app.customer', 'Ada Quill'] }]);
+  });
+
   class Context { 'app.customer' = 'Ada Quill'; }
   it.each<[string, unknown]>([
     ['null', null], ['undefined', undefined], ['a number', 42], ['a string', 'app.customer'], ['an array', ['app.customer']],
@@ -643,6 +661,7 @@ describe('setLocal()', () => {
 
   it.each([
     ['app.customer', 'app.Customer'], ['app.Customer', 'app.customer'], ['APP.CUSTOMER', 'app.customer'], ['Role', 'role'],
+    ['app.Z', 'app.z'], ['app.a', 'app.A'],
   ])('refuses %s and %s, which differ only in case, before any query', async (first, second) => {
     const { sent, client } = settingClient('T'), queries = listened();
     await expect(db.setLocal(client, { [first]: 'Ada Quill', 'app.screening': '1002', [second]: 'Bea Holm' })).rejects.toThrow(casePair(first, second));
