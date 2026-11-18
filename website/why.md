@@ -64,9 +64,9 @@ A transaction starts only when you call [`transaction()`](/transaction#transacti
 
 The same goes for your own functions. Zapatos's docs advise against giving a function's client argument the pool as its default: "I find that way it's too easy to accidentally issue queries outside of transactions."
 
-So a function of yours takes its client with no default, and each caller passes the pool or its transaction's client. One that only runs queries takes a [`Queryable`](/sql-template#Queryable).
+So a function of yours takes its client with no default, and each caller passes the pool or its transaction's client. One that only runs queries takes a [`Queryable`](/sql-template#Queryable); typed [`QueryableLike`](/sql-template#QueryableLike), it also takes another driver's pool or client ([Drivers](/drivers)).
 
-One that opens a transaction takes the pool or the client of its level, `pg.Pool | db.TxnClientForSerializable` for [`serializable()`](/transaction#serializable). A `Queryable` would also take the client of a transaction at a lower level, and the function would run inside it, at that level, unless [`transactionRequiresSatisfyingLevel`](/runtime-config#Config.transactionRequiresSatisfyingLevel) makes it reject ([Book inside a larger transaction](/retries#book-inside-a-larger-transaction)).
+One that opens a transaction takes the pool or the client of its level, `pg.Pool | db.TxnClientForSerializable` for [`serializable()`](/transaction#serializable); typed `db.PoolLike | db.TxnClientForSerializable` ([`PoolLike`](/transaction#PoolLike)), it also takes another driver's pool. A `Queryable` would also take the client of a transaction at a lower level, and the function would run inside it, at that level, unless [`transactionRequiresSatisfyingLevel`](/runtime-config#Config.transactionRequiresSatisfyingLevel) makes it reject ([Book inside a larger transaction](/retries#book-inside-a-larger-transaction)).
 
 ## What pgcast adds
 
