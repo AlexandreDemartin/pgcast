@@ -96,9 +96,21 @@ await db.readCommitted(pool, txnClient => bookSeats(txnClient, 1000, ['G1'], 'Wr
 
 Typed [`db.Queryable`](/sql-template#Queryable), it would take that client, and `bookSeats()` would run at `READ COMMITTED`, with a warning, once, `PGCAST_DEP007`. With [`transactionRequiresSatisfyingLevel`](/runtime-config#Config.transactionRequiresSatisfyingLevel), it rejects instead, before its callback.
 
+## Queue the requests with a lock
+
+Rather than conflict and retry, the requests for one screening can wait in turn. Take [`advisoryXactLock()`](/transaction#advisoryXactLock) first in the callback, in [`readCommitted()`](/transaction#readCommitted), where each query reads what has been committed before it:
+
+<<< ./examples/plain/retries_lock.ts{ts twoslash}
+
+The tab that comes second waits at `SELECT pg_advisory_xact_lock($1, $2)`<!-- probe: db.readCommitted(pool, txnClient => db.advisoryXactLock(txnClient, [2, 1000])) --> until the first one's `COMMIT`, then counts its seats and books nothing: one tab gets its rows, the other `null`, with no 40001 and no retry. Postgres releases the lock when the transaction ends, at each attempt's `ROLLBACK` too, so a retry never inherits it.
+
+- Every transaction that writes what the rule counts takes the lock first, or the rule no longer holds.
+- Keep `readCommitted()`. In `serializable()`, the snapshot is taken before the wait: the second tab still gets 40001, and its retry sees the seats; in `repeatableRead()`, it books too: five seats in all.
+- A key is a pair of 32-bit integers, or a `bigint`; a key from a text, and why there is no session lock: [`advisoryXactLock()`](/transaction#advisoryXactLock).
+
 ## Tune and watch the retries
 
-Three options of [`setConfig()`](/runtime-config#setConfig), for every transaction of the process:
+Four options of [`setConfig()`](/runtime-config#setConfig), for every transaction of the process:
 
 ```ts twoslash
 import * as db from 'zapatos/db';
@@ -107,19 +119,23 @@ db.setConfig({
   transactionAttemptsMax: 10,
   transactionRetryDelay: { minMs: 50, maxMs: 500 },
   transactionListener: (message, txnId) => console.log(`[txn ${txnId}] ${message}`),
+  transactionEventListener: (event, txnId) => console.log(JSON.stringify({ txnId, ...event })),
 });
 ```
 
-A retried transaction then logs:
+A retried transaction then logs each message, then its event, with the same numbers:
 
 ```txt
 [txn 0] Transaction rollback (code 40001) on attempt 1 of 10, retrying in 292ms
+{"txnId":0,"type":"rollback","code":"40001","attempt":1,"maxAttempts":10,"delayMs":292}
 [txn 0] Retrying transaction, attempt 2 of 10
+{"txnId":0,"type":"retry","attempt":2,"maxAttempts":10}
 ```
 
 - [`transactionAttemptsMax`](/runtime-config#Config.transactionAttemptsMax): the attempts in all. `1` turns the retries off.
 - [`transactionRetryDelay`](/runtime-config#Config.transactionRetryDelay): the wait before each retry. The client stays checked out of the pool while it waits.
 - [`transactionListener`](/runtime-config#Config.transactionListener): every message it gets is in [Retries](/transaction#retries).
+- [`transactionEventListener`](/runtime-config#Config.transactionEventListener): the same, as a [`TransactionEvent`](/runtime-config#TransactionEvent), so a log or a metric reads the kind, the code and the attempt as fields.
 
 ## Test a retry
 
@@ -136,4 +152,5 @@ Here with `test` from `node:test` and `assert` from `node:assert/strict`; any te
 
 - [`transaction()`](/transaction#transaction): its isolation levels, the SQL it sends, its retries and its errors.
 - [`TxnClientForSerializable`](/transaction#TxnClientForSerializable) and [`IsolationSatisfying`](/transaction#IsolationSatisfying): which client a level accepts.
+- [Savepoints](/savepoints): undo part of a transaction and keep the rest.
 - [Errors](/handle-errors): the errors of an app, from Postgres and from pgcast.

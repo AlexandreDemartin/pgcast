@@ -29,6 +29,7 @@ const groups: Group[] = [
       { text: { en: 'Pagination', fr: 'Pagination' }, link: '/paginate' },
       { text: { en: 'Batches', fr: 'Batches' }, link: '/batches' },
       { text: { en: 'Retries', fr: 'Retries' }, link: '/retries' },
+      { text: { en: 'Savepoints<small class="since">6.12</small>', fr: 'Savepoints<small class="since">6.12</small>' }, link: '/savepoints' },
       { text: { en: 'Custom types', fr: 'Types personnalisés' }, link: '/custom-types' },
       { text: { en: 'Raw SQL', fr: 'SQL brut' }, link: '/raw-sql' },
       { text: { en: 'Errors', fr: 'Erreurs' }, link: '/handle-errors' },

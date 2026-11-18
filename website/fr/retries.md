@@ -1,5 +1,5 @@
 ---
-english: 01fe07e4fe62
+english: daf35566a7c4
 description: "Réservez des places sous SERIALIZABLE, pour que deux requêtes HTTP simultanées n’enfreignent pas une règle, et laissez pgcast relancer la transaction refusée."
 ---
 
@@ -97,9 +97,21 @@ await db.readCommitted(pool, txnClient => bookSeats(txnClient, 1000, ['G1'], 'Wr
 
 Typé [`db.Queryable`](/fr/sql-template#Queryable), il accepterait ce client, et `bookSeats()` s’exécuterait en `READ COMMITTED`, avec un avertissement, une fois, `PGCAST_DEP007`. Avec [`transactionRequiresSatisfyingLevel`](/fr/runtime-config#Config.transactionRequiresSatisfyingLevel), elle est rejetée à la place, avant son callback.
 
+## Mettre les requêtes en file avec un lock {#queue-the-requests-with-a-lock}
+
+Plutôt que d’entrer en conflit et de réessayer, les requêtes HTTP pour une même séance peuvent attendre leur tour. Prenez [`advisoryXactLock()`](/fr/transaction#advisoryXactLock) en premier dans le callback, dans [`readCommitted()`](/fr/transaction#readCommitted), où chaque requête SQL lit ce qui a été commité avant elle :
+
+<<< ../examples/plain/retries_lock.ts{ts twoslash}
+
+L’onglet qui arrive en second attend à `SELECT pg_advisory_xact_lock($1, $2)`<!-- probe: db.readCommitted(pool, txnClient => db.advisoryXactLock(txnClient, [2, 1000])) --> jusqu’au `COMMIT` du premier, puis compte ses places et ne réserve rien : un onglet obtient ses lignes, l’autre `null`, sans 40001 ni retry. Postgres libère le lock à la fin de la transaction, au `ROLLBACK` de chaque tentative aussi, donc un retry n’en hérite jamais.
+
+- Chaque transaction qui écrit ce que compte la règle prend d’abord le lock, sinon la règle ne tient plus.
+- Gardez `readCommitted()`. Dans `serializable()`, l’instantané est pris avant l’attente : le second onglet reçoit quand même un 40001, et son retry voit les places ; dans `repeatableRead()`, il réserve aussi : cinq places en tout.
+- Une clé est une paire d’entiers de 32 bits, ou un `bigint` ; une clé tirée d’un texte, et pourquoi il n’y a pas de lock de session : [`advisoryXactLock()`](/fr/transaction#advisoryXactLock).
+
 ## Régler et suivre les retries {#tune-and-watch-the-retries}
 
-Trois options de [`setConfig()`](/fr/runtime-config#setConfig), pour chaque transaction du processus :
+Quatre options de [`setConfig()`](/fr/runtime-config#setConfig), pour chaque transaction du processus :
 
 ```ts twoslash
 import * as db from 'zapatos/db';
@@ -108,19 +120,23 @@ db.setConfig({
   transactionAttemptsMax: 10,
   transactionRetryDelay: { minMs: 50, maxMs: 500 },
   transactionListener: (message, txnId) => console.log(`[txn ${txnId}] ${message}`),
+  transactionEventListener: (event, txnId) => console.log(JSON.stringify({ txnId, ...event })),
 });
 ```
 
-Une transaction réessayée affiche alors :
+Une transaction réessayée affiche alors chaque message, puis son événement, avec les mêmes nombres :
 
 ```txt
 [txn 0] Transaction rollback (code 40001) on attempt 1 of 10, retrying in 292ms
+{"txnId":0,"type":"rollback","code":"40001","attempt":1,"maxAttempts":10,"delayMs":292}
 [txn 0] Retrying transaction, attempt 2 of 10
+{"txnId":0,"type":"retry","attempt":2,"maxAttempts":10}
 ```
 
 - [`transactionAttemptsMax`](/fr/runtime-config#Config.transactionAttemptsMax) : le nombre total de tentatives. `1` désactive les retries.
 - [`transactionRetryDelay`](/fr/runtime-config#Config.transactionRetryDelay) : l’attente avant chaque retry. Le client n’est pas libéré pendant qu’il attend.
 - [`transactionListener`](/fr/runtime-config#Config.transactionListener) : chaque message qu’il reçoit figure dans [Retries](/fr/transaction#retries).
+- [`transactionEventListener`](/fr/runtime-config#Config.transactionEventListener) : la même chose, sous forme de [`TransactionEvent`](/fr/runtime-config#TransactionEvent), pour qu’un log ou une métrique lise le type, le code et la tentative dans des champs.
 
 ## Tester un retry {#test-a-retry}
 
@@ -137,4 +153,5 @@ Ici avec `test` de `node:test` et `assert` de `node:assert/strict` ; n’import
 
 - [`transaction()`](/fr/transaction#transaction) : ses niveaux d’isolation, le SQL qu’elle envoie, ses retries et ses erreurs.
 - [`TxnClientForSerializable`](/fr/transaction#TxnClientForSerializable) et [`IsolationSatisfying`](/fr/transaction#IsolationSatisfying) : quel client un niveau accepte.
+- [Savepoints](/fr/savepoints) : annuler une partie d’une transaction et garder le reste.
 - [Erreurs](/fr/handle-errors) : les erreurs d’une application, venues de Postgres et de pgcast.
