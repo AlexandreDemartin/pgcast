@@ -213,10 +213,11 @@ export function asPool(pglite: PGliteLike): PGlitePool {
     // pg sends a query with no value and no name as a simple Query, which may hold several statements
     if (values.length === 0 && name == null) return resultOf(await send(queryMessage(text)));
 
-    const previous = name == null ? undefined : state.prepared.get(name);
-    if (previous !== undefined && previous !== text) throw new Error(`Prepared statements must be unique - '${name}' was used for a different statement`);
     const parameters = values.map(v => prepareValue(v));
     return pglite.runExclusive(async () => {
+      // read here, so that a query sent at the same moment under the same name sees the parse of the first
+      const previous = name == null ? undefined : state.prepared.get(name);
+      if (previous !== undefined && previous !== text) throw new Error(`Prepared statements must be unique - '${name}' was used for a different statement`);
       if (name != null && previous === undefined) {
         // prepared once, as pg prepares it once a parse completes, even if the query then fails
         await pglite.execProtocol(concat([parseMessage(name, text), sync]));
