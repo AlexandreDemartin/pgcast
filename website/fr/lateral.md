@@ -1,5 +1,5 @@
 ---
-english: 771b408acd94
+english: 56a290a58837
 description: "Récupérez des lignes avec celles qui s’y rattachent, en une requête et un résultat typé : un film avec sa distribution, un membre de l’équipe avec son mentor."
 ---
 
@@ -137,6 +137,30 @@ Avec un `groupBy`, le résultat de chaque lateral figure aussi dans la ligne : 
 
 - `GROUP BY "studio_id", "lateral_studio".result`<!-- probe: examples/lateral_result_group.ts --> : chaque studio une seule fois, avec son nom et son nombre de films.
 - `db.sql<s.films.SQL>` refuse `${'name'}`, une colonne de `studios`. Un tableau de colonnes ne peut pas contenir le fragment : [`groupBy`](/fr/select#groupby-and-having) prend une colonne, un tableau de colonnes ou un seul fragment.
+
+## Nommer la ligne d’un lateral réutilisable {#name-the-row-of-a-reusable-lateral}
+
+Un lateral que plusieurs requêtes partagent va dans une fonction. Nommez la ligne qu’il donne à partir du type de cette fonction, plutôt qu’avec une interface écrite à la main, qu’il vous faudrait tenir à jour à chaque changement de la requête :
+
+<CastPanel example="lateral_row_map">
+
+<<< ../examples/lateral_row_map.ts{ts twoslash}
+
+</CastPanel>
+
+- [`LateralResult`](/fr/select#LateralResult) donne à chaque clé de l’objet le type du résultat de sa sous-requête : `cast` est un tableau de `{ character, billing }`.
+- `s.films.JSONSelectable` est la ligne entière du film, telle que la donne `db.all` sans `columns`. Avec `columns` ou `extras`, nommez plutôt la ligne entière de la requête (plus bas).
+
+Un lateral générique dans ses colonnes donne un type par appel. Appelez-le, et nommez le résultat de cet appel avec [`RunResultForSQLFragment`](/fr/sql-template#RunResultForSQLFragment) :
+
+<<< ../examples/plain/lateral_row_generic.ts{ts twoslash}
+
+- `Mentor` est le `name` et le `job` du mentor, ou `null` : dans un lateral, un `selectOne()` qui ne trouve aucune ligne donne `null`, là où son propre `.run()` donne `undefined`.
+- Nommée à partir de `ReturnType<typeof mentorLateral>`, la ligne aurait toutes les colonnes de `crew` : `C` y vaut sa contrainte, `s.crew.Column`.
+
+Pour la ligne entière d’une requête, ses `columns`, ses `extras` et ses laterals ensemble, tirez-la de `.run()` (`Awaited` demande TypeScript 4.5) :
+
+<<< ../examples/plain/lateral_row_whole.ts{ts twoslash}
 
 ## Vérifier la colonne parente {#check-the-parent-column}
 
