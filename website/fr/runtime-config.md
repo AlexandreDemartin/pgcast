@@ -1,5 +1,5 @@
 ---
-english: 906e235717ec
+english: 1fc49c78eaaf
 description: "Ce que zapatos/db vous laisse régler à l’exécution : setConfig() et chaque option de Config, les écouteurs, les opt-ins et leurs codes d’avertissement."
 ---
 
@@ -358,7 +358,7 @@ Sur un `40001` à la première de cinq tentatives, ce code affiche `{"txnId":0,"
 
 - Comme `transactionListener`, il n’est pas appelé pour une transaction commitée dès sa première tentative, ni pour toute autre erreur, ni par un `transaction()` qui reçoit le client d’une transaction et le transmet tel quel.
 - S’il lève une erreur, `transaction()` est rejetée avec cette erreur, comme quand `transactionListener` en lève une : une fois le `ROLLBACK` envoyé, et le client libéré. Une erreur qu’il lève à `retry` avec un `code` `40001` ou `40P01` compte comme l’échec de cette tentative, qui est réessayée tant qu’il reste une tentative, comme tout `40001`.
-- C’est une propriété, là où les autres écouteurs sont des méthodes : un écouteur typé pour une partie des événements, qui lirait une clé que les autres n’ont pas, ne compile pas.
+- C’est une propriété, là où les autres écouteurs sont des méthodes : un écouteur typé pour une partie des événements, qui lirait une clé que les autres n’ont pas, ne compile pas sous `strict` (`strictFunctionTypes`).
 - Zapatos 6.6.1 n’a pas cette option ([Revenir en arrière](/fr/switching#go-back)).
 
 ### Les ids de transaction {#transaction-ids}

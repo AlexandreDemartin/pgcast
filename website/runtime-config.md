@@ -353,7 +353,7 @@ On a `40001` at the first of five attempts, this prints `{"txnId":0,"type":"roll
 
 - As for `transactionListener`, it is not called for a transaction that commits on its first attempt, for any other error, or by a `transaction()` given the client of a transaction, which passes it through.
 - If it throws, `transaction()` rejects with its error, as when `transactionListener` throws: once `ROLLBACK` is sent, and the client is released. An error that it throws at `retry` with a `code` of `40001` or `40P01` counts as that attempt's failure, which is retried while an attempt is left, as any `40001`.
-- It is a property, where the other listeners are methods: a listener typed for some of the events, which would read a key the others lack, doesn't compile.
+- It is a property, where the other listeners are methods: a listener typed for some of the events, which would read a key the others lack, doesn't compile under `strict` (`strictFunctionTypes`).
 - Zapatos 6.6.1 has no such option ([Go back](/switching#go-back)).
 
 ### Transaction ids {#transaction-ids}
