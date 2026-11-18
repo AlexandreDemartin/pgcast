@@ -253,6 +253,29 @@ describe('a nested call on another driver’s client (#702)', () => {
     expectTypeOf(nested).returns.resolves.toEqualTypeOf<db.IsolationLevel.Serializable>();
   });
 
+  test('a pool with client methods and a plain pg client can both start a fresh transaction', () => {
+    type Client = { query(q: db.SQLQuery): Promise<{ rows: any[]; command: string }>; release(): void };
+    type Serial = db.TxnClientLike<Client, db.IsolationLevel.Serializable>;
+    type Pool = Client & db.PoolLike<Client>;
+    // @ts-expect-error the pool has connect() even though it also has query() and release()
+    const read = (source: Pool | Serial) => db.readCommitted(source, async c => c._zapatos!.isolationLevel);
+    // @ts-expect-error a pool starts a READ COMMITTED transaction
+    const level = (p: Pool): Promise<db.IsolationLevel.Serializable> => read(p);
+    void level;
+    // @ts-expect-error choosing Serial explicitly cannot give a plain pg client an outer transaction
+    void db.readCommitted<db.IsolationLevel.Serializable, Client, Serial>(plain, async c => c._zapatos!.isolationLevel);
+    const nested = (c: Serial) => db.readCommitted(c, async inner => inner._zapatos!.isolationLevel);
+    expectTypeOf(nested).returns.resolves.toEqualTypeOf<db.IsolationLevel.Serializable>();
+  });
+
+  test('the fallback client shape written out by a caller is still refused', () => {
+    type Client = { query: (q: db.SQLQuery) => PromiseLike<{ rows: any[]; command: string }>; release: () => void };
+    type Copy = db.TxnClientLike<Client, db.IsolationLevel> & { connect?: never };
+    // @ts-expect-error this is the fallback type used when no client was inferred
+    const read = (c: Copy) => db.serializable(c, async inner => inner);
+    void read;
+  });
+
   test('a union of different drivers’ marked clients must be narrowed first', () => {
     type Serial = db.TxnClientLike<OtherClient, db.IsolationLevel.Serializable>;
     type Second = db.TxnClientLike<LiteralClient & { driver: 'second' }, db.IsolationLevel.Serializable>;
