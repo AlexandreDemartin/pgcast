@@ -16,6 +16,7 @@ declare function countSeats(txnClient: db.TxnClientForSerializableRO): Promise<n
 declare function countFilms(txnClient: db.TxnClientForRepeatableReadRO): Promise<number>;
 declare function countTags(txnClient: db.TxnClientForReadCommittedRO): Promise<number>;
 declare function countSeatsAnyRO(txnClient: db.TxnClientForSerializableRO | db.TxnClientForSerializableRODeferrable): Promise<number>;
+declare function bookSeat(txnClient: db.TxnClientForSerializable): Promise<number>;
 
 describe('the client of a transaction', () => {
   test('the callback gets the client of its level', () => {
@@ -116,6 +117,7 @@ type OtherClient = {
 type TxnOther<L extends db.IsolationLevel> = db.TxnClientLike<OtherClient, db.IsolationSatisfying<L>>;
 type Fails = OtherClient['query'];
 interface MyPool extends pg.Pool { extra: number }
+declare class AppPool extends pg.Pool { connect(): Promise<pg.PoolClient & { tag: 1 }> }
 interface MyClient extends pg.ClientBase { extra: number }
 declare const other: { connect: () => Promise<OtherClient> };
 declare const txn: db.TxnClientForSerializable;
@@ -124,6 +126,7 @@ declare const txnAny: db.TxnClient<db.IsolationLevel>;
 declare const clientBase: pg.ClientBase;
 declare const queryable: db.Queryable;
 declare const myPool: MyPool;
+declare const appPool: AppPool;
 declare const myClient: MyClient;
 declare const anyValue: any;
 declare const queryableLike: db.QueryableLike;
@@ -211,6 +214,12 @@ describe('the calls of Zapatos 6.6.1 keep their types (#696)', () => {
     expectTypeOf(db.transaction(queryable, db.IsolationLevel.RepeatableReadRO, async c => c)).resolves.toEqualTypeOf<db.TxnClientForRepeatableReadRO>();
   });
 
+  test('a pg.Pool subclass whose connect() gives a narrower client still gives the TxnClient… of its level', () => {
+    expectTypeOf(db.serializable(appPool, async c => c)).resolves.toEqualTypeOf<db.TxnClientForSerializable>();
+    // @ts-expect-error a TxnClientForSerializable has no tag, as in Zapatos 6.6.1
+    void db.serializable(appPool, async c => c.tag);
+  });
+
   test('generic forwarders, explicit type arguments and values keep them', () => {
     const forwarder = <Q extends db.Queryable>(q: Q) => db.serializable(q, async c => c);
     expectTypeOf(forwarder(pool)).resolves.toEqualTypeOf<db.TxnClientForSerializable>();
@@ -228,6 +237,58 @@ describe('the calls of Zapatos 6.6.1 keep their types (#696)', () => {
     void viaParameters;
     const mockImplementation = <F extends (...args: any) => any>(_: F, impl: (...args: Parameters<F>) => ReturnType<F>) => impl;
     void mockImplementation(db.serializable, async (_, callback) => callback(txn));
+  });
+
+  // the pool's client is inferred from the pool alone, never from the callback's own parameter (NoInfer), at each function
+  test('a callback typed for a level the transaction does not satisfy is refused, by reference, annotated, forwarded or as a value', () => {
+    expectTypeOf(db.serializable(pool, countBookings)).resolves.toEqualTypeOf<number>();
+    // @ts-expect-error READ COMMITTED does not satisfy REPEATABLE READ
+    void db.readCommitted(pool, countBookings);
+    // @ts-expect-error READ ONLY does not satisfy a read-write level
+    void db.repeatableReadRO(pool, countBookings);
+    // @ts-expect-error IsolationSatisfying<SerializableRO> leaves SerializableRODeferrable out (#489)
+    void db.serializableRODeferrable(pool, countSeats);
+    // @ts-expect-error READ COMMITTED, READ ONLY does not satisfy SERIALIZABLE
+    void db.readCommittedRO(pool, bookSeat);
+    // @ts-expect-error REPEATABLE READ does not satisfy SERIALIZABLE, READ ONLY
+    void db.repeatableRead(pool, countSeats);
+    // @ts-expect-error SERIALIZABLE, READ ONLY does not satisfy SERIALIZABLE
+    void db.serializableRO(pool, bookSeat);
+    // @ts-expect-error a callback typed for another driver's client, given a pg pool: a pg client has no exec()
+    void db.serializable(pool, async (c: OtherClient) => c.exec('SELECT 1'));
+    // @ts-expect-error at repeatableRead()
+    void db.repeatableRead(pool, async (c: OtherClient) => c.exec('SELECT 1'));
+    // @ts-expect-error at readCommitted()
+    void db.readCommitted(pool, async (c: OtherClient) => c.exec('SELECT 1'));
+    // @ts-expect-error at serializableRO()
+    void db.serializableRO(pool, async (c: OtherClient) => c.exec('SELECT 1'));
+    // @ts-expect-error at repeatableReadRO()
+    void db.repeatableReadRO(pool, async (c: OtherClient) => c.exec('SELECT 1'));
+    // @ts-expect-error at readCommittedRO()
+    void db.readCommittedRO(pool, async (c: OtherClient) => c.exec('SELECT 1'));
+    // @ts-expect-error at serializableRODeferrable()
+    void db.serializableRODeferrable(pool, async (c: OtherClient) => c.exec('SELECT 1'));
+    // @ts-expect-error at transaction()
+    void db.transaction(pool, db.IsolationLevel.ReadCommitted, async (c: OtherClient) => c.exec('SELECT 1'));
+    // @ts-expect-error transaction() at READ COMMITTED
+    void db.transaction(pool, db.IsolationLevel.ReadCommitted, countBookings);
+    // @ts-expect-error an arrow annotated with the wrong level
+    void db.readCommitted(pool, async (c: db.TxnClientForRepeatableRead) => countBookings(c));
+    // @ts-expect-error an annotated arrow that reads the level
+    void db.readCommittedRO(pool, async (c: db.TxnClientForSerializable) => c._zapatos?.isolationLevel);
+    const forwarder = <T>(cb: (c: db.TxnClientForRepeatableRead) => Promise<T>) =>
+      // @ts-expect-error a forwarder's callback
+      db.readCommitted(pool, cb);
+    void forwarder;
+    // @ts-expect-error inside a map()
+    void [pool].map(p => db.readCommitted(p, countBookings));
+    // @ts-expect-error on a plain client
+    void db.readCommitted(plain, countBookings);
+    // @ts-expect-error on a queryable typed any
+    void db.readCommitted(anyValue, countBookings);
+    // @ts-expect-error readCommitted() as a value typed for a REPEATABLE READ callback
+    const asValue: (q: db.Queryable, cb: (c: db.TxnClientForRepeatableRead) => Promise<number>) => Promise<number> = db.readCommitted;
+    void asValue;
   });
 
   test('the two paths that move: the first parameter as a type, and an arrow given as the function', () => {
