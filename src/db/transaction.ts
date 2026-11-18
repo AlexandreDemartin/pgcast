@@ -696,9 +696,11 @@ async function* cursorBatches<RunResult>(
       const status = transactionStatus(txnClient as pg.ClientBase);  // I after a COMMIT of yours, whose cursors went with it (34000)
       // pg reads the status E at the ReadyForQuery after an ErrorResponse, often a chunk later, so a CLOSE can still go
       // out after a query of the loop failed: Postgres's 25P02 for it is dropped, or it would replace that query's error
-      if (declared && !rejected && !ended() && status !== 'E' && status !== 'I') await sql`CLOSE ${name}`.run(txnClient).catch((err: unknown) => {
-        if (!isDatabaseError(err, 'InvalidTransactionState_InFailedSqlTransaction')) throw err;
-      });
+      if (declared && !rejected && !ended() && status !== 'E' && status !== 'I') {
+        await sql`CLOSE ${name}`.run(txnClient).catch((err: unknown) => {
+          if (!isDatabaseError(err, 'InvalidTransactionState_InFailedSqlTransaction')) throw err;
+        });
+      }
     } finally {
       held.delete(n);
       if (held.size === 0) cursorNumbers.delete(txnClient);

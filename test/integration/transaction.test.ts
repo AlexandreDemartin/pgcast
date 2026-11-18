@@ -2093,7 +2093,7 @@ describe('cursor()', () => {
     let attempts = 0;
     await db.serializable(lagging, async c => {
       const batches = db.cursor(c, series(3), { batchSize: 1 });
-      try { for (let r = await batches.next(); !r.done; r = await batches.next()) if (++attempts === 1) await raise(c, '40001'); }
+      try { for (let r = await batches.next(); !r.done; r = await batches.next()) if (++attempts === 1) await raise(c as never, '40001'); }
       finally { await batches.return(); }
     });
     expect(attempts).toBe(4);
@@ -2104,7 +2104,7 @@ describe('cursor()', () => {
   it('drops the 25P02 that Postgres gives a CLOSE after a failed query, so a break after an error the loop caught ends the loop', async () => {
     const texts = sent(), ended = new Error('ended');
     await expect(db.readCommitted(lagging, async c => {
-      for await (const _ of db.cursor(c, series(3), { batchSize: 1 })) { await raise(c, '23505').catch(() => undefined); break; }
+      for await (const _ of db.cursor(c, series(3), { batchSize: 1 })) { await raise(c as never, '23505').catch(() => undefined); break; }
       throw ended;
     })).rejects.toBe(ended);
     expect(texts).toEqual(['START TRANSACTION', 'DECLARE pgcast_cursor_1', 'FETCH FORWARD', 'DO $$BEGIN', 'CLOSE pgcast_cursor_1', 'ROLLBACK']);
