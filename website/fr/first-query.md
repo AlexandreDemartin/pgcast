@@ -332,7 +332,7 @@ console.log(newFilm);
 
 ## 8. Quand le schéma change {#when-the-schema-changes}
 
-Relancez `npx pgcast` après chaque migration. `schema.d.ts` est entièrement réécrit, et TypeScript y confronte chaque requête. Essayez : renommez une colonne, régénérez, et vérifiez le fichier :
+Relancez `npx pgcast` après chaque migration. `schema.d.ts` est entièrement réécrit, et TypeScript y confronte chaque requête. En CI, [`npx pgcast --check`](/fr/generator#check) sort avec le code 1 tant qu’un fichier généré diffère de ce que donne la base. Essayez : renommez une colonne, régénérez, et vérifiez le fichier :
 
 ```sh
 psql "$DATABASE_URL" -c 'ALTER TABLE films RENAME runtime_minutes TO minutes'

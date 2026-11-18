@@ -160,7 +160,7 @@ describe('select', () => {
     expectTypeOf(db.upsert('extra.spools', { length: 3 }, 'id').run(pool)).resolves.not.toBeAny();
   });
 
-  // an array has a length, a number, so `[]`, an array held in a variable and one `as const` fitted the one-row overload
+  // an array has a length, a number, so `[]` and an array held in a variable fitted the one-row overload
   // of extra.spools, and their result was typed as one row (an inline `[{ length: 1 }, {}]` already took the array
   // overload); the guard sends them to the array overload, as on any other table (#674)
   test('an array of rows takes the array overload of insert() and upsert(), with a column named length (#674)', () => {
@@ -177,8 +177,9 @@ describe('select', () => {
       .resolves.toEqualTypeOf<Pick<s.extra.spools.JSONSelectable, 'id'>[]>();
   });
 
-  // a readonly array fitted the one-row overload of extra.spools, typed as one row, under Zapatos 6.6.1 (#674), and
-  // no overload on any other table; it takes the array overload, as it runs (#683)
+  // a readonly array and an array `as const`, held in a variable or written in the call, fitted the one-row overload
+  // of extra.spools, typed as one row, under Zapatos 6.6.1 and pgcast 6.10.0, on TypeScript 4.1.6, 5.9.3 and 7.0.2;
+  // they take the array overload, as they run (#683)
   test('a readonly array of rows takes the array overload, with a column named length (#683)', () => {
     const ro: readonly s.extra.spools.Insertable[] = [{ length: 1 }];
     const asConst = [{ length: 1 }, {}] as const;
@@ -186,7 +187,10 @@ describe('select', () => {
     expectTypeOf(db.insert('extra.spools', asConst)).toEqualTypeOf<db.SQLFragment<s.extra.spools.JSONSelectable[]>>();
     expectTypeOf(db.insert('extra.spools', [] as const)).toEqualTypeOf<db.SQLFragment<s.extra.spools.JSONSelectable[]>>();
     expectTypeOf(db.upsert('extra.spools', ro, 'id').run(pool)).resolves.toEqualTypeOf<(s.extra.spools.JSONSelectable & db.UpsertAction)[]>();
-    expectTypeOf(db.upsert('extra.spools', asConst, 'id').run(pool)).resolves.not.toBeAny();
+    expectTypeOf(db.upsert('extra.spools', asConst, 'id').run(pool)).resolves.toEqualTypeOf<(s.extra.spools.JSONSelectable & db.UpsertAction)[]>();
+    expectTypeOf(db.insert('extra.spools', [{ length: 1 }, {}] as const)).toEqualTypeOf<db.SQLFragment<s.extra.spools.JSONSelectable[]>>();
+    expectTypeOf(db.upsert('extra.spools', [{ length: 1 }, {}] as const, 'id').run(pool))
+      .resolves.toEqualTypeOf<(s.extra.spools.JSONSelectable & db.UpsertAction)[]>();
     // @ts-expect-error a readonly array of strings is no array of Insertables of extra.spools
     db.insert('extra.spools', ['serach'] as const);
     // @ts-expect-error a readonly array of strings is no array of Insertables of extra.spools (upsert)

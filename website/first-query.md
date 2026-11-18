@@ -331,7 +331,7 @@ console.log(newFilm);
 
 ## 8. When the schema changes {#when-the-schema-changes}
 
-Run `npx pgcast` again after each migration. `schema.d.ts` is written afresh, and TypeScript checks every query against it. Try it: rename a column, regenerate, and check the file:
+Run `npx pgcast` again after each migration. `schema.d.ts` is written afresh, and TypeScript checks every query against it. In CI, [`npx pgcast --check`](/generator#check) exits with 1 while a generated file differs from what the database gives. Try it: rename a column, regenerate, and check the file:
 
 ```sh
 psql "$DATABASE_URL" -c 'ALTER TABLE films RENAME runtime_minutes TO minutes'
