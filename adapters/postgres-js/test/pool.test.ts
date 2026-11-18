@@ -173,16 +173,20 @@ describe('transactions', () => {
     expect(texts).toEqual(['START TRANSACTION', 'DECLARE pgcast_cursor_1', 'FETCH FORWARD', 'FETCH FORWARD', 'CLOSE pgcast_cursor_1', 'SELECT name', 'COMMIT']);
   });
 
-  it('sends CLOSE after a failed query of the loop, as its client reports no status: dropped when the loop throws, the rejection of a break after a caught error (#743)', async () => {
+  it('sends CLOSE after a failed query of the loop, as its client reports no status, and drops its 25P02: the loop’s error goes out, a break after a caught error ends the loop (#743)', async () => {
     const series = db.sql<db.SQL, { g: number }[]>`SELECT g FROM generate_series(1, 5) AS g`, failing = db.sql`SELECT 1/0`;
+    const texts: string[] = [];
+    db.setConfig({ queryListener: q => { texts.push(q.text.split(' ').slice(0, 2).join(' ')); } });
     const thrown = await db.readCommitted(u.pool, async c => {
       for await (const _ of db.cursor(c, series, { batchSize: 2 })) await failing.run(c);
     }).catch((e: unknown) => e);
     expect((thrown as { code?: string }).code).toBe('22012');
-    const broken = await db.readCommitted(u.pool, async c => {
+    const ended = new Error('ended');
+    await expect(db.readCommitted(u.pool, async c => {
       for await (const _ of db.cursor(c, series, { batchSize: 2 })) { await failing.run(c).catch(() => { }); break; }
-    }).catch((e: unknown) => e);
-    expect((broken as { code?: string }).code).toBe('25P02');
+      throw ended;
+    })).rejects.toBe(ended);
+    expect(texts.filter(text => text === 'CLOSE pgcast_cursor_1')).toHaveLength(2);
   });
 });
 

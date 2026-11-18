@@ -911,6 +911,26 @@ describe('cursor()', () => {
     expect(sent.slice(1)).toEqual([fetch(2)]);
   });
 
+  // pg rejects a query at its ErrorResponse and reads the status E at the ReadyForQuery after it, often a chunk later:
+  // the status is still T, CLOSE goes out and Postgres refuses it, 25P02
+  it('drops a 25P02 of CLOSE after a break, so the loop ends', async () => {
+    const { sent, client } = cursorClient({ rows: rows(5), status: 'T', fail: text => text.startsWith('CLOSE') ? sqlError('25P02') : undefined });
+    const batches: Row[][] = [];
+    for await (const batch of db.cursor(client, users, { batchSize: 2 })) { batches.push(batch); break; }
+    expect(batches).toEqual([rows(2)]);
+    expect(sent.slice(1)).toEqual([fetch(2), close()]);
+  });
+
+  it('drops a 25P02 of CLOSE at a return() in a finally, so the error of the loop’s query goes out', async () => {
+    const { sent, client } = cursorClient({ rows: rows(5), status: 'T', fail: text => text.startsWith('CLOSE') ? sqlError('25P02') : undefined });
+    const failure = sqlError('40001'), batches = db.cursor(client, users, { batchSize: 2 });
+    await expect((async () => {
+      try { for (let r = await batches.next(); !r.done; r = await batches.next()) throw failure; }
+      finally { await batches.return(); }
+    })()).rejects.toBe(failure);
+    expect(sent.slice(1)).toEqual([fetch(2), close()]);
+  });
+
   it('sends no CLOSE after a FETCH that rejects, rejects with its error unchanged, and frees the number', async () => {
     let fetches = 0;
     const failure = sqlError('22012');

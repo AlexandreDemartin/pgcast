@@ -2080,6 +2080,36 @@ describe('cursor()', () => {
     expect(texts.filter(text => text !== 'CLOSE pgcast_cursor_1')).toEqual(['START TRANSACTION', 'DECLARE pgcast_cursor_1', 'FETCH FORWARD', 'DO $$BEGIN', 'ROLLBACK']);
   });
 
+  /** A pool whose clients report T at all times, as pg does when the ReadyForQuery after an error has not yet come. */
+  const lagging = {
+    connect: async () => {
+      const c = await t.pool.connect();
+      return { query: (q: db.SQLQuery) => c.query(q), release: (err?: Error | boolean) => c.release(err), getTransactionStatus: () => 'T' };
+    },
+  };
+
+  it('drops the 25P02 that Postgres gives a CLOSE after a failed query: a 40001 is retried, under a return() in a finally too', async () => {
+    const { messages } = listen(), texts = sent();
+    let attempts = 0;
+    await db.serializable(lagging, async c => {
+      const batches = db.cursor(c, series(3), { batchSize: 1 });
+      try { for (let r = await batches.next(); !r.done; r = await batches.next()) if (++attempts === 1) await raise(c, '40001'); }
+      finally { await batches.return(); }
+    });
+    expect(attempts).toBe(4);
+    expect(texts.slice(0, 6)).toEqual(['START TRANSACTION', 'DECLARE pgcast_cursor_1', 'FETCH FORWARD', 'DO $$BEGIN', 'CLOSE pgcast_cursor_1', 'ROLLBACK']);
+    expect(messages).toEqual([expect.stringMatching(/^Transaction rollback \(code 40001\) on attempt 1 of /), expect.stringMatching(/^Retrying transaction, attempt 2 of /)]);
+  });
+
+  it('drops the 25P02 that Postgres gives a CLOSE after a failed query, so a break after an error the loop caught ends the loop', async () => {
+    const texts = sent(), ended = new Error('ended');
+    await expect(db.readCommitted(lagging, async c => {
+      for await (const _ of db.cursor(c, series(3), { batchSize: 1 })) { await raise(c, '23505').catch(() => undefined); break; }
+      throw ended;
+    })).rejects.toBe(ended);
+    expect(texts).toEqual(['START TRANSACTION', 'DECLARE pgcast_cursor_1', 'FETCH FORWARD', 'DO $$BEGIN', 'CLOSE pgcast_cursor_1', 'ROLLBACK']);
+  });
+
   it('yields the batches before a row that fails at FETCH time, then rejects with 22012, and sends no CLOSE', async () => {
     const texts = sent(), batches: unknown[] = [];
     const err = await db.readCommitted(t.pool, async c => {
