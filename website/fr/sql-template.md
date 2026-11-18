@@ -661,7 +661,7 @@ const migrationClient = {
 const films = await db.select('films', db.all).run(migrationClient);
 ```
 
-- Le SQL est le même que sur un pool `pg`, tout comme le type en quoi `run()` se résout. `runResultTransform` reçoit ce que donne `query()`, tel quel.
+- Le SQL est le même que sur un pool `pg`, tout comme le type en quoi `run()` se résout, qui suppose des valeurs parsées comme `pg` les parse (`json` et `jsonb` en objets) : un driver qui renvoie le `jsonb` en texte résout `select()` en une chaîne, typée comme ses lignes. `runResultTransform` reçoit ce que donne `query()`, tel quel.
 - Un driver qui ignore `name` exécute un fragment préparé sans le préparer.
 - Un `query()` qui ne prend que le texte, comme le `query(text, params)` de PGlite, ne compile pas, pas plus qu’un driver sans `query()`, comme postgres.js : chacun a besoin d’un adaptateur ([#697](https://github.com/AlexandreDemartin/pgcast/issues/697), [#698](https://github.com/AlexandreDemartin/pgcast/issues/698)).
 - [`transaction()`](/fr/transaction#transaction) ne prend toujours qu’un `Queryable` ou un `TxnClient` ([#696](https://github.com/AlexandreDemartin/pgcast/issues/696)).

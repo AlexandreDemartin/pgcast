@@ -332,7 +332,8 @@ export type Queryable = pg.ClientBase | pg.Pool;
 /**
  * What `run()` takes: a `pg` pool or client, or a client of any other driver
  * whose `query()` takes `pg`'s query object, `{ text, values, name? }`, and
- * resolves to the rows in `rows`. A driver that ignores `name` runs a
+ * resolves to the rows in `rows`, with values parsed as `pg` parses them
+ * (`json` and `jsonb` to objects). A driver that ignores `name` runs a
  * prepared fragment unprepared.
  */
 export interface QueryableLike {
