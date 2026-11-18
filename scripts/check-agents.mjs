@@ -9,77 +9,41 @@ import {checkArchitecture} from './check-architecture.mjs';
 import {checkChangelogEntries} from './check-changelog-entries.mjs';
 import {checkDeprecations, sourcesOfSrc} from './check-deprecations.mjs';
 import {checkReport} from './check-report.mjs';
+import {checkSkills, citationErrors, frontmatterOf, sizeErrors, sizeOf} from './check-skills.mjs';
 
 const skillsDirectory = '.agents/skills';
 const agentsDirectory = '.claude/agents';
-const maxDescriptionLength = 350;
-const maxLines = 150;  // hard limits of a skill or an agent (.agents/README.md § Writing a skill); the budget is ~100 lines
-const maxWords = 1800;  // and ~1,200 words
 
-const errors = [];
 const sizes = [];
-
-/** Lines and words as `wc -l` and `wc -w` count them; fails a skill or an agent above `maxLines` or `maxWords`. */
-function measure(path, limited) {
+const measured = path => {
   const text = readFileSync(path, 'utf8');
-  const lines = text.split('\n').length - (text.endsWith('\n') ? 1 : 0);
-  const words = text.split(/\s+/).filter(Boolean).length;
-  sizes.push({path, lines, words});
-  if (limited && lines > maxLines) errors.push(`${path}: ${lines} lines, max ${maxLines}`);
-  if (limited && words > maxWords) errors.push(`${path}: ${words} words, max ${maxWords}`);
-}
+  sizes.push({path, ...sizeOf(text)});
+  return text;
+};
 
-function frontmatterOf(path) {
-  const match = readFileSync(path, 'utf8').match(/^---\n([\s\S]*?)\n---\n/);
-  if (!match) {
-    errors.push(`${path}: missing frontmatter`);
-    return {};
-  }
-  return Object.fromEntries(match[1].split('\n').map(line => {
-    const [key, ...rest] = line.split(':');
-    return [key.trim(), rest.join(':').trim().replace(/^'(.*)'$/, '$1')];
-  }));
-}
-
-const skills = readdirSync(skillsDirectory, {withFileTypes: true}).filter(e => e.isDirectory()).map(e => e.name);
-for (const skill of skills) {
-  const path = join(skillsDirectory, skill, 'SKILL.md');
-  if (!existsSync(path)) {
-    errors.push(`${path}: missing`);
-    continue;
-  }
-  const {name, description = ''} = frontmatterOf(path);
-  if (name !== skill) errors.push(`${path}: name '${name}' differs from its folder '${skill}'`);
-  if (!description) errors.push(`${path}: missing description`);
-  if (description.length > maxDescriptionLength) {
-    errors.push(`${path}: description is ${description.length} characters, max ${maxDescriptionLength}`);
-  }
-  if (!/USE FOR:/.test(description)) errors.push(`${path}: description lacks USE FOR:`);
-  measure(path, true);
-}
+// Each skill's frontmatter, size and citations (scripts/check-skills.mjs).
+const {skills, files: skillFiles, errors} = checkSkills(skillsDirectory);
+skillFiles.forEach(measured);
 
 for (const file of readdirSync(agentsDirectory).filter(f => f.endsWith('.md'))) {
-  const path = join(agentsDirectory, file);
-  const {name, description} = frontmatterOf(path);
+  const path = join(agentsDirectory, file), text = measured(path);
+  const frontmatter = frontmatterOf(text);
+  if (!frontmatter) errors.push(`${path}: missing frontmatter`);
+  const {name, description} = frontmatter ?? {};
   if (name !== file.replace(/\.md$/, '')) errors.push(`${path}: name '${name}' differs from its file name`);
   if (!description) errors.push(`${path}: missing description`);
-  measure(path, true);
+  errors.push(...sizeErrors(path, text));
 }
-for (const path of ['AGENTS.md', '.agents/README.md']) measure(path, false);
+for (const path of ['AGENTS.md', '.agents/README.md']) measured(path);
 
-// Every "skill `x`" cited in the method docs must exist.
+// Every "skill `x`" cited in the other method docs must exist.
 const citingFiles = [
   'AGENTS.md',
   '.agents/README.md',
   'docs/WORKFLOW.md',
-  ...skills.map(s => join(skillsDirectory, s, 'SKILL.md')),
   ...readdirSync(agentsDirectory).filter(f => f.endsWith('.md')).map(f => join(agentsDirectory, f)),
 ].filter(existsSync);
-for (const path of citingFiles) {
-  for (const [, cited] of readFileSync(path, 'utf8').matchAll(/skills? `([a-z0-9-]+)`/g)) {
-    if (!skills.includes(cited)) errors.push(`${path}: cites unknown skill '${cited}'`);
-  }
-}
+for (const path of citingFiles) errors.push(...citationErrors(path, readFileSync(path, 'utf8'), skills));
 
 // Each module of src/db and src/generate named in AGENTS.md § Architecture (scripts/check-architecture.mjs).
 const modules = Object.fromEntries(['src/db/', 'src/generate/']
@@ -106,6 +70,7 @@ if (errors.length > 0) {
 console.log(`✓ ${skills.length} skills, ${readdirSync(agentsDirectory).filter(f => f.endsWith('.md')).length} agents, AGENTS.md § Architecture, CHANGELOG.md § Deprecated and entries, ${reportPath} summary`);
 
 const tests = spawnSync(process.execPath, ['--test', '.claude/hooks/guard.test.mjs', 'scripts/check-architecture.test.mjs',
-  'scripts/check-changelog-entries.test.mjs', 'scripts/check-deprecations.test.mjs', 'scripts/check-report.test.mjs'],
+  'scripts/check-changelog-entries.test.mjs', 'scripts/check-deprecations.test.mjs', 'scripts/check-report.test.mjs',
+  'scripts/check-skills.test.mjs'],
   {stdio: 'inherit'});
 process.exit(tests.status ?? 1);
