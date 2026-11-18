@@ -1,5 +1,5 @@
 ---
-english: b14d48f86224
+english: edb4865c5045
 ---
 
 # Transactions
@@ -300,7 +300,7 @@ await db.serializable(pool, txnClient => countBookings(txnClient));
 await db.readCommitted(pool, txnClient => countBookings(txnClient));
 ```
 
-`SerializableRODeferrable` est omis des lignes de `SerializableRO`, `RepeatableReadRO` et `ReadCommittedRO`, comme dans Zapatos 6.6.1, bien qu’il donne toutes les garanties qu’elles demandent, et `transaction()` transmet son client ([Transmettre une transaction](#passing-a-transaction-through)). Donc une fonction qui prend un `TxnClientForSerializableRO` refuse le client de `serializableRODeferrable()` (2345). Cela reste ainsi : l’y compter élargirait aussi le client que reçoivent les callbacks de `serializableRO()`, `repeatableReadRO()` et `readCommittedRO()`, et son `_zapatos.isolationLevel`, si bien que du code qui compile sous la 6.6.1 échouerait, comme un `switch` exhaustif sur ce niveau ou un `Record<db.IsolationSatisfying<…>, …>` ([#489](https://github.com/AlexandreDemartin/pgcast/issues/489)). Une fonction qui prend les deux clients nomme les deux types, et il en va de même pour les deux autres niveaux :
+`SerializableRODeferrable` est omis des lignes de `SerializableRO`, `RepeatableReadRO` et `ReadCommittedRO`, comme dans Zapatos 6.6.1, bien qu’il donne toutes les garanties qu’elles demandent, et `transaction()` transmet son client ([Transmettre une transaction](#passing-a-transaction-through)). Donc une fonction qui prend un `TxnClientForSerializableRO` refuse le client de `serializableRODeferrable()` (2345). Cela reste ainsi : en l’y comptant, une fonction qui prend un `TxnClientForSerializableRO` lirait `SerializableRODeferrable` dans son propre `_zapatos.isolationLevel`, tout comme les callbacks de `serializableRO()`, `repeatableReadRO()` et `readCommittedRO()`. Du code qui compile sous la 6.6.1 échouerait alors, comme un `switch` exhaustif sur ce niveau ou un `Record` dont ces niveaux sont les clés ([#489](https://github.com/AlexandreDemartin/pgcast/issues/489) ; le changement attend la 7.0, [#694](https://github.com/AlexandreDemartin/pgcast/issues/694)). Une fonction qui prend les deux clients nomme les deux types, et il en va de même pour les deux autres niveaux :
 
 ```ts twoslash
 import * as db from 'zapatos/db';
