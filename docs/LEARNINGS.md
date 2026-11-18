@@ -425,6 +425,9 @@ Candidates for a check, a rule or a skill line.
 - #682: an unexported lookup is spelled out per table in a consumer's emitted `.d.ts`: measure it on a schema of about 100 tables.
 - #682: probe `keyof Parameters<…>` and each member of an exported options type, not only the named lookups.
 - #682: a `{{` in inline code breaks the VitePress build (Vue reads a mustache), in `CHANGELOG.md` too: use `<code v-pre>` in pages.
+- #684: to widen an overloaded parameter, add an overload and keep 6.6.1's last: `Parameters` and `ReturnType` read the last one, so derived types stay byte-identical (`readonly` in place broke `p.push()`).
+- #684: TS 7, and 5.9 with `--pretty false`, print only the last overload's error: check the message a wrong call gets once an overload is added.
+- #684: an `as const` array in a variable is a `readonly` tuple and resolves to other overloads than the inline form: test both, on 4.1.6 too.
 
 ## Minors kept
 

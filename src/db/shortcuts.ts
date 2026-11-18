@@ -251,7 +251,7 @@ const hasOwnKey = (row: object, undefinedIsMissing = false) => {
 /**
  * Generate an `INSERT` query `SQLFragment`.
  * @param table The table into which to insert
- * @param values The `Insertable` values (or array thereof) to be inserted.
+ * @param values The `Insertable` values (or array thereof, `readonly` too) to be inserted.
  * They need at least one column: a row with no key, or rows with none between
  * them, throw before any query (for a row of defaults, `DEFAULT VALUES` in a
  * `sql` template). A `null` row given on its own, not in an array, or a
@@ -278,6 +278,14 @@ export const insert: {
     values: InsertableArg<T>,
     options?: ReturningOptionsForTable<T, C, E>
   ): SQLFragment<ReturningTypeForTable<T, C, E>>;
+
+  // a readonly array of rows, which a mutable one fits too; the mutable overload stays last, as the one that
+  // Parameters and ReturnType read (#683)
+  <T extends Table, C extends ColumnsOption<T>, E extends ExtrasOption<T>>(
+    table: T,
+    values: readonly InsertableArg<T>[],
+    options?: ReturningOptionsForTable<T, C, E>
+  ): SQLFragment<ReturningTypeForTable<T, C, E>[]>;
 
   <T extends Table, C extends ColumnsOption<T>, E extends ExtrasOption<T>>(
     table: T,
@@ -438,7 +446,7 @@ const updateValueSQL = (value: any, column: string) =>
 /**
  * Generate an 'upsert' (`INSERT ... ON CONFLICT ...`) query `SQLFragment`.
  * @param table The table to update or insert into
- * @param values An `Insertable` of values (or an array thereof) to be inserted 
+ * @param values An `Insertable` of values (or an array thereof, `readonly` too) to be inserted 
  * or updated; as for `insert`, they need at least one column, or it throws
  * before any query, and a shortcut's query is written in parentheses
  * @param conflictTarget A `UNIQUE`-indexed column (or array thereof) or a 
@@ -497,6 +505,19 @@ export const upsert: {
     conflictTarget: UpsertConflictTargetForTable<T>,
     options?: UpsertOptions<T, C, E, UC, RA>
   ): SQLFragment<UpsertReturnableForTable<T, C, E, RA> | (UC extends never[] ? undefined : never)>;
+
+  // as for insert(): a readonly array of rows, then the mutable overload, kept last (#683)
+  <T extends Table,
+    C extends ColumnsOption<T>,
+    E extends ExtrasOption<T>,
+    UC extends UpdateColumns<T> | undefined,
+    RA extends UpsertReportAction | undefined
+  >(
+    table: T,
+    values: readonly InsertableArg<T>[],
+    conflictTarget: UpsertConflictTargetForTable<T>,
+    options?: UpsertOptions<T, C, E, UC, RA>
+  ): SQLFragment<UpsertReturnableForTable<T, C, E, RA>[]>;
 
   <T extends Table,
     C extends ColumnsOption<T>,

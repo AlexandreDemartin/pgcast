@@ -177,17 +177,20 @@ describe('select', () => {
       .resolves.toEqualTypeOf<Pick<s.extra.spools.JSONSelectable, 'id'>[]>();
   });
 
-  // a readonly array fits neither overload, as on any other table; it fitted the one-row overload of extra.spools,
-  // typed as one row, under Zapatos 6.6.1 (#674); #683 takes a readonly array on every table
-  test('a readonly array of rows is refused, as on any other table (#674)', () => {
+  // a readonly array fitted the one-row overload of extra.spools, typed as one row, under Zapatos 6.6.1 (#674), and
+  // no overload on any other table; it takes the array overload, as it runs (#683)
+  test('a readonly array of rows takes the array overload, with a column named length (#683)', () => {
     const ro: readonly s.extra.spools.Insertable[] = [{ length: 1 }];
-    // @ts-expect-error a readonly array is no Insertable[] (2769)
-    db.insert('extra.spools', ro);
-    // @ts-expect-error a readonly array is no Insertable[] (2769)
-    db.upsert('extra.spools', ro, 'id');
-    const users: readonly s.users.Insertable[] = [];
-    // @ts-expect-error the same on a table with no column named like a member of String
-    db.insert('users', users);
+    const asConst = [{ length: 1 }, {}] as const;
+    expectTypeOf(db.insert('extra.spools', ro)).toEqualTypeOf<db.SQLFragment<s.extra.spools.JSONSelectable[]>>();
+    expectTypeOf(db.insert('extra.spools', asConst)).toEqualTypeOf<db.SQLFragment<s.extra.spools.JSONSelectable[]>>();
+    expectTypeOf(db.insert('extra.spools', [] as const)).toEqualTypeOf<db.SQLFragment<s.extra.spools.JSONSelectable[]>>();
+    expectTypeOf(db.upsert('extra.spools', ro, 'id').run(pool)).resolves.toEqualTypeOf<(s.extra.spools.JSONSelectable & db.UpsertAction)[]>();
+    expectTypeOf(db.upsert('extra.spools', asConst, 'id').run(pool)).resolves.not.toBeAny();
+    // @ts-expect-error a readonly array of strings is no array of Insertables of extra.spools
+    db.insert('extra.spools', ['serach'] as const);
+    // @ts-expect-error a readonly array of strings is no array of Insertables of extra.spools (upsert)
+    db.upsert('extra.spools', null as unknown as readonly string[], 'id');
   });
 
   // left by design (#674): and(), or() and not() take the Whereable of every table, which names no table to look the
@@ -438,6 +441,43 @@ describe('insert', () => {
     expectTypeOf(one.run(pool)).resolves.not.toBeAny();
   });
 
+  // a typed constant, a ReadonlyArray parameter or `as const` gives a readonly array, which runs as any array (#683)
+  test('a readonly array of rows: JSONSelectable[] (#683)', () => {
+    type Rows = s.users.JSONSelectable[];
+    const
+      ro: readonly s.users.Insertable[] = [{ email: 'a@b', display_name: 'A' }],
+      roArray: ReadonlyArray<s.users.Insertable> = ro,
+      tuple: readonly [s.users.Insertable, s.users.Insertable] = [ro[0]!, ro[0]!],
+      asConst = [{ email: 'a@b', display_name: 'A' }] as const;
+    expectTypeOf(db.insert('users', ro).run(pool)).resolves.toEqualTypeOf<Rows>();
+    expectTypeOf(db.insert('users', ro).run(pool)).resolves.not.toBeAny();
+    expectTypeOf(db.insert('users', roArray).run(pool)).resolves.toEqualTypeOf<Rows>();
+    expectTypeOf(db.insert('users', tuple).run(pool)).resolves.toEqualTypeOf<Rows>();
+    expectTypeOf(db.insert('users', asConst).run(pool)).resolves.toEqualTypeOf<Rows>();
+    expectTypeOf(db.insert('users', [{ email: 'a@b', display_name: 'A' }] as const).run(pool)).resolves.toEqualTypeOf<Rows>();
+    expectTypeOf(db.insert('users', [] as const).run(pool)).resolves.toEqualTypeOf<Rows>();
+    expectTypeOf(db.insert('users', ro, { returning: ['id'] }).run(pool)).resolves.toEqualTypeOf<Pick<s.users.JSONSelectable, 'id'>[]>();
+    const forward = <T extends s.Table>(t: T, rows: readonly s.InsertableForTable<T>[]) => db.insert(t, rows);
+    expectTypeOf(forward('users', ro).run(pool)).resolves.toEqualTypeOf<s.JSONSelectableForTable<'users'>[]>();
+  });
+
+  test('refuses a readonly array of a wrong row (#683)', () => {
+    // @ts-expect-error email is required
+    db.insert('users', [{ display_name: 'A' }] as const);
+    // @ts-expect-error a row of products is no row of users
+    db.insert('users', null as unknown as readonly s.products.Insertable[]);
+    // @ts-expect-error a readonly array of strings is no array of rows
+    db.insert('users', null as unknown as readonly string[]);
+  });
+
+  // the array overload Zapatos 6.6.1 had stays last, the one Parameters and ReturnType read (#683)
+  test('Parameters of insert() and upsert() still give a mutable array of rows (#683)', () => {
+    type InsertRows = Parameters<typeof db.insert>[1];
+    type UpsertRows = Parameters<typeof db.upsert>[1];
+    expectTypeOf<InsertRows>().toEqualTypeOf<InsertRows[number][]>();
+    expectTypeOf<UpsertRows>().toEqualTypeOf<UpsertRows[number][]>();
+  });
+
   test('returning: only those columns', () => {
     const q = db.insert('users', { email: 'a@b', display_name: 'A' }, { returning: ['id'] });
     expectTypeOf(q.run(pool)).resolves.toEqualTypeOf<Pick<s.users.JSONSelectable, 'id'>>();
@@ -500,6 +540,21 @@ describe('upsert', () => {
     expectTypeOf(one.run(pool)).resolves.toEqualTypeOf<s.users.JSONSelectable & db.UpsertAction>();
     expectTypeOf(many.run(pool)).resolves.toEqualTypeOf<(s.users.JSONSelectable & db.UpsertAction)[]>();
     expectTypeOf(one.run(pool)).resolves.not.toBeAny();
+  });
+
+  test('a readonly array of rows: an array, with or without $action (#683)', () => {
+    type Row = s.users.JSONSelectable & db.UpsertAction;
+    const
+      ro: readonly s.users.Insertable[] = [row],
+      asConst = [{ email: 'a@b', display_name: 'A' }] as const;
+    expectTypeOf(db.upsert('users', ro, 'email').run(pool)).resolves.toEqualTypeOf<Row[]>();
+    expectTypeOf(db.upsert('users', ro, 'email').run(pool)).resolves.not.toBeAny();
+    expectTypeOf(db.upsert('users', asConst, 'email').run(pool)).resolves.toEqualTypeOf<Row[]>();
+    expectTypeOf(db.upsert('users', ro, 'email', { updateColumns: db.doNothing }).run(pool)).resolves.toEqualTypeOf<Row[]>();
+    expectTypeOf(db.upsert('users', ro, 'email', { returning: ['id'], reportAction: 'suppress' }).run(pool))
+      .resolves.toEqualTypeOf<Pick<s.users.JSONSelectable, 'id'>[]>();
+    // @ts-expect-error email is required
+    db.upsert('users', [{ display_name: 'A' }] as const, 'email');
   });
 
   test("reportAction: 'suppress' drops $action", () => {
