@@ -1,5 +1,5 @@
 ---
-english: dce54da5ddb8
+english: 0e95f888e5a8
 ---
 
 # Lectures {#select-and-the-aggregates}
@@ -119,9 +119,30 @@ Un raccourci de lecture y est une sous-requête : `select()`, `selectOne()`, `s
 
 - **Un objet** : chaque clé devient une clé du résultat, qui contient le résultat de sa sous-requête : un tableau pour `select()`, un objet ou `null` pour `selectOne()`, un nombre pour `count()`, ou `null` quand sa requête ne renvoie aucune ligne ([`count()`](#count)). Un `count()` dont le `groupBy` donne plusieurs groupes fait revenir la ligne parente une fois par groupe sous un `select()` extérieur ; sous `selectOne()` ou `selectExactlyOne()`, une seule fois, avec le compte de l’un des groupes, mais avec [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), `selectExactlyOne()` est rejetée avec une `NotExactlyOneError`. Les clés sont jointes dans l’ordre alphabétique ; chacune est un seul identifiant, `"lateral_<key>"`.
 - **Une seule sous-requête** : son résultat est transmis à la place de chaque ligne. `columns` et `extras` n’ont alors rien à quoi s’ajouter, et le type les refuse, avec `strictNullChecks` activé.
-  - Quand la requête exécutée est un `selectOne()` ou un `selectExactlyOne()` qui le transmet, directement ou à travers un autre raccourci qui le transmet de même, un [`count()`](#count), ou un `sum()` ou un `avg()` d’une colonne de type entier ou `numeric`, est une chaîne (`"3"`), car `pg` lit `bigint` et `numeric` en chaînes, bien que typé `number`, ou `number | null` pour `sum()` et `avg()` avec [`aggregatesTypedByColumn`](#typed-by-column) déclaré. Sous une clé ou sous un `select()` extérieur, il revient en nombre JSON.
+  - Quand `selectOne()` ou `selectExactlyOne()` transmet la colonne `result`, directement ou par l’intermédiaire d’un autre raccourci qui en fait autant, vous obtenez la valeur telle que `pg` la parse. Sous une clé ou sous un `select()` extérieur, vous obtenez sa valeur JSON. Avec les parseurs par défaut de `pg`, `now()` donne un `Date` dans le premier cas et une chaîne dans le second. L’annotation du type de résultat d’un template `sql` reste la même dans les deux cas.
+  - Un [`count()`](#count), ou un `sum()` ou `avg()` sur une colonne de type entier ou `numeric`, donne ainsi une chaîne comme `"2"` quand `pg` lit son `bigint` ou son `numeric`, et un nombre en JSON. Le type est `number`, ou `number | null` pour `sum()` et `avg()` avec [`aggregatesTypedByColumn`](#typed-by-column) déclaré.
   - Passez à `Number()` cette chaîne, et non les autres valeurs : l’agrégat vaut `null` quand sa requête ne renvoie aucune ligne (un `groupBy` sans aucun groupe), et, pour `sum()` et `avg()`, quand aucune ligne ne correspond ; `selectOne()` donne `undefined` sans ligne parente.
 - **`null`** : `lateral: null`, ou une clé dont la sous-requête vaut `null` ou `undefined`, lève une erreur à la compilation, si bien que `.run()` est rejetée avant toute requête : "`` `lateral: null` has no meaning: for no lateral join, leave `lateral` out; to join, give it a `select()`, `selectOne()` or `count()` query, or an object of them. ``<!-- message -->", ou "`` The `lateral` key 'cast' is `null`, not a query: leave the key out, or give it a `select()`, `selectOne()` or `count()` query. ``<!-- message -->". Zapatos 6.6.1 levait une `TypeError` à l’appel.
+
+Pour obtenir un nombre avec les trois raccourcis, placez le compte sous une clé. Avec `columns: []`, la ligne ne contient que `{ n: 2 }`.
+
+<<< ../examples/plain/lateral_keyed_count.ts{ts twoslash}
+
+<!-- probe: db.selectExactlyOne('studios', { id: 1000 }, { columns: [], lateral: { n: db.count('films', { studio_id: db.parent('id') }) } }) -->
+```sql
+SELECT jsonb_build_object() || jsonb_build_object($1::text, "lateral_n".result) AS result FROM "studios" LEFT JOIN LATERAL (SELECT count(*) AS result FROM "films" WHERE ("studio_id" = "studios"."id")) AS "lateral_n" ON true WHERE ("id" = $2) LIMIT $3
+-- ["n", 1000, 1]
+```
+
+Pour obtenir une chaîne avec les trois raccourcis, convertissez l’horodatage en JSON dans la sous-requête et indiquez `string` comme type de résultat.
+
+<<< ../examples/plain/lateral_json_timestamp.ts{ts twoslash}
+
+<!-- probe: db.select('studios', { id: 1000 }, { lateral: db.sql`SELECT to_jsonb(now()) AS result` }) -->
+```sql
+SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (SELECT "lateral_passthru".result AS result FROM "studios" LEFT JOIN LATERAL (SELECT to_jsonb(now()) AS result) AS "lateral_passthru" ON true WHERE ("id" = $1)) AS "sq_studios"
+-- [1000]
+```
 
 Étapes, imbrication et auto-jointures : [Jointures](/fr/lateral). Depuis pgcast 6.6.2, une clé ou un `alias` contenant un `"` reste un seul identifiant ; dans Zapatos 6.6.1, il pouvait fermer ses guillemets ([changelog](/fr/changelog#6.6.2-security)).
 
@@ -266,7 +287,7 @@ COMMIT
 ```
 
 - Chaque ligne est typée comme `select()` la type. Une seule sous-requête `lateral` est transmise telle que [`selectOne()`](#selectOne) la transmet, comme `pg` parse sa colonne, et typée ainsi : avec [`aggregatesTypedByColumn`](#typed-by-column), un `min()` d’une `date` est un `Date`, là où `select()` donne sa chaîne JSON.
-- Un `lateral` transmis et typé `number` ne compile pas : `count()`, `sum()`, `avg()`, et `min()` ou `max()` sauf typés par colonne, seuls ou dans une union, `cond ? count() : select()`. L’erreur est TS2322 sur `lateral`, `… is not assignable to type 'undefined'.` Leur type est celui de `Number()` ou du JSON, là où `pg` donne un `bigint` ou un `numeric` en chaînes et une `date` en `Date` ([#749](https://github.com/AlexandreDemartin/pgcast/issues/749)). Un template `sql` typé `number` est refusé avec eux, car son type ne se distingue pas du leur. Sous une clé `lateral`, la valeur est du JSON et son type tient : `` db.selectRows('studios', db.all, { lateral: { films: db.count('films', { studio_id: db.parent('id') }) } }) ``<!-- tsc -->. Un `lateral` dont le type est un paramètre de type, objet de sous-requêtes compris, ou un fragment typé par un paramètre de type sans contrainte, `db.SQLFragment<R>`, ne compile pas non plus : `function f<L extends db.SQLFragmentMap>(l: L) { return db.selectRows('studios', db.all, { lateral: l }); }` donne TS2345. La fonction qui transmet cette valeur peut appeler `select()` ou caster l’objet de sous-requêtes avec `l as db.SQLFragmentMap`. Pour un fragment de type `db.SQLFragment<R>`, utilisez `l as db.SQLFragment<any>` (le cast en `db.SQLFragmentMap` donne l’erreur TS2352). Hors du type, en JavaScript, `run()` donne la valeur de `pg`.
+- Un `lateral` transmis et typé `number` ne compile pas : `count()`, `sum()`, `avg()`, et `min()` ou `max()` sauf typés par colonne, seuls ou dans une union, `cond ? count() : select()`. L’erreur est TS2322 sur `lateral`, `… is not assignable to type 'undefined'.` Leur type est celui de `Number()` ou du JSON, là où `pg` donne un `bigint` ou un `numeric` en chaînes et une `date` en `Date` (voir [`lateral`](#lateral)). Un template `sql` typé `number` est refusé avec eux, car son type ne se distingue pas du leur. Sous une clé `lateral`, la valeur est du JSON et son type tient : `` db.selectRows('studios', db.all, { lateral: { films: db.count('films', { studio_id: db.parent('id') }) } }) ``<!-- tsc -->. Un `lateral` dont le type est un paramètre de type, objet de sous-requêtes compris, ou un fragment typé par un paramètre de type sans contrainte, `db.SQLFragment<R>`, ne compile pas non plus : `function f<L extends db.SQLFragmentMap>(l: L) { return db.selectRows('studios', db.all, { lateral: l }); }` donne TS2345. La fonction qui transmet cette valeur peut appeler `select()` ou caster l’objet de sous-requêtes avec `l as db.SQLFragmentMap`. Pour un fragment de type `db.SQLFragment<R>`, utilisez `l as db.SQLFragment<any>` (le cast en `db.SQLFragmentMap` donne l’erreur TS2352). Hors du type, en JavaScript, `run()` donne la valeur de `pg`.
 - Un `lock` verrouille chaque ligne quand son batch est lu, pas avant.
 - Imbriquée, c’est un ensemble de lignes, pas une valeur. Un template `sql` la prend, `` db.sql`SELECT count(*) FROM (${db.selectRows('films', db.all)}) AS f` ``<!-- tsc -->, de même que [`withCTEs()`](/fr/sql-template#withCTEs) et `cursor()`. Comme `lateral`, valeur d’`extras`, `where` ou valeur Whereable d’une colonne typée, elle ne compile pas : son type, un [`RowsQuery`](#RowsQuery), le dit. Son type la prend comme `order.by`, et comme valeur Whereable d’une colonne typée `any`, où Postgres la refuse. Hors du type, en JavaScript, une clé `lateral` répète la ligne parente une fois par ligne, et une valeur d’`extras` reçoit l’erreur 21000 de Postgres.
 

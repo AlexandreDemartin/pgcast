@@ -52,6 +52,7 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
   - Unchanged: `select()`, `selectOne()`, `selectExactlyOne()`, `count()` and the aggregates, their SQL and their types; `SelectResultMode`, whose members stay four; `SQLFragment`.
 
 ### Changed
+- The Select reference shows how the outer shortcut reads a passed-through lateral and how to get a numeric count or a timestamp string with all three selectors (`select.md` § `lateral`, #749).
 - The Cursors guide indexes films one batch at a time with `cursor()` and `selectRows()`, and shows which rows the loop sees and which batches a retry repeats (`cursors.md`, #745).
 - The docs let each customer see only their own bookings, a row-level security policy reading the setting that `setLocal()` sets, with why the example sets `role`, why a setting lasts one transaction, and its pitfalls, such as the `''` that a reused connection reads (`row-security.md`, #739). The docs schema gains the policy on `seat_bookings` and its role, `cinema_customer`; its types do not change.
 - The docs book the free seats among several in one transaction, each seat's `insert()` in its own `savepoint()`, so that a seat already taken undoes its own insert alone (`savepoints.md`, #726). `retries.md` queues a screening's bookings with `advisoryXactLock()` in `readCommitted()`, with no 40001 and no retry, where `serializable()` still retries after the wait; and logs each retry's `TransactionEvent` as JSON beside its message.
