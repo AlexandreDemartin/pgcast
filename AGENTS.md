@@ -111,7 +111,7 @@ A task is **done** only if `lint`, `typecheck`, `test` and `test:types` pass, an
 - An ambiguous design decision: write `docs/decisions/NNN-title.md` (context, options, proposed choice) and ask for validation before implementing.
 - If the compile benchmark exceeds its threshold (+20 %).
 - Before merging a `high` PR: the owner's OK (skill `merge-gate`).
-- Before any npm publication or release, pushing a `v*` tag included: it starts `release.yml`, whose deployment the owner approves (`docs/WORKFLOW.md` § Releases); `prepack` builds before any `npm pack` or `npm publish`.
+- Before any npm publication or release, pushing a tag included, the core's `v*` or an extension's `@pgcast/<name>@<version>`: a `v*` tag starts `release.yml`, whose deployment the owner approves (`docs/WORKFLOW.md` § Releases); `prepack` builds before any `npm pack` or `npm publish`.
 - Before any change to `exports`, `bin`, `files`, `engines`, `peerDependencies` or `dependencies`: they are part of the public API.
 
 ## Local environment
