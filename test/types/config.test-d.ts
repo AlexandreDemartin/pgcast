@@ -79,6 +79,23 @@ describe('transactionEventListener and TransactionEvent', () => {
     expectTypeOf(db.setConfig({}).transactionEventListener).toEqualTypeOf<((event: db.TransactionEvent, txnId?: number) => void) | undefined>();
   });
 
+  // a listener typed for one event would read a key that the other two don't have, and throw in the retry loop
+  test('a listener typed for some of the events is refused, as a function or as a class method', () => {
+    const onRollback = (event: Extract<db.TransactionEvent, { type: 'rollback' }>) => event.code.toLowerCase();
+    // @ts-expect-error a retry event has no code: the listener takes all three types
+    db.setConfig({ transactionEventListener: onRollback });
+    class RollbackListener implements db.NewConfig {
+      // @ts-expect-error a class method typed for one event, likewise
+      transactionEventListener(event: Extract<db.TransactionEvent, { type: 'rollback' }>) { event.code.toLowerCase(); }
+    }
+    class EventListener implements db.NewConfig {
+      transactionEventListener(event: db.TransactionEvent, txnId?: number) { describeEvent(event); return txnId; }
+    }
+    db.setConfig(new EventListener());
+    db.setConfig({ transactionEventListener: (event: unknown) => event });
+    expectTypeOf(RollbackListener).not.toBeAny();
+  });
+
   test('an event of a fourth type is refused', () => {
     // @ts-expect-error 'commit' is none of the three types
     describeEvent({ type: 'commit', attempt: 1, maxAttempts: 5 });
@@ -107,5 +124,14 @@ describe('transactionEventListener and TransactionEvent', () => {
       },
     });
     expectTypeOf(db.getConfig().transactionListener).toEqualTypeOf<((message: string, txnId?: number) => void) | undefined>();
+    class Config661 implements db.Config {
+      transactionAttemptsMax = 5;
+      transactionRetryDelay = { minMs: 25, maxMs: 250 };
+      castArrayParamsToJson = false;
+      castObjectParamsToJson = false;
+      queryListener(query: db.SQLQuery, txnId?: number) { return [query.text, txnId]; }
+      transactionListener(message: string, txnId?: number) { return [message, txnId]; }
+    }
+    db.setConfig(new Config661());
   });
 });
