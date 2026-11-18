@@ -166,6 +166,31 @@ Candidates for a check, a rule or a skill line.
 - #748 — Mutants matched by a fixed pattern break as soon as the code is edited; mutants built from the source text itself (slice from marker to marker) survive the edit — builder
 - #748 — When a fix drops a server error, replay the case where the caller caught its cause: the next statement must still surface the abort (COMMIT answers ROLLBACK, a savepoint's RELEASE gets 25P02) — branch-reviewer
 - #748 — In pg, `_txStatus` is set at ReadyForQuery before a successful query resolves, but a failed query rejects at its ErrorResponse before that ReadyForQuery: a status read after a resolve is fresh, after a rejection it can be stale, a `COMMIT` included — branch-reviewer
+- #746 — `PREPARE` + `pg_prepared_statements` sent over the simple protocol runs any statement that follows it in the text: a describing tool sends the user's text through Parse or not at all — builder
+- #746 — RowDescription gives a domain column's base type (`citext`), `pg_prepared_statements` the domain's name: read the domain from the origin column — builder
+- #746 — `pg` has no public Describe, but its documented Submittable (as pg-cursor uses) gives Parse/Describe with `pg`'s own login and TLS; `pg-protocol` alone means writing SCRAM again — builder
+- #746 — A probe script that talks the protocol sets a timeout per message and drops its leftover database on start — builder
+- #746 — On Postgres 14–17, `attnotnull` is no proof for a table with inheritance children (`ALTER TABLE child … DROP NOT NULL`, `ALTER TABLE ONLY parent … SET NOT NULL`) nor for a foreign table or partition, where NOT NULL is not enforced — branch-reviewer
+- #746 — `MERGE … RETURNING` with `WHEN NOT MATCHED BY SOURCE` null-extends the source with no outer-join word, and Describe still gives the source column's origin — branch-reviewer
+- #746 — With pg's Submittable, an ErrorResponse clears the active query, so `handleReadyForQuery` never fires on the failed object: a describer resolves and removes its listeners in `handleError` — branch-reviewer
+- #746 — A keyword guard that skips literals is only as sound as its lexer: matching the raw text case-insensitively is the sound default, at the cost of some loose columns — branch-reviewer
+- #746 — Parse takes the statement's locks: a describe-only tool on a shared database needs `lock_timeout` — branch-reviewer
+- #746 — `param(x, true)` compiles to a JSON cast only for an array or a plain object; a string stays a bare `$1`: a neutraliser cannot know the form from the syntax alone — builder
+- #746 — TypeScript 4.1.6 ends a string literal at a raw U+2028 or U+2029 (TS1002), which `JSON.stringify` leaves raw: a generated string literal escapes both — builder
+- #746 — Postgres 14 lexes `1LEFT` as `1` then `LEFT` (15 and later refuse it): a keyword guard cannot use `\b` on its left side — builder
+- #746 — `String.prototype.replace` with a string replacement turns `$$` into `$`: a probe that splices SQL text uses a function replacement — builder
+- #746 — When analysis swaps run-time content for a typed placeholder, the type only proves what fits at that spot, not what the content can add after it (`UNION`, `GROUP BY ROLLUP`): each soundness probe of a neutralisation includes content that appends SQL — branch-reviewer
+- #746 — Postgres refuses most catalog states that would break a name-matched `pg_inherits` proof (rename or drop of an inherited column, `INHERIT`/`ATTACH` of a nullable child): such a proof only has to cover foreign tables and `ALTER TABLE ONLY` — branch-reviewer
+- #746 — Wrapping a fragment in parentheses contains it only if its own parentheses balance: a claim like "always one parenthesised boolean" needs a replay with an unbalanced fragment — builder
+- #746 — A coverage count for a rule on dynamic conditions is made at the depth the rule checks: 13 templates under the first rule, 1 under the narrow one, 0 with nothing opaque inside — builder
+- #746 — "The text described is the run's own" holds only if every name the tool evaluates binds to the library's export: a scan that matches `getText()` accepts shadowed names; bind through the checker or refuse — branch-reviewer
+- #746 — A substitution of placeholders for values is replayed on every member of the API it feeds, not a sample: 5 sample pairs hid 10 `db.conditions` exports that throw or compile another text — branch-reviewer
+- #746 — Three verify rounds that each found a deeper hole in a part reaching 0 of 58 row types: cut the part to a Deferred section with its preconditions, rather than fix it again — orchestrator
+- #746 — When a part is cut to a Deferred section, check whether its blocking findings also hit what stays: the shadowing hole applied to `param` in the accepted scope too — builder
+- #746 — Recount replay figures by tagging each replayed text with its scope, so a cut recomputes them instead of patching numbers by hand — builder
+- #746 — A name-binding rule over imports compares the imported name (`ImportSpecifier.propertyName`) as well as the local one, and skips type-only imports: `import { raw as param }` compiles — branch-reviewer
+- #746 — A scanner of tagged templates reads the cooked strings (`head.text`, `literal.text`) the tag receives, not `getText()`: an escape such as `\x4c` makes a keyword appear only at run time — branch-reviewer
+- #746 — A binding rule pins `<ns>.sql` to exactly one level: a `head()` that walks down a property chain lets `db.x.sql` pass — builder
 
 ## Minors kept
 
@@ -189,3 +214,4 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #741 — `website/transaction.md:398` and `src/db/transaction.ts:543` "a savepoint taken before it": "taken before the setting", as the FR « pris avant ce réglage » — branch-reviewer
 - #748 — cursor(): a `COMMIT` of yours that fails and is caught inside the loop leaves `T` for a moment, so a `break` can reject with CLOSE's 34000 (1/40 direct, 20/20 through a chunk-splitting proxy); drop CLOSE's 34000 too, or name the case in the `I` row of `website/transaction.md:467` — branch-reviewer
 - #748 — `website/transaction.md:466` (FR `:470`) "a `break` after an error the loop caught ends the loop": add that the transaction stays aborted, so `COMMIT` gets `ROLLBACK` (`PGCAST_DEP003`, or a rejection under `transactionRequiresCommit`), link to `:62` — branch-reviewer
+
