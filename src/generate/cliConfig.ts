@@ -127,7 +127,7 @@ export const runCli = async (args: string[], dir = '.') => {
       { warningListener } = finaliseConfig(config),
       warn = warningListener === true ? console.log : warningListener || (() => void 0);
 
-    for (const flag of ignoredFlags) warn(`Note: unknown flag ${flag} ignored: the only flag is --check, before or after the JSON argument.`);
+    for (const flag of ignoredFlags) warn(`Note: flag ${flag} ignored after the JSON argument: only --check may follow it.`);
   }
 
   if (!checkOnly) {

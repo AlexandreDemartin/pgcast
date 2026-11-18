@@ -600,7 +600,7 @@ Writing custom types file: src/zapatos/custom/index.d.ts
   - the same, with `"zapatos"` and a `pgcast/schema.d.ts`;
 - `Note: pgcastconfig.json and zapatosconfig.json are both here, and only pgcastconfig.json is read. Move any option you still need from zapatosconfig.json into pgcastconfig.json, then delete zapatosconfig.json.`
   - from [the CLI](#cli), before generating, when the folder it runs in has both files;
-- `Note: unknown flag --chek ignored: the only flag is --check, before or after the JSON argument.`
+- `Note: flag --chek ignored after the JSON argument: only --check may follow it.`
   - from [the CLI](#cli), before generating or checking, for each argument after `config` that starts with `--` and is not `--check`;
 - `Note: a query failed, so generate() ends the process with process.exit(1), and its promise never settles (PGCAST_DEP006). Set rejectOnQueryError: true to reject with the error instead; it will be the default in pgcast 7.0.`
   - from `generate()` without [`rejectOnQueryError`](#generate.rejectOnQueryError), when a query fails, after the error and just before the exit;
