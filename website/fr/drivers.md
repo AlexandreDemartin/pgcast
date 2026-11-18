@@ -1,5 +1,5 @@
 ---
-english: f6fba0e4c688
+english: bd4c4d76f159
 description: "Lancer pgcast sur pg, sur postgres.js ou PGlite via leurs adaptateurs, ou sur un driver à vous : le même SQL et les mêmes types sur chacun."
 ---
 
@@ -120,7 +120,7 @@ Elle envoie ce qu’elle envoie sur un `pg.Pool` ([Le SQL envoyé](/fr/transacti
 
 - Sur PGlite, ou sur tout pool d’une seule connexion (`max: 1` pour un `pg.Pool` ou un `sql` de postgres.js), une requête sur le pool attend que la transaction libère la connexion. Avec un `await` dans le callback, `.run(pool)` attend indéfiniment : lancez les requêtes du callback sur `txnClient`.
 - Les `query()` et `exec()` de PGlite lui-même n’attendent pas : dans la transaction, ils s’y exécutent ([How it differs from pg](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters/pglite#how-it-differs-from-pg)).
-- Une transaction imbriquée prend le client du callback casté en client de `pg` ([Le pool d’un autre driver](/fr/transaction#another-drivers-pool), [#702](https://github.com/AlexandreDemartin/pgcast/issues/702)).
+- Une transaction imbriquée prend le client du callback sans cast, et son callback reçoit ce client, au niveau de la transaction extérieure ([Le pool d’un autre driver](/fr/transaction#another-drivers-pool), [#702](https://github.com/AlexandreDemartin/pgcast/issues/702)).
 
 ## Un driver à vous {#a-driver-of-your-own}
 
