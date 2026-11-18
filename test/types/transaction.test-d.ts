@@ -199,6 +199,11 @@ declare const atAnyLevel: db.TxnClientLike<Awaited<ReturnType<db.PoolLike['conne
 declare function countUsers(txnClient: TxnOther<db.IsolationLevel.Serializable>): Promise<number>;
 type IndexedClient = OtherClient & { [key: string]: unknown };  // keyof holds every key, connect included
 declare const indexed: db.PoolLike<IndexedClient>;
+declare const p1: db.PoolLike<{
+  query: (q: db.SQLQuery) => Promise<{ rows: any[]; command: string }>;
+  release: () => void;
+  connect?: never;
+}>;
 
 // #702: run time passes the client of another driver's transaction through a nested call; its callback gets that same
 // client, typed at the outer level it runs at, as savepoint() gives it, where a pg client gets its own level, as in 6.6.1
@@ -219,7 +224,7 @@ describe('a nested call on another driver’s client (#702)', () => {
     expectTypeOf(run).resolves.toEqualTypeOf<s.JSONSelectableForTable<'users'>[]>();
     expectTypeOf(run).resolves.not.toBeAny();
     expectTypeOf(db.serializable(literal, c => db.readCommitted(c, async inner => inner))).resolves.toEqualTypeOf<db.TxnClientLike<LiteralClient, db.IsolationLevel.Serializable>>();
-    // the client of a db.PoolLike at any level: exactly the fallback's members but connect, so told apart by that key
+    // the client of a db.PoolLike at any level has all the fallback's members except connect
     expectTypeOf(db.serializable(atAnyLevel, async inner => inner)).resolves.toEqualTypeOf<typeof atAnyLevel>();
   });
 
@@ -227,6 +232,11 @@ describe('a nested call on another driver’s client (#702)', () => {
     void db.serializable(indexed, c => db.readCommitted(c, async inner => { expectTypeOf(inner).toEqualTypeOf<db.TxnClientLike<IndexedClient, db.IsolationLevel.Serializable>>(); }));
     // @ts-expect-error its query() takes pg's query object, not a string
     void db.serializable(indexed, c => db.readCommitted(c, inner => inner.query('SELECT 1')));
+  });
+
+  test('a client that declares connect?: never keeps its query type in a nested call', () => {
+    // @ts-expect-error this driver's query() requires a query object
+    void db.serializable(p1, c => db.readCommitted(c, inner => inner.query('SELECT 1')));
   });
 
   test('a helper that takes the client, or a pool typed with its client, compiles', () => {
