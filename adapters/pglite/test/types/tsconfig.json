@@ -1,0 +1,14 @@
+{
+  // The fit of asPool() to the core (fit.test-d.ts), compiled as a consumer project compiles: against the root's
+  // db.d.ts, which `npm run build` at the root emits first, and the fixture's generated schema (../../../../test/generated).
+  "extends": "../../../../test/generated/tsconfig.json",
+  "include": ["../../../../test/generated/zapatos/**/*", "./**/*"],
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "skipLibCheck": true,
+    "paths": {
+      "zapatos/db": ["../../../../db"]
+    }
+  }
+}
