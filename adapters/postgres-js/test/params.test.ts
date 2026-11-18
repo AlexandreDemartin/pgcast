@@ -3,10 +3,21 @@
 // The parameter table (README § What it writes): each value written through pg and through the adapter, in the
 // same query, is stored the same, read back as text, or refused with the same SQLSTATE.
 
-import { beforeAll, describe, expect, it } from 'vitest';
+import postgres from 'postgres';
+import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
+import { urlForDatabase } from '../../../test/helpers/databases';
+import { asPool, type PostgresJsPool } from '../src';
 import { refusal, shape, usePostgresJs } from './helpers';
 
 const u = usePostgresJs();
+
+// a sql whose `types` has a serializer, which postgres.js 4 reads to decide whether to describe a statement first
+let typedSql: ReturnType<typeof postgres> | undefined, typedPool: PostgresJsPool;
+beforeAll(() => {
+  typedSql = postgres(urlForDatabase(inject('pgcastDb')!.url, u.t.name), { max: 2, onnotice: () => { }, types: { bigint: postgres.BigInt } });
+  typedPool = asPool(typedSql);
+});
+afterAll(async () => { await typedSql?.end({ timeout: 1 }); });
 
 beforeAll(async () => {
   await u.t.pool.query(`CREATE TABLE written (k serial, c_text text, c_int8 int8, c_numeric numeric, c_bool bool,
@@ -82,14 +93,49 @@ const cases: [string, string, unknown][] = [
   ['a string to jsonb ? $1', select(`'{"a":1}'::jsonb ? $1`), 'a'],
 ];
 
-const written = async (q: { query: (q: { text: string; values: any[] }) => PromiseLike<{ rows: any[] }> }, text: string, value: unknown) => {
-  try { return shape((await q.query({ text, values: [value] })).rows[0].t); }
+type Queryable = { query: (q: { text: string; values: any[]; name?: string }) => PromiseLike<{ rows: any[] }> };
+const written = async (q: Queryable, text: string, value: unknown, values: unknown[] = [value], name?: string) => {
+  try { return shape((await q.query({ text, values, name })).rows[0].t); }
   catch (e) { return refusal(e); }
 };
+
+// a NULL in $2, as db.insert() sends a null column: postgres.js 4 then describes the statement first
+const besideNull = (text: string) => `WITH beside AS (SELECT $2::text AS n) ${text}`;
 
 describe('writes as pg writes:', () => {
   it.each(cases)('%s', async (_, text, value) => {
     expect(await written(u.pool, text, value)).toEqual(await written(u.t.pool, text, value));
+  });
+
+  it.each(cases)('%s, beside a NULL, unprepared and prepared twice, on a sql with types too', async (label, text, value) => {
+    const name = 'beside_' + cases.findIndex(c => c[0] === label), pg = await written(u.t.pool, besideNull(text), value, [value, null]);
+    const runs = async (pool: Queryable) => [
+      await written(pool, besideNull(text), value, [value, null]),
+      await written(pool, besideNull(text), value, [value, null], name),
+      await written(pool, besideNull(text), value, [value, null], name),
+    ];
+    expect({ default: await runs(u.pool), types: await runs(typedPool) }).toEqual({ default: [pg, pg, pg], types: [pg, pg, pg] });
+  });
+
+  it('after DEALLOCATE ALL, which drops the statements of the connection', async () => {
+    const sql = postgres(urlForDatabase(inject('pgcastDb')!.url, u.t.name), { max: 2, onnotice: () => { } }), pool = asPool(sql);
+    try {
+      const c = await pool.connect(), seen: Record<string, unknown[]> = {}, expected: Record<string, unknown[]> = {};
+      try {
+        for (const [label, text, value] of cases.filter(c => /JSON text to CAST|'true' to bool|\\x string|an object to jsonb$/.test(c[0]))) {
+          const pg = await written(u.t.pool, text, value);
+          for (const [via, q] of [['pool', pool], ['client', c]] as const) {
+            const key = via + ': ' + label, name = 'deallocated_' + via;
+            seen[key] = [await written(q, text, value), await written(q, text, value, [value], name)];
+            await q.query({ text: 'DEALLOCATE ALL', values: [] });
+            seen[key].push(await written(q, text, value), await written(q, text, value, [value], name));
+            expected[key] = [pg, pg, pg, pg];
+          }
+        }
+      } finally { c.release(); }
+      expect(Object.keys(seen)).toHaveLength(8);
+      expect(seen).toEqual(expected);
+    } finally { await sql.end({ timeout: 1 }); }
   });
 
   it('several values, as IN ($1, $2)', async () => {
