@@ -61,7 +61,7 @@ export function checkSkills(directory) {
     }
     const frontmatter = frontmatterOf(text);
     if (!frontmatter) {
-      errors.push(`${path}: missing frontmatter`);
+      errors.push(`${path}: missing frontmatter`, ...sizeErrors(path, text));
       continue;
     }
     const {name, description = ''} = frontmatter;
