@@ -36,7 +36,7 @@ export type IsolationSatisfying<T extends IsolationLevel> = {
 
 // For each level, the levels of a transaction whose client a call at that level may join, as Postgres runs them: each
 // gives every guarantee the level asks for. IsolationSatisfying, plus SerializableRODeferrable in the rows of the three
-// other read-only levels, which the type leaves it out of (see https://github.com/AlexandreDemartin/pgcast/issues/489).
+// other read-only levels, which the type leaves it out of, as in Zapatos 6.6.1 (see https://github.com/AlexandreDemartin/pgcast/issues/489).
 // A Map, so that a level it doesn't know, a string from JavaScript ('constructor'), is passed through, as in Zapatos 6.6.1
 const
   { Serializable: S, RepeatableRead: RR, ReadCommitted: RC, SerializableRO: SRO, RepeatableReadRO: RRRO,
@@ -131,7 +131,7 @@ let txnSeq = 0;
  *
  * Given the client of a transaction at a level that doesn't satisfy this one
  * (`IsolationSatisfying`, plus `SerializableRODeferrable` for the three other
- * read-only levels, which the type leaves out, #489), the callback would run at that level: with the
+ * read-only levels, which the type leaves out, as in Zapatos 6.6.1, #489), the callback would run at that level: with the
  * `transactionRequiresSatisfyingLevel` config option, this rejects before
  * calling it; without it, it runs and emits `PGCAST_DEP007`, once.
  * @param txnClientOrQueryable The `pg.Pool` from which to check out a client,

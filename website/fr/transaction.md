@@ -1,5 +1,5 @@
 ---
-english: e120e4c2948a
+english: edb4865c5045
 ---
 
 # Transactions
@@ -99,7 +99,7 @@ Avec le client d’une transaction que `transaction()` a ouverte, elle n’envoi
 Une seule transaction, les deux sièges ou aucun : `START TRANSACTION ISOLATION LEVEL SERIALIZABLE`<!-- probe: db.serializable(pool, async () => {}) -->, les deux `INSERT`, `COMMIT`.
 
 - Le callback s’exécute au niveau de la transaction extérieure, car Postgres ne peut plus changer le niveau d’isolation une fois la première requête de celle-ci exécutée. Le type ne vérifie pas ce niveau : chaque `TxnClient` est un [`Queryable`](/fr/sql-template#Queryable), donc `db.serializable(txnClient, …)` passe la vérification de types avec un client de `db.readCommitted()`, et son callback s’exécute dans cette transaction `READ COMMITTED`, comme dans Zapatos 6.6.1, avec un avertissement, une fois, `PGCAST_DEP007`.
-- Avec [`transactionRequiresSatisfyingLevel`](/fr/runtime-config#Config.transactionRequiresSatisfyingLevel), quand le niveau extérieur ne vaut pas pour celui demandé ([`IsolationSatisfying`](#IsolationSatisfying)), `transaction()` est rejetée avant d’appeler le callback, et la transaction extérieure est annulée, à moins que son callback n’intercepte l’erreur. Un niveau qui vaut pour celui demandé est transmis, avec ou sans l’option, de même que le client de `db.serializableRODeferrable()` donné à `db.serializableRO()`, `db.repeatableReadRO()` ou `db.readCommittedRO()`, qu’`IsolationSatisfying` omet ([#489](https://github.com/AlexandreDemartin/pgcast/issues/489)).
+- Avec [`transactionRequiresSatisfyingLevel`](/fr/runtime-config#Config.transactionRequiresSatisfyingLevel), quand le niveau extérieur ne vaut pas pour celui demandé ([`IsolationSatisfying`](#IsolationSatisfying)), `transaction()` est rejetée avant d’appeler le callback, et la transaction extérieure est annulée, à moins que son callback n’intercepte l’erreur. Un niveau qui vaut pour celui demandé est transmis, avec ou sans l’option, de même que le client de `db.serializableRODeferrable()` donné à `db.serializableRO()`, `db.repeatableReadRO()` ou `db.readCommittedRO()`, que le type omet, comme dans Zapatos 6.6.1 ([`IsolationSatisfying`](#IsolationSatisfying)).
 - Une fonction dont le paramètre est d’un type `TxnClientFor…` est vérifiée : [`IsolationSatisfying`](#IsolationSatisfying).
 - Ce qui marque le client, c’est sa propre propriété `_zapatos` ([`TxnClient`](#TxnClient)).
 - Une transaction que vous avez ouverte vous-même, par un `BEGIN` brut, n’a pas de marque : elle n’est pas transmise ([Votre propre `BEGIN`](#your-own-begin)). Ouvrez la transaction extérieure avec `transaction()`.
@@ -298,6 +298,22 @@ const countBookings = (txnClient: db.TxnClientForRepeatableRead) =>
 
 await db.serializable(pool, txnClient => countBookings(txnClient));
 await db.readCommitted(pool, txnClient => countBookings(txnClient));
+```
+
+`SerializableRODeferrable` est omis des lignes de `SerializableRO`, `RepeatableReadRO` et `ReadCommittedRO`, comme dans Zapatos 6.6.1, bien qu’il donne toutes les garanties qu’elles demandent, et `transaction()` transmet son client ([Transmettre une transaction](#passing-a-transaction-through)). Donc une fonction qui prend un `TxnClientForSerializableRO` refuse le client de `serializableRODeferrable()` (2345). Cela reste ainsi : en l’y comptant, une fonction qui prend un `TxnClientForSerializableRO` lirait `SerializableRODeferrable` dans son propre `_zapatos.isolationLevel`, tout comme les callbacks de `serializableRO()`, `repeatableReadRO()` et `readCommittedRO()`. Du code qui compile sous la 6.6.1 échouerait alors, comme un `switch` exhaustif sur ce niveau ou un `Record` dont ces niveaux sont les clés ([#489](https://github.com/AlexandreDemartin/pgcast/issues/489) ; le changement attend la 7.0, [#694](https://github.com/AlexandreDemartin/pgcast/issues/694)). Une fonction qui prend les deux clients nomme les deux types, et il en va de même pour les deux autres niveaux :
+
+```ts twoslash
+import * as db from 'zapatos/db';
+import type pg from 'pg';
+declare const pool: pg.Pool;
+// ---cut---
+const countSeats = (txnClient: db.TxnClientForSerializableRO | db.TxnClientForSerializableRODeferrable) =>
+  db.count('seat_bookings', { screening_id: 1000 }).run(txnClient);
+
+await db.serializableRO(pool, txnClient => countSeats(txnClient));
+await db.serializableRODeferrable(pool, txnClient => countSeats(txnClient));
+// @ts-expect-error REPEATABLE READ, READ ONLY satisfies neither type
+await db.repeatableReadRO(pool, txnClient => countSeats(txnClient));
 ```
 
 ### `TxnClient` {#TxnClient}
