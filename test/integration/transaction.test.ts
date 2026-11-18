@@ -1217,4 +1217,32 @@ describe('advisoryXactLock()', () => {
       client.release();
     }
   });
+
+  // pg's status is that of the last query answered: a BEGIN not awaited still reads I, though pg would send the lock
+  // after it
+  it('refuses a pg.PoolClient whose BEGIN is not yet answered, before any query', async () => {
+    const queries: db.SQLQuery[] = [];
+    db.setConfig({ queryListener: q => { queries.push(q); } });
+    const client = await t.pool.connect();
+    try {
+      const begin = client.query('BEGIN');
+      await expect(db.advisoryXactLock(client, BigInt(42))).rejects.toThrow(/^advisoryXactLock\(\) was given a client outside a transaction block/);
+      await begin;
+      expect(client.getTransactionStatus()).toBe('T');
+      expect(queries).toEqual([]);
+      expect(await advisoryLocks()).toEqual([]);
+    } finally {
+      await client.query('ROLLBACK');
+      client.release();
+    }
+  });
+
+  it('refuses a pg.Pool, given past a cast, before any query: no lock is left', async () => {
+    const queries: db.SQLQuery[] = [];
+    db.setConfig({ queryListener: q => { queries.push(q); } });
+    await expect(db.advisoryXactLock(t.pool as never, [5, 4])).rejects.toThrow(
+      'advisoryXactLock() was given a pg.Pool, which runs each query on a client outside a transaction block, so Postgres would release the lock as soon as it is taken: call it on the client of a transaction(), or after a BEGIN of yours');
+    expect(queries).toEqual([]);
+    expect(await advisoryLocks()).toEqual([]);
+  });
 });

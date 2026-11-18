@@ -229,6 +229,16 @@ describe('advisoryXactLock()', () => {
     expect(sent).toEqual([{ text, values }]);
   });
 
+  it('reads each item of the caller’s pair once: a getter that changes is sent as first read', async () => {
+    let reads = 0;
+    const key = [0, 42];
+    Object.defineProperty(key, 0, { get: () => (reads++ === 0 ? 5 : null), enumerable: true });
+    const { sent, client } = lockClient('T');
+    await db.advisoryXactLock(client, key as unknown as Key);
+    expect(reads).toBe(1);
+    expect(sent).toEqual([{ text: 'SELECT pg_advisory_xact_lock($1, $2)', values: [5, 42] }]);
+  });
+
   it('gives queryListener values it can JSON.stringify: a bigint is sent as its decimal string', async () => {
     const strings: string[] = [];
     db.setConfig({ queryListener: q => { strings.push(JSON.stringify(q)); } });
