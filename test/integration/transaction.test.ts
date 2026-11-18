@@ -3,7 +3,8 @@
 // Characterization of src/db/transaction.ts. transaction() runs START TRANSACTION
 // then COMMIT, which would commit the harness's per-test transaction: these tests
 // run on the file's pool (t.pool), write only to txn_probe, and empty it after
-// each test. The per-test client (t.client) is not used here.
+// each test. The per-test client (t.client) is used only inside its own BEGIN,
+// by advisoryXactLock() (#724).
 // Retries are provoked deterministically: the callback raises the SQLSTATE
 // itself on its first attempts (a DO block with RAISE ... USING ERRCODE).
 
@@ -1730,5 +1731,138 @@ describe('savepoint() (#723)', () => {
     expect(names).toEqual(['pgcast_savepoint_1', 'pgcast_savepoint_1']);  // the outer one's ROLLBACK TO goes back to the inner one
     expect(await notes()).toEqual(['after', 'base', 'outer work']);
     expect(attempts).toBe(1);
+  });
+});
+
+// #724: the lock advisoryXactLock() takes, as a second connection reads it in pg_locks, and when Postgres releases it
+describe('advisoryXactLock()', () => {
+  type Key = bigint | readonly [number, number];
+
+  /** The advisory locks held in this file's database, read on another connection. */
+  const advisoryLocks = async () => (await t.pool.query(
+    "SELECT classid, objid, objsubid FROM pg_locks WHERE locktype = 'advisory' AND database = (SELECT oid FROM pg_database WHERE datname = current_database()) ORDER BY classid, objid, objsubid",
+  )).rows;
+
+  /** Whether another connection gets the lock, which it then releases at once (it runs outside a block). */
+  const othersGet = async (key: Key) => (await (typeof key === 'bigint' ?
+    t.pool.query('SELECT pg_try_advisory_xact_lock($1) AS got', [String(key)]) :
+    t.pool.query('SELECT pg_try_advisory_xact_lock($1, $2) AS got', [key[0], key[1]]))).rows[0].got;
+
+  it('takes a bigint key and a pair as two locks, objsubid 1 and 2, held until COMMIT', async () => {
+    await db.serializable(t.pool, async c => {
+      await db.advisoryXactLock(c, BigInt(42));
+      await db.advisoryXactLock(c, [0, 42]);
+      await db.advisoryXactLock(c, BigInt(2) ** BigInt(32) + BigInt(42));  // the high 32 bits go to classid
+      expect(await advisoryLocks()).toEqual([
+        { classid: 0, objid: 42, objsubid: 1 }, { classid: 0, objid: 42, objsubid: 2 }, { classid: 1, objid: 42, objsubid: 1 },
+      ]);
+      expect(await othersGet(BigInt(42))).toBe(false);
+      expect(await othersGet([0, 42])).toBe(false);
+    });
+    expect(await advisoryLocks()).toEqual([]);
+    expect(await othersGet(BigInt(42))).toBe(true);
+    expect(await othersGet([0, 42])).toBe(true);
+  });
+
+  it('is released at ROLLBACK', async () => {
+    const err = await db.serializable(t.pool, async c => {
+      await db.advisoryXactLock(c, [1, 42]);
+      expect(await advisoryLocks()).toEqual([{ classid: 1, objid: 42, objsubid: 2 }]);
+      throw new Error('boom');
+    }).catch((e: unknown) => e);
+    expect((err as Error).message).toBe('boom');
+    expect(await advisoryLocks()).toEqual([]);
+  });
+
+  it('runs inside a BEGIN of yours, and is released at the ROLLBACK TO of a savepoint() taken before it, not one taken after', async () => {
+    await db.advisoryXactLock(t.client, [1, 41]);  // the harness's client, inside its BEGIN
+    const failed = new Error('the unit of work failed');
+    const err = await db.savepoint(t.client, async sp => {
+      await db.advisoryXactLock(sp, [1, 42]);
+      expect(await advisoryLocks()).toEqual([{ classid: 1, objid: 41, objsubid: 2 }, { classid: 1, objid: 42, objsubid: 2 }]);
+      throw failed;
+    }).catch((e: unknown) => e);
+    expect(err).toBe(failed);
+    expect(await advisoryLocks()).toEqual([{ classid: 1, objid: 41, objsubid: 2 }]);
+    expect(await othersGet([1, 42])).toBe(true);
+  });
+
+  it('is kept past the RELEASE of a savepoint() that resolves, until the transaction ends', async () => {
+    await db.serializable(t.pool, async c => {
+      await db.savepoint(c, sp => db.advisoryXactLock(sp, [1, 43]));
+      expect(await advisoryLocks()).toEqual([{ classid: 1, objid: 43, objsubid: 2 }]);
+      expect(await othersGet([1, 43])).toBe(false);
+    });
+    expect(await advisoryLocks()).toEqual([]);
+  });
+
+  it('is released between two attempts of a transaction retried on 40001', async () => {
+    db.setConfig({ transactionRetryDelay: { minMs: 0, maxMs: 0 } });
+    const seen: unknown[] = [];
+    let attempts = 0;
+    await db.serializable(t.pool, async c => {
+      seen.push(await advisoryLocks());
+      await db.advisoryXactLock(c, BigInt(724));
+      seen.push(await advisoryLocks());
+      if (++attempts === 1) await raise(c, '40001');
+    });
+    const held = [{ classid: 0, objid: 724, objsubid: 1 }];
+    expect(seen).toEqual([[], held, [], held]);  // the second attempt starts with the first one's lock released
+    expect(await advisoryLocks()).toEqual([]);
+  });
+
+  it('takes the two ends of bigint, and passes on Postgres\'s errors for a key out of range or not an integer', async () => {
+    await db.readCommitted(t.pool, async c => {
+      await db.advisoryXactLock(c, -(BigInt(2) ** BigInt(63)));
+      await db.advisoryXactLock(c, BigInt(2) ** BigInt(63) - BigInt(1));
+      expect(await advisoryLocks()).toHaveLength(2);
+    });
+    const errorOf = (key: Key) => db.readCommitted(t.pool, c => db.advisoryXactLock(c, key)).catch((e: unknown) => e);
+    expect(await errorOf(BigInt(2) ** BigInt(63))).toMatchObject({ code: '22003', message: 'value "9223372036854775808" is out of range for type bigint' });
+    expect(await errorOf([1, 3000000000])).toMatchObject({ code: '22003', message: 'value "3000000000" is out of range for type integer' });
+    expect(await errorOf([1.5, 2])).toMatchObject({ code: '22P02', message: 'invalid input syntax for type integer: "1.5"' });
+    expect(await errorOf([NaN, 2])).toMatchObject({ code: '22P02', message: 'invalid input syntax for type integer: "NaN"' });
+  });
+
+  it('refuses a pg.PoolClient outside a transaction block, before any query: no lock is left', async () => {
+    const queries: db.SQLQuery[] = [];
+    db.setConfig({ queryListener: q => { queries.push(q); } });
+    const client = await t.pool.connect();
+    try {
+      expect(client.getTransactionStatus()).toBe('I');
+      await expect(db.advisoryXactLock(client, BigInt(42))).rejects.toThrow(/^advisoryXactLock\(\) was given a client outside a transaction block/);
+      expect(queries).toEqual([]);
+      expect(await advisoryLocks()).toEqual([]);
+    } finally {
+      client.release();
+    }
+  });
+
+  // pg's status is that of the last query answered: a BEGIN not awaited still reads I, though pg would send the lock
+  // after it
+  it('refuses a pg.PoolClient whose BEGIN is not yet answered, before any query', async () => {
+    const queries: db.SQLQuery[] = [];
+    db.setConfig({ queryListener: q => { queries.push(q); } });
+    const client = await t.pool.connect();
+    try {
+      const begin = client.query('BEGIN');
+      await expect(db.advisoryXactLock(client, BigInt(42))).rejects.toThrow(/^advisoryXactLock\(\) was given a client outside a transaction block/);
+      await begin;
+      expect(client.getTransactionStatus()).toBe('T');
+      expect(queries).toEqual([]);
+      expect(await advisoryLocks()).toEqual([]);
+    } finally {
+      await client.query('ROLLBACK');
+      client.release();
+    }
+  });
+
+  it('refuses a pg.Pool, given past a cast, before any query: no lock is left', async () => {
+    const queries: db.SQLQuery[] = [];
+    db.setConfig({ queryListener: q => { queries.push(q); } });
+    await expect(db.advisoryXactLock(t.pool as never, [5, 4])).rejects.toThrow(
+      'advisoryXactLock() was given a pg.Pool, which runs each query on a client outside a transaction block, so Postgres would release the lock as soon as it is taken: call it on the client of a transaction(), or on a client of the pool after a BEGIN of yours');
+    expect(queries).toEqual([]);
+    expect(await advisoryLocks()).toEqual([]);
   });
 });

@@ -4,12 +4,13 @@
 // (R26). pg-native is not installed: pg.native is stubbed by vi.mock, for this
 // file only. Under Vitest, src imports pg's ESM entry, which has no `native`;
 // the stub adds it, own and enumerable, as pg 7 has it. Then a pool of another
-// driver (#696), which run time takes for a pool, and the SQL savepoint() sends
-// (#723). No database.
+// driver (#696), which run time takes for a pool, the SQL savepoint() sends
+// (#723), and the SQL advisoryXactLock() sends (#724). No database.
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as db from '../../src/db';
 import { IsolationLevel } from '../../src/db';
+import { resetConfig } from '../helpers/config';
 
 const native = vi.hoisted(() => {
   /** A connected pg.native.Client: it records the SQL it is sent, and has no release(). */
@@ -430,5 +431,104 @@ describe('savepoint() on a transaction client', () => {
     await expect(db.savepoint(client, callback)).rejects.toBe(noBlock);
     expect(callback).not.toHaveBeenCalled();
     expect(sentAs(sent)).toEqual([SP]);
+  });
+});
+
+// #724: advisoryXactLock() on a client that logs what it is sent: the SQL of each key, and its two refusals, each
+// before any query
+describe('advisoryXactLock()', () => {
+  afterEach(resetConfig);
+
+  type Key = bigint | readonly [number, number];
+
+  /** A transaction's client that logs each query; its getTransactionStatus() gives `status`, and with none it has no such method. */
+  const lockClient = (...status: [] | [string | null]) => {
+    const sent: db.SQLQuery[] = [];
+    const client = {
+      query: async (q: db.SQLQuery) => { sent.push({ text: q.text, values: q.values }); return { rows: [{ pg_advisory_xact_lock: '' }], command: 'SELECT' }; },
+      release: () => undefined,
+      ...(status.length ? { getTransactionStatus: () => status[0] } : {}),
+    };
+    return { sent, client };
+  };
+
+  /** The queries queryListener gets. */
+  const listened = () => {
+    const queries: db.SQLQuery[] = [];
+    db.setConfig({ queryListener: q => { queries.push(q); } });
+    return queries;
+  };
+
+  const pair = [7, 42] as const, tuple: readonly [number, number] = [8, 42];
+  it.each<{ name: string; key: Key; text: string; values: unknown[] }>([
+    { name: 'BigInt(42)', key: BigInt(42), text: 'SELECT pg_advisory_xact_lock($1)', values: ['42'] },
+    { name: 'the smallest bigint', key: -(BigInt(2) ** BigInt(63)), text: 'SELECT pg_advisory_xact_lock($1)', values: ['-9223372036854775808'] },
+    { name: '[1, 42]', key: [1, 42], text: 'SELECT pg_advisory_xact_lock($1, $2)', values: [1, 42] },
+    { name: '[0, 42]', key: [0, 42], text: 'SELECT pg_advisory_xact_lock($1, $2)', values: [0, 42] },
+    { name: 'a pair as const', key: pair, text: 'SELECT pg_advisory_xact_lock($1, $2)', values: [7, 42] },
+    { name: 'a readonly tuple', key: tuple, text: 'SELECT pg_advisory_xact_lock($1, $2)', values: [8, 42] },
+  ])('sends one query for $name, and resolves to undefined', async ({ key, text, values }) => {
+    const { sent, client } = lockClient('T');
+    expect(await db.advisoryXactLock(client, key)).toBeUndefined();
+    expect(sent).toEqual([{ text, values }]);
+  });
+
+  it('reads each item of the caller’s pair once: a getter that changes is sent as first read', async () => {
+    let reads = 0;
+    const key = [0, 42];
+    Object.defineProperty(key, 0, { get: () => (reads++ === 0 ? 5 : null), enumerable: true });
+    const { sent, client } = lockClient('T');
+    await db.advisoryXactLock(client, key as unknown as Key);
+    expect(reads).toBe(1);
+    expect(sent).toEqual([{ text: 'SELECT pg_advisory_xact_lock($1, $2)', values: [5, 42] }]);
+  });
+
+  it('gives queryListener values it can JSON.stringify: a bigint is sent as its decimal string', async () => {
+    const strings: string[] = [];
+    db.setConfig({ queryListener: q => { strings.push(JSON.stringify(q)); } });
+    await db.advisoryXactLock(lockClient('T').client, BigInt('9223372036854775807'));
+    expect(strings).toEqual(['{"text":"SELECT pg_advisory_xact_lock($1)","values":["9223372036854775807"]}']);
+  });
+
+  it.each<[string, unknown]>([
+    ['null', null], ['undefined', undefined], ['a number', 42], ['a string', '42'], ['one number', [1]],
+    ['three numbers', [1, 2, 3]], ['a null first item', [null, 2]], ['a null second item', [1, null]],
+    ['a bigint item', [BigInt(1), 2]], ['a string item', [1, '2']], ['an array-like', { 0: 1, 1: 2, length: 2 }],
+  ])('refuses %s as a key, before any query', async (_, key) => {
+    const { sent, client } = lockClient('T'), queries = listened();
+    await expect(db.advisoryXactLock(client, key as Key)).rejects.toThrow(
+      'advisoryXactLock() was given a key that is neither a bigint nor an array of two numbers, so Postgres would take no lock: give a bigint, BigInt(42), or a pair of integers, [1, 42]');
+    expect(sent).toEqual([]);
+    expect(queries).toEqual([]);
+  });
+
+  it('refuses a client that reports it is outside a transaction block, before any query', async () => {
+    const { sent, client } = lockClient('I'), queries = listened();
+    await expect(db.advisoryXactLock(client, BigInt(42))).rejects.toThrow(
+      'advisoryXactLock() was given a client outside a transaction block, so Postgres would release the lock as soon as it is taken: call it on the client of a transaction(), or after a BEGIN of yours');
+    expect(sent).toEqual([]);
+    expect(queries).toEqual([]);
+  });
+
+  it('checks the key first: a wrong key on an idle client gets the key’s message', async () => {
+    await expect(db.advisoryXactLock(lockClient('I').client, null as unknown as Key)).rejects.toThrow(/^advisoryXactLock\(\) was given a key/);
+  });
+
+  // pg reports T inside a block, E inside an aborted one (Postgres then refuses the query, 25P02); null, or no method,
+  // when it can't say: another driver, pg before 8.21, pg-native before 3.8
+  it.each<[string, [] | [string | null]]>([['T', ['T']], ['E', ['E']], ['null', [null]], ['no status', []]])('runs on a client whose status is %s', async (_, status) => {
+    const { sent, client } = lockClient(...status);
+    await db.advisoryXactLock(client, [1, 42]);
+    expect(sent).toEqual([{ text: 'SELECT pg_advisory_xact_lock($1, $2)', values: [1, 42] }]);
+  });
+
+  it('runs on the client of another driver’s pool, in its transaction', async () => {
+    const sent: string[] = [];
+    const client = {
+      query: async (q: db.SQLQuery) => { sent.push(q.text); return { rows: [], command: q.text.split(' ')[0] }; },
+      release: () => { sent.push('release()'); },
+    };
+    await db.serializable({ connect: async () => client }, c => db.advisoryXactLock(c, BigInt(42)));
+    expect(sent).toEqual(['START TRANSACTION ISOLATION LEVEL SERIALIZABLE', 'SELECT pg_advisory_xact_lock($1)', 'COMMIT', 'release()']);
   });
 });

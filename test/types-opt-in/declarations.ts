@@ -76,3 +76,9 @@ export const clientOf = (pool: db.PoolLike<OtherClient>) => db.serializable(pool
 export const savepointClientOf = (pool: db.PoolLike<OtherClient>) => db.serializable(pool, txnClient => db.savepoint(txnClient, async spClient => spClient));  // #723
 export const anyPoolClientOf = (pool: db.PoolLike) => db.readCommitted(pool, async txnClient => txnClient);
 export const firstParameterOf = (queryable: Parameters<typeof db.serializable>[0]) => [queryable];
+
+// an advisory lock in a transaction of another driver's pool, and on a client typed by advisoryXactLock()'s first
+// parameter, as a library writes them (#724)
+export const lockIn = (pool: db.PoolLike<OtherClient>) => db.serializable(pool, txnClient => db.advisoryXactLock(txnClient, [1, 42]));
+export const lockOn = (txnClient: Parameters<typeof db.advisoryXactLock>[0], key: Parameters<typeof db.advisoryXactLock>[1]) =>
+  db.advisoryXactLock(txnClient, key);

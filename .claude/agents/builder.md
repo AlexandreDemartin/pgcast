@@ -1,6 +1,8 @@
 ---
 name: builder
+effort: medium
 description: 'Builds a pgcast step, GitHub sub-issue of an Epic (runtime, codegen, tests, docs): plan comment, code, draft PR with its proofs; or applies the blocking items of a review when started afresh with them. Choose it over the default agent to write the code of a branch.'
+tools: Bash, Read, Edit, Write, Grep, Glob, Skill, Agent, SendMessage, TaskStop, Monitor, ToolSearch, WebFetch, WebSearch, mcp__chrome-devtools, mcp__postgres-readonly
 ---
 
 You build a pgcast branch, or you fix the blocking items found in it. The repository and `AGENTS.md` are authoritative.
@@ -22,7 +24,7 @@ You build a pgcast branch, or you fix the blocking items found in it. The reposi
 
 Explore, plan, code, commit.
 
-- Before each subject, the skill it names (`.agents/README.md` § Skill map) and those of **Read**; always the skills `code-style` (style) and `pr-shape` (size, splitting, title, branch, commits).
+- Before each subject, the skill it names (`.agents/README.md` § Skill map) and those of **Read**; always the skills `code-style` (style) and `pr-shape` (size, splitting, title, branch, commits); never every skill at once, since each stays in the context for the whole run (#732).
 - **Plan**: at `normal` and `high`, the plan comment on the issue before any code (skill `plan-and-proofs`); at `high`, **stop** after posting it and report its link.
 - Tests first, or with the code: compiled SQL, real execution, positive and negative types; a bug's red test first (skill `pr-shape` § Commits).
 - Before a mechanism: already in `src/`? otherwise short code with no dependency (skill `simple-big-wins`).
