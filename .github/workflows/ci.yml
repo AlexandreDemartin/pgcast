@@ -219,7 +219,8 @@ jobs:
   adapter-postgres-js:
     # The postgres.js adapter, a package of its own (adapters/postgres-js/): its tests read and write each type through pg
     # and through the adapter on the fixture's database, with the root's install and helpers, so the root builds first;
-    # its type test compiles against the root's db.d.ts. On its peer's floor, the lockfile's version and the latest major.
+    # its type test compiles against the root's db.d.ts. On its peer's floor, the lockfile's version, and the first and
+    # the latest 4.x.
     needs: changes
     if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
@@ -227,7 +228,7 @@ jobs:
       fail-fast: false
       matrix:
         postgres: [14, 18]
-        driver: [3.4.0, lockfile, 4.1.1]
+        driver: [3.4.0, lockfile, 4.0.0, 4.1.1]
     defaults:
       run:
         working-directory: adapters/postgres-js
