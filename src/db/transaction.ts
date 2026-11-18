@@ -113,6 +113,10 @@ type IsPassedLike<N> = (<X>() => X extends N ? 1 : 2) extends (<X>() => X extend
 type Passed<N> = 0 extends 1 & N ? never : IsPassedLike<N> extends true ? never : '_zapatos' extends keyof N ? N : never;
 // a marked client goes straight to the callback. When the argument can be a pool, the call starts its own transaction.
 type WithPassed<N, Else> = ([Passed<N>] extends [never] ? Else : never) | Passed<N>;
+// The constraint on N binds only the type argument. The client argument itself must exclude values with connect().
+// Keeping N in the never branch lets TypeScript infer the whole client, including a caller's copy of PassedLike.
+type WithPassedArgument<N, Else> = ([Passed<N>] extends [never] ? Else : never) |
+  ([N] extends [never] ? N : Passed<N> & { connect?: never });
 
 // the callback as the body of transaction() calls it: with the client of a PoolLike, which run time uses as a TxnClient
 type Callback<T, M extends IsolationLevel> = (client: TxnClient<IsolationSatisfying<M>>) => Promise<T>;
@@ -205,7 +209,7 @@ type RetriedCode = Extract<TransactionEvent, { type: 'rollback' }>['code'];
  * to it
  */
 export async function transaction<T, M extends IsolationLevel, C = unknown, N extends PassedLike = PassedLike>(
-  txnClientOrQueryable: WithPassed<N, Queryable | TxnClient<IsolationSatisfying<M>> | PoolLike<C>>,
+  txnClientOrQueryable: WithPassedArgument<N, Queryable | TxnClient<IsolationSatisfying<M>> | PoolLike<C>>,
   isolationLevel: M,
   callback: (client: WithPassed<NoInfer<N>, TxnClientOf<NoInfer<C>, TxnClient<IsolationSatisfying<M>>, IsolationSatisfying<M>>>) => Promise<T>
 ): Promise<T> {
@@ -330,7 +334,7 @@ export async function transaction<T, M extends IsolationLevel, C = unknown, N ex
  * @param callback A callback function that runs queries on the client provided
  * to it
  */
-export async function serializable<T, C = unknown, N extends PassedLike = PassedLike>(txnClientOrQueryable: WithPassed<N, Queryable | TxnClientForSerializable | PoolLike<C>>, callback: (client: WithPassed<NoInfer<N>, TxnClientOf<NoInfer<C>, TxnClientForSerializable, IsolationSatisfying<IsolationLevel.Serializable>>>) => Promise<T>) {
+export async function serializable<T, C = unknown, N extends PassedLike = PassedLike>(txnClientOrQueryable: WithPassedArgument<N, Queryable | TxnClientForSerializable | PoolLike<C>>, callback: (client: WithPassed<NoInfer<N>, TxnClientOf<NoInfer<C>, TxnClientForSerializable, IsolationSatisfying<IsolationLevel.Serializable>>>) => Promise<T>) {
   return transaction(txnClientOrQueryable as Queryable, IsolationLevel.Serializable, callback as Callback<T, IsolationLevel.Serializable>);
 }
 /**
@@ -341,7 +345,7 @@ export async function serializable<T, C = unknown, N extends PassedLike = Passed
  * @param callback A callback function that runs queries on the client provided
  * to it
  */
-export async function repeatableRead<T, C = unknown, N extends PassedLike = PassedLike>(txnClientOrQueryable: WithPassed<N, Queryable | TxnClientForRepeatableRead | PoolLike<C>>, callback: (client: WithPassed<NoInfer<N>, TxnClientOf<NoInfer<C>, TxnClientForRepeatableRead, IsolationSatisfying<IsolationLevel.RepeatableRead>>>) => Promise<T>) {
+export async function repeatableRead<T, C = unknown, N extends PassedLike = PassedLike>(txnClientOrQueryable: WithPassedArgument<N, Queryable | TxnClientForRepeatableRead | PoolLike<C>>, callback: (client: WithPassed<NoInfer<N>, TxnClientOf<NoInfer<C>, TxnClientForRepeatableRead, IsolationSatisfying<IsolationLevel.RepeatableRead>>>) => Promise<T>) {
   return transaction(txnClientOrQueryable as Queryable, IsolationLevel.RepeatableRead, callback as Callback<T, IsolationLevel.RepeatableRead>);
 }
 /**
@@ -352,7 +356,7 @@ export async function repeatableRead<T, C = unknown, N extends PassedLike = Pass
  * @param callback A callback function that runs queries on the client provided 
  * to it
  */
-export async function readCommitted<T, C = unknown, N extends PassedLike = PassedLike>(txnClientOrQueryable: WithPassed<N, Queryable | TxnClientForReadCommitted | PoolLike<C>>, callback: (client: WithPassed<NoInfer<N>, TxnClientOf<NoInfer<C>, TxnClientForReadCommitted, IsolationSatisfying<IsolationLevel.ReadCommitted>>>) => Promise<T>) {
+export async function readCommitted<T, C = unknown, N extends PassedLike = PassedLike>(txnClientOrQueryable: WithPassedArgument<N, Queryable | TxnClientForReadCommitted | PoolLike<C>>, callback: (client: WithPassed<NoInfer<N>, TxnClientOf<NoInfer<C>, TxnClientForReadCommitted, IsolationSatisfying<IsolationLevel.ReadCommitted>>>) => Promise<T>) {
   return transaction(txnClientOrQueryable as Queryable, IsolationLevel.ReadCommitted, callback as Callback<T, IsolationLevel.ReadCommitted>);
 }
 /**
@@ -363,7 +367,7 @@ export async function readCommitted<T, C = unknown, N extends PassedLike = Passe
  * @param callback A callback function that runs queries on the client provided
  * to it
  */
-export async function serializableRO<T, C = unknown, N extends PassedLike = PassedLike>(txnClientOrQueryable: WithPassed<N, Queryable | TxnClientForSerializableRO | PoolLike<C>>, callback: (client: WithPassed<NoInfer<N>, TxnClientOf<NoInfer<C>, TxnClientForSerializableRO, IsolationSatisfying<IsolationLevel.SerializableRO>>>) => Promise<T>) {
+export async function serializableRO<T, C = unknown, N extends PassedLike = PassedLike>(txnClientOrQueryable: WithPassedArgument<N, Queryable | TxnClientForSerializableRO | PoolLike<C>>, callback: (client: WithPassed<NoInfer<N>, TxnClientOf<NoInfer<C>, TxnClientForSerializableRO, IsolationSatisfying<IsolationLevel.SerializableRO>>>) => Promise<T>) {
   return transaction(txnClientOrQueryable as Queryable, IsolationLevel.SerializableRO, callback as Callback<T, IsolationLevel.SerializableRO>);
 }
 /**
@@ -374,7 +378,7 @@ export async function serializableRO<T, C = unknown, N extends PassedLike = Pass
  * @param callback A callback function that runs queries on the client provided
  * to it
  */
-export async function repeatableReadRO<T, C = unknown, N extends PassedLike = PassedLike>(txnClientOrQueryable: WithPassed<N, Queryable | TxnClientForRepeatableReadRO | PoolLike<C>>, callback: (client: WithPassed<NoInfer<N>, TxnClientOf<NoInfer<C>, TxnClientForRepeatableReadRO, IsolationSatisfying<IsolationLevel.RepeatableReadRO>>>) => Promise<T>) {
+export async function repeatableReadRO<T, C = unknown, N extends PassedLike = PassedLike>(txnClientOrQueryable: WithPassedArgument<N, Queryable | TxnClientForRepeatableReadRO | PoolLike<C>>, callback: (client: WithPassed<NoInfer<N>, TxnClientOf<NoInfer<C>, TxnClientForRepeatableReadRO, IsolationSatisfying<IsolationLevel.RepeatableReadRO>>>) => Promise<T>) {
   return transaction(txnClientOrQueryable as Queryable, IsolationLevel.RepeatableReadRO, callback as Callback<T, IsolationLevel.RepeatableReadRO>);
 }
 /**
@@ -385,7 +389,7 @@ export async function repeatableReadRO<T, C = unknown, N extends PassedLike = Pa
  * @param callback A callback function that runs queries on the client provided
  * to it
  */
-export async function readCommittedRO<T, C = unknown, N extends PassedLike = PassedLike>(txnClientOrQueryable: WithPassed<N, Queryable | TxnClientForReadCommittedRO | PoolLike<C>>, callback: (client: WithPassed<NoInfer<N>, TxnClientOf<NoInfer<C>, TxnClientForReadCommittedRO, IsolationSatisfying<IsolationLevel.ReadCommittedRO>>>) => Promise<T>) {
+export async function readCommittedRO<T, C = unknown, N extends PassedLike = PassedLike>(txnClientOrQueryable: WithPassedArgument<N, Queryable | TxnClientForReadCommittedRO | PoolLike<C>>, callback: (client: WithPassed<NoInfer<N>, TxnClientOf<NoInfer<C>, TxnClientForReadCommittedRO, IsolationSatisfying<IsolationLevel.ReadCommittedRO>>>) => Promise<T>) {
   return transaction(txnClientOrQueryable as Queryable, IsolationLevel.ReadCommittedRO, callback as Callback<T, IsolationLevel.ReadCommittedRO>);
 }
 /**
@@ -396,7 +400,7 @@ export async function readCommittedRO<T, C = unknown, N extends PassedLike = Pas
  * @param callback A callback function that runs queries on the client provided
  * to it
  */
-export async function serializableRODeferrable<T, C = unknown, N extends PassedLike = PassedLike>(txnClientOrQueryable: WithPassed<N, Queryable | TxnClientForSerializableRODeferrable | PoolLike<C>>, callback: (client: WithPassed<NoInfer<N>, TxnClientOf<NoInfer<C>, TxnClientForSerializableRODeferrable, IsolationSatisfying<IsolationLevel.SerializableRODeferrable>>>) => Promise<T>) {
+export async function serializableRODeferrable<T, C = unknown, N extends PassedLike = PassedLike>(txnClientOrQueryable: WithPassedArgument<N, Queryable | TxnClientForSerializableRODeferrable | PoolLike<C>>, callback: (client: WithPassed<NoInfer<N>, TxnClientOf<NoInfer<C>, TxnClientForSerializableRODeferrable, IsolationSatisfying<IsolationLevel.SerializableRODeferrable>>>) => Promise<T>) {
   return transaction(txnClientOrQueryable as Queryable, IsolationLevel.SerializableRODeferrable, callback as Callback<T, IsolationLevel.SerializableRODeferrable>);
 }
 
