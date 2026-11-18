@@ -40,6 +40,7 @@ export const savepoint = mod.savepoint;
 export const select = mod.select;
 export const selectExactlyOne = mod.selectExactlyOne;
 export const selectOne = mod.selectOne;
+export const selectRows = mod.selectRows;
 export const self = mod.self;
 export const serializable = mod.serializable;
 export const serializableRO = mod.serializableRO;

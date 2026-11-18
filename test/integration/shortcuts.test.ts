@@ -919,6 +919,53 @@ describe('select', () => {
   });
 });
 
+describe('selectRows', () => {
+  const byId = { by: 'id', direction: 'ASC' } as const;
+  const cases: [string, any, any, any?][] = [
+    ['db.all', 'users', all, { order: byId }],
+    ['a Whereable', 'users', { manager_id: 1 }, { order: byId }],
+    ['a sql filter', 'users', sql`${'id'} > ${param(1)}`, { order: byId }],
+    ['columns', 'users', all, { columns: ['id', 'display_name'], order: byId }],
+    ['extras', 'users', all, { columns: ['id'], extras: { n: db.count('accounts', all), name: 'display_name', upper: sql`upper(${'display_name'})` }, order: byId }],
+    ['a lateral map', 'users', all, { columns: ['id'], lateral: { accounts: db.select('accounts', { owner_id: parent('id') }, { columns: ['balance'], order: byId }), n: db.count('accounts', { owner_id: parent('id') }) }, order: byId }],
+    ['a select() passed through', 'users', all, { lateral: db.select('accounts', { owner_id: parent('id') }, { columns: ['id'], order: byId }), order: byId }],
+    ['a selectOne() passed through', 'users', all, { lateral: db.selectOne('accounts', { owner_id: parent('id') }, { columns: ['id'], order: byId }), order: byId }],
+    ['limit and offset', 'users', all, { order: byId, limit: 1, offset: 1 }],
+    ['withTies', 'accounts', all, { columns: ['owner_id'], order: { by: 'owner_id', direction: 'ASC' }, limit: 1, withTies: true }],
+    ['distinct', 'accounts', all, { columns: ['owner_id'], distinct: true }],  // no ORDER BY with DISTINCT but on its columns (42P10)
+    ['distinct on columns', 'accounts', all, { columns: ['owner_id'], distinct: ['owner_id'], order: { by: 'owner_id', direction: 'ASC' } }],
+    ['groupBy and having', 'accounts', all, { columns: ['owner_id'], groupBy: 'owner_id', having: sql`count(*) > ${param(1)}` }],
+    ['alias', 'users', all, { alias: 'u', columns: ['id'], order: { by: sql`${'u.id'}`, direction: 'DESC' } }],
+    ['lock', 'accounts', { owner_id: 1 }, { columns: ['id'], order: byId, lock: { for: 'UPDATE', wait: 'NOWAIT' } }],
+    ['no row', 'users', { id: -1 }],
+  ];
+
+  it.each(cases)('%s: run() gives what select() gives', async (_, table, where, options) => {
+    const
+      rows = await run(db.selectRows(table, where, options)), selected = await run(db.select(table, where, options)),
+      sorted = (r: unknown[]) => options?.order ? r : [...r].sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+    expect(sorted(rows)).toEqual(sorted(selected));
+    expect(rows.length > 0).toBe(where?.id !== -1);
+  });
+
+  it('a count() passed through comes as pg parses its bigint, a string, as selectOne() passes it, where select() reads it from JSON', async () => {
+    const options = { lateral: db.count('accounts', { owner_id: parent('id') }), order: byId } as const;
+    expect(await run(db.selectRows('users', all, options))).toEqual(['2', '1', '0']);
+    expect(await run(db.selectOne('users', { id: 1 }, options))).toBe('2');
+    expect(await run(db.select('users', all, options))).toEqual([2, 1, 0]);
+  });
+
+  it('past the type, from JavaScript: a lateral key repeats the parent row once per row, and an extras value gets 21000', async () => {
+    const accounts = db.selectRows('accounts', { owner_id: parent('id') }, { columns: ['id'], order: byId });
+    expect(await run(db.select('users', { id: 1 }, { columns: ['id'], lateral: { accounts } as any }))).toEqual([{ id: 1, accounts: { id: 1 } }, { id: 1, accounts: { id: 2 } }]);
+    expect((await fails(db.select('users', { id: 1 }, { columns: ['id'], extras: { accounts: db.selectRows('accounts', all) } as any }))).code).toBe('21000');
+  });
+
+  it('nested in a sql template, it is a set of rows', async () => {
+    expect((await t.client.query(sql`SELECT count(*)::int AS n FROM (${db.selectRows('users', all)}) AS u`.compile())).rows).toEqual([{ n: 3 }]);
+  });
+});
+
 describe('selectOne, selectExactlyOne', () => {
   it('selectOne: the first row, or undefined', async () => {
     expect(await run(db.selectOne('users', { mood: 'ok' }, { columns: ['id'] }))).toEqual({ id: 2 });

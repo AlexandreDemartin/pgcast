@@ -898,6 +898,9 @@ const functionName = new RegExp(`^${space}(?:${identifier})(?:${space}\\.${space
  * anything else, a `UESCAPE` clause included, throws. With
  * `columns: ['id']`, `'my_schema."MyAgg"'` gives
  * `SELECT my_schema."MyAgg"("id") AS result FROM "users"`.
+ *
+ * For its rows one by one, as `cursor()` reads them, the same query without
+ * `jsonb_agg`: `selectRows()`.
  */
 export const select: SelectSignatures = function (
   table: Table,
@@ -905,6 +908,19 @@ export const select: SelectSignatures = function (
   options: SelectOptionsForTable<Table, ColumnsOption<Table>, LateralOption<ColumnsOption<Table>, ExtrasOption<Table>>, ExtrasOption<Table>, any> = {},
   mode: SelectResultMode = SelectResultMode.Many,
   aggregate: string = 'count',
+) {
+  return selectQuery(table, where, options, mode, aggregate, false);
+};
+
+// the body of select(), and of selectRows(), which gives its rows query alone: `rows` is no mode, so that
+// SelectResultMode, which is exported, keeps its members
+function selectQuery(
+  table: Table,
+  where: Whereable | SQLFragment<any> | AllType,
+  options: SelectOptionsForTable<Table, ColumnsOption<Table>, LateralOption<ColumnsOption<Table>, ExtrasOption<Table>>, ExtrasOption<Table>, any>,
+  mode: SelectResultMode,
+  aggregate: string,
+  rows: boolean,
 ) {
 
   // converted to a string once, as raw() converts it (valueOf() first, as in 6.6.1), so that raw() writes the name
@@ -991,7 +1007,7 @@ export const select: SelectSignatures = function (
   const
     rowsSQL = (limit: number | undefined) => sql<SQL, any>`SELECT${distinctSQL} ${allColsSQL} AS result FROM ${table}${tableAliasSQL}${lateralSQL}${whereSQL}${groupBySQL}${havingSQL}${orderSQL}${limitSQL(limit)}${offsetSQL}${lockSQL}`,
     rowsQuery = rowsSQL(callerValue(allOptions, 'limit')),
-    query = mode !== SelectResultMode.Many ? rowsQuery :
+    query = mode !== SelectResultMode.Many || rows ? rowsQuery :
       // we need the aggregate to sit in a sub-SELECT in order to keep ORDER and LIMIT working as usual
       sql<SQL, any>`SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (${rowsQuery}) AS ${SQLForAlias('sq_', alias)}`,
     checksSecondRow = mode === SelectResultMode.ExactlyOne && (getConfig().selectExactlyOneChecksForSecondRow ?? false);
@@ -1013,6 +1029,9 @@ export const select: SelectSignatures = function (
 
   query.runResultTransform =
 
+    // selectRows(): one result per row, as insert() of an array gives its rows
+    rows ? (qr) => qr.rows.map(r => r.result) :
+
     mode === SelectResultMode.Numeric ?
       // note: pg deliberately returns strings for int8 in case 64-bit numbers overflow
       // (see https://github.com/brianc/node-pg-types#use), but we assume our counts aren't that big;
@@ -1031,6 +1050,60 @@ export const select: SelectSignatures = function (
 
   query['parenthesisedInExtras'] = true;
   return query;
+}
+
+
+/* === selectRows === */
+
+declare const rowsQuery: unique symbol;
+
+/**
+ * The second type argument of the `SQLFragment` that `selectRows()` returns: a
+ * query of many rows, which `lateral`, `extras` and a `where` refuse, as they
+ * take `SQLFragment<any>`, and a `sql` template, `withCTEs()` and `cursor()`
+ * take, as `SQLFragment<any, any>`.
+ */
+export interface RowsQuery { readonly [rowsQuery]: true }
+
+export interface SelectRowsSignatures {
+  <
+    T extends Table,
+    C extends ColumnsOption<T>,
+    L extends LateralOption<C, E>,
+    E extends ExtrasOption<T>,
+    A extends string = never,
+  >(
+    table: T,
+    where: WhereableArg<T> | SQLFragment<any> | AllType,
+    options?: SelectOptionsForTable<T, C, L, E, A>,
+  ): SQLFragment<SelectReturnTypeForTable<T, C, L, E, SelectResultMode.One>[], RowsQuery>;
+}
+
+/**
+ * Generate the query `select()` wraps in `jsonb_agg`, as a `SQLFragment` of
+ * its own, one row per result: for `cursor()`, which runs exactly the
+ * fragment it is given, and so reads a `select()` as its one `jsonb_agg` row.
+ * With `{ columns: ['id', 'title'], order: { by: 'title', direction: 'ASC' } }`:
+ * `SELECT jsonb_build_object($1::text, "id", $2::text, "title") AS result FROM "films" ORDER BY "title" ASC`,
+ * where `select()` sends
+ * `SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (…the same…) AS "sq_films"`.
+ *
+ * `run()` gives what `select()` gives, `[]` for no row, but for a single
+ * `lateral` subquery, whose result is passed through as `selectOne()` passes
+ * it, as `pg` parses its column. A query of many rows, it is typed so that
+ * `lateral`, `extras` and a `where` refuse it; a `sql` template,
+ * `withCTEs()` and `cursor()` take it.
+ * @param table The table to select from
+ * @param where A `Whereable` or `SQLFragment` defining the rows to be selected,
+ * or `all`
+ * @param options Options object. See documentation for `select` for details.
+ */
+export const selectRows: SelectRowsSignatures = function (
+  table: Table,
+  where: Whereable | SQLFragment<any> | AllType = all,
+  options: SelectOptionsForTable<Table, ColumnsOption<Table>, LateralOption<ColumnsOption<Table>, ExtrasOption<Table>>, ExtrasOption<Table>, any> = {},
+) {
+  return selectQuery(table, where, options, SelectResultMode.Many, 'count', true);
 };
 
 

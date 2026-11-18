@@ -2287,4 +2287,39 @@ describe('cursor()', () => {
     await expect(batches.next()).rejects.toThrow(/^cursor\(\) was iterated after its transaction ended/);
     expect(texts).toEqual(['START TRANSACTION', 'DECLARE pgcast_cursor_1', 'FETCH FORWARD', 'COMMIT']);
   });
+
+  it('reads a selectRows() row by row: every row once, in order, each batch what select() gives for those rows, a lateral as its array', async () => {
+    const options = {
+      columns: ['id', 'display_name'], order: { by: 'id', direction: 'ASC' },
+      lateral: { accounts: db.select('accounts', { owner_id: db.parent('id') }, { columns: ['id'], order: { by: 'id', direction: 'ASC' } }) },
+    } as const;
+    await db.readCommitted(t.pool, async c => {
+      const batches = await read(db.cursor(c, db.selectRows('users', db.all, options), { batchSize: 2 }));
+      expect(batches.map(b => b.length)).toEqual([2, 1]);
+      expect(batches.flat()).toEqual(await db.select('users', db.all, options).run(c));
+      expect(batches[0][0].accounts).toEqual([{ id: 1 }, { id: 2 }]);
+      expect(await read(db.cursor(c, db.withCTEs({ owners: db.selectRows('accounts', db.all) }, db.selectRows('users', { id: 1 }, { columns: ['id'] })), { batchSize: 2 })))
+        .toEqual([[{ id: 1 }]]);
+    });
+  });
+
+  it('locks each row of a selectRows() with lock: { for: UPDATE } as it is fetched', async () => {
+    const other = await t.pool.connect();
+    const lockedFor = async (id: number) => {
+      await other.query("BEGIN; SET LOCAL lock_timeout = '50ms'");
+      try { await other.query('SELECT id FROM accounts WHERE id = $1 FOR UPDATE', [id]); return 'free'; }
+      catch (err) { return codeOf(err); }
+      finally { await other.query('ROLLBACK'); }
+    };
+    try {
+      await db.readCommitted(t.pool, async c => {
+        const batches = db.cursor(c, db.selectRows('accounts', db.all, { columns: ['id'], order: { by: 'id', direction: 'ASC' }, lock: { for: 'UPDATE' } }), { batchSize: 1 });
+        expect((await batches.next()).value).toEqual([{ id: 1 }]);
+        expect([await lockedFor(1), await lockedFor(2)]).toEqual(['55P03', 'free']);
+        expect((await batches.next()).value).toEqual([{ id: 2 }]);
+        expect([await lockedFor(2), await lockedFor(3)]).toEqual(['55P03', 'free']);
+        await batches.return();
+      });
+    } finally { other.release(); }
+  });
 });
