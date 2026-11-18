@@ -1,6 +1,6 @@
 # Transactions
 
-`transaction()` and its seven shortcuts, one per isolation level: the SQL they send, their retries and the types of the client they give. `advisoryXactLock()`, a lock the transaction holds until it ends. Then the errors: `isDatabaseError()` for those from Postgres, and those pgcast throws before any query.
+`transaction()` and its seven shortcuts, one per isolation level: the SQL they send, their retries and the types of the client they give. `savepoint()`, for a unit of work that can fail alone inside a transaction. `advisoryXactLock()`, a lock the transaction holds until it ends. Then the errors: `isDatabaseError()` for those from Postgres, and those pgcast throws before any query.
 {.lede}
 
 <AtAGlance>
@@ -58,7 +58,7 @@ The two `count()`s run on `client`, outside the transaction: after the block, `b
 | `START TRANSACTION`, the callback or `COMMIT` rejects | `ROLLBACK`<!-- probe: db.serializable(pool, async () => { throw new Error(); }) -->, then a retry or the rejection |
 
 - These three run on the transaction's client, as the callback's queries do. Each reaches [`queryListener`](/runtime-config#Config.queryListener) and [`resultListener`](/runtime-config#Config.resultListener) with the transaction's id: a counter from 0, one per transaction opened, kept across retries; a transaction passed through keeps the outer one's.
-- No `SAVEPOINT`: a transaction inside another is the outer one ([Passing a transaction through](#passing-a-transaction-through)).
+- No `SAVEPOINT`: a transaction inside another is the outer one ([Passing a transaction through](#passing-a-transaction-through)). To nest a unit of work that can fail alone: [`savepoint()`](#savepoint).
 - After a query error that the callback catches, Postgres answers the `COMMIT` with `ROLLBACK`, not an error, and nothing is saved. `transaction()` resolves, as in Zapatos 6.6.1, and warns once (`PGCAST_DEP003`); with [`transactionRequiresCommit`](/runtime-config#Config.transactionRequiresCommit), it rejects.
 - Given a client you sent `BEGIN` on, it ends your transaction, unless [`transactionRequiresIdleClient`](/runtime-config#Config.transactionRequiresIdleClient) makes it reject first ([Your own `BEGIN`](#your-own-begin)).
 
@@ -118,7 +118,7 @@ COMMIT
 The SQL of the callback's query: [`count()`](/select#count).
 
 - The callback gets the pool's client, typed as the pool gives it and marked: a [`TxnClientLike`](#TxnClientLike) at that level. `taken` is a `number`, as on a `pg.Pool`.
-- `command` is read off the `COMMIT`, which Postgres answers with `ROLLBACK` after a query error that the callback caught ([The SQL it sends](#the-sql-it-sends)): a pool whose client gives no `command` does not compile. PGlite and postgres.js give it at run time, but PGlite's type makes it optional, `command?: string`, so a pool that forwards PGlite's result maps `command` to a `string`, as its adapter will ([#698](https://github.com/AlexandreDemartin/pgcast/issues/698)).
+- `command` is read off the `COMMIT`, which Postgres answers with `ROLLBACK` after a query error that the callback caught ([The SQL it sends](#the-sql-it-sends)): a pool whose client gives no `command` does not compile. PGlite and postgres.js give it at run time, but PGlite's type makes it optional, `command?: string`, so a pool that forwards PGlite's result maps `command` to a `string`, as its adapter does ([Drivers](/drivers#pglite)).
 - A retry reads the error's `code` alone, so another driver's 40001 and 40P01 are retried too ([Retries](#retries)).
 - Passed to a nested call, the callback's client is passed through at run time, but the type takes only `pg`'s ([Passing a transaction through](#passing-a-transaction-through)): cast it, `txnClient as unknown as db.TxnClientForReadCommitted`<!-- tsc: export const nested = db.serializable({ connect: async () => ({ query: async () => ({ rows: [], command: 'COMMIT' }), release() {} }) }, txnClient => db.readCommitted(…, async inner => inner)); -->. Once cast, it is typed as a `pg.PoolClient`, which it is not: run only fragments on it, `.run(inner)` and the shortcuts. `inner.query('SELECT 1')`<!-- tsc: export const raw = db.serializable({ connect: async () => ({ query: async () => ({ rows: [], command: 'COMMIT' }), release() {} }) }, txnClient => db.readCommitted(txnClient as unknown as db.TxnClientForReadCommitted, async inner => …)); --> compiles, but the other driver's `query()` takes only the query object. Never give the nested call the pool: its client is a second transaction, and a pool of one connection, as PGlite's, waits for the first one's `release()` forever.
 - A parameter that takes a `pg.Pool` or another driver's pool is typed `db.PoolLike`, which a `pg.Pool` is: `(pool: db.PoolLike) => db.serializable(pool, async txnClient => txnClient)`<!-- tsc: export const inAnyPool = …; -->. Typed as a union, `pg.Pool | typeof showPool`, it gives the callback the other driver's client, where `pg`'s is a `pg.PoolClient`.
@@ -260,6 +260,56 @@ COMMIT
 ```
 
 The SQL of each query: [`count()`](/select#count). The other read-only shortcuts send the same, with their level; in [`readCommittedRO()`](#readCommittedRO), each query reads its own snapshot, so a booking committed between the two counts is in the second.
+
+## `savepoint()` {#savepoint}
+
+```ts
+db.savepoint(txnClient, callback)
+```
+
+Runs `callback` inside a savepoint of the transaction `txnClient` is in. It returns a promise of what `callback` resolves to.
+
+- `txnClient`: the client of a transaction: a [`TxnClient`](#TxnClient), the [`TxnClientLike`](#TxnClientLike) of another driver's pool, or a `pg.PoolClient` you sent `BEGIN` on. A pool, a `pg.Client` or a [`QueryableLike`](/sql-template#QueryableLike) does not compile.
+- `callback`: `async spClient => …`, given that same client, typed as it is: in `db.serializable()`, a [`TxnClientForSerializable`](#TxnClientForSerializable). A callback typed for a level the client does not satisfy does not compile ([`IsolationSatisfying`](#IsolationSatisfying)).
+
+A customer books three seats, skipping one already taken; the others are booked in one transaction:
+
+<<< ./examples/plain/savepoint_seat.ts{ts twoslash}
+
+`booked` is `['K1', 'K3']`. Each seat sends:
+
+<!-- probe: db.savepoint(pool, async () => {}).then(() => db.savepoint(pool, async () => { throw new Error(); })) -->
+```sql
+-- K1 and K3
+SAVEPOINT pgcast_savepoint_1
+-- the callback's insert()
+RELEASE SAVEPOINT pgcast_savepoint_1
+-- K2
+SAVEPOINT pgcast_savepoint_1
+-- the callback's insert(), which Postgres refuses with 23505
+ROLLBACK TO SAVEPOINT pgcast_savepoint_1
+RELEASE SAVEPOINT pgcast_savepoint_1
+```
+
+The SQL of the callback's query: [`insert()`](/insert#insert).
+
+| When | SQL |
+|---|---|
+| before the callback | `SAVEPOINT pgcast_savepoint_1`<!-- probe: db.savepoint(pool, async () => {}) --> |
+| the callback resolves | `RELEASE SAVEPOINT pgcast_savepoint_1`<!-- probe: db.savepoint(pool, async () => {}) --> |
+| the callback or that `RELEASE` rejects | `ROLLBACK TO SAVEPOINT pgcast_savepoint_1`<!-- probe: db.savepoint(pool, async () => { throw new Error(); }) -->, then `RELEASE SAVEPOINT pgcast_savepoint_1`<!-- probe: db.savepoint(pool, async () => { throw new Error(); }) -->, then it rejects with that error |
+| that `ROLLBACK TO` or that `RELEASE` rejects | nothing more: it rejects with its error, in place of the first, as `transaction()` does when its `ROLLBACK` rejects |
+| it rejects with 40001 or 40P01 | nothing more: it rejects with that error |
+
+- The name ends in the savepoint's depth: `pgcast_savepoint_1` directly in the transaction, `pgcast_savepoint_2` inside that, and so on, the same text on every call at a depth. `ROLLBACK TO` and `RELEASE` also end every savepoint established after their own, so savepoints nest: each failure undoes the work of its own level, inner levels included, whatever they left. Don't give a savepoint of yours such a name.
+- On 40001 or 40P01, the transaction stays aborted: its `COMMIT` cannot save half of it. `transaction()` rolls back and runs its whole callback again, the savepoint included ([Retries](#retries)). A savepoint never retries on its own: only a new transaction gets a new snapshot.
+- A callback that catches a query's error and returns: Postgres refuses the `RELEASE` (25P02), so `savepoint()` rolls back to the savepoint and rejects with that 25P02. Its work is undone, inner levels included, and the transaction can go on. So a 40001 or 40P01 the callback catches is not retried there. After a 40P01, or a 40001 of `REPEATABLE READ`, the transaction's `COMMIT` saves what it wrote outside that savepoint; after a 40001 of `SERIALIZABLE`, Postgres can refuse a later query or the `COMMIT` with 40001 again, and `transaction()` retries that one. Let them out, and rethrow them around `savepoint()`, as the example does.
+- The 40001 and 40P01 are read by their `code`, as [Retries](#retries) reads them. One thrown from JavaScript, then caught, gets no `ROLLBACK TO`: the work of its savepoint stays in, unless an outer level rolls back.
+- Outside a transaction block, Postgres refuses the `SAVEPOINT` (25P01): `savepoint()` rejects with it, and never calls the callback.
+- One at a time on a client: `await` each. Two at once nest in the order they are called: the first, if it ends first, ends the second's savepoint, whose own `RELEASE` then fails (3B001), and the transaction is aborted; a `ROLLBACK TO` of the second also undoes what the first wrote after the second's `SAVEPOINT`. Not checked.
+- The depth is counted per client object, by each copy of pgcast installed: a wrapper or a `Proxy` of the client counts from 1 again, as does, with two copies such as two versions in `node_modules`, a savepoint of one inside the other's. The inner savepoint then takes the outer one's name, and its 40001 caught by the outer callback leaves the outer work in.
+- Its queries reach [`queryListener`](/runtime-config#Config.queryListener) and [`resultListener`](/runtime-config#Config.resultListener) with the transaction's id; [`transactionListener`](/runtime-config#Config.transactionListener) gets nothing from it.
+- A `transaction()` given the client of a `transaction()` callback is [passed through](#passing-a-transaction-through): it sends no `SAVEPOINT`. Given a `pg.PoolClient` you sent `BEGIN` on, it is not ([Your own `BEGIN`](#your-own-begin)).
 
 ## `advisoryXactLock()` {#advisoryXactLock}
 

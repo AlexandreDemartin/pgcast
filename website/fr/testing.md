@@ -1,5 +1,5 @@
 ---
-english: 679cc7ebf3ea
+english: da2e4ebf2a3f
 description: "Trois façons de tester vos requêtes pgcast : contre un vrai Postgres, test annulé ; sur la requête compilée ; sur un faux résultat typé d’après le schéma."
 ---
 
@@ -24,7 +24,7 @@ async function programme(queryable: db.Queryable, studio_id: number) {
 }
 ```
 
-Elle prend un [`Queryable`](/fr/sql-template#Queryable) : un test peut donc lui passer n’importe quel pool ou client, ou un fake.
+Elle prend un [`Queryable`](/fr/sql-template#Queryable) : un test peut donc lui passer n’importe quel pool ou client de `pg`, ou un fake ; typée [`QueryableLike`](/fr/sql-template#QueryableLike), elle prend aussi celui d’un autre driver ([Drivers](/fr/drivers)).
 
 ## Tester contre une vraie base {#test-against-a-real-database}
 

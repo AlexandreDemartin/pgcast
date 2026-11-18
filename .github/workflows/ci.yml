@@ -28,8 +28,8 @@ jobs:
         # Markdown outside .agents/ and .claude/ needs no build: those two hold the agent method, which check:agents checks,
         # as it checks AGENTS.md § Architecture and recounts the summary of docs/CHARACTERISATION-REPORT.md.
         # The docs site builds on a change to website/ (its pages are Markdown too), to CHANGELOG.md, its /changelog page, to
-        # src/, which its examples use, to what builds the library it installs (the root package.json, package-lock.json,
-        # tsconfig.json), or to the workflows.
+        # src/, which its examples use, to adapters/*/src/, which its Drivers page compiles against, to what builds the library
+        # it installs (the root package.json, package-lock.json, tsconfig.json), or to the workflows.
         # A push to master always runs everything.
         env:
           EVENT: ${{ github.event_name }}
@@ -44,7 +44,7 @@ jobs:
               case "$file" in
                 '') ;;
                 website/*|CHANGELOG.md) docs=true ;;
-                src/*|package.json|package-lock.json|tsconfig.json|.github/workflows/*) code=true; docs=true ;;
+                src/*|adapters/*/src/*|package.json|package-lock.json|tsconfig.json|.github/workflows/*) code=true; docs=true ;;
                 .agents/*|.claude/*|AGENTS.md|docs/CHARACTERISATION-REPORT.md) code=true ;;
                 *.md) ;;
                 *) code=true ;;

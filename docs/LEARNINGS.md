@@ -57,6 +57,26 @@ Candidates for a check, a rule or a skill line.
 - #721 — "One more row than expected" was one more retry message: read the failing assertion before suspecting a double commit — builder
 - #721 — A promise of another transaction awaited inside a `transaction()` callback brings that transaction's error into the callback, and its 40001 is retried as the callback's own: an ordering in a test or user code stops on the other side's failure — branch-reviewer
 - #721 — A mutant that removes a test's ordering wait proves it only under the replay condition (13/30 red without the commit delay, 30/30 with it): run it with the slow-commit trick on — branch-reviewer
+- #723 — An issue's **Files** is checked against `website/README.md` § Examples: an example that sends several queries brings a file in `website/examples/plain/` — builder
+- #727 — A mutant that drops the `RELEASE` after `ROLLBACK TO` passes a nesting test unless an outer level fails right after an inner one has failed — builder
+- #727 — On an aborted transaction `ROLLBACK TO` succeeds, so the only Postgres-level proof of "no `ROLLBACK TO` on 40P01" is that `COMMIT` answers `ROLLBACK` — builder
+- #727 — `check-prose.mjs` matches a SQL block against its probe's queries exactly: no comment at the end of a query line — builder
+- #727 — A claim that savepoints sharing one name stay balanced is tested by counting those still established (`RELEASE` in a loop until 3B001), at depth 2 or more, with the error caught one level above where it was raised — branch-reviewer
+- #727 — A nesting argument for a fixed name holds only if every exit pops exactly one savepoint: list the exits (resolve, reject, rethrow as is, a failing rollback) and check each before deciding — orchestrator
+- #727 — A `RELEASE` tried inside a probe savepoint, rolled back to on 3B001, counts the savepoints still established without aborting the transaction — builder
+- #727 — `check-prose` cannot match a number that changes from run to run: write `…` in the span — builder
+- #727 — A claim about what follows a caught 40001 is replayed with a real serialisation conflict between two transactions: `RAISE … USING ERRCODE = '40001'` does not doom a SERIALIZABLE transaction, so it hides a later refusal of the `COMMIT`; replay at REPEATABLE READ too — branch-reviewer
+- #727 — Before Postgres 17, `pg_stat_statements` tracks a utility statement by its text: an identifier that changes on every call (a savepoint name from a counter) takes an entry per call — orchestrator
+- #727 — Leftover savepoints are counted highest depth first: releasing `_1` also releases `_2` and `_3` — builder
+- #727 — A test where one client waits on another's lock rolls back the lock holder first in `finally`, or it hangs instead of failing — builder
+- #727 — A mutant script killed by SIGTERM never runs its `finally`, so the mutant stays in `src/`: restore with `git show HEAD:<path> > <path>` — builder
+- #727 — A per-client state kept in a `WeakMap` is keyed by identity: probe it with a `Proxy` of the client, `Object.create(client)` and a second copy of the library, each of which starts from scratch — branch-reviewer
+- #727 — A mutant harness keyed on exact source lines skips mutants silently after a re-indent: report "NOT APPLIED" before reading the counts — branch-reviewer
+- #727 — `Object.create(client)` is not a working pg client (pg writes its own state onto the derived object): a `Proxy` is the wrapper to test identity-keyed limits with — builder
+- #722 — A replay of an argument after the JSON argument gives it an unreachable `connectionString`: with no config file, 6.6.1 falls back to the `PG*` variables and reaches a real Postgres — builder
+- #722 — An `it.each` title that interpolates an argument holding a URL puts it in the test names; `%#` keeps titles free of URLs — builder
+- #722 — A CLI replay sets `PGHOST`/`PGPORT` on a closed port as well as an unreachable `connectionString`: otherwise a result depends on the machine's local Postgres — branch-reviewer
+- #722 — A message kept "byte for byte" is reread against the new outputs beside it: a note true before a new flag ("the only flag is --check") can become false after it — orchestrator
 - #698 — Decision 005 and #698's body were partly wrong about PGlite's defaults (`int8` a number below 2^53, `date` off unless Node runs in UTC, infinity an Invalid Date until 0.5.16): a driver's defaults are replayed per version and time zone before an issue states them — builder
 - #698 — An unquoted `CREATE DATABASE` folds case: probe database names are lowercase, or the connection URL names a database that does not exist — builder
 - #698 — PGlite 0.5.5's `execProtocol()` after `close()` blocks the event loop, so a probe's own timer never fires: such a probe runs in the background and is killed by PID — builder
@@ -79,6 +99,11 @@ Candidates for a check, a rule or a skill line.
 - #709/#712 — Two reviewers disagreed on the same race (0.5.13+ returning the row vs rejecting): a race claimed per version is probed with a count per order and per version before it is written — orchestrator
 - #709/#712 — A race probed by a reviewer is replayed with and without an `await` between the calls: one `await` flipped the outcome on every PGlite version, which is how two reviewers saw opposite results — builder
 - #709 — A race test that accepts two outcomes pairs with a mutant run on each CI version: the no-result branch is reached only on 0.5.0, so the lockfile leg alone lets that mutant pass — branch-reviewer
+- #729 — A cast-panel example must declare `declare const pool: pg.Pool;` (`playgroundLinks.ts`), so a panel cannot type its pool as another driver's: the adapter's types are compiled in a setup block above it — builder
+- #729 — The docs sidebar is `website/.vitepress/outline.ts`, not `config.ts`: an issue's **Files** names `outline.ts` for a new page — builder
+- #729 — A Twoslash `paths` entry pointing outside `website/` makes the docs build depend on that folder: CI's change detection (`ci.yml` `changes`) lists it as a docs input, or the break first shows on master's deploy — branch-reviewer
+- #729 — Before writing "throws on X", read what the guard tests and replay the neighbouring inputs: `asPool()` tests `transform.{column,value,row}.from`, not `transform` — branch-reviewer
+- #729 — A page that says "run on it as on a `pg.Pool`" is replayed on the error path too (`err.constraint` from `handle-errors.md`), not only on the result types — branch-reviewer
 
 ## Minors kept
 
@@ -91,5 +116,7 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #708 — defect: `likeAny([])` infers `never` and compiles on an int column, which Postgres refuses with 42883 — branch-reviewer
 - #708 — form: `notAnArray` says "value" for `likeAny()`/`ilikeAny()` where `notAList` says "patterns" — branch-reviewer
 - #721 — form: #720's Done when asked for a replay on Postgres 14; only CI's leg covers it (the fix does not depend on the version) — branch-reviewer
+
 - #709 — form: `adapters/pglite/test/params.test.ts` has no row with a `getTime` that is not a Date (`{ getTime: () => 0, toPostgres: () => 'tp' }`), so `typeof v.getTime === 'function'` as `isDate` passes all 468 rows — branch-reviewer
 - #709 — defect: a real Date reprototyped to `Object.prototype` is not a Date for the PGlite adapter's `isDate` (written as JSON, where pg writes its time); contrived — branch-reviewer
+

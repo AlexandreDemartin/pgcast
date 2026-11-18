@@ -1,5 +1,5 @@
 ---
-english: 5f3dd9d8b218
+english: 400d1aee7818
 ---
 
 # Pourquoi pgcast
@@ -62,15 +62,15 @@ Quand un raccourci ne convient pas, le template [`sql`](/fr/sql-template#sql) es
 
 Il n’y a pas de modèles. Une requête renvoie des objets simples, typés : « <span lang="en">just (fully-typed) POJOs</span> », selon les mots de la doc de Zapatos. Aucune classe à étendre, aucune relation à déclarer, rien de chargé paresseusement derrière une propriété, et aucun état qu’un enregistrement ultérieur réécrirait.
 
-Pas de connexion par défaut non plus : chaque `.run()` prend le pool ou le client sur lequel s’exécuter, car « <span lang="en">Zapatos is always explicit about what client or pool is running your query</span> ».
+Pas de connexion par défaut non plus : chaque `.run()` prend le pool ou le client sur lequel s’exécuter, de `pg` ou d’un autre driver ([Drivers](/fr/drivers)), car « <span lang="en">Zapatos is always explicit about what client or pool is running your query</span> ».
 
 Une transaction ne commence que lorsque vous appelez [`transaction()`](/fr/transaction#transaction). Elle envoie `START TRANSACTION`<!-- probe: db.serializable(pool, async () => {}) --> au niveau d’isolation choisi, puis `COMMIT`<!-- probe: db.serializable(pool, async () => {}) --> ou `ROLLBACK`<!-- probe: db.serializable(pool, async () => { throw new Error(); }) -->, et relance votre callback après un échec de sérialisation ou un deadlock ([Retries](/fr/retries)).
 
 Il en va de même pour vos propres fonctions. La doc de Zapatos déconseille de donner le pool comme valeur par défaut à l’argument client d’une fonction : « <span lang="en">I find that way it’s too easy to accidentally issue queries outside of transactions</span> ».
 
-Une fonction à vous prend donc son client sans valeur par défaut, et chaque appelant passe le pool ou le client de sa transaction. Celle qui ne fait qu’exécuter des requêtes prend un [`Queryable`](/fr/sql-template#Queryable).
+Une fonction à vous prend donc son client sans valeur par défaut, et chaque appelant passe le pool ou le client de sa transaction. Celle qui ne fait qu’exécuter des requêtes prend un [`Queryable`](/fr/sql-template#Queryable) ; typée [`QueryableLike`](/fr/sql-template#QueryableLike), elle prend aussi le pool ou le client d’un autre driver ([Drivers](/fr/drivers)).
 
-Celle qui ouvre une transaction prend le pool ou le client de son niveau, `pg.Pool | db.TxnClientForSerializable` pour [`serializable()`](/fr/transaction#serializable). Un `Queryable` accepterait aussi le client d’une transaction de niveau inférieur, et la fonction s’exécuterait dedans, à ce niveau, à moins qu’avec [`transactionRequiresSatisfyingLevel`](/fr/runtime-config#Config.transactionRequiresSatisfyingLevel) elle ne soit rejetée ([Réserver dans une transaction plus large](/fr/retries#book-inside-a-larger-transaction)).
+Celle qui ouvre une transaction prend le pool ou le client de son niveau, `pg.Pool | db.TxnClientForSerializable` pour [`serializable()`](/fr/transaction#serializable) ; typée `db.PoolLike | db.TxnClientForSerializable` ([`PoolLike`](/fr/transaction#PoolLike)), elle prend aussi le pool d’un autre driver. Un `Queryable` accepterait aussi le client d’une transaction de niveau inférieur, et la fonction s’exécuterait dedans, à ce niveau, à moins qu’avec [`transactionRequiresSatisfyingLevel`](/fr/runtime-config#Config.transactionRequiresSatisfyingLevel) elle ne soit rejetée ([Réserver dans une transaction plus large](/fr/retries#book-inside-a-larger-transaction)).
 
 ## Ce qu’ajoute pgcast {#what-pgcast-adds}
 

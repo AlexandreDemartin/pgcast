@@ -23,7 +23,7 @@ async function programme(queryable: db.Queryable, studio_id: number) {
 }
 ```
 
-It takes a [`Queryable`](/sql-template#Queryable), so a test can hand it any pool or client, or a fake.
+It takes a [`Queryable`](/sql-template#Queryable), so a test can hand it any pool or client of `pg`, or a fake; typed [`QueryableLike`](/sql-template#QueryableLike), it also takes another driver's ([Drivers](/drivers)).
 
 ## Test against a real database
 

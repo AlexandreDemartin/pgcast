@@ -1,5 +1,5 @@
 ---
-english: 05450447ef3b
+english: 98105e5d5a8a
 description: "Comprendre ce qui a échoué dans une requête et y répondre : une place déjà réservée, une séance qui n’existe pas, une option mal donnée par votre code."
 ---
 
@@ -10,7 +10,7 @@ Comprendre ce qui a échoué dans une requête, et y répondre : une place déj
 
 ## Intercepter un refus de Postgres {#catch-a-refusal-from-postgres}
 
-Quand Postgres refuse une requête, la promesse de `.run()` est rejetée avec la `DatabaseError` de node-postgres, dont le `code` est le SQLSTATE. Donnez-le à [`isDatabaseError()`](/fr/transaction#isDatabaseError) avec le nom du refus que vous attendez, et laissez passer tout le reste. Réservez la place C4 de la séance 1002, que quelqu’un a peut-être déjà réservée :
+Quand Postgres refuse une requête, la promesse de `.run()` sur `pg` est rejetée avec la `DatabaseError` de node-postgres, dont le `code` est le SQLSTATE (l’erreur d’un autre driver : [Drivers](/fr/drivers)). Donnez-le à [`isDatabaseError()`](/fr/transaction#isDatabaseError) avec le nom du refus que vous attendez, et laissez passer tout le reste. Réservez la place C4 de la séance 1002, que quelqu’un a peut-être déjà réservée :
 
 <CastPanel example="errors_seat_taken">
 
