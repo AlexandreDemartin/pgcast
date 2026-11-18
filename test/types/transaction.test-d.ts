@@ -57,7 +57,8 @@ describe('the client of a transaction', () => {
   });
 
   // #489: the type leaves SerializableRODeferrable out of the levels that satisfy the three read-only ones, as in
-  // Zapatos 6.6.1; counting it in would widen these callbacks' client, which code may read (website/transaction.md)
+  // Zapatos 6.6.1: counting it in, a function that takes a TxnClientForSerializableRO would read it in its own
+  // _zapatos.isolationLevel, and so would these levels' callbacks, which code may read (website/transaction.md)
   test('a parameter typed TxnClientFor… of the three other read-only levels refuses the client of serializableRODeferrable(), as in Zapatos 6.6.1', () => {
     void db.serializableRO(pool, c => countSeats(c));
     // @ts-expect-error IsolationSatisfying<SerializableRO> leaves SerializableRODeferrable out
@@ -78,7 +79,13 @@ describe('the client of a transaction', () => {
     void db.repeatableReadRO(pool, c => countSeatsAnyRO(c));
   });
 
-  test('the client of the three other read-only levels gives the isolation levels of Zapatos 6.6.1, SerializableRODeferrable left out', () => {
+  test('TxnClientForSerializableRO, …RepeatableReadRO and …ReadCommittedRO give the isolation levels of Zapatos 6.6.1, SerializableRODeferrable left out', () => {
+    expectTypeOf<NonNullable<db.TxnClientForSerializableRO['_zapatos']>['isolationLevel']>().toEqualTypeOf<db.IsolationLevel.Serializable | db.IsolationLevel.SerializableRO>();
+    expectTypeOf<NonNullable<db.TxnClientForRepeatableReadRO['_zapatos']>['isolationLevel']>().toEqualTypeOf<db.IsolationLevel.Serializable | db.IsolationLevel.RepeatableRead | db.IsolationLevel.SerializableRO | db.IsolationLevel.RepeatableReadRO>();
+    expectTypeOf<NonNullable<db.TxnClientForReadCommittedRO['_zapatos']>['isolationLevel']>().toEqualTypeOf<db.IsolationLevel.Serializable | db.IsolationLevel.RepeatableRead | db.IsolationLevel.ReadCommitted | db.IsolationLevel.SerializableRO | db.IsolationLevel.RepeatableReadRO | db.IsolationLevel.ReadCommittedRO>();
+  });
+
+  test('the callbacks of serializableRO(), repeatableReadRO() and readCommittedRO() get the isolation levels of Zapatos 6.6.1, SerializableRODeferrable left out', () => {
     void db.serializableRO(pool, async c => {
       expectTypeOf(c._zapatos!.isolationLevel).toEqualTypeOf<db.IsolationLevel.Serializable | db.IsolationLevel.SerializableRO>();
     });
