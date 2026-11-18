@@ -51,6 +51,8 @@ Then run queries on `pool` as on a `pg.Pool`:
 
 </CastPanel>
 
+The panel's code is typed on a `pg.Pool`; on `asPool(sql)`, the SQL and the type are the same.
+
 - `starts_at` is a `Date`, as with `pg`: the adapter reads each column with `pg`'s parsers, never postgres.js's. So a `date` is a `Date` at local midnight, where postgres.js alone gives UTC midnight.
 - `asPool()` never creates, configures nor ends `sql`: you do, as with a `pg.Pool`. It throws on an `sql` whose `transform` changes the columns, values or rows it reads (`postgres.camel`): give pgcast a `postgres()` of its own.
 - Each query runs through `sql.unsafe()`, unprepared, [`prepared()`](/sql-template#prepared) ones too: its name is ignored.
@@ -82,6 +84,8 @@ const pool = asPool(pglite);
 <<< ./examples/drivers_pglite.ts{ts twoslash}
 
 </CastPanel>
+
+The panel's code is typed on a `pg.Pool`; on `asPool(pglite)`, the SQL and the type are the same.
 
 - A `bigint` comes as a string, as with `pg`, where PGlite's own `query()` gives a `number`, or a `bigint` beyond 2^53.
 - `asPool()` never creates nor closes the PGlite: you do.
