@@ -427,7 +427,7 @@ describe('advisoryXactLock()', () => {
 });
 
 // #738: setLocal() takes the client of a transaction, of any driver, and an object of strings: a value Postgres
-// would store as '' or as a driver's text does not compile
+// would take as a reset or as a driver's text does not compile, though an optional property does from TypeScript 4.2
 describe('setLocal()', () => {
   const settings = { 'app.customer': 'Ada Quill' };
   test('it takes the client of each shortcut, another driver’s, a pg.PoolClient, and resolves to void', () => {
@@ -465,15 +465,25 @@ describe('setLocal()', () => {
     expectTypeOf<Parameters<typeof db.setLocal>[1]>().toEqualTypeOf<{ readonly [name: string]: string }>();
   });
 
+  // TypeScript 4.1 refuses it; from 4.2 an optional property fits an index signature, with or without
+  // exactOptionalPropertyTypes, so an undefined in it reaches the run-time refusal
+  test('an optional property compiles, as do a Partial and a Symbol key', () => {
+    type Claims = { 'app.customer'?: string; role: string };
+    const claims: Claims = { role: 'cinema_customer' }, partial: Partial<Record<'app.customer', string>> = {};
+    void db.setLocal(txn, claims);
+    void db.setLocal(txn, partial);
+    void db.setLocal(txn, { [Symbol('app.customer')]: 'Ada Quill' });
+  });
+
   test('a value that is not a string, or settings that are not an object of strings, do not compile', () => {
     interface Context { 'app.customer': string }
     const context: Context = { 'app.customer': 'Ada Quill' }, maybe: string | undefined = undefined;
     const map = new Map([['app.customer', 'Ada Quill']]), names: string[] = ['app.customer'];
     // @ts-expect-error a number, which Postgres would store as pg's text of it
     void db.setLocal(txn, { 'app.screening': 42 });
-    // @ts-expect-error null, which Postgres would store as ''
+    // @ts-expect-error null, which Postgres would take as a reset
     void db.setLocal(txn, { 'app.customer': null });
-    // @ts-expect-error undefined, which Postgres would store as ''
+    // @ts-expect-error undefined, which Postgres would take as a reset
     void db.setLocal(txn, { 'app.customer': undefined });
     // @ts-expect-error a string or undefined
     void db.setLocal(txn, { 'app.customer': maybe });

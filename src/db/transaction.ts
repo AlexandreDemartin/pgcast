@@ -538,22 +538,24 @@ export async function advisoryXactLock(
  * - two settings: `SELECT set_config($1, $2, true), set_config($3, $4, true)`;
  * - `{}`: no query.
  *
- * Postgres keeps a setting until `COMMIT` or `ROLLBACK`, through a `RELEASE`;
+ * Postgres keeps a setting until `COMMIT` or `ROLLBACK`, so an attempt that
+ * `transaction()` retries never sees the last one's, and through a `RELEASE`;
  * a `ROLLBACK TO` a savepoint taken before it gives back the value from before
- * that savepoint, so an attempt that `transaction()` retries never sees the
- * last one's. After the transaction, `current_setting(name, true)` reads `''`
- * on that connection, not `NULL`: a policy that casts it writes
+ * that savepoint. After the transaction, `current_setting(name, true)` reads
+ * `''` on that connection for a name of your own with no session value, not
+ * `NULL`: a policy that casts it writes
  * `NULLIF(current_setting('app.tenant', true), '')::int`. Postgres checks each
  * name: a custom one needs a dot (42704 without one, 42602 if it is not an
  * identifier), and built-ins such as `role` are taken. In a query of yours,
  * write `set_config(${db.param(name)}, ${db.param(value)}, true)` in `sql`.
  *
  * It rejects before any query when given settings that are not a plain object,
- * a value that is not a string (Postgres would store `''` for a `null`), two
- * names that differ only in case from `A` to `Z`, which Postgres folds into one
- * setting, a `pg.Pool`, or a client that `pg` reports outside a transaction
- * block, where Postgres would undo the settings as soon as they are set. One
- * that reports no status (another driver, `pg` before 8.21) runs.
+ * a value that is not a string (Postgres would reset the setting for a `null`,
+ * to `''` for a name of your own), two names that differ only in case from `A`
+ * to `Z`, which Postgres folds into one setting, a `pg.Pool`, or a client that
+ * `pg` reports outside a transaction block, where Postgres would undo the
+ * settings as soon as they are set. One that reports no status (another
+ * driver, `pg` before 8.21) runs.
  * @param txnClient The client of a transaction: a `transaction()` callback's,
  * of any driver, or a `pg.PoolClient` you sent `BEGIN` on
  * @param settings Each setting's name and its value, a string
@@ -567,11 +569,12 @@ export async function setLocal(
   const proto = typeof settings === 'object' && settings !== null ? Object.getPrototypeOf(settings) : undefined;
   if (proto !== Object.prototype && proto !== null) throw new Error("setLocal() was given settings that are not a plain object, whose own properties Postgres would not read as names and values: give an object of strings, { 'app.customer': 'Ada Quill' }");
 
-  // the caller's settings read once; Postgres folds A to Z only in a setting's name (guc_name_compare), and which of
+  // the caller's settings read once, their own enumerable string keys only, never one inherited from a polluted
+  // Object.prototype; Postgres folds A to Z only in a setting's name (guc_name_compare), and which of
   // two such names one select list leaves set rests on an evaluation order it does not document
   const entries = Object.entries(settings), folded = new Map<string, string>();
   for (const [name, value] of entries) {
-    if (typeof value !== 'string') throw new Error(`setLocal() was given a value for ${name} that is not a string, which Postgres would store as '' for a null, or as a driver's text of its own: give a string`);
+    if (typeof value !== 'string') throw new Error(`setLocal() was given a value for ${name} that is not a string, which Postgres would take as a reset for a null, to '' for a name of your own, or as a driver's text of its own: give a string`);
     const key = name.replace(/[A-Z]+/g, upper => upper.toLowerCase()), first = folded.get(key);
     if (first !== undefined) throw new Error(`setLocal() was given ${first} and ${name}, which Postgres takes for one setting, as it folds A to Z to lower case: give one of them`);
     folded.set(key, name);
