@@ -108,10 +108,11 @@ type TxnClientOf<C, Pg, T extends IsolationLevel> = unknown extends C ? Pg : [C]
 type PassedLike = TxnClientLike<PoolClientLike, IsolationLevel> & { connect?: never };
 // when inference finds no N, its default or constraint is PassedLike's own type object
 type IsPassedLike<N> = (<X>() => X extends N ? 1 : 2) extends (<X>() => X extends PassedLike ? 1 : 2) ? true : false;
-// only a client that declares _zapatos can be passed through. A generic wrapper can infer N as any,
-// which would turn the whole first parameter into any.
-type Passed<N> = 0 extends 1 & N ? never : IsPassedLike<N> extends true ? never : '_zapatos' extends keyof N ? N : never;
-// a marked client goes straight to the callback. When the argument can be a pool, the call starts its own transaction.
+// A string index signature gives a client the _zapatos key. Check the marker's type too.
+type Passed<N> = 0 extends 1 & N ? never : IsPassedLike<N> extends true ? never :
+  '_zapatos' extends keyof N ? N['_zapatos'] extends PassedLike['_zapatos'] ? N : never : never;
+// A pool and a marked client can share the pool parameter if both fit PoolLike.
+// At run time a client with its own marker passes through at the outer level.
 type WithPassed<N, Else> = ([Passed<N>] extends [never] ? Else : never) | Passed<N>;
 // The constraint on N binds only the type argument. The client argument itself must exclude values with connect().
 // Keeping N in the never branch lets TypeScript infer the whole client, including a caller's copy of PassedLike.
