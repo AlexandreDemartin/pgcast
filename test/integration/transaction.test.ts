@@ -1370,12 +1370,12 @@ describe('savepoint() (#723)', () => {
   });
 
   describe('a real conflict, caught in the callback, which returns (not raise())', () => {
-    /** Runs `fn` with two clients of the pool, and ends both: `ROLLBACK` on each, a no-op once committed. */
+    /** Runs `fn` with two clients of the pool, then `ROLLBACK` on each, a no-op once committed: c2 first, whose locks c1 may wait for. */
     const twoClients = async <T>(fn: (c1: pg.PoolClient, c2: pg.PoolClient) => Promise<T>) => {
       const c1 = await t.pool.connect(), c2 = await t.pool.connect();
       try { return await fn(c1, c2); }
       finally {
-        for (const c of [c1, c2]) { await c.query('ROLLBACK').catch(() => undefined); c.release(); }
+        for (const c of [c2, c1]) { await c.query('ROLLBACK').catch(() => undefined); c.release(); }
       }
     };
     /** A savepoint whose callback writes `note`, catches that write's error, notes its code, and returns. */
@@ -1447,10 +1447,10 @@ describe('savepoint() (#723)', () => {
         await c2.query(`SET LOCAL deadlock_timeout = '10ms'`);  // c2 finds the deadlock, and is the one that fails
         await c2.query(`UPDATE txn_probe SET note = 'a by 2' WHERE note = 'a'`);
         await c1.query(`UPDATE txn_probe SET note = 'b by 1' WHERE note = 'b'`);
-        const waiting = c1.query(`UPDATE txn_probe SET note = 'a by 1' WHERE note = 'a'`);  // waits for c2's lock
+        const waiting = c1.query(`UPDATE txn_probe SET note = 'a by 1' WHERE note = 'a'`).then(() => undefined, (e: unknown) => e);  // waits for c2's lock
         steps.push(await swallowing(c2, steps, `UPDATE txn_probe SET note = $1 WHERE note = 'b'`, ['b by 2']));
         steps.push(await c2.query('COMMIT').then(r => `COMMIT ${r.command}`, (e: { code?: string }) => `COMMIT rejects ${e.code}`));
-        await waiting;
+        expect(await waiting).toBeUndefined();
         await c1.query('COMMIT');
       });
       expect(steps).toEqual(['in the callback 40P01', 'savepoint rejects 25P02', 'COMMIT COMMIT']);
@@ -1478,6 +1478,9 @@ describe('savepoint() (#723)', () => {
           second: async (fail = false) => { failSecond = fail; g2.open(); results.push(await second); },
         });
         results.push((await client.query('COMMIT')).command);
+        await client.query('BEGIN');
+        await db.savepoint(client, async () => undefined);  // back at depth 1 on that client, whichever order they ended in
+        await client.query('ROLLBACK');
         return { results, queries, committed: await notes() };
       } finally {
         client.release();
@@ -1490,6 +1493,7 @@ describe('savepoint() (#723)', () => {
         queries: [
           'SAVEPOINT pgcast_savepoint_1', 'SAVEPOINT pgcast_savepoint_2', 'RELEASE SAVEPOINT pgcast_savepoint_1',
           'RELEASE SAVEPOINT pgcast_savepoint_2', 'ROLLBACK TO SAVEPOINT pgcast_savepoint_2',
+          'SAVEPOINT pgcast_savepoint_1', 'RELEASE SAVEPOINT pgcast_savepoint_1',
         ],
         committed: [],
       });
@@ -1498,7 +1502,10 @@ describe('savepoint() (#723)', () => {
     it('the second, if it ends first, resolves on its own, and COMMIT saves both', async () => {
       expect(await twoAtOnce(async ends => { await ends.second(); await ends.first(); })).toEqual({
         results: ['resolves', 'resolves', 'COMMIT'],
-        queries: ['SAVEPOINT pgcast_savepoint_1', 'SAVEPOINT pgcast_savepoint_2', 'RELEASE SAVEPOINT pgcast_savepoint_2', 'RELEASE SAVEPOINT pgcast_savepoint_1'],
+        queries: [
+          'SAVEPOINT pgcast_savepoint_1', 'SAVEPOINT pgcast_savepoint_2', 'RELEASE SAVEPOINT pgcast_savepoint_2', 'RELEASE SAVEPOINT pgcast_savepoint_1',
+          'SAVEPOINT pgcast_savepoint_1', 'RELEASE SAVEPOINT pgcast_savepoint_1',
+        ],
         committed: ['first', 'second'],
       });
     });
@@ -1509,6 +1516,7 @@ describe('savepoint() (#723)', () => {
         queries: [
           'SAVEPOINT pgcast_savepoint_1', 'SAVEPOINT pgcast_savepoint_2', 'ROLLBACK TO SAVEPOINT pgcast_savepoint_2',
           'RELEASE SAVEPOINT pgcast_savepoint_2', 'RELEASE SAVEPOINT pgcast_savepoint_1',
+          'SAVEPOINT pgcast_savepoint_1', 'RELEASE SAVEPOINT pgcast_savepoint_1',
         ],
         committed: [],
       });
