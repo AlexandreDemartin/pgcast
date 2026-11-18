@@ -425,3 +425,88 @@ describe('advisoryXactLock()', () => {
     void db.advisoryXactLock(other, BigInt(42));
   });
 });
+
+// #738: setLocal() takes the client of a transaction, of any driver, and an object of strings: a value Postgres
+// would take as a reset or as a driver's text does not compile, though an optional property does from TypeScript 4.2
+describe('setLocal()', () => {
+  const settings = { 'app.customer': 'Ada Quill' };
+  test('it takes the client of each shortcut, another driver’s, a pg.PoolClient, and resolves to void', () => {
+    expectTypeOf(db.setLocal(txn, settings)).toEqualTypeOf<Promise<void>>();
+    expectTypeOf(db.setLocal(txn, settings)).resolves.not.toBeAny();
+    void db.transaction(pool, db.IsolationLevel.ReadCommitted, c => db.setLocal(c, settings));
+    void db.serializable(pool, c => db.setLocal(c, settings));
+    void db.repeatableRead(pool, c => db.setLocal(c, settings));
+    void db.readCommitted(pool, c => db.setLocal(c, settings));
+    void db.serializableRO(pool, c => db.setLocal(c, settings));
+    void db.repeatableReadRO(pool, c => db.setLocal(c, settings));
+    void db.readCommittedRO(pool, c => db.setLocal(c, settings));
+    void db.serializableRODeferrable(pool, c => db.setLocal(c, settings));
+    void db.serializable(other, c => db.setLocal(c, settings));
+    void db.readCommitted(typedPool, c => db.setLocal(c, settings));
+    void db.serializable(literal, c => db.setLocal(c, settings));
+    void db.setLocal(txnRC, settings);
+    void db.setLocal(txnAny, settings);
+    void db.setLocal(plain, settings);
+  });
+
+  test('its settings are a literal, a computed name, a type alias, a Record, as const, the spread of an interface, or {}', () => {
+    type Claims = { 'app.customer': string; role: string };
+    interface Context { 'app.customer': string }
+    const name: string = 'app.customer', claims: Claims = { 'app.customer': 'Ada Quill', role: 'cinema_customer' };
+    const record: Record<string, string> = { 'app.customer': 'Ada Quill' }, asConst = { 'app.customer': 'Ada Quill' } as const;
+    const context: Context = { 'app.customer': 'Ada Quill' };
+    void db.setLocal(txn, { 'app.customer': 'Ada Quill', role: 'cinema_customer' });
+    void db.setLocal(txn, { [name]: 'Ada Quill' });
+    void db.setLocal(txn, claims);
+    void db.setLocal(txn, record);
+    void db.setLocal(txn, asConst);
+    void db.setLocal(txn, { ...context });
+    void db.setLocal(txn, {});
+    expectTypeOf<Parameters<typeof db.setLocal>[1]>().toEqualTypeOf<{ readonly [name: string]: string }>();
+  });
+
+  // TypeScript 4.1 refuses it; from 4.2 an optional property fits an index signature, with or without
+  // exactOptionalPropertyTypes, so an undefined in it reaches the run-time refusal
+  test('an optional property compiles, as do a Partial and a Symbol key', () => {
+    type Claims = { 'app.customer'?: string; role: string };
+    const claims: Claims = { role: 'cinema_customer' }, partial: Partial<Record<'app.customer', string>> = {};
+    void db.setLocal(txn, claims);
+    void db.setLocal(txn, partial);
+    void db.setLocal(txn, { [Symbol('app.customer')]: 'Ada Quill' });
+  });
+
+  test('a value that is not a string, or settings that are not an object of strings, do not compile', () => {
+    interface Context { 'app.customer': string }
+    const context: Context = { 'app.customer': 'Ada Quill' }, maybe: string | undefined = undefined;
+    const map = new Map([['app.customer', 'Ada Quill']]), names: string[] = ['app.customer'];
+    // @ts-expect-error a number, which Postgres would store as pg's text of it
+    void db.setLocal(txn, { 'app.screening': 42 });
+    // @ts-expect-error null, which Postgres would take as a reset
+    void db.setLocal(txn, { 'app.customer': null });
+    // @ts-expect-error undefined, which Postgres would take as a reset
+    void db.setLocal(txn, { 'app.customer': undefined });
+    // @ts-expect-error a string or undefined
+    void db.setLocal(txn, { 'app.customer': maybe });
+    // @ts-expect-error an interface, which has no index signature: spread it
+    void db.setLocal(txn, context);
+    // @ts-expect-error a Map, whose entries are no own properties
+    void db.setLocal(txn, map);
+    // @ts-expect-error a string
+    void db.setLocal(txn, 'app.customer');
+    // @ts-expect-error a string[]
+    void db.setLocal(txn, names);
+    // @ts-expect-error a Date
+    void db.setLocal(txn, new Date());
+  });
+
+  test('a client that is no transaction’s does not compile', () => {
+    // @ts-expect-error a pg.Pool, whose query would run on a client of its own, outside any transaction
+    void db.setLocal(pool, settings);
+    // @ts-expect-error a pg.Client
+    void db.setLocal(client, settings);
+    // @ts-expect-error a QueryableLike
+    void db.setLocal(queryableLike, settings);
+    // @ts-expect-error another driver's pool
+    void db.setLocal(other, settings);
+  });
+});

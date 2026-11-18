@@ -44,6 +44,7 @@ export const serializable = mod.serializable;
 export const serializableRO = mod.serializableRO;
 export const serializableRODeferrable = mod.serializableRODeferrable;
 export const setConfig = mod.setConfig;
+export const setLocal = mod.setLocal;
 export const sql = mod.sql;
 export const strict = mod.strict;
 export const sum = mod.sum;

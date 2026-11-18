@@ -5,7 +5,8 @@
 // file only. Under Vitest, src imports pg's ESM entry, which has no `native`;
 // the stub adds it, own and enumerable, as pg 7 has it. Then a pool of another
 // driver (#696), which run time takes for a pool, the SQL savepoint() sends
-// (#723), and the SQL advisoryXactLock() sends (#724). No database.
+// (#723), the SQL advisoryXactLock() sends (#724), and the SQL setLocal() sends (#738).
+// No database.
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as db from '../../src/db';
@@ -530,5 +531,200 @@ describe('advisoryXactLock()', () => {
     };
     await db.serializable({ connect: async () => client }, c => db.advisoryXactLock(c, BigInt(42)));
     expect(sent).toEqual(['START TRANSACTION ISOLATION LEVEL SERIALIZABLE', 'SELECT pg_advisory_xact_lock($1)', 'COMMIT', 'release()']);
+  });
+});
+
+// #738: setLocal() on a client that logs what it is sent: the SQL of each set of settings, and its five refusals, each
+// before any query
+describe('setLocal()', () => {
+  afterEach(resetConfig);
+
+  type Settings = { readonly [name: string]: string };
+
+  /** A transaction's client that logs each query; its getTransactionStatus() gives `status`, and with none it has no such method. */
+  const settingClient = (...status: [] | [string | null]) => {
+    const sent: db.SQLQuery[] = [];
+    const client = {
+      query: async (q: db.SQLQuery) => { sent.push({ text: q.text, values: q.values }); return { rows: [{ set_config: '' }], command: 'SELECT' }; },
+      release: () => undefined,
+      ...(status.length ? { getTransactionStatus: () => status[0] } : {}),
+    };
+    return { sent, client };
+  };
+
+  /** The queries queryListener gets. */
+  const listened = () => {
+    const queries: db.SQLQuery[] = [];
+    db.setConfig({ queryListener: q => { queries.push(q); } });
+    return queries;
+  };
+
+  const
+    notPlain = 'setLocal() was given settings that are not a plain object, whose own properties Postgres would not read as names and values: give an object of strings, { \'app.customer\': \'Ada Quill\' }',
+    notString = (name: string) => `setLocal() was given a value for ${name} that is not a string, which Postgres would take as a RESET for a null, or as a driver's text of its own: give a string`,
+    casePair = (first: string, second: string) => `setLocal() was given ${first} and ${second}, which Postgres takes for one setting, as it folds A to Z to lower case: give one of them`,
+    idle = 'setLocal() was given a client outside a transaction block, so Postgres would undo the settings as soon as they are set: call it on the client of a transaction(), or after a BEGIN of yours';
+
+  const name = 'app.customer', aliased: Settings = { 'app.customer': 'Ada Quill' }, asConst = { 'app.screening': '1002' } as const;
+  it.each<{ name: string; settings: Settings; text: string; values: unknown[] }>([
+    { name: 'one setting', settings: { 'app.customer': 'Ada Quill' }, text: 'SELECT set_config($1, $2, true)', values: ['app.customer', 'Ada Quill'] },
+    {
+      name: 'two settings, in the object’s order', settings: { role: 'cinema_customer', 'app.customer': 'Ada Quill' },
+      text: 'SELECT set_config($1, $2, true), set_config($3, $4, true)', values: ['role', 'cinema_customer', 'app.customer', 'Ada Quill'],
+    },
+    {
+      name: 'the same two the other way round', settings: { 'app.customer': 'Ada Quill', role: 'cinema_customer' },
+      text: 'SELECT set_config($1, $2, true), set_config($3, $4, true)', values: ['app.customer', 'Ada Quill', 'role', 'cinema_customer'],
+    },
+    { name: 'a computed name', settings: { [name]: 'Ada Quill' }, text: 'SELECT set_config($1, $2, true)', values: ['app.customer', 'Ada Quill'] },
+    { name: 'a typed object', settings: aliased, text: 'SELECT set_config($1, $2, true)', values: ['app.customer', 'Ada Quill'] },
+    { name: 'an object as const', settings: asConst, text: 'SELECT set_config($1, $2, true)', values: ['app.screening', '1002'] },
+    { name: 'an empty value', settings: { 'app.customer': '' }, text: 'SELECT set_config($1, $2, true)', values: ['app.customer', ''] },
+    {
+      name: 'an object with no prototype', settings: Object.assign(Object.create(null) as Record<string, string>, { 'app.customer': 'Ada Quill' }),
+      text: 'SELECT set_config($1, $2, true)', values: ['app.customer', 'Ada Quill'],
+    },
+  ])('sends one query for $name, and resolves to undefined', async ({ settings, text, values }) => {
+    const { sent, client } = settingClient('T');
+    expect(await db.setLocal(client, settings)).toBeUndefined();
+    expect(sent).toEqual([{ text, values }]);
+  });
+
+  it('sends nothing for {}, and resolves to undefined', async () => {
+    const { sent, client } = settingClient('T'), queries = listened();
+    expect(await db.setLocal(client, {})).toBeUndefined();
+    expect(sent).toEqual([]);
+    expect(queries).toEqual([]);
+  });
+
+  it.each([
+    ['castArrayParamsToJson', { castArrayParamsToJson: true }],
+    ['castObjectParamsToJson', { castObjectParamsToJson: true }],
+    ['both', { castArrayParamsToJson: true, castObjectParamsToJson: true }],
+  ])('sends the same SQL under %s', async (_, config) => {
+    db.setConfig(config);
+    const { sent, client } = settingClient('T');
+    await db.setLocal(client, { role: 'cinema_customer', 'app.customer': 'Ada Quill' });
+    expect(sent).toEqual([{ text: 'SELECT set_config($1, $2, true), set_config($3, $4, true)', values: ['role', 'cinema_customer', 'app.customer', 'Ada Quill'] }]);
+  });
+
+  it('reads each value once: a getter that changes is sent as first read', async () => {
+    let reads = 0;
+    const settings = Object.defineProperty({}, 'app.customer', { get: () => (reads++ === 0 ? 'Ada Quill' : 42), enumerable: true }) as Settings;
+    const { sent, client } = settingClient('T');
+    await db.setLocal(client, settings);
+    expect(reads).toBe(1);
+    expect(sent).toEqual([{ text: 'SELECT set_config($1, $2, true)', values: ['app.customer', 'Ada Quill'] }]);
+  });
+
+  it('sends only the object’s own keys: one made enumerable on Object.prototype is not sent', async () => {
+    const proto = Object.prototype as Record<string, unknown>, { sent, client } = settingClient('T');
+    proto.role = 'postgres';
+    try {
+      await db.setLocal(client, { 'app.customer': 'Ada Quill' });
+    } finally {
+      delete proto.role;
+    }
+    expect(sent).toEqual([{ text: 'SELECT set_config($1, $2, true)', values: ['app.customer', 'Ada Quill'] }]);
+  });
+
+  it('drops a Symbol key and a non-enumerable one: nothing is sent for them, and nothing thrown', async () => {
+    const settings = Object.defineProperty({ [Symbol('app.screening')]: '1002', 'app.customer': 'Ada Quill' }, 'role', { value: 'postgres', enumerable: false });
+    const { sent, client } = settingClient('T');
+    await db.setLocal(client, settings);
+    expect(sent).toEqual([{ text: 'SELECT set_config($1, $2, true)', values: ['app.customer', 'Ada Quill'] }]);
+  });
+
+  class Context { 'app.customer' = 'Ada Quill'; }
+  it.each<[string, unknown]>([
+    ['null', null], ['undefined', undefined], ['a number', 42], ['a string', 'app.customer'], ['an array', ['app.customer']],
+    ['a Map', new Map([['app.customer', 'Ada Quill']])], ['a Date', new Date(0)], ['an instance of a class', new Context()],
+    ['a function', () => 'Ada Quill'],
+  ])('refuses %s as settings, before any query', async (_, settings) => {
+    const { sent, client } = settingClient('T'), queries = listened();
+    await expect(db.setLocal(client, settings as Settings)).rejects.toThrow(notPlain);
+    expect(sent).toEqual([]);
+    expect(queries).toEqual([]);
+  });
+
+  it.each<[string, unknown]>([
+    ['null', null], ['undefined', undefined], ['a number', 42], ['true', true], ['a bigint', BigInt(42)], ['a Date', new Date(0)],
+    ['an object', { token: 'secret-claim' }], ['an array', ['secret-claim']], ['a String object', new String('secret-claim')],
+  ])('refuses %s as a value, naming the setting and not the value, before any query', async (_, value) => {
+    const { sent, client } = settingClient('T'), queries = listened();
+    const error = await db.setLocal(client, { role: 'cinema_customer', 'app.customer': value } as unknown as Settings).catch((e: unknown) => e);
+    expect(error).toEqual(new Error(notString('app.customer')));
+    expect((error as Error).message).not.toContain('secret');
+    expect(sent).toEqual([]);
+    expect(queries).toEqual([]);
+  });
+
+  it.each([
+    ['app.customer', 'app.Customer'], ['app.Customer', 'app.customer'], ['APP.CUSTOMER', 'app.customer'], ['Role', 'role'],
+    ['app.Z', 'app.z'], ['app.a', 'app.A'],
+  ])('refuses %s and %s, which differ only in case, before any query', async (first, second) => {
+    const { sent, client } = settingClient('T'), queries = listened();
+    await expect(db.setLocal(client, { [first]: 'Ada Quill', 'app.screening': '1002', [second]: 'Bea Holm' })).rejects.toThrow(casePair(first, second));
+    expect(sent).toEqual([]);
+    expect(queries).toEqual([]);
+  });
+
+  // Postgres folds A to Z only (guc_name_compare), so that each of these pairs is two settings, as probed on 17.3
+  it.each([['app.é', 'app.É'], ['app.É', 'app.é'], ['app.k', 'app.K'], ['app.K', 'app.k'], ['app.i', 'app.İ'], ['app.İ', 'app.i']])(
+    'sends %s and %s, which Postgres takes for two settings', async (first, second) => {
+      const { sent, client } = settingClient('T');
+      await db.setLocal(client, { [first]: 'one', [second]: 'two' });
+      expect(sent).toEqual([{ text: 'SELECT set_config($1, $2, true), set_config($3, $4, true)', values: [first, 'one', second, 'two'] }]);
+    });
+
+  it('refuses a client that reports it is outside a transaction block, before any query, even for {}', async () => {
+    const { sent, client } = settingClient('I'), queries = listened();
+    await expect(db.setLocal(client, aliased)).rejects.toThrow(idle);
+    await expect(db.setLocal(client, {})).rejects.toThrow(idle);
+    expect(sent).toEqual([]);
+    expect(queries).toEqual([]);
+  });
+
+  it('checks the settings first: on an idle client, settings that are not plain get their message', async () => {
+    await expect(db.setLocal(settingClient('I').client, null as unknown as Settings)).rejects.toThrow(notPlain);
+  });
+
+  it('checks each value before the client: on an idle client, a value that is not a string gets its message', async () => {
+    await expect(db.setLocal(settingClient('I').client, { 'app.customer': null } as unknown as Settings)).rejects.toThrow(notString('app.customer'));
+  });
+
+  it('checks case pairs before the client: on an idle client, a pair gets its message', async () => {
+    await expect(db.setLocal(settingClient('I').client, { 'app.x': 'a', 'APP.X': 'b' })).rejects.toThrow(casePair('app.x', 'APP.X'));
+  });
+
+  it('checks an entry’s value before its name: a pair whose second value is not a string gets the value’s message', async () => {
+    await expect(db.setLocal(settingClient('T').client, { 'app.x': 'a', 'APP.X': 42 } as unknown as Settings)).rejects.toThrow(notString('APP.X'));
+  });
+
+  // pg reports T inside a block, E inside an aborted one (Postgres then refuses the query, 25P02); null, or no method,
+  // when it can't say: another driver, pg before 8.21, pg-native before 3.8
+  it.each<[string, [] | [string | null]]>([['T', ['T']], ['E', ['E']], ['null', [null]], ['no status', []]])('runs on a client whose status is %s', async (_, status) => {
+    const { sent, client } = settingClient(...status);
+    await db.setLocal(client, aliased);
+    expect(sent).toEqual([{ text: 'SELECT set_config($1, $2, true)', values: ['app.customer', 'Ada Quill'] }]);
+  });
+
+  it('runs on the client of another driver’s pool, in its transaction: queryListener gets it with the txnId, the transaction listeners nothing', async () => {
+    const sent: string[] = [], queries: [string, number | undefined][] = [], messages: unknown[] = [];
+    db.setConfig({
+      queryListener: (q, txnId) => { queries.push([q.text, txnId]); },
+      transactionListener: message => { messages.push(message); },
+      transactionEventListener: event => { messages.push(event); },
+    });
+    const client = {
+      query: async (q: db.SQLQuery) => { sent.push(q.text); return { rows: [], command: q.text.split(' ')[0] }; },
+      release: () => { sent.push('release()'); },
+    };
+    await db.serializable({ connect: async () => client }, c => db.setLocal(c, aliased));
+    expect(sent).toEqual(['START TRANSACTION ISOLATION LEVEL SERIALIZABLE', 'SELECT set_config($1, $2, true)', 'COMMIT', 'release()']);
+    const txnId = queries[0]?.[1];
+    expect(typeof txnId).toBe('number');
+    expect(queries).toEqual([['START TRANSACTION ISOLATION LEVEL SERIALIZABLE', txnId], ['SELECT set_config($1, $2, true)', txnId], ['COMMIT', txnId]]);
+    expect(messages).toEqual([]);
   });
 });
