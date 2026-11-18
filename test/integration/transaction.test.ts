@@ -4,7 +4,7 @@
 // then COMMIT, which would commit the harness's per-test transaction: these tests
 // run on the file's pool (t.pool), write only to txn_probe, and empty it after
 // each test. The per-test client (t.client) is used only inside its own BEGIN,
-// by advisoryXactLock() (#724).
+// by advisoryXactLock() (#724) and setLocal() (#738).
 // Retries are provoked deterministically: the callback raises the SQLSTATE
 // itself on its first attempts (a DO block with RAISE ... USING ERRCODE).
 
@@ -1864,5 +1864,153 @@ describe('advisoryXactLock()', () => {
       'advisoryXactLock() was given a pg.Pool, which runs each query on a client outside a transaction block, so Postgres would release the lock as soon as it is taken: call it on the client of a transaction(), or on a client of the pool after a BEGIN of yours');
     expect(queries).toEqual([]);
     expect(await advisoryLocks()).toEqual([]);
+  });
+});
+
+// #738: what setLocal() sets, as current_setting() reads it back, how long Postgres keeps it, and what Postgres
+// answers for a name it refuses
+describe('setLocal()', () => {
+  /** What current_setting(name, true) reads on `queryable`: '' for a name defined on that session but not set, null for one never defined. */
+  const setting = async (queryable: pg.ClientBase | pg.Pool, name: string) =>
+    (await queryable.query<{ s: string | null }>('SELECT current_setting($1, true) AS s', [name])).rows[0]!.s;
+
+  /** A client of the pool for one test, released with destroy so that no session setting outlives it. */
+  const ownClient = async (test: (client: pg.PoolClient) => Promise<void>) => {
+    const client = await t.pool.connect();
+    try { await test(client); } finally { client.release(true); }
+  };
+
+  it('sets each setting for the transaction, read back by current_setting()', async () => {
+    await db.readCommitted(t.pool, async c => {
+      await db.setLocal(c, { 'app.customer': 'Ada Quill', 'app.screening': '1002' });
+      expect(await setting(c, 'app.customer')).toBe('Ada Quill');
+      expect(await setting(c, 'app.screening')).toBe('1002');
+      expect(await setting(c, 'APP.Customer')).toBe('Ada Quill');  // Postgres folds A to Z in a name
+    });
+  });
+
+  // a name of each row's own, never set on any connection of the pool before
+  it.each([['COMMIT', 'app.after_commit', async () => undefined], ['ROLLBACK', 'app.after_rollback', async () => { throw new Error('rolled back'); }]] as const)(
+    'leaves \'\' on that connection after %s, not NULL as before', async (_, name, end) => {
+      await ownClient(async client => {
+        expect(await setting(client, name)).toBeNull();
+        await db.readCommitted(client, async c => { await db.setLocal(c, { [name]: 'Ada Quill' }); await end(); }).catch(() => undefined);
+        expect(await setting(client, name)).toBe('');
+      });
+    });
+
+  it('gives back the session’s value of the same name at COMMIT', async () => {
+    await ownClient(async client => {
+      await client.query("SET app.customer = 'session'");
+      await db.readCommitted(client, async c => {
+        await db.setLocal(c, { 'app.customer': 'Ada Quill' });
+        expect(await setting(c, 'app.customer')).toBe('Ada Quill');
+      });
+      expect(await setting(client, 'app.customer')).toBe('session');
+    });
+  });
+
+  it('keeps a setting through the RELEASE of a savepoint()', async () => {
+    await db.readCommitted(t.pool, async c => {
+      await db.savepoint(c, sp => db.setLocal(sp, { 'app.customer': 'inner' }));
+      expect(await setting(c, 'app.customer')).toBe('inner');
+    });
+  });
+
+  it('gives back the value from before each savepoint at its ROLLBACK TO, at two nested levels', async () => {
+    await db.readCommitted(t.pool, async c => {
+      await db.setLocal(c, { 'app.customer': 'outer' });
+      await db.savepoint(c, async l1 => {
+        await db.setLocal(l1, { 'app.customer': 'L1', 'app.screening': 'L1' });
+        await db.savepoint(l1, async l2 => {
+          await db.setLocal(l2, { 'app.customer': 'L2' });
+          throw new Error('L2 fails');
+        }).catch(() => undefined);
+        expect(await setting(l1, 'app.customer')).toBe('L1');
+        throw new Error('L1 fails');
+      }).catch(() => undefined);
+      expect(await setting(c, 'app.customer')).toBe('outer');
+      expect(await setting(c, 'app.screening')).toBe('');  // set only inside
+    });
+  });
+
+  it('is not seen by an attempt that transaction() retries after a 40001', async () => {
+    db.setConfig({ transactionRetryDelay: { minMs: 0, maxMs: 0 } });
+    const seen: (string | null)[] = [];
+    await db.serializable(t.pool, async c => {
+      seen.push(await setting(c, 'app.customer'));
+      await db.setLocal(c, { 'app.customer': `attempt ${seen.length}` });
+      if (seen.length === 1) await raise(c, '40001');
+    });
+    expect(seen).toHaveLength(2);
+    expect(seen[1]).toBe('');  // the same connection: the name stays defined, its value gone
+  });
+
+  // a role of this test, created, granted and dropped inside the harness's BEGIN, so that its ROLLBACK leaves nothing;
+  // the suite's role is a superuser, which row-level security does not bind
+  it('gives a row-level security policy its customer and role: only that customer’s rows', async () => {
+    const role = `pgcast_test_${process.pid}_set_local`;
+    await t.client.query(`CREATE ROLE "${role}" NOLOGIN`);
+    await t.client.query(`GRANT SELECT ON users TO "${role}"`);
+    await t.client.query('ALTER TABLE users ENABLE ROW LEVEL SECURITY');
+    await t.client.query("CREATE POLICY own_row ON users USING (display_name = current_setting('app.customer', true))");
+    await db.setLocal(t.client, { role, 'app.customer': 'Bob' });
+    const { rows } = await t.client.query('SELECT current_user AS u, array_agg(display_name) AS names FROM users');
+    expect(rows).toEqual([{ u: role, names: ['Bob'] }]);
+  });
+
+  it('refuses two names that differ only in case, before any query', async () => {
+    const queries: db.SQLQuery[] = [];
+    db.setConfig({ queryListener: q => { queries.push(q); } });
+    await expect(db.setLocal(t.client, { 'app.customer': 'Ada Quill', 'app.Customer': 'Bob' })).rejects.toThrow(/^setLocal\(\) was given app\.customer and app\.Customer/);
+    expect(queries).toEqual([]);
+  });
+
+  // probed on 17.3; the same codes on each Postgres of the CI matrix
+  it.each([
+    ['author_id', '42704', 'unrecognized configuration parameter "author_id"'],
+    ['', '42704', 'unrecognized configuration parameter ""'],
+    ['app.author id', '42602', 'invalid configuration parameter name "app.author id"'],
+    ['app.author-id', '42602', 'invalid configuration parameter name "app.author-id"'],
+    ['app.', '42602', 'invalid configuration parameter name "app."'],
+    ['.x', '42602', 'invalid configuration parameter name ".x"'],
+    ['app.1x', '42602', 'invalid configuration parameter name "app.1x"'],
+    ['app."x"', '42602', 'invalid configuration parameter name "app."x""'],
+    ['is_superuser', '55P02', 'parameter "is_superuser" cannot be changed'],
+  ])('rejects with Postgres’s error for %j', async (name, code, message) => {
+    const error = await db.readCommitted(t.pool, c => db.setLocal(c, { [name]: 'v' })).catch((e: unknown) => e);
+    expect(error).toMatchObject({ code, message });
+  });
+
+  it('takes the names Postgres takes: several dots, capitals, a letter beyond ASCII, a built-in', async () => {
+    await db.readCommitted(t.pool, async c => {
+      await db.setLocal(c, { 'a.b.c': '1', 'App.X': '2', 'app.é': '3', search_path: 'public', statement_timeout: '1min' });
+      expect([await setting(c, 'a.b.c'), await setting(c, 'app.x'), await setting(c, 'app.é'), await setting(c, 'search_path'), await setting(c, 'statement_timeout')])
+        .toEqual(['1', '2', '3', 'public', '1min']);
+    });
+  });
+
+  it('refuses a pg.Pool, given past a cast, before any query', async () => {
+    const queries: db.SQLQuery[] = [];
+    db.setConfig({ queryListener: q => { queries.push(q); } });
+    await expect(db.setLocal(t.pool as never, { 'app.customer': 'Ada Quill' })).rejects.toThrow(
+      'setLocal() was given a pg.Pool, which runs each query on a client outside a transaction block, so Postgres would undo the settings as soon as they are set: call it on the client of a transaction(), or on a client of the pool after a BEGIN of yours');
+    await expect(db.setLocal(t.pool as never, {})).rejects.toThrow(/^setLocal\(\) was given a pg\.Pool/);
+    expect(queries).toEqual([]);
+  });
+
+  it('refuses a pg.PoolClient outside a transaction block, before any query, and runs inside a BEGIN of yours', async () => {
+    const queries: db.SQLQuery[] = [];
+    db.setConfig({ queryListener: q => { queries.push(q); } });
+    await ownClient(async client => {
+      expect(client.getTransactionStatus()).toBe('I');
+      await expect(db.setLocal(client, { 'app.customer': 'Ada Quill' })).rejects.toThrow(/^setLocal\(\) was given a client outside a transaction block/);
+      expect(queries).toEqual([]);
+      await client.query('BEGIN');
+      await db.setLocal(client, { 'app.customer': 'Ada Quill' });
+      expect(await setting(client, 'app.customer')).toBe('Ada Quill');
+      await client.query('ROLLBACK');
+      expect(queries.map(q => q.text)).toEqual(['SELECT set_config($1, $2, true)']);
+    });
   });
 });

@@ -82,3 +82,9 @@ export const firstParameterOf = (queryable: Parameters<typeof db.serializable>[0
 export const lockIn = (pool: db.PoolLike<OtherClient>) => db.serializable(pool, txnClient => db.advisoryXactLock(txnClient, [1, 42]));
 export const lockOn = (txnClient: Parameters<typeof db.advisoryXactLock>[0], key: Parameters<typeof db.advisoryXactLock>[1]) =>
   db.advisoryXactLock(txnClient, key);
+
+// settings for the rest of a transaction of another driver's pool, and on a client typed by setLocal()'s parameters,
+// as a library writes them (#738)
+export const settingsIn = (pool: db.PoolLike<OtherClient>) => db.serializable(pool, txnClient => db.setLocal(txnClient, { 'app.customer': 'Ada Quill' }));
+export const settingsOn = (txnClient: Parameters<typeof db.setLocal>[0], settings: Parameters<typeof db.setLocal>[1]) =>
+  db.setLocal(txnClient, settings);
