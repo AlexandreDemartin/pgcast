@@ -106,16 +106,14 @@ type TxnClientOf<C, Pg, T extends IsolationLevel> = unknown extends C ? Pg : [C]
 // the client of another driver's transaction, given to a nested call, N: it has no connect(), which every pg value and
 // pool has, so these fail the constraint, or infer nothing, and N stays PassedLike (#702)
 type PassedLike = TxnClientLike<PoolClientLike, IsolationLevel> & { connect?: never };
-// a type that declares _zapatos, as TxnClientLike does: a bare client, outside any transaction, would be taken for a pool;
-// never for any, inferred when a generic function takes a shortcut, which would make the whole parameter any, and never
-// for PassedLike itself, where N stays when it infers nothing, as in a helper's body over a client type left unresolved:
-// that client is then refused, as in Zapatos 6.6.1, since the callback would get pg's; told apart by exact identity
-type Passed<N> = 0 extends 1 & N ? never :
-  (<X>() => X extends N ? 1 : 2) extends (<X>() => X extends PassedLike ? 1 : 2) ? never : '_zapatos' extends keyof N ? N : never;
-// the client a callback gets: N itself, at the outer level it runs at, as savepoint() gives it; Else when N is PassedLike,
-// told apart by its connect key, or never or any; a string index signature puts connect in keyof N too
-type CallbackClient<N, Else> = [N] extends [never] ? Else : 0 extends 1 & N ? Else :
-  'connect' extends keyof N ? string extends keyof N ? N : Else : N;
+// when inference finds no N, its default or constraint is PassedLike's own type object
+type IsPassedLike<N> = (<X>() => X extends N ? 1 : 2) extends (<X>() => X extends PassedLike ? 1 : 2) ? true : false;
+// only a client that declares _zapatos can be passed through. Identity excludes the uninferred N even when
+// a real client's members also match PassedLike's.
+type Passed<N> = 0 extends 1 & N ? never : IsPassedLike<N> extends true ? never : '_zapatos' extends keyof N ? N : never;
+// keep the existing callback type for the fallback. A real client can also declare connect?: never, so only
+// identity distinguishes the fallback from that client, which the nested callback gets as given.
+type CallbackClient<N, Else> = [N] extends [never] ? Else : 0 extends 1 & N ? Else : IsPassedLike<N> extends true ? Else : N;
 
 // the callback as the body of transaction() calls it: with the client of a PoolLike, which run time uses as a TxnClient
 type Callback<T, M extends IsolationLevel> = (client: TxnClient<IsolationSatisfying<M>>) => Promise<T>;
