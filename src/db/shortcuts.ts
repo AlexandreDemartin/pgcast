@@ -1102,11 +1102,14 @@ export interface SelectRowsSignatures {
  *
  * `run()` gives what `select()` gives, `[]` for no row, but for a single
  * `lateral` subquery, whose result is passed through as `selectOne()` passes
- * it, as `pg` parses its column, and typed so. One typed `number` does not
- * compile: `count()`, `sum()`, `avg()`, and `min()` or `max()` unless typed by
- * column (`aggregatesTypedByColumn`), since `pg` gives a `bigint` or a
- * `numeric` as a string and a `date` as a `Date` (#749). Under a `lateral` key
- * it is JSON, as in `select()`; past the type, from JavaScript, `pg`'s value.
+ * it, as `pg` parses its column, and typed so. One typed `number`, alone or in
+ * a union, does not compile: `count()`, `sum()`, `avg()`, and `min()` or
+ * `max()` unless typed by column (`aggregatesTypedByColumn`), since `pg` gives
+ * a `bigint` or a `numeric` as a string and a `date` as a `Date` (#749).
+ * Under a `lateral` key it is JSON, as in `select()`; past the type, from
+ * JavaScript, `pg`'s value.
+ * A `lateral` whose type is a type parameter does not compile either: a
+ * function that forwards one calls `select()`, or casts.
  *
  * A query of many rows, it is typed so that a `lateral`, an `extras` value, a
  * `where` and the `Whereable` value of a typed column refuse it; a `sql`

@@ -549,6 +549,17 @@ describe('selectRows', () => {
     expectTypeOf<Run<typeof keyed>[number]['n']>().toEqualTypeOf<number>();
   });
 
+  test('refuses a lateral whose type is a type parameter; a forwarder calls select() or casts', () => {
+    const forward = <L extends db.SQLFragmentMap>(l: L) =>
+      // @ts-expect-error the lateral's type is a type parameter, which the check of a lateral typed number cannot resolve
+      db.selectRows('users', db.all, { lateral: l });
+    const forwardSelect = <L extends db.SQLFragmentMap>(l: L) => db.select('users', db.all, { lateral: l });
+    const forwardCast = <L extends db.SQLFragmentMap>(l: L) => db.selectRows('users', db.all, { lateral: l as db.SQLFragmentMap });
+    void forward;
+    expectTypeOf(forwardSelect).returns.not.toBeAny();
+    expectTypeOf<Run<ReturnType<typeof forwardCast>>[number]>().toMatchTypeOf<s.users.JSONSelectable>();
+  });
+
   test('a helper typed SQLFragment<R> refuses it; SQLFragment<R, any> takes it', () => {
     const rows = db.selectRows('users', db.all, { columns: ['id'] });
     const runAny = <R>(q: db.SQLFragment<R>) => q.run(pool);
