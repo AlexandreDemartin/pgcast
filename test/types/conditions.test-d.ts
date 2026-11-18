@@ -82,6 +82,71 @@ describe('eqAny()', () => {
   });
 });
 
+describe('likeAny() and ilikeAny()', () => {
+  test('take an array of patterns, as like() and ilike() take one, and give a condition on a text-like column', () => {
+    expectTypeOf(c.ilikeAny(['a%', 'b%'])).toEqualTypeOf<db.SQLFragment<boolean | null, 'a%' | 'b%'>>();
+    expectTypeOf(c.ilikeAny(['a%', 'b%'])).not.toBeAny();
+    expectTypeOf(c.likeAny(['a%'])).toEqualTypeOf<db.SQLFragment<boolean | null, 'a%'>>();
+    expectTypeOf(c.likeAny(['a%'])).not.toBeAny();
+    const patterns: readonly string[] = ['a%', 'b%'];
+    expectTypeOf(c.likeAny(patterns)).toEqualTypeOf<db.SQLFragment<boolean | null, string>>();
+    expectTypeOf(c.ilikeAny(patterns)).toEqualTypeOf<db.SQLFragment<boolean | null, string>>();
+    expectTypeOf(db.select('users', { display_name: c.ilikeAny(patterns), email: c.likeAny(['%@example.com']) }).run)
+      .returns.resolves.not.toBeAny();
+    db.select('extra.type_zoo', { c_text: c.likeAny(patterns), c_varchar: c.ilikeAny(['a%']), c_char: c.likeAny(['A_a%']), c_citext: c.ilikeAny(['a%']) });
+    db.select('users', { display_name: c.ilikeAny([]) });
+    db.select('users', { display_name: c.not(c.ilikeAny(patterns)) });
+    db.select('users', { display_name: c.or(c.likeAny(['A%']), c.ilikeAny(['b%'])) });
+  });
+
+  test('characterization: an enum column takes a pattern that is one of its labels, as like(), and Postgres refuses it (42883)', () => {
+    db.select('users', { mood: c.likeAny(['ok']), display_name: c.like('A%') });
+    db.select('users', { mood: c.like('ok') });
+  });
+
+  test('refuse a number column, an item that is no string, one pattern, and a list that is not an array', () => {
+    // @ts-expect-error an int column
+    db.select('users', { id: c.ilikeAny(['1%']) });
+    // @ts-expect-error an int column, as like()
+    db.select('users', { id: c.likeAny(['1%']) });
+    // @ts-expect-error a pattern that is no label of the enum, as like()
+    db.select('users', { mood: c.ilikeAny(['h%']) });
+    // @ts-expect-error a number item
+    db.select('users', { display_name: c.likeAny([1]) });
+    // @ts-expect-error a null item, with strictNullChecks
+    db.select('users', { display_name: c.ilikeAny(['a%', null]) });
+    // @ts-expect-error one pattern in place of the list
+    db.select('users', { display_name: c.ilikeAny('a%') });
+    // @ts-expect-error a Set
+    db.select('users', { display_name: c.likeAny(new Set(['a%'])) });
+    // @ts-expect-error a Parameter of the array
+    db.select('users', { display_name: c.ilikeAny(db.param(['a%'])) });
+    // @ts-expect-error parent(), which eqAny() takes
+    db.select('users', { display_name: c.ilikeAny(db.parent('tags')) });
+    // @ts-expect-error a sql fragment in place of the array
+    db.select('users', { display_name: c.likeAny(db.sql`ARRAY['a%']`) });
+  });
+
+  test('refuse Default, self, all, raw(), cols(), vals(), a Parameter and a fragment as items', () => {
+    // @ts-expect-error Default
+    db.select('users', { display_name: c.ilikeAny([db.Default]) });
+    // @ts-expect-error self
+    db.select('users', { display_name: c.ilikeAny([db.self]) });
+    // @ts-expect-error all
+    db.select('users', { display_name: c.likeAny([db.all]) });
+    // @ts-expect-error raw()
+    db.select('users', { display_name: c.likeAny([db.raw("'a%'")]) });
+    // @ts-expect-error cols()
+    db.select('users', { display_name: c.ilikeAny([db.cols('a%')]) });
+    // @ts-expect-error vals()
+    db.select('users', { display_name: c.ilikeAny([db.vals('a%')]) });
+    // @ts-expect-error a Parameter
+    db.select('users', { display_name: c.ilikeAny([db.param('a%')]) });
+    // @ts-expect-error a sql fragment
+    db.select('users', { display_name: c.likeAny([db.sql`'a%'`]) });
+  });
+});
+
 describe('websearchToTsquery()', () => {
   test('gives a condition on a tsvector column, whose placeholder is any as generated', () => {
     expectTypeOf(c.websearchToTsquery('english', 'salt')).toEqualTypeOf<db.SQLFragment<boolean | null, db.conditions.TsvectorColumn>>();

@@ -331,6 +331,23 @@ describe('values stay parameters', () => {
     }
   });
 
+  it('the patterns of likeAny and ilikeAny are one array parameter, whatever they hold and whatever the configuration', () => {
+    // a pattern's own `%`, `_` and `\\` are LIKE's, read by Postgres from the parameter, never SQL
+    const patterns = [...Object.values(hostile), '%', '_', 'a\\%b', "%' OR '1' = '1", '$1', '{a,b}'];
+    for (const config of [{}, { castArrayParamsToJson: true }, { castObjectParamsToJson: true }]) {
+      db.setConfig(config);
+      try {
+        expect({
+          likeAny: sql`WHERE ${{ display_name: db.conditions.likeAny(patterns) }}`.compile(),
+          ilikeAny: sql`WHERE ${{ display_name: db.conditions.ilikeAny(patterns) }}`.compile(),
+        }).toEqual({
+          likeAny: { text: 'WHERE (("display_name" LIKE ANY($1)))', values: [patterns] },
+          ilikeAny: { text: 'WHERE (("display_name" ILIKE ANY($1)))', values: [patterns] },
+        });
+      } finally { resetConfig(); }
+    }
+  });
+
   it('the configuration and the query of websearchToTsquery are two parameters, whatever they hold and whatever the configuration', () => {
     // the cast to regconfig is a constant of the code
     for (const config of [{}, { castArrayParamsToJson: true }, { castObjectParamsToJson: true }]) {
@@ -2262,11 +2279,12 @@ describe('a built-in object as a Whereable', () => {
   });
 });
 
-describe('a list that is not an array in isIn(), isNotIn() and eqAny()', () => {
+describe('a list that is not an array in isIn(), isNotIn(), eqAny(), likeAny() and ilikeAny()', () => {
   // 6.6.1 read `a.length`: an iterable has none, so isNotIn() compiled to `true`, every row, and isIn() to
   // `false`; an array-like or a string gave its keys' values, null and undefined a TypeError at the call (#235).
   // eqAny() sent it as its one parameter, which pg writes as '{}' for a Set: no row, with no error
-  const lists = { isIn: db.conditions.isIn, isNotIn: db.conditions.isNotIn, eqAny: db.conditions.eqAny };
+  const lists = { isIn: db.conditions.isIn, isNotIn: db.conditions.isNotIn, eqAny: db.conditions.eqAny,
+    likeAny: db.conditions.likeAny, ilikeAny: db.conditions.ilikeAny };
   const entryPoints: Record<string, (c: db.SQL) => db.SQLFragment<any, any>> = {
     deletes: c => db.deletes('users', { id: c }),
     select: c => db.select('users', { id: c }),
@@ -2284,7 +2302,7 @@ describe('a list that is not an array in isIn(), isNotIn() and eqAny()', () => {
     `\`${fn}()\` takes an array, not \`${kind}\`: for one value, write \`${fn}([value])\`.` :
     `\`${fn}()\` takes an array, not \`${kind}\`: make one with \`${fn}([...values])\`, or \`Array.from(values)\` for an array-like object.`;
 
-  it('throws for each kind, in isIn(), isNotIn() and eqAny(), through deletes, select and update, nested in and(), or() and not(), and copied', () => {
+  it('throws for each kind, in isIn(), isNotIn(), eqAny(), likeAny() and ilikeAny(), through deletes, select and update, nested in and(), or() and not(), and copied', () => {
     const outcomes: string[] = [];
     for (const [fn, list] of Object.entries(lists))
       for (const [entryPoint, build] of Object.entries(entryPoints))
