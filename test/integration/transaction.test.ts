@@ -1124,3 +1124,196 @@ describe('the client of a transaction at another level', () => {
     expect(emitWarning).not.toHaveBeenCalled();
   });
 });
+
+describe('savepoint() (#723)', () => {
+  const failed = new Error('the unit of work failed');
+  /** Writes a note in a savepoint, then rejects with `failed`; resolves once the savepoint has rejected. */
+  const writeThenFail = (c: db.TxnClientForSerializable, note: string) =>
+    db.savepoint(c, async sp => { await write(sp, note); throw failed; }).catch((err: unknown) => { expect(err).toBe(failed); });
+
+  it('keeps the rows of a callback that resolves, undoes those of one that rejects, and the outer transaction commits', async () => {
+    const result = await db.serializable(t.pool, async c => {
+      await write(c, 'a outer');
+      const kept = await db.savepoint(c, async sp => { await write(sp, 'b kept'); return 'kept'; });
+      await writeThenFail(c, 'c undone');
+      await write(c, 'd outer');
+      return kept;
+    });
+    expect(result).toBe('kept');
+    expect(await notes()).toEqual(['a outer', 'b kept', 'd outer']);
+  });
+
+  it('three levels nested: each failure undoes only its own level', async () => {
+    await db.serializable(t.pool, async c => {
+      await write(c, '1');
+      await db.savepoint(c, async level1 => {
+        await write(level1, '2');
+        await db.savepoint(level1, async level2 => {
+          await write(level2, '3');
+          await writeThenFail(level2, '4 undone');
+          await write(level2, '5');
+        });
+        await db.savepoint(level1, async level2 => {
+          await write(level2, '6 undone');
+          await db.savepoint(level2, level3 => write(level3, '7 undone'));
+          throw failed;
+        }).catch(() => undefined);
+        await write(level1, '8');
+      });
+      await db.savepoint(c, async level1 => {
+        await write(level1, '9 undone');
+        await db.savepoint(level1, level2 => write(level2, '9 undone too'));
+        throw failed;
+      }).catch(() => undefined);
+    });
+    expect(await notes()).toEqual(['1', '2', '3', '5', '8']);
+  });
+
+  it.each(['40001', '40P01'] as const)('inside serializable(), a %s raised in the savepoint retries the whole callback, only the last attempt committed', async code => {
+    const { messages, txnIds } = listen();
+    let attempts = 0, savepointRuns = 0;
+    const result = await db.serializable(t.pool, async c => {
+      attempts++;
+      await write(c, `outer ${attempts}`);
+      return db.savepoint(c, async sp => {
+        savepointRuns++;
+        await write(sp, `savepoint ${attempts}`);
+        if (attempts < 3) await raise(sp, code);
+        return attempts;
+      });
+    });
+    expect(result).toBe(3);
+    expect(savepointRuns).toBe(3);  // once per attempt
+    expect(await notes()).toEqual(['outer 3', 'savepoint 3']);
+    expect(messages).toEqual([
+      `Transaction rollback (code ${code}) on attempt 1 of 5, retrying in 0ms`,
+      'Retrying transaction, attempt 2 of 5',
+      `Transaction rollback (code ${code}) on attempt 2 of 5, retrying in 0ms`,
+      'Retrying transaction, attempt 3 of 5',
+    ]);
+    expect(txnIds.size).toBe(1);
+  });
+
+  it('a callback that swallows a query error: rejects with 25P02 after ROLLBACK TO, and the outer transaction commits its own rows', async () => {
+    const queries: string[] = [];
+    db.setConfig({ transactionRequiresCommit: true, queryListener: q => queries.push(q.text) });
+    const result = await db.serializable(t.pool, async c => {
+      await write(c, 'outer');
+      const err = await db.savepoint(c, async sp => {
+        await write(sp, 'undone');
+        await raise(sp, '23505').catch(() => undefined);
+        return 'swallowed';
+      }).catch((e: unknown) => e);
+      expect(db.isDatabaseError(err, 'InvalidTransactionState_InFailedSqlTransaction')).toBe(true);
+      await write(c, 'after');
+      return 'committed';
+    });
+    expect(result).toBe('committed');
+    expect(await notes()).toEqual(['after', 'outer']);
+    expect(queries.slice(2, 7)).toEqual([
+      'SAVEPOINT pgcast_savepoint', 'INSERT INTO "txn_probe" ("note") VALUES ($1)', expect.stringMatching(/^DO /),
+      'RELEASE SAVEPOINT pgcast_savepoint', 'ROLLBACK TO SAVEPOINT pgcast_savepoint',
+    ]);
+  });
+
+  it('a callback that swallows a 40001 loses the retry: the savepoint rejects with 25P02, which is not retried', async () => {
+    const { messages } = listen();
+    let attempts = 0;
+    const err = await db.serializable(t.pool, async c => {
+      attempts++;
+      await write(c, 'lost');
+      return db.savepoint(c, async sp => { await raise(sp, '40001').catch(() => undefined); });
+    }).catch((e: unknown) => e);
+    expect(db.isDatabaseError(err, 'InvalidTransactionState_InFailedSqlTransaction')).toBe(true);
+    expect(attempts).toBe(1);
+    expect(messages).toEqual([]);
+    expect(await notes()).toEqual([]);
+  });
+
+  it('outside a transaction block: rejects with 25P01, and never calls the callback', async () => {
+    const client = await t.pool.connect();
+    try {
+      const callback = vi.fn(async () => 'never');
+      const err = await db.savepoint(client, callback).catch((e: unknown) => e);
+      expect(db.isDatabaseError(err, 'InvalidTransactionState_NoActiveSqlTransaction')).toBe(true);
+      expect(callback).not.toHaveBeenCalled();
+    } finally {
+      client.release();
+    }
+  });
+
+  it('never retries on its own: in a raw BEGIN, a 40001 runs the callback once and leaves the transaction aborted', async () => {
+    const client = await t.pool.connect();
+    try {
+      await client.query('BEGIN');
+      let runs = 0;
+      const err = await db.savepoint(client, async sp => { runs++; await raise(sp, '40001'); }).catch((e: unknown) => e);
+      expect(db.isDatabaseError(err, 'TransactionRollback_SerializationFailure')).toBe(true);
+      expect(runs).toBe(1);
+      expect((await client.query('COMMIT')).command).toBe('ROLLBACK');  // a caught 40001 cannot commit
+    } finally {
+      client.release();
+    }
+  });
+
+  it('gives the callback the same client, its _zapatos and txnId unchanged, and its queries carry that txnId', async () => {
+    const seen: [string, number | undefined][] = [];
+    const messages: string[] = [];
+    db.setConfig({ queryListener: (q, txnId) => seen.push([q.text, txnId]), transactionListener: m => messages.push(m) });
+    await db.serializable(t.pool, async c => {
+      const mark = c._zapatos;
+      await db.savepoint(c, async sp => {
+        expect(sp).toBe(c);
+        expect(sp._zapatos).toBe(mark);
+        await write(sp, 'x');
+      });
+      expect(c._zapatos).toBe(mark);
+      expect(c._zapatos).toEqual({ isolationLevel: IsolationLevel.Serializable, txnId: seen[0][1] });
+    });
+    const txnId = seen[0][1];
+    expect(seen).toEqual([
+      'START TRANSACTION ISOLATION LEVEL SERIALIZABLE', 'SAVEPOINT pgcast_savepoint', 'INSERT INTO "txn_probe" ("note") VALUES ($1)',
+      'RELEASE SAVEPOINT pgcast_savepoint', 'COMMIT',
+    ].map(text => [text, txnId]));
+    expect(messages).toEqual([]);  // transactionListener gets nothing from a savepoint
+  });
+
+  it('a transaction() nested in the savepoint passes through', async () => {
+    const queries: string[] = [];
+    db.setConfig({ queryListener: q => queries.push(q.text) });
+    await db.serializable(t.pool, c => db.savepoint(c, sp => db.serializable(sp, async inner => {
+      expect(inner).toBe(c);
+      await write(inner, 'inner');
+    })));
+    expect(queries).toEqual([
+      'START TRANSACTION ISOLATION LEVEL SERIALIZABLE', 'SAVEPOINT pgcast_savepoint', 'INSERT INTO "txn_probe" ("note") VALUES ($1)',
+      'RELEASE SAVEPOINT pgcast_savepoint', 'COMMIT',
+    ]);
+    expect(await notes()).toEqual(['inner']);
+  });
+
+  it('with transactionRequiresCommit, an error caught around savepoint() commits the rest', async () => {
+    db.setConfig({ transactionRequiresCommit: true });
+    const result = await db.serializable(t.pool, async c => {
+      await write(c, 'kept');
+      await db.savepoint(c, async sp => { await write(sp, 'duplicate'); await raise(sp, '23505'); }).catch((err: unknown) => {
+        if (!db.isDatabaseError(err, 'IntegrityConstraintViolation_UniqueViolation')) throw err;
+      });
+      return 'committed';
+    });
+    expect(result).toBe('committed');
+    expect(await notes()).toEqual(['kept']);
+  });
+
+  it('limitation: a 40001 thrown from JavaScript, caught, leaves its savepoint established, so an outer one\'s ROLLBACK TO stops at it', async () => {
+    const notFromPostgres = Object.assign(new Error('not from Postgres'), { code: '40001' });
+    await db.serializable(t.pool, async c => {
+      await db.savepoint(c, async outer => {
+        await write(outer, 'survives');
+        await db.savepoint(outer, async () => { throw notFromPostgres; }).catch(() => undefined);
+        throw failed;
+      }).catch(() => undefined);
+    });
+    expect(await notes()).toEqual(['survives']);  // with the stack balanced, the outer ROLLBACK TO would undo it
+  });
+});

@@ -4,7 +4,8 @@
 // (R26). pg-native is not installed: pg.native is stubbed by vi.mock, for this
 // file only. Under Vitest, src imports pg's ESM entry, which has no `native`;
 // the stub adds it, own and enumerable, as pg 7 has it. Then a pool of another
-// driver (#696), which run time takes for a pool. No database.
+// driver (#696), which run time takes for a pool, and the SQL savepoint() sends
+// (#723). No database.
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as db from '../../src/db';
@@ -185,5 +186,120 @@ describe('transaction() on a pool that is not pg’s', () => {
       db.readCommitted(c as unknown as db.TxnClientForReadCommitted, async inner => { await db.sql`SELECT 1`.run(inner); return inner; }));
     expect(nested).toBe(pool.client);
     expect(pool.sent).toEqual(['connect()', 'START TRANSACTION ISOLATION LEVEL SERIALIZABLE', 'SELECT 1', 'COMMIT', 'release()']);
+  });
+
+  it('runs a savepoint on its client, with no cast: the same SQL, and release() once', async () => {
+    const pool = otherPool();
+    const result = await db.serializable(pool, c => db.savepoint(c, async sp => { expect(sp).toBe(c); await db.sql`SELECT 1`.run(sp); return 'done'; }));
+    expect(result).toBe('done');
+    expect(pool.sent).toEqual([
+      'connect()', 'START TRANSACTION ISOLATION LEVEL SERIALIZABLE', 'SAVEPOINT pgcast_savepoint', 'SELECT 1',
+      'RELEASE SAVEPOINT pgcast_savepoint', 'COMMIT', 'release()',
+    ]);
+  });
+
+  it('retries the whole callback on a 40001 raised in a savepoint, with no ROLLBACK TO, and releases the client once', async () => {
+    db.setConfig({ transactionRetryDelay: { minMs: 0, maxMs: 0 } });
+    let failures = 1;
+    const pool = otherPool(text => text === 'SELECT 1' && failures-- > 0 ? serializationFailure() : undefined);
+    expect(await db.serializable(pool, c => db.savepoint(c, async sp => { await db.sql`SELECT 1`.run(sp); return 'done'; }))).toBe('done');
+    expect(pool.sent).toEqual([
+      'connect()', 'START TRANSACTION ISOLATION LEVEL SERIALIZABLE', 'SAVEPOINT pgcast_savepoint', 'SELECT 1', 'ROLLBACK',
+      'START TRANSACTION ISOLATION LEVEL SERIALIZABLE', 'SAVEPOINT pgcast_savepoint', 'SELECT 1', 'RELEASE SAVEPOINT pgcast_savepoint',
+      'COMMIT', 'release()',
+    ]);
+  });
+});
+
+describe('savepoint() on a transaction client', () => {
+  const dbError = (code: string) => Object.assign(new Error(`simulated ${code}`), { code });
+
+  /** A transaction's client, marked, that logs each query as sent, and rejects one when `fail` returns an error. */
+  const txnClient = (fail: (text: string) => unknown = () => undefined) => {
+    const sent: { text: string; values: unknown[] }[] = [];
+    const mark = { isolationLevel: IsolationLevel.Serializable, txnId: 7 };
+    const client = {
+      _zapatos: mark,
+      query: async (q: { text: string; values: unknown[] }) => {
+        sent.push({ text: q.text, values: q.values });
+        const error = fail(q.text);
+        if (error) throw error;
+        return { rows: [], command: q.text.split(' ')[0] };
+      },
+      release: () => { sent.push({ text: 'release()', values: [] }); },
+    };
+    return { sent, client, mark };
+  };
+  const queries = (...texts: string[]) => texts.map(text => ({ text, values: [] }));
+  const [SP, RELEASE, ROLLBACK_TO] = ['SAVEPOINT pgcast_savepoint', 'RELEASE SAVEPOINT pgcast_savepoint', 'ROLLBACK TO SAVEPOINT pgcast_savepoint'];
+
+  it('sends SAVEPOINT, the callback\'s queries, then RELEASE, and resolves to what the callback resolves to', async () => {
+    const { sent, client, mark } = txnClient();
+    const result = await db.savepoint(client, async sp => {
+      expect(sp).toBe(client);
+      expect(sp._zapatos).toBe(mark);
+      await db.sql`SELECT 1`.run(sp);
+      return 'done';
+    });
+    expect(result).toBe('done');
+    expect(client._zapatos).toBe(mark);
+    expect(sent).toEqual(queries(SP, 'SELECT 1', RELEASE));
+  });
+
+  it('on a plain Error, sends ROLLBACK TO and RELEASE, then rejects with that error', async () => {
+    const { sent, client } = txnClient();
+    const error = new Error('boom');
+    await expect(db.savepoint(client, async () => { throw error; })).rejects.toBe(error);
+    expect(sent).toEqual(queries(SP, ROLLBACK_TO, RELEASE));
+  });
+
+  it('on a thrown null, sends ROLLBACK TO and RELEASE, then rejects with it', async () => {
+    const { sent, client } = txnClient();
+    await expect(db.savepoint(client, async () => { throw null; })).rejects.toBeNull();
+    expect(sent).toEqual(queries(SP, ROLLBACK_TO, RELEASE));
+  });
+
+  it.each(['40001', '40P01'])('on %s, rejects with it at once: no ROLLBACK TO, no RELEASE', async code => {
+    const error = dbError(code);
+    const { sent, client } = txnClient(text => text === 'SELECT 1' ? error : undefined);
+    await expect(db.savepoint(client, sp => db.sql`SELECT 1`.run(sp))).rejects.toBe(error);
+    expect(sent).toEqual(queries(SP, 'SELECT 1'));
+  });
+
+  it('when RELEASE rejects with 25P02 (a query error the callback caught), sends ROLLBACK TO and RELEASE, then rejects with that 25P02', async () => {
+    const aborted = dbError('25P02');
+    let releases = 0;
+    const { sent, client } = txnClient(text => {
+      if (text === 'SELECT 1/0') return dbError('22012');
+      if (text === RELEASE && releases++ === 0) return aborted;
+    });
+    await expect(db.savepoint(client, async sp => { await db.sql`SELECT 1/0`.run(sp).catch(() => undefined); return 'swallowed'; })).rejects.toBe(aborted);
+    expect(sent).toEqual(queries(SP, 'SELECT 1/0', RELEASE, ROLLBACK_TO, RELEASE));
+  });
+
+  it('nested two levels: the same SQL at each, the inner failure undone by its own ROLLBACK TO', async () => {
+    const { sent, client } = txnClient();
+    const result = await db.savepoint(client, async outer => {
+      await db.savepoint(outer, async () => { throw new Error('inner'); }).catch(() => undefined);
+      return db.savepoint(outer, async inner => { expect(inner).toBe(client); return 'done'; });
+    });
+    expect(result).toBe('done');
+    expect(sent).toEqual(queries(SP, SP, ROLLBACK_TO, RELEASE, SP, RELEASE, RELEASE));
+  });
+
+  it('nested two levels: a 40001 goes up through both, with no ROLLBACK TO', async () => {
+    const error = dbError('40001');
+    const { sent, client } = txnClient(text => text === 'SELECT 1' ? error : undefined);
+    await expect(db.savepoint(client, outer => db.savepoint(outer, inner => db.sql`SELECT 1`.run(inner)))).rejects.toBe(error);
+    expect(sent).toEqual(queries(SP, SP, 'SELECT 1'));
+  });
+
+  it('when SAVEPOINT rejects, rejects with its error, never calls the callback, and sends nothing more', async () => {
+    const noBlock = dbError('25P01');
+    const { sent, client } = txnClient(text => text === SP ? noBlock : undefined);
+    const callback = vi.fn(async () => 'never');
+    await expect(db.savepoint(client, callback)).rejects.toBe(noBlock);
+    expect(callback).not.toHaveBeenCalled();
+    expect(sent).toEqual(queries(SP));
   });
 });
