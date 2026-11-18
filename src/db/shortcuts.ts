@@ -1068,13 +1068,14 @@ export interface RowsQuery { readonly [rowsQuery]: true }
 // a single lateral passed through comes row by row as pg parses its column: a bigint or a numeric as a string, a date
 // as a Date. count(), sum(), avg(), and min() or max() unless typed by column, are typed number, as their own run()
 // gives them, through Number(), or nested, as JSON (#749): refused, with any fragment typed number, which the type
-// cannot tell from them. Nested under a lateral key, the value is JSON, and its type holds
-type RowsLateralOption<L> =
-  0 extends 1 & L ? unknown : [L] extends [ColumnAggregateFragment<any, any>] ? unknown :
-  [L] extends [SQLFragment<infer R, any>] ?
-    (0 extends 1 & R ? unknown : [Exclude<R, null | undefined>] extends [never] ? unknown :
-      [Exclude<R, null | undefined>] extends [number] ? { lateral?: never } : unknown) :
-  unknown;
+// cannot tell from them. Nested under a lateral key, the value is JSON, and its type holds. Each member of a union
+// is checked (cond ? count() : select()), and `true extends`, as TS 4.1 resolves `[…] extends [never]` wrongly here
+type RowsNumberMember<L> = L extends ColumnAggregateFragment<any, any> ? never :
+  L extends SQLFragment<infer R, any> ?
+    (0 extends 1 & R ? never : [Exclude<R, null | undefined>] extends [never] ? never :
+      [Exclude<R, null | undefined>] extends [number] ? true : never) :
+  never;
+type RowsLateralOption<L> = 0 extends 1 & L ? unknown : true extends RowsNumberMember<L> ? { lateral?: never } : unknown;
 
 export interface SelectRowsSignatures {
   <
