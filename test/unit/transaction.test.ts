@@ -3,7 +3,8 @@
 // How transaction() (src/db/transaction.ts) classes a pg.native client or pool
 // (R26). pg-native is not installed: pg.native is stubbed by vi.mock, for this
 // file only. Under Vitest, src imports pg's ESM entry, which has no `native`;
-// the stub adds it, own and enumerable, as pg 7 has it. No database.
+// the stub adds it, own and enumerable, as pg 7 has it. Then a pool of another
+// driver (#696), which run time takes for a pool. No database.
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as db from '../../src/db';
@@ -98,5 +99,91 @@ describe('transaction() on a client that cannot tell its transaction status', ()
     const client = Object.assign(new native.Client(), { getTransactionStatus: () => status });
     expect(await db.transaction(queryable(client), IsolationLevel.Serializable, async () => 'done')).toBe('done');
     expect(client.sent).toEqual(['START TRANSACTION ISOLATION LEVEL SERIALIZABLE', 'COMMIT']);
+  });
+});
+
+// #696: a pool of another driver, no pg class and no `_connected`, typed with no cast (db.PoolLike)
+describe('transaction() on a pool that is not pg’s', () => {
+  afterEach(() => {
+    db.setConfig({ transactionRetryDelay: { minMs: 25, maxMs: 250 }, transactionAttemptsMax: 5, transactionRequiresCommit: false });
+    vi.restoreAllMocks();
+  });
+
+  /** A pool whose client logs what it is sent, and rejects a query when `fail` returns an error. */
+  const otherPool = (fail: (text: string) => unknown = () => undefined, commitTag = 'COMMIT') => {
+    const sent: string[] = [];
+    const client = {
+      query: async (q: { text: string; values?: unknown[] }) => {
+        sent.push(q.text);
+        const error = fail(q.text);
+        if (error) throw error;
+        return { rows: [], command: q.text === 'COMMIT' ? commitTag : q.text.split(' ')[0] };
+      },
+      release: () => { sent.push('release()'); },
+    };
+    return { sent, client, connect: async () => { sent.push('connect()'); return client; } };
+  };
+  const serializationFailure = () => Object.assign(new Error('could not serialize access'), { code: '40001' });
+
+  it('checks out a client, marks it while the callback runs, commits, then releases it', async () => {
+    const pool = otherPool();
+    let given: unknown, mark: unknown;
+    const result = await db.serializable(pool, async c => { given = c; mark = { ...c._zapatos }; await db.sql`SELECT 1`.run(c); return 'done'; });
+    expect(result).toBe('done');
+    expect(given).toBe(pool.client);
+    expect(mark).toEqual({ isolationLevel: IsolationLevel.Serializable, txnId: expect.any(Number) });
+    expect(Object.prototype.hasOwnProperty.call(pool.client, '_zapatos')).toBe(false);
+    expect(pool.sent).toEqual(['connect()', 'START TRANSACTION ISOLATION LEVEL SERIALIZABLE', 'SELECT 1', 'COMMIT', 'release()']);
+  });
+
+  it('rolls back, releases the client, and rejects with the error of the callback', async () => {
+    const pool = otherPool();
+    await expect(db.transaction(pool, IsolationLevel.ReadCommitted, async () => { throw new Error('boom'); })).rejects.toThrow('boom');
+    expect(pool.sent).toEqual(['connect()', 'START TRANSACTION ISOLATION LEVEL READ COMMITTED', 'ROLLBACK', 'release()']);
+  });
+
+  it('retries on 40001 on the same client, then releases it once', async () => {
+    db.setConfig({ transactionRetryDelay: { minMs: 0, maxMs: 0 } });
+    let failures = 1;
+    const pool = otherPool(text => text === 'SELECT 1' && failures-- > 0 ? serializationFailure() : undefined);
+    expect(await db.serializable(pool, async c => { await db.sql`SELECT 1`.run(c); return 'done'; })).toBe('done');
+    expect(pool.sent).toEqual([
+      'connect()', 'START TRANSACTION ISOLATION LEVEL SERIALIZABLE', 'SELECT 1', 'ROLLBACK',
+      'START TRANSACTION ISOLATION LEVEL SERIALIZABLE', 'SELECT 1', 'COMMIT', 'release()',
+    ]);
+  });
+
+  it('gives up on 40001 after the last attempt, rejects with it, and releases the client once', async () => {
+    db.setConfig({ transactionRetryDelay: { minMs: 0, maxMs: 0 }, transactionAttemptsMax: 2 });
+    const pool = otherPool(text => text === 'SELECT 1' ? serializationFailure() : undefined);
+    await expect(db.serializable(pool, c => db.sql`SELECT 1`.run(c))).rejects.toMatchObject({ code: '40001' });
+    expect(pool.sent).toEqual([
+      'connect()', 'START TRANSACTION ISOLATION LEVEL SERIALIZABLE', 'SELECT 1', 'ROLLBACK',
+      'START TRANSACTION ISOLATION LEVEL SERIALIZABLE', 'SELECT 1', 'ROLLBACK', 'release()',
+    ]);
+  });
+
+  it('reads the command of its COMMIT: answered ROLLBACK, it warns PGCAST_DEP003, then releases the client', async () => {
+    const emitWarning = vi.spyOn(process, 'emitWarning').mockImplementation(() => undefined);
+    const pool = otherPool(undefined, 'ROLLBACK');
+    expect(await db.serializable(pool, async () => 'done')).toBe('done');
+    expect(emitWarning).toHaveBeenCalledWith(expect.stringMatching(/answered its COMMIT with ROLLBACK/), { type: 'DeprecationWarning', code: 'PGCAST_DEP003' });
+    expect(pool.sent).toEqual(['connect()', 'START TRANSACTION ISOLATION LEVEL SERIALIZABLE', 'COMMIT', 'release()']);
+  });
+
+  it('reads the command of its COMMIT: answered ROLLBACK, with transactionRequiresCommit, it rejects, then releases the client', async () => {
+    db.setConfig({ transactionRequiresCommit: true });
+    const pool = otherPool(undefined, 'ROLLBACK');
+    await expect(db.serializable(pool, async () => 'done')).rejects.toThrow(/^the transaction was rolled back, not committed/);
+    expect(pool.sent).toEqual(['connect()', 'START TRANSACTION ISOLATION LEVEL SERIALIZABLE', 'COMMIT', 'release()']);
+  });
+
+  // the types refuse another driver's client here (test/types/transaction.test-d.ts): run time passes it through
+  it('passes its client through to a nested call, which neither checks out another client nor commits', async () => {
+    const pool = otherPool();
+    const nested = await db.serializable(pool, c =>
+      db.readCommitted(c as unknown as db.TxnClientForReadCommitted, async inner => { await db.sql`SELECT 1`.run(inner); return inner; }));
+    expect(nested).toBe(pool.client);
+    expect(pool.sent).toEqual(['connect()', 'START TRANSACTION ISOLATION LEVEL SERIALIZABLE', 'SELECT 1', 'COMMIT', 'release()']);
   });
 });

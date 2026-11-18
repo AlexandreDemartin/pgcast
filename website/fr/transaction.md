@@ -1,5 +1,5 @@
 ---
-english: edb4865c5045
+english: e316c90f6f92
 ---
 
 # Transactions
@@ -23,9 +23,9 @@ db.transaction(txnClientOrQueryable, isolationLevel, callback)
 
 Exécute `callback` dans une transaction, puis la commite, la réessaie ou l’annule. Elle renvoie une promesse de la valeur en laquelle `callback` se résout.
 
-- `txnClientOrQueryable` : un `pg.Pool`, dont elle récupère un client, libéré à la fin ; un client, `pg.Client`, `pg.native.Client` ou un `pg.PoolClient` déjà récupéré, utilisé et laissé connecté ; ou le client d’une transaction déjà ouverte, [transmise](#passing-a-transaction-through).
+- `txnClientOrQueryable` : un `pg.Pool`, dont elle récupère un client, libéré à la fin ; un client, `pg.Client`, `pg.native.Client` ou un `pg.PoolClient` déjà récupéré, utilisé et laissé connecté ; le client d’une transaction déjà ouverte, [transmise](#passing-a-transaction-through) ; ou le [`PoolLike`](#PoolLike) d’un autre driver, utilisé comme un `pg.Pool` ([Le pool d’un autre driver](#another-drivers-pool)).
 - `isolationLevel` : un [`IsolationLevel`](#IsolationLevel).
-- `callback` : `async txnClient => …`, qui reçoit un [`TxnClient`](#TxnClient) de ce niveau. Les requêtes de la transaction sont celles lancées avec `.run(txnClient)` ; une requête lancée sur le pool, ou sur tout autre client, n’y est pas.
+- `callback` : `async txnClient => …`, qui reçoit un [`TxnClient`](#TxnClient) de ce niveau, ou, d’un `PoolLike`, un [`TxnClientLike`](#TxnClientLike). Les requêtes de la transaction sont celles lancées avec `.run(txnClient)` ; une requête lancée sur le pool, ou sur tout autre client, n’y est pas.
 
 `db.serializable(pool, callback)` équivaut à `db.transaction(pool, db.IsolationLevel.Serializable, callback)`. Deux clients réservent en même temps le siège F7 de la séance 1000 :
 
@@ -103,6 +103,32 @@ Une seule transaction, les deux sièges ou aucun : `START TRANSACTION ISOLATION
 - Une fonction dont le paramètre est d’un type `TxnClientFor…` est vérifiée : [`IsolationSatisfying`](#IsolationSatisfying).
 - Ce qui marque le client, c’est sa propre propriété `_zapatos` ([`TxnClient`](#TxnClient)).
 - Une transaction que vous avez ouverte vous-même, par un `BEGIN` brut, n’a pas de marque : elle n’est pas transmise ([Votre propre `BEGIN`](#your-own-begin)). Ouvrez la transaction extérieure avec `transaction()`.
+
+### Le pool d’un autre driver {#another-drivers-pool}
+
+À partir de la 6.12.0, `transaction()` et ses raccourcis acceptent aussi un [`PoolLike`](#PoolLike) : le pool de n’importe quel driver dont le `connect()` donne un client dont la `query()` prend l’objet de requête de `pg` et se résout en `{ rows, command }`, et qui a un `release()`. L’adaptateur d’un driver en donne un, un fake de test aussi. Aucun cast n’est nécessaire :
+
+<<< ../examples/plain/transaction_other_pool.ts{ts twoslash}
+
+Elle récupère un client du pool, y exécute la transaction, puis le libère, comme sur un `pg.Pool` :
+
+<!-- probe: db.serializable({ connect: async () => ({ query: async q => { await pool.query(q); return { rows: [], command: q.text }; }, release() {} }) }, async () => 0) -->
+```sql
+START TRANSACTION ISOLATION LEVEL SERIALIZABLE
+-- the callback's count()
+COMMIT
+```
+
+Le SQL de la requête du callback : [`count()`](/fr/select#count).
+
+- Le callback reçoit le client du pool, typé tel que le pool le donne, et marqué : un [`TxnClientLike`](#TxnClientLike) de ce niveau. `taken` est un `number`, comme sur un `pg.Pool`.
+- `command` est lu sur le `COMMIT`, auquel Postgres répond par `ROLLBACK` après une erreur de requête que le callback a interceptée ([Le SQL envoyé](#the-sql-it-sends)) : un pool dont le client ne donne pas de `command` ne compile pas. PGlite et postgres.js le donnent à l’exécution, mais le type de PGlite le rend optionnel, `command?: string` : un pool qui transmet le résultat de PGlite convertit donc `command` en `string`, comme le fera son adaptateur ([#698](https://github.com/AlexandreDemartin/pgcast/issues/698)).
+- Un retry ne lit que le `code` de l’erreur : les 40001 et 40P01 d’un autre driver sont donc réessayés aussi ([Retries](#retries)).
+- Donné à un appel imbriqué, le client du callback est transmis à l’exécution, mais le type n’accepte que celui de `pg` ([Transmettre une transaction](#passing-a-transaction-through)) : castez-le, `txnClient as unknown as db.TxnClientForReadCommitted`<!-- tsc: export const nested = db.serializable({ connect: async () => ({ query: async () => ({ rows: [], command: 'COMMIT' }), release() {} }) }, txnClient => db.readCommitted(…, async inner => inner)); -->. Une fois casté, il est typé comme un `pg.PoolClient`, ce qu’il n’est pas : n’y exécutez que des fragments, `.run(inner)` et les raccourcis. `inner.query('SELECT 1')`<!-- tsc: export const raw = db.serializable({ connect: async () => ({ query: async () => ({ rows: [], command: 'COMMIT' }), release() {} }) }, txnClient => db.readCommitted(txnClient as unknown as db.TxnClientForReadCommitted, async inner => …)); --> compile, mais le `query()` de l’autre driver n’accepte que l’objet de requête. Ne donnez jamais le pool à l’appel imbriqué : son client est une seconde transaction, et un pool d’une seule connexion, comme celui de PGlite, attend indéfiniment le `release()` de la première.
+- Un paramètre qui accepte un `pg.Pool` ou le pool d’un autre driver se type `db.PoolLike`, ce qu’est un `pg.Pool` : `(pool: db.PoolLike) => db.serializable(pool, async txnClient => txnClient)`<!-- tsc: export const inAnyPool = …; -->. Typé comme une union, `pg.Pool | typeof showPool`, il donne au callback le client de l’autre driver, alors que celui de `pg` est un `pg.PoolClient`.
+- Les appels de Zapatos 6.6.1 gardent leurs types, client du callback compris. Là où TypeScript lit le premier paramètre comme un type, c’est aussi un `PoolLike`, et deux chemins changent :
+  - `Parameters<typeof db.serializable>[0]`, ou le premier paramètre tel qu’un `infer` le lit : `.query('SELECT 1')` dessus donne TS2339 ;
+  - une fonction fléchée donnée là où `typeof db.serializable` est attendu, `async (_, callback) => callback(txnClient)`, donne TS2345, et une fonction typée avec les paramètres de Zapatos 6.6.1 donne TS2322.
 
 ### Votre propre `BEGIN` {#your-own-begin}
 
@@ -357,6 +383,32 @@ Le client que reçoit le callback d’une [`transaction()`](#transaction) : cel
 ### `TxnClientForSerializableRODeferrable` {#TxnClientForSerializableRODeferrable}
 
 `TxnClient<IsolationSatisfying<IsolationLevel.SerializableRODeferrable>>` : le client de [`serializableRODeferrable()`](#serializableRODeferrable) ; accepte aussi celui de `serializable()` et de `serializableRO()`.
+
+### `PoolLike` {#PoolLike}
+
+```ts
+type PoolClientLike = { query: (query: SQLQuery) => PromiseLike<{ rows: any[]; command: string }>; release: () => void }
+
+interface PoolLike<C = PoolClientLike> {
+  connect: () => PromiseLike<C extends PoolClientLike ? C : PoolClientLike>
+}
+```
+
+Le pool de n’importe quel driver, que [`transaction()`](#transaction) accepte comme un `pg.Pool`, à partir de la 6.12.0 ([Le pool d’un autre driver](#another-drivers-pool)).
+
+- La `query()` de son client est celle d’un [`QueryableLike`](/fr/sql-template#QueryableLike), dont le résultat a aussi `command`, le command tag : `COMMIT`, ou `ROLLBACK` quand Postgres a annulé la transaction. `release()` est appelé une fois la transaction terminée, sans argument.
+- `C` est le type de ce client, que reçoit le callback. `PoolClientLike` n’est pas exporté.
+- Un `pg.Pool` est un `PoolLike`.
+
+### `TxnClientLike` {#TxnClientLike}
+
+```ts
+type TxnClientLike<C, T extends IsolationLevel> = C & {
+  _zapatos?: { isolationLevel: T; txnId: number }
+}
+```
+
+Le client d’un [`PoolLike`](#PoolLike), `C`, tel que le reçoit le callback d’une [`transaction()`](#transaction) : marqué pendant que la transaction s’exécute, comme un [`TxnClient`](#TxnClient), `_zapatos` étant optionnel dans le type lui aussi. Un appel imbriqué ne l’accepte pas ([Le pool d’un autre driver](#another-drivers-pool)).
 
 ## `isDatabaseError()` {#isDatabaseError}
 
