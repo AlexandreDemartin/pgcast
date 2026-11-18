@@ -7,7 +7,7 @@ import postgres from 'postgres';
 import { afterEach, describe, expect, inject, it, vi } from 'vitest';
 import * as db from '../../../src/db';
 import { urlForDatabase } from '../../../test/helpers/databases';
-import { asPool } from '../src';
+import { asPool, type PostgresJsSql } from '../src';
 import { shape, usePostgresJs } from './helpers';
 
 const u = usePostgresJs(), config = db.getConfig();
@@ -155,6 +155,13 @@ describe('transactions', () => {
 });
 
 describe('asPool()', () => {
+  it('refuses a sql with no reserve(), a transaction\'s or a reserved connection\'s, which transaction() would take', async () => {
+    const refused = new Error('asPool() needs a postgres.js sql with reserve(), for transaction() to take a connection: give it the sql that postgres() returns, not a transaction\'s nor a reserved connection\'s');
+    await u.sql.begin(async tx => { expect(() => asPool(tx as unknown as PostgresJsSql)).toThrow(refused); });
+    const reserved = await u.sql.reserve();
+    try { expect(() => asPool(reserved as unknown as PostgresJsSql)).toThrow(refused); } finally { reserved.release(); }
+  });
+
   it('refuses a sql whose transform renames columns or rows, which Selectable would not name', () => {
     const url = urlForDatabase(inject('pgcastDb')!.url, u.t.name);
     for (const transform of [postgres.camel, { row: { from: (row: unknown) => row } }]) {

@@ -42,8 +42,11 @@ asPool(pgPool);
 // @ts-expect-error nor is a client with query() alone
 asPool({ query: async () => ({ rows: [] }) });
 void sql.begin(tx => {
-  // @ts-expect-error a postgres.js transaction has no reserve(), for transaction() to take a connection
-  asPool(tx);
+  // a transaction has no reserve() at run time, for transaction() to take a connection: refused where its typings say
+  // so (3.4.9 and later), and by asPool() at run time (pool.test.ts)
+  expectTypeOf<typeof tx extends Parameters<typeof asPool>[0] ? true : false>().toEqualTypeOf<'reserve' extends keyof typeof tx ? true : false>();
+  // @ts-expect-error nor a sql with no reserve()
+  asPool(tx as Omit<typeof tx, 'reserve'>);
 });
 const takesPgClient = (c: db.TxnClientForSerializable) => c;
 void db.serializable(pool, async c => {
