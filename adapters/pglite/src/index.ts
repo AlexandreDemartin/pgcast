@@ -26,9 +26,16 @@ export type PGliteQuery = { text: string; values: any[]; name?: string };
 /** What a query resolves to: the rows, as `pg` parses them, and the command tag, as `pg` gives it. */
 export type PGliteResult = { rows: any[]; command: string };
 
-/** What `asPool()` gives, which `run()` takes. */
+/** The PGlite's one connection, held by `connect()` until `release()`. */
+export interface PGliteClient {
+  query: (query: PGliteQuery) => Promise<PGliteResult>;
+  release: () => void;
+}
+
+/** What `asPool()` gives, which `run()` and `transaction()` take: a pool of one connection. */
 export interface PGlitePool {
   query: (query: PGliteQuery) => Promise<PGliteResult>;
+  connect: () => Promise<PGliteClient>;
 }
 
 /* === values, as pg writes them === */
@@ -186,18 +193,29 @@ function resultsOf(messages: Message[]) {
 
 /* === asPool === */
 
-// what the adapter keeps for each PGlite, whichever asPool() gave its pool: the statements prepared under a name
-const states = new WeakMap<PGliteLike, { prepared: Map<string, string> }>();
+// what the adapter keeps for each PGlite, whichever asPool() gave its pool: the statements prepared under a name,
+// and the end of the queue for its one connection
+type State = { prepared: Map<string, string>; tail: Promise<void> };
+const states = new WeakMap<PGliteLike, State>();
 
 function stateOf(pglite: PGliteLike) {
   let state = states.get(pglite);
-  if (!state) states.set(pglite, state = { prepared: new Map() });
+  if (!state) states.set(pglite, state = { prepared: new Map(), tail: Promise.resolve() });
   return state;
 }
 
+// the connection, once each holder before has released it: in turn, as a pg.Pool with max: 1 gives it
+function acquire(state: State) {
+  let release!: () => void;
+  const turn = state.tail;
+  state.tail = new Promise<void>(resolve => { release = resolve; });
+  return turn.then(() => release);
+}
+
 /**
- * Give pgcast's `run()` a `PGlite`, whose values are read and written as `pg` reads and writes them, with `pg`'s
- * parsers: each query goes to Postgres as `pg` sends it, through `execProtocol()`.
+ * Give pgcast's `run()` and `transaction()` a `PGlite`, whose values are read and written as `pg` reads and writes
+ * them, with `pg`'s parsers: each query goes to Postgres as `pg` sends it, through `execProtocol()`. The pool has
+ * the PGlite's one connection: `connect()` waits for the `release()` before, and a query on the pool waits too.
  * `.prepared(name)` prepares the query once on that PGlite, as `pg` does on a connection.
  * @param pglite The `PGlite`, or its `PGliteWorker`: the adapter never configures nor closes it
  */
@@ -236,5 +254,22 @@ export function asPool(pglite: PGliteLike): PGlitePool {
     return results.length === 1 ? results[0] : results as unknown as PGliteResult;
   };
 
-  return { query: run };
+  return {
+    query: async query => {
+      const release = await acquire(state);
+      try { return await run(query); } finally { release(); }
+    },
+    connect: async () => {
+      const release = await acquire(state);
+      let released = false;
+      return {
+        query: query => released ? Promise.reject(new Error('query() on a client after its release(): connect() again')) : run(query),
+        release: () => {
+          if (released) throw new Error('Release called on client which has already been released to the pool.');  // pg-pool's
+          released = true;
+          release();
+        },
+      };
+    },
+  };
 }
