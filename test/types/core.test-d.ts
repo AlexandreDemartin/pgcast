@@ -1002,7 +1002,7 @@ describe('QueryableLike: what run() takes (#695)', () => {
     void db.serializable(fake, async () => 1);
   });
 
-  test('Queryable, and what 6.6.1 code reads or assigns of run(), are unchanged', () => {
+  test('Queryable, and a function typed for it assigned to run, are unchanged; run\'s parameter read off it moves', () => {
     expectTypeOf<db.Queryable>().toEqualTypeOf<pg.ClientBase | pg.Pool>();
     expectTypeOf<keyof db.Queryable>().toEqualTypeOf<keyof (pg.ClientBase | pg.Pool)>();
     expectTypeOf<ReturnType<typeof q.run>>().toEqualTypeOf<Promise<number[]>>();
@@ -1011,12 +1011,14 @@ describe('QueryableLike: what run() takes (#695)', () => {
     q.run = async (queryable: db.Queryable) => { void queryable; return []; };
     const typed: typeof q.run = async (queryable: db.Queryable) => { void queryable; return []; };
     const contextual: typeof q.run = async queryable => { expectTypeOf(queryable).toEqualTypeOf<db.QueryableLike>(); return []; };
+    // @ts-expect-error a contextual arrow's parameter, Queryable in 6.6.1, is QueryableLike: pg's query(text) moves
+    const readsPg: typeof q.run = async queryable => { await queryable.query('SELECT 1'); return []; };
     class Traced<R> extends db.SQLFragment<R> {
       run = async (queryable: db.Queryable, force?: boolean): Promise<R> => { void queryable; void force; return undefined as unknown as R; };
     }
     expectTypeOf(new Traced<number>([], []).run(pgPool)).resolves.toEqualTypeOf<number>();
-    void typed; void contextual;
-    // the one type that moves: run()'s parameter, read off the value, was Queryable
+    void typed; void contextual; void readsPg;
+    // run()'s parameter, read off the value, was Queryable
     expectTypeOf<Parameters<typeof q.run>[0]>().toEqualTypeOf<db.QueryableLike>();
   });
 });
