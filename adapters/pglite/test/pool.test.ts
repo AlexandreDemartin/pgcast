@@ -97,6 +97,22 @@ describe('transactions', () => {
     expect(await db.select('orgs', { country: 'TX' }, { columns: ['code'] }).run(u.pool())).toEqual([{ code: 'kept' }]);
     await db.deletes('orgs', { country: 'TX' }).run(u.pool());
   });
+
+  it('read a cursor() in two batches, then send CLOSE on a break (#743)', async () => {
+    const texts: string[] = [];
+    db.setConfig({ queryListener: q => { texts.push(q.text.split(' ').slice(0, 2).join(' ')); } });
+    const { batches, open } = await db.readCommitted(u.pool(), async c => {
+      const read: unknown[] = [];
+      for await (const batch of db.cursor(c, db.sql<db.SQL, { g: number }[]>`SELECT g FROM generate_series(1, 5) AS g`, { batchSize: 2 })) {
+        read.push(batch);
+        if (read.length === 2) break;
+      }
+      return { batches: read, open: await db.sql`SELECT name FROM pg_cursors`.run(c) };
+    });
+    expect(batches).toEqual([[{ g: 1 }, { g: 2 }], [{ g: 3 }, { g: 4 }]]);
+    expect(open).toEqual([]);
+    expect(texts).toEqual(['START TRANSACTION', 'DECLARE pgcast_cursor_1', 'FETCH FORWARD', 'FETCH FORWARD', 'CLOSE pgcast_cursor_1', 'SELECT name', 'COMMIT']);
+  });
 });
 
 describe('the pool of one', () => {
