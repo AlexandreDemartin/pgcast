@@ -665,7 +665,10 @@ const films = await db.select('films', db.all).run(migrationClient);
 - Un driver qui ignore `name` exécute un fragment préparé sans le préparer.
 - Un `query()` qui ne prend que le texte, comme le `query(text, params)` de PGlite, ne compile pas, pas plus qu’un driver sans `query()`, comme postgres.js : chacun a besoin d’un adaptateur ([#697](https://github.com/AlexandreDemartin/pgcast/issues/697), [#698](https://github.com/AlexandreDemartin/pgcast/issues/698)).
 - [`transaction()`](/fr/transaction#transaction) ne prend toujours qu’un `Queryable` ou un `TxnClient` ([#696](https://github.com/AlexandreDemartin/pgcast/issues/696)).
-- `Queryable` ne change pas, et une fonction typée pour lui peut toujours être affectée à `run`. Seul le type du paramètre de `run()` lu sur la valeur, `Parameters<typeof fragment.run>[0]`, est `QueryableLike`.
+- `Queryable` ne change pas, pas plus que, dans un programme qui importe `zapatos/db`, une fonction typée pour lui affectée à `run`. Là où TypeScript infère ou lit le paramètre de `run`, il est `QueryableLike`, et un corps qui lit un membre de `pg` sur lui ne compile plus : `query('SELECT 1')` avec une chaîne (TS2345), `rowCount` (TS2339), le résultat de `query()` renvoyé comme la `Promise` de `run` (TS2739). Typer le paramètre `db.Queryable` garde le type de Zapatos 6.6.1. Les chemins :
+  - une fonction fléchée sans type affectée à `run`, `fragment.run = async queryable => …`, ou donnée comme valeur typée `typeof fragment.run`, comme littéral d’un `Pick<db.SQLFragment<…>, 'run'>` ou au `mockImplementation()` d’un espion ;
+  - un générique ou un `infer` qui lit le paramètre de `run`, `Parameters<typeof fragment.run>[0]` compris : `.connect()` dessus donne TS2339 ;
+  - une bibliothèque dont le `.d.ts` réexporte `run` y écrit `QueryableLike` : avec `strictFunctionTypes`, son consommateur ne peut plus affecter à ce `run` une fonction typée pour `Queryable` (TS2322).
 
 ## `SQL` {#SQL}
 
