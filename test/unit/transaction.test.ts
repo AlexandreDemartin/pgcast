@@ -949,6 +949,15 @@ describe('cursor()', () => {
     expect(sent.slice(1)).toEqual([fetch(2)]);
   });
 
+  it('takes no number when the fragment’s copy() throws', async () => {
+    const { sent, client } = cursorClient({ rows: rows(1) });
+    const query = sql<db.SQL, Row[]>`SELECT ${'id'} FROM ${'users'}`, failure = new Error('copy');
+    query.copy = () => { throw failure; };
+    await expect(db.cursor(client, query, { batchSize: 1 }).next()).rejects.toBe(failure);
+    await db.cursor(client, users, { batchSize: 1 }).next();
+    expect(sent.map(q => q.text.split(' ').slice(0, 2).join(' '))).toEqual(['DECLARE pgcast_cursor_1', 'FETCH FORWARD']);
+  });
+
   it('sends no CLOSE after a FETCH that rejects, rejects with its error unchanged, and frees the number', async () => {
     let fetches = 0;
     const failure = sqlError('22012');
