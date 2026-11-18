@@ -549,7 +549,7 @@ The text is not a stable API: a minor version may change it, as long as the resu
 fragment.runResultTransform: (qr: pg.QueryResult) => any  // default: qr => qr.rows
 ```
 
-Applied by `run()` to what `pg` returns. The shortcuts set their own (`selectOne()` takes the first row's `result`). Assign one to return something else; `RunResult` must then be the type it returns:
+Applied by `run()` to what `pg` returns. `qr` is typed `pg.QueryResult`, but a [`QueryableLike`](#QueryableLike) promises `rows` only: `rowCount`, `command` and `fields` are `pg`'s. The shortcuts set their own (`selectOne()` takes the first row's `result`). Assign one to return something else; `RunResult` must then be the type it returns:
 
 <CastPanel example="sql_run_result_transform">
 

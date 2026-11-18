@@ -445,7 +445,9 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
    * When calling `run`, this function is applied to the object returned by `pg`
    * to produce the result that is returned. By default, the `rows` array is
    * returned — i.e. `(qr) => qr.rows` — but some shortcut functions alter this
-   * in order to match their declared `RunResult` type.
+   * in order to match their declared `RunResult` type. On a `QueryableLike`, `qr`
+   * holds what its `query()` gives: `rows` only is promised, and `rowCount`,
+   * `command` and `fields` are `pg`'s.
    */
   runResultTransform: (qr: pg.QueryResult) => any = qr => qr.rows;
 

@@ -553,7 +553,7 @@ Le texte n’est pas une API stable : une version mineure peut le changer, tant
 fragment.runResultTransform: (qr: pg.QueryResult) => any  // default: qr => qr.rows
 ```
 
-Appliqué par `run()` à ce que renvoie `pg`. Les raccourcis fixent le leur (`selectOne()` prend le `result` de la première ligne). Affectez-en un pour renvoyer autre chose ; `RunResult` doit alors être le type qu’il renvoie :
+Appliqué par `run()` à ce que renvoie `pg`. `qr` est typé `pg.QueryResult`, mais un [`QueryableLike`](#QueryableLike) ne promet que `rows` : `rowCount`, `command` et `fields` sont ceux de `pg`. Les raccourcis fixent le leur (`selectOne()` prend le `result` de la première ligne). Affectez-en un pour renvoyer autre chose ; `RunResult` doit alors être le type qu’il renvoie :
 
 <CastPanel example="sql_run_result_transform">
 
