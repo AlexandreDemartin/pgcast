@@ -1,5 +1,5 @@
 ---
-english: f6c5d947a4e2
+english: c049e4ac1643
 ---
 
 # Générateur
@@ -726,17 +726,20 @@ Pourquoi les types ont cette forme, avec un `timestamptz` qui est un `Date` dans
 Chaque `schema.d.ts` déclare `zapatos/schema`, le seul module où `zapatos/db` prend ses tables : une compilation type donc une seule base. Pour deux, donnez à chacune son propre projet TypeScript, et typez à la main ce que l’un passe à l’autre. Ici, la base de la doc, `films`, à côté d’une petite base `box_office` qui a sa propre table `films`, dont l’`id` est un `text`, et une table `takings`.
 
 ```txt
-tsconfig.json          no files: a reference to each project
-tsconfig.base.json     your usual options
+tsconfig.json
+tsconfig.base.json
 films/
 ├── pgcastconfig.json
 ├── tsconfig.json
-└── src/               zapatos/ and the queries on films
+└── src/
 box_office/
 ├── pgcastconfig.json
 ├── tsconfig.json
-└── src/               zapatos/ and the queries on box_office
+└── src/
 ```
+
+- `tsconfig.json` n’a aucun fichier : une référence vers chaque projet. `tsconfig.base.json` contient vos options habituelles.
+- Chaque `src/` contient le dossier `zapatos/` de sa base et les requêtes sur cette base.
 
 ::: code-group
 
@@ -794,7 +797,7 @@ Une app qui relie les deux, ou un autre paquet d’un monorepo, lit les déclara
 
 Sans `skipLibCheck`, les erreurs dans les `.d.ts` du lecteur le signalent : TS2307 sur `zapatos/schema` sans schéma, TS2344 ou TS6200 avec un schéma. La solution est un type écrit en TypeScript ordinaire, jamais `s.films.JSONSelectable` :
 
-```ts [films/src/queries.ts]
+```ts twoslash [films/src/queries.ts]
 import * as db from 'zapatos/db';
 import type { Pool } from 'pg';
 
