@@ -145,6 +145,13 @@ Candidates for a check, a rule or a skill line.
 - #741 — `ALTER ROLE CURRENT_USER IN DATABASE <probe> SET …` gives a role-level case that goes away with the probe database's `DROP`, so the shared role is never touched — builder
 - #741 — When a fix splits a sentence in two, reread the second one's pronouns: "It keeps it … taken before it" gained a new antecedent — branch-reviewer
 - #741 — An orchestrator's Expected text that states a Postgres value carries the same "only when nothing else sets it" condition the review checks for: two rounds went to an Expected that lost it — branch-reviewer
+- #747 — The chrome-devtools screenshot tool refuses paths outside the workspace roots: save under the worktree's ignored `website/.vitepress/dist/`, then move it to scratch — builder
+- #747 — A French lede runs about 20 % longer than the English one: a new FR page often needs its own front-matter `description` for the 160-character limit — builder
+- #747 — On PGlite, `GRANT <role> TO …` fails with 42501 after `RESET SESSION AUTHORIZATION`, while Postgres 17.3 accepts it: probe membership claims on Postgres — builder
+- #747 — `pg`'s `Pool.query()` destroys its client when the query fails: a probe of what a reused connection reads keeps one client from `pool.connect()` — branch-reviewer
+- #747 — A row-level security rule about who bypasses a policy has three exemptions (superuser, owner without `FORCE`, `BYPASSRLS`); a positive sentence listing two is a data leak for its reader — branch-reviewer
+- #747 — A decision that cites a source by its exact wording (a French term) fetches that source and checks the quote — branch-reviewer
+- #747 — `docs:examples` has an `assert` stand-in, so a plain example can check its own result, on a visible line: `---cut-after---` would make the page and `llms.ts` disagree — builder
 
 ## Minors kept
 
@@ -166,3 +173,4 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #730 — defect: three DEFERRABLE and isolation-level integration tests timed out at 5 s with other suites on the server, and passed alone (a flaky timeout to watch) — builder
 - #742 — check:agents does not check that a SKILL.md's `reference.md § X` names an existing heading, that a linked reference.md exists, that a reference.md is still named by its SKILL.md, nor other .md files in a skill folder; the README line "the core names each section with when to read it" relies on it — branch-reviewer
 - #741 — `website/transaction.md:398` and `src/db/transaction.ts:543` "a savepoint taken before it": "taken before the setting", as the FR « pris avant ce réglage » — branch-reviewer
+
