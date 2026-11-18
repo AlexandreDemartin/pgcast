@@ -51,11 +51,12 @@ https://pgcast.dev/llms-full.txt
 - Prefer the shortcuts to hand-written SQL: `db.select()`, `db.selectOne()`,
   `db.count()` and the other aggregates, `db.insert()`, `db.upsert()`,
   `db.update()`, `db.deletes()`; filters from `db.conditions`; related rows
-  through `lateral`.
+  through `lateral`; CTEs before a shortcut with `db.withCTEs()`.
   https://pgcast.dev/select
   https://pgcast.dev/insert
   https://pgcast.dev/conditions
   https://pgcast.dev/lateral
+  https://pgcast.dev/raw-sql#put-a-cte-before-a-shortcut
 - Write what no shortcut covers in a `db.sql` template, typed with the table's
   names and its rows: `` db.sql<s.films.SQL, s.films.Selectable[]>`…` ``.
   https://pgcast.dev/raw-sql

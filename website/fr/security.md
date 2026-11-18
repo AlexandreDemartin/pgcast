@@ -1,5 +1,5 @@
 ---
-english: 021b3931b885
+english: 46d60f0a03ca
 ---
 
 # Sécurité
@@ -60,7 +60,7 @@ Certains morceaux de SQL ne sont ni une valeur ni un nom : `DESC`, `FOR UPDATE`
 
 Le type dit lesquels ; à l’exécution, pgcast vérifie de nouveau et lève une erreur avant toute requête, car un cast, un `any` ou un corps JSON peut lui passer n’importe quoi : un `lock` valant `{ for: 'UPDATE; DROP TABLE ratings; --' }` lève l’erreur "Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not '…'"<!-- message -->.
 
-Les valeurs qui n’ont pas de sens là où elles se trouvent sont refusées de la même façon : `db.Default`, `db.self` ou `db.raw()` comme valeur de filtre lève une erreur à la compilation, donc la promesse de `.run()` est rejetée avant que quoi que ce soit n’atteigne Postgres. Zapatos 6.6.1 les envoyait comme chaînes ou comme JSON : aucune ligne ne correspondait sur une colonne de texte, toutes sous `ne()` et `isNotIn()`, et les autres types échouaient.
+Les valeurs qui n’ont pas de sens là où elles se trouvent sont refusées de la même façon : `db.Default`, `db.self` ou `db.raw()` comme valeur de filtre lève une erreur à la compilation, donc la promesse de `.run()` est rejetée avant que quoi que ce soit n’atteigne Postgres. Zapatos 6.6.1 les envoyait comme chaînes ou comme JSON : aucune ligne ne correspondait sur une colonne de texte, toutes sous `ne()` et `isNotIn()`, et les autres types échouaient. À partir de la 6.11.0, `db.all` et `db.self` lèvent une erreur de la même façon comme valeur d’`insert()`, d’`upsert()` ou d’`update()`, et dans un `vals(…)` d’une requête que vous écrivez, là où Zapatos 6.6.1 les envoyait comme `'Symbol(all)'` et `'Symbol(self)'`.
 
 Une telle valeur est un bug du code appelant, et un bug ne devrait pas devenir une requête. Chacune de ces erreurs, avec ce qui la lève : [Erreurs que pgcast lève avant toute requête](/fr/transaction#errors-pgcast-throws-before-any-query). Les distinguer de celles de Postgres : [Erreurs](/fr/handle-errors#fix-the-errors-pgcast-throws).
 

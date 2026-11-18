@@ -1,5 +1,5 @@
 ---
-english: d48945cf2f45
+english: 415879ff07e7
 ---
 
 # Écritures
@@ -23,8 +23,9 @@ db.insert(table, values, options?)
 Insère une ligne ou plusieurs, et les renvoie telles que Postgres les a stockées, valeurs par défaut et serials remplis.
 
 - `table` : une table du schéma.
-- `values` : un `Insertable`, ou un tableau de ceux-ci, `readonly` ou non. Un fragment `sql` est écrit comme SQL (`` db.sql`now()` ``), `db.Default` comme `DEFAULT` ; une valeur `undefined` est `NULL` ([Une valeur `undefined`](#undefined-values)).
-  - Sur un tableau `readonly`, une ligne erronée, ou un autre argument erroné, donne sous TypeScript 7 « <span lang="en">The type '…' is 'readonly' and cannot be assigned to the mutable type '…'</span> » : l’erreur de la dernière surcharge, celle du tableau modifiable, que TypeScript 7 affiche seule. TypeScript 4.1 et 5.9 listent l’erreur de chaque surcharge, dont celle de la ligne.
+- `values` : un `Insertable`, ou un tableau de ceux-ci, `readonly` ou non (`readonly` à partir de la 6.11.0). Un fragment `sql` est écrit comme SQL (`` db.sql`now()` ``), `db.Default` comme `DEFAULT` ; une valeur `undefined` est `NULL` ([Une valeur `undefined`](#undefined-values)).
+  - Avec un tableau `readonly`, l’erreur d’une ligne erronée, ou d’un autre argument erroné, est, sous TypeScript 7, « <span lang="en">The type '…' is 'readonly' and cannot be assigned to the mutable type '…'</span> » : l’erreur de la dernière surcharge, celle du tableau modifiable, que TypeScript 7 affiche seule. TypeScript 4.1 et 5.9 listent l’erreur de chaque surcharge, dont celle de la ligne.
+  - À partir de la 6.11.0, le type refuse une chaîne ou un `String` comme ligne, ici et dans `upsert()` (2769), et une chaîne, un `String` ou un tableau comme valeurs d’`update()` (2345), même sur une table dont une colonne porte le nom d’un membre de `String`, d’un type auquel ce membre correspond (`length` un nombre), quel que soit le schéma.
   - `raw()`, `cols()` et `vals()` ne sont pas des valeurs ici : ils lèvent une erreur à la compilation, avant toute requête ([`raw()`](/fr/sql-template#raw) donne le message), et le type de pgcast les refuse, là où celui de Zapatos 6.6.1 les acceptait. Pour du SQL, écrivez un fragment `sql` ; dans un tableau ou un objet `jsonb`, ils font partie de la valeur, envoyée en JSON.
   - `db.parent()` lève "The 'parent' table alias has no meaning here"<!-- message --> : un `INSERT` n’a pas de requête parente. Le type le refuse.
   - À partir de la 6.10.0, un raccourci de lecture, `select()`, `selectOne()`, `selectExactlyOne()`, `count()`, `sum()`, `avg()`, `min()` ou `max()`, ou une `.copy()` de l’un d’eux, est une sous-requête : il est écrit entre parenthèses, `VALUES ($1, $2, (SELECT count(*) AS result FROM "ratings"))`<!-- probe: db.insert('ratings', { film_id: 1, stars: 5, votes: db.count('ratings', db.all) }) -->, dans `upsert()` et `update()` aussi. Il stocke ce qu’il donne comme valeur d’[`extras`](/fr/select#extras) : un agrégat sa valeur, les autres leur JSON, si bien que `selectOne()` avec `columns: ['title']` stocke `{"title": "The Salt Orchard"}` dans une colonne `text`. Sans aucune ligne, `select()` stocke `[]` et `count()` `0` ; `selectOne()`, `selectExactlyOne()`, `sum()`, `avg()`, `min()` et `max()` stockent `NULL`, et `selectExactlyOne()` ne lève pas d’erreur. Zapatos 6.6.1 l’écrivait sans parenthèses, ce que Postgres refusait (42601). Un raccourci d’écriture y est refusé avec ou sans parenthèses (42601) : Postgres ne l’exécute que dans un `WITH`.
@@ -175,7 +176,7 @@ db.upsert('ratings', { film_id: 1002, stars: 4 }, db.constraint('ratings_stars_k
 - Deux autres passent aussi la vérification de types, et Postgres les refuse : sur Postgres 18, une clé `WITHOUT OVERLAPS` avec `DO UPDATE`, que Postgres traite comme une contrainte d’exclusion (42809), et une contrainte dont l’index n’est pas encore valide, comme celle d’une table partitionnée, ajoutée avec `ALTER TABLE ONLY` : Postgres la refuse avec `doNothing` aussi, et par ses colonnes comme `conflictTarget` (42P10).
 - Générez avec [`uniqueIndexConstraintsOnly`](/fr/generator#generate.uniqueIndexConstraintsOnly) et aucun de ces noms ne compile : `UniqueIndex` ne liste alors que ce que Postgres accepte ici. Ce sera le comportement par défaut en 7.0.
 
-Le type ne vérifie pas qu’une contrainte appartient à la table de l’upsert, et Postgres refuse celle d’une autre table : 42704. `constraint()` ne prend les noms de la table qu’à l’intérieur de l’appel, comme ci-dessus. Gardé dans une variable, `const k = db.constraint('tags_pkey')` accepte le nom de n’importe quelle table, donc `db.upsert('ratings', …, k)` compile. Donnez la table, `db.constraint<'ratings'>('ratings_pkey')`, et le type vérifie le nom par rapport à elle :
+Le type ne vérifie pas qu’une contrainte appartient à la table de l’upsert, et Postgres refuse celle d’une autre table : 42704. `constraint()` ne prend les noms de la table qu’à l’intérieur de l’appel, comme ci-dessus. Contenu dans une variable, `const k = db.constraint('tags_pkey')` accepte le nom de n’importe quelle table, donc `db.upsert('ratings', …, k)` compile. Donnez la table, `db.constraint<'ratings'>('ratings_pkey')`, et le type vérifie le nom par rapport à elle :
 
 ```ts twoslash
 import * as db from 'zapatos/db';
