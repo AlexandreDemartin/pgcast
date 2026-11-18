@@ -72,7 +72,7 @@ When the Epic's last step is merged: a review of the whole merged range, then a 
 
 ## Releases
 
-Each release goes in this order; the tag and the deployment stay the owner's (`AGENTS.md` § Stop points).
+The core's release, `@pgcast/pgcast`, goes in this order; an extension's, below. The tag and the deployment stay the owner's (`AGENTS.md` § Stop points).
 
 1. **The pre-release pass**, before every publication:
    - a range review of every PR merged since the last pass;
@@ -85,11 +85,21 @@ Each release goes in this order; the tag and the deployment stay the owner's (`A
 4. **The session** checks the registry (version, `latest`, provenance), closes the milestone, and lists the existing advisories before publishing one, so none is published twice.
 
 - The tag starts [release.yml](../.github/workflows/release.yml): it checks that the tag names `package.json`'s version on a commit of master, then publishes with npm trusted publishing (OIDC, no token) and a provenance attestation.
-- Publishing stays the owner's act: the tag only queues a deployment to the GitHub environment `npm`, which waits for the owner's approval before the job runs. An agent never pushes a `v*` tag (`AGENTS.md` § Stop points).
+- Publishing stays the owner's act: the tag only queues a deployment to the GitHub environment `npm`, which waits for the owner's approval before the job runs. An agent never pushes a tag, `v*` or an extension's (`AGENTS.md` § Stop points).
 - Once, in this order, the owner's settings:
   1. On GitHub, Settings › Environments › `npm`: Required reviewers, the owner; Deployment branches and tags, the tags `v*` only.
   2. On npmjs.com, package settings › Trusted publishing: repository `AlexandreDemartin/pgcast`, workflow `release.yml`, environment `npm`. Then Publishing access › "Require two-factor authentication and disallow tokens", and revoke the token of `~/.npmrc`.
 - Until both are set, the job fails at `npm publish` without publishing anything; with the npm side alone, a tag would publish with no approval.
+
+### An extension
+
+Each extension under `@pgcast/*` (`adapters/<driver>/`, later `tools/<name>/`) is released apart from the core, under its own version (decision [013](decisions/013-package-model.md)).
+
+- **Its tag**: `@pgcast/<name>@<version>`, on its version commit, `@pgcast/adapter-postgres-js@0.1.0`; the core keeps `v<version>`.
+- **Before it**: the pre-release pass of step 1, on its range and its `npm pack`.
+- **Its version PR**: `version` in its `package.json` and both root entries of its `package-lock.json`; its own `CHANGELOG.md`, as the core's above.
+- **The core's `CHANGELOG.md`**: one line, at its first publication, linking to its changelog.
+- **Until #718** teaches `release.yml` its tag, the owner publishes it by hand, with the commands of its README § Publishing, then pushes its tag.
 
 ## Later
 

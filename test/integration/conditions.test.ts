@@ -352,6 +352,117 @@ describe('eqAny: one array parameter', () => {
   });
 });
 
+describe('likeAny and ilikeAny: the patterns in one array parameter', () => {
+  // users: 1 Ada (Ada@Example.com), 2 Bob (bob@example.com), 3 Cyd (cyd@example.com); email is a domain over
+  // ext.citext, whose schema is off the search_path
+  const { likeAny, ilikeAny, like, not } = dc;
+  const nul = null as unknown as string;
+  const cases: [string, db.SQL, number[]][] = [
+    ['likeAny', { display_name: likeAny(['A%', '%d']) }, [1, 3]],
+    ['likeAny is case-sensitive', { display_name: likeAny(['a%', 'b%']) }, []],
+    ['ilikeAny ignores case', { display_name: ilikeAny(['a%', 'b%']) }, [1, 2]],
+    ['_ is one character', { display_name: likeAny(['_o_']) }, [2]],
+    ['the empty array matches no row', { display_name: ilikeAny([]) }, []],
+    ['under not(), the empty array matches every row', { display_name: not(ilikeAny([])) }, [1, 2, 3]],
+    ['under not(), the rows no pattern matches', { display_name: not(ilikeAny(['a%', 'b%'])) }, [3]],
+    ['a null item beside a pattern that matches', { display_name: ilikeAny(['a%', nul]) }, [1]],
+    ['under not(), a null item matches no row', { display_name: not(ilikeAny(['a%', nul])) }, []],
+    ['a domain over citext, off the search_path: likeAny is case-sensitive', { email: likeAny(['ada@%']) }, []],
+    ['a domain over citext, off the search_path: ilikeAny', { email: ilikeAny(['ADA@%', 'CYD@%']) }, [1, 3]],
+  ];
+
+  it.each(cases)('%s', async (_name, where, expected) => {
+    expect(await ids('users', where)).toEqual(expected);
+  });
+
+  it('the empty array gives false, on a NULL column too; a null item gives NULL, where no pattern matches', async () => {
+    const { id } = await db.insert('extra.type_zoo', { c_text: null }, { returning: ['id'] }).run(t.client);
+    const value = async (table: string, key: string, where: db.SQL, condition: db.SQL) =>
+      (await sql<db.SQL, { r: boolean | null }[]>`SELECT ${{ [key]: condition }} AS r FROM ${table} WHERE ${where}`.run(t.client))[0]!.r;
+    expect({
+      emptyOnNull: await value('extra.type_zoo', 'c_text', { id }, ilikeAny([])),
+      emptyOnNullLike: await value('extra.type_zoo', 'c_text', { id }, likeAny([])),
+      patternOnNull: await value('extra.type_zoo', 'c_text', { id }, ilikeAny(['%'])),
+      empty: await value('users', 'display_name', { id: 1 }, ilikeAny([])),
+      nullItem: await value('users', 'display_name', { id: 1 }, ilikeAny([nul])),
+      nullItemBesideAMatch: await value('users', 'display_name', { id: 1 }, ilikeAny(['a%', nul])),
+      nullItemBesideAMiss: await value('users', 'display_name', { id: 1 }, ilikeAny(['b%', nul])),
+    }).toEqual({
+      emptyOnNull: false, emptyOnNullLike: false, patternOnNull: null, empty: false,
+      nullItem: null, nullItemBesideAMatch: true, nullItemBesideAMiss: null,
+    });
+  });
+
+  it('not(ilikeAny(xs)) is NOT ILIKE ALL, and not(likeAny(xs)) NOT LIKE ALL, NULLs included', async () => {
+    const inserted = (await db.insert('extra.type_zoo', [{ c_text: 'Ada' }, { c_text: 'bob' }, { c_text: null }], { returning: ['id'] })
+      .run(t.client)).map(r => r.id);
+    const lists = [[], ['a%'], ['A%'], ['a%', 'x%'], [nul], ['b%', nul], ['%']];
+    for (const xs of lists) {
+      const rows = await sql<db.SQL, { a: boolean | null, b: boolean | null, c: boolean | null, d: boolean | null }[]>`
+        SELECT ${{ c_text: not(ilikeAny(xs)) }} AS a, ${'c_text'} NOT ILIKE ALL(${param(xs)}) AS b,
+          ${{ c_text: not(likeAny(xs)) }} AS c, ${'c_text'} NOT LIKE ALL(${param(xs)}) AS d
+        FROM ${'extra.type_zoo'} WHERE ${{ id: dc.isIn(inserted) }} ORDER BY ${'id'}`.run(t.client);
+      expect(rows.length).toBe(3);
+      for (const { a, b, c, d } of rows) expect([a, c]).toEqual([b, d]);
+    }
+  });
+
+  it('wildcards are the caller\'s to escape, as in like(): a \\ before % or _ matches it as itself', async () => {
+    const { id } = await db.insert('extra.type_zoo', { c_text: '100%' }, { returning: ['id'] }).run(t.client);
+    const other = await db.insert('extra.type_zoo', { c_text: '100 films' }, { returning: ['id'] }).run(t.client);
+    const both = dc.isIn([id, other.id]);
+    expect({
+      wildcard: await ids('extra.type_zoo', dc.and({ id: both }, { c_text: likeAny(['100%']) })),
+      escaped: await ids('extra.type_zoo', dc.and({ id: both }, { c_text: likeAny(['100\\%']) })),
+      escapedLike: await ids('extra.type_zoo', dc.and({ id: both }, { c_text: like('100\\%') })),
+    }).toEqual({ wildcard: [id, other.id], escaped: [id], escapedLike: [id] });
+  });
+
+  it('a domain over citext: case-insensitive once its schema is on the search_path, as like()', async () => {
+    const off = { likeAny: await ids('users', { email: likeAny(['ada@%']) }), like: await ids('users', { email: like('ada@%') }) };
+    await t.client.query('SET LOCAL search_path = public, ext');
+    const on = { likeAny: await ids('users', { email: likeAny(['ada@%']) }), like: await ids('users', { email: like('ada@%') }) };
+    expect({ off, on }).toEqual({ off: { likeAny: [], like: [] }, on: { likeAny: [1], like: [1] } });
+  });
+
+  it('varchar, char and citext columns, as like() and ilike()', async () => {
+    const { id } = await db.insert('extra.type_zoo', { c_varchar: 'Ada', c_char: 'Ada', c_citext: 'Ada' }, { returning: ['id'] }).run(t.client);
+    const outcomes: Record<string, [number[], number[]]> = {};
+    for (const column of ['c_varchar', 'c_char', 'c_citext'])
+      for (const pattern of ['Ada', 'a%', 'A_a'])
+        outcomes[`${column} ${pattern}`] = [
+          await ids('extra.type_zoo', { id, [column]: likeAny([pattern]) }), await ids('extra.type_zoo', { id, [column]: like(pattern) })];
+    for (const [name, [any, one]] of Object.entries(outcomes)) expect(any, name).toEqual(one);
+    expect(await ids('extra.type_zoo', { id, c_varchar: ilikeAny(['a%']), c_char: ilikeAny(['a%']), c_citext: ilikeAny(['a%']) })).toEqual([id]);
+  });
+
+  it('characterization: an enum column passes the type for a label, and Postgres refuses it, 42883, as like()', async () => {
+    expect({
+      likeAny: await pgError(t.client, () => ids('users', { mood: likeAny(['ok']) })),
+      like: await pgError(t.client, () => ids('users', { mood: like('ok') })),
+    }).toEqual({
+      likeAny: { code: '42883', message: 'operator does not exist: mood ~~ unknown' },
+      like: { code: '42883', message: 'operator does not exist: mood ~~ unknown' },
+    });
+  });
+
+  it('one prepared statement for any number of patterns', async () => {
+    const byName = (where: db.SQL) => sql`SELECT ${'id'} FROM ${'users'} WHERE ${where} ORDER BY ${'id'}`.prepared('pgcast_test_ilike_any');
+    expect((await byName({ display_name: ilikeAny(['a%']) }).run(t.client)).map(r => r.id)).toEqual([1]);
+    expect((await byName({ display_name: ilikeAny(['b%', 'c%', 'z%']) }).run(t.client)).map(r => r.id)).toEqual([2, 3]);
+  });
+
+  it('a list that is not an array, or an item that is no string, rejects before any query', async () => {
+    const query = vi.spyOn(t.client, 'query');
+    try {
+      await expect(ids('users', { display_name: ilikeAny(new Set(['a%']) as unknown as string[]) })).rejects.toThrow('`ilikeAny()` takes an array, not `Set`');
+      await expect(ids('users', { display_name: likeAny(['a%', db.param('b%') as unknown as string]) }))
+        .rejects.toThrow('`likeAny()` sends its array as one parameter, so each item is a pattern, a string, not `db.param()`');
+      expect(query).not.toHaveBeenCalled();
+    } finally { query.mockRestore(); }
+  });
+});
+
 describe('websearchToTsquery on a tsvector column', () => {
   // products.search is to_tsvector('simple', coalesce(title, '')): 1 'T-shirt small', 2 'T-shirt medium', 3 no title, ''
   const { websearchToTsquery: search, not } = dc;

@@ -133,6 +133,30 @@ With a `groupBy`, each lateral's result is in the row too, so group by it as wel
 - `GROUP BY "studio_id", "lateral_studio".result`<!-- probe: examples/lateral_result_group.ts -->: each studio once, with its name and its number of films.
 - `db.sql<s.films.SQL>` refuses `${'name'}`, a column of `studios`. An array of columns can't hold the fragment: [`groupBy`](/select#groupby-and-having) takes a column, an array of columns, or one fragment.
 
+## Name the row of a reusable lateral
+
+A lateral that several queries share goes in a function. Name the row it gives from that function's type, rather than with an interface written by hand, which you would keep in step with each change to the query:
+
+<CastPanel example="lateral_row_map">
+
+<<< ./examples/lateral_row_map.ts{ts twoslash}
+
+</CastPanel>
+
+- [`LateralResult`](/select#LateralResult) types each key of the map as its subquery's result: `cast` is an array of `{ character, billing }`.
+- `s.films.JSONSelectable` is the film's whole row, as `db.all` with no `columns` gives it. With `columns` or `extras`, name the query's whole row instead (below).
+
+A lateral generic in its columns gives a type per call. Call it, and name that call's result with [`RunResultForSQLFragment`](/sql-template#RunResultForSQLFragment):
+
+<<< ./examples/plain/lateral_row_generic.ts{ts twoslash}
+
+- `Mentor` is the mentor's `name` and `job`, or `null`: in a lateral, a `selectOne()` that finds no row gives `null`, where its own `.run()` gives `undefined`.
+- Named from `ReturnType<typeof mentorLateral>`, the row would hold every column of `crew`: there, `C` is its constraint, `s.crew.Column`.
+
+For the whole row of one query, its `columns`, `extras` and laterals together, take it from `.run()` (`Awaited` needs TypeScript 4.5):
+
+<<< ./examples/plain/lateral_row_whole.ts{ts twoslash}
+
 ## Check the parent column
 
 `db.parent()` takes a column of any table, so a join on the wrong column compiles. Postgres refuses a column the parent doesn't have: `db.parent('billing')` under `films` fails with 42703, "column films.billing does not exist". Give the parent's columns as a type argument, `db.parent<s.films.Column>('id')`, and the type checks the name against them:

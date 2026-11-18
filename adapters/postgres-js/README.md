@@ -105,11 +105,12 @@ The owner publishes it, apart from pgcast, under its own version:
 npm ci && npm run build   # at the repository root
 cd adapters/postgres-js
 npm ci && npm test && npm run test:types
-npm pack --dry-run        # dist/, README.md, LICENCE, package.json
+npm pack --dry-run        # dist/, README.md, CHANGELOG.md, LICENCE, package.json
 npm publish --access public
+git tag @pgcast/adapter-postgres-js@0.1.0 && git push origin @pgcast/adapter-postgres-js@0.1.0
 ```
 
-`prepack` builds `dist/`. The first publish of a scoped package needs `--access public`.
+`prepack` builds `dist/`. The first publish of a scoped package needs `--access public`. The tag names the published commit, as `v<version>` names pgcast's.
 
 ## Licence
 

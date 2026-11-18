@@ -46,8 +46,10 @@ export interface PGlitePool {
 // and the deprecation notice for an invalid Date, which is sent as pg sends it. Node's built-ins are left out too, so
 // that it runs in a page: util.types.isDate() is the getTime() check below, a Buffer an ArrayBuffer view, sent as its bytes.
 
-// a Date of any realm, whatever its Symbol.toStringTag: getTime() throws on anything else
-function isDate(v: unknown) {
+// a Date of any realm, whatever its Symbol.toStringTag: getTime() throws on anything else; an array or a plain object,
+// the values most sent, skip that throw
+function isDate(v: object) {
+  if (Array.isArray(v) || Object.getPrototypeOf(v) === Object.prototype) return false;
   try { Date.prototype.getTime.call(v); return true; } catch { return false; }
 }
 
@@ -260,7 +262,7 @@ export function asPool(pglite: PGliteLike): PGlitePool {
 
   const send = async (bytes: Uint8Array) => (await pglite.runExclusive(() => pglite.execProtocol(bytes))).messages;
 
-  // several statements give an array of results, as with pg; none, a PGlite closing as the query was sent (0.5.0, 0.5.5)
+  // several statements give an array of results, as with pg; none, a PGlite closed as the query waited
   const resultOf = (messages: Message[]) => {
     const results = resultsOf(messages);
     if (results.length === 0) throw new Error('PGlite gave no result: was it closed while the query waited?');

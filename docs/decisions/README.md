@@ -15,3 +15,4 @@ One note per ambiguous decision: context, options, proposed choice, then validat
 | [009](./009-functions.md) | Postgres functions: signatures, `fn()` and set-returning functions | accepted (2026-11-17), by delegation: not built in the core; `sql` documented |
 | [010](./010-aliases-and-with.md) | Table aliases and `withCTEs()`: qualified column names and CTEs before a shortcut | accepted (2026-11-17), by delegation: `withCTEs()` for CTEs; no alias helper, `sql`'s type argument documented |
 | [011](./011-several-databases.md) | Several databases: how a program types queries on more than one | accepted (2026-11-17), by delegation: not built in the core; one database per project, documented |
+| [013](./013-package-model.md) | The package model: one core, extensions under `@pgcast` | accepted (2026-11-18), by delegation |
