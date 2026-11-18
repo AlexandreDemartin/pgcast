@@ -276,37 +276,38 @@ A customer books three seats, skipping one already taken; the others are booked 
 
 <<< ./examples/plain/savepoint_seat.ts{ts twoslash}
 
-`booked` is `['K1', 'K3']`. Each seat sends, `…` a number of its own:
+`booked` is `['K1', 'K3']`. Each seat sends:
 
 <!-- probe: db.savepoint(pool, async () => {}).then(() => db.savepoint(pool, async () => { throw new Error(); })) -->
 ```sql
 -- K1 and K3
-SAVEPOINT pgcast_savepoint_…
+SAVEPOINT pgcast_savepoint_1
 -- the callback's insert()
-RELEASE SAVEPOINT pgcast_savepoint_…
+RELEASE SAVEPOINT pgcast_savepoint_1
 -- K2
-SAVEPOINT pgcast_savepoint_…
+SAVEPOINT pgcast_savepoint_1
 -- the callback's insert(), which Postgres refuses with 23505
-ROLLBACK TO SAVEPOINT pgcast_savepoint_…
-RELEASE SAVEPOINT pgcast_savepoint_…
+ROLLBACK TO SAVEPOINT pgcast_savepoint_1
+RELEASE SAVEPOINT pgcast_savepoint_1
 ```
 
 The SQL of the callback's query: [`insert()`](/insert#insert).
 
 | When | SQL |
 |---|---|
-| before the callback | `SAVEPOINT pgcast_savepoint_…`<!-- probe: db.savepoint(pool, async () => {}) --> |
-| the callback resolves | `RELEASE SAVEPOINT pgcast_savepoint_…`<!-- probe: db.savepoint(pool, async () => {}) --> |
-| the callback or that `RELEASE` rejects | `ROLLBACK TO SAVEPOINT pgcast_savepoint_…`<!-- probe: db.savepoint(pool, async () => { throw new Error(); }) -->, then `RELEASE SAVEPOINT pgcast_savepoint_…`<!-- probe: db.savepoint(pool, async () => { throw new Error(); }) -->, then it rejects with that error |
+| before the callback | `SAVEPOINT pgcast_savepoint_1`<!-- probe: db.savepoint(pool, async () => {}) --> |
+| the callback resolves | `RELEASE SAVEPOINT pgcast_savepoint_1`<!-- probe: db.savepoint(pool, async () => {}) --> |
+| the callback or that `RELEASE` rejects | `ROLLBACK TO SAVEPOINT pgcast_savepoint_1`<!-- probe: db.savepoint(pool, async () => { throw new Error(); }) -->, then `RELEASE SAVEPOINT pgcast_savepoint_1`<!-- probe: db.savepoint(pool, async () => { throw new Error(); }) -->, then it rejects with that error |
 | that `ROLLBACK TO` or that `RELEASE` rejects | nothing more: it rejects with its error, in place of the first, as `transaction()` does when its `ROLLBACK` rejects |
 | it rejects with 40001 or 40P01 | nothing more: it rejects with that error |
 
-- Each call names its savepoint `pgcast_savepoint_` and a number, one more on each call: the one part of the SQL that changes. `ROLLBACK TO` and `RELEASE` also end every savepoint established after their own, so savepoints nest: each failure undoes the work of its own level, inner levels included, whatever they left. Don't give a savepoint of yours such a name.
+- The name ends in the savepoint's depth: `pgcast_savepoint_1` directly in the transaction, `pgcast_savepoint_2` inside that, and so on, the same text on every call at a depth. `ROLLBACK TO` and `RELEASE` also end every savepoint established after their own, so savepoints nest: each failure undoes the work of its own level, inner levels included, whatever they left. Don't give a savepoint of yours such a name.
 - On 40001 or 40P01, the transaction stays aborted: its `COMMIT` cannot save half of it. `transaction()` rolls back and runs its whole callback again, the savepoint included ([Retries](#retries)). A savepoint never retries on its own: only a new transaction gets a new snapshot.
-- A callback that catches a query's error and returns: Postgres refuses the `RELEASE` (25P02), so `savepoint()` rolls back to the savepoint and rejects with that 25P02. Its work is undone, inner levels included, and the transaction can go on. So a 40001 or 40P01 the callback catches is not retried: the transaction's `COMMIT` saves what it wrote outside that savepoint. After a conflict of `SERIALIZABLE`, Postgres can refuse a later write with 40001 again. Let them out, and rethrow them around `savepoint()`, as the example does.
+- A callback that catches a query's error and returns: Postgres refuses the `RELEASE` (25P02), so `savepoint()` rolls back to the savepoint and rejects with that 25P02. Its work is undone, inner levels included, and the transaction can go on. So a 40001 or 40P01 the callback catches is not retried there. After a 40P01, or a 40001 of `REPEATABLE READ`, the transaction's `COMMIT` saves what it wrote outside that savepoint; after a 40001 of `SERIALIZABLE`, Postgres can refuse a later query or the `COMMIT` with 40001 again, and `transaction()` retries that one. Let them out, and rethrow them around `savepoint()`, as the example does.
 - The 40001 and 40P01 are read by their `code`, as [Retries](#retries) reads them. One thrown from JavaScript, then caught, gets no `ROLLBACK TO`: the work of its savepoint stays in, unless an outer level rolls back.
 - Outside a transaction block, Postgres refuses the `SAVEPOINT` (25P01): `savepoint()` rejects with it, and never calls the callback.
-- One at a time on a client: `await` each. Two at once interleave on its connection: the `ROLLBACK TO` or `RELEASE` of one ends the savepoint of the other, whose own then fails (3B001), and the transaction is aborted. Not checked.
+- One at a time on a client: `await` each. Two at once nest in the order they are called: the first, if it ends first, ends the second's savepoint, whose own `RELEASE` then fails (3B001), and the transaction is aborted; a `ROLLBACK TO` of the second also undoes what the first wrote after the second's `SAVEPOINT`. Not checked.
+- The depth is counted per client by each copy of pgcast installed: with two, such as two versions in `node_modules`, a savepoint of one inside the other's takes the same name, and an inner savepoint's 40001 caught by the outer callback then leaves the outer work in.
 - Its queries reach [`queryListener`](/runtime-config#Config.queryListener) and [`resultListener`](/runtime-config#Config.resultListener) with the transaction's id; [`transactionListener`](/runtime-config#Config.transactionListener) gets nothing from it.
 - A `transaction()` given the client of a `transaction()` callback is [passed through](#passing-a-transaction-through): it sends no `SAVEPOINT`. Given a `pg.PoolClient` you sent `BEGIN` on, it is not ([Your own `BEGIN`](#your-own-begin)).
 
