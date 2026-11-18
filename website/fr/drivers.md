@@ -10,7 +10,7 @@ Lancez les requêtes et les transactions de pgcast sur `pg`, sur postgres.js ou 
 
 ## pg {#pg}
 
-Ce qu’utilise le tutoriel, sans rien à ajouter : `.run()` prend un `pg.Pool` ou un client, et [`transaction()`](/fr/transaction#transaction) le pool.
+Ce qu’utilise le tutoriel, sans rien à ajouter : `.run()` prend un `pg.Pool` ou un client, et [`transaction()`](/fr/transaction#transaction) un pool ou un client.
 
 ```ts twoslash
 import * as db from 'zapatos/db';

@@ -9,7 +9,7 @@ Run pgcast's queries and transactions on `pg`, on postgres.js or PGlite through 
 
 ## pg
 
-What the tutorial uses, and nothing to add: `.run()` takes a `pg.Pool` or a client, and [`transaction()`](/transaction#transaction) the pool.
+What the tutorial uses, and nothing to add: `.run()` takes a `pg.Pool` or a client, and [`transaction()`](/transaction#transaction) a pool or a client.
 
 ```ts twoslash
 import * as db from 'zapatos/db';
