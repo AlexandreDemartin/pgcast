@@ -154,6 +154,31 @@ describe('prepared queries', () => {
   });
 });
 
+describe('COPY FROM STDIN', () => {
+  // a PGlite of its own, which the COPY would stop if left unanswered
+  const copied = async (query: { text: string; values: any[]; name?: string }) => {
+    const pglite = await PGlite.create(), pool = asPool(pglite);
+    try {
+      await pool.query({ text: 'CREATE TABLE copied (a int)', values: [] });
+      return [await pool.query(query).then(() => 'ran', (e: any) => e.code), (await pool.query({ text: 'SELECT count(*)::int AS n FROM copied', values: [] })).rows];
+    } finally { await pglite.close(); }
+  };
+
+  it('is refused with 57014, as pg refuses it with no stream to send, and the next query runs', async () => {
+    const query = { text: 'COPY copied FROM STDIN', values: [] }, pg = await u.t.pool.connect();
+    try {
+      await pg.query('CREATE TEMP TABLE copied (a int)');
+      expect(await copied(query)).toEqual([await pg.query(query).then(() => 'ran', (e: any) => e.code), (await pg.query('SELECT count(*)::int AS n FROM copied')).rows]);
+    } finally { pg.release(); }
+    expect(await copied(query)).toEqual(['57014', [{ n: 0 }]]);
+  });
+
+  // pg's own next query waits forever there: Postgres ignores its Sync during the COPY, and so waits for another
+  it('is refused with 57014 under a name, by the extended protocol, and the next query runs', async () => {
+    expect(await copied({ text: 'COPY copied FROM STDIN', values: [], name: 'copy_in' })).toEqual(['57014', [{ n: 0 }]]);
+  });
+});
+
 describe('errors', () => {
   it('are the DatabaseError PGlite reads, with the fields pg gives, and the next query runs', async () => {
     const duplicate = (q: db.QueryableLike) => db.insert('orgs', [{ country: 'DU', code: 'p', name: 'n' }, { country: 'DU', code: 'p', name: 'n' }]).run(q).catch(e => e);
