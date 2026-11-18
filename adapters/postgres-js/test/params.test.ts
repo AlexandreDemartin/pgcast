@@ -95,7 +95,7 @@ const cases: [string, string, unknown][] = [
 
 type Queryable = { query: (q: { text: string; values: any[]; name?: string }) => PromiseLike<{ rows: any[] }> };
 const written = async (q: Queryable, text: string, value: unknown, values: unknown[] = [value], name?: string) => {
-  try { return shape((await q.query({ text, values, name })).rows[0].t); }
+  try { return shape((await q.query({ text, values, ...name === undefined ? {} : { name } })).rows[0].t); }
   catch (e) { return refusal(e); }
 };
 
