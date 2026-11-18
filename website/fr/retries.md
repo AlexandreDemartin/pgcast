@@ -1,5 +1,5 @@
 ---
-english: d26cc5951b1b
+english: daf35566a7c4
 description: "Réservez des places sous SERIALIZABLE, pour que deux requêtes HTTP simultanées n’enfreignent pas une règle, et laissez pgcast relancer la transaction refusée."
 ---
 
@@ -99,15 +99,15 @@ Typé [`db.Queryable`](/fr/sql-template#Queryable), il accepterait ce client, et
 
 ## Mettre les requêtes en file avec un lock {#queue-the-requests-with-a-lock}
 
-Plutôt que d’entrer en conflit et de réessayer, les requêtes HTTP pour une même séance peuvent attendre leur tour. Prenez [`advisoryXactLock()`](/fr/transaction#advisoryXactLock) en premier dans le callback, dans [`readCommitted()`](/fr/transaction#readCommitted), où chaque requête lit ce qui a été commité avant elle :
+Plutôt que d’entrer en conflit et de réessayer, les requêtes HTTP pour une même séance peuvent attendre leur tour. Prenez [`advisoryXactLock()`](/fr/transaction#advisoryXactLock) en premier dans le callback, dans [`readCommitted()`](/fr/transaction#readCommitted), où chaque requête SQL lit ce qui a été commité avant elle :
 
 <<< ../examples/plain/retries_lock.ts{ts twoslash}
 
 L’onglet qui arrive en second attend à `SELECT pg_advisory_xact_lock($1, $2)`<!-- probe: db.readCommitted(pool, txnClient => db.advisoryXactLock(txnClient, [2, 1000])) --> jusqu’au `COMMIT` du premier, puis compte ses places et ne réserve rien : un onglet obtient ses lignes, l’autre `null`, sans 40001 ni retry. Postgres libère le lock à la fin de la transaction, au `ROLLBACK` de chaque tentative aussi, donc un retry n’en hérite jamais.
 
 - Chaque transaction qui écrit ce que compte la règle prend d’abord le lock, sinon la règle ne tient plus.
-- Gardez `readCommitted()`. Dans `serializable()`, l’instantané est pris avant l’attente : le second onglet reçoit quand même un 40001, et son retry voit les places ; dans `repeatableRead()`, il en réserve cinq.
-- Une clé est une paire de nombres, ou un `bigint` ; une clé tirée d’un texte, et pourquoi il n’y a pas de lock de session : [`advisoryXactLock()`](/fr/transaction#advisoryXactLock).
+- Gardez `readCommitted()`. Dans `serializable()`, l’instantané est pris avant l’attente : le second onglet reçoit quand même un 40001, et son retry voit les places ; dans `repeatableRead()`, il réserve aussi : cinq places en tout.
+- Une clé est une paire d’entiers de 32 bits, ou un `bigint` ; une clé tirée d’un texte, et pourquoi il n’y a pas de lock de session : [`advisoryXactLock()`](/fr/transaction#advisoryXactLock).
 
 ## Régler et suivre les retries {#tune-and-watch-the-retries}
 
@@ -136,7 +136,7 @@ Une transaction réessayée affiche alors chaque message, puis son événement, 
 - [`transactionAttemptsMax`](/fr/runtime-config#Config.transactionAttemptsMax) : le nombre total de tentatives. `1` désactive les retries.
 - [`transactionRetryDelay`](/fr/runtime-config#Config.transactionRetryDelay) : l’attente avant chaque retry. Le client n’est pas libéré pendant qu’il attend.
 - [`transactionListener`](/fr/runtime-config#Config.transactionListener) : chaque message qu’il reçoit figure dans [Retries](/fr/transaction#retries).
-- [`transactionEventListener`](/fr/runtime-config#Config.transactionEventListener) : la même chose, sous forme de `TransactionEvent`, pour qu’un log ou une métrique lise le type, le code et la tentative dans des champs.
+- [`transactionEventListener`](/fr/runtime-config#Config.transactionEventListener) : la même chose, sous forme de [`TransactionEvent`](/fr/runtime-config#TransactionEvent), pour qu’un log ou une métrique lise le type, le code et la tentative dans des champs.
 
 ## Tester un retry {#test-a-retry}
 

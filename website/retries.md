@@ -105,8 +105,8 @@ Rather than conflict and retry, the requests for one screening can wait in turn.
 The tab that comes second waits at `SELECT pg_advisory_xact_lock($1, $2)`<!-- probe: db.readCommitted(pool, txnClient => db.advisoryXactLock(txnClient, [2, 1000])) --> until the first one's `COMMIT`, then counts its seats and books nothing: one tab gets its rows, the other `null`, with no 40001 and no retry. Postgres releases the lock when the transaction ends, at each attempt's `ROLLBACK` too, so a retry never inherits it.
 
 - Every transaction that writes what the rule counts takes the lock first, or the rule no longer holds.
-- Keep `readCommitted()`. In `serializable()`, the snapshot is taken before the wait: the second tab still gets 40001, and its retry sees the seats; in `repeatableRead()`, it books five.
-- A key is a pair of numbers, or a `bigint`; a key from a text, and why there is no session lock: [`advisoryXactLock()`](/transaction#advisoryXactLock).
+- Keep `readCommitted()`. In `serializable()`, the snapshot is taken before the wait: the second tab still gets 40001, and its retry sees the seats; in `repeatableRead()`, it books too: five seats in all.
+- A key is a pair of 32-bit integers, or a `bigint`; a key from a text, and why there is no session lock: [`advisoryXactLock()`](/transaction#advisoryXactLock).
 
 ## Tune and watch the retries
 
@@ -135,7 +135,7 @@ A retried transaction then logs each message, then its event, with the same numb
 - [`transactionAttemptsMax`](/runtime-config#Config.transactionAttemptsMax): the attempts in all. `1` turns the retries off.
 - [`transactionRetryDelay`](/runtime-config#Config.transactionRetryDelay): the wait before each retry. The client stays checked out of the pool while it waits.
 - [`transactionListener`](/runtime-config#Config.transactionListener): every message it gets is in [Retries](/transaction#retries).
-- [`transactionEventListener`](/runtime-config#Config.transactionEventListener): the same, as a `TransactionEvent`, so a log or a metric reads the kind, the code and the attempt as fields.
+- [`transactionEventListener`](/runtime-config#Config.transactionEventListener): the same, as a [`TransactionEvent`](/runtime-config#TransactionEvent), so a log or a metric reads the kind, the code and the attempt as fields.
 
 ## Test a retry
 
