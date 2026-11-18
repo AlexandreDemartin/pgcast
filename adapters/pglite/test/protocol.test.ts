@@ -142,6 +142,15 @@ describe('the PGlite', () => {
     await expect(pool.query({ text: 'SELECT 1', values: [] })).rejects.toThrow('PGlite is closed');
   });
 
+  it('is shared with its own queries, run at the same moment, which never land between the adapter\'s messages', async () => {
+    const own = Array.from({ length: 20 }, (_, i) => u.pglite().query<{ n: number }>('SELECT $1::int AS n', [i]).then(r => r.rows[0].n));
+    const adapter = Array.from({ length: 20 }, (_, i) => i % 2 ?
+      u.pool().query({ text: 'SELECT $1::int AS n', values: [i] }).then(r => r.rows[0].n) :
+      u.pool().query({ text: `SELECT ${i} AS n`, values: [] }).then(r => r.rows[0].n));
+    const indices = Array.from({ length: 20 }, (_, i) => i);
+    expect(await Promise.all([...own, ...adapter])).toEqual([...indices, ...indices]);
+  });
+
   it('is never closed nor configured by the adapter', async () => {
     const pglite = await PGlite.create();
     try {
