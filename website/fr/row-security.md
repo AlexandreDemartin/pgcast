@@ -1,5 +1,5 @@
 ---
-english: 9c284ed57311
+english: 9a7a61b5a0ad
 description: "Ne montrez à chaque client que ses propres réservations : une politique de sécurité niveau ligne lit un réglage, que setLocal() définit pour une transaction."
 ---
 
@@ -41,10 +41,10 @@ Les valeurs sont `['role', 'cinema_customer', 'app.customer', 'Ada Quill']`, cha
 
 ## Pourquoi le rôle {#why-the-role}
 
-Une politique ne s’applique jamais à un superutilisateur, même avec `FORCE ROW LEVEL SECURITY`, ni au propriétaire de la table sans cette option. La doc se connecte en superutilisateur, comme le fait l’insert ci-dessus, donc l’exemple définit aussi `role` : le reste de la transaction s’exécute en tant que `cinema_customer`, auquel la politique s’applique. Au `COMMIT`, le rôle redevient celui de la session.
+Une politique ne s’applique jamais à un superutilisateur ni à un rôle doté de `BYPASSRLS`, même avec `FORCE ROW LEVEL SECURITY`, ni au propriétaire de la table sans cette option. La doc se connecte en superutilisateur, comme le fait l’insert ci-dessus, donc l’exemple définit aussi `role` : le reste de la transaction s’exécute en tant que `cinema_customer`, auquel la politique s’applique. Au `COMMIT`, le rôle redevient celui de la session.
 
 - Un rôle qui n’est pas superutilisateur ne peut définir `role` que sur un rôle dont il est membre : `GRANT cinema_customer TO <your app's role>`, sinon 42501.
-- Une application qui se connecte avec un rôle qui n’est ni propriétaire de la table ni superutilisateur y est déjà soumise, et n’a besoin que d’`app.customer`.
+- Une app qui se connecte avec un rôle qui n’est ni propriétaire de la table, ni superutilisateur, ni doté de `BYPASSRLS` y est déjà soumise, et n’a besoin que d’`app.customer`.
 
 ## Pourquoi une seule transaction {#why-one-transaction}
 

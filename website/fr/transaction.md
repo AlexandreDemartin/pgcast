@@ -1,5 +1,5 @@
 ---
-english: d411de911bf7
+english: bb9fe8a087b2
 ---
 
 # Transactions
@@ -382,7 +382,7 @@ Avec une politique à vous sur `seat_bookings`, `USING (customer = current_setti
 
 <<< ../examples/plain/set_local_customer.ts{ts twoslash}
 
-Le rôle avec lequel votre app se connecte ne doit pas être propriétaire de la table, sinon la politique demande `FORCE ROW LEVEL SECURITY` ; un superutilisateur n’y est jamais soumis. Définir aussi `role`, `{ role: 'cinema_customer', 'app.customer': customer }`, exécute le reste de la transaction sous ce rôle, comme le ferait `SET LOCAL ROLE`. Elle envoie :
+Le rôle avec lequel votre app se connecte ne doit pas être propriétaire de la table, sinon la politique demande `FORCE ROW LEVEL SECURITY` ; un superutilisateur ou un rôle doté de `BYPASSRLS` n’y est jamais soumis. Définir aussi `role`, `{ role: 'cinema_customer', 'app.customer': customer }`, exécute le reste de la transaction sous ce rôle, comme le ferait `SET LOCAL ROLE`. Elle envoie :
 
 <!-- probe: db.readCommitted(pool, txnClient => db.setLocal(txnClient, { 'app.customer': 'Ada Quill' })) -->
 ```sql

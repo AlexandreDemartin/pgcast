@@ -378,7 +378,7 @@ Given a policy of yours on `seat_bookings`, `USING (customer = current_setting('
 
 <<< ./examples/plain/set_local_customer.ts{ts twoslash}
 
-The role your app connects with must not own the table, or the policy needs `FORCE ROW LEVEL SECURITY`; a superuser is never bound. Setting `role` too, `{ role: 'cinema_customer', 'app.customer': customer }`, runs the rest of the transaction as that role, as `SET LOCAL ROLE` would. It sends:
+The role your app connects with must not own the table, or the policy needs `FORCE ROW LEVEL SECURITY`; a superuser or a role with `BYPASSRLS` is never bound. Setting `role` too, `{ role: 'cinema_customer', 'app.customer': customer }`, runs the rest of the transaction as that role, as `SET LOCAL ROLE` would. It sends:
 
 <!-- probe: db.readCommitted(pool, txnClient => db.setLocal(txnClient, { 'app.customer': 'Ada Quill' })) -->
 ```sql

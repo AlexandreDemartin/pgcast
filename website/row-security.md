@@ -36,10 +36,10 @@ The values are `['role', 'cinema_customer', 'app.customer', 'Ada Quill']`, each 
 
 ## Why the role
 
-A policy never binds a superuser, even with `FORCE ROW LEVEL SECURITY`, nor the table's owner without it. The docs connect as a superuser, as the insert above does, so the example sets `role` too: the rest of the transaction runs as `cinema_customer`, which the policy binds. At `COMMIT` the role is the session's again.
+A policy never binds a superuser or a role with `BYPASSRLS`, even with `FORCE ROW LEVEL SECURITY`, nor the table's owner without it. The docs connect as a superuser, as the insert above does, so the example sets `role` too: the rest of the transaction runs as `cinema_customer`, which the policy binds. At `COMMIT` the role is the session's again.
 
 - A role that is not a superuser may set `role` only to a role it is a member of: `GRANT cinema_customer TO <your app's role>`, or 42501.
-- An app that connects as a role that neither owns the table nor is a superuser is bound already, and needs only `app.customer`.
+- An app that connects as a role that neither owns the table, nor is a superuser, nor has `BYPASSRLS` is bound already, and needs only `app.customer`.
 
 ## Why one transaction
 
