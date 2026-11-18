@@ -396,10 +396,11 @@ export async function serializableRODeferrable<T, C = unknown>(txnClientOrQuerya
  * It rejects before any query when given a key that is neither a `bigint` nor
  * an array of two numbers (Postgres takes no lock on a `NULL`), a `pg.Pool`, or
  * a client that `pg` reports outside a transaction block, where Postgres would
- * release the lock as soon as it is taken. That status is the one of the last
- * query answered: a query not yet answered, such as a `BEGIN` you did not await,
- * is not counted. A client that reports no status (another driver, `pg` before
- * 8.21) runs.
+ * release the lock as soon as it is taken. That status is the last one `pg`
+ * received: a query not yet answered, such as a `BEGIN` you did not await, is
+ * not counted, and a client whose `COMMIT` of your own `BEGIN` just failed can
+ * still read as inside a block. One that reports no status (another driver,
+ * `pg` before 8.21) runs.
  * @param txnClient The client of a transaction: a `transaction()` callback's,
  * of any driver, or a `pg.PoolClient` you sent `BEGIN` on
  * @param key A `bigint`, or a pair of 32-bit integers

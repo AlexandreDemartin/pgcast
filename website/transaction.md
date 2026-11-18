@@ -295,20 +295,21 @@ The SQL of the callback's queries: [`count()`](/select#count) and [`insert()`](/
 
 - The key goes to `pg_advisory_xact_lock` as it is, with no hash. Its two forms are two key spaces, so `BigInt(42)` and `[0, 42]` are two locks. To lock on a text, hash it in a query of yours: `` db.sql`SELECT pg_advisory_xact_lock(hashtextextended(${db.param(title)}, 0))` ``.
 - Postgres releases the lock at `COMMIT`, at `ROLLBACK`, and at a `ROLLBACK TO` a savepoint taken before it. So an attempt that `transaction()` retries never holds the lock of the one before ([Retries](#retries)).
-- At `REPEATABLE READ` and `SERIALIZABLE`, the snapshot is taken by the transaction's first query. When that query is the lock, the snapshot is from before the wait, and a row the other transaction committed meanwhile is not seen. At `READ COMMITTED`, as in the example, each query takes its own: the `count()` sees it.
+- At `REPEATABLE READ` and `SERIALIZABLE`, the transaction's snapshot is taken by its first query, at the latest the lock, so before the wait: a row the other transaction committed meanwhile is not seen. At `REPEATABLE READ`, the example's `count()` then misses the other booking, and the last seat is sold twice; at `SERIALIZABLE`, Postgres refuses one of the two with 40001, and its retry sees the row. At `READ COMMITTED`, as in the example, each query takes its own snapshot: the `count()` sees it.
 - Postgres checks the key's range: 22003 outside `bigint` or a 32-bit integer, 22P02 for a fraction or `NaN`.
 - It runs, rather than returning a fragment, so that its type can ask for a transaction's client, which a fragment's `run()` can't. In a query of yours, write `pg_advisory_xact_lock(${db.param(…)})` in `sql`.
 - Its query reaches [`queryListener`](/runtime-config#Config.queryListener) and [`resultListener`](/runtime-config#Config.resultListener) with the transaction's id.
 - The session lock, `pg_advisory_lock()`, has no function: it outlives the transaction, its retries and the client's checkout ([Know what a rollback leaves](/testing#know-what-a-rollback-leaves)).
 
-It rejects before any query in two cases:
+It rejects before any query in three cases:
 
 <div class="stack">
 
 | Rejects with | When |
 |---|---|
 | "advisoryXactLock() was given a key that is neither a bigint nor an array of two numbers, so Postgres would take no lock: give a bigint, BigInt(42), or a pair of integers, [1, 42]"<!-- message --> | `key` is neither, from JavaScript or past a cast: `null`, `42`, `[1]`, `[null, 2]`. Postgres takes no lock on a `NULL` key, and says nothing |
-| "advisoryXactLock() was given a client outside a transaction block, so Postgres would release the lock as soon as it is taken: call it on the client of a transaction(), or after a BEGIN of yours"<!-- message --> | `pg` reports the client outside a transaction block (from `pg` 8.21), where the `SELECT` would be a transaction of its own. The status is the last one `pg` received: a client whose `COMMIT` of your `BEGIN` just failed can still read as inside a block. A client that reports none, another driver's or `pg` before 8.21, runs |
+| "advisoryXactLock() was given a pg.Pool, which runs each query on a client outside a transaction block, so Postgres would release the lock as soon as it is taken: call it on the client of a transaction(), or on a client of the pool after a BEGIN of yours"<!-- message --> | `txnClient` is a `pg.Pool`, from JavaScript or past a cast, whose `query()` would run the `SELECT` as a transaction of its own |
+| "advisoryXactLock() was given a client outside a transaction block, so Postgres would release the lock as soon as it is taken: call it on the client of a transaction(), or after a BEGIN of yours"<!-- message --> | `pg` reports the client outside a transaction block (from `pg` 8.21), where the `SELECT` would be a transaction of its own. The status is the last one `pg` received: a query not yet answered, such as a `BEGIN` you did not await, is not counted, and a client whose `COMMIT` of your `BEGIN` just failed can still read as inside a block. A client that reports none, another driver's or `pg` before 8.21, runs |
 
 </div>
 
@@ -530,7 +531,7 @@ The others are thrown as `.compile()` compiles the query, so `.run()` rejects wi
 | `truncate()` with its options in another order | `.run()` rejects | [`truncate()`](/insert#truncate) |
 | `transaction()` with another isolation level | its promise rejects | [`transaction()`, Errors](#errors) |
 | `transaction()` given a client inside a transaction block, with `transactionRequiresIdleClient`, after an empty query | its promise rejects | [Your own `BEGIN`](#your-own-begin) |
-| `advisoryXactLock()` given a key that is neither a `bigint` nor an array of two numbers, or a client outside a transaction block | its promise rejects | [`advisoryXactLock()`](#advisoryXactLock) |
+| `advisoryXactLock()` given a key that is neither a `bigint` nor an array of two numbers, a `pg.Pool`, or a client outside a transaction block | its promise rejects | [`advisoryXactLock()`](#advisoryXactLock) |
 
 </div>
 
