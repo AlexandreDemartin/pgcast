@@ -178,6 +178,37 @@ describe('transaction() on a pool that is not pg’s', () => {
     ]);
   });
 
+  // isDatabaseError() matches a String object code (#501): the event gives its text, as the message prints it
+  it.each([
+    ['a String object', () => new String('40001')],
+    ['a string', () => '40001'],
+  ])('gives a code that is %s as the message prints it, read once for both listeners', async (_, code) => {
+    let reads = 0;
+    const failure = () => Object.defineProperty(new Error('could not serialize access'), 'code', { get: () => { reads++; return code(); } });
+    const logged: unknown[] = [];
+    db.setConfig({
+      transactionRetryDelay: { minMs: 0, maxMs: 0 }, transactionAttemptsMax: 2,
+      transactionListener: message => { logged.push(message); },
+      transactionEventListener: event => { logged.push(event); },
+    });
+    try {
+      const pool = otherPool(text => text === 'SELECT 1' ? failure() : undefined);
+      await expect(db.serializable(pool, c => db.sql`SELECT 1`.run(c))).rejects.toThrow('could not serialize access');
+      expect(logged).toEqual([
+        'Transaction rollback (code 40001) on attempt 1 of 2, retrying in 0ms',
+        { type: 'rollback', code: '40001', attempt: 1, maxAttempts: 2, delayMs: 0 },
+        'Retrying transaction, attempt 2 of 2',
+        { type: 'retry', attempt: 2, maxAttempts: 2 },
+        'Transaction rollback (code 40001) on attempt 2 of 2, giving up',
+        { type: 'giveUp', code: '40001', attempt: 2, maxAttempts: 2 },
+      ]);
+      expect(logged.filter(e => typeof e === 'object').map(e => typeof (e as { code?: unknown }).code)).toEqual(['string', 'undefined', 'string']);
+      expect(reads).toBe(4);  // at each failure, once by isDatabaseError(), once for the listeners: as on master with transactionListener alone
+    } finally {
+      db.setConfig({ transactionListener: undefined } as unknown as db.NewConfig);
+    }
+  });
+
   it('reads the command of its COMMIT: answered ROLLBACK, it warns PGCAST_DEP003, then releases the client', async () => {
     const emitWarning = vi.spyOn(process, 'emitWarning').mockImplementation(() => undefined);
     const pool = otherPool(undefined, 'ROLLBACK');
