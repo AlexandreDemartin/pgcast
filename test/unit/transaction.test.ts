@@ -561,7 +561,7 @@ describe('setLocal()', () => {
 
   const
     notPlain = 'setLocal() was given settings that are not a plain object, whose own properties Postgres would not read as names and values: give an object of strings, { \'app.customer\': \'Ada Quill\' }',
-    notString = (name: string) => `setLocal() was given a value for ${name} that is not a string, which Postgres would take as a reset for a null, to '' for a name of your own, or as a driver's text of its own: give a string`,
+    notString = (name: string) => `setLocal() was given a value for ${name} that is not a string, which Postgres would take as a RESET for a null, or as a driver's text of its own: give a string`,
     casePair = (first: string, second: string) => `setLocal() was given ${first} and ${second}, which Postgres takes for one setting, as it folds A to Z to lower case: give one of them`,
     idle = 'setLocal() was given a client outside a transaction block, so Postgres would undo the settings as soon as they are set: call it on the client of a transaction(), or after a BEGIN of yours';
 

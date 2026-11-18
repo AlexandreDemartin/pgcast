@@ -550,8 +550,8 @@ export async function advisoryXactLock(
  * write `set_config(${db.param(name)}, ${db.param(value)}, true)` in `sql`.
  *
  * It rejects before any query when given settings that are not a plain object,
- * a value that is not a string (Postgres would reset the setting for a `null`,
- * to `''` for a name of your own), two names that differ only in case from `A`
+ * a value that is not a string (a `null` would reset the setting, as `RESET`
+ * does, even over a value set before), two names that differ only in case from `A`
  * to `Z`, which Postgres folds into one setting, a `pg.Pool`, or a client that
  * `pg` reports outside a transaction block, where Postgres would undo the
  * settings as soon as they are set. One that reports no status (another
@@ -574,7 +574,7 @@ export async function setLocal(
   // two such names one select list leaves set rests on an evaluation order it does not document
   const entries = Object.entries(settings), folded = new Map<string, string>();
   for (const [name, value] of entries) {
-    if (typeof value !== 'string') throw new Error(`setLocal() was given a value for ${name} that is not a string, which Postgres would take as a reset for a null, to '' for a name of your own, or as a driver's text of its own: give a string`);
+    if (typeof value !== 'string') throw new Error(`setLocal() was given a value for ${name} that is not a string, which Postgres would take as a RESET for a null, or as a driver's text of its own: give a string`);
     const key = name.replace(/[A-Z]+/g, upper => upper.toLowerCase()), first = folded.get(key);
     if (first !== undefined) throw new Error(`setLocal() was given ${first} and ${name}, which Postgres takes for one setting, as it folds A to Z to lower case: give one of them`);
     folded.set(key, name);
