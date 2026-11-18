@@ -722,17 +722,20 @@ Why the types look as they do, a `timestamptz` a `Date` in `Selectable` and a st
 Each `schema.d.ts` declares `zapatos/schema`, the one module `zapatos/db` takes its tables from, so a compilation types one database. For two, give each its own TypeScript project, and type by hand what one passes to another. Here, the docs' database, `films`, beside a small `box_office` database with its own `films` table, whose `id` is a `text`, and a `takings` table.
 
 ```txt
-tsconfig.json          no files: a reference to each project
-tsconfig.base.json     your usual options
+tsconfig.json
+tsconfig.base.json
 films/
 ├── pgcastconfig.json
 ├── tsconfig.json
-└── src/               zapatos/ and the queries on films
+└── src/
 box_office/
 ├── pgcastconfig.json
 ├── tsconfig.json
-└── src/               zapatos/ and the queries on box_office
+└── src/
 ```
+
+- `tsconfig.json` has no files: a reference to each project. `tsconfig.base.json` holds your usual options.
+- Each `src/` holds its database's `zapatos/` folder and the queries on that database.
 
 ::: code-group
 
@@ -790,7 +793,7 @@ An app that wires both, or another package of a monorepo, reads `films`'s emitte
 
 Without `skipLibCheck`, the reader's `.d.ts` errors say so: TS2307 on `zapatos/schema` with no schema, TS2344 or TS6200 with one. The way out is a type written out as plain TypeScript, never `s.films.JSONSelectable`:
 
-```ts [films/src/queries.ts]
+```ts twoslash [films/src/queries.ts]
 import * as db from 'zapatos/db';
 import type { Pool } from 'pg';
 

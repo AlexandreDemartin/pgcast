@@ -245,7 +245,7 @@ The build compares each French page with its English page, by VitePress's own pa
   | a Postgres notice, a tagline, a request (HTTP) | un avis, une accroche, une requête HTTP (never a bare « requête », which is a query) |
   | an error class (`DatabaseError`, `TypeError`) | feminine, as « une erreur »: une `DatabaseError` |
   | a `Date`, Off / On (a table's columns), from 6.7.0, 6.6.2 is | un `Date`, Désactivé / Activé, à partir de la 6.7.0, la 6.6.2 est |
-  | set from `EXCLUDED`, written inline, refuses it bare | prend sa valeur dans `EXCLUDED`, écrit en ligne, le refuse sans parenthèses |
+  | set from `EXCLUDED`, written inline, held in a variable, refuses it bare | prend sa valeur dans `EXCLUDED`, écrit en ligne, contenu dans une variable, le refuse sans parenthèses |
   | tutorial, how-to guide, reference, explanation; a note's chip: Coming, Security | tutoriel, guide pratique, référence, explication ; À venir, Sécurité |
   | an options table: Option → SQL it adds → Effect on the type, none | Option → SQL ajouté → Effet sur le type, aucun |
 
