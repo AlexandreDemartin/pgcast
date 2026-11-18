@@ -205,7 +205,8 @@ export function asPool(pglite: PGliteLike): PGlitePool {
   if (typeof pglite?.execProtocol !== 'function' || typeof pglite.runExclusive !== 'function') throw new Error('asPool() needs a PGlite with execProtocol() and runExclusive(), to send each query as pg sends it on its one connection: give it the PGlite that PGlite.create() or new PGlite() returns, not a transaction\'s');
   const state = stateOf(pglite);
 
-  const run = async ({ text, values = [], name }: PGliteQuery): Promise<PGliteResult> => {
+  const run = async ({ text, values = [], name: given }: PGliteQuery): Promise<PGliteResult> => {
+    const name = given || undefined;  // an empty name is unnamed, as pg tests it for truth
     // PGlite's own query() says so, where execProtocol() of a closed PGlite throws a TypeError, or blocks on 0.5.5
     if (pglite.closed) throw new Error('PGlite is closed');
     await pglite.waitReady;
