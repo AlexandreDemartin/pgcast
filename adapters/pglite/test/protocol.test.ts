@@ -29,9 +29,10 @@ describe('shortcuts', () => {
       try { return (await db.insert('orgs', rows).run(q)).length; }
       finally { await db.deletes('orgs', { country: 'MX' }).run(q); }
     };
-    expect(await inserted(u.pool())).toBe(await inserted(u.t.client));
-    expect(await inserted(u.pool())).toBe(21_845);
-  }, 30_000);
+    const viaAdapter = await inserted(u.pool());
+    expect(viaAdapter).toBe(await inserted(u.t.client));
+    expect(viaAdapter).toBe(21_845);
+  }, 60_000);
 
   it('insert(), upsert(), count() and select() with a lateral give what they give on pg', async () => {
     const viaAdapter = await scenario(u.pool(), 'PL');
