@@ -90,7 +90,7 @@ A new example in the docs, the README, a JSDoc, an issue or a PR uses pgcast's o
 ## Further than Zapatos
 
 - Its roadmap first ([Zapatos's docs](https://jawj.github.io/zapatos/) § What's next): a real test suite, including on inferred types. Its laterals typed by foreign keys stay written by hand (note 007: no `related()` in the core): `parent<T.Column>('c')` checks the column, and the docs show a lateral on each kind of key.
-- Its written limits (§ lateral, Limitations) stay where lifting them needs a schema at run time or a compile cost past +20 % (note 007, #625): a join is checked by `parent()`'s type argument only, and `selectExactlyOne` is written by hand when the FK is `NOT NULL`.
+- Its written limits (§ lateral, Limitations) stay, as note 007 decides (choice D: a core helper saves a type, never a line nor the SQL; a revival is a revision of the note): a join is checked by `parent()`'s type argument only, and `selectExactlyOne` is written by hand when the FK is `NOT NULL`.
 - What it did not have: tests, checked types, CI. They come without changing how it feels to use.
 - A new API must be able to pass for Zapatos's: same vocabulary, same shape, same visible SQL.
 
