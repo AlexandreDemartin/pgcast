@@ -1,5 +1,5 @@
 ---
-english: 7d9f1a5c5f24
+english: 5cf4991252bc
 ---
 
 # Transactions
@@ -658,7 +658,7 @@ type TxnClientLike<C, T extends IsolationLevel> = C & {
 }
 ```
 
-Le client d’un [`PoolLike`](#PoolLike), `C`, tel que le reçoit le callback d’une [`transaction()`](#transaction) : marqué pendant que la transaction s’exécute, comme un [`TxnClient`](#TxnClient), `_zapatos` étant optionnel dans le type lui aussi. Un appel imbriqué le transmet, et son callback le reçoit tel quel, au niveau de la transaction extérieure, celui auquel il s’exécute ; un `TxnClient` est typé au niveau propre de l’appel imbriqué, et une fonction générique sur `C` ne compile pas ([Le pool d’un autre driver](#another-drivers-pool)).
+Le client d’un [`PoolLike`](#PoolLike), `C`, tel que le reçoit le callback d’une [`transaction()`](#transaction) : marqué pendant que la transaction s’exécute, comme un [`TxnClient`](#TxnClient), `_zapatos` étant optionnel dans le type lui aussi. Un appel imbriqué le transmet, et son callback le reçoit tel quel, au niveau de la transaction extérieure, celui auquel il s’exécute ; un `TxnClient` est typé au niveau propre de l’appel imbriqué, et un appel imbriqué dans une fonction générique sur `C` ne compile pas ([Le pool d’un autre driver](#another-drivers-pool)).
 
 ## `isDatabaseError()` {#isDatabaseError}
 
