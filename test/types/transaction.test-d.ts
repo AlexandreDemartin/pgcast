@@ -261,6 +261,10 @@ describe('a nested call on another driver’s client (#702)', () => {
       // @ts-expect-error a client generic over another driver's: type it db.TxnClientLike<OtherClient, L>
       db.serializable(c, async () => 1);
     void overClient;
+    const nestedOverPool = <C extends OtherClient>(p: db.PoolLike<C>) =>
+      // @ts-expect-error the nested call's client depends on C, left unresolved: its callback would get pg's client
+      db.serializable(p, c => db.readCommitted(c, inner => inner.query('SELECT 1')));
+    void nestedOverPool;
   });
 });
 
