@@ -1,5 +1,5 @@
 ---
-english: d21069941bcb
+english: 309123f6dd96
 ---
 
 # Transactions
@@ -348,7 +348,7 @@ Le SQL des requêtes du callback : [`count()`](/fr/select#count) et [`insert()`
 | deux nombres, `[1, 42]` | `SELECT pg_advisory_xact_lock($1, $2)`<!-- probe: db.advisoryXactLock(pool, [1, 42]) --> | `[1, 42]` |
 
 - La clé va telle quelle à `pg_advisory_xact_lock`, sans hachage. Ses deux formes sont deux espaces de clés : `BigInt(42)` et `[0, 42]` sont deux locks. Pour un lock sur un texte, hachez-le dans une requête à vous : `` db.sql`SELECT pg_advisory_xact_lock(hashtextextended(${db.param(title)}, 0))` ``.
-- Postgres libère le lock au `COMMIT`, au `ROLLBACK`, et à un `ROLLBACK TO` vers un savepoint pris avant lui. Une tentative que `transaction()` réessaie ne détient donc jamais le lock de la précédente ([Retries](#retries)).
+- Postgres libère le lock au `COMMIT`, au `ROLLBACK`, et à un `ROLLBACK TO` vers un savepoint pris avant lui, comme celui d’un [`savepoint()`](#savepoint) dont le callback est rejeté ; un `RELEASE` ne le libère pas. Une tentative que `transaction()` réessaie ne détient donc jamais le lock de la précédente ([Retries](#retries)).
 - En `REPEATABLE READ` et `SERIALIZABLE`, l’instantané de la transaction est pris par sa première requête, au plus tard le lock, donc avant l’attente : une ligne que l’autre transaction a commitée entre-temps n’est pas vue. En `REPEATABLE READ`, le `count()` de l’exemple ne voit alors pas l’autre réservation, et la dernière place est vendue deux fois ; en `SERIALIZABLE`, Postgres refuse l’une des deux avec 40001, et son retry voit la ligne. En `READ COMMITTED`, comme dans l’exemple, chaque requête prend son propre instantané : le `count()` la voit.
 - Postgres vérifie la plage de la clé : 22003 hors de `bigint` ou d’un entier 32 bits, 22P02 pour une fraction ou `NaN`.
 - Elle s’exécute, au lieu de renvoyer un fragment, pour que son type puisse demander le client d’une transaction, ce que le `run()` d’un fragment ne peut pas. Dans une requête à vous, écrivez `pg_advisory_xact_lock(${db.param(…)})` dans `sql`.
