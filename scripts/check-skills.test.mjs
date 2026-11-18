@@ -45,6 +45,11 @@ test('fails on a SKILL.md over 150 lines or 1,800 words', () => {
   assert.deepEqual(errorsOf({'alpha/SKILL.md': head + 'word '.repeat(1793)}), ['alpha/SKILL.md: 1801 words, max 1800']);
 });
 
+test('fails on a SKILL.md with no frontmatter for its size too', () => {
+  assert.deepEqual(errorsOf({'alpha/SKILL.md': 'no frontmatter\n' + 'line\n'.repeat(160)}),
+    ['alpha/SKILL.md: missing frontmatter', 'alpha/SKILL.md: 161 lines, max 150']);
+});
+
 test('fails on a reference.md that cites an unknown skill', () => {
   assert.deepEqual(errorsOf({'alpha/reference.md': '# Alpha: reference\n\nSee skill `beta`, then skill `gamma`.\n'}),
     ["alpha/reference.md: cites unknown skill 'gamma'"]);
