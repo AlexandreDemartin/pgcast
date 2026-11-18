@@ -7,7 +7,7 @@ Released under the MIT licence: see LICENCE file
 import * as pg from 'pg';
 import { isDatabaseError } from './pgErrors';
 import { mapWithSeparator, wait, warnOnce } from './utils';
-import { sql, raw, param } from './core';
+import { sql, raw, param, SQLFragment } from './core';
 import { getConfig } from './config';
 import type { SQLQuery, TransactionEvent } from './config';
 import type { Queryable } from './core';
@@ -584,4 +584,126 @@ export async function setLocal(
 
   if (entries.length === 0) return;
   await sql`SELECT ${mapWithSeparator(entries, sql`, `, ([name, value]) => sql`set_config(${param(name)}, ${param(value)}, true)`)}`.run(txnClient);
+}
+
+/* === cursor === */
+
+const cursorNumbers = new WeakMap<object, Set<number>>();  // the numbers of the cursor() calls running on each client
+
+const iteratedAfter = 'cursor() was iterated after its transaction ended, so its next query would run on a client that may be in another transaction, or in none: iterate it inside the transaction() callback that called cursor()';
+
+/**
+ * Read the rows of `query` through a server-side cursor, `batchSize` at a
+ * time, and yield each batch as `query.run()` would give those rows. Nothing
+ * is sent before the first `next()`; then, `<n>` the lowest number no other
+ * `cursor()` still running on this client holds:
+ *
+ * `DECLARE pgcast_cursor_<n> NO SCROLL CURSOR FOR <query>`, with the
+ * fragment's text and values as a `sql` template nests it, then
+ * `FETCH FORWARD <batchSize> FROM pgcast_cursor_<n>` until a `FETCH` returns
+ * no row, then `CLOSE pgcast_cursor_<n>`.
+ *
+ * - Each non-empty batch goes through `query.runResultTransform`: a `select()`
+ *   passed as is reads its one `jsonb_agg` row, so one batch, the whole array.
+ * - A `break`, a `return`, a throw in the loop or a `runResultTransform` that
+ *   throws sends `CLOSE`, and a throw goes out as it is. A query of its own
+ *   that rejects, or a client that `pg` reports aborted (the status it last
+ *   received), sends no `CLOSE`, which Postgres would refuse (25P02): the
+ *   error goes out unchanged, and `transaction()` retries a 40001 or 40P01.
+ *   A `CLOSE` sent after a query of the loop failed, before `pg` received the
+ *   status, or on a driver that reports none, gets 25P02, which is dropped:
+ *   no 25P02 of `CLOSE`'s replaces the loop's error. A client that `pg`
+ *   reports outside a transaction block, after a `COMMIT` of yours, sends no
+ *   `CLOSE` either: its cursor went with the transaction.
+ *   A generator left unfinished leaves its cursor to `COMMIT` or `ROLLBACK`,
+ *   and its number taken on this client.
+ * - A prepared fragment runs unprepared: the `DECLARE`'s text changes with
+ *   `<n>`, and `pg` refuses a second text under one name.
+ * - A cursor whose own `FETCH` fails inside a `savepoint()` it was declared
+ *   before stays open after the `ROLLBACK TO`: the next `cursor()` on this
+ *   client then gets 42P03. Don't name a cursor of yours `pgcast_cursor_<n>`.
+ * - Postgres refuses a `DECLARE` outside a transaction block (25P01), and a
+ *   query that is not a `SELECT`, `VALUES`, `TABLE` or `WITH … SELECT`, such
+ *   as an `insert()` (42601).
+ *
+ * `next()` rejects before any query when given a query that is not a
+ * `SQLFragment`, a `batchSize` that is not an integer from 1 to 2147483647, or
+ * when the `transaction()` it was called in has ended. It is the same
+ * transaction through every attempt: a generator that read a batch in one
+ * attempt and goes on in the next gets 34000, as its cursor went with the
+ * `ROLLBACK`; one first read in the next attempt sends its `DECLARE` then.
+ * @param txnClient The client of a transaction: a `transaction()` callback's,
+ * of any driver, or a `pg.PoolClient` you sent `BEGIN` on
+ * @param query A `SELECT` fragment whose result is an array of rows
+ * @param options `batchSize`: the rows each `FETCH` reads
+ */
+export function cursor<RunResult extends readonly unknown[]>(
+  txnClient: TxnClient<IsolationLevel> | TxnClientLike<PoolClientLike, IsolationLevel>,
+  query: SQLFragment<RunResult, any>,
+  options: { readonly batchSize: number }
+): AsyncGenerator<RunResult, void, undefined> {
+  // the transaction it is called in, which transaction() marks; read with ?., so that nothing throws before next()
+  const mark: unknown = (txnClient as { _zapatos?: unknown } | undefined)?._zapatos;
+  return cursorBatches(txnClient, query, options, mark);
+}
+
+async function* cursorBatches<RunResult>(
+  txnClient: TxnClient<IsolationLevel> | TxnClientLike<PoolClientLike, IsolationLevel>,
+  query: SQLFragment<RunResult, any>,
+  options: { readonly batchSize: number },
+  mark: unknown
+): AsyncGenerator<RunResult, void, undefined> {
+
+  // read once; Postgres takes no parameter for a FETCH count (42601), so it is written in, after this check
+  const batchSize: unknown = (options as typeof options | undefined)?.batchSize;
+  if (!(query instanceof SQLFragment)) throw new Error('cursor() was given a query that is not a SQLFragment, such as a string or a { text, values } object: give a db.sql fragment or a select()');
+  if (typeof batchSize !== 'number' || !Number.isInteger(batchSize) || batchSize < 1 || batchSize > 2147483647) throw new Error('cursor() was given a batchSize that is not an integer from 1 to 2147483647, the rows each FETCH reads: give a number of rows, { batchSize: 100 }');
+
+  // a client given back to the pool has lost the mark, or carries another transaction's; one with none at the call is not checked
+  const ended = () => mark !== undefined && (txnClient as { _zapatos?: unknown })._zapatos !== mark;
+  if (ended()) throw new Error(iteratedAfter);
+
+  const unprepared = query.copy();  // before a number is taken, which a copy() that throws would leave taken
+  delete unprepared.preparedName;  // nested, a prepared fragment would name the DECLARE, whose text changes with n
+
+  // the lowest free number, not a depth: two loops at once, then a third, each get a name no running one holds
+  const held = cursorNumbers.get(txnClient) ?? new Set<number>();
+  let n = 1;
+  while (held.has(n)) n++;
+  held.add(n);
+  cursorNumbers.set(txnClient, held);
+
+  let fetched: pg.QueryResult | undefined, declared = false, rejected = false;
+  const
+    name = raw(`pgcast_cursor_${n}`),
+    fetch = sql`FETCH FORWARD ${raw(String(batchSize))} FROM ${name}`;
+
+  fetch.runResultTransform = qr => { fetched = qr; return qr.rows; };  // its rows, as any sql fragment's; the batch is made below
+
+  try {
+    await sql`DECLARE ${name} NO SCROLL CURSOR FOR ${unprepared}`.run(txnClient);
+    declared = true;
+    for (;;) {
+      if (ended()) throw new Error(iteratedAfter);
+      try { await fetch.run(txnClient); }
+      catch (err) { rejected = true; throw err; }  // Postgres has aborted the transaction: a CLOSE would only get 25P02, a round trip for nothing
+      if (fetched!.rows.length === 0) return;
+      yield query.runResultTransform(fetched!) as RunResult;  // a transform that throws ends the loop as a throw in it does
+    }
+
+  } finally {
+    try {
+      const status = transactionStatus(txnClient as pg.ClientBase);  // I after a COMMIT of yours, whose cursors went with it (34000)
+      // pg reads the status E at the ReadyForQuery after an ErrorResponse, often a chunk later, so a CLOSE can still go
+      // out after a query of the loop failed: Postgres's 25P02 for it is dropped, or it would replace that query's error
+      if (declared && !rejected && !ended() && status !== 'E' && status !== 'I') {
+        await sql`CLOSE ${name}`.run(txnClient).catch((err: unknown) => {
+          if (!isDatabaseError(err, 'InvalidTransactionState_InFailedSqlTransaction')) throw err;
+        });
+      }
+    } finally {
+      held.delete(n);
+      if (held.size === 0) cursorNumbers.delete(txnClient);
+    }
+  }
 }

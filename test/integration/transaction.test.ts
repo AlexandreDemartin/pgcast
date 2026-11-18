@@ -2016,3 +2016,275 @@ describe('setLocal()', () => {
     });
   });
 });
+
+// #743: cursor() on Postgres: the rows each batch reads, how each loop ends, the locks and the snapshot of a cursor,
+// and the errors Postgres sends for what it refuses to DECLARE
+describe('cursor()', () => {
+  beforeAll(async () => {
+    // raises 40001 the first time it reads 4, from the second batch of 3, as a serialisation failure found mid-way
+    await t.pool.query('CREATE SEQUENCE cursor_failures');
+    await t.pool.query(`CREATE FUNCTION fail_once_at_4(g int) RETURNS int LANGUAGE plpgsql AS $$
+      BEGIN IF g = 4 AND nextval('cursor_failures') = 1 THEN RAISE EXCEPTION 'simulated' USING ERRCODE = '40001'; END IF; RETURN g; END $$`);
+  });
+
+  type G = { g: number };
+  const series = (n: number) => sql<db.SQL, G[]>`SELECT g FROM generate_series(1, ${db.param(n)}) AS g`;
+  const gs = (...g: number[]) => g.map(n => ({ g: n }));
+  const read = async <R>(batches: AsyncIterable<R>) => { const all: R[] = []; for await (const batch of batches) all.push(batch); return all; };
+  const codeOf = (err: unknown) => (err as { code?: string }).code;
+  const notesIn = sql<db.SQL, { note: string }[]>`SELECT ${'note'} FROM ${'txn_probe'} ORDER BY ${'note'}`;
+
+  /** The texts queryListener gets, each cut after its first two words. */
+  const sent = () => {
+    const texts: string[] = [];
+    db.setConfig({ queryListener: q => { texts.push(q.text.split(' ').slice(0, 2).join(' ')); } });
+    return texts;
+  };
+
+  it('reads every row once, in order, in batches of the size given, the last one shorter', async () => {
+    const texts = sent();
+    const batches = await db.readCommitted(t.pool, c => read(db.cursor(c, series(7), { batchSize: 3 })));
+    expect(batches).toEqual([gs(1, 2, 3), gs(4, 5, 6), gs(7)]);
+    expect(texts).toEqual(['START TRANSACTION', 'DECLARE pgcast_cursor_1', 'FETCH FORWARD', 'FETCH FORWARD', 'FETCH FORWARD', 'FETCH FORWARD', 'CLOSE pgcast_cursor_1', 'COMMIT']);
+  });
+
+  it('yields nothing for an empty result, after DECLARE, one FETCH and CLOSE', async () => {
+    const texts = sent();
+    expect(await db.readCommitted(t.pool, c => read(db.cursor(c, series(0), { batchSize: 3 })))).toEqual([]);
+    expect(texts).toEqual(['START TRANSACTION', 'DECLARE pgcast_cursor_1', 'FETCH FORWARD', 'CLOSE pgcast_cursor_1', 'COMMIT']);
+  });
+
+  it('sends CLOSE on a break: Postgres then holds no cursor', async () => {
+    await db.readCommitted(t.pool, async c => {
+      for await (const batch of db.cursor(c, series(7), { batchSize: 3 })) { expect(batch).toEqual(gs(1, 2, 3)); break; }
+      expect((await c.query('SELECT name FROM pg_cursors')).rows).toEqual([]);
+    });
+  });
+
+  it('sends CLOSE when the loop throws, and rejects with the loop’s error', async () => {
+    const texts = sent(), thrown = new Error('the loop’s own');
+    await expect(db.readCommitted(t.pool, async c => {
+      for await (const _ of db.cursor(c, series(7), { batchSize: 3 })) throw thrown;
+    })).rejects.toBe(thrown);
+    expect(texts).toEqual(['START TRANSACTION', 'DECLARE pgcast_cursor_1', 'FETCH FORWARD', 'CLOSE pgcast_cursor_1', 'ROLLBACK']);
+  });
+
+  // pg rejects the query at Postgres's ErrorResponse, and reads the status E at the ReadyForQuery after it: when that
+  // comes in a chunk of its own, the status is still T, and CLOSE goes out, refused (25P02), its error dropped
+  it('rejects with the error of a query of the loop that fails, and sends no CLOSE once pg reports the transaction aborted', async () => {
+    const texts = sent();
+    const err = await db.readCommitted(t.pool, async c => {
+      for await (const _ of db.cursor(c, series(7), { batchSize: 3 })) await raise(c, '23505');
+    }).catch((e: unknown) => e);
+    expect(codeOf(err)).toBe('23505');
+    expect(texts.filter(text => text !== 'CLOSE pgcast_cursor_1')).toEqual(['START TRANSACTION', 'DECLARE pgcast_cursor_1', 'FETCH FORWARD', 'DO $$BEGIN', 'ROLLBACK']);
+  });
+
+  /** A pool whose clients report T at all times, as pg does when the ReadyForQuery after an error has not yet come. */
+  const lagging = {
+    connect: async () => {
+      const c = await t.pool.connect();
+      return { query: (q: db.SQLQuery) => c.query(q), release: (err?: Error | boolean) => c.release(err), getTransactionStatus: () => 'T' };
+    },
+  };
+
+  it('drops the 25P02 that Postgres gives a CLOSE after a failed query: a 40001 is retried, under a return() in a finally too', async () => {
+    const { messages } = listen(), texts = sent();
+    let attempts = 0;
+    await db.serializable(lagging, async c => {
+      const batches = db.cursor(c, series(3), { batchSize: 1 });
+      try { for (let r = await batches.next(); !r.done; r = await batches.next()) if (++attempts === 1) await raise(c as never, '40001'); }
+      finally { await batches.return(); }
+    });
+    expect(attempts).toBe(4);
+    expect(texts.slice(0, 6)).toEqual(['START TRANSACTION', 'DECLARE pgcast_cursor_1', 'FETCH FORWARD', 'DO $$BEGIN', 'CLOSE pgcast_cursor_1', 'ROLLBACK']);
+    expect(messages).toEqual([expect.stringMatching(/^Transaction rollback \(code 40001\) on attempt 1 of /), expect.stringMatching(/^Retrying transaction, attempt 2 of /)]);
+  });
+
+  it('drops the 25P02 that Postgres gives a CLOSE after a failed query, so a break after an error the loop caught ends the loop', async () => {
+    const texts = sent(), ended = new Error('ended');
+    await expect(db.readCommitted(lagging, async c => {
+      for await (const _ of db.cursor(c, series(3), { batchSize: 1 })) { await raise(c as never, '23505').catch(() => undefined); break; }
+      throw ended;
+    })).rejects.toBe(ended);
+    expect(texts).toEqual(['START TRANSACTION', 'DECLARE pgcast_cursor_1', 'FETCH FORWARD', 'DO $$BEGIN', 'CLOSE pgcast_cursor_1', 'ROLLBACK']);
+  });
+
+  it('yields the batches before a row that fails at FETCH time, then rejects with 22012, and sends no CLOSE', async () => {
+    const texts = sent(), batches: unknown[] = [];
+    const err = await db.readCommitted(t.pool, async c => {
+      for await (const batch of db.cursor(c, sql<db.SQL, { q: number }[]>`SELECT 10 / (g - 3) AS q FROM generate_series(1, 6) AS g`, { batchSize: 2 })) batches.push(batch);
+    }).catch((e: unknown) => e);
+    expect(codeOf(err)).toBe('22012');
+    expect(batches).toEqual([[{ q: -5 }, { q: -10 }]]);
+    expect(texts).toEqual(['START TRANSACTION', 'DECLARE pgcast_cursor_1', 'FETCH FORWARD', 'FETCH FORWARD', 'ROLLBACK']);
+  });
+
+  it('rolls back on a 40001 raised at FETCH time, and reads every batch again on the second attempt', async () => {
+    const { messages } = listen(), attempts: unknown[][] = [];
+    await db.serializable(t.pool, async c => {
+      const batches: unknown[] = [];
+      attempts.push(batches);
+      for await (const batch of db.cursor(c, sql<db.SQL, { g: number }[]>`SELECT fail_once_at_4(g) AS g FROM generate_series(1, 6) AS g`, { batchSize: 3 })) batches.push(batch);
+    });
+    expect(attempts).toEqual([[gs(1, 2, 3)], [gs(1, 2, 3), gs(4, 5, 6)]]);
+    expect(messages).toEqual([expect.stringMatching(/^Transaction rollback \(code 40001\) on attempt 1 of /), expect.stringMatching(/^Retrying transaction, attempt 2 of /)]);
+  });
+
+  it('yields the rows’ result of a fragment whose runResultTransform reads them, and a select() as is in one batch, its array', async () => {
+    const query = sql<db.SQL, G[]>`SELECT jsonb_build_object('g', g) AS result FROM generate_series(1, 3) AS g`;
+    query.runResultTransform = qr => qr.rows.map(r => r.result);
+    await db.readCommitted(t.pool, async c => {
+      expect(await read(db.cursor(c, query, { batchSize: 2 }))).toEqual([gs(1, 2), gs(3)]);
+      const users = db.select('users', db.all, { columns: ['id'], order: { by: 'id', direction: 'ASC' } }), texts = sent();
+      expect(await read(db.cursor(c, users, { batchSize: 2 }))).toEqual([await users.run(c)]);
+      expect(texts).toEqual(['DECLARE pgcast_cursor_1', 'FETCH FORWARD', 'FETCH FORWARD', 'CLOSE pgcast_cursor_1', 'SELECT coalesce(jsonb_agg(result),']);
+    });
+  });
+
+  it('does not read rows the transaction inserts after the DECLARE', async () => {
+    await write(t.pool, 'a');
+    await write(t.pool, 'b');
+    const batches = await db.readCommitted(t.pool, async c => {
+      const all: unknown[] = [];
+      for await (const batch of db.cursor(c, sql<db.SQL, { note: string }[]>`SELECT ${'note'} FROM ${'txn_probe'}`, { batchSize: 1 })) {
+        all.push(batch);
+        await write(c, `c${all.length}`);
+      }
+      expect(await notesIn.run(c)).toEqual([{ note: 'a' }, { note: 'b' }, { note: 'c1' }, { note: 'c2' }]);
+      return all;
+    });
+    expect(batches.flat()).toEqual([{ note: 'a' }, { note: 'b' }]);
+  });
+
+  it('locks a row of FOR UPDATE once it is fetched, not before', async () => {
+    for (const note of ['a', 'b', 'c', 'd']) await write(t.pool, note);
+    const other = await t.pool.connect();
+    const lockedFor = async (note: string) => {
+      await other.query("BEGIN; SET LOCAL lock_timeout = '50ms'");
+      try { await other.query('SELECT note FROM txn_probe WHERE note = $1 FOR UPDATE', [note]); return 'free'; }
+      catch (err) { return codeOf(err); }
+      finally { await other.query('ROLLBACK'); }
+    };
+    try {
+      await db.readCommitted(t.pool, async c => {
+        const batches = db.cursor(c, sql<db.SQL, { note: string }[]>`SELECT ${'note'} FROM ${'txn_probe'} ORDER BY ${'note'} FOR UPDATE`, { batchSize: 2 });
+        expect(await lockedFor('a')).toBe('free');
+        expect((await batches.next()).value).toEqual([{ note: 'a' }, { note: 'b' }]);
+        expect([await lockedFor('a'), await lockedFor('b'), await lockedFor('c')]).toEqual(['55P03', '55P03', 'free']);
+        await batches.return();
+      });
+    } finally { other.release(); }
+  });
+
+  it('keeps its place past a ROLLBACK TO a savepoint taken after the DECLARE', async () => {
+    await db.readCommitted(t.pool, async c => {
+      const batches = db.cursor(c, series(6), { batchSize: 2 });
+      expect((await batches.next()).value).toEqual(gs(1, 2));
+      const err = await db.savepoint(c, async () => {
+        expect((await batches.next()).value).toEqual(gs(3, 4));
+        throw new Error('undo');
+      }).catch((e: unknown) => e);
+      expect((err as Error).message).toBe('undo');
+      expect(await read(batches)).toEqual([gs(5, 6)]);
+    });
+  });
+
+  it('limitation: a cursor whose own FETCH fails inside a savepoint stays open after ROLLBACK TO, and the next cursor() on the client gets 42P03', async () => {
+    const errors: unknown[] = [];
+    await db.readCommitted(t.pool, async c => {
+      const failing = db.cursor(c, sql<db.SQL, { q: number }[]>`SELECT 10 / (g - 3) AS q FROM generate_series(1, 6) AS g`, { batchSize: 2 });
+      await failing.next();
+      errors.push(codeOf(await db.savepoint(c, () => failing.next()).catch((e: unknown) => e)));
+      errors.push(codeOf(await db.savepoint(c, () => db.cursor(c, series(2), { batchSize: 2 }).next()).catch((e: unknown) => e)));
+      expect((await c.query('SELECT name FROM pg_cursors')).rows).toEqual([{ name: 'pgcast_cursor_1' }]);
+    });
+    expect(errors).toEqual(['22012', '42P03']);
+  });
+
+  it('limitation: a generator that read a batch in one attempt and goes on in the next gets 34000, its cursor gone with the ROLLBACK', async () => {
+    listen();
+    let stale: AsyncGenerator<G[], void, undefined> | undefined;
+    const err = await db.serializable(t.pool, async c => {
+      if (!stale) {
+        stale = db.cursor(c, series(3), { batchSize: 1 });
+        await stale.next();
+        await raise(c, '40001');
+      }
+      await stale.next();
+    }).catch((e: unknown) => e);
+    expect(codeOf(err)).toBe('34000');
+  });
+
+  it('reads all the rows of a generator made in one attempt and first read in the next, which sends its DECLARE then', async () => {
+    listen();
+    const texts = sent();
+    let unstarted: AsyncGenerator<G[], void, undefined> | undefined;
+    const batches = await db.serializable(t.pool, async c => {
+      if (!unstarted) {
+        unstarted = db.cursor(c, series(3), { batchSize: 2 });
+        await raise(c, '40001');
+      }
+      return read(unstarted);
+    });
+    expect(batches).toEqual([gs(1, 2), gs(3)]);
+    expect(texts).toEqual(['START TRANSACTION', 'DO $$BEGIN', 'ROLLBACK', 'START TRANSACTION', 'DECLARE pgcast_cursor_1', 'FETCH FORWARD', 'FETCH FORWARD', 'FETCH FORWARD', 'CLOSE pgcast_cursor_1', 'COMMIT']);
+  });
+
+  it('reads all the rows of two loops at once on one client', async () => {
+    const both = await db.readCommitted(t.pool, c => Promise.all([read(db.cursor(c, series(3), { batchSize: 2 })), read(db.cursor(c, series(4), { batchSize: 3 }))]));
+    expect(both).toEqual([[gs(1, 2), gs(3)], [gs(1, 2, 3), gs(4)]]);
+  });
+
+  it('passes on Postgres’s 25P01 for a pg.Pool and an idle pg.PoolClient, nothing sent before the DECLARE', async () => {
+    const texts = sent();
+    expect(codeOf(await db.cursor(t.pool as never, series(3), { batchSize: 2 }).next().catch((e: unknown) => e))).toBe('25P01');
+    const client = await t.pool.connect();
+    try {
+      expect(client.getTransactionStatus()).toBe('I');
+      expect(codeOf(await db.cursor(client, series(3), { batchSize: 2 }).next().catch((e: unknown) => e))).toBe('25P01');
+    } finally { client.release(); }
+    expect(texts).toEqual(['DECLARE pgcast_cursor_1', 'DECLARE pgcast_cursor_1']);
+  });
+
+  it.each<[string, string, () => db.SQLFragment<any[], any>]>([
+    ['an insert() of rows', '42601', () => db.insert('users', [{ email: 'ada@example.com', display_name: 'Ada' }])],
+    ['a data-modifying WITH', '0A000', () => sql`WITH w AS (INSERT INTO ${'txn_probe'} (${'note'}) VALUES ('x') RETURNING ${'note'}) SELECT * FROM w`],
+  ])('passes on Postgres’s error for %s, %s, nothing sent before the DECLARE', async (_, code, query) => {
+    const texts = sent();
+    const err = await db.readCommitted(t.pool, c => read(db.cursor(c, query(), { batchSize: 2 }))).catch((e: unknown) => e);
+    expect(codeOf(err)).toBe(code);
+    expect(texts).toEqual(['START TRANSACTION', 'DECLARE pgcast_cursor_1', 'ROLLBACK']);
+    expect(await notes()).toEqual([]);
+  });
+
+  it('sends no CLOSE on a pg.PoolClient whose COMMIT of yours came before the generator’s return(): the cursor went with it', async () => {
+    const texts = sent(), client = await t.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const batches = db.cursor(client, series(3), { batchSize: 1 });
+      await batches.next();
+      await client.query('COMMIT');
+      expect(await batches.return()).toEqual({ value: undefined, done: true });
+    } finally { client.release(); }
+    expect(texts).toEqual(['DECLARE pgcast_cursor_1', 'FETCH FORWARD']);
+  });
+
+  it('runs on a pg.PoolClient after a BEGIN of yours, which carries no mark, and refuses a generator iterated after transaction()', async () => {
+    const client = await t.pool.connect();
+    try {
+      await client.query('BEGIN');
+      expect(await read(db.cursor(client, series(3), { batchSize: 2 }))).toEqual([gs(1, 2), gs(3)]);
+      await client.query('COMMIT');
+    } finally { client.release(); }
+
+    const texts = sent();
+    const batches = await db.readCommitted(t.pool, async c => {
+      const inside = db.cursor(c, series(3), { batchSize: 2 });
+      await inside.next();
+      return inside;
+    });
+    await expect(batches.next()).rejects.toThrow(/^cursor\(\) was iterated after its transaction ended/);
+    expect(texts).toEqual(['START TRANSACTION', 'DECLARE pgcast_cursor_1', 'FETCH FORWARD', 'COMMIT']);
+  });
+});

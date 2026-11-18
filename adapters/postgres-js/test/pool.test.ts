@@ -156,6 +156,38 @@ describe('transactions', () => {
     fdb.setConfig({ transactionRequiresCommit: true });
     await expect(fdb.readCommitted(u.pool, swallow)).rejects.toThrow('the transaction was rolled back, not committed');
   });
+
+  it('reads a cursor() in two batches, then sends CLOSE on a break (#743)', async () => {
+    const texts: string[] = [];
+    db.setConfig({ queryListener: q => { texts.push(q.text.split(' ').slice(0, 2).join(' ')); } });
+    const { batches, open } = await db.readCommitted(u.pool, async c => {
+      const read: unknown[] = [];
+      for await (const batch of db.cursor(c, db.sql<db.SQL, { g: number }[]>`SELECT g FROM generate_series(1, 5) AS g`, { batchSize: 2 })) {
+        read.push(batch);
+        if (read.length === 2) break;
+      }
+      return { batches: read, open: await db.sql`SELECT name FROM pg_cursors`.run(c) };
+    });
+    expect(batches).toEqual([[{ g: 1 }, { g: 2 }], [{ g: 3 }, { g: 4 }]]);
+    expect(open).toEqual([]);
+    expect(texts).toEqual(['START TRANSACTION', 'DECLARE pgcast_cursor_1', 'FETCH FORWARD', 'FETCH FORWARD', 'CLOSE pgcast_cursor_1', 'SELECT name', 'COMMIT']);
+  });
+
+  it('sends CLOSE after a failed query of the loop, as its client reports no status, and drops its 25P02: the loop’s error goes out, a break after a caught error ends the loop (#743)', async () => {
+    const series = db.sql<db.SQL, { g: number }[]>`SELECT g FROM generate_series(1, 5) AS g`, failing = db.sql`SELECT 1/0`;
+    const texts: string[] = [];
+    db.setConfig({ queryListener: q => { texts.push(q.text.split(' ').slice(0, 2).join(' ')); } });
+    const thrown = await db.readCommitted(u.pool, async c => {
+      for await (const _ of db.cursor(c, series, { batchSize: 2 })) await failing.run(c);
+    }).catch((e: unknown) => e);
+    expect((thrown as { code?: string }).code).toBe('22012');
+    const ended = new Error('ended');
+    await expect(db.readCommitted(u.pool, async c => {
+      for await (const _ of db.cursor(c, series, { batchSize: 2 })) { await failing.run(c).catch(() => { }); break; }
+      throw ended;
+    })).rejects.toBe(ended);
+    expect(texts.filter(text => text === 'CLOSE pgcast_cursor_1')).toHaveLength(2);
+  });
 });
 
 describe('asPool()', () => {

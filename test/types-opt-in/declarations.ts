@@ -88,3 +88,12 @@ export const lockOn = (txnClient: Parameters<typeof db.advisoryXactLock>[0], key
 export const settingsIn = (pool: db.PoolLike<OtherClient>) => db.serializable(pool, txnClient => db.setLocal(txnClient, { 'app.customer': 'Ada Quill' }));
 export const settingsOn = (txnClient: Parameters<typeof db.setLocal>[0], settings: Parameters<typeof db.setLocal>[1]) =>
   db.setLocal(txnClient, settings);
+
+// the batches of a cursor in a transaction of another driver's pool, and on a client and a query typed by cursor()'s
+// parameters, as a library writes them (#743)
+export const batchesIn = (pool: db.PoolLike<OtherClient>) => db.serializable(pool, async txnClient => {
+  for await (const rows of db.cursor(txnClient, db.sql`SELECT 1`, { batchSize: 100 })) return rows;
+  return [];
+});
+export const batchesOf = <R extends readonly unknown[]>(txnClient: Parameters<typeof db.cursor>[0], query: db.SQLFragment<R, any>) =>
+  db.cursor(txnClient, query, { batchSize: 100 });

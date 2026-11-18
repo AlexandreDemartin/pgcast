@@ -152,6 +152,20 @@ Candidates for a check, a rule or a skill line.
 - #747 — A row-level security rule about who bypasses a policy has three exemptions (superuser, owner without `FORCE`, `BYPASSRLS`); a positive sentence listing two is a data leak for its reader — branch-reviewer
 - #747 — A decision that cites a source by its exact wording (a French term) fetches that source and checks the quote — branch-reviewer
 - #747 — `docs:examples` has an `assert` stand-in, so a plain example can check its own result, on a visible line: `---cut-after---` would make the page and `llms.ts` disagree — builder
+- #61 drafts — `copy({ preparedName: undefined })` does not compile under `exactOptionalPropertyTypes`: clearing a fragment's prepared name needs a cast — builder
+- #743 plan — Neither `SQLFragment.copy()` nor `.prepared()` nests a prepared fragment safely: the nested `compile()` still writes `result.name`, so every wrapper drops `preparedName` itself, as `inWith()` does — builder
+- #743 plan — A drafter's prototype can disagree quietly with the issue that settled the design: check the probe outputs, not only the prototype — builder
+- #748 — `pg` sets the transaction status from the message after an error, not from the error itself: code that checks `'E'` right after a failed query can still read `'T'`, so that check is best effort — builder
+- #748 — An `insert()` of one row is typed as one row, not `any`: check a claim about a shortcut's `RunResult` with `tsc` before it goes into an issue — builder
+- #748 — A message that holds a backtick cannot be quoted in a Markdown table cell: keep messages free of backticks — builder
+- #748 — Postgres flushes an ErrorResponse before the ReadyForQuery after it (elog.c `send_message_to_frontend` → `pq_flush()`), so `pg`'s status read right after a rejected query is often stale (6 % to 96 % by error): a decision on it reads it again or stays correct when stale — branch-reviewer
+- #748 — `for await` drops an error from `return()` only when the body threw; hand iteration with `finally { await g.return() }` lets a cleanup error replace the body's: probe both forms — branch-reviewer
+- #748 — For a value checked then written through `raw(String(x))`, run the mutant that reads the option again at the write site: only a getter or Proxy that answers differently the second time kills it — branch-reviewer
+- #748 — A TCP proxy that sends each backend message as its own chunk reproduces `pg` chunk-timing races every time — branch-reviewer
+- #748 — A client wrapper that always reports `T` turns `pg`'s chunk race into a deterministic integration test against real Postgres — builder
+- #748 — Mutants matched by a fixed pattern break as soon as the code is edited; mutants built from the source text itself (slice from marker to marker) survive the edit — builder
+- #748 — When a fix drops a server error, replay the case where the caller caught its cause: the next statement must still surface the abort (COMMIT answers ROLLBACK, a savepoint's RELEASE gets 25P02) — branch-reviewer
+- #748 — In pg, `_txStatus` is set at ReadyForQuery before a successful query resolves, but a failed query rejects at its ErrorResponse before that ReadyForQuery: a status read after a resolve is fresh, after a rejection it can be stale, a `COMMIT` included — branch-reviewer
 
 ## Minors kept
 
@@ -173,4 +187,5 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #730 — defect: three DEFERRABLE and isolation-level integration tests timed out at 5 s with other suites on the server, and passed alone (a flaky timeout to watch) — builder
 - #742 — check:agents does not check that a SKILL.md's `reference.md § X` names an existing heading, that a linked reference.md exists, that a reference.md is still named by its SKILL.md, nor other .md files in a skill folder; the README line "the core names each section with when to read it" relies on it — branch-reviewer
 - #741 — `website/transaction.md:398` and `src/db/transaction.ts:543` "a savepoint taken before it": "taken before the setting", as the FR « pris avant ce réglage » — branch-reviewer
-
+- #748 — cursor(): a `COMMIT` of yours that fails and is caught inside the loop leaves `T` for a moment, so a `break` can reject with CLOSE's 34000 (1/40 direct, 20/20 through a chunk-splitting proxy); drop CLOSE's 34000 too, or name the case in the `I` row of `website/transaction.md:467` — branch-reviewer
+- #748 — `website/transaction.md:466` (FR `:470`) "a `break` after an error the loop caught ends the loop": add that the transaction stays aborted, so `COMMIT` gets `ROLLBACK` (`PGCAST_DEP003`, or a rejection under `transactionRequiresCommit`), link to `:62` — branch-reviewer
