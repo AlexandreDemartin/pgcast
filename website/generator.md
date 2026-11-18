@@ -8,6 +8,7 @@ The generator reads your database's catalog and writes the types of `zapatos/sch
 ```sh
 npx pgcast [--check] [config]
 npx zapatos [--check] [config]
+npx pgcast --help
 ```
 
 The same program under two names: `pgcast`, and `zapatos`, as in Zapatos 6.6.1. It reads the config, then runs [`generate()`](#generate) with it, or with [`--check`](#check) compares what it would write with your files.
@@ -19,7 +20,9 @@ The same program under two names: `pgcast`, and `zapatos`, as in Zapatos 6.6.1. 
   - A key given here replaces the file's whole value, so `'{"db": {"application_name": "codegen"}}'` drops the file's `connectionString`.
   - The file's variables are filled in before the merge: one it names must be set even when the argument replaces its key, or the CLI stops with `Environment variable 'NAME' is not set`.
 - Each string in both, at any depth, has its environment variables filled in ([Environment variables](#environment-variables)).
-- From 6.8.0, one flag, `--check`, before or after `config`. Any other argument starting with `--`, in `config`'s place, stops it with code 1 before it reads the config, Node printing `Unknown flag --help: the only flag is --check, beside the JSON argument` and its stack; Zapatos 6.6.1 read it as the JSON argument, which failed. After `config`, one is ignored, as in Zapatos 6.6.1, with a [note](#generate.warningListener): a misspelt `npx pgcast '{}' --chek` generates.
+- From 6.8.0, one flag, `--check`, before or after `config`. From 6.12.0, `--help` or `-h` in `config`'s place prints the usage, which names the config files, `config`, the flags and this page, and exits with code 0, before it reads the config.
+- Any other argument starting with `--`, in `config`'s place, stops it with code 1 before it reads the config. From 6.12.0, it prints `Unknown flag --chek: the flags are --check, --help and -h` and the usage, on stderr; from 6.8.0, Node printed `Unknown flag --chek: the only flag is --check, beside the JSON argument` and its stack. Zapatos 6.6.1 read each of these, `-h` too, as the JSON argument, which failed.
+- After `config`, one is ignored, `--help` included, as in Zapatos 6.6.1, with a [note](#generate.warningListener): a misspelt `npx pgcast '{}' --chek` generates.
 - Of the other arguments, the first is `config`; any later one is ignored.
 - Paths are relative to the folder you run it in: `outDir`, and so the `zapatos` folder.
 
@@ -44,7 +47,7 @@ Then it ends with the cause:
 
 | Cause | Ending |
 |---|---|
-| not valid JSON | `JSON.parse`'s message, which depends on the input and on Node: on Node 22, `Unexpected end of JSON input` for an empty file, `No number after minus sign in JSON at position 1 (line 1 column 2)` for `-h`, `Expected double-quoted property name in JSON at position 15 (line 1 column 16)` for a trailing comma |
+| not valid JSON | `JSON.parse`'s message, which depends on the input and on Node: on Node 22, `Unexpected end of JSON input` for an empty file, `No number after minus sign in JSON at position 1 (line 1 column 2)` for `-x`, `Expected double-quoted property name in JSON at position 15 (line 1 column 16)` for a trailing comma |
 | a variable is not set | `Environment variable 'DATABASE_URL' is not set` |
 
 A query that fails, the connection included, ends it with code 1, after `*** error <n> ***` and the error, as in Zapatos 6.6.1: it sets [`rejectOnQueryError`](#generate.rejectOnQueryError) to `false` over the file and the argument.

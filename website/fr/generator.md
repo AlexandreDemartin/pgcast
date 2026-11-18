@@ -1,5 +1,5 @@
 ---
-english: c049e4ac1643
+english: e7d21dc635a7
 ---
 
 # Générateur
@@ -12,6 +12,7 @@ Le générateur lit le catalogue de votre base et écrit les types de `zapatos/s
 ```sh
 npx pgcast [--check] [config]
 npx zapatos [--check] [config]
+npx pgcast --help
 ```
 
 Le même programme sous deux noms : `pgcast`, et `zapatos`, comme dans Zapatos 6.6.1. Il lit la config, puis lance [`generate()`](#generate) avec elle, ou, avec [`--check`](#check), compare ce qu’il écrirait à vos fichiers.
@@ -23,7 +24,9 @@ Le même programme sous deux noms : `pgcast`, et `zapatos`, comme dans Zapatos 
   - Une clé donnée ici remplace toute la valeur du fichier, donc `'{"db": {"application_name": "codegen"}}'` écarte le `connectionString` du fichier.
   - Les variables du fichier sont substituées avant la fusion : une variable qu’il nomme doit être définie même quand l’argument remplace sa clé, sinon la CLI s’arrête avec `Environment variable 'NAME' is not set`.
 - Dans chaque chaîne des deux, à toute profondeur, les variables d’environnement sont substituées ([Variables d’environnement](#environment-variables)).
-- À partir de la 6.8.0, un seul flag, `--check`, avant ou après `config`. Tout autre argument qui commence par `--`, à la place de `config`, l’arrête avec le code 1 avant qu’elle lise la config, et Node affiche `Unknown flag --help: the only flag is --check, beside the JSON argument` et sa pile ; Zapatos 6.6.1 le lisait comme l’argument JSON, et échouait. Après `config`, un tel argument est ignoré, comme dans Zapatos 6.6.1, avec une [note](#generate.warningListener) : un `npx pgcast '{}' --chek` mal orthographié génère.
+- À partir de la 6.8.0, un seul flag, `--check`, avant ou après `config`. À partir de la 6.12.0, `--help` ou `-h` à la place de `config` affiche l’aide, qui nomme les fichiers de configuration, `config`, les flags et cette page, et se termine avec le code 0, avant qu’elle lise la config.
+- Tout autre argument qui commence par `--`, à la place de `config`, l’arrête avec le code 1 avant qu’elle lise la config. À partir de la 6.12.0, elle affiche `Unknown flag --chek: the flags are --check, --help and -h` et l’aide, sur stderr ; à partir de la 6.8.0, Node affichait `Unknown flag --chek: the only flag is --check, beside the JSON argument` et sa pile. Zapatos 6.6.1 lisait chacun d’eux, `-h` aussi, comme l’argument JSON, et échouait.
+- Après `config`, un tel argument est ignoré, `--help` compris, comme dans Zapatos 6.6.1, avec une [note](#generate.warningListener) : un `npx pgcast '{}' --chek` mal orthographié génère.
 - Parmi les autres arguments, le premier est `config` ; les suivants sont ignorés.
 - Les chemins sont relatifs au dossier où vous le lancez : `outDir`, et donc le dossier `zapatos`.
 
@@ -48,7 +51,7 @@ Puis elle se termine par la cause :
 
 | Cause | Fin |
 |---|---|
-| JSON invalide | le message de `JSON.parse`, qui dépend de l’entrée et de Node : sur Node 22, `Unexpected end of JSON input` pour un fichier vide, `No number after minus sign in JSON at position 1 (line 1 column 2)` pour `-h`, `Expected double-quoted property name in JSON at position 15 (line 1 column 16)` pour une virgule finale |
+| JSON invalide | le message de `JSON.parse`, qui dépend de l’entrée et de Node : sur Node 22, `Unexpected end of JSON input` pour un fichier vide, `No number after minus sign in JSON at position 1 (line 1 column 2)` pour `-x`, `Expected double-quoted property name in JSON at position 15 (line 1 column 16)` pour une virgule finale |
 | une variable n’est pas définie | `Environment variable 'DATABASE_URL' is not set` |
 
 Une requête qui échoue, connexion comprise, l’arrête avec le code 1, après `*** error <n> ***` et l’erreur, comme dans Zapatos 6.6.1 : la CLI met [`rejectOnQueryError`](#generate.rejectOnQueryError) à `false` par-dessus le fichier et l’argument.
