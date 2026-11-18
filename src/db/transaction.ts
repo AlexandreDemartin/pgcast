@@ -99,8 +99,9 @@ export type TxnClientLike<C, T extends IsolationLevel> = C & {
 type NoInfer<T> = [T][T extends any ? 0 : never];  // https://github.com/Microsoft/TypeScript/issues/14829
 
 // the client a callback gets: C stays unknown for a pg queryable, which gives the TxnClient… of Zapatos 6.6.1, Pg, as
-// do Parameters and infer, which read C as unknown; a PoolLike's client otherwise, inferred from its connect()
-type TxnClientOf<C, Pg, T extends IsolationLevel> = unknown extends C ? Pg : TxnClientLike<C, T>;
+// do Parameters and infer, which read C as unknown, and so does a pg.PoolClient, from a pg.Pool subclass whose connect()
+// is its own; a PoolLike's client otherwise, inferred from its connect()
+type TxnClientOf<C, Pg, T extends IsolationLevel> = unknown extends C ? Pg : [C] extends [pg.PoolClient] ? Pg : TxnClientLike<C, T>;
 
 // the callback as the body of transaction() calls it: with the client of a PoolLike, which run time uses as a TxnClient
 type Callback<T, M extends IsolationLevel> = (client: TxnClient<IsolationSatisfying<M>>) => Promise<T>;
