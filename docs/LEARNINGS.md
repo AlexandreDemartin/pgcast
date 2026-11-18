@@ -119,6 +119,12 @@ Candidates for a check, a rule or a skill line.
 - #730 — A field documented as normalised (here `maxAttempts`) needs a test row where the raw input and the normalised value differ (0, 2.5, '3') — branch-reviewer
 - #730 — For a TS 4.1.6 consumer probe, `npm pack` the build and link the 4.1 `@types` with `preserveSymlinks`: a symlink to the checkout pulls in its newer `@types/node`, which 4.1.6 cannot parse — builder
 - #730 — A refusal resting on `strictFunctionTypes` holds only under `strict`: a docs "doesn't compile" for it names the condition, probed with `strict: false` — branch-reviewer
+- #740 — A guide sentence copied from an issue is replayed before it is written: "the lock queues rather than retries" held only at READ COMMITTED — builder
+- #740 — A two-transaction race needs a warm pool and a sleep inside the lock to overlap, or the replay shows no conflict at any level; `pg_locks` covers the whole server, so filter it by `database` — builder
+- #740 — A how-to written after its reference entry and restating it drops the conditions the reference's review added: check each shared sentence against the entry's full bullet, or link it — branch-reviewer
+- #740 — A pronoun in a race claim ("it books five") can carry a wrong subject: log each participant's result, not only the total, and reread the sentence against them — branch-reviewer
+- #740 — At SERIALIZABLE a unique violation becomes a 40001 only if the transaction had read the key: a real 40001 inside a savepoint takes a write skew, not a duplicate key — branch-reviewer
+- #740 — A reference passage copied into a guide drops its conditions; a guide that links the entry, one clause per rule, keeps them by construction — builder
 
 ## Minors kept
 
@@ -138,3 +144,4 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #728 — form: `website/fr/transaction.md:351` "dont le callback est rejeté": a callback is not rejected, its promise is ("dont le callback échoue") — branch-reviewer
 - #728 — defect: `advisoryXactLock()`'s `instanceof pg.Pool` misses a `pg.native.Pool` and a pool of a second copy of `pg` (not run) — branch-reviewer
 - #730 — defect: three DEFERRABLE and isolation-level integration tests timed out at 5 s with other suites on the server, and passed alone (a flaky timeout to watch) — builder
+
