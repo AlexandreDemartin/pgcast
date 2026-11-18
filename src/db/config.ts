@@ -45,7 +45,7 @@ export interface Config {
   queryListener?(query: SQLQuery, txnId?: number): void;
   resultListener?(result: any, txnId?: number, elapsedMs?: number, query?: SQLQuery): void;
   transactionListener?(message: string, txnId?: number): void;
-  transactionEventListener?(event: TransactionEvent, txnId?: number): void;  // called right after transactionListener, at its three points
+  transactionEventListener?: (event: TransactionEvent, txnId?: number) => void;  // called right after transactionListener, at its three points; a property, so that a listener must take all three types
 }
 export type NewConfig = Partial<Config>;
 
