@@ -169,6 +169,12 @@ let txnSeq = 0;
  * read-only levels, which the type leaves out, as in Zapatos 6.6.1, #489), the callback would run at that level: with the
  * `transactionRequiresSatisfyingLevel` config option, this rejects before
  * calling it; without it, it runs and emits `PGCAST_DEP007`, once.
+ *
+ * Given a `PoolLike` of another driver, the callback gets its client, a
+ * `TxnClientLike`, released once the transaction ends. Passed to a nested
+ * call, that client is passed through at run time, but the type takes only
+ * `pg`'s: cast it (`as unknown as db.TxnClientForSerializable`), and never
+ * give the nested call the pool, whose second client is another transaction.
  * @param txnClientOrQueryable The `pg.Pool` from which to check out a client,
  * a plain client (`pg.Client`, `pg.native.Client` or a `pg.PoolClient`, used
  * as is and not released), an existing transaction client to be passed
@@ -183,7 +189,6 @@ export async function transaction<T, M extends IsolationLevel, C = unknown>(
   isolationLevel: M,
   callback: (client: TxnClientOf<C, TxnClient<IsolationSatisfying<M>>, IsolationSatisfying<M>>) => Promise<T>
 ): Promise<T> {
-
 
   if (Object.prototype.hasOwnProperty.call(txnClientOrQueryable, '_zapatos')) {
     // if txnClientOrQueryable is a TxnClient, just pass it through: its callback runs at the outer transaction's level, as
