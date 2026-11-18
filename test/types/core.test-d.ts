@@ -60,8 +60,9 @@ describe('sql<Interpolations, RunResult, Constraint>', () => {
     db.sql<s.products.SQL>`${titel}`;
   });
 
-  // the guard is in each table's SQL, not in db.SQL: there, it refused a generic `${{ ...w, id: 1 }}` on
-  // TypeScript 4.1 (review of #676)
+  // left by design (#674): the guard is in each table's SQL, not in db.SQL, where it refused a generic
+  // `${{ ...w, id: 1 }}` on TypeScript 4.1 (review of #676); as a Whereable given as sql's own type argument, it
+  // refused a forwarder `<I>(…) => db.sql<I>(…)`
   test('characterization: db.SQL, and a Whereable given as sql\'s own type argument, still take any string (#674)', () => {
     expectTypeOf(db.sql`${'serach'}`).toEqualTypeOf<db.SQLFragment<any[], never>>();
     expectTypeOf(db.sql<s.products.Whereable>`${'serach'}`).toEqualTypeOf<db.SQLFragment<any[], never>>();

@@ -1,5 +1,5 @@
 ---
-english: 8d6d3f525d2c
+english: 271fffaf73ac
 ---
 
 # Écritures
@@ -209,6 +209,8 @@ Un tableau vide, pour le `updateColumns` d’`upsert()` : une ligne en conflit 
 ## `UpsertOptions` {#UpsertOptions}
 
 À partir de la 6.9.0. `UpsertOptions<T, C, E, UC, RA>` : les `options` d’`upsert()`, le [`ReturningOptionsForTable`](#ReturningOptionsForTable) avec `updateValues`, `updateColumns`, `noNullUpdateColumns` et `reportAction` ([Options](#upsert-options)). `UC` est le type d’`updateColumns` et `RA` celui de `reportAction` (`undefined` pour une option non donnée).
+
+Son `updateValues` accepte n’importe quelle chaîne sur une table dont une colonne porte le nom d’un membre de `String`, d’un type auquel ce membre correspond (`length`, un nombre), à dessein : la vérification qu’ont les valeurs d’`upsert()`, d’`insert()` et d’`update()` ajouterait une clé à `UpsertOptions['updateValues']` ([#674](https://github.com/AlexandreDemartin/pgcast/issues/674)).
 
 ## `UpsertReturnableForTable` {#UpsertReturnableForTable}
 

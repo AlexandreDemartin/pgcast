@@ -646,6 +646,8 @@ The default `Interpolations` of `sql`: an expression, or an array of them. Each 
 
 So `` db.sql<s.films.SQL>`INSERT INTO ${'films'} (${db.cols({ seat: 1 })}) VALUES (${db.vals({ seat: 1 })})` `` type-checks, and fails only in Postgres (42703: `films` has no `seat`).
 
+`db.SQL` takes the Whereable of every table, so in a schema with a column named like a member of `String`, of a type that member fits (`length`, a number), it takes any string, as the Whereable of such a table given as `Interpolations` does. This is by design: a check in `db.SQL` refused a generic <code v-pre>${{ ...where, id }}</code> in `db.sql` on TypeScript 4.1, and one on `Interpolations` a forwarder `<I>(…) => db.sql<I>(…)` ([#674](https://github.com/AlexandreDemartin/pgcast/issues/674)). Give the table's `SQL`, which refuses it.
+
 ### `SQLExpression` {#SQLExpression}
 
 ```ts

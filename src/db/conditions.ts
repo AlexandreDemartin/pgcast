@@ -365,6 +365,9 @@ const subquery = (fn: string, head: SQL, table: string, where: SQL | AllType, op
   return query;
 };
 
+// as in ./shortcuts: a string, which has an iterator, is no Whereable of `table` (#674)
+type WhereableArg<T extends Table> = { [K in Table]: WhereableForTable<K> & { [Symbol.iterator]?: undefined } }[T];
+
 /**
  * `EXISTS (SELECT 1 FROM <table> WHERE <where>)`: some row of `table` matches `where`. In `where`, `parent('id')`
  * is the outer row's column, `"<parent>"."id"`, once `parent` names the outer table. Never `NULL`; it fits under any
@@ -374,7 +377,7 @@ const subquery = (fn: string, head: SQL, table: string, where: SQL | AllType, op
  * @param options `parent`, the outer table as the outer query names it (its alias, if any); `alias`, `AS <alias>`
  * after `table`, needed when `parent` names it; `null` is none, and one that is no string throws as the query compiles
  */
-export const exists = <T extends Table>(table: T, where: WhereableForTable<T> | SQLFragment<any> | AllType, options?: { parent?: string; alias?: string }) =>
+export const exists = <T extends Table>(table: T, where: WhereableArg<T> | SQLFragment<any> | AllType, options?: { parent?: string; alias?: string }) =>
   sql<SQL, boolean, never>`EXISTS (${subquery('exists', raw('SELECT 1'), table, where, options)})`;
 
 /**
@@ -386,7 +389,7 @@ export const exists = <T extends Table>(table: T, where: WhereableForTable<T> | 
  * @param column The column of `table` the subquery selects
  * @param options `parent` and `alias`, as in `exists()`; `null` is none
  */
-export const isInSelect = <T extends Table, C extends keyof SelectableForTable<T>>(table: T, where: WhereableForTable<T> | SQLFragment<any> | AllType, column: C, options?: { parent?: string; alias?: string }) =>
+export const isInSelect = <T extends Table, C extends keyof SelectableForTable<T>>(table: T, where: WhereableArg<T> | SQLFragment<any> | AllType, column: C, options?: { parent?: string; alias?: string }) =>
   sql<SQL, boolean | null, Exclude<SelectableForTable<T>[C], null>>`${self} IN (${subquery('isInSelect', sql`SELECT ${column as Column}`, table, where, options)})`;
 
 /* === full-text search === */

@@ -1,5 +1,5 @@
 ---
-english: 460ecaf4e4e9
+english: 54e6bb276e20
 ---
 
 # Template SQL
@@ -649,6 +649,8 @@ type SQL = SQLExpression | SQLExpression[]
 Les `Interpolations` par défaut de `sql` : une expression, ou un tableau d’expressions. Chaque table du schéma généré a le sien, `s.films.SQL`, qui n’accepte que les noms et les Whereables de cette table ; `cols()` et `vals()` de n’importe quelle valeur, comme dans Zapatos 6.6.1.
 
 Ainsi, `` db.sql<s.films.SQL>`INSERT INTO ${'films'} (${db.cols({ seat: 1 })}) VALUES (${db.vals({ seat: 1 })})` `` passe la vérification de types, et n’échoue que dans Postgres (42703 : `films` n’a pas de `seat`).
+
+`db.SQL` prend le Whereable de toutes les tables : dans un schéma où une colonne porte le nom d’un membre de `String`, d’un type auquel ce membre correspond (`length`, un nombre), il accepte donc n’importe quelle chaîne, comme le fait le Whereable d’une telle table donné comme `Interpolations`. C’est voulu : une vérification dans `db.SQL` refusait un <code v-pre>${{ ...where, id }}</code> de `db.sql` dans une fonction générique sous TypeScript 4.1, et une vérification sur `Interpolations` refusait une fonction qui transmet son type, `<I>(…) => db.sql<I>(…)` ([#674](https://github.com/AlexandreDemartin/pgcast/issues/674)). Donnez le `SQL` de la table, qui la refuse.
 
 ### `SQLExpression` {#SQLExpression}
 

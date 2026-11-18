@@ -174,6 +174,14 @@ CREATE TABLE extra.articles (
   body text NOT NULL
 );
 
+-- a column named like a member of String, of a type that member fits (`length`, a number), and no column required:
+-- a string fits its Whereable, Insertable and Updatable but for the guard of zapatos/db (#674)
+CREATE TABLE extra.spools (
+  id int GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  length int,
+  label text
+);
+
 -- foreign table (file_fdw): /dev/null exists on every server, so scans return no row
 CREATE SERVER fixture_files FOREIGN DATA WRAPPER file_fdw;
 CREATE FOREIGN TABLE extra.imported_lines (line text) SERVER fixture_files OPTIONS (filename '/dev/null', format 'text');

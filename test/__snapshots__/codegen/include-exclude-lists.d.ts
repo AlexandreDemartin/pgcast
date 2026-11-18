@@ -920,22 +920,123 @@ declare module 'zapatos/schema' {
       export type SQL = SQLExpression | SQLExpression[];
     }
   
+    /**
+     * **extra.spools**
+     * - Table in database
+     */
+    export namespace spools {
+      export type Table = 'extra.spools';
+      export interface Selectable {
+        /**
+        * **extra.spools.id**
+        * - `int4` in database
+        * - Generated column
+        */
+        id: number;
+        /**
+        * **extra.spools.label**
+        * - `text` in database
+        * - Nullable, no default
+        */
+        label: string | null;
+        /**
+        * **extra.spools.length**
+        * - `int4` in database
+        * - Nullable, no default
+        */
+        length: number | null;
+      }
+      export interface JSONSelectable {
+        /**
+        * **extra.spools.id**
+        * - `int4` in database
+        * - Generated column
+        */
+        id: number;
+        /**
+        * **extra.spools.label**
+        * - `text` in database
+        * - Nullable, no default
+        */
+        label: string | null;
+        /**
+        * **extra.spools.length**
+        * - `int4` in database
+        * - Nullable, no default
+        */
+        length: number | null;
+      }
+      export interface Whereable {
+        /**
+        * **extra.spools.id**
+        * - `int4` in database
+        * - Generated column
+        */
+        id?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+        /**
+        * **extra.spools.label**
+        * - `text` in database
+        * - Nullable, no default
+        */
+        label?: string | db.Parameter<string> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, string | db.Parameter<string> | db.SQLFragment | db.ParentColumn>;
+        /**
+        * **extra.spools.length**
+        * - `int4` in database
+        * - Nullable, no default
+        */
+        length?: number | db.Parameter<number> | db.SQLFragment | db.ParentColumn | db.SQLFragment<any, number | db.Parameter<number> | db.SQLFragment | db.ParentColumn>;
+      }
+      export interface Insertable {
+        /**
+        * **extra.spools.label**
+        * - `text` in database
+        * - Nullable, no default
+        */
+        label?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment<any>;
+        /**
+        * **extra.spools.length**
+        * - `int4` in database
+        * - Nullable, no default
+        */
+        length?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment<any>;
+      }
+      export interface Updatable {
+        /**
+        * **extra.spools.label**
+        * - `text` in database
+        * - Nullable, no default
+        */
+        label?: string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, string | db.Parameter<string> | null | db.DefaultType | db.SQLFragment>;
+        /**
+        * **extra.spools.length**
+        * - `int4` in database
+        * - Nullable, no default
+        */
+        length?: number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, number | db.Parameter<number> | null | db.DefaultType | db.SQLFragment>;
+      }
+      export type UniqueIndex = 'spools_pkey';
+      export type Column = keyof Selectable;
+      export type OnlyCols<T extends readonly Column[]> = Pick<Selectable, T[number]>;
+      export type SQLExpression = Table | db.ColumnNames<Updatable | (keyof Updatable)[]> | db.ColumnValues<Updatable> | (Whereable & { [Symbol.iterator]?: undefined }) | Column | db.ParentColumn | db.GenericSQLExpression;
+      export type SQL = SQLExpression | SQLExpression[];
+    }
+  
     /* --- aggregate types --- */
   
-    export type Table = article_authors.Table | articles.Table;
-    export type Selectable = article_authors.Selectable | articles.Selectable;
-    export type JSONSelectable = article_authors.JSONSelectable | articles.JSONSelectable;
-    export type Whereable = article_authors.Whereable | articles.Whereable;
-    export type Insertable = article_authors.Insertable | articles.Insertable;
-    export type Updatable = article_authors.Updatable | articles.Updatable;
-    export type UniqueIndex = article_authors.UniqueIndex | articles.UniqueIndex;
-    export type Column = article_authors.Column | articles.Column;
+    export type Table = article_authors.Table | articles.Table | spools.Table;
+    export type Selectable = article_authors.Selectable | articles.Selectable | spools.Selectable;
+    export type JSONSelectable = article_authors.JSONSelectable | articles.JSONSelectable | spools.JSONSelectable;
+    export type Whereable = article_authors.Whereable | articles.Whereable | spools.Whereable;
+    export type Insertable = article_authors.Insertable | articles.Insertable | spools.Insertable;
+    export type Updatable = article_authors.Updatable | articles.Updatable | spools.Updatable;
+    export type UniqueIndex = article_authors.UniqueIndex | articles.UniqueIndex | spools.UniqueIndex;
+    export type Column = article_authors.Column | articles.Column | spools.Column;
   
-    export type AllBaseTables = [articles.Table];
+    export type AllBaseTables = [articles.Table, spools.Table];
     export type AllForeignTables = [];
     export type AllViews = [article_authors.Table];
     export type AllMaterializedViews = [];
-    export type AllTablesAndViews = [article_authors.Table, articles.Table];
+    export type AllTablesAndViews = [article_authors.Table, articles.Table, spools.Table];
   }
 
 
@@ -966,6 +1067,7 @@ declare module 'zapatos/schema' {
     "users": users.Selectable;
     "extra.article_authors": extra.article_authors.Selectable;
     "extra.articles": extra.articles.Selectable;
+    "extra.spools": extra.spools.Selectable;
   }[T];
 
   export type JSONSelectableForTable<T extends Table> = {
@@ -973,6 +1075,7 @@ declare module 'zapatos/schema' {
     "users": users.JSONSelectable;
     "extra.article_authors": extra.article_authors.JSONSelectable;
     "extra.articles": extra.articles.JSONSelectable;
+    "extra.spools": extra.spools.JSONSelectable;
   }[T];
 
   export type WhereableForTable<T extends Table> = {
@@ -980,6 +1083,7 @@ declare module 'zapatos/schema' {
     "users": users.Whereable;
     "extra.article_authors": extra.article_authors.Whereable;
     "extra.articles": extra.articles.Whereable;
+    "extra.spools": extra.spools.Whereable;
   }[T];
 
   export type InsertableForTable<T extends Table> = {
@@ -987,6 +1091,7 @@ declare module 'zapatos/schema' {
     "users": users.Insertable;
     "extra.article_authors": extra.article_authors.Insertable;
     "extra.articles": extra.articles.Insertable;
+    "extra.spools": extra.spools.Insertable;
   }[T];
 
   export type UpdatableForTable<T extends Table> = {
@@ -994,6 +1099,7 @@ declare module 'zapatos/schema' {
     "users": users.Updatable;
     "extra.article_authors": extra.article_authors.Updatable;
     "extra.articles": extra.articles.Updatable;
+    "extra.spools": extra.spools.Updatable;
   }[T];
 
   export type UniqueIndexForTable<T extends Table> = {
@@ -1001,6 +1107,7 @@ declare module 'zapatos/schema' {
     "users": users.UniqueIndex;
     "extra.article_authors": extra.article_authors.UniqueIndex;
     "extra.articles": extra.articles.UniqueIndex;
+    "extra.spools": extra.spools.UniqueIndex;
   }[T];
 
   export type ColumnForTable<T extends Table> = {
@@ -1008,6 +1115,7 @@ declare module 'zapatos/schema' {
     "users": users.Column;
     "extra.article_authors": extra.article_authors.Column;
     "extra.articles": extra.articles.Column;
+    "extra.spools": extra.spools.Column;
   }[T];
 
   export type SQLForTable<T extends Table> = {
@@ -1015,6 +1123,7 @@ declare module 'zapatos/schema' {
     "users": users.SQL;
     "extra.article_authors": extra.article_authors.SQL;
     "extra.articles": extra.articles.SQL;
+    "extra.spools": extra.spools.SQL;
   }[T];
 
 }
