@@ -108,6 +108,7 @@ describe('transaction() on a client that cannot tell its transaction status', ()
 describe('transaction() on a pool that is not pg’s', () => {
   afterEach(() => {
     db.setConfig({ transactionRetryDelay: { minMs: 25, maxMs: 250 }, transactionAttemptsMax: 5, transactionRequiresCommit: false });
+    db.setConfig({ transactionEventListener: undefined } as unknown as db.NewConfig);  // exactOptionalPropertyTypes refuses it
     vi.restoreAllMocks();
   });
 
@@ -163,6 +164,51 @@ describe('transaction() on a pool that is not pg’s', () => {
       'connect()', 'START TRANSACTION ISOLATION LEVEL SERIALIZABLE', 'SELECT 1', 'ROLLBACK',
       'START TRANSACTION ISOLATION LEVEL SERIALIZABLE', 'SELECT 1', 'ROLLBACK', 'release()',
     ]);
+  });
+
+  it('retries on 40001 with the same events as on a pg pool (#725)', async () => {
+    const events: [db.TransactionEvent, number | undefined][] = [];
+    db.setConfig({ transactionRetryDelay: { minMs: 0, maxMs: 0 }, transactionEventListener: (event, txnId) => { events.push([event, txnId]); } });
+    let failures = 1;
+    const pool = otherPool(text => text === 'SELECT 1' && failures-- > 0 ? serializationFailure() : undefined);
+    expect(await db.serializable(pool, async c => { await db.sql`SELECT 1`.run(c); return 'done'; })).toBe('done');
+    const txnId = events[0]?.[1];
+    expect(typeof txnId).toBe('number');
+    expect(events).toStrictEqual([
+      [{ type: 'rollback', code: '40001', attempt: 1, maxAttempts: 5, delayMs: 0 }, txnId],
+      [{ type: 'retry', attempt: 2, maxAttempts: 5 }, txnId],
+    ]);
+  });
+
+  // isDatabaseError() matches a String object code (#501): the event gives its text, as the message prints it
+  it.each([
+    ['a String object', () => new String('40001')],
+    ['a string', () => '40001'],
+  ])('gives a code that is %s as the message prints it, read once for both listeners', async (_, code) => {
+    let reads = 0;
+    const failure = () => Object.defineProperty(new Error('could not serialize access'), 'code', { get: () => { reads++; return code(); } });
+    const logged: unknown[] = [];
+    db.setConfig({
+      transactionRetryDelay: { minMs: 0, maxMs: 0 }, transactionAttemptsMax: 2,
+      transactionListener: message => { logged.push(message); },
+      transactionEventListener: event => { logged.push(event); },
+    });
+    try {
+      const pool = otherPool(text => text === 'SELECT 1' ? failure() : undefined);
+      await expect(db.serializable(pool, c => db.sql`SELECT 1`.run(c))).rejects.toThrow('could not serialize access');
+      expect(logged).toStrictEqual([
+        'Transaction rollback (code 40001) on attempt 1 of 2, retrying in 0ms',
+        { type: 'rollback', code: '40001', attempt: 1, maxAttempts: 2, delayMs: 0 },
+        'Retrying transaction, attempt 2 of 2',
+        { type: 'retry', attempt: 2, maxAttempts: 2 },
+        'Transaction rollback (code 40001) on attempt 2 of 2, giving up',
+        { type: 'giveUp', code: '40001', attempt: 2, maxAttempts: 2 },
+      ]);
+      expect(logged.filter(e => typeof e === 'object').map(e => typeof (e as { code?: unknown }).code)).toEqual(['string', 'undefined', 'string']);
+      expect(reads).toBe(4);  // at each failure, once by isDatabaseError(), once for the listeners: as on master with transactionListener alone
+    } finally {
+      db.setConfig({ transactionListener: undefined } as unknown as db.NewConfig);
+    }
   });
 
   it('reads the command of its COMMIT: answered ROLLBACK, it warns PGCAST_DEP003, then releases the client', async () => {

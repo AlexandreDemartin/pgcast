@@ -1,5 +1,5 @@
 ---
-english: 171d5081ff6d
+english: 2698f52995f4
 description: "Passez de Zapatos 6.6.1 à pgcast : changez une ligne de package.json et régénérez ; tsc et les avertissements de pgcast montrent les rares appels qui changent."
 ---
 
@@ -322,7 +322,7 @@ La note de [`rejectOnQueryError`](/fr/generator#generate.rejectOnQueryError) vie
 npm install zapatos@6.6.1
 ```
 
-- D’abord, retirez de `setConfig()` les options que la `Config` de Zapatos 6.6.1 n’a pas (2353) : `upsertRequiresSameKeys`, `undefinedMeansMissing`, `transactionRequiresCommit`, `transactionRequiresIdleClient`, `transactionRequiresSatisfyingLevel`, `selectExactlyOneChecksForSecondRow` et `aggregatesTypedByColumn`.
+- D’abord, retirez de `setConfig()` les options que la `Config` de Zapatos 6.6.1 n’a pas (2353) : `upsertRequiresSameKeys`, `undefinedMeansMissing`, `transactionRequiresCommit`, `transactionRequiresIdleClient`, `transactionRequiresSatisfyingLevel`, `selectExactlyOneChecksForSecondRow`, `aggregatesTypedByColumn` et `transactionEventListener`, que TypeScript prend pour une faute de frappe de `transactionListener` (2561). Zapatos 6.6.1 n’appelle jamais cet écouteur : alimentez plutôt un log ou une métrique avec les messages de `transactionListener`.
 - Avec [`moduleNames`](/fr/generator#generate.moduleNames) à `"pgcast"`, lancez aussi `npm uninstall pgcast` : les deux paquets ont une commande `zapatos`. Vos imports `pgcast/…` ne se résolvent alors plus, et la 6.6.1 écrit `zapatos/` mais laisse `pgcast/` en place. Remettez donc chaque import en `zapatos/…`, déplacez les placeholders que vous avez modifiés dans `zapatos/custom/`, leur `declare module 'pgcast/custom'` renommé en `'zapatos/custom'`, et supprimez `pgcast/`.
 - Renommez un `pgcastconfig.json` en `zapatosconfig.json` : la CLI de Zapatos 6.6.1 ne lit aucun autre fichier.
 - Retirez [`--check`](/fr/generator#check) de vos scripts. Avant l’argument JSON, la CLI de Zapatos 6.6.1 le lit comme cet argument, et s’arrête avec le code 1 ; après lui, elle l’ignore, écrit les fichiers et se termine avec le code 0 : la vérification passe donc toujours. [`check()`](/fr/generator#check) aussi : le `zapatos/generate` de Zapatos 6.6.1 n’a pas cet export, ce que TypeScript refuse (2305) ; à l’exécution, `require()` donne `undefined` et l’appel lève `TypeError: check is not a function`, et un import de module ES échoue avant que le moindre code ne s’exécute.

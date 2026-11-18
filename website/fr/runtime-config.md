@@ -1,5 +1,5 @@
 ---
-english: 557959ef843c
+english: 1fc49c78eaaf
 description: "Ce que zapatos/db vous laisse régler à l’exécution : setConfig() et chaque option de Config, les écouteurs, les opt-ins et leurs codes d’avertissement."
 ---
 
@@ -83,6 +83,7 @@ interface Config {
   queryListener?(query: SQLQuery, txnId?: number): void;
   resultListener?(result: any, txnId?: number, elapsedMs?: number, query?: SQLQuery): void;
   transactionListener?(message: string, txnId?: number): void;
+  transactionEventListener?: (event: TransactionEvent, txnId?: number) => void;
 }
 ```
 
@@ -106,6 +107,7 @@ Les clés qu’ajoute pgcast sont facultatives, donc un `Config` écrit pour Zap
 | [`queryListener`](#Config.queryListener) | aucun | appelé avec chaque requête qu’envoie `run()` | à chaque `run()` |
 | [`resultListener`](#Config.resultListener) | aucun | appelé avec chaque résultat que donne `run()` | à chaque `run()` |
 | [`transactionListener`](#Config.transactionListener) | aucun | appelé quand une tentative de `transaction()` échoue avec `40001` ou `40P01`, et à chaque retry | à chaque `transaction()` |
+| [`transactionEventListener`](#Config.transactionEventListener) | aucun | appelé juste après `transactionListener`, avec un [`TransactionEvent`](#TransactionEvent) à la place du message | à chaque `transaction()` |
 
 </div>
 
@@ -127,7 +129,7 @@ Combien de fois [`transaction()`](/fr/transaction#transaction) exécute son call
 transactionRetryDelay: { minMs: number; maxMs: number }  // default: { minMs: 25, maxMs: 250 }
 ```
 
-Avant chaque retry, `transaction()` attend un nombre entier de millisecondes de `minMs` à `maxMs`, arrondi d’un tirage uniforme entre les deux : `Math.round(minMs + (maxMs - minMs) * Math.random())`. Ainsi `minMs` et `maxMs` sortent deux fois moins souvent que chaque valeur entre eux. [`transactionListener`](#Config.transactionListener) est informé de l’attente.
+Avant chaque retry, `transaction()` attend un nombre entier de millisecondes de `minMs` à `maxMs`, arrondi d’un tirage uniforme entre les deux : `Math.round(minMs + (maxMs - minMs) * Math.random())`. Ainsi `minMs` et `maxMs` sortent deux fois moins souvent que chaque valeur entre eux. [`transactionListener`](#Config.transactionListener) est informé de l’attente, et [`transactionEventListener`](#Config.transactionEventListener) la reçoit dans `delayMs`.
 
 ### `castArrayParamsToJson` {#Config.castArrayParamsToJson}
 
@@ -327,13 +329,37 @@ Appelé par `transaction()` quand une tentative échoue avec `40001` ou `40P01`,
 
 | Quand | Message |
 |---|---|
-| une tentative a échoué, il en reste une autre | `` `Transaction rollback (code ${err.code}) on attempt ${attempt} of ${maxAttempts}, retrying in ${delayBeforeRetry}ms` ``<!-- message --> |
+| une tentative a échoué, il en reste une autre | `` `Transaction rollback (code ${code}) on attempt ${attempt} of ${maxAttempts}, retrying in ${delayBeforeRetry}ms` ``<!-- message --> |
 | la tentative suivante démarre | `` `Retrying transaction, attempt ${attempt} of ${maxAttempts}` ``<!-- message --> |
-| la dernière tentative a échoué | `` `Transaction rollback (code ${err.code}) on attempt ${attempt} of ${maxAttempts}, giving up` ``<!-- message --> |
+| la dernière tentative a échoué | `` `Transaction rollback (code ${code}) on attempt ${attempt} of ${maxAttempts}, giving up` ``<!-- message --> |
 
 Avec `transactionAttemptsMax: 3` et `transactionRetryDelay: { minMs: 1, maxMs: 2 }`, un callback qui échoue avec `40001` à chaque fois donne `Transaction rollback (code 40001) on attempt 1 of 3, retrying in 1ms`<!-- message -->, `Retrying transaction, attempt 2 of 3`<!-- message -->, puis la même chose pour la tentative 2, et `Transaction rollback (code 40001) on attempt 3 of 3, giving up`<!-- message -->.
 
 Il n’est pas appelé pour une transaction commitée dès sa première tentative, ni pour toute autre erreur.
+
+### `transactionEventListener` {#Config.transactionEventListener}
+
+```ts
+transactionEventListener?: (event: TransactionEvent, txnId?: number) => void
+```
+
+À partir de la 6.12.0. Appelé par `transaction()` juste après [`transactionListener`](#Config.transactionListener), aux trois mêmes moments, avec un [`TransactionEvent`](#TransactionEvent) qui porte les nombres du message, et avec l’id de la transaction. Chaque écouteur est appelé s’il est réglé, que l’autre le soit ou non. Un log ou une métrique lit ainsi la nature de l’événement, le code et la tentative comme des champs, et non dans le texte :
+
+```ts twoslash
+import * as db from 'zapatos/db';
+// ---cut---
+db.setConfig({
+  transactionEventListener: (event, txnId) =>
+    console.log(JSON.stringify({ txnId, ...event })),
+});
+```
+
+Sur un `40001` à la première de cinq tentatives, ce code affiche `{"txnId":0,"type":"rollback","code":"40001","attempt":1,"maxAttempts":5,"delayMs":97}`, `delayMs` étant l’attente tirée de [`transactionRetryDelay`](#Config.transactionRetryDelay), puis `{"txnId":0,"type":"retry","attempt":2,"maxAttempts":5}`.
+
+- Comme `transactionListener`, il n’est pas appelé pour une transaction commitée dès sa première tentative, ni pour toute autre erreur, ni par un `transaction()` qui reçoit le client d’une transaction et le transmet tel quel.
+- S’il lève une erreur, `transaction()` est rejetée avec cette erreur, comme quand `transactionListener` en lève une : une fois le `ROLLBACK` envoyé, et le client libéré. Une erreur qu’il lève à `retry` avec un `code` `40001` ou `40P01` compte comme l’échec de cette tentative, qui est réessayée tant qu’il reste une tentative, comme tout `40001`.
+- C’est une propriété, là où les autres écouteurs sont des méthodes : un écouteur typé pour une partie des événements, qui lirait une clé que les autres n’ont pas, ne compile pas sous `strict` (`strictFunctionTypes`).
+- Zapatos 6.6.1 n’a pas cette option ([Revenir en arrière](/fr/switching#go-back)).
 
 ### Les ids de transaction {#transaction-ids}
 
@@ -390,6 +416,27 @@ interface SQLQuery { text: string; values: any[]; name?: string }
 ```
 
 Une requête compilée, telle que la prend le `query()` de `pg` : ce que renvoie [`compile()`](/fr/sql-template#compile) et ce que reçoivent les écouteurs. `name` est réglé par [`prepared()`](/fr/sql-template#prepared).
+
+## `TransactionEvent` {#TransactionEvent}
+
+```ts
+type TransactionEvent =
+  | { type: 'rollback'; code: '40001' | '40P01'; attempt: number; maxAttempts: number; delayMs: number }
+  | { type: 'retry'; attempt: number; maxAttempts: number }
+  | { type: 'giveUp'; code: '40001' | '40P01'; attempt: number; maxAttempts: number };
+```
+
+À partir de la 6.12.0. Ce que reçoit [`transactionEventListener`](#Config.transactionEventListener), un événement par message de [`transactionListener`](#Config.transactionListener) :
+
+| `type` | Quand | Son message |
+|---|---|---|
+| `rollback` | une tentative a échoué, il en reste une autre : avant l’attente de `delayMs` | `` `Transaction rollback (code ${code}) on attempt ${attempt} of ${maxAttempts}, retrying in ${delayBeforeRetry}ms` ``<!-- message --> |
+| `retry` | la tentative suivante démarre, avant son `START TRANSACTION` | `` `Retrying transaction, attempt ${attempt} of ${maxAttempts}` ``<!-- message --> |
+| `giveUp` | la dernière tentative a échoué, avant que `transaction()` soit rejetée | `` `Transaction rollback (code ${code}) on attempt ${attempt} of ${maxAttempts}, giving up` ``<!-- message --> |
+
+- `code` est le `code` de l’erreur, tel que le message l’affiche : une chaîne, bien que `isDatabaseError()` corresponde aussi à un objet `String`.
+- `attempt` compte à partir de 1. `maxAttempts` est le nombre de tentatives que fait `transaction()`, que le message compte aussi : `1` pour un `transactionAttemptsMax` de `0`.
+- `type` affine le type de l’événement : `event.delayMs` ne compile qu’après `event.type === 'rollback'`.
 
 ## Opt-ins et avertissements {#opt-ins-and-warnings}
 

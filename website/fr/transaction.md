@@ -1,5 +1,5 @@
 ---
-english: 309123f6dd96
+english: 200b060a0c7a
 ---
 
 # Transactions
@@ -80,13 +80,13 @@ Quand `START TRANSACTION`, le callback ou `COMMIT` est rejeté avec un `code` 40
 - Après la dernière tentative, elle est rejetée avec l’erreur de cette tentative.
 - Tout autre rejet : `ROLLBACK`, puis elle est rejetée avec lui, aussitôt.
 - Un `COMMIT` auquel Postgres répond par `ROLLBACK` n’est pas relancé : pgcast ne sait pas quelle erreur le callback a interceptée.
-- [`transactionListener`](/fr/runtime-config#Config.transactionListener) reçoit chaque message avec l’id de la transaction :
+- [`transactionListener`](/fr/runtime-config#Config.transactionListener) reçoit chaque message avec l’id de la transaction, et [`transactionEventListener`](/fr/runtime-config#Config.transactionEventListener) l’événement qui l’accompagne, juste après, avec les mêmes nombres :
 
-| Message | Quand |
-|---|---|
-| ``Transaction rollback (code ${err.code}) on attempt ${attempt} of ${maxAttempts}, retrying in ${delayBeforeRetry}ms``<!-- message --> | avant l’attente |
-| ``Retrying transaction, attempt ${attempt} of ${maxAttempts}``<!-- message --> | avant de renvoyer `START TRANSACTION` |
-| ``Transaction rollback (code ${err.code}) on attempt ${attempt} of ${maxAttempts}, giving up``<!-- message --> | avant le rejet |
+| Message | Événement | Quand |
+|---|---|---|
+| ``Transaction rollback (code ${code}) on attempt ${attempt} of ${maxAttempts}, retrying in ${delayBeforeRetry}ms``<!-- message --> | `{ type: 'rollback', code, attempt, maxAttempts, delayMs }` | avant l’attente |
+| ``Retrying transaction, attempt ${attempt} of ${maxAttempts}``<!-- message --> | `{ type: 'retry', attempt, maxAttempts }` | avant de renvoyer `START TRANSACTION` |
+| ``Transaction rollback (code ${code}) on attempt ${attempt} of ${maxAttempts}, giving up``<!-- message --> | `{ type: 'giveUp', code, attempt, maxAttempts }` | avant le rejet |
 
 Le callback peut s’exécuter plusieurs fois : [Retries](/fr/retries).
 
