@@ -662,6 +662,9 @@ async function* cursorBatches<RunResult>(
   const ended = () => mark !== undefined && (txnClient as { _zapatos?: unknown })._zapatos !== mark;
   if (ended()) throw new Error(iteratedAfter);
 
+  const unprepared = query.copy();  // before a number is taken, which a copy() that throws would leave taken
+  delete unprepared.preparedName;  // nested, a prepared fragment would name the DECLARE, whose text changes with n
+
   // the lowest free number, not a depth: two loops at once, then a third, each get a name no running one holds
   const held = cursorNumbers.get(txnClient) ?? new Set<number>();
   let n = 1;
@@ -672,10 +675,7 @@ async function* cursorBatches<RunResult>(
   let fetched: pg.QueryResult | undefined, declared = false, rejected = false;
   const
     name = raw(`pgcast_cursor_${n}`),
-    unprepared = query.copy(),
     fetch = sql`FETCH FORWARD ${raw(String(batchSize))} FROM ${name}`;
-
-  delete unprepared.preparedName;  // nested, a prepared fragment would name the DECLARE, whose text changes with n
 
   fetch.runResultTransform = qr => { fetched = qr; return qr.rows; };  // its rows, as any sql fragment's; the batch is made below
 
