@@ -238,9 +238,10 @@ export function asPool(pglite: PGliteLike): PGlitePool {
 
   const send = async (bytes: Uint8Array) => (await pglite.runExclusive(() => pglite.execProtocol(bytes))).messages;
 
-  // several statements give an array of results, as with pg
+  // several statements give an array of results, as with pg; none, a PGlite closing as the query was sent (0.5.0, 0.5.5)
   const resultOf = (messages: Message[]) => {
     const results = resultsOf(messages);
+    if (results.length === 0) throw new Error('PGlite gave no result: was it closed while the query waited?');
     return results.length === 1 ? results[0] : results as unknown as PGliteResult;
   };
 
