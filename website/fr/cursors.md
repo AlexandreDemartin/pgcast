@@ -1,10 +1,10 @@
 ---
-english: d67af2a17166
+english: fbace3d72d62
 ---
 
 # Curseurs
 
-Envoyez tous les films à un index de recherche par batchs, en gardant seulement le batch en cours en mémoire. Pour servir une page par requête HTTP, voir [Pagination](/fr/paginate).
+Envoyez tous les films à un index de recherche par batchs. Pour servir une page par requête HTTP, voir [Pagination](/fr/paginate).
 {.lede}
 
 ## Indexer les films {#index-the-films}
@@ -15,7 +15,7 @@ Choisissez les colonnes dont l’index a besoin et triez les films par identifia
 
 Survolez `films` pour voir son type, `{ id: number; title: string }[]`. C’est le type que donne [`select()`](/fr/select#select) pour les mêmes colonnes. Utilisez ici [`selectRows()`](/fr/select#selectRows) pour que Postgres renvoie une ligne par film. Avec `select()`, le curseur lirait l’unique ligne produite par l’agrégat (`jsonb_agg`) et donnerait les quatre films à l’index en une fois.
 
-L’index de l’exemple affiche dans ses logs les identifiants 1000 et 1001 ensemble, puis 1002 et 1003. La déclaration prend les valeurs `['id', 'title']`.
+L’index de l’exemple consigne dans ses logs les identifiants 1000 et 1001 ensemble, puis 1002 et 1003. Si vous fixez la taille du batch à trois films, le second batch ne contient que le quatrième film. Les valeurs de la déclaration sont `['id', 'title']`.
 
 <!-- probe: db.repeatableReadRO(pool, async txnClient => { for await (const films of db.cursor(txnClient, db.selectRows('films', db.all, { columns: ['id', 'title'], order: { by: 'id', direction: 'ASC' } }), { batchSize: 2 })) { } }) -->
 ```sql
@@ -27,29 +27,31 @@ CLOSE pgcast_cursor_1
 COMMIT
 ```
 
-Chaque lecture coûte un aller-retour. Choisissez une taille de batch de 1 à 2147483647 en prévoyant assez de mémoire pour un tableau pouvant contenir autant de lignes. Avec une taille de trois, le second batch contient seulement le quatrième film.
+Chaque lecture coûte un aller-retour. Pour limiter le nombre de lignes chargées en mémoire à chaque lecture, fixez la taille du batch à un entier compris entre 1 et 2147483647. Prévoyez assez de mémoire pour que deux batchs successifs puissent s’y trouver en même temps.
 
-Dans [`cursor()`](/fr/transaction#cursor), même un fragment préparé s’exécute sans préparation. Le numéro du curseur change le SQL de la déclaration, et `pg` exige un seul texte de requête par nom de requête préparée. Le fragment garde son nom pour sa prochaine exécution ordinaire.
+[`cursor()`](/fr/transaction#cursor) ignore le nom de la requête préparée du fragment que vous lui passez. Si vous réutilisez la requête, laissez les fragments imbriqués sans nom. Le numéro du curseur peut changer le SQL de la déclaration, et `pg` exige un seul texte de requête par nom.
 
 ## Garder un seul instantané {#keep-one-snapshot}
 
-Lisez le curseur dans le callback de [`transaction()`](/fr/transaction#transaction). Postgres refuse la déclaration hors transaction (25P01) et ferme le curseur à la fin de la transaction. Si le callback renvoie le générateur, pgcast rejette la première lecture avant d’envoyer une requête.
+Lisez le curseur dans l’appel à [`transaction()`](/fr/transaction#transaction) dont il dépend. Postgres refuse la déclaration hors transaction (25P01) et ferme le curseur à la fin de la transaction. Si vous lisez le générateur pour la première fois après la fin de cette transaction, pgcast rejette la lecture avant d’envoyer une requête.
 
-Le curseur voit les films tels qu’ils étaient au moment de sa déclaration. Supposons qu’une autre transaction commite l’insertion d’un cinquième film après le premier batch. En `READ COMMITTED`, un [`count()`](/fr/select#count) dans la boucle compte cinq films, alors que le curseur en lit quatre. En `REPEATABLE READ, READ ONLY`, les deux en voient quatre.
+Dans l’exemple, la requête de sélection simple utilise l’instantané visible à la déclaration du curseur. En lecture répétable, une requête exécutée plus tôt dans la transaction peut avoir déjà fixé cet instantané.
+
+Supposons qu’une autre transaction commite l’insertion d’un cinquième film après le premier batch. En `READ COMMITTED`, un [`count()`](/fr/select#count) dans la boucle compte cinq films, alors que le curseur en lit quatre. En `REPEATABLE READ, READ ONLY`, les deux en voient quatre.
 
 ## Gérer une sortie anticipée de la boucle ou un retry {#handle-an-early-exit-or-a-retry}
 
-Quitter la boucle avec `break` ou `return` ferme le curseur. Lever une erreur dans la boucle le ferme aussi et transmet la même erreur à l’appelant.
+Tant que la transaction est active, le curseur se ferme si vous quittez la boucle avec `break` ou `return`, ou si l’index lève une erreur. L’appelant reçoit l’erreur de l’index. Si une requête SQL échoue dans la boucle, voir [`cursor()`](/fr/transaction#cursor).
 
-Une erreur dans une colonne calculée, par exemple une division par zéro sur le troisième film, se manifeste quand la deuxième lecture arrive à ce film. L’index a déjà reçu les deux premiers films et la transaction passe en échec côté Postgres.
+Si une lecture échoue, l’index garde les batchs qu’il a déjà reçus. Après une erreur de sérialisation (40001), un retry relance le parcours sur un nouvel instantané. Un film reçu lors de la tentative qui a échoué peut manquer dans le nouveau parcours.
 
-Si une lecture échoue avec une erreur de sérialisation (40001), un [retry](/fr/retries) reprend le callback au début et relit le premier batch. Prévoyez une indexation que vous pouvez répéter sans risque, par exemple en vous servant de l’identifiant du film pour remplacer l’entrée correspondante. Pour écrire dans Postgres, utilisez le même client dans une transaction en lecture-écriture afin qu’un rollback annule aussi les écritures du batch.
+Si l’index publié doit correspondre à un seul parcours réussi, utilisez `txnClient` dans une transaction en lecture-écriture pour écrire les batchs dans une table intermédiaire prévue pour ce parcours. Un rollback annule l’écriture des lignes de cette tentative. Publiez un nouvel index à partir des lignes de cette table [après le commit](/fr/retries#keep-side-effects-out-of-the-callback).
 
 ## Travailler dans la boucle {#work-inside-the-loop}
 
-- Dans une transaction en lecture-écriture, `lock: { for: 'UPDATE' }` verrouille les lignes à mesure que le curseur les lit. Après le premier batch, une autre transaction peut encore verrouiller le troisième film.
+- Dans une transaction en lecture-écriture, `lock: { for: 'UPDATE' }` verrouille les lignes à mesure que le curseur les lit. En `READ COMMITTED`, une lecture ultérieure peut voir un changement de titre qu’une autre transaction a commité après la déclaration.
 - Un film inséré par la boucle reste en dehors de l’instantané du curseur ouvert.
 - Un [`savepoint()`](/fr/transaction#savepoint) établi pendant que le curseur est ouvert permet d’annuler des opérations. Le curseur garde sa position. Si vous lisez un film dans le savepoint, la lecture qui suit le rollback commence après ce film.
-- Deux boucles imbriquées ou exécutées en même temps sur le même client ont chacune leur curseur, `pgcast_cursor_1` et `pgcast_cursor_2`.
+- Chaque curseur prend le plus petit numéro libre sur son client pour former son nom, `pgcast_cursor_<n>`.
 
 La doc de Postgres décrit la durée de vie du curseur dans [DECLARE](https://www.postgresql.org/docs/current/sql-declare.html) et explique dans [FETCH](https://www.postgresql.org/docs/current/sql-fetch.html) comment il avance.
