@@ -40,3 +40,16 @@ test('fails on a SKILL.md over 150 lines or 1,800 words', () => {
   assert.deepEqual(errorsOf({'alpha/SKILL.md': head + 'line\n'.repeat(147)}), ['alpha/SKILL.md: 151 lines, max 150']);
   assert.deepEqual(errorsOf({'alpha/SKILL.md': head + 'word '.repeat(1793)}), ['alpha/SKILL.md: 1801 words, max 1800']);
 });
+
+test('fails on a reference.md that cites an unknown skill', () => {
+  assert.deepEqual(errorsOf({'alpha/reference.md': '# Alpha: reference\n\nSee skill `beta`, then skill `gamma`.\n'}),
+    ["alpha/reference.md: cites unknown skill 'gamma'"]);
+});
+
+test('fails on a reference.md over 150 lines', () => {
+  assert.deepEqual(errorsOf({'alpha/reference.md': 'line\n'.repeat(151)}), ['alpha/reference.md: 151 lines, max 150']);
+});
+
+test('fails on a reference.md over 1,800 words', () => {
+  assert.deepEqual(errorsOf({'alpha/reference.md': 'word '.repeat(1801)}), ['alpha/reference.md: 1801 words, max 1800']);
+});
