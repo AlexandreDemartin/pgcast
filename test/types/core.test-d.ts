@@ -5,7 +5,7 @@
 // condition. Surprises (a type that accepts what the runtime refuses, or refuses
 // what it accepts) are frozen with a `characterization:` comment.
 
-import { describe, expectTypeOf, test } from 'vitest';
+import { describe, expectTypeOf, test, vi } from 'vitest';
 import * as db from 'zapatos/db';
 import type * as s from 'zapatos/schema';
 import type * as pg from 'pg';
@@ -1022,5 +1022,15 @@ describe('QueryableLike: what run() takes (#695)', () => {
     void typed; void contextual; void readsPg;
     // run()'s parameter, read off the value, was Queryable
     expectTypeOf<Parameters<typeof q.run>[0]>().toEqualTypeOf<db.QueryableLike>();
+  });
+
+  test('a spy copies run as a function type: its parameter is checked one way, so a body casts to Queryable', () => {
+    vi.spyOn(q, 'run').mockImplementation(async queryable => {
+      const r = await (queryable as db.Queryable).query('SELECT 1');
+      return [r.rowCount ?? 0];
+    });
+    vi.spyOn(q, 'run').mockImplementation(async (queryable: db.QueryableLike) => { void queryable; return []; });
+    // @ts-expect-error a spy's implementation typed for Queryable, which 6.6.1 took: QueryableLike is not a Queryable
+    vi.spyOn(q, 'run').mockImplementation(async (queryable: db.Queryable) => { void queryable; return []; });
   });
 });

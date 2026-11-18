@@ -1,5 +1,5 @@
 ---
-english: 3c40ea3147d3
+english: 31ff52d0e385
 ---
 
 # Template SQL
@@ -665,10 +665,10 @@ const films = await db.select('films', db.all).run(migrationClient);
 - Un driver qui ignore `name` exécute un fragment préparé sans le préparer.
 - Un `query()` qui ne prend que le texte, comme le `query(text, params)` de PGlite, ne compile pas, pas plus qu’un driver sans `query()`, comme postgres.js : chacun a besoin d’un adaptateur ([#697](https://github.com/AlexandreDemartin/pgcast/issues/697), [#698](https://github.com/AlexandreDemartin/pgcast/issues/698)).
 - [`transaction()`](/fr/transaction#transaction) prend un `Queryable`, un `TxnClient` ou un [`PoolLike`](/fr/transaction#PoolLike), dont le client est un `QueryableLike` dont le résultat a aussi un `command`, avec un `release()` ([Le pool d’un autre driver](/fr/transaction#another-drivers-pool)).
-- `Queryable` ne change pas, pas plus que, dans un programme qui importe `zapatos/db`, une fonction typée pour lui affectée à `run`. Là où TypeScript infère ou lit le paramètre de `run`, il est `QueryableLike`, et un corps qui lit un membre de `pg` sur lui ne compile plus : `query('SELECT 1')` avec une chaîne (TS2345), `rowCount` (TS2339), le résultat de `query()` renvoyé comme la `Promise` de `run` (TS2739). Typer le paramètre `db.Queryable` garde le type de Zapatos 6.6.1. Les chemins :
-  - une fonction fléchée sans type affectée à `run`, `fragment.run = async queryable => …`, ou donnée comme valeur typée `typeof fragment.run`, comme littéral d’un `Pick<db.SQLFragment<…>, 'run'>` ou au `mockImplementation()` d’un espion ;
+- `Queryable` ne change pas, pas plus que, là où le type de `run` est celui que déclare `SQLFragment`, une fonction typée pour lui affectée à `run`, qui le redéfinit, ou donnée comme valeur typée `typeof fragment.run` ou comme littéral d’un `Pick<db.SQLFragment<…>, 'run'>`. Là où TypeScript infère ou lit le paramètre de `run`, il est `QueryableLike`, et un corps qui lit un membre de `pg` sur lui ne compile plus : `query('SELECT 1')` avec une chaîne (TS2345), `rowCount` (TS2339), le résultat de `query()` renvoyé comme la `Promise` de `run` (TS2739). Les chemins :
+  - une fonction fléchée sans type affectée à `run`, `fragment.run = async queryable => …`, ou donnée comme valeur typée `typeof fragment.run`, comme littéral d’un `Pick<db.SQLFragment<…>, 'run'>` ou au `vi.spyOn(fragment, 'run').mockImplementation()` de Vitest : typer le paramètre `db.Queryable` garde le type de Zapatos 6.6.1, sauf dans l’espion ;
   - un générique ou un `infer` qui lit le paramètre de `run`, `Parameters<typeof fragment.run>[0]` compris : `.connect()` dessus donne TS2339 ;
-  - une bibliothèque dont le `.d.ts` réexporte `run` y écrit `QueryableLike` : avec `strictFunctionTypes`, son consommateur ne peut plus affecter à ce `run` une fonction typée pour `Queryable` (TS2322).
+  - une copie du type de `run` en type de fonction, dans le `mockImplementation()` de Vitest ou dans le `.d.ts` d’une bibliothèque qui réexporte `run` : avec `strictFunctionTypes`, une fonction typée pour `Queryable` n’y compile plus (TS2345, TS2322). Faites un cast dans le corps, `(queryable as db.Queryable).query('SELECT 1')`, ou typez le paramètre `db.QueryableLike`.
 
 ## `SQL` {#SQL}
 
