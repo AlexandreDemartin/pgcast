@@ -61,6 +61,7 @@ Each test runs on one client, inside `BEGIN`, rolled back afterwards: what it wr
 | A `SERIAL` or identity value taken | still taken: the next test's `insert()` gets the next id, 2 after 1, though row 1 is gone |
 | `PREPARE`, or a query run with [`prepared()`](/sql-template#prepared) | kept on the connection, for the next test that gets it from the pool |
 | A session advisory lock, `pg_advisory_lock()` | still held by that connection |
+| A transaction advisory lock, [`advisoryXactLock()`](/transaction#advisoryXactLock) | released |
 
 So an id is read, never hard-coded; and a prepared name stands for one text across every test that shares the pool.
 
