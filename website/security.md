@@ -56,7 +56,7 @@ Some SQL is neither a value nor a name: `DESC`, `FOR UPDATE`, `SERIALIZABLE`, `R
 
 The type says which; at run time pgcast checks again and throws before any query, because a cast, an `any` or a JSON body can hand it anything: a `lock` of `{ for: 'UPDATE; DROP TABLE ratings; --' }` throws "Lock strength must be UPDATE/NO KEY UPDATE/SHARE/KEY SHARE, not '…'"<!-- message -->.
 
-Values with no meaning where they stand are refused the same way: `db.Default`, `db.self` or `db.raw()` as a filter value throws while compiling, so `.run()` rejects before anything reaches Postgres. Zapatos 6.6.1 sent them as strings or as JSON: no row matched on a text column, every row under `ne()` and `isNotIn()`, and other types failed.
+Values with no meaning where they stand are refused the same way: `db.Default`, `db.self` or `db.raw()` as a filter value throws while compiling, so `.run()` rejects before anything reaches Postgres. Zapatos 6.6.1 sent them as strings or as JSON: no row matched on a text column, every row under `ne()` and `isNotIn()`, and other types failed. From 6.11.0, `db.all` and `db.self` throw the same way as a value of `insert()`, `upsert()` or `update()`, and in a `vals(…)` of a query you write, where Zapatos 6.6.1 sent them as `'Symbol(all)'` and `'Symbol(self)'`.
 
 Such a value is a bug in the calling code, and a bug should not become a query. Each of these errors, with what throws it: [Errors pgcast throws before any query](/transaction#errors-pgcast-throws-before-any-query). Telling them from Postgres's own: [Errors](/handle-errors#fix-the-errors-pgcast-throws).
 
