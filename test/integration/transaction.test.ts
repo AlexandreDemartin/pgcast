@@ -14,7 +14,6 @@ import { sql, IsolationLevel } from '../../src/db';
 import { resetConfig } from '../helpers/config';
 import { useTestDatabase } from '../helpers/db';
 import { satisfies } from '../helpers/isolation';
-import { renamed } from '../helpers/savepoints';
 
 const t = useTestDatabase();
 
@@ -1196,6 +1195,23 @@ describe('savepoint() (#723)', () => {
     expect(txnIds.size).toBe(1);
   });
 
+  it('names each savepoint by its depth: a 40001 two deep, retried, starts again at 1 on the next attempt', async () => {
+    const { messages } = listen();
+    const names: string[] = [];
+    db.setConfig({ queryListener: q => { if (q.text.startsWith('SAVEPOINT ')) names.push(q.text); } });
+    let attempts = 0;
+    await db.serializable(t.pool, async c => {
+      attempts++;
+      await db.savepoint(c, outer => db.savepoint(outer, async inner => { if (attempts < 2) await raise(inner, '40001'); }));
+      await db.savepoint(c, async () => undefined);
+    });
+    expect(messages).toHaveLength(2);
+    expect(names).toEqual([
+      'SAVEPOINT pgcast_savepoint_1', 'SAVEPOINT pgcast_savepoint_2',
+      'SAVEPOINT pgcast_savepoint_1', 'SAVEPOINT pgcast_savepoint_2', 'SAVEPOINT pgcast_savepoint_1',
+    ]);
+  });
+
   it('a callback that swallows a query error: rejects with 25P02 after ROLLBACK TO, and the outer transaction commits its own rows', async () => {
     const queries: string[] = [];
     db.setConfig({ transactionRequiresCommit: true, queryListener: q => queries.push(q.text) });
@@ -1212,9 +1228,9 @@ describe('savepoint() (#723)', () => {
     });
     expect(result).toBe('committed');
     expect(await notes()).toEqual(['after', 'outer']);
-    expect(renamed(queries.slice(2, 8))).toEqual([
-      'SAVEPOINT sp1', 'INSERT INTO "txn_probe" ("note") VALUES ($1)', expect.stringMatching(/^DO /),
-      'RELEASE SAVEPOINT sp1', 'ROLLBACK TO SAVEPOINT sp1', 'RELEASE SAVEPOINT sp1',
+    expect(queries.slice(2, 8)).toEqual([
+      'SAVEPOINT pgcast_savepoint_1', 'INSERT INTO "txn_probe" ("note") VALUES ($1)', expect.stringMatching(/^DO /),
+      'RELEASE SAVEPOINT pgcast_savepoint_1', 'ROLLBACK TO SAVEPOINT pgcast_savepoint_1', 'RELEASE SAVEPOINT pgcast_savepoint_1',
     ]);
   });
 
@@ -1274,9 +1290,9 @@ describe('savepoint() (#723)', () => {
     });
     const txnId = seen[0][1];
     expect(seen.map(([, id]) => id)).toEqual(seen.map(() => txnId));
-    expect(renamed(seen.map(([text]) => text))).toEqual([
-      'START TRANSACTION ISOLATION LEVEL SERIALIZABLE', 'SAVEPOINT sp1', 'INSERT INTO "txn_probe" ("note") VALUES ($1)',
-      'RELEASE SAVEPOINT sp1', 'COMMIT',
+    expect(seen.map(([text]) => text)).toEqual([
+      'START TRANSACTION ISOLATION LEVEL SERIALIZABLE', 'SAVEPOINT pgcast_savepoint_1', 'INSERT INTO "txn_probe" ("note") VALUES ($1)',
+      'RELEASE SAVEPOINT pgcast_savepoint_1', 'COMMIT',
     ]);
     expect(messages).toEqual([]);  // transactionListener gets nothing from a savepoint
   });
@@ -1288,9 +1304,9 @@ describe('savepoint() (#723)', () => {
       expect(inner).toBe(c);
       await write(inner, 'inner');
     })));
-    expect(renamed(queries)).toEqual([
-      'START TRANSACTION ISOLATION LEVEL SERIALIZABLE', 'SAVEPOINT sp1', 'INSERT INTO "txn_probe" ("note") VALUES ($1)',
-      'RELEASE SAVEPOINT sp1', 'COMMIT',
+    expect(queries).toEqual([
+      'START TRANSACTION ISOLATION LEVEL SERIALIZABLE', 'SAVEPOINT pgcast_savepoint_1', 'INSERT INTO "txn_probe" ("note") VALUES ($1)',
+      'RELEASE SAVEPOINT pgcast_savepoint_1', 'COMMIT',
     ]);
     expect(await notes()).toEqual(['inner']);
   });
@@ -1308,10 +1324,13 @@ describe('savepoint() (#723)', () => {
     expect(await notes()).toEqual(['kept']);
   });
 
-  /** How many of the savepoints `names` are still established: each `RELEASE` tried in a savepoint of its own, rolled back to on 3B001. */
+  /**
+   * How many of the savepoints `names` are still established: each `RELEASE` tried in a savepoint of its own, rolled
+   * back to on 3B001, the innermost name first, as releasing an outer one releases those inside it.
+   */
   const established = async (c: db.TxnClientForSerializable, names: string[]) => {
     let count = 0;
-    for (const name of new Set(names)) for (;;) {
+    for (const name of [...new Set(names)].reverse()) for (;;) {
       await c.query('SAVEPOINT count_probe');
       const released = await c.query(`RELEASE SAVEPOINT ${name}`).then(() => true, (err: { code?: string }) => {
         expect(err.code).toBe('3B001');
@@ -1345,7 +1364,7 @@ describe('savepoint() (#723)', () => {
       left = await established(c, names);
     });
     expect(await notes()).toEqual(['after', 'base']);
-    expect(names).toHaveLength(2);
+    expect(names).toEqual(['pgcast_savepoint_1', 'pgcast_savepoint_2']);
     expect(left).toBe(0);
     expect(attempts).toBe(1);  // the 40001 was caught: no retry
   });
