@@ -153,7 +153,7 @@ const attemptsMade = (max: number) => {
 };
 
 let txnSeq = 0;
-let savepointSeq = 0;  // names each savepoint() apart
+const savepointDepths = new WeakMap<object, number>();  // how many savepoint() calls each client is inside
 
 /**
  * Provide a database client to the callback, whose queries are then wrapped in 
@@ -378,12 +378,13 @@ export async function serializableRODeferrable<T, C = unknown>(txnClientOrQuerya
 /**
  * Run the callback inside a savepoint of the transaction `txnClient` is in,
  * and return a promise of what it resolves to. The callback gets that same
- * client. The SQL, `<n>` a counter, the one part that changes between calls:
+ * client. The SQL, `<d>` its depth, 1 directly in the transaction, 2 inside
+ * that, and so on:
  *
- * `SAVEPOINT pgcast_savepoint_<n>`, the callback's queries, then
- * `RELEASE SAVEPOINT pgcast_savepoint_<n>`. If the callback or that `RELEASE`
- * rejects, `ROLLBACK TO SAVEPOINT pgcast_savepoint_<n>` and
- * `RELEASE SAVEPOINT pgcast_savepoint_<n>`, then it rejects with that error;
+ * `SAVEPOINT pgcast_savepoint_<d>`, the callback's queries, then
+ * `RELEASE SAVEPOINT pgcast_savepoint_<d>`. If the callback or that `RELEASE`
+ * rejects, `ROLLBACK TO SAVEPOINT pgcast_savepoint_<d>` and
+ * `RELEASE SAVEPOINT pgcast_savepoint_<d>`, then it rejects with that error;
  * if one of these two rejects, it rejects with its error instead.
  *
  * - On 40001 or 40P01, it rejects at once, with no `ROLLBACK TO`: the
@@ -392,12 +393,22 @@ export async function serializableRODeferrable<T, C = unknown>(txnClientOrQuerya
  * - A callback that catches a query's error and returns gets 25P02 from
  *   `RELEASE`: its work is undone, nested savepoints included, and this
  *   rejects with that 25P02. So a 40001 or 40P01 caught in the callback is not
- *   retried: the transaction goes on, and commits what it does outside this
- *   savepoint. Let them out.
+ *   retried there. After a 40P01, or a 40001 of `REPEATABLE READ`, the
+ *   transaction goes on, and its `COMMIT` saves what it wrote outside this
+ *   savepoint; after a 40001 of `SERIALIZABLE`, Postgres can refuse a later
+ *   query or the `COMMIT` with 40001 again, which `transaction()` retries.
+ *   Let them out.
  * - Each `ROLLBACK TO` and `RELEASE` also ends the savepoints established
  *   after its own, so each level undoes its own work whatever an inner one
- *   left. Don't name a savepoint of yours `pgcast_savepoint_<n>`. `await`
- *   each: two at once on one client end each other's savepoints.
+ *   left. Don't name a savepoint of yours `pgcast_savepoint_<d>`.
+ * - The depth is counted per client, by each copy of this library apart: a
+ *   savepoint of one copy inside another's takes the same name, and an inner
+ *   40001 caught one level up then leaves the outer work in.
+ * - `await` each: two at once on one client nest in the order they are
+ *   called. The first, if it ends first, ends the second's savepoint, whose
+ *   own `RELEASE` then fails (3B001) and aborts the transaction; a
+ *   `ROLLBACK TO` of the second also undoes what the first wrote after the
+ *   second's `SAVEPOINT`.
  * - Only the `code` is read, as `transaction()` reads it: a 40001 thrown from
  *   JavaScript, then caught, leaves the work of its savepoint in, unless an
  *   outer level rolls back.
@@ -413,25 +424,35 @@ export async function savepoint<T, C extends TxnClient<IsolationLevel> | TxnClie
   callback: (client: NoInfer<C>) => Promise<T>
 ): Promise<T> {
 
-  if (savepointSeq >= Number.MAX_SAFE_INTEGER - 1) savepointSeq = 0;  // wrap around
+  // the name of its depth on this client: ROLLBACK TO and RELEASE then also destroy any savepoint an inner level left
+  // established (the 40001 / 40P01 exit below cannot RELEASE its own), see https://www.postgresql.org/docs/current/sql-rollback-to.html;
+  // one text per depth, as pg_stat_statements before Postgres 17 keeps an entry per text of a SAVEPOINT
+  const
+    depth = (savepointDepths.get(txnClient) ?? 0) + 1,
+    name = raw(`pgcast_savepoint_${depth}`);
 
-  // a name of its own: ROLLBACK TO and RELEASE then also destroy any savepoint an inner level left established
-  // (the 40001 / 40P01 exit below cannot RELEASE its own), see https://www.postgresql.org/docs/current/sql-rollback-to.html
-  const name = raw(`pgcast_savepoint_${savepointSeq++}`);
+  savepointDepths.set(txnClient, depth);
+  try {  // from here, every exit leaves the depth one less
+    await sql`SAVEPOINT ${name}`.run(txnClient);
+    try {
+      const result = await callback(txnClient as NoInfer<C>);
+      await sql`RELEASE SAVEPOINT ${name}`.run(txnClient);
+      return result;
 
-  await sql`SAVEPOINT ${name}`.run(txnClient);
-  try {
-    const result = await callback(txnClient as NoInfer<C>);
-    await sql`RELEASE SAVEPOINT ${name}`.run(txnClient);
-    return result;
+    } catch (err: any) {
+      // rethrown as it is, so that the outer transaction() rolls back and retries: a thrown null or undefined is not one
+      if (err != null && isDatabaseError(err, "TransactionRollback_SerializationFailure", "TransactionRollback_DeadlockDetected")) throw err;
 
-  } catch (err: any) {
-    // rethrown as it is, so that the outer transaction() rolls back and retries: a thrown null or undefined is not one
-    if (err != null && isDatabaseError(err, "TransactionRollback_SerializationFailure", "TransactionRollback_DeadlockDetected")) throw err;
+      // RELEASE after ROLLBACK TO, which leaves the savepoint established; either one rejecting rejects with its own error
+      await sql`ROLLBACK TO SAVEPOINT ${name}`.run(txnClient);
+      await sql`RELEASE SAVEPOINT ${name}`.run(txnClient);
+      throw err;
+    }
 
-    // RELEASE after ROLLBACK TO, which leaves the savepoint established; either one rejecting rejects with its own error
-    await sql`ROLLBACK TO SAVEPOINT ${name}`.run(txnClient);
-    await sql`RELEASE SAVEPOINT ${name}`.run(txnClient);
-    throw err;
+  } finally {
+    // one less than now, not depth - 1: two at once on one client, unsupported, still leave it back at 0
+    const left = (savepointDepths.get(txnClient) ?? 1) - 1;
+    if (left > 0) savepointDepths.set(txnClient, left);
+    else savepointDepths.delete(txnClient);
   }
 }
