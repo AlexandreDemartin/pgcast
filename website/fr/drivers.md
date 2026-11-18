@@ -53,7 +53,7 @@ Puis lancez vos requêtes sur `pool` comme sur un `pg.Pool` :
 </CastPanel>
 
 - `starts_at` est un `Date`, comme avec `pg` : l’adaptateur lit chaque colonne avec les parsers de `pg`, jamais ceux de postgres.js. Une `date` est donc un `Date` à minuit, heure locale, là où postgres.js seul donne minuit UTC.
-- `asPool()` ne crée, ne configure ni ne ferme jamais `sql` : c’est à vous de le faire, comme avec un `pg.Pool`. Il lève une erreur sur un `sql` muni d’un `transform` (`postgres.camel`) : donnez à pgcast un `postgres()` à lui.
+- `asPool()` ne crée, ne configure ni ne ferme jamais `sql` : c’est à vous de le faire, comme avec un `pg.Pool`. Il lève une erreur sur un `sql` dont le `transform` change les colonnes, les valeurs ou les lignes qu’il lit (`postgres.camel`) : donnez à pgcast un `postgres()` à lui.
 - Chaque requête passe par `sql.unsafe()`, sans être préparée, celles de [`prepared()`](/fr/sql-template#prepared) aussi : leur nom est ignoré.
 - Une erreur est une `PostgresError` de postgres.js, pas une `pg.DatabaseError` : `code` est le SQLSTATE, donc [`isDatabaseError()`](/fr/transaction#isDatabaseError) et les [retries](/fr/retries) fonctionnent, mais ses autres champs portent les noms de postgres.js (`constraint_name`, `table_name`).
 
