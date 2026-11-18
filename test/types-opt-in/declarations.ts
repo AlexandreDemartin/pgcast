@@ -72,3 +72,9 @@ type OtherClient = { query: (query: db.SQLQuery) => Promise<{ rows: any[]; comma
 export const clientOf = (pool: db.PoolLike<OtherClient>) => db.serializable(pool, async txnClient => txnClient);
 export const anyPoolClientOf = (pool: db.PoolLike) => db.readCommitted(pool, async txnClient => txnClient);
 export const firstParameterOf = (queryable: Parameters<typeof db.serializable>[0]) => [queryable];
+
+// an advisory lock in a transaction of another driver's pool, and on a client typed by advisoryXactLock()'s first
+// parameter, as a library writes them (#724)
+export const lockIn = (pool: db.PoolLike<OtherClient>) => db.serializable(pool, txnClient => db.advisoryXactLock(txnClient, [1, 42]));
+export const lockOn = (txnClient: Parameters<typeof db.advisoryXactLock>[0], key: Parameters<typeof db.advisoryXactLock>[1]) =>
+  db.advisoryXactLock(txnClient, key);
