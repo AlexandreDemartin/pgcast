@@ -120,9 +120,10 @@ describe('transactions', () => {
     expect([n.reserves(), n.releases()]).toEqual([3, 3]);
   });
 
-  it('passes the client of a transaction through to a nested one', async () => {
+  it('passes the client of a transaction through to a nested one, given with a cast (#696)', async () => {
     const n = counted();
-    expect(await db.serializable(u.pool, outer => db.serializable(outer, async inner => inner === outer))).toBe(true);
+    expect(await db.serializable(u.pool, outer =>
+      db.serializable(outer as unknown as db.TxnClientForSerializable, async inner => inner === (outer as unknown)))).toBe(true);
     expect([n.reserves(), n.releases()]).toEqual([1, 1]);
   });
 
