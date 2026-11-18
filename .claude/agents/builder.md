@@ -15,7 +15,7 @@ You build a pgcast branch, or you fix the blocking items found in it. The reposi
 
 - In the main checkout, on the step's branch; a worktree only if the orchestrator asks (skill `run-step` § Ritual rules). It then needs `src/.env` copied or linked from the main checkout (ignored by git), then `npm ci`, and `cd website && npm ci` before a `docs:*` script: the root's `npm ci` does not install it, and `docs:translated` exists only there (#262, #301, #495).
 - Test database: `TEST_DATABASE_URL` from `src/.env`, never printed: test it as a boolean (auto mode refuses a command that could print it); a child process gets it through the environment, never as an argument, which an `execFileSync` error prints (#67). The tests create and drop their own databases; never touch the server's other databases.
-- A probe database is named `pgcast_test_${process.pid}_<agent>_<tag>` by its own script: any `npm test` drops a `pgcast_test_*` whose pid is gone, and two agents with one name share rows.
+- A probe database is named `pgcast_test_${process.pid}_<agent>_<tag>` by its own script: any `npm test` drops a `pgcast_test_*` whose pid is gone, and two agents with one name share rows. One long-lived process creates, uses and drops it, with `client.on('error')` (another suite's `WITH (FORCE)` ends it), its output to a file: a `| head` kills it before its `finally` (#519, #560, #598, #632).
 - Scratch files go in the folder the brief names, never in `test/` or the checkout.
 
 ## Build
@@ -36,7 +36,7 @@ Explore, plan, code, commit.
 - `npm run lint && npm run typecheck && npm test && npm run test:types && npm run build`.
 - Plus the commands its **Done when** names (`bench:types`, `check:agents`…).
 - Risk `low`: reread your diff before the PR.
-- A red suite while other worktrees run theirs is rerun once before it counts (#170: 2 failures in 50 s, then green in 15 s).
+- A red suite while other worktrees run theirs, or beside a heavy `tsc` grid, is rerun once before it counts, a timed-out file alone (#170: 2 failures in 50 s, then green in 15 s; #513, #519, #526); a grid runs after `npm test`, not beside it (#669).
 
 ## Git
 
@@ -61,8 +61,8 @@ After the merge: skill `merge-gate` § Clean up (`git branch -D` once merged).
 ## Known pitfalls
 
 - `AGENTS.md` § Local environment (npm 10 and `npm install`); the lib's `tsc` uses the dummy schema `src/typings/zapatos/schema.ts`, the tests the fixture's generated schema (skill `type-tests`).
-- French pages hold U+00A0 (`website/README.md` § Typography): a scripted find-and-replace matches it or normalises first (#262, #484).
-- The shell is zsh: quote `"${ref}:path"` (`:s` is a history modifier) and `'==='`; `$pipestatus`, not `PIPESTATUS`; macOS has no `timeout`.
+- French pages hold U+00A0 (`website/README.md` § Typography): a scripted find-and-replace matches it, normalises first or anchors on the line's start; a conflict keeps its own text, never retyped (checked by byte); `docs:translated` runs once the page is checked, never chained after the edit (#262, #484, #575, #632, #667).
+- The shell is zsh: quote `"${ref}:path"` (`:s` is a history modifier), `'==='`, a heredoc (`<<'EOF'`, or its backticks run) and a glob (`--include='*.ts'`, or "no matches found" zeroes a count); `$pipestatus`, not `PIPESTATUS`; macOS has no `timeout`, and BSD `sed` no `\|` (`sed -E`): check that a scripted edit changed its file (#516, #521, #680).
 
 ## Report
 
