@@ -50,6 +50,8 @@ Candidates for a check, a rule or a skill line.
 - #715 — Second finding that no script checks a `<!-- tsc -->` mark in a site page (only `CHANGELOG.md`): the marks in `conditions.md` are never compiled, so skill `type-tests` § A claim about a type does not hold for pages yet — builder
 - #715 — A cast panel shows the type of the first top-level `const`; an example meant to name a type defines its helpers with `function` or goes in `examples/plain/` — builder
 - #714 — An issue's code sketch inside a `sql` template was wrong as written: a plain string interpolated there (`${'200'}`) is an identifier, not a value; a sketch is replayed exactly as written before it is copied — builder
+- #719 — `guard.mjs` blocks a pushed `v*` tag but not an extension's `@pgcast/<name>@<version>`: a new tag pattern extends the guard in the same chapter (added to #718) — builder
+- #719 — The postgres.js adapter's 40001 retry test failed once on Postgres 14 with postgres.js 3.4.0 (one extra row), passed on rerun: filed — builder
 
 ## Minors kept
 
