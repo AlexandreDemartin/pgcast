@@ -103,6 +103,11 @@ describe('prepared queries', () => {
     expect(await refused(u.pool())).toEqual(['ran', 'Prepared statements must be unique - \'taken\' was used for a different statement', '42601']);
   });
 
+  it('prepares a name once for queries sent at the same moment', async () => {
+    const same = () => u.pool().query({ text: 'SELECT $1::int AS n', values: [6], name: 'at_once' });
+    expect((await Promise.all([same(), same(), same()])).map(r => r.rows)).toEqual([[{ n: 6 }], [{ n: 6 }], [{ n: 6 }]]);
+  });
+
   it('knows the names prepared on a PGlite through any of its pools', async () => {
     const [a, b] = [asPool(u.pglite()), asPool(u.pglite())];
     expect((await a.query({ text: 'SELECT 4 AS n', values: [], name: 'shared' })).rows).toEqual([{ n: 4 }]);
