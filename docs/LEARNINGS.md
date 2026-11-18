@@ -111,6 +111,14 @@ Candidates for a check, a rule or a skill line.
 - #728 — A lock waited on in the first statement of a REPEATABLE READ transaction leaves the snapshot from before the wait and a check-then-insert passes twice; at SERIALIZABLE, SSI turns the same race into a 40001 and a correct retry: a claim grouping the two levels is replayed per level — branch-reviewer
 - #728 — A refusal's advice is checked against each kind of input it fires on: "after a BEGIN of yours" does not work on a pool, whose `BEGIN` runs on another client — builder
 - #728 — A query error inside a savepoint releases the advisory transaction locks taken in it at once, before any `ROLLBACK TO`; locks taken before the savepoint stay — branch-reviewer
+- #725 — `isDatabaseError()` matches a `String` object code (#501): a field typed with a literal union and copied from `err.code` is written `` `${err.code}` `` — builder
+- #730 — `check-prose.mjs` matches a quoted template literal by its source text: renaming an interpolated variable in a message breaks every docs quote of that message — builder
+- #730 — On Zapatos 6.6.1's types, a key one edit away from an existing one gives TS2561, not 2353: `switching.md` § Go back names the code per key — builder
+- #730 — A listener key typed with method syntax (`k?(e: Union): void`) has a bivariant parameter even under `strict`: a listener annotated for one member of a discriminated union compiles and throws on the others; a new callback key takes the property form, probed with `(e: Extract<Union, …>) => …` — branch-reviewer
+- #730 — Vitest's `toEqual` ignores keys set to `undefined`: to freeze an event's or a row's shape, `toStrictEqual` — branch-reviewer
+- #730 — A field documented as normalised (here `maxAttempts`) needs a test row where the raw input and the normalised value differ (0, 2.5, '3') — branch-reviewer
+- #730 — For a TS 4.1.6 consumer probe, `npm pack` the build and link the 4.1 `@types` with `preserveSymlinks`: a symlink to the checkout pulls in its newer `@types/node`, which 4.1.6 cannot parse — builder
+- #730 — A refusal resting on `strictFunctionTypes` holds only under `strict`: a docs "doesn't compile" for it names the condition, probed with `strict: false` — branch-reviewer
 
 ## Minors kept
 
@@ -129,3 +137,4 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #728 — form: `website/transaction.md:347` gives `ROLLBACK TO` as why a failed `savepoint()` releases an advisory lock taken in it; on 40001 / 40P01 none is sent, and Postgres releases the subtransaction's locks at the error itself — branch-reviewer
 - #728 — form: `website/fr/transaction.md:351` "dont le callback est rejeté": a callback is not rejected, its promise is ("dont le callback échoue") — branch-reviewer
 - #728 — defect: `advisoryXactLock()`'s `instanceof pg.Pool` misses a `pg.native.Pool` and a pool of a second copy of `pg` (not run) — branch-reviewer
+- #730 — defect: three DEFERRABLE and isolation-level integration tests timed out at 5 s with other suites on the server, and passed alone (a flaky timeout to watch) — builder
