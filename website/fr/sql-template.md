@@ -1,5 +1,5 @@
 ---
-english: 824870fc6dc1
+english: 25e41438232c
 ---
 
 # Template SQL
@@ -509,12 +509,12 @@ Ce que renvoient `sql` et chaque raccourci : une requête, ou une partie de req
 ### `run()` {#run}
 
 ```ts
-fragment.run(queryable: Queryable, force = false): Promise<RunResult>
+fragment.run(queryable: QueryableLike, force = false): Promise<RunResult>
 ```
 
 1. Compile le fragment ([`compile()`](#compile)) ; sur une erreur, la promesse est rejetée, avant toute requête.
 2. Appelle [`queryListener`](/fr/runtime-config#Config.queryListener) avec la requête et l’id de la transaction, s’il est défini.
-3. Envoie la requête à `queryable`, et passe le résultat de `pg` dans [`runResultTransform`](#runResultTransform). Un fragment `noop` n’envoie rien et donne `noopResult`, sauf si `force` vaut `true`.
+3. Envoie la requête à `queryable` ([`QueryableLike`](#QueryableLike)) sous la forme de l’objet de requête de `pg`, `{ text, values, name? }`, et passe ce qui revient dans [`runResultTransform`](#runResultTransform). Un fragment `noop` n’envoie rien et donne `noopResult`, sauf si `force` vaut `true`.
 4. Appelle [`resultListener`](/fr/runtime-config#Config.resultListener) avec le résultat, l’id de la transaction, le temps écoulé et la requête, s’il est défini.
 
 Un fragment `noop` se compile quand même, son SQL derrière un commentaire. `force` l’envoie, et il n’insère rien : `.run()` donne `[]`.
@@ -553,7 +553,7 @@ Le texte n’est pas une API stable : une version mineure peut le changer, tant
 fragment.runResultTransform: (qr: pg.QueryResult) => any  // default: qr => qr.rows
 ```
 
-Appliqué par `run()` à ce que renvoie `pg`. Les raccourcis fixent le leur (`selectOne()` prend le `result` de la première ligne). Affectez-en un pour renvoyer autre chose ; `RunResult` doit alors être le type qu’il renvoie :
+Appliqué par `run()` à ce que renvoie `pg`. `qr` est typé `pg.QueryResult`, mais un [`QueryableLike`](#QueryableLike) ne promet que `rows` : `rowCount`, `command` et `fields` sont ceux de `pg`. Les raccourcis fixent le leur (`selectOne()` prend le `result` de la première ligne). Affectez-en un pour renvoyer autre chose ; `RunResult` doit alors être le type qu’il renvoie :
 
 <CastPanel example="sql_run_result_transform">
 
@@ -634,11 +634,41 @@ const mentors = crew.map(member => nameOf(member.mentor));
 type Queryable = pg.ClientBase | pg.Pool
 ```
 
-Ce que prend `run()` : un pool, un client, ou le client qu’une [`transaction()`](/fr/transaction#transaction) donne à son callback. Typée ainsi, une fonction de requête s’exécute sur n’importe lequel d’entre eux :
+Ce que prend `run()` de `pg` : un pool, un client, ou le client qu’une [`transaction()`](/fr/transaction#transaction) donne à son callback. Typée ainsi, une fonction de requête s’exécute sur n’importe lequel d’entre eux :
 
 <<< ../examples/plain/sql_queryable.ts{ts twoslash}
 
 `Queryable` accepte le client d’une transaction quel que soit son niveau : une fonction qui a besoin de `SERIALIZABLE` prend plutôt `pg.Pool | TxnClientForSerializable` ([`TxnClientForSerializable`](/fr/transaction#TxnClientForSerializable), [Réserver dans une transaction plus large](/fr/retries#book-inside-a-larger-transaction)).
+
+Une fonction qui exécute des requêtes aussi sur le client d’un autre driver prend un [`QueryableLike`](#QueryableLike).
+
+## `QueryableLike` {#QueryableLike}
+
+```ts
+interface QueryableLike {
+  query: (query: SQLQuery) => PromiseLike<{ rows: any[] }>
+}
+```
+
+Ce que prend `run()`, depuis la 6.12.0 : un [`Queryable`](#Queryable), ou le client de n’importe quel autre driver dont `query()` prend l’objet de requête de `pg`, `{ text, values, name? }`, et se résout en un objet dont `rows` contient les lignes, comme le client d’un outil de migration ou le fake d’un test. Il n’a besoin d’aucun cast :
+
+```ts twoslash
+import * as db from 'zapatos/db';
+// ---cut---
+const migrationClient = {
+  query: async (query: { text: string; values?: unknown[] }) => ({ rows: [] as any[] }),
+};
+const films = await db.select('films', db.all).run(migrationClient);
+```
+
+- Le SQL est le même que sur un pool `pg`, tout comme le type en quoi `run()` se résout, qui suppose des valeurs parsées comme `pg` les parse (`json` et `jsonb` en objets) : un driver qui renvoie le `jsonb` en texte résout `select()` en une chaîne, typée comme ses lignes. `runResultTransform` reçoit ce que donne `query()`, tel quel.
+- Un driver qui ignore `name` exécute un fragment préparé sans le préparer.
+- Un `query()` qui ne prend que le texte, comme le `query(text, params)` de PGlite, ne compile pas, pas plus qu’un driver sans `query()`, comme postgres.js : chacun a besoin d’un adaptateur ([#697](https://github.com/AlexandreDemartin/pgcast/issues/697), [#698](https://github.com/AlexandreDemartin/pgcast/issues/698)).
+- [`transaction()`](/fr/transaction#transaction) ne prend toujours qu’un `Queryable` ou un `TxnClient` ([#696](https://github.com/AlexandreDemartin/pgcast/issues/696)).
+- `Queryable` ne change pas, pas plus que, là où le type de `run` est celui que déclare `SQLFragment`, une fonction typée pour lui affectée à `run`, qui le redéfinit, ou donnée comme valeur typée `typeof fragment.run` ou comme littéral d’un `Pick<db.SQLFragment<…>, 'run'>`. Là où TypeScript infère ou lit le paramètre de `run`, il est `QueryableLike`, et un corps qui lit un membre de `pg` sur lui ne compile plus : `query('SELECT 1')` avec une chaîne (TS2345), `rowCount` (TS2339), le résultat de `query()` renvoyé comme la `Promise` de `run` (TS2739). Les chemins :
+  - une fonction fléchée sans type affectée à `run`, `fragment.run = async queryable => …`, ou donnée comme valeur typée `typeof fragment.run`, comme littéral d’un `Pick<db.SQLFragment<…>, 'run'>` ou au `vi.spyOn(fragment, 'run').mockImplementation()` de Vitest : typer le paramètre `db.Queryable` garde le type de Zapatos 6.6.1, sauf dans l’espion ;
+  - un générique ou un `infer` qui lit le paramètre de `run`, `Parameters<typeof fragment.run>[0]` compris : `.connect()` dessus donne TS2339 ;
+  - une copie du type de `run` en type de fonction, dans le `mockImplementation()` de Vitest ou dans le `.d.ts` d’une bibliothèque qui réexporte `run` : avec `strictFunctionTypes`, une fonction typée pour `Queryable` n’y compile plus (TS2345, TS2322). Faites un cast dans le corps, `(queryable as db.Queryable).query('SELECT 1')`, ou typez le paramètre `db.QueryableLike`.
 
 ## `SQL` {#SQL}
 

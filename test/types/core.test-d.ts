@@ -5,7 +5,7 @@
 // condition. Surprises (a type that accepts what the runtime refuses, or refuses
 // what it accepts) are frozen with a `characterization:` comment.
 
-import { describe, expectTypeOf, test } from 'vitest';
+import { describe, expectTypeOf, test, vi } from 'vitest';
 import * as db from 'zapatos/db';
 import type * as s from 'zapatos/schema';
 import type * as pg from 'pg';
@@ -950,5 +950,87 @@ describe('range strings', () => {
     expectTypeOf(handWritten).not.toBeAny();
     expectTypeOf(finite).not.toBeAny();
     expectTypeOf(asAlias).not.toBeAny();
+  });
+});
+
+// A client that isn't pg's: run() sends it pg's query object, { text, values, name? }, and reads `rows` (#695)
+interface MigrationClient {  // a migration tool's client, typed with pg's own overloads
+  query(queryConfig: pg.QueryArrayConfig, values?: any[]): Promise<pg.QueryArrayResult>;
+  query(queryConfig: pg.QueryConfig): Promise<pg.QueryResult>;
+  query(queryTextOrConfig: string | pg.QueryConfig, values?: any[]): Promise<pg.QueryResult>;
+}
+declare const
+  pgPool: pg.Pool, pgPoolClient: pg.PoolClient, pgClient: pg.Client, pgClientBase: pg.ClientBase,
+  txnClient: db.TxnClientForSerializable, migrationClient: MigrationClient;
+
+describe('QueryableLike: what run() takes (#695)', () => {
+  const
+    q = db.sql<db.SQL, number[]>`SELECT 1`,
+    fake = { query: async () => ({ rows: [{ result: [] }] }) },
+    configStub = { query: async (query: { text: string; values?: unknown[] }) => ({ rows: [query.text] }) };
+
+  test('pg pools and clients, as in Zapatos 6.6.1, and any client with pg\'s query object', () => {
+    expectTypeOf(q.run(pool)).resolves.toEqualTypeOf<number[]>();
+    expectTypeOf(q.run(pgPool)).resolves.toEqualTypeOf<number[]>();
+    expectTypeOf(q.run(pgPoolClient)).resolves.toEqualTypeOf<number[]>();
+    expectTypeOf(q.run(pgClient)).resolves.toEqualTypeOf<number[]>();
+    expectTypeOf(q.run(pgClientBase)).resolves.toEqualTypeOf<number[]>();
+    expectTypeOf(q.run(txnClient)).resolves.toEqualTypeOf<number[]>();
+    expectTypeOf(<Q extends db.Queryable>(queryable: Q) => q.run(queryable)).returns.resolves.toEqualTypeOf<number[]>();
+    expectTypeOf(q.run(migrationClient)).resolves.toEqualTypeOf<number[]>();
+    expectTypeOf(q.run(fake)).resolves.toEqualTypeOf<number[]>();
+    expectTypeOf(q.run(configStub)).resolves.toEqualTypeOf<number[]>();
+    expectTypeOf(db.select('users', db.all).run(fake)).toEqualTypeOf(db.select('users', db.all).run(pool));
+    expectTypeOf(db.select('users', db.all).run(fake)).resolves.not.toBeAny();
+    const typed: db.QueryableLike = fake;
+    expectTypeOf(q.run(typed)).resolves.toEqualTypeOf<number[]>();
+  });
+
+  test('a client whose query() takes something else, or gives no rows', () => {
+    // @ts-expect-error a query() that takes the text alone, as PGlite's query(text, params): run() sends an object
+    q.run({ query: async (text: string, values?: unknown[]) => ({ rows: [text, values] }) });
+    const postgresJsLike = { unsafe: async (text: string, values?: unknown[]) => [text, values] };
+    // @ts-expect-error no query(), as postgres.js's sql, which runs a text through unsafe()
+    q.run(postgresJsLike);
+    // @ts-expect-error a result without rows
+    q.run({ query: async () => ({ row: [] }) });
+    // @ts-expect-error a result that isn't a promise
+    q.run({ query: () => ({ rows: [] }) });
+    // @ts-expect-error nothing to query
+    q.run({});
+    // @ts-expect-error a query() that needs more than run() sends: a name, which an unprepared fragment has not
+    q.run({ query: async (query: { text: string; values: any[]; name: string }) => ({ rows: [query.name.toUpperCase()] }) });
+    // @ts-expect-error transaction() still takes pg's pools and clients only: run time calls connect() (#696)
+    void db.serializable(fake, async () => 1);
+  });
+
+  test('Queryable, and a function typed for it assigned to run, are unchanged; run\'s parameter read off it moves', () => {
+    expectTypeOf<db.Queryable>().toEqualTypeOf<pg.ClientBase | pg.Pool>();
+    expectTypeOf<keyof db.Queryable>().toEqualTypeOf<keyof (pg.ClientBase | pg.Pool)>();
+    expectTypeOf<ReturnType<typeof q.run>>().toEqualTypeOf<Promise<number[]>>();
+    // run is typed as a method is, its parameter checked both ways: a function typed for Queryable may still be
+    // assigned to it, or override it, as in 6.6.1
+    q.run = async (queryable: db.Queryable) => { void queryable; return []; };
+    const typed: typeof q.run = async (queryable: db.Queryable) => { void queryable; return []; };
+    const contextual: typeof q.run = async queryable => { expectTypeOf(queryable).toEqualTypeOf<db.QueryableLike>(); return []; };
+    // @ts-expect-error a contextual arrow's parameter, Queryable in 6.6.1, is QueryableLike: pg's query(text) moves
+    const readsPg: typeof q.run = async queryable => { await queryable.query('SELECT 1'); return []; };
+    class Traced<R> extends db.SQLFragment<R> {
+      run = async (queryable: db.Queryable, force?: boolean): Promise<R> => { void queryable; void force; return undefined as unknown as R; };
+    }
+    expectTypeOf(new Traced<number>([], []).run(pgPool)).resolves.toEqualTypeOf<number>();
+    void typed; void contextual; void readsPg;
+    // run()'s parameter, read off the value, was Queryable
+    expectTypeOf<Parameters<typeof q.run>[0]>().toEqualTypeOf<db.QueryableLike>();
+  });
+
+  test('a spy copies run as a function type: its parameter is checked one way, so a body casts to Queryable', () => {
+    vi.spyOn(q, 'run').mockImplementation(async queryable => {
+      const r = await (queryable as db.Queryable).query('SELECT 1');
+      return [r.rowCount ?? 0];
+    });
+    vi.spyOn(q, 'run').mockImplementation(async (queryable: db.QueryableLike) => { void queryable; return []; });
+    // @ts-expect-error a spy's implementation typed for Queryable, which 6.6.1 took: QueryableLike is not a Queryable
+    vi.spyOn(q, 'run').mockImplementation(async (queryable: db.Queryable) => { void queryable; return []; });
   });
 });

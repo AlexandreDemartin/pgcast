@@ -134,6 +134,7 @@ For the logic around a query, with no database at all: a fake `Queryable` return
 
 - `run()` sends the compiled query to `query()` and reads its result from what comes back; the fake ignores the query.
 - It is neither a `pg.Pool` nor a client, hence `as unknown as`: a plain `as db.Queryable` does not compile (TS2352).
+- A function typed [`db.QueryableLike`](/sql-template#QueryableLike) instead takes the fake with no cast, `async function programme(queryable: db.QueryableLike, studio_id: number)`<!-- tsc: … { return db.select('films', { studio_id }).run(queryable); } export const titles = programme({ query: async () => ({ rows: [] }) }, 1000); -->: `run()` takes it as it is, from 6.12.0.
 - A [`transaction()`](/transaction#transaction) given the fake calls its `connect()`, which it doesn't have: a fake for code that opens one also needs `connect()`, returning itself with a `release()`, and gets `START TRANSACTION …` and `COMMIT` as queries too.
 
 Say a migration renames `release_year`: once the generator has run, every fake row that still has it fails to compile. Here, a fake row with a column `films` doesn't have:

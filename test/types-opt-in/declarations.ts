@@ -61,3 +61,7 @@ export const restOf = (x: db.Parameter<string>) => { const { cast, ...rest } = x
 export const schemasOf = (config: gen.Config) => config.schemas;
 export const columnOptionsOf = (config: gen.Config) => config.columnOptions;
 export const { ...generateValues } = gen;
+
+// run() on a client that isn't pg's, and run itself, as a library re-exports them (#695)
+export const usersOn = (queryable: db.QueryableLike) => db.select('users', db.all).run(queryable);
+export const runOfUsers = db.select('users', db.all).run;

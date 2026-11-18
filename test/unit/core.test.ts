@@ -1397,3 +1397,50 @@ describe('SQLFragment', () => {
     `);
   });
 });
+
+describe('run() on a client that isn\'t pg\'s (#695)', () => {
+  // a QueryableLike, typed with no cast: it records the query object run() sends, and answers with the given rows
+  const recording = (rows: any[]) => {
+    const sent: unknown[] = [];
+    const client: db.QueryableLike = { query: async query => { sent.push({ ...query }); return { rows }; } };
+    return { client, sent };
+  };
+
+  it('sends a select() with a lateral as compile() gives it, and resolves to its result', async () => {
+    const
+      { client, sent } = recording([{ result: [{ id: 1, accounts: [] }] }]),
+      query = db.select('users', { id: 1 }, { lateral: { accounts: db.select('accounts', { owner_id: parent('id') }) } });
+    expect(await query.run(client)).toEqual([{ id: 1, accounts: [] }]);
+    expect(sent).toEqual([query.compile()]);
+  });
+
+  it('sends an insert() of two rows, and resolves to each row\'s result', async () => {
+    const
+      { client, sent } = recording([{ result: { id: 1 } }, { result: { id: 2 } }]),
+      query = db.insert('users', [{ email: 'a@example.com', display_name: 'Ada' }, { email: 'g@example.com', display_name: 'Grace' }]);
+    expect(await query.run(client)).toEqual([{ id: 1 }, { id: 2 }]);
+    expect(sent).toEqual([{
+      text: 'INSERT INTO "users" ("display_name", "email") VALUES ($1, $2), ($3, $4) RETURNING to_jsonb("users".*) AS result',
+      values: ['Ada', 'a@example.com', 'Grace', 'g@example.com'],
+    }]);
+  });
+
+  it('sends a count(), and resolves to a number', async () => {
+    const { client, sent } = recording([{ result: '2' }]);
+    expect(await db.count('users', db.all).run(client)).toBe(2);
+    expect(sent).toEqual([{ text: 'SELECT count(*) AS result FROM "users"', values: [] }]);
+  });
+
+  it('sends a prepared fragment\'s name with its text and values', async () => {
+    const { client, sent } = recording([{ n: 1 }]);
+    expect(await sql`SELECT ${param(1)} AS n`.prepared('one').run(client)).toEqual([{ n: 1 }]);
+    expect(sent).toEqual([{ text: 'SELECT $1 AS n', values: [1], name: 'one' }]);
+  });
+
+  it('run is a field bound to its fragment: taken off it, it still runs', async () => {
+    const { client, sent } = recording([{ n: 1 }]), query = sql`SELECT 1 AS n`, { run } = query;
+    expect(await run(client)).toEqual([{ n: 1 }]);
+    expect(await Promise.resolve(client).then(query.run)).toEqual([{ n: 1 }]);
+    expect(sent).toEqual([{ text: 'SELECT 1 AS n', values: [] }, { text: 'SELECT 1 AS n', values: [] }]);
+  });
+});
