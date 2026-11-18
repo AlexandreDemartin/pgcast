@@ -87,7 +87,7 @@ Each value is prepared as `pg` prepares it (its `prepareValue()`: a `Date` in lo
 - **A nested transaction**: `transaction()` passes the client of a transaction given to it through, but TypeScript wants it cast to the level's `TxnClient…` (#702).
 - **Errors** are PGlite's `DatabaseError`, with `pg`'s fields (`code`, `detail`, `constraint`…), so `db.isDatabaseError()` and the retry of `transaction()` work. A closed PGlite rejects with PGlite's `PGlite is closed`; a query sent as `close()` begins, with `PGlite gave no result: was it closed while the query waited?` (0.5.0 and 0.5.5; 0.5.13 and 0.5.16 run it first).
 - **`pg.types.setTypeParser()`** changes the adapter's parsing too when npm installs one `pg-types` for both.
-- **A `PGliteWorker`** fits `asPool()`'s types, but the tests run on a `PGlite` only.
+- **A `PGliteWorker`** fits `asPool()`'s types, but is not tested: nothing checks that an error keeps its `code` across `postMessage()`, that a name `.prepared()` kept still exists after another tab becomes the leader, nor that one tab's transaction keeps another's queries out.
 
 ## Development
 
