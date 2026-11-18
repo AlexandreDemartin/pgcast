@@ -190,10 +190,66 @@ describe('a pool that is not pg’s', () => {
     void db.serializable({ connect: async () => ({ query: fails, release(_: Error) {} }) }, async () => 1);
   });
 
-  // #696: not typed, as every typing tried moves a call of Zapatos 6.6.1 (website/transaction.md § Another driver's pool)
-  test('the callback’s client is refused by a nested transaction(), which run time passes through', () => {
-    // @ts-expect-error another driver's client, passed to a nested call
-    void db.serializable(other, c => db.serializable(c, async () => 1));
+});
+
+declare const bare: OtherClient;
+declare const withConnect: db.TxnClientLike<OtherClient & { connect: () => Promise<void> }, db.IsolationLevel.Serializable>;
+declare const atAnyLevel: db.TxnClientLike<Awaited<ReturnType<db.PoolLike['connect']>>, db.IsolationLevel>;
+declare function countUsers(txnClient: TxnOther<db.IsolationLevel.Serializable>): Promise<number>;
+
+// #702: run time passes the client of another driver's transaction through a nested call; its callback gets that same
+// client, typed at the outer level it runs at, as savepoint() gives it, where a pg client gets its own level, as in 6.6.1
+describe('a nested call on another driver’s client (#702)', () => {
+  test('the callback gets the client given, at the outer level, at each function', () => {
+    void db.serializable(other, c => db.transaction(c, db.IsolationLevel.ReadCommitted, async inner => { expectTypeOf(inner).toEqualTypeOf<TxnOther<db.IsolationLevel.Serializable>>(); }));
+    void db.serializable(other, c => db.serializable(c, async inner => { expectTypeOf(inner).toEqualTypeOf<TxnOther<db.IsolationLevel.Serializable>>(); }));
+    void db.serializable(other, c => db.repeatableRead(c, async inner => { expectTypeOf(inner).toEqualTypeOf<TxnOther<db.IsolationLevel.Serializable>>(); }));
+    void db.serializable(other, c => db.readCommitted(c, async inner => { expectTypeOf(inner).toEqualTypeOf<TxnOther<db.IsolationLevel.Serializable>>(); }));
+    void db.serializable(other, c => db.serializableRO(c, async inner => { expectTypeOf(inner).toEqualTypeOf<TxnOther<db.IsolationLevel.Serializable>>(); }));
+    void db.serializable(other, c => db.repeatableReadRO(c, async inner => { expectTypeOf(inner).toEqualTypeOf<TxnOther<db.IsolationLevel.Serializable>>(); }));
+    void db.serializable(other, c => db.readCommittedRO(c, async inner => { expectTypeOf(inner).toEqualTypeOf<TxnOther<db.IsolationLevel.Serializable>>(); }));
+    void db.serializable(other, c => db.serializableRODeferrable(c, async inner => { expectTypeOf(inner).toEqualTypeOf<TxnOther<db.IsolationLevel.Serializable>>(); }));
+    const nested = db.readCommitted(other, c => db.serializable(c, async inner => inner));
+    expectTypeOf(nested).resolves.toEqualTypeOf<TxnOther<db.IsolationLevel.ReadCommitted>>();
+    expectTypeOf(nested).resolves.not.toBeAny();
+    const run = db.serializable(other, c => db.readCommitted(c, inner => db.select('users', db.all).run(inner)));
+    expectTypeOf(run).resolves.toEqualTypeOf<s.JSONSelectableForTable<'users'>[]>();
+    expectTypeOf(run).resolves.not.toBeAny();
+    expectTypeOf(db.serializable(literal, c => db.readCommitted(c, async inner => inner))).resolves.toEqualTypeOf<db.TxnClientLike<LiteralClient, db.IsolationLevel.Serializable>>();
+    // the client of a db.PoolLike at any level: exactly the fallback's members but connect, so told apart by that key
+    expectTypeOf(db.serializable(atAnyLevel, async inner => inner)).resolves.toEqualTypeOf<typeof atAnyLevel>();
+  });
+
+  test('a helper that takes the client, or a pool typed with its client, compiles', () => {
+    const countTwice = (c: TxnOther<db.IsolationLevel.Serializable>) => db.serializable(c, inner => countUsers(inner));
+    expectTypeOf(db.serializable(other, countTwice)).resolves.toEqualTypeOf<number>();
+    const inPool = (p: db.PoolLike<OtherClient>, cb: (c: TxnOther<db.IsolationLevel.Serializable>) => Promise<number>) => db.serializable(p, cb);
+    expectTypeOf(inPool(other, countTwice)).resolves.toEqualTypeOf<number>();
+    expectTypeOf(inPool(other, countTwice)).resolves.not.toBeAny();
+  });
+
+  test('a bare client, a client with a connect(), a query() string, a pg-typed callback and a level not satisfied are refused', () => {
+    // @ts-expect-error a client outside any transaction, whose type declares no _zapatos: run time would call its connect()
+    void db.serializable(bare, async () => 1);
+    // @ts-expect-error a client with a connect() is neither a pool's client nor a PoolLike
+    void db.serializable(withConnect, async () => 1);
+    // @ts-expect-error its query() takes pg's query object, not a string
+    void db.serializable(other, c => db.readCommitted(c, inner => inner.query('SELECT 1')));
+    // @ts-expect-error another driver's client is no TxnClientForRepeatableRead
+    void db.serializable(other, c => db.readCommitted(c, inner => countBookings(inner)));
+    // @ts-expect-error the outer level, READ COMMITTED, does not satisfy SERIALIZABLE
+    void db.readCommitted(other, c => db.serializable(c, inner => countUsers(inner)));
+  });
+
+  test('limitation: a helper generic over the pool’s client, or over the client, does not compile', () => {
+    const overPool = <C>(p: db.PoolLike<C>, cb: (c: db.TxnClientLike<C, db.IsolationLevel.Serializable>) => Promise<number>) =>
+      // @ts-expect-error the callback's client depends on C, left unresolved: type the pool db.PoolLike<OtherClient>
+      db.serializable(p, cb);
+    void overPool;
+    const overClient = <C extends TxnOther<db.IsolationLevel.Serializable>>(c: C) =>
+      // @ts-expect-error a client generic over another driver's: type it db.TxnClientLike<OtherClient, L>
+      db.serializable(c, async () => 1);
+    void overClient;
   });
 });
 
@@ -237,6 +293,17 @@ describe('the calls of Zapatos 6.6.1 keep their types (#696)', () => {
     void viaParameters;
     const mockImplementation = <F extends (...args: any) => any>(_: F, impl: (...args: Parameters<F>) => ReturnType<F>) => impl;
     void mockImplementation(db.serializable, async (_, callback) => callback(txn));
+  });
+
+  // #702: another driver's client is inferred from the first argument only when it has no connect(), which every pg value has
+  test('inside a generic forwarder over a pg client or pool, the callback gets the TxnClient… of its level', () => {
+    const overTxn = <C extends db.TxnClientForSerializable>(c: C) => db.serializable(c, async inner => { expectTypeOf(inner).toEqualTypeOf<db.TxnClientForSerializable>(); return bookSeat(inner); });
+    const overPoolClient = <C extends pg.PoolClient>(c: C) => db.serializable(c, async inner => { expectTypeOf(inner).toEqualTypeOf<db.TxnClientForSerializable>(); return bookSeat(inner); });
+    const overAnyTxn = <C extends db.TxnClient<db.IsolationLevel>>(c: C) => db.readCommitted(c, async inner => { expectTypeOf(inner).toEqualTypeOf<db.TxnClientForReadCommitted>(); });
+    const overPool = <P extends pg.Pool>(p: P) => db.serializable(p, async inner => { expectTypeOf(inner).toEqualTypeOf<db.TxnClientForSerializable>(); return bookSeat(inner); });
+    const overQueryable = <Q extends db.Queryable>(q: Q) => db.serializable(q, async inner => { expectTypeOf(inner).toEqualTypeOf<db.TxnClientForSerializable>(); return bookSeat(inner); });
+    expectTypeOf(overTxn(txn)).resolves.toEqualTypeOf<number>();
+    void [overPoolClient, overAnyTxn, overPool, overQueryable];
   });
 
   // the pool's client is inferred from the pool alone, never from the callback's own parameter (NoInfer), at each function
