@@ -61,6 +61,28 @@ Candidates for a check, a rule or a skill line.
 - #722 — An `it.each` title that interpolates an argument holding a URL puts it in the test names; `%#` keeps titles free of URLs — builder
 - #722 — A CLI replay sets `PGHOST`/`PGPORT` on a closed port as well as an unreachable `connectionString`: otherwise a result depends on the machine's local Postgres — branch-reviewer
 - #722 — A message kept "byte for byte" is reread against the new outputs beside it: a note true before a new flag ("the only flag is --check") can become false after it — orchestrator
+- #698 — Decision 005 and #698's body were partly wrong about PGlite's defaults (`int8` a number below 2^53, `date` off unless Node runs in UTC, infinity an Invalid Date until 0.5.16): a driver's defaults are replayed per version and time zone before an issue states them — builder
+- #698 — An unquoted `CREATE DATABASE` folds case: probe database names are lowercase, or the connection URL names a database that does not exist — builder
+- #698 — PGlite 0.5.5's `execProtocol()` after `close()` blocks the event loop, so a probe's own timer never fires: such a probe runs in the background and is killed by PID — builder
+- #709 — `postgres-bytea`, loaded by `pg-types`, reads `Buffer.from` at load, not at parse: an import-only bundle check cannot see a missing global; the check loads the built bundle with `Buffer` deleted — builder
+- #709 — A concurrent-prepare race passed every parity table, which sends queries one after another: shared state needs a test that sends at the same moment — builder
+- #712 — Two adapters stacked on master each add a CI job and a CHANGELOG line in the same place, so the second to merge conflicts in `ci.yml` and `CHANGELOG.md` — builder
+- #712 — A sentence about a shared single connection that names several APIs needs a probe per API, in each direction: one test covered `query()`, and PGlite's `transaction()` did the opposite of the sentence, committing the adapter's writes — branch-reviewer
+- #712 — `npm pack --dry-run` exits 0 whatever is missing: a CI step named "holds X" asserts on `--json`, or it checks nothing (both adapter jobs) — branch-reviewer
+- #709 — In a hand-written wire-protocol client `''` is the unnamed statement; a cache keyed by name reads it as pg does (always re-parsed), or a later unnamed `Parse` swaps the statement under it (a `SELECT` ran as a `DELETE`) — branch-reviewer, `adapters/pglite/src/index.ts`
+- #709 — A protocol message built by spreading per-value parts into a variadic function fails from about 35,000 values (V8's argument limit); Postgres's 65,535-parameter ceiling belongs in every adapter's table — branch-reviewer
+- #709 — An embedded backend has no client to answer a `CopyInResponse`: pg's client-side `CopyFail` is sent up front, or the backend process exits — branch-reviewer
+- #709 — A test config pinned to one time zone east of UTC freezes only one sign of a copied date formatter: run once on each side, with a half-hour offset — branch-reviewer
+- #709 — A COPY FROM STDIN left unanswered spins PGlite's Postgres at 100% CPU, so vitest's timeout never fires: such red tests run under an alarm — builder
+- #709 — `returning: [cols]` adds a value (`jsonb_build_object($1::text, …)`): a test at the 65,535-value limit uses the default returning — builder
+- #709 — A `git commit -am` swept a second change into a fix commit: stage by path when two changes are in progress — builder
+- #712 — A claim that one version range behaves differently in a race needs a probe per version, in both call orders; a test that accepts either outcome freezes no version split — branch-reviewer
+- #712 — After a transaction's first query Postgres refuses a change of isolation level (25001) but not READ ONLY: a claim about a nested `START TRANSACTION` is probed per level, read-only ones included — branch-reviewer
+- #709 — A guard whose bug shows only on some versions of the peer is frozen only by the CI legs on those versions; its mutant runs on the version that triggers it — branch-reviewer
+- #709 — A brand check by `try`/`catch` costs a thrown error per value that fails it: on a per-value path, cheap shape tests (arrays, plain objects) go first — branch-reviewer
+- #709/#712 — Two reviewers disagreed on the same race (0.5.13+ returning the row vs rejecting): a race claimed per version is probed with a count per order and per version before it is written — orchestrator
+- #709/#712 — A race probed by a reviewer is replayed with and without an `await` between the calls: one `await` flipped the outcome on every PGlite version, which is how two reviewers saw opposite results — builder
+- #709 — A race test that accepts two outcomes pairs with a mutant run on each CI version: the no-result branch is reached only on 0.5.0, so the lockfile leg alone lets that mutant pass — branch-reviewer
 
 ## Minors kept
 
@@ -74,3 +96,5 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #708 — form: `notAnArray` says "value" for `likeAny()`/`ilikeAny()` where `notAList` says "patterns" — branch-reviewer
 - #721 — form: #720's Done when asked for a replay on Postgres 14; only CI's leg covers it (the fix does not depend on the version) — branch-reviewer
 
+- #709 — form: `adapters/pglite/test/params.test.ts` has no row with a `getTime` that is not a Date (`{ getTime: () => 0, toPostgres: () => 'tp' }`), so `typeof v.getTime === 'function'` as `isDate` passes all 468 rows — branch-reviewer
+- #709 — defect: a real Date reprototyped to `Object.prototype` is not a Date for the PGlite adapter's `isDate` (written as JSON, where pg writes its time); contrived — branch-reviewer
