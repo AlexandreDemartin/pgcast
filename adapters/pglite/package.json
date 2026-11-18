@@ -31,13 +31,14 @@
   "files": [
     "dist",
     "README.md",
+    "CHANGELOG.md",
     "LICENCE"
   ],
   "scripts": {
     "build": "tsc",
     "prepack": "npm run build",
     "test": "vitest run",
-    "test:types": "tsc -p test",
+    "test:types": "tsc -p test && tsc -p test/types",
     "check:browser": "node test/browser-bundle.mjs"
   },
   "dependencies": {
