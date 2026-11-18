@@ -16,6 +16,7 @@ declare function countSeats(txnClient: db.TxnClientForSerializableRO): Promise<n
 declare function countFilms(txnClient: db.TxnClientForRepeatableReadRO): Promise<number>;
 declare function countTags(txnClient: db.TxnClientForReadCommittedRO): Promise<number>;
 declare function countSeatsAnyRO(txnClient: db.TxnClientForSerializableRO | db.TxnClientForSerializableRODeferrable): Promise<number>;
+declare function bookSeat(txnClient: db.TxnClientForSerializable): Promise<number>;
 
 describe('the client of a transaction', () => {
   test('the callback gets the client of its level', () => {
@@ -228,6 +229,38 @@ describe('the calls of Zapatos 6.6.1 keep their types (#696)', () => {
     void viaParameters;
     const mockImplementation = <F extends (...args: any) => any>(_: F, impl: (...args: Parameters<F>) => ReturnType<F>) => impl;
     void mockImplementation(db.serializable, async (_, callback) => callback(txn));
+  });
+
+  // the callback is no inference site for the pool's client: from it, a pg client's would be the callback's own
+  test('a callback typed for a level the transaction does not satisfy is refused, by reference, annotated, forwarded or as a value', () => {
+    expectTypeOf(db.serializable(pool, countBookings)).resolves.toEqualTypeOf<number>();
+    // @ts-expect-error READ COMMITTED does not satisfy REPEATABLE READ
+    void db.readCommitted(pool, countBookings);
+    // @ts-expect-error READ ONLY does not satisfy a read-write level
+    void db.repeatableReadRO(pool, countBookings);
+    // @ts-expect-error IsolationSatisfying<SerializableRO> leaves SerializableRODeferrable out (#489)
+    void db.serializableRODeferrable(pool, countSeats);
+    // @ts-expect-error READ COMMITTED, READ ONLY does not satisfy SERIALIZABLE
+    void db.readCommittedRO(pool, bookSeat);
+    // @ts-expect-error transaction() at READ COMMITTED
+    void db.transaction(pool, db.IsolationLevel.ReadCommitted, countBookings);
+    // @ts-expect-error an arrow annotated with the wrong level
+    void db.readCommitted(pool, async (c: db.TxnClientForRepeatableRead) => countBookings(c));
+    // @ts-expect-error an annotated arrow that reads the level
+    void db.readCommittedRO(pool, async (c: db.TxnClientForSerializable) => c._zapatos?.isolationLevel);
+    const forwarder = <T>(cb: (c: db.TxnClientForRepeatableRead) => Promise<T>) =>
+      // @ts-expect-error a forwarder's callback
+      db.readCommitted(pool, cb);
+    void forwarder;
+    // @ts-expect-error inside a map()
+    void [pool].map(p => db.readCommitted(p, countBookings));
+    // @ts-expect-error on a plain client
+    void db.readCommitted(plain, countBookings);
+    // @ts-expect-error on a queryable typed any
+    void db.readCommitted(anyValue, countBookings);
+    // @ts-expect-error readCommitted() as a value typed for a REPEATABLE READ callback
+    const asValue: (q: db.Queryable, cb: (c: db.TxnClientForRepeatableRead) => Promise<number>) => Promise<number> = db.readCommitted;
+    void asValue;
   });
 
   test('the two paths that move: the first parameter as a type, and an arrow given as the function', () => {
