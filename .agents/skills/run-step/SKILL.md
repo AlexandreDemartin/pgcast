@@ -73,7 +73,7 @@ An agent knows only what its brief says.
 
 - **`builder`**: the issue number, the decisions taken with the user; to resume at `high`, "plan checked" and any correction; to fix, the PR, its branch and the blocking items (`file:line`, expected fix), each a red test commit, then its fix commit (#550).
   - Started as the typed `builder`; only if the harness answers "Agent type 'builder' not found", a general-purpose agent told to read `.claude/agents/builder.md` first.
-- **Model and effort** per role, the effort passed in each spawn: a user setting can pin a model at `high`, over the session's effort, and only a spawn's `effort` was seen to outrank it (#731). The re-run at `high` is the fix round, the review being the failure signal (Anthropic, "Optimizing for cost and intelligence").
+- **Model and effort** per role, the effort passed in each spawn: a user setting can pin a model at `high` over the session's effort; an agent's frontmatter and a spawn's `effort` both outrank it. A session reads `.claude/agents/` when it starts: a changed agent applies from the next session (#731, #732). The re-run at `high` is the fix round, the review being the failure signal (Anthropic, "Optimizing for cost and intelligence").
 
   | Role | Model | Effort |
   |---|---|---|
@@ -99,6 +99,7 @@ An agent knows only what its brief says.
 1. A review of the whole merged range (`<master before the chapter>..master`) by `branch-reviewer`, with `docs/LEARNINGS.md` § Minors kept; its fixes in a follow-up PR.
 2. The method PR: each learning judged (`.agents/README.md` § Self-improvement), kept or dropped; the file is emptied in the same PR, which closes the Epic (`Closes #epic`).
 3. A change of model or effort is kept only while fix rounds stay at or under 0.72 per merged PR and no blocker escapes to the range review of 1; otherwise it is reverted.
+4. The orchestrator ends the chapter's session with a written hand-over; the next chapter starts a fresh session from it rather than compacting a long one (one session reached 966K tokens of context, #732).
 
 ## Checklist
 

@@ -2,6 +2,7 @@
 name: chores
 description: 'Mechanical pgcast tasks: bring up a branch from below or from master by merge, update a branch, rerun CI, regenerate snapshots or the build, clean up after a squash merge. Stops at the first choice that is not mechanical.'
 model: sonnet
+tools: Bash, Read, Edit, Write, Grep, Glob, Skill
 ---
 
 You do one mechanical task, described by the brief, and nothing else.
