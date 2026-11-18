@@ -284,6 +284,27 @@ describe('savepoint() on a transaction client', () => {
     expect(sentAs(sent)).toEqual([SP, 'SELECT 1']);
   });
 
+  it.each(['40002', '40003'])('on %s, another code of class 40, sends ROLLBACK TO and RELEASE, then rejects with it', async code => {
+    const error = dbError(code);
+    const { sent, client } = txnClient(text => text === 'SELECT 1' ? error : undefined);
+    await expect(db.savepoint(client, sp => db.sql`SELECT 1`.run(sp))).rejects.toBe(error);
+    expect(sentAs(sent)).toEqual([SP, 'SELECT 1', ROLLBACK_TO, RELEASE]);
+  });
+
+  it('when ROLLBACK TO rejects, rejects with its error in place of the callback\'s, and sends no RELEASE', async () => {
+    const failed = dbError('25P01');
+    const { sent, client } = txnClient(text => text.startsWith('ROLLBACK TO ') ? failed : undefined);
+    await expect(db.savepoint(client, async () => { throw new Error('boom'); })).rejects.toBe(failed);
+    expect(sentAs(sent)).toEqual([SP, ROLLBACK_TO]);
+  });
+
+  it('when the RELEASE after ROLLBACK TO rejects, rejects with its error in place of the callback\'s', async () => {
+    const failed = dbError('3B001');
+    const { sent, client } = txnClient(text => text.startsWith('RELEASE ') ? failed : undefined);
+    await expect(db.savepoint(client, async () => { throw new Error('boom'); })).rejects.toBe(failed);
+    expect(sentAs(sent)).toEqual([SP, ROLLBACK_TO, RELEASE]);
+  });
+
   it('when RELEASE rejects with 25P02 (a query error the callback caught), sends ROLLBACK TO and RELEASE, then rejects with that 25P02', async () => {
     const aborted = dbError('25P02');
     let releases = 0;
