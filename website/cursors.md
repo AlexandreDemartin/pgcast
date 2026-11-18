@@ -37,7 +37,7 @@ Suppose another transaction commits a fifth film after the first batch. Under `R
 
 ## Handle an early exit or a retry
 
-While the transaction is live, a `break`, a `return` or an error thrown by the index closes the cursor. The caller receives the index’s error. For a failed SQL query inside the loop, see [`cursor()`](/transaction#cursor).
+While the transaction is live, a `break`, a `return` or an error thrown by the index closes the cursor. For a failed SQL query inside the loop, see [`cursor()`](/transaction#cursor).
 
 If a fetch fails, the index keeps any batches it has already received. A retry after a serialisation failure (40001) starts the scan on a new snapshot. A film delivered by the failed attempt may be missing from the new scan.
 
@@ -47,7 +47,7 @@ If the published index must match one successful scan, write the batches to a st
 
 - In a read-write transaction, `lock: { for: 'UPDATE' }` locks rows as the cursor fetches them. Under `READ COMMITTED`, a later fetch can see a title change another transaction committed after declaration.
 - A film inserted by the loop stays outside the open cursor’s snapshot.
-- A [`savepoint()`](/transaction#savepoint) taken while the cursor is open can roll back work, but the cursor keeps its position. If you fetch a film inside the savepoint, the next fetch after the rollback starts after that film.
+- If the cursor was already open when you called [`savepoint()`](/transaction#savepoint) and you fetch a film inside the savepoint, the next fetch after the rollback starts after that film.
 - Each cursor takes the lowest free number on its client for its name, `pgcast_cursor_<n>`.
 
 Postgres documents the cursor’s lifetime in [DECLARE](https://www.postgresql.org/docs/current/sql-declare.html) and how it advances in [FETCH](https://www.postgresql.org/docs/current/sql-fetch.html).

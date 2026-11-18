@@ -1,5 +1,5 @@
 ---
-english: fbace3d72d62
+english: 00dc718eb2d1
 ---
 
 # Curseurs
@@ -13,9 +13,9 @@ Choisissez les colonnes dont l’index a besoin et triez les films par identifia
 
 <<< ../examples/plain/cursors_films.ts{ts twoslash}
 
-Survolez `films` pour voir son type, `{ id: number; title: string }[]`. C’est le type que donne [`select()`](/fr/select#select) pour les mêmes colonnes. Utilisez ici [`selectRows()`](/fr/select#selectRows) pour que Postgres renvoie une ligne par film. Avec `select()`, le curseur lirait l’unique ligne produite par l’agrégat (`jsonb_agg`) et donnerait les quatre films à l’index en une fois.
+Survolez `films` pour voir son type, `{ id: number; title: string }[]`. C’est le type que donne [`select()`](/fr/select#select) pour les mêmes colonnes. Utilisez ici [`selectRows()`](/fr/select#selectRows) pour que Postgres renvoie une ligne par film. Avec `select()`, le curseur lirait l’unique ligne produite par l’agrégat (`jsonb_agg`) et transmettrait les quatre films à l’index en une seule fois.
 
-L’index de l’exemple consigne dans ses logs les identifiants 1000 et 1001 ensemble, puis 1002 et 1003. Si vous fixez la taille du batch à trois films, le second batch ne contient que le quatrième film. Les valeurs de la déclaration sont `['id', 'title']`.
+Dans ses logs, l’index de l’exemple regroupe les identifiants 1000 et 1001, puis 1002 et 1003. Si vous fixez la taille du batch à trois films, le second batch ne contient que le quatrième film. Les valeurs de la déclaration sont `['id', 'title']`.
 
 <!-- probe: db.repeatableReadRO(pool, async txnClient => { for await (const films of db.cursor(txnClient, db.selectRows('films', db.all, { columns: ['id', 'title'], order: { by: 'id', direction: 'ASC' } }), { batchSize: 2 })) { } }) -->
 ```sql
@@ -29,7 +29,7 @@ COMMIT
 
 Chaque lecture coûte un aller-retour. Pour limiter le nombre de lignes chargées en mémoire à chaque lecture, fixez la taille du batch à un entier compris entre 1 et 2147483647. Prévoyez assez de mémoire pour que deux batchs successifs puissent s’y trouver en même temps.
 
-[`cursor()`](/fr/transaction#cursor) ignore le nom de la requête préparée du fragment que vous lui passez. Si vous réutilisez la requête, laissez les fragments imbriqués sans nom. Le numéro du curseur peut changer le SQL de la déclaration, et `pg` exige un seul texte de requête par nom.
+[`cursor()`](/fr/transaction#cursor) ignore le nom de requête préparée associé au fragment que vous lui passez. Si vous réutilisez la requête, laissez les fragments imbriqués sans nom. Le numéro du curseur peut changer le SQL de la déclaration, et `pg` exige un seul texte de requête par nom.
 
 ## Garder un seul instantané {#keep-one-snapshot}
 
@@ -37,11 +37,11 @@ Lisez le curseur dans l’appel à [`transaction()`](/fr/transaction#transaction
 
 Dans l’exemple, la requête de sélection simple utilise l’instantané visible à la déclaration du curseur. En lecture répétable, une requête exécutée plus tôt dans la transaction peut avoir déjà fixé cet instantané.
 
-Supposons qu’une autre transaction commite l’insertion d’un cinquième film après le premier batch. En `READ COMMITTED`, un [`count()`](/fr/select#count) dans la boucle compte cinq films, alors que le curseur en lit quatre. En `REPEATABLE READ, READ ONLY`, les deux en voient quatre.
+Supposons qu’une autre transaction commite l’insertion d’un cinquième film après le premier batch. En `READ COMMITTED`, un appel à [`count()`](/fr/select#count) dans la boucle renvoie cinq, alors que le curseur lit quatre films. En `REPEATABLE READ, READ ONLY`, les deux en voient quatre.
 
 ## Gérer une sortie anticipée de la boucle ou un retry {#handle-an-early-exit-or-a-retry}
 
-Tant que la transaction est active, le curseur se ferme si vous quittez la boucle avec `break` ou `return`, ou si l’index lève une erreur. L’appelant reçoit l’erreur de l’index. Si une requête SQL échoue dans la boucle, voir [`cursor()`](/fr/transaction#cursor).
+Tant que la transaction est active, le curseur se ferme si vous quittez la boucle avec `break` ou `return`, ou si l’index lève une erreur. Si une requête SQL échoue dans la boucle, voir [`cursor()`](/fr/transaction#cursor).
 
 Si une lecture échoue, l’index garde les batchs qu’il a déjà reçus. Après une erreur de sérialisation (40001), un retry relance le parcours sur un nouvel instantané. Un film reçu lors de la tentative qui a échoué peut manquer dans le nouveau parcours.
 
@@ -49,9 +49,9 @@ Si l’index publié doit correspondre à un seul parcours réussi, utilisez `tx
 
 ## Travailler dans la boucle {#work-inside-the-loop}
 
-- Dans une transaction en lecture-écriture, `lock: { for: 'UPDATE' }` verrouille les lignes à mesure que le curseur les lit. En `READ COMMITTED`, une lecture ultérieure peut voir un changement de titre qu’une autre transaction a commité après la déclaration.
+- Dans une transaction en lecture-écriture, `lock: { for: 'UPDATE' }` verrouille les lignes à mesure que le curseur les lit. En `READ COMMITTED`, si une autre transaction commite un changement de titre après la déclaration du curseur, une lecture ultérieure peut renvoyer le nouveau titre.
 - Un film inséré par la boucle reste en dehors de l’instantané du curseur ouvert.
-- Un [`savepoint()`](/fr/transaction#savepoint) établi pendant que le curseur est ouvert permet d’annuler des opérations. Le curseur garde sa position. Si vous lisez un film dans le savepoint, la lecture qui suit le rollback commence après ce film.
-- Chaque curseur prend le plus petit numéro libre sur son client pour former son nom, `pgcast_cursor_<n>`.
+- Si le curseur était déjà ouvert lors de l’appel à [`savepoint()`](/fr/transaction#savepoint) et que vous lisez un film dans le savepoint, la première lecture après le rollback reprend après ce film.
+- Chaque curseur utilise le plus petit numéro libre sur son client pour former son nom, `pgcast_cursor_<n>`.
 
 La doc de Postgres décrit la durée de vie du curseur dans [DECLARE](https://www.postgresql.org/docs/current/sql-declare.html) et explique dans [FETCH](https://www.postgresql.org/docs/current/sql-fetch.html) comment il avance.
