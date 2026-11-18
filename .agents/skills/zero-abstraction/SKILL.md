@@ -15,10 +15,10 @@ A pgcast helper is a writing shortcut to SQL you would have written by hand; not
 - **Parameter, never literal**: a value goes through `param()`; an identifier goes through `Column`/`Table` typing (skill `sql-safety`).
 - **Derived from the database**: a type comes from the generated schema (`ColumnForTable<T>`, `SelectableForTable<T>`), never from a hand-written declaration.
 - **No state, no magic**: no cache, no global registry, no lazy read, no implicit extra query.
-- **State lives on the fragment**: a mark or a property that changes how a query compiles or what it returns (`parentTable`, `preparedName`, `noop`, a transform) is carried by `copy()`, with a test of the copy (#32, #262, #263).
+- **State lives on the fragment**: a mark or a property that changes how a query compiles or what it returns (`parentTable`, `preparedName`, `noop`, a transform) is carried by `copy()`, with a test of the copy (#32, #262, #263). A fragment is mutable (`prepared()` sets `preparedName`): a helper returns a copy, never its argument, an empty case included, and a guard reads a fragment's state where it compiles, not at the call (#673).
 - **Minimal surface**: one more option only if real usage asks for it (skill `consumer-usage`); otherwise a `sql` fragment is enough.
 - **Opt-in**: anything that changes the default output or adds a dependency sits behind an option (skill `backward-compat`).
-- **Valid empty case**: a variadic or array helper produces valid SQL with no argument (`and()` → `TRUE`, `or()` → `FALSE`), never `()`.
+- **Valid empty case**: a variadic or array helper produces valid SQL with no argument (`and()` → `TRUE`, `or()` → `FALSE`), never `()`. A path that forces or wraps a no-op runs on a `GENERATED ALWAYS` column and on a view (the fixture's `users`, `active_users`): an empty `insert()`'s text is refused there (428C9, #673).
 
 ## Shape of a condition
 
@@ -34,6 +34,7 @@ export const like = <T extends string>(a: T) => sql<SQL, boolean | null, T>`${se
 
 - The name of the Postgres operator or function when there is one (`arrayOverlaps` for `&&`, `websearchToTsquery`).
 - No synonym of an existing helper; no "handy" alias.
+- A name `db.mjs` can export: `gen-esm-wrapper` leaves out a reserved word (`with`), silently (#668).
 
 ## Checklist
 
