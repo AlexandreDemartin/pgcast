@@ -146,15 +146,19 @@ const
   // statement, and gives 57014 for the COPY, which would otherwise wait for its data and stop PGlite's Postgres
   copyFail = message('f', cstring('No source stream defined'));
 
-// each value in text, or in binary for its bytes, as pg's Bind sends them; the columns all in text
+// each value in text, or in binary for its bytes, as pg's Bind sends them; the columns all in text. The parts go in
+// one array, as a spread of up to 65,535 values would pass the most arguments a call takes
 function bindMessage(name: string, values: (string | Uint8Array | null)[]) {
-  const formats: Uint8Array[] = [], parameters: Uint8Array[] = [];
+  const parts: Uint8Array[] = [cstring(''), cstring(name), int16(values.length)];
+  for (const value of values) parts.push(int16(value instanceof Uint8Array ? 1 : 0));
+  parts.push(int16(values.length));
   for (const value of values) {
     const bytes = typeof value === 'string' ? encoder.encode(value) : value;
-    formats.push(int16(value instanceof Uint8Array ? 1 : 0));
-    parameters.push(...bytes === null ? [int32(-1)] : [int32(bytes.length), bytes]);
+    if (bytes === null) parts.push(int32(-1));
+    else parts.push(int32(bytes.length), bytes);
   }
-  return message('B', cstring(''), cstring(name), int16(values.length), ...formats, int16(values.length), ...parameters, int16(0));
+  parts.push(int16(0));
+  return message('B', concat(parts));
 }
 
 /* === results, as pg reads them === */
