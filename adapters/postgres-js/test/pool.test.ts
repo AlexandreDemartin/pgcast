@@ -110,14 +110,18 @@ describe('transactions', () => {
     db.setConfig({ transactionListener: m => messages.push(m), transactionRetryDelay: { minMs: 0, maxMs: 0 } });
     let arrive!: () => void;
     const bothCounted = new Promise<void>(resolve => { let k = 0; arrive = () => { if (++k === 2) resolve(); }; });
-    const book = (code: string) => db.serializable(u.pool, async c => {
+    // each counts none, then inserts what the other counted; b inserts once a has committed, so b fails with 40001
+    // there, and its retry starts after a's commit, which it sees: which side retries and when depend on no timing
+    // (a retry while a's commit is still flushed counted none again, and failed again, on CI)
+    const book = (code: string, after?: Promise<unknown>) => db.serializable(u.pool, async c => {
       const before = await db.count('orgs', { country: 'SS' }).run(c);
-      if (before === 0) { arrive(); await bothCounted; }  // each read the other's write: one of them fails with 40001
+      if (before === 0) { arrive(); await bothCounted; await after; }
       await db.insert('orgs', { country: 'SS', code: code + before, name: 'n' }).run(c);
       return before;
     });
-    expect((await Promise.all([book('a'), book('b')])).sort()).toEqual([0, 1]);
-    expect(messages.filter(m => m.startsWith('Retrying'))).toEqual(['Retrying transaction, attempt 2 of 5']);
+    const a = book('a');
+    expect(await Promise.all([a, book('b', a)])).toEqual([0, 1]);
+    expect(messages).toEqual(['Transaction rollback (code 40001) on attempt 1 of 5, retrying in 0ms', 'Retrying transaction, attempt 2 of 5']);
     expect(await db.count('orgs', { country: 'SS' }).run(u.pool)).toBe(2);
     expect([n.reserves(), n.releases()]).toEqual([2, 2]);
   });
