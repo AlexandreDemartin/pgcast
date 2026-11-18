@@ -1,5 +1,6 @@
 ---
 name: builder
+effort: medium
 description: 'Builds a pgcast step, GitHub sub-issue of an Epic (runtime, codegen, tests, docs): plan comment, code, draft PR with its proofs; or applies the blocking items of a review when started afresh with them. Choose it over the default agent to write the code of a branch.'
 ---
 

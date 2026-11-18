@@ -73,7 +73,16 @@ An agent knows only what its brief says.
 
 - **`builder`**: the issue number, the decisions taken with the user; to resume at `high`, "plan checked" and any correction; to fix, the PR, its branch and the blocking items (`file:line`, expected fix), each a red test commit, then its fix commit (#550).
   - Started as the typed `builder`; only if the harness answers "Agent type 'builder' not found", a general-purpose agent told to read `.claude/agents/builder.md` first.
-  - Effort: the session's, and `effort: high` for a `high` step (plan and build) and for a round of fixes, the re-run of a failure the review found (Anthropic, "Optimizing for cost and intelligence").
+- **Model and effort** per role, the effort passed in each spawn: a user setting can pin a model at `high`, over the session's effort, and only a spawn's `effort` was seen to outrank it (#731). The re-run at `high` is the fix round, the review being the failure signal (Anthropic, "Optimizing for cost and intelligence").
+
+  | Role | Model | Effort |
+  |---|---|---|
+  | `builder`, `low` or `normal` step | the session's | `medium` |
+  | `builder`, `high` step (plan and build), round of fixes | the session's | `high` |
+  | `branch-reviewer`, review and `verify` | the session's | `high` |
+  | `chores`, French proofreader, npm and site audits | `sonnet` | `medium` |
+  | Orchestrator | the session's | the session's |
+
 - **`branch-reviewer`**: the PR, the **Risk** and its blockers, the lens (`sql`, `types`, `codegen`, `compat`) if the issue has one; in `verify` mode, the blocking items and the range of the fix commits.
 - Never the expected conclusion: a reviewer fed the hypothesis confirms it.
 - **Agents in parallel**: each its worktree (§ Ritual rules) and its own scratch folder per round, named after its PR, where the reviewer's harness stays for the fix round.
@@ -89,6 +98,7 @@ An agent knows only what its brief says.
 
 1. A review of the whole merged range (`<master before the chapter>..master`) by `branch-reviewer`, with `docs/LEARNINGS.md` § Minors kept; its fixes in a follow-up PR.
 2. The method PR: each learning judged (`.agents/README.md` § Self-improvement), kept or dropped; the file is emptied in the same PR, which closes the Epic (`Closes #epic`).
+3. A change of model or effort is kept only while fix rounds stay at or under 0.72 per merged PR and no blocker escapes to the range review of 1; otherwise it is reverted.
 
 ## Checklist
 
