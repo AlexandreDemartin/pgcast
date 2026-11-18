@@ -1,6 +1,6 @@
 # Transactions
 
-`transaction()` and its seven shortcuts, one per isolation level: the SQL they send, their retries and the types of the client they give. `savepoint()`, for a unit of work that can fail alone inside a transaction. `advisoryXactLock()`, a lock the transaction holds until it ends. `setLocal()`, settings for the rest of the transaction, as row-level security reads them. Then the errors: `isDatabaseError()` for those from Postgres, and those pgcast throws before any query.
+`transaction()` and its seven shortcuts, one per isolation level: the SQL they send, their retries and the types of the client they give. `savepoint()`, for a unit of work that can fail alone inside a transaction. `advisoryXactLock()`, a lock the transaction holds until it ends. `setLocal()`, settings for the rest of the transaction, as row-level security reads them. `cursor()`, a query's rows read in batches. Then the errors: `isDatabaseError()` for those from Postgres, and those pgcast throws before any query.
 {.lede}
 
 <AtAGlance>
@@ -416,6 +416,82 @@ It rejects before any query in five cases, in this order:
 
 </div>
 
+## `cursor()` {#cursor}
+
+```ts
+db.cursor(txnClient, query, { batchSize })
+```
+
+From 6.12.0. Reads the rows of `query` through a server-side cursor, `batchSize` at a time, and yields each batch as `query.run()` would give those rows. It returns an async generator, for `for await`, and sends nothing before the first batch is asked for ([`DECLARE`](https://www.postgresql.org/docs/current/sql-declare.html)).
+
+- `txnClient`: the client of a transaction: a [`TxnClient`](#TxnClient), the [`TxnClientLike`](#TxnClientLike) of another driver's pool, or a `pg.PoolClient` you sent `BEGIN` on. A pool, a `pg.Client` or a [`QueryableLike`](/sql-template#QueryableLike) does not compile.
+- `query`: a fragment whose result is an array of rows: a `sql` template, typed `s.films.Selectable[]` or `any[]` by default, or a [`select()`](/select#select). A batch has that type, `readonly` kept. `selectOne()`, `selectExactlyOne()`, `count()` and the other aggregates, whose result is no array, do not compile.
+- `batchSize`: the rows each `FETCH` reads, an integer from 1 to 2147483647. There is no default: no size fits every row's width.
+
+A studio's films, read 100 at a time:
+
+<<< ./examples/plain/cursor_films.ts{ts twoslash}
+
+`titles` holds every title, in order. It sends:
+
+<!-- probe: db.readCommitted(pool, async txnClient => { for await (const _ of db.cursor(txnClient, db.sql`SELECT * FROM ${'films'} WHERE ${{ studio_id: 1000 }} ORDER BY ${'id'}`, { batchSize: 100 })) { } }) -->
+```sql
+START TRANSACTION ISOLATION LEVEL READ COMMITTED
+DECLARE pgcast_cursor_1 NO SCROLL CURSOR FOR SELECT * FROM "films" WHERE ("studio_id" = $1) ORDER BY "id"
+FETCH FORWARD 100 FROM pgcast_cursor_1
+-- the same FETCH again, until one returns no row
+CLOSE pgcast_cursor_1
+COMMIT
+```
+
+- After `CURSOR FOR` comes the fragment's own text, with its values, as a `sql` template nests a fragment. A `select()` passed as is sends its `jsonb_agg` query, so it reads in one batch, the whole array, as its type says.
+- `pgcast_cursor_<n>` takes the lowest number that no other `cursor()` still running on that client holds: nested loops get 1, then 2; a loop after another gets 1 again; two at once get two names. Don't name a cursor of yours `pgcast_cursor_<n>`.
+- `NO SCROLL`: it only fetches forward. Without it, whether Postgres could fetch backward would depend on the plan. It is also the form a `FOR UPDATE` query needs, whose rows are locked as each batch is fetched, not before.
+- Postgres takes no parameter in `FETCH FORWARD`, so the size is written into the SQL once it has been checked.
+- Each batch with rows goes through the fragment's `runResultTransform`; the `FETCH` that returns no row ends the loop.
+- A prepared fragment runs unprepared, and stays prepared. The `DECLARE`'s text changes with the cursor's number, and `pg` refuses a second text under one name ("Prepared statements must be unique").
+- The cursor reads the rows as they were at its `DECLARE`: rows the transaction writes after it are not read. A `ROLLBACK TO` a savepoint taken after the `DECLARE` does not move it back.
+- [`queryListener`](/runtime-config#Config.queryListener) gets the `DECLARE`, each `FETCH` and the `CLOSE`, with the transaction's id; [`resultListener`](/runtime-config#Config.resultListener) gets each `FETCH`'s rows, the batch of a `sql` fragment, then `[]`. [`transactionListener`](/runtime-config#Config.transactionListener) and [`transactionEventListener`](/runtime-config#Config.transactionEventListener) get nothing from it.
+- It runs, rather than returning a fragment, so that its type can ask for a transaction's client, which a fragment's `run()` can't. In a query of yours, `DECLARE`, `FETCH` and `CLOSE` are plain `sql`.
+
+How it ends:
+
+<div class="stack">
+
+| When | It sends | And |
+|---|---|---|
+| the last batch is read, or the loop `break`s or `return`s | `CLOSE` | |
+| the loop throws | `CLOSE` | the loop's error goes out, whatever `CLOSE` gives |
+| the fragment's `runResultTransform` throws | `CLOSE` | its error goes out |
+| a query of the loop fails, on `pg` | no `CLOSE`, which Postgres would refuse in the aborted transaction (25P02) | that query's error goes out. A client that reports no status, another driver's, sends `CLOSE`: its 25P02 is dropped when the loop threw, but rejects a `break` after an error the loop caught |
+| a `FETCH` fails: a row whose computation fails (22012), a 40001 found mid-way | no `CLOSE` | its error goes out unchanged; `transaction()` retries a 40001 or 40P01, and the next attempt reads every batch again |
+| the generator is left, neither finished nor `return()`ed | nothing | Postgres closes the cursor at `COMMIT` or `ROLLBACK`; its number stays taken on that client |
+
+</div>
+
+Two cases go wrong, by design:
+
+- A cursor declared before a [`savepoint()`](#savepoint) whose own `FETCH` fails inside it stays open after the `ROLLBACK TO`, unusable: the next `cursor()` on that client gets 42P03. Only a `next()` called by hand inside a savepoint gets there.
+- `transaction()` marks its client once for all its attempts, so a generator made in one attempt and read in the next is not refused: its `FETCH` gets 34000, its cursor gone with the `ROLLBACK`. Make it in the attempt that reads it.
+
+Postgres refuses before any row, and its error goes out as it is:
+
+- 25P01 for a `DECLARE` outside a transaction block: a `pg.Pool` given past a cast, or a `pg.PoolClient` with no `BEGIN`;
+- 42601 for a statement `DECLARE` does not take: an `insert()` of an array of rows, which gets past the type as its result is an array, an `update()` or a `deletes()`; 0A000 for a `WITH` that writes. `VALUES`, `TABLE` and `WITH … SELECT` are taken;
+- 25P02 in an aborted transaction.
+
+`next()` rejects before any query in three cases, in this order:
+
+<div class="stack">
+
+| Rejects with | When |
+|---|---|
+| "cursor() was given a query that is not a SQLFragment, such as a string or a { text, values } object: give a db.sql fragment or a select()"<!-- message --> | `query` is not a fragment, from JavaScript or past a cast |
+| "cursor() was given a batchSize that is not an integer from 1 to 2147483647, the rows each FETCH reads: give a number of rows, { batchSize: 100 }"<!-- message --> | `batchSize` is `0`, where Postgres would return no row and the loop would end at once, a negative, a fraction, `NaN`, `Infinity`, a string, a `bigint` or a `Number` object, or `options` is missing |
+| "cursor() was iterated after its transaction ended, so its next query would run on a client that may be in another transaction, or in none: iterate it inside the transaction() callback that called cursor()"<!-- message --> | the `transaction()` it was called in has ended: a generator returned from the callback, before its first batch or after one. It is checked before the `DECLARE` and each `FETCH`; a `CLOSE` is then skipped, with no error. A client that `transaction()` did not mark, a `pg.PoolClient` after a `BEGIN` of yours, is not checked |
+
+</div>
+
 ## Types
 
 ### `IsolationLevel` {#IsolationLevel}
@@ -617,7 +693,7 @@ Handling them in an app: [Errors](/handle-errors).
 
 A plain `Error`, with no `code`, before anything is sent. A shortcut throws its own synchronously, from the call itself, but for `truncate()`'s options in another order and an aggregate's `columns` or `lateral` ([`count()`](/select#count)): `.run()` is never reached, so a `.catch()` chained on it does not get them.
 
-The others are thrown as `.compile()` compiles the query, so `.run()` rejects with them; `transaction()`, `advisoryXactLock()` and `setLocal()` reject with their own. Each is listed with what throws it:
+The others are thrown as `.compile()` compiles the query, so `.run()` rejects with them; `transaction()`, `advisoryXactLock()` and `setLocal()` reject with their own, and `cursor()`'s `next()` with its own. Each is listed with what throws it:
 
 <div class="stack">
 
@@ -636,6 +712,7 @@ The others are thrown as `.compile()` compiles the query, so `.run()` rejects wi
 | `transaction()` given a client inside a transaction block, with `transactionRequiresIdleClient`, after an empty query | its promise rejects | [Your own `BEGIN`](#your-own-begin) |
 | `advisoryXactLock()` given a key that is neither a `bigint` nor an array of two numbers, a `pg.Pool`, or a client outside a transaction block | its promise rejects | [`advisoryXactLock()`](#advisoryXactLock) |
 | `setLocal()` given settings that are not a plain object, a value that is not a string, two names that differ only in case, a `pg.Pool`, or a client outside a transaction block | its promise rejects | [`setLocal()`](#setLocal) |
+| `cursor()` given a query that is not a fragment or a `batchSize` that is not an integer from 1 to 2147483647, or iterated after its transaction ended | its first `next()` rejects, or the `next()` after the transaction | [`cursor()`](#cursor) |
 
 </div>
 

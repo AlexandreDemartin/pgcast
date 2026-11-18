@@ -1,10 +1,10 @@
 ---
-english: ebfddedf7875
+english: 105c829ce849
 ---
 
 # Transactions
 
-`transaction()` et ses sept raccourcis, un par niveau d’isolation : le SQL qu’ils envoient, leurs retries et les types du client qu’ils donnent. `savepoint()`, pour une unité de travail qui peut échouer seule dans une transaction. `advisoryXactLock()`, un lock que la transaction détient jusqu’à sa fin. `setLocal()`, des réglages pour le reste de la transaction, comme les lit la sécurité niveau ligne. Puis les erreurs : `isDatabaseError()` pour celles de Postgres, et celles que pgcast lève avant toute requête.
+`transaction()` et ses sept raccourcis, un par niveau d’isolation : le SQL qu’ils envoient, leurs retries et les types du client qu’ils donnent. `savepoint()`, pour une unité de travail qui peut échouer seule dans une transaction. `advisoryXactLock()`, un lock que la transaction détient jusqu’à sa fin. `setLocal()`, des réglages pour le reste de la transaction, comme les lit la sécurité niveau ligne. `cursor()`, les lignes d’une requête lues par batchs. Puis les erreurs : `isDatabaseError()` pour celles de Postgres, et celles que pgcast lève avant toute requête.
 {.lede}
 
 <AtAGlance>
@@ -420,6 +420,82 @@ Elle est rejetée avant toute requête dans cinq cas, dans cet ordre :
 
 </div>
 
+## `cursor()` {#cursor}
+
+```ts
+db.cursor(txnClient, query, { batchSize })
+```
+
+À partir de la 6.12.0. Lit les lignes de `query` par un curseur côté serveur, `batchSize` à la fois, et produit chaque batch tel que `query.run()` donnerait ces lignes. Elle renvoie un générateur asynchrone, pour `for await`, et n’envoie rien avant que le premier batch soit demandé ([`DECLARE`](https://www.postgresql.org/docs/current/sql-declare.html)).
+
+- `txnClient` : le client d’une transaction : un [`TxnClient`](#TxnClient), le [`TxnClientLike`](#TxnClientLike) du pool d’un autre driver, ou un `pg.PoolClient` sur lequel vous avez envoyé `BEGIN`. Un pool, un `pg.Client` ou un [`QueryableLike`](/fr/sql-template#QueryableLike) ne compile pas.
+- `query` : un fragment dont le résultat est un tableau de lignes : un template `sql`, typé `s.films.Selectable[]`, ou `any[]` par défaut, ou un [`select()`](/fr/select#select). Un batch a ce type, `readonly` compris. `selectOne()`, `selectExactlyOne()`, `count()` et les autres agrégats, dont le résultat n’est pas un tableau, ne compilent pas.
+- `batchSize` : les lignes que lit chaque `FETCH`, un entier de 1 à 2147483647. Il n’y a pas de valeur par défaut : aucune taille ne convient à toutes les largeurs de ligne.
+
+Les films d’un studio, lus 100 à la fois :
+
+<<< ../examples/plain/cursor_films.ts{ts twoslash}
+
+`titles` contient tous les titres, dans l’ordre. Cet exemple envoie :
+
+<!-- probe: db.readCommitted(pool, async txnClient => { for await (const _ of db.cursor(txnClient, db.sql`SELECT * FROM ${'films'} WHERE ${{ studio_id: 1000 }} ORDER BY ${'id'}`, { batchSize: 100 })) { } }) -->
+```sql
+START TRANSACTION ISOLATION LEVEL READ COMMITTED
+DECLARE pgcast_cursor_1 NO SCROLL CURSOR FOR SELECT * FROM "films" WHERE ("studio_id" = $1) ORDER BY "id"
+FETCH FORWARD 100 FROM pgcast_cursor_1
+-- the same FETCH again, until one returns no row
+CLOSE pgcast_cursor_1
+COMMIT
+```
+
+- Après `CURSOR FOR` vient le texte du fragment lui-même, avec ses valeurs, comme un template `sql` imbrique un fragment. Un `select()` passé tel quel envoie sa requête `jsonb_agg` : il est donc lu en un seul batch, le tableau entier, comme le dit son type.
+- `pgcast_cursor_<n>` prend le plus petit numéro qu’aucun autre `cursor()` encore en cours sur ce client ne détient : des boucles imbriquées obtiennent 1, puis 2 ; une boucle après une autre obtient de nouveau 1 ; deux en même temps obtiennent deux noms. Ne donnez pas à l’un de vos curseurs un nom de la forme `pgcast_cursor_<n>`.
+- `NO SCROLL` : le curseur ne lit qu’en avant. Sans lui, savoir si Postgres peut lire en arrière dépendrait du plan. C’est aussi la forme qu’exige une requête `FOR UPDATE`, dont les lignes sont verrouillées à mesure que chaque batch est lu, pas avant.
+- Postgres n’accepte pas de paramètre dans `FETCH FORWARD` : la taille est donc écrite dans le SQL, une fois vérifiée.
+- Chaque batch qui a des lignes passe par le `runResultTransform` du fragment ; le `FETCH` qui ne renvoie aucune ligne termine la boucle.
+- Un fragment préparé s’exécute non préparé, mais reste préparé. Le texte du `DECLARE` change avec le numéro du curseur, et `pg` refuse un second texte sous un même nom (« <span lang="en">Prepared statements must be unique</span> »).
+- Le curseur lit les lignes telles qu’elles étaient à son `DECLARE` : les lignes que la transaction écrit après ne sont pas lues. Un `ROLLBACK TO` vers un savepoint pris après le `DECLARE` ne le fait pas reculer.
+- [`queryListener`](/fr/runtime-config#Config.queryListener) reçoit le `DECLARE`, chaque `FETCH` et le `CLOSE`, avec l’id de la transaction ; [`resultListener`](/fr/runtime-config#Config.resultListener) reçoit les lignes de chaque `FETCH`, le batch d’un fragment `sql`, puis `[]`. [`transactionListener`](/fr/runtime-config#Config.transactionListener) et [`transactionEventListener`](/fr/runtime-config#Config.transactionEventListener) n’en reçoivent rien.
+- Elle s’exécute, au lieu de renvoyer un fragment, pour que son type puisse demander le client d’une transaction, ce que le `run()` d’un fragment ne peut pas. Dans une requête à vous, `DECLARE`, `FETCH` et `CLOSE` s’écrivent en simple `sql`.
+
+Comment elle se termine :
+
+<div class="stack">
+
+| Quand | Elle envoie | Et |
+|---|---|---|
+| le dernier batch est lu, ou la boucle fait `break` ou `return` | `CLOSE` | |
+| la boucle lève une erreur | `CLOSE` | l’erreur de la boucle sort, quoi que donne `CLOSE` |
+| le `runResultTransform` du fragment lève une erreur | `CLOSE` | son erreur sort |
+| une requête de la boucle échoue, sur `pg` | pas de `CLOSE`, que Postgres refuserait dans la transaction annulée (25P02) | l’erreur de cette requête sort. Un client qui n’indique aucun statut, celui d’un autre driver, envoie `CLOSE` : son 25P02 est ignoré quand la boucle a levé une erreur, mais rejette un `break` après une erreur que la boucle a interceptée |
+| un `FETCH` échoue : une ligne dont le calcul échoue (22012), un 40001 détecté en cours de route | pas de `CLOSE` | son erreur sort inchangée ; `transaction()` réessaie un 40001 ou un 40P01, et la tentative suivante relit chaque batch |
+| le générateur est abandonné, ni terminé ni arrêté par `return()` | rien | Postgres ferme le curseur au `COMMIT` ou au `ROLLBACK` ; son numéro reste pris sur ce client |
+
+</div>
+
+Deux cas tournent mal, à dessein :
+
+- Un curseur déclaré avant un [`savepoint()`](#savepoint), et dont le `FETCH` échoue à l’intérieur de celui-ci, reste ouvert après le `ROLLBACK TO`, inutilisable : le `cursor()` suivant sur ce client reçoit 42P03. Seul un `next()` appelé à la main dans un savepoint en arrive là.
+- `transaction()` marque son client une seule fois pour toutes ses tentatives : un générateur créé dans une tentative et lu dans la suivante n’est donc pas refusé, et son `FETCH` reçoit 34000, son curseur parti avec le `ROLLBACK`. Créez-le dans la tentative qui le lit.
+
+Postgres refuse avant toute ligne, et son erreur sort telle quelle :
+
+- 25P01 pour un `DECLARE` hors d’un bloc de transaction : un `pg.Pool` passé malgré un cast, ou un `pg.PoolClient` sans `BEGIN` ;
+- 42601 pour une instruction que `DECLARE` n’accepte pas : un `insert()` d’un tableau de lignes, qui passe le type puisque son résultat est un tableau, un `update()` ou un `deletes()` ; 0A000 pour un `WITH` qui écrit. `VALUES`, `TABLE` et `WITH … SELECT` sont acceptés ;
+- 25P02 dans une transaction annulée.
+
+`next()` est rejeté avant toute requête dans trois cas, dans cet ordre :
+
+<div class="stack">
+
+| Rejeté avec | Quand |
+|---|---|
+| "cursor() was given a query that is not a SQLFragment, such as a string or a { text, values } object: give a db.sql fragment or a select()"<!-- message --> | `query` n’est pas un fragment, depuis JavaScript ou malgré un cast |
+| "cursor() was given a batchSize that is not an integer from 1 to 2147483647, the rows each FETCH reads: give a number of rows, { batchSize: 100 }"<!-- message --> | `batchSize` vaut `0`, où Postgres ne renverrait aucune ligne et la boucle s’arrêterait aussitôt, un négatif, une fraction, `NaN`, `Infinity`, une chaîne, un `bigint` ou un objet `Number`, ou `options` manque |
+| "cursor() was iterated after its transaction ended, so its next query would run on a client that may be in another transaction, or in none: iterate it inside the transaction() callback that called cursor()"<!-- message --> | la `transaction()` dans laquelle elle a été appelée est terminée : un générateur renvoyé par le callback, avant son premier batch ou après un. C’est vérifié avant le `DECLARE` et chaque `FETCH` ; un `CLOSE` est alors sauté, sans erreur. Un client que `transaction()` n’a pas marqué, un `pg.PoolClient` après un `BEGIN` à vous, n’est pas vérifié |
+
+</div>
+
 ## Types {#types}
 
 ### `IsolationLevel` {#IsolationLevel}
@@ -621,7 +697,7 @@ Les gérer dans une application : [Erreurs](/fr/handle-errors).
 
 Une simple `Error`, sans `code`, avant que rien ne soit envoyé. Un raccourci lève les siennes de façon synchrone, dès l’appel, sauf pour les options de `truncate()` dans un autre ordre et les `columns` ou le `lateral` d’un agrégat ([`count()`](/fr/select#count)) : `.run()` n’est jamais atteint, donc un `.catch()` chaîné dessus ne les reçoit pas.
 
-Les autres sont levées quand `.compile()` compile la requête, donc `.run()` est rejetée avec elles ; `transaction()`, `advisoryXactLock()` et `setLocal()` sont rejetées avec les leurs. Chacune est listée avec ce qui la lève :
+Les autres sont levées quand `.compile()` compile la requête, donc `.run()` est rejetée avec elles ; `transaction()`, `advisoryXactLock()` et `setLocal()` sont rejetées avec les leurs, et le `next()` de `cursor()` avec les siennes. Chacune est listée avec ce qui la lève :
 
 <div class="stack">
 
@@ -640,6 +716,7 @@ Les autres sont levées quand `.compile()` compile la requête, donc `.run()` es
 | `transaction()` qui reçoit un client dans un bloc de transaction, avec `transactionRequiresIdleClient`, après une requête vide | sa promesse est rejetée | [Votre propre `BEGIN`](#your-own-begin) |
 | `advisoryXactLock()` qui reçoit une clé qui n’est ni un `bigint` ni un tableau de deux nombres, un `pg.Pool`, ou un client hors d’un bloc de transaction | sa promesse est rejetée | [`advisoryXactLock()`](#advisoryXactLock) |
 | `setLocal()` qui reçoit des réglages qui ne sont pas un objet simple, une valeur qui n’est pas une chaîne, deux noms qui ne diffèrent que par la casse, un `pg.Pool`, ou un client hors d’un bloc de transaction | sa promesse est rejetée | [`setLocal()`](#setLocal) |
+| `cursor()` qui reçoit une requête qui n’est pas un fragment ou un `batchSize` qui n’est pas un entier de 1 à 2147483647, ou parcourue après la fin de sa transaction | son premier `next()` est rejeté, ou le `next()` qui suit la transaction | [`cursor()`](#cursor) |
 
 </div>
 
