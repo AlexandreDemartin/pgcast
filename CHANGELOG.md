@@ -6,6 +6,11 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 
 ## [Unreleased]
 
+### Added
+- `QueryableLike`: `run()` takes any client whose `query({ text, values, name? })` resolves to `{ rows }`, such as a migration tool's client or a test's fake, with no cast (`sql-template.md` § `QueryableLike`, #695). `db.select('films', db.all).run(migrationClient)` compiles where it needed `as unknown as db.Queryable`; the query sent and its SQL are the same. A driver that ignores `name` runs a prepared fragment unprepared.
+  - Unchanged: `Queryable` (`pg.ClientBase | pg.Pool`) and its `keyof`, the signatures of `transaction()` (#696), the type `run()` resolves to, what `run()` does at run time, and a function typed for `Queryable` assigned to `run` or overriding it.
+  - Changed: `run()`'s parameter type read off the value, `Parameters<typeof fragment.run>[0]`, is `QueryableLike`, so a `pg` member read on it no longer compiles (TS2345).
+
 ### Changed
 - The docs say why `IsolationSatisfying` leaves `SerializableRODeferrable` out of the levels that satisfy `SerializableRO`, `RepeatableReadRO` and `ReadCommittedRO`, as in Zapatos 6.6.1, though it gives every guarantee they ask for and `transaction()` passes its client through (`transaction.md` § `IsolationSatisfying`, #489). Counting it in, a function that takes a `TxnClientForSerializableRO` would read `SerializableRODeferrable` in its own `_zapatos.isolationLevel`, and so would the callbacks of `serializableRO()`, `repeatableReadRO()` and `readCommittedRO()`. Code that compiles under 6.6.1 would then fail, such as an exhaustive `switch` on that level or a `Record` keyed by those levels. The change waits for 7.0 (#694). A function that takes the client of `serializableRO()` and that of `serializableRODeferrable()` names both types: `db.TxnClientForSerializableRO | db.TxnClientForSerializableRODeferrable`<!-- tsc: export const countSeats = (txnClient: …) => db.count('seat_bookings', { screening_id: 1000 }).run(txnClient); -->.
   - Unchanged: the types, and what `transaction()` does at run time.

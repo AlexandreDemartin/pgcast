@@ -1,5 +1,5 @@
 ---
-english: 68579145a8e5
+english: e1b440a4ce2a
 description: "Trois façons de tester vos requêtes pgcast : contre un vrai Postgres, test annulé ; sur la requête compilée ; sur un faux résultat typé d’après le schéma."
 ---
 
@@ -135,6 +135,7 @@ Pour la logique autour d’une requête, sans aucune base : un faux `Queryable`
 
 - `run()` envoie la requête compilée à `query()` et lit son résultat dans ce qui revient ; le fake ignore la requête.
 - Ce n’est ni un `pg.Pool` ni un client, d’où `as unknown as` : un simple `as db.Queryable` ne compile pas (TS2352).
+- Une fonction typée [`db.QueryableLike`](/fr/sql-template#QueryableLike) prend au contraire le fake sans cast : `run()` le prend tel quel, depuis la 6.12.0.
 - Une [`transaction()`](/fr/transaction#transaction) à laquelle on donne le fake appelle son `connect()`, qu’il n’a pas : un fake pour du code qui en ouvre une a aussi besoin de `connect()`, qui le renvoie lui-même avec un `release()`, et reçoit aussi `START TRANSACTION …` et `COMMIT` comme requêtes.
 
 Supposons qu’une migration renomme `release_year` : une fois le générateur relancé, chaque fausse ligne qui l’a encore ne compile plus. Ici, une fausse ligne avec une colonne que `films` n’a pas :

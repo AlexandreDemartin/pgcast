@@ -1,5 +1,5 @@
 ---
-english: 824870fc6dc1
+english: 0643956a998f
 ---
 
 # Template SQL
@@ -509,12 +509,12 @@ Ce que renvoient `sql` et chaque raccourci : une requête, ou une partie de req
 ### `run()` {#run}
 
 ```ts
-fragment.run(queryable: Queryable, force = false): Promise<RunResult>
+fragment.run(queryable: QueryableLike, force = false): Promise<RunResult>
 ```
 
 1. Compile le fragment ([`compile()`](#compile)) ; sur une erreur, la promesse est rejetée, avant toute requête.
 2. Appelle [`queryListener`](/fr/runtime-config#Config.queryListener) avec la requête et l’id de la transaction, s’il est défini.
-3. Envoie la requête à `queryable`, et passe le résultat de `pg` dans [`runResultTransform`](#runResultTransform). Un fragment `noop` n’envoie rien et donne `noopResult`, sauf si `force` vaut `true`.
+3. Envoie la requête à `queryable` ([`QueryableLike`](#QueryableLike)) sous la forme de l’objet de requête de `pg`, `{ text, values, name? }`, et passe ce qui revient dans [`runResultTransform`](#runResultTransform). Un fragment `noop` n’envoie rien et donne `noopResult`, sauf si `force` vaut `true`.
 4. Appelle [`resultListener`](/fr/runtime-config#Config.resultListener) avec le résultat, l’id de la transaction, le temps écoulé et la requête, s’il est défini.
 
 Un fragment `noop` se compile quand même, son SQL derrière un commentaire. `force` l’envoie, et il n’insère rien : `.run()` donne `[]`.
@@ -634,11 +634,38 @@ const mentors = crew.map(member => nameOf(member.mentor));
 type Queryable = pg.ClientBase | pg.Pool
 ```
 
-Ce que prend `run()` : un pool, un client, ou le client qu’une [`transaction()`](/fr/transaction#transaction) donne à son callback. Typée ainsi, une fonction de requête s’exécute sur n’importe lequel d’entre eux :
+Ce que prend `run()` de `pg` : un pool, un client, ou le client qu’une [`transaction()`](/fr/transaction#transaction) donne à son callback. Typée ainsi, une fonction de requête s’exécute sur n’importe lequel d’entre eux :
 
 <<< ../examples/plain/sql_queryable.ts{ts twoslash}
 
 `Queryable` accepte le client d’une transaction quel que soit son niveau : une fonction qui a besoin de `SERIALIZABLE` prend plutôt `pg.Pool | TxnClientForSerializable` ([`TxnClientForSerializable`](/fr/transaction#TxnClientForSerializable), [Réserver dans une transaction plus large](/fr/retries#book-inside-a-larger-transaction)).
+
+Une fonction qui exécute des requêtes aussi sur le client d’un autre driver prend un [`QueryableLike`](#QueryableLike).
+
+## `QueryableLike` {#QueryableLike}
+
+```ts
+interface QueryableLike {
+  query(query: SQLQuery): PromiseLike<{ rows: any[] }>
+}
+```
+
+Ce que prend `run()`, depuis la 6.12.0 : un [`Queryable`](#Queryable), ou le client de n’importe quel autre driver dont `query()` prend l’objet de requête de `pg`, `{ text, values, name? }`, et se résout en un objet dont `rows` contient les lignes, comme le client d’un outil de migration ou le fake d’un test. Il n’a besoin d’aucun cast :
+
+```ts twoslash
+import * as db from 'zapatos/db';
+// ---cut---
+const migrationClient = {
+  query: async (query: { text: string; values?: unknown[] }) => ({ rows: [] as any[] }),
+};
+const films = await db.select('films', db.all).run(migrationClient);
+```
+
+- Le SQL est le même que sur un pool `pg`, tout comme le type en quoi `run()` se résout. `runResultTransform` reçoit ce que donne `query()`, tel quel.
+- Un driver qui ignore `name` exécute un fragment préparé sans le préparer.
+- Un `query()` qui ne prend que le texte, comme le `query(text, params)` de PGlite, ne compile pas, pas plus qu’un driver sans `query()`, comme postgres.js : chacun a besoin d’un adaptateur ([#697](https://github.com/AlexandreDemartin/pgcast/issues/697), [#698](https://github.com/AlexandreDemartin/pgcast/issues/698)).
+- [`transaction()`](/fr/transaction#transaction) ne prend toujours qu’un `Queryable` ou un `TxnClient` ([#696](https://github.com/AlexandreDemartin/pgcast/issues/696)).
+- `Queryable` ne change pas, et une fonction typée pour lui peut toujours être affectée à `run`. Seul le type du paramètre de `run()` lu sur la valeur, `Parameters<typeof fragment.run>[0]`, est `QueryableLike`.
 
 ## `SQL` {#SQL}
 

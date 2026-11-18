@@ -505,12 +505,12 @@ What `sql` and every shortcut return: a query, or part of one, not yet compiled.
 ### `run()` {#run}
 
 ```ts
-fragment.run(queryable: Queryable, force = false): Promise<RunResult>
+fragment.run(queryable: QueryableLike, force = false): Promise<RunResult>
 ```
 
 1. Compiles the fragment ([`compile()`](#compile)); an error there rejects, before any query.
 2. Calls [`queryListener`](/runtime-config#Config.queryListener) with the query and the transaction's id, if set.
-3. Sends the query to `queryable`, and passes `pg`'s result through [`runResultTransform`](#runResultTransform). A `noop` fragment sends nothing and gives `noopResult`, unless `force` is `true`.
+3. Sends the query to `queryable` ([`QueryableLike`](#QueryableLike)) as `pg`'s query object, `{ text, values, name? }`, and passes what comes back through [`runResultTransform`](#runResultTransform). A `noop` fragment sends nothing and gives `noopResult`, unless `force` is `true`.
 4. Calls [`resultListener`](/runtime-config#Config.resultListener) with the result, the transaction's id, the time taken and the query, if set.
 
 A `noop` fragment still compiles, its SQL behind a comment. `force` sends it, and it inserts nothing: `.run()` gives `[]`.
@@ -630,11 +630,38 @@ const mentors = crew.map(member => nameOf(member.mentor));
 type Queryable = pg.ClientBase | pg.Pool
 ```
 
-What `run()` takes: a pool, a client, or the client a [`transaction()`](/transaction#transaction) gives its callback. Typed so, a query function runs on any of them:
+What `run()` takes from `pg`: a pool, a client, or the client a [`transaction()`](/transaction#transaction) gives its callback. Typed so, a query function runs on any of them:
 
 <<< ./examples/plain/sql_queryable.ts{ts twoslash}
 
 `Queryable` takes a transaction's client whatever its level: a function that needs `SERIALIZABLE` takes `pg.Pool | TxnClientForSerializable` instead ([`TxnClientForSerializable`](/transaction#TxnClientForSerializable), [Book inside a larger transaction](/retries#book-inside-a-larger-transaction)).
+
+A function that runs queries on a client of another driver too takes a [`QueryableLike`](#QueryableLike).
+
+## `QueryableLike` {#QueryableLike}
+
+```ts
+interface QueryableLike {
+  query(query: SQLQuery): PromiseLike<{ rows: any[] }>
+}
+```
+
+What `run()` takes, from 6.12.0: a [`Queryable`](#Queryable), or a client of any other driver whose `query()` takes `pg`'s query object, `{ text, values, name? }`, and resolves to the rows in `rows`, such as a migration tool's client or a test's fake. It needs no cast:
+
+```ts twoslash
+import * as db from 'zapatos/db';
+// ---cut---
+const migrationClient = {
+  query: async (query: { text: string; values?: unknown[] }) => ({ rows: [] as any[] }),
+};
+const films = await db.select('films', db.all).run(migrationClient);
+```
+
+- The SQL is the same as on a `pg` pool, and so is the type `run()` resolves to. `runResultTransform` gets what `query()` gives, as it comes.
+- A driver that ignores `name` runs a prepared fragment unprepared.
+- A `query()` that takes the text alone, as PGlite's `query(text, params)` does, does not compile, nor does a driver with no `query()`, as postgres.js: each needs an adapter ([#697](https://github.com/AlexandreDemartin/pgcast/issues/697), [#698](https://github.com/AlexandreDemartin/pgcast/issues/698)).
+- [`transaction()`](/transaction#transaction) still takes a `Queryable` or a `TxnClient` only ([#696](https://github.com/AlexandreDemartin/pgcast/issues/696)).
+- `Queryable` is unchanged, and a function typed for it can still be assigned to `run`. Only `run()`'s parameter type read off the value, `Parameters<typeof fragment.run>[0]`, is `QueryableLike`.
 
 ## `SQL` {#SQL}
 
