@@ -124,10 +124,10 @@ function dateToString(date: Date) {
 // and postgres.js 4 asks Postgres for the types, then serializes each value for its type: JSON text twice
 const UNKNOWN = 705;
 
-// no statement is named, as pg names none for a query with no name: postgres.js 4 runs a named statement that Postgres
-// no longer has (26000, after a DEALLOCATE ALL) again, with each value serialized for the type Postgres then gives;
-// a query with a name keeps to the extended protocol, so that several statements are refused, as pg refuses them
-const unnamed = { prepare: false }, unnamedExtended = { prepare: false, simple: false };
+// a query with a name is not prepared, as sql.unsafe() prepares none by default: postgres.js 4 runs a prepared
+// statement that Postgres no longer has (26000, after a DEALLOCATE ALL) again, with each value serialized for the type
+// Postgres then gives; it keeps to the extended protocol, which refuses several statements, as pg refuses them
+const named = { simple: false };
 
 // pg keeps the tag's first word (`START` for `START TRANSACTION`), with this pattern of its lib/result.js
 // (an empty query has none: null, as pg gives it, though pg types it string)
@@ -164,7 +164,7 @@ export function asPool(sql: PostgresJsSql): PostgresJsPool {
         const value = prepareValue(v);
         return sql.typed(value === null ? null : Buffer.isBuffer(value) ? '\\x' + value.toString('hex') : value, UNKNOWN);
       }),
-      raw = await target.unsafe(text, parameters, name == null ? unnamed : unnamedExtended).raw();
+      raw = await target.unsafe(text, parameters, name == null ? {} : named).raw();
 
     // several statements with no value give an array of results, with no command of its own, as with pg
     return raw.command === undefined ? (raw as unknown as RawResult[]).map(resultOf) as unknown as PostgresJsResult : resultOf(raw);
