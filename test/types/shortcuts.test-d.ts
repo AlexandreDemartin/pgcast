@@ -533,6 +533,8 @@ describe('selectRows', () => {
     db.selectRows('users', db.all, { lateral: db.sql<db.SQL, number>`SELECT 7::int8 AS result` });
     // @ts-expect-error a selectOne() passing a count() through, typed number | undefined
     db.selectRows('users', db.all, { lateral: db.selectOne('accounts', { owner_id: p }, { lateral: db.count('events', db.all) }) });
+    // @ts-expect-error count() or select() by a condition: each member is checked, and count()'s is typed number
+    db.selectRows('users', db.all, { lateral: Math.random() > 0.5 ? db.count('accounts', { owner_id: p }) : db.select('accounts', { owner_id: p }, { columns: ['id'] }) });
     // a sql template is typed as written: a string for an int8, a Date for a timestamptz, as pg parses them
     const
       int8 = db.selectRows('users', db.all, { lateral: db.sql<db.SQL, db.Int8String>`SELECT 7::int8 AS result` }),
