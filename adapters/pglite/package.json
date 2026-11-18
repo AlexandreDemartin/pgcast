@@ -1,0 +1,52 @@
+{
+  "name": "@pgcast/adapter-pglite",
+  "version": "0.1.0",
+  "description": "Run pgcast's queries on a PGlite, with values read and written as pg reads and writes them.",
+  "license": "MIT",
+  "author": "Alexandre Demartin (https://github.com/AlexandreDemartin)",
+  "homepage": "https://github.com/AlexandreDemartin/pgcast/tree/master/adapters/pglite#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AlexandreDemartin/pgcast.git",
+    "directory": "adapters/pglite"
+  },
+  "bugs": {
+    "url": "https://github.com/AlexandreDemartin/pgcast/issues"
+  },
+  "keywords": [
+    "pgcast",
+    "zapatos",
+    "postgres",
+    "pglite",
+    "postgresql"
+  ],
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENCE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepack": "npm run build",
+    "test": "vitest run",
+    "test:types": "tsc -p test",
+    "check:browser": "node test/browser-bundle.mjs"
+  },
+  "dependencies": {
+    "pg-types": "^2.2.0"
+  },
+  "peerDependencies": {
+    "@electric-sql/pglite": "^0.5.0"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.16"
+  }
+}

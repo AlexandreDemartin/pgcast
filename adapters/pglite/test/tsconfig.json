@@ -1,0 +1,6 @@
+{
+  // The package's tests, type-checked as the root's are (../../../test/tsconfig.json): against src/db and the stub
+  // schema of src/typings.
+  "extends": "../../../test/tsconfig.json",
+  "include": ["./**/*", "../src/**/*"]
+}
