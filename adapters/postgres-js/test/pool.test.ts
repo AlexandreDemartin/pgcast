@@ -60,6 +60,21 @@ describe('shortcuts', () => {
     expect(await u.pool.query(query)).toEqual(await u.t.pool.query(query).then(rs => (rs as unknown as any[]).map(r => ({ rows: r.rows, command: r.command }))));
   });
 
+  it('prepares a prepared query on its connection, and refuses it several statements, as pg does', async () => {
+    const prepared = async (pool: { connect: () => Promise<any> }, name: string) => {
+      const c = await pool.connect(), count = { text: 'SELECT count(*)::int AS n FROM pg_prepared_statements WHERE NOT from_sql', values: [] };
+      try {
+        const before = (await c.query(count)).rows[0].n;
+        await c.query({ text: 'SELECT 1 AS ' + name, values: [], name });  // a text of its own, prepared on no connection yet
+        const after = (await c.query(count)).rows[0].n;
+        const refused = await c.query({ text: 'SELECT 1; SELECT 2', values: [], name: name + '_two' }).catch((e: any) => e.code);
+        return { added: after - before, refused };
+      } finally { c.release(); }
+    };
+    expect(await prepared(u.pool, 'via_adapter')).toEqual({ added: 1, refused: '42601' });
+    expect(await prepared(u.t.pool, 'via_pg')).toEqual({ added: 1, refused: '42601' });
+  });
+
   it('passes the errors of postgres.js through, with their SQLSTATE', async () => {
     const err = await db.insert('orgs', [{ country: 'DU', code: 'p', name: 'n' }, { country: 'DU', code: 'p', name: 'n' }]).run(u.pool).catch(e => e);
     expect(err).toBeInstanceOf(postgres.PostgresError);
