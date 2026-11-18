@@ -216,6 +216,62 @@ jobs:
         run: npm run docs:examples
       - run: npm run docs:build
 
+  adapter-postgres-js:
+    # The postgres.js adapter, a package of its own (adapters/postgres-js/): its tests read and write each type through pg
+    # and through the adapter on the fixture's database, with the root's install and helpers, so the root builds first;
+    # its type test compiles against the root's db.d.ts. On its peer's floor, the lockfile's version, and the first and
+    # the latest 4.x.
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres: [14, 18]
+        driver: [3.4.0, lockfile, 4.0.0, 4.1.1]
+    defaults:
+      run:
+        working-directory: adapters/postgres-js
+    services:
+      postgres:
+        image: postgres:${{ matrix.postgres }}
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: pgcast
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/pgcast
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22.x
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            adapters/postgres-js/package-lock.json
+      - run: npm ci && npm run build
+        working-directory: .
+      - run: npm ci
+      - name: postgres.js ${{ matrix.driver }}
+        if: matrix.driver != 'lockfile'
+        env:
+          DRIVER: ${{ matrix.driver }}
+        run: npm install --no-save "postgres@$DRIVER"
+      - run: npm run build
+      - run: npm test
+      - run: npm run test:types
+      - name: The package holds its build, README and LICENCE
+        run: npm pack --dry-run
+
   adapter-pglite:
     # The PGlite adapter, a package of its own (adapters/pglite/): its tests read and write each type through pg on the
     # fixture's database and through the adapter on a PGlite with the same fixture, with the root's install and helpers,
@@ -277,13 +333,13 @@ jobs:
   ci-passed:
     # The one check master requires: it stays stable when the matrix changes, and passes when docs-only skips the rest.
     name: CI passed
-    needs: [changes, build, bench-types, typescript-7, typescript-4-1, docs, adapter-pglite]
+    needs: [changes, build, bench-types, typescript-7, typescript-4-1, docs, adapter-postgres-js, adapter-pglite]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Every job passed, or was skipped on purpose
         env:
-          RESULTS: ${{ needs.changes.result }} ${{ needs.build.result }} ${{ needs.bench-types.result }} ${{ needs.typescript-7.result }} ${{ needs.typescript-4-1.result }} ${{ needs.docs.result }} ${{ needs.adapter-pglite.result }}
+          RESULTS: ${{ needs.changes.result }} ${{ needs.build.result }} ${{ needs.bench-types.result }} ${{ needs.typescript-7.result }} ${{ needs.typescript-4-1.result }} ${{ needs.docs.result }} ${{ needs.adapter-postgres-js.result }} ${{ needs.adapter-pglite.result }}
         run: |
           for result in $RESULTS; do
             case "$result" in

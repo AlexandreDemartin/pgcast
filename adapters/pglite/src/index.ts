@@ -220,7 +220,7 @@ function acquire(state: State) {
  * @param pglite The `PGlite`, or its `PGliteWorker`: the adapter never configures nor closes it
  */
 export function asPool(pglite: PGliteLike): PGlitePool {
-  if (typeof pglite?.execProtocol !== 'function' || typeof pglite.runExclusive !== 'function') throw new Error('asPool() needs a PGlite with execProtocol() and runExclusive(): give it the PGlite that PGlite.create() returns, not a transaction\'s');
+  if (typeof pglite?.execProtocol !== 'function' || typeof pglite.runExclusive !== 'function') throw new Error('asPool() needs a PGlite with execProtocol() and runExclusive(), to send each query as pg sends it on its one connection: give it the PGlite that PGlite.create() or new PGlite() returns, not a transaction\'s');
   const state = stateOf(pglite);
 
   const run = async ({ text, values = [], name }: PGliteQuery): Promise<PGliteResult> => {
