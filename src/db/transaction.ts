@@ -6,7 +6,7 @@ Released under the MIT licence: see LICENCE file
 
 import * as pg from 'pg';
 import { isDatabaseError } from './pgErrors';
-import { wait, warnOnce } from './utils';
+import { mapWithSeparator, wait, warnOnce } from './utils';
 import { sql, raw, param } from './core';
 import { getConfig } from './config';
 import type { SQLQuery, TransactionEvent } from './config';
@@ -523,4 +523,62 @@ export async function advisoryXactLock(
   if (transactionStatus(txnClient as pg.ClientBase) === 'I') throw new Error('advisoryXactLock() was given a client outside a transaction block, so Postgres would release the lock as soon as it is taken: call it on the client of a transaction(), or after a BEGIN of yours');
 
   await query.run(txnClient);
+}
+
+/* === setLocal === */
+
+/**
+ * Set each of `settings` for the rest of the transaction `txnClient` is in, as
+ * `SET LOCAL` does, and resolve to `undefined`. A row-level security policy
+ * then reads them with `current_setting()`. One query, each name and value a
+ * parameter, in the object's order:
+ *
+ * - `{ 'app.customer': 'Ada Quill' }`: `SELECT set_config($1, $2, true)`, with
+ *   `['app.customer', 'Ada Quill']`;
+ * - two settings: `SELECT set_config($1, $2, true), set_config($3, $4, true)`;
+ * - `{}`: no query.
+ *
+ * Postgres keeps a setting until `COMMIT` or `ROLLBACK`, through a `RELEASE`;
+ * a `ROLLBACK TO` a savepoint taken before it gives back the value from before
+ * that savepoint, so an attempt that `transaction()` retries never sees the
+ * last one's. After the transaction, `current_setting(name, true)` reads `''`
+ * on that connection, not `NULL`: a policy that casts it writes
+ * `NULLIF(current_setting('app.tenant', true), '')::int`. Postgres checks each
+ * name: a custom one needs a dot (42704 without one, 42602 if it is not an
+ * identifier), and built-ins such as `role` are taken. In a query of yours,
+ * write `set_config(${db.param(name)}, ${db.param(value)}, true)` in `sql`.
+ *
+ * It rejects before any query when given settings that are not a plain object,
+ * a value that is not a string (Postgres would store `''` for a `null`), two
+ * names that differ only in case from `A` to `Z`, which Postgres folds into one
+ * setting, a `pg.Pool`, or a client that `pg` reports outside a transaction
+ * block, where Postgres would undo the settings as soon as they are set. One
+ * that reports no status (another driver, `pg` before 8.21) runs.
+ * @param txnClient The client of a transaction: a `transaction()` callback's,
+ * of any driver, or a `pg.PoolClient` you sent `BEGIN` on
+ * @param settings Each setting's name and its value, a string
+ */
+export async function setLocal(
+  txnClient: TxnClient<IsolationLevel> | TxnClientLike<PoolClientLike, IsolationLevel>,
+  settings: { readonly [name: string]: string }
+): Promise<void> {
+
+  // a Map, a Date or a class instance has no own entries that are its settings, so it would set nothing, or not those
+  const proto = typeof settings === 'object' && settings !== null ? Object.getPrototypeOf(settings) : undefined;
+  if (proto !== Object.prototype && proto !== null) throw new Error("setLocal() was given settings that are not a plain object, whose own properties Postgres would not read as names and values: give an object of strings, { 'app.customer': 'Ada Quill' }");
+
+  // the caller's settings read once; Postgres folds A to Z only in a setting's name (guc_name_compare), and which of
+  // two such names one select list leaves set rests on an evaluation order it does not document
+  const entries = Object.entries(settings), folded = new Map<string, string>();
+  for (const [name, value] of entries) {
+    if (typeof value !== 'string') throw new Error(`setLocal() was given a value for ${name} that is not a string, which Postgres would store as '' for a null, or as a driver's text of its own: give a string`);
+    const key = name.replace(/[A-Z]+/g, upper => upper.toLowerCase()), first = folded.get(key);
+    if (first !== undefined) throw new Error(`setLocal() was given ${first} and ${name}, which Postgres takes for one setting, as it folds A to Z to lower case: give one of them`);
+    folded.set(key, name);
+  }
+  if (txnClient instanceof pg.Pool) throw new Error('setLocal() was given a pg.Pool, which runs each query on a client outside a transaction block, so Postgres would undo the settings as soon as they are set: call it on the client of a transaction(), or on a client of the pool after a BEGIN of yours');
+  if (transactionStatus(txnClient as pg.ClientBase) === 'I') throw new Error('setLocal() was given a client outside a transaction block, so Postgres would undo the settings as soon as they are set: call it on the client of a transaction(), or after a BEGIN of yours');
+
+  if (entries.length === 0) return;
+  await sql`SELECT ${mapWithSeparator(entries, sql`, `, ([name, value]) => sql`set_config(${param(name)}, ${param(value)}, true)`)}`.run(txnClient);
 }
