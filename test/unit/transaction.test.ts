@@ -5,12 +5,12 @@
 // file only. Under Vitest, src imports pg's ESM entry, which has no `native`;
 // the stub adds it, own and enumerable, as pg 7 has it. Then a pool of another
 // driver (#696), which run time takes for a pool, the SQL savepoint() sends
-// (#723), the SQL advisoryXactLock() sends (#724), and the SQL setLocal() sends (#738).
-// No database.
+// (#723), the SQL advisoryXactLock() sends (#724), the SQL setLocal() sends (#738),
+// and the SQL cursor() sends (#743). No database.
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as db from '../../src/db';
-import { IsolationLevel } from '../../src/db';
+import { IsolationLevel, sql, param } from '../../src/db';
 import { resetConfig } from '../helpers/config';
 
 const native = vi.hoisted(() => {
@@ -726,5 +726,323 @@ describe('setLocal()', () => {
     expect(typeof txnId).toBe('number');
     expect(queries).toEqual([['START TRANSACTION ISOLATION LEVEL SERIALIZABLE', txnId], ['SELECT set_config($1, $2, true)', txnId], ['COMMIT', txnId]]);
     expect(messages).toEqual([]);
+  });
+});
+
+// #743: cursor() on a client that logs what it is sent and answers each FETCH from its rows: the SQL of each query,
+// the cursor's name, how it ends, and its refusals, each before its query
+describe('cursor()', () => {
+  afterEach(resetConfig);
+
+  type Row = { id: number };
+
+  /**
+   * A transaction's client that logs each query, as it is sent, and answers each FETCH from `rows`, which each DECLARE
+   * reads anew; `fail` gives the error a query rejects with. Its getTransactionStatus() gives `status`, and with no
+   * `status` key it has no such method.
+   */
+  const cursorClient = (options: { rows?: readonly unknown[]; status?: string | null; fail?: (text: string) => Error | undefined } = {}) => {
+    const sent: db.SQLQuery[] = [], open = new Map<string, unknown[]>();
+    const client = {
+      query: async (q: db.SQLQuery) => {
+        sent.push({ ...q });
+        const error = options.fail?.(q.text);
+        if (error) throw error;
+        let m: RegExpExecArray | null;
+        if ((m = /^DECLARE (\S+) /.exec(q.text))) open.set(m[1]!, [...options.rows ?? []]);
+        else if ((m = /^FETCH FORWARD (\d+) FROM (\S+)$/.exec(q.text))) return { rows: open.get(m[2]!)!.splice(0, Number(m[1])), command: 'FETCH' };
+        else if ((m = /^CLOSE (\S+)$/.exec(q.text))) open.delete(m[1]!);
+        return { rows: [], command: q.text.split(' ')[0] };
+      },
+      release: () => undefined,
+      ...('status' in options ? { getTransactionStatus: () => options.status } : {}),
+    };
+    return { sent, client };
+  };
+
+  const rows = (n: number) => Array.from({ length: n }, (_, i) => ({ id: i + 1 }));
+  const read = async <R>(batches: AsyncIterable<R>) => { const all: R[] = []; for await (const batch of batches) all.push(batch); return all; };
+  const users = sql<db.SQL, Row[]>`SELECT ${'id'} FROM ${'users'} ORDER BY ${'id'}`;
+  const fetch = (size: number, n = 1) => ({ text: `FETCH FORWARD ${size} FROM pgcast_cursor_${n}`, values: [] });
+  const close = (n = 1) => ({ text: `CLOSE pgcast_cursor_${n}`, values: [] });
+  const sqlError = (code: string) => Object.assign(new Error(`simulated ${code}`), { code });
+
+  it('sends DECLARE with the fragment and its values, a FETCH until one returns no row, then CLOSE', async () => {
+    const { sent, client } = cursorClient({ rows: rows(5), status: 'T' });
+    const query = sql<db.SQL, Row[]>`SELECT * FROM ${'users'} WHERE ${{ manager_id: 1000 }} ORDER BY ${'id'}`;
+    expect(await read(db.cursor(client, query, { batchSize: 2 }))).toEqual([[{ id: 1 }, { id: 2 }], [{ id: 3 }, { id: 4 }], [{ id: 5 }]]);
+    expect(sent).toEqual([
+      { text: 'DECLARE pgcast_cursor_1 NO SCROLL CURSOR FOR SELECT * FROM "users" WHERE ("manager_id" = $1) ORDER BY "id"', values: [1000] },
+      fetch(2), fetch(2), fetch(2), fetch(2),
+      close(),
+    ]);
+  });
+
+  it('sends nothing before the first next(), and nothing for a return() before it', async () => {
+    const { sent, client } = cursorClient({ rows: rows(3) });
+    const batches = db.cursor(client, users, { batchSize: 2 });
+    await Promise.resolve();
+    expect(sent).toEqual([]);
+    expect(await batches.return()).toEqual({ value: undefined, done: true });
+    expect(await batches.next()).toEqual({ value: undefined, done: true });
+    expect(sent).toEqual([]);
+  });
+
+  it('yields nothing for no row: DECLARE, one FETCH, CLOSE', async () => {
+    const { sent, client } = cursorClient();
+    expect(await read(db.cursor(client, users, { batchSize: 100 }))).toEqual([]);
+    expect(sent.map(q => q.text)).toEqual(['DECLARE pgcast_cursor_1 NO SCROLL CURSOR FOR SELECT "id" FROM "users" ORDER BY "id"', fetch(100).text, close().text]);
+  });
+
+  it('writes a select() after CURSOR FOR as it compiles on its own, columns, order, limit and lock included, and yields its one row’s array', async () => {
+    const { sent, client } = cursorClient({ rows: [{ result: [{ id: 7 }] }] });
+    const query = db.select('users', { manager_id: 1000 }, { columns: ['id'], order: { by: 'id', direction: 'ASC' }, limit: 10, lock: { for: 'UPDATE' } });
+    expect(await read(db.cursor(client, query, { batchSize: 100 }))).toEqual([[{ id: 7 }]]);
+    const own = query.compile();
+    expect(sent[0]).toEqual({ text: `DECLARE pgcast_cursor_1 NO SCROLL CURSOR FOR ${own.text}`, values: own.values });
+    expect(own.text).toMatch(/ ORDER BY "id" ASC LIMIT \$3 FOR UPDATE\) /);
+    expect(sent.slice(1)).toEqual([fetch(100), fetch(100), close()]);
+  });
+
+  it.each([1, 2147483647])('writes a batchSize of %d into each FETCH', async size => {
+    const { sent, client } = cursorClient({ rows: rows(2) });
+    await read(db.cursor(client, users, { batchSize: size }));
+    expect(sent.slice(1, 2)).toEqual([fetch(size)]);
+  });
+
+  it('names nested loops pgcast_cursor_1, then pgcast_cursor_2, and one loop after another pgcast_cursor_1 twice', async () => {
+    const { sent, client } = cursorClient({ rows: rows(2) });
+    for await (const outer of db.cursor(client, users, { batchSize: 2 })) {
+      expect(await read(db.cursor(client, users, { batchSize: 2 }))).toEqual([outer]);
+    }
+    await read(db.cursor(client, users, { batchSize: 2 }));
+    expect(sent.map(q => q.text.replace(/ NO SCROLL.*/, ''))).toEqual([
+      'DECLARE pgcast_cursor_1', fetch(2, 1).text,
+      'DECLARE pgcast_cursor_2', fetch(2, 2).text, fetch(2, 2).text, close(2).text,
+      fetch(2, 1).text, close(1).text,
+      'DECLARE pgcast_cursor_1', fetch(2, 1).text, fetch(2, 1).text, close(1).text,
+    ]);
+  });
+
+  it('gives two loops at once two names, each reading all its rows, and a third the lowest number free', async () => {
+    const { sent, client } = cursorClient({ rows: rows(3) });
+    const [a, b] = await Promise.all([read(db.cursor(client, users, { batchSize: 2 })), read(db.cursor(client, users, { batchSize: 2 }))]);
+    expect([a, b]).toEqual([[rows(2), [{ id: 3 }]], [rows(2), [{ id: 3 }]]]);
+    expect(sent.filter(q => q.text.startsWith('DECLARE')).map(q => q.text.split(' ')[1])).toEqual(['pgcast_cursor_1', 'pgcast_cursor_2']);
+
+    sent.length = 0;
+    const first = db.cursor(client, users, { batchSize: 1 }), second = db.cursor(client, users, { batchSize: 1 });
+    await first.next();
+    await second.next();
+    await first.return();
+    await db.cursor(client, users, { batchSize: 1 }).next();  // 1 is free again, 2 is not
+    expect(sent.filter(q => q.text.startsWith('DECLARE')).map(q => q.text.split(' ')[1])).toEqual(['pgcast_cursor_1', 'pgcast_cursor_2', 'pgcast_cursor_1']);
+  });
+
+  it('runs a prepared fragment unprepared, with no name sent, and leaves the fragment prepared', async () => {
+    const { sent, client } = cursorClient({ rows: rows(1) });
+    const query = sql<db.SQL, Row[]>`SELECT ${'id'} FROM ${'users'} WHERE ${'id'} = ${param(1)}`.prepared('cursor_users');
+    await read(db.cursor(client, query, { batchSize: 1 }));
+    await read(db.cursor(client, query, { batchSize: 1 }));
+    expect(sent.length).toBe(8);
+    expect(sent.filter(q => 'name' in q)).toEqual([]);
+    expect(query.preparedName).toBe('cursor_users');
+    expect(query.compile().name).toBe('cursor_users');
+  });
+
+  it.each([
+    ['castArrayParamsToJson', { castArrayParamsToJson: true }],
+    ['castObjectParamsToJson', { castObjectParamsToJson: true }],
+    ['both', { castArrayParamsToJson: true, castObjectParamsToJson: true }],
+  ])('sends the fragment’s own text and values under %s', async (_, config) => {
+    db.setConfig(config);
+    const { sent, client } = cursorClient();
+    const query = sql<db.SQL, Row[]>`SELECT ${'id'} FROM ${'users'} WHERE ${'tags'} = ${param(['a', 'b'])} AND ${'settings'} = ${param({ a: 1 })}`;
+    await read(db.cursor(client, query, { batchSize: 1 }));
+    const own = query.compile();
+    expect(sent[0]).toEqual({ text: `DECLARE pgcast_cursor_1 NO SCROLL CURSOR FOR ${own.text}`, values: own.values });
+  });
+
+  it('passes each non-empty batch through the fragment’s runResultTransform, and never the empty one', async () => {
+    const { client } = cursorClient({ rows: [{ result: { id: 1 } }, { result: { id: 2 } }, { result: { id: 3 } }] });
+    const query = sql<db.SQL, Row[]>`SELECT to_jsonb(u) AS result FROM ${'users'} u`, seen: number[] = [];
+    query.runResultTransform = qr => { seen.push(qr.rows.length); if (qr.rows.length === 0) throw new Error('empty batch'); return qr.rows.map(r => r.result); };
+    expect(await read(db.cursor(client, query, { batchSize: 2 }))).toEqual([[{ id: 1 }, { id: 2 }], [{ id: 3 }]]);
+    expect(seen).toEqual([2, 1]);
+  });
+
+  it('gives queryListener each query with the txnId, resultListener the rows of each, the transaction listeners nothing', async () => {
+    const queries: [string, number | undefined][] = [], results: unknown[] = [], messages: unknown[] = [];
+    db.setConfig({
+      queryListener: (q, txnId) => { queries.push([q.text, txnId]); },
+      resultListener: (result, txnId) => { if (txnId !== queries[0]?.[1]) throw new Error('txnId'); results.push(result); },
+      transactionListener: message => { messages.push(message); },
+      transactionEventListener: event => { messages.push(event); },
+    });
+    const { client } = cursorClient({ rows: rows(3) });
+    await db.readCommitted({ connect: async () => client }, c => read(db.cursor(c, users, { batchSize: 2 })));
+    const txnId = queries[0]?.[1];
+    expect(typeof txnId).toBe('number');
+    expect(queries.map(([text]) => text.replace(/ NO SCROLL.*/, ''))).toEqual([
+      'START TRANSACTION ISOLATION LEVEL READ COMMITTED', 'DECLARE pgcast_cursor_1', fetch(2).text, fetch(2).text, fetch(2).text, close().text, 'COMMIT']);
+    expect(queries.every(([, id]) => id === txnId)).toBe(true);
+    expect(results).toEqual([[], [], rows(2), [{ id: 3 }], [], [], []]);
+    expect(messages).toEqual([]);
+  });
+
+  it('sends CLOSE on a break', async () => {
+    const { sent, client } = cursorClient({ rows: rows(5), status: 'T' });
+    for await (const batch of db.cursor(client, users, { batchSize: 2 })) { expect(batch).toEqual(rows(2)); break; }
+    expect(sent.slice(1)).toEqual([fetch(2), close()]);
+  });
+
+  it.each<[string, [] | [string | null]]>([['T', ['T']], ['null', [null]], ['no status', []]])(
+    'sends CLOSE when the loop throws on a client whose status is %s, and rejects with that error, whatever CLOSE gives', async (_, status) => {
+      const { sent, client } = cursorClient({ rows: rows(5), ...(status.length ? { status: status[0] } : {}), fail: text => text.startsWith('CLOSE') ? sqlError('25P02') : undefined });
+      const thrown = new Error('the loop’s own');
+      await expect((async () => { for await (const _ of db.cursor(client, users, { batchSize: 2 })) throw thrown; })()).rejects.toBe(thrown);
+      expect(sent.slice(1)).toEqual([fetch(2), close()]);
+    });
+
+  it('sends no CLOSE when pg reports the transaction aborted, and rejects with the loop’s error', async () => {
+    const { sent, client } = cursorClient({ rows: rows(5), status: 'E' });
+    const thrown = sqlError('23505');
+    await expect((async () => { for await (const _ of db.cursor(client, users, { batchSize: 2 })) throw thrown; })()).rejects.toBe(thrown);
+    expect(sent.slice(1)).toEqual([fetch(2)]);
+  });
+
+  // pg rejects a query at its ErrorResponse and reads the status E at the ReadyForQuery after it, often a chunk later:
+  // the status is still T, CLOSE goes out and Postgres refuses it, 25P02
+  it('drops a 25P02 of CLOSE after a break, so the loop ends', async () => {
+    const { sent, client } = cursorClient({ rows: rows(5), status: 'T', fail: text => text.startsWith('CLOSE') ? sqlError('25P02') : undefined });
+    const batches: Row[][] = [];
+    for await (const batch of db.cursor(client, users, { batchSize: 2 })) { batches.push(batch); break; }
+    expect(batches).toEqual([rows(2)]);
+    expect(sent.slice(1)).toEqual([fetch(2), close()]);
+  });
+
+  it('drops a 25P02 of CLOSE at a return() in a finally, so the error of the loop’s query goes out', async () => {
+    const { sent, client } = cursorClient({ rows: rows(5), status: 'T', fail: text => text.startsWith('CLOSE') ? sqlError('25P02') : undefined });
+    const failure = sqlError('40001'), batches = db.cursor(client, users, { batchSize: 2 });
+    await expect((async () => {
+      try { for (let r = await batches.next(); !r.done; r = await batches.next()) throw failure; }
+      finally { await batches.return(); }
+    })()).rejects.toBe(failure);
+    expect(sent.slice(1)).toEqual([fetch(2), close()]);
+  });
+
+  it('rejects a break with any other error of CLOSE, and frees the number', async () => {
+    let closes = 0;
+    const failure = sqlError('57P01');
+    const { sent, client } = cursorClient({ rows: rows(5), status: 'T', fail: text => text.startsWith('CLOSE') && ++closes === 1 ? failure : undefined });
+    await expect((async () => { for await (const _ of db.cursor(client, users, { batchSize: 2 })) break; })()).rejects.toBe(failure);
+    await db.cursor(client, users, { batchSize: 2 }).next();
+    expect(sent.map(q => q.text.split(' ').slice(0, 2).join(' '))).toEqual(['DECLARE pgcast_cursor_1', 'FETCH FORWARD', close().text, 'DECLARE pgcast_cursor_1', 'FETCH FORWARD']);
+  });
+
+  it('sends no CLOSE when pg reports the client outside a transaction block, as after a COMMIT of yours', async () => {
+    const { sent, client } = cursorClient({ rows: rows(5), status: 'T' });
+    const batches = db.cursor(client, users, { batchSize: 2 });
+    await batches.next();
+    client.getTransactionStatus = () => 'I';
+    expect(await batches.return()).toEqual({ value: undefined, done: true });
+    expect(sent.slice(1)).toEqual([fetch(2)]);
+  });
+
+  it('takes no number when the fragment’s copy() throws', async () => {
+    const { sent, client } = cursorClient({ rows: rows(1) });
+    const query = sql<db.SQL, Row[]>`SELECT ${'id'} FROM ${'users'}`, failure = new Error('copy');
+    query.copy = () => { throw failure; };
+    await expect(db.cursor(client, query, { batchSize: 1 }).next()).rejects.toBe(failure);
+    await db.cursor(client, users, { batchSize: 1 }).next();
+    expect(sent.map(q => q.text.split(' ').slice(0, 2).join(' '))).toEqual(['DECLARE pgcast_cursor_1', 'FETCH FORWARD']);
+  });
+
+  it('sends no CLOSE after a FETCH that rejects, rejects with its error unchanged, and frees the number', async () => {
+    let fetches = 0;
+    const failure = sqlError('22012');
+    const { sent, client } = cursorClient({ rows: rows(5), status: 'T', fail: text => text.startsWith('FETCH') && ++fetches === 2 ? failure : undefined });
+    const batches: Row[][] = [];
+    await expect((async () => { for await (const batch of db.cursor(client, users, { batchSize: 2 })) batches.push(batch); })()).rejects.toBe(failure);
+    expect(batches).toEqual([rows(2)]);
+    expect(sent.slice(1)).toEqual([fetch(2), fetch(2)]);
+    await db.cursor(client, users, { batchSize: 2 }).next();
+    expect(sent[3]?.text).toMatch(/^DECLARE pgcast_cursor_1 /);
+  });
+
+  it('sends no CLOSE after a DECLARE that rejects, and frees the number', async () => {
+    const failure = sqlError('25P01');
+    const { sent, client } = cursorClient({ fail: text => text.startsWith('DECLARE') ? failure : undefined });
+    await expect(db.cursor(client, users, { batchSize: 2 }).next()).rejects.toBe(failure);
+    await expect(db.cursor(client, users, { batchSize: 2 }).next()).rejects.toBe(failure);
+    expect(sent.map(q => q.text.split(' ').slice(0, 2).join(' '))).toEqual(['DECLARE pgcast_cursor_1', 'DECLARE pgcast_cursor_1']);
+  });
+
+  it('sends CLOSE when the fragment’s runResultTransform throws, rejects with its error, and frees the number', async () => {
+    const { sent, client } = cursorClient({ rows: rows(5), status: 'T' });
+    const query = sql<db.SQL, Row[]>`SELECT ${'id'} FROM ${'users'}`, failure = new Error('transform');
+    let calls = 0;
+    query.runResultTransform = qr => { if (++calls === 2) throw failure; return qr.rows; };
+    await expect(read(db.cursor(client, query, { batchSize: 2 }))).rejects.toBe(failure);
+    expect(sent.slice(1)).toEqual([fetch(2), fetch(2), close()]);
+    expect(await read(db.cursor(client, users, { batchSize: 5 }))).toEqual([rows(5)]);
+    expect(sent[4]?.text).toMatch(/^DECLARE pgcast_cursor_1 /);
+  });
+
+  const notFragment = 'cursor() was given a query that is not a SQLFragment, such as a string or a { text, values } object: give a db.sql fragment or a select()';
+  const badSize = 'cursor() was given a batchSize that is not an integer from 1 to 2147483647, the rows each FETCH reads: give a number of rows, { batchSize: 100 }';
+  const iteratedAfter = 'cursor() was iterated after its transaction ended, so its next query would run on a client that may be in another transaction, or in none: iterate it inside the transaction() callback that called cursor()';
+
+  it.each<[string, unknown]>([
+    ['a string', 'SELECT 1'], ['a query object', { text: 'SELECT 1', values: [] }], ['undefined', undefined], ['null', null],
+  ])('rejects %s as the query at the first next(), before any query', async (_, query) => {
+    const { sent, client } = cursorClient();
+    const batches = db.cursor(client, query as typeof users, { batchSize: 0 });  // the query is checked first
+    await expect(batches.next()).rejects.toThrow(notFragment);
+    expect(sent).toEqual([]);
+  });
+
+  it.each<[string, unknown]>([
+    ['0', { batchSize: 0 }], ['-1', { batchSize: -1 }], ['1.5', { batchSize: 1.5 }], ['NaN', { batchSize: NaN }],
+    ['Infinity', { batchSize: Infinity }], ['2147483648', { batchSize: 2147483648 }], ["'100'", { batchSize: '100' }],
+    ['BigInt(100)', { batchSize: BigInt(100) }], ['new Number(100)', { batchSize: new Number(100) }], ['{}', {}],
+    ['no options', undefined], ['null options', null],
+  ])('rejects a batchSize of %s at the first next(), before any query', async (_, options) => {
+    const { sent, client } = cursorClient();
+    (client as { _zapatos?: unknown })._zapatos = {};  // a mark that changes below: the size is checked first
+    const batches = db.cursor(client, users, options as { batchSize: number });
+    (client as { _zapatos?: unknown })._zapatos = {};
+    await expect(batches.next()).rejects.toThrow(badSize);
+    expect(sent).toEqual([]);
+  });
+
+  it('rejects a generator returned from a transaction() callback at its first next(), with nothing sent after COMMIT', async () => {
+    const { sent, client } = cursorClient({ rows: rows(3) });
+    const batches = await db.readCommitted({ connect: async () => client }, async c => db.cursor(c, users, { batchSize: 2 }));
+    await expect(batches.next()).rejects.toThrow(iteratedAfter);
+    expect(sent.map(q => q.text)).toEqual(['START TRANSACTION ISOLATION LEVEL READ COMMITTED', 'COMMIT']);
+  });
+
+  it('rejects a generator iterated after its transaction ended, after one batch: no FETCH, no CLOSE after COMMIT', async () => {
+    const { sent, client } = cursorClient({ rows: rows(3), status: 'T' });
+    const batches = await db.readCommitted({ connect: async () => client }, async c => {
+      const inside = db.cursor(c, users, { batchSize: 2 });
+      expect((await inside.next()).value).toEqual(rows(2));
+      return inside;
+    });
+    await expect(batches.next()).rejects.toThrow(iteratedAfter);
+    expect(await batches.next()).toEqual({ value: undefined, done: true });
+    expect(sent.map(q => q.text.replace(/ NO SCROLL.*/, ''))).toEqual(['START TRANSACTION ISOLATION LEVEL READ COMMITTED', 'DECLARE pgcast_cursor_1', fetch(2).text, 'COMMIT']);
+  });
+
+  it('rejects a generator whose client carries another transaction’s mark, and sends no CLOSE on a return() then', async () => {
+    const { sent, client } = cursorClient({ rows: rows(3), status: 'T' });
+    (client as { _zapatos?: unknown })._zapatos = { isolationLevel: IsolationLevel.ReadCommitted, txnId: 1 };
+    const later = db.cursor(client, users, { batchSize: 2 }), stopped = db.cursor(client, users, { batchSize: 2 });
+    await stopped.next();
+    (client as { _zapatos?: unknown })._zapatos = { isolationLevel: IsolationLevel.ReadCommitted, txnId: 2 };
+    await expect(later.next()).rejects.toThrow(iteratedAfter);
+    expect(await stopped.return()).toEqual({ value: undefined, done: true });
+    expect(sent.map(q => q.text.replace(/ NO SCROLL.*/, ''))).toEqual(['DECLARE pgcast_cursor_1', fetch(2).text]);
   });
 });
