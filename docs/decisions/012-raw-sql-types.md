@@ -2,7 +2,7 @@
 
 - **Status**: accepted (2026-11-18), decided alone under the owner's delegation: each choice below is decided under the philosophy, and carries its own status.
 - **Scope**: feature [#62](https://github.com/AlexandreDemartin/pgcast/issues/62), its step [#710](https://github.com/AlexandreDemartin/pgcast/issues/710) (this note) and its planned PRs; the chapter's epic [#21](https://github.com/AlexandreDemartin/pgcast/issues/21).
-- **In short**: **option A, in a separate package**, `@pgcast/typegen` (`tools/typegen/`, note [013](./013-package-model.md)). Opted-in queries are found by the row type they name, `Row<'name'>`; each dynamic fragment becomes a parameter that Postgres must type `boolean`, or the query is refused; the query is described, never executed, by the extended protocol's Parse / Describe over `pg`; a result column is `NOT NULL` only where its origin column is proved so, down every inheritance child, and no guard word (an outer join, a grouping set, `MERGE`, `OLD`, `NEW`) sits in the text; the types land in a committed file that `--check` compares. The core, the default codegen output and the bench are unchanged; Epic #20 (drivers) is not needed.
+- **In short**: **option A, in a separate package**, `@pgcast/typegen` (`tools/typegen/`, note [013](./013-package-model.md)). Opted-in queries are found by the row type they name, `Row<'name'>`; each dynamic fragment becomes a parameter that Postgres must type `boolean`, or the query is refused; a `param()` is neutralised as `core.ts` compiles it; the query is described, never executed, by the extended protocol's Parse / Describe over `pg`; a result column is `NOT NULL` only where its origin column is proved so, down every inheritance child, and no guard word (an outer join, a grouping set, `MERGE`, `OLD`, `NEW`) sits in the text; the types land in a committed file that `--check` compares. The core, the default codegen output and the bench are unchanged; Epic #20 (drivers) is not needed.
 
 ## Context
 
@@ -31,6 +31,7 @@ Two projects of real usage (skill `consumer-usage`; no project named; counted wi
 | … with `UNION`, `INTERSECT` or `EXCEPT` | 3 |
 | … with `ROLLUP`, `CUBE` or `GROUPING SETS` | 1 |
 | … holding one of choice 2's guard words, matched as it says | 6 (the outer joins) |
+| … with a `param()`, each cast-less | 12 (41 calls; one template holds 22) |
 
 So about 40 of the 58 hand-written row types are within reach of option A as decided below: the static ones, and those whose fragments sit in a condition; the rest stay manual. The keyword scan is approximate (a fragment's position is read from the static text before it).
 
@@ -82,6 +83,9 @@ On the fixture database (`test/fixtures/schema.sql` and its rows, Postgres 17.3,
 | A fragment in the select list | `` sql`SELECT ${db.cols(['id', 'email'])} FROM users` `` and `db.cols(['display_name'])` | `integer, email`; `text` | two columns, then one | the shape changes with the value | **refused** (as a placeholder, `text`): left manual |
 | Parameters | `WHERE id = $1 AND display_name LIKE $2 AND created_at > $3` | `integer`, `text`, `timestamp with time zone` | the same OIDs | — | written as the query's `params` |
 | … untyped, cast | `SELECT $1 AS x`; `SELECT $1::int8[] AS ids` | `text`; `bigint[]` | the same | — | the same |
+| `param(x, 'int4')` | `` sql`SELECT ${param(5, 'int4')} AS n` `` → `SELECT CAST($1 AS "int4") AS n`, under each setting; `param(undefined, 'int4')` compiles to the same text; `'int4[]'` → `CAST($1 AS "int4"[])` | — | `integer`; `integer[]`, origin 0 | — | neutralised as compiled |
+| `param(x)`, `param(x, true)` | `param([1, 2])` → `$1` by default, `CAST($1 AS "json")` under `castArrayParamsToJson`; `param({ a: 1 })` the same under `castObjectParamsToJson`; `param(x, true)` → `CAST($1 AS "json")` for an array or a plain object, `$1` for `'x'`; `param(x, false)` → `$1` always | — | `SELECT $1 AS n`: `text`; `SELECT CAST($1 AS "json") AS n`: `json`; `u.id = CAST($1 AS "json")` and `settings \|\| CAST($1 AS "json")`: refused by Parse | — | both forms described: `text` against `json` **refused**; a form Parse refuses is dropped |
+| A cast that is not a literal | `` const t = 'int4' `` then `'text'`: `param(5, t)` → `CAST($1 AS "int4")`, then `CAST($1 AS "text")` | — | — | the text changes with the value | **refused** |
 | `INSERT … RETURNING` | `INSERT INTO extra.spools (label) VALUES ($1) RETURNING id, length` | `integer`, `integer` | `spools.id` not null, `spools.length` null | as the origins | exact |
 | No result | `UPDATE extra.spools SET label = $1 WHERE id = $2` | `NULL` | NoData | — | no row type |
 | Two statements | `SELECT 1; CREATE TABLE probe_710 ()` | `PREPARE` ran the `CREATE TABLE` | refused, nothing run | — | refused |
@@ -154,12 +158,24 @@ The guard only removes proofs, never adds one: a word in a literal or a comment 
 |---|---|
 | **Opt-in and name** | the row type names the query: `` sql<s.films.SQL, Row<'films-by-studio'>[]>`…` ``, `Row` imported from the generated file; nothing in the SQL text (a marker in an alias, pgTyped's and SQLx's `AS "title!"`, would change the key `pg` returns) |
 | **Finding** | TypeScript's parser (`ts.createSourceFile`, no checker), over the files of the user's `tsconfig.json`: a tagged template whose tag is `sql` and whose type argument is `Row<'…'>` from the generated file. Two templates of one name and different texts: an error |
-| **Neutralising** | per interpolation, by its syntax: a `param(…)` call becomes `$n`, typed by Postgres; a string literal becomes the identifier `sql` compiles it to; anything else becomes `$k`, and the query is refused unless Postgres types every `$k` `boolean` (§ Replays). A refusal names the template and the placeholder |
+| **Neutralising** | per interpolation, by its syntax, as `core.ts` compiles it (the list below); a refusal names the template and the placeholder |
 | **Output** | one committed `.ts`, a plain module beside the schema (no `declare module`, so note 002's names are untouched): `export interface Queries { 'films-by-studio': { params: [number]; row: { … } } }` and `type Row<N extends keyof Queries>`, each entry under a JSDoc holding its neutralised text, readable in review |
 | **Column types** | a column with an origin is the schema's own type, `s.films.Selectable['title']`, plus `\| null` where choice 2 says; any other through `tsTypeForPgType()`; `json`, `jsonb` and `json_agg` are `db.JSONValue`, never a shape the database does not state |
 | **Parameters** | written as `params`, from ParameterDescription; not checked at the call site, since `sql` takes its interpolations untyped, and checking them would need a change to `core.ts` (a stop point) |
 | **`--check`** | without a database: each found template's neutralised text against the stored one, so a changed query, a new one or a renamed one fails; with one, each query described again, so a schema change fails too. A renamed query not regenerated also fails to compile: `Row<'old-name'>` gives TS2344 (5.9.3 and 4.1.6) |
 | **What stays manual** | a fragment outside a condition (select list, `ORDER BY`, `FROM`), a shape inside `json`/`jsonb`, a loose column (choice 4), a query not opted in |
+
+Each interpolation is neutralised as `core.ts` compiles it (§ Replays), which this note reads and does not change:
+
+- **`param(x, '…')`**, a string literal or a template literal without substitutions: compiled by `core.ts` itself from `param(undefined, '…')`, so its quoting is the run's. `param(x, 'int4')` gives `CAST($1 AS "int4")`, described `integer`, under each setting. A cast `core.ts` throws on (`''`) refuses the query, with its message.
+- **`param(x, false)`**: `$n`, whatever the settings.
+- **`param(x)` and `param(x, true)`**: `$n` or `CAST($n AS "json")`, by the value and by `castArrayParamsToJson` / `castObjectParamsToJson` at run time. `true` casts an array or a plain object, not a string; a setting casts a cast-less array or plain object. So the query is described in every combination of these parameters:
+  - a combination Parse refuses is dropped, since that run fails and returns no rows (`u.id = CAST($1 AS "json")`, `settings || CAST($1 AS "json")`);
+  - the query is refused if two kept combinations give different rows (`SELECT $1` is `text`, `SELECT CAST($1 AS "json")` `json`), or if none is kept;
+  - above 4 such parameters (16 Describes), it is refused: the hint gives each a cast, or `false`. In the corpus, 1 of the 12 templates with a `param()` is above it.
+- **A cast that is not a literal** (`param(x, t)`): refused, since the text changes with the value (`CAST($1 AS "int4")`, then `CAST($1 AS "text")`).
+- **A string literal**: the identifier `sql` compiles it to.
+- **Anything else**: `$k`. The query is refused unless Postgres types every `$k` `boolean`, in every combination (§ Replays).
 
 **Measured** (`tsc --extendedDiagnostics`, the bench's options on the fixture's schema, net of an empty floor): 50 calls `` sql<s.users.SQL, R[]>`… ${whereable} … ${param(i)}` ``, each row of 5 columns read, cost **+2,007** Instantiations and +810 Types with hand-written interfaces; **+2,507** and +969 with a generated `Queries` and `Row<'…'>`; +2,357 and +969 with `Queries['…']['row']` spelled out: about 10 Instantiations per call above today's. `bench:types` is unchanged: nothing in the core or the bench moves.
 
