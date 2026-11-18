@@ -1,10 +1,10 @@
 ---
-english: 200b060a0c7a
+english: 4ed1ce710154
 ---
 
 # Transactions
 
-`transaction()` et ses sept raccourcis, un par niveau d’isolation : le SQL qu’ils envoient, leurs retries et les types du client qu’ils donnent. `savepoint()`, pour une unité de travail qui peut échouer seule dans une transaction. `advisoryXactLock()`, un lock que la transaction détient jusqu’à sa fin. Puis les erreurs : `isDatabaseError()` pour celles de Postgres, et celles que pgcast lève avant toute requête.
+`transaction()` et ses sept raccourcis, un par niveau d’isolation : le SQL qu’ils envoient, leurs retries et les types du client qu’ils donnent. `savepoint()`, pour une unité de travail qui peut échouer seule dans une transaction. `advisoryXactLock()`, un lock que la transaction détient jusqu’à sa fin. `setLocal()`, des réglages pour le reste de la transaction, comme les lit la sécurité niveau ligne. Puis les erreurs : `isDatabaseError()` pour celles de Postgres, et celles que pgcast lève avant toute requête.
 {.lede}
 
 <AtAGlance>
@@ -367,6 +367,59 @@ Elle est rejetée avant toute requête dans trois cas :
 
 </div>
 
+## `setLocal()` {#setLocal}
+
+```ts
+db.setLocal(txnClient, settings)
+```
+
+À partir de la 6.12.0. Définit chacun des `settings` pour le reste de la transaction, comme le fait `SET LOCAL`. Elle renvoie une promesse qui se résout en `undefined`. Une politique de sécurité niveau ligne les lit ensuite avec `current_setting()` ([Row security policies](https://www.postgresql.org/docs/current/ddl-rowsecurity.html)).
+
+- `txnClient` : le client d’une transaction : un [`TxnClient`](#TxnClient), le [`TxnClientLike`](#TxnClientLike) du pool d’un autre driver, ou un `pg.PoolClient` sur lequel vous avez envoyé `BEGIN`. Un pool, un `pg.Client` ou un [`QueryableLike`](/fr/sql-template#QueryableLike) ne compile pas.
+- `settings` : un objet de chaînes, chacune le nom d’un réglage et sa valeur : un littéral, un `Record<string, string>`, un alias de type, `as const`. Une interface n’a pas de signature d’index, elle ne compile donc pas : passez-en le spread, `{ ...context }`. Une valeur typée `number`, `null` ou `string | undefined`, une `Map` et un `Date` ne compilent pas non plus.
+
+Avec une politique à vous sur `seat_bookings`, `USING (customer = current_setting('app.customer', true))`, un client ne lit que ses propres réservations :
+
+<<< ../examples/plain/set_local_customer.ts{ts twoslash}
+
+Le rôle avec lequel votre app se connecte ne doit pas être propriétaire de la table, sinon la politique demande `FORCE ROW LEVEL SECURITY` ; un superutilisateur n’y est jamais soumis. Définir aussi `role`, `{ role: 'cinema_customer', 'app.customer': customer }`, exécute le reste de la transaction sous ce rôle, comme le ferait `SET LOCAL ROLE`. Elle envoie :
+
+<!-- probe: db.readCommitted(pool, txnClient => db.setLocal(txnClient, { 'app.customer': 'Ada Quill' })) -->
+```sql
+START TRANSACTION ISOLATION LEVEL READ COMMITTED
+SELECT set_config($1, $2, true)
+-- the callback's select()
+COMMIT
+```
+
+| Réglages | SQL | Valeurs |
+|---|---|---|
+| un, `{ 'app.customer': 'Ada Quill' }` | `SELECT set_config($1, $2, true)`<!-- probe: db.setLocal(pool, { 'app.customer': 'Ada Quill' }) --> | `['app.customer', 'Ada Quill']` |
+| deux, `{ role: 'cinema_customer', 'app.customer': 'Ada Quill' }` | `SELECT set_config($1, $2, true), set_config($3, $4, true)`<!-- probe: db.setLocal(pool, { role: 'cinema_customer', 'app.customer': 'Ada Quill' }) --> | `['role', 'cinema_customer', 'app.customer', 'Ada Quill']`, dans l’ordre de l’objet |
+| aucun, `{}` | aucune requête | |
+
+- Chaque nom et chaque valeur est un paramètre : `SET LOCAL` n’en prend aucun, donc un nom ou une valeur écrit dedans serait collé dans le SQL. Le texte ne dépend que du nombre de réglages.
+- Postgres garde un réglage jusqu’au `COMMIT` ou au `ROLLBACK`, et à travers le `RELEASE` d’un [`savepoint()`](#savepoint). Un `ROLLBACK TO` vers un savepoint pris avant ce réglage rend la valeur d’avant ce savepoint : une tentative que `transaction()` réessaie ne voit donc jamais la valeur de la précédente ([Retries](#retries)). Une valeur de session du même nom revient au `COMMIT`.
+- Après la transaction, `current_setting('app.customer', true)` lit `''` sur cette connexion, et non `NULL` comme sur une connexion neuve : Postgres garde le nom défini pour la session. Une politique qui le caste, `current_setting('app.tenant', true)::int`, échoue alors à la transaction suivante de cette connexion du pool (22P02). Écrivez `NULLIF(current_setting('app.tenant', true), '')::int`.
+- Postgres vérifie chaque nom. Un nom à vous demande un point, `app.customer` : 42704 sans point, `customer_id`, et 42602 quand une partie n’est pas un identifiant, `app.customer-id`. Il accepte un réglage natif comme `role`, `search_path` ou `statement_timeout`, mais refuse `is_superuser` (55P02). Il ignore la casse de `A` à `Z` : `app.Customer` est `app.customer`.
+- Elle s’exécute, au lieu de renvoyer un fragment, pour que son type puisse demander le client d’une transaction, ce que le `run()` d’un fragment ne peut pas. Dans une requête à vous, écrivez `set_config(${db.param(name)}, ${db.param(value)}, true)` dans `sql`, et lisez un réglage avec `current_setting(${db.param(name)}, true)`.
+- Sa requête parvient à [`queryListener`](/fr/runtime-config#Config.queryListener) et à [`resultListener`](/fr/runtime-config#Config.resultListener) avec l’id de la transaction ; [`transactionListener`](/fr/runtime-config#Config.transactionListener) et [`transactionEventListener`](/fr/runtime-config#Config.transactionEventListener) n’en reçoivent rien.
+- Un réglage de session, `set_config(…, false)` ou `SET`, n’a pas de fonction dédiée : il survit à la transaction, et parvient au prochain utilisateur d’une connexion du pool.
+
+Elle est rejetée avant toute requête dans cinq cas, dans cet ordre :
+
+<div class="stack">
+
+| Rejetée avec | Quand |
+|---|---|
+| "setLocal() was given settings that are not a plain object, whose own properties Postgres would not read as names and values: give an object of strings, { 'app.customer': 'Ada Quill' }"<!-- message --> | `settings` n’est pas un objet dont le prototype est `Object.prototype` ou `null`, depuis JavaScript ou malgré un cast : `null`, `42`, une chaîne, un tableau, une `Map`, un `Date`, l’instance d’une classe. Une `Map` n’a pas de propres entrées : rien ne serait défini, sans rien dire |
+| "setLocal() was given a value for ${name} that is not a string, which Postgres would store as '' for a null, or as a driver's text of its own: give a string"<!-- message --> | une valeur n’est pas une chaîne : `null` et `undefined` définiraient `''`, même par-dessus une valeur définie avant ; un nombre, un `Date` ou un objet serait stocké tel que `pg` l’écrit. Le message nomme le réglage, jamais sa valeur |
+| "setLocal() was given ${first} and ${name}, which Postgres takes for one setting, as it folds A to Z to lower case: give one of them"<!-- message --> | deux noms ne diffèrent que par la casse de `A` à `Z`, `app.customer` et `app.Customer` : la valeur que Postgres garderait n’est pas documentée. `app.é` et `app.É` sont deux réglages pour Postgres, et sont envoyés |
+| "setLocal() was given a pg.Pool, which runs each query on a client outside a transaction block, so Postgres would undo the settings as soon as they are set: call it on the client of a transaction(), or on a client of the pool after a BEGIN of yours"<!-- message --> | `txnClient` est un `pg.Pool`, depuis JavaScript ou malgré un cast, même avec `{}` |
+| "setLocal() was given a client outside a transaction block, so Postgres would undo the settings as soon as they are set: call it on the client of a transaction(), or after a BEGIN of yours"<!-- message --> | `pg` indique que le client est hors d’un bloc de transaction (à partir de `pg` 8.21), même avec `{}`. Le `SELECT` y serait une transaction à lui seul : il renvoie chaque valeur, et le réglage disparaît aussitôt. Comme pour [`advisoryXactLock()`](#advisoryXactLock), ce statut est le dernier que `pg` a reçu, et un client qui n’en indique aucun, celui d’un autre driver ou `pg` avant 8.21, s’exécute |
+
+</div>
+
 ## Types {#types}
 
 ### `IsolationLevel` {#IsolationLevel}
@@ -568,7 +621,7 @@ Les gérer dans une application : [Erreurs](/fr/handle-errors).
 
 Une simple `Error`, sans `code`, avant que rien ne soit envoyé. Un raccourci lève les siennes de façon synchrone, dès l’appel, sauf pour les options de `truncate()` dans un autre ordre et les `columns` ou le `lateral` d’un agrégat ([`count()`](/fr/select#count)) : `.run()` n’est jamais atteint, donc un `.catch()` chaîné dessus ne les reçoit pas.
 
-Les autres sont levées quand `.compile()` compile la requête, donc `.run()` est rejetée avec elles ; `transaction()` et `advisoryXactLock()` sont rejetées avec les leurs. Chacune est listée avec ce qui la lève :
+Les autres sont levées quand `.compile()` compile la requête, donc `.run()` est rejetée avec elles ; `transaction()`, `advisoryXactLock()` et `setLocal()` sont rejetées avec les leurs. Chacune est listée avec ce qui la lève :
 
 <div class="stack">
 
@@ -586,6 +639,7 @@ Les autres sont levées quand `.compile()` compile la requête, donc `.run()` es
 | `transaction()` avec un autre niveau d’isolation | sa promesse est rejetée | [`transaction()`, Erreurs](#errors) |
 | `transaction()` qui reçoit un client dans un bloc de transaction, avec `transactionRequiresIdleClient`, après une requête vide | sa promesse est rejetée | [Votre propre `BEGIN`](#your-own-begin) |
 | `advisoryXactLock()` qui reçoit une clé qui n’est ni un `bigint` ni un tableau de deux nombres, un `pg.Pool`, ou un client hors d’un bloc de transaction | sa promesse est rejetée | [`advisoryXactLock()`](#advisoryXactLock) |
+| `setLocal()` qui reçoit des réglages qui ne sont pas un objet simple, une valeur qui n’est pas une chaîne, deux noms qui ne diffèrent que par la casse, un `pg.Pool`, ou un client hors d’un bloc de transaction | sa promesse est rejetée | [`setLocal()`](#setLocal) |
 
 </div>
 
