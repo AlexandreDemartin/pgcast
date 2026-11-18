@@ -216,6 +216,14 @@ describe('the PGlite', () => {
     await expect(pool.query({ text: 'SELECT 1', values: [] })).rejects.toThrow('PGlite is closed');
   });
 
+  // PGlite 0.5.13 runs the query first; 0.5.0 and 0.5.5 close first, and give the query no result
+  it('rejects a query it closes before running, or runs it', async () => {
+    const pglite = await PGlite.create();
+    const query = asPool(pglite).query({ text: 'SELECT 1 AS a', values: [] }).then(r => r.rows, (e: Error) => e.message);
+    await pglite.close();
+    expect([[{ a: 1 }], 'PGlite gave no result: was it closed while the query waited?']).toContainEqual(await query);
+  });
+
   it('is shared with its own queries, run at the same moment, which never land between the adapter\'s messages', async () => {
     const own = Array.from({ length: 20 }, (_, i) => u.pglite().query<{ n: number }>('SELECT $1::int AS n', [i]).then(r => r.rows[0].n));
     const adapter = Array.from({ length: 20 }, (_, i) => i % 2 ?
