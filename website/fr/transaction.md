@@ -1,5 +1,5 @@
 ---
-english: 077d3217cd11
+english: ba1d74183dc0
 ---
 
 # Transactions
@@ -311,7 +311,7 @@ Le SQL de la requête du callback : [`insert()`](/fr/insert#insert).
 - Les 40001 et 40P01 sont reconnus à leur `code`, comme dans [Retries](#retries). Une telle erreur levée depuis JavaScript, puis interceptée, ne reçoit pas de `ROLLBACK TO` : le travail de son savepoint reste en place, sauf si un niveau extérieur l’annule.
 - Hors d’un bloc de transaction, Postgres refuse le `SAVEPOINT` (25P01) : `savepoint()` est rejetée avec cette erreur, et n’appelle jamais le callback.
 - Un seul à la fois sur un client : attendez chacun avec `await`. Deux en même temps s’imbriquent dans l’ordre de leurs appels : le premier, s’il se termine en premier, supprime le savepoint du second, dont le `RELEASE` échoue alors (3B001), et la transaction passe en échec ; un `ROLLBACK TO` du second annule aussi ce que le premier a écrit après le `SAVEPOINT` du second. Non vérifié.
-- La profondeur est comptée par client, par chaque copie de pgcast installée : avec deux copies, par exemple deux versions dans `node_modules`, un savepoint de l’une placé dans un savepoint de l’autre prend le même nom, et le 40001 d’un savepoint intérieur intercepté par le callback extérieur laisse alors en place le travail du niveau extérieur.
+- La profondeur est comptée par objet client, par chaque copie de pgcast installée : un objet wrapper ou un `Proxy` du client repart de 1, tout comme, avec deux copies, par exemple deux versions dans `node_modules`, un savepoint de l’une placé dans un savepoint de l’autre. Le savepoint intérieur prend alors le nom de l’extérieur, et son 40001 intercepté par le callback extérieur laisse en place le travail du niveau extérieur.
 - Ses requêtes passent par [`queryListener`](/fr/runtime-config#Config.queryListener) et [`resultListener`](/fr/runtime-config#Config.resultListener) avec l’id de la transaction ; [`transactionListener`](/fr/runtime-config#Config.transactionListener) n’en reçoit rien.
 - Une `transaction()` appelée avec le client du callback d’une `transaction()` est [transmise](#passing-a-transaction-through) : elle n’envoie pas de `SAVEPOINT`. Appelée avec un `pg.PoolClient` sur lequel vous avez envoyé `BEGIN`, elle ne l’est pas ([Votre propre `BEGIN`](#your-own-begin)).
 

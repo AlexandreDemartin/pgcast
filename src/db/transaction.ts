@@ -401,9 +401,11 @@ export async function serializableRODeferrable<T, C = unknown>(txnClientOrQuerya
  * - Each `ROLLBACK TO` and `RELEASE` also ends the savepoints established
  *   after its own, so each level undoes its own work whatever an inner one
  *   left. Don't name a savepoint of yours `pgcast_savepoint_<d>`.
- * - The depth is counted per client, by each copy of this library apart: a
- *   savepoint of one copy inside another's takes the same name, and an inner
- *   40001 caught one level up then leaves the outer work in.
+ * - The depth is counted per client object, by each copy of this library
+ *   apart: a wrapper or a `Proxy` of the client counts from 1 again, as does a
+ *   savepoint of one copy inside another's. The inner savepoint then takes the
+ *   outer one's name, and an inner 40001 caught one level up leaves the outer
+ *   work in.
  * - `await` each: two at once on one client nest in the order they are
  *   called. The first, if it ends first, ends the second's savepoint, whose
  *   own `RELEASE` then fails (3B001) and aborts the transaction; a
