@@ -264,7 +264,7 @@ COMMIT
 - Each row is typed as `select()` types it. A single `lateral` subquery is passed through as [`selectOne()`](#selectOne) passes it, as `pg` parses its column, and typed so: with [`aggregatesTypedByColumn`](#typed-by-column), a `min()` of a `date` is a `Date`, where `select()` gives its JSON string.
 - A `lateral` passed through and typed `number` does not compile: `count()`, `sum()`, `avg()`, and `min()` or `max()` unless typed by column. Their type is `Number()`'s or JSON's, where `pg` gives a `bigint` or a `numeric` as a string and a `date` as a `Date` ([#749](https://github.com/AlexandreDemartin/pgcast/issues/749)). A `sql` template typed `number` is refused with them, as its type cannot be told from theirs. Under a `lateral` key, the value is JSON and its type holds: `` db.selectRows('studios', db.all, { lateral: { films: db.count('films', { studio_id: db.parent('id') }) } }) ``<!-- tsc -->. Past the type, from JavaScript, `run()` gives `pg`'s value.
 - A `lock` locks each row as its batch is fetched, not before.
-- Nested, it is a set of rows, not one value. A `sql` template takes it, `` db.sql`SELECT count(*) FROM (${db.selectRows('films', db.all)}) AS f` ``<!-- tsc -->, and so do [`withCTEs()`](/sql-template#withCTEs) and `cursor()`. As a `lateral`, an `extras` value or a `where`, it does not compile: its type, a [`RowsQuery`](#RowsQuery), says so. Past the type, from JavaScript, a `lateral` key repeats the parent row once per row, and an `extras` value gets 21000 from Postgres.
+- Nested, it is a set of rows, not one value. A `sql` template takes it, `` db.sql`SELECT count(*) FROM (${db.selectRows('films', db.all)}) AS f` ``<!-- tsc -->, and so do [`withCTEs()`](/sql-template#withCTEs) and `cursor()`. As a `lateral`, an `extras` value, a `where` or the Whereable value of a typed column, it does not compile: its type, a [`RowsQuery`](#RowsQuery), says so. Its type takes it as `order.by`, and as the Whereable value of a column typed `any`, where Postgres refuses it. Past the type, from JavaScript, a `lateral` key repeats the parent row once per row, and an `extras` value gets 21000 from Postgres.
 
 ## `count()` {#count}
 
@@ -565,7 +565,7 @@ From 6.12.0. The call signature of `selectRows()`: `table`, `where`, `options?`,
 interface RowsQuery
 ```
 
-From 6.12.0. The second type argument of the fragment `selectRows()` returns, which marks a query of many rows: `lateral`, `extras` and a `where` take `SQLFragment<any>`, whose second argument is `never`, so they refuse it; a `sql` template, `withCTEs()` and `cursor()` take `SQLFragment<any, any>`. Write it to type a variable: `db.SQLFragment<s.films.JSONSelectable[], db.RowsQuery>`.
+From 6.12.0. The second type argument of the fragment `selectRows()` returns, which marks a query of many rows: `lateral`, `extras` and a `where` take `SQLFragment<any>`, whose second argument is `never`, so they refuse it; a `sql` template, `withCTEs()` and `cursor()` take `SQLFragment<any, any>`. Write it to type a variable: `db.SQLFragment<s.films.JSONSelectable[], db.RowsQuery>`. A helper typed `db.SQLFragment<R>` or `db.SQLFragment<any>` refuses it too (TS2345); typed `db.SQLFragment<R, any>`, it takes both: `` const run = <R>(q: db.SQLFragment<R, any>) => q.run(pool); ``<!-- tsc: export … -->.
 
 ### `NumericAggregateSignatures` {#NumericAggregateSignatures}
 

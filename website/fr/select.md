@@ -1,5 +1,5 @@
 ---
-english: 48b95b56b374
+english: a4b4acea8a92
 ---
 
 # Lectures {#select-and-the-aggregates}
@@ -268,7 +268,7 @@ COMMIT
 - Chaque ligne est typée comme `select()` la type. Une seule sous-requête `lateral` est transmise telle que [`selectOne()`](#selectOne) la transmet, comme `pg` parse sa colonne, et typée ainsi : avec [`aggregatesTypedByColumn`](#typed-by-column), un `min()` d’une `date` est un `Date`, là où `select()` donne sa chaîne JSON.
 - Un `lateral` transmis et typé `number` ne compile pas : `count()`, `sum()`, `avg()`, et `min()` ou `max()` sauf typés par colonne. Leur type est celui de `Number()` ou du JSON, là où `pg` donne un `bigint` ou un `numeric` en chaînes et une `date` en `Date` ([#749](https://github.com/AlexandreDemartin/pgcast/issues/749)). Un template `sql` typé `number` est refusé avec eux, car son type ne se distingue pas du leur. Sous une clé `lateral`, la valeur est du JSON et son type tient : `` db.selectRows('studios', db.all, { lateral: { films: db.count('films', { studio_id: db.parent('id') }) } }) ``<!-- tsc -->. Hors du type, en JavaScript, `run()` donne la valeur de `pg`.
 - Un `lock` verrouille chaque ligne quand son batch est lu, pas avant.
-- Imbriquée, c’est un ensemble de lignes, pas une valeur. Un template `sql` la prend, `` db.sql`SELECT count(*) FROM (${db.selectRows('films', db.all)}) AS f` ``<!-- tsc -->, de même que [`withCTEs()`](/fr/sql-template#withCTEs) et `cursor()`. Comme `lateral`, valeur d’`extras` ou `where`, elle ne compile pas : son type, un [`RowsQuery`](#RowsQuery), le dit. Hors du type, en JavaScript, une clé `lateral` répète la ligne parente une fois par ligne, et une valeur d’`extras` reçoit l’erreur 21000 de Postgres.
+- Imbriquée, c’est un ensemble de lignes, pas une valeur. Un template `sql` la prend, `` db.sql`SELECT count(*) FROM (${db.selectRows('films', db.all)}) AS f` ``<!-- tsc -->, de même que [`withCTEs()`](/fr/sql-template#withCTEs) et `cursor()`. Comme `lateral`, valeur d’`extras`, `where` ou valeur Whereable d’une colonne typée, elle ne compile pas : son type, un [`RowsQuery`](#RowsQuery), le dit. Son type la prend comme `order.by`, et comme valeur Whereable d’une colonne typée `any`, où Postgres la refuse. Hors du type, en JavaScript, une clé `lateral` répète la ligne parente une fois par ligne, et une valeur d’`extras` reçoit l’erreur 21000 de Postgres.
 
 ## `count()` {#count}
 
@@ -569,7 +569,7 @@ La signature d’appel de `selectExactlyOne()` : `table`, `where`, `options?`, 
 interface RowsQuery
 ```
 
-À partir de la 6.12.0. Le second argument de type du fragment que renvoie `selectRows()`, qui marque une requête de plusieurs lignes : `lateral`, `extras` et un `where` prennent `SQLFragment<any>`, dont le second argument est `never`, et la refusent donc ; un template `sql`, `withCTEs()` et `cursor()` prennent `SQLFragment<any, any>`. Écrivez-le pour typer une variable : `db.SQLFragment<s.films.JSONSelectable[], db.RowsQuery>`.
+À partir de la 6.12.0. Le second argument de type du fragment que renvoie `selectRows()`, qui marque une requête de plusieurs lignes : `lateral`, `extras` et un `where` prennent `SQLFragment<any>`, dont le second argument est `never`, et la refusent donc ; un template `sql`, `withCTEs()` et `cursor()` prennent `SQLFragment<any, any>`. Écrivez-le pour typer une variable : `db.SQLFragment<s.films.JSONSelectable[], db.RowsQuery>`. Un helper typé `db.SQLFragment<R>` ou `db.SQLFragment<any>` refuse aussi ce fragment (TS2345) ; typé `db.SQLFragment<R, any>`, il prend les deux : `` const run = <R>(q: db.SQLFragment<R, any>) => q.run(pool); ``<!-- tsc: export … -->.
 
 ### `NumericAggregateSignatures` {#NumericAggregateSignatures}
 

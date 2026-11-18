@@ -1107,9 +1107,9 @@ export interface SelectRowsSignatures {
  * `numeric` as a string and a `date` as a `Date` (#749). Under a `lateral` key
  * it is JSON, as in `select()`; past the type, from JavaScript, `pg`'s value.
  *
- * A query of many rows, it is typed so that a `lateral`, an `extras` value
- * and a `where` refuse it; a `sql` template, `withCTEs()` and `cursor()` take
- * it.
+ * A query of many rows, it is typed so that a `lateral`, an `extras` value, a
+ * `where` and the `Whereable` value of a typed column refuse it; a `sql`
+ * template, `withCTEs()` and `cursor()` take it.
  * @param table The table to select from
  * @param where A `Whereable` or `SQLFragment` defining the rows to be selected,
  * or `all`

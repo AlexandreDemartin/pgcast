@@ -509,6 +509,12 @@ describe('selectRows', () => {
     void plain;
   });
 
+  test('takes it as order.by and as the Whereable value of a column typed any (home), which Postgres refuses', () => {
+    const rows = db.selectRows('accounts', db.all, { columns: ['id'] });
+    expectTypeOf(db.select('users', db.all, { order: { by: rows, direction: 'ASC' } })).toEqualTypeOf(db.select('users', db.all));
+    expectTypeOf(db.select('users', { home: rows })).toEqualTypeOf(db.select('users', db.all));
+  });
+
   test('refuses a lateral typed number passed through, which comes as pg parses its column (#749); takes it under a key', () => {
     const p = db.parent('id');
     // @ts-expect-error count() passed through: pg gives its bigint as a string
@@ -539,6 +545,17 @@ describe('selectRows', () => {
     // under a lateral key, a count() is JSON, a number, as in select()
     expectTypeOf<Run<typeof keyed>>().toEqualTypeOf<Run<typeof keyedSelected>>();
     expectTypeOf<Run<typeof keyed>[number]['n']>().toEqualTypeOf<number>();
+  });
+
+  test('a helper typed SQLFragment<R> refuses it; SQLFragment<R, any> takes it', () => {
+    const rows = db.selectRows('users', db.all, { columns: ['id'] });
+    const runAny = <R>(q: db.SQLFragment<R>) => q.run(pool);
+    const runRows = <R>(q: db.SQLFragment<R, any>) => q.run(pool);
+    // @ts-expect-error a helper typed the Zapatos way takes SQLFragment<R>, whose second type argument is never
+    runAny(rows);
+    expectTypeOf(runRows(rows)).resolves.toEqualTypeOf<Pick<s.users.JSONSelectable, 'id'>[]>();
+    expectTypeOf(runRows(rows)).resolves.not.toBeAny();
+    expectTypeOf(runRows(db.select('users', db.all))).resolves.toEqualTypeOf<s.users.JSONSelectable[]>();
   });
 
   test('refuses an unknown column or table', () => {

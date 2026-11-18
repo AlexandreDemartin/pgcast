@@ -984,6 +984,12 @@ describe('selectRows', () => {
     expect((await fails(db.select('users', { id: 1 }, { columns: ['id'], extras: { accounts: db.selectRows('accounts', all) } as any }))).code).toBe('21000');
   });
 
+  it('as order.by, or the Whereable value of a column typed any, which its type takes, Postgres refuses it', async () => {
+    const accounts = db.selectRows('accounts', all, { columns: ['id'] });
+    expect((await fails(db.select('users', all, { order: { by: accounts, direction: 'ASC' } }))).code).toBe('42601');
+    expect((await fails(db.select('users', { home: accounts }))).code).toBe('42804');
+  });
+
   it('nested in a sql template, it is a set of rows', async () => {
     expect((await t.client.query(sql`SELECT count(*)::int AS n FROM (${db.selectRows('users', all)}) AS u`.compile())).rows).toEqual([{ n: 3 }]);
   });
