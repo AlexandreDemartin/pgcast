@@ -30,6 +30,17 @@ Candidates for a check, a rule or a skill line.
 - #701 — An issue number written into the docs is checked with `gh issue view <n>` on that number alone: a fix linked PGlite's adapter to #697 (postgres.js) — orchestrator
 - #701 — `NoInfer` on a callback's parameter also blocks a generic caller from forwarding a callback typed with the same type parameter; a helper type exported "so users can type a helper" gets a probe of that helper, generic over the parameter — branch-reviewer
 - #701 — A fix-round grid compares the whole `(cell, code)` list and the emitted `.d.ts` with 6.6.1's, not only the cells the review named — branch-reviewer
+- #703 — `vi.resetModules()` reloads TypeScript sources only; the root's `db.js` shim loads `dist` through Node's CommonJS cache, which Vitest does not reset, so a once-per-process warning is tested on `src/db` — builder
+- #703 — A test that needs a fresh prepared statement on a pooled connection uses a text of its own: the connection handed out may already have prepared the same text — builder
+- #703 — A package's own scripts run tools from the root's install without listing them: npm puts every parent folder's `node_modules/.bin` on `PATH` — builder
+- #703 — postgres.js 4.0.0 (2026-10-29) is ESM only, reads `timestamp` as UTC and lets the server type parameters; anything that names postgres.js covers both majors — builder
+- #703 — A driver parity test that sends one value per query misses paths that depend on the other parameters: postgres.js 4 serializes by the reported type as soon as one parameter is untyped (a NULL), when `types` has a serializer, and when it retries a prepared statement; a parameter table has a row with a NULL beside the value and a second run of a prepared query — branch-reviewer
+- #703 — A negative type test against a peer's typings compiles on every version of the peer range: postgres.js 3.4.0's `TransactionSql extends Sql` (with `reserve()`), 3.4.9's extends `ISql` — branch-reviewer
+- #703 — A stacked branch that merged an earlier tip of the layer below conflicts with master once that layer is squashed; merge master in before the review, not after — orchestrator
+- #703 — postgres.js `sql.unsafe()` defaults to `prepare: false` on 3.4 and 4.x: a probe of the driver alone beat reading `connection.js`, whose 4.x retry paths suggested every query was prepared — builder
+- #703 — A transform guard needs a row per transform key alone: `postgres.camel` sets both `column.from` and `value.from`, which hid a missing column guard — builder
+- #703 — A red test commit can pass `npm test` and still fail `test:types` (TS2379 under `exactOptionalPropertyTypes`); both run on the red commit — builder
+- #703 — When a driver can rerun a statement by itself (postgres.js 4 after 26000 or a bind error), the parity tests force that rerun (`DEALLOCATE ALL`, a value that fails at bind); steady-state runs never take that path — branch-reviewer
 
 ## Minors kept
 
@@ -39,3 +50,4 @@ Minor review defects, each tagged `form` or `defect` (skill `review-comments`), 
 - #700 — form: `CHANGELOG.md` `<!-- tsc -->` mark proves the cast on `frag.run = …`, not on the spy or a library's re-export it is prescribed for; the re-export consumer's cast is compiled nowhere in the repo — branch-reviewer
 - #700 — defect: `QueryableLike` with `strict: false` still accepts a `query()` that requires more than `run()` sends (no `strictFunctionTypes`) — builder
 - #701 — defect: a helper generic over `db.PoolLike<C>` typing its callback `db.TxnClientLike<C, …>` gives TS2345 (filed in #702) — branch-reviewer
+
