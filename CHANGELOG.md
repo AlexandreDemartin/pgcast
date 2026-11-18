@@ -60,6 +60,9 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 - `npx pgcast --help`, or `-h`, in the JSON argument's place, prints a usage and exits with code 0, before it reads the config: both command names, the config files it reads, the JSON argument, `--check`, and a link to the docs (`generator.md` § The CLI, #688). Any other argument starting with `--` there prints `Unknown flag --chek: the flags are --check, --help and -h` and the usage on stderr, with code 1 as before, where Node printed `Unknown flag --chek: the only flag is --check, beside the JSON argument` and its stack. Zapatos 6.6.1 read each of them as the JSON argument, which failed with code 1. After the JSON argument, a flag, `--help` included, is still ignored, its note now `Note: flag --help ignored after the JSON argument: only --check may follow it.`, where it called `--help` an unknown flag and `--check` the only one.
   - Unchanged: the output, files and exit code with no argument, a JSON argument, and `--check` before or after it; a single dash other than `-h`, still read as the JSON argument; a config the CLI cannot read, which Node still prints with its stack.
 
+### Fixed
+- The generator skips a bare `--` forwarded by pnpm, so `pnpm run gen -- --check` runs the check (#557).
+
 ## [6.11.0] - 2026-11-18
 
 ### Added
