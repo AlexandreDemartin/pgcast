@@ -3,6 +3,8 @@
 Show a long list a page at a time: here the films, newest first, two to a page. The last section puts the steps together in a request handler. It assumes the basics of the [tutorial](/tutorial).
 {.lede}
 
+Here the cursor is a page token for the next HTTP request. To read a whole table in one process, see [Cursors](/cursors).
+
 <AtAGlance>
 
 - A page is an `order` that never ties, then a `limit`.
