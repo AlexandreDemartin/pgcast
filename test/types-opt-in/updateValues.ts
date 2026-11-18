@@ -18,4 +18,3 @@ export const settingsUpdate = updateValue('settings');
 // and whose .d.ts writes its result type out (#533)
 export const touchUser = <T extends 'users'>(table: T, row: s.InsertableForTable<T>, on: s.ColumnForTable<T>, at: Date) =>
   db.upsert(table, row, on, { updateValues: { created_at: at } });
-

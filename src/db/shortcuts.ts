@@ -1303,7 +1303,8 @@ const inWith = <F>(fragment: F) =>
  * order (as `Object.keys` gives it: an integer key comes first), so that each
  * may read those before it. With no CTE, a copy of `query`, its own SQL, so a
  * list built at run time needs no branch. Each key is one name, as a
- * `lateral` key is: its `"` doubled, never split on `.`.
+ * `lateral` key is: its `"` doubled, but a `""` escaped by hand kept as written
+ * (`a""b` and `a"b` both give `"a""b"`), never split on `.`.
  *
  * The result is a copy of `query`: it resolves to what `query` does, and is
  * written in parentheses as an `extras` or `insert()` value where `query` is.

@@ -794,6 +794,8 @@ describe('upsert', () => {
       db.upsert(t, r, c, { updateValues: { created_at: db.cols(anyV) } });
       // @ts-expect-error vals() of any, refused as by 6.6.1
       db.upsert(t, r, c, { updateValues: { created_at: db.vals(anyV) } });
+      // @ts-expect-error param() of any, refused as by 6.6.1 (#541)
+      db.upsert(t, r, c, { updateValues: { created_at: db.param(anyV) } });
       // @ts-expect-error a number, refused as by 6.6.1
       db.upsert(t, r, c, { updateValues: { created_at: 1 } });
     };
