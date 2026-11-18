@@ -661,7 +661,7 @@ type TxnClientLike<C, T extends IsolationLevel> = C & {
 }
 ```
 
-The client of a [`PoolLike`](#PoolLike), `C`, as a [`transaction()`](#transaction) callback gets it: marked while the transaction runs, as a [`TxnClient`](#TxnClient) is, `_zapatos` optional in the type too. A nested call passes it through, and its callback gets it as given, at the outer transaction's level, the one it runs at; a `TxnClient` is typed at the nested call's own level, and a nested call in a function generic over `C` does not compile ([Another driver's pool](#another-drivers-pool)).
+The client of a [`PoolLike`](#PoolLike), `C`, as a [`transaction()`](#transaction) callback gets it: marked while the transaction runs, as a [`TxnClient`](#TxnClient) is, `_zapatos` optional in the type too. The nested callback gets the same client. See [how TypeScript infers its isolation level](#another-drivers-pool). A `TxnClient` is typed at the nested call's own level, and a nested call in a function generic over `C` does not compile.
 
 ## `isDatabaseError()` {#isDatabaseError}
 
