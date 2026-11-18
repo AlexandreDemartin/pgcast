@@ -1,5 +1,5 @@
 ---
-english: 20f7d8aa76b4
+english: aebf7cf74357
 ---
 
 # Template SQL
@@ -171,7 +171,7 @@ Comme valeur de `eq()`, `add()` et des autres [conditions](/fr/conditions) :
 
 Dans [`vals({…})`](#vals), donc comme valeur d’`insert()`, d’`upsert()` ou d’`update()`, et dans votre propre template `sql`, dans un `lateral` ou non :
 
-> `` `db.raw()`, `db.cols()` and `db.vals()` have no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value: to write SQL, use a `sql` fragment value (in `update()`, `db.self` there stands for the column); to write a value, give the value itself, or `db.param()`. ``<!-- message -->
+> `` `db.raw()`, `db.cols()` and `db.vals()` have no meaning as a value in `vals({…})`, so as an `insert()`, `upsert()` or `update()` value, nor in a `sql` template of your own (`VALUES (…)` or a filter's `IN (…)`): to write SQL, use a `sql` fragment value (in `update()`, `db.self` there stands for the column); to write a value, give the value itself, or `db.param()`. ``<!-- message -->
 
 Le type les refuse là, et comme valeur d’`insert()` ou d’`update()`, sur chaque colonne qu’il type (une colonne typée `any`, ce que donne un placeholder de `zapatos/custom`, accepte tout) ; il les accepte dans le `vals({…})` d’un template `sql` :
 
