@@ -141,7 +141,10 @@ const
   parseMessage = (name: string, text: string) => message('P', cstring(name), cstring(text), int16(0)),  // types left to Postgres
   describePortal = message('D', new Uint8Array([0x50]), cstring('')),
   executePortal = message('E', cstring(''), int32(0)),
-  sync = message('S');
+  sync = message('S'),
+  // pg's answer to a COPY FROM STDIN, sent ahead as there is no reply to wait for: Postgres ignores it after any other
+  // statement, and gives 57014 for the COPY, which would otherwise wait for its data and stop PGlite's Postgres
+  copyFail = message('f', cstring('No source stream defined'));
 
 // each value in text, or in binary for its bytes, as pg's Bind sends them; the columns all in text
 function bindMessage(name: string, values: (string | Uint8Array | null)[]) {
@@ -212,7 +215,7 @@ export function asPool(pglite: PGliteLike): PGlitePool {
     await pglite.waitReady;
 
     // pg sends a query with no value and no name as a simple Query, which may hold several statements
-    if (values.length === 0 && name == null) return resultOf(await send(queryMessage(text)));
+    if (values.length === 0 && name == null) return resultOf(await send(concat([queryMessage(text), copyFail])));
 
     const parameters = values.map(v => prepareValue(v));
     return pglite.runExclusive(async () => {
@@ -225,7 +228,7 @@ export function asPool(pglite: PGliteLike): PGlitePool {
         state.prepared.set(name, text);
       }
       const parse = name == null ? [parseMessage('', text)] : [];
-      return resultOf((await pglite.execProtocol(concat([...parse, bindMessage(name ?? '', parameters), describePortal, executePortal, sync]))).messages);
+      return resultOf((await pglite.execProtocol(concat([...parse, bindMessage(name ?? '', parameters), describePortal, executePortal, copyFail, sync]))).messages);
     });
   };
 
