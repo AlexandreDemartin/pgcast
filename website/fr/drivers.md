@@ -114,7 +114,8 @@ const booked = await bookSeat(pool, 'F12', 'Ines Calloway');
 
 Elle envoie ce qu’elle envoie sur un `pg.Pool` ([Le SQL envoyé](/fr/transaction#the-sql-it-sends)), sur une seule connexion : l’adaptateur de postgres.js en réserve une (`sql.reserve()`), et celui de PGlite prend la seule qu’il a.
 
-- Sur PGlite, une requête sur le pool attend que la transaction libère la connexion. Avec un `await` dans le callback, `.run(pool)` attend indéfiniment : lancez les requêtes du callback sur `txnClient`.
+- Sur PGlite, ou sur tout pool d’une seule connexion (`max: 1` pour un `pg.Pool` ou un `sql` de postgres.js), une requête sur le pool attend que la transaction libère la connexion. Avec un `await` dans le callback, `.run(pool)` attend indéfiniment : lancez les requêtes du callback sur `txnClient`.
+- Les `query()` et `exec()` de PGlite lui-même n’attendent pas : dans la transaction, ils s’y exécutent ([How it differs from pg](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters/pglite#how-it-differs-from-pg)).
 - Une transaction imbriquée prend le client du callback casté en client de `pg` ([Le pool d’un autre driver](/fr/transaction#another-drivers-pool), [#702](https://github.com/AlexandreDemartin/pgcast/issues/702)).
 
 ## Un driver à vous {#a-driver-of-your-own}
