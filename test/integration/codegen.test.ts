@@ -4493,11 +4493,12 @@ describe('the CLI with --check (#556)', () => {
     expect(printed()).toEqual([]);
   });
 
-  it('ignores an unknown flag after the JSON argument, as Zapatos 6.6.1 does, with a note through warningListener', async () => {
+  it('ignores a flag after the JSON argument, as Zapatos 6.6.1 does, with a note through warningListener', async () => {
     const
-      note = (flag: string) => `Note: unknown flag ${flag} ignored: the only flag is --check, before or after the JSON argument.`,
-      notes = () => printed().filter(line => line.startsWith('Note: unknown flag'));
-    expect(await runCli([json({ warningListener: true }), '--chek'], dir)).toBe(0);
+      note = (flag: string) => `Note: flag ${flag} ignored after the JSON argument: only --check may follow it.`,
+      notes = () => printed().filter(line => line.startsWith('Note: flag'));
+    // -h, a single dash, is ignored there without a note, as any later argument
+    expect(await runCli([json({ warningListener: true }), '--chek', '-h'], dir)).toBe(0);
     expect(files(outDir)).toEqual([placeholderFile, indexFile, schemaFile]);
     expect(notes()).toEqual([note('--chek')]);
     log.mockClear();
