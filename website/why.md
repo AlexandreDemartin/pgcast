@@ -58,7 +58,7 @@ When a shortcut doesn't fit, the [`sql`](/sql-template#sql) template is always t
 
 There are no models. A query gives back plain objects, typed: "just (fully-typed) POJOs", in the words of Zapatos's docs. There's no class to extend, no relationship to declare, nothing loaded lazily behind a property, and no state for a later save to write back.
 
-Nor is there a default connection: each `.run()` takes the pool or client to run on, as "Zapatos is always explicit about what client or pool is running your query".
+Nor is there a default connection: each `.run()` takes the pool or client to run on, `pg`'s or another driver's ([Drivers](/drivers)), as "Zapatos is always explicit about what client or pool is running your query".
 
 A transaction starts only when you call [`transaction()`](/transaction#transaction). It sends `START TRANSACTION`<!-- probe: db.serializable(pool, async () => {}) --> at the isolation level you chose, then `COMMIT`<!-- probe: db.serializable(pool, async () => {}) --> or `ROLLBACK`<!-- probe: db.serializable(pool, async () => { throw new Error(); }) -->, and runs your callback again after a serialisation failure or a deadlock ([Retries](/retries)).
 

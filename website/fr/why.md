@@ -1,5 +1,5 @@
 ---
-english: 5f3dd9d8b218
+english: 078caef3fae1
 ---
 
 # Pourquoi pgcast
@@ -62,7 +62,7 @@ Quand un raccourci ne convient pas, le template [`sql`](/fr/sql-template#sql) es
 
 Il n’y a pas de modèles. Une requête renvoie des objets simples, typés : « <span lang="en">just (fully-typed) POJOs</span> », selon les mots de la doc de Zapatos. Aucune classe à étendre, aucune relation à déclarer, rien de chargé paresseusement derrière une propriété, et aucun état qu’un enregistrement ultérieur réécrirait.
 
-Pas de connexion par défaut non plus : chaque `.run()` prend le pool ou le client sur lequel s’exécuter, car « <span lang="en">Zapatos is always explicit about what client or pool is running your query</span> ».
+Pas de connexion par défaut non plus : chaque `.run()` prend le pool ou le client sur lequel s’exécuter, de `pg` ou d’un autre driver ([Drivers](/fr/drivers)), car « <span lang="en">Zapatos is always explicit about what client or pool is running your query</span> ».
 
 Une transaction ne commence que lorsque vous appelez [`transaction()`](/fr/transaction#transaction). Elle envoie `START TRANSACTION`<!-- probe: db.serializable(pool, async () => {}) --> au niveau d’isolation choisi, puis `COMMIT`<!-- probe: db.serializable(pool, async () => {}) --> ou `ROLLBACK`<!-- probe: db.serializable(pool, async () => { throw new Error(); }) -->, et relance votre callback après un échec de sérialisation ou un deadlock ([Retries](/fr/retries)).
 
