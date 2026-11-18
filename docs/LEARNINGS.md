@@ -407,11 +407,18 @@ Candidates for a check, a rule or a skill line.
 - #676: a mutant run while another part of the fix is in place can pass for the wrong reason: rerun each mutant against the final shape.
 - #676: a fixture with an accidental hole can hide that the library's own sources rely on it: "type-checks against a generated one" goes red when it closes.
 - #676: run a type fix's forwarder grid on TS 4.1.6, 5.9 and 7: a guard in `db.SQLExpression` broke a generic `` db.sql`${{ ...w, id }}` `` on 4.1.6 only.
+- #680: what a declaration degrades to depends on the TypeScript version and on whether the reader has its own ambient module: replay on 4.1.6 and in a reader without one before writing it down.
+- #680: quote a maintainer's comment through to its conclusion, and read the closing comment of each linked issue.
+- #680: with project references, tsserver checks a reader against the referenced projects' sources, not their `.d.ts`: a docs claim about the editor needs its own tsserver probe.
+- #680: two copies of the runtime turn the other copy's `Default` into a `$1` = `null`: an insert writes NULL with no error.
+- #680: in zsh, an unquoted `grep --include=*.ts` fails as "no matches found" and silently zeroes a count: quote the pattern.
 - #677: rate the risk by where the change lands: a refusal added inside `compileExpression` is `high`, even when no SQL changes; only a message on a path that already threw stays `normal`.
 - #677: `upsert()` `updateValues` is compiled with no current column, so a refusal in `core.ts` that waits for `currentColumn` never reaches it.
 - #677: a message's advice gets the same proof as a code path: run what it says, where it says it, on Postgres (42703 in a `VALUES` list, 42702 in `updateValues`).
 - #677: a docs sentence "the type refuses it" is compiled for each position it covers, a hand-written `sql` template and an `any` column included.
 - #677: a message that quotes `` sql`${…}` `` fails lint's `no-template-curly-in-string` and the docs check: write the advice as plain SQL.
+- #681: below TS 5.5, a declaration that names a table by module starts with `/// <reference path>` to its project's `schema.d.ts`, which joins the reader's compilation: replay a claim about types across projects with and without an `s` import in the writer.
+- #681: a docs table's cell holds the type the reader gets, one short example at most; the why goes in a bullet under it.
 
 ## Minors kept
 
