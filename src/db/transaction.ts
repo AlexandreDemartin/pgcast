@@ -9,6 +9,7 @@ import { isDatabaseError } from './pgErrors';
 import { wait, warnOnce } from './utils';
 import { sql, raw } from './core';
 import { getConfig } from './config';
+import type { SQLQuery } from './config';
 import type { Queryable } from './core';
 
 
@@ -65,6 +66,40 @@ export type TxnClientForSerializableRO = TxnClient<IsolationSatisfying<Isolation
 export type TxnClientForRepeatableReadRO = TxnClient<IsolationSatisfying<IsolationLevel.RepeatableReadRO>>;
 export type TxnClientForReadCommittedRO = TxnClient<IsolationSatisfying<IsolationLevel.ReadCommittedRO>>;
 export type TxnClientForSerializableRODeferrable = TxnClient<IsolationSatisfying<IsolationLevel.SerializableRODeferrable>>;
+
+// a client of a PoolLike: a QueryableLike whose result also gives the command tag, which transaction() reads off its
+// COMMIT (#190), and a release(), which it calls once done; properties, as QueryableLike's query, checked one way
+type PoolClientLike = { query: (query: SQLQuery) => PromiseLike<{ rows: any[]; command: string }>; release: () => void };
+
+/**
+ * A pool of any driver, which `transaction()` takes as it takes a `pg.Pool`:
+ * its `connect()` resolves to a client whose `query({ text, values })`
+ * resolves to `{ rows, command }`, `command` holding the command tag
+ * (`COMMIT`, or `ROLLBACK` when Postgres rolled the transaction back), and
+ * which has a `release()`, called once the transaction ends. `C` is that
+ * client's type; a `pg.Pool` is a `PoolLike` too.
+ */
+export interface PoolLike<C = PoolClientLike> {
+  connect: () => PromiseLike<C extends PoolClientLike ? C : PoolClientLike>;
+}
+
+/**
+ * The client of a `PoolLike`, `C`, as a `transaction()` callback gets it:
+ * marked by `_zapatos` while the transaction runs, as a `TxnClient` is.
+ */
+export type TxnClientLike<C, T extends IsolationLevel> = C & {
+  _zapatos?: {
+    isolationLevel: T;
+    txnId: number;
+  };
+};
+
+// the client a callback gets: C stays unknown for a pg queryable, which gives the TxnClient… of Zapatos 6.6.1, Pg, as
+// do Parameters and infer, which read C as unknown; a PoolLike's client otherwise, inferred from its connect()
+type TxnClientOf<C, Pg, T extends IsolationLevel> = unknown extends C ? Pg : TxnClientLike<C, T>;
+
+// the callback as the body of transaction() calls it: with the client of a PoolLike, which run time uses as a TxnClient
+type Callback<T, M extends IsolationLevel> = (client: TxnClient<IsolationSatisfying<M>>) => Promise<T>;
 
 
 function typeofQueryable(queryable: Queryable) {
@@ -136,18 +171,19 @@ let txnSeq = 0;
  * calling it; without it, it runs and emits `PGCAST_DEP007`, once.
  * @param txnClientOrQueryable The `pg.Pool` from which to check out a client,
  * a plain client (`pg.Client`, `pg.native.Client` or a `pg.PoolClient`, used
- * as is and not released), or an existing transaction client to be passed
- * through
+ * as is and not released), an existing transaction client to be passed
+ * through, or the `PoolLike` of another driver, whose client the callback gets
  * @param isolationLevel The desired isolation level (e.g.
  * `IsolationLevel.Serializable`)
  * @param callback A callback function that runs queries on the client provided
  * to it
  */
-export async function transaction<T, M extends IsolationLevel>(
-  txnClientOrQueryable: Queryable | TxnClient<IsolationSatisfying<M>>,
+export async function transaction<T, M extends IsolationLevel, C = unknown>(
+  txnClientOrQueryable: Queryable | TxnClient<IsolationSatisfying<M>> | PoolLike<C>,
   isolationLevel: M,
-  callback: (client: TxnClient<IsolationSatisfying<M>>) => Promise<T>
+  callback: (client: TxnClientOf<C, TxnClient<IsolationSatisfying<M>>, IsolationSatisfying<M>>) => Promise<T>
 ): Promise<T> {
+
 
   if (Object.prototype.hasOwnProperty.call(txnClientOrQueryable, '_zapatos')) {
     // if txnClientOrQueryable is a TxnClient, just pass it through: its callback runs at the outer transaction's level, as
@@ -157,7 +193,7 @@ export async function transaction<T, M extends IsolationLevel>(
       if (getConfig().transactionRequiresSatisfyingLevel ?? false) throw new Error(`transaction() at ${isolationLevel} was given the client of a transaction at ${outer}, so its callback would run at ${outer}: open the outer transaction at a level that satisfies ${isolationLevel} (IsolationSatisfying)`);
       warnOnce('PGCAST_DEP007', `transaction() at ${isolationLevel} was given the client of a transaction at ${outer}, so its callback runs at ${outer}. Set transactionRequiresSatisfyingLevel: true (db.setConfig) to reject instead; it will be the default in pgcast 7.0.`);
     }
-    return callback(txnClientOrQueryable as TxnClient<IsolationSatisfying<M>>);
+    return (callback as Callback<T, M>)(txnClientOrQueryable as TxnClient<IsolationSatisfying<M>>);
   }
 
   if (!Object.values(IsolationLevel).includes(isolationLevel)) throw new Error(`Isolation level must be an IsolationLevel value (e.g. IsolationLevel.Serializable), not '${isolationLevel}'`);
@@ -166,8 +202,9 @@ export async function transaction<T, M extends IsolationLevel>(
 
   const
     txnId = txnSeq++,
-    clientIsOurs = typeofQueryable(txnClientOrQueryable) === 'pool',
-    txnClient = (clientIsOurs ? await txnClientOrQueryable.connect() : txnClientOrQueryable) as TxnClient<M>;
+    // run time takes any object that is no pg client for a pool: a PoolLike is used as a pg.Pool is
+    clientIsOurs = typeofQueryable(txnClientOrQueryable as Queryable) === 'pool',
+    txnClient = (clientIsOurs ? await (txnClientOrQueryable as pg.Pool).connect() : txnClientOrQueryable) as TxnClient<M>;
 
   try {  // from here, every path releases a client checked out from the pool
     txnClient._zapatos = { isolationLevel, txnId };
@@ -199,7 +236,7 @@ export async function transaction<T, M extends IsolationLevel>(
         if (attempt > 1 && transactionListener) transactionListener(`Retrying transaction, attempt ${attempt} of ${maxAttempts}`, txnId);
 
         await sql`START TRANSACTION ISOLATION LEVEL ${raw(isolationLevel)}`.run(txnClient);
-        result = await callback(txnClient as TxnClient<IsolationSatisfying<M>>);
+        result = await (callback as Callback<T, M>)(txnClient as TxnClient<IsolationSatisfying<M>>);
 
         const commit = sql`COMMIT`;
         commit.runResultTransform = qr => { commandTag = qr.command; return qr.rows; };  // listeners get the rows, as before
@@ -250,70 +287,77 @@ export async function transaction<T, M extends IsolationLevel>(
 /**
  * Shortcut for `transaction` with isolation level `Serializable`.
  * @param txnClientOrQueryable The `pg.Pool` from which to check out a client,
- * a plain client, or an existing transaction client to be passed through
+ * a plain client, an existing transaction client to be passed through, or the
+ * `PoolLike` of another driver
  * @param callback A callback function that runs queries on the client provided
  * to it
  */
-export async function serializable<T>(txnClientOrQueryable: Queryable | TxnClientForSerializable, callback: (client: TxnClientForSerializable) => Promise<T>) {
+export async function serializable<T, C = unknown>(txnClientOrQueryable: Queryable | TxnClientForSerializable | PoolLike<C>, callback: (client: TxnClientOf<C, TxnClientForSerializable, IsolationSatisfying<IsolationLevel.Serializable>>) => Promise<T>) {
   return transaction(txnClientOrQueryable, IsolationLevel.Serializable, callback);
 }
 /**
  * Shortcut for `transaction` with isolation level `RepeatableRead`.
  * @param txnClientOrQueryable The `pg.Pool` from which to check out a client,
- * a plain client, or an existing transaction client to be passed through
+ * a plain client, an existing transaction client to be passed through, or the
+ * `PoolLike` of another driver
  * @param callback A callback function that runs queries on the client provided
  * to it
  */
-export async function repeatableRead<T>(txnClientOrQueryable: Queryable | TxnClientForRepeatableRead, callback: (client: TxnClientForRepeatableRead) => Promise<T>) {
+export async function repeatableRead<T, C = unknown>(txnClientOrQueryable: Queryable | TxnClientForRepeatableRead | PoolLike<C>, callback: (client: TxnClientOf<C, TxnClientForRepeatableRead, IsolationSatisfying<IsolationLevel.RepeatableRead>>) => Promise<T>) {
   return transaction(txnClientOrQueryable, IsolationLevel.RepeatableRead, callback);
 }
 /**
  * Shortcut for `transaction` with isolation level `ReadCommitted`.
  * @param txnClientOrQueryable The `pg.Pool` from which to check out a client,
- * a plain client, or an existing transaction client to be passed through
+ * a plain client, an existing transaction client to be passed through, or the
+ * `PoolLike` of another driver
  * @param callback A callback function that runs queries on the client provided 
  * to it
  */
-export async function readCommitted<T>(txnClientOrQueryable: Queryable | TxnClientForReadCommitted, callback: (client: TxnClientForReadCommitted) => Promise<T>) {
+export async function readCommitted<T, C = unknown>(txnClientOrQueryable: Queryable | TxnClientForReadCommitted | PoolLike<C>, callback: (client: TxnClientOf<C, TxnClientForReadCommitted, IsolationSatisfying<IsolationLevel.ReadCommitted>>) => Promise<T>) {
   return transaction(txnClientOrQueryable, IsolationLevel.ReadCommitted, callback);
 }
 /**
  * Shortcut for `transaction` with isolation level `SerializableRO`.
  * @param txnClientOrQueryable The `pg.Pool` from which to check out a client,
- * a plain client, or an existing transaction client to be passed through
+ * a plain client, an existing transaction client to be passed through, or the
+ * `PoolLike` of another driver
  * @param callback A callback function that runs queries on the client provided
  * to it
  */
-export async function serializableRO<T>(txnClientOrQueryable: Queryable | TxnClientForSerializableRO, callback: (client: TxnClientForSerializableRO) => Promise<T>) {
+export async function serializableRO<T, C = unknown>(txnClientOrQueryable: Queryable | TxnClientForSerializableRO | PoolLike<C>, callback: (client: TxnClientOf<C, TxnClientForSerializableRO, IsolationSatisfying<IsolationLevel.SerializableRO>>) => Promise<T>) {
   return transaction(txnClientOrQueryable, IsolationLevel.SerializableRO, callback);
 }
 /**
  * Shortcut for `transaction` with isolation level `RepeatableReadRO`.
  * @param txnClientOrQueryable The `pg.Pool` from which to check out a client,
- * a plain client, or an existing transaction client to be passed through
+ * a plain client, an existing transaction client to be passed through, or the
+ * `PoolLike` of another driver
  * @param callback A callback function that runs queries on the client provided
  * to it
  */
-export async function repeatableReadRO<T>(txnClientOrQueryable: Queryable | TxnClientForRepeatableReadRO, callback: (client: TxnClientForRepeatableReadRO) => Promise<T>) {
+export async function repeatableReadRO<T, C = unknown>(txnClientOrQueryable: Queryable | TxnClientForRepeatableReadRO | PoolLike<C>, callback: (client: TxnClientOf<C, TxnClientForRepeatableReadRO, IsolationSatisfying<IsolationLevel.RepeatableReadRO>>) => Promise<T>) {
   return transaction(txnClientOrQueryable, IsolationLevel.RepeatableReadRO, callback);
 }
 /**
  * Shortcut for `transaction` with isolation level `ReadCommittedRO`.
  * @param txnClientOrQueryable The `pg.Pool` from which to check out a client,
- * a plain client, or an existing transaction client to be passed through
+ * a plain client, an existing transaction client to be passed through, or the
+ * `PoolLike` of another driver
  * @param callback A callback function that runs queries on the client provided
  * to it
  */
-export async function readCommittedRO<T>(txnClientOrQueryable: Queryable | TxnClientForReadCommittedRO, callback: (client: TxnClientForReadCommittedRO) => Promise<T>) {
+export async function readCommittedRO<T, C = unknown>(txnClientOrQueryable: Queryable | TxnClientForReadCommittedRO | PoolLike<C>, callback: (client: TxnClientOf<C, TxnClientForReadCommittedRO, IsolationSatisfying<IsolationLevel.ReadCommittedRO>>) => Promise<T>) {
   return transaction(txnClientOrQueryable, IsolationLevel.ReadCommittedRO, callback);
 }
 /**
  * Shortcut for `transaction` with isolation level `SerializableRODeferrable`.
  * @param txnClientOrQueryable The `pg.Pool` from which to check out a client,
- * a plain client, or an existing transaction client to be passed through
+ * a plain client, an existing transaction client to be passed through, or the
+ * `PoolLike` of another driver
  * @param callback A callback function that runs queries on the client provided
  * to it
  */
-export async function serializableRODeferrable<T>(txnClientOrQueryable: Queryable | TxnClientForSerializableRODeferrable, callback: (client: TxnClientForSerializableRODeferrable) => Promise<T>) {
+export async function serializableRODeferrable<T, C = unknown>(txnClientOrQueryable: Queryable | TxnClientForSerializableRODeferrable | PoolLike<C>, callback: (client: TxnClientOf<C, TxnClientForSerializableRODeferrable, IsolationSatisfying<IsolationLevel.SerializableRODeferrable>>) => Promise<T>) {
   return transaction(txnClientOrQueryable, IsolationLevel.SerializableRODeferrable, callback);
 }
