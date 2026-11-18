@@ -197,6 +197,7 @@ declare const bare: OtherClient;
 declare const withConnect: db.TxnClientLike<OtherClient & { connect: () => Promise<void> }, db.IsolationLevel.Serializable>;
 declare const atAnyLevel: db.TxnClientLike<Awaited<ReturnType<db.PoolLike['connect']>>, db.IsolationLevel>;
 declare function countUsers(txnClient: TxnOther<db.IsolationLevel.Serializable>): Promise<number>;
+type Client = { query(q: db.SQLQuery): Promise<{ rows: any[]; command: string }>; release(): void };
 type IndexedClient = OtherClient & { [key: string]: unknown };  // keyof holds every key, connect included
 declare const indexed: db.PoolLike<IndexedClient>;
 declare const p1: db.PoolLike<{
@@ -229,6 +230,9 @@ describe('a nested call on another driver’s client (#702)', () => {
   });
 
   test('a client whose type has a string index signature gets itself, its query() taking no string', () => {
+    const bare: Client & Record<string, unknown> = { query: async () => ({ rows: [], command: 'SELECT' }), release() {} };
+    // @ts-expect-error the index signature gives no transaction marker
+    void db.serializable(bare, async () => 1);
     void db.serializable(indexed, c => db.readCommitted(c, async inner => { expectTypeOf(inner).toEqualTypeOf<db.TxnClientLike<IndexedClient, db.IsolationLevel.Serializable>>(); }));
     // @ts-expect-error its query() takes pg's query object, not a string
     void db.serializable(indexed, c => db.readCommitted(c, inner => inner.query('SELECT 1')));
@@ -254,7 +258,6 @@ describe('a nested call on another driver’s client (#702)', () => {
   });
 
   test('a pool with client methods and a plain pg client can both start a fresh transaction', () => {
-    type Client = { query(q: db.SQLQuery): Promise<{ rows: any[]; command: string }>; release(): void };
     type Serial = db.TxnClientLike<Client, db.IsolationLevel.Serializable>;
     type Pool = Client & db.PoolLike<Client>;
     // @ts-expect-error the pool has connect() even though it also has query() and release()
@@ -264,6 +267,11 @@ describe('a nested call on another driver’s client (#702)', () => {
     void level;
     // @ts-expect-error choosing Serial explicitly cannot give a plain pg client an outer transaction
     void db.readCommitted<db.IsolationLevel.Serializable, Client, Serial>(plain, async c => c._zapatos!.isolationLevel);
+    // Explicit Serial asserts the outer level. A pool passed through this helper starts a READ COMMITTED transaction.
+    const readAsSerial = <C extends Client>(source: C) =>
+      db.readCommitted<db.IsolationLevel.Serializable, Client, Serial>(source, async c => c._zapatos!.isolationLevel);
+    const throughPool = (p: Pool) => readAsSerial(p);
+    expectTypeOf(throughPool).returns.toEqualTypeOf<Promise<db.IsolationLevel.Serializable>>();
     const nested = (c: Serial) => db.readCommitted(c, async inner => inner._zapatos!.isolationLevel);
     expectTypeOf(nested).returns.resolves.toEqualTypeOf<db.IsolationLevel.Serializable>();
   });
