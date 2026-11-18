@@ -153,6 +153,7 @@ function resultOf(raw: RawResult): PostgresJsResult {
  * ends it
  */
 export function asPool(sql: PostgresJsSql): PostgresJsPool {
+  if (typeof sql.reserve !== 'function') throw new Error('asPool() needs a postgres.js sql with reserve(), for transaction() to take a connection: give it the sql that postgres() returns, not a transaction\'s nor a reserved connection\'s');
   const transform = sql.options?.transform;
   if (transform?.column?.from || transform?.row?.from) throw new Error('asPool() needs a postgres.js sql with no column or row transform: pgcast reads the columns under the names Postgres gives them. Give it a postgres() of its own, without `transform`');
 
