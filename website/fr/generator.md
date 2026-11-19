@@ -55,7 +55,7 @@ Puis elle se termine par la cause :
 | JSON invalide | le message de `JSON.parse`, qui dépend de l’entrée et de Node : sur Node 22, `Unexpected end of JSON input` pour un fichier vide, `No number after minus sign in JSON at position 1 (line 1 column 2)` pour `-x`, `Expected double-quoted property name in JSON at position 15 (line 1 column 16)` pour une virgule finale |
 | une variable n’est pas définie | `Environment variable 'DATABASE_URL' is not set` |
 
-Si la connexion ou une requête échoue, la CLI affiche `*** error <n> ***` et l’erreur sur la sortie standard, puis quitte avec le code 1. Sous ses deux noms, la CLI impose [`rejectOnQueryError`](#generate.rejectOnQueryError) à `false` quelles que soient les valeurs du fichier de configuration et de l’argument JSON, y compris avec `--check`.
+Si la connexion ou une requête échoue, la CLI affiche `*** error <n> ***` et l’erreur sur la sortie standard, puis quitte avec le code 1. Les deux commandes, `pgcast` et `zapatos`, fixent [`rejectOnQueryError`](#generate.rejectOnQueryError) à `false`, quels que soient le fichier de configuration et l’argument JSON, y compris avec `--check`.
 
 ### Variables d’environnement {#environment-variables}
 
@@ -137,7 +137,7 @@ await generate({
 
 - Il ouvre son propre `pg.Pool` sur `config.db`, et le ferme avant de se résoudre.
 - Il n’envoie que des `SELECT`, sur `information_schema` et `pg_catalog` : un pour les relations de chaque schéma, un pour ses enums, puis deux par relation, ses colonnes et ses index uniques, et un pour les enums de chaque autre schéma d’où vient le type d’une colonne (`pg_catalog` compris).
-- Si la connexion ou une requête échoue, la promesse est rejetée avant toute écriture. Vous pouvez intercepter l’erreur d’origine de `pg` ou régler [`rejectOnQueryError: false`](#generate.rejectOnQueryError) pour conserver l’arrêt de la 6.x.
+- Si la connexion ou une requête échoue, la promesse est rejetée avant toute écriture. Vous pouvez intercepter l’erreur d’origine de `pg` ou régler [`rejectOnQueryError: false`](#generate.rejectOnQueryError) pour que le processus s’arrête comme en 6.x.
 - Sur les autres erreurs, la promesse est rejetée : une écriture qui échoue (`ENOTDIR: not a directory, mkdir 'afile/zapatos'` quand `outDir` est un fichier), une [règle](#generate.schemas) mal formée.
 - À l’exécution, une clé qu’il ne connaît pas est ignorée : un ancien `srcMode`, un `outdir` mal orthographié. En TypeScript, un littéral objet qui en contient une ne compile pas (TS2353, ou TS2561 avec une suggestion pour un nom proche comme `outdir`).
 - `zapatos/generate` exporte aussi `Config` et les fonctions qui composent `generate()` (`tsForConfig()`, `definitionForRelationInSchema()` et d’autres), non documentées ici.
@@ -160,7 +160,7 @@ Toutes les options sont facultatives. Une option donnée remplace entièrement s
 | [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas) | `false` | le type d’un enum d’un autre schéma |
 | [`enumOrder`](#generate.enumOrder) | `"alphabetical"` | l’ordre des labels d’un enum |
 | [`moduleNames`](#generate.moduleNames) | `"zapatos"` | les noms de modules que déclarent et importent les fichiers, et leur dossier |
-| [`rejectOnQueryError`](#generate.rejectOnQueryError) | `true` | si, quand une requête échoue, la promesse est rejetée ou le processus s’arrête |
+| [`rejectOnQueryError`](#generate.rejectOnQueryError) | `true` | en cas d’échec d’une requête, rejet de la promesse ou arrêt du processus |
 | [`uniqueIndexConstraintsOnly`](#generate.uniqueIndexConstraintsOnly) | `false` | les noms de l’`UniqueIndex` de chaque relation |
 | [`domainsTypedByContext`](#generate.domainsTypedByContext) | `false` | le type d’un domaine sur `bigint`, `numeric`, `bytea`, `money` ou une date, ou sur un tableau de l’un d’eux, hors de `Selectable`, et d’un domaine sur un domaine ou d’un tableau d’un domaine |
 | [`enumArraysTypedAsText`](#generate.enumArraysTypedAsText) | aucune : un tableau, avec une note | le type `Selectable` d’un tableau d’un enum |
@@ -396,11 +396,11 @@ import type * as s from 'pgcast/schema';
 
 ### `rejectOnQueryError` {#generate.rejectOnQueryError}
 
-`boolean`, par défaut `true` depuis la 7.0. Si l’option est omise, vaut `null` en JSON ou vaut `true`, une erreur de connexion ou de requête rejette la promesse de `generate()`, de `tsForConfig()` ou de [`check()`](#export-check) avec l’erreur d’origine. Le générateur n’affiche ni erreur ni note de migration et n’écrit aucun fichier.
+`boolean`, par défaut `true` à partir de la 7.0. Si l’option est omise ou si elle vaut `null` en JSON ou `true`, tout échec de connexion ou de requête entraîne le rejet de la promesse de `generate()`, de `tsForConfig()` ou de [`check()`](#export-check) avec l’erreur d’origine. Le générateur n’affiche ni erreur ni note de migration et n’écrit aucun fichier.
 
-Réglez `rejectOnQueryError: false` pour afficher `*** error <n> ***` et l’erreur sur la sortie standard, puis arrêter le processus avec le code 1 avant que la promesse se résolve ou soit rejetée. Cette option est permanente et [la CLI](#cli) l’utilise.
+Réglez `rejectOnQueryError: false` pour afficher `*** error <n> ***` et l’erreur sur la sortie standard, puis arrêter le processus avec le code 1 avant que la promesse se résolve ou soit rejetée. Cette valeur reste disponible et c’est celle qu’utilise [la CLI](#cli).
 
-Si l’échec de la génération doit faire échouer le script, relancez l’erreur ou fixez le code de sortie dans votre gestionnaire d’erreurs.
+Si votre script doit se terminer en erreur en cas d’échec de la génération, relancez l’erreur ou fixez le code de sortie dans votre gestionnaire d’erreurs.
 
 ```ts twoslash
 import { generate } from 'zapatos/generate';

@@ -324,7 +324,7 @@ La note d’[`enumArraysTypedAsText`](/fr/generator#generate.enumArraysTypedAsTe
 
 La note d’[`intervalsTypedAsObjects`](/fr/generator#generate.intervalsTypedAsObjects) nomme chaque colonne de type `interval` ou `interval[]`, ou d’un domaine sur l’un ou l’autre, que le générateur type par son texte, bien que `pg` renvoie un objet pour une requête à vous. Activez-le et régénérez : `tsc` montre le code qui lisait une telle colonne depuis une requête `sql` comme une chaîne, ce qui ne marchait qu’avec un parser de types à vous. Si vous en avez réglé un, `pg.types.setTypeParser(1186, …)`, écrivez plutôt `false`, qui garde le texte sans note, en 7.0 aussi.
 
-En 6.x, un script qui appelait `generate()` pouvait afficher `PGCAST_DEP006` juste avant de s’arrêter sur une erreur de base de données. En 7.0, la promesse est rejetée et votre bloc `catch` s’exécute. Si le script doit échouer, relancez l’erreur ou fixez `process.exitCode = 1`. Pour conserver l’arrêt immédiat, réglez [`rejectOnQueryError: false`](/fr/generator#generate.rejectOnQueryError). Ce choix reste possible au-delà de la 8.0. La CLI affiche toujours l’erreur et quitte avec le code 1.
+En 6.x, un script qui appelait `generate()` pouvait afficher `PGCAST_DEP006` juste avant de s’arrêter sur une erreur de base de données. En 7.0, la promesse est rejetée et votre bloc `catch` s’exécute. Si le script doit échouer, relancez l’erreur ou utilisez `process.exitCode = 1`. Pour conserver l’arrêt immédiat, réglez [`rejectOnQueryError: false`](/fr/generator#generate.rejectOnQueryError). Ce choix reste possible au-delà de la 8.0. La CLI affiche toujours l’erreur et quitte avec le code 1.
 
 ## Revenir en arrière {#go-back}
 
