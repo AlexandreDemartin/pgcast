@@ -28,6 +28,7 @@ When you run `npx pgcast`, the generator asks those tables a handful of question
 | its `COMMENT ON COLUMN` | `pg_description` | the JSDoc your editor shows for the column, with its Postgres type and default |
 | each enum and its labels | `pg_enum` | a union of strings, and the tuple `every.<name>` |
 | each unique index, and the constraint it belongs to | `pg_indexes`, `pg_namespace`, `pg_class`, `pg_index`, `pg_constraint` | `UniqueIndex`, the names [`constraint()`](/insert#constraint) takes |
+| with [`constraintNames`](/generator#generate.constraintNames), each relation's constraint and unique index names | `pg_constraint` and the unique indexes above | the relation's `Constraint` type |
 | with [`domainsTypedAsUnions`](/generator#generate.domainsTypedAsUnions), each domain over `text`, its `CHECK` and its `COMMENT ON DOMAIN` | `pg_type`, `pg_constraint`, `pg_description` | the union of the values the `CHECK` lists, and the tuple `every.<name>` |
 
 With the 7.0 defaults, the generator reads each enum in its own schema and the first label of `every.crew_job` is `director`, as in `CREATE TYPE crew_job`. See [`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas) and [`enumOrder`](/generator#generate.enumOrder).
@@ -38,7 +39,7 @@ And what the catalog can't see, such as a column a trigger fills in, you say in 
 
 ### What the generator doesn't read
 
-The generator reads names, types, nullability and defaults. Postgres also keeps each foreign key and `CHECK` constraint, in `pg_constraint`, but Zapatos 6.6.1 never read that table, nor the SQL inside views and functions. pgcast reads it to tell a unique index that `ON CONFLICT ON CONSTRAINT` takes from one it refuses ([`uniqueIndexConstraintsOnly`](/generator#generate.uniqueIndexConstraintsOnly)), and, with [`domainsTypedAsUnions`](/generator#generate.domainsTypedAsUnions), the values a domain's `CHECK` lists.
+The generator reads names, types, nullability and defaults. Postgres stores foreign keys and `CHECK` constraints in `pg_constraint`, but Zapatos 6.6.1 never read that table or the SQL inside views and functions. pgcast reads it for the indexes that `ON CONFLICT ON CONSTRAINT` accepts ([`uniqueIndexConstraintsOnly`](/generator#generate.uniqueIndexConstraintsOnly)), the values listed by a domain's `CHECK` ([`domainsTypedAsUnions`](/generator#generate.domainsTypedAsUnions)) and the constraint names of a relation ([`constraintNames`](/generator#generate.constraintNames)).
 
 So `ratings.stars`, `CHECK (stars BETWEEN 1 AND 5)`, is a `number`; a `seat_label` matching `'^[A-Z][0-9]{1,2}$'` is a `string`; and nothing tells TypeScript that `films.studio_id` points at a studio.
 

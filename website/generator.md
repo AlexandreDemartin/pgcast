@@ -446,13 +446,13 @@ CREATE UNIQUE INDEX festival_entries_live_idx ON festival_entries (film_id) WHER
 
 From 7.1.0. Set `constraintNames` to `true` to generate a `Constraint` type in each relation's namespace. It lists the names of its primary keys, unique constraints, foreign keys, checks, exclusion constraints and all its unique indexes. For the table above, `festival_entries.Constraint` includes both `festival_entries_slot_key` and `festival_entries_live_idx` with either setting of `uniqueIndexConstraintsOnly`.
 
-The type lists the catalogue names whether or not Postgres enforces them. A trigger or function can report a name outside the type, so check `err.table` and `err.constraint`. A relation with no matching names gets `never`.
+The type lists the catalogue names whether or not Postgres enforces them. A trigger or function can report a name outside the type. A relation with no matching names gets `never`.
 
-Each partition or inheritance child gets its own names, including inherited checks. When a write through a partitioned table fails in a partition, Postgres reports the partition, so compare with its `Constraint`.
+Check `err.constraint` against the names in `Constraint` for `err.schema` and `err.table`. Each partition or inheritance child gets its own names, including inherited checks. A routed write that violates a partition's constraint reports that partition. A delete refused by a foreign key reports the referencing table.
 
 Table `NOT NULL` constraints are excluded. For a not-null violation on a table's column, Postgres reports the column. Domain checks belong to the domain, and a domain's `NOT NULL` violation reports the domain in `err.dataType`.
 
-If the generator includes a relation named `every` from a schema with an enum named `Constraint`, both declare `every.Constraint`: exclude that relation, leave the option off for that schema or rename one of them.
+In a schema with a relation named `every`, an enum named `Constraint` or a domain of that name generated as a union also declares `every.Constraint`. The option applies to the whole run. To keep it on, exclude the relation or rename either object.
 
 The extra catalogue query and declaration are off unless the merged configuration (file, then JSON argument) sets `constraintNames` to `true`. A JSON `null` in the argument turns a file's `true` off.
 
