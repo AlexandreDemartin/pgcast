@@ -1,5 +1,5 @@
 ---
-english: b0a46bbf7f45
+english: d58a8c07ca6c
 description: "Ce que zapatos/db vous laisse régler à l’exécution : setConfig() et chaque option de Config, les écouteurs, les opt-ins et leurs codes d’avertissement."
 ---
 
@@ -442,7 +442,7 @@ En 6.x, [`undefinedMeansMissing`](#Config.undefinedMeansMissing), [`upsertRequir
 
 Un opt-in n’a pas d’avertissement et ne devient pas le comportement par défaut en 7.0 : [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow), puisque la lecture de `selectExactlyOne()` par la 6.6.1, au moins une ligne, est une lecture que Zapatos documente.
 
-Le générateur a ses propres opt-ins : [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext), [`enumArraysTypedAsText`](/fr/generator#generate.enumArraysTypedAsText) et [`intervalsTypedAsObjects`](/fr/generator#generate.intervalsTypedAsObjects). Pour les anciens comportements, l’écouteur [`warningListener`](/fr/generator#generate.warningListener) reçoit des notes une fois par exécution. Ces notes sont distinctes des `DeprecationWarning`. Ces opt-ins seront eux aussi activés par défaut en 7.0. L’option [`domainsTypedAsUnions`](/fr/generator#generate.domainsTypedAsUnions) reste désactivée en 7.0 et ne donne lieu à aucune note. Depuis la 7.0, le générateur cherche par défaut chaque enum dans son propre schéma ([`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas)) et écrit ses labels dans l’ordre de déclaration ([`enumOrder`](/fr/generator#generate.enumOrder)), sans note de migration. Il active aussi [`uniqueIndexConstraintsOnly`](/fr/generator#generate.uniqueIndexConstraintsOnly) par défaut, sans note de migration.
+Depuis la 7.0, le générateur active [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext), [`enumArraysTypedAsText`](/fr/generator#generate.enumArraysTypedAsText) et [`intervalsTypedAsObjects`](/fr/generator#generate.intervalsTypedAsObjects) par défaut, sans note de migration. L’option [`domainsTypedAsUnions`](/fr/generator#generate.domainsTypedAsUnions) reste désactivée en 7.0 et ne donne lieu à aucune note. Le générateur cherche par défaut chaque enum dans son propre schéma ([`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas)) et écrit ses labels dans l’ordre de déclaration ([`enumOrder`](/fr/generator#generate.enumOrder)), sans note de migration. Il active également [`uniqueIndexConstraintsOnly`](/fr/generator#generate.uniqueIndexConstraintsOnly) par défaut, sans note de migration.
 
 Node émet chaque avertissement de migration une fois par processus et indique le nom de l’option dans le message. En 6.x, une réponse `ROLLBACK` à un `COMMIT` produisait l’avertissement ci-dessous sur `stderr`.
 
@@ -483,8 +483,8 @@ process.on('warning', (warning: Error & { code?: string }) => {
 - Une colonne tableau prend le tableau du type de son élément : `int8[]` donne `Int8String[]` dans un `Selectable`.
 - Avec l’option [`customJSONParsingForLargeNumbers`](/fr/generator#generate.customJSONParsingForLargeNumbers) du générateur, `int8` et `numeric` sont `number | Int8String` et `number | NumericString` dans un `JSONSelectable` ([`enableCustomJSONParsingForLargeNumbers()`](#enableCustomJSONParsingForLargeNumbers)).
 - Les raccourcis renvoient des `JSONSelectable`. Un `Selectable` est ce que `pg` renvoie pour un simple `SELECT` de la ligne.
-- Un domaine sur l’un de ces types prend le type de son placeholder, celui du `Selectable`, dans chaque interface, sauf si l’option [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext) du générateur est activée ([`DomainInContext`](#DomainInContext)).
-- Un `interval` est une `string` dans chaque interface, sauf si l’option [`intervalsTypedAsObjects`](/fr/generator#generate.intervalsTypedAsObjects) du générateur est activée : alors [`PostgresInterval`](#PostgresInterval) dans un `Selectable`, et `string | PostgresInterval` dans une écriture.
+- Un domaine suit son type de base dans chaque contexte tant que son placeholder conserve le type généré ([`DomainInContext`](#DomainInContext)). Avec [`domainsTypedByContext: false`](/fr/generator#generate.domainsTypedByContext), le type vient du placeholder. Pour un domaine portant directement sur un tableau d’enums, il faut aussi `enumArraysTypedAsText: false` pour utiliser ce type dans les lignes brutes. Pour un domaine sur un intervalle, `intervalsTypedAsObjects` détermine le type d’un nouveau placeholder.
+- Un `interval` donne un [`PostgresInterval`](#PostgresInterval) dans `Selectable`, une `string` en JSON et `string | PostgresInterval` dans une écriture. Avec [`intervalsTypedAsObjects: false`](/fr/generator#generate.intervalsTypedAsObjects), les cinq interfaces utilisent `string`.
 
 Chaque type vérifie la forme d’une chaîne, pas sa valeur : `'2030-13-45'` est un `DateString`.
 
@@ -503,7 +503,7 @@ type DomainInContext<Custom, Generated, InContext> =
   (<T>() => T extends Custom ? 1 : 2) extends (<T>() => T extends Generated ? 1 : 2) ? InContext : Custom
 ```
 
-Le type qu’écrit l’option [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext) du générateur pour une colonne d’un domaine, dans `JSONSelectable`, `Whereable`, `Insertable` et `Updatable`, et aussi dans `Selectable` pour un domaine sur un domaine ou un tableau d’un domaine : `InContext`, le type de son type de base dans ce contexte, tant que le placeholder `Custom` vaut encore exactement `Generated`, le type qu’y a écrit le générateur ; sinon `Custom`, comme sans l’option.
+L’option [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext) du générateur utilise ce type pour les colonnes de type domaine dans `JSONSelectable`, `Whereable`, `Insertable` et `Updatable`, ainsi que dans `Selectable` pour un domaine imbriqué ou un tableau de domaines. Tant que le placeholder `Custom` correspond exactement à `Generated`, le type qu’y a écrit le générateur, le résultat est `InContext`, le type de base du domaine dans ce contexte. Sinon, le résultat est `Custom`, comme avec `domainsTypedByContext: false`.
 
 - `DomainInContext<db.Int8String, db.Int8String, number>` est `number` : un placeholder laissé tel que généré.
 - `DomainInContext<number | db.Int8String, db.Int8String, number>` est `number | db.Int8String` : un placeholder modifié garde son type, dans chaque contexte.

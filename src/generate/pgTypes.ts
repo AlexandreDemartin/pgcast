@@ -70,7 +70,7 @@ const baseTsTypeForBasePgType = (pgType: string, enums: EnumData, context: TypeC
     case "daterange":  // ditto
       return 'db.DateRangeString';
     case 'interval':  // format depends on IntervalStyle, hence only string-typed; but pg parses it, into an object
-      return !config.intervalsTypedAsObjects || context === 'JSONSelectable' ? 'string' :
+      return !(config.intervalsTypedAsObjects ?? true) || context === 'JSONSelectable' ? 'string' :
         context === 'Selectable' ? 'db.PostgresInterval' : '(string | db.PostgresInterval)';
     case 'bpchar':
     case 'char':
@@ -99,7 +99,8 @@ const baseTsTypeForBasePgType = (pgType: string, enums: EnumData, context: TypeC
 };
 
 /**
- * The TypeScript type of a Postgres type in one context, or `'any'` for a custom type.
+ * Maps a Postgres type name in one context, or returns `'any'` for a custom type.
+ * Enum arrays map to arrays. `definitionForRelationInSchema()` applies `enumArraysTypedAsText` to raw reads.
  * @param inlineEnums An enum of `enums` is typed as the union of its values, rather than by its name: for an
  * enum of another schema, whose name is not in scope.
  */

@@ -157,89 +157,6 @@ const warnAboutSharedCustomTypeNames = (origins: CustomTypeOrigins, config: Comp
 };
 
 /**
- * Without `domainsTypedByContext`, note the columns it would type by context, once per run: a domain over a type
- * typed by context, such as int8, takes its placeholder's one type in all five interfaces, which, as generated, is what pg returns.
- */
-const warnAboutDomainsNotByContext = (columns: string[], config: CompleteConfig) => {
-  if (columns.length === 0) return;
-
-  const
-    warn = config.warningListener === true ? console.log : config.warningListener || (() => void 0),
-    sorted = [...columns].sort(),
-    one = sorted.length === 1,
-    them = one ? 'it' : 'them',
-    list = one ? sorted[0] : sorted.slice(0, -1).join(', ') + ' and ' + sorted[sorted.length - 1];
-
-  warn(`Note: ${list} ${one ? 'has a domain' : 'have domains'} over a type typed by context, such as int8 or date: ` +
-    `as generated, ${one ? 'its placeholder types it' : 'their placeholders type them'} in all five interfaces as pg ` +
-    `returns ${them}, though a write takes more and, except for money, the shortcuts' JSON gives another type. ` +
-    `Set domainsTypedByContext: true to type ${them} by context while ` +
-    `${one ? 'its placeholder holds' : 'their placeholders hold'} what the generator wrote for ${them}; ` +
-    `it will be the default in pgcast 7.0.`);
-};
-
-/**
- * Without `domainsTypedByContext`, note the columns it would type by the base type under their domains, once per run:
- * a domain over a domain, or an array of a domain, has a placeholder that holds `any`.
- */
-const warnAboutDomainsUnderDomains = (columns: string[], config: CompleteConfig) => {
-  if (columns.length === 0) return;
-
-  const
-    warn = config.warningListener === true ? console.log : config.warningListener || (() => void 0),
-    sorted = [...columns].sort(),
-    one = sorted.length === 1,
-    them = one ? 'it' : 'them',
-    list = one ? sorted[0] : sorted.slice(0, -1).join(', ') + ' and ' + sorted[sorted.length - 1];
-
-  warn(`Note: ${list} ${one ? 'has a domain over a domain, or an array' : 'have domains over a domain, or arrays'} of a ` +
-    `domain: as generated, ${one ? 'its placeholder types it' : 'their placeholders type them'} as \`any\`. ` +
-    `Set domainsTypedByContext: true to type ${them} by the base type of the innermost domain while ` +
-    `${one ? 'its placeholder holds' : 'their placeholders hold'} \`any\`; it will be the default in pgcast 7.0.`);
-};
-
-/**
- * With `enumArraysTypedAsText` left out, note the columns it would type as a string in `Selectable`, once per run:
- * `false` keeps the array with no note, for a project that parses it with `pg.types.setTypeParser`.
- */
-const warnAboutEnumArraysNotAsText = (columns: string[], config: CompleteConfig) => {
-  if (columns.length === 0) return;
-
-  const
-    warn = config.warningListener === true ? console.log : config.warningListener || (() => void 0),
-    sorted = [...columns].sort(),
-    one = sorted.length === 1,
-    them = one ? 'it' : 'them',
-    list = one ? sorted[0] : sorted.slice(0, -1).join(', ') + ' and ' + sorted[sorted.length - 1];
-
-  warn(`Note: ${list} ${one ? 'is an array' : 'are arrays'} of an enum, which pg returns as ${one ? 'its' : 'their'} ` +
-    `text, such as '{a,b}', though Selectable types ${them} as ${one ? 'an array' : 'arrays'}. ` +
-    `Set enumArraysTypedAsText: true to type ${them} as ${one ? 'a string' : 'strings'} there, or false to keep ` +
-    `the ${one ? 'array' : 'arrays'} if pg.types.setTypeParser parses ${them}; true will be the default in pgcast 7.0.`);
-};
-
-/**
- * With `intervalsTypedAsObjects` left out, note the columns it would type otherwise, once per run: an interval is typed
- * as its text, though pg parses it into an object for a query of your own. `false` keeps the text with no note.
- */
-const warnAboutIntervalsAsText = (columns: string[], config: CompleteConfig) => {
-  if (columns.length === 0) return;
-
-  const
-    warn = config.warningListener === true ? console.log : config.warningListener || (() => void 0),
-    sorted = [...columns].sort(),
-    one = sorted.length === 1,
-    them = one ? 'it' : 'them',
-    list = one ? sorted[0] : sorted.slice(0, -1).join(', ') + ' and ' + sorted[sorted.length - 1];
-
-  warn(`Note: ${list} ${one ? 'is' : 'are'} of interval or of a type that wraps it in arrays or domains: as generated, ` +
-    `${one ? 'it is typed as its' : 'they are typed as their'} text, though pg's default type ` +
-    `parser returns an interval from a query of your own as an object, a PostgresInterval. Set intervalsTypedAsObjects: ` +
-    `true to type ${them} as pg parses ${them}; it will be the default in pgcast 7.0. Set it to false to keep the text, ` +
-    `if a type parser of yours returns it.`);
-};
-
-/**
  * Warn about each `include` entry that names no relation of its schema: it generates nothing.
  * `information_schema.tables` lists only the tables and views the connecting role has a privilege on.
  */
@@ -335,12 +252,8 @@ const tsForQueries = async (config: CompleteConfig, queryFn: (q: pg.QueryConfig)
     enumsBySchema: Record<string, Promise<EnumData>> = Object.create(null),
     enumsForSchema = (schema: string) => enumsBySchema[schema] ??=
       enumOrdersForSchema(schema, queryFn).then(orders => orders[enumOrder]),
-    domainsNotByContext: string[] = [],
     domainRootsOnce: Promise<DomainRoots>[] = [],
     domainRoots = () => domainRootsOnce[0] ??= domainRootsInDatabase(queryFn),
-    domainsUnderDomains: string[] = [],
-    enumArraysNotAsText: [string, string | null][] = [],
-    intervalsAsText: string[] = [],
     schemaNames = Object.keys(schemas),
     unions = config.domainsTypedAsUnions ?? false ? await domainUnionsInDatabase(schemaNames, queryFn) : [],
     schemaData = (await Promise.all(
@@ -359,8 +272,8 @@ const tsForQueries = async (config: CompleteConfig, queryFn: (q: pg.QueryConfig)
           enums = await enumsForSchema(schema),
           tableDefs = await Promise.all(tables.map(async table =>
             definitionForRelationInSchema(table, schema, enums, customTypes, config, queryFn, customTypeOrigins,
-              enumsForSchema, undefined, customTypeImports, undefined, domainsNotByContext,
-              domainRoots, domainsUnderDomains, enumArraysNotAsText, intervalsAsText, customTypeHolders))),
+              enumsForSchema, undefined, customTypeImports, undefined, undefined,
+              domainRoots, undefined, undefined, undefined, customTypeHolders))),
           schemaIsUnprefixed = schema === config.unprefixedSchema,
           schemaUnions = unions.filter(union => union.schema === schema),
           none = '/* (none) */',
@@ -429,12 +342,6 @@ const tsForQueries = async (config: CompleteConfig, queryFn: (q: pg.QueryConfig)
   // as 6.10.0 wrote them: with the import of a placeholder's own name, which a type of zapatos/schema may take too
   warnAboutPlaceholdersOnDisk(unionPlaceholders, customTypeSourceFiles, config,
     sourceFilesForCustomTypes(customTypes, names, customTypeImports, new Set()));
-  warnAboutDomainsNotByContext(domainsNotByContext, config);
-  warnAboutDomainsUnderDomains(domainsUnderDomains, config);
-  // a domain whose placeholder ends `any` stays `any` with the key (db.DomainInContext): no column of it is noted
-  warnAboutEnumArraysNotAsText(enumArraysNotAsText
-    .filter(([, customType]) => customType === null || customTypes[customType] !== 'any').map(([column]) => column), config);
-  warnAboutIntervalsAsText(intervalsAsText, config);
 
   return { ts, customTypeSourceFiles };
 };

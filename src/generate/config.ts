@@ -35,12 +35,9 @@ export interface OptionalConfig {
   // optional for a CompleteConfig written for 6.6.1; the CLI sets false
   rejectOnQueryError?: boolean;  // reject with the query or connection error by default; false prints it and exits
   uniqueIndexConstraintsOnly?: boolean;  // UniqueIndex lists usable ON CONFLICT ON CONSTRAINT arbiters by default; false lists all unique indexes
-  // optional too; read it with ?? false, deprecated: true in 7.0
-  domainsTypedByContext?: boolean;  // a domain over int8, numeric, bytea, money or a date, or an array of one, is typed by context, as its base type is, while its placeholder holds what the generator wrote; a domain over a domain, or an array of a domain, by its innermost base type
-  // optional too; read it with ?? false, and with == null for the note (left out, or null from JSON); deprecated: true in 7.0
-  enumArraysTypedAsText?: boolean;  // an array of an enum, or a domain over one, is string in Selectable: pg returns it as its text; false keeps the array, for a parser set with pg.types.setTypeParser
-  // optional too; read it with ?? false, and with == null for the note (left out, or null from JSON); deprecated: true in 7.0, false kept
-  intervalsTypedAsObjects?: boolean;  // an interval is typed in Selectable as pg's default type parser returns it, a db.PostgresInterval, which a write takes back
+  domainsTypedByContext?: boolean;  // use the base type by context when the placeholder matches the type generated with these settings
+  enumArraysTypedAsText?: boolean;  // pg returns an enum array as text in Selectable by default; false keeps the label array for a custom parser
+  intervalsTypedAsObjects?: boolean;  // pg returns a PostgresInterval in Selectable by default; false keeps string for a custom parser
   // optional too; read it with ?? false
   domainsTypedAsUnions?: boolean;  // a domain over text whose valid CHECK lists its values is declared as their union, which a new placeholder names
 }
