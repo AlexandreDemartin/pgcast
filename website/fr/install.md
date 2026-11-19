@@ -1,5 +1,5 @@
 ---
-english: 0326614b3f3b
+english: 09ff08fe61ba
 ---
 
 # Installation
@@ -77,11 +77,11 @@ pnpm add pgcast@npm:@pgcast/pgcast pg
 ```
 
 ```sh [yarn]
-yarn add pgcast@npm:@pgcast/pgcast@^6.7 pg
+yarn add pgcast@npm:@pgcast/pgcast@^7 pg
 ```
 
 ```sh [bun]
-bun add pgcast@npm:@pgcast/pgcast@^6.7 pg
+bun add pgcast@npm:@pgcast/pgcast@^7 pg
 ```
 
 :::
