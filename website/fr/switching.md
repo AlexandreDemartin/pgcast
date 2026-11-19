@@ -12,7 +12,7 @@ Passez un projet de Zapatos 6.6.1 à pgcast : changez une ligne de `package.jso
 
 - Une ligne de `package.json` remplace le paquet ; imports, configuration et fichiers générés restent tels quels.
 - Quelques appels donnent d’autres lignes, ou lèvent une erreur : [l’étape 4](#find-the-calls-whose-result-changes) les liste, avec ce qu’il faut faire.
-- Les comportements sur lesquels votre code peut compter à l’exécution sont conservés, avec un avertissement, jusqu’à ce que vous activiez leur opt-in. Les [types des conditions sur tableaux en 7.0](#array-condition-types) changent sans avertissement.
+- À l’exécution, pgcast conserve les comportements sur lesquels votre code peut compter et émet un avertissement jusqu’à ce que vous activiez l’opt-in correspondant. Les [types des conditions sur tableaux en 7.0](#array-condition-types) changent sans avertissement.
 
 </AtAGlance>
 
@@ -107,12 +107,12 @@ Pour comparer avec du SQL, donnez un fragment `sql` comme valeur, `db.self` pour
 
 Pour `arrayContains()`, `arrayContainedIn()` et `arrayOverlaps()` (`c = db.conditions`) :
 
-- Un mock de la 6.6.1 doit implémenter les deux surcharges, pour une colonne parente et pour un tableau.
-- Remplacez `.map(c.arrayContains)` par `.map(xs => c.arrayContains(xs))` pour conserver le type des éléments. Un `c.arrayContains([1])` stocké dans une variable a pour contrainte `number[]`.
-- Omettez l’argument de type dans `c.arrayContains(db.parent('genres'))`. Pour une union d’un tableau et d’une colonne parente, affinez le type avant l’appel.
+- Si vous aviez un mock en 6.6.1, implémentez les deux surcharges, celle qui accepte une colonne parente et celle qui accepte un tableau.
+- Remplacez `.map(c.arrayContains)` par `.map(xs => c.arrayContains(xs))` pour conserver le type des éléments. Si vous stockez le résultat de `c.arrayContains([1])` dans une variable, la contrainte du fragment est `number[]`.
+- Omettez l’argument de type dans `c.arrayContains(db.parent('genres'))`. Si le type de l’opérande autorise un tableau ou une colonne parente, affinez-le avant l’appel.
 - Pour inclure les colonnes parentes dans le type dérivé de l’opérande, utilisez `Parameters<typeof c.arrayContains>[0] | db.ParentColumn`.
-- Pour `xs: T[]` avec `T extends number[]`, laissez TypeScript inférer le type de retour de la fonction. L’ancienne annotation `db.SQLFragment<boolean | null, T>` est refusée.
-- Pour un tableau d’enum avec TypeScript 4.1 ou 5.9, utilisez `['director'] as const` ou un tableau de type `s.crew_job[]`.
+- Si votre fonction appelle la condition avec `xs: T[]` et `T extends number[]`, laissez TypeScript inférer son type de retour. L’ancienne annotation `db.SQLFragment<boolean | null, T>` est refusée.
+- Avec TypeScript 4.1 ou 5.9, passez les labels d’un enum sous la forme `['director'] as const` ou dans un tableau de type `s.crew_job[]`.
 
 ## 4. Trouver les appels dont le résultat change {#find-the-calls-whose-result-changes}
 
