@@ -1,5 +1,5 @@
 ---
-english: e9e8b37c8deb
+english: 66d9f07a6cbf
 ---
 
 # Sécurité
