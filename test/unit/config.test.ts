@@ -73,6 +73,7 @@ describe('setConfig()', () => {
     transactionRequiresIdleClient: false,
     transactionRequiresSatisfyingLevel: false,
     selectExactlyOneChecksForSecondRow: false,
+    aggregatesTypedByColumn: true,
   };
   const changed = {
     transactionAttemptsMax: 2,
@@ -85,6 +86,7 @@ describe('setConfig()', () => {
     transactionRequiresIdleClient: true,
     transactionRequiresSatisfyingLevel: true,
     selectExactlyOneChecksForSecondRow: true,
+    aggregatesTypedByColumn: false,
   };
 
   it.each([undefined, null])('resets each write option independently with %s', value => {

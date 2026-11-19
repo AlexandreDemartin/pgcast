@@ -334,12 +334,12 @@ describe('selectOne, selectExactlyOne, count', () => {
     expectTypeOf(q.run(pool)).resolves.not.toBeAny();
   });
 
-  test('count, sum: number', () => {
+  test('count gives a number, sum and extrema can be null', () => {
     expectTypeOf(db.count('users', db.all).run(pool)).resolves.toEqualTypeOf<number>();
-    expectTypeOf(db.sum('accounts', db.all, { columns: ['balance'] }).run(pool)).resolves.toEqualTypeOf<number>();
-    // options that can leave no row (#163) give 0 then, which the type already holds
+    expectTypeOf(db.sum('accounts', db.all, { columns: ['balance'] }).run(pool)).resolves.toEqualTypeOf<number | null>();
+    // options that can leave no row (#163) give 0 for count and null for max
     expectTypeOf(db.count('users', db.all, { offset: 1 }).run(pool)).resolves.toEqualTypeOf<number>();
-    expectTypeOf(db.max('accounts', { id: -1 }, { columns: ['balance'], groupBy: 'owner_id' }).run(pool)).resolves.toEqualTypeOf<number>();
+    expectTypeOf(db.max('accounts', { id: -1 }, { columns: ['balance'], groupBy: 'owner_id' }).run(pool)).resolves.toEqualTypeOf<db.NumericString | null>();
   });
 
   test('aggregates: one column, as a literal, a tuple or an array of unknown length', () => {
@@ -347,21 +347,21 @@ describe('selectOne, selectExactlyOne, count', () => {
     const roCols: readonly s.accounts.Column[] = ['balance'];
     const one = ['balance'] as const;
     expectTypeOf(db.count('users', db.all, { columns: ['manager_id'] }).run(pool)).resolves.toEqualTypeOf<number>();
-    expectTypeOf(db.sum('accounts', db.all, { columns: one }).run(pool)).resolves.toEqualTypeOf<number>();
-    expectTypeOf(db.avg('accounts', db.all, { columns: cols }).run(pool)).resolves.toEqualTypeOf<number>();
+    expectTypeOf(db.sum('accounts', db.all, { columns: one }).run(pool)).resolves.toEqualTypeOf<number | null>();
+    expectTypeOf(db.avg('accounts', db.all, { columns: cols }).run(pool)).resolves.toEqualTypeOf<number | null>();
     expectTypeOf(db.max('accounts', db.all, { columns: roCols }).run(pool)).resolves.not.toBeAny();
     // a generic wrapper, and an aggregate picked at run time
     const sumOf = <C extends readonly s.accounts.Column[]>(columns: C) => db.sum('accounts', db.all, { columns });
-    expectTypeOf(sumOf(['balance']).run(pool)).resolves.toEqualTypeOf<number>();
+    expectTypeOf(sumOf(['balance']).run(pool)).resolves.toEqualTypeOf<number | null>();
     const pick = Math.random() > 0.5 ? db.sum : db.count;
-    expectTypeOf(pick('accounts', db.all, { columns: ['balance'] }).run(pool)).resolves.toEqualTypeOf<number>();
+    expectTypeOf(pick('accounts', db.all, { columns: ['balance'] }).run(pool)).resolves.toEqualTypeOf<number | null>();
   });
 
   test('aggregates keep the type of Zapatos 6.6.1: several columns and a passthru lateral compile, and throw at run time', () => {
     // the owner's decision on #34: nothing that compiles under Zapatos 6.6.1 stops compiling
     const n = db.count('accounts', { owner_id: db.parent('id') });
     expectTypeOf(db.count('users', db.all, { columns: ['id', 'mood'] })).toEqualTypeOf<db.SQLFragment<number>>();
-    expectTypeOf(db.sum('accounts', db.all, { columns: ['balance', 'ratio'] as const })).toEqualTypeOf<db.SQLFragment<number>>();
+    expectTypeOf(db.sum('accounts', db.all, { columns: ['balance', 'ratio'] as const })).toEqualTypeOf<db.SQLFragment<number | null>>();
     expectTypeOf(db.count('users', db.all, { lateral: n })).toEqualTypeOf<db.SQLFragment<number>>();
     expectTypeOf(db.count('users', db.all, { lateral: { n } }).run(pool)).resolves.toEqualTypeOf<number>();
   });
@@ -376,11 +376,11 @@ describe('selectOne, selectExactlyOne, count', () => {
     const none: db.SelectOptionsForTable<'users', undefined, db.LateralOption<undefined, undefined>, undefined, never> = {};
     expectTypeOf(db.count('users', db.all, none)).toEqualTypeOf<db.SQLFragment<number>>();
     const balance: db.SelectOptionsForTable<'accounts', db.ColumnsOption<'accounts'>, db.LateralOption<db.ColumnsOption<'accounts'>, undefined>, undefined, never> = { columns: ['balance'] };
-    expectTypeOf(db.sum('accounts', db.all, balance)).toEqualTypeOf<db.SQLFragment<number>>();
+    expectTypeOf(db.sum('accounts', db.all, balance)).toEqualTypeOf<db.SQLFragment<number | null>>();
     // a union holding a two-column tuple, whose value has one
     const oneOrTwo: ['balance'] | ['balance', 'ratio'] = ['balance'];
-    expectTypeOf(db.sum('accounts', db.all, { columns: oneOrTwo })).toEqualTypeOf<db.SQLFragment<number>>();
-    expectTypeOf(db.sum('accounts', db.all, { columns: Math.random() > 0.5 ? ['balance'] : ['balance', 'ratio'] })).toEqualTypeOf<db.SQLFragment<number>>();
+    expectTypeOf(db.sum('accounts', db.all, { columns: oneOrTwo })).toEqualTypeOf<db.SQLFragment<number | null>>();
+    expectTypeOf(db.sum('accounts', db.all, { columns: Math.random() > 0.5 ? ['balance'] : ['balance', 'ratio'] })).toEqualTypeOf<db.SQLFragment<number | null>>();
     // a hand-written signature of 6.6.1's shape
     type Agg661 = <T extends s.Table, C extends db.ColumnsOption<T>, L extends db.LateralOption<C, E>, E extends db.ExtrasOption<T>, A extends string>(
       table: T, where: s.WhereableForTable<T> | db.SQLFragment<any> | db.AllType, options?: db.SelectOptionsForTable<T, C, L, E, A>) => db.SQLFragment<number>;
@@ -389,19 +389,22 @@ describe('selectOne, selectExactlyOne, count', () => {
   });
 
   test('sum, avg, min, max without columns compile as in 6.6.1, and throw at run time', () => {
-    expectTypeOf(db.sum('accounts', db.all)).toEqualTypeOf<db.SQLFragment<number>>();
-    expectTypeOf(db.avg('accounts', db.all, { columns: undefined })).toEqualTypeOf<db.SQLFragment<number>>();
-    expectTypeOf(db.min).toEqualTypeOf<db.NumericAggregateSignatures>();
+    expectTypeOf(db.sum('accounts', db.all)).toEqualTypeOf<db.SQLFragment<number | null>>();
+    expectTypeOf(db.avg('accounts', db.all, { columns: undefined })).toEqualTypeOf<db.SQLFragment<number | null>>();
+    expectTypeOf(db.min).toEqualTypeOf<db.ColumnAggregateSignatures>();
   });
 
-  test('without aggregatesTypedByColumn declared in ConfigTypes, min and max are a number, as in 6.6.1, nested too', () => {
+  test('an empty ConfigTypes gives the column type at top level and its JSON type under a key', () => {
     expectTypeOf<db.ConfigTypes>().toEqualTypeOf<{}>();
-    expectTypeOf(db.min('events', db.all, { columns: ['occurred_on'] }).run(pool)).resolves.toEqualTypeOf<number>();
-    expectTypeOf(db.max('users', db.all, { columns: ['display_name'] })).toEqualTypeOf<db.SQLFragment<number>>();
-    expectTypeOf(db.sum).toEqualTypeOf<db.NumericAggregateSignatures>();
-    expectTypeOf(db.max).toEqualTypeOf<db.NumericAggregateSignatures>();
-    const q = db.selectOne('users', db.all, { lateral: { first: db.min('events', db.all, { columns: ['occurred_on'] }) } });
-    expectTypeOf<NonNullable<Run<typeof q>>['first']>().toEqualTypeOf<number>();
+    const first = db.min('events', db.all, { columns: ['occurred_on'] });
+    expectTypeOf(first.run(pool)).resolves.toEqualTypeOf<Date | null>();
+    expectTypeOf(first.run(pool)).resolves.not.toBeAny();
+    expectTypeOf(db.max('users', db.all, { columns: ['display_name'] }).run(pool)).resolves.toEqualTypeOf<string | null>();
+    expectTypeOf(db.sum).toEqualTypeOf<db.NullableNumericAggregateSignatures>();
+    const q = db.selectOne('users', db.all, { lateral: { first } });
+    expectTypeOf<NonNullable<Run<typeof q>>['first']>().toEqualTypeOf<db.DateString | null>();
+    // @ts-expect-error the default sum can be null
+    db.sum('accounts', db.all, { columns: ['balance'] }).run(pool).then((n): number => n);
   });
 
   test('a single SQL lateral keeps its result annotation under each selector', () => {
@@ -535,12 +538,8 @@ describe('selectRows', () => {
     db.selectRows('users', db.all, { lateral: db.sum('accounts', { owner_id: p }, { columns: ['balance'] }) });
     // @ts-expect-error avg() passed through: pg gives a numeric as a string
     db.selectRows('users', db.all, { lateral: db.avg('accounts', { owner_id: p }, { columns: ['balance'] }) });
-    // @ts-expect-error min() of a number passed through, typed number but not by its column
-    db.selectRows('users', db.all, { lateral: db.min('accounts', { owner_id: p }, { columns: ['ratio'] }) });
-    // @ts-expect-error max() of an int8 passed through: pg gives it as a string
-    db.selectRows('users', db.all, { lateral: db.max('accounts', { owner_id: p }, { columns: ['lifetime_ops'] }) });
-    // @ts-expect-error min() of a date passed through: pg gives a Date
-    db.selectRows('users', db.all, { lateral: db.min('events', db.all, { columns: ['occurred_on'] }) });
+    const first = db.min('events', db.all, { columns: ['occurred_on'] });
+    expectTypeOf(db.selectRows('users', db.all, { lateral: first }).run(pool)).resolves.toEqualTypeOf<(Date | null)[]>();
     // @ts-expect-error a sql template typed number: the type cannot tell it from count()
     db.selectRows('users', db.all, { lateral: db.sql<db.SQL, number>`SELECT 7::int8 AS result` });
     // @ts-expect-error even an int4, which pg parses as a number, has the same fragment type as count()
@@ -1486,8 +1485,8 @@ describe('copy()', () => {
   test('a copy of a shortcut resolves to the shortcut\'s result', () => {
     const row = { email: 'a@b', display_name: 'A' };
     expectTypeOf(db.count('users', db.all).copy().run(pool)).resolves.toEqualTypeOf<number>();
-    expectTypeOf(db.sum('accounts', db.all, { columns: ['balance'] }).copy().run(pool)).resolves.toEqualTypeOf<number>();
-    expectTypeOf(db.max('accounts', db.all, { columns: ['balance'] }).copy().run(pool)).resolves.toEqualTypeOf<number>();
+    expectTypeOf(db.sum('accounts', db.all, { columns: ['balance'] }).copy().run(pool)).resolves.toEqualTypeOf<number | null>();
+    expectTypeOf(db.max('accounts', db.all, { columns: ['balance'] }).copy().run(pool)).resolves.toEqualTypeOf<db.NumericString | null>();
     expectTypeOf(db.select('users', db.all).copy().run(pool)).resolves.toEqualTypeOf<s.users.JSONSelectable[]>();
     expectTypeOf(db.selectOne('users', { id: 1 }).copy().run(pool)).resolves.toEqualTypeOf<s.users.JSONSelectable | undefined>();
     expectTypeOf(db.selectExactlyOne('users', { id: 1 }).copy().run(pool)).resolves.toEqualTypeOf<s.users.JSONSelectable>();

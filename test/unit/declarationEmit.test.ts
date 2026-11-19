@@ -52,9 +52,6 @@ export const tsvectorSpread = { ...(null! as db.conditions.TsvectorColumn) };
 `,
   'nestedResult.ts': `import * as db from 'zapatos/db';
 export const minSpread = { ...db.min('users', db.all, { columns: ['display_name'] }) };
-declare module 'zapatos/db' {
-  interface ConfigTypes { aggregatesTypedByColumn: true }
-}
 `,
 };
 
