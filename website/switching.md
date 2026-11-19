@@ -102,6 +102,16 @@ To compare with SQL, give a `sql` fragment as the value, `db.self` for the colum
 - From 6.11.0, once the schema is regenerated, a table with a column named like a member of `String`, of a type that member fits (`search` typed `any`, as a `tsvector` is, or a `length` number), no longer takes any string as a name in its `SQL` type (2345): `` db.sql<s.films.SQL>`${'titel'}` ``. Zapatos 6.6.1 took the string as a name, `"titel"`, which Postgres refuses when no column has it (42703). For a name known only at run time, check it, then type it as the table's `Column`.
 - From 6.11.0, on such a table, a shortcut's `where`, `select()`'s `having`, `exists()` and `isInSelect()`, and the rows of `insert()`, `upsert()` and `update()`, no longer take a string, a `String` or an array, whatever the schema (2345, 2769): `db.select('films', 'titel')`. Zapatos 6.6.1 ran the string as a column, `WHERE "titel"` (42703 when no column has that name; when it named a boolean column, the query filtered by that column), and sent a string row as its characters, `("0", "1", …)` (42703). Write a Whereable, `{ subtitled: true }`, or a fragment, `` db.sql<s.screenings.SQL>`${'subtitled'}` `` ([#674](https://github.com/AlexandreDemartin/pgcast/issues/674)). On a table whose columns are all optional, one named `length`, `[]`, an array of rows held in a variable, a `readonly` one and an array `as const`, held in a variable or written in the call, given to `insert()` or `upsert()`, are now typed as an array, as they run, not as one row ([#683](https://github.com/AlexandreDemartin/pgcast/issues/683)).
 
+### From 7.0 {#from-7-0}
+
+<div class="stack">
+
+| Your code | Zapatos 6.6.1 and pgcast 6.x | pgcast 7.0 | What to do |
+|---|---|---|---|
+| `db.serializableRO(pool, countSeats)`, where the parameter of `countSeats` is typed `db.TxnClient<db.IsolationLevel.Serializable \| db.IsolationLevel.SerializableRO>` | Compiles | TS2345 under `strictFunctionTypes` (on with `strict`) because TypeScript checks the callback against the wider client type | For `pg`, use [`db.TxnClientForSerializableRO`](/transaction#TxnClientForSerializableRO). For an adapter with client type `C`, use `db.TxnClientLike<C, db.IsolationSatisfying<db.IsolationLevel.SerializableRO>>`. If the helper inspects `_zapatos.isolationLevel`, handle `SerializableRODeferrable` too. Types built on the levels see it too: add the `SerializableRODeferrable` key to a `Record` keyed by `IsolationSatisfying<…>`, widen the client of a handwritten signature, and pass an explicit discriminator where overloads on the ordinary and deferrable client types chose the result, since the two types now coincide. The callbacks of `transaction()`, `savepoint()` and nested calls that keep the client get the wider type too. |
+
+</div>
+
 ## 4. Find the calls whose result changes {#find-the-calls-whose-result-changes}
 
 pgcast fixes, with no option to turn on, what no code could rely on in Zapatos 6.6.1: a call that Postgres or the type refused, that did the opposite of its name, or that let a string splice SQL. A few such calls did run, and now give other rows, or throw.

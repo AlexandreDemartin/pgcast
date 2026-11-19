@@ -1196,7 +1196,7 @@ describe('the client of a transaction at another level', () => {
   it('the levels whose client satisfies another: 25 of the 49 pairs do not', () => {
     expect(pairs).toHaveLength(49);
     expect(pairs.filter(([outer, inner]) => !satisfies(outer, inner))).toHaveLength(25);
-    // SERIALIZABLE, READ ONLY, DEFERRABLE gives every guarantee of the three read-only levels, which IsolationSatisfying leaves it out of
+    // SERIALIZABLE, READ ONLY, DEFERRABLE gives every guarantee of the three other read-only levels
     expect([SRO, RRRO, RCRO].every(inner => satisfies(SROD, inner))).toBe(true);
   });
 

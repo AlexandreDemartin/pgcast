@@ -1,5 +1,5 @@
 ---
-english: d01a991290f6
+english: b2816ae478b4
 ---
 
 # Transactions
@@ -99,7 +99,7 @@ Avec le client d’une transaction que `transaction()` a ouverte, elle n’envoi
 Une seule transaction, les deux sièges ou aucun : `START TRANSACTION ISOLATION LEVEL SERIALIZABLE`<!-- probe: db.serializable(pool, async () => {}) -->, les deux `INSERT`, `COMMIT`.
 
 - Le callback s’exécute au niveau de la transaction extérieure, car Postgres ne peut plus changer le niveau d’isolation une fois la première requête de celle-ci exécutée. Le type ne vérifie pas ce niveau : chaque `TxnClient` est un [`Queryable`](/fr/sql-template#Queryable), donc `db.serializable(txnClient, …)` passe la vérification de types avec un client de `db.readCommitted()`, et son callback s’exécute dans cette transaction `READ COMMITTED`, comme dans Zapatos 6.6.1, avec un avertissement, une fois, `PGCAST_DEP007`.
-- Avec [`transactionRequiresSatisfyingLevel`](/fr/runtime-config#Config.transactionRequiresSatisfyingLevel), quand le niveau extérieur ne vaut pas pour celui demandé ([`IsolationSatisfying`](#IsolationSatisfying)), `transaction()` est rejetée avant d’appeler le callback, et la transaction extérieure est annulée, à moins que son callback n’intercepte l’erreur. Un niveau qui vaut pour celui demandé est transmis, avec ou sans l’option, de même que le client de `db.serializableRODeferrable()` donné à `db.serializableRO()`, `db.repeatableReadRO()` ou `db.readCommittedRO()`, que le type omet, comme dans Zapatos 6.6.1 ([`IsolationSatisfying`](#IsolationSatisfying)).
+- Avec [`transactionRequiresSatisfyingLevel`](/fr/runtime-config#Config.transactionRequiresSatisfyingLevel), si le niveau de la transaction extérieure ne satisfait pas le niveau demandé ([`IsolationSatisfying`](#IsolationSatisfying)), la promesse est rejetée avant l’appel au callback et la transaction extérieure est annulée, à moins que son callback n’intercepte l’erreur. Si le niveau extérieur satisfait le niveau demandé, l’appel transmet le client avec ou sans l’option.
 - Une fonction dont le paramètre est d’un type `TxnClientFor…` est vérifiée : [`IsolationSatisfying`](#IsolationSatisfying).
 - Ce qui marque le client, c’est sa propre propriété `_zapatos` ([`TxnClient`](#TxnClient)).
 - Une transaction que vous avez ouverte vous-même, par un `BEGIN` brut, n’a pas de marque : elle n’est pas transmise ([Votre propre `BEGIN`](#your-own-begin)). Ouvrez la transaction extérieure avec `transaction()`.
@@ -153,7 +153,7 @@ Le SQL de la requête du callback : [`count()`](/fr/select#count).
   Ne donnez jamais le pool à l’appel imbriqué. L’appel ouvre une seconde transaction sur un client du pool. Si le pool n’a qu’une connexion, comme celui de PGlite, il attend indéfiniment que la première transaction libère son client avec `release()`.
 - Un paramètre qui accepte un `pg.Pool` ou le pool d’un autre driver se type `db.PoolLike`, ce qu’est un `pg.Pool` : `(pool: db.PoolLike) => db.serializable(pool, async txnClient => txnClient)`<!-- tsc: export const inAnyPool = …; -->. Typé comme une union, `pg.Pool | typeof showPool`, il donne au callback le client de l’autre driver, alors que celui de `pg` est un `pg.PoolClient`. Si le type est une union entre un client marqué d’un autre driver et un pool, affinez-le avant l’appel, sauf si le client lui-même est compatible avec le paramètre `PoolLike`. Dans ce cas, l’union compile. À l’exécution, un client qui possède sa propre propriété `_zapatos` est transmis au niveau d’isolation de la transaction extérieure. Affinez aussi le type si l’union combine des types de clients distincts, comme dans `db.TxnClientForSerializable | db.TxnClientLike<ShowClient, …>`.
 - En fournissant un argument de type explicite pour le client, comme dans `readCommitted<T, C, Serial>(…)`, vous affirmez son type, comme avec un cast. Si une fonction accepte un client et que vous lui passez en réalité un pool, ce pool ouvre sa propre transaction au niveau d’isolation demandé par l’appel.
-- Les appels de Zapatos 6.6.1 gardent leurs types, client du callback compris. Là où TypeScript lit le premier paramètre comme un type, c’est aussi un `PoolLike`, et deux chemins changent :
+- Depuis la 6.12.0, le premier paramètre accepte aussi un `PoolLike`. Ce changement de type a deux effets.
   - `Parameters<typeof db.serializable>[0]`, ou le premier paramètre tel qu’un `infer` le lit : `.query('SELECT 1')` dessus donne TS2339 ;
   - une fonction fléchée donnée là où `typeof db.serializable` est attendu, `async (_, callback) => callback(txnClient)`, donne TS2345, et une fonction typée avec les paramètres de Zapatos 6.6.1 donne TS2322.
 
@@ -560,16 +560,16 @@ Le deuxième argument de [`transaction()`](#transaction). Chaque valeur est écr
 type IsolationSatisfying<T extends IsolationLevel>
 ```
 
-Les niveaux dont le client est accepté là où un client de niveau `T` est demandé : `T` et les niveaux plus stricts. Un niveau en lecture-écriture vaut pour sa version en lecture seule, pas l’inverse ; `SerializableRODeferrable` ne vaut que pour lui-même.
+Les niveaux de la transaction extérieure qu’un appel imbriqué au niveau `T` accepte avec [`transactionRequiresSatisfyingLevel`](/fr/runtime-config#Config.transactionRequiresSatisfyingLevel) ; sans cette option, tout niveau extérieur est accepté, avec `PGCAST_DEP007`.
 
 | `T` | `IsolationSatisfying<T>` |
 |---|---|
 | `Serializable` | `Serializable` |
 | `RepeatableRead` | `Serializable`, `RepeatableRead` |
 | `ReadCommitted` | `Serializable`, `RepeatableRead`, `ReadCommitted` |
-| `SerializableRO` | `Serializable`, `SerializableRO` |
-| `RepeatableReadRO` | `Serializable`, `RepeatableRead`, `SerializableRO`, `RepeatableReadRO` |
-| `ReadCommittedRO` | chaque niveau sauf `SerializableRODeferrable` |
+| `SerializableRO` | `Serializable`, `SerializableRO`, `SerializableRODeferrable` |
+| `RepeatableReadRO` | `Serializable`, `RepeatableRead`, `SerializableRO`, `RepeatableReadRO`, `SerializableRODeferrable` |
+| `ReadCommittedRO` | tous les niveaux |
 | `SerializableRODeferrable` | `Serializable`, `SerializableRO`, `SerializableRODeferrable` |
 
 Une fonction qui prend un [`TxnClientForRepeatableRead`](#TxnClientForRepeatableRead) accepte le client de `serializable()`, pas celui de `readCommitted()` (2345, avec `strict` activé ou non) :
@@ -587,19 +587,19 @@ await db.serializable(pool, txnClient => countBookings(txnClient));
 await db.readCommitted(pool, txnClient => countBookings(txnClient));
 ```
 
-`SerializableRODeferrable` est omis des lignes de `SerializableRO`, `RepeatableReadRO` et `ReadCommittedRO`, comme dans Zapatos 6.6.1, bien qu’il donne toutes les garanties qu’elles demandent, et `transaction()` transmet son client ([Transmettre une transaction](#passing-a-transaction-through)). Donc une fonction qui prend un `TxnClientForSerializableRO` refuse le client de `serializableRODeferrable()` (2345). Cela reste ainsi : en l’y comptant, une fonction qui prend un `TxnClientForSerializableRO` lirait `SerializableRODeferrable` dans son propre `_zapatos.isolationLevel`, tout comme les callbacks de `serializableRO()`, `repeatableReadRO()` et `readCommittedRO()`. Du code qui compile sous la 6.6.1 échouerait alors, comme un `switch` exhaustif sur ce niveau ou un `Record` dont ces niveaux sont les clés ([#489](https://github.com/AlexandreDemartin/pgcast/issues/489) ; le changement attend la 7.0, [#694](https://github.com/AlexandreDemartin/pgcast/issues/694)). Une fonction qui prend les deux clients nomme les deux types, et il en va de même pour les deux autres niveaux :
+À partir de la 7.0, une fonction qui attend un client `pg` de l’un des trois autres niveaux en lecture seule accepte celui de `serializableRODeferrable()`. Si vous utilisez la fonction ci-dessous aussi avec la 6.x, donnez à son paramètre le type `TxnClientForSerializableRO | TxnClientForSerializableRODeferrable`.
 
 ```ts twoslash
 import * as db from 'zapatos/db';
 import type pg from 'pg';
 declare const pool: pg.Pool;
 // ---cut---
-const countSeats = (txnClient: db.TxnClientForSerializableRO | db.TxnClientForSerializableRODeferrable) =>
+const countSeats = (txnClient: db.TxnClientForSerializableRO) =>
   db.count('seat_bookings', { screening_id: 1000 }).run(txnClient);
 
 await db.serializableRO(pool, txnClient => countSeats(txnClient));
 await db.serializableRODeferrable(pool, txnClient => countSeats(txnClient));
-// @ts-expect-error REPEATABLE READ, READ ONLY satisfies neither type
+// @ts-expect-error REPEATABLE READ, READ ONLY does not satisfy SERIALIZABLE, READ ONLY
 await db.repeatableReadRO(pool, txnClient => countSeats(txnClient));
 ```
 
@@ -631,15 +631,15 @@ Le client que reçoit le callback d’une [`transaction()`](#transaction) : cel
 
 ### `TxnClientForSerializableRO` {#TxnClientForSerializableRO}
 
-`TxnClient<IsolationSatisfying<IsolationLevel.SerializableRO>>` : le client de [`serializableRO()`](#serializableRO) ; accepte aussi celui de `serializable()`.
+`TxnClient<IsolationSatisfying<IsolationLevel.SerializableRO>>` : le client `pg` de [`serializableRO()`](#serializableRO). Ce type accepte aussi le client de `serializable()` et de `serializableRODeferrable()`.
 
 ### `TxnClientForRepeatableReadRO` {#TxnClientForRepeatableReadRO}
 
-`TxnClient<IsolationSatisfying<IsolationLevel.RepeatableReadRO>>` : le client de [`repeatableReadRO()`](#repeatableReadRO) ; accepte aussi celui de `serializable()`, de `repeatableRead()` et de `serializableRO()`.
+`TxnClient<IsolationSatisfying<IsolationLevel.RepeatableReadRO>>` : le client `pg` de [`repeatableReadRO()`](#repeatableReadRO). Ce type accepte aussi le client de `serializable()`, de `repeatableRead()`, de `serializableRO()` et de `serializableRODeferrable()`.
 
 ### `TxnClientForReadCommittedRO` {#TxnClientForReadCommittedRO}
 
-`TxnClient<IsolationSatisfying<IsolationLevel.ReadCommittedRO>>` : le client de [`readCommittedRO()`](#readCommittedRO) ; accepte celui de chaque raccourci sauf `serializableRODeferrable()`.
+`TxnClient<IsolationSatisfying<IsolationLevel.ReadCommittedRO>>` : le client `pg` de [`readCommittedRO()`](#readCommittedRO). Ce type accepte le client de tout raccourci de transaction.
 
 ### `TxnClientForSerializableRODeferrable` {#TxnClientForSerializableRODeferrable}
 

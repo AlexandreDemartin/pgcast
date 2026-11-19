@@ -238,7 +238,7 @@ With `true`, when that level doesn't satisfy the one asked for ([`IsolationSatis
 
 Off, it passes the client through, as Zapatos 6.6.1 does, and warns once per process, `PGCAST_DEP007`, only when the level doesn't satisfy the one asked for.
 
-- A client of a level that satisfies it is passed through, as before, option or not. So is the client of `db.serializableRODeferrable()` given to `db.serializableRO()`, `db.repeatableReadRO()` or `db.readCommittedRO()`: it gives every guarantee they ask for, though `IsolationSatisfying` leaves it out ([#489](https://github.com/AlexandreDemartin/pgcast/issues/489)).
+- With or without the option, the call passes the client through if its level appears in the requested level's row of the [isolation table](/transaction#IsolationSatisfying).
 - Only the client of a `transaction()` is checked, by its `_zapatos` mark, which a plain client also carries while a `transaction()` runs on it, so a second call at the same moment on that client is checked: a pool, an idle plain client and a client kept after its transaction ended get a transaction of their own, as before.
 - The types don't change: a `Queryable` takes the client of any level ([`TxnClient`](/transaction#TxnClient)).
 - A test that runs code inside a `transaction()` of its own, and hands it that client: open it at `IsolationLevel.Serializable`, which satisfies every level.

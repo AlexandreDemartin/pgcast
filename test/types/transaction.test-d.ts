@@ -45,30 +45,19 @@ describe('the client of a transaction', () => {
   });
 
   // The runtime tests check transactionRequiresSatisfyingLevel against this table, pair by pair (test/integration/transaction.test.ts)
-  test('the table of levels that satisfy another holds every level IsolationSatisfying lists, and SerializableRODeferrable in three more rows', () => {
+  test('IsolationSatisfying and the runtime table list the same levels in each row', () => {
     type Row<K extends db.IsolationLevel> = (typeof satisfying)[`${K}`][number];
-    type Missing = { [K in db.IsolationLevel]: Exclude<`${db.IsolationSatisfying<K>}`, Row<K>> }[db.IsolationLevel];
-    type Extra<K extends db.IsolationLevel> = Exclude<Row<K>, `${db.IsolationSatisfying<K>}`>;
+    type Missing = { [K in db.IsolationLevel]: Exclude<Row<K>, `${db.IsolationSatisfying<K>}`> }[db.IsolationLevel];
+    type Extra = { [K in db.IsolationLevel]: Exclude<`${db.IsolationSatisfying<K>}`, Row<K>> }[db.IsolationLevel];
     expectTypeOf<Missing>().toBeNever();
-    expectTypeOf<Extra<db.IsolationLevel.SerializableRO | db.IsolationLevel.RepeatableReadRO | db.IsolationLevel.ReadCommittedRO>>()
-      .toEqualTypeOf<'SERIALIZABLE, READ ONLY, DEFERRABLE'>();
-    expectTypeOf<Extra<db.IsolationLevel.SerializableRO>>().toEqualTypeOf<'SERIALIZABLE, READ ONLY, DEFERRABLE'>();
-    expectTypeOf<Extra<db.IsolationLevel.RepeatableReadRO>>().toEqualTypeOf<'SERIALIZABLE, READ ONLY, DEFERRABLE'>();
-    expectTypeOf<Extra<db.IsolationLevel.ReadCommittedRO>>().toEqualTypeOf<'SERIALIZABLE, READ ONLY, DEFERRABLE'>();
-    expectTypeOf<Extra<db.IsolationLevel.Serializable | db.IsolationLevel.RepeatableRead | db.IsolationLevel.ReadCommitted | db.IsolationLevel.SerializableRODeferrable>>()
-      .toBeNever();
+    expectTypeOf<Extra>().toBeNever();
   });
 
-  // #489: the type leaves SerializableRODeferrable out of the levels that satisfy the three read-only ones, as in
-  // Zapatos 6.6.1: counting it in, a function that takes a TxnClientForSerializableRO would read it in its own
-  // _zapatos.isolationLevel, and so would these levels' callbacks, which code may read (website/transaction.md)
-  test('a parameter typed TxnClientFor… of the three other read-only levels refuses the client of serializableRODeferrable(), as in Zapatos 6.6.1', () => {
+  test('a helper at each read-only level takes the deferrable client', () => {
     void db.serializableRO(pool, c => countSeats(c));
-    // @ts-expect-error IsolationSatisfying<SerializableRO> leaves SerializableRODeferrable out
     void db.serializableRODeferrable(pool, c => countSeats(c));
-    // @ts-expect-error IsolationSatisfying<RepeatableReadRO> leaves SerializableRODeferrable out
+    void db.serializableRODeferrable(pool, countSeats);
     void db.serializableRODeferrable(pool, c => countFilms(c));
-    // @ts-expect-error IsolationSatisfying<ReadCommittedRO> leaves SerializableRODeferrable out
     void db.serializableRODeferrable(pool, c => countTags(c));
     // @ts-expect-error READ ONLY does not satisfy a read-write level
     void db.serializableRODeferrable(pool, c => countBookings(c));
@@ -82,21 +71,24 @@ describe('the client of a transaction', () => {
     void db.repeatableReadRO(pool, c => countSeatsAnyRO(c));
   });
 
-  test('TxnClientForSerializableRO, …RepeatableReadRO and …ReadCommittedRO give the isolation levels of Zapatos 6.6.1, SerializableRODeferrable left out', () => {
-    expectTypeOf<NonNullable<db.TxnClientForSerializableRO['_zapatos']>['isolationLevel']>().toEqualTypeOf<db.IsolationLevel.Serializable | db.IsolationLevel.SerializableRO>();
-    expectTypeOf<NonNullable<db.TxnClientForRepeatableReadRO['_zapatos']>['isolationLevel']>().toEqualTypeOf<db.IsolationLevel.Serializable | db.IsolationLevel.RepeatableRead | db.IsolationLevel.SerializableRO | db.IsolationLevel.RepeatableReadRO>();
-    expectTypeOf<NonNullable<db.TxnClientForReadCommittedRO['_zapatos']>['isolationLevel']>().toEqualTypeOf<db.IsolationLevel.Serializable | db.IsolationLevel.RepeatableRead | db.IsolationLevel.ReadCommitted | db.IsolationLevel.SerializableRO | db.IsolationLevel.RepeatableReadRO | db.IsolationLevel.ReadCommittedRO>();
-  });
+  test('the three read-only shortcuts give their callbacks the named clients and their satisfying levels', () => {
+    type SerializableRO = db.IsolationLevel.Serializable | db.IsolationLevel.SerializableRO | db.IsolationLevel.SerializableRODeferrable;
+    type RepeatableReadRO = SerializableRO | db.IsolationLevel.RepeatableRead | db.IsolationLevel.RepeatableReadRO;
+    expectTypeOf<NonNullable<db.TxnClientForSerializableRO['_zapatos']>['isolationLevel']>().toEqualTypeOf<SerializableRO>();
+    expectTypeOf<NonNullable<db.TxnClientForRepeatableReadRO['_zapatos']>['isolationLevel']>().toEqualTypeOf<RepeatableReadRO>();
+    expectTypeOf<NonNullable<db.TxnClientForReadCommittedRO['_zapatos']>['isolationLevel']>().toEqualTypeOf<db.IsolationLevel>();
 
-  test('the callbacks of serializableRO(), repeatableReadRO() and readCommittedRO() get the isolation levels of Zapatos 6.6.1, SerializableRODeferrable left out', () => {
     void db.serializableRO(pool, async c => {
-      expectTypeOf(c._zapatos!.isolationLevel).toEqualTypeOf<db.IsolationLevel.Serializable | db.IsolationLevel.SerializableRO>();
+      expectTypeOf(c).toEqualTypeOf<db.TxnClientForSerializableRO>();
+      expectTypeOf(c._zapatos!.isolationLevel).toEqualTypeOf<SerializableRO>();
     });
     void db.repeatableReadRO(pool, async c => {
-      expectTypeOf(c._zapatos!.isolationLevel).toEqualTypeOf<db.IsolationLevel.Serializable | db.IsolationLevel.RepeatableRead | db.IsolationLevel.SerializableRO | db.IsolationLevel.RepeatableReadRO>();
+      expectTypeOf(c).toEqualTypeOf<db.TxnClientForRepeatableReadRO>();
+      expectTypeOf(c._zapatos!.isolationLevel).toEqualTypeOf<RepeatableReadRO>();
     });
     void db.readCommittedRO(pool, async c => {
-      expectTypeOf(c._zapatos!.isolationLevel).toEqualTypeOf<db.IsolationLevel.Serializable | db.IsolationLevel.RepeatableRead | db.IsolationLevel.ReadCommitted | db.IsolationLevel.SerializableRO | db.IsolationLevel.RepeatableReadRO | db.IsolationLevel.ReadCommittedRO>();
+      expectTypeOf(c).toEqualTypeOf<db.TxnClientForReadCommittedRO>();
+      expectTypeOf(c._zapatos!.isolationLevel).toEqualTypeOf<db.IsolationLevel>();
     });
   });
 
@@ -164,6 +156,17 @@ describe('a pool that is not pg’s', () => {
     expectTypeOf(forwarder(other)).resolves.toEqualTypeOf<TxnOther<db.IsolationLevel.Serializable>>();
     const levels = <M extends db.IsolationLevel>(m: M) => db.transaction(other, m, async c => c);
     expectTypeOf(levels(db.IsolationLevel.ReadCommitted)).resolves.toEqualTypeOf<TxnOther<db.IsolationLevel.ReadCommitted>>();
+  });
+
+  test('a serializable read-only callback on an adapter pool must accept the deferrable level', () => {
+    const current = async (c: TxnOther<db.IsolationLevel.SerializableRO>) => c;
+    const narrow = async (c: db.TxnClientLike<OtherClient, db.IsolationLevel.Serializable | db.IsolationLevel.SerializableRO>) => c;
+    void db.serializableRO(typedPool, current);
+    void db.transaction(typedPool, db.IsolationLevel.SerializableRO, current);
+    // @ts-expect-error the old callback omits SerializableRODeferrable
+    void db.serializableRO(typedPool, narrow);
+    // @ts-expect-error the old callback omits SerializableRODeferrable
+    void db.transaction(typedPool, db.IsolationLevel.SerializableRO, narrow);
   });
 
   test('widening the pool to PoolLike<unknown> or serializable’s first parameter gives the callback pg’s client type', () => {
@@ -486,8 +489,6 @@ describe('the calls of Zapatos 6.6.1 keep their types (#696)', () => {
     void db.readCommitted(pool, countBookings);
     // @ts-expect-error READ ONLY does not satisfy a read-write level
     void db.repeatableReadRO(pool, countBookings);
-    // @ts-expect-error IsolationSatisfying<SerializableRO> leaves SerializableRODeferrable out (#489)
-    void db.serializableRODeferrable(pool, countSeats);
     // @ts-expect-error READ COMMITTED, READ ONLY does not satisfy SERIALIZABLE
     void db.readCommittedRO(pool, bookSeat);
     // @ts-expect-error REPEATABLE READ does not satisfy SERIALIZABLE, READ ONLY

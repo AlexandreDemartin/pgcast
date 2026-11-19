@@ -29,15 +29,13 @@ export type IsolationSatisfying<T extends IsolationLevel> = {
   [IsolationLevel.Serializable]: IsolationLevel.Serializable;
   [IsolationLevel.RepeatableRead]: IsolationSatisfying<IsolationLevel.Serializable> | IsolationLevel.RepeatableRead;
   [IsolationLevel.ReadCommitted]: IsolationSatisfying<IsolationLevel.RepeatableRead> | IsolationLevel.ReadCommitted;
-  [IsolationLevel.SerializableRO]: IsolationSatisfying<IsolationLevel.Serializable> | IsolationLevel.SerializableRO;
+  [IsolationLevel.SerializableRO]: IsolationSatisfying<IsolationLevel.Serializable> | IsolationLevel.SerializableRO | IsolationLevel.SerializableRODeferrable;
   [IsolationLevel.RepeatableReadRO]: IsolationSatisfying<IsolationLevel.SerializableRO> | IsolationSatisfying<IsolationLevel.RepeatableRead> | IsolationLevel.RepeatableReadRO;
   [IsolationLevel.ReadCommittedRO]: IsolationSatisfying<IsolationLevel.RepeatableReadRO> | IsolationSatisfying<IsolationLevel.ReadCommitted> | IsolationLevel.ReadCommittedRO;
-  [IsolationLevel.SerializableRODeferrable]: IsolationSatisfying<IsolationLevel.SerializableRO> | IsolationLevel.SerializableRODeferrable;
+  [IsolationLevel.SerializableRODeferrable]: IsolationSatisfying<IsolationLevel.SerializableRO>;
 }[T];
 
-// For each level, the levels of a transaction whose client a call at that level may join, as Postgres runs them: each
-// gives every guarantee the level asks for. IsolationSatisfying, plus SerializableRODeferrable in the rows of the three
-// other read-only levels, which the type leaves it out of, as in Zapatos 6.6.1 (see https://github.com/AlexandreDemartin/pgcast/issues/489).
+// For each nested request, the outer levels accepted with transactionRequiresSatisfyingLevel. The type tests check each row against IsolationSatisfying.
 // A Map, so that a level it doesn't know, a string from JavaScript ('constructor'), is passed through, as in Zapatos 6.6.1
 const
   { Serializable: S, RepeatableRead: RR, ReadCommitted: RC, SerializableRO: SRO, RepeatableReadRO: RRRO,
@@ -98,7 +96,7 @@ export type TxnClientLike<C, T extends IsolationLevel> = C & {
 // callback's own parameter, which would let a callback typed for a level the transaction doesn't satisfy compile
 type NoInfer<T> = [T][T extends any ? 0 : never];  // https://github.com/Microsoft/TypeScript/issues/14829
 
-// the client a callback gets: C stays unknown for a pg queryable, which gives the TxnClient… of Zapatos 6.6.1, Pg, as
+// the client a callback gets: C stays unknown for a pg queryable, which gives the named TxnClient… type, Pg, as
 // do Parameters and infer, which read C as unknown, and so does a pg.PoolClient, from a pg.Pool subclass whose connect()
 // is its own; a PoolLike's client otherwise, inferred from its connect()
 type TxnClientOf<C, Pg, T extends IsolationLevel> = unknown extends C ? Pg : [C] extends [pg.PoolClient] ? Pg : TxnClientLike<C, T>;
@@ -189,8 +187,7 @@ type RetriedCode = Extract<TransactionEvent, { type: 'rollback' }>['code'];
  * `START TRANSACTION`; without it, it runs and emits `PGCAST_DEP005`, once.
  *
  * Given the client of a transaction at a level that doesn't satisfy this one
- * (`IsolationSatisfying`, plus `SerializableRODeferrable` for the three other
- * read-only levels, which the type leaves out, as in Zapatos 6.6.1, #489), the callback would run at that level: with the
+ * (`IsolationSatisfying`), the callback would run at the outer level. With the
  * `transactionRequiresSatisfyingLevel` config option, this rejects before
  * calling it; without it, it runs and emits `PGCAST_DEP007`, once.
  *

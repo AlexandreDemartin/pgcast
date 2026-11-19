@@ -1,5 +1,5 @@
 ---
-english: af53158e19f1
+english: 05d9b6c2eacb
 description: "Passez de Zapatos 6.6.1 à pgcast : changez une ligne de package.json et régénérez ; tsc et les avertissements de pgcast montrent les rares appels qui changent."
 ---
 
@@ -102,6 +102,16 @@ Pour comparer avec du SQL, donnez un fragment `sql` comme valeur, `db.self` pour
 - Un range sélectionné peut désormais valoir `'empty'`, puisque Postgres écrit ainsi un range vide ([`RangeString`](/fr/runtime-config#RangeString)) : il n’est donc plus assignable à un type qui commence par un crochet, `` `[${string}` | `(${string}` `` (2322). Vérifiez d’abord ce cas, `if (range !== 'empty')` ; dans un type, écrivez `Exclude<db.DateRangeString, 'empty'>`.
 - À partir de la 6.11.0, une fois le schéma régénéré, une table dont une colonne porte le nom d’un membre de `String`, d’un type auquel ce membre correspond (`search` typée `any`, comme l’est un `tsvector`, ou `length` un nombre), n’accepte plus n’importe quelle chaîne comme nom dans son type `SQL` (2345) : `` db.sql<s.films.SQL>`${'titel'}` ``. Zapatos 6.6.1 acceptait la chaîne comme un nom, `"titel"`, que Postgres refuse quand aucune colonne ne le porte (42703). Pour un nom connu seulement à l’exécution, vérifiez-le, puis typez-le comme le `Column` de la table.
 - À partir de la 6.11.0, sur une telle table, le `where` d’un raccourci, le `having` de `select()`, `exists()` et `isInSelect()`, ainsi que les lignes d’`insert()`, d’`upsert()` et d’`update()`, n’acceptent plus une chaîne, un `String` ni un tableau, quel que soit le schéma (2345, 2769) : `db.select('films', 'titel')`. Zapatos 6.6.1 exécutait la chaîne comme une colonne, `WHERE "titel"` (42703 quand aucune colonne ne porte ce nom ; quand elle nommait une colonne booléenne, la requête filtrait par cette colonne), et envoyait une ligne donnée en chaîne comme ses caractères, `("0", "1", …)` (42703). Écrivez un Whereable, `{ subtitled: true }`, ou un fragment, `` db.sql<s.screenings.SQL>`${'subtitled'}` `` ([#674](https://github.com/AlexandreDemartin/pgcast/issues/674)). Sur une table dont toutes les colonnes sont optionnelles, l’une nommée `length`, `[]`, un tableau de lignes contenu dans une variable, un tableau `readonly` et un tableau `as const`, contenu dans une variable ou écrit dans l’appel, donnés à `insert()` ou à `upsert()`, sont désormais typés comme un tableau, comme ils s’exécutent, et non comme une seule ligne ([#683](https://github.com/AlexandreDemartin/pgcast/issues/683)).
+
+### À partir de la 7.0 {#from-7-0}
+
+<div class="stack">
+
+| Votre code | Zapatos 6.6.1 et pgcast 6.x | pgcast 7.0 | Que faire |
+|---|---|---|---|
+| `db.serializableRO(pool, countSeats)`, où le paramètre de `countSeats` est de type `db.TxnClient<db.IsolationLevel.Serializable \| db.IsolationLevel.SerializableRO>` | Compile | TS2345 avec `strictFunctionTypes` (activé par `strict`), car TypeScript vérifie le callback avec le type de client élargi | Avec `pg`, donnez au paramètre le type [`db.TxnClientForSerializableRO`](/fr/transaction#TxnClientForSerializableRO). Avec un adaptateur dont le client est de type `C`, utilisez `db.TxnClientLike<C, db.IsolationSatisfying<db.IsolationLevel.SerializableRO>>`. Si la fonction examine `_zapatos.isolationLevel`, traitez aussi le cas `SerializableRODeferrable`. Les types construits à partir de ces niveaux sont aussi concernés : ajoutez la clé `SerializableRODeferrable` à un `Record` indexé par `IsolationSatisfying<…>`, élargissez le type du client dans une signature écrite à la main et passez un discriminant explicite si des surcharges choisissaient le résultat en fonction des types de clients ordinaire et différable, puisque les deux types coïncident désormais. Les callbacks de `transaction()`, de `savepoint()` et des appels imbriqués qui conservent le client reçoivent aussi le type élargi. |
+
+</div>
 
 ## 4. Trouver les appels dont le résultat change {#find-the-calls-whose-result-changes}
 
