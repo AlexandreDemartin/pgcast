@@ -1,5 +1,5 @@
 ---
-english: 98105e5d5a8a
+english: 5fa678f29684
 description: "Comprendre ce qui a échoué dans une requête et y répondre : une place déjà réservée, une séance qui n’existe pas, une option mal donnée par votre code."
 ---
 

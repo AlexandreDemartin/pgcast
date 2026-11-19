@@ -1,5 +1,5 @@
 ---
-english: a64e40acff27
+english: 91f0661bfa5c
 description: "Lancer pgcast sur pg, sur postgres.js ou PGlite via leurs adaptateurs, ou sur un driver à vous : le même SQL et les mêmes types sur chacun."
 ---
 
