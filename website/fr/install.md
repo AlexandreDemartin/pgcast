@@ -10,8 +10,8 @@ english: b740b272da24
 ## Prérequis {#requirements}
 
 - Postgres. La suite de tests tourne sur les versions 14, 16 et 18.
-- Node et `pg` (node-postgres). À partir de la 7.0, `pg` est la seule peer dependency requise pour exécuter les requêtes et le générateur en JavaScript.
-- Pour vérifier les types, ajoutez `typescript` et `@types/pg` à vos `devDependencies`. Utilisez TypeScript 5.7 ou plus récent pour vérifier les types de `@types/node` et de `pg-protocol`, qu’installe `@types/pg`, ainsi que le type de retour de [`toBuffer()`](/fr/runtime-config#toBuffer), `Buffer<ArrayBuffer>`.
+- Node et `pg` (node-postgres). À partir de la 7.0, en JavaScript, `pg` est la seule peer dependency nécessaire pour exécuter des requêtes et lancer le générateur.
+- Pour vérifier les types, ajoutez `typescript` et `@types/pg` à vos `devDependencies`. TypeScript 5.7 ou plus récent est nécessaire pour vérifier les déclarations de `@types/node` et de `pg-protocol`, qu’installe `@types/pg`, ainsi que le type de retour de [`toBuffer()`](/fr/runtime-config#toBuffer), `Buffer<ArrayBuffer>`.
 
 ::: code-group
 
@@ -62,7 +62,7 @@ npm install --save-dev --save-exact @types/node@ts4.1
 
 ## Ajouter le paquet {#add-the-package}
 
-Pour la 7.x, utilisez `@^7` là où les commandes Yarn ou bun ci-dessous indiquent une plage de versions 6.x pour l’alias.
+Pour la 7.x, remplacez la plage de versions 6.x de l’alias par `@^7` dans les commandes Yarn ou bun ci-dessous.
 
 ### Sous son propre nom {#under-its-own-name}
 
