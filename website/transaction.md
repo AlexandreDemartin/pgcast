@@ -490,14 +490,14 @@ How it ends:
 | the last batch is read, or the loop `break`s or `return`s | `CLOSE` | |
 | the loop throws | `CLOSE` | the loop's error goes out, whatever `CLOSE` gives |
 | the fragment's `runResultTransform` throws, or `resultListener` throws after `DECLARE` or `FETCH` | `CLOSE` | its error goes out unless a failure in `CLOSE` other than 25P02 replaces it |
-| a query of the loop fails, on `pg` | no `CLOSE`, which Postgres would refuse in the aborted transaction (25P02) | that query's error goes out, and `transaction()` retries a 40001 or 40P01. The status is the last one `pg` received, which can come just after the error: a `CLOSE` can then still go out. A client that reports no status, another driver's, sends `CLOSE`. Either way its 25P02 is dropped, in a `for await` as in a `finally` that calls `return()`, and a `break` after an error the loop caught ends the loop |
+| a query of the loop fails, on `pg` | no `CLOSE`, which Postgres would refuse in the aborted transaction (25P02) | that query's error goes out. If a 40001 or 40P01 reaches the outer `transaction()` with an attempt left, it retries. The status is the last one `pg` received, which can come just after the error: a `CLOSE` can then still go out. A client that reports no status, another driver's, sends `CLOSE`. Either way its 25P02 is dropped, in a `for await` as in a `finally` that calls `return()`, and a `break` after an error the loop caught ends the loop |
 | `pg` reports the client outside a transaction block: a `COMMIT` of yours came before the loop ended | no `CLOSE`, which Postgres would refuse (34000) | the cursor went with the transaction |
 | Postgres rejects a `FETCH`, for example with 22012 or 40001 | no `CLOSE` | its error goes out unchanged. If `transaction()` retries, the scan restarts on a fresh snapshot. The batches can differ. |
 | the generator is left, neither finished nor `return()`ed | nothing | Postgres closes the cursor at `COMMIT` or `ROLLBACK`; its number stays taken on that client |
 
 </div>
 
-A query listener that throws before a `FETCH` or `CLOSE` reaches the driver can leave the cursor open until the transaction ends, so the next `cursor()` on that client gets 42P03.
+A query listener that throws before a `FETCH` or `CLOSE` reaches the driver can leave the cursor open until the transaction ends. Reusing the leaked cursor's name in the same transaction fails with 42P03.
 
 Two cases go wrong, by design:
 

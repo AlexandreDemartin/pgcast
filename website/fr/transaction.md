@@ -494,14 +494,14 @@ Comment elle se termine :
 | le dernier batch est lu, ou la boucle fait `break` ou `return` | `CLOSE` | |
 | la boucle lève une erreur | `CLOSE` | l’erreur de la boucle sort, quoi que donne `CLOSE` |
 | le `runResultTransform` du fragment lève une erreur, ou `resultListener` en lève une après `DECLARE` ou `FETCH` | `CLOSE` | l’erreur initiale remonte, sauf si une erreur autre que 25P02 survient lors du `CLOSE` et la remplace |
-| une requête de la boucle échoue, sur `pg` | pas de `CLOSE`, que Postgres refuserait dans la transaction annulée (25P02) | l’erreur de cette requête sort, et `transaction()` réessaie un 40001 ou un 40P01. Ce statut est le dernier reçu par `pg`, et il peut arriver juste après l’erreur : un `CLOSE` peut alors encore partir. Un client qui n’indique aucun statut, celui d’un autre driver, envoie `CLOSE`. Dans les deux cas, son 25P02 est ignoré, dans un `for await` comme dans un `finally` qui appelle `return()`, et un `break` après une erreur que la boucle a interceptée termine la boucle |
+| une requête de la boucle échoue, sur `pg` | pas de `CLOSE`, que Postgres refuserait dans la transaction annulée (25P02) | l’erreur de cette requête remonte. Si un 40001 ou un 40P01 atteint l’appel externe à `transaction()` et qu’il reste une tentative, celui-ci réessaie. Ce statut est le dernier reçu par `pg`, et il peut arriver juste après l’erreur : un `CLOSE` peut alors encore partir. Un client qui n’indique aucun statut, celui d’un autre driver, envoie `CLOSE`. Dans les deux cas, son 25P02 est ignoré, dans un `for await` comme dans un `finally` qui appelle `return()`, et un `break` après une erreur que la boucle a interceptée termine la boucle |
 | `pg` indique que le client est hors d’un bloc de transaction : un `COMMIT` de votre part est passé avant la fin de la boucle | pas de `CLOSE`, que Postgres refuserait (34000) | le curseur est parti avec la transaction |
 | Postgres refuse un `FETCH`, par exemple avec le code 22012 ou 40001 | pas de `CLOSE` | l’erreur du `FETCH` remonte telle quelle. Si `transaction()` réessaie, le parcours recommence sur un nouvel instantané. Les batchs peuvent différer. |
 | le générateur est abandonné, ni terminé ni arrêté par `return()` | rien | Postgres ferme le curseur au `COMMIT` ou au `ROLLBACK` ; son numéro reste pris sur ce client |
 
 </div>
 
-Si un écouteur de requête lève une erreur avant que le driver reçoive un `FETCH` ou un `CLOSE`, le curseur peut rester ouvert jusqu’à la fin de la transaction. Le prochain appel à `cursor()` sur ce client échoue alors avec le code 42P03.
+Si un écouteur de requête lève une erreur avant que le driver reçoive un `FETCH` ou un `CLOSE`, le curseur peut rester ouvert jusqu’à la fin de la transaction. Réutiliser le nom de ce curseur dans la même transaction échoue avec le code 42P03.
 
 Deux cas tournent mal, à dessein :
 

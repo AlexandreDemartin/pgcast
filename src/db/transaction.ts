@@ -634,11 +634,12 @@ const iteratedAfter = 'cursor() was iterated after its transaction ended, so its
  *   `DECLARE` or `FETCH`, the generator sends `CLOSE` and rethrows the original
  *   error unless `CLOSE` fails with an error other than 25P02.
  *   A query listener that throws before a `FETCH` or `CLOSE` reaches the driver
- *   can leave the cursor open until the transaction ends, so the next `cursor()`
- *   on that client gets 42P03.
+ *   can leave the cursor open until the transaction ends. Reusing the leaked cursor's
+ *   name in the same transaction fails with 42P03.
  *   If the driver rejects `DECLARE` or `FETCH`, or `pg` reports an aborted
  *   transaction (the status it last received), the generator skips `CLOSE`.
- *   The error goes out unchanged, and `transaction()` retries a 40001 or 40P01.
+ *   The error goes out unchanged. If a 40001 or 40P01 reaches the outer
+ *   `transaction()` with an attempt left, it retries.
  *   A `CLOSE` sent after a query of the loop failed, before `pg` received the
  *   status, or on a driver that reports none, gets 25P02, which is dropped:
  *   no 25P02 of `CLOSE`'s replaces the loop's error. A client that `pg`
