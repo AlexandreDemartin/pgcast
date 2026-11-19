@@ -529,7 +529,8 @@ describe('variant snapshots', { timeout: 30_000 }, () => {
       CREATE SCHEMA arr_probe;
       CREATE TYPE arr_probe.mood AS ENUM ('sad', 'ok', 'happy');
       CREATE DOMAIN arr_probe.moods AS arr_probe.mood[];
-      CREATE TABLE arr_probe.films (id int PRIMARY KEY, moods arr_probe.mood[], dmoods arr_probe.moods);`));
+      CREATE DOMAIN arr_probe.nested_moods AS arr_probe.moods;
+      CREATE TABLE arr_probe.films (id int PRIMARY KEY, moods arr_probe.mood[], dmoods arr_probe.moods, nested arr_probe.nested_moods);`));
     afterAll(() => t.pool.query('DROP SCHEMA arr_probe CASCADE'));
 
     const config = { schemas: { arr_probe: all } };
@@ -544,10 +545,13 @@ describe('variant snapshots', { timeout: 30_000 }, () => {
       export const reads = [
         json.moods satisfies s.arr_probe.mood[] | null,
         json.dmoods satisfies s.arr_probe.mood[] | null,
+        json.nested satisfies s.arr_probe.mood[] | null,
         ${refused} the text pg returns, not an array
         sel.moods satisfies s.arr_probe.mood[] | null,
         ${refused} the text pg returns, through a domain
         sel.dmoods satisfies s.arr_probe.mood[] | null,
+        ${refused} the same raw text through a nested domain
+        sel.nested satisfies s.arr_probe.mood[] | null,
       ];
       export const writes = [
         db.insert('arr_probe.films', { id: 1, moods: ['happy'], dmoods: json.dmoods }),
@@ -561,7 +565,8 @@ describe('variant snapshots', { timeout: 30_000 }, () => {
       import type * as s from 'zapatos/schema';
       declare const sel: s.arr_probe.films.Selectable;
       export const text: string | null = sel.moods;
-      export const domainText: string | null = sel.dmoods;`;
+      export const domainText: string | null = sel.dmoods;
+      export const nestedText: string | null = sel.nested;`;
 
     it('types the text pg returns in Selectable, and only there', async () => {
       expect(await probeErrors(config, probe('// @ts-expect-error'))).toEqual([]);
@@ -570,8 +575,8 @@ describe('variant snapshots', { timeout: 30_000 }, () => {
 
     it('with false: an array, as in Zapatos 6.6.1, so that each refusal is the option\'s', async () => {
       expect(await probeErrors(off, probe('//'))).toEqual([]);
-      expect(await probeErrors(off, probe('// @ts-expect-error'))).toEqual(Array(3).fill(unused));
-      expect((await probeErrors(off, asText)).map(e => e.slice(0, 15))).toEqual(Array(2).fill('probe.ts TS2322'));
+      expect(await probeErrors(off, probe('// @ts-expect-error'))).toEqual(Array(4).fill(unused));
+      expect((await probeErrors(off, asText)).map(e => e.slice(0, 15))).toEqual(Array(3).fill('probe.ts TS2322'));
     });
 
     it('keeps an edited placeholder\'s type in Selectable', async () => {
