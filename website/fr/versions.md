@@ -1,5 +1,5 @@
 ---
-english: af187a0a2934
+english: 5122aac77796
 description: "Pourquoi pgcast prolonge les versions de Zapatos, quand une correction peut changer ce que reçoit votre code, et ce que demande un avertissement PGCAST_DEP00n."
 ---
 
@@ -67,14 +67,14 @@ Le coût : quelques clés de plus dans [`Config`](/fr/runtime-config#Config), e
 
 ## Lire un avertissement {#reading-a-warning}
 
-Avec les réglages par défaut de la 6.7, si le callback de `transaction()` intercepte une erreur de requête et que Postgres répond au `COMMIT` par `ROLLBACK`, Node affiche cet avertissement une fois :
+Avec les réglages par défaut de pgcast 6.7.0, si le callback de `transaction()` intercepte une erreur de requête et que Postgres répond au `COMMIT` par `ROLLBACK`, Node affiche cet avertissement une fois :
 
 ```txt
 (node:4242) [PGCAST_DEP003] DeprecationWarning: transaction() resolved, but Postgres answered its COMMIT with ROLLBACK: a query failed and the callback caught the error, so nothing was saved. Set transactionRequiresCommit: true (db.setConfig) to reject instead; it will be the default in pgcast 7.0.
 (Use `node --trace-deprecation ...` to show where the warning was created)
 ```
 
-Chaque comportement déprécié du runtime a son propre code, affiché entre crochets pour faciliter la recherche. La section [Opt-ins et avertissements](/fr/runtime-config#opt-ins-and-warnings) liste les avertissements actuels et ce qui les déclenche. Le message décrit le comportement encore en vigueur, indique l’option qui le modifie et annonce que la 7.0 adoptera le nouveau comportement par défaut.
+Chaque comportement déprécié du runtime a son propre code, affiché entre crochets pour faciliter la recherche. La section [Opt-ins et avertissements](/fr/runtime-config#opt-ins-and-warnings) liste les avertissements de la 6.x et ce qui les déclenche. Le message décrit le comportement encore en vigueur, indique l’option qui le modifie et annonce que la 7.0 adoptera le nouveau comportement par défaut.
 
 La promesse se résout comme en 6.6.1, même avec `--throw-deprecation`, puis Node arrête le processus sur l’avertissement ([Opt-ins et avertissements](/fr/runtime-config#opt-ins-and-warnings)).
 
@@ -90,11 +90,11 @@ Tout au long de la série 7.x, `aggregatesTypedByColumn: false` dans `db.setConf
 
 La 7.0 active par défaut les opt-ins que liste la décision 003 : `upsertRequiresSameKeys`, `undefinedMeansMissing`, `transactionRequiresCommit`, `aggregatesTypedByColumn`, `transactionRequiresIdleClient`, `transactionRequiresSatisfyingLevel` et ceux du générateur (plus bas), sauf `selectExactlyOneChecksForSecondRow`, qui reste désactivé.
 
-Si vous n’avez activé `aggregatesTypedByColumn` qu’à l’exécution en 6.x, lancez `tsc` pour repérer les utilisations incompatibles avec les nouveaux types. Si vous avez activé toutes les options, y compris le typage des agrégats dans `ConfigTypes`, et que vous ne voyez ni avertissement `PGCAST_DEP` ni note du générateur, vous n’avez rien à modifier dans votre code, sauf s’il dépend des [types de clients en lecture seule élargis en 7.0](/fr/switching#from-7-0) ou des [types des conditions sur tableaux en 7.0](/fr/switching#array-condition-types), qui changent sans avertissement. Si vous vérifiez les types, déclarez les deux [peer dependencies facultatives](/fr/install#requirements), `typescript` et `@types/pg`, dans vos `devDependencies`.
+Activez toutes les corrections en 6.x, y compris le typage des agrégats dans `ConfigTypes`, pour vous préparer aux nouvelles valeurs par défaut. Même sans avertissement, compilez les [callbacks de transactions en lecture seule et les conditions sur tableaux](/fr/switching#from-7-0), puis vérifiez les [peer dependencies facultatives qui fournissent les types](/fr/install#requirements) après une installation neuve. Le [guide de migration](/fr/switching#regenerate-for-7-0) recense les dix anciens réglages qui restent utilisables sans avertissement en 7.x et disparaissent en 8.0, ainsi que les trois réglages permanents.
 
 Pendant toute la 7.x, `undefinedMeansMissing: false` et `upsertRequiresSameKeys: false` rétablissent indépendamment les comportements d’écriture de la 6.x, sans avertissement. La 8.0 supprime ces deux anciens comportements. Parmi les autres options, trois conservent leur ancienne valeur : `rejectOnQueryError: false`, `enumArraysTypedAsText: false` et `intervalsTypedAsObjects: false` (plus bas).
 
-En 7.x, `transactionRequiresCommit`, `transactionRequiresIdleClient` et `transactionRequiresSatisfyingLevel` valent aussi `true` par défaut. Passez une de ces options à `false` pour retrouver, sans avertissement, le [comportement des transactions en 6.x](/fr/switching#turn-on-the-opt-ins) qui correspond à cette option. Ces trois réglages disparaissent en 8.0.
+En 7.x, `transactionRequiresCommit`, `transactionRequiresIdleClient` et `transactionRequiresSatisfyingLevel` valent aussi `true` par défaut. Passez une de ces options à `false` pour rétablir le [comportement correspondant en 6.x](/fr/switching#runtime-migration) sans avertissement. Ces trois réglages disparaissent en 8.0.
 
 Le générateur a ses propres opt-ins en 6.7 : [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas), qui type un enum d’un autre schéma par ses labels, [`enumOrder`](/fr/generator#generate.enumOrder), qui garde les labels d’un enum dans leur ordre de déclaration, [`rejectOnQueryError`](/fr/generator#generate.rejectOnQueryError), qui rejette la promesse de `generate()` quand une requête échoue, plutôt que d’arrêter le processus, [`uniqueIndexConstraintsOnly`](/fr/generator#generate.uniqueIndexConstraintsOnly), qui ne liste dans `UniqueIndex` que les noms qu’accepte `ON CONFLICT ON CONSTRAINT`, [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext), qui type un domaine sur `bigint`, `numeric`, `bytea`, `money` ou une date, ou sur un tableau de l’un d’eux, selon le contexte, comme l’est son type de base, et un domaine sur un domaine ou un tableau d’un domaine, `any` sans l’option, par le type de base de son domaine le plus intérieur, [`enumArraysTypedAsText`](/fr/generator#generate.enumArraysTypedAsText), qui type dans `Selectable` un tableau d’un enum comme le texte que renvoie `pg`, et [`intervalsTypedAsObjects`](/fr/generator#generate.intervalsTypedAsObjects), qui type un `interval` dans `Selectable` comme `pg` le parse.
 

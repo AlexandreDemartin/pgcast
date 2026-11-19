@@ -66,15 +66,9 @@ const films: (s.films.JSONSelectable & { cast: s.roles.JSONSelectable[] })[]
 
 ## Install
 
-By default, the generated schema and the runtime use the `zapatos/*` module names (`zapatos/db`, `zapatos/schema`). To switch an existing project **without touching a single import**, install pgcast under the `zapatos` alias:
-
-```bash
-npm install zapatos@npm:@pgcast/pgcast
-npx zapatos        # or: npx pgcast
-```
+Switching from Zapatos 6.6.1? Keep your `zapatos/*` imports and [install pgcast 6.x](https://pgcast.dev/switching#swap-the-package) to see its migration warnings. Already on pgcast 6.x? Follow the [7.0 migration guide](https://pgcast.dev/switching#from-7-0).
 
 - `pg` is required. From 7.0, projects that check types must [declare any missing dev dependencies](https://pgcast.dev/install#requirements) (`typescript` 4.1 or later and `@types/pg`). pgcast still reads `zapatosconfig.json`.
-- pnpm, yarn and bun: `pnpm add zapatos@npm:@pgcast/pgcast`, `yarn add zapatos@npm:@pgcast/pgcast@^6`, `bun add zapatos@npm:@pgcast/pgcast@^6` (Yarn 2 and later need the range).
 - From 6.7.0, a new project installs pgcast under its own name, `npm install pgcast@npm:@pgcast/pgcast` (`pnpm add pgcast@npm:@pgcast/pgcast`, `yarn add pgcast@npm:@pgcast/pgcast@^6.7`, `bun add pgcast@npm:@pgcast/pgcast@^6.7`), sets the generator's [`moduleNames: 'pgcast'`](https://pgcast.dev/generator#generate.moduleNames) in `pgcastconfig.json`, and imports `pgcast/db` and `pgcast/schema` ([decision 002](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/002-module-names.md)). 6.6.2 ignores the option and the file. Installed as plain `@pgcast/pgcast`, neither name resolves.
 - From 6.8.0, `npx pgcast --check` compares the files the generator would write with yours and writes nothing, for CI: it exits with code 1 if one differs or is missing ([`--check`](https://pgcast.dev/generator#check)).
 
