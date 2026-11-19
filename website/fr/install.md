@@ -1,5 +1,5 @@
 ---
-english: 0326614b3f3b
+english: 053c751ab17f
 ---
 
 # Installation
@@ -62,8 +62,6 @@ npm install --save-dev --save-exact @types/node@ts4.1
 
 ## Ajouter le paquet {#add-the-package}
 
-Pour la 7.x, remplacez la plage de versions 6.x de l’alias par `@^7` dans les commandes Yarn ou bun ci-dessous.
-
 ### Sous son propre nom {#under-its-own-name}
 
 ::: code-group
@@ -77,18 +75,18 @@ pnpm add pgcast@npm:@pgcast/pgcast pg
 ```
 
 ```sh [yarn]
-yarn add pgcast@npm:@pgcast/pgcast@^6.7 pg
+yarn add pgcast@npm:@pgcast/pgcast@^7 pg
 ```
 
 ```sh [bun]
-bun add pgcast@npm:@pgcast/pgcast@^6.7 pg
+bun add pgcast@npm:@pgcast/pgcast@^7 pg
 ```
 
 :::
 
 Indiquez ensuite `"moduleNames": "pgcast"` dans `pgcastconfig.json`, le fichier de configuration du générateur ([La CLI](/fr/generator#cli)), et importez `pgcast/db` et `pgcast/schema` ([`moduleNames`](/fr/generator#generate.moduleNames)).
 
-Yarn 2 et les versions suivantes exigent une plage de versions dans un alias, et Yarn 1 et bun avant 1.4 n’en écrivent aucune sans elle : d’où le `@^6.7`, la première version qui a `moduleNames`.
+La plage `^7` sélectionne les versions 7.x de pgcast. Depuis la version 2, Yarn exige une plage de versions dans un alias. Yarn 1 et les versions de Bun antérieures à la 1.4 n’enregistrent cette plage que si vous la précisez.
 
 ### Sous l’alias `zapatos` {#under-the-zapatos-alias}
 

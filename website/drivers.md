@@ -30,7 +30,7 @@ The types pgcast generates describe values as `pg` parses them ([Parse like pg](
 ## postgres.js
 
 ```sh
-npm install zapatos@npm:@pgcast/pgcast@^6.12.0 @pgcast/adapter-postgres-js postgres
+npm install zapatos@npm:@pgcast/pgcast@^7 @pgcast/adapter-postgres-js postgres
 ```
 
 Give `asPool()` the `sql` that `postgres()` returns, imported as usual (`import postgres from 'postgres'`):
@@ -65,7 +65,7 @@ What it reads and writes, type by type, and how it differs from `pg`: [its READM
 ## PGlite
 
 ```sh
-npm install zapatos@npm:@pgcast/pgcast@^6.12.0 @pgcast/adapter-pglite @electric-sql/pglite
+npm install zapatos@npm:@pgcast/pgcast@^7 @pgcast/adapter-pglite @electric-sql/pglite
 ```
 
 Give `asPool()` a PGlite with your schema loaded, the one pgcast generated its types from:
