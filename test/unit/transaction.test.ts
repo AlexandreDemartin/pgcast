@@ -73,8 +73,6 @@ describe('transaction() on a pg.native pool', () => {
 
 // #233: the status comes from getTransactionStatus(), from pg 8.21; on pg-native < 3.8 the native client's throws
 describe('transaction() on a client that cannot tell its transaction status', () => {
-  afterEach(() => { db.setConfig({ transactionRequiresIdleClient: false }); });
-
   const inBlock = (status: string) => Object.assign(new native.Client(), { getTransactionStatus: () => status });
 
   it.each([
@@ -82,15 +80,13 @@ describe('transaction() on a client that cannot tell its transaction status', ()
     ['whose getTransactionStatus() throws (pg-native < 3.8)', () => Object.assign(new native.Client(), {
       getTransactionStatus: () => { throw new TypeError('this.native.getTransactionStatus is not a function'); },
     })],
-  ])('%s, runs as in Zapatos 6.6.1, even with transactionRequiresIdleClient', async (_, make) => {
-    db.setConfig({ transactionRequiresIdleClient: true });
+  ])('%s, runs as in Zapatos 6.6.1, on the default', async (_, make) => {
     const client = make();
     expect(await db.transaction(queryable(client), IsolationLevel.Serializable, async () => 'done')).toBe('done');
     expect(client.sent).toEqual(['START TRANSACTION ISOLATION LEVEL SERIALIZABLE', 'COMMIT']);
   });
 
-  it.each(['T', 'E'])('in a block (%s), with transactionRequiresIdleClient, sends only the empty query, then rejects', async status => {
-    db.setConfig({ transactionRequiresIdleClient: true });
+  it.each(['T', 'E'])('in a block (%s), sends only the empty query, then rejects', async status => {
     const client = inBlock(status);
     await expect(db.transaction(queryable(client), IsolationLevel.Serializable, async () => 'done'))
       .rejects.toThrow(/^transaction\(\) was given a client inside a transaction block/);
@@ -98,7 +94,6 @@ describe('transaction() on a client that cannot tell its transaction status', ()
   });
 
   it.each(['I', null])('outside a block (%s), sends no empty query', async status => {
-    db.setConfig({ transactionRequiresIdleClient: true });
     const client = Object.assign(new native.Client(), { getTransactionStatus: () => status });
     expect(await db.transaction(queryable(client), IsolationLevel.Serializable, async () => 'done')).toBe('done');
     expect(client.sent).toEqual(['START TRANSACTION ISOLATION LEVEL SERIALIZABLE', 'COMMIT']);
@@ -108,8 +103,7 @@ describe('transaction() on a client that cannot tell its transaction status', ()
 // #696: a pool of another driver, no pg class and no `_connected`, typed with no cast (db.PoolLike)
 describe('transaction() on a pool that is not pg’s', () => {
   afterEach(() => {
-    db.setConfig({ transactionRetryDelay: { minMs: 25, maxMs: 250 }, transactionAttemptsMax: 5, transactionRequiresCommit: false });
-    db.setConfig({ transactionEventListener: undefined } as unknown as db.NewConfig);  // exactOptionalPropertyTypes refuses it
+    resetConfig();
     vi.restoreAllMocks();
   });
 
@@ -212,16 +206,16 @@ describe('transaction() on a pool that is not pg’s', () => {
     }
   });
 
-  it('reads the command of its COMMIT: answered ROLLBACK, it warns PGCAST_DEP003, then releases the client', async () => {
+  it('reads the command of its COMMIT: answered ROLLBACK, with transactionRequiresCommit false it resolves quietly, then releases the client', async () => {
     const emitWarning = vi.spyOn(process, 'emitWarning').mockImplementation(() => undefined);
     const pool = otherPool(undefined, 'ROLLBACK');
+    db.setConfig({ transactionRequiresCommit: false });
     expect(await db.serializable(pool, async () => 'done')).toBe('done');
-    expect(emitWarning).toHaveBeenCalledWith(expect.stringMatching(/answered its COMMIT with ROLLBACK/), { type: 'DeprecationWarning', code: 'PGCAST_DEP003' });
+    expect(emitWarning).not.toHaveBeenCalled();
     expect(pool.sent).toEqual(['connect()', 'START TRANSACTION ISOLATION LEVEL SERIALIZABLE', 'COMMIT', 'release()']);
   });
 
-  it('reads the command of its COMMIT: answered ROLLBACK, with transactionRequiresCommit, it rejects, then releases the client', async () => {
-    db.setConfig({ transactionRequiresCommit: true });
+  it('reads the command of its COMMIT: answered ROLLBACK, by default it rejects, then releases the client', async () => {
     const pool = otherPool(undefined, 'ROLLBACK');
     await expect(db.serializable(pool, async () => 'done')).rejects.toThrow(/^the transaction was rolled back, not committed/);
     expect(pool.sent).toEqual(['connect()', 'START TRANSACTION ISOLATION LEVEL SERIALIZABLE', 'COMMIT', 'release()']);

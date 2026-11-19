@@ -1,5 +1,5 @@
 ---
-english: 0f644053f6f1
+english: 0592a26e618d
 description: "Ce que zapatos/db vous laisse régler à l’exécution : setConfig() et chaque option de Config, les écouteurs, les opt-ins et leurs codes d’avertissement."
 ---
 
@@ -98,9 +98,9 @@ Les clés qu’ajoute pgcast sont facultatives, donc un `Config` écrit pour Zap
 | [`castObjectParamsToJson`](#Config.castObjectParamsToJson) | `false` | un paramètre objet simple : `CAST($1 AS "json")`<!-- probe: (db.setConfig({ castObjectParamsToJson: true }), db.sql`${db.param({ a: 1 })}`) --> au lieu de `$1` | à chaque `compile()` |
 | [`upsertRequiresSameKeys`](#Config.upsertRequiresSameKeys) | `true` | Par défaut, un upsert de plusieurs lignes lève une erreur à l’appel si sa mise à jour implicite inclut une colonne absente d’une ligne, sauf si la cible du conflit la nomme ou si `updateValues` lui donne une valeur définie. Un `updateColumns` explicite désactive la vérification. Avec `noNullUpdateColumns` seul, elle s’applique toujours. | à chaque `upsert()` |
 | [`undefinedMeansMissing`](#Config.undefinedMeansMissing) | `true` | une valeur `undefined` dans `insert()`, `update()` et `upsert()` : la traiter comme une clé absente | à chaque appel de l’une d’elles |
-| [`transactionRequiresCommit`](#Config.transactionRequiresCommit) | `false` | un `COMMIT` auquel Postgres répond `ROLLBACK` : être rejetée, pas se résoudre | à chaque `transaction()` |
-| [`transactionRequiresIdleClient`](#Config.transactionRequiresIdleClient) | `false` | un client à vous déjà dans un bloc de transaction : être rejetée avant son `START TRANSACTION`, pas terminer votre transaction | à chaque `transaction()` qui reçoit un tel client |
-| [`transactionRequiresSatisfyingLevel`](#Config.transactionRequiresSatisfyingLevel) | `false` | le client d’une transaction à un niveau qui ne vaut pas pour celui demandé : être rejetée, pas exécuter le callback à ce niveau | à chaque `transaction()` qui reçoit un tel client |
+| [`transactionRequiresCommit`](#Config.transactionRequiresCommit) | `true` | rejeter la promesse si Postgres répond au `COMMIT` par `ROLLBACK` | à chaque `transaction()` |
+| [`transactionRequiresIdleClient`](#Config.transactionRequiresIdleClient) | `true` | rejeter la promesse avant `START TRANSACTION` uniquement si votre client sans marqueur signale `T` ou `E` avant et après la requête vide. Si le client ne fournit aucun statut, l’appel se poursuit | à chaque `transaction()` qui reçoit un tel client |
+| [`transactionRequiresSatisfyingLevel`](#Config.transactionRequiresSatisfyingLevel) | `true` | rejeter la promesse avant d’appeler le callback si le niveau d’isolation du client ne satisfait pas le niveau demandé | à chaque `transaction()` qui reçoit un tel client |
 | [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow) | `false` | un `selectExactlyOne()` exécuté seul : `LIMIT 2`, et une deuxième ligne entraîne un rejet | à chaque `selectExactlyOne()` |
 | [`aggregatesTypedByColumn`](#Config.aggregatesTypedByColumn) | `true` | `sum()`, `avg()`, `min()` et `max()` : `null` quand aucune ligne ne correspond, et pour `min()` et `max()` la valeur de la colonne sans conversion par `Number()` | à chaque `run()` de ces agrégats |
 | [`queryListener`](#Config.queryListener) | aucun | appelé avec chaque requête qu’envoie `run()` | à chaque `run()` |
@@ -197,14 +197,14 @@ Avec `true`, une valeur `undefined` dans [`insert()`](/fr/insert#insert), [`upda
 ### `transactionRequiresCommit` {#Config.transactionRequiresCommit}
 
 ```ts
-transactionRequiresCommit?: boolean  // default: false; the default in 7.0
+transactionRequiresCommit?: boolean  // default: true
 ```
 
-Quand le callback de [`transaction()`](/fr/transaction#transaction) intercepte l’erreur d’une requête et se termine normalement, Postgres a interrompu la transaction : il répond au `COMMIT`<!-- probe: db.serializable(pool, async () => {}) --> par le command tag `ROLLBACK`, pas par une erreur, et rien n’est enregistré.
+Si Postgres répond au `COMMIT`<!-- probe: db.serializable(pool, async () => {}) --> de [`transaction()`](/fr/transaction#transaction) par le command tag `ROLLBACK`, rien n’est enregistré.
 
 Avec `true`, `transaction()` est alors rejetée, sans retry, avec "the transaction was rolled back, not committed: a query in it failed and the callback caught the error, so Postgres answered COMMIT with ROLLBACK; let the error out of the callback, or ROLLBACK TO a SAVEPOINT before going on"<!-- message -->.
 
-Sans l’option, elle se résout avec ce que le callback a renvoyé, comme dans Zapatos 6.6.1, avec un avertissement une fois par processus : `PGCAST_DEP003`. Que faire à la place : [Laisser passer l’erreur](/fr/retries#let-the-error-through).
+Avec `false`, la promesse se résout avec la valeur renvoyée par le callback, sans avertissement. Voir [Laisser passer l’erreur](/fr/retries#let-the-error-through).
 
 - Non couvert : un callback qui envoie lui-même `COMMIT` ou `ROLLBACK`.
 - Non testé avec `pg-native`.
@@ -212,36 +212,35 @@ Sans l’option, elle se résout avec ce que le callback a renvoyé, comme dans 
 ### `transactionRequiresIdleClient` {#Config.transactionRequiresIdleClient}
 
 ```ts
-transactionRequiresIdleClient?: boolean  // default: false; the default in 7.0
+transactionRequiresIdleClient?: boolean  // default: true
 ```
 
 Avec un client sur lequel vous avez ouvert vous-même une transaction, par `BEGIN`, [`transaction()`](/fr/transaction#transaction) terminerait votre transaction : son `COMMIT`<!-- probe: db.serializable(pool, async () => {}) --> la valide, ou son `ROLLBACK`<!-- probe: db.serializable(pool, async () => { throw 0; }) --> l’annule ([Votre propre `BEGIN`](/fr/transaction#your-own-begin)).
 
 Avec `true`, elle est rejetée avant d’envoyer son `START TRANSACTION`, avec "transaction() was given a client inside a transaction block, so its COMMIT or ROLLBACK would end that transaction: COMMIT or ROLLBACK it first, or run the queries on that client without transaction()"<!-- message -->. Votre transaction reste ouverte, pour votre `COMMIT` ou votre `ROLLBACK`.
 
-Sans l’option, elle envoie ce qu’envoie Zapatos 6.6.1, avec un avertissement une fois par processus, `PGCAST_DEP005`, avant son `START TRANSACTION`.
+Avec `false`, `transaction()` envoie `START TRANSACTION` sans vérifier de nouveau le statut du client, comme dans Zapatos 6.6.1. pgcast n’émet aucun avertissement.
 
 - pg dit si un client est dans un bloc à partir de pg 8.21 (`getTransactionStatus()`). Avec les versions antérieures, `transaction()` s’exécute comme dans la 6.6.1, avec ou sans l’option, sans avertissement.
 - Avec `true`, quand pg signale un bloc, `transaction()` envoie d’abord une requête vide, pour relire le statut ; [`queryListener`](#Config.queryListener) et [`resultListener`](#Config.resultListener) la reçoivent, avec l’id de la transaction ([Votre propre `BEGIN`](/fr/transaction#your-own-begin)).
-- Avec `true`, une `transaction()` lancée au même moment sur ce client est transmise, comme dans la 6.6.1, et ne valide ni n’annule rien : ses requêtes s’exécutent dans votre bloc, ou, quand pg signalait un bloc déjà terminé, comme le dit le dernier point.
-- Sans l’option, rien ne relit le statut : juste après un `COMMIT` qui a échoué, pg peut encore signaler son bloc, et l’avertissement peut arriver une fois pour un client hors de tout bloc.
+- Pendant cette seconde vérification, le marqueur du premier appel contient le niveau d’isolation demandé par cet appel. Par défaut, un second appel n’exécute son callback sur ce client que si le niveau enregistré satisfait le niveau qu’il demande. Si un bloc de transaction est ouvert, les requêtes du callback s’exécutent au niveau d’isolation de ce bloc.
 - Seul un client que vous passez est vérifié : un client emprunté au pool, libéré alors qu’il était encore dans un bloc, ne l’est pas.
 - Un `BEGIN` envoyé sans `await` n’est pas encore vu : le client paraît hors de tout bloc.
 - Un `BEGIN` envoyé dans une même chaîne de requête avec une instruction qui échoue peut lui aussi paraître hors de tout bloc : `transaction()` s’exécute alors comme dans la 6.6.1, sans avertissement.
 - Non testé avec `pg-native`.
-- Avec `true`, juste après un `COMMIT` qui a échoué, deux appels de `transaction()` au même moment sur un même client : quand pg signale encore le bloc, le premier envoie sa requête vide, puis continue, et le second, transmis, envoie sa première requête, et celles envoyées avec elle, avant le `START TRANSACTION` du premier, hors de toute transaction, si bien que chacune est commitée à part. Ses requêtes suivantes s’exécutent dans la transaction du premier appel.
+- Si pg signale encore un bloc après l’échec d’un `COMMIT`, la seconde vérification peut indiquer que le client est hors transaction. Les écritures du second callback peuvent être commitées séparément avant le `START TRANSACTION` du premier appel ou après la fin de sa transaction.
 
 ### `transactionRequiresSatisfyingLevel` {#Config.transactionRequiresSatisfyingLevel}
 
 ```ts
-transactionRequiresSatisfyingLevel?: boolean  // default: false; the default in 7.0
+transactionRequiresSatisfyingLevel?: boolean  // default: true
 ```
 
-Avec le client d’une transaction qu’elle a ouverte, [`transaction()`](/fr/transaction#transaction) le transmet, et son callback s’exécute au niveau de cette transaction, car Postgres ne peut plus changer le niveau d’isolation une fois la première requête de la transaction exécutée : `db.serializable(txnClient, …)`, avec le client de `db.readCommitted()`, s’exécute en `READ COMMITTED` ([Transmettre une transaction](/fr/transaction#passing-a-transaction-through)).
+Un callback imbriqué s’exécute au niveau d’isolation de la transaction extérieure. Un appel à `serializable()` avec le client de `readCommitted()` ne peut donc pas garantir le niveau demandé ([Transmettre une transaction](/fr/transaction#passing-a-transaction-through)).
 
 Avec `true`, quand ce niveau ne vaut pas pour celui demandé ([`IsolationSatisfying`](/fr/transaction#IsolationSatisfying)), elle est rejetée avant d’appeler son callback, avec "transaction() at … was given the client of a transaction at …, so its callback would run at …: open the outer transaction at a level that satisfies … (IsolationSatisfying)"<!-- message -->, chaque `…` étant un niveau de l’appel (`SERIALIZABLE`, `READ COMMITTED`). À moins que le callback extérieur n’intercepte l’erreur, la transaction extérieure est alors annulée.
 
-Sans l’option, elle transmet le client, comme Zapatos 6.6.1, avec un avertissement une fois par processus, `PGCAST_DEP007`, seulement quand le niveau ne vaut pas pour celui demandé.
+Avec `false`, le client est transmis même si son niveau d’isolation est insuffisant. pgcast n’émet aucun avertissement.
 
 - Avec ou sans l’option, l’appel transmet le client si, dans le [tableau des niveaux d’isolation](/fr/transaction#IsolationSatisfying), son niveau figure sur la ligne correspondant au niveau demandé.
 - Seul le client d’une `transaction()` est vérifié, par sa marque `_zapatos`, que porte aussi un client simple tant qu’une `transaction()` s’exécute dessus, si bien qu’un second appel au même moment sur ce client est vérifié : un pool, un client simple inactif et un client gardé après la fin de sa transaction reçoivent leur propre transaction, comme avant.
@@ -439,29 +438,19 @@ type TransactionEvent =
 
 ## Opt-ins et avertissements {#opt-ins-and-warnings}
 
-Un comportement de Zapatos 6.6.1 sur lequel du code peut compter, mais que pgcast changerait, reste celui par défaut jusqu’à la 7.0 : une option active le nouveau, et l’ancien émet un avertissement. Pourquoi ce choix : [Versions](/fr/versions).
-
-<div class="stack">
-
-| Option | Avertissement | Émis quand | Par défaut à partir de |
-|---|---|---|---|
-| [`transactionRequiresCommit: true`](#Config.transactionRequiresCommit) | `PGCAST_DEP003` | Postgres répond au `COMMIT` de `transaction()` par `ROLLBACK`, après une erreur de requête que le callback a interceptée ([Laisser passer l’erreur](/fr/retries#let-the-error-through)) | 7.0 |
-| [`transactionRequiresIdleClient: true`](#Config.transactionRequiresIdleClient) | `PGCAST_DEP005` | `transaction()` reçoit un client déjà dans un bloc de transaction, auquel son `COMMIT` ou son `ROLLBACK` mettra fin ([Votre propre `BEGIN`](/fr/transaction#your-own-begin)) | 7.0 |
-| [`transactionRequiresSatisfyingLevel: true`](#Config.transactionRequiresSatisfyingLevel) | `PGCAST_DEP007` | `transaction()` reçoit le client d’une transaction à un niveau qui ne vaut pas pour le sien, et son callback s’exécute alors à ce niveau ([Transmettre une transaction](/fr/transaction#passing-a-transaction-through)) | 7.0 |
-
-</div>
+En 6.x, [`undefinedMeansMissing`](#Config.undefinedMeansMissing), [`upsertRequiresSameKeys`](#Config.upsertRequiresSameKeys), [`transactionRequiresCommit`](#Config.transactionRequiresCommit), [`aggregatesTypedByColumn`](#Config.aggregatesTypedByColumn), [`transactionRequiresIdleClient`](#Config.transactionRequiresIdleClient) et [`transactionRequiresSatisfyingLevel`](#Config.transactionRequiresSatisfyingLevel) étaient des opt-ins dont l’ancien comportement déclenchait un avertissement. La 7.0 les active par défaut et aucun ne déclenche d’avertissement. Un `false` explicite conserve l’ancien comportement sans avertissement pendant toute la série 7.x (voir [Versions](/fr/versions) et la [migration vers la 7.0](/fr/switching#from-7-0)).
 
 Un opt-in n’a pas d’avertissement et ne devient pas le comportement par défaut en 7.0 : [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow), puisque la lecture de `selectExactlyOne()` par la 6.6.1, au moins une ligne, est une lecture que Zapatos documente.
 
 Le générateur a ses propres opt-ins : [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas), [`enumOrder`](/fr/generator#generate.enumOrder), [`uniqueIndexConstraintsOnly`](/fr/generator#generate.uniqueIndexConstraintsOnly), [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext), [`enumArraysTypedAsText`](/fr/generator#generate.enumArraysTypedAsText) et [`intervalsTypedAsObjects`](/fr/generator#generate.intervalsTypedAsObjects). Les anciens comportements sont signalés une fois par exécution par des notes via [`warningListener`](/fr/generator#generate.warningListener), distinctes des `DeprecationWarning`. Ces opt-ins seront eux aussi activés par défaut en 7.0. L’option [`domainsTypedAsUnions`](/fr/generator#generate.domainsTypedAsUnions) reste désactivée en 7.0 et ne donne lieu à aucune note.
 
-Node.js émet chaque `DeprecationWarning` une fois par processus et par code, uniquement si l’appel au raccourci utilise l’ancien comportement. Pour `PGCAST_DEP003`, c’est quand la promesse de `transaction()` se résout. Pour `PGCAST_DEP005` et `PGCAST_DEP007`, c’est à l’appel de `transaction()`, avant son `START TRANSACTION` et avant son callback, respectivement. Le message nomme l’option. Node l’affiche sur `stderr` :
+Node émet chaque avertissement de migration une fois par processus et indique le nom de l’option dans le message. En 6.x, une réponse `ROLLBACK` à un `COMMIT` produisait l’avertissement ci-dessous sur `stderr`.
 
 ```txt
 (node:4242) [PGCAST_DEP003] DeprecationWarning: transaction() resolved, but Postgres answered its COMMIT with ROLLBACK: a query failed and the callback caught the error, so nothing was saved. Set transactionRequiresCommit: true (db.setConfig) to reject instead; it will be the default in pgcast 7.0.
 ```
 
-- `process.on('warning', …)` le reçoit, avec pour `name` `'DeprecationWarning'` et pour `code` `'PGCAST_DEP003'`.
+- `process.on('warning', …)` le recevait en 6.x, avec pour `name` `'DeprecationWarning'` et pour `code` `'PGCAST_DEP003'`.
 - `node --no-deprecation` le masque, y compris pour ce hook ; `node --no-warnings` le masque sur `stderr` seulement. `node --throw-deprecation` le lève comme une erreur que rien n’intercepte, donc le processus s’arrête.
 - Avec l’option activée, l’appel n’avertit jamais.
 

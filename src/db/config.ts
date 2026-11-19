@@ -64,9 +64,9 @@ const defaults: Config = {
   castObjectParamsToJson: false,
   upsertRequiresSameKeys: true,
   undefinedMeansMissing: true,
-  transactionRequiresCommit: false,  // the default in 7.0
-  transactionRequiresIdleClient: false,  // the default in 7.0
-  transactionRequiresSatisfyingLevel: false,  // the default in 7.0
+  transactionRequiresCommit: true,
+  transactionRequiresIdleClient: true,
+  transactionRequiresSatisfyingLevel: true,
   selectExactlyOneChecksForSecondRow: false,  // stays the default in 7.0
   aggregatesTypedByColumn: true,
 };

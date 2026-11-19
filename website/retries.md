@@ -51,9 +51,9 @@ Moved into the callback, a retried booking sends two confirmation emails, and pu
 
 ## Let the error through
 
-pgcast retries only what reaches it. Don't swallow a database error inside the callback: after it, Postgres refuses every query of the transaction with 25P02 (`current transaction is aborted, commands ignored until end of transaction block`), and if the callback returns, pgcast sends `COMMIT`<!-- probe: db.serializable(pool, async () => {}) -->, which Postgres turns into a rollback without an error.
+pgcast retries only what reaches it. After a query error, ordinary queries fail with 25P02 (`current transaction is aborted, commands ignored until end of transaction block`) until rollback. If the callback returns, pgcast sends `COMMIT`<!-- probe: db.serializable(pool, async () => {}) -->.
 
-The promise then resolves with what the callback returned, nothing is saved, and a 40001 caught this way is never retried; pgcast warns once, `PGCAST_DEP003`. With [`transactionRequiresCommit: true`](/runtime-config#Config.transactionRequiresCommit), the default from 7.0, the promise rejects instead, still without a retry: pgcast never saw the error.
+If Postgres answers that `COMMIT` with `ROLLBACK`, the promise rejects without a retry and nothing is saved. With [`transactionRequiresCommit: false`](/runtime-config#Config.transactionRequiresCommit), it resolves with the callback result. A fresh 40001 at `COMMIT` can still trigger a retry.
 
 If you catch one inside, rethrow it.
 
@@ -70,7 +70,7 @@ Catch it outside the transaction, once pgcast has given up, with [`isDatabaseErr
 
 ## Book inside a larger transaction
 
-Given the `txnClient` of a transaction already open, `bookSeats()` joins it: `serializable()` sends nothing of its own and calls the callback at once ([Passing a transaction through](/transaction#passing-a-transaction-through)). A couple books two seats, both or neither:
+Given an open transaction's `txnClient`, `bookSeats()` joins it if its marked level satisfies `serializable()`. The nested call then sends no SQL of its own ([Passing a transaction through](/transaction#passing-a-transaction-through)). A couple books two seats, both or neither:
 
 <<< ./examples/plain/retries_larger.ts{ts twoslash}
 
@@ -94,7 +94,9 @@ const bookSeats = (txnClientOrPool: pg.Pool | db.TxnClientForSerializable,
 await db.readCommitted(pool, txnClient => bookSeats(txnClient, 1000, ['G1'], 'Wren Abernathy'));
 ```
 
-Typed [`db.Queryable`](/sql-template#Queryable), it would take that client, and `bookSeats()` would run at `READ COMMITTED`, with a warning, once, `PGCAST_DEP007`. With [`transactionRequiresSatisfyingLevel`](/runtime-config#Config.transactionRequiresSatisfyingLevel), it rejects instead, before its callback.
+A [`db.Queryable`](/sql-template#Queryable) parameter accepts this client. The call below compiles, then rejects before the booking callback. With [`transactionRequiresSatisfyingLevel: false`](/runtime-config#Config.transactionRequiresSatisfyingLevel), the booking would run at `READ COMMITTED`.
+
+<<< ./examples/plain/retries_lower_level.ts{ts twoslash}
 
 ## Queue the requests with a lock
 

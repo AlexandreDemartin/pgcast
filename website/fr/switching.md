@@ -1,5 +1,5 @@
 ---
-english: 45e8357ecf16
+english: 3a14eea8d4da
 description: "Passez de Zapatos 6.6.1 à pgcast : changez une ligne de package.json et régénérez ; tsc et les avertissements de pgcast montrent les rares appels qui changent."
 ---
 
@@ -320,11 +320,13 @@ En 7.0, `tagline: undefined` seul lève l’erreur `nothing to update`. Ici, la 
 
 Pour garder un comportement d’écriture de la 6.x pendant toute la 7.x, passez son option à `false` dans `db.setConfig()`. Les deux choix sont indépendants : `undefinedMeansMissing: false` conserve les valeurs `undefined` à l’écriture, et `upsertRequiresSameKeys: false` permet d’écraser des valeurs stockées même si les clés correspondantes sont absentes. Aucun des deux réglages n’émet l’avertissement de la 6.x.
 
+En 7.x, les trois vérifications de transaction sont activées par défaut. Dans `db.setConfig()`, passez à `false` uniquement les vérifications que vous voulez désactiver. Avec [`transactionRequiresCommit: false`](/fr/runtime-config#Config.transactionRequiresCommit), la promesse se résout avec la valeur renvoyée par le callback si Postgres répond au `COMMIT` par `ROLLBACK`. Avec [`transactionRequiresIdleClient: false`](/fr/runtime-config#Config.transactionRequiresIdleClient), le raccourci peut mettre fin à la transaction de l’appelant. Avec [`transactionRequiresSatisfyingLevel: false`](/fr/runtime-config#Config.transactionRequiresSatisfyingLevel), le callback imbriqué s’exécute au niveau d’isolation de la transaction extérieure. Ces réglages n’émettent aucun avertissement en 7.x et disparaissent en 8.0.
+
 - `insert()` envoie `DEFAULT`<!-- probe: db.insert('tags', { film_id: 1000, tag: undefined }) --> pour une valeur `undefined`, un `update()` sans autre clé lève l’erreur "nothing to update: an Updatable needs at least one column"<!-- message -->, et un `upsert()` sans autre clé "nothing to insert: an Insertable needs at least one column; for a row of defaults only, write INSERT ... DEFAULT VALUES in a sql template"<!-- message -->.
 - Par défaut, un upsert de plusieurs lignes lève une erreur à l’appel si sa mise à jour implicite inclut une colonne absente d’une ligne, sauf si la cible du conflit la nomme ou si `updateValues` lui donne une valeur définie. Un `updateColumns` explicite désactive la vérification. Avec `noNullUpdateColumns` seul, elle s’applique toujours. Erreur : "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message -->.
 - Une `transaction()` dont Postgres répond au `COMMIT` par `ROLLBACK` est rejetée, sans retry ([`transaction()`, Erreurs](/fr/transaction#errors)).
-- Une `transaction()` qui reçoit un client déjà dans un bloc de transaction est rejetée, et laisse cette transaction ouverte ([Votre propre `BEGIN`](/fr/transaction#your-own-begin)).
-- Une `transaction()` qui reçoit le client d’une transaction à un niveau qui ne vaut pas pour le sien est rejetée avant son callback ([Transmettre une transaction](/fr/transaction#passing-a-transaction-through)).
+- Si votre client sans marqueur signale `T` ou `E` avant et après la requête vide, la promesse de `transaction()` est rejetée et votre bloc reste ouvert. Si le client ne fournit aucun statut, l’appel se poursuit. Un appel concurrent peut commiter des écritures avant le début de la première transaction. Sur un même client, attendez la fin de chaque appel avant de lancer le suivant ([Votre propre `BEGIN`](/fr/transaction#your-own-begin)).
+- La promesse d’un appel imbriqué à `transaction()` est rejetée avant l’exécution du callback si le niveau d’isolation enregistré à l’ouverture de la transaction extérieure ne satisfait pas le niveau demandé. Un `SET TRANSACTION` ultérieur laisse le marqueur inchangé. Ouvrez la transaction extérieure au niveau voulu avec le raccourci ([Transmettre une transaction](/fr/transaction#passing-a-transaction-through)).
 - `sum()`, `avg()`, `min()` et `max()` donnent `null` quand aucune ligne ne correspond, et `min()` et `max()` la valeur de leur colonne, que la déclaration dans `ConfigTypes` type ainsi ([Typé par colonne](/fr/select#typed-by-column)).
 - Aucune option n’avertit. Pour que cela dure, `NODE_OPTIONS=--throw-deprecation npm test` fait échouer l’exécution au premier avertissement.
 

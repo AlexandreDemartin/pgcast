@@ -7,7 +7,7 @@
 
 - Only the queries you `.run(txnClient)` are in the transaction; one run on the pool is not.
 - On 40001 or 40P01, the whole callback runs again, five attempts in all by default: write it so it can.
-- A query error that the callback catches turns `COMMIT` into `ROLLBACK`, and nothing is saved: let the error out.
+- If Postgres answers the helper's `COMMIT` with `ROLLBACK`, by default the promise rejects without a retry and nothing is saved. Let query errors out of the callback.
 
 </AtAGlance>
 
@@ -59,8 +59,8 @@ The two `count()`s run on `client`, outside the transaction: after the block, `b
 
 - These three run on the transaction's client, as the callback's queries do. Each reaches [`queryListener`](/runtime-config#Config.queryListener) and [`resultListener`](/runtime-config#Config.resultListener) with the transaction's id: a counter from 0, one per transaction opened, kept across retries; a transaction passed through keeps the outer one's.
 - No `SAVEPOINT`: a transaction inside another is the outer one ([Passing a transaction through](#passing-a-transaction-through)). To nest a unit of work that can fail alone: [`savepoint()`](#savepoint).
-- After a query error that the callback catches, Postgres answers the `COMMIT` with `ROLLBACK`, not an error, and nothing is saved. `transaction()` resolves, as in Zapatos 6.6.1, and warns once (`PGCAST_DEP003`); with [`transactionRequiresCommit`](/runtime-config#Config.transactionRequiresCommit), it rejects.
-- Given a client you sent `BEGIN` on, it ends your transaction, unless [`transactionRequiresIdleClient`](/runtime-config#Config.transactionRequiresIdleClient) makes it reject first ([Your own `BEGIN`](#your-own-begin)).
+- If the callback catches a query error and Postgres answers `COMMIT` with `ROLLBACK`, nothing is saved. The promise rejects without a retry. With [`transactionRequiresCommit: false`](/runtime-config#Config.transactionRequiresCommit), it resolves with the callback result.
+- With the idle check on, if pg reports that your unmarked client is already in a transaction, pgcast rechecks its status before starting one. See [Your own `BEGIN`](#your-own-begin).
 
 ### Retries
 
@@ -88,14 +88,14 @@ The callback may run several times: [Retries](/retries).
 
 ### Passing a transaction through
 
-Given the client of a transaction that `transaction()` has open, it sends nothing: it calls the callback with that client, at once, and returns its promise. No `START TRANSACTION`, `COMMIT`, `ROLLBACK` nor retry of its own; the outer transaction does them. So a function can run in its own transaction, or in the caller's:
+Given a client marked by `transaction()` whose level satisfies the request, the nested call sends nothing: it calls the callback with that client, at once, and returns its promise. No `START TRANSACTION`, `COMMIT`, `ROLLBACK` nor retry of its own; the outer transaction does them. So a function can run in its own transaction, or in the caller's:
 
 <<< ./examples/plain/pass_through.ts{ts twoslash}
 
 One transaction, both seats or neither: `START TRANSACTION ISOLATION LEVEL SERIALIZABLE`<!-- probe: db.serializable(pool, async () => {}) -->, the two `INSERT`s, `COMMIT`.
 
-- The callback runs at the outer transaction's level, as Postgres can't change the isolation level once the transaction's first query has run. The type doesn't check that level: every `TxnClient` is a [`Queryable`](/sql-template#Queryable), so `db.serializable(txnClient, …)` type-checks with a client of `db.readCommitted()`, and its callback runs in that `READ COMMITTED` transaction, as in Zapatos 6.6.1, with a warning, once, `PGCAST_DEP007`.
-- With [`transactionRequiresSatisfyingLevel`](/runtime-config#Config.transactionRequiresSatisfyingLevel), when the outer level doesn't satisfy the one asked for ([`IsolationSatisfying`](#IsolationSatisfying)), it rejects before calling the callback, and the outer transaction rolls back unless its callback catches the error. If the outer level satisfies the requested level, the call passes the client through with or without the option.
+- Every `TxnClient` is a [`Queryable`](/sql-template#Queryable), so TypeScript accepts `serializable()` with the client of `readCommitted()`. By default, pgcast rejects that request at run time before calling its callback.
+- The outer transaction rolls back unless its callback catches the error. With [`transactionRequiresSatisfyingLevel: false`](/runtime-config#Config.transactionRequiresSatisfyingLevel), the inner callback runs at the outer level. A [satisfying level](#IsolationSatisfying) passes the same client through under either setting.
 - A function whose parameter is a `TxnClientFor…` type is checked: [`IsolationSatisfying`](#IsolationSatisfying).
 - What marks the client is its own `_zapatos` property ([`TxnClient`](#TxnClient)).
 - A transaction you opened yourself, with a raw `BEGIN`, has no mark: it is not passed through ([Your own `BEGIN`](#your-own-begin)). Open the outer transaction with `transaction()`.
@@ -155,23 +155,21 @@ The SQL of the callback's query: [`count()`](/select#count).
 
 ### Your own `BEGIN`
 
-Given a client you sent `BEGIN` on, `transaction()` sends its own `START TRANSACTION`<!-- probe: db.serializable(pool, async () => {}) -->, which Postgres only warns about (25001), then ends your transaction:
+If pg reports a block, the default leaves your transaction open. With [`transactionRequiresIdleClient: false`](/runtime-config#Config.transactionRequiresIdleClient), pgcast sends its own `START TRANSACTION`<!-- probe: db.serializable(pool, async () => {}) --> and can end yours. In a live block, Postgres emits notice 25001.
 
-| Your transaction | Zapatos 6.6.1, and pgcast without the option | With [`transactionRequiresIdleClient`](/runtime-config#Config.transactionRequiresIdleClient) |
+| Your transaction | Zapatos 6.6.1 or explicit `false` | 7.0 default |
 |---|---|---|
 | no query yet, or at the session's own level (`readCommitted()`, on a default server) | its `COMMIT`<!-- probe: db.serializable(pool, async () => {}) --> commits yours, rows and all | rejects before sending its `START TRANSACTION`; yours stays open |
 | another level, after a query | Postgres refuses (25001), and its `ROLLBACK`<!-- probe: db.serializable(pool, async () => { throw 0; }) --> undoes your rows | rejects before its `START TRANSACTION`; yours stays open |
 | aborted by a failed query | Postgres refuses (25P02), and its `ROLLBACK` ends yours | rejects before its `START TRANSACTION`; yours stays open, aborted, for your `ROLLBACK` |
 
-Either way, without the option, your own `ROLLBACK` then has nothing left to undo (25P01), and pgcast warns once, `PGCAST_DEP005`. With it, your `ROLLBACK` undoes the seat:
+With the default, the caller can still roll back the booking:
 
 ```ts twoslash
 import * as db from 'zapatos/db';
 import type pg from 'pg';
 declare const pool: pg.Pool;
 // ---cut---
-db.setConfig({ transactionRequiresIdleClient: true });
-
 const client = await pool.connect();
 await client.query('BEGIN');
 await db.insert('seat_bookings', { screening_id: 1002, seat: 'D4', customer: 'Hollis Brandt' }).run(client);
@@ -183,11 +181,10 @@ client.release();
 ```
 
 - pg reports the block from pg 8.21. Before, `transaction()` runs as in 6.6.1, with no warning. Not tested with `pg-native`.
-- With the option, when pg reports one, `transaction()` first sends an empty query, so as to read the status again: pg can still report a block just after a `COMMIT` that failed. Postgres counts it as no query of yours. [`queryListener`](/runtime-config#Config.queryListener) and [`resultListener`](/runtime-config#Config.resultListener) get it, with the transaction's id, as they get its `START TRANSACTION`.
-- With the option, a `transaction()` at the same moment on that client is passed through, as in 6.6.1, and neither commits nor rolls back: its queries run in your block, or, when pg's report of a block was stale, as the last point says.
-- Without it, `transaction()` sends what 6.6.1 sends, and warns before its `START TRANSACTION`. Nothing reads the status again, so just after a `COMMIT` that failed, the warning can come once for a client outside a block.
+- By default, when pg reports one, `transaction()` first sends an empty query, so as to read the status again: pg can still report a block just after a `COMMIT` that failed. Postgres counts it as no query of yours. [`queryListener`](/runtime-config#Config.queryListener) and [`resultListener`](/runtime-config#Config.resultListener) get it, with the transaction's id, as they get its `START TRANSACTION`.
+- During the recheck, the first call's marker holds its requested level. By default, a second call runs its callback on that client only if the marked level satisfies its request. In an open block, its queries run at that block's level.
 - Not caught: a client the pool hands out still in a block, as one released before its `ROLLBACK`; a `BEGIN` sent without `await`; a `BEGIN` sent in one query string with a statement that fails (`'BEGIN; …; SELECT 1/0'`), which pg can still report as outside a block, so `transaction()` runs as in 6.6.1, with no warning.
-- With the option, just after a `COMMIT` that failed, two `transaction()` calls at the same moment on one client: when pg still reports the block, the first sends its empty query, then goes on, and the second, passed through, sends its first query, and any sent with it, before the first's `START TRANSACTION`, outside any transaction, so each is committed on its own. Its later queries run in the first call's transaction.
+- If pg still reports a block after a failed `COMMIT`, the recheck can find the client idle. Writes from a second callback can commit separately before the first call's `START TRANSACTION` or after its transaction ends.
 
 ### Errors
 
@@ -556,7 +553,7 @@ The second argument of [`transaction()`](#transaction). Each value is written af
 type IsolationSatisfying<T extends IsolationLevel>
 ```
 
-The outer levels a nested call at level `T` accepts with [`transactionRequiresSatisfyingLevel`](/runtime-config#Config.transactionRequiresSatisfyingLevel); without it, any outer level passes, with `PGCAST_DEP007`.
+The outer levels that satisfy a nested request at level `T`. With [`transactionRequiresSatisfyingLevel: false`](/runtime-config#Config.transactionRequiresSatisfyingLevel), any outer level passes.
 
 | `T` | `IsolationSatisfying<T>` |
 |---|---|

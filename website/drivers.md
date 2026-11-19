@@ -123,7 +123,7 @@ It sends what it sends on a `pg.Pool` ([The SQL it sends](/transaction#the-sql-i
 
 - On PGlite, or any pool of one connection (`max: 1` for a `pg.Pool` or a postgres.js `sql`), a query on the pool waits until the transaction releases the connection. Awaited inside the callback, `.run(pool)` waits forever: run the callback's queries on `txnClient`.
 - PGlite's own `query()` and `exec()` don't wait: inside the transaction, they run in it ([How it differs from pg](https://github.com/AlexandreDemartin/pgcast/tree/master/adapters/pglite#how-it-differs-from-pg)).
-- A nested transaction takes the callback's client with no cast, and its callback gets that client, at the outer transaction's level ([Another driver's pool](/transaction#another-drivers-pool), [#702](https://github.com/AlexandreDemartin/pgcast/issues/702)).
+- A nested transaction takes the callback's client with no cast. By default its callback gets that client only if the marked outer level satisfies the request ([Another driver's pool](/transaction#another-drivers-pool), [#702](https://github.com/AlexandreDemartin/pgcast/issues/702)).
 
 ## A driver of your own
 
