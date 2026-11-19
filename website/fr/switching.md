@@ -367,7 +367,7 @@ Par défaut, la promesse de `check()` est déjà rejetée en cas d’erreur de b
 
 La régénération conserve les placeholders existants dans `custom/`. Générez une seconde copie dans un `outDir` vide, hors de votre projet TypeScript. Comparez ses placeholders aux vôtres et intégrez les changements adaptés à vos parsers. Lancez ensuite `npx tsc` avec le schéma régénéré, puis vos tests.
 
-Trois réglages conservent leur valeur par défaut. `selectExactlyOneChecksForSecondRow` reste désactivé. Si vous l’activez, seule une requête exécutée isolément vérifie la présence d’une deuxième ligne. Une requête imbriquée ou une copie obtenue avec `.copy()` garde `LIMIT 1`, sauf si [`withTies`](/fr/select#order-limit-offset-and-withties) inclut les lignes ex æquo. Dans le générateur, [`domainsTypedAsUnions`](/fr/generator#generate.domainsTypedAsUnions) reste un opt-in et [`moduleNames`](/fr/generator#generate.moduleNames) vaut toujours `'zapatos'` par défaut.
+Trois réglages conservent leur valeur par défaut. `selectExactlyOneChecksForSecondRow` reste désactivé. Si vous l’activez, une requête exécutée seule est rejetée à la deuxième ligne. [Les requêtes imbriquées et les copies](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow) demandent une ligne, plus les éventuels ex æquo avec `withTies: true`. Dans le générateur, [`domainsTypedAsUnions`](/fr/generator#generate.domainsTypedAsUnions) reste un opt-in et [`moduleNames`](/fr/generator#generate.moduleNames) vaut toujours `'zapatos'` par défaut.
 
 ### Types des enums en 7.0 {#enum-types}
 
@@ -389,7 +389,7 @@ Si le type `UniqueIndex` d’une relation devient `never`, un objet littéral de
 
 Sur Postgres 18, un upsert qui cible par son nom une clé `WITHOUT OVERLAPS` non différable avec `updateColumns: db.doNothing` compilait et fonctionnait en 6.x. Avec le réglage par défaut de la 7.0, le compilateur refuse ce nom. Pour conserver `DO NOTHING`, écrivez une requête `sql` explicite qui nomme la clé ou utilisez `uniqueIndexConstraintsOnly: false` en 7.x.
 
-Sur une table partitionnée, le type union suit l’index de la table parente. Il exclut une clé différable de la table parente, même si la clé non différable de la partition permet à l’upsert à cible nommée de fonctionner. Utilisez une requête SQL explicite ou réglez `uniqueIndexConstraintsOnly: false` en 7.x. Avec une clé non différable sur la table parente et une clé différable sur la partition, TypeScript accepte le nom, mais Postgres peut renvoyer l’erreur `55000`.
+Sur une table partitionnée, le type union suit l’index de la table parente. Il exclut une clé différable de la table parente, même si la clé non différable de la partition permet à l’upsert à cible nommée de fonctionner avec `{ reportAction: 'suppress' }`. Utilisez une requête SQL explicite ou réglez `uniqueIndexConstraintsOnly: false` en 7.x. Avec une clé non différable sur la table parente et une clé différable sur la partition, TypeScript accepte le nom, mais Postgres peut renvoyer l’erreur `55000`.
 
 Ce réglage rétablit le type union de la 6.x sans note de migration. C’est le seul qui renseigne le paramètre de sortie `uniqueIndexesNotArbiters` de `definitionForRelationInSchema()`.
 
@@ -414,10 +414,10 @@ Si vous appelez `definitionForRelationInSchema()`, les quatre tableaux facultati
 
 Le typage par contexte compare le type du placeholder à celui qu’une nouvelle génération produirait avec les réglages actuels. Un ancien placeholder pour un domaine sur `interval` garde le type `string`. Si vous lui donnez le type `db.PostgresInterval`, il correspond au nouveau type par défaut et les raccourcis renvoient du texte en JSON. Si vous repassez à `intervalsTypedAsObjects: false`, un placeholder existant de type objet garde son type. [Comparez votre placeholder à celui d’une nouvelle génération](#regenerate-for-7-0). S’il manque l’import de `db`, [ajoutez-le](/fr/custom-types#when-a-placeholder-does-not-compile).
 
-Vérifiez les domaines imbriqués même si vous aviez activé toutes les corrections du générateur en 6.x :
+Pour les domaines imbriqués dont le placeholder vient d’être généré, comparez les types bruts selon vos réglages en 6.x.
 
-- Pour un domaine imbriqué sur un tableau d’enums qui utilise le placeholder généré, le type dans les lignes brutes passe d’un tableau de labels à `string`. Pour écrire ces valeurs en base, reprenez le tableau renvoyé dans le JSON du raccourci ou réglez `enumArraysTypedAsText: false` si votre parser renvoie un tableau. Pour un domaine portant directement sur le tableau, ce seul réglage rétablit le type brut du placeholder de la 6.x.
-- Sur `numeric[]`, le type brut du domaine imbriqué passe de `any` à `db.NumericString[]`. Le parser par défaut de `pg` renvoie des nombres. Si les tableaux ont une seule dimension et que leurs éléments sont non nuls, donnez au placeholder du domaine le type `number[]`.
+- Sur un tableau d’enums, le type brut passe de `any` (réglages par défaut de la 6.x) ou d’un tableau de labels (toutes les corrections activées en 6.x) à `string`. Pour écrire ces valeurs en base, reprenez le tableau renvoyé dans le JSON du raccourci ou réglez `enumArraysTypedAsText: false` si votre parser renvoie un tableau. Pour un domaine portant directement sur le tableau, ce seul réglage rétablit le type brut du placeholder de la 6.x.
+- Sur `numeric[]`, le type brut passe de `any` (réglages par défaut de la 6.x) à `db.NumericString[]`, déjà son type en 6.x avec le typage par contexte. Le parser par défaut de `pg` lit les éléments numériques comme des nombres. Traitez l’élément brut comme `unknown` et vérifiez `typeof value === 'number'` avant de l’utiliser comme nombre. Le placeholder type aussi le JSON des raccourcis, où `NaN` est une chaîne. Utilisez `number[]` seulement si tous les contextes de lecture renvoient des tableaux à une dimension de nombres sans élément `null`.
 
 ### Revenir à pgcast 6.x {#roll-back-to-6-x}
 

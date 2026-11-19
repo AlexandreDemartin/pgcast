@@ -366,7 +366,7 @@ By default, `await check()` already rejects on database errors. It compares the 
 
 Regeneration preserves existing `custom/` placeholders. Generate a second copy into an empty `outDir` outside your TypeScript project, compare its placeholders with yours and merge the changes that fit your parsers. Then run `npx tsc` against the regenerated schema and run your tests.
 
-Three settings keep their own defaults. `selectExactlyOneChecksForSecondRow` stays off. Enabling it checks for a second row only in a standalone query. A nested query or a `.copy()` keeps `LIMIT 1` unless [`withTies`](/select#order-limit-offset-and-withties) includes tied rows. The generator's [`domainsTypedAsUnions`](/generator#generate.domainsTypedAsUnions) stays opt-in and [`moduleNames`](/generator#generate.moduleNames) still defaults to `'zapatos'`.
+Three settings keep their own defaults. `selectExactlyOneChecksForSecondRow` stays off. When enabled, a standalone query rejects on a second row. [Nested queries and copies](/runtime-config#Config.selectExactlyOneChecksForSecondRow) request one row plus any ties with `withTies: true`. The generator's [`domainsTypedAsUnions`](/generator#generate.domainsTypedAsUnions) stays opt-in and [`moduleNames`](/generator#generate.moduleNames) still defaults to `'zapatos'`.
 
 ### Enum types in 7.0 {#enum-types}
 
@@ -388,7 +388,7 @@ If a relation's `UniqueIndex` becomes `never`, a `Record` literal typed with tha
 
 On Postgres 18, naming a non-deferrable `WITHOUT OVERLAPS` key with `updateColumns: db.doNothing` compiled and worked in 6.x. The 7.0 default rejects the name at compile time. To keep `DO NOTHING`, write an explicit `sql` statement naming the key, or set `uniqueIndexConstraintsOnly: false` through 7.x.
 
-On a partitioned table, the union follows the parent index. A deferrable parent key drops out even when an immediate partition key lets the named upsert work. Use explicit SQL or set `uniqueIndexConstraintsOnly: false` through 7.x. With an immediate parent and a deferrable partition key, the name compiles but Postgres can raise 55000.
+On a partitioned table, the union follows the parent index. A deferrable parent key drops out even when an immediate partition key lets the named upsert work with `{ reportAction: 'suppress' }`. Use explicit SQL or set `uniqueIndexConstraintsOnly: false` through 7.x. With an immediate parent and a deferrable partition key, the name compiles but Postgres can raise 55000.
 
 This setting restores the 6.x union without a migration note. It alone fills the `uniqueIndexesNotArbiters` out-parameter of `definitionForRelationInSchema()`.
 
@@ -413,10 +413,10 @@ For callers of `definitionForRelationInSchema()`, the four optional arrays still
 
 Context typing compares the placeholder's type with the type a fresh run would generate under the current settings. An old interval-domain `string` stays text. An edit to `db.PostgresInterval` matches the new default, so shortcut JSON becomes text. Switching back to `intervalsTypedAsObjects: false` preserves an existing object placeholder. [Compare your placeholder with fresh output](#regenerate-for-7-0). For a missing `db` import, [add the import](/custom-types#when-a-placeholder-does-not-compile).
 
-Check nested domains even if you enabled all the generator fixes in 6.x:
+Compare nested domains with fresh placeholders against your 6.x settings.
 
-- Over an enum array, a nested domain with its generated placeholder changes from a label array to `string` in raw rows. Write back the shortcut JSON array, or set `enumArraysTypedAsText: false` for an array-returning parser. For a direct domain over the array, that setting alone restores the 6.x raw placeholder type.
-- Over `numeric[]`, the raw nested domain narrows from `any` to `db.NumericString[]`. The default `pg` parser returns numbers. If the arrays have one dimension and non-null elements, type the domain's placeholder as `number[]`.
+- Over an enum array, the raw type changes from `any` (6.x defaults) or a label array (all 6.x fixes enabled) to `string`. Write back the shortcut JSON array, or set `enumArraysTypedAsText: false` for an array-returning parser. For a direct domain over the array, that setting alone restores the 6.x raw placeholder type.
+- Over `numeric[]`, the raw type narrows from `any` (6.x defaults) to `db.NumericString[]`, already its type with 6.x context typing. The default `pg` parser reads numeric elements as numbers. Treat the raw element as `unknown` and check `typeof value === 'number'` before using it as a number. The placeholder also types shortcut JSON, where `NaN` is a string. Use `number[]` only if every read context returns one-dimensional arrays of non-null numbers.
 
 ### Roll back to pgcast 6.x {#roll-back-to-6-x}
 

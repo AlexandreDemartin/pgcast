@@ -96,7 +96,7 @@ The keys pgcast adds are optional, so a `Config` written for Zapatos 6.6.1 still
 | [`transactionRequiresCommit`](#Config.transactionRequiresCommit) | `true` | a `COMMIT` that Postgres answers with `ROLLBACK`: reject, not resolve | at each `transaction()` |
 | [`transactionRequiresIdleClient`](#Config.transactionRequiresIdleClient) | `true` | reject before `START TRANSACTION` only if your unmarked client reports `T` or `E` both before and after the empty query. Without a status, the call proceeds | at each `transaction()` given such a client |
 | [`transactionRequiresSatisfyingLevel`](#Config.transactionRequiresSatisfyingLevel) | `true` | the client of a transaction at a level that doesn't satisfy the one asked for: reject, not run the callback at that level | at each `transaction()` given such a client |
-| [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow) | `false` | a `selectExactlyOne()` run on its own: `LIMIT 2`, and a second row rejects | at each `selectExactlyOne()` |
+| [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow) | `false` | a standalone `selectExactlyOne()` requests two rows and rejects on a second | at each `selectExactlyOne()` |
 | [`aggregatesTypedByColumn`](#Config.aggregatesTypedByColumn) | `true` | `sum()`, `avg()`, `min()` and `max()`: `null` when no row matches, and `min()` and `max()` the column's value, not `Number()` of it | at each `run()` of those |
 | [`queryListener`](#Config.queryListener) | none | called with each query `run()` sends | at each `run()` |
 | [`resultListener`](#Config.resultListener) | none | called with each result `run()` gives | at each `run()` |
@@ -258,10 +258,10 @@ With `false`, an insufficient level also passes through without a warning.
 selectExactlyOneChecksForSecondRow?: boolean  // default: false, in 7.0 too
 ```
 
-With `true`, a [`selectExactlyOne()`](/select#selectExactlyOne) run on its own asks for two rows, `LIMIT $2`<!-- probe: (db.setConfig({ selectExactlyOneChecksForSecondRow: true }), db.selectExactlyOne('films', { id: 1000 })) --> with `2`, and `.run()` rejects with a [`NotExactlyOneError`](/select#NotExactlyOneError) when a second row comes: "One result expected but more returned (hint: check `.query.compile()` on this Error)"<!-- message -->. Off, it asks for one, `LIMIT 1`, and gives the first row that matches, as in Zapatos 6.6.1.
+With the check enabled and `withTies` off, a [`selectExactlyOne()`](/select#selectExactlyOne) run on its own asks for two rows, `LIMIT $2`<!-- probe: (db.setConfig({ selectExactlyOneChecksForSecondRow: true }), db.selectExactlyOne('films', { id: 1000 })) --> with `2`, and `.run()` rejects with a [`NotExactlyOneError`](/select#NotExactlyOneError) when a second row comes: "One result expected but more returned (hint: check `.query.compile()` on this Error)"<!-- message -->. With both off, it asks for one, `LIMIT 1`, and gives the first row that matches, as in Zapatos 6.6.1.
 
-- Nested in another query, in a `lateral` or a `sql` template, it keeps `LIMIT 1` unless [`withTies`](/select#order-limit-offset-and-withties) includes tied rows. "On its own" is how the query is compiled: `.run()` and `.compile()` compile it alone, a parent query compiles it as part of its own SQL.
-- A [`.copy()`](/sql-template#copy) of it compiles as nested, so the same limit and `withTies` rule apply even when run on its own.
+- Nested in a `lateral` or a `sql` template, or copied with [`.copy()`](/sql-template#copy), it requests one row.
+- [`withTies: true`](/select#order-limit-offset-and-withties) compiles each limit as `FETCH FIRST … ROWS WITH TIES`. A nested query can return all ties. A standalone copy still requests one row plus ties and rejects with `NotExactlyOneError` if it gets a second row with the check enabled.
 - With a [`lock`](/select#lock), `LIMIT $2` locks the second row too: after `.run()` rejects, both rows stay locked until the transaction ends, and another session's `FOR UPDATE NOWAIT` on either gets 55P03.
 - Off, it never warns, and it stays off in 7.0: "at least one row" is how Zapatos reads `selectExactlyOne()`, nested in a `lateral` on a `NOT NULL` foreign key ([decision 003](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/003-fixes-and-deprecation.md)).
 - Read when `selectExactlyOne()` is called, not at `.run()`.
@@ -490,7 +490,7 @@ process.on('warning', (warning: Error & { code?: string }) => {
 - In a `Selectable`, `int8[]` gives `Int8String[]`. A raw [enum array](/generator#generate.enumArraysTypedAsText) is text by default.
 - With the generator's [`customJSONParsingForLargeNumbers`](/generator#generate.customJSONParsingForLargeNumbers), `int8` and `numeric` are `number | Int8String` and `number | NumericString` in a `JSONSelectable` ([`enableCustomJSONParsingForLargeNumbers()`](#enableCustomJSONParsingForLargeNumbers)).
 - The shortcuts return `JSONSelectable`s. A `Selectable` is what `pg` returns for a plain `SELECT` of the row.
-- A domain follows its base type in each context while its placeholder holds the generated type ([`DomainInContext`](#DomainInContext)). [`domainsTypedByContext: false`](/generator#generate.domainsTypedByContext) uses the placeholder. For raw enum-array domains, see the [direct and nested cases](/switching#domain-and-parser-types). For interval domains, `intervalsTypedAsObjects` determines the type of a fresh placeholder.
+- A domain follows its base type in each context while its placeholder holds the generated type ([`DomainInContext`](#DomainInContext)). [`domainsTypedByContext: false`](/generator#generate.domainsTypedByContext) uses the placeholder, except in raw rows for a [direct domain over an enum array](/switching#domain-and-parser-types). There, `enumArraysTypedAsText: false` alone restores the placeholder. For interval domains, `intervalsTypedAsObjects` determines the type of a fresh placeholder.
 - An `interval` gives a [`PostgresInterval`](#PostgresInterval) in `Selectable`, a `string` in JSON and `string | PostgresInterval` in a write. With [`intervalsTypedAsObjects: false`](/generator#generate.intervalsTypedAsObjects), all five interfaces use `string`.
 
 Each type checks the shape of a string, not its value: `'2030-13-45'` is a `DateString`.

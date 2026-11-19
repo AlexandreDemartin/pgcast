@@ -44,9 +44,9 @@ About half of them can't be fixed without changing a result that is valid today 
 
 A fix can still stop a call that only worked through the bug. 6.6.2's escaping fixes are an example: a column name such as `id" AS "x` used to close its quotes and add an alias, and now names a column that doesn't exist. The changelog lists every such call, with what to write instead.
 
-Two opt-ins will stay off for good: `selectExactlyOneChecksForSecondRow`, below, and the generator's [`domainsTypedAsUnions`](#_7-0-and-8-0). [`selectExactlyOne()`](/select#selectExactlyOne) asks Postgres for one row only, so it means "at least one", and Zapatos's own docs nest it in a `lateral`, where looking for a second row would duplicate the parent row.
+Two opt-ins will stay off for good: `selectExactlyOneChecksForSecondRow`, below, and the generator's [`domainsTypedAsUnions`](#_7-0-and-8-0). [`selectExactlyOne()`](/select#selectExactlyOne) checks for at least one row. Zapatos nests it in a `lateral`, where ties can duplicate the parent row with `withTies: true`.
 
-Its option, [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow), looks for a second row only in a query run on its own, never in one nested in another, never warns, and never becomes the default.
+Its option, [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow), rejects on a second row when the query is run on its own. It never warns or becomes the default.
 
 ## Why an opt-in, not a breaking change
 
@@ -103,7 +103,7 @@ On partitioned tables the 7.x `UniqueIndex` follows the parent index. [`uniqueIn
 
 In 6.x the warnings for the six schema options are notes through [`warningListener`](/generator#generate.warningListener), not a `DeprecationWarning`, and come only when your schema has something they would change, once per run: `typeEnumsAcrossSchemas`'s names each column, `enumOrder`'s each enum, `uniqueIndexConstraintsOnly`'s each unique index, `domainsTypedByContext`'s, `enumArraysTypedAsText`'s and `intervalsTypedAsObjects`'s each column.
 
-From 7.0, domain columns are typed by context. In raw rows, enum arrays are text and intervals are objects. The 6.x migration notes go away. `domainsTypedByContext: false` restores typing by placeholder through 7.x and goes in 8.0. For fresh interval-domain text placeholders, set `intervalsTypedAsObjects: false`. The two parser choices, `enumArraysTypedAsText: false` and `intervalsTypedAsObjects: false`, remain available beyond 8.0. See [Domains, enum arrays and intervals in 7.0](/switching#domain-and-parser-types).
+From 7.0, domain columns are typed by context. In raw rows, enum arrays are text and intervals are objects. The 6.x migration notes go away. `domainsTypedByContext: false` restores typing by placeholder through 7.x and goes in 8.0. For a raw direct domain over an enum array, `enumArraysTypedAsText: false` alone restores its placeholder. For fresh interval-domain text placeholders, set `intervalsTypedAsObjects: false`. The two parser choices, `enumArraysTypedAsText: false` and `intervalsTypedAsObjects: false`, remain available beyond 8.0. See [Domains, enum arrays and intervals in 7.0](/switching#domain-and-parser-types).
 
 From 6.7 until 7.0, with `rejectOnQueryError` omitted or set to `null` in JSON, `generate()` and `tsForConfig()` sent `PGCAST_DEP006` to an enabled `warningListener` before exiting on a connection or query failure. From 7.0, both functions then reject with the original error, as [`check()`](/generator#export-check) does. The note is retired. Set `rejectOnQueryError: false` to keep the CLI's immediate exit with code 1 on a connection or query failure in 7.x, 8.0 and later.
 

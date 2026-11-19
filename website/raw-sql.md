@@ -332,7 +332,7 @@ A write shortcut can be a CTE too. It runs, and the main query sees each table a
 
 Nested, `withCTEs()` goes where its query would: in parentheses as an `extras` or `insert()` value, as a subquery in a `lateral`.
 
-A `selectExactlyOne()` as the query keeps its checks. With [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow), at the top level, it still asks for a second row, `LIMIT $1`<!-- probe: (db.setConfig({ selectExactlyOneChecksForSecondRow: true }), db.withCTEs({ r: db.sql`SELECT 1` }, db.selectExactlyOne('films', db.all))) --> with `2`, and rejects on one; nested in another query, it keeps `LIMIT 1`, as a [`copy()`](/sql-template#copy) does. With no row, it rejects with `NotExactlyOneError`, whose `.query` is the shortcut, without the `WITH`.
+A `selectExactlyOne()` as the query keeps its checks. With [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow), at the top level, it still asks for a second row (by default `LIMIT $1`<!-- probe: (db.setConfig({ selectExactlyOneChecksForSecondRow: true }), db.withCTEs({ r: db.sql`SELECT 1` }, db.selectExactlyOne('films', db.all))) --> with `2`) and rejects on one. Nested, it requests one row plus any ties with `withTies: true`, as a [`copy()`](/sql-template#copy) does. With no row, it rejects with `NotExactlyOneError`, whose `.query` is the shortcut, without the `WITH`.
 
 `withCTEs()` writes neither `RECURSIVE` nor `MATERIALIZED`: write such a `WITH` in `sql`, with its main query. Put all the CTEs in one call: a query that already starts with a `WITH`, a `withCTEs()` result for one, is refused (42601).
 

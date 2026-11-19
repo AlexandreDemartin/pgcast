@@ -246,7 +246,7 @@ Comme [`selectOne()`](#selectOne), mais son type n’a pas d’`undefined` : qu
 
 </CastPanel>
 
-Avec [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), la requête exécutée seule demande deux lignes, `LIMIT $2`<!-- probe: (db.setConfig({ selectExactlyOneChecksForSecondRow: true }), db.selectExactlyOne('studios', { id: 1000 })) --> avec `2`, et la promesse de `.run()` est aussi rejetée s’il y a une deuxième ligne. Imbriquée dans une autre requête, dans un `lateral` ou un template `sql`, elle garde `LIMIT 1`, sauf si [`withTies`](#order-limit-offset-and-withties) inclut les ex æquo.
+Avec [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), la requête exécutée seule demande deux lignes (par défaut `LIMIT $2`<!-- probe: (db.setConfig({ selectExactlyOneChecksForSecondRow: true }), db.selectExactlyOne('studios', { id: 1000 })) --> avec `2`) et la promesse de `.run()` est aussi rejetée s’il y a une deuxième ligne. Imbriquée dans un `lateral` ou un template `sql`, elle demande une ligne, plus les éventuels ex æquo avec `withTies: true`.
 
 ### `NotExactlyOneError` {#NotExactlyOneError}
 
@@ -446,7 +446,7 @@ const firstShow = await db.min('screenings', db.all, {
 - `min()` et `max()` donnent un `bigint` ou un `numeric` sous forme de chaîne avec le parseur par défaut de `pg` et le réglage d’exécution par défaut. Sous une clé de `lateral`, le parseur JSON de la requête extérieure lit le nombre et peut conserver les grandes valeurs sous forme de chaînes.
 - `count()` ne change pas avec l’option : `0` au premier niveau, et `null` imbriqué dans un `lateral` ou comme valeur d’`extras` quand sa requête ne renvoie aucune ligne.
 - Passé comme unique `lateral`, l’agrégat est typé comme au premier niveau par `selectOne()` et `selectExactlyOne()`, qui rendent sa colonne telle quelle, et comme imbriqué par `select()`, qui enveloppe ses lignes dans `jsonb_agg()`. Ce `selectOne()` ou ce `selectExactlyOne()`, imbriqué à son tour, est typé comme imbriqué.
-- `.copy()` renvoie un simple `SQLFragment`, typé comme au premier niveau : imbriquée à son tour, une copie revient en JSON avec ce type.
+- `.copy()` renvoie un simple `SQLFragment`. Dans `extras` ou sous une clé de `lateral`, imbriquez le fragment d’origine de `min()` ou de `max()`. Pour une colonne de type date, la copie garde le type direct `Date | null`, alors que Postgres renvoie en JSON une chaîne pour une date non nulle.
 
 ## Types {#types}
 
