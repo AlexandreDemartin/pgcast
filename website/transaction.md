@@ -118,6 +118,7 @@ COMMIT
 The SQL of the callback's query: [`count()`](/select#count).
 
 - The callback gets the pool's client, typed as the pool gives it and marked: a [`TxnClientLike`](#TxnClientLike) at that level. `taken` is a `number`, as on a `pg.Pool`.
+  With another driver's pool, specifying the result type without the client type gives the callback a `pg` client type. To keep the driver's client type, let TypeScript infer both or supply the client type too, as in the seat-booking example below. For `transaction()`, the client type comes third, after the result and isolation level.
 - `command` is read off the `COMMIT`, which Postgres answers with `ROLLBACK` after a query error that the callback caught ([The SQL it sends](#the-sql-it-sends)): a pool whose client gives no `command` does not compile. PGlite and postgres.js give it at run time, but PGlite's type makes it optional, `command?: string`, so a pool that forwards PGlite's result maps `command` to a `string`, as its adapter does ([Drivers](/drivers#pglite)).
 - A retry reads the error's `code` alone, so another driver's 40001 and 40P01 are retried too ([Retries](#retries)).
 - Passed to a nested call, the callback's client is passed through ([Passing a transaction through](#passing-a-transaction-through)), with no cast. The nested callback gets the same client, normally typed at the outer transaction's level. If the client itself fits the `PoolLike` parameter, TypeScript types the callback's client at the nested call's level, as it does for a `pg` client in Zapatos 6.6.1. At run time the usual check against the outer transaction's level applies.
@@ -138,6 +139,7 @@ The SQL of the callback's query: [`count()`](/select#count).
       db.count('seat_bookings', { screening_id: 1000 }).run(inner));
 
   const taken = await db.serializable(showPool, countTaken);
+  const alsoTaken = await db.serializable<number, ShowClient>(showPool, countTaken);
   ```
 
   A function generic over that client, `<C extends db.TxnClientLike<ShowClient, db.IsolationLevel>>(txnClient: C)`, does not compile (2345), nor does one generic over the pool's, `<C>(pool: db.PoolLike<C>, …)` or `<C extends ShowClient>`, that passes on a callback typed with `C` or nests a call on its callback's client: name the driver's client, `db.TxnClientLike<ShowClient, …>` or `db.PoolLike<ShowClient>`.

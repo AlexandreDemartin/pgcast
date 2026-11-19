@@ -140,9 +140,18 @@ type LiteralClient = Awaited<ReturnType<typeof literal.connect>>;
 // callback gets, marked (db.TxnClientLike); a pg queryable still gives the TxnClient… of Zapatos 6.6.1
 describe('a pool that is not pg’s', () => {
   test('the callback gets the pool’s client, marked, at each level', () => {
-    void db.transaction(other, db.IsolationLevel.ReadCommitted, async c => { expectTypeOf(c).toEqualTypeOf<TxnOther<db.IsolationLevel.ReadCommitted>>(); });
-    void db.serializable(other, async c => { expectTypeOf(c).toEqualTypeOf<TxnOther<db.IsolationLevel.Serializable>>(); });
-    void db.repeatableRead(other, async c => { expectTypeOf(c).toEqualTypeOf<TxnOther<db.IsolationLevel.RepeatableRead>>(); });
+    expectTypeOf(db.transaction(other, db.IsolationLevel.ReadCommitted, async c => {
+      expectTypeOf(c).toEqualTypeOf<TxnOther<db.IsolationLevel.ReadCommitted>>();
+      return 1;
+    })).resolves.toEqualTypeOf<number>();
+    expectTypeOf(db.serializable(other, async c => {
+      expectTypeOf(c).toEqualTypeOf<TxnOther<db.IsolationLevel.Serializable>>();
+      return 1;
+    })).resolves.toEqualTypeOf<number>();
+    expectTypeOf(db.repeatableRead(other, async c => {
+      expectTypeOf(c).toEqualTypeOf<TxnOther<db.IsolationLevel.RepeatableRead>>();
+      return 1;
+    })).resolves.toEqualTypeOf<number>();
     void db.readCommitted(other, async c => { expectTypeOf(c).toEqualTypeOf<TxnOther<db.IsolationLevel.ReadCommitted>>(); });
     void db.serializableRO(other, async c => { expectTypeOf(c).toEqualTypeOf<TxnOther<db.IsolationLevel.SerializableRO>>(); });
     void db.repeatableReadRO(other, async c => { expectTypeOf(c).toEqualTypeOf<TxnOther<db.IsolationLevel.RepeatableReadRO>>(); });
@@ -155,6 +164,37 @@ describe('a pool that is not pg’s', () => {
     expectTypeOf(forwarder(other)).resolves.toEqualTypeOf<TxnOther<db.IsolationLevel.Serializable>>();
     const levels = <M extends db.IsolationLevel>(m: M) => db.transaction(other, m, async c => c);
     expectTypeOf(levels(db.IsolationLevel.ReadCommitted)).resolves.toEqualTypeOf<TxnOther<db.IsolationLevel.ReadCommitted>>();
+  });
+
+  // https://github.com/AlexandreDemartin/pgcast/issues/752: an explicit result type leaves the client at its pg default.
+  test('naming the result alone gives the callback a pg client type', () => {
+    void db.transaction<number, db.IsolationLevel.ReadCommitted>(other, db.IsolationLevel.ReadCommitted, async c => {
+      expectTypeOf(c).toEqualTypeOf<db.TxnClientForReadCommitted>();
+      return 1;
+    });
+    void db.serializable<number>(other, async c => {
+      expectTypeOf(c).toEqualTypeOf<db.TxnClientForSerializable>();
+      return 1;
+    });
+    void db.repeatableRead<number>(other, async c => {
+      expectTypeOf(c).toEqualTypeOf<db.TxnClientForRepeatableRead>();
+      return 1;
+    });
+  });
+
+  test('naming the driver client alongside the result gives the callback that client type', () => {
+    void db.transaction<number, db.IsolationLevel.ReadCommitted, OtherClient>(other, db.IsolationLevel.ReadCommitted, async c => {
+      expectTypeOf(c).toEqualTypeOf<TxnOther<db.IsolationLevel.ReadCommitted>>();
+      return 1;
+    });
+    void db.serializable<number, OtherClient>(other, async c => {
+      expectTypeOf(c).toEqualTypeOf<TxnOther<db.IsolationLevel.Serializable>>();
+      return 1;
+    });
+    void db.repeatableRead<number, OtherClient>(other, async c => {
+      expectTypeOf(c).toEqualTypeOf<TxnOther<db.IsolationLevel.RepeatableRead>>();
+      return 1;
+    });
   });
 
   test('the callback’s client runs a fragment, and has the pool client’s own members', () => {

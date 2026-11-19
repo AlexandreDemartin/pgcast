@@ -122,6 +122,7 @@ COMMIT
 Le SQL de la requête du callback : [`count()`](/fr/select#count).
 
 - Le callback reçoit le client du pool, typé tel que le pool le donne, et marqué : un [`TxnClientLike`](#TxnClientLike) de ce niveau. `taken` est un `number`, comme sur un `pg.Pool`.
+  Avec le pool d’un autre driver, si vous précisez le type du résultat sans préciser celui du client, TypeScript donne au client du callback le type de `pg`. Pour garder le type du driver, laissez TypeScript tout inférer ou précisez aussi le type du client, comme dans l’exemple de réservation ci-dessous. Pour `transaction()`, le type du client vient en troisième, après le résultat et le niveau d’isolation.
 - `command` est lu sur le `COMMIT`, auquel Postgres répond par `ROLLBACK` après une erreur de requête que le callback a interceptée ([Le SQL envoyé](#the-sql-it-sends)) : un pool dont le client ne donne pas de `command` ne compile pas. PGlite et postgres.js le donnent à l’exécution, mais le type de PGlite le rend optionnel, `command?: string` : un pool qui transmet le résultat de PGlite convertit donc `command` en `string`, comme le fait son adaptateur ([Drivers](/fr/drivers#pglite)).
 - Un retry ne lit que le `code` de l’erreur : les 40001 et 40P01 d’un autre driver sont donc réessayés aussi ([Retries](#retries)).
 - Si vous passez le client du callback à un appel imbriqué, il est transmis sans cast ([Transmettre une transaction](#passing-a-transaction-through)). Le callback imbriqué reçoit le même client, dont le type correspond en général au niveau d’isolation de la transaction extérieure. Si le client lui-même est compatible avec le paramètre `PoolLike`, TypeScript lui donne dans le callback le type qui correspond au niveau demandé par l’appel imbriqué, comme pour un client `pg` dans Zapatos 6.6.1. À l’exécution, pgcast compare comme d’habitude le niveau demandé à celui de la transaction extérieure.
@@ -142,6 +143,7 @@ Le SQL de la requête du callback : [`count()`](/fr/select#count).
       db.count('seat_bookings', { screening_id: 1000 }).run(inner));
 
   const taken = await db.serializable(showPool, countTaken);
+  const alsoTaken = await db.serializable<number, ShowClient>(showPool, countTaken);
   ```
 
   Une fonction générique sur ce client, `<C extends db.TxnClientLike<ShowClient, db.IsolationLevel>>(txnClient: C)`, ne compile pas (2345), pas plus qu’une fonction générique sur celui du pool, `<C>(pool: db.PoolLike<C>, …)` ou `<C extends ShowClient>`, qui transmet un callback typé avec `C` ou imbrique un appel sur le client de son callback : nommez le client du driver, `db.TxnClientLike<ShowClient, …>` ou `db.PoolLike<ShowClient>`.
