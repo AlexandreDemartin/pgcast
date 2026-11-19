@@ -6,6 +6,8 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 
 ## [Unreleased]
 
+## [7.1.0] - 2026-11-19
+
 ### Added
 
 - Set the generator's `constraintNames` option to `true` to get each relation's primary key, unique, foreign key, check and exclusion constraint names and all its unique index names in `Constraint`. Table `NOT NULL` constraints are excluded. [#713](https://github.com/AlexandreDemartin/pgcast/issues/713)
