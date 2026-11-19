@@ -34,11 +34,11 @@ The SQL of the callback's query: [`insert()`](/insert#insert); each case `savepo
 
 ## Let a conflict retry the transaction
 
-The `catch` keeps the 23505 alone and rethrows any other error. On a 40001 or a 40P01 that the savepoint's callback lets out, `savepoint()` rejects with it and the transaction stays aborted ([`savepoint()`](/transaction#savepoint)), so only a new transaction can retry it: rethrown, it reaches `serializable()`, which rolls back and runs its whole callback again, every seat's savepoint included ([Retries](/retries)).
+The `catch` handles 23505 and rethrows any other error. If the callback lets a 40001 or 40P01 from Postgres escape, [`savepoint()`](/transaction#savepoint) rethrows it. The transaction stays aborted. If the error reaches the outer `serializable()` with an attempt left, it retries the whole booking ([Retries](/retries)).
 
 ## Avoid the pitfalls
 
-- One savepoint at a time on a client: `await` each, as the loop does; two seats booked at once, with `Promise.all()`, make the transaction reject with 3B001 ([`savepoint()`](/transaction#savepoint)).
+- Await each savepoint on a client, as the loop does. pgcast does not check for overlap. If the outer savepoint is released first, Postgres removes the inner one too. Its own `RELEASE` then fails with 3B001 ([`savepoint()`](/transaction#savepoint)).
 - Catch a query's error around `savepoint()`, as the example does: a callback that catches it and returns makes `savepoint()` reject with 25P02, so a 40001 it catches is not retried there; with the example's `catch`, the transaction rejects with that 25P02 ([`savepoint()`](/transaction#savepoint)).
 - Call `savepoint()` on a transaction's client: outside one, Postgres refuses its `SAVEPOINT` with 25P01 ([`savepoint()`](/transaction#savepoint)).
 - A `transaction()` given the callback's client is no savepoint: it joins the outer transaction ([Passing a transaction through](/transaction#passing-a-transaction-through)).

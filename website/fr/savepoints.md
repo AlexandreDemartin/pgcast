@@ -39,11 +39,11 @@ Le SQL de la requête du callback : [`insert()`](/fr/insert#insert) ; chaque c
 
 ## Laisser un conflit relancer la transaction {#let-a-conflict-retry-the-transaction}
 
-Le `catch` ne garde que le 23505 et relance toute autre erreur. Sur un 40001 ou un 40P01 que le callback du savepoint laisse remonter, `savepoint()` est rejetée avec cette erreur et la transaction reste en échec ([`savepoint()`](/fr/transaction#savepoint)), donc seule une nouvelle transaction peut la réessayer : relancée, l’erreur atteint `serializable()`, qui annule la transaction et exécute de nouveau tout son callback, savepoint de chaque place compris ([Retries](/fr/retries)).
+Le `catch` traite le 23505 et relance toute autre erreur. Si le callback laisse remonter une erreur 40001 ou 40P01 de Postgres, [`savepoint()`](/fr/transaction#savepoint) la relance. La transaction reste en échec. Si l’erreur atteint l’appel extérieur à `serializable()` et qu’il reste une tentative, celui-ci reprend toute la réservation ([Retries](/fr/retries)).
 
 ## Éviter les pièges {#avoid-the-pitfalls}
 
-- Un seul savepoint à la fois sur un client : attendez chacun avec `await`, comme le fait la boucle ; deux places réservées en même temps, avec `Promise.all()`, font rejeter la transaction avec 3B001 ([`savepoint()`](/fr/transaction#savepoint)).
+- Sur un même client, attendez chaque savepoint avec `await`, comme le fait la boucle. pgcast ne vérifie pas si les appels se chevauchent. Si le savepoint extérieur est libéré en premier, Postgres supprime aussi le savepoint intérieur. Son propre `RELEASE` échoue alors avec 3B001 ([`savepoint()`](/fr/transaction#savepoint)).
 - Interceptez l’erreur d’une requête autour de `savepoint()`, comme le fait l’exemple : si le callback l’intercepte et se termine, `savepoint()` est rejetée avec 25P02, donc un 40001 qu’il intercepte n’est pas réessayé à cet endroit ; avec le `catch` de l’exemple, la transaction est rejetée avec ce 25P02 ([`savepoint()`](/fr/transaction#savepoint)).
 - Appelez `savepoint()` sur le client d’une transaction : hors d’une transaction, Postgres refuse son `SAVEPOINT` avec 25P01 ([`savepoint()`](/fr/transaction#savepoint)).
 - Une `transaction()` appelée avec le client du callback n’est pas un savepoint : elle rejoint la transaction extérieure ([Transmettre une transaction](/fr/transaction#passing-a-transaction-through)).
