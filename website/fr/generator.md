@@ -608,7 +608,7 @@ Writing custom types file: src/zapatos/custom/index.d.ts
 - `Note: pgcastconfig.json and zapatosconfig.json are both here, and only pgcastconfig.json is read. Move any option you still need from zapatosconfig.json into pgcastconfig.json, then delete zapatosconfig.json.`
   - depuis [la CLI](#cli), avant de générer, quand le dossier où elle tourne contient les deux fichiers ;
 - `Note: flag --chek ignored after the JSON argument: only --check may follow it.`
-  - depuis [la CLI](#cli), avant de générer ou de vérifier, pour chaque argument après `config` qui commence par `--` sauf `--` et `--check` ;
+  - depuis [la CLI](#cli), avant de générer ou de vérifier, pour chaque argument placé après `config` et commençant par `--`, sauf s’il s’agit de `--` ou de `--check` ;
 - `Note: a query failed, so generate() ends the process with process.exit(1), and its promise never settles (PGCAST_DEP006). Set rejectOnQueryError: true to reject with the error instead; it will be the default in pgcast 7.0.`
   - depuis `generate()` sans [`rejectOnQueryError`](#generate.rejectOnQueryError), quand une requête échoue, après l’erreur et juste avant l’arrêt ;
 - l’[avertissement sur l’ancienne arborescence](#the-old-layout-warning) ;

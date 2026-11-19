@@ -19,7 +19,7 @@ ALTER TABLE seat_bookings ENABLE ROW LEVEL SECURITY;
 CREATE POLICY own_bookings ON seat_bookings USING (customer = NULLIF(current_setting('app.customer', true), ''));
 ```
 
-Utilisez des identifiants client non vides. Avec `NULLIF`, un réglage vide ne correspond à aucune réservation.
+Utilisez des identifiants de client non vides. Avec `NULLIF`, un réglage vide ne correspond à aucune réservation.
 
 Avec `true`, `current_setting()` renvoie `NULL` pour un nom que cette connexion n’a jamais défini (`''` une fois qu’elle l’a défini, voir [les pièges](#avoid-the-pitfalls)), là où sans `true` il échouerait avec 42704. La politique est celle de Postgres : [Row Security Policies](https://www.postgresql.org/docs/current/ddl-rowsecurity.html).
 
