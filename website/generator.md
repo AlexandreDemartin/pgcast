@@ -158,6 +158,7 @@ Every option is optional. Each one given replaces its default whole: `schemas` w
 | [`moduleNames`](#generate.moduleNames) | `"zapatos"` | the module names the files declare and import, and their folder |
 | [`rejectOnQueryError`](#generate.rejectOnQueryError) | `true` | whether a failed query rejects, or ends the process |
 | [`uniqueIndexConstraintsOnly`](#generate.uniqueIndexConstraintsOnly) | `true` | the names in each relation's `UniqueIndex` |
+| [`constraintNames`](#generate.constraintNames) | `false` | the names in each relation's `Constraint` type |
 | [`domainsTypedByContext`](#generate.domainsTypedByContext) | `true` | the type of a domain over `bigint`, `numeric`, `bytea`, `money` or a date, or over an array of one, outside `Selectable`, and of a domain over a domain or an array of a domain |
 | [`enumArraysTypedAsText`](#generate.enumArraysTypedAsText) | `true` | the `Selectable` type of an array of an enum |
 | [`intervalsTypedAsObjects`](#generate.intervalsTypedAsObjects) | `true` | the type of an `interval` in `Selectable` and in a write |
@@ -440,6 +441,20 @@ CREATE UNIQUE INDEX festival_entries_live_idx ON festival_entries (film_id) WHER
 - For a partitioned table, the union follows the parent constraint. Postgres checks the receiving partition's index, so a deferrable key there can still raise 55000. A deferrable parent key is omitted even when the partitions' keys are immediate.
 - A relation left with none gets `never`. `UniqueIndexForTable` and the aggregate `UniqueIndex` types follow.
 - In 7.x, `false` restores the 6.x union without a migration note. The override goes in 8.0.
+
+### `constraintNames` {#generate.constraintNames}
+
+From 7.1.0. Set `constraintNames` to `true` to generate a `Constraint` type in each relation's namespace. It lists the names of its primary keys, unique constraints, foreign keys, checks, exclusion constraints and all its unique indexes. For the table above, `festival_entries.Constraint` includes both `festival_entries_slot_key` and `festival_entries_live_idx` with either setting of `uniqueIndexConstraintsOnly`.
+
+The type lists the catalogue names whether or not Postgres enforces them. A trigger or function can report a name outside the type, so check `err.table` and `err.constraint`. A relation with no matching names gets `never`.
+
+Each partition or inheritance child gets its own names, including inherited checks. When a write through a partitioned table fails in a partition, Postgres reports the partition, so compare with its `Constraint`.
+
+Table `NOT NULL` constraints are excluded. For a not-null violation on a table's column, Postgres reports the column. Domain checks belong to the domain, and a domain's `NOT NULL` violation reports the domain in `err.dataType`.
+
+If the generator includes a relation named `every` from a schema with an enum named `Constraint`, both declare `every.Constraint`: exclude that relation, leave the option off for that schema or rename one of them.
+
+The extra catalogue query and declaration are off unless the merged configuration (file, then JSON argument) sets `constraintNames` to `true`. A JSON `null` in the argument turns a file's `true` off.
 
 ### `domainsTypedByContext` {#generate.domainsTypedByContext}
 

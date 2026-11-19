@@ -60,6 +60,15 @@ describe('cliConfig()', () => {
     expect(cliConfig('{"uniqueIndexConstraintsOnly":false}', dir).uniqueIndexConstraintsOnly).toBe(false);
   });
 
+  it.each(['pgcastconfig.json', 'zapatosconfig.json'])('overlays constraintNames by key in %s', name => {
+    write(name, '{"constraintNames":true}');
+    expect(cliConfig('{}', dir).constraintNames).toBe(true);
+    expect(cliConfig('{"constraintNames":false}', dir).constraintNames).toBe(false);
+    expect(cliConfig('{"constraintNames":null}', dir).constraintNames).toBeNull();
+    write(name, '{"constraintNames":false}');
+    expect(cliConfig('{"constraintNames":true}', dir).constraintNames).toBe(true);
+  });
+
   it.each(['pgcastconfig.json', 'zapatosconfig.json'])('overlays domain and parser settings by key in %s', name => {
     for (const key of ['domainsTypedByContext', 'enumArraysTypedAsText', 'intervalsTypedAsObjects']) {
       const setting = (value: boolean | null) => JSON.stringify({ [key]: value });
