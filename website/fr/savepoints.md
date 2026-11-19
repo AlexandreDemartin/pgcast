@@ -1,5 +1,5 @@
 ---
-english: 02624e04518e
+english: 579bd779db8e
 description: "Annulez une partie d’une transaction et gardez le reste : réservez les places libres parmi plusieurs, dans une seule transaction."
 ---
 
