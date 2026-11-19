@@ -349,7 +349,7 @@ declare module 'zapatos/schema' {
       */
       weight_kg?: c.PgFloat_range | db.Parameter<c.PgFloat_range> | null | db.DefaultType | db.SQLFragment | db.SQLFragment<any, c.PgFloat_range | db.Parameter<c.PgFloat_range> | null | db.DefaultType | db.SQLFragment>;
     }
-    export type UniqueIndex = 'products_pkey' | 'products_sku_variant_key' | 'products_status_sku_key' | 'products_title_lower_key';
+    export type UniqueIndex = 'products_pkey' | 'products_sku_variant_key';
     export type Column = keyof Selectable;
     export type OnlyCols<T extends readonly Column[]> = Pick<Selectable, T[number]>;
     export type SQLExpression = Table | db.ColumnNames<Updatable | (keyof Updatable)[]> | db.ColumnValues<Updatable> | (Whereable & { [Symbol.iterator]?: undefined }) | Column | db.ParentColumn | db.GenericSQLExpression;

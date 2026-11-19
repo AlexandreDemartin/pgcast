@@ -157,26 +157,6 @@ const warnAboutSharedCustomTypeNames = (origins: CustomTypeOrigins, config: Comp
 };
 
 /**
- * Without `uniqueIndexConstraintsOnly`, note the unique indexes it would leave out of `UniqueIndex`, once per run:
- * `constraint()` takes them, and `ON CONFLICT ON CONSTRAINT` refuses them, with `DO NOTHING` too but for a `WITHOUT OVERLAPS` key.
- */
-const warnAboutUniqueIndexesNotArbiters = (indexes: string[], config: CompleteConfig) => {
-  if (indexes.length === 0) return;
-
-  const
-    warn = config.warningListener === true ? console.log : config.warningListener || (() => void 0),
-    sorted = [...indexes].sort(),
-    one = sorted.length === 1,
-    list = one ? sorted[0] : sorted.slice(0, -1).join(', ') + ' and ' + sorted[sorted.length - 1];
-
-  warn(`Note: UniqueIndex lists ${list}, ${one ? 'a unique index' : 'unique indexes'} of no UNIQUE or PRIMARY KEY ` +
-    `constraint, of a DEFERRABLE or WITHOUT OVERLAPS one, or not yet valid: db.constraint() takes ${one ? 'it' : 'them'}, and ` +
-    `Postgres refuses ${one ? 'it' : 'them'} in ON CONFLICT ON CONSTRAINT ... DO UPDATE, ` +
-    'and in ... DO NOTHING except a WITHOUT OVERLAPS key. ' +
-    `Set uniqueIndexConstraintsOnly: true to leave ${one ? 'it' : 'them'} out; it will be the default in pgcast 7.0.`);
-};
-
-/**
  * Without `domainsTypedByContext`, note the columns it would type by context, once per run: a domain over a type
  * typed by context, such as int8, takes its placeholder's one type in all five interfaces, which, as generated, is what pg returns.
  */
@@ -355,7 +335,6 @@ const tsForQueries = async (config: CompleteConfig, queryFn: (q: pg.QueryConfig)
     enumsBySchema: Record<string, Promise<EnumData>> = Object.create(null),
     enumsForSchema = (schema: string) => enumsBySchema[schema] ??=
       enumOrdersForSchema(schema, queryFn).then(orders => orders[enumOrder]),
-    uniqueIndexesNotArbiters: string[] = [],
     domainsNotByContext: string[] = [],
     domainRootsOnce: Promise<DomainRoots>[] = [],
     domainRoots = () => domainRootsOnce[0] ??= domainRootsInDatabase(queryFn),
@@ -380,7 +359,7 @@ const tsForQueries = async (config: CompleteConfig, queryFn: (q: pg.QueryConfig)
           enums = await enumsForSchema(schema),
           tableDefs = await Promise.all(tables.map(async table =>
             definitionForRelationInSchema(table, schema, enums, customTypes, config, queryFn, customTypeOrigins,
-              enumsForSchema, undefined, customTypeImports, uniqueIndexesNotArbiters, domainsNotByContext,
+              enumsForSchema, undefined, customTypeImports, undefined, domainsNotByContext,
               domainRoots, domainsUnderDomains, enumArraysNotAsText, intervalsAsText, customTypeHolders))),
           schemaIsUnprefixed = schema === config.unprefixedSchema,
           schemaUnions = unions.filter(union => union.schema === schema),
@@ -450,7 +429,6 @@ const tsForQueries = async (config: CompleteConfig, queryFn: (q: pg.QueryConfig)
   // as 6.10.0 wrote them: with the import of a placeholder's own name, which a type of zapatos/schema may take too
   warnAboutPlaceholdersOnDisk(unionPlaceholders, customTypeSourceFiles, config,
     sourceFilesForCustomTypes(customTypes, names, customTypeImports, new Set()));
-  warnAboutUniqueIndexesNotArbiters(uniqueIndexesNotArbiters, config);
   warnAboutDomainsNotByContext(domainsNotByContext, config);
   warnAboutDomainsUnderDomains(domainsUnderDomains, config);
   // a domain whose placeholder ends `any` stays `any` with the key (db.DomainInContext): no column of it is noted

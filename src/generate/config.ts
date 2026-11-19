@@ -34,8 +34,7 @@ export interface OptionalConfig {
   moduleNames?: 'zapatos' | 'pgcast';  // the folder written, and the module names it declares and imports: pgcast/schema, pgcast/db…
   // optional for a CompleteConfig written for 6.6.1; the CLI sets false
   rejectOnQueryError?: boolean;  // reject with the query or connection error by default; false prints it and exits
-  // optional too; read it with ?? false, deprecated: true in 7.0
-  uniqueIndexConstraintsOnly?: boolean;  // UniqueIndex lists only what ON CONFLICT ON CONSTRAINT takes: UNIQUE and PRIMARY KEY constraints, valid, not DEFERRABLE nor WITHOUT OVERLAPS
+  uniqueIndexConstraintsOnly?: boolean;  // UniqueIndex lists usable ON CONFLICT ON CONSTRAINT arbiters by default; false lists all unique indexes
   // optional too; read it with ?? false, deprecated: true in 7.0
   domainsTypedByContext?: boolean;  // a domain over int8, numeric, bytea, money or a date, or an array of one, is typed by context, as its base type is, while its placeholder holds what the generator wrote; a domain over a domain, or an array of a domain, by its innermost base type
   // optional too; read it with ?? false, and with == null for the note (left out, or null from JSON); deprecated: true in 7.0
