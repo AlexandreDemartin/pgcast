@@ -1,5 +1,5 @@
 ---
-english: 64fb2e7b4b6d
+english: 2dd94eb32124
 ---
 
 # Le catalogue
@@ -43,7 +43,7 @@ Et ce que le catalogue ne voit pas, comme une colonne qu’un trigger remplit, v
 
 ### Ce que le générateur ne lit pas {#what-the-generator-doesn-t-read}
 
-Le générateur lit les noms, les types, la nullabilité et les valeurs par défaut. Postgres garde aussi chaque clé étrangère et chaque contrainte `CHECK`, dans `pg_constraint`, mais Zapatos 6.6.1 n’a jamais lu cette table, ni le SQL à l’intérieur des vues et des fonctions. pgcast la lit pour distinguer un index unique qu’accepte `ON CONFLICT ON CONSTRAINT` d’un index que cette clause refuse ([`uniqueIndexConstraintsOnly`](/fr/generator#generate.uniqueIndexConstraintsOnly)) ; avec [`domainsTypedAsUnions`](/fr/generator#generate.domainsTypedAsUnions), les valeurs que liste le `CHECK` d’un domaine ; et, avec [`constraintNames`](/fr/generator#generate.constraintNames), les noms que liste le tableau ci-dessus.
+Le générateur lit les noms, les types, la nullabilité et les valeurs par défaut. Postgres garde aussi chaque clé étrangère et chaque contrainte `CHECK`, dans `pg_constraint`, mais Zapatos 6.6.1 n’a jamais lu cette table, ni le SQL à l’intérieur des vues et des fonctions. pgcast la lit pour distinguer un index unique qu’accepte `ON CONFLICT ON CONSTRAINT` d’un index que cette clause refuse ([`uniqueIndexConstraintsOnly`](/fr/generator#generate.uniqueIndexConstraintsOnly)) ; avec [`domainsTypedAsUnions`](/fr/generator#generate.domainsTypedAsUnions), les valeurs que liste le `CHECK` d’un domaine ; et, avec [`constraintNames`](/fr/generator#generate.constraintNames), les noms que liste le tableau ci-dessus.
 
 Ainsi `ratings.stars`, `CHECK (stars BETWEEN 1 AND 5)`, est un `number` ; un `seat_label` qui respecte `'^[A-Z][0-9]{1,2}$'` est une `string` ; et rien ne dit à TypeScript que `films.studio_id` pointe vers un studio.
 
