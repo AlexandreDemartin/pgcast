@@ -11,8 +11,10 @@ The docs schema enables row-level security on `seat_bookings`, with a policy tha
 CREATE ROLE cinema_customer NOLOGIN;
 GRANT SELECT ON seat_bookings TO cinema_customer;
 ALTER TABLE seat_bookings ENABLE ROW LEVEL SECURITY;
-CREATE POLICY own_bookings ON seat_bookings USING (customer = current_setting('app.customer', true));
+CREATE POLICY own_bookings ON seat_bookings USING (customer = NULLIF(current_setting('app.customer', true), ''));
 ```
+
+Use non-empty customer identifiers. `NULLIF` makes an empty setting match no booking.
 
 With `true`, `current_setting()` returns `NULL` for a name this connection has never set (`''` once it has, see [the pitfalls](#avoid-the-pitfalls)), where without `true` it would fail with 42704. The policy is Postgres's: [Row Security Policies](https://www.postgresql.org/docs/current/ddl-rowsecurity.html).
 
