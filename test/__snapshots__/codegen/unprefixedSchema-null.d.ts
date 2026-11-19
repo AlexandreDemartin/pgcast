@@ -22,9 +22,9 @@ declare module 'zapatos/schema' {
   
     /* --- enums --- */
   
-    export type mood = 'happy' | 'ok' | 'sad';
+    export type mood = 'sad' | 'ok' | 'happy';
     export namespace every {
-      export type mood = ['happy', 'ok', 'sad'];
+      export type mood = ['sad', 'ok', 'happy'];
     }
   
     /* --- tables --- */
@@ -523,9 +523,9 @@ declare module 'zapatos/schema' {
   
     /* --- enums --- */
   
-    export type status = 'archived' | 'draft' | 'published';
+    export type status = 'draft' | 'published' | 'archived';
     export namespace every {
-      export type status = ['archived', 'draft', 'published'];
+      export type status = ['draft', 'published', 'archived'];
     }
   
     /* --- tables --- */

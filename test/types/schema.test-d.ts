@@ -192,21 +192,18 @@ describe('enum', () => {
     void i;
   });
 
-  test('another schema (products.status, extra.status) is `any` without typeEnumsAcrossSchemas', () => {
-    // typed c.PgStatus, an `any` placeholder; any value is accepted. With the option, the labels of extra.status:
-    // integration/codegen › typeEnumsAcrossSchemas: an enum of another schema takes its labels, and only them
-    expectTypeOf<s.products.Selectable['status']>().toBeAny();
-    const i: s.products.Insertable = { sku: 'x', price_cents: 1, status: 'no such label' };
-    void i;
+  test('foreign columns take the labels of their enum', () => {
+    expectTypeOf<s.products.Selectable['status']>().toEqualTypeOf<'draft' | 'published' | 'archived'>();
+    db.insert('products', { sku: 'x', price_cents: 1, status: 'draft' });
+    // @ts-expect-error outside extra.status
+    db.insert('products', { sku: 'x', price_cents: 1, status: 'no such label' });
+    // @ts-expect-error outside public.mood
+    db.insert('extra.type_zoo', { c_enum_array: ['meh'] });
   });
 
-  test('every.<enum>: its labels in alphabetical order without enumOrder', () => {
-    // declared 'sad', 'ok', 'happy'; with enumOrder: 'declared', that order:
-    // integration/codegen › enumOrder-declared: every.<enum> takes the declared order, and only it
-    expectTypeOf<s.every.mood>().toEqualTypeOf<['happy', 'ok', 'sad']>();
-    // @ts-expect-error the declared order
-    const declared: s.every.mood = ['sad', 'ok', 'happy'];
-    void declared;
+  test('every.<enum> follows Postgres order', () => {
+    expectTypeOf<s.every.mood>().toEqualTypeOf<['sad', 'ok', 'happy']>();
+    expectTypeOf<s.every.mood[0]>().toEqualTypeOf<'sad'>();
   });
 });
 

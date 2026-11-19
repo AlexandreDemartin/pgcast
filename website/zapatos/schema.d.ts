@@ -20,9 +20,9 @@ declare module 'zapatos/schema' {
 
   /* --- enums --- */
 
-  export type crew_job = 'cinematographer' | 'composer' | 'director' | 'editor' | 'writer';
+  export type crew_job = 'director' | 'writer' | 'editor' | 'cinematographer' | 'composer';
   export namespace every {
-    export type crew_job = ['cinematographer', 'composer', 'director', 'editor', 'writer'];
+    export type crew_job = ['director', 'writer', 'editor', 'cinematographer', 'composer'];
   }
 
   /* --- tables --- */

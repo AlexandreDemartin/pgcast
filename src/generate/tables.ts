@@ -153,7 +153,7 @@ export const definitionForRelationInSchema = async (
   queryFn: (q: pg.QueryConfig) => Promise<pg.QueryResult<any>>,
   customTypeOrigins: CustomTypeOrigins = Object.create(null),  // an 'out' parameter too
   enumsForSchema = async (schema: string) => (await enumOrdersForSchema(schema, queryFn))[enumOrderOf(config)],
-  columnsTypedByEnumName: string[] = [],  // an 'out' parameter too: what typeEnumsAcrossSchemas would change
+  columnsTypedByEnumName?: string[],  // an 'out' parameter too: what typeEnumsAcrossSchemas would change
   // an 'out' parameter too: what a placeholder imports from zapatos/schema, '' for nothing, null for an enum's labels written out
   customTypeImports: Record<string, string | null> = Object.create(null),
   uniqueIndexesNotArbiters: string[] = [],  // an 'out' parameter too: what uniqueIndexConstraintsOnly would leave out
@@ -174,7 +174,7 @@ export const definitionForRelationInSchema = async (
     otherSchemas = [...new Set<string>(rows.map(row => row.udtSchema))].filter(schema => schema !== schemaName),
     otherEnums: Record<string, EnumData> = Object.fromEntries(await Promise.all(
       otherSchemas.map(async schema => [schema, await enumsForSchema(schema)]))),
-    typeEnumsAcrossSchemas = config.typeEnumsAcrossSchemas ?? false,
+    typeEnumsAcrossSchemas = config.typeEnumsAcrossSchemas ?? true,
     enumArraysAsText = config.enumArraysTypedAsText ?? false,
     inlineIn = (schema: string) => typeEnumsAcrossSchemas && schema !== schemaName,
     // a domain over a domain, or an array of a domain, is `any` to tsTypeForPgType: the base type under its domains
@@ -228,7 +228,7 @@ export const definitionForRelationInSchema = async (
       intervalsAsText.push(`${schemaName}.${rel.name}.${column} (${type})`);
     }
 
-    if (!typeEnumsAcrossSchemas && acrossSchemas &&
+    if (columnsTypedByEnumName && !typeEnumsAcrossSchemas && acrossSchemas &&
       tsTypeForPgType(udtName, otherEnums[udtSchema], 'Selectable', udtConfig, true) !== selectableType) {
       const isArray = udtName.charAt(0) === '_' && !Object.prototype.hasOwnProperty.call(otherEnums[udtSchema], udtName);
       columnsTypedByEnumName.push(`${schemaName}.${rel.name}.${column} (${udtSchema}.${isArray ? udtName.slice(1) + '[]' : udtName})`);

@@ -21,9 +21,9 @@ declare module 'zapatos/schema' {
   
     /* --- enums --- */
   
-    export type traffic_light = 'amber\'s' | 'green light' | 'red';
+    export type traffic_light = 'red' | 'amber\'s' | 'green light';
     export namespace every {
-      export type traffic_light = ['amber\'s', 'green light', 'red'];
+      export type traffic_light = ['red', 'amber\'s', 'green light'];
     }
   
     /* --- tables --- */

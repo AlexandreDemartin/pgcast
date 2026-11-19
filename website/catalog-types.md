@@ -30,6 +30,8 @@ When you run `npx pgcast`, the generator asks those tables a handful of question
 | each unique index, and the constraint it belongs to | `pg_indexes`, `pg_namespace`, `pg_class`, `pg_index`, `pg_constraint` | `UniqueIndex`, the names [`constraint()`](/insert#constraint) takes |
 | with [`domainsTypedAsUnions`](/generator#generate.domainsTypedAsUnions), each domain over `text`, its `CHECK` and its `COMMENT ON DOMAIN` | `pg_type`, `pg_constraint`, `pg_description` | the union of the values the `CHECK` lists, and the tuple `every.<name>` |
 
+With the 7.0 defaults, the generator reads each enum in its own schema and the first label of `every.crew_job` is `director`, as in `CREATE TYPE crew_job`. See [`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas) and [`enumOrder`](/generator#generate.enumOrder).
+
 To watch the queries themselves, set [`debugListener`](/generator#generate.debugListener). A domain, such as `seat_label`, and a type the generator has no mapping for, such as `point`, each get a placeholder in `zapatos/custom/`, yours to fill in ([Custom types](/custom-types)).
 
 And what the catalog can't see, such as a column a trigger fills in, you say in the config: [`columnOptions`](/generator#generate.columnOptions) leaves it out of `Insertable` or `Updatable`, or makes it optional in `Insertable`.
@@ -64,8 +66,6 @@ A materialised view keeps no `NOT NULL` at all, not even a domain's, so its colu
 
 For views, pgcast keeps to what Postgres states, as Zapatos did: a nullability the database doesn't state would be a guess, and a guess is the one thing a generated type mustn't be. Some gaps in what the generator reads are known, and described here as they are today:
 
-- Enum labels come out in alphabetical order: `crew_job` is `'cinematographer' | 'composer' | 'director' | 'editor' | 'writer'`, not the order of its `CREATE TYPE`, unless [`enumOrder`](/generator#generate.enumOrder) is `"declared"`.
-- An enum of another schema becomes an `any` placeholder, or takes the labels of the enum of the same name in the relation's schema, unless [`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas) is on.
 - `UniqueIndex` lists every unique index, those `ON CONFLICT ON CONSTRAINT` refuses included, unless [`uniqueIndexConstraintsOnly`](/generator#generate.uniqueIndexConstraintsOnly) is on.
 - A domain over `int8`, `numeric`, `bytea`, `money` or a date, or over an array of one, is typed by its placeholder in all five interfaces, which, as generated, holds what `pg` returns, unless [`domainsTypedByContext`](/generator#generate.domainsTypedByContext) is on.
 - A domain over a domain, or an array of a domain, is `any`, its placeholder's type as generated, unless [`domainsTypedByContext`](/generator#generate.domainsTypedByContext) is on.
@@ -162,7 +162,7 @@ The generator is Zapatos 6.6.1's, its version canary still at 104 ([`SchemaVersi
 
 What pgcast changes on the way in is in the run-time library, not in the generated types. [`raw()`](/sql-template#raw), [`cols()`](/sql-template#cols) and [`vals()`](/sql-template#vals) no longer type-check as a value of a `Whereable`, `Insertable` or `Updatable`, where 6.6.1 took them for a `Parameter`, an object of the same shape (`{ value }`).
 
-In 7.0, writes treat an `undefined` value as a missing key by default. See [`undefinedMeansMissing`](/runtime-config#Config.undefinedMeansMissing) ([An `undefined` value](/insert#undefined-values)). Changes to the output itself come the same way, each as a fix or an opt-in of its own: while [`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas), [`enumOrder`](/generator#generate.enumOrder), [`uniqueIndexConstraintsOnly`](/generator#generate.uniqueIndexConstraintsOnly), [`domainsTypedByContext`](/generator#generate.domainsTypedByContext) and [`domainsTypedAsUnions`](/generator#generate.domainsTypedAsUnions) are off, and [`enumArraysTypedAsText`](/generator#generate.enumArraysTypedAsText) and [`intervalsTypedAsObjects`](/generator#generate.intervalsTypedAsObjects) left out or `false`, the rest of `schema.d.ts` is 6.6.1's ([Versions](/versions)).
+In 7.0, writes treat an `undefined` value as a missing key by default. See [`undefinedMeansMissing`](/runtime-config#Config.undefinedMeansMissing) ([An `undefined` value](/insert#undefined-values)). With `typeEnumsAcrossSchemas: false` and `enumOrder: 'alphabetical'`, the generator looks up enums in the relation's schema and sorts their labels alphabetically, as in pgcast 6.x ([Versions](/versions)).
 
 What pgcast refuses is a second source of truth: a model class, a schema written in TypeScript, a type declared beside the table it describes. The database has the last word, and the cost is a habit: run the generator again after each migration, and let TypeScript point at the queries that no longer fit ([First query](/first-query#when-the-schema-changes)).
 
