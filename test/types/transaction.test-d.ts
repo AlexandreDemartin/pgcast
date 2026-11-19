@@ -166,6 +166,13 @@ describe('a pool that is not pg’s', () => {
     expectTypeOf(levels(db.IsolationLevel.ReadCommitted)).resolves.toEqualTypeOf<TxnOther<db.IsolationLevel.ReadCommitted>>();
   });
 
+  test('widening the pool to PoolLike<unknown> or serializable’s first parameter gives the callback pg’s client type', () => {
+    const unknownPool: db.PoolLike<unknown> = other;
+    const parameter: Parameters<typeof db.serializable>[0] = other;
+    void db.serializable(unknownPool, async c => { expectTypeOf(c).toEqualTypeOf<db.TxnClientForSerializable>(); });
+    void db.serializable(parameter, async c => { expectTypeOf(c).toEqualTypeOf<db.TxnClientForSerializable>(); });
+  });
+
   // https://github.com/AlexandreDemartin/pgcast/issues/752: the explicit-result wrappers accepted by Zapatos 6.6.1
   test('a wrapper can pass each function’s first parameter with a result type argument', () => {
     const count = async () => 1;
