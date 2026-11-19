@@ -1,5 +1,5 @@
 ---
-english: c79d772e091a
+english: 7c8d521b9e57
 description: "À la fin de cette page, vous aurez généré les types d’une base, demandé des films et ajouté un film, avec sous les yeux le SQL et le type de chaque requête."
 ---
 
@@ -286,8 +286,8 @@ const row: s.films.Insertable = {
 };
 ```
 
-::: tip Opt-in
-Omettez une clé pour obtenir la valeur par défaut de sa colonne. Une clé à `undefined` est envoyée comme `NULL`, comme dans Zapatos 6.6.1, et pgcast émet un avertissement, une seule fois (`PGCAST_DEP002`). Avec `db.setConfig({ undefinedMeansMissing: true })`, elle compte comme omise ; ce sera le comportement par défaut à partir de la 7.0 ([Versions](/fr/versions)).
+::: tip Par défaut en 7.0
+Une clé absente ou une cellule `undefined` utilise la valeur par défaut de la colonne. Avec `undefinedMeansMissing: false`, seule la clé absente garde ce comportement : une cellule `undefined` passe `undefined` en paramètre, ce que `pg` envoie comme `NULL`. Omettre la seule clé lève l’erreur `nothing to insert`. Utilisez `null` pour stocker un `NULL` SQL dans une colonne nullable ([Une valeur `undefined`](/fr/insert#undefined-values)).
 :::
 
 <!-- joined: src/films.ts -->

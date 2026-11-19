@@ -102,6 +102,16 @@ To compare with SQL, give a `sql` fragment as the value, `db.self` for the colum
 - From 6.11.0, once the schema is regenerated, a table with a column named like a member of `String`, of a type that member fits (`search` typed `any`, as a `tsvector` is, or a `length` number), no longer takes any string as a name in its `SQL` type (2345): `` db.sql<s.films.SQL>`${'titel'}` ``. Zapatos 6.6.1 took the string as a name, `"titel"`, which Postgres refuses when no column has it (42703). For a name known only at run time, check it, then type it as the table's `Column`.
 - From 6.11.0, on such a table, a shortcut's `where`, `select()`'s `having`, `exists()` and `isInSelect()`, and the rows of `insert()`, `upsert()` and `update()`, no longer take a string, a `String` or an array, whatever the schema (2345, 2769): `db.select('films', 'titel')`. Zapatos 6.6.1 ran the string as a column, `WHERE "titel"` (42703 when no column has that name; when it named a boolean column, the query filtered by that column), and sent a string row as its characters, `("0", "1", …)` (42703). Write a Whereable, `{ subtitled: true }`, or a fragment, `` db.sql<s.screenings.SQL>`${'subtitled'}` `` ([#674](https://github.com/AlexandreDemartin/pgcast/issues/674)). On a table whose columns are all optional, one named `length`, `[]`, an array of rows held in a variable, a `readonly` one and an array `as const`, held in a variable or written in the call, given to `insert()` or `upsert()`, are now typed as an array, as they run, not as one row ([#683](https://github.com/AlexandreDemartin/pgcast/issues/683)).
 
+### From 7.0 {#from-7-0}
+
+<div class="stack">
+
+| Your code | Zapatos 6.6.1 and pgcast 6.x | pgcast 7.0 | What to do |
+|---|---|---|---|
+| `db.serializableRO(pool, countSeats)`, where the parameter of `countSeats` is typed `db.TxnClient<db.IsolationLevel.Serializable \| db.IsolationLevel.SerializableRO>` | Compiles | TS2345 under `strictFunctionTypes` (on with `strict`) because TypeScript checks the callback against the wider client type | For `pg`, use [`db.TxnClientForSerializableRO`](/transaction#TxnClientForSerializableRO). For an adapter with client type `C`, use `db.TxnClientLike<C, db.IsolationSatisfying<db.IsolationLevel.SerializableRO>>`. If the helper inspects `_zapatos.isolationLevel`, handle `SerializableRODeferrable` too. Types built on the levels see it too: add the `SerializableRODeferrable` key to a `Record` keyed by `IsolationSatisfying<…>`, widen the client of a handwritten signature, and pass an explicit discriminator where overloads on the ordinary and deferrable client types chose the result, since the two types now coincide. The callbacks of `transaction()`, `savepoint()` and nested calls that keep the client get the wider type too. |
+
+</div>
+
 ### Array condition types in 7.0 {#array-condition-types}
 
 For `arrayContains()`, `arrayContainedIn()` and `arrayOverlaps()` (`c = db.conditions`):
@@ -240,10 +250,10 @@ The text and values of `.compile()` change beyond these rows, where the rows ret
 
 ## 5. Read the warnings {#read-the-warnings}
 
-Run your tests, then your app. Where Zapatos 6.6.1 did something that code may rely on, pgcast keeps it, and warns once per process the first time a call does it:
+Before upgrading from 6.x, run your tests and your app with deprecation warnings enabled. In 6.x, the first call that uses each legacy behaviour emits a warning like this:
 
 ```txt
-(node:4242) [PGCAST_DEP002] DeprecationWarning: An undefined value in insert(), update() or upsert() is sent as NULL, or, in upsert() updateValues, set from EXCLUDED. Set undefinedMeansMissing: true (db.setConfig) to treat it as a missing key instead (DEFAULT in insert(), left out of update() and upsert()); it will be the default in pgcast 7.0.
+(node:4242) [PGCAST_DEP003] DeprecationWarning: transaction() resolved, but Postgres answered its COMMIT with ROLLBACK: a query failed and the callback caught the error, so nothing was saved. Set transactionRequiresCommit: true (db.setConfig) to reject instead; it will be the default in pgcast 7.0.
 (Use `node --trace-deprecation ...` to show where the warning was created)
 ```
 
@@ -262,8 +272,6 @@ To find each call:
 
 | Warning | The call | Fix it, or turn on |
 |---|---|---|
-| `PGCAST_DEP001` | a multi-row `upsert()` without [`updateColumns`](/insert#upsert-options), with a key missing from some rows: inserted as `DEFAULT`, it overwrites the existing value ([Rows with different keys](/insert#upsert-different-keys)) | give every row the key (`db.Default` keeps the SQL), or pass `updateColumns`; or [`upsertRequiresSameKeys`](/runtime-config#Config.upsertRequiresSameKeys), and such a call throws |
-| `PGCAST_DEP002` | an `undefined` value in `insert()`, `update()` or `upsert()`, sent as `NULL`, or in `upsert()` `updateValues`, set from `EXCLUDED` ([An `undefined` value](/insert#undefined-values)) | leave the key out, or give `null` to erase the column; or [`undefinedMeansMissing`](/runtime-config#Config.undefinedMeansMissing), and `undefined` is a missing key |
 | `PGCAST_DEP003` | a [`transaction()`](/transaction#transaction) whose callback catches a query's error and returns: Postgres answers the `COMMIT` with `ROLLBACK`, and nothing is saved ([Let the error through](/retries#let-the-error-through)) | let the error out of the callback, or `ROLLBACK TO` a `SAVEPOINT` before going on; or [`transactionRequiresCommit`](/runtime-config#Config.transactionRequiresCommit), and such a transaction rejects |
 | `PGCAST_DEP004` | a [`sum()`, `avg()`, `min()` or `max()`](/select#typed-by-column) whose result `Number()` changes: `0` for no row, a date's milliseconds, `NaN` for a text | turn on [`aggregatesTypedByColumn`](/runtime-config#Config.aggregatesTypedByColumn), declared in [`ConfigTypes`](/runtime-config#ConfigTypes): `tsc` then shows each call whose result is now `null` or the column's type, and `?? 0` keeps a `0` |
 | `PGCAST_DEP005` | a [`transaction()`](/transaction#transaction) given a client you sent `BEGIN` on: its `COMMIT` or `ROLLBACK` ends your transaction ([Your own `BEGIN`](/transaction#your-own-begin)) | open the outer transaction with `transaction()`, or give that call the pool, for a transaction of its own, committed apart from the outer one, which doesn't see the outer one's uncommitted rows, and hangs (unless `lock_timeout` is set) if it writes or locks a row the outer one has written or locked, or inserts a key the outer one has inserted (two `FOR SHARE` locks don't conflict); or [`transactionRequiresIdleClient`](/runtime-config#Config.transactionRequiresIdleClient), and such a call rejects before sending its `START TRANSACTION` |
@@ -273,7 +281,7 @@ To find each call:
 
 ## 6. Turn on the opt-ins {#turn-on-the-opt-ins}
 
-Once a run shows no warning, or each one comes from a call you've checked, turn the options on, once, before the first query:
+On 6.x, once a run shows no warning, or each one comes from a call you've checked, turn the options on, once, before the first query:
 
 ```ts twoslash
 import * as db from 'zapatos/db';
@@ -288,7 +296,7 @@ db.setConfig({
 });
 ```
 
-All of them will be the default in 7.0 ([Versions](/versions)). With them on, an `undefined` value is left out of an `update()`:
+In 7.0, `tagline: undefined` alone throws `nothing to update`. This update runs because it also assigns `title`, so the stored tagline survives.
 
 <CastPanel example="switching_undefined">
 
@@ -296,8 +304,10 @@ All of them will be the default in 7.0 ([Versions](/versions)). With them on, an
 
 </CastPanel>
 
-- `insert()` sends `DEFAULT`<!-- probe: (db.setConfig({ undefinedMeansMissing: true }), db.insert('tags', { film_id: 1000, tag: undefined })) --> for an `undefined` value, an `update()` with no other key throws "nothing to update: an Updatable needs at least one column"<!-- message -->, and an `upsert()` with no other key "nothing to insert: an Insertable needs at least one column; for a row of defaults only, write INSERT ... DEFAULT VALUES in a sql template"<!-- message -->.
-- The `upsert()` of `PGCAST_DEP001` throws when called, before any query: "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message -->.
+To keep a 6.x write behaviour through 7.x, set its option to `false` in `db.setConfig()`. Choose them independently: `undefinedMeansMissing: false` keeps undefined write values, and `upsertRequiresSameKeys: false` allows missing keys to overwrite stored columns. Neither setting emits the 6.x warning.
+
+- `insert()` sends `DEFAULT`<!-- probe: db.insert('tags', { film_id: 1000, tag: undefined }) --> for an `undefined` value, an `update()` with no other key throws "nothing to update: an Updatable needs at least one column"<!-- message -->, and an `upsert()` with no other key "nothing to insert: an Insertable needs at least one column; for a row of defaults only, write INSERT ... DEFAULT VALUES in a sql template"<!-- message -->.
+- By default, a batch upsert throws at construction if its implicit update includes a column missing from any row, unless the conflict target names it or `updateValues` gives it a defined value. Explicit `updateColumns` skips the check. With `noNullUpdateColumns` alone, it still applies. Error: "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message -->.
 - A `transaction()` whose `COMMIT` Postgres answers with `ROLLBACK` rejects, without a retry ([`transaction()`, Errors](/transaction#errors)).
 - A `transaction()` given a client already inside a transaction block rejects, and leaves that transaction open ([Your own `BEGIN`](/transaction#your-own-begin)).
 - A `transaction()` given the client of a transaction at a level that doesn't satisfy its own rejects before its callback ([Passing a transaction through](/transaction#passing-a-transaction-through)).

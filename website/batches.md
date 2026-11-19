@@ -92,16 +92,13 @@ Then add each row's votes to those stored: set `votes` in [`updateValues`](/inse
 </CastPanel>
 
 - The first run inserts the three rows. The second updates them, to 4, 2 and 6 votes, each with `$action: 'UPDATE'`.
-- An `undefined` in `updateValues` sets `votes` to the batch's count, since the rows insert it: `EXCLUDED."votes"`<!-- probe: db.upsert('ratings', [{ film_id: 1000, stars: 5, votes: 3 }], ['film_id', 'stars'], { updateValues: { votes: undefined } }) -->, and with [`undefinedMeansMissing`](/runtime-config#Config.undefinedMeansMissing) on, `EXCLUDED."votes"`<!-- probe: (db.setConfig({ undefinedMeansMissing: true }), db.upsert('ratings', [{ film_id: 1000, stars: 5, votes: 3 }], ['film_id', 'stars'], { updateValues: { votes: undefined } })) --> too ([An `undefined` value](/insert#undefined-values)).
+- An `undefined` in `updateValues` sets `votes` to the batch's count, since the rows insert it: `EXCLUDED."votes"`<!-- probe: db.upsert('ratings', [{ film_id: 1000, stars: 5, votes: 3 }], ['film_id', 'stars'], { updateValues: { votes: undefined } }) -->, under either setting ([An `undefined` value](/insert#undefined-values)).
 
 ## Rows with different keys
 
-pgcast inserts a key that some rows lack as `DEFAULT` in those rows. Without `updateColumns`, an upsert then sets every column from `EXCLUDED`, that `DEFAULT` included. Say you correct the names on two bookings, and only one of them has its `booked_at`:
+Suppose you correct the names on two bookings, and only one row includes `booked_at`. A plain upsert throws before sending SQL: on conflict, the missing cell would overwrite the other booking time with `DEFAULT` (`now()`).
 
-- the second row is `(DEFAULT, $5, $6, $7)`<!-- probe: db.upsert('seat_bookings', [{ screening_id: 1000, seat: 'F7', customer: 'Ines Calloway', booked_at: '2030-02-20T09:15:00Z' }, { screening_id: 1000, seat: 'F8', customer: 'Barnaby Quill-Hart' }], ['screening_id', 'seat']) -->, and `"booked_at"` is set from `EXCLUDED."booked_at"`<!-- probe: db.upsert('seat_bookings', [{ screening_id: 1000, seat: 'F7', customer: 'Ines Calloway', booked_at: '2030-02-20T09:15:00Z' }, { screening_id: 1000, seat: 'F8', customer: 'Barnaby Quill-Hart' }], ['screening_id', 'seat']) -->: F8's booking time becomes the time of the upsert, `now()`, the column's default;
-- pgcast warns once per process, `PGCAST_DEP001`.
-
-Name the columns to update instead, with [`updateColumns`](/insert#upsert-options):
+Name the column you want to change with [`updateColumns`](/insert#upsert-options):
 
 <CastPanel example="batches_different_keys">
 
@@ -113,19 +110,9 @@ Name the columns to update instead, with [`updateColumns`](/insert#upsert-option
 - Or give every row the same keys: upsert the rows with a `booked_at` and those without in two calls.
 - Not every key counts as missing ([Rows with different keys](/insert#upsert-different-keys)).
 
-::: tip Opt-in
-With `db.setConfig({ upsertRequiresSameKeys: true })` ([`Config.upsertRequiresSameKeys`](/runtime-config#Config.upsertRequiresSameKeys)), such an upsert throws before it sends anything.
-:::
-
 ### An `undefined` in a row
 
-Rows built from input often hold an `undefined`, such as a `booked_at` the form left empty. By default it's sent as `NULL`, as in Zapatos 6.6.1.
-
-`booked_at` is `NOT NULL`, so Postgres refuses the whole batch, 23502, `null value in column "booked_at" of relation "seat_bookings" violates not-null constraint`, and pgcast warns once, `PGCAST_DEP002`.
-
-::: tip Opt-in
-With `db.setConfig({ undefinedMeansMissing: true })` ([`Config.undefinedMeansMissing`](/runtime-config#Config.undefinedMeansMissing)), an `undefined` is a missing key: F8 with `booked_at: undefined` is `(DEFAULT, $5, $6, $7)`<!-- probe: (db.setConfig({ undefinedMeansMissing: true }), db.upsert('seat_bookings', [{ screening_id: 1000, seat: 'F7', customer: 'Ines Calloway', booked_at: '2030-02-20T09:15:00Z' }, { screening_id: 1000, seat: 'F8', customer: 'Barnaby Quill-Hart', booked_at: undefined }], ['screening_id', 'seat'], { updateColumns: 'customer' })) -->, a row with different keys as above ([An `undefined` value](/insert#undefined-values)).
-:::
+If the form gives F8 `booked_at: undefined`, the same rule applies. With `updateColumns: 'customer'`, its cell takes the default, `(DEFAULT, $5, $6, $7)`<!-- probe: db.upsert('seat_bookings', [{ screening_id: 1000, seat: 'F7', customer: 'Ines Calloway', booked_at: '2030-02-20T09:15:00Z' }, { screening_id: 1000, seat: 'F8', customer: 'Barnaby Quill-Hart', booked_at: undefined }], ['screening_id', 'seat'], { updateColumns: 'customer' }) -->, and an existing booking keeps its time. See [An `undefined` value](/insert#undefined-values).
 
 ## Choose what comes back
 

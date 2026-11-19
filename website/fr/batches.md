@@ -1,5 +1,5 @@
 ---
-english: 610a348f86d0
+english: 879316085090
 description: "Écrivez beaucoup de lignes d’un coup : découpez-les sous la limite de paramètres, ignorez celles déjà là, additionnez des comptes, ne récupérez que l’utile."
 ---
 
@@ -93,16 +93,13 @@ Ajoutez ensuite les votes de chaque ligne à ceux déjà stockés : calculez `v
 </CastPanel>
 
 - La première exécution insère les trois lignes. La seconde les passe à 4, 2 et 6 votes, chacune avec `$action: 'UPDATE'`.
-- Un `undefined` dans `updateValues` donne à `votes` le compte du batch, puisque les lignes l’insèrent : `EXCLUDED."votes"`<!-- probe: db.upsert('ratings', [{ film_id: 1000, stars: 5, votes: 3 }], ['film_id', 'stars'], { updateValues: { votes: undefined } }) -->, et avec [`undefinedMeansMissing`](/fr/runtime-config#Config.undefinedMeansMissing) activé, `EXCLUDED."votes"`<!-- probe: (db.setConfig({ undefinedMeansMissing: true }), db.upsert('ratings', [{ film_id: 1000, stars: 5, votes: 3 }], ['film_id', 'stars'], { updateValues: { votes: undefined } })) --> aussi ([Une valeur `undefined`](/fr/insert#undefined-values)).
+- Un `undefined` dans `updateValues` donne à `votes` le nombre de votes inséré par le batch : `EXCLUDED."votes"`<!-- probe: db.upsert('ratings', [{ film_id: 1000, stars: 5, votes: 3 }], ['film_id', 'stars'], { updateValues: { votes: undefined } }) -->, quel que soit le réglage ([Une valeur `undefined`](/fr/insert#undefined-values)).
 
 ## Lignes aux clés différentes {#rows-with-different-keys}
 
-Quand une clé manque à certaines lignes, pgcast y insère `DEFAULT`. Sans `updateColumns`, un upsert met alors à jour chaque colonne depuis `EXCLUDED`, ce `DEFAULT` compris. Supposons que vous corrigiez le nom sur deux réservations, dont une seule a son `booked_at` :
+Supposons que vous corrigiez les noms de deux réservations et qu’une seule ligne contienne `booked_at`. Un upsert sans option lève une erreur avant l’envoi du SQL : en cas de conflit, la cellule manquante écraserait l’heure de l’autre réservation en lui donnant la valeur `DEFAULT` (`now()`).
 
-- la deuxième ligne est `(DEFAULT, $5, $6, $7)`<!-- probe: db.upsert('seat_bookings', [{ screening_id: 1000, seat: 'F7', customer: 'Ines Calloway', booked_at: '2030-02-20T09:15:00Z' }, { screening_id: 1000, seat: 'F8', customer: 'Barnaby Quill-Hart' }], ['screening_id', 'seat']) -->, et `"booked_at"` prend la valeur de `EXCLUDED."booked_at"`<!-- probe: db.upsert('seat_bookings', [{ screening_id: 1000, seat: 'F7', customer: 'Ines Calloway', booked_at: '2030-02-20T09:15:00Z' }, { screening_id: 1000, seat: 'F8', customer: 'Barnaby Quill-Hart' }], ['screening_id', 'seat']) --> : l’heure de réservation de F8 devient l’heure de l’upsert, `now()`, la valeur par défaut de la colonne ;
-- pgcast avertit une fois par processus, `PGCAST_DEP001`.
-
-Nommez plutôt les colonnes à mettre à jour, avec [`updateColumns`](/fr/insert#upsert-options) :
+Nommez la colonne à modifier dans [`updateColumns`](/fr/insert#upsert-options) :
 
 <CastPanel example="batches_different_keys">
 
@@ -114,19 +111,9 @@ Nommez plutôt les colonnes à mettre à jour, avec [`updateColumns`](/fr/insert
 - Ou donnez à chaque ligne les mêmes clés : faites l’upsert des lignes qui ont un `booked_at` et de celles qui n’en ont pas en deux appels.
 - Toutes les clés ne comptent pas comme manquantes ([Lignes aux clés différentes](/fr/insert#upsert-different-keys)).
 
-::: tip Opt-in
-Avec `db.setConfig({ upsertRequiresSameKeys: true })` ([`Config.upsertRequiresSameKeys`](/fr/runtime-config#Config.upsertRequiresSameKeys)), un tel upsert lève une erreur avant d’envoyer quoi que ce soit.
-:::
-
 ### Un `undefined` dans une ligne {#an-undefined-in-a-row}
 
-Les lignes construites à partir d’une saisie contiennent souvent un `undefined`, comme un `booked_at` que le formulaire a laissé vide. Par défaut, pgcast l’envoie comme `NULL`, comme Zapatos 6.6.1.
-
-`booked_at` est `NOT NULL`, donc Postgres refuse tout le batch, 23502, `null value in column "booked_at" of relation "seat_bookings" violates not-null constraint`, et pgcast avertit une fois, `PGCAST_DEP002`.
-
-::: tip Opt-in
-Avec `db.setConfig({ undefinedMeansMissing: true })` ([`Config.undefinedMeansMissing`](/fr/runtime-config#Config.undefinedMeansMissing)), un `undefined` est une clé manquante : F8 avec `booked_at: undefined` est `(DEFAULT, $5, $6, $7)`<!-- probe: (db.setConfig({ undefinedMeansMissing: true }), db.upsert('seat_bookings', [{ screening_id: 1000, seat: 'F7', customer: 'Ines Calloway', booked_at: '2030-02-20T09:15:00Z' }, { screening_id: 1000, seat: 'F8', customer: 'Barnaby Quill-Hart', booked_at: undefined }], ['screening_id', 'seat'], { updateColumns: 'customer' })) -->, une ligne aux clés différentes comme ci-dessus ([Une valeur `undefined`](/fr/insert#undefined-values)).
-:::
+Si le formulaire fournit `booked_at: undefined` pour F8, la même règle s’applique. Avec `updateColumns: 'customer'`, la cellule prend la valeur par défaut, `(DEFAULT, $5, $6, $7)`<!-- probe: db.upsert('seat_bookings', [{ screening_id: 1000, seat: 'F7', customer: 'Ines Calloway', booked_at: '2030-02-20T09:15:00Z' }, { screening_id: 1000, seat: 'F8', customer: 'Barnaby Quill-Hart', booked_at: undefined }], ['screening_id', 'seat'], { updateColumns: 'customer' }) -->, et une réservation existante garde son heure. Voir [Une valeur `undefined`](/fr/insert#undefined-values).
 
 ## Choisir ce qui revient {#choose-what-comes-back}
 

@@ -1,5 +1,5 @@
 ---
-english: 299e2cec580b
+english: 297b458ed022
 description: "Ce que zapatos/db vous laisse régler à l’exécution : setConfig() et chaque option de Config, les écouteurs, les opt-ins et leurs codes d’avertissement."
 ---
 
@@ -22,7 +22,6 @@ import * as db from 'zapatos/db';
 db.setConfig({
   transactionAttemptsMax: 3,
   transactionRetryDelay: { minMs: 50, maxMs: 500 },
-  undefinedMeansMissing: true,
 });
 ```
 
@@ -97,8 +96,8 @@ Les clés qu’ajoute pgcast sont facultatives, donc un `Config` écrit pour Zap
 | [`transactionRetryDelay`](#Config.transactionRetryDelay) | `{ minMs: 25, maxMs: 250 }` | l’attente avant chaque retry | à chaque `transaction()` |
 | [`castArrayParamsToJson`](#Config.castArrayParamsToJson) | `false` | un paramètre tableau : `CAST($1 AS "json")`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${db.param([1])}`) --> au lieu de `$1` | à chaque `compile()` |
 | [`castObjectParamsToJson`](#Config.castObjectParamsToJson) | `false` | un paramètre objet simple : `CAST($1 AS "json")`<!-- probe: (db.setConfig({ castObjectParamsToJson: true }), db.sql`${db.param({ a: 1 })}`) --> au lieu de `$1` | à chaque `compile()` |
-| [`upsertRequiresSameKeys`](#Config.upsertRequiresSameKeys) | `false` | un `upsert()` de plusieurs lignes dont une clé, absente de certaines lignes, prend quand même sa valeur dans `EXCLUDED` : lever une erreur, pas avertir | à chaque `upsert()` |
-| [`undefinedMeansMissing`](#Config.undefinedMeansMissing) | `false` | une valeur `undefined` dans `insert()`, `update()` et `upsert()` : une clé manquante, pas `NULL` | à chaque appel de l’une d’elles |
+| [`upsertRequiresSameKeys`](#Config.upsertRequiresSameKeys) | `true` | Par défaut, un upsert de plusieurs lignes lève une erreur à l’appel si sa mise à jour implicite inclut une colonne absente d’une ligne, sauf si la cible du conflit la nomme ou si `updateValues` lui donne une valeur définie. Un `updateColumns` explicite désactive la vérification. Avec `noNullUpdateColumns` seul, elle s’applique toujours. | à chaque `upsert()` |
+| [`undefinedMeansMissing`](#Config.undefinedMeansMissing) | `true` | une valeur `undefined` dans `insert()`, `update()` et `upsert()` : la traiter comme une clé absente | à chaque appel de l’une d’elles |
 | [`transactionRequiresCommit`](#Config.transactionRequiresCommit) | `false` | un `COMMIT` auquel Postgres répond `ROLLBACK` : être rejetée, pas se résoudre | à chaque `transaction()` |
 | [`transactionRequiresIdleClient`](#Config.transactionRequiresIdleClient) | `false` | un client à vous déjà dans un bloc de transaction : être rejetée avant son `START TRANSACTION`, pas terminer votre transaction | à chaque `transaction()` qui reçoit un tel client |
 | [`transactionRequiresSatisfyingLevel`](#Config.transactionRequiresSatisfyingLevel) | `false` | le client d’une transaction à un niveau qui ne vaut pas pour celui demandé : être rejetée, pas exécuter le callback à ce niveau | à chaque `transaction()` qui reçoit un tel client |
@@ -180,20 +179,20 @@ Un cast donné en chaîne l’emporte, la valeur restant du texte JSON : `param
 ### `upsertRequiresSameKeys` {#Config.upsertRequiresSameKeys}
 
 ```ts
-upsertRequiresSameKeys?: boolean  // default: false; the default in 7.0
+upsertRequiresSameKeys?: boolean  // default: true
 ```
 
-Avec `true`, un [`upsert()`](/fr/insert#upsert) de plusieurs lignes sans `updateColumns`, où une clé absente de certaines lignes prend quand même sa valeur dans `EXCLUDED`, lève une erreur dès l’appel, avant toute requête : "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message -->.
+Par défaut, un upsert de plusieurs lignes lève une erreur à l’appel si sa mise à jour implicite inclut une colonne absente d’une ligne, sauf si la cible du conflit la nomme ou si `updateValues` lui donne une valeur définie. Un `updateColumns` explicite désactive la vérification. Avec `noNullUpdateColumns` seul, elle s’applique toujours. Erreur : "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message -->.
 
-Sans l’option, il s’exécute comme dans Zapatos 6.6.1, avec un avertissement une fois par processus : `PGCAST_DEP001`. Quelles clés comptent, et le SQL : [Lignes aux clés différentes](/fr/insert#upsert-different-keys).
+Avec `false`, une clé absente peut entraîner l’écrasement de la valeur stockée sans avertissement. Voir [Lignes aux clés différentes](/fr/insert#upsert-different-keys).
 
 ### `undefinedMeansMissing` {#Config.undefinedMeansMissing}
 
 ```ts
-undefinedMeansMissing?: boolean  // default: false; the default in 7.0
+undefinedMeansMissing?: boolean  // default: true
 ```
 
-Avec `true`, une valeur `undefined` dans [`insert()`](/fr/insert#insert), [`update()`](/fr/insert#update) et [`upsert()`](/fr/insert#upsert) est une clé manquante : `DEFAULT` dans `insert()`, omise dans `update()` et `upsert()`, `updateValues` compris. Sans l’option, elle est envoyée comme `NULL` (dans `updateValues`, sa colonne prend sa valeur dans `EXCLUDED`), comme dans Zapatos 6.6.1, avec un avertissement une fois par processus : `PGCAST_DEP002`. Le SQL de chacune : [Une valeur `undefined`](/fr/insert#undefined-values).
+Avec `true`, une valeur `undefined` dans [`insert()`](/fr/insert#insert), [`update()`](/fr/insert#update) et [`upsert()`](/fr/insert#upsert) est une clé manquante : `DEFAULT` dans `insert()`, omise dans `update()` et `upsert()`, `updateValues` compris. Avec `false`, elle est envoyée comme `NULL` (dans `updateValues`, sa colonne prend sa valeur dans `EXCLUDED`), comme dans Zapatos 6.6.1, sans avertissement. Pour le SQL de chaque appel, voir [Une valeur `undefined`](/fr/insert#undefined-values).
 
 ### `transactionRequiresCommit` {#Config.transactionRequiresCommit}
 
@@ -244,7 +243,7 @@ Avec `true`, quand ce niveau ne vaut pas pour celui demandé ([`IsolationSatisfy
 
 Sans l’option, elle transmet le client, comme Zapatos 6.6.1, avec un avertissement une fois par processus, `PGCAST_DEP007`, seulement quand le niveau ne vaut pas pour celui demandé.
 
-- Le client d’un niveau qui vaut pour celui demandé est transmis, comme avant, avec ou sans l’option. De même pour le client de `db.serializableRODeferrable()` donné à `db.serializableRO()`, `db.repeatableReadRO()` ou `db.readCommittedRO()` : il apporte toutes les garanties qu’ils demandent, bien qu’`IsolationSatisfying` l’omette ([#489](https://github.com/AlexandreDemartin/pgcast/issues/489)).
+- Avec ou sans l’option, l’appel transmet le client si, dans le [tableau des niveaux d’isolation](/fr/transaction#IsolationSatisfying), son niveau figure sur la ligne correspondant au niveau demandé.
 - Seul le client d’une `transaction()` est vérifié, par sa marque `_zapatos`, que porte aussi un client simple tant qu’une `transaction()` s’exécute dessus, si bien qu’un second appel au même moment sur ce client est vérifié : un pool, un client simple inactif et un client gardé après la fin de sa transaction reçoivent leur propre transaction, comme avant.
 - Les types ne changent pas : un `Queryable` accepte le client de n’importe quel niveau ([`TxnClient`](/fr/transaction#TxnClient)).
 - Un test qui exécute du code dans une `transaction()` à lui, et lui passe ce client : ouvrez-la en `IsolationLevel.Serializable`, qui vaut pour tous les niveaux.
@@ -446,8 +445,6 @@ Un comportement de Zapatos 6.6.1 sur lequel du code peut compter, mais que pgcas
 
 | Option | Avertissement | Émis quand | Par défaut à partir de |
 |---|---|---|---|
-| [`upsertRequiresSameKeys: true`](#Config.upsertRequiresSameKeys) | `PGCAST_DEP001` | un `upsert()` de plusieurs lignes sans `updateColumns` a une clé absente de certaines lignes qui prend quand même sa valeur dans `EXCLUDED` ([Lignes aux clés différentes](/fr/insert#upsert-different-keys)) | 7.0 |
-| [`undefinedMeansMissing: true`](#Config.undefinedMeansMissing) | `PGCAST_DEP002` | une valeur d’`insert()`, `update()` ou `upsert()` est `undefined`, ou une clé d’`updateValues` d’`upsert()` l’est et ajoute sa colonne ([Une valeur `undefined`](/fr/insert#undefined-values)) | 7.0 |
 | [`transactionRequiresCommit: true`](#Config.transactionRequiresCommit) | `PGCAST_DEP003` | Postgres répond au `COMMIT` de `transaction()` par `ROLLBACK`, après une erreur de requête que le callback a interceptée ([Laisser passer l’erreur](/fr/retries#let-the-error-through)) | 7.0 |
 | [`aggregatesTypedByColumn: true`](#Config.aggregatesTypedByColumn) | `PGCAST_DEP004` | `Number()` change le résultat de `sum()`, `avg()`, `min()` ou `max()` : un `NULL` devenu `0`, ou un `min()` ou `max()` qui n’est pas un nombre ([Typé par colonne](/fr/select#typed-by-column)) | 7.0 |
 | [`transactionRequiresIdleClient: true`](#Config.transactionRequiresIdleClient) | `PGCAST_DEP005` | `transaction()` reçoit un client déjà dans un bloc de transaction, auquel son `COMMIT` ou son `ROLLBACK` mettra fin ([Votre propre `BEGIN`](/fr/transaction#your-own-begin)) | 7.0 |
@@ -462,10 +459,10 @@ Le générateur a les siens : [`typeEnumsAcrossSchemas`](/fr/generator#generate
 Chaque avertissement est un `DeprecationWarning` de Node.js, émis une fois par processus pour chaque code, quand le raccourci est appelé (`PGCAST_DEP003` : quand `transaction()` se résout ; `PGCAST_DEP004` : quand `.run()` reçoit le résultat ; `PGCAST_DEP005` : quand `transaction()` est appelée, avant son `START TRANSACTION` ; `PGCAST_DEP007` : quand `transaction()` est appelée, avant son callback), et seulement quand l’ancien comportement est utilisé. Son message nomme l’option. Node l’affiche sur `stderr` :
 
 ```txt
-(node:4242) [PGCAST_DEP002] DeprecationWarning: An undefined value in insert(), update() or upsert() is sent as NULL, or, in upsert() updateValues, set from EXCLUDED. Set undefinedMeansMissing: true (db.setConfig) to treat it as a missing key instead (DEFAULT in insert(), left out of update() and upsert()); it will be the default in pgcast 7.0.
+(node:4242) [PGCAST_DEP003] DeprecationWarning: transaction() resolved, but Postgres answered its COMMIT with ROLLBACK: a query failed and the callback caught the error, so nothing was saved. Set transactionRequiresCommit: true (db.setConfig) to reject instead; it will be the default in pgcast 7.0.
 ```
 
-- `process.on('warning', …)` le reçoit, avec pour `name` `'DeprecationWarning'` et pour `code` `'PGCAST_DEP002'`.
+- `process.on('warning', …)` le reçoit, avec pour `name` `'DeprecationWarning'` et pour `code` `'PGCAST_DEP003'`.
 - `node --no-deprecation` le masque, y compris pour ce hook ; `node --no-warnings` le masque sur `stderr` seulement. `node --throw-deprecation` le lève comme une erreur que rien n’intercepte, donc le processus s’arrête.
 - Avec l’option activée, l’appel n’avertit jamais.
 

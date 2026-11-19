@@ -1,5 +1,5 @@
 ---
-english: 9ad74ac77f0f
+english: 1694ac0844a0
 description: "Pourquoi pgcast prolonge les versions de Zapatos, quand une correction peut changer ce que reçoit votre code, et ce que demande un avertissement PGCAST_DEP00n."
 ---
 
@@ -37,7 +37,7 @@ Environ la moitié ne peuvent pas être corrigées sans changer un résultat val
 | Classe | Quand | Ce qui change pour vous | Exemple |
 |---|---|---|---|
 | Correction | Postgres ou le type le refusait déjà, ou cela contredit le nom de la fonction ; chaque faille de sécurité | tout de suite ; le changelog liste chaque résultat qui change | [`not()`](/fr/conditions#conditions.not) nie toute sa condition : `` not(sql`a OR b`) `` donnait `(NOT a OR b)`, que Postgres lit `(NOT a) OR b` |
-| Opt-in | le résultat est valide, et du code peut en dépendre | rien tant que vous n’activez pas l’option ; l’ancien comportement avertit | une valeur `undefined` envoyée comme `NULL`, jusqu’à ce qu’[`undefinedMeansMissing`](/fr/runtime-config#Config.undefinedMeansMissing) en fasse une clé absente |
+| Opt-in | le résultat est valide, et du code peut en dépendre | rien tant que vous n’activez pas l’option ; l’ancien comportement avertit | une valeur `undefined` envoyée comme `NULL` en 6.x, jusqu’à ce qu’[`undefinedMeansMissing`](/fr/runtime-config#Config.undefinedMeansMissing) en fasse une clé absente |
 | Documenter | Postgres le fait, c’est voulu, ou le type ne peut pas voir une valeur connue seulement à l’exécution | rien ; la doc le dit | [`isNotIn()`](/fr/conditions#conditions.isNotIn) avec un `NULL` dans sa liste ne correspond à aucune ligne : c’est ainsi que Postgres lit `NOT IN` |
 | Laisser | [le rapport](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/CHARACTERISATION-REPORT.md) donne la raison : le type protège, le cas est rare, ou une correction demanderait de deviner | rien | une colonne `int[][]` est typée `number[]` : Postgres n’impose pas les dimensions, et y stocke une, deux ou trois dimensions indifféremment |
 
@@ -55,11 +55,11 @@ Prenez un `update()` avec une valeur `undefined` :
 
 <<< ../examples/plain/versions_undefined.ts{ts twoslash}
 
-Zapatos 6.6.1 envoie `SET ("tagline") = ROW($1)`<!-- probe: db.update('films', { tagline: undefined }, { id: 1002 }) --> avec `null`, et le film perd son slogan. C’est peut-être un bug, une clé copiée d’un champ de formulaire jamais rempli ; c’est peut-être aussi la façon dont un projet vide une colonne.
+Zapatos 6.6.1 envoie `SET ("tagline") = ROW($1)`<!-- probe: (db.setConfig({ undefinedMeansMissing: false }), db.update('films', { tagline: undefined }, { id: 1002 })) --> avec `null`, et le film perd son accroche. C’est peut-être un bug, une clé copiée d’un champ de formulaire jamais rempli ; c’est peut-être aussi la façon dont un projet vide une colonne.
 
-pgcast ne peut pas savoir lequel, et votre compilateur non plus : si la 6.7 avait simplement omis la colonne, ce code compilerait toujours, s’exécuterait toujours, et cesserait sans bruit de vider les slogans.
+Avec les valeurs par défaut de la 7.0, `tagline: undefined` seul lève l’erreur `nothing to update`. La mise à jour ne s’exécute que si elle affecte une autre colonne. Elle conserve alors l’accroche.
 
-La nouvelle lecture arrive donc comme une option, désactivée par défaut, et l’ancienne avertit quand elle s’exécute. Vous basculez quand vous êtes prêt, une option à la fois, avec vos tests pour montrer ce qui a bougé.
+En 6.x, la nouvelle interprétation d’`undefined` est proposée en option, désactivée par défaut. L’ancien comportement déclenche un avertissement. Quand vous êtes prêt, activez les options une par une et vérifiez ce qui change avec vos tests.
 
 Le modèle est emprunté : le cycle de dépréciation de Node lui-même (documenté, puis un avertissement à l’exécution, puis supprimé dans une majeure), les future flags de React Router, et la famille `--strict` de TypeScript, une option par comportement plus sûr.
 
@@ -67,22 +67,20 @@ Le coût : quelques clés de plus dans [`Config`](/fr/runtime-config#Config), e
 
 ## Lire un avertissement {#reading-a-warning}
 
-Appelez cet `update()` en 6.7 et Node affiche, une fois :
+Avec les réglages par défaut de la 6.7, si le callback de `transaction()` intercepte une erreur de requête et que Postgres répond au `COMMIT` par `ROLLBACK`, Node affiche cet avertissement une fois :
 
 ```txt
-(node:4242) [PGCAST_DEP002] DeprecationWarning: An undefined value in insert(), update() or upsert() is sent as NULL, or, in upsert() updateValues, set from EXCLUDED. Set undefinedMeansMissing: true (db.setConfig) to treat it as a missing key instead (DEFAULT in insert(), left out of update() and upsert()); it will be the default in pgcast 7.0.
+(node:4242) [PGCAST_DEP003] DeprecationWarning: transaction() resolved, but Postgres answered its COMMIT with ROLLBACK: a query failed and the callback caught the error, so nothing was saved. Set transactionRequiresCommit: true (db.setConfig) to reject instead; it will be the default in pgcast 7.0.
 (Use `node --trace-deprecation ...` to show where the warning was created)
 ```
 
-Entre crochets figure le code, un par comportement déprécié du runtime, qu’on peut rechercher : [Opt-ins et avertissements](/fr/runtime-config#opt-ins-and-warnings) les liste, avec ce qui déclenche chacun. Ensuite, le message dit ce qui se passe encore, quelle option le change, et que la 7.0 en fera le comportement par défaut.
+Chaque comportement déprécié du runtime a son propre code, affiché entre crochets pour faciliter la recherche. La section [Opt-ins et avertissements](/fr/runtime-config#opt-ins-and-warnings) liste les avertissements actuels et ce qui les déclenche. Le message décrit le comportement encore en vigueur, indique l’option qui le modifie et annonce que la 7.0 adoptera le nouveau comportement par défaut.
 
-Rien d’autre ne change : la requête s’exécute comme en 6.6.1, sauf si Node tourne avec `--throw-deprecation`, qui arrête le processus ([Opt-ins et avertissements](/fr/runtime-config#opt-ins-and-warnings)).
+La promesse se résout comme en 6.6.1, même avec `--throw-deprecation`, puis Node arrête le processus sur l’avertissement ([Opt-ins et avertissements](/fr/runtime-config#opt-ins-and-warnings)).
 
-L’avertissement arrive quand vous appelez le raccourci, avant `.run()`, et seulement si l’ancien comportement est vraiment utilisé : un `update()` sans `undefined` n’avertit jamais.
+Chaque code avertit une fois par processus. `node --trace-deprecation` affiche la pile. Pour retrouver les autres appels, activez l’option et lancez vos tests.
 
-Il arrive une fois par processus pour chaque code, donc il vous dit que l’ancien chemin a été pris, pas où ni combien de fois. `node --trace-deprecation` ajoute la pile, jusqu’à la ligne qui a appelé `update()` ; pour le reste, activez l’option et laissez vos tests trouver ce qui change.
-
-`PGCAST_DEP003` arrive plus tard : une fois que `transaction()` a envoyé `COMMIT` et que Postgres a répondu `ROLLBACK`, juste avant que la promesse se résolve. `PGCAST_DEP004` aussi, une fois que `.run()` a le résultat de `sum()`, `avg()`, `min()` ou `max()` : c’est seulement alors que `.run()` peut voir si `Number()` le change.
+`PGCAST_DEP004` est émis après que `.run()` a reçu le résultat de `sum()`, `avg()`, `min()` ou `max()`, si `Number()` le modifie.
 
 Là où `undefined` voulait dire « vide-la », `null` le dit avec l’un ou l’autre réglage, et n’avertit jamais.
 
@@ -90,7 +88,7 @@ Là où `undefined` voulait dire « vide-la », `null` le dit avec l’un ou l
 
 La 7.0 active par défaut les opt-ins que liste la décision 003 : `upsertRequiresSameKeys`, `undefinedMeansMissing`, `transactionRequiresCommit`, `aggregatesTypedByColumn`, `transactionRequiresIdleClient`, `transactionRequiresSatisfyingLevel` et ceux du générateur (plus bas), sauf `selectExactlyOneChecksForSecondRow`, qui reste désactivé.
 
-Si tous les opt-ins sont activés et qu’il ne reste ni avertissement `PGCAST_DEP` ni note du générateur, vérifiez les [types des conditions sur tableaux en 7.0](/fr/switching#array-condition-types), qui changent sans avertissement. Les anciens comportements disparaissent en 8.0, à trois exceptions près : `rejectOnQueryError: false`, `enumArraysTypedAsText: false` et `intervalsTypedAsObjects: false` (plus bas).
+Un projet qui a activé chaque option et ne voit ni avertissement `PGCAST_DEP` ni note du générateur n’a rien à changer, sauf s’il utilise les [types de clients en lecture seule élargis en 7.0](/fr/switching#from-7-0) ou les [types des conditions sur tableaux en 7.0](/fr/switching#array-condition-types), qui changent sans avertissement. Pendant toute la 7.x, `undefinedMeansMissing: false` et `upsertRequiresSameKeys: false` rétablissent indépendamment les comportements d’écriture de la 6.x, sans avertissement. La 8.0 supprime ces deux anciens comportements. Parmi les autres options, trois conservent leur ancienne valeur : `rejectOnQueryError: false`, `enumArraysTypedAsText: false` et `intervalsTypedAsObjects: false` (plus bas).
 
 Le générateur a ses propres opt-ins en 6.7 : [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas), qui type un enum d’un autre schéma par ses labels, [`enumOrder`](/fr/generator#generate.enumOrder), qui garde les labels d’un enum dans leur ordre de déclaration, [`rejectOnQueryError`](/fr/generator#generate.rejectOnQueryError), qui rejette la promesse de `generate()` quand une requête échoue, plutôt que d’arrêter le processus, [`uniqueIndexConstraintsOnly`](/fr/generator#generate.uniqueIndexConstraintsOnly), qui ne liste dans `UniqueIndex` que les noms qu’accepte `ON CONFLICT ON CONSTRAINT`, [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext), qui type un domaine sur `bigint`, `numeric`, `bytea`, `money` ou une date, ou sur un tableau de l’un d’eux, selon le contexte, comme l’est son type de base, et un domaine sur un domaine ou un tableau d’un domaine, `any` sans l’option, par le type de base de son domaine le plus intérieur, [`enumArraysTypedAsText`](/fr/generator#generate.enumArraysTypedAsText), qui type dans `Selectable` un tableau d’un enum comme le texte que renvoie `pg`, et [`intervalsTypedAsObjects`](/fr/generator#generate.intervalsTypedAsObjects), qui type un `interval` dans `Selectable` comme `pg` le parse.
 

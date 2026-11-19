@@ -67,8 +67,8 @@ describe('setConfig()', () => {
     transactionRetryDelay: { minMs: 25, maxMs: 250 },
     castArrayParamsToJson: false,
     castObjectParamsToJson: false,
-    upsertRequiresSameKeys: false,
-    undefinedMeansMissing: false,
+    upsertRequiresSameKeys: true,
+    undefinedMeansMissing: true,
     transactionRequiresCommit: false,
     transactionRequiresIdleClient: false,
     transactionRequiresSatisfyingLevel: false,
@@ -79,13 +79,22 @@ describe('setConfig()', () => {
     transactionRetryDelay: { minMs: 0, maxMs: 0 },
     castArrayParamsToJson: true,
     castObjectParamsToJson: true,
-    upsertRequiresSameKeys: true,
-    undefinedMeansMissing: true,
+    upsertRequiresSameKeys: false,
+    undefinedMeansMissing: false,
     transactionRequiresCommit: true,
     transactionRequiresIdleClient: true,
     transactionRequiresSatisfyingLevel: true,
     selectExactlyOneChecksForSecondRow: true,
   };
+
+  it.each([undefined, null])('resets each write option independently with %s', value => {
+    const legacy = { upsertRequiresSameKeys: false, undefinedMeansMissing: false };
+    expect(db.getConfig()).toMatchObject({ upsertRequiresSameKeys: true, undefinedMeansMissing: true });
+    for (const key of ['undefinedMeansMissing', 'upsertRequiresSameKeys'] as const) {
+      expect(db.setConfig(legacy)).toMatchObject(legacy);
+      expect(db.setConfig({ [key]: value })).toMatchObject({ ...legacy, [key]: true });
+    }
+  });
 
   it.each([undefined, null])('sets a key that has a default back to it when given as %s', value => {
     expect(db.setConfig(changed)).toMatchObject(changed);

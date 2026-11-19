@@ -19,7 +19,7 @@ db.insert(table, values, options?)
 Insert one row or several, and return them as Postgres stored them, defaults and serials filled in.
 
 - `table`: a table of the schema.
-- `values`: an `Insertable`, or an array of them, `readonly` or not (`readonly` from 6.11.0). A `sql` fragment is written as SQL (`` db.sql`now()` ``), `db.Default` as `DEFAULT`; an `undefined` value is `NULL` ([An `undefined` value](#undefined-values)).
+- `values`: an `Insertable`, or an array of them, `readonly` or not (`readonly` from 6.11.0). A `sql` fragment is written as SQL (`` db.sql`now()` ``), `db.Default` as `DEFAULT`; an `undefined` cell takes `DEFAULT` ([An `undefined` value](#undefined-values)).
   - With a `readonly` array, the error for a wrong row, or for another wrong argument, reads "The type '…' is 'readonly' and cannot be assigned to the mutable type '…'" on TypeScript 7: the error of the last overload, the mutable array's, which TypeScript 7 prints alone. TypeScript 4.1 and 5.9 list each overload's error, the row's among them.
   - From 6.11.0, the type refuses a string or a `String` as a row, here and in `upsert()` (2769), and a string, a `String` or an array as `update()`'s values (2345), even on a table with a column named like a member of `String`, of a type that member fits (`length` a number), whatever the schema.
   - `raw()`, `cols()` and `vals()` are no values here: they throw while compiling, before any query ([`raw()`](/sql-template#raw) gives the message), and pgcast's type refuses them, where Zapatos 6.6.1's took them. For SQL, write a `sql` fragment; in an array or a `jsonb` object, they are part of the value, sent as JSON.
@@ -84,7 +84,7 @@ db.upsert(table, values, conflictTarget, options?)
 - Each result has `$action`, `'INSERT'` or `'UPDATE'` ([`UpsertAction`](#UpsertAction)).
 - One row gives one result; an array gives an array, without the rows that do nothing ([`doNothing`](#doNothing)).
 - An empty array is a no-op, as for `insert()`.
-- A row with no key, or rows with none between them, throw, as for `insert()`; with `undefinedMeansMissing`, an `undefined` value is no key.
+- A row with no key, or rows with none between them, throw, as for `insert()`; by default, an `undefined` value is no key.
 
 ### Options {#upsert-options}
 
@@ -101,8 +101,8 @@ Each SQL replaces the `DO UPDATE SET …` of the plain upsert, on `ratings` (on 
 | `reportAction: 'suppress'` | no `\|\| jsonb_build_object('$action', CASE xmax WHEN 0 THEN 'INSERT' ELSE 'UPDATE' END)`<!-- probe: db.upsert('ratings', { film_id: 1000, stars: 5, votes: 1 }, ['film_id', 'stars']) --> | no `UpsertAction` |
 
 - `updateColumns` takes a column or an array; `noNullUpdateColumns` a column, an array, or `db.all` for every column. [Batches](/batches#rows-with-different-keys) has a panel of `updateColumns`: a booking keeps its time.
-- An `updateColumns` computed at run time may be empty. With no `updateValues` key, the SQL is then `DO NOTHING`<!-- probe: db.upsert('ratings', { film_id: 1000, stars: 5, votes: 1 }, ['film_id', 'stars'], { updateColumns: ['votes'].filter(() => false) }) -->; with `undefinedMeansMissing`, a key set to `undefined` is none ([An `undefined` value](#undefined-values)). One row that conflicts then gives `undefined`, though the type of a `ratings.Column[]` says the row. Check for `undefined`, or pass [`doNothing`](#doNothing), which the type follows.
-- `updateValues` is one set of values for every row updated. Its keys are always updated, even when `updateColumns` leaves them out, or is `doNothing` (then the SQL is `DO UPDATE SET`<!-- probe: db.upsert('ratings', { film_id: 1000, stars: 5 }, ['film_id', 'stars'], { updateColumns: db.doNothing, updateValues: { votes: 1 } }) -->, not `DO NOTHING`); with `undefinedMeansMissing`, a key set to `undefined` is not ([An `undefined` value](#undefined-values)).
+- An `updateColumns` computed at run time may be empty. With no `updateValues` key, the SQL is then `DO NOTHING`<!-- probe: db.upsert('ratings', { film_id: 1000, stars: 5, votes: 1 }, ['film_id', 'stars'], { updateColumns: ['votes'].filter(() => false) }) -->; by default, a key set to `undefined` is none ([An `undefined` value](#undefined-values)). One row that conflicts then gives `undefined`, though the type of a `ratings.Column[]` says the row. Check for `undefined`, or pass [`doNothing`](#doNothing), which the type follows.
+- `updateValues` is one set of values for every row updated. Its defined keys are updated, even when `updateColumns` leaves them out, or is `doNothing` (then the SQL is `DO UPDATE SET`<!-- probe: db.upsert('ratings', { film_id: 1000, stars: 5 }, ['film_id', 'stars'], { updateColumns: db.doNothing, updateValues: { votes: 1 } }) -->, not `DO NOTHING`); by default, a key set to `undefined` adds no column ([An `undefined` value](#undefined-values)).
 - In `updateValues`, a plain value is a parameter. A value that holds a fragment, `param()`, `raw()`, `cols()`, `vals()`, `parent()`, `Default` or `self`, at any depth of its arrays and plain objects, is compiled as in a `sql` template; a read shortcut is written in parentheses, as in [`insert()`](#insert).
 - To read a column there, name the table for the existing row, `${'ratings'}.${'votes'}`, or `EXCLUDED` for the new one, `` db.sql`EXCLUDED.${'votes'}` ``.
 - There, a fragment or condition that uses `db.self` (`` db.sql`${db.self} + 1` ``, [`conditions.add()`](/conditions#conditions.add)) throws "The 'self' column alias has no meaning here"<!-- message -->, as in Zapatos 6.6.1; `db.self` or `db.all` alone, or in a `vals([…])`, throws while compiling ([`self`](/sql-template#self), [`all`](/sql-template#all)); `db.parent()`, alone or in a fragment, throws "The 'parent' table alias has no meaning here"<!-- message -->.
@@ -138,17 +138,13 @@ A partitioned table needs `'suppress'` when a row lands in a partition whose col
 
 ### Rows with different keys {#upsert-different-keys}
 
-In several rows without `updateColumns`, a key missing from one row is inserted as `DEFAULT`, then set from `EXCLUDED` on conflict: that row's existing value is lost.
+By default, a batch upsert throws at construction if its implicit update includes a column missing from any row, unless the conflict target names it or `updateValues` gives it a defined value. Explicit `updateColumns` skips the check. With `noNullUpdateColumns` alone, it still applies. Error: "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message -->.
 
-- `[{ film_id: 1002, stars: 5, votes: 3 }, { film_id: 1002, stars: 4 }]` sends `($4, $5, DEFAULT)`<!-- probe: db.upsert('ratings', [{ film_id: 1002, stars: 5, votes: 3 }, { film_id: 1002, stars: 4 }], ['film_id', 'stars']) -->, so an existing count of 4-star votes goes back to 1.
-- It runs, as in Zapatos 6.6.1, and warns once per process: `PGCAST_DEP001`.
-- A key of `updateValues`, or a column of an array or string `conflictTarget`, does not count: new rows without their serial `id`, upserted on `'id'`, neither warn nor throw. With `constraint()`, every key counts.
-- Rows with the same keys, one row, and any `updateColumns` never warn.
-- A `null` row among others misses every key, so it warns too; it runs as in Zapatos 6.6.1, a row of defaults.
+- Give every row the key to keep the implicit update.
+- New rows can omit their serial `id` when upserting on `'id'`. A constraint name alone does not identify its columns to pgcast.
+- A `null` row among others counts as a row missing every key.
 
-::: tip Opt-in
-With `upsertRequiresSameKeys: true` ([`Config`](/runtime-config#Config.upsertRequiresSameKeys)), such an upsert throws before any query: "rows have different keys: pass updateColumns, or give every row the same keys"<!-- message -->. Without it, pgcast warns as `PGCAST_DEP001`; it becomes the default in 7.0 ([Versions](/versions)).
-:::
+With [`upsertRequiresSameKeys: false`](/runtime-config#Config.upsertRequiresSameKeys), the missing cell takes `DEFAULT` and can overwrite a stored value. For example, `[{ film_id: 1002, stars: 5, votes: 3 }, { film_id: 1002, stars: 4 }]` sends `($4, $5, DEFAULT)`<!-- probe: (db.setConfig({ upsertRequiresSameKeys: false }), db.upsert('ratings', [{ film_id: 1002, stars: 5, votes: 3 }, { film_id: 1002, stars: 4 }], ['film_id', 'stars'])) -->, so an existing count of 4-star votes goes back to 1.
 
 ## `constraint()` {#constraint}
 
@@ -223,7 +219,7 @@ db.update(table, values, where, options?)
 Update the rows that match, and return them. The arguments come in the order of the SQL: `SET`, then `WHERE`.
 
 - `table`: a table of the schema.
-- `values`: an `Updatable`, with at least one key. A `sql` fragment is written as SQL, where `db.self` is the column, and so is a condition such as [`conditions.add()`](/conditions#conditions.add); written inline, it may need a type argument ([`Constraint`](/sql-template#type-arguments)). `raw()`, `cols()`, `vals()` and `parent()` throw, as for [`insert()`](#insert). An `undefined` value is `NULL` ([An `undefined` value](#undefined-values)).
+- `values`: an `Updatable`, with at least one key. A `sql` fragment is written as SQL, where `db.self` is the column, and so is a condition such as [`conditions.add()`](/conditions#conditions.add); written inline, it may need a type argument ([`Constraint`](/sql-template#type-arguments)). `raw()`, `cols()`, `vals()` and `parent()` throw, as for [`insert()`](#insert). An `undefined` assignment is omitted ([An `undefined` value](#undefined-values)).
 - `where`: a `Whereable`, or a `sql` fragment ([Conditions](/conditions)).
 - `options`: `returning` and `extras`, as for [`insert()`](#insert-options).
 
@@ -316,27 +312,22 @@ With `'CASCADE'`, Postgres empties every table that references one of them, at a
 
 ## An `undefined` value {#undefined-values}
 
-In the values of `insert()`, `update()` and `upsert()`, Zapatos 6.6.1 sends `undefined` as `NULL`: a `NOT NULL DEFAULT` column fails, and `update()` erases the column instead of leaving it.
+In 7.0 an undefined write value counts as a missing key. Use `null` to store SQL `NULL` in a nullable column. These rules apply to the values read at the call, provided they stay unchanged until the query runs and getters return the same value on later reads.
 
 <div class="stack">
 
-| In | By default, as in 6.6.1 | With `undefinedMeansMissing: true` |
+| In | Default in 7.0 | With `undefinedMeansMissing: false` |
 |---|---|---|
-| `insert()` | `NULL` | `DEFAULT`: `VALUES ($1, $2, $3, DEFAULT, $4)`<!-- probe: (db.setConfig({ undefinedMeansMissing: true }), db.insert('films', { studio_id: 1000, title: 'x', release_year: 2030, tagline: undefined, runtime_minutes: 90 })) --> |
-| `update()` | sets the column to `NULL`, and counts as a key | left out: `SET ("title") = ROW($1)`<!-- probe: (db.setConfig({ undefinedMeansMissing: true }), db.update('films', { title: 'x', tagline: undefined }, { id: 1000 })) -->; with no key left, it throws "nothing to update…"<!-- message --> |
-| `upsert()` | inserts `NULL`, then sets it from `EXCLUDED` | left out: not inserted, nor updated unless `updateColumns` names it (then from `EXCLUDED`, so an existing row takes the column's `DEFAULT`); in several rows, its cell is `DEFAULT` and counts as missing ([Rows with different keys](#upsert-different-keys)); with no column left, it throws "nothing to insert…"<!-- message --> |
-| `upsert()` `updateValues` | sets it from `EXCLUDED`: the value inserted, or the column's `DEFAULT` | left out, as a key `updateValues` doesn't have: `SET ("film_id", "stars") = ROW(EXCLUDED."film_id", EXCLUDED."stars")`<!-- probe: (db.setConfig({ undefinedMeansMissing: true }), db.upsert('ratings', { film_id: 1002, stars: 4 }, ['film_id', 'stars'], { updateValues: { votes: undefined } })) -->, so the existing value stays; with `doNothing`, or an `updateColumns` empty at run time, and no other key, `DO NOTHING`<!-- probe: (db.setConfig({ undefinedMeansMissing: true }), db.upsert('ratings', { film_id: 1002, stars: 4 }, ['film_id', 'stars'], { updateColumns: db.doNothing, updateValues: { votes: undefined } })) --> |
+| `insert()` | `DEFAULT`: `VALUES ($1, $2, $3, DEFAULT, $4)`<!-- probe: db.insert('films', { studio_id: 1000, title: 'x', release_year: 2030, tagline: undefined, runtime_minutes: 90 }) --> | `NULL` |
+| `update()` | left out: `SET ("title") = ROW($1)`<!-- probe: db.update('films', { title: 'x', tagline: undefined }, { id: 1000 }) -->; with no key left, it throws "nothing to update…"<!-- message --> | sets the column to `NULL`, and counts as a key |
+| `upsert()` | column omitted if no row supplies it, otherwise `DEFAULT` in the missing cell ([Rows with different keys](#upsert-different-keys)). An omitted column is updated only if named in `updateColumns` or given a defined `updateValues` override (see the `noNullUpdateColumns` `CASE` below). With no column to insert, the call throws "nothing to insert…"<!-- message --> | inserts `NULL` |
+| `upsert()` `updateValues` | left out, as a key `updateValues` doesn't have: `SET ("film_id", "stars") = ROW(EXCLUDED."film_id", EXCLUDED."stars")`<!-- probe: db.upsert('ratings', { film_id: 1002, stars: 4 }, ['film_id', 'stars'], { updateValues: { votes: undefined } }) -->, so the existing value stays; with `doNothing`, or an `updateColumns` empty at run time, and no other key, `DO NOTHING`<!-- probe: db.upsert('ratings', { film_id: 1002, stars: 4 }, ['film_id', 'stars'], { updateColumns: db.doNothing, updateValues: { votes: undefined } }) --> | sets it from `EXCLUDED`: the value inserted, or the column's `DEFAULT` |
 
 </div>
 
-- By default, each sends the SQL of 6.6.1 and warns once per process: `PGCAST_DEP002`.
-- An `undefined` in a `where` is unchanged.
-- In `updateValues`, by default, `upsert('ratings', { film_id: 1002, stars: 4 }, ['film_id', 'stars'], { updateValues: { votes: undefined } })` sends `EXCLUDED."votes"`<!-- probe: db.upsert('ratings', { film_id: 1002, stars: 4 }, ['film_id', 'stars'], { updateValues: { votes: undefined } }) -->, and an existing count goes back to 1. It warns only when the key alone adds its column: `updateColumns` leaves it out or, without `updateColumns`, no row inserts it.
-- A column the update sets anyway, inserted with no `updateColumns` or named in it, stays set from `EXCLUDED` in both modes, as with no key in `updateValues`.
+An `undefined` in a filter still binds a parameter. On conflict, a defined `updateValues` override wins. Otherwise a selected column takes its value from `EXCLUDED`. For columns protected by `noNullUpdateColumns`, a `CASE` keeps the stored value if the incoming value is `NULL`.
 
-::: tip Opt-in
-`undefinedMeansMissing: true` ([`Config`](/runtime-config#Config.undefinedMeansMissing)) reads an `undefined` value as a missing key, as `JSON.stringify()` does. Without it, pgcast warns as `PGCAST_DEP002`; it becomes the default in 7.0 ([Versions](/versions)).
-:::
+Set [`undefinedMeansMissing: false`](/runtime-config#Config.undefinedMeansMissing) to keep the 6.x write behaviour through 7.x. This choice is independent of the upsert key check.
 
 ## `ReturningOptionsForTable` {#ReturningOptionsForTable}
 
