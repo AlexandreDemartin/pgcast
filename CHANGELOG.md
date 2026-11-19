@@ -6,6 +6,9 @@ pgcast is forked from [Zapatos 6.6.1](https://github.com/jawj/zapatos/tree/v6.6.
 
 ## [Unreleased]
 
+### Added
+- First releases of [`@pgcast/adapter-postgres-js`](https://github.com/AlexandreDemartin/pgcast/blob/master/adapters/postgres-js/CHANGELOG.md) and [`@pgcast/adapter-pglite`](https://github.com/AlexandreDemartin/pgcast/blob/master/adapters/pglite/CHANGELOG.md), both at 0.1.0.
+
 ## [6.12.0] - 2026-11-19
 
 ### Added
