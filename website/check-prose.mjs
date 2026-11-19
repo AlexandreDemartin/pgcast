@@ -5,7 +5,7 @@
 // `<!-- probe: … -->` after SQL, or on the line above a `sql` block, and `<!-- message -->` after a message. A probe
 // is a cast panel's example (`examples/<name>.ts`), or a JavaScript expression with `db` and a recording `pool` in
 // scope. It sends no query to Postgres, so the site still builds without a database. It also fails on an install
-// command whose `@pgcast/pgcast@^N` is not the major of the root `package.json`. Run by `npm run docs:build`.
+// command whose `@pgcast/pgcast@^N` differs from the target major. Run by `npm run docs:build`.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import ts from 'typescript';
 import * as db from 'zapatos/db';
@@ -212,24 +212,26 @@ let checked = 0;
 for (const page of pages)
   checked += await check(page, readFileSync(new URL(page, import.meta.url), 'utf8').split('\n'), problems);
 
-// The yarn and bun commands pin the major, `zapatos@npm:@pgcast/pgcast@^6` (install.md § Add the package): at the
-// next major, one left behind would install the previous one.
+// Install instructions follow the package major. The two migration routes target specific majors.
 const
   { version } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')),
   major = version.split('.')[0];
 let pinned = 0;
-for (const file of [...pages, '../README.md'])
+for (const file of [...pages, '../README.md']) {
+  let target = major;
   readFileSync(new URL(file, import.meta.url), 'utf8').split('\n').forEach((line, i) => {
+    if ((file === 'switching.md' || file === 'fr/switching.md') && line.startsWith('## '))
+      target = line.endsWith('{#swap-the-package}') ? '6' : line.endsWith('{#from-7-0}') ? '7' : major;
     for (const [range, n] of line.matchAll(/@pgcast\/pgcast@\^(\d+)/g)) {
       pinned++;
-      if (n !== major) problems.push(`${file}:${i + 1}: \`${range}\` is not the major of ` +
-        `package.json, ${version}: write \`@pgcast/pgcast@^${major}\``);
+      if (n !== target) problems.push(`${file}:${i + 1}: ${range} targets major ${n}, expected ${target}`);
     }
   });
+}
 
 if (problems.length > 0) {
   console.error(`The prose check failed (README.md § Conventions):\n  ${problems.join('\n  ')}`);
   process.exit(1);
 }
 console.log(`The SQL and the messages the pages quote match pgcast: ${checked} marks; ` +
-  `${pinned} install commands pin its major, ${major}.`);
+  `${pinned} package ranges pin the intended major.`);
