@@ -450,9 +450,15 @@ CREATE UNIQUE INDEX festival_entries_live_idx ON festival_entries (film_id) WHER
 
 À partir de la 7.1.0, réglez `constraintNames` sur `true` pour générer un type `Constraint` dans l’espace de noms de chaque relation. Ce type réunit les noms des clés primaires, des contraintes d’unicité, des clés étrangères, des contraintes de vérification, des contraintes d’exclusion et de tous les index uniques de la relation. Pour la table ci-dessus, `festival_entries.Constraint` contient `festival_entries_slot_key` et `festival_entries_live_idx`, quelle que soit la valeur de `uniqueIndexConstraintsOnly`.
 
-Pour chaque partition ou table qui hérite d’une autre table, le type reprend les noms que Postgres enregistre pour cette relation, y compris ceux des contraintes de vérification héritées. Les contraintes de vérification d’un domaine appartiennent au domaine. En cas de violation d’une contrainte `NOT NULL`, Postgres indique la colonne. Si aucun nom ne correspond, le type vaut `never`.
+Le type reprend les noms du catalogue, que Postgres fasse respecter les contraintes ou non. Un déclencheur ou une fonction peut signaler un nom absent du type, donc vérifiez `err.table` et `err.constraint`. Si aucun nom ne correspond, le type vaut `never`.
 
-La valeur par défaut est `false`. Omettre la clé ou lui donner la valeur JSON `null` évite aussi la requête supplémentaire au catalogue et la déclaration du type.
+Chaque partition ou table qui hérite d’une autre table a ses propres noms, y compris ceux des contraintes de vérification héritées. Lorsqu’une écriture dans une table partitionnée échoue dans une partition, Postgres indique la partition. Comparez le nom signalé avec son type `Constraint`.
+
+Les contraintes `NOT NULL` des tables sont exclues. En cas de violation d’une contrainte `NOT NULL` sur une colonne de table, Postgres indique la colonne. Les contraintes de vérification d’un domaine appartiennent au domaine, et la violation de sa contrainte `NOT NULL` indique le domaine dans `err.dataType`.
+
+Si un schéma contient une relation nommée `every` et un enum nommé `Constraint`, tous deux déclarent `every.Constraint`, donc laissez l’option désactivée pour la génération de ce schéma ou renommez l’un des deux.
+
+Le générateur n’exécute la requête supplémentaire au catalogue et ne déclare le type que si la configuration fusionnée (fichier, puis argument JSON) fixe `constraintNames` à `true`. La valeur JSON `null` dans l’argument désactive l’option même si le fichier indique `true`.
 
 ### `domainsTypedByContext` {#generate.domainsTypedByContext}
 

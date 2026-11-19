@@ -446,9 +446,15 @@ CREATE UNIQUE INDEX festival_entries_live_idx ON festival_entries (film_id) WHER
 
 From 7.1.0. Set `constraintNames` to `true` to generate a `Constraint` type in each relation's namespace. It lists the names of its primary keys, unique constraints, foreign keys, checks, exclusion constraints and all its unique indexes. For the table above, `festival_entries.Constraint` includes both `festival_entries_slot_key` and `festival_entries_live_idx` with either setting of `uniqueIndexConstraintsOnly`.
 
-Each partition or inheritance child gets the names Postgres records for that relation, including inherited checks. Domain checks belong to the domain. For a not-null violation, Postgres reports the column. A relation with no matching names gets `never`.
+The type lists the catalogue names whether or not Postgres enforces them. A trigger or function can report a name outside the type, so check `err.table` and `err.constraint`. A relation with no matching names gets `never`.
 
-The default is `false`. Omitting the key or passing JSON `null` also skips the extra catalogue query and the declaration.
+Each partition or inheritance child gets its own names, including inherited checks. When a write through a partitioned table fails in a partition, Postgres reports the partition, so compare with its `Constraint`.
+
+Table `NOT NULL` constraints are excluded. For a not-null violation on a table's column, Postgres reports the column. Domain checks belong to the domain, and a domain's `NOT NULL` violation reports the domain in `err.dataType`.
+
+If a schema has a relation named `every` and an enum named `Constraint`, both declare `every.Constraint`, so leave the option off when generating that schema or rename one of them.
+
+The extra catalogue query and declaration are off unless the merged configuration (file, then JSON argument) sets `constraintNames` to `true`. A JSON `null` in the argument turns a file's `true` off.
 
 ### `domainsTypedByContext` {#generate.domainsTypedByContext}
 
