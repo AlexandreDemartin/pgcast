@@ -1,5 +1,5 @@
 ---
-english: 05d9b6c2eacb
+english: 59f7dd14c56e
 description: "Passez de Zapatos 6.6.1 à pgcast : changez une ligne de package.json et régénérez ; tsc et les avertissements de pgcast montrent les rares appels qui changent."
 ---
 
@@ -12,7 +12,7 @@ Passez un projet de Zapatos 6.6.1 à pgcast : changez une ligne de `package.jso
 
 - Une ligne de `package.json` remplace le paquet ; imports, configuration et fichiers générés restent tels quels.
 - Quelques appels donnent d’autres lignes, ou lèvent une erreur : [l’étape 4](#find-the-calls-whose-result-changes) les liste, avec ce qu’il faut faire.
-- Ce sur quoi du code peut compter est gardé, avec un avertissement, jusqu’à ce que vous activiez son opt-in.
+- À l’exécution, pgcast conserve les comportements sur lesquels votre code peut compter et émet un avertissement jusqu’à ce que vous activiez l’opt-in correspondant. Les [types des conditions sur tableaux en 7.0](#array-condition-types) changent sans avertissement.
 
 </AtAGlance>
 
@@ -113,6 +113,17 @@ Pour comparer avec du SQL, donnez un fragment `sql` comme valeur, `db.self` pour
 
 </div>
 
+### Les types des conditions sur tableaux en 7.0 {#array-condition-types}
+
+Pour `arrayContains()`, `arrayContainedIn()` et `arrayOverlaps()` (`c = db.conditions`) :
+
+- Si vous aviez un mock en 6.6.1, implémentez les deux surcharges, celle qui accepte une colonne parente et celle qui accepte un tableau.
+- Remplacez `.map(c.arrayContains)` par `.map(xs => c.arrayContains(xs))` pour conserver le type des éléments. Si vous stockez le résultat de `c.arrayContains([1])` dans une variable, la contrainte du fragment est `number[]`.
+- Omettez l’argument de type dans `c.arrayContains(db.parent('genres'))`. Si le type de l’opérande autorise un tableau ou une colonne parente, affinez-le avant l’appel.
+- Pour inclure les colonnes parentes dans le type dérivé de l’opérande, utilisez `Parameters<typeof c.arrayContains>[0] | db.ParentColumn`.
+- Si votre fonction appelle la condition avec `xs: T[]` et `T extends number[]`, laissez TypeScript inférer son type de retour. L’ancienne annotation `db.SQLFragment<boolean | null, T>` est refusée.
+- Avec TypeScript 4.1 ou 5.9, passez les labels d’un enum sous la forme `['director'] as const` ou dans un tableau de type `s.crew_job[]`.
+
 ## 4. Trouver les appels dont le résultat change {#find-the-calls-whose-result-changes}
 
 pgcast corrige, sans option à activer, ce sur quoi aucun code ne pouvait compter dans Zapatos 6.6.1 : un appel que Postgres ou le type refusait, qui faisait le contraire de son nom, ou qui laissait une chaîne injecter du SQL. Quelques-uns de ces appels s’exécutaient bel et bien, et donnent maintenant d’autres lignes, ou lèvent une erreur.
@@ -129,7 +140,7 @@ Cherchez dans votre code la première colonne de chaque tableau ci-dessous. Chaq
 | [`and()`](/fr/conditions#conditions.and) d’un fragment avec un `OR` nu et un autre opérande : `` and(db.sql`${'id'} = 1000 OR ${'id'} = 1001`, { studio_id: 1001 }) `` | `a OR (b AND c)`, donc aussi le film 1000 | `((a OR b) AND (c))`<!-- probe: db.conditions.and(db.sql`a OR b`, db.sql`c`) --> | pour les anciennes lignes, un seul fragment : `` db.sql`${'id'} = 1000 OR (${'id'} = 1001 AND ${'studio_id'} = ${db.param(1001)})` `` |
 | [`and()`](/fr/conditions#conditions.and) de fragments qui coupent une expression : `` and(db.sql`${'release_year'} BETWEEN 1970`, db.sql`2000`) `` | `(a BETWEEN 1970 AND 2000)`, les films 1000 et 1001 | `((a BETWEEN 1970) AND (2000))`<!-- probe: db.conditions.and(db.sql`a BETWEEN 1970`, db.sql`2000`) -->, que Postgres refuse (42601) | une seule condition : `{ release_year: db.conditions.between(1970, 2000) }` |
 | `groupBy` qui reçoit un `and()` ou un `or()` sans argument : `count('films', db.all, { groupBy: db.conditions.and() })` | `GROUP BY ()`, l’ensemble de regroupement vide : 4 | `GROUP BY TRUE`<!-- probe: db.count('films', db.all, { groupBy: db.conditions.and() }) -->, que Postgres refuse (42601), `GROUP BY FALSE` pour `or()` | omettez `groupBy` : 4 |
-| [`db.all`](/fr/sql-template#all) comme valeur d’une condition, `{ title: db.all }`, `isIn([db.all])` / `isNotIn([db.all])` ou `arrayContains([db.all])` : `deletes('films', { title: db.conditions.ne(db.all) })` ; `db.Default`, `db.self`, `raw()`, `cols()`, `vals()`, `param()`, un fragment ou `parent()` comme élément d’[`arrayContains()`](/fr/conditions#conditions.arrayContains), d’`arrayContainedIn()` ou d’`arrayOverlaps()` : `update('films', { title: 'Gone' }, { genres: db.conditions.not(db.conditions.arrayOverlaps([db.Default])) })` | `'Symbol(all)'`, donc tout film qui a un titre est supprimé ; l’élément sous forme de texte ou de JSON dans le tableau, `'{"Symbol(DEFAULT)"}'`, donc tout film est renommé | refusé par `tsc`, sauf sur une colonne typée `any` et pour `parent()` ou un fragment comme seuls éléments ; lève une erreur à la compilation de la requête | pour les mêmes lignes, `{ title: db.conditions.isNotNull }`, `{ genres: db.conditions.isNotNull }` ; sinon, une valeur à comparer |
+| [`db.all`](/fr/sql-template#all) comme valeur d’une condition, `{ title: db.all }`, `isIn([db.all])` / `isNotIn([db.all])` ou `arrayContains([db.all])` : `deletes('films', { title: db.conditions.ne(db.all) })` ; `db.Default`, `db.self`, `raw()`, `cols()`, `vals()`, `param()`, un fragment ou `parent()` comme élément d’[`arrayContains()`](/fr/conditions#conditions.arrayContains), d’`arrayContainedIn()` ou d’`arrayOverlaps()` : `update('films', { title: 'Gone' }, { genres: db.conditions.not(db.conditions.arrayOverlaps([db.Default])) })` | `'Symbol(all)'`, donc tout film qui a un titre est supprimé ; l’élément sous forme de texte ou de JSON dans le tableau, `'{"Symbol(DEFAULT)"}'`, donc tout film est renommé | `tsc` refuse ces valeurs sur ces colonnes et les accepte sur une colonne de type `any`. La compilation de la requête lève une erreur. | pour les mêmes lignes, `{ title: db.conditions.isNotNull }`, `{ genres: db.conditions.isNotNull }` ; sinon, une valeur à comparer |
 
 </div>
 

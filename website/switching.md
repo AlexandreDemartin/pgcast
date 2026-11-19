@@ -11,7 +11,7 @@ Move a project from Zapatos 6.6.1 to pgcast: change one line of `package.json`, 
 
 - One line of `package.json` swaps the package; imports, config and generated files stay as they are.
 - A few calls give other rows, or throw: [step 4](#find-the-calls-whose-result-changes) lists them, with what to do.
-- What code may rely on is kept, with a warning, until you turn on its opt-in.
+- What code may rely on at runtime is kept, with a warning, until you turn on its opt-in. The [7.0 array condition types](#array-condition-types) change without a warning.
 
 </AtAGlance>
 
@@ -112,6 +112,17 @@ To compare with SQL, give a `sql` fragment as the value, `db.self` for the colum
 
 </div>
 
+### Array condition types in 7.0 {#array-condition-types}
+
+For `arrayContains()`, `arrayContainedIn()` and `arrayOverlaps()` (`c = db.conditions`):
+
+- A 6.6.1 mock must implement both the parent and array overloads.
+- Replace `.map(c.arrayContains)` with `.map(xs => c.arrayContains(xs))` to keep the element type. A saved `c.arrayContains([1])` constrains `number[]`.
+- Drop the type argument on `c.arrayContains(db.parent('genres'))`. Narrow an array-or-parent union before calling.
+- To include parents in a derived operand type, use `Parameters<typeof c.arrayContains>[0] | db.ParentColumn`.
+- For `xs: T[]` with `T extends number[]`, let the wrapper infer its return type. Its old `db.SQLFragment<boolean | null, T>` annotation fails.
+- For an enum array on TypeScript 4.1 and 5.9, use `['director'] as const` or a typed `s.crew_job[]`.
+
 ## 4. Find the calls whose result changes {#find-the-calls-whose-result-changes}
 
 pgcast fixes, with no option to turn on, what no code could rely on in Zapatos 6.6.1: a call that Postgres or the type refused, that did the opposite of its name, or that let a string splice SQL. A few such calls did run, and now give other rows, or throw.
@@ -128,7 +139,7 @@ Look through your code for the first column of each table below. Each change in 
 | [`and()`](/conditions#conditions.and) of a fragment with a bare `OR` and another operand: `` and(db.sql`${'id'} = 1000 OR ${'id'} = 1001`, { studio_id: 1001 }) `` | `a OR (b AND c)`, so film 1000 too | `((a OR b) AND (c))`<!-- probe: db.conditions.and(db.sql`a OR b`, db.sql`c`) --> | for the old rows, one fragment: `` db.sql`${'id'} = 1000 OR (${'id'} = 1001 AND ${'studio_id'} = ${db.param(1001)})` `` |
 | [`and()`](/conditions#conditions.and) of fragments that split one expression: `` and(db.sql`${'release_year'} BETWEEN 1970`, db.sql`2000`) `` | `(a BETWEEN 1970 AND 2000)`, films 1000 and 1001 | `((a BETWEEN 1970) AND (2000))`<!-- probe: db.conditions.and(db.sql`a BETWEEN 1970`, db.sql`2000`) -->, which Postgres refuses (42601) | one condition: `{ release_year: db.conditions.between(1970, 2000) }` |
 | `groupBy` given an `and()` or `or()` with no argument: `count('films', db.all, { groupBy: db.conditions.and() })` | `GROUP BY ()`, the empty grouping set: 4 | `GROUP BY TRUE`<!-- probe: db.count('films', db.all, { groupBy: db.conditions.and() }) -->, which Postgres refuses (42601), `GROUP BY FALSE` for `or()` | leave `groupBy` out: 4 |
-| [`db.all`](/sql-template#all) as a condition's value, `{ title: db.all }`, `isIn([db.all])` / `isNotIn([db.all])` or `arrayContains([db.all])`: `deletes('films', { title: db.conditions.ne(db.all) })`; `db.Default`, `db.self`, `raw()`, `cols()`, `vals()`, `param()`, a fragment or `parent()` as an item of [`arrayContains()`](/conditions#conditions.arrayContains), `arrayContainedIn()` or `arrayOverlaps()`: `update('films', { title: 'Gone' }, { genres: db.conditions.not(db.conditions.arrayOverlaps([db.Default])) })` | `'Symbol(all)'`, so every film with a title deleted; the item as its text or JSON in the array, `'{"Symbol(DEFAULT)"}'`, so every film renamed | refused by `tsc`, but on a column typed `any`, and for `parent()` or a fragment as the only items; throws while compiling | for the same rows, `{ title: db.conditions.isNotNull }`, `{ genres: db.conditions.isNotNull }`; else a value to compare with |
+| [`db.all`](/sql-template#all) as a condition's value, `{ title: db.all }`, `isIn([db.all])` / `isNotIn([db.all])` or `arrayContains([db.all])`: `deletes('films', { title: db.conditions.ne(db.all) })`; `db.Default`, `db.self`, `raw()`, `cols()`, `vals()`, `param()`, a fragment or `parent()` as an item of [`arrayContains()`](/conditions#conditions.arrayContains), `arrayContainedIn()` or `arrayOverlaps()`: `update('films', { title: 'Gone' }, { genres: db.conditions.not(db.conditions.arrayOverlaps([db.Default])) })` | `'Symbol(all)'`, so every film with a title deleted; the item as its text or JSON in the array, `'{"Symbol(DEFAULT)"}'`, so every film renamed | refused by `tsc` on these columns, accepted on a column typed `any`; throws while compiling | for the same rows, `{ title: db.conditions.isNotNull }`, `{ genres: db.conditions.isNotNull }`; else a value to compare with |
 
 </div>
 
