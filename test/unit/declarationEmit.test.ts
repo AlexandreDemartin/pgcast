@@ -56,6 +56,7 @@ export const minSpread = { ...db.min('users', db.all, { columns: ['display_name'
 };
 
 const
+  aggregateResults = new Map<string, string | undefined>(),
   emitted = new Map<string, string>(),
   diagnostics = new Map<string, string[]>();
 
@@ -96,6 +97,21 @@ beforeAll(() => {
       strict: true, declaration: true, emitDeclarationOnly: true, outDir: path.join(virtual, 'out'), rootDir: virtual,
       types: ['node'], paths: { 'zapatos/db': [path.join(virtual, 'db')] },
     }, files);
+
+  // A ConfigTypes augmentation applies to the whole program. Compile each declaration on its own.
+  const aggregate = path.join(consumer, 'aggregate.ts');
+  for (const setting of ['any', 'never', 'boolean', 'true', 'false']) {
+    files.set(aggregate, `import * as db from 'zapatos/db';
+declare module 'zapatos/db' { interface ConfigTypes { aggregatesTypedByColumn: ${setting} } }
+declare const client: db.Queryable;
+export const first = db.min('events', db.all, { columns: ['occurred_on'] }).run(client);`);
+    const result = compile([aggregate, ...roots.filter(f => f.endsWith('.d.ts'))], {
+      ...options, skipLibCheck: true, emitDeclarationOnly: true, rootDir: consumer, outDir: virtual,
+      paths: { 'zapatos/db': [path.join(virtual, 'db')] },
+    }, files);
+    expect(result.reported.map(d => ts.flattenDiagnosticMessageText(d.messageText, ' '))).toEqual([]);
+    aggregateResults.set(setting, result.out.get(path.join(virtual, 'aggregate.d.ts')));
+  }
 
   for (const [f, text] of out) emitted.set(path.basename(f, '.d.ts'), text);
   for (const d of reported) {
@@ -187,5 +203,12 @@ describe('the documented limits', () => {
 
   it('cannot write out the members of min() typed by column', () => {
     expect(diagnostics.get('nestedResult')).toEqual([expect.stringMatching(/^TS4023: Exported variable 'minSpread' has or is using name 'nestedResult' from external module ".*" but cannot be named\.$/)]);
+  });
+});
+
+describe('aggregate signatures declared in ConfigTypes', () => {
+  it.each(['any', 'never', 'boolean', 'true', 'false'])('a date minimum with %s', setting => {
+    const type = setting === 'false' ? 'number' : 'Date | null';
+    expect(aggregateResults.get(setting)).toContain(`first: Promise<${type}>`);
   });
 });
