@@ -52,6 +52,14 @@ describe('cliConfig()', () => {
       .toEqual({ typeEnumsAcrossSchemas: null, enumOrder: 'alphabetical', ...exits });
   });
 
+  it.each(['pgcastconfig.json', 'zapatosconfig.json'])('overlays the arbiter setting by key in %s', name => {
+    write(name, '{"uniqueIndexConstraintsOnly":false}');
+    expect(cliConfig('{}', dir).uniqueIndexConstraintsOnly).toBe(false);
+    expect(cliConfig('{"uniqueIndexConstraintsOnly":null}', dir).uniqueIndexConstraintsOnly).toBeNull();
+    write(name, '{"uniqueIndexConstraintsOnly":true}');
+    expect(cliConfig('{"uniqueIndexConstraintsOnly":false}', dir).uniqueIndexConstraintsOnly).toBe(false);
+  });
+
   it('reads pgcastconfig.json alone', () => {
     write('pgcastconfig.json', '{"db": {"connectionString": "{{ PGCAST_FILMS_URL }}"}, "moduleNames": "pgcast"}');
     expect(cliConfig('{"outDir": "./src"}', dir))
