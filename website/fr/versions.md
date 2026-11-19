@@ -45,7 +45,7 @@ Environ la moitié ne peuvent pas être corrigées sans changer un résultat val
 
 Une correction peut tout de même casser un appel qui ne marchait que grâce au bug. Les corrections d’échappement de 6.6.2 en sont un exemple : un nom de colonne comme `id" AS "x` fermait ses guillemets et ajoutait un alias, et désigne maintenant une colonne qui n’existe pas. Le changelog liste chacun de ces appels, avec ce qu’il faut écrire à la place.
 
-Deux opt-ins resteront désactivés pour de bon : `selectExactlyOneChecksForSecondRow`, ci-dessous, et [`domainsTypedAsUnions`](#_7-0-and-8-0), l’option du générateur. [`selectExactlyOne()`](/fr/select#selectExactlyOne) vérifie qu’il existe au moins une ligne. Zapatos l’imbrique dans un `lateral`. Avec `withTies: true`, les lignes ex æquo peuvent alors dupliquer la ligne parente.
+Deux opt-ins resteront désactivés pour de bon : `selectExactlyOneChecksForSecondRow`, ci-dessous, et [`domainsTypedAsUnions`](#_7-0-and-8-0), l’option du générateur. [`selectExactlyOne()`](/fr/select#selectExactlyOne) vérifie qu’il existe au moins une ligne quand elle est exécutée seule ; imbriquée, une ligne absente donne `null`. Zapatos l’imbrique dans un `lateral`. Avec `withTies: true`, les lignes ex æquo peuvent alors dupliquer la ligne parente.
 
 Son option, [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), entraîne le rejet de la promesse si la requête, exécutée seule, trouve une deuxième ligne. Elle n’émet aucun avertissement et reste désactivée par défaut.
 

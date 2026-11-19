@@ -440,7 +440,7 @@ const firstShow = await db.min('screenings', db.all, {
 - `min()` and `max()` give a `bigint` or `numeric` as a string with the default pg parser and runtime setting. Under a lateral key the outer JSON parser reads the number and can preserve large values as strings.
 - `count()` is unchanged by the option: `0` at top level, and `null` nested in a `lateral` or as an `extras` value when its query returns no row.
 - Passed through as the single `lateral`, it is typed as at top level by `selectOne()` and `selectExactlyOne()`, which hand its column over as it is, and as nested by `select()`, which wraps its rows in `jsonb_agg()`. That `selectOne()` or `selectExactlyOne()`, nested in turn, is typed as nested.
-- `.copy()` returns a plain `SQLFragment`. In `extras` or under a `lateral` key, nest the original `min()` or `max()`. A copied date aggregate keeps the direct type `Date | null` even though Postgres returns a date string in JSON for a non-null date.
+- `.copy()` returns a plain `SQLFragment`. In `extras` or under a `lateral` key, nest the original `min()` or `max()`. With the default column typing, a copied date aggregate keeps the direct type `Date | null` even though Postgres returns a date string in JSON for a non-null date.
 
 ## Types
 

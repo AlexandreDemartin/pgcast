@@ -44,7 +44,7 @@ About half of them can't be fixed without changing a result that is valid today 
 
 A fix can still stop a call that only worked through the bug. 6.6.2's escaping fixes are an example: a column name such as `id" AS "x` used to close its quotes and add an alias, and now names a column that doesn't exist. The changelog lists every such call, with what to write instead.
 
-Two opt-ins will stay off for good: `selectExactlyOneChecksForSecondRow`, below, and the generator's [`domainsTypedAsUnions`](#_7-0-and-8-0). [`selectExactlyOne()`](/select#selectExactlyOne) checks for at least one row. Zapatos nests it in a `lateral`, where ties can duplicate the parent row with `withTies: true`.
+Two opt-ins will stay off for good: `selectExactlyOneChecksForSecondRow`, below, and the generator's [`domainsTypedAsUnions`](#_7-0-and-8-0). [`selectExactlyOne()`](/select#selectExactlyOne) checks for at least one row when run alone; nested, a missing row gives `null`. Zapatos nests it in a `lateral`, where ties can duplicate the parent row with `withTies: true`.
 
 Its option, [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow), rejects on a second row when the query is run on its own. It never warns or becomes the default.
 
