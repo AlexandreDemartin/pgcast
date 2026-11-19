@@ -80,7 +80,11 @@ declare const nestedResult: unique symbol;
  * `zapatos/db` does not export, so a package built with `declaration: true` cannot write them out (TS4023 on a
  * spread of `min()`); it can name the type itself, as a function returning `min()` does.
  */
-export interface ColumnAggregateFragment<RunResult, NestedResult> extends SQLFragment<RunResult> { [nestedResult]: NestedResult }
+export interface ColumnAggregateFragment<RunResult, NestedResult> extends SQLFragment<RunResult> {
+  [nestedResult]: NestedResult;
+  copy(): ColumnAggregateFragment<RunResult, NestedResult>;
+  copy(...args: Parameters<SQLFragment<RunResult>['copy']>): SQLFragment<RunResult>;
+}
 
 export type RunResultForSQLFragment<T extends SQLFragment<any, any>> = T extends SQLFragment<infer RunResult, any> ?
   (TypedByColumn extends true ? NestedResultOf<T, RunResult> : undefined extends RunResult ? NonNullable<RunResult> | null : RunResult) :
