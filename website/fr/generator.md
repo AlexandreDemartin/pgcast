@@ -161,7 +161,7 @@ Toutes les options sont facultatives. Une option donnée remplace entièrement s
 | [`enumOrder`](#generate.enumOrder) | `"declared"` | l’ordre des labels d’un enum |
 | [`moduleNames`](#generate.moduleNames) | `"zapatos"` | les noms de modules que déclarent et importent les fichiers, et leur dossier |
 | [`rejectOnQueryError`](#generate.rejectOnQueryError) | `true` | en cas d’échec d’une requête, rejet de la promesse ou arrêt du processus |
-| [`uniqueIndexConstraintsOnly`](#generate.uniqueIndexConstraintsOnly) | `true` | les noms de l’`UniqueIndex` de chaque relation |
+| [`uniqueIndexConstraintsOnly`](#generate.uniqueIndexConstraintsOnly) | `true` | les noms figurant dans l’`UniqueIndex` de chaque relation |
 | [`domainsTypedByContext`](#generate.domainsTypedByContext) | `false` | le type d’un domaine sur `bigint`, `numeric`, `bytea`, `money` ou une date, ou sur un tableau de l’un d’eux, hors de `Selectable`, et d’un domaine sur un domaine ou d’un tableau d’un domaine |
 | [`enumArraysTypedAsText`](#generate.enumArraysTypedAsText) | aucune : un tableau, avec une note | le type `Selectable` d’un tableau d’un enum |
 | [`intervalsTypedAsObjects`](#generate.intervalsTypedAsObjects) | aucune : le texte, avec une note | le type d’un `interval` dans `Selectable` et dans une écriture |
@@ -414,7 +414,7 @@ try {
 
 ### `uniqueIndexConstraintsOnly` {#generate.uniqueIndexConstraintsOnly}
 
-En 7.0, `true` est la valeur par défaut, y compris pour `null` en JSON. L’`UniqueIndex` de chaque relation contient les noms de contraintes que [`constraint()`](/fr/insert#constraint) peut utiliser dans `ON CONFLICT ON CONSTRAINT … DO UPDATE`. Avec `false`, le générateur liste tous les index uniques de la relation.
+À partir de la 7.0, cette option booléenne vaut `true` par défaut, y compris si la configuration JSON indique `null`. L’`UniqueIndex` de chaque relation contient les noms de contraintes que [`constraint()`](/fr/insert#constraint) peut utiliser dans `ON CONFLICT ON CONSTRAINT … DO UPDATE`. Avec `false`, le générateur liste tous les index uniques de la relation.
 
 ```sql
 CREATE TABLE festival_entries (
@@ -436,10 +436,10 @@ CREATE UNIQUE INDEX festival_entries_live_idx ON festival_entries (film_id) WHER
 | `festival_entries_slot_key`, `DEFERRABLE` | oui | non | 55000, `ON CONFLICT does not support deferrable unique constraints/exclusion constraints as arbiters` |
 | `festival_entries_live_idx`, un index et pas une contrainte | oui | non | 42704, `constraint "festival_entries_live_idx" for table "festival_entries" does not exist` |
 
-- `true` laisse aussi de côté les index uniques d’une vue matérialisée et, sur Postgres 18, ceux d’une clé `WITHOUT OVERLAPS`, que Postgres traite comme une contrainte d’exclusion. Il accepte cette clé avec `DO NOTHING` et renvoie 42809 avec `DO UPDATE`. Une contrainte `EXCLUDE` n’est dans aucune des deux listes, puisque son index n’est pas unique.
+- `true` laisse aussi de côté les index uniques d’une vue matérialisée et, sur Postgres 18, ceux d’une clé `WITHOUT OVERLAPS`, que Postgres traite comme une contrainte d’exclusion. Postgres accepte cette clé avec `DO NOTHING` et renvoie le code 42809 avec `DO UPDATE`. Une contrainte `EXCLUDE` n’est dans aucune des deux listes, puisque son index n’est pas unique.
 - `true` laisse aussi de côté une contrainte dont l’index n’est pas encore valide : celle d’une table partitionnée, ajoutée avec `ALTER TABLE ONLY`, tant que l’index de chaque partition n’est pas attaché ([Partitionnement](https://www.postgresql.org/docs/current/ddl-partitioning.html#DDL-PARTITIONING-DECLARATIVE-MAINTENANCE)). Entre-temps, Postgres répond 42P10, `there is no unique or exclusion constraint matching the ON CONFLICT specification` ; régénérez une fois ces index attachés.
 - Une relation qui n’en garde aucun reçoit `never`. `UniqueIndexForTable` et les types agrégés `UniqueIndex` suivent le même changement.
-- En 7.x, `false` rétablit l’union de la 6.x sans note de migration. La 8.0 supprime ce réglage.
+- En 7.x, `false` rétablit le type union de la 6.x sans note de migration. Ce réglage disparaît en 8.0.
 
 ### `domainsTypedByContext` {#generate.domainsTypedByContext}
 
