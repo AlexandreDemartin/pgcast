@@ -1,5 +1,5 @@
 ---
-english: 05d9b6c2eacb
+english: e38e80b6e988
 description: "Passez de Zapatos 6.6.1 à pgcast : changez une ligne de package.json et régénérez ; tsc et les avertissements de pgcast montrent les rares appels qui changent."
 ---
 
@@ -12,7 +12,7 @@ Passez un projet de Zapatos 6.6.1 à pgcast : changez une ligne de `package.jso
 
 - Une ligne de `package.json` remplace le paquet ; imports, configuration et fichiers générés restent tels quels.
 - Quelques appels donnent d’autres lignes, ou lèvent une erreur : [l’étape 4](#find-the-calls-whose-result-changes) les liste, avec ce qu’il faut faire.
-- Ce sur quoi du code peut compter est gardé, avec un avertissement, jusqu’à ce que vous activiez son opt-in.
+- À l’exécution, pgcast conserve les comportements sur lesquels votre code peut compter et émet un avertissement jusqu’à ce que vous activiez l’opt-in correspondant. Les [types des conditions sur tableaux en 7.0](#array-condition-types) changent sans avertissement.
 
 </AtAGlance>
 
@@ -126,6 +126,17 @@ db.setConfig({ aggregatesTypedByColumn: false });
 
 </div>
 
+### Les types des conditions sur tableaux en 7.0 {#array-condition-types}
+
+Pour `arrayContains()`, `arrayContainedIn()` et `arrayOverlaps()` (`c = db.conditions`) :
+
+- Si vous aviez un mock en 6.6.1, implémentez les deux surcharges, celle qui accepte une colonne parente et celle qui accepte un tableau.
+- Remplacez `.map(c.arrayContains)` par `.map(xs => c.arrayContains(xs))` pour conserver le type des éléments. Si vous stockez le résultat de `c.arrayContains([1])` dans une variable, la contrainte du fragment est `number[]`.
+- Omettez l’argument de type dans `c.arrayContains(db.parent('genres'))`. Si le type de l’opérande autorise un tableau ou une colonne parente, affinez-le avant l’appel.
+- Pour inclure les colonnes parentes dans le type dérivé de l’opérande, utilisez `Parameters<typeof c.arrayContains>[0] | db.ParentColumn`.
+- Si votre fonction appelle la condition avec `xs: T[]` et `T extends number[]`, laissez TypeScript inférer son type de retour. L’ancienne annotation `db.SQLFragment<boolean | null, T>` est refusée.
+- Avec TypeScript 4.1 ou 5.9, passez les labels d’un enum sous la forme `['director'] as const` ou dans un tableau de type `s.crew_job[]`.
+
 ## 4. Trouver les appels dont le résultat change {#find-the-calls-whose-result-changes}
 
 pgcast corrige, sans option à activer, ce sur quoi aucun code ne pouvait compter dans Zapatos 6.6.1 : un appel que Postgres ou le type refusait, qui faisait le contraire de son nom, ou qui laissait une chaîne injecter du SQL. Quelques-uns de ces appels s’exécutaient bel et bien, et donnent maintenant d’autres lignes, ou lèvent une erreur.
@@ -142,7 +153,7 @@ Cherchez dans votre code la première colonne de chaque tableau ci-dessous. Chaq
 | [`and()`](/fr/conditions#conditions.and) d’un fragment avec un `OR` nu et un autre opérande : `` and(db.sql`${'id'} = 1000 OR ${'id'} = 1001`, { studio_id: 1001 }) `` | `a OR (b AND c)`, donc aussi le film 1000 | `((a OR b) AND (c))`<!-- probe: db.conditions.and(db.sql`a OR b`, db.sql`c`) --> | pour les anciennes lignes, un seul fragment : `` db.sql`${'id'} = 1000 OR (${'id'} = 1001 AND ${'studio_id'} = ${db.param(1001)})` `` |
 | [`and()`](/fr/conditions#conditions.and) de fragments qui coupent une expression : `` and(db.sql`${'release_year'} BETWEEN 1970`, db.sql`2000`) `` | `(a BETWEEN 1970 AND 2000)`, les films 1000 et 1001 | `((a BETWEEN 1970) AND (2000))`<!-- probe: db.conditions.and(db.sql`a BETWEEN 1970`, db.sql`2000`) -->, que Postgres refuse (42601) | une seule condition : `{ release_year: db.conditions.between(1970, 2000) }` |
 | `groupBy` qui reçoit un `and()` ou un `or()` sans argument : `count('films', db.all, { groupBy: db.conditions.and() })` | `GROUP BY ()`, l’ensemble de regroupement vide : 4 | `GROUP BY TRUE`<!-- probe: db.count('films', db.all, { groupBy: db.conditions.and() }) -->, que Postgres refuse (42601), `GROUP BY FALSE` pour `or()` | omettez `groupBy` : 4 |
-| [`db.all`](/fr/sql-template#all) comme valeur d’une condition, `{ title: db.all }`, `isIn([db.all])` / `isNotIn([db.all])` ou `arrayContains([db.all])` : `deletes('films', { title: db.conditions.ne(db.all) })` ; `db.Default`, `db.self`, `raw()`, `cols()`, `vals()`, `param()`, un fragment ou `parent()` comme élément d’[`arrayContains()`](/fr/conditions#conditions.arrayContains), d’`arrayContainedIn()` ou d’`arrayOverlaps()` : `update('films', { title: 'Gone' }, { genres: db.conditions.not(db.conditions.arrayOverlaps([db.Default])) })` | `'Symbol(all)'`, donc tout film qui a un titre est supprimé ; l’élément sous forme de texte ou de JSON dans le tableau, `'{"Symbol(DEFAULT)"}'`, donc tout film est renommé | refusé par `tsc`, sauf sur une colonne typée `any` et pour `parent()` ou un fragment comme seuls éléments ; lève une erreur à la compilation de la requête | pour les mêmes lignes, `{ title: db.conditions.isNotNull }`, `{ genres: db.conditions.isNotNull }` ; sinon, une valeur à comparer |
+| [`db.all`](/fr/sql-template#all) comme valeur d’une condition, `{ title: db.all }`, `isIn([db.all])` / `isNotIn([db.all])` ou `arrayContains([db.all])` : `deletes('films', { title: db.conditions.ne(db.all) })` ; `db.Default`, `db.self`, `raw()`, `cols()`, `vals()`, `param()`, un fragment ou `parent()` comme élément d’[`arrayContains()`](/fr/conditions#conditions.arrayContains), d’`arrayContainedIn()` ou d’`arrayOverlaps()` : `update('films', { title: 'Gone' }, { genres: db.conditions.not(db.conditions.arrayOverlaps([db.Default])) })` | `'Symbol(all)'`, donc tout film qui a un titre est supprimé ; l’élément sous forme de texte ou de JSON dans le tableau, `'{"Symbol(DEFAULT)"}'`, donc tout film est renommé | `tsc` refuse ces valeurs sur ces colonnes et les accepte sur une colonne de type `any`. La compilation de la requête lève une erreur. | pour les mêmes lignes, `{ title: db.conditions.isNotNull }`, `{ genres: db.conditions.isNotNull }` ; sinon, une valeur à comparer |
 
 </div>
 
@@ -319,7 +330,7 @@ Pour garder un comportement d’écriture de la 6.x pendant toute la 7.x, passez
 
 Un opt-in de plus, [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), n’a pas d’avertissement à guetter, et reste désactivé dans la 7.0. Avec lui, un `selectExactlyOne()` exécuté seul est rejeté sur une deuxième ligne, pas seulement sur aucune. Activez-le là où vos tests ne montrent aucun `selectExactlyOne()` qui trouve deux lignes.
 
-Le générateur a des opt-ins qui lui sont propres, chacun appelé à devenir le comportement par défaut dans la 7.0. L’avertissement de chacun, sauf `rejectOnQueryError`, est une note de `npx zapatos`, pas de vos tests.
+En 6.x, lancez `npx zapatos` pour voir quelles options du générateur changeraient les types de votre schéma.
 
 La note de [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas) nomme chaque colonne dont le type est un enum d’un autre schéma, et cet enum, typé jusque-là comme `any` ou comme l’enum du même nom dans le schéma de la relation :
 
@@ -337,7 +348,7 @@ La note d’[`enumArraysTypedAsText`](/fr/generator#generate.enumArraysTypedAsTe
 
 La note d’[`intervalsTypedAsObjects`](/fr/generator#generate.intervalsTypedAsObjects) nomme chaque colonne de type `interval` ou `interval[]`, ou d’un domaine sur l’un ou l’autre, que le générateur type par son texte, bien que `pg` renvoie un objet pour une requête à vous. Activez-le et régénérez : `tsc` montre le code qui lisait une telle colonne depuis une requête `sql` comme une chaîne, ce qui ne marchait qu’avec un parser de types à vous. Si vous en avez réglé un, `pg.types.setTypeParser(1186, …)`, écrivez plutôt `false`, qui garde le texte sans note, en 7.0 aussi.
 
-La note de [`rejectOnQueryError`](/fr/generator#generate.rejectOnQueryError) vient d’un script qui appelle `generate()`, quand une requête échoue, jamais de `npx zapatos`, qui s’arrête toujours. Activez-le là où le script attend `generate()` avec `await`, et relisez ce que fait son `catch` : une connexion refusée y arrive désormais, et un script qui logge l’erreur puis continue se termine avec le code 0, pas 1.
+De la 6.7 à la fin de la 6.x, `generate()` et `tsForConfig()` pouvaient signaler `PGCAST_DEP006` avant d’arrêter le processus en cas d’échec de connexion ou de requête. En 7.0, si vous omettez `rejectOnQueryError` ou fixez sa valeur à `null` en JSON, votre bloc `catch` peut intercepter l’erreur d’origine. La promesse est aussi rejetée si un écouteur lève une erreur. Les messages que les écouteurs ont déjà affichés restent visibles. Si le script doit échouer, relancez l’erreur ou utilisez `process.exitCode = 1`. Pour conserver l’arrêt immédiat, réglez [`rejectOnQueryError: false`](/fr/generator#generate.rejectOnQueryError). Ce choix reste possible au-delà de la 8.0. En cas d’échec de connexion ou de requête, la CLI affiche l’erreur et quitte avec le code 1.
 
 ## Revenir en arrière {#go-back}
 

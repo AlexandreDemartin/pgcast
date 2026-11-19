@@ -11,7 +11,7 @@ Move a project from Zapatos 6.6.1 to pgcast: change one line of `package.json`, 
 
 - One line of `package.json` swaps the package; imports, config and generated files stay as they are.
 - A few calls give other rows, or throw: [step 4](#find-the-calls-whose-result-changes) lists them, with what to do.
-- What code may rely on is kept, with a warning, until you turn on its opt-in.
+- What code may rely on at runtime is kept, with a warning, until you turn on its opt-in. The [7.0 array condition types](#array-condition-types) change without a warning.
 
 </AtAGlance>
 
@@ -125,6 +125,17 @@ db.setConfig({ aggregatesTypedByColumn: false });
 
 </div>
 
+### Array condition types in 7.0 {#array-condition-types}
+
+For `arrayContains()`, `arrayContainedIn()` and `arrayOverlaps()` (`c = db.conditions`):
+
+- A 6.6.1 mock must implement both the parent and array overloads.
+- Replace `.map(c.arrayContains)` with `.map(xs => c.arrayContains(xs))` to keep the element type. A saved `c.arrayContains([1])` constrains `number[]`.
+- Drop the type argument on `c.arrayContains(db.parent('genres'))`. Narrow an array-or-parent union before calling.
+- To include parents in a derived operand type, use `Parameters<typeof c.arrayContains>[0] | db.ParentColumn`.
+- For `xs: T[]` with `T extends number[]`, let the wrapper infer its return type. Its old `db.SQLFragment<boolean | null, T>` annotation fails.
+- For an enum array on TypeScript 4.1 and 5.9, use `['director'] as const` or a typed `s.crew_job[]`.
+
 ## 4. Find the calls whose result changes {#find-the-calls-whose-result-changes}
 
 pgcast fixes, with no option to turn on, what no code could rely on in Zapatos 6.6.1: a call that Postgres or the type refused, that did the opposite of its name, or that let a string splice SQL. A few such calls did run, and now give other rows, or throw.
@@ -141,7 +152,7 @@ Look through your code for the first column of each table below. Each change in 
 | [`and()`](/conditions#conditions.and) of a fragment with a bare `OR` and another operand: `` and(db.sql`${'id'} = 1000 OR ${'id'} = 1001`, { studio_id: 1001 }) `` | `a OR (b AND c)`, so film 1000 too | `((a OR b) AND (c))`<!-- probe: db.conditions.and(db.sql`a OR b`, db.sql`c`) --> | for the old rows, one fragment: `` db.sql`${'id'} = 1000 OR (${'id'} = 1001 AND ${'studio_id'} = ${db.param(1001)})` `` |
 | [`and()`](/conditions#conditions.and) of fragments that split one expression: `` and(db.sql`${'release_year'} BETWEEN 1970`, db.sql`2000`) `` | `(a BETWEEN 1970 AND 2000)`, films 1000 and 1001 | `((a BETWEEN 1970) AND (2000))`<!-- probe: db.conditions.and(db.sql`a BETWEEN 1970`, db.sql`2000`) -->, which Postgres refuses (42601) | one condition: `{ release_year: db.conditions.between(1970, 2000) }` |
 | `groupBy` given an `and()` or `or()` with no argument: `count('films', db.all, { groupBy: db.conditions.and() })` | `GROUP BY ()`, the empty grouping set: 4 | `GROUP BY TRUE`<!-- probe: db.count('films', db.all, { groupBy: db.conditions.and() }) -->, which Postgres refuses (42601), `GROUP BY FALSE` for `or()` | leave `groupBy` out: 4 |
-| [`db.all`](/sql-template#all) as a condition's value, `{ title: db.all }`, `isIn([db.all])` / `isNotIn([db.all])` or `arrayContains([db.all])`: `deletes('films', { title: db.conditions.ne(db.all) })`; `db.Default`, `db.self`, `raw()`, `cols()`, `vals()`, `param()`, a fragment or `parent()` as an item of [`arrayContains()`](/conditions#conditions.arrayContains), `arrayContainedIn()` or `arrayOverlaps()`: `update('films', { title: 'Gone' }, { genres: db.conditions.not(db.conditions.arrayOverlaps([db.Default])) })` | `'Symbol(all)'`, so every film with a title deleted; the item as its text or JSON in the array, `'{"Symbol(DEFAULT)"}'`, so every film renamed | refused by `tsc`, but on a column typed `any`, and for `parent()` or a fragment as the only items; throws while compiling | for the same rows, `{ title: db.conditions.isNotNull }`, `{ genres: db.conditions.isNotNull }`; else a value to compare with |
+| [`db.all`](/sql-template#all) as a condition's value, `{ title: db.all }`, `isIn([db.all])` / `isNotIn([db.all])` or `arrayContains([db.all])`: `deletes('films', { title: db.conditions.ne(db.all) })`; `db.Default`, `db.self`, `raw()`, `cols()`, `vals()`, `param()`, a fragment or `parent()` as an item of [`arrayContains()`](/conditions#conditions.arrayContains), `arrayContainedIn()` or `arrayOverlaps()`: `update('films', { title: 'Gone' }, { genres: db.conditions.not(db.conditions.arrayOverlaps([db.Default])) })` | `'Symbol(all)'`, so every film with a title deleted; the item as its text or JSON in the array, `'{"Symbol(DEFAULT)"}'`, so every film renamed | refused by `tsc` on these columns, accepted on a column typed `any`; throws while compiling | for the same rows, `{ title: db.conditions.isNotNull }`, `{ genres: db.conditions.isNotNull }`; else a value to compare with |
 
 </div>
 
@@ -318,7 +329,7 @@ To keep a 6.x write behaviour through 7.x, set its option to `false` in `db.setC
 
 One more opt-in, [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow), has no warning to look for, and stays off in 7.0. With it, a `selectExactlyOne()` run on its own rejects on a second row, not only on none. Turn it on where your tests show no `selectExactlyOne()` matching two rows.
 
-The generator has opt-ins of its own, each to be the default in 7.0. The warning of each but `rejectOnQueryError` is a note from `npx zapatos`, not your tests.
+In 6.x, run `npx zapatos` to see which generator options would change the types for your schema.
 
 The note of [`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas) names each column whose type is an enum of another schema, and that enum, typed until then as `any` or as the enum of the same name in the relation's schema:
 
@@ -336,7 +347,7 @@ The note of [`enumArraysTypedAsText`](/generator#generate.enumArraysTypedAsText)
 
 The note of [`intervalsTypedAsObjects`](/generator#generate.intervalsTypedAsObjects) names each column of `interval`, `interval[]` or a domain over either, which the generator types as its text, though `pg` returns an object from a query of your own. Turn it on and regenerate: `tsc` shows the code that read such a column from a `sql` query as a string, which ran only with a type parser of your own. If you set one, `pg.types.setTypeParser(1186, …)`, write `false` instead, which keeps the text with no note, in 7.0 too.
 
-The note of [`rejectOnQueryError`](/generator#generate.rejectOnQueryError) comes from a script that calls `generate()`, when a query fails, never from `npx zapatos`, which always exits. Turn it on where the script awaits `generate()`, and read what its `catch` does: a refused connection now reaches it, and a script that logs the error and carries on exits with code 0, not 1.
+From 6.7 until 7.0, `generate()` and `tsForConfig()` could report `PGCAST_DEP006` before exiting on a connection or query failure. In 7.0, omitting `rejectOnQueryError` or setting it to `null` in JSON lets your `catch` handle the original error. Listener errors also reject the promise, and earlier listener output stays visible. If the script must fail, rethrow the error or set `process.exitCode = 1`. To keep the immediate exit, set [`rejectOnQueryError: false`](/generator#generate.rejectOnQueryError). This choice remains available beyond 8.0. On a connection or query failure, the CLI prints the error and exits with code 1.
 
 ## Go back
 

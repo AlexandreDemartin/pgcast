@@ -611,7 +611,7 @@ describe('type surprises', () => {
     db.select('accounts', { scores: c.arrayContainedIn([db.all]) });
     // @ts-expect-error nor of arrayOverlaps
     db.select('accounts', { scores: c.arrayOverlaps([db.all]) });
-    // @ts-expect-error nor nested, in the typed form
+    // @ts-expect-error nor nested, in the 6.6.1 spelling
     db.select('accounts', { scores: c.arrayContains<number[]>([[db.all]]) });
   });
 
@@ -630,19 +630,20 @@ describe('type surprises', () => {
     db.select('accounts', { scores: c.arrayContains([db.vals([1])]) });
     // @ts-expect-error nor a Parameter
     db.select('accounts', { scores: c.arrayContains([db.param(1)]) });
-    // @ts-expect-error nor nested, in the typed form
+    // @ts-expect-error nor nested, in the 6.6.1 spelling
     db.select('accounts', { scores: c.arrayContains<number[]>([[db.Default]]) });
     // @ts-expect-error nor on a text[] domain column
     db.select('users', { tags: c.arrayOverlaps(['a', db.Default]) });
   });
 
-  test('parent() or a fragment as the only items of an array condition passes the type, which the runtime refuses', () => {
-    // T infers as the item alone, which the Whereable's fragment takes; the runtime throws on each while compiling
-    // (#636), where 6.6.1 sent its JSON in the array parameter: 22P02 on an int4[], a string no row holds on a text[]
+  test('array columns refuse parent() and fragments as array items', () => {
+    // @ts-expect-error a parent reference is no integer
     db.select('accounts', { scores: c.arrayContains([db.parent('id')]) });
+    // @ts-expect-error nor is a fragment
     db.select('accounts', { scores: c.arrayContains([db.sql`1`]) });
+    // @ts-expect-error a fragment is no string either
     db.select('users', { tags: c.arrayContainedIn([db.sql`'b'`]) });
-    // @ts-expect-error beside a value, T is no element of the column
+    // @ts-expect-error a parent reference beside an integer
     db.select('accounts', { scores: c.arrayOverlaps([1, db.parent('id')]) });
     // @ts-expect-error nor beside a string, on a text[] domain column
     db.select('users', { tags: c.arrayContainedIn(['a', db.sql`'b'`]) });
@@ -705,17 +706,83 @@ describe('type surprises', () => {
     expectTypeOf(db.insert('users', { email: 'a@b', display_name: 'A', created_at: c.now })).not.toBeAny();
   });
 
-  test('array conditions are typed on the element, not on the column', () => {
-    // documented (R34, #40): arrayContains<T>(a: T[] | ParentColumn) gives Constraint T = number; scores wants number[].
-    // Every type tried on the column broke code that compiles under 6.6.1 (a mock written to its signature, `.map()`)
-    // @ts-expect-error valid at run time ("scores" @> '{1}'), refused by the type
-    db.select('accounts', { scores: c.arrayContains([1]) });
-    // @ts-expect-error same for arrayContainedIn
-    db.select('accounts', { scores: c.arrayContainedIn([1]) });
-    // @ts-expect-error same for arrayOverlaps
-    db.select('accounts', { scores: c.arrayOverlaps([1]) });
-    // the workaround types the argument as an array of arrays
+  test('array conditions are typed on the column', () => {
+    const contains = c.arrayContains([1]), containedIn = c.arrayContainedIn(['a']), overlaps = c.arrayOverlaps(['a']);
+    expectTypeOf(contains).toEqualTypeOf<db.SQLFragment<boolean | null, number[]>>();
+    expectTypeOf(contains).not.toBeAny();
+    expectTypeOf(containedIn).toEqualTypeOf<db.SQLFragment<boolean | null, string[]>>();
+    expectTypeOf(containedIn).not.toBeAny();
+    expectTypeOf(overlaps).toEqualTypeOf<db.SQLFragment<boolean | null, string[]>>();
+    expectTypeOf(overlaps).not.toBeAny();
+    db.select('accounts', { scores: contains });
+    db.select('users', { tags: containedIn });
+    db.select('extra.type_zoo', { c_text_array: overlaps, c_point: contains });
     db.select('accounts', { scores: c.arrayContains<number[]>([[1]]) });
+    db.select('accounts', { scores: c.arrayContains([[1]] as const) });
+    db.select('extra.type_zoo', { c_jsonb: c.arrayContains([1]) });
+    db.select('extra.type_zoo', { c_jsonb: c.arrayContainedIn([1]) });
+    db.select('extra.type_zoo', { c_jsonb: c.arrayOverlaps([1]) });
+    // @ts-expect-error Date is not a JSON value
+    db.select('extra.type_zoo', { c_jsonb: c.arrayContains([new Date()]) });
+    // @ts-expect-error Date is not a JSON value
+    db.select('extra.type_zoo', { c_jsonb: c.arrayContainedIn([new Date()]) });
+    // @ts-expect-error Date is not a JSON value
+    db.select('extra.type_zoo', { c_jsonb: c.arrayOverlaps([new Date()]) });
+    const scores: readonly number[] = [1];
+    db.select('accounts', { scores: c.arrayOverlaps(scores) });
+    // @ts-expect-error a string on an int4[] column
+    db.select('accounts', { scores: c.arrayContains(['a']) });
+    // @ts-expect-error a number on the tag_list domain
+    db.select('users', { tags: c.arrayContainedIn([1]) });
+    // @ts-expect-error a number on a text[] column
+    db.select('extra.type_zoo', { c_text_array: c.arrayOverlaps([1]) });
+    // @ts-expect-error owner_id is a scalar
+    db.select('accounts', { owner_id: c.arrayContains([1]) });
+
+    const parentCondition = <P extends db.ParentColumn>(p: P) => c.arrayOverlaps(p);
+    expectTypeOf(parentCondition(db.parent())).toEqualTypeOf<db.SQLFragment<boolean | null, never>>();
+    db.select('accounts', { scores: parentCondition(db.parent('scores')) });
+    // An empty array inferred as never[] or a parent reference leaves the scalar unchecked.
+    const empty: never[] = [];
+    db.select('accounts', { owner_id: c.arrayContains([]) });
+    db.select('accounts', { owner_id: c.arrayContainedIn(empty) });
+    db.select('accounts', { owner_id: c.arrayOverlaps(db.parent('scores')) });
+  });
+
+  test('array conditions passed as callbacks or stored with a 6.6.1 annotation', () => {
+    const mapped = [[1]].map(c.arrayContains), wrapped = [[1]].map(xs => c.arrayContains(xs));
+    expectTypeOf(mapped).toEqualTypeOf<db.SQLFragment<boolean | null, unknown[]>[]>();
+    expectTypeOf(wrapped).toEqualTypeOf<db.SQLFragment<boolean | null, number[]>[]>();
+    const stored = c.arrayContains([1]);
+    // @ts-expect-error the stored condition now constrains the whole array
+    const oldResult: db.SQLFragment<boolean | null, number> = stored;
+    const oldMock = <T>(_a: T[] | db.ParentColumn) => db.sql<db.SQL, boolean | null, T>`TRUE`;
+    // @ts-expect-error the 6.6.1 mock cannot implement the new overloads
+    const mock: typeof c.arrayContains = oldMock;
+    void [oldResult, mock];
+  });
+
+  test('array conditions on enum labels', () => {
+    const happy: db.SQLFragment<boolean | null, s.mood[]> = c.arrayContains(['happy'] as const);
+    // @ts-expect-error 'glad' is not a mood
+    const glad: typeof happy = c.arrayContains(['glad'] as const);
+    void glad;
+  });
+
+  test('array condition operand and wrapper migrations', () => {
+    type Operand = Parameters<typeof c.arrayContains>[0];
+    // @ts-expect-error Parameters reads the array overload
+    const oldOperand: Operand = db.parent('scores');
+    const operand: Operand | db.ParentColumn = db.parent('scores');
+    const contains = <T extends number[]>(xs: T[]) => {
+      const condition = c.arrayContains(xs);
+      // @ts-expect-error the conditional return type is deferred for T
+      const oldResult: db.SQLFragment<boolean | null, T> = condition;
+      void oldResult;
+      return condition;
+    };
+    db.select('accounts', { scores: contains([[1]]) });
+    void [oldOperand, operand];
   });
 
   test('characterization: {}, { value } and param() of a column name pass an array condition as its ParentColumn', () => {
@@ -727,7 +794,7 @@ describe('type surprises', () => {
     db.select('accounts', { scores: c.arrayContainedIn({ value: undefined }) });
     db.select('accounts', { scores: c.arrayOverlaps({ value: 'id' }) });
     db.select('accounts', { scores: c.arrayContains(db.param('id')) });
-    expectTypeOf(c.arrayOverlaps(db.param('id'))).toEqualTypeOf<db.SQLFragment<boolean | null, unknown>>();
+    expectTypeOf(c.arrayOverlaps(db.param('id'))).toEqualTypeOf<db.SQLFragment<boolean | null, never>>();
     // @ts-expect-error a Parameter of an array is no ParentColumn
     db.select('accounts', { scores: c.arrayContains(db.param([1])) });
   });

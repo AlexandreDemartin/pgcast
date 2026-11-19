@@ -1,5 +1,5 @@
 ---
-english: 297b458ed022
+english: ef1572724905
 description: "Ce que zapatos/db vous laisse régler à l’exécution : setConfig() et chaque option de Config, les écouteurs, les opt-ins et leurs codes d’avertissement."
 ---
 
@@ -151,7 +151,7 @@ Un cast donné en chaîne l’emporte ([#36](https://github.com/AlexandreDemarti
 
 - Sans l’option, la même requête échoue : `json_array_length($1)` donne 22P02 « <span lang="en">invalid input syntax for type json</span> ». `param(x, true)` envoie le tableau en JSON avec ou sans l’option.
 - Sur une colonne tableau de Postgres, Postgres refuse un tableau envoyé en JSON : 42804 `column "genres" is of type text[] but expression is of type json` dans un `insert()` ou un `update()`, 42883 « <span lang="en">operator does not exist: text[] = json</span> » dans un Whereable, et « <span lang="en">… text[] && json</span> » avec [`arrayOverlaps()`](/fr/conditions#conditions.arrayOverlaps).
-- Dans un `insert()`, un `update()` ou un Whereable, `db.param(genres, 'text[]')` l’envoie comme un tableau. Les conditions sur tableaux ne prennent pas de `Parameter` ([#40](https://github.com/AlexandreDemartin/pgcast/issues/40)) : faites-y la comparaison dans un [fragment `sql`](/fr/conditions#arrays).
+- Dans un `insert()`, un `update()` ou un Whereable, `db.param(genres, 'text[]')` l’envoie comme un tableau. Si vous devez comparer ce `Parameter` à une colonne de type tableau, utilisez un [fragment `sql`](/fr/conditions#arrays). Les conditions sur tableaux refusent un `Parameter` qui contient le tableau ([#40](https://github.com/AlexandreDemartin/pgcast/issues/40)).
 - `param(x, false)` envoie le tableau tel quel, avec ou sans l’option : `{ genres: db.param(['mystery', 'drama'], false) }` donne `SET ("genres") = ROW($1)`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.update('films', { genres: db.param(['mystery', 'drama'], false) }, { id: 1000 })) -->.
 - Chaque élément d’`isIn()` est un paramètre à part, donc un tableau de nombres y reste inchangé : `"id" IN ($1, $2)`<!-- probe: (db.setConfig({ castArrayParamsToJson: true }), db.sql`${{ id: db.conditions.isIn([1000, 1001]) }}`) -->.
 - Comment `param()` compile chaque `cast` : [`param()`](/fr/sql-template#param).
@@ -453,7 +453,7 @@ Un comportement de Zapatos 6.6.1 sur lequel du code peut compter, mais que pgcas
 
 Un opt-in n’a pas d’avertissement et ne devient pas le comportement par défaut en 7.0 : [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow), puisque la lecture de `selectExactlyOne()` par la 6.6.1, au moins une ligne, est une lecture que Zapatos documente.
 
-Le générateur a les siens : [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas), [`enumOrder`](/fr/generator#generate.enumOrder), [`rejectOnQueryError`](/fr/generator#generate.rejectOnQueryError), [`uniqueIndexConstraintsOnly`](/fr/generator#generate.uniqueIndexConstraintsOnly), [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext), [`enumArraysTypedAsText`](/fr/generator#generate.enumArraysTypedAsText) et [`intervalsTypedAsObjects`](/fr/generator#generate.intervalsTypedAsObjects), dont les anciens chemins donnent des notes via [`warningListener`](/fr/generator#generate.warningListener), une fois par exécution, plutôt qu’un `DeprecationWarning` ; ils deviendront eux aussi le comportement par défaut en 7.0. Son [`domainsTypedAsUnions`](/fr/generator#generate.domainsTypedAsUnions) n’a pas de note, et reste désactivé en 7.0.
+Le générateur a ses propres opt-ins : [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas), [`enumOrder`](/fr/generator#generate.enumOrder), [`uniqueIndexConstraintsOnly`](/fr/generator#generate.uniqueIndexConstraintsOnly), [`domainsTypedByContext`](/fr/generator#generate.domainsTypedByContext), [`enumArraysTypedAsText`](/fr/generator#generate.enumArraysTypedAsText) et [`intervalsTypedAsObjects`](/fr/generator#generate.intervalsTypedAsObjects). Les anciens comportements sont signalés une fois par exécution par des notes via [`warningListener`](/fr/generator#generate.warningListener), distinctes des `DeprecationWarning`. Ces opt-ins seront eux aussi activés par défaut en 7.0. L’option [`domainsTypedAsUnions`](/fr/generator#generate.domainsTypedAsUnions) reste désactivée en 7.0 et ne donne lieu à aucune note.
 
 Node.js émet chaque `DeprecationWarning` une fois par processus et par code, uniquement si l’appel au raccourci utilise l’ancien comportement. Pour `PGCAST_DEP003`, c’est quand la promesse de `transaction()` se résout. Pour `PGCAST_DEP005` et `PGCAST_DEP007`, c’est à l’appel de `transaction()`, avant son `START TRANSACTION` et avant son callback, respectivement. Le message nomme l’option. Node l’affiche sur `stderr` :
 
