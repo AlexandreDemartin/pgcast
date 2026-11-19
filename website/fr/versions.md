@@ -57,7 +57,7 @@ Prenez un `update()` avec une valeur `undefined` :
 
 Zapatos 6.6.1 envoie `SET ("tagline") = ROW($1)`<!-- probe: (db.setConfig({ undefinedMeansMissing: false }), db.update('films', { tagline: undefined }, { id: 1002 })) --> avec `null`, et le film perd son accroche. C’est peut-être un bug, une clé copiée d’un champ de formulaire jamais rempli ; c’est peut-être aussi la façon dont un projet vide une colonne.
 
-En 7.0, `tagline: undefined` seul lève l’erreur `nothing to update`. La mise à jour ne s’exécute que si elle affecte une autre colonne. Elle conserve alors l’accroche.
+Avec les valeurs par défaut de la 7.0, `tagline: undefined` seul lève l’erreur `nothing to update`. La mise à jour ne s’exécute que si elle affecte une autre colonne. Elle conserve alors l’accroche.
 
 En 6.x, la nouvelle interprétation d’`undefined` est proposée en option, désactivée par défaut. L’ancien comportement déclenche un avertissement. Quand vous êtes prêt, activez les options une par une et vérifiez ce qui change avec vos tests.
 
@@ -76,7 +76,7 @@ Avec les réglages par défaut de la 6.7, si le callback de `transaction()` inte
 
 Chaque comportement déprécié du runtime a son propre code, affiché entre crochets pour faciliter la recherche. La section [Opt-ins et avertissements](/fr/runtime-config#opt-ins-and-warnings) liste les avertissements actuels et ce qui les déclenche. Le message décrit le comportement encore en vigueur, indique l’option qui le modifie et annonce que la 7.0 adoptera le nouveau comportement par défaut.
 
-La promesse se résout comme en 6.6.1, sauf si Node utilise `--throw-deprecation`, qui arrête le processus ([Opt-ins et avertissements](/fr/runtime-config#opt-ins-and-warnings)).
+La promesse se résout comme en 6.6.1, même avec `--throw-deprecation`, puis Node arrête le processus sur l’avertissement ([Opt-ins et avertissements](/fr/runtime-config#opt-ins-and-warnings)).
 
 Chaque code avertit une fois par processus. `node --trace-deprecation` affiche la pile. Pour retrouver les autres appels, activez l’option et lancez vos tests.
 
