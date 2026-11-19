@@ -33,8 +33,8 @@ export interface OptionalConfig {
   enumOrder?: 'alphabetical' | 'declared';  // the order of an enum's labels: 'declared' is Postgres's, by which it sorts and compares them
   // optional too; read it with ?? 'zapatos'
   moduleNames?: 'zapatos' | 'pgcast';  // the folder written, and the module names it declares and imports: pgcast/schema, pgcast/db…
-  // optional too; read it with ?? false, and with == null for the note (left out, or null from JSON); deprecated: true in 7.0; the CLI sets false
-  rejectOnQueryError?: boolean;  // a failed query, the connection included, rejects generate() with its error, rather than exit; check() rejects unless false
+  // optional for a CompleteConfig written for 6.6.1; the CLI sets false
+  rejectOnQueryError?: boolean;  // reject with the query or connection error by default; false prints it and exits
   // optional too; read it with ?? false, deprecated: true in 7.0
   uniqueIndexConstraintsOnly?: boolean;  // UniqueIndex lists only what ON CONFLICT ON CONSTRAINT takes: UNIQUE and PRIMARY KEY constraints, valid, not DEFERRABLE nor WITHOUT OVERLAPS
   // optional too; read it with ?? false, deprecated: true in 7.0

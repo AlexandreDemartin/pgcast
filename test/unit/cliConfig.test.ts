@@ -107,10 +107,13 @@ describe('cliConfig()', () => {
     expect(log).not.toHaveBeenCalled();
   });
 
-  it('sets rejectOnQueryError to false over the file and the argument, so the CLI exits on a failed query', () => {
-    write('pgcastconfig.json', '{"rejectOnQueryError": true}');
-    expect(cliConfig(undefined, dir)).toEqual({ rejectOnQueryError: false });
-    expect(cliConfig('{"rejectOnQueryError": true}', dir)).toEqual({ rejectOnQueryError: false });
+  it.each([true, false])('forces the CLI exit over file and argument values, including %s', value => {
+    const file = { rejectOnQueryError: value, outDir: './file' };
+    const arg = { rejectOnQueryError: !value, outDir: './argument' };
+    expect(cliConfig(JSON.stringify(arg), dir)).toEqual({ ...arg, ...exits });
+    write('pgcastconfig.json', JSON.stringify(file));
+    expect(cliConfig(undefined, dir)).toEqual({ ...file, ...exits });
+    expect(cliConfig(JSON.stringify(arg), dir)).toEqual({ ...arg, ...exits });
   });
 
   it('names the argument in its error', () => {
