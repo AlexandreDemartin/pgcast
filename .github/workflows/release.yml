@@ -1,92 +1,44 @@
 name: Release
 
+# Publish the package named by a release tag with npm trusted publishing and provenance.
+# The protected npm environment gives the owner the final say before publication (docs/WORKFLOW.md § Releases).
 on:
   push:
     tags: ['v*', '@pgcast/*@*']
-  pull_request:
-    paths:
-      - .github/workflows/release.yml
-      - package*.json
-      - adapters/**
 
 permissions: {}
 
 jobs:
-  dry-run:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    strategy:
-      matrix:
-        folder: ['.', adapters/postgres-js, adapters/pglite]
-    steps:
-      - &checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-      - &node
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 24.x
-          registry-url: https://registry.npmjs.org
-          package-manager-cache: false
-      - name: Make a sample tag from the package under test
-        working-directory: ${{ matrix.folder }}
-        env:
-          FOLDER: ${{ matrix.folder }}
-        run: |
-          prefix=v
-          if [[ "$FOLDER" != . ]]; then prefix="$(node -p 'require("./package.json").name')@"; fi
-          echo "TAG=$prefix$(node -p 'require("./package.json").version')" >> "$GITHUB_ENV"
-      - &resolve
-        name: Find the package whose name and version match the tag
-        id: package
-        run: |
-          for folder in . adapters/*; do
-            [[ -f "$folder/package.json" ]] || continue
-            expected=$(cd "$folder" && node -p '
-              const {name, version} = require("./package.json");
-              (process.argv[1] === "." ? "v" : name + "@") + version' "$folder")
-            if [[ "$TAG" == "$expected" ]]; then
-              echo "folder=$folder" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-          done
-          echo "No package matches tag $TAG" >&2
-          exit 1
-      - name: Check the resolved folder
-        env:
-          ACTUAL: ${{ steps.package.outputs.folder }}
-          EXPECTED: ${{ matrix.folder }}
-        run: test "$ACTUAL" = "$EXPECTED"
-      - &install-root
-        run: npm ci --ignore-scripts
-      - &install-extension
-        if: steps.package.outputs.folder != '.'
-        working-directory: ${{ steps.package.outputs.folder }}
-        run: npm ci --ignore-scripts
-      - run: npm publish --dry-run --access public
-        working-directory: ${{ steps.package.outputs.folder }}
-
   publish:
-    if: github.event_name == 'push' && !github.event.deleted
+    if: ${{ !github.event.deleted }}
     runs-on: ubuntu-latest
     environment: npm
-    concurrency: release
+    concurrency: release-${{ github.ref_name }}
     permissions:
       contents: read
       id-token: write
     env:
       TAG: ${{ github.ref_name }}
     steps:
-      - *checkout
-      - *node
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.x
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
       - name: Check the tag is on master
         run: git merge-base --is-ancestor "$GITHUB_SHA" origin/master
-      - *resolve
-      - *install-root
-      - *install-extension
+      - name: Find the package whose name and version match the tag
+        id: package
+        run: |
+          folder=$(node scripts/release-folder.mjs "$TAG")
+          echo "folder=$folder" >> "$GITHUB_OUTPUT"
+      - run: npm ci --ignore-scripts
+      - if: steps.package.outputs.folder != '.'
+        working-directory: ${{ steps.package.outputs.folder }}
+        run: npm ci --ignore-scripts
       - run: npm publish --provenance --access public
         working-directory: ${{ steps.package.outputs.folder }}
