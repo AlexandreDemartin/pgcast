@@ -162,7 +162,7 @@ Toutes les options sont facultatives. Une option donnée remplace entièrement s
 | [`moduleNames`](#generate.moduleNames) | `"zapatos"` | les noms de modules que déclarent et importent les fichiers, et leur dossier |
 | [`rejectOnQueryError`](#generate.rejectOnQueryError) | `true` | en cas d’échec d’une requête, rejet de la promesse ou arrêt du processus |
 | [`uniqueIndexConstraintsOnly`](#generate.uniqueIndexConstraintsOnly) | `true` | les noms figurant dans l’`UniqueIndex` de chaque relation |
-| [`constraintNames`](#generate.constraintNames) | `false` | les noms dans le type `Constraint` de chaque relation |
+| [`constraintNames`](#generate.constraintNames) | `false` | les noms figurant dans le type `Constraint` de chaque relation |
 | [`domainsTypedByContext`](#generate.domainsTypedByContext) | `true` | le type des domaines imbriqués et des tableaux de domaines, ainsi que celui des domaines sur `bigint`, `numeric`, `bytea`, `money`, une date ou un tableau de ces types hors de `Selectable` |
 | [`enumArraysTypedAsText`](#generate.enumArraysTypedAsText) | `true` | le type `Selectable` d’un tableau d’un enum |
 | [`intervalsTypedAsObjects`](#generate.intervalsTypedAsObjects) | `true` | le type d’un `interval` dans `Selectable` et dans une écriture |
@@ -448,11 +448,11 @@ CREATE UNIQUE INDEX festival_entries_live_idx ON festival_entries (film_id) WHER
 
 ### `constraintNames` {#generate.constraintNames}
 
-À partir de la 7.1.0. Réglez `constraintNames` sur `true` pour générer un type `Constraint` dans l’espace de noms de chaque relation. Il liste les noms de ses clés primaires, contraintes d’unicité, clés étrangères, contraintes de vérification et d’exclusion, ainsi que de tous ses index uniques. Pour la table ci-dessus, `festival_entries.Constraint` inclut à la fois `festival_entries_slot_key` et `festival_entries_live_idx`, quelle que soit la valeur de `uniqueIndexConstraintsOnly`.
+À partir de la 7.1.0, réglez `constraintNames` sur `true` pour générer un type `Constraint` dans l’espace de noms de chaque relation. Ce type réunit les noms des clés primaires, des contraintes d’unicité, des clés étrangères, des contraintes de vérification, des contraintes d’exclusion et de tous les index uniques de la relation. Pour la table ci-dessus, `festival_entries.Constraint` contient `festival_entries_slot_key` et `festival_entries_live_idx`, quelle que soit la valeur de `uniqueIndexConstraintsOnly`.
 
-Chaque partition ou table fille reçoit les noms que Postgres enregistre pour cette relation, y compris ceux des contraintes de vérification héritées. Les contraintes de vérification d’un domaine appartiennent au domaine. En cas de violation de `NOT NULL`, Postgres indique la colonne. Une relation sans nom correspondant reçoit `never`.
+Pour chaque partition ou table qui hérite d’une autre table, le type reprend les noms que Postgres enregistre pour cette relation, y compris ceux des contraintes de vérification héritées. Les contraintes de vérification d’un domaine appartiennent au domaine. En cas de violation d’une contrainte `NOT NULL`, Postgres indique la colonne. Si aucun nom ne correspond, le type vaut `never`.
 
-La valeur par défaut est `false`. Omettre la clé ou passer `null` en JSON évite aussi la requête supplémentaire sur le catalogue et la déclaration du type.
+La valeur par défaut est `false`. Omettre la clé ou lui donner la valeur JSON `null` évite aussi la requête supplémentaire au catalogue et la déclaration du type.
 
 ### `domainsTypedByContext` {#generate.domainsTypedByContext}
 
