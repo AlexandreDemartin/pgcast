@@ -414,7 +414,9 @@ try {
 
 ### `uniqueIndexConstraintsOnly` {#generate.uniqueIndexConstraintsOnly}
 
-À partir de la 7.0, cette option booléenne vaut `true` par défaut, y compris si la configuration JSON indique `null`. L’`UniqueIndex` de chaque relation contient les noms de contraintes que [`constraint()`](/fr/insert#constraint) peut utiliser dans `ON CONFLICT ON CONSTRAINT … DO UPDATE`. Avec `false`, le générateur liste tous les index uniques de la relation.
+À partir de la 7.0, cette option booléenne vaut `true` par défaut, y compris si la configuration JSON indique `null`. L’`UniqueIndex` de chaque relation liste ses contraintes `UNIQUE` et `PRIMARY KEY` non différables dont l’index est valide et n’est pas un index d’exclusion. Avec `false`, le générateur liste tous les index uniques de la relation.
+
+[`constraint()`](/fr/insert#constraint) compile un nom contenant un point comme un identifiant qualifié. Pour `screenings.id`, il produit `"screenings"."id"` (42601). Écrivez une requête `sql` explicite avec `ON CONSTRAINT "screenings.id"`.
 
 ```sql
 CREATE TABLE festival_entries (
@@ -436,8 +438,9 @@ CREATE UNIQUE INDEX festival_entries_live_idx ON festival_entries (film_id) WHER
 | `festival_entries_slot_key`, `DEFERRABLE` | oui | non | 55000, `ON CONFLICT does not support deferrable unique constraints/exclusion constraints as arbiters` |
 | `festival_entries_live_idx`, un index et pas une contrainte | oui | non | 42704, `constraint "festival_entries_live_idx" for table "festival_entries" does not exist` |
 
-- `true` laisse aussi de côté les index uniques d’une vue matérialisée et, sur Postgres 18, ceux d’une clé `WITHOUT OVERLAPS`, que Postgres traite comme une contrainte d’exclusion. Postgres accepte cette clé avec `DO NOTHING` et renvoie le code 42809 avec `DO UPDATE`. Une contrainte `EXCLUDE` n’est dans aucune des deux listes, puisque son index n’est pas unique.
+- `true` laisse aussi de côté les index uniques d’une vue matérialisée et, sur Postgres 18, ceux d’une clé `WITHOUT OVERLAPS`, que Postgres traite comme une contrainte d’exclusion. `DO NOTHING` accepte une clé non différable et renvoie le code 55000 pour une clé différable. `DO UPDATE` renvoie 42809 dans les deux cas. Une contrainte `EXCLUDE` n’est dans aucune des deux listes, puisque son index n’est pas unique.
 - `true` laisse aussi de côté une contrainte dont l’index n’est pas encore valide : celle d’une table partitionnée, ajoutée avec `ALTER TABLE ONLY`, tant que l’index de chaque partition n’est pas attaché ([Partitionnement](https://www.postgresql.org/docs/current/ddl-partitioning.html#DDL-PARTITIONING-DECLARATIVE-MAINTENANCE)). Entre-temps, Postgres répond 42P10, `there is no unique or exclusion constraint matching the ON CONFLICT specification` ; régénérez une fois ces index attachés.
+- Pour une table partitionnée, le type union suit la contrainte de la table parente. Postgres vérifie l’index de la partition qui reçoit la ligne : une clé différable sur cette partition peut donc entraîner l’erreur 55000. Une clé différable de la table parente est exclue même si les clés des partitions sont immédiates.
 - Une relation qui n’en garde aucun reçoit `never`. `UniqueIndexForTable` et les types agrégés `UniqueIndex` suivent le même changement.
 - En 7.x, `false` rétablit le type union de la 6.x sans note de migration. Ce réglage disparaît en 8.0.
 

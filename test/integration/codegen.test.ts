@@ -1460,7 +1460,9 @@ describe('uniqueIndexConstraintsOnly', () => {
       CREATE UNIQUE INDEX item_counts_id_key ON arb.item_counts (id);` +
       (version >= 150000 ? `CREATE TABLE arb.nnd (id int, CONSTRAINT nnd_id_key UNIQUE NULLS NOT DISTINCT (id));` : '') +
       // an exclusion constraint to Postgres, whose index is unique: range columns, so no btree_gist
-      (version >= 180000 ? `CREATE TABLE arb.spans (id int4range, valid daterange, CONSTRAINT spans_pkey PRIMARY KEY (id, valid WITHOUT OVERLAPS));` : ''));
+      (version >= 180000 ? `
+        CREATE TABLE arb.spans (id int4range, valid daterange, PRIMARY KEY (id, valid WITHOUT OVERLAPS));
+        CREATE TABLE arb.deferred_spans (id int4range, valid daterange, PRIMARY KEY (id, valid WITHOUT OVERLAPS) DEFERRABLE);` : ''));
     // a failed CREATE UNIQUE INDEX CONCURRENTLY leaves its index behind, invalid; outside a transaction block
     await t.pool.query('CREATE UNIQUE INDEX CONCURRENTLY dupes_id_idx ON arb.dupes (id)')
       .then(() => { throw new Error('dupes_id_idx was built'); }, (e: pg.DatabaseError) => { if (e.code !== '23505') throw e; });
@@ -1475,10 +1477,10 @@ describe('uniqueIndexConstraintsOnly', () => {
       /export namespace (\w+) \{\s*export type Table = [^;]*;[^]*?export type UniqueIndex = ([^;]*);/g)]
       .map(([, rel, type]) => [rel, type]));
   };
-  /** By version: the relation that Postgres 15 and 18 add, and its `UniqueIndex`. */
-  const gated = (nnd: string, spans: string) => ({
+  /** Relations available from Postgres 15 and 18, and their `UniqueIndex` types. */
+  const gated = (nnd: string, spans: string, deferred_spans: string) => ({
     ...version >= 150000 ? { nnd } : {},
-    ...version >= 180000 ? { spans } : {},
+    ...version >= 180000 ? { spans, deferred_spans } : {},
   });
 
   it('lists every unique index with explicit false', async () => {
@@ -1492,7 +1494,7 @@ describe('uniqueIndexConstraintsOnly', () => {
       parts: "'parts_id_k_key'",
       parts_1: "'parts_1_id_k_key'",
       renamed: "'renamed_new_key'",
-      ...gated("'nnd_id_key'", "'spans_pkey'"),
+      ...gated("'nnd_id_key'", "'spans_pkey'", "'deferred_spans_pkey'"),
     });
   });
 
@@ -1507,7 +1509,7 @@ describe('uniqueIndexConstraintsOnly', () => {
       parts: "'parts_id_k_key'",
       parts_1: "'parts_1_id_k_key'",
       renamed: "'renamed_new_key'",
-      ...gated("'nnd_id_key'", 'never'),
+      ...gated("'nnd_id_key'", 'never', 'never'),
     });
   });
 
@@ -1515,9 +1517,10 @@ describe('uniqueIndexConstraintsOnly', () => {
     const answers: Record<string, string | null> = {}, nothing: Record<string, string | null> = {};
     const off = await uniqueIndexes({ ...arb, uniqueIndexConstraintsOnly: false });
     // a row, since Postgres refuses a deferrable arbiter only once it inserts one
+    const span = "(id, valid) VALUES ('[1,2)', '[2026-01-01,2026-02-01)')";
     const rows: Record<string, string> = {
       parts: '(id, k) VALUES (1, 1)', parts_1: '(id, k) VALUES (1, 1)', halves: '(id, k) VALUES (1, 1)',
-      spans: "(id, valid) VALUES ('[1,2)', '[2026-01-01,2026-02-01)')",
+      spans: span, deferred_spans: span,
     };
     for (const [rel, type] of Object.entries(off)) {
       for (const name of type === 'never' ? [] : type.slice(1, -1).split("' | '")) {
@@ -1547,10 +1550,10 @@ describe('uniqueIndexConstraintsOnly', () => {
       parts_1_id_k_key: null,
       renamed_new_key: null,
       ...version >= 150000 ? { nnd_id_key: null } : {},
-      ...version >= 180000 ? { spans_pkey: '42809' } : {},  // ON CONFLICT DO UPDATE not supported with exclusion constraints
+      ...version >= 180000 ? { spans_pkey: '42809', deferred_spans_pkey: '42809' } : {},
     });
-    // DO NOTHING refuses each of them with the same code, and takes a WITHOUT OVERLAPS key, as any exclusion constraint
-    expect(nothing).toEqual({ ...answers, ...version >= 180000 ? { spans_pkey: null } : {} });
+    // DO NOTHING accepts a non-deferrable WITHOUT OVERLAPS key.
+    expect(nothing).toEqual({ ...answers, ...version >= 180000 ? { spans_pkey: null, deferred_spans_pkey: '55000' } : {} });
     const on = Object.values(await uniqueIndexes(arb))
       .flatMap(type => type === 'never' ? [] : type.slice(1, -1).split("' | '"));
     expect(on.sort()).toEqual(Object.keys(answers).filter(name => answers[name] === null).sort());

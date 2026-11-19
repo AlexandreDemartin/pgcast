@@ -166,9 +166,11 @@ db.upsert('ratings', { film_id: 1002, stars: 4 }, db.constraint('ratings_pkey'))
 db.upsert('ratings', { film_id: 1002, stars: 4 }, db.constraint('ratings_stars_key'));
 ```
 
-Par défaut, `constraint()` accepte les contraintes `UNIQUE` et `PRIMARY KEY` utilisables avec `DO UPDATE`. Pour un index unique ordinaire sur `code`, passez le nom de la colonne, `'code'`, comme `conflictTarget`. Postgres refuse le nom d’un index sans contrainte (42704), une contrainte différable (55000), une contrainte dont l’index est encore invalide (42P10) et, depuis Postgres 18, une clé `WITHOUT OVERLAPS` avec `DO UPDATE` (42809). En 7.x, [`uniqueIndexConstraintsOnly: false`](/fr/generator#generate.uniqueIndexConstraintsOnly) rétablit la vérification de types de la 6.x. Postgres applique toujours les mêmes règles.
+Par défaut, `constraint()` accepte les contraintes `UNIQUE` et `PRIMARY KEY` utilisables avec `DO UPDATE`. Pour un index unique ordinaire sur `code`, passez le nom de la colonne, `'code'`, comme `conflictTarget`. Postgres refuse une contrainte différable (55000), une contrainte dont l’index est encore invalide (42P10) et, depuis Postgres 18, une clé `WITHOUT OVERLAPS` avec `DO UPDATE` (42809). En 7.x, [`uniqueIndexConstraintsOnly: false`](/fr/generator#generate.uniqueIndexConstraintsOnly) rétablit la vérification de types de la 6.x. Postgres applique toujours les mêmes règles.
 
-Le type ne vérifie pas qu’une contrainte appartient à la table de l’upsert, et Postgres refuse celle d’une autre table : 42704. `constraint()` ne prend les noms de la table qu’à l’intérieur de l’appel, comme ci-dessus. Contenu dans une variable, `const k = db.constraint('tags_pkey')` accepte le nom de n’importe quelle table, donc `db.upsert('ratings', …, k)` compile. Donnez la table, `db.constraint<'ratings'>('ratings_pkey')`, et le type vérifie le nom par rapport à elle :
+Postgres cherche la contrainte sur la table cible, même si une autre table a une contrainte du même nom. Si la contrainte est absente, Postgres renvoie 42704. Une contrainte sans index pouvant arbitrer le conflit, comme un `CHECK` qui porte le même nom qu’un index unique ordinaire, donne l’erreur 42809.
+
+`constraint()` ne prend les noms de la table qu’à l’intérieur de l’appel, comme ci-dessus. Contenu dans une variable, `const k = db.constraint('tags_pkey')` accepte le nom de n’importe quelle table, donc `db.upsert('ratings', …, k)` compile. Donnez la table, `db.constraint<'ratings'>('ratings_pkey')`, et le type vérifie le nom par rapport à elle :
 
 ```ts twoslash
 import * as db from 'zapatos/db';

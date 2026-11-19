@@ -333,13 +333,17 @@ export class Constraint<T extends Table> { constructor(public value: UniqueIndex
  * Returns a `Constraint` instance, wrapping a unique index of the target table
  * for use as the arbiter constraint of an `upsert` shortcut query.
  *
- * The type does not check that it belongs to the upsert's table, and Postgres
- * refuses another table's (42704): held in a variable, `constraint('...')`
- * takes any table's name; `constraint<'users'>('users_pkey')` checks the name
- * against `users`.
+ * Held in a variable, `constraint('...')` accepts any table's name.
+ * `constraint<'users'>('users_pkey')` checks the name against `users`.
+ * Postgres looks up the target table's own constraint, even for a shared name.
+ * A missing constraint gives 42704. A constraint with no arbiter index, such
+ * as a `CHECK` sharing a bare index's name, gives 42809.
  *
  * By default the generator lists the table's valid, non-deferrable unique and
- * primary-key constraints usable with `DO UPDATE`. In 7.x, generating with
+ * primary-key constraints usable with `DO UPDATE`. A partitioned table's union
+ * follows the parent constraint. Postgres checks the receiving partition's index,
+ * so a deferrable key there can raise 55000. A deferrable parent key is omitted
+ * even when the partitions' keys are immediate. In 7.x, generating with
  * `uniqueIndexConstraintsOnly: false` also admits names Postgres refuses.
  */
 export function constraint<T extends Table>(x: UniqueIndexForTable<T>) { return new Constraint<T>(x); }

@@ -58,7 +58,7 @@ bun add zapatos@npm:@pgcast/pgcast@^6
 npx zapatos
 ```
 
-En 6.x, le générateur de pgcast est celui de Zapatos 6.6.1, avec trois corrections dans les fichiers générés. Un `git diff` sur votre dossier `zapatos/` ne montre rien, sauf si :
+En 6.x, un `git diff` sur votre dossier `zapatos/` régénéré peut montrer des différences avec Zapatos 6.6.1, par exemple si
 
 - un commentaire de colonne s’étend sur plusieurs lignes : chaque ligne commence maintenant par ` * ` ;
 - une table a un index simple nommé comme l’index unique d’un autre schéma : son `UniqueIndex` n’emprunte plus ce nom ;
@@ -153,7 +153,11 @@ Dans toutes les versions 7.x, [`typeEnumsAcrossSchemas: false`](/fr/generator#ge
 
 Régénérez le schéma puis lancez `tsc`. Pour [la table `festival_entries`](/fr/generator#generate.uniqueIndexConstraintsOnly), `constraint()` accepte encore `festival_entries_pkey` et `festival_entries_film_festival_key`. Dans un objet littéral de type `Record<s.festival_entries.UniqueIndex, string>`, gardez ces deux clés et retirez `festival_entries_live_idx` et `festival_entries_slot_key`. Si un upsert cible l’un de ces noms, choisissez une contrainte compatible avec `DO UPDATE`.
 
-En 7.x, `uniqueIndexConstraintsOnly: false` rétablit le type union de la 6.x sans note de migration. Ce réglage est le seul qui renseigne le paramètre de sortie `uniqueIndexesNotArbiters` de `definitionForRelationInSchema()`.
+Si le type `UniqueIndex` d’une relation devient `never`, un objet littéral de type `Record` indexé par ce type compile encore avec l’ancienne clé. Vérifiez ces objets à la main.
+
+Sur Postgres 18, un upsert qui nomme une clé `WITHOUT OVERLAPS` non différable avec `updateColumns: db.doNothing` compilait et fonctionnait en 6.x. Avec les réglages par défaut de la 7.0, le compilateur refuse ce nom. Pour conserver `DO NOTHING`, écrivez une requête `sql` explicite qui nomme la clé, ou réglez `uniqueIndexConstraintsOnly: false` en 7.x.
+
+Ce réglage rétablit le type union de la 6.x sans note de migration. C’est le seul qui renseigne le paramètre de sortie `uniqueIndexesNotArbiters` de `definitionForRelationInSchema()`.
 
 ## 4. Trouver les appels dont le résultat change {#find-the-calls-whose-result-changes}
 

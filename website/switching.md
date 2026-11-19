@@ -57,7 +57,7 @@ bun add zapatos@npm:@pgcast/pgcast@^6
 npx zapatos
 ```
 
-In 6.x, pgcast's generator is Zapatos 6.6.1's, with three fixes to what it writes. A `git diff` on your `zapatos/` folder shows nothing, unless:
+In pgcast 6.x, `git diff` on your regenerated `zapatos/` folder can show differences from Zapatos 6.6.1, for example when
 
 - a column comment runs over several lines: each line now starts with ` * `;
 - a table has a plain index named like another schema's unique index: its `UniqueIndex` no longer borrows that name;
@@ -152,7 +152,11 @@ Throughout 7.x, [`typeEnumsAcrossSchemas: false`](/generator#generate.typeEnumsA
 
 Regenerate the schema and run `tsc`. For [the `festival_entries` table](/generator#generate.uniqueIndexConstraintsOnly), `constraint()` still accepts `festival_entries_pkey` and `festival_entries_film_festival_key`. Keep these two keys in a `Record<s.festival_entries.UniqueIndex, string>` object literal. Remove `festival_entries_live_idx` and `festival_entries_slot_key`. If an upsert targets either name, choose a constraint usable with `DO UPDATE`.
 
-In 7.x, `uniqueIndexConstraintsOnly: false` restores the 6.x union without a migration note. Only this setting fills the `uniqueIndexesNotArbiters` out-parameter of `definitionForRelationInSchema()`.
+If a relation's `UniqueIndex` becomes `never`, a `Record` literal typed with that union still compiles with the old key. Check those records by hand.
+
+On Postgres 18, naming a non-deferrable `WITHOUT OVERLAPS` key with `updateColumns: db.doNothing` compiled and worked in 6.x. The 7.0 default rejects the name at compile time. To keep `DO NOTHING`, write an explicit `sql` statement naming the key, or set `uniqueIndexConstraintsOnly: false` through 7.x.
+
+This setting restores the 6.x union without a migration note. It alone fills the `uniqueIndexesNotArbiters` out-parameter of `definitionForRelationInSchema()`.
 
 ## 4. Find the calls whose result changes {#find-the-calls-whose-result-changes}
 
