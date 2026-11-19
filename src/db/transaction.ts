@@ -629,12 +629,16 @@ const iteratedAfter = 'cursor() was iterated after its transaction ended, so its
  *   [a locking select](https://pgcast.dev/cursors#work-inside-the-loop) with
  *   `FOR UPDATE` can fetch a newer version of a row. A transaction retry
  *   restarts the scan on a fresh snapshot.
- * - A `break`, a `return`, a throw in the loop or a `runResultTransform` that
- *   throws sends `CLOSE`. So does a result listener that throws after a successful
- *   `DECLARE` or `FETCH`. A query of its own
- *   that rejects, or a client that `pg` reports aborted (the status it last
- *   received), sends no `CLOSE`, which Postgres would refuse (25P02): the
- *   error goes out unchanged, and `transaction()` retries a 40001 or 40P01.
+ * - A `break`, a `return` or a throw in the loop sends `CLOSE`. If the query's
+ *   `runResultTransform` throws, or a result listener throws after a successful
+ *   `DECLARE` or `FETCH`, the generator sends `CLOSE` and rethrows the original
+ *   error unless `CLOSE` fails with an error other than 25P02.
+ *   A query listener that throws before a `FETCH` or `CLOSE` reaches the driver
+ *   can leave the cursor open until the transaction ends, so the next `cursor()`
+ *   on that client gets 42P03.
+ *   If the driver rejects `DECLARE` or `FETCH`, or `pg` reports an aborted
+ *   transaction (the status it last received), the generator skips `CLOSE`.
+ *   The error goes out unchanged, and `transaction()` retries a 40001 or 40P01.
  *   A `CLOSE` sent after a query of the loop failed, before `pg` received the
  *   status, or on a driver that reports none, gets 25P02, which is dropped:
  *   no 25P02 of `CLOSE`'s replaces the loop's error. A client that `pg`
@@ -708,13 +712,16 @@ async function* cursorBatches<RunResult>(
   declaration.runResultTransform = fetch.runResultTransform = qr => { response = qr; return qr.rows; };
 
   try {
-    const compiled = declaration.compile();
-    delete compiled.name;  // a prepared fragment at any depth can name the whole DECLARE
-    declaration.compile = () => compiled;
+    const compileDeclaration = declaration.compile;
+    declaration.compile = () => {
+      const compiled = compileDeclaration();
+      delete compiled.name;  // a nested prepared fragment can name the whole DECLARE
+      return compiled;
+    };
     await declaration.run(txnClient);
     for (;;) {
       if (ended()) throw new Error(iteratedAfter);
-      response = undefined;  // if the FETCH fails, Postgres has aborted the transaction and would refuse CLOSE
+      response = undefined;  // skip CLOSE unless the driver returns a FETCH result
       await fetch.run(txnClient);
       const fetched = response!;
       if (fetched.rows.length === 0) return;
