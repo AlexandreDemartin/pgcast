@@ -340,6 +340,35 @@ CREATE TABLE unions.books (
 CREATE VIEW unions.ebooks AS SELECT id, format FROM unions.books WHERE format = 'ebook';
 CREATE MATERIALIZED VIEW unions.formats_in_use AS SELECT DISTINCT format FROM unions.books;
 
+-- Constraint names belong to the relation that reports the violation (#713).
+CREATE SCHEMA cinema;
+CREATE DOMAIN cinema.minutes AS integer CONSTRAINT positive_minutes CHECK (VALUE > 0);
+CREATE TABLE cinema.studios (id integer PRIMARY KEY);
+CREATE TABLE cinema.films (
+  id integer PRIMARY KEY,
+  title text NOT NULL CONSTRAINT "Title ""cut""'s Key" UNIQUE,
+  slug text,
+  ticket integer CONSTRAINT films_ticket_key UNIQUE DEFERRABLE,
+  studio integer CONSTRAINT films_studio_fkey REFERENCES cinema.studios,
+  rating integer CONSTRAINT films_rating CHECK (rating > 0),
+  duration cinema.minutes CONSTRAINT "aééééééééééééééééééééééééééééééééé" CHECK (duration < 240)
+);
+CREATE UNIQUE INDEX films_slug_idx ON cinema.films (lower(slug)) WHERE slug IS NOT NULL;
+CREATE TABLE cinema.screenings (slot int4range, CONSTRAINT screenings_slot_excl EXCLUDE USING gist (slot WITH &&));
+CREATE TABLE cinema.bookings (
+  id integer PRIMARY KEY,
+  seats integer CONSTRAINT seats_positive CHECK (seats > 0),
+  studio integer CONSTRAINT bookings_studio_fkey REFERENCES cinema.studios
+) PARTITION BY RANGE (id);
+CREATE TABLE cinema.bookings_first PARTITION OF cinema.bookings FOR VALUES FROM (0) TO (100);
+CREATE TABLE cinema.releases (
+  rating integer CONSTRAINT releases_rating CHECK (rating > 0),
+  code text CONSTRAINT releases_code_key UNIQUE
+);
+CREATE TABLE cinema.premieres () INHERITS (cinema.releases);
+CREATE TYPE cinema."Constraint" AS ENUM ('short', 'feature');
+CREATE TABLE cinema.drafts (format cinema."Constraint" NOT NULL, formats cinema."Constraint"[] NOT NULL);
+
 -- ---------------------------------------------------------------- seed
 
 INSERT INTO public.users (email, display_name, mood, manager_id, home, settings, tags) VALUES

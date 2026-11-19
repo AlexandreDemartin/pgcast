@@ -52,6 +52,10 @@ const main: Config = { schemas: { public: all, extra: all }, unprefixedSchema: '
 /** Custom types of every kind: domains, composites, a custom range, unknown built-ins, cross-schema enums. */
 const customTypesSchemas: Schemas = { public: only('users', 'products'), extra: only('type_zoo') };
 
+const cinema: Config = { schemas: { cinema: all }, unprefixedSchema: 'cinema' };
+const constraintNames = { ...cinema, constraintNames: true };
+const constraintNamesOff: Config[] = [{}, { constraintNames: false }, JSON.parse('{"constraintNames":null}')];
+
 // [snapshot file name, configuration]
 const variants: [string, Config][] = [
   ['unprefixedSchema-null', {
@@ -68,6 +72,7 @@ const variants: [string, Config][] = [
   ['moduleNames-pgcast', { schemas: customTypesSchemas, moduleNames: 'pgcast' }],
   // main, whose output is test/generated/: only the UniqueIndex of products, extra.articles and account_totals differ
   ['uniqueIndexConstraintsOnly-false', { ...main, uniqueIndexConstraintsOnly: false }],
+  ['constraintNames', constraintNames],
   // only extra.type_zoo's c_int8_domain differs, in the four interfaces but Selectable; the placeholders are the same
   ['domainsTypedByContext-false', { schemas: customTypesSchemas, domainsTypedByContext: false }],
   // extra.type_zoo's c_enum_array in Selectable is the label array a custom parser returns
@@ -155,6 +160,13 @@ describe('tsForConfig()', () => {
     const second = await codegen(main);
     expect(second.ts).toBe(first.ts);
     expect(customFiles(second.customTypeSourceFiles)).toBe(customFiles(first.customTypeSourceFiles));
+  });
+
+  it.each(variants.filter(([name]) => name !== 'constraintNames'))('%s is identical with constraintNames off', async (_, variant) => {
+    const omitted = await codegen(variant);
+    for (const setting of constraintNamesOff.slice(1)) {
+      expect(await codegen({ ...variant, ...setting })).toEqual(omitted);
+    }
   });
 });
 
@@ -248,6 +260,49 @@ describe('variant snapshots', { timeout: 30_000 }, () => {
       };`;
     expect(await probeErrors(main, migrated, { skipLibCheck })).toEqual([]);
     expect(await probeErrors({ ...main, uniqueIndexConstraintsOnly: false }, constraintProbe('//'), { skipLibCheck })).toEqual([]);
+  });
+
+  it.each([true, false])("checks each relation's constraint names with uniqueIndexConstraintsOnly %s", async arbiters => {
+    const names: Record<string, string[]> = {
+      studios: ['studios_pkey'],
+      films: [`Title "cut"'s Key`, 'a' + 'é'.repeat(31), 'films_pkey', 'films_rating', 'films_slug_idx', 'films_studio_fkey', 'films_ticket_key'],
+      screenings: ['screenings_slot_excl'],
+      bookings: ['bookings_pkey', 'bookings_studio_fkey', 'seats_positive'],
+      bookings_first: ['bookings_first_pkey', 'bookings_studio_fkey', 'seats_positive'],
+      releases: ['releases_code_key', 'releases_rating'],
+      premieres: ['releases_rating'],
+      drafts: [],
+    };
+    for (const [table, expected] of Object.entries(names)) {
+      const { rows } = await t.client.query<{ name: string }>(`
+        SELECT conname AS name FROM pg_constraint WHERE conrelid = $1::regclass AND contype IN ('p','u','f','c','x')
+        UNION
+        SELECT i.relname FROM pg_index x JOIN pg_class i ON i.oid = x.indexrelid
+        WHERE x.indrelid = $1::regclass AND x.indisunique`, [`cinema.${table}`]);
+      expect(rows.map(row => row.name).sort(), table).toEqual(expected);
+    }
+
+    const config: Config = { ...constraintNames, uniqueIndexConstraintsOnly: arbiters,
+      moduleNames: arbiters ? 'zapatos' : 'pgcast', unprefixedSchema: arbiters ? 'cinema' : null };
+    const ns = arbiters ? 's' : 's.cinema';
+    const probe = `
+      import type * as s from '${config.moduleNames}/schema';
+      type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false;
+      ${Object.entries(names).map(([table, values]) =>
+        `export const ${table}: Equal<${ns}.${table}.Constraint, ${values.map(v => JSON.stringify(v)).join(' | ') || 'never'}> = true;`
+      ).join('\n')}
+      export const slug: ${ns}.films.Constraint = 'films_slug_idx';
+      export const format: Equal<${ns}.drafts.Selectable['format'], 'short' | 'feature'> = true;
+      export const formats: Equal<${ns}.drafts.JSONSelectable['formats'], ('short' | 'feature')[]> = true;
+      // @ts-expect-error the index was renamed
+      export const stale: ${ns}.films.Constraint = 'films_old_idx';
+      // @ts-expect-error the check belongs to the domain
+      export const domain: ${ns}.films.Constraint = 'positive_minutes';
+    `;
+    expect(await probeErrors(config, probe, { skipLibCheck: false })).toEqual([]);
+    const controls = probe.replace('films_old_idx', 'films_slug_idx').replace('positive_minutes', 'films_rating');
+    expect(await probeErrors(config, controls, { skipLibCheck: true })).toEqual(Array(2).fill(
+      "probe.ts TS2578 Unused '@ts-expect-error' directive."));
   });
 
   it('enumOrder-declared: every.<enum> takes the declared order, and only it', async () => {
@@ -3987,6 +4042,17 @@ describe('debugListener', () => {
     return queries.map(q => ({ ...q, rows: results.get(q.seq) }));
   };
 
+  it('reads constraint names once per relation only on explicit opt-in', async () => {
+    const schemas = { cinema: only('films') };
+    const queries = async (setting: Config) => (await printedQueries({ schemas, ...setting })).map(({ text, values }) => ({ text, values }));
+    const enabled = await queries({ constraintNames: true });
+    const extra = enabled.filter(q => /SELECT (?:\w+\.)?conname\b/i.test(q.text));
+    expect(extra.map(q => q.values)).toEqual([['films', 'cinema']]);
+    for (const setting of constraintNamesOff) {
+      expect(await queries(setting)).toEqual(enabled.filter(q => !extra.includes(q)));
+    }
+  });
+
   it('prints a query with its blank lines and line breaks, less the margin of its source', async () => {
     const [relations] = await printedQueries({ schemas: { public: only('users') } });
     expect(relations.seq).toBe('0');
@@ -4034,8 +4100,8 @@ describe('generate()', () => {
   const read = (root: string, file: string) => readFileSync(join(root, file), 'utf8');
   const contents = (root: string) => Object.fromEntries(files(root).map(f => [f, read(root, f)]));
 
-  it('writes zapatos/schema.d.ts, one placeholder per custom type and custom/index.d.ts, as in test/generated', async () => {
-    await run();
+  it.each(constraintNamesOff)('writes the files in test/generated with constraintNames off (%j)', async setting => {
+    await generate({ ...main, ...setting, ...quiet, db: db(), outDir });
     const written = files(outDir);
     expect(written.filter(f => !f.startsWith('zapatos/custom/Pg'))).toEqual([
       'zapatos/custom/index.d.ts',
