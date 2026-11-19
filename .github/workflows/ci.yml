@@ -99,6 +99,48 @@ jobs:
       - name: Committed ESM wrappers match the build
         run: git diff --exit-code -- db.mjs generate.mjs
 
+  release-dry-run:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        folder: ['.', adapters/postgres-js, adapters/pglite]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.x
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+      - name: Make a sample tag for an unpublished version
+        working-directory: ${{ matrix.folder }}
+        env:
+          FOLDER: ${{ matrix.folder }}
+        run: |
+          version=$(node -p 'require("./package.json").version')
+          npm version --no-git-tag-version --ignore-scripts "${version%%+*}-ci.$GITHUB_RUN_ID.$GITHUB_RUN_ATTEMPT"
+          prefix=v
+          if [[ "$FOLDER" != . ]]; then prefix="$(node -p 'require("./package.json").name')@"; fi
+          echo "TAG=$prefix$(node -p 'require("./package.json").version')" >> "$GITHUB_ENV"
+      - name: Check the tag resolves to the package under test
+        id: package
+        env:
+          EXPECTED: ${{ matrix.folder }}
+        run: |
+          folder=$(node scripts/release-folder.mjs "$TAG")
+          test "$folder" = "$EXPECTED"
+          echo "folder=$folder" >> "$GITHUB_OUTPUT"
+      - run: npm ci --ignore-scripts
+      - if: steps.package.outputs.folder != '.'
+        working-directory: ${{ steps.package.outputs.folder }}
+        run: npm ci --ignore-scripts
+      - run: npm publish --dry-run --tag ci --access public
+        working-directory: ${{ steps.package.outputs.folder }}
+
   bench-types:
     # No Postgres: bench/ compiles the committed test/generated/ schema.
     needs: changes
@@ -345,13 +387,13 @@ jobs:
   ci-passed:
     # The one check master requires: it stays stable when the matrix changes, and passes when docs-only skips the rest.
     name: CI passed
-    needs: [changes, build, bench-types, typescript-7, typescript-4-1, docs, adapter-postgres-js, adapter-pglite]
+    needs: [changes, build, release-dry-run, bench-types, typescript-7, typescript-4-1, docs, adapter-postgres-js, adapter-pglite]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Every job passed, or was skipped on purpose
         env:
-          RESULTS: ${{ needs.changes.result }} ${{ needs.build.result }} ${{ needs.bench-types.result }} ${{ needs.typescript-7.result }} ${{ needs.typescript-4-1.result }} ${{ needs.docs.result }} ${{ needs.adapter-postgres-js.result }} ${{ needs.adapter-pglite.result }}
+          RESULTS: ${{ needs.changes.result }} ${{ needs.build.result }} ${{ needs.release-dry-run.result }} ${{ needs.bench-types.result }} ${{ needs.typescript-7.result }} ${{ needs.typescript-4-1.result }} ${{ needs.docs.result }} ${{ needs.adapter-postgres-js.result }} ${{ needs.adapter-pglite.result }}
         run: |
           for result in $RESULTS; do
             case "$result" in

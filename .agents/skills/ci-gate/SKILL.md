@@ -14,7 +14,7 @@ We validate locally while iterating; CI runs **once ready**.
 | **Draft** PR | no heavy job (`.github/workflows/ci.yml`, condition on `draft`) |
 | Ready PR, **docs only** (`.md` outside `.agents/`, `.claude/` and `website/`, `CHANGELOG.md` aside) | `changes` then **CI passed**; `build`, `bench-types`, `typescript-7`, `typescript-4-1` and `docs` skipped |
 | Ready PR, **docs site only** (anything under `website/`, its Markdown included, or `CHANGELOG.md`, its `/changelog` page) | `docs` (builds the site, checks its examples), then **CI passed**; `build`, `bench-types`, `typescript-7` and `typescript-4-1` skipped |
-| Ready PR, anything else | full run: `build` (9 jobs), `bench-types`, `typescript-7`, `typescript-4-1`, `docs` when `src/`, the root `package*.json`, `tsconfig.json` or a workflow changes, then **CI passed** |
+| Ready PR, anything else | full run: `build` (9 jobs), `release-dry-run` (3 jobs, a publish dry run per package), `bench-types`, `typescript-7`, `typescript-4-1`, `docs` when `src/`, the root `package*.json`, `tsconfig.json` or a workflow changes, then **CI passed** |
 | Push to `master` | full run |
 | Layer of a stack (base: the branch below) | same rule as a PR to `master`: CI runs on each layer |
 
@@ -37,7 +37,7 @@ We validate locally while iterating; CI runs **once ready**.
 - **Proofs on a draft**: **CI passed** is green with every job skipped; they are local only.
 - **`[skip ci]` on the last commit**: no check, the merge is blocked; push a commit without it.
 - **A conflicting PR**: GitHub runs no CI on it (CodeQL only). Before review, `gh pr ready` and merge, `gh pr view <n> --json mergeable` says `MERGEABLE` and **CI passed** is in `statusCheckRollup`; a French page's `english:` hash conflicts each time master edits its English page (#43, #183, #341, #442, #460, #483).
-- **A job added to `ci.yml`**: add it to the `needs` of **CI passed**, otherwise its failure does not block the merge.
+- **A job added to `ci.yml`**: add it to the `needs` of **CI passed** and its result to `RESULTS`, otherwise its failure does not block the merge.
 
 ## Rerun
 

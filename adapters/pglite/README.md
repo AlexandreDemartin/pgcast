@@ -106,18 +106,9 @@ CI runs them on PGlite 0.5.0, 0.5.13 and the lockfile's version, on Postgres 14 
 
 ## Publishing
 
-The owner publishes it, apart from pgcast, under its own version:
+Follow the [owner setup and first publication](../../docs/WORKFLOW.md#owner-setup) once for `@pgcast/adapter-pglite`.
 
-```sh
-npm ci && npm run build   # at the repository root
-cd adapters/pglite
-npm ci && npm test && npm run test:types && npm run check:browser
-npm pack --dry-run        # dist/, README.md, CHANGELOG.md, LICENCE, package.json
-npm publish --access public
-git tag @pgcast/adapter-pglite@0.1.0 && git push origin @pgcast/adapter-pglite@0.1.0
-```
-
-`prepack` builds `dist/`. The first publish of a scoped package needs `--access public`. The tag names the published commit, as `v<version>` names pgcast's.
+For each later release, the owner pushes `@pgcast/adapter-pglite@<version>` on the merged version commit and approves the `npm` deployment. The workflow builds and publishes this adapter with provenance.
 
 ## Licence
 
