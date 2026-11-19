@@ -556,7 +556,7 @@ The second argument of [`transaction()`](#transaction). Each value is written af
 type IsolationSatisfying<T extends IsolationLevel>
 ```
 
-The isolation levels that give every guarantee `T` asks for. A read-write level also satisfies its read-only counterpart.
+The outer levels pgcast accepts for a nested call at level `T`.
 
 | `T` | `IsolationSatisfying<T>` |
 |---|---|
@@ -583,7 +583,7 @@ await db.serializable(pool, txnClient => countBookings(txnClient));
 await db.readCommitted(pool, txnClient => countBookings(txnClient));
 ```
 
-From 7.0, a helper that asks for any of the three other read-only levels accepts the client of `serializableRODeferrable()`. For a helper shared with 6.x, use the union `TxnClientForSerializableRO | TxnClientForSerializableRODeferrable` in the example below.
+From 7.0, a helper taking a `pg` client at any of the three other read-only levels accepts the client of `serializableRODeferrable()`. For a helper shared with 6.x, use the union `TxnClientForSerializableRO | TxnClientForSerializableRODeferrable` in the example below.
 
 ```ts twoslash
 import * as db from 'zapatos/db';
@@ -627,15 +627,15 @@ The client a [`transaction()`](#transaction) callback gets: the one checked out 
 
 ### `TxnClientForSerializableRO` {#TxnClientForSerializableRO}
 
-`TxnClient<IsolationSatisfying<IsolationLevel.SerializableRO>>`: the client of [`serializableRO()`](#serializableRO). It also accepts the client of `serializable()` and `serializableRODeferrable()`.
+`TxnClient<IsolationSatisfying<IsolationLevel.SerializableRO>>`: the `pg` client of [`serializableRO()`](#serializableRO). It also accepts the client of `serializable()` and `serializableRODeferrable()`.
 
 ### `TxnClientForRepeatableReadRO` {#TxnClientForRepeatableReadRO}
 
-`TxnClient<IsolationSatisfying<IsolationLevel.RepeatableReadRO>>`: the client of [`repeatableReadRO()`](#repeatableReadRO). It also accepts the client of `serializable()`, `repeatableRead()`, `serializableRO()` and `serializableRODeferrable()`.
+`TxnClient<IsolationSatisfying<IsolationLevel.RepeatableReadRO>>`: the `pg` client of [`repeatableReadRO()`](#repeatableReadRO). It also accepts the client of `serializable()`, `repeatableRead()`, `serializableRO()` and `serializableRODeferrable()`.
 
 ### `TxnClientForReadCommittedRO` {#TxnClientForReadCommittedRO}
 
-`TxnClient<IsolationSatisfying<IsolationLevel.ReadCommittedRO>>`: the client of [`readCommittedRO()`](#readCommittedRO). It accepts the client of every transaction shortcut.
+`TxnClient<IsolationSatisfying<IsolationLevel.ReadCommittedRO>>`: the `pg` client of [`readCommittedRO()`](#readCommittedRO). It accepts the client of every transaction shortcut.
 
 ### `TxnClientForSerializableRODeferrable` {#TxnClientForSerializableRODeferrable}
 

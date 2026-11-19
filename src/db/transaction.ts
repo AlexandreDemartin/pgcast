@@ -35,8 +35,7 @@ export type IsolationSatisfying<T extends IsolationLevel> = {
   [IsolationLevel.SerializableRODeferrable]: IsolationSatisfying<IsolationLevel.SerializableRO>;
 }[T];
 
-// For each level, the levels of a transaction whose client a call at that level may join, as Postgres runs them: each
-// gives every guarantee the level asks for. The type tests check each row against IsolationSatisfying.
+// For each nested request, the outer levels pgcast accepts. The type tests check each row against IsolationSatisfying.
 // A Map, so that a level it doesn't know, a string from JavaScript ('constructor'), is passed through, as in Zapatos 6.6.1
 const
   { Serializable: S, RepeatableRead: RR, ReadCommitted: RC, SerializableRO: SRO, RepeatableReadRO: RRRO,

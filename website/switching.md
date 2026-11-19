@@ -108,7 +108,7 @@ To compare with SQL, give a `sql` fragment as the value, `db.self` for the colum
 
 | Your code | Zapatos 6.6.1 and pgcast 6.x | pgcast 7.0 | What to do |
 |---|---|---|---|
-| `db.serializableRO(pool, countSeats)`, where the parameter of `countSeats` is typed `db.TxnClient<db.IsolationLevel.Serializable \| db.IsolationLevel.SerializableRO>` | Compiles | TS2345 under `strict` because the callback can also receive the `SerializableRODeferrable` level | Type the parameter as [`db.TxnClientForSerializableRO`](/transaction#TxnClientForSerializableRO). If the helper inspects `_zapatos.isolationLevel`, handle `SerializableRODeferrable` too. |
+| `db.serializableRO(pool, countSeats)`, where the parameter of `countSeats` is typed `db.TxnClient<db.IsolationLevel.Serializable \| db.IsolationLevel.SerializableRO>` | Compiles | TS2345 under `strictFunctionTypes` (on with `strict`) because TypeScript checks the callback against the wider client type | For `pg`, use [`db.TxnClientForSerializableRO`](/transaction#TxnClientForSerializableRO). For an adapter with client type `C`, use `db.TxnClientLike<C, db.IsolationSatisfying<db.IsolationLevel.SerializableRO>>`. If the helper inspects `_zapatos.isolationLevel`, handle `SerializableRODeferrable` too. This level also affects a `Record` keyed by `IsolationSatisfying<…>`, overloads on the ordinary and deferrable client types and handwritten signatures using the old callback type. |
 
 </div>
 

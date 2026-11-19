@@ -109,7 +109,7 @@ Pour comparer avec du SQL, donnez un fragment `sql` comme valeur, `db.self` pour
 
 | Votre code | Zapatos 6.6.1 et pgcast 6.x | pgcast 7.0 | Que faire |
 |---|---|---|---|
-| `db.serializableRO(pool, countSeats)`, où le paramètre de `countSeats` est de type `db.TxnClient<db.IsolationLevel.Serializable \| db.IsolationLevel.SerializableRO>` | Compile | TS2345 avec `strict`, car le callback peut aussi recevoir un client de niveau `SerializableRODeferrable` | Donnez au paramètre le type [`db.TxnClientForSerializableRO`](/fr/transaction#TxnClientForSerializableRO). Si la fonction examine `_zapatos.isolationLevel`, traitez aussi le cas `SerializableRODeferrable`. |
+| `db.serializableRO(pool, countSeats)`, où le paramètre de `countSeats` est de type `db.TxnClient<db.IsolationLevel.Serializable \| db.IsolationLevel.SerializableRO>` | Compile | TS2345 avec `strictFunctionTypes` (activé par `strict`), car TypeScript vérifie le callback avec le type de client élargi | Avec `pg`, donnez au paramètre le type [`db.TxnClientForSerializableRO`](/fr/transaction#TxnClientForSerializableRO). Avec un adaptateur dont le client est de type `C`, utilisez `db.TxnClientLike<C, db.IsolationSatisfying<db.IsolationLevel.SerializableRO>>`. Si la fonction examine `_zapatos.isolationLevel`, traitez aussi le cas `SerializableRODeferrable`. Ce niveau compte aussi pour un `Record` indexé par `IsolationSatisfying<…>`, les surcharges sur les types de clients ordinaire et différable et les signatures écrites avec l’ancien type de callback. |
 
 </div>
 

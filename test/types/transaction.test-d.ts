@@ -158,6 +158,17 @@ describe('a pool that is not pg’s', () => {
     expectTypeOf(levels(db.IsolationLevel.ReadCommitted)).resolves.toEqualTypeOf<TxnOther<db.IsolationLevel.ReadCommitted>>();
   });
 
+  test('a serializable read-only callback on an adapter pool must accept the deferrable level', () => {
+    const current = async (c: TxnOther<db.IsolationLevel.SerializableRO>) => c;
+    const narrow = async (c: db.TxnClientLike<OtherClient, db.IsolationLevel.Serializable | db.IsolationLevel.SerializableRO>) => c;
+    void db.serializableRO(typedPool, current);
+    void db.transaction(typedPool, db.IsolationLevel.SerializableRO, current);
+    // @ts-expect-error the old callback omits SerializableRODeferrable
+    void db.serializableRO(typedPool, narrow);
+    // @ts-expect-error the old callback omits SerializableRODeferrable
+    void db.transaction(typedPool, db.IsolationLevel.SerializableRO, narrow);
+  });
+
   test('widening the pool to PoolLike<unknown> or serializable’s first parameter gives the callback pg’s client type', () => {
     const unknownPool: db.PoolLike<unknown> = other;
     const parameter: Parameters<typeof db.serializable>[0] = other;
