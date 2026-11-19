@@ -1,5 +1,5 @@
 ---
-english: 4df816f69533
+english: db76e97da576
 description: "Quand aucun raccourci n’écrit la requête dont vous avez besoin, écrivez-la dans le template sql, et gardez hors de son texte toute valeur venue de l’extérieur."
 ---
 
@@ -333,7 +333,7 @@ Un raccourci d’écriture peut aussi être une CTE. Il s’exécute, et la requ
 
 Imbriqué, `withCTEs()` va là où irait sa requête : entre parenthèses comme valeur d’`extras` ou d’`insert()`, comme sous-requête dans un `lateral`.
 
-Un `selectExactlyOne()` comme requête garde ses vérifications. Avec [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), au premier niveau, il demande toujours une deuxième ligne, `LIMIT $1`<!-- probe: (db.setConfig({ selectExactlyOneChecksForSecondRow: true }), db.withCTEs({ r: db.sql`SELECT 1` }, db.selectExactlyOne('films', db.all))) --> avec `2`, et il est rejeté s’il en trouve une ; imbriqué dans une autre requête, il garde `LIMIT 1`, comme le fait une [`copy()`](/fr/sql-template#copy). Sans ligne, il est rejeté avec `NotExactlyOneError`, dont la `.query` est le raccourci, sans le `WITH`.
+Si la requête principale est un `selectExactlyOne()`, elle garde ses vérifications. Au premier niveau, avec [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), elle demande toujours une deuxième ligne (par défaut `LIMIT $1`<!-- probe: (db.setConfig({ selectExactlyOneChecksForSecondRow: true }), db.withCTEs({ r: db.sql`SELECT 1` }, db.selectExactlyOne('films', db.all))) --> avec `2`). Si elle en trouve une, sa promesse est rejetée. Imbriquée, elle demande une ligne et, avec `withTies: true`, les éventuelles lignes ex æquo, comme une [`copy()`](/fr/sql-template#copy). Si elle ne trouve aucune ligne, sa promesse est rejetée avec une `NotExactlyOneError` dont la propriété `.query` contient le raccourci sans le `WITH`.
 
 `withCTEs()` n’écrit ni `RECURSIVE` ni `MATERIALIZED` : écrivez un tel `WITH` en `sql`, avec sa requête principale. Mettez toutes les CTE dans un seul appel : une requête qui commence déjà par un `WITH`, un résultat de `withCTEs()` par exemple, est refusée (42601).
 

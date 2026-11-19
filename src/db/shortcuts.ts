@@ -76,8 +76,10 @@ declare const nestedResult: unique symbol;
  * A column-typed `min()` or `max()`: with the default runtime setting, `run()` gives the pg value.
  * A single lateral of `selectOne()`, `selectExactlyOne()` or `selectRows()` also gives the pg value.
  * `ConfigTypes` selects the types: `RunResult` there, `NestedResult` for JSON under a lateral key,
- * in `extras` or under `select()`. Its own members name a symbol
- * `zapatos/db` does not export, so a package built with `declaration: true` cannot write them out (TS4023 on a
+ * in `extras` or under `select()`. Nest the original fragment for JSON. A `.copy()` returns a plain
+ * `SQLFragment` with the direct type (e.g. `Date | null` for a date returned as a JSON string).
+ * The original fragment's own members name a symbol `zapatos/db` does not export,
+ * so a package built with `declaration: true` cannot write them out (TS4023 on a
  * spread of `min()`); it can name the type itself, as a function returning `min()` does.
  */
 export interface ColumnAggregateFragment<RunResult, NestedResult> extends SQLFragment<RunResult> { [nestedResult]: NestedResult }

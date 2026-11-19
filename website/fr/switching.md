@@ -1,5 +1,5 @@
 ---
-english: 4010acd4a443
+english: bdea0cc82fac
 description: "Passez de Zapatos 6.6.1 à pgcast 6.x, puis à la 7.0. Vérifiez les valeurs par défaut, les types et les dépendances à installer."
 ---
 
@@ -254,7 +254,7 @@ Pour trouver chaque appel :
 | Avertissement | L’appel | Corrigez-le, ou activez |
 |---|---|---|
 | `PGCAST_DEP001` | Un upsert de plusieurs lignes mettrait à jour une colonne absente d’une ligne. | Ajoutez la clé de cette colonne à chaque ligne ou précisez `updateColumns`. |
-| `PGCAST_DEP002` | Une écriture utilise `undefined` comme valeur de colonne. | Utilisez `null` pour mettre la colonne à `NULL` ou omettez la clé pour conserver sa valeur lors d’une mise à jour. Voir la [règle de `updateValues`](/fr/insert#undefined-values). |
+| `PGCAST_DEP002` | Une valeur vaut `undefined` dans une ligne, ou la seule raison de mettre à jour une colonne est la présence d’une clé à `undefined` dans `updateValues`. | Utilisez `null` pour mettre la colonne à `NULL` ou omettez la clé pour conserver sa valeur lors d’une mise à jour. Voir la [règle de `updateValues`](/fr/insert#undefined-values). |
 | `PGCAST_DEP003` | une [`transaction()`](/fr/transaction#transaction) dont le callback intercepte l’erreur d’une requête et se termine : Postgres répond au `COMMIT` par `ROLLBACK`, et rien n’est enregistré ([Laisser passer l’erreur](/fr/retries#let-the-error-through)) | laissez l’erreur sortir du callback, ou faites `ROLLBACK TO` un `SAVEPOINT` avant de continuer ; ou [`transactionRequiresCommit`](/fr/runtime-config#Config.transactionRequiresCommit), et une telle transaction est rejetée |
 | `PGCAST_DEP004` en 6.x | un [`sum()`, `avg()`, `min()` ou `max()`](/fr/select#typed-by-column) dont le résultat vaut `null` ou est absent, ou un minimum ou un maximum dont la valeur renvoyée par `pg` est d’un autre type que `number` | activez [`aggregatesTypedByColumn`](/fr/runtime-config#Config.aggregatesTypedByColumn) et déclarez-le dans [`ConfigTypes`](/fr/runtime-config#ConfigTypes). `tsc` signale alors les utilisations incompatibles avec le nouveau type, et `?? 0` permet de garder `0` |
 | `PGCAST_DEP005` | une [`transaction()`](/fr/transaction#transaction) qui reçoit un client sur lequel vous avez envoyé `BEGIN` : son `COMMIT` ou son `ROLLBACK` termine votre transaction ([Votre propre `BEGIN`](/fr/transaction#your-own-begin)) | ouvrez la transaction extérieure avec `transaction()`, ou donnez le pool à cet appel, pour une transaction à lui, qui est commitée séparément de la transaction extérieure, ne voit pas les lignes non commitées de celle-ci, et reste bloquée (sauf si `lock_timeout` est défini) si elle écrit ou verrouille une ligne que la transaction extérieure a écrite ou verrouillée, ou insère une clé que celle-ci a insérée (deux verrous `FOR SHARE` n’entrent pas en conflit) ; ou [`transactionRequiresIdleClient`](/fr/runtime-config#Config.transactionRequiresIdleClient), et un tel appel est rejeté avant d’envoyer son `START TRANSACTION` |
@@ -297,7 +297,7 @@ npm install pgcast@npm:@pgcast/pgcast@^7
 
 :::
 
-Outre les changements de valeurs par défaut, la 6.x n’émet aucun avertissement sur [les callbacks de transaction en lecture seule](#runtime-migration), [les conditions sur tableaux](#array-condition-types) et [les peer dependencies de types devenues facultatives](/fr/install#requirements). Si vous vérifiez les types et comptiez sur l’installation automatique de ces dépendances, ajoutez uniquement celle qui manque en dépendance de développement (`typescript` ou `@types/pg`). Lancez `npm install --save-dev typescript @types/pg` si les deux manquent. En JavaScript, seule la peer dependency `pg` est requise. [#592](https://github.com/AlexandreDemartin/pgcast/issues/592).
+Même si la 6.x n’a émis aucun avertissement, vérifiez [les écritures par lots, les agrégats et les callbacks de transaction en lecture seule](#runtime-migration), [les conditions sur tableaux](#array-condition-types), [les types générés](#regenerate-for-7-0) et [les peer dependencies facultatives pour la vérification des types](/fr/install#requirements). Si vous comptiez sur l’installation automatique de ces dépendances pour vérifier les types, ajoutez uniquement celle qui manque à vos dépendances de développement (`typescript` ou `@types/pg`). Lancez `npm install --save-dev typescript @types/pg` si les deux manquent. En JavaScript, seule la peer dependency `pg` est requise. [#592](https://github.com/AlexandreDemartin/pgcast/issues/592).
 
 ### Vérifier les appels au runtime {#runtime-migration}
 
@@ -305,12 +305,12 @@ Les six options ci-dessous valent désormais `true` par défaut. Pour conserver 
 
 | Réglage temporaire | Ce qu’il faut vérifier en 7.0 | Avec le réglage 6.x |
 |---|---|---|
-| `undefinedMeansMissing: false` | À l’insertion, une valeur `undefined` prend la valeur par défaut de la colonne. Une mise à jour avec `tagline: undefined` conserve l’accroche si elle modifie aussi `title`. Pour effacer l’accroche, passez `null`. | Dans une ligne, une valeur `undefined` est transmise à Postgres sous forme de `NULL`. Voir la [règle de `updateValues`](/fr/insert#undefined-values). |
-| `upsertRequiresSameKeys: false` | Si une seule ligne d’un lot fournit `tagline` et que la mise à jour implicite écraserait cette colonne, l’upsert lève une erreur dès sa construction. Voir les [exceptions pour la cible de conflit, `updateValues` et `updateColumns`](/fr/insert#upsert-options). | Si la colonne manque dans une ligne, sa valeur par défaut peut remplacer la valeur stockée. |
-| `transactionRequiresCommit: false` | Si le callback intercepte une erreur de requête et que Postgres répond au `COMMIT` par `ROLLBACK`, la promesse est rejetée. [Erreurs](/fr/transaction#errors). | La promesse se résout avec le résultat du callback. |
-| `transactionRequiresIdleClient: false` | Après votre propre `BEGIN`, la promesse est rejetée si le client signale toujours une transaction ouverte à la seconde vérification. Terminez d’abord votre transaction. Sur ce client, attendez la fin de chaque appel à un raccourci de transaction avant de lancer le suivant. [Votre propre `BEGIN`](/fr/transaction#your-own-begin). | Le raccourci peut mettre fin à la transaction de l’appelant. |
-| `transactionRequiresSatisfyingLevel: false` | Un `serializable()` imbriqué dans `readCommitted()` est rejeté avant l’exécution du callback intérieur. Ouvrez la transaction extérieure au niveau voulu. [Transmettre une transaction](/fr/transaction#passing-a-transaction-through). | Le callback intérieur s’exécute au niveau d’isolation de la transaction extérieure. |
-| `aggregatesTypedByColumn: false` | `sum()` renvoie `null` en l’absence de lignes. Sur une colonne de dates, `min()` renvoie la date minimale. Traitez le cas `null` avant tout calcul. [Typé par colonne](/fr/select#typed-by-column). | Un appel direct à `.run()` applique `Number()`. Une somme sans lignes vaut donc zéro. Dans `extras`, cette somme vaut `null` en JSON et la date minimale reste une chaîne de caractères. |
+| [`undefinedMeansMissing: false`](/fr/runtime-config#Config.undefinedMeansMissing) | À l’insertion, une cellule à `undefined` reçoit la valeur par défaut de la colonne. Une mise à jour avec `tagline: undefined` conserve l’accroche si elle modifie aussi `title`. Pour effacer l’accroche, passez `null`. | Dans une ligne, une valeur `undefined` est transmise à Postgres sous forme de `NULL`. Voir la [règle de `updateValues`](/fr/insert#undefined-values). |
+| [`upsertRequiresSameKeys: false`](/fr/runtime-config#Config.upsertRequiresSameKeys) | Si une seule ligne d’un lot fournit `tagline` et que la mise à jour implicite écraserait cette colonne, l’upsert lève une erreur dès sa construction. Une propriété non énumérable compte désormais comme absente, même si les deux corrections étaient activées en 6.x. Pour écrire sa valeur, utilisez `{ ...row, tagline: row.tagline }`. Voir les [exceptions pour la cible de conflit, `updateValues` et `updateColumns`](/fr/insert#upsert-options). | Si la colonne manque dans une ligne, sa valeur par défaut peut remplacer la valeur stockée. |
+| [`transactionRequiresCommit: false`](/fr/runtime-config#Config.transactionRequiresCommit) | Si le callback intercepte une erreur de requête et que Postgres répond au `COMMIT` par `ROLLBACK`, la promesse est rejetée. [Erreurs](/fr/transaction#errors). | La promesse se résout avec le résultat du callback. |
+| [`transactionRequiresIdleClient: false`](/fr/runtime-config#Config.transactionRequiresIdleClient) | Après votre propre `BEGIN`, la promesse est rejetée si le client signale toujours une transaction ouverte à la seconde vérification. Terminez d’abord votre transaction. Sur ce client, attendez la fin de chaque appel à un raccourci de transaction avant de lancer le suivant. [Votre propre `BEGIN`](/fr/transaction#your-own-begin). | Le raccourci peut mettre fin à la transaction de l’appelant. |
+| [`transactionRequiresSatisfyingLevel: false`](/fr/runtime-config#Config.transactionRequiresSatisfyingLevel) | Dans un `readCommitted()`, la promesse de `serializable()` est rejetée avant l’exécution de son callback. Ouvrez la transaction extérieure au niveau voulu. [Transmettre une transaction](/fr/transaction#passing-a-transaction-through). | Le callback imbriqué s’exécute au niveau d’isolation de la transaction extérieure. |
+| [`aggregatesTypedByColumn: false`](/fr/runtime-config#Config.aggregatesTypedByColumn) | `sum()` renvoie `null` en l’absence de lignes. Sur une colonne de dates, `min()` renvoie la date minimale. Traitez le cas `null` avant tout calcul. [Typé par colonne](/fr/select#typed-by-column). | Un appel direct à `.run()` applique `Number()`. Une somme sans lignes vaut donc zéro. Dans `extras`, cette somme vaut `null` en JSON et la date minimale reste une chaîne de caractères. |
 
 <CastPanel example="switching_undefined">
 
@@ -341,7 +341,7 @@ db.setConfig({ aggregatesTypedByColumn: false });
 
 ### Types des conditions sur tableaux en 7.0 {#array-condition-types}
 
-Pour un fragment contenu dans une variable, remplacez la contrainte scalaire `number` par `number[]`. Vous pouvez simplifier `arrayContains<number[]>([[1]])` en `arrayContains([1])`. Voir [Les tableaux](/fr/conditions#arrays) pour les opérandes, les callbacks et les mocks. [#705](https://github.com/AlexandreDemartin/pgcast/issues/705).
+Pour un fragment contenu dans une variable, remplacez la contrainte scalaire `number` par `number[]`. Vous pouvez simplifier `arrayContains<number[]>([[1]])` en `arrayContains([1])`. Dans un mock de l’ancienne signature, implémentez les deux surcharges. Voir [Les tableaux](/fr/conditions#arrays) pour les opérandes et les callbacks. [#705](https://github.com/AlexandreDemartin/pgcast/issues/705).
 
 Pour `arrayContains()`, `arrayContainedIn()` et `arrayOverlaps()` (`c = db.conditions`) :
 
@@ -355,19 +355,19 @@ Régénérez le schéma dès que vous changez de version du générateur ou d’
 
 | Valeur par défaut en 7.0 | Ce qui change pour votre code | Ancien réglage |
 |---|---|---|
-| `typeEnumsAcrossSchemas: true` | Une écriture dans [`prints.keeper`](/fr/generator#generate.typeEnumsAcrossSchemas) accepte le label `'archivist'` de l’autre schéma. TypeScript refuse désormais le label local `'director'`. Vérifiez les [imports de placeholders](#enum-types). | `false` |
-| `enumOrder: 'declared'` | `every.crew_job[0]` vaut `'director'`, le premier label déclaré. Vérifiez le code qui utilise l’indice d’un label. | `'alphabetical'` |
-| `uniqueIndexConstraintsOnly: true` | Un index unique sans contrainte, comme `festival_entries_live_idx`, disparaît de `UniqueIndex`. Choisissez une contrainte admissible pour un [upsert à cible nommée](#named-conflict-targets). | `false` |
-| `domainsTypedByContext: true` | Avec le placeholder généré et les parseurs par défaut, un domaine sur `bigint` donne une chaîne dans une ligne brute et un nombre dans le JSON d’un raccourci. Il accepte un `bigint` à l’écriture. [Types des domaines](#domain-and-parser-types). | `false` |
-| `enumArraysTypedAsText: true` | Dans une ligne brute, un tableau d’enums est du texte, par exemple `'{writer,editor}'`. Utilisez le tableau du raccourci pour appeler `.map()`, ou choisissez `false` si votre parser renvoie un tableau. | `false` (permanent) |
-| `intervalsTypedAsObjects: true` | Dans une ligne brute, un intervalle possède la méthode `toPostgres()`. Le JSON d’un raccourci conserve le texte. Choisissez `false` si votre parser renvoie du texte. | `false` (permanent) |
-| `rejectOnQueryError: true` | Les promesses de `generate()` et de `tsForConfig()` sont rejetées avec l’erreur de connexion ou de requête d’origine. Relancez l’erreur ou fixez `process.exitCode = 1` si le script doit échouer. | `false` (arrêt immédiat permanent) |
+| [`typeEnumsAcrossSchemas: true`](/fr/generator#generate.typeEnumsAcrossSchemas) | Une écriture dans `prints.keeper` accepte le label `'archivist'` de l’autre schéma. TypeScript refuse désormais le label local `'director'`. Vérifiez les [collisions de noms et les imports de placeholders](#enum-types). | `false` |
+| [`enumOrder: 'declared'`](/fr/generator#generate.enumOrder) | `every.crew_job[0]` vaut `'director'`, le premier label déclaré. Vérifiez le code qui accède aux éléments du tuple par leur indice. | `'alphabetical'` |
+| [`uniqueIndexConstraintsOnly: true`](/fr/generator#generate.uniqueIndexConstraintsOnly) | Un index unique sans contrainte, comme `festival_entries_live_idx`, disparaît de `UniqueIndex`. Choisissez une contrainte admissible pour un [upsert à cible nommée](#named-conflict-targets). | `false` |
+| [`domainsTypedByContext: true`](/fr/generator#generate.domainsTypedByContext) | Avec le placeholder généré et les parseurs par défaut, un domaine sur `bigint` donne une chaîne dans une ligne brute et un nombre dans le JSON d’un raccourci. Il accepte un `bigint` à l’écriture. [Types des domaines](#domain-and-parser-types). | `false` |
+| [`enumArraysTypedAsText: true`](/fr/generator#generate.enumArraysTypedAsText) | Dans une ligne brute, un tableau d’enums est du texte, par exemple `'{writer,editor}'`. Utilisez le tableau du raccourci pour appeler `.map()`, ou choisissez `false` si votre parser renvoie un tableau. | `false` (permanent) |
+| [`intervalsTypedAsObjects: true`](/fr/generator#generate.intervalsTypedAsObjects) | Dans une ligne brute, un intervalle possède la méthode `toPostgres()`. Le JSON d’un raccourci conserve le texte. Choisissez `false` si votre parser renvoie du texte. | `false` (permanent) |
+| [`rejectOnQueryError: true`](/fr/generator#generate.rejectOnQueryError) | Les promesses de `generate()` et de `tsForConfig()` sont rejetées avec l’erreur de connexion ou de requête d’origine. Relancez l’erreur ou définissez `process.exitCode = 1` si le script doit échouer. Une erreur synchrone d’un écouteur rejette aussi la promesse de génération. Gérez les promesses que renvoie l’écouteur. | `false` (arrêt immédiat, réglage permanent) |
 
 Par défaut, la promesse de `check()` est déjà rejetée en cas d’erreur de base de données. La fonction compare le contenu du schéma et, si le générateur produit un index des types personnalisés, celui de cet index. Elle vérifie aussi la présence de chaque placeholder. Si la vérification échoue, la promesse se résout avec `false`. Avec `rejectOnQueryError: false`, les trois fonctions arrêtent le processus en cas d’erreur de base de données. Les deux commandes, `pgcast` et `zapatos`, quittent avec le code 1 dans ce cas. Leur option `--check` renvoie aussi le code 1 quand cette vérification renvoie `false`. [Erreurs du générateur](/fr/generator#generate.rejectOnQueryError).
 
 La régénération conserve les placeholders existants dans `custom/`. Générez une seconde copie dans un `outDir` vide, hors de votre projet TypeScript. Comparez ses placeholders aux vôtres et intégrez les changements adaptés à vos parsers. Lancez ensuite `npx tsc` avec le schéma régénéré, puis vos tests.
 
-Trois réglages conservent leur valeur par défaut. `selectExactlyOneChecksForSecondRow` reste désactivé. Si vous l’activez, seule une requête exécutée isolément vérifie la présence d’une deuxième ligne. Une requête imbriquée garde `LIMIT 1`, sauf si [`withTies`](/fr/select#order-limit-offset-and-withties) inclut les lignes ex æquo. Dans le générateur, [`domainsTypedAsUnions`](/fr/generator#generate.domainsTypedAsUnions) reste un opt-in et [`moduleNames`](/fr/generator#generate.moduleNames) vaut toujours `'zapatos'` par défaut.
+Trois réglages conservent leur valeur par défaut. `selectExactlyOneChecksForSecondRow` reste désactivé. Si vous l’activez, la promesse d’une requête exécutée seule est rejetée si Postgres renvoie une deuxième ligne. [Les requêtes imbriquées et les copies](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow) demandent une ligne et, avec `withTies: true`, les éventuelles lignes ex æquo. Dans le générateur, [`domainsTypedAsUnions`](/fr/generator#generate.domainsTypedAsUnions) reste un opt-in et [`moduleNames`](/fr/generator#generate.moduleNames) vaut toujours `'zapatos'` par défaut.
 
 ### Types des enums en 7.0 {#enum-types}
 
@@ -388,6 +388,8 @@ Régénérez le schéma puis lancez `tsc`. Pour [la table `festival_entries`](/f
 Si le type `UniqueIndex` d’une relation devient `never`, un objet littéral de type `Record` dont les clés sont typées par cette union compile encore avec l’ancienne clé. Vérifiez ces objets à la main.
 
 Sur Postgres 18, un upsert qui cible par son nom une clé `WITHOUT OVERLAPS` non différable avec `updateColumns: db.doNothing` compilait et fonctionnait en 6.x. Avec le réglage par défaut de la 7.0, le compilateur refuse ce nom. Pour conserver `DO NOTHING`, écrivez une requête `sql` explicite qui nomme la clé ou utilisez `uniqueIndexConstraintsOnly: false` en 7.x.
+
+Sur une table partitionnée, le type union suit l’index de la table parente. Il exclut une clé différable de la table parente, même si la clé non différable de la partition permet à l’upsert à cible nommée de fonctionner avec `{ reportAction: 'suppress' }`. Utilisez une requête SQL explicite ou réglez `uniqueIndexConstraintsOnly: false` en 7.x. Avec une clé non différable sur la table parente et une clé différable sur la partition, TypeScript accepte le nom, mais Postgres peut renvoyer l’erreur `55000`.
 
 Ce réglage rétablit le type union de la 6.x sans note de migration. C’est le seul qui renseigne le paramètre de sortie `uniqueIndexesNotArbiters` de `definitionForRelationInSchema()`.
 
@@ -412,7 +414,10 @@ Si vous appelez `definitionForRelationInSchema()`, les quatre tableaux facultati
 
 Le typage par contexte compare le type du placeholder à celui qu’une nouvelle génération produirait avec les réglages actuels. Un ancien placeholder pour un domaine sur `interval` garde le type `string`. Si vous lui donnez le type `db.PostgresInterval`, il correspond au nouveau type par défaut et les raccourcis renvoient du texte en JSON. Si vous repassez à `intervalsTypedAsObjects: false`, un placeholder existant de type objet garde son type. [Comparez votre placeholder à celui d’une nouvelle génération](#regenerate-for-7-0). S’il manque l’import de `db`, [ajoutez-le](/fr/custom-types#when-a-placeholder-does-not-compile).
 
-Pour retrouver le type brut de la 6.x pour un domaine sur un tableau d’enums, réglez `domainsTypedByContext` et `enumArraysTypedAsText` sur `false`.
+Pour les domaines imbriqués dont le placeholder vient d’être généré, comparez le type dans les lignes brutes à celui obtenu avec vos réglages de la 6.x.
+
+- Sur un tableau d’enums, le type brut passe de `any` (réglages par défaut de la 6.x) ou d’un tableau de labels (toutes les corrections activées en 6.x) à `string`. Pour réécrire ces valeurs en base, reprenez le tableau du JSON du raccourci ou réglez `enumArraysTypedAsText: false` si votre parser renvoie un tableau. Pour un domaine portant directement sur le tableau, ce seul réglage rétablit le type brut du placeholder de la 6.x.
+- Sur `numeric[]`, le type brut passe de `any` (réglages par défaut de la 6.x) à `db.NumericString[]`. En 6.x, le typage par contexte donnait déjà ce type. Le parser par défaut de `pg` lit les éléments numériques comme des nombres. Traitez chaque élément du tableau lu dans une ligne brute comme `unknown` et vérifiez `typeof value === 'number'` avant de l’utiliser comme nombre. Le placeholder sert aussi à typer le JSON des raccourcis, où `NaN` est une chaîne. Utilisez `number[]` seulement si tous les contextes de lecture renvoient des tableaux à une dimension composés de nombres, sans valeur `null`.
 
 ### Revenir à pgcast 6.x {#roll-back-to-6-x}
 
@@ -442,6 +447,6 @@ Les failles fermées par les corrections de sécurité de chaque version sont de
 
 ## Voir aussi {#see-also}
 
-- [Opt-ins et avertissements](/fr/runtime-config#opt-ins-and-warnings) : chaque option, son avertissement et quand il est émis.
+- [Lire les avertissements](#read-the-warnings) pour retrouver, en 6.x, l’appel qui déclenche chaque code.
 - [Versions](/fr/versions) : pourquoi pgcast corrige certaines choses d’emblée et d’autres derrière une option.
 - [Sécurité](/fr/security) : pourquoi un nom ou une valeur `raw()` ne peut plus injecter de SQL.

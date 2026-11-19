@@ -11,7 +11,7 @@ Why pgcast's version numbers carry on from Zapatos's, how it decides whether a f
 
 pgcast starts where Zapatos 6.6.1 stopped, so its first version is 6.6.2, not 1.0. A number that carries on says exactly that: this is the next version of the library you already have.
 
-The module names are still `zapatos/db` and `zapatos/schema`, and the generated schema keeps 6.6.1's [canary](/runtime-config#SchemaVersionCanary), so a project switches by changing its dependency, not its code ([Switch from Zapatos](/switching)).
+The module names are still `zapatos/db` and `zapatos/schema`, and the generated schema keeps 6.6.1's [canary](/runtime-config#SchemaVersionCanary), so you can [switch from Zapatos to 6.x](/switching) with the same imports. Check [behaviour and type changes in 7.0](/switching#from-7-0) before upgrading.
 
 The numbers follow [SemVer](https://semver.org/), read from the side of a project on 6.6.1:
 
@@ -23,7 +23,7 @@ Each release, its security fixes included: the [changelog](/changelog); the late
 
 Zapatos broke things in its majors too, each at once: 1.0 renamed the transaction types, 2.0 made the last argument of `upsert()` an options object, 6.0 put the schema in the names of tables and enums outside `public`. Each came with notes on what to rewrite.
 
-pgcast spreads a break over two majors instead, and warns you ahead of the first.
+For the temporary opt-ins, 6.x warns, 7.0 changes the default and 8.0 removes the old behaviour. The [7.0 guide](/switching#from-7-0) also covers changes without a 6.x warning.
 
 ## Four answers to a surprise
 
@@ -44,9 +44,9 @@ About half of them can't be fixed without changing a result that is valid today 
 
 A fix can still stop a call that only worked through the bug. 6.6.2's escaping fixes are an example: a column name such as `id" AS "x` used to close its quotes and add an alias, and now names a column that doesn't exist. The changelog lists every such call, with what to write instead.
 
-Two opt-ins will stay off for good: `selectExactlyOneChecksForSecondRow`, below, and the generator's [`domainsTypedAsUnions`](#_7-0-and-8-0). [`selectExactlyOne()`](/select#selectExactlyOne) asks Postgres for one row only, so it means "at least one", and Zapatos's own docs nest it in a `lateral`, where looking for a second row would duplicate the parent row.
+Two opt-ins will stay off for good: `selectExactlyOneChecksForSecondRow`, below, and the generator's [`domainsTypedAsUnions`](#_7-0-and-8-0). [`selectExactlyOne()`](/select#selectExactlyOne) checks for at least one row when run alone; nested, a missing row gives `null`. Zapatos nests it in a `lateral`, where ties can duplicate the parent row with `withTies: true`.
 
-Its option, [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow), looks for a second row only in a query run on its own, never in one nested in another, never warns, and never becomes the default.
+Its option, [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow), rejects on a second row when the query is run on its own. It never warns or becomes the default.
 
 ## Why an opt-in, not a breaking change
 
@@ -73,11 +73,11 @@ With the pgcast 6.7.0 defaults, if a `transaction()` callback catches a query er
 (Use `node --trace-deprecation ...` to show where the warning was created)
 ```
 
-In brackets is the code, one per deprecated behaviour of the runtime, there to search for: [Opt-ins and warnings](/runtime-config#opt-ins-and-warnings) lists the 6.x warnings and their triggers. Then the message says what still happens, which option changes it, and that 7.0 will make it the default.
+In brackets is the code, one per deprecated behaviour of the runtime, there to search for: [Read the warnings](/switching#read-the-warnings) lists the 6.x warnings and their triggers. Then the message says what still happens, which option changes it, and that 7.0 will make it the default.
 
-The promise resolves as in 6.6.1, even with `--throw-deprecation`, after which Node ends the process on the warning ([Opt-ins and warnings](/runtime-config#opt-ins-and-warnings)).
+In 6.x the promise resolves as in 6.6.1, even with `--throw-deprecation`, after which Node ends the process on the warning.
 
-Each code warns once per process. `node --trace-deprecation` prints the stack. To find the other calls, turn the option on and run your tests.
+In 6.x each code warns once per process. `node --trace-deprecation` prints the stack. To find the other calls, turn the option on and run your tests.
 
 In 6.x, `PGCAST_DEP004` warned on the legacy path for a null or missing result from `sum()`, `avg()`, `min()` or `max()`, or a non-number minimum or maximum. From 7.0, aggregates are typed by column by default.
 
@@ -95,15 +95,15 @@ Throughout 7.x, `undefinedMeansMissing: false` and `upsertRequiresSameKeys: fals
 
 In 7.x, `transactionRequiresCommit`, `transactionRequiresIdleClient` and `transactionRequiresSatisfyingLevel` also default to `true`. Set any one to `false` to restore its [6.x transaction behaviour](/switching#runtime-migration) without a warning. 8.0 removes these three overrides.
 
-The generator gets opt-ins of its own in 6.7: [`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas), which types an enum of another schema by its labels, [`enumOrder`](/generator#generate.enumOrder), which keeps an enum's labels in their declared order, [`rejectOnQueryError`](/generator#generate.rejectOnQueryError), which rejects `generate()` on a failed query rather than end the process, [`uniqueIndexConstraintsOnly`](/generator#generate.uniqueIndexConstraintsOnly), which lists in `UniqueIndex` only the names `ON CONFLICT ON CONSTRAINT` takes, [`domainsTypedByContext`](/generator#generate.domainsTypedByContext), which types a domain over `bigint`, `numeric`, `bytea`, `money` or a date, or over an array of one, by context, as its base type is, and a domain over a domain or an array of a domain, `any` without it, by the base type of its innermost domain, [`enumArraysTypedAsText`](/generator#generate.enumArraysTypedAsText), which types an array of an enum as the text `pg` returns in `Selectable`, and [`intervalsTypedAsObjects`](/generator#generate.intervalsTypedAsObjects), which types an `interval` in `Selectable` as `pg` parses it.
+The generator gets opt-ins of its own in 6.7: [`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas), which uses a foreign enum's labels subject to name collisions, [`enumOrder`](/generator#generate.enumOrder), which keeps an enum's labels in their declared order, [`rejectOnQueryError`](/generator#generate.rejectOnQueryError), which rejects `generate()` on a failed query rather than end the process, [`uniqueIndexConstraintsOnly`](/generator#generate.uniqueIndexConstraintsOnly), which filters named conflict targets by the relation's index, [`domainsTypedByContext`](/generator#generate.domainsTypedByContext), which types a domain over `bigint`, `numeric`, `bytea`, `money` or a date, or over an array of one, by context, as its base type is, and a domain over a domain or an array of a domain, `any` without it, by the base type of its innermost domain, [`enumArraysTypedAsText`](/generator#generate.enumArraysTypedAsText), which types an array of an enum as the text `pg` returns in `Selectable`, and [`intervalsTypedAsObjects`](/generator#generate.intervalsTypedAsObjects), which types an `interval` in `Selectable` as `pg` parses it.
 
 In 7.x, `typeEnumsAcrossSchemas: false` restores lookup in the relation's schema and `enumOrder: "alphabetical"` restores sorted tuples. Each setting works independently. Both migration notes retire in 7.0 and both legacy behaviours go in 8.0. See the [migration for foreign enum placeholder imports](/switching#enum-types).
 
-In 7.x, `UniqueIndex` defaults to the constraints usable with `DO UPDATE`. [`uniqueIndexConstraintsOnly: false`](/generator#generate.uniqueIndexConstraintsOnly) quietly restores the list of all the relation's unique indexes. The override goes in 8.0. See the [named conflict target migration](/switching#named-conflict-targets).
+On partitioned tables the 7.x `UniqueIndex` follows the parent index. [`uniqueIndexConstraintsOnly: false`](/generator#generate.uniqueIndexConstraintsOnly) quietly restores the list of all the relation's unique indexes. The override goes in 8.0. See the [named conflict target migration](/switching#named-conflict-targets).
 
 In 6.x the warnings for the six schema options are notes through [`warningListener`](/generator#generate.warningListener), not a `DeprecationWarning`, and come only when your schema has something they would change, once per run: `typeEnumsAcrossSchemas`'s names each column, `enumOrder`'s each enum, `uniqueIndexConstraintsOnly`'s each unique index, `domainsTypedByContext`'s, `enumArraysTypedAsText`'s and `intervalsTypedAsObjects`'s each column.
 
-From 7.0, domain columns are typed by context. In raw rows, enum arrays are text and intervals are objects. The 6.x migration notes go away. `domainsTypedByContext: false` restores typing by placeholder through 7.x and goes in 8.0. The old raw enum-array domain type also needs `enumArraysTypedAsText: false`, and fresh interval-domain text placeholders need `intervalsTypedAsObjects: false`. The two parser choices, `enumArraysTypedAsText: false` and `intervalsTypedAsObjects: false`, remain available beyond 8.0. See [Domains, enum arrays and intervals in 7.0](/switching#domain-and-parser-types).
+From 7.0, domain columns are typed by context. In raw rows, enum arrays are text and intervals are objects. The 6.x migration notes go away. `domainsTypedByContext: false` restores typing by placeholder through 7.x and goes in 8.0. For a raw direct domain over an enum array, `enumArraysTypedAsText: false` alone restores its placeholder. For fresh interval-domain text placeholders, set `intervalsTypedAsObjects: false`. The two parser choices, `enumArraysTypedAsText: false` and `intervalsTypedAsObjects: false`, remain available beyond 8.0. See [Domains, enum arrays and intervals in 7.0](/switching#domain-and-parser-types).
 
 From 6.7 until 7.0, with `rejectOnQueryError` omitted or set to `null` in JSON, `generate()` and `tsForConfig()` sent `PGCAST_DEP006` to an enabled `warningListener` before exiting on a connection or query failure. From 7.0, both functions then reject with the original error, as [`check()`](/generator#export-check) does. The note is retired. Set `rejectOnQueryError: false` to keep the CLI's immediate exit with code 1 on a connection or query failure in 7.x, 8.0 and later.
 

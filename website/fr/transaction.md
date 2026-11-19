@@ -1,5 +1,5 @@
 ---
-english: 6ce3417e27c7
+english: 8d0885b6beec
 ---
 
 # Transactions
@@ -584,7 +584,7 @@ await db.serializable(pool, txnClient => countBookings(txnClient));
 await db.readCommitted(pool, txnClient => countBookings(txnClient));
 ```
 
-À partir de la 7.0, une fonction qui attend un client `pg` de l’un des trois autres niveaux en lecture seule accepte celui de `serializableRODeferrable()`. Si vous utilisez la fonction ci-dessous aussi avec la 6.x, donnez à son paramètre le type `TxnClientForSerializableRO | TxnClientForSerializableRODeferrable`.
+À partir de la 7.0.0, une fonction qui attend un client `pg` de l’un des trois autres niveaux en lecture seule accepte celui de `serializableRODeferrable()`. Si vous utilisez aussi la fonction ci-dessous avec la 6.x, donnez à son paramètre le type `TxnClientForSerializableRO | TxnClientForSerializableRODeferrable`.
 
 ```ts twoslash
 import * as db from 'zapatos/db';

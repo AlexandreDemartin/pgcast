@@ -1,5 +1,5 @@
 ---
-english: 4753ca65410b
+english: f9075780579f
 description: "Ce que zapatos/db vous laisse régler à l’exécution : setConfig() et chaque option de Config, les écouteurs, les opt-ins et leurs codes d’avertissement."
 ---
 
@@ -101,7 +101,7 @@ Les clés qu’ajoute pgcast sont facultatives, donc un `Config` écrit pour Zap
 | [`transactionRequiresCommit`](#Config.transactionRequiresCommit) | `true` | rejeter la promesse si Postgres répond au `COMMIT` par `ROLLBACK` | à chaque `transaction()` |
 | [`transactionRequiresIdleClient`](#Config.transactionRequiresIdleClient) | `true` | rejeter la promesse avant `START TRANSACTION` uniquement si votre client sans marqueur signale `T` ou `E` avant et après la requête vide. Si le client ne fournit aucun statut, l’appel se poursuit | à chaque `transaction()` qui reçoit un tel client |
 | [`transactionRequiresSatisfyingLevel`](#Config.transactionRequiresSatisfyingLevel) | `true` | rejeter la promesse avant d’appeler le callback si le niveau d’isolation du client ne satisfait pas le niveau demandé | à chaque `transaction()` qui reçoit un tel client |
-| [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow) | `false` | un `selectExactlyOne()` exécuté seul : `LIMIT 2`, et une deuxième ligne entraîne un rejet | à chaque `selectExactlyOne()` |
+| [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow) | `false` | un `selectExactlyOne()` exécuté seul demande deux lignes et sa promesse est rejetée s’il en trouve une deuxième | à chaque `selectExactlyOne()` |
 | [`aggregatesTypedByColumn`](#Config.aggregatesTypedByColumn) | `true` | `sum()`, `avg()`, `min()` et `max()` : `null` quand aucune ligne ne correspond, et pour `min()` et `max()` la valeur de la colonne sans conversion par `Number()` | à chaque `run()` de ces agrégats |
 | [`queryListener`](#Config.queryListener) | aucun | appelé avec chaque requête qu’envoie `run()` | à chaque `run()` |
 | [`resultListener`](#Config.resultListener) | aucun | appelé avec chaque résultat que donne `run()` | à chaque `run()` |
@@ -178,6 +178,8 @@ Un cast donné en chaîne l’emporte, la valeur restant du texte JSON : `param
 
 ### `upsertRequiresSameKeys` {#Config.upsertRequiresSameKeys}
 
+À partir de la 7.0.0, l’option vaut `true` par défaut.
+
 ```ts
 upsertRequiresSameKeys?: boolean  // default: true
 ```
@@ -188,6 +190,8 @@ Avec `false`, une clé absente peut entraîner l’écrasement de la valeur stoc
 
 ### `undefinedMeansMissing` {#Config.undefinedMeansMissing}
 
+À partir de la 7.0.0, l’option vaut `true` par défaut.
+
 ```ts
 undefinedMeansMissing?: boolean  // default: true
 ```
@@ -195,6 +199,8 @@ undefinedMeansMissing?: boolean  // default: true
 Avec `true`, une valeur `undefined` dans [`insert()`](/fr/insert#insert), [`update()`](/fr/insert#update) et [`upsert()`](/fr/insert#upsert) est une clé manquante : `DEFAULT` dans `insert()`, omise dans `update()` et `upsert()`, `updateValues` compris. Avec `false`, elle est envoyée comme `NULL` (dans `updateValues`, sa colonne prend sa valeur dans `EXCLUDED`), comme dans Zapatos 6.6.1, sans avertissement. Pour le SQL de chaque appel, voir [Une valeur `undefined`](/fr/insert#undefined-values).
 
 ### `transactionRequiresCommit` {#Config.transactionRequiresCommit}
+
+À partir de la 7.0.0, l’option vaut `true` par défaut.
 
 ```ts
 transactionRequiresCommit?: boolean  // default: true
@@ -210,6 +216,8 @@ Avec `false`, la promesse se résout avec la valeur renvoyée par le callback, s
 - Non testé avec `pg-native`.
 
 ### `transactionRequiresIdleClient` {#Config.transactionRequiresIdleClient}
+
+À partir de la 7.0.0, l’option vaut `true` par défaut.
 
 ```ts
 transactionRequiresIdleClient?: boolean  // default: true
@@ -232,6 +240,8 @@ Avec `false`, `transaction()` envoie `START TRANSACTION` sans vérifier de nouve
 
 ### `transactionRequiresSatisfyingLevel` {#Config.transactionRequiresSatisfyingLevel}
 
+À partir de la 7.0.0, l’option vaut `true` par défaut.
+
 ```ts
 transactionRequiresSatisfyingLevel?: boolean  // default: true
 ```
@@ -253,10 +263,10 @@ Avec `false`, le client est transmis même si son niveau d’isolation est insuf
 selectExactlyOneChecksForSecondRow?: boolean  // default: false, in 7.0 too
 ```
 
-Avec `true`, un [`selectExactlyOne()`](/fr/select#selectExactlyOne) exécuté seul demande deux lignes, `LIMIT $2`<!-- probe: (db.setConfig({ selectExactlyOneChecksForSecondRow: true }), db.selectExactlyOne('films', { id: 1000 })) --> avec `2`, et `.run()` est rejetée avec une [`NotExactlyOneError`](/fr/select#NotExactlyOneError) quand une deuxième ligne arrive : "One result expected but more returned (hint: check `.query.compile()` on this Error)"<!-- message -->. Sans l’option, il en demande une, `LIMIT 1`, et donne la première ligne qui correspond, comme dans Zapatos 6.6.1.
+Avec la vérification activée et `withTies` désactivé, un [`selectExactlyOne()`](/fr/select#selectExactlyOne) exécuté seul demande deux lignes, `LIMIT $2`<!-- probe: (db.setConfig({ selectExactlyOneChecksForSecondRow: true }), db.selectExactlyOne('films', { id: 1000 })) --> avec `2`, et la promesse de `.run()` est rejetée avec une [`NotExactlyOneError`](/fr/select#NotExactlyOneError) si la requête trouve une deuxième ligne : "One result expected but more returned (hint: check `.query.compile()` on this Error)"<!-- message -->. Avec les deux options désactivées, il en demande une, `LIMIT 1`, et renvoie la première ligne qui correspond, comme dans Zapatos 6.6.1.
 
-- Imbriqué dans une autre requête, dans un `lateral` ou un template `sql`, il garde `LIMIT 1`, avec ou sans l’option : une deuxième ligne y joindrait deux fois la ligne parente. « Seul » dépend de la façon dont la requête est compilée : `.run()` et `.compile()` la compilent seule, une requête parente la compile dans son propre SQL.
-- Une [`.copy()`](/fr/sql-template#copy) de celui-ci se compile comme imbriquée : elle garde donc `LIMIT 1`, exécutée seule aussi.
+- Imbriqué dans un `lateral` ou un template `sql`, ou copié avec [`.copy()`](/fr/sql-template#copy), le raccourci demande une ligne.
+- Avec [`withTies: true`](/fr/select#order-limit-offset-and-withties), chaque limite se compile en `FETCH FIRST … ROWS WITH TIES`. Une requête imbriquée peut renvoyer tous les ex æquo. Une copie exécutée seule demande toujours une ligne et les éventuelles lignes ex æquo. Si la vérification est activée et que Postgres renvoie une deuxième ligne, sa promesse est rejetée avec une `NotExactlyOneError`.
 - Avec un [`lock`](/fr/select#lock), `LIMIT $2` verrouille aussi la deuxième ligne : une fois `.run()` rejetée, les deux lignes restent verrouillées jusqu’à la fin de la transaction, et le `FOR UPDATE NOWAIT` d’une autre session sur l’une d’elles reçoit 55P03.
 - Sans l’option, aucun avertissement, et elle reste désactivée en 7.0 : « au moins une ligne », c’est ainsi que Zapatos lit `selectExactlyOne()`, imbriqué dans un `lateral` sur une clé étrangère `NOT NULL` ([décision 003](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/003-fixes-and-deprecation.md)).
 - Lue quand `selectExactlyOne()` est appelée, pas à `.run()`.
@@ -267,7 +277,7 @@ Avec `true`, un [`selectExactlyOne()`](/fr/select#selectExactlyOne) exécuté se
 aggregatesTypedByColumn?: boolean  // default: true
 ```
 
-À partir de la 7.0, par défaut, [`sum()`](/fr/select#sum), [`avg()`](/fr/select#avg), [`min()`](/fr/select#min) et [`max()`](/fr/select#max) donnent `null` quand aucune ligne ne correspond. `min()` et `max()` donnent la valeur de la colonne telle que `pg` la lit : avec les parseurs par défaut, un `Date` pour une valeur finie de type `timestamptz` et une chaîne pour un `text` ou un enum. Le SQL généré et le comportement de [`count()`](/fr/select#count) restent les mêmes.
+À partir de la 7.0.0, par défaut, [`sum()`](/fr/select#sum), [`avg()`](/fr/select#avg), [`min()`](/fr/select#min) et [`max()`](/fr/select#max) donnent `null` quand aucune ligne ne correspond. `min()` et `max()` donnent la valeur de la colonne telle que `pg` la lit : avec les parseurs par défaut, un `Date` pour une valeur finie de type `timestamptz` et une chaîne pour un `text` ou un enum. Le SQL généré et le comportement de [`count()`](/fr/select#count) restent les mêmes.
 
 Avec `false`, `.run()` applique `Number()` au résultat. Un ensemble vide donne `0`, une date finie lue comme un `Date` donne le nombre de millisecondes depuis l’époque Unix et un texte non numérique donne `NaN`. Ce réglage reste disponible sans avertissement en 7.x et disparaît en 8.0.
 
@@ -446,7 +456,7 @@ Depuis la 7.0, le générateur active [`domainsTypedByContext`](/fr/generator#ge
 
 Avec pgcast 6.7.0, le générateur appelé depuis un programme pouvait transmettre `PGCAST_DEP006` à [`warningListener`](/fr/generator#generate.warningListener) avant d’arrêter le processus en cas d’erreur de base de données. Depuis la 7.0, [`rejectOnQueryError`](/fr/generator#generate.rejectOnQueryError) vaut `true` par défaut. La valeur explicite `false` conserve l’arrêt immédiat sans note de migration.
 
-Node émet chaque avertissement de migration une fois par processus et indique le nom de l’option dans le message. Par exemple, lorsque Postgres répondait à un `COMMIT` par `ROLLBACK`, pgcast 6.7.0 émettait l’avertissement ci-dessous sur `stderr`.
+En 6.x, Node émet chaque [avertissement de migration](/fr/switching#read-the-warnings) une fois par processus et indique le nom de l’option dans le message. Par exemple, lorsque Postgres répondait à un `COMMIT` par `ROLLBACK`, pgcast 6.7.0 émettait l’avertissement ci-dessous sur `stderr`.
 
 ```txt
 (node:4242) [PGCAST_DEP003] DeprecationWarning: transaction() resolved, but Postgres answered its COMMIT with ROLLBACK: a query failed and the callback caught the error, so nothing was saved. Set transactionRequiresCommit: true (db.setConfig) to reject instead; it will be the default in pgcast 7.0.
@@ -482,10 +492,10 @@ process.on('warning', (warning: Error & { code?: string }) => {
 | `tsrange`, `tstzrange`, `daterange` | [`DateRangeString`](#DateRangeString) | `DateRangeString` | `DateRangeString` |
 | `json`, `jsonb` | [`JSONValue`](#JSONValue) | `JSONValue` | `JSONValue` |
 
-- Une colonne tableau prend le tableau du type de son élément : `int8[]` donne `Int8String[]` dans un `Selectable`.
+- Dans un `Selectable`, `int8[]` donne `Int8String[]`. Dans une ligne brute, un [tableau d’enums](/fr/generator#generate.enumArraysTypedAsText) est représenté par du texte par défaut.
 - Avec l’option [`customJSONParsingForLargeNumbers`](/fr/generator#generate.customJSONParsingForLargeNumbers) du générateur, `int8` et `numeric` sont `number | Int8String` et `number | NumericString` dans un `JSONSelectable` ([`enableCustomJSONParsingForLargeNumbers()`](#enableCustomJSONParsingForLargeNumbers)).
 - Les raccourcis renvoient des `JSONSelectable`. Un `Selectable` est ce que `pg` renvoie pour un simple `SELECT` de la ligne.
-- Un domaine suit son type de base dans chaque contexte tant que son placeholder conserve le type généré ([`DomainInContext`](#DomainInContext)). Avec [`domainsTypedByContext: false`](/fr/generator#generate.domainsTypedByContext), le type vient du placeholder. Pour un domaine portant directement sur un tableau d’enums, il faut aussi `enumArraysTypedAsText: false` pour utiliser ce type dans les lignes brutes. Pour un domaine sur un intervalle, `intervalsTypedAsObjects` détermine le type d’un nouveau placeholder.
+- Un domaine suit son type de base dans chaque contexte tant que son placeholder conserve le type généré ([`DomainInContext`](#DomainInContext)). Avec [`domainsTypedByContext: false`](/fr/generator#generate.domainsTypedByContext), le type vient du placeholder, sauf dans les lignes brutes pour un [domaine portant directement sur un tableau d’enums](/fr/switching#domain-and-parser-types). Dans ce cas, `enumArraysTypedAsText: false` suffit à rétablir le type du placeholder. Pour un domaine sur un intervalle, `intervalsTypedAsObjects` détermine le type d’un nouveau placeholder.
 - Un `interval` donne un [`PostgresInterval`](#PostgresInterval) dans `Selectable`, une `string` en JSON et `string | PostgresInterval` dans une écriture. Avec [`intervalsTypedAsObjects: false`](/fr/generator#generate.intervalsTypedAsObjects), les cinq interfaces utilisent `string`.
 
 Chaque type vérifie la forme d’une chaîne, pas sa valeur : `'2030-13-45'` est un `DateString`.

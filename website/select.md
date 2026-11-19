@@ -1,6 +1,6 @@
 # Select {#select-and-the-aggregates}
 
-The read shortcuts: `select()`, `selectOne()` and `selectExactlyOne()` for rows, `count()`, `sum()`, `avg()`, `min()` and `max()` for one number. Each option, the SQL it adds and what it does to the type, then the types they share.
+`select()`, `selectOne()` and `selectExactlyOne()` return rows. By default, `count()` returns a number, `sum()` and `avg()` a number or `null`, and `min()` and `max()` a column value or `null`.
 {.lede}
 
 ## `select()` {#select}
@@ -242,7 +242,7 @@ As [`selectOne()`](#selectOne), but its type has no `undefined`: when no row mat
 
 </CastPanel>
 
-With [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow), the query run on its own asks for two rows, `LIMIT $2`<!-- probe: (db.setConfig({ selectExactlyOneChecksForSecondRow: true }), db.selectExactlyOne('studios', { id: 1000 })) --> with `2`, and `.run()` rejects on a second row too. Nested in another query, in a `lateral` or a `sql` template, it keeps `LIMIT 1`, option or not: a second row there would join the parent row twice.
+With [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow), the query run on its own asks for two rows (by default `LIMIT $2`<!-- probe: (db.setConfig({ selectExactlyOneChecksForSecondRow: true }), db.selectExactlyOne('studios', { id: 1000 })) --> with `2`) and `.run()` rejects on a second row too. Nested in a `lateral` or a `sql` template, it requests one row plus any ties with `withTies: true`.
 
 ### `NotExactlyOneError` {#NotExactlyOneError}
 
@@ -440,7 +440,7 @@ const firstShow = await db.min('screenings', db.all, {
 - `min()` and `max()` give a `bigint` or `numeric` as a string with the default pg parser and runtime setting. Under a lateral key the outer JSON parser reads the number and can preserve large values as strings.
 - `count()` is unchanged by the option: `0` at top level, and `null` nested in a `lateral` or as an `extras` value when its query returns no row.
 - Passed through as the single `lateral`, it is typed as at top level by `selectOne()` and `selectExactlyOne()`, which hand its column over as it is, and as nested by `select()`, which wraps its rows in `jsonb_agg()`. That `selectOne()` or `selectExactlyOne()`, nested in turn, is typed as nested.
-- `.copy()` returns a plain `SQLFragment`, typed as at top level: nested in turn, a copy comes back as JSON with that type.
+- `.copy()` returns a plain `SQLFragment`. In `extras` or under a `lateral` key, nest the original `min()` or `max()`. With the default column typing, a copied date aggregate keeps the direct type `Date | null` even though Postgres returns a date string in JSON for a non-null date.
 
 ## Types
 
@@ -452,7 +452,7 @@ What the signatures above are made of, from `zapatos/db`. `T` is a table, `C` th
 enum SelectResultMode { Many, One, ExactlyOne, Numeric }
 ```
 
-The fourth argument of `select()`: an array of rows (`select()`), a row or `undefined` (`selectOne()`), a row or an error (`selectExactlyOne()`), a number (`count()` and the others).
+The fourth argument of `select()`: an array of rows (`select()`), a row or `undefined` (`selectOne()`), a row or an error (`selectExactlyOne()`), a number when you call `select()` with `SelectResultMode.Numeric`.
 
 With `Numeric`, the fifth argument names the aggregate, `'count'` by default; since pgcast 6.6.2 it must be a function name, plain, quoted or `U&` quoted, in up to three dotted parts (`stddev_pop`, `my_schema."MyAgg"`). Any aggregate that returns a number works:
 

@@ -253,7 +253,7 @@ To find each call:
 | Warning | The call | Fix it, or turn on |
 |---|---|---|
 | `PGCAST_DEP001` | A batch upsert would update a column missing from a row. | Give every row that key or specify `updateColumns`. |
-| `PGCAST_DEP002` | A write uses `undefined` for a column value. | Use `null` to clear the column or omit the key to leave it untouched on update. See the [`updateValues` rule](/insert#undefined-values). |
+| `PGCAST_DEP002` | A row supplies `undefined`, or an undefined `updateValues` override alone adds the column to the update. | Use `null` to clear the column or omit the key to leave it untouched on update. See the [`updateValues` rule](/insert#undefined-values). |
 | `PGCAST_DEP003` | a [`transaction()`](/transaction#transaction) whose callback catches a query's error and returns: Postgres answers the `COMMIT` with `ROLLBACK`, and nothing is saved ([Let the error through](/retries#let-the-error-through)) | let the error out of the callback, or `ROLLBACK TO` a `SAVEPOINT` before going on; or [`transactionRequiresCommit`](/runtime-config#Config.transactionRequiresCommit), and such a transaction rejects |
 | `PGCAST_DEP004` in 6.x | a [`sum()`, `avg()`, `min()` or `max()`](/select#typed-by-column) with a null or missing result, or a minimum or maximum whose pg value is not a number | turn on [`aggregatesTypedByColumn`](/runtime-config#Config.aggregatesTypedByColumn), declared in [`ConfigTypes`](/runtime-config#ConfigTypes): `tsc` then shows uses incompatible with the new type, and `?? 0` keeps a `0` |
 | `PGCAST_DEP005` | a [`transaction()`](/transaction#transaction) given a client you sent `BEGIN` on: its `COMMIT` or `ROLLBACK` ends your transaction ([Your own `BEGIN`](/transaction#your-own-begin)) | open the outer transaction with `transaction()`, or give that call the pool, for a transaction of its own, committed apart from the outer one, which doesn't see the outer one's uncommitted rows, and hangs (unless `lock_timeout` is set) if it writes or locks a row the outer one has written or locked, or inserts a key the outer one has inserted (two `FOR SHARE` locks don't conflict); or [`transactionRequiresIdleClient`](/runtime-config#Config.transactionRequiresIdleClient), and such a call rejects before sending its `START TRANSACTION` |
@@ -296,7 +296,7 @@ npm install pgcast@npm:@pgcast/pgcast@^7
 
 :::
 
-Beyond the default changes, three migrations have no 6.x warning: [read-only callbacks](#runtime-migration), [array conditions](#array-condition-types) and [optional type peers](/install#requirements). If you check types and relied on automatic peer installation, add only the missing dev dependency (`typescript` or `@types/pg`). Run `npm install --save-dev typescript @types/pg` if both are missing. JavaScript needs only the `pg` peer. [#592](https://github.com/AlexandreDemartin/pgcast/issues/592).
+Even after a warning-free 6.x run, check [write batches, aggregates and read-only callbacks](#runtime-migration), [array conditions](#array-condition-types), [generated types](#regenerate-for-7-0) and [optional type peers](/install#requirements). If you check types and relied on automatic peer installation, add only the missing dev dependency (`typescript` or `@types/pg`). Run `npm install --save-dev typescript @types/pg` if both are missing. JavaScript needs only the `pg` peer. [#592](https://github.com/AlexandreDemartin/pgcast/issues/592).
 
 ### Check runtime calls {#runtime-migration}
 
@@ -304,12 +304,12 @@ All six settings below now default to `true`. To keep one 6.x behaviour, set the
 
 | Temporary setting | What to check in 7.0 | With the 6.x setting |
 |---|---|---|
-| `undefinedMeansMissing: false` | An undefined insert cell takes its column default. An update with `tagline: undefined` leaves the tagline untouched if it also assigns `title`. Use `null` to clear it. | An undefined row value reaches Postgres as `NULL`. See the [`updateValues` rule](/insert#undefined-values). |
-| `upsertRequiresSameKeys: false` | A batch with `tagline` in only one row throws at construction if the implicit update would overwrite that column. Check the [conflict target, `updateValues` and `updateColumns` exceptions](/insert#upsert-options). | A missing cell can overwrite a stored value with the column default. |
-| `transactionRequiresCommit: false` | If a callback catches a failed query and Postgres answers its `COMMIT` with `ROLLBACK`, the promise rejects. [Transaction errors](/transaction#errors). | The promise resolves with the callback result. |
-| `transactionRequiresIdleClient: false` | After your own `BEGIN`, the helper rejects if your client still reports a block after the status recheck. End your block first. Await each helper before starting the next on that client. [Your own `BEGIN`](/transaction#your-own-begin). | The helper can end the caller's transaction. |
-| `transactionRequiresSatisfyingLevel: false` | A nested `serializable()` inside `readCommitted()` rejects before the inner callback runs. Open the outer transaction at the level you need. [Passing a transaction through](/transaction#passing-a-transaction-through). | The inner callback runs at the outer isolation level. |
-| `aggregatesTypedByColumn: false` | An empty `sum()` returns `null`. A `min()` over a date returns the date value. Handle `null` before arithmetic. [Typed by column](/select#typed-by-column). | A direct `.run()` applies `Number()`, so an empty sum is zero. In `extras`, the same sum is JSON `null` and a date minimum stays a date string. |
+| [`undefinedMeansMissing: false`](/runtime-config#Config.undefinedMeansMissing) | An undefined insert cell takes its column default. An update with `tagline: undefined` leaves the tagline untouched if it also assigns `title`. Use `null` to clear it. | An undefined row value reaches Postgres as `NULL`. See the [`updateValues` rule](/insert#undefined-values). |
+| [`upsertRequiresSameKeys: false`](/runtime-config#Config.upsertRequiresSameKeys) | A batch with `tagline` in only one row throws at construction if the implicit update would overwrite that column. A non-enumerable property now counts as missing even with both fixes enabled in 6.x. To write it, use `{ ...row, tagline: row.tagline }`. Check the [conflict target, `updateValues` and `updateColumns` exceptions](/insert#upsert-options). | A missing cell can overwrite a stored value with the column default. |
+| [`transactionRequiresCommit: false`](/runtime-config#Config.transactionRequiresCommit) | If a callback catches a failed query and Postgres answers its `COMMIT` with `ROLLBACK`, the promise rejects. [Transaction errors](/transaction#errors). | The promise resolves with the callback result. |
+| [`transactionRequiresIdleClient: false`](/runtime-config#Config.transactionRequiresIdleClient) | After your own `BEGIN`, the helper rejects if your client still reports a block after the status recheck. End your block first. Await each helper before starting the next on that client. [Your own `BEGIN`](/transaction#your-own-begin). | The helper can end the caller's transaction. |
+| [`transactionRequiresSatisfyingLevel: false`](/runtime-config#Config.transactionRequiresSatisfyingLevel) | A nested `serializable()` inside `readCommitted()` rejects before the inner callback runs. Open the outer transaction at the level you need. [Passing a transaction through](/transaction#passing-a-transaction-through). | The inner callback runs at the outer isolation level. |
+| [`aggregatesTypedByColumn: false`](/runtime-config#Config.aggregatesTypedByColumn) | An empty `sum()` returns `null`. A `min()` over a date returns the date value. Handle `null` before arithmetic. [Typed by column](/select#typed-by-column). | A direct `.run()` applies `Number()`, so an empty sum is zero. In `extras`, the same sum is JSON `null` and a date minimum stays a date string. |
 
 <CastPanel example="switching_undefined">
 
@@ -340,7 +340,7 @@ db.setConfig({ aggregatesTypedByColumn: false });
 
 ### Array condition types in 7.0 {#array-condition-types}
 
-Change a saved fragment's scalar constraint from `number` to `number[]`. You can simplify `arrayContains<number[]>([[1]])` to `arrayContains([1])`. See [Arrays](/conditions#arrays) for operands, callbacks and mocks. [#705](https://github.com/AlexandreDemartin/pgcast/issues/705).
+Change a saved fragment's scalar constraint from `number` to `number[]`. You can simplify `arrayContains<number[]>([[1]])` to `arrayContains([1])`. Implement both overloads in a mock of the old signature. See [Arrays](/conditions#arrays) for operands and callbacks. [#705](https://github.com/AlexandreDemartin/pgcast/issues/705).
 
 For `arrayContains()`, `arrayContainedIn()` and `arrayOverlaps()` (`c = db.conditions`):
 
@@ -354,19 +354,19 @@ Regenerate whenever the generator version or an output option changes. Run `npx 
 
 | 7.0 default | What changes for the caller | Old setting |
 |---|---|---|
-| `typeEnumsAcrossSchemas: true` | A write to [`prints.keeper`](/generator#generate.typeEnumsAcrossSchemas) takes the foreign label `'archivist'`. The local label `'director'` no longer compiles. Check [placeholder imports](#enum-types). | `false` |
-| `enumOrder: 'declared'` | `every.crew_job[0]` is `'director'`, the first declared label. Check code that indexes the tuple. | `'alphabetical'` |
-| `uniqueIndexConstraintsOnly: true` | A bare unique index such as `festival_entries_live_idx` drops out of `UniqueIndex`. Choose an eligible constraint for a [named upsert](#named-conflict-targets). | `false` |
-| `domainsTypedByContext: true` | With the generated placeholder and default parsers, a `bigint` domain is a string in a raw row, a number in shortcut JSON, and accepts a `bigint` on write. [Domain types](#domain-and-parser-types). | `false` |
-| `enumArraysTypedAsText: true` | A raw enum array is text such as `'{writer,editor}'`. Use the shortcut's array for `.map()`, or select `false` if your parser returns an array. | `false` (permanent) |
-| `intervalsTypedAsObjects: true` | A raw interval has `toPostgres()`. Shortcut JSON keeps the text. Select `false` if your parser returns text. | `false` (permanent) |
-| `rejectOnQueryError: true` | `await generate()` and `await tsForConfig()` reject with the original connection or query error. Rethrow it or set `process.exitCode = 1` if the job must fail. | `false` (permanent immediate exit) |
+| [`typeEnumsAcrossSchemas: true`](/generator#generate.typeEnumsAcrossSchemas) | A write to `prints.keeper` takes the foreign label `'archivist'`. The local label `'director'` no longer compiles. Check [name collisions and placeholder imports](#enum-types). | `false` |
+| [`enumOrder: 'declared'`](/generator#generate.enumOrder) | `every.crew_job[0]` is `'director'`, the first declared label. Check code that indexes the tuple. | `'alphabetical'` |
+| [`uniqueIndexConstraintsOnly: true`](/generator#generate.uniqueIndexConstraintsOnly) | A bare unique index such as `festival_entries_live_idx` drops out of `UniqueIndex`. Choose an eligible constraint for a [named upsert](#named-conflict-targets). | `false` |
+| [`domainsTypedByContext: true`](/generator#generate.domainsTypedByContext) | With the generated placeholder and default parsers, a `bigint` domain is a string in a raw row, a number in shortcut JSON, and accepts a `bigint` on write. [Domain types](#domain-and-parser-types). | `false` |
+| [`enumArraysTypedAsText: true`](/generator#generate.enumArraysTypedAsText) | A raw enum array is text such as `'{writer,editor}'`. Use the shortcut's array for `.map()`, or select `false` if your parser returns an array. | `false` (permanent) |
+| [`intervalsTypedAsObjects: true`](/generator#generate.intervalsTypedAsObjects) | A raw interval has `toPostgres()`. Shortcut JSON keeps the text. Select `false` if your parser returns text. | `false` (permanent) |
+| [`rejectOnQueryError: true`](/generator#generate.rejectOnQueryError) | `await generate()` and `await tsForConfig()` reject with the original connection or query error. Rethrow it or set `process.exitCode = 1` if the job must fail. A synchronous listener error also rejects generation. Handle any promise the listener returns. | `false` (permanent immediate exit) |
 
 By default, `await check()` already rejects on database errors. It compares the contents of the schema and any generated custom types index, and checks that each placeholder exists. A failed check returns `false`. Explicit `rejectOnQueryError: false` ends the process on database errors for all three functions. Both CLI names, `pgcast` and `zapatos`, exit 1 on database errors. Their `--check` also exits 1 when that check returns `false`. [Generator errors](/generator#generate.rejectOnQueryError).
 
 Regeneration preserves existing `custom/` placeholders. Generate a second copy into an empty `outDir` outside your TypeScript project, compare its placeholders with yours and merge the changes that fit your parsers. Then run `npx tsc` against the regenerated schema and run your tests.
 
-Three settings keep their own defaults. `selectExactlyOneChecksForSecondRow` stays off. Enabling it checks for a second row only in a standalone query. A nested query keeps `LIMIT 1` unless [`withTies`](/select#order-limit-offset-and-withties) includes tied rows. The generator's [`domainsTypedAsUnions`](/generator#generate.domainsTypedAsUnions) stays opt-in and [`moduleNames`](/generator#generate.moduleNames) still defaults to `'zapatos'`.
+Three settings keep their own defaults. `selectExactlyOneChecksForSecondRow` stays off. When enabled, a standalone query rejects on a second row. [Nested queries and copies](/runtime-config#Config.selectExactlyOneChecksForSecondRow) request one row plus any ties with `withTies: true`. The generator's [`domainsTypedAsUnions`](/generator#generate.domainsTypedAsUnions) stays opt-in and [`moduleNames`](/generator#generate.moduleNames) still defaults to `'zapatos'`.
 
 ### Enum types in 7.0 {#enum-types}
 
@@ -387,6 +387,8 @@ Regenerate the schema and run `tsc`. For [the `festival_entries` table](/generat
 If a relation's `UniqueIndex` becomes `never`, a `Record` literal typed with that union still compiles with the old key. Check those records by hand.
 
 On Postgres 18, naming a non-deferrable `WITHOUT OVERLAPS` key with `updateColumns: db.doNothing` compiled and worked in 6.x. The 7.0 default rejects the name at compile time. To keep `DO NOTHING`, write an explicit `sql` statement naming the key, or set `uniqueIndexConstraintsOnly: false` through 7.x.
+
+On a partitioned table, the union follows the parent index. A deferrable parent key drops out even when an immediate partition key lets the named upsert work with `{ reportAction: 'suppress' }`. Use explicit SQL or set `uniqueIndexConstraintsOnly: false` through 7.x. With an immediate parent and a deferrable partition key, the name compiles but Postgres can raise 55000.
 
 This setting restores the 6.x union without a migration note. It alone fills the `uniqueIndexesNotArbiters` out-parameter of `definitionForRelationInSchema()`.
 
@@ -411,7 +413,10 @@ For callers of `definitionForRelationInSchema()`, the four optional arrays still
 
 Context typing compares the placeholder's type with the type a fresh run would generate under the current settings. An old interval-domain `string` stays text. An edit to `db.PostgresInterval` matches the new default, so shortcut JSON becomes text. Switching back to `intervalsTypedAsObjects: false` preserves an existing object placeholder. [Compare your placeholder with fresh output](#regenerate-for-7-0). For a missing `db` import, [add the import](/custom-types#when-a-placeholder-does-not-compile).
 
-To restore the 6.x raw type of a domain over an enum array, set both `domainsTypedByContext` and `enumArraysTypedAsText` to `false`.
+Compare nested domains with fresh placeholders against your 6.x settings.
+
+- Over an enum array, the raw type changes from `any` (6.x defaults) or a label array (all 6.x fixes enabled) to `string`. Write back the shortcut JSON array, or set `enumArraysTypedAsText: false` for an array-returning parser. For a direct domain over the array, that setting alone restores the 6.x raw placeholder type.
+- Over `numeric[]`, the raw type narrows from `any` (6.x defaults) to `db.NumericString[]`, already its type with 6.x context typing. The default `pg` parser reads numeric elements as numbers. Treat the raw element as `unknown` and check `typeof value === 'number'` before using it as a number. The placeholder also types shortcut JSON, where `NaN` is a string. Use `number[]` only if every read context returns one-dimensional arrays of non-null numbers.
 
 ### Roll back to pgcast 6.x {#roll-back-to-6-x}
 
@@ -441,6 +446,6 @@ The holes that each release's security fixes closed are open again ([Fixes by re
 
 ## See also
 
-- [Opt-ins and warnings](/runtime-config#opt-ins-and-warnings): each option, its warning and when it warns.
+- [Read the 6.x warnings](#read-the-warnings) to find the call that triggers each code.
 - [Versions](/versions): why pgcast fixes some things outright and others behind an option.
 - [Security](/security): why a name or a `raw()` value can no longer splice SQL.

@@ -96,7 +96,7 @@ The keys pgcast adds are optional, so a `Config` written for Zapatos 6.6.1 still
 | [`transactionRequiresCommit`](#Config.transactionRequiresCommit) | `true` | a `COMMIT` that Postgres answers with `ROLLBACK`: reject, not resolve | at each `transaction()` |
 | [`transactionRequiresIdleClient`](#Config.transactionRequiresIdleClient) | `true` | reject before `START TRANSACTION` only if your unmarked client reports `T` or `E` both before and after the empty query. Without a status, the call proceeds | at each `transaction()` given such a client |
 | [`transactionRequiresSatisfyingLevel`](#Config.transactionRequiresSatisfyingLevel) | `true` | the client of a transaction at a level that doesn't satisfy the one asked for: reject, not run the callback at that level | at each `transaction()` given such a client |
-| [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow) | `false` | a `selectExactlyOne()` run on its own: `LIMIT 2`, and a second row rejects | at each `selectExactlyOne()` |
+| [`selectExactlyOneChecksForSecondRow`](#Config.selectExactlyOneChecksForSecondRow) | `false` | a standalone `selectExactlyOne()` requests two rows and rejects on a second | at each `selectExactlyOne()` |
 | [`aggregatesTypedByColumn`](#Config.aggregatesTypedByColumn) | `true` | `sum()`, `avg()`, `min()` and `max()`: `null` when no row matches, and `min()` and `max()` the column's value, not `Number()` of it | at each `run()` of those |
 | [`queryListener`](#Config.queryListener) | none | called with each query `run()` sends | at each `run()` |
 | [`resultListener`](#Config.resultListener) | none | called with each result `run()` gives | at each `run()` |
@@ -173,6 +173,8 @@ A string cast wins, the value still JSON text: `param({ a: 1 }, 'jsonb')` gives 
 
 ### `upsertRequiresSameKeys` {#Config.upsertRequiresSameKeys}
 
+From 7.0.0. The default is now `true`.
+
 ```ts
 upsertRequiresSameKeys?: boolean  // default: true
 ```
@@ -183,6 +185,8 @@ With `false`, the missing key can overwrite the stored value without a warning. 
 
 ### `undefinedMeansMissing` {#Config.undefinedMeansMissing}
 
+From 7.0.0. The default is now `true`.
+
 ```ts
 undefinedMeansMissing?: boolean  // default: true
 ```
@@ -190,6 +194,8 @@ undefinedMeansMissing?: boolean  // default: true
 With `true`, an `undefined` value in [`insert()`](/insert#insert), [`update()`](/insert#update) and [`upsert()`](/insert#upsert) is a missing key: `DEFAULT` in `insert()`, left out of `update()` and `upsert()`, its `updateValues` included. With `false`, it is sent as `NULL` (in `updateValues`, set from `EXCLUDED`), as in Zapatos 6.6.1, without a warning. The SQL of each: [An `undefined` value](/insert#undefined-values).
 
 ### `transactionRequiresCommit` {#Config.transactionRequiresCommit}
+
+From 7.0.0. The default is now `true`.
 
 ```ts
 transactionRequiresCommit?: boolean  // default: true
@@ -205,6 +211,8 @@ With `false`, it resolves quietly with the callback result. See [Let the error t
 - Not tested with `pg-native`.
 
 ### `transactionRequiresIdleClient` {#Config.transactionRequiresIdleClient}
+
+From 7.0.0. The default is now `true`.
 
 ```ts
 transactionRequiresIdleClient?: boolean  // default: true
@@ -227,6 +235,8 @@ With `false`, it skips the status recheck and sends `START TRANSACTION` without 
 
 ### `transactionRequiresSatisfyingLevel` {#Config.transactionRequiresSatisfyingLevel}
 
+From 7.0.0. The default is now `true`.
+
 ```ts
 transactionRequiresSatisfyingLevel?: boolean  // default: true
 ```
@@ -248,10 +258,10 @@ With `false`, an insufficient level also passes through without a warning.
 selectExactlyOneChecksForSecondRow?: boolean  // default: false, in 7.0 too
 ```
 
-With `true`, a [`selectExactlyOne()`](/select#selectExactlyOne) run on its own asks for two rows, `LIMIT $2`<!-- probe: (db.setConfig({ selectExactlyOneChecksForSecondRow: true }), db.selectExactlyOne('films', { id: 1000 })) --> with `2`, and `.run()` rejects with a [`NotExactlyOneError`](/select#NotExactlyOneError) when a second row comes: "One result expected but more returned (hint: check `.query.compile()` on this Error)"<!-- message -->. Off, it asks for one, `LIMIT 1`, and gives the first row that matches, as in Zapatos 6.6.1.
+With the check enabled and `withTies` off, a [`selectExactlyOne()`](/select#selectExactlyOne) run on its own asks for two rows, `LIMIT $2`<!-- probe: (db.setConfig({ selectExactlyOneChecksForSecondRow: true }), db.selectExactlyOne('films', { id: 1000 })) --> with `2`, and `.run()` rejects with a [`NotExactlyOneError`](/select#NotExactlyOneError) when a second row comes: "One result expected but more returned (hint: check `.query.compile()` on this Error)"<!-- message -->. With both off, it asks for one, `LIMIT 1`, and gives the first row that matches, as in Zapatos 6.6.1.
 
-- Nested in another query, in a `lateral` or a `sql` template, it keeps `LIMIT 1`, option or not: a second row there would join the parent row twice. "On its own" is how the query is compiled: `.run()` and `.compile()` compile it alone, a parent query compiles it as part of its own SQL.
-- A [`.copy()`](/sql-template#copy) of it compiles as nested, so it keeps `LIMIT 1`, run on its own too.
+- Nested in a `lateral` or a `sql` template, or copied with [`.copy()`](/sql-template#copy), it requests one row.
+- [`withTies: true`](/select#order-limit-offset-and-withties) compiles each limit as `FETCH FIRST … ROWS WITH TIES`. A nested query can return all ties. A standalone copy still requests one row plus ties and rejects with `NotExactlyOneError` if it gets a second row with the check enabled.
 - With a [`lock`](/select#lock), `LIMIT $2` locks the second row too: after `.run()` rejects, both rows stay locked until the transaction ends, and another session's `FOR UPDATE NOWAIT` on either gets 55P03.
 - Off, it never warns, and it stays off in 7.0: "at least one row" is how Zapatos reads `selectExactlyOne()`, nested in a `lateral` on a `NOT NULL` foreign key ([decision 003](https://github.com/AlexandreDemartin/pgcast/blob/master/docs/decisions/003-fixes-and-deprecation.md)).
 - Read when `selectExactlyOne()` is called, not at `.run()`.
@@ -262,7 +272,7 @@ With `true`, a [`selectExactlyOne()`](/select#selectExactlyOne) run on its own a
 aggregatesTypedByColumn?: boolean  // default: true
 ```
 
-From 7.0, by default, [`sum()`](/select#sum), [`avg()`](/select#avg), [`min()`](/select#min) and [`max()`](/select#max) give `null` when no row matches, and `min()` and `max()` give the column's value as `pg` reads it: with the default parsers, a `Date` for a finite `timestamptz` and a string for `text` or an enum. The SQL doesn't change, nor does [`count()`](/select#count).
+From 7.0.0. By default, [`sum()`](/select#sum), [`avg()`](/select#avg), [`min()`](/select#min) and [`max()`](/select#max) give `null` when no row matches, and `min()` and `max()` give the column's value as `pg` reads it: with the default parsers, a `Date` for a finite `timestamptz` and a string for `text` or an enum. The SQL doesn't change, nor does [`count()`](/select#count).
 
 With `false`, `.run()` applies `Number()` to the result. An empty set gives `0`, a finite date read as a `Date` gives its epoch milliseconds and non-numeric text gives `NaN`. This setting runs silently through 7.x and goes in 8.0.
 
@@ -441,7 +451,7 @@ From 7.0, the generator enables [`domainsTypedByContext`](/generator#generate.do
 
 In pgcast 6.7.0, a programmatic generator could send `PGCAST_DEP006` through [`warningListener`](/generator#generate.warningListener) before exiting on a database error. From 7.0, [`rejectOnQueryError`](/generator#generate.rejectOnQueryError) defaults to `true`. Explicit `false` keeps the immediate exit without a migration note.
 
-Node emits each migration warning once per process and names the option in its message. For example, in pgcast 6.7.0 a rolled-back commit produced this warning on `stderr`:
+In 6.x Node emits each [migration warning](/switching#read-the-warnings) once per process and names the option in its message. For example, in pgcast 6.7.0 a rolled-back commit produced this warning on `stderr`:
 
 ```txt
 (node:4242) [PGCAST_DEP003] DeprecationWarning: transaction() resolved, but Postgres answered its COMMIT with ROLLBACK: a query failed and the callback caught the error, so nothing was saved. Set transactionRequiresCommit: true (db.setConfig) to reject instead; it will be the default in pgcast 7.0.
@@ -477,10 +487,10 @@ process.on('warning', (warning: Error & { code?: string }) => {
 | `tsrange`, `tstzrange`, `daterange` | [`DateRangeString`](#DateRangeString) | `DateRangeString` | `DateRangeString` |
 | `json`, `jsonb` | [`JSONValue`](#JSONValue) | `JSONValue` | `JSONValue` |
 
-- An array column takes the array of its item's type: `int8[]` gives `Int8String[]` in a `Selectable`.
+- In a `Selectable`, `int8[]` gives `Int8String[]`. A raw [enum array](/generator#generate.enumArraysTypedAsText) is text by default.
 - With the generator's [`customJSONParsingForLargeNumbers`](/generator#generate.customJSONParsingForLargeNumbers), `int8` and `numeric` are `number | Int8String` and `number | NumericString` in a `JSONSelectable` ([`enableCustomJSONParsingForLargeNumbers()`](#enableCustomJSONParsingForLargeNumbers)).
 - The shortcuts return `JSONSelectable`s. A `Selectable` is what `pg` returns for a plain `SELECT` of the row.
-- A domain follows its base type in each context while its placeholder holds the generated type ([`DomainInContext`](#DomainInContext)). [`domainsTypedByContext: false`](/generator#generate.domainsTypedByContext) uses the placeholder. A direct domain over an enum array also needs `enumArraysTypedAsText: false` to use that type in raw rows. For interval domains, `intervalsTypedAsObjects` determines the type of a fresh placeholder.
+- A domain follows its base type in each context while its placeholder holds the generated type ([`DomainInContext`](#DomainInContext)). [`domainsTypedByContext: false`](/generator#generate.domainsTypedByContext) uses the placeholder, except in raw rows for a [direct domain over an enum array](/switching#domain-and-parser-types). There, `enumArraysTypedAsText: false` alone restores the placeholder. For interval domains, `intervalsTypedAsObjects` determines the type of a fresh placeholder.
 - An `interval` gives a [`PostgresInterval`](#PostgresInterval) in `Selectable`, a `string` in JSON and `string | PostgresInterval` in a write. With [`intervalsTypedAsObjects: false`](/generator#generate.intervalsTypedAsObjects), all five interfaces use `string`.
 
 Each type checks the shape of a string, not its value: `'2030-13-45'` is a `DateString`.
