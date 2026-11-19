@@ -305,7 +305,7 @@ To keep a 6.x write behaviour through 7.x, set its option to `false` in `db.setC
 
 One more opt-in, [`selectExactlyOneChecksForSecondRow`](/runtime-config#Config.selectExactlyOneChecksForSecondRow), has no warning to look for, and stays off in 7.0. With it, a `selectExactlyOne()` run on its own rejects on a second row, not only on none. Turn it on where your tests show no `selectExactlyOne()` matching two rows.
 
-The generator has opt-ins of its own, each to be the default in 7.0. The warning of each but `rejectOnQueryError` is a note from `npx zapatos`, not your tests.
+In 6.x, run `npx zapatos` to see which generator options would change the types for your schema.
 
 The note of [`typeEnumsAcrossSchemas`](/generator#generate.typeEnumsAcrossSchemas) names each column whose type is an enum of another schema, and that enum, typed until then as `any` or as the enum of the same name in the relation's schema:
 
@@ -323,7 +323,7 @@ The note of [`enumArraysTypedAsText`](/generator#generate.enumArraysTypedAsText)
 
 The note of [`intervalsTypedAsObjects`](/generator#generate.intervalsTypedAsObjects) names each column of `interval`, `interval[]` or a domain over either, which the generator types as its text, though `pg` returns an object from a query of your own. Turn it on and regenerate: `tsc` shows the code that read such a column from a `sql` query as a string, which ran only with a type parser of your own. If you set one, `pg.types.setTypeParser(1186, …)`, write `false` instead, which keeps the text with no note, in 7.0 too.
 
-The note of [`rejectOnQueryError`](/generator#generate.rejectOnQueryError) comes from a script that calls `generate()`, when a query fails, never from `npx zapatos`, which always exits. Turn it on where the script awaits `generate()`, and read what its `catch` does: a refused connection now reaches it, and a script that logs the error and carries on exits with code 0, not 1.
+In 6.x, a script calling `generate()` could print `PGCAST_DEP006` just before exiting on a database error. In 7.0, the promise rejects and your `catch` runs. If the script must fail, rethrow the error or set `process.exitCode = 1`. To keep the immediate exit, set [`rejectOnQueryError: false`](/generator#generate.rejectOnQueryError). This choice remains available beyond 8.0. The CLI always prints the error and exits with code 1.
 
 ## Go back
 

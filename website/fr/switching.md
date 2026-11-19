@@ -306,7 +306,7 @@ Pour garder un comportement d’écriture de la 6.x pendant toute la 7.x, passez
 
 Un opt-in de plus, [`selectExactlyOneChecksForSecondRow`](/fr/runtime-config#Config.selectExactlyOneChecksForSecondRow), n’a pas d’avertissement à guetter, et reste désactivé dans la 7.0. Avec lui, un `selectExactlyOne()` exécuté seul est rejeté sur une deuxième ligne, pas seulement sur aucune. Activez-le là où vos tests ne montrent aucun `selectExactlyOne()` qui trouve deux lignes.
 
-Le générateur a des opt-ins qui lui sont propres, chacun appelé à devenir le comportement par défaut dans la 7.0. L’avertissement de chacun, sauf `rejectOnQueryError`, est une note de `npx zapatos`, pas de vos tests.
+En 6.x, lancez `npx zapatos` pour voir quelles options du générateur changeraient les types de votre schéma.
 
 La note de [`typeEnumsAcrossSchemas`](/fr/generator#generate.typeEnumsAcrossSchemas) nomme chaque colonne dont le type est un enum d’un autre schéma, et cet enum, typé jusque-là comme `any` ou comme l’enum du même nom dans le schéma de la relation :
 
@@ -324,7 +324,7 @@ La note d’[`enumArraysTypedAsText`](/fr/generator#generate.enumArraysTypedAsTe
 
 La note d’[`intervalsTypedAsObjects`](/fr/generator#generate.intervalsTypedAsObjects) nomme chaque colonne de type `interval` ou `interval[]`, ou d’un domaine sur l’un ou l’autre, que le générateur type par son texte, bien que `pg` renvoie un objet pour une requête à vous. Activez-le et régénérez : `tsc` montre le code qui lisait une telle colonne depuis une requête `sql` comme une chaîne, ce qui ne marchait qu’avec un parser de types à vous. Si vous en avez réglé un, `pg.types.setTypeParser(1186, …)`, écrivez plutôt `false`, qui garde le texte sans note, en 7.0 aussi.
 
-La note de [`rejectOnQueryError`](/fr/generator#generate.rejectOnQueryError) vient d’un script qui appelle `generate()`, quand une requête échoue, jamais de `npx zapatos`, qui s’arrête toujours. Activez-le là où le script attend `generate()` avec `await`, et relisez ce que fait son `catch` : une connexion refusée y arrive désormais, et un script qui logge l’erreur puis continue se termine avec le code 0, pas 1.
+En 6.x, un script qui appelait `generate()` pouvait afficher `PGCAST_DEP006` juste avant de s’arrêter sur une erreur de base de données. En 7.0, la promesse est rejetée et votre bloc `catch` s’exécute. Si le script doit échouer, relancez l’erreur ou fixez `process.exitCode = 1`. Pour conserver l’arrêt immédiat, réglez [`rejectOnQueryError: false`](/fr/generator#generate.rejectOnQueryError). Ce choix reste possible au-delà de la 8.0. La CLI affiche toujours l’erreur et quitte avec le code 1.
 
 ## Revenir en arrière {#go-back}
 

@@ -51,7 +51,7 @@ Then it ends with the cause:
 | not valid JSON | `JSON.parse`'s message, which depends on the input and on Node: on Node 22, `Unexpected end of JSON input` for an empty file, `No number after minus sign in JSON at position 1 (line 1 column 2)` for `-x`, `Expected double-quoted property name in JSON at position 15 (line 1 column 16)` for a trailing comma |
 | a variable is not set | `Environment variable 'DATABASE_URL' is not set` |
 
-A query that fails, the connection included, ends it with code 1, after `*** error <n> ***` and the error, as in Zapatos 6.6.1: it sets [`rejectOnQueryError`](#generate.rejectOnQueryError) to `false` over the file and the argument.
+If a connection or query fails, the CLI prints `*** error <n> ***` and the error to stdout, then exits with code 1. Both CLI names set [`rejectOnQueryError`](#generate.rejectOnQueryError) to `false` over the config file and the JSON argument, including with `--check`.
 
 ### Environment variables {#environment-variables}
 
@@ -108,7 +108,7 @@ if (!upToDate) process.exitCode = 1;
 
 - It takes the config of [`generate()`](#generate), and resolves to `true` when every file matches. The exit code is yours to set.
 - It prints only through the listeners: a line per file that differs or is missing through [`warningListener`](#generate.warningListener), so with `console.log` by default; `The generated files in src/zapatos are up to date.` through [`progressListener`](#generate.progressListener). Not the CLI's last line, `Run the generator without --check to write them.`
-- A failed query rejects it with the error, before writing anything and with no note: unlike `generate()`, only [`rejectOnQueryError: false`](#generate.rejectOnQueryError) ends the process.
+- A failed query rejects the promise with the original error. Set [`rejectOnQueryError: false`](#generate.rejectOnQueryError) to print it and exit with code 1.
 
 ## `generate()` {#generate}
 
@@ -133,7 +133,7 @@ await generate({
 
 - It opens a `pg.Pool` of its own on `config.db`, and ends it before resolving.
 - It sends only `SELECT`s, on `information_schema` and `pg_catalog`: one for the relations of each schema, one for its enums, then two per relation, its columns and its unique indexes, and one for the enums of each other schema a column's type comes from (`pg_catalog` included).
-- A query that fails, the connection included, prints `*** error <n> ***` and the error with `console.log`, then ends the process with `process.exit(1)`, as in Zapatos 6.6.1. The promise never settles, so a `try`/`catch` around it does not run. With [`rejectOnQueryError`](#generate.rejectOnQueryError), it rejects with that error instead.
+- A connection or query error rejects the promise before any files are written. You can catch the original `pg` error or set [`rejectOnQueryError: false`](#generate.rejectOnQueryError) to keep the 6.x exit.
 - Other errors reject it: a write that fails (`ENOTDIR: not a directory, mkdir 'afile/zapatos'` when `outDir` is a file), a malformed [rule](#generate.schemas).
 - At run time, a key it doesn't know is ignored: an old `srcMode`, a misspelt `outdir`. In TypeScript, an object literal with one fails to compile (TS2353, or TS2561 with a suggestion for a near-miss such as `outdir`).
 - `zapatos/generate` also exports `Config` and the functions `generate()` is built from (`tsForConfig()`, `definitionForRelationInSchema()` and others), with no entry here.
@@ -156,7 +156,7 @@ Every option is optional. Each one given replaces its default whole: `schemas` w
 | [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas) | `false` | the type of an enum of another schema |
 | [`enumOrder`](#generate.enumOrder) | `"alphabetical"` | the order of an enum's labels |
 | [`moduleNames`](#generate.moduleNames) | `"zapatos"` | the module names the files declare and import, and their folder |
-| [`rejectOnQueryError`](#generate.rejectOnQueryError) | none: exits, with a note | whether a failed query rejects, or ends the process |
+| [`rejectOnQueryError`](#generate.rejectOnQueryError) | `true` | whether a failed query rejects, or ends the process |
 | [`uniqueIndexConstraintsOnly`](#generate.uniqueIndexConstraintsOnly) | `false` | the names in each relation's `UniqueIndex` |
 | [`domainsTypedByContext`](#generate.domainsTypedByContext) | `false` | the type of a domain over `bigint`, `numeric`, `bytea`, `money` or a date, or over an array of one, outside `Selectable`, and of a domain over a domain or an array of a domain |
 | [`enumArraysTypedAsText`](#generate.enumArraysTypedAsText) | none: an array, with a note | the `Selectable` type of an array of an enum |
@@ -392,24 +392,22 @@ import type * as s from 'pgcast/schema';
 
 ### `rejectOnQueryError` {#generate.rejectOnQueryError}
 
-`boolean`, or left out; an opt-in. What a failed query does: a refused connection, a wrong password, a query Postgres refuses.
+`boolean`, default `true` from 7.0. With the option omitted, set to `null` in JSON, or set to `true`, a failed connection or query rejects `generate()`, `tsForConfig()` and [`check()`](#export-check) with the original error. The generator prints no error or migration note, and writes no files.
 
-- Left out, or `null`: as in Zapatos 6.6.1, the generator prints `*** error <n> ***` and the error with `console.log`, then ends the process with `process.exit(1)`; in between, it notes the option through [`warningListener`](#generate.warningListener). From 7.0, left out means `true` ([Versions](/versions)). [`check()`](#export-check), which Zapatos 6.6.1 doesn't have, reads it as `true` already, with no note.
-- `false`: the same exit, with no note, from `generate()` and `check()` alike. It stays in 7.0 and 8.0: the exit is [the CLI](#cli)'s own path, and the CLI sets `false` over its config file and its argument.
-- `true`: rejects `generate()` or `check()` with that error, as `pg` gives it, and prints nothing:
+Set `rejectOnQueryError: false` to print `*** error <n> ***` and the error to stdout, then end the process with code 1 before the promise settles. This is a permanent option and the one [the CLI](#cli) uses.
+
+If generation must fail the job, rethrow the error or set the exit code in your handler.
 
 ```ts twoslash
 import { generate } from 'zapatos/generate';
 // ---cut---
 try {
-  await generate({ db: { connectionString: process.env.DATABASE_URL }, outDir: './src', rejectOnQueryError: true });
+  await generate({ db: { connectionString: process.env.DATABASE_URL }, outDir: './src' });
 } catch (err) {
   console.error('types not regenerated:', err);  // ECONNREFUSED, or a pg DatabaseError
+  process.exitCode = 1;
 }
 ```
-
-- It rejects before writing anything: the files of the last run stay as they are.
-- A `warningListener` that throws at the note still ends in the exit.
 
 ### `uniqueIndexConstraintsOnly` {#generate.uniqueIndexConstraintsOnly}
 
@@ -605,8 +603,6 @@ Writing custom types file: src/zapatos/custom/index.d.ts
   - from [the CLI](#cli), before generating, when the folder it runs in has both files;
 - `Note: flag --chek ignored after the JSON argument: only --check may follow it.`
   - from [the CLI](#cli), before generating or checking, for each argument after `config` that starts with `--` except `--` and `--check`;
-- `Note: a query failed, so generate() ends the process with process.exit(1), and its promise never settles (PGCAST_DEP006). Set rejectOnQueryError: true to reject with the error instead; it will be the default in pgcast 7.0.`
-  - from `generate()` without [`rejectOnQueryError`](#generate.rejectOnQueryError), when a query fails, after the error and just before the exit;
 - the [old layout warning](#the-old-layout-warning);
 - `Out of date: src/zapatos/schema.d.ts` and `Missing: src/zapatos/custom/PgSeat_label.d.ts`
   - from [`check()`](#export-check), for each file that differs or is missing, after the notes of a run.
