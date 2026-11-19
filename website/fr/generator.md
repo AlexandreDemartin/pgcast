@@ -322,7 +322,7 @@ billing: number;
 
 ### `typeEnumsAcrossSchemas` {#generate.typeEnumsAcrossSchemas}
 
-La valeur par défaut de la 7.0, `true`, s’applique si la clé est absente ou vaut `null` après fusion. L’argument JSON conserve la valeur du fichier pour toute clé omise. Le générateur cherche l’enum dans son propre schéma et écrit ses labels. La valeur `false` rétablit la recherche par nom dans le schéma de la relation, comme en 6.x.
+La valeur par défaut de la 7.0, `true`, s’applique si la clé est absente ou vaut `null` dans la configuration fusionnée. Pour chaque clé omise dans l’argument JSON, la valeur du fichier est conservée. Le générateur cherche l’enum dans son propre schéma et écrit ses labels. La valeur `false` rétablit la recherche par nom dans le schéma de la relation, comme en 6.x.
 
 ```sql
 CREATE SCHEMA archive;
@@ -338,12 +338,12 @@ CREATE TABLE prints (id int PRIMARY KEY, format archive.print_format NOT NULL, f
 | `keeper` | `crew_job \| null` : les labels de `public.crew_job` | `('projectionist' \| 'archivist') \| null` |
 
 - Les labels sont écrits en toutes lettres, pas nommés : le schéma de l’enum n’a pas besoin d’être dans [`schemas`](#generate.schemas). Dans l’ordre d’[`enumOrder`](#generate.enumOrder), comme pour chaque enum.
-- Le générateur reconnaît les enums d’autres schémas par leur nom et peut donc mal typer la colonne si un type natif ou le type tableau associé à un autre type Postgres porte ce nom.
-- Un domaine sur un tel enum reste un type personnalisé, `c.<name>`. Si aucun autre type ne partage son nom de placeholder, un nouveau placeholder reçoit les labels sans import, même quand une relation du schéma de l’enum utilise aussi ce domaine. Un placeholder existant n’est jamais écrasé.
+- Le générateur reconnaît les enums d’autres schémas par leur nom et peut donc attribuer un type incorrect à la colonne si un type natif ou le type tableau associé à un autre type Postgres porte ce nom.
+- Un domaine sur un tel enum reste un type personnalisé, `c.<name>`. Si le nom du placeholder est propre à ce domaine, le générateur y écrit les labels sans import à la première génération, même quand une relation du schéma de l’enum utilise aussi ce domaine. Un placeholder existant n’est jamais écrasé.
 
 ### `enumOrder` {#generate.enumOrder}
 
-La valeur par défaut de la 7.0, `"declared"`, s’applique si la clé est absente ou vaut `null` après fusion. L’argument JSON conserve la valeur du fichier pour toute clé omise. Les labels suivent l’ordre de déclaration de l’enum, celui que Postgres utilise pour `ORDER BY`, les comparaisons et `enum_range()`. La valeur `"alphabetical"` rétablit le tri alphabétique de la 6.x.
+La valeur par défaut de la 7.0, `"declared"`, s’applique si la clé est absente ou vaut `null` dans la configuration fusionnée. Pour chaque clé omise dans l’argument JSON, la valeur du fichier est conservée. Les labels suivent l’ordre de déclaration de l’enum, celui que Postgres utilise pour `ORDER BY`, les comparaisons et `enum_range()`. La valeur `"alphabetical"` rétablit le tri alphabétique de la 6.x.
 
 ```sql
 CREATE TYPE crew_job AS ENUM ('director', 'writer', 'editor', 'cinematographer', 'composer');
@@ -355,7 +355,7 @@ CREATE TYPE crew_job AS ENUM ('director', 'writer', 'editor', 'cinematographer',
 | `every.crew_job` | `['cinematographer', 'composer', 'director', 'editor', 'writer']` | `['director', 'writer', 'editor', 'cinematographer', 'composer']` |
 
 - Un label ajouté par `ALTER TYPE … ADD VALUE … BEFORE` ou `AFTER` prend sa place dans cet ordre, tel que le donne `enum_range()`.
-- Pour TypeScript, seul `every.<name>` change : une union est le même type dans n’importe quel ordre. Avec [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas), les labels écrits pour un enum d’un autre schéma suivent cet ordre, y compris dans le nouveau placeholder d’un domaine si aucun autre type ne partage son nom de placeholder.
+- Pour TypeScript, seul `every.<name>` change : une union est le même type dans n’importe quel ordre. Avec [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas), les labels d’un enum d’un autre schéma suivent cet ordre. Il en va de même dans un placeholder généré pour la première fois si son nom est propre au domaine.
 - Avec toute autre valeur, le générateur s’arrête avant la première requête et n’écrit aucun fichier. Il signale l’erreur `enumOrder must be 'declared' (the default) or 'alphabetical', not 'declard'`. TypeScript refuse aussi cette valeur (TS2322, ou TS2820 avec une suggestion pour une valeur proche comme `"declard"`).
 
 ### `moduleNames` {#generate.moduleNames}
@@ -481,7 +481,7 @@ ALTER TABLE seat_bookings ADD COLUMN vip_ticket vip_ticket_no, ADD COLUMN ticket
 
 - `false` les type tous deux par leur placeholder, `any`, dans les cinq interfaces, comme Zapatos 6.6.1.
 - `pg` parse un domaine sur un domaine selon le type de base de son domaine le plus intérieur, mais renvoie un tableau d’un domaine sous forme de texte, faute de connaître le type de ce tableau : de même pour un domaine sur un tel tableau, directement ou à travers d’autres domaines. Un tableau d’un domaine sur un tableau reste `any`, de même qu’un domaine sur celui-ci, ou qu’un type de base que le générateur ne sait pas traduire, tel que `point`.
-- Pour un domaine imbriqué ou un tableau de domaines dont le type de base est un enum, le générateur écrit le nom de cet enum s’il est défini dans le schéma de la relation, et ses labels s’il est défini ailleurs. Ce comportement vaut quel que soit le réglage de [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas) et écarte tout homonyme. Un domaine défini directement sur un enum d’un autre schéma garde son placeholder dans les cinq interfaces. Si aucun autre type ne partage son nom de placeholder, un nouveau placeholder contient par défaut les labels de cet enum. Avec `typeEnumsAcrossSchemas: false`, il contient l’enum du même nom dans le schéma de la relation, ou `any` si ce schéma n’en contient aucun.
+- Pour un domaine imbriqué ou un tableau de domaines dont le type de base est un enum, le générateur écrit le nom de cet enum s’il est défini dans le schéma de la relation, et ses labels s’il est défini ailleurs. Ce comportement vaut quel que soit le réglage de [`typeEnumsAcrossSchemas`](#generate.typeEnumsAcrossSchemas) et écarte tout homonyme. Un domaine défini directement sur un enum d’un autre schéma garde son placeholder dans les cinq interfaces. Si le placeholder est généré pour la première fois et que son nom est propre au domaine, son contenu dépend de `typeEnumsAcrossSchemas`. Par défaut, il contient les labels de cet enum. Avec `false`, il contient l’enum du même nom dans le schéma de la relation, ou `any` si ce schéma n’en contient aucun.
 - Un placeholder que vous modifiez garde son type dans les cinq, `unknown` compris. Un placeholder modifié vers `any` compte comme laissé tel que généré : écrivez `unknown`, ou laissez l’option désactivée, pour garder une telle colonne non typée.
 - `false` signale, via [`warningListener`](#generate.warningListener), chacune de ces colonnes, dans une note à part.
 

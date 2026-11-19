@@ -128,7 +128,7 @@ Pour `arrayContains()`, `arrayContainedIn()` et `arrayOverlaps()` (`c = db.condi
 
 Avec les réglages par défaut de la 7.0, un enum d’un autre schéma fournit ses propres labels, même si un enum du schéma de la relation porte le même nom. Le tuple `every.<name>` suit l’ordre de déclaration des labels dans Postgres. Régénérez les types et lancez `tsc` pour repérer les écritures qui utilisent des labels invalides et le code qui dépend de la position d’un label.
 
-- Dans un nouveau dossier, le générateur omet de `zapatos/custom` les placeholders d’enums d’autres schémas comme `PgStatus` et `Pg_mood`. Les fichiers existants restent sur disque, mais leurs colonnes ne les utilisent plus. Remplacez chaque import par le type de la colonne, par exemple `products.Selectable['status']`, ou réglez `typeEnumsAcrossSchemas: false` en 7.x.
+- Lorsque vous générez les types dans un nouveau dossier, les placeholders d’enums d’autres schémas, comme `PgStatus` et `Pg_mood`, sont absents de `zapatos/custom`. Les fichiers existants restent sur disque, mais leurs colonnes ne les utilisent plus. Remplacez chaque import par le type de la colonne, par exemple `products.Selectable['status']`, ou réglez `typeEnumsAcrossSchemas: false` en 7.x.
 - Un type composite d’un autre schéma qui porte le nom d’un enum local reçoit désormais son propre placeholder. Donnez-lui le type que renvoie votre parser, ou réglez `typeEnumsAcrossSchemas: false` en 7.x.
 - Si vous passez le tableau `columnsTypedByEnumName` à `definitionForRelationInSchema()`, seul le réglage `typeEnumsAcrossSchemas: false` le remplit.
 
